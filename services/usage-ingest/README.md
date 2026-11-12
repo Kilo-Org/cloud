@@ -31,6 +31,33 @@ auth returns 401. Invalid JSON/schema returns 400, requests or serialized events
 over 120,000 bytes return 413, and enqueue failure returns a generic 503.
 Unrelated paths return 404; other methods on `/usage` return 405.
 
+Authenticated `POST /enkrypt-usage` accepts one bare Enkrypt usage record that
+parses under `EnkryptUsageWriteSchema` and sends exactly one
+`{kind: 'enkrypt_usage', v: 1, record}` message to the same `USAGE_INGEST_QUEUE`.
+The path names the kind, so this ingress is the only place that builds the
+envelope; an envelope-shaped body, an LLM usage body, or any other unknown key
+returns 400, and an Enkrypt record on `/usage` returns 400. It uses the same
+`USAGE_INGEST_PUBLISH_SECRET`, checked before the body is read, because the
+gateway is the only Enkrypt producer and already holds it. Bodies over 8,192
+bytes return 413; other statuses and the `usage_ingest_rejected`,
+`usage_ingest_enqueue_start` and `usage_ingest_enqueue` events match `/usage`,
+with an added `usage_kind: "enkrypt_usage"`. Body read and send failures also
+log `error_name`, never the error message. Enkrypt schema rejections log only
+issue codes and top-level schema field names. Deploy the consumer that routes tagged Enkrypt
+messages before this ingress, and this ingress before any gateway publishes to it.
+
+Authenticated `POST /exa-usage` works the same way for Exa: it accepts one bare record that
+parses under `ExaUsageRecordSchema` and sends exactly one `{kind: 'exa_usage', v: 1, record}`
+message to the same queue. An envelope-shaped body, an LLM usage body, an Enkrypt record or
+any other unknown key returns 400, and an Exa record on `/usage` or `/enkrypt-usage` returns 400.
+The organization id stays a strict UUID, as the Exa contract defines. It uses the same
+`USAGE_INGEST_PUBLISH_SECRET`, checked before the body is read. The web app, the only Exa
+producer, already holds `INTERNAL_API_SECRET`, which writes usage directly to the writer
+routes, so also holding the publish secret adds little. The 8,192-byte cap, statuses and logs
+match `/enkrypt-usage`, with `usage_kind: "exa_usage"`. Schema rejections name top-level
+fields, but Exa log values never include the user, organization, path, cost, feature, type or
+`occurredAt`. See [Exa usage rollout](#exa-usage-rollout).
+
 | Environment | Worker | Producer and consumer queue | DLQ (no consumer) |
 |---|---|---|---|
 | Production (top-level config) | `usage-ingest` | `usage-ingest-processing-eu` | `usage-ingest-processing-dlq-eu` |
@@ -143,7 +170,64 @@ successful processing; missing configuration retries instead of discarding usage
 The shared helper makes one attempt with a 160-second timeout. HTTP 200
 `not_recorded`, malformed or mismatched acknowledgements, redirects, and transport
 failures are unavailable outcomes. Responses are limited to 4 KiB; helper logs
-contain only the usage ID and categorical outcome or HTTP status.
+contain only the usage ID, the usage kind for tagged writes, categorical outcome or
+HTTP status, and for a caught transport, parse or stream failure its error name
+(never its message). An unread error body is released; if that release fails, the
+helper logs `usage writer response release failed` with the usage ID, usage kind
+and error name only, and the write outcome is unchanged. A body that was already
+read is not released again.
+
+### Tagged Enkrypt and Exa usage
+
+The same queue can also carry Enkrypt guardrail usage and Exa usage. Such a message is a
+tagged envelope: `{"kind":"enkrypt_usage","v":1,"record":<EnkryptUsageWrite>}`
+(`EnkryptUsageQueueMessageSchema` in `@kilocode/usage-contracts`) or
+`{"kind":"exa_usage","v":1,"record":<ExaUsageRecord>}` (`ExaUsageQueueMessageSchema`).
+LLM usage stays untagged and unchanged; its ingress schema strips unknown keys, so a body
+with its own `kind` key is always a tagged message. The gateway produces Enkrypt messages
+only through `/enkrypt-usage`, behind a default-off flag; see
+[Enkrypt usage rollout](#enkrypt-usage-rollout). Exa messages come only through
+`/exa-usage`, and only as a fallback after a failed direct write; see
+[Exa usage rollout](#exa-usage-rollout).
+
+The consumer reads the tag before anything else:
+
+| Body | Writer call | ACK on | Retry on |
+|---|---|---|---|
+| Untagged | Existing LLM writer at `USAGE_WRITER_URL` | Unchanged | Unchanged |
+| `enkrypt_usage`, `v: 1`, valid record | `/api/internal/enkrypt-usage/record` with `x-usage-write-source: queue` | `recorded` or `duplicate` whose `usageId` equals `record.id` | Any other response, including a wrong or missing id echo, HTTP 429 and 503 |
+| `exa_usage`, `v: 1`, valid record | `/api/internal/exa-usage/record` with `x-usage-write-source: queue` | `recorded` or `duplicate` whose `usageId` equals `record.id` | Any other response, including a wrong or missing id echo, HTTP 429 and 503 |
+| `enkrypt_usage` or `exa_usage`, `v: 1`, invalid record or extra key | None | Never | Conservative retry (`invalid_event`) |
+| Any other `kind`, or another `v` | None | Never | Conservative retry (`unsupported_kind`) |
+
+A message that never ACKs exhausts the shared 20-retry budget and goes to the DLQ,
+so the DLQ can hold all three kinds. A recognized admission 429 takes the admission
+retry schedule, and HTTP 429/503 rejects the invocation, exactly as for LLM usage.
+The invocation launch budget is shared. Consumer settings are unchanged. On the
+writer, these queue writes take the `non_llm` admission class described under
+[writer admission protection](#writer-admission-protection); its ceiling rejection
+is a recognized `queue_limit` 429.
+
+The Enkrypt and Exa writer URLs are `USAGE_WRITER_URL` with its documented
+`/api/internal/usage/record` suffix replaced by the kind's path, so no new
+variable is needed. If `USAGE_WRITER_URL` is missing or does not end with that
+suffix, tagged messages retry as `missing_config` without network I/O. The writer
+credential, bypass and 160-second timeout are shared.
+
+Tagged messages add `usage_kind` to `usage_ingest_handler_entry`,
+`usage_ingest_processing` and the writer helper logs (`usageKind` there):
+`enkrypt_usage`, `exa_usage`, or `unknown` for an unrecognized tag (the raw tag is
+not logged). Untagged LLM logs keep exactly their existing fields, so filter LLM-only
+counts with a missing `usage_kind`. Tagged logs carry only the usage id and kind: no
+payer, user, session, cost or `occurredAt`-derived age.
+
+Deploy order: this consumer first, then the ingress, then the producer with its
+flag off. Never roll the consumer back to a version that does not route a kind
+while messages of that kind may be in flight or retrying: such a consumer retries
+them as invalid or unsupported events and they reach the DLQ after 20 retries. In
+particular, never roll back to a consumer from before Exa routing while Exa
+messages may be queued. To stop tagged traffic, turn the producer flag off and let
+the consumer drain.
 
 ## Observability
 
@@ -193,6 +277,50 @@ ID, categorical reason and failed attempt number before each retry. `usage accou
 persistence completion. This is not durable recovery: unaccepted events may be
 lost, and ambiguous failures may still be recorded later by the consumer. For
 unselected events, the existing SFO handoff-to-local fallback remains unchanged.
+
+### Publisher attempt timing
+
+The Cloudflare HTTP publisher writes one `usage_publisher_attempt` JSON line at
+`info` level for each attempt that completes. It adds no request, retry, timeout,
+budget or response change. Fields, with times in milliseconds from
+`performance.now()`:
+
+| Field | Meaning |
+|---|---|
+| `usage_id`, `execution_region` | The published usage ID and Vercel function region, as on the other publisher logs |
+| `usage_kind` | `enkrypt_usage` on Enkrypt publications to `/enkrypt-usage`, whose `usage_id` is the Enkrypt record id; omitted for LLM usage, as on the other publisher logs |
+| `attempt`, `max_attempts` | 1-based attempt number; `max_attempts` is 4 with retries and 1 for a single-attempt call |
+| `accepted` | The attempt received HTTP 202 |
+| `attempt_end` | `response_headers`, `timeout` (its abort signal fired) or `network_error` |
+| `http_status` | The actual status, only when `attempt_end` is `response_headers` |
+| `reason` | The existing categorical reason (`http_<status>`, `timeout`, `request_failed`) when not accepted |
+| `duration_ms` | Just before `fetch` to response headers, or to the error or abort reaching the publisher. It includes local scheduling delay and never waits for the body |
+| `timeout_ms` | The abort window this attempt used, after clipping to the remaining budget |
+| `remaining_budget_ms` | Retries only: what was left of the 40 s budget when the attempt started |
+| `start_offset_ms` | Publication start, after serialization when the budget clock starts, to this attempt's start |
+| `prior_backoff_planned_ms`, `prior_backoff_elapsed_ms` | Later attempts only: the jittered sleep chosen and the measured sleep. Elapsed above planned is timer or runtime delay |
+| `sample_rate` | `0.01` for a sampled fast acceptance, otherwise `1` |
+
+Coverage: an attempt that was not accepted, any attempt after the first, and any
+attempt that took at least 1,000 ms are always logged. A first attempt accepted in
+under 1,000 ms is logged only when a stable hash of its usage ID falls in a nominal
+1% bucket, the same method as the consumer's delivery baseline. That is at most one
+line per attempt, four per publication, and about 1% of publications plus every
+slow, failed or retried attempt. The rows are not a uniform sample: weight fast
+rows by `1 / sample_rate` and do not read either subset as population percentiles.
+An attempt cut off by a process kill writes nothing. Configuration failures and the
+Vercel queue transport make no attempt and log nothing new. If writing the line
+throws, the publisher reports a Sentry warning tagged `usage_publisher_attempt_log`
+and the publication continues with its existing outcome.
+
+To join a publication to ingress, select these lines by `usage_id` and the
+`usage_ingest_enqueue_start`, `usage_ingest_enqueue` and
+`usage_ingest_enqueue_observed` events with the same `usage_id`. Each attempt that
+reached the Worker has its own ingress start. Order them by time but do not
+subtract timestamps across hosts as exact durations. Enkrypt attempts join the
+`/enkrypt-usage` start and enqueue events on both `usage_id` and `usage_kind`. An
+accepted attempt is queue acceptance only; for LLM usage `usage_record_completion`
+is the persistence signal.
 
 `duration_ms` covers the shared persistence call and its awaited follow-up work,
 not pure SQL time. `event_age_ms` retains the original event timestamp across
@@ -332,19 +460,23 @@ retries, mixed histories, consumed attempts, scheduling and retention affect the
 actual lifecycle. Increasing the configured count does not reset existing attempts.
 
 Deploy and verify this retry consumer **before merging/deploying default-on
-writer admission PR #9241**. Merging both ahead of one deployment is insufficient:
-the production workflow promotes web before Workers. That rollout kept pool 10,
-batch 6/par 2, consumer cap 200 and exposure unchanged; admission is per-runtime
-and does not establish aggregate database capacity for larger settings.
+writer admission PR #9241**. Merging both ahead of one deployment is insufficient
+while the consumer is not yet live: production deploys Workers beside the Vercel
+stage-and-promote chain, so the graph does not order this service's deploy ahead
+of the promotion. Confirm the deploy of this service finished before relying on
+the promoted release. That rollout kept pool 10, batch 6/par 2, consumer cap 200
+and exposure unchanged; admission is per-runtime and does not establish aggregate
+database capacity for larger settings.
 
 Persistent failures still reach the configured DLQ after the finite retry budget;
-a DLQ is a recovery queue, not proof the payload is poison. Before guard rollout,
-verify actual source/DLQ retention, alerting, replay ownership, and a controlled
-stable-ID reconciliation/replay procedure. This change performs no hosted
-retention or DLQ readback. A safe rollback must **not lower retries back to 3 while
-higher-attempt messages remain outstanding**, because their next failure could
-immediately dead-letter them. Preserve stable IDs and reconcile ambiguous writes
-before replay; do not republish to reset attempts or discard accepted events.
+a DLQ is a recovery queue, not proof the payload is poison. DLQ retention is
+enforced at Cloudflare's maximum of 14 days (1209600 seconds); see
+[Retention](#retention). Before guard rollout, verify alerting, replay ownership,
+and a controlled stable-ID reconciliation/replay procedure. A safe rollback must
+**not lower retries back to 3 while higher-attempt messages remain outstanding**,
+because their next failure could immediately dead-letter them. Preserve stable IDs
+and reconcile ambiguous writes before replay; do not republish to reset attempts
+or discard accepted events.
 
 The isolated staging Vercel queue keeps its own retry settings; it shares only the
 bounded writer-response classification. No new environment knob or worker binding
@@ -402,9 +534,23 @@ batch size at 6 in production and 2 in staging; retry settings also stay unchang
 There is no new environment knob; merging this change activates queue rejection
 when the normal automatic deployment reaches the writer.
 
+Queue writes to the Enkrypt writer (`/api/internal/enkrypt-usage/record`) and the Exa
+writer (`/api/internal/exa-usage/record`) use the same guard and the same shared limit,
+as writer class `non_llm`; Enkrypt and Exa share that one class. That class has
+its own ceiling inside the shared limit: `max(1, min(2, limit - 1))`, currently
+**2 of 8**. A `non_llm` call over the ceiling gets the same HTTP 429 body with
+reason `queue_limit` and is not written. Its active plus queued calls never exceed
+the ceiling, so it cannot fill the FIFO either. LLM queue writes can still use all
+8 slots; the ceiling only stops non-LLM writes from taking more than 2. When the
+shared limit is 1 (pool maximum 3 or less), the ceiling is 1 and a non-LLM call
+can take the only slot. The total limit is unchanged. Like the shared limit, this
+is a per-runtime counter, not a connection reservation, and it makes no
+fleet-wide fairness claim.
+
 `usage_writer_admission` diagnostics sample admitted decisions at 1% and warn on
 all rejected decisions. Fields contain only the bounded caller/outcome/reason,
-active count/limit, pool gauges/max, and sample rate; diagnostic failures cannot
+`writer_class` (`queue` or `non_llm`), active count/limit, `active_non_llm` and
+`non_llm_limit`, pool gauges/max, and sample rate; diagnostic failures cannot
 change admission or persistence results.
 
 The source policy remains finite: initial delivery plus up to **20 retries**
@@ -463,9 +609,11 @@ route, retry delay/budget and per-message dispositions.
 
 ## Deploy
 
-The existing `.github/workflows/deploy-workers.yml` discovers this service for
-production and staging deployments. Production's scheduled workflow can deploy
-merged changes automatically; deployment authorization and all
+The `detect-changes` job of `.github/workflows/deploy-workers.yml` discovers
+this service for production and staging deployments. Each deploy workflow calls
+that workflow once for detection, as soon as it holds the baseline, and a second
+time to deploy the matrix the detection call returns. Production's scheduled
+workflow can deploy merged changes automatically; deployment authorization and all
 [production prerequisites](eu-queues.md#production-merge-gate)
 must be satisfied before merge. There is no guaranteed manual deployment window.
 To deploy it individually when separately authorized, dispatch that
@@ -474,7 +622,8 @@ or `staging`.
 
 Normal production and staging CI prepare their selected EU queues before Worker upload.
 It reads queue names from `wrangler.jsonc`, creates missing resources with
-explicit `jurisdiction: "eu"`, and verifies/reuses existing EU resources.
+explicit `jurisdiction: "eu"`, and verifies/reuses existing EU resources. It keeps
+the selected DLQ at maximum message retention ([Retention](#retention)).
 Unknown jurisdiction or lookup/API errors stop deployment. Both consumer upload
 attempts disable Wrangler's global auto-provisioning for EU selections. Staging
 continues direct HTTP to its writer; production also uses its direct Frankfurt writer. The preparation step also detaches the obsolete
@@ -515,17 +664,96 @@ routes or preview URLs are configured. The consumer is attached to each environm
 The Worker has no direct database connection; the authenticated writer owns persistence. See
 [Wrangler automatic provisioning](https://developers.cloudflare.com/workers/wrangler/configuration/#automatic-provisioning).
 
+## Enkrypt usage rollout
+
+The gateway sends Enkrypt guardrail usage through this queue only when the
+`kilocode-ai-gateway` variable `ENKRYPT_USAGE_QUEUE_ENABLED` is exactly `true`; see
+`ENVIRONMENT.md`. It posts the bare Enkrypt usage record to `/enkrypt-usage` on the
+same Worker as `/usage`, and the ingress wraps it in the tagged queue envelope.
+
+Deploy in this order. Each step must be deployed and verified before the next:
+
+1. The gateway accepts an optional `usageId` in Enkrypt handoff replies.
+2. The web app's Enkrypt usage route echoes `usageId` and takes queue writer admission.
+3. The writer's small non-LLM admission class, the consumer that routes tagged Enkrypt
+   messages, and the `/enkrypt-usage` ingress. Nothing posts to the ingress before step 4.
+4. The gateway producer, with the flag off.
+5. The flag on. Frankfurt and SFO pick it up with the same gateway deployment; that is not
+   an atomic cutover, because a rolling deployment can briefly overlap old and new settings.
+
+Rollback: set the flag to anything other than `true` and redeploy the gateway. New Enkrypt
+usage then takes the direct path again, and the consumer drains what the queue already
+accepted. Never roll the consumer back to an LLM-only version while tagged Enkrypt messages
+may still be in the source queue or in flight: they would fail every retry and reach the DLQ.
+
+Human-only steps, before the flag is turned on:
+
+- name a replay owner for the now-mixed DLQ, with a replay that handles both LLM and Enkrypt
+  messages;
+- confirm the existing DLQ alerting covers it;
+- set the flag on `kilocode-ai-gateway` and redeploy.
+
+## Exa usage rollout
+
+Exa usage keeps its direct Frankfurt write as the normal path. The queue is only a durable
+fallback: when the direct write fails, the web app posts the same bare record, with the same
+`id` and `occurredAt`, to `/exa-usage`, and the ingress wraps it in the tagged envelope. The
+Exa writer is idempotent by the `id`/`occurredAt` pair, so a queued copy of a write that did
+commit returns `duplicate` and makes no second debit; a replay must keep both values. The
+producer is a separate change behind the
+`kilocode-app` flag `EXA_USAGE_QUEUE_FALLBACK_ENABLED`; until it lands with the flag on,
+nothing sends Exa messages.
+
+Deploy in this order. Each step must be deployed and verified before the next:
+
+1. This Worker's consumer that routes tagged Exa messages and its `/exa-usage` ingress, and
+   the web app's Exa writer taking the `non_llm` admission class for queue writes. They ship
+   together and nothing posts to the ingress yet. The production Worker deploy is not
+   ordered against the Vercel promotion, so confirm both before step 2.
+2. The web app producer, with the flag off.
+3. The flag on.
+
+Rollback: set the flag to anything other than `true` and redeploy the web app. Failed direct
+writes then stop publishing, and the consumer drains what the queue already accepted. Never
+roll the consumer back to a version without Exa routing while Exa messages may still be in
+the source queue or in flight: they would fail every retry and reach the DLQ.
+
+Human-only steps, before the flag is turned on:
+
+- give `kilocode-app` the ingress address and the existing `USAGE_INGEST_PUBLISH_SECRET`;
+  no new Worker secret is needed;
+- name a replay owner for the mixed DLQ, with a replay that handles LLM, Enkrypt and Exa
+  messages;
+- confirm the existing DLQ alerting covers it;
+- set the flag on `kilocode-app` and redeploy.
+
 ## Retention
 
-The retention target is **four days (345600 seconds)** for each source queue and
-DLQ. Retention is managed separately from `wrangler.jsonc`; the pinned Wrangler
-schema does not expose it. Update a queue using its name from the table above:
+Each selected DLQ keeps messages for **14 days (1209600 seconds)**, Cloudflare's
+maximum. Retention is a property of the queue resource, and `wrangler.jsonc`
+cannot set it, so the queue preparation helper enforces it as
+`DLQ_MESSAGE_RETENTION_SECONDS`. It creates a missing DLQ with that retention. For
+an existing DLQ, it raises lower retention with a PATCH that resends the other
+queue settings unchanged, then reads the queue back and stops deployment on any
+mismatch. Retention at or above the value is left alone, so it is never lowered.
+Jurisdiction, consumers and messages are not touched.
 
-```bash
-pnpm --filter cloudflare-usage-ingest exec wrangler queues update <queue-name> --message-retention-period-secs 345600
-```
+The value is applied by CI's preparation step on the next usage-ingest deployment
+of each environment, and every later deployment keeps it at the maximum. Merging
+does not change a live queue. To read it back, open **Queues** in the Cloudflare
+dashboard, select the DLQ from the table above, and check the message retention
+period on its **Settings** tab. The read-only API equivalent is
+`result.settings.message_retention_period` from
+`GET /accounts/{account_id}/queues/{queue_id}`.
 
-See [queue settings](https://developers.cloudflare.com/queues/configuration/configure-queues/).
+Source queues keep Cloudflare's default of four days (345600 seconds), which the
+helper does not change. That is far longer than the source retry window: 20
+retries at the 60-second `retry_delay`, and under nine hours even if all 21
+deliveries ran for the 15-minute invocation limit with the 600-second maximum
+handled retry delay.
+
+See [queue settings](https://developers.cloudflare.com/queues/configuration/configure-queues/#queue-configuration)
+and [limits](https://developers.cloudflare.com/queues/platform/limits/).
 
 ## Verify locally
 

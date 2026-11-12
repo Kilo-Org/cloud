@@ -71,7 +71,7 @@ describe('buildFrameEnv', () => {
     expect(result.secretEnvKeys).toEqual(['DATABASE_URL']);
   });
 
-  it('deletes an org id a secret added when the uncontained spec did not carry it', () => {
+  it('deletes an org id a secret added when the spec did not carry it', () => {
     const result = buildFrameEnv({
       specEnv: {},
       encryptedSecrets: { KILOCODE_ORGANIZATION_ID: secret('org-from-secret') },

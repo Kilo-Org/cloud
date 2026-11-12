@@ -1,5 +1,7 @@
 import { ABUSE_CLASSIFICATION, GatewayApiKindSchema } from './schema-types';
 import { z } from 'zod';
+import type { EnkryptUsageQueueMessage } from './enkrypt';
+import type { ExaUsageQueueMessage } from './exa';
 
 export { ABUSE_CLASSIFICATION, GatewayApiKindSchema } from './schema-types';
 export type { AbuseClassification, GatewayApiKind } from './schema-types';
@@ -8,18 +10,26 @@ export {
   EXA_USAGE_FEATURE_ID_MAX_LENGTH,
   EXA_USAGE_TYPE_MAX_LENGTH,
   EXA_USAGE_WRITE_PATH,
+  ExaUsageQueueMessageSchema,
   ExaUsageRecordSchema,
   ExaUsageWriteResponseSchema,
   isExaAllowedPath,
 } from './exa';
-export type { ExaAllowedPath, ExaUsageRecord, ExaUsageWriteResponse } from './exa';
+export type {
+  ExaAllowedPath,
+  ExaUsageQueueMessage,
+  ExaUsageRecord,
+  ExaUsageWriteResponse,
+} from './exa';
 export {
   ENKRYPT_USAGE_WRITE_PATH,
+  EnkryptUsageQueueMessageSchema,
   EnkryptUsageWriteResponseSchema,
   EnkryptUsageWriteSchema,
   MAX_ENKRYPT_CREDITS_PER_CALL,
 } from './enkrypt';
 export type {
+  EnkryptUsageQueueMessage,
   EnkryptUsageWrite,
   EnkryptUsageWriteInput,
   EnkryptUsageWriteResponse,
@@ -161,6 +171,14 @@ export const UsageRecordRequestSchema = z.object({
 });
 
 export type UsageRecordRequest = z.infer<typeof UsageRecordRequestSchema>;
+
+/** The LLM body on the shared usage queue stays an untagged request for wire compatibility. */
+export type LlmUsageQueueMessage = UsageRecordRequest;
+
+export type UsageQueueMessage =
+  | LlmUsageQueueMessage
+  | EnkryptUsageQueueMessage
+  | ExaUsageQueueMessage;
 
 /**
  * `duplicate` means the usage row already existed, so this delivery was a retry

@@ -1,7 +1,12 @@
-import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { type ChatComposerControl } from '@/components/agents/chat-composer';
+import {
+  CREDITS_DELIVERY_REASON,
+  type MessageDeliveryStatement,
+} from '@/components/agents/message-failure-state';
+import { CREDITS_FAILURE_KEY } from '@/lib/chat/backend-target';
 import { type ChatState, type Displaced } from '@/lib/chat/state';
 import { askedMessageId, displacedMessageId } from '@/lib/chat/turns';
 
@@ -39,8 +44,9 @@ function onTheirWay(state: Pick<ChatState, 'askedFrom' | 'waiting'>): ReadonlySe
 /** What a bubble of a chat is handed: its details, and for an unanswered question, its recovery. */
 type BubbleActions = {
   onLongPressDetails: (message: StoredMessage) => void;
-  deliveryState?: MessageDeliveryState;
+  deliveryState?: MessageDeliveryStatement;
   onRetryMessage?: () => void;
+  onAddCredits?: () => void;
   onCopyToComposer?: (text: string) => void;
 };
 
@@ -54,6 +60,11 @@ type BubbleActions = {
  * the slot keeps the recovery it had there. A chat asks only that last question
  * again, so no other message offers a Retry.
  *
+ * A send the account's balance refused is the exception: the question states
+ * that cause and offers Add credits and Copy to composer, and no Retry, because
+ * asking again meets the same balance. `addCredits` opens where credit is
+ * bought; the words come back through Copy to composer once it is added.
+ *
  * The slot's question is found by its identifier rather than by being last: what
  * was typed while its answer failed waits under it. A question asked again is
  * one bubble at the place it was said, so the slot's identifier is that bubble
@@ -65,36 +76,53 @@ export function useChatMessageActions(
     'sessionId' | 'status' | 'asked' | 'askedFrom' | 'displaced' | 'waiting' | 'failureKey'
   >,
   messages: readonly StoredMessage[],
-  retry: (displaced?: Displaced) => Promise<void>
+  recovery: {
+    readonly retry: (displaced?: Displaced) => Promise<void>;
+    readonly addCredits: () => void;
+  }
 ) {
+  const { retry, addCredits } = recovery;
   const composerControlRef = useRef<ChatComposerControl | null>(null);
   const [detailsId, setDetailsId] = useState<string | null>(null);
   const unanswered = slotBubbleId(state);
   // A question whose answer failed says so, and the row under the transcript
-  // says why. A question with no failure was stopped.
+  // says why. A question with no failure was stopped, and one the balance
+  // refused states that cause instead of a generic failure.
   const stopped = state.failureKey === null;
-  const delivery = useMemo<MessageDeliveryState>(
-    () => ({ status: 'failed', error: '', reason: stopped ? 'interrupted' : 'execution' }),
-    [stopped]
-  );
+  const credits = state.failureKey === CREDITS_FAILURE_KEY;
+  const delivery = useMemo<MessageDeliveryStatement>(() => {
+    if (stopped) {
+      return { status: 'failed', error: '', reason: 'interrupted' };
+    }
+    return {
+      status: 'failed',
+      error: '',
+      reason: credits ? CREDITS_DELIVERY_REASON : 'execution',
+    };
+  }, [credits, stopped]);
   /* Each kept question with how it ended, by the identifier its bubble carries.
      A failed answer says the response failed; a question the person stopped
-     reads as interrupted, as the slot's own question does while it holds it. */
+     reads as interrupted, as the slot's own question does while it holds it.
+     The cause it failed with travels with it, so a send the balance refused
+     keeps its statement and its Add credits where it was said. */
   const kept = useMemo(
     () =>
       new Map(
-        state.displaced.map(question => [
-          displacedMessageId(state.sessionId, question.id),
-          {
-            question,
-            delivery: {
-              status: 'failed' as const,
-              error: '',
-              reason:
-                question.outcome === 'failed' ? ('execution' as const) : ('interrupted' as const),
-            },
-          },
-        ])
+        state.displaced.map(question => {
+          const refused = question.failureKey === CREDITS_FAILURE_KEY;
+          const statement: MessageDeliveryStatement =
+            question.outcome === 'failed'
+              ? {
+                  status: 'failed',
+                  error: '',
+                  reason: refused ? CREDITS_DELIVERY_REASON : 'execution',
+                }
+              : { status: 'failed', error: '', reason: 'interrupted' };
+          return [
+            displacedMessageId(state.sessionId, question.id),
+            { question, refused, statement },
+          ];
+        })
       ),
     [state.displaced, state.sessionId]
   );
@@ -120,9 +148,15 @@ export function useChatMessageActions(
         return {
           onLongPressDetails: openDetails,
           deliveryState: delivery,
-          onRetryMessage: () => {
-            void retry();
-          },
+          /* A refused send carries the action that settles it instead of a Retry
+             that would meet the same balance. */
+          ...(credits
+            ? { onAddCredits: addCredits }
+            : {
+                onRetryMessage: () => {
+                  void retry();
+                },
+              }),
           onCopyToComposer: copyToComposer,
         };
       }
@@ -132,16 +166,22 @@ export function useChatMessageActions(
       if (earlier !== undefined && !asking.has(earlier.question.id)) {
         return {
           onLongPressDetails: openDetails,
-          deliveryState: earlier.delivery,
-          onRetryMessage: () => {
-            void retry(earlier.question);
-          },
+          deliveryState: earlier.statement,
+          /* A kept question the balance refused offers the action that settles
+             it, as it did in the slot; every other kept question keeps Retry. */
+          ...(earlier.refused
+            ? { onAddCredits: addCredits }
+            : {
+                onRetryMessage: () => {
+                  void retry(earlier.question);
+                },
+              }),
           onCopyToComposer: copyToComposer,
         };
       }
       return { onLongPressDetails: openDetails };
     },
-    [asking, copyToComposer, delivery, kept, openDetails, retry, unanswered]
+    [addCredits, asking, copyToComposer, credits, delivery, kept, openDetails, retry, unanswered]
   );
 
   // A message can leave the transcript while its details are open: a model
@@ -150,7 +190,7 @@ export function useChatMessageActions(
   const shown = messages.find(message => message.info.id === detailsId) ?? null;
   const shownSlot = shown !== null && shown.info.id === unanswered ? delivery : undefined;
   const shownKept = shown === null || shownSlot !== undefined ? undefined : kept.get(shown.info.id);
-  const detailsDelivery = shownSlot ?? shownKept?.delivery;
+  const detailsDelivery = shownSlot ?? shownKept?.statement;
   return {
     composerControlRef,
     hasUnanswered: unanswered !== undefined,

@@ -350,6 +350,19 @@ describe('/cloud-agent-fork/review/[reviewId]', () => {
       expect(response.status).toBe(303);
     });
 
+    it('returns the confirmation page when the request names no addressed host', async () => {
+      const response = await submitFixSession(REVIEW_ID, {
+        origin: 'https://kilo.test',
+        host: null,
+        secFetchSite: 'same-origin',
+      });
+
+      expect(response.status).toBe(303);
+      expectConfirmationRedirect(response, 'invalid_origin');
+      expect(mockCreateTRPCContext).not.toHaveBeenCalled();
+      expectNoSessionCreation();
+    });
+
     it('rejects invalid UUIDs without authenticating, loading reviews, or creating sessions', async () => {
       const response = await submitFixSession('not-a-uuid');
 

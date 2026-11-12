@@ -2,7 +2,12 @@
 
 import { useId } from 'react';
 import { Box, TriangleAlert } from 'lucide-react';
-import type { SelectableSandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
+import {
+  getSandboxAllocationRequest,
+  type SandboxDestination,
+  type SelectableSandboxAllocation,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import { useComputePrice } from '@/hooks/useComputePrice';
 import {
   Select,
   SelectContent,
@@ -32,6 +37,8 @@ type SandboxSelectProps = {
   noneLabel: string;
   /** What `noneLabel` resolves to. Shown beside it so the default is not a mystery. */
   noneDescription?: DefaultSandboxDescription;
+  /** The sandbox `noneLabel` resolves to, so its compute price can be shown. */
+  noneDestination?: SandboxDestination;
   labelledBy: string;
   disabled: boolean;
   className?: string;
@@ -45,6 +52,7 @@ export function SandboxSelect({
   unavailableReason,
   noneLabel,
   noneDescription,
+  noneDestination,
   labelledBy,
   disabled,
   className,
@@ -52,9 +60,14 @@ export function SandboxSelect({
   onChange,
 }: SandboxSelectProps) {
   const noteId = useId();
+  const priceOf = useComputePrice();
+  const nonePrice = priceOf(noneDestination);
   const options = withSavedChoice(choices, value, unavailableReason);
   const selected = options.find(choice => choice.allocation === value);
   const warning = selected?.unavailableReason;
+  const selectedPrice = selected
+    ? priceOf(getSandboxAllocationRequest(selected.allocation))
+    : nonePrice;
 
   // Nothing to choose from and nothing saved: show where sessions run instead
   // of a control that cannot be used.
@@ -93,8 +106,9 @@ export function SandboxSelect({
                   {selected?.instance ?? noneLabel}
                 </span>
                 {layout === 'detailed' && (selected?.provider || noneDescription) && (
-                  <span className="text-muted-foreground block text-xs leading-5">
+                  <span className="text-muted-foreground block text-xs leading-5 tabular-nums">
                     {selected?.provider ?? noneDescription?.summary}
+                    {selectedPrice && ` · ${selectedPrice}`}
                   </span>
                 )}
               </span>
@@ -105,9 +119,9 @@ export function SandboxSelect({
           <SelectItem value={NONE} textValue={noneLabel}>
             <span className="block min-w-0 py-1">
               <span className="block">{noneLabel}</span>
-              {noneDescription && (
+              {(noneDescription || nonePrice) && (
                 <span className="text-muted-foreground block text-xs tabular-nums">
-                  {noneDescription.summary}
+                  {[noneDescription?.summary, nonePrice].filter(Boolean).join(' · ')}
                 </span>
               )}
             </span>
@@ -116,19 +130,24 @@ export function SandboxSelect({
           {groupChoicesByProvider(options).map(group => (
             <SelectGroup key={group.provider}>
               <SelectLabel>{group.provider}</SelectLabel>
-              {group.choices.map(choice => (
-                <SelectItem
-                  key={choice.allocation}
-                  value={choice.allocation}
-                  textValue={choice.instance}
-                  disabled={!!choice.unavailableReason}
-                >
-                  <span className="tabular-nums">{choice.instance}</span>
-                  {choice.unavailableReason && (
-                    <span className="text-muted-foreground"> · Unavailable</span>
-                  )}
-                </SelectItem>
-              ))}
+              {group.choices.map(choice => {
+                const price = choice.unavailableReason
+                  ? 'Unavailable'
+                  : priceOf(getSandboxAllocationRequest(choice.allocation));
+                return (
+                  <SelectItem
+                    key={choice.allocation}
+                    value={choice.allocation}
+                    textValue={choice.instance}
+                    disabled={!!choice.unavailableReason}
+                  >
+                    <span className="tabular-nums">
+                      {choice.instance}
+                      {price && <span className="text-muted-foreground"> · {price}</span>}
+                    </span>
+                  </SelectItem>
+                );
+              })}
             </SelectGroup>
           ))}
         </SelectContent>

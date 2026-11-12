@@ -521,8 +521,37 @@ describe('getAuthorizedOrgContext', () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.nextResponse.status).toBe(403);
+      expect(result.denial).toEqual({
+        status: 403,
+        reason: 'support_access_not_allowlisted',
+        isPlatformAdmin: true,
+      });
       await expect(result.nextResponse.json()).resolves.toMatchObject({
         code: 'support_access_not_allowlisted',
+      });
+    }
+  });
+
+  test('when on, a non-member admin without a grant gets a grant-required denial', async () => {
+    enableSupportAccess(true);
+    const admin = await insertTestUser({ is_admin: true });
+
+    const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
+      getUserFromAuthOverride: async () => ({ user: admin, authFailedResponse: null }),
+      surface: 'server-component',
+      supportKey: '/api/organizations/[id]/defaults',
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.nextResponse.status).toBe(403);
+      expect(result.denial).toEqual({
+        status: 403,
+        reason: 'support_grant_required',
+        isPlatformAdmin: true,
+      });
+      await expect(result.nextResponse.json()).resolves.toMatchObject({
+        code: 'support_grant_required',
       });
     }
   });
@@ -556,6 +585,11 @@ describe('getAuthorizedOrgContext', () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.nextResponse.status).toBe(503);
+        expect(result.denial).toEqual({
+          status: 503,
+          reason: 'support_grant_lookup_failed',
+          isPlatformAdmin: true,
+        });
         await expect(result.nextResponse.json()).resolves.toMatchObject({
           code: 'support_grant_lookup_failed',
         });

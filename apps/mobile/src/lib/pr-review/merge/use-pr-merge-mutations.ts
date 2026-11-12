@@ -36,9 +36,9 @@ import { announceForA11y } from '@/lib/a11y/announce';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import {
+  type GitHubPrRef,
   type ProviderPrPlatform,
   type ProviderPrScope,
-  type ProviderPrTriple,
   providerPrTriple,
 } from '@/lib/pr-review/provider-pr-ref';
 import {
@@ -281,10 +281,15 @@ export function useMergePullRequestMutation(ref: ReviewWriteRef) {
   });
 }
 
-export function useUpdateBranchMutation(ref: ProviderPrTriple) {
+/**
+ * Update the branch from its base. The procedure and its caches are GitHub's,
+ * so the hook takes a GitHub pull request ref: a GitLab or Bitbucket ref, or a
+ * provider-neutral triple, does not type-check into this arm.
+ */
+export function useUpdateBranchMutation(ref: GitHubPrRef) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const keys = useMergeKeys({ ref: { platform: 'github', ...ref }, organizationId: null });
+  const keys = useMergeKeys({ ref, organizationId: null });
 
   return useMutation(
     trpc.githubPrReview.updateBranch.mutationOptions({

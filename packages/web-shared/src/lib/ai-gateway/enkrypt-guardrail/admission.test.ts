@@ -24,6 +24,22 @@ const inputGuardrail: OrganizationSettings = {
   enkrypt: { input_guardrail: { enabled: true } },
 };
 
+const groupId = '00000000-0000-4000-8000-000000000003';
+const otherGroupId = '00000000-0000-4000-8000-000000000004';
+
+const groupInputGuardrail: OrganizationSettings = {
+  kilo_encrypt: true,
+  enkrypt: { input_guardrail: { enabled: true, group_id: groupId } },
+};
+
+function noGroups(): Promise<readonly string[]> {
+  return Promise.resolve([]);
+}
+
+function memberOf(...groupIds: string[]) {
+  return jest.fn((): Promise<readonly string[]> => Promise.resolve(groupIds));
+}
+
 function account(settings: OrganizationSettings, balanceMicrodollars: number) {
   return {
     settings,
@@ -42,7 +58,11 @@ describe('admitEnkryptGuardrail', () => {
   });
 
   it('admits a funded organization with its input guardrail', async () => {
-    const admission = await admitEnkryptGuardrail(organizationCaller, account(inputGuardrail, 1));
+    const admission = await admitEnkryptGuardrail(
+      organizationCaller,
+      account(inputGuardrail, 1),
+      noGroups
+    );
 
     expect(admission).toEqual({
       kind: 'admitted',
@@ -59,7 +79,8 @@ describe('admitEnkryptGuardrail', () => {
     async balance => {
       const admission = await admitEnkryptGuardrail(
         organizationCaller,
-        account(inputGuardrail, balance)
+        account(inputGuardrail, balance),
+        noGroups
       );
 
       expect(admission.kind).toBe('rejected');
@@ -73,13 +94,16 @@ describe('admitEnkryptGuardrail', () => {
 
   it('rejects when every input detector is log-only', async () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
-    detectors.injection_attack.enabled = false;
     const settings: OrganizationSettings = {
       kilo_encrypt: true,
       enkrypt: { input_guardrail: { enabled: true, detectors } },
     };
 
-    const admission = await admitEnkryptGuardrail(organizationCaller, account(settings, 0));
+    const admission = await admitEnkryptGuardrail(
+      organizationCaller,
+      account(settings, 0),
+      noGroups
+    );
 
     expect(admission.kind).toBe('rejected');
   });
@@ -98,17 +122,23 @@ describe('admitEnkryptGuardrail', () => {
       },
     };
 
-    expect((await admitEnkryptGuardrail(organizationCaller, account(settings, 0))).kind).toBe(
-      'rejected'
+    expect(
+      (await admitEnkryptGuardrail(organizationCaller, account(settings, 0), noGroups)).kind
+    ).toBe('rejected');
+    expect(await admitEnkryptGuardrail(organizationCaller, account(settings, 1), noGroups)).toEqual(
+      {
+        kind: 'admitted',
+        inputGuardrail: null,
+      }
     );
-    expect(await admitEnkryptGuardrail(organizationCaller, account(settings, 1))).toEqual({
-      kind: 'admitted',
-      inputGuardrail: null,
-    });
   });
 
   it('rejects a caller without a payer row', async () => {
-    const admission = await admitEnkryptGuardrail(organizationCaller, { settings: inputGuardrail });
+    const admission = await admitEnkryptGuardrail(
+      organizationCaller,
+      { settings: inputGuardrail },
+      noGroups
+    );
 
     expect(admission.kind).toBe('rejected');
   });
@@ -116,7 +146,11 @@ describe('admitEnkryptGuardrail', () => {
   it('returns a retryable response while an organization top-up is in flight', async () => {
     mockedIsAutoTopUpInFlight.mockResolvedValue(true);
 
-    const admission = await admitEnkryptGuardrail(organizationCaller, account(inputGuardrail, 0));
+    const admission = await admitEnkryptGuardrail(
+      organizationCaller,
+      account(inputGuardrail, 0),
+      noGroups
+    );
 
     expect(admission.kind).toBe('rejected');
     if (admission.kind !== 'rejected') return;
@@ -139,9 +173,123 @@ describe('admitEnkryptGuardrail', () => {
       settings: inputGuardrail,
     },
   ])('admits $name regardless of balance', async ({ caller, settings }) => {
-    const admission = await admitEnkryptGuardrail(caller, account(settings, 0));
+    const admission = await admitEnkryptGuardrail(caller, account(settings, 0), noGroups);
 
     expect(admission).toEqual({ kind: 'admitted', inputGuardrail: null });
     expect(mockedIsAutoTopUpInFlight).not.toHaveBeenCalled();
+  });
+
+  describe('input guardrail limited to a group', () => {
+    it('applies to a member of the group', async () => {
+      const memberGroupIds = memberOf(otherGroupId, groupId);
+
+      const admission = await admitEnkryptGuardrail(
+        organizationCaller,
+        account(groupInputGuardrail, 1),
+        memberGroupIds
+      );
+
+      expect(admission).toEqual({
+        kind: 'admitted',
+        inputGuardrail: {
+          organizationId: 'org-1',
+          kiloUserId: 'user-1',
+          config: expect.objectContaining({ status: 'ready' }),
+        },
+      });
+      expect(memberGroupIds).toHaveBeenCalledTimes(1);
+    });
+
+    it('still requires organization credits from a member of the group', async () => {
+      const admission = await admitEnkryptGuardrail(
+        organizationCaller,
+        account(groupInputGuardrail, 0),
+        memberOf(groupId)
+      );
+
+      expect(admission.kind).toBe('rejected');
+    });
+
+    it('does not apply to, or require credits from, a member outside the group', async () => {
+      const admission = await admitEnkryptGuardrail(
+        organizationCaller,
+        account(groupInputGuardrail, 0),
+        memberOf(otherGroupId)
+      );
+
+      expect(admission).toEqual({ kind: 'admitted', inputGuardrail: null });
+      expect(mockedIsAutoTopUpInFlight).not.toHaveBeenCalled();
+    });
+
+    it('still requires credits from a member outside the group while an output guardrail is on', async () => {
+      const settings: OrganizationSettings = {
+        kilo_encrypt: true,
+        enkrypt: {
+          input_guardrail: { enabled: true, group_id: groupId },
+          output_guardrail: {
+            enabled: true,
+            detectors: {
+              ...createEmptyEnkryptOutputDetectors(),
+              pii: { enabled: true, action: 'block', entities: ['secrets'] },
+            },
+          },
+        },
+      };
+
+      expect(
+        (await admitEnkryptGuardrail(organizationCaller, account(settings, 0), noGroups)).kind
+      ).toBe('rejected');
+      expect(
+        await admitEnkryptGuardrail(organizationCaller, account(settings, 1), noGroups)
+      ).toEqual({ kind: 'admitted', inputGuardrail: null });
+    });
+
+    it('applies when the member groups cannot be read', async () => {
+      const memberGroupIds = jest.fn((): Promise<readonly string[]> =>
+        Promise.reject(new Error('database unavailable'))
+      );
+
+      const admission = await admitEnkryptGuardrail(
+        organizationCaller,
+        account(groupInputGuardrail, 1),
+        memberGroupIds
+      );
+
+      expect(admission).toEqual({
+        kind: 'admitted',
+        inputGuardrail: expect.objectContaining({
+          config: expect.objectContaining({ status: 'ready' }),
+        }),
+      });
+      expect(memberGroupIds).toHaveBeenCalledTimes(1);
+    });
+
+    it.each<{ name: string; caller: GatewayCaller; settings: OrganizationSettings }>([
+      { name: 'the guardrail has no group', caller: organizationCaller, settings: inputGuardrail },
+      {
+        name: 'the guardrail is disabled',
+        caller: organizationCaller,
+        settings: {
+          kilo_encrypt: true,
+          enkrypt: { input_guardrail: { enabled: false, group_id: groupId } },
+        },
+      },
+      {
+        name: 'the feature is not granted',
+        caller: organizationCaller,
+        settings: { enkrypt: { input_guardrail: { enabled: true, group_id: groupId } } },
+      },
+      {
+        name: 'the request is personal',
+        caller: { ...organizationCaller, organizationId: undefined },
+        settings: groupInputGuardrail,
+      },
+    ])('does not read member groups when $name', async ({ caller, settings }) => {
+      const memberGroupIds = memberOf(groupId);
+
+      await admitEnkryptGuardrail(caller, account(settings, 1), memberGroupIds);
+
+      expect(memberGroupIds).not.toHaveBeenCalled();
+    });
   });
 });

@@ -90,7 +90,7 @@ its containers survive in `kilo-docker`.
   `.wrangler/kilo-startup/env`. Outside the repository it runs the real pnpm, saved at
   `/usr/local/lib/kilo-cloud-agent/real-pnpm`, unchanged.
 - Installs dependencies, creates `.env.local`, runs `pnpm test:db`, and seeds a
-  fake-login user with credits.
+  fake-login user with credits and local Cloud Agent billing SKUs.
 - Builds the Cloud Agent sandbox images by running `wrangler dev` for
   `cloud-agent-next` on spare ports until `Container image(s) ready`. The log is
   `.wrangler/kilo-startup/sandbox-images.log`. Skip this with
@@ -129,12 +129,11 @@ pnpm dev:stop
 
 - `KILO_DEV_WITHOUT` in the env file skips agents services that fake-LLM sessions
   on public repositories do not need: notifications, event-service,
-  webhook-agent-ingest, container-usage-meter, and git-token-service. That
-  leaves 7 services, about 3 GB when idle. Add services back with
+  webhook-agent-ingest, scim-sync, and git-token-service. The usage meter must run:
+  compute admission fails closed without it, even for fake inference. Add services back with
   `--without=<smaller list>`. `--without=` starts everything, but the full agents
   stack does not fit in the cap.
-- Expected warnings without those services: billing-heartbeat errors from the
-  skipped usage meter. GitHub-backed repositories need git-token-service and
+- GitHub-backed repositories need git-token-service and
   GitHub App credentials, which the sandbox does not have.
 - `--no-attach` returns once services are up: about 50 s for `app`. The first
   page load compiles with Turbopack and takes about 30 s more.
@@ -186,16 +185,23 @@ Ports below are the defaults; check `pnpm dev:status`.
 
 ```bash
 WORKER_URL=http://localhost:8794 FAKE_LLM_URL=http://localhost:8811 \
-  pnpm -s exec tsx services/cloud-agent-next/test/e2e/run.ts cold echo:hi
+  E2E_FUNDED=1 pnpm -s exec tsx services/cloud-agent-next/test/e2e/run.ts cold echo:hi
 ```
+
+For an older sandbox snapshot, include `container-usage-meter` in the stack and run
+`pnpm dev:seed cloud-agent:billing-skus` after migrations. Missing SKU catalog rows
+otherwise reject admission with `sku_not_found`. The seed is loopback-only, uses
+synthetic test prices, and preserves existing SKU rates and admission settings.
+Use `E2E_FUNDED=1` for newly created driver users; compute requires at least $5 credit.
 
 - Verified passing on the minimal stack: `cold echo:hi`, `cold-hot echo:hi`,
   `chunked-streaming slow:5:50`, `queue-while-busy`, and
   `--api=legacy cold-hot echo:legacy`. `llm-error boom` fails a retry-status
   assertion that is unrelated to the sandbox.
-- Each run leaves a sandbox container of about 750 MB until it stops for being
-  idle. Remove them between runs:
-  `docker rm -f $(docker ps -q --filter name=workerd-cloud-agent-next-dev-Sandbox)`.
+- Shared scenario teardown reclaims exclusively owned sandbox primaries and
+  proxies before deleting their native roots. If containers remain, follow
+  `services/cloud-agent-next/DEBUG.md` to identify the owned family; do not bulk
+  delete sandbox containers that could belong to another run.
 - The first session after `dev:start` can fail model validation with a 503
   ("Model availability could not be verified"). Turbopack is still compiling
   the validation route; retry once.
@@ -210,6 +216,54 @@ WORKER_URL=http://localhost:8794 FAKE_LLM_URL=http://localhost:8811 \
 
   Sending a message to a harness session from the UI fails with
   "Session not found".
+
+### Selecting Kilo v2 for local tests
+
+The default development runtime runs **v1**. Select a local test organization
+for v2 before starting the stack. The driver user must have membership in that organization.
+Use the current `PINNED_CLIS.kilo2.version` in
+`services/cloud-agent-next/scripts/runtime-cli-artifact.ts`, not the moving
+`kilo-v2` npm tag. For the verified `0.0.0-v2-85` pin, from the repository root:
+
+```bash
+export E2E_ORG_ID=<organization-uuid>
+export E2E_USER_EMAIL=<funded-member-email>
+node services/cloud-agent-next/scripts/prepare-kilo2-local.mjs "$E2E_ORG_ID"
+pnpm dev:start --no-attach agents fake-llm
+pnpm dev:status --json
+```
+
+The preparation script generates ignored `wrangler.kilo2-local.json` in the
+service directory. The dev launcher selects it and publishes the pinned runtime
+artifacts to local R2. New sandboxes download those artifacts; production configuration is unchanged.
+The script accepts an organization UUID, not a CLI version or dist-tag. If the stack
+is already running, restart `cloud-agent-next` instead of starting another stack.
+Wait for `Container image(s) ready` in `dev/logs/cloud-agent-next.log` before
+creating a **fresh** test session; service status `up` alone is insufficient.
+
+Drain scenarios additionally require `E2E_KILO2_DRAIN=1`. This flag declares the
+test capability; it does **not** select or verify the runtime. Use the actual ports
+from `dev:status` (defaults shown), and fresh parent/child tags on repeated runs:
+
+```bash
+WORKER_URL=http://localhost:8794 FAKE_LLM_URL=http://localhost:8811 \
+  E2E_FUNDED=1 E2E_KILO2_DRAIN=1 pnpm exec tsx \
+  services/cloud-agent-next/test/e2e/run.ts \
+  drain-background-child background-task:parent1:child1 --timeout-ms=90000
+```
+
+Native full-tree drain requires the RPC supplied by `0.0.0-v2-85`; the older
+`v2-77` pin is insufficient. The child scenarios assert no callback during an
+eight-second hold, then completion after release. Keep inference routed through
+the gateway to fake-LLM, and retain the usage-meter/SKU/credit prerequisites above.
+
+For a v1 comparison, temporarily move the generated `wrangler.kilo2-local.json`
+aside, restart the Worker, unset `E2E_ORG_ID`, and create fresh sessions. Restore the file afterwards.
+Do not change branches or the production Wrangler configuration.
+
+Full recipes: `services/cloud-agent-next/test/e2e/README.md` and
+`services/cloud-agent-next/kilo2-runtime/README.md`. Recorded v1/v2 results:
+`services/cloud-agent-next/docs/drain-manual-verification.md`.
 
 ## Memory
 

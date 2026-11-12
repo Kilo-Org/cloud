@@ -14,6 +14,7 @@ import {
   openRouterModelsMetadataSource,
   openRouterTranscriptionModelsMetadataSource,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { openRouterEmbeddingModelsMetadataSource } from '@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models';
 import { openAiServedModelsMetadataSource } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models';
 import { OPENAI_CHATGPT_API_KEY_ENV } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/upstream';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
@@ -22,9 +23,9 @@ import {
   gatewayModelEndpointsSource,
   gatewayModelEndpointsUrl,
   openRouterGatewayModelsSource,
-  openRouterProvidersSource,
   vercelGatewayModelsSource,
-} from '@/lib/providers/openrouter/sync-providers';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import { openRouterProvidersSource } from '@/lib/providers/openrouter/sync-providers';
 import { openRouterProviderModelsSource } from '@/lib/providers/openrouter/fetch-provider-models';
 import { modelsDevCatalogSource } from '@/lib/providers/direct-byok/models-dev';
 import { directByokMetadataSources } from '@/lib/providers/direct-byok/sync-direct-byok';
@@ -55,6 +56,7 @@ function catalogSources(): MetadataSource<unknown>[] {
   const sources: MetadataSource<unknown>[] = [
     openRouterModelsMetadataSource,
     openRouterTranscriptionModelsMetadataSource,
+    openRouterEmbeddingModelsMetadataSource,
     openRouterGatewayModelsSource,
     vercelGatewayModelsSource,
     openRouterProvidersSource,

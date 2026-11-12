@@ -5,7 +5,6 @@ import {
   failureText,
   formatAge,
   setupBudgetWarning,
-  snapshotBadge,
   stalenessText,
   type EnvironmentBuildStatus,
   type EnvironmentBuildSummary,
@@ -107,7 +106,7 @@ describe('environment build display', () => {
     ).toBe('Environment settings have changed. Refresh the snapshot to include them.');
     expect(stalenessText(status({ published: PUBLISHED }))).toBeNull();
     expect(stalenessText(status({ published: { ...PUBLISHED, stale: 'image' } }))).toBe(
-      'The snapshot was built for an earlier sandbox image. Refresh it: sessions can use it for at most 24 hours after capture, and only while the runtime is unchanged.'
+      'The snapshot was built for an earlier sandbox image. Sessions keep using it until a refresh publishes, unless the runtime changed.'
     );
   });
 
@@ -130,13 +129,7 @@ describe('environment build display', () => {
     );
   });
 
-  it('summarizes the row badge and failures', () => {
-    expect(snapshotBadge(status({ published: PUBLISHED }), NOW)).toBe('Snapshot 3 h ago');
-    expect(snapshotBadge(status({ activeBuild: summary() }), NOW)).toBe('Building snapshot');
-    expect(snapshotBadge(status({ latestBuild: summary({ state: 'failed' }) }), NOW)).toBe(
-      'Snapshot build failed'
-    );
-    expect(snapshotBadge(status({ supported: false }), NOW)).toBeNull();
+  it('explains failures and formats snapshot age for the detail pane', () => {
     expect(failureText('setup_failed')).toBe('A setup command failed. See the build log.');
     expect(failureText('runtime_base_incompatible')).toBe(
       'The selected runtime release could not be installed.'

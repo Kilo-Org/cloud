@@ -7,6 +7,9 @@ Use this guide when a local Cloud Agent flow stalls, a sandbox behaves unexpecte
 - Worker, Durable Object, router, queue, stream, ingest, callback, and sandbox-control logs are emitted by Wrangler and normally land in `dev/logs/cloud-agent-next.log`.
 - The control wrapper runs inside the sandbox container. Its durable debug log is `/tmp/kilocode-control-wrapper.log` (`CONTROL_WRAPPER_LOG_PATH`, configured through `WRAPPER_LOG_PATH`).
 - Kilo CLI logs inside the sandbox live under `/tmp/kilo-worktrees/<home>/.local/share/kilo/log/*.log`.
+- Kilo v2 uses the runtime's actual home, commonly `/home/<id>/.local/share/kilo2/log/opencode.log`.
+  `/root/.local/share/kilo2/log/opencode.log` can contain only the version probe;
+  do not mistake it for the running session's log.
 - The wrapper uploads a bounded archive containing its own log plus the worktree Kilo logs every 30 seconds and again on shutdown. Wrangler shows matching R2 upload traffic.
 - `restore-session` logs print to wrapper stderr and are also mirrored into the wrapper log file, so import/restore traces survive sandbox-side debugging.
 
@@ -27,6 +30,7 @@ Useful Worker-log landmarks include:
 - `Wrapper ingest WebSocket accepted`
 - `Client stream WebSocket accepted for setup`
 - `Session message terminalized`
+- `Runtime credential proxy request failed` (`logTag: runtime_proxy_request_failed`): one record per failed Kilo credential-proxy request. `rejectionStage: route` with `pathShape` means the facade has no allowlist entry for that path and answered 404 without an upstream call. When Kilo v2 then cannot load its model catalog, the run fails with `failure_reason = model_catalog_unavailable` (platform) and the user sees "The Kilo model catalog could not be loaded".
 
 ## Worker Logs
 
@@ -62,7 +66,7 @@ List local sandbox containers and their proxy siblings:
 docker ps --format '{{.ID}} {{.Names}} {{.Image}} {{.Status}}'
 ```
 
-Cloudflare container sandboxes usually include `SandboxContainers` in the synthesized name and run an image built from `Dockerfile.containers`. Docker container names are synthesized, so when several sandboxes are running, confirm the primary container by finding the control wrapper process (`kilocode-control-plane-wrapper.js`) or the `workspace_*` session's route in the Worker log.
+Cloudflare container sandboxes usually include `SandboxContainers` in the synthesized name and run an image built from `Dockerfile.containers.runtime-free`, then download the selected CLI and wrapper. Docker container names are synthesized, so when several sandboxes are running, confirm the primary container by finding the control wrapper process (`kilocode-control-plane-wrapper.js`) or the `workspace_*` session's route in the Worker log.
 
 To inspect one candidate:
 

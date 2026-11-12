@@ -80,48 +80,40 @@ export async function POST(request: Request) {
 
     const { cloudAgentSessionId, organizationId } = validation.data;
 
-    if (organizationId) {
-      // Organization context
-      await ensureOrganizationAccess({ user, tokenSource }, organizationId);
+    const sessionAccess = organizationId
+      ? {
+          verify: async () => {
+            await ensureOrganizationAccess({ user, tokenSource }, organizationId);
+            return verifyOrgOwnsSessionByCloudAgentId(
+              db,
+              organizationId,
+              user.id,
+              cloudAgentSessionId
+            );
+          },
+          refusal: 'Organization does not own this session',
+          ticketFields: { organizationId },
+        }
+      : {
+          verify: () => verifyUserOwnsSessionByCloudAgentId(db, user.id, cloudAgentSessionId),
+          refusal: 'Session not found or access denied',
+          ticketFields: {},
+        };
 
-      const sessionOwnership = await verifyOrgOwnsSessionByCloudAgentId(
-        db,
-        organizationId,
-        user.id,
-        cloudAgentSessionId
-      );
-      if (!sessionOwnership) {
-        return NextResponse.json(
-          { error: 'Organization does not own this session' },
-          { status: 403 }
-        );
-      }
+    const sessionOwnership = await sessionAccess.verify();
 
-      const result = signStreamTicket({
-        userId: user.id,
-        kiloSessionId: sessionOwnership.kiloSessionId,
-        cloudAgentSessionId,
-        organizationId,
-      });
-      return NextResponse.json(result);
-    } else {
-      // Personal context
-      const sessionOwnership = await verifyUserOwnsSessionByCloudAgentId(
-        db,
-        user.id,
-        cloudAgentSessionId
-      );
-      if (!sessionOwnership) {
-        return NextResponse.json({ error: 'Session not found or access denied' }, { status: 403 });
-      }
-
-      const result = signStreamTicket({
-        userId: user.id,
-        kiloSessionId: sessionOwnership.kiloSessionId,
-        cloudAgentSessionId,
-      });
-      return NextResponse.json(result);
+    if (!sessionOwnership) {
+      return NextResponse.json({ error: sessionAccess.refusal }, { status: 403 });
     }
+
+    return NextResponse.json(
+      signStreamTicket({
+        userId: user.id,
+        kiloSessionId: sessionOwnership.kiloSessionId,
+        cloudAgentSessionId,
+        ...sessionAccess.ticketFields,
+      })
+    );
   } catch (error) {
     return handleTRPCError(error);
   }

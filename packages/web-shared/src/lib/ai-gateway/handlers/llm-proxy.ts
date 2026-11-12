@@ -65,7 +65,7 @@ import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { startEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
 import { enkryptGuardrailRejectionResponse } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/responses';
 import { admitEnkryptGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/admission';
-import { extractRequestSegments } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
+import { extractRequestParts } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import {
   parseLlmProxyRequest,
   readLlmProxyHeaders,
@@ -204,15 +204,17 @@ export async function handleLlmProxyRequest(
       ? readGatewayBalance(caller.user, caller.organizationId, requestedModelLowerCased)
       : anonymousBalance
   );
-  const organizationGroupPolicyPromise = callerPromise.then(async caller => {
+  const organizationGroupContextPromise = callerPromise.then(async caller => {
     if (caller.kind !== 'signed-in' || !caller.organizationId) return null;
-    const context = await getOrganizationGroupPolicyContext({
+    return await getOrganizationGroupPolicyContext({
       organizationId: caller.organizationId,
       subject: { type: 'member', kiloUserId: caller.user.id },
       fromDb: readDb,
     });
-    return evaluateEffectiveModelAccessPolicy(context);
   });
+  const organizationGroupPolicyPromise = organizationGroupContextPromise.then(
+    context => context && evaluateEffectiveModelAccessPolicy(context)
+  );
   // Some early returns do not await organization policy. Keep those paths from
   // surfacing policy-context failures as unhandled rejections.
   void organizationGroupPolicyPromise.catch(() => {});
@@ -221,12 +223,15 @@ export async function handleLlmProxyRequest(
   const usageId = randomUUID();
 
   const enkryptAdmission = await Promise.all([callerPromise, balanceAndSettingsPromise]).then(
-    ([caller, account]) => admitEnkryptGuardrail(caller, account)
+    ([caller, account]) =>
+      admitEnkryptGuardrail(caller, account, () =>
+        organizationGroupContextPromise.then(context => context?.groupIds ?? [])
+      )
   );
   if (enkryptAdmission.kind === 'rejected') return enkryptAdmission.response;
 
   // Like the bouncer decide, the guardrail scan overlaps routing work. Its blocking detectors are
-  // awaited just before the upstream call; log-only detectors are never awaited. Segments are
+  // awaited just before the upstream call; log-only detectors are never awaited. Parts are
   // extracted inside the promise so an extraction failure rejects the guardrail, failing closed.
   const enkryptGuardrail = startEnkryptInputGuardrail(
     Promise.resolve(enkryptAdmission.inputGuardrail).then(
@@ -237,9 +242,7 @@ export async function handleLlmProxyRequest(
           microdollarUsageId: usageId,
           apiKind: requestBodyParsed.kind,
           clientRequestId: headers.clientRequestId,
-          segments: extractRequestSegments(requestBodyParsed, {
-            includeToolResults: inputGuardrail.config.scanToolResults,
-          }),
+          parts: extractRequestParts(requestBodyParsed),
         }
     ),
     request.signal

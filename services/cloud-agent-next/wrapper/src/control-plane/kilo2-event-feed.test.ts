@@ -4,6 +4,68 @@ import { classifyAssistantFailure } from '../../../src/shared/assistant-failure.
 import type { KiloFeedEvent } from './kilo-event-feed.js';
 import type { HarnessActivityEvent } from './harness-activity.js';
 
+it('translates native drain proof without session reads or conversation history', async () => {
+  const events: KiloFeedEvent[] = [];
+  let reads = 0;
+  const marker = { sessionID: 'ses_root', token: 'proof-token' };
+  const native = Bun.serve({
+    port: 0,
+    fetch(request) {
+      if (new URL(request.url).pathname !== '/api/event') {
+        reads++;
+        return new Response(null, { status: 503 });
+      }
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            for (const [type, data] of [
+              ['server.connected', {}],
+              ['rpc.kilocode.session-drain.drained', marker],
+            ] as const)
+              controller.enqueue(
+                new TextEncoder().encode(
+                  `data: ${JSON.stringify({ id: `evt_${type}`, type, data, created: 1, location: { directory: '/workspace' } })}\n\n`
+                )
+              );
+          },
+        }),
+        { headers: { 'content-type': 'text/event-stream' } }
+      );
+    },
+  });
+  const received = Promise.withResolvers<void>();
+  const feed = createKilo2EventFeed({
+    source: {
+      server: { url: native.url.origin },
+      directory: '/workspace',
+      nativeRuntimeId: 'rt_v2',
+    },
+    signal: AbortSignal.timeout(5000),
+    onEvent(event) {
+      events.push(event);
+      if (event.type === 'session.drained') received.resolve();
+    },
+    onFailure() {},
+  });
+  try {
+    await feed.open();
+    await received.promise;
+    expect(events).toEqual([
+      { type: 'server.connected', properties: {}, directory: undefined, nativeRuntimeId: 'rt_v2' },
+      {
+        type: 'session.drained',
+        properties: marker,
+        directory: '/workspace',
+        nativeRuntimeId: 'rt_v2',
+      },
+    ]);
+    expect(reads).toBe(0);
+  } finally {
+    feed.close();
+    await native.stop(true);
+  }
+});
+
 it('does not acknowledge a later prompt from an earlier interrupted execution snapshot', async () => {
   const directory = '/workspace';
   const sessionID = 'ses_local';
@@ -62,6 +124,14 @@ it('does not acknowledge a later prompt from an earlier interrupted execution sn
   }
   try {
     await feed.open();
+    controller?.enqueue(frame('command.updated', {}));
+    await until(() => events.some(event => event.type === 'command.updated'));
+    expect(events.find(event => event.type === 'command.updated')).toEqual({
+      type: 'command.updated',
+      properties: {},
+      directory,
+      nativeRuntimeId: 'runtime_local',
+    });
     controller?.enqueue(frame('session.execution.interrupted', { sessionID }));
     await until(() => events.some(event => event.type === 'session.turn.close'));
     expect(messages()).toEqual([]);
@@ -293,6 +363,29 @@ it.each([
   [{ type: 'unknown', message: 'Request failed' }, 'unknown'],
 ] as const)('classifies a native execution error by its status and type', (error, reason) => {
   expect(classifyAssistantFailure(nativeTurnError(error)).reason).toBe(reason);
+});
+
+// Kilo v2 0.0.0-v2-77 reports every model catalog load failure with this text.
+const catalogFailure = (detail: string) =>
+  `Failed to load the Kilo model catalog (${detail}). Check your connection and credentials.`;
+
+it.each([
+  [catalogFailure('HTTP 404'), 'model_catalog_unavailable'],
+  [
+    `SessionRunnerModel.ModelUnavailableError: ${catalogFailure('HTTP 404')}`,
+    'model_catalog_unavailable',
+  ],
+  [catalogFailure('HTTP 503'), 'provider_unavailable'],
+  [catalogFailure('HTTP 401'), 'provider_authentication'],
+  [catalogFailure('network'), 'unknown'],
+  ['No model is selected', 'unknown'],
+] as const)('classifies a native no-route failure %s as %s', (message, reason) => {
+  const failure = classifyAssistantFailure(nativeTurnError({ type: 'provider.no-route', message }));
+  expect(failure.reason).toBe(reason);
+  if (reason === 'model_catalog_unavailable') {
+    expect(failure.safeMessage).toBe('The Kilo model catalog could not be loaded');
+    expect(failure.terminalCode).toBeUndefined();
+  }
 });
 
 it('restricts step starts to their message and emits each pending permission once', async () => {

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
-import { AddCreditsRow } from './add-credits-row';
+import { AddCreditsButton, AddCreditsRow } from './add-credits-row';
 
 const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, scale: 2 }));
 const platform = vi.hoisted(() => ({ OS: 'android' as string }));
@@ -55,6 +55,31 @@ describe('AddCreditsRow mounted layout', () => {
     const root = renderRow();
     expect(containerClasses(root)).not.toContain('flex-row');
     expect(String(root.findByType(BUTTON).props.className).split(' ')).toContain('w-full');
+  });
+
+  it('gives the button the shared state-surface target', () => {
+    const root = renderRow();
+    expect(String(root.findByType(BUTTON).props.className).split(' ')).toContain('min-h-[48px]');
+  });
+
+  it('keeps the shared floor when a caller passes a smaller one', () => {
+    act(() => {
+      const element = createElement(AddCreditsButton, {
+        onPress: () => undefined,
+        className: 'min-h-11',
+      });
+      if (renderer) {
+        renderer.update(element);
+      } else {
+        renderer = TestRenderer.create(element);
+      }
+    });
+    if (!renderer) {
+      throw new Error('Missing AddCreditsButton renderer');
+    }
+    const classes = String(renderer.root.findByType(BUTTON).props.className).split(' ');
+    expect(classes).toContain('min-h-[48px]');
+    expect(classes).not.toContain('min-h-11');
   });
 
   it('keeps the button at its natural width at phone widths', () => {

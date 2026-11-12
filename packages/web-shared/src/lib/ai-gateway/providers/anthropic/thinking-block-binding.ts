@@ -1,12 +1,15 @@
 import { appendAnthropicBetaHeader } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/beta-header';
-import { getClaudeVersion } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
+import {
+  getClaudeVersion,
+  isClaudeModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import type { TransformRequestContext } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 
 const THINKING_BINDING_BETA = 'thinking-binding-controls-2026-08-01';
 
 /**
- * Claude models of every family from version 5.1 on are matched. The models known to bind each
- * thinking block to the system prompt, tools, and earlier messages it was created with are Fable
+ * Claude models of every family from version 5.1 on, including `-latest` aliases, are matched.
+ * The models known to bind each thinking block to its system prompt, tools, and earlier messages are Fable
  * 5.1 and Opus, Sonnet, and Haiku 5.5, and newer models are assumed to keep doing so. Provider
  * accounts created on or after 2026-08-31 reject a replayed block whose prefix changed, failing the
  * whole turn. Older models are excluded: OpenRouter's Bedrock route rewrites adaptive thinking for
@@ -14,6 +17,7 @@ const THINKING_BINDING_BETA = 'thinking-binding-controls-2026-08-01';
  * https://platform.claude.com/docs/en/build-with-claude/preserved-thinking
  */
 function bindsThinkingToPrefix(model: string) {
+  if (isClaudeModel(model) && model.endsWith('-latest')) return true;
   const version = getClaudeVersion(model);
   if (!version) return false;
   return version.major > 5 || (version.major === 5 && version.minor >= 1);

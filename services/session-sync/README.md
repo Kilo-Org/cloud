@@ -372,6 +372,10 @@ as registration retries; an already-created session adopts that admission instea
 Lowered quotas do not reject an existing admission or a lease that stays equal or shrinks.
 Admission denial returns nonretryable `tenant_budget_exceeded` (413) with
 `error.details.sessions` and `error.details.bytes` containing the configured limits.
+A denied first registration of a new session removes its intent, its wakeup, and its
+creator index entry before it answers, so a refused identifier leaves no admission
+residue for the alarm to retry. An unconfirmed refusal cleanup keeps the intent, and
+that alarm removes the remaining index entry.
 
 ### Account erasure and idle retention
 

@@ -158,6 +158,7 @@ function session(id: string): StoredSession {
     total_cost_microdollars: null,
     created_at: '2026-08-28T10:00:00.000Z',
     updated_at: '2026-08-28T11:55:00.000Z',
+    last_activity_at: null,
     version: 0,
     associatedPr: null,
   };
@@ -182,10 +183,11 @@ function contentProps(overrides: Partial<ContentProps> = {}): ContentProps {
     onSessionPress: () => undefined,
     nonPullRefreshes: 0,
     hasActiveQuery: false,
+    hasActiveFilters: false,
     isSearching: false,
     isRetrying: false,
     searchQuery: '',
-    onClearQuery: () => undefined,
+    onClearAction: () => undefined,
     onCreateSession: () => undefined,
     ...overrides,
   };
@@ -250,9 +252,12 @@ describe('AgentSessionListContent liveness', () => {
       let destination: Parameters<ContentProps['onSessionPress']> | undefined = undefined;
       const first = session('first');
       const later = session('later');
-      const allSections = [{ title: 'Today', data: [first, later] }];
+      const allSections = [{ title: 'Today', timeZone: 'UTC', data: [first, later] }];
       let props: ContentProps = contentProps({
-        sections: mode === 'later-page' ? [{ title: 'Today', data: [first] }] : allSections,
+        sections:
+          mode === 'later-page'
+            ? [{ title: 'Today', timeZone: 'UTC', data: [first] }]
+            : allSections,
         activeSessionIds: new Set(['first', 'later title', 'active-only']),
         hasActiveQuery: mode === 'filtered' || mode === 'searched',
         isSearching: mode === 'searched',
@@ -307,7 +312,7 @@ describe('AgentSessionListContent liveness', () => {
     const retained = Array.from({ length: 12 }, (_, index) => session(`row-${index}`));
     const pageOne = retained.slice(0, 4);
     const props = contentProps({
-      sections: [{ title: 'Today', data: retained }],
+      sections: [{ title: 'Today', timeZone: 'UTC', data: retained }],
       onEndReached,
     });
     const renderer = mount(props);
@@ -319,7 +324,7 @@ describe('AgentSessionListContent liveness', () => {
       renderer.update(
         createElement(AgentSessionListContent, {
           ...props,
-          sections: [{ title: 'Today', data: pageOne }],
+          sections: [{ title: 'Today', timeZone: 'UTC', data: pageOne }],
         })
       );
     });
@@ -350,7 +355,7 @@ describe('AgentSessionListContent liveness', () => {
     // the park and replay the end-reach it dropped.
     const pageOne = retained.slice(0, 4);
     const props = contentProps({
-      sections: [{ title: 'Today', data: retained }],
+      sections: [{ title: 'Today', timeZone: 'UTC', data: retained }],
       onEndReached,
     });
     const renderer = mount(props);
@@ -358,7 +363,7 @@ describe('AgentSessionListContent liveness', () => {
       renderer.update(
         createElement(AgentSessionListContent, {
           ...props,
-          sections: [{ title: 'Today', data: pageOne }],
+          sections: [{ title: 'Today', timeZone: 'UTC', data: pageOne }],
         })
       );
     });
@@ -385,13 +390,14 @@ describe('AgentSessionListContent liveness', () => {
 
   it.each([false, true])('preserves retry recovery for searching=%s', isSearching => {
     const recovered = contentProps({
-      sections: [{ title: 'Today', data: [session('recovered')] }],
+      sections: [{ title: 'Today', timeZone: 'UTC', data: [session('recovered')] }],
     });
     const renderer = mount(
       contentProps({
         isError: true,
-        hasAnySessions: isSearching,
-        hasActiveQuery: isSearching,
+        hasAnySessions: true,
+        hasActiveQuery: true,
+        hasActiveFilters: !isSearching,
         isSearching,
         searchQuery: isSearching ? 'title' : '',
         onRetry: () => {
@@ -409,25 +415,55 @@ describe('AgentSessionListContent liveness', () => {
     expect(rows(renderer).map(item => item.id)).toEqual(['recovered']);
   });
 
-  it.each([false, true])('keeps the clear control for empty searching=%s', isSearching => {
+  it.each([
+    { isSearching: true, hasActiveFilters: false, label: 'Clear search' },
+    { isSearching: false, hasActiveFilters: true, label: 'Clear filters' },
+  ])('keeps the $label control for empty searching=$isSearching', test => {
     const recovered = contentProps({
-      sections: [{ title: 'Today', data: [session('recovered')] }],
+      sections: [{ title: 'Today', timeZone: 'UTC', data: [session('recovered')] }],
     });
     const renderer = mount(
       contentProps({
         hasActiveQuery: true,
-        isSearching,
-        searchQuery: isSearching ? 'missing' : '',
-        onClearQuery: () => {
+        hasActiveFilters: test.hasActiveFilters,
+        isSearching: test.isSearching,
+        searchQuery: test.isSearching ? 'missing' : '',
+        onClearAction: () => {
           renderer.update(createElement(AgentSessionListContent, recovered));
         },
       })
     );
     const texts = hosts(renderer, 'Text').map(node => node.props.children);
     expect(texts).toContain(i18n.t('agents.sessionList.noMatches'));
-    expect(texts).toContain(isSearching ? 'Clear search' : 'Clear filters');
+    expect(texts).toContain(test.label);
     press(hosts(renderer, 'Button')[0]);
     expect(rows(renderer).map(item => item.id)).toEqual(['recovered']);
+  });
+
+  it('gives each narrowing cause its own clear control and hands back that action', () => {
+    const cleared: string[] = [];
+    const renderer = mount(
+      contentProps({
+        hasActiveQuery: true,
+        hasActiveFilters: true,
+        isSearching: true,
+        searchQuery: 'missing',
+        onClearAction: action => {
+          cleared.push(action);
+        },
+      })
+    );
+    const texts = hosts(renderer, 'Text').map(node => node.props.children);
+    expect(texts).toContain(
+      `${i18n.t('agents.sessionList.tryDifferentSearch')} ${i18n.t('agents.sessionList.tryAdjustFilters')}`
+    );
+    const buttons = hosts(renderer, 'Button');
+    expect(buttons).toHaveLength(2);
+    press(buttons[0]);
+    press(buttons[1]);
+    // Clearing the search alone cannot add rows while the filter still narrows
+    // the list, so each control retires only its own cause.
+    expect(cleared).toEqual(['clear-search', 'clear-filters']);
   });
 
   it('renders empty history as its own surface, not a list of active rows', () => {
@@ -443,7 +479,7 @@ describe('AgentSessionListContent liveness', () => {
     const renderer = mount(
       contentProps({
         isError: true,
-        sections: [{ title: 'Today', data: [session('cached')] }],
+        sections: [{ title: 'Today', timeZone: 'UTC', data: [session('cached')] }],
         activeSessionIds: new Set(['cached']),
       })
     );
@@ -470,7 +506,7 @@ describe('AgentSessionListContent liveness', () => {
       contentProps({
         isError: true,
         hasFreshHistory: false,
-        sections: [{ title: 'Today', data: [session('stale')] }],
+        sections: [{ title: 'Today', timeZone: 'UTC', data: [session('stale')] }],
         activeSessionIds: new Set(['stale']),
       })
     );
@@ -493,7 +529,7 @@ describe('AgentSessionListContent liveness', () => {
       const props = contentProps({
         isError: true,
         hasFreshHistory: false,
-        sections: [{ title: 'Today', data: [session('cached')] }],
+        sections: [{ title: 'Today', timeZone: 'UTC', data: [session('cached')] }],
         refetch: () => promise,
       });
       const renderer = mount(props);
@@ -540,7 +576,7 @@ describe('AgentSessionListContent liveness', () => {
       const props = contentProps({
         isError: true,
         hasFreshHistory: false,
-        sections: [{ title: 'Today', data: [session('cached')] }],
+        sections: [{ title: 'Today', timeZone: 'UTC', data: [session('cached')] }],
         refetch,
       });
       const renderer = mount(props);
@@ -615,7 +651,7 @@ describe('AgentSessionListContent liveness', () => {
     vi.useFakeTimers();
     try {
       const props = contentProps({
-        sections: [{ title: 'Today', data: [session('cached')] }],
+        sections: [{ title: 'Today', timeZone: 'UTC', data: [session('cached')] }],
         refetch: hang,
       });
       const renderer = mount(props);
@@ -672,7 +708,7 @@ describe('AgentSessionListContent liveness', () => {
       });
       const renderer = mount(
         contentProps({
-          sections: [{ title: 'Today', data: [session('cached')] }],
+          sections: [{ title: 'Today', timeZone: 'UTC', data: [session('cached')] }],
           refetch: hang,
         })
       );
@@ -740,7 +776,7 @@ describe('AgentSessionListContent liveness', () => {
 
   it('swaps the reserved skeleton rows for real rows inside the same mounted list', () => {
     const loaded = contentProps({
-      sections: [{ title: 'Today', data: [session('landed')] }],
+      sections: [{ title: 'Today', timeZone: 'UTC', data: [session('landed')] }],
     });
     const renderer = mount(contentProps({ isLoading: true, hasAnySessions: false }));
     const list = renderer.root.find(node => isHost(node, 'FlashList'));
@@ -755,7 +791,7 @@ describe('AgentSessionListContent liveness', () => {
   });
 
   it('insets the FlashList wrapper by the landscape side insets', () => {
-    const sections = [{ title: 'Today', data: [session('padded')] }];
+    const sections = [{ title: 'Today', timeZone: 'UTC', data: [session('padded')] }];
     const renderer = mount(contentProps({ sections }));
     const list = renderer.root.find(node => isHost(node, 'FlashList'));
     const contentStyle = () =>
@@ -793,8 +829,8 @@ describe('AgentSessionListContent liveness', () => {
 
   it('renders date-section headers as ordinary in-flow rows', () => {
     const sections = [
-      { title: 'Today', data: [session('a'), session('b')] },
-      { title: 'Older', data: [session('c')] },
+      { title: 'Today', timeZone: 'UTC', data: [session('a'), session('b')] },
+      { title: 'Older', timeZone: 'UTC', data: [session('c')] },
     ];
     const renderer = mount(contentProps({ sections }));
     expect(hosts(renderer, 'SessionListSectionHeader')).toHaveLength(2);
@@ -803,7 +839,7 @@ describe('AgentSessionListContent liveness', () => {
   it('keeps stale history behind the busy Retry control until refetch completes', () => {
     const renderer = mount(
       contentProps({
-        sections: [{ title: 'Today', data: [session('cached')] }],
+        sections: [{ title: 'Today', timeZone: 'UTC', data: [session('cached')] }],
         isError: false,
         hasAnySessions: true,
         hasFreshHistory: false,
@@ -818,7 +854,7 @@ describe('AgentSessionListContent liveness', () => {
         createElement(
           AgentSessionListContent,
           contentProps({
-            sections: [{ title: 'Today', data: [session('recovered')] }],
+            sections: [{ title: 'Today', timeZone: 'UTC', data: [session('recovered')] }],
             hasFreshHistory: true,
             isRetrying: false,
           })
@@ -843,7 +879,7 @@ describe('AgentSessionListContent liveness', () => {
 });
 
 describe('AgentSessionListContent next-page footer', () => {
-  const page = [{ title: 'Today', data: [session('a'), session('b')] }];
+  const page = [{ title: 'Today', timeZone: 'UTC', data: [session('a'), session('b')] }];
 
   it('keeps the loaded rows and offers a retry when the next page failed', () => {
     const onRetryNextPage = vi.fn<() => void>();

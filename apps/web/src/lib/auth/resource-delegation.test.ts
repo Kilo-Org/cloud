@@ -550,6 +550,114 @@ describe('resource delegation authority', () => {
     expect(claims.exp! - claims.iat!).toBeLessThanOrEqual(15 * 60);
   });
 
+  test.each([
+    ['pages', 'pages'],
+    ['pages-dev', 'pages-dev'],
+  ] as const)('mints a minimal five-minute %s token', async (resource, audience) => {
+    const current = await user();
+    const result = await createDelegatedResourceToken(current, resource, {
+      headers: bearer(modernToken(current)),
+      tokenSource: 'harness',
+      expiresIn: 3600,
+    });
+    const claims = jwt.verify(result.token, secret) as jwt.JwtPayload;
+    expect(claims).toMatchObject({
+      aud: audience,
+      kiloUserId: current.id,
+      tokenPurpose: 'delegated-workload',
+      credentialExchange: false,
+      env: process.env.NODE_ENV,
+    });
+    expect(claims.exp! - claims.iat!).toBe(300);
+    expect(Object.keys(claims).sort()).toEqual(
+      [
+        'aud',
+        'credentialExchange',
+        'env',
+        'exp',
+        'iat',
+        'kiloUserId',
+        'tokenPurpose',
+        'version',
+      ].sort()
+    );
+    expect(new Date(result.expiresAt).getTime() / 1000).toBe(claims.exp);
+  });
+
+  test('mints a Pages token from the legacy five-year device credential', async () => {
+    const current = await user();
+    const now = Math.floor(Date.now() / 1000);
+    const legacy = jwt.sign(
+      {
+        env: process.env.NODE_ENV,
+        kiloUserId: current.id,
+        apiTokenPepper: current.api_token_pepper,
+        version: 3,
+        deviceAuthRequestCode: 'ABC123',
+        iat: now,
+        exp: now + 157_788_000,
+      },
+      secret,
+      { algorithm: 'HS256' }
+    );
+    const result = await createDelegatedResourceToken(current, 'pages', {
+      headers: bearer(legacy),
+    });
+    expect(jwt.decode(result.token)).toMatchObject({ aud: 'pages' });
+  });
+
+  test('refuses to mint a Pages token from a gateway-audience token', async () => {
+    const current = await user();
+    const now = Math.floor(Date.now() / 1000);
+    const gateway = jwt.sign(
+      buildModernKiloTokenPayload({
+        userId: current.id,
+        pepper: current.api_token_pepper,
+        env: process.env.NODE_ENV,
+        audience: 'kilo-gateway',
+        issuedAt: now,
+        expiresAt: now + 1800,
+        tokenPurpose: 'delegated-workload',
+        credentialExchange: false,
+      }),
+      secret,
+      { algorithm: 'HS256' }
+    );
+    await expect(
+      createDelegatedResourceToken(current, 'pages', { headers: bearer(gateway) })
+    ).rejects.toMatchObject({ status: 401 });
+  });
+
+  test('refuses to mint a Pages token with an organization', async () => {
+    const current = await user();
+    const organization = await organizationFor(current.id);
+    await expect(
+      createDelegatedResourceToken(current, 'pages', {
+        headers: bearer(modernToken(current)),
+        organizationId: organization.id,
+      })
+    ).rejects.toMatchObject({ status: 403, delegationCode: 'FORBIDDEN' });
+    expect(getAuthorizedOrgContext).not.toHaveBeenCalled();
+  });
+
+  test('refuses to mint a Pages token while delegated issuance is disabled', async () => {
+    const current = await user();
+    shared.enabled = false;
+    await expect(
+      createDelegatedResourceToken(current, 'pages', { headers: bearer(modernToken(current)) })
+    ).rejects.toMatchObject({ status: 503, delegationCode: 'MIGRATION_UNAVAILABLE' });
+  });
+
+  test('keeps the pepper on api and gateway tokens', async () => {
+    const current = await user();
+    for (const resource of ['api', 'gateway'] as const) {
+      const result = await createDelegatedResourceToken(current, resource, {
+        headers: bearer(modernToken(current)),
+      });
+      expect(jwt.decode(result.token)).toMatchObject({ apiTokenPepper: current.api_token_pepper });
+    }
+  });
+
   test('caps delegated tokens to the parent credential expiry', async () => {
     const current = await user();
     const now = Math.floor(Date.now() / 1000);

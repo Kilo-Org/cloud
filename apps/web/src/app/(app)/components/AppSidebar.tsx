@@ -14,7 +14,7 @@ import { compareOrganizationsForDefault } from '@/lib/organizations/sales-demo-s
 const UUID = '[0-9a-f-]{36}';
 
 // Routes linked from the footer user menu (see SidebarUserFooter). Keep in sync.
-const FOOTER_MENU_ROUTES = ['/connected-accounts', '/data-exports', '/install', '/learn'];
+const FOOTER_MENU_ROUTES = ['/connected-accounts', '/data-exports'];
 
 function isKiloClawNewPath(pathname: string): boolean {
   return pathname === '/claw/new' || new RegExp(`^/organizations/${UUID}/claw/new$`).test(pathname);

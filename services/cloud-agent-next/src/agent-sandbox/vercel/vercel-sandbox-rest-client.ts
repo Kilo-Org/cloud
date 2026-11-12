@@ -488,7 +488,8 @@ export class VercelSandboxRestClient {
     throw new VercelSandboxRestError('invalid_response', operation);
   }
 
-  async inspectSnapshot(snapshotId: string): Promise<VercelSandboxSnapshot> {
+  /** One snapshot in any status. A deleted or unknown ID fails with status 404. */
+  async getSnapshot(snapshotId: string): Promise<VercelSandboxSnapshot> {
     const operation = 'get-snapshot';
     this.validateConfiguration(operation);
     requireIdentifier(snapshotId, operation);
@@ -500,8 +501,17 @@ export class VercelSandboxRestClient {
     const response = await this.fetchProvider(operation, url, { method: 'GET' });
     await this.requireSuccessfulResponse(response, operation);
     const snapshot = (await this.parseJson(response, snapshotEnvelopeSchema, operation)).snapshot;
-    if (snapshot.id !== snapshotId || snapshot.status !== 'created') {
+    if (snapshot.id !== snapshotId) {
       throw new VercelSandboxRestError('correlation_mismatch', operation);
+    }
+    return snapshot;
+  }
+
+  /** One snapshot that must already be created. */
+  async inspectSnapshot(snapshotId: string): Promise<VercelSandboxSnapshot> {
+    const snapshot = await this.getSnapshot(snapshotId);
+    if (snapshot.status !== 'created') {
+      throw new VercelSandboxRestError('correlation_mismatch', 'get-snapshot');
     }
     return snapshot;
   }

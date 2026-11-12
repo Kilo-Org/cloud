@@ -67,6 +67,8 @@ export type HarnessReads = Pick<
 };
 
 export type Harness = {
+  /** Safe to open siblings without suppressing later session-ingest file restoration. */
+  supportsHistoryPreload?: boolean;
   open(
     input: HarnessSession & {
       /** Reads one page of this session's Cloud history; v2 restores from it. */
@@ -89,7 +91,14 @@ export type Harness = {
       variant?: string;
     }
   ): Promise<void>;
-  compact(input: HarnessSession & { model: string; auto?: boolean }): Promise<boolean>;
+  compact(
+    input: HarnessSession & {
+      /** Native message identity for Kilo v2; the Kilo v1 summarize API cannot accept an ID. */
+      messageId: string;
+      model: string;
+      auto?: boolean;
+    }
+  ): Promise<'executed' | 'replayed'>;
   condense(input: HarnessSession & { model: string }): Promise<CondenseResult>;
   answer(input: {
     directory: string;
@@ -98,6 +107,8 @@ export type Harness = {
     signal?: AbortSignal;
   }): Promise<boolean>;
   interrupt(input: HarnessSession): Promise<boolean>;
+  /** Full-tree HTTP/marker completion proof, supported only by the Kilo v2 harness. */
+  drainSession?: (input: HarnessSession & { token?: string }) => Promise<boolean>;
   observe(input: HarnessObservationInput): Promise<SessionObservation[]>;
   release(input: HarnessSession & { deadlineMs: number; signal: AbortSignal }): Promise<{
     ok: boolean;

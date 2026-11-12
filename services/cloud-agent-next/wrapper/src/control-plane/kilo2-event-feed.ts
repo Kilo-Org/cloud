@@ -142,6 +142,17 @@ export function createKilo2EventFeed(options: KiloEventFeedOptions): KiloEventFe
       return;
     }
     const directory = event.location?.directory;
+    if (event.type === 'command.updated') {
+      emit(event.type, {}, directory);
+      return;
+    }
+    if (event.type === 'rpc.kilocode.session-drain.drained') {
+      const marker = z
+        .object({ sessionID: z.string(), token: z.string().min(1).max(128) })
+        .parse(event.data);
+      emit('session.drained', marker, directory);
+      return;
+    }
     const id = event.data.sessionID;
     if (typeof id === 'string')
       emit('conversation.event', { sessionID: id, source: { version: 'v2' }, event }, directory);

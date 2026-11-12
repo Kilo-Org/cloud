@@ -211,7 +211,7 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
     action:
       'Open PostHog and confirm the person, events, and recordings deletion. Then Retry or Mark done with evidence.',
   },
-  posthog_verify_timeout: {
+  posthog_verify_unconfirmed: {
     title: 'PostHog deletion did not confirm in time',
     action:
       'Check the PostHog deletion task. If it finished, Mark done with evidence. Otherwise Retry.',

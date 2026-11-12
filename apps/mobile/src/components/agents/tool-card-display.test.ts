@@ -334,6 +334,59 @@ describe('getToolDisplay mapping', () => {
     });
   });
 
+  it('maps a sent file to its label and the file name', () => {
+    const attachment: FilePart = { ...makeAttachment('text/plain'), filename: 'random.txt' };
+    expect(
+      getDisplay(
+        makeToolPart('send_file', {
+          ...completed({ path: '/tmp/random.txt' }),
+          attachments: [attachment],
+        })
+      )
+    ).toEqual({ title: 'Sent file', subtitle: 'random.txt' });
+  });
+
+  it('names the sent file from the input path until the attachment arrives', () => {
+    expect(getDisplay(makeToolPart('send_file', completed({ filePath: '/w/report.pdf' })))).toEqual(
+      {
+        title: 'Sent file',
+        subtitle: 'report.pdf',
+      }
+    );
+  });
+
+  it('reports the action, not the outcome, while a send is unfinished', () => {
+    // A running call must not claim a delivery, and a failed one must not read
+    // as a successful send.
+    expect(getDisplay(makeToolPart('send_file', running({ path: '/tmp/random.txt' })))).toEqual({
+      title: 'Send file',
+      subtitle: 'random.txt',
+    });
+    expect(getDisplay(makeToolPart('send_file', errorState({ path: '/tmp/random.txt' })))).toEqual({
+      title: 'Send file',
+      subtitle: 'random.txt',
+    });
+  });
+
+  it('marks only the completed send for a header without the repeated name', () => {
+    // The completed part renders a file chip that names the file, so its header
+    // shows the label alone. An unfinished part has no chip yet, so its header
+    // keeps the name in the prefix.
+    expect(
+      getToolDisplay(makeToolPart('send_file', completed({ path: '/a.txt' }))).headerTitleOnly
+    ).toBe(true);
+    expect(
+      getToolDisplay(makeToolPart('send_file', running({ path: '/a.txt' }))).headerTitleOnly
+    ).toBe(undefined);
+  });
+
+  it('keeps the sent-file label alone when the part carries no file name', () => {
+    expect(getDisplay(makeToolPart('send_file', completed()))).toEqual({
+      title: 'Sent file',
+      subtitle: undefined,
+    });
+  });
+
   it('summarizes a generic tool from its arguments', () => {
     expect(
       getDisplay(makeToolPart('lookup', completed({ description: 'Find matching records' })))
@@ -509,6 +562,10 @@ describe('getToolDisplay translatable provenance', () => {
     expect(getToolDisplay(makeToolPart('read', completed({ filePath: 'a.ts' }))).translatable).toBe(
       true
     );
+    expect(getToolDisplay(makeToolPart('send_file', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(makeToolPart('send_file', completed({ path: '/tmp/random.txt' }))).translatable
+    ).toBe(true);
   });
 
   it('keeps the fallback bash/glob/grep/list/patch labels out of translation', () => {

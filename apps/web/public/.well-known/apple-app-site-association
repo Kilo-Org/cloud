@@ -7,7 +7,6 @@
           { "/": "/home" },
           { "/": "/profile" },
           { "/": "/profile/preferences" },
-          { "/": "/claw" },
           { "/": "/cloud/sessions" },
           { "/": "/cloud/sessions/*" },
           { "/": "/security-agent" },

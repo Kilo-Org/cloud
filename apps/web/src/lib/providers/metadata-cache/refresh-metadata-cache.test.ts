@@ -6,6 +6,7 @@ import {
   openRouterModelsMetadataSource,
   openRouterTranscriptionModelsMetadataSource,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { openRouterEmbeddingModelsMetadataSource } from '@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models';
 import { openAiServedModelsMetadataSource } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models';
 import { mockOpenRouterModels } from '@kilocode/web-shared/tests/helpers/openrouter-models.helper';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
@@ -23,9 +24,9 @@ import { alertIfMetadataCacheStale } from '@/lib/providers/metadata-cache/metada
 import {
   gatewayModelEndpointsSource,
   openRouterGatewayModelsSource,
-  openRouterProvidersSource,
   vercelGatewayModelsSource,
-} from '@/lib/providers/openrouter/sync-providers';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import { openRouterProvidersSource } from '@/lib/providers/openrouter/sync-providers';
 import { openRouterProviderModelsSource } from '@/lib/providers/openrouter/fetch-provider-models';
 import { modelsDevCatalogSource } from '@/lib/providers/direct-byok/models-dev';
 import { refreshMetadataCache } from './refresh-metadata-cache';
@@ -121,6 +122,10 @@ beforeEach(async () => {
     [openAiServedModelsMetadataSource.url, () => Response.json({ data: [{ id: 'gpt-test' }] })],
     [openRouterModelsMetadataSource.url, () => Response.json(catalogModels())],
     [
+      openRouterEmbeddingModelsMetadataSource.url,
+      () => Response.json({ data: [{ id: 'vendor/embedding-1', name: 'Embedding 1' }] }),
+    ],
+    [
       openRouterTranscriptionModelsMetadataSource.url,
       () => Response.json({ data: mockOpenRouterModels.data.slice(0, 1) }),
     ],
@@ -172,6 +177,55 @@ describe('refreshMetadataCache', () => {
     });
     expect(alertIfMetadataCacheStale).toHaveBeenCalledWith([]);
   });
+
+  it('stores the refreshed OpenRouter embedding inventory, including additions and removals', async () => {
+    const existing = {
+      data: [
+        { id: 'vendor/embedding-1', name: 'Embedding 1' },
+        { id: 'vendor/removed-embedding', name: 'Removed Embedding' },
+      ],
+    };
+    const refreshed = {
+      data: [
+        { id: 'vendor/embedding-1', name: 'Embedding 1' },
+        { id: 'vendor/added-embedding', name: 'Added Embedding' },
+      ],
+    };
+    await storeRow(openRouterEmbeddingModelsMetadataSource.url, existing, hoursAgo(1));
+    respond(openRouterEmbeddingModelsMetadataSource.url, () => Response.json(refreshed));
+
+    const summary = await refreshMetadataCache();
+
+    expect(fetchedUrls()).toContain(openRouterEmbeddingModelsMetadataSource.url);
+    const stored = await readRow(openRouterEmbeddingModelsMetadataSource.url);
+    expect(stored?.data).toEqual(refreshed);
+    const storedIds = openRouterEmbeddingModelsMetadataSource
+      .parse(stored?.data)
+      .data.map(model => model.id);
+    expect(storedIds).toContain('vendor/added-embedding');
+    expect(storedIds).not.toContain('vendor/removed-embedding');
+    expect(summary).toMatchObject({ failed_count: 0, stale_count: 0 });
+  });
+
+  it.each([
+    ['an HTTP error', () => new Response(null, { status: 503, statusText: 'Unavailable' })],
+    ['a response rejected by the source parser', () => Response.json({ data: [{ id: 'bad' }] })],
+  ])(
+    'preserves the stored embedding inventory when the upstream returns %s',
+    async (_label, response) => {
+      const existing = {
+        data: [{ id: 'vendor/stored-embedding', name: 'Stored Embedding' }],
+      };
+      await storeRow(openRouterEmbeddingModelsMetadataSource.url, existing, hoursAgo(1));
+      const before = await readRow(openRouterEmbeddingModelsMetadataSource.url);
+      respond(openRouterEmbeddingModelsMetadataSource.url, response);
+
+      const summary = await refreshMetadataCache();
+
+      expect(await readRow(openRouterEmbeddingModelsMetadataSource.url)).toEqual(before);
+      expect(summary).toMatchObject({ failed_count: 1, stale_count: 0 });
+    }
+  );
 
   it.each([
     ['an error status', () => new Response(null, { status: 503, statusText: 'Unavailable' })],

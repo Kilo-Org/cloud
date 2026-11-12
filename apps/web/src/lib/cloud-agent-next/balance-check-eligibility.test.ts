@@ -65,6 +65,21 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
 
 const CONNECTED_CHATGPT = { connection: { status: 'connected' }, isEnabled: true };
 
+const mockGetClaudeBillingConnection = jest.fn();
+const mockResolveClaudeBillingModel = jest.fn();
+const mockResolveClaudeBillingConnector = jest.fn();
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/store', () => ({
+  getGrantedClaudeBillingConnection: (...args: unknown[]) =>
+    mockGetClaudeBillingConnection(...args),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/routing', () => ({
+  resolveClaudeBillingModel: (...args: unknown[]) => mockResolveClaudeBillingModel(...args),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/connector', () => ({
+  resolveClaudeBillingConnector: (...args: unknown[]) => mockResolveClaudeBillingConnector(...args),
+}));
+
 import { computeCloudAgentNextBalanceCheckEligibility } from './balance-check-eligibility';
 
 const PAID_MODEL = 'anthropic/claude-sonnet-4';
@@ -86,6 +101,7 @@ beforeEach(() => {
   mockIsCustomLlm.mockResolvedValue(false);
   mockResolveOrganizationMemberModelDecision.mockResolvedValue({ decision: { allowed: true } });
   mockGetOpenAiChatGptStoredConnection.mockResolvedValue(null);
+  mockResolveClaudeBillingConnector.mockResolvedValue({ kind: 'unrecorded' });
 });
 
 describe('computeCloudAgentNextBalanceCheckEligibility', () => {
@@ -202,6 +218,108 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
 
     expect(await eligibility(true)).toEqual({ isFree: false, hasUserByokAvailable: true });
     expect(await eligibility(false)).toEqual({ isFree: false, hasUserByokAvailable: false });
+  });
+
+  describe('Claude billing link', () => {
+    const eligibility = (includeSharedServicesConnection: boolean, organizationId?: string) =>
+      computeCloudAgentNextBalanceCheckEligibility({
+        fromDb: fakeDb,
+        user: fakeUser,
+        modelId: PAID_MODEL,
+        ...(organizationId ? { organizationId } : {}),
+        includeSharedServicesConnection,
+      });
+
+    beforeEach(() => {
+      mockResolveClaudeBillingModel.mockResolvedValue('claude-sonnet-4');
+    });
+
+    it("counts the organization's shared-services Claude link for service runs only", async () => {
+      mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
+        owner.kind === 'shared_services' ? { status: 'connected' } : null
+      );
+      expect(await eligibility(true, 'org-1')).toEqual({
+        isFree: false,
+        hasUserByokAvailable: true,
+      });
+      expect(await eligibility(false, 'org-1')).toEqual({
+        isFree: false,
+        hasUserByokAvailable: false,
+      });
+    });
+
+    it('does not count a shared-services link whose recorded connector is gone', async () => {
+      mockGetClaudeBillingConnection.mockImplementation(async () => ({
+        status: 'connected',
+        created_by: 'connector',
+      }));
+      mockResolveClaudeBillingConnector.mockResolvedValue({ kind: 'gone' });
+
+      expect(await eligibility(true, 'org-1')).toEqual({
+        isFree: false,
+        hasUserByokAvailable: false,
+        reconnectRequired: 'claude_billing',
+      });
+      expect(mockResolveClaudeBillingConnector).toHaveBeenCalledWith('connector', fakeDb);
+    });
+
+    it('reports the reconnect requirement for a shared-services link before a member link', async () => {
+      // Routing tries the shared link first, so a member's own link does not keep
+      // the model billable while the shared link needs a reconnect.
+      mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
+        owner.kind === 'shared_services'
+          ? { status: 'connected', created_by: 'connector' }
+          : { status: 'connected', created_by: 'member' }
+      );
+      mockResolveClaudeBillingConnector.mockResolvedValue({ kind: 'gone' });
+
+      expect(await eligibility(true, 'org-1')).toEqual({
+        isFree: false,
+        hasUserByokAvailable: false,
+        reconnectRequired: 'claude_billing',
+      });
+      expect(mockResolveClaudeBillingConnector).toHaveBeenCalledTimes(1);
+    });
+
+    it('counts a shared-services link whose recorded connector still resolves', async () => {
+      mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
+        owner.kind === 'shared_services' ? { status: 'connected', created_by: 'connector' } : null
+      );
+      mockResolveClaudeBillingConnector.mockResolvedValue({
+        kind: 'present',
+        email: 'connector@example.test',
+      });
+
+      expect(await eligibility(true, 'org-1')).toEqual({
+        isFree: false,
+        hasUserByokAvailable: true,
+      });
+    });
+
+    it("counts a member's own Claude link in the organization", async () => {
+      mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
+        owner.kind === 'member' ? { status: 'connected', created_by: 'connector' } : null
+      );
+      mockResolveClaudeBillingConnector.mockResolvedValue({ kind: 'gone' });
+
+      expect(await eligibility(false, 'org-1')).toEqual({
+        isFree: false,
+        hasUserByokAvailable: true,
+      });
+      expect(mockResolveClaudeBillingConnector).not.toHaveBeenCalled();
+    });
+
+    it('does not count past a shared-services link that cannot bill', async () => {
+      mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
+        owner.kind === 'shared_services'
+          ? { status: 'billing_unavailable' }
+          : { status: 'connected' }
+      );
+      expect(await eligibility(true, 'org-1')).toEqual({
+        isFree: false,
+        hasUserByokAvailable: false,
+      });
+    });
   });
 
   describe('direct BYOK key', () => {

@@ -23,6 +23,7 @@ import {
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
   RegisterBenchmarkProfilesRequestSchema,
+  RefreshBenchmarkProfilesRequestSchema,
   SyncBenchmarkSubscriptionsRequestSchema,
   resolveBenchmarkIdentity,
 } from './benchmark';
@@ -793,5 +794,39 @@ describe('benchmark subscription request contracts', () => {
     ])('rejects invalid paired identity %j', owner => {
       expect(schema.safeParse({ entries, ...owner }).success).toBe(false);
     });
+  });
+});
+
+describe('RefreshBenchmarkProfilesRequestSchema duplicate pairs', () => {
+  const request = (entries: { model: string; variant: string | null }[]) => ({
+    mode: 'refresh' as const,
+    entries,
+  });
+
+  it('rejects a repeated model and variant at the repeated index', () => {
+    const result = RefreshBenchmarkProfilesRequestSchema.safeParse(
+      request([
+        { model: 'model/a', variant: 'xhigh' },
+        { model: 'model/a', variant: 'xhigh' },
+      ])
+    );
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toContainEqual(
+        expect.objectContaining({ path: ['entries', 1], message: 'Duplicate benchmark pair.' })
+      );
+    }
+  });
+
+  it('keeps one model with distinct variants and distinct models apart', () => {
+    expect(
+      RefreshBenchmarkProfilesRequestSchema.safeParse(
+        request([
+          { model: 'model/a', variant: null },
+          { model: 'model/a', variant: 'xhigh' },
+          { model: 'model/b', variant: null },
+        ])
+      ).success
+    ).toBe(true);
   });
 });

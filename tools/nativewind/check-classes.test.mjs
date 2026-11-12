@@ -14,14 +14,15 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 
-// The checker reads the app's global.css for its token list and resolves
+// The checker reads the app's global.css for its token list, resolves
 // react-native-css through apps/mobile's node_modules for the compiler
-// assertions, so the fixture tree mirrors the repository layout.
+// assertions, and imports the parser from the root's, so the fixture tree
+// mirrors the repository layout and links both dependency trees.
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
 const MOBILE_ROOT = join(REPO, 'apps/mobile');
 // Every module under tools/lib the checker imports, copied into each fixture so
 // the checker runs from a root that mirrors the repository layout.
-const SHARED_SCANNERS = ['js-scan.mjs', 'source-files.mjs'];
+const SHARED_SCANNERS = ['ast.mjs', 'source-files.mjs'];
 
 function makeFixture(context, files) {
   const root = mkdtempSync(join(tmpdir(), 'check-classes-'));
@@ -45,6 +46,8 @@ function makeFixture(context, files) {
   }
   copyFileSync(join(MOBILE_ROOT, 'src/global.css'), join(root, 'apps/mobile/src/global.css'));
   symlinkSync(join(MOBILE_ROOT, 'node_modules'), join(root, 'apps/mobile/node_modules'), 'dir');
+  // The parser is a root dependency, resolved the way the repository resolves it.
+  symlinkSync(join(REPO, 'node_modules'), join(root, 'node_modules'), 'dir');
   return root;
 }
 
@@ -76,6 +79,9 @@ function importOnlyRoot(context) {
   for (const name of SHARED_SCANNERS) {
     copyFileSync(new URL(`../lib/${name}`, import.meta.url), join(root, `tools/lib/${name}`));
   }
+  // The parser resolves, because importing the checker loads it; nothing else
+  // the fixture lacks, global.css and react-native-css included, may be read.
+  symlinkSync(join(REPO, 'node_modules'), join(root, 'node_modules'), 'dir');
   return root;
 }
 
@@ -439,7 +445,38 @@ test('reads the container classes past a nested template literal', context => {
   assert.match(result.stderr, /screen\.tsx:2: <ScrollView> carries "px-4" on its own className/);
 });
 
-test('reports each ban at its own line from one whole-text scan', context => {
+test('reads the container classes past an arrow type argument', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/screen.tsx':
+      'export const a = <FlashList<() => void> data={rows} className="ps-3" />;\n',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /screen\.tsx:1: <FlashList> carries "ps-3" on its own className/);
+});
+
+test('reads the container classes past a block comment holding a quote and a brace', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/screen.tsx':
+      'export const a = (\n' +
+      '  <ScrollView\n' +
+      `    /* it's the "body" { } */\n` +
+      '    className="pl-2"\n' +
+      '  />\n' +
+      ');\n',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /screen\.tsx:2: <ScrollView> carries "pl-2" on its own className/);
+});
+
+test('reports a source file the parser refuses', context => {
+  const result = runChecker(context, { 'apps/mobile/src/broken.ts': 'const a = ;\n' });
+  assert.equal(result.status, 1, result.stderr);
+  // An unreadable file is a problem of its own: its tree is empty, so a silent
+  // skip would report the file as clean.
+  assert.match(result.stderr, /broken\.ts:1: cannot parse: /);
+});
+
+test('reports each ban at its own line', context => {
   const result = runChecker(context, {
     'apps/mobile/src/bans.ts':
       'const a = 1;\n' +
@@ -447,8 +484,8 @@ test('reports each ban at its own line from one whole-text scan', context => {
       'const b = "text-start";\n' +
       'const c = 2;\n' +
       'const d = "ltr: leading-9";\n' +
-      '// "bg-primary/50" in the rule comment is documentation\n' +
-      ' * text-start in a block-comment body\n',
+      '/* "bg-primary/50" in the rule comment is documentation\n' +
+      ' * text-start in a block-comment body */\n',
   });
   assert.equal(result.status, 1, result.stderr);
   assert.deepEqual(
@@ -461,7 +498,24 @@ test('reports each ban at its own line from one whole-text scan', context => {
   );
 });
 
-test('keeps the Intl scan line-shaped across a line break', context => {
+test('reads a ban inside a template chunk but not one in a comment or a regular expression', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/bans.ts':
+      'const a = `flex-1 text-start`;\n' +
+      'const b = 1; // text-start is not a class here\n' +
+      'const c = /text-start/;\n' +
+      '/* ltr: and leading-9 in a comment body read as documentation */\n',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.deepEqual(
+    result.stderr.split('\n').filter(line => line.startsWith('apps/')),
+    [
+      `apps/mobile/src/bans.ts:1: "text-start" text-align: start/end is dropped; the shared Text handles RTL alignment already`,
+    ]
+  );
+});
+
+test('flags a formatter whose call parenthesis starts the next line', context => {
   const result = runChecker(context, {
     'apps/mobile/src/format.ts':
       'export const a = Intl.NumberFormat\n' +
@@ -471,8 +525,8 @@ test('keeps the Intl scan line-shaped across a line break', context => {
   });
   assert.equal(result.status, 1, result.stderr);
   assert.match(result.stderr, /"new Intl\.DateTimeFormat" builds its own formatter/);
-  // The constructor called on the next line stays out, as it did line by line.
-  assert.doesNotMatch(result.stderr, /"Intl\.NumberFormat"/);
+  // A call that wraps its parenthesis is the same formatter as one on a line.
+  assert.match(result.stderr, /"Intl\.NumberFormat\(" builds its own formatter/);
 });
 
 test('reports a constructor whose new ends the previous line', context => {
@@ -480,9 +534,8 @@ test('reports a constructor whose new ends the previous line', context => {
     'apps/mobile/src/format.ts': 'export const a = new\nIntl.DateTimeFormat("en");\n',
   });
   assert.equal(result.status, 1, result.stderr);
-  // The line-by-line scan reported the call on its own line; the rejected
-  // `new\nIntl…` match must not swallow it.
-  assert.match(result.stderr, /format\.ts:2: "Intl\.DateTimeFormat\(" builds its own formatter/);
+  // The constructor is reported where its name is, whichever line `new` took.
+  assert.match(result.stderr, /format\.ts:2: "new Intl\.DateTimeFormat" builds its own formatter/);
 });
 
 test('reads one relative path the same however it is spelled', context => {

@@ -22,7 +22,6 @@ import {
   COMPOSER_CONTROL_HIT_SLOP_DP,
   COMPOSER_VOICE_SEND_GAP_CLASS,
   composerFacingHitSlop,
-  VOICE_INPUT_LG_HIT_SLOP_DP,
 } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -41,18 +40,18 @@ const CONTROL_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
  * so it stays on the side a control faces its neighbour on when the row
  * mirrors under RTL (`marginInlineStart` resolves to Yoga Start in both
  * directions; `screen-header.tsx` documents the same choice). That gap is
- * wider than the two facing hit slops (the voice toggle's
- * `VOICE_INPUT_LG_HIT_SLOP_DP` plus `COMPOSER_CONTROL_HIT_SLOP_DP`), so
- * neighbouring controls keep separate tap areas. Without it a control renders
- * flush against the one before it: the microphone and the send/stop circles
- * merged into a single shape and their tap areas overlapped (spot check e1 /
- * e1-en-two-msg). Every control but the leading paperclip carries this same
- * class — the paperclip only ever meets the input, whose own start margin is
- * the gap after it — so the input and each trailing control sit one gap apart
- * and a trailing control added without it cannot sit flush against its
- * neighbour again. The one exception is the send/stop control after the voice
- * toggle: that pair sits `COMPOSER_VOICE_SEND_GAP_CLASS` apart and zeroes the
- * slop on the sides they face each other on.
+ * wider than the facing hit slop of the row's own controls
+ * (`COMPOSER_CONTROL_HIT_SLOP_DP`), so neighbouring controls keep separate tap
+ * areas. Without it a control renders flush against the one before it: the
+ * microphone and the send/stop circles merged into a single shape and their
+ * tap areas overlapped (spot check e1 / e1-en-two-msg). Every control but the
+ * leading paperclip carries this same class — the paperclip only ever meets
+ * the input, whose own start margin is the gap after it — so the input and each
+ * trailing control sit one gap apart and a trailing control added without it
+ * cannot sit flush against its neighbour again. The one exception is the
+ * send/stop control after the voice toggle: that pair sits
+ * `COMPOSER_VOICE_SEND_GAP_CLASS` apart and zeroes the slop on the side the
+ * send control faces it on.
  */
 export const COMPOSER_CONTROL_GAP_CLASS = 'ms-3';
 
@@ -165,8 +164,8 @@ export function ChatComposerInputRow({
     includeFontPadding: false,
     lineHeight: textInputStyle.lineHeight,
   };
-  // The microphone is always present, so the send control keeps the facing gap
-  // and the slop it shares with it.
+  // The microphone is always present, so the send control keeps the narrower
+  // voice/send gap and zeroes the slop on the side it faces the toggle on.
   const sendGapClass = COMPOSER_VOICE_SEND_GAP_CLASS;
   const sendHitSlop = composerFacingHitSlop(COMPOSER_CONTROL_HIT_SLOP_DP, 'start');
 
@@ -273,11 +272,12 @@ export function ChatComposerInputRow({
 
         {/* The toggle stays in the row whether or not the OS recognizer answers
             available: a tap re-probes it and either starts a session or says why
-            it cannot, so the control never disappears without a word. */}
+            it cannot, so the control never disappears without a word. `lg`
+            renders its own 48dp target box, so the row adds no slop and the
+            box cannot reach into a neighbour. */}
         <View className={COMPOSER_CONTROL_GAP_CLASS}>
           <VoiceInputButton
             disabled={voiceDisabled}
-            hitSlop={composerFacingHitSlop(VOICE_INPUT_LG_HIT_SLOP_DP, 'end')}
             size="lg"
             status={voiceInputStatus}
             onPress={onToggleVoice}

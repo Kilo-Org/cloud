@@ -10,7 +10,7 @@ import {
   getVercelModelsMetadataFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import type { StoredModel } from '@kilocode/db';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getVercelModelsMetadataFromDatabase: jest.fn(),
@@ -34,7 +34,7 @@ beforeEach(() => {
     [SONNET]: {
       id: SONNET,
       endpoints: [{ provider_name: 'anthropic' }, { provider_name: 'bedrock' }],
-    } as StoredModel,
+    } as GatewayModelWithEndpoints,
   });
   jest.mocked(getVercelModelsFromDatabase).mockResolvedValue(new Set([SONNET]));
   jest.mocked(isValidOpenRouterModelId).mockResolvedValue(true);

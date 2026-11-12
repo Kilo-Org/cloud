@@ -2,11 +2,13 @@ import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
 import { queryAnalyticsEngine, sqlDateTime, sqlString } from '@/lib/cloudflare/analytics-engine';
+import { timingSafeEqual } from '@kilocode/encryption';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
+import { MODELS_HEALTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { getMonitoredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
-// Simple hardcoded key for authentication
-const HEALTH_CHECK_KEY = 'kilo-models-health-check';
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 type ModelHealthMetrics = {
   healthy: boolean;
@@ -161,13 +163,12 @@ function evaluateModelHealth(stats: ModelStats): ModelHealthMetrics {
 export async function GET(
   request: Request
 ): Promise<NextResponse<HealthResponse | HealthResponseError>> {
-  const { searchParams } = new URL(request.url);
-  const key = searchParams.get('key');
-
-  if (key !== HEALTH_CHECK_KEY) {
-    return NextResponse.json({ healthy: false }, { status: 401 });
+  const token = extractBearerToken(request.headers.get('authorization'));
+  if (!MODELS_HEALTH_SECRET || !token || !timingSafeEqual(token, MODELS_HEALTH_SECRET)) {
+    return NextResponse.json({ healthy: false }, { status: 401, headers: NO_STORE_HEADERS });
   }
 
+  const { searchParams } = new URL(request.url);
   // Optional `at` parameter: ISO 8601 timestamp to anchor the query window.
   // When omitted the query uses the current time. Must be within the last 24 hours.
   const atParam = searchParams.get('at');
@@ -175,11 +176,11 @@ export async function GET(
   if (atParam) {
     const parsed = new Date(atParam);
     if (Number.isNaN(parsed.getTime())) {
-      return NextResponse.json({ healthy: false }, { status: 400 });
+      return NextResponse.json({ healthy: false }, { status: 400, headers: NO_STORE_HEADERS });
     }
     const ageMs = Date.now() - parsed.getTime();
     if (ageMs < 0 || ageMs > 24 * 60 * 60 * 1000) {
-      return NextResponse.json({ healthy: false }, { status: 400 });
+      return NextResponse.json({ healthy: false }, { status: 400, headers: NO_STORE_HEADERS });
     }
     anchorTime = parsed;
   }
@@ -198,7 +199,7 @@ export async function GET(
         healthy: false,
         error: error instanceof Error ? error.message : 'Monitored models unavailable',
       },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 
@@ -245,7 +246,7 @@ export async function GET(
           queryExecutionTimeMs,
         },
       },
-      { status }
+      { status, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
     captureException(error, {
@@ -263,7 +264,7 @@ export async function GET(
           queryExecutionTimeMs: -1,
         },
       },
-      { status: 200 }
+      { status: 200, headers: NO_STORE_HEADERS }
     );
   }
 }

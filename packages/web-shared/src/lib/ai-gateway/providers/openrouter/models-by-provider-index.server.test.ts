@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from '@jest/globals';
 import { ai_gateway_config } from '@kilocode/db/schema';
-import type { StoredModel } from '@kilocode/db/schema-types';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import type {
   NormalizedOpenRouterResponse,
@@ -71,7 +71,7 @@ function makeSnapshot(): NormalizedOpenRouterResponse {
   };
 }
 
-function storedModel(id: string, tags: (string | undefined)[]): StoredModel {
+function storedModel(id: string, tags: (string | undefined)[]): GatewayModelWithEndpoints {
   return {
     id,
     name: id,
@@ -79,7 +79,7 @@ function storedModel(id: string, tags: (string | undefined)[]): StoredModel {
   };
 }
 
-const storedModels: Record<string, StoredModel> = {
+const storedModels: Record<string, GatewayModelWithEndpoints> = {
   [MODEL]: storedModel(MODEL, ['deepinfra/bf16', 'coreweave/bf16']),
   [FREE_MODEL]: storedModel(FREE_MODEL, ['nvidia/nvfp4']),
 };
@@ -208,8 +208,8 @@ describe('narrowProviderSlugsToVariant', () => {
 
 describe('createModelsByProviderIndexLoader', () => {
   function loader(
-    models: Record<string, StoredModel> = storedModels,
-    vercelModels: Record<string, StoredModel> = {},
+    models: Record<string, GatewayModelWithEndpoints> = storedModels,
+    vercelModels: Record<string, GatewayModelWithEndpoints> = {},
     snapshot = makeSnapshot()
   ) {
     return createModelsByProviderIndexLoader({

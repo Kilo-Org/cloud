@@ -8,6 +8,7 @@ import {
   type PreparationRowSummary,
 } from './preparation-summary';
 import { describeFailedCommand, failedCommandRows } from './failed-commands';
+import { readableSessionError } from './session-error-copy';
 
 type PreparationRowProps = {
   attempt: PreparationAttempt;
@@ -102,8 +103,12 @@ function RowLabel({ summary }: { summary: PreparationRowSummary }) {
   }
   return (
     <>
-      <span className="text-destructive shrink-0">Preparation failed</span>
-      {summary.error && <span className="text-destructive min-w-0 truncate">{summary.error}</span>}
+      <span className="shrink-0">Preparation failed</span>
+      {summary.error && (
+        <span className="text-foreground-subtle min-w-0 truncate">
+          · {readableSessionError(summary.error)}
+        </span>
+      )}
       <span className="shrink-0 underline underline-offset-2">View details</span>
     </>
   );

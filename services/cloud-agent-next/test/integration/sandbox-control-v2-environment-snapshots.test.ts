@@ -1,5 +1,6 @@
 import { env, reset, runInDurableObject } from 'cloudflare:test';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { logger } from '../../src/logger.js';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { sessionDoName } from '../../src/session-identity.js';
@@ -7,6 +8,7 @@ import { allocation as allocationTable } from '../../src/control-plane/sandbox/s
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import type { SnapshotResolution } from '../../src/environment-build/coordinator.js';
+import { ENVIRONMENT_SNAPSHOT_MESSAGES } from '../../src/control-plane/sandbox/environment-snapshot-launch.js';
 import type { SessionEnvironmentReference } from '../../src/environment-build/reference.js';
 import type {
   ProviderAdapter,
@@ -14,14 +16,17 @@ import type {
   ProviderLaunchOptions,
   ProviderLaunchResult,
   ProviderStartSource,
+  ProviderStartupCommand,
   StopResult,
 } from '../../src/sandbox-control/provider.js';
+import { ProviderSnapshotCreationError } from '../../src/sandbox-control/provider.js';
+import { RUNTIME_BASE_ABI } from '../../src/sandbox-control/runtime-release.js';
 import type { ControlPlaneRouteSpec } from '../../src/shared/control-plane-protocol.js';
 import {
   createFakeCredentialBroker,
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import {
   FakeSessionPeer,
@@ -43,10 +48,14 @@ const REFERENCE: SessionEnvironmentReference = {
   configurationRevision: 2,
   repository: { platform: 'github', repoFullName: 'acme/widgets' },
 };
-const SNAPSHOT = { snapshotId: 'snap-env', baseImage: 'registry.example/app:1' };
+const SNAPSHOT = {
+  snapshotId: 'snap-env',
+  baseImage: 'registry.example/app:1',
+};
 const RESOLVED: SnapshotResolution = {
   snapshot: {
     ...SNAPSHOT,
+    provider: 'cloudflare-containers',
     revision: 1,
     capturedAt: 1,
     buildId: '66666666-6666-4666-8666-666666666666',
@@ -60,15 +69,44 @@ const MISSING: SnapshotResolution = {
   reason: 'missing',
   admission: { status: 'active', buildId: '77777777-7777-4777-8777-777777777777' },
 };
-
+const VERCEL_SNAPSHOT = { ...SNAPSHOT, provider: 'vercel' as const };
+const RESOLVED_VERCEL: SnapshotResolution = {
+  ...RESOLVED,
+  snapshot: { ...RESOLVED.snapshot!, ...VERCEL_SNAPSHOT },
+};
+const BYOC = {
+  credentialId: '88888888-8888-4888-8888-888888888888',
+  organizationId: REFERENCE.owner.id,
+};
+const VERCEL_SELECTION = { provider: 'vercel' as const, byoc: BYOC };
+const RUNTIME_DESCRIPTOR = JSON.stringify({
+  format: 1,
+  bootstrap: 1,
+  platform: { os: 'linux', arch: 'x64', libc: 'glibc', cpu: 'baseline' },
+  abi: RUNTIME_BASE_ABI,
+  cliVersion: '7.8.1',
+  cliExecutable: 'package/bin/kilo',
+  wrapperSdkVersion: '7.8.1',
+  protocol: '1',
+  artifacts: [
+    { role: 'cli', sha256: 'a'.repeat(64), transferBytes: 1, expandedBytes: 1, fileCount: 1 },
+    { role: 'control', sha256: 'b'.repeat(64), transferBytes: 1, expandedBytes: 1, fileCount: 1 },
+  ],
+  caps: { maxTransferBytes: 100, maxExpandedBytes: 100, maxFileCount: 10 },
+  inventory: [
+    ['cli', 'package/bin/kilo', 0o755, 1, 'a'.repeat(64)],
+    ['control', 'usr/local/bin/wrapper', 0o755, 1, 'b'.repeat(64)],
+  ],
+});
 /** A coordinator namespace that answers every lookup with one resolution and records it. */
-function fakeEnvironmentBuild(resolution: SnapshotResolution = RESOLVED) {
+function fakeEnvironmentBuild(resolution: SnapshotResolution = RESOLVED, events?: string[]) {
   const lookups: unknown[] = [];
   return {
     lookups,
     namespace: {
       getByName: () => ({
         resolveSnapshot: async (input: unknown) => {
+          events?.push('lookup');
           lookups.push(input);
           return resolution;
         },
@@ -78,6 +116,31 @@ function fakeEnvironmentBuild(resolution: SnapshotResolution = RESOLVED) {
 }
 const WITH_SNAPSHOT = { ENVIRONMENT_BUILD: fakeEnvironmentBuild().namespace };
 const WITHOUT_SNAPSHOT = { ENVIRONMENT_BUILD: fakeEnvironmentBuild(MISSING).namespace };
+const VERCEL_ENV = {
+  ...WITH_SNAPSHOT,
+  VERCEL_SANDBOX_RUNTIME: 'node24',
+  VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
+  VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
+  RUNTIME_RELEASE_DESCRIPTOR: RUNTIME_DESCRIPTOR,
+  RUNTIME_RELEASE_BUCKET: {
+    async head() {
+      return { size: 1 };
+    },
+  },
+  // Vercel has no outbound credential proxy, so a managed repository token is resolved directly.
+  GIT_TOKEN_SERVICE: {
+    ...createFakeCredentialBroker(),
+    async getTokenForRepo() {
+      return {
+        success: true as const,
+        token: 'ghs_fake_installation_token',
+        installationId: '1',
+        accountLogin: 'acme',
+        appType: 'standard' as const,
+      };
+    },
+  },
+};
 // The Durable Object shares one env object across tests, so every test states the env it
 // needs and the Worker secret a previous test removed is put back.
 const WORKER_SECRET = (env as unknown as { NEXTAUTH_SECRET: unknown }).NEXTAUTH_SECRET;
@@ -88,13 +151,20 @@ const sandboxNamespace = (env as unknown as { SANDBOX_CONTROL: SandboxControlNam
 
 type FakeProvider = {
   adapter: ProviderAdapter;
+  adapterFor: (allocationName: string) => ProviderAdapter;
+  createIntents: ProviderCreateIntent[];
+  createdRefs: string[];
   launchEnvs: Record<string, string>[];
+  launchCommands: ProviderStartupCommand[];
   launchOptions: Array<ProviderLaunchOptions | undefined>;
   launchDeadlines: Array<number | undefined>;
   launchRefs: string[];
   stopRefs: Array<string | null>;
+  stopMismatches: Array<{ boundName: string; ref: string | null }>;
   launchHold: boolean;
   releaseLaunch: () => void;
+  createHoldIndex: number | undefined;
+  releaseCreate: () => void;
   stopHold: boolean;
   releaseStop: () => void;
 };
@@ -104,36 +174,82 @@ function createFakeProvider(
     snapshots?: boolean;
     startSource?: ProviderStartSource;
     holdLaunch?: boolean;
+    holdCreateIndex?: number;
     holdStop?: boolean;
     launchError?: Error;
     launches?: Array<ProviderLaunchResult | Error>;
+    creates?: Array<{ snapshotFailed?: true } | { unresolved: true } | undefined>;
+    createErrors?: Array<Error | undefined>;
+    createErrorsBeforeRef?: Array<Error | undefined>;
+    observeReplacement?: () => 'unknown' | { providerRef: string };
+    /** Physical refs include the allocation name, like the real Vercel provider. */
+    vercel?: boolean;
+    events?: string[];
     stopResult?: StopResult;
+    stopError?: Error;
     stopDelayMs?: number;
   } = {}
 ): FakeProvider {
   let releaseLaunch: () => void = () => undefined;
+  let releaseCreate: () => void = () => undefined;
   let releaseStop: () => void = () => undefined;
   const provider: FakeProvider = {
     adapter: null as unknown as ProviderAdapter,
+    adapterFor: () => null as unknown as ProviderAdapter,
+    createIntents: [],
+    createdRefs: [],
     launchEnvs: [],
+    launchCommands: [],
     launchOptions: [],
     launchDeadlines: [],
     launchRefs: [],
     stopRefs: [],
+    stopMismatches: [],
     launchHold: options.holdLaunch ?? false,
     releaseLaunch: () => releaseLaunch(),
+    createHoldIndex: options.holdCreateIndex,
+    releaseCreate: () => releaseCreate(),
     stopHold: options.holdStop ?? false,
     releaseStop: () => releaseStop(),
   };
   provider.adapter = {
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
-      return { providerRef: `mem_${intent.intentId}` };
+      options.events?.push('create');
+      const createIndex = provider.createIntents.length;
+      provider.createIntents.push(intent);
+      if (provider.createHoldIndex === createIndex) {
+        await new Promise<void>(resolve => {
+          releaseCreate = resolve;
+        });
+      }
+      const configured = options.creates?.[createIndex];
+      if (configured !== undefined && 'unresolved' in configured) return configured;
+      const createErrorBeforeRef = options.createErrorsBeforeRef?.[createIndex];
+      if (createErrorBeforeRef !== undefined) throw createErrorBeforeRef;
+      const providerRef = options.vercel
+        ? `mem_${intent.allocationName}_${intent.intentId}`
+        : `mem_${intent.intentId}`;
+      provider.createdRefs.push(providerRef);
+      const createError = options.createErrors?.[createIndex];
+      if (createError !== undefined) throw createError;
+      return configured?.snapshotFailed === true
+        ? { providerRef, snapshotFailed: true as const }
+        : { providerRef };
     },
-    async launch(ref, { env: launchEnv }, launchOptions) {
+    async launch(ref, { env: launchEnv, command }, launchOptions) {
       const launchIndex = provider.launchEnvs.length;
       provider.launchEnvs.push({ ...launchEnv });
-      const { deadlineAt, ...recordedOptions } = launchOptions ?? {};
+      provider.launchCommands.push(command);
+      const { deadlineAt, snapshotDiagnostic, ...recordedOptions } = launchOptions ?? {};
+      if (snapshotDiagnostic) {
+        expect(snapshotDiagnostic).toMatchObject({
+          allocationId: launchEnv.CONTROL_PLANE_ALLOCATION_ID,
+          source: 'environment',
+          attempt: expect.any(Number),
+          startedAt: expect.any(Number),
+        });
+      }
       provider.launchOptions.push(launchOptions === undefined ? undefined : recordedOptions);
       provider.launchDeadlines.push(deadlineAt);
       provider.launchRefs.push(ref);
@@ -147,11 +263,22 @@ function createFakeProvider(
       if (result instanceof Error) throw result;
       return result ?? { startSource: options.startSource ?? 'image' };
     },
-    async observe(ref) {
+    async observe(ref, intent) {
+      if (ref === null && intent !== undefined && options.vercel) {
+        const scripted = options.observeReplacement?.();
+        if (scripted === 'unknown') return { status: 'unknown' as const };
+        if (scripted !== undefined)
+          return { status: 'active' as const, providerRef: scripted.providerRef };
+        const expected = `mem_${intent.allocationName}_${intent.intentId}`;
+        return provider.createdRefs.includes(expected)
+          ? { status: 'active' as const, providerRef: expected }
+          : { status: 'unknown' as const };
+      }
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
     },
     async stop(ref) {
       provider.stopRefs.push(ref);
+      if (options.stopError) throw options.stopError;
       if (options.stopDelayMs) {
         await new Promise(resolve => setTimeout(resolve, options.stopDelayMs));
       }
@@ -166,8 +293,24 @@ function createFakeProvider(
     async logs() {
       return '';
     },
-    ...(options.snapshots === false ? {} : { environmentSnapshots: true as const }),
+    ...(options.vercel ? { applyContainedCredentials: async () => {} } : {}),
+    ...(options.snapshots === false
+      ? {}
+      : { environmentSnapshots: options.vercel ? ('create' as const) : ('launch' as const) }),
   };
+  provider.adapterFor = allocationName =>
+    options.vercel
+      ? {
+          ...provider.adapter,
+          async stop(ref, intent) {
+            if (ref !== null && !ref.startsWith(`mem_${allocationName}_`)) {
+              provider.stopMismatches.push({ boundName: allocationName, ref });
+              return 'retryable';
+            }
+            return provider.adapter.stop(ref, intent);
+          },
+        }
+      : provider.adapter;
   return provider;
 }
 
@@ -226,14 +369,10 @@ async function setup(
   const stub = sandboxNamespace.getByName(sandboxId);
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
+    installFakeSandboxEnv(instance, createFakeCredentialBroker(), {
       NEXTAUTH_SECRET: WORKER_SECRET,
       // Credential grants require the runtime proxy facade, independent of local settings.
       WORKER_URL: 'https://worker.example.com',
-      // These tests use fake providers, independently of local runtime deployment settings.
-      RUNTIME_STARTUP_MODE: 'preinstalled',
-      NATIVE_RUNTIME_IMAGE: 'all-in-one',
-      RUNTIME_RELEASE_DESCRIPTOR: undefined,
       ...extraEnv,
     });
     peer.runtimeProxyForSession = createRuntimeProxyMintingPeer(instance.env, sessionId => {
@@ -242,7 +381,8 @@ async function setup(
       return identity;
     });
     Object.assign(instance, {
-      createProviderAdapter: () => provider.adapter,
+      createProviderAdapter: (pin: { allocationName?: string }) =>
+        provider.adapterFor(pin.allocationName ?? ''),
       provider: provider.adapter,
       sessionPeerFor: (_ownerId: string, id: string) => peer.forSession(id),
     });
@@ -293,6 +433,7 @@ async function prepareFrameOf(wrapper: FakeWrapper) {
 
 afterEach(async () => {
   await reset();
+  vi.restoreAllMocks();
 });
 /** An environment with one build command: it may only start from its snapshot. */
 const BUILD: RouteOverrides = { setupCommands: ['env-build'], environmentSetupCommandCount: 1 };
@@ -364,8 +505,8 @@ describe('environment snapshot launch', () => {
     const { wrapper, allocationId } = await connect(sandboxId, provider, 2);
 
     expect(provider.launchOptions).toEqual([
-      { snapshot: SNAPSHOT, nativeImage: 'all-in-one' },
-      { snapshot: SNAPSHOT, nativeImage: 'all-in-one' },
+      { snapshot: SNAPSHOT, nativeImage: 'runtime-free' },
+      { snapshot: SNAPSHOT, nativeImage: 'runtime-free' },
     ]);
     expect(provider.launchRefs[1]).toBe(provider.launchRefs[0]);
     expect(provider.stopRefs).toEqual([provider.launchRefs[0]]);
@@ -374,14 +515,15 @@ describe('environment snapshot launch', () => {
     await prepareFrameOf(wrapper);
     expect(await readLaunchRecord(stub)).toEqual({
       allocationId,
-      startupMode: 'preinstalled',
+      startupMode: 'downloaded',
       startSource: 'repository',
       confirmed: true,
     });
     expect(peer.routeUpdatesFor(SESSION).some(update => update.state === 'failed')).toBe(false);
   });
 
-  it('fails with "Rebuild the environment" after a repeated transient failure, without an image launch', async () => {
+  it('offers a message retry after a repeated transient failure, without an image launch', async () => {
+    const fields = vi.spyOn(logger, 'withFields');
     const provider = createFakeProvider({
       launches: [
         { startSource: 'repository', snapshotFailed: true, snapshotFailureReason: 'transient' },
@@ -396,8 +538,66 @@ describe('environment snapshot launch', () => {
     expect(
       provider.launchOptions.every(options => options?.snapshot?.snapshotId === 'snap-env')
     ).toBe(true);
-    expect(environmentSnapshotDetails(peer).at(-1)).toContain('Rebuild the environment');
+    expect(environmentSnapshotDetails(peer).at(-1)).toBe(
+      'Sandbox could not start from the environment snapshot. Send the message again to retry. Rebuild the environment only if this failure repeats.'
+    );
     expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed');
+    expect(fields.mock.calls.map(([record]) => record)).toContainEqual(
+      expect.objectContaining({
+        diagnosticEvent: 'snapshot_start_blocked',
+        failureStage: 'provider_snapshot',
+        reason: 'environment_snapshot_start_failed',
+        attempt: 2,
+        source: 'environment',
+      })
+    );
+  });
+
+  it.each([
+    {
+      name: 'unconfirmed stop',
+      stopError: undefined,
+      errorName: 'none',
+      cause: 'stop_not_confirmed',
+    },
+    {
+      name: 'rejected stop',
+      stopError: new TypeError('provider stop rejected'),
+      errorName: 'TypeError',
+      cause: 'provider_stop_rejected',
+    },
+  ])('records a $name without changing the route failure or launching again', async scenario => {
+    const fields = vi.spyOn(logger, 'withFields');
+    const provider = createFakeProvider({
+      launches: [new TypeError('provider rejected start')],
+      stopResult: 'retryable',
+      stopError: scenario.stopError,
+    });
+    const { stub, peer } = await setup('sbx__repo_retry_stop_failed', provider);
+    await stub.prepare(prepareInput(BUILD));
+    await waitForFailed(peer);
+    expect(provider.launchEnvs).toHaveLength(1);
+    const records = fields.mock.calls.map(([record]) => record);
+    expect(records.filter(record => record.diagnosticEvent === 'snapshot_launch_failed')).toEqual([
+      expect.objectContaining({
+        source: 'environment',
+        failureStage: 'retry_stop',
+        reason: 'stop_failed',
+        errorName: scenario.errorName,
+        cause: scenario.cause,
+        launchErrorName: 'TypeError',
+        launchCause: 'provider_rejected_start',
+        attempt: 1,
+      }),
+    ]);
+    expect(records.filter(record => record.diagnosticEvent === 'snapshot_start_blocked')).toEqual([
+      expect.objectContaining({
+        reason: 'environment_snapshot_start_failed',
+        failureStage: 'retry_stop',
+        errorName: scenario.errorName,
+        cause: scenario.cause,
+      }),
+    ]);
   });
 
   it.each([
@@ -416,6 +616,10 @@ describe('environment snapshot launch', () => {
     await stub.prepare(prepareInput(BUILD));
     await waitForFailed(peer);
     expect(provider.launchEnvs).toHaveLength(1);
+    expect(environmentSnapshotDetails(peer).at(-1)).toBe(
+      'Environment snapshot is unavailable. Rebuild the environment.'
+    );
+    expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed');
   });
 
   it('holds preparation for an early hello until the snapshot launch reports its source', async () => {
@@ -463,8 +667,10 @@ describe('environment snapshot launch', () => {
     const { wrapper } = await connect('sbx__env_launch_selected', provider);
     const frame = await prepareFrameOf(wrapper);
 
-    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT, nativeImage: 'all-in-one' }]);
-    expect(lookups.lookups).toEqual([{ reference: REFERENCE, actorUserId: 'user_123' }]);
+    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT, nativeImage: 'runtime-free' }]);
+    expect(lookups.lookups).toEqual([
+      { reference: REFERENCE, actorUserId: 'user_123', provider: 'cloudflare-containers' },
+    ]);
     expect(frame.spec.capture).toBeUndefined();
     expect(frame.spec).not.toHaveProperty('environment');
     await waitFor(() =>
@@ -472,8 +678,7 @@ describe('environment snapshot launch', () => {
         state: 'preparing',
         attemptId: expect.any(String),
         step: 'environment_snapshot',
-        detail:
-          'Using environment snapshot; environment settings have changed; cached files may retain earlier values; a replacement build was started',
+        detail: 'Using environment snapshot',
         snapshotCapturedAt: 1,
       })
     );
@@ -515,7 +720,7 @@ describe('environment snapshot launch', () => {
     const { wrapper } = await connect(sandboxId, provider);
     const frame = await prepareFrameOf(wrapper);
 
-    expect(provider.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
+    expect(provider.launchOptions).toEqual([{ nativeImage: 'runtime-free' }]);
     expect(lookups.lookups).toEqual([]);
     expect(frame.spec.capture).toBeUndefined();
   });
@@ -528,7 +733,7 @@ describe('environment snapshot launch', () => {
 
     expect(provider.launchEnvs).toHaveLength(0);
     expect(environmentSnapshotDetails(peer)).toContain(
-      'The environment is building. Build 77777777-7777-4777-8777-777777777777.'
+      'Environment is building. Retry when it finishes.'
     );
   });
 
@@ -540,6 +745,9 @@ describe('environment snapshot launch', () => {
     await stub.prepare(prepareInput(BUILD));
     await waitForFailed(peer);
     expect(provider.launchEnvs).toHaveLength(0);
+    expect(environmentSnapshotDetails(peer)).toContain(
+      'Environment snapshot is temporarily unavailable. Try again.'
+    );
   });
 
   it.each([
@@ -547,13 +755,13 @@ describe('environment snapshot launch', () => {
       name: 'retired shared sandbox path',
       directory: '/workspace/org/user/sessions/s1',
       snapshots: true,
-      detail: 'This session uses a retired sandbox type',
+      detail: 'This session cannot use the environment snapshot. Start a new session.',
     },
     {
       name: 'provider without snapshots',
       directory: ISOLATED_DIRECTORY,
       snapshots: false,
-      detail: 'This sandbox provider does not support environment snapshots yet',
+      detail: 'Environment snapshots are not supported for this session.',
     },
   ])(
     'fails at once without an image start or a build link when no environment snapshot can serve it: $name',
@@ -573,7 +781,7 @@ describe('environment snapshot launch', () => {
             ? [update.detail]
             : []
         );
-      expect(sandboxDetails.some(detail => detail.startsWith(scenario.detail))).toBe(true);
+      expect(sandboxDetails).toContain(scenario.detail);
     }
   );
 
@@ -605,7 +813,7 @@ describe('environment snapshot launch', () => {
 
     await connect('sbx__repo_launch_keep', provider);
 
-    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT, nativeImage: 'all-in-one' }]);
+    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT, nativeImage: 'runtime-free' }]);
   });
 
   it('does not carry a previous confirmation onto a launch that never connects', async () => {
@@ -661,7 +869,7 @@ describe('environment snapshot launch', () => {
     provider.launchHold = false;
     await releaseHeld(stub, () => provider.releaseStop());
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
-    expect(provider.launchOptions[1]).toEqual({ snapshot: SNAPSHOT, nativeImage: 'all-in-one' });
+    expect(provider.launchOptions[1]).toEqual({ snapshot: SNAPSHOT, nativeImage: 'runtime-free' });
   });
 
   it('marks the launch confirmed only for the allocation whose wrapper connected', async () => {
@@ -843,5 +1051,141 @@ describe('environment snapshot session preparation', () => {
     );
     expect(provider.stopRefs).toEqual([]);
     expect(provider.launchEnvs).toHaveLength(1);
+  });
+});
+
+describe('Vercel BYOC environment snapshot restore', () => {
+  it('looks up and passes the selected snapshot in the create intent before Vercel starts', async () => {
+    const sandboxId = 'sbx__vercel_snapshot_intent';
+    const events: string[] = [];
+    const lookups = fakeEnvironmentBuild(RESOLVED_VERCEL, events);
+    const provider = createFakeProvider({ startSource: 'repository', vercel: true, events });
+    const { stub } = await setup(sandboxId, provider, {
+      ...VERCEL_ENV,
+      ENVIRONMENT_BUILD: lookups.namespace,
+    });
+    await stub.prepare({ ...prepareInput(BUILD), sandboxSelection: VERCEL_SELECTION });
+    const { wrapper, allocationId } = await connect(sandboxId, provider);
+    await prepareFrameOf(wrapper);
+
+    expect(events).toEqual(['lookup', 'create']);
+    expect(lookups.lookups).toEqual([
+      { reference: REFERENCE, actorUserId: 'user_123', provider: 'vercel' },
+    ]);
+    expect(provider.createIntents).toHaveLength(1);
+    expect(provider.createIntents[0]?.allocationName).toMatch(/^sbx-[0-9a-f]{32}$/);
+    const selectedSnapshot = {
+      snapshotId: VERCEL_SNAPSHOT.snapshotId,
+      baseImage: VERCEL_SNAPSHOT.baseImage,
+      provider: 'vercel',
+    };
+    expect(provider.createIntents[0]).toMatchObject({ snapshot: selectedSnapshot });
+    expect(provider.launchOptions).toEqual([{ snapshot: selectedSnapshot }]);
+    // Vercel always downloads its own runtime, including a restore from a snapshot.
+    const command = provider.launchCommands[0]!;
+    expect(command.argv.some(value => value.includes('package/bin/kilo'))).toBe(true);
+    expect(command.argv.some(value => value.includes('https://worker.example.com'))).toBe(true);
+    expect(await readLaunchRecord(stub)).toEqual({
+      allocationId,
+      startupMode: 'downloaded',
+      startSource: 'repository',
+      confirmed: true,
+    });
+    expect((await stub.getAllocationState()).provider).toBe('vercel');
+  });
+
+  it('reports a missing Vercel environment snapshot without creating a clean-base replacement', async () => {
+    const diagnostics = vi.spyOn(logger, 'withFields');
+    const sandboxId = 'sbx__vercel_snapshot_missing';
+    const provider = createFakeProvider({
+      vercel: true,
+      createErrorsBeforeRef: [new ProviderSnapshotCreationError('missing')],
+    });
+    const { stub, peer } = await setup(sandboxId, provider, {
+      ...VERCEL_ENV,
+      ENVIRONMENT_BUILD: fakeEnvironmentBuild(RESOLVED_VERCEL).namespace,
+    });
+    await stub.prepare({ ...prepareInput(BUILD), sandboxSelection: VERCEL_SELECTION });
+    await waitForFailed(peer);
+
+    expect(provider.createIntents).toHaveLength(1);
+    expect(provider.createIntents[0]?.snapshot).toEqual(VERCEL_SNAPSHOT);
+    expect(provider.launchEnvs).toEqual([]);
+    expect(environmentSnapshotDetails(peer)).toContain(
+      'Environment snapshot is unavailable. Rebuild the environment.'
+    );
+    await waitFor(() =>
+      expect(diagnostics).toHaveBeenCalledWith(
+        expect.objectContaining({
+          diagnosticEvent: 'snapshot_start_blocked',
+          sandboxId,
+          environmentId: REFERENCE.environmentId,
+          buildId: '77777777-7777-4777-8777-777777777777',
+        })
+      )
+    );
+  });
+
+  it('recreates from the same Vercel snapshot after a transient launch failure', async () => {
+    const sandboxId = 'sbx__vercel_snapshot_launch_retry';
+    const provider = createFakeProvider({
+      vercel: true,
+      launches: [new Error('temporary command request failure'), { startSource: 'repository' }],
+    });
+    const { stub } = await setup(sandboxId, provider, {
+      ...VERCEL_ENV,
+      ENVIRONMENT_BUILD: fakeEnvironmentBuild(RESOLVED_VERCEL).namespace,
+    });
+    await stub.prepare({ ...prepareInput(BUILD), sandboxSelection: VERCEL_SELECTION });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    await waitFor(async () => expect((await stub.getAllocationState()).providerRef).toBeNull());
+    await runInDurableObject(stub, async (instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      await db
+        .update(allocationTable)
+        .set({ create_deadline_at: Date.now() - 1 })
+        .where(eq(allocationTable.id, 'current'));
+      await instance.alarm();
+    });
+    await connect(sandboxId, provider, 2);
+
+    expect(provider.createIntents).toHaveLength(2);
+    expect(provider.createIntents.map(intent => intent.snapshot)).toEqual([
+      VERCEL_SNAPSHOT,
+      VERCEL_SNAPSHOT,
+    ]);
+    expect(provider.launchRefs[1]).not.toBe(provider.launchRefs[0]);
+    expect(provider.stopRefs).toContain(provider.launchRefs[0]);
+  });
+
+  it('fails a Vercel start at once, without a rebuild instruction, when the environment builds on other compute', async () => {
+    const sandboxId = 'sbx__vercel_snapshot_provider_mismatch';
+    const lookups = fakeEnvironmentBuild({
+      snapshot: null,
+      reason: 'provider_mismatch',
+      admission: { status: 'skipped', reason: 'unsupported' },
+    });
+    const provider = createFakeProvider({ startSource: 'image', vercel: true });
+    const { stub, peer } = await setup(sandboxId, provider, {
+      ...VERCEL_ENV,
+      ENVIRONMENT_BUILD: lookups.namespace,
+    });
+    await stub.prepare({ ...prepareInput(BUILD), sandboxSelection: VERCEL_SELECTION });
+    await waitForFailed(peer);
+
+    expect(lookups.lookups).toEqual([
+      { reference: REFERENCE, actorUserId: 'user_123', provider: 'vercel' },
+    ]);
+    expect(provider.createIntents).toHaveLength(0);
+    expect((await stub.getAllocationState()).provider).toBe('vercel');
+    expect(environmentSnapshotDetails(peer)).toEqual([]);
+    const sandboxDetails = peer
+      .routeUpdatesFor(SESSION)
+      .flatMap(update =>
+        update.state === 'preparing' && update.step === 'sandbox_create' && update.detail
+          ? [update.detail]
+          : []
+      );
+    expect(sandboxDetails).toContain(ENVIRONMENT_SNAPSHOT_MESSAGES.providerMismatch);
   });
 });

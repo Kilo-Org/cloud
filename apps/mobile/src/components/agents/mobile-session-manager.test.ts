@@ -56,6 +56,11 @@ vi.mock('@/lib/persist/resolved-delivery-failures', () => ({
   readResolvedDeliveryFailures: vi.fn(async () => []),
   persistResolvedDeliveryFailure: vi.fn(async () => undefined),
 }));
+vi.mock('@/lib/persist/pending-send-confirmations', () => ({
+  readPendingSendConfirmations: vi.fn(async () => []),
+  persistPendingSendConfirmation: vi.fn(async () => undefined),
+  clearPendingSendConfirmation: vi.fn(async () => undefined),
+}));
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.test',
   CLOUD_AGENT_WS_URL: 'wss://ws.test',

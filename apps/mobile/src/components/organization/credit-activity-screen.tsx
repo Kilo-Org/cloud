@@ -17,7 +17,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { formatDate, formatMoney } from '@/lib/format';
+import { isolateLtrBidiText } from '@/lib/bidi';
+import { formatDate, formatPrefixedMoney } from '@/lib/format';
 import {
   type CreditTransaction,
   useOrgBoundary,
@@ -94,8 +95,12 @@ const CreditRow = memo(function CreditRow({
           {title}
         </Text>
         <Text className={cn('text-sm font-medium', isPositive ? 'text-good' : 'text-foreground')}>
-          {isPositive ? '+' : '-'}
-          {formatMoney(Math.abs(amount), i18n.language)}
+          {/* The sign and the symbol are neutral characters, which a
+              right-to-left paragraph may move behind the number; the isolate
+              keeps the amount in its own left-to-right run. */}
+          {isolateLtrBidiText(
+            `${isPositive ? '+' : '-'}${formatPrefixedMoney(Math.abs(amount), i18n.language)}`
+          )}
         </Text>
       </View>
       <View className="flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">

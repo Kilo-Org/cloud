@@ -34,6 +34,7 @@ import {
   UNSUPPORTED_SESSION_TITLE,
   type SessionIngestItem,
 } from '../lib/mobile-sheet-fixtures';
+import { seedTokenSigningParams } from '../lib/token-signing';
 
 export const usage = '<email> [options]';
 
@@ -224,8 +225,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     userId: user.userId,
     pepper: user.apiTokenPepper,
     secret,
-    expiresInSeconds: TOKEN_EXPIRES_SECONDS,
-    env: process.env.NODE_ENV ?? 'development',
+    ...seedTokenSigningParams(TOKEN_EXPIRES_SECONDS),
     extra: user.isAdmin ? { isAdmin: true } : undefined,
   });
 

@@ -9,6 +9,7 @@
 import type { UserId } from '../types/ids.js';
 import type { AgentMode } from '../schema.js';
 import type { Attachments } from '../router/schemas.js';
+import type { GateThreshold } from '@kilocode/app-shared/code-review';
 
 /** Mode of execution - passed directly to kilocode CLI */
 export type ExecutionMode = AgentMode;
@@ -81,7 +82,7 @@ export type TurnFinalization = {
 
 /** Session policy extends per-turn finalization with session-only gates. */
 export type SessionFinalization = TurnFinalization & {
-  gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  gateThreshold?: GateThreshold;
 };
 
 /**

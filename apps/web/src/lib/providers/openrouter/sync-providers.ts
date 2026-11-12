@@ -1,4 +1,3 @@
-import * as z from 'zod';
 import pLimit from 'p-limit';
 import {
   normalizeModelId,
@@ -9,6 +8,17 @@ import {
   getMetadata,
   type MetadataSource,
 } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
+import {
+  formatModelIds,
+  gatewayModelEndpointsSource,
+  joinGatewayModelEndpoints,
+  openRouterGatewayModelsSource,
+  readStoredGatewayModels,
+  vercelGatewayModelsSource,
+  type GatewayModelList,
+  type GatewayModelMap,
+  type ListedGatewayModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type {
   NormalizedOpenRouterResponse,
   NormalizedProvider,
@@ -25,10 +35,7 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-change-log';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import type { Endpoint, StoredModel } from '@kilocode/db/schema-types';
 import {
-  EndpointsSchema,
-  ModelsSchema,
   VercelModelIdOverridesConfigSchema,
   type VercelModelIdOverride,
 } from '@kilocode/db/schema-types';
@@ -68,63 +75,6 @@ import { injectDirectByokProviders } from '@/lib/providers/openrouter/inject-dir
  */
 const SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY = 'sync-providers:snapshot';
 
-const NO_ENDPOINTS_RESOURCE = 'no-endpoints-resource';
-const NoEndpointsResourceSchema = z.strictObject({ status: z.literal(404) });
-
-type GatewayModels = z.infer<typeof ModelsSchema>;
-type GatewayModelEndpoints = Endpoint[] | typeof NO_ENDPOINTS_RESOURCE;
-
-function gatewayHeaders(gateway: Provider) {
-  return {
-    ...ATTRIBUTION_HEADERS,
-    authorization: `Bearer ${gateway.apiKey}`,
-  };
-}
-
-export function gatewayModelsSource(
-  gateway: Provider,
-  modelsPath: string
-): MetadataSource<GatewayModels> {
-  const url = `${gateway.apiUrl}${modelsPath}`;
-  return {
-    url,
-    headers: () => gatewayHeaders(gateway),
-    parse: raw => {
-      const models = ModelsSchema.parse(raw);
-      assertMinimumCount(url, models.data.length, 100);
-      return models;
-    },
-  };
-}
-
-// The default OpenRouter list only has text-output models; System One models output decisions.
-export const openRouterGatewayModelsSource = gatewayModelsSource(
-  OPENROUTER,
-  '/models?output_modalities=all'
-);
-export const vercelGatewayModelsSource = gatewayModelsSource(VERCEL_AI_GATEWAY, '/models');
-
-export function gatewayModelEndpointsUrl(gateway: Provider, modelId: string) {
-  return `${gateway.apiUrl}/models/${modelId}/endpoints`;
-}
-
-export function gatewayModelEndpointsSource(
-  gateway: Provider,
-  modelId: string
-): MetadataSource<GatewayModelEndpoints> {
-  return {
-    url: gatewayModelEndpointsUrl(gateway, modelId),
-    headers: () => gatewayHeaders(gateway),
-    // Gateways list some models (e.g. Vercel's `*-batch` variants) that have no endpoints resource.
-    // Storing the 404 as a row keeps sync-providers from fetching those models live on every run.
-    rawWhenNotFound: { status: 404 } satisfies z.infer<typeof NoEndpointsResourceSchema>,
-    parse: raw =>
-      NoEndpointsResourceSchema.safeParse(raw).success
-        ? NO_ENDPOINTS_RESOURCE
-        : EndpointsSchema.parse(raw).data.endpoints,
-  };
-}
-
 export const openRouterProvidersSource: MetadataSource<OpenRouterProvider[]> = {
   url: 'https://openrouter.ai/api/frontend/v1/all-providers',
   headers: () => ATTRIBUTION_HEADERS,
@@ -136,60 +86,60 @@ export const openRouterProvidersSource: MetadataSource<OpenRouterProvider[]> = {
   },
 };
 
-export async function fetchGatewayModels(gateway: Provider, source: MetadataSource<GatewayModels>) {
-  const models = await getMetadata(source, readDb);
+/**
+ * Reads the stored list and every stored endpoints row in one query. A missing or unusable list or
+ * endpoints row falls back to `getMetadata`, which fetches it upstream, so an upstream outage does
+ * not fail the sync while the rows are stored.
+ */
+export async function fetchGatewayModels(
+  gateway: Provider,
+  source: MetadataSource<GatewayModelList>
+): Promise<GatewayModelMap> {
+  const stored = await readStoredGatewayModels(gateway, source, readDb).catch((error: unknown) => {
+    console.warn(`[fetchGatewayModels] stored ${gateway.type} models are unusable`, error);
+    return null;
+  });
+  const listedModels: ListedGatewayModel[] =
+    stored ??
+    (await getMetadata(source, readDb)).data.map(model => ({ model, endpoints: undefined }));
 
   const limit = pLimit(8);
-  const result: Record<string, StoredModel> = {};
-  const modelsWithoutEndpoints: string[] = [];
-  await Promise.all(
-    models.data.map(model =>
-      limit(async () => {
-        const endpoints = await getMetadata(gatewayModelEndpointsSource(gateway, model.id), readDb);
-        if (endpoints === NO_ENDPOINTS_RESOURCE) {
-          modelsWithoutEndpoints.push(model.id);
-          return;
-        }
-        const { reasoning, ...modelMetadata } = model;
-        result[model.id] = {
-          ...modelMetadata,
-          ...(reasoning && {
-            reasoning: {
-              mandatory: reasoning.mandatory,
-              ...(reasoning.supported_efforts && {
-                supported_efforts: reasoning.supported_efforts,
-              }),
-            },
-          }),
-          endpoints,
-        };
-      })
+  const withEndpoints = await Promise.all(
+    listedModels.map(listed =>
+      listed.endpoints !== undefined
+        ? listed
+        : limit(async () => ({
+            model: listed.model,
+            // Clearing here, before this task settles, stops the limiter from starting a queued model.
+            endpoints: await getMetadata(
+              gatewayModelEndpointsSource(gateway, listed.model.id),
+              readDb
+            ).catch((error: unknown) => {
+              limit.clearQueue();
+              throw error;
+            }),
+          }))
     )
-  ).catch((error: unknown) => {
-    limit.clearQueue();
-    throw error;
-  });
+  );
 
-  if (modelsWithoutEndpoints.length > 0) {
+  const joined = joinGatewayModelEndpoints(gateway, withEndpoints);
+  if (joined.withoutEndpointsResource.length > 0) {
     console.warn(
-      `[fetchGatewayModels] skipped ${modelsWithoutEndpoints.length} ${gateway.type} models without endpoints: ${modelsWithoutEndpoints.sort().join(', ')}`
+      `[fetchGatewayModels] skipped ${joined.withoutEndpointsResource.length} ${gateway.type} models without endpoints: ${formatModelIds(joined.withoutEndpointsResource)}`
     );
   }
+  console.debug(
+    `[fetchGatewayModels] fetched ${Object.keys(joined.models).length} models from ${gateway.type}`
+  );
 
-  const count = Object.keys(result).length;
-  if (count < 100) {
-    throw new Error(`Suspicious: total number of ${gateway.type} models is ${count} < 100`);
-  }
-  console.debug(`[fetchGatewayModels] fetched ${count} models from ${gateway.type}`);
-
-  return result;
+  return joined.models;
 }
 
 async function syncProviders(params: {
   providers: OpenRouterProvider[];
-  openRouterModels: Record<string, StoredModel>;
+  openRouterModels: GatewayModelMap;
   openRouterCatalogModels: CatalogModel[];
-  vercelModels: Record<string, StoredModel>;
+  vercelModels: GatewayModelMap;
   vercelModelIdOverrides: VercelModelIdOverrides;
   customLlms: CustomLlm[];
 }) {
@@ -355,8 +305,8 @@ async function syncProviders(params: {
 }
 
 async function generateVercelModelIdOverrides(
-  openrouterModels: Record<string, StoredModel>,
-  vercelModels: Record<string, StoredModel>
+  openrouterModels: GatewayModelMap,
+  vercelModels: GatewayModelMap
 ): Promise<VercelModelIdOverride[] | null> {
   try {
     return buildVercelModelIdOverrides({
@@ -401,14 +351,12 @@ async function storeVercelModelIdOverrides(overrides: VercelModelIdOverride[]) {
  */
 export async function applySnapshotChangesAndAudit(params: {
   providers: NormalizedOpenRouterResponse;
-  openrouter_data: Record<string, StoredModel>;
-  vercel_data: Record<string, StoredModel>;
 }): Promise<{
   id: number;
   data: NormalizedOpenRouterResponse;
   previousSnapshot: NormalizedOpenRouterResponse | null;
 }> {
-  const { providers, openrouter_data, vercel_data } = params;
+  const { providers } = params;
 
   const { row, previousSnapshot } = await db.transaction(async tx => {
     await tx.execute(
@@ -424,12 +372,8 @@ export async function applySnapshotChangesAndAudit(params: {
 
     const results = await tx
       .insert(modelsByProvider)
-      .values({
-        data: providers,
-        openrouter: openrouter_data,
-        vercel: vercel_data,
-      })
-      .returning();
+      .values({ data: providers })
+      .returning({ id: modelsByProvider.id, data: modelsByProvider.data });
     await tx.delete(modelsByProvider).where(lt(modelsByProvider.id, results[0].id));
     return { row: results[0], previousSnapshot };
   });
@@ -447,16 +391,16 @@ export async function applySnapshotChangesAndAudit(params: {
 export async function syncAndStoreProviders() {
   const startTime = performance.now();
 
-  const openrouter_data = await fetchGatewayModels(OPENROUTER, openRouterGatewayModelsSource);
-  const vercel_data = await fetchGatewayModels(VERCEL_AI_GATEWAY, vercelGatewayModelsSource);
+  const openRouterModels = await fetchGatewayModels(OPENROUTER, openRouterGatewayModelsSource);
+  const vercelModels = await fetchGatewayModels(VERCEL_AI_GATEWAY, vercelGatewayModelsSource);
 
   const openrouterProviders = await getMetadata(openRouterProvidersSource, readDb);
 
   const openRouterCatalog = await getMetadata(openRouterModelsMetadataSource, readDb);
 
   const generatedVercelModelIdOverrides = await generateVercelModelIdOverrides(
-    openrouter_data,
-    vercel_data
+    openRouterModels,
+    vercelModels
   );
   const vercelModelIdOverrides: VercelModelIdOverrides = generatedVercelModelIdOverrides
     ? new Map(
@@ -469,9 +413,9 @@ export async function syncAndStoreProviders() {
 
   const providers = await syncProviders({
     providers: openrouterProviders,
-    openRouterModels: openrouter_data,
+    openRouterModels,
     openRouterCatalogModels: openRouterCatalog.data,
-    vercelModels: vercel_data,
+    vercelModels,
     vercelModelIdOverrides,
     customLlms: await fetchCustomLlmsFromDatabase(),
   });
@@ -488,11 +432,7 @@ export async function syncAndStoreProviders() {
     await storeVercelModelIdOverrides(generatedVercelModelIdOverrides);
   }
 
-  const result = await applySnapshotChangesAndAudit({
-    providers,
-    openrouter_data,
-    vercel_data,
-  });
+  const result = await applySnapshotChangesAndAudit({ providers });
 
   const completed_at = await recordSyncCompleted('providers');
 

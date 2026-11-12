@@ -325,11 +325,19 @@ async function choose(renderer: ReactTestRenderer, label: string) {
   });
 }
 
-/** The header container's classes: the only View the card gives `min-h-11 gap-3`. */
+/**
+ * The header container's classes: the row that lays out the credits eyebrow
+ * beside the account picker. The card's outer box is the only View whose whole
+ * class list is `gap-3`, so the header is the one that adds to it.
+ */
 function headerClasses(renderer: ReactTestRenderer): string[] {
-  const header = renderer.root.find(
-    node => Object.is(node.type, 'View') && String(node.props.className).includes('min-h-11 gap-3')
-  );
+  const header = renderer.root.find(node => {
+    if (!Object.is(node.type, 'View')) {
+      return false;
+    }
+    const className = String(node.props.className);
+    return className.includes('gap-3') && className !== 'gap-3';
+  });
   return String(header.props.className).split(' ');
 }
 
@@ -1319,6 +1327,28 @@ describe('CreditsCard credits header', () => {
     expect(classes).not.toContain('flex-row');
     // The eyebrow keeps its full copy instead of breaking mid-word.
     expect(texts()).toContain('Credits');
+    unmount();
+  });
+
+  it('keeps the header on the eyebrow line with the picker target inside the row', async () => {
+    const { renderer, unmount } = await mountCard(createTestQueryClient(), headerOrgs);
+
+    // The row and the picker both carry a literal 44dp box, so the picker's
+    // whole touch target stays inside the row's bounds: RN drops touches
+    // outside every ancestor, and a shorter row would clip it. Both children
+    // align to the row's bottom, which puts the eyebrow on the picker's line and
+    // closes the gap to the credits card to the section headers' own gap. The
+    // literal is used because the app's `min-h-11` compiles to about 38.5pt.
+    expect(headerClasses(renderer)).toContain('min-h-[44px]');
+    expect(headerClasses(renderer)).toContain('items-end');
+    const picker = renderer.root.find(
+      node => Object.is(node.type, Pressable) && node.props.accessibilityHint === 'Select account'
+    );
+    expect(String(picker.props.className)).toContain('min-h-[44px]');
+    // A short account or org name must not shrink the target below 44pt.
+    expect(String(picker.props.className)).toContain('min-w-[44px]');
+    expect(String(picker.props.className)).toContain('items-end');
+    expect(picker.props.hitSlop).toBeUndefined();
     unmount();
   });
 });

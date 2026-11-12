@@ -159,18 +159,27 @@ describe('awsBedrock definition', () => {
     expect(chat.extraHeaders).toEqual({});
   });
 
-  it('drops mismatched Claude thinking blocks', () => {
+  it.each([
+    {
+      model: 'bedrock-byok/global.anthropic.claude-sonnet-5-5',
+      upstreamModel: 'global.anthropic.claude-sonnet-5-5',
+    },
+    {
+      model: 'bedrock-byok/global.anthropic.claude-sonnet-latest',
+      upstreamModel: 'global.anthropic.claude-sonnet-latest',
+    },
+  ])('drops mismatched Claude thinking blocks for $model', ({ model, upstreamModel }) => {
     const context = createContext(
       {
         kind: 'messages',
         body: {
-          model: 'global.anthropic.claude-sonnet-5-5',
+          model: upstreamModel,
           messages: [],
           max_tokens: 10,
           thinking: { type: 'adaptive' },
         },
       },
-      'bedrock-byok/global.anthropic.claude-sonnet-5-5'
+      model
     );
 
     awsBedrock.transformRequest(context);

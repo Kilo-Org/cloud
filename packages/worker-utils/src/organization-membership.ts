@@ -209,6 +209,27 @@ export function activeOrganizationAccessSql(
   )`;
 }
 
+/** The {@link hasOrganizationAccess} lookup, unexecuted, for use inside `EXISTS`. */
+export function organizationAccessQuery(
+  db: OrganizationMembershipDb,
+  params: { kiloUserId: string; organizationId: string }
+) {
+  return db
+    .select({ id: organization_memberships.id })
+    .from(organization_memberships)
+    .innerJoin(
+      organizations,
+      activeOrganizationJoinCondition(organization_memberships.organization_id)
+    )
+    .where(
+      and(
+        eq(organization_memberships.organization_id, params.organizationId),
+        eq(organization_memberships.kilo_user_id, params.kiloUserId)
+      )
+    )
+    .limit(1);
+}
+
 /**
  * True when the user has a direct membership row for the organization and the
  * organization is not soft-deleted. Mirrors worker session-access predicates in
@@ -228,20 +249,6 @@ export async function hasOrganizationAccess(
   db: OrganizationMembershipDb,
   params: { kiloUserId: string; organizationId: string }
 ): Promise<boolean> {
-  const rows = await db
-    .select({ id: organization_memberships.id })
-    .from(organization_memberships)
-    .innerJoin(
-      organizations,
-      activeOrganizationJoinCondition(organization_memberships.organization_id)
-    )
-    .where(
-      and(
-        eq(organization_memberships.organization_id, params.organizationId),
-        eq(organization_memberships.kilo_user_id, params.kiloUserId)
-      )
-    )
-    .limit(1);
-
+  const rows = await organizationAccessQuery(db, params);
   return rows[0] !== undefined;
 }

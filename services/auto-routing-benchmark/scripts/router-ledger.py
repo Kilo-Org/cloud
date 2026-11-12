@@ -23,9 +23,9 @@ RUN_CAP_USD = Decimal("60")
 PROSPECTIVE_SCHEMA = "router-capped-exploration-allowance-v1"
 AMENDMENT_SCHEMA = "router-capped-exploration-amendment-v1"
 FINANCING_SCHEMA = "router-cost-forecast-v1"
-# Stored v4 financing manifests stay readable for audit. They never authorize v5 dispatch.
+# Stored v4 financing manifests stay readable for audit. They never authorize current-version dispatch.
 LEGACY_FINANCING_SCHEMA = "router-financing-manifest-v1"
-MANIFEST_VERSION = 5
+MANIFEST_VERSION = 6
 
 
 def grant_tables(db):
@@ -458,6 +458,22 @@ def register(db, manifest, candidates):
     return {"campaign_id": values["campaign_id"], "candidate_fingerprints": sorted(new), "registered_before": state["registered"]}
 
 
+def register_manifest(db, manifest):
+    """Register a v6 manifest only. The live router arm is not a candidate.
+
+    No campaign_candidates or campaign_prospective_candidates row is
+    written, so the router arm counts toward neither CANDIDATE_CAP nor a
+    grant's per-mode candidate slot.
+    """
+    values = metadata(db)
+    grant = prospective_grant(db)
+    if grant is None or manifest.get("version") != MANIFEST_VERSION or manifest.get("spec", {}).get("prospective_grant_id") != grant["grant_id"]:
+        raise ValueError("Manifest registration requires the current prospective grant manifest")
+    manifest_hash = digest(manifest)
+    db.execute("INSERT INTO campaign_manifests VALUES (?,?,?)", (manifest_hash, manifest["out_root"], json.dumps(manifest, sort_keys=True)))
+    return {"campaign_id": values["campaign_id"], "manifest_sha256": manifest_hash, "candidate_fingerprints": []}
+
+
 def plan_liability(db, pending=None):
     """Incurred liability under capped exploration.
 
@@ -578,7 +594,7 @@ def register_financing(db, financing):
     manifest_sha = financing.get("manifest_sha256")
     manifest, _plan, expected = _registered_plan(db, financing)
     if manifest.get("version") != MANIFEST_VERSION:
-        raise ValueError("Cost forecast requires a version5 manifest; old manifests are audit-only")
+        raise ValueError("Cost forecast requires a version6 manifest; old manifests are audit-only")
     authorization = effective_authorization(db, financing.get("authorization", {}).get("grant_id") if isinstance(financing.get("authorization"), dict) else None)
     if authorization is None or financing["authorization"] != authorization_summary(authorization):
         raise ValueError("Cost forecast must bind the current effective authorization and origin snapshot")
@@ -605,7 +621,7 @@ def _revalidate_financing(db, financing_sha, financing, manifest_sha, authorizat
     though the immutable financing record itself is preserved for audit.
     """
     if financing.get("schema") != FINANCING_SCHEMA or financing.get("forecast_only") is not True:
-        raise ValueError("Stored financing evidence is audit-only; register a version5 cost forecast before dispatch")
+        raise ValueError("Stored financing evidence is audit-only; register a version6 cost forecast before dispatch")
     if financing.get("manifest_sha256") != manifest_sha:
         raise ValueError("Registered cost forecast manifest binding changed")
     stored_rows = {}
@@ -667,7 +683,7 @@ def audit(path):
                     executable = financing_for(db, sha) is not None
                 except ValueError:
                     executable = False
-                forecasts.append({"sha256": sha, "schema": stored.get("schema"), "hash_matches": digest(stored) == sha, "total_envelope_usd": stored.get("total_envelope_usd"), "executable_for_v5": executable})
+                forecasts.append({"sha256": sha, "schema": stored.get("schema"), "hash_matches": digest(stored) == sha, "total_envelope_usd": stored.get("total_envelope_usd"), "executable_for_current_version": executable})
         source_hashes = {name: sha for name, sha in db.execute("SELECT path,sha256 FROM campaign_sources")}
         attributed = dict(db.execute("SELECT id,kind FROM router_requests"))
         receipt_locations = [{"request_id": request_id, "source": source, "original_path": original, "evidence_path": evidence, "sha256": sha} for request_id, source, original, evidence, sha in db.execute("SELECT * FROM campaign_receipt_locations ORDER BY source,request_id")]

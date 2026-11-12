@@ -70,11 +70,10 @@ export const OAuthProviderIds = [...LinkableAuthProviders.map(p => p.id)] as con
 export const ProdNonSSOAuthProviders = [...LinkableAuthProviders.map(p => p.id), 'email'] as const;
 
 // Providers whose callback does not carry the web session that started an
-// account link: the link requires that session, and Apple's callback is a
-// cross-site form POST. They stay sign-in methods only. This is the single
-// declaration of the exclusion; the offered list and the link start both read
-// what it produces.
-const LinkSessionUnavailableProviderIds = ['apple'] as const satisfies readonly AuthProviderId[];
+// account link and have no completion bounce. Apple used to be listed here:
+// its callback now parks an explicit pending link and completes it on a
+// same-site route that carries the session, so it is linkable.
+const LinkSessionUnavailableProviderIds = [] as const satisfies readonly AuthProviderId[];
 
 // The providers a person may start an account link for. Every link start reads
 // this list, not only the `/connected-accounts` offer: the organization BYOK

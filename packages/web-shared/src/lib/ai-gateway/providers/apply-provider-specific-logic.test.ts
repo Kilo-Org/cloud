@@ -1027,9 +1027,24 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
 describe('applyProviderSpecificLogic thinking block binding', () => {
   const model = 'anthropic/claude-opus-5.5';
 
-  async function apply(provider: Provider, requestedModel = model) {
+  async function apply(
+    provider: Provider,
+    requestedModel = model,
+    thinking: 'adaptive' | 'disabled' | 'omitted' = 'adaptive'
+  ) {
     const request = makeMessagesRequest(requestedModel);
-    request.body.thinking = { type: 'adaptive' };
+    request.body.thinking = thinking === 'omitted' ? undefined : { type: thinking };
+    request.body.messages.push(
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: '', signature: 'FAKE_PROVIDER_TEST_SIGNATURE' },
+          { type: 'redacted_thinking', data: 'FAKE_PROVIDER_TEST_REDACTED_DATA' },
+          { type: 'text', text: 'Previous answer.' },
+        ],
+      },
+      { role: 'user', content: 'Continue.' }
+    );
     const extraHeaders: Record<string, string> = {};
     await applyProviderSpecificLogic(
       provider,
@@ -1045,7 +1060,7 @@ describe('applyProviderSpecificLogic thinking block binding', () => {
       false,
       null
     );
-    return { thinking: request.body.thinking, extraHeaders };
+    return { thinking: request.body.thinking, messages: request.body.messages, extraHeaders };
   }
 
   it.each([
@@ -1064,6 +1079,31 @@ describe('applyProviderSpecificLogic thinking block binding', () => {
     expect(extraHeaders['anthropic-beta']).toBe(
       'fine-grained-tool-streaming-2025-05-14,thinking-binding-controls-2026-08-01'
     );
+  });
+
+  it.each([
+    { name: 'Vercel', provider: VERCEL_AI_GATEWAY },
+    { name: 'OpenRouter', provider: OPENROUTER },
+  ])('handles disabled and omitted thinking on $name', async ({ provider }) => {
+    const disabled = await apply(provider, model, 'disabled');
+    const omitted = await apply(provider, model, 'omitted');
+
+    expect(disabled.thinking).toEqual({ type: 'disabled' });
+    expect(disabled.messages[1]).toEqual({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'Previous answer.' }],
+    });
+    expect(omitted.thinking).toEqual({
+      type: 'adaptive',
+      block_binding: { prefix_mismatch_behavior: 'drop_block' },
+    });
+    expect(omitted.messages[1]).toMatchObject({
+      content: [{ type: 'thinking' }, { type: 'redacted_thinking' }, { type: 'text' }],
+    });
+    for (const headers of [disabled.extraHeaders, omitted.extraHeaders]) {
+      expect(headers['anthropic-beta']).toContain('thinking-binding-controls-2026-08-01');
+      expect(headers['x-anthropic-beta']).toContain('thinking-binding-controls-2026-08-01');
+    }
   });
 
   it('leaves upstreams without verified support untouched', async () => {

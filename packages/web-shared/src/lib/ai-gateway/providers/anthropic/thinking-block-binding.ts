@@ -24,8 +24,10 @@ function bindsThinkingToPrefix(model: string) {
 }
 
 /**
- * Drops invalidated thinking blocks instead of failing the request. Only call this for upstreams
- * verified to forward the beta flag, since `block_binding` without it is rejected.
+ * Drops invalidated thinking blocks instead of failing the request. Adaptive thinking delegates
+ * this to the upstream; explicit nonadaptive modes remove historical thinking before forwarding.
+ * Only call this for upstreams verified to forward the beta flag, since `block_binding` without
+ * it is rejected.
  *
  * Kilo and opencode clients change the prefix of a running session in normal use. The 400 error
  * names what changed; from most to least common in production:
@@ -48,12 +50,25 @@ export function dropThinkingBlocksOnPrefixMismatch({
   extraHeaders,
 }: Pick<TransformRequestContext, 'model' | 'request' | 'extraHeaders'>) {
   if (request.kind !== 'messages' || !bindsThinkingToPrefix(model)) return;
-  const thinking = request.body.thinking;
-  // block_binding is rejected with enabled or disabled thinking.
-  if (thinking?.type !== 'adaptive') return;
+  appendAnthropicBetaHeader(extraHeaders, THINKING_BINDING_BETA);
+  // These models default to adaptive thinking when the client omits the setting.
+  const thinking = (request.body.thinking ??= { type: 'adaptive' });
+  if (thinking.type !== 'adaptive') {
+    // block_binding is adaptive-only. Remove whole blocks, including signatures and redacted data,
+    // without changing the explicit mode or touching nested tool results and user content.
+    request.body.messages = request.body.messages.flatMap(message => {
+      if (message.role !== 'assistant' || !Array.isArray(message.content)) return [message];
+      const content = message.content.filter(
+        block => block.type !== 'thinking' && block.type !== 'redacted_thinking'
+      );
+      if (content.length === message.content.length) return [message];
+      const hasContent = content.some(block => block.type !== 'text' || block.text.trim() !== '');
+      return hasContent ? [{ ...message, content }] : [];
+    });
+    return;
+  }
   const binding = thinking.block_binding ?? {};
   if (binding.prefix_mismatch_behavior === undefined && binding.mismatch_behavior === undefined) {
     thinking.block_binding = { ...binding, prefix_mismatch_behavior: 'drop_block' };
   }
-  appendAnthropicBetaHeader(extraHeaders, THINKING_BINDING_BETA);
 }

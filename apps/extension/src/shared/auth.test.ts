@@ -1,8 +1,12 @@
+/* eslint-disable max-lines -- one suite for the auth client, storage, and device sign-in flow */
 import { describe, expect, it, vi } from 'vitest';
 import {
   AUTH_STORAGE_KEY,
   DEFAULT_KILO_API_BASE_URL,
   DEFAULT_LOCAL_KILO_API_BASE_URL,
+  DEVICE_AUTH_CODE_TTL_SECONDS,
+  DeviceAuthHttpError,
+  cancelDeviceAuthRequest,
   clearStoredSession,
   clearStoredAuth,
   createDeviceAuthRequest,
@@ -145,14 +149,110 @@ describe('device auth API client', () => {
       );
     };
 
-    await expect(
-      createDeviceAuthRequest({ apiBaseUrl: 'https://app.kilo.ai/', fetch })
-    ).resolves.toStrictEqual({
+    const request = await createDeviceAuthRequest({ apiBaseUrl: 'https://app.kilo.ai/', fetch });
+
+    expect(request).toMatchObject({
       code: 'poll-secret-9f8e7d6c5b4a3210fedcba9876543210abc',
       userCode: 'ABCD-2345',
       verificationUrl: 'https://app.kilo.ai/device-auth?code=ABCD-2345&app=1',
     });
     expect(seenRequests).toStrictEqual(['https://app.kilo.ai/api/device-auth/codes?app=1']);
+  });
+
+  it('uses the expiry window the server reports', async () => {
+    const fetch: FetchLike = () =>
+      jsonResponse(
+        {
+          code: 'poll-secret-9f8e7d6c5b4a3210fedcba9876543210abc',
+          expiresIn: 30,
+          user_code: 'ABCD-2345',
+          verificationUrl: 'https://app.kilo.ai/device-auth?code=ABCD-2345&app=1',
+        },
+        { status: 200 }
+      );
+
+    const request = await createDeviceAuthRequest({ apiBaseUrl: 'https://app.kilo.ai', fetch });
+
+    expect(request.expiresAt - Date.now()).toBeLessThanOrEqual(30_000);
+    expect(request.expiresAt - Date.now()).toBeGreaterThan(25_000);
+  });
+
+  it('falls back to the server window when the response omits the expiry', async () => {
+    const fetch: FetchLike = () =>
+      jsonResponse(
+        {
+          code: 'poll-secret-9f8e7d6c5b4a3210fedcba9876543210abc',
+          user_code: 'ABCD-2345',
+          verificationUrl: 'https://app.kilo.ai/device-auth?code=ABCD-2345&app=1',
+        },
+        { status: 200 }
+      );
+
+    const request = await createDeviceAuthRequest({ apiBaseUrl: 'https://app.kilo.ai', fetch });
+
+    expect(request.expiresAt - Date.now()).toBeLessThanOrEqual(DEVICE_AUTH_CODE_TTL_SECONDS * 1000);
+    expect(request.expiresAt - Date.now()).toBeGreaterThan(
+      (DEVICE_AUTH_CODE_TTL_SECONDS - 1) * 1000
+    );
+  });
+
+  it('keeps the server refusal with a failed start', async () => {
+    const fetch: FetchLike = () =>
+      jsonResponse(
+        { error: 'Too many sign-in attempts from this network. Wait a few minutes and try again.' },
+        { status: 429 }
+      );
+
+    const failure = await createDeviceAuthRequest({
+      apiBaseUrl: 'https://app.kilo.ai',
+      fetch,
+    }).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(DeviceAuthHttpError);
+    expect(failure).toMatchObject({
+      body: {
+        error: 'Too many sign-in attempts from this network. Wait a few minutes and try again.',
+      },
+      status: 429,
+    });
+  });
+
+  it('cancels a pending request with its poll secret', async () => {
+    const seenRequests: { method: string | undefined; url: string }[] = [];
+    const fetch: FetchLike = (input, init) => {
+      seenRequests.push({ method: init?.method, url: String(input) });
+      return jsonResponse({ success: true });
+    };
+
+    await cancelDeviceAuthRequest({
+      apiBaseUrl: 'https://app.kilo.ai/',
+      code: 'poll/secret',
+      fetch,
+    });
+
+    expect(seenRequests).toStrictEqual([
+      { method: 'DELETE', url: 'https://app.kilo.ai/api/device-auth/codes/poll%2Fsecret' },
+    ]);
+  });
+
+  it('accepts a cancel for a request that is already gone', async () => {
+    await expect(
+      cancelDeviceAuthRequest({
+        apiBaseUrl: 'https://app.kilo.ai',
+        code: 'poll-secret',
+        fetch: () => jsonResponse({ error: 'Not found' }, { status: 404 }),
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  it('reports a cancel the server could not record', async () => {
+    await expect(
+      cancelDeviceAuthRequest({
+        apiBaseUrl: 'https://app.kilo.ai',
+        code: 'poll-secret',
+        fetch: () => jsonResponse({ error: 'Internal server error' }, { status: 500 }),
+      })
+    ).rejects.toMatchObject({ status: 500 });
   });
 
   it('rejects a device auth response without a user code', async () => {

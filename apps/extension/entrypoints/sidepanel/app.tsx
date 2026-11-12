@@ -1,19 +1,16 @@
 import { browser, storage } from '#imports';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { resetAnalyticsUser } from '@/src/shared/analytics';
 import {
   clearStoredSession,
-  createDeviceAuthRequest,
   getKiloApiBaseUrl,
   loadStoredAuth,
-  pollDeviceAuthCode,
   saveStoredAuth,
   validateAuthToken,
 } from '@/src/shared/auth';
-import type { DeviceAuthRequest, FetchLike, StoredAuth } from '@/src/shared/auth';
-import { persistApprovedDeviceAuth } from '@/src/shared/device-auth-approval';
+import type { FetchLike, StoredAuth } from '@/src/shared/auth';
 import {
   getAuthValidationQueryKey,
   removeAccountScopedAgentsQueries,
@@ -28,8 +25,9 @@ import {
 import { clearPerConversationAtoms } from './agent-chat-atoms';
 import { useAnalyticsIdentity } from './use-analytics-identity';
 import type { SignInSource } from './use-analytics-identity';
+import { useDeviceSignIn } from './use-device-sign-in';
+import type { DescribedFetchError } from './use-device-sign-in';
 
-const pollIntervalMs = 3000;
 const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow: FetchLike = (input, init) => fetch(input, init);
 const storedAuthQueryKey = ['side-panel', 'stored-auth'] as const;
@@ -49,8 +47,8 @@ type AuthValidationData =
 
 export const App = (): JSX.Element => {
   const queryClient = useQueryClient();
-  const [pendingAuthRequest, setPendingAuthRequest] = useState<DeviceAuthRequest | undefined>();
-  const [signedOutMessage, setSignedOutMessage] = useState<string | undefined>();
+  const [signedOutMessage, setSignedOutMessage] = useState<string | null>(null);
+  const [signedOutError, setSignedOutError] = useState<DescribedFetchError | null>(null);
   /*
    * Ref (not state): device-approval must write the source synchronously before
    * the signed-in cache write, so the identity hook never sees a stale source.
@@ -110,95 +108,47 @@ export const App = (): JSX.Element => {
         ? getAuthValidationQueryKey('none')
         : getAuthValidationQueryKey(storedAuth.token),
   });
-  const startSignIn = useMutation({
-    mutationFn: () =>
-      createDeviceAuthRequest({
-        apiBaseUrl,
-        fetch: fetchFromWindow,
-      }),
-    onError: () => {
-      setSignedOutMessage('Failed to start sign in. Try again.');
-    },
-    onSuccess: authRequest => {
-      setSignedOutMessage(undefined);
-      setPendingAuthRequest(authRequest);
-      void browser.tabs.create({ url: authRequest.verificationUrl });
-    },
-  });
-  const devicePollQuery = useQuery({
-    enabled: pendingAuthRequest !== undefined,
-    queryFn: ({ signal }) => {
-      if (pendingAuthRequest === undefined) {
-        return Promise.resolve({ status: 'pending' as const });
-      }
 
-      return pollDeviceAuthCode({
-        apiBaseUrl,
-        code: pendingAuthRequest.code,
-        fetch: fetchFromWindow,
-        signal,
-      });
+  const handleApproved = useCallback(
+    (auth: StoredAuth): void => {
+      // Agents caches are keyed by identity; clear them for this transition.
+      removeAccountScopedAgentsQueries(queryClient);
+      /*
+       * Must precede the signed-in cache writes so the identity hook reads
+       * device_auth for this transition (ref is sync; useState would race).
+       */
+      signInSourceRef.current = 'device_auth';
+      queryClient.setQueryData(storedAuthQueryKey, auth);
+      queryClient.setQueryData(getAuthValidationQueryKey(auth.token), {
+        auth,
+        status: 'signedIn',
+      } satisfies AuthValidationData);
     },
-    queryKey: ['side-panel', 'device-auth', pendingAuthRequest?.code ?? 'idle'],
-    refetchInterval: pendingAuthRequest === undefined ? false : pollIntervalMs,
+    [queryClient]
+  );
+
+  const handleApprovalLost = useCallback((): void => {
+    queryClient.setQueryData(storedAuthQueryKey, undefined);
+  }, [queryClient]);
+
+  const { cancelSignIn, isStarting, pendingAuthRequest, startSignIn } = useDeviceSignIn({
+    apiBaseUrl,
+    fetch: fetchFromWindow,
+    onApprovalLost: handleApprovalLost,
+    onApproved: handleApproved,
+    reportError: setSignedOutError,
+    reportMessage: setSignedOutMessage,
   });
 
   useEffect(() => {
     if (authValidationData?.status === 'signedOut') {
-      setSignedOutMessage(authValidationData.message);
+      setSignedOutMessage(authValidationData.message ?? null);
+      setSignedOutError(null);
       queryClient.setQueryData(storedAuthQueryKey, undefined);
       signInSourceRef.current = 'stored_session';
       void resetAnalyticsUser({ reason: 'expired' });
     }
   }, [authValidationData, queryClient]);
-
-  useEffect(() => {
-    const result = devicePollQuery.data;
-
-    if (pendingAuthRequest === undefined || result === undefined || result.status === 'pending') {
-      return;
-    }
-
-    if (result.status === 'approved') {
-      void (async (): Promise<void> => {
-        const persistence = await persistApprovedDeviceAuth(storage, result.auth);
-
-        setPendingAuthRequest(undefined);
-        if (persistence.status === 'failed') {
-          setSignedOutMessage(persistence.message);
-          queryClient.setQueryData(storedAuthQueryKey, undefined);
-          return;
-        }
-
-        setSignedOutMessage(undefined);
-        // Agents caches are keyed by identity; clear them for this transition.
-        removeAccountScopedAgentsQueries(queryClient);
-        /*
-         * Must precede the signed-in cache writes so the identity hook reads
-         * device_auth for this transition (ref is sync; useState would race).
-         */
-        signInSourceRef.current = 'device_auth';
-        queryClient.setQueryData(storedAuthQueryKey, persistence.auth);
-        queryClient.setQueryData(getAuthValidationQueryKey(persistence.auth.token), {
-          auth: persistence.auth,
-          status: 'signedIn',
-        } satisfies AuthValidationData);
-      })();
-      return;
-    }
-
-    setPendingAuthRequest(undefined);
-    setSignedOutMessage(
-      result.status === 'denied' ? 'Access was denied.' : 'Your sign-in code expired.'
-    );
-  }, [devicePollQuery.data, pendingAuthRequest, queryClient]);
-
-  useEffect(() => {
-    if (devicePollQuery.isError) {
-      setPendingAuthRequest(undefined);
-      setSignedOutMessage('Sign in failed. Try again.');
-    }
-  }, [devicePollQuery.isError]);
 
   useAnalyticsIdentity({
     email:
@@ -208,13 +158,9 @@ export const App = (): JSX.Element => {
     storageArea: storage,
   });
 
-  const cancelSignIn = useCallback((): void => {
-    setPendingAuthRequest(undefined);
-  }, []);
-
   const signOut = useCallback((): void => {
-    setPendingAuthRequest(undefined);
-    setSignedOutMessage(undefined);
+    setSignedOutMessage(null);
+    setSignedOutError(null);
     signInSourceRef.current = 'stored_session';
     void resetAnalyticsUser({ reason: 'explicit' });
     void (async (): Promise<void> => {
@@ -246,14 +192,13 @@ export const App = (): JSX.Element => {
     return <LoadingView />;
   }
 
-  if (startSignIn.isPending) {
+  if (isStarting) {
     return (
       <SignedOutView
+        error={signedOutError}
         isStarting
         message={signedOutMessage}
-        onSignIn={() => {
-          startSignIn.mutate();
-        }}
+        onSignIn={startSignIn}
       />
     );
   }
@@ -271,14 +216,7 @@ export const App = (): JSX.Element => {
   }
 
   if (authValidationData?.status === 'validationError' || isAuthValidationError) {
-    return (
-      <ValidationErrorView
-        onRetry={retrySessionCheck}
-        onSignInAgain={() => {
-          startSignIn.mutate();
-        }}
-      />
-    );
+    return <ValidationErrorView onRetry={retrySessionCheck} onSignInAgain={startSignIn} />;
   }
 
   if (authValidationData?.status === 'signedIn') {
@@ -287,11 +225,10 @@ export const App = (): JSX.Element => {
 
   return (
     <SignedOutView
+      error={signedOutError}
       isStarting={false}
       message={signedOutMessage}
-      onSignIn={() => {
-        startSignIn.mutate();
-      }}
+      onSignIn={startSignIn}
     />
   );
 };

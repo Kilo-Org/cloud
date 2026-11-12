@@ -11,6 +11,8 @@ import { AgentsMode } from './agents-mode';
 import { AgentsModeSwitch } from './agents-mode-switch';
 import { ExtensionAgentsProvider } from './agents-provider';
 import { Shell } from './auth-shell';
+import { ErrorNotice } from './error-notice';
+import type { DescribedFetchError } from './error-notice';
 import { useOrganizationCreditAccount } from './organization-credit-account';
 import { PendingMemorySaveCard } from './pending-memory-save-card';
 import { PendingWorkflowSaveCard } from './pending-workflow-save-card';
@@ -30,16 +32,18 @@ export const LoadingView = (): JSX.Element => (
 );
 
 export const SignedOutView = ({
+  error,
   isStarting,
   message,
   onSignIn,
 }: {
+  error: DescribedFetchError | null;
   isStarting: boolean;
-  message: string | undefined;
+  message: string | null;
   onSignIn: () => void;
 }): JSX.Element => (
   <Shell>
-    <div className="flex flex-1 flex-col justify-center gap-4 px-4 py-6">
+    <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-4 px-4 py-6">
       <div className="space-y-1">
         <p className="type-heading text-foreground">Sign in to continue</p>
         <p className="type-body text-foreground-muted">
@@ -47,10 +51,14 @@ export const SignedOutView = ({
         </p>
       </div>
 
-      {message === undefined ? null : (
+      {message === null ? null : (
         <p className="type-body rounded-xl border border-border bg-surface-raised p-3 text-foreground">
           {message}
         </p>
+      )}
+
+      {error === null ? null : (
+        <ErrorNotice detail={error.detail} retryable={error.retryable} title={error.title} />
       )}
 
       <button
@@ -190,15 +198,19 @@ export const SignedInView = ({
         onHeaderBeforeSettingsChange={setHeaderBeforeSettings}
         organizationId={selectedOrganizationId === '' ? undefined : selectedOrganizationId}
       />
-      {mode === 'browser' ? null : (
+      <div
+        className={mode === 'agents' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}
+        data-mode={mode}
+      >
         <ExtensionAgentsProvider
           auth={auth}
+          isActive={mode === 'agents'}
           key={`${auth.token}:${selectedOrganizationId}`}
           organizationId={agentsOrgId}
         >
           <AgentsMode />
         </ExtensionAgentsProvider>
-      )}
+      </div>
     </Shell>
   );
 };

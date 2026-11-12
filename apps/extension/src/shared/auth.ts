@@ -26,6 +26,24 @@ export interface DeviceAuthRequest {
   readonly code: string;
   readonly userCode: string;
   readonly verificationUrl: string;
+  readonly expiresAt: number;
+}
+
+export interface DeviceAuthFailureBody {
+  readonly error?: unknown;
+  readonly message?: unknown;
+}
+
+export class DeviceAuthHttpError extends Error {
+  readonly body: DeviceAuthFailureBody | undefined;
+  readonly status: number;
+
+  constructor(message: string, status: number, body: DeviceAuthFailureBody | undefined) {
+    super(message);
+    this.name = 'DeviceAuthHttpError';
+    this.status = status;
+    this.body = body;
+  }
 }
 
 export type DeviceAuthPollResult =
@@ -56,12 +74,26 @@ interface PollDeviceAuthCodeOptions extends ApiClientOptions {
   readonly signal?: AbortSignal;
 }
 
+interface CancelDeviceAuthRequestOptions extends ApiClientOptions {
+  readonly code: string;
+}
+
 interface ValidateAuthTokenOptions extends ApiClientOptions {
   readonly token: string;
   readonly signal?: AbortSignal;
 }
 
+/** Mirrors the server's device-code window, used when the response omits one. */
+export const DEVICE_AUTH_CODE_TTL_SECONDS = 600;
+
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
+
+const readFailureBody = async (response: Response): Promise<DeviceAuthFailureBody | undefined> => {
+  const parsed = failureBodySchema.safeParse(await response.json().catch(() => null));
+
+  return parsed.success ? parsed.data : undefined;
+};
+
 const nonEmptyStringSchema = z.string().min(1);
 const storedAuthSchema = z.object({
   token: nonEmptyStringSchema,
@@ -69,8 +101,13 @@ const storedAuthSchema = z.object({
 });
 const deviceAuthRequestSchema = z.object({
   code: nonEmptyStringSchema,
+  expiresIn: z.number().positive().optional(),
   user_code: nonEmptyStringSchema,
   verificationUrl: nonEmptyStringSchema,
+});
+const failureBodySchema = z.object({
+  error: z.unknown().optional(),
+  message: z.unknown().optional(),
 });
 const userResponseSchema = z.object({
   google_user_email: nonEmptyStringSchema.optional(),
@@ -129,6 +166,7 @@ const parseDeviceAuthRequest = (value: unknown): DeviceAuthRequest => {
 
   return {
     code: parsed.data.code,
+    expiresAt: Date.now() + (parsed.data.expiresIn ?? DEVICE_AUTH_CODE_TTL_SECONDS) * 1000,
     userCode: parsed.data.user_code,
     verificationUrl: parsed.data.verificationUrl,
   };
@@ -157,11 +195,37 @@ export const createDeviceAuthRequest = async ({
   });
 
   if (!response.ok) {
-    throw new Error('Failed to start sign in.');
+    throw new DeviceAuthHttpError(
+      'Failed to start sign in.',
+      response.status,
+      await readFailureBody(response)
+    );
   }
 
   const data: unknown = await response.json();
   return parseDeviceAuthRequest(data);
+};
+
+export const cancelDeviceAuthRequest = async ({
+  apiBaseUrl,
+  code,
+  fetch,
+}: CancelDeviceAuthRequestOptions): Promise<void> => {
+  const response = await fetch(
+    `${trimTrailingSlash(apiBaseUrl)}/api/device-auth/codes/${encodeURIComponent(code)}`,
+    { method: 'DELETE' }
+  );
+
+  // A request that is gone or no longer pending can no longer be approved.
+  if (response.ok || response.status === 404 || response.status === 409) {
+    return;
+  }
+
+  throw new DeviceAuthHttpError(
+    'Failed to cancel sign in.',
+    response.status,
+    await readFailureBody(response)
+  );
 };
 
 export const pollDeviceAuthCode = async ({

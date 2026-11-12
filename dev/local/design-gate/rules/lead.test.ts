@@ -53,23 +53,25 @@ test('leading-gap: a touch frame that holds the first text at its bottom is an e
 
 test('leading-gap: content at its padding, within the allowance, or centred in its row passes', () => {
   assert.deepEqual(screen({ row: [14, 124, 52, 14], text: [14, 124, 52, 12.6] }), []);
-  // Bottom-aligned text: 12 dp above it is the allowance, 12.5 dp is past it.
-  assert.deepEqual(screen({ row: [14, 124, 52, 24.6], text: [14, 136, 52, 12.6] }), []);
-  assert.equal(screen({ row: [14, 124, 52, 25.1], text: [14, 136.5, 52, 12.6] }).length, 1);
+  // Bottom-aligned text: 24 dp above it is the allowance, 24.5 dp is past it.
+  // Home's first section header keeps the 22.9 dp label air every later one has.
+  assert.deepEqual(screen({ row: [14, 124, 52, 46.1], text: [14, 146.9, 52, 14.1] }), []);
+  assert.deepEqual(screen({ row: [14, 124, 52, 36.6], text: [14, 148, 52, 12.6] }), []);
+  assert.equal(screen({ row: [14, 124, 52, 37.1], text: [14, 148.5, 52, 12.6] }).length, 1);
   // A 48 dp list row that centres its line keeps equal space on both sides.
   assert.deepEqual(screen({ row: [14, 124, 372, 48], text: [14, 141.5, 300, 14] }), []);
 });
 
 test('leading-gap: a first block pushed down by a margin is an error', () => {
   const [finding] = screen({
-    block: [14, 145, 372, 160],
-    row: [14, 145, 52, 14],
-    text: [14, 145, 52, 12.6],
+    block: [14, 150, 372, 160],
+    row: [14, 150, 52, 14],
+    text: [14, 150, 52, 12.6],
   });
-  assert.equal(finding?.measured, 21);
+  assert.equal(finding?.measured, 26);
   assert.match(finding?.message ?? '', /top margin/);
   assert.deepEqual(
-    screen({ block: [14, 136, 372, 160], row: [14, 136, 52, 14], text: [14, 136, 52, 12.6] }),
+    screen({ block: [14, 148, 372, 160], row: [14, 148, 52, 14], text: [14, 148, 52, 12.6] }),
     []
   );
 });
@@ -104,10 +106,12 @@ test('leading-gap: a painted first block at the padding passes in a content box 
   // above it is only the content's own top padding, which the screen chose.
   assert.deepEqual(
     screen({
-      contentHeight: 174,
+      contentHeight: 190,
+      contentStyle: { paddingTop: 30 },
+      block: [14, 140, 372, 160],
       blockStyle: { backgroundColor: '#f0eee6' },
-      row: [14, 140, 52, 14],
-      text: [14, 140, 52, 12.6],
+      row: [14, 150, 52, 14],
+      text: [14, 150, 52, 12.6],
     }),
     []
   );

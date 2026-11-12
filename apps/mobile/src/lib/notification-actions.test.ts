@@ -17,6 +17,7 @@ import {
   setPendingDeepLink,
 } from './deep-link-launch';
 import {
+  _resetOpenedExternalPagesForTests,
   handleNeedsInputNotificationResponse,
   isNeedsInputActionIdentifier,
   registerNeedsInputCategories,
@@ -126,6 +127,7 @@ function raiseResponse(input: ResponseInput = {}): Notifications.NotificationRes
 
 beforeEach(() => {
   _resetDeepLinkLaunchForTests();
+  _resetOpenedExternalPagesForTests();
   _setSecureStoreForTests({
     setItemAsync: vi.fn().mockResolvedValue(undefined),
     deleteItemAsync: vi.fn().mockResolvedValue(undefined),
@@ -944,6 +946,30 @@ describe('handleNeedsInputNotificationResponse — default action', () => {
     await vi.waitFor(() => {
       expect(mocks.openExternalUrl).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('opens one KiloClaw page when the second delivery arrives after the first settled', async () => {
+    // The background task can deliver the same tap after the listener's
+    // dispatch resolved, when the in-flight map no longer holds the identity.
+    const sameTap = {
+      identifier: 'e2e-warm-sequential',
+      actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+      data: { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
+    } as const;
+
+    await handleNeedsInputNotificationResponse(raiseResponse(sameTap), {
+      runInteraction: mocks.runNeedsInputInteraction,
+    });
+    await vi.waitFor(() => {
+      expect(mocks.openExternalUrl).toHaveBeenCalledTimes(1);
+    });
+
+    await handleNeedsInputNotificationResponse(raiseResponse(sameTap), {
+      runInteraction: mocks.runNeedsInputInteraction,
+    });
+
+    // The settled identity is remembered, so the second delivery opens nothing.
+    expect(mocks.openExternalUrl).toHaveBeenCalledTimes(1);
   });
 
   it('opens again for a tap on a different notification', async () => {

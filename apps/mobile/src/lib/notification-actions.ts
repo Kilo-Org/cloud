@@ -193,9 +193,10 @@ const headlessStringDataSchema = z.string();
  * the JS response listener and the registered background task
  * (ExpoHandlingDelegate.handleNotificationResponse), so one tap can arrive
  * twice. Concurrent dispatches of one response share the first one — an action
- * answers once, and a body tap opens its destination once (a KiloClaw web page
- * must not open twice); once it settles, a later tap — on the replaced result
- * notification — is answered again.
+ * answers once, and a body tap opens its destination once; once it settles, a
+ * later tap — on the replaced result notification — is answered again, except
+ * that a KiloClaw page already opened for that response identity is not opened
+ * a second time by a late second delivery of the same tap.
  */
 // eslint-disable-next-line promise-function-async -- passthrough dispatch: one interaction per tap shares an in-flight promise
 export function handleNeedsInputNotificationResponse(
@@ -235,6 +236,51 @@ async function trackDispatch(key: string, dispatch: Promise<boolean>): Promise<b
     inFlightDispatches.delete(key);
     throw error;
   }
+}
+
+// How long a response identity is remembered as having opened its page. Expo
+// can deliver one body tap as two responses that are not concurrent — the JS
+// listener first, then the registered background task after the first
+// dispatch settled — so the in-flight map alone cannot stop the second open.
+// The window stays far shorter than a person re-tapping a notification left in
+// the tray.
+const OPENED_EXTERNAL_TTL_MS = 5 * 60 * 1000;
+
+// Oldest-first, so a full memory drops the least recently opened page.
+const OPENED_EXTERNAL_MEMORY_SIZE = 32;
+
+/** When each response identity last opened its external page. */
+const openedExternalPages = new Map<string, number>();
+
+/**
+ * True when this dispatch is the first for the response's identity, false when
+ * the same tap already opened its page. Expired entries are pruned on the way
+ * in, and the memory stays bounded so a long session cannot grow it.
+ */
+function claimExternalOpen(key: string, now: number): boolean {
+  for (const [seen, openedAt] of openedExternalPages) {
+    if (now - openedAt <= OPENED_EXTERNAL_TTL_MS) {
+      // Insertion order runs oldest first: every later entry is newer.
+      break;
+    }
+    openedExternalPages.delete(seen);
+  }
+  if (openedExternalPages.has(key)) {
+    return false;
+  }
+  openedExternalPages.set(key, now);
+  if (openedExternalPages.size > OPENED_EXTERNAL_MEMORY_SIZE) {
+    const oldest = openedExternalPages.keys().next().value;
+    if (oldest !== undefined) {
+      openedExternalPages.delete(oldest);
+    }
+  }
+  return true;
+}
+
+/** Clear the opened-page memory between tests; it is process-wide state. */
+export function _resetOpenedExternalPagesForTests(): void {
+  openedExternalPages.clear();
 }
 
 async function dispatchNeedsInputResponse(
@@ -307,8 +353,12 @@ async function dispatchNeedsInputResponse(
   Notifications.clearLastNotificationResponse();
   if (destination.kind === 'external') {
     // A KiloClaw push has no mobile screen: its tap opens the web page in the
-    // in-app browser, with the retry affordance a failed open offers.
-    void openClawNotificationWebUrl(destination.url);
+    // in-app browser, with the retry affordance a failed open offers. One tap
+    // can arrive twice, and a second delivery lands after the in-flight map
+    // has forgotten the first, so the page is claimed by response identity.
+    if (claimExternalOpen(responseDispatchKey(response), Date.now())) {
+      void openClawNotificationWebUrl(destination.url);
+    }
     return false;
   }
   // Always stash: the gated consumer in `_layout.tsx` owns every navigation.

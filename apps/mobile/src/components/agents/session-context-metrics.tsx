@@ -115,15 +115,16 @@ export function SessionContextMetrics({
 
   // The pill's second value slot. `bg-muted-soft` is the one gray that stands
   // off this pill's own `bg-secondary` fill — the theme's `muted` equals
-  // `secondary` in both palettes — and the slot keeps the cost label's width in
-  // every placeholder state, so the pill never grows a value out of a smaller
-  // pill and never shrinks when a session settles without one.
+  // `secondary` in both palettes. The label keeps the marker's 32 dp floor in
+  // every state, so the cost arriving fills the slot the placeholder showed and
+  // the pill keeps its width; a cost wider than the floor grows the slot, and
+  // the pill truncates only past what the row can hold.
   let costSlot: ReactNode = null;
   if (content.costSlot === 'label' && content.secondary !== null) {
     costSlot = (
       <Text
         numberOfLines={1}
-        className="min-w-0 shrink text-xs tabular-nums text-muted-foreground"
+        className="min-w-8 shrink text-center text-xs tabular-nums text-muted-foreground"
         accessibilityElementsHidden
         importantForAccessibility="no"
       >

@@ -30,10 +30,16 @@ declare global {
 
 /**
  * Claim this instance's tag range. Call it once, before the first render: the renderer reads
- * the published base when it allocates its first tag.
+ * the published base when it allocates its first tag. A build or runtime that cannot answer
+ * starts at the platform's own first tag, which is the behaviour the app had before ranges.
  */
 export function claimViewTagRange(): number {
-  const claimed = nativeModule?.claimRange();
+  let claimed: number | undefined;
+  try {
+    claimed = nativeModule?.claimRange();
+  } catch {
+    claimed = undefined;
+  }
   const base =
     typeof claimed === 'number' && Number.isSafeInteger(claimed) && claimed > 0 ? claimed : 0;
   globalThis.__kiloViewTagBase = base;

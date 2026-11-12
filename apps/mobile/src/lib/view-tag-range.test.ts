@@ -54,6 +54,16 @@ describe('claimViewTagRange', () => {
     expect(globalThis.__kiloViewTagBase).toBe(0);
   });
 
+  it('starts at the platform range when the claim itself fails', async () => {
+    host.claimRange.mockImplementation(() => {
+      throw new Error('module registry unavailable');
+    });
+    const claimViewTagRange = await loadClaim();
+
+    expect(claimViewTagRange()).toBe(0);
+    expect(globalThis.__kiloViewTagBase).toBe(0);
+  });
+
   it('ignores a range it cannot use instead of handing the renderer a broken start', async () => {
     const claimViewTagRange = await loadClaim();
 

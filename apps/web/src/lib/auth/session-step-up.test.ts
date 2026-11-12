@@ -596,7 +596,10 @@ describe('session step-up ceremony', () => {
     for (const request of [
       {
         actionClass: 'sensitive_write' as const,
-        operation: { ...sensitiveWriteOperation(user.id), target: { kind: 'user' as const, id: 'someone-else' } },
+        operation: {
+          ...sensitiveWriteOperation(user.id),
+          target: { kind: 'user' as const, id: 'someone-else' },
+        },
       },
       {
         actionClass: 'sensitive_write' as const,

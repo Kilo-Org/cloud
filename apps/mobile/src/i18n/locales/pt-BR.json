@@ -1910,6 +1910,7 @@
       "planningNextSteps": "Planejando os próximos passos",
       "delegatingWork": "Delegando trabalho",
       "askingQuestion": "Fazendo uma pergunta",
+      "waitingForPermission": "Aguardando permissão",
       "consideringNextSteps": "Considerando os próximos passos",
       "writingResponse": "Escrevendo a resposta",
       "initializingSnapshot": "Inicializando a cópia do estado…"

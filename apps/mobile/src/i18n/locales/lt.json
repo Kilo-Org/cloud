@@ -2551,6 +2551,7 @@
       "planningNextSteps": "Planuojami kiti žingsniai",
       "delegatingWork": "Perduodamas darbas",
       "askingQuestion": "Užduodamas klausimas",
+      "waitingForPermission": "Laukia leidimo",
       "consideringNextSteps": "Svarstomi kiti žingsniai",
       "writingResponse": "Rašomas atsakymas",
       "initializingSnapshot": "Rengiama momentinė kopija…"

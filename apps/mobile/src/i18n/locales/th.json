@@ -2453,6 +2453,7 @@
       "planningNextSteps": "กำลังวางแผนขั้นตอนถัดไป",
       "delegatingWork": "กำลังมอบหมายงาน",
       "askingQuestion": "กำลังถามคำถาม",
+      "waitingForPermission": "กำลังรอการอนุญาต",
       "consideringNextSteps": "กำลังพิจารณาขั้นตอนถัดไป",
       "writingResponse": "กำลังเขียนคำตอบ",
       "initializingSnapshot": "กำลังเริ่มสร้างสแนปช็อต…"

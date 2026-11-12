@@ -1911,6 +1911,7 @@
       "planningNextSteps": "다음 단계 계획 중",
       "delegatingWork": "작업 위임 중",
       "askingQuestion": "질문하는 중",
+      "waitingForPermission": "권한 대기 중",
       "consideringNextSteps": "다음 단계 검토 중",
       "writingResponse": "응답 작성 중",
       "initializingSnapshot": "스냅샷 초기화 중…"

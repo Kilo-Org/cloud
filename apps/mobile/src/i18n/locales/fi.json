@@ -2453,6 +2453,7 @@
       "planningNextSteps": "Suunnitellaan seuraavia vaiheita",
       "delegatingWork": "Delegoidaan työtä",
       "askingQuestion": "Esitetään kysymys",
+      "waitingForPermission": "Odotetaan lupaa",
       "consideringNextSteps": "Harkitaan seuraavia vaiheita",
       "writingResponse": "Kirjoitetaan vastausta",
       "initializingSnapshot": "Alustetaan tilannekuvaa…"

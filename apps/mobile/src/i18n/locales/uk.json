@@ -1963,6 +1963,7 @@
       "planningNextSteps": "Планування наступних кроків",
       "delegatingWork": "Делегування роботи",
       "askingQuestion": "Агент ставить запитання",
+      "waitingForPermission": "Очікує на дозвіл",
       "consideringNextSteps": "Обмірковування наступних кроків",
       "writingResponse": "Написання відповіді",
       "initializingSnapshot": "Ініціалізація знімка…"

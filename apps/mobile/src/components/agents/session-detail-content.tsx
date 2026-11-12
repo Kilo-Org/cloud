@@ -2780,8 +2780,15 @@ export function SessionDetailContent({
                  from the last assistant part, and compute-status.ts maps a
                  reasoning part to agentChat.partDetail.thinking, so the spinner
                  reads Thinking during a reasoning stream in both modes. Feeding
-                 it displayedMessages would drop that label. */
-              <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
+                 it displayedMessages would drop that label. A pending ask takes
+                 the label instead: the blocked tool part has not run, and
+                 `blockingInteraction` already excludes an ask the auto-approve
+                 reply answers, so that ask keeps the activity label. */
+              <WorkingIndicator
+                messages={messages}
+                isStreaming={shouldShowFooterWorking}
+                blockingInteraction={hasBlockingInteraction ? blockingInteraction : 'none'}
+              />
             ) : null}
             {sessionFooterItem === 'status' && footerStatusIndicator !== null ? (
               <SessionStatusIndicator indicator={footerStatusIndicator} />

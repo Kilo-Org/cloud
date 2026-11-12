@@ -2453,6 +2453,7 @@
       "planningNextSteps": "اگلے مراحل کی منصوبہ بندی کر رہا ہے",
       "delegatingWork": "کام تفویض کر رہا ہے",
       "askingQuestion": "سوال پوچھ رہا ہے",
+      "waitingForPermission": "اجازت کا انتظار",
       "consideringNextSteps": "اگلے مراحل پر غور کر رہا ہے",
       "writingResponse": "جواب لکھ رہا ہے",
       "initializingSnapshot": "اسنیپ شاٹ تیار ہو رہا ہے…"

@@ -2453,6 +2453,7 @@
       "planningNextSteps": "ቀጣይ እርምጃዎችን በማቀድ ላይ",
       "delegatingWork": "ሥራን ለሌሎች ወኪሎች በመመደብ ላይ",
       "askingQuestion": "ጥያቄ በመጠየቅ ላይ",
+      "waitingForPermission": "ፈቃድ በመጠበቅ ላይ",
       "consideringNextSteps": "ቀጣይ እርምጃዎችን በማሰብ ላይ",
       "writingResponse": "ምላሽ በመጻፍ ላይ",
       "initializingSnapshot": "ቅጽበታዊ ቅጂን በማስጀመር ላይ…"

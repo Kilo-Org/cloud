@@ -2453,6 +2453,7 @@
       "planningNextSteps": "နောက်အဆင့်များကို စီစဉ်နေသည်",
       "delegatingWork": "လုပ်ငန်းများကို တာဝန်ခွဲပေးနေသည်",
       "askingQuestion": "မေးခွန်းတစ်ခု မေးနေသည်",
+      "waitingForPermission": "ခွင့်ပြုချက်ကို စောင့်နေ",
       "consideringNextSteps": "နောက်အဆင့်များကို စဉ်းစားနေသည်",
       "writingResponse": "တုံ့ပြန်ချက် ရေးနေသည်",
       "initializingSnapshot": "လက်ရှိအခြေအနေမှတ်တမ်းကို စတင်ဖန်တီးနေသည်…"

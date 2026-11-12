@@ -1911,6 +1911,7 @@
       "planningNextSteps": "規劃後續步驟中",
       "delegatingWork": "分派任務中",
       "askingQuestion": "提問中",
+      "waitingForPermission": "等待權限中",
       "consideringNextSteps": "思考後續步驟中",
       "writingResponse": "撰寫回覆中",
       "initializingSnapshot": "初始化快照中…"

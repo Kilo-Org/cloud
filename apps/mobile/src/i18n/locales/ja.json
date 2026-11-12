@@ -1911,6 +1911,7 @@
       "planningNextSteps": "次のステップを計画中",
       "delegatingWork": "作業を委任中",
       "askingQuestion": "質問中",
+      "waitingForPermission": "許可待ち",
       "consideringNextSteps": "次のステップを検討中",
       "writingResponse": "応答を作成中",
       "initializingSnapshot": "スナップショットを初期化中…"

@@ -2453,6 +2453,7 @@
       "planningNextSteps": "அடுத்த படிகளைத் திட்டமிடுகிறது",
       "delegatingWork": "பணியை ஒப்படைக்கிறது",
       "askingQuestion": "ஒரு கேள்வியைக் கேட்கிறது",
+      "waitingForPermission": "அனுமதிக்காகக் காத்திருக்கிறது",
       "consideringNextSteps": "அடுத்த படிகளைப் பரிசீலிக்கிறது",
       "writingResponse": "பதிலை எழுதுகிறது",
       "initializingSnapshot": "நிலைப்பதிவைத் தொடங்குகிறது…"

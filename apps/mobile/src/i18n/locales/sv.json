@@ -2453,6 +2453,7 @@
       "planningNextSteps": "Planerar nästa steg",
       "delegatingWork": "Delegerar arbete",
       "askingQuestion": "Ställer en fråga",
+      "waitingForPermission": "Väntar på behörighet",
       "consideringNextSteps": "Överväger nästa steg",
       "writingResponse": "Skriver svar",
       "initializingSnapshot": "Förbereder ögonblicksbild…"

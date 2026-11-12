@@ -2546,6 +2546,7 @@
       "planningNextSteps": "Planning next steps",
       "delegatingWork": "Delegating work",
       "askingQuestion": "Asking a question",
+      "waitingForPermission": "Waiting for permission",
       "consideringNextSteps": "Considering next steps",
       "writingResponse": "Writing response",
       "initializingSnapshot": "Initializing snapshot…"

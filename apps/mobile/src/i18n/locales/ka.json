@@ -2453,6 +2453,7 @@
       "planningNextSteps": "შემდეგი ნაბიჯების დაგეგმვა",
       "delegatingWork": "სამუშაოს განაწილება",
       "askingQuestion": "კითხვის დასმა",
+      "waitingForPermission": "ნებართვას ელის",
       "consideringNextSteps": "შემდეგი ნაბიჯების განხილვა",
       "writingResponse": "პასუხის წერა",
       "initializingSnapshot": "მდგომარეობის ასლის მომზადება…"

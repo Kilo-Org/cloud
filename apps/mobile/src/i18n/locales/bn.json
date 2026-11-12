@@ -2453,6 +2453,7 @@
       "planningNextSteps": "পরের ধাপগুলোর পরিকল্পনা করছে",
       "delegatingWork": "কাজের দায়িত্ব দিচ্ছে",
       "askingQuestion": "প্রশ্ন করছে",
+      "waitingForPermission": "অনুমতির অপেক্ষায়",
       "consideringNextSteps": "পরের ধাপগুলো বিবেচনা করছে",
       "writingResponse": "উত্তর লিখছে",
       "initializingSnapshot": "স্ন্যাপশট প্রস্তুত করা হচ্ছে…"

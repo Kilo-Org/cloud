@@ -4788,6 +4788,70 @@ describe('SessionDetailContent fixed indicator row', () => {
     expect(items).toHaveLength(1);
     expect(Object.is(items[0]?.type, WorkingIndicator)).toBe(true);
   });
+
+  /** A writable session streaming on a blocked bash call. */
+  function mountBlockedOnPermission() {
+    goalMountOptions = { resolvedType: 'remote' };
+    return mountDetails([footerMessage]);
+  }
+
+  function pendingBashPermission(
+    view: Awaited<ReturnType<typeof mountDetails>>,
+    requestId: string
+  ) {
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.isStreaming, true);
+      view.store.set<StandalonePermission | null, [StandalonePermission | null], unknown>(
+        view.manager.atoms.activePermission,
+        { requestId, permission: 'bash', patterns: [], metadata: {}, always: [] }
+      );
+    });
+  }
+
+  it('names the pending permission ask in the row and hands the label back after the answer', async () => {
+    const view = await mountBlockedOnPermission();
+    vi.spyOn(view.manager, 'respondToPermission').mockResolvedValue(undefined);
+    pendingBashPermission(view, 'perm-row');
+
+    // A blocked command has not run, so the row states the wait instead.
+    expect(view.renderer.root.findByType(WorkingIndicator).props.blockingInteraction).toBe(
+      'permission'
+    );
+    expect(renderedText(view.renderer.root)).toContain(
+      i18n.t('agentChat.computeStatus.waitingForPermission')
+    );
+
+    act(() => {
+      view.store.set<StandalonePermission | null, [StandalonePermission | null], unknown>(
+        view.manager.atoms.activePermission,
+        null
+      );
+    });
+    expect(view.renderer.root.findByType(WorkingIndicator).props.blockingInteraction).toBe('none');
+    expect(renderedText(view.renderer.root)).not.toContain(
+      i18n.t('agentChat.computeStatus.waitingForPermission')
+    );
+  });
+
+  it('keeps the activity label for a permission ask the auto-reply answers', async () => {
+    setSessionAutoApproveEnabled(ROOT_ID, true);
+    onTestFinished(() => {
+      setSessionAutoApproveEnabled(ROOT_ID, false);
+    });
+    const view = await mountBlockedOnPermission();
+    vi.spyOn(view.manager, 'respondToPermission').mockResolvedValue(undefined);
+    pendingBashPermission(view, 'perm-auto');
+
+    // The card is gated out while the auto-reply settles, so the row keeps
+    // stating the work that resumes the moment the ask clears.
+    expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(0);
+    expect(view.renderer.root.findByType(WorkingIndicator).props.blockingInteraction).toBe('none');
+    expect(renderedText(view.renderer.root)).not.toContain(
+      i18n.t('agentChat.computeStatus.waitingForPermission')
+    );
+  });
 });
 
 describe('session detail read-only composer', () => {

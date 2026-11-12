@@ -1,4 +1,4 @@
-import { Redirect } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
@@ -18,11 +18,20 @@ const FIXTURE_DISPLAY_SCOPE = { organizationId: null, isResolved: true };
  * can compare between two revisions. The refused message renders as an
  * undelivered bubble with Retry, and the composer stays empty.
  *
+ * `?state=pending-permission` holds the same screen behind a bash ask: the
+ * transcript stops at the command the ask blocks, and the row above the card
+ * reports the wait. Any other state is the plain idle screen.
+ *
  * The development fixture path in `src/app/+native-intent.tsx` maps to it, and a
  * release build refuses the path outright so the fixture is never reachable.
  */
 export default function AgentChatFixtureRoute() {
-  const manager = useMemo(() => createAgentChatFixtureManager(), []);
+  const { state } = useLocalSearchParams<{ state?: string }>();
+  const manager = useMemo(
+    () =>
+      createAgentChatFixtureManager(state === 'pending-permission' ? 'pending-permission' : 'idle'),
+    [state]
+  );
   if (!__DEV__) {
     return <Redirect href="/(auth)/login" />;
   }

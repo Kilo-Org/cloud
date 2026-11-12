@@ -2453,6 +2453,7 @@
       "planningNextSteps": "Skipuleggur næstu skref",
       "delegatingWork": "Úthlutar verkefnum",
       "askingQuestion": "Spyr",
+      "waitingForPermission": "Bíður eftir heimild",
       "consideringNextSteps": "Hugleiðir næstu skref",
       "writingResponse": "Skrifar svar",
       "initializingSnapshot": "Undirbýr stöðumynd…"

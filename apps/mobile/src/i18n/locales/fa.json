@@ -2453,6 +2453,7 @@
       "planningNextSteps": "در حال برنامه‌ریزی گام‌های بعدی",
       "delegatingWork": "در حال واگذاری کار",
       "askingQuestion": "در حال طرح پرسش",
+      "waitingForPermission": "در انتظار مجوز",
       "consideringNextSteps": "در حال بررسی گام‌های بعدی",
       "writingResponse": "در حال نوشتن پاسخ",
       "initializingSnapshot": "در حال آماده‌سازی نسخهٔ لحظه‌ای…"

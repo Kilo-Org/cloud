@@ -2453,6 +2453,7 @@
       "planningNextSteps": "Keyingi qadamlar rejalashtirilmoqda",
       "delegatingWork": "Ish topshirilmoqda",
       "askingQuestion": "Savol berilmoqda",
+      "waitingForPermission": "Ruxsat kutilmoqda",
       "consideringNextSteps": "Keyingi qadamlar ko'rib chiqilmoqda",
       "writingResponse": "Javob yozilmoqda",
       "initializingSnapshot": "Holat nusxasi tayyorlanmoqda…"

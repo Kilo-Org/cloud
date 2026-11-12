@@ -2453,6 +2453,7 @@
       "planningNextSteps": "Պլանավորում է հաջորդ քայլերը",
       "delegatingWork": "Պատվիրակում է աշխատանք",
       "askingQuestion": "Հարց է տալիս",
+      "waitingForPermission": "Սպասում է թույլտվության",
       "consideringNextSteps": "Մտածում է հաջորդ քայլերի մասին",
       "writingResponse": "Գրում է պատասխան",
       "initializingSnapshot": "Ստեղծվում է վիճակի պատճենը…"

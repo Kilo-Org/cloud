@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getBottomReservation,
   getCenteredStateBand,
+  getCenteredStateBandStyle,
   getCenteredStateLayout,
   getPendingCenteredStateStyle,
   getStateSurfaceInsets,
@@ -318,6 +319,32 @@ describe('getPendingCenteredStateStyle', () => {
       contentHeight: 170.67,
     });
     expect(renderedTop(measured, viewport.top, 170.67)).toBeCloseTo(410.67, 1);
+  });
+
+  it.each([
+    {
+      name: 'a reserved top inset',
+      window: { top: 0, bottom: 800 },
+      viewport: { top: 173, bottom: 640 },
+      topInset: 48,
+      contentHeight: 108.5,
+    },
+    {
+      name: 'a native filled viewport above the keyboard',
+      window: { top: 0, bottom: 400 },
+      viewport: { top: 80, bottom: 620 },
+      nativeViewportFillsSurface: true,
+      nativeViewportBottom: 700,
+      contentHeight: 120,
+    },
+  ])('keeps the band style on the measured placement for $name', band => {
+    const { contentHeight, ...geometry } = band;
+    const bandStyle = getCenteredStateBandStyle(geometry);
+    const layout = getCenteredStateLayout({ ...geometry, contentHeight });
+    expect(renderedTop(bandStyle, geometry.viewport.top, contentHeight)).toBeCloseTo(
+      renderedTop(layout, geometry.viewport.top, contentHeight),
+      6
+    );
   });
 
   it('keeps the bottom reserve free before the viewport is measured', () => {

@@ -27,6 +27,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useProfileMutations } from '@/hooks/useCloudAgentProfiles';
 import { profileVarKeyError } from '@/lib/profile-var-key';
+import { TRPCClientError } from '@trpc/client';
 
 const profileFormSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
@@ -156,9 +157,13 @@ export function SaveProfileDialog({
       onSaved?.(profileId);
     } catch (error) {
       console.error('Failed to save profile:', error);
-      // The server words its refusals, including the profile-count limit, so
-      // its sentence reaches the screen instead of a generic failure.
-      toast.error(error instanceof Error ? error.message : 'Failed to save profile.');
+      // A refusal the server words, such as the profile limit, explains itself.
+      // Anything else keeps the generic sentence instead of raw error text.
+      toast.error(
+        error instanceof TRPCClientError && error.data?.code === 'PRECONDITION_FAILED'
+          ? error.message
+          : 'Failed to save profile.'
+      );
     } finally {
       setIsSaving(false);
     }

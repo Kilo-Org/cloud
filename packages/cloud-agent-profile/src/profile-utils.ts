@@ -47,10 +47,7 @@ export async function verifyProfileOwnership(
  * that needs the whole owner serialized, and a row lock on the user or
  * organization row would queue behind unrelated credit and membership writes.
  */
-export async function lockProfileCreation(
-  db: ProfileDatabase,
-  owner: ProfileOwner
-): Promise<void> {
+export async function lockProfileCreation(db: ProfileDatabase, owner: ProfileOwner): Promise<void> {
   const key = `agent-environment-profile-creation:${owner.type}:${owner.id}`;
   await db.execute(
     sql`SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(${key}, 0))`

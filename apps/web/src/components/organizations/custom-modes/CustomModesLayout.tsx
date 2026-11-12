@@ -32,9 +32,7 @@ import { NewModeForm } from './NewModeForm';
 import { EditModeForm } from './EditModeForm';
 import { useOrganizationReadOnly } from '@/lib/organizations/use-organization-read-only';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
-import {
-  getOrganizationAutoRoute,
-} from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
+import { getOrganizationAutoRoute } from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
 import { ORGANIZATION_AUTO_MODEL_FLAG } from '@kilocode/app-shared/feature-flags';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';

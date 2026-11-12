@@ -18,6 +18,57 @@ function handlerThrowing(error: TRPCError) {
   }));
 }
 
+describe('createTRPCRouteHandler context options', () => {
+  function echoContextOptions() {
+    const { createTRPCContext } = jest.requireMock<{
+      createTRPCContext: jest.Mock;
+    }>('@kilocode/web-shared/lib/trpc/init');
+    createTRPCContext.mockImplementation(async (opts?: { fromDb?: unknown }) => ({
+      fromDb: opts?.fromDb,
+    }));
+    return createTRPCContext;
+  }
+
+  it('passes the configured read client into the request context', async () => {
+    const createTRPCContext = echoContextOptions();
+    const fromDb = { clientName: 'replica' };
+    const handle = createTRPCRouteHandler(
+      (ctx: { fromDb?: unknown }) => ({
+        run: async () => ({ readFrom: ctx.fromDb }),
+      }),
+      { fromDb }
+    );
+
+    const response = await handle(
+      new Request('http://localhost/api/v1/organizations/org-1/models') as never,
+      caller => caller.run()
+    );
+
+    expect(createTRPCContext).toHaveBeenCalledWith({
+      req: expect.anything(),
+      fromDb,
+    });
+    await expect(response.json()).resolves.toEqual({ readFrom: { clientName: 'replica' } });
+  });
+
+  it('leaves the client unset when the route handler configures none', async () => {
+    const createTRPCContext = echoContextOptions();
+    const handle = createTRPCRouteHandler((ctx: { fromDb?: unknown }) => ({
+      run: async () => ({ readFrom: ctx.fromDb ?? null }),
+    }));
+
+    const response = await handle(new Request('http://localhost/api/test') as never, caller =>
+      caller.run()
+    );
+
+    expect(createTRPCContext).toHaveBeenCalledWith({
+      req: expect.anything(),
+      fromDb: undefined,
+    });
+    await expect(response.json()).resolves.toEqual({ readFrom: null });
+  });
+});
+
 describe('createTRPCRouteHandler step-up mapping', () => {
   it.each(['BEARER_NOT_ALLOWED', 'MFA_REQUIRED', 'STEP_UP_UNAVAILABLE'] as const)(
     'maps %s to a 403 REST code',

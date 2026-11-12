@@ -36,6 +36,11 @@ work, work after the upstream request starts, and exceptional paths may use it.
   acceptable for auth. Shared helpers keep their `fromDb = db` default for the
   web app; gateway callers must pass `readDb`, since omitting it selects the
   primary.
+- `lib/model-stats/model-stats-cache` keeps one snapshot per read client, so the
+  gateway's replica load and the web app's primary load never answer for each
+  other; `invalidateModelStatsCache` expires both. The gateway callers that load
+  it (`providers/openrouter`, `handlers/models`, `handlers/model-validation`,
+  `organizations/organization-models`) pass `readDb`.
 - Usage accounting has its own transport selection; do not infer it from the
   general write guidance below. `usageAccountingTransport` selects queue or
   direct transport per request for `logMicrodollarUsage` and

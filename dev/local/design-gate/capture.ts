@@ -642,7 +642,15 @@ export async function runMatrix(
       try {
         await ensureLanguage(ctx, baseline);
       } catch (error) {
-        errors.push(error);
+        // A reload window that outlives the probe client's retry leaves the
+        // language unverified on the device. That is probe availability, not
+        // a device state the next run inherits wrongly: log it, but do not
+        // report the whole run as unrestored for it.
+        if (error instanceof InfraError) {
+          ctx.log(`design-gate: language restore skipped: ${String(error)}`);
+        } else {
+          errors.push(error);
+        }
       }
       for (const error of errors) ctx.log(`design-gate: restore failed: ${String(error)}`);
       return errors;
@@ -666,7 +674,8 @@ export async function runMatrix(
       outcome.cells.push(run);
       const seen = new Map<string, string>();
       for (const [index, target] of targets.entries()) {
-        const targetLanguage = await ensureLanguage(ctx, language);
+        try {
+          const targetLanguage = await ensureLanguage(ctx, language);
         const languageReady = targetLanguage.matched;
         // A cell-level reload leaves only its first target cold; a reload this
         // target itself caused (the previous target switched the app language)
@@ -746,6 +755,19 @@ export async function runMatrix(
               cell: config.id,
               target: target.id,
             }))
+          );
+        }
+        } catch (error) {
+          // A reload window that outlives the probe client's own retry leaves
+          // the target unreadable: the probe client reports it as an
+          // InfraError. The cell still measures its other targets; this one is
+          // logged and skipped rather than aborting the whole run. No finding
+          // without a dump: there is nothing measured to grade. Every other
+          // error (a failed screencap, a decode) is a real defect and still
+          // aborts.
+          if (!(error instanceof InfraError)) throw error;
+          ctx.log(
+            `design-gate: ${target.id} could not be read this cell: ${String(error)}`
           );
         }
       }

@@ -85,6 +85,10 @@ const EVALUATE_TIMEOUT_MS = 15_000;
 const LIST_TIMEOUT_MS = 10_000;
 const RETRIES = 3;
 const RETRY_DELAY_MS = 2_000;
+// A language switch reloads the runtime; the target stops answering for a few
+// seconds and comes back (measured ~5-6 s on the emulator). This bounds how
+// long the probe client waits for that return before it gives up.
+const RELOAD_RECONNECT_MS = 20_000;
 const PROBE = 'globalThis.__kiloDesignGate';
 
 export class ProbeScriptError extends Error {
@@ -271,6 +275,12 @@ export function createProbeClient(options: ProbeClientOptions): ProbeClient {
   const timeoutMs = options.timeoutMs ?? EVALUATE_TIMEOUT_MS;
   const sleep = options.sleep ?? delay;
   let session: CdpSession | undefined;
+  // The id of the page whose session last failed. A language switch reloads the
+  // runtime: the old target stays listed while it stops answering, and the new
+  // one appears under a fresh id. Retrying against the same dead target is what
+  // turned that window into a run abort.
+  let failedPageId: string | undefined;
+  let lastOpenedPageId: string | undefined;
 
   const connect = async (): Promise<CdpSession> => {
     if (session?.isOpen()) return session;
@@ -282,12 +292,59 @@ export function createProbeClient(options: ProbeClientOptions): ProbeClient {
       );
     }
     session = await openSession(page.webSocketDebuggerUrl, options.createSocket, timeoutMs);
+    lastOpenedPageId = page.id;
     return session;
   };
 
   const disconnect = () => {
     session?.close();
     session = undefined;
+  };
+
+  const isTransient = (error: unknown): boolean => {
+    // A probe exception is a product bug, never a reload window: it fails fast.
+    if (error instanceof ProbeScriptError) return false;
+    // The two shapes a reload window produces: the freshly re-created target
+    // has not bound its Runtime domain yet, and the half-remounted tree raises
+    // inside the probe. Both clear once the runtime is back (measured ~5-6 s).
+    const text = String(error);
+    return (
+      text.includes('-32601') ||
+      (text.includes('Runtime.evaluate') && text.includes('not found')) ||
+      text.includes('CDP socket closed') ||
+      text.includes('CDP session closed') ||
+      text.includes('CDP socket error') ||
+      text.includes('No Metro debugger page')
+    );
+  };
+
+  // Wait out a runtime reload: the page list may hold only the target that is
+  // going away, so the next call needs either a different target or the same
+  // one answering again before its evaluate goes out.
+  const reconnectAfterReload = async (): Promise<void> => {
+    const deadline = Date.now() + RELOAD_RECONNECT_MS;
+    while (Date.now() < deadline) {
+      await sleep(RETRY_DELAY_MS);
+      try {
+        const pages = await listPages(options.metro, options.fetch);
+        const page = selectPage(pages, options.names);
+        if (page?.webSocketDebuggerUrl === undefined) continue;
+        if (page.id !== failedPageId) {
+          failedPageId = undefined;
+          return;
+        }
+        // The same target listed again is also fine when it answers: the
+        // runtime re-attached in place.
+        const probe = await openSession(page.webSocketDebuggerUrl, options.createSocket, timeoutMs);
+        await evaluate(probe, `${PROBE}?.ready() === true`, timeoutMs);
+        probe.close();
+        failedPageId = undefined;
+        return;
+      } catch {
+        // Still inside the reload window.
+      }
+    }
+    failedPageId = undefined;
   };
 
   const call = async (expression: string): Promise<unknown> => {
@@ -300,9 +357,15 @@ export function createProbeClient(options: ProbeClientOptions): ProbeClient {
         if (error instanceof ProbeScriptError) throw error;
         lastError = error;
         disconnect();
+        // A reload window is transient: the runtime comes back on its own
+        // (measured ~5-6 s). Wait it out instead of burning the retries against
+        // a target that is going away.
+        if (isTransient(error)) {
+          failedPageId = lastOpenedPageId;
+          await reconnectAfterReload();
+        }
       }
     }
-    if (lastError instanceof InfraError) throw lastError;
     throw new InfraError(`CDP evaluate failed after ${RETRIES} retries: ${String(lastError)}`);
   };
 

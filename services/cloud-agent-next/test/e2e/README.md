@@ -237,6 +237,8 @@ It creates a synthetic saved profile and tests variables, encrypted secrets, ord
 instructions, custom agents, custom and marketplace skills, skill companion
 files, local and remote MCP credentials, disabled entries, slash-command catalog
 delivery, command arguments, subtask commands, sibling reuse, and native restart.
+It verifies `KILO_USE_RELEASE_CONFIG=1` on the pinned v2 server, executes repository
+`.kilo` commands and skills, discovers repository agents, and ignores `.kilo2` commands.
 It checks native skill loading and the shared profile configuration in sibling
 sessions. An empty browser sibling must inherit the command catalog and profile
 association before its first message, then execute a command as its first turn.

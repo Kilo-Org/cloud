@@ -41,6 +41,7 @@
     "./callback-token": "./src/callback-token.ts",
     "./cloud-agent-next-client": "./src/cloud-agent-next-client.ts",
     "./cloud-agent-session-access": "./src/cloud-agent-session-access.ts",
+    "./cloud-agent-session-sync": "./src/cloud-agent-session-sync.ts",
     "./cloud-agent-worktree-changes": "./src/cloud-agent-worktree-changes.ts",
     "./cloud-agent-worktree-operations": "./src/cloud-agent-worktree-operations.ts",
     "./cloud-agent-commits": "./src/cloud-agent-commits.ts",

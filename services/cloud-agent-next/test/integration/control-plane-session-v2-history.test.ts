@@ -159,6 +159,24 @@ afterEach(async () => {
 });
 
 describe('workspace DO history and mutation cursors', () => {
+  it('authorizes upload descendants only through the registered root and stored ancestry', async () => {
+    const { stub, kiloSessionId } = await fixture();
+    const child = nativeId();
+    const grandchild = nativeId();
+    const unrelated = nativeId();
+    for (const [id, parentID] of [
+      [child, kiloSessionId],
+      [grandchild, child],
+      [unrelated, nativeId()],
+    ]) {
+      await publish(stub, 'session.created', { info: { ...snapshot(id), parentID } });
+    }
+    expect(await stub.hasSessionSyncDescendant(kiloSessionId, child)).toBe(true);
+    expect(await stub.hasSessionSyncDescendant(kiloSessionId, grandchild)).toBe(true);
+    expect(await stub.hasSessionSyncDescendant(kiloSessionId, unrelated)).toBe(false);
+    expect(await stub.hasSessionSyncDescendant(nativeId(), child)).toBe(false);
+    expect(await stub.hasSessionSyncDescendant(kiloSessionId, nativeId())).toBe(false);
+  });
   it('sanitizes native turn-close errors in durable storage and the public stream', async () => {
     const { stub, sessionId, kiloSessionId } = await fixture();
     await runInDurableObject(stub, (_instance, state) => {

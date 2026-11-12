@@ -38844,6 +38844,55 @@
     ],
     "searchBlob": "workspaceFolders.reorder Change the display order of workspace folders. workspacefolders reorder organizationid folderids organizationId folderIds"
   },
+  "workspaceFolders.reorderWorktrees": {
+    "path": "workspaceFolders.reorderWorktrees",
+    "kind": "mutation",
+    "summary": "Set the custom worktree order inside a smart workspace folder in the cloud agent sidebar, so you can manually arrange worktrees within the folder. Use to save a drag-and-drop reordering of worktrees.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "folderId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "worktreeIds": {
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        }
+      },
+      "required": [
+        "organizationId",
+        "folderId",
+        "worktreeIds"
+      ]
+    },
+    "tags": [
+      "workspacefolders",
+      "reorderworktrees",
+      "organizationid",
+      "folderid",
+      "worktreeids"
+    ],
+    "searchBlob": "workspaceFolders.reorderWorktrees Set the custom worktree order inside a smart workspace folder in the cloud agent sidebar, so you can manually arrange worktrees within the folder. Use to save a drag-and-drop reordering of worktrees. workspacefolders reorderworktrees organizationid folderid worktreeids organizationId folderId worktreeIds"
+  },
   "workspaceFolders.update": {
     "path": "workspaceFolders.update",
     "kind": "mutation",

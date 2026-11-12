@@ -94,21 +94,29 @@ describe('useSessionListAutoScroll viewport resize', () => {
     // The first layout records the pre-resize viewport height.
     act(() => {
       api.handleListLayout(layoutEvent(600));
+      vi.advanceTimersByTime(1);
     });
     closeProgrammaticScrollWindow();
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
     scrollToEnd.mockClear();
 
     // A streamed row grows the content and starts a follow scroll.
     act(() => {
       api.handleContentSizeChange(400, 2000);
+      vi.advanceTimersByTime(1);
     });
     expect(scrollToEnd).toHaveBeenCalledTimes(1);
 
     scrollToEnd.mockClear();
 
     // Inside that window the status row mounts and the list gets shorter.
+    // The correction is coalesced to the task, so the resize and any content
+    // change it carries land as one scroll.
     act(() => {
       api.handleListLayout(layoutEvent(500));
+      vi.advanceTimersByTime(1);
     });
 
     expect(scrollToEnd).toHaveBeenCalledTimes(1);
@@ -120,6 +128,7 @@ describe('useSessionListAutoScroll viewport resize', () => {
 
     act(() => {
       api.handleListLayout(layoutEvent(600));
+      vi.advanceTimersByTime(1);
     });
     closeProgrammaticScrollWindow();
     // Far from the content end: the follow is off.
@@ -130,6 +139,7 @@ describe('useSessionListAutoScroll viewport resize', () => {
 
     act(() => {
       api.handleListLayout(layoutEvent(500));
+      vi.advanceTimersByTime(1);
     });
 
     expect(scrollToEnd).not.toHaveBeenCalled();
@@ -141,6 +151,7 @@ describe('useSessionListAutoScroll viewport resize', () => {
 
     act(() => {
       api.handleListLayout(layoutEvent(600));
+      vi.advanceTimersByTime(1);
     });
     closeProgrammaticScrollWindow();
     act(() => {
@@ -150,6 +161,7 @@ describe('useSessionListAutoScroll viewport resize', () => {
 
     act(() => {
       api.handleListLayout(layoutEvent(500));
+      vi.advanceTimersByTime(1);
     });
 
     expect(scrollToEnd).not.toHaveBeenCalled();

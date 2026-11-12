@@ -6,7 +6,7 @@ import {
   EndpointsSchema,
   ModelArchitectureSchema,
   ModelSchema,
-  ModelsSchema,
+  VercelModelSchema,
   type Endpoint,
   type GatewayModel,
 } from '@kilocode/db/schema-types';
@@ -27,7 +27,12 @@ export type GatewayModelMap = Record<string, GatewayModelWithEndpoints>;
 export const NO_ENDPOINTS_RESOURCE = 'no-endpoints-resource';
 const NoEndpointsResourceSchema = z.strictObject({ status: z.literal(404) });
 
-export type GatewayModelList = z.infer<typeof ModelsSchema>;
+export type GatewayModelList = { data: GatewayModel[] };
+
+/** A gateway's model list source. Reading it back from the cache keeps only `modelKeys`. */
+export type GatewayModelsSource = MetadataSource<GatewayModelList> & {
+  modelKeys: readonly string[];
+};
 export type GatewayModelEndpoints = Endpoint[] | typeof NO_ENDPOINTS_RESOURCE;
 
 const MINIMUM_GATEWAY_MODEL_COUNT = 100;
@@ -42,14 +47,17 @@ function gatewayHeaders(gateway: Provider) {
 
 export function gatewayModelsSource(
   gateway: Provider,
-  modelsPath: string
-): MetadataSource<GatewayModelList> {
+  modelsPath: string,
+  modelSchema: typeof ModelSchema | typeof VercelModelSchema = ModelSchema
+): GatewayModelsSource {
   const url = `${gateway.apiUrl}${modelsPath}`;
+  const listSchema = z.object({ data: z.array(modelSchema) });
   return {
     url,
     headers: () => gatewayHeaders(gateway),
+    modelKeys: modelSchema.keyof().options,
     parse: raw => {
-      const models = ModelsSchema.parse(raw);
+      const models: GatewayModelList = listSchema.parse(raw);
       assertMinimumCount(url, models.data.length, MINIMUM_GATEWAY_MODEL_COUNT);
       return models;
     },
@@ -61,7 +69,12 @@ export const openRouterGatewayModelsSource = gatewayModelsSource(
   OPENROUTER,
   '/models?output_modalities=all'
 );
-export const vercelGatewayModelsSource = gatewayModelsSource(VERCEL_AI_GATEWAY, '/models');
+// Vercel's list also describes each model, which Kilo needs to list models only Vercel serves.
+export const vercelGatewayModelsSource = gatewayModelsSource(
+  VERCEL_AI_GATEWAY,
+  '/models',
+  VercelModelSchema
+);
 
 function gatewayModelEndpointsUrlPrefix(gateway: Provider) {
   return `${gateway.apiUrl}/models/`;
@@ -153,7 +166,7 @@ function parseStoredGatewayModelEndpoints(raw: unknown): GatewayModelEndpoints |
  */
 export async function readStoredGatewayModels(
   gateway: Provider,
-  source: MetadataSource<GatewayModelList>,
+  source: GatewayModelsSource,
   fromDb: MetadataDb
 ): Promise<ListedGatewayModel[] | null> {
   const item = sql`items.item`;
@@ -172,7 +185,7 @@ export async function readStoredGatewayModels(
     CROSS JOIN LATERAL (
       SELECT
         jsonb_agg(
-          ${pickJsonbKeys(item, ModelSchema.keyof().options, {
+          ${pickJsonbKeys(item, source.modelKeys, {
             architecture: ModelArchitectureSchema.keyof().options,
           })}
           ORDER BY items.ordinality

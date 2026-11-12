@@ -1499,6 +1499,17 @@ export class UserConnectionDO extends DurableObject<Env> {
     attachment: WSAttachment & { role: 'web' },
     sessionId: string
   ): Promise<void> {
+    // A socket that already holds this subscription keeps it: the stored entry
+    // is the answer, and the access recheck, session-list send and CLI forward
+    // below run once per subscription. An unsubscribe clears both entries, so
+    // the next subscribe resolves access.
+    if (
+      this.webSubscriptions.get(sessionId)?.has(ws) &&
+      attachment.subscribedSessions.includes(sessionId)
+    ) {
+      return;
+    }
+
     // Recheck current membership before subscribing: a removed member must not
     // receive events from an org session they no longer have access to.
     const kiloUserId = attachment.kiloUserId;

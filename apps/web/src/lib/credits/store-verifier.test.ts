@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 
+import { VerificationException, VerificationStatus } from '@apple/app-store-server-library';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 
@@ -204,6 +205,58 @@ describe('verifyAppleCreditPurchase', () => {
       quantity: 2,
       amountMicrodollars: 20_000_000,
     });
+  });
+
+  it.each([
+    ['VERIFICATION_FAILURE', VerificationStatus.VERIFICATION_FAILURE],
+    ['INVALID_APP_IDENTIFIER', VerificationStatus.INVALID_APP_IDENTIFIER],
+    ['INVALID_ENVIRONMENT', VerificationStatus.INVALID_ENVIRONMENT],
+    ['INVALID_CHAIN_LENGTH', VerificationStatus.INVALID_CHAIN_LENGTH],
+  ])('refuses a transaction Apple rejects with %s as terminal', async (_name, status) => {
+    const { verifyAppleCreditPurchase } = loadVerifier();
+    const signedTransactionJws = 'not-a-decodable-jws-secret-value';
+    mockDecodeAppleStoreTransactionJws.mockRejectedValueOnce(
+      new VerificationException(
+        status,
+        new TypeError(
+          `Cannot read properties of null (reading 'originalTransactionId') ${signedTransactionJws}`
+        )
+      )
+    );
+
+    const error = await verifyAppleCreditPurchase(signedTransactionJws).catch(
+      (caught: unknown) => caught
+    );
+
+    expect(error).toBeInstanceOf(StoreVerificationError);
+    expect((error as Error).message).toBe(`Apple transaction could not be verified (${_name})`);
+    expect((error as Error).message).not.toContain(signedTransactionJws);
+  });
+
+  it.each([
+    ['RETRYABLE_VERIFICATION_FAILURE', VerificationStatus.RETRYABLE_VERIFICATION_FAILURE],
+    ['INVALID_CERTIFICATE', VerificationStatus.INVALID_CERTIFICATE],
+    ['FAILURE', VerificationStatus.FAILURE],
+  ])('keeps an Apple %s verification failure retryable', async (_name, status) => {
+    const { verifyAppleCreditPurchase } = loadVerifier();
+    const verifierError = new VerificationException(status);
+    mockDecodeAppleStoreTransactionJws.mockRejectedValueOnce(verifierError);
+
+    const error = await verifyAppleCreditPurchase('signed-jws').catch((caught: unknown) => caught);
+
+    expect(error).toBe(verifierError);
+    expect(error).not.toBeInstanceOf(StoreVerificationError);
+  });
+
+  it('passes an untyped provider failure through unchanged', async () => {
+    const { verifyAppleCreditPurchase } = loadVerifier();
+    const providerError = new Error('provider unavailable');
+    mockDecodeAppleStoreTransactionJws.mockRejectedValueOnce(providerError);
+
+    const error = await verifyAppleCreditPurchase('signed-jws').catch((caught: unknown) => caught);
+
+    expect(error).toBe(providerError);
+    expect(error).not.toBeInstanceOf(StoreVerificationError);
   });
 });
 

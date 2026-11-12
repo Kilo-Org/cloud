@@ -3,6 +3,16 @@ import { runtimeHarness, kilo2RuntimeEnvironment } from './runtime-harness.js';
 import { readKilo2Sse } from './kilo2-event-feed.js';
 
 describe('runtime harness selection', () => {
+  it.each([undefined, '0', '1'])('enables release config for v2 when inherited as %s', value => {
+    const env: Record<string, string> =
+      value === undefined ? {} : { KILO_USE_RELEASE_CONFIG: value };
+    const original = { ...env };
+    const result = kilo2RuntimeEnvironment(env);
+    expect(result.KILO_USE_RELEASE_CONFIG).toBe('1');
+    expect(kilo2RuntimeEnvironment(result)).toEqual(result);
+    expect(env).toEqual(original);
+  });
+
   it('uses the v2 background subagent default without changing the v1 environment', () => {
     const env = { KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'false', KILO_CONFIG_CONTENT: '{}' };
     expect(kilo2RuntimeEnvironment(env).KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS).toBeUndefined();

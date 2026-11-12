@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ai_gateway_metadata_cache } from '@kilocode/db/schema';
-import { EndpointsSchema, ModelSchema } from '@kilocode/db/schema-types';
+import { EndpointsSchema, ModelSchema, VercelModelSchema } from '@kilocode/db/schema-types';
 import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
@@ -320,6 +320,47 @@ describe('readStoredGatewayModels', () => {
     expect(storedEndpointsOf(stored)).toEqual(
       new Map([['vendor/null-flags', [{ provider_name: 'flags' }]]])
     );
+  });
+
+  it('keeps the model description fields only for a source whose schema has them', async () => {
+    const described = {
+      id: 'vendor/described',
+      name: 'Described',
+      type: 'language',
+      owned_by: 'vendor',
+      description: 'A described model',
+      created: 1_755_815_280,
+      released: 1_790_000_000,
+      context_window: 256_000,
+      max_tokens: 32_000,
+      modalities: { input: ['text'], output: ['text'] },
+      supported_parameters: ['tools'],
+      pricing: { input: '0.000001', output: '0.000002', input_cache_read: null },
+      deprecated_at: Date.UTC(2027, 0, 15),
+      reasoning_options: [{ type: 'effort', values: ['low', 'high'] }],
+    };
+    await storeList([described]);
+    const vercelSource = gatewayModelsSource(gateway, '/models', VercelModelSchema);
+
+    const [vercelModel] = modelsOf(await readStoredGatewayModels(gateway, vercelSource, db)) ?? [];
+    const [plainModel] = modelsOf(await read()) ?? [];
+
+    expect(vercelModel).toEqual({
+      id: 'vendor/described',
+      name: 'Described',
+      type: 'language',
+      description: 'A described model',
+      created: 1_755_815_280,
+      released: 1_790_000_000,
+      context_window: 256_000,
+      max_tokens: 32_000,
+      modalities: { input: ['text'], output: ['text'] },
+      supported_parameters: ['tools'],
+      pricing: { input: '0.000001', output: '0.000002' },
+      deprecated_at: Date.UTC(2027, 0, 15),
+      reasoning_options: [{ type: 'effort', values: ['low', 'high'] }],
+    });
+    expect(plainModel).toEqual({ id: 'vendor/described', name: 'Described', type: 'language' });
   });
 
   it('joins only endpoints rows of the given gateway', async () => {

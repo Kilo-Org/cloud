@@ -535,6 +535,7 @@ const ComparisonFindingSchema = z
       'layout-shift',
       'rtl-mirror',
       'safe-area',
+      'leading-gap',
       'unsettled',
       'loading-placeholder',
       'capture-alignment',

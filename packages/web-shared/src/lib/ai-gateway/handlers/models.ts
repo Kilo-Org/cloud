@@ -29,7 +29,7 @@ import {
 } from '@kilocode/web-shared/lib/model-stats/enkrypt';
 
 async function modelResponse(response: OpenRouterModelsResponse) {
-  const snapshot = await getEnkryptBenchmarks();
+  const snapshot = await getEnkryptBenchmarks({ fromDb: readDb });
   return NextResponse.json({
     ...response,
     data: publishEnkryptModels(response.data, snapshot),
@@ -90,7 +90,7 @@ export async function handleModelsRequest(
       });
     }
 
-    const data = await getEnhancedOpenRouterModels({ countryCode });
+    const data = await getEnhancedOpenRouterModels({ countryCode, fromDb: readDb });
     if (!Array.isArray(data.data)) {
       return NextResponse.json(data);
     }

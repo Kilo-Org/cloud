@@ -1700,6 +1700,72 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(reprepareFrame.spec.attemptId).toBe(after?.attempt_id);
   });
 
+  it('carries the latest saved worktree recovery into a wrapper restart', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const initial = prepareInput(SESSION);
+    initial.spec = {
+      ...initial.spec,
+      worktreeRecovery: {
+        files: [{ path: 'old.txt', status: 'added', patch: 'old patch' }],
+      },
+    };
+    await stub.prepare(initial);
+    const { wrapper, credential, allocationId } = await connectAndHello(provider, 'wr_1');
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    const latest = {
+      files: [{ path: 'src/latest.ts', status: 'modified' as const, patch: 'latest patch' }],
+    };
+    const reprepare = prepareInput(SESSION);
+    reprepare.spec = { ...reprepare.spec, worktreeRecovery: latest };
+    await stub.prepare(reprepare);
+    const row = await readRouteRow(stub, SESSION);
+    expect(row).not.toBeNull();
+    expect(JSON.parse(row?.spec ?? '{}').worktreeRecovery).toEqual(latest);
+
+    wrapper.close();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
+    const wrapper2 = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    await wrapper2.hello({ wrapperId: 'wr_2', allocationId });
+    const frame = await wrapper2.next();
+    expect(frame).toMatchObject({ type: 'session.prepare' });
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.worktreeRecovery).toEqual(latest);
+    wrapper2.close();
+    wrapper.close();
+  });
+
+  it('adopts a later saved worktree recovery while the route is still preparing', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const prepared = {
+      files: [{ path: 'old.txt', status: 'added' as const, patch: 'old patch' }],
+    };
+    const initial = prepareInput(SESSION);
+    initial.spec = { ...initial.spec, worktreeRecovery: prepared };
+    await stub.prepare(initial);
+    expect((await readRouteRow(stub, SESSION))?.state).toBe('preparing');
+
+    const late = {
+      files: [{ path: 'src/late.ts', status: 'modified' as const, patch: 'late patch' }],
+    };
+    const reprepare = prepareInput(SESSION);
+    reprepare.spec = { ...reprepare.spec, worktreeRecovery: late };
+    await stub.prepare(reprepare);
+    const row = await readRouteRow(stub, SESSION);
+    expect(JSON.parse(row?.spec ?? '{}').worktreeRecovery).toEqual(late);
+
+    const { wrapper } = await connectAndHello(provider, 'wr_1');
+    const frame = await wrapper.next();
+    expect(frame).toMatchObject({ type: 'session.prepare' });
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.worktreeRecovery).toEqual(late);
+    wrapper.close();
+  });
+
   it('re-notifies ready for the same wrapperId after a reconnect', async () => {
     const provider = createFakeProvider();
     const { stub, peer } = await setup(provider);

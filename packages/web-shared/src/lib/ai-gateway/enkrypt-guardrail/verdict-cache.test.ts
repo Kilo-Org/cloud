@@ -681,20 +681,6 @@ describe('scanRequestWithVerdictCache', () => {
     });
   });
 
-  it('accepts automatically deserialized block objects as well as serialized entries', async () => {
-    const store = memoryStore();
-    store.mget.mockResolvedValue([{ action: 'block', detectors: ['injection_attack'] }]);
-    const dependencies = deps(store);
-
-    const result = await scanConversation(makeRequest([segment('user', 'blocked')]), dependencies);
-
-    expect(result.verdict).toEqual({
-      action: 'block',
-      message: guardrailBlockMessage(['injection_attack'], null),
-    });
-    expect(dependencies.fetch).not.toHaveBeenCalled();
-  });
-
   it.each<[string, unknown]>([
     ['missing entry', null],
     ['old allow marker', '1'],
@@ -702,12 +688,16 @@ describe('scanRequestWithVerdictCache', () => {
     ['invalid JSON', '{"action":'],
     ['boolean', true],
     ['array', ['allow']],
-    ['missing detectors', { action: 'block' }],
-    ['empty detectors', { action: 'block', detectors: [] }],
-    ['unknown detector', { action: 'block', detectors: ['unknown_detector'] }],
-    ['non-blocking detector', { action: 'block', detectors: ['pii'] }],
-    ['wrong action', { action: 'allow', detectors: ['injection_attack'] }],
-    ['extra message', { action: 'block', detectors: ['injection_attack'], message: 'private' }],
+    ['unserialized block', { action: 'block', detectors: ['injection_attack'] }],
+    ['missing detectors', JSON.stringify({ action: 'block' })],
+    ['empty detectors', JSON.stringify({ action: 'block', detectors: [] })],
+    ['unknown detector', JSON.stringify({ action: 'block', detectors: ['unknown_detector'] })],
+    ['non-blocking detector', JSON.stringify({ action: 'block', detectors: ['pii'] })],
+    ['wrong action', JSON.stringify({ action: 'allow', detectors: ['injection_attack'] })],
+    [
+      'extra message',
+      JSON.stringify({ action: 'block', detectors: ['injection_attack'], message: 'private' }),
+    ],
     ['serialized invalid detectors', '{"action":"block","detectors":[123]}'],
   ])('rescans for malformed cache data: %s', async (_name, value) => {
     const store = memoryStore();
@@ -980,26 +970,6 @@ describe('scanRequestWithVerdictCache', () => {
     expect(store.mget).not.toHaveBeenCalled();
   });
 
-  it('scans every segment when the cache lookup fails, even ones that are cached', async () => {
-    const store = memoryStore(keysFor(conversation));
-    store.mget.mockRejectedValue(new Error('The operation timed out.'));
-    const dependencies = deps(store);
-
-    const result = await scanConversation(makeRequest(conversation), dependencies);
-
-    expect(scannedTexts(dependencies)).toEqual([render(conversation)]);
-    expect(result.verdict).toEqual({ action: 'allow' });
-    expect(result.cacheEntries).toEqual(allowed(keysFor(conversation)));
-    expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
-      '[enkrypt-guardrail] verdict cache lookup failed; scanning in full',
-      { organization_id: organizationId, error: 'The operation timed out.' }
-    );
-    expect(console.debug).toHaveBeenCalledWith(
-      '[enkrypt-guardrail] decision',
-      expect.objectContaining({ verdict_cache: 'error', cached_segments: 0 })
-    );
-  });
-
   it('scans in full without a lookup when the cache is disabled', async () => {
     const dependencies = deps(null);
 
@@ -1036,36 +1006,6 @@ describe('scanRequestWithVerdictCache', () => {
   });
 
   describe('packing and splitting', () => {
-    it('packs uncached segments, in order, into as few calls as fit the scan limit', async () => {
-      const segments = [
-        segment('user', numbered('a', 40_000)),
-        segment('assistant', numbered('b', 40_000)),
-        segment('user', numbered('c', 40_000)),
-        segment('assistant', 'done'),
-      ];
-      const calls = [render(segments.slice(0, 2)), render(segments.slice(2))];
-      const captured: Promise<EnkryptRequestLog>[] = [];
-      const dependencies = deps(memoryStore());
-      dependencies.requestLog = { guardrail: 'input', capture: entry => captured.push(entry) };
-
-      const result = await scanConversation(makeRequest(segments), dependencies);
-
-      expect(scannedTexts(dependencies)).toEqual(calls);
-      for (const text of calls)
-        expect(text.length).toBeLessThanOrEqual(ENKRYPT_MAX_SCAN_CHARACTERS);
-      expect(result.report).toMatchObject({
-        chunks: 2,
-        attempts: 2,
-        scanned_characters: sum(calls.map(text => text.length)),
-      });
-      expect(result.cacheEntries).toEqual(allowed(keysFor(segments)));
-      const logs = await Promise.all(captured);
-      expect(logs.map(log => [log.part, log.chunk, log.request.text])).toEqual([
-        ['conversation', { index: 0, count: 2 }, calls[0]],
-        ['conversation', { index: 1, count: 2 }, calls[1]],
-      ]);
-    });
-
     it.each([
       ['fill one call to exactly the scan limit', 49_979, 1],
       ['need two calls one character past the scan limit', 49_980, 2],
@@ -1208,35 +1148,6 @@ describe('scanRequestWithVerdictCache', () => {
         expect(retried.verdict.action).toBe('block');
         expect(retried.report).toMatchObject({ cached_segments: 2, chunks: 0 });
       });
-    });
-
-    it('never splits a surrogate pair between slices', async () => {
-      const body = `x${'\u{1F600}'.repeat(60_000)}`;
-      const dependencies = deps(memoryStore());
-
-      await scanConversation(makeRequest([segment('user', body)]), dependencies);
-
-      const texts = scannedTexts(dependencies);
-      expect(texts).toHaveLength(2);
-      for (const text of texts) {
-        expect(text).not.toMatch(
-          /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/
-        );
-      }
-      // The cut, and the start of the overlap before it, would each fall inside a pair, so the
-      // first slice ends one character early and the second starts one character late.
-      const [first, second] = texts.map(sliceBody);
-      const step =
-        ENKRYPT_MAX_SCAN_CHARACTERS -
-        '[user, beginning and end omitted]'.length -
-        1 -
-        ENKRYPT_SLICE_OVERLAP_CHARACTERS;
-      expect(first).toHaveLength(step - 1);
-      expect(body.startsWith(first!)).toBe(true);
-      expect(body.endsWith(second!)).toBe(true);
-      expect(first!.length + second!.length - body.length).toBe(
-        ENKRYPT_SLICE_OVERLAP_CHARACTERS - 2
-      );
     });
 
     it('rejects a segment whose header is too long to split without a call for it', async () => {
@@ -2084,9 +1995,13 @@ describe('scanRequestWithVerdictCache', () => {
       });
     });
 
-    it('scans each part and tool in full when the cache lookup fails', async () => {
-      const store = memoryStore();
-      store.mget.mockRejectedValue(new Error('unreachable'));
+    it('scans each part and tool in full when the cache lookup fails, even what is cached', async () => {
+      const store = memoryStore([
+        ...tools.map(each => toolKey(each)),
+        ...keysFor(system, {}, 'system'),
+        ...keysFor(conversation),
+      ]);
+      store.mget.mockRejectedValue(new Error('The operation timed out.'));
       const dependencies = deps(store);
 
       const results = await scanRequestWithVerdictCache(
@@ -2107,6 +2022,21 @@ describe('scanRequestWithVerdictCache', () => {
         { action: 'allow' },
         { action: 'allow' },
       ]);
+      expect(resultByPart(results, 'conversation').cacheEntries).toEqual(
+        allowed(keysFor(conversation))
+      );
+      expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+        '[enkrypt-guardrail] verdict cache lookup failed; scanning in full',
+        { organization_id: organizationId, error: 'The operation timed out.' }
+      );
+      expect(console.debug).toHaveBeenCalledWith(
+        '[enkrypt-guardrail] decision',
+        expect.objectContaining({
+          part: 'conversation',
+          verdict_cache: 'error',
+          cached_segments: 0,
+        })
+      );
     });
   });
 

@@ -1900,31 +1900,6 @@ export async function addReactionToMR(
   });
 }
 
-export async function getGitLabProject(
-  accessToken: string,
-  projectPath: string,
-  instanceUrl: string = DEFAULT_GITLAB_URL
-): Promise<GitLabProject> {
-  const encodedPath = encodeURIComponent(projectPath);
-
-  const response = await fetchGitLab(
-    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedPath}`),
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    const bodyExcerpt = providerErrorExcerpt(await response.text());
-    logExceptInTest('GitLab project fetch failed:', { status: response.status, bodyExcerpt });
-    throw new Error(`GitLab project fetch failed: ${response.status}`);
-  }
-
-  return (await response.json()) as GitLabProject;
-}
-
 export async function fetchGitLabRepositorySize(
   accessToken: string,
   projectPath: string,

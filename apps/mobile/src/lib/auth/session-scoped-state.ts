@@ -106,7 +106,7 @@ function clearRecentPrsBestEffort(): void {
  * connection and the stored servers behind it, the app-settings-tools group
  * switch, the debounced repository-selection send state, the browsable
  * artifact mirror, app-owned temp copies, the stored PR recents, the retained
-* PR discussion conversation, the staged share deliveries, the phone's own
+ * PR discussion conversation, the staged share deliveries, the phone's own
  * search index, the OS launcher shortcuts and tile, and the durable
  * last-opened-session and last-route records. Every member is
  * best-effort; one member's throw falls through to the members after it, and to

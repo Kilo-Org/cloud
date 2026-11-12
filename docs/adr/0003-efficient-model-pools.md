@@ -89,20 +89,16 @@ id:
    decision and the gateway's balanced fallback. A configured pool with no
    ready/compatible selected pair likewise returns no decision.
 
-7. **Deploy-order contract.** Production promotes the Vercel web deployment
-   *before* deploying workers, so every merge runs new web against old workers
-   for the worker build window. During that window,
-   `GET /admin/routing-settings` 404s on old workers; the web BFF synthesizes
-   the settings response from the legacy `/admin/routing-mode` route with
-   `poolSupported: false` (no pool annotation), and the Auto routing card hides
-   pool controls and saves mode-only through the legacy web mode route —
-   mode-only at every worker version, never touching pool keys. A settings PUT
-   that 404s (mid-session worker rollback from a supported UI) answers a
-   retryable 503 `pool_temporarily_unavailable` for every body shape; there is
-   deliberately no legacy PUT fallback, because `pool: null` from a supported UI
-   is clear intent an old worker cannot honor (it would silently preserve the
-   pool), and a stale unsupported-UI body must never reach a new worker's
-   settings PUT (it would silently clear the pool).
+7. **Deploy-order contract.** Production deploys workers *before* promoting the
+   Vercel web deployment, in the same wave as the database gate, so the previous
+   web release runs against the new workers until the promotion lands. A worker
+   change therefore keeps every route that the previous web release calls until
+   promotion replaces that release: the mode-only `/admin/routing-mode` route
+   stays at every worker version, and the Auto routing card keeps saving through
+   it. Pools graduated to custom routers (ADR 0005), so the settings compat path
+   this invariant once described — the `/admin/routing-settings` 404 fallback and
+   the `pool_temporarily_unavailable` retry — no longer exists in the worker or
+   in the web client.
 
 8. **Inheritance.** Mode and pool inherit independently (organization →
    personal → platform default). A configured pool does not force the owner into
@@ -119,7 +115,8 @@ the admission limits and drain mechanism keep the slot from starving either
 purpose.
 
 The deploy-order contract constrains when pool-related routes can land in
-workers relative to the web deployment. Pool settings are additive to the
+workers relative to the web deployment: a worker ships first, so it keeps the
+routes the previous web release calls. Pool settings are additive to the
 existing worker schema; rollback to pre-pool workers runs prior code against
 the migrated schema (migration 0005 rebuilds `case_results` / `model_summaries`
 / `run_models` with generated rebuild SQL preserving legacy rows; 0006/0007 are

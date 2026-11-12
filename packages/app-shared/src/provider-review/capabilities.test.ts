@@ -3,26 +3,26 @@ import { describe, expect, it } from 'vitest';
 import {
   PROVIDER_REVIEW_CAPABILITIES,
   providerPrTerm,
+  type ProviderReviewCapability,
   type ProviderReviewCapabilities,
 } from './capabilities';
 
 const PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
 
-/** Every affordance the table models, so the invariant covers a new one too. */
-const CAPABILITY_KEYS = [
-  'canComment',
-  'canResolveThreads',
-  'canMerge',
-  'autoMerge',
-  'reactions',
-  'reviewStatus',
-] as const satisfies readonly (keyof ProviderReviewCapabilities)[];
+/**
+ * Every capability the table holds, read from the table itself: `reviewEvents`
+ * is the only non-capability value, so a new affordance needs no edit here.
+ */
+function capabilitiesOf(table: ProviderReviewCapabilities): ProviderReviewCapability[] {
+  return Object.values(table).filter(
+    (value): value is ProviderReviewCapability => !Array.isArray(value)
+  );
+}
 
 describe('PROVIDER_REVIEW_CAPABILITIES', () => {
   it('gives every unsupported capability a human-readable provider reason', () => {
     for (const platform of PLATFORMS) {
-      const table = PROVIDER_REVIEW_CAPABILITIES[platform];
-      for (const capability of CAPABILITY_KEYS.map(key => table[key])) {
+      for (const capability of capabilitiesOf(PROVIDER_REVIEW_CAPABILITIES[platform])) {
         if (capability.supported) continue;
         expect(capability.reason.length).toBeGreaterThan(0);
         expect(capability.reason[0]).toBe(capability.reason[0]?.toUpperCase());
@@ -39,8 +39,7 @@ describe('PROVIDER_REVIEW_CAPABILITIES', () => {
 
   it('keeps supported capabilities free of a reason string', () => {
     for (const platform of PLATFORMS) {
-      const table = PROVIDER_REVIEW_CAPABILITIES[platform];
-      for (const capability of CAPABILITY_KEYS.map(key => table[key])) {
+      for (const capability of capabilitiesOf(PROVIDER_REVIEW_CAPABILITIES[platform])) {
         if (capability.supported) expect(capability.reason).toBe('');
       }
     }

@@ -47,6 +47,7 @@ import {
   conversationRetentionKey,
   retainConversationAcrossMounts,
 } from '@/lib/pr-review/discussion/conversation-retention';
+import { createLauncherSurfacesPublisher } from '@/lib/launcher-surfaces-publish';
 import { type ConversationComment } from '@/lib/pr-review/discussion/review-discussion-types';
 import {
   clearSessionScopedState,
@@ -277,6 +278,30 @@ describe('clearSessionScopedState', () => {
     expect(mocks.clearLauncherSurfaces).toHaveBeenCalledTimes(2);
     expect(mocks.clearLastOpenedSession).toHaveBeenCalledTimes(2);
     expect(mocks.clearLastRoute).toHaveBeenCalledTimes(2);
+  });
+
+  it('makes the live launcher publisher write its derivation again', () => {
+    // The parent layout stays mounted across an account switch, and the
+    // derived list can match the one just written, so the boundary reaches the
+    // mounted publisher as well as the OS surface.
+    const publish = vi.fn<(payload: unknown) => void>();
+    const publisher = createLauncherSurfacesPublisher(publish, () => {
+      mocks.clearLauncherSurfaces();
+    });
+    const launcherTargets = {
+      newAgentUrl: 'kiloapp:///cloud/sessions/new',
+      needsInputUrl: null,
+      openLastSessionUrl: null,
+    };
+    const translate = (key: string): string => key;
+
+    publisher.apply(launcherTargets, translate);
+    expect(publish).toHaveBeenCalledTimes(1);
+
+    clearSessionScopedState();
+
+    publisher.apply(launcherTargets, translate);
+    expect(publish).toHaveBeenCalledTimes(2);
   });
 
   it('drops the retained PR discussion conversation', () => {

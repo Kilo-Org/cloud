@@ -19,6 +19,7 @@ import { clearTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { clearLastOpenedSession } from '@/lib/last-opened-session';
 import { clearLastRoute } from '@/lib/last-route';
+import { noteLauncherSurfacesCleared } from '@/lib/launcher-surfaces-publish';
 import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
 import { clearConversationRetention } from '@/lib/pr-review/discussion/conversation-retention';
@@ -181,9 +182,13 @@ export function clearSessionScopedState(): void {
   // The OS launcher surfaces are device-wide too, and their labels come from the
   // signed-in account's sessions: the Android dynamic shortcuts and
   // quick-settings tile, and the home-screen quick actions. The account
-  // boundary drops them with the other account-scoped members, so each surface
-  // names the account that is signed in.
-  runClear(clearLauncherSurfaces);
+  // boundary drops them with the other account-scoped members, and records the
+  // clear in the surface revision, so a mounted publisher writes the derived
+  // list again on the derivation that follows.
+  runClear(() => {
+    clearLauncherSurfaces();
+    noteLauncherSurfacesCleared();
+  });
   // The durable last-opened session record and the last-route record are read
   // through the active account's user id, and they are also the inputs the
   // launcher surfaces and the relaunch restore derive from. The account

@@ -310,6 +310,17 @@ function bySeverity<T extends { decision: EnkryptScanReport['decision'] }>(a: T,
   return DECISION_SEVERITY.indexOf(a.decision) - DECISION_SEVERITY.indexOf(b.decision);
 }
 
+function mostSevereDecision(
+  decisions: EnkryptScanReport['decision'][]
+): EnkryptScanReport['decision'] {
+  return DECISION_SEVERITY.find(each => decisions.includes(each)) ?? 'allowed';
+}
+
+/** The error of the most severe report that failed. */
+function mostSevereError(reports: EnkryptScanReport[]): EnkryptScanReport['error'] {
+  return reports.toSorted(bySeverity).find(report => report.error !== null)?.error ?? null;
+}
+
 function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
 }
@@ -322,15 +333,14 @@ function combineChunks(results: EnkryptGuardrailScanResult[]): EnkryptGuardrailS
   const first = required(results[0]);
   if (results.length === 1) return first;
   const reports = results.map(result => result.report);
-  const bySeverest = [...reports].sort(bySeverity);
   return {
     verdict: mostSevereVerdict(results.map(result => result.verdict)),
     usageRecords: results.flatMap(result => result.usageRecords),
     report: {
       ...first.report,
       scanned_characters: sum(reports.map(report => report.scanned_characters)),
-      decision: required(bySeverest[0]).decision,
-      error: bySeverest.find(report => report.error !== null)?.error ?? null,
+      decision: mostSevereDecision(reports.map(report => report.decision)),
+      error: mostSevereError(reports),
       detectors_fired: ENKRYPT_DETECTOR_IDS.filter(id =>
         reports.some(report => report.detectors_fired.includes(id))
       ),
@@ -494,11 +504,6 @@ function toolsReport(
     outcome.kind === 'scanned' ? [outcome.result.report] : []
   );
   const flagged = outcomes.flatMap(each => flaggedTool(each) ?? []).sort(bySeverity);
-  const decisions = [
-    ...reports.map(report => report.decision),
-    ...flagged.map(each => each.decision),
-  ];
-  const decision = DECISION_SEVERITY.find(each => decisions.includes(each)) ?? 'allowed';
   return {
     scan: scanKind(config),
     part: 'tools',
@@ -513,8 +518,11 @@ function toolsReport(
       sum(cached.map(each => each.characters)) +
       sum(reports.map(report => report.cached_characters)),
     scanned_characters: sum(reports.map(report => report.scanned_characters)),
-    decision,
-    error: [...reports].sort(bySeverity).find(report => report.error !== null)?.error ?? null,
+    decision: mostSevereDecision([
+      ...reports.map(report => report.decision),
+      ...flagged.map(each => each.decision),
+    ]),
+    error: mostSevereError(reports),
     detectors_fired: ENKRYPT_DETECTOR_IDS.filter(id =>
       flagged.some(each => each.detectors_fired.includes(id))
     ),

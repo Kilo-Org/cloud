@@ -66,9 +66,7 @@ export function OrganizationPlanRefusal({
               textActionTargetClass()
             )}
           >
-            <Text className="text-sm font-semibold text-destructive underline">
-              {action.label}
-            </Text>
+            <Text className="text-sm font-semibold text-destructive underline">{action.label}</Text>
           </Pressable>
         ) : null}
       </View>

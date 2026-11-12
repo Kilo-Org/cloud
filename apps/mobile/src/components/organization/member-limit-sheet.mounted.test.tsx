@@ -9,37 +9,17 @@ import { renderWithProviders } from '@/test/render-with-providers';
 import { InviteMemberSheet } from './invite-member-sheet';
 import { LowBalanceAlertSheet } from './low-balance-alert-sheet';
 import { MemberLimitSheet } from './member-limit-sheet';
+import {
+  type OrganizationBoundaryFixture,
+  resetOrganizationBoundary,
+} from './member-limit-sheet.mounted.test-helpers';
 
-type BoundaryOrg = {
-  organizationId: string;
-  plan: string;
-  requireSeats: boolean;
-  seatCount: { used: number; total: number };
-};
-
-/**
- * Seat enforcement is off here: these surfaces are about their own states, and
- * the invite sheet reads the organization's plan and seat usage to decide
- * whether Send is available.
- */
-const boundary = vi.hoisted(
-  (): {
-    organizationId: string | null;
-    role: string;
-    org: BoundaryOrg | null;
-    isResolving: boolean;
-  } => ({
-    organizationId: 'org-1',
-    role: 'owner',
-    org: {
-      organizationId: 'org-1',
-      plan: 'teams',
-      requireSeats: false,
-      seatCount: { used: 1, total: 5 },
-    },
-    isResolving: false,
-  })
-);
+const boundary = vi.hoisted((): OrganizationBoundaryFixture => ({
+  organizationId: null,
+  role: 'owner',
+  org: null,
+  isResolving: false,
+}));
 const query = vi.hoisted(() => ({
   data: undefined as
     | {
@@ -139,15 +119,7 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
 }));
 
 beforeEach(() => {
-  boundary.organizationId = 'org-1';
-  boundary.org = {
-    organizationId: 'org-1',
-    plan: 'teams',
-    requireSeats: false,
-    seatCount: { used: 1, total: 5 },
-  };
-  boundary.role = 'owner';
-  boundary.isResolving = false;
+  resetOrganizationBoundary(boundary);
   query.data = undefined;
   query.isLoading = false;
   query.isPending = false;

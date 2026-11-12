@@ -38,9 +38,6 @@ export function humanizeDimension(value: string, locale: string): string {
     .replaceAll(/[-_]+/g, ' ')
     .split(' ')
     .filter(Boolean)
-    .map(
-      word =>
-        word.charAt(0).toLocaleUpperCase(locale) + word.slice(1).toLocaleLowerCase(locale)
-    )
+    .map(word => word.charAt(0).toLocaleUpperCase(locale) + word.slice(1).toLocaleLowerCase(locale))
     .join(' ');
 }

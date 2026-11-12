@@ -2708,7 +2708,7 @@
     "subscriptionLoading": "የKilo Pass ምዝገባ መረጃ በመጫን ላይ",
     "retryHint": "የKilo Pass ሁኔታን ለማግኘት እንደገና ይሞክራል።",
     "cardAccessibility": "{{title}}። {{description}}። {{actionLabel}}",
-    "cardLabel": "{{title}}። {{description}}።",
+    "cardLabel": "{{title}}። {{description}}",
     "purchaseUnavailableEnded": "የእርስዎ Kilo Pass አልቋል።",
     "notAvailableInApp": "Kilo Pass በመተግበሪያው ውስጥ አይገኝም።",
     "statusActive": "ንቁ",

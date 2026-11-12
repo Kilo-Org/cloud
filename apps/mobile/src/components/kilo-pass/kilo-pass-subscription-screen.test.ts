@@ -181,12 +181,18 @@ describe('KiloPassSubscriptionScreen', () => {
     renderer.unmount();
   });
 
-  it('hands the window top to the modal surface when it reaches the window top', async () => {
+  it('clears the window top inset itself when the modal surface reaches the window top', async () => {
     mockClearance.windowTop = 51.8;
     const renderer = await renderScreen();
     const header = nodesOfType(renderer, 'ScreenHeader')[0];
     expect(header?.props.safeAreaTop).toBe(false);
     expect(String(header?.props.className)).toContain('pt-2');
+    // `safeAreaTop: false` only stops the header drawing the inset; the surface
+    // that owns the window top pads it, or the header sits under the status bar.
+    const padded = nodesOfType(renderer, 'View').filter(
+      node => (node.props.style as { paddingTop?: number } | undefined)?.paddingTop === 51.8
+    );
+    expect(padded).toHaveLength(1);
     renderer.unmount();
     mockClearance.windowTop = 0;
   });

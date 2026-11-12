@@ -2196,7 +2196,7 @@
     "subscriptionLoading": "פרטי המינוי ל-Kilo Pass בטעינה",
     "retryHint": "טעינת המצב של Kilo Pass שוב.",
     "cardAccessibility": "{{title}}. {{description}}. פעולה: {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}. פעולה",
+    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "ה-Kilo Pass שלך הסתיים.",
     "notAvailableInApp": "Kilo Pass אינו זמין באפליקציה.",
     "statusActive": "פעיל",

@@ -2708,7 +2708,7 @@
     "subscriptionLoading": "Kilo Pass előfizetés betöltése",
     "retryHint": "Újra lekéri a Kilo Pass állapotát.",
     "cardAccessibility": "{{title}}. {{description}}. Művelet: {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}. Művelet",
+    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "A Kilo Pass előfizetésed lejárt.",
     "notAvailableInApp": "A Kilo Pass nem érhető el az alkalmazásban.",
     "statusActive": "Aktív",

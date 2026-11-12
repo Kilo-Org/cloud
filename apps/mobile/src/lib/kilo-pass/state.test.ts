@@ -121,6 +121,28 @@ describe('getKiloPassDetailState', () => {
     });
   });
 
+  it('prefers the paid-through date when a paused pass is also set to cancel', () => {
+    const detail = getKiloPassDetailState({
+      subscription: subscription({
+        status: 'paused',
+        cancelAtPeriodEnd: true,
+        resumesAt: '2027-02-01T12:00:00.000Z',
+      }),
+      isError: false,
+      isPending: false,
+    });
+
+    if (detail.kind !== 'active') {
+      throw new Error(`unexpected state: ${detail.kind}`);
+    }
+    expect(detail.statusLabel).toBe('Canceling');
+    expect(detail.rows[0]).toEqual({
+      id: 'renewal',
+      label: 'Active until',
+      value: 'Dec 5, 2026',
+    });
+  });
+
   it('labels an issued referral bonus with the amount actually granted', () => {
     const detail = getKiloPassDetailState({
       subscription: subscription({

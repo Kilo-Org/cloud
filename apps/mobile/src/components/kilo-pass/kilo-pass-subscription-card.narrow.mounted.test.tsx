@@ -122,7 +122,7 @@ describe('KiloPassSubscriptionCard loading layout', () => {
     cardState.content = { kind: 'loading' };
     windowDims.width = 160;
     const root = renderCard(true);
-    expect(String(root.findByProps({ className: 'h-[114px]' }).props.className)).toBe('h-[114px]');
+    expect(String(root.findByProps({ className: 'h-[100px]' }).props.className)).toBe('h-[100px]');
   });
 
   it('reserves the single-row card height at phone widths', () => {

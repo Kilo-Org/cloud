@@ -93,7 +93,6 @@ function formatIsoDate(iso: string | null | undefined): string | null {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
-        timeZone: 'UTC',
       });
 }
 
@@ -145,7 +144,9 @@ function currentPeriodBonus(
 }
 
 function renewalRow(subscription: KiloPassSubscription): KiloPassRow | null {
-  if (subscription.status === 'paused') {
+  // A scheduled cancellation wins over a pause: the pass stops for good on the
+  // paid-through date, so a resume date would contradict the status line.
+  if (!subscription.cancelAtPeriodEnd && subscription.status === 'paused') {
     const resumedAt = formatIsoDate(subscription.resumesAt);
     return resumedAt
       ? { id: 'renewal', label: i18n.t('kiloPass.resumes'), value: resumedAt }

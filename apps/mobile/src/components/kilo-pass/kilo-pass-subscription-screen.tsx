@@ -29,12 +29,16 @@ function KiloPassFrame({ children }: { children: ReactNode }) {
   const surfaceOwnsWindowTop = windowTopClearance > 0;
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={t('kiloPass.title')}
-        modal
-        safeAreaTop={!surfaceOwnsWindowTop}
-        className={surfaceOwnsWindowTop ? 'pt-2' : undefined}
-      />
+      {/* `safeAreaTop` only draws the inset inside the header, so the surface
+          that owns the window top pads it here instead. */}
+      <View style={surfaceOwnsWindowTop ? { paddingTop: windowTopClearance } : undefined}>
+        <ScreenHeader
+          title={t('kiloPass.title')}
+          modal
+          safeAreaTop={!surfaceOwnsWindowTop}
+          className={surfaceOwnsWindowTop ? 'pt-2' : undefined}
+        />
+      </View>
       {children}
     </View>
   );
@@ -44,13 +48,16 @@ function KiloPassLoadingScreen() {
   return (
     <KiloPassFrame>
       <View className="flex-1 px-5">
-        <View className="gap-4 pt-2">
-          <View className="gap-2">
-            <Skeleton className="h-5 w-40 max-w-full rounded" />
-            <Skeleton className="h-4 w-24 max-w-full rounded" />
-          </View>
-          <Skeleton className="h-[132px] rounded-lg" />
-        </View>
+        {/* The scroller applies the landscape side insets, so a cutout window
+            cannot paint the reserved blocks under the sensor area. */}
+        <DetailScreenScrollView
+          className="-mx-1 flex-1"
+          contentContainerClassName="gap-3 px-1"
+          showsVerticalScrollIndicator={false}
+        >
+          <Skeleton className="h-4 w-64 rounded" />
+          <Skeleton className="h-[132px] w-full rounded-lg" />
+        </DetailScreenScrollView>
       </View>
     </KiloPassFrame>
   );

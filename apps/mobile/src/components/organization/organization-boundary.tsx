@@ -177,11 +177,10 @@ function OrganizationPickerBoundaryState({
 }: Readonly<{ icon: LucideIcon; backAction?: ReactNode }>) {
   const { t } = useTranslation();
   const { orgs } = useOrgBoundary();
-  const { openPicker, picker } = useContextPicker(orgs);
+  const { openPicker } = useContextPicker(orgs);
 
   return (
     <>
-      {picker}
       <EmptyState
         icon={icon}
         title={t('organization.boundary.selectOrganization')}

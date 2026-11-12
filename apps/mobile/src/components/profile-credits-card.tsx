@@ -68,7 +68,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // row's full width.
   const narrow = isNarrowLayout(width);
   const { t, i18n } = useTranslation();
-  const { openPicker, picker } = useContextPicker(orgs);
+  const { openPicker } = useContextPicker(orgs);
   const { organizationId, error, isSaving, retry } = useOrganization();
   const selectedOrgId = organizationId ?? undefined;
 
@@ -332,7 +332,6 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           </Pressable>
         )}
       </View>
-      {picker}
       {error === 'save' && (
         <View>
           <AccessibleStatus message={t('common.couldNotSaveSetting')} className="text-sm" />

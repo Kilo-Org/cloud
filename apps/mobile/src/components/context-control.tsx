@@ -1,12 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import { useFocusEffect } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useCallback, useState } from 'react';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { ContextPickerSheet } from '@/components/context-picker-sheet';
 import { ChevronDown } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -15,6 +13,7 @@ import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { contextPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -22,11 +21,12 @@ export type ContextDisplayScope = { organizationId: string | null; isResolved: b
 
 /**
  * The caller supplies its cached memberships; the picker does not fetch data.
- * Returns the opener for its control plus the sheet element the caller renders,
- * so the sheet lives in the caller's tree (a portal-free `Modal`) instead of a
- * process-wide action-sheet provider. `onSelectionChange` fires only for a
- * picked account that differs from the shown one, so a caller that reloads its
- * screen can leave a re-pick of the current account a no-op.
+ * Returns the opener for its control: the picker is the shared
+ * `/context-picker` formSheet route, so every surface presents the same sheet
+ * and the navigator owns its dismissal and Android Back.
+ * `onSelectionChange` fires only for a picked account that differs from the
+ * shown one, so a caller that reloads its screen can leave a re-pick of the
+ * current account a no-op.
  *
  * `shownOrganizationId` is the account the caller's screen is scoped to when
  * that differs from the active one (for example an explicit route scope). It
@@ -38,33 +38,14 @@ export function useContextPicker(
   onSelectionChange?: (organizationId: string | null) => void,
   shownOrganizationId?: string | null
 ) {
+  const router = useRouter();
   const { t } = useTranslation();
   const { setOrganizationId, organizationId } = useOrganization();
-  const [open, setOpen] = useState(false);
   const shownId = shownOrganizationId !== undefined ? shownOrganizationId : organizationId;
-  // The sheet is a separate native window that stacks over every screen, so a
-  // link (or a tab switch) that moves the app to another route while it is open
-  // leaves it covering the screen the person was sent to. Close it when the
-  // owning screen loses focus; the picker's own dismissal paths (Cancel,
-  // backdrop, drag, a pick) are untouched while it stays focused.
-  useFocusEffect(
-    useCallback(
-      () => () => {
-        setOpen(false);
-      },
-      []
-    )
-  );
-
-  const labels = [
-    t('common.personal'),
-    ...(orgs ?? []).map(org => org.organizationName),
-    t('common.cancel'),
-  ];
-  const cancelButtonIndex = labels.length - 1;
   // Personal is index 0 and the memberships follow in list order. A persisted
   // membership that is no longer listed checks nothing, so the mark never names
   // an account the user is not on.
+  const labels = [t('common.personal'), ...(orgs ?? []).map(org => org.organizationName)];
   const memberIndex = orgs?.findIndex(org => org.organizationId === shownId) ?? -1;
   let currentIndex = -1;
   if (shownId === null) {
@@ -74,10 +55,6 @@ export function useContextPicker(
   }
 
   const select = (index: number) => {
-    setOpen(false);
-    if (index === cancelButtonIndex) {
-      return;
-    }
     if (index === 0) {
       if (shownId !== null) {
         setOrganizationId(null);
@@ -94,23 +71,15 @@ export function useContextPicker(
 
   return {
     openPicker: () => {
-      if (orgs) {
-        setOpen(true);
+      if (!orgs) {
+        return;
       }
+      // The route reads its rows and its pick from the registry, so the
+      // memberships and the selection identity the control shows are the ones
+      // the sheet renders.
+      contextPickerSlot.set(UNFENCED_ROUTE_KEY, { options: labels, currentIndex, onSelect: select });
+      router.push('/(app)/context-picker' as Href);
     },
-    picker: orgs ? (
-      <ContextPickerSheet
-        visible={open}
-        title={t('profile.selectAccount')}
-        options={labels}
-        cancelButtonIndex={cancelButtonIndex}
-        currentIndex={currentIndex}
-        onSelect={select}
-        onClose={() => {
-          setOpen(false);
-        }}
-      />
-    ) : null,
   };
 }
 
@@ -173,11 +142,7 @@ export function ContextControl({
     enabled: token != null,
   });
   const orgs = organizations.data;
-  const { openPicker, picker } = useContextPicker(
-    orgs,
-    onSelectionChange,
-    scope ? undefined : value
-  );
+  const { openPicker } = useContextPicker(orgs, onSelectionChange, scope ? undefined : value);
   // A caller-supplied `value` (or a read-only scope) is the screen's own
   // account; otherwise the active account drives the label.
   const shownId = value !== undefined ? value : context.organizationId;
@@ -316,7 +281,6 @@ export function ContextControl({
     <View className="min-w-0 max-w-full">
       {row}
       <AccessibleStatus message={placedMessage} className="text-sm" />
-      {picker}
       {retry && placedMessage ? (
         <Pressable
           accessibilityRole="button"

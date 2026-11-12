@@ -1,9 +1,11 @@
-// The account picker's sheet: it owns the themed surface, the row dividers,
-// the current-account check, and the selected state a screen reader reads. The
-// consumer contracts (selection, palette, missing membership) live in
-// `context-control.mounted.test.tsx` and `profile-credits-card.mounted.test.tsx`.
+// The account picker's route body: the account rows, the current-account check,
+// and the one-time reveal of a checked row that opens below the fold. The pick
+// and the dismissal paths live in `context-picker.back.mounted.test.tsx`, and
+// the consumer contracts (selection, palette, missing membership) in
+// `context-control.mounted.test.tsx`.
 
 import { createElement, type ElementType } from 'react';
+import type * as ReactI18next from 'react-i18next';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -13,56 +15,58 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 const theme = vi.hoisted(() => ({ colors: { primary: '#FFDD00', foreground: '#F2F0EB' } }));
 const onSelect = vi.hoisted(() => vi.fn());
-const onClose = vi.hoisted(() => vi.fn());
+const onDone = vi.hoisted(() => vi.fn());
 
 vi.mock('react-native', async () => {
   // `vi.mock` factories are hoisted above the file's static imports, so the
   // shared host-element mock is pulled in here too.
   const { MockScrollView } = await import('@/test/scroll-view-mock');
   return {
-    Modal: 'Modal',
-    Platform: { OS: 'ios' },
+    BackHandler: { addEventListener: () => ({ remove: () => undefined }) },
+    Platform: { OS: 'android' },
     Pressable: 'Pressable',
     ScrollView: MockScrollView,
     View: 'View',
-    useWindowDimensions: () => ({ width: 400, height: 800 }),
   };
 });
-vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 24 }) }));
+vi.mock('expo-router', () => ({ useRouter: () => ({ back: vi.fn() }) }));
+vi.mock('react-i18next', async importOriginal => {
+  const original = await importOriginal<typeof ReactI18next>();
+  return { ...original, useTranslation: () => ({ t: (key: string) => key }) };
+});
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
+vi.mock('@/components/ui/icons', () => ({ Check: 'Check', Info: 'Icon' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => theme.colors }));
+vi.mock('@/lib/navigation/route-focus', () => ({ useRouteFocused: () => true }));
 
 const Pressable = 'Pressable' as ElementType;
 const Check = 'Check' as ElementType;
 const View = 'View' as ElementType;
 const ScrollView = 'ScrollView' as ElementType;
 const Text = 'Text' as ElementType;
-const AXE = ['Personal', 'Acme Corp', 'Cancel'];
+const AXE = ['Personal', 'Acme Corp'];
 const mounted: { unmount: () => void }[] = [];
 
 async function mount(
-  props: Partial<{
-    visible: boolean;
-    currentIndex: number;
-    title: string;
-    options: string[];
-  }> = {}
+  props: Partial<{ currentIndex: number; title: string; options: string[]; expired: boolean }> = {}
 ) {
-  const options = props.options ?? AXE;
   const ui = await renderWithProviders(
     createElement(ContextPickerSheet, {
-      visible: props.visible ?? true,
       title: props.title ?? 'Select account',
-      options,
-      cancelButtonIndex: options.length - 1,
+      options: props.options ?? AXE,
       currentIndex: props.currentIndex ?? 1,
       onSelect: index => {
         onSelect(index);
       },
-      onClose: () => {
-        onClose();
+      onDone: () => {
+        onDone();
       },
+      expired: props.expired ?? false,
     })
   );
   mounted.push(ui);
@@ -99,29 +103,24 @@ function rows(renderer: ReactTestRenderer) {
   }));
 }
 
-/** The native sheet wrapper; its `onClose` is the dismiss path the sheet owns. */
-function sheet(renderer: ReactTestRenderer) {
-  return renderer.root.find(node => (node.type as string) === 'BottomSheet');
-}
-
 function press(node: ReactTestInstance) {
   return act(() => {
     (node.props.onPress as () => void)();
   });
 }
 
-beforeEach(() => {
-  for (const ui of mounted.splice(0)) {
-    ui.unmount();
-  }
-  onSelect.mockReset();
-  onClose.mockReset();
-  scrollTo.mockClear();
-});
-
 /** The account list: the one scrollable region inside the sheet. */
 function list(renderer: ReactTestRenderer) {
   return renderer.root.find(node => node.type === ScrollView);
+}
+
+/** The list's own viewport report; the reveal measures the fold from it. */
+function layOutViewport(renderer: ReactTestRenderer, height: number) {
+  act(() => {
+    (list(renderer).props.onLayout as (event: unknown) => void)({
+      nativeEvent: { layout: { height } },
+    });
+  });
 }
 
 /** The checked row's one-time reveal: it is the only row carrying `onLayout`. */
@@ -134,37 +133,33 @@ function revealHandler(renderer: ReactTestRenderer) {
     throw new Error('the checked account row must reveal itself');
   }
   expect(selectedState(revealing)).toBe(true);
-  return revealing.props.onLayout as (event: unknown) => void;
+  return (event: unknown) => {
+    act(() => {
+      (revealing.props.onLayout as (event: unknown) => void)(event);
+    });
+  };
 }
 
+beforeEach(() => {
+  for (const ui of mounted.splice(0)) {
+    ui.unmount();
+  }
+  onSelect.mockReset();
+  onDone.mockReset();
+  scrollTo.mockClear();
+});
+
 describe('ContextPickerSheet', () => {
-  it('renders nothing while it is closed', async () => {
-    const renderer = await mount({ visible: false });
-
-    expect(renderer.root.findAllByProps({ accessibilityRole: 'header' })).toHaveLength(0);
-    expect(renderer.root.findAll(accountRow)).toHaveLength(0);
-  });
-
-  it('rules off the action row instead of the last account row', async () => {
+  it('rules off every account row but the last', async () => {
     const renderer = await mount();
 
-    expect(renderer.root.findByProps({ accessibilityRole: 'header' }).children).toContain(
+    expect(renderer.root.findByType('SheetHeader' as ElementType).props.title).toBe(
       'Select account'
     );
     expect(rows(renderer)).toEqual([
       { label: 'Personal', selected: false, divider: true, check: false, gutter: true },
       { label: 'Acme Corp', selected: true, divider: false, check: true, gutter: true },
     ]);
-    // Cancel is the ordinary button below them: no selected state, no check. A
-    // full rule closes the list above it, so it reads as an action rather than
-    // the next account, and the sheet's content stops at the safe area.
-    const cancel = renderer.root.find(
-      node => node.type === Pressable && node.props.accessibilityLabel === 'Cancel'
-    );
-    expect(cancel.props.accessibilityRole).toBe('button');
-    expect(cancel.props.accessibilityState).toBeUndefined();
-    expect(String(cancel.parent?.props.className)).toContain('border-t');
-    expect(cancel.parent?.parent?.props.style).toEqual({ paddingBottom: 24 });
   });
 
   it('keeps the end of a label that does not fit its row', async () => {
@@ -186,8 +181,11 @@ describe('ContextPickerSheet', () => {
 
     expect(rows(renderer).map(row => row.selected)).toEqual([false, false]);
     expect(rows(renderer).map(row => row.check)).toEqual([false, false]);
-    // Nothing is checked, so nothing scrolls: the list opens at its first row.
-    expect(renderer.root.findAll(node => node.props.onLayout !== undefined)).toHaveLength(0);
+    // Nothing is checked, so nothing scrolls: no account row carries the
+    // reveal handler (the list reports its own viewport regardless).
+    expect(
+      renderer.root.findAll(accountRow).filter(node => node.props.onLayout !== undefined)
+    ).toHaveLength(0);
   });
 
   it('paints the check with the active palette', async () => {
@@ -198,70 +196,49 @@ describe('ContextPickerSheet', () => {
     expect(check[0]?.props.color).toBe(theme.colors.primary);
   });
 
-  it('leaves the list at its top when the checked row fits inside the cap', async () => {
+  it('leaves the list at its top when the checked row fits inside the fold', async () => {
     const renderer = await mount();
     const layOut = revealHandler(renderer);
+    layOutViewport(renderer, 400);
 
-    // Mocked window height 800 caps the list at 400. The checked row ends at
-    // 96, so it is already visible: scrolling it to the top would clip the row
-    // above it — the personal account — out of the sheet.
-    act(() => {
-      layOut({ nativeEvent: { layout: { y: 48, height: 48 } } });
-    });
+    // The checked row ends at 96, inside the 400 viewport: scrolling it to the
+    // top would clip the row above it — the personal account — out of the sheet.
+    layOut({ nativeEvent: { layout: { y: 48, height: 48 } } });
     expect(scrollTo).not.toHaveBeenCalled();
 
     // The reveal is spent even when it changes nothing: a later layout pass
     // must not scroll a list the user has scrolled.
-    act(() => {
-      layOut({ nativeEvent: { layout: { y: 0, height: 48 } } });
-    });
+    layOut({ nativeEvent: { layout: { y: 0, height: 48 } } });
     expect(scrollTo).not.toHaveBeenCalled();
   });
 
-  it('reveals a checked row below the cap, and never scrolls the list again', async () => {
+  it('reveals a checked row below the fold once the viewport is measured', async () => {
     const renderer = await mount();
     const layOut = revealHandler(renderer);
 
-    // 380 + 48 runs 28 past the 400 cap: the reveal stops at the row's bottom
-    // edge instead of pinning it to the top, so the rows above keep their room.
-    act(() => {
-      layOut({ nativeEvent: { layout: { y: 380, height: 48 } } });
-    });
+    // The row is measured before the list reports its own height, so the reveal
+    // waits for the viewport instead of guessing one.
+    layOut({ nativeEvent: { layout: { y: 380, height: 48 } } });
+    expect(scrollTo).not.toHaveBeenCalled();
+
+    // 380 + 48 runs 28 past the 400 viewport: the reveal stops at the row's
+    // bottom edge instead of pinning it to the top, so the rows above keep
+    // their room.
+    layOutViewport(renderer, 400);
     expect(scrollTo).toHaveBeenCalledWith({ y: 28, animated: false });
 
     // A later layout pass must not yank the list the user has scrolled.
-    act(() => {
-      layOut({ nativeEvent: { layout: { y: 0, height: 48 } } });
-    });
+    layOut({ nativeEvent: { layout: { y: 0, height: 48 } } });
+    layOutViewport(renderer, 300);
     expect(scrollTo).toHaveBeenCalledTimes(1);
   });
 
-  it('reports the pressed row by index and dismisses through the sheet', async () => {
+  it('reports the pressed row by index', async () => {
     const renderer = await mount();
 
     await press(renderer.root.findByProps({ accessibilityLabel: AXE[1] }));
-    await press(renderer.root.findByProps({ accessibilityLabel: 'Cancel' }));
-    expect(onSelect.mock.calls).toEqual([[1], [2]]);
-    expect(onClose).not.toHaveBeenCalled();
-
-    // The native sheet owns the backdrop and the swipe; both route through the
-    // sheet's `onClose`.
-    await act(() => {
-      (sheet(renderer).props.onClose as () => void)();
-    });
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('keeps Cancel outside the scrolling list, so no account count can scroll it away', async () => {
-    const renderer = await mount();
-
-    const scroll = list(renderer);
-    const cancel = renderer.root.find(
-      node => node.type === Pressable && node.props.accessibilityLabel === 'Cancel'
-    );
-    expect(scroll.findAll(node => node === cancel)).toHaveLength(0);
-    // Every account row is inside the list; the heading sits above it.
-    expect(scroll.findAll(accountRow)).toHaveLength(AXE.length - 1);
+    expect(onSelect.mock.calls).toEqual([[1]]);
+    expect(onDone).not.toHaveBeenCalled();
   });
 
   it('keeps every membership selectable when the current account is at the end', async () => {
@@ -271,33 +248,26 @@ describe('ContextPickerSheet', () => {
       'منظمة أفق المفتوحة',
       'مبادرة النور',
       ...Array.from({ length: 8 }, (_, index) => `Workspace ${index + 1}`),
-      'Cancel',
     ];
-    const renderer = await mount({ options, currentIndex: options.length - 2 });
+    const renderer = await mount({ options, currentIndex: options.length - 1 });
     const accounts = renderer.root.findAll(accountRow);
 
-    expect(accounts.map(row => row.props.accessibilityLabel)).toEqual(options.slice(0, -1));
+    expect(accounts.map(row => row.props.accessibilityLabel)).toEqual(options);
     expect(accounts.filter(row => selectedState(row) === true)).toHaveLength(1);
-    await act(() => {
+    act(() => {
       for (const row of accounts) {
         (row.props.onPress as () => void)();
       }
-      (renderer.root.findByProps({ accessibilityLabel: 'Cancel' }).props.onPress as () => void)();
     });
     expect(onSelect.mock.calls).toEqual(options.map((_, index) => [index]));
   });
 
-  it('bounds the list to half the window and lets the sheet size to its content', async () => {
-    const renderer = await mount();
-    const style: unknown = list(renderer).props.style;
-    if (typeof style !== 'object' || style === null || !('maxHeight' in style)) {
-      throw new Error('the account list must carry its own height bound');
-    }
+  it('shows the expired shell instead of rows when the caller has no bridge', async () => {
+    const renderer = await mount({ expired: true });
 
-    // A detent sheet hands its content the window height on Android, so the list
-    // carries the bound that keeps the sheet sized to its content (mocked window
-    // height 800).
-    expect(style.maxHeight).toBe(400);
-    expect(sheet(renderer).props.snapPoints).toBeUndefined();
+    expect(renderer.root.findAll(accountRow)).toHaveLength(0);
+    expect(renderer.root.findAll(node => node.type === ('EmptyState' as ElementType))).toHaveLength(
+      1
+    );
   });
 });

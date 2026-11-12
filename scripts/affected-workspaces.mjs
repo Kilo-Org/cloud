@@ -40,7 +40,9 @@
 // reader selection, because another workspace's runner may be the only one that
 // runs its tests (a nested workspace whose parent's suite reaches into it). A
 // non-test file in the same workspace, an EXTRA_INPUTS match or a dependency
-// consumer keeps the full reader selection as well.
+// consumer keeps the full reader selection as well. A test that reads data from
+// the workspace runs only when its reference reaches the changed file, because a
+// changed test file is not the data it reads.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { posix } from 'node:path';
@@ -138,6 +140,12 @@ export const isDependencyInput = file => DEPENDENCY_MANIFESTS.has(file) || isPat
 const SOURCE_GLOBS = ['ts', 'tsx', 'mts', 'cts', 'js', 'mjs', 'cjs', 'json', 'jsonc'];
 
 const TEST_FILE = /(^|\/)__tests__\/|\.(test|spec)\.[^/]+$/;
+
+// Whether a relative reference to `target` reaches `file`. A reference names a
+// path that may be a directory or omit the extension, so a file under the target
+// or the same path with an extension counts.
+const reaches = (target, file) =>
+  file === target || file.startsWith(`${target}/`) || file.startsWith(`${target}.`);
 
 // Calls whose first argument is a module specifier.
 const MODULE_CALLS = new Set([
@@ -294,18 +302,19 @@ export function selectAffected({ items, changedFiles, dependencyDirs, references
   // Root paths (outside every workspace) that a workspace reads, with the test
   // file that reads it as data, if one does.
   const rootReads = [];
-  // [reader, workspace, test file]: the test file reads the workspace's files
-  // as data.
+  // [reader, workspace, test file, target]: the test file reads `target` in the
+  // workspace as data.
   const testReads = [];
   for (const [file, target, asPath] of references) {
     const from = owner(dirs, file);
     const to = owner(dirs, target);
     const testFile = asPath && TEST_FILE.test(file) ? file : null;
-    if (to && testFile) testReads.push([from, to, file]);
+    if (to && testFile) testReads.push([from, to, file, target]);
     else if (to) read(from, to);
     else if (from) rootReads.push([target, from, testFile]);
   }
-  // [reader, test file]: the test file reads changed data.
+  // One entry per reading test file and changed file: the test reads `changed`
+  // through `target`, in `workspace`.
   const tested = [];
 
   // The workspaces that read a root path: a test that reads it as data runs the
@@ -314,9 +323,10 @@ export function selectAffected({ items, changedFiles, dependencyDirs, references
     const reading = rootReads.filter(
       ([target]) => file === target || file.startsWith(`${target}/`)
     );
-    for (const [, reader, testFile] of reading) {
-      if (testFile) tested.push([reader, testFile]);
-      else changed.add(reader);
+    for (const [target, reader, testFile] of reading) {
+      if (testFile) {
+        tested.push({ reader, readerFile: testFile, target, workspace: null, changed: file });
+      } else changed.add(reader);
     }
     return reading.length > 0;
   };
@@ -335,8 +345,10 @@ export function selectAffected({ items, changedFiles, dependencyDirs, references
         if (TEST_FILE.test(file)) testOnlyChanged.add(dir);
         else changed.add(dir);
       }
-      for (const [reader, workspace, testFile] of testReads) {
-        if (file.startsWith(`${workspace}/`)) tested.push([reader, testFile]);
+      for (const [reader, workspace, testFile, target] of testReads) {
+        if (file.startsWith(`${workspace}/`)) {
+          tested.push({ reader, readerFile: testFile, target, workspace: dir, changed: file });
+        }
       }
       for (const [pattern, reader] of EXTRA_INPUTS) {
         if (pattern.test(file) && readers.has(reader)) changed.add(reader);
@@ -402,11 +414,15 @@ export function selectAffected({ items, changedFiles, dependencyDirs, references
   for (const dir of narrowed) affected.add(dir);
   // Workspaces that only need their tests run, with the test files that read
   // changed data.
+  const narrowedSet = new Set(narrowed);
   const testOnly = new Map();
-  for (const [reader, file] of tested) {
-    if (reader && !affected.has(reader)) {
-      testOnly.set(reader, (testOnly.get(reader) ?? new Set()).add(file));
-    }
+  for (const { reader, readerFile, target, workspace, changed: file } of tested) {
+    if (!reader || affected.has(reader)) continue;
+    // A narrowed change touches only test files, so it leaves the data a reader
+    // reads unchanged: the reader's tests run only when its reference reaches the
+    // changed file itself.
+    if (narrowedSet.has(workspace) && !reaches(target, file)) continue;
+    testOnly.set(reader, (testOnly.get(reader) ?? new Set()).add(readerFile));
   }
   return {
     full,

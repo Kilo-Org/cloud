@@ -488,6 +488,39 @@ test('a test-only workspace that reads a changed workspace still selects its rea
   assert.deepEqual(result.packages, ['a', 'b', 'c']);
 });
 
+test('a test-only change does not run a reader test that reads other files', () => {
+  const references = [['services/leaf/src/copy.test.ts', 'apps/mobile/src/i18n/en.json', true]];
+  const testOnly = selectAffected({
+    items: dataItems,
+    changedFiles: ['apps/mobile/src/app/index.test.tsx'],
+    dependencyDirs: [],
+    references,
+  });
+  assert.deepEqual(testOnly.dirs, ['apps/mobile']);
+  assert.deepEqual(testOnly.test_only_dirs, []);
+  // The workspace-level read rule stays for a change that is not test-only.
+  const source = selectAffected({
+    items: dataItems,
+    changedFiles: ['apps/mobile/src/app/index.tsx'],
+    dependencyDirs: [],
+    references,
+  });
+  assert.deepEqual(source.test_only_dirs, ['services/leaf']);
+});
+
+test('a test-only change runs a reader test that reads the changed file', () => {
+  const changed = 'apps/mobile/src/__tests__/fixtures.json';
+  const result = selectAffected({
+    items: dataItems,
+    changedFiles: [changed],
+    dependencyDirs: [],
+    references: [['services/leaf/src/copy.test.ts', changed, true]],
+  });
+  assert.deepEqual(result.dirs, ['apps/mobile']);
+  assert.deepEqual(result.test_only_dirs, ['services/leaf']);
+  assert.deepEqual(result.test_only_files, ['services/leaf/src/copy.test.ts']);
+});
+
 test('the neutral filter keeps every path a check reads', () => {
   // The paths the test matrix still sees after the detector drops the neutral
   // ones.

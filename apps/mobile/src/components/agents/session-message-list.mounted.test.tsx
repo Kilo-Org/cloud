@@ -808,7 +808,6 @@ describe('SessionMessageList chrome ride-up', () => {
     expect(shiftStyle(renderer)).toBe(-64);
   });
 
-
   it('keeps a transcript that cannot scroll still', () => {
     const renderer = mountList({ chromeGrowthDp: 64 });
     fire('onScrollEndDrag', {

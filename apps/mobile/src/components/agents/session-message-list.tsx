@@ -106,9 +106,10 @@ type SessionMessageListProps<T> = {
   onOpenSettledChange?: (sessionId: string, settled: boolean) => void;
   /**
    * How far the chrome under the transcript has grown past its resting height,
-   * in dp. The list shifts its content up by this amount while it is anchored at
-   * its bottom, so the newest row stays on that chrome's top edge in the same
-   * commit that grows it. Absent or 0 keeps every other caller byte-identical.
+   * in dp. While the list can scroll, its content rides up by this amount so
+   * the newest row stays on that chrome's top edge in the same commit that
+   * grows it; the top of the same amount is clipped by the frame and returns
+   * when the growth does. Absent or 0 keeps every other caller byte-identical.
    */
   chromeGrowthDp?: number;
 };
@@ -339,10 +340,12 @@ export function SessionMessageList<T>({
     olderArrivalNewestKeyRef.current = newestItemKey;
   }, [items, newestItemKey]);
 
-  // The transcript rides up by the chrome's growth while it is anchored at its
-  // bottom, so the newest row keeps the chrome's top edge in the same commit
-  // that grows the chrome. A list that cannot scroll has no row to bring back,
-  // so it never shifts.
+  // The transcript rides up by the chrome's growth while its content overflows
+  // the viewport, so the newest row keeps the chrome's top edge in the same
+  // commit that grows the chrome. A list that cannot scroll has no row to bring
+  // back, so it never shifts. The frame holds that growth out of the list's own
+  // height, which costs the top of the content the same amount until the chrome
+  // shrinks again; releasing the shift instead would move every row at once.
   const chromeRideUp = resolveTranscriptRideUp(chromeGrowthDp ?? 0, isScrollable);
   // Memoized by the growth so the frame's style objects keep their identity: a
   // fresh style object on every render re-applies the native transform, and the

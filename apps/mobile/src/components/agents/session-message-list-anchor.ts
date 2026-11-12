@@ -6,8 +6,7 @@ import { type ViewStyle } from 'react-native';
  * The shift applies only while the transcript's content overflows the viewport:
  * a transcript that cannot scroll has no anchoring problem to solve, and
  * shifting it would hide its first rows behind the holder with no way to
- * scroll them back. A list that can scroll keeps every hidden row reachable,
- * because the shift is a paint offset and the scroll range is untouched.
+ * scroll them back.
  */
 export function resolveTranscriptRideUp(chromeGrowth: number, scrollable: boolean): number {
   if (!scrollable || !(chromeGrowth > 0) || !Number.isFinite(chromeGrowth)) {
@@ -34,6 +33,13 @@ export function resolveTranscriptRideUp(chromeGrowth: number, scrollable: boolea
  * top edge. The holder clips the strip the shift pushes above its top edge,
  * exactly as a scroll view clips the rows a scroll moves past its edge, and the
  * chrome paints over the part of the holder that lies behind it.
+ *
+ * That clipped strip is the cost of the same-frame anchor: it is the top
+ * `chromeGrowth` of the content, which the reader can only reach again by
+ * shrinking the draft. The alternative — releasing the shift when the reader
+ * leaves the bottom — moves every row by the growth in one frame, and no scroll
+ * command can compensate in time; the growth is bounded by the composer's own
+ * cap, so the strip is at most one and a half lines.
  */
 export type TranscriptFrame = Readonly<{ holder: ViewStyle; content: ViewStyle }>;
 

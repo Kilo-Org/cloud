@@ -1,5 +1,5 @@
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
-import { type Href, useLocalSearchParams, usePathname } from 'expo-router';
+import { type Href, useLocalSearchParams } from 'expo-router';
 import { hashKey, useQuery } from '@tanstack/react-query';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -43,8 +43,6 @@ import { useTRPC } from '@/lib/trpc';
 export default function SessionDetailScreen() {
   const owner = useSyncExternalStore(subscribeAuthenticatedOwner, getAuthenticatedOwner);
   const confirmation = useIdentityConfirmation();
-  const pathname = usePathname();
-  const restoredOpen = useRestoredRouteOpen(pathname);
   const {
     'session-id': rawSessionId,
     organizationId: routeOrganizationId,
@@ -95,6 +93,12 @@ export default function SessionDetailScreen() {
   const autoSendParam = Array.isArray(autoSendRaw) ? autoSendRaw[0] : autoSendRaw;
   const spawnedMode = Array.isArray(modeParam) ? modeParam[0] : modeParam;
   const resumeAt = parseResumeAnchor(resumeAtRaw);
+  // Whether the relaunch repair opened this destination. It is keyed on the
+  // destination this screen renders, never on the focused route's pathname: a
+  // sheet or a share gate in front of this screen must not answer for it.
+  const restoredOpen = useRestoredRouteOpen(
+    sessionId === null ? '' : `/(app)/agent-chat/${sessionId}`
+  );
   const trpc = useTRPC();
   const { t } = useTranslation();
   // The open's clock starts at route mount — before the metadata query and

@@ -39,7 +39,6 @@ import { _resetLastRouteForTests, noteRestoredRouteOpen } from '@/lib/last-route
 import SessionDetailScreen from './[session-id]';
 
 const useLocalSearchParamsMock = vi.hoisted(() => vi.fn());
-const usePathnameMock = vi.hoisted(() => vi.fn());
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 const useRouterMock = vi.hoisted(() => vi.fn());
@@ -178,7 +177,6 @@ vi.mock('@/components/agents/chat-markdown-text', () => ({
 vi.mock('expo-router', () => ({
   useLocalSearchParams: useLocalSearchParamsMock,
   useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
-  usePathname: usePathnameMock,
   useRouter: useRouterMock,
 }));
 
@@ -525,8 +523,6 @@ beforeEach(() => {
     }
   );
   useLocalSearchParamsMock.mockReset();
-  usePathnameMock.mockReset();
-  usePathnameMock.mockReturnValue('/agent-chat/ses_12345678901234567890123456');
   useRouterMock.mockReset();
   useRouteForegroundRefreshMock.mockClear();
   cliSessionGetQueryKeyMock.mockClear();
@@ -650,12 +646,10 @@ describe('SessionDetailScreen invalid session-id', () => {
 
 describe('SessionDetailScreen relaunch restore', () => {
   const SESSION_ID = 'ses_12345678901234567890123456';
-  const SESSION_PATH = `/agent-chat/${SESSION_ID}`;
   const RECORDED_HREF = `/(app)/agent-chat/${SESSION_ID}`;
 
   function mountTerminalSession(code: string) {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': SESSION_ID });
-    usePathnameMock.mockReturnValue(SESSION_PATH);
     queryState.data = null;
     queryState.isError = true;
     queryState.error = { data: { code } };

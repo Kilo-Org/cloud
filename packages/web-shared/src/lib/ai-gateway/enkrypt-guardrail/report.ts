@@ -68,7 +68,7 @@ const scanOutcomeShape = {
  * tool definitions, its system prompt, its conversation, or the model's response, or one chunk of
  * them.
  */
-export const EnkryptScanReportSchema = z.object({
+const EnkryptScanReportSchema = z.object({
   ...scanOutcomeShape,
   part: z.enum(['tools', 'system', 'conversation', 'response']),
   total_segments: z.number(),
@@ -99,7 +99,7 @@ export type EnkryptFlaggedTool = z.infer<typeof FlaggedToolSchema>;
  * one segment. The decision and error are those of the most severe tool. Characters, calls, and
  * credits are summed; the latency runs until the last tool's scan finished.
  */
-export const EnkryptToolScanReportSchema = z.object({
+const EnkryptToolScanReportSchema = z.object({
   ...scanOutcomeShape,
   part: z.literal('tools'),
   tools_total: z.number(),
@@ -136,14 +136,14 @@ const EnkryptSegmentsScanReportSchema = EnkryptScanReportSchema.extend({
 });
 
 /** A scan of the input guardrail: the aggregate of the tool definitions, the system prompt, or the conversation. */
-export const EnkryptInputScanReportSchema = z.union([
+const EnkryptInputScanReportSchema = z.union([
   EnkryptToolScanReportSchema.extend(verdictCacheWriteShape),
   EnkryptSegmentsScanReportSchema.extend(verdictCacheWriteShape),
 ]);
 
 export type EnkryptInputScanReport = z.infer<typeof EnkryptInputScanReportSchema>;
 
-export type EnkryptSegmentsScanReport = z.infer<typeof EnkryptSegmentsScanReportSchema>;
+type EnkryptSegmentsScanReport = z.infer<typeof EnkryptSegmentsScanReportSchema>;
 
 /** An input guardrail scan before its verdict cache write is known. */
 export type EnkryptInputPartScanReport = EnkryptToolScanReport | EnkryptSegmentsScanReport;

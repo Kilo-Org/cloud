@@ -10,7 +10,7 @@ export type ApiRequestLogBlobUpload = {
   uploadError: string | null;
 };
 
-export const enkryptRequestLogSchema = z.object({
+const enkryptRequestLogSchema = z.object({
   guardrail: z.enum(['input', 'output']),
   scan: z.enum(['blocking', 'log_only']),
   part: z.enum(['tools', 'system', 'conversation', 'response']),

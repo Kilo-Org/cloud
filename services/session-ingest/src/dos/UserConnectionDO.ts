@@ -711,9 +711,8 @@ export class UserConnectionDO extends DurableObject<Env> {
   ): void {
     const result = CLIOutboundMessageSchema.safeParse(parsed);
     if (!result.success) {
-      // A refused heartbeat returns before any per-session work. Its advertised
-      // count is read from the shape alone, so the log names the size and never
-      // an id, title or URL.
+      // Report the frame's size beside the byte count so a frame outside the
+      // contract is diagnosable from its shape, never from its contents.
       const sessionCount = heartbeatSessionCount(parsed);
       console.warn('CLI message parse failed', {
         role: 'cli',

@@ -25,46 +25,43 @@ export type Instance = z.infer<typeof instanceSchema>;
 
 // -- Heartbeat session bounds -------------------------------------------------
 
-// One heartbeat's advertised sessions, and every free-form string in one row,
-// are bounded so that the durable object's per-session work for one frame
-// (rename catch-up reads, ready-push entries, owner bookkeeping, the broadcast)
-// is fixed by the contract instead of by the sender. The values keep clear
-// margin over what a supported producer sends, because a refused heartbeat
-// hides every session of that connection from `sessions.list`.
+// The heartbeat session list and every free-form string in one row carry
+// explicit limits, so the work one heartbeat describes is fixed by the
+// contract. Each limit keeps clear margin over the values a supported producer
+// sends in that field.
 
-// Above this count the frame is refused before any per-session work. The
-// presence relay caps an advertisement at 100 sessions, the socket attachment
+// The presence relay advertises at most 100 sessions, the socket attachment
 // frame holds roughly 270 minimal rows, and a CLI advertises only sessions with
-// a live status entry, so no supported producer approaches this bound.
+// an active status entry.
 export const MAX_HEARTBEAT_SESSIONS = 256;
-// Session identifiers are `ses_` plus 26 characters today; the session-sync
-// contract caps an entity id at 256.
+// Session identifiers are `ses_` plus 26 characters; the session-sync contract
+// caps an entity id at 256.
 export const MAX_HEARTBEAT_SESSION_ID_LENGTH = 256;
-// Derived statuses are idle, busy, question, permission, retry and scheduled;
+// Statuses are idle, busy, question, permission, retry and scheduled;
 // `permission` is the longest at 10 characters.
 export const MAX_HEARTBEAT_STATUS_LENGTH = 64;
-// Every producer that caps a title allows 200 characters (web rename route, VS
-// Code rename helper, mobile rename dialog) and a generated title is one line.
-// A terminal rename dialog does not cap its input, so keep five times that.
+// Five times the 200-character titles the web rename route, the VS Code rename
+// helper and the mobile rename dialog allow; a generated title is one line.
 export const MAX_HEARTBEAT_TITLE_LENGTH = 1024;
 // A normalized git remote URL; the sibling `prLink.prUrl` uses the same bound.
 export const MAX_HEARTBEAT_GIT_URL_LENGTH = 2048;
-// A per-session branch is advertised untruncated; the create-session contract
-// caps `gitBranch` and `baseBranch` at 256.
+// A per-session branch; the create-session contract caps `gitBranch` and
+// `baseBranch` at 256.
 export const MAX_HEARTBEAT_GIT_BRANCH_LENGTH = 256;
 // A parent identifier is another session id, so it shares that bound.
 export const MAX_HEARTBEAT_PARENT_SESSION_ID_LENGTH = 256;
 
-// Reads only the advertised session count from a frame that may fail the full
-// heartbeat contract, so a refusal is diagnosable from its size alone.
+// Reads the advertised session count from a frame independently of the full
+// heartbeat contract, so a frame outside the limits above is reported with its
+// size.
 const HeartbeatSessionsEnvelopeSchema = z.object({
   type: z.literal('heartbeat'),
   sessions: z.array(z.unknown()),
 });
 
 /**
- * Advertised session count of a heartbeat frame, including a frame the full
- * contract refuses. Returns undefined for any other shape.
+ * Advertised session count of a heartbeat frame, valid or not. Returns
+ * undefined for any other shape.
  */
 export function heartbeatSessionCount(parsed: unknown): number | undefined {
   const envelope = HeartbeatSessionsEnvelopeSchema.safeParse(parsed);

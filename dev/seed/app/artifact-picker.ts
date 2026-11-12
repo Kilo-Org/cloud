@@ -18,7 +18,7 @@ import {
 import { seedTokenSigningParams } from '../lib/token-signing';
 import { isValidEmail } from '../lib/users';
 
-export const usage = '<email> [--session <id>]';
+export const usage = '<email>';
 
 export const SESSION_ID = 'ses_000000000006ArtifactPick01';
 export const SESSION_TITLE = 'Quarterly report artifacts';
@@ -226,9 +226,14 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error(`No user found for email ${email}.`);
   }
   const exact = matches.filter(match => match.email === email);
-  const [user] = exact.length > 0 ? exact : matches;
+  const resolved = exact.length > 0 ? exact : matches;
+  if (resolved.length > 1) {
+    const listed = resolved.map(match => `${match.email} (${match.userId})`).join(', ');
+    throw new Error(`Multiple users matched ${email}: ${listed}`);
+  }
+  const [user] = resolved;
   if (!user) {
-    throw new Error(`Multiple users matched ${email}.`);
+    throw new Error(`No user found for email ${email}.`);
   }
 
   if (user.stripeCustomerId?.startsWith('cus_local_')) {

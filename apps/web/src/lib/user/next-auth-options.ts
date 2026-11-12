@@ -1343,9 +1343,14 @@ export const authOptions: NextAuthOptions = {
 
         // A redeemed passkey ticket already proved identity, so a passkey skips
         // both Turnstile and user settlement. This return sits after the domain
-        // blacklist and SSO-authority checks above, so a passkey can never
-        // bypass a domain that enforces SSO. No `user_auth_provider` row is
-        // written for a passkey: the jwt callback resolves it by user id.
+        // blacklist, the account-status gate and the SSO-authority checks above,
+        // so a passkey can never bypass a domain that enforces SSO. The
+        // account-status gate refuses a closed account for every provider: a
+        // deletion in progress writes its `blocked_reason` through
+        // `disableUserAccessForDeletion`, and the `isBlockedAccount` check right
+        // after `findAndSyncExistingUser` then answers the BLOCKED redirect. No
+        // `user_auth_provider` row is written for a passkey: the jwt callback
+        // resolves it by user id.
         if (accountInfo.provider === 'passkey') {
           return true;
         }

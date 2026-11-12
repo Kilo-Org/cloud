@@ -142,6 +142,7 @@ beforeEach(() => {
 describe('isAutomaticallyRetryableReview', () => {
   it.each([
     ['assistant_timeout', 'failed', 1, true],
+    ['assistant_unauthorized', 'failed', 1, true],
     ['timeout', 'failed', 1, true],
     ['workspace_capacity', 'failed', 2, true],
     ['repository_clone_failed', 'failed', 1, true],

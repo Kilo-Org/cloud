@@ -411,8 +411,9 @@ describe('Organization hub plan', () => {
 
     const [refusal] = refusals(renderer);
     // The web billing page refuses this role, so the block states the state
-    // without offering a control that would fail.
-    expect(refusal?.props.message).toBe(i18n.t('organization.hub.planEnded'));
+    // without offering a control that would fail, and it keeps the sentence
+    // that names who can end it.
+    expect(refusal?.props.message).toBe(i18n.t('common.organizationTrialEnded'));
     expect(refusal?.props.action).toBeUndefined();
     unmount();
   });

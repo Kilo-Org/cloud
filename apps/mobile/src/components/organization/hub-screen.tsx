@@ -186,6 +186,13 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
       ? t('organization.hub.planEnterprise')
       : t('organization.hub.planTeams');
   const planBillingUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions`;
+  // A role that gets the billing action below the block needs only the state,
+  // because the action is the next step. A role that cannot change the plan
+  // gets the sentence the rest of the app shows with the same explanation, so
+  // the member still learns who can end the state.
+  const planMessage = showMoney
+    ? t('organization.hub.planEnded')
+    : t('common.organizationTrialEnded');
 
   return (
     <View className="flex-1 bg-background">
@@ -215,15 +222,15 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
       >
         {/* A lapsed plan blocks every new session for every member of this
             organization, so it is stated before the numbers the screen opens
-            on. The sentence stops at the state: the billing action below it is
-            the next step for a role that can take it, so repeating the
-            instruction the other surfaces carry would restate the control.
-            Only a billing role gets the action, because the web billing page
-            refuses the other roles. The plan row inside the card below states
-            the tier and its status, so this block adds neither. */}
+            on. Only a billing role gets the action, because the web billing
+            page refuses the other roles; the sentence then stops at the state
+            so it does not restate the control below it, while a role without
+            the action keeps the next step in the sentence. The plan row inside
+            the card below states the tier and its status, so this block adds
+            neither. */}
         {planEnded ? (
           <OrganizationPlanRefusal
-            message={t('organization.hub.planEnded')}
+            message={planMessage}
             action={
               showMoney
                 ? {

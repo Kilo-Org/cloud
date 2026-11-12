@@ -1,5 +1,11 @@
-import { describe, expect, test } from '@jest/globals';
+import { beforeEach, describe, expect, test } from '@jest/globals';
 import { handleEmbeddingModelsRequest } from './embedding-models';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  getEffectiveModelDecision,
+  resolveOrganizationMemberModelPolicy,
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
   KILO_DEFAULT_EMBEDDING_MODEL,
   KILO_EMBEDDING_MODEL_CATALOG,
@@ -7,12 +13,119 @@ import {
   normalizeKiloEmbeddingModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/embeddings/kilo-embedding-models';
 
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    getEffectiveModelDecision: jest.fn(),
+    resolveOrganizationMemberModelPolicy: jest.fn(),
+  })
+);
+
+const policy = {
+  requireModelInCurrentSnapshot: false,
+  organizationModelDenyList: [],
+  memberGrant: { mode: 'unrestricted' },
+  policyRevision: 1,
+  customLlmGrantee: { organizationId: 'org-1', groupIds: [] },
+} satisfies Awaited<ReturnType<typeof resolveOrganizationMemberModelPolicy>>;
+
+function setOrganizationAllowedModels(modelIds: string[]) {
+  jest.mocked(getUserFromAuth).mockResolvedValue({
+    user: { id: 'user-1' },
+    organizationId: 'org-1',
+    authFailedResponse: null,
+  } as Awaited<ReturnType<typeof getUserFromAuth>>);
+  jest.mocked(getEffectiveModelDecision).mockImplementation(async (_policy, modelId) => ({
+    allowed: modelIds.includes(modelId),
+  }));
+}
+
 describe('GET /api/gateway/embedding-models', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+    jest.mocked(getUserFromAuth).mockRejectedValue(new Error('Unauthenticated'));
+    jest.mocked(resolveOrganizationMemberModelPolicy).mockResolvedValue(policy);
+  });
+
   test('returns the Kilo embedding model catalog', async () => {
     const response = await handleEmbeddingModelsRequest();
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual(KILO_EMBEDDING_MODEL_CATALOG);
+    expect(resolveOrganizationMemberModelPolicy).not.toHaveBeenCalled();
+  });
+
+  test('prefers the global OpenAI default when allowed by the organization', async () => {
+    setOrganizationAllowedModels(KILO_EMBEDDING_MODEL_CATALOG.models.map(model => model.id));
+
+    const response = await handleEmbeddingModelsRequest();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(KILO_EMBEDDING_MODEL_CATALOG);
+    expect(resolveOrganizationMemberModelPolicy).toHaveBeenCalledTimes(1);
+    expect(resolveOrganizationMemberModelPolicy).toHaveBeenCalledWith({
+      organizationId: 'org-1',
+      kiloUserId: 'user-1',
+      fromDb: readDb,
+    });
+    expect(getEffectiveModelDecision).toHaveBeenCalledTimes(
+      KILO_EMBEDDING_MODEL_CATALOG.models.length
+    );
+  });
+
+  test('preserves the legacy Mistral default when the organization blocks OpenAI', async () => {
+    setOrganizationAllowedModels([
+      'mistralai/codestral-embed-2505',
+      'mistralai/mistral-embed-2312',
+    ]);
+
+    const response = await handleEmbeddingModelsRequest();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      defaultModel: 'mistralai/mistral-embed-2312',
+      models: [{ id: 'mistralai/codestral-embed-2505' }, { id: 'mistralai/mistral-embed-2312' }],
+    });
+  });
+
+  test('uses the first allowed model when both preferred defaults are blocked', async () => {
+    setOrganizationAllowedModels(['google/gemini-embedding-001', 'mistralai/codestral-embed-2505']);
+
+    const response = await handleEmbeddingModelsRequest();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      defaultModel: 'mistralai/codestral-embed-2505',
+      models: [{ id: 'mistralai/codestral-embed-2505' }, { id: 'google/gemini-embedding-001' }],
+    });
+  });
+
+  test('returns 409 when the organization has no allowed embedding models', async () => {
+    setOrganizationAllowedModels([]);
+
+    const response = await handleEmbeddingModelsRequest();
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: 'No embedding models are available through your organization groups.',
+    });
+  });
+
+  test('only returns aliases for allowed organization models', async () => {
+    setOrganizationAllowedModels(['mistralai/mistral-embed-2312', 'baai/bge-m3']);
+
+    const response = await handleEmbeddingModelsRequest();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      defaultModel: 'mistralai/mistral-embed-2312',
+      models: KILO_EMBEDDING_MODEL_CATALOG.models.filter(model =>
+        ['mistralai/mistral-embed-2312', 'baai/bge-m3'].includes(model.id)
+      ),
+      aliases: { 'mistral-embed-2312': 'mistralai/mistral-embed-2312' },
+    });
   });
 
   test('catalog includes default model metadata and aliases', () => {

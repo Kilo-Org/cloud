@@ -32,6 +32,11 @@ export async function handleEmbeddingModelsRequest(): Promise<NextResponse> {
       );
     }
     const modelIds = new Set(models.map(model => model.id));
+    // Preserve the prior default for organizations that block the new global default.
+    const defaultModel =
+      [KILO_EMBEDDING_MODEL_CATALOG.defaultModel, 'mistralai/mistral-embed-2312'].find(modelId =>
+        modelIds.has(modelId)
+      ) ?? models[0].id;
     const aliases = Object.fromEntries(
       Object.entries(KILO_EMBEDDING_MODEL_CATALOG.aliases).filter(([, modelId]) =>
         modelIds.has(modelId)
@@ -39,9 +44,7 @@ export async function handleEmbeddingModelsRequest(): Promise<NextResponse> {
     );
     return NextResponse.json({
       ...KILO_EMBEDDING_MODEL_CATALOG,
-      defaultModel: modelIds.has(KILO_EMBEDDING_MODEL_CATALOG.defaultModel)
-        ? KILO_EMBEDDING_MODEL_CATALOG.defaultModel
-        : models[0].id,
+      defaultModel,
       models,
       aliases,
     });

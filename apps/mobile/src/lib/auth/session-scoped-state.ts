@@ -17,6 +17,9 @@ import { clearFormDrafts } from '@/lib/form-draft';
 import { clearRepoSelectionSenders } from '@/lib/hooks/repo-selection-senders';
 import { clearTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
+import { clearLastOpenedSession } from '@/lib/last-opened-session';
+import { clearLastRoute } from '@/lib/last-route';
+import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
 import { clearConversationRetention } from '@/lib/pr-review/discussion/conversation-retention';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
@@ -100,7 +103,9 @@ function clearRecentPrsBestEffort(): void {
  * connection and the stored servers behind it, the app-settings-tools group
  * switch, the debounced repository-selection send state, the browsable
  * artifact mirror, app-owned temp copies, the stored PR recents, the retained
- * PR discussion conversation, and the phone's own search index. Every member is
+ * PR discussion conversation, the phone's own search index, the OS launcher
+ * shortcuts and tile, and the durable last-opened-session and last-route
+ * records. Every member is
  * best-effort; one member's throw falls through to the members after it, and to
  * the caller's own sign-in/sign-out state reset. The recents delete and OS
  * search clear are fired without awaiting, so the function stays synchronous;
@@ -173,6 +178,19 @@ export function clearSessionScopedState(): void {
   // account switch, and the next sync would republish them from the cache that
   // has not been cleared yet.
   runClear(clearSessionCatalogBestEffort);
+  // The OS launcher surfaces are device-wide too, and their labels come from the
+  // signed-in account's sessions: the Android dynamic shortcuts and
+  // quick-settings tile, and the iOS Home Screen Quick Actions. The account
+  // boundary drops them with the other account-scoped members, so each surface
+  // names the account that is signed in.
+  runClear(clearLauncherSurfaces);
+  // The durable last-opened session record and the last-route record are read
+  // through the active account's user id, and they are also the inputs the
+  // launcher surfaces and the relaunch restore derive from. The account
+  // boundary deletes both with the other account-bound records, so both belong
+  // to the account that is signed in.
+  runClear(clearLastOpenedSession);
+  runClear(clearLastRoute);
 }
 
 /** One best-effort clear: a throw never stops the clears that follow it. */

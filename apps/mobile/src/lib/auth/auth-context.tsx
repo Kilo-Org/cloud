@@ -67,10 +67,7 @@ import {
   clearSessionScopedState,
   clearSystemSearchIndexOnSignedOutLaunch,
 } from '@/lib/auth/session-scoped-state';
-import { clearLastRoute } from '@/lib/last-route';
-import { clearLastOpenedSession } from '@/lib/last-opened-session';
 import { clearLoginDrafts } from '@/lib/login-draft';
-import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
 import { resetPurchaseErrorToastDedup } from '@/lib/credits/use-store-credit-purchase';
 import {
   isSignOutActive,
@@ -154,19 +151,6 @@ function readUserIdFromToken(token: string): string | null {
     return parsed.success && parsed.data.kiloUserId ? parsed.data.kiloUserId : null;
   } catch {
     return null;
-  }
-}
-
-/**
- * Run one synchronous best-effort teardown step. Sign-out's local cleanups are
- * independent: a throw in one must never abort the transition or reject
- * `signOut`, so each call site is guarded by this wrapper.
- */
-function runBestEffortTeardown(step: () => void): void {
-  try {
-    step();
-  } catch {
-    // Best effort: a failed clear never aborts sign-out.
   }
 }
 
@@ -463,8 +447,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         await Promise.allSettled([releaseChatsForAccountSwitch()]);
         queryClient.clear();
         setToken(tokenValue);
-        // A direct account switch must not keep the prior account's session
-        // state: trusted hosts, image confirms, media caches, temp copies.
+        // Every account boundary drops the session-scoped local state: trusted
+        // hosts, image confirms, media caches, temp copies, and the device-wide
+        // records that belong to an account (the OS launcher surfaces and the
+        // durable last-opened-session and last-route records). It runs in the
+        // same synchronous block as the token publish, ahead of every read a
+        // derived surface performs.
         clearSessionScopedState();
         // The sign-in form's drafts belong to the attempt that just succeeded,
         // whatever provider finished it; a later signed-out screen must not
@@ -648,14 +636,6 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearPrReviewFooterPreference();
           clearCondenseToolCallsPreference();
           clearCollapsedConnectCtasPreference();
-          // The launcher surfaces belong to the signed-out account: drop the
-          // dynamic shortcuts/tile natively and the durable last-opened record,
-          // so the next account never sees the previous account's session.
-          // Both are synchronous best-effort clears, guarded so neither can
-          // throw into sign-out.
-          runBestEffortTeardown(clearLauncherSurfaces);
-          runBestEffortTeardown(clearLastOpenedSession);
-          runBestEffortTeardown(clearLastRoute);
         } finally {
           queryClient.clear();
           setSessionEnded(ended);

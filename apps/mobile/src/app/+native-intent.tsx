@@ -141,6 +141,11 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/agent-chat-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/agent-chat-fixture';
     }
+    // Dev-only auth transition: the real sign-in screen, mounted inside the
+    // signed-in app, so sign-in can be exercised while an account is active.
+    if (/(?:^|\/)dev\/auth-switch-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/auth-switch-fixture';
+    }
     // Dev-only render-recovery faults: `kiloapp:///dev/render-recovery-fixture/<name>`
     // arms one and opens the fixture route, or clears it without navigating.
     const renderRecoveryFixture = handleRenderRecoveryFixturePath(path);

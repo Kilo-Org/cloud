@@ -170,6 +170,10 @@ const nativeLauncherSurfacesMock = vi.hoisted(() => ({
   clearLauncherSurfaces: vi.fn(),
 }));
 
+const lastRouteMock = vi.hoisted(() => ({
+  clearLastRoute: vi.fn(),
+}));
+
 // Hoisted so the unauthorized-handler tests can capture the handler the
 // provider registers, across the vi.resetModules() re-imports every mount
 // performs: the mock factory closes over this object, so the captured handler
@@ -311,6 +315,8 @@ vi.mock('@/lib/consent', () => ({
 vi.mock('@/lib/last-opened-session', () => lastOpenedSessionMock);
 
 vi.mock('@/lib/native-launcher-surfaces', () => nativeLauncherSurfacesMock);
+
+vi.mock('@/lib/last-route', () => lastRouteMock);
 
 vi.mock('@/lib/auth/trpc-unauthorized', () => ({
   setTrpcUnauthorizedHandler: unauthorizedMock.setTrpcUnauthorizedHandler,
@@ -929,6 +935,26 @@ describe('sign-out teardown ordering', () => {
     unmount();
   });
 
+  it('clears the launcher surfaces and the durable session records on sign-in (account switch)', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockClear();
+    lastOpenedSessionMock.clearLastOpenedSession.mockClear();
+    lastRouteMock.clearLastRoute.mockClear();
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+    });
+
+    // The switch owns the device's own surfaces and records: the dynamic
+    // shortcuts/tile are dropped natively and both durable records are deleted,
+    // like the sign-out body.
+    expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
+    expect(lastOpenedSessionMock.clearLastOpenedSession).toHaveBeenCalledTimes(1);
+    expect(lastRouteMock.clearLastRoute).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
   it('clears the local preferences on sign-out', async () => {
     const { ctx } = await mountAndGetContext();
 
@@ -971,10 +997,11 @@ describe('sign-out teardown ordering', () => {
       await ctx.signOut();
     });
 
-    // The dynamic shortcuts/tile are dropped natively and the durable record is
-    // deleted locally, so the next account never sees the previous session.
+    // The dynamic shortcuts/tile are dropped natively and the durable records
+    // are deleted locally, with the other account-scoped members.
     expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
     expect(lastOpenedSessionMock.clearLastOpenedSession).toHaveBeenCalledTimes(1);
+    expect(lastRouteMock.clearLastRoute).toHaveBeenCalledTimes(1);
   });
 
   it('regression: sign-out deletes run through deleteAccountMetadata and land after in-flight metadata writes', async () => {

@@ -44,9 +44,7 @@ describe('getCenteredStateLayout', () => {
       viewport,
       contentHeight: 200,
     });
-    expect(renderedTop(layout, viewport.top, 200) + 100).toBe(
-      (viewport.top + viewport.bottom) / 2
-    );
+    expect(renderedTop(layout, viewport.top, 200) + 100).toBe((viewport.top + viewport.bottom) / 2);
     expect(layout.minHeight).toBe(viewport.bottom - viewport.top);
   });
 
@@ -345,6 +343,30 @@ describe('getPendingCenteredStateStyle', () => {
       renderedTop(layout, geometry.viewport.top, contentHeight),
       6
     );
+  });
+
+  it('matches the measured placement outside the strip its content nearly fills', () => {
+    // The layout engine pins content inside the last `2 * STATE_GAP` of the band
+    // where the measured layout still centers it. Everywhere else the two boxes
+    // agree: both center a shorter state, and both pin one gap below the band's
+    // top when it is taller than the band.
+    const geometry = { window: { top: 0, bottom: 200 }, viewport: { top: 0, bottom: 200 } };
+    const bandStyle = getCenteredStateBandStyle(geometry);
+    const difference = (contentHeight: number) =>
+      Math.abs(
+        renderedTop(bandStyle, 0, contentHeight) -
+          renderedTop(getCenteredStateLayout({ ...geometry, contentHeight }), 0, contentHeight)
+      );
+    expect(difference(100)).toBe(0);
+    // `band - 2 * STATE_GAP`: the strip starts here, where both still agree.
+    expect(difference(168)).toBe(0);
+    expect(difference(260)).toBe(0);
+    // Inside that strip the estimate is short by at most one gap, and the state
+    // is scrollable there.
+    expect(difference(184)).toBeLessThanOrEqual(16);
+    expect(difference(190)).toBeLessThanOrEqual(16);
+    // An exact fit is the worst case: one gap.
+    expect(difference(200)).toBe(16);
   });
 
   it('keeps the bottom reserve free before the viewport is measured', () => {

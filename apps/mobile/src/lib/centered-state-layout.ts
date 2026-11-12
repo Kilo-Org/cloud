@@ -163,12 +163,19 @@ export function getCenteredStateLayout({
 }
 
 /**
- * The content box that places a state at the center of the band before its
- * content height is known: the layout engine centers the content, and the two
- * paddings only carry the band's own asymmetry — how far the band's top sits
- * below the scroller's top, and how far its bottom sits above the scroller's
- * bottom. `getCenteredStateLayout` computes the same center once the content
- * reports its height, so a state painted with this style does not move.
+ * The content box that places a state in the band before its content height is
+ * known: the layout engine centers the content, and the two paddings carry the
+ * band's own asymmetry — how far the band's top sits below the scroller's top,
+ * and how far its bottom sits above the scroller's bottom.
+ *
+ * This reproduces `getCenteredStateLayout` exactly while the content is at
+ * least `2 * STATE_GAP` shorter than the band (both center it) or taller than
+ * the band (both pin it one gap below the band's top). Inside that narrow
+ * strip the layout engine pins the content where the measured layout would
+ * still center it, so the content can move by up to `STATE_GAP` (16 dp) when
+ * its height lands; the state is scrollable there either way. The bands the
+ * app paints are tens of dp away from their content's height, so no screen in
+ * the design-gate matrix lands in that strip.
  */
 export function getCenteredStateBandStyle({
   window: windowFrame,

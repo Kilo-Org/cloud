@@ -160,7 +160,11 @@ export function CenteredState({
   // itself: a state whose window has not moved keeps its placement instead of
   // dropping back to the pending one and jumping when it returns.
   const measuredViewport = useMemo(() => {
-    if (!viewport || viewport.surface.top !== frame.top || viewport.surface.bottom !== frame.bottom) {
+    if (
+      !viewport ||
+      viewport.surface.top !== frame.top ||
+      viewport.surface.bottom !== frame.bottom
+    ) {
       return null;
     }
     return viewport.frame;

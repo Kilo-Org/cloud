@@ -295,19 +295,21 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           `min-h-11` compiles to about 38.5pt, short of DESIGN.md's 44pt target.
           The picker's own box therefore holds the whole touch target inside the
           row's bounds, because RN drops touches outside every ancestor and a
-          shorter row would clip it. Both children align to the row's bottom
-          instead of its centre, which puts the eyebrow on the picker's line and
-          keeps the gap to the credits card at the gap the section headers below
-          keep to their first rows. */}
+          shorter row would clip it. The eyebrow takes the same 44dp box, bottom
+          aligned, so the two boxes share one centre line while their text stays
+          on the picker's line and keeps the gap to the credits card at the gap
+          the section headers below keep to their first rows. */}
       <View
         className={cn(
           'min-h-[44px] gap-3',
           narrow ? 'flex-col items-stretch' : 'flex-row items-end justify-between'
         )}
       >
-        <Text variant="small" className="shrink uppercase tracking-wide text-muted-foreground">
-          {t('profile.credits')}
-        </Text>
+        <View className={narrow ? undefined : 'min-h-[44px] shrink justify-end'}>
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            {t('profile.credits')}
+          </Text>
+        </View>
         {canPickContext && (
           <Pressable
             className={cn(

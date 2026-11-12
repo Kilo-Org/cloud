@@ -17,6 +17,7 @@ import {
   type BouncerDecideParams,
 } from '@kilocode/web-shared/lib/bouncer/inference';
 import type { FeatureValue } from '@kilocode/web-shared/lib/feature-detection';
+import type { BalancePayer } from '@kilocode/web-shared/lib/organizations/organization-usage';
 
 type BouncerAccountInputs = Pick<NonNullable<BouncerDecideParams['account']>, 'tier' | 'payer'>;
 
@@ -29,7 +30,6 @@ export type BouncerUsageFields = Pick<
 type BouncerRequestBase = {
   /** Shared by the decide and the usage event so bouncer can correlate them. */
   readonly requestId: string;
-  usage(fields: BouncerUsageFields): BouncerUsageContext;
   /**
    * Maps the verdict to a rejection, or records its `spendWatch` on the usage context and returns
    * null so the request is sent upstream.
@@ -42,6 +42,15 @@ type BouncerRequestBase = {
 
 export type SignedInBouncerRequest = BouncerRequestBase & {
   readonly kind: 'signed-in';
+  /**
+   * The usage row for this request, carrying the same payer key the decide uses. Pass the payer the
+   * balance check read, or a promise of it, so an organization member reports against the root of
+   * the organization family.
+   */
+  usage(
+    fields: BouncerUsageFields,
+    payer?: BalancePayer | Promise<BalancePayer | undefined>
+  ): Promise<BouncerUsageContext>;
   /** Starts this request's only decide; see {@link startBouncerDecide}. */
   decide(
     account: BouncerAccountInputs | Promise<BouncerAccountInputs>
@@ -50,6 +59,7 @@ export type SignedInBouncerRequest = BouncerRequestBase & {
 
 export type AnonymousBouncerRequest = BouncerRequestBase & {
   readonly kind: 'anonymous';
+  usage(fields: BouncerUsageFields): Promise<BouncerUsageContext>;
   /** Starts this request's only decide; see {@link startBouncerDecide}. */
   decide(): Promise<DecideResponse | null>;
 };
@@ -60,14 +70,23 @@ type BouncerRequestInput = {
   ja4Digest: string | null | undefined;
 };
 
-function bouncerRequestBase(
-  requestId: string,
-  accountId: string | null,
-  usageIp: string | undefined
-): BouncerRequestBase {
+/**
+ * The payer key bouncer uses for a signed-in request: the root organization of an organization
+ * payer, else the user. It is one value for both the decide and the usage event of a request.
+ */
+export function bouncerPayerKey(
+  userId: string,
+  organizationId: string | undefined,
+  payer: BalancePayer | undefined
+): string {
+  return organizationId
+    ? bouncerAccountId(userId, payer?.rootOrganizationId ?? organizationId)
+    : bouncerAccountId(userId);
+}
+
+function bouncerRequestBase(requestId: string): BouncerRequestBase {
   return {
     requestId,
-    usage: fields => ({ requestId, accountId, clientIp: usageIp, ...fields }),
     apply(verdict, usage) {
       const rejection = bouncerRejectionResponse(verdict, requestId);
       if (rejection) return rejection;
@@ -100,18 +119,35 @@ export function signedInBouncerRequest(
   }
 ): SignedInBouncerRequest {
   const requestId = randomUUID();
-  const accountId = bouncerAccountId(input.userId, input.organizationId);
   const ja4 = normalizeJa4(input.ja4Digest);
+  const usageIp = payerSharingIp(input.ip, input.feature);
   return {
     kind: 'signed-in',
-    ...bouncerRequestBase(requestId, accountId, payerSharingIp(input.ip, input.feature)),
+    ...bouncerRequestBase(requestId),
+    usage(fields, payer) {
+      // A rejected balance read leaves the request's own error handling to answer; the usage row
+      // still needs an identity, so it falls back to the organization the request named.
+      return Promise.resolve(payer)
+        .catch(() => undefined)
+        .then(resolved => ({
+          requestId,
+          accountId: bouncerPayerKey(input.userId, input.organizationId, resolved),
+          clientIp: usageIp,
+          ...fields,
+        }));
+    },
     decide: oneDecide(account =>
       startBouncerDecide(
         Promise.resolve(account).then(({ tier, payer }) => ({
           requestId,
           ip: input.ip,
           ja4,
-          account: { accountId, userId: input.userId, tier, payer },
+          account: {
+            accountId: bouncerPayerKey(input.userId, input.organizationId, payer),
+            userId: input.userId,
+            tier,
+            payer,
+          },
         }))
       )
     ),
@@ -127,7 +163,8 @@ export function anonymousBouncerRequest(input: BouncerRequestInput): AnonymousBo
   const ja4 = normalizeJa4(input.ja4Digest);
   return {
     kind: 'anonymous',
-    ...bouncerRequestBase(requestId, null, input.ip),
+    ...bouncerRequestBase(requestId),
+    usage: fields => Promise.resolve({ requestId, accountId: null, clientIp: input.ip, ...fields }),
     decide: oneDecide(() => startBouncerDecide({ requestId, ip: input.ip, ja4 })),
   };
 }

@@ -102,7 +102,10 @@ export type BouncerDecideParams = {
     /** The authenticated actor, independently of the paying account. */
     userId: string;
     tier: Exclude<DecideTier, 'anonymous'>;
-    /** The paying user's or organization's row, as the balance check read it. */
+    /**
+     * The paying user's row, or for an org payer the root organization of its family, with the
+     * family's totals, as the balance check read it.
+     */
     payer?: BalancePayer;
   };
 };

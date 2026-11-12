@@ -43,9 +43,13 @@ import {
 /**
  * The paying account's row as the balance check read it: the user for a personal request, the
  * organization for an org request. Bouncer's decide uses it to judge whether an account is
- * established.
+ * established. For an organization payer the facts describe the organization family — the root
+ * organization and the sums over it and its children — while the balance check itself stays on the
+ * organization the member belongs to.
  */
 export type BalancePayer = {
+  /** The family root bouncer keys this payer on. Absent for a personal payer. */
+  rootOrganizationId?: string;
   createdAt: string;
   microdollarsUsed: number;
   totalMicrodollarsAcquired: number;
@@ -142,7 +146,6 @@ export async function getBalanceForOrganizationUser(
     plan,
     auto_top_up_enabled,
     next_credit_expiration_at,
-    created_at,
   } = row;
 
   let { microdollars_used, total_microdollars_acquired } = row;
@@ -174,9 +177,10 @@ export async function getBalanceForOrganizationUser(
   }
 
   const payer: BalancePayer = {
-    createdAt: created_at,
-    microdollarsUsed: microdollars_used,
-    totalMicrodollarsAcquired: total_microdollars_acquired,
+    rootOrganizationId: row.payerRootOrganizationId,
+    createdAt: row.payerRootCreatedAt,
+    microdollarsUsed: row.payerMicrodollarsUsed,
+    totalMicrodollarsAcquired: row.payerTotalMicrodollarsAcquired,
   };
 
   const organization_balance = accountBalanceMicrodollars({

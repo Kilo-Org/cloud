@@ -23,7 +23,12 @@ import { forgetRemoteMcp } from '@/lib/chat/remote-mcp';
 import { clearRemoteMcpServers } from '@/lib/chat/remote-mcp-store';
 import { clearPendingConsentOutcome } from '@/lib/consent';
 import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
-import { clearAccountBoundPendingDeepLink, setCurrentDeepLinkUserId } from '@/lib/deep-link-launch';
+import {
+  clearAccountBoundPendingDeepLink,
+  setCurrentDeepLinkUserId,
+  setPendingDeepLink,
+} from '@/lib/deep-link-launch';
+import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { deleteAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { runLogoutCleanup, unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup';
@@ -68,6 +73,7 @@ import {
   clearSystemSearchIndexOnSignedOutLaunch,
 } from '@/lib/auth/session-scoped-state';
 import { clearLoginDrafts } from '@/lib/login-draft';
+import { takeAccountIndependentLaunchUrl } from '@/lib/native-launcher-surfaces';
 import { resetPurchaseErrorToastDedup } from '@/lib/credits/use-store-credit-purchase';
 import {
   isSignOutActive,
@@ -447,6 +453,17 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         await Promise.allSettled([releaseChatsForAccountSwitch()]);
         queryClient.clear();
         setToken(tokenValue);
+        // A Quick Action tapped while the app was signed out parks its launch
+        // URL natively, and the signed-in launcher mount is its only reader.
+        // Take the account-independent destination before the teardown below
+        // clears the launcher surfaces, and stage it for the account that just
+        // signed in, so the tap still lands where it points.
+        const parkedLaunchUrl = takeAccountIndependentLaunchUrl();
+        const parkedLaunchHref =
+          parkedLaunchUrl === null ? null : resolveIncomingUrl(parkedLaunchUrl);
+        if (parkedLaunchHref !== null) {
+          setPendingDeepLink(parkedLaunchHref, 'universal-link');
+        }
         // Every account boundary drops the session-scoped local state: trusted
         // hosts, image confirms, media caches, temp copies, and the device-wide
         // records that belong to an account (the OS launcher surfaces and the

@@ -58,6 +58,8 @@ import {
 
 beforeEach(() => {
   jest.mocked(getUserFromAuth).mockReset();
+  jest.mocked(saveClaudeBillingPending).mockClear();
+  jest.mocked(pushClaudeAuthorizationRequest).mockClear();
   jest.mocked(isClaudePlatformOAuthEnabled).mockReset().mockResolvedValue(true);
   jest.mocked(canManageClaudeBillingOrganization).mockReset().mockResolvedValue(true);
   jest.mocked(isClaudeBillingOrganizationMember).mockReset().mockResolvedValue(true);
@@ -253,7 +255,6 @@ describe('Claude billing callback', () => {
     async flow => {
       const { row } = await seed();
       signedOut();
-      jest.mocked(saveClaudeBillingPending).mockClear();
 
       const response =
         flow === 'connect'
@@ -429,7 +430,6 @@ describe('Claude billing callback', () => {
     };
     await shareClaudeBillingConnection(personal, member, user.id);
     signedIn(user);
-    jest.mocked(saveClaudeBillingPending).mockClear();
 
     await connect(
       new NextRequest('http://localhost/claude/billing/connect?owner=personal&return=%2Fbyok')
@@ -473,7 +473,6 @@ describe('Claude billing callback', () => {
     await shareClaudeBillingConnection(personal, member, user.id);
     await removeClaudeBillingGrant(personal);
     signedIn(user);
-    jest.mocked(saveClaudeBillingPending).mockClear();
 
     await connect(
       new NextRequest('http://localhost/claude/billing/connect?owner=personal&return=%2Fbyok')

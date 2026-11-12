@@ -359,6 +359,7 @@ export function subscribeAccountStagedShareClear(listener: () => void): () => vo
 export function __resetSharePayloadStoreForTests(): void {
   payloads.clear();
   insertionOrder.length = 0;
+  accountStagedClearListeners.clear();
   deleteCachedFile = defaultDeleteCachedFile;
   checkFileExists = defaultFileExists;
   sharePersistUserId = null;

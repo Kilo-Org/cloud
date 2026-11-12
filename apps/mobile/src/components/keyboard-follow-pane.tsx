@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { createContext, type ReactNode, useContext } from 'react';
 import { View, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,13 @@ import { useKeyboardMotionHeight } from '@/components/keyboard-motion-provider';
 
 const CLIP: ViewStyle = { flex: 1, overflow: 'hidden' };
 const PANE: ViewStyle = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 };
+
+const KeyboardFollowContext = createContext(false);
+
+/** Whether this subtree already moves with the keyboard through a transform. */
+export function useInsideKeyboardFollowPane(): boolean {
+  return useContext(KeyboardFollowContext);
+}
 
 /**
  * Lifts its children with the keyboard without changing their layout.
@@ -20,6 +27,8 @@ const PANE: ViewStyle = { position: 'absolute', top: 0, left: 0, right: 0, botto
  *
  * The parent clips, so the part of the pane that lifts above the screen edge
  * (a header's worth) is hidden instead of painting over the content above it.
+ * Children that avoid the keyboard themselves read `useInsideKeyboardFollowPane`
+ * and must not resize with it a second time.
  */
 export function KeyboardFollowPane({ children }: Readonly<{ children: ReactNode }>) {
   const keyboardHeight = useKeyboardMotionHeight();
@@ -31,8 +40,10 @@ export function KeyboardFollowPane({ children }: Readonly<{ children: ReactNode 
   }));
 
   return (
-    <View style={CLIP}>
-      <Animated.View style={[PANE, lift]}>{children}</Animated.View>
-    </View>
+    <KeyboardFollowContext value>
+      <View style={CLIP}>
+        <Animated.View style={[PANE, lift]}>{children}</Animated.View>
+      </View>
+    </KeyboardFollowContext>
   );
 }

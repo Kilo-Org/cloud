@@ -1,4 +1,4 @@
-import { createContext, type ReactNode, useContext, useEffect } from 'react';
+import { createContext, type ReactNode, useContext, useEffect, useMemo } from 'react';
 import {
   KeyboardProvider,
   useGenericKeyboardHandler,
@@ -61,7 +61,7 @@ function KeyboardMotionValues({ children }: Readonly<{ children: ReactNode }>) {
 function useSharedMotionValue(): KeyboardMotion {
   const progress = useSharedValue(0);
   const height = useSharedValue(0);
-  return { progress, height };
+  return useMemo(() => ({ progress, height }), [progress, height]);
 }
 
 function useKeyboardMotion(): KeyboardMotion {

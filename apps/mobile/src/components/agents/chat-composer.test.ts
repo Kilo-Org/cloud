@@ -57,6 +57,7 @@ const keyboardState = vi.hoisted(() => ({ height: 0 }));
 const keyboardProgress = vi.hoisted(() => ({ value: 0 }));
 const sharedSlots = vi.hoisted(() => ({ slots: [] as { value: unknown }[], cursor: 0 }));
 const toolbarShown = vi.hoisted(() => ({ value: true }));
+const insidePane = vi.hoisted(() => ({ value: false }));
 const returnSendsPref = vi.hoisted(() => ({ returnSendsMessage: false }));
 const reducedMotionOn = vi.hoisted(() => ({ value: false }));
 
@@ -165,6 +166,10 @@ vi.mock('react-native-reanimated', () => ({
     return (sharedSlots.slots[index] ??= { value: initial as unknown }) as { value: T };
   },
   useAnimatedStyle: (style: () => unknown) => style(),
+}));
+vi.mock('@/components/keyboard-follow-pane', () => ({
+  KeyboardFollowPane: 'KeyboardFollowPane',
+  useInsideKeyboardFollowPane: () => insidePane.value,
 }));
 vi.mock('@/lib/a11y/motion', () => ({
   selectReducedMotionEntrance: <T>(reduced: boolean, entrance: T) =>
@@ -531,6 +536,7 @@ beforeEach(() => {
   layoutDirection.isRTL = false;
   keyboardState.height = 0;
   keyboardProgress.value = 0;
+  insidePane.value = false;
   toolbarShown.value = true;
   voiceStatus.value = 'idle';
   safeAreaInsets.bottom = 0;
@@ -868,49 +874,98 @@ describe('ChatComposer reduced motion', () => {
 });
 
 describe('ChatComposer toolbar row', () => {
-  function maxHeightOf(style: unknown): number | null {
-    if (typeof style !== 'object' || style === null || !('maxHeight' in style)) {
-      return null;
-    }
-    const value: unknown = style.maxHeight;
-    return typeof value === 'number' ? value : null;
+  function rowOf(render: React.ReactElement) {
+    return findNode(
+      render,
+      (type, props) => type === 'Animated.View' && typeof props.onLayout === 'function'
+    );
   }
 
   function toolbarRow(render: React.ReactElement) {
-    const row = findNode(
-      render,
-      (type, props) => type === 'Animated.View' && maxHeightOf(props.style) !== null
-    );
+    const row = rowOf(render);
     if (row === null) {
-      return null;
+      throw new Error('toolbar row not found');
     }
-    return { maxHeight: maxHeightOf(row.props.style) ?? 0 };
+    const { style, onLayout } = row.props;
+    if (typeof style !== 'object' || style === null || typeof style.maxHeight !== 'number') {
+      throw new Error('toolbar row has no clamped style');
+    }
+    return {
+      maxHeight: style.maxHeight as number,
+      layout: (height: number) => {
+        (onLayout as (event: { nativeEvent: { layout: { height: number } } }) => void)({
+          nativeEvent: { layout: { height } },
+        });
+      },
+    };
   }
 
-  it('keeps the row while the chip is available, whatever the keyboard does', async () => {
+  it('gives the hidden row height back in step with the keyboard, not after it lands', async () => {
     const props = makeProps({});
-    toolbarShown.value = true;
-
-    keyboardState.height = 0;
-    expect(toolbarRow(await mount(props))?.maxHeight).toBeGreaterThan(1000);
-
-    // The keyboard rises and falls: the row's height is not a keyboard
-    // decision, so the composer's layout never changes with it.
     keyboardState.height = 300;
-    expect(toolbarRow(await rerender(props))?.maxHeight).toBeGreaterThan(1000);
+    keyboardProgress.value = 1;
+    toolbarRow(await mount(props)).layout(38);
 
-    keyboardState.height = 0;
-    expect(toolbarRow(await rerender(props))?.maxHeight).toBeGreaterThan(1000);
+    // Blur: the chip hides while the JS keyboard height still reports open.
+    toolbarShown.value = false;
+    expect(toolbarRow(await rerender(props)).maxHeight).toBe(38);
+
+    keyboardProgress.value = 0.5;
+    const halfway = toolbarRow(await rerender(props));
+    expect(halfway.maxHeight).toBe(19);
+    // A layout pass at the clamped height must not replace the row's natural
+    // height, or an interactive dismiss that reverses would reopen it short.
+    halfway.layout(19);
+    keyboardProgress.value = 1;
+    expect(toolbarRow(await rerender(props)).maxHeight).toBe(38);
+
+    // The keyboard has landed but its JS height has not reached zero yet: the
+    // row already takes no space, so its later unmount moves nothing.
+    keyboardProgress.value = 0;
+    expect(toolbarRow(await rerender(props)).maxHeight).toBe(0);
   });
 
-  it('drops the row when the chip is not available', async () => {
+  it('unclamps a row that mounted collapsed once the chip is shown', async () => {
     const props = makeProps({});
-    keyboardState.height = 0;
+    keyboardState.height = 300;
+    keyboardProgress.value = 1;
     toolbarShown.value = false;
-    expect(toolbarRow(await mount(props))).toBeNull();
+    expect(toolbarRow(await mount(props)).maxHeight).toBe(0);
 
+    // Focus lands after the keyboard started: the row must open to its
+    // natural height instead of staying at the collapsed height.
     toolbarShown.value = true;
-    expect(toolbarRow(await rerender(props))?.maxHeight).toBeGreaterThan(1000);
+    const shown = toolbarRow(await rerender(props));
+    expect(shown.maxHeight).toBeGreaterThan(1000);
+    shown.layout(38);
+
+    toolbarShown.value = false;
+    expect(toolbarRow(await rerender(props)).maxHeight).toBe(38);
+  });
+
+  it('holds one height inside the keyboard-follow pane, and follows only the chip', async () => {
+    insidePane.value = true;
+    const props = makeProps({});
+    keyboardState.height = 300;
+    keyboardProgress.value = 1;
+
+    // The keyboard rises and falls while the chip stays available: the row's
+    // height never changes, so the pane's children are not re-laid out.
+    toolbarShown.value = true;
+    const mounted = toolbarRow(await mount(props));
+    expect(mounted.maxHeight).toBeGreaterThan(1000);
+    mounted.layout(38);
+
+    keyboardProgress.value = 0.4;
+    expect(toolbarRow(await rerender(props)).maxHeight).toBeGreaterThan(1000);
+
+    keyboardProgress.value = 1;
+    expect(toolbarRow(await rerender(props)).maxHeight).toBeGreaterThan(1000);
+
+    // The chip hides at blur: the row goes then, before the keyboard moves,
+    // rather than waiting for the keyboard flag to land.
+    toolbarShown.value = false;
+    expect(rowOf(await rerender(props))).toBeNull();
   });
 });
 

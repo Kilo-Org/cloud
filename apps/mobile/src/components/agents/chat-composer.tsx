@@ -37,8 +37,13 @@ import {
   View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useKeyboardState } from 'react-native-keyboard-controller';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useKeyboardState, useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { usePreventRemove } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -48,6 +53,7 @@ import { i18n } from '@/i18n';
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
 import { SharePrefillFailure } from '@/components/agents/share-prefill-failure';
 import { ChatToolbar, type ChatToolbarModeControl } from '@/components/agents/chat-toolbar';
+import { useInsideKeyboardFollowPane } from '@/components/keyboard-follow-pane';
 import { pickAgentAttachments, pickAgentImages } from '@/components/agents/attachment-picker';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -349,6 +355,9 @@ export function ChatComposer({
   const restoreFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hasText, setHasText] = useState(false);
   const keyboardHeight = useKeyboardState(state => state.height);
+  // The provider's keyboard height caps the remaining space and keeps the
+  // toolbar row in place while the IME still owns the bottom of the screen.
+  const keyboardVisible = keyboardHeight > 0;
   const [slashCommandInput, setSlashCommandInput] = useState<string | null>(null);
   // Inline validation feedback for a rejected slash-command submission. A
   // transient toast (sonner-native) renders outside the accessibility /
@@ -810,20 +819,53 @@ export function ChatComposer({
     voiceInputActive: voiceInput.isActive,
   });
 
-  // The model chip's row and the input are separate rows. The row's height is
-  // a decision of the composer's own state, never of the keyboard: collapsing it
-  // per keyboard frame resized the transcript on every frame, and the list
-  // corrected its tail on each of those layout events. A row that appears or
-  // disappears with the keyboard would move the input after the keyboard had
-  // landed instead, so the row is simply present whenever the chip is available.
-  const showToolbarRow = control.showToolbar;
-  const toolbarRowStyle = useMemo(
+  // The model chip's row and the input are separate rows, and the chip's row
+  // keeps its space for as long as the keyboard has any claim on the composer:
+  // losing it in the same frames the keyboard moved collapsed the chip through
+  // the message field (video V1 ~4.5s and ~19s).
+  //
+  // Inside `KeyboardFollowPane` the transcript and the composer move with the
+  // keyboard as one transform, so the row must NOT resize with it: a per-frame
+  // height change resized the list on every keyboard frame, and the list
+  // corrected its tail on each of those layout events. There the row's height is
+  // a decision of the composer's own state, so the container never re-lays out
+  // during the animation. Every other host still avoids its own keyboard, so it
+  // keeps the collapse that moves with it.
+  const insideKeyboardFollowPane = useInsideKeyboardFollowPane();
+  // Inside the pane the row's presence follows the chip alone. A row that
+  // waits for the JS keyboard flag appears only after the keyboard has landed,
+  // and the composer would give that height back in one step right after the
+  // animation; following the chip alone moves the composer at blur, before the
+  // keyboard starts to move.
+  const showToolbarRow = control.showToolbar || (!insideKeyboardFollowPane && keyboardVisible);
+
+  // Once the chip is hidden, its row gives its height back in the same frames
+  // as the keyboard. `keyboardVisible` reaches false only after the keyboard
+  // has landed, so unmounting the row on that flag alone shifted the
+  // transcript a second time, after the keyboard had finished moving. The
+  // worklet reads only shared values and always writes `maxHeight`: Reanimated
+  // keeps a style key a worklet stops returning, so a conditional key would
+  // leave the row stuck at its collapsed height.
+  const { progress: keyboardProgress } = useReanimatedKeyboardAnimation();
+  const toolbarRowHeight = useSharedValue(0);
+  const toolbarRowCollapsing = useSharedValue(false);
+  useEffect(() => {
+    toolbarRowCollapsing.value = !control.showToolbar;
+  }, [control.showToolbar, toolbarRowCollapsing]);
+  const collapsingRowStyle = useAnimatedStyle(() => ({
+    maxHeight: toolbarRowCollapsing.value
+      ? toolbarRowHeight.value * keyboardProgress.value
+      : TOOLBAR_ROW_UNCLAMPED_HEIGHT,
+    overflow: 'hidden',
+  }));
+  const constantRowStyle = useMemo(
     () => ({
       maxHeight: TOOLBAR_ROW_UNCLAMPED_HEIGHT,
       overflow: 'hidden' as const,
     }),
     []
   );
+  const toolbarRowStyle = insideKeyboardFollowPane ? constantRowStyle : collapsingRowStyle;
 
   const { paste: pasteClipboard } = useClipboardPaste({
     addFile: async file => {
@@ -1369,7 +1411,14 @@ export function ChatComposer({
         {suggestionRow}
 
         {!suggestionRow && showToolbarRow ? (
-          <Animated.View style={toolbarRowStyle}>
+          <Animated.View
+            style={toolbarRowStyle}
+            onLayout={event => {
+              if (!toolbarRowCollapsing.value) {
+                toolbarRowHeight.value = event.nativeEvent.layout.height;
+              }
+            }}
+          >
             <Animated.View
               // The row is never animated out. An exit animation leaves its
               // snapshot painted while the input row has already moved up into

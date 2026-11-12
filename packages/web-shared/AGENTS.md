@@ -56,10 +56,19 @@ work, work after the upstream request starts, and exceptional paths may use it.
   ambiguous failure, because the event may already be queued.
 - For other writes, defer with `after()` or forward them to `fra1` like
   `recordUsageInPrimaryRegion` does.
-- Redis (`lib/redis`) has its primary in `fra1` and a read replica in `sfo1`:
-  reads are local, but treat writes like database writes.
-- Where correctness needs the primary on a rare path (read-after-write, a row
-  lock, or an optimistic write such as lazy credit expiry), comment why.
+- Redis (`lib/redis`) uses an Upstash global REST endpoint with its primary in
+  Frankfurt (`fra1`) and a read replica in SFO (`sfo1`). Upstash automatically
+  routes reads to the nearest configured region, so SFO reads normally stay
+  local; no separate replica client is needed. Writes go to the primary: treat
+  them like database writes.
+- Redis replication is asynchronous, so replica reads can be stale. The SDK's
+  default read-your-writes synchronization covers sequential commands on the
+  same client, not separate clients or function instances. For cross-instance
+  read-after-write correctness, propagate `readYourWritesSyncToken` or use an
+  authoritative path; a completed write alone does not guarantee a fresh read.
+  See [Upstash's read-your-writes guide](https://upstash.com/docs/redis/howto/readyourwrites).
+- Where database correctness needs the primary on a rare path (read-after-write,
+  a row lock, or an optimistic write such as lazy credit expiry), comment why.
 - `readDb` falls back to the primary when `POSTGRES_REPLICA_US_URL` is unset, so
   that variable must stay set on the `kilocode-ai-gateway` Vercel project.
 

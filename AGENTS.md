@@ -80,10 +80,13 @@ suggests:
 | `kilocode-ai-gateway` | Frankfurt and us-west (SFO) |
 | `kilocode-ai-gateway-secure-proxy` | us-west (SFO) only |
 
-Treat this table as the source of truth for compute location, database and Redis
-round-trip latency, and replica reasoning. If an observed region is not `fra1` or
-`sfo1`, it is a proxy/edge hop, not the function. Confirm against the Vercel
-project's region list rather than inferring from a request or log field.
+Treat this table as the source of truth for compute location, not storage
+location. Redis has its primary in Frankfurt and a read replica in SFO, so SFO
+reads do not inherently require a Frankfurt round trip; writes do. Follow
+[AI gateway database and Redis access](packages/web-shared/AGENTS.md#ai-gateway-database-and-redis-access)
+for storage routing, latency, and consistency rules. If an observed region is not
+`fra1` or `sfo1`, it is a proxy/edge hop, not the function. Confirm against the
+Vercel project's region list rather than inferring from a request or log field.
 
 Region fields are not interchangeable. Per Vercel's Log Drains reference:
 

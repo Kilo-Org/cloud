@@ -20,8 +20,9 @@ through those paths and that no `apps/web` route is shadowed by a rewrite.
 - Tests live next to the routes and run in the `apps/web` Jest suite, which
   includes this app as a root. Import from this app and `@kilocode/web-shared`
   only; `@/` resolves to `apps/web` there.
-- `sfo1` is far from the Frankfurt primary database; follow "AI gateway
-  database access" in `packages/web-shared/AGENTS.md`.
+- `sfo1` is far from the Frankfurt write primaries; follow
+  [AI gateway database and Redis access](../../packages/web-shared/AGENTS.md#ai-gateway-database-and-redis-access)
+  for read-replica routing and write-latency rules.
 - Route files are thin facades over handlers in `packages/web-shared`. Keep the
   `apps/web` `maxDuration` and `withRestTiming` usage, with route patterns that
   match this app's paths. Import them as `@kilocode/web-shared/…`; see

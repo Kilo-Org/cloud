@@ -332,7 +332,7 @@ export async function guardEnkryptOutput({
       { ...scan, config, text, coverage: wholeResponseCoverage(text) },
       deps
     );
-    report.scans.push(result.report);
+    report.scans.push({ ...result.report, part: 'response' });
     return result;
   };
   const finish = async (decision: OutputDecision): Promise<NextResponse> => {

@@ -168,6 +168,13 @@ export const EnkryptGuardrailReportSchema = z.object({
 
 export type EnkryptGuardrailReport = z.infer<typeof EnkryptGuardrailReportSchema>;
 
+/** A scan of the output guardrail, which scans the whole response. */
+const EnkryptOutputScanReportSchema = EnkryptScanReportSchema.extend({
+  part: z.literal('response'),
+});
+
+export type EnkryptOutputScanReport = z.infer<typeof EnkryptOutputScanReportSchema>;
+
 /**
  * What the output guardrail did for one response. Holds settings, sizes, timings, and outcomes
  * only, never response text or Enkrypt's messages. Output scans never use the verdict cache.
@@ -192,7 +199,7 @@ export const EnkryptOutputGuardrailReportSchema = z.object({
   unavailable_reason: z.enum(['transient', 'timeout', 'failed']).nullable(),
   /** How long the held-back response waited for the verdict after the upstream response ended. */
   added_latency_ms: z.number().nullable(),
-  scans: z.array(EnkryptScanReportSchema),
+  scans: z.array(EnkryptOutputScanReportSchema),
 });
 
 export type EnkryptOutputGuardrailReport = z.infer<typeof EnkryptOutputGuardrailReportSchema>;

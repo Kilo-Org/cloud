@@ -4,7 +4,7 @@ import type {
   EnkryptGuardrailReport,
   EnkryptInputScanReport,
   EnkryptOutputGuardrailReport,
-  EnkryptScanReport,
+  EnkryptOutputScanReport,
   EnkryptToolScanReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import type { ReactNode } from 'react';
@@ -15,7 +15,7 @@ import { ABSENT, formatCount, formatDurationMs } from './format';
 import type { StepTone } from './routing-labels';
 
 type Verdict = EnkryptGuardrailReport['verdict'];
-type Scan = EnkryptInputScanReport | EnkryptScanReport;
+type Scan = EnkryptInputScanReport | EnkryptOutputScanReport;
 type Settings = NonNullable<EnkryptGuardrailReport['settings']>;
 type DetectorSetting = Settings['detectors'][number];
 
@@ -84,8 +84,8 @@ function DetectorList({ detectors }: { detectors: EnkryptDetectorId[] }) {
   return <>{detectors.map(detectorLabel).join(', ')}</>;
 }
 
-function verdictCacheValue(scan: Scan): string {
-  const stored = 'verdict_cache_write' in scan && scan.verdict_cache_write === 'written';
+function verdictCacheValue(scan: EnkryptInputScanReport): string {
+  const stored = scan.verdict_cache_write === 'written';
   return `${VERDICT_CACHE_LABELS[scan.verdict_cache]}${stored ? ', stored' : ''}`;
 }
 
@@ -133,37 +133,40 @@ function charactersCached(scan: Scan): DetailItem {
 }
 
 function scanItems(scan: Scan): DetailItem[] {
-  if (scan.part === 'tools' && 'tools_total' in scan) {
-    return [
-      {
-        label: 'Tools',
-        value: `${formatCount(scan.tools_total)} total, ${formatCount(scan.tools_cached)} cached, ${formatCount(scan.tools_scanned)} scanned`,
-      },
-      { label: 'Verdict cache', value: verdictCacheValue(scan) },
-      charactersSent(scan),
-      charactersCached(scan),
-      { label: 'Enkrypt calls', value: formatCount(scan.attempts) },
-    ];
+  const calls = { label: 'Enkrypt calls', value: formatCount(scan.attempts) };
+  switch (scan.part) {
+    case 'tools':
+      return [
+        {
+          label: 'Tools',
+          value: `${formatCount(scan.tools_total)} total, ${formatCount(scan.tools_cached)} cached, ${formatCount(scan.tools_scanned)} scanned`,
+        },
+        { label: 'Verdict cache', value: verdictCacheValue(scan) },
+        charactersSent(scan),
+        charactersCached(scan),
+        calls,
+      ];
+    case 'system':
+    case 'conversation':
+      return [
+        { label: 'Verdict cache', value: verdictCacheValue(scan) },
+        charactersSent(scan),
+        charactersCached(scan),
+        ...(scan.part === 'conversation'
+          ? [
+              {
+                label: 'Segments cached',
+                value: `${formatCount(scan.cached_segments)} of ${formatCount(scan.total_segments)}`,
+              },
+              { label: 'Attachments omitted', value: formatCount(scan.omitted_attachments) },
+            ]
+          : []),
+        { label: 'Chunks', value: formatCount(scan.chunks) },
+        calls,
+      ];
+    case 'response':
+      return [charactersSent(scan), calls];
   }
-  if (!('total_segments' in scan)) return [];
-  return [
-    ...(scan.part === 'response'
-      ? []
-      : [{ label: 'Verdict cache', value: verdictCacheValue(scan) }]),
-    charactersSent(scan),
-    ...(scan.part === 'response' ? [] : [charactersCached(scan)]),
-    ...(scan.part === 'conversation'
-      ? [
-          {
-            label: 'Segments cached',
-            value: `${formatCount(scan.cached_segments)} of ${formatCount(scan.total_segments)}`,
-          },
-          { label: 'Attachments omitted', value: formatCount(scan.omitted_attachments) },
-        ]
-      : []),
-    ...('chunks' in scan ? [{ label: 'Chunks', value: formatCount(scan.chunks) }] : []),
-    { label: 'Enkrypt calls', value: formatCount(scan.attempts) },
-  ];
 }
 
 function ScanCard({ scan }: { scan: Scan }) {
@@ -198,7 +201,7 @@ function ScanCard({ scan }: { scan: Scan }) {
           ...scanItems(scan),
         ]}
       />
-      {'flagged_tools' in scan && <FlaggedTools scan={scan} />}
+      {scan.part === 'tools' && <FlaggedTools scan={scan} />}
       {scan.error && <p className="text-status-destructive text-xs">{scan.error}</p>}
     </li>
   );

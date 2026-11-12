@@ -3998,6 +3998,28 @@
     ],
     "searchBlob": "byok.listCatalogModeSupportedModels List which AI models each direct BYOK provider supports when running in catalog mode, grouped by provider and returned as model names with catalog ids. Use to discover available catalog-mode models per provider. byok listcatalogmodesupportedmodels"
   },
+  "byok.listProviders": {
+    "path": "byok.listProviders",
+    "kind": "query",
+    "summary": "List the AI model providers you can connect with your own API key (bring your own key), optionally scoped to an organization. Includes experimental providers only when experimental BYOK is enabled.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "byok",
+      "listproviders",
+      "organizationid"
+    ],
+    "searchBlob": "byok.listProviders List the AI model providers you can connect with your own API key (bring your own key), optionally scoped to an organization. Includes experimental providers only when experimental BYOK is enabled. byok listproviders organizationid organizationId"
+  },
   "byok.listSupportedModels": {
     "path": "byok.listSupportedModels",
     "kind": "query",
@@ -37132,6 +37154,17 @@
       "getpasskeys"
     ],
     "searchBlob": "user.getPasskeys List all passkeys (WebAuthn security keys, Face ID, Touch ID) registered to the signed-in user's account, including device type and last used time. user getpasskeys"
+  },
+  "user.getProfileLinks": {
+    "path": "user.getProfileLinks",
+    "kind": "query",
+    "summary": "Get the signed-in user's saved LinkedIn and GitHub profile URLs from their account settings.",
+    "inputSchema": {},
+    "tags": [
+      "user",
+      "getprofilelinks"
+    ],
+    "searchBlob": "user.getProfileLinks Get the signed-in user's saved LinkedIn and GitHub profile URLs from their account settings. user getprofilelinks"
   },
   "user.hasGatewayUsage": {
     "path": "user.hasGatewayUsage",

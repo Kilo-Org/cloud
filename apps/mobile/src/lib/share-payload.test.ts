@@ -1,11 +1,12 @@
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake KV factories settle without await because they resolve immediately */
 /* eslint-disable max-lines -- the compose, payload-store, eviction, and normalize suites share one module. */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   __resetSharePayloadStoreForTests,
   __setCheckFileExistsForTests,
   __setDeleteCachedFileForTests,
+  clearAccountStagedSharePayloads,
   clearPendingShareIdDraft,
   clearSharePayload,
   composeShareText,
@@ -19,6 +20,7 @@ import {
   setSharePersistUserId,
   SHARE_PAYLOAD_MAX_ENTRIES,
   SHARE_TEXT_MAX_CHARS,
+  subscribeAccountStagedShareClear,
   takeSharePayload,
 } from './share-payload';
 import {
@@ -418,8 +420,10 @@ describe('share payload durable persistence', () => {
     setSharePersistUserId('u1');
     const id = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
     await persistSharePayloadsNow();
-    __resetSharePayloadStoreForTests();
     // simulate process death (clears memory)
+    __resetSharePayloadStoreForTests();
+    // the identity resolves again before the restore runs
+    setSharePersistUserId('u1');
     await restoreSharePayloads('u1');
     expect(peekSharePayload(id)?.text).toBe('hello');
   });
@@ -431,6 +435,7 @@ describe('share payload durable persistence', () => {
     expect(takeSharePayload(id)?.text).toBe('consumed');
     await persistSharePayloadsNow();
     __resetSharePayloadStoreForTests();
+    setSharePersistUserId('u1');
     await restoreSharePayloads('u1');
     expect(peekSharePayload(id)).toBeNull();
   });
@@ -442,6 +447,7 @@ describe('share payload durable persistence', () => {
     clearSharePayload(id);
     await persistSharePayloadsNow();
     __resetSharePayloadStoreForTests();
+    setSharePersistUserId('u1');
     await restoreSharePayloads('u1');
     expect(peekSharePayload(id)).toBeNull();
   });
@@ -454,6 +460,7 @@ describe('share payload durable persistence', () => {
     }
     await persistSharePayloadsNow();
     __resetSharePayloadStoreForTests();
+    setSharePersistUserId('u1');
     await restoreSharePayloads('u1');
     expect(peekSharePayload(ids[0] ?? '')).toBeNull();
     expect(peekSharePayload(ids[1] ?? '')).toBeNull();
@@ -472,6 +479,7 @@ describe('share payload durable persistence', () => {
     });
     await persistSharePayloadsNow();
     __resetSharePayloadStoreForTests();
+    setSharePersistUserId('u1');
     __setCheckFileExistsForTests(uri => uri.includes('present'));
     await restoreSharePayloads('u1');
     const restored = peekSharePayload(id);
@@ -485,6 +493,8 @@ describe('share payload durable persistence', () => {
     await persistSharePayloadsNow();
     expect(kvMock.setItem).not.toHaveBeenCalled();
     __resetSharePayloadStoreForTests();
+    // A signed-in restore finds no draft for the share staged while signed out.
+    setSharePersistUserId('u1');
     await restoreSharePayloads('u1');
     expect(peekSharePayload(id)).toBeNull();
   });
@@ -539,6 +549,8 @@ describe('share payload durable persistence', () => {
     });
     await flushDraft('userB', SHARE_PAYLOADS_DRAFT_KEY);
 
+    // The identity resolves to B before B's restore runs.
+    setSharePersistUserId('userB');
     await restoreSharePayloads('userB');
 
     expect(peekSharePayload(liveId)?.text).toBe('live-a');
@@ -626,6 +638,115 @@ describe('share payload durable persistence', () => {
     await vi.waitFor(async () => {
       expect(await loadDraft('u1', PENDING_SHARE_ID_DRAFT_KEY, isStringDraft)).toBe(b);
     });
+  });
+});
+
+describe('share payload account boundary', () => {
+  beforeEach(() => {
+    __resetSharePayloadStoreForTests();
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    __resetSharePayloadStoreForTests();
+  });
+
+  it('drops a payload staged under an account', () => {
+    setSharePersistUserId('userA');
+    const id = putSharePayload({ text: 'by-a', files: [], failedFiles: [] });
+
+    clearAccountStagedSharePayloads();
+
+    expect(peekSharePayload(id)).toBeNull();
+    expect(takeSharePayload(id)).toBeNull();
+  });
+
+  it('deletes the cache copies of each dropped payload', async () => {
+    await withDeleteTracking(async deleted => {
+      setSharePersistUserId('userA');
+      const id = putSharePayload({
+        text: 'by-a',
+        files: [
+          { name: 'one.jpg', uri: 'file:///cache/one.jpg' },
+          { name: 'two.png', uri: 'file:///cache/two.png' },
+        ],
+        failedFiles: [],
+      });
+
+      clearAccountStagedSharePayloads();
+      await drainAsync();
+
+      expect(deleted).toEqual(['file:///cache/one.jpg', 'file:///cache/two.png']);
+      expect(peekSharePayload(id)).toBeNull();
+    });
+  });
+
+  it('keeps a payload staged while signed out so a same-process sign-in still opens the gate', () => {
+    const id = putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
+
+    clearAccountStagedSharePayloads();
+
+    expect(peekSharePayload(id)?.text).toBe('captured-out');
+  });
+
+  it('drops the account payload and keeps the signed-out one in the same store', () => {
+    const signedOut = putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
+    setSharePersistUserId('userA');
+    const accountId = putSharePayload({ text: 'by-a', files: [], failedFiles: [] });
+
+    clearAccountStagedSharePayloads();
+
+    expect(peekSharePayload(accountId)).toBeNull();
+    expect(peekSharePayload(signedOut)?.text).toBe('captured-out');
+  });
+
+  it('notifies subscribers only when it dropped a staged payload', () => {
+    const listener = vi.fn<() => void>();
+    const unsubscribe = subscribeAccountStagedShareClear(listener);
+    try {
+      // Nothing staged: the boundary stays silent, so a share staged before an
+      // account resolves keeps its pending slot in the root layout.
+      clearAccountStagedSharePayloads();
+      expect(listener).not.toHaveBeenCalled();
+
+      setSharePersistUserId('userA');
+      putSharePayload({ text: 'by-a', files: [], failedFiles: [] });
+      clearAccountStagedSharePayloads();
+      expect(listener).toHaveBeenCalledTimes(1);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it('stops notifying after the subscriber leaves', () => {
+    setSharePersistUserId('userA');
+    putSharePayload({ text: 'by-a', files: [], failedFiles: [] });
+    const listener = vi.fn<() => void>();
+    subscribeAccountStagedShareClear(listener)();
+
+    clearAccountStagedSharePayloads();
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('stops filling the store when the account changes during the read', async () => {
+    setSharePersistUserId('userA');
+    saveDraft('userA', SHARE_PAYLOADS_DRAFT_KEY, {
+      order: ['a-id'],
+      entries: { 'a-id': { text: 'draft-a', files: [], failedFiles: [] } },
+    });
+    await flushDraft('userA', SHARE_PAYLOADS_DRAFT_KEY);
+    __resetSharePayloadStoreForTests();
+    setSharePersistUserId('userA');
+
+    // The restore suspends on the draft read; the account changes before it
+    // fills.
+    const restore = restoreSharePayloads('userA');
+    clearAccountStagedSharePayloads();
+    setSharePersistUserId('userB');
+    await restore;
+
+    expect(peekSharePayload('a-id')).toBeNull();
   });
 });
 

@@ -40,8 +40,19 @@ type CopyToCache = (args: { from: string; fileName: string }) => Promise<string>
 
 type DeleteCachedFile = (uri: string) => void | Promise<void>;
 
-const payloads = new Map<ShareId, SharePayload>();
+/**
+ * One staged payload and the account that staged it. A null `stagedUserId` is
+ * a share captured while signed out: it is memory-only (DEC-01), carries no
+ * account data, and outlives the account boundary so a same-process sign-in
+ * can still open the gate for it.
+ */
+type StagedSharePayload = { payload: SharePayload; stagedUserId: string | null };
+
+const payloads = new Map<ShareId, StagedSharePayload>();
 const insertionOrder: ShareId[] = [];
+
+/** Listeners the account boundary notifies after it dropped staged payloads. */
+const accountStagedClearListeners = new Set<() => void>();
 
 // Signed-in user id that scopes durable persistence. When null, every
 // persist/clear helper no-ops (DEC-01 account scope): a share captured while
@@ -106,11 +117,11 @@ function sharePayloadsDraftSnapshot() {
     ShareId,
     { text: string; files: { name: string; uri: string }[]; failedFiles: string[] }
   > = {};
-  for (const [id, payload] of payloads) {
+  for (const [id, entry] of payloads) {
     entries[id] = {
-      text: payload.text,
-      files: payload.files.map(file => ({ name: file.name, uri: file.uri })),
-      failedFiles: [...payload.failedFiles],
+      text: entry.payload.text,
+      files: entry.payload.files.map(file => ({ name: file.name, uri: file.uri })),
+      failedFiles: [...entry.payload.failedFiles],
     };
   }
   return { order, entries };
@@ -158,7 +169,7 @@ function evictOldestIfNeeded(): void {
       const evicted = payloads.get(oldest);
       payloads.delete(oldest);
       if (evicted) {
-        discardPayloadCacheFiles(evicted);
+        discardPayloadCacheFiles(evicted.payload);
       }
     }
   }
@@ -168,7 +179,7 @@ function evictOldestIfNeeded(): void {
 /** Adds an entry and returns its id. Evicts oldest beyond SHARE_PAYLOAD_MAX_ENTRIES. */
 export function putSharePayload(payload: SharePayload): ShareId {
   const id = Crypto.randomUUID();
-  payloads.set(id, payload);
+  payloads.set(id, { payload, stagedUserId: sharePersistUserId });
   insertionOrder.push(id);
   evictOldestIfNeeded();
   void persistSharePayloadsNow();
@@ -181,8 +192,8 @@ export function putSharePayload(payload: SharePayload): ShareId {
  * also clears the durable pending-share-id hint so the gate never re-opens.
  */
 export function takeSharePayload(id: ShareId): SharePayload | null {
-  const payload = payloads.get(id) ?? null;
-  if (payload === null) {
+  const entry = payloads.get(id);
+  if (entry === undefined) {
     return null;
   }
   payloads.delete(id);
@@ -192,7 +203,7 @@ export function takeSharePayload(id: ShareId): SharePayload | null {
   }
   void persistSharePayloadsNow();
   void clearPendingShareIdDraft(id);
-  return payload;
+  return entry.payload;
 }
 
 /**
@@ -207,20 +218,20 @@ export function restoreSharePayload(id: ShareId, payload: SharePayload): void {
   if (payloads.has(id)) {
     return;
   }
-  payloads.set(id, payload);
+  payloads.set(id, { payload, stagedUserId: sharePersistUserId });
   insertionOrder.push(id);
   evictOldestIfNeeded();
 }
 
 /** Read-only, for the gate's own preview. */
 export function peekSharePayload(id: ShareId): SharePayload | null {
-  return payloads.get(id) ?? null;
+  return payloads.get(id)?.payload ?? null;
 }
 
 /** Id-scoped abandonment. Never clears another id's entry. */
 export function clearSharePayload(id: ShareId): void {
-  const payload = payloads.get(id);
-  if (payload === undefined) {
+  const entry = payloads.get(id);
+  if (entry === undefined) {
     return;
   }
   payloads.delete(id);
@@ -228,7 +239,7 @@ export function clearSharePayload(id: ShareId): void {
   if (index !== -1) {
     insertionOrder.splice(index, 1);
   }
-  discardPayloadCacheFiles(payload);
+  discardPayloadCacheFiles(entry.payload);
   void persistSharePayloadsNow();
   void clearPendingShareIdDraft(id);
 }
@@ -248,6 +259,13 @@ export async function restoreSharePayloads(userId: string): Promise<void> {
   const { loadDraft, SHARE_PAYLOADS_DRAFT_KEY, isSharePayloadsDraft } = await getDrafts();
   const draft = await loadDraft(userId, SHARE_PAYLOADS_DRAFT_KEY, isSharePayloadsDraft);
 
+  // The identity can change while the draft read is in flight, and a restore
+  // belongs to the account it started for. When the persist scope moved, this
+  // read returns without filling the store.
+  if (sharePersistUserId !== userId) {
+    return;
+  }
+
   // Fill only an empty store. The check runs after the read settles so a put
   // that lands during the read also wins, and it must not be replaced with an
   // early "no draft" return: a take/clear persists a truthy empty draft
@@ -266,16 +284,19 @@ export async function restoreSharePayloads(userId: string): Promise<void> {
     const entry = draft.entries[id];
     if (entry) {
       payloads.set(id, {
-        text: entry.text,
-        files: entry.files.map(file => ({ name: file.name, uri: file.uri })),
-        failedFiles: [...entry.failedFiles],
+        payload: {
+          text: entry.text,
+          files: entry.files.map(file => ({ name: file.name, uri: file.uri })),
+          failedFiles: [...entry.failedFiles],
+        },
+        stagedUserId: userId,
       });
       insertionOrder.push(id);
     }
   }
 
   // Then reconcile each file against the filesystem.
-  for (const payload of payloads.values()) {
+  for (const { payload } of payloads.values()) {
     const kept: AgentAttachmentCandidate[] = [];
     const failed = [...payload.failedFiles];
     for (const file of payload.files) {
@@ -290,6 +311,48 @@ export async function restoreSharePayloads(userId: string): Promise<void> {
     payload.failedFiles.length = 0;
     payload.failedFiles.push(...failed);
   }
+}
+
+/**
+ * Drop every payload staged under a signed-in account, with its cache copies.
+ * The account boundary (sign-out and a direct account switch) calls this, so
+ * staged share state belongs to exactly one account session: entries stamped
+ * with that account leave with it.
+ *
+ * A payload staged while signed out keeps its place (DEC-01 account scope): it
+ * is memory-only, and a same-process sign-in still opens the gate for it. This
+ * call never persists; it runs at a boundary, not inside an account session.
+ */
+export function clearAccountStagedSharePayloads(): void {
+  const dropped = [...payloads].filter(([, entry]) => entry.stagedUserId !== null);
+  for (const [id, entry] of dropped) {
+    payloads.delete(id);
+    const index = insertionOrder.indexOf(id);
+    if (index !== -1) {
+      insertionOrder.splice(index, 1);
+    }
+    discardPayloadCacheFiles(entry.payload);
+  }
+  if (dropped.length === 0) {
+    return;
+  }
+  // The pending slot lives in the root layout and resets with the payloads, so
+  // the shell and the store always describe the same staged share.
+  for (const listener of accountStagedClearListeners) {
+    listener();
+  }
+}
+
+/**
+ * Subscribe to the account boundary dropping staged payloads. The root layout
+ * uses it to reset its pending share id; it fires only when a stamped entry
+ * was dropped, so a capture staged before an account resolves keeps its slot.
+ */
+export function subscribeAccountStagedShareClear(listener: () => void): () => void {
+  accountStagedClearListeners.add(listener);
+  return () => {
+    accountStagedClearListeners.delete(listener);
+  };
 }
 
 /** Test-only: wipe the module store between cases. */

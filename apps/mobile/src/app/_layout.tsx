@@ -156,6 +156,7 @@ import {
   setSharePersistUserId,
   type ShareId,
   type SharePayload,
+  subscribeAccountStagedShareClear,
 } from '@/lib/share-payload';
 import { persistShareNavigationNow, restoreShareNavigation } from '@/lib/share-navigation';
 import { captureSystemSearchLaunch } from '@/lib/system-search-route';
@@ -595,6 +596,22 @@ function RootLayoutNav({
   // Bumped by the ingest arm and the gate consume so the cold-start restore can
   // detect any live arm/consume during its async reads and skip the fill.
   const pendingShareIdEpochRef = useRef(0);
+
+  // Staged share deliveries belong to the account that staged them. The shared
+  // account boundary drops them, and this subscription resets the pending slot
+  // in step, so the slot always describes a staged share that exists. The
+  // epoch bump also abandons a cold-start restore that is in flight. The
+  // notification fires only when a stamped entry was dropped, so a share staged
+  // before an account resolves keeps its slot for a same-process sign-in
+  // (DEC-01).
+  useEffect(
+    () =>
+      subscribeAccountStagedShareClear(() => {
+        pendingShareIdEpochRef.current += 1;
+        setPendingShareId(null);
+      }),
+    []
+  );
 
   // Flush a share staged while the account id was still loading: the ingest
   // effect persisted nothing (userId was falsy), so once userId resolves the

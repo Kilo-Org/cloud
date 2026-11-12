@@ -21,7 +21,21 @@ const formDraftMock = vi.hoisted(() => ({
   clearFormDrafts: vi.fn(),
 }));
 
+const shareMock = vi.hoisted(() => ({
+  clearAccountStagedSharePayloads: vi.fn(),
+  clearAccountStagedShareNavigation: vi.fn(),
+}));
+
 vi.mock('@/lib/native-system-search', () => nativeSearchMock);
+
+// The staged share deliveries are the account-bound store this clear owns; its
+// own suites pin which entries survive the boundary and which do not.
+vi.mock('@/lib/share-payload', () => ({
+  clearAccountStagedSharePayloads: shareMock.clearAccountStagedSharePayloads,
+}));
+vi.mock('@/lib/share-navigation', () => ({
+  clearAccountStagedShareNavigation: shareMock.clearAccountStagedShareNavigation,
+}));
 
 // The App Intents catalog is the same titles in another place; the boundary's
 // real clear helper runs against this faked bridge.
@@ -185,6 +199,8 @@ const SESSION_MEMBERS = [
   mocks.clearChatBackends,
   mocks.clearSettingsToolsEnabled,
   mocks.clearRepoSelectionSenders,
+  shareMock.clearAccountStagedSharePayloads,
+  shareMock.clearAccountStagedShareNavigation,
 ];
 
 /** Android mirror root: `Paths.document` plus the mirror folder name. */
@@ -213,6 +229,31 @@ describe('clearSessionScopedState', () => {
     // clear; without it the collector re-indexes the previous account's PRs.
     clearSessionScopedState();
     expect(recentPrsMock.clearRecentPrs).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the staged share deliveries at the account boundary', () => {
+    // Both boundaries (sign-out and a direct account switch) run this clear,
+    // so staged share state belongs to one account session.
+    clearSessionScopedState();
+    expect(shareMock.clearAccountStagedSharePayloads).toHaveBeenCalledTimes(1);
+    expect(shareMock.clearAccountStagedShareNavigation).toHaveBeenCalledTimes(1);
+
+    clearSessionScopedState();
+    expect(shareMock.clearAccountStagedSharePayloads).toHaveBeenCalledTimes(2);
+    expect(shareMock.clearAccountStagedShareNavigation).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps clearing after a staged-share clear throws', () => {
+    shareMock.clearAccountStagedSharePayloads.mockImplementationOnce(() => {
+      throw new Error('share store unavailable');
+    });
+
+    expect(() => {
+      clearSessionScopedState();
+    }).not.toThrow();
+
+    expect(shareMock.clearAccountStagedShareNavigation).toHaveBeenCalledTimes(1);
+    expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(1);
   });
 
   it('drops the App Intents catalog that names the previous account’s sessions', () => {

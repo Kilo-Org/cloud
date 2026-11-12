@@ -182,6 +182,17 @@ vi.mock('@/lib/temp-file-registry', () => ({
   reapTempFiles: vi.fn(),
 }));
 
+// The staged share deliveries read expo-file-system / expo-crypto on import.
+// This suite asserts the credential deletes; the boundary behavior lives in
+// `lib/share-*.test.ts`.
+vi.mock('@/lib/share-payload', () => ({
+  clearAccountStagedSharePayloads: vi.fn(),
+}));
+
+vi.mock('@/lib/share-navigation', () => ({
+  clearAccountStagedShareNavigation: vi.fn(),
+}));
+
 // The artifact mirror members of the same teardown read expo-file-system and
 // the native provider bridge. This suite asserts the credential deletes, and
 // the mirror's own suite covers the wipe and its provider signal.

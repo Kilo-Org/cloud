@@ -6,6 +6,7 @@ import { setSharePersistUserId, SHARE_PAYLOAD_MAX_ENTRIES } from './share-payloa
 import {
   __resetPendingShareNavigationForTests,
   appendShareParams,
+  clearAccountStagedShareNavigation,
   isShareNavigationTargetFocused,
   navigationContainsShareGate,
   parseShareHrefParams,
@@ -15,6 +16,7 @@ import {
   shareDeliveryShareId,
   takePendingShareNavigation,
 } from './share-navigation';
+import { flushDraft, saveDraft, SHARE_NAV_DRAFT_KEY } from '@/lib/persist/drafts';
 
 // share-navigation imports SHARE_PAYLOAD_MAX_ENTRIES from share-payload, which
 // pulls expo modules that transitively load react-native Flow sources.
@@ -213,6 +215,80 @@ describe('share navigation durable persistence', () => {
     expect(takePendingShareNavigation()).toEqual({
       href: '/(app)/agent-chat/live',
       shareId: 'live',
+    });
+    expect(takePendingShareNavigation()).toBeNull();
+  });
+
+  it('stops restoring when the account changes during the read', async () => {
+    setSharePersistUserId('userA');
+    saveDraft('userA', SHARE_NAV_DRAFT_KEY, [
+      { href: '/(app)/agent-chat/ses_a?shareId=a&organizationId=org_a', shareId: 'a' },
+    ]);
+    await flushDraft('userA', SHARE_NAV_DRAFT_KEY);
+
+    const restore = restoreShareNavigation('userA');
+    clearAccountStagedShareNavigation();
+    setSharePersistUserId('userB');
+    await restore;
+
+    expect(takePendingShareNavigation()).toBeNull();
+  });
+});
+
+describe('share navigation account boundary', () => {
+  beforeEach(() => {
+    __resetPendingShareNavigationForTests();
+    setSharePersistUserId(null);
+  });
+
+  afterEach(() => {
+    __resetPendingShareNavigationForTests();
+    setSharePersistUserId(null);
+  });
+
+  it('drops a destination staged under an account, with its payload id and organization scope', () => {
+    setSharePersistUserId('userA');
+    setPendingShareNavigation({
+      href: '/(app)/agent-chat/new?shareId=share-a&autoSend=1&organizationId=org_a',
+      shareId: 'share-a',
+    });
+
+    clearAccountStagedShareNavigation();
+
+    expect(takePendingShareNavigation()).toBeNull();
+  });
+
+  it('drops a staged non-share destination too', () => {
+    setSharePersistUserId('userA');
+    setPendingShareNavigation({ href: '/(app)/pr-review/acme/repo/42', shareId: null });
+
+    clearAccountStagedShareNavigation();
+
+    expect(takePendingShareNavigation()).toBeNull();
+  });
+
+  it('keeps a destination staged while signed out so a same-process sign-in still delivers it', () => {
+    // A share captured with no account resolved stays in memory only (DEC-01).
+    setPendingShareNavigation({ href: '/(app)/agent-chat/new?shareId=out', shareId: 'out' });
+
+    clearAccountStagedShareNavigation();
+
+    expect(takePendingShareNavigation()).toEqual({
+      href: '/(app)/agent-chat/new?shareId=out',
+      shareId: 'out',
+    });
+  });
+
+  it('keeps the signed-out destination and drops the account one in the same queue', () => {
+    setPendingShareNavigation({ href: '/(app)/agent-chat/new?shareId=out', shareId: 'out' });
+    setSharePersistUserId('userA');
+    setPendingShareNavigation({ href: '/(app)/agent-chat/new?shareId=a', shareId: 'a' });
+
+    clearAccountStagedShareNavigation();
+
+    expect(takePendingShareNavigation()).toEqual({
+      href: '/(app)/agent-chat/new?shareId=out',
+      shareId: 'out',
     });
     expect(takePendingShareNavigation()).toBeNull();
   });

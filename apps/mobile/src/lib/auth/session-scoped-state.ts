@@ -20,6 +20,8 @@ import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
 import { clearConversationRetention } from '@/lib/pr-review/discussion/conversation-retention';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
+import { clearAccountStagedShareNavigation } from '@/lib/share-navigation';
+import { clearAccountStagedSharePayloads } from '@/lib/share-payload';
 import { reportSystemSearchFailure } from '@/lib/system-search-telemetry';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { reapTempFiles } from '@/lib/temp-file-registry';
@@ -100,7 +102,8 @@ function clearRecentPrsBestEffort(): void {
  * connection and the stored servers behind it, the app-settings-tools group
  * switch, the debounced repository-selection send state, the browsable
  * artifact mirror, app-owned temp copies, the stored PR recents, the retained
- * PR discussion conversation, and the phone's own search index. Every member is
+ * PR discussion conversation, the staged share deliveries, and the phone's own
+ * search index. Every member is
  * best-effort; one member's throw falls through to the members after it, and to
  * the caller's own sign-in/sign-out state reset. The recents delete and OS
  * search clear are fired without awaiting, so the function stays synchronous;
@@ -159,6 +162,12 @@ export function clearSessionScopedState(): void {
   // account-scoped members. Within one account, the organization component of
   // `conversationRetentionKey` separates organizations' reads of the same PR.
   runClear(clearConversationRetention);
+  // Staged share deliveries are account-scoped: the boundary drops the payloads
+  // and queued destinations stamped with a signed-in account, together with
+  // their cache copies. A delivery staged before an account resolves stays in
+  // memory, so a same-process sign-in can still open the gate for it (DEC-01).
+  runClear(clearAccountStagedSharePayloads);
+  runClear(clearAccountStagedShareNavigation);
   // The phone's search index is device-wide, not scoped to the signed-in
   // session, so without this the previous account's session, pull-request and
   // security titles stay searchable in Spotlight and Android app search after a

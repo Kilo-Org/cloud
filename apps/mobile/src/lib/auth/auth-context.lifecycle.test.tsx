@@ -394,6 +394,17 @@ vi.mock('@/lib/agent-attachments/clipboard-image', () => ({
   clearClipboardImages: vi.fn(),
 }));
 
+// The staged share deliveries read expo-file-system / expo-crypto and the
+// share-intent native module on import. This suite asserts the teardown
+// ordering; the boundary behavior lives in `lib/share-*.test.ts`.
+vi.mock('@/lib/share-payload', () => ({
+  clearAccountStagedSharePayloads: vi.fn(),
+}));
+
+vi.mock('@/lib/share-navigation', () => ({
+  clearAccountStagedShareNavigation: vi.fn(),
+}));
+
 vi.mock('@/lib/temp-file-registry', () => ({
   reapTempFiles: vi.fn(),
 }));

@@ -24,6 +24,7 @@ export type FetchLike = (input: string, init?: RequestInit) => MaybePromise<Resp
 
 export interface DeviceAuthRequest {
   readonly code: string;
+  readonly userCode: string;
   readonly verificationUrl: string;
 }
 
@@ -68,6 +69,7 @@ const storedAuthSchema = z.object({
 });
 const deviceAuthRequestSchema = z.object({
   code: nonEmptyStringSchema,
+  user_code: nonEmptyStringSchema,
   verificationUrl: nonEmptyStringSchema,
 });
 const userResponseSchema = z.object({
@@ -120,10 +122,16 @@ const parseDeviceAuthRequest = (value: unknown): DeviceAuthRequest => {
   const parsed = deviceAuthRequestSchema.safeParse(value);
 
   if (!parsed.success) {
-    throw new TypeError('Device auth response did not include a code and verification URL.');
+    throw new TypeError(
+      'Device auth response did not include a code, user code, and verification URL.'
+    );
   }
 
-  return parsed.data;
+  return {
+    code: parsed.data.code,
+    userCode: parsed.data.user_code,
+    verificationUrl: parsed.data.verificationUrl,
+  };
 };
 
 const parseApprovedAuth = (value: unknown): StoredAuth => {

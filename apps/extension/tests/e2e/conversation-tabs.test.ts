@@ -807,15 +807,21 @@ test('conversation remount loads current storage instead of cached query history
     await mockKiloApi(context);
     await context.route('https://app.kilo.ai/api/device-auth/codes?app=1', route =>
       route.fulfill({
-        json: { code: 'ABCD-2345', verificationUrl: 'https://app.kilo.ai/device-auth' },
+        json: {
+          code: 'poll-secret-9f8e7d6c5b4a3210fedcba9876543210abc',
+          user_code: 'ABCD-EFGH',
+          verificationUrl: 'https://app.kilo.ai/device-auth',
+        },
         status: 200,
       })
     );
-    await context.route('https://app.kilo.ai/api/device-auth/codes/ABCD-2345', route =>
-      route.fulfill({
-        json: { token: 'token-2', userEmail: 'user@kilo.ai' },
-        status: 200,
-      })
+    await context.route(
+      'https://app.kilo.ai/api/device-auth/codes/poll-secret-9f8e7d6c5b4a3210fedcba9876543210abc',
+      route =>
+        route.fulfill({
+          json: { token: 'token-2', userEmail: 'user@kilo.ai' },
+          status: 200,
+        })
     );
 
     const sidePanel = await context.newPage();

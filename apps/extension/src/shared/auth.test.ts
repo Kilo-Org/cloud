@@ -137,7 +137,8 @@ describe('device auth API client', () => {
       seenRequests.push(String(input));
       return jsonResponse(
         {
-          code: 'ABCD-2345',
+          code: 'poll-secret-9f8e7d6c5b4a3210fedcba9876543210abc',
+          user_code: 'ABCD-2345',
           verificationUrl: 'https://app.kilo.ai/device-auth?code=ABCD-2345&app=1',
         },
         { status: 200 }
@@ -147,10 +148,26 @@ describe('device auth API client', () => {
     await expect(
       createDeviceAuthRequest({ apiBaseUrl: 'https://app.kilo.ai/', fetch })
     ).resolves.toStrictEqual({
-      code: 'ABCD-2345',
+      code: 'poll-secret-9f8e7d6c5b4a3210fedcba9876543210abc',
+      userCode: 'ABCD-2345',
       verificationUrl: 'https://app.kilo.ai/device-auth?code=ABCD-2345&app=1',
     });
     expect(seenRequests).toStrictEqual(['https://app.kilo.ai/api/device-auth/codes?app=1']);
+  });
+
+  it('rejects a device auth response without a user code', async () => {
+    const fetch: FetchLike = () =>
+      jsonResponse(
+        {
+          code: 'poll-secret-9f8e7d6c5b4a3210fedcba9876543210abc',
+          verificationUrl: 'https://app.kilo.ai/device-auth?app=1',
+        },
+        { status: 200 }
+      );
+
+    await expect(
+      createDeviceAuthRequest({ apiBaseUrl: 'https://app.kilo.ai', fetch })
+    ).rejects.toThrow(TypeError);
   });
 
   it('maps poll status codes to pending, approved, denied, and expired states', async () => {

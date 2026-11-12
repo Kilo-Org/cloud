@@ -261,11 +261,11 @@ export const App = (): JSX.Element => {
   if (pendingAuthRequest !== undefined) {
     return (
       <PendingView
-        code={pendingAuthRequest.code}
         onCancel={cancelSignIn}
         onOpen={() => {
           void browser.tabs.create({ url: pendingAuthRequest.verificationUrl });
         }}
+        userCode={pendingAuthRequest.userCode}
       />
     );
   }

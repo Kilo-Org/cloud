@@ -66,13 +66,13 @@ export const SignedOutView = ({
 );
 
 export const PendingView = ({
-  code,
   onCancel,
   onOpen,
+  userCode,
 }: {
-  code: string;
   onCancel: () => void;
   onOpen: () => void;
+  userCode: string;
 }): JSX.Element => (
   <Shell>
     <div className="flex flex-1 flex-col justify-center gap-4 px-4 py-6">
@@ -84,7 +84,7 @@ export const PendingView = ({
       <div className="rounded-md border border-border bg-surface-inset p-4 text-center">
         <p className="type-eyebrow text-foreground-muted">Code</p>
         <p className="mt-2 font-mono text-2xl font-semibold tracking-[0.18em] text-foreground">
-          {code}
+          {userCode}
         </p>
       </div>
 

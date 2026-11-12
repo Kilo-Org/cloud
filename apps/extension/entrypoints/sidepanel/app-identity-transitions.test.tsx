@@ -167,7 +167,8 @@ describe('side panel identity transitions clear the agents cache', () => {
   it('clears the agents cache on device-auth sign-in', async () => {
     authMocks.loadStoredAuth.mockResolvedValue(null);
     authMocks.createDeviceAuthRequest.mockResolvedValue({
-      code: 'ABCD-2345',
+      code: 'poll-secret-9f8e7d6c5b4a3210fedcba9876543210abc',
+      userCode: 'ABCD-2345',
       verificationUrl: 'https://app.kilo.test/device-auth',
     });
     authMocks.pollDeviceAuthCode.mockResolvedValue({ auth: BETA_AUTH, status: 'approved' });

@@ -1054,7 +1054,14 @@ async function registerWorktreeSession(
       () => getSandboxSessionStub(ctx.env, ctx.userId, source.ownership.cloudAgentSessionId),
       stub => stub.getAvailableCommands(),
       'getAvailableCommands'
-    );
+    ).catch(() => {
+      logControlDiagnostic(
+        'worktree_chat_command_catalog',
+        { ...diagnostic, result: 'unavailable', reason: 'source_catalog_read_failed' },
+        'warn'
+      );
+      return undefined;
+    });
     response = await withDORetry(
       () => getSandboxSessionStub(ctx.env, ctx.userId, progress.cloudAgentSessionId),
       async stub => {

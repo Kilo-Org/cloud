@@ -1355,6 +1355,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const sealed = await this.unsealAuthorization(runtimeAuthorizationSeal, metadata);
     if (sealed.type === 'failure') return sealed.failure;
     await this.enqueue(async () => {
+      // Finish seeding before metadata can make a registration retry return success.
+      if (initialCommands !== undefined) await this.cacheAvailableCommands(initialCommands);
       if (metadata.clone === undefined) markHistoryHydrated(this.ctx.storage);
       await this.ctx.storage.put(REGISTRATION_KEY, registration);
       this.registration = registration;
@@ -1364,7 +1366,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         await this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, sealed.authorization);
         this.runtimeAuthorization = sealed.authorization;
       }
-      if (initialCommands !== undefined) await this.cacheAvailableCommands(initialCommands);
     });
     return { success: true };
   }

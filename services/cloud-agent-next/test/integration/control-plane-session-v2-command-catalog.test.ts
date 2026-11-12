@@ -1,6 +1,7 @@
-import { env, evictAllDurableObjects, reset, SELF } from 'cloudflare:test';
-import { afterEach, describe, expect, it } from 'vitest';
+import { env, evictAllDurableObjects, reset, runInDurableObject, SELF } from 'cloudflare:test';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
+import type { SessionEventQueries } from '../../src/control-plane/session/event-queries.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 
@@ -62,6 +63,54 @@ afterEach(async () => {
 });
 
 describe('new sibling command catalog', () => {
+  it.each(['catalog write', 'event upsert'] as const)(
+    'retries registration after a failed %s without losing the seeded catalog',
+    async failure => {
+      const sibling = fixture();
+      const input = {
+        ...sibling.input,
+        initialCommands: { commands: [{ name: 'profile-check' }] },
+      };
+      await runInDurableObject(sibling.stub, async (instance, state) => {
+        await instance.getMetadata();
+        const { eventQueries } = instance as unknown as { eventQueries: SessionEventQueries };
+        const put = state.storage.put.bind(state.storage);
+        const fault =
+          failure === 'catalog write'
+            ? vi.spyOn(state.storage, 'put').mockImplementation(async (key, value) => {
+                if (key === 'available_commands') throw new Error('catalog write failed');
+                if (typeof key === 'string') await put(key, value);
+                else await put(key);
+              })
+            : vi.spyOn(eventQueries, 'upsert').mockImplementationOnce(() => {
+                throw new Error('event upsert failed');
+              });
+        try {
+          await expect(instance.registerSessionFromMetadata(input)).rejects.toThrow(
+            `${failure} failed`
+          );
+          expect(await instance.getMetadata()).toBeNull();
+          expect(await state.storage.get('control_plane_session')).toBeUndefined();
+          expect(await state.storage.get('session_metadata')).toBeUndefined();
+        } finally {
+          fault.mockRestore();
+        }
+      });
+      await evictAllDurableObjects();
+      expect(await sibling.stub.registerSessionFromMetadata(input)).toEqual({ success: true });
+      const catalog = await sibling.stub.getAvailableCommands();
+      expect(catalog.commands.map(command => command.name)).toContain('profile-check');
+      await runInDurableObject(sibling.stub, instance => {
+        const { eventQueries } = instance as unknown as { eventQueries: SessionEventQueries };
+        expect(eventQueries.findByEntityId('commands-available')?.payload).toBe(
+          JSON.stringify(catalog)
+        );
+      });
+      await evictAllDurableObjects();
+      expect(await connectingCatalog(sibling.sessionId)).toEqual(catalog);
+    }
+  );
+
   it('hydrates the workspace catalog before the first message without preparing a runtime', async () => {
     const source = fixture();
     expect(await source.stub.registerSessionFromMetadata(source.input)).toEqual({ success: true });

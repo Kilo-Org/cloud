@@ -26,6 +26,7 @@ import { useInlinePurchaseErrorOwnership } from '@/lib/credits/use-store-credit-
 import { openExternalUrl } from '@/lib/external-link';
 import { formatPrefixedMoney } from '@/lib/format';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { getStoreLegalLinks } from '@/lib/iap/legal-links';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
@@ -86,6 +87,9 @@ export function CreditPurchaseScreen() {
   // Every text line the pack area reserves space for grows with the system
   // font scale, so the reservation does too; see `packAreaMinHeight`.
   const fontScale = useLiveFontScale();
+  // The error overlay sits outside the scroller, so it takes the side insets
+  // the scroller applies to its own content.
+  const sideInsetStyle = useSideInsetStyle();
   const trpc = useTRPC();
   const {
     connected,
@@ -445,9 +449,19 @@ export function CreditPurchaseScreen() {
         </DetailScreenScrollView>
         {/* The purchase error is an overlay, not a block in the flow: it comes
             and goes with a purchase attempt, and the four pack states are the
-            ones whose heights the slot holds. Floating it over the surface
-            keeps its announcement and leaves the layout untouched. */}
-        <View className="pointer-events-none absolute inset-x-0 bottom-4 px-5">
+            ones whose heights the slot holds. Floating it keeps its
+            announcement and leaves the layout untouched.
+
+            It hangs from the top of the scroll area, just under the header, so
+            it never covers the description and the legal links at the end of
+            the content — those are what the slot protects. It takes the same
+            side insets the scroller uses, so it stays inside the safe band in
+            landscape, and it carries the gutter itself because the container
+            owns the screen's padding. */}
+        <View
+          className="pointer-events-none absolute inset-x-0 top-0 px-5 pt-2"
+          style={sideInsetStyle}
+        >
           <AccessibleStatus
             message={purchaseErrorMessageKey ? t(purchaseErrorMessageKey) : null}
             className="rounded-xl border border-destructive bg-card px-4 py-3 text-sm"

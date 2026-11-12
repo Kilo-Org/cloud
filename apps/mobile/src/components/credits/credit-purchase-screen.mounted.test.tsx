@@ -782,6 +782,29 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
+  it('floats the purchase error above the pack area without covering the copy', async () => {
+    // The error is not one of the four pack states, so it must not take layout
+    // height and must not sit over the description and the legal links that the
+    // slot protects.
+    owner.errorMessageKey = 'credits.purchaseOwnedByAnotherAccount';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => renderer.root.findAllByType(AccessibleStatus).length > 0);
+
+    const scroller = renderer.root.findByType(DetailScreenScrollView);
+    const [status] = renderer.root.findAllByType(AccessibleStatus);
+    expect(status).toBeDefined();
+    const inScroller = scroller.findAllByType(AccessibleStatus);
+    expect(inScroller).toHaveLength(0);
+
+    // It is anchored to the top of the scroll area, not its end: the copy lives
+    // at the end, so a top anchor can never cover it.
+    const wrapper = status?.parent;
+    expect(String(wrapper?.props.className)).toContain('top-0');
+    expect(String(wrapper?.props.className)).not.toContain('bottom-');
+    unmount();
+  });
+
   it('empty: an empty backend catalog shows credits.empty with no purchase CTA', async () => {
     backend.response = { appAccountToken: '550e8400-e29b-41d4-a716-446655440000', products: [] };
 

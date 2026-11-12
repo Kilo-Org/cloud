@@ -491,7 +491,6 @@ function flaggedTool({
 }
 
 function toolsReport(
-  kind: EnkryptToolScanReport['scan'],
   config: EnkryptGuardrailConfig,
   cache: EnkryptToolScanReport['verdict_cache'],
   outcomes: ToolOutcome[]
@@ -507,7 +506,7 @@ function toolsReport(
   ];
   const decision = DECISION_SEVERITY.find(each => decisions.includes(each)) ?? 'allowed';
   return {
-    scan: kind,
+    scan: scanKind(config),
     part: 'tools',
     ...detectorsReport(config),
     verdict_cache: cache,
@@ -606,7 +605,7 @@ async function planTools(
           },
         };
       });
-      const report = toolsReport(scanKind(config), config, status, outcomes);
+      const report = toolsReport(config, status, outcomes);
       if (report.tools_cached > 0) {
         console.debug('[enkrypt-guardrail] tool definitions', {
           ...scanLogFields(request),

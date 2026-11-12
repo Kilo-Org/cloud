@@ -45,7 +45,7 @@ export type EnkryptInputGuardrail = {
 
 type VerdictCacheWrite = EnkryptGuardrailReport['scans'][number]['verdict_cache_write'];
 
-/** For tool definitions: `failed` if any write failed, else `written` if any was written. */
+/** For a result's cache entries: `failed` if any write failed, else `written` if any was written. */
 function combinedWrite(writes: VerdictCacheWrite[]): VerdictCacheWrite {
   if (writes.includes('failed')) return 'failed';
   return writes.includes('written') ? 'written' : 'skipped';
@@ -118,9 +118,9 @@ export async function recordEnkryptUsageRecords(
  * they already have.
  *
  * Usage records are written in an `after()` callback registered now, so a request that returns
- * early still accounts for a scan Enkrypt performed. A request's verdict cache entry is
- * written as soon as the verdict is known, so the agent's next step can already use it, and
- * `after()` keeps the function alive until the write finishes.
+ * early still accounts for a scan Enkrypt performed. A request's verdict cache entries, each for
+ * one segment or slice of one, are written as soon as the verdict is known, so the agent's next
+ * step can already use them, and `after()` keeps the function alive until the writes finish.
  */
 export function startEnkryptInputGuardrail(
   scan: Promise<EnkryptGuardrailRequest | null>,

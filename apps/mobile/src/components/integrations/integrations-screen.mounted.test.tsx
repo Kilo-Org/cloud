@@ -12,6 +12,8 @@ import { IntegrationsScreen } from './integrations-screen';
 
 type SetupStatusRow = { platform: string; installed: boolean; installation?: unknown };
 
+const MEMBER_HINT = 'Ask an organization owner or admin to change these connections.';
+
 const state = vi.hoisted(() => ({
   statuses: {
     data: [] as SetupStatusRow[] | undefined,
@@ -276,7 +278,7 @@ describe('IntegrationsScreen', () => {
     });
   });
 
-  it('hides every action from a member and points at the role that can change them', () => {
+  it('lets a member make the first GitLab connect and hides the manager actions', () => {
     state.role = 'member';
     state.statuses.data = [
       { platform: 'slack', installed: true, installation: { teamName: 'Acme' } },
@@ -286,11 +288,11 @@ describe('IntegrationsScreen', () => {
     const root = renderer.root;
 
     expect(actionOf(rowTitled(root, 'GitHub'))).toBeNull();
-    expect(actionOf(rowTitled(root, 'Slack'))).toBeNull();
     expect(actionOf(rowTitled(root, 'Bitbucket'))).toBeNull();
-    expect(texts(root)).toContain(
-      'Ask an organization owner or admin to change these connections.'
-    );
+    // `resolveGitLabOAuthOwner` only needs billing roles to replace an existing
+    // integration, so a member's first connect is accepted.
+    expect(actionOf(rowTitled(root, 'GitLab'))?.props.accessibilityLabel).toBe('Connect. GitLab');
+    expect(texts(root)).not.toContain(MEMBER_HINT);
 
     act(() => {
       renderer.unmount();

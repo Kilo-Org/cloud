@@ -30,6 +30,7 @@ function githubConnection(
     installed_at: '2026-01-01T00:00:00.000Z',
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
+    canUninstallNatively: true,
     ...overrides,
   };
 }
@@ -87,6 +88,19 @@ describe('buildIntegrationRows', () => {
     });
     const github = rows.find(row => row.provider === 'github');
     expect(github).toMatchObject({ githubIntegrationId: 'gh-active', webManaged: false });
+  });
+
+  it('sends a GitHub connection the server will not uninstall to the web page', () => {
+    const rows = buildIntegrationRows({
+      scope: 'organization',
+      statuses: [setupStatus('github', true, { accountLogin: 'acme' })],
+      githubConnections: [githubConnection({ id: 'gh-shared', canUninstallNatively: false })],
+    });
+    expect(rows.find(row => row.provider === 'github')).toMatchObject({
+      installed: true,
+      githubIntegrationId: null,
+      webManaged: true,
+    });
   });
 
   it('sends an ambiguous GitHub organization to the web page', () => {

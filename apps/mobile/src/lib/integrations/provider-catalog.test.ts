@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   canManageProvider,
   INTEGRATION_PROVIDERS,
+  type IntegrationProvider,
   integrationScope,
   providerLabelKey,
   visibleIntegrationProviders,
@@ -45,32 +46,89 @@ describe('visibleIntegrationProviders', () => {
 });
 
 describe('canManageProvider', () => {
-  it('lets the account owner manage every personal connection', () => {
+  it('lets the account owner take every action on a personal connection', () => {
     for (const provider of INTEGRATION_PROVIDERS) {
-      expect(canManageProvider(provider, 'personal', undefined)).toBe(true);
+      for (const action of ['connect', 'disconnect'] as const) {
+        expect(canManageProvider({ provider, scope: 'personal', role: undefined, action })).toBe(
+          true
+        );
+      }
     }
   });
 
-  it('reserves Slack and GitHub organization connections for owners and admins', () => {
-    expect(canManageProvider('slack', 'organization', 'owner')).toBe(true);
-    expect(canManageProvider('slack', 'organization', 'admin')).toBe(true);
-    expect(canManageProvider('slack', 'organization', 'billing_manager')).toBe(false);
-    expect(canManageProvider('github', 'organization', 'billing_manager')).toBe(false);
-    expect(canManageProvider('github', 'organization', 'member')).toBe(false);
-  });
+  // Mirrors the server procedure each action actually calls:
+  // - `githubApps.uninstallApp` and `slack.uninstallApp` pass
+  //   ORGANIZATION_MANAGE_ROLES explicitly;
+  // - `slack`, `linear` and `discord` connects, plus `linear`, `discord` and
+  //   `gitlab` disconnects, go through `resolveAuthorizedOwner`, whose default
+  //   is ORGANIZATION_BILLING_ROLES;
+  // - `resolveGitLabOAuthOwner` only demands billing roles when it replaces an
+  //   existing integration, so a member's first GitLab connect is allowed.
+  const MATRIX: {
+    provider: IntegrationProvider;
+    action: 'connect' | 'disconnect';
+    installed?: boolean;
+    allowed: string[];
+  }[] = [
+    { provider: 'github', action: 'connect', allowed: ['owner', 'admin'] },
+    { provider: 'github', action: 'disconnect', allowed: ['owner', 'admin'] },
+    { provider: 'slack', action: 'connect', allowed: ['owner', 'admin'] },
+    { provider: 'slack', action: 'disconnect', allowed: ['owner', 'admin'] },
+    {
+      provider: 'gitlab',
+      action: 'connect',
+      installed: false,
+      allowed: ['owner', 'admin', 'billing_manager', 'member'],
+    },
+    {
+      provider: 'gitlab',
+      action: 'connect',
+      installed: true,
+      allowed: ['owner', 'admin', 'billing_manager'],
+    },
+    { provider: 'gitlab', action: 'disconnect', allowed: ['owner', 'admin', 'billing_manager'] },
+    { provider: 'discord', action: 'connect', allowed: ['owner', 'admin', 'billing_manager'] },
+    { provider: 'discord', action: 'disconnect', allowed: ['owner', 'admin', 'billing_manager'] },
+    { provider: 'linear', action: 'connect', allowed: ['owner', 'admin', 'billing_manager'] },
+    { provider: 'linear', action: 'disconnect', allowed: ['owner', 'admin', 'billing_manager'] },
+    // Bitbucket's connect and its web controls both follow the billing role set.
+    { provider: 'bitbucket', action: 'connect', allowed: ['owner', 'admin', 'billing_manager'] },
+    { provider: 'bitbucket', action: 'disconnect', allowed: ['owner', 'admin', 'billing_manager'] },
+  ];
 
-  it('accepts a billing role for the platforms whose server check is billing-wide', () => {
-    for (const provider of ['gitlab', 'discord', 'linear'] as const) {
-      expect(canManageProvider(provider, 'organization', 'billing_manager')).toBe(true);
-      expect(canManageProvider(provider, 'organization', 'admin')).toBe(true);
-      expect(canManageProvider(provider, 'organization', 'member')).toBe(false);
+  const ROLES = ['owner', 'admin', 'billing_manager', 'member'] as const;
+
+  it.each(MATRIX)(
+    '$provider $action (installed=$installed) admits exactly $allowed',
+    ({ provider, action, installed, allowed }) => {
+      for (const role of ROLES) {
+        expect(
+          canManageProvider({
+            provider,
+            scope: 'organization',
+            role,
+            action,
+            installed: installed ?? false,
+          })
+        ).toBe(allowed.includes(role));
+      }
     }
-  });
+  );
 
-  it('keeps Bitbucket on the owner and billing-manager rule its web controls use', () => {
-    expect(canManageProvider('bitbucket', 'organization', 'owner')).toBe(true);
-    expect(canManageProvider('bitbucket', 'organization', 'billing_manager')).toBe(true);
-    expect(canManageProvider('bitbucket', 'organization', 'admin')).toBe(false);
+  it('offers nothing while the viewer role is still unresolved', () => {
+    for (const provider of INTEGRATION_PROVIDERS) {
+      expect(
+        canManageProvider({ provider, scope: 'organization', role: undefined, action: 'connect' })
+      ).toBe(false);
+      expect(
+        canManageProvider({
+          provider,
+          scope: 'organization',
+          role: undefined,
+          action: 'disconnect',
+        })
+      ).toBe(false);
+    }
   });
 });
 

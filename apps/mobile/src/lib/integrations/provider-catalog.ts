@@ -21,50 +21,71 @@ export type IntegrationProvider = (typeof INTEGRATION_PROVIDERS)[number];
 
 export type IntegrationScope = 'personal' | 'organization';
 
+/** The two things a row can offer. Each has its own server-side role rule. */
+export type IntegrationAction = 'connect' | 'disconnect';
+
 type ProviderDefinition = {
   scope: readonly IntegrationScope[];
-  /**
-   * Mirrors `hiddenUnlessInstalled` in apps/web's platform definitions: Discord
-   * is not offered as a new connection from the hub, so it only appears once
-   * a server already has it.
-   */
   hiddenUnlessInstalled: boolean;
-  /** The org roles the web offers connect and disconnect to, per platform. */
-  organizationRoles: readonly OrganizationRole[];
+  /**
+   * Roles the provider's connect flow accepts; `null` means any organization
+   * member, because a first-time OAuth connect only proves membership.
+   */
+  connectRoles: readonly OrganizationRole[] | null;
+  /** Roles the provider's disconnect procedure accepts; `null` means any member. */
+  disconnectRoles: readonly OrganizationRole[] | null;
+  /** Roles a connect that replaces an existing integration needs. */
+  replaceRoles?: readonly OrganizationRole[];
 };
 
+/**
+ * Mirrors the server, per action, instead of one role set per provider:
+ * `githubApps.uninstallApp` and `slack.uninstallApp` name
+ * `ORGANIZATION_MANAGE_ROLES`, while `slack`, `linear` and `discord` connects
+ * and the `gitlab`/`discord`/`linear` disconnects run through
+ * `resolveAuthorizedOwner`, whose default is `ORGANIZATION_BILLING_ROLES`.
+ * `resolveGitLabOAuthOwner` only requires billing roles when it replaces an
+ * existing integration, so a member may make GitLab's first connect.
+ */
 const PROVIDERS = {
   github: {
     scope: ['personal', 'organization'],
     hiddenUnlessInstalled: false,
-    organizationRoles: ORGANIZATION_MANAGE_ROLES,
+    connectRoles: ORGANIZATION_MANAGE_ROLES,
+    disconnectRoles: ORGANIZATION_MANAGE_ROLES,
   },
   slack: {
     scope: ['personal', 'organization'],
     hiddenUnlessInstalled: false,
-    organizationRoles: ORGANIZATION_MANAGE_ROLES,
+    connectRoles: ORGANIZATION_MANAGE_ROLES,
+    disconnectRoles: ORGANIZATION_MANAGE_ROLES,
   },
   gitlab: {
     scope: ['personal', 'organization'],
     hiddenUnlessInstalled: false,
-    organizationRoles: ORGANIZATION_BILLING_ROLES,
+    connectRoles: null,
+    replaceRoles: ORGANIZATION_BILLING_ROLES,
+    disconnectRoles: ORGANIZATION_BILLING_ROLES,
   },
   discord: {
     scope: ['personal', 'organization'],
     hiddenUnlessInstalled: true,
-    organizationRoles: ORGANIZATION_BILLING_ROLES,
+    connectRoles: ORGANIZATION_BILLING_ROLES,
+    disconnectRoles: ORGANIZATION_BILLING_ROLES,
   },
   linear: {
     scope: ['personal', 'organization'],
     hiddenUnlessInstalled: false,
-    organizationRoles: ORGANIZATION_BILLING_ROLES,
+    connectRoles: ORGANIZATION_BILLING_ROLES,
+    disconnectRoles: ORGANIZATION_BILLING_ROLES,
   },
   // Bitbucket is org-only, and its web controls are shown to owners and billing
   // managers (see `BitbucketIntegrationControls` and the server's `canManage`).
   bitbucket: {
     scope: ['organization'],
     hiddenUnlessInstalled: false,
-    organizationRoles: ['owner', 'billing_manager'],
+    connectRoles: ORGANIZATION_BILLING_ROLES,
+    disconnectRoles: ORGANIZATION_BILLING_ROLES,
   },
 } satisfies Record<IntegrationProvider, ProviderDefinition>;
 
@@ -86,21 +107,45 @@ export function visibleIntegrationProviders(
   });
 }
 
+/** The roles the server procedure behind this action requires. */
+function rolesFor(
+  definition: ProviderDefinition,
+  action: IntegrationAction,
+  installed: boolean | undefined
+): readonly OrganizationRole[] | null {
+  if (action === 'disconnect') {
+    return definition.disconnectRoles;
+  }
+  if (installed === true && definition.replaceRoles) {
+    return definition.replaceRoles;
+  }
+  return definition.connectRoles;
+}
+
 /**
- * Whether the viewer may connect or disconnect this provider's org connection.
- * The personal scope belongs to the viewer, so it is always theirs to manage.
- * The roles mirror what apps/web offers, so the app never shows an action the
- * server rejects.
+ * Whether the viewer may take this action on this provider's connection. The
+ * personal scope belongs to the viewer, so every action is theirs. In an
+ * organization the answer follows the server procedure that would run, action
+ * by action, so the hub never shows a control the server rejects.
  */
-export function canManageProvider(
-  provider: IntegrationProvider,
-  scope: IntegrationScope,
-  role: string | undefined
-): boolean {
-  if (scope === 'personal') {
+export function canManageProvider(input: {
+  provider: IntegrationProvider;
+  scope: IntegrationScope;
+  role: string | undefined;
+  action: IntegrationAction;
+  /** Whether the connection already exists, so a connect would replace it. */
+  installed?: boolean;
+}): boolean {
+  if (input.scope === 'personal') {
     return true;
   }
-  return PROVIDERS[provider].organizationRoles.some(allowedRole => allowedRole === role);
+  const allowedRoles = rolesFor(PROVIDERS[input.provider], input.action, input.installed);
+  // `null` names any member: the connect flow only proves membership. A viewer
+  // whose role is not resolved yet gets nothing.
+  if (allowedRoles === null) {
+    return input.role != null;
+  }
+  return allowedRoles.some(allowedRole => allowedRole === input.role);
 }
 
 /**

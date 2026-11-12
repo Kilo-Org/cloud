@@ -102,8 +102,18 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
     githubConnections: githubConnections.data ?? [],
   });
   const role = boundary.role ?? undefined;
-  const canManageAny = rows.some(row => canManageProvider(row.provider, scope, role));
-  const showMemberHint = scope === 'organization' && rows.length > 0 && !canManageAny;
+  const canActOnRow = (row: IntegrationRow) =>
+    canManageProvider({
+      provider: row.provider,
+      scope,
+      role,
+      action: 'connect',
+      installed: row.installed,
+    }) || canManageProvider({ provider: row.provider, scope, role, action: 'disconnect' });
+  // The hint names the role that can change the connections, so it only shows
+  // when no row offers the viewer any action at all.
+  const showMemberHint =
+    scope === 'organization' && rows.length > 0 && !rows.some(row => canActOnRow(row));
 
   const openProviderPage = (provider: IntegrationProvider) => {
     void openExternalUrl(getIntegrationPageUrl(WEB_BASE_URL, provider, organizationId), {

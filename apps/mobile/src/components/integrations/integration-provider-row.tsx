@@ -67,7 +67,19 @@ export function IntegrationProviderRow({
 }: IntegrationProviderRowProps) {
   const { t } = useTranslation();
   const label = t(providerLabelKey(row.provider));
-  const canManage = canManageProvider(row.provider, scope, role);
+  const canConnect = canManageProvider({
+    provider: row.provider,
+    scope,
+    role,
+    action: 'connect',
+    installed: row.installed,
+  });
+  const canDisconnect = canManageProvider({
+    provider: row.provider,
+    scope,
+    role,
+    action: 'disconnect',
+  });
   let subtitle = t('common.connected');
   if (!row.installed) {
     subtitle = t('common.notConnected');
@@ -76,45 +88,44 @@ export function IntegrationProviderRow({
   }
   const namedAction = (action: string) => [action, label].join(t('common.sentenceJoiner'));
 
-  // A member reads the connections but changes none of them, on the web either:
-  // the page behind "Manage on the web" is the same manager-only control.
+  // The page behind "Manage on the web" is the same manager-only surface as
+  // Disconnect, so it follows the disconnect roles; Connect follows the
+  // connect flow's own rule, which for GitLab admits any member.
   let action: ReactNode = null;
-  if (canManage) {
-    if (row.installed && row.webManaged) {
-      action = (
-        <Button
-          size="sm"
-          variant="outline"
-          onPress={onManageOnWeb}
-          accessibilityLabel={namedAction(t('integrations.manageOnWeb'))}
-        >
-          <Text>{t('integrations.manageOnWeb')}</Text>
-        </Button>
-      );
-    } else if (row.installed) {
-      action = (
-        <Button
-          size="sm"
-          variant="outline"
-          loading={disconnecting}
-          onPress={onDisconnect}
-          accessibilityLabel={namedAction(t('integrations.disconnect'))}
-        >
-          <Text>{t('integrations.disconnect')}</Text>
-        </Button>
-      );
-    } else {
-      action = (
-        <Button
-          size="sm"
-          loading={connecting}
-          onPress={onConnect}
-          accessibilityLabel={namedAction(t('common.connect'))}
-        >
-          <Text>{t('common.connect')}</Text>
-        </Button>
-      );
-    }
+  if (row.installed && row.webManaged) {
+    action = canDisconnect ? (
+      <Button
+        size="sm"
+        variant="outline"
+        onPress={onManageOnWeb}
+        accessibilityLabel={namedAction(t('integrations.manageOnWeb'))}
+      >
+        <Text>{t('integrations.manageOnWeb')}</Text>
+      </Button>
+    ) : null;
+  } else if (row.installed) {
+    action = canDisconnect ? (
+      <Button
+        size="sm"
+        variant="outline"
+        loading={disconnecting}
+        onPress={onDisconnect}
+        accessibilityLabel={namedAction(t('integrations.disconnect'))}
+      >
+        <Text>{t('integrations.disconnect')}</Text>
+      </Button>
+    ) : null;
+  } else {
+    action = canConnect ? (
+      <Button
+        size="sm"
+        loading={connecting}
+        onPress={onConnect}
+        accessibilityLabel={namedAction(t('common.connect'))}
+      >
+        <Text>{t('common.connect')}</Text>
+      </Button>
+    ) : null;
   }
 
   return (

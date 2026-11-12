@@ -64,7 +64,15 @@ export function buildIntegrationRows(input: {
   }
 
   const activeGitHub = input.githubConnections.filter(isActiveGitHubConnection);
-  const githubIntegrationId = activeGitHub.length === 1 ? (activeGitHub[0]?.id ?? null) : null;
+  // `uninstallApp` only accepts a `workflow`-role connection whose installation
+  // has no other locally connected association; the read reports that verdict
+  // per connection, so anything else goes to the web page instead of a
+  // Disconnect the server would refuse.
+  const githubConnection =
+    activeGitHub.length === 1 && activeGitHub[0]?.canUninstallNatively === true
+      ? activeGitHub[0]
+      : null;
+  const githubIntegrationId = githubConnection?.id ?? null;
 
   return visibleIntegrationProviders(input.scope, installed).map(provider => {
     const status = statusByPlatform.get(provider);

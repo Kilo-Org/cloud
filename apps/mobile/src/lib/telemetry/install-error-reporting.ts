@@ -9,14 +9,17 @@
  * carry their own reporting (see lib/trpc.ts), so this wrapper skips
  * `/api/trpc` URLs to avoid double-reporting. It also skips the app's own
  * telemetry transports — the SDK vendors and the latency sink — because their
- * failures are never user-facing (see `isTelemetryHost`).
+ * failures are never user-facing (see `isTelemetryHost`). The Kilo MCP client's
+ * optional SSE probe is an expected answer rather than a failure, so it leaves
+ * a breadcrumb and no event (see `isMcpSseProbe`).
  */
 
 import * as Sentry from '@sentry/react-native';
 
-import { LATENCY_INGEST_URL } from '@/lib/config';
+import { KILO_MCP_URL, LATENCY_INGEST_URL } from '@/lib/config';
 import { setBreadcrumbSink, setTelemetrySink } from '@/lib/telemetry/error-sink';
-import { createNetworkErrorFetch } from '@/lib/telemetry/network-errors';
+import { createNetworkErrorFetch, type NetworkErrorContext } from '@/lib/telemetry/network-errors';
+import { stripQueryString } from '@/lib/telemetry/request-target';
 import { LATENCY_INGEST_URL_DEFAULT } from '@/lib/url-contract';
 
 const HTTP_URL_PATTERN = /^https?:\/\//iu;
@@ -60,6 +63,35 @@ function telemetryAuthorities(): ReadonlySet<string> {
 }
 
 const TELEMETRY_AUTHORITIES = telemetryAuthorities();
+
+/**
+ * The Streamable HTTP endpoint of the Kilo MCP server this build reaches: the
+ * MCP client appends `/mcp` to the configured base URL (`kiloServer` in
+ * lib/chat/kilo-mcp.ts). Undefined when the build carries no server, which
+ * hides the feature.
+ */
+const MCP_ENDPOINT_URL: string | undefined =
+  KILO_MCP_URL === undefined ? undefined : `${KILO_MCP_URL}/mcp`;
+
+/**
+ * True for the one MCP answer that is a protocol fact, not a defect: the
+ * Streamable HTTP client opens an optional SSE stream with a GET, and a 405 is
+ * the documented "this server offers no stream", on which the SDK returns and
+ * carries on over POST. Reporting it filed an issue per discovery
+ * (KILO-APP-3VA). Every other answer from the endpoint — a failing POST — still
+ * names app code and is reported.
+ */
+function isMcpSseProbe(context: NetworkErrorContext): boolean {
+  // An unnamed method is the GET fetch sends, the way the failure message
+  // names it.
+  const method = context.method ?? 'GET';
+  return (
+    method === 'GET' &&
+    context.status === 405 &&
+    MCP_ENDPOINT_URL !== undefined &&
+    stripQueryString(context.url) === MCP_ENDPOINT_URL
+  );
+}
 
 // Fast Refresh re-evaluates this module, which would reset a module-local
 // guard and wrap an already-wrapped `globalThis.fetch`, stacking wrappers and
@@ -121,6 +153,7 @@ function installFetchWrapper(): void {
   const wrapped = createNetworkErrorFetch(globalThis.fetch, {
     source: 'fetch',
     shouldReport: isReportableAppUrl,
+    isExpectedAnswer: isMcpSseProbe,
   });
   try {
     globalThis.fetch = wrapped;

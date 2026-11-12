@@ -110,6 +110,7 @@ describe('PreparationGroup failure copy', () => {
           step({
             id: 'provision',
             key: 'sandbox_provision',
+            latestDetail: 'Creating sandbox',
             safeError: 'sandbox_out_of_memory',
           }),
           step({ id: 'boot', key: 'sandbox_boot', safeError: 'sandbox_lost' }),
@@ -121,6 +122,9 @@ describe('PreparationGroup failure copy', () => {
     // The header names the provisioning stage, so its cause stands in for its
     // row and the later stage keeps its own expandable row.
     expect(mounted.texts()).toContain('The sandbox ran out of memory');
+    // Naming the stage in the header keeps what that step recorded: the line it
+    // had reached before it stopped.
+    expect(mounted.texts()).toContain('Creating sandbox');
     expect(mounted.texts()).not.toContain('Sandbox provisioning');
     expect(mounted.texts()).toContain('Sandbox start');
     mounted.unmount();

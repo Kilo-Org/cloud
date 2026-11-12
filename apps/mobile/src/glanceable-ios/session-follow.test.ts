@@ -9,6 +9,7 @@ import {
   setLiveActivityEnabledValue,
   setNotificationPermissionGrantedValue,
 } from '@/lib/glanceable/live-activity-switch';
+import { SESSION_CARD_SCOPE_KEY } from '@/lib/glanceable/widget-store';
 import { setProtectedDataAvailable } from '@/lib/protected-data';
 
 import {
@@ -281,7 +282,7 @@ describe('the follow scope record', () => {
       setProtectedDataAvailable(true);
     });
 
-    it('reads the records as unavailable instead of calling the keychain', async () => {
+    it('reads a refused record as unavailable', async () => {
       rememberSessionCardScope('session-1', CTX);
       await _settleSessionCardScopeWritesForTests();
       const read = vi.fn(scopeStore.getItemAsync);
@@ -291,15 +292,18 @@ describe('the follow scope record', () => {
       });
 
       setProtectedDataAvailable(false);
+      scopeReadsFail = true;
       const records = await readSessionCardScopes();
 
       // Unavailable, never empty: an empty map would make every followed card
-      // out of scope and end it.
+      // out of scope and end it. The record is written
+      // AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY, so a locked device still tries the
+      // read; the refusal is what makes it unreadable.
       expect(records).toBeNull();
-      expect(read).not.toHaveBeenCalled();
+      expect(read).toHaveBeenCalled();
     });
 
-    it('does not write a follow it could only half record', async () => {
+    it('records a follow while the device is locked', async () => {
       const write = vi.fn(scopeStore.setItemAsync);
       _setSessionCardScopeStoreForTests({
         getItemAsync: scopeStore.getItemAsync,
@@ -310,10 +314,9 @@ describe('the follow scope record', () => {
       rememberSessionCardScope('session-1', CTX);
       await _settleSessionCardScopeWritesForTests();
 
-      // The card stays followed; only the record it cannot write is skipped, and
-      // the next follow or restore writes it.
-      expect(write).not.toHaveBeenCalled();
-      expect(storedScopes.has('session-1')).toBe(false);
+      // A push can re-register a card with the screen locked, so the record is
+      // written rather than left for the next unlocked follow.
+      expect(storedScopes.get(SESSION_CARD_SCOPE_KEY)).toContain('"session-1"');
     });
   });
 });

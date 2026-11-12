@@ -48,14 +48,16 @@ const KEYCHAIN_INTERACTION_REFUSED_MESSAGE = 'User interaction is not allowed';
  *
  * A refusal from a locked device is not reported: iOS rejects every
  * `WHEN_UNLOCKED*` item with `errSecInteractionNotAllowed` until unlock, by
- * design. The cached protected-data state cannot recognise every one of them —
- * a background start after the screen locked can still read it as available,
- * and it can flip during the call — so the refusal itself is recognised too.
- * Such a refusal leaves a breadcrumb on the next event and files no event of
- * its own.
+ * design, and an `AFTER_FIRST_UNLOCK` item the same way until the device's first
+ * unlock since boot. The cached protected-data state cannot recognise every one
+ * of them — a background start after the screen locked can still read it as
+ * available, and it can flip during the call — so the refusal itself is checked
+ * first, and it leaves a breadcrumb on the next event instead of being dropped
+ * or filed as a defect of its own.
  */
 export function reportSecureStoreFailure(operation: SecureStoreOperation, error: unknown): void {
-  if (error instanceof ProtectedDataUnavailableError || !isProtectedDataAvailable()) {
+  // The app's own guard: the keychain was never called.
+  if (error instanceof ProtectedDataUnavailableError) {
     return;
   }
   if (error instanceof Error && error.message.includes(KEYCHAIN_INTERACTION_REFUSED_MESSAGE)) {
@@ -65,6 +67,11 @@ export function reportSecureStoreFailure(operation: SecureStoreOperation, error:
       message: 'keychain refused a call while the device was locked',
       data: { operation },
     });
+    return;
+  }
+  // Any other failure while the keychain is closed is unattributable, so it is
+  // dropped rather than filed against the wrong cause.
+  if (!isProtectedDataAvailable()) {
     return;
   }
   captureTelemetry({

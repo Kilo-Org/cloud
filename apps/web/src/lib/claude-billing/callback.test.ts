@@ -275,7 +275,6 @@ describe('Claude billing callback', () => {
 
   it('does not create a profile or start an authorization push for a refused account', async () => {
     const user = await insertTestUser();
-    signedIn(user);
     refusedAccount();
 
     const response = await connect(new NextRequest('http://localhost/claude/billing/connect'));

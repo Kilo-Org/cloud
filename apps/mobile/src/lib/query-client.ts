@@ -199,11 +199,16 @@ function queryKeyInput(queryKey: unknown): QueryKeyInput | undefined {
 
 /**
  * Drops a permission-denied query from the cache so the next persister save
- * omits it. An org-scoped query is removed by its org prefix (procedure path +
+ * omits it. An org-scoped query is cleared by its org prefix (procedure path +
  * `input.organizationId`), which also covers every sibling variant of that
- * procedure for the same org; a non-org query is removed by its exact key.
+ * procedure for the same org; a non-org query is cleared by its exact key.
+ *
+ * A query something still observes cannot be removed: its screen would rebuild
+ * it on the next render and refetch straight into the same denial. It keeps its
+ * place in the cache and loses its payload instead, so no denied row keeps
+ * rendering and the next save still omits it.
  */
-function removePermissionDeniedQueries(
+function dropPermissionDeniedQuery(
   queryClient: QueryClient,
   error: unknown,
   query: Query<unknown, unknown, unknown>
@@ -214,9 +219,16 @@ function removePermissionDeniedQueries(
   const input = queryKeyInput(query.queryKey);
   const organizationId = input?.organizationId;
   if (organizationId !== undefined && organizationId !== null) {
+    if (query.isActive()) {
+      query.setState({ data: undefined });
+      return;
+    }
     queryClient.removeQueries({
       queryKey: [query.queryKey[0], { input: { organizationId } }],
     });
+    return;
+  }
+  if (query.isActive()) {
     return;
   }
   queryClient.removeQueries({ queryKey: query.queryKey });
@@ -286,12 +298,9 @@ export function createKiloAppQueryClient(): QueryClient {
         void handleTrpcQueryError(error);
         reportTrpcError(error);
         reportAppError(error, { source: 'query', queryKey: query.queryKey });
-        // Removing a still-observed query rebuilds it on the next render and
-        // refetches, which fails FORBIDDEN again and loops for as long as the
-        // error screen stays mounted. Only drop queries nothing is observing.
-        if (!query.isActive()) {
-          removePermissionDeniedQueries(queryClient, error, query);
-        }
+        // A denied query drops its cached rows even while a screen observes it;
+        // only the query object survives, so the screen can show the denial.
+        dropPermissionDeniedQuery(queryClient, error, query);
         refreshOrganizationsListOnPermissionLoss(queryClient, error, query);
       },
     }),

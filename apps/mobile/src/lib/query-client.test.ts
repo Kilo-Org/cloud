@@ -137,7 +137,7 @@ describe('permission-denied query removal', () => {
     clear();
   });
 
-  it('keeps an actively-observed query in the cache on FORBIDDEN', async () => {
+  it('drops the payload of an actively-observed org query on FORBIDDEN without rebuilding it', async () => {
     const signOut = vi.fn();
     const clear = setTrpcUnauthorizedHandler(signOut);
     const queryClient = createKiloAppQueryClient();
@@ -162,11 +162,42 @@ describe('permission-denied query removal', () => {
     });
     const unsubscribe = observer.subscribe(() => undefined);
 
-    // The observer makes the query active; a forced refetch fails FORBIDDEN but
-    // must not drop the still-observed query (removal would rebuild and loop).
+    // The observer keeps the query in the cache (removal would rebuild it and
+    // loop), but its payload is gone so nothing denied keeps rendering.
     await observer.refetch().catch(() => undefined);
 
-    expect(queryClient.getQueryData(key)).toEqual({ members: ['a'] });
+    expect(queryClient.getQueryData(key)).toBeUndefined();
+    expect(queryClient.getQueryCache().find({ queryKey: key, exact: true })).toBeDefined();
+    expect(signOut).not.toHaveBeenCalled();
+    unsubscribe();
+    clear();
+  });
+
+  it('keeps the payload of an actively-observed non-org query on FORBIDDEN', async () => {
+    const signOut = vi.fn();
+    const clear = setTrpcUnauthorizedHandler(signOut);
+    const queryClient = createKiloAppQueryClient();
+
+    const key: readonly unknown[] = [['cliSessionsV2', 'byId'], { type: 'query' }];
+    queryClient.setQueryData(key, { session: 'open' });
+
+    const error = Object.assign(new Error('forbidden'), {
+      data: { code: 'FORBIDDEN', httpStatus: 403 },
+    });
+
+    const observer = new QueryObserver(queryClient, {
+      queryKey: key,
+      queryFn: () => {
+        throw error;
+      },
+      retry: false,
+      staleTime: Infinity,
+    });
+    const unsubscribe = observer.subscribe(() => undefined);
+
+    await observer.refetch().catch(() => undefined);
+
+    expect(queryClient.getQueryData(key)).toEqual({ session: 'open' });
     expect(signOut).not.toHaveBeenCalled();
     unsubscribe();
     clear();

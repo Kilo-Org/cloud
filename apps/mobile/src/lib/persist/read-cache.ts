@@ -2,6 +2,7 @@ import { type Query, type QueryClient } from '@tanstack/react-query';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import {
   type AsyncStorage,
+  type PersistedClient,
   type Persister,
   persistQueryClientRestore,
 } from '@tanstack/react-query-persist-client';
@@ -84,6 +85,12 @@ function metaInput(meta: unknown): Record<string, unknown> | undefined {
 type AllowedProcedure = {
   path: string;
   isAllowedInput: (meta: unknown) => boolean;
+  /**
+   * Present only for a procedure whose payload can name an organization. Such
+   * an entry persists the payloads this accepts and nothing else, so the shape
+   * of the result — not the key — decides what a cold start may restore.
+   */
+  isAllowedPayload?: (data: unknown) => boolean;
 };
 
 /**
@@ -111,20 +118,58 @@ const briefingListCacheInputSchema = z
   );
 const briefingDetailCacheInputSchema = z.object({ reportId: z.string().min(1) }).strict();
 
+// A briefing payload carries the context it belongs to, so its own shape says
+// whether it holds organization data. Only a payload every part of which names
+// no organization is restored: an organization snapshot is read from the
+// server, which owns the access decision, and never painted from this cache.
+const briefingContextPayloadSchema = z.object({ organizationId: z.string().nullable() });
+const briefingContextRefPayloadSchema = z.object({ context: briefingContextPayloadSchema });
+const briefingListPageSchema = z.object({ reports: z.array(briefingContextRefPayloadSchema) });
+const briefingListPagesSchema = z.object({ pages: z.array(briefingListPageSchema) });
+const briefingPreferencesPayloadSchema = z.object({
+  contexts: z.array(briefingContextRefPayloadSchema),
+});
+
+function isPersonalBriefingPage(page: z.infer<typeof briefingListPageSchema>): boolean {
+  return page.reports.every(report => report.context.organizationId === null);
+}
+
+function isPersonalBriefingList(data: unknown): boolean {
+  const pages = briefingListPagesSchema.safeParse(data);
+  if (pages.success) {
+    return pages.data.pages.every(isPersonalBriefingPage);
+  }
+  const page = briefingListPageSchema.safeParse(data);
+  return page.success && isPersonalBriefingPage(page.data);
+}
+
+function isPersonalBriefingReport(data: unknown): boolean {
+  const parsed = briefingContextRefPayloadSchema.safeParse(data);
+  return parsed.success && parsed.data.context.organizationId === null;
+}
+
+function isPersonalBriefingPreferences(data: unknown): boolean {
+  const parsed = briefingPreferencesPayloadSchema.safeParse(data);
+  return parsed.success && parsed.data.contexts.every(item => item.context.organizationId === null);
+}
+
 // Initial allowlist. Verified against the mobile tRPC router
 // (`packages/trpc/src/mobile.ts`) before coding.
 const ALLOWED_PROCEDURES: readonly AllowedProcedure[] = [
   {
     path: 'agentBriefing.list',
     isAllowedInput: meta => briefingListCacheInputSchema.safeParse(metaInput(meta)).success,
+    isAllowedPayload: isPersonalBriefingList,
   },
   {
     path: 'agentBriefing.get',
     isAllowedInput: meta => briefingDetailCacheInputSchema.safeParse(metaInput(meta)).success,
+    isAllowedPayload: isPersonalBriefingReport,
   },
   {
     path: 'agentBriefing.preferences',
     isAllowedInput: () => true,
+    isAllowedPayload: isPersonalBriefingPreferences,
   },
   {
     path: 'user.getMe',
@@ -176,44 +221,65 @@ const ALLOWED_PROCEDURES: readonly AllowedProcedure[] = [
   },
 ];
 
+/** The allowlist entry that admits this query key, or undefined. */
+function admittedProcedure(queryKey: unknown): AllowedProcedure | undefined {
+  if (!Array.isArray(queryKey) || queryKey.length < 2) {
+    return undefined;
+  }
+  const segments = queryKey[0];
+  if (!Array.isArray(segments) || segments.length === 0) {
+    // Flat application keys (e.g. ['org-default-model', <id>]) and empty
+    // paths are denied, never thrown on.
+    return undefined;
+  }
+  const path = segments.join('.');
+  const allowed = ALLOWED_PROCEDURES.find(procedure => procedure.path === path);
+  return allowed?.isAllowedInput(queryKey[1]) ? allowed : undefined;
+}
+
 /**
  * True when a query key is an allowlisted tRPC shape. The exact-path allowlist
  * is the only filter: every other path — transcript pages, patches, diffs,
  * tokens and secrets — is denied because it is not on the list.
  */
 export function isReadCacheAllowedKey(queryKey: unknown): boolean {
-  if (!Array.isArray(queryKey) || queryKey.length < 2) {
-    return false;
-  }
-  const segments = queryKey[0];
-  if (!Array.isArray(segments) || segments.length === 0) {
-    // Flat application keys (e.g. ['org-default-model', <id>]) and empty
-    // paths are denied, never thrown on.
-    return false;
-  }
-  const path = segments.join('.');
-  const allowed = ALLOWED_PROCEDURES.find(procedure => procedure.path === path);
-  return allowed?.isAllowedInput(queryKey[1]) ?? false;
+  return admittedProcedure(queryKey) !== undefined;
 }
 
 /**
- * Persist only successful queries on allowlisted shapes. An allowlisted
- * infinite query persists only while it holds the first page: the tRPC
- * adapter strips `cursor`/`direction` from infinite-query keys, so every
- * loaded page shares the same key and only the loaded data can prove the
- * snapshot is the first page.
+ * True when a snapshot of this query may enter — or leave — the persisted
+ * cache: an allowlisted key whose payload the entry accepts, and, for an
+ * allowlisted infinite query, the first page only. The tRPC adapter strips
+ * `cursor`/`direction` from infinite-query keys, so every loaded page shares
+ * the same key and only the loaded data can prove the snapshot is the first
+ * page.
  */
-export function shouldPersistReadCacheQuery(query: Query): boolean {
-  if (query.state.status !== 'success' || !isReadCacheAllowedKey(query.queryKey)) {
+function isPersistableSnapshot(
+  queryKey: unknown,
+  state: { status: string; data: unknown }
+): boolean {
+  if (state.status !== 'success') {
+    return false;
+  }
+  const allowed = admittedProcedure(queryKey);
+  if (!allowed) {
+    return false;
+  }
+  if (allowed.isAllowedPayload && !allowed.isAllowedPayload(state.data)) {
     return false;
   }
   // The allowlist guarantees an array key with a meta segment.
-  const meta = query.queryKey[1] as { type?: unknown } | null | undefined;
+  const meta = (queryKey as readonly unknown[])[1] as { type?: unknown } | null | undefined;
   if (meta?.type !== 'infinite') {
     return true;
   }
-  const data = query.state.data as { pageParams?: unknown[] } | undefined;
+  const data = state.data as { pageParams?: unknown[] } | undefined;
   return (data?.pageParams?.length ?? 1) <= 1;
+}
+
+/** Persist only successful queries whose snapshot this build restores. */
+export function shouldPersistReadCacheQuery(query: Query): boolean {
+  return isPersistableSnapshot(query.queryKey, query.state);
 }
 
 // ── Persister ──────────────────────────────────────────────────────────────
@@ -286,6 +352,20 @@ let coldStartGeneration = 0;
 let coldStartRestoredScope: string | null = null;
 
 /**
+ * Drops restored queries this build would not persist. A blob written by an
+ * earlier build can hold an entry the current rule never restores, and a cold
+ * start must not paint it once and fetch it after.
+ */
+function withoutUnrestorableQueries(persisted: PersistedClient): PersistedClient {
+  const { queries } = persisted.clientState;
+  const restorable = queries.filter(query => isPersistableSnapshot(query.queryKey, query.state));
+  if (restorable.length === queries.length) {
+    return persisted;
+  }
+  return { ...persisted, clientState: { ...persisted.clientState, queries: restorable } };
+}
+
+/**
  * Best-effort cold-start restore for the identity hint stored in
  * `ACTIVE_USER_ID_KEY`. Never blocks startup. A generation flag abandons the
  * restore once the authenticated mount takes over: a late restore no-ops —
@@ -331,8 +411,8 @@ export async function restorePersistedCacheOnColdStart(queryClient: QueryClient)
       ...persister,
       restoreClient: async () => {
         const restored = await persister.restoreClient();
-        return generation === coldStartGeneration && isCurrentAuthEpoch(epoch)
-          ? restored
+        return generation === coldStartGeneration && isCurrentAuthEpoch(epoch) && restored
+          ? withoutUnrestorableQueries(restored)
           : undefined;
       },
     };

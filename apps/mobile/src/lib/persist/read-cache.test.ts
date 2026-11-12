@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- cohesive unit suite for the read-cache allowlist, budget, fences, takeover, mismatch, and cleanup contract */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake KV factories settle without await because they resolve immediately */
-import { type Query, QueryClient } from '@tanstack/react-query';
+import { hashKey, type Query, QueryClient } from '@tanstack/react-query';
 import { type PersistedClient } from '@tanstack/react-query-persist-client';
 import * as SecureStore from 'expo-secure-store';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -347,6 +347,26 @@ describe('allowlist filter', () => {
 });
 
 describe('dehydration filter', () => {
+  const briefingReport = (organizationId: string | null) => ({ context: { organizationId } });
+  const personalReport = briefingReport(null);
+  const organizationReport = briefingReport('org-1');
+  const briefingListKey: readonly unknown[] = [
+    ['agentBriefing', 'list'],
+    { type: 'query', input: { scope: 'all', currentOnly: true, limit: 30 } },
+  ];
+  const briefingHistoryKey: readonly unknown[] = [
+    ['agentBriefing', 'list'],
+    { type: 'infinite', input: { scope: 'all', currentOnly: false, limit: 30 } },
+  ];
+  const briefingReportKey: readonly unknown[] = [
+    ['agentBriefing', 'get'],
+    { type: 'query', input: { reportId: 'report-1' } },
+  ];
+  const briefingPreferencesKey: readonly unknown[] = [
+    ['agentBriefing', 'preferences'],
+    { type: 'query', input: { timezone: 'UTC' } },
+  ];
+
   it('persists only successful queries on allowlisted shapes', () => {
     expect(shouldPersistReadCacheQuery(queryLike({ status: 'success' }, GET_ME_QUERY_KEY))).toBe(
       true
@@ -401,6 +421,101 @@ describe('dehydration filter', () => {
           },
           infiniteListKey
         )
+      )
+    ).toBe(false);
+  });
+
+  it('persists a briefing list only when every report names no organization', () => {
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike(
+          { status: 'success', data: { reports: [personalReport], nextCursor: null } },
+          briefingListKey
+        )
+      )
+    ).toBe(true);
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike(
+          {
+            status: 'success',
+            data: { reports: [personalReport, organizationReport], nextCursor: null },
+          },
+          briefingListKey
+        )
+      )
+    ).toBe(false);
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike(
+          {
+            status: 'success',
+            data: {
+              pages: [{ reports: [personalReport], nextCursor: null }],
+              pageParams: [undefined],
+            },
+          },
+          briefingHistoryKey
+        )
+      )
+    ).toBe(true);
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike(
+          {
+            status: 'success',
+            data: {
+              pages: [{ reports: [organizationReport], nextCursor: null }],
+              pageParams: [undefined],
+            },
+          },
+          briefingHistoryKey
+        )
+      )
+    ).toBe(false);
+  });
+
+  it('persists a briefing report and its preferences only in personal context', () => {
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike({ status: 'success', data: personalReport }, briefingReportKey)
+      )
+    ).toBe(true);
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike({ status: 'success', data: organizationReport }, briefingReportKey)
+      )
+    ).toBe(false);
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike(
+          { status: 'success', data: { contexts: [personalReport] } },
+          briefingPreferencesKey
+        )
+      )
+    ).toBe(true);
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike(
+          { status: 'success', data: { contexts: [personalReport, organizationReport] } },
+          briefingPreferencesKey
+        )
+      )
+    ).toBe(false);
+  });
+
+  it('persists no briefing payload whose shape does not name its own context', () => {
+    // A shape the filter cannot read is not restored: the server answer decides
+    // what a briefing surface paints.
+    expect(
+      shouldPersistReadCacheQuery(queryLike({ status: 'success', data: {} }, briefingListKey))
+    ).toBe(false);
+    expect(
+      shouldPersistReadCacheQuery(queryLike({ status: 'success', data: {} }, briefingReportKey))
+    ).toBe(false);
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike({ status: 'success', data: {} }, briefingPreferencesKey)
       )
     ).toBe(false);
   });
@@ -595,6 +710,63 @@ describe('cold-start restore and takeover', () => {
     expect(takeOverColdStartRestore()).toBe(readCacheScope('u1'));
     // A completed restore is reported exactly once.
     expect(takeOverColdStartRestore()).toBeNull();
+  });
+
+  it('drops a briefing entry an earlier blob holds but the current rule never restores', async () => {
+    const { scopes } = createFakeKv();
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    const briefingKey = (reportId: string) => [
+      ['agentBriefing', 'get'],
+      { type: 'query', input: { reportId } },
+    ];
+    const personalKey = briefingKey('personal-report');
+    const organizationKey = briefingKey('organization-report');
+    const successState = (data: unknown) => ({
+      data,
+      dataUpdateCount: 0,
+      dataUpdatedAt: Date.now(),
+      error: null,
+      errorUpdateCount: 0,
+      errorUpdatedAt: 0,
+      fetchFailureCount: 0,
+      fetchFailureReason: null,
+      fetchMeta: null,
+      isInvalidated: false,
+      status: 'success' as const,
+      fetchStatus: 'idle' as const,
+    });
+    const entry = (queryKey: readonly unknown[], data: unknown) => ({
+      queryHash: hashKey(queryKey),
+      queryKey,
+      dehydratedAt: Date.now(),
+      state: successState(data),
+    });
+    scopes.set(
+      readCacheScope('u1'),
+      new Map([
+        [
+          'read-cache',
+          JSON.stringify({
+            timestamp: Date.now(),
+            buster: '',
+            clientState: {
+              mutations: [],
+              queries: [
+                entry(GET_ME_QUERY_KEY, { id: 'u1' }),
+                entry(personalKey, { context: { organizationId: null } }),
+                entry(organizationKey, { context: { organizationId: 'org-1' } }),
+              ],
+            },
+          }),
+        ],
+      ])
+    );
+    const queryClient = new QueryClient();
+
+    await restorePersistedCacheOnColdStart(queryClient);
+
+    expect(queryClient.getQueryData(personalKey)).toEqual({ context: { organizationId: null } });
+    expect(queryClient.getQueryData(organizationKey)).toBeUndefined();
   });
 
   it('retries a rejected identity-hint read and still hydrates the cache', async () => {

@@ -1646,6 +1646,14 @@ test('test-scripts starts only for the inputs its two step groups read', () => {
       `${name}: gated on the data filter and the detector answer`
     );
   }
+  // The suite copies shared tables and reads the worktree rows, so it needs the
+  // migrated schema. This step also runs when the detector alone selects the
+  // service, a run in which the meter step above never applies the migrations.
+  assert.equal(
+    step('Run Session Ingest Postgres tests').run,
+    'NODE_ENV=development pnpm drizzle migrate && pnpm --filter cloudflare-session-ingest test:postgres',
+    'the session ingest suite migrates its own schema'
+  );
   // The workspace matrix runs one of these suites under its own condition, and
   // it must not repeat a run this job already covers, whichever of the two
   // conditions started it.

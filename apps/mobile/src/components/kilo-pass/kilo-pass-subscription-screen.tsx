@@ -53,7 +53,7 @@ function KiloPassLoadingScreen() {
             cannot paint the reserved blocks under the sensor area. */}
         <DetailScreenScrollView
           className="-mx-1 flex-1"
-          contentContainerClassName="gap-3 px-1"
+          contentContainerClassName="grow justify-center gap-3 px-1"
           showsVerticalScrollIndicator={false}
         >
           <Skeleton className="h-4 w-64 rounded" />

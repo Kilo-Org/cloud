@@ -5,7 +5,7 @@ import { Pressable, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 
-import { ChevronRight } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Text } from '@/components/ui/text';
 import { KiloPassIcon } from '@/components/kilo-pass/kilo-pass-icon';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -173,7 +173,11 @@ export function KiloPassSubscriptionCard({
                 {contentState.description}
               </Text>
             </>,
-            <ChevronRight size={16} color={colors.mutedForeground} className="shrink-0" />
+            <DirectionalChevronRight
+              size={14}
+              color={colors.mutedForeground}
+              className="shrink-0"
+            />
           )}
         </Pressable>
       ) : null}

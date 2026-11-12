@@ -33,7 +33,10 @@ import {
   type WorktreeChangesRefresh,
 } from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
-import { cloudAgentId, kiloId } from '@kilocode/cloud-agent-sdk/test-helpers';
+import { cloudAgentId } from '@kilocode/cloud-agent-sdk/test-helpers';
+
+import { AGENT_CHAT_FIXTURE_SESSION_ID } from './agent-chat-fixture-session';
+import { BLOCKED_BASH_COMMAND, PENDING_BASH_ASK } from './agent-chat-fixture-states';
 
 /**
  * The agent chat screen — transcript and composer — against one fixed
@@ -50,9 +53,6 @@ import { cloudAgentId, kiloId } from '@kilocode/cloud-agent-sdk/test-helpers';
  * writing into that account's drafts. That state is proven by device captures
  * and the component suites instead.
  */
-export const AGENT_CHAT_FIXTURE_SESSION_ID: KiloSessionId = kiloId(
-  'ses_designGateAgentChatFixture0001'
-);
 
 /** The prompt the refused message carries. */
 const FIXTURE_PROMPT = 'Deploy the fix to staging';
@@ -194,12 +194,29 @@ function fixed<T>(value: T) {
 /* eslint-disable require-await -- the fixture's methods settle without work, one per manager member */
 
 /**
+ * The still states the fixture can hold, one per design-gate target. The plain
+ * agent chat screen is `idle`; `pending-permission` holds the same screen behind
+ * a bash ask, so the row that reports the agent's activity can be compared
+ * while the agent waits for the answer; `running` holds the same blocked
+ * transcript with the ask answered, which is the row the wait returns to.
+ */
+export type AgentChatFixtureState = 'idle' | 'pending-permission' | 'running';
+
+/**
  * The session manager the real screen mounts against, typed as the product's own
  * interface so a member the screen starts reading is caught here, not on device.
  */
-export function createAgentChatFixtureManager(): SessionManager {
-  const messages: StoredMessage[] = [opening, answer, refused];
-  const pending = new Map<string, MessageDeliveryState>([[refused.info.id, undeliveredEntry]]);
+export function createAgentChatFixtureManager(
+  state: AgentChatFixtureState = 'idle'
+): SessionManager {
+  const waitingForPermission = state === 'pending-permission';
+  const streaming = state !== 'idle';
+  const messages: StoredMessage[] = streaming
+    ? [opening, answer, BLOCKED_BASH_COMMAND]
+    : [opening, answer, refused];
+  const pending = streaming
+    ? new Map<string, MessageDeliveryState>()
+    : new Map<string, MessageDeliveryState>([[refused.info.id, undeliveredEntry]]);
   const idle = async (): Promise<void> => undefined;
   return {
     switchSession: async () => undefined,
@@ -230,7 +247,7 @@ export function createAgentChatFixtureManager(): SessionManager {
     clearError: () => undefined,
     destroy: () => undefined,
     atoms: {
-      isStreaming: fixed(false),
+      isStreaming: fixed(streaming),
       isLoading: fixed(false),
       isRefreshingCachedTranscript: fixed(false),
       cachedTranscriptSessionId: fixed<KiloSessionId | null>(null),
@@ -258,7 +275,7 @@ export function createAgentChatFixtureManager(): SessionManager {
       question: fixed<QuestionState | null>(null),
       sessionInfo: fixed<SessionInfo | null>({ id: AGENT_CHAT_FIXTURE_SESSION_ID }),
       sessionId: fixed<CloudAgentSessionId | null>(cloudAgentId('cag_designGateAgentChat')),
-      activity: fixed<SessionActivity>({ type: 'idle' }),
+      activity: fixed<SessionActivity>(streaming ? { type: 'busy' } : { type: 'idle' }),
       agentStatus: fixed<AgentStatus>({ type: 'idle' }),
       cloudStatus: fixed<CloudStatus | null>(null),
       setupLog: fixed<readonly string[]>([]),
@@ -269,9 +286,13 @@ export function createAgentChatFixtureManager(): SessionManager {
       chatUI: fixed<{ shouldAutoScroll: boolean }>({ shouldAutoScroll: true }),
       activeQuestion: fixed<StandaloneQuestion | null>(null),
       permission: fixed<PermissionState | null>(null),
-      activePermission: fixed<StandalonePermission | null>(null),
+      activePermission: fixed<StandalonePermission | null>(
+        waitingForPermission ? PENDING_BASH_ASK : null
+      ),
       pendingQuestions: fixed<readonly StandaloneQuestion[]>([]),
-      pendingPermissions: fixed<readonly StandalonePermission[]>([]),
+      pendingPermissions: fixed<readonly StandalonePermission[]>(
+        waitingForPermission ? [PENDING_BASH_ASK] : []
+      ),
       unreadablePermissions: fixed<readonly UnreadablePermissionState[]>([]),
       suggestion: fixed<SuggestionState | null>(null),
       activeSuggestion: fixed<StandaloneSuggestion | null>(null),

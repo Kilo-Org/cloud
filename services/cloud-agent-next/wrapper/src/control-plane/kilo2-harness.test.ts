@@ -59,6 +59,53 @@ const credential = {
   expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
 };
 
+describe('Kilo v2 harness commit messages', () => {
+  it('uses the native commit-message RPC in the target repository with server authorization', async () => {
+    const message = 'fix: preserve descriptive commit messages';
+    const { url, requests } = startStub(() => Response.json({ output: { message } }));
+    const repository = '/workspace/another repository';
+
+    expect(await createHarness(url).generateCommitMessage({ path: repository })).toEqual({
+      message,
+    });
+    expect(requests).toEqual([
+      {
+        method: 'POST',
+        pathname: '/api/rpc/kilocode.commit-message/generate',
+        directory: repository,
+        authorization: 'Basic harness-test',
+        body: { input: { path: repository } },
+      },
+    ]);
+  });
+
+  it.each([
+    { status: 503, body: { message: 'Generation unavailable' } },
+    { status: 200, body: { output: { message: null } } },
+    { status: 200, body: { data: { text: 'Wrong API envelope' } } },
+    { status: 200, body: { error: { code: 'failed', message: 'Generation failed' } } },
+  ])('rejects failed or invalid native generation responses: %j', async ({ status, body }) => {
+    const { url, requests } = startStub(() => Response.json(body, { status }));
+    const error: unknown = await createHarness(url)
+      .generateCommitMessage({ path: directory })
+      .catch(cause => cause);
+    expect(error).toBeInstanceOf(Error);
+    expect(requests).toHaveLength(1);
+  });
+
+  it('honors cancellation before requesting a commit message', async () => {
+    const { url, requests } = startStub(() => Response.json({ output: { message: 'unused' } }));
+    const error: unknown = await createHarness(url)
+      .generateCommitMessage({
+        path: directory,
+        signal: AbortSignal.abort(),
+      })
+      .catch(cause => cause);
+    expect(error).toBeInstanceOf(Error);
+    expect(requests).toHaveLength(0);
+  });
+});
+
 describe('Kilo v2 harness compaction', () => {
   const sessionId = 'ses_compaction';
   const messageId = `msg_${'a'.repeat(26)}`;

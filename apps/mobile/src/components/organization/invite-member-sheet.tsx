@@ -1,3 +1,4 @@
+import { hasInviteSeatCapacity, inviteConsumesSeat } from '@kilocode/app-shared/organizations';
 import { useFocusEffect } from 'expo-router';
 import { Check } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useRef, useState } from 'react';
@@ -10,7 +11,10 @@ import {
   inviteEmailError,
   inviteErrorCopy,
 } from '@/components/organization/invite-member-validators';
-import { invitableRoles, submittedInviteRole } from '@/components/organization/invite-member-roles';
+import {
+  invitableRoles,
+  submittedInviteRole,
+} from '@/components/organization/organization-role-options';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { SheetHeader } from '@/components/sheet-header';
@@ -25,6 +29,8 @@ import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { captureEvent, ORGANIZATION_MEMBER_INVITED_EVENT } from '@/lib/analytics/posthog';
+import { isolateLtrBidiText } from '@/lib/bidi';
+import { formatNumber } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { isMoneyRole, type OrgRole, useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -44,7 +50,7 @@ export function InviteMemberSheet() {
   const popOnce = usePopOnce();
   // The sheet header takes its top clearance from the one shared rule.
   const modalTopInset = useFormSheetHeaderTopInset();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const colors = useThemeColors();
   const { organizationId, role: myRole, org, isResolving } = useOrgBoundary();
   const mutations = useOrganizationMutations(organizationId ?? '');
@@ -144,8 +150,31 @@ export function InviteMemberSheet() {
     return <PermissionDenied description={t('organization.inviteMember.permissionDenied')} />;
   }
 
+  // Seat capacity is the rule the web dialog shows and the invite procedure
+  // enforces. A billing manager takes no seat, so a full organization still
+  // accepts one; every other role is blocked here and, if the usage changed
+  // under this form, by the server.
+  const seatCapacityAvailable = hasInviteSeatCapacity({
+    plan: org.plan,
+    requireSeats: org.requireSeats,
+    usedSeats: org.seatCount.used,
+    totalSeats: org.seatCount.total,
+  });
+  const seatBlocked = !seatCapacityAvailable && inviteConsumesSeat(selectedRole);
+  const seatNumbers = {
+    used: isolateLtrBidiText(formatNumber(org.seatCount.used, i18n.language)),
+    total: isolateLtrBidiText(formatNumber(org.seatCount.total, i18n.language)),
+  };
+  let seatWarning: string | null = null;
+  if (seatBlocked) {
+    seatWarning = roles.includes('billing_manager')
+      ? t('organization.inviteMember.seatsFullCanInviteBilling', seatNumbers)
+      : t('organization.inviteMember.seatsFull', seatNumbers);
+  }
+  const canSubmitInvite = canSubmit && !seatBlocked;
+
   const onSubmit = () => {
-    if (!canSubmit) {
+    if (!canSubmitInvite) {
       return;
     }
     const email = emailRef.current.trim().toLowerCase();
@@ -172,7 +201,7 @@ export function InviteMemberSheet() {
         doneLabel={t('organization.inviteMember.sendInvite')}
         onCancel={requestClose}
         disabled={mutations.invite.isPending}
-        doneDisabled={!canSubmit || mutations.invite.isPending}
+        doneDisabled={!canSubmitInvite || mutations.invite.isPending}
         // A formSheet that is its stack's root presents at the window top, so
         // its header clears the status bar itself; a sheet pushed over another
         // screen settles an inset lower and reserves nothing. The native
@@ -217,6 +246,19 @@ export function InviteMemberSheet() {
           message={visibleInviteError?.field === 'form' ? visibleInviteError.message : null}
           className="text-sm"
         />
+
+        {/* A full organization states why Send is unavailable before the role
+            group, and names the one role that still works when the caller may
+            assign it. */}
+        {seatWarning ? (
+          <View
+            accessible
+            accessibilityRole="alert"
+            className="rounded-lg border border-warn-tile-border bg-warn-tile-bg p-3"
+          >
+            <Text className="text-sm text-warn">{seatWarning}</Text>
+          </View>
+        ) : null}
 
         {isBillingManager ? (
           <Text variant="muted">{t('organization.inviteMember.roleMember')}</Text>

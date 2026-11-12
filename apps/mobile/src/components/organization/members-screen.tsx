@@ -1,3 +1,7 @@
+import {
+  canManageOrganization,
+  canManageOrganizationOwners,
+} from '@kilocode/app-shared/organizations';
 import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
 import { UserPlus, Users } from '@/components/ui/icons';
@@ -98,7 +102,10 @@ export function OrganizationMembersScreen() {
   const isError = orgWithMembers.isError && !orgWithMembers.data;
   const enableUsageLimits = orgWithMembers.data?.settings.enable_usage_limits !== false;
   const canInvite = isMoneyRole(role);
-  const isOwner = role === 'owner';
+  // Membership management is owner-and-admin; owner management stays owner-only,
+  // mirroring the server's `assertOwnerAuthority` and the web's role dropdowns.
+  const canManageMembers = canManageOrganization(role);
+  const canManageOwners = canManageOrganizationOwners(role);
 
   const errorView = isError ? selectOrgListErrorView(orgWithMembers.error) : null;
 
@@ -151,7 +158,12 @@ export function OrganizationMembersScreen() {
           >
             <MemberRow
               member={item.member}
-              canManage={isOwner && item.member.id !== currentUserId}
+              canManage={
+                canManageMembers &&
+                item.member.id !== currentUserId &&
+                (item.member.role !== 'owner' || canManageOwners)
+              }
+              callerRole={role}
               enableUsageLimits={enableUsageLimits}
               organizationId={organizationId}
               last={item.last}
@@ -171,7 +183,7 @@ export function OrganizationMembersScreen() {
           >
             <InvitedMemberRow
               invite={item.invite}
-              canManage={isOwner}
+              canManage={canManageMembers && (item.invite.role !== 'owner' || canManageOwners)}
               organizationId={organizationId}
               last={item.last}
             />

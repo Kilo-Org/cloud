@@ -8,7 +8,7 @@ export type McpCatalogVariant =
       label: string;
       identityKey: string;
       target: McpTarget;
-      versionHint: string | null;
+      versionSpecHint: string | null;
     }
   | { eligible: false; label: string; reason: string };
 

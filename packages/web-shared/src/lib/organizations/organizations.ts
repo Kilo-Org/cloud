@@ -721,12 +721,56 @@ async function decideChildOrganizationMembership(
   return parentMembership ? 'permitted' : 'refused';
 }
 
+/**
+ * Refuses an address that already belongs to the organization, or that already
+ * has an invitation outstanding. It runs inside the caller's transaction, so a
+ * caller with a refusal of its own — the seat check — can raise this one first:
+ * an existing member never hears about the organization's seats.
+ */
+export async function assertInviteeAddressIsAvailable(
+  tx: DrizzleTransaction,
+  organizationId: Organization['id'],
+  email: string
+): Promise<void> {
+  const pendingInvitations = await tx
+    .select({ email: organization_invitations.email })
+    .from(organization_invitations)
+    .where(
+      and(
+        eq(organization_invitations.organization_id, organizationId),
+        isNull(organization_invitations.accepted_at),
+        gt(organization_invitations.expires_at, sql`NOW()`)
+      )
+    );
+
+  if (pendingInvitations.some(invitation => isSameInvitationAddress(invitation.email, email))) {
+    throw new Error('User already has a pending invitation');
+  }
+
+  const existingMembers = await organizationMembersMatchingEmail(tx, organizationId, email);
+
+  if (existingMembers.length > 0) {
+    throw new Error('User is already a member of this organization');
+  }
+}
+
+export type InviteUserOptions = {
+  /**
+   * The caller already ran {@link assertInviteeAddressIsAvailable} in this
+   * transaction. Only the invite procedure sets it: it must answer a duplicate
+   * address before its seat check, so it runs the lookup itself and asks the
+   * insert not to repeat it.
+   */
+  addressAlreadyChecked?: boolean;
+};
+
 export async function inviteUserToOrganization(
   organizationId: Organization['id'],
   invitingUserId: User['id'],
   email: string,
   role: OrganizationRole,
-  txn?: DrizzleTransaction
+  txn?: DrizzleTransaction,
+  options: InviteUserOptions = {}
 ): Promise<OrganizationInvitation> {
   const run = async (tx: DrizzleTransaction): Promise<OrganizationInvitation> => {
     const membershipRule = await decideChildOrganizationMembership(tx, organizationId, { email });
@@ -751,25 +795,8 @@ export async function inviteUserToOrganization(
       ssoSourceOrganizationId = policy.sourceOrganizationId;
     }
 
-    const pendingInvitations = await tx
-      .select({ email: organization_invitations.email })
-      .from(organization_invitations)
-      .where(
-        and(
-          eq(organization_invitations.organization_id, organizationId),
-          isNull(organization_invitations.accepted_at),
-          gt(organization_invitations.expires_at, sql`NOW()`)
-        )
-      );
-
-    if (pendingInvitations.some(invitation => isSameInvitationAddress(invitation.email, email))) {
-      throw new Error('User already has a pending invitation');
-    }
-
-    const existingMembers = await organizationMembersMatchingEmail(tx, organizationId, email);
-
-    if (existingMembers.length > 0) {
-      throw new Error('User is already a member of this organization');
+    if (!options.addressAlreadyChecked) {
+      await assertInviteeAddressIsAvailable(tx, organizationId, email);
     }
 
     const [invitation] = await tx

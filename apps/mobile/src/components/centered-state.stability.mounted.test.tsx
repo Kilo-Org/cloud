@@ -27,7 +27,7 @@ const native = vi.hoisted(() => {
     nativeViewportFillsSurface: false,
     register: vi.fn(() => vi.fn()),
   };
-  return { scale: 2, viewportTop: 0.5, viewportBottom: 800, surface };
+  return { scale: 2, viewportTop: 0.5, viewportBottom: 800, windowHeight: 800, surface };
 });
 
 vi.mock('@/components/centered-state-surface', () => ({ useStateSurface: () => native.surface }));
@@ -39,7 +39,7 @@ vi.mock('react-native', () => ({
   },
   // A portrait window, so the short-band flag the scroller publishes stays
   // false and this fixture measures the full stack.
-  useWindowDimensions: () => ({ width: 400, height: 800, fontScale: 1 }),
+  useWindowDimensions: () => ({ width: 400, height: native.windowHeight, fontScale: 1 }),
   View: 'View',
   ScrollView: (props: ComponentPropsWithRef<typeof ScrollView>) => {
     const { ref, ...rest } = props;
@@ -61,6 +61,7 @@ beforeEach(() => {
   native.scale = 2;
   native.viewportTop = 0.5;
   native.viewportBottom = 800;
+  native.windowHeight = 800;
   native.surface.frame = { top: 0, bottom: 800 };
   native.surface.bounds = { top: 0, bottom: 800 };
   native.surface.topInset = 0;
@@ -121,7 +122,7 @@ it.each([
 it.each([
   { clip: 'viewport', top: 0 },
   { clip: 'viewport', top: 100 / 3 },
-  { clip: 'surface', top: 0 },
+  { clip: 'window', top: 0 },
   { clip: 'inset', top: 0 },
 ])('keeps fractional exact-fit content inside the $clip at $top', async ({ clip, top }) => {
   native.scale = 3;
@@ -130,8 +131,8 @@ it.each([
   const bottom = native.viewportTop + height;
   if (clip === 'viewport') {
     native.viewportBottom = bottom;
-  } else if (clip === 'surface') {
-    native.surface.frame = { top: 0, bottom };
+  } else if (clip === 'window') {
+    native.windowHeight = bottom;
   } else {
     native.surface.bottomInset = 800 - bottom;
   }
@@ -151,7 +152,7 @@ it.each([
 
 it.each([
   { scale: 2, top: 320, viewportTop: 384, bottom: 640, height: 177.5, paddingTop: 39.5 },
-  { scale: 3, top: 0, viewportTop: 100, bottom: 800, height: 533 / 3, paddingTop: 634 / 3 },
+  { scale: 3, top: 0, viewportTop: 100, bottom: 800, height: 533 / 3, paddingTop: 784 / 3 },
 ])('does not add scrolling after rounding padding at $scale× density', async geometry => {
   native.scale = geometry.scale;
   native.viewportTop = geometry.viewportTop;
@@ -170,13 +171,13 @@ it.each([
 
 it.each([
   {
-    name: 'original surface center with unequal header and footer',
+    name: 'band center with unequal header and footer',
     bottom: 800,
     nativeBottom: 800,
     viewportBottom: 760,
     height: 200,
     nativeFill: false,
-    expected: { minHeight: 680, paddingTop: 220, paddingBottom: 260 },
+    expected: { minHeight: 680, paddingTop: 240, paddingBottom: 240 },
   },
   {
     name: 'native sheet clipped above the keyboard',
@@ -185,7 +186,7 @@ it.each([
     viewportBottom: 620,
     height: 120,
     nativeFill: true,
-    expected: { minHeight: 620, paddingTop: 60, paddingBottom: 440 },
+    expected: { minHeight: 620, paddingTop: 100, paddingBottom: 400 },
   },
   {
     name: 'overflow above the keyboard',
@@ -208,7 +209,7 @@ it.each([
 ])('preserves the $name', async geometry => {
   native.viewportTop = 80;
   native.viewportBottom = geometry.viewportBottom;
-  native.surface.frame = { top: 0, bottom: geometry.bottom };
+  native.windowHeight = geometry.bottom;
   native.surface.bounds = { top: 0, bottom: geometry.nativeBottom };
   native.surface.nativeViewportFillsSurface = geometry.nativeFill;
   const mounted = await mount();
@@ -225,7 +226,7 @@ it('normalizes fractional-pixel measurement noise but still responds to real hei
   const first = mounted.layout();
   await mounted.measure(200.333_343_505_859_38);
   expect(mounted.layout()).toEqual(first);
-  await mounted.measure(200.333_343_505_859_38 + 1 / native.scale);
+  await mounted.measure(200.333_343_505_859_38 + 1);
   expect(mounted.layout().paddingTop).toBeLessThan(first.paddingTop);
   mounted.unmount();
 });

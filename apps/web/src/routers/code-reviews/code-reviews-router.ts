@@ -25,6 +25,7 @@ import {
   getSessionUsageFromBilling,
 } from '@/lib/code-reviews/db/code-reviews';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import { readCodeReviewContainerCost } from '@/lib/code-reviews/compute-billing';
 import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
 import { setCommitStatus } from '@/lib/integrations/platforms/gitlab/adapter';
 import {
@@ -370,6 +371,20 @@ export const codeReviewRouter = createTRPCRouter({
             cached: 0,
           };
 
+      const containerCostMusd = await readCodeReviewContainerCost(
+        db,
+        review.owned_by_organization_id
+          ? { type: 'org', id: review.owned_by_organization_id }
+          : { type: 'user', id: ctx.user.id },
+        [
+          ...new Set(
+            [review.session_id, ...attempts.map(attempt => attempt.session_id)].filter(
+              (id): id is string => id !== null
+            )
+          ),
+        ]
+      );
+
       let selectedModel = review.model ?? (isTerminal ? (billingUsage?.model ?? null) : null);
       if (!selectedModel && !isTerminal) {
         selectedModel = selectedModelFromReviewSources({
@@ -427,6 +442,7 @@ export const codeReviewRouter = createTRPCRouter({
         attempts: visibleAttempts,
         tokenUsage,
         sessionCostMusd: billingUsage?.totalCostMusd ?? null,
+        containerCostMusd,
       });
     } catch (error) {
       if (error instanceof TRPCError) {

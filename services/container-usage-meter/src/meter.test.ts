@@ -24,9 +24,11 @@ vi.mock('./postgres', () => ({
   applyStart: vi.fn(),
   applyHeartbeat: vi.fn(),
   applyStop: vi.fn(),
+  getContainerUsageDb: vi.fn(),
+  resolveBillingMode: vi.fn(),
 }));
 
-import { applyHeartbeat, applyStart, applyStop } from './postgres';
+import { applyHeartbeat, applyStart, applyStop, resolveBillingMode } from './postgres';
 import { ContainerUsageMeter } from './meter';
 
 const context = {
@@ -93,6 +95,17 @@ beforeEach(() => {
 });
 
 describe('ContainerUsageMeter', () => {
+  it.each(['paid', 'shadow'] as const)('reports the admission billing decision: %s', async mode => {
+    vi.mocked(resolveBillingMode).mockResolvedValueOnce(mode);
+    await expect(
+      createMeter().getBillingMode({
+        service: 'cloud-agent-next-sandbox-containers-code-review',
+        subject: { type: 'user', id: 'oauth/provider/user' },
+      })
+    ).resolves.toBe(mode);
+    expect(applyStart).not.toHaveBeenCalled();
+  });
+
   it('writes an admitted start directly to PostgreSQL', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     await expect(createMeter().recordStart(validStart())).resolves.toEqual({

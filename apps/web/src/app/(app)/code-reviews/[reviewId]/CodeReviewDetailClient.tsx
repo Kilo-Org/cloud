@@ -287,8 +287,14 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
             )}
             {sessionCostMusd != null && isRenderableSessionCost(sessionCostMusd / 1_000_000) && (
               <div>
-                <dt className="text-muted-foreground">Cost</dt>
+                <dt className="text-muted-foreground">Model cost</dt>
                 <dd>{formatSessionCost(sessionCostMusd / 1_000_000)}</dd>
+              </div>
+            )}
+            {data.containerCostMusd !== null && (
+              <div>
+                <dt className="text-muted-foreground">Container cost</dt>
+                <dd>{formatSessionCost(data.containerCostMusd / 1_000_000)}</dd>
               </div>
             )}
             <div>

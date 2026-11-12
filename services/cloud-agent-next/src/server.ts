@@ -1,5 +1,6 @@
 import { byocVercelOwnerSchema } from './byoc/vercel-owner.js';
 import { Hono } from 'hono';
+import { billingSubjectSchema } from '@kilocode/container-usage';
 import type { Context, Next } from 'hono';
 import { trpcServer } from '@hono/trpc-server';
 import { appRouter } from './router.js';
@@ -313,6 +314,21 @@ registerControlLogRoutes(app);
 registerRuntimeArtifactRoutes(app);
 registerStartupFailureRoute(app);
 registerEnvironmentBuildRoutes(app);
+
+app.get('/internal/code-review/billing/:type/:id', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+  const subject = billingSubjectSchema.safeParse({
+    type: c.req.param('type'),
+    id: c.req.param('id'),
+  });
+  if (!subject.success) return c.text('Invalid billing owner', 400);
+  const mode = await c.env.CONTAINER_USAGE_METER.getBillingMode({
+    service: 'cloud-agent-next-sandbox-containers-code-review',
+    subject: subject.data,
+  });
+  return c.json({ enabled: mode === 'paid' }, 200, { 'Cache-Control': 'no-store' });
+});
 
 app.get('/internal/byoc/vercel-enrollment/:organizationId', (c: Context<HonoContext>) => {
   const unauthorized = requireInternalApi(c);

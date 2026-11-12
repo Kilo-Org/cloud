@@ -74,6 +74,14 @@ type PurchaseHistoryRowProps = Readonly<{
 }>;
 
 /**
+ * The receipt action's reach. Its own box is the audit's 28 dp floor and
+ * renders 27.8 dp at this density, so the slop has to carry it past
+ * `DESIGN.md`'s 44 dp: 8 per side lands on 43.8 dp, and 9 measures 45.8 dp.
+ * Horizontal too: the row's `gap-3` keeps the reach off the amount beside it.
+ */
+const RECEIPT_HIT_SLOP = { top: 9, bottom: 9, left: 9, right: 9 } as const;
+
+/**
  * One paid credit purchase.
  *
  * A card purchase keeps its Stripe receipt behind the trailing action; a pack
@@ -109,10 +117,14 @@ export const PurchaseHistoryRow = memo(function PurchaseHistoryRow({
         </Text>
         {channel === 'card' && (
           <Pressable
-            className="w-5 items-center justify-center active:opacity-70"
-            // The glyph is 14 dp; the slop gives the action a 44 dp touch box
-            // without widening the column the amount aligns against.
-            hitSlop={15}
+            // The audit reads the pressable's own rect, and the glyph is 14 dp,
+            // so the box carries the floor itself: 28 dp, with the negative
+            // margin cancelling it back to one line so the row keeps its
+            // height (the same form as `INLINE_LINK_BOX_CLASS`). The slop then
+            // carries the reach to 44 dp without overlapping the amount beside
+            // it.
+            className="-my-[7px] min-h-[28px] min-w-[28px] items-center justify-center active:opacity-70"
+            hitSlop={RECEIPT_HIT_SLOP}
             disabled={isOpeningReceipt}
             accessibilityRole="button"
             accessibilityState={{ busy: isOpeningReceipt }}

@@ -68,6 +68,18 @@ export const WIDGET_STORE_CLASS_MARKER = {
   value: 'after-first-unlock',
 } as const;
 
+/**
+ * The item the upgrade writes with expo-secure-store's default class to prove the
+ * device is unlocked right now. A `WHEN_UNLOCKED` write is refused while the
+ * device is locked (`SecureStoreModule.swift`: `setValueWithKeyAsync` throws for
+ * every status but success and duplicate), so a successful write is the one
+ * positive answer to "may I read a not-yet-upgraded item's absence as absent?".
+ */
+export const WIDGET_STORE_UNLOCK_CANARY = {
+  key: 'widget-store-unlock-canary',
+  value: 'unlocked',
+} as const;
+
 /** The read half of a store; a caller that only reads can supply exactly that. */
 export type GatedReadStore = {
   getItemAsync(key: string, options?: GatedStoreOptions): Promise<string | null>;
@@ -112,6 +124,31 @@ export function withWidgetAccessibility(store: NativeWidgetStore): GatedSecureSt
 export function widgetSecureStore(): GatedSecureStore {
   // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- headless-safe lazy native load: the pure suites that import this module must not load expo-modules-core
   return withWidgetAccessibility(require('expo-secure-store') as NativeWidgetStore);
+}
+
+/**
+ * The same keychain written with expo-secure-store's default `WHEN_UNLOCKED`
+ * class. Only the upgrade's canary uses it: that class cannot be written while
+ * the device is locked, which makes a successful write the proof that a `null`
+ * from a not-yet-upgraded item is an absence rather than a locked read.
+ */
+export function widgetStoreDefaultClass(): GatedSecureStore {
+  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- headless-safe lazy native load: the pure suites that import this module must not load expo-modules-core
+  return require('expo-secure-store') as GatedSecureStore;
+}
+
+/** `true` only when a default-class write lands right now, so the device is unlocked. */
+async function deviceIsUnlocked(resolveStore: () => GatedSecureStore): Promise<boolean> {
+  try {
+    await resolveStore().setItemAsync(
+      WIDGET_STORE_UNLOCK_CANARY.key,
+      WIDGET_STORE_UNLOCK_CANARY.value
+    );
+    return true;
+  } catch (error) {
+    reportSecureStoreFailure('write', error);
+    return false;
+  }
 }
 
 /**
@@ -231,19 +268,25 @@ export function writeGatedValue(
  *
  * The read and the write are one queue step, so the upgrade can never overwrite
  * a newer value: a write ordered before it is the value it reads and repeats,
- * and a write ordered after it wins. An absent item has nothing to upgrade and
- * reads as done; an unreadable item or a refused write reads as `false`, so the
- * caller does not record an upgrade it never made.
+ * and a write ordered after it wins. An empty read counts as done only when a
+ * default-class canary write proves the device is unlocked — an item the upgrade
+ * has not rewritten yet can answer `null` while locked, and the marker must never
+ * claim such an item was upgraded. A refused canary or write reads as `false`,
+ * so the caller stops without recording the upgrade.
  */
 export function upgradeGatedValue(
   resolveStore: () => GatedSecureStore,
-  key: string
+  key: string,
+  resolveDefaultClassStore: () => GatedSecureStore = widgetStoreDefaultClass
 ): Promise<boolean> {
   return serialized(key, async () => {
     const stored = await readGatedValueRaw(resolveStore, key);
     if (stored.status === 'unreadable') {
       return false;
     }
-    return stored.value === null || (await setGatedValue(resolveStore, key, stored.value));
+    if (stored.value === null) {
+      return deviceIsUnlocked(resolveDefaultClassStore);
+    }
+    return setGatedValue(resolveStore, key, stored.value);
   });
 }

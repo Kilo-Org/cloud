@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive store suite: the class write, the upgrade, the absence proof and the per-key ordering share one fake store */
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import {
@@ -8,9 +9,11 @@ import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
 
 import {
   type GatedSecureStore,
+  type NativeWidgetStore,
   readGatedValueForUpdate,
   upgradeGatedValue,
   WIDGET_STORE_CLASS_MARKER,
+  WIDGET_STORE_UNLOCK_CANARY,
   withWidgetAccessibility,
   writeGatedValue,
 } from '@/lib/auth/secure-store-gated';
@@ -31,6 +34,7 @@ import {
 } from '@/lib/telemetry/error-sink';
 
 import {
+  GLANCEABLE_LEGACY_SCOPE_KEY,
   GLANCEABLE_SNAPSHOT_KEY,
   HOME_WIDGET_DATA_KEY,
   migrateWidgetStoreAccessibility,
@@ -50,6 +54,8 @@ type SetItem = (key: string, value: string) => Promise<void>;
 type InspectableStore = {
   getItem: Mock<GetItem>;
   setItem: Mock<SetItem>;
+  /** The native module stand-in, written with the platform's default class. */
+  native: NativeWidgetStore;
   gated: GatedSecureStore;
 };
 
@@ -67,18 +73,15 @@ async function defaultSetItem(key: string, value: string): Promise<void> {
   store.set(key, value);
 }
 
-function inspectableStore(): InspectableStore {
+function inspectableStore(write: SetItem = defaultSetItem): InspectableStore {
   const getItem = vi.fn(defaultGetItem);
-  const setItem = vi.fn(defaultSetItem);
-  return {
-    getItem,
-    setItem,
-    gated: withWidgetAccessibility({
-      AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
-      getItemAsync: getItem,
-      setItemAsync: setItem,
-    }),
+  const setItem = vi.fn(write);
+  const native: NativeWidgetStore = {
+    AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+    getItemAsync: getItem,
+    setItemAsync: setItem,
   };
+  return { getItem, setItem, native, gated: withWidgetAccessibility(native) };
 }
 
 /** Mark the install as upgraded, the state every absence proof needs. */
@@ -180,57 +183,103 @@ describe('the widget store writes with AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY', () 
 });
 
 describe('migrateWidgetStoreAccessibility', () => {
-  it('upgrades an existing item once, then marks the class applied', async () => {
-    store.set(GLANCEABLE_SNAPSHOT_KEY, '{"scopeKey":"s1"}');
-    const { setItem, gated } = inspectableStore();
+  const STORED: Readonly<Record<string, string>> = {
+    [HOME_WIDGET_DATA_KEY]: '{"snapshot":{}}',
+    [GLANCEABLE_SNAPSHOT_KEY]: '{"scopeKey":"s1"}',
+    [GLANCEABLE_LEGACY_SCOPE_KEY]: 'scope-key',
+    [SESSION_CARD_SCOPE_KEY]: '{"version":1,"cards":{}}',
+    [ACTIVE_USER_ID_KEY]: 'u1',
+    [ORGANIZATION_STORAGE_KEY]: 'org-9',
+  };
 
-    await migrateWidgetStoreAccessibility(() => gated);
+  it('upgrades every stored item once, then marks the class applied', async () => {
+    for (const [key, value] of Object.entries(STORED)) {
+      store.set(key, value);
+    }
+    const { setItem, native, gated } = inspectableStore();
+
+    await migrateWidgetStoreAccessibility(
+      () => gated,
+      () => native
+    );
 
     expect(setItem.mock.calls).toEqual([
-      [
-        GLANCEABLE_SNAPSHOT_KEY,
-        '{"scopeKey":"s1"}',
+      ...Object.entries(STORED).map(([key, value]) => [
+        key,
+        value,
         { keychainAccessible: AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY },
-      ],
+      ]),
       [
         WIDGET_STORE_CLASS_MARKER.key,
         WIDGET_STORE_CLASS_MARKER.value,
         { keychainAccessible: AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY },
       ],
     ]);
-    expect(store.get(GLANCEABLE_SNAPSHOT_KEY)).toBe('{"scopeKey":"s1"}');
+    // Every value is unchanged; only the class moved.
+    for (const [key, value] of Object.entries(STORED)) {
+      expect(store.get(key)).toBe(value);
+    }
 
-    // The marker records the upgrade, so the next start leaves the item alone.
-    await migrateWidgetStoreAccessibility(() => gated);
-    expect(writtenKeys(setItem)).toEqual([GLANCEABLE_SNAPSHOT_KEY, WIDGET_STORE_CLASS_MARKER.key]);
+    // The marker records the upgrade, so the next start leaves the items alone.
+    await migrateWidgetStoreAccessibility(
+      () => gated,
+      () => native
+    );
+    expect(writtenKeys(setItem)).toHaveLength(Object.keys(STORED).length + 1);
   });
 
-  it('skips a key the install never stored', async () => {
-    store.set(HOME_WIDGET_DATA_KEY, '{"snapshot":{}}');
-    const { setItem, gated } = inspectableStore();
+  it('counts an absent item as done once the canary proves the device unlocked', async () => {
+    const { setItem, native, gated } = inspectableStore();
 
-    await migrateWidgetStoreAccessibility(() => gated);
+    await migrateWidgetStoreAccessibility(
+      () => gated,
+      () => native
+    );
 
-    expect(writtenKeys(setItem)).toEqual([HOME_WIDGET_DATA_KEY, WIDGET_STORE_CLASS_MARKER.key]);
-  });
-
-  it('upgrades the identity hints the locked fences read', async () => {
-    store.set(ACTIVE_USER_ID_KEY, 'u1');
-    store.set(ORGANIZATION_STORAGE_KEY, 'org-9');
-    const { setItem, gated } = inspectableStore();
-
-    await migrateWidgetStoreAccessibility(() => gated);
-
-    expect(writtenKeys(setItem)).toEqual([
-      ACTIVE_USER_ID_KEY,
-      ORGANIZATION_STORAGE_KEY,
+    // Nothing to rewrite: every empty read is vouched for by a default-class
+    // write, and the marker is written last.
+    expect(new Set(writtenKeys(setItem))).toEqual(
+      new Set([WIDGET_STORE_UNLOCK_CANARY.key, WIDGET_STORE_CLASS_MARKER.key])
+    );
+    expect(setItem).toHaveBeenLastCalledWith(
       WIDGET_STORE_CLASS_MARKER.key,
-    ]);
+      WIDGET_STORE_CLASS_MARKER.value,
+      { keychainAccessible: AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY }
+    );
+  });
+
+  it('does not record the upgrade when the canary cannot be written', async () => {
+    // A default-class write is refused while the device is locked, so an empty
+    // read is no proof of absence then: nothing may be recorded as upgraded.
+    const getItem = vi.fn(defaultGetItem);
+    const setItem = vi.fn(defaultSetItem);
+    const native: NativeWidgetStore = {
+      getItemAsync: getItem,
+      setItemAsync: vi.fn(async () => {
+        await Promise.resolve();
+        throw new Error(REFUSED);
+      }),
+    };
+    const gated = withWidgetAccessibility({
+      AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+      getItemAsync: getItem,
+      setItemAsync: setItem,
+    });
+
+    await migrateWidgetStoreAccessibility(
+      () => gated,
+      () => native
+    );
+
+    expect(store.has(WIDGET_STORE_CLASS_MARKER.key)).toBe(false);
+    expect(setItem).not.toHaveBeenCalled();
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs.length).toBeGreaterThan(0);
   });
 
   it('cannot restore an identity hint a delete removes on its own chain', async () => {
     store.set(ACTIVE_USER_ID_KEY, 'u1');
-    const { setItem, gated } = inspectableStore();
+    const { setItem, native, gated } = inspectableStore();
     // The owner's sign-out delete is already on the key's chain when the upgrade
     // starts; the upgrade joins behind it, so it reads the key as absent instead
     // of writing the id it saw earlier back over the delete.
@@ -239,7 +288,10 @@ describe('migrateWidgetStoreAccessibility', () => {
       await gate.promise;
       store.delete(ACTIVE_USER_ID_KEY);
     });
-    const migration = migrateWidgetStoreAccessibility(() => gated);
+    const migration = migrateWidgetStoreAccessibility(
+      () => gated,
+      () => native
+    );
 
     gate.resolve(null);
     await Promise.all([del, migration]);
@@ -249,10 +301,13 @@ describe('migrateWidgetStoreAccessibility', () => {
   });
 
   it('leaves the marker unwritten when the keychain refuses a read', async () => {
-    const { setItem, getItem, gated } = inspectableStore();
+    const { setItem, getItem, native, gated } = inspectableStore();
     getItem.mockRejectedValue(new Error(REFUSED));
 
-    await migrateWidgetStoreAccessibility(() => gated);
+    await migrateWidgetStoreAccessibility(
+      () => gated,
+      () => native
+    );
 
     expect(setItem).not.toHaveBeenCalled();
     expect(store.has(WIDGET_STORE_CLASS_MARKER.key)).toBe(false);
@@ -261,16 +316,19 @@ describe('migrateWidgetStoreAccessibility', () => {
   });
 
   it('leaves the marker unwritten when the keychain refuses a write', async () => {
-    store.set(GLANCEABLE_SNAPSHOT_KEY, '{"scopeKey":"s1"}');
-    const { setItem, getItem, gated } = inspectableStore();
+    const { setItem, getItem, native, gated } = inspectableStore(async () => {
+      await Promise.resolve();
+      throw new Error(REFUSED);
+    });
     getItem.mockResolvedValue(null);
-    setItem.mockRejectedValue(new Error(REFUSED));
 
-    await migrateWidgetStoreAccessibility(() => gated);
+    await migrateWidgetStoreAccessibility(
+      () => gated,
+      () => native
+    );
 
-    expect(writtenKeys(setItem)).toEqual([WIDGET_STORE_CLASS_MARKER.key]);
+    expect(writtenKeys(setItem)).toEqual([WIDGET_STORE_UNLOCK_CANARY.key]);
     expect(store.has(WIDGET_STORE_CLASS_MARKER.key)).toBe(false);
-    expect(store.get(GLANCEABLE_SNAPSHOT_KEY)).toBe('{"scopeKey":"s1"}');
   });
 });
 

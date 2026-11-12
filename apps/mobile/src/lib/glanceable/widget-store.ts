@@ -5,6 +5,7 @@ import {
   WIDGET_STORE_CLASS_MARKER,
   widgetSecureStore,
   widgetStoreClassApplied,
+  widgetStoreDefaultClass,
   writeGatedValue,
 } from '@/lib/auth/secure-store-gated';
 import { chainSave } from '@/lib/hooks/save-chain';
@@ -54,12 +55,13 @@ const lockReadableKeys: ReadonlySet<string> = new Set(LOCK_READABLE_METADATA_KEY
  */
 function upgradeWidgetStoreItem(
   resolveStore: () => GatedSecureStore,
+  resolveDefaultClassStore: () => GatedSecureStore,
   key: string
 ): Promise<boolean> {
   if (lockReadableKeys.has(key)) {
-    return chainSave(key, () => upgradeGatedValue(resolveStore, key));
+    return chainSave(key, () => upgradeGatedValue(resolveStore, key, resolveDefaultClassStore));
   }
-  return upgradeGatedValue(resolveStore, key);
+  return upgradeGatedValue(resolveStore, key, resolveDefaultClassStore);
 }
 
 /**
@@ -73,20 +75,22 @@ function upgradeWidgetStoreItem(
  *
  * The marker is the whole point. It is written with the same class and only
  * after every item, so its presence is what lets an absent record read as absent
- * rather than unreadable (`lib/auth/secure-store-gated`). A device that has not
- * been unlocked since boot, or a pass that stopped at a refused write, leaves it
- * unwritten: every absence then stays unreadable and the next unlocked start
+ * rather than unreadable (`lib/auth/secure-store-gated`). An empty read counts as
+ * done only after a default-class canary write proves the device is unlocked, so
+ * a pass that starts or runs on with the screen locked never records an item it
+ * could not read; the marker stays unwritten and the next unlocked start
  * finishes the upgrade, which is the safe direction.
  */
 export async function migrateWidgetStoreAccessibility(
-  resolveStore: () => GatedSecureStore = widgetSecureStore
+  resolveStore: () => GatedSecureStore = widgetSecureStore,
+  resolveDefaultClassStore: () => GatedSecureStore = widgetStoreDefaultClass
 ): Promise<void> {
   if (await widgetStoreClassApplied(resolveStore)) {
     return;
   }
   for (const key of WIDGET_STORE_KEYS) {
     // eslint-disable-next-line no-await-in-loop -- one item at a time: a device that has not been unlocked since boot refuses every call, and the upgrade must stop after the first refusal instead of firing the rest of them
-    if (!(await upgradeWidgetStoreItem(resolveStore, key))) {
+    if (!(await upgradeWidgetStoreItem(resolveStore, resolveDefaultClassStore, key))) {
       return;
     }
   }

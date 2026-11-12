@@ -5,8 +5,8 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
 import migrations from '../../drizzle/migrations';
 import * as state from '../db/state';
-import { applyEvent } from '../dispatch/apply-event';
-import type { AppCallContext, AttemptOutcome } from '../dispatch/app-client';
+import { applyEvent, directoryIdOf } from '../dispatch/apply-event';
+import type { AppCallContext, AttemptClass, AttemptOutcome } from '../dispatch/app-client';
 import type { EventFailureState, PollResult, ScimSyncDOStatus } from '../types';
 import {
   CATCH_UP_DELAY_SECONDS,
@@ -21,6 +21,18 @@ import {
 import { clampPollIntervalSeconds } from '../util/interval';
 import { logger } from '../util/logger';
 import { resolveSecret } from '../util/secret';
+
+/**
+ * A failure the loop steps over, and what it records for it.
+ *
+ * The class is not always the attempt's own: a conflict a directory can never
+ * clear is parked as terminal, because nothing the directory sends repairs it.
+ */
+type ParkDecision = {
+  class: AttemptClass;
+  /** Stored on the park row and logged; never an event's `data`. */
+  reason: string | null;
+};
 
 export class ScimSyncDO extends DurableObject<Env> {
   private db: state.Db;
@@ -164,11 +176,21 @@ export class ScimSyncDO extends DurableObject<Env> {
           }
 
           lastEventId = event.id;
+          const directoryId = directoryIdOf(event);
           const outcome = await applyEvent(app, event);
 
           if (outcome.class === 'applied') {
             state.commitCursor(this.db, event.id, seed);
             state.clearFailure(this.db, event.id);
+            if (directoryId !== null) {
+              // The window belongs to this event: it closes when the event
+              // that opened it applies, and an activation that applies binds the
+              // directory's organization, so both records are stale.
+              state.closeConflictWindow(this.db, directoryId, event.id);
+              if (event.event === 'dsync.activated') {
+                state.clearDirectoryLimits(this.db, directoryId);
+              }
+            }
             cursor = event.id;
             eventsApplied += 1;
             continue;
@@ -176,22 +198,30 @@ export class ScimSyncDO extends DurableObject<Env> {
 
           const now = Date.now();
           const failure = state.recordFailure(this.db, event, outcome, now);
+          const decision = this.parkDecision(outcome, failure, now, directoryId);
 
-          if (this.shouldPark(outcome, failure, now)) {
+          if (decision !== null) {
             // Parking advances the cursor past the event, which is the whole
             // point: the stream continues, and the event stays recoverable in
             // `parked_events` rather than being silently lost.
-            state.parkEvent(this.db, event, outcome, failure.attempts, now);
+            state.parkEvent(this.db, event, outcome, decision, failure.attempts, now);
+            if (event.event === 'dsync.activated' && directoryId !== null) {
+              // A parked activation leaves the directory without a bound
+              // organization, so its missing-organization conflicts park at
+              // once from here on.
+              state.markActivationParked(this.db, directoryId, now);
+            }
             state.commitCursor(this.db, event.id, seed);
             cursor = event.id;
             eventsParked += 1;
             logger.error('SCIM sync parked an event', {
               eventId: event.id,
               eventType: event.event,
-              class: outcome.class,
+              directoryId,
+              class: decision.class,
               status: outcome.status,
               code: outcome.code,
-              reason: outcome.reason,
+              reason: decision.reason,
               attempts: failure.attempts,
             });
             continue;
@@ -256,20 +286,68 @@ export class ScimSyncDO extends DurableObject<Env> {
   }
 
   /**
-   * Whether a failed event is stepped over rather than retried.
+   * Whether a failed event is stepped over rather than retried, and what the
+   * park records.
    *
    * `terminal` parks at once: no arrival order and no waiting repairs a
    * structural violation or a claim the directory cannot substantiate.
-   * `conflict` parks only once its one-hour budget from the first failure is
-   * spent — a conflict names a dependency an event *behind* the cursor can
-   * supply, and nothing ahead of it ever will. `unavailable` never parks: the
-   * app not answering says nothing about the event, and parking the stream
-   * over a missing secret would discard every event behind it.
+   * `unavailable` never parks: the app not answering says nothing about the
+   * event, and parking the stream over a missing secret would discard every
+   * event behind it.
+   *
+   * `conflict` names a dependency an event *behind* the cursor can supply, so it
+   * is retried — but only within two bounds, because the cursor is shared by
+   * every tenant:
+   *
+   * - the event's own first failure, which is what a single conflicting event is
+   *   allowed to hold;
+   * - its directory's conflict window, which is what one directory is allowed to
+   *   hold in aggregate. The window opens at its first conflicting event and is
+   *   spent after one budget, so its later conflicts park at once and the
+   *   directory's events hold the shared cursor for about one budget in total.
+   *
+   * A directory whose activation was parked has no organization bound and no
+   * later event binds one, so its missing-organization conflicts are decided
+   * rather than retried, and park at once.
    */
-  private shouldPark(outcome: AttemptOutcome, failure: EventFailureState, now: number): boolean {
-    if (outcome.class === 'terminal') return true;
-    if (outcome.class !== 'conflict') return false;
-    return now - failure.firstFailedAt >= CONFLICT_RETRY_BUDGET_MS;
+  private parkDecision(
+    outcome: AttemptOutcome,
+    failure: EventFailureState,
+    now: number,
+    directoryId: string | null
+  ): ParkDecision | null {
+    if (outcome.class === 'terminal') {
+      return { class: 'terminal', reason: outcome.reason };
+    }
+    if (outcome.class !== 'conflict') return null;
+
+    const reason = outcome.reason ?? 'the app answered with a retryable conflict';
+
+    if (directoryId !== null) {
+      if (
+        outcome.code === 'directory_not_found' &&
+        state.activationParkedAt(this.db, directoryId) !== null
+      ) {
+        return {
+          class: 'terminal',
+          reason: `${reason}; the directory's activation was parked, so no event can bind its organization`,
+        };
+      }
+
+      const window = state.openConflictWindow(this.db, directoryId, failure.eventId, now);
+      if (now - window.firstConflictAt >= CONFLICT_RETRY_BUDGET_MS) {
+        return {
+          class: 'conflict',
+          reason: `${reason}; the directory has spent its conflict window`,
+        };
+      }
+    }
+
+    if (now - failure.firstFailedAt >= CONFLICT_RETRY_BUDGET_MS) {
+      return { class: 'conflict', reason: outcome.reason };
+    }
+
+    return null;
   }
 
   /**

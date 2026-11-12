@@ -103,6 +103,7 @@ import {
 import {
   sandboxProviderConfigurationSchema,
   ProviderCreationError,
+  ProviderSnapshotCreationError,
   type ProviderAdapter,
   type ProviderAllocationIntent,
   type ProviderCreateIntent,
@@ -545,11 +546,15 @@ class EnvironmentSnapshotRequiredError extends Error {
   }
 }
 
-type EnvironmentSnapshotUnusableReason = 'provider_no_snapshots' | 'not_isolated';
+type EnvironmentSnapshotUnusableReason =
+  | 'provider_no_snapshots'
+  | 'not_isolated'
+  | 'provider_mismatch';
 
 const ENVIRONMENT_SNAPSHOT_UNUSABLE_DETAIL: Record<EnvironmentSnapshotUnusableReason, string> = {
   provider_no_snapshots: ENVIRONMENT_SNAPSHOT_MESSAGES.unsupported,
   not_isolated: ENVIRONMENT_SNAPSHOT_MESSAGES.newSession,
+  provider_mismatch: ENVIRONMENT_SNAPSHOT_MESSAGES.providerMismatch,
 };
 
 /**
@@ -2876,7 +2881,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const previous = await this.readAllocation();
     const timers = { ...this.sandboxTimers() };
     if (
-      this.currentProvider() === 'cloudflare-containers' &&
+      this.provider.environmentSnapshots !== undefined &&
       (event.type === 'ensure' || event.type === 'tick')
     ) {
       const routes = await listRoutes(this.db);
@@ -5093,6 +5098,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
       let createdRef: string | null = null;
       let billingAdmissionDeadlineAt: number | undefined;
       let billingAdmissionTimedOut = false;
+      let selectedLaunch:
+        | { options: ProviderLaunchOptions; selection: SnapshotStartSelection | null }
+        | undefined;
       try {
         const pin = this.providerPin;
         if (pin === null) throw new ProviderCreationError('invalid_configuration');
@@ -5125,11 +5133,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
         );
         const launchEnv = await this.wrapperLaunchEnv(credential, allocationId, pin.provider);
         if (pin.billing) await assertContainerAccountAvailable(this.env, pin.billing);
+        selectedLaunch =
+          this.provider.environmentSnapshots === 'create'
+            ? await this.environmentSnapshotLaunch(state, allocationId, createDeadline)
+            : undefined;
         const intent: ProviderCreateIntent = {
           intentId: allocationId,
           createdAt: Date.now(),
           allocationName: pin.allocationName ?? this.sandboxId,
           containment: this.resolvedContainment(),
+          ...(selectedLaunch?.options.snapshot === undefined
+            ? {}
+            : { snapshot: selectedLaunch.options.snapshot }),
           ...(pin.billing === null ? {} : { billing: pin.billing }),
         };
         // Serialize admission setup with alarm failure notifications. Start the RPC
@@ -5225,7 +5240,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
         );
         const launch =
           workspaceSnapshot === null
-            ? await this.environmentSnapshotLaunch(current, allocationId, launchDeadline)
+            ? (selectedLaunch ??
+              (await this.environmentSnapshotLaunch(current, allocationId, launchDeadline)))
             : {
                 options: {
                   snapshot: {
@@ -5320,6 +5336,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
           !(error instanceof ProviderCreationError && error.code === 'meter_unavailable')
         ) {
           await clearNativeBillingAdmissionDeadline(this.ctx.storage);
+        }
+        if (error instanceof ProviderSnapshotCreationError) {
+          await this.failSnapshotStart(
+            allocationId,
+            this.snapshotStartFailure(selectedLaunch?.selection ?? null, error.reason)
+          );
+          return;
         }
         if (error instanceof RetiredSandboxProviderError) {
           logControlDiagnostic(
@@ -5629,7 +5652,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // Build commands run only in an environment build. When no environment
       // snapshot can serve this start, rebuilding cannot help: fail at once.
       const unusable =
-        this.provider.environmentSnapshots !== true
+        this.provider.environmentSnapshots === undefined
           ? 'provider_no_snapshots'
           : 'reason' in selected && selected.reason === 'not_isolated'
             ? 'not_isolated'
@@ -5661,8 +5684,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const lookup = await lookupEnvironmentSnapshot({
       namespace: this.env.ENVIRONMENT_BUILD,
       candidate,
+      provider: this.currentProvider() === 'vercel' ? 'vercel' : 'cloudflare-containers',
       launchDeadlineAt,
     });
+    if (lookup.kind === 'resolved' && lookup.resolution.reason === 'provider_mismatch') {
+      log({ reason: 'provider_mismatch' });
+      throw new EnvironmentSnapshotUnusableError(
+        'provider_mismatch',
+        ENVIRONMENT_SNAPSHOT_UNUSABLE_DETAIL.provider_mismatch,
+        candidate.reference.environmentId
+      );
+    }
     const decision = environmentSnapshotDecision(candidate, lookup);
     if (decision.kind === 'blocked') {
       log({
@@ -5808,7 +5840,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
           'Sandbox launch timed out'
         );
       } catch (error) {
-        if (!requestedSnapshot) throw error;
+        // A create-time snapshot cannot be retried by launch. Retry creation
+        // through the allocation lifecycle instead.
+        if (!requestedSnapshot || this.provider.environmentSnapshots === 'create') throw error;
         if (await this.allocationOwnedElsewhere(input.allocationId)) {
           return {
             result: { startSource: 'repository' },

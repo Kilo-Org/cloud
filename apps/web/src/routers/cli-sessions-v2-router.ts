@@ -27,6 +27,7 @@ import {
   cli_sessions_v2,
   cloud_agent_session_runs,
   cloud_agent_user_settings,
+  cloud_agent_workspace_folders,
   cloud_agent_worktrees,
   github_branch_pull_requests,
   organization_memberships,
@@ -1462,6 +1463,14 @@ export const cliSessionsV2Router = createTRPCRouter({
         .select({
           sessionId: sql<string>`${cli_sessions_v2.session_id}`.as('session_id'),
           worktreeId: sql<string>`${cli_sessions_v2.cloud_agent_worktree_id}`.as('worktree_id'),
+          doneFolderEnabled: sql<boolean>`exists (
+            select 1 from ${cloud_agent_workspace_folders}
+            where ${cloud_agent_workspace_folders.kilo_user_id} = ${ctx.user.id}
+              and ${cloud_agent_workspace_folders.organization_id}
+                is not distinct from ${cli_sessions_v2.organization_id}
+              and ${cloud_agent_workspace_folders.kind} = 'smart'
+              and ${cloud_agent_workspace_folders.smart_preset} = 'done'
+          )`.as('done_folder_enabled'),
           gitUrl: sql<string | null>`${cli_sessions_v2.git_url}`.as('session_git_url'),
           gitBranch: sql<string | null>`${cli_sessions_v2.git_branch}`.as('git_branch'),
           title: sql<string | null>`${cli_sessions_v2.title}`.as('title'),
@@ -1552,6 +1561,9 @@ export const cliSessionsV2Router = createTRPCRouter({
       db
         .select({
           worktreeId: sql<string>`${scoped.worktreeId}`.as('worktree_id'),
+          doneFolderEnabled: sql<boolean>`bool_or(${scoped.doneFolderEnabled})`.as(
+            'done_folder_enabled'
+          ),
           name: sql<string | null>`${scoped.worktreeName}`.as('name'),
           folderId: sql<string | null>`${scoped.folderId}`.as('folder_id'),
           sidebarPosition: sql<string | null>`${scoped.sidebarPosition}`.as('sidebar_position'),
@@ -1664,6 +1676,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       db
         .select({
           worktreeId: sql<string>`"workspace_grouped"."worktree_id"`.as('worktree_id'),
+          doneFolderEnabled: grouped.doneFolderEnabled,
           name: sql<string | null>`${grouped.name}`.as('name'),
           folderId: sql<string | null>`${grouped.folderId}`.as('folder_id'),
           sidebarPosition: sql<string | null>`${grouped.sidebarPosition}`.as('sidebar_position'),
@@ -1791,6 +1804,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           (or(
             isNull(base.pr_state),
             inArray(base.pr_state, ['open', 'draft']),
+            base.doneFolderEnabled,
             sql`${base.lastActivityAt} >= now() - interval '5 days'`
           ) as SQL)
       )

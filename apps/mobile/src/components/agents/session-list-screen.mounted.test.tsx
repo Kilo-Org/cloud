@@ -19,6 +19,7 @@ import { SessionListTouchGate } from '@/components/session-list-touch-gate';
 import { Text } from '@/components/ui/text';
 import { PULL_FEEDBACK_MIN_BEAT_MS } from './use-pull-refresh';
 import { getEmptyStateFullHeight } from '@/lib/agents-bottom-chrome';
+import { MIN_BODY_VIEWPORT } from '@/lib/body-viewport';
 import { type ActiveSession, type useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { type BannerState } from '@/lib/offline-banner-state';
 import {
@@ -470,9 +471,20 @@ function action(label: string) {
 function press(label: string) {
   (action(label).props.onPress as () => void)();
 }
+/** Press a control by its test id; the empty-state clear row carries one per cause. */
+function pressControl(testID: string) {
+  const control = nodes('Pressable').find(node => node.props.testID === testID);
+  if (!control) {
+    throw new Error(`Missing control: ${testID}`);
+  }
+  (control.props.onPress as () => void)();
+}
 /** Fire the body wrapper's layout with the height the list can use. */
 function layoutBody(height: number) {
-  const wrapper = nodes('View').find(node => typeof node.props.onLayout === 'function');
+  const keyboardFrame = liftNode().findByType('View');
+  const wrapper = nodes('View').find(
+    node => node.props.onLayout !== undefined && node !== keyboardFrame
+  );
   if (!wrapper) {
     throw new Error('Missing body wrapper');
   }
@@ -557,6 +569,13 @@ function hideKeyboard() {
 }
 function surfaceBottomInset() {
   return root().findByType(StateSurfaceInsets).props.bottomInset as number;
+}
+/** Report the room the keyboard lift's own frame has, as the layout pass does. */
+function layoutKeyboardFrame(height: number) {
+  const onLayout = liftNode().findByType('View').props.onLayout as (event: {
+    nativeEvent: { layout: { height: number } };
+  }) => void;
+  onLayout({ nativeEvent: { layout: { height } } });
 }
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -1499,7 +1518,11 @@ describe('AgentSessionListScreen live filtering', () => {
     });
 
     const emptyState = renderer.root.findByType(EmptyState);
-    expect(emptyState.props.description).toBe('Try a different search term.');
+    // The persisted filter still narrows the list under the search, so the copy
+    // names both causes and each cause keeps its own control.
+    expect(emptyState.props.description).toBe(
+      'Try a different search term. Try adjusting or clearing your filters.'
+    );
     expect(nodes('CenteredState')).toHaveLength(1);
     expect(nodes('FlashList')).toHaveLength(0);
     // The no-match body owns the band the tab bar leaves (the FAB's band is no
@@ -1509,7 +1532,7 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(fab()).toBeUndefined();
     expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
     act(() => {
-      (emptyState.props.action as { props: { onPress: () => void } }).props.onPress();
+      pressControl('agents-clear-search');
     });
 
     expect(nodes('FlashList')).toHaveLength(1);
@@ -1654,6 +1677,40 @@ describe('AgentSessionListScreen live filtering', () => {
       hideKeyboard();
     });
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
+  });
+
+  it('keeps the rows and the FAB band on the pad the lift could write in a short window', async () => {
+    // A keyboard height belongs to the window it was measured in. Rotating to a
+    // window shorter than that band used to pad the whole body away: no rows,
+    // no skeleton, no empty state and no error. The lift keeps a minimum
+    // viewport instead, and the FAB's band must subtract only the pad the body
+    // actually gave up.
+    state.platform.OS = 'android';
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const listStyle = () => nodes('FlashList')[0]?.props.style as { marginBottom: number };
+    const fabBand = state.tabBarHeight + FAB_SIZE + FAB_MARGIN;
+
+    openSearch();
+    act(() => {
+      showKeyboard(320);
+    });
+    expect(liftPad()).toBe(320);
+
+    // The rotation leaves the body less room than the band it is carrying.
+    act(() => {
+      layoutKeyboardFrame(253);
+    });
+
+    expect(liftPad()).toBe(253 - MIN_BODY_VIEWPORT);
+    expect(listStyle()).toEqual({ marginBottom: Math.max(0, fabBand - (253 - MIN_BODY_VIEWPORT)) });
+    expect(nodes('FlashList')).toHaveLength(1);
+
+    // A window with the room keeps the whole band, so portrait is unchanged.
+    act(() => {
+      layoutKeyboardFrame(758);
+    });
+    expect(liftPad()).toBe(320);
   });
 
   it('ignores a keyboard another screen raised, so the rows and centered states stay put', async () => {
@@ -1947,31 +2004,35 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(requireNode('SessionStatusFilterBar').props.count).toBe(0);
     const emptyState = renderer.root.findByType(EmptyState);
     expect(emptyState.props.title).toBe('No sessions match');
-    const clearAction = emptyState.props.action as { props: { onPress: () => void } };
     act(() => {
-      clearAction.props.onPress();
+      pressControl('agents-clear-filters');
     });
     expect(state.routeParams.status).toBeUndefined();
   });
 
-  it('clears the search too when a status filter and a search leave no rows', async () => {
+  it('keeps the search when the filters are cleared and restores rows from Clear search', async () => {
     state.live.activeSessions = [{ ...row, id: 'idle-1', status: 'idle' }];
     state.routeParams = { status: 'idle' };
-    const renderer = await renderScreen();
+    await renderScreen();
     const searchHeader = openSearch();
     act(() => {
       (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
     });
 
-    const emptyState = renderer.root.findByType(EmptyState);
-    const clearAction = emptyState.props.action as { props: { onPress: () => void } };
+    // Each control retires only its own cause, so clearing the filters leaves
+    // the search term in place and the search body keeps the list empty.
     act(() => {
-      clearAction.props.onPress();
+      pressControl('agents-clear-filters');
     });
-
-    // Clearing only the status would land on the same empty body, so the action
-    // must also clear the search that still excludes every row.
     expect(state.routeParams.status).toBeUndefined();
+    expect(nodes('FlashList')).toHaveLength(0);
+    const searchField = requireNode('SessionListSearchHeader');
+    expect(searchField.props.hasText).toBe(true);
+
+    // The search control is what brings the rows back.
+    act(() => {
+      pressControl('agents-clear-search');
+    });
     expect(nodes('FlashList')).toHaveLength(1);
   });
 
@@ -1990,10 +2051,8 @@ describe('AgentSessionListScreen live filtering', () => {
     act(() => {
       (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
     });
-    const emptyState = renderer.root.findByType(EmptyState);
-    const clearAction = emptyState.props.action as { props: { onPress: () => void } };
     act(() => {
-      clearAction.props.onPress();
+      pressControl('agents-clear-search');
     });
 
     // The clear swaps the empty state for the rows in the same commit; the gate
@@ -2053,9 +2112,8 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(filterButtonProps().accessibilityValue).toBeUndefined();
     expect(nodes('ScrollView')).toHaveLength(0);
 
-    const clearAction = emptyState.props.action as { props: { onPress: () => void } };
     act(() => {
-      clearAction.props.onPress();
+      pressControl('agents-clear-filters');
     });
     expect(nodes('FlashList')).toHaveLength(1);
     expect(headerAction('agents-open-filters').props.activeCount).toBe(0);

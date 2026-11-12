@@ -49,6 +49,25 @@ describe('persistHandlerOutcome progress', () => {
     expect(step?.progress_json).toEqual({ processed_count: 10 });
   });
 
+  it('honors an explicit continue delay before the step is claimable again', async () => {
+    const { requestId, claimToken } = await enqueueRunningStep(UserDeletionStepKey.Posthog);
+
+    const result = await persistHandlerOutcome({
+      requestId,
+      stepKey: UserDeletionStepKey.Posthog,
+      claimToken,
+      outcome: { kind: 'continue', delayMs: 10 * 60_000 },
+    });
+
+    expect(result.kind).toBe('applied');
+    const step = await loadStep(requestId, UserDeletionStepKey.Posthog);
+    expect(step?.status).toBe(UserDeletionStepStatus.Pending);
+    if (!step) throw new Error('missing step');
+    const delaySeconds = (new Date(step.available_at).getTime() - Date.now()) / 1000;
+    expect(delaySeconds).toBeGreaterThan(590);
+    expect(delaySeconds).toBeLessThan(620);
+  });
+
   it('writes needs_attention progress onto the step', async () => {
     const { requestId, claimToken } = await enqueueRunningStep(UserDeletionStepKey.CliV2Sessions);
 

@@ -207,6 +207,7 @@ test('adds the Enkrypt guardrail report read at upload time', async () => {
         credits_cost: 3,
         latency_ms: 400,
         verdict_cache_write: 'skipped',
+        chunks: 1,
       },
     ],
   };

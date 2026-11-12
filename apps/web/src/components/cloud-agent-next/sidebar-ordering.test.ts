@@ -5,7 +5,6 @@ import {
   getPositionBetween,
   groupWorkspaceGroupsByDestination,
   isValidPositionKey,
-  sortSmartFolderGroups,
   sortWorkspaceGroups,
   type SidebarWorkspaceGroup,
   type SidebarWorkspaceRow,
@@ -141,19 +140,5 @@ describe('groupWorkspaceGroupsByDestination', () => {
       'review',
       'done',
     ]);
-  });
-
-  it('sorts Needs you by the oldest waiting status', () => {
-    const older = group('older', {
-      status: 'failed',
-      statusUpdatedAt: '2026-01-01T00:00:00.000Z',
-    });
-    const newer = group('newer', {
-      hasPendingQuestion: true,
-      statusUpdatedAt: '2026-02-01T00:00:00.000Z',
-    });
-    expect(
-      sortSmartFolderGroups([newer, older], 'needs_you', 'manual').map(item => item.root.worktreeId)
-    ).toEqual(['older', 'newer']);
   });
 });

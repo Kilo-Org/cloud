@@ -182,17 +182,24 @@ the concrete cause; there is no skip or production fallback.
 With this worktree's Kilo v2 stack running, execute:
 
 ```bash
-RUN_SKILLS_SH_INSTALL_TEST=1 pnpm exec tsx services/cloud-agent-next/test/e2e/profiles-local.ts
+E2E_ORG_ID=<local-v2-org-uuid> E2E_USER_EMAIL=<funded-local-member-email> \
+  RUN_SKILLS_SH_INSTALL_TEST=1 pnpm exec tsx services/cloud-agent-next/test/e2e/profiles-local.ts
 ```
 
 The driver discovers local ports and refuses a database outside this stack.
 It needs migrated PostgreSQL, sandbox billing SKUs, the usage meter, and
 `AGENT_ENV_VARS_PRIVATE_KEY` in `services/cloud-agent-next/.dev.vars` before Worker
 startup. The driver uses that same key, not an exported driver-only value.
+The organization must be in the Worker's `RUNTIME_KILO2_ORG_IDS` list. The
+local user must already belong to it. The driver uses browser-origin creation
+to select Kilo v2 and checks the running harness before reporting success.
 It creates a synthetic saved profile and tests variables, encrypted secrets, ordered setup,
 instructions, custom agents, custom and marketplace skills, skill companion
 files, local and remote MCP credentials, disabled entries, slash-command catalog
 delivery, command arguments, subtask commands, sibling reuse, and native restart.
+It checks native skill loading and the shared profile configuration in sibling
+sessions. An empty browser sibling must inherit the command catalog and profile
+association before its first message, then execute a command as its first turn.
 The optional flag also installs `vercel-labs/skills@find-skills` through the real
 skills.sh installer. Only model inference uses the deterministic fake.
 The driver deletes its workspace and profile after the run.

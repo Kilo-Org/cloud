@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useNavigation } from 'expo-router';
 
 import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
+import { type SessionListClearAction } from '@/components/agents/session-list-body-model';
 import { SessionListTouchGate } from '@/components/session-list-touch-gate';
 import { AgentSessionListContent } from '@/components/agents/session-list-content';
 import { SessionListHeader } from '@/components/agents/session-list-header';
@@ -15,7 +16,7 @@ import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-
 import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
 import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
 import { useOwnedKeyboard } from '@/components/agents/use-owned-keyboard';
-import { OwnedKeyboardLift } from '@/components/agents/owned-keyboard-lift';
+import { OwnedKeyboardLift, useKeyboardLiftPad } from '@/components/agents/owned-keyboard-lift';
 import { shouldLoadMoreSessions } from '@/lib/agent-session-pages';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
 import { SESSION_FILTERS_KEY } from '@/lib/storage-keys';
@@ -73,6 +74,7 @@ export function SessionHistoryScreen() {
     restoreSettled: searchDraftState.settled,
   });
   const keyboard = useOwnedKeyboard();
+  const keyboardLift = useKeyboardLiftPad(keyboard.occlusion);
 
   const ready = filtersLoaded && orgLoaded;
 
@@ -183,21 +185,25 @@ export function SessionHistoryScreen() {
   // query — never the active set.
   const hasAnySessions = storedSessions.length > 0 || hasActiveQuery;
 
-  // The empty-state CTA reads "Clear search" or "Clear filters" depending on
-  // isSearching, so it must clear exactly that. Clearing both under a label
-  // naming one would silently drop the persisted filters.
+  // Every empty-state clear control names the one narrowing input it retires,
+  // so it clears exactly that. A search and a filter can both hide the session;
+  // clearing the filter under a "Clear search" label would leave the search in
+  // place and land on the same empty body.
   // Either branch replaces the body in place, so the gate holds this screen's
   // list for the settle window: the rows mount under the finger that just
   // released the action, and a repeat tap would open the row there.
-  const handleClearQuery = useCallback(() => {
-    holdSessionListTouch();
-    if (isSearching) {
-      clearSearchInput();
-      searchController.clearSearchOnly();
-      return;
-    }
-    clearFilters();
-  }, [clearSearchInput, searchController, clearFilters, isSearching]);
+  const handleClearAction = useCallback(
+    (action: SessionListClearAction) => {
+      holdSessionListTouch();
+      if (action === 'clear-search') {
+        clearSearchInput();
+        searchController.clearSearchOnly();
+        return;
+      }
+      clearFilters();
+    },
+    [clearSearchInput, searchController, clearFilters]
+  );
 
   // The durable draft is the saved search this screen reopens with. Until the
   // hook has applied it, the body cannot know whether a search applies, so it
@@ -236,10 +242,11 @@ export function SessionHistoryScreen() {
       onSessionPress={navigateToSession}
       nonPullRefreshes={nonPullRefreshes}
       hasActiveQuery={hasActiveQuery}
+      hasActiveFilters={activeFilterCount > 0}
       isSearching={isSearching}
       searchQuery={searchQuery}
       isRetrying={isRetrying}
-      onClearQuery={handleClearQuery}
+      onClearAction={handleClearAction}
       onCreateSession={handleCreateSession}
     />
   );
@@ -273,7 +280,9 @@ export function SessionHistoryScreen() {
         }
       />
       <SessionListTouchGate>
-        <OwnedKeyboardLift occlusion={keyboard.occlusion}>{sessionListBody}</OwnedKeyboardLift>
+        <OwnedKeyboardLift pad={keyboardLift.pad} onLayout={keyboardLift.handleLayout}>
+          {sessionListBody}
+        </OwnedKeyboardLift>
       </SessionListTouchGate>
       <SessionFilterModal
         visible={showFilterModal}

@@ -502,7 +502,7 @@ describe('provider-specific contract differences', () => {
     const harness = containersHarness();
     const ref = await harness.create();
 
-    expect(harness.adapter.environmentSnapshots).toBe(true);
+    expect(harness.adapter.environmentSnapshots).toBe('launch');
     const snapshot = { snapshotId: 'snap-env', baseImage: 'registry.example/app:1' };
     await harness.adapter.launch(ref, { command: supervisorStartup(), env: {} }, { snapshot });
     expect(harness.launchInputs!().at(-1)?.snapshot).toEqual(snapshot);
@@ -620,7 +620,7 @@ describe('provider-specific contract differences', () => {
     const leases = harness.leaseMs().length;
     await harness.adapter.ensureLeaseAtLeast(harness.foreignRef(), OWNED_LEASE_MS);
     expect(harness.leaseMs()).toHaveLength(leases);
-    expect('environmentSnapshots' in harness.adapter).toBe(false);
+    expect(harness.adapter.environmentSnapshots).toBe('create');
 
     await expect(
       harness.adapter.applyContainedCredentials!(ref, [] as readonly SessionCredentialGrant[])

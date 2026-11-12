@@ -291,6 +291,7 @@ export default function CloudChatPage({
   const unreadablePermissions = useAtomValue(manager.atoms.unreadablePermissions);
   const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
   const failedPrompt = useAtomValue(manager.atoms.failedPrompt);
+  const deliveredFailedPrompt = useAtomValue(manager.atoms.deliveredFailedPrompt);
   const staticMessages = useAtomValue(manager.atoms.staticMessages);
   const dynamicMessages = useAtomValue(manager.atoms.dynamicMessages);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
@@ -1964,6 +1965,7 @@ export default function CloudChatPage({
                                 availableVariants={displayAvailableVariants}
                                 showToolbar={Boolean(sessionIdFromParams)}
                                 initialValue={failedPrompt ?? undefined}
+                                withdrawnFailedPrompt={deliveredFailedPrompt}
                                 customModeOptions={customModeOptions}
                                 modelPickerDisabled={
                                   modelPickerLocked || sessionModels.modelPickerDisabled

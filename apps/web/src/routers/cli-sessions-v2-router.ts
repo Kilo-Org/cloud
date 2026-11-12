@@ -47,6 +47,7 @@ import {
   deleteSession as deleteSessionIngest,
   shareSession as shareSessionIngest,
   SessionShareTooLargeError,
+  sessionIngestTrpcError,
   unshareSession as unshareSessionIngest,
 } from '@/lib/session-ingest-client';
 import {
@@ -2365,11 +2366,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           `Failed to fetch messages for session ${input.session_id}:`,
           error instanceof Error ? error.message : error
         );
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch session messages',
-          cause: error,
-        });
+        throw sessionIngestTrpcError('Failed to fetch session messages', error);
       }
     }),
 
@@ -2408,19 +2405,16 @@ export const cliSessionsV2Router = createTRPCRouter({
           });
         } catch (error) {
           // Match the existing `getSessionMessages` error contract: surface a
-          // stable INTERNAL_SERVER_ERROR so the mobile client can map the
-          // outcome without inferring retry semantics from the worker's
-          // text. The client already calls `captureException`; we do not
-          // double-capture here.
+          // stable code the mobile client can map without inferring retry
+          // semantics from the worker's text — the budget expiry as the
+          // retryable `SERVICE_UNAVAILABLE`, anything else as
+          // `INTERNAL_SERVER_ERROR`. The client already calls
+          // `captureException`; we do not double-capture here.
           console.error(
             `Failed to fetch session messages page for session ${input.session_id}:`,
             error instanceof Error ? error.message : error
           );
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to fetch session messages page',
-            cause: error,
-          });
+          throw sessionIngestTrpcError('Failed to fetch session messages page', error);
         }
       })();
 
@@ -2487,11 +2481,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       try {
         diff = await fetchSessionDiff(input.session_id, ctx.user.id);
       } catch (error) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch session diff',
-          cause: error,
-        });
+        throw sessionIngestTrpcError('Failed to fetch session diff', error);
       }
       if (diff === null) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });

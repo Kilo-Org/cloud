@@ -147,6 +147,28 @@ async function fetchSessionIngest(requestUrl: string, init: RequestInit = {}): P
 }
 
 // ---------------------------------------------------------------------------
+// Failure mapping
+// ---------------------------------------------------------------------------
+
+/**
+ * The tRPC error one session-ingest call failure becomes.
+ *
+ * A budget expiry is an upstream that did not answer in time, not a fault in
+ * this control plane, so it must stay retryable: `SERVICE_UNAVAILABLE`. Every
+ * other failure keeps the `INTERNAL_SERVER_ERROR` contract the routers already
+ * publish for an unexpected worker answer. `cause` is preserved so the
+ * original timeout stays attributable in logs and Sentry.
+ */
+export function sessionIngestTrpcError(message: string, cause: unknown): TRPCError {
+  return new TRPCError({
+    code:
+      cause instanceof ServiceFetchTimeoutError ? 'SERVICE_UNAVAILABLE' : 'INTERNAL_SERVER_ERROR',
+    message,
+    cause,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Fetch
 // ---------------------------------------------------------------------------
 

@@ -6772,6 +6772,13 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 100
+        },
+        "toolDisplay": {
+          "type": "string",
+          "enum": [
+            "full",
+            "preview"
+          ]
         }
       },
       "required": [
@@ -6784,9 +6791,61 @@
       "sessionid",
       "kilosessionid",
       "cursor",
-      "limit"
+      "limit",
+      "tooldisplay"
     ],
-    "searchBlob": "cloudAgentNext.getSessionMessagesPage Retrieve a paginated page of messages and conversation history for one of your Cloud Agent sessions, with an optional cursor for older messages. Use it to load or scroll through session history. cloudagentnext getsessionmessagespage sessionid kilosessionid cursor limit sessionId kiloSessionId cursor limit"
+    "searchBlob": "cloudAgentNext.getSessionMessagesPage Retrieve a paginated page of messages and conversation history for one of your Cloud Agent sessions, with an optional cursor for older messages. Use it to load or scroll through session history. cloudagentnext getsessionmessagespage sessionid kilosessionid cursor limit tooldisplay sessionId kiloSessionId cursor limit toolDisplay"
+  },
+  "cloudAgentNext.getSessionToolPartDetail": {
+    "path": "cloudAgentNext.getSessionToolPartDetail",
+    "kind": "query",
+    "summary": "Get the full detail of a single tool call part within a Cloud Agent session, including its input, output, and status. Use to inspect exactly what a specific tool invocation did during an agent run.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "kiloSessionId": {
+          "type": "string",
+          "minLength": 30,
+          "maxLength": 30,
+          "format": "starts_with",
+          "pattern": "^ses_.*"
+        },
+        "messageId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "partId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "callId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "sessionId",
+        "messageId",
+        "partId"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "getsessiontoolpartdetail",
+      "sessionid",
+      "kilosessionid",
+      "messageid",
+      "partid",
+      "callid"
+    ],
+    "searchBlob": "cloudAgentNext.getSessionToolPartDetail Get the full detail of a single tool call part within a Cloud Agent session, including its input, output, and status. Use to inspect exactly what a specific tool invocation did during an agent run. cloudagentnext getsessiontoolpartdetail sessionid kilosessionid messageid partid callid sessionId kiloSessionId messageId partId callId"
   },
   "cloudAgentNext.getStackedWorkspaceSource": {
     "path": "cloudAgentNext.getStackedWorkspaceSource",
@@ -18479,6 +18538,13 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 100
+        },
+        "toolDisplay": {
+          "type": "string",
+          "enum": [
+            "full",
+            "preview"
+          ]
         }
       },
       "required": [
@@ -18494,9 +18560,69 @@
       "sessionid",
       "kilosessionid",
       "cursor",
-      "limit"
+      "limit",
+      "tooldisplay"
     ],
-    "searchBlob": "organizations.cloudAgentNext.getSessionMessagesPage Get a paginated page of chat messages from a cloud agent session, using a cursor and limit to page through the conversation history. Use to load earlier or later messages in a session transcript for an organization. organizations cloudagentnext getsessionmessagespage organizationid sessionid kilosessionid cursor limit organizationId sessionId kiloSessionId cursor limit"
+    "searchBlob": "organizations.cloudAgentNext.getSessionMessagesPage Get a paginated page of chat messages from a cloud agent session, using a cursor and limit to page through the conversation history. Use to load earlier or later messages in a session transcript for an organization. organizations cloudagentnext getsessionmessagespage organizationid sessionid kilosessionid cursor limit tooldisplay organizationId sessionId kiloSessionId cursor limit toolDisplay"
+  },
+  "organizations.cloudAgentNext.getSessionToolPartDetail": {
+    "path": "organizations.cloudAgentNext.getSessionToolPartDetail",
+    "kind": "query",
+    "summary": "Fetch the full stored details of a single tool call inside an organization's Cloud Agent session chat, such as the tool's input, output, status, and error, identified by message, part, and call ID. Use it to expand a tool-call preview in session history or inspect what a specific tool actually did.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "kiloSessionId": {
+          "type": "string",
+          "minLength": 30,
+          "maxLength": 30,
+          "format": "starts_with",
+          "pattern": "^ses_.*"
+        },
+        "messageId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "partId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "callId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "organizationId",
+        "sessionId",
+        "messageId",
+        "partId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getsessiontoolpartdetail",
+      "organizationid",
+      "sessionid",
+      "kilosessionid",
+      "messageid",
+      "partid",
+      "callid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getSessionToolPartDetail Fetch the full stored details of a single tool call inside an organization's Cloud Agent session chat, such as the tool's input, output, status, and error, identified by message, part, and call ID. Use it to expand a tool-call preview in session history or inspect what a specific tool actually did. organizations cloudagentnext getsessiontoolpartdetail organizationid sessionid kilosessionid messageid partid callid organizationId sessionId kiloSessionId messageId partId callId"
   },
   "organizations.cloudAgentNext.getStackedWorkspaceSource": {
     "path": "organizations.cloudAgentNext.getStackedWorkspaceSource",
@@ -38717,6 +38843,55 @@
       "folderids"
     ],
     "searchBlob": "workspaceFolders.reorder Change the display order of workspace folders. workspacefolders reorder organizationid folderids organizationId folderIds"
+  },
+  "workspaceFolders.reorderWorktrees": {
+    "path": "workspaceFolders.reorderWorktrees",
+    "kind": "mutation",
+    "summary": "Set the custom worktree order inside a smart workspace folder in the cloud agent sidebar, so you can manually arrange worktrees within the folder. Use to save a drag-and-drop reordering of worktrees.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "folderId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "worktreeIds": {
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        }
+      },
+      "required": [
+        "organizationId",
+        "folderId",
+        "worktreeIds"
+      ]
+    },
+    "tags": [
+      "workspacefolders",
+      "reorderworktrees",
+      "organizationid",
+      "folderid",
+      "worktreeids"
+    ],
+    "searchBlob": "workspaceFolders.reorderWorktrees Set the custom worktree order inside a smart workspace folder in the cloud agent sidebar, so you can manually arrange worktrees within the folder. Use to save a drag-and-drop reordering of worktrees. workspacefolders reorderworktrees organizationid folderid worktreeids organizationId folderId worktreeIds"
   },
   "workspaceFolders.update": {
     "path": "workspaceFolders.update",

@@ -5,8 +5,6 @@ import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import {
   ENKRYPT_GUARDRAIL_TIMEOUT_MS,
   ENKRYPT_MAX_SCAN_CHARACTERS,
-  responseBlockMessage,
-  RESPONSE_TOO_LARGE_MESSAGE,
   scanRequest,
   type EnkryptGuardrailScan,
   type EnkryptGuardrailScanResult,
@@ -64,6 +62,8 @@ const SHORTER_RESPONSE_ADVICE =
 
 const HELD_OUTPUT_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot hold back more than ${MAX_HELD_OUTPUT_BYTES / 1024 / 1024} MB of model response at once, so this response was withheld. ${SHORTER_RESPONSE_ADVICE}`;
 
+export const RESPONSE_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters of model output at once, so this response was withheld. ${SHORTER_RESPONSE_ADVICE}`;
+
 type OutputScanResult = Omit<EnkryptGuardrailScanResult, 'report'> & {
   /** Null when Enkrypt was not asked. */
   report: EnkryptScanReport | null;
@@ -75,15 +75,13 @@ const outputTooLarge: OutputScanResult = {
   report: null,
 };
 
-/** Responses that `scanRequest` would reject as too large never reach it, so it is not billed. */
+/**
+ * A response is scanned in one call, so one longer than a call can hold is blocked without a scan.
+ * Checking it here, rather than leaving it to `scanRequest`, words the block for the response and
+ * records why the output was not scanned.
+ */
 function isTooLargeToScan(text: string): boolean {
   return text.length > ENKRYPT_MAX_SCAN_CHARACTERS;
-}
-
-function asResponseVerdict(verdict: EnkryptGuardrailVerdict): EnkryptGuardrailVerdict {
-  return verdict.action === 'block'
-    ? { action: 'block', message: responseBlockMessage(verdict.message) }
-    : verdict;
 }
 
 /** The comment the response rewrite already sends for upstream keep-alives. */
@@ -500,7 +498,7 @@ export async function guardEnkryptOutput({
     const addedLatencyMs = Math.round(performance.now() - waitStartedAt);
     report.added_latency_ms = addedLatencyMs;
     return {
-      decision: decide(asResponseVerdict(verdict), replayedResponse(response, buffered)),
+      decision: decide(verdict, replayedResponse(response, buffered)),
       usageRecords: logOnlyResult.then(logOnlyScan =>
         outputUsageRecords(usageRecords, logOnlyScan.usageRecords, addedLatencyMs)
       ),

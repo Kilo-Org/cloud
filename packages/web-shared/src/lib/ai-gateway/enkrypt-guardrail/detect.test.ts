@@ -5,8 +5,6 @@ import {
   ENKRYPT_MAX_SCAN_CHARACTERS,
   guardrailBlockMessage,
   REQUEST_TOO_LARGE_MESSAGE,
-  RESPONSE_TOO_LARGE_MESSAGE,
-  responseBlockMessage,
   scanRequest,
   type EnkryptDetectDependencies,
   type EnkryptGuardrailScan,
@@ -299,6 +297,19 @@ describe('scanRequest', () => {
     });
   });
 
+  it("words a block of the model's response for the response", async () => {
+    const result = await scanRequest(
+      makeScan({ coverage: { ...makeScan().coverage, part: 'response' } }),
+      deps(async () => detectResponse({ summary: { toxicity: ['insult'] }, result_message: null }))
+    );
+
+    expect(result.verdict).toEqual({
+      action: 'block',
+      message:
+        "Your organization's Enkrypt AI guardrail blocked the model's response (detected: toxicity). The response was flagged by your organization policy. Rephrase the request and retry.",
+    });
+  });
+
   it('blocks a revise-type detector set to block without showing the redacted text', async () => {
     const result = await scanRequest(
       makeScan(),
@@ -576,14 +587,9 @@ describe('scanRequest', () => {
   describe('a request above the scan limit', () => {
     const text = 'a'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS + 1);
 
-    it.each([
-      ['tools', REQUEST_TOO_LARGE_MESSAGE],
-      ['system', REQUEST_TOO_LARGE_MESSAGE],
-      ['conversation', REQUEST_TOO_LARGE_MESSAGE],
-      ['response', RESPONSE_TOO_LARGE_MESSAGE],
-    ] as const)(
+    it.each(['tools', 'system', 'conversation'] as const)(
       'is rejected for the %s part without truncating or sending it',
-      async (part, message) => {
+      async part => {
         const dependencies = deps(async () => detectResponse({ summary: {} }));
 
         const result = await scanRequest(
@@ -593,7 +599,7 @@ describe('scanRequest', () => {
 
         expect(result).toEqual({
           report: expect.any(Object),
-          verdict: { action: 'block', message },
+          verdict: { action: 'block', message: REQUEST_TOO_LARGE_MESSAGE },
           usageRecords: [],
         });
         expect(result.report).toMatchObject({
@@ -607,18 +613,10 @@ describe('scanRequest', () => {
     );
   });
 
-  describe('the too-large messages', () => {
-    it('say that a request is split into scans, and that retrying unchanged will not help', () => {
-      expect(REQUEST_TOO_LARGE_MESSAGE).toContain('100,000 characters');
-      expect(REQUEST_TOO_LARGE_MESSAGE).toContain('splits long requests into scans');
-      expect(REQUEST_TOO_LARGE_MESSAGE).toContain('Retrying the unchanged request will not help.');
-    });
-
-    it('say that a response is withheld above 100,000 characters', () => {
-      expect(RESPONSE_TOO_LARGE_MESSAGE).toContain('100,000 characters');
-      expect(RESPONSE_TOO_LARGE_MESSAGE).toContain('model output');
-      expect(RESPONSE_TOO_LARGE_MESSAGE).toContain('so this response was withheld');
-    });
+  it('says that a too-large request is split into scans, and that retrying unchanged will not help', () => {
+    expect(REQUEST_TOO_LARGE_MESSAGE).toContain('100,000 characters');
+    expect(REQUEST_TOO_LARGE_MESSAGE).toContain('splits long requests into scans');
+    expect(REQUEST_TOO_LARGE_MESSAGE).toContain('Retrying the unchanged request will not help.');
   });
 
   it('preserves the inference association on both usage records after a transient failure', async () => {
@@ -1452,15 +1450,24 @@ describe('scanRequest', () => {
   });
 });
 
-describe('responseBlockMessage', () => {
-  it('rewords the default block reason for a response', () => {
-    expect(responseBlockMessage(guardrailBlockMessage(['pii'], 'redacted text'))).toBe(
+describe('guardrailBlockMessage', () => {
+  it.each(['tools', 'system', 'conversation', undefined] as const)(
+    'words a block of the %s part for the request',
+    part => {
+      expect(guardrailBlockMessage(['pii'], 'redacted text', part)).toBe(
+        "Your organization's Enkrypt AI guardrail blocked this request (detected: pii). The request was flagged by your organization policy."
+      );
+    }
+  );
+
+  it('words the default block reason for a response', () => {
+    expect(guardrailBlockMessage(['pii'], 'redacted text', 'response')).toBe(
       "Your organization's Enkrypt AI guardrail blocked the model's response (detected: pii). The response was flagged by your organization policy. Rephrase the request and retry."
     );
   });
 
-  it("keeps Enkrypt's block message", () => {
-    expect(responseBlockMessage(guardrailBlockMessage(['toxicity'], 'Toxic content.'))).toBe(
+  it("keeps Enkrypt's block message for a response", () => {
+    expect(guardrailBlockMessage(['toxicity'], 'Toxic content.', 'response')).toBe(
       "Your organization's Enkrypt AI guardrail blocked the model's response (detected: toxicity). Toxic content."
     );
   });

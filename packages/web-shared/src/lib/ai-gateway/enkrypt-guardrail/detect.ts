@@ -48,8 +48,6 @@ const MAX_SCAN_CHARACTERS_LABEL = ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en
 /** Request text is split into scans; only a segment whose header is too long to split is too large. */
 export const REQUEST_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail splits long requests into scans of at most ${MAX_SCAN_CHARACTERS_LABEL} characters, but this request has a name or label, such as a tool or file name, too long to split, so it was not sent. Shorten that name, then retry. Retrying the unchanged request will not help.`;
 
-export const RESPONSE_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of model output at once, so this response was withheld. Ask for a shorter response, for example by lowering the maximum output tokens, then retry.`;
-
 const detectResponseSchema = z.object({
   summary: z.record(z.string(), z.unknown()),
   result_message: z.string().nullish(),
@@ -355,34 +353,32 @@ function sanitizeBlockMessage(message: string | null): string | null {
   return cleaned || null;
 }
 
+const REQUEST_BLOCK_WORDING = {
+  blocked: "Your organization's Enkrypt AI guardrail blocked this request",
+  flaggedReason: 'The request was flagged by your organization policy.',
+};
+
+const RESPONSE_BLOCK_WORDING = {
+  blocked: "Your organization's Enkrypt AI guardrail blocked the model's response",
+  flaggedReason:
+    'The response was flagged by your organization policy. Rephrase the request and retry.',
+};
+
 /**
  * Enkrypt's `result_message` is a block message only when a block-type detector fired; when only
- * revise-type detectors fired it is the redacted input text, which is never shown.
+ * revise-type detectors fired it is the redacted input text, which is never shown. A block of the
+ * model's response is worded for the response; every other part is worded for the request.
  */
 export function guardrailBlockMessage(
   detectors: EnkryptDetectorId[],
-  resultMessage: string | null
+  resultMessage: string | null,
+  part?: EnkryptScanPart
 ): string {
+  const wording = part === 'response' ? RESPONSE_BLOCK_WORDING : REQUEST_BLOCK_WORDING;
   const enkryptBlocked = detectors.some(detector => ENKRYPT_DETECTOR_TYPES[detector] === 'block');
   const reason =
-    (enkryptBlocked ? sanitizeBlockMessage(resultMessage) : null) ?? REQUEST_FLAGGED_REASON;
-  return `${REQUEST_BLOCKED} (detected: ${detectors.join(', ')}). ${reason}`;
-}
-
-const REQUEST_BLOCKED = "Your organization's Enkrypt AI guardrail blocked this request";
-const REQUEST_FLAGGED_REASON = 'The request was flagged by your organization policy.';
-const RESPONSE_BLOCKED = "Your organization's Enkrypt AI guardrail blocked the model's response";
-const RESPONSE_FLAGGED_REASON =
-  'The response was flagged by your organization policy. Rephrase the request and retry.';
-
-/**
- * `scanRequest` words a block for a request; the output guardrail scans the model's response with
- * it and rewords the block for the response.
- */
-export function responseBlockMessage(requestBlockMessage: string): string {
-  return requestBlockMessage
-    .replace(REQUEST_BLOCKED, RESPONSE_BLOCKED)
-    .replace(REQUEST_FLAGGED_REASON, RESPONSE_FLAGGED_REASON);
+    (enkryptBlocked ? sanitizeBlockMessage(resultMessage) : null) ?? wording.flaggedReason;
+  return `${wording.blocked} (detected: ${detectors.join(', ')}). ${reason}`;
 }
 
 function attemptDecision(
@@ -448,11 +444,7 @@ export async function scanRequest(
     return failedVerdict([], scope, {
       error: 'request_too_large',
       latencyMs: 0,
-      closedVerdict: {
-        action: 'block',
-        message:
-          coverage.part === 'response' ? RESPONSE_TOO_LARGE_MESSAGE : REQUEST_TOO_LARGE_MESSAGE,
-      },
+      closedVerdict: { action: 'block', message: REQUEST_TOO_LARGE_MESSAGE },
     });
   }
 
@@ -542,7 +534,10 @@ export async function scanRequest(
     verdict:
       blocking.length === 0
         ? { action: 'allow' }
-        : { action: 'block', message: guardrailBlockMessage(blocking, attempt.resultMessage) },
+        : {
+            action: 'block',
+            message: guardrailBlockMessage(blocking, attempt.resultMessage, coverage.part),
+          },
     usageRecords,
     report,
   };

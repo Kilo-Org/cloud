@@ -4,7 +4,6 @@ import type { EnkryptOutputDetectors, OrganizationSettings } from '@kilocode/db/
 import {
   ENKRYPT_DETECT_URL,
   ENKRYPT_MAX_SCAN_CHARACTERS,
-  RESPONSE_TOO_LARGE_MESSAGE,
   type EnkryptGuardrailVerdict,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import { createEmptyEnkryptOutputDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
@@ -20,6 +19,7 @@ import {
   MAX_HELD_OUTPUT_BYTES,
   OUTPUT_KEEP_ALIVE_INTERVAL_MS,
   resolveEnkryptOutputScan,
+  RESPONSE_TOO_LARGE_MESSAGE,
   type EnkryptOutputScan,
 } from './output-guardrail';
 
@@ -385,6 +385,14 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.restoreAllMocks();
+});
+
+describe('RESPONSE_TOO_LARGE_MESSAGE', () => {
+  it('says that a response is withheld above 100,000 characters', () => {
+    expect(RESPONSE_TOO_LARGE_MESSAGE).toBe(
+      "Your organization's Enkrypt AI guardrail cannot scan more than 100,000 characters of model output at once, so this response was withheld. Ask for a shorter response, for example by lowering the maximum output tokens, then retry."
+    );
+  });
 });
 
 describe('resolveEnkryptOutputScan', () => {

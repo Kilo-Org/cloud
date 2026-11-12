@@ -780,12 +780,11 @@ describe('SessionMessageList chrome ride-up', () => {
     return node?.props.style as { overflow?: string; marginBottom?: number } | undefined;
   }
 
-  function listTransformY(): number | null {
-    const raw = flashListProps.current?.style;
-    const styles: unknown[] = Array.isArray(raw) ? raw : [raw];
-    for (const entry of styles) {
-      const value = (entry as { transform?: readonly { translateY?: number }[] } | undefined)
-        ?.transform?.[0]?.translateY;
+  function shiftStyle(renderer: TestRenderer.ReactTestRenderer): number | null {
+    for (const node of renderer.root.findAll(candidate => Object.is(candidate.type, 'View'))) {
+      const value = (
+        node.props.style as { transform?: readonly { translateY?: number }[] } | undefined
+      )?.transform?.[0]?.translateY;
       if (typeof value === 'number') return value;
     }
     return null;
@@ -794,7 +793,7 @@ describe('SessionMessageList chrome ride-up', () => {
   it('shifts the list by the chrome growth while the transcript is anchored', () => {
     const renderer = mountList({ chromeGrowthDp: 64 });
     settleAtBottom();
-    expect(listTransformY()).toBe(-64);
+    expect(shiftStyle(renderer)).toBe(-64);
     expect(holderStyle(renderer)?.marginBottom).toBe(-64);
     expect(holderStyle(renderer)?.overflow).toBe('hidden');
   });
@@ -802,20 +801,20 @@ describe('SessionMessageList chrome ride-up', () => {
   it('applies the shift in the render that publishes the growth', () => {
     const renderer = mountList({ chromeGrowthDp: 0 });
     settleAtBottom();
-    expect(listTransformY()).toBeNull();
+    expect(shiftStyle(renderer)).toBeNull();
     rerenderList(renderer, { chromeGrowthDp: 64 });
-    expect(listTransformY()).toBe(-64);
+    expect(shiftStyle(renderer)).toBe(-64);
   });
 
   it('keeps the content still once the reader is above the tail', () => {
-    mountList({ chromeGrowthDp: 64 });
+    const renderer = mountList({ chromeGrowthDp: 64 });
     settleAtBottom();
     scrollAwayFromBottom();
-    expect(listTransformY()).toBeNull();
+    expect(shiftStyle(renderer)).toBeNull();
   });
 
   it('keeps a transcript that cannot scroll still', () => {
-    mountList({ chromeGrowthDp: 64 });
+    const renderer = mountList({ chromeGrowthDp: 64 });
     fire('onScrollEndDrag', {
       nativeEvent: {
         contentOffset: { y: 0 },
@@ -823,6 +822,6 @@ describe('SessionMessageList chrome ride-up', () => {
         layoutMeasurement: { height: 500, width: 0 },
       },
     });
-    expect(listTransformY()).toBeNull();
+    expect(shiftStyle(renderer)).toBeNull();
   });
 });

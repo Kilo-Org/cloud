@@ -378,7 +378,7 @@ const ServerRow = ({
             )}
             <span className="type-body font-medium text-foreground">{server.displayName}</span>
           </button>
-          <p className="ml-5 break-words type-label text-foreground-muted">{server.url}</p>
+          <p className="ml-5 break-all type-label text-foreground-muted">{server.url}</p>
           <p className="ml-5 flex items-center gap-1 type-label text-foreground-muted">
             {busy ? (
               <>
@@ -392,11 +392,6 @@ const ServerRow = ({
               </>
             )}
           </p>
-          {server.lastError === undefined ? null : (
-            <div className="mt-2">
-              <ErrorNotice retryable={false} title={server.lastError} />
-            </div>
-          )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
@@ -436,6 +431,11 @@ const ServerRow = ({
           </button>
         </div>
       </div>
+      {server.lastError === undefined ? null : (
+        <div className="mt-2">
+          <ErrorNotice retryable={false} title={server.lastError} />
+        </div>
+      )}
       {expanded && server.cachedTools.length > 0 ? (
         <div className="mt-2 overflow-x-auto">
           <pre className="font-mono text-xs text-foreground-muted">

@@ -24,7 +24,7 @@ export type ErrorNoticeProps = {
 };
 
 const secondaryControlClassName =
-  'h-8 shrink-0 rounded-md border border-border bg-surface-overlay px-2 type-label text-foreground-on-secondary outline-none transition hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background disabled:cursor-not-allowed disabled:opacity-50';
+  'inline-flex h-8 shrink-0 items-center rounded-md border border-border bg-surface-overlay px-2 type-label text-foreground-on-secondary outline-none transition hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background disabled:cursor-not-allowed disabled:opacity-50';
 
 export const ErrorNotice = ({
   action,
@@ -54,7 +54,7 @@ export const ErrorNotice = ({
         </div>
       </div>
       {showRetry || action !== undefined ? (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div className="mt-2 flex flex-wrap items-center gap-2 pl-5.5">
           {showRetry ? (
             <button
               aria-busy={busy}

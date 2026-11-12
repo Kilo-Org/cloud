@@ -225,7 +225,6 @@ export function ProfileScreen() {
       <ScreenHeader title={t('common.profile')} size="large" showBackButton={false} />
       <TabScreenScrollView
         ref={deleteScrollRef}
-        testID="profile-screen"
         className="flex-1"
         contentContainerClassName="px-4 pt-4"
         showsVerticalScrollIndicator={false}

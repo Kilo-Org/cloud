@@ -139,6 +139,15 @@ function failImage(renderer: Renderer) {
 function unavailable(root: Instance) {
   return nodes(root, 'Text').filter(node => node.props.children === 'Image unavailable');
 }
+function reportDismissed(renderer: Renderer) {
+  const node = nodes(renderer.root, 'BottomSheet')[0];
+  if (!node) {
+    throw new Error('sheet was not rendered');
+  }
+  act(() => {
+    (node.props.onDismiss as () => void)();
+  });
+}
 
 beforeEach(() => {
   cache.clear();
@@ -288,6 +297,8 @@ describe('PartDetailSheet image failures', () => {
       update({ ...part, id: 'part-2' });
     } else {
       update(part, false);
+      expect(unavailable(renderer.root)).toHaveLength(1);
+      reportDismissed(renderer);
       update(part);
     }
     expect(nodes(renderer.root, 'CenteredState')).toHaveLength(0);

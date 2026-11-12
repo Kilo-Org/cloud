@@ -19,11 +19,20 @@ import { GLANCEABLE_STATUS_KINDS } from '@kilocode/app-shared/glanceable-agents-
 
 /**
  * The card's status kinds: the shared glanceable vocabulary plus a turn that
- * failed. The parser (`pushDataSchema`) and the builder (`SessionCardStatusKind`)
- * both read this one list, so the accepted and the produced kinds cannot drift.
+ * failed. `pushDataSchema` validates a pushed `statusKind` against this list,
+ * and the type derived from it types the kind the builder produces.
  */
 export const SESSION_CARD_STATUS_KINDS = [...GLANCEABLE_STATUS_KINDS, 'failed'] as const;
 export type SessionCardStatusKind = (typeof SESSION_CARD_STATUS_KINDS)[number];
+
+/**
+ * The card kinds that mean the turn finished: a quiet idle card or a failed
+ * turn. The content builder and the relevance ranking share this one test, so a
+ * new terminal kind changes both together.
+ */
+export function isFinishedSessionCardStatus(kind: SessionCardStatusKind): boolean {
+  return kind === 'idle' || kind === 'failed';
+}
 
 /** How a finished session ended, for the outcome line. */
 export const sessionLiveOutcomeKindSchema = z.enum(['pr_opened', 'changes', 'none']);

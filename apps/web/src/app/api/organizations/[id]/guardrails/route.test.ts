@@ -1,22 +1,30 @@
 import { describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
-import { organization_guardrails } from '@kilocode/db/schema';
+import {
+  organization_group_memberships,
+  organization_groups,
+  organization_guardrails,
+} from '@kilocode/db/schema';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
+import {
+  addUserToOrganization,
+  getOrganizationById,
+  mutateOrganizationSettings,
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
+import { getAuthorizedOrgContextOrSupport } from '@/lib/organizations/organization-auth';
 import { GET } from './route';
 
 jest.mock('@/lib/organizations/organization-auth');
 
-const mockedGetAuthorizedOrgContext = jest.mocked(getAuthorizedOrgContext);
+const mockedGetAuthorizedOrgContext = jest.mocked(getAuthorizedOrgContextOrSupport);
 
-async function request(organizationId: string) {
+async function request(organizationId: string, userId = 'user-1') {
   const organization = await getOrganizationById(organizationId);
   mockedGetAuthorizedOrgContext.mockResolvedValue({
     success: true,
-    data: { organization, user: { id: 'user-1' } },
+    data: { organization, user: { id: userId } },
   } as never);
   return GET(new NextRequest('http://localhost:3000'), {
     params: Promise.resolve({ id: organizationId }),
@@ -78,6 +86,7 @@ describe('GET /api/organizations/[id]/guardrails', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       inputScan: { enabled: false, scanToolResults: false },
+      outputScan: { enabled: false, buffersResponses: false },
       mcp: { enforcement: 'off', allowedServers: [] },
       skill: { enabled: false, scanBeforeUse: false },
     });
@@ -92,7 +101,7 @@ describe('GET /api/organizations/[id]/guardrails', () => {
         skill: { enabled: true, scan_before_use: false },
       },
       enkrypt: {
-        input_guardrail: { enabled: true, scan_tool_results: false },
+        input_guardrail: { enabled: true, ...{ scan_tool_results: false } },
       },
     });
     await addMcp(organization.id, 'Zeta', '@acme/zeta');
@@ -103,7 +112,8 @@ describe('GET /api/organizations/[id]/guardrails', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      inputScan: { enabled: true, scanToolResults: false },
+      inputScan: { enabled: true, scanToolResults: true },
+      outputScan: { enabled: false, buffersResponses: false },
       mcp: {
         enforcement: 'enforce',
         allowedServers: [
@@ -148,5 +158,36 @@ describe('GET /api/organizations/[id]/guardrails', () => {
 
     expect(body.mcp).toEqual({ enforcement: 'off', allowedServers: [] });
     expect(body.skill).toEqual({ enabled: false, scanBeforeUse: true });
+  });
+
+  test('turns input scanning off for members outside the group the input guardrail is limited to', async () => {
+    const owner = await insertTestUser();
+    const inGroup = await insertTestUser();
+    const outsideGroup = await insertTestUser();
+    const organization = await createTestOrganization('Scoped guardrails', owner.id, 0);
+    await addUserToOrganization(organization.id, inGroup.id, 'member');
+    await addUserToOrganization(organization.id, outsideGroup.id, 'member');
+    const [group] = await db
+      .insert(organization_groups)
+      .values({ organization_id: organization.id, name: 'Engineering' })
+      .returning();
+    await db.insert(organization_group_memberships).values({
+      organization_id: organization.id,
+      group_id: group.id,
+      kilo_user_id: inGroup.id,
+    });
+    await mutateOrganizationSettings(organization.id, () => ({
+      kilo_encrypt: true,
+      guardrails: { skill: { enabled: true, scan_before_use: true } },
+      enkrypt: { input_guardrail: { enabled: true, group_id: group.id } },
+    }));
+
+    const memberBody = await (await request(organization.id, inGroup.id)).json();
+    const outsiderBody = await (await request(organization.id, outsideGroup.id)).json();
+
+    expect(memberBody.inputScan).toEqual({ enabled: true, scanToolResults: true });
+    expect(outsiderBody.inputScan).toEqual({ enabled: false, scanToolResults: false });
+    expect(outsiderBody.skill).toEqual(memberBody.skill);
+    expect(outsiderBody.skill).toEqual({ enabled: true, scanBeforeUse: true });
   });
 });

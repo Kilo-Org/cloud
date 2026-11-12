@@ -4,6 +4,9 @@ import { describe, expect, it, spyOn } from 'bun:test';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { kilo2RuntimeEnvironment } from './runtime-harness.js';
+import { buildWorktreeKiloEnvironment } from '../control/worktree-runtime.js';
+import { prepareKiloFilesystem } from './kilo-runtime.js';
 import {
   createRuntimeProfileMaterializer,
   materializeRuntimeProfile,
@@ -100,6 +103,65 @@ async function expectPreviousProfile(home: string, previousConfig: string): Prom
 }
 
 describe('runtime profile materialization', () => {
+  it('shares profile rules and rematerializes them before a restored runtime starts', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-instructions-'));
+    try {
+      const profile = {
+        runtimeInstructions: [
+          { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+        ],
+      };
+      const owner = createRuntimeProfileMaterializer();
+      await owner.materialize(home, profile);
+      const file = path.join(home, '.kilocode/rules/profile-proof.md');
+      await fs.writeFile(file, 'shared-runtime-file');
+      await owner.materialize(home, profile);
+      expect(await fs.readFile(file, 'utf8')).toBe('shared-runtime-file');
+      expect(
+        await captureRejection(
+          owner.materialize(home, {
+            runtimeInstructions: [
+              { name: 'different-profile', content: 'Do not isolate a sibling' },
+            ],
+          })
+        )
+      ).toBeInstanceOf(RuntimeProfileMismatchError);
+
+      // A new wrapper restores the stored workspace profile, not a chat-local config.
+      await createRuntimeProfileMaterializer().materialize(home, profile);
+      const v1 = buildWorktreeKiloEnvironment(
+        '/workspace',
+        home,
+        {
+          scopeId: 'synthetic-scope',
+          token: 'synthetic-token',
+          targets: {
+            backendBaseUrl: 'http://localhost:1',
+            providerBaseUrl: 'http://localhost:1',
+            sessionIngestBaseUrl: 'http://localhost:1',
+          },
+        },
+        {},
+        {}
+      );
+      await prepareKiloFilesystem(v1, path.join(home, 'workspace'));
+      expect(JSON.parse(v1.KILO_CONFIG_CONTENT).instructions).toBeUndefined();
+      const v2 = kilo2RuntimeEnvironment(v1);
+      expect(JSON.parse(v2.KILO_CONFIG_CONTENT).instructions).toEqual([
+        path.join(home, '.kilocode/rules/*.md'),
+      ]);
+      expect(await fs.readFile(file, 'utf8')).toBe(profile.runtimeInstructions[0].content);
+      expect((await fs.readdir(path.dirname(file))).sort()).toEqual([
+        'cloud-agent.md',
+        'profile-proof.md',
+      ]);
+      expect(v2.KILO_CONFIG).toBeUndefined();
+      await createRuntimeProfileMaterializer().materialize(home, {});
+      expect((await fs.readdir(path.dirname(file))).sort()).toEqual(['cloud-agent.md']);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
   it('writes large valid command templates to disk without expanding process env', async () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-'));
     try {
@@ -115,6 +177,32 @@ describe('runtime profile materialization', () => {
         JSON.parse(await fs.readFile(env.KILO_CONFIG, 'utf8')).command['long-review'].template
       ).toBe(profile.kiloCommands[0].template);
       expect((await fs.stat(env.KILO_CONFIG)).mode & 0o777).toBe(0o600);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('applies built-in agent overrides without forcing a mode', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-'));
+    try {
+      await materializeRuntimeProfile(home, {
+        builtinAgents: {
+          explore: { model: 'anthropic/claude-haiku-4.5' },
+          compaction: { model: 'anthropic/claude-haiku-4.5', variant: 'low' },
+          plan: { disable: true },
+        },
+        runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', config: {} }],
+      });
+      const config = JSON.parse(await fs.readFile(profileConfigPath(home), 'utf8')) as {
+        agent: Record<string, Record<string, unknown>>;
+      };
+      expect(config.agent.explore).toEqual({ model: 'kilo/anthropic/claude-haiku-4.5' });
+      expect(config.agent.compaction).toEqual({
+        model: 'kilo/anthropic/claude-haiku-4.5',
+        variant: 'low',
+      });
+      expect(config.agent.plan).toEqual({ disable: true });
+      expect(config.agent.reviewer).toEqual({ mode: 'primary' });
     } finally {
       await fs.rm(home, { recursive: true, force: true });
     }

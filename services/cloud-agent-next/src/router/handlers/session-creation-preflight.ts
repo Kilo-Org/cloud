@@ -1,10 +1,13 @@
 import { TRPCError } from '@trpc/server';
 import type { WorkerDb } from '@kilocode/db/client';
 import {
+  getBuiltinAgentSettings,
+  hasBuiltinAgentSettings,
   loadEnvironmentForSession,
   mergeProfileConfiguration,
   profileMcpServersToClientRecord,
   ProfileNotFoundError,
+  type BuiltinAgentSettings,
   type EnvironmentForSession,
   type EnvironmentInlineArgs,
   type EnvironmentOwner,
@@ -38,6 +41,7 @@ import { validateBalanceOnly } from '../../balance-validation.js';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { isRepositoryAgentOrigin } from '../../shared/agent-modes.js';
 import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
+import { logger } from '../../logger.js';
 
 const WEB_ORIGIN = 'cloud-agent-web';
 
@@ -188,8 +192,10 @@ async function resolveProfileForSessionCreateRequest(
 
 function applyProfileResolution(
   input: SessionCreateRequest,
-  resolved: MergeProfileConfigurationResult | null
+  resolved: MergeProfileConfigurationResult | null,
+  builtinAgents: BuiltinAgentSettings
 ): SessionCreateRequest {
+  const hasBuiltinAgents = hasBuiltinAgentSettings(builtinAgents);
   if (!resolved) {
     return {
       ...input,
@@ -203,6 +209,7 @@ function applyProfileResolution(
           mcpServers: input.profile?.overrides?.mcpServers,
           runtimeSkills: input.profile?.overrides?.runtimeSkills,
           runtimeAgents: input.profile?.overrides?.runtimeAgents,
+          ...(hasBuiltinAgents ? { builtinAgents } : {}),
         },
       },
     };
@@ -219,10 +226,15 @@ function applyProfileResolution(
       resolved: {
         envVars: resolved.envVars,
         setupCommands: resolved.setupCommands,
+        ...(resolved.startCommands ? { startCommands: resolved.startCommands } : {}),
+        ...(resolved.environmentSetupCommandCount === undefined
+          ? {}
+          : { environmentSetupCommandCount: resolved.environmentSetupCommandCount }),
         encryptedSecrets: resolved.encryptedSecrets,
         mcpServers: profileMcpServersToClientRecord(resolved.mcpServers),
         runtimeSkills: resolved.skills,
         runtimeAgents: resolved.agents,
+        ...(hasBuiltinAgents ? { builtinAgents } : {}),
         kiloCommands: resolved.kiloCommands ?? input.profile?.resolved?.kiloCommands,
         runtimeInstructions: resolved.instructions ?? input.profile?.resolved?.runtimeInstructions,
       },
@@ -233,16 +245,36 @@ function applyProfileResolution(
 function assertResolvedConfigurationWithinSessionLimits(
   resolved: SessionProfileBundle | undefined
 ): void {
+  // An older wrapper receives the start commands appended to setup, so the
+  // combined list must fit one setup list.
+  const setupAndStart = [...(resolved?.setupCommands ?? []), ...(resolved?.startCommands ?? [])];
   const parsed = SessionProfileBundleSchema.safeParse({
     envVars: resolved?.envVars,
     encryptedSecrets: resolved?.encryptedSecrets,
-    setupCommands: resolved?.setupCommands,
+    setupCommands: setupAndStart,
   });
   if (!parsed.success) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: 'resolved configuration exceeds session limits',
     });
+  }
+}
+
+async function loadBuiltinAgentSettingsForSession(
+  ctx: Pick<TRPCContext, 'env' | 'userId'>,
+  db?: WorkerDb
+): Promise<BuiltinAgentSettings> {
+  try {
+    return await getBuiltinAgentSettings(db ?? getPgDb(ctx.env), ctx.userId);
+  } catch (error) {
+    logger
+      .withFields({
+        userId: ctx.userId,
+        errorClass: error instanceof Error ? error.name : typeof error,
+      })
+      .warn('Unable to load built-in agent preferences; using defaults');
+    return {};
   }
 }
 
@@ -260,11 +292,14 @@ export async function resolveEffectiveSessionConfiguration(
   });
   // An environment resolves only under the implicit-defaults policy, so the
   // profile path always runs when one exists.
-  const resolved = shouldResolveProfile(input, policy)
-    ? await resolveProfileForSessionCreateRequest(ctx, input, environment?.layer, db)
-    : null;
+  const [resolved, builtinAgents] = await Promise.all([
+    shouldResolveProfile(input, policy)
+      ? resolveProfileForSessionCreateRequest(ctx, input, environment?.layer, db)
+      : Promise.resolve(null),
+    loadBuiltinAgentSettingsForSession(ctx, db),
+  ]);
 
-  const resolvedRequest = applyProfileResolution(input, resolved);
+  const resolvedRequest = applyProfileResolution(input, resolved, builtinAgents);
   assertResolvedConfigurationWithinSessionLimits(resolvedRequest.profile?.resolved);
   // The reference and the allocation travel beside the merged configuration;
   // a client cannot set them.
@@ -482,6 +517,7 @@ export async function preflightSessionCreation(
     env: ctx.env,
     userId: ctx.userId,
     orgId: organizationId,
+    createdOnPlatform: request.options?.createdOnPlatform,
     repository: request.repository,
   });
 

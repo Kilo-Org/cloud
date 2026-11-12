@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { writeJson, type CellRun, type Exec, type RunOutcome } from './capture';
 import type { Finding, Rect } from './findings';
+import { hasPresentedOwner, parseDump } from './tree';
 
 export type RunMeta = {
   platform: string;
@@ -171,23 +172,49 @@ export function summarize(findings: readonly Finding[]): { errors: number; warni
   return { errors, warnings: findings.length - errors };
 }
 
-export function skippedRules(cells: readonly CellRun[]) {
+export function skippedRules(cells: readonly CellRun[], out: string) {
   return cells.flatMap(cell =>
-    cell.screens
-      .filter(screen => screen.env.safeAreaKnown === false)
-      .map(screen => ({
-        cell: cell.id,
-        target: screen.target,
-        rule: 'safe-area',
-        reason: 'snapshot has no system-bar inset evidence',
-      }))
+    cell.screens.flatMap(screen => {
+      const entries: { cell: string; target: string; rule: string; reason: string }[] = [];
+      if (screen.env.safeAreaKnown === false) {
+        entries.push({
+          cell: cell.id,
+          target: screen.target,
+          rule: 'safe-area',
+          reason: 'snapshot has no system-bar inset evidence',
+        });
+      }
+      // A screen that shows a natively presented dialog or sheet loses its
+      // safe-area check: the probe reports those frames from the surface's own
+      // origin, so the window's insets do not describe them. The gap is listed
+      // rather than hidden, so the rule it silenced is visible in the report.
+      if (hasPresentedSurface(path.resolve(out, screen.dump))) {
+        entries.push({
+          cell: cell.id,
+          target: screen.target,
+          rule: 'safe-area',
+          reason: 'a native dialog or sheet hosts the content, so its frames are surface-local',
+        });
+      }
+      return entries;
+    })
   );
+}
+
+/** True when the snapshot holds content a native dialog or sheet hosts. */
+function hasPresentedSurface(dump: string): boolean {
+  try {
+    return parseDump(fs.readFileSync(dump, 'utf8')).nodes.some(hasPresentedOwner);
+  } catch {
+    return false;
+  }
 }
 
 export function renderReport(
   meta: RunMeta,
   cells: readonly CellRun[],
-  groups: readonly FindingGroup[]
+  groups: readonly FindingGroup[],
+  out: string
 ): string {
   const findings = groups.map(group => group.finding);
   const lines = [
@@ -221,7 +248,7 @@ export function renderReport(
       );
     }
   }
-  const skipped = skippedRules(cells);
+  const skipped = skippedRules(cells, out);
   if (skipped.length > 0) {
     lines.push('', '## Skipped rules', '');
     for (const entry of skipped) {
@@ -293,7 +320,7 @@ export function writeArtifacts(args: {
   }
   writeJson(path.join(out, 'findings.json'), {
     version: 1,
-    run: { ...meta, sheets, skippedRules: skippedRules(outcome.cells) },
+    run: { ...meta, sheets, skippedRules: skippedRules(outcome.cells, out) },
     cells: outcome.cells.map(cell => ({
       id: cell.id,
       config: cell.config,
@@ -303,6 +330,6 @@ export function writeArtifacts(args: {
     findings: groups.map(group => group.finding),
   });
   const reportPath = path.join(out, 'report.md');
-  fs.writeFileSync(reportPath, renderReport(meta, outcome.cells, groups));
+  fs.writeFileSync(reportPath, renderReport(meta, outcome.cells, groups, out));
   return reportPath;
 }

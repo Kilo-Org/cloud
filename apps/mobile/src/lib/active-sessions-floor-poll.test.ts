@@ -25,6 +25,10 @@ function makePr(overrides: Partial<AssociatedPr> = {}): AssociatedPr {
     lastSyncedAt: '2026-09-22T10:00:00.000Z',
     reviewDecision: null,
     reviewDecisionPending: false,
+    baseRef: null,
+    stackNumber: null,
+    stackPosition: null,
+    stackSize: null,
     platform: 'github',
     observations: null,
     ...overrides,
@@ -58,7 +62,7 @@ function payload(sessions: Session[]): CachedActiveSessionsData {
 }
 
 describe('isLiveAgentsSurfaceSegments', () => {
-  it.each(['(0_home)', '(1_kiloclaw)', '(2_agents)', '(3_profile)', '(4_chat)', 'share-gate'])(
+  it.each(['(0_home)', '(2_agents)', '(3_profile)', '(4_chat)', 'share-gate'])(
     'is true for the live-agents segment %s',
     segment => {
       expect(isLiveAgentsSurfaceSegments(['(app)', '(tabs)', segment])).toBe(true);
@@ -87,7 +91,6 @@ describe('isLiveAgentsSurfaceSegments', () => {
   it('lists exactly the surfaces documented as live consumers', () => {
     expect([...LIVE_AGENTS_SURFACE_SEGMENTS]).toEqual([
       '(0_home)',
-      '(1_kiloclaw)',
       '(2_agents)',
       '(3_profile)',
       '(4_chat)',

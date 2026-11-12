@@ -13,20 +13,22 @@ import {
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
   INLINE_LINK_FACING_HIT_SLOP_DP,
+  INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP,
   INLINE_LINK_LINE_GAP_CLASS,
   INLINE_LINK_LINE_GAP_DP,
   INLINE_LINK_OUTER_HIT_SLOP_DP,
+  INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP,
   INLINE_LINK_ROW_CLASS,
   INLINE_LINK_ROW_MARGIN_DP,
   INLINE_LINK_SENTENCE_LINE_DP,
-  INLINE_LINK_VERTICAL_HIT_SLOP_DP,
   MIN_TAP_TARGET_DP,
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
 import { i18n } from '@/i18n';
 
-import { IdleAuth, PROVIDER_GLYPH_SLOT_CLASS } from '../idle-auth';
+import { IdleAuth } from '../idle-auth';
+import { PROVIDER_GLYPH_SLOT_CLASS } from '../provider-buttons';
 
 type StartFn = (mode: 'signin' | 'sso', ssoEmail?: string) => Promise<void>;
 
@@ -73,6 +75,8 @@ vi.mock('@/lib/auth/use-native-auth', () => ({
     ssoRecovery: ssoRecovery.value,
     clearSsoRecovery: vi.fn(),
     handleSsoError: vi.fn(),
+    pendingLinkFailure: undefined,
+    clearPendingLinkFailure: vi.fn(),
   }),
 }));
 
@@ -108,7 +112,7 @@ vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/login/email-otp-form', () => ({ EmailOtpForm: 'EmailOtpForm' }));
 vi.mock('@/components/login/apple-logo', () => ({ AppleLogo: 'AppleLogo' }));
 vi.mock('@/components/login/google-logo', () => ({ GoogleLogo: 'GoogleLogo' }));
-vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound' }));
+vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound', Mail: 'Mail' }));
 
 vi.mock('expo-web-browser', () => ({
   openBrowserAsync: vi.fn(),
@@ -178,6 +182,20 @@ function findButton(root: I, label: string): I {
   return btn;
 }
 
+/**
+ * The block that reports the action under the landing view's email field, so
+ * the login shell reserves what the keyboard actually covers there.
+ */
+function belowFieldBlock(root: I): I {
+  const field = root.findByType('FormField');
+  const siblings = field.parent?.children ?? [];
+  const next = siblings[siblings.indexOf(field) + 1];
+  if (next === undefined || typeof next === 'string' || next.props.onLayout === undefined) {
+    throw new Error('no measured block follows the email field');
+  }
+  return next;
+}
+
 function linkPressables(root: I): I[] {
   return root.findAll(
     n =>
@@ -198,14 +216,16 @@ function findLink(root: I, label: string): I {
 
 /** The sentence end a legal link's accessibility label sits at. */
 function linkEdge(label: string | undefined): 'start' | 'end' {
-  return label === 'Terms' ? 'start' : 'end';
+  return label === 'Terms of Use' ? 'start' : 'end';
 }
 
 /**
  * The per-side slop the legal link at one end of the sentence must render. The
- * facing side (4dp) points at the connector, the outer side (12dp) reaches over
- * plain prose, and the two still add to the 44pt target from the 28dp audit
- * floor. The sentence is LTR in this suite's native mock.
+ * facing side points at the connector (4dp) or, vertically, at the line the
+ * neighbour can occupy below it (0dp); the outer side reaches over plain prose
+ * (12dp) and past the row's own line (16dp). Each axis still adds to the 44pt
+ * target from the 28dp audit floor. The sentence is LTR in this suite's native
+ * mock.
  */
 function expectedLinkSlop(edge: 'start' | 'end'): {
   top: number;
@@ -214,8 +234,14 @@ function expectedLinkSlop(edge: 'start' | 'end'): {
   right: number;
 } {
   return {
-    top: INLINE_LINK_VERTICAL_HIT_SLOP_DP,
-    bottom: INLINE_LINK_VERTICAL_HIT_SLOP_DP,
+    top:
+      edge === 'start'
+        ? INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP
+        : INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP,
+    bottom:
+      edge === 'start'
+        ? INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP
+        : INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP,
     left: edge === 'start' ? INLINE_LINK_OUTER_HIT_SLOP_DP : INLINE_LINK_FACING_HIT_SLOP_DP,
     right: edge === 'start' ? INLINE_LINK_FACING_HIT_SLOP_DP : INLINE_LINK_OUTER_HIT_SLOP_DP,
   };
@@ -586,7 +612,8 @@ describe('IdleAuth SSO recovery', () => {
       (btn.props.onPress as () => void)();
     });
 
-    expect(start).toHaveBeenCalledWith('sso', 'user@example.com');
+    // Without a pending link the browser start carries no link token.
+    expect(start).toHaveBeenCalledWith('sso', 'user@example.com', undefined);
   });
 
   it('moves the SSO busy spinner inside its primary Button', async () => {
@@ -930,7 +957,7 @@ describe('IdleAuth email continue copy', () => {
     const start = vi.fn<StartFn>();
     const renderer = await mountIdleAuth(start);
 
-    expect(texts(renderer.root)).toContain('Terms');
+    expect(texts(renderer.root)).toContain('Terms of Use');
     expect(texts(renderer.root)).toContain('Privacy Policy');
   });
 
@@ -939,7 +966,10 @@ describe('IdleAuth email continue copy', () => {
     const renderer = await mountIdleAuth(start);
 
     const links = linkPressables(renderer.root);
-    expect(links.map(link => link.props.accessibilityLabel)).toEqual(['Terms', 'Privacy Policy']);
+    expect(links.map(link => link.props.accessibilityLabel)).toEqual([
+      'Terms of Use',
+      'Privacy Policy',
+    ]);
 
     for (const link of links) {
       const box = boxDp(link.props.className as string);
@@ -960,10 +990,10 @@ describe('IdleAuth email continue copy', () => {
       expect(box.height + slop.top + slop.bottom).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
     }
 
-    // The sentence's copy is unchanged: both labels still render, with the
+    // The sentence's copy is unchanged: both links still render, with the
     // connector and suffix the sentence carried before.
     expect(texts(renderer.root)).toEqual(
-      expect.arrayContaining(['Terms', 'Privacy Policy', ' and ', '.'])
+      expect.arrayContaining(['Terms of Use', 'Privacy Policy', ' and ', '.'])
     );
 
     act(() => {
@@ -1000,7 +1030,7 @@ describe('IdleAuth email continue copy', () => {
     const start = vi.fn<StartFn>();
     const renderer = await mountIdleAuth(start);
 
-    const terms = findLink(renderer.root, 'Terms');
+    const terms = findLink(renderer.root, 'Terms of Use');
     act(() => {
       (terms.props.onPress as () => void)();
     });
@@ -1030,7 +1060,7 @@ describe('IdleAuth email continue copy', () => {
     );
     expect(wrapper.props.accessibilityRole).toBe('text');
     expect(wrapper.props.accessibilityLabel).toBe(
-      'By continuing you agree to our Terms and Privacy Policy.'
+      'By continuing you agree to our Terms of Use and Privacy Policy.'
     );
     expect(wrapper.props.accessibilityActions).toEqual([
       { name: 'openTerms', label: 'Terms' },
@@ -1082,8 +1112,12 @@ describe('IdleAuth email validation layout', () => {
     );
     const button = findButton(renderer.root, 'Continue with email');
     expect(button.props.disabled).toBe(false);
-    const siblings = field.parent?.children;
-    expect(siblings?.indexOf(field)).toBeLessThan(siblings?.indexOf(button) ?? 0);
+    // The action follows the field inside the measured block under it, so the
+    // tree order still reads field, then action.
+    const below = belowFieldBlock(renderer.root);
+    const siblings = field.parent?.children ?? [];
+    expect(siblings[siblings.indexOf(field) + 1]).toBe(below);
+    expect(below.findAllByProps({ accessibilityLabel: 'Continue with email' })).toHaveLength(1);
     act(() => {
       (field.props.onChangeText as (value: string) => void)('user@example.com');
     });
@@ -1205,18 +1239,68 @@ describe('IdleAuth layout repairs', () => {
     });
   });
 
+  it('reports what each step renders below its field and resets on a step change', async () => {
+    const reportBelowField = vi.fn<(height: number) => void>();
+    const ref: { current: R | undefined } = { current: undefined };
+    await act(async () => {
+      ref.current = TestRenderer.create(
+        createElement(IdleAuth, {
+          start: vi.fn<StartFn>(),
+          onBelowFieldHeightChange: reportBelowField,
+        })
+      );
+      await Promise.resolve();
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    renderers.push(renderer);
+
+    // A step change clears the previous step's block before the new one lays out.
+    expect(reportBelowField).toHaveBeenCalledWith(0);
+
+    const layout = (height: number, y = 0) => ({
+      nativeEvent: { layout: { height, y, width: 336, x: 0 } },
+    });
+    const field = renderer.root.findByType('FormField');
+    const action = belowFieldBlock(renderer.root);
+    act(() => {
+      // The field block grows by the message under the input (`text-sm` plus
+      // its 6pt inner gap), which the input's own frame marks.
+      (field.props.containerOnLayout as (event: unknown) => void)(layout(100));
+      (field.props.onLayout as (event: unknown) => void)(layout(44, 32));
+      (action.props.onLayout as (event: unknown) => void)(layout(142));
+    });
+    // Everything under the input: 100 − (32 + 44) of message, then the action.
+    expect(reportBelowField).toHaveBeenLastCalledWith(166);
+
+    // The code step clears the landing view's height, so that content never
+    // sizes the code step; the code step then reports its own.
+    nativeAuth.requestEmailCode.mockResolvedValue(true);
+    await act(async () => {
+      await (
+        findButton(renderer.root, 'Continue with email').props.onPress as () => Promise<void>
+      )();
+    });
+    expect(renderer.root.findAllByType('EmailOtpForm')).toHaveLength(1);
+    expect(reportBelowField).toHaveBeenCalledWith(0);
+  });
+
   it('keeps the field-to-Continue gutter on the shared screen gap', async () => {
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
 
     const field = renderer.root.findByType('FormField');
     const button = findButton(renderer.root, 'Continue with email');
-    // The button is the field's next sibling in the screen's `gap-3` column, so
-    // with no reserved slot the visible input-to-Continue space is exactly
-    // `gap-3` (10.5pt / 21px at 2.02 px per point).
+    // The block under the field is its next sibling in the screen's `gap-3`
+    // column, so with no reserved slot the visible input-to-Continue space is
+    // still exactly `gap-3` (10.5pt / 21px at 2.02 px per point).
     expect(field.parent?.props.className).toBe('gap-3');
-    expect(field.parent).toBe(button.parent);
-    const siblings = field.parent?.children;
-    expect(siblings?.indexOf(field)).toBeLessThan(siblings?.indexOf(button) ?? 0);
+    const below = belowFieldBlock(renderer.root);
+    expect(below.parent).toBe(field.parent);
+    expect(button.parent).toBe(below);
+    const siblings = field.parent?.children ?? [];
+    expect(siblings[siblings.indexOf(field) + 1]).toBe(below);
 
     act(() => {
       renderer.unmount();
@@ -1230,7 +1314,7 @@ describe('IdleAuth layout repairs', () => {
     // tight against "Privacy Policy". The links' own px-1 padding widened every
     // boundary it touched.
     expect(legalSentence(renderer.root)).toBe(
-      'By continuing you agree to our Terms and Privacy Policy.'
+      'By continuing you agree to our Terms of Use and Privacy Policy.'
     );
     for (const link of linkPressables(renderer.root)) {
       expect(String(link.props.className)).not.toMatch(/(?:^|\s)px-/);
@@ -1307,25 +1391,29 @@ describe('IdleAuth layout repairs', () => {
   it('keeps each legal link touch region inside the row gutter, clear of the Continue button', async () => {
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
 
-    // A link's 44pt vertical region reaches (28 - 17.5) / 2 + 8 = 13.25dp past
-    // the text line it sits on. The screen's `gap-3` gutter to the Continue
-    // button above the row (and the ghost button below) is 10.5dp — 2.75dp
-    // short — so the legal row carries its own margin and the free space is
-    // 10.5 + 5 = 15.5dp each side. Without that clearance the region started
-    // 4.5dp inside the Continue button and a tap on the button's bottom strip
-    // opened the link instead of sending the code (the earlier mis-routed-tap
-    // finding).
+    // Each legal link keeps its whole 44pt vertical reach on the far side of the
+    // sentence line (the facing side belongs to the neighbour's line), so a
+    // link's region reaches (28 - 17.5) / 2 + 16 = 21.25dp past that line. The
+    // screen's `gap-3` gutter to the Continue button above the row (and the
+    // ghost button below) is 10.5dp, so the legal row carries its own margin and
+    // the free space is 10.5 + 11 = 21.5dp each side. Without that clearance the
+    // region covered the Continue button's bottom strip and a tap there opened
+    // the link instead of sending the code (the earlier mis-routed-tap finding).
     expect(INLINE_LINK_ROW_CLASS).toBe(
       `my-[${INLINE_LINK_ROW_MARGIN_DP}px] ${INLINE_LINK_LINE_GAP_CLASS}`
     );
-    // A wrapped sentence line gets more than the box's per-side overflow, or
-    // the box on the next line enters the prose above it (a pt-BR gate run
-    // measured 6.9dp of that collision on the old 14dp line).
+    // Two link boxes on adjacent wrapped lines: the gap beats both overflows
+    // together, and the two facing reaches (which sit on top of those overflows)
+    // still stop short of each other inside it.
     const overflowDp = (MIN_TAP_TARGET_DP - INLINE_LINK_SENTENCE_LINE_DP) / 2;
-    expect(INLINE_LINK_LINE_GAP_DP).toBeGreaterThan(overflowDp);
-    const gutterDp = 10.5 + INLINE_LINK_ROW_MARGIN_DP;
-    expect(overflowDp + INLINE_LINK_VERTICAL_HIT_SLOP_DP).toBeLessThanOrEqual(gutterDp);
     expect(overflowDp).toBe(5.25);
+    expect(INLINE_LINK_LINE_GAP_DP).toBeGreaterThan(2 * overflowDp);
+    expect(2 * (overflowDp + INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP)).toBeLessThan(
+      INLINE_LINK_LINE_GAP_DP
+    );
+    // The far reach is what the screen gutter and the row's margin have to hold.
+    const gutterDp = 10.5 + INLINE_LINK_ROW_MARGIN_DP;
+    expect(overflowDp + INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP).toBeLessThanOrEqual(gutterDp);
 
     const row = renderer.root.find(
       n =>
@@ -1342,10 +1430,11 @@ describe('IdleAuth layout repairs', () => {
         left: number;
         right: number;
       };
-      expect(slop.top).toBe(INLINE_LINK_VERTICAL_HIT_SLOP_DP);
-      expect(slop.bottom).toBe(INLINE_LINK_VERTICAL_HIT_SLOP_DP);
-      expect(overflowDp + slop.top).toBeLessThanOrEqual(gutterDp);
-      expect(overflowDp + slop.bottom).toBeLessThanOrEqual(gutterDp);
+      // The side that points at the other link's line carries no reach; the far
+      // side carries all of it, and the row's gutter has to hold it.
+      expect(Math.min(slop.top, slop.bottom)).toBe(INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP);
+      expect(Math.max(slop.top, slop.bottom)).toBe(INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP);
+      expect(overflowDp + Math.max(slop.top, slop.bottom)).toBeLessThanOrEqual(gutterDp);
       // The region the gutter bounds is still the full design target.
       const box = boxDp(link.props.className as string);
       expect(box.height + slop.top + slop.bottom).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);

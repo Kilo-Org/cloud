@@ -1,14 +1,11 @@
 import type { NextRequest } from 'next/server';
-import { checkRateLimit } from '@vercel/firewall';
-import { captureMessage } from '@sentry/nextjs';
 import { createHmac } from 'node:crypto';
+import { checkFirewallRateLimit } from '@/lib/auth/firewall-rate-limit';
 import { findUserByNormalizedEmail, getWorkOSOrganization } from '@/lib/user';
 import { validateMagicLinkSignupEmail } from '@/lib/schemas/email';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
-import {
-  isEmailBlacklistedByDomainAsync,
-  isBlockedTLD,
-} from '@kilocode/web-shared/lib/user/server';
+import { isBlockedTLD } from '@kilocode/web-shared/lib/user/server';
+import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
@@ -19,9 +16,10 @@ const SIGN_IN_CODE_EMAIL_IP_RATE_LIMIT_ID = 'sign-in-code-email-ip';
 
 /**
  * Vercel Firewall rate limits that apply to sign-in code email volume. Each
- * rule lives in the project's firewall configuration; a rule that is not
- * configured is skipped and the gap is reported to Sentry at most once a
- * minute.
+ * rule lives in the project's firewall configuration; a send runs only when
+ * every rule answers, so a rule that is not configured refuses the send and
+ * the gap is reported to Sentry at most once a minute through the shared
+ * firewall reporter.
  *
  * - `magic-link-email` counts sends per normalized address.
  * - `sign-in-code-email-ip` counts sends per caller address.
@@ -36,10 +34,10 @@ function getMagicLinkEmailRateLimitKey(email: string): string {
 /**
  * The caller address the firewall rule counts against. `x-vercel-forwarded-for`
  * is the header Vercel's edge sets for the request's source address, so it is
- * read first; `clientIpFromHeaders` in
- * packages/web-shared/src/lib/admin/admin-access-log.ts reads the same header
- * as its fallback. `x-real-ip` covers requests that arrive without the edge
- * header, and `unknown` keeps the bucket key non-empty.
+ * read first, matching `clientIpFromHeaders` in
+ * packages/web-shared/src/lib/admin/admin-access-log.ts. `x-real-ip` covers
+ * requests that arrive without the edge header, and `unknown` keeps the bucket
+ * key non-empty.
  */
 function clientIpAddress(request: NextRequest): string {
   const forwarded = request.headers.get('x-vercel-forwarded-for');
@@ -49,31 +47,15 @@ function clientIpAddress(request: NextRequest): string {
   return request.headers.get('x-real-ip') || 'unknown';
 }
 
-const missingRuleReportedAt: Record<string, number> = {};
-const MISSING_RULE_REPORT_INTERVAL_MS = 60_000;
-
 /**
- * One report a minute is enough to raise the alarm for a rule that is missing
- * from the project's firewall configuration; reporting per request would flood
- * Sentry.
- */
-function reportMissingRule(ruleId: string): void {
-  const now = Date.now();
-  if (now - (missingRuleReportedAt[ruleId] ?? 0) >= MISSING_RULE_REPORT_INTERVAL_MS) {
-    missingRuleReportedAt[ruleId] = now;
-    captureMessage(`Firewall rate limit '${ruleId}' is not configured`, {
-      level: 'error',
-      tags: { source: 'email_signin_eligibility' },
-    });
-  }
-}
-
-/**
- * Applies the per-address and per-caller firewall rules and reports whether a
- * count is exhausted. A rule that is not configured is skipped.
+ * Applies the per-address and per-caller firewall rules and reports whether the
+ * send is refused. Every rule must answer `allowed`: an exhausted budget, a
+ * rule that is not configured, and a limiter that cannot answer all refuse, so
+ * an email leaves only when the budget was confirmed. The first refusal stops
+ * the checks, leaving the remaining allowances unspent.
  * Runs before the eligibility rules: these refusals cost nothing downstream.
  */
-async function isSendBudgetExhausted(email: string, request: NextRequest): Promise<boolean> {
+async function isSendBudgetRefused(email: string, request: NextRequest): Promise<boolean> {
   const checks = [
     {
       id: MAGIC_LINK_EMAIL_RATE_LIMIT_ID,
@@ -86,15 +68,12 @@ async function isSendBudgetExhausted(email: string, request: NextRequest): Promi
   ] as const;
 
   for (const check of checks) {
-    const { rateLimited, error } = await checkRateLimit(check.id, {
+    const result = await checkFirewallRateLimit(check.id, {
+      source: 'email_signin_eligibility',
       request,
       rateLimitKey: check.key,
     });
-    if (error === 'not-found') {
-      reportMissingRule(check.id);
-      continue;
-    }
-    if (rateLimited) {
+    if (result !== 'allowed') {
       return true;
     }
   }
@@ -124,7 +103,7 @@ export type DomainSignInEligibility =
 export async function checkDomainSignInEligibility(
   email: string
 ): Promise<DomainSignInEligibility> {
-  if (await isEmailBlacklistedByDomainAsync(email)) {
+  if (await isEmailBlacklisted(email)) {
     return { ok: false, status: 403, errorCode: 'BLOCKED' };
   }
 
@@ -184,7 +163,7 @@ export async function isNewAccountEligibleForMagicLink(email: string): Promise<b
     return false;
   }
 
-  if (await isEmailBlacklistedByDomainAsync(email)) {
+  if (await isEmailBlacklisted(email)) {
     return false;
   }
 
@@ -207,7 +186,7 @@ export async function checkEmailSignInEligibility(
   email: string,
   request: NextRequest
 ): Promise<EmailSignInEligibility> {
-  if (await isSendBudgetExhausted(email, request)) {
+  if (await isSendBudgetRefused(email, request)) {
     return {
       ok: false,
       status: 429,

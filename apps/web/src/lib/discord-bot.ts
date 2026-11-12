@@ -243,6 +243,9 @@ async function spawnCloudAgentSession(
       user: { id: ticketUserId },
       modelId: model,
       organizationId: kilocodeOrganizationId,
+      // An organization's Discord run carries a bot id, so routing tries the
+      // organization's shared-services connection first.
+      includeSharedServicesConnection: owner.type === 'org',
     });
     client = createCloudAgentNextClientForModel(authToken, eligibility);
   } catch (error) {
@@ -328,7 +331,7 @@ export async function processDiscordBotMessage(
     };
   }
 
-  // Get the configured model for this integration (validated at setup/update time)
+  // The integration's model, resolved against the organization's current policy
   const selectedModel = await getModel(owner);
   if (!selectedModel) {
     console.error('[DiscordBot] No model configured for owner:', owner);

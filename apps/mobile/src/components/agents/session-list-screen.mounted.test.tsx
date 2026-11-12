@@ -8,65 +8,78 @@ import type * as MotionContextModule from '@/lib/a11y/motion-context';
 import type * as PlatformFilterModule from './platform-filter-modal';
 import type * as TextModule from '@/components/ui/text';
 import { AgentSessionListScreen } from './session-list-screen';
+import { OwnedKeyboardLift } from './owned-keyboard-lift';
 import { RowsRefreshControl } from './rows-refresh-control';
 import { FAB_MARGIN, FAB_SIZE } from './session-list-content';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
 import { LiveSessionListEmptyState } from './live-session-list-empty-state';
 import { ScreenHeader } from '@/components/screen-header';
+import { SessionListTouchGate } from '@/components/session-list-touch-gate';
 import { Text } from '@/components/ui/text';
 import { PULL_FEEDBACK_MIN_BEAT_MS } from './use-pull-refresh';
 import { getEmptyStateFullHeight } from '@/lib/agents-bottom-chrome';
+import { MIN_BODY_VIEWPORT } from '@/lib/body-viewport';
 import { type ActiveSession, type useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { type BannerState } from '@/lib/offline-banner-state';
+import {
+  __resetSessionListTouchGateForTests,
+  isSessionListTouchHeld,
+} from '@/lib/session-list-touch-gate';
 
 type Org = { organizationId: string; organizationName: string };
-const state = vi.hoisted(() => ({
-  focused: true,
-  fontScale: 1,
-  // The window width `ScreenHeader` reads to decide whether the header's
-  // controls share the title's row. Undefined by default keeps every other case
-  // on the single-row layout; a case that sets it exercises the reflow.
-  windowWidth: undefined as number | undefined,
-  // Mutable so a case can put the tree on Android: the platform decides
-  // whether the floating pull-to-refresh indicator is safe (device defect
-  // uxs1) or the reserved band carries the in-flight state instead.
-  platform: { OS: 'ios' as string },
-  // Mutable so a case can turn reduced motion on: the platform control is then
-  // inert and a centered body draws the pull's static progress itself.
-  reducedMotion: false,
-  topInset: 0,
-  leftInset: 0,
-  rightInset: 0,
-  tabBarHeight: 60,
-  focusCallbacks: new Set<() => void>(),
-  listeners: new Set<(state: string) => void>(),
-  // Keyboard listeners, keyed by the event the platform reports (the screen's
-  // empty state reserves the IME's height, so a case must be able to raise it).
-  keyboard: new Map<string, Set<(event: { endCoordinates: { height: number } }) => void>>(),
-  auth: { token: 'account' as string | undefined, isLoading: false, isSigningOut: false },
-  organization: { organizationId: null as string | null, isLoaded: true },
-  boundary: { orgs: [] as Org[] | undefined, isResolving: false, isError: false },
-  live: {
-    activeSessions: [] as ActiveSession[],
-    isLoading: false,
-    isError: false,
-    hasAcceptedSuccess: true,
-    isFetching: false,
-    isPaused: false,
-    terminalError: null as ReturnType<typeof useLiveAgentSessions>['terminalError'],
-  },
-  internet: 'online' as BannerState,
-  connection: { isConnected: true, reconnectExhausted: false },
-  refetch: vi.fn<() => Promise<boolean>>(),
-  boundaryRefetch: vi.fn(),
-  socketRetry: vi.fn(),
-  invalidate: vi.fn(),
-  announcements: [] as string[],
-  destination: '',
-  sessionId: '',
-  liveQuery: vi.fn<(options: Parameters<typeof useLiveAgentSessions>[0]) => void>(),
-}));
+const state = vi.hoisted(() => {
+  // Route parameters the screen reads; a case sets `status` to mount the
+  // transient status filter the Home card opens.
+  const routeParams: Record<string, string | undefined> = {};
+  return {
+    focused: true,
+    fontScale: 1,
+    // The window width `ScreenHeader` reads to decide whether the header's
+    // controls share the title's row. Undefined by default keeps every other case
+    // on the single-row layout; a case that sets it exercises the reflow.
+    windowWidth: undefined as number | undefined,
+    // Mutable so a case can put the tree on Android: the platform decides
+    // whether the floating pull-to-refresh indicator is safe (device defect
+    // uxs1) or the reserved band carries the in-flight state instead.
+    platform: { OS: 'ios' as string },
+    // Mutable so a case can turn reduced motion on: the platform control is then
+    // inert and a centered body draws the pull's static progress itself.
+    reducedMotion: false,
+    topInset: 0,
+    leftInset: 0,
+    rightInset: 0,
+    tabBarHeight: 60,
+    focusCallbacks: new Set<() => void>(),
+    listeners: new Set<(state: string) => void>(),
+    // Keyboard listeners, keyed by the event the platform reports (the screen's
+    // empty state reserves the IME's height, so a case must be able to raise it).
+    keyboard: new Map<string, Set<(event: { endCoordinates: { height: number } }) => void>>(),
+    auth: { token: 'account' as string | undefined, isLoading: false, isSigningOut: false },
+    organization: { organizationId: null as string | null, isLoaded: true },
+    boundary: { orgs: [] as Org[] | undefined, isResolving: false, isError: false },
+    live: {
+      activeSessions: [] as ActiveSession[],
+      isLoading: false,
+      isError: false,
+      hasAcceptedSuccess: true,
+      isFetching: false,
+      isPaused: false,
+      terminalError: null as ReturnType<typeof useLiveAgentSessions>['terminalError'],
+    },
+    internet: 'online' as BannerState,
+    connection: { isConnected: true, reconnectExhausted: false },
+    refetch: vi.fn<() => Promise<boolean>>(),
+    boundaryRefetch: vi.fn(),
+    socketRetry: vi.fn(),
+    invalidate: vi.fn(),
+    announcements: [] as string[],
+    destination: '',
+    sessionId: '',
+    routeParams,
+    liveQuery: vi.fn<(options: Parameters<typeof useLiveAgentSessions>[0]) => void>(),
+  };
+});
 const searchInput = vi.hoisted(() => ({
   focus: vi.fn(),
   clear: vi.fn(),
@@ -221,6 +234,14 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => state.focused }),
+  // Real `setParams` shallow-merges and cannot delete a key; the real
+  // `useLocalSearchParams` then hides an undefined value. The mock keeps the
+  // merged key and masks it on read, so a cleared status is absent to the
+  // screen exactly as it is on the device.
+  useLocalSearchParams: () =>
+    Object.fromEntries(
+      Object.entries(state.routeParams).filter(([, value]) => value !== undefined)
+    ),
   useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   useFocusEffect: (effect: () => void) => {
     state.focusCallbacks.add(effect);
@@ -232,6 +253,9 @@ vi.mock('expo-router', () => ({
     },
     replace: (path: string) => {
       state.destination = path;
+    },
+    setParams: (params: Record<string, string | undefined>) => {
+      Object.assign(state.routeParams, params);
     },
   }),
   useScrollToTop: () => undefined,
@@ -272,6 +296,9 @@ vi.mock('@/components/agents/session-list-content', () => ({
   AgentSessionListContent: 'AgentSessionListContent',
   FAB_MARGIN: 16,
   FAB_SIZE: 48,
+}));
+vi.mock('@/components/agents/session-status-filter-bar', () => ({
+  SessionStatusFilterBar: 'SessionStatusFilterBar',
 }));
 vi.mock('@/components/agents/session-list-search-header', async () => {
   // Vitest hoists this factory before React's static imports.
@@ -414,6 +441,21 @@ function requireNode(type: string) {
   }
   return result;
 }
+function liftNode() {
+  return root().findByType(OwnedKeyboardLift);
+}
+/** The pad the lift writes on the body frame; 0 is the full height. */
+function liftPad() {
+  const style: unknown = liftNode().findByType('View').props.style;
+  if (typeof style !== 'object' || style === null || !('paddingBottom' in style)) {
+    throw new TypeError('The keyboard lift wrote no paddingBottom');
+  }
+  const pad: unknown = style.paddingBottom;
+  if (typeof pad !== 'number') {
+    throw new TypeError('The keyboard lift wrote a non-numeric paddingBottom');
+  }
+  return pad;
+}
 function text() {
   return nodes('Text')
     .map(node => node.children.filter(child => typeof child === 'string').join(''))
@@ -429,9 +471,20 @@ function action(label: string) {
 function press(label: string) {
   (action(label).props.onPress as () => void)();
 }
+/** Press a control by its test id; the empty-state clear row carries one per cause. */
+function pressControl(testID: string) {
+  const control = nodes('Pressable').find(node => node.props.testID === testID);
+  if (!control) {
+    throw new Error(`Missing control: ${testID}`);
+  }
+  (control.props.onPress as () => void)();
+}
 /** Fire the body wrapper's layout with the height the list can use. */
 function layoutBody(height: number) {
-  const wrapper = nodes('View').find(node => typeof node.props.onLayout === 'function');
+  const keyboardFrame = liftNode().findByType('View');
+  const wrapper = nodes('View').find(
+    node => node.props.onLayout !== undefined && node !== keyboardFrame
+  );
   if (!wrapper) {
     throw new Error('Missing body wrapper');
   }
@@ -517,6 +570,13 @@ function hideKeyboard() {
 function surfaceBottomInset() {
   return root().findByType(StateSurfaceInsets).props.bottomInset as number;
 }
+/** Report the room the keyboard lift's own frame has, as the layout pass does. */
+function layoutKeyboardFrame(height: number) {
+  const onLayout = liftNode().findByType('View').props.onLayout as (event: {
+    nativeEvent: { layout: { height: number } };
+  }) => void;
+  onLayout({ nativeEvent: { layout: { height } } });
+}
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   state.focused = true;
@@ -534,6 +594,7 @@ beforeEach(() => {
   keyboardStore.setHeight(0);
   state.destination = '';
   state.sessionId = '';
+  state.routeParams = {};
   state.announcements = [];
   Object.assign(state.auth, { token: 'account', isLoading: false, isSigningOut: false });
   Object.assign(state.organization, { organizationId: null, isLoaded: true });
@@ -565,6 +626,7 @@ afterEach(async () => {
   state.listeners.clear();
   state.keyboard.clear();
   keyboardStore.setHeight(0);
+  __resetSessionListTouchGateForTests();
   await i18n.changeLanguage('en');
 });
 
@@ -1369,12 +1431,12 @@ describe('AgentSessionListScreen live filtering', () => {
     state.live.activeSessions = [row];
     await renderScreen();
     const searchHeader = openSearch();
-    const container = requireNode('KeyboardAvoidingView');
+    const container = liftNode();
     act(() => {
       (searchHeader.props.onBlur as (() => void) | undefined)?.();
     });
     expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
-    expect(requireNode('KeyboardAvoidingView')).toBe(container);
+    expect(liftNode()).toBe(container);
     expect(searchHeader.props.hasText).toBe(false);
   });
 
@@ -1456,7 +1518,11 @@ describe('AgentSessionListScreen live filtering', () => {
     });
 
     const emptyState = renderer.root.findByType(EmptyState);
-    expect(emptyState.props.description).toBe('Try a different search term.');
+    // The persisted filter still narrows the list under the search, so the copy
+    // names both causes and each cause keeps its own control.
+    expect(emptyState.props.description).toBe(
+      'Try a different search term. Try adjusting or clearing your filters.'
+    );
     expect(nodes('CenteredState')).toHaveLength(1);
     expect(nodes('FlashList')).toHaveLength(0);
     // The no-match body owns the band the tab bar leaves (the FAB's band is no
@@ -1466,7 +1532,7 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(fab()).toBeUndefined();
     expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
     act(() => {
-      (emptyState.props.action as { props: { onPress: () => void } }).props.onPress();
+      pressControl('agents-clear-search');
     });
 
     expect(nodes('FlashList')).toHaveLength(1);
@@ -1484,28 +1550,31 @@ describe('AgentSessionListScreen live filtering', () => {
       (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
     });
 
-    // iOS: the native container owns the lift, so the centered no-match body is
+    // iOS: the lift owns the keyboard band, so the centered no-match body is
     // inside it and re-measures against the viewport it shrinks.
-    const container = requireNode('KeyboardAvoidingView');
-    expect(container.props.behavior).toBe('padding');
+    const container = liftNode();
+    expect(liftPad()).toBe(0);
     expect(descendantsOf(container, 'CenteredState')).toHaveLength(1);
-    expect(nodes('KeyboardAvoidingView')).toHaveLength(1);
+    expect(root().findAllByType(OwnedKeyboardLift)).toHaveLength(1);
+    act(() => {
+      showKeyboard(320);
+    });
+    expect(liftPad()).toBe(320);
 
     // Android: edge-to-edge never resizes the window for the IME either, and the
-    // same native container owns the lift. The tree carries no JS padding, so
-    // the body stays inside the one container instead of a per-platform fork.
+    // same lift owns the band. The tree carries no second per-platform fork.
     state.platform.OS = 'android';
     await renderScreen();
     act(() => {
       showKeyboard(320);
     });
-    const androidContainer = requireNode('KeyboardAvoidingView');
-    expect(androidContainer.props.behavior).toBe('padding');
+    const androidContainer = liftNode();
+    expect(liftPad()).toBe(320);
     expect(descendantsOf(androidContainer, 'CenteredState')).toHaveLength(1);
-    expect(nodes('KeyboardAvoidingView')).toHaveLength(1);
+    expect(root().findAllByType(OwnedKeyboardLift)).toHaveLength(1);
   });
 
-  it('lets the native container own keyboard clearance without changing the search surface', async () => {
+  it('lets the keyboard lift clear the body without changing the search surface', async () => {
     state.platform.OS = 'android';
     state.live.activeSessions = [row];
     await renderScreen();
@@ -1513,7 +1582,7 @@ describe('AgentSessionListScreen live filtering', () => {
     act(() => {
       (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
     });
-    const container = requireNode('KeyboardAvoidingView');
+    const container = liftNode();
     const emptyState = root().findByType(EmptyState);
     for (const height of [320, 100, 0]) {
       act(() => {
@@ -1523,7 +1592,8 @@ describe('AgentSessionListScreen live filtering', () => {
           hideKeyboard();
         }
       });
-      expect(requireNode('KeyboardAvoidingView')).toBe(container);
+      expect(liftNode()).toBe(container);
+      expect(liftPad()).toBe(height);
       expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
       expect(root().findByType(EmptyState)).toBe(emptyState);
       expect(surfaceBottomInset()).toBe(state.tabBarHeight);
@@ -1558,20 +1628,20 @@ describe('AgentSessionListScreen live filtering', () => {
     state.live.activeSessions = [row];
     await renderScreen();
     const listStyle = () => nodes('FlashList')[0]?.props.style as { marginBottom: number };
-    // Keyboard down the native container lifts nothing and the frame ends at the
-    // tab bar: the FAB clearance rides on the content, not the frame.
-    expect(requireNode('KeyboardAvoidingView').props.behavior).toBe('padding');
+    // Keyboard down the lift pads nothing and the frame ends at the tab bar:
+    // the FAB clearance rides on the content, not the frame.
+    expect(liftPad()).toBe(0);
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
 
     openSearch();
     act(() => {
       showKeyboard(320);
     });
-    // The native container owns the whole IME lift, so the frame adds nothing and
-    // the viewport ends at the IME's top edge instead of a whole keyboard height
+    // The lift owns the whole IME band, so the frame adds nothing and the
+    // viewport ends at the IME's top edge instead of a whole keyboard height
     // above it. The IME is taller than the FAB band, so the frame contributes
     // nothing.
-    expect(requireNode('KeyboardAvoidingView').props.behavior).toBe('padding');
+    expect(liftPad()).toBe(320);
     expect(listStyle()).toEqual({ marginBottom: 0 });
 
     act(() => {
@@ -1597,16 +1667,50 @@ describe('AgentSessionListScreen live filtering', () => {
       showKeyboard(100);
     });
     expect(surfaceBottomInset()).toBe(fabBand);
-    // The rows list cannot: the native container lifts the IME's 100 and the
-    // frame adds the rest of the FAB band, so a shorter frame never parks rows
-    // under the button.
-    expect(requireNode('KeyboardAvoidingView').props.behavior).toBe('padding');
+    // The rows list cannot: the lift pads the IME's 100 and the frame adds the
+    // rest of the FAB band, so a shorter frame never parks rows under the
+    // button.
+    expect(liftPad()).toBe(100);
     expect(listStyle()).toEqual({ marginBottom: fabBand - 100 });
 
     act(() => {
       hideKeyboard();
     });
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
+  });
+
+  it('keeps the rows and the FAB band on the pad the lift could write in a short window', async () => {
+    // A keyboard height belongs to the window it was measured in. Rotating to a
+    // window shorter than that band used to pad the whole body away: no rows,
+    // no skeleton, no empty state and no error. The lift keeps a minimum
+    // viewport instead, and the FAB's band must subtract only the pad the body
+    // actually gave up.
+    state.platform.OS = 'android';
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const listStyle = () => nodes('FlashList')[0]?.props.style as { marginBottom: number };
+    const fabBand = state.tabBarHeight + FAB_SIZE + FAB_MARGIN;
+
+    openSearch();
+    act(() => {
+      showKeyboard(320);
+    });
+    expect(liftPad()).toBe(320);
+
+    // The rotation leaves the body less room than the band it is carrying.
+    act(() => {
+      layoutKeyboardFrame(253);
+    });
+
+    expect(liftPad()).toBe(253 - MIN_BODY_VIEWPORT);
+    expect(listStyle()).toEqual({ marginBottom: Math.max(0, fabBand - (253 - MIN_BODY_VIEWPORT)) });
+    expect(nodes('FlashList')).toHaveLength(1);
+
+    // A window with the room keeps the whole band, so portrait is unchanged.
+    act(() => {
+      layoutKeyboardFrame(758);
+    });
+    expect(liftPad()).toBe(320);
   });
 
   it('ignores a keyboard another screen raised, so the rows and centered states stay put', async () => {
@@ -1621,7 +1725,7 @@ describe('AgentSessionListScreen live filtering', () => {
     act(() => {
       showKeyboard(320);
     });
-    expect(requireNode('KeyboardAvoidingView').props.enabled).toBe(false);
+    expect(liftPad()).toBe(0);
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
 
     act(() => {
@@ -1631,7 +1735,7 @@ describe('AgentSessionListScreen live filtering', () => {
     act(() => {
       showKeyboard(320);
     });
-    expect(requireNode('KeyboardAvoidingView').props.enabled).toBe(true);
+    expect(liftPad()).toBe(320);
     expect(listStyle()).toEqual({ marginBottom: 0 });
 
     // Android Back hides the IME while the field keeps focus; a tap on the
@@ -1639,15 +1743,17 @@ describe('AgentSessionListScreen live filtering', () => {
     act(() => {
       hideKeyboard();
     });
+    expect(liftPad()).toBe(0);
     act(() => {
       showKeyboard(320);
     });
+    expect(liftPad()).toBe(320);
     expect(listStyle()).toEqual({ marginBottom: 0 });
 
     act(() => {
       (requireNode('SessionListSearchHeader').props.onBlur as () => void)();
     });
-    expect(requireNode('KeyboardAvoidingView').props.enabled).toBe(false);
+    expect(liftPad()).toBe(0);
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
   });
 
@@ -1753,11 +1859,11 @@ describe('AgentSessionListScreen live filtering', () => {
       ).toEqual(step.ids);
       expect(nodes('ScrollView')).toHaveLength(0);
       expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
-      const rows = descendantsOf(requireNode('KeyboardAvoidingView'), 'FlashList');
+      const rows = descendantsOf(liftNode(), 'FlashList');
       expect(rows).toHaveLength(1);
       // The body wrapper that measures the list's available height is the
       // `onLayout` view the rows list hangs from (see `useAgentsListChrome`).
-      const wrapper = descendantsOf(requireNode('KeyboardAvoidingView'), 'View').find(
+      const wrapper = descendantsOf(liftNode(), 'View').find(
         node =>
           typeof node.props.onLayout === 'function' && descendantsOf(node, 'FlashList').length === 1
       );
@@ -1847,6 +1953,139 @@ describe('AgentSessionListScreen live filtering', () => {
     expect((list.props.data as ActiveSession[]).map(session => session.id)).toEqual(['a1']);
   });
 
+  it('narrows the live list to the status the Home card sets and clears the filter', async () => {
+    state.live.activeSessions = [
+      { ...row, id: 'idle-1', status: 'idle' },
+      { ...row, id: 'work-1', status: 'running' },
+    ];
+    state.routeParams = { status: 'idle' };
+    await renderScreen();
+
+    const list = requireNode('FlashList');
+    expect((list.props.data as ActiveSession[]).map(session => session.id)).toEqual(['idle-1']);
+    const bar = requireNode('SessionStatusFilterBar');
+    expect(bar.props.kind).toBe('idle');
+    expect(bar.props.count).toBe(1);
+
+    act(() => {
+      (bar.props.onClear as () => void)();
+    });
+    expect(state.routeParams.status).toBeUndefined();
+  });
+
+  it('keeps the filter options of the whole live set while a status filter is active', async () => {
+    state.live.activeSessions = [
+      { ...row, id: 'idle-1', status: 'idle' },
+      {
+        ...row,
+        id: 'work-1',
+        status: 'running',
+        organizationId: null,
+        gitUrl: 'https://github.com/kilo/cloud.git',
+      },
+    ];
+    state.routeParams = { status: 'idle' };
+    await renderScreen();
+
+    act(() => {
+      headerAction('agents-open-filters').props.onPress();
+    });
+
+    expect(requireNode('SessionFilterModal').props.projectOptions).toHaveLength(1);
+  });
+
+  it('shows a clearable no-match state when the Home status filter has no rows', async () => {
+    state.live.activeSessions = [{ ...row, id: 'work-1', status: 'running' }];
+    state.routeParams = { status: 'idle' };
+    const renderer = await renderScreen();
+
+    expect(nodes('FlashList')).toHaveLength(0);
+    // The bar still names the active filter, with a zero count.
+    expect(requireNode('SessionStatusFilterBar').props.count).toBe(0);
+    const emptyState = renderer.root.findByType(EmptyState);
+    expect(emptyState.props.title).toBe('No sessions match');
+    act(() => {
+      pressControl('agents-clear-filters');
+    });
+    expect(state.routeParams.status).toBeUndefined();
+  });
+
+  it('keeps the search when the filters are cleared and restores rows from Clear search', async () => {
+    state.live.activeSessions = [{ ...row, id: 'idle-1', status: 'idle' }];
+    state.routeParams = { status: 'idle' };
+    await renderScreen();
+    const searchHeader = openSearch();
+    act(() => {
+      (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+    });
+
+    // Each control retires only its own cause, so clearing the filters leaves
+    // the search term in place and the search body keeps the list empty.
+    act(() => {
+      pressControl('agents-clear-filters');
+    });
+    expect(state.routeParams.status).toBeUndefined();
+    expect(nodes('FlashList')).toHaveLength(0);
+    const searchField = requireNode('SessionListSearchHeader');
+    expect(searchField.props.hasText).toBe(true);
+
+    // The search control is what brings the rows back.
+    act(() => {
+      pressControl('agents-clear-search');
+    });
+    expect(nodes('FlashList')).toHaveLength(1);
+  });
+
+  it('holds the list through the body swap after the no-match Clear action', async () => {
+    state.live.activeSessions = [{ ...row, id: 'idle-1', status: 'idle' }];
+    state.routeParams = { status: 'idle' };
+    const renderer = await renderScreen();
+    const gateProps = renderer.root
+      .findByType(SessionListTouchGate)
+      .findByType('View' as unknown as React.ElementType).props as {
+      onStartShouldSetResponderCapture: () => boolean;
+    };
+    expect(gateProps.onStartShouldSetResponderCapture()).toBe(false);
+
+    const searchHeader = openSearch();
+    act(() => {
+      (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+    });
+    act(() => {
+      pressControl('agents-clear-search');
+    });
+
+    // The clear swaps the empty state for the rows in the same commit; the gate
+    // claims the touch that follows instead of handing it to a row.
+    expect(nodes('FlashList')).toHaveLength(1);
+    expect(isSessionListTouchHeld()).toBe(true);
+    expect(gateProps.onStartShouldSetResponderCapture()).toBe(true);
+  });
+
+  it('holds the list through the body swap after the status bar Clear control', async () => {
+    state.live.activeSessions = [{ ...row, id: 'work-1', status: 'running' }];
+    state.routeParams = { status: 'running' };
+    const renderer = await renderScreen();
+    const gateProps = renderer.root
+      .findByType(SessionListTouchGate)
+      .findByType('View' as unknown as React.ElementType).props as {
+      onStartShouldSetResponderCapture: () => boolean;
+    };
+    expect(gateProps.onStartShouldSetResponderCapture()).toBe(false);
+
+    const statusBar = requireNode('SessionStatusFilterBar').props as { onClear: () => void };
+    act(() => {
+      statusBar.onClear();
+    });
+
+    // The bar's own Clear control sits above the list, so the rows it brings
+    // back land under the point it released.
+    expect(state.routeParams.status).toBeUndefined();
+    expect(nodes('FlashList')).toHaveLength(1);
+    expect(isSessionListTouchHeld()).toBe(true);
+    expect(gateProps.onStartShouldSetResponderCapture()).toBe(true);
+  });
+
   it('shows a clearable no-match state when every live row is filtered out', async () => {
     state.live.activeSessions = [
       { ...row, id: 'a1', organizationId: null, gitUrl: 'https://github.com/kilo/cloud.git' },
@@ -1873,9 +2112,8 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(filterButtonProps().accessibilityValue).toBeUndefined();
     expect(nodes('ScrollView')).toHaveLength(0);
 
-    const clearAction = emptyState.props.action as { props: { onPress: () => void } };
     act(() => {
-      clearAction.props.onPress();
+      pressControl('agents-clear-filters');
     });
     expect(nodes('FlashList')).toHaveLength(1);
     expect(headerAction('agents-open-filters').props.activeCount).toBe(0);

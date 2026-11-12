@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import type { CloudAgentSessionFailureStage } from '@kilocode/db/schema';
+
+export type { CloudAgentSessionFailureStage } from '@kilocode/db/schema';
 
 export const CLOUD_AGENT_FAILURE_STAGES = [
   'pre_dispatch',
@@ -49,16 +52,129 @@ export const WORKSPACE_FAILURE_SUBTYPES = [
   'git_pack_corrupt',
   'git_checkout_conflict',
   'git_branch_missing',
+  'base_branch_changed',
+  'base_branch_missing',
+  'base_branch_stale',
   'sandbox_storage_full',
   'kilo_import_timeout',
   'kilo_import_failed',
   'setup_command_timeout',
   'setup_command_failed',
+  'workspace_snapshot_start_failed',
+  'environment_snapshot_required',
   'workspace_setup_unknown',
 ] as const;
 
 export const WorkspaceFailureSubtypeSchema = z.enum(WORKSPACE_FAILURE_SUBTYPES);
 export type WorkspaceFailureSubtype = z.infer<typeof WorkspaceFailureSubtypeSchema>;
+
+const USER_FAILURE_MESSAGES = {
+  sandbox_connect_failed: 'Could not connect to the sandbox',
+  workspace_setup_failed: 'Workspace setup failed',
+  kilo_server_failed: 'Kilo server failed to start',
+  wrapper_start_failed: 'Agent wrapper failed to start',
+  invalid_delivery_request: 'The message could not be delivered',
+  session_metadata_missing: 'Session metadata is unavailable',
+  model_missing: 'No model was selected',
+  delivery_failure_unknown: 'The message could not be delivered',
+  wrapper_disconnected: 'Agent wrapper disconnected',
+  wrapper_no_output: 'Agent wrapper made no execution progress during the watchdog window',
+  wrapper_ping_timeout: 'Agent wrapper stopped responding',
+  wrapper_error_before_activity: 'Agent wrapper failed before processing the message',
+  assistant_error: 'Assistant request failed',
+  wrapper_error_after_activity: 'Agent wrapper failed while processing the message',
+  missing_assistant_reply: 'No assistant reply was produced',
+  payment_required: 'Assistant request failed: insufficient credits',
+  admission_billing_unavailable:
+    'Sandbox billing or capacity verification is unavailable. Try again shortly.',
+  container_limit_reached:
+    'Concurrent container limit reached. Stop an existing container before starting another.',
+  account_blocked: 'This account is blocked.',
+  user_interrupt: 'The message was interrupted by the user',
+  container_shutdown: 'The agent container shut down',
+  system_interrupt: 'The message was interrupted',
+  unclassified: 'The message failed',
+} as const satisfies Record<CloudAgentFailureCode, string>;
+
+const WORKSPACE_FAILURE_MESSAGES = {
+  git_clone_timeout: 'Repository clone timed out',
+  git_checkout_timeout: 'Repository checkout timed out',
+  git_authentication_failed: 'Repository authentication failed',
+  git_rate_limited: 'Repository request was rate limited',
+  git_network_failed: 'Repository network request failed',
+  git_pack_corrupt: 'Repository data is corrupt',
+  git_checkout_conflict: 'Repository checkout conflict',
+  git_branch_missing: 'Requested repository branch was not found',
+  base_branch_changed: 'Base branch changed while the workspace was starting',
+  base_branch_missing: 'Base branch has not been pushed',
+  base_branch_stale:
+    'Base branch no longer contains this workspace’s recorded base; recreate the stacked workspace',
+  sandbox_storage_full: 'Workspace setup failed: sandbox storage full',
+  kilo_import_timeout: 'Session import timed out',
+  kilo_import_failed: 'Session import failed',
+  setup_command_timeout: 'Setup command timed out',
+  setup_command_failed: 'Setup command failed',
+  workspace_snapshot_start_failed: 'Workspace snapshot could not be restored',
+  environment_snapshot_required: 'Sandbox could not start from the environment snapshot',
+  workspace_setup_unknown: 'Workspace setup failed',
+} as const satisfies Record<WorkspaceFailureSubtype, string>;
+
+export function userVisibleFailureMessage(code: CloudAgentFailureCode): string {
+  return USER_FAILURE_MESSAGES[code];
+}
+
+export function workspaceFailureUserMessage(subtype: WorkspaceFailureSubtype): string {
+  return WORKSPACE_FAILURE_MESSAGES[subtype];
+}
+
+export const CLOUD_AGENT_SESSION_FAILURE_CODES = [
+  'sandbox_id_derivation_failed',
+  'do_registration_rejected',
+  'initial_admission_rejected',
+  'initial_queue_full',
+  'invalid_initial_intent',
+  'do_rpc_outcome_unknown',
+] as const;
+
+export const CloudAgentSessionFailureCodeSchema = z.enum(CLOUD_AGENT_SESSION_FAILURE_CODES);
+export type CloudAgentSessionFailureCode = z.infer<typeof CloudAgentSessionFailureCodeSchema>;
+
+export const CLOUD_AGENT_SESSION_FAILURE_STAGES = [
+  'sandbox_identity',
+  'registration',
+  'initial_admission',
+  'transport',
+] as const satisfies readonly CloudAgentSessionFailureStage[];
+
+/**
+ * Compile-time guard: adding a stage to the database type without listing it
+ * above fails the build here instead of silently rejecting a valid value.
+ */
+export type SessionFailureStagesCoverDatabase = [
+  Exclude<CloudAgentSessionFailureStage, (typeof CLOUD_AGENT_SESSION_FAILURE_STAGES)[number]>,
+] extends [never]
+  ? true
+  : never;
+
+// Materialise the guard: a bare type alias resolving to never compiles
+// cleanly, so only a value of that type makes a missing stage fail the build.
+const sessionFailureStagesCoverDatabase: SessionFailureStagesCoverDatabase = true;
+void sessionFailureStagesCoverDatabase;
+
+export const CloudAgentSessionFailureStageSchema = z.enum(CLOUD_AGENT_SESSION_FAILURE_STAGES);
+
+export const SESSION_FAILURE_MESSAGES = {
+  sandbox_id_derivation_failed: 'Could not create the session (sandbox identity)',
+  do_registration_rejected: 'Could not create the session (registration rejected)',
+  initial_admission_rejected: 'Environment preparation failed (admission rejected)',
+  initial_queue_full: 'Environment preparation failed (queue full)',
+  invalid_initial_intent: 'Environment preparation failed (invalid initial request)',
+  do_rpc_outcome_unknown: 'Session creation outcome is unknown (transport failure)',
+} as const satisfies Record<CloudAgentSessionFailureCode, string>;
+
+export function userVisibleSessionFailureMessage(code: CloudAgentSessionFailureCode): string {
+  return SESSION_FAILURE_MESSAGES[code];
+}
 
 /**
  * Bounded admission-result codes carried across the setup failure boundary so
@@ -121,6 +237,7 @@ export const CLOUD_AGENT_FAILURE_REASONS = [
   'managed_provider_unavailable',
   'managed_provider_authentication',
   'managed_model_configuration',
+  'model_catalog_unavailable',
   'provider_unavailable',
   'provider_disconnect',
   'gateway_unavailable',
@@ -186,6 +303,7 @@ export const CLOUD_AGENT_ASSISTANT_FAILURE_REASONS = [
   'output_limit',
   'content_filter',
   'structured_output',
+  'model_catalog_unavailable',
   'unknown',
 ] as const;
 export const CloudAgentAssistantFailureReasonSchema = z.enum(CLOUD_AGENT_ASSISTANT_FAILURE_REASONS);
@@ -209,14 +327,8 @@ type RunFailureFacts = {
 
 type SetupFailureFacts = {
   source: 'setup';
-  stage: 'sandbox_identity' | 'registration' | 'initial_admission' | 'transport';
-  code:
-    | 'sandbox_id_derivation_failed'
-    | 'do_registration_rejected'
-    | 'initial_admission_rejected'
-    | 'initial_queue_full'
-    | 'invalid_initial_intent'
-    | 'do_rpc_outcome_unknown';
+  stage: CloudAgentSessionFailureStage;
+  code: CloudAgentSessionFailureCode;
   admissionCode?: CloudAgentAdmissionFailureCode;
 };
 
@@ -235,11 +347,20 @@ function classifyWorkspaceFailure(
       return classified('user', 'source_control_authentication');
     case 'git_checkout_conflict':
     case 'git_branch_missing':
+    case 'base_branch_changed':
+    case 'base_branch_missing':
+    case 'base_branch_stale':
       return classified('user', 'source_control_configuration');
     case 'setup_command_timeout':
       return classified('user', 'setup_command_timeout');
     case 'setup_command_failed':
       return classified('user', 'setup_command');
+    case 'environment_snapshot_required':
+      return classified('user', 'setup_command');
+    case 'workspace_snapshot_start_failed':
+      // The workspace snapshot cannot start (most often a sandbox image change)
+      // and waits for the user to choose "Start fresh"; it must not page.
+      return classified('user', 'workspace_unknown');
     case 'sandbox_storage_full':
       return classified('platform', 'sandbox_capacity');
     case 'git_rate_limited':
@@ -304,11 +425,15 @@ function classifyAdmissionFailure(
  * provider are indistinguishable from the cloud agent's point of view, so
  * ownership does not change the responsibility for a provider outage, rate
  * limit, timeout or model-availability failure. Only a failure whose handling
- * the cloud agent platform itself controls stays `platform`.
+ * the cloud agent platform itself controls stays `platform`, such as a model
+ * catalog path that the runtime credential proxy does not allow.
  */
 function classifyAssistantFailure(input: RunFailureFacts): CloudAgentFailureClassification {
   if (input.code === 'payment_required' || input.assistantReason === 'insufficient_credits') {
     return classified('user', 'insufficient_credits');
+  }
+  if (input.assistantReason === 'model_catalog_unavailable') {
+    return classified('platform', 'model_catalog_unavailable');
   }
   if (input.assistantReason === 'rate_limited') return classified('provider', 'rate_limited');
   if (input.code === 'model_missing' || input.assistantReason === 'model_unavailable') {

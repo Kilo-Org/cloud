@@ -24,7 +24,6 @@ import {
   type SandboxKind,
 } from '../sandbox-placement.js';
 import { isControlSession } from '../session-identity.js';
-import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { agentSandboxProviderSchema, type AgentSandboxProvider } from '../types.js';
 import {
@@ -45,10 +44,14 @@ const SandboxIdSchema = z
   .refine(isValidSandboxId, 'Invalid sandboxId format')
   .transform(s => s);
 
+/** Legacy decode only: the key of a retired owner-scoped shared sandbox. */
 const SharedSandboxIdSchema = z
   .string()
   .refine(isGeneratedSharedSandboxId, 'Invalid shared sandbox ID format')
   .transform(s => s);
+
+/** Legacy decode only: the failover slot a retired shared sandbox route could record. */
+const LEGACY_SHARED_SANDBOX_FAILOVER_SUFFIX = 'shared-slot-v1';
 
 const MessageIdSchema = z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION);
 const SandboxProviderSchema = agentSandboxProviderSchema;
@@ -97,6 +100,13 @@ const MetadataAuthSchema = z
 const RepositoryCommonSchema = {
   token: z.string().optional(),
   upstreamBranch: branchNameSchema.optional(),
+  /** Branch a stacked workspace was created from; null/absent means the default branch. */
+  baseBranch: branchNameSchema.optional(),
+  /** Parent tip the working branch was last created or restacked onto. */
+  baseSha: z
+    .string()
+    .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/)
+    .optional(),
 };
 
 const repositoryTypes = new Set(['github', 'gitlab', 'bitbucket', 'git']);
@@ -174,6 +184,11 @@ const MetadataRepositorySchema = z.preprocess(
           bitbucketIntegrationId: z.string().uuid().optional(),
           bitbucketTokenManaged: z.boolean().optional(),
           upstreamBranch: branchNameSchema.optional(),
+          baseBranch: branchNameSchema.optional(),
+          baseSha: z
+            .string()
+            .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/)
+            .optional(),
         })
         .strip(),
       z
@@ -240,11 +255,16 @@ const MetadataCallbackSchema = z
   })
   .strip();
 
+/**
+ * Legacy decode only. Every sandbox serves one workspace; this route belongs to
+ * a retired owner-scoped shared sandbox. Stored metadata can still carry it, so
+ * it must keep parsing, but no new session writes it.
+ */
 const MetadataSharedSandboxRouteSchema = z
   .object({
     kind: z.literal('shared'),
     routeKey: SharedSandboxIdSchema,
-    suffix: z.literal(SHARED_SANDBOX_FAILOVER_SUFFIX).optional(),
+    suffix: z.literal(LEGACY_SHARED_SANDBOX_FAILOVER_SUFFIX).optional(),
   })
   .strip();
 
@@ -257,7 +277,10 @@ const CredentialContainmentSchema = z
   })
   .strip();
 
-/** Sandbox-ID class each isolated allocation must have in persisted metadata. */
+/**
+ * Sandbox-ID class each isolated allocation must have in persisted metadata.
+ * `cloudflare-shared` is legacy decode only and is matched separately.
+ */
 const SANDBOX_ALLOCATION_ID_CLASS: Record<
   Exclude<SandboxAllocation, 'cloudflare-shared'>,
   SandboxIdClass
@@ -307,6 +330,8 @@ const MetadataWorkspaceSchema = egressPolicySchema
     sandboxProviderBinding: SandboxProviderBindingSchema.optional(),
     providerRuntime: ProviderRuntimeSchema.optional(),
     worktreeId: cloudAgentWorktreeIdSchema.optional(),
+    /** Parent worktree for a stacked workspace. */
+    parentWorktreeId: cloudAgentWorktreeIdSchema.optional(),
     workspacePath: z.string().optional(),
     sessionHome: z.string().optional(),
     branchName: z.string().optional(),
@@ -570,6 +595,29 @@ export function retiredRuntimeMessage(metadata: SessionMetadata): string | null 
   if (hasRetiredDevcontainerRuntime(metadata)) return DEVCONTAINER_RETIRED_MESSAGE;
   if (metadata.workspace === undefined) return null;
   return getSandboxProvider(metadata) === 'cloudflare' ? CLOUDFLARE_RUNTIME_RETIRED_MESSAGE : null;
+}
+
+/**
+ * Legacy decode only: whether a stored workspace names a retired owner-scoped
+ * shared sandbox. Every sandbox now serves one workspace. Such a workspace ran
+ * on the retired Cloudflare Sandbox runtime, so {@link retiredRuntimeMessage}
+ * already stops its compute; this check keeps it from gaining new authority or
+ * from being registered again.
+ */
+export function isLegacySharedSandboxWorkspace(
+  workspace:
+    | {
+        sandboxAllocation?: SandboxAllocation;
+        sandboxKind?: SandboxKind;
+        sandboxRoute?: unknown;
+      }
+    | undefined
+): boolean {
+  return (
+    workspace?.sandboxAllocation === 'cloudflare-shared' ||
+    workspace?.sandboxKind === 'shared' ||
+    workspace?.sandboxRoute !== undefined
+  );
 }
 
 export function requiresContainmentSandbox(metadata: SessionMetadata): boolean {

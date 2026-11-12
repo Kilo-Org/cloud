@@ -19,7 +19,7 @@ export type DeviceSession = inferRouterOutputs<MobileRouter>['user']['listDevice
 export function deviceSessionLabel(userAgent: string | null | undefined): string {
   const trimmed = userAgent?.trim() ?? '';
   if (!trimmed) {
-    return i18n.t('kiloclaw.devicePairing.unknownDevice');
+    return i18n.t('deviceSessions.unknownDevice');
   }
   if (trimmed.startsWith('Mozilla/')) {
     return i18n.t('deviceSessions.webBrowser');
@@ -33,7 +33,7 @@ export function deviceSessionLabel(userAgent: string | null | undefined): string
   ) {
     return i18n.t('deviceSessions.kiloApp');
   }
-  return trimmed.split(/[\s/]/)[0] ?? i18n.t('kiloclaw.devicePairing.unknownDevice');
+  return trimmed.split(/[\s/]/)[0] ?? i18n.t('deviceSessions.unknownDevice');
 }
 
 /**

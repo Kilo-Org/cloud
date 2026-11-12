@@ -1,3 +1,4 @@
+import { billingFailureFromAdmission } from '../billing-failure.js';
 import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
 import { getContainerCapacityFailureReason } from '../container-concurrency.js';
 import {
@@ -80,7 +81,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
     ref,
     billing
   ) => {
-    if (!billing) return;
+    if (!billing) throw new ProviderCreationError('invalid_configuration');
     const parsed = decodeOwnedProviderRef(ref);
     if (!parsed) throw new ProviderCreationError('invalid_configuration');
     let input: ReturnType<typeof parseSandboxBillingInput>;
@@ -89,40 +90,36 @@ export function createCloudflareContainersProviderAdapter(deps: {
     } catch {
       throw new ProviderCreationError('invalid_configuration');
     }
-    const container = deps.getContainer(deps.logicalSandboxId);
-    let blocked = false;
+    let admission: SandboxBillingAdmissionResult;
     try {
-      blocked = await container.isBillingBlocked();
-    } catch {
-      blocked = input.enforcementRequested === true;
-    }
-    if (input.enforcementRequested || blocked) {
-      let admission: SandboxBillingAdmissionResult;
-      try {
-        admission = await container.ensureBillingAdmission(input, instance);
-      } catch (error) {
-        if (getContainerCapacityFailureReason(error)) throw error;
-        admission = {
-          success: false,
-          code: 'meter_unavailable',
-          message: 'Container billing admission is unavailable',
-        };
-      }
-      if (!admission.success) {
-        throw new ProviderCreationError(admission.code);
-      }
-    } else {
-      await withDORetry(
+      admission = await withDORetry(
         () => deps.getContainer(deps.logicalSandboxId),
-        container => container.configureBilling(input, instance),
-        'configureSandboxContainersBilling'
+        async (stub): Promise<SandboxBillingAdmissionResult> =>
+          stub.ensureBillingAdmission(input, instance),
+        'ensureSandboxContainersBillingAdmission'
+      );
+    } catch (error) {
+      if (getContainerCapacityFailureReason(error)) throw error;
+      admission = {
+        success: false,
+        code: 'meter_unavailable',
+        message: 'Container billing admission is unavailable',
+      };
+    }
+    if (!admission.success) {
+      throw new ProviderCreationError(
+        admission.code,
+        admission.code === 'invalid_configuration'
+          ? undefined
+          : billingFailureFromAdmission(input.subject, { ...admission, code: admission.code })
       );
     }
   };
 
   return {
-    environmentSnapshots: true,
-    sessionSnapshots: {
+    environmentSnapshots: 'launch',
+    workspaceSnapshots: {
+      currentImage: image => deps.getContainer(deps.logicalSandboxId).currentImage(image),
       async capture(ref, captureId) {
         if (decodeOwnedProviderRef(ref) === null)
           throw new ProviderCreationError('invalid_configuration');
@@ -164,7 +161,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
       // One launch selection (amendment "cold session without a snapshot"): a
       // trusted descriptor installs the verified runtime before the supervisor,
       // also on a snapshot start; no descriptor runs the baked supervisor.
-      const { startSource, snapshotFailed } = await container.launchWrapper({
+      const { startSource, snapshotFailed, snapshotFailureReason } = await container.launchWrapper({
         allocationRef: ref,
         command,
         instance,
@@ -174,6 +171,9 @@ export function createCloudflareContainersProviderAdapter(deps: {
         ...(deps.egressAudit === true ? { egressAudit: true } : {}),
         ...(options?.deadlineAt === undefined ? {} : { deadlineAt: options.deadlineAt }),
         ...(options?.nativeImage === undefined ? {} : { nativeImage: options.nativeImage }),
+        ...(options?.snapshotDiagnostic === undefined
+          ? {}
+          : { snapshotDiagnostic: options.snapshotDiagnostic }),
         env: {
           ...env,
           CONTROL_WORKLOAD_LIMIT_MB: workloadLimitMb,
@@ -181,7 +181,12 @@ export function createCloudflareContainersProviderAdapter(deps: {
           WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
         },
       });
-      if (snapshotFailed) return { startSource, snapshotFailed };
+      if (snapshotFailed)
+        return {
+          startSource,
+          snapshotFailed,
+          ...(snapshotFailureReason === undefined ? {} : { snapshotFailureReason }),
+        };
       // Lease renewal only starts once the wrapper reports ready, which the
       // recovery admission gate can delay. Establish the initial lease here so
       // the container is not reaped by its inactivity timeout before then.

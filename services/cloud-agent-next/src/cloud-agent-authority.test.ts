@@ -11,8 +11,8 @@ import type * as RuntimeAuthorizationModule from '@kilocode/worker-utils/runtime
 import type { SessionMetadata } from './persistence/session-metadata.js';
 import {
   assertCloudAgentParentAuthority,
-  assertCloudAgentIsolatedAllocation,
   authorizeCloudAgentChild,
+  authorizeCloudAgentWorkspaceSibling,
   issueCloudAgentMcpGrant,
   resolveCloudAgentMcpUrl,
   validateScopedWorkerPreparation,
@@ -44,6 +44,7 @@ const launch = {
   mode: 'code',
   model: 'kilo/test-model',
   autoInitiate: true,
+  operationKey: '33333333-3333-4333-8333-333333333333',
 };
 const githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
 const webForwardedLaunch = {
@@ -97,14 +98,6 @@ describe('Cloud Agent spawn authority', () => {
     expect(workspaceMcpAnchorSessionId(worktreeId, childSessionId)).toBe(parentSessionId);
     expect(workspaceMcpAnchorSessionId(undefined, childSessionId)).toBe(childSessionId);
     expect(workspaceMcpAnchorSessionId('worktree_invalid', childSessionId)).toBeUndefined();
-  });
-
-  it('rejects shared allocation for opted-in parents and scoped children after saved-settings resolution', () => {
-    expect(() => assertCloudAgentIsolatedAllocation(true, 'cloudflare-shared')).toThrow(
-      'isolated sandbox'
-    );
-    expect(() => assertCloudAgentIsolatedAllocation(true, 'vercel-small')).not.toThrow();
-    expect(() => assertCloudAgentIsolatedAllocation(false, 'cloudflare-shared')).not.toThrow();
   });
 
   it('refuses grants from already-persisted shared sandbox parents', () => {
@@ -237,6 +230,54 @@ describe('Cloud Agent spawn authority', () => {
     ).toThrow();
   });
 
+  it('accepts a requested environment and rejects widened nested fields on scoped preparation', () => {
+    const organizationId = '22345678-1234-4234-8234-123456789abc';
+    const organizationScope: CloudAgentAuthority = { ...scope, organizationId };
+    const requestedEnvironment = {
+      id: '32345678-1234-4234-8234-123456789abc',
+      repositories: [{ repoFullName: 'acme/other', branch: 'feature/child' }],
+    };
+    const input = {
+      ...webForwardedLaunch,
+      kilocodeOrganizationId: organizationId,
+      requestedEnvironment,
+    };
+
+    expect(validateScopedWorkerPreparation(organizationScope, input)).toEqual({
+      ...launch,
+      organizationId,
+      requestedEnvironment,
+    });
+
+    for (const invalid of [
+      { ...requestedEnvironment, extra: true },
+      { ...requestedEnvironment, id: 'not-a-uuid' },
+      {
+        ...requestedEnvironment,
+        repositories: [{ repoFullName: 'acme/other', branch: 'b'.repeat(256) }],
+      },
+      {
+        ...requestedEnvironment,
+        repositories: [{ repoFullName: 'acme/other', extra: true }],
+      },
+    ]) {
+      expect(() =>
+        validateScopedWorkerPreparation(organizationScope, {
+          ...input,
+          requestedEnvironment: invalid,
+        })
+      ).toThrow();
+    }
+    for (const requireEnvironmentChoice of [true, false]) {
+      expect(() =>
+        validateScopedWorkerPreparation(organizationScope, {
+          ...input,
+          requireEnvironmentChoice,
+        })
+      ).toThrow();
+    }
+  });
+
   it('rejects a malformed trusted GitHub integration identity', () => {
     expect(() =>
       validateScopedWorkerPreparation(scope, {
@@ -330,6 +371,64 @@ describe('Cloud Agent spawn authority', () => {
     expect(record.source).toEqual(authorization.source);
     expect(result.seal).toBe('private-child-authorization-seal');
     expect(jwt.decode(result.token)).not.toHaveProperty('cloudAgentAuthority');
+  });
+
+  it('mints an independent sibling authorization in the parent workspace only', async () => {
+    const { context, authorization } = fixture();
+    const result = await authorizeCloudAgentWorkspaceSibling({
+      parentSessionId,
+      siblingSessionId: childSessionId,
+      ...context,
+    });
+    const record = renew.mock.calls[0][0].authorization;
+    expect(record).toMatchObject({
+      ...authorization,
+      id: expect.any(String),
+      resourceId: childSessionId,
+      issuedAt: now.toISOString(),
+      delegationExpiresAt: authorization.delegationExpiresAt,
+    });
+    expect(record.id).not.toBe(authorization.id);
+    expect(record.bindings).toEqual(authorization.bindings);
+    expect(result.seal).toBe('private-child-authorization-seal');
+    expect(jwt.decode(result.token)).not.toHaveProperty('cloudAgentAuthority');
+    expect(jwt.decode(result.token)).not.toHaveProperty('parentCloudAgentSessionId');
+  });
+
+  it('refuses sibling authorization for a self target or a disabled parent', async () => {
+    const { context, metadata } = fixture();
+    await expect(
+      authorizeCloudAgentWorkspaceSibling({
+        parentSessionId,
+        siblingSessionId: parentSessionId,
+        ...context,
+      })
+    ).rejects.toThrow('independent workspace session');
+    metadata.allowSubagentSessions = false;
+    await expect(
+      authorizeCloudAgentWorkspaceSibling({
+        parentSessionId,
+        siblingSessionId: childSessionId,
+        ...context,
+      })
+    ).rejects.toThrow('parent authority denied');
+    expect(renew).not.toHaveBeenCalled();
+  });
+
+  it('refuses sibling authorization when the parent is revoked during minting', async () => {
+    const { context, authorization } = fixture();
+    renew.mockImplementationOnce(async () => {
+      authorization.state = 'revoked';
+      return { token: 'must-not-escape' };
+    });
+    await expect(
+      authorizeCloudAgentWorkspaceSibling({
+        parentSessionId,
+        siblingSessionId: childSessionId,
+        ...context,
+      })
+    ).rejects.toThrow('parent authority denied');
+    expect(seal).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -497,6 +596,43 @@ describe('Cloud Agent spawn authority', () => {
       })
     ).toThrow();
     expect(() => CloudAgentAuthoritySchema.parse({ ...scope, remainingDepth: 2 })).toThrow();
+  });
+  it('accepts the web-resolved stacked branch, commit, and connection at the internal boundary', () => {
+    const parentWorktreeId = 'worktree_12345678-1234-4234-8234-123456789abc';
+    expect(
+      validateScopedWorkerPreparation(scope, {
+        ...launch,
+        githubIntegrationId: '44444444-4444-4444-8444-444444444444',
+        platform: 'github',
+        baseBranch: 'feature/parent',
+        baseSha: 'a'.repeat(40),
+        parentWorktreeId,
+        operationKey: '33333333-3333-4333-8333-333333333333',
+      })
+    ).toEqual({
+      ...launch,
+      stackOnWorktreeId: parentWorktreeId,
+      operationKey: '33333333-3333-4333-8333-333333333333',
+    });
+  });
+  it.each([
+    { stackOnWorktreeId: 'worktree_12345678-1234-4234-8234-123456789abc' },
+    { baseBranch: 'main', baseSha: 'a'.repeat(40) },
+    { parentWorktreeId: 'worktree_12345678-1234-4234-8234-123456789abc' },
+    {
+      parentWorktreeId: 'worktree_12345678-1234-4234-8234-123456789abc',
+      baseBranch: 'feature/parent',
+      baseSha: 'invalid-sha',
+    },
+    {
+      parentWorktreeId: 'worktree_12345678-1234-4234-8234-123456789abc',
+      baseBranch: 'feature/parent',
+      baseSha: 'a'.repeat(40),
+      upstreamBranch: 'main',
+      operationKey: '33333333-3333-4333-8333-333333333333',
+    },
+  ])('rejects incomplete or conflicting internal stack metadata %j', metadata => {
+    expect(() => validateScopedWorkerPreparation(scope, { ...launch, ...metadata })).toThrow();
   });
 
   it('never reissues an expired or revoked parent authorization', async () => {

@@ -5,8 +5,9 @@ import {
   getEnhancedOpenRouterModels,
   getOpenRouterTranscriptionModels,
   getRawOpenRouterModels,
+  resetOpenRouterModelsCaches,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
-import type { StoredModel } from '@kilocode/db/schema-types';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import {
   createMockResponse,
   mockOpenRouterModels,
@@ -22,10 +23,16 @@ import {
   getDataCollectionRequiredModelIds,
   getProviderSlugsForModels,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getOpenRouterModelsMetadataFromDatabase,
+  getVercelModelsMetadataFromDatabase,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type * as MapModelIdToVercelModule from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { resolveCatalogVariant } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
 import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type * as UnavailableModelsModule from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { getVercelOnlyCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => {
   const actual = jest.requireActual<typeof UnavailableModelsModule>(
@@ -36,6 +43,18 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => {
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
+  getVercelModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
+  ...jest.requireActual<typeof MapModelIdToVercelModule>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel'
+  ),
+  getVercelModelIdOverrides: jest.fn(() => Promise.resolve(new Map())),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models', () => ({
+  getVercelOnlyCatalogModels: jest.fn(() => Promise.resolve([])),
 }));
 
 jest.mock(
@@ -49,6 +68,10 @@ jest.mock(
 );
 
 const originalFetch = global.fetch;
+
+beforeEach(() => {
+  resetOpenRouterModelsCaches();
+});
 
 function buildModel(overrides: Partial<OpenRouterModel> = {}): OpenRouterModel {
   return {
@@ -193,13 +216,24 @@ describe('auto models', () => {
     expect(models.data.some(model => model.id === KILO_AUTO_EFFICIENT_MODEL.id)).toBe(true);
   });
 
-  it('explicitly caches authenticated catalog requests', async () => {
+  it('caches authenticated catalog requests in memory and bypasses the framework data cache', async () => {
+    await getEnhancedOpenRouterModels({ countryCode: null });
     await getEnhancedOpenRouterModels({ countryCode: null });
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://openrouter.ai/api/v1/models',
-      expect.objectContaining({ cache: 'force-cache', next: { revalidate: 60 } })
-    );
+    const catalogCalls = jest
+      .mocked(global.fetch)
+      .mock.calls.filter(([url]) => url === 'https://openrouter.ai/api/v1/models');
+    expect(catalogCalls).toEqual([
+      [
+        'https://openrouter.ai/api/v1/models',
+        expect.objectContaining({
+          method: 'GET',
+          cache: 'no-store',
+          headers: expect.objectContaining({ Authorization: expect.stringMatching(/^Bearer /) }),
+        }),
+      ],
+    ]);
+    expect(catalogCalls[0]?.[1]).not.toHaveProperty('next');
   });
 
   it.each([undefined, { name: 'Current model', slug: 'vendor/current' }])(
@@ -254,12 +288,14 @@ describe('auto models', () => {
     const target = buildModel({ id: 'vendor/current' });
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValueOnce({
       [alias.id]: {
-        ...alias,
+        id: alias.id,
+        name: alias.name,
         endpoints: [],
         alias_target: { slug: target.id },
       },
       [target.id]: {
-        ...target,
+        id: target.id,
+        name: target.name,
         endpoints: [],
         alias_target: { slug: 'vendor/ignored' },
       },
@@ -387,6 +423,91 @@ describe('auto models', () => {
   });
 });
 
+describe('Vercel-only models', () => {
+  const vercelOnlyModel = buildModel({ id: 'vendor/vercel-only', name: 'Vendor: Vercel Only' });
+
+  beforeEach(() => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(createMockResponse({ jsonData: { data: [buildModel()] } }))
+    ) as unknown as typeof fetch;
+    jest.mocked(getVercelOnlyCatalogModels).mockResolvedValueOnce([vercelOnlyModel]);
+    jest
+      .mocked(getProviderSlugsForModels)
+      .mockImplementation(
+        async ids =>
+          new Map(
+            ids.map(id => [
+              id,
+              new Set(id === vercelOnlyModel.id ? ['amazon-bedrock', 'vendor'] : []),
+            ])
+          )
+      );
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+    jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({});
+    jest
+      .mocked(getProviderSlugsForModels)
+      .mockImplementation(async ids => new Map(ids.map(id => [id, new Set<string>()])));
+  });
+
+  it('lists them after the OpenRouter models with their snapshot providers', async () => {
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+
+    expect(getVercelOnlyCatalogModels).toHaveBeenCalledWith({
+      openRouterModels: [expect.objectContaining({ id: 'vendor/model' })],
+      openRouterMetadata: {},
+    });
+    const ids = models.data.map(model => model.id);
+    expect(ids.indexOf('vendor/vercel-only')).toBe(ids.indexOf('vendor/model') + 1);
+    expect(models.data.find(model => model.id === 'vendor/vercel-only')).toMatchObject({
+      name: 'Vendor: Vercel Only',
+      inference_provider_ids: ['amazon-bedrock', 'vendor'],
+      isFree: false,
+    });
+  });
+
+  it('advertises Vercel reasoning variants that request-time variant resolution accepts', async () => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      'vendor/model': { id: 'vendor/model', name: 'Test Model', endpoints: [] },
+    });
+    jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({
+      [vercelOnlyModel.id]: {
+        id: vercelOnlyModel.id,
+        name: 'Vercel Only',
+        type: 'language',
+        context_window: 32_000,
+        modalities: { input: ['text'], output: ['text'] },
+        pricing: { input: '0.000001', output: '0.000005' },
+        reasoning_options: [{ type: 'effort', values: ['low', 'medium', 'high'] }],
+        endpoints: [{ provider_name: 'vendor' }],
+      },
+    });
+
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+    const variants =
+      models.data.find(model => model.id === vercelOnlyModel.id)?.opencode?.variants ?? {};
+
+    expect(Object.keys(variants)).toEqual(['low', 'medium', 'high']);
+    for (const [variant, settings] of Object.entries(variants)) {
+      expect(await resolveCatalogVariant(vercelOnlyModel.id, variant)).toEqual({
+        model: vercelOnlyModel.id,
+        reasoning: settings.reasoning,
+      });
+    }
+  });
+
+  it('hides unavailable ones', async () => {
+    jest.mocked(getUnavailableModelIds).mockResolvedValueOnce(new Set([vercelOnlyModel.id]));
+
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+
+    expect(models.data.some(model => model.id === vercelOnlyModel.id)).toBe(false);
+  });
+});
+
 describe.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
   'OpenRouter catalog inheritance for %s',
   modelId => {
@@ -461,7 +582,7 @@ describe('reasoning variants', () => {
 
 describe('reasoning options', () => {
   const reasoningSupported = ['max_tokens', 'tools', 'reasoning', 'include_reasoning'];
-  const openRouterReasoning: Record<string, StoredModel['reasoning']> = {
+  const openRouterReasoning: Record<string, GatewayModelWithEndpoints['reasoning']> = {
     'anthropic/claude-sonnet-4.6': {
       mandatory: false,
       supported_efforts: ['max', 'high', 'medium', 'low'],
@@ -643,15 +764,10 @@ describe('OpenRouter transcription model fetcher', () => {
     );
   });
 
-  it('never caches the transcription catalogue so an unreachable gateway surfaces as a failure', async () => {
-    // The Data Cache would keep serving a stale catalogue while the gateway
-    // is down, and the mobile picker would list dead models instead of its
-    // load-failed retry state.
+  it('reuses the fetched transcription catalogue from memory', async () => {
+    await getOpenRouterTranscriptionModels();
     await getOpenRouterTranscriptionModels();
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ cache: 'no-store' })
-    );
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 });

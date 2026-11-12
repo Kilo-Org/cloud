@@ -2,6 +2,10 @@ import { GetObjectCommand, NoSuchKey, PutObjectCommand, type S3Client } from '@a
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { ApiRequestLog } from '@kilocode/db/schema';
+import {
+  EnkryptScanKindSchema,
+  EnkryptScanPartSchema,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { createR2Client } from '@kilocode/web-shared/lib/r2/create-client';
 
@@ -10,10 +14,36 @@ export type ApiRequestLogBlobUpload = {
   uploadError: string | null;
 };
 
+const enkryptRequestLogSchema = z.object({
+  guardrail: z.enum(['input', 'output']),
+  scan: EnkryptScanKindSchema,
+  part: EnkryptScanPartSchema,
+  /** Which of the input part's chunks the call scanned; each chunk is scanned by its own calls. */
+  chunk: z.object({ index: z.number(), count: z.number() }).optional(),
+  request: z.object({
+    text: z.string(),
+    detectors: z.record(z.string(), z.unknown()),
+    user_metadata: z.object({ organization_id: z.string() }),
+  }),
+  response: z.string().nullable(),
+  response_truncated: z.boolean().optional(),
+  status_code: z.number().nullable(),
+  error: z.string().nullable(),
+});
+
+export type EnkryptRequestLog = z.infer<typeof enkryptRequestLogSchema>;
+
 export const apiRequestLogBlobSchema = z.object({
   version: z.literal(1),
   request: z.record(z.string(), z.unknown()),
   response: z.string().nullable(),
+  enkrypt: z
+    .array(
+      // Blobs written before scans were split into parts have no `part`, but still hold the
+      // request and response bodies.
+      enkryptRequestLogSchema.extend({ part: enkryptRequestLogSchema.shape.part.optional() })
+    )
+    .optional(),
 });
 
 type ApiRequestLogStorage = { client: S3Client; bucket: string };
@@ -46,16 +76,21 @@ function getStorage(): ApiRequestLogStorage {
 export async function uploadApiRequestLogBlobs({
   request,
   response,
+  enkrypt,
 }: {
   request: Record<string, unknown>;
   response: string | undefined;
+  enkrypt?: EnkryptRequestLog[];
 }): Promise<ApiRequestLogBlobUpload> {
   try {
     const { client, bucket } = getStorage();
     const key = `${new Date().toISOString().slice(0, 10)}/${randomUUID()}/record.v1.json`;
-    const body = { version: 1, request, response: response ?? null } satisfies z.infer<
-      typeof apiRequestLogBlobSchema
-    >;
+    const body = {
+      version: 1,
+      request,
+      response: response ?? null,
+      ...(enkrypt?.length ? { enkrypt } : {}),
+    } satisfies z.infer<typeof apiRequestLogBlobSchema>;
     await client.send(
       new PutObjectCommand({
         Bucket: bucket,

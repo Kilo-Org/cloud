@@ -321,6 +321,38 @@ beforeEach(() => {
   });
 });
 
+describe('retired notification payloads', () => {
+  it.each([
+    { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
+    { type: 'instance-lifecycle', event: 'ready', sandboxId: 's1' },
+    { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 's1' },
+  ])('ignores $type without displaying a foreground notification', async data => {
+    const loaded = await loadNotifications();
+    expect(loaded.parseNotificationData(data)).toBeNull();
+    loaded.setupNotificationHandler();
+    const handler = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
+      handleNotification: (notification: {
+        request: { content: { data: unknown; title: string; body: string } };
+      }) => Promise<{
+        shouldShowBanner: boolean;
+        shouldShowList: boolean;
+        shouldSetBadge: boolean;
+        shouldPlaySound: boolean;
+      }>;
+    };
+    expect(
+      await handler.handleNotification({
+        request: { content: { data, title: 'Kilo', body: 'Activity update' } },
+      })
+    ).toMatchObject({
+      shouldShowBanner: false,
+      shouldShowList: false,
+      shouldSetBadge: false,
+      shouldPlaySound: false,
+    });
+  });
+});
+
 describe('ensureAndroidNotificationChannels', () => {
   it('is a no-op on iOS', async () => {
     mocks.platform.OS = 'ios';
@@ -350,7 +382,6 @@ describe('ensureAndroidNotificationChannels', () => {
         },
       ],
       ['agent-briefing', { name: 'Agent brief', importance: 3, bypassDnd: false }],
-      ['kiloclaw', { name: 'KiloClaw activity', importance: 3, bypassDnd: false }],
       ['balance', { name: 'Balance alerts', importance: 3, bypassDnd: false }],
       ['security', { name: 'Security findings', importance: 4, bypassDnd: false }],
       [
@@ -396,6 +427,7 @@ describe('ensureAndroidNotificationChannels', () => {
     expect(mocks.deleteNotificationChannelAsync.mock.calls).toEqual([
       ['agent'],
       ['chat'],
+      ['kiloclaw'],
       ['active-agents'],
       ['followed-sessions'],
     ]);
@@ -419,7 +451,6 @@ describe('ensureAndroidNotificationChannels', () => {
         },
       ],
       ['agent-briefing', { name: expect.any(String), importance: 3, bypassDnd: false }],
-      ['kiloclaw', { name: expect.any(String), importance: 3, bypassDnd: false }],
       ['balance', { name: expect.any(String), importance: 3, bypassDnd: false }],
       ['security', { name: expect.any(String), importance: 4, bypassDnd: false }],
       [
@@ -445,8 +476,8 @@ describe('ensureAndroidNotificationChannels', () => {
 
     expect(first).toBe(second);
     await Promise.all([first, second]);
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(7);
-    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(4);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
+    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(5);
   });
 
   it('swallows a per-channel failure and still creates the remaining channels', async () => {
@@ -455,8 +486,8 @@ describe('ensureAndroidNotificationChannels', () => {
 
     await expect(ensureAndroidNotificationChannels()).resolves.toBeUndefined();
 
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(7);
-    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(4);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
+    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(5);
     expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: {
         'error.subsystem': 'notifications',
@@ -472,7 +503,7 @@ describe('ensureAndroidNotificationChannels', () => {
 
     await expect(ensureAndroidNotificationChannels()).resolves.toBeUndefined();
 
-    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(4);
+    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(5);
     expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: {
         'error.subsystem': 'notifications',
@@ -498,7 +529,6 @@ describe('ensureAndroidNotificationChannels', () => {
       'needs-input',
       'agent-progress',
       'agent-briefing',
-      'kiloclaw',
       'balance',
       'security',
       'followed-sessions-lock-screen',
@@ -514,7 +544,7 @@ describe('ensureAndroidNotificationChannels', () => {
     const { ensureAndroidNotificationChannels } = await loadNotifications();
 
     await ensureAndroidNotificationChannels();
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(7);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
     mocks.setNotificationChannelAsync.mockClear();
 
     await ensureAndroidNotificationChannels();
@@ -725,8 +755,8 @@ const securityResponses = ['personal', 'org-example'].flatMap(scope =>
 );
 const responseCases = [
   {
-    data: { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
-    path: '/(app)/(tabs)/(1_kiloclaw)/chat/s1/c1?via=push',
+    data: { type: 'cloud_agent_session', cliSessionId: 'ses_1' },
+    path: '/(app)/agent-chat/ses_1?via=push',
   },
   ...securityResponses,
 ];
@@ -1125,10 +1155,8 @@ describe('glanceable app badge sink', () => {
           title: 'Kilo',
           body: 'A message arrived',
           data: {
-            type: 'chat.message',
-            sandboxId: 'sandbox-1',
-            conversationId: 'conversation-1',
-            messageId: 'message-1',
+            type: 'cloud_agent_session',
+            cliSessionId: 'ses_1',
           },
         },
       },
@@ -1213,10 +1241,8 @@ describe('glanceable app badge sink', () => {
           title: 'Kilo',
           body: 'A message arrived',
           data: {
-            type: 'chat.message',
-            sandboxId: 'sandbox-1',
-            conversationId: 'conversation-1',
-            messageId: 'message-1',
+            type: 'cloud_agent_session',
+            cliSessionId: 'ses_1',
           },
         },
       },
@@ -1833,6 +1859,10 @@ describe('setupNotificationBackgroundHandler', () => {
     _resetGlanceablePersistForTests();
     _setSecureStoreForTests(secureStoreMock);
     secureStore.clear();
+    // The restore reads the identity beside the record it adopts, as the one
+    // keychain does on the device.
+    secureStore.set(ACTIVE_USER_ID_KEY, 'u1');
+    secureStore.set(ORGANIZATION_STORAGE_KEY, 'org-9');
     mockSecureStoreKeys();
     mocks.defineTask.mockReset();
     mocks.registerTaskAsync.mockResolvedValue(null);

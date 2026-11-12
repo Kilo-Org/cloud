@@ -113,6 +113,62 @@ const {
   cleanupVercelSnapshotBuild,
 } = realCloudAgentClientModule;
 
+describe('CloudAgentNextClient DO session history', () => {
+  const input = {
+    sessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+    cursor: 'opaque',
+    limit: 20,
+  };
+  const page = {
+    kind: 'success',
+    info: { id: 'ses_12345678901234567890123456' },
+    messages: [],
+    nextCursor: null,
+    omittedItemCount: 0,
+    updateCursor: 51,
+  };
+  const query =
+    jest.fn<(request: CloudAgentClientModule.GetSessionMessagesPageInput) => Promise<unknown>>();
+
+  beforeEach(() => {
+    query.mockReset().mockResolvedValue(page);
+    mockCreateTRPCClient.mockReturnValueOnce({ getSessionMessagesPage: { query } });
+  });
+
+  it('forwards the dedicated Worker query and preserves its mutation watermark', async () => {
+    await expect(
+      new CloudAgentNextClient('control-token').getSessionMessagesPage(input)
+    ).resolves.toEqual(page);
+    expect(query).toHaveBeenCalledWith(input);
+  });
+
+  it('keeps a native child selector on the root Worker page query', async () => {
+    const childInput = { ...input, kiloSessionId: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb' };
+    await new CloudAgentNextClient('control-token').getSessionMessagesPage(childInput);
+    expect(query).toHaveBeenCalledWith(childInput);
+  });
+
+  it('validates Worker responses and returns not-found without another data source', async () => {
+    const client = new CloudAgentNextClient('control-token');
+    query.mockResolvedValueOnce({ ...page, updateCursor: -1 }).mockResolvedValueOnce(null);
+    await expect(client.getSessionMessagesPage(input)).rejects.toThrow();
+    await expect(client.getSessionMessagesPage(input)).resolves.toBeNull();
+    expect(query).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    { ...input, sessionId: 'agent_12345678-1234-4234-9234-123456789abc' },
+    { ...input, cursor: '' },
+    { ...input, limit: 101 },
+    { ...input, kiloSessionId: 'workspace_12345678-1234-4234-9234-123456789abc' },
+  ])('rejects invalid page inputs before querying the Worker', async invalid => {
+    await expect(
+      new CloudAgentNextClient('control-token').getSessionMessagesPage(invalid)
+    ).rejects.toThrow();
+    expect(query).not.toHaveBeenCalled();
+  });
+});
+
 describe('CloudAgentNextClient review message results', () => {
   const input = {
     cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
@@ -1086,13 +1142,14 @@ describe('CloudAgentNextClient.deleteWorktree', () => {
       };
       const mutate = jest
         .fn<(request: DeleteWorktreeInput) => Promise<DeleteWorktreeOutput>>()
-        .mockResolvedValue({ success: true, deletedSessionIds });
+        .mockResolvedValue({ success: true, deletedSessionIds, cleanup: 'complete' });
       mockCreateTRPCClient.mockReturnValueOnce({ deleteWorktree: { mutate } });
       const client = new CloudAgentNextClient('auth-token');
 
       await expect(client.deleteWorktree(input)).resolves.toEqual({
         success: true,
         deletedSessionIds,
+        cleanup: 'complete',
       });
       expect(mutate).toHaveBeenCalledWith(input);
       expect(mockHttpLink.mock.calls[0]?.[0].headers()).toEqual({
@@ -1101,6 +1158,39 @@ describe('CloudAgentNextClient.deleteWorktree', () => {
       });
     }
   );
+
+  it('forwards onlyIfSoleSessionId to the Worker', async () => {
+    const input: DeleteWorktreeInput = {
+      worktreeId,
+      onlyIfSoleSessionId: 'ses_12345678901234567890123456',
+    };
+    const mutate = jest
+      .fn<(request: DeleteWorktreeInput) => Promise<DeleteWorktreeOutput>>()
+      .mockResolvedValue({ success: true, deletedSessionIds, cleanup: 'complete' });
+    mockCreateTRPCClient.mockReturnValueOnce({ deleteWorktree: { mutate } });
+
+    await expect(new CloudAgentNextClient('auth-token').deleteWorktree(input)).resolves.toEqual({
+      success: true,
+      deletedSessionIds,
+      cleanup: 'complete',
+    });
+    expect(mutate).toHaveBeenCalledWith(input);
+  });
+
+  it('preserves pending cleanup from the Worker', async () => {
+    const mutate = jest
+      .fn<(request: DeleteWorktreeInput) => Promise<DeleteWorktreeOutput>>()
+      .mockResolvedValue({ success: true, deletedSessionIds, cleanup: 'pending' });
+    mockCreateTRPCClient.mockReturnValueOnce({ deleteWorktree: { mutate } });
+
+    await expect(
+      new CloudAgentNextClient('auth-token').deleteWorktree({ worktreeId })
+    ).resolves.toEqual({
+      success: true,
+      deletedSessionIds,
+      cleanup: 'pending',
+    });
+  });
 
   it.each([
     ['CONFLICT', 409],
@@ -1151,6 +1241,7 @@ describe('CloudAgentNextClient.deleteWorktree', () => {
     { success: false, deletedSessionIds: [] },
     { success: true },
     { success: true, deletedSessionIds: [42] },
+    { success: true, deletedSessionIds: [], cleanup: 'partial' },
   ])('rejects an unconfirmed or malformed cleanup result: %p', async output => {
     mockCreateTRPCClient.mockReturnValueOnce({
       deleteWorktree: { mutate: jest.fn(async () => output) },
@@ -1175,7 +1266,28 @@ describe('CloudAgentNextClient.deleteWorktree', () => {
     ).resolves.toEqual({
       success: true,
       deletedSessionIds: [],
+      cleanup: 'complete',
     });
+  });
+});
+
+describe('CloudAgentNextClient.deleteHostedWorkspaceSession', () => {
+  const workspaceId = 'worktree_12345678-1234-4234-9234-123456789abc';
+  const sessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+  const operationKey = '12345678-1234-4234-9234-123456789abc';
+
+  it('forwards the operation key and preserves pending cleanup', async () => {
+    const input = { workspaceId, sessionId, operationKey };
+    const output = { success: true as const, ...input, cleanup: 'pending' as const };
+    const mutate = jest
+      .fn<(request: typeof input) => Promise<typeof output>>()
+      .mockResolvedValue(output);
+    mockCreateTRPCClient.mockReturnValueOnce({ deleteHostedWorkspaceSession: { mutate } });
+
+    await expect(
+      new CloudAgentNextClient('auth-token').deleteHostedWorkspaceSession(input)
+    ).resolves.toEqual(output);
+    expect(mutate).toHaveBeenCalledWith(input);
   });
 });
 

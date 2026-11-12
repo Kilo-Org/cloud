@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { load } from 'js-yaml';
 
+import { wiringCommand } from './ci-wiring-suites.mjs';
+
 const workflow = load(
   readFileSync(new URL('../.github/workflows/meta-janitor-approve.yml', import.meta.url), 'utf8')
 );
@@ -172,11 +174,7 @@ test('workflow is created-comment-only, least-privilege, and never checks out PR
     assert.ok(workflow.jobs.approve.if.includes(condition));
   }
   const ci = load(readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8'));
-  assert.ok(
-    ci.jobs['ci-wiring'].steps.some(
-      step => step.run === 'node --test scripts/meta-janitor-approve.test.mjs'
-    )
-  );
+  assert.ok(ci.jobs['ci-wiring'].steps.some(step => step.run === wiringCommand));
 });
 
 test('approves the assessed commit without requiring stale-approval dismissal', async () => {

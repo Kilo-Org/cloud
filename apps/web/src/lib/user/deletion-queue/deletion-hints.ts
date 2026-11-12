@@ -211,7 +211,7 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
     action:
       'Open PostHog and confirm the person, events, and recordings deletion. Then Retry or Mark done with evidence.',
   },
-  posthog_verify_timeout: {
+  posthog_verify_unconfirmed: {
     title: 'PostHog deletion did not confirm in time',
     action:
       'Check the PostHog deletion task. If it finished, Mark done with evidence. Otherwise Retry.',
@@ -319,6 +319,11 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
   session_cleanup_unconfirmed: {
     title: 'Session cleanup was not confirmed',
     action: 'Retry. If the sessions are already gone, Mark done with evidence.',
+  },
+  session_worktree_deleting: {
+    title: 'A worktree deletion keeps refusing session deletes',
+    action:
+      'Check the hosted worktree deletion for these sessions. Once it finishes or is repaired, Retry. If the sessions are already gone, Mark done with evidence.',
   },
   teardown_incomplete: {
     title: 'Teardown tasks are not finished',

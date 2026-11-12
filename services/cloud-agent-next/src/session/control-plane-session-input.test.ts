@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Env } from '../types.js';
+import type { SessionMetadata } from '../persistence/session-metadata.js';
 import {
   buildControlPlaneCreateInput,
+  buildControlPlaneMessagePayload,
   buildControlPlaneRegisterInput,
   buildControlPlanePromptPayload,
 } from './control-plane-session-input.js';
@@ -53,6 +55,62 @@ describe('buildControlPlanePromptPayload', () => {
   });
 });
 
+describe('buildControlPlaneMessagePayload variant inheritance', () => {
+  const storedMetadata = {
+    agent: { mode: 'code', model: 'kilo/anthropic/claude-sonnet-4', variant: 'high' },
+  } as SessionMetadata;
+
+  function buildCommandPayload(agentOverride?: {
+    mode?: string;
+    model?: string;
+    variant?: string;
+  }) {
+    return buildControlPlaneMessagePayload({
+      env: {} as Env,
+      userId: 'user-1',
+      sessionId: 'workspace_12345678-1234-4234-8234-123456789012' as never,
+      metadata: storedMetadata,
+      turn: { type: 'command', command: 'compact', arguments: '' },
+      ...(agentOverride ? { agentOverride } : {}),
+    });
+  }
+
+  it('does not pair a new model with the stored model variant', async () => {
+    const payload = await buildCommandPayload({ model: 'kilo/anthropic/claude-opus-4' });
+    expect(payload.agent).toEqual({ mode: 'code', model: 'anthropic/claude-opus-4' });
+  });
+
+  it('inherits the stored variant when the override keeps the stored model', async () => {
+    const payload = await buildCommandPayload({ model: 'anthropic/claude-sonnet-4' });
+    expect(payload.agent).toEqual({
+      mode: 'code',
+      model: 'anthropic/claude-sonnet-4',
+      variant: 'high',
+    });
+  });
+
+  it('inherits the stored model and variant when the model is not overridden', async () => {
+    const payload = await buildCommandPayload({ mode: 'code' });
+    expect(payload.agent).toEqual({
+      mode: 'code',
+      model: 'anthropic/claude-sonnet-4',
+      variant: 'high',
+    });
+  });
+
+  it('uses an explicit variant alongside a model override', async () => {
+    const payload = await buildCommandPayload({
+      model: 'kilo/anthropic/claude-opus-4',
+      variant: 'low',
+    });
+    expect(payload.agent).toEqual({
+      mode: 'code',
+      model: 'anthropic/claude-opus-4',
+      variant: 'low',
+    });
+  });
+});
+
 describe('buildControlPlaneCreateInput', () => {
   it.each([
     { organizationId: '11111111-1111-4111-8111-111111111111' },
@@ -64,7 +122,9 @@ describe('buildControlPlaneCreateInput', () => {
       credentialId: '22222222-2222-4222-8222-222222222222',
     };
     const input = await buildControlPlaneCreateInput({
+      env: {} as Env,
       command: {
+        generatedBranch: 'kilo/eager-hub-j9o',
         identity: {
           sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
           userId: 'usr_1',
@@ -82,7 +142,6 @@ describe('buildControlPlaneCreateInput', () => {
           sandboxProviderBinding: { kind: 'vercel', source },
         },
       },
-      env: { CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true' } as Env,
       attachments: [],
       agent: { mode: 'code', model: FULL_MODEL },
     });
@@ -110,6 +169,7 @@ describe('buildControlPlaneCreateInput', () => {
     'persists and selects the same policy for start and registration: %j',
     async ({ egressMode, egressAllowlist, egressAudit }) => {
       const command = {
+        generatedBranch: 'kilo/eager-hub-j9o',
         identity: { sessionId: 'workspace_12345678-1234-1234-1234-123456789abc', userId: 'usr_1' },
         auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: MODERN_KILO_TOKEN },
         message: {
@@ -166,6 +226,7 @@ describe('buildControlPlaneCreateInput', () => {
       await expect(
         buildControlPlaneCreateInput({
           command: {
+            generatedBranch: 'kilo/eager-hub-j9o',
             identity: {
               sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
               userId: 'usr_1',
@@ -193,15 +254,51 @@ describe('buildControlPlaneCreateInput', () => {
     }
   );
 
-  it.each([
-    ['isolated', 'workspace_12345678-1234-1234-1234-123456789abc'],
-    ['shared', undefined],
-  ] as const)(
-    'carries the %s kind into the pin and its billing input',
-    async (sandboxKind, billedSessionId) => {
-      const sandboxId = `sbx-${'a'.repeat(48)}` as const;
-      const input = await buildControlPlaneCreateInput({
+  it('carries the isolated kind into the pin and its billing input', async () => {
+    const sandboxKind = 'isolated';
+    const sandboxId = `sbx-${'a'.repeat(48)}` as const;
+    const input = await buildControlPlaneCreateInput({
+      command: {
+        generatedBranch: 'kilo/eager-hub-j9o',
+        identity: {
+          sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+          userId: 'usr_1',
+        },
+        auth: {
+          kiloSessionId: 'ses_12345678901234567890123456',
+          kilocodeToken: MODERN_KILO_TOKEN,
+        },
+        message: {
+          initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+          turn: { type: 'prompt', prompt: 'hi' },
+        },
+        agent: { mode: 'code', model: FULL_MODEL },
+        workspace: { sandboxId, sandboxProvider: 'cloudflare', sandboxKind: 'isolated' },
+      },
+      env: {} as Env,
+      attachments: [],
+      agent: { mode: 'code', model: FULL_MODEL },
+    });
+
+    expect(input.metadata.workspace?.sandboxKind).toBe(sandboxKind);
+    expect(input.sandboxSelection.sandboxKind).toBe(sandboxKind);
+    expect(input.sandboxSelection.billing).toMatchObject({ sandboxId, sandboxKind });
+    expect(input.sandboxSelection.billing?.sessionId).toBe(
+      'workspace_12345678-1234-1234-1234-123456789abc'
+    );
+    // The Session DO accepts the Worker's selection as built.
+    expect(
+      buildControlPlaneSessionRegistration(input.metadata, input.sandboxSelection).sandboxSelection
+        ?.sandboxKind
+    ).toBe(sandboxKind);
+  });
+
+  it('rejects a retired shared kind', async () => {
+    const sandboxId = `sbx-${'a'.repeat(48)}` as const;
+    await expect(
+      buildControlPlaneCreateInput({
         command: {
+          generatedBranch: 'kilo/eager-hub-j9o',
           identity: {
             sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
             userId: 'usr_1',
@@ -215,24 +312,14 @@ describe('buildControlPlaneCreateInput', () => {
             turn: { type: 'prompt', prompt: 'hi' },
           },
           agent: { mode: 'code', model: FULL_MODEL },
-          workspace: { sandboxId, sandboxProvider: 'cloudflare', sandboxKind },
+          workspace: { sandboxId, sandboxProvider: 'cloudflare', sandboxKind: 'shared' },
         },
         env: {} as Env,
         attachments: [],
         agent: { mode: 'code', model: FULL_MODEL },
-      });
-
-      expect(input.metadata.workspace?.sandboxKind).toBe(sandboxKind);
-      expect(input.sandboxSelection.sandboxKind).toBe(sandboxKind);
-      expect(input.sandboxSelection.billing).toMatchObject({ sandboxId, sandboxKind });
-      expect(input.sandboxSelection.billing?.sessionId).toBe(billedSessionId);
-      // The Session DO accepts the Worker's selection as built.
-      expect(
-        buildControlPlaneSessionRegistration(input.metadata, input.sandboxSelection)
-          .sandboxSelection?.sandboxKind
-      ).toBe(sandboxKind);
-    }
-  );
+      })
+    ).rejects.toThrow('shared sandboxes are retired');
+  });
 
   it.each([
     ['cloudflare-containers-standard-3', 'standard-3'],
@@ -242,6 +329,7 @@ describe('buildControlPlaneCreateInput', () => {
     async (allocation, instance) => {
       const input = await buildControlPlaneCreateInput({
         command: {
+          generatedBranch: 'kilo/eager-hub-j9o',
           identity: {
             sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
             userId: 'usr_1',
@@ -275,6 +363,7 @@ describe('buildControlPlaneCreateInput', () => {
   it('pins code review on Cloudflare Containers to the code-review instance size', async () => {
     const input = await buildControlPlaneCreateInput({
       command: {
+        generatedBranch: 'kilo/eager-hub-j9o',
         identity: {
           sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
           userId: 'usr_1',
@@ -304,6 +393,7 @@ describe('buildControlPlaneCreateInput', () => {
   it('keeps the full model in stored metadata while dispatching the stripped id', async () => {
     const input = await buildControlPlaneCreateInput({
       command: {
+        generatedBranch: 'kilo/eager-hub-j9o',
         identity: {
           sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
           userId: 'usr_1',

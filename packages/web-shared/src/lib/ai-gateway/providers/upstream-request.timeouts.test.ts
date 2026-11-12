@@ -1,7 +1,11 @@
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { OPENROUTER } from './definitions/openrouter';
 import type { OpenRouterChatCompletionRequest } from './openrouter/types';
-import { UpstreamTimeoutError, upstreamRequest } from './upstream-request';
+import {
+  UPSTREAM_DURATION_BUDGET_MS,
+  UpstreamTimeoutError,
+  upstreamRequest,
+} from './upstream-request';
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -22,10 +26,9 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 
 const mockErrorExceptInTest = jest.mocked(errorExceptInTest);
 const originalFetch = global.fetch;
-const BUDGET_MS = 10 * 60 * 1000;
 const encoder = new TextEncoder();
 
-function request(stream: boolean) {
+function request(stream: boolean, durationBudgetMs = UPSTREAM_DURATION_BUDGET_MS) {
   const body: OpenRouterChatCompletionRequest = {
     model: 'test-model',
     messages: [{ role: 'user', content: 'test' }],
@@ -40,6 +43,7 @@ function request(stream: boolean) {
     provider: OPENROUTER,
     vercelRequestId: 'iad1::request-id',
     reasoningEffort: null,
+    durationBudgetMs,
   });
 }
 
@@ -102,7 +106,7 @@ describe('upstreamRequest duration budget', () => {
 
     // The only gateway timer is the total budget; undici's headersTimeout bounds the header wait.
     expect(AbortSignal.timeout).toHaveBeenCalledTimes(1);
-    expect(AbortSignal.timeout).toHaveBeenCalledWith(BUDGET_MS);
+    expect(AbortSignal.timeout).toHaveBeenCalledWith(UPSTREAM_DURATION_BUDGET_MS);
     expect(mockErrorExceptInTest).toHaveBeenCalledWith(
       '[upstreamRequest] gateway timeout after 600000ms waiting for upstream response headers',
       { vercelRequestId: 'iad1::request-id', phase: 'headers' }
@@ -140,7 +144,7 @@ describe('upstreamRequest duration budget', () => {
     expect(readError).toBeInstanceOf(UpstreamTimeoutError);
     expect(readError).toMatchObject({
       name: 'TimeoutError',
-      limitMs: BUDGET_MS,
+      limitMs: UPSTREAM_DURATION_BUDGET_MS,
       headersReceivedAfterMs: 5_000,
     });
     expect(mockErrorExceptInTest).toHaveBeenCalledTimes(1);
@@ -148,5 +152,22 @@ describe('upstreamRequest duration budget', () => {
       '[upstreamRequest] upstream stream exceeded the gateway duration budget after 600s (headers at 5s)',
       { vercelRequestId: 'iad1::request-id', phase: 'stream' }
     );
+  });
+
+  it('aborts at a smaller budget an earlier attempt left', async () => {
+    headersNeverArrive();
+
+    const pending = request(false, 90_000);
+    budgetTimer.abort();
+    const result = await pending;
+
+    expect(AbortSignal.timeout).toHaveBeenCalledTimes(1);
+    expect(AbortSignal.timeout).toHaveBeenCalledWith(90_000);
+    expect(mockErrorExceptInTest).toHaveBeenCalledWith(
+      '[upstreamRequest] gateway timeout after 90000ms waiting for upstream response headers',
+      { vercelRequestId: 'iad1::request-id', phase: 'headers' }
+    );
+    if (result.type !== 'error') throw new Error('expected an error result');
+    expect(result.response.status).toBe(503);
   });
 });

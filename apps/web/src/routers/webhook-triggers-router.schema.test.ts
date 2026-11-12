@@ -55,23 +55,21 @@ const mockDbInsert = jest.fn();
 const mockDbUpdate = jest.fn();
 const mockDbDelete = jest.fn();
 const mockFindAdmin = jest.fn<() => Promise<Partial<User> | undefined>>();
-const mockSelectWhere = jest.fn<
-  (condition?: SQL) => Promise<
-    Array<{
-      id: string;
-      activation_mode: string;
-      target_type: 'cloud_agent' | 'kiloclaw_chat';
-      github_repo?: string | null;
-    }>
-  >
->();
+const mockSelectWhere = jest.fn<(condition?: SQL) => Promise<Array<Record<string, unknown>>>>();
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     query: { kilocode_users: { findFirst: mockFindAdmin } },
     select: () => ({
       from: () => ({
-        where: mockSelectWhere,
+        where: (condition?: SQL) => {
+          const result = mockSelectWhere(condition);
+          return {
+            limit: () => result,
+            orderBy: () => result,
+            then: result.then.bind(result),
+          };
+        },
       }),
     }),
     insert: mockDbInsert.mockImplementation(() => ({
@@ -1200,6 +1198,274 @@ describe('webhook trigger variant inputs', () => {
         sandboxAllocation: 'isolated-standard',
       })
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(mockUpdateWorkerTrigger).not.toHaveBeenCalled();
+  });
+});
+
+describe('webhook trigger environment selection', () => {
+  const organizationId = '00000000-0000-4000-8000-000000000003';
+  const environmentId = '00000000-0000-4000-8000-000000000006';
+  const triggerRow = {
+    id: '00000000-0000-4000-8000-000000000002',
+    activation_mode: 'webhook',
+    target_type: 'cloud_agent' as const,
+    github_repo: 'owner/repo',
+  };
+
+  function environmentRow(repoFullName = 'owner/repo') {
+    return {
+      id: environmentId,
+      name: 'Trigger environment',
+      platform: 'github',
+      repo_full_name: repoFullName,
+      gitlab_clone_url: null,
+      bitbucket_workspace_uuid: null,
+      bitbucket_repository_uuid: null,
+      repositories: null,
+      commands: [],
+      start_commands: [],
+      configuration_revision: 1,
+      sandbox_allocation: null,
+      egress_mode: null,
+      egress_allowlist: null,
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    };
+  }
+
+  async function environmentQueries() {
+    const { PgDialect } = await import('drizzle-orm/pg-core');
+    const dialect = new PgDialect();
+    return mockSelectWhere.mock.calls
+      .map(([condition]) => condition)
+      .filter((condition): condition is SQL => condition !== undefined)
+      .map(condition => dialect.sqlToQuery(condition))
+      .filter(query => query.sql.includes('cloud_agent_environments'));
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSelectWhere.mockResolvedValue([triggerRow]);
+    mockCreateWorkerTrigger.mockResolvedValue({ success: true, inboundUrl: 'https://inbound' });
+    mockGetWorkerTrigger.mockResolvedValue({ found: true, config: triggerConfig });
+    mockUpdateWorkerTrigger.mockResolvedValue({ success: true, config: triggerConfig });
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockGetSandboxSelectionOptions.mockResolvedValue({ enabled: false, options: [] });
+  });
+
+  it('accepts nullable UUID environment IDs and rejects malformed values', () => {
+    for (const value of [environmentId, null]) {
+      expect(
+        WebhookTriggerCreateInput.safeParse({ ...createInput, environmentId: value }).success
+      ).toBe(true);
+      expect(
+        WebhookTriggerUpdateInput.safeParse({ triggerId: 'trigger-id', environmentId: value })
+          .success
+      ).toBe(true);
+    }
+    expect(
+      WebhookTriggerCreateInput.safeParse({ ...createInput, environmentId: 'invalid' }).success
+    ).toBe(false);
+    expect(
+      WebhookTriggerUpdateInput.safeParse({ triggerId: 'trigger-id', environmentId: 'invalid' })
+        .success
+    ).toBe(false);
+  });
+
+  it('rejects a configured environment for KiloClaw Chat creates', () => {
+    const result = WebhookTriggerCreateInput.safeParse({
+      triggerId: 'trigger-id',
+      targetType: 'kiloclaw_chat',
+      kiloclawInstanceId: environmentId,
+      promptTemplate: 'Run task',
+      environmentId,
+    });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(['environmentId']);
+    expect(
+      WebhookTriggerCreateInput.safeParse({
+        triggerId: 'trigger-id',
+        targetType: 'kiloclaw_chat',
+        kiloclawInstanceId: environmentId,
+        promptTemplate: 'Run task',
+        environmentId: null,
+      }).success
+    ).toBe(true);
+  });
+
+  it('validates personal environment ownership and the selected repository before creating', async () => {
+    mockSelectWhere.mockResolvedValue([environmentRow()]);
+
+    await createCaller({ user }).create({
+      ...createInput,
+      profileId: undefined,
+      environmentId,
+    });
+
+    const [environmentQuery] = await environmentQueries();
+    expect(environmentQuery?.sql).toContain('owned_by_user_id');
+    expect(environmentQuery?.params).toContain(user.id);
+    expect(mockCreateWorkerTrigger).toHaveBeenCalledWith(
+      user.id,
+      undefined,
+      'trigger-id',
+      expect.objectContaining({ environmentId })
+    );
+  });
+
+  it('retains organization environment ownership when creating a creator-run trigger', async () => {
+    mockSelectWhere.mockResolvedValue([environmentRow()]);
+
+    await createCaller({ user }).create({
+      ...createInput,
+      profileId: undefined,
+      organizationId,
+      runAsCreator: true,
+      environmentId,
+      webhookAuth: { header: 'x-secret', secret: creatorSecret },
+    });
+
+    const [environmentQuery] = await environmentQueries();
+    expect(environmentQuery?.sql).toContain('owned_by_organization_id');
+    expect(environmentQuery?.params).toContain(organizationId);
+    expect(mockCreateWorkerTrigger).toHaveBeenCalledWith(
+      undefined,
+      organizationId,
+      'trigger-id',
+      expect.objectContaining({ environmentId, executionUserId: user.id })
+    );
+  });
+
+  it('accepts a V2 environment that contains the selected repository', async () => {
+    mockSelectWhere.mockResolvedValue([
+      {
+        ...environmentRow(),
+        platform: null,
+        repo_full_name: null,
+        repositories: [{ platform: 'github', repoFullName: 'owner/repo' }],
+      },
+    ]);
+
+    await createCaller({ user }).create({
+      ...createInput,
+      profileId: undefined,
+      environmentId,
+    });
+
+    expect(mockCreateWorkerTrigger).toHaveBeenCalledWith(
+      user.id,
+      undefined,
+      'trigger-id',
+      expect.objectContaining({ environmentId })
+    );
+  });
+
+  it('rejects an environment owned elsewhere', async () => {
+    mockSelectWhere.mockResolvedValue([]);
+
+    await expect(
+      createCaller({ user }).create({ ...createInput, profileId: undefined, environmentId })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockCreateWorkerTrigger).not.toHaveBeenCalled();
+  });
+
+  it('rejects an environment that does not contain the selected repository', async () => {
+    mockSelectWhere.mockResolvedValue([environmentRow('owner/other')]);
+
+    await expect(
+      createCaller({ user }).create({ ...createInput, profileId: undefined, environmentId })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Environment does not include the selected repository',
+    });
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockCreateWorkerTrigger).not.toHaveBeenCalled();
+  });
+
+  it('validates and forwards an environment update using the stored repository', async () => {
+    mockSelectWhere.mockResolvedValue([environmentRow()]);
+    mockSelectWhere.mockResolvedValueOnce([triggerRow]);
+
+    await createCaller({ user }).update({ triggerId: 'trigger-id', environmentId });
+
+    expect(mockUpdateWorkerTrigger).toHaveBeenCalledWith(
+      user.id,
+      undefined,
+      'trigger-id',
+      expect.objectContaining({ environmentId })
+    );
+  });
+
+  it('retains organization environment ownership when updating a creator-run trigger', async () => {
+    mockSelectWhere.mockResolvedValue([environmentRow()]);
+    mockSelectWhere.mockResolvedValueOnce([triggerRow]);
+    mockGetWorkerTrigger.mockResolvedValue({
+      found: true,
+      config: { ...triggerConfig, executionUserId: user.id },
+    });
+
+    await createCaller({ user }).update({
+      triggerId: 'trigger-id',
+      organizationId,
+      environmentId,
+    });
+
+    const [environmentQuery] = await environmentQueries();
+    expect(environmentQuery?.sql).toContain('owned_by_organization_id');
+    expect(environmentQuery?.params).toContain(organizationId);
+  });
+
+  it('forwards environment clearing and preserves omission on update', async () => {
+    await createCaller({ user }).update({ triggerId: 'trigger-id', environmentId: null });
+    expect(mockUpdateWorkerTrigger).toHaveBeenLastCalledWith(
+      user.id,
+      undefined,
+      'trigger-id',
+      expect.objectContaining({ environmentId: null })
+    );
+
+    await createCaller({ user }).update({ triggerId: 'trigger-id', promptTemplate: 'Updated' });
+    expect(mockUpdateWorkerTrigger).toHaveBeenLastCalledWith(
+      user.id,
+      undefined,
+      'trigger-id',
+      expect.objectContaining({ environmentId: undefined })
+    );
+  });
+
+  it('rejects an environment that omits the stored repository on update', async () => {
+    mockSelectWhere.mockResolvedValue([environmentRow('owner/other')]);
+    mockSelectWhere.mockResolvedValueOnce([triggerRow]);
+
+    await expect(
+      createCaller({ user }).update({ triggerId: 'trigger-id', environmentId })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Environment does not include the selected repository',
+    });
+    expect(mockUpdateWorkerTrigger).not.toHaveBeenCalled();
+  });
+
+  it('accepts a null environment update for stored KiloClaw Chat triggers', async () => {
+    mockSelectWhere.mockResolvedValue([{ ...triggerRow, target_type: 'kiloclaw_chat' }]);
+
+    await createCaller({ user }).update({ triggerId: 'trigger-id', environmentId: null });
+
+    expect(mockUpdateWorkerTrigger).toHaveBeenCalledWith(
+      user.id,
+      undefined,
+      'trigger-id',
+      expect.objectContaining({ environmentId: null })
+    );
+  });
+
+  it('rejects an environment selection for stored KiloClaw Chat triggers', async () => {
+    mockSelectWhere.mockResolvedValue([{ ...triggerRow, target_type: 'kiloclaw_chat' }]);
+
+    await expect(
+      createCaller({ user }).update({ triggerId: 'trigger-id', environmentId })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(mockUpdateWorkerTrigger).not.toHaveBeenCalled();
   });
 });

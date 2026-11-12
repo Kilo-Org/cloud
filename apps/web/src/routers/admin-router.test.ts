@@ -1,9 +1,11 @@
-import { afterEach, describe, test, expect } from '@jest/globals';
+import { afterEach, describe, test, expect, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import {
   admin_action_audit_logs,
+  kilo_pass_subscriptions,
   kilocode_users,
   organizations,
+  user_admin_notes,
   user_auth_provider,
 } from '@kilocode/db/schema';
 import {
@@ -11,11 +13,21 @@ import {
   createSoftDeletedBlockedReason,
 } from '@kilocode/db/user-soft-delete';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
+import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 import { getAllUserProviders } from '@/lib/user';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+
+async function kiloPassAuditRows(targetUserId: string) {
+  const rows = await db
+    .select()
+    .from(admin_action_audit_logs)
+    .where(eq(admin_action_audit_logs.action, 'kilo_pass.cancel_refund'));
+  return rows.filter(row => row.target_id === targetUserId);
+}
 
 async function getBlockState(id: string) {
   return db.query.kilocode_users.findFirst({
@@ -540,6 +552,171 @@ describe('admin.users.releaseEmailAddress', () => {
   });
 });
 
+describe('admin.cancelAndRefundKiloPass', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  async function insertActiveKiloPass(kiloUserId: string, stripeSubscriptionId: string) {
+    await db.insert(kilo_pass_subscriptions).values({
+      kilo_user_id: kiloUserId,
+      provider_subscription_id: stripeSubscriptionId,
+      stripe_subscription_id: stripeSubscriptionId,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+      status: 'active',
+      cancel_at_period_end: false,
+      current_streak_months: 1,
+      started_at: new Date().toISOString(),
+      ended_at: null,
+      next_yearly_issue_at: null,
+    });
+  }
+
+  test('refuses a platform admin who is not a superadmin', async () => {
+    const platformAdmin = await insertTestUser({ is_admin: true });
+    const target = await insertTestUser();
+    await insertActiveKiloPass(target.id, `sub_guard_${crypto.randomUUID()}`);
+
+    const caller = await createCallerForUser(platformAdmin.id);
+    await expect(
+      caller.admin.users.cancelAndRefundKiloPass({ userId: target.id, reason: 'policy' })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Superadmin access required' });
+
+    const [subRow] = await db
+      .select()
+      .from(kilo_pass_subscriptions)
+      .where(eq(kilo_pass_subscriptions.kilo_user_id, target.id));
+    expect(subRow?.status).toBe('active');
+    expect(await kiloPassAuditRows(target.id)).toEqual([]);
+  });
+
+  test('a superadmin cancels and refunds, and the refund is attributed', async () => {
+    const superadmin = await insertTestUser({ is_admin: true, is_super_admin: true });
+    const target = await insertTestUser();
+    const subscriptionId = `sub_refund_${crypto.randomUUID()}`;
+    await insertActiveKiloPass(target.id, subscriptionId);
+
+    jest.spyOn(stripeClient.subscriptions, 'cancel').mockResolvedValue({} as never);
+    jest.spyOn(stripeClient.invoices, 'list').mockResolvedValue({
+      data: [{ id: 'in_admin_router' }],
+    } as never);
+    jest.spyOn(stripeClient.invoicePayments, 'list').mockResolvedValue({
+      data: [{ payment: { payment_intent: 'pi_admin_router' } }],
+    } as never);
+    jest.spyOn(stripeClient.refunds, 'create').mockResolvedValue({ amount: 1900 } as never);
+
+    const caller = await createCallerForUser(superadmin.id);
+    const result = await caller.admin.users.cancelAndRefundKiloPass({
+      userId: target.id,
+      reason: 'chargeback reported by victim@example.com',
+    });
+
+    expect(result).toEqual({
+      success: true,
+      refundedAmountCents: 1900,
+      balanceResetAmountUsd: null,
+      alreadyBlocked: false,
+    });
+
+    const audits = await kiloPassAuditRows(target.id);
+    expect(audits).toEqual([
+      expect.objectContaining({
+        actor_id: superadmin.id,
+        target_type: 'user',
+        target_id: target.id,
+        message: 'Cancelled Kilo Pass and refunded the latest payment',
+        metadata: expect.objectContaining({ reason: 'chargeback reported by [redacted-email]' }),
+      }),
+    ]);
+    expect(JSON.stringify(audits[0]?.metadata)).not.toContain('example.com');
+
+    // The block reason and the admin note hold the same text an admin can read,
+    // so they carry the same replaced address.
+    const blockState = await getBlockState(target.id);
+    expect(blockState?.blocked_reason).toBe('chargeback reported by [redacted-email]');
+    const notes = await db
+      .select()
+      .from(user_admin_notes)
+      .where(eq(user_admin_notes.kilo_user_id, target.id));
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.note_content).toContain('Reason: chargeback reported by [redacted-email]');
+    expect(notes[0]?.note_content).not.toContain('victim@example.com');
+  });
+
+  test('a cancellation with no refundable payment is recorded as such', async () => {
+    const superadmin = await insertTestUser({ is_admin: true, is_super_admin: true });
+    const target = await insertTestUser();
+    await insertActiveKiloPass(target.id, `sub_no_invoice_${crypto.randomUUID()}`);
+
+    jest.spyOn(stripeClient.subscriptions, 'cancel').mockResolvedValue({} as never);
+    jest.spyOn(stripeClient.invoices, 'list').mockResolvedValue({ data: [] } as never);
+
+    const caller = await createCallerForUser(superadmin.id);
+    const result = await caller.admin.users.cancelAndRefundKiloPass({
+      userId: target.id,
+      reason: 'policy',
+    });
+    expect(result).toEqual({
+      success: true,
+      refundedAmountCents: null,
+      balanceResetAmountUsd: null,
+      alreadyBlocked: false,
+    });
+
+    const audits = await kiloPassAuditRows(target.id);
+    expect(audits).toEqual([
+      expect.objectContaining({
+        actor_id: superadmin.id,
+        message: 'Cancelled Kilo Pass with no refundable payment',
+      }),
+    ]);
+  });
+
+  test('a refund that fails after the subscription was cancelled is still attributed', async () => {
+    const superadmin = await insertTestUser({ is_admin: true, is_super_admin: true });
+    const target = await insertTestUser();
+    await insertActiveKiloPass(target.id, `sub_fail_${crypto.randomUUID()}`);
+
+    jest.spyOn(stripeClient.subscriptions, 'cancel').mockResolvedValue({} as never);
+    jest.spyOn(stripeClient.invoices, 'list').mockResolvedValue({
+      data: [{ id: 'in_admin_router_fail' }],
+    } as never);
+    jest.spyOn(stripeClient.invoicePayments, 'list').mockResolvedValue({
+      data: [{ payment: { payment_intent: 'pi_admin_router_fail' } }],
+    } as never);
+    jest.spyOn(stripeClient.refunds, 'create').mockRejectedValue(new Error('Stripe boom'));
+
+    const caller = await createCallerForUser(superadmin.id);
+    await expect(
+      caller.admin.users.cancelAndRefundKiloPass({ userId: target.id, reason: 'chargeback' })
+    ).rejects.toThrow('Stripe boom');
+
+    const audits = await kiloPassAuditRows(target.id);
+    expect(audits).toEqual([
+      expect.objectContaining({
+        actor_id: superadmin.id,
+        target_id: target.id,
+        message: 'Kilo Pass cancel attempted with unknown outcome',
+      }),
+    ]);
+  });
+
+  test('rejects a reason longer than the bounded length', async () => {
+    const superadmin = await insertTestUser({ is_admin: true, is_super_admin: true });
+
+    const caller = await createCallerForUser(superadmin.id);
+    await expect(
+      caller.admin.users.cancelAndRefundKiloPass({
+        userId: 'length-bound-target',
+        reason: 'x'.repeat(501),
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(await kiloPassAuditRows('length-bound-target')).toEqual([]);
+  });
+});
+
 describe('admin.syncProviders manual sync', () => {
   const originalVercelEnv = process.env.VERCEL_ENV;
 
@@ -561,6 +738,9 @@ describe('admin.syncProviders manual sync', () => {
       code: 'FORBIDDEN',
     });
     await expect(caller.admin.syncProviders.triggerDirectByokSync()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    await expect(caller.admin.syncProviders.triggerMetadataCacheRefresh()).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });
   });

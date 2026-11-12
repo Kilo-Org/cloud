@@ -301,6 +301,40 @@ describe('deleteSession', () => {
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
+  it.each([
+    'workspace_requires_root_session',
+    'workspace_deleting',
+    'workspace_identity_conflict',
+    'worktree_deleting',
+  ])('maps an ingest 409 %s response to TRPC CONFLICT', async reason => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ success: false, error: reason }), {
+        status: 409,
+        statusText: 'Conflict',
+      })
+    );
+
+    await expect(deleteSession('ses_abc123', 'user_123')).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: reason,
+    });
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('does not map an unknown ingest 409 reason to TRPC CONFLICT', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ success: false, error: 'session_deleted' }), {
+        status: 409,
+        statusText: 'Conflict',
+      })
+    );
+
+    await expect(deleteSession('ses_abc123', 'user_123')).rejects.toThrow(
+      'Session ingest delete failed: 409 Conflict - {"success":false,"error":"session_deleted"}'
+    );
+    expect(mockCaptureException).toHaveBeenCalled();
+  });
+
   it('encodes session ID in URL', async () => {
     mockFetch.mockResolvedValue({ ok: true, status: 200 });
 

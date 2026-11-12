@@ -10,8 +10,15 @@ jest.mock('@/lib/auth/passkey', () => ({
 }));
 jest.mock('@vercel/firewall');
 jest.mock('@sentry/nextjs');
+jest.mock('@/lib/admin/admin-action-audit');
+jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/admin/step-up-store'),
+  evaluateStepUp: jest.fn(),
+}));
 
-import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
+import { evaluateStepUp } from '@kilocode/web-shared/lib/admin/step-up-store';
+import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import {
   createRegistrationOptions,
   verifyRegistration,
@@ -22,13 +29,21 @@ import { captureMessage } from '@sentry/nextjs';
 import { POST } from './route';
 import { __test__ as rateLimitTest } from '@/lib/auth/firewall-rate-limit';
 
-const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
+const mockGetUserFromAuth = jest.mocked(getUserFromSessionForCredentialIssuance);
+const mockEvaluateStepUp = jest.mocked(evaluateStepUp);
+const mockRecordAdminAction = jest.mocked(recordAdminAction);
 const mockCreateRegistrationOptions = jest.mocked(createRegistrationOptions);
 const mockVerifyRegistration = jest.mocked(verifyRegistration);
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const mockCaptureMessage = jest.mocked(captureMessage);
 
-const fakeUser = { id: 'user-1', google_user_email: 'user@example.com' };
+const fakeUser = {
+  id: 'user-1',
+  google_user_email: 'user@example.com',
+  google_user_name: 'User',
+  is_admin: false,
+  is_super_admin: false,
+};
 
 const challengeId = '11111111-1111-4111-8111-111111111111';
 
@@ -60,6 +75,9 @@ describe('POST /api/auth/passkey/register', () => {
     mockGetUserFromAuth.mockResolvedValue({
       user: fakeUser,
       authFailedResponse: null,
+      webSessionId: 'session-1',
+      webSessionPepper: 'session-pepper-1',
+      authenticatedAt: Math.floor(Date.now() / 1000),
     } as never);
   });
 
@@ -153,7 +171,12 @@ describe('POST /api/auth/passkey/register', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ credentialId: 'credential-1' });
-    expect(mockVerifyRegistration).toHaveBeenCalledWith('user-1', challengeId, attestation);
+    expect(mockVerifyRegistration).toHaveBeenCalledWith(
+      'user-1',
+      challengeId,
+      attestation,
+      'session-pepper-1'
+    );
   });
 
   it('returns 400 for an invalid request', async () => {
@@ -206,5 +229,94 @@ describe('POST /api/auth/passkey/register', () => {
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: 'CHALLENGE_ALREADY_USED' });
+  });
+
+  it('refuses a stale admin enrollment without a fresh sign-in or step-up proof', async () => {
+    mockGetUserFromAuth.mockResolvedValue({
+      user: { ...fakeUser, is_admin: true },
+      authFailedResponse: null,
+      webSessionId: 'session-1',
+      authenticatedAt: Math.floor(Date.now() / 1000) - 20 * 60,
+    } as never);
+    mockEvaluateStepUp.mockResolvedValue({
+      state: { status: 'required' },
+      proof: null,
+      passkeyCount: 0,
+    } as never);
+
+    const response = await POST(
+      createRequest({ action: 'verify', challengeId, response: attestation })
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'REAUTH_REQUIRED' });
+    expect(mockVerifyRegistration).not.toHaveBeenCalled();
+  });
+
+  it('refuses the options step for a stale admin enrollment', async () => {
+    mockGetUserFromAuth.mockResolvedValue({
+      user: { ...fakeUser, is_admin: true },
+      authFailedResponse: null,
+      webSessionId: 'session-1',
+      authenticatedAt: Math.floor(Date.now() / 1000) - 20 * 60,
+    } as never);
+    mockEvaluateStepUp.mockResolvedValue({
+      state: { status: 'required' },
+      proof: null,
+      passkeyCount: 1,
+    } as never);
+
+    const response = await POST(createRequest({ action: 'options' }));
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'REAUTH_REQUIRED' });
+    expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
+  });
+
+  it('allows an admin enrollment from a fresh sign-in', async () => {
+    mockGetUserFromAuth.mockResolvedValue({
+      user: { ...fakeUser, is_admin: true },
+      authFailedResponse: null,
+      webSessionId: 'session-1',
+      authenticatedAt: Math.floor(Date.now() / 1000) - 60,
+    } as never);
+    mockVerifyRegistration.mockResolvedValue({ credential_id: 'credential-1' } as never);
+
+    const response = await POST(
+      createRequest({ action: 'verify', challengeId, response: attestation })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockEvaluateStepUp).not.toHaveBeenCalled();
+    expect(mockRecordAdminAction).toHaveBeenCalledWith(
+      expect.objectContaining({ trpcPath: '/api/auth/passkey/register' }),
+      expect.objectContaining({ action: 'admin.passkey.enrolled' })
+    );
+  });
+
+  it('allows an admin enrollment with a live step-up proof', async () => {
+    mockGetUserFromAuth.mockResolvedValue({
+      user: { ...fakeUser, is_admin: true },
+      authFailedResponse: null,
+      webSessionId: 'session-1',
+      authenticatedAt: Math.floor(Date.now() / 1000) - 20 * 60,
+    } as never);
+    mockEvaluateStepUp.mockResolvedValue({
+      state: {
+        status: 'fresh',
+        method: 'webauthn_uv',
+        verifiedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+      proof: null,
+      passkeyCount: 1,
+    } as never);
+    mockVerifyRegistration.mockResolvedValue({ credential_id: 'credential-1' } as never);
+
+    const response = await POST(
+      createRequest({ action: 'verify', challengeId, response: attestation })
+    );
+
+    expect(response.status).toBe(200);
   });
 });

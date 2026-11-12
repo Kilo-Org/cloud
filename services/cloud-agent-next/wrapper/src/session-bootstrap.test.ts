@@ -2524,11 +2524,15 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(progress).toHaveBeenCalledWith('kilo_session', 'Warm workspace reused');
     expect(progress).toHaveBeenCalledWith('kilo_server', 'Starting Kilo...');
     expect(gitCalls).toEqual([['remote', 'set-url', 'origin', 'https://gitlab.com/acme/repo.git']]);
-    expect(await fsp.readFile(rulesPath, 'utf8')).toBe(
+    const rules = await fsp.readFile(rulesPath, 'utf8');
+    expect(rules).toBe(
       buildCloudAgentRules({
         bashDefaultTimeoutMs: process.env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS,
       })
     );
+    expect(rules).toContain('**New stacked workspace**');
+    expect(rules).toContain('The parent does not need an open PR.');
+    expect(rules).toContain('does not register a Cloud workspace');
   });
 
   it('atomically rotates warm credentials without rerunning runtime bootstrap', async () => {

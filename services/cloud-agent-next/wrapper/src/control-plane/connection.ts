@@ -1,8 +1,14 @@
 import {
+  KILO_CLI_VERSION_HEADER,
+  WRAPPER_VERSION_HEADER,
+  RUNTIME_HARNESS_HEADER,
+  type RuntimeHarness,
   WORKTREE_RUNTIME_HEADER,
   WORKTREE_RUNTIME_VERSION,
   WORKSPACE_CONFIGURATION_HEADER,
   WORKSPACE_CONFIGURATION_VERSION,
+  RUNTIME_INSTRUCTIONS_HEADER,
+  RUNTIME_INSTRUCTIONS_VERSION,
 } from '../../../src/shared/control-plane-runtime-contract.js';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
@@ -28,6 +34,12 @@ const RECONNECT_JITTER_DIVISOR = 4;
  * with the original hello that every supported Worker accepts.
  */
 const FALLBACK_HELLO_CAPABILITIES = [
+  {
+    heartbeatAck: true,
+    workspaceSnapshots: true,
+    redactsNamedSecrets: true,
+    installsSkillsSh: true,
+  },
   { heartbeatAck: true, redactsNamedSecrets: true, installsSkillsSh: true },
   {},
 ] as const;
@@ -55,7 +67,7 @@ type WebSocketWithHeadersCtor = new (
   options?: { headers?: Record<string, string> }
 ) => WebSocket;
 
-export type ControlPlaneHeartbeat = { active: boolean; degraded: boolean };
+export type ControlPlaneHeartbeat = { active: boolean; degraded: boolean; workspaceBusy?: boolean };
 
 /** The live connection phase, derived from the shared tuple so it cannot drift. */
 export type ControlPlaneConnectionPhase = NativeConnectionPhase;
@@ -72,6 +84,9 @@ export type ControlPlaneConnectionOptions = {
   allocationId: string;
   timers: ControlPlaneTimers;
   wrapperId?: string;
+  /** Sent as an upgrade header so the Worker can attribute runs to Kilo v1 or v2. */
+  runtimeHarness?: RuntimeHarness;
+  runtimeVersions?: { kiloCliVersion: string | null; wrapperVersion: string };
   log?: (message: string) => void;
   getHeartbeat?: () => ControlPlaneHeartbeat;
   onFrame?: (frame: ControlPlaneWrapperFrame) => void;
@@ -281,7 +296,11 @@ export function createControlPlaneConnection(
     ackTimer = deadline;
   }
 
-  function startHeartbeat(target: WebSocket, acknowledged: boolean): void {
+  function startHeartbeat(
+    target: WebSocket,
+    acknowledged: boolean,
+    workspaceSnapshots: boolean
+  ): void {
     stopHeartbeat();
     heartbeatAck = acknowledged;
     if (heartbeatAck) armAckDeadline(target);
@@ -291,6 +310,7 @@ export function createControlPlaneConnection(
       writeRaw(target, {
         type: 'heartbeat',
         active: heartbeat.active,
+        ...(workspaceSnapshots ? { workspaceBusy: heartbeat.workspaceBusy ?? false } : {}),
         degraded: heartbeat.degraded,
       });
     }, options.timers.wrapper.heartbeatIntervalMs);
@@ -377,7 +397,7 @@ export function createControlPlaneConnection(
       phase = 'connected';
       disconnectEpisodeReported = false;
       attempt = 0;
-      startHeartbeat(target, frame.heartbeatAck === true);
+      startHeartbeat(target, frame.heartbeatAck === true, frame.workspaceSnapshots === true);
       options.onConnected?.();
       return;
     }
@@ -404,6 +424,14 @@ export function createControlPlaneConnection(
           Authorization: `Bearer ${options.credential}`,
           [WORKTREE_RUNTIME_HEADER]: WORKTREE_RUNTIME_VERSION,
           [WORKSPACE_CONFIGURATION_HEADER]: WORKSPACE_CONFIGURATION_VERSION,
+          [RUNTIME_INSTRUCTIONS_HEADER]: RUNTIME_INSTRUCTIONS_VERSION,
+          ...(options.runtimeHarness ? { [RUNTIME_HARNESS_HEADER]: options.runtimeHarness } : {}),
+          ...(options.runtimeVersions?.kiloCliVersion
+            ? { [KILO_CLI_VERSION_HEADER]: options.runtimeVersions.kiloCliVersion }
+            : {}),
+          ...(options.runtimeVersions
+            ? { [WRAPPER_VERSION_HEADER]: options.runtimeVersions.wrapperVersion }
+            : {}),
         },
       });
     } catch (error) {
@@ -434,9 +462,11 @@ export function createControlPlaneConnection(
           allocationId: options.allocationId,
           protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
           heartbeatAck: true,
-          sessionSnapshots: true,
+          workspaceSnapshots: true,
           redactsNamedSecrets: true,
           installsSkillsSh: true,
+          startCommands: true,
+          worktreeGit: true,
         })
       )
         return;

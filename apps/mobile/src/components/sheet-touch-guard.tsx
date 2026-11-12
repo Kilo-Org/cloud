@@ -18,7 +18,9 @@ import { isSheetTouchHeld } from '@/lib/sheet-touch-guard';
  * a still-opening sheet cannot act: pressing its Cancel afterwards returns the
  * user to the place they opened it from. The hold is bounded to the handover
  * (`SHEET_TOUCH_HOLD_MS`), because the sheet's own content is part of this tree
- * and must get its presses back once the sheet is up.
+ * and must get its presses back once the sheet is up; the sheet re-arms the
+ * same bounded hold for its dismissal, so a tap during the close animation is
+ * kept from the row behind it in the same way.
  */
 export function SheetTouchGuard({ children }: Readonly<{ children: ReactNode }>) {
   return (

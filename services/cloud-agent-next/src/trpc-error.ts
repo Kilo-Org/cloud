@@ -1,17 +1,6 @@
 import { PublicErrorCodeSchema, type ClientError } from '@kilocode/worker-utils/client-error';
 import { TRPC_ERROR_CODES_BY_KEY } from '@trpc/server/rpc';
-import { z } from 'zod';
-
-// Keep aligned with packages/cloud-agent-sdk/src/schemas.ts.
-const customerBillingFailureSchema = z
-  .object({
-    code: z.enum(['INSUFFICIENT_CREDITS', 'COMPUTE_STOPPING', 'BILLING_UNAVAILABLE']),
-    payer: z.object({ type: z.enum(['user', 'org']), id: z.string().min(1) }).strict(),
-    retryable: z.boolean(),
-    remainingMicrodollars: z.number().int().nonnegative().optional(),
-    minimumRequiredMicrodollars: z.number().int().nonnegative().optional(),
-  })
-  .strict();
+import { customerBillingFailureSchema } from '@kilocode/session-ingest-contracts';
 
 const NON_RETRYABLE_CODES = new Set([
   'PARSE_ERROR',
@@ -111,16 +100,28 @@ export function projectTrpcErrorData(
   };
 }
 
-export function buildTrpcErrorResponse(status: number, message: string, path?: string): Response {
+type BuildTrpcErrorResponseOptions = { retryable?: boolean };
+
+export function buildTrpcErrorResponse(
+  status: number,
+  message: string,
+  path?: string,
+  options: BuildTrpcErrorResponseOptions = {}
+): Response {
   const code =
     STATUS_TO_TRPC_CODE[status as keyof typeof STATUS_TO_TRPC_CODE] ?? 'INTERNAL_SERVER_ERROR';
+  const data = projectTrpcErrorData({ code, httpStatus: status, path }, message);
+  const clientError =
+    options.retryable === undefined
+      ? data.clientError
+      : { ...data.clientError, retryable: options.retryable };
 
   return new Response(
     JSON.stringify({
       error: {
         message,
         code: TRPC_ERROR_CODES_BY_KEY[code],
-        data: projectTrpcErrorData({ code, httpStatus: status, path }, message),
+        data: { ...data, clientError },
       },
     }),
     {

@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- The hub composes every organization row (money, members, Kilo Pass, rename) on one screen. */
+import { ORGANIZATION_NAME_MAX_LENGTH } from '@kilocode/app-shared/organizations';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
@@ -18,6 +19,7 @@ import {
   type OrgKiloPassRowState,
 } from '@/components/organization/org-kilo-pass-row-state';
 import { OrgUsageStats } from '@/components/organization/org-usage-stats';
+import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -27,11 +29,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { agentColor, type Tint, toneColor } from '@/lib/agent-color';
+import { NEUTRAL_TINT, type Tint, toneColor } from '@/lib/agent-color';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { WEB_BASE_URL } from '@/lib/config';
+import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
 import { openExternalUrl } from '@/lib/external-link';
-import { formatMoney, formatNumber } from '@/lib/format';
+import { formatNumber, formatPrefixedMoney } from '@/lib/format';
+import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
   isMoneyRole,
@@ -42,6 +46,7 @@ import {
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
+import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { cn } from '@/lib/utils';
 
 type OrganizationHubScreenProps = Readonly<{
@@ -109,6 +114,11 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   const mutations = useOrganizationMutations(organizationId ?? '');
   const [renameVisible, setRenameVisible] = useState(false);
   const { t } = useTranslation();
+  // The same preference the Profile credits card obeys. Until the disk read
+  // settles the choice is unknown, so the amount stays masked: the hub must
+  // never paint an amount the person may have hidden one screen away.
+  const { hideBalance, hasLoaded: hideBalanceLoaded } = useHideBalancePreference();
+  const hideOrgBalance = hideBalance || !hideBalanceLoaded;
 
   if (isResolving || organizationId == null || org == null) {
     return (
@@ -140,7 +150,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   let lowBalanceSubtitle: string | undefined = undefined;
   if (minimumBalance != null) {
     lowBalanceSubtitle = t('organization.hub.lowBalanceBelow', {
-      amount: formatMoney(minimumBalance, i18n.language),
+      amount: isolateLtrBidiText(formatPrefixedMoney(minimumBalance, i18n.language)),
     });
   } else if (orgWithMembers.data != null) {
     lowBalanceSubtitle = t('common.off');
@@ -161,6 +171,29 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   const lowBalanceAccessibilityLabel = lowBalanceRetry
     ? `${t('organization.lowBalanceAlert.title')}. ${lowBalanceDetail}. ${lowBalanceRetry}`
     : `${t('organization.lowBalanceAlert.title')}. ${lowBalanceDetail}`;
+
+  // One string for the painted balance and its spoken label, in the shape the
+  // Profile credits card paints the same balance.
+  const balanceAmount = formatPrefixedMoney(fromMicrodollars(org.balance), i18n.language);
+  // The plan and the subscription gate's own verdict arrive on the same
+  // membership row that decides whether this screen renders at all, so both
+  // paint settled on the first frame: there is no plan loading or plan error
+  // state to reserve room for, and a refetch that fails keeps the last verdict
+  // exactly as it does for the new-session composer. Only the server's boolean
+  // is read; nothing re-derives the plan state from seats or balance.
+  const planEnded = org.isTrialExpiredForEnforcement;
+  const planName =
+    org.plan === 'enterprise'
+      ? t('organization.hub.planEnterprise')
+      : t('organization.hub.planTeams');
+  const planBillingUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions`;
+  // A role that gets the billing action below the block needs only the state,
+  // because the action is the next step. A role that cannot change the plan
+  // gets the sentence the rest of the app shows with the same explanation, so
+  // the member still learns who can end the state.
+  const planMessage = showMoney
+    ? t('organization.hub.planEnded')
+    : t('common.organizationTrialEnded');
 
   return (
     <View className="flex-1 bg-background">
@@ -188,18 +221,52 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
         contentContainerClassName="px-6 gap-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
+        {/* A lapsed plan blocks every new session for every member of this
+            organization, so it is stated before the numbers the screen opens
+            on. Only a billing role gets the action, because the web billing
+            page refuses the other roles; the sentence then stops at the state
+            so it does not restate the control below it, while a role without
+            the action keeps the next step in the sentence. The plan row inside
+            the card below states the tier and its status, so this block adds
+            neither. */}
+        {planEnded ? (
+          <OrganizationPlanRefusal
+            message={planMessage}
+            action={
+              showMoney
+                ? {
+                    label: t('organization.hub.manageBilling'),
+                    onPress: () => {
+                      void openExternalUrl(planBillingUrl, {
+                        label: t('organization.hub.manageBilling'),
+                      });
+                    },
+                  }
+                : undefined
+            }
+          />
+        ) : null}
         <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary px-3">
           {showMoney && (
             <KvRow
               label={t('organization.hub.balance')}
-              value={formatMoney(fromMicrodollars(org.balance), i18n.language)}
+              value={hideOrgBalance ? HIDDEN_BALANCE : balanceAmount}
               valueFace="numeric"
-            />
-          )}
-          {showMoney && org.balance === 0 && (
-            <AddCreditsRow
-              url={`${WEB_BASE_URL}/organizations/${organizationId}/payment-details`}
-              className="border-b-[0.5px] border-hair-soft py-3"
+              // The amount's symbol and sign are neutral to the paragraph's
+              // direction, so the run carries its own left-to-right order.
+              valueDirection="ltr"
+              // An empty balance offers the top-up on the amount's own line: a
+              // row of its own would hold nothing but this control.
+              trailing={
+                org.balance === 0 ? (
+                  <AddCreditsRow inline url={organizationBillingUrl(organizationId)} />
+                ) : undefined
+              }
+              // Always pass the label: a node React Native stops handing a
+              // label keeps its previous native value on Android, so a
+              // masked row that reveals its amount would still announce
+              // "Balance hidden" (the credits card's own note).
+              valueAccessibilityLabel={hideOrgBalance ? t('profile.balanceHidden') : balanceAmount}
             />
           )}
           <KvRow
@@ -217,6 +284,21 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                 : formatNumber(org.seatCount.used, i18n.language)
             }
             valueFace="numeric"
+          />
+          {/* The plan is the tier the seats belong to, so it closes the card
+              the seats are counted in and paints in every state. A lapsed plan
+              states that in this row: the tier alone beside the block above
+              would read as an active plan, and the tier keeps the row's own ink
+              so only the state carries the warning. */}
+          <KvRow
+            label={t('organization.hub.plan')}
+            value={planName}
+            valueStatus={
+              planEnded
+                ? { label: t('organization.hub.planStatusLapsed'), tone: 'danger' }
+                : undefined
+            }
+            valueFace="text"
             last
           />
         </Animated.View>
@@ -315,6 +397,12 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           title={t('organization.hub.renameTitle')}
           placeholder={t('organization.hub.renamePlaceholder')}
           initialValue={org.organizationName}
+          // The server validates a rename with `OrganizationNameSchema`
+          // (packages/web-shared), so the field must accept the name it would
+          // accept. RenameModal's own default is lower than a stored name can
+          // be, and React Native applies `maxLength` to the seeded value: the
+          // dialog would open on a cut name, and saving would store the cut.
+          maxLength={ORGANIZATION_NAME_MAX_LENGTH}
           onSave={async name => {
             await mutations.rename.mutateAsync({ name });
             notificationHaptic(Haptics.NotificationFeedbackType.Success);
@@ -342,12 +430,14 @@ type OrgKiloPassRowProps = Readonly<{
  * a plain function component, not a LucideIcon) and sets explicit
  * accessibility roles/labels for the manage, setup, and retry actions. Never
  * the last row — "Low balance alert" always follows it — so the divider is
- * permanent.
+ * permanent. Its icon tile follows ConfigureRow's rule too: the shared neutral
+ * tile unless the state needs attention (warn), never a hue hashed from the
+ * title.
  */
 function OrgKiloPassRow({ state, onManage, onSetup, onRetry }: OrgKiloPassRowProps) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const tint: Tint = state.attention ? toneColor('warn') : agentColor('Kilo Pass');
+  const tint: Tint = state.attention ? toneColor('warn') : NEUTRAL_TINT;
   let onPress: (() => void) | null = null;
   if (state.action === 'manage') {
     onPress = onManage;

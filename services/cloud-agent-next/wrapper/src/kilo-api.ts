@@ -20,7 +20,7 @@ import {
 } from '@kilocode/sdk/v2';
 import { z } from 'zod';
 import { logToFile } from './utils.js';
-import { kiloClientConfig, type KiloServer } from './kilo-server-auth.js';
+import { kiloClientConfig, kiloServerHeaders, type KiloServer } from './kilo-server-auth.js';
 import {
   boundSlashCommandCatalog,
   toSlashCommandInfo,
@@ -186,6 +186,28 @@ function requireSdkData<T>(
   return result.data;
 }
 
+export type DrainSessionErrorKind = 'transient' | 'definitive' | 'anomalous' | 'unclassified';
+
+/**
+ * A classified drain failure. Transport-level retry policy reads `kind`; the
+ * caller never parses an HTTP status out of the message.
+ */
+export class DrainSessionError extends Error {
+  readonly kind: DrainSessionErrorKind;
+  readonly status?: number;
+
+  constructor(
+    kind: DrainSessionErrorKind,
+    message: string,
+    options?: { status?: number; cause?: unknown }
+  ) {
+    super(message, options?.cause === undefined ? undefined : { cause: options.cause });
+    this.name = 'DrainSessionError';
+    this.kind = kind;
+    if (options?.status !== undefined) this.status = options.status;
+  }
+}
+
 export type KiloServerHandle = {
   url: string;
   close: () => void;
@@ -239,6 +261,8 @@ type PromptOptions = {
     { type: 'text'; text: string } | { type: 'file'; mime: string; url: string; filename?: string }
   >;
   prompt?: string;
+  /** Server-owned context sent as a synthetic text part before the prompt. */
+  context?: string;
   variant?: string;
   agent?: string;
   model?: { providerID?: string; modelID: string };
@@ -316,6 +340,12 @@ export type WrapperKiloClient = {
     directory: string;
     signal?: AbortSignal;
   }) => Promise<void>;
+  drainSession: (opts: {
+    sessionId: string;
+    directory?: string;
+    token?: string;
+    signal?: AbortSignal;
+  }) => Promise<boolean>;
   summarizeSession: (opts: {
     sessionId: string;
     model: { providerID?: string; modelID: string };
@@ -385,6 +415,7 @@ export type WrapperKiloClient = {
   }) => Promise<WrapperPty>;
   resizePty: (ptyId: string, size: WrapperPtySize, directory?: string) => Promise<WrapperPty>;
   deletePty: (ptyId: string, directory?: string) => Promise<boolean>;
+  connectPty: (ptyId: string, directory: string) => WebSocket;
 
   /**
    * Subscribe to kilo events. The stream yields typed events until the abort
@@ -412,11 +443,17 @@ export function createWrapperKiloClient(
   function promptParameters(opts: PromptOptions) {
     const rawParts =
       opts.parts ?? (opts.prompt ? [{ type: 'text' as const, text: opts.prompt }] : []);
+    const parts = [
+      ...(opts.context
+        ? [{ type: 'text' as const, text: opts.context, synthetic: true as const }]
+        : []),
+      ...rawParts,
+    ];
     return {
       sessionID: opts.sessionId,
       directory: opts.directory ?? workspacePath,
       messageID: opts.messageId,
-      parts: rawParts.map(part =>
+      parts: parts.map(part =>
         part.type === 'file'
           ? {
               type: 'file' as const,
@@ -424,7 +461,11 @@ export function createWrapperKiloClient(
               url: part.url,
               ...(part.filename ? { filename: part.filename } : {}),
             }
-          : { type: 'text' as const, text: part.text }
+          : {
+              type: 'text' as const,
+              text: part.text,
+              ...('synthetic' in part ? { synthetic: true as const } : {}),
+            }
       ),
       ...(opts.variant ? { variant: opts.variant } : {}),
       ...(opts.model
@@ -667,6 +708,56 @@ export function createWrapperKiloClient(
       }
     },
 
+    drainSession: async opts => {
+      let result: Awaited<ReturnType<typeof v2Client.kilocode.drainSession>>;
+      try {
+        result = await v2Client.kilocode.drainSession(
+          {
+            sessionID: opts.sessionId,
+            directory: opts.directory ?? workspacePath,
+            token: opts.token ?? crypto.randomUUID(),
+          },
+          { signal: opts.signal, throwOnError: false }
+        );
+      } catch (error) {
+        if (opts.signal?.aborted) {
+          if (error instanceof Error) throw error;
+          throw new DOMException('Aborted', 'AbortError');
+        }
+        throw new DrainSessionError('unclassified', 'protocol error', { cause: error });
+      }
+      const status: number | undefined = result.response?.status;
+      if (opts.signal?.aborted) {
+        if (result.error instanceof Error) throw result.error;
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      if (result.error !== undefined) {
+        if (status === 408 || status === 429 || (status !== undefined && status >= 500)) {
+          throw new DrainSessionError('transient', `HTTP ${status}`, {
+            status,
+            cause: result.error,
+          });
+        }
+        if (status !== undefined && status >= 400 && status < 500) {
+          throw new DrainSessionError('definitive', `HTTP ${status}`, {
+            status,
+            cause: result.error,
+          });
+        }
+        if (result.response === undefined) {
+          throw new DrainSessionError('transient', 'request error', { cause: result.error });
+        }
+        throw new DrainSessionError('unclassified', 'protocol error', { cause: result.error });
+      }
+      if (status === 204 || typeof result.data !== 'boolean') {
+        throw new DrainSessionError('anomalous', 'returned no boolean result');
+      }
+      if (result.data === false) {
+        throw new DrainSessionError('anomalous', 'Session drain returned false');
+      }
+      return result.data;
+    },
+
     summarizeSession: async opts => {
       const result = await v2Client.session.summarize(
         {
@@ -842,6 +933,17 @@ export function createWrapperKiloClient(
         directory,
       });
       return requireSdkData(result, `PTY delete for ${ptyId}`);
+    },
+    connectPty: (ptyId, directory) => {
+      const url = new URL(`/pty/${encodeURIComponent(ptyId)}/connect`, server.url);
+      url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+      url.search = '';
+      url.hash = '';
+      url.searchParams.set('directory', directory);
+      const Socket = WebSocket as typeof WebSocket & {
+        new (url: string, options: { headers: Record<string, string> }): WebSocket;
+      };
+      return new Socket(url.toString(), { headers: kiloServerHeaders(server) });
     },
   };
 }

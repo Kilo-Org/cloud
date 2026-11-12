@@ -3,11 +3,18 @@
  * validated bundle. UI-free so the skill-specific archive contract can be
  * tested directly; the shared decoder owns bounded ZIP mechanics.
  */
-import { decodeSkillBundleArchive } from '@kilocode/cloud-agent-profile/import';
+import {
+  decodeSkillBundleArchive,
+  overLimitMessage,
+  overTotalMessage,
+} from '@kilocode/cloud-agent-profile/import';
 
 const SKILL_FILE_PATH_PATTERN = /^[a-zA-Z0-9._\-/]+$/;
 
-// Keep in sync with apps/web/src/lib/agent/profile-skills-service.ts limits.
+// Client-side copy of the profile skill limits in
+// packages/cloud-agent-profile/src/contracts/skills.ts. They are duplicated so
+// the client bundle stays on the browser-safe import entry point; the wording
+// comes from the shared helpers above so it cannot drift.
 const MAX_SKILL_MARKDOWN_LENGTH = 100_000;
 export const MAX_COMPANION_FILES = 40;
 const MAX_COMPANION_FILE_SIZE = 100_000;
@@ -105,7 +112,7 @@ export async function extractSkillZip(file: SkillZipFile): Promise<ExtractedSkil
     }
     if (rel.toLowerCase() === 'skill.md') {
       if (entry.content.length > MAX_SKILL_MARKDOWN_LENGTH) {
-        throw new Error(`SKILL.md exceeds ${MAX_SKILL_MARKDOWN_LENGTH} bytes`);
+        throw new Error(overLimitMessage('SKILL.md', MAX_SKILL_MARKDOWN_LENGTH));
       }
       skillMd = entry.content;
       continue;
@@ -115,7 +122,7 @@ export async function extractSkillZip(file: SkillZipFile): Promise<ExtractedSkil
     }
 
     if (entry.content.length > MAX_COMPANION_FILE_SIZE) {
-      throw new Error(`File "${rel}" exceeds ${MAX_COMPANION_FILE_SIZE} bytes`);
+      throw new Error(overLimitMessage(`File "${rel}"`, MAX_COMPANION_FILE_SIZE));
     }
     fileCount += 1;
     totalBytes += entry.content.length;
@@ -123,7 +130,7 @@ export async function extractSkillZip(file: SkillZipFile): Promise<ExtractedSkil
       throw new Error(`Skill may have at most ${MAX_COMPANION_FILES} companion files`);
     }
     if (totalBytes > MAX_COMPANION_FILES_TOTAL) {
-      throw new Error(`Companion files exceed ${MAX_COMPANION_FILES_TOTAL} bytes total`);
+      throw new Error(overTotalMessage('Companion files', totalBytes, MAX_COMPANION_FILES_TOTAL));
     }
     files[rel] = entry.content;
   }

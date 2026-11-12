@@ -14,8 +14,35 @@ import { reportTrpcError } from '@/lib/force-update-signal';
 import { reportAppError } from '@/lib/telemetry/app-error-reporting';
 import { isPermissionDeniedError, isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
 
+const acceptedActiveSessionsDataSchema = z.object({
+  sessions: z.array(z.looseObject({ id: z.string() })),
+});
+
+/**
+ * The session ids of one accepted (non-manual) `activeSessions.list` result,
+ * read defensively: a later refactor of the router's output shape must leave
+ * the metadata without provenance (surfaces resolve empty) instead of
+ * crashing every observer of the query cache.
+ */
+function acceptedActiveSessionsRowIds(data: unknown): readonly string[] {
+  const parsed = acceptedActiveSessionsDataSchema.safeParse(data);
+  if (parsed.success) {
+    return parsed.data.sessions.map(row => row.id);
+  }
+  return [];
+}
+
 export type ActiveSessionsQueryMetadata = Readonly<{
   acceptedRevision: number;
+  /**
+   * The session ids the last accepted (non-manual) server answer listed. A
+   * later manual cache write (a socket write, the floor poll) replaces the
+   * cache without a server answer, so this set is what an empty live cache is
+   * compared against: cache empty while these are still listed means the
+   * emptiness was never confirmed by the server, and the surface keeps its
+   * last rows from the query cache until the confirmation answer lands.
+   */
+  acceptedSessionIds: ReadonlySet<string>;
   terminalError: Readonly<{
     error: unknown;
     kind: 'retryable' | 'non-retryable';
@@ -24,8 +51,10 @@ export type ActiveSessionsQueryMetadata = Readonly<{
 
 // Old/manual-only cache entries have no server provenance. They cannot establish
 // empty success; keep this fallback while those entries can occur.
+const EMPTY_SESSION_ID_SET: ReadonlySet<string> = new Set();
 const EMPTY_ACTIVE_SESSIONS_METADATA: ActiveSessionsQueryMetadata = {
   acceptedRevision: 0,
+  acceptedSessionIds: EMPTY_SESSION_ID_SET,
   terminalError: null,
 };
 const activeSessionsMetadata = new WeakMap<Query, ActiveSessionsQueryMetadata>();
@@ -115,6 +144,7 @@ function observeActiveSessionsQueryOutcomes(queryCache: QueryCache): void {
     ) {
       activeSessionsMetadata.set(query, {
         acceptedRevision: previous.acceptedRevision + 1,
+        acceptedSessionIds: new Set(acceptedActiveSessionsRowIds(event.action.data)),
         terminalError: null,
       });
     } else if (
@@ -169,11 +199,14 @@ function queryKeyInput(queryKey: unknown): QueryKeyInput | undefined {
 
 /**
  * Drops a permission-denied query from the cache so the next persister save
- * omits it. An org-scoped query is removed by its org prefix (procedure path +
+ * omits it. An org-scoped query is dropped by its org prefix (procedure path +
  * `input.organizationId`), which also covers every sibling variant of that
- * procedure for the same org; a non-org query is removed by its exact key.
+ * procedure for the same org; a non-org query is dropped by its exact key. A
+ * sibling a screen observes keeps its slot — removing it rebuilds and refetches,
+ * which fails again for as long as its error screen mounts — and loses only the
+ * denied rows, so every other sibling leaves the cache.
  */
-function removePermissionDeniedQueries(
+function dropPermissionDeniedQuery(
   queryClient: QueryClient,
   error: unknown,
   query: Query<unknown, unknown, unknown>
@@ -183,13 +216,21 @@ function removePermissionDeniedQueries(
   }
   const input = queryKeyInput(query.queryKey);
   const organizationId = input?.organizationId;
-  if (organizationId !== undefined && organizationId !== null) {
-    queryClient.removeQueries({
-      queryKey: [query.queryKey[0], { input: { organizationId } }],
-    });
+  if (organizationId === undefined || organizationId === null) {
+    if (query.isActive()) {
+      return;
+    }
+    queryClient.removeQueries({ queryKey: query.queryKey });
     return;
   }
-  queryClient.removeQueries({ queryKey: query.queryKey });
+  const orgPrefix = [query.queryKey[0], { input: { organizationId } }];
+  queryClient.removeQueries({ queryKey: orgPrefix, type: 'inactive' });
+  for (const observed of queryClient.getQueryCache().findAll({
+    queryKey: orgPrefix,
+    type: 'active',
+  })) {
+    observed.setState({ data: undefined });
+  }
 }
 
 /**
@@ -239,7 +280,7 @@ export function createKiloAppQueryClient(): QueryClient {
         // (invalidateQueries, refetchQueries, refetchInterval, pull-to-refresh)
         // still refetches, and call sites that pass `staleTime: 0` still override.
         staleTime: DEFAULT_QUERY_STALE_TIME_MS,
-        // Foreground freshness is owned per route by useRouteForegroundRefresh mounts; the blanket focusManager refetch also woke frozen background tabs.
+        // Foreground freshness is owned per route by useRouteForegroundRefresh mounts; the blanket focusManager refetch also refetched unfocused tabs.
         refetchOnWindowFocus: false,
         retry: (failureCount, error) => {
           const code = (error as { data?: { code?: string } } | null)?.data?.code;
@@ -256,12 +297,9 @@ export function createKiloAppQueryClient(): QueryClient {
         void handleTrpcQueryError(error);
         reportTrpcError(error);
         reportAppError(error, { source: 'query', queryKey: query.queryKey });
-        // Removing a still-observed query rebuilds it on the next render and
-        // refetches, which fails FORBIDDEN again and loops for as long as the
-        // error screen stays mounted. Only drop queries nothing is observing.
-        if (!query.isActive()) {
-          removePermissionDeniedQueries(queryClient, error, query);
-        }
+        // A denied query drops its cached rows even while a screen observes it;
+        // only the query object survives, so the screen can show the denial.
+        dropPermissionDeniedQuery(queryClient, error, query);
         refreshOrganizationsListOnPermissionLoss(queryClient, error, query);
       },
     }),

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite owns every member the account boundary clears */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const nativeSearchMock = vi.hoisted(() => ({
@@ -12,11 +13,19 @@ const recentPrsMock = vi.hoisted(() => ({
   clearRecentPrs: vi.fn<() => Promise<void>>(),
 }));
 
+const sessionCatalogMock = vi.hoisted(() => ({
+  clearNativeSessionCatalog: vi.fn<() => Promise<boolean>>(),
+}));
+
 const formDraftMock = vi.hoisted(() => ({
   clearFormDrafts: vi.fn(),
 }));
 
 vi.mock('@/lib/native-system-search', () => nativeSearchMock);
+
+// The App Intents catalog is the same titles in another place; the boundary's
+// real clear helper runs against this faked bridge.
+vi.mock('@/lib/app-actions/native-bridge', () => sessionCatalogMock);
 
 vi.mock('@/lib/telemetry/error-sink', () => telemetryMock);
 
@@ -38,6 +47,7 @@ import {
   conversationRetentionKey,
   retainConversationAcrossMounts,
 } from '@/lib/pr-review/discussion/conversation-retention';
+import { createLauncherSurfacesPublisher } from '@/lib/launcher-surfaces-publish';
 import { type ConversationComment } from '@/lib/pr-review/discussion/review-discussion-types';
 import {
   clearSessionScopedState,
@@ -94,6 +104,9 @@ const mocks = vi.hoisted(() => ({
   forgetRemoteMcp: vi.fn(),
   clearTrustedImageHosts: vi.fn(),
   clearRepoSelectionSenders: vi.fn(),
+  clearLauncherSurfaces: vi.fn(),
+  clearLastOpenedSession: vi.fn(),
+  clearLastRoute: vi.fn(),
   notifyArtifactsChanged: vi.fn(),
   reapTempFiles: vi.fn(),
   resetArtifactMirrorSyncState: vi.fn(),
@@ -151,6 +164,17 @@ vi.mock('@/lib/chat/settings-tools-switch', () => ({
 vi.mock('@/lib/hooks/repo-selection-senders', () => ({
   clearRepoSelectionSenders: mocks.clearRepoSelectionSenders,
 }));
+// The OS launcher surfaces and the two durable records are device-wide and their
+// modules reach the native launcher bridge and SecureStore on import, so the
+// boundary suite observes their clears through these spies. Their own suites
+// pin what each clear removes.
+vi.mock('@/lib/native-launcher-surfaces', () => ({
+  clearLauncherSurfaces: mocks.clearLauncherSurfaces,
+}));
+vi.mock('@/lib/last-opened-session', () => ({
+  clearLastOpenedSession: mocks.clearLastOpenedSession,
+}));
+vi.mock('@/lib/last-route', () => ({ clearLastRoute: mocks.clearLastRoute }));
 // The platform provider bridge: sign-out has to tell an open Files app the tree
 // changed, or it keeps the listing it read before the wipe.
 vi.mock('@/lib/artifacts/artifact-provider-native', () => ({
@@ -176,6 +200,9 @@ const SESSION_MEMBERS = [
   mocks.clearChatBackends,
   mocks.clearSettingsToolsEnabled,
   mocks.clearRepoSelectionSenders,
+  mocks.clearLauncherSurfaces,
+  mocks.clearLastOpenedSession,
+  mocks.clearLastRoute,
 ];
 
 /** Android mirror root: `Paths.document` plus the mirror folder name. */
@@ -187,6 +214,7 @@ beforeEach(() => {
   fakeFs.state.rootExists = true;
   nativeSearchMock.clearSystemSearchIndex.mockResolvedValue(undefined);
   recentPrsMock.clearRecentPrs.mockResolvedValue(undefined);
+  sessionCatalogMock.clearNativeSessionCatalog.mockResolvedValue(true);
 });
 
 describe('clearSessionScopedState', () => {
@@ -203,6 +231,77 @@ describe('clearSessionScopedState', () => {
     // clear; without it the collector re-indexes the previous account's PRs.
     clearSessionScopedState();
     expect(recentPrsMock.clearRecentPrs).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the App Intents catalog that names the previous account’s sessions', () => {
+    // The same titles the search index holds are also what Shortcuts and Siri
+    // offer; a boundary that cleared one and not the other would leave them
+    // addressable from outside the app.
+    clearSessionScopedState();
+    expect(sessionCatalogMock.clearNativeSessionCatalog).toHaveBeenCalledTimes(1);
+
+    clearSessionScopedState();
+    expect(sessionCatalogMock.clearNativeSessionCatalog).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports a rejected catalog clear and keeps clearing the rest', async () => {
+    const failure = new Error('The catalog store refused the clear.');
+    sessionCatalogMock.clearNativeSessionCatalog.mockRejectedValue(failure);
+
+    expect(() => {
+      clearSessionScopedState();
+    }).not.toThrow();
+
+    await vi.waitFor(() => {
+      expect(telemetryMock.captureTelemetry).toHaveBeenCalledWith({
+        error: failure,
+        level: 'warning',
+        tags: { 'error.subsystem': 'app-intent-catalog', 'error.operation': 'clear' },
+      });
+    });
+    // The members after it still ran.
+    expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the OS launcher surfaces and the durable last-session records', () => {
+    // The shortcuts/tile labels and the two records belong to the account that
+    // wrote them, and both boundaries drop them with the other account-scoped
+    // members.
+    clearSessionScopedState();
+
+    expect(mocks.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
+    expect(mocks.clearLastOpenedSession).toHaveBeenCalledTimes(1);
+    expect(mocks.clearLastRoute).toHaveBeenCalledTimes(1);
+
+    clearSessionScopedState();
+
+    expect(mocks.clearLauncherSurfaces).toHaveBeenCalledTimes(2);
+    expect(mocks.clearLastOpenedSession).toHaveBeenCalledTimes(2);
+    expect(mocks.clearLastRoute).toHaveBeenCalledTimes(2);
+  });
+
+  it('makes the live launcher publisher write its derivation again', () => {
+    // The parent layout stays mounted across an account switch, and the
+    // derived list can match the one just written, so the boundary reaches the
+    // mounted publisher as well as the OS surface.
+    const publish = vi.fn<(payload: unknown) => void>();
+    const publisher = createLauncherSurfacesPublisher(publish, () => {
+      mocks.clearLauncherSurfaces();
+    });
+    const launcherTargets = {
+      newAgentUrl: 'kiloapp:///cloud/sessions/new',
+      needsInputUrl: null,
+      openLastSessionUrl: null,
+    };
+    const translate = (key: string): string => key;
+
+    publisher.apply(launcherTargets, translate);
+    expect(publish).toHaveBeenCalledTimes(1);
+
+    clearSessionScopedState();
+
+    publisher.apply(launcherTargets, translate);
+    expect(publish).toHaveBeenCalledTimes(2);
   });
 
   it('drops the retained PR discussion conversation', () => {
@@ -265,6 +364,14 @@ describe('clearSystemSearchIndexOnSignedOutLaunch', () => {
   it('re-runs the idempotent OS search clear for the signed-out launch', () => {
     clearSystemSearchIndexOnSignedOutLaunch();
     expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-runs the App Intents catalog clear for the signed-out launch', () => {
+    // The teardown fired its clear without awaiting it; a process killed before
+    // it landed would otherwise leave the previous account's sessions named by
+    // Siri for the whole signed-out window.
+    clearSystemSearchIndexOnSignedOutLaunch();
+    expect(sessionCatalogMock.clearNativeSessionCatalog).toHaveBeenCalledTimes(1);
   });
 
   it('reports a failed re-clear through telemetry and never throws', async () => {

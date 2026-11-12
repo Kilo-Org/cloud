@@ -30,7 +30,10 @@ import {
   resolveGatewayCaller,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { findSupportedFimModel } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
-import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  emitApiMetricsForResponse,
+  emitGatewayApiMetrics,
+} from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   bareIpLiteral,
   bouncerDecideTier,
@@ -172,14 +175,14 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     user_byok: !!userByokEntry,
     has_tools: false,
     feature,
-    bouncer: bouncer.usage({
-      occurredAt: new Date(requestStartedAtMs),
-      clientAttributed: usageBase.clientAttributed,
-      requestedLogprobs: false,
-      samples: null,
-      // Edit feeds volume rules only, which do not read a prompt hash.
-      promptSimHash: null,
-    }),
+  };
+  const bouncerUsageFields = {
+    occurredAt: new Date(requestStartedAtMs),
+    clientAttributed: usageBase.clientAttributed,
+    requestedLogprobs: false,
+    samples: null,
+    // Edit feeds volume rules only, which do not read a prompt hash.
+    promptSimHash: null,
   };
 
   setTag('ui.ai_model', requestBody.model);
@@ -193,6 +196,10 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   });
   if (accessResult.rejection) return accessResult.rejection;
   const { balance, plan, payer } = accessResult.access;
+
+  // The usage row reports the payer the balance check resolved: the root organization for an
+  // organization member.
+  usageContext.bouncer = await bouncer.usage(bouncerUsageFields, payer);
 
   // Data-use contract for this route: edit goes straight to Inception, which the gateway's
   // provider data policy classifies as not training on prompts and not retaining them
@@ -245,26 +252,23 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.status_code = proxyRes.status;
 
-  emitApiMetricsForResponse(
-    {
-      kiloUserId: user.id,
-      organizationId,
-      isAnonymous: false,
-      isStreaming: false,
-      userByok: !!userByokEntry,
-      provider: editProvider,
-      requestedModel: requestBody.model,
-      resolvedModel: requestBody.model,
-      toolsAvailable: [],
-      toolsUsed: [],
-      ttfbMs,
-      statusCode: proxyRes.status,
-    },
-    proxyRes.clone(),
-    requestStartedAt
-  );
+  const metricsParams = {
+    kiloUserId: user.id,
+    organizationId,
+    isAnonymous: false,
+    isStreaming: false,
+    userByok: !!userByokEntry,
+    provider: editProvider,
+    requestedModel: requestBody.model,
+    resolvedModel: requestBody.model,
+    toolsAvailable: [],
+    toolsUsed: [],
+    ttfbMs,
+    statusCode: proxyRes.status,
+  };
 
   if (!proxyRes.body) {
+    emitGatewayApiMetrics({ ...metricsParams, completeRequestMs: ttfbMs });
     return NextResponse.json(
       {
         error: 'No body returned from upstream',
@@ -286,7 +290,8 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
 
   const clonedResponse = proxyRes.clone();
 
-  countAndStoreEditUsage(clonedResponse, usageContext, requestSpan);
+  const accounting = countAndStoreEditUsage(clonedResponse, usageContext, requestSpan);
+  emitApiMetricsForResponse(metricsParams, accounting.statsPromise, requestStartedAt);
 
   return upstreamErrorResponse ?? wrapInSafeNextResponse(proxyRes);
 }

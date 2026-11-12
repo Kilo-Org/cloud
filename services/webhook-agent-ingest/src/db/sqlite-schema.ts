@@ -54,6 +54,7 @@ export const triggerConfig = sqliteTable('trigger_config', {
   model: text('model'),
   variant: text('variant'),
   sandbox_allocation: text('sandbox_allocation'),
+  environment_id: text('environment_id'),
   prompt_template: text('prompt_template').notNull(),
   profile_id: text('profile_id'),
   body_schema: text('body_schema', { mode: 'json' }).$type<WebhookBodySchema>(),

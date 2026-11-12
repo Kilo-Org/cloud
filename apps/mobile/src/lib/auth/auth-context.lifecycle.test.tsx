@@ -14,6 +14,7 @@ import {
   ORGANIZATION_PERSONAL_STORAGE_KEY,
   REFRESH_TOKEN_KEY,
 } from '@/lib/storage-keys';
+import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 
 // The mobile-app gate runs `vitest related` over ~170 files concurrently with
 // the device stack, so every real timer in this file stretches several-fold.
@@ -89,7 +90,9 @@ const hoisted = vi.hoisted(() => {
 
   const deepLinkLaunch = {
     clearAccountBoundPendingDeepLink: vi.fn(),
+    getPendingDeepLinkSnapshot: vi.fn<() => string | null>(() => null),
     setCurrentDeepLinkUserId: vi.fn(),
+    setPendingDeepLink: vi.fn(),
   };
 
   // The legacy-exchange branch of the bootstrap load. Resolves null (a failed
@@ -167,6 +170,11 @@ const lastOpenedSessionMock = vi.hoisted(() => ({
 
 const nativeLauncherSurfacesMock = vi.hoisted(() => ({
   clearLauncherSurfaces: vi.fn(),
+  takeAccountIndependentLaunchUrl: vi.fn<() => string | null>(() => null),
+}));
+
+const lastRouteMock = vi.hoisted(() => ({
+  clearLastRoute: vi.fn(),
 }));
 
 // Hoisted so the unauthorized-handler tests can capture the handler the
@@ -254,7 +262,9 @@ vi.mock('@/lib/appsflyer', () => ({
 
 vi.mock('@/lib/deep-link-launch', () => ({
   clearAccountBoundPendingDeepLink: hoisted.deepLinkLaunch.clearAccountBoundPendingDeepLink,
+  getPendingDeepLinkSnapshot: hoisted.deepLinkLaunch.getPendingDeepLinkSnapshot,
   setCurrentDeepLinkUserId: hoisted.deepLinkLaunch.setCurrentDeepLinkUserId,
+  setPendingDeepLink: hoisted.deepLinkLaunch.setPendingDeepLink,
 }));
 
 vi.mock('@/lib/auth/exchange-legacy-token', () => ({
@@ -295,6 +305,12 @@ vi.mock('@/lib/native-system-search', () => ({
   clearSystemSearchIndex: vi.fn().mockResolvedValue(undefined),
 }));
 
+// The App Intents catalog clear reaches the same entry through the app-action
+// bridge, so it is a no-op here too.
+vi.mock('@/lib/app-actions/session-catalog', () => ({
+  clearSessionCatalogBestEffort: vi.fn(),
+}));
+
 vi.mock('@/lib/auth/logout-cleanup', () => logoutCleanupMock);
 
 vi.mock('@/lib/consent', () => ({
@@ -304,6 +320,8 @@ vi.mock('@/lib/consent', () => ({
 vi.mock('@/lib/last-opened-session', () => lastOpenedSessionMock);
 
 vi.mock('@/lib/native-launcher-surfaces', () => nativeLauncherSurfacesMock);
+
+vi.mock('@/lib/last-route', () => lastRouteMock);
 
 vi.mock('@/lib/auth/trpc-unauthorized', () => ({
   setTrpcUnauthorizedHandler: unauthorizedMock.setTrpcUnauthorizedHandler,
@@ -420,14 +438,6 @@ vi.mock('@/lib/hooks/use-collapsed-connect-ctas-preference', () => ({
   clearCollapsedConnectCtasPreference,
 }));
 
-vi.mock('@/lib/last-active-instance', () => ({
-  clearLastActiveInstance: vi.fn().mockResolvedValue(undefined),
-}));
-
-// The ownership module is intentionally NOT mocked here: the sign-out gate
-// regression test must observe the real gate closing before any await and
-// blocking a late persist from calling SecureStore.setItem.
-
 vi.mock('@/lib/credits/use-store-credit-purchase', () => ({
   resetPurchaseErrorToastDedup: vi.fn(),
 }));
@@ -463,7 +473,7 @@ vi.mock('@/lib/storage-keys', () => ({
   AUTH_TOKEN_KEY: 'auth-token',
   CHAT_BACKENDS_KEY: 'chat-backends',
   KEEP_SCREEN_ON_KEY: 'keep-session-screen-on',
-  KILOCLAW_OWNED_KEY: 'kiloclaw-owned',
+  LAST_ROUTE_KEY: 'last-route',
   LEGACY_EXCHANGE_DONE_KEY: 'legacy-exchange-done',
   LOGIN_EMAIL_DRAFT_KEY: 'login-email-draft',
   LOGIN_SSO_RECOVERY_DRAFT_KEY: 'login-sso-recovery-draft',
@@ -930,6 +940,72 @@ describe('sign-out teardown ordering', () => {
     unmount();
   });
 
+  it('clears the launcher surfaces and the durable session records on sign-in (account switch)', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockClear();
+    lastOpenedSessionMock.clearLastOpenedSession.mockClear();
+    lastRouteMock.clearLastRoute.mockClear();
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+    });
+
+    // The switch owns the device's own surfaces and records: the dynamic
+    // shortcuts/tile are dropped natively and both durable records are deleted,
+    // like the sign-out body.
+    expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
+    expect(lastOpenedSessionMock.clearLastOpenedSession).toHaveBeenCalledTimes(1);
+    expect(lastRouteMock.clearLastRoute).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('keeps a parked account-independent launch destination on sign-in', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl.mockReturnValueOnce(
+      'kiloapp:///cloud/sessions/new'
+    );
+    hoisted.deepLinkLaunch.setPendingDeepLink.mockClear();
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+    });
+
+    // The launcher clear that runs at this boundary takes the parked URL with
+    // it, so the destination that names no account is staged for this account
+    // and the signed-in mount still opens where the Quick Action points.
+    expect(nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl).toHaveBeenCalled();
+    expect(hoisted.deepLinkLaunch.setPendingDeepLink).toHaveBeenCalledWith(
+      expect.stringContaining('/agent-chat/new'),
+      'universal-link'
+    );
+    expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('keeps the destination already in the pending slot over the parked one', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl.mockReturnValueOnce(
+      'kiloapp:///cloud/sessions/new'
+    );
+    hoisted.deepLinkLaunch.getPendingDeepLinkSnapshot.mockReturnValue(
+      '/(app)/pr-review/github/octocat/hello/7'
+    );
+    hoisted.deepLinkLaunch.setPendingDeepLink.mockClear();
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+    });
+
+    // The parked URL has no deadline and the captured link is live, so the
+    // occupied slot keeps the destination the person opened.
+    expect(hoisted.deepLinkLaunch.setPendingDeepLink).not.toHaveBeenCalled();
+    expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
   it('clears the local preferences on sign-out', async () => {
     const { ctx } = await mountAndGetContext();
 
@@ -972,39 +1048,11 @@ describe('sign-out teardown ordering', () => {
       await ctx.signOut();
     });
 
-    // The dynamic shortcuts/tile are dropped natively and the durable record is
-    // deleted locally, so the next account never sees the previous session.
+    // The dynamic shortcuts/tile are dropped natively and the durable records
+    // are deleted locally, with the other account-scoped members.
     expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
     expect(lastOpenedSessionMock.clearLastOpenedSession).toHaveBeenCalledTimes(1);
-  });
-
-  it('closes the ownership gate before any await and blocks a late persist', async () => {
-    const { ctx, unmount } = await mountAndGetContext();
-    const ownership = await import('@/lib/kiloclaw-tab-ownership');
-
-    // The old account's tab layout already resolved and persisted ownership.
-    ownership.persistKiloClawOwned(true);
-    expect(hoisted.secureStore.setItem).toHaveBeenCalledTimes(1);
-
-    // Sign-out starts; the gate closes synchronously at the first line,
-    // before the first await, while the teardown awaits are still in flight.
-    const signOutPromise = ctx.signOut();
-
-    // A late list reconcile from the old observer runs before
-    // clearKiloClawOwned is reached.
-    ownership.persistKiloClawOwned(false);
-
-    await act(async () => {
-      await signOutPromise;
-    });
-
-    // The late persist could not call SecureStore.setItem; only the
-    // pre-sign-out write happened, and the clear step still deleted the key.
-    expect(hoisted.secureStore.setItem).toHaveBeenCalledTimes(1);
-    expect(hoisted.secureStore.setItem).toHaveBeenCalledWith('kiloclaw-owned', '1');
-    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('kiloclaw-owned');
-
-    unmount();
+    expect(lastRouteMock.clearLastRoute).toHaveBeenCalledTimes(1);
   });
 
   it('regression: sign-out deletes run through deleteAccountMetadata and land after in-flight metadata writes', async () => {
@@ -2675,8 +2723,7 @@ describe('auth-transition queue and sign-out failure matrix', () => {
 
   it('runs every other batch member, the preference clears, and state reset when one batch member rejects', async () => {
     const { getCtx, unmount } = await mountQueueTest();
-    const { clearLastActiveInstance } = await import('@/lib/last-active-instance');
-    vi.mocked(clearLastActiveInstance).mockRejectedValueOnce(new Error('storage down'));
+    vi.mocked(clearRecentPrs).mockRejectedValueOnce(new Error('storage down'));
 
     await act(async () => {
       await getCtx().signOut();

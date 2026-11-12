@@ -103,6 +103,8 @@ const allocationRequests = {
     provider: { id: 'cloudflare', account: 'kilo' },
     instanceType: 'single',
   },
+  // Legacy decode only: one sandbox serves one workspace, so nothing creates a
+  // shared sandbox.
   'cloudflare-shared': {
     provider: { id: 'cloudflare', account: 'kilo' },
     instanceType: 'shared',
@@ -206,8 +208,8 @@ export function getSandboxAllocationProvider(allocation: SandboxAllocation) {
 
 /**
  * A multi-repository environment keeps every repository in one workspace, so it
- * needs a sandbox that one session owns. The shared Cloudflare sandbox and Vercel
- * cannot give it one.
+ * needs a sandbox that one session owns. The retired shared Cloudflare sandbox
+ * and Vercel cannot give it one.
  */
 export function allocationSupportsMultiRepository(allocation: SandboxAllocation): boolean {
   return (

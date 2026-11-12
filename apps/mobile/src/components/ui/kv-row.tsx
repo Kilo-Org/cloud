@@ -1,4 +1,5 @@
 import { type LucideIcon } from '@/components/ui/icons';
+import { type ReactNode } from 'react';
 import { View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
@@ -13,6 +14,12 @@ type KvRowProps = {
   label: string;
   value: string;
   valueTone?: 'default' | KvTone;
+  /**
+   * A state that trails the value on its own ink — the status of the thing the
+   * value names. The value keeps the row's ordinary ink, so the state carries
+   * the emphasis instead of colouring the name it belongs to.
+   */
+  valueStatus?: KvStatus;
   /**
    * Renders a small colored status dot before the label to categorize the row,
    * leaving the value uncolored (mirrors the web dashboard's summary rows). Use
@@ -36,12 +43,23 @@ type KvRowProps = {
   /** Extra classes for the value text only (e.g. `uppercase` for a status readout). */
   valueClassName?: string;
   /**
+   * Replaces the spoken label of the value node (e.g. a masked amount speaks
+   * "Balance hidden" instead of the hidden characters).
+   */
+  valueAccessibilityLabel?: string;
+  /**
    * Render the value as a left-to-right run whatever the interface direction is.
    * A version, a version range and a CVE or GHSA id are written left to right,
    * so the bidi algorithm otherwise reverses a range in a right-to-left locale:
    * `< 6.13.0` paints as `6.13.0 >`, which inverts its meaning.
    */
   valueDirection?: 'ltr';
+  /**
+   * A control that belongs to this row, painted after the value at the row's
+   * trailing edge — an action for the amount beside it. The row keeps its own
+   * height, so the control shares the line instead of opening a block below.
+   */
+  trailing?: ReactNode;
 };
 
 const VALUE_TONE = {
@@ -59,19 +77,30 @@ const DOT_TONE = {
   muted: 'bg-muted-foreground',
 } satisfies Record<KvTone, string>;
 
+/**
+ * Value props for a status that trails a value on its own ink — the state of
+ * the thing the value names. The label carries its own leading separator in the
+ * catalog, so each language keeps its own spacing and the value keeps the row's
+ * ordinary colour.
+ */
+type KvStatus = Readonly<{ label: string; tone: KvTone }>;
+
 /** Label-left / value-right row with hair-soft bottom divider. */
 export function KvRow({
   icon: Icon,
   label,
   value,
   valueTone = 'default',
+  valueStatus,
   dotTone,
   valueFace = 'mono',
   last,
   className,
   selectable,
   valueClassName,
+  valueAccessibilityLabel,
   valueDirection,
+  trailing,
 }: Readonly<KvRowProps>) {
   const colors = useThemeColors();
   // Android's `selectable` routes the value through ReactTextView, which
@@ -81,6 +110,31 @@ export function KvRow({
   // row). Clamp the values that can hold it; a selectable value wraps inside
   // the row and the row grows to fit it, so no glyph is cut off.
   const valueLineLimit = selectable ? undefined : 1;
+  const valueText = (
+    <Text
+      variant={valueFace === 'mono' ? 'mono' : 'default'}
+      selectable={selectable}
+      accessibilityLabel={valueAccessibilityLabel}
+      numberOfLines={valueLineLimit}
+      ellipsizeMode={valueLineLimit ? 'middle' : undefined}
+      style={valueDirection === 'ltr' ? LTR_TEXT_DIRECTION : undefined}
+      className={cn(
+        'min-w-0 shrink text-right text-[13px]',
+        valueFace === 'numeric' && 'tabular-nums',
+        VALUE_TONE[valueTone],
+        valueClassName
+      )}
+    >
+      {value}
+      {valueStatus === undefined ? null : (
+        // The status keeps its own ink inside the value paragraph, so the name
+        // before it stays in the row's ordinary colour. It restates the value's
+        // own size, because the shared Text carries the body size by default and
+        // a nested node would otherwise paint larger than the value it follows.
+        <Text className={cn('text-[13px]', VALUE_TONE[valueStatus.tone])}>{valueStatus.label}</Text>
+      )}
+    </Text>
+  );
   return (
     <View
       className={cn(
@@ -96,21 +150,16 @@ export function KvRow({
           {label}
         </Text>
       </View>
-      <Text
-        variant={valueFace === 'mono' ? 'mono' : 'default'}
-        selectable={selectable}
-        numberOfLines={valueLineLimit}
-        ellipsizeMode={valueLineLimit ? 'middle' : undefined}
-        style={valueDirection === 'ltr' ? LTR_TEXT_DIRECTION : undefined}
-        className={cn(
-          'min-w-0 shrink text-right text-[13px]',
-          valueFace === 'numeric' && 'tabular-nums',
-          VALUE_TONE[valueTone],
-          valueClassName
-        )}
-      >
-        {value}
-      </Text>
+      {trailing === undefined ? (
+        valueText
+      ) : (
+        // The value keeps its right edge beside the control, so the pair reads
+        // as one trailing group on the row the control belongs to.
+        <View className="min-w-0 shrink flex-row items-center justify-end gap-3">
+          {valueText}
+          {trailing}
+        </View>
+      )}
     </View>
   );
 }

@@ -18,7 +18,11 @@ import { isPlatformIntegrationHealthy, platformIntegrationHealthSql } from '../c
 import { PendingInstallationMetadataWrapperSchema } from '../core/schemas';
 import type { GitHubAppType } from '../platforms/github/app-selector';
 import { canOrganizationUseMultipleGitHubInstallations } from '../github/multiple-installations';
-import { effectiveAppTypeCondition, ownerCondition } from './predicates';
+import {
+  effectiveAppTypeCondition,
+  occupiesAnotherGitHubInstallationSlot,
+  ownerCondition,
+} from './predicates';
 
 /**
  * Exact app-type scope. The writers below must not reach a row whose app type
@@ -709,12 +713,24 @@ export async function deleteGitHubInstallationRecords(
 
 /**
  * Gets all platform integrations for an organization (supports multiple)
+ *
+ * A GitHub workflow listing uses the shared organization workflow connection
+ * definition, exactly as the status and operational lookups do, so the
+ * installation an organization's connection surfaces report as connected is
+ * the one whose repositories this listing returns. The listing is also ordered
+ * by the same preference rule those lookups use, so an association that stores
+ * the workflow role comes before a roleless one that resolves to the same
+ * connection.
+ *
+ * The agent purpose keeps its stored-role scope: roleless associations are not
+ * agent connections until a policy decision says they are.
  */
 export async function getIntegrationsByOrganization(
   organizationId: string,
   platform: string,
   purpose: 'workflow' | 'agent' | 'management' = 'workflow'
 ) {
+  const isGithubWorkflow = platform === PLATFORM.GITHUB && purpose === 'workflow';
   return await db
     .select()
     .from(platform_integrations)
@@ -722,8 +738,8 @@ export async function getIntegrationsByOrganization(
       and(
         eq(platform_integrations.owned_by_organization_id, organizationId),
         eq(platform_integrations.platform, platform),
-        platform === PLATFORM.GITHUB && purpose === 'workflow'
-          ? eq(platform_integrations.github_connection_role, 'workflow')
+        isGithubWorkflow
+          ? organizationWorkflowGitHubConnectionSql()
           : platform === PLATFORM.GITHUB && purpose === 'agent'
             ? or(
                 eq(platform_integrations.github_connection_role, 'workflow'),
@@ -732,7 +748,11 @@ export async function getIntegrationsByOrganization(
             : undefined
       )
     )
-    .orderBy(asc(platform_integrations.created_at), asc(platform_integrations.id));
+    .orderBy(
+      ...(isGithubWorkflow ? [desc(organizationWorkflowGitHubPreferenceSql())] : []),
+      asc(platform_integrations.created_at),
+      asc(platform_integrations.id)
+    );
 }
 
 /**
@@ -1317,6 +1337,10 @@ export async function upsertPlatformIntegrationForOwner(
     repository_access: data.repositoryAccess,
     integration_status: INTEGRATION_STATUS.ACTIVE,
     repositories: data.repositories || null,
+    // A stored list is the snapshot the caller read from the provider for this
+    // request, so it carries its sync time; a row without one stays unsynced
+    // and the next repository read fetches a fresh list.
+    repositories_synced_at: data.repositories?.length ? now : null,
     installed_at: data.installedAt || new Date().toISOString(),
     github_app_type: appType,
     ...authorizationProvenance,
@@ -1371,23 +1395,26 @@ export async function upsertPlatformIntegrationForOwner(
 
       if (requiresOwnerCardinalityLock) {
         const ownerIntegrations = await tx
-          .select({ installationId: platform_integrations.platform_installation_id })
+          .select({
+            installationId: platform_integrations.platform_installation_id,
+            appType: platform_integrations.github_app_type,
+          })
           .from(platform_integrations)
           .where(
             and(
               eq(platform_integrations.owned_by_organization_id, owner.id),
               eq(platform_integrations.platform, PLATFORM.GITHUB),
               // A locally disconnected connection has relinquished its slot;
-              // it must not block attaching a different installation. Matches
-              // the equivalent guard in connectVerifiedGitHubInstallation.
+              // it must not block attaching a different installation.
               isNull(platform_integrations.github_disconnected_at)
             )
           );
         if (
-          ownerIntegrations.some(
-            integration =>
-              integration.installationId !== null &&
-              integration.installationId !== data.platformInstallationId
+          ownerIntegrations.some(integration =>
+            occupiesAnotherGitHubInstallationSlot(integration, {
+              installationId: data.platformInstallationId,
+              appType,
+            })
           )
         ) {
           return { ok: false, reason: 'multiple_installations_disabled' };
@@ -1411,6 +1438,7 @@ export async function upsertPlatformIntegrationForOwner(
           repository_access: values.repository_access,
           integration_status: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN ${INTEGRATION_STATUS.ACTIVE} ELSE ${platform_integrations.integration_status} END`,
           repositories: values.repositories,
+          repositories_synced_at: values.repositories_synced_at,
           github_app_type: appType,
           auth_invalid_at: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_at} END`,
           auth_invalid_reason: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_reason} END`,
@@ -1449,6 +1477,7 @@ export async function upsertPlatformIntegrationForOwner(
         repository_access: values.repository_access,
         integration_status: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN ${INTEGRATION_STATUS.ACTIVE} ELSE ${platform_integrations.integration_status} END`,
         repositories: values.repositories,
+        repositories_synced_at: values.repositories_synced_at,
         github_app_type: appType,
         auth_invalid_at: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_at} END`,
         auth_invalid_reason: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_reason} END`,
@@ -1510,23 +1539,6 @@ export async function findGitLabIntegrationByWebhookToken(
     .limit(1);
 
   return integration ?? null;
-}
-
-/**
- * Updates the metadata for a platform integration
- * Used for storing webhook configuration, tokens, etc.
- */
-export async function updateIntegrationMetadata(
-  integrationId: string,
-  metadata: Record<string, unknown>
-) {
-  await db
-    .update(platform_integrations)
-    .set({
-      metadata,
-      updated_at: new Date().toISOString(),
-    })
-    .where(eq(platform_integrations.id, integrationId));
 }
 
 /**

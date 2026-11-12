@@ -3,17 +3,15 @@
 import { useId, useState, type ReactNode } from 'react';
 import {
   ENKRYPT_DETECTOR_LIMITS,
+  ENKRYPT_OUTPUT_DETECTOR_IDS,
   ENKRYPT_PII_ENTITIES,
   type EnkryptDetectorId,
+  type EnkryptOutputDetectorId,
   type EnkryptPiiEntity,
 } from '@kilocode/db/schema-types';
-import {
-  ENKRYPT_BLOCK_DETECTOR_IDS,
-  ENKRYPT_REVISE_DETECTOR_IDS,
-} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
+import { ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import {
@@ -21,6 +19,7 @@ import {
   parseLineList,
   type EnkryptGuardrailsIssues,
   type EnkryptInputDetectorsDraft,
+  type EnkryptOutputDetectorsDraft,
 } from './enkrypt-guardrails-draft';
 import { EnkryptPolicyRulesEditor } from './EnkryptPolicyRulesEditor';
 import { FieldMessages } from './FieldMessages';
@@ -31,9 +30,14 @@ export type UpdateEnkryptDetector = <K extends EnkryptDetectorId>(
   patch: Partial<EnkryptInputDetectorsDraft[K]>
 ) => void;
 
-type ReviseDetectorId = (typeof ENKRYPT_REVISE_DETECTOR_IDS)[number];
+export type UpdateEnkryptOutputDetector = <K extends EnkryptOutputDetectorId>(
+  id: K,
+  patch: Partial<EnkryptOutputDetectorsDraft[K]>
+) => void;
 
-const DETECTOR_DETAILS: Record<EnkryptDetectorId, { label: string; description: string }> = {
+type DetectorDetails = { label: string; description: string };
+
+export const DETECTOR_DETAILS: Record<EnkryptDetectorId, DetectorDetails> = {
   injection_attack: {
     label: 'Prompt injection',
     description: 'Detects attempts to override instructions or jailbreak the model.',
@@ -72,12 +76,29 @@ const DETECTOR_DETAILS: Record<EnkryptDetectorId, { label: string; description: 
   },
 };
 
-const PII_ENTITY_DETAILS: Record<EnkryptPiiEntity, { label: string; description: string }> = {
-  pii: { label: 'Personal data', description: 'Names, email addresses, phone numbers.' },
-  secrets: { label: 'Secrets', description: 'API keys, tokens, passwords.' },
-  ip_address: { label: 'IP addresses', description: 'IPv4 and IPv6 addresses.' },
-  url: { label: 'URLs', description: 'Web addresses.' },
+const OUTPUT_DETECTOR_DETAILS: Record<EnkryptOutputDetectorId, DetectorDetails> = {
+  ...DETECTOR_DETAILS,
+  keyword_detector: {
+    label: 'Banned keywords',
+    description: 'Detects responses that contain any keyword you list.',
+  },
+  topic_detector: {
+    label: 'Topics',
+    description: 'Flags responses about any topic you list.',
+  },
+  policy_violation: {
+    label: 'Policy violation',
+    description: 'Flags responses that break your organization policy, written as text or rules.',
+  },
 };
+
+export const PII_ENTITY_DETAILS: Record<EnkryptPiiEntity, { label: string; description: string }> =
+  {
+    pii: { label: 'Personal data', description: 'Names, email addresses, phone numbers.' },
+    secrets: { label: 'Secrets', description: 'API keys, tokens, passwords.' },
+    ip_address: { label: 'IP addresses', description: 'IPv4 and IPv6 addresses.' },
+    url: { label: 'URLs', description: 'Web addresses.' },
+  };
 
 const POLICY_FORMAT_OPTIONS = [
   {
@@ -92,105 +113,127 @@ const POLICY_FORMAT_OPTIONS = [
   },
 ] as const;
 
-type ReviseChoice = 'off' | 'log' | 'block';
+type DetectorChoice = 'off' | 'log' | 'block';
 
-const REVISE_CHOICES: { value: ReviseChoice; label: string }[] = [
+const DETECTOR_CHOICES: { value: DetectorChoice; label: string }[] = [
   { value: 'off', label: 'Off' },
   { value: 'log', label: 'Log only' },
   { value: 'block', label: 'Block' },
 ];
 
+function choicePatch(choice: DetectorChoice) {
+  return choice === 'off' ? { enabled: false } : { enabled: true, action: choice };
+}
+
+/** An input detector turned off is saved without its action, so it resumes at Block. */
+function inputChoicePatch(choice: DetectorChoice) {
+  return choice === 'off' ? { enabled: false, action: 'block' as const } : choicePatch(choice);
+}
+
+/** Only the configurable detectors are shown; the gateway turns the others off. */
 export function EnkryptDetectorList({
   detectors,
   issues,
   onUpdate,
+  action,
 }: {
   detectors: EnkryptInputDetectorsDraft;
   issues: EnkryptGuardrailsIssues;
   onUpdate: UpdateEnkryptDetector;
+  action: ReactNode;
 }) {
-  const options = (id: EnkryptDetectorId) => (
-    <DetectorOptions id={id} detectors={detectors} issues={issues} onUpdate={onUpdate} />
-  );
-
   return (
-    <div className="grid gap-8">
-      <DetectorSection
-        title="Always block"
-        description="When one of these detects something, the request is blocked before it reaches the model."
-      >
-        {ENKRYPT_BLOCK_DETECTOR_IDS.map(id => (
-          <DetectorRow
-            key={id}
-            id={id}
-            enabled={detectors[id].enabled}
-            control={(labelId, descriptionId) => (
-              <Switch
-                checked={detectors[id].enabled}
-                aria-labelledby={labelId}
-                aria-describedby={descriptionId}
-                onCheckedChange={enabled => onUpdate(id, { enabled })}
-              />
-            )}
-          >
-            {options(id)}
-          </DetectorRow>
-        ))}
-      </DetectorSection>
-
-      <DetectorSection
-        title="Block or log"
-        description="Enkrypt flags these without blocking. Choose whether a detection blocks the request or is only logged, in which case the request reaches the model without waiting for the detector."
-      >
-        {ENKRYPT_REVISE_DETECTOR_IDS.map(id => (
-          <DetectorRow
-            key={id}
-            id={id}
-            enabled={detectors[id].enabled}
-            control={(labelId, descriptionId) => (
-              <ReviseChoiceControl
-                labelId={labelId}
-                descriptionId={descriptionId}
-                value={reviseChoice(detectors, id)}
-                onChange={choice =>
-                  onUpdate(
-                    id,
-                    choice === 'off' ? { enabled: false } : { enabled: true, action: choice }
-                  )
-                }
-              />
-            )}
-          >
-            {options(id)}
-          </DetectorRow>
-        ))}
-      </DetectorSection>
-    </div>
+    <DetectorSection
+      title="Detectors"
+      description="Block stops a flagged request. Log only records detections without delaying the request."
+      action={action}
+    >
+      {ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS.map(id => (
+        <DetectorRow
+          key={id}
+          details={DETECTOR_DETAILS[id]}
+          enabled={detectors[id].enabled}
+          control={(labelId, descriptionId) => (
+            <DetectorChoiceControl
+              labelId={labelId}
+              descriptionId={descriptionId}
+              value={detectorChoice(detectors[id])}
+              onChange={choice => onUpdate(id, inputChoicePatch(choice))}
+            />
+          )}
+        >
+          <DetectorOptions id={id} detectors={detectors} issues={issues} onUpdate={onUpdate} />
+        </DetectorRow>
+      ))}
+    </DetectorSection>
   );
 }
 
-function reviseChoice(detectors: EnkryptInputDetectorsDraft, id: ReviseDetectorId): ReviseChoice {
-  const detector = detectors[id];
+/**
+ * Every output detector can block or only log. A blocking one makes the gateway hold back each
+ * response until it is checked.
+ */
+export function EnkryptOutputDetectorList({
+  detectors,
+  issues,
+  onUpdate,
+}: {
+  detectors: EnkryptOutputDetectorsDraft;
+  issues: EnkryptGuardrailsIssues;
+  onUpdate: UpdateEnkryptOutputDetector;
+}) {
+  return (
+    <DetectorSection
+      title="Detectors"
+      description="Block replaces a flagged response with an error. Log only records detections without delaying the response."
+    >
+      {ENKRYPT_OUTPUT_DETECTOR_IDS.map(id => (
+        <DetectorRow
+          key={id}
+          details={OUTPUT_DETECTOR_DETAILS[id]}
+          enabled={detectors[id].enabled}
+          control={(labelId, descriptionId) => (
+            <DetectorChoiceControl
+              labelId={labelId}
+              descriptionId={descriptionId}
+              value={detectorChoice(detectors[id])}
+              onChange={choice => onUpdate(id, choicePatch(choice))}
+            />
+          )}
+        >
+          <DetectorOptions id={id} detectors={detectors} issues={issues} onUpdate={onUpdate} />
+        </DetectorRow>
+      ))}
+    </DetectorSection>
+  );
+}
+
+function detectorChoice(detector: { enabled: boolean; action: 'log' | 'block' }): DetectorChoice {
   return detector.enabled ? detector.action : 'off';
 }
 
 function DetectorSection({
   title,
   description,
+  action,
   children,
 }: {
   title: string;
   description: string;
+  action?: ReactNode;
   children: ReactNode;
 }) {
   const titleId = useId();
   return (
     <section aria-labelledby={titleId} className="grid gap-4">
-      <div className="grid gap-1">
-        <h3 id={titleId} className="text-sm font-semibold">
-          {title}
-        </h3>
-        <p className="text-muted-foreground text-sm">{description}</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="grid min-w-0 flex-1 gap-1">
+          <h4 id={titleId} className="text-sm font-semibold">
+            {title}
+          </h4>
+          <p className="text-muted-foreground text-sm">{description}</p>
+        </div>
+        {action}
       </div>
       <ul className="divide-border divide-y rounded-md border px-4">{children}</ul>
     </section>
@@ -198,19 +241,18 @@ function DetectorSection({
 }
 
 function DetectorRow({
-  id,
+  details,
   enabled,
   control,
   children,
 }: {
-  id: EnkryptDetectorId;
+  details: DetectorDetails;
   enabled: boolean;
   control: (labelId: string, descriptionId: string) => ReactNode;
   children: ReactNode;
 }) {
   const labelId = useId();
   const descriptionId = useId();
-  const details = DETECTOR_DETAILS[id];
 
   return (
     <li className="flex flex-col gap-3 py-4">
@@ -230,7 +272,7 @@ function DetectorRow({
   );
 }
 
-function ReviseChoiceControl({
+function DetectorChoiceControl({
   labelId,
   descriptionId,
   value,
@@ -238,8 +280,8 @@ function ReviseChoiceControl({
 }: {
   labelId: string;
   descriptionId: string;
-  value: ReviseChoice;
-  onChange: (value: ReviseChoice) => void;
+  value: DetectorChoice;
+  onChange: (value: DetectorChoice) => void;
 }) {
   const name = useId();
   return (
@@ -249,7 +291,7 @@ function ReviseChoiceControl({
       aria-describedby={descriptionId}
       className="bg-muted/40 inline-flex shrink-0 rounded-md border p-0.5"
     >
-      {REVISE_CHOICES.map(choice => (
+      {DETECTOR_CHOICES.map(choice => (
         <label
           key={choice.value}
           className={cn(
@@ -273,6 +315,26 @@ function ReviseChoiceControl({
   );
 }
 
+type DetectorOptionsDraft = Pick<
+  EnkryptInputDetectorsDraft,
+  'pii' | 'keyword_detector' | 'topic_detector' | 'policy_violation'
+>;
+
+type UpdateDetectorOptions = {
+  (id: 'pii', patch: Pick<DetectorOptionsDraft['pii'], 'entities'>): void;
+  (
+    id: 'keyword_detector',
+    patch: Pick<DetectorOptionsDraft['keyword_detector'], 'banned_keywords'>
+  ): void;
+  (id: 'topic_detector', patch: Pick<DetectorOptionsDraft['topic_detector'], 'topic'>): void;
+  (
+    id: 'policy_violation',
+    patch: Partial<
+      Pick<DetectorOptionsDraft['policy_violation'], 'format' | 'policy_text' | 'rules'>
+    >
+  ): void;
+};
+
 function DetectorOptions({
   id,
   detectors,
@@ -280,9 +342,9 @@ function DetectorOptions({
   onUpdate,
 }: {
   id: EnkryptDetectorId;
-  detectors: EnkryptInputDetectorsDraft;
+  detectors: DetectorOptionsDraft;
   issues: EnkryptGuardrailsIssues;
-  onUpdate: UpdateEnkryptDetector;
+  onUpdate: UpdateDetectorOptions;
 }) {
   switch (id) {
     case 'pii':

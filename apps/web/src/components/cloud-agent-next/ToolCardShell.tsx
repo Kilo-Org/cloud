@@ -1,10 +1,11 @@
 'use client';
 
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronRight, Loader2, XCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
+import { ToolDetailNotice, useToolDetail } from './ToolPartDetail';
 
 type ToolCardShellProps = {
   icon: LucideIcon;
@@ -27,6 +28,12 @@ export function ToolCardShell({
 }: ToolCardShellProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded ?? false);
   const pointerDown = useRef<{ x: number; y: number } | null>(null);
+  const detail = useToolDetail();
+  const requestDetail = detail?.request;
+  // An expanded preview reads its complete call; closed previews never fetch.
+  useEffect(() => {
+    if (isExpanded) requestDetail?.();
+  }, [isExpanded, requestDetail]);
 
   return (
     <Collapsible open={isExpanded} onOpenChange={setIsExpanded} data-tool-card>
@@ -81,9 +88,12 @@ export function ToolCardShell({
         {badge}
         <ChevronRight className={cn('size-3.5 shrink-0', isExpanded && 'rotate-90')} />
       </CollapsibleTrigger>
-      <CollapsibleContent className="border-border/60 mt-1 ml-3 space-y-2 border-l px-3 py-2">
-        {children}
-      </CollapsibleContent>
+      {isExpanded && (
+        <CollapsibleContent className="border-border/60 mt-1 ml-3 space-y-2 border-l px-3 py-2">
+          <ToolDetailNotice />
+          {children}
+        </CollapsibleContent>
+      )}
     </Collapsible>
   );
 }

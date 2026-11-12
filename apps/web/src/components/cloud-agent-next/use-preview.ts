@@ -1,30 +1,49 @@
 'use client';
 
 import { createContext, useCallback, useContext, useRef } from 'react';
-import { skipToken, useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
+import { skipToken, useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
+import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
 
-type PreviewSessionId = `workspace_${string}`;
+export function usePreviewServices(target: PreviewTarget, organizationId: string | undefined) {
+  const trpc = useTRPC();
+  const options = {
+    staleTime: 0,
+    retry: 1,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  } as const;
+  const personal = useQuery({
+    ...trpc.cloudAgentNext.listPreviewServices.queryOptions(organizationId ? skipToken : target),
+    ...options,
+  });
+  const organization = useQuery({
+    ...trpc.organizations.cloudAgentNext.listPreviewServices.queryOptions(
+      organizationId ? { ...target, organizationId } : skipToken
+    ),
+    ...options,
+  });
+  return organizationId ? organization : personal;
+}
 
 /**
- * The session's preview URL with a `{port}` placeholder, or null when the
+ * The target's preview URL with a `{port}` placeholder, or null when the
  * Worker does not serve preview for it. The answer changes only on a Worker
- * deploy, so it is read once per session; it is null while loading.
+ * deploy, so it is read once per target and organization scope; it is null
+ * while loading.
  */
 export function usePreviewUrlTemplate(
-  cloudAgentSessionId: PreviewSessionId | null,
+  target: PreviewTarget | null,
   organizationId: string | undefined
 ): string | null {
   const trpc = useTRPC();
   const query = useQuery({
     ...trpc.cloudAgentNext.getPreviewOptions.queryOptions(
-      cloudAgentSessionId ? { cloudAgentSessionId, organizationId } : skipToken
+      target ? { ...target, organizationId } : skipToken
     ),
     staleTime: Infinity,
     retry: false,
-    // Chats of a worktree share its sandbox, so a chat switch keeps the preview action in place.
-    placeholderData: keepPreviousData,
   });
   return query.data?.enabled ? query.data.urlTemplate : null;
 }
@@ -44,7 +63,7 @@ export function useOpenPreview(organizationId: string | undefined) {
   const inFlight = useRef(false);
 
   const openPreview = useCallback(
-    async (cloudAgentSessionId: PreviewSessionId, port: number, path?: string) => {
+    async (target: PreviewTarget, port: number, path?: string) => {
       if (inFlight.current) return false;
       const popup = window.open('about:blank', '_blank');
       if (!popup) {
@@ -55,7 +74,7 @@ export function useOpenPreview(organizationId: string | undefined) {
 
       inFlight.current = true;
       try {
-        const input = { cloudAgentSessionId, port, path };
+        const input = { ...target, port, path };
         const result = organizationId
           ? await createOrg({ ...input, organizationId })
           : await createPersonal(input);

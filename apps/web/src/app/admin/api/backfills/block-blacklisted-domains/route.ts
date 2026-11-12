@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { getBlacklistedDomains } from '@kilocode/web-shared/lib/blacklist-domains-config';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { listBlacklistedDomains } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import {
   backfillBlockBlacklistedDomainsBatch,
   findBlacklistedEmailDomains,
@@ -17,7 +18,7 @@ export async function GET(): Promise<
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
 
-  const domains = await getBlacklistedDomains();
+  const domains = await listBlacklistedDomains(readDb);
   if (domains.length === 0) {
     return NextResponse.json({ unblocked: 0 });
   }
@@ -34,7 +35,7 @@ export async function POST(): Promise<
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
 
-  const domains = await getBlacklistedDomains();
+  const domains = await listBlacklistedDomains();
   return NextResponse.json(
     await backfillBlockBlacklistedDomainsBatch({ actorId: user.id, domains })
   );

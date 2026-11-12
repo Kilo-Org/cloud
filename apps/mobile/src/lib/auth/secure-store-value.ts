@@ -16,9 +16,7 @@ export type SecureStoreReadOptions = SecureStore.SecureStoreOptions;
  * match on the exact argument list, so a call that passed no options must stay
  * a one-argument call.
  */
-export function secureStoreOptionsArgs(
-  options?: SecureStoreReadOptions
-): [] | [SecureStoreReadOptions] {
+function secureStoreOptionsArgs(options?: SecureStoreReadOptions): [] | [SecureStoreReadOptions] {
   return options === undefined ? [] : [options];
 }
 

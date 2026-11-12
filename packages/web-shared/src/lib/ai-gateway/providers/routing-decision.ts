@@ -1,5 +1,8 @@
 import * as z from 'zod';
-import { EnkryptGuardrailReportSchema } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
+import {
+  EnkryptGuardrailReportSchema,
+  EnkryptOutputGuardrailReportSchema,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import {
   UserByokProviderIdSchema,
   type UserByokProviderId,
@@ -108,6 +111,17 @@ const RoutingDecisionStepSchema = z.union([
     outcome: z.literal('deferred'),
     reason: z.literal('catalog-key-serves'),
   }),
+  z.object({ step: z.literal('claude-billing'), outcome: z.literal('selected') }),
+  z.object({
+    step: z.literal('claude-billing'),
+    outcome: z.literal('rejected'),
+    reason: z.enum(['unavailable', 'reconnect']),
+  }),
+  z.object({
+    step: z.literal('claude-billing'),
+    outcome: z.literal('skipped'),
+    reason: z.literal('unavailable'),
+  }),
   z.object({
     step: z.literal('byok-key'),
     outcome: z.literal('selected'),
@@ -142,6 +156,7 @@ const SelectedRouteSchema = z.enum([
   'custom-llm',
   'direct-byok-model',
   'chatgpt',
+  'claude-billing',
   ...ByokCandidateRouteSchema.options,
   'unsupported-api-kind',
   'kilo',
@@ -155,6 +170,7 @@ const PayerSchema = z.enum([
   'custom-llm-credential',
   'owner-byok-key',
   'chatgpt-subscription',
+  'customer-claude-organization',
   'kilo',
 ]);
 
@@ -170,7 +186,13 @@ const RoutingDecisionResultSchema = z.discriminatedUnion('kind', [
     is_free: z.boolean(),
   }),
   z.object({
-    kind: z.enum(['chatgpt-reconnect', 'custom-llm-unavailable', 'direct-byok-catalog-only']),
+    kind: z.enum([
+      'chatgpt-reconnect',
+      'claude-billing-unavailable',
+      'claude-billing-reconnect',
+      'custom-llm-unavailable',
+      'direct-byok-catalog-only',
+    ]),
   }),
 ]);
 
@@ -187,6 +209,28 @@ const ProviderRoutingDecisionSchema = z.object({
 
 export type ProviderRoutingDecision = z.infer<typeof ProviderRoutingDecisionSchema>;
 
+const ByokFailoverAttemptSchema = z.object({
+  provider_type: ProviderTypeSchema,
+  byok_provider_ids: z.array(UserByokProviderIdSchema),
+  status: z.number().int(),
+  /** A machine-readable code from the error body, such as `rate_limit_error`; never its message. */
+  error_code: z.string().optional(),
+  /** Until the upstream answered with response headers, or failed without them. */
+  duration_ms: z.number().int().nonnegative(),
+  /** `failed-over`: the next BYOK key took the request. The last attempt is `served` or `failed`. */
+  outcome: z.enum(['failed-over', 'served', 'failed']),
+  /**
+   * On a final `failed` attempt, why no further key was tried: none of the remaining keys could take
+   * the request, the shared upstream budget ran out, the client went away, or the gateway the key
+   * routes through does not list the model.
+   */
+  stop_reason: z
+    .enum(['no-keys-left', 'budget-exhausted', 'client-disconnected', 'model-unavailable'])
+    .optional(),
+});
+
+export type ByokFailoverAttempt = z.infer<typeof ByokFailoverAttemptSchema>;
+
 /** A `<usage_id>.json` object in the AI provider metadata bucket. */
 export const KiloRoutingDecisionRecordSchema = ProviderRoutingDecisionSchema.extend({
   schema_version: z.literal(1),
@@ -200,6 +244,10 @@ export const KiloRoutingDecisionRecordSchema = ProviderRoutingDecisionSchema.ext
     .optional(),
   /** The organization's Enkrypt input guardrail, when it applied to the request. */
   enkrypt: EnkryptGuardrailReportSchema.optional(),
+  /** The organization's Enkrypt output guardrail, when it applied to the response. */
+  enkrypt_output: EnkryptOutputGuardrailReportSchema.optional(),
+  /** Every upstream attempt, in order, when a failing BYOK key failed over to the owner's next key. */
+  byok_failover_attempts: z.array(ByokFailoverAttemptSchema).optional(),
 });
 
 export type KiloRoutingDecisionRecord = z.infer<typeof KiloRoutingDecisionRecordSchema>;
@@ -232,6 +280,8 @@ function payerOf(route: SelectedRoute): Payer {
       return 'custom-llm-credential';
     case 'chatgpt':
       return 'chatgpt-subscription';
+    case 'claude-billing':
+      return 'customer-claude-organization';
     case 'kilo':
       return 'kilo';
     case 'direct-byok-model':

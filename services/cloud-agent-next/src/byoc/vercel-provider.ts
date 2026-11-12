@@ -1,6 +1,7 @@
 import type { ByocVercelOwner } from './vercel-owner.js';
 import type { Env } from '../types.js';
 import type { ProviderAdapter } from '../sandbox-control/provider.js';
+import { ProviderSnapshotCreationError } from '../sandbox-control/provider.js';
 import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
 import type { SessionCredentialGrant } from '../sandbox-control/session-credentials.js';
 import {
@@ -8,6 +9,7 @@ import {
   type VercelProviderLocator,
 } from '../sandbox-control/vercel-provider.js';
 import { VercelSandboxRestError } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
+import { vercelSnapshotBaseImage } from './vercel-snapshot-compatibility.js';
 import {
   ByocCredentialMissingError,
   ByocVercelNotReadyError,
@@ -40,6 +42,7 @@ export function createByocVercelProviderAdapter(deps: {
   sandboxName: string;
   resources?: VercelSandboxResources;
   locator?: VercelProviderLocator | null;
+  persistRuntimeLocator?: (locator: VercelProviderLocator) => Promise<void>;
   readContainedGrants: () => Promise<readonly SessionCredentialGrant[]>;
   readAcceptedRuntimeProxyHandles?: () => Promise<ReadonlyMap<string, readonly string[]>>;
 }): ProviderAdapter {
@@ -52,6 +55,7 @@ export function createByocVercelProviderAdapter(deps: {
   }
 
   return {
+    environmentSnapshots: 'create',
     ensureBillingAdmission: async () => {},
     async create(intent) {
       let snapshot: ByocVercelRuntimeSnapshot | undefined;
@@ -59,11 +63,39 @@ export function createByocVercelProviderAdapter(deps: {
         const config = await resolveByocVercelRuntimeConfig(deps.env, deps.source, value => {
           snapshot = value;
         });
+        await deps.persistRuntimeLocator?.({
+          teamId: config.teamId,
+          projectId: config.projectId,
+          snapshotId: config.snapshotId,
+          runtimeBuildId: config.runtimeBuildId,
+          runtime: config.runtime,
+        });
         const adapter = createVercelProviderAdapter({
           ...deps,
           config: { ...config, resources: deps.resources },
         });
-        return await adapter.create(intent);
+        const requested = intent.snapshot;
+        const compatible =
+          requested?.provider === 'vercel' &&
+          requested.baseImage ===
+            vercelSnapshotBaseImage({
+              ...config,
+              credentialId: deps.source.credentialId,
+              baseSnapshotId: config.snapshotId,
+            });
+        if (requested !== undefined && !compatible)
+          throw new ProviderSnapshotCreationError('image_mismatch');
+        try {
+          return await adapter.create(intent);
+        } catch (error) {
+          if (
+            requested !== undefined &&
+            error instanceof VercelSandboxRestError &&
+            (error.status === 404 || error.status === 410)
+          )
+            throw new ProviderSnapshotCreationError('missing');
+          throw error;
+        }
       } catch (error) {
         if (error instanceof ByocCredentialMissingError)
           throw new ByocVercelProviderError(error.code);

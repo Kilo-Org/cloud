@@ -3,7 +3,9 @@ import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import {
   mapModelIdToVercel,
+  mapResolvedModelIdToVercel,
   mapResolvedModelIdToVercelWithoutOverrides,
+  mapVercelModelIdToOpenRouter,
   readVercelModelIdOverrides,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { AUTO_SMALL_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
@@ -117,4 +119,49 @@ describe('mapModelIdToVercel', () => {
       AUTO_SMALL_TARGET_MODELS.paid
     );
   });
+});
+
+describe('mapVercelModelIdToOpenRouter', () => {
+  const overrideMap = new Map(overrides.map(o => [o.openrouter_model_id, o.vercel_model_id]));
+
+  it.each([
+    ['bytedance/seed-1.8', 'bytedance-seed/seed-1.8'],
+    ['mistral/mistral-large-4', 'mistralai/mistral-large-4'],
+    ['alibaba/qwen3.5-flash', 'qwen/qwen3.5-flash'],
+    ['spacexai/grok-4.20-reasoning', 'x-ai/grok-4.20-reasoning'],
+    ['zai/glm-5.3-fast', 'z-ai/glm-5.3-fast'],
+  ])('reverses the prefix of %s to %s', (vercelModelId, expected) => {
+    expect(mapVercelModelIdToOpenRouter(vercelModelId, new Map())).toBe(expected);
+  });
+
+  it('leaves an unmapped prefix and an id without a slash unchanged', () => {
+    expect(mapVercelModelIdToOpenRouter('amazon/nova-pro', new Map())).toBe('amazon/nova-pro');
+    expect(mapVercelModelIdToOpenRouter('some-model', new Map())).toBe('some-model');
+  });
+
+  it('prefers the OpenRouter id of an override', () => {
+    expect(mapVercelModelIdToOpenRouter('alibaba/qwen-3-14b', overrideMap)).toBe('qwen/qwen3-14b');
+    expect(mapVercelModelIdToOpenRouter('meta/muse-wonder-1.0', overrideMap)).toBe(
+      'meta/muse-wonder'
+    );
+  });
+
+  it('returns undefined when an override sends the reversed id to another Vercel model', () => {
+    expect(
+      mapVercelModelIdToOpenRouter('alibaba/qwen-max', new Map([['qwen/qwen-max', 'other/model']]))
+    ).toBeUndefined();
+  });
+
+  it('returns undefined when the forward prefix rewrite cannot produce the id', () => {
+    expect(mapVercelModelIdToOpenRouter('x-ai/grok-4', new Map())).toBeUndefined();
+  });
+
+  it.each(['bytedance/seed-1.8', 'alibaba/qwen-3-14b', 'openai/gpt-5-fast', 'zai/glm-5.3-fast'])(
+    'round-trips %s through mapResolvedModelIdToVercel',
+    vercelModelId => {
+      const openRouterModelId = mapVercelModelIdToOpenRouter(vercelModelId, overrideMap);
+      expect(openRouterModelId).toBeDefined();
+      expect(mapResolvedModelIdToVercel(openRouterModelId ?? '', overrideMap)).toBe(vercelModelId);
+    }
+  );
 });

@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { InfraError } from './capture';
+import { scopeToFocusedRoute } from './route-scope';
 import { parseDump, type ProbeDump } from './tree';
 
 export type MetroPage = Readonly<{
@@ -321,7 +322,10 @@ export function createProbeClient(options: ProbeClientOptions): ProbeClient {
       const json = await call(`${PROBE}.dump()`);
       if (typeof json !== 'string')
         throw new InfraError('Design gate probe dump() did not return a string');
-      return parseDump(json);
+      // Every read of the probe passes here, so the settle loop, the capture
+      // bracket and the layout rules all judge the focused screen alone rather
+      // than a background tab that keeps re-laying itself out behind it.
+      return scopeToFocusedRoute(parseDump(json));
     },
     setLanguage: async (preference, resolved) => {
       await run('setLanguage', preference, resolved);
@@ -338,7 +342,16 @@ export function createProbeClient(options: ProbeClientOptions): ProbeClient {
     startSampling: async (intervalMs, maxMs) => {
       await run('startSampling', intervalMs, maxMs);
     },
-    stopSampling: async () => parseSamples(await text('stopSampling')),
+    stopSampling: async () => {
+      const sampled = parseSamples(await text('stopSampling'));
+      return {
+        truncated: sampled.truncated,
+        samples: sampled.samples.map(sample => ({
+          ...sample,
+          dump: scopeToFocusedRoute(sample.dump),
+        })),
+      };
+    },
     disconnect,
   };
 }

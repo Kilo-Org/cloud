@@ -25,6 +25,7 @@ import {
   rejectDisallowedUpstreamUrls,
   rejectUpstreamRedirect,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
+import { fetchClaudeWithRetry } from '@kilocode/web-shared/lib/auth/claude/http';
 
 type UpstreamFetchFailureFamily =
   | 'request_timeout'
@@ -53,7 +54,7 @@ type UpstreamFetchFailureFamily =
  * header wait after 300s (`headersTimeout`, surfaced as UND_ERR_HEADERS_TIMEOUT
  * and classified `headers_timeout`), and that limit stops once headers arrive.
  */
-const UPSTREAM_DURATION_BUDGET_MS = 10 * 60 * 1000;
+export const UPSTREAM_DURATION_BUDGET_MS = 10 * 60 * 1000;
 
 function formatSeconds(ms: number): string {
   return `${Number((ms / 1000).toFixed(1))}s`;
@@ -297,6 +298,7 @@ export async function upstreamRequest({
   signal,
   vercelRequestId,
   reasoningEffort,
+  durationBudgetMs,
 }: {
   chatApi: GatewayChatApiKind;
   search: string;
@@ -308,6 +310,8 @@ export async function upstreamRequest({
   /** Incoming `x-vercel-id`, used to correlate failures with the platform logs. */
   vercelRequestId?: string | null;
   reasoningEffort: string | null;
+  /** At most `UPSTREAM_DURATION_BUDGET_MS`; less when an earlier attempt of the invocation spent part of it. */
+  durationBudgetMs: number;
 }): Promise<{ type: 'success'; response: Response } | { type: 'error'; response: NextResponse }> {
   const headers = new Headers();
   for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
@@ -336,9 +340,9 @@ export async function upstreamRequest({
   // AbortSignal.timeout keeps its timer unref'd; re-aborting through our own
   // controller lets the abort reason say which phase the budget ran out in.
   const timeoutController = new AbortController();
-  const budgetSignal = AbortSignal.timeout(UPSTREAM_DURATION_BUDGET_MS);
+  const budgetSignal = AbortSignal.timeout(durationBudgetMs);
   const onBudgetExceeded = () => {
-    const reason = new UpstreamTimeoutError(UPSTREAM_DURATION_BUDGET_MS, headersReceivedAfterMs);
+    const reason = new UpstreamTimeoutError(durationBudgetMs, headersReceivedAfterMs);
     errorExceptInTest(`[upstreamRequest] ${reason.message}`, {
       vercelRequestId: vercelRequestId ?? '<none>',
       phase: headersReceivedAfterMs === null ? 'headers' : 'stream',
@@ -392,15 +396,23 @@ export async function upstreamRequest({
       return { type: 'error', response: urlRejection };
     }
 
-    const response = await fetch(outgoing.url, {
+    const requestOptions: RequestInit & { duplex: 'half' } = {
       method,
       headers: outgoing.headers,
       body: outgoing.body,
       redirect: enforceUrlPolicy ? 'manual' : 'follow',
-      // @ts-expect-error see https://github.com/node-fetch/node-fetch/issues/1769
       duplex: 'half',
       signal: combinedSignal,
-    });
+    };
+    const response =
+      provider.type === 'claude-billing'
+        ? await fetchClaudeWithRetry(
+            outgoing.url,
+            async () => requestOptions,
+            status => status === 503,
+            combinedSignal
+          )
+        : await fetch(outgoing.url, requestOptions);
     headersReceivedAfterMs = performance.now() - fetchStartedAt;
     const redirectRejection = enforceUrlPolicy
       ? await rejectUpstreamRedirect({

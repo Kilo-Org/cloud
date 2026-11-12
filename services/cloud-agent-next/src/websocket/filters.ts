@@ -59,6 +59,12 @@ function parseTimestamp(value: string | null): number | undefined {
 export function parseStreamFilters(url: URL, sessionId: SessionId): StreamFilters {
   const filters: StreamFilters = { sessionId };
 
+  const afterCursor = url.searchParams.get('afterCursor');
+  if (afterCursor !== null && /^(0|[1-9][0-9]*)$/.test(afterCursor)) {
+    const parsed = Number(afterCursor);
+    if (Number.isSafeInteger(parsed)) filters.afterCursor = parsed;
+  }
+
   const fromIdParam = url.searchParams.get('fromId');
   if (fromIdParam) {
     const parsed = parseInt(fromIdParam, 10);
@@ -79,6 +85,7 @@ export function parseStreamFilters(url: URL, sessionId: SessionId): StreamFilter
 
   filters.startTime = parseTimestamp(url.searchParams.get('startTime'));
   filters.endTime = parseTimestamp(url.searchParams.get('endTime'));
+  if (url.searchParams.get('toolDisplay') === 'preview') filters.toolDisplay = 'preview';
 
   return filters;
 }

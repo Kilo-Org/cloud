@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { glanceableAgentsSnapshotSchema } from '@kilocode/app-shared/glanceable-agents-snapshot';
+
 import { pushDataSchema } from './push-data';
 
 describe('pushDataSchema agent_briefing', () => {
@@ -356,5 +358,97 @@ describe('pushDataSchema active_agents_glanceable', () => {
     expect(pushDataSchema.safeParse({ ...glanceablePayload, needsApproval: 1.5 }).success).toBe(
       false
     );
+  });
+});
+
+describe('pushDataSchema active_agents_glanceable snapshot shape', () => {
+  const fullSnapshot = {
+    schemaVersion: 1,
+    revision: 4,
+    scopeKey: 'deadbeef',
+    organizationBound: true,
+    status: 'waiting',
+    running: 1,
+    needsInput: 2,
+    needsApproval: 1,
+    idle: 0,
+    scheduled: 1,
+    updatedAt: '2026-08-27T10:00:00.000Z',
+    expiresAt: '2026-08-27T18:00:00.000Z',
+    needsInputSince: '2026-08-27T09:00:00.000Z',
+    scheduledAt: '2026-08-27T11:00:00.000Z',
+    newestResultKind: 'needsInput',
+    newestResultAt: '2026-08-27T09:00:00.000Z',
+  } as const;
+
+  it('agrees with the shared snapshot schema on every field bound and default', () => {
+    // The push member carries the one snapshot shape, so a field cannot be
+    // accepted, bounded or defaulted one way here and another way there.
+    const bodies = [
+      fullSnapshot,
+      {
+        schemaVersion: 1,
+        revision: 1,
+        scopeKey: 'deadbeef',
+        organizationBound: false,
+        status: 'happy',
+        running: 0,
+        needsInput: 0,
+        idle: 1,
+        updatedAt: '2026-08-27T10:00:00.000Z',
+        expiresAt: '2026-08-27T18:00:00.000Z',
+        needsInputSince: null,
+      },
+      { ...fullSnapshot, revision: 0 },
+      { ...fullSnapshot, running: -1 },
+      { ...fullSnapshot, needsApproval: 1.5 },
+      { ...fullSnapshot, scopeKey: '' },
+      { ...fullSnapshot, status: 'unknown' },
+      { ...fullSnapshot, needsInputSince: undefined },
+    ];
+    for (const body of bodies) {
+      const member = pushDataSchema.safeParse({ type: 'active_agents_glanceable', ...body });
+      const shared = glanceableAgentsSnapshotSchema.safeParse(body);
+      expect(member.success).toBe(shared.success);
+      if (member.success && shared.success) {
+        expect(member.data).toEqual({ type: 'active_agents_glanceable', ...shared.data });
+      }
+    }
+  });
+
+  it('leaves out the client-set account epoch a server could not know', () => {
+    const parsed = pushDataSchema.parse({
+      type: 'active_agents_glanceable',
+      ...fullSnapshot,
+      accountEpoch: 7,
+    });
+    expect('organizationBound' in parsed).toBe(true);
+    expect('accountEpoch' in parsed).toBe(false);
+  });
+});
+
+describe('pushDataSchema session_live_update approvalKey', () => {
+  const sessionLiveUpdate = (approvalKey: unknown) => ({
+    type: 'session_live_update',
+    schemaVersion: 1,
+    event: 'update',
+    content: {
+      sessionId: 'session-1',
+      title: null,
+      statusKind: 'needsInput',
+      statusSince: '2026-11-12T09:00:00.000Z',
+      scheduledAt: null,
+      awaitingPermission: approvalKey !== null,
+      approvalKey,
+      updatedAt: '2026-11-12T09:01:00.000Z',
+    },
+  });
+
+  it('accepts lowercase SHA-256 hex and null, and nothing else', () => {
+    expect(pushDataSchema.safeParse(sessionLiveUpdate('a'.repeat(64))).success).toBe(true);
+    expect(pushDataSchema.safeParse(sessionLiveUpdate(null)).success).toBe(true);
+    for (const key of ['a'.repeat(63), 'a'.repeat(65), 'A'.repeat(64), 'per_raw_permission', '']) {
+      expect(pushDataSchema.safeParse(sessionLiveUpdate(key)).success).toBe(false);
+    }
   });
 });

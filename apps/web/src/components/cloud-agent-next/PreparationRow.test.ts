@@ -5,6 +5,52 @@ import { PreparationRow } from './PreparationRow';
 
 Object.assign(globalThis, { React });
 
+describe('PreparationRow failed command rows', () => {
+  it('shows a non-fatal failed start command under the completed summary', () => {
+    const attempt: PreparationAttempt = {
+      id: 'attempt-1',
+      triggerMessageId: 'message-1',
+      status: 'completed',
+      startedAt: 1000,
+      completedAt: 2000,
+      revision: 2,
+      steps: [
+        {
+          id: 'start',
+          key: 'start_commands',
+          kind: 'phase',
+          label: 'start commands',
+          status: 'completed',
+          startedAt: 1000,
+          revision: 1,
+        },
+        {
+          id: 'command-1',
+          key: 'start_commands',
+          kind: 'setup_command',
+          label: 'Start command 1',
+          command: 'pnpm dev:start',
+          commandIndex: 0,
+          commandCount: 2,
+          parentStepId: 'start',
+          status: 'failed',
+          exitCode: 1,
+          safeError: 'Start command 1 failed',
+          startedAt: 1000,
+          revision: 1,
+        },
+      ],
+    };
+    const markup = renderToStaticMarkup(
+      React.createElement(PreparationRow, { attempt, onOpenDetails: jest.fn() })
+    );
+
+    expect(markup).toContain('Environment prepared');
+    expect(markup).toContain('Start command 1 of 2 (`pnpm dev:start`) exited 1');
+    expect(markup).toContain('View output');
+  });
+});
+
 describe('PreparationRow output ticker', () => {
   it('fits the indented output preview within the row instead of adding margin to full width', () => {
     const attempt: PreparationAttempt = {

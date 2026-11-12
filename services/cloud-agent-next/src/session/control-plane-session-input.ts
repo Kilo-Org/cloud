@@ -24,7 +24,6 @@ import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { Env, SandboxId } from '../types.js';
 import type { SessionId } from '../types/ids.js';
 import { buildSandboxBillingInput } from '../container-usage-context.js';
-import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
 import { buildSignedPromptAttachments } from '../execution/attachment-prompt-parts.js';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import { CODE_REVIEW_CONTAINERS_INSTANCE } from '../sandbox-containers/instance-size.js';
@@ -86,10 +85,20 @@ export async function buildControlPlaneMessagePayload(input: {
         })
       : [];
   const mode = input.agentOverride?.mode ?? input.metadata.agent?.mode;
-  const model = input.agentOverride?.model ?? input.metadata.agent?.model;
+  const modelOverride = input.agentOverride?.model;
+  const model = modelOverride ?? input.metadata.agent?.model;
   if (mode === undefined || (input.turn.type === 'prompt' && model === undefined)) {
     throw new ControlPlaneMessageInputError('Session is missing a valid agent selection');
   }
+  // Variants are model-specific. Only inherit the stored variant when the turn
+  // keeps the stored model; an override that switches models must not pair the
+  // new model with a variant meant for the old one.
+  const keepsStoredModel =
+    modelOverride === undefined ||
+    dispatchedKilocodeModelId(modelOverride) ===
+      dispatchedKilocodeModelId(input.metadata.agent?.model);
+  const variant =
+    input.agentOverride?.variant ?? (keepsStoredModel ? input.metadata.agent?.variant : undefined);
   return buildControlPlanePromptPayload({
     messageId,
     turn: input.turn,
@@ -98,9 +107,7 @@ export async function buildControlPlaneMessagePayload(input: {
     agent: {
       mode,
       ...(model === undefined ? {} : { model }),
-      ...((input.agentOverride?.variant ?? input.metadata.agent?.variant) === undefined
-        ? {}
-        : { variant: input.agentOverride?.variant ?? input.metadata.agent?.variant }),
+      ...(variant === undefined ? {} : { variant }),
     },
   });
 }
@@ -163,7 +170,7 @@ export function buildControlPlanePromptPayload(input: {
  */
 export function buildControlPlaneSandboxSelection(
   metadata: SessionMetadata,
-  env: Env,
+  _env: Env,
   sandboxId: SandboxId
 ): ControlPlaneSandboxSelection {
   const provider = metadata.workspace?.sandboxProvider ?? 'cloudflare';
@@ -184,11 +191,7 @@ export function buildControlPlaneSandboxSelection(
       ...(sandboxKind ? { sandboxKind } : {}),
     };
   }
-  const enforcementRequested = isCloudAgentContainerBillingEnabled(env, metadata.identity);
-  const billing = {
-    ...buildSandboxBillingInput(metadata, sandboxId, enforcementRequested),
-    enforcementRequested,
-  };
+  const billing = buildSandboxBillingInput(metadata, sandboxId);
   const pinned = {
     billing,
     ...(sandboxKind ? { sandboxKind } : {}),

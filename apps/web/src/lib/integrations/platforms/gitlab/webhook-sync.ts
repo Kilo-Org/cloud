@@ -60,7 +60,15 @@ export async function syncWebhooksForRepositories(
 
   const updatedWebhooks: Record<string, ConfiguredWebhook> = { ...configuredWebhooks };
 
-  const addedRepos = selectedRepositoryIds.filter(id => !previousRepositoryIds.includes(id));
+  // A selected repository needs a Kilo webhook unless the stored configuration
+  // already records one for it. A create that failed records nothing, so the
+  // next save that carries the same selection must attempt it again instead of
+  // treating it as unchanged; the rotate path passes an empty previous
+  // selection for the same reason. Removals still diff against the previous
+  // selection, which is what deletes a hook for a repository that was dropped.
+  const addedRepos = selectedRepositoryIds.filter(
+    id => !previousRepositoryIds.includes(id) || configuredWebhooks[String(id)] === undefined
+  );
 
   const removedRepos = previousRepositoryIds.filter(id => !selectedRepositoryIds.includes(id));
 

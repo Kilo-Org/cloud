@@ -16,23 +16,50 @@ type SessionContextMetricsProps = {
   info: SessionContextInfo | undefined;
   totalCostMicrodollars: number | null;
   /**
-   * Empty sessions reserve the pill's layout box. `onPress` decides whether the
+   * Empty sessions keep the pill's layout box. `onPress` decides whether the
    * pill is live — the parent passes it whenever the context sheet can open —
-   * so the reserved box never swallows a tap.
+   * so the box never swallows a tap.
    */
   hasMessages: boolean;
   autoApproveAvailable?: boolean;
   onPress?: () => void;
   /**
-   * Marks the unresolved-session placeholder. The layout box stays reserved so
-   * the header does not shift; the pill itself stays hidden only while there is
-   * nothing to open.
+   * Marks the unresolved-session placeholder. The pill stays hidden while there
+   * is nothing to open.
    */
   loading?: boolean;
+  /**
+   * Marks a settled session that will never report usage and cannot open any
+   * sheet: an empty stored transcript reports no usage, and its sheet has no
+   * permission settings (read-only sessions cannot auto-approve). The pill then
+   * stays hidden, because the track-only ring would read as a permanent
+   * placeholder beside the finished empty state.
+   */
+  onNothingToReport?: boolean;
 };
 
 const RING_SIZE = 28;
 const RING_STROKE = 3;
+
+/**
+ * The pill hugs what it holds: the ring, then the values the session has
+ * reported. `gap-2` keeps the reading clear of the ring, and the value row's own
+ * `gap-1` separates the percentage from the cost, so the three parts of a
+ * settled reading each stand on their own.
+ *
+ * The pill is the cluster's leading control, beside the trailing action, so a
+ * reading that arrives widens it into the row and the heading beside it gives up
+ * that width — the heading keeps its own line cap and tail ellipsis. `shrink
+ * min-w-0` keeps the pill inside the header's capped trailing slot: RN's default
+ * flexShrink is 0, so without them a long reading would paint past the row's
+ * right edge. The percentage is a few glyphs at most, so it keeps its width; the
+ * cost is the only unbounded part, so it is the one that truncates to one line.
+ */
+const PILL_CLASS =
+  'h-[44px] shrink min-w-0 flex-row items-center gap-2 rounded-full border border-border bg-secondary px-3';
+const VALUE_ROW_CLASS = 'min-w-0 shrink flex-row items-baseline gap-1';
+const PRIMARY_VALUE_CLASS = 'shrink-0 text-xs tabular-nums';
+const COST_VALUE_CLASS = 'min-w-0 shrink text-xs tabular-nums';
 
 const TONE_TEXT_CLASS = {
   destructive: 'text-destructive',
@@ -41,10 +68,6 @@ const TONE_TEXT_CLASS = {
   neutral: 'text-foreground',
 } satisfies Record<ContextTone, string>;
 
-function toneTextClass(tone: ContextTone): string {
-  return TONE_TEXT_CLASS[tone];
-}
-
 export function SessionContextMetrics({
   info,
   totalCostMicrodollars,
@@ -52,6 +75,7 @@ export function SessionContextMetrics({
   autoApproveAvailable = false,
   onPress,
   loading = false,
+  onNothingToReport = false,
 }: Readonly<SessionContextMetricsProps>) {
   const content = getHeaderPillContent({ info, totalCostMicrodollars, hasMessages, loading });
   // This pill is the only way into the session's context sheet, which owns the
@@ -61,10 +85,13 @@ export function SessionContextMetrics({
   // whose transcript is still loading — or failed to load — must not leave its
   // settings behind a control that looks dead or an invisible tap target.
   const pressable = onPress != null;
-  // Without an `onPress` this is the unresolved-session placeholder: the layout
-  // box keeps its space in every state, and stays invisible while there is
-  // nothing to open.
-  const hidden = !pressable && (loading || (!hasMessages && !autoApproveAvailable));
+  // Without an `onPress` this is the unresolved-session placeholder: the box
+  // keeps its space in every state, and stays invisible while there is nothing
+  // to open. A settled session that will never report usage and cannot open the
+  // sheet hides the same way, so its value never paints as a permanent
+  // placeholder.
+  const hidden =
+    !pressable && (loading || (!hasMessages && !autoApproveAvailable) || onNothingToReport);
   const accessibilityLabel = getMetricsAccessibilityLabel({
     info,
     totalCostMicrodollars,
@@ -72,16 +99,16 @@ export function SessionContextMetrics({
     usageUnavailable: content.usageUnavailable,
   });
 
-  // Exactly 44pt via h-[44px]. rem-scaled h-11 measured ~38.7pt on device with
-  // NativeWind 5 preview (rem ≈ 14px here), so an arbitrary px value is required
-  // for the 44pt minimum touch target; height is identical in every pill state.
-  // `shrink min-w-0` lets the pill compress inside the header's capped trailing
-  // slot: RN's default flexShrink is 0, so without them the pill keeps its
-  // natural width and paints past the row's right edge, off-screen. The cost is
-  // the only unbounded text in the pill, so both text slots truncate to one
-  // line instead of painting past the pill.
-  const pillClassName =
-    'h-[44px] shrink min-w-0 flex-row items-center gap-2 rounded-full border border-border bg-secondary px-3';
+  // A value has no placeholder: the percentage paints once the session reports
+  // it, and the cost paints once it is known, so the pill never stands a dash in
+  // for a number that has not arrived. A session that reported tokens but no
+  // context window has no honest percentage either, so its slot paints nothing;
+  // the ring's indeterminate arc, the accessibility label and the context sheet
+  // carry the unknown.
+  const costLabel =
+    content.costSlot === 'label' && content.secondary !== null
+      ? isolateLtrBidiText(content.secondary)
+      : null;
 
   const body = (
     <>
@@ -91,25 +118,24 @@ export function SessionContextMetrics({
         arcFraction={content.arcFraction}
         tone={content.tone}
       />
-      {content.primary != null ? (
-        <View className="min-w-0 shrink flex-row items-baseline gap-1">
-          <Text
-            numberOfLines={1}
-            className={cn(
-              'min-w-0 shrink text-xs font-semibold tabular-nums',
-              toneTextClass(content.tone)
-            )}
-          >
-            {content.primary}
-          </Text>
-          {content.hasCost && content.secondary ? (
+      {content.primary !== null || costLabel !== null ? (
+        <View className={VALUE_ROW_CLASS}>
+          {content.primary !== null ? (
             <Text
               numberOfLines={1}
-              className="min-w-0 shrink text-xs tabular-nums text-muted-foreground"
+              className={cn(PRIMARY_VALUE_CLASS, 'font-semibold', TONE_TEXT_CLASS[content.tone])}
+            >
+              {content.primary}
+            </Text>
+          ) : null}
+          {costLabel !== null ? (
+            <Text
+              numberOfLines={1}
+              className={cn(COST_VALUE_CLASS, 'text-muted-foreground')}
               accessibilityElementsHidden
               importantForAccessibility="no"
             >
-              {isolateLtrBidiText(content.secondary)}
+              {costLabel}
             </Text>
           ) : null}
         </View>
@@ -124,7 +150,7 @@ export function SessionContextMetrics({
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         hitSlop={8}
-        className={cn(pillClassName, 'active:opacity-70')}
+        className={cn(PILL_CLASS, 'active:opacity-70')}
         testID="session-context-metrics"
       >
         {body}
@@ -138,7 +164,7 @@ export function SessionContextMetrics({
       {...(hidden
         ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
         : {})}
-      className={cn(pillClassName, hidden && 'opacity-0')}
+      className={cn(PILL_CLASS, hidden && 'opacity-0')}
       testID="session-context-metrics"
     >
       {body}

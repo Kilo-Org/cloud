@@ -411,6 +411,7 @@ describe('applyReasoningDetailsTransform', () => {
             content: 'hi',
             reasoning_details: [
               { type: 'reasoning.text' as const, text: 'thinking ', signature: null },
+              { type: 'reasoning.summary' as const, summary: 'summary must not be transplanted' },
               { type: 'reasoning.encrypted' as const, data: 'opaque-blob' },
               { type: 'reasoning.text' as const, text: 'hard' },
             ],
@@ -525,6 +526,157 @@ describe('applyReasoningDetailsTransform', () => {
 
     expect(assistant).not.toHaveProperty('reasoning');
     expect(assistant.reasoning_content).toBe('upstream thinking');
+  });
+
+  it('keeps a legacy reasoning string when reasoning_details is an empty array', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning_details = [];
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant).not.toHaveProperty('reasoning_details');
+    expect(assistant.reasoning_content).toBe('legacy thinking');
+  });
+
+  it('keeps a legacy reasoning string when reasoning_details hold only encrypted entries', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning_details = [{ type: 'reasoning.encrypted', data: 'opaque-blob' }];
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant).not.toHaveProperty('reasoning_details');
+    expect(assistant.reasoning_content).toBe('legacy thinking');
+  });
+
+  it('keeps a legacy reasoning string when reasoning_details fold to no text for reasoning upstreams', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning_details = [{ type: 'reasoning.encrypted', data: 'opaque-blob' }];
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.Reasoning), request);
+
+    expect(assistant).not.toHaveProperty('reasoning_details');
+    expect(assistant.reasoning).toBe('legacy thinking');
+  });
+
+  it('keeps a legacy reasoning string when reasoning_details are blank', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning_details = [
+      { type: 'reasoning.text', text: '' },
+      { type: 'reasoning.summary', summary: '' },
+    ];
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant).not.toHaveProperty('reasoning_details');
+    expect(assistant.reasoning_content).toBe('legacy thinking');
+  });
+
+  it.each([
+    {
+      responseTransform: ReasoningDetailsTransform.ReasoningContent,
+      targetField: 'reasoning_content',
+    },
+    { responseTransform: ReasoningDetailsTransform.Reasoning, targetField: 'reasoning' },
+  ] as const)(
+    'does not transplant summary-only reasoning_details into $targetField',
+    ({ responseTransform, targetField }) => {
+      const request = makeReasoningRequest();
+      const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+      assistant.reasoning_details = [{ type: 'reasoning.summary', summary: 'summarized thought' }];
+
+      applyReasoningDetailsTransform(makeProvider(responseTransform), request);
+
+      expect(assistant).not.toHaveProperty('reasoning_details');
+      expect(assistant).not.toHaveProperty(targetField);
+    }
+  );
+
+  it.each([
+    {
+      responseTransform: ReasoningDetailsTransform.ReasoningContent,
+      targetField: 'reasoning_content',
+    },
+    { responseTransform: ReasoningDetailsTransform.Reasoning, targetField: 'reasoning' },
+  ] as const)(
+    'falls back to legacy raw reasoning when $targetField has no reasoning.text entries',
+    ({ responseTransform, targetField }) => {
+      const request = makeReasoningRequest();
+      const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+      assistant.reasoning_details = [
+        { type: 'reasoning.summary', summary: 'summarized thought' },
+        { type: 'reasoning.encrypted', data: 'opaque-blob' },
+      ];
+      assistant.reasoning = 'legacy raw reasoning';
+
+      applyReasoningDetailsTransform(makeProvider(responseTransform), request);
+
+      expect(assistant).not.toHaveProperty('reasoning_details');
+      expect(assistant).toHaveProperty(targetField, 'legacy raw reasoning');
+    }
+  );
+
+  it('keeps an empty target field for a legacy reasoning string when reasoning_details is empty', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning_details = [];
+    assistant.reasoning = 'legacy thinking';
+    assistant.reasoning_content = '';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant.reasoning_content).toBe('legacy thinking');
+  });
+
+  it('keeps a set target field when reasoning_details is an empty array', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning_details = [];
+    assistant.reasoning = 'legacy thinking';
+    assistant.reasoning_content = 'upstream thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant.reasoning_content).toBe('upstream thinking');
+  });
+
+  it('prefers folded reasoning_details over a legacy reasoning string', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant.reasoning_content).toBe('thinking hard');
   });
 
   it('drops the legacy reasoning string for Gemini', () => {
@@ -875,13 +1027,28 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
 describe('applyProviderSpecificLogic thinking block binding', () => {
   const model = 'anthropic/claude-opus-5.5';
 
-  async function apply(provider: Provider) {
-    const request = makeMessagesRequest(model);
-    request.body.thinking = { type: 'adaptive' };
+  async function apply(
+    provider: Provider,
+    requestedModel = model,
+    thinking: 'adaptive' | 'disabled' | 'omitted' = 'adaptive'
+  ) {
+    const request = makeMessagesRequest(requestedModel);
+    request.body.thinking = thinking === 'omitted' ? undefined : { type: thinking };
+    request.body.messages.push(
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: '', signature: 'FAKE_PROVIDER_TEST_SIGNATURE' },
+          { type: 'redacted_thinking', data: 'FAKE_PROVIDER_TEST_REDACTED_DATA' },
+          { type: 'text', text: 'Previous answer.' },
+        ],
+      },
+      { role: 'user', content: 'Continue.' }
+    );
     const extraHeaders: Record<string, string> = {};
     await applyProviderSpecificLogic(
       provider,
-      model,
+      requestedModel,
       request,
       extraHeaders,
       null,
@@ -893,14 +1060,16 @@ describe('applyProviderSpecificLogic thinking block binding', () => {
       false,
       null
     );
-    return { thinking: request.body.thinking, extraHeaders };
+    return { thinking: request.body.thinking, messages: request.body.messages, extraHeaders };
   }
 
   it.each([
-    { name: 'Vercel', provider: VERCEL_AI_GATEWAY },
-    { name: 'OpenRouter', provider: OPENROUTER },
-  ])('drops mismatched thinking blocks on $name', async ({ provider }) => {
-    const { thinking, extraHeaders } = await apply(provider);
+    { name: 'Vercel', provider: VERCEL_AI_GATEWAY, model },
+    { name: 'OpenRouter', provider: OPENROUTER, model },
+    { name: 'Vercel', provider: VERCEL_AI_GATEWAY, model: 'anthropic/claude-opus-latest' },
+    { name: 'OpenRouter', provider: OPENROUTER, model: 'anthropic/claude-opus-latest' },
+  ])('drops mismatched thinking blocks on $name for $model', async ({ provider, model }) => {
+    const { thinking, extraHeaders } = await apply(provider, model);
 
     expect(thinking).toEqual({
       type: 'adaptive',
@@ -912,11 +1081,102 @@ describe('applyProviderSpecificLogic thinking block binding', () => {
     );
   });
 
+  it.each([
+    { name: 'Vercel', provider: VERCEL_AI_GATEWAY },
+    { name: 'OpenRouter', provider: OPENROUTER },
+  ])('handles disabled and omitted thinking on $name', async ({ provider }) => {
+    const disabled = await apply(provider, model, 'disabled');
+    const omitted = await apply(provider, model, 'omitted');
+
+    expect(disabled.thinking).toEqual({ type: 'disabled' });
+    expect(disabled.messages[1]).toEqual({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'Previous answer.' }],
+    });
+    expect(omitted.thinking).toEqual({
+      type: 'adaptive',
+      block_binding: { prefix_mismatch_behavior: 'drop_block' },
+    });
+    expect(omitted.messages[1]).toMatchObject({
+      content: [{ type: 'thinking' }, { type: 'redacted_thinking' }, { type: 'text' }],
+    });
+    for (const headers of [disabled.extraHeaders, omitted.extraHeaders]) {
+      expect(headers['anthropic-beta']).toContain('thinking-binding-controls-2026-08-01');
+      expect(headers['x-anthropic-beta']).toContain('thinking-binding-controls-2026-08-01');
+    }
+  });
+
   it('leaves upstreams without verified support untouched', async () => {
     const { thinking, extraHeaders } = await apply({ ...makeProvider(null), type: 'custom' });
 
     expect(thinking).toEqual({ type: 'adaptive', display: 'summarized' });
     expect(extraHeaders['anthropic-beta']).toBe('fine-grained-tool-streaming-2025-05-14');
+  });
+});
+
+describe('applyProviderSpecificLogic whitespace-only messages', () => {
+  const model = 'anthropic/claude-opus-5.5';
+
+  it.each([
+    { name: 'Vercel', provider: VERCEL_AI_GATEWAY },
+    { name: 'OpenRouter', provider: OPENROUTER },
+    { name: 'a direct provider', provider: { ...makeProvider(null), type: 'custom' as const } },
+  ])('removes a whitespace-only assistant turn on $name', async ({ provider }) => {
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const toolUse = { type: 'tool_use' as const, id: 'toolu_1', name: 'read', input: {} };
+    const toolResult = { type: 'tool_result' as const, tool_use_id: 'toolu_1', content: 'ok' };
+    const request = makeMessagesRequest(model);
+    request.body.thinking = { type: 'adaptive' };
+    request.body.messages = [
+      { role: 'user', content: [{ type: 'text', text: 'Read the file.' }] },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: 'Use the read tool.', signature: 'sig-1' },
+          { type: 'text', text: '\n\n' },
+          toolUse,
+        ],
+      },
+      { role: 'user', content: [toolResult] },
+      { role: 'assistant', content: [{ type: 'text', text: '\n\n' }] },
+      {
+        role: 'user',
+        content: [{ type: 'text', text: 'Continue.', cache_control: { type: 'ephemeral' } }],
+      },
+    ];
+
+    await applyProviderSpecificLogic(
+      provider,
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false,
+      null
+    );
+
+    expect(request.body.messages).toEqual([
+      { role: 'user', content: [{ type: 'text', text: 'Read the file.' }] },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: 'Use the read tool.', signature: 'sig-1' },
+          { type: 'text', text: '\n\n' },
+          toolUse,
+        ],
+      },
+      { role: 'user', content: [toolResult] },
+      {
+        role: 'user',
+        content: [{ type: 'text', text: 'Continue.', cache_control: { type: 'ephemeral' } }],
+      },
+    ]);
+    jest.restoreAllMocks();
   });
 });
 
@@ -1030,7 +1290,7 @@ describe('applyPreferredProvider', () => {
     model => {
       const request = makeRequest(model);
 
-      applyPreferredProvider(config, model, request.body, false);
+      applyPreferredProvider(config, model, request.body, true);
 
       expect(request.body.provider).toEqual({ order: ['openai'] });
     }
@@ -1049,9 +1309,18 @@ describe('applyPreferredProvider', () => {
     const model = 'openai/gpt-5.5';
     const request = makeRequest(model);
 
-    applyPreferredProvider(EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG, model, request.body, false);
+    applyPreferredProvider(EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG, model, request.body, true);
 
     expect(request.body.provider).toBeUndefined();
+  });
+
+  it('still ignores Amazon Bedrock for OpenAI models without a stored config', () => {
+    const model = 'openai/gpt-5.5';
+    const request = makeRequest(model);
+
+    applyPreferredProvider(EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG, model, request.body, false);
+
+    expect(request.body.provider).toEqual({ ignore: ['amazon-bedrock'] });
   });
 
   it('still ignores Anthropic for Claude without a stored config', () => {
@@ -1094,12 +1363,28 @@ describe('applyPreferredProvider', () => {
     });
   });
 
-  it('does not ignore Anthropic for non-Claude models', () => {
+  it('ignores Amazon Bedrock instead of Anthropic for OpenAI models', () => {
     const request = makeRequest('openai/gpt-5.5');
 
     applyPreferredProvider(config, 'openai/gpt-5.5', request.body, false);
 
+    expect(request.body.provider).toEqual({ order: ['openai'], ignore: ['amazon-bedrock'] });
+  });
+
+  it('does not ignore Amazon Bedrock for OpenAI models when the organization is a non-trial enterprise', () => {
+    const request = makeRequest('openai/gpt-5.5');
+
+    applyPreferredProvider(config, 'openai/gpt-5.5', request.body, true);
+
     expect(request.body.provider).toEqual({ order: ['openai'] });
+  });
+
+  it('does not ignore Amazon Bedrock for gpt-oss', () => {
+    const request = makeRequest('openai/gpt-oss-120b');
+
+    applyPreferredProvider(config, 'openai/gpt-oss-120b', request.body, false);
+
+    expect(request.body.provider).toBeUndefined();
   });
 
   it('preserves valid provider options when adding order', () => {
@@ -1216,8 +1501,14 @@ describe('getIgnoredProviders', () => {
   it.each([
     ['anthropic/claude-opus-5', false, ['anthropic']],
     ['anthropic/claude-opus-5', true, []],
-    ['openai/gpt-5.5', false, []],
-  ] as const)('for %s with Anthropic allowed=%s returns %j', (model, allowed, expected) => {
-    expect(getIgnoredProviders(model, allowed)).toEqual(expected);
-  });
+    ['openai/gpt-5.5', false, ['amazon-bedrock']],
+    ['openai/gpt-5.5', true, []],
+    ['openai/gpt-oss-120b', false, []],
+    ['moonshotai/kimi-k3', false, []],
+  ] as const)(
+    'for %s with non-trial enterprise=%s returns %j',
+    (model, isNonTrialEnterprise, expected) => {
+      expect(getIgnoredProviders(model, isNonTrialEnterprise)).toEqual(expected);
+    }
+  );
 });

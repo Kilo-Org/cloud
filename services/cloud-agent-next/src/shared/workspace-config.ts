@@ -13,7 +13,16 @@ export function workspaceConfigRuntimeKey(
 export function workspaceConfigFromSpec(
   spec: Pick<
     ControlPlaneRouteSpec,
-    'env' | 'secretEnvKeys' | 'setupCommands' | 'runtimeSkills' | 'runtimeAgents' | 'kiloCommands'
+    | 'env'
+    | 'secretEnvKeys'
+    | 'setupCommands'
+    | 'startCommands'
+    | 'environmentSetupCommandCount'
+    | 'runtimeSkills'
+    | 'runtimeInstructions'
+    | 'runtimeAgents'
+    | 'builtinAgents'
+    | 'kiloCommands'
   >,
   mcp: WorkspaceConfig['mcp']
 ): WorkspaceConfig {
@@ -22,8 +31,16 @@ export function workspaceConfigFromSpec(
     ...(spec.env === undefined ? {} : { env: spec.env }),
     ...(spec.secretEnvKeys === undefined ? {} : { secretEnvKeys: spec.secretEnvKeys }),
     ...(spec.setupCommands === undefined ? {} : { setupCommands: spec.setupCommands }),
+    ...(spec.startCommands === undefined ? {} : { startCommands: spec.startCommands }),
+    ...(spec.environmentSetupCommandCount === undefined
+      ? {}
+      : { environmentSetupCommandCount: spec.environmentSetupCommandCount }),
     ...(spec.runtimeSkills === undefined ? {} : { runtimeSkills: spec.runtimeSkills }),
+    ...(spec.runtimeInstructions === undefined
+      ? {}
+      : { runtimeInstructions: spec.runtimeInstructions }),
     ...(spec.runtimeAgents === undefined ? {} : { runtimeAgents: spec.runtimeAgents }),
+    ...(spec.builtinAgents === undefined ? {} : { builtinAgents: spec.builtinAgents }),
     ...(spec.kiloCommands === undefined ? {} : { kiloCommands: spec.kiloCommands }),
   };
 }
@@ -34,8 +51,12 @@ export function attachmentSpecFromRouteSpec(spec: ControlPlaneRouteSpec): Attach
     env: _env,
     secretEnvKeys: _secretEnvKeys,
     setupCommands: _setupCommands,
+    startCommands: _startCommands,
+    environmentSetupCommandCount: _environmentSetupCommandCount,
     runtimeSkills: _runtimeSkills,
+    runtimeInstructions: _runtimeInstructions,
     runtimeAgents: _runtimeAgents,
+    builtinAgents: _builtinAgents,
     kiloCommands: _kiloCommands,
     ...attachment
   } = spec;

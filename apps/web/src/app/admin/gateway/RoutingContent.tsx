@@ -82,12 +82,12 @@ export function RoutingContent() {
     <div className="flex w-full flex-col gap-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Gateway Routing</CardTitle>
+          <CardTitle>Vercel Routing</CardTitle>
           <CardDescription>
-            When on, all free and paid traffic for models available on the Vercel AI Gateway is
-            routed to Vercel. When off, that traffic goes to OpenRouter. Models not available on
-            Vercel, opt-out models, and requests whose provider preferences Vercel cannot satisfy
-            always go to OpenRouter. On by default.
+            When on, non-BYOK chat traffic for models in the Vercel AI Gateway catalog goes to
+            Vercel; otherwise it goes to OpenRouter. Opt-out models, organizations that disabled
+            Vercel, requests with a spend ceiling, and provider preferences Vercel cannot satisfy
+            always use OpenRouter.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -125,8 +125,8 @@ export function RoutingContent() {
               className="font-mono text-sm"
             />
             <p id="routing-opt-out-models-description" className="text-muted-foreground text-xs">
-              One model ID per line. Matching is exact after entries are lowercased; matching models
-              are never routed to Vercel. Changes take effect within one minute on warm instances.
+              One model ID per line, matched exactly and case-insensitively. Changes apply within
+              about a minute.
             </p>
             {validationError && (
               <pre

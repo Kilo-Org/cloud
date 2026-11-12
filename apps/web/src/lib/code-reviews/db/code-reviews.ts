@@ -23,6 +23,7 @@ import {
   count,
   ne,
   inArray,
+  or,
   sql,
   gte,
   lte,
@@ -155,7 +156,9 @@ function buildAttemptUpdateData(
   if (fields.sessionId !== undefined) updateData.session_id = fields.sessionId;
   if (fields.cliSessionId !== undefined) updateData.cli_session_id = fields.cliSessionId;
   if (fields.executionId !== undefined) updateData.execution_id = fields.executionId;
-  if (fields.errorMessage !== undefined) updateData.error_message = fields.errorMessage;
+  if (fields.errorMessage !== undefined) {
+    updateData.error_message = sanitizePostgresString(fields.errorMessage);
+  }
   if (fields.terminalReason !== undefined) updateData.terminal_reason = fields.terminalReason;
   if (fields.startedAt !== undefined) updateData.started_at = fields.startedAt.toISOString();
   if (fields.completedAt !== undefined) updateData.completed_at = fields.completedAt.toISOString();
@@ -234,6 +237,7 @@ function codeReviewInsertValues(
     platform: params.platform ?? 'github',
     platform_project_id: params.platformProjectId ?? null,
     manual_config: params.manualConfig ?? null,
+    manual_operation_key: params.manualOperationKey ?? null,
     review_type: params.reviewType ?? 'standard',
     trigger_source: params.triggerSource ?? null,
     agent_version: 'v2',
@@ -590,7 +594,8 @@ export async function createCodeReviewAttempt(params: {
           execution_id: params.executionId ?? null,
           analytics_enabled_at_dispatch: params.analyticsEnabledAtDispatch ?? null,
           status,
-          error_message: params.errorMessage ?? null,
+          error_message:
+            params.errorMessage === undefined ? null : sanitizePostgresString(params.errorMessage),
           terminal_reason: params.terminalReason ?? null,
           started_at:
             params.startedAt?.toISOString() ?? (status === 'running' ? now.toISOString() : null),
@@ -1188,7 +1193,9 @@ function buildCodeReviewStatusUpdateData(
 
   if (updates.sessionId !== undefined) updateData.session_id = updates.sessionId;
   if (updates.cliSessionId !== undefined) updateData.cli_session_id = updates.cliSessionId;
-  if (updates.errorMessage !== undefined) updateData.error_message = updates.errorMessage;
+  if (updates.errorMessage !== undefined) {
+    updateData.error_message = sanitizePostgresString(updates.errorMessage);
+  }
   if (updates.terminalReason !== undefined) updateData.terminal_reason = updates.terminalReason;
   if (updates.startedAt !== undefined) updateData.started_at = updates.startedAt.toISOString();
   if (updates.completedAt !== undefined) {
@@ -1405,35 +1412,122 @@ export async function reviewIsSuperseded(reviewId: string): Promise<boolean> {
   }
 }
 
-/**
- * Updates only usage-related columns on a code review, without touching status or timestamps.
- */
-export async function updateCodeReviewUsage(
-  reviewId: string,
-  usage: {
-    model?: string;
-    totalTokensIn?: number;
-    totalTokensOut?: number;
-    totalCostMusd?: number;
+export type CodeReviewUsage = {
+  model?: string;
+  totalTokensIn?: number;
+  totalTokensOut?: number;
+  totalCostMusd?: number;
+};
+
+function buildCodeReviewUsageUpdateData(
+  usage: CodeReviewUsage
+): Partial<typeof cloud_agent_code_reviews.$inferInsert> {
+  const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {};
+
+  if (usage.model !== undefined) {
+    updateData.model = usage.model;
   }
+  if (usage.totalTokensIn !== undefined) {
+    updateData.total_tokens_in = usage.totalTokensIn;
+  }
+  if (usage.totalTokensOut !== undefined) {
+    updateData.total_tokens_out = usage.totalTokensOut;
+  }
+  if (usage.totalCostMusd !== undefined) {
+    updateData.total_cost_musd = usage.totalCostMusd;
+  }
+
+  return updateData;
+}
+
+/**
+ * Records usage on a code review once per metered column.
+ *
+ * Each metered column is written only while it is still empty, so a call that
+ * repeats or arrives after another writer recorded usage leaves the stored
+ * values unchanged and fills only totals that are still missing. The model is
+ * recorded with the first usage write and is never replaced here. A call
+ * without metered values records nothing.
+ *
+ * Only {@link backfillCodeReviewUsage} may replace recorded usage; it runs from
+ * the terminal status callback with the billing totals, which are the source of
+ * truth for token usage.
+ *
+ * Returns whether the row changed.
+ */
+export async function settleCodeReviewUsage(
+  reviewId: string,
+  usage: CodeReviewUsage
+): Promise<boolean> {
+  const unsettledColumns: SQL[] = [];
+  if (usage.totalTokensIn !== undefined) {
+    unsettledColumns.push(isNull(cloud_agent_code_reviews.total_tokens_in));
+  }
+  if (usage.totalTokensOut !== undefined) {
+    unsettledColumns.push(isNull(cloud_agent_code_reviews.total_tokens_out));
+  }
+  if (usage.totalCostMusd !== undefined) {
+    unsettledColumns.push(isNull(cloud_agent_code_reviews.total_cost_musd));
+  }
+  if (unsettledColumns.length === 0) {
+    return false;
+  }
+
+  try {
+    const updated = await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        ...(usage.model !== undefined
+          ? { model: sql`COALESCE(${cloud_agent_code_reviews.model}, ${usage.model})` }
+          : {}),
+        ...(usage.totalTokensIn !== undefined
+          ? {
+              total_tokens_in: sql`COALESCE(${cloud_agent_code_reviews.total_tokens_in}, ${usage.totalTokensIn})`,
+            }
+          : {}),
+        ...(usage.totalTokensOut !== undefined
+          ? {
+              total_tokens_out: sql`COALESCE(${cloud_agent_code_reviews.total_tokens_out}, ${usage.totalTokensOut})`,
+            }
+          : {}),
+        ...(usage.totalCostMusd !== undefined
+          ? {
+              total_cost_musd: sql`COALESCE(${cloud_agent_code_reviews.total_cost_musd}, ${usage.totalCostMusd})`,
+            }
+          : {}),
+        updated_at: new Date().toISOString(),
+      })
+      .where(and(eq(cloud_agent_code_reviews.id, reviewId), or(...unsettledColumns)))
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    return updated.length > 0;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'settleCodeReviewUsage' },
+      extra: { reviewId, usage },
+    });
+    throw error;
+  }
+}
+
+/**
+ * Overwrites the usage columns of a code review with the authoritative billing
+ * totals, without touching status or timestamps.
+ *
+ * The terminal status callback calls this after it aggregates the review's
+ * billing rows, so it deliberately ignores the compare-and-set of
+ * {@link settleCodeReviewUsage}: billing totals replace whatever an earlier
+ * writer recorded. Do not call it from a callback that can repeat.
+ */
+export async function backfillCodeReviewUsage(
+  reviewId: string,
+  usage: CodeReviewUsage
 ): Promise<void> {
   try {
     const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {
+      ...buildCodeReviewUsageUpdateData(usage),
       updated_at: new Date().toISOString(),
     };
-
-    if (usage.model !== undefined) {
-      updateData.model = usage.model;
-    }
-    if (usage.totalTokensIn !== undefined) {
-      updateData.total_tokens_in = usage.totalTokensIn;
-    }
-    if (usage.totalTokensOut !== undefined) {
-      updateData.total_tokens_out = usage.totalTokensOut;
-    }
-    if (usage.totalCostMusd !== undefined) {
-      updateData.total_cost_musd = usage.totalCostMusd;
-    }
 
     await db
       .update(cloud_agent_code_reviews)
@@ -1441,7 +1535,7 @@ export async function updateCodeReviewUsage(
       .where(eq(cloud_agent_code_reviews.id, reviewId));
   } catch (error) {
     captureException(error, {
-      tags: { operation: 'updateCodeReviewUsage' },
+      tags: { operation: 'backfillCodeReviewUsage' },
       extra: { reviewId, usage },
     });
     throw error;
@@ -1508,7 +1602,9 @@ export async function updateRepositoryReviewInstructionsMetadata(
 /**
  * Lists code reviews for an owner (org or user)
  * Supports filtering by status and repository
- * Returns reviews sorted by creation date (newest first)
+ * Returns reviews sorted by creation date (newest first), with the review id
+ * as the tiebreaker so an offset page never repeats or drops a row that shares
+ * a `created_at` value with another
  */
 export type CodeReviewListRow = Omit<
   CloudAgentCodeReview,
@@ -1553,7 +1649,7 @@ export async function listCodeReviews(params: ListReviewsParams): Promise<CodeRe
       .select(listColumns)
       .from(cloud_agent_code_reviews)
       .where(and(...conditions))
-      .orderBy(desc(cloud_agent_code_reviews.created_at))
+      .orderBy(desc(cloud_agent_code_reviews.created_at), asc(cloud_agent_code_reviews.id))
       .limit(limit)
       .offset(offset);
 
@@ -1789,14 +1885,26 @@ export async function createCodeReviewIfAbsentInTransaction(
 }
 
 /**
- * Cancels a code review
- * Sets status to 'cancelled' and records completion time
+ * Cancels one review on request, and only while it is still cancellable: the
+ * update is a compare-and-set from a non-terminal status, so a review that
+ * reached a terminal state in the meantime is left untouched.
+ *
+ * Cancelling runs through {@link cancelCodeReviewsWithDatabase} so the review's
+ * non-terminal attempts are cancelled in the same statement, the diagnostic
+ * phrase matches the attempt rows, and a dangling dispatch reservation is
+ * cleared. Ledger settling belongs to the caller, which only has a settle to
+ * make when this reports that a row changed.
  */
-export async function cancelCodeReview(reviewId: string): Promise<void> {
+export async function cancelCodeReview(reviewId: string): Promise<boolean> {
   try {
-    await updateCodeReviewStatus(reviewId, 'cancelled', {
-      completedAt: new Date(),
+    const cancelled = await cancelCodeReviewsWithDatabase(db, {
+      targetPredicate: eq(cloud_agent_code_reviews.id, reviewId),
+      terminalReason: 'user_cancelled',
+      errorMessage: 'Cancelled by user',
+      clearDispatchReservation: true,
     });
+
+    return cancelled.length > 0;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'cancelCodeReview' },
@@ -1914,6 +2022,58 @@ export async function findActiveProviderPublishingReview(input: {
     captureException(error, {
       tags: { operation: 'findActiveProviderPublishingReview' },
       extra: { input },
+    });
+    throw error;
+  }
+}
+
+/**
+ * Resolves the review a manual-start operation key already produced. The
+ * client sends the same key with a retry of the same draft, so a lookup hit
+ * means the first attempt was accepted even if its response never reached the
+ * client. Owner-scoped, matching the partial unique indexes on
+ * `manual_operation_key`.
+ */
+export async function findManualReviewByOperationKey(input: {
+  owner: CreateReviewParams['owner'];
+  manualOperationKey: string;
+}): Promise<{
+  id: string;
+  platform: CodeReviewPlatform;
+  repoFullName: string;
+  prNumber: number;
+} | null> {
+  const ownerCondition =
+    input.owner.type === 'org'
+      ? eq(cloud_agent_code_reviews.owned_by_organization_id, input.owner.id)
+      : eq(cloud_agent_code_reviews.owned_by_user_id, input.owner.id);
+
+  try {
+    const [review] = await db
+      .select({
+        id: cloud_agent_code_reviews.id,
+        platform: cloud_agent_code_reviews.platform,
+        repoFullName: cloud_agent_code_reviews.repo_full_name,
+        prNumber: cloud_agent_code_reviews.pr_number,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(
+        and(
+          ownerCondition,
+          eq(cloud_agent_code_reviews.manual_operation_key, input.manualOperationKey)
+        )
+      )
+      .limit(1);
+
+    return review ?? null;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'findManualReviewByOperationKey' },
+      extra: {
+        ownerType: input.owner.type,
+        ownerId: input.owner.id,
+        manualOperationKey: input.manualOperationKey,
+      },
     });
     throw error;
   }

@@ -13,9 +13,8 @@ import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { PartDetailSheetHost } from '@/components/agents/part-detail-sheet-host';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SessionMessageList } from '@/components/agents/session-message-list';
-import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
-import { MessageCircle, Wrench } from '@/components/ui/icons';
+import { Wrench } from '@/components/ui/icons';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useSessionModelOptions } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -28,7 +27,7 @@ import { getChatBackendsHasLoaded, useChatBackends } from '@/lib/chat/backend-st
 import { useTargetSupportsImages } from '@/lib/chat/backend-capabilities';
 import { rememberModelFacts } from '@/lib/chat/layers';
 import { requiresBackendDisclosure } from '@/lib/chat/backend-model-options';
-import { chatTargetKind, resolveChatTarget } from '@/lib/chat/backend-target';
+import { chatTargetKind, CREDITS_FAILURE_KEY, resolveChatTarget } from '@/lib/chat/backend-target';
 import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { type EffortChoices, effortOfVariant, variantOfEffort } from '@/lib/chat/effort';
@@ -39,10 +38,12 @@ import { ChatTitle } from './chat-title';
 import { ChatComposerArea } from './chat-composer-area';
 import { ChatTranscriptFailure } from './chat-transcript-failure';
 import { ChatDetailsSheet } from './chat-details-sheet';
+import { ChatEmptyState } from './chat-empty-state';
 import { useChatDetails } from './chat-details-state';
 import { McpSettingsSheet, useMcpSettings } from './mcp-settings-sheet';
 import { BackendSettingsControl } from './backend-settings-sheet';
 import { useChatMessageActions } from './use-chat-message-actions';
+import { useChatAddCredits } from './use-chat-add-credits';
 import { useWebSearchSetting } from './web-search-row';
 
 /**
@@ -182,8 +183,12 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     selectModel(modelId, null);
   };
 
+  // Where the account buys the credit a refused send needs. Both the failed
+  // question and the row above the composer reach it through this one action.
+  const addCredits = useChatAddCredits(place);
+
   const messages = asMessages(state);
-  const actions = useChatMessageActions(state, messages, retry);
+  const actions = useChatMessageActions(state, messages, { retry, addCredits });
   const { actionsFor } = actions;
   const details = useChatDetails({
     model: state.model === '' ? model : state.model,
@@ -236,8 +241,17 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const transcriptFailure =
     state.status === 'idle' && messages.length === 0 ? state.failureKey : null;
   // A chat that is not one this place may read is not one this place can retry
-  // into: entering it again settles the same state.
-  const retryable = !actions.hasUnanswered && state.failureKey !== CHAT_UNAVAILABLE_KEY;
+  // into: entering it again settles the same state. Neither is a send the
+  // balance refused: a re-send meets the same refusal, so the action that
+  // settles it is Add credits, never a Retry.
+  const creditsRefused = state.failureKey === CREDITS_FAILURE_KEY;
+  const retryable =
+    !actions.hasUnanswered && state.failureKey !== CHAT_UNAVAILABLE_KEY && !creditsRefused;
+  // The refused question's own bubble states the credits cause and carries Add
+  // credits, so the row above the composer does not repeat them. With no
+  // question on screen that row is the only place that can state it, and the
+  // only place that can offer the action.
+  const rowFailureKey = creditsRefused && actions.hasUnanswered ? null : state.failureKey;
 
   function renderTranscript() {
     if (state.status === 'opening') {
@@ -266,17 +280,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       );
     }
     if (messages.length === 0) {
-      return (
-        <EmptyState
-          icon={MessageCircle}
-          // i18n-dup-ok: 'modelChat.empty.title' was renamed from the base catalog's
-          // quickChat.empty.title in the harness-chat rebuild; no other live key carries it.
-          title={t('modelChat.empty.title')}
-          // i18n-dup-ok: 'modelChat.empty.description' was renamed from the base catalog's
-          // quickChat.empty.description in the harness-chat rebuild; no other live key carries it.
-          description={t('modelChat.empty.description')}
-        />
-      );
+      return <ChatEmptyState />;
     }
     // The host lets a folded thinking row open its text in the part sheet.
     return (
@@ -309,12 +313,10 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
           <ChatComposerArea
             status={state.status}
             messages={messages}
-            failureKey={state.failureKey}
+            failureKey={rowFailureKey}
             retryable={retryable}
             onRetry={() => void retry()}
-            onAddCredits={() => {
-              router.push('/(app)/credits' as Href);
-            }}
+            addCredits={addCredits}
             onSend={handleSend}
             composerControlRef={actions.composerControlRef}
             onStop={handleStop}

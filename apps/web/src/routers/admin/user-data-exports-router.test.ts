@@ -560,6 +560,35 @@ describe('adminUserDataExportsRouter', () => {
     }
   });
 
+  it('refuses recovery for an owner whose block timestamp is set', async () => {
+    const [target] = await db
+      .insert(user_data_exports)
+      .values({
+        kilo_user_id: recoveryOwner.id,
+        status: 'failed',
+        snapshot_at: '2026-08-03T00:00:00.000Z',
+      })
+      .returning({ id: user_data_exports.id });
+    exportIds.push(target.id);
+    await db
+      .update(kilocode_users)
+      .set({ blocked_at: '2026-01-15T12:00:00.000Z' })
+      .where(eq(kilocode_users.id, recoveryOwner.id));
+    try {
+      await expect(
+        (await createCallerForUser(admin.id)).admin.userDataExports.cancelAndPurge({
+          exportId: target.id,
+          expectedGeneration: 0,
+        })
+      ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    } finally {
+      await db
+        .update(kilocode_users)
+        .set({ blocked_at: null })
+        .where(eq(kilocode_users.id, recoveryOwner.id));
+    }
+  });
+
   it('rejects recovery when the artifact key is not canonical', async () => {
     const [target] = await db
       .insert(user_data_exports)

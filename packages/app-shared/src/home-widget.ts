@@ -3,6 +3,7 @@ import {
   sessionLiveCut,
 } from '@kilocode/session-ingest-contracts/session-live-summary';
 import { z } from 'zod';
+import { approvalKeySchema } from './approval-key';
 import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
@@ -17,17 +18,12 @@ import {
   type GlanceableSessionRow,
   type GlanceableStatusKind,
 } from './glanceable-agents-snapshot';
-import { timestampMs } from './utils';
+import { timestampMs, timestampToIso } from './utils';
 
 export const HOME_WIDGET_DETAIL_LIMIT = 3;
 export const HOME_WIDGET_TITLE_LIMIT = 120;
 const titleSchema = z.string().max(HOME_WIDGET_TITLE_LIMIT);
 const kindSchema = z.enum(GLANCEABLE_STATUS_KINDS);
-/** SHA-256 hex of the exact visible approval target; grants no authority. */
-const approvalKeySchema = z
-  .string()
-  .regex(/^[a-f0-9]{64}$/)
-  .nullable();
 
 /** Private Home-only data. Never include this in Live Activity content-state. */
 export const homeWidgetDetailsSchema = z.object({
@@ -115,23 +111,13 @@ function refreshInterval(snapshot: GlanceableAgentsSnapshot): number {
 }
 
 /**
- * Code points that occupy no display width: directional marks and embeddings, the invisible
- * operators, and the zero-width space. ZWNJ and ZWJ stay, because they join the glyphs of
- * Persian and Indic words and of emoji sequences.
+ * The one display-title cut every glanceable surface draws: the text as one
+ * line of what it draws, trimmed, then capped at `HOME_WIDGET_TITLE_LIMIT` on a
+ * character boundary. A surface adds only its own empty or placeholder rule on
+ * top, so the cap cannot drift between the Home widget and the session card.
  */
-const NON_PRINTING_TITLE_CHARACTERS =
-  /[\u061c\u200b\u200e\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]/g;
-
-/** ISO 8601 form of a row time, or null when it does not parse. */
-function isoTime(value: string | undefined | null): string | null {
-  const at = timestampMs(value);
-  return at === null ? null : new Date(at).toISOString();
-}
-
-function safeTitle(value: string | undefined | null): string {
-  const title = sessionDisplayLine(value ?? '')
-    .replace(NON_PRINTING_TITLE_CHARACTERS, '')
-    .trim();
+export function glanceableTitle(value: string | null | undefined): string {
+  const title = sessionDisplayLine(value ?? '').trim();
   return sessionLiveCut(title, HOME_WIDGET_TITLE_LIMIT);
 }
 
@@ -168,17 +154,17 @@ export function buildHomeWidgetDetails(
             )[0];
   return {
     approvalKey: waiting.find(row => row.approvalKey != null)?.approvalKey ?? null,
-    primaryTitle: primary === undefined ? null : safeTitle(primary.title),
+    primaryTitle: primary === undefined ? null : glanceableTitle(primary.title),
     waitingAgents: waiting.slice(0, HOME_WIDGET_DETAIL_LIMIT).flatMap(row => {
       // The status fold above admits only needs-input statuses; a status that
       // is not one of them has no kind here and the row is dropped rather
       // than mislabelled.
       const kind = glanceableNeedsInputKind(row.status);
-      return kind === null ? [] : [{ title: safeTitle(row.title), kind }];
+      return kind === null ? [] : [{ title: glanceableTitle(row.title), kind }];
     }),
     scheduledAgents: scheduled.slice(0, HOME_WIDGET_DETAIL_LIMIT).map(row => ({
-      title: safeTitle(row.title),
-      scheduledAt: isoTime(row.scheduledAt),
+      title: glanceableTitle(row.title),
+      scheduledAt: timestampToIso(row.scheduledAt),
     })),
   };
 }

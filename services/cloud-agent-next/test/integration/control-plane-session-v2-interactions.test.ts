@@ -22,7 +22,7 @@ import {
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINERS_NAMESPACE,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -128,7 +128,7 @@ async function installSandbox(
   const broker = createFakeCredentialBroker();
   await runInDurableObject(sandboxStub, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(instance.env, broker, {
+    installFakeSandboxEnv(instance, broker, {
       SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',
@@ -208,7 +208,7 @@ async function setupSiblingPair(): Promise<{
   const sessionB = newSessionId();
   const worktreeId = `worktree_${crypto.randomUUID()}`;
   const workspacePath = '/workspace/worktrees/shared';
-  const sandboxId = await generateSandboxId(undefined, ORG_ID, USER_ID, sessionA, undefined, {
+  const sandboxId = await generateSandboxId(sessionA, {
     sandboxAllocation: 'cloudflare-containers-standard-3',
   });
   const provider = createFakeProvider();
@@ -285,7 +285,7 @@ async function registerOnlySession(): Promise<{
   peer: FakeSandboxPeer;
 }> {
   const sessionId = newSessionId();
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+  const sandboxId = await generateSandboxId(sessionId);
   const stub = sessions.getByName(sessionId);
   const peer = new FakeSandboxPeer();
   await runInDurableObject(stub, instance => {

@@ -10,11 +10,47 @@ import { runtimeKey } from './prepare.js';
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
 import type { ControlPlaneWrapperFrame } from '../../../src/shared/control-plane-protocol.js';
 import { projectSafeSessionError } from '../../../src/shared/assistant-failure.js';
+import { writeCloudAgentRulesFile } from '../cloud-agent-rules-file.js';
 
 const binary = process.env.KILO_781_BINARY;
 const suite = binary ? describe : describe.skip;
 
 suite('pinned Kilo profile discovery', () => {
+  it('keeps V1 implicit profile and built-in rules alongside repository instructions without duplication', async () => {
+    if (!binary) throw new Error('KILO_781_BINARY is required');
+    const fixture = await activityFixture(binary);
+    try {
+      await materializeRuntimeProfile(fixture.root, {
+        runtimeInstructions: [
+          { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+        ],
+      });
+      await writeCloudAgentRulesFile(fixture.root, {});
+      await fs.writeFile(
+        path.join(fixture.directory, 'AGENTS.md'),
+        'SYNTHETIC_REPOSITORY_INSTRUCTION'
+      );
+      const session = await fixture.session();
+      await fixture.prompt(session, 'Respond once without tools.');
+      await fixture.until(
+        () => fixture.sessionEvents(session),
+        events =>
+          events.some(
+            event => event.type === 'session.turn.close' && event.properties.reason === 'completed'
+          ),
+        'V1 instruction proof'
+      );
+      expect(fixture.modelRequests).toHaveLength(1);
+      for (const marker of [
+        'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION',
+        'SYNTHETIC_REPOSITORY_INSTRUCTION',
+        '# Cloud Agent Environment',
+      ])
+        expect(fixture.modelRequests[0].split(marker)).toHaveLength(2);
+    } finally {
+      await fixture.dispose();
+    }
+  }, 30_000);
   it.each(['repository', 'profile'] as const)(
     'executes a %s-defined agent through the wrapper SDK with its own system prompt',
     async source => {
@@ -104,15 +140,17 @@ suite('pinned Kilo profile discovery', () => {
         createdOnPlatform: 'webhook',
       };
       const runtime: TurnKiloRuntime = {
+        nativeRuntimeId: 'agent-probe',
         directory: fixture.directory,
         env: {},
-        client: fixture.wrapper,
-        ensure: async () => fixture.wrapper,
+        client: fixture.harness,
+        ensure: async () => fixture.harness,
         isSuspected: () => false,
         isRestarting: () => false,
         isUnavailable: () => false,
         isRetiredClient: () => false,
         sessionState: () => undefined,
+        liveTreeExecutions: () => undefined,
         refreshActivity: async () => {},
       };
       manager = createTurnManager({

@@ -1,9 +1,18 @@
 import { describe, test, expect } from '@jest/globals';
 import { eq, and, isNull } from 'drizzle-orm';
-import { admin_action_audit_logs, kilocode_users, user_admin_notes } from '@kilocode/db/schema';
+import {
+  admin_action_audit_logs,
+  kilocode_users,
+  support_access_grants,
+  passkey_credentials,
+  session_step_up_proofs,
+  user_admin_notes,
+} from '@kilocode/db/schema';
+import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 
 const KILO_DOMAIN = hosted_domain_specials.kilocode_admin;
@@ -61,6 +70,38 @@ async function getUser(userId: string) {
   });
   if (!user) throw new Error(`Expected test user ${userId} to exist`);
   return user;
+}
+
+async function insertStepUpProof(userId: string, sessionId: string) {
+  const [credential] = await db
+    .insert(passkey_credentials)
+    .values({
+      kilo_user_id: userId,
+      credential_id: `admin-role-credential-${crypto.randomUUID()}`,
+      public_key: 'unused',
+    })
+    .returning();
+  const [proof] = await db
+    .insert(session_step_up_proofs)
+    .values({
+      kilo_user_id: userId,
+      session_id_hash: hashWebSessionId(sessionId),
+      method: 'webauthn_uv',
+      passkey_credential_id: credential!.id,
+      purpose: 'session',
+      verified_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+    })
+    .returning();
+  return proof!;
+}
+
+async function proofRevocation(userId: string, proofId: string) {
+  const [row] = await db
+    .select()
+    .from(session_step_up_proofs)
+    .where(eq(session_step_up_proofs.id, proofId));
+  return row;
 }
 
 describe('admin.users.listPlatformAdmins', () => {
@@ -560,8 +601,15 @@ describe('admin.users.setAdminPermissions', () => {
       })
     ).resolves.toMatchObject({ changed: true });
 
+    // The first call rotates the actor's own session credentials, so the next
+    // request carries the freshly authenticated session.
+    const current = await getUser(admin.id);
+    const nextCaller = await createSessionCallerForUser(admin.id, {
+      webSessionPepper: current.web_session_pepper,
+    });
+
     await expect(
-      caller.admin.users.setAdminPermissions({
+      nextCaller.admin.users.setAdminPermissions({
         userId: admin.id,
         permissions: { isSuperadmin: false },
       })
@@ -596,6 +644,41 @@ describe('admin.users.setAdminPermissions', () => {
       'Granted API request log export access.',
       'Revoked API request log export access.',
     ]);
+  });
+
+  test('revoking platform admin access revokes open support grants', async () => {
+    const superadmin = await insertQualifyingAdmin();
+    const target = await insertQualifyingAdmin({ is_super_admin: false });
+    const owner = await insertTestUser({ is_admin: false });
+    const organization = await createTestOrganization(
+      `support-admin-revoke-${crypto.randomUUID()}`,
+      owner.id,
+      0
+    );
+    const now = new Date();
+    const [grant] = await db
+      .insert(support_access_grants)
+      .values({
+        actor_kilo_user_id: target.id,
+        organization_id: organization.id,
+        action_class: 'support_read',
+        reason: 'investigating a customer report',
+        requested_duration_seconds: 1800,
+        status: 'active',
+        issued_at: now.toISOString(),
+        expires_at: new Date(now.getTime() + 30 * 60 * 1000).toISOString(),
+      })
+      .returning();
+
+    const caller = await createCallerForUser(superadmin.id);
+    await caller.admin.users.setPlatformAdminAccess({ userId: target.id, isAdmin: false });
+
+    const updated = await getUser(target.id);
+    expect(updated.is_admin).toBe(false);
+    const revoked = await db.query.support_access_grants.findFirst({
+      where: eq(support_access_grants.id, grant.id),
+    });
+    expect(revoked?.status).toBe('revoked');
   });
 
   test('rejects targets that are not platform admins', async () => {
@@ -868,5 +951,26 @@ describe('admin role change audit logging', () => {
     });
 
     expect(await getRoleAudits(admin.id)).toHaveLength(0);
+  });
+
+  test('role and permission changes revoke step-up proofs', async () => {
+    const superadmin = await insertQualifyingAdmin();
+    const candidate = await insertEligibleCandidate();
+    const caller = await createCallerForUser(superadmin.id);
+    const roleProof = await insertStepUpProof(candidate.id, 'role-change-session');
+
+    await caller.admin.users.setPlatformAdminAccess({ userId: candidate.id, isAdmin: true });
+
+    expect((await proofRevocation(candidate.id, roleProof.id))?.revoked_reason).toBe('role_change');
+
+    const permissionProof = await insertStepUpProof(candidate.id, 'permission-change-session');
+    await caller.admin.users.setAdminPermissions({
+      userId: candidate.id,
+      permissions: { canViewSessions: true },
+    });
+
+    expect((await proofRevocation(candidate.id, permissionProof.id))?.revoked_reason).toBe(
+      'permission_change'
+    );
   });
 });

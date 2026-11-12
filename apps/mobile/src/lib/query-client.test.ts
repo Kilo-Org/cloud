@@ -137,7 +137,7 @@ describe('permission-denied query removal', () => {
     clear();
   });
 
-  it('keeps an actively-observed query in the cache on FORBIDDEN', async () => {
+  it('drops the payload of an actively-observed org query on FORBIDDEN without rebuilding it', async () => {
     const signOut = vi.fn();
     const clear = setTrpcUnauthorizedHandler(signOut);
     const queryClient = createKiloAppQueryClient();
@@ -162,11 +162,93 @@ describe('permission-denied query removal', () => {
     });
     const unsubscribe = observer.subscribe(() => undefined);
 
-    // The observer makes the query active; a forced refetch fails FORBIDDEN but
-    // must not drop the still-observed query (removal would rebuild and loop).
+    // The observer keeps the query in the cache (removal would rebuild it and
+    // loop), but its payload is gone so nothing denied keeps rendering.
     await observer.refetch().catch(() => undefined);
 
-    expect(queryClient.getQueryData(key)).toEqual({ members: ['a'] });
+    expect(queryClient.getQueryData(key)).toBeUndefined();
+    expect(queryClient.getQueryCache().find({ queryKey: key, exact: true })).toBeDefined();
+    expect(signOut).not.toHaveBeenCalled();
+    unsubscribe();
+    clear();
+  });
+
+  it('clears every unobserved sibling variant of a denied org query', async () => {
+    const signOut = vi.fn();
+    const clear = setTrpcUnauthorizedHandler(signOut);
+    const queryClient = createKiloAppQueryClient();
+
+    const observedKey: readonly unknown[] = [
+      ['organizations', 'withMembers'],
+      { type: 'query', input: { organizationId: 'org-1', limit: 10 } },
+    ];
+    const idleSiblingKey: readonly unknown[] = [
+      ['organizations', 'withMembers'],
+      { type: 'query', input: { organizationId: 'org-1', limit: 100 } },
+    ];
+    const otherOrgKey: readonly unknown[] = [
+      ['organizations', 'withMembers'],
+      { type: 'query', input: { organizationId: 'org-2', limit: 10 } },
+    ];
+    queryClient.setQueryData(observedKey, { members: ['a'] });
+    queryClient.setQueryData(idleSiblingKey, { members: ['a'] });
+    queryClient.setQueryData(otherOrgKey, { members: ['b'] });
+
+    const error = Object.assign(new Error('forbidden'), {
+      data: { code: 'FORBIDDEN', httpStatus: 403 },
+    });
+    const observer = new QueryObserver(queryClient, {
+      queryKey: observedKey,
+      queryFn: () => {
+        throw error;
+      },
+      retry: false,
+      staleTime: Infinity,
+    });
+    const unsubscribe = observer.subscribe(() => undefined);
+    await observer.refetch().catch(() => undefined);
+
+    // The org prefix covers the variant no screen observes: it leaves the
+    // cache, so a later mount cannot paint its rows.
+    expect(queryClient.getQueryData(idleSiblingKey)).toBeUndefined();
+    expect(
+      queryClient.getQueryCache().find({ queryKey: idleSiblingKey, exact: true })
+    ).toBeUndefined();
+    // The observed variant keeps its slot and loses only the denied rows.
+    expect(queryClient.getQueryData(observedKey)).toBeUndefined();
+    expect(queryClient.getQueryCache().find({ queryKey: observedKey, exact: true })).toBeDefined();
+    // Another organization is another prefix.
+    expect(queryClient.getQueryData(otherOrgKey)).toEqual({ members: ['b'] });
+    expect(signOut).not.toHaveBeenCalled();
+    unsubscribe();
+    clear();
+  });
+
+  it('keeps the payload of an actively-observed non-org query on FORBIDDEN', async () => {
+    const signOut = vi.fn();
+    const clear = setTrpcUnauthorizedHandler(signOut);
+    const queryClient = createKiloAppQueryClient();
+
+    const key: readonly unknown[] = [['cliSessionsV2', 'byId'], { type: 'query' }];
+    queryClient.setQueryData(key, { session: 'open' });
+
+    const error = Object.assign(new Error('forbidden'), {
+      data: { code: 'FORBIDDEN', httpStatus: 403 },
+    });
+
+    const observer = new QueryObserver(queryClient, {
+      queryKey: key,
+      queryFn: () => {
+        throw error;
+      },
+      retry: false,
+      staleTime: Infinity,
+    });
+    const unsubscribe = observer.subscribe(() => undefined);
+
+    await observer.refetch().catch(() => undefined);
+
+    expect(queryClient.getQueryData(key)).toEqual({ session: 'open' });
     expect(signOut).not.toHaveBeenCalled();
     unsubscribe();
     clear();
@@ -350,6 +432,7 @@ describe('accepted active-session outcomes', () => {
       await client.query({ queryKey: QUERY_KEY, queryFn: () => emptyResult });
       expect(getActiveSessionsQueryMetadata(query)).toEqual({
         acceptedRevision: 1,
+        acceptedSessionIds: new Set(),
         terminalError: null,
       });
       unsubscribe();

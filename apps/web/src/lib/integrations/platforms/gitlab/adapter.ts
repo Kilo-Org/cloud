@@ -728,6 +728,53 @@ export async function fetchGitLabBranches(
 }
 
 /**
+ * The exact remote head of one branch. Unlike the listing, this is a single
+ * point read: a missing branch is `null`, never a default-branch success.
+ */
+export async function fetchGitLabBranchHead(
+  accessToken: string,
+  projectId: string | number,
+  branch: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<{ sha: string } | null> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+  const budget = new GitLabListingBudget('branch head');
+  try {
+    const response = await fetchGitLab(
+      buildGitLabUrl(
+        instanceUrl,
+        `/api/v4/projects/${encodedProjectId}/repository/branches/${encodeURIComponent(branch)}`
+      ),
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+      budget
+    );
+
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      const bodyExcerpt = providerErrorExcerpt(await response.text());
+      logExceptInTest('GitLab branch head fetch failed:', {
+        status: response.status,
+        bodyExcerpt,
+      });
+      throw new GitLabBranchesFetchError(
+        response.status,
+        `GitLab branch head fetch failed: ${response.status}`
+      );
+    }
+
+    const data = (await response.json()) as { commit?: { id?: string } };
+    return typeof data.commit?.id === 'string' ? { sha: data.commit.id } : null;
+  } finally {
+    budget.dispose();
+  }
+}
+
+/**
  * Fetches a repository root text file at a specific ref.
  * Returns null for missing files and throws for non-404 API failures.
  */
@@ -1853,31 +1900,6 @@ export async function addReactionToMR(
   });
 }
 
-export async function getGitLabProject(
-  accessToken: string,
-  projectPath: string,
-  instanceUrl: string = DEFAULT_GITLAB_URL
-): Promise<GitLabProject> {
-  const encodedPath = encodeURIComponent(projectPath);
-
-  const response = await fetchGitLab(
-    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedPath}`),
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    const bodyExcerpt = providerErrorExcerpt(await response.text());
-    logExceptInTest('GitLab project fetch failed:', { status: response.status, bodyExcerpt });
-    throw new Error(`GitLab project fetch failed: ${response.status}`);
-  }
-
-  return (await response.json()) as GitLabProject;
-}
-
 export async function fetchGitLabRepositorySize(
   accessToken: string,
   projectPath: string,
@@ -2429,13 +2451,17 @@ export async function rotateProjectAccessToken(
  * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401)
  * @throws {GitLabProjectAccessTokenPermissionError} When user doesn't have Maintainer+ role (HTTP 403)
  *
+ * `signal` carries a caller's deadline, so a settlement that has spent its
+ * budget does not keep one revocation open for the per-request timeout.
+ *
  * @see https://docs.gitlab.com/ee/api/project_access_tokens.html#revoke-a-project-access-token
  */
 export async function revokeProjectAccessToken(
   accessToken: string,
   projectId: string | number,
   tokenId: number,
-  instanceUrl: string = DEFAULT_GITLAB_URL
+  instanceUrl: string = DEFAULT_GITLAB_URL,
+  signal?: AbortSignal
 ): Promise<void> {
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
@@ -2447,6 +2473,7 @@ export async function revokeProjectAccessToken(
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
+      ...(signal === undefined ? {} : { signal }),
     }
   );
 

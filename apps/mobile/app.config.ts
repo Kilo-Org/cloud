@@ -73,11 +73,17 @@ if (missing.length > 0) {
 
 // URL contract: every URL value must use its allowed scheme. Non-production
 // builds additionally permit http:/ws: for local development; production
-// builds also assert the host against the production allowlist.
-for (const [key, schemes] of Object.entries(URL_SCHEMES)) {
-  const value = process.env[ENV_KEYS[key as keyof typeof ENV_KEYS]];
+// builds also assert the host against the production allowlist. A URL key may
+// be required or optional, so its name comes from both maps; the explicit type
+// makes a URL_SCHEMES key with no name in either map a type error.
+const URL_ENV_NAMES: Record<keyof typeof URL_SCHEMES, string> = {
+  ...ENV_KEYS,
+  ...OPTIONAL_ENV_KEYS,
+};
+for (const key of Object.keys(URL_SCHEMES) as (keyof typeof URL_SCHEMES)[]) {
+  const value = process.env[URL_ENV_NAMES[key]];
   if (!value) continue;
-  assertUrlScheme(key, value, schemes, { allowInsecure: !isProductionBuild });
+  assertUrlScheme(key, value, URL_SCHEMES[key], { allowInsecure: !isProductionBuild });
   if (isProductionBuild) {
     assertProductionHost(key, value, PRODUCTION_HOSTS);
   }
@@ -137,13 +143,13 @@ const config: ExpoConfig = {
   // Keep in lockstep with AGENT_CHANNEL_SPLIT_APP_VERSION in
   // @kilocode/notifications: this is the first build that creates the split
   // agent channels, so older tokens stay on the legacy `agent` channel.
-  version: '1.0.15',
+  version: '1.0.16',
   // Rotation is supported on iOS and Android: `default` resolves to portrait +
   // both landscapes in UISupportedInterfaceOrientations on iOS and all
   // orientations in the Android manifest, satisfying WCAG 1.3.4 (Orientation)
-  // without claiming an "essential" exception. `ios.requireFullScreen` below
-  // STAYS true so iPad split-view/multitasking remains out of scope:
-  // full-screen rotation yes, Split View/Slide Over no.
+  // without claiming an "essential" exception. Rotation does not describe the
+  // window: the iOS 27 SDK makes every window resizable on its own, so
+  // `ios.requireFullScreen` below is a resizing preference, not a scope.
   orientation: 'default',
   icon: './assets/images/logo.png',
   scheme: 'kiloapp',
@@ -168,11 +174,8 @@ const config: ExpoConfig = {
   // usage-description keys (the plugin options below stay as the base Info.plist
   // value). `ios`-nested because only iOS has this catalog: Android defines no
   // per-locale native string file for permission prompts, so its `withLocales`
-  // resolves each tag to nothing by capability rather than by omission. The
-  // location copy spells the app name out: `.lproj` strings are not
-  // build-expanded, so the upstream `$(PRODUCT_NAME)` would render literally
-  // there. The `Localizable.strings` the same bundle resolves is written by
-  // `withAppIntentLocalizations` below, not here.
+  // resolves each tag to nothing by capability rather than by omission.
+  // `withAppIntentLocalizations` writes the same bundle's `Localizable.strings`.
   locales: nativeLocales,
   ios: {
     // iOS 18+ appearance variants. `light` is the existing icon unchanged; `dark` keeps the
@@ -185,7 +188,14 @@ const config: ExpoConfig = {
       tinted: './assets/images/logo-tinted.png',
     },
     bundleIdentifier: 'com.kilocode.kiloapp',
-    requireFullScreen: true,
+    // Apple deprecated `UIRequiresFullScreen` in iOS 27: it no longer opts an
+    // app out of resizing, it asks for discrete resizing only. `false` keeps
+    // continuous resizing, which the shared geometry helpers already serve
+    // (src/lib/screen-insets.ts, narrow-layout.ts, tab-bar-layout.ts,
+    // form-sheet.ts). With `supportsTablet`, Expo's config plugin then writes
+    // all four `UISupportedInterfaceOrientations~ipad` values, which App Store
+    // validation requires of a resizable iPad app (ITMS-90474).
+    requireFullScreen: false,
     supportsTablet: true,
     usesAppleSignIn: true,
     // `webcredentials` is the passkey half of the claim: it lets the iOS
@@ -437,21 +447,6 @@ const config: ExpoConfig = {
         imageWidth: 100,
       },
     ],
-    [
-      'expo-location',
-      {
-        locationWhenInUsePermission:
-          'Allow $(PRODUCT_NAME) to use your location to set up local weather.',
-        // The app requests only foreground location for weather setup.
-        locationAlwaysAndWhenInUsePermission: false,
-        locationAlwaysPermission: false,
-        // Apple requires this key for the library's linked motion APIs, even though Kilo never calls them.
-        motionUsagePermission: PERMISSION_PROMPT_COPY.en.NSMotionUsageDescription,
-        isIosBackgroundLocationEnabled: false,
-        isAndroidBackgroundLocationEnabled: false,
-        isAndroidForegroundServiceEnabled: false,
-      },
-    ],
     'expo-apple-authentication',
     // Play store, pinned: `modules.horizon` and `modules.amazon.fireOS` are the
     // flags the plugin reads, so pinning both false keeps a stray
@@ -519,6 +514,9 @@ const config: ExpoConfig = {
     // exists only in the androidx compose artifacts.
     './plugins/withAndroidSheetCloseLabel',
     './plugins/withAndroidExpoModuleRepos',
+    // Compiles the App Intents in the app target (see the plugin): the static
+    // KiloAppActions pod has no bundle for the system to load intents from.
+    './plugins/withKiloAppIntents',
     // Writes the app target's single `Localizable.strings` per language: the
     // four App Intent actions and their parameters resolve their
     // `LocalizedStringResource` literals against it, and the Focus-filter copy

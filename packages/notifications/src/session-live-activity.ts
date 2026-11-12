@@ -1,37 +1,37 @@
 import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
+import { glanceableTitle } from '@kilocode/app-shared/home-widget';
+import { timestampMs, timestampToIso } from '@kilocode/app-shared/utils';
 import {
   isDefaultSessionTitle,
   SESSION_LIVE_COMMAND_LIMIT,
   SESSION_LIVE_PLAN_STEP_LIMIT,
   SESSION_LIVE_TARGET_LIMIT,
-  sessionLiveCut,
-  sessionDisplayLine,
   sessionLiveText,
   type SessionLiveChanges,
   type SessionLiveFailureKind,
   type SessionLivePlan,
   type SessionLiveStep,
-} from '@kilocode/session-ingest-contracts';
+} from '@kilocode/session-ingest-contracts/session-live-summary';
 
 import { LIVE_ACTIVITY_RELEVANCE, type SessionLiveActivityContentState } from './push-data';
 import {
+  isFinishedSessionCardStatus,
   SESSION_CARD_QUIET_AFTER_MS,
   type SessionCardStatusKind,
   type SessionLiveOutcomeKind,
 } from './session-live-content';
 
 /**
- * The session card title (spec "Content" rule 2): trimmed and capped like a
- * home widget row title, and read through the shared display rule so the card
- * draws the title text it stands for. An untitled session or the backend
+ * The session card title (spec "Content" rule 2): the shared glanceable title
+ * cut, so the card draws the same text the Home widget row would. This surface
+ * adds only its own empty rule: an untitled session or the backend
  * `New session - <ISO>` placeholder gives null, so the card draws
  * `common.agent` instead.
  */
 export function sessionLiveActivityTitle(raw: string | null | undefined): string | null {
-  const title = sessionDisplayLine(raw ?? '').trim();
+  const title = glanceableTitle(raw);
   if (title === '' || isDefaultSessionTitle(title)) return null;
-  return sessionLiveCut(title, HOME_WIDGET_TITLE_LIMIT);
+  return title;
 }
 
 /** The facts of one session row that the session card shows. */
@@ -62,17 +62,6 @@ export type SessionLiveActivityBuildOptions = {
   /** The content the card already shows, so server-only facts survive a local rebuild. */
   previous?: Partial<SessionLiveActivityContentState> | undefined;
 };
-
-/** Epoch milliseconds of one backend time, or null when it is missing or does not parse. */
-function parseTimestampMs(value: string | null | undefined): number | null {
-  const at = value == null ? Number.NaN : Date.parse(value);
-  return Number.isFinite(at) ? at : null;
-}
-
-function isoOrNull(value: string | null | undefined): string | null {
-  const at = parseTimestampMs(value);
-  return at === null ? null : new Date(at).toISOString();
-}
 
 /** The larger of the stored and the new cost, so a local update never lowers it. */
 function maxCost(
@@ -124,7 +113,7 @@ export function buildSessionLiveActivityContentState(
   const statusKind: SessionCardStatusKind = base === 'idle' && failure !== null ? 'failed' : base;
   const approvalKey = row.status === 'permission' ? options.approvalKey : null;
   const changes = row.changes ?? previous?.changes ?? null;
-  const finished = statusKind === 'idle' || statusKind === 'failed';
+  const finished = isFinishedSessionCardStatus(statusKind);
   const step = row.currentStep ?? previous?.currentStep ?? null;
   const plan = row.plan ?? previous?.plan ?? null;
   const command = row.permissionCommand ?? previous?.permissionCommand ?? null;
@@ -132,8 +121,8 @@ export function buildSessionLiveActivityContentState(
     sessionId: row.id,
     title: sessionLiveActivityTitle(row.title),
     statusKind,
-    statusSince: isoOrNull(row.statusUpdatedAt) ?? options.statusSinceFallback,
-    scheduledAt: statusKind === 'scheduled' ? isoOrNull(row.scheduledAt) : null,
+    statusSince: timestampToIso(row.statusUpdatedAt) ?? options.statusSinceFallback,
+    scheduledAt: statusKind === 'scheduled' ? timestampToIso(row.scheduledAt) : null,
     awaitingPermission: approvalKey !== null,
     approvalKey,
     updatedAt: options.updatedAt,
@@ -148,11 +137,11 @@ export function buildSessionLiveActivityContentState(
     permissionCommand:
       approvalKey === null ? null : sessionLiveText(command, SESSION_LIVE_COMMAND_LIMIT),
     changes,
-    lastActivityAt: isoOrNull(row.lastActivityAt) ?? previous?.lastActivityAt ?? null,
+    lastActivityAt: timestampToIso(row.lastActivityAt) ?? previous?.lastActivityAt ?? null,
     costMicrodollars: maxCost(previous?.costMicrodollars, row.costMicrodollars),
     outcome: finished ? { kind: outcomeKind(row, changes) } : null,
     failure: failure === null || statusKind !== 'failed' ? null : { kind: failure },
-    startedAt: isoOrNull(row.startedAt) ?? previous?.startedAt ?? null,
+    startedAt: timestampToIso(row.startedAt) ?? previous?.startedAt ?? null,
   };
 }
 
@@ -170,7 +159,7 @@ export function sessionCardStaleAtSeconds(
   defaultStaleAtSeconds: number
 ): number {
   if (content.statusKind !== 'running') return defaultStaleAtSeconds;
-  const at = parseTimestampMs(content.lastActivityAt);
+  const at = timestampMs(content.lastActivityAt);
   if (at === null) return defaultStaleAtSeconds;
   return Math.min(
     defaultStaleAtSeconds,
@@ -195,7 +184,7 @@ const RECENCY_HALF_MS = 365 * 24 * 60 * 60_000;
  * a newer change first, and a bounded term so no tie-break can leave its band.
  */
 function recencyTerm(changedAt: string | null): number {
-  const at = parseTimestampMs(changedAt);
+  const at = timestampMs(changedAt);
   if (at === null) return 0;
   const elapsed = Math.max(0, at - RECENCY_ORIGIN_MS);
   return Math.min(19, (19 * elapsed) / (elapsed + RECENCY_HALF_MS));
@@ -212,7 +201,7 @@ export function sessionLiveActivityRelevance(
   const band =
     statusKind === 'needsInput'
       ? LIVE_ACTIVITY_RELEVANCE.sessionNeedsInput
-      : statusKind === 'idle' || statusKind === 'failed'
+      : isFinishedSessionCardStatus(statusKind)
         ? LIVE_ACTIVITY_RELEVANCE.sessionIdle
         : LIVE_ACTIVITY_RELEVANCE.sessionActive;
   return band + recencyTerm(statusSince);

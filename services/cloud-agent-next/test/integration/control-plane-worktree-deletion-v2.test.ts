@@ -31,7 +31,7 @@ import {
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINERS_NAMESPACE,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { waitFor } from './wait-for.js';
@@ -155,7 +155,7 @@ async function injectProvider(
   const broker = createFakeCredentialBroker();
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(instance.env, broker, {
+    installFakeSandboxEnv(instance, broker, {
       SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',
@@ -238,7 +238,7 @@ async function startConnectedSandbox(): Promise<{
   kiloSessionId: string;
   worktreeId: string;
 }> {
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+  const sandboxId = await generateSandboxId(newSessionId());
   const provider = createFakeProvider();
   const sandbox = await injectProvider(sandboxId, provider);
   const sessionId = newSessionId();
@@ -432,7 +432,7 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
   });
 
   it('shortcuts only a stopped allocation with no unconfirmed provider ref', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const sandbox = await injectProvider(sandboxId, provider);
     const worktree = worktreeId();
@@ -601,7 +601,7 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
   });
 
   it('cleans a connected shared sandbox when the deleted worktree has no route', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const sandbox = await injectProvider(sandboxId, provider);
     const worktreeA = worktreeId();
@@ -770,7 +770,7 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
   });
 
   it('rejects a foreign sandbox location', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const sandbox = await injectProvider(sandboxId, provider);
 

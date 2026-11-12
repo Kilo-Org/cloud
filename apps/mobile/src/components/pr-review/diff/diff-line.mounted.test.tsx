@@ -223,6 +223,32 @@ describe('DiffLine code direction', () => {
   });
 });
 
+describe('DiffLine code end inset', () => {
+  // The row mirrors under an RTL interface: the gutter's trailing `pr-2` moves
+  // with it, while a physical-only inset would leave the LTR code Text flush
+  // against the row's mirrored end (the physical left screen edge). The code
+  // container names a logical end inset so both sides of the mirrored row keep
+  // the gutter's 8 dp, and the start side stays the gutter's own padding.
+  it('names a logical end inset and no physical side padding on the code container', () => {
+    const renderer = mountLine({ line: line(), language: null, keyId: 'end-inset' });
+
+    const row = findRow(renderer);
+    const [, code] = row.props.children as [
+      TestRenderer.ReactTestInstance,
+      TestRenderer.ReactTestInstance,
+    ];
+    const style = code.props.style as {
+      paddingEnd?: number;
+      paddingLeft?: number;
+      paddingRight?: number;
+    };
+
+    expect(style.paddingEnd).toBe(8);
+    expect(style.paddingLeft).toBeUndefined();
+    expect(style.paddingRight).toBeUndefined();
+  });
+});
+
 describe('DiffLine highlight runs', () => {
   // The diff line shares the code block's run renderer: untagged tokens stay
   // raw strings (React Native coalesces them into the code Text's own

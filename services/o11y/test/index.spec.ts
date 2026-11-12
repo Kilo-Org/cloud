@@ -292,7 +292,7 @@ describe('session metrics RPC', () => {
       'user_123',
       'anthropic/claude-sonnet-4',
     ]);
-    expect(call.doubles).toEqual([60000, 1500, 5, 12, 2, 21000, 0.15, 1, 0, 1, 1]);
+    expect(call.doubles).toEqual([60000, 1500, 5, 12, 2, 21000, 0.15, 1, 0, 1, 1, 0]);
 
     expect(pipelineSpy.send).toHaveBeenCalledOnce();
     expect(pipelineSpy.send.mock.calls[0][0]).toEqual([
@@ -344,6 +344,22 @@ describe('session metrics RPC', () => {
 
     const call = aeSpy.writeDataPoint.mock.calls[0][0];
     expect(call.doubles[1]).toBe(-1);
+  });
+
+  it('marks a record whose counted figures cover only part of the session', async () => {
+    const aeSpy = makeWriteDataPointSpy();
+    const env = makeTestEnv({ O11Y_SESSION_METRICS: aeSpy as unknown as AnalyticsEngineDataset });
+    const ctx = createExecutionContext();
+    const instance = new Worker(ctx, env);
+
+    await instance.ingestSessionMetrics({
+      ...makeValidSessionMetrics(),
+      metricsBounded: true,
+    });
+
+    const call = aeSpy.writeDataPoint.mock.calls[0][0];
+    expect(call.doubles[11]).toBe(1);
+    // The exported stream keeps its immutable schema; the flag rides the AE point.
   });
 
   it('defaults ingestVersion to 0 when omitted', async () => {

@@ -8,7 +8,8 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { useMutation } from '@tanstack/react-query';
 import { signIn } from 'next-auth/react';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
-import { LinkableAuthProviders } from '@/lib/auth/provider-metadata';
+import { AccountLinkingProviders } from '@/lib/auth/provider-metadata';
+import { useClaudeSignInEnabled } from '@/lib/auth/claude/use-claude-sign-in-enabled';
 
 export type AuthProvider = {
   provider: AuthProviderId;
@@ -27,7 +28,10 @@ type LoginMethodsCardProps = {
 export function LoginMethodsCard({ primaryEmail, providers, onError }: LoginMethodsCardProps) {
   const trpc = useTRPC();
   const alreadyLinkedProviders = new Set(providers.map(o => o.provider));
-  const availableProviders = LinkableAuthProviders.filter(p => !alreadyLinkedProviders.has(p.id));
+  const claudeSignInEnabled = useClaudeSignInEnabled();
+  const availableProviders = AccountLinkingProviders.filter(
+    p => !alreadyLinkedProviders.has(p.id) && (p.id !== 'claude' || claudeSignInEnabled)
+  );
 
   const linkMutation = useMutation(
     trpc.user.linkAuthProvider.mutationOptions({

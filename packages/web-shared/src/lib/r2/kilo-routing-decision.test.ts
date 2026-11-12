@@ -2,9 +2,13 @@ import { after } from 'next/server';
 import { PutObjectCommand, S3ServiceException } from '@aws-sdk/client-s3';
 import {
   KiloRoutingDecisionRecordSchema,
+  type ByokFailoverAttempt,
   type ProviderRoutingDecision,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
-import type { EnkryptGuardrailReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
+import type {
+  EnkryptGuardrailReport,
+  EnkryptOutputGuardrailReport,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { createAiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
@@ -179,7 +183,6 @@ test('adds the Enkrypt guardrail report read at upload time', async () => {
   const enkrypt: EnkryptGuardrailReport = {
     settings: {
       status: 'ready',
-      scan_tool_results: true,
       detectors: [{ detector: 'injection_attack', action: 'block' }],
     },
     verdict: 'block',
@@ -188,6 +191,7 @@ test('adds the Enkrypt guardrail report read at upload time', async () => {
     scans: [
       {
         scan: 'blocking',
+        part: 'conversation',
         detectors_enabled: ['injection_attack'],
         detectors_blocking: ['injection_attack'],
         verdict_cache: 'hit',
@@ -195,6 +199,7 @@ test('adds the Enkrypt guardrail report read at upload time', async () => {
         total_segments: 12,
         cached_characters: 8_000,
         cached_segments: 10,
+        omitted_attachments: 1,
         scanned_characters: 3_000,
         decision: 'blocked',
         error: null,
@@ -203,6 +208,7 @@ test('adds the Enkrypt guardrail report read at upload time', async () => {
         credits_cost: 3,
         latency_ms: 400,
         verdict_cache_write: 'skipped',
+        chunks: 1,
       },
     ],
   };
@@ -221,6 +227,77 @@ test('adds the Enkrypt guardrail report read at upload time', async () => {
     ...decision,
     enkrypt,
   });
+});
+
+test('adds the Enkrypt output guardrail report read at upload time', async () => {
+  const enkryptOutput: EnkryptOutputGuardrailReport = {
+    settings: {
+      status: 'ready',
+      detectors: [{ detector: 'pii', action: 'block', pii_entities: ['secrets'] }],
+    },
+    held_back: true,
+    held_bytes: 4_096,
+    held_ms: 8_200,
+    upstream_read_failed: false,
+    output_characters: 1_200,
+    not_scanned_reason: null,
+    verdict: 'block',
+    unavailable_reason: null,
+    added_latency_ms: 310,
+    scans: [
+      {
+        scan: 'blocking',
+        part: 'response',
+        detectors_enabled: ['pii'],
+        detectors_blocking: ['pii'],
+        verdict_cache: 'off',
+        total_characters: 1_200,
+        total_segments: 1,
+        cached_characters: 0,
+        cached_segments: 0,
+        omitted_attachments: 0,
+        scanned_characters: 1_200,
+        decision: 'blocked',
+        error: null,
+        detectors_fired: ['pii'],
+        attempts: 1,
+        credits_cost: 2,
+        latency_ms: 300,
+      },
+    ],
+  };
+  const report = jest.fn(async () => enkryptOutput);
+  const capture = createAiProviderMetadataCapture(USAGE_ID);
+  capture?.captureEnkryptOutputReport(report);
+  capture?.captureRoutingDecision(decision);
+  expect(report).not.toHaveBeenCalled();
+
+  await runScheduledUpload();
+
+  expect(archivedRecord()).toEqual({
+    schema_version: 1,
+    usage_id: USAGE_ID,
+    created_at: expect.any(String),
+    ...decision,
+    enkrypt_output: enkryptOutput,
+  });
+});
+
+test('archives the input report when the Enkrypt output report fails', async () => {
+  const capture = createAiProviderMetadataCapture(USAGE_ID);
+  capture?.captureEnkryptReport(async () => null);
+  capture?.captureEnkryptOutputReport(async () => {
+    throw new TypeError('boom');
+  });
+  capture?.captureRoutingDecision(decision);
+
+  await runScheduledUpload();
+
+  expect(archivedRecord()).not.toHaveProperty('enkrypt_output');
+  expect(errorExceptInTest).toHaveBeenCalledWith(
+    '[kilo-routing-decision] Enkrypt output report failed; archived without it',
+    { usageId: USAGE_ID, errorType: 'TypeError' }
+  );
 });
 
 test('still archives the routing decision when the Enkrypt report fails', async () => {
@@ -252,6 +329,101 @@ test('omits the Enkrypt entry when no guardrail applied', async () => {
   await runScheduledUpload();
 
   expect(archivedRecord()).not.toHaveProperty('enkrypt');
+});
+
+test('adds the BYOK failover attempts', async () => {
+  const attempts: ByokFailoverAttempt[] = [
+    {
+      provider_type: 'vercel',
+      byok_provider_ids: ['openai'],
+      status: 429,
+      error_code: 'insufficient_quota',
+      duration_ms: 412,
+      outcome: 'failed-over',
+    },
+    {
+      provider_type: 'openrouter',
+      byok_provider_ids: ['openrouter'],
+      status: 200,
+      duration_ms: 903,
+      outcome: 'served',
+    },
+  ];
+  const capture = createAiProviderMetadataCapture(USAGE_ID);
+  capture?.captureRoutingDecision(decision);
+  capture?.captureByokFailoverAttempts(Promise.resolve(attempts));
+
+  await runScheduledUpload();
+
+  expect(archivedRecord()).toEqual({
+    schema_version: 1,
+    usage_id: USAGE_ID,
+    created_at: expect.any(String),
+    ...decision,
+    byok_failover_attempts: attempts,
+  });
+});
+
+test('awaits the BYOK failover attempts at upload time', async () => {
+  const attempts = Promise.withResolvers<ByokFailoverAttempt[]>();
+  const capture = createAiProviderMetadataCapture(USAGE_ID);
+  capture?.captureRoutingDecision(decision);
+  capture?.captureByokFailoverAttempts(attempts.promise);
+  expect(fakeR2.send).not.toHaveBeenCalled();
+
+  const upload = runScheduledUpload();
+  await Promise.resolve();
+  expect(fakeR2.send).not.toHaveBeenCalled();
+  attempts.resolve([
+    {
+      provider_type: 'vercel',
+      byok_provider_ids: ['openai'],
+      status: 429,
+      error_code: 'rate_limit_error',
+      duration_ms: 120,
+      outcome: 'failed-over',
+    },
+  ]);
+  await upload;
+
+  expect(archivedRecord().byok_failover_attempts).toEqual([
+    expect.objectContaining({ status: 429, error_code: 'rate_limit_error' }),
+  ]);
+});
+
+test('archives without the BYOK failover attempts when they fail to resolve', async () => {
+  const capture = createAiProviderMetadataCapture(USAGE_ID);
+  capture?.captureRoutingDecision(decision);
+  capture?.captureByokFailoverAttempts(Promise.reject(new Error('upstream error text')));
+
+  await runScheduledUpload();
+
+  expect(archivedRecord()).toEqual({
+    schema_version: 1,
+    usage_id: USAGE_ID,
+    created_at: expect.any(String),
+    ...decision,
+  });
+  expect(errorExceptInTest).toHaveBeenCalledWith(
+    '[kilo-routing-decision] BYOK failover attempts failed; archived without it',
+    { usageId: USAGE_ID, errorType: 'Error' }
+  );
+  expect(JSON.stringify(jest.mocked(errorExceptInTest).mock.calls)).not.toMatch(
+    /upstream error text/
+  );
+});
+
+test.each([
+  { name: 'none were captured', attempts: undefined },
+  { name: 'an empty list was captured', attempts: Promise.resolve([]) },
+])('omits the BYOK failover attempts when $name', async ({ attempts }) => {
+  const capture = createAiProviderMetadataCapture(USAGE_ID);
+  capture?.captureRoutingDecision(decision);
+  if (attempts) capture?.captureByokFailoverAttempts(attempts);
+
+  await runScheduledUpload();
+
+  expect(archivedRecord()).not.toHaveProperty('byok_failover_attempts');
 });
 
 test('does not register an archive from metadata or parser settlement without routing', async () => {

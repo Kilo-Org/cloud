@@ -11,9 +11,13 @@ export default {
       return Response.json({ status: 'ok', service: 'scim-sync' });
     }
 
-    // Calls the Durable Object, so a 200 proves the namespace is reachable and
-    // not merely that the Worker booted. Unauthenticated, which is why the
-    // Worker publishes no public URL: see `workers_dev` in wrangler.jsonc.
+    // Diagnostic only, and not reachable in production: this Worker has
+    // `workers_dev: false`, no `routes`, and no inbound service binding, so
+    // nothing can issue an HTTP request to it once deployed. It answers under
+    // `wrangler dev`, where the response proves the Durable Object namespace
+    // works. Anything that exposes this route later has to add authentication
+    // first: it reports internal state, and reaching it drives a billable
+    // Durable Object request.
     if (pathname === '/status') {
       return Response.json(await getScimSyncDOStub(env).getStatus());
     }

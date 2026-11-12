@@ -250,14 +250,6 @@ export function preflightAndQueuePromptMessage(
   return preflightAndAdmitPromptMessage(input, ctx, procedure, queueControlPlaneMessage);
 }
 
-export async function queueMessage(
-  input: QueueMessageInput,
-  ctx: QueueMessageContext
-): Promise<QueueAckResponse> {
-  await preflightRuntimeAuthorizationRecovery(input.cloudAgentSessionId, ctx);
-  return queueControlPlaneMessage(input, ctx);
-}
-
 /**
  * Admits a control-plane message through the V2 Session DO `send` RPC. The
  * Worker owns resolving the effective agent and materializing attachments,

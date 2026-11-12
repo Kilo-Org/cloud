@@ -1,4 +1,5 @@
 import { readProfileBundle } from '../../session-profile.js';
+import { commandsPayloadSchema } from '../../session/ingest-handlers/commands-available.js';
 import { z } from 'zod';
 import type { SessionAttachPayload } from '../../shared/sandbox-control-protocol.js';
 import {
@@ -65,6 +66,7 @@ export const controlPlaneSessionRegisterInputSchema = z
   .object({
     metadata: CurrentSessionMetadataSchema,
     sandboxSelection: controlPlaneSandboxSelectionSchema,
+    initialCommands: commandsPayloadSchema.optional(),
     runtimeAuthorizationSeal: z
       .string()
       .min(1)
@@ -124,9 +126,15 @@ export function controlPlaneRouteSpecFromAttachPayload(
     directory: payload.directory,
     ...(payload.branch ? { branch: payload.branch } : {}),
     ...(payload.branchMode ? { branchMode: payload.branchMode } : {}),
+    ...(payload.baseBranch ? { baseBranch: payload.baseBranch } : {}),
+    ...(payload.baseSha ? { baseSha: payload.baseSha } : {}),
     ...(git ? { git } : {}),
     ...(env ? { env } : {}),
     ...(payload.setupCommands ? { setupCommands: payload.setupCommands } : {}),
+    ...(payload.startCommands ? { startCommands: payload.startCommands } : {}),
+    ...(payload.environmentSetupCommandCount === undefined
+      ? {}
+      : { environmentSetupCommandCount: payload.environmentSetupCommandCount }),
     ...(runtimeIsolation ? { runtimeIsolation } : {}),
     // The Sandbox DO replaces this with its own route attempt id; the field is
     // only a protocol placeholder until an attempt starts.
@@ -219,12 +227,7 @@ export function buildControlPlaneSessionRegistration(
   ) {
     throw new Error('Sandbox selection kind does not match session metadata');
   }
-  const containment =
-    sandboxSelection.containment ??
-    getWorktreeCredentialContainment(runtimeConfiguration?.containmentEnabled ?? true);
-  if (sandboxProvider === 'vercel' && !containment.kilocode && !containment.github) {
-    throw new Error('Vercel requires credential containment');
-  }
+  const containment = getWorktreeCredentialContainment();
   if (!hasModernRuntimeAuthorization(metadata)) {
     throw new SessionCredentialUpgradeRequiredError();
   }
@@ -241,7 +244,7 @@ export function buildControlPlaneSessionRegistration(
     if (!validated.success) throw new McpAttachValidationError(validated.reason);
   }
   // A read-only Bitbucket review runs with worker-owned env only, so its
-  // encrypted profile secrets, agents, commands and MCP are withheld.
+  // encrypted profile secrets, instructions, agents, commands and MCP are withheld.
   // Its runtime skills stay: they
   // carry the trusted review skill that the Code Reviewer attaches.
   const readOnlyBitbucketReview = isReadOnlyBitbucketReview(metadata);
@@ -250,9 +253,17 @@ export function buildControlPlaneSessionRegistration(
     encryptedSecrets !== undefined && Object.keys(encryptedSecrets).length > 0;
   const profile = readProfileBundle(metadata);
   const runtimeProfile = {
+    ...(!readOnlyBitbucketReview && profile.runtimeInstructions?.length
+      ? { runtimeInstructions: profile.runtimeInstructions }
+      : {}),
     ...(profile.runtimeSkills?.length ? { runtimeSkills: profile.runtimeSkills } : {}),
     ...(!readOnlyBitbucketReview && profile.runtimeAgents?.length
       ? { runtimeAgents: profile.runtimeAgents }
+      : {}),
+    ...(!readOnlyBitbucketReview &&
+    profile.builtinAgents &&
+    Object.keys(profile.builtinAgents).length > 0
+      ? { builtinAgents: profile.builtinAgents }
       : {}),
     ...(!readOnlyBitbucketReview && profile.kiloCommands?.length
       ? { kiloCommands: profile.kiloCommands }

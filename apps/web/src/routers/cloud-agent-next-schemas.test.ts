@@ -22,6 +22,12 @@ import {
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentRelaxedAttachmentFilenameSchema,
   baseSendMessageNextSchema,
+  baseGetStackedWorkspaceSourceNextSchema,
+  baseStackedWorkspaceSourceNextOutputSchema,
+  baseSyncWorktreeBranchNextSchema,
+  baseRestackWorktreeBranchNextSchema,
+  baseCreatePreviewNextSchema,
+  basePreviewOptionsNextSchema,
 } from './cloud-agent-next-schemas';
 
 const MESSAGE_UUID = '12345678-1234-4234-9234-123456789abc';
@@ -291,6 +297,30 @@ describe('baseGetSessionNextOutputSchema', () => {
     expect(
       baseGetSessionNextOutputSchema.parse({ ...baseSession, runtimeAgents }).runtimeAgents
     ).toEqual(runtimeAgents);
+  });
+
+  it('preserves safe DO-native metadata fields used by session detail UIs', () => {
+    const metadata = {
+      title: 'DO title',
+      associatedPr: {
+        url: 'https://github.com/Kilo-Org/cloud/pull/42',
+        number: 42,
+        state: 'open',
+        title: 'Preserve metadata',
+        headSha: 'a'.repeat(40),
+        lastSyncedAt: '2026-10-19T21:00:00.000Z',
+        platform: 'github',
+        reviewDecision: 'approved',
+        reviewDecisionPending: false,
+      },
+      totalCostMicrodollars: 350_000,
+      createdOnPlatform: 'extension',
+      profileId: 'profile-1',
+    };
+    expect(baseGetSessionNextOutputSchema.parse({ ...baseSession, ...metadata })).toEqual({
+      ...baseSession,
+      ...metadata,
+    });
   });
 });
 
@@ -1047,5 +1077,139 @@ describe('baseCancelQueuedMessageNextSchema', () => {
     expect(
       baseCancelQueuedMessageNextSchema.safeParse({ messageId: VALID_MESSAGE_ID }).success
     ).toBe(false);
+  });
+});
+
+describe('stacked workspace schemas', () => {
+  const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+  const base = {
+    prompt: 'Create a stacked session',
+    mode: 'code',
+    model: 'kilo/test-model',
+  };
+
+  it('allows stackOnWorktreeId to be the only repository source', () => {
+    expect(
+      personalPrepareSessionNextSchema.safeParse({
+        ...base,
+        stackOnWorktreeId: worktreeId,
+      }).success
+    ).toBe(true);
+  });
+
+  it('still requires a repository when there is no parent', () => {
+    expect(personalPrepareSessionNextSchema.safeParse(base).success).toBe(false);
+  });
+
+  it('allows a parent with a repository that the router then verifies', () => {
+    expect(
+      personalPrepareSessionNextSchema.safeParse({
+        ...base,
+        stackOnWorktreeId: worktreeId,
+        githubRepo: 'acme/repo',
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects an upstream branch with a parent', () => {
+    expect(
+      personalPrepareSessionNextSchema.safeParse({
+        ...base,
+        stackOnWorktreeId: worktreeId,
+        upstreamBranch: 'other',
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a base branch and an upstream branch together', () => {
+    expect(
+      personalPrepareSessionNextSchema.safeParse({
+        ...base,
+        githubRepo: 'acme/repo',
+        baseBranch: 'feat',
+        upstreamBranch: 'other',
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts only the session id for sync and restack', () => {
+    expect(
+      baseSyncWorktreeBranchNextSchema.safeParse({
+        cloudAgentSessionId: 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      }).success
+    ).toBe(true);
+    expect(
+      baseRestackWorktreeBranchNextSchema.safeParse({
+        cloudAgentSessionId: 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        baseBranch: 'main',
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts only a worktree id for the read-only source query', () => {
+    expect(baseGetStackedWorkspaceSourceNextSchema.safeParse({ worktreeId }).success).toBe(true);
+    expect(
+      baseGetStackedWorkspaceSourceNextSchema.safeParse({ worktreeId, prompt: 'no' }).success
+    ).toBe(false);
+  });
+
+  it('round-trips the read-only stacked source output', () => {
+    expect(
+      baseStackedWorkspaceSourceNextOutputSchema.parse({
+        worktreeId,
+        repository: 'acme/repo',
+        gitUrl: 'https://github.com/acme/repo.git',
+        platform: 'github',
+        branch: 'feat-parent',
+        prNumber: 7,
+        basePushed: false,
+        githubIntegrationId: null,
+        providerInput: { githubRepo: 'acme/repo', githubIntegrationId: null },
+      })
+    ).toMatchObject({ worktreeId, basePushed: false });
+  });
+});
+
+describe('preview target schemas', () => {
+  const WORKTREE_ID = 'worktree_12345678-1234-4234-9234-123456789abc';
+  const WORKSPACE_ID = 'workspace_12345678-1234-4234-9234-123456789abc';
+
+  it('accepts a worktree target or a standalone session target', () => {
+    expect(
+      baseCreatePreviewNextSchema.safeParse({ worktreeId: WORKTREE_ID, port: 5173 }).success
+    ).toBe(true);
+    expect(
+      baseCreatePreviewNextSchema.safeParse({ cloudAgentSessionId: WORKSPACE_ID, port: 5173 })
+        .success
+    ).toBe(true);
+  });
+
+  it('requires exactly one target', () => {
+    expect(baseCreatePreviewNextSchema.safeParse({ port: 5173 }).success).toBe(false);
+    expect(
+      baseCreatePreviewNextSchema.safeParse({
+        worktreeId: WORKTREE_ID,
+        cloudAgentSessionId: WORKSPACE_ID,
+        port: 5173,
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects malformed targets', () => {
+    expect(
+      baseCreatePreviewNextSchema.safeParse({ worktreeId: 'worktree_1', port: 5173 }).success
+    ).toBe(false);
+    expect(
+      baseCreatePreviewNextSchema.safeParse({ cloudAgentSessionId: 'agent_1', port: 5173 }).success
+    ).toBe(false);
+  });
+
+  it('carries the route organization alongside a target', () => {
+    expect(
+      basePreviewOptionsNextSchema.safeParse({
+        worktreeId: WORKTREE_ID,
+        organizationId: '11111111-1111-4111-8111-111111111111',
+      }).success
+    ).toBe(true);
   });
 });

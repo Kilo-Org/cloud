@@ -117,6 +117,32 @@ test('a workspace installation policy change selects all workspaces', () => {
   assert.deepEqual(changedDependencyWorkspaces(snapshot(), after), ['*']);
 });
 
+test('a release-age policy change selects no workspace on its own', () => {
+  // A frozen-lockfile install pins every resolution, so the release-age policy
+  // cannot move an installed tree while the lockfile stays the same.
+  const aged = snapshot();
+  aged.workspace.minimumReleaseAge = 6842;
+  const excluded = snapshot();
+  excluded.workspace.minimumReleaseAge = 6842;
+  excluded.workspace.minimumReleaseAgeExclude = ['router@1.0.0'];
+
+  assert.deepEqual(changedDependencyWorkspaces(snapshot(), aged), []);
+  assert.deepEqual(changedDependencyWorkspaces(aged, excluded), []);
+  assert.deepEqual(changedDependencyWorkspaces(excluded, snapshot()), []);
+
+  // Every other installation-policy key can change the installed tree.
+  for (const [key, value] of [
+    ['packages', ['apps/*']],
+    ['autoInstallPeers', true],
+    ['allowBuilds', { esbuild: true }],
+    ['publicHoistPattern', ['metro']],
+  ]) {
+    const after = snapshot();
+    after.workspace[key] = value;
+    assert.deepEqual(changedDependencyWorkspaces(snapshot(), after), ['*'], key);
+  }
+});
+
 test('a lockfile setting change selects all workspaces', () => {
   const after = snapshot();
   after.lockfile.settings.autoInstallPeers = true;
@@ -340,7 +366,10 @@ test('the ingest workspace runs only the explicit native attachment regression',
   const step = workflow.jobs['workspace-tests'].steps.find(step =>
     step.run?.includes('test:integration')
   );
-  assert.equal(step?.if, "matrix.workspace.name == 'cloudflare-session-ingest'");
+  assert.equal(
+    step?.if,
+    "matrix.workspace.name == 'cloudflare-session-ingest' && needs.changes.outputs.test_scripts_db != 'true' && needs.changes.outputs.data_session_ingest != 'true'"
+  );
   assert.equal(
     step?.run,
     'pnpm --filter cloudflare-session-ingest run test:integration test/integration/user-connection-attachment.test.ts'

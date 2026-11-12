@@ -8,17 +8,26 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": false,
-  "observability": { "enabled": true },
+  // env.staging inherits this block. Trace sampling is independent of Workers Logs.
+  "observability": {
+    "enabled": true,
+    "traces": { "enabled": true, "head_sampling_rate": 0.05 },
+  },
   // Production merge/deployment prerequisites: eu-queues.md.
   "vars": {
     "USAGE_INGEST_PARALLELISM": "2",
     "USAGE_WRITER_URL": "https://app.kilo.ai/api/internal/usage/record",
+    // Stall hedge to the global queue: README.md#stall-hedge-to-the-global-queue.
+    "USAGE_INGEST_HEDGE_MODE": "off",
+    "USAGE_INGEST_HEDGE_DELAY_MS": "1000",
+    "USAGE_INGEST_HEDGE_PERCENT": "50",
   },
   "queues": {
     "producers": [
       { "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing-eu" },
       // Unused by the Worker: exposes the matching DLQ to queue preparation.
       { "binding": "USAGE_INGEST_DLQ", "queue": "usage-ingest-processing-dlq-eu" },
+      { "binding": "USAGE_INGEST_HEDGE_QUEUE", "queue": "usage-ingest-processing" },
     ],
     "consumers": [
       {
@@ -27,8 +36,19 @@
         "max_batch_timeout": 0,
         "max_retries": 20,
         "retry_delay": 60,
-        "max_concurrency": 200,
+        "max_concurrency": 225,
         "dead_letter_queue": "usage-ingest-processing-dlq-eu",
+      },
+      // Attached regardless of the hedge mode so hedged copies always drain. A DLQ must share
+      // its source queue's jurisdiction, so the global queue keeps its global DLQ.
+      {
+        "queue": "usage-ingest-processing",
+        "max_batch_size": 6,
+        "max_batch_timeout": 0,
+        "max_retries": 20,
+        "retry_delay": 60,
+        "max_concurrency": 25,
+        "dead_letter_queue": "usage-ingest-processing-dlq",
       },
     ],
   },
@@ -39,11 +59,15 @@
       "vars": {
         "USAGE_INGEST_PARALLELISM": "2",
         "USAGE_WRITER_URL": "https://staging-app.kilo.ai/api/internal/usage/record",
+        "USAGE_INGEST_HEDGE_MODE": "on",
+        "USAGE_INGEST_HEDGE_DELAY_MS": "1000",
+        "USAGE_INGEST_HEDGE_PERCENT": "100",
       },
       "queues": {
         "producers": [
           { "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing-staging-eu" },
           { "binding": "USAGE_INGEST_DLQ", "queue": "usage-ingest-processing-dlq-staging-eu" },
+          { "binding": "USAGE_INGEST_HEDGE_QUEUE", "queue": "usage-ingest-processing-staging" },
         ],
         "consumers": [
           {
@@ -54,6 +78,15 @@
             "retry_delay": 60,
             "max_concurrency": 200,
             "dead_letter_queue": "usage-ingest-processing-dlq-staging-eu",
+          },
+          {
+            "queue": "usage-ingest-processing-staging",
+            "max_batch_size": 2,
+            "max_batch_timeout": 0,
+            "max_retries": 20,
+            "retry_delay": 60,
+            "max_concurrency": 25,
+            "dead_letter_queue": "usage-ingest-processing-dlq-staging",
           },
         ],
       },

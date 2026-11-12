@@ -9,7 +9,8 @@
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only theme-token guard, runs in node, never bundled into the app
 import { readFileSync } from 'node:fs';
 
-import { createElement } from 'react';
+import { ORGANIZATION_NAME_MAX_LENGTH } from '@kilocode/app-shared/organizations';
+import { createElement, isValidElement } from 'react';
 import { act, type TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -17,6 +18,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 import { compiledDimensions, compiledLengthDp } from '@/test/native-dimensions';
 
 import { i18n } from '@/i18n';
+import { AddCreditsRow } from '@/components/add-credits-row';
 import { type OrgKiloPassRowState, type OrgKiloPassSummary } from './org-kilo-pass-row-state';
 import { OrganizationHubScreen } from './hub-screen';
 
@@ -29,11 +31,16 @@ const SPACING_UNIT_DP = 4;
 
 const boundary = vi.hoisted(() => ({
   role: 'owner' as string,
+  name: 'Acme',
   parentOrganizationId: null as string | null | undefined,
   requireSeats: false,
   seatCount: { used: 1, total: 1 },
+  balance: 5_000_000,
+  plan: 'teams' as 'teams' | 'enterprise',
+  isTrialExpiredForEnforcement: false,
 }));
 const routerPush = vi.hoisted(() => vi.fn());
+const openExternalUrlMock = vi.hoisted(() => vi.fn());
 const kiloPassQuery = vi.hoisted(() => ({ enabled: [] as boolean[] }));
 const membersQuery = vi.hoisted(() => ({
   data: undefined as
@@ -60,11 +67,13 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     role: boundary.role,
     org: {
       organizationId: 'org-1',
-      organizationName: 'Acme',
+      organizationName: boundary.name,
       parentOrganizationId: boundary.parentOrganizationId,
-      balance: 5_000_000,
+      balance: boundary.balance,
       requireSeats: boundary.requireSeats,
       seatCount: boundary.seatCount,
+      plan: boundary.plan,
+      isTrialExpiredForEnforcement: boundary.isTrialExpiredForEnforcement,
     },
     isResolving: false,
   }),
@@ -79,6 +88,21 @@ vi.mock('@/lib/hooks/use-organization-mutations', () => ({
   useOrganizationMutations: () => ({ rename: { mutateAsync: vi.fn() } }),
 }));
 
+// The hub obeys the Profile tab's hide-balance preference; this suite pins both
+// renderings from a hoisted state each case sets.
+const hideBalancePref = vi.hoisted(() => ({
+  hideBalance: false,
+  hasLoaded: true,
+}));
+
+vi.mock('@/lib/hooks/use-hide-balance-preference', () => ({
+  useHideBalancePreference: () => ({
+    hideBalance: hideBalancePref.hideBalance,
+    hasLoaded: hideBalancePref.hasLoaded,
+    setHideBalance: vi.fn(),
+  }),
+}));
+
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: 'gray', foreground: 'black' }),
 }));
@@ -89,16 +113,11 @@ vi.mock('@/lib/organization-context', () => ({
 
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.kilo.test' }));
 
-vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: openExternalUrlMock }));
 
 vi.mock('@/lib/format', () => ({
-  formatMoney: (amount: number) => `$${amount}`,
+  formatPrefixedMoney: (amount: number) => `$${amount}`,
   formatNumber: String,
-}));
-
-vi.mock('@/lib/agent-color', () => ({
-  agentColor: () => ({}),
-  toneColor: () => ({}),
 }));
 
 vi.mock('@/lib/utils', () => ({
@@ -135,6 +154,12 @@ vi.mock('@/components/organization/org-kilo-pass-row-state', async importOrigina
   };
 });
 vi.mock('@/components/organization/org-usage-stats', () => ({ OrgUsageStats: 'OrgUsageStats' }));
+
+// The block's own paint (icon, tint, action press) is covered by its mounted
+// test; this suite asserts which plan state the hub hands it.
+vi.mock('@/components/organization/plan-refusal', () => ({
+  OrganizationPlanRefusal: 'OrganizationPlanRefusal',
+}));
 
 vi.mock('@/components/organization/organization-boundary', () => ({
   OrganizationBoundary: () => null,
@@ -239,11 +264,18 @@ async function renderHub() {
 
 beforeEach(() => {
   boundary.role = 'owner';
+  boundary.name = 'Acme';
   boundary.parentOrganizationId = null;
   boundary.requireSeats = false;
   boundary.seatCount = { used: 1, total: 1 };
+  boundary.balance = 5_000_000;
+  boundary.plan = 'teams';
+  boundary.isTrialExpiredForEnforcement = false;
+  hideBalancePref.hideBalance = false;
+  hideBalancePref.hasLoaded = true;
   kiloPassRowState.current = null;
   routerPush.mockClear();
+  openExternalUrlMock.mockClear();
   kiloPassQuery.enabled = [];
   membersQuery.data = { parent_organization_id: null, settings: {} };
   membersQuery.isError = false;
@@ -275,6 +307,170 @@ describe('Organization hub card', () => {
     // Left-to-right isolate (U+2066) and pop-directional-isolate (U+2069): the
     // pair reads 1 of 5 in either interface direction.
     expect(seats?.props.value).toBe('\u20661 / 5\u2069');
+    unmount();
+  });
+
+  it('offers the top-up on the balance line of an empty balance', async () => {
+    boundary.balance = 0;
+
+    const { renderer, unmount } = await renderHub();
+
+    const balance = renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.balance'));
+    // The control shares the amount's row: a row of its own held nothing but
+    // the button once the copy beside it left.
+    const trailing: object | null | undefined = balance?.props.trailing;
+    expect(isValidElement(trailing) && trailing.type === AddCreditsRow).toBe(true);
+    unmount();
+  });
+
+  it('keeps a funded organization on its balance line alone', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const balance = renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.balance'));
+    expect(balance?.props.value).toBe('$5');
+    expect(balance?.props.trailing).toBeUndefined();
+    unmount();
+  });
+});
+
+describe('Organization hub plan', () => {
+  const planRow = (renderer: TestRenderer.ReactTestRenderer) =>
+    renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.plan'));
+  const refusals = (renderer: TestRenderer.ReactTestRenderer) =>
+    renderer.root.findAllByType('OrganizationPlanRefusal');
+
+  it('names the plan in every state, in the card the seats belong to', async () => {
+    const entitled = await renderHub();
+
+    const entitledRow = planRow(entitled.renderer);
+    expect(entitledRow?.props.value).toBe(i18n.t('organization.hub.planTeams'));
+    // The row never overrides its value ink: the tier reads like every other
+    // value in the card.
+    expect(entitledRow?.props.valueTone).toBeUndefined();
+    // An entitled organization is not warned about a state it is not in, and it
+    // carries no status segment.
+    expect(entitledRow?.props.valueStatus).toBeUndefined();
+    expect(refusals(entitled.renderer)).toHaveLength(0);
+    entitled.unmount();
+
+    boundary.plan = 'enterprise';
+    boundary.isTrialExpiredForEnforcement = true;
+    const lapsed = await renderHub();
+
+    // A lapsed organization keeps its tier named and states the status beside
+    // it: the bare tier beside a block that says there is no active plan reads
+    // as a plan that is still running. The tier keeps the row's ordinary ink and
+    // the status carries the warning, so the name does not glow with it.
+    const lapsedRow = planRow(lapsed.renderer);
+    expect(lapsedRow?.props.value).toBe(i18n.t('organization.hub.planEnterprise'));
+    expect(lapsedRow?.props.valueTone).toBeUndefined();
+    expect(lapsedRow?.props.valueStatus).toMatchObject({
+      label: i18n.t('organization.hub.planStatusLapsed'),
+      tone: 'danger',
+    });
+    lapsed.unmount();
+  });
+
+  it('explains a lapsed plan with the state alone, leaving the step to the action', async () => {
+    boundary.isTrialExpiredForEnforcement = true;
+
+    const { renderer, unmount } = await renderHub();
+
+    const [refusal] = refusals(renderer);
+    expect(refusal?.props.message).toBe(i18n.t('organization.hub.planEnded'));
+    // The billing action below the sentence is the next step, so the message
+    // must not repeat the instruction the surfaces without an action carry.
+    expect(refusal?.props.message).not.toBe(i18n.t('common.organizationTrialEnded'));
+    unmount();
+  });
+
+  it('opens the web billing page for a role that can change the plan', async () => {
+    boundary.isTrialExpiredForEnforcement = true;
+
+    const { renderer, unmount } = await renderHub();
+
+    const action = refusals(renderer)[0]?.props.action as
+      | { label: string; onPress: () => void }
+      | undefined;
+    expect(action?.label).toBe(i18n.t('organization.hub.manageBilling'));
+    act(() => {
+      action?.onPress();
+    });
+
+    expect(openExternalUrlMock).toHaveBeenCalledWith(
+      'https://app.kilo.test/organizations/org-1/subscriptions',
+      { label: i18n.t('organization.hub.manageBilling') }
+    );
+    unmount();
+  });
+
+  it('keeps the explanation and drops the action for a member', async () => {
+    boundary.role = 'member';
+    boundary.isTrialExpiredForEnforcement = true;
+
+    const { renderer, unmount } = await renderHub();
+
+    const [refusal] = refusals(renderer);
+    // The web billing page refuses this role, so the block states the state
+    // without offering a control that would fail, and it keeps the sentence
+    // that names who can end it.
+    expect(refusal?.props.message).toBe(i18n.t('common.organizationTrialEnded'));
+    expect(refusal?.props.action).toBeUndefined();
+    unmount();
+  });
+});
+
+describe('Organization hub balance masking', () => {
+  // The mocked org carries balance 5_000_000 → the mocked formatMoney paints $5.
+  const balanceRow = (renderer: TestRenderer.ReactTestRenderer) =>
+    renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.balance'));
+
+  it('paints the amount while the hide-balance preference is off', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const row = balanceRow(renderer);
+    expect(row?.props.value).toBe('$5');
+    // The spoken label always carries the amount: a node React Native stops
+    // handing a label keeps its previous native value on Android, so the
+    // masked-until-settled flip to visible must not leave "Balance hidden".
+    expect(row?.props.valueAccessibilityLabel).toBe('$5');
+    unmount();
+  });
+
+  it('masks the amount and speaks the hidden label while the preference is on', async () => {
+    hideBalancePref.hideBalance = true;
+
+    const { renderer, unmount } = await renderHub();
+
+    const row = balanceRow(renderer);
+    expect(row?.props.value).toBe('*****');
+    expect(row?.props.valueAccessibilityLabel).toBe(i18n.t('profile.balanceHidden'));
+    // No painted node may carry the amount while it is hidden.
+    expect(
+      renderer.root.findAll(
+        node => typeof node.props.children === 'string' && node.props.children === '$5'
+      )
+    ).toHaveLength(0);
+    unmount();
+  });
+
+  it('keeps the amount masked until the preference read settles', async () => {
+    hideBalancePref.hideBalance = false;
+    hideBalancePref.hasLoaded = false;
+
+    const { renderer, unmount } = await renderHub();
+
+    const row = balanceRow(renderer);
+    expect(row?.props.value).toBe('*****');
+    expect(row?.props.valueAccessibilityLabel).toBe(i18n.t('profile.balanceHidden'));
     unmount();
   });
 });
@@ -342,6 +538,31 @@ describe('OrganizationHubScreen rename control', () => {
     });
 
     expect(renderer.root.findAll(node => String(node.type) === 'RenameModal')).toHaveLength(1);
+    unmount();
+  });
+
+  it('opens the rename sheet on the whole stored name, up to the server limit', async () => {
+    // `RenameModal`'s own default is shorter than a stored organization name can
+    // be, and React Native applies `maxLength` to the seeded value: the dialog
+    // then opens on a cut name, and saving keeps only what the field shows.
+    const longName = 'Northwind Logistics — European Operations and Customer Support Berlin';
+    expect(longName.length).toBeGreaterThan(50);
+    boundary.name = longName;
+
+    const { renderer, unmount } = await renderHub();
+    const control = findRenameControl(renderer.root)[0];
+    if (!control) {
+      throw new Error('rename control not found');
+    }
+    act(() => {
+      (control.props.onPress as () => void)();
+    });
+
+    const modal = renderer.root.findAll(node => String(node.type) === 'RenameModal')[0];
+    expect(modal?.props).toMatchObject({
+      initialValue: longName,
+      maxLength: ORGANIZATION_NAME_MAX_LENGTH,
+    });
     unmount();
   });
 
@@ -418,8 +639,8 @@ describe('Organization hub Kilo Pass placeholder', () => {
     const classes = skeletonClasses(renderer.root)[0] ?? '';
     const tokens = classes.split(/\s+/).filter(Boolean);
 
-    // `bg-muted` equals the `bg-secondary` row card in both palettes, so the
-    // default bar drew nothing on this screen.
+    // `skeleton-fill` matches the `bg-secondary` row card in the light palette,
+    // so the default bar drew nothing on this screen.
     expect(tokens).toContain('bg-muted-soft');
     expect(tokens).not.toContain('bg-muted');
 
@@ -641,6 +862,59 @@ describe('Organization hub billing card while its data loads', () => {
     });
     expect(membersQuery.refetch).toHaveBeenCalledOnce();
     expect(kiloPassQuery.enabled.at(-1)).toBe(false);
+    unmount();
+  });
+});
+
+describe('Organization hub Kilo Pass icon tile', () => {
+  /** The tile's own classes: the View that holds the Kilo Pass glyph. */
+  function tileClass(root: TestRenderer.ReactTestInstance): string {
+    const icon = root.findAllByType('KiloPassIcon')[0];
+    if (icon === undefined) {
+      throw new Error('Kilo Pass icon missing');
+    }
+    const tile = icon.parent;
+    if (tile === null) {
+      throw new Error('Kilo Pass tile missing');
+    }
+    return String(tile.props.className);
+  }
+
+  // The row stands beside ConfigureRows that carry no tone, so it takes the
+  // shared neutral tile; a hue hashed from its title would put one accent in a
+  // settings list. Attention is the only state that earns a tone.
+  it('takes the neutral tile when the row needs no attention, never a hashed hue', async () => {
+    kiloPassRowState.current = {
+      subtitle: 'Not subscribed',
+      attention: false,
+      action: 'setup',
+      actionLabel: 'Set up',
+      accessibilityHint: 'Opens Kilo Pass setup on web.',
+      loading: false,
+    };
+    const { renderer, unmount } = await renderHub();
+
+    const tokens = tileClass(renderer.root).split(/\s+/).filter(Boolean);
+    expect(tokens).toContain('bg-hair-soft');
+    expect(tokens).toContain('border-border');
+    expect(tokens.filter(token => token.startsWith('bg-agent-'))).toEqual([]);
+    unmount();
+  });
+
+  it('keeps the warn tile for the attention state', async () => {
+    kiloPassRowState.current = {
+      subtitle: 'Could not load status',
+      attention: true,
+      action: 'retry',
+      actionLabel: 'Retry',
+      accessibilityHint: 'Retries loading Kilo Pass status.',
+      loading: false,
+    };
+    const { renderer, unmount } = await renderHub();
+
+    const tokens = tileClass(renderer.root).split(/\s+/).filter(Boolean);
+    expect(tokens).toContain('bg-warn-tile-bg');
+    expect(tokens).toContain('border-warn-tile-border');
     unmount();
   });
 });

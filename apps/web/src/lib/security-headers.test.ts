@@ -77,24 +77,35 @@ describe('security headers', () => {
     const env: Record<string, string | undefined> = {
       NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL: 'wss://next-agent.example.com/path',
       NEXT_PUBLIC_SESSION_INGEST_WS_URL: 'wss://ingest.example.com/path',
-      NEXT_PUBLIC_GASTOWN_URL: 'https://gastown.example.com/api',
     };
 
     expect(getConfiguredConnectSrcOrigins(env)).toEqual([
       'wss://next-agent.example.com',
       'wss://ingest.example.com',
-      'https://gastown.example.com',
-      'wss://gastown.example.com',
     ]);
   });
 
-  it('derives ws:// Gastown origins for non-HTTPS development URLs', () => {
+  it('derives ws:// session-sync origins for non-HTTPS development URLs', () => {
     expect(
       getConfiguredConnectSrcOrigins({
-        NEXT_PUBLIC_GASTOWN_URL: 'http://localhost:8787/api',
+        NODE_ENV: 'development',
+        NEXT_PUBLIC_SESSION_SYNC_URL: 'http://localhost:8791',
       })
-    ).toEqual(['http://localhost:8787', 'ws://localhost:8787']);
+    ).toEqual(['http://localhost:8791', 'ws://localhost:8791']);
   });
+
+  it.each(['production', 'test', undefined])(
+    'excludes preview relay permissions from CSP outside development: %s',
+    nodeEnv => {
+      const origins = getConfiguredConnectSrcOrigins({
+        NODE_ENV: nodeEnv,
+        NEXT_PUBLIC_SESSION_SYNC_URL: 'https://preview-relay.example.com/path',
+      });
+      const policy = buildContentSecurityPolicy({ connectSrcUrls: origins });
+
+      expect(getPolicyDirective(policy, 'connect-src')).not.toContain('preview-relay.example.com');
+    }
+  );
 
   it('supports enforcement, report-only, and off modes', () => {
     expect(getContentSecurityPolicyMode({})).toBe('report-only');

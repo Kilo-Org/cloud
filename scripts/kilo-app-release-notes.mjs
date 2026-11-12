@@ -63,8 +63,6 @@ const APP_PATHS = [
   'apps/mobile/',
   'packages/trpc/',
   'packages/app-shared/',
-  'packages/kilo-chat/',
-  'packages/kilo-chat-hooks/',
   'packages/event-service/',
   'packages/notifications/',
   'packages/cloud-agent-sdk/',

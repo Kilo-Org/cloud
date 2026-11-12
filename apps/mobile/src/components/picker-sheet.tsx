@@ -21,6 +21,7 @@ export function PickerSheet({
   headerContent,
   expired = false,
   scrollable = true,
+  headerInBody = false,
   disabled = false,
   onHardwareBack,
   doneDisabled = false,
@@ -47,6 +48,14 @@ export function PickerSheet({
    * the header instead of nesting them in a ScrollView.
    */
   scrollable?: boolean;
+  /**
+   * Set when the caller renders `headerContent` as the first item of its own
+   * scrolling body instead of pinning it under the title row. A sheet whose
+   * presented height is smaller than the pinned header plus one row (a short
+   * window, and the keyboard takes more of it) keeps the title row and its
+   * actions, and lets everything else scroll.
+   */
+  headerInBody?: boolean;
   /** Disables the header Done/Cancel controls while the caller applies a choice. */
   disabled?: boolean;
   /**
@@ -153,7 +162,7 @@ export function PickerSheet({
           doneDisabled={doneDisabled}
           topInset={topInset}
         />
-        {headerContent}
+        {!headerInBody && headerContent}
       </View>
       {scrollable && !expired ? (
         // "handled" is the shell's own rule for the sheets that live in it: a

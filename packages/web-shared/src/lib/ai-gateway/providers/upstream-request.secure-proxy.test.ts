@@ -1,7 +1,8 @@
 import { SecureProxyRequestBodySchema } from '@kilocode/ai-gateway-secure-proxy-contracts';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { buildDirectProvider } from './build-direct-provider';
-import { upstreamRequest } from './upstream-request';
+import { UPSTREAM_DURATION_BUDGET_MS, upstreamRequest } from './upstream-request';
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -15,7 +16,7 @@ jest.mock('next/server', () => ({
 
 const originalFetch = global.fetch;
 
-function secureProxyProvider(disable_url_suffix: boolean, prompt_cache_key_as_mt_user_id: boolean) {
+function secureProxyProvider(disable_url_suffix: boolean, user_hash_as_mt_user_id: boolean) {
   return buildDirectProvider(
     'custom',
     ['chat_completions'],
@@ -23,7 +24,7 @@ function secureProxyProvider(disable_url_suffix: boolean, prompt_cache_key_as_mt
       internal_id: 'upstream-model',
       base_url: 'https://secure-proxy.example.com/api/proxy',
       disable_url_suffix,
-      prompt_cache_key_as_mt_user_id,
+      user_hash_as_mt_user_id,
       extra_headers: { 'x-definition-header': 'definition' },
     },
     {
@@ -42,7 +43,7 @@ function secureProxyProvider(disable_url_suffix: boolean, prompt_cache_key_as_mt
 
 async function sendThroughSecureProxy(
   disable_url_suffix: boolean,
-  prompt_cache_key_as_mt_user_id = false,
+  user_hash_as_mt_user_id = false,
   prompt_cache_key = 'task-cache-key'
 ) {
   const fetchMock = jest.fn(
@@ -54,7 +55,7 @@ async function sendThroughSecureProxy(
     messages: [{ role: 'user' as const, content: 'hi' }],
     prompt_cache_key,
   };
-  const provider = secureProxyProvider(disable_url_suffix, prompt_cache_key_as_mt_user_id);
+  const provider = secureProxyProvider(disable_url_suffix, user_hash_as_mt_user_id);
   const extraHeaders: Record<string, string> = {};
   await provider.transformRequest({
     provider,
@@ -76,6 +77,7 @@ async function sendThroughSecureProxy(
     extraHeaders,
     provider,
     reasoningEffort: null,
+    durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
   });
 
   expect(result.type).toBe('success');
@@ -125,19 +127,23 @@ describe('upstreamRequest through the secure proxy', () => {
     expect(body.kilo_secure_proxy.url).toBe('https://llm.example.com/v1?trace=1');
   });
 
-  it('sends Mt-User-Id only to the upstream when enabled', async () => {
+  it('sends the prefixed Mt-User-Id only to the upstream when enabled', async () => {
     const { headers, body } = await sendThroughSecureProxy(false, true);
 
     expect(headers.has('Mt-User-Id')).toBe(false);
-    expect(body.kilo_secure_proxy.headers['mt-user-id']).toBe('task-cache-key');
+    expect(body.kilo_secure_proxy.headers['mt-user-id']).toBe(
+      'kilo:' + generateProviderSpecificHash('user-1', secureProxyProvider(false, true))
+    );
   });
 
   it.each(['\u4e2d\u6587', 'key\r\nInjected: value', 'key\0'])(
-    'still sends the request when cache key %s cannot be used as a header',
+    'sends the user hash when cache key %s cannot be used as a header',
     async cacheKey => {
       const { body } = await sendThroughSecureProxy(false, true, cacheKey);
 
-      expect(body.kilo_secure_proxy.headers).not.toHaveProperty('mt-user-id');
+      expect(body.kilo_secure_proxy.headers['mt-user-id']).toBe(
+        'kilo:' + generateProviderSpecificHash('user-1', secureProxyProvider(false, true))
+      );
       expect(body.prompt_cache_key).toBe(cacheKey);
     }
   );

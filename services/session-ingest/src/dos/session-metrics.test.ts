@@ -3,7 +3,6 @@ import {
   adjustRunningAssistantCostUsd,
   assistantMessageCostUsd,
   clampAssistantCostUsd,
-  computeRunningAssistantCostUsd,
   computeSessionMetrics,
   decideLivePersist,
   MAX_ASSISTANT_COST_USD,
@@ -214,6 +213,24 @@ describe('computeSessionMetrics', () => {
     ];
     const result = computeSessionMetrics(items, 'completed');
     expect(result.timeToFirstResponseMs).toBe(1500);
+    expect(result.metricsBounded).toBe(false);
+  });
+
+  it('states a partial item set and omits a time to first response it cannot know', () => {
+    const items = [
+      makeItem('message', { role: 'user', time: { created: 6_000_000 } }),
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 6_000_500 },
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 0,
+      }),
+    ];
+    const result = computeSessionMetrics(items, 'completed', { bounded: true });
+    // A partial item set holds no first message, so no response time is reported.
+    expect(result.timeToFirstResponseMs).toBeUndefined();
+    expect(result.metricsBounded).toBe(true);
+    expect(result.totalTurns).toBe(1);
   });
 
   it('extracts platform from kilo_meta', () => {
@@ -458,48 +475,6 @@ function assistantMessage(cost: number) {
   });
 }
 
-describe('computeRunningAssistantCostUsd', () => {
-  it('sums assistant message costs in USD', () => {
-    const rows = [assistantMessage(0.05), assistantMessage(0.1)];
-    expect(computeRunningAssistantCostUsd(rows)).toBeCloseTo(0.15);
-  });
-
-  it('ignores user messages', () => {
-    const rows = [
-      makeItem('message', { role: 'user', time: { created: 1000 } }),
-      assistantMessage(0.2),
-    ];
-    expect(computeRunningAssistantCostUsd(rows)).toBeCloseTo(0.2);
-  });
-
-  it('skips malformed rows', () => {
-    const rows = [{ item_data: 'not json' }, { item_data: 'null' }, assistantMessage(0.07)];
-    expect(computeRunningAssistantCostUsd(rows)).toBeCloseTo(0.07);
-  });
-
-  it("treats R2-offloaded '{}' as 0", () => {
-    expect(computeRunningAssistantCostUsd([{ item_data: '{}' }])).toBe(0);
-  });
-
-  it('returns a non-negative cost total', () => {
-    expect(computeRunningAssistantCostUsd([assistantMessage(-0.5)])).toBe(0);
-  });
-
-  it('adds bounded message cost contributions', () => {
-    const rows = [assistantMessage(0.5), assistantMessage(-1000)];
-    expect(computeRunningAssistantCostUsd(rows)).toBeCloseTo(0.5);
-  });
-
-  it('applies the maximum message cost before summing', () => {
-    expect(computeRunningAssistantCostUsd([assistantMessage(1e308)])).toBe(MAX_ASSISTANT_COST_USD);
-  });
-
-  it('converts to microdollars with the close-path formula (0.15 USD → 150_000)', () => {
-    const usd = computeRunningAssistantCostUsd([assistantMessage(0.15)]);
-    expect(Math.max(0, Math.round(usd * 1_000_000))).toBe(150_000);
-  });
-});
-
 describe('storedAssistantMessageCostUsd', () => {
   it('reads an inline assistant message body', () => {
     expect(
@@ -526,10 +501,9 @@ describe('storedAssistantMessageCostUsd', () => {
     );
   });
 
-  it('applies the same clamp as the full recomputation', () => {
+  it('applies the maximum message cost', () => {
     const row = { ...assistantMessage(1e308), item_data_r2_key: null };
     expect(storedAssistantMessageCostUsd(row)).toBe(MAX_ASSISTANT_COST_USD);
-    expect(computeRunningAssistantCostUsd([row])).toBe(MAX_ASSISTANT_COST_USD);
   });
 });
 
@@ -594,14 +568,12 @@ describe('adjustRunningAssistantCostUsd', () => {
     expect(adjustRunningAssistantCostUsd(0.1, 0.5, 0)).toBe(0);
   });
 
-  it('matches a full recomputation across replacements', () => {
+  it('matches the total over the stored contributions across replacements', () => {
     const rows = new Map<string, number>([
       ['a', 0.25],
       ['b', 0.125],
     ]);
-    let running = computeRunningAssistantCostUsd(
-      [...rows.values()].map(cost => ({ item_data: assistantMessage(cost).item_data }))
-    );
+    let running = [...rows.values()].reduce((sum, cost) => sum + cost, 0);
     for (const [id, cost] of [
       ['a', 0.5],
       ['b', 0.0625],
@@ -611,10 +583,10 @@ describe('adjustRunningAssistantCostUsd', () => {
       rows.set(id, cost);
       running = adjustRunningAssistantCostUsd(running, previous, cost);
     }
-    const recomputed = computeRunningAssistantCostUsd(
-      [...rows.values()].map(cost => ({ item_data: assistantMessage(cost).item_data }))
+    expect(running).toBeCloseTo(
+      [...rows.values()].reduce((sum, cost) => sum + cost, 0),
+      10
     );
-    expect(running).toBeCloseTo(recomputed, 10);
   });
 });
 

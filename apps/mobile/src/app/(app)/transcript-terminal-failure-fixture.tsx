@@ -15,5 +15,5 @@ export default function TranscriptTerminalFailureFixtureRoute() {
   if (!__DEV__) {
     return <Redirect href="/" />;
   }
-  return <TranscriptStyleFixture terminalFailure />;
+  return <TranscriptStyleFixture failure="terminal" />;
 }

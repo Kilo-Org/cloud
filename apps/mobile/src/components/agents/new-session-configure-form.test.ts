@@ -11,8 +11,8 @@ import {
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 
+import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { NewSessionProfileRow } from './new-session-environment-row';
 
 import '@/i18n';
@@ -430,9 +430,8 @@ describe('NewSessionConfigureForm', () => {
     // A three-line explanation in the pinned footer shrinks the scroll frame
     // and cuts the launch folder on a compact screen, so the body carries it.
     const scrollBody = findElement(element, 'ScrollView');
-    expect(findElementByComponent(scrollBody, AccessibleStatus)).toMatchObject({
+    expect(findElementByComponent(scrollBody, OrganizationPlanRefusal)).toMatchObject({
       message: 'The organization trial has ended.',
-      tone: 'error',
     });
     // The footer keeps only the start-blocked reason (its own component): the
     // refusal must not take height from the form a second time. The pinned
@@ -443,7 +442,7 @@ describe('NewSessionConfigureForm', () => {
     expect(lift).not.toBeNull();
     expect(footer).toBeDefined();
     expect(findElementByType(footer, 'NewSessionStartButton')).not.toBeNull();
-    expect(findElementByComponent(footer, AccessibleStatus)).toBeNull();
+    expect(findElementByComponent(footer, OrganizationPlanRefusal)).toBeNull();
   });
 
   // ── Case 1: Cloud, selector shown ──
@@ -464,9 +463,36 @@ describe('NewSessionConfigureForm', () => {
     });
   });
 
-  it('renders the account section above the run-target block', async () => {
+  it('keeps the run-target block while every provider asks to be connected', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
+    // The first-run form with no Git provider connected: the repository section
+    // renders its connect cards, and the run target must stay next to them so a
+    // Cloud Agent pick can still be switched back to a connected computer.
+    const connectGroups: RepositoryGroup[] = [
+      { key: 'github', status: 'connect', repositories: [] },
+      { key: 'gitlab', status: 'connect', repositories: [] },
+    ];
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      showRunOnSelector: true,
+      groups: connectGroups,
+    }) as Node;
+
+    expect(findElementByType(element, 'NewSessionRepositorySection')).toMatchObject({
+      groups: connectGroups,
+    });
+    expect(findElementByType(element, 'NewSessionRunTarget')).toMatchObject({
+      showRunOnSelector: true,
+      disabled: false,
+    });
+  });
+
+  it('renders the account section above the run-target block', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = NewSessionConfigureForm({
       ...defaultProps(),
@@ -1099,18 +1125,5 @@ describe('NewSessionConfigureForm', () => {
       cloudCreateError,
     }) as Node;
     expect(findElementByType(remote, 'NewSessionCloudCreateError')).toBeNull();
-  });
-
-  // ── Case 15: the scroll frame is measured and handed to the prompt ──
-  it('measures the scroll frame and threads it to NewSessionPrompt', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = NewSessionConfigureForm(defaultProps()) as Node;
-
-    // The ScrollView reports its height so the prompt can yield its floor to it.
-    expect(findElementByType(element, 'ScrollView')?.onLayout).toEqual(expect.any(Function));
-    // The mocked useState holds the initial measurement (0) and never setStates.
-    expect(findElementByType(element, 'NewSessionPrompt')?.frameHeight).toBe(0);
   });
 });

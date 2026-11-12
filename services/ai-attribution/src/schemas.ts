@@ -46,6 +46,9 @@ export const OrganizationJWTPayload = z.object({
   kiloUserId: z.string(),
   organizationId: z.string(),
   organizationRole: z.enum(['owner', 'member']),
+  // Present on every organization and delegated token, as a string or an explicit null.
+  // Absent only on internal service tokens, which carry no organization role.
+  apiTokenPepper: z.string().nullable().optional(),
   iat: z.number().optional(),
   exp: z.number().optional(),
 });

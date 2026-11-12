@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
-import type { WrapperKiloClient } from '../kilo-api.js';
+import type { Harness } from './harness.js';
 import {
   createRuntimeActivity,
   SESSION_CONTROL_REQUEST_MS,
@@ -18,25 +18,26 @@ const observation = (status: 'busy' | 'idle' = 'busy'): SessionObservation => ({
   interactions: [],
 });
 
-function harness() {
+function harness(nativeDrain = false) {
   let now = 0;
   const snapshots: Array<Parameters<NonNullable<RuntimeActivityOptions['readSnapshot']>>[0]> = [];
-  const aborts: Array<Parameters<WrapperKiloClient['abortSession']>[0]> = [];
+  const aborts: Array<Parameters<Harness['interrupt']>[0]> = [];
   const faults: ActivityFault[] = [];
   const deadlines: string[] = [];
   let read: NonNullable<RuntimeActivityOptions['readSnapshot']> = async () => [];
-  let abort: WrapperKiloClient['abortSession'] = async () => true;
+  let abort: Harness['interrupt'] = async () => true;
   const activity = createRuntimeActivity({
     nativeRuntimeId: 'process-1',
     directory: '/workspace',
     timers: CONTROL_PLANE_TIMERS.wrapper,
     now: () => now,
     client: {
-      abortSession: async input => {
+      ...(nativeDrain ? { drainSession: async () => true } : {}),
+      interrupt: async input => {
         aborts.push(input);
         return abort(input);
       },
-    } as WrapperKiloClient,
+    } as Harness,
     readSnapshot: input => {
       snapshots.push(input);
       return read(input);
@@ -259,5 +260,47 @@ describe('runtime activity observation', () => {
     expect(h.activity.state('ses_native')).toBeUndefined();
     expect(h.activity.needsCompute()).toBe(false);
     expect(h.faults).toEqual([]);
+  });
+});
+
+describe('execution tree observation readiness', () => {
+  it('keeps initial, disconnected, and disposed observations unknown', async () => {
+    const h = harness();
+    expect(h.activity.liveTreeExecutions('root')).toBeUndefined();
+    h.activity.connected();
+    await settle();
+    expect(h.activity.liveTreeExecutions('root')).toEqual([]);
+    h.activity.lost();
+    expect(h.activity.liveTreeExecutions('root')).toBeUndefined();
+    h.activity.connected();
+    await settle();
+    expect(h.activity.liveTreeExecutions('root')).toEqual([]);
+    h.activity.dispose();
+    expect(h.activity.liveTreeExecutions('root')).toBeUndefined();
+  });
+
+  it('keeps the tree but suspends native deadlines while a periodic snapshot fails on an open feed', async () => {
+    const h = harness(true);
+    h.read(async () => [observation()]);
+    h.activity.connected();
+    await h.activity.refresh();
+    const tree = h.activity.liveTreeExecutions('ses_native');
+    expect(tree).toHaveLength(1);
+    h.read(async () => {
+      throw new Error('Kilo activity request timed out');
+    });
+    h.advance(CONTROL_PLANE_TIMERS.wrapper.noProgressMs - 1);
+    await h.activity.refresh();
+    h.advance(1);
+    h.activity.tick();
+    await settle();
+    expect(h.deadlines).toEqual([]);
+    expect(h.activity.liveTreeExecutions('ses_native')).toEqual(tree);
+    h.read(async () => [observation()]);
+    await h.activity.refresh();
+    h.activity.tick();
+    await settle();
+    expect(h.deadlines).toEqual(['no_progress']);
+    h.activity.dispose();
   });
 });

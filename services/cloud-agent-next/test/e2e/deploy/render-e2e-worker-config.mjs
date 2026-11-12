@@ -29,7 +29,6 @@ const E2E_INTERNAL_SECRET_PATTERN = /^[A-Za-z0-9._~-]+$/;
 const CALLBACK_QUEUE = 'cloud-agent-next-callback-queue';
 const CALLBACK_QUEUE_E2E = 'cloud-agent-next-callback-queue-e2e-test';
 const REPORT_QUEUE = 'cloud-agent-next-report-queue';
-const SHARED_SANDBOX_OVERRIDES_KV_ID_E2E = '4d5f651fb14b4de682204eaa9fa60a7d';
 
 // Native Cloudflare Containers is the only runtime, so the E2E Worker boots the
 // same `SandboxContainers` class as production.
@@ -186,18 +185,13 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
     KILO_OPENROUTER_BASE: kiloOpenRouterBase,
     WS_ALLOWED_ORIGINS: 'https://app.kilo.ai,https://api.kilo.ai,http://localhost:3000',
-    PER_SESSION_SANDBOX_ORG_IDS: '*',
     TOOL_CGROUP_ORG_IDS: '*',
     TOOL_CGROUP_MODE: 'enforce',
     TOOL_CGROUP_RESERVE_MB: '1024',
     TOOL_CGROUP_CPU_WEIGHT: '50',
-    CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'false',
-    CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: '',
-    CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: '',
     // The suite runs every scenario through one funded test account, so its own
     // churn would trip the per-account concurrent-container cap.
     CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'true',
-    CREDENTIAL_CONTAINMENT_ENABLED: 'true',
   };
 
   config.secrets_store_secrets = config.secrets_store_secrets ?? [];
@@ -208,12 +202,6 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
       secret_name: 'NEXTAUTH_SECRET',
     });
   }
-
-  config.kv_namespaces = (config.kv_namespaces ?? []).map(kvNamespace =>
-    kvNamespace.binding === 'SHARED_SANDBOX_OVERRIDES'
-      ? { ...kvNamespace, id: SHARED_SANDBOX_OVERRIDES_KV_ID_E2E }
-      : kvNamespace
-  );
 
   config.queues = {
     ...config.queues,
@@ -439,7 +427,22 @@ if (isMain) {
     }
 
     const kiloOpenRouterBase = `${parsedFakeLlmBaseUrl.origin}${parsedFakeLlmBaseUrl.pathname}`;
-    const sourceConfig = parse(readFileSync(sourceConfigPath, 'utf8'));
+    const runtimeConfigPath = join(packageDir, 'wrangler.runtime-generated.json');
+    if (!existsSync(runtimeConfigPath)) {
+      throw new Error(
+        'Prepare the exact-SHA runtime deployment before rendering deployed E2E configuration (scripts/prepare-runtime-deploy.ts production <source-sha>).'
+      );
+    }
+    const sourceConfig = parse(readFileSync(runtimeConfigPath, 'utf8'));
+    if (
+      sourceConfig.vars?.RUNTIME_STARTUP_MODE !== 'downloaded' ||
+      sourceConfig.vars?.NATIVE_RUNTIME_IMAGE !== 'runtime-free' ||
+      !sourceConfig.vars?.RUNTIME_RELEASE_DESCRIPTOR
+    ) {
+      throw new Error(
+        'Deployed E2E requires a verified downloaded runtime-free deployment configuration.'
+      );
+    }
     let rendered;
     try {
       rendered = buildE2eWorkerConfig(sourceConfig, {

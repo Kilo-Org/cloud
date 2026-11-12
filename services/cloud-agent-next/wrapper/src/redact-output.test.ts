@@ -61,6 +61,28 @@ describe('redactSecrets', () => {
     );
   });
 
+  it('redacts inline credentials in setup command bodies', () => {
+    expect(
+      redactSecrets("npm config set //registry.npmjs.org/:_authToken 'inline-token-canary'")
+    ).toBe('npm config set //registry.npmjs.org/:_authToken [REDACTED]');
+    expect(redactSecrets("npm config set //registry.npmjs.org/:_auth 'dXNlcjpwYXNz'")).toBe(
+      'npm config set //registry.npmjs.org/:_auth [REDACTED]'
+    );
+    expect(redactSecrets('npm config set //registry.npmjs.org/:_password cGFzcw==')).toBe(
+      'npm config set //registry.npmjs.org/:_password [REDACTED]'
+    );
+    expect(redactSecrets('//registry.npmjs.org/:_auth=dXNlcjpwYXNz')).toBe(
+      '//registry.npmjs.org/:_auth=[REDACTED]'
+    );
+    expect(redactSecrets('curl -u user:inline-password-canary https://example.com')).toBe(
+      'curl -u [REDACTED] https://example.com'
+    );
+    expect(redactSecrets('curl --user=user:inline-password-canary https://example.com')).toBe(
+      'curl --user=[REDACTED] https://example.com'
+    );
+    expect(redactSecrets('git push -u origin main')).toBe('git push -u origin main');
+  });
+
   it('redacts multiple secrets in multi-line output', () => {
     const input = [
       'bare-unlabeled-token',

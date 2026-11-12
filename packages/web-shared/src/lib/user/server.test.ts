@@ -5,6 +5,17 @@ jest.mock('next/headers', () => ({
   cookies: jest.fn(),
 }));
 
+jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/admin/step-up-store');
+  return { ...actual, evaluateStepUp: jest.fn(actual.evaluateStepUp) };
+});
+
+// The defensive unexpected-throw case needs this seam.
+jest.mock('@kilocode/web-shared/lib/admin/step-up-guard', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/admin/step-up-guard');
+  return { ...actual, runStepUpGuard: jest.fn(actual.runStepUpGuard) };
+});
+
 const mockGetServerSession = jest.fn();
 const mockRedirect = jest.fn((url: string) => {
   throw new Error(`NEXT_REDIRECT:${url}`);
@@ -39,7 +50,13 @@ import {
   setAdminAccessSinkForTest,
   type AdminAccessEvent,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
-import { device_sessions, kilocode_users, organizations } from '@kilocode/db/schema';
+import {
+  blacklisted_domains,
+  device_sessions,
+  kilocode_users,
+  organizations,
+} from '@kilocode/db/schema';
+import { clearEmailBlacklistCache } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import type { User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { markOrganizationAsDeleted } from '@kilocode/web-shared/lib/organizations/organizations';
@@ -68,6 +85,7 @@ beforeEach(() => {
   mockHeaders.mockReset();
   mockGetServerSession.mockReset();
   mockRedirect.mockClear();
+  clearEmailBlacklistCache();
   resetDeviceSessionCacheForTest();
 });
 
@@ -484,6 +502,7 @@ describe('getUserFromAuth', () => {
 
     expect(result.user).toBeNull();
     expect(result.credentialsRejected).toBe(false);
+    expect(result.authorizationRefused).toBe(false);
   });
 
   test('returns 401 when the session read throws on malformed cookies', async () => {
@@ -659,6 +678,53 @@ describe('getUserFromAuth', () => {
     expect(result.organizationId).toBe(organization.id);
   });
 
+  test('returns the authorization response for a refused email domain', async () => {
+    const blockedDomain = `${crypto.randomUUID()}.blocked.example`;
+    const user = await insertTestUser({
+      google_user_email: `blacklisted-domain@mail.${blockedDomain}`,
+      api_token_pepper: 'blacklisted-domain-pepper',
+    });
+    await db.insert(blacklisted_domains).values({ domain: blockedDomain });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    try {
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.user).toBeNull();
+      expect(result.authFailedResponse?.status).toBe(403);
+      await expect(result.authFailedResponse?.json()).resolves.toEqual({
+        success: false,
+        error: 'Access denied (R0)',
+      });
+      expect(result.authorizationRefused).toBe(true);
+    } finally {
+      await db.delete(blacklisted_domains).where(eq(blacklisted_domains.domain, blockedDomain));
+    }
+  });
+
+  test('authorizes a user whose email domain only shares a raw suffix with a refused domain', async () => {
+    const blockedDomain = `${crypto.randomUUID()}.blocked.example`;
+    const user = await insertTestUser({
+      google_user_email: `allowed@not${blockedDomain}`,
+      api_token_pepper: 'allowed-domain-pepper',
+    });
+    await db.insert(blacklisted_domains).values({ domain: blockedDomain });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    try {
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.authFailedResponse).toBeNull();
+      expect(result.user?.id).toBe(user.id);
+    } finally {
+      await db.delete(blacklisted_domains).where(eq(blacklisted_domains.domain, blockedDomain));
+    }
+  });
+
   test('rejects a token whose organization context was soft-deleted', async () => {
     const user = await insertTestUser({ api_token_pepper: 'deleted-organization-pepper' });
     const organization = await createTestOrganization(
@@ -679,6 +745,7 @@ describe('getUserFromAuth', () => {
 
     expect(result.user).toBeNull();
     expect(result.authFailedResponse?.status).toBe(403);
+    expect(result.authorizationRefused).toBe(true);
   });
 
   test('allows API-token authentication for users from SSO-protected domains', async () => {
@@ -879,6 +946,34 @@ describe('credential issuance authentication guards', () => {
     expect(mockGetServerSession).toHaveBeenCalledWith(sessionAuthOptions);
   });
 
+  test('threads the server-only webSessionId and pepper from the session claim', async () => {
+    const user = await insertTestUser({ web_session_pepper: 'current-web-session-pepper' });
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: user.id,
+      webSessionPepper: 'current-web-session-pepper',
+      webSessionId: 'per-session-id',
+    });
+
+    const result = await getUserFromSessionForCredentialIssuance();
+
+    expect(result.user?.id).toBe(user.id);
+    expect(result.webSessionId).toBe('per-session-id');
+    expect(result.webSessionPepper).toBe('current-web-session-pepper');
+  });
+
+  test('a bearer credential carries no webSessionId', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'generic-bearer-pepper' });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user?.id).toBe(user.id);
+    expect(result.webSessionId).toBeUndefined();
+  });
+
   test('returns 401 when the session read throws on malformed cookies', async () => {
     mockHeaders.mockResolvedValue(new Headers());
     mockGetServerSession.mockRejectedValue(new TypeError('argument name is invalid'));
@@ -912,6 +1007,21 @@ describe('credential issuance authentication guards', () => {
 
     expect(result.user).toBeNull();
     expect(result.authFailedResponse?.status).toBe(403);
+    expect(result.authorizationRefused).toBe(true);
+  });
+
+  test('does not authorize credential issuance when the block timestamp is set', async () => {
+    const user = await insertTestUser({
+      blocked_reason: null,
+      blocked_at: '2026-01-15T12:00:00.000Z',
+    });
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockResolvedValue({ kiloUserId: user.id, webSessionPepper: null });
+
+    const result = await getUserFromSessionForCredentialIssuance();
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(403);
   });
 
   test('leaves generic bearer authentication available', async () => {
@@ -937,6 +1047,20 @@ describe('credential issuance authentication guards', () => {
 
   test('redirects blocked sessions to the blocked account page', async () => {
     const user = await insertTestUser({ blocked_reason: 'blocked for test' });
+    mockHeaders.mockResolvedValue(new Headers({ 'x-pathname': '/profile' }));
+    mockGetServerSession.mockResolvedValue({ kiloUserId: user.id, webSessionPepper: null });
+
+    await expect(getUserFromSessionForCredentialIssuanceOrRedirect()).rejects.toThrow(
+      'NEXT_REDIRECT:/account-blocked'
+    );
+    expect(mockRedirect).toHaveBeenCalledWith('/account-blocked');
+  });
+
+  test('redirects a session with a block timestamp to the blocked account page', async () => {
+    const user = await insertTestUser({
+      blocked_reason: null,
+      blocked_at: '2026-01-15T12:00:00.000Z',
+    });
     mockHeaders.mockResolvedValue(new Headers({ 'x-pathname': '/profile' }));
     mockGetServerSession.mockResolvedValue({ kiloUserId: user.id, webSessionPepper: null });
 
@@ -1223,7 +1347,6 @@ describe('credential exchange bearer authentication guard', () => {
     ['token source', { tokenSource: '' }],
     ['admin', { isAdmin: false }],
     ['internal use', { internalApiUse: false }],
-    ['gastown access', { gastownAccess: false }],
   ])('rejects a legacy bearer token with a %s marker', async (_name, marker) => {
     const user = await insertTestUser({ api_token_pepper: 'system-marker-pepper' });
     const now = Math.floor(Date.now() / 1000);
@@ -1424,6 +1547,302 @@ describe('credential exchange bearer authentication guard', () => {
   });
 });
 
+describe('binary step-up enforcement (REST)', () => {
+  const originalSwitch = process.env.ADMIN_STEP_UP_ENABLED;
+  let evaluateStepUp: jest.Mock;
+
+  beforeAll(() => {
+    ({ evaluateStepUp } = jest.requireMock('@kilocode/web-shared/lib/admin/step-up-store') as {
+      evaluateStepUp: jest.Mock;
+    });
+  });
+
+  afterEach(() => {
+    process.env.ADMIN_STEP_UP_ENABLED = originalSwitch;
+    evaluateStepUp.mockClear();
+    mockHeaders.mockReset();
+    mockGetServerSession.mockReset();
+  });
+
+  async function sessionAdmin() {
+    const admin = await insertTestUser({
+      google_user_email: `step-up-admin-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: true,
+      web_session_pepper: 'step-up-session-pepper',
+    });
+    mockHeaders.mockResolvedValue(new Headers({ 'x-pathname': '/admin/api/private-users' }));
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: admin.id,
+      webSessionPepper: 'step-up-session-pepper',
+      webSessionId: 'step-up-web-session',
+    });
+    return admin;
+  }
+
+  async function errorCode(result: { authFailedResponse: unknown }): Promise<unknown> {
+    return (await (result.authFailedResponse as Response).json()) as unknown;
+  }
+
+  it('does not evaluate or deny when the switch is off', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'false';
+    const admin = await sessionAdmin();
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(evaluateStepUp).not.toHaveBeenCalled();
+    expect(result.user?.id).toBe(admin.id);
+    expect(result.authFailedResponse).toBeNull();
+  });
+
+  it('allows a session with a fresh proof when on', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    const admin = await sessionAdmin();
+    evaluateStepUp.mockResolvedValueOnce({
+      state: {
+        status: 'fresh',
+        method: 'webauthn_uv',
+        verifiedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+      proof: null,
+      passkeyCount: 1,
+    });
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(result.user?.id).toBe(admin.id);
+    expect(result.authFailedResponse).toBeNull();
+  });
+
+  it.each([
+    [{ status: 'not_enrolled' }, 'NOT_ENROLLED'],
+    [{ status: 'required' }, 'MFA_REQUIRED'],
+    [{ status: 'expired', verifiedAt: new Date().toISOString() }, 'MFA_EXPIRED'],
+    [{ status: 'session_unbound' }, 'SESSION_UNBOUND'],
+  ] as const)('denies %j with %s when on', async (state, code) => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    await sessionAdmin();
+    evaluateStepUp.mockResolvedValueOnce({ state, proof: null, passkeyCount: 0 });
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(await errorCode(result)).toEqual({ success: false, error: code });
+  });
+
+  it('denies a bearer credential with BEARER_NOT_ALLOWED when on', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    const admin = await insertTestUser({
+      google_user_email: `step-up-bearer-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: true,
+      api_token_pepper: 'step-up-bearer-pepper',
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${generateApiToken(admin)}`,
+        'x-pathname': '/admin/api/private-users',
+      })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(evaluateStepUp).not.toHaveBeenCalled();
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(await errorCode(result)).toEqual({ success: false, error: 'BEARER_NOT_ALLOWED' });
+  });
+
+  it('fails closed with STEP_UP_UNAVAILABLE when evaluation errors', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    await sessionAdmin();
+    evaluateStepUp.mockRejectedValueOnce(new Error('relation does not exist'));
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(await errorCode(result)).toEqual({ success: false, error: 'STEP_UP_UNAVAILABLE' });
+  });
+
+  it('skips enforcement only for the layout escape hatch', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    const admin = await sessionAdmin();
+
+    const result = await getUserFromAuth({ adminOnly: true, skipStepUpGuard: true });
+
+    expect(evaluateStepUp).not.toHaveBeenCalled();
+    expect(result.user?.id).toBe(admin.id);
+  });
+});
+
+describe('step-up refusal telemetry (REST)', () => {
+  const originalSwitch = process.env.ADMIN_STEP_UP_ENABLED;
+  let evaluateStepUp: jest.Mock;
+  let runStepUpGuard: jest.Mock;
+  let events: AdminAccessEvent[];
+
+  beforeAll(() => {
+    ({ evaluateStepUp } = jest.requireMock('@kilocode/web-shared/lib/admin/step-up-store') as {
+      evaluateStepUp: jest.Mock;
+    });
+    ({ runStepUpGuard } = jest.requireMock('@kilocode/web-shared/lib/admin/step-up-guard') as {
+      runStepUpGuard: jest.Mock;
+    });
+  });
+
+  beforeEach(() => {
+    events = [];
+    setAdminAccessSinkForTest(event => events.push(event));
+  });
+
+  afterEach(() => {
+    setAdminAccessSinkForTest(null);
+    process.env.ADMIN_STEP_UP_ENABLED = originalSwitch;
+    evaluateStepUp.mockClear();
+  });
+
+  async function bearerAdmin(pathname = '/admin/api/safety-identifiers') {
+    const admin = await insertTestUser({
+      google_user_email: `step-up-audit-bearer-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: true,
+      api_token_pepper: `step-up-audit-bearer-${crypto.randomUUID()}`,
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${generateApiToken(admin)}`,
+        'x-pathname': pathname,
+        'x-forwarded-for': '203.0.113.9, 10.0.0.1',
+      })
+    );
+    return admin;
+  }
+
+  async function sessionAdmin() {
+    const admin = await insertTestUser({
+      google_user_email: `step-up-audit-session-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: true,
+      web_session_pepper: 'step-up-audit-session-pepper',
+    });
+    mockHeaders.mockResolvedValue(new Headers({ 'x-pathname': '/admin/api/safety-identifiers' }));
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: admin.id,
+      webSessionPepper: 'step-up-audit-session-pepper',
+      webSessionId: 'step-up-audit-web-session',
+    });
+    return admin;
+  }
+
+  test('records one denied privileged_access event for a refused API token', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    const admin = await bearerAdmin();
+
+    const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(evaluateStepUp).not.toHaveBeenCalled();
+    expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
+    expect(events[1]).toMatchObject({
+      event: 'admin_access',
+      surface: 'rest',
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      authVia: 'token',
+      outcome: 'denied',
+      actionClass: 'platform_read',
+      actionId: 'rest.admin.safetyIdentifiers',
+      target: null,
+      wouldBlock: true,
+      kiloUserId: admin.id,
+      adminTier: 'platform_admin',
+      route: '/admin/api/safety-identifiers',
+      method: 'GET',
+      ip: '203.0.113.9',
+      tokenSource: null,
+    });
+  });
+
+  test('records exactly one succeeded event when the API token passes', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'false';
+    const admin = await bearerAdmin();
+
+    const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+    expect(result.user?.id).toBe(admin.id);
+    expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
+    expect(events[1]).toMatchObject({
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      outcome: 'succeeded',
+      actionClass: 'platform_read',
+      actionId: 'rest.admin.safetyIdentifiers',
+    });
+    expect(
+      events.filter(event => event.kind === 'privileged_access' && event.outcome === 'denied')
+    ).toHaveLength(0);
+  });
+
+  test('carries the arriving surface through both events of one request', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'false';
+    await bearerAdmin('/admin');
+
+    const result = await getUserFromAuth({
+      adminOnly: true,
+      requestMethod: 'GET',
+      stepUpSurface: 'server-component',
+    });
+
+    expect(result.user).not.toBeNull();
+    expect(events.map(event => event.surface)).toEqual(['server-component', 'server-component']);
+    expect(events[1]).toMatchObject({
+      kind: 'privileged_access',
+      outcome: 'succeeded',
+      actionClass: 'platform_read',
+      actionId: 'serverComponent.admin',
+      route: '/admin',
+      method: 'GET',
+    });
+  });
+
+  test('records a failed event for an unexpected guard throw', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    await bearerAdmin();
+    runStepUpGuard.mockRejectedValueOnce(new Error('unexpected guard failure'));
+
+    const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(await (result.authFailedResponse as Response).json()).toEqual({
+      success: false,
+      error: 'STEP_UP_UNAVAILABLE',
+    });
+    expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
+    expect(events[1]).toMatchObject({
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      outcome: 'failed',
+      actionClass: 'platform_read',
+      actionId: 'rest.admin.safetyIdentifiers',
+    });
+  });
+
+  test('leaves a session step-up refusal on the admin guard event', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    await sessionAdmin();
+    evaluateStepUp.mockResolvedValueOnce({
+      state: { status: 'not_enrolled' },
+      proof: null,
+      passkeyCount: 0,
+    });
+
+    const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(events.map(event => event.kind)).toEqual(['admin_guard']);
+  });
+});
+
 describe('getUserFromAuth admin_access telemetry (REST)', () => {
   let events: AdminAccessEvent[];
 
@@ -1456,13 +1875,15 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
     const result = await getUserFromAuth({ adminOnly: true });
 
     expect(result.user?.id).toBe(admin.id);
-    expect(events).toHaveLength(1);
+    expect(events).toHaveLength(2);
     expect(events[0]).toMatchObject({
       event: 'admin_access',
       surface: 'rest',
       kind: 'admin_guard',
       authVia: 'token',
       adminTier: 'super_admin',
+      credential: 'human_bearer',
+      wouldBlock: true,
       kiloUserId: admin.id,
       email: admin.google_user_email,
       route: '/admin/api/safety-identifiers',
@@ -1470,7 +1891,41 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
       ip: '203.0.113.7',
       tokenSource: null,
     });
+    expect(events[1]).toMatchObject({
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      outcome: 'succeeded',
+      actionClass: 'sensitive_write',
+      route: '/admin/api/safety-identifiers',
+      kiloUserId: admin.id,
+    });
   });
+
+  test.each([
+    ['delegated workload', { tokenSource: 'cloud-agent' }, 'delegated_workload'],
+    ['service assertion', { internalApiUse: true }, 'service_assertion'],
+  ] as const)(
+    'preserves %s provenance on a denied admin request',
+    async (_label, extra, expectedCredential) => {
+      const user = await insertTestUser({
+        google_user_email: `denied-${crypto.randomUUID()}@kilocode.ai`,
+        api_token_pepper: `denied-${crypto.randomUUID()}`,
+      });
+      mockHeaders.mockResolvedValue(
+        new Headers({ Authorization: `Bearer ${generateApiToken(user, extra)}` })
+      );
+
+      const result = await getUserFromAuth({ adminOnly: true });
+
+      expect(result.authFailedResponse).not.toBeNull();
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        kind: 'privileged_access',
+        credential: expectedCredential,
+        outcome: 'denied',
+      });
+    }
+  );
 
   test('does not emit when a non-admin token hits an admin-only check', async () => {
     const nonAdmin = await insertTestUser({
@@ -1483,7 +1938,14 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
     const result = await getUserFromAuth({ adminOnly: true });
 
     expect(result.authFailedResponse).not.toBeNull();
-    expect(events).toHaveLength(0);
+    expect(result.authorizationRefused).toBe(true);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      outcome: 'denied',
+      kiloUserId: null,
+    });
   });
 
   test('does not emit for adminOnly:false calls even for an admin', async () => {

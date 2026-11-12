@@ -5,6 +5,7 @@ import { clearUserSessionTitles } from '@/components/agents/session-detail-renam
 import { clearSessionGoalCollapseState } from '@/components/agents/session-goal-collapse';
 import { clearToolCardImageCache } from '@/components/agents/tool-card-image-cache';
 import { clearClipboardImages } from '@/lib/agent-attachments/clipboard-image';
+import { clearSessionCatalogBestEffort } from '@/lib/app-actions/session-catalog';
 import { clearArtifactMirror } from '@/lib/artifacts/artifact-mirror';
 import { resetArtifactMirrorSyncState } from '@/lib/artifacts/artifact-mirror-sync';
 import { notifyArtifactsChanged } from '@/lib/artifacts/artifact-provider-native';
@@ -16,6 +17,10 @@ import { clearFormDrafts } from '@/lib/form-draft';
 import { clearRepoSelectionSenders } from '@/lib/hooks/repo-selection-senders';
 import { clearTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
+import { clearLastOpenedSession } from '@/lib/last-opened-session';
+import { clearLastRoute } from '@/lib/last-route';
+import { noteLauncherSurfacesCleared } from '@/lib/launcher-surfaces-publish';
+import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
 import { clearConversationRetention } from '@/lib/pr-review/discussion/conversation-retention';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
@@ -56,6 +61,13 @@ function clearSearchIndexBestEffort(): void {
  */
 export function clearSystemSearchIndexOnSignedOutLaunch(): void {
   clearSearchIndexBestEffort();
+  // The intent catalog is the same titles in another place, and its clear has
+  // the same one-shot problem: the teardown fired it without awaiting, so a
+  // process killed before it landed would leave the previous account's sessions
+  // named by Siri for the whole signed-out window. The signed-out launch is that
+  // retry, and running it while signed out cannot re-publish anything because
+  // the sync is gated off.
+  clearSessionCatalogBestEffort();
 }
 
 /**
@@ -92,7 +104,9 @@ function clearRecentPrsBestEffort(): void {
  * connection and the stored servers behind it, the app-settings-tools group
  * switch, the debounced repository-selection send state, the browsable
  * artifact mirror, app-owned temp copies, the stored PR recents, the retained
- * PR discussion conversation, and the phone's own search index. Every member is
+ * PR discussion conversation, the phone's own search index, the OS launcher
+ * shortcuts and tile, and the durable last-opened-session and last-route
+ * records. Every member is
  * best-effort; one member's throw falls through to the members after it, and to
  * the caller's own sign-in/sign-out state reset. The recents delete and OS
  * search clear are fired without awaiting, so the function stays synchronous;
@@ -159,6 +173,29 @@ export function clearSessionScopedState(): void {
   // ledger the indexer diffs against, so the next sync re-indexes whatever the
   // new account can see.
   runClear(clearSearchIndexBestEffort);
+  // The App Intents session catalog is device-wide for the same reason, and it
+  // is the same titles in another place: without this, Shortcuts and Siri would
+  // keep offering the previous account's sessions after a sign-out or an
+  // account switch, and the next sync would republish them from the cache that
+  // has not been cleared yet.
+  runClear(clearSessionCatalogBestEffort);
+  // The OS launcher surfaces are device-wide too, and their labels come from the
+  // signed-in account's sessions: the Android dynamic shortcuts and
+  // quick-settings tile, and the home-screen quick actions. The account
+  // boundary drops them with the other account-scoped members, and records the
+  // clear in the surface revision, so a mounted publisher writes the derived
+  // list again on the derivation that follows.
+  runClear(() => {
+    clearLauncherSurfaces();
+    noteLauncherSurfacesCleared();
+  });
+  // The durable last-opened session record and the last-route record are read
+  // through the active account's user id, and they are also the inputs the
+  // launcher surfaces and the relaunch restore derive from. The account
+  // boundary deletes both with the other account-bound records, so both belong
+  // to the account that is signed in.
+  runClear(clearLastOpenedSession);
+  runClear(clearLastRoute);
 }
 
 /** One best-effort clear: a throw never stops the clears that follow it. */

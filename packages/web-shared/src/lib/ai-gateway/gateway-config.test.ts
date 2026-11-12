@@ -236,7 +236,11 @@ describe('GatewayOrganizationFeaturesConfigSchema', () => {
     expect(
       GatewayOrganizationFeaturesConfigSchema.parse({ vercel_routing_enabled: true })
         .organization_features
-    ).toEqual({ experimental_byok: [], gateway_settings: [] });
+    ).toEqual({
+      experimental_byok: [],
+      enkrypt_output_guardrail: [],
+      gateway_settings: [],
+    });
   });
 
   test('fills features missing from a saved configuration', () => {
@@ -246,6 +250,22 @@ describe('GatewayOrganizationFeaturesConfigSchema', () => {
       }).organization_features
     ).toEqual({
       experimental_byok: ['00000000-0000-4000-8000-000000000001'],
+      enkrypt_output_guardrail: [],
+      gateway_settings: [],
+    });
+  });
+
+  test('strips removed features from saved configurations', () => {
+    expect(
+      GatewayOrganizationFeaturesConfigSchema.parse({
+        organization_features: {
+          experimental_byok: [],
+          request_logs: ['00000000-0000-4000-8000-000000000001'],
+        },
+      }).organization_features
+    ).toEqual({
+      experimental_byok: [],
+      enkrypt_output_guardrail: [],
       gateway_settings: [],
     });
   });
@@ -254,9 +274,16 @@ describe('GatewayOrganizationFeaturesConfigSchema', () => {
 test('lowercases stored organization IDs', () => {
   expect(
     GatewayOrganizationFeaturesConfigSchema.parse({
-      organization_features: { gateway_settings: ['9D278969-5453-4AE3-A51F-A8D2274A7B56'] },
-    }).organization_features.gateway_settings
-  ).toEqual(['9d278969-5453-4ae3-a51f-a8d2274a7b56']);
+      organization_features: {
+        gateway_settings: ['9D278969-5453-4AE3-A51F-A8D2274A7B56'],
+        enkrypt_output_guardrail: ['9D278969-5453-4AE3-A51F-A8D2274A7B56'],
+      },
+    }).organization_features
+  ).toEqual({
+    experimental_byok: [],
+    enkrypt_output_guardrail: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
+    gateway_settings: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
+  });
 });
 
 describe('OrganizationFeaturesInputSchema', () => {
@@ -267,15 +294,21 @@ describe('OrganizationFeaturesInputSchema', () => {
           '9D278969-5453-4AE3-A51F-A8D2274A7B56',
           '9d278969-5453-4ae3-a51f-a8d2274a7b56',
         ],
+        enkrypt_output_guardrail: ['9D278969-5453-4AE3-A51F-A8D2274A7B56'],
         gateway_settings: [],
-      }).experimental_byok
-    ).toEqual(['9d278969-5453-4ae3-a51f-a8d2274a7b56']);
+      })
+    ).toEqual({
+      experimental_byok: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
+      enkrypt_output_guardrail: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
+      gateway_settings: [],
+    });
   });
 
   test('rejects an entry that is not an organization ID', () => {
     expect(
       OrganizationFeaturesInputSchema.safeParse({
         experimental_byok: ['kilo'],
+        enkrypt_output_guardrail: [],
         gateway_settings: [],
       }).success
     ).toBe(false);

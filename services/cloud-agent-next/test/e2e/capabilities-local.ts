@@ -22,6 +22,7 @@ import {
   findControlPlaneKiloRuntime,
   inspectControlPlaneSummaryCount,
   inspectControlPlaneUserMessageParts,
+  killOwnedControlPlanePrimary,
   recycleControlConnection,
   signalKiloServerProcess,
   waitForNewSandboxPresent,
@@ -31,7 +32,6 @@ import {
   currentOwnedSandbox,
   reclaimOwnedSandboxes,
   snapshotSandboxIds,
-  stopOwnedSandboxFamily,
   waitForOwnedSandbox,
 } from './lifecycle.js';
 import { captureLogCursor, readWorkerLogSnapshot, type LogRecord } from './idle-stop-evidence.js';
@@ -296,11 +296,7 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
     killOwnedContainer: async target => {
       const container = await requireOwnedContainer(target);
       await requireMatchingWrapper(container.id, target);
-      const killed = await stopOwnedSandboxFamily(
-        container,
-        target.cloudAgentSessionId,
-        target.kiloSessionId
-      );
+      const killed = await killOwnedControlPlanePrimary(container, target.kiloSessionId);
       frozenHandles.delete(target.cloudAgentSessionId);
       if (killed.length === 0) {
         return {
@@ -936,14 +932,9 @@ export function createLocalControlPlaneRuntime(): ControlPlaneRuntimeObservation
   };
 }
 
-/**
- * Mirror the Worker's containment parsing exactly
- * (`session-registration.ts`: `!== 'false'`, so an absent value is enabled) so
- * the harness reads the same `.dev.vars` source and there is no second flag to
- * keep in sync.
- */
-export function credentialContainmentEnabled(devVars: Record<string, string>): boolean {
-  return devVars.CREDENTIAL_CONTAINMENT_ENABLED !== 'false';
+/** Credential containment is mandatory, including local scenarios. */
+export function credentialContainmentEnabled(_devVars: Record<string, string>): boolean {
+  return true;
 }
 
 export function createLocalScenarioEnvironment(options?: {
@@ -1007,6 +998,7 @@ export function createLocalScenarioEnvironment(options?: {
     ...(databaseUrl ? { database: { url: databaseUrl } } : {}),
     callbacks: createLocalCallbacks(),
     gates: { parkedStreamsSupported: true },
+    ...(process.env.E2E_KILO2_DRAIN === '1' ? { kilo2Drain: { ready: true as const } } : {}),
     sandboxFaults: createLocalSandboxFaults(),
     controlPlaneRuntime: createLocalControlPlaneRuntime(),
     // The report row lives in Postgres; without a connection string the

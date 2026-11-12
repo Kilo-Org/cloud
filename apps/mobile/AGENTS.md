@@ -48,14 +48,6 @@ git diff --check
   `jotai/vanilla/utils` and calls `setSelf`; both are gone in 3.x. Revisit as
   soon as `jotai-minidb` ships a release that supports `jotai` 3; 3.0.1 already
   clears `minimumReleaseAge`.
-- `@kilocode/kilo-chat-hooks` is copied, not symlinked. After editing it:
-
-  ```bash
-  pnpm install --filter kilo-app...
-  rm -rf "$TMPDIR/metro-cache" "$TMPDIR"/metro-file-map-*
-  ```
-
-  Then restart Metro and force-quit the app.
 
 ## Library First
 
@@ -89,7 +81,7 @@ One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces th
 | Video | `expo-video` | `react-native-video`, `expo-av` |
 | Blur | `expo-blur` | `expo-glass-effect`, `@callstack/liquid-glass` (no Liquid Glass) |
 | Toast | `sonner-native` | `react-native-toast-message`, `burnt` |
-| Images | `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
+| Images | `Image` from `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
 | Icons | `@/components/ui/icons` | `lucide-react-native` |
 | Markdown | `MarkdownText` from `@/components/agents/markdown-text`, rendered by `react-native-enriched-markdown` | `react-native-marked`, `react-native-markdown-display` |
 | HTML in markdown | `MarkdownText`: `markdown-html-convert` turns HTML markdown can express into markdown; the rest renders through `MarkdownHtml` (`@native-html/render`) | `react-native-render-html` |
@@ -112,8 +104,18 @@ Use a concrete height and `flex: 0` for an inline `FlashList`; `maxHeight` alone
 Omit empty-state descriptions that repeat the title or tell the user to use a disabled action.
 
 Keyboard avoidance is `react-native-keyboard-controller`, wrapped in one `KeyboardProvider` at the app root.
-`KeyboardAvoidingView` clears the IME on the session, history, quick-chat, session-detail, new-session,
-conversation, manual-review and PR-discussion surfaces; `useKeyboardState` is the app's one keyboard-height read.
+`KeyboardAvoidingView` clears the IME on the session, quick-chat, session-detail, new-session,
+conversation, manual-review and PR-discussion surfaces; the Agents list and the stored history render
+`@/components/agents/owned-keyboard-lift` instead, which pads by the keyboard their own search field raised and
+writes that pad on every render (the library container drops its animated style when `enabled` turns false, and
+the property it last applied stays on the native view). The pad never takes more room than the body can spare:
+it is clamped so a minimum viewport survives (`MIN_BODY_VIEWPORT` in `@/lib/body-viewport`, the same floor
+`TabScreenScrollView` applies to its frame), because a keyboard height belongs to the window it was measured in
+and a rotation replaces that window with a much shorter one — an unclamped pad then fills the body and the list
+renders nothing, with no rows, skeleton, empty state or error. The clamp measures the body frame and keys that
+measurement to `useWindowDimensions().height`: the layout pass that reports a new frame runs after the first
+render a rotation produces, so a frame measured in the previous window is released for that render instead of
+being trusted. `useKeyboardState` is the app's one keyboard-height read.
 The conversation list follows the newest message when its viewport shrinks; it must not add a second keyboard inset.
 A surface whose content
 pads the platform's bottom inset itself passes `keyboardVerticalOffset={keyboardInsetOffset(bottom)}`
@@ -125,6 +127,25 @@ Nothing else may read the keyboard: no surface adds a listener beside the provid
 Android searchable `formSheet` routes use only the existing safe-area-capped full detent.
 Model, repository, app-language, auth-language and voice-language searches must keep results above the software keyboard.
 iOS keeps native detent expansion when the search field gains focus.
+
+A searchable picker in a window shorter than 600pt also presents at the full detent, on either platform.
+The half detent sizes the sheet to its title row and search field, so a short window leaves the list under
+one row and the first result is clipped at the sheet edge (measured in a 501pt-tall iPad window).
+`searchPickerHeaderInList` (`@/lib/form-sheet-detents`) owns that threshold, and the language picker moves
+its search field into the scrolling list there so the title row, its actions, the field and a row stay
+together.
+
+An imperative `Sheet` with `snapPoints` hands its React content the window height on Android, not the
+detent's height, so a body that takes its slack is laid out past the sheet frame and whatever sits at its
+bottom — a dismiss row, a submit row — cannot be reached. Size such a sheet to its content instead, keep
+the rows that must stay reachable at the sheet's own edge, and bound a list that could otherwise push them
+off.
+
+The picker `formSheet` routes the `(app)` layout registers carry a single half detent on Android.
+Android lays a formSheet route's content out at the largest allowed detent, not at the presented one, so a second
+detent leaves the rows below the half sheet's edge outside the frame: the list has nothing to scroll and a drag
+on a row fires that row. One detent bounds the content host to the presented height, so the list scrolls inside
+it. `pickerSheetOptions` in that layout carries it.
 
 A sheet header takes its top clearance from `useSheetHeaderTopClearance` (`@/lib/form-sheet`), never from
 its own safe-area provider: a nested provider reports zero for the header's first frame and the window inset
@@ -179,7 +200,7 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Every pressable gives lightweight feedback unless navigation or a native control already provides it.
 - Every data screen handles loading, empty, error, and happy states. Use `Skeleton` matching final dimensions, `EmptyState`, and pagination when results can grow.
 - Use `ActivityIndicator` only for inline waits. Where layout would jump, use the existing Reanimated `FadeIn`/`FadeOut`/`LinearTransition` patterns.
-- Set `freezeOnBlur: true` on tabs. Use haptics for commits and outcomes only, never passive interaction.
+- Use haptics for commits and outcomes only, never passive interaction.
 - Set `transition={0}` on small or header `expo-image` images to avoid flicker.
 - A scroll view takes a horizontal inset through `contentContainerClassName`, never `className`: the scroller's own style does not narrow the scroll content, so an inset there leaves the end side flush in right-to-left layouts. `CenteredState` applies that class to its content box instead, because a `contentContainerStyle` of its own drops the caller's class.
 - Respect padding at every size: content never touches or crosses its container's padding, and opposite sides match unless the design says otherwise.
@@ -187,6 +208,7 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Keep related items closer together than unrelated groups, and use the same gap for the same relation everywhere.
 - Plan long text: a label that can grow truncates with an ellipsis or wraps by design. When secondary text cannot fit, drop it before you squeeze the primary text.
 - Never shift layout when state changes. Reserve the space for spinners, status lines, errors, and copy that comes and goes, or replace content in place.
+- Never grow a row or a section header to a control's touch size. Keep the row one line tall and reach 44pt with `hitSlop` on a shared compact box from `@/lib/a11y/tap-target` (`LINE_ACTION_BOX_CLASS`, `SECTION_ACTION_BOX_CLASS`). A taller box leaves empty space above its text, and at the top of a screen that space reads as a hole under the title.
 - Do not repeat what the screen already shows: no "Enabled" beside a switch, no product name beside its logo, no description that restates the title.
 - Change only the visual properties the task names. A color fix does not change dimensions.
 
@@ -246,6 +268,7 @@ pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standar
 - Pass one `--link` per changed screen and per state it can show: loading, empty, error, and long text. Open a hard-to-reach state through a fixture link (see Fixtures).
 - The standard matrix covers the default size, dark mode, a compact screen, and right-to-left on Android, and the default size, dark mode, and right-to-left on iOS. It keeps font scale and display density at their defaults.
 - After a link opens, the gate keeps measuring for 2.5 s, so content that arrives late and moves the screen is a `layout-shift` error.
+- A scrolling screen must start with what it shows. Empty space above the first painted content, beyond the scroll content's top padding and one section break (24 dp), is a `leading-gap` error: a first block pushed down by a margin, or a box that holds its content at its bottom.
 - Shift measurements use transform-free layout frames. Navigation transforms remain visible in screenshots and motion recordings without hiding real content shifts.
 - The sampler retains the newest 400 distinct layouts. A truncation flag in the timeline and motion artifacts marks incomplete capture.
 - Fix every `error` finding, then run the gate again until it exits 0. Fix each `warning`, or give a one-line reason in the pull request.
@@ -261,6 +284,10 @@ pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standar
 - Never change simulator Dynamic Type, accessibility text size, or font scaling for testing or debugging.
 
 Add narrow temporary logs at the real boundaries. Reproduce. Read the tmux service logs. Fix the demonstrated cause. Remove the logs. Do not guess, and do not commit debug logging.
+
+- `pnpm dev:mobile:diagnostics status` names this worktree's dev server, whether the bundler is ready, and how many apps are connected to it.
+- `pnpm dev:mobile:diagnostics errors` prints what the connected app threw, with the project frame of each error. It reads the port of this worktree's dev session and refuses a dev server that serves another worktree.
+- Both use Expo's agent CLI on an explicit dev-server URL. They never start Metro or a build, and they prove no tap: `runtime:tap` and `runtime:tree` invoke props, so use `agent-device` for a touch and `agent-device metro reload` after an edit.
 
 ## Chat tab
 

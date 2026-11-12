@@ -1,13 +1,14 @@
 import { z } from 'zod';
+import { approvalKeySchema } from '@kilocode/app-shared/approval-key';
+import { glanceableAgentsSnapshotSchema } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { HOME_WIDGET_TITLE_LIMIT, homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
-import { GLANCEABLE_STATUS_KINDS } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
   SESSION_LIVE_COMMAND_LIMIT,
   sessionLiveChangesSchema,
   sessionLiveFailureSchema,
   sessionLivePlanSchema,
   sessionLiveStepSchema,
-} from '@kilocode/session-ingest-contracts';
+} from '@kilocode/session-ingest-contracts/session-live-summary';
 
 import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
 import {
@@ -18,7 +19,7 @@ import {
 import { SESSION_CARD_STATUS_KINDS, sessionLiveOutcomeSchema } from './session-live-content';
 import { refineSpendAlertScope } from './spend-alert-scope';
 
-const nonEmptyStringSchema = z.string().min(1);
+export const nonEmptyStringSchema = z.string().min(1);
 
 // Discriminates between attention-requiring and status-only cloud agent
 // session notifications. Optional everywhere it appears so old producers
@@ -46,7 +47,7 @@ export const sessionLiveActivityContentStateSchema = z.object({
   /** True only when Approve can answer the waiting permission request. */
   awaitingPermission: z.boolean(),
   /** SHA-256 hex of `JSON.stringify([sessionId, permissionId])`, else null. */
-  approvalKey: z.string().nullable(),
+  approvalKey: approvalKeySchema,
   /** ISO 8601; when the server confirmed this content. */
   updatedAt: z.string(),
   /** The step the agent is on; null when the session is not working. */
@@ -147,45 +148,12 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   // Aggregate snapshot remains privacy-minimal. Optional Home-only details
   // travel beside it for background Home widget updates and are never copied
   // into Live Activity/ongoing content-state. Older producers omit them.
-  z.object({
+  //
+  // Derived from the one snapshot schema so a field, its bound and its default
+  // exist once. `accountEpoch` is left out deliberately: it is client-set (see
+  // the shared schema's comment), and a server has no value to push for it.
+  glanceableAgentsSnapshotSchema.omit({ accountEpoch: true }).extend({
     type: z.literal('active_agents_glanceable'),
-    schemaVersion: z.literal(1),
-    revision: z.number().int().min(1),
-    scopeKey: nonEmptyStringSchema,
-    organizationBound: z.boolean(),
-    status: z.enum(['waiting', 'empty', 'happy', 'stale', 'expired', 'signed_out', 'privacy']),
-    running: z.number().int().min(0),
-    needsInput: z.number().int().min(0),
-    /**
-     * Needs-input rows waiting on a permission prompt: the ones the wrist can
-     * approve. Optional on input with a zero default so a push from a server
-     * older than this release still parses.
-     */
-    needsApproval: z.number().int().min(0).default(0),
-    idle: z.number().int().min(0),
-    /**
-     * Sessions scheduled to wake later. Optional on input with a zero default
-     * so a push from a server older than this release still parses; every
-     * mobile reader treats absent as 0.
-     */
-    scheduled: z.number().int().min(0).default(0),
-    updatedAt: z.string(),
-    expiresAt: z.string(),
-    needsInputSince: z.string().nullable(),
-    /**
-     * Soonest wake among scheduled sessions, or null when none carries one.
-     * Optional on input with a null default so a push from a server older than
-     * this release still parses.
-     */
-    scheduledAt: z.string().nullable().default(null),
-    // The newest agent state change: its kind in the shared status
-    // vocabulary and when it happened. Optional on input with a null default,
-    // so a payload from a server that predates the fact still parses while the
-    // parsed (output) type stays total — the mobile client spreads the parsed
-    // fields straight into a `GlanceableAgentsSnapshot`. Remove the optional
-    // and the default when every server sends both keys.
-    newestResultKind: z.enum(GLANCEABLE_STATUS_KINDS).nullable().default(null),
-    newestResultAt: z.string().nullable().default(null),
     homeWidgetDetails: homeWidgetDetailsSchema.optional(),
   }),
   // One followed session's Android ongoing notification

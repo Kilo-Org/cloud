@@ -1,4 +1,4 @@
-import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { NextRequest, NextResponse } from 'next/server';
 import { randomBytes } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
@@ -10,6 +10,11 @@ import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { recordAdminAction } from '@/lib/admin/admin-action-audit';
+import {
+  apiRequestLogBlobSchema,
+  uploadApiRequestLogBlobs,
+  type EnkryptRequestLog,
+} from '@kilocode/web-shared/lib/r2/api-request-log';
 import { GET } from './route';
 
 jest.mock('next/server', () => {
@@ -318,6 +323,215 @@ describe('GET /admin/api/api-request-log/download', () => {
     expect(send.mock.calls[0][0]).toMatchObject({ input: { Bucket: BUCKET, Key: key } });
   });
 
+  it('uploads and exports the full ordered Enkrypt input/output call array, including retries', async () => {
+    const request = { messages: [{ role: 'user', content: 'hello' }] };
+    const response = 'data: [DONE]\n\n';
+    const inputRequest = {
+      text: 'hello',
+      detectors: { toxicity: { enabled: true, threshold: 0.5 }, custom: ['policy'] },
+      user_metadata: { organization_id: 'org-1' },
+    };
+    const outputRequest = { ...inputRequest, text: 'world' };
+    const enkrypt: EnkryptRequestLog[] = [
+      {
+        guardrail: 'input',
+        scan: 'blocking',
+        part: 'conversation',
+        request: inputRequest,
+        response: 'Service unavailable',
+        status_code: 503,
+        error: 'Enkrypt returned 503',
+      },
+      {
+        guardrail: 'input',
+        scan: 'blocking',
+        part: 'conversation',
+        request: inputRequest,
+        response: '{"summary":{"toxicity":0}}',
+        status_code: 200,
+        error: null,
+      },
+      {
+        guardrail: 'output',
+        scan: 'log_only',
+        part: 'response',
+        request: outputRequest,
+        response: null,
+        status_code: null,
+        error: 'Enkrypt request timed out',
+      },
+      {
+        guardrail: 'output',
+        scan: 'log_only',
+        part: 'response',
+        request: outputRequest,
+        response: '{"summary":{"toxicity":0}}',
+        status_code: 200,
+        error: null,
+      },
+    ];
+    const send = jest.spyOn(fakeR2, 'send');
+
+    const upload = await uploadApiRequestLogBlobs({ request, response, enkrypt });
+
+    expect(upload.uploadError).toBeNull();
+    expect(upload.columns.request_r2_key).toEqual(expect.stringMatching(/\/record\.v1\.json$/));
+    expect(upload.columns.response_r2_key).toBe(upload.columns.request_r2_key);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
+    const body = fakeR2.objects.get(`${BUCKET}/${upload.columns.request_r2_key}`);
+    if (!body) throw new Error('Missing uploaded envelope');
+    expect(JSON.parse(body)).toEqual({ version: 1, request, response, enkrypt });
+    expect(apiRequestLogBlobSchema.parse(JSON.parse(body)).enkrypt).toEqual(enkrypt);
+    const [row] = await db
+      .insert(api_request_log)
+      .values({ ...baseRow, ...upload.columns })
+      .returning({ id: api_request_log.id, created_at: api_request_log.created_at });
+    send.mockClear();
+
+    const entries = await downloadEntries();
+
+    const timestamp = row.created_at.replaceAll(':', '-').replaceAll(' ', '_');
+    expect(Object.keys(entries)).toEqual([
+      `${timestamp}_${row.id}_request.json`,
+      `${timestamp}_${row.id}_response.txt`,
+      `${timestamp}_${row.id}_enkrypt.json`,
+    ]);
+    expect(readEntry(entries, `_${row.id}_request.json`)).toBe(JSON.stringify(request, null, 2));
+    expect(readEntry(entries, `_${row.id}_response.txt`)).toBe(response);
+    expect(readEntry(entries, `_${row.id}_enkrypt.json`)).toBe(JSON.stringify(enkrypt, null, 2));
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(expect.any(GetObjectCommand));
+  });
+
+  it.each([undefined, []])(
+    'omits empty Enkrypt uploads (%j) from the version-1 envelope',
+    async enkrypt => {
+      const request = { request: true };
+      const send = jest.spyOn(fakeR2, 'send');
+
+      const upload = await uploadApiRequestLogBlobs({ request, response: undefined, enkrypt });
+
+      expect(upload.uploadError).toBeNull();
+      expect(upload.columns.response_r2_key).toBe(upload.columns.request_r2_key);
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
+      const body = fakeR2.objects.get(`${BUCKET}/${upload.columns.request_r2_key}`);
+      if (!body) throw new Error('Missing uploaded envelope');
+      expect(JSON.parse(body)).toEqual({ version: 1, request, response: null });
+    }
+  );
+
+  it.each([undefined, []])(
+    'omits the Enkrypt export when the persisted array is absent or empty (%j)',
+    async enkrypt => {
+      const key = '2026-08-01/no-enkrypt/log.json';
+      const request = { request: true };
+      const response = '{"response":true}';
+      fakeR2.objects.set(
+        `${BUCKET}/${key}`,
+        JSON.stringify({ version: 1, request, response, enkrypt })
+      );
+      const [row] = await db
+        .insert(api_request_log)
+        .values({ ...baseRow, request_r2_key: key, response_r2_key: key })
+        .returning({ id: api_request_log.id });
+      const send = jest.spyOn(fakeR2, 'send');
+
+      const entries = await downloadEntries();
+
+      expect(Object.keys(entries)).toHaveLength(2);
+      expect(readEntry(entries, `_${row.id}_request.json`)).toBe(JSON.stringify(request, null, 2));
+      expect(readEntry(entries, `_${row.id}_response.json`)).toBe(
+        JSON.stringify({ response: true }, null, 2)
+      );
+      expect(Object.keys(entries).some(name => name.endsWith('_enkrypt.json'))).toBe(false);
+      expect(send).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('exports a combined log whose Enkrypt calls predate scan parts', async () => {
+    const key = '2026-08-01/before-parts/log.json';
+    const request = { request: true };
+    const enkrypt = [
+      {
+        guardrail: 'input',
+        scan: 'log_only',
+        request: { text: 'hello', detectors: {}, user_metadata: { organization_id: 'org' } },
+        response: null,
+        status_code: 200,
+        error: null,
+      },
+    ];
+    fakeR2.objects.set(
+      `${BUCKET}/${key}`,
+      JSON.stringify({ version: 1, request, response: '{"response":true}', enkrypt })
+    );
+    const [row] = await db
+      .insert(api_request_log)
+      .values({ ...baseRow, request_r2_key: key, response_r2_key: key })
+      .returning({ id: api_request_log.id });
+
+    const entries = await downloadEntries();
+
+    expect(readEntry(entries, `_${row.id}_request.json`)).toBe(JSON.stringify(request, null, 2));
+    expect(readEntry(entries, `_${row.id}_enkrypt.json`)).toBe(JSON.stringify(enkrypt, null, 2));
+  });
+
+  it('exports chunked Enkrypt calls with their chunk and calls from before chunking', async () => {
+    const key = '2026-08-01/chunked/log.json';
+    const request = { request: true };
+    const response = '{"response":true}';
+    const inputRequest = {
+      text: 'first chunk',
+      detectors: { injection_attack: { enabled: true } },
+      user_metadata: { organization_id: 'org' },
+    };
+    const enkrypt: EnkryptRequestLog[] = [
+      {
+        guardrail: 'input',
+        scan: 'blocking',
+        part: 'system',
+        chunk: { index: 0, count: 2 },
+        request: inputRequest,
+        response: '{"summary":{"injection_attack":0}}',
+        status_code: 200,
+        error: null,
+      },
+      {
+        guardrail: 'input',
+        scan: 'blocking',
+        part: 'system',
+        chunk: { index: 1, count: 2 },
+        request: { ...inputRequest, text: 'second chunk' },
+        response: null,
+        status_code: null,
+        error: 'Enkrypt request timed out',
+      },
+      {
+        guardrail: 'input',
+        scan: 'log_only',
+        part: 'conversation',
+        request: inputRequest,
+        response: '{"summary":{"injection_attack":0}}',
+        status_code: 200,
+        error: null,
+      },
+    ];
+    const body = JSON.stringify({ version: 1, request, response, enkrypt });
+    fakeR2.objects.set(`${BUCKET}/${key}`, body);
+    expect(apiRequestLogBlobSchema.parse(JSON.parse(body)).enkrypt).toEqual(enkrypt);
+    const [row] = await db
+      .insert(api_request_log)
+      .values({ ...baseRow, request_r2_key: key, response_r2_key: key })
+      .returning({ id: api_request_log.id });
+
+    const entries = await downloadEntries();
+
+    expect(readEntry(entries, `_${row.id}_request.json`)).toBe(JSON.stringify(request, null, 2));
+    expect(readEntry(entries, `_${row.id}_enkrypt.json`)).toBe(JSON.stringify(enkrypt, null, 2));
+  });
+
   it('omits the response file for a combined log with a null response', async () => {
     const key = '2026-08-01/no-response/log.json';
     fakeR2.objects.set(
@@ -366,6 +580,19 @@ describe('GET /admin/api/api-request-log/download', () => {
       JSON.stringify({ version: 1, request: { content: 'private' }, response: {} }),
     ],
     ['missing response', JSON.stringify({ version: 1, request: { content: 'private' } })],
+    [
+      'non-array Enkrypt calls',
+      JSON.stringify({ version: 1, request: { content: 'private' }, response: null, enkrypt: {} }),
+    ],
+    [
+      'malformed Enkrypt call',
+      JSON.stringify({
+        version: 1,
+        request: { content: 'private' },
+        response: null,
+        enkrypt: [{ guardrail: 'input' }],
+      }),
+    ],
   ])(
     'records load errors for a combined log with %s without exposing its payload',
     async (_, body) => {

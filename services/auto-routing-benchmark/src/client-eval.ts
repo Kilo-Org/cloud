@@ -24,7 +24,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 import { formatError } from '@kilocode/worker-utils';
-import type { UsageWriteOutcome } from '@kilocode/worker-utils/usage-writer-client';
+import type { LlmUsageWriteOutcome } from '@kilocode/worker-utils/usage-writer-client';
 import type { Hono } from 'hono';
 import type * as z from 'zod';
 import { DECIDER_CLI_TIMEOUT_MS, deciderCliPrompt } from './cli-runner';
@@ -72,7 +72,7 @@ export class ClientEvalError extends Error {
 export type ClientEvalDeps = {
   source: CatalogSource;
   createJudge: () => Promise<DeciderJudge>;
-  writeUsage: (usage: UsageRecordRequest) => Promise<UsageWriteOutcome>;
+  writeUsage: (usage: UsageRecordRequest) => Promise<LlmUsageWriteOutcome>;
   now?: () => Date;
 };
 

@@ -10,7 +10,11 @@ const HEAVY: Partial<ControlPlaneRouteSpec> = {
   env: { WORKSPACE_SETTING: 'creator', PRIVATE_SETTING: 'decrypted-value' },
   secretEnvKeys: ['PRIVATE_SETTING'],
   setupCommands: ['echo first'],
+  environmentSetupCommandCount: 1,
   runtimeSkills: [{ name: 'review', rawMarkdown: '# Review' }],
+  runtimeInstructions: [
+    { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+  ],
   runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
   kiloCommands: [{ name: 'review', template: 'Review the change' }],
 };
@@ -37,7 +41,9 @@ describe('workspace config', () => {
   it('splits the heavy fields out of the attachment spec', () => {
     const attachment = attachmentSpecFromRouteSpec(spec());
     expect(attachment).not.toHaveProperty('setupCommands');
+    expect(attachment).not.toHaveProperty('environmentSetupCommandCount');
     expect(attachment).not.toHaveProperty('runtimeSkills');
+    expect(attachment).not.toHaveProperty('runtimeInstructions');
     expect(attachment).not.toHaveProperty('runtimeAgents');
     expect(attachment).not.toHaveProperty('kiloCommands');
     expect(attachment).not.toHaveProperty('mcp');
@@ -53,6 +59,9 @@ describe('workspace config', () => {
     ).toEqual({
       setupCommands: [],
       mcp: { local: { type: 'remote', url: 'u' } },
+    });
+    expect(workspaceConfigFromSpec({ environmentSetupCommandCount: 0 }, undefined)).toEqual({
+      environmentSetupCommandCount: 0,
     });
   });
 });

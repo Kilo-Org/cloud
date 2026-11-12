@@ -50,14 +50,6 @@ export type VercelProviderMetaData = {
   };
 };
 
-export type MaybeHasVercelProviderMetaData = {
-  choices?: {
-    message?: {
-      provider_metadata?: VercelProviderMetaData;
-    };
-  }[];
-};
-
 export type MaybeHasVercelProviderMetaDataChunk = {
   choices?: {
     delta?: { provider_metadata?: VercelProviderMetaData };
@@ -86,7 +78,8 @@ export type NotYetCostedUsageStats = {
   hasError: boolean;
   inference_provider: string | null;
   upstream_id: string | null;
-  finish_reason: string | null;
+  /** Unvalidated upstream value; `toInsertableDbUsageRecord` records a non-string as null. */
+  finish_reason: unknown;
   latency: number | null;
   moderation_latency: number | null;
   generation_time: number | null;
@@ -201,7 +194,8 @@ export type BouncerUsageContext = {
   /** Wall-clock time the request started. */
   occurredAt: Date;
   /**
-   * The payer key bouncer uses: `org:<id>` for an org request, else `user:<id>`.
+   * The payer key bouncer uses: `org:<id>` for an org request, `user:<id>` otherwise. An org
+   * request carries the root organization of its family, the same key its decide uses.
    * Null for an anonymous request, which bouncer keys on the IP instead and must
    * never turn into a payer-sharing row.
    */
@@ -302,11 +296,4 @@ export type UsageMetaData = {
   is_free: boolean | null;
   abuse_delay: number | null;
   abuse_downgraded_from: string | null;
-};
-
-export type OpenRouterError = {
-  message: string;
-  code: number | string;
-  metadata?: Record<string, unknown>;
-  provider_name?: string;
 };

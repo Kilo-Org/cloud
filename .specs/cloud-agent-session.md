@@ -22,7 +22,11 @@ revised 2026-10-07 to add the optional repository environment; revised
 sandbox size into it; revised 2026-10-22 to simplify environment editing and
 show profile conflicts before saving; revised 2026-10-29 to allow several
 repositories in one environment; revised 2026-10-31 to define worktree-owned
-shared runtime and MCP configuration.
+shared runtime and MCP configuration; revised 2026-11-04 to state that one
+sandbox serves one workspace; revised 2026-11-04 to add environment start
+commands and skip setup in a workspace started from an environment snapshot;
+revised 2026-11-12 to define organization-connection repository access without
+requiring a personal provider identity and retain GitHub-triggered actor write checks.
 
 ## Conventions
 
@@ -35,9 +39,12 @@ they appear in all capitals, as shown here.
 
 - **Session**: one chat bound to one repository and one environment.
 - **Environment**: the isolated workspace where the agent runs.
+- **Sandbox**: the compute that hosts one Environment. One sandbox serves one
+  workspace only: the sibling chats of that workspace share it, and no other
+  workspace uses it.
 - **Repository environment**: an optional saved setup for one or several
-  repositories -- setup commands, plaintext variables, secrets, and a sandbox
-  size -- distinct from the sandbox Environment. A repository MAY belong to
+  repositories -- setup commands, start commands, plaintext variables, secrets,
+  and a sandbox size -- distinct from the sandbox Environment. A repository MAY belong to
   several environments of one owner.
 - **Multi-repository environment** (V2): a repository environment that lists its
   repositories. Multi-repository environments are available to all personal and
@@ -47,6 +54,11 @@ they appear in all capitals, as shown here.
 - **Environment snapshot**: a prepared copy of a repository environment's
   default branch after its saved setup, built from the base image on request
   or for a session, that later sessions of that environment start from.
+- **Start commands**: a repository environment's workspace start script. It
+  runs each time a workspace starts -- after setup, or alone when the workspace
+  starts from a snapshot -- and not when a chat joins a running workspace. It
+  is not a build input: a build never runs it, and changing it does not change
+  the configuration revision.
 - **Worktree**: a group of independent browser chats that share the same
   checked-out repository files while their environment exists.
 - **Preparation**: visible setup of that environment -- clone, branch, setup
@@ -68,8 +80,8 @@ repository.
 
 ### Start
 
-1. The user MUST connect a git provider and select a repository before a session
-   can start.
+1. A session MUST have a connected git provider and a selected repository before
+   it can start.
 2. Paid use MUST require a balance of at least $1. Below that, the user MAY
    start only with a free or bring-your-own-key model.
 3. Submitting the first prompt MUST open the chat with that prompt already
@@ -85,7 +97,8 @@ repository.
    launches unchanged. Its setup commands MUST run as preparation steps and
    MUST NOT reveal secret values. When several environments contain the
    repository, rules 14 to 16 decide.
-7. While a repository environment applies, profile setup commands MUST NOT run.
+7. While a repository environment applies, profile setup commands run as
+   session setup commands beside the environment's commands (Preparation rule 5).
    Profile variables, and variables and commands sent with the request, still
    apply over the environment.
 8. The new-session form MUST show the chosen repository's environment beside
@@ -141,10 +154,83 @@ repository.
     at `/workspace/<name>`, and the agent and setup MUST start at `/workspace`.
     Setup MUST run once. Each additional repository MAY have its own branch;
     otherwise it MUST use the session's generated branch.
-19. Saving a multi-repository environment with the shared or a Vercel sandbox
-    MUST fail, and so MUST a session request for one. A saved default of that
-    kind (repository or owner) MUST be skipped, and the session MUST start on
-    another sandbox.
+19. Saving a multi-repository environment with a Vercel sandbox MUST fail, and
+    so MUST a session request for one. A saved default of that kind (repository
+    or owner) MUST be skipped, and the session MUST start on another sandbox.
+20. A new session MUST NOT start on a sandbox that another workspace uses. The
+    picker MUST NOT offer a shared sandbox. A request for the retired shared
+    sandbox MUST fail with a specific message, and a saved shared default MUST
+    be skipped so that the session starts on another sandbox.
+21. A user's Cloud Agent settings MAY override the model of a built-in agent,
+    including `explore` and `compaction`, and MAY hide a built-in primary agent
+    other than `code`. These preferences MUST belong to the user, MUST apply to
+    every session that user starts including organization sessions, and MUST
+    NOT be settable by a session request.
+
+### Repository Access
+
+1. A session started from an organization chat integration (Slack, Linear,
+   Discord) MUST get repository access from the organization's connected GitHub
+   App installation or GitLab connection.
+2. The session MUST NOT require the requesting member to link a personal GitHub
+   or GitLab identity.
+3. Rule 1 applies to every session mode, including a session that changes code.
+   The system MUST NOT check the requesting member's own permission on the
+   repository or project. A member who can use the integration gets the access
+   of the organization's connection, as in an organization web session.
+4. A GitHub-triggered action from an organization repository MUST require write
+   access for the triggering GitHub account. That account is not necessarily an
+   organization member.
+
+### Stacked Worktrees
+
+1. The user MAY create a stacked workspace from an existing worktree's sidebar
+   or chat-header menu. The composer MUST identify the parent branch, keep its
+   repository locked, and allow removing the stack target to start normally.
+2. A stacked worktree MUST have its own branch and sandbox. Its first checkout
+   MUST start at the remote parent commit resolved when the workspace was
+   prepared. Sibling chats MUST retain the same stack and base.
+3. A parent outside the user's personal or organization scope, a different
+   repository, or a parent being deleted MUST NOT be accepted. An unpushed base
+   MUST fail before creating the workspace with a specific reason. A base
+   rewritten during startup MUST fail with a retryable base-changed reason.
+4. The Changes panel MUST compare a layer with its base branch, not with its own
+   branch. When the base no longer exists, it MUST compare with the repository's
+   default branch and identify that fallback.
+5. A worktree MUST rewrite or push only its own branch. Auto-commit MUST NOT
+   force-push. A remote history change MUST retain local commits and offer Sync.
+6. Sync and Restack MUST require a user action and MUST refuse while any chat in
+   the worktree is running or the working tree has uncommitted changes. Restack
+   MUST use a force-with-lease pinned to the expected remote head. Waking an idle
+   sandbox MUST be visible as operation progress.
+7. Restack stack MUST visit layers bottom-up, in their own sandboxes, and stop
+   on the first refusal or conflict. A conflicting rebase MUST be aborted before
+   the agent receives the exact operation, command, files, and expected result
+   as a resolving turn. No unrelated branch may be rewritten.
+8. Deleting a parent worktree MUST preserve its branch and its children's base
+   branches. The confirmation MUST warn when stacked children exist. Children
+   MUST remain usable after the parent worktree is deleted.
+9. A stack MUST appear as one sidebar unit with an individually navigable row
+   and PR state for each layer. A collapsed stack MUST summarize its layer count
+   and most urgent status.
+10. Sidebar layout preferences MUST belong to the individual user in the
+    selected scope, including within organizations. All members MAY change their
+    own workspace order and smart folders. Single sessions MUST remain sorted
+    by actual activity, and PR verification or other metadata writes MUST NOT
+    move them or workspaces in activity order.
+11. A Cloud Agent permitted to launch child sessions MUST be able to orchestrate
+    stacked workspaces through its scoped launch tool when the user requests a
+    PR stack. Every new launch MUST use a fresh UUID `operationKey` and create a
+    registered workspace. The response MUST return its `worktreeId`, including
+    on an identical retry. The orchestrator MAY launch worker A independently,
+    then launch B with `stackOnWorktreeId` set to A's returned ID after A pushes.
+    The stack parent MAY be another owned worktree in the same personal or
+    organization scope. Completion callbacks MUST target the launching
+    orchestrator independently of the stack parent. The server MUST resolve the
+    parent repository, branch, and pushed commit with the UI ownership checks.
+    The agent MUST NOT select the resolved commit, override its lineage, or
+    combine stacking with `upstreamBranch`. Each layer MUST receive its PR base
+    instruction and may push only its own branch.
 
 ### Preparation
 
@@ -159,9 +245,15 @@ repository.
 4. Running and failed preparation MUST always be visible. Failed preparation,
    its triggering failed message, and its safe error MUST remain visible, with
    a way to open details.
-5. Setup commands MUST run on the first prepare and again on every rebuild,
-   except when restoring a private session disk snapshot. A failing or timed-out
-   setup command MUST fail preparation and the turn.
+ 5. The environment's build commands MUST run only in an environment build.
+    Session setup commands (request-supplied and profile) and the environment's
+    start commands MUST run on a fresh start and on an environment snapshot start.
+    Neither MUST run when restoring a private workspace tail snapshot or when a
+    chat joins a workspace that is already running. A failing or timed-out
+    session setup or start command MUST NOT fail preparation or the turn: the
+    user MUST see a row naming the command kind, number, command text and exit
+    code or timeout, with a way to open its output, and the agent MUST receive a
+    short note about it with the first message after that preparation.
 6. Follow-up turns MUST NOT show preparation unless the environment was
    rebuilt.
 7. Preparation output MUST NOT reveal tokens or secret values.
@@ -178,24 +270,41 @@ repository.
 ### Environment snapshots
 
 1. Only an environment build MAY create a reusable environment snapshot.
-   Private session disk snapshots MUST follow the separate session snapshot
+   Private workspace tail snapshots MUST follow the separate workspace snapshot
    rules below and MUST NOT be published as environment snapshots.
-2. A session that uses a repository environment MAY start from that
-   environment's published snapshot when the owner, repository, sandbox image
-   and runtime match and the snapshot revision is not newer than the
+2. A session whose repository environment has build commands MUST start from
+   that environment's published snapshot when the owner, repository and
+   runtime match and the snapshot revision is not newer than the
    session's configuration revision. For a multi-repository environment, the
    environment, owner and the same list of repositories MUST match instead of
-   one repository. Otherwise, and when the lookup is unavailable, it MUST start from
-   the base image. The lookup MUST NOT delay the start by more than 15 seconds
-   and MUST NOT wait for a build.
-3. A session that starts from a snapshot MUST still run setup with the
-   configuration admitted for that session. Cached files MAY retain earlier
-   values, including secrets.
+   one repository. A snapshot from an earlier sandbox image MUST remain
+   eligible while a replacement build runs, until its eligible lifetime ends;
+   the runtime ABI MUST still match. A missing, building, failed or backed-off environment
+   or an unavailable lookup MUST fail with a specific reason and a way to open
+   the environment build, never start from the base image. When no environment
+   snapshot can serve the start at all -- a sandbox provider that cannot restore
+   one, or a retired sandbox type whose workspace path the snapshot does not
+   cover -- rebuilding cannot help: the start MUST fail at once with that
+   reason, without a way to open the environment build, and MUST NOT start from
+   the base image. An environment without build commands MUST
+   start from the base image. The lookup MUST NOT delay the
+   start by more than 15 seconds and MUST NOT wait for a build.
+3. Build commands are the environment's setup commands and run only in its
+   build. Session setup commands are the request-supplied and profile setup
+   commands. A workspace that starts from an environment snapshot, at any
+   revision, or from the base image MUST run the session setup commands, then
+   the start commands, as Preparation rule 5 describes. Changed build commands
+   take effect after the next build. Cached files MAY retain earlier values,
+   including secrets.
 4. When a session starts from an older snapshot revision, preparation MUST
    show the snapshot revision, the session's revision, and the actual
    replacement build status, including a skipped build or backoff.
-5. If a snapshot start fails, the session MUST start once from the base image
-   within the same preparation deadline.
+5. If a snapshot start fails transiently, the session MUST retry the same
+   snapshot within the preparation deadline. A permanent failure MUST fail with
+   a specific reason that asks to rebuild the environment. A repeated transient
+   failure MUST ask the user to send the message again and rebuild only if the
+   failure repeats. In both cases, the session MUST NOT continue from the base
+   image.
 6. A snapshot MUST NOT contain git or build credentials, reflogs, or a Kilo
    home.
 7. Organization managers and personal owners MAY build, refresh, or cancel a
@@ -207,42 +316,57 @@ repository.
 9. Automatic builds started by sessions MUST back off after repeated failures
    of one revision. A manual build MUST stay available during backoff.
 
-### Session disk snapshots
+### Workspace tail snapshots
 
-1. Session disk snapshots MUST be disabled by default and enabled only for
-   explicitly enrolled users or organizations. Capture and restore MUST both
-   check enrollment independently of environment snapshot enrollment.
-2. An enrolled session MAY capture its container disk after two minutes idle,
-   using the existing wrapper heartbeat and sandbox alarm. Capture MUST NOT
-   delay turn completion or Stop and MUST run at most once per idle period.
-3. A snapshot MUST belong to exactly one session, Kilo session, sandbox, and
-   owner. Only isolated, single-session native Cloudflare Containers at
-   `/workspace/app` with an interactive origin (`cloud-agent-web`, `desktop` or
-   `agent-manager`) MAY capture or restore. Allocations that hosted another
-   session MUST NOT produce a session snapshot.
-4. Capture publication MUST reject changed allocation, connection, preparation,
-   activity or session identity. Active heartbeats, new delivery, Stop and
-   release MUST invalidate older disk state. Capture failure MUST be best effort
-   without repeatedly retrying in the same idle period.
-5. A cold start MAY prefer its own compatible session snapshot over an
-   environment snapshot or base image. Selection MUST use the Sandbox DO's
-   local metadata and MUST NOT consume the snapshot before work is delivered.
-   Runtime release changes MUST NOT disqualify a checkpoint with compatible
-   startup mode and image. Downloaded startup MUST install the currently selected
-   Kilo and wrapper runtime over the restored disk.
-6. Restore MUST preserve local branches, unpushed commits, the Git index,
-   dirty, untracked and ignored files, and session home state. It MUST NOT run
-   environment-template adoption, checkout, setup replay, or older file recovery
-   over the restored disk. It MUST refresh current credentials and configuration,
-   reuse the restored session history with ordinary ingest fallback, and validate
-   workspace provenance before reporting ready.
-7. Unsupported runtimes, failed restore, or failed restored preparation MUST
-   use the bounded fresh-start fallback without silently hanging the session.
-   Existing history and worktree recovery MUST remain available on that fallback.
-8. A private disk snapshot MAY contain session credentials, caches, and user
-   secrets. It MUST NOT be shared with another session or an environment build.
-   Invalidation or session release MUST NOT claim physical deletion where the
-   provider offers no delete API.
+1. `WORKSPACE_SNAPSHOT_IDS` MUST accept a comma-separated allowlist of user or organization
+   IDs. Matching either MUST enroll the owner. Empty or unset is off; `*` MUST enroll everyone.
+2. Only a trusted registered `worktree_*` workspace MAY capture or restore a tail
+   snapshot. Standalone sessions MUST NOT capture or restore one.
+3. A snapshot MUST belong to one workspace, user, organization, sandbox binding,
+   and canonical directory. The source allocation is provenance, not session ownership.
+   Only isolated native Cloudflare Containers with interactive origins qualify.
+   A sandbox serves one workspace only. Other providers retain ordinary recovery.
+4. All sibling sessions in that workspace MUST share one current snapshot.
+   A sibling joining or leaving MUST NOT permanently disable future capture.
+5. Capture MAY run once after one minute of aggregate workspace inactivity.
+   Preparation, native child executions, terminals and admitted filesystem mutations MUST
+   fence capture. Provider capture MUST run outside the Sandbox DO queue and MUST NOT delay Stop.
+6. Publication MUST reject changed allocation, connection, workspace binding, preparation,
+   membership, activity or mutation generation. New admitted work MUST fence pending
+   publication before dispatch and MUST NOT delete the current snapshot. A capture failure
+   MUST NOT retry repeatedly within the idle period.
+7. Session deletion MUST keep the workspace snapshot and allow another idle capture for
+   survivors. Only a newer capture, workspace deletion or the user's explicit "Start fresh"
+   MAY remove it. Workspace deletion MUST invalidate selection and pending publication before
+   resource teardown. Restored disks MUST NOT restore deleted-session authorization or
+   recreate a deleted workspace.
+8. When a private workspace snapshot exists, cold startup MUST use it as the only source.
+   Selection MUST validate ownership, enrollment, provider, startup mode, image class and
+   the 30-day lifetime from durable Sandbox DO metadata. A later base image MUST NOT block
+   the restore. A compatible downloaded runtime release MAY update the restored disk.
+9. Only a confirmed provider restore MAY supply frame-only workspace provenance.
+   Every authorized sibling, including later joins, MUST receive it.
+   Registration MUST reject supplied restore provenance. Older peers use ordinary recovery.
+10. The wrapper MUST validate workspace identity, directory and source allocation stamp.
+    It MUST preserve branches, local commits, index, dirty, untracked and ignored files,
+    HOME and native databases. It MUST NOT replay checkout, setup, environment adoption
+    or older file recovery over a valid tail snapshot.
+11. A snapshot MUST contain only the disk. Restore MUST apply the current credentials and
+    runtime configuration from the route, as a fresh start does, and reconcile current
+    authorization before exposing native sessions. Existing native sessions are reused.
+    Missing sessions use history recovery without replacing workspace files.
+    New chats MUST attach without resetting files.
+12. A transient provider failure MUST retry the same snapshot within the preparation deadline.
+    An expired, missing or incompatible snapshot, an incompatible peer, a permanent or repeated
+    provider failure, or a failed restore step MUST fail with a specific reason, keep the
+    snapshot and queued message identity, and MUST NOT fall back to another source. That
+    failure MUST offer "Start fresh", which names the changes since the capture time that it
+    discards. A failure that may be transient MUST also say that a new message retries. Diagnostics MUST identify workspace, requesting session, allocation, capture
+    time, selected source and failure reason. Logs MUST NOT contain snapshot handles,
+    credentials or file contents.
+13. Superseded descriptors MUST remain unselectable. Provider artifacts expire 30 days after
+    creation or their last restore; each restore resets this TTL. Snapshots preserve disk,
+    not running processes, terminals or memory.
 
 ### Turn
 
@@ -285,7 +409,7 @@ repository.
    A healthy runtime that still cannot be observed at that bound, or no longer
    has recent real progress, MUST use bounded restart recovery without claiming
    that Kilo was unresponsive. The existing memory hold MUST retain precedence.
-   The separate 120-minute execution cap MUST include user waits. Native
+   The separate 12-hour execution cap MUST include user waits. Native
    cancellation MUST be bounded and confirmed; unconfirmed cancellation MUST
    use bounded runtime recovery. Accepted Cloud messages MUST settle once;
    autonomous routed failures MUST remain visible without inventing new message
@@ -303,7 +427,7 @@ repository.
    five minutes, the environment MUST stop and every accepted message on it
    MUST fail with a specific connection reason; queued messages MUST wait for a
    new environment in the same chat. Each affected composer MUST become usable;
-   already-terminal messages MUST stay unchanged. Do not wait for the 120-minute
+   already-terminal messages MUST stay unchanged. Do not wait for the 12-hour
    execution cap or physical stop confirmation, and do not claim that Kilo
    stalled or returned an error.
 
@@ -323,6 +447,20 @@ repository.
 1. The user MUST be able to open a terminal on the environment as a tab beside
    the chat, and close it. A read-only session MUST NOT offer terminals.
 2. A pull request the session opened MUST be visible with its current state.
+   In a worktree, a same-repository pull request on the branch the worktree has
+   checked out belongs to the worktree: every chat in it MUST show that pull
+   request without any chat reporting it, an open or draft pull request MUST win
+   over a closed or merged one, and it MUST only match within the worktree's
+   personal or organization scope. Outside worktrees a branch name alone MUST
+   NOT link a pull request.
+   The first workspace registration MUST record its canonical repository and
+   working branch without requiring a CLI metadata report. A generated branch
+   MUST remain stable across registration retries and takeovers; an explicitly
+   selected upstream branch MUST take precedence. Registration MUST NOT record
+   the base branch as the workspace's working branch or overwrite a previously
+   registered checkout. A later registration MUST fill the repository and working
+   branch when both stored fields are absent. Legacy CLI checkout reports MAY
+   still update it.
 3. Open workspace tabs — the workspace terminal and file tabs, their order, and
    the active tab — MUST survive refresh and navigation between worktrees, and
    MUST remain scoped to the current user and personal or organization context.
@@ -374,7 +512,9 @@ repository.
    from the repository's default branch. An agent MAY still perform explicit Git
    operations during its chat.
 8. Deleting one chat MUST leave its siblings usable. Deleting the final chat
-   MUST remove the worktree group from the session list.
+   MUST require explicit confirmation that the workspace and its files will also
+   be deleted, then delete the worktree. The server MUST reject that conditional
+   workspace deletion if another root chat was created before deletion began.
 9. Existing ungrouped and legacy chats MUST remain individual sidebar rows and
    retain their current behavior. Worktree grouping MUST NOT change
    native-mobile chat behavior.
@@ -403,8 +543,12 @@ repository.
     state. It MUST preserve other worktrees and destroy a physical sandbox only
     when that sandbox is exclusively owned by the deleted worktree. Ownership
     and current personal or organization access MUST be checked server-side.
-    Incomplete cleanup MUST remain recoverable, MUST NOT report success, and
-    MUST NOT permit late creation or ingestion to resurrect the worktree.
+    Saved content deletion MUST NOT depend on an available runtime or container.
+    The UI MAY report content removal once ingest deletion succeeds, but MUST
+    distinguish incomplete runtime cleanup from complete deletion. Incomplete
+    cleanup MUST retain its recovery journal and MUST NOT permit late creation
+    or ingestion to resurrect the worktree. It MUST NOT be described as automatic
+    background cleanup unless a reconciler is scheduled.
 14. Chats in one worktree MUST share one runtime and one MCP configuration.
     Runtime and MCP configuration MUST NOT be isolated per chat, and a sibling
     MUST NOT replace the worktree's configuration. Independent worktrees MUST
@@ -417,7 +561,19 @@ repository.
     MUST check current canonical-parent authorization and persisted child
     lineage, owner and organization. It MUST NOT manage the parent itself,
     sibling chats or unrelated sessions. Child completion callbacks MUST target
-    the canonical workspace parent, not an arbitrary invoking sibling.
+    either a new chat created in the parent's workspace
+    (`workspace:new-chat`) or one existing chat in that workspace
+    (`workspace:<session-id>`). The server MUST verify that a session target is
+    a root or sibling chat with the same owner, organization and workspace, and
+    that it is still accessible; it MUST reject a target outside the spawning
+    parent's workspace or any target that is a child session. The target chat
+    learns its own session id from the `cloud-agent-context` line in its turns.
+    A `workspace:new-chat` callback starts the new chat with the child result as
+    its first message, and every workspace callback MUST be idempotent for the
+    persisted callback message ID. A child completion callback MUST render as a
+    distinct child session message that identifies the child session, shows its
+    reported result or failure, and links to that session. It MUST NOT render
+    the serialized callback envelope as the user's message.
 
 ### Watch PR (Observation-Only Pilot)
 
@@ -480,8 +636,9 @@ are not a complete recovery mechanism. Exact recovery limits are documented in
    provider information rather than an arbitrary provider string. When present,
    `runtime` MUST contain only nullable `sandboxType`, `kiloCliVersion`,
    `wrapperVersion`, `startedAt`, and `stoppedAt` fields. Sandbox types MUST be
-   bounded to shared, isolated-small, isolated-standard, code-review,
-   devcontainer, containers-standard-3, containers-standard-4, or unknown.
+   bounded to shared (legacy sessions only), isolated-small,
+   isolated-standard, code-review, devcontainer, containers-standard-3,
+   containers-standard-4, or unknown.
    Versions MUST be bounded, validated values reported
    by the relevant runtime, not inferred from the current deployment. Runtime
    identifiers, owner identifiers, infrastructure addresses or regions,
@@ -574,8 +731,14 @@ are not a complete recovery mechanism. Exact recovery limits are documented in
 3. If the environment dies, the next prompt MUST recover in the same chat. The
    user MUST NOT be forced to start a new session.
 4. Recovery MUST preserve each worktree chat, its transcript, and its grouping.
-   Uncommitted files are not guaranteed to survive replacement of the shared
-   physical environment.
+   Uncommitted tracked and untracked text changes in the saved worktree snapshot
+   are restored best-effort into a replacement environment. Binary, oversized,
+   truncated, ignored, or over-budget files MAY be omitted, and a partial
+   recovery MUST NOT block the next turn.
+5. A route MUST adopt the recovery saved for a later preparation, so a restart
+   restores the newest saved snapshot rather than the one captured when the route
+   was first prepared. An attempt that already received its preparation frame is
+   not re-prepared for a newer snapshot; the next attempt gets it.
 
 ### Continuity
 
@@ -656,12 +819,43 @@ The following use SHOULD and are not enforced today:
    - A repository that cannot be authorized fails the start with a generic
      message that does not name it. A timeout while authorizing fails as a
      workspace setup failure.
-   - The sandbox picker does not know the environment. It can show a shared
+   - The sandbox picker does not know the environment. It can show a Vercel
      default that the session skips.
    - With several repositories, the agent runs at `/workspace` and does not
      load the `AGENTS.md` or skills of each repository.
 
 ## Changelog
+
+### 2026-11-12 -- Organization repository access
+
+- Sessions from organization chat integrations get repository access from the
+  organization's GitHub or GitLab connection, in every mode. They no longer
+  require a personal provider identity or the member's own repository
+  permission. GitHub-triggered actions still check the triggering account's
+  write access.
+
+### 2026-11-10 -- Worktree pull requests
+
+- A pull request on a worktree's checked-out branch now belongs to the worktree
+  and shows on every chat in it, without the agent reporting a link.
+
+### 2026-11-04 -- Environment start commands
+
+- Environments have a workspace start script that runs each time a workspace
+  starts, after setup or from a snapshot. It is not part of a build, and a chat
+  that joins a running workspace does not run it.
+- A workspace that starts from an environment snapshot, at any revision, skips
+  the environment's setup, but still runs request-supplied setup. Changed
+  environment setup commands take effect after the next build.
+- Start commands also run after a session disk snapshot restore, because no
+  process survives a snapshot.
+
+### 2026-11-04 -- One sandbox per workspace
+
+- One sandbox serves one workspace only. The shared sandbox is retired: new
+  sessions cannot request it, and a saved shared default is skipped.
+- Stored sessions, settings and triggers that name the shared sandbox still
+  load. A session on it does not resume and needs a new session.
 
 ### 2026-11-03 -- Environment selection preferences
 

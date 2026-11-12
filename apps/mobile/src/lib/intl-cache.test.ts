@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   dateTimeFormat,
+  deviceTimeZone,
   durationFormat,
   listFormat,
   numberFormat,
@@ -38,10 +39,69 @@ describe('intl-cache', () => {
     );
   });
 
+  it('reports the device zone through the same probe that drops the cache', () => {
+    expect(deviceTimeZone()).toBe(new Intl.DateTimeFormat().resolvedOptions().timeZone);
+  });
+
   it('formats in the locale it was asked for', () => {
     expect(dateTimeFormat('en', { weekday: 'long' }).format(new Date('2026-08-24T12:00:00Z'))).toBe(
       'Monday'
     );
+  });
+
+  it('formats in the new device time zone after the zone moves', () => {
+    const instant = new Date('2026-11-04T01:10:00.000Z');
+    const options = { hour: 'numeric', minute: '2-digit' } as const;
+    const originalZone = process.env.TZ;
+    const restoreZone = () => {
+      if (originalZone === undefined) {
+        delete process.env.TZ;
+      } else {
+        process.env.TZ = originalZone;
+      }
+    };
+    vi.useFakeTimers();
+    try {
+      process.env.TZ = 'UTC';
+      vi.advanceTimersByTime(2000);
+      expect(dateTimeFormat('en', options).format(instant)).toBe('1:10 AM');
+
+      // The device zone moved, and enough time passed for the cache to notice.
+      process.env.TZ = 'Pacific/Auckland';
+      vi.advanceTimersByTime(2000);
+      expect(dateTimeFormat('en', options).format(instant)).toBe('2:10 PM');
+
+      restoreZone();
+      vi.advanceTimersByTime(2000);
+      // Whatever zone the test host runs in: a formatter built now agrees with
+      // the zone the process is back in, not with the zone it left.
+      expect(dateTimeFormat('en', options).format(instant)).toBe(
+        new Intl.DateTimeFormat('en', options).format(instant)
+      );
+    } finally {
+      restoreZone();
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps a formatter it rebuilt inside the check interval', () => {
+    const options = { weekday: 'long' } as const;
+    const originalZone = process.env.TZ;
+    vi.useFakeTimers();
+    try {
+      process.env.TZ = 'UTC';
+      vi.advanceTimersByTime(2000);
+      const first = dateTimeFormat('en', options);
+      vi.advanceTimersByTime(200);
+      expect(dateTimeFormat('en', options)).toBe(first);
+    } finally {
+      if (originalZone === undefined) {
+        delete process.env.TZ;
+      } else {
+        process.env.TZ = originalZone;
+      }
+      vi.useRealTimers();
+    }
   });
 
   it('polyfills the constructors that Hermes omits', () => {

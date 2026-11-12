@@ -6,17 +6,18 @@ import {
   sandboxKindMatchesKey,
   type SandboxKind,
 } from '../sandbox-placement.js';
+import type { RuntimeHarness } from '../shared/control-plane-runtime-contract.js';
 import type { AgentSandboxProvider, Env } from '../types.js';
 import { ProviderCreationError } from './provider.js';
+import { RetiredSandboxProviderError } from './retired-cloudflare-provider.js';
 
 export type StartupMode = 'preinstalled' | 'downloaded';
 export type NativeRuntimeImage = 'all-in-one' | 'runtime-free';
-export type StartupSelection =
-  | { mode: 'preinstalled'; image: NativeRuntimeImage }
-  | { mode: 'downloaded'; image: NativeRuntimeImage; descriptor: string };
+export type StartupSelection = { mode: 'downloaded'; image: 'runtime-free'; descriptor: string };
 
 export type StartupRouteIdentity = {
   orgId?: string;
+  billingOrigin?: string;
 };
 
 export type StartupCohortContext = {
@@ -26,16 +27,16 @@ export type StartupCohortContext = {
   sandboxId?: string;
 };
 
-const interactiveOrgIdsSchema = z.array(z.uuid()).min(1);
+const orgIdsSchema = z.array(z.uuid()).min(1);
 
-function configuredInteractiveOrgIds(raw: string | undefined): string[] | undefined {
+function configuredOrgIds(raw: string | undefined): string[] | undefined {
   if (raw === undefined) return undefined;
   const values = raw
     .split(',')
     .map(value => value.trim())
     .filter(Boolean);
   if (values.length === 0) return [];
-  const parsed = interactiveOrgIdsSchema.safeParse(values);
+  const parsed = orgIdsSchema.safeParse(values);
   if (!parsed.success) throw new ProviderCreationError('invalid_configuration');
   return parsed.data;
 }
@@ -50,15 +51,12 @@ function isIsolatedNativeSandbox(cohort: StartupCohortContext | undefined): bool
   return sandboxClass === 'isolated-small' || sandboxClass === 'isolated-standard';
 }
 
-/**
- * Every preparing route must belong to one configured organization, whatever
- * its origin. Mixed or missing identity stays on the baseline.
- */
-function isScopedCohort(
+function inOrgScope(
+  provider: AgentSandboxProvider,
   cohort: StartupCohortContext | undefined,
-  interactiveOrgIds: readonly string[]
+  orgIds: readonly string[]
 ): boolean {
-  if (interactiveOrgIds.length === 0) return false;
+  if (orgIds.length === 0) return false;
   const routes = cohort?.preparingRoutes ?? [];
   if (routes.length === 0) return false;
   let orgId: string | undefined;
@@ -67,42 +65,70 @@ function isScopedCohort(
     if (orgId !== undefined && route.orgId !== orgId) return false;
     orgId = route.orgId;
   }
-  return orgId !== undefined && interactiveOrgIds.includes(orgId);
+  return (
+    orgId !== undefined &&
+    orgIds.includes(orgId) &&
+    (provider !== 'cloudflare-containers' || isIsolatedNativeSandbox(cohort))
+  );
+}
+
+type StartupEnv = Pick<
+  Env,
+  | 'RUNTIME_STARTUP_MODE'
+  | 'NATIVE_RUNTIME_IMAGE'
+  | 'RUNTIME_RELEASE_DESCRIPTOR'
+  | 'RUNTIME_INTERACTIVE_ORG_IDS'
+  | 'RUNTIME_RELEASE_DESCRIPTOR_KILO2'
+  | 'RUNTIME_KILO2_ORG_IDS'
+>;
+
+function startupTarget(
+  env: StartupEnv,
+  provider: AgentSandboxProvider
+): { mode: 'downloaded'; image: 'runtime-free' } {
+  if (provider === 'cloudflare') throw new RetiredSandboxProviderError('create');
+  if (provider === 'vercel') return { mode: 'downloaded', image: 'runtime-free' };
+  if (env.RUNTIME_INTERACTIVE_ORG_IDS !== undefined)
+    throw new ProviderCreationError('invalid_configuration');
+  const selected = runtimeStartupConfigSchema.safeParse({
+    mode: env.RUNTIME_STARTUP_MODE ?? 'downloaded',
+    image: env.NATIVE_RUNTIME_IMAGE ?? 'runtime-free',
+  });
+  if (!selected.success) throw new ProviderCreationError('invalid_configuration');
+  const { mode, image } = selected.data;
+  return { mode, image };
+}
+
+/**
+ * The harness a sandbox's first allocation selects. Only a downloaded start in
+ * the `RUNTIME_KILO2_ORG_IDS` scope runs v2 when every route has the trusted
+ * cloud-agent-web origin.
+ * An unset list keeps v1 everywhere.
+ */
+export function newSandboxHarness(
+  env: StartupEnv,
+  provider: AgentSandboxProvider,
+  cohort?: StartupCohortContext
+): RuntimeHarness {
+  startupTarget(env, provider);
+  const orgIds = configuredOrgIds(env.RUNTIME_KILO2_ORG_IDS);
+  return orgIds !== undefined &&
+    inOrgScope(provider, cohort, orgIds) &&
+    cohort?.preparingRoutes?.every(route => route.billingOrigin === 'cloud-agent-web')
+    ? 'kilo2'
+    : 'kilo';
 }
 
 /** Resolve trusted deployment configuration once per create attempt. */
 export function selectStartup(
-  env: Pick<
-    Env,
-    | 'RUNTIME_STARTUP_MODE'
-    | 'NATIVE_RUNTIME_IMAGE'
-    | 'RUNTIME_RELEASE_DESCRIPTOR'
-    | 'RUNTIME_INTERACTIVE_ORG_IDS'
-  >,
+  env: StartupEnv,
   provider: AgentSandboxProvider,
-  cohort?: StartupCohortContext
+  _cohort?: StartupCohortContext,
+  harness: RuntimeHarness = 'kilo'
 ): StartupSelection {
-  const selected = runtimeStartupConfigSchema.safeParse({
-    mode: env.RUNTIME_STARTUP_MODE ?? 'preinstalled',
-    image: env.NATIVE_RUNTIME_IMAGE ?? 'all-in-one',
-  });
-  if (!selected.success) throw new ProviderCreationError('invalid_configuration');
-  const { mode, image } = selected.data;
-  // The retired SDK provider keeps its preinstalled launch contract.
-  if (mode === 'preinstalled' || provider === 'cloudflare')
-    return { mode: 'preinstalled', image: 'all-in-one' };
-  const interactiveOrgIds = configuredInteractiveOrgIds(env.RUNTIME_INTERACTIVE_ORG_IDS);
-  if (
-    interactiveOrgIds !== undefined &&
-    (!isScopedCohort(cohort, interactiveOrgIds) ||
-      (provider === 'cloudflare-containers' && !isIsolatedNativeSandbox(cohort)))
-  )
-    return { mode: 'preinstalled', image: 'all-in-one' };
-  if (!env.RUNTIME_RELEASE_DESCRIPTOR) throw new ProviderCreationError('invalid_configuration');
-  return { mode, image, descriptor: env.RUNTIME_RELEASE_DESCRIPTOR };
-}
-
-/** Preserve legacy preinstalled snapshot keys. Downloaded snapshots have a separate namespace. */
-export function startupRepositoryKey(repoKey: string, mode: StartupMode): string {
-  return mode === 'preinstalled' ? repoKey : `downloaded:${repoKey}`;
+  const target = startupTarget(env, provider);
+  const descriptor =
+    harness === 'kilo2' ? env.RUNTIME_RELEASE_DESCRIPTOR_KILO2 : env.RUNTIME_RELEASE_DESCRIPTOR;
+  if (!descriptor) throw new ProviderCreationError('invalid_configuration');
+  return { ...target, descriptor };
 }

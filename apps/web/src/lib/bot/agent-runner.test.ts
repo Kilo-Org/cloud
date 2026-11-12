@@ -11,6 +11,7 @@ import type { SpawnCloudAgentInput as SpawnInput } from './tools/spawn-cloud-age
 import {
   buildGitLabCloneUrl,
   getGitLabInstanceUrlForOrganization,
+  getGitLabInstanceUrlForUser,
   getGitLabTokenForOrganization,
   getGitLabTokenForUser,
   validateGitLabRepoAccessForOrganization,
@@ -26,6 +27,7 @@ import {
   getGitLabRepositoryContext,
 } from '@/lib/slack-bot/gitlab-repository-context';
 import { recordBotRequestCloudAgentSession } from '@/lib/bot/request-logging';
+import { resolveOrganizationBotModel } from '@/lib/bot/organization-model';
 
 type AgentOptions = {
   instructions: string;
@@ -67,6 +69,11 @@ jest.mock('@/lib/bot/platforms', () => ({
       getRequesterInfo: async () => ({ displayName: 'Requester', platform: 'github' }),
     }),
   },
+}));
+jest.mock('@/lib/bot/organization-model', () => ({
+  resolveOrganizationBotModel: jest.fn(
+    async ({ storedModelSlug }: { storedModelSlug: string }) => storedModelSlug
+  ),
 }));
 jest.mock('@/lib/bot/request-logging', () => ({
   linkBotRequestToSession: jest.fn(),
@@ -234,6 +241,7 @@ beforeEach(() => {
   mockGetGitHubIntegrationById.mockResolvedValue({
     ...runParams().platformIntegration,
     id: 'github-association-1',
+    platform_installation_id: 'installation-1',
     repositories: githubRepositories,
   });
   jest.mocked(getGitLabRepositoryContext).mockResolvedValue({
@@ -248,6 +256,7 @@ beforeEach(() => {
   jest.mocked(getGitLabTokenForOrganization).mockResolvedValue('gitlab-token');
   jest.mocked(getGitLabTokenForUser).mockResolvedValue('gitlab-token');
   jest.mocked(getGitLabInstanceUrlForOrganization).mockResolvedValue('https://gitlab.com');
+  jest.mocked(getGitLabInstanceUrlForUser).mockResolvedValue('https://gitlab.com');
   jest.mocked(buildGitLabCloneUrl).mockReturnValue(`https://gitlab.com/${gitlabProject}.git`);
 });
 
@@ -495,5 +504,18 @@ describe.each(['slack', 'linear'] as const)('%s repository selection', platform 
     expect(getGitLabTokenForOrganization).not.toHaveBeenCalled();
     expect(mockPrepareSession).not.toHaveBeenCalled();
     expect(createCloudAgentNextClient).not.toHaveBeenCalled();
+  });
+});
+
+describe('organization model resolution', () => {
+  it('starts the session on the model the organization policy allows', async () => {
+    jest.mocked(resolveOrganizationBotModel).mockResolvedValueOnce('org/allowed-model');
+
+    const result = await runBotAgent(runParams());
+
+    expect(result.startedCloudAgentSession).toBe(true);
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'org/allowed-model' })
+    );
   });
 });

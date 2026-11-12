@@ -58,6 +58,9 @@ export function SessionShareSection({
   const [duration, setDuration] = useState<SessionShareDuration>('7d');
   const [includeNewMessages, setIncludeNewMessages] = useState(false);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
+  // When this sheet created `createdUrl`. A read that started before it cannot
+  // say whether the link is still live; one that started after it can.
+  const [createdAtMs, setCreatedAtMs] = useState<number | null>(null);
   const [copyState, setShareCopyState] = useState<ShareCopyState>('idle');
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -67,16 +70,46 @@ export function SessionShareSection({
       { enabled: visible, staleTime: 30_000 }
     )
   );
+  // Until the session row has been read, whether this session already has a
+  // link is unknown — and treating that as "no link" offers a create action
+  // whose mutation rotates the share generation and revokes the previous link.
+  const shareStateLoaded = !shareStateQuery.isPending && !shareStateQuery.isError;
   const hasActiveLink = shareStateQuery.data?.public_id != null;
 
   // Closing the sheet drops the transient outcomes, so a reopen starts from the
-  // action rather than from the last attempt's feedback.
+  // action rather than from the last attempt's feedback. The created URL is one
+  // of them: the server stores only the token's identity, so keeping it across a
+  // close would offer Copy/Share for a link that may since have been revoked.
   useEffect(() => {
     if (!visible) {
       setShareCopyState('idle');
       setActionError(null);
+      setCreatedUrl(null);
+      setCreatedAtMs(null);
     }
   }, [visible]);
+
+  // The link belongs to the server, not to this sheet: a read that lands after
+  // the create and reports no public id means it has expired, been revoked, or
+  // been rotated out elsewhere, so the URL held here is no longer the live one.
+  useEffect(() => {
+    if (createdUrl === null || createdAtMs === null) {
+      return;
+    }
+    if (shareStateQuery.isFetching || shareStateQuery.dataUpdatedAt <= createdAtMs) {
+      return;
+    }
+    if (shareStateQuery.data?.public_id == null) {
+      setCreatedUrl(null);
+      setCreatedAtMs(null);
+    }
+  }, [
+    createdAtMs,
+    createdUrl,
+    shareStateQuery.data,
+    shareStateQuery.dataUpdatedAt,
+    shareStateQuery.isFetching,
+  ]);
 
   const invalidateShareState = () => {
     void queryClient.invalidateQueries({
@@ -93,6 +126,7 @@ export function SessionShareSection({
     onSuccess: async created => {
       const { WEB_BASE_URL } = await import('@/lib/config');
       setCreatedUrl(`${WEB_BASE_URL}/s/${created.share_token}`);
+      setCreatedAtMs(Date.now());
       setShareCopyState('idle');
       setActionError(null);
       notificationHaptic(Haptics.NotificationFeedbackType.Success);
@@ -107,6 +141,7 @@ export function SessionShareSection({
     ...trpc.cliSessionsV2.unshare.mutationOptions(),
     onSuccess: () => {
       setCreatedUrl(null);
+      setCreatedAtMs(null);
       setShareCopyState('idle');
       setActionError(null);
       notificationHaptic(Haptics.NotificationFeedbackType.Success);
@@ -191,6 +226,34 @@ export function SessionShareSection({
         }}
         onRevoke={revokeLink}
       />
+    );
+  } else if (shareStateQuery.isError) {
+    // The session row could not be read, so this sheet cannot tell whether a
+    // link already exists. Offer the read again instead of a create action
+    // that would silently rotate the link another device may hold.
+    actions = (
+      <View className="gap-3">
+        <Text className="text-xs text-destructive" testID="session-share-state-error">
+          {t('common.somethingWentWrong')}
+        </Text>
+        <Button
+          variant="outline"
+          className="w-full"
+          loading={shareStateQuery.isFetching}
+          onPress={() => {
+            void shareStateQuery.refetch();
+          }}
+          testID="session-share-state-retry"
+        >
+          {t('common.retry')}
+        </Button>
+      </View>
+    );
+  } else if (!shareStateLoaded) {
+    actions = (
+      <Text variant="muted" className="text-xs" testID="session-share-state-loading">
+        {t('common.loading')}
+      </Text>
     );
   } else if (hasActiveLink) {
     actions = (

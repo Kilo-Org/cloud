@@ -230,6 +230,7 @@ describe(`POST ${EXA_USAGE_WRITE_PATH}`, () => {
     expect(acquire).toHaveBeenCalledWith('queue', record.id, {
       maxWaitMs: 250,
       signal: expect.any(AbortSignal),
+      writerClass: 'non_llm',
     });
     expect(transaction).not.toHaveBeenCalled();
     expect(await logRows(record.userId)).toEqual([]);

@@ -1,8 +1,11 @@
 import {
   EnkryptUsageWriteResponseSchema,
+  ExaUsageWriteResponseSchema,
   UsageRecordResponseSchema,
   type EnkryptUsageWrite,
   type EnkryptUsageWriteResponse,
+  type ExaUsageRecord,
+  type ExaUsageWriteResponse,
   type UsageRecordRequest,
   type UsageRecordResponse,
 } from '@kilocode/usage-contracts';
@@ -45,9 +48,11 @@ export type EnkryptUsageWriteOutcome =
   | AcknowledgedWrite<EnkryptUsageWriteResponse>
   | UnavailableWrite;
 
+export type ExaUsageWriteOutcome = AcknowledgedWrite<ExaUsageWriteResponse> | UnavailableWrite;
+
 type WriterRequest<Result> = {
   usageId: string;
-  usageKind?: 'enkrypt_usage';
+  usageKind?: 'enkrypt_usage' | 'exa_usage';
   body: unknown;
   acknowledge: (value: unknown) => AcknowledgedWrite<Result> | 'not_recorded' | 'invalid';
 };
@@ -213,6 +218,28 @@ export function recordEnkryptUsage(
       body: record,
       acknowledge(value) {
         const parsed = EnkryptUsageWriteResponseSchema.safeParse(value);
+        if (!parsed.success || parsed.data.usageId !== record.id) return 'invalid';
+        return { kind: parsed.data.status, result: parsed.data };
+      },
+    },
+    config,
+    fetchWriter
+  );
+}
+
+/** Only an echo of this record's id acknowledges it; any other id is an invalid response. */
+export function recordExaUsage(
+  record: ExaUsageRecord,
+  config: UsageWriterConfig,
+  fetchWriter: typeof fetch = fetch
+): Promise<ExaUsageWriteOutcome> {
+  return sendUsageWrite(
+    {
+      usageId: record.id,
+      usageKind: 'exa_usage',
+      body: record,
+      acknowledge(value) {
+        const parsed = ExaUsageWriteResponseSchema.safeParse(value);
         if (!parsed.success || parsed.data.usageId !== record.id) return 'invalid';
         return { kind: parsed.data.status, result: parsed.data };
       },

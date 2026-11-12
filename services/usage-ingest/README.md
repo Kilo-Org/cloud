@@ -165,15 +165,18 @@ helper logs `usage writer response release failed` with the usage ID, usage kind
 and error name only, and the write outcome is unchanged. A body that was already
 read is not released again.
 
-### Tagged Enkrypt usage
+### Tagged Enkrypt and Exa usage
 
-The same queue can also carry Enkrypt guardrail usage. Such a message is a tagged
-envelope, `{"kind":"enkrypt_usage","v":1,"record":<EnkryptUsageWrite>}`
-(`EnkryptUsageQueueMessageSchema` in `@kilocode/usage-contracts`). LLM usage stays
+The same queue can also carry Enkrypt guardrail usage and Exa usage. Such a message
+is a tagged envelope, `{"kind":"enkrypt_usage","v":1,"record":<EnkryptUsageWrite>}`
+or `{"kind":"exa_usage","v":1,"record":<ExaUsageRecord>}`
+(`EnkryptUsageQueueMessageSchema` and `ExaUsageQueueMessageSchema` in
+`@kilocode/usage-contracts`). LLM usage stays
 untagged and unchanged; its ingress schema strips unknown keys, so a body with its
 own `kind` key is always a tagged message. The gateway produces Enkrypt messages
 only through `/enkrypt-usage`, behind a default-off flag; see
-[Enkrypt usage rollout](#enkrypt-usage-rollout).
+[Enkrypt usage rollout](#enkrypt-usage-rollout). Exa messages are a durable
+fallback copy of an Exa usage record whose direct write failed.
 
 The consumer reads the tag before anything else:
 
@@ -181,29 +184,30 @@ The consumer reads the tag before anything else:
 |---|---|---|---|
 | Untagged | Existing LLM writer at `USAGE_WRITER_URL` | Unchanged | Unchanged |
 | `enkrypt_usage`, `v: 1`, valid record | `/api/internal/enkrypt-usage/record` with `x-usage-write-source: queue` | `recorded` or `duplicate` whose `usageId` equals `record.id` | Any other response, including a wrong or missing id echo, HTTP 429 and 503 |
-| `enkrypt_usage`, `v: 1`, invalid record or extra key | None | Never | Conservative retry (`invalid_event`) |
+| `exa_usage`, `v: 1`, valid record | `/api/internal/exa-usage/record` with `x-usage-write-source: queue` | `recorded` or `duplicate` whose `usageId` equals `record.id` | Any other response, including a wrong or missing id echo, HTTP 429 and 503 |
+| `enkrypt_usage` or `exa_usage`, `v: 1`, invalid record or extra key | None | Never | Conservative retry (`invalid_event`) |
 | Any other `kind`, or another `v` | None | Never | Conservative retry (`unsupported_kind`) |
 
 A message that never ACKs exhausts the shared 20-retry budget and goes to the DLQ,
-so the DLQ can hold both kinds. A recognized admission 429 takes the admission
+so the DLQ can hold every kind. A recognized admission 429 takes the admission
 retry schedule, and HTTP 429/503 rejects the invocation, exactly as for LLM usage.
 The invocation launch budget is shared. Consumer settings are unchanged. On the
 writer, these queue writes take the `non_llm` admission class described under
 [writer admission protection](#writer-admission-protection); its ceiling rejection
 is a recognized `queue_limit` 429.
 
-The Enkrypt writer URL is `USAGE_WRITER_URL` with its documented
-`/api/internal/usage/record` suffix replaced by the Enkrypt path, so no new
+The Enkrypt and Exa writer URLs are `USAGE_WRITER_URL` with its documented
+`/api/internal/usage/record` suffix replaced by the kind's path, so no new
 variable is needed. If `USAGE_WRITER_URL` is missing or does not end with that
-suffix, Enkrypt messages retry as `missing_config` without network I/O. The writer
+suffix, tagged messages retry as `missing_config` without network I/O. The writer
 credential, bypass and 160-second timeout are shared.
 
 Tagged messages add `usage_kind` to `usage_ingest_handler_entry`,
 `usage_ingest_processing` and the writer helper logs (`usageKind` there):
-`enkrypt_usage`, or `unknown` for an unrecognized tag (the raw tag is not logged).
+`enkrypt_usage`, `exa_usage`, or `unknown` for an unrecognized tag (the raw tag is not logged).
 Untagged LLM logs keep exactly their existing fields, so filter LLM-only counts
-with a missing `usage_kind`. Enkrypt logs carry only the usage id and kind: no
-payer, user, session, cost or `occurredAt`-derived age.
+with a missing `usage_kind`. Tagged logs carry only the usage id and kind: no
+payer, user, session, cost, Exa path or `occurredAt`-derived age.
 
 Deploy order: this consumer first, then the ingress, then the producer with its
 flag off. Never roll the consumer back to an LLM-only version while tagged
@@ -472,8 +476,8 @@ batch size at 6 in production and 2 in staging; retry settings also stay unchang
 There is no new environment knob; merging this change activates queue rejection
 when the normal automatic deployment reaches the writer.
 
-Queue writes to the Enkrypt writer (`/api/internal/enkrypt-usage/record`) use the
-same guard and the same shared limit, as writer class `non_llm`. That class has
+Queue writes to the Enkrypt writer (`/api/internal/enkrypt-usage/record`) and the
+Exa writer (`/api/internal/exa-usage/record`) use the same guard and the same shared limit, as writer class `non_llm`. That class has
 its own ceiling inside the shared limit: `max(1, min(2, limit - 1))`, currently
 **2 of 8**. A `non_llm` call over the ceiling gets the same HTTP 429 body with
 reason `queue_limit` and is not written. Its active plus queued calls never exceed

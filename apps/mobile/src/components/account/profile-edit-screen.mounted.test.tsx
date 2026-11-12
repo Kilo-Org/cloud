@@ -16,6 +16,7 @@ type MutationOptions = {
 };
 
 type ScreenState = {
+  invalidate: Mock;
   links: Links;
   error: boolean;
   mutations: MutationOptions[];

@@ -159,7 +159,7 @@ export function BlockedPeopleScreen() {
           logins={hidden.data.blockedLogins}
           actionLabel={t('profile.blockedPeople.unblock')}
           actionA11y={login => t('profile.blockedPeople.unblockA11y', { login })}
-          busyLogin={unblock.isPending ? (unblock.variables?.githubLogin ?? null) : null}
+          busyLogin={unblock.isPending ? unblock.variables.githubLogin : null}
           onAction={login => {
             unblock.mutate({ githubLogin: login });
           }}
@@ -169,7 +169,7 @@ export function BlockedPeopleScreen() {
           logins={hidden.data.mutedLogins}
           actionLabel={t('profile.blockedPeople.unmute')}
           actionA11y={login => t('profile.blockedPeople.unmuteA11y', { login })}
-          busyLogin={unmute.isPending ? (unmute.variables?.githubLogin ?? null) : null}
+          busyLogin={unmute.isPending ? unmute.variables.githubLogin : null}
           onAction={login => {
             unmute.mutate({ githubLogin: login });
           }}

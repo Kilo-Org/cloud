@@ -42,7 +42,7 @@ export async function validateKiloToken(
 ): Promise<
   | ({ success: true; token: string } & Pick<
       OrganizationJWTPayload,
-      'organizationId' | 'organizationRole' | 'kiloUserId'
+      'organizationId' | 'organizationRole' | 'kiloUserId' | 'apiTokenPepper'
     >)
   | { success: false; error: string }
 > {
@@ -64,6 +64,7 @@ export async function validateKiloToken(
       token,
       organizationId: payload.organizationId,
       organizationRole: payload.organizationRole,
+      apiTokenPepper: payload.apiTokenPepper,
     };
   } catch {
     return { success: false, error: 'Invalid or expired token' };
@@ -90,6 +91,7 @@ export const authMiddleware = createMiddleware<HonoContext>(async (c, next) => {
   c.set('token', result.token);
   c.set('organization_id', result.organizationId);
   c.set('organization_role', result.organizationRole);
+  c.set('token_pepper', result.apiTokenPepper);
 
   logger.info('Request authenticated', {
     userId: result.kiloUserId,
@@ -111,6 +113,12 @@ export function createIdentityMiddleware(
     const claims: AttributionIdentityClaims = {
       kiloUserId: c.get('user_id'),
       organizationId: c.get('organization_id'),
+      apiTokenPepper: c.get('token_pepper'),
+    };
+    // The pepper is a stored secret, so it stays out of every log line.
+    const loggedClaims = {
+      kiloUserId: claims.kiloUserId,
+      organizationId: claims.organizationId,
     };
 
     let refusal: AttributionIdentityRefusal | null;
@@ -118,7 +126,7 @@ export function createIdentityMiddleware(
       refusal = await checkIdentity(c.env, claims);
     } catch (error) {
       logger.error('Account check failed', {
-        ...claims,
+        ...loggedClaims,
         error: error instanceof Error ? error.message : String(error),
       });
       return c.json({ success: false, error: 'Account checks are temporarily unavailable' }, 503, {
@@ -127,7 +135,10 @@ export function createIdentityMiddleware(
     }
 
     if (refusal !== null) {
-      logger.warn('Attribution identity refused', { ...claims, reason: refusal });
+      logger.warn('Attribution identity refused', { ...loggedClaims, reason: refusal });
+      if (refusal === 'credential_stale') {
+        return c.json({ success: false, error: 'Invalid or expired token' }, 401);
+      }
       return c.json({ success: false, error: 'Access denied' }, 403);
     }
 

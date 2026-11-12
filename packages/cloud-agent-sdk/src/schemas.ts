@@ -1179,6 +1179,7 @@ export const cloudMessageSentDataSchema = z
     messageId: z.string(),
     executionId: z.string().optional(),
     delivery: z.literal('sent').optional(),
+    turnType: z.literal('command').optional(),
   })
   .passthrough();
 export type CloudMessageSentData = z.infer<typeof cloudMessageSentDataSchema>;

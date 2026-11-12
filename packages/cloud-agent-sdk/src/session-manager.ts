@@ -3834,26 +3834,18 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       };
     }
 
-    // Optimistic local insert: render the user's prompt (plus any file parts)
-    // as soon as the transport send is attempted, before the server or CLI
-    // echoes it back. Reconciliation differs by session type:
-    //   - cloud-agent: the server honors `messageId`, so the later
-    //     `cloud.message.queued` synthesize is a no-op (existing-id guard) and
-    //     the authoritative `message.updated` overwrites this row by id. If
-    //     that update never lands (the wrapper's event publications can all be
-    //     rejected), the row keeps `info.synthetic` and the transcript renders
-    //     it as an unconfirmed submission — typed failure footer on a recorded
-    //     failed run.
-    //   - remote: new CLIs echo `messageId` back; old CLIs assign their own,
-    //     so we track the id in `remoteOptimisticIds` and retarget when the
-    //     authoritative user message lands (see the onEvent handler).
+    // Cloud prompts preserve messageId; their synthetic row keeps delivery failures
+    // visible if the native message never arrives. Kilo v2 commands can expand under
+    // a different id, so only server queue events create their temporary row;
+    // acceptance removes it. Commands have no optimistic row for markSending or onOptimisticSend.
+    // Older remote CLIs also assign ids; remoteOptimisticIds reconciles those echoes.
     const optimisticStorage = store.get(sessionStorageAtom);
     const optimisticSessionId = store.get(rootSessionIdAtom) ?? kiloSessionId;
-    const insertedOptimisticRow = Boolean(
-      sessionAtSend && optimisticStorage && optimisticSessionId
-    );
+    const insertedOptimisticRow =
+      (input.payload.type === 'prompt' || sessionType === 'remote') &&
+      Boolean(sessionAtSend && optimisticStorage && optimisticSessionId);
     try {
-      if (sessionAtSend && optimisticStorage && optimisticSessionId) {
+      if (insertedOptimisticRow && optimisticStorage && optimisticSessionId) {
         insertOptimisticUserMessage({
           storage: optimisticStorage,
           sessionId: optimisticSessionId,

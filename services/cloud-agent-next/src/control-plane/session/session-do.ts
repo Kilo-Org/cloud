@@ -179,7 +179,7 @@ import {
   oldestOpenMessage,
   openMessages,
   queueMessage,
-  renderTurnContent,
+  renderQueuedMessageContent,
   settleAcceptedUpTo,
   settleMessages,
   type MessageReduction,
@@ -4155,7 +4155,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       'cloud.message.queued',
       {
         messageId: message.messageId,
-        content: renderTurnContent(message.intent),
+        content: renderQueuedMessageContent(message),
         delivery: 'queued',
       },
       `cloud-message/queued/${message.messageId}`,
@@ -4166,7 +4166,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private emitSent(message: SessionMessage): void {
     this.emitSynthetic(
       'cloud.message.sent',
-      { messageId: message.messageId, delivery: 'sent' },
+      {
+        messageId: message.messageId,
+        delivery: 'sent',
+        ...(message.intent.turn.type === 'command' ? { turnType: 'command' } : {}),
+      },
       `cloud-message/sent/${message.messageId}`,
       message.acceptedAt ?? message.createdAt
     );
@@ -4348,8 +4352,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         const timestamp = message.acceptedAt ?? message.createdAt;
         const snapshot: QueuedMessageSnapshot = {
           messageId: message.messageId,
-          content: renderTurnContent(message.intent),
+          content: renderQueuedMessageContent(message),
           timestamp,
+          ...(message.intent.turn.type === 'command' ? { turnType: 'command' as const } : {}),
           ...(message.state === 'accepted' ? { delivery: 'sent' as const } : {}),
         };
         if (message.state === 'failed') {

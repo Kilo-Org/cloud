@@ -83,6 +83,7 @@ export type QueuedMessageSnapshot = {
   content: string;
   timestamp: number;
   delivery?: 'queued' | 'sent';
+  turnType?: 'command';
   terminalFailure?: CloudMessageFailedPayload & { timestamp: number };
 };
 
@@ -324,7 +325,11 @@ export function createStreamHandler(
         if (msg.delivery === 'sent') {
           sendSnapshot(
             'cloud.message.sent',
-            { messageId: msg.messageId, delivery: 'sent' },
+            {
+              messageId: msg.messageId,
+              delivery: 'sent',
+              ...(msg.turnType === 'command' ? { turnType: 'command' } : {}),
+            },
             msg.timestamp
           );
         }

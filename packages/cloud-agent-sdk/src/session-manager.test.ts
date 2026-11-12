@@ -3322,6 +3322,70 @@ describe('createSessionManager', () => {
       });
     });
 
+    it('waits for the expanded command message instead of inserting the command text', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      const onOptimisticSend = jest.fn();
+      mockSession.send.mockResolvedValue(undefined);
+
+      expect(
+        await mgr.send({
+          payload: { type: 'command', command: 'review', arguments: 'main' },
+          onOptimisticSend,
+        })
+      ).toBe(true);
+
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+      expect(onOptimisticSend).not.toHaveBeenCalled();
+      expect(mockSession.send).toHaveBeenCalledWith({
+        messageId: expect.stringMatching(/^msg_/),
+        payload: { type: 'command', command: 'review', arguments: 'main' },
+      });
+
+      const storage = mockSession.storage!;
+      const processor = createChatProcessor(storage);
+      const messageId = mockSession.send.mock.calls[0][0].messageId;
+      if (!messageId) throw new Error('Command submission did not receive a message id');
+      processor.synthesizeQueuedUserMessage({ messageId, sessionId: 'ses-1', content: '' });
+      processor.process({
+        type: 'message.updated',
+        info: stubUserMessage({ id: 'msg_expanded', sessionID: 'ses-1' }),
+      });
+      processor.process({
+        type: 'message.part.updated',
+        part: {
+          id: 'prt_expanded',
+          messageID: 'msg_expanded',
+          sessionID: 'ses-1',
+          type: 'text',
+          text: 'Review the changes against main',
+          synthetic: true,
+        },
+      });
+
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([
+        expect.objectContaining({
+          info: expect.objectContaining({ id: 'msg_expanded' }),
+          parts: [expect.objectContaining({ text: 'Review the changes against main' })],
+        }),
+      ]);
+    });
+
+    it('restores a command when its transport send fails', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSession.send.mockRejectedValue(new Error('network down'));
+
+      expect(
+        await mgr.send({ payload: { type: 'command', command: 'review', arguments: 'main' } })
+      ).toBe(false);
+
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('/review main');
+    });
+
     it('inserts one optimistic row before cloud.message.queued arrives', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -4216,6 +4280,20 @@ describe('createSessionManager', () => {
           mode: 'code',
         },
       });
+    });
+
+    it('keeps remote command reconciliation unchanged', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSession.send.mockResolvedValue(undefined);
+
+      await mgr.send({ payload: { type: 'command', command: 'review', arguments: 'main' } });
+
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([
+        expect.objectContaining({ parts: [expect.objectContaining({ text: '/review main' })] }),
+      ]);
     });
 
     it('persists one optimistic row for remote sessions', async () => {

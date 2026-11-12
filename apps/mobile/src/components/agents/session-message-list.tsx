@@ -342,9 +342,11 @@ export function SessionMessageList<T>({
   // bottom, so the newest row keeps the chrome's top edge in the same commit
   // that grows the chrome. A list that cannot scroll has no row to bring back,
   // so it never shifts.
-  const transcriptFrame = resolveTranscriptFrame(
-    resolveTranscriptRideUp(chromeGrowthDp ?? 0, isAtBottom && isScrollable)
-  );
+  const chromeRideUp = resolveTranscriptRideUp(chromeGrowthDp ?? 0, isAtBottom && isScrollable);
+  // Memoized by the growth so the frame's style objects keep their identity: a
+  // fresh style object on every render re-applies the native transform, and the
+  // list re-lays-out each time it lands.
+  const transcriptFrame = useMemo(() => resolveTranscriptFrame(chromeRideUp), [chromeRideUp]);
 
   // When the optional `contentBottomInset` is omitted and the landscape side
   // insets are 0 (portrait) we return the original module-level

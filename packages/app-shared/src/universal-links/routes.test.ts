@@ -87,8 +87,8 @@ const ROW_CASES = [
 ] as const;
 
 describe('UNIVERSAL_LINK_ROUTES', () => {
-  it('has exactly 18 rows', () => {
-    expect(UNIVERSAL_LINK_ROUTES).toHaveLength(18);
+  it('has exactly 19 rows', () => {
+    expect(UNIVERSAL_LINK_ROUTES).toHaveLength(19);
   });
 });
 
@@ -371,16 +371,8 @@ describe('parseKiloWebPath', () => {
 });
 
 describe('aasaComponents', () => {
-<<<<<<< HEAD
-  it('returns 23 entries (18 rows + 5 exclusions)', () => {
-    expect(aasaComponents()).toHaveLength(23);
-||||||| b5436850d4
-  it('returns 19 entries (17 rows + 2 exclusions)', () => {
-    expect(aasaComponents()).toHaveLength(19);
-=======
-  it('returns 20 entries (18 rows + 2 exclusions)', () => {
-    expect(aasaComponents()).toHaveLength(20);
->>>>>>> origin/main
+  it('returns 24 entries (19 rows + 5 exclusions)', () => {
+    expect(aasaComponents()).toHaveLength(24);
   });
 
   it('every entry has a "/" key', () => {

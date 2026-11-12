@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "ເລືອກສາຂາໂຄ້ດໜຶ່ງ",
       "runOnWithTarget": "ເຮັດວຽກເທິງ: {{target}}",
       "environment": "ສະພາບແວດລ້ອມ",
+      "cloudEnvironment": "ສະພາບແວດລ້ອມຄລາວ",
       "couldNotLoadEnvironment": "ບໍ່ສາມາດໂຫຼດສະພາບແວດລ້ອມຂອງເຈົ້າໄດ້.",
       "retryLoadingEnvironment": "ລອງໂຫຼດສະພາບແວດລ້ອມໃໝ່",
       "defaultEnvironment": "ສະພາບແວດລ້ອມມາດຕະຖານ",

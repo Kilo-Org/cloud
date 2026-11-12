@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Zaɓi reshe",
       "runOnWithTarget": "Gudanar da aiki a: {{target}}",
       "environment": "Muhallin aiki",
+      "cloudEnvironment": "Yanayin girgije",
       "couldNotLoadEnvironment": "An kasa loda muhallin aikinka.",
       "retryLoadingEnvironment": "Sake gwada loda muhallin aiki",
       "defaultEnvironment": "Muhallin aiki na asali",

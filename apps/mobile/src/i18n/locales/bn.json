@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "একটি ব্রাঞ্চ বেছে নিন",
       "runOnWithTarget": "চলবে: {{target}}",
       "environment": "পরিবেশ",
+      "cloudEnvironment": "ক্লাউড পরিবেশ",
       "couldNotLoadEnvironment": "আপনার পরিবেশ লোড করা যায়নি।",
       "retryLoadingEnvironment": "পরিবেশ লোড করার জন্য আবার চেষ্টা করুন",
       "defaultEnvironment": "ডিফল্ট পরিবেশ",

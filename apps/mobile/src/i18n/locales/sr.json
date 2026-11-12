@@ -1985,6 +1985,7 @@
       "branchPlaceholder": "Izaberi granu",
       "runOnWithTarget": "Pokretanje na: {{target}}",
       "environment": "Okruženje",
+      "cloudEnvironment": "Cloud okruženje",
       "couldNotLoadEnvironment": "Učitavanje tvog okruženja nije uspelo.",
       "retryLoadingEnvironment": "Pokušaj ponovo da učitaš okruženje",
       "defaultEnvironment": "Podrazumevano okruženje",

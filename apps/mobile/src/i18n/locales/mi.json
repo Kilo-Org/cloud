@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Kōwhiria he peka",
       "runOnWithTarget": "Whakahaeretia ki: {{target}}",
       "environment": "Te taiao",
+      "cloudEnvironment": "Taiao kapua",
       "couldNotLoadEnvironment": "Kāore i taea te uta i tō taiao.",
       "retryLoadingEnvironment": "Whakamātau anō ki te uta i te taiao",
       "defaultEnvironment": "Te taiao taunoa",

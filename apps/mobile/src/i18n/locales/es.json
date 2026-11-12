@@ -1420,6 +1420,7 @@
       "branchPlaceholder": "Seleccionar una rama",
       "runOnWithTarget": "Ejecutar en: {{target}}",
       "environment": "Entorno",
+      "cloudEnvironment": "Entorno en la nube",
       "couldNotLoadEnvironment": "No se pudo cargar tu entorno.",
       "retryLoadingEnvironment": "Reintentar la carga del entorno",
       "defaultEnvironment": "Entorno predeterminado",

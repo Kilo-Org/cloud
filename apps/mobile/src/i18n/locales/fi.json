@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Valitse haara",
       "runOnWithTarget": "Suoritusympäristö: {{target}}",
       "environment": "Ympäristö",
+      "cloudEnvironment": "Pilviympäristö",
       "couldNotLoadEnvironment": "Ympäristöäsi ei voitu ladata.",
       "retryLoadingEnvironment": "Yritä ladata ympäristö uudelleen",
       "defaultEnvironment": "Oletusympäristö",

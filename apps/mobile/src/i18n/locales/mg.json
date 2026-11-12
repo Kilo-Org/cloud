@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Safidio sampana iray",
       "runOnWithTarget": "Ampandeho amin'ny: {{target}}",
       "environment": "Tontolo fiasana",
+      "cloudEnvironment": "Tontolo rahona",
       "couldNotLoadEnvironment": "Tsy voaray ny tontolo fiasanao.",
       "retryLoadingEnvironment": "Andramo alaina indray ny tontolo fiasana",
       "defaultEnvironment": "Tontolo fiasana voafidy mialoha",

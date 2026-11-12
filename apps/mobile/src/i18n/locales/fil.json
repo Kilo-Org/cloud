@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Pumili ng sangay",
       "runOnWithTarget": "Patakbuhin sa: {{target}}",
       "environment": "Kapaligiran",
+      "cloudEnvironment": "Kapaligirang cloud",
       "couldNotLoadEnvironment": "Hindi ma-load ang iyong kapaligiran.",
       "retryLoadingEnvironment": "Subukang i-load muli ang kapaligiran",
       "defaultEnvironment": "Paunang itinakdang kapaligiran",

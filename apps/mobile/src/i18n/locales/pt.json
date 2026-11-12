@@ -1991,6 +1991,7 @@
       "branchPlaceholder": "Selecionar um ramo",
       "runOnWithTarget": "Executar em: {{target}}",
       "environment": "Ambiente",
+      "cloudEnvironment": "Ambiente de nuvem",
       "couldNotLoadEnvironment": "Não foi possível carregar o seu ambiente.",
       "retryLoadingEnvironment": "Tentar carregar o ambiente novamente",
       "defaultEnvironment": "Ambiente predefinido",

@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "ಶಾಖೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ",
       "runOnWithTarget": "{{target}} ನಲ್ಲಿ ಚಲಾಯಿಸಿ",
       "environment": "ಪರಿಸರ",
+      "cloudEnvironment": "ಕ್ಲೌಡ್ ಪರಿಸರ",
       "couldNotLoadEnvironment": "ನಿಮ್ಮ ಪರಿಸರವನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "retryLoadingEnvironment": "ಪರಿಸರವನ್ನು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
       "defaultEnvironment": "ಡೀಫಾಲ್ಟ್ ಪರಿಸರ",

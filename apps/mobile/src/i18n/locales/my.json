@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "ခွဲတစ်ခုကို ရွေးချယ်ပါ",
       "runOnWithTarget": "လုပ်ဆောင်မည့်နေရာ- {{target}}",
       "environment": "လုပ်ဆောင်မှုပတ်ဝန်းကျင်",
+      "cloudEnvironment": "ကလောက် ပတ်ဝန်းကျင်",
       "couldNotLoadEnvironment": "သင့်လုပ်ဆောင်မှုပတ်ဝန်းကျင်ကို ရယူ၍မရပါ။",
       "retryLoadingEnvironment": "လုပ်ဆောင်မှုပတ်ဝန်းကျင်ကို ထပ်ရယူကြည့်ပါ",
       "defaultEnvironment": "မူလလုပ်ဆောင်မှုပတ်ဝန်းကျင်",

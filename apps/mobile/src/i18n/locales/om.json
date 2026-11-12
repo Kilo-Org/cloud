@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Damee tokko filadhu",
       "runOnWithTarget": "{{target}} irratti hojjechiisi",
       "environment": "Naannoo",
+      "cloudEnvironment": "Naannoo duumessa",
       "couldNotLoadEnvironment": "Naannoo kee fe'uu hin danda'amne.",
       "retryLoadingEnvironment": "Naannoo fe'uuf deebi'ii yaali",
       "defaultEnvironment": "Naannoo durtii",

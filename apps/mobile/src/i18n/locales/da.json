@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Vælg en gren",
       "runOnWithTarget": "Kør på: {{target}}",
       "environment": "Miljø",
+      "cloudEnvironment": "Cloudmiljø",
       "couldNotLoadEnvironment": "Kunne ikke indlæse dit miljø.",
       "retryLoadingEnvironment": "Prøv at indlæse miljøet igen",
       "defaultEnvironment": "Standardmiljø",

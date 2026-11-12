@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "یک شاخه انتخاب کنید",
       "runOnWithTarget": "اجرا روی: {{target}}",
       "environment": "محیط",
+      "cloudEnvironment": "محیط ابری",
       "couldNotLoadEnvironment": "بارگذاری محیط شما ممکن نشد.",
       "retryLoadingEnvironment": "تلاش دوباره برای بارگذاری محیط",
       "defaultEnvironment": "محیط پیش‌فرض",

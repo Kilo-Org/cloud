@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Pilih satu cabang",
       "runOnWithTarget": "Jalankan pada: {{target}}",
       "environment": "Persekitaran",
+      "cloudEnvironment": "Persekitaran awan",
       "couldNotLoadEnvironment": "Tidak dapat memuatkan persekitaran anda.",
       "retryLoadingEnvironment": "Cuba muatkan semula persekitaran",
       "defaultEnvironment": "Persekitaran lalai",

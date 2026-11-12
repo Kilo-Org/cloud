@@ -2026,6 +2026,7 @@
       "branchPlaceholder": "Vybrat větev",
       "runOnWithTarget": "Spustit na: {{target}}",
       "environment": "Prostředí",
+      "cloudEnvironment": "Cloudové prostředí",
       "couldNotLoadEnvironment": "Vaše prostředí se nepodařilo načíst.",
       "retryLoadingEnvironment": "Znovu načíst prostředí",
       "defaultEnvironment": "Výchozí prostředí",

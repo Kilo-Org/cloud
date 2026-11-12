@@ -1393,6 +1393,7 @@
       "branchPlaceholder": "Selecionar um branch",
       "runOnWithTarget": "Executar em: {{target}}",
       "environment": "Ambiente",
+      "cloudEnvironment": "Ambiente de nuvem",
       "couldNotLoadEnvironment": "Não foi possível carregar seu ambiente.",
       "retryLoadingEnvironment": "Tentar carregar o ambiente novamente",
       "defaultEnvironment": "Ambiente padrão",

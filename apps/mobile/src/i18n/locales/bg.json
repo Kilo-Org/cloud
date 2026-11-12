@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Изберете клон",
       "runOnWithTarget": "Изпълнение в: {{target}}",
       "environment": "Среда",
+      "cloudEnvironment": "Облачна среда",
       "couldNotLoadEnvironment": "Не успяхме да заредим средата ти.",
       "retryLoadingEnvironment": "Опитай отново да заредиш средата",
       "defaultEnvironment": "Среда по подразбиране",

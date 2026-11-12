@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Изберете гранка",
       "runOnWithTarget": "Изврши на: {{target}}",
       "environment": "Околина",
+      "cloudEnvironment": "Облачна околина",
       "couldNotLoadEnvironment": "Не успеа вчитувањето на твојата околина.",
       "retryLoadingEnvironment": "Повторно вчитај ја околината",
       "defaultEnvironment": "Стандардна околина",

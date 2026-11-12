@@ -2011,6 +2011,7 @@
       "branchPlaceholder": "Select a branch",
       "runOnWithTarget": "Run on: {{target}}",
       "environment": "Environment",
+      "cloudEnvironment": "Cloud environment",
       "couldNotLoadEnvironment": "Couldn't load your environment",
       "retryLoadingEnvironment": "Retry loading environment",
       "defaultEnvironment": "Default environment",

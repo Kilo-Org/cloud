@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Салбар сонгоно уу",
       "runOnWithTarget": "{{target}} дээр ажиллуулах",
       "environment": "Орчин",
+      "cloudEnvironment": "Үүлэн орчин",
       "couldNotLoadEnvironment": "Таны орчныг ачаалж чадсангүй.",
       "retryLoadingEnvironment": "Орчныг дахин ачаалах",
       "defaultEnvironment": "Үндсэн орчин",

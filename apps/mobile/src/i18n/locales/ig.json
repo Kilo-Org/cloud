@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Họrọ otu alaka",
       "runOnWithTarget": "Rụọ ọrụ na: {{target}}",
       "environment": "Ebe ọrụ",
+      "cloudEnvironment": "Gburugburu igwe ojii",
       "couldNotLoadEnvironment": "Enweghị ike ibudata ebe ọrụ gị.",
       "retryLoadingEnvironment": "Nwaa ibudata ebe ọrụ ọzọ",
       "defaultEnvironment": "Ebe ọrụ ndabara",

@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "ஒரு கிளையைத் தேர்ந்தெடுக்கவும்",
       "runOnWithTarget": "இயக்கும் இடம்: {{target}}",
       "environment": "சூழல்",
+      "cloudEnvironment": "கிளவுட் சூழல்",
       "couldNotLoadEnvironment": "உங்கள் சூழலை ஏற்ற முடியவில்லை.",
       "retryLoadingEnvironment": "சூழலை மீண்டும் ஏற்ற முயற்சிக்கவும்",
       "defaultEnvironment": "இயல்புநிலை சூழல்",

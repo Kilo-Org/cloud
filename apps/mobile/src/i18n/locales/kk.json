@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Тармақты таңдаңыз",
       "runOnWithTarget": "Іске қосу орны: {{target}}",
       "environment": "Орта",
+      "cloudEnvironment": "Бұлттық орта",
       "couldNotLoadEnvironment": "Ортаңызды жүктеу мүмкін болмады.",
       "retryLoadingEnvironment": "Ортаны жүктеуді қайталау",
       "defaultEnvironment": "Әдепкі орта",

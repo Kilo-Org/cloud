@@ -2026,6 +2026,7 @@
       "branchPlaceholder": "Выберыце галіну",
       "runOnWithTarget": "Асяроддзе запуску: {{target}}",
       "environment": "Асяроддзе",
+      "cloudEnvironment": "Хмарнае асяроддзе",
       "couldNotLoadEnvironment": "Не ўдалося загрузіць ваша асяроддзе.",
       "retryLoadingEnvironment": "Паўтарыць загрузку асяроддзя",
       "defaultEnvironment": "Прадвызначанае асяроддзе",

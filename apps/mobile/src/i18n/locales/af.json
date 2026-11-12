@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Kies 'n tak",
       "runOnWithTarget": "Voer uit op: {{target}}",
       "environment": "Omgewing",
+      "cloudEnvironment": "Wolkomgewing",
       "couldNotLoadEnvironment": "Jou omgewing kon nie gelaai word nie.",
       "retryLoadingEnvironment": "Probeer weer om die omgewing te laai",
       "defaultEnvironment": "Standaardomgewing",

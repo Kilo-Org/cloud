@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Vali haru",
       "runOnWithTarget": "Käivituskoht: {{target}}",
       "environment": "Keskkond",
+      "cloudEnvironment": "Pilvekeskkond",
       "couldNotLoadEnvironment": "Sinu keskkonna laadimine ebaõnnestus.",
       "retryLoadingEnvironment": "Proovi keskkonna laadimist uuesti",
       "defaultEnvironment": "Vaikekeskkond",

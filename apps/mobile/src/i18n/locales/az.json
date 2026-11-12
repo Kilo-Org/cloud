@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Budaq seç",
       "runOnWithTarget": "İcra mühiti: {{target}}",
       "environment": "Mühit",
+      "cloudEnvironment": "Bulud mühiti",
       "couldNotLoadEnvironment": "Mühitini yükləmək mümkün olmadı.",
       "retryLoadingEnvironment": "Mühiti yenidən yüklə",
       "defaultEnvironment": "Standart mühit",

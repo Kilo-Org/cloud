@@ -1402,6 +1402,7 @@
       "branchPlaceholder": "Branch auswählen",
       "runOnWithTarget": "Ausführen auf: {{target}}",
       "environment": "Umgebung",
+      "cloudEnvironment": "Cloud-Umgebung",
       "couldNotLoadEnvironment": "Deine Umgebung konnte nicht geladen werden.",
       "retryLoadingEnvironment": "Umgebung erneut laden",
       "defaultEnvironment": "Standardumgebung",

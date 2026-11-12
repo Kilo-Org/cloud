@@ -1402,6 +1402,7 @@
       "branchPlaceholder": "एक ब्रांच चुनें",
       "runOnWithTarget": "इस पर चलाएँ: {{target}}",
       "environment": "एनवायरनमेंट",
+      "cloudEnvironment": "क्लाउड एनवायरनमेंट",
       "couldNotLoadEnvironment": "आपका एनवायरनमेंट लोड नहीं हो सका।",
       "retryLoadingEnvironment": "एनवायरनमेंट फिर से लोड करें",
       "defaultEnvironment": "डिफ़ॉल्ट एनवायरनमेंट",

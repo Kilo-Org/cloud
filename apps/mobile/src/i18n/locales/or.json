@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "ଗୋଟିଏ ଶାଖା ବାଛନ୍ତୁ",
       "runOnWithTarget": "{{target}} ରେ ଚଲାନ୍ତୁ",
       "environment": "ପରିବେଶ",
+      "cloudEnvironment": "କ୍ଲାଉଡ ପରିବେଶ",
       "couldNotLoadEnvironment": "ଆପଣଙ୍କ ପରିବେଶ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "retryLoadingEnvironment": "ପରିବେଶ ପୁଣି ଲୋଡ୍ କରନ୍ତୁ",
       "defaultEnvironment": "ଡିଫଲ୍ଟ ପରିବେଶ",

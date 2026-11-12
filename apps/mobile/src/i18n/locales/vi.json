@@ -1402,6 +1402,7 @@
       "branchPlaceholder": "Chọn một nhánh",
       "runOnWithTarget": "Chạy trên: {{target}}",
       "environment": "Môi trường",
+      "cloudEnvironment": "Môi trường đám mây",
       "couldNotLoadEnvironment": "Không thể tải môi trường của bạn.",
       "retryLoadingEnvironment": "Thử tải lại môi trường",
       "defaultEnvironment": "Môi trường mặc định",

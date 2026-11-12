@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Chagua tawi",
       "runOnWithTarget": "Endesha kwenye: {{target}}",
       "environment": "Mazingira",
+      "cloudEnvironment": "Mazingira ya wingu",
       "couldNotLoadEnvironment": "Imeshindikana kupakia mazingira yako.",
       "retryLoadingEnvironment": "Jaribu tena kupakia mazingira",
       "defaultEnvironment": "Mazingira chaguomsingi",

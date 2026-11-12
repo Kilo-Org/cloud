@@ -1985,6 +1985,7 @@
       "branchPlaceholder": "Selectează o ramură",
       "runOnWithTarget": "Rulează pe: {{target}}",
       "environment": "Mediu",
+      "cloudEnvironment": "Mediu cloud",
       "couldNotLoadEnvironment": "Nu s-a putut încărca mediul tău.",
       "retryLoadingEnvironment": "Reîncearcă încărcarea mediului",
       "defaultEnvironment": "Mediu implicit",

@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Përzgjidh një degë",
       "runOnWithTarget": "Ekzekuto në: {{target}}",
       "environment": "Mjedisi",
+      "cloudEnvironment": "Mjedis cloud",
       "couldNotLoadEnvironment": "Nuk u ngarkua mjedisi yt.",
       "retryLoadingEnvironment": "Provo ta ngarkosh përsëri mjedisin",
       "defaultEnvironment": "Mjedisi i parazgjedhur",

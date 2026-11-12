@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Veldu kvist",
       "runOnWithTarget": "Keyra á: {{target}}",
       "environment": "Umhverfi",
+      "cloudEnvironment": "Skýjaumhverfi",
       "couldNotLoadEnvironment": "Ekki tókst að hlaða umhverfinu þínu.",
       "retryLoadingEnvironment": "Reyna að hlaða umhverfinu aftur",
       "defaultEnvironment": "Sjálfgefið umhverfi",

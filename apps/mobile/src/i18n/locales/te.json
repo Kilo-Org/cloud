@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "బ్రాంచ్‌ను ఎంచుకోండి",
       "runOnWithTarget": "అమలు చేసే చోటు: {{target}}",
       "environment": "పని వాతావరణం",
+      "cloudEnvironment": "క్లౌడ్ వాతావరణం",
       "couldNotLoadEnvironment": "మీ పని వాతావరణాన్ని లోడ్ చేయలేకపోయాము.",
       "retryLoadingEnvironment": "పని వాతావరణాన్ని లోడ్ చేయడానికి మళ్లీ ప్రయత్నించండి",
       "defaultEnvironment": "డిఫాల్ట్ పని వాతావరణం",

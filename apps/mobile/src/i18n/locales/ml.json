@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "ഒരു ബ്രാഞ്ച് തിരഞ്ഞെടുക്കുക",
       "runOnWithTarget": "{{target}}-ൽ പ്രവർത്തിപ്പിക്കുക",
       "environment": "പ്രവർത്തനാന്തരീക്ഷം",
+      "cloudEnvironment": "ക്ലൗഡ് അന്തരീക്ഷം",
       "couldNotLoadEnvironment": "നിങ്ങളുടെ പ്രവർത്തനാന്തരീക്ഷം ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "retryLoadingEnvironment": "പ്രവർത്തനാന്തരീക്ഷം ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
       "defaultEnvironment": "ഡിഫോൾട്ട് പ്രവർത്തനാന്തരീക്ഷം",

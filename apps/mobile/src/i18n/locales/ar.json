@@ -1474,6 +1474,7 @@
       "branchPlaceholder": "اختر فرعًا",
       "runOnWithTarget": "التشغيل على: {{target}}",
       "environment": "البيئة",
+      "cloudEnvironment": "بيئة سحابية",
       "couldNotLoadEnvironment": "تعذّر تحميل بيئتك.",
       "retryLoadingEnvironment": "إعادة محاولة تحميل البيئة",
       "defaultEnvironment": "البيئة الافتراضية",

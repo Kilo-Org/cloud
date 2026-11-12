@@ -1420,6 +1420,7 @@
       "branchPlaceholder": "בחרו ענף",
       "runOnWithTarget": "יעד ההרצה: {{target}}",
       "environment": "סביבה",
+      "cloudEnvironment": "סביבת ענן",
       "couldNotLoadEnvironment": "לא ניתן היה לטעון את הסביבה שלך.",
       "retryLoadingEnvironment": "ניסיון נוסף לטעון את הסביבה",
       "defaultEnvironment": "סביבת ברירת מחדל",

@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "አንድ ቅርንጫፍ ይምረጡ",
       "runOnWithTarget": "ማስኬጃ፦ {{target}}",
       "environment": "የሥራ አካባቢ",
+      "cloudEnvironment": "የክላውድ አካባቢ",
       "couldNotLoadEnvironment": "የሥራ አካባቢዎን መጫን አልተቻለም።",
       "retryLoadingEnvironment": "የሥራ አካባቢውን ለመጫን እንደገና ይሞክሩ",
       "defaultEnvironment": "ነባሪ የሥራ አካባቢ",

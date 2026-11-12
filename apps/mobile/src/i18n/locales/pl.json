@@ -1438,6 +1438,7 @@
       "branchPlaceholder": "Wybierz gałąź",
       "runOnWithTarget": "Miejsce uruchomienia: {{target}}",
       "environment": "Środowisko",
+      "cloudEnvironment": "Środowisko chmury",
       "couldNotLoadEnvironment": "Nie udało się wczytać twojego środowiska.",
       "retryLoadingEnvironment": "Wczytaj środowisko ponownie",
       "defaultEnvironment": "Domyślne środowisko",

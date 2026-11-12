@@ -1438,6 +1438,7 @@
       "branchPlaceholder": "Выберите ветку",
       "runOnWithTarget": "Место запуска: {{target}}",
       "environment": "Окружение",
+      "cloudEnvironment": "Облачная среда",
       "couldNotLoadEnvironment": "Не удалось загрузить ваше окружение.",
       "retryLoadingEnvironment": "Повторить загрузку окружения",
       "defaultEnvironment": "Окружение по умолчанию",

@@ -2108,6 +2108,7 @@
       "branchPlaceholder": "Dewiswch gangen",
       "runOnWithTarget": "Rhedeg ar: {{target}}",
       "environment": "Amgylchedd",
+      "cloudEnvironment": "Amgylchedd cwmwl",
       "couldNotLoadEnvironment": "Methu llwytho'ch amgylchedd.",
       "retryLoadingEnvironment": "Ceisio llwytho'r amgylchedd eto",
       "defaultEnvironment": "Amgylchedd diofyn",

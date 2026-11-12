@@ -1319,6 +1319,7 @@
       "branchPlaceholder": "Sélectionner une branche",
       "runOnWithTarget": "Exécution sur : {{target}}",
       "environment": "Environnement",
+      "cloudEnvironment": "Environnement cloud",
       "couldNotLoadEnvironment": "Impossible de charger votre environnement",
       "retryLoadingEnvironment": "Réessayer de charger l'environnement",
       "defaultEnvironment": "Environnement par défaut",

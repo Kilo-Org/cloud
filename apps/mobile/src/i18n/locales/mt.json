@@ -2067,6 +2067,7 @@
       "branchPlaceholder": "Agħżel fergħa",
       "runOnWithTarget": "Ħaddem fuq: {{target}}",
       "environment": "Ambjent",
+      "cloudEnvironment": "Ambjent cloud",
       "couldNotLoadEnvironment": "Ma setax jitgħabba l-ambjent tiegħek.",
       "retryLoadingEnvironment": "Erġa' pprova tgħabbi l-ambjent",
       "defaultEnvironment": "Ambjent prestabbilit",

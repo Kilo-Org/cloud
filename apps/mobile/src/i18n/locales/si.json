@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "ශාඛාවක් තෝරන්න",
       "runOnWithTarget": "ධාවනය වන ස්ථානය: {{target}}",
       "environment": "පරිසරය",
+      "cloudEnvironment": "ක්ලවුඩ් පරිසරය",
       "couldNotLoadEnvironment": "ඔබේ පරිසරය පූරණය කළ නොහැකි විය.",
       "retryLoadingEnvironment": "පරිසරය පූරණය කිරීමට නැවත උත්සාහ කරන්න",
       "defaultEnvironment": "පෙරනිමි පරිසරය",

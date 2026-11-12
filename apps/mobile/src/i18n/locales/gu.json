@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "એક બ્રાંચ પસંદ કરો",
       "runOnWithTarget": "{{target}} પર ચલાવો",
       "environment": "કાર્યપરિસર",
+      "cloudEnvironment": "ક્લાઉડ પરિસર",
       "couldNotLoadEnvironment": "તમારું કાર્યપરિસર લોડ કરી શકાયું નહીં.",
       "retryLoadingEnvironment": "કાર્યપરિસર લોડ કરવા ફરી પ્રયાસ કરો",
       "defaultEnvironment": "ડિફોલ્ટ કાર્યપરિસર",

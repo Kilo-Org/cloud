@@ -1985,6 +1985,7 @@
       "branchPlaceholder": "Izvēlēties atzaru",
       "runOnWithTarget": "Izpildes vide: {{target}}",
       "environment": "Vide",
+      "cloudEnvironment": "Mākoņa vide",
       "couldNotLoadEnvironment": "Neizdevās ielādēt tavu vidi.",
       "retryLoadingEnvironment": "Mēģināt ielādēt vidi vēlreiz",
       "defaultEnvironment": "Noklusējuma vide",

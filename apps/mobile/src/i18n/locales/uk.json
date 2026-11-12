@@ -1438,6 +1438,7 @@
       "branchPlaceholder": "Виберіть гілку",
       "runOnWithTarget": "Середовище запуску: {{target}}",
       "environment": "Середовище",
+      "cloudEnvironment": "Хмарне середовище",
       "couldNotLoadEnvironment": "Не вдалося завантажити ваше середовище.",
       "retryLoadingEnvironment": "Повторити завантаження середовища",
       "defaultEnvironment": "Типове середовище",

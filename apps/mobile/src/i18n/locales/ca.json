@@ -1985,6 +1985,7 @@
       "branchPlaceholder": "Selecciona una branca",
       "runOnWithTarget": "Execució a: {{target}}",
       "environment": "Entorn",
+      "cloudEnvironment": "Entorn al núvol",
       "couldNotLoadEnvironment": "No s'ha pogut carregar el teu entorn.",
       "retryLoadingEnvironment": "Torna a provar de carregar l'entorn",
       "defaultEnvironment": "Entorn predeterminat",

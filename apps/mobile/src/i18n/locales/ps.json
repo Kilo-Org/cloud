@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "یوه څانګه وټاکئ",
       "runOnWithTarget": "د چلولو ځای: {{target}}",
       "environment": "چاپېریال",
+      "cloudEnvironment": "د کلاوډ چاپېریال",
       "couldNotLoadEnvironment": "ستاسو چاپېریال بار نه شو.",
       "retryLoadingEnvironment": "د چاپېریال بارولو بیا هڅه کړئ",
       "defaultEnvironment": "ډیفالټ چاپېریال",

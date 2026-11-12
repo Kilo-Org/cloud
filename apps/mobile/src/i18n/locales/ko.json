@@ -1402,6 +1402,7 @@
       "branchPlaceholder": "브랜치 선택",
       "runOnWithTarget": "실행 위치: {{target}}",
       "environment": "환경",
+      "cloudEnvironment": "클라우드 환경",
       "couldNotLoadEnvironment": "환경을 불러올 수 없습니다.",
       "retryLoadingEnvironment": "환경 불러오기 다시 시도",
       "defaultEnvironment": "기본 환경",

@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Velg en gren",
       "runOnWithTarget": "Kjør på: {{target}}",
       "environment": "Miljø",
+      "cloudEnvironment": "Skymiljø",
       "couldNotLoadEnvironment": "Kunne ikke laste inn miljøet ditt.",
       "retryLoadingEnvironment": "Prøv å laste inn miljøet på nytt",
       "defaultEnvironment": "Standardmiljø",

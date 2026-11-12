@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Hautatu adar bat",
       "runOnWithTarget": "Exekutatu honetan: {{target}}",
       "environment": "Ingurunea",
+      "cloudEnvironment": "Hodei-ingurunea",
       "couldNotLoadEnvironment": "Ezin izan da zure ingurunea kargatu.",
       "retryLoadingEnvironment": "Saiatu berriro ingurunea kargatzen",
       "defaultEnvironment": "Ingurune lehenetsia",

@@ -1402,6 +1402,7 @@
       "branchPlaceholder": "Een branch selecteren",
       "runOnWithTarget": "Uitvoeren op: {{target}}",
       "environment": "Omgeving",
+      "cloudEnvironment": "Cloudomgeving",
       "couldNotLoadEnvironment": "Je omgeving kon niet worden geladen.",
       "retryLoadingEnvironment": "Omgeving opnieuw laden",
       "defaultEnvironment": "Standaardomgeving",

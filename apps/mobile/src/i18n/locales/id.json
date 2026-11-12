@@ -1402,6 +1402,7 @@
       "branchPlaceholder": "Pilih cabang",
       "runOnWithTarget": "Jalankan di: {{target}}",
       "environment": "Lingkungan",
+      "cloudEnvironment": "Lingkungan cloud",
       "couldNotLoadEnvironment": "Tidak dapat memuat lingkunganmu.",
       "retryLoadingEnvironment": "Coba muat ulang lingkungan",
       "defaultEnvironment": "Lingkungan bawaan",

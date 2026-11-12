@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Επίλεξε κλάδο",
       "runOnWithTarget": "Εκτέλεση σε: {{target}}",
       "environment": "Περιβάλλον",
+      "cloudEnvironment": "Περιβάλλον cloud",
       "couldNotLoadEnvironment": "Δεν ήταν δυνατή η φόρτωση του περιβάλλοντός σου.",
       "retryLoadingEnvironment": "Επανάληψη φόρτωσης περιβάλλοντος",
       "defaultEnvironment": "Προεπιλεγμένο περιβάλλον",

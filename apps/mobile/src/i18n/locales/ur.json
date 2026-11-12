@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "ایک برانچ منتخب کریں",
       "runOnWithTarget": "{{target}} پر چلائیں",
       "environment": "ماحول",
+      "cloudEnvironment": "کلاؤڈ ماحول",
       "couldNotLoadEnvironment": "آپ کا ماحول لوڈ نہیں ہو سکا۔",
       "retryLoadingEnvironment": "ماحول دوبارہ لوڈ کرنے کی کوشش کریں",
       "defaultEnvironment": "پہلے سے طے شدہ ماحول",

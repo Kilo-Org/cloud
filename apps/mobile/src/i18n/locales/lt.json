@@ -2026,6 +2026,7 @@
       "branchPlaceholder": "Pasirinkti šaką",
       "runOnWithTarget": "Vykdymo vieta: {{target}}",
       "environment": "Aplinka",
+      "cloudEnvironment": "Debesų aplinka",
       "couldNotLoadEnvironment": "Nepavyko įkelti jūsų aplinkos.",
       "retryLoadingEnvironment": "Bandyti įkelti aplinką iš naujo",
       "defaultEnvironment": "Numatytoji aplinka",

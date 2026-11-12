@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Välj en gren",
       "runOnWithTarget": "Kör på: {{target}}",
       "environment": "Miljö",
+      "cloudEnvironment": "Molnmiljö",
       "couldNotLoadEnvironment": "Det gick inte att läsa in din miljö.",
       "retryLoadingEnvironment": "Försök läsa in miljön igen",
       "defaultEnvironment": "Standardmiljö",

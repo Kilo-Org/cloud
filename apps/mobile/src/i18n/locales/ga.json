@@ -2067,6 +2067,7 @@
       "branchPlaceholder": "Roghnaigh brainse",
       "runOnWithTarget": "Rith ar: {{target}}",
       "environment": "Timpeallacht",
+      "cloudEnvironment": "Timpeallacht néil",
       "couldNotLoadEnvironment": "Níorbh fhéidir do thimpeallacht a lódáil.",
       "retryLoadingEnvironment": "Bain triail as an timpeallacht a lódáil arís",
       "defaultEnvironment": "Timpeallacht réamhshocraithe",

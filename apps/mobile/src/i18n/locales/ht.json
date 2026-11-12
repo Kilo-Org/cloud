@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "Chwazi yon branch",
       "runOnWithTarget": "Egzekite sou: {{target}}",
       "environment": "Anviwònman",
+      "cloudEnvironment": "Anviwònman nyaj",
       "couldNotLoadEnvironment": "Nou pa t ka chaje anviwònman ou an.",
       "retryLoadingEnvironment": "Eseye chaje anviwònman an ankò",
       "defaultEnvironment": "Anviwònman pa defo",

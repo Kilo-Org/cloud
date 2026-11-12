@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "აირჩიეთ განშტოება",
       "runOnWithTarget": "გაშვების გარემო: {{target}}",
       "environment": "გარემო",
+      "cloudEnvironment": "ღრუბლოვანი გარემო",
       "couldNotLoadEnvironment": "თქვენი გარემოს ჩატვირთვა ვერ მოხერხდა.",
       "retryLoadingEnvironment": "გარემოს ხელახლა ჩატვირთვა",
       "defaultEnvironment": "ნაგულისხმევი გარემო",

@@ -1402,6 +1402,7 @@
       "branchPlaceholder": "選取一個分支",
       "runOnWithTarget": "執行環境：{{target}}",
       "environment": "環境",
+      "cloudEnvironment": "雲端環境",
       "couldNotLoadEnvironment": "無法載入你的環境。",
       "retryLoadingEnvironment": "重新載入環境",
       "defaultEnvironment": "預設環境",

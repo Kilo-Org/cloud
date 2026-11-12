@@ -1944,6 +1944,7 @@
       "branchPlaceholder": "एक ब्रँच निवडा",
       "runOnWithTarget": "यावर चालवा: {{target}}",
       "environment": "कार्यपरिसर",
+      "cloudEnvironment": "क्लाउड वातावरण",
       "couldNotLoadEnvironment": "तुमचा कार्यपरिसर लोड करता आला नाही.",
       "retryLoadingEnvironment": "कार्यपरिसर लोड करण्याचा पुन्हा प्रयत्न करा",
       "defaultEnvironment": "डीफॉल्ट कार्यपरिसर",

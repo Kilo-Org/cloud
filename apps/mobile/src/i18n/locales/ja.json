@@ -1402,6 +1402,7 @@
       "branchPlaceholder": "ブランチを選択",
       "runOnWithTarget": "実行先：{{target}}",
       "environment": "環境",
+      "cloudEnvironment": "クラウド環境",
       "couldNotLoadEnvironment": "環境を読み込めませんでした。",
       "retryLoadingEnvironment": "環境の読み込みを再試行",
       "defaultEnvironment": "デフォルト環境",

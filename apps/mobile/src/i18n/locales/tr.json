@@ -1402,6 +1402,7 @@
       "branchPlaceholder": "Bir dal seç",
       "runOnWithTarget": "Çalıştırma yeri: {{target}}",
       "environment": "Ortam",
+      "cloudEnvironment": "Bulut ortamı",
       "couldNotLoadEnvironment": "Ortamın yüklenemedi.",
       "retryLoadingEnvironment": "Ortamı yüklemeyi tekrar dene",
       "defaultEnvironment": "Varsayılan ortam",

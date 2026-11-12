@@ -531,6 +531,65 @@ describe('needsConsent gate teardown', () => {
   });
 });
 
+describe('client reuse across gate re-runs', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.device.deviceType = 1;
+    hoisted.appsFlyer.create.mockResolvedValue(undefined);
+  });
+
+  it('identifies the running client when the email arrives later instead of rebuilding it', async () => {
+    vi.useFakeTimers();
+    const gate = await loadPostHogWithGate();
+    const PostHogModule = await import('posthog-react-native');
+
+    type GateState = Parameters<typeof gate.useAnalyticsConsentGate>[0];
+    function GateWrapper(props: GateState): null {
+      gate.useAnalyticsConsentGate(props);
+      return null;
+    }
+
+    const state: GateState = {
+      hasToken: true,
+      ...SETTLED,
+      consentChecked: true,
+      needsConsent: false,
+      email: undefined,
+      accountId: 'test-account',
+      optionalConsent: false,
+    };
+
+    const renderer = TestRenderer.create(createElement(GateWrapper, state));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await vi.advanceTimersByTimeAsync(120);
+
+    expect(PostHogModule.default).toHaveBeenCalledTimes(1);
+    expect(hoisted.client.identify).not.toHaveBeenCalled();
+    expect(hoisted.storage.sealPostHogStorage).not.toHaveBeenCalled();
+
+    // The same account and consent, only the email resolved a moment later.
+    renderer.update(createElement(GateWrapper, { ...state, email: 'test@test.com' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await vi.advanceTimersByTimeAsync(120);
+
+    // The running client is identified: no teardown, no second client, and the
+    // queue it already holds survives.
+    expect(PostHogModule.default).toHaveBeenCalledTimes(1);
+    expect(hoisted.storage.sealPostHogStorage).not.toHaveBeenCalled();
+    expect(hoisted.client.optOut).not.toHaveBeenCalled();
+    expect(hoisted.client.identify).toHaveBeenCalledTimes(1);
+    expect(hoisted.client.identify).toHaveBeenCalledWith('test@test.com', undefined);
+
+    renderer.unmount();
+    vi.useRealTimers();
+  });
+});
+
 describe('unsettled consent teardown', () => {
   beforeEach(() => {
     vi.clearAllMocks();

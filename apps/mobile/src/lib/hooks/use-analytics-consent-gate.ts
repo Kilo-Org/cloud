@@ -4,7 +4,8 @@ import {
   discardPostHog,
   identifyUser,
   initPostHog,
-  isPostHogReady,
+  isCaptureAllowed,
+  livePostHogClient,
   resumePostHog,
 } from '@/lib/analytics/posthog';
 import { initAppsFlyer, resetAppsFlyerState } from '@/lib/appsflyer';
@@ -13,6 +14,7 @@ import {
   clearTelemetryDecision,
   currentAccountId,
   currentEpoch,
+  currentGeneration,
   setTelemetryDecision,
 } from '@/lib/telemetry/controller';
 import { purgePostHogPersistence } from '@/lib/telemetry/posthog-storage';
@@ -42,11 +44,16 @@ async function discardOptionalTelemetry(epoch: number): Promise<void> {
 
 /**
  * Bring telemetry up for the signed-in account once the user has answered the
- * consent screen. A client already running under another account, or another
- * consent state, is torn down first: its queue may hold events the current
- * consent forbids, and a consent change needs a fresh client because the
- * capture options are constructor-only. A cold start has no client, so its
- * storage survives.
+ * consent screen. The client only needs rebuilding when what it was built for
+ * changes: another account (a different controller generation) or another
+ * capture level. An unchanged build keeps its client and its queued events, and
+ * a caller that only learned the email a moment later identifies the running
+ * client instead.
+ *
+ * When a rebuild is needed, a client already running under another account, or
+ * another consent state, is torn down first: its queue may hold events the
+ * current consent forbids, and the capture options are constructor-only. A cold
+ * start has no client, so its storage survives.
  *
  * `initPostHog` then creates the client the current consent allows — capture on
  * with optional consent, flags-only without it. A flags-only client still
@@ -57,7 +64,18 @@ async function startTelemetry(epoch: number, email: string | undefined): Promise
   if (currentEpoch() !== epoch) {
     return;
   }
-  if (isPostHogReady()) {
+  const live = livePostHogClient();
+  if (
+    live &&
+    live.generation === currentGeneration() &&
+    live.captureAllowed === isCaptureAllowed()
+  ) {
+    if (email !== undefined && live.identifiedEmail !== email) {
+      identifyUser(email);
+    }
+    return;
+  }
+  if (live) {
     await discardOptionalTelemetry(epoch);
     if (currentEpoch() !== epoch) {
       return;

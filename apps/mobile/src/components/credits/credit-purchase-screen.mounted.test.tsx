@@ -35,10 +35,27 @@ const owner = vi.hoisted(() => ({
   clearError: vi.fn(),
 }));
 
-const balance = vi.hoisted(() => ({ balance: 1234 }));
+const balance = vi.hoisted(() => ({
+  balance: 1234,
+  state: 'ok' as 'ok' | 'pending' | 'error',
+}));
 const creditBlocks = vi.hoisted(() => ({
   entries: [] as { balance_mUsd: number; expiry_date: string | null }[],
+  state: 'ok' as 'ok' | 'pending' | 'error',
 }));
+
+/** What one of the card's two reads answers in the current state. */
+const answerRead = (state: 'ok' | 'pending' | 'error', answer: unknown): Promise<unknown> => {
+  if (state === 'error') {
+    return Promise.reject(new Error('read failed'));
+  }
+  if (state === 'pending') {
+    // A read that never answers is the card's loading state; the test only
+    // inspects the painted frame, so the promise stays open.
+    return new Promise(() => undefined);
+  }
+  return Promise.resolve(answer);
+};
 
 const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }));
 
@@ -147,13 +164,15 @@ vi.mock('@/lib/trpc', () => ({
       getContextBalance: {
         queryOptions: () => ({
           queryKey: ['user', 'getContextBalance', {}],
-          queryFn: () => ({ balance: balance.balance, isDepleted: false }),
+          queryFn: () =>
+            answerRead(balance.state, { balance: balance.balance, isDepleted: false }),
         }),
       },
       getCreditBlocks: {
         queryOptions: () => ({
           queryKey: ['user', 'getCreditBlocks', {}],
-          queryFn: () => ({ creditBlocks: creditBlocks.entries }),
+          queryFn: () =>
+            answerRead(creditBlocks.state, { creditBlocks: creditBlocks.entries }),
         }),
       },
     },
@@ -298,7 +317,9 @@ describe('CreditPurchaseScreen', () => {
     owner.errorMessageKey = null;
     owner.completedPurchaseCount = 0;
     balance.balance = 1234;
+    balance.state = 'ok';
     creditBlocks.entries = [];
+    creditBlocks.state = 'ok';
     hideBalancePref.hideBalance = false;
     hideBalancePref.hasLoaded = true;
     identity.userId = 'user-1';
@@ -1112,12 +1133,13 @@ describe('CreditPurchaseScreen', () => {
     expect(reduced).toBeGreaterThan(single * 0.85);
   });
 
-  it('names an expiring balance and says nothing when none expires', async () => {
-    // The pack rows already state that these credits never expire, so a balance
-    // with no expiring part needs no second line; the slot keeps its height.
+  it('names an expiring balance and states plainly when none expires', async () => {
+    // The card paints a caption in both states, so the space it reserves is
+    // never a band: the quiet state says the same thing the Profile credits
+    // card says instead of leaving the second line blank.
     const quiet = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => packRows(quiet.renderer).length === 4);
-    expect(allText(quiet.renderer)).not.toContain('No expiring credits.');
+    expect(allText(quiet.renderer)).toContain('No expiring credits.');
     quiet.unmount();
 
     creditBlocks.entries = [{ balance_mUsd: 10_000_000, expiry_date: '2027-10-15T00:00:00Z' }];
@@ -1125,6 +1147,100 @@ describe('CreditPurchaseScreen', () => {
     await waitFor(() => allText(expiring.renderer).includes('in credits expires'));
     expect(allText(expiring.renderer)).not.toContain('No expiring credits.');
     expiring.unmount();
+  });
+
+  it('holds the balance card height in every state of its two reads', async () => {
+    // The card is the only block above the pack area whose content arrives
+    // late, so it paints one height in every state: a skeleton, the value, the
+    // failed read's retry target, and a caption in all three cases. Otherwise a
+    // settling read would move the packs and the copy below them.
+    const slotHeight = (scope: TestRenderer.ReactTestInstance, testID: string): number => {
+      const [slot] = scope.findAll(node => (node.props as { testID?: string }).testID === testID);
+      const style: unknown = slot?.props.style;
+      const height =
+        typeof style === 'object' && style !== null && 'height' in style ? style.height : 0;
+      return typeof height === 'number' ? height : 0;
+    };
+    const cases: { state: string; expected: string; prepare: () => void }[] = [
+      { state: 'reads pending', expected: 'Credits are a one-time purchase', prepare: () => undefined },
+      {
+        state: 'nothing expires',
+        expected: 'No expiring credits.',
+        prepare: () => {
+          balance.state = 'ok';
+          creditBlocks.state = 'ok';
+        },
+      },
+      {
+        state: 'expiring balance',
+        expected: 'in credits expires',
+        prepare: () => {
+          balance.state = 'ok';
+          creditBlocks.state = 'ok';
+          creditBlocks.entries = [
+            { balance_mUsd: 10_000_000, expiry_date: '2027-10-15T00:00:00Z' },
+          ];
+        },
+      },
+      {
+        state: 'credit blocks failed',
+        expected: 'Credit expiry unavailable.',
+        prepare: () => {
+          balance.state = 'ok';
+          creditBlocks.state = 'error';
+        },
+      },
+      {
+        state: 'balance failed',
+        expected: 'Failed to load balance. Tap to retry.',
+        prepare: () => {
+          balance.state = 'error';
+          creditBlocks.state = 'ok';
+        },
+      },
+    ];
+
+    const measured: { state: string; amount: number; caption: number; captionText: string }[] = [];
+    /* eslint-disable no-await-in-loop -- each scenario mutates the shared read state */
+    for (const scenario of cases) {
+      balance.state = 'pending';
+      creditBlocks.state = 'pending';
+      creditBlocks.entries = [];
+      scenario.prepare();
+      const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+      await waitFor(() => allText(renderer).includes(scenario.expected));
+      const card = renderer.root.findAll(
+        node => (node.props as { testID?: string }).testID === 'credit-purchase-screen'
+      )[0];
+      if (!card) {
+        throw new Error(`expected the screen in ${scenario.state}`);
+      }
+      measured.push({
+        state: scenario.state,
+        amount: slotHeight(card, 'credit-balance-slot'),
+        caption: slotHeight(card, 'credit-expiry-slot'),
+        captionText: allText(renderer),
+      });
+      unmount();
+      vi.clearAllMocks();
+    }
+    /* eslint-enable no-await-in-loop */
+
+    const amountHeight = measured[0]?.amount ?? 0;
+    const captionHeight = measured[0]?.caption ?? 0;
+    // Both slots are text line boxes: the amount's own line, and the two lines
+    // the caption's sentence wraps to in this card's width.
+    expect(amountHeight).toBeGreaterThan(0);
+    expect(captionHeight).toBeGreaterThan(0);
+    for (const result of measured) {
+      expect(result.amount, result.state).toBe(amountHeight);
+      expect(result.caption, result.state).toBe(captionHeight);
+    }
+    const captions = measured.map(result => result.captionText);
+    expect(captions.some(text => text.includes('No expiring credits.'))).toBe(true);
+    expect(captions.some(text => text.includes('in credits expires'))).toBe(true);
+    expect(captions.some(text => text.includes('Credit expiry unavailable.'))).toBe(true);
+    expect(captions.some(text => text.includes('Failed to load balance. Tap to retry.'))).toBe(true);
   });
 
   it('identity failure: shows its own retryable card instead of an empty pack area', async () => {

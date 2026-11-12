@@ -56,6 +56,34 @@ const purchaseErrorClearance = (fontScale: number, bottomInset: number): number 
   Math.max(bottomInset, 16) +
   8;
 
+/**
+ * The balance card's two data slots, at the default font scale.
+ *
+ * The card is the one block above the pack area whose content arrives late, so
+ * it holds one height in every state of its two reads and the copy below never
+ * moves. The amount keeps its own `text-2xl` line box — a skeleton, the value
+ * and the failed read's retry all sit inside it — and the expiry caption keeps
+ * the two `text-xs` lines its sentence wraps to in this card's width.
+ *
+ * Both reservations are the text's line box itself, not extra space on top of
+ * it, so the card's bottom padding stays its `py-4` and matches the top. The
+ * caption is laid out from the slot's bottom, so a one-line caption sits where
+ * the second line would end and leaves no band under the amount.
+ *
+ * The text scales with the system font size, so the reservations do too; only
+ * the two lines' text is multiplied, the spacing stays fixed, as in the rows.
+ */
+const BALANCE_AMOUNT_LINE_HEIGHT = 28.2;
+const EXPIRY_CAPTION_LINES = 2;
+const EXPIRY_LINE_HEIGHT = 14.1;
+
+/**
+ * Per-side `hitSlop` of the failed balance read's retry target: its box is one
+ * amount line high, so the slop lifts the 28 dp box to the 44 dp touch target
+ * without adding height that would move the copy below the card.
+ */
+const BALANCE_RETRY_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
+
 /** Reserved pack-row space while the store connects, so rows never jump in. */
 const PACK_SKELETON_ROWS = 4;
 
@@ -199,15 +227,21 @@ export function CreditPurchaseScreen() {
   };
 
   const renderBalanceValue = () => {
+    // Every branch below is one `h-8` tall, the amount's own line box: the
+    // card's height stays the same in all three states, so the copy below it
+    // never moves when the read settles. The skeleton keeps the value's box,
+    // and the failed read's target keeps the box too: its tap area comes from
+    // the hit slop, not from a taller box, which would move the copy.
     if (balancePending) {
-      return <Skeleton className="h-7 w-24 rounded" />;
+      return <Skeleton className="h-8 w-24 rounded" />;
     }
     if (balanceFailed) {
       return (
         <Pressable
           accessibilityLabel={t('profile.failedToLoadBalance')}
           accessibilityRole="button"
-          className="min-h-11 justify-center active:opacity-70"
+          className="h-8 justify-center active:opacity-70"
+          hitSlop={BALANCE_RETRY_HIT_SLOP}
           onPress={() => {
             void refetchBalance();
           }}
@@ -233,26 +267,29 @@ export function CreditPurchaseScreen() {
     );
   };
 
-  const renderExpirySlot = () => {
-    // A failed read is not "no expiring credits": the slot states that the
-    // expiry is unknown, using the same copy the Profile credits card shows,
-    // and keeps its reserved height either way.
+const renderExpirySlot = () => {
+    // Every state paints one caption inside the same two-line slot: the
+    // sentence, the "no expiring credits" line the Profile credits card also
+    // shows, "expiry unavailable" when the read fails, or the skeleton. The
+    // slot is two lines because that is what the sentence wraps to in this
+    // card's width, and it is laid out from its bottom, so the card's bottom
+    // padding stays its `py-4` in every state and the copy below never moves.
     if (creditBlocksQuery.isError) {
       return (
-        <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
+        <Text className="text-xs text-muted-foreground" numberOfLines={EXPIRY_CAPTION_LINES}>
+          {t('credits.expiryUnavailable')}
+        </Text>
       );
     }
     if (creditBlocksQuery.isPending) {
       return <Skeleton className="h-3 w-40 max-w-full rounded" />;
     }
-    // Nothing to say when no part of the balance expires: a "no expiring
-    // credits" line would repeat, in every state, the sentence each pack row
-    // already carries. The slot keeps its height so the rows below it stay put
-    // when this read settles.
     return (
       <CreditExpiryNote
         creditBlocks={creditBlocksQuery.data.creditBlocks}
         hiddenAmount={hideBalanceAmount ? HIDDEN_BALANCE : undefined}
+        emptyMessage={t('credits.noExpiringCredits')}
+        numberOfLines={EXPIRY_CAPTION_LINES}
       />
     );
   };
@@ -270,12 +307,12 @@ export function CreditPurchaseScreen() {
           // NativeWind drop this scroller's `contentContainerClassName`, and
           // it would take the content gap and gutter with it.
         >
-          {/* The card holds both of its data slots in every state: the amount (a
-              skeleton, the value, or the failed read's own retry target) and
-              the expiry caption, which is two lines at text-xs in this card's
-              width and keeps one line when the account has none. It is the one
-              block above the pack rows whose height comes from late data, so
-              without the slots a settling read would move every row below it. */}
+          {/* The card holds both of its data slots in every state, so a
+              settling read changes what the slots paint, never the card's
+              height: the amount keeps its own line box (a skeleton, the value,
+              or the failed read's retry target), and the caption keeps the two
+              lines its sentence wraps to. Both reservations are the text's
+              line box, so the card's `py-4` stays balanced top and bottom. */}
           <View className="rounded-xl border border-border bg-card px-5 py-4">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('profile.credits')}
@@ -283,8 +320,25 @@ export function CreditPurchaseScreen() {
             {/* The amount starts one 3.5 dp step under its label, as it did
                 before this screen reserved the slot: the reservation sits
                 below the value, never between the label and the value. */}
-            <View className="mt-1 min-h-11 justify-start">{renderBalanceValue()}</View>
-            <View className="mt-1 min-h-8 justify-center">{renderExpirySlot()}</View>
+            <View
+              className="mt-1 justify-center"
+              style={{ height: BALANCE_AMOUNT_LINE_HEIGHT * fontScale }}
+              testID="credit-balance-slot"
+            >
+              {renderBalanceValue()}
+            </View>
+            {/* The caption is centred in its two-line slot: a one-line
+                caption splits the line it does not use above and below, so the
+                card's bottom edge keeps the same distance from the text as its
+                top edge does. Anchoring it to either end of the slot would put
+                the whole unused line on the other side and read as a band. */}
+            <View
+              className="mt-1 justify-center"
+              style={{ height: EXPIRY_CAPTION_LINES * EXPIRY_LINE_HEIGHT * fontScale }}
+              testID="credit-expiry-slot"
+            >
+              {renderExpirySlot()}
+            </View>
           </View>
 
           {/* The pack surface shows exactly one of four things — placeholder

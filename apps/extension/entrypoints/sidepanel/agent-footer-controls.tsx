@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import { Shield, TriangleAlert } from 'lucide-react';
 import { getFooterControlDisplay } from '@/src/shared/agent-chat-placeholder';
@@ -7,6 +7,7 @@ import { thinkingEffortLabel } from '@/src/shared/kilo-api-client';
 import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
 import type { InspectableTab } from '@/src/shared/tab-debugger';
 import { ModelPicker } from './model-picker';
+import { useDismissOnOutsideClick, useEscapeKey } from './use-dismiss';
 
 const modeOptions = [
   { label: 'Safe', value: 'safe' },
@@ -70,13 +71,29 @@ const ModeControl = ({
 }): JSX.Element => {
   const display = getFooterControlDisplay({ mode, model: '', thinkingEffort: 'medium' });
   const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEscapeKey(isOpen, () => {
+    setIsOpen(false);
+  });
+  useDismissOnOutsideClick({
+    enabled: isOpen,
+    onDismiss: () => {
+      setIsOpen(false);
+    },
+    targetRef: containerRef,
+  });
 
   return (
-    <div className="relative shrink-0">
+    <div className="relative shrink-0" ref={containerRef}>
       <button
         aria-expanded={isOpen}
         aria-label={`${display.modeLabel} mode: ${display.modeDescription}`}
-        className="flex h-8 w-10 items-center justify-center rounded-md border border-border bg-surface-overlay text-foreground-on-secondary outline-none transition hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background"
+        className={
+          display.modeIconTone === 'danger'
+            ? 'flex h-8 w-10 items-center justify-center rounded-md border border-status-yellow-500/60 bg-status-yellow-500/15 text-foreground outline-none transition hover:bg-status-yellow-500/25 focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background'
+            : 'flex h-8 w-10 items-center justify-center rounded-md border border-border bg-surface-overlay text-foreground-on-secondary outline-none transition hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background'
+        }
         disabled={disabled}
         onClick={() => {
           setIsOpen(current => !current);
@@ -138,7 +155,6 @@ export const AgentFooterControls = ({
   isConversationStoreLoaded,
   isRunning,
   isModelSelectDisabled,
-  isThinkingSelectDisabled,
   mode,
   model,
   modelLoadError,
@@ -161,7 +177,6 @@ export const AgentFooterControls = ({
   isConversationStoreLoaded: boolean;
   isRunning: boolean;
   isModelSelectDisabled: boolean;
-  isThinkingSelectDisabled: boolean;
   mode: AgentMode;
   model: string;
   modelLoadError: string | undefined;
@@ -192,6 +207,10 @@ export const AgentFooterControls = ({
             inspectableTabs.length === 0
           }
           onChange={value => {
+            if (value === '') {
+              return;
+            }
+
             const tabId = Number(value);
 
             if (Number.isInteger(tabId)) {
@@ -201,10 +220,10 @@ export const AgentFooterControls = ({
           value={selectedTabId === undefined ? '' : String(selectedTabId)}
         >
           {inspectableTabs.length === 0 ? (
-            <option value="">{isLoadingTabs ? 'Loading tabs...' : 'No tab selected'}</option>
+            <option value="">{isLoadingTabs ? 'Loading tabs...' : 'No tabs available'}</option>
           ) : (
             <>
-              {selectedTabId === undefined ? <option value="">No tab selected</option> : null}
+              {selectedTabId === undefined ? <option value="">Pick a tab</option> : null}
               {inspectableTabs.map(tab => (
                 <option key={tab.id} value={tab.id}>
                   {tab.title}
@@ -231,23 +250,23 @@ export const AgentFooterControls = ({
           onModelChange={onModelChange}
           organizationId={organizationId}
         />
-        <CompactSelectControl
-          ariaLabel="Thinking effort"
-          className="w-24 pl-2 pr-6"
-          disabled={isConversationControlDisabled || isThinkingSelectDisabled || isRunning}
-          onChange={onThinkingEffortChange}
-          value={thinkingEffort}
-        >
-          {thinkingOptions.length === 0 ? (
-            <option value="">...</option>
-          ) : (
-            thinkingOptions.map(option => (
-              <option key={option} value={option}>
-                {thinkingEffortLabel(option)}
-              </option>
-            ))
-          )}
-        </CompactSelectControl>
+        {thinkingOptions.length === 0 ? null : (
+          <div className="hidden shrink-0 min-[380px]:block">
+            <CompactSelectControl
+              ariaLabel="Thinking effort"
+              className="w-24 pl-2 pr-6"
+              disabled={isConversationControlDisabled || isRunning}
+              onChange={onThinkingEffortChange}
+              value={thinkingEffort}
+            >
+              {thinkingOptions.map(option => (
+                <option key={option} value={option}>
+                  {thinkingEffortLabel(option)}
+                </option>
+              ))}
+            </CompactSelectControl>
+          </div>
+        )}
         {contextDonut}
       </div>
       {modelLoadError === undefined ? null : (

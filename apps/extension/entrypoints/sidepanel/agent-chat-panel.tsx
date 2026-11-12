@@ -21,13 +21,17 @@ import {
   shouldSendQueuedMessage,
 } from './agent-message-queue';
 import {
-  createAssistantMessage,
   createToolResult,
   createUserMessage,
   createWorkflowToolCall,
   groupConversationEvents,
 } from '@/src/shared/agent-conversation';
-import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
+import type {
+  AgentConversationEvent,
+  AgentMode,
+  ConversationErrorEvent,
+} from '@/src/shared/agent-conversation';
+import { createCompactionErrorEvent } from '@/src/shared/agent-turn-error';
 import {
   KEEP_RECENT_EXCHANGES,
   KEEP_RECENT_EXCHANGES_MANUAL,
@@ -90,6 +94,9 @@ import { workflowRunRequestAtom } from './workflow-settings-state';
 import { activeConversationIdAtom, conversationModeAtom } from './settings-dialog-state';
 import { sanitizeTabContextText, sanitizeTabContextUrl } from '@/src/shared/tab-context-sanitize';
 import { maxAgentToolRounds } from '@/src/shared/agent-tool-round-limit';
+import { getConversationEmptyHint } from '@/src/shared/agent-conversation-tabs';
+import { getDefaultGatewayModelId } from '@/src/shared/default-gateway-model';
+import { hydrateStoredDrafts, persistDraft } from './agent-draft-storage';
 
 const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =>
@@ -103,18 +110,23 @@ interface ConversationRunState {
 }
 
 export const getSelectedInspectableTabId = ({
-  activeTabId,
   inspectableTabs,
   selectedTabId,
 }: {
-  readonly activeTabId?: number | undefined;
   readonly inspectableTabs: readonly { readonly id: number }[];
   readonly selectedTabId: number | undefined;
-}): number | undefined => {
-  if (selectedTabId !== undefined && inspectableTabs.some(tab => tab.id === selectedTabId)) {
-    return selectedTabId;
-  }
+}): number | undefined =>
+  selectedTabId !== undefined && inspectableTabs.some(tab => tab.id === selectedTabId)
+    ? selectedTabId
+    : undefined;
 
+export const getInitialInspectableTabId = ({
+  activeTabId,
+  inspectableTabs,
+}: {
+  readonly activeTabId?: number | undefined;
+  readonly inspectableTabs: readonly { readonly id: number }[];
+}): number | undefined => {
   if (activeTabId !== undefined && inspectableTabs.some(tab => tab.id === activeTabId)) {
     return activeTabId;
   }
@@ -123,10 +135,12 @@ export const getSelectedInspectableTabId = ({
 };
 
 export const formatSystemEnvironment = ({
+  mode,
   selectedTab,
   memories,
   workflows,
 }: {
+  readonly mode?: AgentMode | undefined;
   readonly selectedTab: { readonly title: string; readonly url: string } | undefined;
   readonly memories: readonly AgentMemory[];
   readonly workflows?: readonly AgentWorkflow[];
@@ -140,6 +154,7 @@ export const formatSystemEnvironment = ({
     `Selected tab URL: ${sanitizeTabContextUrl(selectedTab.url)}`,
     `Current time: ${new Date().toISOString()}`,
     `Timezone: ${new Intl.DateTimeFormat().resolvedOptions().timeZone}`,
+    ...(mode === 'dangerous' ? ['Agent mode: dangerous (arbitrary page control)'] : []),
   ];
   const memoryIndex = formatAgentMemoryIndex(memories);
   const workflowIndex =
@@ -197,10 +212,17 @@ export const AgentChatPanel = ({
   const activeConversation = getActiveStoredConversation(conversationStore);
   const { events, id: activeConversationId, mode = defaultMode } = activeConversation;
   const selectedTabId = getSelectedInspectableTabId({
-    activeTabId,
     inspectableTabs,
     selectedTabId: activeConversation.selectedTabId,
   });
+  const selectedTab = useMemo(
+    () => inspectableTabs.find(tab => tab.id === selectedTabId),
+    [inspectableTabs, selectedTabId]
+  );
+  const tabLabels = useMemo(
+    () => new Map(inspectableTabs.map(tab => [tab.id, tab.title] as const)),
+    [inspectableTabs]
+  );
   inspectableTabsRef.current = inspectableTabs;
   const model = activeConversation.model ?? '';
   const selectedModel = useMemo(
@@ -280,6 +302,13 @@ export const AgentChatPanel = ({
           );
           store.set(contextUsageAtomFamily(conversationId), undefined);
         }
+      } catch (error) {
+        setConversationStore(currentStore =>
+          updateStoredConversationEvents(currentStore, conversationId, currentEvents => [
+            ...currentEvents,
+            createCompactionErrorEvent(error),
+          ])
+        );
       } finally {
         setCompactingConversationIds(current => current.filter(id => id !== conversationId));
       }
@@ -336,7 +365,6 @@ export const AgentChatPanel = ({
   );
 
   const isModelSelectDisabled = modelOptions.length === 0;
-  const isThinkingSelectDisabled = thinkingOptions.length === 0;
 
   // The conversation's stored model is the only model a run may use, so every gateway path
   // Waits until the loaded catalog actually contains it. Never fall back to modelOptions[0].
@@ -348,6 +376,15 @@ export const AgentChatPanel = ({
     selectedModel !== undefined &&
     selectedTabId !== undefined &&
     !isCompacting;
+  const sendBlockedReason = !isConversationStoreLoaded
+    ? undefined
+    : selectedTabId === undefined
+      ? 'Pick a tab to send a message.'
+      : selectedModel === undefined
+        ? 'Choose a model to send a message.'
+        : isCompacting
+          ? 'Kilo is compacting this conversation.'
+          : undefined;
 
   conversationStoreRef.current = conversationStore;
   memoriesRef.current = memories;
@@ -361,6 +398,28 @@ export const AgentChatPanel = ({
     },
     []
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async (): Promise<void> => {
+      const drafts = await hydrateStoredDrafts();
+
+      if (cancelled) {
+        return;
+      }
+
+      for (const [conversationId, text] of Object.entries(drafts)) {
+        if (store.get(draftAtomFamily(conversationId)) === '') {
+          store.set(draftAtomFamily(conversationId), text);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [store]);
 
   useEffect(() => {
     let cancelled = false;
@@ -415,17 +474,20 @@ export const AgentChatPanel = ({
       return;
     }
 
+    // A conversation keeps whatever target the user picked. Only a conversation that
+    // never had one adopts the active tab, and a target that stops being inspectable
+    // (closed, or navigated to a chrome:// page) leaves the selection empty.
+    if (activeConversation.selectedTabId !== undefined) {
+      return;
+    }
+
     if (pendingCreateDefaultConversationId === activeConversationId) {
       return;
     }
 
-    const nextSelectedTabId = getSelectedInspectableTabId({
-      activeTabId,
-      inspectableTabs,
-      selectedTabId: activeConversation.selectedTabId,
-    });
+    const initialTabId = getInitialInspectableTabId({ activeTabId, inspectableTabs });
 
-    if (activeConversation.selectedTabId === nextSelectedTabId) {
+    if (initialTabId === undefined) {
       return;
     }
 
@@ -434,22 +496,12 @@ export const AgentChatPanel = ({
         item => item.id === activeConversationId
       );
 
-      if (currentConversation === undefined) {
-        return currentStore;
-      }
-
-      const applyTimeSelectedTabId = getSelectedInspectableTabId({
-        activeTabId,
-        inspectableTabs,
-        selectedTabId: currentConversation.selectedTabId,
-      });
-
-      if (currentConversation.selectedTabId === applyTimeSelectedTabId) {
+      if (currentConversation === undefined || currentConversation.selectedTabId !== undefined) {
         return currentStore;
       }
 
       return updateStoredConversationSettings(currentStore, activeConversationId, {
-        selectedTabId: applyTimeSelectedTabId,
+        selectedTabId: initialTabId,
       });
     });
   }, [
@@ -472,7 +524,7 @@ export const AgentChatPanel = ({
     if (!modelOptions.some(option => option.id === model)) {
       setConversationStore(currentStore =>
         updateStoredConversationSettings(currentStore, activeConversationId, {
-          model: modelOptions[0]?.id ?? '',
+          model: getDefaultGatewayModelId(modelOptions) ?? '',
         })
       );
     }
@@ -642,7 +694,7 @@ export const AgentChatPanel = ({
       return;
     }
     const runSelectedTabId = runStateEntry.selectedTabId;
-    const selectedTab = inspectableTabs.find(tab => tab.id === runSelectedTabId);
+    const runSelectedTab = inspectableTabs.find(tab => tab.id === runSelectedTabId);
 
     try {
       const remoteMcpServers = store.get(remoteMcpStoreAtom).servers;
@@ -716,8 +768,8 @@ export const AgentChatPanel = ({
           requestApproval: (kind, draft) =>
             requestApproval(storage, kind, draft, runState.abort.signal),
           selectedTabId: runSelectedTabId,
-          selectedTabTitle: selectedTab?.title ?? '',
-          selectedTabUrl: selectedTab?.url ?? '',
+          selectedTabTitle: runSelectedTab?.title ?? '',
+          selectedTabUrl: runSelectedTab?.url ?? '',
           signal: runState.abort.signal,
           storage,
         },
@@ -759,32 +811,29 @@ export const AgentChatPanel = ({
       return;
     }
 
-    const conversationEvents = conversation.events;
     const runSelectedTabId = getSelectedInspectableTabId({
-      activeTabId,
       inspectableTabs,
       selectedTabId: conversation.selectedTabId,
     });
-    const selectedTab = inspectableTabs.find(tab => tab.id === runSelectedTabId);
+    const runSelectedTab = inspectableTabs.find(tab => tab.id === runSelectedTabId);
+
+    if (runSelectedTabId === undefined || runSelectedTab === undefined) {
+      return;
+    }
+
+    const conversationEvents = conversation.events;
     const userEvent = createUserMessage(
       text,
       formatSystemEnvironment({
         memories: memoriesRef.current,
-        selectedTab:
-          selectedTab === undefined
-            ? undefined
-            : { title: selectedTab.title, url: selectedTab.url },
+        mode: conversation.mode ?? defaultMode,
+        selectedTab: { title: runSelectedTab.title, url: runSelectedTab.url },
         workflows: workflowsRef.current,
       })
     );
     const conversationWithUserMessage = [...conversationEvents, userEvent];
 
     appendEvents(conversationId, [userEvent]);
-
-    if (runSelectedTabId === undefined) {
-      appendEvents(conversationId, [createAssistantMessage('Pick a target tab first.')]);
-      return;
-    }
 
     const runState = createRunState(conversationId, runSelectedTabId);
 
@@ -798,7 +847,6 @@ export const AgentChatPanel = ({
       hasModel: isModelInCatalog(conversation.model ?? ''),
       hasTargetTab:
         getSelectedInspectableTabId({
-          activeTabId,
           inspectableTabs,
           selectedTabId: conversation.selectedTabId,
         }) !== undefined,
@@ -813,6 +861,7 @@ export const AgentChatPanel = ({
     }
 
     store.set(draftAtomFamily(activeConversationId), '');
+    persistDraft(activeConversationId, '');
 
     // A send during a run queues one pending message for the next turn.
     if (action === 'queue') {
@@ -827,6 +876,43 @@ export const AgentChatPanel = ({
 
   const stopRun = (): void => {
     runStatesRef.current.get(activeConversationId)?.abort.abort();
+  };
+
+  const retryTurn = (conversationId: string, errorEventId: string): void => {
+    const conversation = conversationStoreRef.current.conversations.find(
+      candidate => candidate.id === conversationId
+    );
+    const runSelectedTabId = getSelectedInspectableTabId({
+      inspectableTabs,
+      selectedTabId: conversation?.selectedTabId,
+    });
+
+    if (
+      conversation === undefined ||
+      runSelectedTabId === undefined ||
+      store.get(runningConversationIdsAtom).includes(conversationId) ||
+      store.get(compactingConversationIdsAtom).includes(conversationId)
+    ) {
+      return;
+    }
+
+    const events = conversation.events.filter(
+      event => !(event.type === 'error' && event.id === errorEventId)
+    );
+
+    setConversationStore(currentStore =>
+      updateStoredConversationEvents(currentStore, conversationId, () => events)
+    );
+    void startTurn(conversationId, events, createRunState(conversationId, runSelectedTabId));
+  };
+
+  const retryError = (event: ConversationErrorEvent): void => {
+    if (event.retry === 'compaction') {
+      void compactActiveConversation();
+      return;
+    }
+
+    retryTurn(activeConversationId, event.id);
   };
 
   const workflowRunRequest = useAtomValue(workflowRunRequestAtom);
@@ -850,10 +936,14 @@ export const AgentChatPanel = ({
       const conversationId = conversation.id;
       const runModel = conversation.model ?? '';
       const runSelectedTabId = getSelectedInspectableTabId({
-        activeTabId,
         inspectableTabs,
         selectedTabId: conversation.selectedTabId,
       });
+      const runSelectedTab = inspectableTabs.find(tab => tab.id === runSelectedTabId);
+
+      if (runSelectedTabId === undefined || runSelectedTab === undefined) {
+        return;
+      }
 
       // Preflight gates match run button disabled states — fail silently.
       const isCompactingNow = store.get(compactingConversationIdsAtom).includes(conversationId);
@@ -865,11 +955,6 @@ export const AgentChatPanel = ({
         isCompactingNow ||
         isRunningNow
       ) {
-        return;
-      }
-
-      if (runSelectedTabId === undefined) {
-        appendEvents(conversationId, [createAssistantMessage('Pick a target tab first.')]);
         return;
       }
 
@@ -899,17 +984,14 @@ export const AgentChatPanel = ({
       };
 
       // Build user message with system environment including workflows index.
-      const selectedTab = inspectableTabs.find(tab => tab.id === runSelectedTabId);
       const workflow = workflows.find(wf => wf.id === request.workflowId);
       const workflowName = workflow?.name ?? 'workflow';
       const userEvent = createUserMessage(
         `Run the workflow "${workflowName}".`,
         formatSystemEnvironment({
           memories: memoriesRef.current,
-          selectedTab:
-            selectedTab === undefined
-              ? undefined
-              : { title: selectedTab.title, url: selectedTab.url },
+          mode: conversation.mode ?? defaultMode,
+          selectedTab: { title: runSelectedTab.title, url: runSelectedTab.url },
           workflows: workflows,
         })
       );
@@ -944,8 +1026,8 @@ export const AgentChatPanel = ({
           requestApproval: (kind, draft) =>
             requestApproval(storage, kind, draft, runState.abort.signal),
           selectedTabId: runSelectedTabId,
-          selectedTabTitle: selectedTab?.title ?? '',
-          selectedTabUrl: selectedTab?.url ?? '',
+          selectedTabTitle: runSelectedTab.title,
+          selectedTabUrl: runSelectedTab.url,
           signal: runState.abort.signal,
           storage,
         });
@@ -993,7 +1075,6 @@ export const AgentChatPanel = ({
   }, [
     workflowRunRequest,
     activeConversationId,
-    activeTabId,
     inspectableTabs,
     isConversationStoreLoaded,
     modelOptions,
@@ -1024,7 +1105,11 @@ export const AgentChatPanel = ({
         queued !== undefined &&
         !runningIds.includes(conversation.id) &&
         !compactingIds.includes(conversation.id) &&
-        isModelInCatalog(conversation.model ?? '')
+        isModelInCatalog(conversation.model ?? '') &&
+        getSelectedInspectableTabId({
+          inspectableTabs,
+          selectedTabId: conversation.selectedTabId,
+        }) !== undefined
       ) {
         // Clear before sending so a failing send cannot re-queue itself.
         store.set(queuedMessageAtomFamily(conversation.id), undefined);
@@ -1035,6 +1120,7 @@ export const AgentChatPanel = ({
   }, [
     compactingConversationIds,
     conversationStore,
+    inspectableTabs,
     isConversationStoreLoaded,
     modelOptions,
     runningConversationIds,
@@ -1145,8 +1231,8 @@ export const AgentChatPanel = ({
       setConversationStore(nextStore);
 
       // Evict outside the state updater (StrictMode may double-invoke updaters).
-      // Empty closed tabs are deleted: always free their atoms, including when ensureOpen
-      // Recreates a fallback with the same id so drafts do not survive onto the fresh tab.
+      // Empty closed tabs are deleted: always free their atoms and stored draft, including when
+      // ensureOpen recreates a fallback with the same id so drafts do not survive onto the fresh tab.
       // Non-empty closed tabs keep drafts for History reopen.
       const idsToEvict = new Set<string>();
       if (wasEmpty) {
@@ -1159,6 +1245,7 @@ export const AgentChatPanel = ({
       }
       for (const id of idsToEvict) {
         evictConversationAtoms(id);
+        persistDraft(id, '');
       }
     },
     [abortConversationRun, isConversationStoreLoaded, setConversationStore]
@@ -1181,8 +1268,9 @@ export const AgentChatPanel = ({
       setConversationStore(currentStore =>
         deleteStoredConversation(currentStore, conversationId, emptyDefaultConversationEvents())
       );
-      // Free per-conversation atoms; a deleted conversation can never be reopened.
+      // Free per-conversation atoms and draft; a deleted conversation can never be reopened.
       evictConversationAtoms(conversationId);
+      persistDraft(conversationId, '');
     },
     [abortConversationRun, conversationStore, isConversationStoreLoaded, setConversationStore]
   );
@@ -1202,10 +1290,11 @@ export const AgentChatPanel = ({
           isStoredConversationEmpty(getActiveStoredConversation(currentStore)),
         store: currentStore,
       });
-      // Opening history can drop the active empty conversation; free its atoms.
+      // Opening history can drop the active empty conversation; free its atoms and draft.
       for (const conversation of currentStore.conversations) {
         if (!nextStore.conversations.some(next => next.id === conversation.id)) {
           evictConversationAtoms(conversation.id);
+          persistDraft(conversation.id, '');
         }
       }
       conversationStoreRef.current = nextStore;
@@ -1263,7 +1352,13 @@ export const AgentChatPanel = ({
         onCreateConversation={createConversation}
         onSelectConversation={selectConversation}
       />
-      <ConversationList items={groupedEvents} streamingMessageId={streamingMessageId} />
+      <ConversationList
+        emptyHint={getConversationEmptyHint({ targetTabTitle: selectedTab?.title })}
+        items={groupedEvents}
+        onRetryError={retryError}
+        streamingMessageId={streamingMessageId}
+        tabLabels={tabLabels}
+      />
 
       {remoteMcpToolWarning === undefined ? null : (
         <p className="flex items-start gap-2 border-t border-status-yellow-500/30 bg-status-yellow-500/10 px-4 py-2 text-xs text-status-yellow-300">
@@ -1274,8 +1369,10 @@ export const AgentChatPanel = ({
 
       <MessageComposer
         activeConversationId={activeConversationId}
+        blockedReason={sendBlockedReason}
         canSend={canSend}
         isRunning={isRunning}
+        mode={mode}
         onStop={stopRun}
         onSubmit={submitDraft}
       />
@@ -1289,7 +1386,6 @@ export const AgentChatPanel = ({
           isConversationStoreLoaded={isConversationStoreLoaded}
           isModelSelectDisabled={isModelSelectDisabled}
           isRunning={isRunning}
-          isThinkingSelectDisabled={isThinkingSelectDisabled}
           mode={mode}
           model={model}
           modelLoadError={modelLoadError}

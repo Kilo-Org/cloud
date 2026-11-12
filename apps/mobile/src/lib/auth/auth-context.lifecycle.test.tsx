@@ -337,6 +337,10 @@ vi.mock('@/lib/hooks/use-persisted-run-on-destination', () => ({
   clearRunOnDestinationPreference: vi.fn(),
 }));
 
+vi.mock('@/lib/hooks/environment-choice', () => ({
+  clearEnvironmentChoices: vi.fn(),
+}));
+
 const {
   clearHideThinkingPreference,
   clearKeepScreenOnPreference,

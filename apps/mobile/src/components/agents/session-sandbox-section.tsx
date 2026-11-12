@@ -1,0 +1,188 @@
+import { useTranslation } from 'react-i18next';
+import { View } from 'react-native';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner-native';
+
+import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
+import { Text } from '@/components/ui/text';
+import {
+  sandboxDetailText,
+  sandboxStatusLabel,
+} from '@/lib/cloud-environments/sandbox-status-copy';
+import { formatDate } from '@/lib/format';
+import { useTRPC } from '@/lib/trpc';
+
+/** The worker's own status is a snapshot; a sleeping sandbox changes on its own. */
+const SANDBOX_POLL_MS = 15_000;
+
+type SessionSandboxSectionProps = {
+  /** The control-plane session id (`workspace_…`); null for a stored-only session. */
+  cloudAgentSessionId: string | null;
+  organizationId: string | undefined;
+  /**
+   * The session's start failed. Only then does the web offer to discard the
+   * workspace snapshot: the failure is what makes a fresh start the way out,
+   * and the discarded changes are the ones that start could not use.
+   */
+  startFailed: boolean;
+};
+
+/**
+ * The sandbox block of the session sheet: which sandbox the session runs on,
+ * what its state means, and — after a failed start — the same recovery the web
+ * offers, a fresh start that discards the workspace snapshot.
+ *
+ * The status is the worker's snapshot, not a live probe, so the row names when
+ * it was observed instead of implying it is current to the second.
+ */
+export function SessionSandboxSection({
+  cloudAgentSessionId,
+  organizationId,
+  startFailed,
+}: Readonly<SessionSandboxSectionProps>) {
+  const { t, i18n } = useTranslation();
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const { confirm, dialog } = useConfirmDialog();
+  const sessionId = cloudAgentSessionId ?? '';
+  const statusQuery = useQuery(
+    organizationId
+      ? trpc.organizations.cloudAgentNext.getSandboxStatus.queryOptions(
+          { cloudAgentSessionId: sessionId, organizationId },
+          {
+            enabled: cloudAgentSessionId !== null,
+            refetchInterval: SANDBOX_POLL_MS,
+            retry: false,
+          }
+        )
+      : trpc.cloudAgentNext.getSandboxStatus.queryOptions(
+          { cloudAgentSessionId: sessionId },
+          {
+            enabled: cloudAgentSessionId !== null,
+            refetchInterval: SANDBOX_POLL_MS,
+            retry: false,
+          }
+        )
+  );
+  const recoveryQuery = useQuery(
+    organizationId
+      ? trpc.organizations.cloudAgentNext.getWorkspaceSnapshotRecovery.queryOptions(
+          { sessionId, organizationId },
+          { enabled: cloudAgentSessionId !== null && startFailed, retry: false, staleTime: 0 }
+        )
+      : trpc.cloudAgentNext.getWorkspaceSnapshotRecovery.queryOptions(
+          { sessionId },
+          { enabled: cloudAgentSessionId !== null && startFailed, retry: false, staleTime: 0 }
+        )
+  );
+  const removeSnapshot = useMutation(
+    organizationId
+      ? trpc.organizations.cloudAgentNext.removeWorkspaceSnapshot.mutationOptions({
+          onSuccess: () => {
+            void queryClient.invalidateQueries({
+              queryKey: trpc.organizations.cloudAgentNext.getWorkspaceSnapshotRecovery.queryKey(),
+            });
+            toast.success(t('agentChat.environment.startFreshDone'));
+          },
+          onError: error => {
+            toast.error(
+              error.message.length > 0
+                ? error.message
+                : t('agentChat.environment.couldNotRemoveSnapshot')
+            );
+          },
+        })
+      : trpc.cloudAgentNext.removeWorkspaceSnapshot.mutationOptions({
+          onSuccess: () => {
+            void queryClient.invalidateQueries({
+              queryKey: trpc.cloudAgentNext.getWorkspaceSnapshotRecovery.queryKey(),
+            });
+            toast.success(t('agentChat.environment.startFreshDone'));
+          },
+          onError: error => {
+            toast.error(
+              error.message.length > 0
+                ? error.message
+                : t('agentChat.environment.couldNotRemoveSnapshot')
+            );
+          },
+        })
+  );
+
+  if (cloudAgentSessionId === null) {
+    return null;
+  }
+  const data = statusQuery.data;
+  const detail = data === undefined ? null : sandboxDetailText(data.detailCode, t);
+  const capturedAt = startFailed ? (recoveryQuery.data?.capturedAt ?? null) : null;
+  const capturedLabel =
+    capturedAt === null
+      ? null
+      : formatDate(new Date(capturedAt), i18n.language, {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        });
+  const discard = () => {
+    if (capturedLabel === null) {
+      return;
+    }
+    confirm({
+      title: t('agentChat.environment.startFreshTitle'),
+      message: t('agentChat.environment.startFreshMessage', { when: capturedLabel }),
+      confirmLabel: t('agentChat.environment.startFresh'),
+      cancelLabel: t('common.cancel'),
+      onConfirm: () => {
+        removeSnapshot.mutate(organizationId ? { sessionId, organizationId } : { sessionId });
+      },
+    });
+  };
+
+  return (
+    <View className="gap-2">
+      <Text className="text-sm font-semibold text-foreground">
+        {t('agentChat.environment.sandbox')}
+      </Text>
+      {data === undefined ? (
+        <Text className="text-base font-medium text-foreground">
+          {statusQuery.isError
+            ? t('agentChat.environment.sandboxDetailUnavailable')
+            : t('common.loading')}
+        </Text>
+      ) : (
+        <>
+          <Text className="text-base font-medium text-foreground">
+            {sandboxStatusLabel(data.status, t)}
+          </Text>
+          {detail === null ? null : (
+            <Text className="text-sm text-muted-foreground">{detail}</Text>
+          )}
+          <Text className="text-xs text-muted-foreground">
+            {t('agentChat.environment.sandboxChecked', {
+              when: formatDate(new Date(data.observedAt), i18n.language, {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              }),
+            })}
+          </Text>
+        </>
+      )}
+      {capturedLabel === null ? null : (
+        <View className="gap-2">
+          <Text className="text-sm text-muted-foreground">
+            {t('agentChat.environment.snapshotCaptured', { when: capturedLabel })}
+          </Text>
+          <Button
+            variant="outline"
+            size="sm"
+            loading={removeSnapshot.isPending}
+            onPress={discard}
+          >
+            <Text>{t('agentChat.environment.startFresh')}</Text>
+          </Button>
+        </View>
+      )}
+      {dialog}
+    </View>
+  );
+}

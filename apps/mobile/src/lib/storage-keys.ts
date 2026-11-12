@@ -30,6 +30,8 @@ export const TRACKING_PROMPT_DISMISSED_KEY = 'tracking-prompt-dismissed';
 export const LAST_RUN_ON_DESTINATION_KEY = 'last-run-on-destination';
 export const CONSENT_USER_KEY_PREFIX = 'consent-accepted-';
 export const AGENT_MODEL_PREFERENCE_KEY = 'agent-model-preference';
+/** The last cloud environment chosen per repository and scope, by choice key. */
+export const LAST_CLOUD_ENVIRONMENT_KEY = 'last-cloud-environment';
 export const REASONING_DEFAULT_EXPANDED_KEY = 'agent-reasoning-default-expanded';
 export const HIDE_THINKING_KEY = 'agent-hide-thinking-details';
 export const REVIEW_REQUESTED_AT_KEY = 'store-review-requested-at';

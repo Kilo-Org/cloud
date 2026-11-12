@@ -8,6 +8,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 import { type KiloSessionId, type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 
+import { EnvironmentSheet } from '@/components/agents/environment-sheet';
+import { NewSessionCloudEnvironmentRow } from '@/components/agents/new-session-cloud-environment-row';
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
 import {
   isStoredRepoSelectionGone,
@@ -52,6 +54,12 @@ import { shouldAutoFocusNewSessionPrompt } from '@/components/agents/new-session
 import { useNewSessionOrganization } from '@/components/agents/use-new-session-organization';
 import { useContinueCloudCreate } from '@/components/agents/use-continue-cloud-create';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
+import {
+  environmentBlocksStart,
+  requestedEnvironmentForSelection,
+  requiresEnvironmentChoice,
+} from '@/lib/cloud-environments/environment-selection';
+import { useSessionEnvironment } from '@/lib/cloud-environments/use-session-environment';
 import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { SaveDraftAsTodoSheet } from '@/components/todos/save-draft-as-todo-sheet';
@@ -498,6 +506,37 @@ export function NewSessionScreenBody() {
     );
   }, [repositories, selectedRepo]);
 
+  // The cloud environment of this repository: the environments that contain
+  // it, the remembered pick among several, and each one's snapshot build. A
+  // clone entry picks none (the web's Continue route picks none either), and a
+  // remote target never creates a cloud session, so neither blocks on one.
+  const sessionEnvironment = useSessionEnvironment({
+    organizationId,
+    repository: isCloneEntry ? null : selectedRepository,
+  });
+  const [environmentSheetOpen, setEnvironmentSheetOpen] = useState(false);
+  const isCloudTarget = runOnInstance === null && !computerTargetSelected;
+  const environmentBlocked =
+    !isCloneEntry && isCloudTarget && environmentBlocksStart(sessionEnvironment.selection);
+  const environmentSection = isCloneEntry ? undefined : (
+    <NewSessionCloudEnvironmentRow
+      selection={sessionEnvironment.selection}
+      isError={sessionEnvironment.isError}
+      buildStatus={
+        sessionEnvironment.environment === undefined || sessionEnvironment.environment === null
+          ? undefined
+          : sessionEnvironment.buildStatusFor(sessionEnvironment.environment.id)
+      }
+      disabled={isCreating || isSubmitting}
+      onRetry={() => {
+        sessionEnvironment.retryEnvironmentList();
+      }}
+      onOpen={() => {
+        setEnvironmentSheetOpen(true);
+      }}
+    />
+  );
+
   // A repository is one discrete choice, not a keystroke burst, so it is
   // written through the debounce immediately: a restart in the next half second
   // must still reopen the form on the target the person had just picked.
@@ -757,6 +796,10 @@ export function NewSessionScreenBody() {
     variant: displayVariant,
     autoCommit,
     profileId,
+    requestedEnvironment: requestedEnvironmentForSelection(sessionEnvironment.selection),
+    requireEnvironmentChoice: requiresEnvironmentChoice(sessionEnvironment.selection)
+      ? true
+      : undefined,
     manualEnvVars,
     setupCommands,
     todoId,
@@ -1141,7 +1184,7 @@ export function NewSessionScreenBody() {
   // A lapsed organization plan blocks Start exactly like a missing
   // precondition does: the explanation is already on screen, so the button
   // must not keep the primary fill over it.
-  const isStartDisabled = resolveStartDisabled() || planRefusal !== null;
+  const isStartDisabled = resolveStartDisabled() || planRefusal !== null || environmentBlocked;
 
   // The repository section's own settle state, separated from the repository
   // count exactly as the extension separates provider connect from repo count.
@@ -1200,7 +1243,12 @@ export function NewSessionScreenBody() {
 
   let startBlockedReason: string | null = null;
   let startBlockedAction: { label: string; onPress: () => void; isBusy?: boolean } | null = null;
-  if (runOnInstance === null && computerTargetSelected) {
+  if (environmentBlocked) {
+    // The environment picker is part of the form, so an unchosen repository
+    // environment blocks the start the same way the web's picker does. Its own
+    // row states it too; the footer names the action the person must take.
+    startBlockedReason = t('agentChat.environment.selectEnvironmentToStart');
+  } else if (runOnInstance === null && computerTargetSelected) {
     startBlockedReason = stripInlineCodeMarkers(
       t('agentChat.instancePicker.noCliInstancesDescription')
     );
@@ -1405,6 +1453,7 @@ export function NewSessionScreenBody() {
         onManualCommandsChange={setManualCommands}
         onOpenRepoDefaults={handleOpenRepoDefaults}
         accountSection={accountSection}
+        environmentSection={environmentSection}
         autoCommit={autoCommit}
         onAutoCommitChange={setAutoCommit}
         isStartDisabled={isStartDisabled}
@@ -1421,6 +1470,24 @@ export function NewSessionScreenBody() {
       {/* The discard confirm: a Modal overlay, so the composer behind it keeps
           its layout while the destructive choice keeps its red fill. */}
       {discardConfirm}
+      <EnvironmentSheet
+        visible={environmentSheetOpen}
+        onClose={() => {
+          setEnvironmentSheetOpen(false);
+        }}
+        environments={sessionEnvironment.matches ?? []}
+        selectedEnvironmentId={sessionEnvironment.environment?.id ?? null}
+        repositoryLabel={selectedRepository?.fullName ?? ''}
+        organizationId={organizationId}
+        buildStatusFor={sessionEnvironment.buildStatusFor}
+        buildStatusFailed={sessionEnvironment.buildStatusFailed}
+        onRetryBuildStatus={() => {
+          sessionEnvironment.retryEnvironmentList();
+        }}
+        onChoose={environmentId => {
+          sessionEnvironment.chooseEnvironment(environmentId);
+        }}
+      />
       <SaveDraftAsTodoSheet
         visible={saveAsTodoLeave !== null}
         organizationId={organizationId ?? null}

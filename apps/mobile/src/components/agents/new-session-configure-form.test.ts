@@ -322,6 +322,7 @@ function defaultProps() {
     isFetchingInstances: false,
     onRefreshInstances: vi.fn(),
     onChangeRunOnInstance: vi.fn(),
+    pendingComputer: false,
     showInstanceDisconnectedNote: false,
     folderPath: '',
     onChangeFolderPath: vi.fn(),
@@ -606,12 +607,62 @@ describe('NewSessionConfigureForm', () => {
       showRunOnSelector: true,
       runOnInstance: INSTANCE,
     });
+    // The bound instance already runs Kilo: the line names it instead of
+    // asking the person to start Kilo there.
+    expect(
+      findTextContent(
+        element,
+        t => t === 'To run on your computer, start Kilo there and leave it running.'
+      )
+    ).toBe(false);
+    expect(findTextContent(element, t => t === 'laptop on kilo')).toBe(true);
+  });
+
+  // ── Case 3b: the bound instance keeps the line, the disconnected note adds its own ──
+  it('names the bound instance and shows the disconnected note in place of the setup sentence', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      showRunOnSelector: true,
+      showInstanceDisconnectedNote: true,
+    }) as Node;
+
+    expect(findTextContent(element, t => t === 'laptop on kilo')).toBe(true);
+    expect(
+      findTextContent(
+        element,
+        t => t === 'To run on your computer, start Kilo there and leave it running.'
+      )
+    ).toBe(false);
+    expect(
+      findTextContent(element, t =>
+        t.includes('The selected instance disconnected. Start a session on Cloud Agent')
+      )
+    ).toBe(true);
+  });
+
+  // ── Case 3c: the unbound computer target keeps the setup sentence ──
+  it('keeps the setup sentence while the computer target has no instance bound', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      pendingComputer: true,
+      showRunOnSelector: true,
+    }) as Node;
+
     expect(
       findTextContent(
         element,
         t => t === 'To run on your computer, start Kilo there and leave it running.'
       )
     ).toBe(true);
+    expect(findElementByType(element, 'LaunchFolderField')).not.toBeNull();
   });
 
   // ── Case 4: Remote, selector hidden ──
@@ -1045,8 +1096,8 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(element, t => t === 'Changes')).toBe(false);
   });
 
-  // ── Case 12: the Run on helper sentence stays in plain language, on a remote target only ──
-  it('renders the plain help sentence for a remote target and never for the cloud target', async () => {
+  // ── Case 12: the Run on helper sentence stays in plain language, and only under an unbound computer target ──
+  it('renders the plain help sentence for an unbound computer target and never for a bound instance or the cloud target', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     const helpSentence = 'To run on your computer, start Kilo there and leave it running.';
@@ -1067,20 +1118,33 @@ describe('NewSessionConfigureForm', () => {
     }
     expect(findTextContent(cloud, t => t.includes('`'))).toBe(false);
 
+    // The sentence answers "how do I get a computer connected", so it belongs
+    // to the computer target that has none yet.
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const unboundComputer = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      pendingComputer: true,
+      showRunOnSelector: false,
+    }) as Node;
+    expect(findTextContent(unboundComputer, t => t === helpSentence)).toBe(true);
+    for (const term of cliTerms) {
+      expect(
+        findTextContent(unboundComputer, t => t.includes(term)),
+        term
+      ).toBe(false);
+    }
+    expect(findTextContent(unboundComputer, t => t.includes('`'))).toBe(false);
+
+    // A bound instance needs no setup sentence: it is already running Kilo.
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const remote = NewSessionConfigureForm({
       ...defaultProps(),
       runOnInstance: INSTANCE,
       showRunOnSelector: false,
     }) as Node;
-    expect(findTextContent(remote, t => t === helpSentence)).toBe(true);
-    for (const term of cliTerms) {
-      expect(
-        findTextContent(remote, t => t.includes(term)),
-        term
-      ).toBe(false);
-    }
-    expect(findTextContent(remote, t => t.includes('`'))).toBe(false);
+    expect(findTextContent(remote, t => t === helpSentence)).toBe(false);
+    expect(findTextContent(remote, t => t === 'laptop on kilo')).toBe(true);
   });
 
   // ── Case 13: reorder wiring lock ──

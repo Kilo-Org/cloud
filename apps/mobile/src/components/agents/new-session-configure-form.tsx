@@ -343,9 +343,19 @@ export function NewSessionConfigureForm({
         />
       ) : null}
 
+      {/* Under the folder field: while the computer target has no instance, the
+          setup sentence; once one is bound, the instance the session runs on.
+          A bound instance already runs Kilo, so the setup sentence never sits
+          under it and contradicts the pick. The line keeps its place either
+          way, so the fields above do not move as the target changes. */}
       {isRemote ? (
         <Text className="mt-2 text-sm text-muted-foreground">
-          {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
+          {runOnInstance === null
+            ? stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))
+            : t('agentChat.instancePicker.instanceOnProject', {
+                name: runOnInstance.name,
+                project: runOnInstance.projectName,
+              })}
         </Text>
       ) : null}
 

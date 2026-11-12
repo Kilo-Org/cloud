@@ -615,6 +615,20 @@ async function recoverPullRequest(params: {
       summary.skippedExisting += 1;
       return;
     }
+    // A cause this sweep can restart, with no attempts left: the next restart is
+    // a person's, so report it once per review per run. The attempt rows are read
+    // before the budget so a backlog run that already spent its runs still names
+    // the head that needs that person.
+    const attempts = await listCodeReviewAttempts(existingReview.id);
+    if (!isAutomaticallyRetryableReview(existingReview, attempts.length)) {
+      summary.retriesExhausted += 1;
+      warnExceptInTest('[recoverMissedReviews] Review needs a manual restart', {
+        reviewId: existingReview.id,
+        terminalReason: existingReview.terminal_reason,
+        attempts: attempts.length,
+      });
+      return;
+    }
     // A new review and a restart each cost one agent run, so both draw on the
     // same per-run budget: the two counters are added, and neither alone is the
     // budget.
@@ -629,20 +643,6 @@ async function recoverPullRequest(params: {
     summary.reviewsRetried += 1;
     let retried = false;
     try {
-      // The attempt rows are read only for a review inside the start budget, so
-      // a head that already has its review costs one query.
-      const attempts = await listCodeReviewAttempts(existingReview.id);
-      if (!isAutomaticallyRetryableReview(existingReview, attempts.length)) {
-        // A cause this sweep can restart, with no attempts left: the next
-        // restart is a person's, so report it once per review per run.
-        summary.retriesExhausted += 1;
-        warnExceptInTest('[recoverMissedReviews] Review needs a manual restart', {
-          reviewId: existingReview.id,
-          terminalReason: existingReview.terminal_reason,
-          attempts: attempts.length,
-        });
-        return;
-      }
       const admission = await admitRestart({ owner, review: existingReview, pull });
       if (!admission.admitted) {
         // No run was spent and nothing is left to count as a provider failure.

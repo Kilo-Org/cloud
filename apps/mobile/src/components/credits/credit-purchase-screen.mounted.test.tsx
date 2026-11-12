@@ -175,6 +175,11 @@ function classNameOf(instance: TestRenderer.ReactTestInstance): string {
   return typeof value === 'string' ? value : '';
 }
 
+function labelOf(instance: TestRenderer.ReactTestInstance | undefined): string {
+  const value: unknown = instance?.props.accessibilityLabel;
+  return typeof value === 'string' ? value : '';
+}
+
 function packRows(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance[] {
   return renderer.root.findAll(
     node =>
@@ -755,7 +760,7 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
-  it('place: a status phrase sits under the title, and only a real price takes the trailing slot', async () => {
+  it('place: a status phrase takes the row state line, and only a real price takes the trailing slot', async () => {
     owner.fetchStoreProducts.mockResolvedValue(STORE_LISTINGS.slice(0, 3));
 
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
@@ -764,38 +769,50 @@ describe('CreditPurchaseScreen', () => {
     const rows = packRows(renderer);
     const priced = rows[0]?.findAll(node => String(node.type) === 'Text') ?? [];
     // Title, then the store price: the price is the only trailing child, and
-    // the expiry note follows on its own line.
+    // the expiry note takes the row's one state line.
     expect(priced).toHaveLength(3);
     expect(priced[1]?.props.children).toBe('$10.99');
     expect(String(priced[1]?.props.className)).toContain('shrink-0');
     const unpriced = rows[3]?.findAll(node => String(node.type) === 'Text') ?? [];
-    // Title, its own status line, then the expiry note.
+    // Title, then the status in the same state line its neighbours fill with
+    // the expiry note: the row keeps their height, and the note it no longer
+    // prints stays in its accessibility label.
     expect(unpriced.map(node => node.props.children)).toEqual([
       `Add ${packAmount('$500.00')} of credits`,
       'Price unavailable',
-      'Credits purchased through the App Store do not expire.',
     ]);
-    // The status reads on its own line under the title, one small gap from it,
-    // and no row keeps an empty slot in its place.
-    const unpricedStatus = unpriced[1];
-    expect(String(unpricedStatus?.props.className)).toContain('mt-1');
-    expect(String(unpricedStatus?.parent?.props.className)).not.toContain('flex-row');
-    // The row's last line follows the title block tightly: one small gap after
-    // a status line, and the row's usual gap under a title that states none.
-    const unpricedLine = rows[3]?.findAll(
-      node =>
-        String(node.type) === 'View' &&
-        String((node.props as { className?: string }).className).includes('min-h-5')
+    expect(labelOf(rows[3])).toContain(
+      'Credits purchased through the App Store do not expire.'
     );
-    const pricedLine = rows[0]?.findAll(
-      node =>
-        String(node.type) === 'View' &&
-        String((node.props as { className?: string }).className).includes('min-h-5')
+    // One fixed-height state line, one gap, on every row: the store answering
+    // or dropping changes the copy in place, never a row's height.
+    const stateLines = rows.map(row =>
+      row.findAll(
+        node =>
+          String(node.type) === 'View' &&
+          String((node.props as { className?: string }).className).includes('min-h-5')
+      )
     );
-    expect(unpricedLine).toHaveLength(1);
-    expect(pricedLine).toHaveLength(1);
-    expect(String(unpricedLine?.[0]?.props.className)).toContain('mt-1');
-    expect(String(pricedLine?.[0]?.props.className)).toContain('mt-2');
+    expect(stateLines.every(lines => lines.length === 1)).toBe(true);
+    expect(
+      stateLines.every(([line]) => {
+        if (line === undefined) {
+          return false;
+        }
+        const className = classNameOf(line);
+        return className.includes('min-h-5') && className.includes('mt-2');
+      })
+    ).toBe(true);
+    expect(
+      (stateLines[3]?.[0]?.findAll(node => String(node.type) === 'Text') ?? []).map(
+        node => node.props.children
+      )
+    ).toEqual(['Price unavailable']);
+    expect(
+      (stateLines[0]?.[0]?.findAll(node => String(node.type) === 'Text') ?? []).map(
+        node => node.props.children
+      )
+    ).toEqual(['Credits purchased through the App Store do not expire.']);
     unmount();
   });
 

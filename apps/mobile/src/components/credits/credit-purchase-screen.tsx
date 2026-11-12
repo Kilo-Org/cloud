@@ -244,20 +244,23 @@ export function CreditPurchaseScreen() {
               // line and its full width, so the title yields and a price a user
               // pays is never truncated.
               const storePrice = hasStorePrice ? pack.displayPrice : null;
-              // The in-flight label takes the row's last line, in place of the
-              // expiry note. That line keeps one height for both, so a purchase
-              // never changes a row's height, and the label keeps the full row
+              // The row's state copy takes its one fixed-height line under the
+              // title, in place of the expiry note, and keeps the full row
               // width instead of squeezing the title.
               const completingLabel = rowCompleting ? t('kiloPass.completingPurchase') : null;
-              // A status phrase reads on its own line under the title, so the
-              // title keeps one line at the compact width. The store-unavailable
-              // card above already names the failure, so no row repeats it
-              // there: only the partly priced state, where the store answered
-              // and left this pack out, needs the row to say it.
+              // A status phrase takes the same line, so the title keeps one
+              // line at the compact width and the row keeps the height of its
+              // priced neighbours. The store-unavailable card above already
+              // names the failure, so no row repeats it there: only the partly
+              // priced state, where the store answered and left this pack out,
+              // needs the row to say it.
               const statusLabel =
                 !rowCompleting && !hasStorePrice && !storeUnavailable
                   ? t('credits.priceUnavailable')
                   : null;
+              // Exactly one state phrase shows: the purchase in flight, or the
+              // reason this row is inactive.
+              const stateLabel = completingLabel ?? statusLabel;
               // The row is one accessible element: the explicit label replaces
               // its children, so the charge and the disabled reason must be in
               // the label itself (the canonical Kilo Pass row does the same).
@@ -267,8 +270,8 @@ export function CreditPurchaseScreen() {
               const rowAccessibilityLabel = [
                 packLabel,
                 storePrice,
-                completingLabel ?? statusLabel,
-                storePrice === null && completingLabel === null && statusLabel === null
+                stateLabel,
+                storePrice === null && stateLabel === null
                   ? t('credits.priceUnavailable')
                   : null,
                 expiryMessage,
@@ -301,28 +304,18 @@ export function CreditPurchaseScreen() {
                       </Text>
                     )}
                   </View>
-                  {/* The status, when a row states one, takes its own line
-                      under the title. The last line then follows the title
-                      block: one small gap under a status line, and the row's
-                      usual gap under the title itself. No row keeps an empty
-                      band for a status it does not state. */}
-                  {statusLabel !== null && (
-                    <Text className="mt-1 text-sm text-muted-foreground">{statusLabel}</Text>
-                  )}
-                  {/* One fixed-height line holds the expiry note, or the
-                      in-flight label in its place, so a purchase never changes
-                      any row's height. */}
-                  {(expiryMessage !== undefined || completingLabel !== null) && (
-                    <View
-                      className={cn(
-                        'min-h-5 justify-center',
-                        statusLabel === null ? 'mt-2' : 'mt-1'
-                      )}
-                    >
-                      {completingLabel === null ? (
-                        <Text className="text-xs text-muted-foreground">{expiryMessage}</Text>
+                  {/* One fixed-height line under the title holds the row's
+                      state copy: the in-flight label, the row's own status, or
+                      the expiry note. Exactly one of them shows, so no row
+                      changes height when a purchase or the store state
+                      changes, and no row keeps an empty band for copy it does
+                      not state. */}
+                  {(expiryMessage !== undefined || stateLabel !== null) && (
+                    <View className="mt-2 min-h-5 justify-center">
+                      {stateLabel !== null ? (
+                        <Text className="text-sm text-muted-foreground">{stateLabel}</Text>
                       ) : (
-                        <Text className="text-sm text-muted-foreground">{completingLabel}</Text>
+                        <Text className="text-xs text-muted-foreground">{expiryMessage}</Text>
                       )}
                     </View>
                   )}

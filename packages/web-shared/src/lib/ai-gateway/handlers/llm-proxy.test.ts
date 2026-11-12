@@ -2882,6 +2882,8 @@ describe('organization data-collection policy on provider-policy exempt routes',
     mockedFindCustomLlm.mockResolvedValue(null);
     mockedIsCustomLlm.mockResolvedValue(false);
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    // Free route shapes reach the free-model rate limit, so pin its default for this block.
+    mockedIsFreeModelRateLimited.mockResolvedValue(false);
     mockedAccountForMicrodollarUsage.mockReturnValue(usageAccountingResult());
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',

@@ -11,7 +11,7 @@ const classifiedIncrementWriters = {
   'apps/web/src/lib/exa-usage.ts': 'included_exa_personal',
   'apps/web/src/lib/kiloclaw/credit-billing.ts': 'included_kiloclaw_enrollment',
   'packages/worker-utils/src/organization-usage.ts':
-    'included_ai_gateway_exa_and_native_compute_organization',
+    'included_ai_gateway_exa_enkrypt_and_native_compute_organization',
   'services/container-usage-meter/src/postgres.ts': 'included_container_usage_settlement',
   'services/kiloclaw-billing/src/lifecycle.ts': 'included_kiloclaw_renewal',
   'apps/web/src/app/admin/api/organizations/[id]/consume-credits/route.ts':

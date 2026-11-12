@@ -192,49 +192,47 @@ const headlessStringDataSchema = z.string();
  * With the app alive in the background, Expo hands the same response to both
  * the JS response listener and the registered background task
  * (ExpoHandlingDelegate.handleNotificationResponse), so one tap can arrive
- * twice. Concurrent dispatches of one response share the first interaction;
- * once it settles, a later tap — on the replaced result notification — is
- * answered again.
+ * twice. Concurrent dispatches of one response share the first one — an action
+ * answers once, and a body tap opens its destination once (a KiloClaw web page
+ * must not open twice); once it settles, a later tap — on the replaced result
+ * notification — is answered again.
  */
 // eslint-disable-next-line promise-function-async -- passthrough dispatch: one interaction per tap shares an in-flight promise
 export function handleNeedsInputNotificationResponse(
   response: Notifications.NotificationResponse,
   deps: NeedsInputActionDeps = {}
 ): Promise<boolean> {
-  const key = actionDispatchKey(response);
-  if (key === null) {
-    return dispatchNeedsInputResponse(response, deps);
-  }
-  const inFlight = inFlightActionDispatches.get(key);
+  const key = responseDispatchKey(response);
+  const inFlight = inFlightDispatches.get(key);
   if (inFlight) {
     return inFlight;
   }
-  const dispatch = trackActionDispatch(key, dispatchNeedsInputResponse(response, deps));
-  inFlightActionDispatches.set(key, dispatch);
+  const dispatch = trackDispatch(key, dispatchNeedsInputResponse(response, deps));
+  inFlightDispatches.set(key, dispatch);
   return dispatch;
 }
 
-// One interaction per tap: the in-flight dispatch for each OS response, keyed
-// by its notification identifier and action. Entries are removed on settle so
-// a retry tap on the replaced notification runs again.
-const inFlightActionDispatches = new Map<string, Promise<boolean>>();
+// One dispatch per tap: the in-flight dispatch for each OS response, keyed by
+// its notification identifier and action. A body tap is deduped like an action
+// button, because Expo delivers a warm-background tap to both the JS listener
+// and the registered background task — and the tap's side effect is a browser
+// open, which must happen once. Entries are removed on settle so a retry tap on
+// the replaced notification runs again.
+const inFlightDispatches = new Map<string, Promise<boolean>>();
 
-/** The OS identity of a response, or null for identifiers outside our four actions. */
-function actionDispatchKey(response: Notifications.NotificationResponse): string | null {
-  if (!isNeedsInputActionIdentifier(response.actionIdentifier)) {
-    return null;
-  }
+/** The OS identity of a response: its notification identifier and action id. */
+function responseDispatchKey(response: Notifications.NotificationResponse): string {
   return `${response.notification.request.identifier}:${response.actionIdentifier}`;
 }
 
 /** Forget the in-flight dispatch once it settles, without disturbing its result. */
-async function trackActionDispatch(key: string, dispatch: Promise<boolean>): Promise<boolean> {
+async function trackDispatch(key: string, dispatch: Promise<boolean>): Promise<boolean> {
   try {
     const result = await dispatch;
-    inFlightActionDispatches.delete(key);
+    inFlightDispatches.delete(key);
     return result;
   } catch (error) {
-    inFlightActionDispatches.delete(key);
+    inFlightDispatches.delete(key);
     throw error;
   }
 }

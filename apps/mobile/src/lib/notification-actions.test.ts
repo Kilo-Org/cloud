@@ -138,6 +138,7 @@ beforeEach(() => {
   mocks.runNeedsInputInteraction.mockReset();
   mocks.refreshGlanceableSurfacesFromTray.mockReset().mockResolvedValue(undefined);
   mocks.captureException.mockReset();
+  mocks.openExternalUrl.mockReset();
 });
 
 describe('registerNeedsInputCategories', () => {
@@ -914,6 +915,32 @@ describe('handleNeedsInputNotificationResponse — default action', () => {
     // The browser opens directly; no app route is stashed or consumed.
     expect(getPendingDeepLinkSnapshot()).toBe('/(app)/(tabs)/(3_profile)');
     expect(mocks.clearLastNotificationResponse).toHaveBeenCalled();
+  });
+
+  it('opens one KiloClaw page when a warm tap reaches both dispatchers', async () => {
+    // Expo hands a background body tap to the JS listener and to the
+    // registered background task, two separately deserialized responses with
+    // one OS identity.
+    const response = raiseResponse({
+      identifier: 'e2e-warm-double',
+      actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+      data: { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
+    });
+
+    const [first, second] = await Promise.all([
+      handleNeedsInputNotificationResponse(response, {
+        runInteraction: mocks.runNeedsInputInteraction,
+      }),
+      handleNeedsInputNotificationResponse(response, {
+        runInteraction: mocks.runNeedsInputInteraction,
+      }),
+    ]);
+
+    expect(first).toBe(false);
+    expect(second).toBe(false);
+    await vi.waitFor(() => {
+      expect(mocks.openExternalUrl).toHaveBeenCalledTimes(1);
+    });
   });
 });
 

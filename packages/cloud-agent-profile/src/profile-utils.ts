@@ -13,6 +13,17 @@ export function buildOwnershipCondition(owner: ProfileOwner) {
 }
 
 /**
+ * The advisory-lock key that serializes profile writes for one owner.
+ *
+ * The first segment namespaces this surface, so the key cannot contend with
+ * another feature's advisory locks. Each owner has its own key, so creates for
+ * two owners never wait on each other.
+ */
+export function profileOwnerLockKey(owner: ProfileOwner): string {
+  return `agent-environment-profile-owner:${owner.type}:${owner.id}`;
+}
+
+/**
  * Verify that a profile exists and is owned by the specified owner.
  * @throws TRPCError with NOT_FOUND if profile doesn't exist or isn't owned by the owner
  */

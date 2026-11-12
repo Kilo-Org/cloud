@@ -48,7 +48,11 @@ export {
 } from './profile-session-config';
 
 // Utilities
-export { buildOwnershipCondition, verifyProfileOwnership } from './profile-utils';
+export {
+  buildOwnershipCondition,
+  profileOwnerLockKey,
+  verifyProfileOwnership,
+} from './profile-utils';
 
 // Profile CRUD + lookups
 export {
@@ -63,6 +67,9 @@ export {
   getDefaultProfile,
   getEffectiveDefaultProfileId,
 } from './profile-service';
+
+// Owner-level profile cap
+export { MAX_OWNER_PROFILES } from './contracts/profiles';
 
 // Var CRUD
 export {

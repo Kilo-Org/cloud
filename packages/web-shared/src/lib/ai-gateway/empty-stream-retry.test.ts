@@ -49,6 +49,7 @@ const eligibility: EmptyStreamRetryEligibility = {
   kind: 'chat_completions',
   model: '~deepseek/deepseek-flash-latest',
   models: parseEmptyStreamRetryModels('~deepseek/*'),
+  providerType: 'openrouter',
   streaming: true,
   userByok: false,
 };
@@ -107,6 +108,25 @@ describe('isEmptyStreamRetryEnabled', () => {
   it('excludes a model outside the list and an unlisted API shape', () => {
     expect(isEmptyStreamRetryEnabled({ ...eligibility, model: 'other/model' })).toBe(false);
     expect(isEmptyStreamRetryEnabled({ ...eligibility, kind: 'messages' })).toBe(false);
+  });
+
+  it('excludes every route whose generation bills a delegated account', () => {
+    // A connected ChatGPT subscription, a connected Claude organization, a custom LLM's own
+    // credentials, and a user's direct key all serve requests with `userByok` null.
+    for (const providerType of [
+      'claude-billing',
+      'openai-chatgpt',
+      'custom',
+      'custom-public',
+      'direct-byok',
+    ] as const) {
+      expect(isEmptyStreamRetryEnabled({ ...eligibility, providerType })).toBe(false);
+    }
+  });
+
+  it('accepts the platform-funded gateways', () => {
+    expect(isEmptyStreamRetryEnabled({ ...eligibility, providerType: 'openrouter' })).toBe(true);
+    expect(isEmptyStreamRetryEnabled({ ...eligibility, providerType: 'vercel' })).toBe(true);
   });
 });
 
@@ -182,7 +202,7 @@ describe('maybeRetryEmptyUpstreamStream', () => {
 
     expect(requestForRetry.body.provider).toEqual({
       ignore: ['novita'],
-      order: ['novita', 'alibaba'],
+      order: ['alibaba'],
     });
   });
 
@@ -203,6 +223,42 @@ describe('maybeRetryEmptyUpstreamStream', () => {
     expect(requestForRetry.body.provider).toEqual({ order: ['alibaba'] });
   });
 
+  it('demotes within the gateway-configured order when the request carries none', async () => {
+    const retry = jest.fn(async () => success(CONTENT + DONE));
+    const requestForRetry = chatRequest();
+    await maybeRetryEmptyUpstreamStream({
+      attempt: success(ENVELOPE + DONE),
+      configuredProviderOrder: async () => ['novita', 'alibaba'],
+      enabled: true,
+      kind: 'chat_completions',
+      model: '~deepseek/deepseek-flash-latest',
+      providerType: 'openrouter',
+      requestForRetry,
+      retry,
+      vercelRequestId: null,
+    });
+
+    expect(requestForRetry.body.provider).toEqual({ ignore: ['novita'], order: ['alibaba'] });
+  });
+
+  it('leaves the order off the retry when the configured order holds only the failed provider', async () => {
+    const retry = jest.fn(async () => success(CONTENT + DONE));
+    const requestForRetry = chatRequest();
+    await maybeRetryEmptyUpstreamStream({
+      attempt: success(ENVELOPE + DONE),
+      configuredProviderOrder: async () => ['novita'],
+      enabled: true,
+      kind: 'chat_completions',
+      model: '~deepseek/deepseek-flash-latest',
+      providerType: 'openrouter',
+      requestForRetry,
+      retry,
+      vercelRequestId: null,
+    });
+
+    expect(requestForRetry.body.provider).toEqual({ ignore: ['novita'] });
+  });
+
   it('keeps a caller-only restriction rather than adding an exclusion to it', async () => {
     const retry = jest.fn(async () => success(CONTENT + DONE));
     const requestForRetry = chatRequest({ only: ['novita'] });
@@ -220,10 +276,11 @@ describe('maybeRetryEmptyUpstreamStream', () => {
     expect(requestForRetry.body.provider).toEqual({ only: ['novita'] });
   });
 
-  it('does not retry a model that is not enabled and forwards the first answer', async () => {
+  it('leaves a request it cannot retry completely untouched', async () => {
     const retry = jest.fn(async () => success(CONTENT + DONE));
+    const response = sseResponse(ENVELOPE + DONE);
     const result = await maybeRetryEmptyUpstreamStream({
-      attempt: success(ENVELOPE + DONE),
+      attempt: { response, toolsAvailable: [], toolsUsed: [], type: 'success' },
       enabled: false,
       kind: 'chat_completions',
       model: '~deepseek/deepseek-flash-latest',
@@ -234,8 +291,10 @@ describe('maybeRetryEmptyUpstreamStream', () => {
     });
 
     expect(retry).not.toHaveBeenCalled();
-    expect(result.emptyStream).toMatchObject({ retried: false, retryOutcome: 'not-attempted' });
-    expect(await result.attempt.response.text()).toBe(ENVELOPE + DONE);
+    // No peek: the same response object, with its body still unread and its headers unchanged.
+    expect(result.attempt.response).toBe(response);
+    expect(result.emptyStream).toBeNull();
+    expect(await response.text()).toBe(ENVELOPE + DONE);
   });
 
   it('forwards the first answer when the retry is envelope-only as well', async () => {
@@ -305,7 +364,14 @@ describe('maybeRetryEmptyUpstreamStream', () => {
       kind: 'messages',
       model: '~deepseek/deepseek-flash-latest',
       providerType: 'openrouter',
-      requestForRetry: null,
+      requestForRetry: {
+        body: {
+          max_tokens: 16,
+          messages: [{ content: 'hi', role: 'user' }],
+          model: '~deepseek/deepseek-flash-latest',
+        },
+        kind: 'messages',
+      },
       retry: jest.fn(async () => success(CONTENT + DONE)),
       vercelRequestId: null,
     });

@@ -14,6 +14,8 @@ import {
   isEmptyStreamRetryEnabled,
   maybeRetryEmptyUpstreamStream,
 } from '@kilocode/web-shared/lib/ai-gateway/empty-stream-retry';
+import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import { resolvePreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
@@ -414,6 +416,7 @@ export async function handleLlmProxyRequest(
       kind: requestBodyParsed.kind,
       model: effectiveModelIdLowerCased,
       models: getEmptyStreamRetryModels(),
+      providerType: route.provider.type,
       streaming: requestBodyParsed.body.stream === true,
       userByok: route.userByok !== null,
     }) &&
@@ -545,6 +548,11 @@ export async function handleLlmProxyRequest(
   // the accounted answer is the one the client receives.
   const { attempt: answered, request: retriedRequest } = await maybeRetryEmptyUpstreamStream({
     attempt,
+    configuredProviderOrder: async () =>
+      resolvePreferredProviderOrder(
+        await getPreferredProviderOrderConfig(),
+        effectiveModelIdLowerCased
+      ),
     enabled: requestForEmptyStreamRetry !== null,
     kind: requestBodyParsed.kind,
     model: effectiveModelIdLowerCased,

@@ -8171,6 +8171,34 @@ describe('empty upstream stream retry', () => {
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 
+  it('does not retry a route whose generation bills a delegated account', async () => {
+    setRetryModels('openai/gpt-4o');
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider: {
+          ...provider,
+          type: 'claude-billing',
+          claudeBillingConnectedAt: '2026-01-01T00:00:00.000Z',
+          claudeBillingUserProfileId: 'profile-1',
+        },
+        userByok: null,
+        isFree: false,
+        skipBalanceCheck: true,
+        bypassAccessCheck: false,
+      })
+    );
+    mockedUpstreamRequest.mockImplementation(async () => ({
+      type: 'success',
+      response: streamingResponse(ENVELOPE),
+    }));
+
+    const response = await sendStreamed();
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(ENVELOPE);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+  });
+
   it('forwards the first envelope-only answer when the retry is envelope-only too', async () => {
     setRetryModels('openai/gpt-4o');
     mockedUpstreamRequest.mockImplementation(async () => ({

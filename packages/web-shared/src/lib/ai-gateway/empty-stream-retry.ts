@@ -20,11 +20,7 @@ export const EMPTY_STREAM_RETRY_MODELS_ENV = 'GATEWAY_EMPTY_STREAM_RETRY_MODELS'
 
 type SuccessfulAttempt = Extract<SendUpstreamAttemptResult, { type: 'success' }>;
 
-export type EmptyStreamRetryOutcome =
-  | 'error'
-  | 'not-attempted'
-  | 'unknown'
-  | UpstreamStreamPeekOutcome;
+export type EmptyStreamRetryOutcome = 'error' | 'unknown' | UpstreamStreamPeekOutcome;
 
 export type EmptyStreamObservation = {
   events: number;
@@ -36,6 +32,11 @@ export type EmptyStreamObservation = {
 
 export type MaybeRetryEmptyStreamInput = {
   attempt: SuccessfulAttempt;
+  /**
+   * The order the first attempt was routed with when the caller sent none, read from the gateway
+   * configuration. Only called for a content-free answer whose provider must be demoted.
+   */
+  configuredProviderOrder?: () => Promise<readonly string[]>;
   /** Whether this model may be retried; see `isEmptyStreamRetryEnabled`. */
   enabled: boolean;
   /** The peek reads chat completion deltas, so other API shapes are forwarded unread. */
@@ -110,12 +111,23 @@ export function getEmptyStreamRetryModels(): readonly string[] {
   return cachedModels;
 }
 
+/**
+ * Provider types whose generation Kilo pays for. Every other type bills someone else — a user key
+ * (`direct-byok`), a connected ChatGPT subscription, a connected Claude organization, or a custom
+ * LLM's own credentials — so a second generation would spend that account.
+ */
+const PLATFORM_PAID_PROVIDER_TYPES: Partial<Record<Provider['type'], true>> = {
+  openrouter: true,
+  vercel: true,
+};
+
 export type EmptyStreamRetryEligibility = {
   /** Whether the request carries a bounded-spend header. Each attempt spends the same envelope. */
   costLimited: boolean;
   kind: GatewayRequest['kind'];
   model: string;
   models: readonly string[];
+  providerType: Provider['type'];
   streaming: boolean;
   /** A user's own key pays for the retry, so the retry is never sent for it. */
   userByok: boolean;
@@ -124,6 +136,8 @@ export type EmptyStreamRetryEligibility = {
 /**
  * Every condition the retry needs. `chat_completions` only: the peek reads chat completion deltas,
  * and a retry of another API shape would be classified by a definition that does not describe it.
+ * Both the allowlist and the payer gate also decide whether the peek runs at all, so a request that
+ * cannot be retried streams exactly as it did before this feature.
  */
 export function isEmptyStreamRetryEnabled(input: EmptyStreamRetryEligibility): boolean {
   return (
@@ -131,6 +145,7 @@ export function isEmptyStreamRetryEnabled(input: EmptyStreamRetryEligibility): b
     input.streaming &&
     !input.userByok &&
     !input.costLimited &&
+    PLATFORM_PAID_PROVIDER_TYPES[input.providerType] === true &&
     isEmptyStreamRetryModelListed(input.model, input.models)
   );
 }
@@ -155,23 +170,31 @@ function configuredSlugForReportedProvider(
 
 /**
  * Demotes the provider that produced the empty answer, so OpenRouter routes the retry elsewhere.
- * The gateway's configured order still applies; this only removes one endpoint from it, and only
- * when the reported provider is one of its entries.
+ * The order the first attempt was routed with is either the caller's `provider.order` or the
+ * gateway's configured order for this model, which `applyProviderSpecificLogic` applies later and
+ * only when the body carries no order. Both are handled here: the failed entry is removed from the
+ * order the retry sends and also excluded, so a configured order cannot route the retry back to it.
  */
-function demoteFailedProvider(
+async function demoteFailedProvider(
   request: GatewayRequest,
   providerType: Provider['type'],
-  failedProvider: string | undefined
+  failedProvider: string | undefined,
+  configuredProviderOrder: (() => Promise<readonly string[]>) | undefined
 ) {
   if (providerType !== 'openrouter' || !failedProvider) return;
   const provider = request.body.provider;
   // `only` is the caller's hard restriction; adding an exclusion to it can leave no route at all.
   if (provider?.only && provider.only.length > 0) return;
-  const slug = configuredSlugForReportedProvider(provider?.order, failedProvider);
+  const order = provider?.order ?? (configuredProviderOrder ? await configuredProviderOrder() : []);
+  const slug = configuredSlugForReportedProvider(order, failedProvider);
   if (!slug) return;
+  const remaining = order.filter(entry => entry !== slug);
   request.body.provider = {
     ...provider,
     ignore: [...new Set([...(provider?.ignore ?? []), slug])],
+    // An empty order is left off the body so the configured order applies and the exclusion steers
+    // the retry to its next entry.
+    ...(remaining.length > 0 ? { order: remaining } : {}),
   };
 }
 
@@ -204,14 +227,15 @@ export function logEmptyUpstreamStream(input: {
 }
 
 /**
- * Peeks the first answer, and retries it once when it carried no content and the request is
- * eligible. A retry is only adopted when it produced content; anything else forwards the first
- * answer unchanged, so the client sees exactly what it sees today.
+ * Peeks the first answer of an eligible request and retries it once when it carried no content.
+ * A request the retry cannot serve is returned untouched — no peek, no buffering, and therefore no
+ * change to its headers or first byte. A retry is only adopted when it produced content; anything
+ * else forwards the first answer unchanged, so the client sees exactly what it sees today.
  */
 export async function maybeRetryEmptyUpstreamStream(
   input: MaybeRetryEmptyStreamInput
 ): Promise<MaybeRetryEmptyStreamResult> {
-  if (input.kind !== 'chat_completions') {
+  if (!input.enabled || input.kind !== 'chat_completions' || !input.requestForRetry) {
     return { attempt: input.attempt, emptyStream: null, request: null };
   }
   const peeked = await peekUpstreamStreamForContent(input.attempt.response, input.peekOptions);
@@ -220,40 +244,40 @@ export async function maybeRetryEmptyUpstreamStream(
     return { attempt: firstAttempt, emptyStream: null, request: null };
   }
 
-  let retried = false;
-  let retryOutcome: EmptyStreamRetryOutcome = 'not-attempted';
+  let retryOutcome: EmptyStreamRetryOutcome;
   let attempt = firstAttempt;
   let request: GatewayRequest | null = null;
-  // A retry needs a copy taken before provider transforms; without one the answer forwards.
-  const requestForRetry = input.enabled ? input.requestForRetry : null;
-  if (requestForRetry) {
-    retried = true;
-    demoteFailedProvider(requestForRetry, input.providerType, peeked.provider);
-    const retryAttempt = await input.retry(requestForRetry);
-    if (retryAttempt.type === 'success') {
-      const retryPeeked = await peekUpstreamStreamForContent(
-        retryAttempt.response,
-        input.peekOptions
-      );
-      retryOutcome = retryPeeked.outcome;
-      if (retryPeeked.outcome !== 'empty') {
-        attempt = { ...retryAttempt, response: retryPeeked.response };
-        request = requestForRetry;
-        // The first answer is replaced, so its body must be released rather than left unread.
-        await firstAttempt.response.body?.cancel();
-      } else {
-        await retryPeeked.response.body?.cancel();
-      }
+  const requestForRetry = input.requestForRetry;
+  await demoteFailedProvider(
+    requestForRetry,
+    input.providerType,
+    peeked.provider,
+    input.configuredProviderOrder
+  );
+  const retryAttempt = await input.retry(requestForRetry);
+  if (retryAttempt.type === 'success') {
+    const retryPeeked = await peekUpstreamStreamForContent(
+      retryAttempt.response,
+      input.peekOptions
+    );
+    retryOutcome = retryPeeked.outcome;
+    if (retryPeeked.outcome !== 'empty') {
+      attempt = { ...retryAttempt, response: retryPeeked.response };
+      request = requestForRetry;
+      // The first answer is replaced, so its body must be released rather than left unread.
+      await firstAttempt.response.body?.cancel();
     } else {
-      retryOutcome = 'error';
+      await retryPeeked.response.body?.cancel();
     }
+  } else {
+    retryOutcome = 'error';
   }
 
   const emptyStream: EmptyStreamObservation = {
     events: peeked.events,
     generationId: peeked.generationId,
     provider: peeked.provider,
-    retried,
+    retried: true,
     retryOutcome,
   };
   logEmptyUpstreamStream({

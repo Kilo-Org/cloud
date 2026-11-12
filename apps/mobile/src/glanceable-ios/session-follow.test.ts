@@ -304,6 +304,7 @@ describe('the follow scope record', () => {
     });
 
     it('records a follow while the device is locked', async () => {
+      storedScopes.set(SESSION_CARD_SCOPE_KEY, JSON.stringify({ version: 1, cards: {} }));
       const write = vi.fn(scopeStore.setItemAsync);
       _setSessionCardScopeStoreForTests({
         getItemAsync: scopeStore.getItemAsync,
@@ -314,9 +315,25 @@ describe('the follow scope record', () => {
       rememberSessionCardScope('session-1', CTX);
       await _settleSessionCardScopeWritesForTests();
 
-      // A push can re-register a card with the screen locked, so the record is
-      // written rather than left for the next unlocked follow.
+      // The record is readable with the screen locked once the device has been
+      // unlocked after boot, so a follow records then.
       expect(storedScopes.get(SESSION_CARD_SCOPE_KEY)).toContain('"session-1"');
+    });
+
+    it('does not write a follow over a record it cannot read while locked', async () => {
+      const write = vi.fn(scopeStore.setItemAsync);
+      _setSessionCardScopeStoreForTests({
+        getItemAsync: scopeStore.getItemAsync,
+        setItemAsync: write,
+      });
+
+      setProtectedDataAvailable(false);
+      rememberSessionCardScope('session-1', CTX);
+      await _settleSessionCardScopeWritesForTests();
+
+      // A null from a closed keychain is not proof the record is empty: the map
+      // this follow built would drop every other card's scope.
+      expect(write).not.toHaveBeenCalled();
     });
   });
 });

@@ -249,6 +249,19 @@ describe('restorePersistedGlanceable', () => {
     expect(secureStoreMock.getItemAsync).toHaveBeenCalled();
   });
 
+  it('does not read a locked null as an empty mirror', async () => {
+    // iOS can answer null for an item it will not hand over while the keychain
+    // is closed. A null snapshot is not proof that nothing owns the surface —
+    // the Live Activity sweep ends every card on one — so the restore has to
+    // flag the read instead of leaving it looking empty.
+    setProtectedDataAvailable(false);
+    secureStoreMock.getItemAsync.mockResolvedValue(null);
+    await restorePersistedGlanceable();
+
+    expect(getLastGlanceableSnapshot()).toBeNull();
+    expect(isGlanceableRestoreUnavailable()).toBe(true);
+  });
+
   it('does not report a restore settled until the first read finishes', async () => {
     const gate = deferred();
     secureStoreMock.getItemAsync.mockImplementationOnce(async () => {

@@ -8,7 +8,8 @@ import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
 
 import {
   type GatedSecureStore,
-  readGatedValue,
+  readGatedValueForUpdate,
+  upgradeGatedValue,
   withWidgetAccessibility,
   writeGatedValue,
 } from '@/lib/auth/secure-store-gated';
@@ -86,6 +87,11 @@ function snapshotFor(): GlanceableAgentsSnapshot {
   });
 }
 
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  const { promise, resolve } = Promise.withResolvers<T>();
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   store.clear();
   events = [];
@@ -138,9 +144,10 @@ describe('the widget store writes with AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY', () 
     const { getItem, gated } = inspectableStore();
     store.set(SESSION_CARD_SCOPE_KEY, '{"version":1,"cards":{}}');
 
-    await expect(readGatedValue(() => gated, SESSION_CARD_SCOPE_KEY)).resolves.toBe(
-      '{"version":1,"cards":{}}'
-    );
+    await expect(readGatedValueForUpdate(() => gated, SESSION_CARD_SCOPE_KEY)).resolves.toEqual({
+      status: 'value',
+      value: '{"version":1,"cards":{}}',
+    });
     expect(getItem).toHaveBeenCalledWith(SESSION_CARD_SCOPE_KEY);
   });
 
@@ -215,13 +222,57 @@ describe('the lock gate on widget items', () => {
     const { getItem, gated } = inspectableStore();
     getItem.mockRejectedValue(new Error(REFUSED));
 
-    await expect(readGatedValue(() => gated, HOME_WIDGET_DATA_KEY)).resolves.toBeNull();
+    await expect(readGatedValueForUpdate(() => gated, HOME_WIDGET_DATA_KEY)).resolves.toEqual({
+      status: 'unreadable',
+    });
 
     expect(getItem).toHaveBeenCalledWith(HOME_WIDGET_DATA_KEY);
     expect(events).toHaveLength(0);
     expect(breadcrumbs).toEqual([
       expect.objectContaining({ category: 'secure_store', data: { operation: 'read' } }),
     ]);
+  });
+
+  it('reads a null on a closed keychain as unreadable, never as an absent record', async () => {
+    setProtectedDataAvailable(false);
+    const { gated } = inspectableStore();
+
+    // iOS can answer null for an item it will not hand over, and the Live
+    // Activity sweep ends every card on a null snapshot: this must not look
+    // like nothing is stored.
+    await expect(readGatedValueForUpdate(() => gated, GLANCEABLE_SNAPSHOT_KEY)).resolves.toEqual({
+      status: 'unreadable',
+    });
+  });
+
+  it('leaves the marker unwritten when a locked read answers null', async () => {
+    setProtectedDataAvailable(false);
+    const { setItem, gated } = inspectableStore();
+    store.set(GLANCEABLE_SNAPSHOT_KEY, '{"scopeKey":"s1"}');
+
+    await migrateWidgetStoreAccessibility(() => gated);
+
+    expect(setItem).not.toHaveBeenCalled();
+    expect(store.has('widget-store-accessibility')).toBe(false);
+    expect(store.get(GLANCEABLE_SNAPSHOT_KEY)).toBe('{"scopeKey":"s1"}');
+  });
+
+  it('reports a real failure on a locked device instead of hiding it', async () => {
+    setProtectedDataAvailable(false);
+    const { getItem, gated } = inspectableStore();
+    getItem.mockRejectedValue(new Error('keychain item could not be decoded'));
+
+    await expect(readGatedValueForUpdate(() => gated, HOME_WIDGET_DATA_KEY)).resolves.toEqual({
+      status: 'unreadable',
+    });
+
+    expect(breadcrumbs).toHaveLength(0);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.fingerprint).toEqual(['secure-store-failure', 'read']);
+    expect(events[0]?.tags).toEqual({
+      'error.subsystem': 'secure_store',
+      'error.operation': 'read',
+    });
   });
 
   it('attempts a write on a locked device instead of skipping it', async () => {
@@ -235,5 +286,25 @@ describe('the lock gate on widget items', () => {
     expect(setItem).toHaveBeenCalledWith(GLANCEABLE_SNAPSHOT_KEY, '{"scopeKey":"s1"}', {
       keychainAccessible: AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
     });
+  });
+});
+
+describe('the class upgrade', () => {
+  it('cannot replace a value a publish writes while it holds the item open', async () => {
+    const { getItem, gated } = inspectableStore();
+    const read = deferred<string | null>();
+    getItem.mockReturnValueOnce(read.promise);
+    store.set(GLANCEABLE_SNAPSHOT_KEY, '{"scopeKey":"old"}');
+
+    const upgrade = upgradeGatedValue(() => gated, GLANCEABLE_SNAPSHOT_KEY);
+    // The publish is issued while the upgrade still holds the read open. It
+    // waits on the item's queue, so the upgrade's write of the value it read
+    // can never land after the newer one.
+    const publish = writeGatedValue(() => gated, GLANCEABLE_SNAPSHOT_KEY, '{"scopeKey":"new"}');
+    read.resolve('{"scopeKey":"old"}');
+
+    await expect(upgrade).resolves.toBe(true);
+    await expect(publish).resolves.toBe(true);
+    expect(store.get(GLANCEABLE_SNAPSHOT_KEY)).toBe('{"scopeKey":"new"}');
   });
 });

@@ -1,4 +1,5 @@
 import { type StoredValueRead } from '@/lib/auth/secure-store-value';
+import { isProtectedDataAvailable } from '@/lib/protected-data';
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 
 /**
@@ -19,10 +20,14 @@ import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
  * `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` instead of the `WHEN_UNLOCKED` class
  * expo-secure-store defaults to. That class is readable while locked once the
  * device has been unlocked after boot, so the calls below are attempted in the
- * background rather than skipped; only a refusal before that first unlock fails,
- * and it reads as an unreadable value, never as "nothing stored": an absent
- * record and a record the app cannot reach must stay distinguishable by every
- * caller that acts on the difference.
+ * background rather than skipped; only a refusal before that first unlock
+ * fails.
+ *
+ * A read is still never proof of absence while the keychain is closed: iOS can
+ * answer `null` for an item it will not hand over, exactly as
+ * `lib/auth/secure-store-read` documents for the credential keys. So a `null`
+ * read in that state reports `'unreadable'`, and a caller that ends a surface
+ * over an absent record — the Live Activity sweep — cannot be fooled by it.
  *
  * The bearer tokens never reach this module. They keep
  * `WHEN_UNLOCKED_THIS_DEVICE_ONLY` (`credentials.ts`), which a locked device
@@ -79,45 +84,32 @@ export function widgetSecureStore(): GatedSecureStore {
   return withWidgetAccessibility(require('expo-secure-store') as NativeWidgetStore);
 }
 
-/**
- * Total read: `null` while the device has not been unlocked since boot or when
- * the read failed. For a caller whose outcome is the same whether the value is
- * absent or unreadable.
- */
-export async function readGatedValue(
-  resolveStore: () => GatedSecureStore,
-  key: string
-): Promise<string | null> {
-  try {
-    return await resolveStore().getItemAsync(key);
-  } catch (error) {
-    reportSecureStoreFailure('read', error);
-    return null;
-  }
+// One queue per key, shared by every writer and by the class upgrade. A publish
+// runs while a background push can be mirroring the same key, so a write and a
+// rewrite have to land whole and in order.
+const queues = new Map<string, Promise<unknown>>();
+
+function serialized<T>(key: string, task: () => Promise<T>): Promise<T> {
+  const previous = queues.get(key) ?? Promise.resolve();
+  const next = (async (): Promise<T> => {
+    await previous;
+    return task();
+  })();
+  queues.set(
+    key,
+    (async (): Promise<void> => {
+      try {
+        await next;
+      } catch {
+        // A step the caller sees rejected still releases the queue behind it;
+        // the rejection itself reaches the caller through `next`.
+      }
+    })()
+  );
+  return next;
 }
 
-/**
- * Read for a read-modify-write: `'unreadable'` when the read failed, so the
- * caller never persists a record derived from a value it never read.
- */
-export async function readGatedValueForUpdate(
-  resolveStore: () => GatedSecureStore,
-  key: string
-): Promise<StoredValueRead> {
-  try {
-    return { status: 'value', value: await resolveStore().getItemAsync(key) };
-  } catch (error) {
-    reportSecureStoreFailure('read', error);
-    return { status: 'unreadable' };
-  }
-}
-
-/**
- * Total write: `false` when the write failed. For a mirror whose in-memory value
- * is authoritative, so a skipped write costs the next restore rather than the
- * caller's operation.
- */
-export async function writeGatedValue(
+async function setGatedValue(
   resolveStore: () => GatedSecureStore,
   key: string,
   value: string
@@ -129,4 +121,62 @@ export async function writeGatedValue(
     reportSecureStoreFailure('write', error);
     return false;
   }
+}
+
+/**
+ * Read for a read-modify-write: `'unreadable'` when the value cannot be taken
+ * at face value, so the caller never persists a record derived from a value it
+ * never read. That covers a failed read and — the one that matters for a
+ * surface — a `null` answered while the keychain is closed.
+ */
+export async function readGatedValueForUpdate(
+  resolveStore: () => GatedSecureStore,
+  key: string
+): Promise<StoredValueRead> {
+  try {
+    const value = await resolveStore().getItemAsync(key);
+    if (value === null && !isProtectedDataAvailable()) {
+      return { status: 'unreadable' };
+    }
+    return { status: 'value', value };
+  } catch (error) {
+    reportSecureStoreFailure('read', error);
+    return { status: 'unreadable' };
+  }
+}
+
+/**
+ * Total write: `false` when the write failed. A mirror's in-memory value is
+ * authoritative, so a failed write costs the next restore rather than the
+ * caller's operation.
+ */
+export function writeGatedValue(
+  resolveStore: () => GatedSecureStore,
+  key: string,
+  value: string
+): Promise<boolean> {
+  return serialized(key, () => setGatedValue(resolveStore, key, value));
+}
+
+/**
+ * Rewrite one item with the store's class, keeping the value it holds, inside
+ * the key's queue.
+ *
+ * The read and the write are one queue step, so the upgrade can never overwrite
+ * a newer value: a write ordered before it is the value it reads and repeats,
+ * and a write ordered after it wins. An absent item has nothing to upgrade and
+ * reads as done; an unreadable item or a refused write reads as `false`, so the
+ * caller does not record an upgrade it never made.
+ */
+export function upgradeGatedValue(
+  resolveStore: () => GatedSecureStore,
+  key: string
+): Promise<boolean> {
+  return serialized(key, async () => {
+    const stored = await readGatedValueForUpdate(resolveStore, key);
+    if (stored.status === 'unreadable') {
+      return false;
+    }
+    return stored.value === null || (await setGatedValue(resolveStore, key, stored.value));
+  });
 }

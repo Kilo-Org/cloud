@@ -1,6 +1,7 @@
 import {
   type GatedSecureStore,
   readGatedValueForUpdate,
+  upgradeGatedValue,
   widgetSecureStore,
   writeGatedValue,
 } from '@/lib/auth/secure-store-gated';
@@ -41,29 +42,16 @@ const ACCESSIBILITY_MARKER_KEY = 'widget-store-accessibility';
 const ACCESSIBILITY_MARKER_VALUE = 'after-first-unlock';
 
 /**
- * Rewrite one item through the widget store. `false` when the keychain refused
- * the read or the write, so the upgrade stops rather than recording a marker
- * over an item it never reached.
- */
-async function upgradeWidgetItem(
-  resolveStore: () => GatedSecureStore,
-  key: string
-): Promise<boolean> {
-  const stored = await readGatedValueForUpdate(resolveStore, key);
-  if (stored.status === 'unreadable') {
-    return false;
-  }
-  return stored.value === null || (await writeGatedValue(resolveStore, key, stored.value));
-}
-
-/**
  * Rewrite every widget item with the class `widgetSecureStore` writes, once.
  *
  * An earlier release wrote these items `WHEN_UNLOCKED`, so a background push
  * could not read them on a locked phone. Each record is read and written back
  * through the widget store: an overwrite that carries the class upgrades the
  * item in place, and it also re-adds a record an older expo-secure-store wrote
- * under its legacy service, which the current read still accepts.
+ * under its legacy service, which the current read still accepts. The upgrade
+ * runs on the item's own write queue (`upgradeGatedValue`), so a publish that
+ * lands while it runs is either the value it repeats or the value that wins
+ * after it — never a newer record replaced by an older one.
  *
  * A device that has not been unlocked since boot cannot read the items, so the
  * attempt returns without the marker and the next unlocked run finishes it. The
@@ -79,7 +67,7 @@ export async function migrateWidgetStoreAccessibility(
   }
   for (const key of WIDGET_STORE_KEYS) {
     // eslint-disable-next-line no-await-in-loop -- one item at a time: a device that has not been unlocked since boot refuses every call, and the upgrade must stop after the first refusal instead of firing the rest of them
-    if (!(await upgradeWidgetItem(resolveStore, key))) {
+    if (!(await upgradeGatedValue(resolveStore, key))) {
       return;
     }
   }

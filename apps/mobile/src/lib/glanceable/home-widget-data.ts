@@ -12,7 +12,7 @@ import {
 
 import {
   type GatedSecureStore,
-  readGatedValue,
+  readGatedValueForUpdate,
   widgetSecureStore,
   writeGatedValue,
 } from '@/lib/auth/secure-store-gated';
@@ -172,13 +172,14 @@ export async function restoreHomeWidgetData(scopeKey: string | null): Promise<vo
     return;
   }
   const startedAtEpoch = epoch;
-  // A locked device and a failed read both read as no record: the Home surface
-  // draws from memory until a confirmed fetch mirrors a new one.
-  const raw = await readGatedValue(store, HOME_WIDGET_DATA_KEY);
-  if (raw === null || epoch !== startedAtEpoch) {
+  // A device that has not been unlocked since boot, and a read that failed, both
+  // read as unreadable rather than as no record: the Home surface draws from
+  // memory until a confirmed fetch mirrors a new one.
+  const read = await readGatedValueForUpdate(store, HOME_WIDGET_DATA_KEY);
+  if (read.status === 'unreadable' || read.value === null || epoch !== startedAtEpoch) {
     return;
   }
-  const stored = parseStoredHomeWidgetData(raw);
+  const stored = parseStoredHomeWidgetData(read.value);
   if (
     stored === null ||
     stored.snapshot.scopeKey !== scopeKey ||

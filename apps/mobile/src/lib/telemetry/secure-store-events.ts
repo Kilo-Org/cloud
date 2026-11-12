@@ -7,7 +7,7 @@
  * graph. The sink adapter itself stays in `error-sink.ts`.
  */
 
-import { isProtectedDataAvailable, ProtectedDataUnavailableError } from '@/lib/protected-data';
+import { ProtectedDataUnavailableError } from '@/lib/protected-data';
 import { addTelemetryBreadcrumb, captureTelemetry } from '@/lib/telemetry/error-sink';
 
 /**
@@ -49,11 +49,15 @@ const KEYCHAIN_INTERACTION_REFUSED_MESSAGE = 'User interaction is not allowed';
  * A refusal from a locked device is not reported: iOS rejects every
  * `WHEN_UNLOCKED*` item with `errSecInteractionNotAllowed` until unlock, by
  * design, and an `AFTER_FIRST_UNLOCK` item the same way until the device's first
- * unlock since boot. The cached protected-data state cannot recognise every one
- * of them — a background start after the screen locked can still read it as
- * available, and it can flip during the call — so the refusal itself is checked
- * first, and it leaves a breadcrumb on the next event instead of being dropped
- * or filed as a defect of its own.
+ * unlock since boot. The refusal itself is recognised by its fixed message — the
+ * cached protected-data state is not a substitute, because a background start
+ * can read it as available and it can flip during the call — and it leaves a
+ * breadcrumb on the next event instead of an event of its own.
+ *
+ * Every other failure is reported even while the keychain is closed: the widget
+ * and glanceable scope store runs in that state by design
+ * (`lib/auth/secure-store-gated`), so a real failure there must stay visible
+ * rather than being dropped as unattributable.
  */
 export function reportSecureStoreFailure(operation: SecureStoreOperation, error: unknown): void {
   // The app's own guard: the keychain was never called.
@@ -67,11 +71,6 @@ export function reportSecureStoreFailure(operation: SecureStoreOperation, error:
       message: 'keychain refused a call while the device was locked',
       data: { operation },
     });
-    return;
-  }
-  // Any other failure while the keychain is closed is unattributable, so it is
-  // dropped rather than filed against the wrong cause.
-  if (!isProtectedDataAvailable()) {
     return;
   }
   captureTelemetry({

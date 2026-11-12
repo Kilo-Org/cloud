@@ -1487,6 +1487,31 @@ test('the web-test shards install the closure their Jest suite reads', () => {
   assert.equal(run.run, 'pnpm --filter web test --shard=${{ matrix.shard }}/4');
 });
 
+// The build job runs one Next production build, and that build's type check
+// reads the app's tsconfig include: the app sources and tests, the web-shared
+// sources, the ai-gateway sources one web test imports, and the sources of a
+// billing service two web tests import inside apps/web. A clean install of the
+// app and ai-gateway closures alone fails that check, because a project outside
+// the install scope gets no node_modules to resolve its own imports from. The
+// service imports @kilocode/organization-entitlement, so its dependents are
+// selected along with the two closures. The install step is the only step the
+// narrowing changes, and a measured job run puts the saving above a tenth of
+// the job's wall time.
+const buildInstall =
+  "pnpm install --frozen-lockfile --filter 'web...' --filter 'ai-gateway...' --filter '...@kilocode/organization-entitlement' --filter kilocode-monorepo";
+
+test('the build job installs the closure its Next build reads', () => {
+  const job = ciJobs['build'];
+  const installs = job.steps.filter(step => /^pnpm\b.*\binstall\b/.test(step.run ?? ''));
+  assert.deepEqual(
+    installs.map(step => step.run),
+    [buildInstall],
+    'one install links the build closure and the root project'
+  );
+  const build = job.steps.find(step => step.name === 'Build application');
+  assert.equal(build.run, 'pnpm run build', 'the production build is unchanged');
+});
+
 // The plugin files reach one check only: test-scripts runs
 // `test:oxlint-plugins` over them. The web Jest suite, the web build and the
 // cycle check read none of them, so the plugin path has its own filter pair and

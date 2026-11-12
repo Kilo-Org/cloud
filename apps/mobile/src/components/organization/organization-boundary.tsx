@@ -166,10 +166,8 @@ export function OrganizationBoundary({
 
 /**
  * The settled "memberships exist, nothing selected" state. The boundary's
- * action opens the same context picker sheet the composer's account control
- * uses, so the reader can actually make the selection the heading asks for;
- * `useContextPicker` owns the sheet element the caller's tree must keep
- * mounted alongside the empty state.
+ * action opens the same account picker the composer's account control uses,
+ * so the reader can actually make the selection the heading asks for.
  */
 function OrganizationPickerBoundaryState({
   icon,
@@ -177,29 +175,26 @@ function OrganizationPickerBoundaryState({
 }: Readonly<{ icon: LucideIcon; backAction?: ReactNode }>) {
   const { t } = useTranslation();
   const { orgs } = useOrgBoundary();
-  const { openPicker, picker } = useContextPicker(orgs);
+  const { openPicker } = useContextPicker(orgs);
 
   return (
-    <>
-      {picker}
-      <EmptyState
-        icon={icon}
-        title={t('organization.boundary.selectOrganization')}
-        description={t('organization.boundary.selectDescriptionWithOrganizations')}
-        action={
-          <View className="gap-3">
-            <Button
-              className={STATE_ACTION_CLASS}
-              onPress={() => {
-                openPicker();
-              }}
-            >
-              <Text>{t('organization.boundary.chooseAccount')}</Text>
-            </Button>
-            {backAction}
-          </View>
-        }
-      />
-    </>
+    <EmptyState
+      icon={icon}
+      title={t('organization.boundary.selectOrganization')}
+      description={t('organization.boundary.selectDescriptionWithOrganizations')}
+      action={
+        <View className="gap-3">
+          <Button
+            className={STATE_ACTION_CLASS}
+            onPress={() => {
+              openPicker();
+            }}
+          >
+            <Text>{t('organization.boundary.chooseAccount')}</Text>
+          </Button>
+          {backAction}
+        </View>
+      }
+    />
   );
 }

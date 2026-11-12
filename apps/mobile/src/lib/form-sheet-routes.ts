@@ -11,6 +11,7 @@
  * screen and fails when a declared sheet route is missing here.
  */
 export const FORM_SHEET_ROUTE_SUFFIXES: readonly (readonly string[])[] = [
+  ['account-picker'],
   ['agent-chat', 'model-picker'],
   ['agent-chat', 'repo-picker'],
   ['agent-chat', 'branch-picker'],

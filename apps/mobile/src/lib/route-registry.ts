@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 
 import { type DiffSelection } from './pr-review/diff-selection-bridge';
 import {
+  type AccountPickerBridge,
   type BranchPickerBridge,
   type FolderPickerBridge,
   type InstancePickerBridge,
@@ -37,6 +38,7 @@ type FileNavigatorListener = (request: {
 }) => void;
 
 type SlotValue = {
+  accountPicker: AccountPickerBridge;
   modelPicker: ModelPickerBridge;
   modePicker: ModePickerBridge;
   repoPicker: RepoPickerBridge;
@@ -53,6 +55,7 @@ type SlotKind = keyof SlotValue;
 type RegistrySlots = { [K in SlotKind]: Map<RouteKey, SlotValue[K]> };
 
 const slots: RegistrySlots = {
+  accountPicker: new Map<RouteKey, AccountPickerBridge>(),
   modelPicker: new Map<RouteKey, ModelPickerBridge>(),
   modePicker: new Map<RouteKey, ModePickerBridge>(),
   repoPicker: new Map<RouteKey, RepoPickerBridge>(),
@@ -87,6 +90,7 @@ function createSlot<K extends SlotKind>(kind: K): RouteSlot<K> {
   };
 }
 
+export const accountPickerSlot = createSlot('accountPicker');
 export const modelPickerSlot = createSlot('modelPicker');
 export const modePickerSlot = createSlot('modePicker');
 export const repoPickerSlot = createSlot('repoPicker');

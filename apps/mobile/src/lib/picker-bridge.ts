@@ -135,6 +135,24 @@ export type ProfilePickerBridge = {
   onSelect: (id: string | null) => void;
 };
 
+/** One row of the account list; null is the personal account. */
+export type AccountPickerRow = {
+  organizationId: string | null;
+  label: string;
+};
+
+/**
+ * Bridge for the account picker. `rows` is the membership list the opener
+ * already holds, personal first. `shownOrganizationId` is the account the
+ * opener's screen shows (null is the personal account), so the picker marks
+ * that row; a pick reports the chosen account id.
+ */
+export type AccountPickerBridge = {
+  rows: readonly AccountPickerRow[];
+  shownOrganizationId: string | null;
+  onSelect: (organizationId: string | null) => void;
+};
+
 /**
  * Bridge for the new-session folder picker. `currentPath` is `""` at launch
  * (the CLI's launch directory) and a relative path once the user has drilled

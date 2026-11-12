@@ -10,7 +10,6 @@ import {
   type ElementType,
   type ReactNode,
   useEffect,
-  useSyncExternalStore,
 } from 'react';
 import type * as ReactModule from 'react';
 import { Platform, Pressable } from 'react-native';
@@ -23,6 +22,7 @@ import { CreditsCard } from './profile-credits-card';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { OrganizationProvider } from '@/lib/organization-context';
+import { accountPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 
@@ -110,32 +110,10 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 }));
 
 const routerPush = vi.hoisted(() => vi.fn());
-// The context picker closes itself when the owning screen loses focus, so the
-// suite can drive that blur through this store.
-const pickerFocus = vi.hoisted(() => {
-  const listeners = new Set<() => void>();
-  const subscribe = (notify: () => void) => {
-    listeners.add(notify);
-    return () => {
-      listeners.delete(notify);
-    };
-  };
-  return {
-    focused: true,
-    setFocused(next: boolean) {
-      pickerFocus.focused = next;
-      for (const notify of listeners) {
-        notify();
-      }
-    },
-    subscribe,
-  };
-});
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush }),
   useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
-    const focused = useSyncExternalStore(pickerFocus.subscribe, () => pickerFocus.focused);
-    useEffect(() => (focused ? effect() : undefined), [effect, focused]);
+    useEffect(effect, [effect]);
   },
 }));
 
@@ -279,7 +257,7 @@ async function mountCard(
   };
 }
 
-async function openSheet(renderer: ReactTestRenderer) {
+async function openPickerRoute(renderer: ReactTestRenderer) {
   const control = renderer.root.find(
     node => node.type === Pressable && node.props.accessibilityHint === 'Select account'
   );
@@ -288,37 +266,35 @@ async function openSheet(renderer: ReactTestRenderer) {
   });
 }
 
-/** The selected state an account action button carries, if it carries one. */
-function selectedState(node: ReactTestInstance): boolean | undefined {
-  const state: unknown = node.props.accessibilityState;
-  if (typeof state !== 'object' || state === null || !('selected' in state)) {
-    return undefined;
+/** The bridge the trigger seeds; the account-picker route reads this slot. */
+function seededBridge() {
+  const bridge = accountPickerSlot.get(UNFENCED_ROUTE_KEY);
+  if (!bridge) {
+    throw new Error('the trigger seeded no account bridge');
   }
-  return typeof state.selected === 'boolean' ? state.selected : undefined;
+  return bridge;
 }
 
-/** An account action button: the picker marks every row's selection. */
-function accountRow(node: ReactTestInstance) {
-  return (
-    node.type === Pressable &&
-    node.props.accessibilityRole === 'button' &&
-    selectedState(node) !== undefined
-  );
+/** The account rows the seeded picker route offers, in option order. */
+function accountLabels() {
+  return seededBridge().rows.map(row => row.label);
 }
 
-/** The sheet's account rows, in option order. */
-function accountLabels(renderer: ReactTestRenderer) {
-  return renderer.root.findAll(accountRow).map(node => node.props.accessibilityLabel as string);
+/** Picks one account through the seeded bridge, as the picker route does. */
+async function chooseAccount(label: string) {
+  const row = seededBridge().rows.find(candidate => candidate.label === label);
+  if (!row) {
+    throw new Error(`no seeded account row named ${label}`);
+  }
+  await act(() => {
+    seededBridge().onSelect(row.organizationId);
+  });
 }
 
-/** Presses one row of the open sheet: an account row or Cancel (button). */
-async function choose(renderer: ReactTestRenderer, label: string) {
+/** Presses a labelled control the card renders itself, such as the balance toggle. */
+async function press(renderer: ReactTestRenderer, label: string) {
   const target = renderer.root.find(
-    node =>
-      node.type === Pressable &&
-      node.props.accessibilityLabel === label &&
-      node.props.onPress !== undefined &&
-      (accountRow(node) ? true : node.props.accessibilityHint === undefined)
+    node => node.type === Pressable && node.props.accessibilityLabel === label
   );
   await act(() => {
     (target.props.onPress as () => void)();
@@ -403,6 +379,7 @@ beforeEach(() => {
   // stage a stored selection set their own payload.
   listState.payload = [];
   routerPush.mockReset();
+  accountPickerSlot.clearAll();
   storage.read.mockReset().mockImplementation(async (key: string) => {
     await Promise.resolve();
     return savedMetadata.get(key) ?? null;
@@ -523,8 +500,8 @@ describe('CreditsCard balance state', () => {
     // amount must not stay on the row under the new account's name.
     const stalled = Promise.withResolvers<undefined>();
     getContextBalanceQueryFn.mockReturnValue(stalled.promise);
-    await openSheet(renderer);
-    await choose(renderer, 'Beta');
+    await openPickerRoute(renderer);
+    await chooseAccount('Beta');
 
     await waitFor(() => texts().includes('SKELETON'));
     expect(texts()).not.toContain('$10.00');
@@ -547,7 +524,7 @@ describe('CreditsCard balance state', () => {
       const { renderer, texts, unmount } = await mountCard();
       await waitFor(() => texts().includes('No expiring credits.'));
 
-      await choose(renderer, 'Hide balance');
+      await press(renderer, 'Hide balance');
       expect(texts()).toContain('No expiring credits.');
       expect(texts()).toContain('*****');
       expect(texts()).not.toContain('$10.00');
@@ -570,11 +547,11 @@ describe('CreditsCard balance state', () => {
         .includes(`$2.00${explanation}`)
     );
 
-    await choose(renderer, 'Hide balance');
+    await press(renderer, 'Hide balance');
     expect(texts().map(text => readable(text))).toContain(`*****${explanation}`);
     expect(texts().map(text => readable(text))).not.toContain(`$2.00${explanation}`);
     expect(texts()).not.toContain('$10.00');
-    await choose(renderer, 'Show balance');
+    await press(renderer, 'Show balance');
     expect(texts().map(text => readable(text))).toContain(`$2.00${explanation}`);
     expect(texts()).toContain('$10.00');
     unmount();
@@ -590,7 +567,7 @@ describe('CreditsCard balance state', () => {
 
     expect(texts()).toContain('SKELETON');
     expect(texts()).not.toContain('No expiring credits.');
-    await choose(renderer, 'Hide balance');
+    await press(renderer, 'Hide balance');
     expect(texts()).toContain('SKELETON');
     await act(async () => {
       pending.resolve({ creditBlocks: [] });
@@ -619,7 +596,7 @@ describe('CreditsCard balance state', () => {
       const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
       await waitFor(() => texts().includes('Credit expiry unavailable.'));
       expect(texts()).not.toContain('No expiring credits.');
-      await choose(renderer, 'Hide balance');
+      await press(renderer, 'Hide balance');
       expect(texts()).toContain('Credit expiry unavailable.');
       unmount();
     }
@@ -647,8 +624,8 @@ describe('CreditsCard balance state', () => {
     );
     const pending = Promise.withResolvers<{ creditBlocks: [] }>();
     orgCreditBlocksQueryFn.mockReturnValue(pending.promise);
-    await openSheet(renderer);
-    await choose(renderer, 'Beta');
+    await openPickerRoute(renderer);
+    await chooseAccount('Beta');
     await waitFor(() => texts().includes('$10.00') && texts().includes('SKELETON'));
 
     expect(texts()).not.toContain(previousNote);
@@ -758,11 +735,10 @@ describe('CreditsCard balance state', () => {
   });
 
   it.each([
-    { orgs: [], options: ['Personal', 'Cancel'], choice: 0, expected: null, label: 'Personal' },
+    { orgs: [], options: ['Personal'], expected: null, label: 'Personal' },
     {
       orgs: [{ organizationId: 'org-a', organizationName, role: 'owner' }],
-      options: ['Personal', organizationName, 'Cancel'],
-      choice: 1,
+      options: ['Personal', organizationName],
       expected: 'org-a',
       label: organizationName,
     },
@@ -778,17 +754,31 @@ describe('CreditsCard balance state', () => {
       createTestQueryClient(),
       state.orgs as OrgListEntry[]
     );
-    await openSheet(renderer);
-    expect([...accountLabels(renderer), 'Cancel']).toEqual(state.options);
-    await choose(renderer, 'Cancel');
-    expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(
-      (state.orgs as OrgListEntry[])[0]?.organizationId ?? undefined
-    );
-    await openSheet(renderer);
-    await choose(renderer, state.label);
+    await openPickerRoute(renderer);
+    expect(accountLabels()).toEqual(state.options);
+    await chooseAccount(state.label);
     expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(state.expected ?? undefined);
     const label = renderer.root.findByProps({ children: state.label });
     expect(label.props).toMatchObject({ numberOfLines: 1, ellipsizeMode: 'tail' });
+    unmount();
+  });
+
+  it('leaves the account alone when the picker closes without a pick', async () => {
+    const orgs = [{ organizationId: 'org-a', organizationName, role: 'owner' }] as OrgListEntry[];
+    listState.payload = orgs;
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    await waitFor(() => texts().includes(organizationName));
+    await openPickerRoute(renderer);
+    expect(seededBridge().rows).toEqual([
+      { organizationId: null, label: 'Personal' },
+      { organizationId: 'org-a', label: organizationName },
+    ]);
+    expect(seededBridge().shownOrganizationId).toBe('org-a');
+    // Opening the picker only seeds the route: it reports no pick itself, so
+    // the stored selection and the account the card names both stay put.
+    expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('org-a');
+    expect(texts()).toContain(organizationName);
     unmount();
   });
 
@@ -807,8 +797,8 @@ describe('CreditsCard balance state', () => {
       listState.payload = orgs;
       storage.write.mockRejectedValueOnce(new Error('write failed'));
       const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
-      await openSheet(renderer);
-      await choose(renderer, 'Supplied organization');
+      await openPickerRoute(renderer);
+      await chooseAccount('Supplied organization');
       expect(texts()).toContain('Could not save setting');
       expect(texts()).toContain('Supplied organization');
       expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');
@@ -820,8 +810,8 @@ describe('CreditsCard balance state', () => {
       (id === null ? storage.remove : storage.write).mockRejectedValueOnce(
         new Error('latest save failed')
       );
-      await openSheet(renderer);
-      await choose(renderer, id === null ? 'Personal' : 'Latest organization');
+      await openPickerRoute(renderer);
+      await chooseAccount(id === null ? 'Personal' : 'Latest organization');
       const label = id === null ? 'Personal' : 'Latest organization';
       expect(texts()).toContain(label);
       expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');

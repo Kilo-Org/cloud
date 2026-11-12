@@ -14,6 +14,7 @@
  * picker route missing here falls back to the old behaviour.
  */
 export const PICKER_ROUTE_PATHS = [
+  '/account-picker',
   '/agent-chat/repo-picker',
   '/agent-chat/branch-picker',
   '/agent-chat/mode-picker',

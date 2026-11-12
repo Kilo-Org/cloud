@@ -2,8 +2,6 @@ import {
   createElement,
   type ElementType,
   type ReactNode,
-  useEffect,
-  useSyncExternalStore,
 } from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { PrReviewContextLine } from './pr-review-context-line';
 import { OrganizationProvider } from '@/lib/organization-context';
+import { accountPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { ORGANIZATION_PERSONAL_STORAGE_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import {
   renderWithProviders,
@@ -69,36 +68,11 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61' }),
 }));
 
-// The context picker closes itself when the owning screen loses focus, so the
-// suite can drive that blur through this store.
-const pickerFocus = vi.hoisted(() => {
-  const listeners = new Set<() => void>();
-  const subscribe = (notify: () => void) => {
-    listeners.add(notify);
-    return () => {
-      listeners.delete(notify);
-    };
-  };
-  return {
-    focused: true,
-    setFocused(next: boolean) {
-      pickerFocus.focused = next;
-      for (const notify of listeners) {
-        notify();
-      }
-    },
-    subscribe,
-  };
-});
 vi.mock('expo-router', () => ({
-  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
-    const focused = useSyncExternalStore(pickerFocus.subscribe, () => pickerFocus.focused);
-    useEffect(() => (focused ? effect() : undefined), [effect, focused]);
-  },
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 const Text = 'Text' as ElementType;
-const Pressable = 'Pressable' as ElementType;
 const ChevronDown = 'ChevronDown' as ElementType;
 
 const ORG_A = { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' };
@@ -123,15 +97,6 @@ function line(ui: RenderWithProvidersResult) {
   return nodes[0] as ReactTestInstance | undefined;
 }
 
-/** The selected state an account action button carries, if it carries one. */
-function selectedState(node: ReactTestInstance): boolean | undefined {
-  const state: unknown = node.props.accessibilityState;
-  if (typeof state !== 'object' || state === null || !('selected' in state)) {
-    return undefined;
-  }
-  return typeof state.selected === 'boolean' ? state.selected : undefined;
-}
-
 async function press(node: ReactTestInstance) {
   const onPress = node.props.onPress as () => void;
   await act(() => {
@@ -141,6 +106,7 @@ async function press(node: ReactTestInstance) {
 
 beforeEach(() => {
   auth.token = 'token';
+  accountPickerSlot.clearAll();
   list.mockReset().mockResolvedValue([ORG_A, ORG_B]);
   storage.read.mockReset().mockResolvedValue(null);
   storage.write.mockReset().mockResolvedValue(undefined);
@@ -171,7 +137,7 @@ describe('PrReviewContextLine', () => {
     expect(texts(ui)).toContain('For your personal account');
   });
 
-  it('switches organization through the picker sheet', async () => {
+  it('switches organization through the seeded account picker', async () => {
     storage.read.mockResolvedValue('org-a');
     const ui = await mount();
     await waitFor(() => texts(ui).includes('For Acme'));
@@ -182,21 +148,19 @@ describe('PrReviewContextLine', () => {
     }
     await press(control);
 
-    // The sheet is open: every account row is an action button that reports
-    // whether it is the current account.
-    const rows = ui.renderer.root.findAll(
-      node =>
-        node.type === Pressable &&
-        node.props.accessibilityRole === 'button' &&
-        selectedState(node) !== undefined
-    );
-    expect(rows.map(row => row.props.accessibilityLabel)).toEqual(['Personal', 'Acme', 'Umbrella']);
-
-    const umbrella = rows.find(row => row.props.accessibilityLabel === 'Umbrella');
-    if (!umbrella) {
+    const bridge = accountPickerSlot.get(UNFENCED_ROUTE_KEY);
+    if (!bridge) {
+      throw new Error('the line seeded no account bridge');
+    }
+    expect(bridge.rows.map(row => row.label)).toEqual(['Personal', 'Acme', 'Umbrella']);
+    expect(bridge.shownOrganizationId).toBe('org-a');
+    const umbrelllaRow = bridge.rows.find(row => row.label === 'Umbrella');
+    if (!umbrelllaRow) {
       throw new Error('the Umbrella row is missing from the picker');
     }
-    await press(umbrella);
+    await act(() => {
+      bridge.onSelect(umbrelllaRow.organizationId);
+    });
     await waitFor(() => texts(ui).includes('For Umbrella'));
     expect(storage.write).toHaveBeenCalledWith(ORGANIZATION_STORAGE_KEY, 'org-b');
   });

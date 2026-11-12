@@ -106,10 +106,12 @@ type SessionMessageListProps<T> = {
   onOpenSettledChange?: (sessionId: string, settled: boolean) => void;
   /**
    * How far the chrome under the transcript has grown past its resting height,
-   * in dp. While the list can scroll, its content rides up by this amount so
-   * the newest row stays on that chrome's top edge in the same commit that
-   * grows it; the top of the same amount is clipped by the frame and returns
-   * when the growth does. Absent or 0 keeps every other caller byte-identical.
+   * in dp. The transcript's content rides up by this amount, so the newest row
+   * stays on that chrome's top edge in the same commit that grows it. Holding
+   * the growth out of the list's own height clips the top of the content by the
+   * same amount until the growth ends; that strip is bounded by the composer's
+   * cap and no scroll can recover it without the late jump this removes. Absent
+   * or 0 keeps every other caller byte-identical.
    */
   chromeGrowthDp?: number;
 };

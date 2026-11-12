@@ -531,7 +531,11 @@ async function scanOutcome(
   let elapsedMs = 0;
   let readCurrentDump: () => Promise<ProbeDump>;
   if (args.source === 'probe') {
-    const probe = createProbeClient({ metro: args.metro, names: device.names });
+    const probe = createProbeClient({
+      metro: args.metro,
+      names: device.names,
+      pageWaitMs: APP_RELOAD_PAGE_WAIT_MS,
+    });
     dump = await waitForApp(probe, deps.clock, undefined, 5_000);
     readCurrentDump = () => probe.dump();
   } else {
@@ -677,7 +681,11 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
     fs.mkdirSync(out, { recursive: true });
     const device = openDevice(args, deps);
     if (args.command === 'motion') {
-      const probe = createProbeClient({ metro: args.metro, names: device.names });
+      const probe = createProbeClient({
+      metro: args.metro,
+      names: device.names,
+      pageWaitMs: APP_RELOAD_PAGE_WAIT_MS,
+    });
       await waitForApp(probe, deps.clock);
       const result = await runMotion(
         {
@@ -744,7 +752,11 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
       const result = await runMatrix(
         {
           device,
-          probe: createProbeClient({ metro: args.metro, names: device.names }),
+          probe: createProbeClient({
+      metro: args.metro,
+      names: device.names,
+      pageWaitMs: APP_RELOAD_PAGE_WAIT_MS,
+    }),
           clock: deps.clock,
           out,
           readImage: png => readRgba(png, deps.exec),

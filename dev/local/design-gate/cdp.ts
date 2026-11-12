@@ -79,12 +79,20 @@ export type ProbeClientOptions = {
   createSocket?: (url: string) => CdpSocket;
   timeoutMs?: number;
   sleep?: (ms: number) => Promise<unknown>;
+  /**
+   * How long to wait for the app's debugger page when none is listed. The app
+   * drops its page whenever it reloads — a matrix language switch restarts the
+   * runtime — and the page appears again a moment later, so a run that has just
+   * reloaded waits here instead of reporting an infrastructure failure.
+   */
+  pageWaitMs?: number;
 };
 
 const EVALUATE_TIMEOUT_MS = 15_000;
 const LIST_TIMEOUT_MS = 10_000;
 const RETRIES = 3;
 const RETRY_DELAY_MS = 2_000;
+const PAGE_POLL_MS = 500;
 const PROBE = 'globalThis.__kiloDesignGate';
 
 export class ProbeScriptError extends Error {
@@ -269,13 +277,20 @@ export async function evaluate(
 
 export function createProbeClient(options: ProbeClientOptions): ProbeClient {
   const timeoutMs = options.timeoutMs ?? EVALUATE_TIMEOUT_MS;
+  const pageWaitMs = options.pageWaitMs ?? 0;
   const sleep = options.sleep ?? delay;
   let session: CdpSession | undefined;
 
   const connect = async (): Promise<CdpSession> => {
     if (session?.isOpen()) return session;
-    const pages = await listPages(options.metro, options.fetch);
-    const page = selectPage(pages, options.names);
+    const deadline = Date.now() + pageWaitMs;
+    let pages = await listPages(options.metro, options.fetch);
+    let page = selectPage(pages, options.names);
+    while (page?.webSocketDebuggerUrl === undefined && Date.now() < deadline) {
+      await sleep(PAGE_POLL_MS);
+      pages = await listPages(options.metro, options.fetch);
+      page = selectPage(pages, options.names);
+    }
     if (page?.webSocketDebuggerUrl === undefined) {
       throw new InfraError(
         `No Metro debugger page for ${options.names.join(' / ')} at ${options.metro} (${pages.length} pages listed)`

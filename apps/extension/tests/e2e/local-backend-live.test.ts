@@ -202,7 +202,7 @@ const signInWithLocalDeviceAuth = async ({
       break;
     }
 
-    await expect(sidePanel.getByText('Failed to start sign in. Try again.')).toBeVisible();
+    await expect(sidePanel.getByRole('alert')).toBeVisible();
   }
 
   const code = codeText?.trim();

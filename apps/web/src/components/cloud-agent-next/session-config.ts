@@ -208,7 +208,8 @@ export function resolveSendSelection(
   config:
     | Pick<CloudAgentSessionConfig, 'mode' | 'model' | 'variant' | 'runtimeAgents'>
     | null
-    | undefined
+    | undefined,
+  currentModel?: { model: string | undefined; variant: string | undefined }
 ): SendSelection {
   const selectedAgent = config?.runtimeAgents?.find(agent => agent.slug === config?.mode);
   const agentModel = selectedAgent?.model?.trim() || undefined;
@@ -216,8 +217,12 @@ export function resolveSendSelection(
 
   return {
     mode: normalizeAlias(config?.mode) || 'code',
-    model: agentModel ?? config?.model ?? '',
-    variant: agentModel ? agentVariant : (config?.variant ?? undefined),
+    model: agentModel ?? currentModel?.model ?? config?.model ?? '',
+    variant: agentModel
+      ? agentVariant
+      : currentModel?.model !== undefined
+        ? currentModel.variant
+        : (config?.variant ?? undefined),
   };
 }
 

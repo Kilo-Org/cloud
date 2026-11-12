@@ -1,7 +1,7 @@
 import {
   bitbucketCloneUrl,
   sameRepositoryIdentity,
-  type EnvironmentReferenceRepository as EnvironmentMember,
+  type EnvironmentReferenceRepository,
 } from '@kilocode/cloud-agent-profile';
 import { isMultiRepositoryEnvironment } from '../environment-build/reference.js';
 import type { ControlPlaneCredentialRepository } from '../shared/control-plane-protocol.js';
@@ -25,6 +25,9 @@ import type {
  * that purpose carries the same alias. The proxy tells the members apart by the
  * request URL, never by the alias.
  */
+
+/** A session environment repository. A session reference also carries the resolved branch. */
+type EnvironmentMember = EnvironmentReferenceRepository & { branch?: string | undefined };
 
 /** The environment as the credential grant sees it: V2 lists its repositories. */
 export type CredentialEnvironment = {
@@ -123,18 +126,21 @@ export async function resolveAdditionalMembers(input: {
   members: ReadonlyArray<{
     repoFullName: string;
     repository: AdditionalScmRepository['repository'];
+    /** The ref a new GitHub task grant of this repository covers. */
+    githubTaskRef?: string | undefined;
   }>;
   launchScm: ScmGrant;
   /** The persisted entries, aligned with `repositories`; the grant check proves the alignment. */
   existing: readonly AdditionalScmRepository[] | undefined;
   refresh: (
     repository: AdditionalScmRepository['repository'],
-    existingScm: ScmGrant | undefined
+    existingScm: ScmGrant | undefined,
+    githubTaskRef: string | undefined
   ) => Promise<ScmGrant>;
 }): Promise<AdditionalScmRepository[]> {
   const settled = await Promise.allSettled(
-    input.members.map(({ repository }, index) =>
-      input.refresh(repository, input.existing?.[index]?.scm)
+    input.members.map(({ repository, githubTaskRef }, index) =>
+      input.refresh(repository, input.existing?.[index]?.scm, githubTaskRef)
     )
   );
   const aliases = new Map<ScmGrant['purpose'], string>();

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { prepareLogArchive, type TarArchiveEntry } from './log-archive-files.js';
+export type { TarArchiveEntry } from './log-archive-files.js';
 import { spawn } from 'node:child_process';
 import { logToFile, withTimeoutAndAbort } from './utils.js';
 
@@ -36,31 +36,25 @@ export function createLogArchiveId(wrapperRunId: string): string {
   return `${wrapperRunId}--${randomUUID()}`;
 }
 
-export type TarArchiveEntry = { directory: string; name: string };
-
 type TarStream = {
   stream: ReadableStream<Uint8Array>;
   kill: () => void;
 };
 
 export function createTarStream(paths: Array<string | TarArchiveEntry>): TarStream | undefined {
-  const existing = paths
-    .map(path =>
-      typeof path === 'string' ? { directory: dirname(path), name: basename(path) } : path
-    )
-    .filter(entry => existsSync(join(entry.directory, entry.name)));
-  if (existing.length === 0) return undefined;
-
-  const tarArgs = ['czf', '-'];
-  for (const entry of existing) {
-    tarArgs.push('-C', entry.directory, entry.name);
-  }
+  const archive = prepareLogArchive(paths);
+  if (!archive) return undefined;
+  const tarArgs = ['czf', '-', '-C', archive.directory, '.'];
   const proc = spawn('tar', tarArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
   const { stdout, stderr: stderrStream } = proc;
-  if (!stdout || !stderrStream) return undefined;
+  if (!stdout || !stderrStream) {
+    archive.cleanup();
+    return undefined;
+  }
 
   stderrStream.resume();
   proc.on('close', code => {
+    archive.cleanup();
     if (code !== 0) logToFile(`tar exited with code ${code}`);
   });
 
@@ -85,13 +79,20 @@ export function createTarStream(paths: Array<string | TarArchiveEntry>): TarStre
       stdout.on('end', close);
       stdout.on('error', error);
       proc.on('error', err => {
+        archive.cleanup();
         logToFile('tar spawn error');
         error(err);
       });
     },
   });
 
-  return { stream: stream as ReadableStream<Uint8Array>, kill: () => proc.kill() };
+  return {
+    stream: stream as ReadableStream<Uint8Array>,
+    kill: () => {
+      proc.kill();
+      archive.cleanup();
+    },
+  };
 }
 
 export function createLogUploader(opts: LogUploaderOpts): LogUploader {

@@ -571,8 +571,8 @@ async function setupSyntheticVercel(provider: FakeProvider) {
       accountLogin: 'acme',
       appType: 'standard',
     }),
-    issueGitHubSessionCapability: async () => ({
-      ...(await issue()),
+    issueGitHubSessionCapability: async params => ({
+      ...(await issue(params)),
       source: 'installation',
       permissionScope: 'repository',
     }),
@@ -1001,8 +1001,8 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const broker = createFakeCredentialBroker();
     const issue = broker.issueGitHubSessionCapability;
     Object.assign(broker, {
-      issueGitHubSessionCapability: async () => ({
-        ...(await issue()),
+      issueGitHubSessionCapability: async params => ({
+        ...(await issue(params)),
         source: 'installation',
         permissionScope: 'repository',
       }),
@@ -1078,6 +1078,23 @@ describe('SandboxControlV2 credentials (B3)', () => {
         github: true,
         worktreeScoped: true,
       });
+    });
+  });
+
+  it('rejects a second live wrapper and permits reconnect after the original disconnects', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider);
+    const { wrapper, credential, allocationId } = await prepareWarmRoute(stub, provider);
+    const intruder = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    expect(await intruder.hello({ wrapperId: 'replacement', allocationId })).toBeNull();
+    expect(await intruder.waitForClose()).toBe(1013);
+    expect(await stub.getWrapperId()).toBe('wr_1');
+    wrapper.close();
+    await waitFor(async () => expect((await stub.getAllocationState()).kind).toBe('disconnected'));
+    const reconnected = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    expect(await reconnected.hello({ wrapperId: 'replacement', allocationId })).toEqual({
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
   });
 
@@ -1974,6 +1991,67 @@ describe('SandboxControlV2 credentials (B3)', () => {
     }
   );
 
+  it('keeps initial bot fallback during renewal after a personal identity becomes available', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const original = broker.issueGitHubSessionCapability.bind(broker);
+    let connected = false;
+    const preferences: Array<boolean | undefined> = [];
+    broker.issueGitHubSessionCapability = async params => {
+      preferences.push(params.allowUserAuthorization);
+      const result = await original(params);
+      return { ...result, source: connected ? result.source : 'installation' };
+    };
+    const stub = await setup(provider, broker);
+    const source = { ...credentialsSource(SESSION), createdOnPlatform: 'cloud-agent-web' };
+    const { wrapper } = await prepareWarmRoute(stub, provider, prepareInput(SESSION, source));
+    expect(JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}')).toMatchObject({
+      scm: { githubAuthSource: 'installation' },
+    });
+    connected = true;
+    await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+    expect(
+      await stub.deliver({ sessionId: SESSION, messages: [promptPayload('bot-renewal')] })
+    ).toBe('sent');
+    expect((await wrapper.next())?.type).toBe('session.credentials');
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+    expect(preferences).toEqual([true, false]);
+    expect(JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}')).toMatchObject({
+      scm: { githubAuthSource: 'installation' },
+    });
+  });
+
+  it('does not replace an existing personal identity with a bot during renewal', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const original = broker.issueGitHubSessionCapability.bind(broker);
+    let revoked = false;
+    broker.issueGitHubSessionCapability = async params => {
+      const result = await original(params);
+      return { ...result, source: revoked ? ('installation' as const) : result.source };
+    };
+    const stub = await setup(provider, broker);
+    const source = { ...credentialsSource(SESSION), createdOnPlatform: 'cloud-agent-web' };
+    const { wrapper } = await prepareWarmRoute(stub, provider, prepareInput(SESSION, source));
+    expect(JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}')).toMatchObject({
+      scm: { githubAuthSource: 'user' },
+    });
+    const originalScm = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}').scm;
+    revoked = true;
+    await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+    expect(
+      await stub.deliver({ sessionId: SESSION, messages: [promptPayload('revoked-renewal')] })
+    ).toBe('sent');
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+    expect(JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}').scm).toEqual(originalScm);
+    // A failed early renewal preserves the unexpired actor. Expiry requires recovery.
+    await setGrantExpiry(stub, SESSION, Date.now() - 1);
+    expect(
+      await stub.deliver({ sessionId: SESSION, messages: [promptPayload('expired-personal')] })
+    ).toBe('not_ready');
+    expect((await readRouteRow(stub, SESSION))?.state).toBe('failed');
+  });
+
   it('re-issues below one hour with fresh tokens and sends session.credentials before prompts', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
@@ -2266,7 +2344,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
         url: 'https://github.com/acme/widgets.git/info/refs',
         method: 'GET',
       });
-    expect((await resolve(alias))?.credential).toMatch(/^kgh2\./);
+    expect((await resolve(alias))?.credential).toMatch(/^kgh3\./);
     expect(await resolve('kcp1.unknown.scope.github.xyz')).toBeNull();
     expect(await resolve(alias + 'mutated')).toBeNull();
     expect(await resolve(alias, 'other-container')).toBeNull();
@@ -2674,9 +2752,9 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const original = broker.issueGitHubSessionCapability.bind(broker);
     // Fail issuance for the first route only; issuance is not retried.
     let failing = true;
-    broker.issueGitHubSessionCapability = () => {
+    broker.issueGitHubSessionCapability = params => {
       if (failing) return Promise.reject(new Error('git-token-service unavailable'));
-      return original();
+      return original(params);
     };
     const stub = await setup(provider, broker);
 
@@ -2706,7 +2784,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const stub = await setupVercel(provider, broker);
     // Warm the sandbox so the next attempt's policy is applied against a running
     // provider; a cold prepare has no provider ref to update.
-    await prepareWarmRoute(
+    const { wrapper } = await prepareWarmRoute(
       stub,
       provider,
       prepareInput(SESSION, vercelSource(SESSION), routeSpec(SESSION))
@@ -2723,11 +2801,12 @@ describe('SandboxControlV2 credentials (B3)', () => {
       return update(ref, grants);
     };
 
-    const { prepareFrame } = await prepareWarmRoute(
-      stub,
-      provider,
-      prepareInput(SESSION_NEXT, vercelSource(SESSION_NEXT), routeSpec(SESSION_NEXT))
-    );
+    expect(
+      await stub.prepare(
+        prepareInput(SESSION_NEXT, vercelSource(SESSION_NEXT), routeSpec(SESSION_NEXT))
+      )
+    ).toMatchObject({ state: 'preparing' });
+    const prepareFrame = await wrapper.nextSkipping(['session.credentials']);
     expect(prepareFrame?.type).toBe('session.prepare');
   });
 
@@ -2786,9 +2865,9 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const broker = createFakeCredentialBroker();
     const original = broker.issueGitHubSessionCapability.bind(broker);
     let hang = true;
-    broker.issueGitHubSessionCapability = () => {
+    broker.issueGitHubSessionCapability = params => {
       if (hang) return new Promise<never>(() => {});
-      return original();
+      return original(params);
     };
     const stub = await setup(provider, broker);
     // Production uses the 30 s provider-stop bound; shorten it for the test.
@@ -2877,7 +2956,9 @@ type GrantBrokerCalls = { github: number; gitlab: number; authorize: number };
  * counters live on the sibling test object.
  */
 type GrantBrokerService = {
-  issueGitHubSessionCapability: () => Promise<unknown>;
+  issueGitHubSessionCapability: (
+    params: Parameters<FakeCredentialBroker['issueGitHubSessionCapability']>[0]
+  ) => Promise<unknown>;
   issueGitLabSessionCapability: () => Promise<unknown>;
   authorizeCloudAgentGitHubRepo: () => Promise<unknown>;
   /** Present only in the cold-grant GitHub resolution cases below. */
@@ -2886,17 +2967,11 @@ type GrantBrokerService = {
 
 function createGrantBroker(): { calls: GrantBrokerCalls; service: GrantBrokerService } {
   const calls: GrantBrokerCalls = { github: 0, gitlab: 0, authorize: 0 };
+  const githubBroker = createFakeCredentialBroker();
   const service: GrantBrokerService = {
-    async issueGitHubSessionCapability() {
+    async issueGitHubSessionCapability(params) {
       calls.github += 1;
-      return {
-        success: true,
-        capability: `kgh2.${calls.github}`,
-        installationId: 1,
-        accountLogin: 'acme',
-        appType: 'standard',
-        source: 'managed',
-      };
+      return githubBroker.issueGitHubSessionCapability(params);
     },
     async issueGitLabSessionCapability() {
       calls.gitlab += 1;
@@ -3299,14 +3374,14 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     let hanging = true;
     let rejectGitHub: (error: Error) => void = () => {};
     const issueGitHub = broker.service.issueGitHubSessionCapability;
-    broker.service.issueGitHubSessionCapability = () => {
+    broker.service.issueGitHubSessionCapability = params => {
       if (hanging) {
         broker.calls.github += 1;
         return new Promise<never>((_resolve, reject) => {
           rejectGitHub = reject;
         });
       }
-      return issueGitHub();
+      return issueGitHub(params);
     };
 
     const capture = captureRouteFailed();
@@ -3858,7 +3933,7 @@ describe('SandboxControlV2 environment repository credentials', () => {
     if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
     expect(prepareFrame.credentials.git?.token).toBe(grant.scm.alias);
     expect(prepareFrame.credentials.gitCredentials).toBeUndefined();
-    expect(JSON.stringify(prepareFrame)).not.toContain('kgh2.');
+    expect(JSON.stringify(prepareFrame)).not.toMatch(/kgh\d\./);
   });
 
   it('delivers the roots in the frame and grants at the route directory, which is the cwd', async () => {
@@ -4120,7 +4195,7 @@ describe('SandboxControlV2 environment repository credentials', () => {
     // Provider CLI tokens carry the launch alias only; the GitLab CLI has none.
     expect(prepareFrame.spec.env?.GH_TOKEN).toBe(grant.scm.alias);
     expect(prepareFrame.spec.env?.GITLAB_TOKEN).toBeUndefined();
-    expect(JSON.stringify(prepareFrame)).not.toMatch(/kgh2\.|kgl2\./);
+    expect(JSON.stringify(prepareFrame)).not.toMatch(/kgh\d\.|kgl\d\./);
 
     // Each alias redeems only for its own purpose.
     const gitlab = await redeem(

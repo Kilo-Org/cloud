@@ -25,7 +25,10 @@ import {
   type ControlCredentialPurpose,
 } from './sandbox-control/managed-credential.js';
 
-const CAPABILITY = 'kgh2.opaque';
+const CAPABILITY = 'kgh3.opaque';
+const pushCommand = `${'0'.repeat(40)} ${'1'.repeat(40)} refs/heads/kilo/task\0report-status\n`;
+const pushPrelude = `${(pushCommand.length + 4).toString(16).padStart(4, '0')}${pushCommand}0000`;
+const pushBody = `${pushPrelude}PACKsynthetic`;
 const LEGACY_CAPABILITY = 'kgh1.opaque';
 const GITLAB_CAPABILITY = 'kgl2.opaque';
 const LEGACY_GITLAB_CAPABILITY = 'kgl1.opaque';
@@ -84,7 +87,7 @@ describe('handleManagedScmOutbound', () => {
       createEnv(redeemGitHubSessionCapability)
     );
 
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(403);
     expect(logging.logger.withFields).toHaveBeenCalledWith(
       expect.objectContaining({
         authorizationClass: 'github-managed',
@@ -96,7 +99,7 @@ describe('handleManagedScmOutbound', () => {
     );
     expect(logging.logger.withFields).toHaveBeenCalledWith(
       expect.objectContaining({
-        capabilityVersion: 'kgh2',
+        capabilityVersion: 'kgh3',
         outboundContainerId: OUTBOUND_CONTEXT.containerId,
         reason: 'invalid_upstream_request',
       })
@@ -104,6 +107,55 @@ describe('handleManagedScmOutbound', () => {
     const logs = serializedLogCalls();
     expect(logs).not.toContain(CAPABILITY);
     expect(logs).not.toContain('query-secret');
+  });
+
+  it.each([
+    'https://api.github.com/repos/public-owner/public/contents/file',
+    'https://github.com/public-owner/public.git/info/refs?service=git-upload-pack',
+    'https://raw.githubusercontent.com/public-owner/public/main/file',
+  ])('allows anonymous public reads without forwarding ambient headers: %s', async url => {
+    const forward = vi.fn().mockResolvedValue(new Response('public content'));
+    vi.stubGlobal('fetch', forward);
+    const response = await handleOutbound(
+      new Request(url, {
+        headers: { Cookie: 'synthetic-cookie', 'X-GitHub-OTP': 'synthetic-otp' },
+      }),
+      createEnv()
+    );
+    expect(response.status).toBe(200);
+    const forwarded = forward.mock.calls[0][0] as Request;
+    expect(forwarded.headers.has('authorization')).toBe(false);
+    expect(forwarded.headers.has('cookie')).toBe(false);
+    expect(forwarded.headers.has('x-github-otp')).toBe(false);
+    expect(forwarded.redirect).toBe('manual');
+  });
+
+  it('forwards broker-authorized public reads without the managed credential', async () => {
+    const redeem = vi.fn().mockResolvedValue({ success: true, authorization: null });
+    const forward = vi.fn().mockResolvedValue(new Response('public content'));
+    vi.stubGlobal('fetch', forward);
+    await handleOutbound(
+      new Request('https://api.github.com/repos/public-owner/public/contents/file', {
+        headers: { Authorization: `Bearer ${CAPABILITY}` },
+      }),
+      createEnv(redeem)
+    );
+    const forwarded = forward.mock.calls[0][0] as Request;
+    expect(forwarded.headers.has('authorization')).toBe(false);
+  });
+
+  it('requires managed authorization for writes even to public repositories', async () => {
+    const forward = vi.fn();
+    vi.stubGlobal('fetch', forward);
+    const response = await handleOutbound(
+      new Request('https://api.github.com/repos/public-owner/public/issues', {
+        method: 'POST',
+        body: '{"title":"Issue"}',
+      }),
+      createEnv()
+    );
+    expect(response.status).toBe(401);
+    expect(forward).not.toHaveBeenCalled();
   });
 
   it('logs when GitHub CLI does not send a managed capability', async () => {
@@ -480,7 +532,7 @@ describe('handleManagedScmOutbound', () => {
       headers: {
         Authorization: basicCredential(CAPABILITY),
       },
-      body: 'git-body',
+      body: pushBody,
     });
 
     await handleOutbound(request, createEnv(redeemGitHubSessionCapability));
@@ -488,6 +540,8 @@ describe('handleManagedScmOutbound', () => {
     expect(redeemGitHubSessionCapability).toHaveBeenCalledWith({
       capability: CAPABILITY,
       outboundContainerId: OUTBOUND_CONTEXT.containerId,
+      requestContentType: 'text/plain;charset=UTF-8',
+      requestBody: undefined,
       requestMethod: 'POST',
       requestUrl: 'https://github.com/acme/repo.git/git-receive-pack',
     });
@@ -495,7 +549,7 @@ describe('handleManagedScmOutbound', () => {
     expect(forwarded.headers.get('Authorization')).toBe(REDEEMED_GIT_AUTHORIZATION);
     expect(forwarded.headers.get('PRIVATE-TOKEN')).toBeNull();
     expect(forwarded.redirect).toBe('manual');
-    expect(await forwarded.text()).toBe('git-body');
+    expect(await forwarded.text()).toBe(pushBody);
   });
 
   it('fails closed for a managed capability using alternate Basic scheme casing', async () => {
@@ -519,11 +573,11 @@ describe('handleManagedScmOutbound', () => {
       requestMethod: 'GET',
       requestUrl: 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack',
     });
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(403);
     expect(forward).not.toHaveBeenCalled();
   });
 
-  it('passes non-capability or malformed Basic credentials through unchanged', async () => {
+  it('rejects non-capability or malformed Basic credentials at GitHub', async () => {
     const redeemGitHubSessionCapability = vi.fn();
     const forward = vi.fn().mockResolvedValue(new Response('forwarded'));
     vi.stubGlobal('fetch', forward);
@@ -537,9 +591,7 @@ describe('handleManagedScmOutbound', () => {
     );
 
     expect(redeemGitHubSessionCapability).not.toHaveBeenCalled();
-    const forwarded = forward.mock.calls[0]?.[0] as Request;
-    expect(forwarded.headers.get('Authorization')).toBe(authorization);
-    expect(forwarded.redirect).toBe('follow');
+    expect(forward).not.toHaveBeenCalled();
 
     await handleOutbound(
       new Request('https://github.com/acme/repo.git/info/refs?service=git-upload-pack', {
@@ -548,9 +600,10 @@ describe('handleManagedScmOutbound', () => {
       createEnv(redeemGitHubSessionCapability)
     );
     expect(redeemGitHubSessionCapability).not.toHaveBeenCalled();
+    expect(forward).not.toHaveBeenCalled();
   });
 
-  it('redeems a GitHub LFS Basic capability request', async () => {
+  it('rejects unsupported GitHub LFS publication before forwarding', async () => {
     const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
       success: true,
       authorization: REDEEMED_GIT_AUTHORIZATION,
@@ -567,16 +620,63 @@ describe('handleManagedScmOutbound', () => {
       createEnv(redeemGitHubSessionCapability)
     );
 
-    expect(redeemGitHubSessionCapability).toHaveBeenCalledWith({
+    expect(redeemGitHubSessionCapability).not.toHaveBeenCalled();
+    expect(forward).not.toHaveBeenCalled();
+  });
+
+  it('checks current broker authorization again before each LFS object download', async () => {
+    const oid = 'a'.repeat(64);
+    const url = 'https://github.com/na2-org/cloud-agent-security-test-a.git/info/lfs/objects/batch';
+    const redeem = vi
+      .fn()
+      .mockResolvedValueOnce({ success: true, authorization: REDEEMED_GIT_AUTHORIZATION })
+      .mockResolvedValueOnce({ success: false, reason: 'source_unavailable' });
+    const forward = vi.fn().mockResolvedValueOnce(
+      Response.json({
+        objects: [
+          {
+            oid,
+            size: 17,
+            actions: {
+              download: {
+                href: `https://github-cloud.s3.amazonaws.com/alambic/media/${oid}?signature=synthetic-secret`,
+              },
+            },
+          },
+        ],
+      })
+    );
+    vi.stubGlobal('fetch', forward);
+    const response = await handleOutbound(
+      new Request(url, {
+        method: 'POST',
+        headers: {
+          Authorization: basicCredential(CAPABILITY),
+          'Content-Type': 'application/vnd.git-lfs+json',
+        },
+        body: JSON.stringify({ operation: 'download', objects: [{ oid, size: 17 }] }),
+      }),
+      createEnv(redeem)
+    );
+    expect(response.status).toBe(200);
+    const result = (await response.json()) as {
+      objects: { actions: { download: { href: string; header: { Authorization: string } } } }[];
+    };
+    const action = result.objects[0].actions.download;
+    expect(action.header.Authorization).toBe(`Bearer ${CAPABILITY}`);
+    const denied = await handleOutbound(
+      new Request(action.href, { headers: action.header }),
+      createEnv(redeem)
+    );
+    expect(denied.status).toBe(403);
+    expect(forward).toHaveBeenCalledOnce();
+    expect(redeem).toHaveBeenLastCalledWith({
       capability: CAPABILITY,
       outboundContainerId: OUTBOUND_CONTEXT.containerId,
-      requestMethod: 'POST',
-      requestUrl: 'https://github.com/acme/repo.git/info/lfs/objects/batch',
+      requestMethod: 'GET',
+      requestUrl: action.href,
     });
-    const forwarded = forward.mock.calls[0]?.[0] as Request;
-    expect(forwarded.headers.get('Authorization')).toBe(REDEEMED_GIT_AUTHORIZATION);
-    expect(forwarded.redirect).toBe('manual');
-    expect(await forwarded.text()).toBe('{}');
+    expect(serializedLogCalls()).not.toContain('synthetic-secret');
   });
 
   it('passes an ordinary unrelated outbound request through unchanged', async () => {
@@ -634,7 +734,7 @@ describe('handleManagedScmOutbound', () => {
     expect(forward).toHaveBeenCalledWith(request);
   });
 
-  it('continues redeeming legacy capabilities during staged rollout', async () => {
+  it('rejects unscoped GitHub capabilities while retaining the GitLab contract', async () => {
     const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
       success: false,
       reason: 'invalid_capability',
@@ -658,12 +758,7 @@ describe('handleManagedScmOutbound', () => {
       env
     );
 
-    expect(redeemGitHubSessionCapability).toHaveBeenCalledWith({
-      capability: LEGACY_CAPABILITY,
-      outboundContainerId: OUTBOUND_CONTEXT.containerId,
-      requestMethod: 'GET',
-      requestUrl: 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack',
-    });
+    expect(redeemGitHubSessionCapability).not.toHaveBeenCalled();
     expect(redeemGitLabSessionCapability).toHaveBeenCalledWith({
       capability: LEGACY_GITLAB_CAPABILITY,
       outboundContainerId: OUTBOUND_CONTEXT.containerId,
@@ -715,7 +810,7 @@ describe('handleManagedScmOutbound', () => {
   });
 
   it.each([
-    ['GitHub Git Basic', { Authorization: basicCredential('kgh3.opaque') }],
+    ['GitHub Git Basic', { Authorization: basicCredential('kgh4.opaque') }],
     ['GitHub API bearer', { Authorization: 'Bearer kgh42.opaque' }],
     ['GitLab Git Basic', { Authorization: basicCredential('kgl3.opaque', 'Basic', 'oauth2') }],
     ['GitLab API bearer', { Authorization: 'Bearer kgl42.opaque' }],
@@ -761,7 +856,7 @@ describe('handleManagedScmOutbound', () => {
       requestMethod: 'GET',
       requestUrl: 'https://example.com/resource',
     });
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(403);
     expect(forward).not.toHaveBeenCalled();
   });
 
@@ -793,7 +888,7 @@ describe('handleManagedScmOutbound', () => {
         requestMethod: 'GET',
         requestUrl: 'https://example.com/resource',
       });
-      expect(response.status).toBe(502);
+      expect(response.status).toBe(403);
       expect(forward).not.toHaveBeenCalled();
     }
   );
@@ -814,7 +909,7 @@ describe('handleManagedScmOutbound', () => {
       createEnv(vi.fn().mockRejectedValue(new Error('RPC unavailable')))
     );
 
-    expect(rejected.status).toBe(502);
+    expect(rejected.status).toBe(403);
     expect(thrown.status).toBe(502);
     expect(forward).not.toHaveBeenCalled();
   });
@@ -1100,6 +1195,8 @@ describe('handleManagedScmOutbound API authorization', () => {
       expect(redeemGitHubSessionCapability).toHaveBeenCalledWith({
         capability: CAPABILITY,
         outboundContainerId: OUTBOUND_CONTEXT.containerId,
+        requestContentType: 'text/plain;charset=UTF-8',
+        requestBody: new TextEncoder().encode('{}'),
         requestMethod: 'POST',
         requestUrl: 'https://api.github.com/repos/acme/repo/issues/1/comments',
       });
@@ -1109,7 +1206,7 @@ describe('handleManagedScmOutbound API authorization', () => {
     }
   );
 
-  it('passes explicit profile authorization through without redemption', async () => {
+  it('rejects explicit profile authorization at GitHub', async () => {
     const redeemGitHubSessionCapability = vi.fn();
     const forward = vi.fn().mockResolvedValue(new Response('forwarded'));
     vi.stubGlobal('fetch', forward);
@@ -1122,8 +1219,7 @@ describe('handleManagedScmOutbound API authorization', () => {
     );
 
     expect(redeemGitHubSessionCapability).not.toHaveBeenCalled();
-    const forwarded = forward.mock.calls[0]?.[0] as Request;
-    expect(forwarded.headers.get('Authorization')).toBe('token explicit-profile-token');
+    expect(forward).not.toHaveBeenCalled();
   });
 
   it('fails closed without forwarding when managed API redemption is rejected', async () => {
@@ -1137,7 +1233,7 @@ describe('handleManagedScmOutbound API authorization', () => {
       createEnv(vi.fn().mockResolvedValue({ success: false, reason: 'invalid_capability' }))
     );
 
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(403);
     expect(forward).not.toHaveBeenCalled();
   });
 });
@@ -1247,6 +1343,61 @@ describe('handleManagedScmOutbound control-plane aliases', () => {
     vi.unstubAllGlobals();
   });
 
+  it('keeps LFS downloads behind the original alias after allocation revocation', async () => {
+    const { env, resolveCredential, redemptions, forward } = fixture();
+    const credential = createControlPlaneCredential('sbx_1', 'github');
+    resolveCredential.mockResolvedValueOnce({ credential: CAPABILITY }).mockResolvedValueOnce(null);
+    const oid = 'a'.repeat(64);
+    forward.mockResolvedValueOnce(
+      Response.json({
+        objects: [
+          {
+            oid,
+            size: 17,
+            actions: {
+              download: {
+                href: `https://github-cloud.s3.amazonaws.com/alambic/media/${oid}?signed=synthetic-secret`,
+              },
+            },
+          },
+        ],
+      })
+    );
+    const response = await handleOutbound(
+      new Request(
+        'https://github.com/na2-org/cloud-agent-security-test-a.git/info/lfs/objects/batch',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: basicCredential(credential),
+            'Content-Type': 'application/vnd.git-lfs+json',
+          },
+          body: JSON.stringify({ operation: 'download', objects: [{ oid, size: 17 }] }),
+        }
+      ),
+      env
+    );
+    expect(response.status).toBe(200);
+    const text = await response.text();
+    expect(text).not.toContain(CAPABILITY);
+    expect(text).not.toContain('synthetic-secret');
+    const result = JSON.parse(text) as {
+      objects: { actions: { download: { href: string; header: { Authorization: string } } } }[];
+    };
+    const action = result.objects[0].actions.download;
+    expect(action.header.Authorization).toBe(`Bearer ${credential}`);
+    const denied = await handleOutbound(new Request(action.href, { headers: action.header }), env);
+    expect(denied.status).toBe(502);
+    expect(resolveCredential).toHaveBeenLastCalledWith({
+      credential,
+      outboundContainerId: OUTBOUND_CONTEXT.containerId,
+      url: action.href,
+      method: 'GET',
+    });
+    expect(redemptions.github).toHaveBeenCalledOnce();
+    expect(forward).toHaveBeenCalledOnce();
+  });
+
   it.each([
     { purpose: 'github', scheme: 'bEaReR', username: undefined },
     { purpose: 'github', scheme: 'ToKeN', username: undefined },
@@ -1265,11 +1416,16 @@ describe('handleManagedScmOutbound control-plane aliases', () => {
       const authorization = username
         ? basicCredential(credential, `${scheme}\t `, username)
         : `${scheme}\t ${credential}`;
-      const request = new Request('https://example.test:8443/managed/resource?key=query-secret', {
-        method: 'POST',
-        headers: { Authorization: authorization, Host: 'guest-supplied.invalid' },
-        body: 'request-body',
-      });
+      const request = new Request(
+        purpose === 'github'
+          ? 'https://api.github.com/graphql'
+          : 'https://example.test:8443/managed/resource?key=query-secret',
+        {
+          method: 'POST',
+          headers: { Authorization: authorization, Host: 'guest-supplied.invalid' },
+          body: purpose === 'github' ? '{}' : 'request-body',
+        }
+      );
 
       const response = await handleOutbound(request, env);
 
@@ -1286,6 +1442,12 @@ describe('handleManagedScmOutbound control-plane aliases', () => {
         outboundContainerId: OUTBOUND_CONTEXT.containerId,
         requestUrl: request.url,
         requestMethod: request.method,
+        ...(purpose === 'github'
+          ? {
+              requestContentType: 'text/plain;charset=UTF-8',
+              requestBody: new TextEncoder().encode('{}'),
+            }
+          : {}),
       });
       for (const [provider, redeem] of Object.entries(redemptions)) {
         if (provider !== purpose) expect(redeem).not.toHaveBeenCalled();
@@ -1294,9 +1456,11 @@ describe('handleManagedScmOutbound control-plane aliases', () => {
       const forwarded = forward.mock.calls[0]?.[0];
       expect(forwarded?.headers.get('Authorization')).not.toContain(credential);
       expect(forwarded?.headers.get('Authorization')).not.toContain(capabilities[purpose]);
-      expect(forwarded?.headers.get('Host')).toBe('example.test:8443');
+      expect(forwarded?.headers.get('Host')).toBe(
+        purpose === 'github' ? null : 'example.test:8443'
+      );
       expect(forwarded?.redirect).toBe('manual');
-      expect(await forwarded?.text()).toBe('request-body');
+      expect(await forwarded?.text()).toBe(purpose === 'github' ? '{}' : 'request-body');
       expect(request.headers.get('Authorization')).toBe(authorization);
       const logs = serializedLogCalls();
       expect(logs).not.toContain(credential);
@@ -1307,7 +1471,7 @@ describe('handleManagedScmOutbound control-plane aliases', () => {
   );
 
   it.each([false, true])(
-    'preserves GitHub attachment uploads through managed authorization (alias=%s)',
+    'denies GitHub attachment uploads under the task policy (alias=%s)',
     async alias => {
       const { env, resolveCredential, redemptions, forward } = fixture();
       const credential = alias ? createControlPlaneCredential('sbx_1', 'github') : CAPABILITY;
@@ -1316,39 +1480,22 @@ describe('handleManagedScmOutbound control-plane aliases', () => {
         success: true,
         authorization: 'Bearer upstream-token',
       });
-      const url =
-        'https://uploads.github.com/user-attachments/assets?content_type=image%2Fpng&name=screenshot.png&repository_id=1145038391';
-      const body = new Uint8Array([137, 80, 78, 71, 0, 255]);
+
       const response = await handleOutbound(
-        new Request(url, {
-          method: 'POST',
-          headers: {
-            Authorization: `token ${credential}`,
-            'Content-Type': 'image/png',
-            'User-Agent': 'GitHub CLI 2.103.3',
-          },
-          body,
-        }),
+        new Request(
+          'https://uploads.github.com/user-attachments/assets?content_type=image%2Fpng&name=screenshot.png&repository_id=1145038391',
+          {
+            method: 'POST',
+            headers: { Authorization: `token ${credential}`, 'Content-Type': 'image/png' },
+            body: new Uint8Array([137, 80, 78, 71, 0, 255]),
+          }
+        ),
         env
       );
 
-      expect(response.status).toBe(200);
-      expect(resolveCredential).toHaveBeenCalledTimes(alias ? 1 : 0);
-      expect(redemptions.github).toHaveBeenCalledExactlyOnceWith({
-        capability: CAPABILITY,
-        outboundContainerId: OUTBOUND_CONTEXT.containerId,
-        requestUrl: url,
-        requestMethod: 'POST',
-      });
-      expect(forward).toHaveBeenCalledOnce();
-      const forwarded = forward.mock.calls[0]?.[0];
-      if (!forwarded) throw new Error('Expected forwarded attachment request');
-      expect(forwarded.url).toBe(url);
-      expect(forwarded.method).toBe('POST');
-      expect(forwarded.headers.get('Authorization')).toBe('Bearer upstream-token');
-      expect(forwarded.headers.get('Content-Type')).toBe('image/png');
-      expect(forwarded.redirect).toBe('manual');
-      expect(new Uint8Array(await forwarded.arrayBuffer())).toEqual(body);
+      expect(response.status).toBe(403);
+      expect(await response.text()).toBe('GitHub request is outside the task policy');
+      expect(forward).not.toHaveBeenCalled();
       expect(serializedLogCalls()).not.toContain(credential);
       expect(serializedLogCalls()).not.toContain('upstream-token');
       expect(serializedLogCalls()).not.toContain('screenshot.png');
@@ -1356,7 +1503,7 @@ describe('handleManagedScmOutbound control-plane aliases', () => {
   );
 
   it.each(['repository_mismatch', 'source_unavailable'])(
-    'does not forward GitHub attachment bytes when redemption fails with %s',
+    'does not forward GitHub bytes when redemption fails with %s',
     async reason => {
       const { env, resolveCredential, redemptions, forward } = fixture();
       const credential = createControlPlaneCredential('sbx_1', 'github');
@@ -1364,16 +1511,16 @@ describe('handleManagedScmOutbound control-plane aliases', () => {
       redemptions.github.mockResolvedValue({ success: false, reason });
 
       const response = await handleOutbound(
-        new Request('https://uploads.github.com/user-attachments/assets?repository_id=42', {
+        new Request('https://github.com/acme/repo.git/git-receive-pack', {
           method: 'POST',
-          headers: { Authorization: `token ${credential}` },
-          body: 'attachment-bytes',
+          headers: { Authorization: basicCredential(credential) },
+          body: pushBody,
         }),
         env
       );
 
-      expect(response.status).toBe(502);
-      expect(await response.text()).toBe('GitHub authorization unavailable');
+      expect(response.status).toBe(403);
+      expect(await response.text()).toBe('GitHub request is outside the task policy');
       expect(redemptions.github).toHaveBeenCalledOnce();
       expect(forward).not.toHaveBeenCalled();
       expect(logging.logger.withFields).toHaveBeenCalledWith(
@@ -1620,7 +1767,7 @@ describe('handleManagedScmOutbound control-plane aliases', () => {
       env
     );
 
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(403);
     expect(resolveCredential).toHaveBeenCalledOnce();
     expect(redemptions.github).toHaveBeenCalledOnce();
     expect(forward).not.toHaveBeenCalled();
@@ -1913,7 +2060,7 @@ describe('handleManagedScmOutbound bounded GitHub git rate-limit retry', () => {
         new Request('https://github.com/acme/repo.git/git-receive-pack', {
           method: 'POST',
           headers: { Authorization: basicCredential(CAPABILITY) },
-          body: 'pack-body',
+          body: pushBody,
         }),
     ],
     [

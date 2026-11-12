@@ -1,4 +1,5 @@
 import { RUNTIME_BASE_ABI } from '../../../src/sandbox-control/runtime-release.js';
+import type { GitHubTaskGrant, GitHubTaskScope } from '@kilocode/worker-utils/github-task-grant';
 
 export const FAKE_DOWNLOADED_RUNTIME_ENV = {
   RUNTIME_STARTUP_MODE: 'downloaded',
@@ -45,13 +46,18 @@ export type FakeCredentialBroker = {
   githubIssued: () => number;
   /** The repository each GitHub capability was issued for, by capability. */
   githubCapabilityRepositories: () => ReadonlyMap<string, string>;
-  issueGitHubSessionCapability: (params?: { githubRepo?: string }) => Promise<{
+  issueGitHubSessionCapability: (params: {
+    githubRepo: string;
+    taskScope?: GitHubTaskScope;
+    allowUserAuthorization?: boolean;
+  }) => Promise<{
+    taskGrant: GitHubTaskGrant;
     success: true;
     capability: string;
     installationId: number;
     accountLogin: string;
     appType: 'standard' | 'lite';
-    source: 'managed';
+    source: 'user' | 'installation';
   }>;
 };
 
@@ -65,15 +71,28 @@ export function createFakeCredentialBroker(
     githubCapabilityRepositories: () => repositories,
     async issueGitHubSessionCapability(params) {
       githubIssued += 1;
-      const capability = `kgh2.${githubIssued}`;
-      if (params?.githubRepo) repositories.set(capability, params.githubRepo);
+      if (!params.taskScope) throw new Error('Missing task scope');
+      const [owner, name] = params.githubRepo.toLowerCase().split('/');
+      const capability = `kgh3.${githubIssued}`;
+      repositories.set(capability, params.githubRepo);
       return {
+        taskGrant: {
+          revision: 1,
+          scopeId: params.taskScope.scopeId,
+          taskRef: params.taskScope.taskRef,
+          repository: {
+            id: params.taskScope.repositoryId ?? 101,
+            nodeId: 'R_fixture',
+            owner,
+            name,
+          },
+        },
         success: true as const,
         capability,
         installationId: 1,
         accountLogin: 'acme',
         appType,
-        source: 'managed' as const,
+        source: params.allowUserAuthorization ? ('user' as const) : ('installation' as const),
       };
     },
   };

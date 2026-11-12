@@ -5,6 +5,7 @@ import type { Env } from '../types.js';
 import { isSafeSandboxId } from '../shared/control-plane-credential.js';
 import { admitVercelScmForwardAtLocator } from './vercel-admission.js';
 import { forwardResolvedScmCapability } from './managed-forwarding.js';
+import { forwardUnmanagedScmRequest } from './unmanaged-forwarding.js';
 
 function originalTarget(headers: Headers): URL | null {
   const host = headers.get('vercel-forwarded-host');
@@ -99,7 +100,7 @@ export async function handleVercelScmForward(
       );
     }
     const upstream = upstreamRequest(request, target);
-    if (admission.authority.type === 'unmanaged') return await fetch(upstream);
+    if (admission.authority.type === 'unmanaged') return await forwardUnmanagedScmRequest(upstream);
     return await forwardResolvedScmCapability(
       upstream,
       env.GIT_TOKEN_SERVICE,

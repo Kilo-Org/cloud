@@ -38,7 +38,7 @@ const admitManaged = vi.fn<typeof admitVercelScmForwardAtLocator>(async () => ({
   authority: {
     type: 'managed',
     provider: 'github',
-    capability: 'kgh2.resolved',
+    capability: 'kgh3.resolved',
     outboundContainerId: 'binding-test',
   },
 }));
@@ -139,7 +139,9 @@ describe('prepared Vercel forwarding route', () => {
       const target = `https://${host}${port === '443' ? '' : `:${port}`}${path}`;
       const fetch = vi.fn(async (request: Request) => {
         expect(request.url).toBe(target);
-        expect(request.headers.get('host')).toBe(new URL(target).host);
+        // A GitHub task read is rebuilt without the guest's headers, so fetch derives the host.
+        if (host === 'gitlab.example')
+          expect(request.headers.get('host')).toBe(new URL(target).host);
         return new Response('ok');
       });
       vi.stubGlobal('fetch', fetch);
@@ -161,7 +163,28 @@ describe('prepared Vercel forwarding route', () => {
     }
   );
 
-  it('forwards admitted probes and caller-owned credentials without managed redemption', async () => {
+  it('rejects caller-owned credentials for GitHub task destinations', async () => {
+    const admit = vi.fn<typeof admitVercelScmForwardAtLocator>(async () => ({
+      ok: true,
+      authority: { type: 'unmanaged' },
+    }));
+    const fetch = vi.fn(async () => new Response('forwarded'));
+    vi.stubGlobal('fetch', fetch);
+    const response = await handleVercelScmForward(
+      forwarded(undefined, {
+        headers: { Authorization: 'Bearer caller-owned', Host: 'forged.test' },
+      }),
+      env,
+      'sbx-test',
+      admit
+    );
+    expect(response.status).toBe(401);
+    expect(response.headers.get('www-authenticate')).toBe('Basic realm="GitHub task"');
+    expect(fetch).not.toHaveBeenCalled();
+    expect(env.GIT_TOKEN_SERVICE.redeemGitHubSessionCapability).not.toHaveBeenCalled();
+  });
+
+  it('forwards anonymous GitHub task reads without managed redemption', async () => {
     const admit = vi.fn<typeof admitVercelScmForwardAtLocator>(async () => ({
       ok: true,
       authority: { type: 'unmanaged' },
@@ -170,8 +193,7 @@ describe('prepared Vercel forwarding route', () => {
       expect(request.url).toBe(
         'https://github.com/acme/repo.git/info/refs?service=git-upload-pack'
       );
-      expect(request.headers.get('host')).toBe('github.com');
-      expect(request.headers.get('authorization')).toBe('Bearer caller-owned');
+      expect(request.headers.has('authorization')).toBe(false);
       expect([...request.headers.keys()].some(key => key.startsWith('vercel-'))).toBe(false);
       expect(request.headers.has('x-forwarded-host')).toBe(false);
       expect(request.redirect).toBe('manual');
@@ -179,13 +201,7 @@ describe('prepared Vercel forwarding route', () => {
     });
     vi.stubGlobal('fetch', fetch);
     const response = await handleVercelScmForward(
-      forwarded(undefined, {
-        headers: {
-          Authorization: 'Bearer caller-owned',
-          Host: 'forged.test',
-          'x-forwarded-host': 'forged.test',
-        },
-      }),
+      forwarded(undefined, { headers: { 'x-forwarded-host': 'forged.test' } }),
       env,
       'sbx-test',
       admit
@@ -215,10 +231,11 @@ describe('prepared Vercel forwarding route', () => {
     );
     expect(response.status).toBe(200);
     expect(env.GIT_TOKEN_SERVICE.redeemGitHubSessionCapability).toHaveBeenCalledExactlyOnceWith({
-      capability: 'kgh2.resolved',
+      capability: 'kgh3.resolved',
       outboundContainerId: 'binding-test',
       requestMethod: 'POST',
       requestUrl: 'https://github.com/acme/repo.git/git-receive-pack',
+      requestContentType: 'text/plain;charset=UTF-8',
     });
   });
 
@@ -260,7 +277,7 @@ describe('prepared Vercel forwarding route', () => {
             authority: {
               type: 'managed',
               provider: 'github',
-              capability: 'kgh2.resolved',
+              capability: 'kgh3.resolved',
               outboundContainerId: 'binding-test',
             },
           }),

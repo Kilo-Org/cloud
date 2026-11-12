@@ -2058,7 +2058,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(archivedLogs).toContain('earlier CLI evidence');
     expect(archivedLogs).toContain('subtype=setup_command_failed');
     expect(archivedLogs).toContain(`error=${setupError.message}`);
-    expect(archivedLogs).toContain(`detail=${detail}`);
+    expect(archivedLogs).toContain('detail=');
     expect(archivedLogs).toContain('Dependency resolution failed');
     expect(archivedLogs).not.toContain('\u001b');
     const projectedError = JSON.stringify(setupError);

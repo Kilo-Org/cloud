@@ -1,5 +1,6 @@
 import type { SessionId } from './types/ids.js';
 import type { EnvironmentBuild } from './environment-build/environment-build-do.js';
+import type { GitHubTaskScope, GitHubTaskGrant } from '@kilocode/worker-utils/github-task-grant';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import type {
@@ -241,12 +242,17 @@ type GetCloudAgentAuthForRepoResult =
     }
   | {
       success: false;
-      reason: GitHubRepositoryAuthorizationFailureReason | 'repository_permissions_unavailable';
+      reason:
+        | GitHubRepositoryAuthorizationFailureReason
+        | 'repository_permissions_unavailable'
+        | 'provided_token_not_supported'
+        | 'user_authorization_unavailable';
     };
 
 type IssueGitHubSessionCapabilityResult =
   | {
       success: true;
+      taskGrant?: GitHubTaskGrant;
       capability: string;
       permissionScope?: 'repository';
       installationId: string;
@@ -263,7 +269,14 @@ type IssueGitHubSessionCapabilityResult =
       reason:
         | GitHubRepositoryAuthorizationFailureReason
         | 'capability_configuration_error'
-        | 'repository_permissions_unavailable';
+        | 'repository_permissions_unavailable'
+        | 'provided_token_not_supported'
+        | 'user_authorization_unavailable'
+        | 'invalid_task_scope'
+        | 'repository_mismatch'
+        | 'ref_not_allowed'
+        | 'operation_not_allowed'
+        | 'source_unavailable';
     };
 
 type RedeemGitHubSessionCapabilityResult =
@@ -289,6 +302,9 @@ type RedeemGitHubSessionCapabilityResult =
         | 'source_unavailable'
         | 'repository_permissions_unavailable'
         | 'identity_mismatch'
+        | 'invalid_task_scope'
+        | 'operation_not_allowed'
+        | 'ref_not_allowed'
         | 'integration_mismatch';
     };
 
@@ -413,9 +429,12 @@ export type GitTokenService = {
     params: ManagedGitHubAuthParams & {
       outboundContainerId: string;
       permissionScope?: 'repository';
+      taskScope?: GitHubTaskScope;
     }
   ): Promise<IssueGitHubSessionCapabilityResult>;
   redeemGitHubSessionCapability(params: {
+    requestContentType?: string;
+    requestBody?: Uint8Array;
     capability: string;
     outboundContainerId: string;
     requestMethod: string;

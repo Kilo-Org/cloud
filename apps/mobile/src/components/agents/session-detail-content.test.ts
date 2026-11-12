@@ -2536,6 +2536,97 @@ describe('session detail slow load', () => {
   });
 });
 
+describe('session detail terminal load failure retry', () => {
+  // What the transport writes into `errorAtom` when a session's own page read
+  // fails: the reopen answers the same way until the read recovers.
+  const TRANSPORT_FAILURE = 'Session history temporarily unavailable';
+
+  function errorCard(view: { renderer: ReactTestRenderer }) {
+    return view.renderer.root.findByType(QueryError).props as ComponentProps<typeof QueryError>;
+  }
+
+  function showTransportFailure(view: {
+    store: ReturnType<typeof createStore>;
+    manager: SessionManager;
+  }) {
+    act(() => {
+      view.store.set<string | null, [string | null], unknown>(
+        view.manager.atoms.error,
+        TRANSPORT_FAILURE
+      );
+    });
+  }
+
+  it('keeps the failed card and its busy Retry until the reopen that fails again settles', async () => {
+    const view = await mountDetails(null);
+    showTransportFailure(view);
+    const card = errorCard(view);
+    expect(card.message).toBe(i18n.t('agentChat.session.failedToLoadDetails'));
+    expect(card.isRetrying).toBe(false);
+
+    act(() => {
+      (errorCard(view).onRetry as () => void)();
+    });
+
+    // The tap is acknowledged on the card itself: it stays on screen, stating
+    // the failure it already stated, with the action busy. The skeleton never
+    // replaces it, which is what made a fast re-failure read as a lost tap.
+    expect(errorCard(view).isRetrying).toBe(true);
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
+    expect(renderedText(view.renderer.root)).toContain(i18n.t('agentChat.session.backToSessions'));
+
+    // The reopen reaches its fresh transcript request while the card still
+    // holds the action.
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(view.requestedIds()).toEqual([ROOT_ID, ROOT_ID]);
+    expect(errorCard(view).isRetrying).toBe(true);
+
+    // The reopen fails the same way. The action is handed back only once that
+    // outcome is on screen, so the busy state outlasts the whole round trip.
+    await view.respondOutcome(ROOT_ID, { kind: 'retryable_failure' });
+    expect(errorCard(view).isRetrying).toBe(false);
+    expect(errorCard(view).message).toBe(i18n.t('agentChat.session.failedToLoadDetails'));
+    expect(errorCard(view).onRetry).toBeDefined();
+  });
+
+  it('replaces the failed card with the transcript once a retry succeeds', async () => {
+    const view = await mountDetails(null);
+    showTransportFailure(view);
+
+    act(() => {
+      (errorCard(view).onRetry as () => void)();
+    });
+    expect(errorCard(view).isRetrying).toBe(true);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await view.respond(ROOT_ID, [childMessage(ROOT_ID, 'recovered row')]);
+    expect(view.renderer.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(renderedText(view.renderer.root)).toContain('recovered row');
+  });
+
+  it('offers no Retry for a permanent failure the transport forwarded', async () => {
+    const view = await mountDetails(null);
+    act(() => {
+      view.store.set<string | null, [string | null], unknown>(
+        view.manager.atoms.error,
+        'You are not authorized to use the Cloud Agent.'
+      );
+    });
+
+    const card = errorCard(view);
+    expect(card.variant).toBe('permission');
+    expect(card.title).toBe(i18n.t('common.accessDenied'));
+    expect(card.onRetry).toBeUndefined();
+    expect(card.isRetrying).toBe(false);
+  });
+});
+
 describe('session detail cached metadata refresh', () => {
   it('paints cached rows and offers a refresh Retry when the metadata read fails', async () => {
     const metadata = Promise.withResolvers<undefined>();

@@ -6,15 +6,12 @@ import {
   type ModelOption,
 } from '@/components/shared/ModelCombobox';
 
-// Models that demonstrate the sorting: preferred models + other models
 const sortingDemoModels: ModelOption[] = [
-  // Some preferred models (will appear in "Recommended" section)
   { id: 'x-ai/grok-code-fast-1', name: 'Grok Code Fast 1' },
   { id: 'anthropic/claude-opus-4.5', name: 'Claude Opus 4.5' },
   { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5' },
   { id: 'openai/gpt-5.1', name: 'GPT-5.1' },
 
-  // Other models (will appear in "All Models" section, sorted alphabetically)
   { id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4' },
   { id: 'anthropic/claude-haiku-3.5', name: 'Claude Haiku 3.5' },
   { id: 'openai/gpt-4o', name: 'GPT-4o' },
@@ -43,7 +40,6 @@ const organizationFilteredModels: ModelOption[] = [
   { id: 'google/gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
 ];
 
-// Models demonstrating vision support icons
 const visionSupportModels: ModelOption[] = [
   { id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4', supportsVision: true },
   { id: 'anthropic/claude-opus-4', name: 'Claude Opus 4', supportsVision: true },
@@ -59,14 +55,12 @@ const visionSupportModels: ModelOption[] = [
 ];
 
 const manyModels: ModelOption[] = [
-  // Anthropic
   { id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4' },
   { id: 'anthropic/claude-opus-4', name: 'Claude Opus 4' },
   { id: 'anthropic/claude-haiku-3.5', name: 'Claude Haiku 3.5' },
   { id: 'anthropic/claude-sonnet-3.5', name: 'Claude Sonnet 3.5' },
   { id: 'anthropic/claude-opus-3', name: 'Claude Opus 3' },
   { id: 'anthropic/claude-haiku-3', name: 'Claude Haiku 3' },
-  // OpenAI
   { id: 'openai/gpt-4o', name: 'GPT-4o' },
   { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' },
   { id: 'openai/gpt-4-turbo', name: 'GPT-4 Turbo' },
@@ -75,30 +69,25 @@ const manyModels: ModelOption[] = [
   { id: 'openai/o1', name: 'O1' },
   { id: 'openai/o1-mini', name: 'O1 Mini' },
   { id: 'openai/o1-preview', name: 'O1 Preview' },
-  // Google
   { id: 'google/gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
   { id: 'google/gemini-2.0-pro', name: 'Gemini 2.0 Pro' },
   { id: 'google/gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
   { id: 'google/gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
   { id: 'google/gemini-1.0-pro', name: 'Gemini 1.0 Pro' },
-  // Meta
   { id: 'meta/llama-3.3-70b', name: 'Llama 3.3 70B' },
   { id: 'meta/llama-3.2-90b', name: 'Llama 3.2 90B' },
   { id: 'meta/llama-3.2-11b', name: 'Llama 3.2 11B' },
   { id: 'meta/llama-3.1-405b', name: 'Llama 3.1 405B' },
   { id: 'meta/llama-3.1-70b', name: 'Llama 3.1 70B' },
   { id: 'meta/llama-3.1-8b', name: 'Llama 3.1 8B' },
-  // Mistral
   { id: 'mistral/mistral-large', name: 'Mistral Large' },
   { id: 'mistral/mistral-medium', name: 'Mistral Medium' },
   { id: 'mistral/mistral-small', name: 'Mistral Small' },
   { id: 'mistral/codestral', name: 'Codestral' },
   { id: 'mistral/mixtral-8x22b', name: 'Mixtral 8x22B' },
   { id: 'mistral/mixtral-8x7b', name: 'Mixtral 8x7B' },
-  // Cohere
   { id: 'cohere/command-r-plus', name: 'Command R+' },
   { id: 'cohere/command-r', name: 'Command R' },
-  // DeepSeek
   { id: 'deepseek/deepseek-chat', name: 'DeepSeek Chat' },
   { id: 'deepseek/deepseek-coder', name: 'DeepSeek Coder' },
 ];

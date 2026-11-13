@@ -26,6 +26,11 @@ export type CreateDrizzleClientOptions = {
   connectionString: string;
   poolConfig?: Partial<pg.PoolConfig>;
   logger?: boolean;
+  /**
+   * Replaces the TLS settings that `getDatabaseClientConfig` derives from the connection string
+   * and `DATABASE_CA`. The override is intentional: local and test PostgreSQL servers are often
+   * plaintext, and `DATABASE_CA` in the environment would otherwise force TLS on them.
+   */
   ssl?: { ca: string } | false;
 };
 

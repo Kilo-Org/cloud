@@ -22,9 +22,9 @@ function isMissingDrizzleConfigError(error: unknown): boolean {
   return (
     message.includes('POSTGRES_URL not configured') ||
     message.includes('POSTGRES_URL_PRODUCTION not configured') ||
-    message.includes('POSTGRES_CONNECT_TIMEOUT not configured') ||
-    message.includes('POSTGRES_MAX_QUERY_TIME not configured') ||
-    message.includes('POSTGRES_SCRIPT_URL must be set for scripts')
+    message.includes('Missing required environment variable POSTGRES_CONNECT_TIMEOUT') ||
+    message.includes('Missing required environment variable POSTGRES_MAX_QUERY_TIME') ||
+    message.includes('Missing required environment variable POSTGRES_SCRIPT_URL')
   );
 }
 

@@ -96,7 +96,7 @@ describe('drizzle', () => {
         selectReplicaUrl({
           primaryUrl,
           nodeEnv: 'production',
-          vercelRegion: 'iad1',
+          vercelRegion: 'sfo1',
           usReplicaUrl: 'postgres://us-replica',
           euReplicaUrls: ['postgres://eu-replica'],
         })
@@ -121,7 +121,7 @@ describe('drizzle', () => {
         selectReplicaUrl({
           primaryUrl,
           nodeEnv: 'production',
-          vercelRegion: 'iad1',
+          vercelRegion: 'sfo1',
           usReplicaUrl: undefined,
           euReplicaUrls: ['postgres://eu-replica'],
         })

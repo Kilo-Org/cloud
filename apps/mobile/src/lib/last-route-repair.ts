@@ -15,10 +15,10 @@ import { type Href } from 'expo-router';
  * route inside the app is a screen this launch was started for, and the pending
  * consumer opens it above the shell instead.
  *
- * The root layouts' groups (`(app)`, `(tabs)`) are routing groups and are
- * stripped from both sides. A parenthesized tab (`(3_profile)`) or nested
- * layout is a destination and stays, so two sides that differ only by which
- * tab is focused are still different screens.
+ * The groups that add no URL segment (`(app)`, `(auth)`, `(edit)`, `(tabs)`)
+ * are stripped from both sides. A parenthesized tab (`(3_profile)`) is a
+ * destination and stays, so two sides that differ only by which tab is focused
+ * are still different screens.
  */
 export function shouldRepairRestoredRoute(input: {
   readonly recordedHref: string | null;

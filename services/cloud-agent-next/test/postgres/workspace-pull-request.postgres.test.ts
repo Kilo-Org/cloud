@@ -57,6 +57,7 @@ function observations() {
 async function insertSession(values: {
   worktreeId: string;
   userId: string;
+  gitBranch?: string;
   prUrl?: string;
   prNumber?: number;
   prLinkVerifiedAt?: string;
@@ -69,7 +70,7 @@ async function insertSession(values: {
     kilo_user_id: values.userId,
     cloud_agent_worktree_id: values.worktreeId,
     git_url: gitUrl,
-    git_branch: branch,
+    git_branch: values.gitBranch ?? branch,
     pr_url: values.prUrl ?? null,
     pr_number: values.prNumber ?? null,
     pr_link_verified_at: values.prLinkVerifiedAt ?? null,
@@ -130,6 +131,19 @@ beforeAll(async () => {
     },
     {
       git_url: gitUrl,
+      git_branch: 'feature/unverified-link',
+      owned_by_user_id: owner,
+      pr_url: 'https://github.com/Kilo-Org/cloud/pull/777',
+      pr_number: 777,
+      pr_state: 'open',
+      pr_title: 'Unverified link candidate',
+      pr_head_sha: headSha,
+      pr_observations: observations(),
+      review_decision_pending: false,
+      pr_last_synced_at: '2026-10-21T12:00:00Z',
+    },
+    {
+      git_url: gitUrl,
       git_branch: branch,
       owned_by_user_id: otherUser,
       pr_url: 'https://github.com/Kilo-Org/cloud/pull/999',
@@ -161,6 +175,7 @@ beforeAll(async () => {
   await insertSession({
     worktreeId: worktrees.unverified,
     userId: owner,
+    gitBranch: 'feature/unverified-link',
     prUrl: 'https://github.com/Kilo-Org/cloud/pull/777',
     prNumber: 777,
   });

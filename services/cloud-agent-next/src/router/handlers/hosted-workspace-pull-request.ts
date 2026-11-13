@@ -108,19 +108,21 @@ async function requestWorkspacePullRequestRefresh(
     return { status: 'unavailable', retryAt: null };
   }
 
+  const backendUrl = (env.KILOCODE_BACKEND_BASE_URL ?? DEFAULT_BACKEND_URL)
+    .trim()
+    .replace(/\/+$/, '');
+
   try {
-    const response = await fetch(
-      new URL(REFRESH_PATH, env.KILOCODE_BACKEND_BASE_URL ?? DEFAULT_BACKEND_URL),
-      {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-internal-api-key': secret,
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS),
-      }
-    );
+    const response = await fetch(`${backendUrl}${REFRESH_PATH}`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-internal-api-key': secret,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS),
+      redirect: 'manual',
+    });
 
     if (response.status === 404) {
       await response.body?.cancel();

@@ -132,9 +132,7 @@ describe('refreshHostedWorkspacePullRequest', () => {
     expect(result.refresh).toEqual({ status: 'refreshed', retryAt: null });
     expect(result.pullRequest).toMatchObject({ number: 142 });
     expect(fetchMock).toHaveBeenCalledWith(
-      new URL(
-        'https://api.test/api/internal/cloud-agent-next/hosted-workspace-pull-request/refresh'
-      ),
+      'https://api.test/api/internal/cloud-agent-next/hosted-workspace-pull-request/refresh',
       {
         method: 'POST',
         headers: {
@@ -143,9 +141,24 @@ describe('refreshHostedWorkspacePullRequest', () => {
         },
         body: JSON.stringify({ workspaceId, userId, organizationId: null }),
         signal: expect.any(AbortSignal),
+        redirect: 'manual',
       }
     );
     expect(test.durableObjectAccess).not.toHaveBeenCalled();
+  });
+
+  it('preserves a path-prefixed backend base URL', async () => {
+    fetchMock.mockResolvedValueOnce(backendResponse({ status: 'refreshed', retryAt: null }));
+    const test = fixture({
+      summary: pullRequest(),
+      env: { KILOCODE_BACKEND_BASE_URL: 'https://api.test/root/' },
+    });
+
+    await test.caller.refreshHostedWorkspacePullRequest({ workspaceId });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'https://api.test/root/api/internal/cloud-agent-next/hosted-workspace-pull-request/refresh'
+    );
   });
 
   it('keeps cached data and reports a rate limit', async () => {

@@ -68,6 +68,13 @@ export const activeSessionSchema = z.object({
    * remove optional when every client is past this release.
    */
   associatedPr: associatedPrSchema.optional(),
+  /**
+   * The Cloud Agent runtime id (`workspace_…`) of a live cloud row. It is what
+   * the control-plane routes address the session by, so a client that opens a
+   * terminal in the session's sandbox needs it; CLI rows have no such id and
+   * omit the key.
+   */
+  cloudAgentSessionId: z.string().optional(),
 });
 
 const activeSessionsResponseSchema = z.object({
@@ -329,6 +336,12 @@ function mapCloudCandidateRow(row: CloudCandidateRow): ActiveSession {
   };
   if (row.last_activity_at != null) {
     mapped.lastActivityAt = row.last_activity_at;
+  }
+  // The runtime id a client needs to address this session's own control plane
+  // (a terminal in its sandbox). The candidate query already requires it; the
+  // field stays optional here because only cloud rows carry one.
+  if (row.cloud_agent_session_id != null) {
+    mapped.cloudAgentSessionId = row.cloud_agent_session_id;
   }
   const statusUpdatedAt =
     mapped.status !== row.status || row.status_updated_at == null

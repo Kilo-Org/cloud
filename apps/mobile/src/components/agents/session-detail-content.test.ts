@@ -2612,9 +2612,13 @@ describe('session detail stored transcript with no reply recorded', () => {
   });
 
   it('draws no note when the recorded answer renders nothing', async () => {
-    // Reasoning is not transcript copy: the answer row leaves no visible part,
-    // yet the stored record holds a response to the prompt.
-    const base = assistantMessage('msg-stored-reasoning');
+    // Reasoning is not transcript copy, so with the thinking setting on the
+    // answer row leaves no visible part and the merged transcript drops it. The
+    // stored record still holds a response to the prompt, so the note must stay
+    // away; a decision taken from the rendered rows would show it here.
+    hideThinking.current = true;
+    const answerId = 'msg-stored-reasoning';
+    const base = assistantMessage(answerId);
     const reasoning: StoredMessage = {
       info: {
         ...(base.info as Extract<StoredMessage['info'], { role: 'assistant' }>),
@@ -2623,12 +2627,12 @@ describe('session detail stored transcript with no reply recorded', () => {
       },
       parts: [
         {
-          id: 'reasoning-msg-stored-reasoning',
+          id: `reasoning-${answerId}`,
           sessionID: ROOT_ID,
-          messageID: base.info.id,
+          messageID: answerId,
           type: 'reasoning',
           text: 'Checking the deploy target.',
-          time: { start: 1_761_000_000_000 },
+          time: { start: 1_761_000_000_000, end: 1_761_000_000_500 },
         },
       ],
     };

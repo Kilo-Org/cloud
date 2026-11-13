@@ -2,6 +2,7 @@ import {
   buttonByLabel,
   confirmRemoval,
   confirmSpy,
+  emptyDescription,
   hasButtonLabel,
   list,
   MACBOOK,
@@ -136,6 +137,22 @@ describe('PasskeysScreen inline failures', () => {
     // notice is the state: the rows the account already has stay listed.
     expect(hasButtonLabel(view, 'Add a passkey')).toBe(false);
     expect(texts(view)).toContain('MacBook');
+    view.unmount();
+  });
+
+  it('replaces the empty state hint with the same notice', async () => {
+    store.rows = [];
+    list.register.mockResolvedValue({ status: 'error', failure: 'unavailable' });
+    const view = await mount();
+    await waitFor(() => nodes(view, 'EmptyState').length === 1);
+
+    await press(buttonByLabel(view, 'Add a passkey'));
+    await waitFor(() => !hasButtonLabel(view, 'Add a passkey'));
+
+    // Non-retryable: no retry control, and no Add control that could only be
+    // refused the same way again. The notice takes the hint's place.
+    expect(hasButtonLabel(view, 'Retry')).toBe(false);
+    expect(emptyDescription(view)).toBe('Passkeys can only be added in a web browser.');
     view.unmount();
   });
 });

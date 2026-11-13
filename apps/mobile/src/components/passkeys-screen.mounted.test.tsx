@@ -260,39 +260,6 @@ describe('PasskeysScreen', () => {
     view.unmount();
   });
 
-  it('drops the Add control when the ceremony refuses as unavailable', async () => {
-    store.rows = [];
-    list.register.mockResolvedValue({ status: 'error', failure: 'unavailable' });
-    const view = await mount();
-    await waitFor(() => nodes(view, 'EmptyState').length === 1);
-
-    await press(buttonByLabel(view, 'Add a passkey'));
-    await waitFor(() => !hasButtonLabel(view, 'Add a passkey'));
-
-    // Non-retryable: no retry control, and no Add control that could only be
-    // refused the same way again. The notice replaces the hint the control
-    // annotated.
-    expect(hasButtonLabel(view, 'Retry')).toBe(false);
-    expect(emptyDescription(view)).toBe('Passkeys can only be added in a web browser.');
-    view.unmount();
-  });
-
-  it('keeps the Add control and shows the retryable notice beside the rows', async () => {
-    list.register.mockResolvedValue({ status: 'error', failure: 'failed' });
-    const view = await mount();
-    await waitFor(() => texts(view).includes('MacBook'));
-
-    await press(buttonByLabel(view, 'Add a passkey'));
-    await waitFor(() => texts(view).includes('Could not add a passkey. Try again.'));
-
-    // Retryable: the same control starts a fresh ceremony, so it stays beside
-    // the rows that keep rendering.
-    expect(hasButtonLabel(view, 'Add a passkey')).toBe(true);
-    expect(hasButtonLabel(view, 'Retry')).toBe(false);
-    expect(texts(view)).toContain('MacBook');
-    view.unmount();
-  });
-
   it('keeps the Add CTA and names the reason when creation fails retryably', async () => {
     store.rows = [];
     list.register.mockResolvedValue({ status: 'error', failure: 'failed' });

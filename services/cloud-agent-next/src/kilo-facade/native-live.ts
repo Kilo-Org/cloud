@@ -57,7 +57,10 @@ const nativeSessionSchema = z
   .passthrough();
 
 const nativeMessageSchema = z
-  .object({ info: z.object({ id: z.string().min(1), sessionID: z.string().min(1) }) })
+  .object({
+    info: z.object({ id: z.string().min(1), sessionID: z.string().min(1) }),
+    parts: z.array(z.object({ sessionID: z.string().min(1) }).passthrough()).optional(),
+  })
   .passthrough();
 
 export type NativeReadOutcome =
@@ -121,8 +124,9 @@ function sessionPublicShape(value: unknown, kiloSessionId: string): NativeReadOu
 }
 
 /**
- * Projects only the requested session's transcript window. A row with no session
- * identity refuses the read.
+ * Projects only the requested session's transcript window: a row and each of its
+ * parts must carry the session's identity, and a row with no identity refuses
+ * the read.
  */
 function messagesPublicShape(
   value: unknown,
@@ -136,6 +140,7 @@ function messagesPublicShape(
     const parsed = nativeMessageSchema.safeParse(message);
     if (!parsed.success) return invalidNativeResult();
     if (parsed.data.info.sessionID !== kiloSessionId) continue;
+    if (parsed.data.parts?.some(part => part.sessionID !== kiloSessionId) === true) continue;
     owned.push(message);
   }
   return bounded(projectPublicStructuredPaths(owned, kiloSessionId));

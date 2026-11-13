@@ -1,8 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { planSshConfigImport } from './config-import';
 import { type SshHost } from './hosts';
 import { parseSshConfig } from './ssh-config-parse';
+
+// The planner imports the stores, whose ids come from `expo-crypto`. Under Node
+// that module loads Expo's runtime setup, which reads `__DEV__`; the mock keeps
+// this suite on the pure planner path.
+vi.mock('expo-crypto', () => ({ randomUUID: () => 'id-fixture' }));
 
 const existingHost = (label: string, overrides: Partial<SshHost> = {}): SshHost => ({
   id: `id-${label}`,
@@ -179,7 +184,11 @@ Host internal
       []
     );
 
-    expect(plan.hosts[1]).toMatchObject({ alias: 'internal', jumpTarget: 'bastion', jumpHostId: null });
+    expect(plan.hosts[1]).toMatchObject({
+      alias: 'internal',
+      jumpTarget: 'bastion',
+      jumpHostId: null,
+    });
   });
 
   it('resolves a ProxyJump to an existing host by label, user and port included', () => {
@@ -229,7 +238,7 @@ Host internal
     expect(plan.hosts[2]?.warnings).toEqual([{ kind: 'jumpHostMultiHop' }]);
   });
 
-  it('drops a jump that loops inside the batch', () => {
+  it('keeps one side of a mutual jump and drops the one that would close it', () => {
     const plan = planSshConfigImport(
       `
 Host one
@@ -242,9 +251,10 @@ Host two
       []
     );
 
-    expect(plan.hosts[0]).toMatchObject({ jumpTarget: null });
-    expect(plan.hosts[0]?.warnings).toContainEqual({ kind: 'jumpHostCycle', target: 'two' });
-    expect(plan.hosts[1]).toMatchObject({ jumpTarget: 'one' });
+    expect(plan.hosts[0]).toMatchObject({ jumpTarget: 'two' });
+    expect(plan.hosts[0]?.warnings).toEqual([]);
+    expect(plan.hosts[1]).toMatchObject({ jumpTarget: null });
+    expect(plan.hosts[1]?.warnings).toEqual([{ kind: 'jumpHostCycle', target: 'one' }]);
   });
 
   it('maps LocalForward and RemoteForward into forwards on the host', () => {

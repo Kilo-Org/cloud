@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { type SshConfigPlan, planSshConfigImport } from '@/lib/ssh/config-import';
+import { planSshConfigImport, type SshConfigPlan } from '@/lib/ssh/config-import';
 import { SSH_HOSTS_ROUTE } from '@/lib/ssh/routes';
 import { useSshConfigImport, useSshHosts } from '@/lib/ssh/use-ssh';
 import { cn } from '@/lib/utils';

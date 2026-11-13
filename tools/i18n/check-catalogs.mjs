@@ -242,6 +242,11 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // catalog keeps them as the billing pages and the invoices spell them.
   'organization.hub.planTeams',
   'organization.hub.planEnterprise',
+  // The SSH section's own protocol name and the example hostname the editor
+  // shows. `SSH` is the protocol's acronym and the sample hostname names the
+  // syntax a hostname field accepts, so no catalog translates either.
+  'ssh.title',
+  'ssh.editor.hostnamePlaceholder',
 ]);
 
 /**

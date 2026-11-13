@@ -1,4 +1,4 @@
-import { type SshHost, hostInputSchema, type SshHostInput } from './hosts';
+import { hostInputSchema, type SshHost, type SshHostInput } from './hosts';
 
 export type SshAuthMethod = 'password' | 'key' | 'keyboard_interactive';
 
@@ -102,4 +102,28 @@ export function hostFormIssue(
   field: HostFormField
 ): HostFormErrorKind | undefined {
   return issues.find(issue => issue.field === field)?.kind;
+}
+
+/**
+ * The hosts a jump picker can offer: every other host whose own jump chain does
+ * not come back to `hostId`. A host behind a chosen jump would close a loop, and
+ * the store refuses one, so the picker never offers it.
+ */
+export function jumpHostCandidates(hosts: readonly SshHost[], hostId: string | null): SshHost[] {
+  const byId = new Map(hosts.map(host => [host.id, host]));
+  return hosts.filter(candidate => {
+    if (candidate.id === hostId) {
+      return false;
+    }
+    const seen = new Set<string>();
+    let current = candidate.jumpHostId;
+    while (current !== null && !seen.has(current)) {
+      if (current === hostId) {
+        return false;
+      }
+      seen.add(current);
+      current = byId.get(current)?.jumpHostId ?? null;
+    }
+    return true;
+  });
 }

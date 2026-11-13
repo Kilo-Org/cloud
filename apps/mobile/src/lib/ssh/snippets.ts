@@ -1,13 +1,6 @@
 import { z } from 'zod';
 
-import {
-  booleanColumn,
-  booleanValue,
-  readRow,
-  readRows,
-  type SshDatabase,
-  updateRow,
-} from './database';
+import { booleanColumn, readRow, readRows, type SshDatabase } from './database';
 import { newId } from './id';
 
 const COLUMNS = `
@@ -43,15 +36,6 @@ const snippetInputSchema = z.object({
 });
 
 export type SshSnippetInput = z.input<typeof snippetInputSchema>;
-
-const snippetPatchSchema = z
-  .object({
-    ...snippetFields,
-    appendNewline: z.boolean(),
-  })
-  .partial();
-
-export type SshSnippetPatch = z.input<typeof snippetPatchSchema>;
 
 export function listSnippets(db: SshDatabase): SshSnippet[] {
   return readRows({
@@ -97,30 +81,4 @@ export function createSnippet(
     throw new Error(`ssh_snippets: row ${id} is missing after its own insert`);
   }
   return created;
-}
-
-export function updateSnippet(
-  db: SshDatabase,
-  id: string,
-  patch: SshSnippetPatch
-): SshSnippet | null {
-  const snippet = snippetPatchSchema.parse(patch);
-  updateRow({
-    db,
-    table: 'ssh_snippets',
-    id,
-    updates: {
-      label: snippet.label,
-      command: snippet.command,
-      append_newline: booleanValue(snippet.appendNewline),
-      host_id: snippet.hostId,
-      sort_order: snippet.sortOrder,
-      updated_at: Date.now(),
-    },
-  });
-  return getSnippet(db, id);
-}
-
-export function deleteSnippet(db: SshDatabase, id: string): void {
-  db.runSync('delete from ssh_snippets where id = ?', [id]);
 }

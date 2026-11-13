@@ -2,15 +2,7 @@ import { z } from 'zod';
 
 import { SSH_FORWARD_DIRECTIONS } from '@/lib/persist/schema';
 
-import {
-  booleanColumn,
-  booleanValue,
-  portSchema,
-  readRow,
-  readRows,
-  type SshDatabase,
-  updateRow,
-} from './database';
+import { booleanColumn, portSchema, readRow, readRows, type SshDatabase } from './database';
 import { newId } from './id';
 
 const COLUMNS = `
@@ -53,10 +45,6 @@ const forwardInputSchema = z.object({
 
 export type SshForwardInput = z.input<typeof forwardInputSchema>;
 
-const forwardPatchSchema = z.object(forwardFields).partial();
-
-export type SshForwardPatch = z.input<typeof forwardPatchSchema>;
-
 export function listForwards(db: SshDatabase): SshForward[] {
   return readRows({
     db,
@@ -98,32 +86,4 @@ export function createForward(db: SshDatabase, input: SshForwardInput): SshForwa
     throw new Error(`ssh_forwards: row ${id} is missing after its own insert`);
   }
   return created;
-}
-
-export function updateForward(
-  db: SshDatabase,
-  id: string,
-  patch: SshForwardPatch
-): SshForward | null {
-  const forward = forwardPatchSchema.parse(patch);
-  updateRow({
-    db,
-    table: 'ssh_forwards',
-    id,
-    updates: {
-      host_id: forward.hostId,
-      direction: forward.direction,
-      bind_host: forward.bindHost,
-      bind_port: forward.bindPort,
-      destination_host: forward.destinationHost,
-      destination_port: forward.destinationPort,
-      auto_start: booleanValue(forward.autoStart),
-      label: forward.label,
-    },
-  });
-  return getForward(db, id);
-}
-
-export function deleteForward(db: SshDatabase, id: string): void {
-  db.runSync('delete from ssh_forwards where id = ?', [id]);
 }

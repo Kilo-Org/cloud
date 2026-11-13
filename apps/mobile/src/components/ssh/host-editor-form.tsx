@@ -18,6 +18,7 @@ import {
   type HostFormIssue,
   hostFormIssue,
   hostFormValuesOf,
+  jumpHostCandidates,
   type SshAuthMethod,
   toHostInput,
   validateHostInput,
@@ -67,7 +68,7 @@ export function HostEditorForm({
   const [picker, setPicker] = useState<OpenPicker>(null);
 
   const jumpCycle = saveError instanceof SshJumpHostCycleError;
-  const otherHosts = hosts.filter(candidate => candidate.id !== host?.id);
+  const otherHosts = jumpHostCandidates(hosts, host?.id ?? null);
   const selectedKey = keys.find(key => key.id === keyId) ?? null;
   const selectedJump = otherHosts.find(candidate => candidate.id === jumpHostId) ?? null;
 

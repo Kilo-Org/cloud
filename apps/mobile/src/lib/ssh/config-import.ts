@@ -1,8 +1,13 @@
-import { SSH_AUTH_METHODS } from '@/lib/persist/schema';
+import { type SSH_AUTH_METHODS } from '@/lib/persist/schema';
 
 import { type SshDatabase } from './database';
 import { createForward } from './forwards';
-import { createHost, type SshHost, updateHost } from './hosts';
+import { createHost, getHost, type SshHost, updateHost } from './hosts';
+import {
+  forwardsOf,
+  isRepeatableDirective,
+  type SshConfigForwardDraft,
+} from './ssh-config-forward';
 import { parseSshConfig, type SshConfigBlock, type SshConfigEntry } from './ssh-config-parse';
 
 type SshAuthMethod = (typeof SSH_AUTH_METHODS)[number];
@@ -14,14 +19,6 @@ export type SshConfigWarning =
   | { kind: 'jumpHostMultiHop' }
   | { kind: 'jumpHostCycle'; target: string }
   | { kind: 'forwardUnsupported'; directive: string };
-
-export type SshConfigForwardDraft = Readonly<{
-  direction: 'local' | 'remote';
-  bindHost: string;
-  bindPort: number;
-  destinationHost: string;
-  destinationPort: number;
-}>;
 
 export type SshConfigHostDraft = Readonly<{
   alias: string;
@@ -39,7 +36,7 @@ export type SshConfigHostDraft = Readonly<{
   warnings: readonly SshConfigWarning[];
 }>;
 
-export type SshConfigSkipReason = 'noUsername' | 'invalidPort';
+type SshConfigSkipReason = 'noUsername' | 'invalidPort';
 
 export type SshConfigSkippedHost = Readonly<{ alias: string; reason: SshConfigSkipReason }>;
 
@@ -52,13 +49,6 @@ export type SshConfigPlan = Readonly<{
 
 const WILDCARD_PATTERN = /[*?[]/;
 
-function forwardDirectionOf(key: string): SshConfigForwardDraft['direction'] | null {
-  if (key === 'localforward') {
-    return 'local';
-  }
-  return key === 'remoteforward' ? 'remote' : null;
-}
-
 function firstValue(entries: readonly SshConfigEntry[], key: string): string | null {
   return entries.find(entry => entry.key === key)?.value ?? null;
 }
@@ -68,63 +58,50 @@ function portOf(text: string): number | null {
   return Number.isInteger(value) && value >= 1 && value <= 65535 ? value : null;
 }
 
-type HostAndPort = Readonly<{ host: string | null; port: number | null }>;
-
-function splitHostAndPort(token: string): HostAndPort {
-  const bracketed = /^\[([^\]]+)]:(\d+)$/.exec(token);
-  if (bracketed) {
-    return { host: bracketed[1] ?? null, port: portOf(bracketed[2] ?? '') };
+/**
+ * Adds the block's directives to one alias, keeping every repeatable line and
+ * the first value of every other directive.
+ */
+function mergeEntriesInto(
+  target: { alias: string; entries: SshConfigEntry[] },
+  entries: readonly SshConfigEntry[]
+): void {
+  for (const entry of entries) {
+    if (isRepeatableDirective(entry.key) || firstValue(target.entries, entry.key) === null) {
+      target.entries.push(entry);
+    }
   }
-  const colon = token.lastIndexOf(':');
-  if (colon === -1) {
-    return { host: null, port: portOf(token) };
-  }
-  return { host: token.slice(0, colon), port: portOf(token.slice(colon + 1)) };
 }
 
 /**
- * One `LocalForward`/`RemoteForward` line, in either of OpenSSH's shapes:
- * `port host:hostport` and `[bind_address:]port host:hostport`. A Unix socket
- * target, or a port outside 1-65535, is not a forward this app can store.
+ * One `Host` line per pattern that is not a wildcard, with the directives of
+ * every later block naming the same alias folded in. OpenSSH resolves a host's
+ * own blocks by the first value each directive has, so the first one wins;
+ * directives a block may repeat keep every line.
  */
-function parseForward(
-  direction: SshConfigForwardDraft['direction'],
-  value: string
-): SshConfigForwardDraft | null {
-  const tokens = value.split(/\s+/).filter(token => token.length > 0);
-  let bindToken = tokens[0];
-  let destinationToken = tokens[1];
-  if (tokens.length === 1 && bindToken !== undefined) {
-    const parts = bindToken.split(':');
-    if (parts.length !== 3) {
-      return null;
+function mergeHostBlocks(
+  blocks: readonly SshConfigBlock[]
+): Map<string, { alias: string; entries: SshConfigEntry[] }> {
+  const merged = new Map<string, { alias: string; entries: SshConfigEntry[] }>();
+  for (const block of blocks) {
+    const patterns = block.kind === 'host' ? block.patterns : [];
+    for (const pattern of patterns) {
+      if (!WILDCARD_PATTERN.test(pattern)) {
+        const key = pattern.toLowerCase();
+        const target = merged.get(key) ?? { alias: pattern, entries: [] };
+        merged.set(key, target);
+        mergeEntriesInto(target, block.entries);
+      }
     }
-    bindToken = parts[0];
-    destinationToken = `${parts[1] ?? ''}:${parts[2] ?? ''}`;
   }
-  if (bindToken === undefined || destinationToken === undefined) {
-    return null;
-  }
-  const bind = splitHostAndPort(bindToken);
-  const destination = splitHostAndPort(destinationToken);
-  if (bind.port === null || destination.port === null || destination.host === null) {
-    return null;
-  }
-  return {
-    direction,
-    bindHost: bind.host ?? '127.0.0.1',
-    bindPort: bind.port,
-    destinationHost: destination.host,
-    destinationPort: destination.port,
-  };
+  return merged;
 }
 
 /** The host part of a ProxyJump target, without its `user@` or `:port`. */
 function jumpHostKey(target: string): string {
   const hostPart = target.slice(target.lastIndexOf('@') + 1);
   const bracketed = /^\[([^\]]+)]/.exec(hostPart);
-  const host = bracketed?.[1] ?? hostPart.split(':')[0] ?? '';
-  return host.toLowerCase();
+  return (bracketed?.[1] ?? hostPart.split(':')[0] ?? '').toLowerCase();
 }
 
 type JumpResolution = Readonly<{
@@ -157,59 +134,95 @@ function resolveJump(
   if (existing) {
     return { target: existing.label, hostId: existing.id, warnings };
   }
-  return { target: null, hostId: null, warnings: [...warnings, { kind: 'jumpHostMissing', target }] };
+  return {
+    target: null,
+    hostId: null,
+    warnings: [...warnings, { kind: 'jumpHostMissing', target }],
+  };
 }
 
-type HostDraftResult =
-  | { kind: 'draft'; draft: SshConfigHostDraft }
-  | { kind: 'skipped'; skipped: SshConfigSkippedHost };
+/** Whether `kept`'s chain of accepted jumps already walks from `start` to `goal`. */
+function chainReaches(kept: ReadonlyMap<string, string>, start: string, goal: string): boolean {
+  const seen = new Set<string>();
+  let current: string | null = start;
+  while (current !== null && !seen.has(current)) {
+    if (current === goal) {
+      return true;
+    }
+    seen.add(current);
+    current = kept.get(current) ?? null;
+  }
+  return false;
+}
 
-function forwardsOf(entries: readonly SshConfigEntry[]): {
-  forwards: SshConfigForwardDraft[];
-  warnings: SshConfigWarning[];
-} {
-  const forwards: SshConfigForwardDraft[] = [];
-  const warnings: SshConfigWarning[] = [];
-  for (const entry of entries) {
-    const direction = forwardDirectionOf(entry.key);
-    if (direction !== null) {
-      const forward = parseForward(direction, entry.value);
-      if (forward === null) {
-        warnings.push({ kind: 'forwardUnsupported', directive: entry.key });
-      } else {
-        forwards.push(forward);
+/**
+ * Drops a jump that would loop inside this batch. Drafts are read in file order
+ * and a jump is kept only while the jumps already kept do not walk back to the
+ * host that names it, so one side of a mutual jump keeps its route and the
+ * other is reported instead of failing the whole import in the store.
+ */
+function withResolvedJumps(drafts: readonly SshConfigHostDraft[]): SshConfigHostDraft[] {
+  const kept = new Map<string, string>();
+  const resolved: SshConfigHostDraft[] = [];
+  for (const draft of drafts) {
+    const target = draft.jumpTarget?.toLowerCase() ?? null;
+    const own = draft.alias.toLowerCase();
+    if (target !== null && chainReaches(kept, target, own)) {
+      resolved.push({
+        ...draft,
+        jumpTarget: null,
+        jumpHostId: null,
+        warnings: [...draft.warnings, { kind: 'jumpHostCycle', target: draft.jumpTarget ?? '' }],
+      });
+    } else {
+      if (target !== null) {
+        kept.set(own, target);
       }
+      resolved.push(draft);
     }
   }
-  return { forwards, warnings };
+  return resolved;
 }
 
-function draftOfHost(
-  alias: string,
-  entries: readonly SshConfigEntry[],
-  globalEntries: readonly SshConfigEntry[],
-  batch: ReadonlyMap<string, string>,
-  existingByLabel: ReadonlyMap<string, SshHost>
-): HostDraftResult {
-  const username = (firstValue(entries, 'user') ?? firstValue(globalEntries, 'user') ?? '').trim();
-  if (username.length === 0) {
-    return { kind: 'skipped', skipped: { alias, reason: 'noUsername' } };
-  }
-  const port = portOf(firstValue(entries, 'port') ?? firstValue(globalEntries, 'port') ?? '22');
-  if (port === null) {
-    return { kind: 'skipped', skipped: { alias, reason: 'invalidPort' } };
-  }
-  const identityFile =
-    firstValue(entries, 'identityfile') ?? firstValue(globalEntries, 'identityfile');
-  const jump = resolveJump(firstValue(entries, 'proxyjump'), batch, existingByLabel);
-  const { forwards, warnings: forwardWarnings } = forwardsOf(entries);
-  const warnings: SshConfigWarning[] = [...jump.warnings, ...forwardWarnings];
-  if (identityFile !== null) {
-    warnings.push({ kind: 'needsKey', identityFile });
-  }
-  return {
-    kind: 'draft',
-    draft: {
+/**
+ * The hosts a config file describes, in file order, with everything the
+ * preview needs to explain what it will and will not import.
+ *
+ * A `Host` line naming several patterns stores each pattern that is not a
+ * wildcard; a wildcard names a rule for many hosts rather than one host to
+ * keep. Directives before the first `Host` line are defaults for every host.
+ */
+export function planSshConfigImport(text: string, existing: readonly SshHost[]): SshConfigPlan {
+  const blocks = parseSshConfig(text);
+  const globals = blocks.flatMap(block => (block.kind === 'global' ? block.entries : []));
+  const merged = mergeHostBlocks(blocks);
+  const existingByLabel = new Map(existing.map(host => [host.label.toLowerCase(), host]));
+  const batch = new Map([...merged].map(([key, host]) => [key, host.alias]));
+  const drafts: SshConfigHostDraft[] = [];
+  const skipped: SshConfigSkippedHost[] = [];
+
+  function draftOf(alias: string, entries: readonly SshConfigEntry[]): SshConfigHostDraft | null {
+    const username = (firstValue(entries, 'user') ?? firstValue(globals, 'user') ?? '').trim();
+    if (username.length === 0) {
+      skipped.push({ alias, reason: 'noUsername' });
+      return null;
+    }
+    const port = portOf(firstValue(entries, 'port') ?? firstValue(globals, 'port') ?? '22');
+    if (port === null) {
+      skipped.push({ alias, reason: 'invalidPort' });
+      return null;
+    }
+    const identityFile = firstValue(entries, 'identityfile') ?? firstValue(globals, 'identityfile');
+    const jump = resolveJump(firstValue(entries, 'proxyjump'), batch, existingByLabel);
+    const { forwards, failed } = forwardsOf(entries);
+    const warnings: SshConfigWarning[] = [...jump.warnings];
+    if (identityFile !== null) {
+      warnings.push({ kind: 'needsKey', identityFile });
+    }
+    for (const directive of failed) {
+      warnings.push({ kind: 'forwardUnsupported', directive });
+    }
+    return {
       alias,
       hostname: (firstValue(entries, 'hostname') ?? alias).trim(),
       port,
@@ -220,58 +233,13 @@ function draftOfHost(
       jumpHostId: jump.hostId,
       forwards,
       warnings,
-    },
-  };
-}
-
-function mergeHostBlocks(
-  blocks: readonly SshConfigBlock[]
-): Map<string, { alias: string; entries: SshConfigEntry[] }> {
-  const merged = new Map<string, { alias: string; entries: SshConfigEntry[] }>();
-  for (const block of blocks) {
-    if (block.kind === 'host') {
-      for (const pattern of block.patterns) {
-        if (!WILDCARD_PATTERN.test(pattern)) {
-          const key = pattern.toLowerCase();
-          const target = merged.get(key) ?? { alias: pattern, entries: [] };
-          merged.set(key, target);
-          for (const entry of block.entries) {
-            if (firstValue(target.entries, entry.key) === null) {
-              target.entries.push(entry);
-            }
-          }
-        }
-      }
-    }
+    };
   }
-  return merged;
-}
-
-/**
- * The hosts a config file describes, in file order, with everything the
- * preview needs to explain what it will and will not import.
- *
- * A `Host` line naming several patterns stores each pattern that is not a
- * wildcard; a wildcard names a rule for many hosts rather than one host to
- * keep. When several blocks name one alias, the first value each directive has
- * wins, the way OpenSSH resolves a single host's own blocks. Directives before
- * the first `Host` line are defaults for every imported host.
- */
-export function planSshConfigImport(text: string, existing: readonly SshHost[]): SshConfigPlan {
-  const blocks = parseSshConfig(text);
-  const globalEntries = blocks.flatMap(block => (block.kind === 'global' ? block.entries : []));
-  const merged = mergeHostBlocks(blocks);
-  const existingByLabel = new Map(existing.map(host => [host.label.toLowerCase(), host]));
-  const batchAliases = new Map([...merged].map(([key, host]) => [key, host.alias]));
-  const drafts: SshConfigHostDraft[] = [];
-  const skipped: SshConfigSkippedHost[] = [];
 
   for (const { alias, entries } of merged.values()) {
-    const result = draftOfHost(alias, entries, globalEntries, batchAliases, existingByLabel);
-    if (result.kind === 'draft') {
-      drafts.push(result.draft);
-    } else {
-      skipped.push(result.skipped);
+    const draft = draftOf(alias, entries);
+    if (draft !== null) {
+      drafts.push(draft);
     }
   }
 
@@ -283,45 +251,13 @@ export function planSshConfigImport(text: string, existing: readonly SshHost[]):
   return { hosts: withResolvedJumps(drafts), skipped, startSortOrder };
 }
 
-/**
- * Drops a jump that would loop inside this batch. The store refuses a loop
- * outright, and a config with two hosts jumping through each other is a
- * mistake the preview should report instead of failing the whole import.
- */
-function withResolvedJumps(drafts: readonly SshConfigHostDraft[]): SshConfigHostDraft[] {
-  const targetOf = new Map(
-    drafts
-      .filter(draft => draft.jumpTarget !== null)
-      .map(draft => [draft.alias.toLowerCase(), draft.jumpTarget?.toLowerCase() ?? null])
-  );
-  return drafts.map(draft => {
-    const own = draft.alias.toLowerCase();
-    let current = draft.jumpTarget?.toLowerCase() ?? null;
-    const seen = new Set<string>();
-    while (current !== null && !seen.has(current)) {
-      if (current === own) {
-        return {
-          ...draft,
-          jumpTarget: null,
-          jumpHostId: null,
-          warnings: [
-            ...draft.warnings,
-            { kind: 'jumpHostCycle', target: draft.jumpTarget ?? '' },
-          ],
-        };
-      }
-      seen.add(current);
-      current = targetOf.get(current) ?? null;
-    }
-    return draft;
-  });
-}
-
 export type SshConfigImportResult = Readonly<{ hosts: SshHost[]; forwardCount: number }>;
 
 /**
  * Writes the checked hosts, their jumps and their forwards as one transaction:
- * a config that fails partway leaves the store exactly as it was.
+ * a config that fails partway leaves the store exactly as it was. The rows
+ * returned are read back after their jump is applied, so they describe what
+ * was stored rather than what was inserted.
  */
 export function importSshConfig(
   db: SshDatabase,
@@ -347,12 +283,12 @@ export function importSshConfig(
       ids.set(draft.alias.toLowerCase(), host.id);
       return host;
     });
-    let forwardCount = 0;
-    for (const [index, draft] of plan.hosts.entries()) {
+    const forwards = plan.hosts.flatMap((draft, index) => {
       const host = hosts[index];
-      if (host === undefined) {
-        continue;
-      }
+      return host === undefined ? [] : [{ draft, host }];
+    });
+    let forwardCount = 0;
+    for (const { draft, host } of forwards) {
       const jumpHostId =
         draft.jumpTarget === null
           ? draft.jumpHostId
@@ -365,7 +301,8 @@ export function importSshConfig(
         forwardCount += 1;
       }
     }
-    results.push({ hosts, forwardCount });
+    const written = hosts.flatMap(host => getHost(db, host.id) ?? []);
+    results.push({ hosts: written, forwardCount });
   });
   const result = results[0];
   if (result === undefined) {

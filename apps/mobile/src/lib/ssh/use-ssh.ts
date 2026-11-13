@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
-import { type SshConfigPlan, importSshConfig } from './config-import';
+import { importSshConfig, type SshConfigPlan } from './config-import';
 import { createHost, deleteHost, getHost, listHosts, type SshHostInput, updateHost } from './hosts';
 import { listKeys } from './keys';
 import { listKnownHosts, removeKnownHost } from './known-hosts';
@@ -11,7 +11,6 @@ import { sshDatabase } from './store';
 const SSH_KEY = ['ssh'] as const;
 const HOSTS_KEY = [...SSH_KEY, 'hosts'] as const;
 const KNOWN_HOSTS_KEY = [...SSH_KEY, 'known-hosts'] as const;
-const KEYS_KEY = [...SSH_KEY, 'keys'] as const;
 
 /**
  * The stored hosts, in the order the store keeps them.
@@ -29,14 +28,6 @@ export function useSshHosts() {
 }
 
 /** The keys a host can authenticate with, for the editor's picker. */
-export function useSshKeys() {
-  return useQuery({
-    queryKey: KEYS_KEY,
-    networkMode: 'always',
-    queryFn: async () => listKeys(await sshDatabase()),
-  });
-}
-
 export function useSshKnownHosts() {
   return useQuery({
     queryKey: KNOWN_HOSTS_KEY,

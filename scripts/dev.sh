@@ -84,7 +84,15 @@ APP_URL_OVERRIDE="${APP_URL_OVERRIDE:-$(read_env_value APP_URL_OVERRIDE)}"
 APP_URL_OVERRIDE="${APP_URL_OVERRIDE:-http://localhost:$PORT}"
 NEXTAUTH_URL="${NEXTAUTH_URL:-$(read_env_value NEXTAUTH_URL)}"
 NEXTAUTH_URL="${NEXTAUTH_URL:-$APP_URL_OVERRIDE}"
+# Node reads NODE_EXTRA_CA_CERTS at startup, before Next loads .env*, so the dev
+# Snowflake mock's self-signed CA (dev/mock-snowflake/README.md) only reaches it
+# through this export. Unset stays unset: a stray empty value would disable
+# nothing but is not worth exporting.
+NODE_EXTRA_CA_CERTS="${NODE_EXTRA_CA_CERTS:-$(read_env_value NODE_EXTRA_CA_CERTS)}"
 export APP_URL_OVERRIDE
 export NEXT_DEV_HOSTNAME
 export NEXTAUTH_URL
+if [ -n "$NODE_EXTRA_CA_CERTS" ]; then
+  export NODE_EXTRA_CA_CERTS
+fi
 exec next dev -H "$NEXT_DEV_HOSTNAME" -p "$PORT" "$@"

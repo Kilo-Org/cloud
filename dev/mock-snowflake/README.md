@@ -25,14 +25,18 @@ symlinks it into `apps/web` before starting Next.js):
 
 ```sh
 cat dev/mock-snowflake/fixtures/snowflake-env.txt >> .env.local
-printf 'NODE_TLS_REJECT_UNAUTHORIZED=0\n' >> .env.local
+printf 'NODE_EXTRA_CA_CERTS=%s\n' "$PWD/dev/mock-snowflake/fixtures/tls/cert.pem" >> .env.local
 pnpm dev:start app
 ```
 
-Both lines are dev-only and `.env.local` is gitignored. `NODE_EXTRA_CA_CERTS`
-does not work here: Next.js loads `.env.local` after Node has already read that
-variable, so the certificate would stay untrusted. The trust line is read per
-connection, so the file is enough.
+Both lines are dev-only and `.env.local` is gitignored. `scripts/dev.sh` exports
+`NODE_EXTRA_CA_CERTS` before `next dev` starts, which is what makes it work:
+Next.js loads `.env.local` into its own process after Node has already read that
+variable, so a line that only reached Next would leave the certificate
+untrusted. The generated certificate is a CA that signs only itself and names
+this one host, so the web app trusts the mock and nothing else. Do not use
+`NODE_TLS_REJECT_UNAUTHORIZED=0` instead: it turns certificate verification off
+for every host the Next.js process talks to.
 
 Then write fixture rows for a fake account that already signed in once:
 

@@ -160,6 +160,8 @@ server.listen(PORT, HOST, () => {
   console.log(`mock Snowflake listening on ${BASE_URL}`);
   console.log(`fixture rows: ${join(fixturesDir, '*.json')}`);
   console.log(`environment block: ${writeEnvSnippet()}`);
-  console.log('Append that file to apps/web/.env.development.local, and start the web app with');
-  console.log(`NODE_EXTRA_CA_CERTS=${join(tlsDir, 'cert.pem')} so it trusts this server.`);
+  console.log('Append that file, then this line, to the repo-root .env.local:');
+  console.log(`NODE_EXTRA_CA_CERTS=${join(tlsDir, 'cert.pem')}`);
+  console.log('Then start the web app with `pnpm dev:start app`. The web dev script');
+  console.log('exports that CA before next dev, so the app trusts this server alone.');
 });

@@ -76,11 +76,14 @@ export async function readMobileSessionSnapshotPage(
   // messages at all, and without them the open would paint an empty transcript
   // instead of the run's own failure. Omitted when the router sends none, so
   // the SDK's restore keeps the live rows it already holds.
+  // Mobile ships independently of the API: an older server omits the rows, so
+  // the page is read structurally rather than trusted.
+  const preparationAttempts = Array.isArray(result.preparationAttempts)
+    ? result.preparationAttempts
+    : [];
   const pageState = {
     ...(result.watermarkEventId != null ? { watermarkEventId: result.watermarkEventId } : {}),
-    ...(result.preparationAttempts?.length
-      ? { preparationAttempts: result.preparationAttempts }
-      : {}),
+    ...(preparationAttempts.length > 0 ? { preparationAttempts } : {}),
   };
   if (history === null) {
     return {

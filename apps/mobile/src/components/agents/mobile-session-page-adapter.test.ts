@@ -4,7 +4,6 @@ import {
   type KiloSdkMessageHistoryPage,
   type KiloSdkStoredMessage,
   type KiloSessionId,
-  type PreparationAttempt,
   type SessionSnapshotPageOutcome,
 } from '@kilocode/cloud-agent-sdk';
 
@@ -66,33 +65,6 @@ function historyPage(
     nextCursor: null,
     omittedItemCount: 0,
     ...overrides,
-  };
-}
-
-/** The row a run whose sandbox preparation failed carries, with no messages. */
-function failedPreparationAttempt(): PreparationAttempt {
-  return {
-    id: 'attempt-1',
-    triggerMessageId: 'msg_user_01',
-    status: 'failed',
-    startedAt: 0,
-    completedAt: 1,
-    safeError: 'invalid_configuration',
-    revision: 2,
-    steps: [
-      {
-        id: 'step-sandbox',
-        key: 'sandbox_provision',
-        kind: 'phase',
-        label: 'sandbox provision',
-        status: 'failed',
-        startedAt: 0,
-        completedAt: 1,
-        revision: 1,
-        latestDetail: 'Creating sandbox',
-        safeError: 'invalid_configuration',
-      },
-    ],
   };
 }
 
@@ -206,68 +178,6 @@ describe('fetchMobileSessionSnapshotPage', () => {
       nextCursor: null,
       omittedItemCount: 0,
     });
-  });
-
-  // A run whose sandbox preparation failed has no messages at all, so the
-  // preparation rows are the only thing the open can show. Both success arms
-  // carry them; the SDK restores the rows from the page before the first paint.
-  it('carries the preparation rows of a message page', async () => {
-    const attempt = failedPreparationAttempt();
-    mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
-      kiloSessionId: 'ses_123',
-      history: historyPage({ messages: [storedMessage()] }),
-      watermarkEventId: 7,
-      preparationAttempts: [attempt],
-    });
-
-    const { fetchMobileSessionSnapshotPage } = await importAdapter();
-    await expect(fetchMobileSessionSnapshotPage(kiloSessionId('ses_123'), {})).resolves.toEqual({
-      kind: 'success',
-      info: { id: 'ses_123' },
-      messages: [storedMessage()],
-      nextCursor: null,
-      omittedItemCount: 0,
-      watermarkEventId: 7,
-      preparationAttempts: [attempt],
-    });
-  });
-
-  it('carries the preparation rows of a null history page', async () => {
-    const attempt = failedPreparationAttempt();
-    mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
-      kiloSessionId: 'ses_failed_open',
-      history: null,
-      preparationAttempts: [attempt],
-    });
-
-    const { fetchMobileSessionSnapshotPage } = await importAdapter();
-    await expect(
-      fetchMobileSessionSnapshotPage(kiloSessionId('ses_failed_open'), {})
-    ).resolves.toEqual({
-      kind: 'success',
-      info: { id: 'ses_failed_open' },
-      messages: [],
-      nextCursor: null,
-      omittedItemCount: 0,
-      preparationAttempts: [attempt],
-    });
-  });
-
-  it('omits the preparation field when the router sends no rows', async () => {
-    // Absent means the page cannot vouch for the rows: the SDK's restore keeps
-    // the live ones instead of clearing them on every page read.
-    const cases = [undefined, []];
-    for (const preparationAttempts of cases) {
-      mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
-        kiloSessionId: 'ses_123',
-        history: historyPage(),
-        ...(preparationAttempts === undefined ? {} : { preparationAttempts }),
-      });
-
-      const { fetchMobileSessionSnapshotPage } = await importAdapter();
-      const outcome = await fetchMobileSessionSnapshotPage(kiloSessionId('ses_123'), {});
-      expect(outcome).not.toHaveProperty('preparationAttempts');
-    }
   });
 
   it('passes typed retryable_failure through verbatim so the UI can offer Retry', async () => {

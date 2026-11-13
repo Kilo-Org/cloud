@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as authEpochModule from '@/lib/auth/auth-epoch';
 
+import './tool-summary-translation-client';
 import type * as runtimeModule from './tool-summary-translation-runtime';
 
 /**
@@ -9,6 +10,10 @@ import type * as runtimeModule from './tool-summary-translation-runtime';
  * the client resolves the account and sends. Only the credential store, the
  * encrypted-KV cache and `fetch` are faked, so the assertions observe what the
  * device would actually put on the wire.
+ *
+ * Time is faked. Every step after the batch window is a promise chain, so
+ * advancing the clock drains it; nothing is left to run later except the
+ * request's own deadline, which never fires in these tests.
  */
 
 const { getAuthTokenForRequest, getItemAsync, readMock, writeMock } = vi.hoisted(() => ({
@@ -40,7 +45,7 @@ function contentResponse(content: string): Response {
  * Loads a fresh runtime together with the auth-epoch instance that runtime
  * uses. The imports must stay dynamic: `resetModules` makes the next import
  * re-evaluate a module, which is how this test gets its own runtime instance
- * and the epoch the same instance's fence reads.
+ * and the epoch the same instance's scope reads.
  */
 async function loadRuntime(): Promise<{
   mod: typeof runtimeModule;
@@ -54,27 +59,18 @@ async function loadRuntime(): Promise<{
 
 /** The batch window closed and the client is inside its credential read. */
 async function dispatchBatch(): Promise<void> {
-  await vi.waitFor(() => {
-    expect(getAuthTokenForRequest).toHaveBeenCalledTimes(1);
-  });
+  await vi.advanceTimersByTimeAsync(50);
+  expect(getAuthTokenForRequest).toHaveBeenCalledTimes(1);
 }
 
-/**
- * Gives the client's remaining promise chain time to finish. The client's work
- * after the credential read is a real promise chain across the lazy module
- * boundary, so a fixed bound is the only way to observe its absence of a
- * request; the broken version calls `fetch` within this window, and the batch
- * window plus import is already 40 ms.
- */
+/** Drains the client's promise chain after the batch's last await answers. */
 async function settleBatch(): Promise<void> {
-  const { promise, resolve } = Promise.withResolvers<undefined>();
-  setTimeout(() => {
-    resolve(undefined);
-  }, 200);
-  await promise;
+  await vi.dynamicImportSettled();
+  await vi.advanceTimersByTimeAsync(0);
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockReset();
   getAuthTokenForRequest.mockReset();
@@ -87,6 +83,11 @@ beforeEach(() => {
   fetchMock.mockResolvedValue(contentResponse('["Prüfung ausgeführt"]'));
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
 describe('tool summary translation batch scope', () => {
   it('translates a batch while the account and configuration stay current', async () => {
     const { mod } = await loadRuntime();
@@ -94,6 +95,7 @@ describe('tool summary translation batch scope', () => {
     mod.setConfig({ enabled: true, model: MODEL });
 
     mod.ensureTranslation({ itemId: 'part-1', text: SUMMARY, language: 'de', model: MODEL });
+    await dispatchBatch();
     await settleBatch();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -103,7 +105,7 @@ describe('tool summary translation batch scope', () => {
     expect(mod.getTranslation('part-1', SUMMARY, 'de', MODEL.id)).toBe('Prüfung ausgeführt');
   });
 
-  it('sends nothing when the account switches while the client resolves it', async () => {
+  it('sends nothing when the account epoch moves during the credential read', async () => {
     const { mod, epoch } = await loadRuntime();
     const token = Promise.withResolvers<string | null>();
     getAuthTokenForRequest.mockReturnValue(token.promise);
@@ -111,8 +113,7 @@ describe('tool summary translation batch scope', () => {
 
     mod.ensureTranslation({ itemId: 'part-1', text: SUMMARY, language: 'de', model: MODEL });
     await dispatchBatch();
-    // The sign-out of this account and the sign-in of the next one land while
-    // the client is inside its credential read.
+    // The epoch moves while the client is inside its credential read.
     epoch.bumpAuthEpoch();
     token.resolve('token-of-the-next-account');
     await settleBatch();
@@ -121,7 +122,24 @@ describe('tool summary translation batch scope', () => {
     expect(mod.getTranslation('part-1', SUMMARY, 'de', MODEL.id)).toBeUndefined();
   });
 
-  it('sends nothing when the account reset lands while the client resolves it', async () => {
+  it('drops work queued under an earlier account epoch', async () => {
+    const { mod, epoch } = await loadRuntime();
+    getAuthTokenForRequest.mockResolvedValue('token-of-the-next-account');
+    mod.setConfig({ enabled: true, model: MODEL });
+
+    mod.ensureTranslation({ itemId: 'part-1', text: SUMMARY, language: 'de', model: MODEL });
+    // The epoch moves before the batch window closes, so the queued work is
+    // dropped when a batch would be taken.
+    epoch.bumpAuthEpoch();
+    await vi.advanceTimersByTimeAsync(50);
+    await settleBatch();
+
+    expect(getAuthTokenForRequest).not.toHaveBeenCalled();
+    expect(mod.getQueueSize()).toBe(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('sends nothing when the memory reset lands during the credential read', async () => {
     const { mod } = await loadRuntime();
     const token = Promise.withResolvers<string | null>();
     getAuthTokenForRequest.mockReturnValue(token.promise);
@@ -136,7 +154,7 @@ describe('tool summary translation batch scope', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('sends nothing when the opt-in is turned off while the client resolves it', async () => {
+  it('sends nothing when the opt-in changes during the credential read', async () => {
     const { mod } = await loadRuntime();
     const token = Promise.withResolvers<string | null>();
     getAuthTokenForRequest.mockReturnValue(token.promise);

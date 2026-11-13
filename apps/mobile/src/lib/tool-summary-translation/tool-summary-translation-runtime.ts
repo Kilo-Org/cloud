@@ -68,6 +68,8 @@ type QueueItem = {
   model: { id: string; name: string };
   /** The configuration generation this work was queued under. */
   generation: number;
+  /** The account epoch this work was queued under; a batch serves one epoch only. */
+  authEpoch: number;
 };
 
 /** One request's worth of queued work: one language and model, unique texts. */
@@ -78,6 +80,8 @@ type FlushBatch = {
    * sends: the texts and the opt-in belong to the previous generation.
    */
   generation: number;
+  /** The account epoch the served work was queued under. */
+  authEpoch: number;
   language: string;
   modelId: string;
   /** The unique texts this request carries, in queue order. */
@@ -597,7 +601,10 @@ function takeBatch(): FlushBatch | null {
   // attempt settles unresolved, and the freshness check drops it when the
   // attempt resolves.
   const now = Date.now();
-  const current = queue.filter(item => item.generation === generation);
+  // A batch carries only work queued under the current configuration
+  // generation and account epoch; work from an earlier epoch is dropped here.
+  const epoch = currentAuthEpoch();
+  const current = queue.filter(item => item.generation === generation && item.authEpoch === epoch);
   const eligible: QueueItem[] = [];
   const owned: QueueItem[] = [];
   for (const item of current) {
@@ -658,22 +665,23 @@ function takeBatch(): FlushBatch | null {
   if (texts.length === 0) {
     return null;
   }
-  return { generation, language, modelId, texts, items };
+  return { generation, authEpoch: epoch, language, modelId, texts, items };
 }
 
 /** Fallback contract: nothing thrown here may reach a transcript row. */
 async function runBatch(batch: FlushBatch): Promise<void> {
-  // The authority this batch was taken under. The controllers are aborted by a
-  // configuration change and by the account reset — the two events that bump
-  // the generation — and the same conditions are re-checked by the client
-  // immediately before it sends, so the texts of one account are never sent
-  // as, or attributed to, another.
+  // The scope this batch was taken under: the configuration generation and the
+  // account epoch its work was queued under. A configuration change or a newer
+  // epoch aborts the controller, and the client re-checks the same conditions
+  // immediately before it sends, so a batch is sent only under the scope it was
+  // queued with.
   const controller = new AbortController();
-  const epoch = currentAuthEpoch();
   const scope: toolSummaryTranslationClient.ToolSummaryTranslationScope = {
     signal: controller.signal,
     isCurrent: () =>
-      !controller.signal.aborted && batch.generation === generation && isCurrentAuthEpoch(epoch),
+      !controller.signal.aborted &&
+      batch.generation === generation &&
+      isCurrentAuthEpoch(batch.authEpoch),
   };
   batchControllers.add(controller);
   // One token for the whole request: a config change clears the map and a
@@ -831,7 +839,15 @@ export function ensureTranslation(input: {
     // Resolved: no retry memory is needed for a summary already translated.
     return;
   }
-  const item: QueueItem = { key, itemId, text, language, model, generation };
+  const item: QueueItem = {
+    key,
+    itemId,
+    text,
+    language,
+    model,
+    generation,
+    authEpoch: currentAuthEpoch(),
+  };
   // Remember the unresolved summary before the in-flight and queued guards
   // return, so `retryUnresolvedTranslations` can re-queue it after a connection
   // recovery. A mounted row's retry tick releases its interest and re-asks on

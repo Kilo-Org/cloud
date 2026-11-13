@@ -7,6 +7,7 @@ export const AgentsComposer = ({
   isStreaming,
   isReadOnly,
   isLoading,
+  disabledReason,
   modelPicker,
   onSend,
   onStop,
@@ -16,6 +17,8 @@ export const AgentsComposer = ({
   isStreaming: boolean;
   isReadOnly: boolean;
   isLoading: boolean;
+  /** Why the composer cannot send: shown in place of the input, never silently. */
+  disabledReason?: string | undefined;
   /** Model control row; omitted when the session has no pickable catalog. */
   modelPicker?: ReactNode;
   onSend: (text: string) => void | Promise<void>;
@@ -60,7 +63,7 @@ export const AgentsComposer = ({
     return (
       <div className="border-t border-border bg-surface-raised px-4 py-3">
         <p className="type-label rounded-md bg-surface-selected px-3 py-2 text-center text-foreground-muted">
-          This session is read-only
+          {disabledReason ?? 'This session is read-only'}
         </p>
       </div>
     );
@@ -89,7 +92,8 @@ export const AgentsComposer = ({
         Message agent
       </label>
       <textarea
-        className="type-body min-h-20 w-full resize-none rounded-md border border-border-strong bg-input-bg px-3 py-2 text-foreground outline-none transition placeholder:text-foreground-subtle focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
+        className="type-body min-h-20 w-full resize-none rounded-md border border-border-strong bg-input-bg px-3 py-2 text-foreground outline-none transition placeholder:text-foreground-subtle focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={!canSend}
         id="agents-message"
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
           setDraft(event.currentTarget.value);
@@ -98,6 +102,11 @@ export const AgentsComposer = ({
         placeholder="Send a message…"
         value={draft}
       />
+      {canSend ? null : (
+        <p className="mt-2 type-label text-foreground-muted">
+          {disabledReason ?? 'Messages cannot be sent right now.'}
+        </p>
+      )}
       {modelPicker === undefined ? null : <div className="mt-2 flex gap-2">{modelPicker}</div>}
       <div className="mt-2 flex gap-2">
         <button

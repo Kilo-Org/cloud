@@ -212,7 +212,8 @@ export const WorkflowSettings = (): JSX.Element => {
       aria-label="Workflows"
       className="min-w-0 rounded-xl border border-border bg-surface-raised p-3"
     >
-      <div className="flex flex-col gap-3">
+      <h2 className="type-label text-foreground-muted">Workflows</h2>
+      <div className="mt-2 flex flex-col gap-3">
         {SETTINGS_TOGGLE_ROWS.map(row => (
           <SettingsToggle
             checked={settings[row.key]}
@@ -261,7 +262,7 @@ export const WorkflowSettings = (): JSX.Element => {
         )}
       </div>
 
-      <h2 className="type-label mt-3 text-foreground-muted">Saved workflows</h2>
+      <h3 className="type-label mt-3 text-foreground-muted">Saved workflows</h3>
 
       {view.kind === 'loading' ? (
         <p className="type-body mt-2 text-foreground-muted">Loading…</p>
@@ -293,10 +294,14 @@ export const WorkflowSettings = (): JSX.Element => {
                 activeConversationRunning={activeConversationRunning}
                 allowWorkflowsInSafeMode={settings.allowWorkflowsInSafeMode}
                 autoApproveChanges={settings.autoApproveWorkflowChanges}
+                canEnableSafeModeWorkflows={settingsLoaded && !settingsSaving}
                 isDangerousMode={isDangerousMode}
                 item={item}
                 key={item.id}
                 onDelete={handleDelete}
+                onEnableSafeModeWorkflows={() => {
+                  onToggle('allowWorkflowsInSafeMode');
+                }}
                 onRun={handleRun}
               />
             ))}

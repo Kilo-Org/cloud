@@ -420,6 +420,40 @@ export async function denyDeviceAuthRequest(userCode: string): Promise<void> {
 }
 
 /**
+ * Cancel a request from the device that started it. The poll secret is that
+ * device's proof of ownership: it already authorises polling the request and
+ * no browser session exists in the client that started it.
+ */
+export async function cancelDeviceAuthRequest(code: string): Promise<void> {
+  const [cancelled] = await db
+    .update(device_auth_requests)
+    .set({ status: 'denied' })
+    .where(and(eq(device_auth_requests.code, code), eq(device_auth_requests.status, 'pending')))
+    .returning({ id: device_auth_requests.id });
+
+  if (cancelled) {
+    return;
+  }
+
+  const [request] = await db
+    .select({ status: device_auth_requests.status })
+    .from(device_auth_requests)
+    .where(eq(device_auth_requests.code, code))
+    .limit(1);
+
+  if (!request) {
+    throw new Error('Device authorization request not found');
+  }
+
+  // A request the approver denied, or that already expired, is cancelled.
+  if (request.status === 'denied' || request.status === 'expired') {
+    return;
+  }
+
+  throw new Error('Device authorization request is not pending');
+}
+
+/**
  * Atomically consume an approved request by device code.
  * Returns the appropriate status and mints a token only once per row.
  *

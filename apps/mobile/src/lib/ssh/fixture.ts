@@ -328,6 +328,11 @@ export function handleSshFixturePath(path: string): boolean {
     return true;
   }
   void (async () => {
+    // A prompt sheet from the previous fixture is a modal over the screen the
+    // next link opens, so a run of links would measure one screen repeatedly.
+    if (router.canDismiss()) {
+      router.dismissAll();
+    }
     await clearSshRows();
     if (name === 'hosts') {
       await seedHostList();

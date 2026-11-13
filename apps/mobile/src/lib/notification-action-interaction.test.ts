@@ -909,4 +909,244 @@ describe('runNeedsInputInteraction', () => {
       expect(createManager).not.toHaveBeenCalled();
     });
   });
+
+  describe('presented raise identity', () => {
+    const PRESENTED = '2026-09-18T21:00:00.000Z';
+
+    it('answers the raise the notification presented and acks that same raise', async () => {
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activePermission, { requestId: 'perm-1' });
+        },
+      });
+      // The stored row arrives in the PostgreSQL spelling of the same instant,
+      // which must match the payload's ISO form.
+      getSessionQuery.mockResolvedValue({
+        organization_id: 'org-1',
+        status: 'permission',
+        status_updated_at: '2026-09-18 21:00:00+00',
+      });
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        raiseId: PRESENTED,
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      expect(outcome).toBe('ok');
+      expect(fake.respondToPermission).toHaveBeenCalledWith('perm-1', 'once');
+      expect(ack).toHaveBeenCalledWith(SESSION_ID, 'permission', PRESENTED);
+    });
+
+    it('sends nothing when a different raise of the same kind replaced the presented one', async () => {
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activePermission, { requestId: 'perm-2' });
+        },
+      });
+      getSessionQuery.mockResolvedValue({
+        organization_id: 'org-1',
+        status: 'permission',
+        status_updated_at: '2026-09-18 21:05:00+00',
+      });
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        raiseId: PRESENTED,
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      expect(outcome).toBe('unavailable');
+      expect(fake.respondToPermission).not.toHaveBeenCalled();
+      expect(fake.answerQuestion).not.toHaveBeenCalled();
+      // The ack names the raise the user saw, so the live raise keeps its badge.
+      expect(ack).toHaveBeenCalledWith(SESSION_ID, 'permission', PRESENTED);
+    });
+
+    it('sends nothing when a reply has to answer a question that replaced the presented one', async () => {
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activeQuestion, { requestId: 'question-2' });
+        },
+      });
+      getSessionQuery.mockResolvedValue({
+        organization_id: 'org-1',
+        status: 'question',
+        status_updated_at: '2026-09-18 21:05:00+00',
+      });
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'reply',
+        raiseId: PRESENTED,
+        text: 'Use the staging bucket',
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      expect(outcome).toBe('unavailable');
+      expect(fake.answerQuestion).not.toHaveBeenCalled();
+      expect(ack).toHaveBeenCalledWith(SESSION_ID, 'question', PRESENTED);
+    });
+
+    it('sends nothing when the session stopped waiting on the presented raise', async () => {
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activePermission, { requestId: 'perm-9' });
+        },
+      });
+      getSessionQuery.mockResolvedValue({
+        organization_id: 'org-1',
+        status: 'idle',
+        status_updated_at: '2026-09-18 21:05:00+00',
+      });
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        raiseId: PRESENTED,
+        deps: fakeManagerDeps(fake),
+      });
+
+      expect(outcome).toBe('unavailable');
+      expect(fake.respondToPermission).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing when the presented raise is the other kind than the action answers', async () => {
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activePermission, { requestId: 'perm-1' });
+        },
+      });
+      getSessionQuery.mockResolvedValue({
+        organization_id: 'org-1',
+        status: 'question',
+        status_updated_at: PRESENTED,
+      });
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        raiseId: PRESENTED,
+        deps: fakeManagerDeps(fake),
+      });
+
+      expect(outcome).toBe('unavailable');
+      expect(fake.respondToPermission).not.toHaveBeenCalled();
+    });
+
+    it('keeps the previous outcome when the payload names no raise', async () => {
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activePermission, { requestId: 'perm-2' });
+        },
+      });
+      getSessionQuery.mockResolvedValue({
+        organization_id: 'org-1',
+        status: 'permission',
+        status_updated_at: '2026-09-18 21:05:00+00',
+      });
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      expect(outcome).toBe('ok');
+      expect(fake.respondToPermission).toHaveBeenCalledWith('perm-2', 'once');
+      expect(ack).toHaveBeenCalledWith(SESSION_ID, 'permission', '2026-09-18 21:05:00+00');
+    });
+
+    it('stays retryable when the identity read fails, so no raise is ended on a guess', async () => {
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activePermission, { requestId: 'perm-1' });
+        },
+      });
+      getSessionQuery.mockRejectedValue(new Error('deadline exceeded'));
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        raiseId: PRESENTED,
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      expect(outcome).toBe('retryable');
+      expect(fake.respondToPermission).not.toHaveBeenCalled();
+      expect(ack).not.toHaveBeenCalled();
+    });
+
+    it('reports the presented raise gone when the settle path finds a different one raised', async () => {
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activity, { type: 'idle' });
+        },
+      });
+      getSessionQuery
+        .mockResolvedValueOnce({
+          organization_id: 'org-1',
+          status: 'permission',
+          status_updated_at: PRESENTED,
+        })
+        .mockResolvedValue({
+          organization_id: 'org-1',
+          status: 'permission',
+          status_updated_at: '2026-09-18 21:05:00+00',
+        });
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        raiseId: PRESENTED,
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      // The row still waits, but on a raise the notification never presented:
+      // approving would answer that one, so the presented raise is reported gone.
+      expect(outcome).toBe('unavailable');
+      expect(fake.respondToPermission).not.toHaveBeenCalled();
+      expect(ack).toHaveBeenCalledWith(SESSION_ID, 'permission', PRESENTED);
+    });
+
+    it('approves a still-raised presented raise the settle path proves has no ask', async () => {
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activity, { type: 'idle' });
+        },
+      });
+      getSessionQuery.mockResolvedValue({
+        organization_id: 'org-1',
+        status: 'permission',
+        status_updated_at: PRESENTED,
+      });
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        raiseId: PRESENTED,
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      expect(outcome).toBe('ok');
+      expect(fake.respondToPermission).not.toHaveBeenCalled();
+      expect(ack).toHaveBeenCalledWith(SESSION_ID, 'permission', PRESENTED);
+    });
+  });
 });

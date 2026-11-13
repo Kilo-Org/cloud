@@ -163,12 +163,14 @@ describe('ReportReceiptScreen', () => {
       throw new Error('missing copy control');
     }
 
-    // The copy control takes width from the value, so the id wraps into a
-    // second line on a narrow screen and stays readable; the status rows keep
-    // one line.
-    expect(textNode(root, RECEIPT_ID).props.numberOfLines).toBe(2);
+    // The copy row cuts at the middle, so both ends of the id stay visible while
+    // the control copies it whole; the status rows keep one line, end cut.
+    expect(textNode(root, RECEIPT_ID).props.numberOfLines).toBe(1);
+    expect(textNode(root, RECEIPT_ID).props.ellipsizeMode).toBe('middle');
     expect(textNode(root, 'Received').props.numberOfLines).toBe(1);
+    expect(textNode(root, 'Received').props.ellipsizeMode).toBe('tail');
     expect(textNode(root, 'None submitted').props.numberOfLines).toBe(1);
+    expect(textNode(root, 'None submitted').props.ellipsizeMode).toBe('tail');
 
     act(() => {
       (copyControl.props.onPress as () => void)();

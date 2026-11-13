@@ -62,6 +62,7 @@ import {
   getByokProviderDisplayName,
 } from '@/lib/byok/provider-names';
 import { cn } from '@/lib/utils';
+import type { BYOKKeyTestResult } from '@/lib/byok/types';
 import * as z from 'zod';
 
 export {
@@ -274,6 +275,37 @@ function updateBYOKDialogState(state: BYOKDialogState, update: Partial<BYOKDialo
   return { ...state, ...update };
 }
 
+/**
+ * The stored-key test reports an outcome rather than a message, so this copy
+ * lives here. `detail` is the provider's own error text and is appended only
+ * where the sentence does not already carry it.
+ */
+function byokKeyTestMessage(result: BYOKKeyTestResult, providerId: string | undefined): string {
+  switch (result.outcome) {
+    case 'ok':
+      return `API key test success. Provider: ${result.provider}. Model: ${result.model}.`;
+    case 'incomplete':
+      return 'API key test failed: the provider ended the test before it finished.';
+    case 'unsupported-provider':
+      return providerId
+        ? `Provider ${providerId} is no longer supported.`
+        : 'This provider is no longer supported.';
+    case 'unreadable-key':
+      return 'API key test failed: the stored key could not be read. Try again later.';
+    case 'deprecated-provider':
+      return 'Codestral is deprecated and its API key can no longer be tested.';
+    case 'rejected': {
+      const message =
+        'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.';
+      return result.detail ? `${message} ${result.detail}` : message;
+    }
+    case 'failed':
+      return result.detail
+        ? `API key test failed: ${result.detail}`
+        : 'API key test failed. Check the credential and try again.';
+  }
+}
+
 export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const [dialogState, updateDialogState] = useReducer(
     updateBYOKDialogState,
@@ -418,11 +450,13 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
 
   const testMutation = useMutation(
     trpc.byok.testApiKey.mutationOptions({
-      onSuccess: result => {
-        if (result.success) {
-          toast.success(result.message);
+      onSuccess: (result, variables) => {
+        const providerId = keys?.find(key => key.id === variables.id)?.provider_id;
+        const message = byokKeyTestMessage(result, providerId);
+        if (result.outcome === 'ok') {
+          toast.success(message);
         } else {
-          toast.error(result.message);
+          toast.error(message);
         }
       },
       onError: (error: { message: string }) => {

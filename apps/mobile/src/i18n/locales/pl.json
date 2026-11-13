@@ -362,7 +362,17 @@
       "newKeyDescription": "Klucz jest przechowywany w postaci zaszyfrowanej i nie można go ponownie wyświetlić.",
       "apiKeyLabel": "Klucz API",
       "apiKeyPlaceholder": "Wklej klucz",
-      "apiKeyRequired": "Wpisz klucz."
+      "apiKeyRequired": "Wpisz klucz.",
+      "keyAlreadyExists": "Masz już klucz dla {{provider}}. Usuń go, zanim dodasz kolejny.",
+      "keyStoreFailed": "Nie udało się zapisać klucza. Spróbuj ponownie.",
+      "invalidCredentials": "Ten klucz nie jest w formacie oczekiwanym przez {{provider}}. Sprawdź go i spróbuj ponownie.",
+      "testSucceeded": "Klucz działa. Dostawca: {{provider}}. Model: {{model}}.",
+      "testRejected": "Dostawca odrzucił ten klucz. Sprawdź, czy jest prawidłowy i nie został unieważniony.",
+      "testIncomplete": "Dostawca zakończył test przed jego ukończeniem. Spróbuj ponownie.",
+      "testUnsupportedProvider": "Ten dostawca nie jest już obsługiwany. Usuń klucz.",
+      "testUnreadableKey": "Nie udało się odczytać zapisanego klucza. Spróbuj ponownie później.",
+      "testDeprecatedProvider": "Ten dostawca jest przestarzały, więc nie można przetestować jego klucza.",
+      "testFailed": "Test klucza nie powiódł się. Spróbuj ponownie."
     },
     "dataExport": {
       "title": "Twoje dane",

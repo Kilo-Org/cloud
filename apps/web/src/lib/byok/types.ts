@@ -66,6 +66,22 @@ export const TestBYOKKeyInputSchema = OptionalOrganizationIdSchema.extend({
   id: z.string().uuid(),
 });
 
+/**
+ * The outcome of testing a stored key. Every client renders its own copy from
+ * `outcome`, so a test failure is a value rather than a message the server
+ * words for one client.
+ */
+export const BYOKKeyTestResultSchema = z.discriminatedUnion('outcome', [
+  z.object({ outcome: z.literal('ok'), provider: z.string(), model: z.string() }),
+  z.object({ outcome: z.literal('incomplete') }),
+  z.object({ outcome: z.literal('unsupported-provider') }),
+  z.object({ outcome: z.literal('unreadable-key') }),
+  z.object({ outcome: z.literal('deprecated-provider') }),
+  z.object({ outcome: z.literal('rejected'), detail: z.string().optional() }),
+  z.object({ outcome: z.literal('failed'), detail: z.string().optional() }),
+]);
+export type BYOKKeyTestResult = z.infer<typeof BYOKKeyTestResultSchema>;
+
 export const BYOKApiKeyResponseSchema = z.object({
   id: z.string().uuid(),
   provider_id: z.string(),

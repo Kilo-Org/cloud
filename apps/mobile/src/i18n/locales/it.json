@@ -362,7 +362,17 @@
       "newKeyDescription": "La chiave viene salvata in forma crittografata e non potrà essere mostrata di nuovo.",
       "apiKeyLabel": "Chiave API",
       "apiKeyPlaceholder": "Incolla la chiave",
-      "apiKeyRequired": "Inserisci la chiave."
+      "apiKeyRequired": "Inserisci la chiave.",
+      "keyAlreadyExists": "Hai già una chiave per {{provider}}. Rimuovila prima di aggiungerne un'altra.",
+      "keyStoreFailed": "Non è stato possibile salvare la chiave. Riprova.",
+      "invalidCredentials": "Questa chiave non è nel formato previsto da {{provider}}. Controllala e riprova.",
+      "testSucceeded": "La chiave funziona. Provider: {{provider}}. Modello: {{model}}.",
+      "testRejected": "Il provider ha rifiutato questa chiave. Verifica che sia corretta e che non sia stata revocata.",
+      "testIncomplete": "Il provider ha terminato il test prima che fosse completato. Riprova.",
+      "testUnsupportedProvider": "Questo provider non è più supportato. Rimuovi la chiave.",
+      "testUnreadableKey": "Non è stato possibile leggere la chiave salvata. Riprova più tardi.",
+      "testDeprecatedProvider": "Questo provider è deprecato, quindi la sua chiave non può essere verificata.",
+      "testFailed": "La verifica della chiave non è riuscita. Riprova."
     },
     "dataExport": {
       "title": "I tuoi dati",

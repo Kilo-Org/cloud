@@ -362,7 +362,17 @@
       "newKeyDescription": "Çelësi ruhet i enkriptuar dhe nuk mund të shfaqet përsëri.",
       "apiKeyLabel": "Çelësi API",
       "apiKeyPlaceholder": "Ngjit çelësin",
-      "apiKeyRequired": "Fut çelësin."
+      "apiKeyRequired": "Fut çelësin.",
+      "keyAlreadyExists": "Ke tashmë një çelës për {{provider}}. Hiqe përpara se të shtosh një tjetër.",
+      "keyStoreFailed": "Çelësi nuk u ruajt dot. Provo përsëri.",
+      "invalidCredentials": "Ky çelës nuk është në formatin që pret {{provider}}. Kontrolloje dhe provo përsëri.",
+      "testSucceeded": "Çelësi funksionon. Ofruesi: {{provider}}. Modeli: {{model}}.",
+      "testRejected": "Ofruesi e refuzoi këtë çelës. Kontrollo që është i saktë dhe nuk është revokuar.",
+      "testIncomplete": "Ofruesi e mbylli testin përpara se të përfundonte. Provo përsëri.",
+      "testUnsupportedProvider": "Ky ofrues nuk mbështetet më. Hiq çelësin.",
+      "testUnreadableKey": "Çelësi i ruajtur nuk u lexua dot. Provo përsëri më vonë.",
+      "testDeprecatedProvider": "Ky ofrues është i vjetëruar, kështu që çelësi i tij nuk mund të testohet.",
+      "testFailed": "Testimi i çelësit dështoi. Provo përsëri."
     },
     "dataExport": {
       "title": "Të dhënat e tua",

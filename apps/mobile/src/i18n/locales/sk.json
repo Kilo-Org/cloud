@@ -362,7 +362,17 @@
       "newKeyDescription": "Kľúč sa uloží zašifrovaný a už ho nebude možné znova zobraziť.",
       "apiKeyLabel": "Kľúč API",
       "apiKeyPlaceholder": "Vlož kľúč",
-      "apiKeyRequired": "Zadaj kľúč."
+      "apiKeyRequired": "Zadaj kľúč.",
+      "keyAlreadyExists": "Pre {{provider}} už máš kľúč. Pred pridaním ďalšieho ho odstráň.",
+      "keyStoreFailed": "Kľúč sa nepodarilo uložiť. Skús to znova.",
+      "invalidCredentials": "Tento kľúč nie je vo formáte, ktorý {{provider}} očakáva. Skontroluj ho a skús to znova.",
+      "testSucceeded": "Kľúč funguje. Poskytovateľ: {{provider}}. Model: {{model}}.",
+      "testRejected": "Poskytovateľ tento kľúč odmietol. Skontroluj, či je správny a či nebol zrušený.",
+      "testIncomplete": "Poskytovateľ ukončil test skôr, než sa dokončil. Skús to znova.",
+      "testUnsupportedProvider": "Tento poskytovateľ už nie je podporovaný. Odstráň kľúč.",
+      "testUnreadableKey": "Uložený kľúč sa nepodarilo prečítať. Skús to znova neskôr.",
+      "testDeprecatedProvider": "Tento poskytovateľ je zastaraný, preto jeho kľúč nemožno otestovať.",
+      "testFailed": "Test kľúča zlyhal. Skús to znova."
     },
     "dataExport": {
       "title": "Tvoje údaje",

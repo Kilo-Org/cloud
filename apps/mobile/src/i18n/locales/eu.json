@@ -362,7 +362,17 @@
       "newKeyDescription": "Gakoa zifratuta gordetzen da, eta ezin da berriro erakutsi.",
       "apiKeyLabel": "API gakoa",
       "apiKeyPlaceholder": "Itsatsi gakoa",
-      "apiKeyRequired": "Idatzi gakoa."
+      "apiKeyRequired": "Idatzi gakoa.",
+      "keyAlreadyExists": "Dagoeneko badaukazu {{provider}} hornitzailearen gako bat. Kendu ezazu beste bat gehitu aurretik.",
+      "keyStoreFailed": "Ezin izan da gakoa gorde. Saiatu berriro.",
+      "invalidCredentials": "Gako hau ez dago {{provider}} hornitzaileak espero duen formatuan. Egiaztatu eta saiatu berriro.",
+      "testSucceeded": "Gakoak funtzionatzen du. Hornitzailea: {{provider}}. Modeloa: {{model}}.",
+      "testRejected": "Hornitzaileak gako hau baztertu du. Egiaztatu zuzena dela eta ez dela baliogabetu.",
+      "testIncomplete": "Hornitzaileak proba amaitu aurretik eten zuen. Saiatu berriro.",
+      "testUnsupportedProvider": "Hornitzaile hau jada ez da onartzen. Kendu gakoa.",
+      "testUnreadableKey": "Ezin izan da gordetako gakoa irakurri. Saiatu geroago.",
+      "testDeprecatedProvider": "Hornitzaile hau zaharkituta dago, beraz ezin da haren gakoa probatu.",
+      "testFailed": "Gakoaren proba huts egin du. Saiatu berriro."
     },
     "dataExport": {
       "title": "Zure datuak",

@@ -362,7 +362,17 @@
       "newKeyDescription": "Atslēga tiek glabāta šifrētā veidā, un to vairs nevarēs parādīt.",
       "apiKeyLabel": "API atslēga",
       "apiKeyPlaceholder": "Ielīmē atslēgu",
-      "apiKeyRequired": "Ievadi atslēgu."
+      "apiKeyRequired": "Ievadi atslēgu.",
+      "keyAlreadyExists": "Tev jau ir atslēga {{provider}}. Noņem to, pirms pievieno vēl vienu.",
+      "keyStoreFailed": "Atslēgu neizdevās saglabāt. Mēģini vēlreiz.",
+      "invalidCredentials": "Šī atslēga nav tādā formātā, kādu gaida {{provider}}. Pārbaudi to un mēģini vēlreiz.",
+      "testSucceeded": "Atslēga darbojas. Nodrošinātājs: {{provider}}. Modelis: {{model}}.",
+      "testRejected": "Nodrošinātājs noraidīja šo atslēgu. Pārbaudi, vai tā ir pareiza un nav atsaukta.",
+      "testIncomplete": "Nodrošinātājs pārtrauca pārbaudi, pirms tā tika pabeigta. Mēģini vēlreiz.",
+      "testUnsupportedProvider": "Šis nodrošinātājs vairs netiek atbalstīts. Noņem atslēgu.",
+      "testUnreadableKey": "Saglabāto atslēgu neizdevās nolasīt. Mēģini vēlreiz vēlāk.",
+      "testDeprecatedProvider": "Šis nodrošinātājs ir novecojis, tāpēc tā atslēgu nevar pārbaudīt.",
+      "testFailed": "Atslēgas pārbaude neizdevās. Mēģini vēlreiz."
     },
     "dataExport": {
       "title": "Tavi dati",

@@ -362,7 +362,17 @@
       "newKeyDescription": "Die sleutel word geënkripteer gestoor en kan nie weer gewys word nie.",
       "apiKeyLabel": "API-sleutel",
       "apiKeyPlaceholder": "Plak die sleutel",
-      "apiKeyRequired": "Voer die sleutel in."
+      "apiKeyRequired": "Voer die sleutel in.",
+      "keyAlreadyExists": "Jy het reeds 'n sleutel vir {{provider}}. Verwyder dit voordat jy nog een byvoeg.",
+      "keyStoreFailed": "Die sleutel kon nie gestoor word nie. Probeer weer.",
+      "invalidCredentials": "Hierdie sleutel is nie in die formaat wat {{provider}} verwag nie. Kontroleer dit en probeer weer.",
+      "testSucceeded": "Sleutel werk. Verskaffer: {{provider}}. Model: {{model}}.",
+      "testRejected": "Die verskaffer het hierdie sleutel verwerp. Kontroleer dat dit korrek is en nie herroep is nie.",
+      "testIncomplete": "Die verskaffer het die toets beëindig voordat dit klaar was. Probeer weer.",
+      "testUnsupportedProvider": "Hierdie verskaffer word nie meer ondersteun nie. Verwyder die sleutel.",
+      "testUnreadableKey": "Die gestoorde sleutel kon nie gelees word nie. Probeer later weer.",
+      "testDeprecatedProvider": "Hierdie verskaffer is verouderd, dus kan die sleutel daarvan nie getoets word nie.",
+      "testFailed": "Die sleuteltoets het misluk. Probeer weer."
     },
     "dataExport": {
       "title": "Jou data",

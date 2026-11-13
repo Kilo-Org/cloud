@@ -362,7 +362,17 @@
       "newKeyDescription": "Furaha waxaa lagu kaydiyaa qaab sir ah lamana muujin karo mar kale.",
       "apiKeyLabel": "Furaha API",
       "apiKeyPlaceholder": "Ku dheji furaha",
-      "apiKeyRequired": "Geli furaha."
+      "apiKeyRequired": "Geli furaha.",
+      "keyAlreadyExists": "Horeba waxaad u haysataa fure {{provider}}. Saar ka hor inta aanad mid kale ku darin.",
+      "keyStoreFailed": "Furaha lama kaydin karin. Isku day mar kale.",
+      "invalidCredentials": "Furahan ma laha qaabka {{provider}} filayo. Hubi oo isku day mar kale.",
+      "testSucceeded": "Furaha wuu shaqeeyaa. Bixiye: {{provider}}. Moodeel: {{model}}.",
+      "testRejected": "Bixiyaha wuu diiday furahan. Hubi inuu sax yahay oo aan la burin.",
+      "testIncomplete": "Bixiyaha wuxuu joojiyay tijaabada ka hor inta aanay dhammaan. Isku day mar kale.",
+      "testUnsupportedProvider": "Bixiyahan mar dambe lama taageero. Saar furaha.",
+      "testUnreadableKey": "Furaha la kaydiyay lama akhrin karin. Mar dambe isku day.",
+      "testDeprecatedProvider": "Bixiyahan waa duugoobay, markaa furahiisa lama tijaabin karo.",
+      "testFailed": "Tijaabada furaha waa guuldareysatay. Isku day mar kale."
     },
     "dataExport": {
       "title": "Xogtaada",

@@ -362,7 +362,17 @@
       "newKeyDescription": "Stóráiltear an eochair criptithe agus ní féidir í a thaispeáint arís.",
       "apiKeyLabel": "Eochair API",
       "apiKeyPlaceholder": "Greamaigh an eochair",
-      "apiKeyRequired": "Cuir isteach an eochair."
+      "apiKeyRequired": "Cuir isteach an eochair.",
+      "keyAlreadyExists": "Tá eochair agat cheana féin do {{provider}}. Bain í sula gcuireann tú eochair eile leis.",
+      "keyStoreFailed": "Níorbh fhéidir an eochair a shábháil. Bain triail eile as.",
+      "invalidCredentials": "Níl an eochair seo san fhormáid a bhfuil {{provider}} ag súil léi. Seiceáil í agus bain triail eile as.",
+      "testSucceeded": "Oibríonn an eochair. Soláthraí: {{provider}}. Múnla: {{model}}.",
+      "testRejected": "Dhiúltaigh an soláthraí don eochair seo. Seiceáil go bhfuil sí i gceart agus nach bhfuil sí aisghairthe.",
+      "testIncomplete": "Chuir an soláthraí deireadh leis an tástáil sula raibh sí críochnaithe. Bain triail eile as.",
+      "testUnsupportedProvider": "Ní thacaítear leis an soláthraí seo a thuilleadh. Bain an eochair.",
+      "testUnreadableKey": "Níorbh fhéidir an eochair stóráilte a léamh. Bain triail eile as níos déanaí.",
+      "testDeprecatedProvider": "Tá an soláthraí seo dímholta, mar sin ní féidir a eochair a thástáil.",
+      "testFailed": "Theip ar an tástáil eochrach. Bain triail eile as."
     },
     "dataExport": {
       "title": "Do chuid sonraí",

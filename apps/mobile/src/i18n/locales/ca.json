@@ -362,7 +362,17 @@
       "newKeyDescription": "La clau es desa xifrada i no es podrà tornar a mostrar.",
       "apiKeyLabel": "Clau d'API",
       "apiKeyPlaceholder": "Enganxa la clau",
-      "apiKeyRequired": "Introdueix la clau."
+      "apiKeyRequired": "Introdueix la clau.",
+      "keyAlreadyExists": "Ja tens una clau per a {{provider}}. Elimina-la abans d'afegir-ne una altra.",
+      "keyStoreFailed": "No s'ha pogut desar la clau. Torna-ho a provar.",
+      "invalidCredentials": "Aquesta clau no té el format que espera {{provider}}. Comprova-la i torna-ho a provar.",
+      "testSucceeded": "La clau funciona. Proveïdor: {{provider}}. Model: {{model}}.",
+      "testRejected": "El proveïdor ha rebutjat aquesta clau. Comprova que sigui correcta i que no s'hagi revocat.",
+      "testIncomplete": "El proveïdor ha finalitzat la prova abans que acabés. Torna-ho a provar.",
+      "testUnsupportedProvider": "Aquest proveïdor ja no és compatible. Elimina la clau.",
+      "testUnreadableKey": "No s'ha pogut llegir la clau desada. Torna-ho a provar més tard.",
+      "testDeprecatedProvider": "Aquest proveïdor està obsolet, així que la seva clau no es pot provar.",
+      "testFailed": "La prova de la clau ha fallat. Torna-ho a provar."
     },
     "dataExport": {
       "title": "Les teves dades",

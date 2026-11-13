@@ -362,7 +362,17 @@
       "newKeyDescription": "Ana adana maɓallin a rufaffen tsari kuma ba za a iya sake nuna shi ba.",
       "apiKeyLabel": "Maɓallin API",
       "apiKeyPlaceholder": "Liƙa maɓallin",
-      "apiKeyRequired": "Shigar da maɓallin."
+      "apiKeyRequired": "Shigar da maɓallin.",
+      "keyAlreadyExists": "Kana da maɓalli don {{provider}} tuni. Cire shi kafin ka ƙara wani.",
+      "keyStoreFailed": "Ba a iya adana maɓallin ba. Sake gwadawa.",
+      "invalidCredentials": "Wannan maɓallin ba ya cikin tsarin da {{provider}} ke tsammani. Duba shi ka sake gwadawa.",
+      "testSucceeded": "Maɓallin yana aiki. Mai samarwa: {{provider}}. Samfuri: {{model}}.",
+      "testRejected": "Mai samarwa ya ƙi wannan maɓallin. Duba cewa daidai ne kuma ba a soke shi ba.",
+      "testIncomplete": "Mai samarwa ya ƙare gwajin kafin ya kammala. Sake gwadawa.",
+      "testUnsupportedProvider": "Ba a ƙara tallafa wa wannan mai samarwa ba. Cire maɓallin.",
+      "testUnreadableKey": "Ba a iya karanta maɓallin da aka adana ba. Sake gwadawa daga baya.",
+      "testDeprecatedProvider": "Wannan mai samarwa ya tsufa, don haka ba za a iya gwada maɓallinsa ba.",
+      "testFailed": "Gwajin maɓallin ya kasa. Sake gwadawa."
     },
     "dataExport": {
       "title": "Bayananka",

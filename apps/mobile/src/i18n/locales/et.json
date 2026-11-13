@@ -362,7 +362,17 @@
       "newKeyDescription": "Võti salvestatakse krüpteeritult ja seda ei saa uuesti kuvada.",
       "apiKeyLabel": "API-võti",
       "apiKeyPlaceholder": "Kleebi võti",
-      "apiKeyRequired": "Sisesta võti."
+      "apiKeyRequired": "Sisesta võti.",
+      "keyAlreadyExists": "Sul on teenusepakkuja {{provider}} võti juba olemas. Eemalda see enne, kui lisad teise.",
+      "keyStoreFailed": "Võtit ei saanud salvestada. Proovi uuesti.",
+      "invalidCredentials": "See võti ei ole selles vormingus, mida {{provider}} ootab. Kontrolli seda ja proovi uuesti.",
+      "testSucceeded": "Võti töötab. Teenusepakkuja: {{provider}}. Mudel: {{model}}.",
+      "testRejected": "Teenusepakkuja lükkas selle võtme tagasi. Kontrolli, et see on õige ja et seda pole tühistatud.",
+      "testIncomplete": "Teenusepakkuja lõpetas testi enne, kui see valmis. Proovi uuesti.",
+      "testUnsupportedProvider": "Seda teenusepakkujat ei toetata enam. Eemalda võti.",
+      "testUnreadableKey": "Salvestatud võtit ei saanud lugeda. Proovi hiljem uuesti.",
+      "testDeprecatedProvider": "See teenusepakkuja on vananenud, seega ei saa selle võtit testida.",
+      "testFailed": "Võtme test ebaõnnestus. Proovi uuesti."
     },
     "dataExport": {
       "title": "Sinu andmed",

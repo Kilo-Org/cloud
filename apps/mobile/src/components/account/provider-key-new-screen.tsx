@@ -19,6 +19,8 @@ import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useTRPC } from '@/lib/trpc';
+import { readTrpcErrorField } from '@/lib/trpc-error';
+import { i18n } from '@/i18n';
 
 type ProviderOption = inferRouterOutputs<MobileRouter>['byok']['listProviders'][number];
 
@@ -26,6 +28,22 @@ const PROVIDER_KEYS_ROUTE = '/(app)/(tabs)/(3_profile)/provider-keys' as Href;
 
 /** The one query parameter this route reads: the provider the picker chose. */
 const ProviderParamSchema = z.object({ provider: z.string().min(1) });
+
+/**
+ * Why the server refused the key, in the app's own words. Its message can quote
+ * the provider's response, which names things this form does not show and does
+ * not translate, so only the code decides the copy.
+ */
+function refusedKeyMessage(error: unknown, provider: ProviderOption | undefined): string {
+  const code = readTrpcErrorField(error, 'code');
+  if (code === 'CONFLICT' && provider) {
+    return i18n.t('profile.providerKeys.keyAlreadyExists', { provider: provider.name });
+  }
+  if (code === 'UNPROCESSABLE_CONTENT' && provider) {
+    return i18n.t('profile.providerKeys.invalidCredentials', { provider: provider.name });
+  }
+  return i18n.t('profile.providerKeys.keyStoreFailed');
+}
 
 /**
  * The key form for one provider, entered from the provider picker.
@@ -58,6 +76,13 @@ export function ProviderKeyNewScreen() {
     []
   );
 
+  // The provider the form is for, resolved before the mutation so the refusal
+  // handler knows whose key it reports on. The route parameter is untrusted
+  // text: an id the server does not offer resolves to nothing.
+  const provider: ProviderOption | undefined = parsedParam.success
+    ? providers.data?.find(row => row.id === parsedParam.data.provider)
+    : undefined;
+
   const create = useMutation(
     trpc.byok.create.mutationOptions({
       onSuccess: () => {
@@ -68,9 +93,9 @@ export function ProviderKeyNewScreen() {
         router.dismissTo(PROVIDER_KEYS_ROUTE);
       },
       // The server applies the same credential rules it applies to every stored
-      // key, so its message is the specific account of the refusal.
+      // key; the form reports which one refused this key.
       onError: error => {
-        setSubmitError(error.message);
+        setSubmitError(refusedKeyMessage(error, provider));
       },
     })
   );
@@ -96,9 +121,6 @@ export function ProviderKeyNewScreen() {
     );
   }
 
-  const provider: ProviderOption | undefined = parsedParam.success
-    ? providers.data.find(row => row.id === parsedParam.data.provider)
-    : undefined;
   if (!provider) {
     return <InvalidRouteState backTo={PROVIDER_KEYS_ROUTE} />;
   }

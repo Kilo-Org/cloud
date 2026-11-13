@@ -362,7 +362,17 @@
       "newKeyDescription": "Raktas saugomas užšifruotas ir daugiau nebus rodomas.",
       "apiKeyLabel": "API raktas",
       "apiKeyPlaceholder": "Įklijuokite raktą",
-      "apiKeyRequired": "Įveskite raktą."
+      "apiKeyRequired": "Įveskite raktą.",
+      "keyAlreadyExists": "Jūs jau turite {{provider}} raktą. Pašalinkite jį prieš pridėdami kitą.",
+      "keyStoreFailed": "Rakto išsaugoti nepavyko. Bandykite dar kartą.",
+      "invalidCredentials": "Šis raktas neatitinka formato, kurio tikisi {{provider}}. Patikrinkite jį ir bandykite dar kartą.",
+      "testSucceeded": "Raktas veikia. Teikėjas: {{provider}}. Modelis: {{model}}.",
+      "testRejected": "Teikėjas atmetė šį raktą. Patikrinkite, ar jis teisingas ir ar nebuvo atšauktas.",
+      "testIncomplete": "Teikėjas užbaigė bandymą anksčiau, nei jis baigėsi. Bandykite dar kartą.",
+      "testUnsupportedProvider": "Šis teikėjas nebepalaikomas. Pašalinkite raktą.",
+      "testUnreadableKey": "Išsaugoto rakto perskaityti nepavyko. Bandykite dar kartą vėliau.",
+      "testDeprecatedProvider": "Šis teikėjas pasenęs, todėl jo rakto negalima išbandyti.",
+      "testFailed": "Rakto bandymas nepavyko. Bandykite dar kartą."
     },
     "dataExport": {
       "title": "Jūsų duomenys",

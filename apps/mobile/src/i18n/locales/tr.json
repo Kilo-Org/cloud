@@ -362,7 +362,17 @@
       "newKeyDescription": "Anahtar şifrelenmiş olarak saklanır ve tekrar gösterilemez.",
       "apiKeyLabel": "API anahtarı",
       "apiKeyPlaceholder": "Anahtarı yapıştır",
-      "apiKeyRequired": "Anahtarı gir."
+      "apiKeyRequired": "Anahtarı gir.",
+      "keyAlreadyExists": "{{provider}} için zaten bir anahtarın var. Başka bir tane eklemeden önce onu kaldır.",
+      "keyStoreFailed": "Anahtar kaydedilemedi. Tekrar dene.",
+      "invalidCredentials": "Bu anahtar {{provider}} tarafından beklenen biçimde değil. Kontrol edip tekrar dene.",
+      "testSucceeded": "Anahtar çalışıyor. Sağlayıcı: {{provider}}. Model: {{model}}.",
+      "testRejected": "Sağlayıcı bu anahtarı reddetti. Anahtarın doğru olduğunu ve iptal edilmediğini kontrol et.",
+      "testIncomplete": "Sağlayıcı testi bitmeden sonlandırdı. Tekrar dene.",
+      "testUnsupportedProvider": "Bu sağlayıcı artık desteklenmiyor. Anahtarı kaldır.",
+      "testUnreadableKey": "Kayıtlı anahtar okunamadı. Daha sonra tekrar dene.",
+      "testDeprecatedProvider": "Bu sağlayıcı kullanımdan kaldırıldı, bu yüzden anahtarı test edilemez.",
+      "testFailed": "Anahtar testi başarısız oldu. Tekrar dene."
     },
     "dataExport": {
       "title": "Verilerin",

@@ -822,6 +822,105 @@ describe('BYOK Router', () => {
       const keys = await caller.byok.list({ organizationId: organizationA.id });
       expect(keys).toHaveLength(2);
     });
+
+    test('create rejects a second key for the same provider with a clean conflict', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      // The caller throws the TRPCError itself, so this reads the code and
+      // message the client receives: no driver text, SQL or envelope may leak.
+      async function expectCleanConflict(call: () => Promise<unknown>) {
+        const error = await call().then(
+          () => {
+            throw new Error('expected the duplicate key create to be rejected');
+          },
+          (thrown: unknown) => thrown
+        );
+        if (
+          typeof error !== 'object' ||
+          error === null ||
+          !('code' in error) ||
+          !('message' in error) ||
+          typeof error.message !== 'string'
+        ) {
+          throw new Error('expected the duplicate key create to reject with a code and message');
+        }
+        expect(error.code).toBe('CONFLICT');
+        expect(error.message).toBe(
+          'A key for this provider already exists. Remove it before you add another.'
+        );
+        for (const leak of ['Failed query', 'insert into', 'iv', 'wrapped_dek', 'arn:']) {
+          expect(error.message).not.toContain(leak);
+        }
+      }
+
+      const personal = await caller.byok.create({
+        provider_id: 'anthropic',
+        api_key: 'personal-anthropic-first',
+      });
+      const [personalBefore] = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, personal.id));
+
+      await expectCleanConflict(() =>
+        caller.byok.create({ provider_id: 'anthropic', api_key: 'personal-anthropic-second' })
+      );
+
+      const personalRows = await db
+        .select()
+        .from(byok_api_keys)
+        .where(
+          and(
+            eq(byok_api_keys.kilo_user_id, ownerUser.id),
+            eq(byok_api_keys.provider_id, 'anthropic')
+          )
+        );
+      expect(personalRows).toEqual([personalBefore]);
+      expect(decryptStoredKey(personalRows[0])).toBe('personal-anthropic-first');
+
+      // A user key and an organization key have different owners, so the
+      // personal conflict does not block the organization key for the provider.
+      const organization = await caller.byok.create({
+        organizationId: organizationA.id,
+        provider_id: 'anthropic',
+        api_key: 'organization-anthropic-first',
+      });
+      const [organizationBefore] = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, organization.id));
+      const logsBefore = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationA.id))
+        .orderBy(organization_audit_logs.id);
+
+      await expectCleanConflict(() =>
+        caller.byok.create({
+          organizationId: organizationA.id,
+          provider_id: 'anthropic',
+          api_key: 'organization-anthropic-second',
+        })
+      );
+
+      const organizationRows = await db
+        .select()
+        .from(byok_api_keys)
+        .where(
+          and(
+            eq(byok_api_keys.organization_id, organizationA.id),
+            eq(byok_api_keys.provider_id, 'anthropic')
+          )
+        );
+      expect(organizationRows).toEqual([organizationBefore]);
+      expect(decryptStoredKey(organizationRows[0])).toBe('organization-anthropic-first');
+      const logsAfter = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationA.id))
+        .orderBy(organization_audit_logs.id);
+      expect(logsAfter).toEqual(logsBefore);
+    });
   });
 
   describe('KMS envelope encryption', () => {
@@ -943,10 +1042,7 @@ describe('BYOK Router', () => {
 
       await expect(
         caller.byok.testApiKey({ organizationId: organizationA.id, id: created.id })
-      ).resolves.toEqual({
-        success: false,
-        message: 'API key test failed: the stored key could not be read. Try again later.',
-      });
+      ).resolves.toEqual({ outcome: 'unreadable-key' });
     });
 
     test('fails create and update without writing when the KMS call fails', async () => {
@@ -1353,7 +1449,7 @@ describe('BYOK Router', () => {
       await expect(
         caller.byok.create({ ...scope, provider_id: 'bedrock', api_key })
       ).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
+        code: 'UNPROCESSABLE_CONTENT',
         message: 'Invalid credentials for provider: bedrock',
       });
       const keysAfterCreate = await db
@@ -1364,7 +1460,7 @@ describe('BYOK Router', () => {
 
       await expect(caller.byok.update({ ...scope, id: created.id, api_key })).rejects.toMatchObject(
         {
-          code: 'BAD_REQUEST',
+          code: 'UNPROCESSABLE_CONTENT',
           message: 'Invalid credentials for provider: bedrock',
         }
       );
@@ -1767,8 +1863,10 @@ describe('BYOK Router', () => {
         );
 
       try {
-        await expect(caller.byok.testApiKey({ id: key.id })).resolves.toMatchObject({
-          success: true,
+        await expect(caller.byok.testApiKey({ id: key.id })).resolves.toEqual({
+          outcome: 'ok',
+          provider: 'openrouter',
+          model: 'openai/gpt-5-nano',
         });
 
         const upstreamCalls = fetchSpy.mock.calls.filter(([input]) =>
@@ -1804,9 +1902,8 @@ describe('BYOK Router', () => {
 
       try {
         await expect(caller.byok.testApiKey({ id: key.id })).resolves.toEqual({
-          success: false,
-          message:
-            'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.',
+          outcome: 'rejected',
+          detail: 'Invalid API key',
         });
         const [url, init] = fetchSpy.mock.calls.find(([input]) =>
           String(input).startsWith('https://')
@@ -1990,13 +2087,12 @@ describe('BYOK Router', () => {
   });
 
   describe('deprecated codestral provider', () => {
-    test('declines to test a legacy codestral key with a deprecation message', async () => {
+    test('declines to test a legacy codestral key as deprecated', async () => {
       const caller = await createCallerForUser(ownerUser.id);
       const key = await caller.byok.create({ provider_id: 'codestral', api_key: 'stored-secret' });
 
       await expect(caller.byok.testApiKey({ id: key.id })).resolves.toEqual({
-        success: false,
-        message: 'Codestral is deprecated and its API key can no longer be tested.',
+        outcome: 'deprecated-provider',
       });
     });
   });

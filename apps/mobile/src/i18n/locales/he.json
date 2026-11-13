@@ -362,7 +362,17 @@
       "newKeyDescription": "המפתח נשמר בהצפנה ולא ניתן להציג אותו שוב.",
       "apiKeyLabel": "מפתח API",
       "apiKeyPlaceholder": "הדבק את המפתח",
-      "apiKeyRequired": "יש להזין את המפתח."
+      "apiKeyRequired": "יש להזין את המפתח.",
+      "keyAlreadyExists": "כבר יש לך מפתח עבור {{provider}}. הסר אותו לפני שתוסיף מפתח אחר.",
+      "keyStoreFailed": "לא ניתן היה לשמור את המפתח. נסה שוב.",
+      "invalidCredentials": "המפתח הזה אינו בפורמט המצופה על ידי {{provider}}. בדוק אותו ונסה שוב.",
+      "testSucceeded": "המפתח עובד. ספק: {{provider}}. מודל: {{model}}.",
+      "testRejected": "הספק דחה את המפתח הזה. בדוק שהוא תקין ושהוא לא בוטל.",
+      "testIncomplete": "הספק סיים את הבדיקה לפני שהסתיימה. נסה שוב.",
+      "testUnsupportedProvider": "הספק הזה כבר לא נתמך. הסר את המפתח.",
+      "testUnreadableKey": "לא ניתן היה לקרוא את המפתח השמור. נסה שוב מאוחר יותר.",
+      "testDeprecatedProvider": "הספק הזה מיושן, ולכן לא ניתן לבדוק את המפתח שלו.",
+      "testFailed": "בדיקת המפתח נכשלה. נסה שוב."
     },
     "dataExport": {
       "title": "הנתונים שלך",

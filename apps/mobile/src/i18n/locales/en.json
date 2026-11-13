@@ -429,7 +429,17 @@
       "newKeyDescription": "The key is stored encrypted and cannot be shown again.",
       "apiKeyLabel": "API key",
       "apiKeyPlaceholder": "Paste the key",
-      "apiKeyRequired": "Enter the key."
+      "apiKeyRequired": "Enter the key.",
+      "keyAlreadyExists": "You already have a key for {{provider}}. Remove it before you add another.",
+      "keyStoreFailed": "The key could not be saved. Try again.",
+      "invalidCredentials": "This key is not in the format {{provider}} expects. Check it and try again.",
+      "testSucceeded": "Key works. Provider: {{provider}}. Model: {{model}}.",
+      "testRejected": "The provider rejected this key. Check that it is correct and has not been revoked.",
+      "testIncomplete": "The provider ended the test before it finished. Try again.",
+      "testUnsupportedProvider": "This provider is no longer supported. Remove the key.",
+      "testUnreadableKey": "The stored key could not be read. Try again later.",
+      "testDeprecatedProvider": "This provider is deprecated, so its key cannot be tested.",
+      "testFailed": "The key test failed. Try again."
     },
     "dataExport": {
       "title": "Your data",

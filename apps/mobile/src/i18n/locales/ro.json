@@ -362,7 +362,17 @@
       "newKeyDescription": "Cheia este stocată criptat și nu mai poate fi afișată din nou.",
       "apiKeyLabel": "Cheie API",
       "apiKeyPlaceholder": "Lipește cheia",
-      "apiKeyRequired": "Introdu cheia."
+      "apiKeyRequired": "Introdu cheia.",
+      "keyAlreadyExists": "Ai deja o cheie pentru {{provider}}. Elimin-o înainte de a adăuga alta.",
+      "keyStoreFailed": "Cheia nu a putut fi salvată. Încearcă din nou.",
+      "invalidCredentials": "Această cheie nu este în formatul pe care îl așteaptă {{provider}}. Verific-o și încearcă din nou.",
+      "testSucceeded": "Cheia funcționează. Furnizor: {{provider}}. Model: {{model}}.",
+      "testRejected": "Furnizorul a respins această cheie. Verifică dacă este corectă și nu a fost revocată.",
+      "testIncomplete": "Furnizorul a încheiat testul înainte de a se termina. Încearcă din nou.",
+      "testUnsupportedProvider": "Acest furnizor nu mai este acceptat. Elimină cheia.",
+      "testUnreadableKey": "Cheia stocată nu a putut fi citită. Încearcă din nou mai târziu.",
+      "testDeprecatedProvider": "Acest furnizor este învechit, așa că cheia sa nu poate fi testată.",
+      "testFailed": "Testul cheii a eșuat. Încearcă din nou."
     },
     "dataExport": {
       "title": "Datele tale",

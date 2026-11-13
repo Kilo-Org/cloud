@@ -362,7 +362,17 @@
       "newKeyDescription": "Kunci disimpan dalam bentuk terenkripsi dan tidak dapat ditampilkan lagi.",
       "apiKeyLabel": "Kunci API",
       "apiKeyPlaceholder": "Tempel kunci",
-      "apiKeyRequired": "Masukkan kunci."
+      "apiKeyRequired": "Masukkan kunci.",
+      "keyAlreadyExists": "Kamu sudah memiliki kunci untuk {{provider}}. Hapus kunci itu sebelum menambahkan yang lain.",
+      "keyStoreFailed": "Kunci tidak dapat disimpan. Coba lagi.",
+      "invalidCredentials": "Kunci ini tidak sesuai format yang diharapkan {{provider}}. Periksa kunci ini dan coba lagi.",
+      "testSucceeded": "Kunci berfungsi. Penyedia: {{provider}}. Model: {{model}}.",
+      "testRejected": "Penyedia menolak kunci ini. Pastikan kunci itu benar dan belum dicabut.",
+      "testIncomplete": "Penyedia mengakhiri pengujian sebelum selesai. Coba lagi.",
+      "testUnsupportedProvider": "Penyedia ini tidak lagi didukung. Hapus kunci.",
+      "testUnreadableKey": "Kunci yang tersimpan tidak dapat dibaca. Coba lagi nanti.",
+      "testDeprecatedProvider": "Penyedia ini sudah usang, sehingga kuncinya tidak dapat diuji.",
+      "testFailed": "Pengujian kunci gagal. Coba lagi."
     },
     "dataExport": {
       "title": "Datamu",

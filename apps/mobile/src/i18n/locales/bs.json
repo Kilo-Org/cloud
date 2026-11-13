@@ -362,7 +362,17 @@
       "newKeyDescription": "Ključ se čuva šifrovan i ne može se ponovo prikazati.",
       "apiKeyLabel": "API ključ",
       "apiKeyPlaceholder": "Zalijepi ključ",
-      "apiKeyRequired": "Unesi ključ."
+      "apiKeyRequired": "Unesi ključ.",
+      "keyAlreadyExists": "Već imaš ključ za {{provider}}. Ukloni ga prije nego što dodaš drugi.",
+      "keyStoreFailed": "Ključ nije mogao biti sačuvan. Pokušaj ponovo.",
+      "invalidCredentials": "Ovaj ključ nije u formatu koji {{provider}} očekuje. Provjeri ga i pokušaj ponovo.",
+      "testSucceeded": "Ključ radi. Pružalac: {{provider}}. Model: {{model}}.",
+      "testRejected": "Pružalac je odbio ovaj ključ. Provjeri da je ispravan i da nije opozvan.",
+      "testIncomplete": "Pružalac je završio test prije nego što je dovršen. Pokušaj ponovo.",
+      "testUnsupportedProvider": "Ovaj pružalac više nije podržan. Ukloni ključ.",
+      "testUnreadableKey": "Sačuvani ključ nije mogao biti pročitan. Pokušaj ponovo kasnije.",
+      "testDeprecatedProvider": "Ovaj pružalac je zastario, pa se njegov ključ ne može testirati.",
+      "testFailed": "Test ključa nije uspio. Pokušaj ponovo."
     },
     "dataExport": {
       "title": "Tvoji podaci",

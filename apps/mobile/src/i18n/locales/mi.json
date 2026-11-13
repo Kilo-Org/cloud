@@ -362,7 +362,17 @@
       "newKeyDescription": "Ka penapenahia te kī kua whakamunatia, ā, kāore e taea te whakaatu anō.",
       "apiKeyLabel": "Kī API",
       "apiKeyPlaceholder": "Whakapiria te kī",
-      "apiKeyRequired": "Tāurutia te kī."
+      "apiKeyRequired": "Tāurutia te kī.",
+      "keyAlreadyExists": "Kei a koe kē tētahi kī mō {{provider}}. Tangohia i mua i te tāpiri i tētahi atu kī.",
+      "keyStoreFailed": "Kāore i taea te penapena i te kī. Whakamātau anō.",
+      "invalidCredentials": "Kāore tēnei kī i te hōputu e hiahiatia ana e {{provider}}. Tirohia, ā, whakamātau anō.",
+      "testSucceeded": "Ka mahi te kī. Kaiwhakarato: {{provider}}. Tauira: {{model}}.",
+      "testRejected": "I whakakahore te kaiwhakarato i tēnei kī. Tirohia mēnā e tika ana, ā, kāore anō i whakakorengia.",
+      "testIncomplete": "I whakamutu te kaiwhakarato i te whakamātau i mua i tōna mutunga. Whakamātau anō.",
+      "testUnsupportedProvider": "Kua kore tēnei kaiwhakarato e tautokona ana. Tangohia te kī.",
+      "testUnreadableKey": "Kāore i taea te pānui i te kī kua penapenahia. Whakamātau anō ā muri ake.",
+      "testDeprecatedProvider": "Kua tawhito tēnei kaiwhakarato, nā reira kāore e taea te whakamātau i tōna kī.",
+      "testFailed": "I rahua te whakamātau kī. Whakamātau anō."
     },
     "dataExport": {
       "title": "Ō raraunga",

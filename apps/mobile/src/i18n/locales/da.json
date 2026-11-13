@@ -362,7 +362,17 @@
       "newKeyDescription": "Nøglen gemmes krypteret og kan ikke vises igen.",
       "apiKeyLabel": "API-nøgle",
       "apiKeyPlaceholder": "Indsæt nøglen",
-      "apiKeyRequired": "Angiv nøglen."
+      "apiKeyRequired": "Angiv nøglen.",
+      "keyAlreadyExists": "Du har allerede en nøgle til {{provider}}. Fjern den, før du tilføjer en anden.",
+      "keyStoreFailed": "Nøglen kunne ikke gemmes. Prøv igen.",
+      "invalidCredentials": "Denne nøgle er ikke i det format, som {{provider}} forventer. Kontrollér den og prøv igen.",
+      "testSucceeded": "Nøglen virker. Udbyder: {{provider}}. Model: {{model}}.",
+      "testRejected": "Udbyderen afviste denne nøgle. Kontrollér, at den er korrekt og ikke er blevet tilbagekaldt.",
+      "testIncomplete": "Udbyderen afsluttede testen, før den blev færdig. Prøv igen.",
+      "testUnsupportedProvider": "Denne udbyder understøttes ikke længere. Fjern nøglen.",
+      "testUnreadableKey": "Den gemte nøgle kunne ikke læses. Prøv igen senere.",
+      "testDeprecatedProvider": "Denne udbyder er forældet, så dens nøgle kan ikke testes.",
+      "testFailed": "Nøgletesten mislykkedes. Prøv igen."
     },
     "dataExport": {
       "title": "Dine data",

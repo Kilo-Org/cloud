@@ -362,7 +362,17 @@
       "newKeyDescription": "Avain tallennetaan salattuna, eikä sitä voi näyttää uudelleen.",
       "apiKeyLabel": "API-avain",
       "apiKeyPlaceholder": "Liitä avain",
-      "apiKeyRequired": "Anna avain."
+      "apiKeyRequired": "Anna avain.",
+      "keyAlreadyExists": "Sinulla on jo avain palveluntarjoajalle {{provider}}. Poista se ennen kuin lisäät toisen.",
+      "keyStoreFailed": "Avainta ei voitu tallentaa. Yritä uudelleen.",
+      "invalidCredentials": "Tämä avain ei ole muodossa, jota {{provider}} odottaa. Tarkista se ja yritä uudelleen.",
+      "testSucceeded": "Avain toimii. Palveluntarjoaja: {{provider}}. Malli: {{model}}.",
+      "testRejected": "Palveluntarjoaja hylkäsi tämän avaimen. Tarkista, että se on oikein eikä sitä ole peruutettu.",
+      "testIncomplete": "Palveluntarjoaja päätti testin ennen sen valmistumista. Yritä uudelleen.",
+      "testUnsupportedProvider": "Tätä palveluntarjoajaa ei enää tueta. Poista avain.",
+      "testUnreadableKey": "Tallennettua avainta ei voitu lukea. Yritä myöhemmin uudelleen.",
+      "testDeprecatedProvider": "Tämä palveluntarjoaja on vanhentunut, joten sen avainta ei voi testata.",
+      "testFailed": "Avaimen testaus epäonnistui. Yritä uudelleen."
     },
     "dataExport": {
       "title": "Tietosi",

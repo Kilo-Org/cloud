@@ -362,7 +362,17 @@
       "newKeyDescription": "De sleutel wordt versleuteld opgeslagen en kan niet opnieuw worden getoond.",
       "apiKeyLabel": "API-sleutel",
       "apiKeyPlaceholder": "Plak de sleutel",
-      "apiKeyRequired": "Voer de sleutel in."
+      "apiKeyRequired": "Voer de sleutel in.",
+      "keyAlreadyExists": "Je hebt al een sleutel voor {{provider}}. Verwijder deze voordat je een nieuwe toevoegt.",
+      "keyStoreFailed": "De sleutel kon niet worden opgeslagen. Probeer het opnieuw.",
+      "invalidCredentials": "Deze sleutel heeft niet de indeling die {{provider}} verwacht. Controleer de sleutel en probeer het opnieuw.",
+      "testSucceeded": "Sleutel werkt. Provider: {{provider}}. Model: {{model}}.",
+      "testRejected": "De provider heeft deze sleutel geweigerd. Controleer of deze correct is en niet is ingetrokken.",
+      "testIncomplete": "De provider heeft de test beëindigd voordat deze was voltooid. Probeer het opnieuw.",
+      "testUnsupportedProvider": "Deze provider wordt niet meer ondersteund. Verwijder de sleutel.",
+      "testUnreadableKey": "De opgeslagen sleutel kon niet worden gelezen. Probeer het later opnieuw.",
+      "testDeprecatedProvider": "Deze provider is verouderd, dus de sleutel kan niet worden getest.",
+      "testFailed": "De sleuteltest is mislukt. Probeer het opnieuw."
     },
     "dataExport": {
       "title": "Je gegevens",

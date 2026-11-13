@@ -362,7 +362,17 @@
       "newKeyDescription": "La clave se almacena cifrada y no se puede volver a mostrar.",
       "apiKeyLabel": "Clave de API",
       "apiKeyPlaceholder": "Pega la clave",
-      "apiKeyRequired": "Introduce la clave."
+      "apiKeyRequired": "Introduce la clave.",
+      "keyAlreadyExists": "Ya tienes una clave para {{provider}}. Elimínala antes de añadir otra.",
+      "keyStoreFailed": "No se pudo guardar la clave. Inténtalo de nuevo.",
+      "invalidCredentials": "Esta clave no tiene el formato que espera {{provider}}. Compruébala e inténtalo de nuevo.",
+      "testSucceeded": "La clave funciona. Proveedor: {{provider}}. Modelo: {{model}}.",
+      "testRejected": "El proveedor ha rechazado esta clave. Comprueba que es correcta y que no se ha revocado.",
+      "testIncomplete": "El proveedor finalizó la prueba antes de que terminara. Inténtalo de nuevo.",
+      "testUnsupportedProvider": "Este proveedor ya no es compatible. Elimina la clave.",
+      "testUnreadableKey": "No se pudo leer la clave almacenada. Inténtalo de nuevo más tarde.",
+      "testDeprecatedProvider": "Este proveedor está obsoleto, por lo que su clave no se puede probar.",
+      "testFailed": "La prueba de la clave ha fallado. Inténtalo de nuevo."
     },
     "dataExport": {
       "title": "Tus datos",

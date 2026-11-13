@@ -362,7 +362,17 @@
       "newKeyDescription": "金鑰會加密儲存，之後無法再次顯示。",
       "apiKeyLabel": "API 金鑰",
       "apiKeyPlaceholder": "貼上金鑰",
-      "apiKeyRequired": "請輸入金鑰。"
+      "apiKeyRequired": "請輸入金鑰。",
+      "keyAlreadyExists": "你已經有 {{provider}} 的金鑰。新增其他金鑰前，請先將其移除。",
+      "keyStoreFailed": "金鑰無法儲存。請再試一次。",
+      "invalidCredentials": "此金鑰不是 {{provider}} 預期的格式。請檢查後再試一次。",
+      "testSucceeded": "金鑰可用。供應商：{{provider}}。模型：{{model}}。",
+      "testRejected": "供應商拒絕了此金鑰。請檢查金鑰是否正確且尚未被撤銷。",
+      "testIncomplete": "供應商在測試完成前就結束了。請再試一次。",
+      "testUnsupportedProvider": "此供應商已不再支援。請移除此金鑰。",
+      "testUnreadableKey": "無法讀取已儲存的金鑰。請稍後再試一次。",
+      "testDeprecatedProvider": "此供應商已棄用，因此無法測試其金鑰。",
+      "testFailed": "金鑰測試失敗。請再試一次。"
     },
     "dataExport": {
       "title": "你的資料",

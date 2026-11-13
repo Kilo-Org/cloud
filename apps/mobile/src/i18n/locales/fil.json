@@ -362,7 +362,17 @@
       "newKeyDescription": "Naka-encrypt na nakaimbak ang key at hindi na ito maipapakita muli.",
       "apiKeyLabel": "API key",
       "apiKeyPlaceholder": "I-paste ang key",
-      "apiKeyRequired": "Ilagay ang key."
+      "apiKeyRequired": "Ilagay ang key.",
+      "keyAlreadyExists": "Mayroon ka nang key para sa {{provider}}. Alisin ito bago ka magdagdag ng isa pa.",
+      "keyStoreFailed": "Hindi naimbak ang key. Subukan muli.",
+      "invalidCredentials": "Hindi ayon ang key na ito sa pormat na inaasahan ng {{provider}}. Suriin ito at subukan muli.",
+      "testSucceeded": "Gumagana ang key. Provider: {{provider}}. Model: {{model}}.",
+      "testRejected": "Tinanggihan ng provider ang key na ito. Suriin na tama ito at hindi pa binawi.",
+      "testIncomplete": "Inihinto ng provider ang pagsubok bago ito matapos. Subukan muli.",
+      "testUnsupportedProvider": "Hindi na sinusuportahan ang provider na ito. Alisin ang key.",
+      "testUnreadableKey": "Hindi mabasa ang nakaimbak na key. Subukan muli mamaya.",
+      "testDeprecatedProvider": "Lipas na ang provider na ito, kaya hindi na masusubukan ang key nito.",
+      "testFailed": "Bigo ang pagsubok ng key. Subukan muli."
     },
     "dataExport": {
       "title": "Ang iyong data",

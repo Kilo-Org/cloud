@@ -362,7 +362,17 @@
       "newKeyDescription": "Nøkkelen lagres kryptert og kan ikke vises igjen.",
       "apiKeyLabel": "API-nøkkel",
       "apiKeyPlaceholder": "Lim inn nøkkelen",
-      "apiKeyRequired": "Skriv inn nøkkelen."
+      "apiKeyRequired": "Skriv inn nøkkelen.",
+      "keyAlreadyExists": "Du har allerede en nøkkel for {{provider}}. Fjern den før du legger til en ny.",
+      "keyStoreFailed": "Nøkkelen kunne ikke lagres. Prøv igjen.",
+      "invalidCredentials": "Denne nøkkelen er ikke i det formatet {{provider}} forventer. Kontroller den og prøv igjen.",
+      "testSucceeded": "Nøkkelen fungerer. Leverandør: {{provider}}. Modell: {{model}}.",
+      "testRejected": "Leverandøren avviste denne nøkkelen. Kontroller at den er riktig og ikke er tilbakekalt.",
+      "testIncomplete": "Leverandøren avsluttet testen før den var ferdig. Prøv igjen.",
+      "testUnsupportedProvider": "Denne leverandøren støttes ikke lenger. Fjern nøkkelen.",
+      "testUnreadableKey": "Den lagrede nøkkelen kunne ikke leses. Prøv igjen senere.",
+      "testDeprecatedProvider": "Denne leverandøren er utdatert, så nøkkelen kan ikke testes.",
+      "testFailed": "Nøkkeltesten mislyktes. Prøv igjen."
     },
     "dataExport": {
       "title": "Dine data",

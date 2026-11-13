@@ -362,7 +362,17 @@
       "newKeyDescription": "Ukhiye ugcinwa ubethelwe futhi ngeke uphinde uboniswe.",
       "apiKeyLabel": "Ukhiye we-API",
       "apiKeyPlaceholder": "Namathisela ukhiye",
-      "apiKeyRequired": "Faka ukhiye."
+      "apiKeyRequired": "Faka ukhiye.",
+      "keyAlreadyExists": "Usuvele unokhiye we-{{provider}}. Susa lo khiye ngaphambi kokuba wengeze omunye.",
+      "keyStoreFailed": "Ukhiye awukwazanga ukugcinwa. Zama futhi.",
+      "invalidCredentials": "Lo khiye awukho efomini elilindelwe ngu-{{provider}}. Hlola lo khiye bese uzama futhi.",
+      "testSucceeded": "Ukhiye uyasebenza. Umhlinzeki: {{provider}}. Imodeli: {{model}}.",
+      "testRejected": "Umhlinzeki uyenqabile lo khiye. Hlola ukuthi ulungile futhi awukakahoxiswa.",
+      "testIncomplete": "Umhlinzeki uqede ukuhlola ngaphambi kokuba kuphele. Zama futhi.",
+      "testUnsupportedProvider": "Lo mhlinzeki akasasekelwa. Susa ukhiye.",
+      "testUnreadableKey": "Ukhiye ogciniwe awukwazanga ukufundwa. Zama futhi kamuva.",
+      "testDeprecatedProvider": "Lo mhlinzeki usuphelelwe yisikhathi, ngakho ukhiye wakhe awukwazi ukuhlolwa.",
+      "testFailed": "Ukuhlolwa kukhiye kwehlulekile. Zama futhi."
     },
     "dataExport": {
       "title": "Idatha yakho",

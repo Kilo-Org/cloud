@@ -362,7 +362,17 @@
       "newKeyDescription": "يُخزَّن المفتاح مشفّرًا ولا يمكن عرضه مرة أخرى.",
       "apiKeyLabel": "مفتاح API",
       "apiKeyPlaceholder": "الصق المفتاح",
-      "apiKeyRequired": "أدخل المفتاح."
+      "apiKeyRequired": "أدخل المفتاح.",
+      "keyAlreadyExists": "لديك بالفعل مفتاح {{provider}}. أزله قبل أن تضيف مفتاحًا آخر.",
+      "keyStoreFailed": "تعذّر حفظ المفتاح. حاول مرة أخرى.",
+      "invalidCredentials": "هذا المفتاح ليس بالتنسيق الذي يتوقعه {{provider}}. تحقق منه وحاول مرة أخرى.",
+      "testSucceeded": "المفتاح يعمل. المزوّد: {{provider}}. النموذج: {{model}}.",
+      "testRejected": "رفض المزوّد هذا المفتاح. تحقق من أنه صحيح ولم يتم إبطاله.",
+      "testIncomplete": "أنهى المزوّد الاختبار قبل اكتماله. حاول مرة أخرى.",
+      "testUnsupportedProvider": "لم يعد هذا المزوّد مدعومًا. أزل المفتاح.",
+      "testUnreadableKey": "تعذّرت قراءة المفتاح المخزَّن. حاول مرة أخرى لاحقًا.",
+      "testDeprecatedProvider": "هذا المزوّد مهجور، لذا لا يمكن اختبار مفتاحه.",
+      "testFailed": "فشل اختبار المفتاح. حاول مرة أخرى."
     },
     "dataExport": {
       "title": "بياناتك",

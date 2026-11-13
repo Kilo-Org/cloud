@@ -362,7 +362,17 @@
       "newKeyDescription": "Iċ-ċavetta tinħażen ikkriptata u ma tistax terġa' tintwera.",
       "apiKeyLabel": "Ċavetta tal-API",
       "apiKeyPlaceholder": "Waħħal iċ-ċavetta",
-      "apiKeyRequired": "Daħħal iċ-ċavetta."
+      "apiKeyRequired": "Daħħal iċ-ċavetta.",
+      "keyAlreadyExists": "Diġà għandek ċavetta għal {{provider}}. Neħħiha qabel ma żżid oħra.",
+      "keyStoreFailed": "Iċ-ċavetta ma setgħetx tiġi salvata. Erġa' pprova.",
+      "invalidCredentials": "Din iċ-ċavetta mhix fil-format li jistenna {{provider}}. Iċċekkjaha u erġa' pprova.",
+      "testSucceeded": "Iċ-ċavetta taħdem. Fornitur: {{provider}}. Mudell: {{model}}.",
+      "testRejected": "Il-fornitur irrifjuta din iċ-ċavetta. Iċċekkja li hija korretta u li ma ġietx revokata.",
+      "testIncomplete": "Il-fornitur temm it-test qabel ma tlesta. Erġa' pprova.",
+      "testUnsupportedProvider": "Dan il-fornitur m'għadux appoġġjat. Neħħi ċ-ċavetta.",
+      "testUnreadableKey": "Iċ-ċavetta maħżuna ma setgħetx tinqara. Erġa' pprova aktar tard.",
+      "testDeprecatedProvider": "Dan il-fornitur huwa skadut, għalhekk iċ-ċavetta tiegħu ma tistax tiġi ttestjata.",
+      "testFailed": "It-test taċ-ċavetta falla. Erġa' pprova."
     },
     "dataExport": {
       "title": "Id-data tiegħek",

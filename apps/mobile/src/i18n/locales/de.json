@@ -362,7 +362,17 @@
       "newKeyDescription": "Der Schlüssel wird verschlüsselt gespeichert und kann nicht erneut angezeigt werden.",
       "apiKeyLabel": "API-Schlüssel",
       "apiKeyPlaceholder": "Schlüssel einfügen",
-      "apiKeyRequired": "Gib den Schlüssel ein."
+      "apiKeyRequired": "Gib den Schlüssel ein.",
+      "keyAlreadyExists": "Du hast bereits einen Schlüssel für {{provider}}. Entferne ihn, bevor du einen weiteren hinzufügst.",
+      "keyStoreFailed": "Der Schlüssel konnte nicht gespeichert werden. Versuche es erneut.",
+      "invalidCredentials": "Dieser Schlüssel hat nicht das Format, das {{provider}} erwartet. Prüfe ihn und versuche es erneut.",
+      "testSucceeded": "Schlüssel funktioniert. Anbieter: {{provider}}. Modell: {{model}}.",
+      "testRejected": "Der Anbieter hat diesen Schlüssel abgelehnt. Prüfe, ob er korrekt und nicht widerrufen ist.",
+      "testIncomplete": "Der Anbieter hat den Test vorzeitig beendet. Versuche es erneut.",
+      "testUnsupportedProvider": "Dieser Anbieter wird nicht mehr unterstützt. Entferne den Schlüssel.",
+      "testUnreadableKey": "Der gespeicherte Schlüssel konnte nicht gelesen werden. Versuche es später erneut.",
+      "testDeprecatedProvider": "Dieser Anbieter ist veraltet, daher kann sein Schlüssel nicht getestet werden.",
+      "testFailed": "Der Schlüsseltest ist fehlgeschlagen. Versuche es erneut."
     },
     "dataExport": {
       "title": "Deine Daten",

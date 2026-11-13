@@ -362,7 +362,17 @@
       "newKeyDescription": "Kle a anrejistre ankripte epi li pa ka parèt ankò.",
       "apiKeyLabel": "Kle API",
       "apiKeyPlaceholder": "Kole kle a",
-      "apiKeyRequired": "Antre kle a."
+      "apiKeyRequired": "Antre kle a.",
+      "keyAlreadyExists": "Ou deja gen yon kle pou {{provider}}. Retire l anvan ou ajoute yon lòt.",
+      "keyStoreFailed": "Kle a pa t kapab anrejistre. Eseye ankò.",
+      "invalidCredentials": "Kle sa a pa nan fòma {{provider}} atann lan. Verifye l epi eseye ankò.",
+      "testSucceeded": "Kle a fonksyone. Founisè: {{provider}}. Modèl: {{model}}.",
+      "testRejected": "Founisè a rejte kle sa a. Verifye ke li kòrèk epi li pa t anile.",
+      "testIncomplete": "Founisè a fini tès la anvan li te konplete. Eseye ankò.",
+      "testUnsupportedProvider": "Founisè sa a pa sipòte ankò. Retire kle a.",
+      "testUnreadableKey": "Kle ki anrejistre a pa t kapab li. Eseye ankò pita.",
+      "testDeprecatedProvider": "Founisè sa a pa rekòmande ankò, kidonk kle li pa ka teste.",
+      "testFailed": "Tès kle a echwe. Eseye ankò."
     },
     "dataExport": {
       "title": "Done ou yo",

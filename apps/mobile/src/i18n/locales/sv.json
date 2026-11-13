@@ -362,7 +362,17 @@
       "newKeyDescription": "Nyckeln lagras krypterad och kan inte visas igen.",
       "apiKeyLabel": "API-nyckel",
       "apiKeyPlaceholder": "Klistra in nyckeln",
-      "apiKeyRequired": "Ange nyckeln."
+      "apiKeyRequired": "Ange nyckeln.",
+      "keyAlreadyExists": "Du har redan en nyckel för {{provider}}. Ta bort den innan du lägger till en annan.",
+      "keyStoreFailed": "Nyckeln kunde inte sparas. Försök igen.",
+      "invalidCredentials": "Den här nyckeln har inte det format som {{provider}} förväntar sig. Kontrollera den och försök igen.",
+      "testSucceeded": "Nyckeln fungerar. Leverantör: {{provider}}. Modell: {{model}}.",
+      "testRejected": "Leverantören avvisade den här nyckeln. Kontrollera att den är korrekt och inte har återkallats.",
+      "testIncomplete": "Leverantören avslutade testet innan det var klart. Försök igen.",
+      "testUnsupportedProvider": "Den här leverantören stöds inte längre. Ta bort nyckeln.",
+      "testUnreadableKey": "Den lagrade nyckeln kunde inte läsas. Försök igen senare.",
+      "testDeprecatedProvider": "Den här leverantören är föråldrad, så dess nyckel kan inte testas.",
+      "testFailed": "Nyckeltestet misslyckades. Försök igen."
     },
     "dataExport": {
       "title": "Dina data",

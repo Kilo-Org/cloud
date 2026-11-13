@@ -362,7 +362,17 @@
       "newKeyDescription": "Caiff yr allwedd ei storio wedi'i hamgryptio ac ni ellir ei dangos eto.",
       "apiKeyLabel": "Allwedd API",
       "apiKeyPlaceholder": "Gludo'r allwedd",
-      "apiKeyRequired": "Rhowch yr allwedd."
+      "apiKeyRequired": "Rhowch yr allwedd.",
+      "keyAlreadyExists": "Mae gennych chi eisoes allwedd ar gyfer {{provider}}. Tynnwch hi cyn ychwanegu un arall.",
+      "keyStoreFailed": "Ni ellid cadw'r allwedd. Ceisiwch eto.",
+      "invalidCredentials": "Nid yw'r allwedd hon yn y fformat y mae {{provider}} yn ei ddisgwyl. Gwiriwch hi a cheisiwch eto.",
+      "testSucceeded": "Mae'r allwedd yn gweithio. Darparwr: {{provider}}. Model: {{model}}.",
+      "testRejected": "Gwrthododd y darparwr yr allwedd hon. Gwiriwch ei bod yn gywir ac nad yw wedi'i ddirymu.",
+      "testIncomplete": "Daeth y darparwr â'r prawf i ben cyn iddo orffen. Ceisiwch eto.",
+      "testUnsupportedProvider": "Nid yw'r darparwr hwn yn cael ei gefnogi mwyach. Tynnwch yr allwedd.",
+      "testUnreadableKey": "Ni ellid darllen yr allwedd a storiwyd. Ceisiwch eto yn nes ymlaen.",
+      "testDeprecatedProvider": "Mae'r darparwr hwn wedi darfod amdano, felly ni ellir profi ei allwedd.",
+      "testFailed": "Methodd prawf yr allwedd. Ceisiwch eto."
     },
     "dataExport": {
       "title": "Eich data",

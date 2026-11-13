@@ -362,7 +362,17 @@
       "newKeyDescription": "Voatahiry amin'ny endrika voaafina ny lakile ary tsy azo aseho intsony.",
       "apiKeyLabel": "Lakile API",
       "apiKeyPlaceholder": "Apetaho ny lakile",
-      "apiKeyRequired": "Ampidiro ny lakile."
+      "apiKeyRequired": "Ampidiro ny lakile.",
+      "keyAlreadyExists": "Efa manana lakile ho an'ny {{provider}} ianao. Esory izy io alohan'ny hanampianao lakile hafa.",
+      "keyStoreFailed": "Tsy voatahiry ny lakile. Andramo indray.",
+      "invalidCredentials": "Tsy amin'ny endrika andrasan'ny {{provider}} ity lakile ity. Hamarino izy ary andramo indray.",
+      "testSucceeded": "Miasa ny lakile. Mpamatsy: {{provider}}. Modely: {{model}}.",
+      "testRejected": "Nolavin'ny mpamatsy ity lakile ity. Hamarino fa marina izy ary tsy voafoanana.",
+      "testIncomplete": "Notapahin'ny mpamatsy ny andrana talohan'ny nifaranany. Andramo indray.",
+      "testUnsupportedProvider": "Tsy tohana intsony ity mpamatsy ity. Esory ny lakile.",
+      "testUnreadableKey": "Tsy azo novakiana ny lakile voatahiry. Andramo indray aoriana.",
+      "testDeprecatedProvider": "Lany andro ity mpamatsy ity, ka tsy azo andramana ny lakile.",
+      "testFailed": "Tsy nahomby ny andramana lakile. Andramo indray."
     },
     "dataExport": {
       "title": "Ny angonao",

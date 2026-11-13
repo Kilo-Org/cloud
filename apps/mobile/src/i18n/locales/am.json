@@ -362,7 +362,17 @@
       "newKeyDescription": "ቁልፉ ተመስጥሮ ይቀመጣል፤ ዳግመኛ ሊታይ አይችልም።",
       "apiKeyLabel": "የAPI ቁልፍ",
       "apiKeyPlaceholder": "ቁልፉን ይለጥፉ",
-      "apiKeyRequired": "ቁልፉን ያስገቡ።"
+      "apiKeyRequired": "ቁልፉን ያስገቡ።",
+      "keyAlreadyExists": "ለ{{provider}} አስቀድመው ቁልፍ አለዎት። ሌላ ከመጨመርዎ በፊት ይወግዱት።",
+      "keyStoreFailed": "ቁልፉ ሊቀመጥ አልቻለም። እንደገና ይሞክሩ።",
+      "invalidCredentials": "ይህ ቁልፍ {{provider}} በሚጠብቀው ቅርጸት አይደለም። ያረጋግጡት እና እንደገና ይሞክሩ።",
+      "testSucceeded": "ቁልፉ ይሠራል። አቅራቢ: {{provider}}። ሞዴል: {{model}}።",
+      "testRejected": "አቅራቢው ይህን ቁልፍ ውድቅ አድርጓል። ትክክል መሆኑን እና እንዳልተሰረዘ ያረጋግጡ።",
+      "testIncomplete": "አቅራቢው ሙከራው ከመጠናቀቁ በፊት አቆመው። እንደገና ይሞክሩ።",
+      "testUnsupportedProvider": "ይህ አቅራቢ ከእንግዲህ አይደገፍም። ቁልፉን ይወግዱ።",
+      "testUnreadableKey": "የተቀመጠው ቁልፍ ሊነበብ አልቻለም። በኋላ እንደገና ይሞክሩ።",
+      "testDeprecatedProvider": "ይህ አቅራቢ ጊዜው ያለፈበት ነው፣ ስለዚህ ቁልፉ ሊሞከር አይችልም።",
+      "testFailed": "የቁልፍ ሙከራው አልተሳካም። እንደገና ይሞክሩ።"
     },
     "dataExport": {
       "title": "የእርስዎ ውሂብ",

@@ -362,7 +362,17 @@
       "newKeyDescription": "키는 암호화되어 저장되며 다시 표시할 수 없습니다.",
       "apiKeyLabel": "API 키",
       "apiKeyPlaceholder": "키 붙여넣기",
-      "apiKeyRequired": "키를 입력하세요."
+      "apiKeyRequired": "키를 입력하세요.",
+      "keyAlreadyExists": "{{provider}}에 대한 키가 이미 있습니다. 다른 키를 추가하기 전에 삭제하세요.",
+      "keyStoreFailed": "키를 저장할 수 없습니다. 다시 시도하세요.",
+      "invalidCredentials": "이 키는 {{provider}}에서 기대하는 형식이 아닙니다. 확인하고 다시 시도하세요.",
+      "testSucceeded": "키가 작동합니다. 제공업체: {{provider}}. 모델: {{model}}.",
+      "testRejected": "제공업체가 이 키를 거부했습니다. 키가 올바르고 해지되지 않았는지 확인하세요.",
+      "testIncomplete": "제공업체가 테스트를 완료하기 전에 종료했습니다. 다시 시도하세요.",
+      "testUnsupportedProvider": "이 제공업체는 이제 지원되지 않습니다. 키를 삭제하세요.",
+      "testUnreadableKey": "저장된 키를 읽을 수 없습니다. 나중에 다시 시도하세요.",
+      "testDeprecatedProvider": "이 제공업체는 사용 중단되었으므로 해당 키를 테스트할 수 없습니다.",
+      "testFailed": "키 테스트에 실패했습니다. 다시 시도하세요."
     },
     "dataExport": {
       "title": "내 데이터",

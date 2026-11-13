@@ -1458,6 +1458,10 @@ async function productionBuilder(args: {
 // `--clean` regenerates ios/ from scratch, as CI does on a fresh checkout.
 // CI=1 keeps the Expo CLI non-interactive (no dirty-git-tree prompt).
 function productionPrebuild(mobileRoot: string): void {
+  execFileSync('bash', ['modules/kilo-ssh/scripts/build-native.sh'], {
+    cwd: mobileRoot,
+    stdio: 'inherit',
+  });
   execFileSync('pnpm', ['exec', 'expo', 'prebuild', '--platform', 'ios', '--clean'], {
     cwd: mobileRoot,
     stdio: 'inherit',

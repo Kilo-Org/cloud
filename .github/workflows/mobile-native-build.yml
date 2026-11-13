@@ -281,6 +281,16 @@ jobs:
           check ios "${{ needs.gate.outputs.ios_hash }}"
           check android "${{ needs.gate.outputs.android_hash }}"
 
+      # The podspec vendors ios/Frameworks/SshCore.xcframework and CocoaPods
+      # resolves that path during this prebuild: a bundle that is absent then is
+      # dropped silently, and the app fails to link the uniffi symbols later.
+      # The script installs the pinned toolchain and its iOS targets on first
+      # use. It runs after the hash check because its outputs are gitignored and
+      # therefore not fingerprint inputs.
+      - name: Build the SSH Rust core
+        if: steps.published.outputs.published != 'true'
+        run: bash apps/mobile/modules/kilo-ssh/scripts/build-native.sh
+
       - name: Expo prebuild
         if: steps.published.outputs.published != 'true'
         run: CI=1 pnpm --filter kilo-app exec expo prebuild --platform ios
@@ -386,6 +396,21 @@ jobs:
       - name: Expo prebuild
         if: steps.published.outputs.published != 'true'
         run: CI=1 pnpm --filter kilo-app exec expo prebuild --platform android
+
+      # The Gradle build runs the SSH module's Rust task, which cross-compiles
+      # libssh_core.so for the app's ABIs before the variant's preBuild. That
+      # task installs the pinned toolchain, its Android targets and cargo-ndk on
+      # first use; this only keeps the crate downloads warm.
+      - name: Cache the cargo registry
+        if: steps.published.outputs.published != 'true'
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-registry-${{ hashFiles('apps/mobile/modules/kilo-ssh/rust/Cargo.lock', 'apps/mobile/modules/kilo-ssh/rust-toolchain.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-cargo-registry-
 
       # The prebuild rewrites apps/mobile/android inside this run, so the key
       # hashes the inputs that pin the generated Gradle toolchain — the app

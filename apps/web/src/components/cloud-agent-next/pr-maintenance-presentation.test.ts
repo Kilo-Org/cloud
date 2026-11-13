@@ -124,18 +124,32 @@ describe('maintenance presentation', () => {
   });
 
   it('does not show live execution help on paused, finished, or observation-only watches', () => {
-    for (const execution_status of ['waiting_for_session', 'needs_input'] as const) {
-      const watch = {
-        status: 'watching' as const,
-        execution_status,
-        policy: { version: 2 as const },
-        activeChat: { chatAvailable: true },
-      };
-      expect(getMaintenanceExecutionHelp(watch)).not.toBeNull();
-      expect(getMaintenanceExecutionHelp({ ...watch, status: 'paused' })).toBeNull();
-      expect(getMaintenanceExecutionHelp({ ...watch, status: 'finished' })).toBeNull();
-      expect(getMaintenanceExecutionHelp({ ...watch, policy: { version: 1 } })).toBeNull();
-    }
+    const watch = {
+      status: 'watching' as const,
+      execution_status: 'waiting_for_session' as const,
+      policy: { version: 2 as const },
+      activeChat: { chatAvailable: true },
+    };
+    expect(getMaintenanceExecutionHelp(watch)).not.toBeNull();
+    expect(getMaintenanceExecutionHelp({ ...watch, status: 'paused' })).toBeNull();
+    expect(getMaintenanceExecutionHelp({ ...watch, status: 'finished' })).toBeNull();
+    expect(getMaintenanceExecutionHelp({ ...watch, policy: { version: 1 } })).toBeNull();
+  });
+
+  it('leaves the answerable needs-input action to the recovery message', () => {
+    const answered = {
+      status: 'watching' as const,
+      execution_status: 'needs_input' as const,
+      policy: { version: 2 as const },
+      activeChat: { chatAvailable: true },
+    };
+    expect(getMaintenanceExecutionHelp(answered)).toBeNull();
+    expect(
+      getMaintenanceExecutionHelp({
+        ...answered,
+        activeChat: { chatAvailable: false },
+      })
+    ).toContain('No maintenance chat needs an answer');
   });
 
   it('does not poll absent or finished watches', () => {

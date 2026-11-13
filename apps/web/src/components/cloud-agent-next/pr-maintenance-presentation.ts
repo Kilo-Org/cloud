@@ -43,10 +43,10 @@ export function getMaintenanceExecutionHelp(watch: {
   if (watch.execution_status === 'waiting_for_session') {
     return 'Maintenance waits for your running chats and the workspace quiet period. No repair chat exists until it can start.';
   }
-  if (watch.execution_status === 'needs_input') {
-    return watch.activeChat?.chatAvailable
-      ? 'Open the current maintenance chat and answer its question. Your other chats can continue.'
-      : 'Resolve the reported blocker, then recheck the PR. No maintenance chat needs an answer.';
+  // The `maintenance_question` recovery message already names the chat action,
+  // so this line adds guidance only when no chat can answer the question.
+  if (watch.execution_status === 'needs_input' && !watch.activeChat?.chatAvailable) {
+    return 'Resolve the reported blocker, then recheck the PR. No maintenance chat needs an answer.';
   }
   return null;
 }

@@ -1311,6 +1311,9 @@ export const cliSessionsV2Router = createTRPCRouter({
           cachePrHeadSha: sql<string | null>`${sessionAssociatedPr.pr_head_sha}`.as(
             'cache_pr_head_sha'
           ),
+          cachePrObservations: sql<unknown>`${sessionAssociatedPr.pr_observations}`.as(
+            'cache_pr_observations'
+          ),
           cachePrLastSyncedAt: sql<string | null>`${sessionAssociatedPr.pr_last_synced_at}`.as(
             'cache_pr_last_synced_at'
           ),
@@ -1455,6 +1458,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_state: sql<string | null>`${scoped.cachePrState}`.as('pr_state'),
           pr_title: sql<string | null>`${scoped.cachePrTitle}`.as('pr_title'),
           pr_head_sha: sql<string | null>`${scoped.cachePrHeadSha}`.as('pr_head_sha'),
+          pr_observations: sql<unknown>`${scoped.cachePrObservations}`.as('pr_observations'),
           pr_last_synced_at: sql<string | null>`${scoped.cachePrLastSyncedAt}`.as(
             'pr_last_synced_at'
           ),
@@ -1527,6 +1531,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_state: sql<string | null>`${prSessions.pr_state}`.as('pr_state'),
           pr_title: sql<string | null>`${prSessions.pr_title}`.as('pr_title'),
           pr_head_sha: sql<string | null>`${prSessions.pr_head_sha}`.as('pr_head_sha'),
+          pr_observations: sql<unknown>`${prSessions.pr_observations}`.as('pr_observations'),
           pr_last_synced_at: sql<string | null>`${prSessions.pr_last_synced_at}`.as(
             'pr_last_synced_at'
           ),
@@ -1604,6 +1609,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         pr_state: base.pr_state,
         pr_title: base.pr_title,
         pr_head_sha: base.pr_head_sha,
+        pr_observations: base.pr_observations,
         pr_last_synced_at: base.pr_last_synced_at,
         pr_review_decision: base.pr_review_decision,
         review_decision_pending: base.review_decision_pending,
@@ -1645,6 +1651,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_state: row.pr_state,
           pr_title: row.pr_title,
           pr_head_sha: row.pr_head_sha,
+          pr_observations: row.pr_observations,
           pr_last_synced_at: row.pr_last_synced_at,
           pr_review_decision: row.pr_review_decision,
           review_decision_pending: row.review_decision_pending,

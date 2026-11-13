@@ -618,7 +618,12 @@ describe('applyNeedsInputNotifications', () => {
     const plan = planNeedsInputNotifications({
       previous: [],
       next: [
-        makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'permission', statusUpdatedAt: raiseId }),
+        makeCached({
+          id: 'ses_1',
+          title: 'Fix the bug',
+          status: 'permission',
+          statusUpdatedAt: raiseId,
+        }),
       ],
       pathname: AWAY,
       appState: ACTIVE,
@@ -631,12 +636,11 @@ describe('applyNeedsInputNotifications', () => {
     const [request] = mocks.scheduleNotificationAsync.mock.calls[0] as [
       { content: { data: Record<string, unknown> } },
     ];
-    // The posted actions answer this raise only, so a raise that replaced it
-    // before the tap is never answered by the older notification.
+    // The posted actions answer the raise this notification presents.
     expect(request.content.data.raiseId).toBe(raiseId);
   });
 
-  it('re-posts the standing notification when the session moves to a new raise', () => {
+  it('re-posts the standing notification when the row presents a new raise', () => {
     const plan = planNeedsInputNotifications({
       previous: [notifiedRow({ raiseId: '2026-09-18T21:00:00.000Z' })],
       next: [
@@ -652,9 +656,7 @@ describe('applyNeedsInputNotifications', () => {
       attentionEnabled: true,
     });
 
-    expect(plan.publish).toEqual([
-      notifiedRow({ raiseId: '2026-09-18T21:05:00.000Z' }),
-    ]);
+    expect(plan.publish).toEqual([notifiedRow({ raiseId: '2026-09-18T21:05:00.000Z' })]);
     expect(plan.updates).toEqual(['ses_1']);
   });
 

@@ -66,7 +66,7 @@ export type NeedsInputNotificationRow = {
   kind: NeedsInputAttentionKind;
   /**
    * The raise this post presents: the cached row's own status time, or null
-   * when it carries none. The posted actions answer this raise only.
+   * when it carries none. The posted actions answer this raise.
    */
   raiseId: string | null;
   prUrl: string | null;

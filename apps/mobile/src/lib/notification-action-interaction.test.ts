@@ -910,10 +910,10 @@ describe('runNeedsInputInteraction', () => {
     });
   });
 
-  describe('presented raise identity', () => {
+  describe('the raise a notification presents', () => {
     const PRESENTED = '2026-09-18T21:00:00.000Z';
 
-    it('answers the raise the notification presented and acks that same raise', async () => {
+    it('answers the raise its notification presents and acks that raise', async () => {
       const fake = createFakeManager({
         onSwitch: seeds => {
           seeds.store.set(seeds.activePermission, { requestId: 'perm-1' });
@@ -941,7 +941,7 @@ describe('runNeedsInputInteraction', () => {
       expect(ack).toHaveBeenCalledWith(SESSION_ID, 'permission', PRESENTED);
     });
 
-    it('sends nothing when a different raise of the same kind replaced the presented one', async () => {
+    it('sends nothing when the session waits on a different raise', async () => {
       const fake = createFakeManager({
         onSwitch: seeds => {
           seeds.store.set(seeds.activePermission, { requestId: 'perm-2' });
@@ -965,11 +965,11 @@ describe('runNeedsInputInteraction', () => {
       expect(outcome).toBe('unavailable');
       expect(fake.respondToPermission).not.toHaveBeenCalled();
       expect(fake.answerQuestion).not.toHaveBeenCalled();
-      // The ack names the raise the user saw, so the live raise keeps its badge.
+      // The ack names the raise the notification presented.
       expect(ack).toHaveBeenCalledWith(SESSION_ID, 'permission', PRESENTED);
     });
 
-    it('sends nothing when a reply has to answer a question that replaced the presented one', async () => {
+    it('sends nothing for a reply when the session waits on a different question', async () => {
       const fake = createFakeManager({
         onSwitch: seeds => {
           seeds.store.set(seeds.activeQuestion, { requestId: 'question-2' });
@@ -996,7 +996,7 @@ describe('runNeedsInputInteraction', () => {
       expect(ack).toHaveBeenCalledWith(SESSION_ID, 'question', PRESENTED);
     });
 
-    it('sends nothing when the session stopped waiting on the presented raise', async () => {
+    it('sends nothing when the session no longer waits on the presented raise', async () => {
       const fake = createFakeManager({
         onSwitch: seeds => {
           seeds.store.set(seeds.activePermission, { requestId: 'perm-9' });
@@ -1042,7 +1042,7 @@ describe('runNeedsInputInteraction', () => {
       expect(fake.respondToPermission).not.toHaveBeenCalled();
     });
 
-    it('keeps the previous outcome when the payload names no raise', async () => {
+    it('keeps the earlier outcome when the payload names no raise', async () => {
       const fake = createFakeManager({
         onSwitch: seeds => {
           seeds.store.set(seeds.activePermission, { requestId: 'perm-2' });
@@ -1067,7 +1067,42 @@ describe('runNeedsInputInteraction', () => {
       expect(ack).toHaveBeenCalledWith(SESSION_ID, 'permission', '2026-09-18 21:05:00+00');
     });
 
-    it('stays retryable when the identity read fails, so no raise is ended on a guess', async () => {
+    it('sends nothing when another raise arrives while the wait runs', async () => {
+      // The live atoms carry a request id but not the raise it belongs to, so
+      // the row is read again right before the answer: the request is sent only
+      // while the session waits on the raise the notification presents.
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activePermission, { requestId: 'perm-late' });
+        },
+      });
+      getSessionQuery
+        .mockResolvedValueOnce({
+          organization_id: 'org-1',
+          status: 'permission',
+          status_updated_at: PRESENTED,
+        })
+        .mockResolvedValue({
+          organization_id: 'org-1',
+          status: 'permission',
+          status_updated_at: '2026-09-18 21:05:00+00',
+        });
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        raiseId: PRESENTED,
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      expect(outcome).toBe('unavailable');
+      expect(fake.respondToPermission).not.toHaveBeenCalled();
+      expect(ack).toHaveBeenCalledWith(SESSION_ID, 'permission', PRESENTED);
+    });
+
+    it('stays retryable when the identity read fails', async () => {
       const fake = createFakeManager({
         onSwitch: seeds => {
           seeds.store.set(seeds.activePermission, { requestId: 'perm-1' });

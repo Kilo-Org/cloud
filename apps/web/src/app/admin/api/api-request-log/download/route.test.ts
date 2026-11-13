@@ -547,6 +547,19 @@ describe('GET /admin/api/api-request-log/download', () => {
     });
   });
 
+  it('records a load error for a row whose R2 key cannot be derived, without aborting the export', async () => {
+    const unparseable = { ...baseRow, id: randomUUID(), created_at: 'infinity' };
+    await db.insert(api_request_log_2).values(unparseable);
+    const present = await insertLog();
+
+    const entries = await downloadEntries({ startDate: '', endDate: '' });
+
+    expect(readEntry(entries, `_${unparseable.id}_load-error.txt`)).toMatch(
+      new RegExp(`^Failed to derive the R2 key of ${unparseable.id}: RangeError`)
+    );
+    expect(exportedIds(entries)).toEqual([present.id]);
+  });
+
   it('streams a complete ZIP of R2-backed bodies across backpressured DB batches', async () => {
     // The first batch must exceed both the Node and web stream queues. This
     // keeps page two blocked until the test starts consuming the response.

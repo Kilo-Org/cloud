@@ -1,9 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  createAssistantMessage,
-  createToolCall,
-  createUserMessage,
-} from '@/src/shared/agent-conversation';
 
 // Agent-chat-panel transitively imports the WXT '#imports' virtual module; stub it so the graph loads under vitest.
 // eslint-disable-next-line vitest/prefer-import-in-mock, jest/no-untyped-mock-factory
@@ -24,28 +19,7 @@ import {
   formatSystemEnvironment,
   getInitialInspectableTabId,
   getSelectedInspectableTabId,
-  truncateToLastUserMessage,
 } from './agent-chat-panel';
-
-describe('retry from the last user message', () => {
-  it('drops the failed turn but keeps the user message it answered', () => {
-    const earlierUser = createUserMessage('first question');
-    const earlierAnswer = createAssistantMessage('first answer');
-    const user = createUserMessage('second question');
-    const partialAnswer = createAssistantMessage('half an ans');
-    const toolCall = createToolCall({ arguments: {}, name: 'kilo_browser_snapshot', tabId: 1 });
-
-    expect(
-      truncateToLastUserMessage([earlierUser, earlierAnswer, user, partialAnswer, toolCall])
-    ).toStrictEqual([earlierUser, earlierAnswer, user]);
-  });
-
-  it('keeps everything when the conversation has no user message', () => {
-    const orphan = createAssistantMessage('orphan');
-
-    expect(truncateToLastUserMessage([orphan])).toStrictEqual([orphan]);
-  });
-});
 
 describe('selected tab context formatting', () => {
   it('redacts URL query and hash data and escapes page-controlled title text', () => {

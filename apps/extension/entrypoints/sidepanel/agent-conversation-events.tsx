@@ -398,6 +398,61 @@ const StandaloneToolEvent = ({
   );
 };
 
+/**
+ * The user message a retry re-sends: the last one before the error being
+ * retried. A newer user message means a later turn started, so that error is
+ * no longer the transcript's outcome.
+ */
+export const canRetryError = (
+  events: readonly AgentConversationEvent[],
+  errorEventId: string
+): boolean => {
+  const errorIndex = events.findIndex(event => event.type === 'error' && event.id === errorEventId);
+
+  if (errorIndex === -1) {
+    return false;
+  }
+
+  return !events
+    .slice(errorIndex + 1)
+    .some(event => event.type === 'message' && event.role === 'user');
+};
+
+export const retryStartEvents = (
+  events: readonly AgentConversationEvent[],
+  errorEventId: string
+): AgentConversationEvent[] => {
+  const errorIndex = events.findIndex(event => event.type === 'error' && event.id === errorEventId);
+
+  if (errorIndex === -1) {
+    return [...events];
+  }
+
+  const userIndex = events
+    .slice(0, errorIndex)
+    .findLastIndex(event => event.type === 'message' && event.role === 'user');
+
+  return userIndex === -1 ? events.slice(0, errorIndex) : events.slice(0, userIndex + 1);
+};
+
+/** Drops the retry affordance from every error a later user message moved past. */
+export const withRetryOnlyOnLatestError = (
+  events: readonly AgentConversationEvent[]
+): AgentConversationEvent[] => {
+  const lastUserIndex = events.findLastIndex(
+    event => event.type === 'message' && event.role === 'user'
+  );
+
+  return events.map((event, index) => {
+    if (event.type !== 'error' || index > lastUserIndex) {
+      return event;
+    }
+
+    const { retry: _retry, ...superseded } = event;
+    return superseded;
+  });
+};
+
 const ErrorEvent = ({
   event,
   onRetry,

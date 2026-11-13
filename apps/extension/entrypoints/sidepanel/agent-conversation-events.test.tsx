@@ -3,7 +3,12 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/react';
-import { AgentConversationItemView } from './agent-conversation-events';
+import {
+  AgentConversationItemView,
+  canRetryError,
+  retryStartEvents,
+  withRetryOnlyOnLatestError,
+} from './agent-conversation-events';
 import {
   createAssistantMessage,
   createConversationErrorEvent,
@@ -523,5 +528,44 @@ describe('error notice rendering', () => {
 
     expect(queryByRole('button', { name: 'Retry' })).toBeNull();
     expect(getByRole('link', { name: 'Add credits' }).getAttribute('target')).toBe('_blank');
+  });
+});
+
+describe('error retry scope', () => {
+  it('retries the user message the error answered, not the newest one', () => {
+    const earlierUser = createUserMessage('first question');
+    const earlierAnswer = createAssistantMessage('first answer');
+    const user = createUserMessage('second question');
+    const partial = createAssistantMessage('half an answer');
+    const error = createConversationErrorEvent({ retry: 'turn', title: 'The server is busy.' });
+    const events = [earlierUser, earlierAnswer, user, partial, error];
+
+    expect(canRetryError(events, error.id)).toBe(true);
+    expect(retryStartEvents(events, error.id)).toStrictEqual([earlierUser, earlierAnswer, user]);
+  });
+
+  it('stops retrying an error a later user message superseded', () => {
+    const error = createConversationErrorEvent({ retry: 'turn', title: 'The server is busy.' });
+    const first = createUserMessage('first question');
+    const second = createUserMessage('second question');
+    const events = [first, error, second];
+
+    expect(canRetryError(events, error.id)).toBe(false);
+    expect(retryStartEvents(events, error.id)).toStrictEqual([first]);
+  });
+
+  it('drops the retry affordance only from an error the transcript moved past', () => {
+    const moved = createConversationErrorEvent({ retry: 'turn', title: 'Old failure.' });
+    const latest = createConversationErrorEvent({ retry: 'turn', title: 'New failure.' });
+    const kept = withRetryOnlyOnLatestError([
+      createUserMessage('first question'),
+      moved,
+      createUserMessage('second question'),
+      latest,
+    ]);
+
+    expect(kept[1]).toMatchObject({ title: 'Old failure.', type: 'error' });
+    expect(kept[1]).not.toHaveProperty('retry');
+    expect(kept[3]).toMatchObject({ retry: 'turn', type: 'error' });
   });
 });

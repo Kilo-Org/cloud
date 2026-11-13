@@ -75,6 +75,11 @@ import { evalInTab, getTabUrl, navigateTab } from './agent-workflow-runtime';
 import { AUTO_COMPACT_RATIO, getContextRatio } from '@/src/shared/context-usage';
 import { addSessionCost } from '@/src/shared/session-cost';
 import { getActiveTabId, useTabDebugger } from './use-tab-debugger';
+import {
+  canRetryError,
+  retryStartEvents,
+  withRetryOnlyOnLatestError,
+} from './agent-conversation-events';
 import { ConversationList } from './conversation-list';
 import { ConversationTabs } from './conversation-tabs';
 import { MessageComposer } from './message-composer';
@@ -102,21 +107,6 @@ const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =>
   fetch(input, init);
 const emptyDefaultConversationEvents = (): AgentConversationEvent[] => [];
-
-/*
- * A retry re-sends the last user message, so everything the failed turn added
- * after it goes too: a stale assistant message, thinking block or tool call
- * would otherwise be replayed into the fresh request.
- */
-export const truncateToLastUserMessage = (
-  events: readonly AgentConversationEvent[]
-): AgentConversationEvent[] => {
-  const lastUserIndex = events.findLastIndex(
-    event => event.type === 'message' && event.role === 'user'
-  );
-
-  return lastUserIndex === -1 ? [...events] : events.slice(0, lastUserIndex + 1);
-};
 
 interface ConversationRunState {
   readonly abort: AbortController;
@@ -299,7 +289,10 @@ export const AgentChatPanel = ({
     () => getSortedStoredConversationHistory(conversationStore),
     [conversationStore]
   );
-  const groupedEvents = useMemo(() => groupConversationEvents(events), [events]);
+  const groupedEvents = useMemo(
+    () => groupConversationEvents(withRetryOnlyOnLatestError(events)),
+    [events]
+  );
   const thinkingOptions = useMemo(
     () => (selectedModel === undefined ? [] : selectedModel.variants),
     [selectedModel]
@@ -957,9 +950,11 @@ export const AgentChatPanel = ({
       return;
     }
 
-    const retryEvents = truncateToLastUserMessage(
-      conversation.events.filter(event => !(event.type === 'error' && event.id === errorEventId))
-    );
+    if (!canRetryError(conversation.events, errorEventId)) {
+      return;
+    }
+
+    const retryEvents = retryStartEvents(conversation.events, errorEventId);
 
     setConversationStore(currentStore =>
       updateStoredConversationEvents(currentStore, conversationId, () => retryEvents)

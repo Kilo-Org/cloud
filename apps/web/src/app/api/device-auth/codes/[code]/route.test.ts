@@ -292,14 +292,15 @@ describe('DELETE /api/device-auth/codes/[code] (cancel from the device)', () => 
       error: 'Device authorization request can no longer be cancelled',
     });
   });
-});
 
-test('returns 429 when a device cancel is rate limited', async () => {
-  mockCheckRateLimit.mockResolvedValue({ rateLimited: true } as never);
+  test('returns 429 when a device cancel is rate limited', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: true } as never);
 
-  const response = await DELETE(createRequest(pollSecret), {
-    params: Promise.resolve({ code: pollSecret }),
+    const response = await DELETE(createRequest(pollSecret), {
+      params: Promise.resolve({ code: pollSecret }),
+    });
+
+    expect(response.status).toBe(429);
+    expect(mockCancel).not.toHaveBeenCalled();
   });
-
-  expect(response.status).toBe(429);
 });

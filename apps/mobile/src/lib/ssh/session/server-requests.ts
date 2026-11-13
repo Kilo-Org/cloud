@@ -11,6 +11,7 @@ import { sshDatabase } from '../store';
 import { fail, forgetSession } from './attempt';
 import { type HostKeyVerdict, judgeHostKey } from './host-key';
 import { live, type LiveSession, setPhase, stillOpen } from './live';
+import { patchSession } from './session-store';
 import { type SshHostKeyAwaiting, type SshHostKeyDecision } from './types';
 
 /** A host key was offered: judge it against the store and ask if it is new. */
@@ -37,15 +38,25 @@ export function answerPrompts(requestId: string, answers: string[] | null): void
   void sendPrompts(requestId, answers);
 }
 
-/** The native connection ended under its session. */
+/** The native connection ended under its session, or under one of its hops. */
 export function handleDisconnect(notice: DisconnectNotice): void {
   for (const entry of live.values()) {
     if (entry.nativeSessionId === notice.sessionId) {
       entry.nativeSessionId = null;
+      patchSession(entry.id, { nativeSessionId: null });
       // The core reports a disconnect before it has released the session, and
       // a session left in its registry keeps the connection state the next
       // attempt to the same host waits on. Closing it is what lets a retry
       // reach the network again.
+      void forgetSession(notice.sessionId);
+      fail(entry, 'disconnected');
+      return;
+    }
+    const hop = entry.jumpSessionIds.indexOf(notice.sessionId);
+    if (hop >= 0) {
+      // A hop that dropped takes the target's path with it, so the whole chain
+      // is retried from the outermost surviving session.
+      entry.jumpSessionIds.splice(hop, 1);
       void forgetSession(notice.sessionId);
       fail(entry, 'disconnected');
       return;
@@ -153,12 +164,15 @@ async function sendPrompts(requestId: string, answers: string[] | null): Promise
 
 /**
  * The session a host key belongs to. The core reports the key before it hands
- * back a session id, so the one attempt in flight for that target is the one
- * the key decides for.
+ * back a session id, so the attempt in flight for that host — the target or one
+ * of its hops — is the one the key decides for.
  */
 function findConnecting(host: string, port: number): LiveSession | null {
   for (const entry of live.values()) {
-    if (entry.connecting && entry.host.hostname === host && entry.host.port === port) {
+    if (
+      entry.connecting &&
+      entry.connectTargets.some(target => target.host === host && target.port === port)
+    ) {
       return entry;
     }
   }
@@ -168,7 +182,7 @@ function findConnecting(host: string, port: number): LiveSession | null {
 /** The session a keyboard-interactive round belongs to, for the same reason. */
 function findAwaitingPrompts(): LiveSession | null {
   for (const entry of live.values()) {
-    if (entry.connecting && entry.prompts === null && entry.host.authMethod === 'keyboard_interactive') {
+    if (entry.connecting && entry.prompts === null && entry.promptsHostId !== null) {
       return entry;
     }
   }

@@ -2,6 +2,8 @@ import { hostTarget } from '../host-target';
 import { type SshHost } from '../hosts';
 import { newId } from '../id';
 import { sshPackage } from '../native';
+import { handleForwardError, resetSessionForwards } from '../forwards-runtime';
+import { forgetIdleNotify } from './idle-notify';
 import { attempt, fail } from './attempt';
 import { clearTimer, live, type LiveSession, setPhase } from './live';
 import {
@@ -25,10 +27,14 @@ export function openSession(host: SshHost): string {
     timer: null,
     hostKey: null,
     prompts: null,
-    password: null,
+    passwords: new Map(),
+    authHostId: null,
+    promptsHostId: null,
+    jumpSessionIds: [],
     passphrase: null,
     keyUnlocked: false,
     connecting: false,
+    connectTargets: [],
   };
   live.set(id, entry);
   writeSession({
@@ -39,6 +45,7 @@ export function openSession(host: SshHost): string {
     startedAt: Date.now(),
     phase: { kind: 'connecting', attempt: 0 },
     shellId: null,
+    nativeSessionId: null,
     pendingCommand: null,
   });
   void begin(entry);
@@ -54,8 +61,11 @@ export async function closeSession(id: string): Promise<void> {
   clearTimer(entry);
   const shellId = sessionById(id)?.shellId ?? null;
   const nativeSessionId = entry.nativeSessionId;
+  const jumps = entry.jumpSessionIds;
   live.delete(id);
   dropSession(id);
+  forgetIdleNotify(id);
+  await resetSessionForwards(id);
   try {
     const ssh = await sshPackage();
     if (shellId !== null) {
@@ -63,6 +73,9 @@ export async function closeSession(id: string): Promise<void> {
     }
     if (nativeSessionId !== null) {
       await ssh.disconnect(nativeSessionId);
+    }
+    for (const jump of jumps) {
+      await ssh.disconnect(jump);
     }
   } catch {
     // The connection already went away, or this build carries no module: no
@@ -78,7 +91,8 @@ export function retrySession(id: string): void {
   }
   entry.attempt = 0;
   entry.keyUnlocked = false;
-  entry.password = null;
+  entry.passwords.clear();
+  entry.authHostId = null;
   entry.passphrase = null;
   void attempt(entry);
 }
@@ -103,13 +117,14 @@ export function decideHostKey(id: string, decision: SshHostKeyDecision): void {
   respondToHostKey(entry, pending, decision);
 }
 
-/** Supplies the password the connection is waiting on. */
+/** Supplies the password the connection is waiting on, for the host that asked. */
 export function submitPassword(id: string, password: string): void {
   const entry = live.get(id);
-  if (entry === undefined) {
+  const hostId = entry?.authHostId ?? null;
+  if (entry === undefined || hostId === null) {
     return;
   }
-  entry.password = password;
+  entry.passwords.set(hostId, password);
   void attempt(entry);
 }
 
@@ -185,4 +200,7 @@ async function subscribeToSshEvents(): Promise<void> {
   ssh.addSshListener('onHostKey', handleHostKey);
   ssh.addSshListener('onKeyboardInteractive', handlePrompts);
   ssh.addSshListener('onDisconnect', handleDisconnect);
+  ssh.addSshListener('onForwardError', notice => {
+    handleForwardError(notice.sessionId);
+  });
 }

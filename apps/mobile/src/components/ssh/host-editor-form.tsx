@@ -5,6 +5,7 @@ import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
+import { HostForwardsSection } from '@/components/ssh/forwards/host-forwards-section';
 import { HostKeyFields, HostPasswordFields } from '@/components/ssh/host-credential-fields';
 import { PickerField } from '@/components/ssh/picker-field';
 import { SwitchField } from '@/components/ssh/switch-field';
@@ -234,6 +235,8 @@ export function HostEditorForm({
             setPicker('jump');
           }}
         />
+
+        <HostForwardsSection hostId={host?.id ?? null} disabled={saving} />
 
         <SwitchField
           label={t('ssh.editor.tmuxAttach')}

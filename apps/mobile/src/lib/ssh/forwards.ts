@@ -2,7 +2,14 @@ import { z } from 'zod';
 
 import { SSH_FORWARD_DIRECTIONS } from '@/lib/persist/schema';
 
-import { booleanColumn, portSchema, readRow, readRows, type SshDatabase } from './database';
+import {
+  booleanColumn,
+  portSchema,
+  readRow,
+  readRows,
+  type SshDatabase,
+  updateRow,
+} from './database';
 import { newId } from './id';
 
 const COLUMNS = `
@@ -62,6 +69,32 @@ export function getForward(db: SshDatabase, id: string): SshForward | null {
   });
 }
 
+/** The forwards stored for one host, in the order the editor lists them. */
+/**
+ * What a row calls this forward: its own name, or the mapping it stands for
+ * when it has none.
+ */
+export function forwardLabel(
+  forward: Pick<
+    SshForward,
+    'label' | 'bindHost' | 'bindPort' | 'destinationHost' | 'destinationPort'
+  >
+): string {
+  return (
+    forward.label ??
+    `${forward.bindHost}:${forward.bindPort} → ${forward.destinationHost}:${forward.destinationPort}`
+  );
+}
+
+export function listForwardsForHost(db: SshDatabase, hostId: string): SshForward[] {
+  return readRows({
+    db,
+    source: `select ${COLUMNS} from ssh_forwards where host_id = ? order by direction, bind_port`,
+    params: [hostId],
+    schema: forwardRowSchema,
+  });
+}
+
 export function createForward(db: SshDatabase, input: SshForwardInput): SshForward {
   const forward = forwardInputSchema.parse(input);
   const id = newId();
@@ -86,4 +119,32 @@ export function createForward(db: SshDatabase, input: SshForwardInput): SshForwa
     throw new Error(`ssh_forwards: row ${id} is missing after its own insert`);
   }
   return created;
+}
+
+export function updateForward(db: SshDatabase, id: string, input: SshForwardInput): SshForward {
+  const forward = forwardInputSchema.parse(input);
+  updateRow({
+    db,
+    table: 'ssh_forwards',
+    id,
+    updates: {
+      host_id: forward.hostId,
+      direction: forward.direction,
+      bind_host: forward.bindHost,
+      bind_port: forward.bindPort,
+      destination_host: forward.destinationHost,
+      destination_port: forward.destinationPort,
+      auto_start: Number(forward.autoStart),
+      label: forward.label,
+    },
+  });
+  const updated = getForward(db, id);
+  if (!updated) {
+    throw new Error(`ssh_forwards: row ${id} is missing after its own update`);
+  }
+  return updated;
+}
+
+export function deleteForward(db: SshDatabase, id: string): void {
+  db.runSync('delete from ssh_forwards where id = ?', [id]);
 }

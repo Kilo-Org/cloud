@@ -5,8 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { Keyboard, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
-import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
+import { SshSessionOverlays } from '@/components/ssh/session/ssh-session-overlays';
+import { SshTerminalClosed } from '@/components/ssh/session/ssh-terminal-closed';
 import { SnippetsSheet } from '@/components/ssh/snippets/snippets-sheet';
 import { SshHostKeyBlocked } from '@/components/ssh/session/ssh-host-key-blocked';
 import { SshSessionNotice } from '@/components/ssh/session/ssh-session-notice';
@@ -18,7 +19,7 @@ import { useTerminalPaste } from '@/components/ssh/session/terminal-paste';
 import { TerminalSurface } from '@/components/ssh/session/terminal-surface';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { RefreshCw, Rows3, Terminal, WifiOff } from '@/components/ui/icons';
+import { FolderOpen, MoreHorizontal, RefreshCw, Rows3, Terminal, WifiOff } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { openExternalUrl } from '@/lib/external-link';
@@ -31,6 +32,7 @@ import {
   endShell,
   retrySession,
 } from '@/lib/ssh/session/manager';
+import { useIdleNotifyArming } from '@/lib/ssh/session/use-idle-notify-arming';
 import { closeReasonMessage } from '@/lib/ssh/session/phase-copy';
 import { needsPrompt, type SshSessionPhase } from '@/lib/ssh/session/types';
 import { useSshSession, useSshSessions } from '@/lib/ssh/session/use-sessions';
@@ -38,6 +40,7 @@ import {
   SSH_HOSTS_ROUTE,
   SSH_KNOWN_HOSTS_ROUTE,
   SSH_SNIPPETS_ROUTE,
+  sshFilesPath,
   sshPromptPath,
   sshSessionPath,
 } from '@/lib/ssh/routes';
@@ -62,6 +65,8 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
   const terminalRef = useRef<TerminalViewHandle>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [snippetsOpen, setSnippetsOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [forwardsOpen, setForwardsOpen] = useState(false);
   const [shellTitle, setShellTitle] = useState<string | null>(null);
   const paste = useTerminalPaste(terminalRef);
 
@@ -70,6 +75,8 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
   const promptOnTop = pathname.includes('/ssh/prompt/');
   const shellId = session?.shellId ?? null;
   const pendingCommand = session?.pendingCommand ?? null;
+
+  useIdleNotifyArming(sessionId, shellId, phase?.kind ?? null);
 
   // A reconnect leaves the last output on screen and the strip above it as the
   // status; the keyboard would only cover that shell, so it closes.
@@ -105,26 +112,7 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
   }
 
   if (session === null || phase === null) {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title={t('ssh.session.closedTitle')} backFallback={SSH_HOSTS_ROUTE} />
-        <EmptyState
-          icon={Terminal}
-          title={t('ssh.session.closedTitle')}
-          description={t('ssh.session.closedDescription')}
-          action={
-            <Button
-              className={STATE_ACTION_CLASS}
-              onPress={() => {
-                router.replace(SSH_HOSTS_ROUTE);
-              }}
-            >
-              <Text>{t('ssh.session.backToHosts')}</Text>
-            </Button>
-          }
-        />
-      </View>
-    );
+    return <SshTerminalClosed />;
   }
 
   // A shell that exists keeps its view — and its buffer — through a reconnect,
@@ -172,15 +160,34 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
         subtitle={shellTitle ?? session.target}
         backFallback={SSH_HOSTS_ROUTE}
         headerRight={
-          <IconButton
-            accessibilityLabel={t('ssh.session.switcherTitle')}
-            onPress={() => {
-              setSwitcherOpen(true);
-            }}
-          >
-            <Rows3 size={20} color={colors.foreground} />
-          </IconButton>
+          <View className="flex-row items-center">
+            <IconButton
+              accessibilityLabel={t('ssh.files.openAction')}
+              onPress={() => {
+                router.push(sshFilesPath(sessionId));
+              }}
+            >
+              <FolderOpen size={20} color={colors.foreground} />
+            </IconButton>
+            <IconButton
+              accessibilityLabel={t('ssh.session.menuTitle')}
+              onPress={() => {
+                setMenuOpen(true);
+              }}
+            >
+              <MoreHorizontal size={20} color={colors.foreground} />
+            </IconButton>
+            <IconButton
+              accessibilityLabel={t('ssh.session.switcherTitle')}
+              onPress={() => {
+                setSwitcherOpen(true);
+              }}
+            >
+              <Rows3 size={20} color={colors.foreground} />
+            </IconButton>
+          </View>
         }
+        headerRightWidth={144}
       />
 
       {phase.kind === 'reconnecting' ? (
@@ -272,6 +279,28 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
         }}
         onClose={() => {
           setSnippetsOpen(false);
+        }}
+      />
+
+      <SshSessionOverlays
+        sessionId={sessionId}
+        hostId={session.hostId}
+        nativeSessionId={session.nativeSessionId}
+        shellId={shellId}
+        menuOpen={menuOpen}
+        forwardsOpen={forwardsOpen}
+        onMenuClose={() => {
+          setMenuOpen(false);
+        }}
+        onForwardsClose={() => {
+          setForwardsOpen(false);
+        }}
+        onOpenFiles={() => {
+          router.push(sshFilesPath(sessionId));
+        }}
+        onOpenForwards={() => {
+          setMenuOpen(false);
+          setForwardsOpen(true);
         }}
       />
 

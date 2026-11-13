@@ -47,11 +47,18 @@ export function SshPromptSheet({ sessionId }: Readonly<{ sessionId: string }>) {
   }
   switch (phase.kind) {
     case 'awaiting-host-key': {
-      return <HostKeyForm sessionId={sessionId} phase={phase} hostLabel={session?.label ?? ''} />;
+      return <HostKeyForm sessionId={sessionId} phase={phase} />;
     }
     case 'awaiting-password':
     case 'awaiting-passphrase': {
-      return <SecretForm sessionId={sessionId} phase={phase} hostLabel={session?.label ?? ''} />;
+      return (
+        <SecretForm
+          sessionId={sessionId}
+          phase={phase}
+          hostLabel={session?.label ?? ''}
+          hopLabel={phase.kind === 'awaiting-password' ? phase.label : null}
+        />
+      );
     }
     case 'awaiting-prompts': {
       return <PromptsForm sessionId={sessionId} phase={phase} />;
@@ -71,12 +78,9 @@ export function SshPromptSheet({ sessionId }: Readonly<{ sessionId: string }>) {
 function HostKeyForm({
   sessionId,
   phase,
-  hostLabel,
 }: Readonly<{
   sessionId: string;
   phase: Extract<SshSessionPhase, { kind: 'awaiting-host-key' }>;
-  /** The host's own name, which the prose uses instead of its stored pattern. */
-  hostLabel: string;
 }>) {
   const { t } = useTranslation();
   const { hostKey } = phase;
@@ -100,7 +104,7 @@ function HostKeyForm({
     >
       <View className="gap-4 px-4 pt-2">
         <Text className="text-sm text-muted-foreground">
-          {t('ssh.session.hostKeyBody', { pattern: hostLabel })}
+          {t('ssh.session.hostKeyBody', { pattern: hostKey.hostPattern })}
         </Text>
         <View className="gap-1 rounded-md border border-border bg-secondary p-3">
           <Text className="text-xs text-muted-foreground">{hostKey.algorithm}</Text>
@@ -136,10 +140,13 @@ function SecretForm({
   sessionId,
   phase,
   hostLabel,
+  hopLabel,
 }: Readonly<{
   sessionId: string;
   /** The host the session is for: the sheet names it in its body copy. */
   hostLabel: string;
+  /** The jump host that asked, when the target is reached through one. */
+  hopLabel: string | null;
   phase: Extract<SshSessionPhase, { kind: 'awaiting-password' | 'awaiting-passphrase' }>;
 }>) {
   const { t } = useTranslation();
@@ -175,7 +182,7 @@ function SecretForm({
       <View className="gap-4 px-4 pt-2">
         <Text className="text-sm text-muted-foreground">
           {password
-            ? t('ssh.session.passwordBody', { label: hostLabel })
+            ? t('ssh.session.passwordBody', { label: hopLabel ?? hostLabel })
             : t('ssh.session.passphraseBody', { label: t('ssh.editor.privateKey') })}
         </Text>
         {phase.failed ? (

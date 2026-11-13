@@ -56,7 +56,12 @@ export type SshPromptsAwaiting = {
 export type SshSessionPhase =
   | { readonly kind: 'connecting'; readonly attempt: number }
   | { readonly kind: 'awaiting-host-key'; readonly hostKey: SshHostKeyAwaiting }
-  | { readonly kind: 'awaiting-password'; readonly failed: boolean }
+  | {
+      readonly kind: 'awaiting-password';
+      readonly failed: boolean;
+      /** The hop that needs it, when the target is reached through a jump host. */
+      readonly label: string | null;
+    }
   | { readonly kind: 'awaiting-passphrase'; readonly failed: boolean }
   | { readonly kind: 'awaiting-prompts'; readonly prompts: SshPromptsAwaiting }
   | { readonly kind: 'connected' }
@@ -73,6 +78,11 @@ export type SshSession = {
   readonly phase: SshSessionPhase;
   /** The native terminal source to render while a shell is open. */
   readonly shellId: string | null;
+  /**
+   * The connection an SFTP channel or a port forward attaches to. Null until
+   * the chain of hops reached the target, and again when it drops.
+   */
+  readonly nativeSessionId: string | null;
   /** A command the terminal types once its view mounts: the tmux attach. */
   readonly pendingCommand: string | null;
 };

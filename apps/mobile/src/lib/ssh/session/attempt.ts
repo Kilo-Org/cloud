@@ -3,6 +3,8 @@ import { type ConnectOptions, type SshAuth, type SshErrorCode } from '@kilocode/
 import { i18n } from '@/i18n';
 
 import { type SshDatabase } from '../database';
+import { listForwardsForHost } from '../forwards';
+import { autoStartForwards, resetSessionForwards } from '../forwards-runtime';
 import { getHost, type SshHost, updateHost } from '../hosts';
 import { getKey } from '../keys';
 import { nativeErrorCode, sshPackage } from '../native';
@@ -34,12 +36,18 @@ const ERROR_CODES: readonly SshErrorCode[] = [
   'ChannelClosed',
   'Protocol',
   'KeyGeneration',
+  'NotFound',
+  'PermissionDenied',
+  'Cancelled',
+  'Forwarding',
+  'LocalIo',
 ];
 
 /**
- * Opens the connection, the shell, and then the terminal the screen renders.
- * Every ending goes through {@link fail}, which decides whether the session
- * retries, asks for an answer, or closes.
+ * Opens the hop chain, then the shell, and then the terminal the screen renders.
+ * A host with a jump host reaches its target through `connectVia`, one session
+ * per hop. Every ending goes through {@link fail}, which decides whether the
+ * session retries, asks for an answer, or closes.
  */
 export async function attempt(entry: LiveSession): Promise<void> {
   if (!stillOpen(entry)) {
@@ -49,6 +57,7 @@ export async function attempt(entry: LiveSession): Promise<void> {
   entry.attempt += 1;
   entry.connecting = true;
   setPhase(entry, { kind: 'connecting', attempt: entry.attempt });
+  const opened: string[] = [];
   try {
     const db = await sshDatabase();
     const host = getHost(db, entry.host.id);
@@ -57,24 +66,55 @@ export async function attempt(entry: LiveSession): Promise<void> {
       return;
     }
     entry.host = host;
-    const auth = await authFor(entry, db, host);
-    if (auth === null) {
+    const chain = hopChain(db, host);
+    if (chain === null) {
+      fail(entry, 'host-missing');
       return;
     }
+    entry.connectTargets = chain.map(hop => ({ host: hop.hostname, port: hop.port }));
+
     const ssh = await sshPackage();
-    const options: ConnectOptions = {
-      host: host.hostname,
-      port: host.port,
-      username: host.username,
-      auth,
-    };
-    const nativeSessionId = await ssh.connect(options);
-    if (!stillOpen(entry)) {
-      await forgetSession(nativeSessionId);
+    let via: string | null = null;
+    for (const hop of chain) {
+      const auth = await authFor(entry, db, hop);
+      if (auth === null) {
+        await disconnectAll(opened);
+        return;
+      }
+      const options: ConnectOptions = {
+        host: hop.hostname,
+        port: hop.port,
+        username: hop.username,
+        auth,
+      };
+      entry.promptsHostId = auth.type === 'keyboardInteractive' ? hop.id : null;
+      let nativeSessionId: string;
+      try {
+        nativeSessionId =
+          via === null ? await ssh.connect(options) : await ssh.connectVia(via, options);
+      } catch (error) {
+        await disconnectAll(opened);
+        fail(entry, reasonOf(error), hop);
+        return;
+      }
+      opened.push(nativeSessionId);
+      via = nativeSessionId;
+      if (!stillOpen(entry)) {
+        await disconnectAll(opened);
+        return;
+      }
+    }
+
+    const targetSessionId = opened.at(-1) ?? null;
+    if (targetSessionId === null) {
+      fail(entry, 'Protocol');
       return;
     }
-    entry.nativeSessionId = nativeSessionId;
-    const shellId = await ssh.openShell(nativeSessionId, { term: TERMINAL_TYPE });
+    entry.jumpSessionIds = opened.slice(0, -1);
+    entry.nativeSessionId = targetSessionId;
+    patchSession(entry.id, { nativeSessionId: targetSessionId });
+
+    const shellId = await ssh.openShell(targetSessionId, { term: TERMINAL_TYPE });
     if (!stillOpen(entry)) {
       ssh.closeShell(shellId);
       return;
@@ -85,27 +125,39 @@ export async function attempt(entry: LiveSession): Promise<void> {
       pendingCommand: host.tmuxAttach ? tmuxAttachCommand(host) : null,
       phase: { kind: 'connected' },
     });
+    // A listening port belongs to the connection that opened it, so the
+    // forwards start here rather than on the screen that shows them.
+    await autoStartForwards(entry.id, targetSessionId, listForwardsForHost(db, host.id));
   } catch (error) {
     fail(entry, reasonOf(error));
   } finally {
     entry.connecting = false;
+    entry.connectTargets = [];
+    entry.promptsHostId = null;
   }
 }
 
 /**
  * Applies the ending of an attempt: the sheets a reason can be answered with,
  * an automatic retry for a transport failure, and the closed state otherwise.
+ * `hop` is the host the failure came from when it is not the target.
  */
-export function fail(entry: LiveSession, reason: SshCloseReason): void {
+export function fail(entry: LiveSession, reason: SshCloseReason, hop?: SshHost): void {
   if (!stillOpen(entry)) {
     return;
   }
   releaseShell(entry);
   entry.prompts = null;
   entry.hostKey = null;
-  if (reason === 'AuthFailed' && entry.host.authMethod === 'password') {
-    entry.password = null;
-    setPhase(entry, { kind: 'awaiting-password', failed: true });
+  const failedHost = hop ?? entry.host;
+  if (reason === 'AuthFailed' && failedHost.authMethod === 'password') {
+    entry.passwords.delete(failedHost.id);
+    entry.authHostId = failedHost.id;
+    setPhase(entry, {
+      kind: 'awaiting-password',
+      failed: true,
+      label: failedHost.id === entry.host.id ? null : failedHost.label,
+    });
     return;
   }
   if (reason === 'WrongPassphrase') {
@@ -120,8 +172,31 @@ export function fail(entry: LiveSession, reason: SshCloseReason): void {
 }
 
 /**
- * The authentication the next attempt sends. `null` means a sheet is open and
- * the session continues when its answer arrives.
+ * The hosts this session opens, outermost first: the target last, each jump
+ * host before the host that jumps through it. Null when a stored hop is gone.
+ */
+function hopChain(db: SshDatabase, host: SshHost): SshHost[] | null {
+  const chain = [host];
+  const seen = new Set([host.id]);
+  let current = host;
+  while (current.jumpHostId !== null) {
+    if (seen.has(current.jumpHostId)) {
+      return null;
+    }
+    const jump = getHost(db, current.jumpHostId);
+    if (jump === null) {
+      return null;
+    }
+    seen.add(jump.id);
+    chain.unshift(jump);
+    current = jump;
+  }
+  return chain;
+}
+
+/**
+ * The authentication the next attempt sends for `host`. `null` means a sheet is
+ * open and the session continues when its answer arrives.
  */
 async function authFor(
   entry: LiveSession,
@@ -129,9 +204,14 @@ async function authFor(
   host: SshHost
 ): Promise<SshAuth | null> {
   if (host.authMethod === 'password') {
-    const password = host.password ?? entry.password;
+    const password = host.password ?? entry.passwords.get(host.id) ?? null;
     if (password === null) {
-      setPhase(entry, { kind: 'awaiting-password', failed: false });
+      entry.authHostId = host.id;
+      setPhase(entry, {
+        kind: 'awaiting-password',
+        failed: false,
+        label: host.id === entry.host.id ? null : host.label,
+      });
       return null;
     }
     return { type: 'password', password };
@@ -188,6 +268,8 @@ function releaseShell(entry: LiveSession): void {
   if (session !== null && (session.shellId !== null || session.pendingCommand !== null)) {
     patchSession(entry.id, { shellId: null, pendingCommand: null });
   }
+  patchSession(entry.id, { nativeSessionId: null });
+  void resetSessionForwards(entry.id);
 }
 
 async function closeShellQuietly(shellId: string): Promise<void> {
@@ -197,6 +279,13 @@ async function closeShellQuietly(shellId: string): Promise<void> {
   } catch {
     // The shell already ended, or this build carries no module: nothing is
     // left to release.
+  }
+}
+
+/** Closes the hop sessions an abandoned attempt opened, outermost last. */
+async function disconnectAll(sessionIds: readonly string[]): Promise<void> {
+  for (const sessionId of [...sessionIds].reverse()) {
+    await forgetSession(sessionId);
   }
 }
 

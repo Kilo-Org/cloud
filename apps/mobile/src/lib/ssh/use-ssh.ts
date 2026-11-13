@@ -77,7 +77,8 @@ export function useSshHostEditor(hostId: string | null) {
   });
 }
 
-function useSshInvalidation() {
+/** The one invalidator every ssh mutation shares. */
+export function useSshInvalidation() {
   const client = useQueryClient();
   return useCallback(() => client.invalidateQueries({ queryKey: SSH_KEY }), [client]);
 }

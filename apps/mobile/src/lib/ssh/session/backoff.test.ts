@@ -55,7 +55,7 @@ describe('needsPrompt', () => {
 
   it('asks for a password, a passphrase and the server prompts', () => {
     const prompting: SshSessionPhase[] = [
-      { kind: 'awaiting-password', failed: false },
+      { kind: 'awaiting-password', failed: false, label: null },
       { kind: 'awaiting-passphrase', failed: true },
       {
         kind: 'awaiting-prompts',

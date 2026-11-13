@@ -1,5 +1,6 @@
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as ReactQuery from '@tanstack/react-query';
 
 import { i18n } from '@/i18n';
 import { AccountSettingsScreen } from '@/components/account-settings-screen';
@@ -25,12 +26,16 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  Ban: 'Ban',
+  Cpu: 'Cpu',
+  FileText: 'FileText',
   Globe: 'Globe',
-  // The merged screen carries the passkeys row (`account-settings-screen.tsx`
-  // renders KeyRound); a mock without it fails the whole mount.
   KeyRound: 'KeyRound',
+  Lock: 'Lock',
+  LogOut: 'LogOut',
   Shield: 'Shield',
   Smartphone: 'Smartphone',
+  UserRound: 'UserRound',
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
@@ -51,6 +56,24 @@ vi.mock('@/lib/picker-bridge', () => ({
 vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
   useTrustedHosts: () => ({ trustedHosts: [], hasLoaded: true }),
 }));
+vi.mock('sonner-native', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { success: vi.fn(), error: vi.fn() },
+}));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
+}));
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    user: { signOutBrowserSessions: { mutationOptions: (options: unknown) => options } },
+  }),
+}));
+vi.mock('@tanstack/react-query', async importOriginal => {
+  // QueryClientProvider stays real so renderWithProviders keeps working; only the
+  // mutation is replaced, so the row's action is never sent.
+  const actual = await importOriginal<typeof ReactQuery>();
+  return { ...actual, useMutation: () => ({ mutate: vi.fn(), isPending: false }) };
+});
 
 let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;
 async function mountAccount(): Promise<ReactTestRenderer> {

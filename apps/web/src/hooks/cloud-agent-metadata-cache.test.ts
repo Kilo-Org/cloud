@@ -14,6 +14,7 @@ import type { RootRouter } from '@/routers/root-router';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { TRPCProvider } from '@/lib/trpc/utils';
 import { CLOUD_AGENT_METADATA_STALE_TIME } from '@/lib/cloud-agent/constants';
+import { useBuiltinAgentSettings } from './useCloudAgentSettings';
 import {
   useCombinedProfileMutations,
   useCombinedProfiles,
@@ -94,6 +95,7 @@ describe.each([
     useMetadata: () => useCombinedProfiles({ organizationId: 'org-1' }),
   },
   { name: 'repository profile bindings', useMetadata: () => useRepoBindings() },
+  { name: 'built-in modes', useMetadata: () => useBuiltinAgentSettings() },
 ])('$name cache', ({ useMetadata }) => {
   it('reuses metadata on remount for fifteen minutes, then refreshes', async () => {
     const now = Date.now();
@@ -146,6 +148,39 @@ describe.each([
     await observer.refetch();
     expect(queryFn).toHaveBeenCalledTimes(3);
     observer.destroy();
+  });
+
+  it('shows cached metadata while a stale entry refreshes in the background', async () => {
+    const now = Date.now();
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
+    const initial = { revision: 1, orgProfiles: [], personalProfiles: [] };
+    let complete: ((value: typeof initial) => void) | undefined;
+    const queryFn = jest
+      .fn<() => Promise<typeof initial>>()
+      .mockResolvedValueOnce(initial)
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            complete = resolve;
+          })
+      );
+    const options = { ...readQueryOptions(useMetadata), queryFn };
+    await queryClient.query(options);
+
+    clock.mockReturnValue(now + 16 * 60_000);
+    const observer = new QueryObserver(queryClient, options);
+    const unsubscribe = observer.subscribe(() => {});
+    expect(observer.getCurrentResult()).toMatchObject({
+      data: { revision: 1 },
+      isLoading: false,
+      isFetching: true,
+    });
+    const refreshed = queryClient.query(options);
+    if (!complete) throw new Error('Metadata refresh did not start');
+    complete({ ...initial, revision: 2 });
+    await refreshed;
+    expect(observer.getCurrentResult().data).toMatchObject({ revision: 2 });
+    unsubscribe();
   });
 });
 

@@ -341,7 +341,7 @@ describe('useInteractionHandlers attention ack', () => {
     }
   );
 
-  it('reports terminal when the permission is no longer available', async () => {
+  it('reports terminal and surfaces the unavailable message when the permission is gone', async () => {
     const manager = {
       answerQuestion: vi.fn(),
       rejectQuestion: vi.fn(),
@@ -356,6 +356,8 @@ describe('useInteractionHandlers attention ack', () => {
     });
 
     await expect(render().handleRespondToPermission('once')).resolves.toBe('terminal');
+
+    expect(toastError).toHaveBeenCalledWith('This permission request is no longer available.');
   });
 
   it('does not ack when answer submit fails', async () => {

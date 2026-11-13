@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { clientKiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
+import { cloudSessionMetadataSchema } from '@kilocode/cloud-agent-sdk/schemas';
 import type { LocalSession } from './local-session';
 
 /**
@@ -22,7 +23,12 @@ const storedLocalSessionSchema = z.object({
   repository: z.string(),
   branch: z.string().nullable(),
   composer: z
-    .object({ mode: z.string(), model: z.string(), variant: z.string().nullable() })
+    .object({
+      mode: z.string(),
+      model: z.string(),
+      variant: z.string().nullable(),
+      runtimeAgents: cloudSessionMetadataSchema.shape.runtimeAgents,
+    })
     .nullable(),
   firstMessage: z
     .object({ id: z.string(), prompt: z.string(), attachmentNames: z.array(z.string()) })

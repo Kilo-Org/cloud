@@ -22,6 +22,8 @@ import { kiloChatRouter } from '@/routers/kilo-chat-router';
 import { spendAlertRouter } from '@/routers/spend-alert-router';
 import { agentBriefingRouter } from '@/routers/agent-briefing-router';
 import { agentProfilesMobileRouter } from './agent-profiles-mobile';
+import { byokRouter } from '@/routers/byok-router';
+import { userExportsRouter } from '@/routers/user-exports-router';
 
 /**
  * Mobile-scoped tRPC router. Composes only the namespaces the mobile app
@@ -53,6 +55,8 @@ const mobileRouter = createTRPCRouter({
   spendAlerts: spendAlertRouter,
   agentBriefing: agentBriefingRouter,
   agentProfiles: agentProfilesMobileRouter,
+  byok: byokRouter,
+  userExports: userExportsRouter,
 });
 
 export type MobileRouter = typeof mobileRouter;

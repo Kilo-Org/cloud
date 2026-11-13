@@ -1962,6 +1962,37 @@
     ],
     "searchBlob": "agentProfiles.get Fetch a single agent profile's full details by ID, scoped to the current user or an organization. agentprofiles get profileid organizationid profileId organizationId"
   },
+  "agentProfiles.instructions": {
+    "path": "agentProfiles.instructions",
+    "kind": "query",
+    "summary": "Returns the profile's instruction (rules) files: name, content, and enabled flag, ordered by name, optionally scoped to an organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "profileId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "instructions",
+      "profileid",
+      "organizationid"
+    ],
+    "searchBlob": "agentProfiles.instructions Returns the profile's instruction (rules) files: name, content, and enabled flag, ordered by name, optionally scoped to an organization. agentprofiles instructions profileid organizationid profileId organizationId"
+  },
   "agentProfiles.kiloCommands": {
     "path": "agentProfiles.kiloCommands",
     "kind": "query",
@@ -3967,6 +3998,28 @@
     ],
     "searchBlob": "byok.listCatalogModeSupportedModels List which AI models each direct BYOK provider supports when running in catalog mode, grouped by provider and returned as model names with catalog ids. Use to discover available catalog-mode models per provider. byok listcatalogmodesupportedmodels"
   },
+  "byok.listProviders": {
+    "path": "byok.listProviders",
+    "kind": "query",
+    "summary": "List the AI model providers you can connect with your own API key (bring your own key), optionally scoped to an organization. Includes experimental providers only when experimental BYOK is enabled.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "byok",
+      "listproviders",
+      "organizationid"
+    ],
+    "searchBlob": "byok.listProviders List the AI model providers you can connect with your own API key (bring your own key), optionally scoped to an organization. Includes experimental providers only when experimental BYOK is enabled. byok listproviders organizationid organizationId"
+  },
   "byok.listSupportedModels": {
     "path": "byok.listSupportedModels",
     "kind": "query",
@@ -5324,6 +5377,31 @@
       "cursor"
     ],
     "searchBlob": "cliSessionsV2.getSessionMessagesPage Fetch a paginated page of a session's message history for incremental loading, including an event watermark when starting a fresh read. clisessionsv2 getsessionmessagespage session_id limit cursor session_id limit cursor"
+  },
+  "cliSessionsV2.getSharedSession": {
+    "path": "cliSessionsV2.getSharedSession",
+    "kind": "query",
+    "summary": "Retrieve a shared CLI session using its share link token, returning the session details for viewing or resuming.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "share_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "share_token"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "getsharedsession",
+      "share_token"
+    ],
+    "searchBlob": "cliSessionsV2.getSharedSession Retrieve a shared CLI session using its share link token, returning the session details for viewing or resuming. clisessionsv2 getsharedsession share_token share_token"
   },
   "cliSessionsV2.getWatchPr": {
     "path": "cliSessionsV2.getWatchPr",
@@ -11184,6 +11262,28 @@
       "page"
     ],
     "searchBlob": "computeBilling.charges List compute usage charges for your personal account or an organization, optionally filtered to your own usage or specific date ranges. computebilling charges organizationid view startdate enddate groupby page organizationId view startDate endDate groupBy page"
+  },
+  "computeBilling.codeReviewRate": {
+    "path": "computeBilling.codeReviewRate",
+    "kind": "query",
+    "summary": "Check whether code review compute billing is enabled for a user or organization, and get the hourly USD rate charged for code review sandbox containers if it is.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "computebilling",
+      "codereviewrate",
+      "organizationid"
+    ],
+    "searchBlob": "computeBilling.codeReviewRate Check whether code review compute billing is enabled for a user or organization, and get the hourly USD rate charged for code review sandbox containers if it is. computebilling codereviewrate organizationid organizationId"
   },
   "computeBilling.rates": {
     "path": "computeBilling.rates",
@@ -37079,6 +37179,17 @@
       "getpasskeys"
     ],
     "searchBlob": "user.getPasskeys List all passkeys (WebAuthn security keys, Face ID, Touch ID) registered to the signed-in user's account, including device type and last used time. user getpasskeys"
+  },
+  "user.getProfileLinks": {
+    "path": "user.getProfileLinks",
+    "kind": "query",
+    "summary": "Get the signed-in user's saved LinkedIn and GitHub profile URLs from their account settings.",
+    "inputSchema": {},
+    "tags": [
+      "user",
+      "getprofilelinks"
+    ],
+    "searchBlob": "user.getProfileLinks Get the signed-in user's saved LinkedIn and GitHub profile URLs from their account settings. user getprofilelinks"
   },
   "user.hasGatewayUsage": {
     "path": "user.hasGatewayUsage",

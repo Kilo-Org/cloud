@@ -222,6 +222,7 @@ export type ServiceEvent =
       messageId: string;
       executionId?: string | undefined;
       content?: string | undefined;
+      createdAt?: number | undefined;
     }
   | {
       type: 'cloud.message.canceled';
@@ -739,6 +740,10 @@ export function normalize(raw: CloudAgentEvent): NormalizedEvent | null {
   const event = normalizeInnerEvent(eventType, data);
   if (raw.streamEventType === 'connected' && event?.type === 'connected') {
     return { ...event, cloudSessionId: raw.sessionId };
+  }
+  if (event?.type === 'cloud.message.queued') {
+    const createdAt = Date.parse(raw.timestamp);
+    return Number.isFinite(createdAt) ? { ...event, createdAt } : event;
   }
   // Only a completion that carries a storable commit hash gets the envelope
   // timestamp the commit record is anchored to. The schema already dropped a

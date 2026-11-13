@@ -103,7 +103,10 @@ it('keeps real portaled overlay clicks out of the sidebar row navigation handler
     });
     expect(onOpenOtherChat).not.toHaveBeenCalled();
   } finally {
-    await act(async () => root.unmount());
+    await act(async () => {
+      root.unmount();
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+    });
     for (const [key, descriptor] of Object.entries(previous)) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor);
       else Reflect.deleteProperty(globalThis, key);

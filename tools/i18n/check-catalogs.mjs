@@ -268,14 +268,15 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
  * Push copy that is English on purpose, per catalog. A value listed for a tag
  * is not reported as untranslated for that tag.
  *
- * These five languages render the security-finding body
+ * These four languages write the security-finding body
  * `{{findingTitle}} in {{repoFullName}}` with the same preposition word English
- * uses, so the copy is already right in them and there is nothing to translate.
+ * uses — "in" is the native word in each — so the copy is already right and
+ * there is nothing to translate. Irish is not one of them: its preposition is
+ * "i", so that catalog carries the translated body instead.
  */
 const NOTIFICATIONS_ENGLISH_COPY_EXCEPTIONS = {
   af: ['{{findingTitle}} in {{repoFullName}}'],
   de: ['{{findingTitle}} in {{repoFullName}}'],
-  ga: ['{{findingTitle}} in {{repoFullName}}'],
   it: ['{{findingTitle}} in {{repoFullName}}'],
   nl: ['{{findingTitle}} in {{repoFullName}}'],
 };

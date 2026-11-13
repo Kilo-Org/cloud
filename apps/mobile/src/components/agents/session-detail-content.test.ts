@@ -109,6 +109,9 @@ const managerSlot = vi.hoisted(() => ({ current: null as SessionManager | null }
 // these cases describe; a test that needs the still-measuring window sets it to
 // `false`, and `null` models a list that never reports.
 const openSettledReport = vi.hoisted(() => ({ value: true as boolean | null }));
+// The props the host hands the transcript list, so the bottom inset it reserves
+// for the composer's growth is readable even though the stub renders nothing.
+const listPropsSlot = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
 const connectionHealth = vi.hoisted(() => ({
   isConnected: true,
   reconnectExhausted: false,
@@ -415,6 +418,7 @@ vi.mock('@/components/agents/session-message-list', () => ({
     // describe an open that has settled, so the mock reports it; a test that
     // needs the still-measuring window sets `openSettledReport.value = false`.
     const { onOpenSettledChange, sessionId } = props;
+    listPropsSlot.current = props as unknown as Record<string, unknown>;
     useEffect(() => {
       const report = openSettledReport.value;
       if (report === null) {
@@ -6419,6 +6423,66 @@ function indicatorNodes(view: Awaited<ReturnType<typeof mountDetails>>) {
   return view.renderer.root.findAll(node => Object.is(node.type, 'SessionStatusIndicator'));
 }
 
+describe('SessionDetailContent transcript chrome growth', () => {
+  /** The growth the host hands the transcript, or null when it hands none. */
+  function chromeGrowth(view: { renderer: ReactTestRenderer }): number {
+    const list = view.renderer.root.find(node => Object.is(node.type, SessionMessageList));
+    return (list.props as { chromeGrowthDp?: number }).chromeGrowthDp ?? 0;
+  }
+
+  it('hands the composer input growth to the transcript in the same commit and gives it back', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([taskMessage(ROOT_ID, CHILD_IDS)]);
+    // Nothing rides up while the input sits on its one-line floor.
+    expect(chromeGrowth(view)).toBe(0);
+
+    act(() => {
+      (composerPropsWithInset(view).onInputBottomInsetChange as (dp: number) => void)(64);
+    });
+    // The list shifts its content by the growth, so its newest row keeps the
+    // composer's top edge without a scroll command.
+    expect(chromeGrowth(view)).toBe(64);
+
+    act(() => {
+      (composerPropsWithInset(view).onInputBottomInsetChange as (dp: number) => void)(0);
+    });
+    expect(chromeGrowth(view)).toBe(0);
+  });
+
+  it('withholds the growth when the composer is replaced by other chrome', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([taskMessage(ROOT_ID, CHILD_IDS)]);
+    act(() => {
+      (composerPropsWithInset(view).onInputBottomInsetChange as (dp: number) => void)(64);
+    });
+    expect(chromeGrowth(view)).toBe(64);
+
+    // The read-only footer is chrome of another height, so nothing rides up
+    // while it is on screen.
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      view.store.set(view.manager.atoms.isReadOnly, true);
+    });
+    expect(
+      view.renderer.root.findAll(candidate => Object.is(candidate.type, 'ChatComposer'))
+    ).toHaveLength(0);
+    expect(chromeGrowth(view)).toBe(0);
+
+    // The measurement survives the swap: once the composer is back, a
+    // multi-line draft keeps its anchor without waiting for another line.
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+    });
+    expect(chromeGrowth(view)).toBe(64);
+  });
+});
+
+function composerPropsWithInset(view: { renderer: ReactTestRenderer }) {
+  return view.renderer.root.find(candidate => Object.is(candidate.type, 'ChatComposer')).props as {
+    onInputBottomInsetChange?: (dp: number) => void;
+  };
+}
 describe('session detail compute polling', () => {
   it('polls the compute read only while the screen is focused and the app is active', async () => {
     computeReadArgs.calls.length = 0;

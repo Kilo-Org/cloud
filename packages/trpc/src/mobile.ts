@@ -5,6 +5,8 @@ import { userRouter } from '@/routers/user-router';
 import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
 import { todosRouter } from '@/routers/todos-router';
 import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
+import { cloudAgentSettingsRouter } from '@/routers/cloud-agent-settings-router';
+import { cloudEnvironmentsRouter } from '@/routers/cloud-environments-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
 import { platformIntegrationsRouter } from '@/routers/platform-integrations-router';
 import { slackRouter } from '@/routers/slack-router';
@@ -45,6 +47,8 @@ const mobileRouter = createTRPCRouter({
   cliSessionsV2: cliSessionsV2Router,
   todos: todosRouter,
   cloudAgentNext: cloudAgentNextRouter,
+  cloudAgentSettings: cloudAgentSettingsRouter,
+  cloudEnvironments: cloudEnvironmentsRouter,
   githubApps: githubAppsRouter,
   platformIntegrations: platformIntegrationsRouter,
   slack: slackRouter,

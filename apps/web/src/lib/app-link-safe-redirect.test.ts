@@ -48,8 +48,11 @@ describe('browserLandingPath', () => {
       '/code-reviews/*': '/code-reviews/abc',
       '/organizations/*/security-agent': '/organizations/o1/security-agent',
       '/organizations/*/security-agent/findings': '/organizations/o1/security-agent/findings',
+      '/organizations/*/security-agent/config': '/organizations/o1/security-agent/config',
       '/organizations/*/code-reviews': '/organizations/o1/code-reviews',
       '/organizations/*/code-reviews/*': '/organizations/o1/code-reviews/r2',
+      '/organizations/*/integrations': '/organizations/o1/integrations',
+      '/organizations/*/usage-details': '/organizations/o1/usage-details',
       '/organizations/*': '/organizations/o1',
       '/s/*': '/s/abc',
     };
@@ -92,6 +95,16 @@ describe('isAppLinkClaimed', () => {
   it('accepts claimed paths', () => {
     expect(isAppLinkClaimed('/profile')).toBe(true);
     expect(isAppLinkClaimed('/cloud/sessions')).toBe(true);
+    // The account pages with a native screen are claimed too.
+    expect(isAppLinkClaimed('/credits')).toBe(true);
+    expect(isAppLinkClaimed('/invoices')).toBe(true);
+    expect(isAppLinkClaimed('/data-exports')).toBe(true);
+    expect(isAppLinkClaimed('/byok')).toBe(true);
+    expect(isAppLinkClaimed('/integrations')).toBe(true);
+    expect(isAppLinkClaimed('/subscriptions/kilo-pass')).toBe(true);
+    expect(isAppLinkClaimed('/security-agent/config')).toBe(true);
+    expect(isAppLinkClaimed('/organizations/abc123/integrations')).toBe(true);
+    expect(isAppLinkClaimed('/organizations/abc123/usage-details')).toBe(true);
     // The org root is the accept-invite destination the app handles; anything
     // below it is a web-only page.
     expect(isAppLinkClaimed('/organizations/abc123')).toBe(true);
@@ -103,6 +116,14 @@ describe('isAppLinkClaimed', () => {
     expect(isAppLinkClaimed('/organizations/abc123/request-logs')).toBe(false);
     expect(isAppLinkClaimed('/claw')).toBe(false);
     expect(isAppLinkClaimed('/account-verification')).toBe(false);
+    // A sub-path of a claimed page with no screen of its own stays in the
+    // browser, so the web keeps serving it (a sign-in redirect to it must not
+    // hop through the interstitial).
+    expect(isAppLinkClaimed('/integrations/slack')).toBe(false);
+    expect(isAppLinkClaimed('/subscriptions/kilo-pass/refer')).toBe(false);
+    expect(isAppLinkClaimed('/security-agent/audit-report')).toBe(false);
+    expect(isAppLinkClaimed('/organizations/abc123/payment-details')).toBe(false);
+    expect(isAppLinkClaimed('/organizations/abc123/byok')).toBe(false);
   });
 });
 

@@ -63,7 +63,12 @@ export function requestRoute(request: Request): string {
   const path = new URL(request.url).pathname;
   if (path === '/v1/auth/exchange') return `${request.method} /v1/auth/exchange`;
   if (path === '/v1/sessions') return `${request.method} /v1/sessions`;
-  if (path === '/v1/presence' || path === '/v1/presence/ticket') {
+  if (
+    path === '/v1/presence' ||
+    path === '/v1/presence/ticket' ||
+    path === '/v1/notifications' ||
+    path === '/v1/notifications/ticket'
+  ) {
     return `${request.method} ${path}`;
   }
   if (/^\/v1\/presence\/instances\/[^/]+\/commands$/.test(path)) {
@@ -74,7 +79,9 @@ export function requestRoute(request: Request): string {
   if (/^\/internal\/users\/[^/]+\/erase$/.test(path)) {
     return `${request.method} /internal/users/:id/erase`;
   }
-  const match = /^\/v1\/sessions\/[^/]+(?:\/(entities|batches|blobs)(?:\/[^/]+)?)?$/.exec(path);
+  const match = /^\/v1\/sessions\/[^/]+(?:\/(entities|batches|blobs|status)(?:\/[^/]+)?)?$/.exec(
+    path
+  );
   return match
     ? `${request.method} /v1/sessions/:id${match[1] ? `/${match[1]}${match[1] === 'blobs' ? '/:hash' : ''}` : ''}`
     : 'not_found';
@@ -205,6 +212,7 @@ export type DiagnosticOperation =
   | 'getState'
   | 'register'
   | 'applyBatch'
+  | 'setStatus'
   | 'readEntities'
   | 'beginBlob'
   | 'abortBlob'

@@ -75,6 +75,12 @@ type NewSessionProfileOverrideProps = {
    * the clone entry.
    */
   accountSection?: React.ReactNode;
+  /**
+   * The Cloud environment row under the repository picker: the environment the
+   * session starts in, from the environments that contain the selected
+   * repository. Cloud-only, like the repository section it follows.
+   */
+  environmentSection?: React.ReactNode;
 };
 
 /**
@@ -155,6 +161,7 @@ export function NewSessionConfigureForm({
   onManualCommandsChange,
   onOpenRepoDefaults,
   accountSection,
+  environmentSection,
   autoCommit,
   onAutoCommitChange,
   isSpawningRemote,
@@ -267,7 +274,7 @@ export function NewSessionConfigureForm({
     <ScrollView
       ref={scrollRef}
       className="flex-1"
-      contentContainerClassName="flex-grow px-4 pt-4"
+      contentContainerClassName="flex-grow px-4 pt-4 pb-4"
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
     >
@@ -371,6 +378,8 @@ export function NewSessionConfigureForm({
           isCloneEntry={isCloneEntry}
         />
       ) : null}
+
+      {!isRemote && !isCloneEntry && repositoryRegionSettled ? environmentSection : null}
 
       {/*
         Everything below the repository section waits for that section's final

@@ -118,6 +118,38 @@ describe('Cloud Agent upload-only access', () => {
     expect(await response.json()).toMatchObject({ position: 0, revision: 0 });
   });
 
+  it('authorizes status writes through the live hosted-session fence without granting notifications', async () => {
+    const f = await fixture();
+    expect(
+      (await f.request('PUT', `/v1/sessions/${f.id}`, { version: 1, sourceID: f.sourceID })).status
+    ).toBe(201);
+    expect(
+      (
+        await f.request('PUT', `/v1/sessions/${f.id}/status`, {
+          version: 1,
+          sourceID: f.sourceID,
+          after: 0,
+          status: 'question',
+        })
+      ).status
+    ).toBe(200);
+    expect(await (await client(personal(f.userID)).state(f.id)).json()).toMatchObject({
+      status: { value: 'question', version: 1 },
+    });
+    expect((await f.request('POST', '/v1/notifications/ticket')).status).toBe(401);
+    f.revoke();
+    expect(
+      (
+        await f.request('PUT', `/v1/sessions/${f.id}/status`, {
+          version: 1,
+          sourceID: f.sourceID,
+          after: 1,
+          status: 'idle',
+        })
+      ).status
+    ).toBe(401);
+  });
+
   it('fails closed and retries ownership that has not reached Cloud yet', async () => {
     const f = await fixture();
     const foreign = newSessionID();

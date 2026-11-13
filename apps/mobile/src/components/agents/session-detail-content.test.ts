@@ -698,10 +698,21 @@ vi.mock('@/components/todos/session-todo-link', () => ({
   SessionTodoChip: () => null,
   SessionTodoLinkRow: () => null,
 }));
+const sandboxTrpc = vi.hoisted(() => {
+  const options = { queryOptions: () => ({}), queryKey: () => [] };
+  return { getSandboxStatus: options, getWorkspaceSnapshotRecovery: options };
+});
 vi.mock('@/lib/trpc', () => ({
-  trpcClient: {},
-  useTRPC: () => ({
+  trpcClient: {
+    cloudAgentNext: { removeWorkspaceSnapshot: { mutate: () => Promise.resolve({}) } },
     organizations: {
+      cloudAgentNext: { removeWorkspaceSnapshot: { mutate: () => Promise.resolve({}) } },
+    },
+  },
+  useTRPC: () => ({
+    cloudAgentNext: sandboxTrpc,
+    organizations: {
+      cloudAgentNext: sandboxTrpc,
       list: {
         queryOptions: () => ({
           queryKey: ['organizations'],

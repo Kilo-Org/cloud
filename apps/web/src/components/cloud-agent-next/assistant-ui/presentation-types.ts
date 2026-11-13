@@ -5,6 +5,7 @@ import type {
   SessionCommit,
 } from '@kilocode/cloud-agent-sdk';
 import type { Part, StoredMessage } from '../types';
+import type { SharedTranscriptSegment } from '../shared-transcript-presentation';
 
 export type CloudPartPresentation = {
   id: string;
@@ -18,6 +19,7 @@ export type CloudMessagePresentation = {
   messageIds: readonly string[];
   sources: readonly StoredMessage[];
   parts: readonly CloudPartPresentation[];
+  segments: readonly (SharedTranscriptSegment & { id: string })[];
   displayTimestamp: number;
   isStreaming: boolean;
   deliveryState?: MessageDeliveryState;

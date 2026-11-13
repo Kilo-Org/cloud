@@ -503,6 +503,21 @@ describe('OrganizationCreditActivityScreen deep-linked organization', () => {
     expect(account.written).toEqual(['org-b']);
     unmount();
   });
+
+  it('leaves the selection alone when the link names no organization', async () => {
+    const { unmount } = await renderWithProviders(createElement(OrganizationCreditActivityScreen));
+
+    expect(account.written).toEqual([]);
+    unmount();
+  });
+
+  it('writes nothing for an organization the viewer is not a member of', async () => {
+    route.org = 'foreign-org';
+    const { unmount } = await renderWithProviders(createElement(OrganizationCreditActivityScreen));
+
+    expect(account.written).toEqual([]);
+    unmount();
+  });
 });
 
 async function switchMountedRoute(next: string) {

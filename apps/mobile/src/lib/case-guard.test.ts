@@ -38,6 +38,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/repo-picker-filter.ts': 'repo search folding',
   'lib/todos/todo-model.ts': 'repository full-name comparison',
   'lib/use-new-session-repos.ts': 'repo key normalization',
+  'lib/cloud-environments/environment-selection.ts': 'remembered-choice key normalization',
   'lib/invoice-download.ts': 'filename comparison',
   'lib/agent-attachments/validate.ts': 'file-extension normalization',
   'lib/document-preview.ts': 'document MIME and file-extension normalization',

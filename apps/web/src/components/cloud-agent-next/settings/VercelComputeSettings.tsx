@@ -1,7 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useVercelComputeData, type VercelComputeRemoveError } from '@/hooks/useVercelComputeData';
+import {
+  useVercelComputeData,
+  type VercelComputeQueries,
+  type VercelComputeRemoveError,
+} from '@/hooks/useVercelComputeData';
 import { useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { AlertTriangle, Check, Circle, ExternalLink, Loader2, MoreHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
@@ -97,7 +101,7 @@ function statusCopy(
 
   switch (status) {
     case 'ready':
-      return { label: 'Ready', variant: 'default' };
+      return { label: 'Ready', variant: 'secondary' };
     case 'failed':
       return { label: 'Setup failed', variant: 'destructive' };
     case 'building':
@@ -107,7 +111,11 @@ function statusCopy(
   }
 }
 
-export function VercelComputeSettings({ organizationId }: { organizationId?: string }) {
+export function VercelComputeSettings({
+  organizationId,
+  enrollmentQuery,
+  statusQuery,
+}: { organizationId?: string } & VercelComputeQueries) {
   const [token, setToken] = useState('');
   const [teamId, setTeamId] = useState('');
   const [projectId, setProjectId] = useState('');
@@ -134,7 +142,6 @@ export function VercelComputeSettings({ organizationId }: { organizationId?: str
     enrollmentState,
     isEnrolled,
     status,
-    statusQuery,
     isSetupFormVisible,
     discoverTeamsMutation,
     discoverProjectsMutation,
@@ -151,6 +158,8 @@ export function VercelComputeSettings({ organizationId }: { organizationId?: str
     dispatchUpgradeRuntime,
     dispatchRemove,
   } = useVercelComputeData(organizationId, normalizedToken, teamId, {
+    enrollmentQuery,
+    statusQuery,
     onRemoveSuccess: removeMutationSuccess,
     onRemoveError: removeMutationError,
   });
@@ -333,8 +342,16 @@ export function VercelComputeSettings({ organizationId }: { organizationId?: str
             <AlertTriangle />
             <AlertTitle>Vercel compute availability could not be verified</AlertTitle>
             <AlertDescription>
-              Setup is temporarily unavailable. Try again later. Existing credentials can still be
-              removed.
+              <p>Setup is temporarily unavailable. Existing credentials can still be removed.</p>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={enrollmentQuery.isFetching}
+                onClick={() => void enrollmentQuery.refetch()}
+              >
+                {enrollmentQuery.isFetching && <Loader2 className="mr-2 size-4 animate-spin" />}
+                Retry enrollment
+              </Button>
             </AlertDescription>
           </Alert>
         )}
@@ -650,23 +667,43 @@ export function VercelComputeSettings({ organizationId }: { organizationId?: str
         ) : status ? (
           <>
             <Card>
-              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <CardTitle className="text-base">Vercel runtime</CardTitle>
-                  <CardDescription>
-                    {status.setupStatus === 'ready'
-                      ? isEnrolled
-                        ? 'New sessions are ready to use this customer-paid project.'
-                        : enrollmentState === 'checking'
-                          ? 'Checking whether new sessions can use this configured project.'
-                          : enrollmentState === 'unavailable'
-                            ? 'Enrollment could not be verified. This project cannot be confirmed as active.'
-                            : 'This owner is not enrolled. New sessions will not use this project.'
-                      : 'Setup status is updated automatically while the runtime is built.'}
-                  </CardDescription>
+              <CardHeader className="flex flex-col gap-4 only:pb-6 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 space-y-1">
+                  <CardTitle className="text-base break-all">
+                    {projectLink ? (
+                      <Link
+                        href={projectLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex max-w-full items-center gap-2 rounded-sm hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        aria-label={`${projectLabel(status.teamSlug, status.projectSlug, status.projectId)} (opens in Vercel)`}
+                      >
+                        <span className="min-w-0">
+                          {projectLabel(status.teamSlug, status.projectSlug, status.projectId)}
+                        </span>
+                        <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
+                      </Link>
+                    ) : (
+                      projectLabel(status.teamSlug, status.projectSlug, status.projectId)
+                    )}
+                  </CardTitle>
+                  {status.setupStatus === 'ready' && (
+                    <CardDescription>
+                      Runtime{' '}
+                      {formatRuntimeLabel(status.runtimeWrapperVersion, status.runtimeReleasedAt)}
+                    </CardDescription>
+                  )}
                 </div>
-                <div className="flex items-center gap-2 self-end sm:self-start">
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
                   {setupStatus && <Badge variant={setupStatus.variant}>{setupStatus.label}</Badge>}
+                  {status.setupStatus === 'ready' &&
+                    (status.upgradeStatus === 'failed' ||
+                      (status.upgradeAvailable && !isUpgradeRunning)) && (
+                      <Button disabled={isBusy || !isEnrolled} onClick={dispatchUpgradeRuntime}>
+                        {upgradeMutation.isPending && <Loader2 className="size-4 animate-spin" />}
+                        {status.upgradeStatus === 'failed' ? 'Retry upgrade' : 'Upgrade runtime'}
+                      </Button>
+                    )}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
@@ -691,152 +728,106 @@ export function VercelComputeSettings({ organizationId }: { organizationId?: str
                   </DropdownMenu>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-5">
-                {status.setupStatus === 'ready' ? (
-                  <div className="space-y-4">
-                    <div className="bg-muted/40 flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="font-medium">
-                          {projectLabel(status.teamSlug, status.projectSlug, status.projectId)}
-                        </p>
-                        <p className="text-muted-foreground text-xs">
-                          Version{' '}
-                          {formatRuntimeLabel(
-                            status.runtimeWrapperVersion,
-                            status.runtimeReleasedAt
-                          )}
-                        </p>
-                        {status.upgradeAvailable &&
-                          !isUpgradeRunning &&
-                          status.upgradeStatus !== 'failed' && (
-                            <p className="text-muted-foreground text-xs">
-                              A newer runtime is available.
-                            </p>
-                          )}
-                      </div>
-                      {projectLink && (
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={projectLink} target="_blank" rel="noreferrer">
-                            Open Vercel project <ExternalLink className="ml-2 size-3.5" />
-                          </Link>
-                        </Button>
+              {(status.setupStatus !== 'ready' ||
+                isUpgradeRunning ||
+                status.upgradeStatus === 'failed') && (
+                <CardContent className="space-y-5">
+                  {status.setupStatus === 'ready' ? (
+                    <div className="space-y-4">
+                      {isUpgradeRunning && (
+                        <div className="space-y-3">
+                          {SETUP_STEPS.map(([step, label], index) => {
+                            const complete = index < currentStep;
+                            const active = index === currentStep;
+                            return (
+                              <div key={step} className="flex items-center gap-3 text-sm">
+                                <span
+                                  className={`flex size-6 shrink-0 items-center justify-center rounded-full border ${complete ? 'border-primary bg-primary text-primary-foreground' : active ? 'border-primary text-primary' : 'text-muted-foreground'}`}
+                                >
+                                  {complete ? (
+                                    <Check className="size-3.5" />
+                                  ) : active ? (
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                  ) : (
+                                    <Circle className="size-2.5 fill-current" />
+                                  )}
+                                </span>
+                                <span className={active ? 'font-medium' : 'text-muted-foreground'}>
+                                  {label}
+                                </span>
+                              </div>
+                            );
+                          })}
+                          <p className="text-muted-foreground text-xs">
+                            Open sessions keep the current snapshot. New sessions use it until this
+                            upgrade finishes.
+                          </p>
+                        </div>
+                      )}
+                      {status.upgradeStatus === 'failed' && (
+                        <Alert variant="destructive">
+                          <AlertTriangle />
+                          <AlertTitle>Runtime upgrade could not finish</AlertTitle>
+                          <AlertDescription>
+                            The current snapshot is still in use. Check Vercel capacity and token
+                            access, then retry the upgrade.
+                          </AlertDescription>
+                        </Alert>
                       )}
                     </div>
-                    {isUpgradeRunning && (
-                      <div className="space-y-3">
-                        {SETUP_STEPS.map(([step, label], index) => {
-                          const complete = index < currentStep;
-                          const active = index === currentStep;
-                          return (
-                            <div key={step} className="flex items-center gap-3 text-sm">
-                              <span
-                                className={`flex size-6 shrink-0 items-center justify-center rounded-full border ${complete ? 'border-primary bg-primary text-primary-foreground' : active ? 'border-primary text-primary' : 'text-muted-foreground'}`}
-                              >
-                                {complete ? (
-                                  <Check className="size-3.5" />
-                                ) : active ? (
-                                  <Loader2 className="size-3.5 animate-spin" />
-                                ) : (
-                                  <Circle className="size-2.5 fill-current" />
-                                )}
-                              </span>
-                              <span className={active ? 'font-medium' : 'text-muted-foreground'}>
-                                {label}
-                              </span>
-                            </div>
-                          );
-                        })}
-                        <p className="text-muted-foreground text-xs">
-                          Open sessions keep the current snapshot. New sessions use it until this
-                          upgrade finishes.
-                        </p>
-                      </div>
-                    )}
-                    {status.upgradeStatus === 'failed' && (
-                      <Alert variant="destructive">
-                        <AlertTriangle />
-                        <AlertTitle>Runtime upgrade could not finish</AlertTitle>
-                        <AlertDescription>
-                          The current snapshot is still in use. Check Vercel capacity and token
-                          access, then retry the upgrade.
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                  </div>
-                ) : status.setupStatus === 'failed' ? (
-                  <Alert variant="destructive">
-                    <AlertTriangle />
-                    <AlertTitle>Setup could not finish</AlertTitle>
-                    <AlertDescription>
-                      {status.setupError === 'byoc_vercel_forbidden'
-                        ? 'The token cannot access this team or project.'
-                        : status.setupError === 'byoc_vercel_capacity'
-                          ? 'Vercel rejected the request because of a capacity or spend limit.'
-                          : status.setupError === 'byoc_vercel_snapshot_missing'
-                            ? 'The runtime snapshot expired or was deleted. Retry setup to rebuild it.'
-                            : 'Check the token, team, and project access, then retry setup.'}
-                    </AlertDescription>
-                  </Alert>
-                ) : (
-                  <div className="space-y-3">
-                    {SETUP_STEPS.map(([step, label], index) => {
-                      const complete = status.setupStatus === 'ready' || index < currentStep;
-                      const active = status.setupStatus !== 'failed' && index === currentStep;
-                      return (
-                        <div key={step} className="flex items-center gap-3 text-sm">
-                          <span
-                            className={`flex size-6 shrink-0 items-center justify-center rounded-full border ${complete ? 'border-primary bg-primary text-primary-foreground' : active ? 'border-primary text-primary' : 'text-muted-foreground'}`}
-                          >
-                            {complete ? (
-                              <Check className="size-3.5" />
-                            ) : active ? (
-                              <Loader2 className="size-3.5 animate-spin" />
-                            ) : (
-                              <Circle className="size-2.5 fill-current" />
-                            )}
-                          </span>
-                          <span className={active ? 'font-medium' : 'text-muted-foreground'}>
-                            {label}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {status.setupStatus === 'failed' && (
-                  <div className="flex flex-wrap justify-end gap-2">
-                    <Button disabled={isBusy || !isEnrolled} onClick={dispatchRetrySetup}>
-                      {retryMutation.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
-                      Retry setup
-                    </Button>
-                  </div>
-                )}
-                {status.setupStatus === 'ready' &&
-                  (status.upgradeStatus === 'failed' ||
-                    (status.upgradeAvailable && !isUpgradeRunning)) && (
-                    <div className="flex flex-wrap justify-end gap-2">
-                      {status.upgradeStatus === 'failed' && (
-                        <Button disabled={isBusy || !isEnrolled} onClick={dispatchUpgradeRuntime}>
-                          {upgradeMutation.isPending && (
-                            <Loader2 className="mr-2 size-4 animate-spin" />
-                          )}
-                          Retry upgrade
-                        </Button>
-                      )}
-                      {status.upgradeAvailable &&
-                        !isUpgradeRunning &&
-                        status.upgradeStatus !== 'failed' && (
-                          <Button disabled={isBusy || !isEnrolled} onClick={dispatchUpgradeRuntime}>
-                            {upgradeMutation.isPending && (
-                              <Loader2 className="mr-2 size-4 animate-spin" />
-                            )}
-                            Upgrade runtime
-                          </Button>
-                        )}
+                  ) : status.setupStatus === 'failed' ? (
+                    <Alert variant="destructive">
+                      <AlertTriangle />
+                      <AlertTitle>Setup could not finish</AlertTitle>
+                      <AlertDescription>
+                        {status.setupError === 'byoc_vercel_forbidden'
+                          ? 'The token cannot access this team or project.'
+                          : status.setupError === 'byoc_vercel_capacity'
+                            ? 'Vercel rejected the request because of a capacity or spend limit.'
+                            : status.setupError === 'byoc_vercel_snapshot_missing'
+                              ? 'The runtime snapshot expired or was deleted. Retry setup to rebuild it.'
+                              : 'Check the token, team, and project access, then retry setup.'}
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <div className="space-y-3">
+                      {SETUP_STEPS.map(([step, label], index) => {
+                        const complete = status.setupStatus === 'ready' || index < currentStep;
+                        const active = status.setupStatus !== 'failed' && index === currentStep;
+                        return (
+                          <div key={step} className="flex items-center gap-3 text-sm">
+                            <span
+                              className={`flex size-6 shrink-0 items-center justify-center rounded-full border ${complete ? 'border-primary bg-primary text-primary-foreground' : active ? 'border-primary text-primary' : 'text-muted-foreground'}`}
+                            >
+                              {complete ? (
+                                <Check className="size-3.5" />
+                              ) : active ? (
+                                <Loader2 className="size-3.5 animate-spin" />
+                              ) : (
+                                <Circle className="size-2.5 fill-current" />
+                              )}
+                            </span>
+                            <span className={active ? 'font-medium' : 'text-muted-foreground'}>
+                              {label}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
-              </CardContent>
+
+                  {status.setupStatus === 'failed' && (
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button disabled={isBusy || !isEnrolled} onClick={dispatchRetrySetup}>
+                        {retryMutation.isPending && (
+                          <Loader2 className="mr-2 size-4 animate-spin" />
+                        )}
+                        Retry setup
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              )}
             </Card>
 
             {((status.setupStatus !== 'ready' && status.setupStatus !== 'failed') ||

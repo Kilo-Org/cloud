@@ -22,7 +22,7 @@ import { api_request_log_2 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
 import { eq } from 'drizzle-orm';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import {
   apiRequestLogBlobKey,
   apiRequestLogBlobSchema,
@@ -3320,6 +3320,80 @@ describe('api_request_log_2 storage', () => {
       expect(fakeR2.objects.size).toBe(0);
     }
   );
+
+  test('strips NUL bytes from the client-supplied session ID and the upstream generation ID', async () => {
+    mockedOptIn.mockResolvedValueOnce('all');
+    const logging = storageLogging({
+      session_id: 'ses\u0000_storage',
+      request: {
+        kind: 'chat_completions',
+        body: { model: 'kilo-internal/my-model' },
+      } as GatewayRequest,
+    });
+    const result = await rewriteModelResponse({
+      response: jsonResponse({ id: 'gen\u0000-1', model: 'upstream-model', choices: [] }),
+      model: 'kilo-internal/my-model',
+      providerId: 'custom',
+      kind: 'chat_completions',
+      isFree: true,
+      userByok: false,
+      customLlmPricing: null,
+      logging,
+      responseTransforms: null,
+    });
+    await result.text();
+    await runScheduledLogInsert();
+
+    expect(await selectLoggedRow()).toMatchObject({
+      id: logging.usage_id,
+      session_id: 'ses_storage',
+      generation_id: 'gen-1',
+    });
+  });
+
+  test('deletes the uploaded blob when the row insert fails', async () => {
+    const send = jest.spyOn(fakeR2, 'send');
+    jest.spyOn(db, 'insert').mockImplementationOnce(() => {
+      throw new Error('database unavailable');
+    });
+
+    await logUpstreamResponse(jsonResponse({ error: 'upstream error' }, 400), 'all', null);
+
+    expect(send.mock.calls.map(([command]) => (command as object).constructor.name)).toEqual([
+      'PutObjectCommand',
+      'DeleteObjectCommand',
+    ]);
+    expect(fakeR2.objects.size).toBe(0);
+    expect(await selectLoggedRows()).toEqual([]);
+    expect(mockedLog).toHaveBeenCalledWith(
+      expect.stringContaining('failed to insert api_request_log_2')
+    );
+  });
+
+  test('logs the key of a blob it could not delete after the row insert fails', async () => {
+    const send = fakeR2.send.bind(fakeR2);
+    jest.spyOn(fakeR2, 'send').mockImplementation(async command => {
+      if (command instanceof DeleteObjectCommand) throw new Error('R2 unavailable');
+      return send(command);
+    });
+    jest.spyOn(db, 'insert').mockImplementationOnce(() => {
+      throw new Error('database unavailable');
+    });
+
+    const logging = await logUpstreamResponse(
+      jsonResponse({ error: 'upstream error' }, 400),
+      'all',
+      null
+    );
+
+    const [key] = [...fakeR2.objects.keys()];
+    expect(key).toMatch(new RegExp(`^${bucket}/\\d{4}/\\d{2}/\\d{2}/${logging.usage_id}\\.json$`));
+    expect(mockedLog).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `failed to delete orphaned api_request_log_2 blob ${key.slice(bucket.length + 1)} from R2: Error: R2 unavailable`
+      )
+    );
+  });
 
   test('skips the row when the R2 upload fails', async () => {
     jest.spyOn(fakeR2, 'send').mockRejectedValue(new Error('R2 unavailable'));

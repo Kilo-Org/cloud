@@ -25,9 +25,9 @@ export const databaseTypeParsers: pg.CustomTypesConfig = {
 export type CreateDrizzleClientOptions = {
   connectionString: string;
   /**
-   * Pool settings this client does not derive itself. `types` is excluded because the client
-   * installs `databaseTypeParsers` on the pool it creates; replacing it would change how every
-   * raw result and export path reads `int8`.
+   * Pool settings this client does not derive itself. `types` is left out of the type because the
+   * pool is created with the module's `databaseTypeParsers`, which raw results and the export paths
+   * expect. Like `GetWorkerDbOptions`, this is a type-level reservation.
    */
   poolConfig?: Omit<Partial<pg.PoolConfig>, 'types'>;
   logger?: boolean;
@@ -61,8 +61,10 @@ export function createDrizzleClient(options: CreateDrizzleClientOptions) {
 }
 
 /**
- * `connectionString`, `max` and `types` are fixed by `getWorkerDb`: Hyperdrive owns pooling, and
- * the int8 parser is what raw results expect, so a caller cannot replace either.
+ * Settings `getWorkerDb` fixes for every pool it creates: the connection string, `max: 1` because
+ * Hyperdrive owns pooling, and `types` because the pool is created with the module's int8 parser.
+ * The type reserves all three. Structural typing still accepts a value that a caller widened to
+ * `pg.PoolConfig`, so this reservation is a type-level guard rather than a runtime one.
  */
 export type GetWorkerDbOptions = Omit<pg.PoolConfig, 'connectionString' | 'max' | 'types'>;
 

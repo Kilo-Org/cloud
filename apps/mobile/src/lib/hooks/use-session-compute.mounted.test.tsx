@@ -9,7 +9,12 @@ import { useSessionComputeCharges } from './use-session-compute';
 
 const state = vi.hoisted(() => ({
   fetch: vi.fn(),
-  options: undefined as { refetchInterval?: number | false } | undefined,
+  options: undefined as
+    | {
+        enabled?: boolean;
+        refetchInterval?: number | false | ((query: unknown) => number | false);
+      }
+    | undefined,
 }));
 
 vi.mock('@/lib/trpc', () => ({
@@ -17,7 +22,7 @@ vi.mock('@/lib/trpc', () => ({
     computeBilling: {
       sessionCharges: {
         queryOptions: (_input: unknown, options: object) => {
-          state.options = options as { refetchInterval?: number | false };
+          state.options = options;
           return {
             queryKey: [['computeBilling', 'sessionCharges']],
             queryFn: state.fetch,
@@ -30,6 +35,7 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 const CLOUD_SESSION_ID = 'workspace_5c1a3f0e-2b7d-4c9a-8f6e-1d2b3c4d5e6f';
+const LOCAL_SESSION_ID = 'ses_123';
 
 /**
  * What a session answers before any run has charged, or after every run
@@ -45,31 +51,68 @@ const IDLE_CHARGES = {
   earlierRuns: null,
 };
 
-function ChargesProbe({ poll }: Readonly<{ poll?: boolean }>) {
+function ChargesProbe({
+  poll,
+  sessionId = CLOUD_SESSION_ID,
+}: Readonly<{ poll?: boolean; sessionId?: string }>) {
   useSessionComputeCharges({
-    cloudAgentSessionId: CLOUD_SESSION_ID,
+    cloudAgentSessionId: sessionId,
     organizationId: undefined,
     poll,
   });
   return null;
 }
 
-async function mountProbe(poll: boolean | undefined): Promise<TestRenderer.ReactTestRenderer> {
+type Mounted = {
+  renderer: TestRenderer.ReactTestRenderer;
+  client: QueryClient;
+};
+
+async function mountProbe({
+  poll,
+  sessionId,
+}: Readonly<{ poll?: boolean; sessionId?: string }> = {}): Promise<Mounted> {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   });
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
     ref.current = TestRenderer.create(
-      createElement(QueryClientProvider, { client }, createElement(ChargesProbe, { poll }))
+      createElement(
+        QueryClientProvider,
+        { client },
+        createElement(ChargesProbe, { poll, sessionId })
+      )
     );
+    await Promise.resolve();
     await Promise.resolve();
   });
   const renderer = ref.current;
   if (!renderer) {
     throw new Error('renderer was not created');
   }
-  return renderer;
+  return { renderer, client };
+}
+
+/** The interval the hook configured, resolved the way TanStack resolves it. */
+function pollInterval({ client }: Mounted): number | false {
+  const option = state.options?.refetchInterval;
+  if (option === undefined) {
+    throw new Error('the hook configured no refetchInterval');
+  }
+  if (typeof option !== 'function') {
+    return option;
+  }
+  const query = client.getQueryCache().getAll()[0];
+  if (query === undefined) {
+    throw new Error('the read mounted no query');
+  }
+  return option(query);
+}
+
+/** A tRPC client error carrying the server's verdict. */
+function trpcError(code: string): Error {
+  return Object.assign(new Error(code), { data: { code } });
 }
 
 beforeEach(() => {
@@ -80,30 +123,64 @@ beforeEach(() => {
 
 // This project mounts without a DOM, so TanStack's module-level `isServer()`
 // disables every timer it would otherwise schedule; the interval is asserted as
-// configured here rather than by advancing a clock that the library ignores.
+// configured and resolved against the read's real state, rather than by
+// advancing a clock the library ignores.
 describe('useSessionComputeCharges polling', () => {
-  it('asks for a timed poll instead of one gated on the cached runs', async () => {
-    const renderer = await mountProbe(undefined);
+  it('polls on a timer, not from the cached runs, so a later run is observed', async () => {
+    const mounted = await mountProbe();
 
     expect(state.fetch).toHaveBeenCalledTimes(1);
-    expect(state.options).toMatchObject({
-      enabled: true,
-      refetchOnWindowFocus: false,
-      refetchInterval: SESSION_COMPUTE_POLL_MS,
-    });
+    expect(state.options?.enabled).toBe(true);
+    expect(pollInterval(mounted)).toBe(SESSION_COMPUTE_POLL_MS);
 
     act(() => {
-      renderer.unmount();
+      mounted.renderer.unmount();
     });
   });
 
   it('leaves the timer to the caller that owns the shared read', async () => {
-    const renderer = await mountProbe(false);
+    const mounted = await mountProbe({ poll: false });
 
-    expect(state.options?.refetchInterval).toBe(false);
+    expect(pollInterval(mounted)).toBe(false);
 
     act(() => {
-      renderer.unmount();
+      mounted.renderer.unmount();
+    });
+  });
+
+  it.each(['FORBIDDEN', 'NOT_FOUND', 'UNAUTHORIZED'])(
+    'stops polling once the read is denied with %s',
+    async code => {
+      state.fetch.mockRejectedValue(trpcError(code));
+      const mounted = await mountProbe();
+
+      expect(pollInterval(mounted)).toBe(false);
+
+      act(() => {
+        mounted.renderer.unmount();
+      });
+    }
+  );
+
+  it('keeps polling when the last read failed in a way a retry can fix', async () => {
+    state.fetch.mockRejectedValue(new Error('network request failed'));
+    const mounted = await mountProbe();
+
+    expect(pollInterval(mounted)).toBe(SESSION_COMPUTE_POLL_MS);
+
+    act(() => {
+      mounted.renderer.unmount();
+    });
+  });
+
+  it('does not poll a session the compute routers cannot address', async () => {
+    const mounted = await mountProbe({ sessionId: LOCAL_SESSION_ID });
+
+    expect(state.options?.enabled).toBe(false);
+    expect(pollInterval(mounted)).toBe(false);
+
+    act(() => {
+      mounted.renderer.unmount();
     });
   });
 });

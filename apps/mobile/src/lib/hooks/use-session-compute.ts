@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { useTRPC } from '@/lib/trpc';
 import { isCloudAgentSessionId, SESSION_COMPUTE_POLL_MS } from '@/lib/session-compute-total';
+import { useTRPC } from '@/lib/trpc';
+import { isRetryableTrpcError } from '@/lib/trpc-error';
 
 /**
  * The session's recorded compute charges. One request per open session: the
@@ -17,7 +18,10 @@ import { isCloudAgentSessionId, SESSION_COMPUTE_POLL_MS } from '@/lib/session-co
  * others read the cache entry it keeps fresh.
  *
  * A session with no reachable compute scope answers `FORBIDDEN`; callers treat
- * that as "this session has nothing to show" rather than as a failure.
+ * that as "this session has nothing to show" rather than as a failure, and the
+ * poll stops with it: a verdict that a retry cannot change is one the sheet
+ * should not ask for every interval. A session whose id the compute routers
+ * could not accept is never polled at all.
  */
 export function useSessionComputeCharges({
   cloudAgentSessionId,
@@ -38,7 +42,10 @@ export function useSessionComputeCharges({
         enabled: addressable,
         staleTime: 30_000,
         refetchOnWindowFocus: false,
-        refetchInterval: poll ? SESSION_COMPUTE_POLL_MS : false,
+        refetchInterval: query =>
+          poll && addressable && isRetryableTrpcError(query.state.error)
+            ? SESSION_COMPUTE_POLL_MS
+            : false,
       }
     )
   );

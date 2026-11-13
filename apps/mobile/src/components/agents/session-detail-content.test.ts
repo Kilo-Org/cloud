@@ -3815,7 +3815,7 @@ describe('session detail unreadable permission notice', () => {
     expect(view.renderer.root.findAllByType(PermissionUnreadableNotice)).toHaveLength(1);
     expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(0);
     expect(renderedText(view.renderer.root)).toContain(
-      'The agent is waiting for a permission decision this app cannot show.'
+      'Another permission request could not be read'
     );
 
     const composer = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'));

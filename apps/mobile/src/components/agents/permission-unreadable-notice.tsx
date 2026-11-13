@@ -21,6 +21,9 @@ import { cn } from '@/lib/utils';
  * about it. Android reads the polite live region as the node is added; iOS has
  * no live region, so the same copy is announced once there. Announcing on both
  * would read it twice on Android.
+ *
+ * The body takes the warning ink because the muted neutral does not clear
+ * small-text contrast on the warning tint in the dark theme.
  */
 export function PermissionUnreadableNotice({ inset = true }: { inset?: boolean }) {
   const { t } = useTranslation();
@@ -45,7 +48,7 @@ export function PermissionUnreadableNotice({ inset = true }: { inset?: boolean }
       <Text className="text-sm font-medium text-warn">
         {t('agentChat.permissionCard.unreadableTitle')}
       </Text>
-      <Text className="mt-1 text-xs text-muted-foreground">{announcement}</Text>
+      <Text className="mt-1 text-xs text-warn">{announcement}</Text>
     </View>
   );
 }

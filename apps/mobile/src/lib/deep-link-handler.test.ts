@@ -82,6 +82,10 @@ const MAPPED_CASES = [
     path: 'https://app.kilo.ai/organizations/org_1/code-reviews/rev_9',
     href: '/(app)/code-reviewer/org_1/reviews/rev_9',
   },
+  {
+    path: 'https://app.kilo.ai/s/share-token.abc-def',
+    href: '/(app)/shared/share-token.abc-def',
+  },
 ] as const;
 
 describe('redirectSystemPath', () => {

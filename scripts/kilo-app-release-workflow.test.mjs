@@ -7,6 +7,8 @@ import test from 'node:test';
 
 import { load } from 'js-yaml';
 
+import { APP_LOCAL_EXCLUDES } from './kilo-app-release-notes.mjs';
+
 const workflowPath = '.github/workflows/kilo-app-release.yml';
 const ciWorkflowPath = '.github/workflows/kilo-app-ci.yml';
 
@@ -107,13 +109,29 @@ function validate(workflow) {
 
   // The changelog commit this workflow pushes re-triggers it, and the tag marks
   // the pre-changelog commit: without the exclusion every release starts the next.
-  const diffLine = check.run.split('\n').find(line => line.includes('git diff --name-only'));
-  assert.ok(diffLine, 'check-changes: the change detection diff is missing');
-  assert.match(
-    diffLine,
-    /\(exclude\)apps\/mobile\/CHANGELOG\.md/,
-    'change detection must exclude apps/mobile/CHANGELOG.md'
+  // The other entries are app-local files that cannot reach the bundle: a range
+  // of only those changes no app byte, so it must not spend an upload. The whole
+  // pathspec is read from the one diff command, so a relocation into another
+  // command would fail here instead of passing on a stale match.
+  const diffMatch = /git diff --name-only[\s\S]*?\)\n/.exec(check.run);
+  assert.ok(diffMatch, 'check-changes: the change detection diff is missing');
+  const diff = diffMatch[0];
+  const declared = [...diff.matchAll(/'(:[^']+)'/g)].map(match => match[1]);
+  assert.deepEqual(
+    [...declared].sort(),
+    [':(exclude)apps/mobile/CHANGELOG.md', ...APP_LOCAL_EXCLUDES].sort(),
+    'the release diff must skip exactly the app-local files the notes step skips'
   );
+  for (const kept of [
+    'apps/mobile/',
+    'packages/trpc/',
+    'packages/app-shared/',
+    'packages/event-service/',
+    'packages/notifications/',
+    'packages/cloud-agent-sdk/',
+  ]) {
+    assert.ok(diff.includes(`${kept} \\`), `change detection must still cover ${kept}`);
+  }
 
   // LAST_TAG feeds the notes range, so a dispatch must compute it too.
   const lastTagIndex = check.run.indexOf('LAST_TAG=$(git tag');
@@ -712,6 +730,138 @@ test('release retries preserve shipped sections on a bump branch without a PR', 
   }
 });
 
+// A merge that touches only app-local tools or docs changes no app byte, and
+// every submission it starts spends one of the capped App Store Connect
+// uploads. The decision is the step's own shell, so run that shell on fixture
+// ranges and read what it publishes.
+test('an app-local tooling or docs range does not release', () => {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-app-changes-'));
+  const repo = join(work, 'repo');
+  const output = join(work, 'output');
+  const envFile = join(work, 'env');
+  const check = step(readWorkflow(), 'check-changes', 'check');
+  const env = {
+    ...process.env,
+    GITHUB_ENV: envFile,
+    GITHUB_OUTPUT: output,
+    GITHUB_EVENT_NAME: 'push',
+  };
+  const git = (...args) =>
+    execFileSync('git', args, {
+      cwd: repo,
+      env,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  const write = (rel, body = 'fixture\n') => {
+    mkdirSync(join(repo, rel.slice(0, rel.lastIndexOf('/'))), { recursive: true });
+    writeFileSync(join(repo, rel), body);
+  };
+  const commit = message => {
+    git('add', '-A');
+    git('commit', '-qm', message);
+  };
+  const decide = () => {
+    writeFileSync(output, '');
+    execFileSync('bash', ['-e', '-o', 'pipefail', '-c', check.run], {
+      cwd: repo,
+      env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const published = Object.fromEntries(
+      readFileSync(output, 'utf8')
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map(line => {
+          const at = line.indexOf('=');
+          return [line.slice(0, at), line.slice(at + 1)];
+        })
+    );
+    return published.should_build;
+  };
+
+  try {
+    execFileSync('git', ['init', '-q', '-b', 'main', repo], { stdio: 'pipe' });
+    git('config', 'user.name', 'Release Test');
+    git('config', 'user.email', 'release@example.invalid');
+    write('apps/mobile/app.config.ts', "export default {\n  version: '1.2.3',\n};\n");
+    write('apps/mobile/package.json', '{}\n');
+    write('apps/mobile/src/components/composer.tsx', 'export const A = 1;\n');
+    write('apps/mobile/.oxlintrc.json', '{}\n');
+    write('apps/mobile/.oxlintrc.i18n.json', '{}\n');
+    write('apps/mobile/vitest.config.ts', 'export default {};\n');
+    write('apps/mobile/vitest.setup.ts', 'export const setup = 1;\n');
+    write('apps/mobile/scripts/assert-theme-colors.mjs', '// initial\n');
+    write('apps/mobile/e2e/github-api-stub/server.mjs', '// initial\n');
+    write('apps/mobile/AGENTS.md', '# Initial\n');
+    write('apps/mobile/README.md', '# Initial\n');
+    write('apps/mobile/CHANGELOG.md', '# Changelog\n');
+    write('packages/trpc/src/router.ts', 'export const R = 1;\n');
+    commit('Fixture app');
+    git('tag', 'kilo-app-release/1.0.0');
+    const released = git('rev-parse', 'HEAD');
+    const reset = () => git('reset', '-q', '--hard', released);
+
+    assert.equal(decide(), 'false', 'an unchanged range must not release');
+
+    for (const [rel, body] of [
+      ['apps/mobile/.oxlintrc.json', '{ "rules": { "a": 1 } }\n'],
+      ['apps/mobile/.oxlintrc.i18n.json', '{ "rules": { "a": 1 } }\n'],
+      ['apps/mobile/vitest.config.ts', 'export default { test: {} };\n'],
+      ['apps/mobile/vitest.setup.ts', 'export const setup = 2;\n'],
+      ['apps/mobile/src/components/composer.test.ts', 'export const t = 1;\n'],
+      ['apps/mobile/src/components/chat/message.mounted.test.tsx', 'export const t = 1;\n'],
+      ['apps/mobile/scripts/assert-theme-colors.mjs', '// changed\n'],
+      ['apps/mobile/e2e/github-api-stub/server.mjs', '// changed\n'],
+      ['apps/mobile/AGENTS.md', '# Changed\n'],
+      ['apps/mobile/README.md', '# Changed\n'],
+      ['apps/mobile/src/lib/lifecycle.md', '# Nested docs\n'],
+      ['apps/mobile/CHANGELOG.md', '# Changelog\n\n## next\n'],
+    ]) {
+      write(rel, body);
+      commit(`App-local: ${rel}`);
+      assert.equal(decide(), 'false', `${rel} alone must not release`);
+      reset();
+    }
+
+    write('apps/mobile/vitest.setup.ts', 'export const setup = 3;\n');
+    write('apps/mobile/AGENTS.md', '# Also changed\n');
+    write('apps/mobile/src/lib/only-tested.test.ts', 'export const t = 2;\n');
+    commit('App-local only, three families');
+    assert.equal(decide(), 'false', 'app-local files together must not release');
+    reset();
+
+    for (const [rel, body] of [
+      ['apps/mobile/src/components/composer.tsx', 'export const A = 2;\n'],
+      ['apps/mobile/package.json', '{ "dependencies": { "x": "1.0.0" } }\n'],
+      ['packages/trpc/src/router.ts', 'export const R = 2;\n'],
+      [
+        'apps/mobile/app.config.ts',
+        "export default {\n  version: '1.2.3',\n  name: 'kilo-app',\n};\n",
+      ],
+    ]) {
+      write(rel, body);
+      commit(`App change: ${rel}`);
+      assert.equal(decide(), 'true', `${rel} must release`);
+      reset();
+    }
+
+    write('apps/mobile/.oxlintrc.json', '{ "rules": { "b": 2 } }\n');
+    write('apps/mobile/src/components/composer.tsx', 'export const A = 3;\n');
+    commit('App-local beside a source change');
+    assert.equal(decide(), 'true', 'a source change releases beside an app-local one');
+    reset();
+
+    write('apps/mobile/app.config.ts', "export default {\n  version: '1.2.4',\n};\n");
+    commit('Version line only');
+    assert.equal(decide(), 'false', 'the version bump alone must not release');
+    reset();
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
 test('the suite lookup reuses a passed run and otherwise runs the suite here', () => {
   const workspace = mkdtempSync(join(tmpdir(), 'kilo-app-suite-'));
   const stubDir = join(workspace, 'bin');
@@ -1095,6 +1245,10 @@ const mutations = {
   'change detection keeps CHANGELOG.md': workflow => {
     const check = step(workflow, 'check-changes', 'check');
     check.run = check.run.replace(" ':(exclude)apps/mobile/CHANGELOG.md'", '');
+  },
+  'change detection releases on app-local tooling': workflow => {
+    const check = step(workflow, 'check-changes', 'check');
+    check.run = check.run.replace(" ':(exclude,glob)apps/mobile/**/*.test.tsx'", '');
   },
   'LAST_TAG is computed after the manual override': workflow => {
     const check = step(workflow, 'check-changes', 'check');

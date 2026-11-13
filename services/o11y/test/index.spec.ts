@@ -113,6 +113,47 @@ describe('o11y worker', () => {
     expect(response.status).toBe(204);
   });
 
+  it('accepts provider names built from letters, digits, dot, underscore and hyphen', async () => {
+    const aeSpy = makeWriteDataPointSpy();
+    const env = makeTestEnv({ O11Y_API_METRICS: aeSpy as unknown as AnalyticsEngineDataset });
+    const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-O11Y-ADMIN-TOKEN': TEST_CLIENT_SECRET,
+      },
+      body: JSON.stringify(makeValidApiMetricsBody({ provider: ' custom-public.v2_beta ' })),
+    });
+
+    const response = await workerFetch(request, env, createExecutionContext());
+    expect(response.status).toBe(204);
+    expect(aeSpy.writeDataPoint.mock.calls[0][0].blobs[0]).toBe('custom-public.v2_beta');
+  });
+
+  it.each([
+    ['an exclamation mark', 'custom!public'],
+    ['a slash', 'custom/public'],
+    ['a space', 'open router'],
+    ['more than 64 characters', 'a'.repeat(65)],
+    ['uppercase letters', 'OpenRouter'],
+  ])('rejects a provider name with %s', async (_label, provider) => {
+    const aeSpy = makeWriteDataPointSpy();
+    const env = makeTestEnv({ O11Y_API_METRICS: aeSpy as unknown as AnalyticsEngineDataset });
+    const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-O11Y-ADMIN-TOKEN': TEST_CLIENT_SECRET,
+      },
+      body: JSON.stringify(makeValidApiMetricsBody({ provider })),
+    });
+
+    const response = await workerFetch(request, env, createExecutionContext());
+    expect(response.status).toBe(400);
+    expect(aeSpy.writeDataPoint).not.toHaveBeenCalled();
+    expect(await response.json()).toMatchObject({ error: 'Invalid request body' });
+  });
+
   it('writes data point to Analytics Engine and Pipeline on successful ingest', async () => {
     const aeSpy = makeWriteDataPointSpy();
     const pipelineSpy = makePipelineSpy();

@@ -12,7 +12,9 @@ import { MessageComposer } from './message-composer';
 const renderComposer = (
   store: ReturnType<typeof createStore>,
   props: {
+    readonly blockedReason?: string;
     readonly isRunning: boolean;
+    readonly mode?: 'dangerous' | 'safe';
     readonly onSubmit?: () => void;
   }
 ) =>
@@ -22,8 +24,10 @@ const renderComposer = (
       { store },
       createElement(MessageComposer, {
         activeConversationId: 'conversation-1',
+        blockedReason: props.blockedReason,
         canSend: true,
         isRunning: props.isRunning,
+        mode: props.mode ?? 'safe',
         onStop: vi.fn(),
         onSubmit: props.onSubmit ?? vi.fn(),
       })
@@ -76,5 +80,39 @@ describe('message composer queue', () => {
     if (sendButton instanceof HTMLButtonElement) {
       expect(sendButton.disabled).toBe(true);
     }
+  });
+});
+
+describe('message composer mode and send blockers', () => {
+  it('calls out dangerous mode and says the agent can act on the page', () => {
+    const store = createStore();
+    const { getByLabelText, getByText } = renderComposer(store, {
+      isRunning: false,
+      mode: 'dangerous',
+    });
+
+    expect(getByText('Dangerous mode')).toBeDefined();
+
+    const textarea = getByLabelText('Message agent');
+    if (textarea instanceof HTMLTextAreaElement) {
+      expect(textarea.placeholder).toBe('Ask Kilo to act on this page...');
+    }
+  });
+
+  it('shows no dangerous notice in safe mode', () => {
+    const store = createStore();
+    const { queryByText } = renderComposer(store, { isRunning: false });
+
+    expect(queryByText('Dangerous mode')).toBeNull();
+  });
+
+  it('shows why sending is blocked', () => {
+    const store = createStore();
+    const { getByText } = renderComposer(store, {
+      blockedReason: 'Pick a tab to send a message.',
+      isRunning: false,
+    });
+
+    expect(getByText('Pick a tab to send a message.')).toBeDefined();
   });
 });

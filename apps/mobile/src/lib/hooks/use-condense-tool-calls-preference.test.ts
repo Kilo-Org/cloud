@@ -37,9 +37,9 @@ function makeStore() {
 }
 
 describe('parseCondenseToolCalls', () => {
-  it('defaults to off for a missing value (fresh install and unreadable read)', async () => {
+  it('defaults to on for a missing value (fresh install and unreadable read)', async () => {
     const { parseCondenseToolCalls } = await import('./use-condense-tool-calls-preference');
-    expect(parseCondenseToolCalls(null)).toBe(false);
+    expect(parseCondenseToolCalls(null)).toBe(true);
   });
 
   it("reads 'true' as on", async () => {

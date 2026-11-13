@@ -18,6 +18,14 @@ import {
 const INVALID_PARAMS = -32602;
 const INTERNAL_ERROR = -32000;
 
+/**
+ * The one refusal a scoped grant gets for a denied call: a bad authority
+ * binding, an expired grant, a procedure or payload outside the grant, and a
+ * procedure whose schema this worker cannot build all look the same to the
+ * caller.
+ */
+const AUTHORITY_REFUSAL = 'Cloud Agent authority does not permit this request';
+
 function assertScopedCall(
   auth: ForwardedAuth,
   path: string,
@@ -37,7 +45,7 @@ function assertScopedCall(
       throw new Error('Cloud Agent authority kind does not match the catalog');
     }
   } catch {
-    throw new JsonRpcFailure(INVALID_PARAMS, 'Cloud Agent authority does not permit this request');
+    throw new JsonRpcFailure(INVALID_PARAMS, AUTHORITY_REFUSAL);
   }
 }
 
@@ -459,12 +467,17 @@ export async function fetchCatalogCall(options: {
 
 /**
  * The `call` tool: validate `input` against the endpoint's published schema and
- * forward a non-guarded endpoint to apps/web over its public tRPC GET transport.
+ * forward a non-guarded endpoint to apps/web over its public tRPC transport.
  *
  * A guarded row (admin or debug) is refused locally before any upstream
  * request: `call` never runs one. Without the opt-in the refusal names the
  * checkbox to tick; with it, the refusal points at the OTP-protected tools.
  * apps/web enforces the admin rule again via `adminProcedure`.
+ *
+ * A scoped authority grant decides the input shape itself (see
+ * `cloudAgentAuthorityInputSchema`), so its schema is built before the value is
+ * read: the authority and the schema then judge the decoded value, which is the
+ * value forwarded.
  */
 export async function callCatalogEndpoint(options: {
   catalog: Catalog;
@@ -474,33 +487,60 @@ export async function callCatalogEndpoint(options: {
   webBaseUrl: string;
   fetchImpl?: typeof fetch;
 }): Promise<{ text: string; truncated: boolean }> {
-  const { catalog, path, input } = options;
-  assertScopedCall(options.auth, path, input);
+  const { catalog, path, input, auth } = options;
   const row = catalogRowFor(catalog, path);
+
+  // A scoped grant's schema covers procedures whose catalog row differs —
+  // models.list takes no input there, and cloudEnvironments.list is narrower —
+  // and it carries the organization constraint. Building it refuses a procedure
+  // outside the grant, and that refusal is the canned authority answer: the
+  // builder's own error never reaches the caller.
+  let scopedSchema: Record<string, unknown> | undefined;
+  if (auth.cloudAgentAuthority !== undefined) {
+    try {
+      scopedSchema = cloudAgentAuthorityInputSchema(auth.cloudAgentAuthority, path);
+    } catch {
+      throw new JsonRpcFailure(INVALID_PARAMS, AUTHORITY_REFUSAL);
+    }
+  }
+
+  let inputSchema: Record<string, unknown>;
+  if (scopedSchema !== undefined) {
+    inputSchema = scopedSchema;
+  } else {
+    if (!row) {
+      throw unknownPath(path);
+    }
+    inputSchema = row.inputSchema;
+  }
+
+  // Decode before any payload check: the authority and the schema must judge the
+  // value that is forwarded, not the client's JSON encoding of it.
+  const decodedInput = decodeStringifiedInput(inputSchema, input);
+  assertScopedCall(auth, path, decodedInput);
   if (!row) {
+    // A granted procedure missing from the catalog is drift; the authority
+    // checks above still decided whether this caller may ask at all.
     throw unknownPath(path);
   }
   if (isGuardedRow(row)) {
     throw new JsonRpcFailure(
       INVALID_PARAMS,
-      options.auth.adminEnabled === true
+      auth.adminEnabled === true
         ? `"${path}" is an admin or debug endpoint. Use the call_protected tool, then submit_otp with the code from your authenticator app, to run it.`
         : `"${path}" is an admin or debug endpoint. Reconnect the Kilo MCP server and tick "Enable admin and debug actions" at sign-in to allow admin and debug actions.`,
       { path }
     );
   }
-  const inputRow = options.auth.cloudAgentAuthority
-    ? {
-        ...row,
-        inputSchema: cloudAgentAuthorityInputSchema(options.auth.cloudAgentAuthority, path),
-      }
-    : row;
-  const decodedInput = decodeStringifiedInput(inputRow.inputSchema, input);
-  assertInputMatchesSchema(inputRow, path, decodedInput);
+  assertInputMatchesSchema(
+    inputSchema === row.inputSchema ? row : { ...row, inputSchema },
+    path,
+    decodedInput
+  );
   return forwardCatalogCall({
     row,
     input: decodedInput,
-    auth: options.auth,
+    auth,
     webBaseUrl: options.webBaseUrl,
     ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
   });

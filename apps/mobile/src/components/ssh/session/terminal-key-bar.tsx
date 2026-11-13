@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Keyboard, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { ClipboardPaste } from '@/components/ui/icons';
+import { ClipboardPaste, KeyboardOff, ScrollText } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
@@ -26,6 +26,7 @@ type TerminalKeyBarProps = Readonly<{
   disabled: boolean;
   onSend: (text: string) => void;
   onPaste: () => void;
+  onSnippets: () => void;
 }>;
 
 /**
@@ -40,7 +41,7 @@ type TerminalKeyBarProps = Readonly<{
  * phone needs most and the row is wider than the screen; the scroller is sized
  * so the next key is always partly visible, which is what says there is more.
  */
-export function TerminalKeyBar({ disabled, onSend, onPaste }: TerminalKeyBarProps) {
+export function TerminalKeyBar({ disabled, onSend, onPaste, onSnippets }: TerminalKeyBarProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const [modifier, setModifier] = useState<Modifier | null>(null);
@@ -96,7 +97,21 @@ export function TerminalKeyBar({ disabled, onSend, onPaste }: TerminalKeyBarProp
             ))}
           </ScrollView>
           <View className="my-2 w-px self-stretch bg-border" />
-          <View className="px-2 py-1">
+          <View className="flex-row items-center gap-1 py-1 pl-1 pr-2">
+            <Pressable
+              onPress={onSnippets}
+              disabled={disabled}
+              accessibilityRole="button"
+              accessibilityLabel={t('ssh.snippets.title')}
+              accessibilityState={{ disabled }}
+              className={cn(
+                KEY_BOX_CLASS,
+                'bg-secondary active:opacity-70',
+                disabled && 'opacity-50'
+              )}
+            >
+              <ScrollText size={18} color={colors.foreground} />
+            </Pressable>
             <Pressable
               onPress={onPaste}
               disabled={disabled}
@@ -110,6 +125,16 @@ export function TerminalKeyBar({ disabled, onSend, onPaste }: TerminalKeyBarProp
               )}
             >
               <ClipboardPaste size={18} color={colors.foreground} />
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                Keyboard.dismiss();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('ssh.session.hideKeyboard')}
+              className={cn(KEY_BOX_CLASS, 'bg-secondary active:opacity-70')}
+            >
+              <KeyboardOff size={18} color={colors.foreground} />
             </Pressable>
           </View>
         </>

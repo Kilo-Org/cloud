@@ -453,6 +453,11 @@ test('unreadable permission notices replace cards, clear on reply and yield to a
   );
   expect(replaced.permissions).toEqual([]);
   expect(replaced.unreadablePermissions).toEqual([{ requestId: 'current' }]);
+  // A replayed request keeps its place: the list is oldest first.
+  expect(
+    reduceNativePendingRequests(next, frame('permission.asked', { id: 'perm-1' }))
+      .unreadablePermissions
+  ).toEqual([{ requestId: 'perm-1' }, { requestId: 'perm-2' }]);
 });
 
 test('native live reduction shares untouched content, ignores late deltas and flags missing ordinals', () => {

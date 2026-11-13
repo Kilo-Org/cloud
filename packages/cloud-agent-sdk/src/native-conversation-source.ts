@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { hasUnresolvedKilo2Assets, readKilo2Messages } from './kilo2-source-messages';
 import type { NativeEvent, NativeSessionState } from './native-sync';
 import type { NativeSnapshotMessage, NativeSnapshotSession } from './native-sync-snapshot';
+import { upsertByRequestId } from './pending-requests';
 import { permissionAskedIdentitySchema } from './schemas';
 import type { SessionSnapshot, UnreadablePermissionState } from './types';
 
@@ -111,10 +112,10 @@ export function reduceNativePendingRequests(
     return {
       ...pending,
       permissions: pending.permissions.filter(item => item.id !== identity.data.id),
-      unreadablePermissions: [
-        ...pending.unreadablePermissions.filter(item => item.requestId !== identity.data.id),
-        { requestId: identity.data.id },
-      ],
+      // In place, so a replayed request keeps its place in the oldest-first list.
+      unreadablePermissions: upsertByRequestId(pending.unreadablePermissions, {
+        requestId: identity.data.id,
+      }),
     };
   }
   if (event.type === 'permission.replied')

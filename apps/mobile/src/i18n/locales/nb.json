@@ -4133,7 +4133,7 @@
     "disconnectFailed": "Kunne ikke koble fra {{provider}}",
     "couldNotLoad": "Kunne ikke laste inn integrasjoner",
     "permissionDenied": "Du har ikke tillatelse til å administrere disse integrasjonene.",
-    "managedByOwner": "Be en eier i organisasjonen om å endre en tilkobling du ikke kan.",
+    "managedByOwner": "Be en eier i organisasjonen om å endre en tilkobling du ikke kan endre.",
     "connectFailed": "Kunne ikke åpne tilkoblingssiden"
   },
   "invoices": {

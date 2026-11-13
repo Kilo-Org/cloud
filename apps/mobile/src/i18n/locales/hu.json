@@ -4133,7 +4133,7 @@
     "disconnectFailed": "Nem sikerült leválasztani: {{provider}}",
     "couldNotLoad": "Nem sikerült betölteni az integrációkat",
     "permissionDenied": "Nincs jogosultságod ezeknek az integrációknak a kezeléséhez.",
-    "managedByOwner": "Kérd meg a szervezet egyik tulajdonosát, hogy módosítsa a kapcsolatot, amelyet te nem tudsz.",
+    "managedByOwner": "Kérd meg a szervezet egyik tulajdonosát, hogy módosítsa a kapcsolatot, amelyet te nem tudsz módosítani.",
     "connectFailed": "Nem sikerült megnyitni a csatlakozási oldalt"
   },
   "invoices": {

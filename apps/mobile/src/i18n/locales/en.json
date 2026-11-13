@@ -4133,7 +4133,7 @@
     "disconnectFailed": "Could not disconnect {{provider}}",
     "couldNotLoad": "Could not load integrations",
     "permissionDenied": "You do not have permission to manage these integrations.",
-    "managedByOwner": "Ask an organization owner to change a connection you cannot.",
+    "managedByOwner": "Ask an organization owner to change connections you can't edit.",
     "connectFailed": "Could not open the connection page"
   },
   "invoices": {

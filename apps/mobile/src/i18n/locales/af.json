@@ -4133,7 +4133,7 @@
     "disconnectFailed": "Kon nie {{provider}} ontkoppel nie",
     "couldNotLoad": "Kon nie integrasies laai nie",
     "permissionDenied": "Jy het nie toestemming om hierdie integrasies te bestuur nie.",
-    "managedByOwner": "Vra 'n eienaar van die organisasie om 'n koppeling te verander wat jy nie kan nie.",
+    "managedByOwner": "Vra 'n eienaar van die organisasie om 'n koppeling te verander wat jy nie kan verander nie.",
     "connectFailed": "Kon nie die koppelbladsy oopmaak nie"
   },
   "invoices": {

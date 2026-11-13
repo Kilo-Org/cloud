@@ -8,12 +8,13 @@ import { type ComponentType, createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { IntegrationsScreen } from './integrations-screen';
 
 type SetupStatusRow = { platform: string; installed: boolean; installation?: unknown };
 
-const SHARED_NOTE = 'Ask an organization owner to change a connection you cannot.';
+/** The catalog value, so a copy edit does not need a test edit. */
+const SHARED_NOTE = i18n.t('integrations.managedByOwner');
 
 const GITHUB_CONNECTION = {
   id: 'gh-1',

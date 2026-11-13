@@ -4133,7 +4133,7 @@
     "disconnectFailed": "Ba a iya cire haɗin {{provider}} ba",
     "couldNotLoad": "Ba a iya loda haɗe-haɗe ba",
     "permissionDenied": "Ba ka da izinin sarrafa waɗannan haɗe-haɗe.",
-    "managedByOwner": "Ka roƙi mamallakin ƙungiya ya canza haɗin da ba za ka iya ba.",
+    "managedByOwner": "Ka roƙi mamallakin ƙungiya ya canza haɗin da ba za ka iya canza ba.",
     "connectFailed": "Ba a iya buɗe shafin haɗi ba"
   },
   "invoices": {

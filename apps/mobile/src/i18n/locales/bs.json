@@ -4198,7 +4198,7 @@
     "disconnectFailed": "Nije moguće prekinuti vezu s {{provider}}",
     "couldNotLoad": "Nije moguće učitati integracije",
     "permissionDenied": "Nemate dozvolu za upravljanje ovim integracijama.",
-    "managedByOwner": "Zamolite vlasnika organizacije da promijeni vezu koju ne možete.",
+    "managedByOwner": "Zamolite vlasnika organizacije da promijeni vezu koju ne možete promijeniti.",
     "connectFailed": "Nije moguće otvoriti stranicu za povezivanje"
   },
   "invoices": {

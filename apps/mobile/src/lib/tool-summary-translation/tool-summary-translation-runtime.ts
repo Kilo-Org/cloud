@@ -673,9 +673,7 @@ async function runBatch(batch: FlushBatch): Promise<void> {
   const scope: toolSummaryTranslationClient.ToolSummaryTranslationScope = {
     signal: controller.signal,
     isCurrent: () =>
-      !controller.signal.aborted &&
-      batch.generation === generation &&
-      isCurrentAuthEpoch(epoch),
+      !controller.signal.aborted && batch.generation === generation && isCurrentAuthEpoch(epoch),
   };
   batchControllers.add(controller);
   // One token for the whole request: a config change clears the map and a

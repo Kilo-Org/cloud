@@ -60,6 +60,10 @@ function statusLabel(dictionary: Readonly<Record<string, string>>, status: strin
  * A copy row holds its value on one line and cuts at its middle. The first and
  * last characters of an id therefore stay on screen. A row without a control
  * also holds one line, with the end cut.
+ *
+ * The row's `gap-5` is 17.5dp at NativeWind's 14pt rem. It is the only
+ * clearance a value keeps once it fills its box, which the copy row's id does
+ * when it truncates, so it stays above the 16dp a label needs from its value.
  */
 function StatusRow({
   label,
@@ -68,7 +72,7 @@ function StatusRow({
 }: Readonly<{ label: string; value: string; copyLabel?: string }>) {
   const colors = useThemeColors();
   return (
-    <View className="flex-row items-center justify-between gap-3 rounded-lg bg-secondary p-3">
+    <View className="flex-row items-center justify-between gap-5 rounded-lg bg-secondary p-3">
       <Text className="shrink text-sm text-muted-foreground" numberOfLines={1}>
         {label}
       </Text>

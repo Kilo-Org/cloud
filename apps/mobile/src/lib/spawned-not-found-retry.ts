@@ -17,11 +17,14 @@
  * - `shouldRetryNotFoundOnSpawnedRoute` gates the `spawned=1` param (the
  *   `kilo remote` happy path) on its own.
  * - `shouldRetryNotFoundOnYoungRoute` extends the same window to every
- *   other navigation into the route. The route skips it for an open that
- *   began on the restored identity, whose denial must stay immediate.
+ *   other navigation into the route.
+ * - `shouldRetrySessionNotFound` is what the route hands to Query: it picks
+ *   the entry point for the open, and every open — including one that began
+ *   on the identity restored from storage — gets the budget.
  *
- * A stale or deleted session reaches the same permanent "not found"
- * state once the window closes.
+ * A stale or deleted session reaches the same terminal "not found" state
+ * once the window closes; that state keeps a Retry, because a client cannot
+ * tell a deleted row from a read that has not settled.
  *
  * Implemented as free functions (not methods on the route component) so
  * they can be unit-tested in a plain Node vitest environment without
@@ -86,4 +89,39 @@ export function shouldRetryNotFoundOnYoungRoute({
     return false;
   }
   return attempt < SPAWNED_NOT_FOUND_MAX_ATTEMPTS;
+}
+
+/**
+ * The single decision the route hands to TanStack Query: whether one failed
+ * `cliSessionsV2.get` attempt may be repeated.
+ *
+ * `NOT_FOUND` is never proof that the session is gone. The row can lag the
+ * client's read, and every open runs the same 8×1s budget whoever started it —
+ * a session-row tap, a link, an app action, a notification, the spawn's own
+ * route, and an open that began on the identity restored from storage. That
+ * last case used to be denied the budget: one unsettled read at a cold start
+ * painted the terminal not-found body for a session the account still listed.
+ * The denial the skip was meant to protect is an access boundary, and an access
+ * boundary is `UNAUTHORIZED`/`FORBIDDEN`, which this predicate never retries —
+ * so the boundary stays immediate without the skip.
+ *
+ * Codes other than `NOT_FOUND` return false, so the route's own terminal
+ * handling owns them.
+ */
+export function shouldRetrySessionNotFound({
+  spawned,
+  attempt,
+  errorCode,
+}: {
+  /** The `spawned` route param, if any. */
+  spawned: string | undefined;
+  /** 0-indexed attempt count from TanStack Query's `retry(failureCount)`. */
+  attempt: number;
+  /** The structured tRPC error code, if any. */
+  errorCode: string | undefined;
+}): boolean {
+  if (spawned !== undefined) {
+    return shouldRetryNotFoundOnSpawnedRoute({ spawned, attempt, errorCode });
+  }
+  return shouldRetryNotFoundOnYoungRoute({ attempt, errorCode });
 }

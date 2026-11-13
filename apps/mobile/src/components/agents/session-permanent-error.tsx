@@ -28,8 +28,9 @@ type SessionPermanentErrorProps = {
 
 /**
  * The session route's terminal body: a session the server refuses to answer
- * for, or one that never resolved. It keeps Copy and Back, and it never offers
- * a retry for a permanent denial.
+ * for, or one that never resolved. It keeps Copy and Back. Retry is the
+ * caller's answer: an access denial is permanent and passes none, while a
+ * not-found lookup can be unsettled and passes one.
  *
  * An automatic restore that lands here leaves instead: nobody asked for this
  * screen, so the app returns to the screen it starts on instead of holding a

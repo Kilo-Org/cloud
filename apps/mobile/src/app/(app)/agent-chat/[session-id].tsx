@@ -35,10 +35,7 @@ import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { parseResumeAnchor } from '@/lib/session-resume';
 import { useRestoredAccountId } from '@/lib/hooks/use-restored-account-id';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
-import {
-  shouldRetryNotFoundOnSpawnedRoute,
-  shouldRetryNotFoundOnYoungRoute,
-} from '@/lib/spawned-not-found-retry';
+import { shouldRetrySessionNotFound } from '@/lib/spawned-not-found-retry';
 import { useTRPC } from '@/lib/trpc';
 
 export default function SessionDetailScreen() {
@@ -111,24 +108,9 @@ export default function SessionDetailScreen() {
   // the user tapped, not from when SessionDetailContent happens to mount.
   // Keyed on the session id: a reused route instance opening a different
   // session restarts the clock.
-  //
-  // `beganOnRestoredIdentity` records whether the persisted identity hint
-  // scoped this open: credentials restored from storage, with the live
-  // account still unconfirmed. A pending fresh sign-in also has no live id,
-  // but it carries no hint scope, so it is not this case. Captured here
-  // because the live `getMe` confirms seconds later, after which the resolved
-  // scope can no longer tell the hint's scope from the live one.
-  const openStart = useRef({
-    sessionId: rawSessionId,
-    startedAt: Date.now(),
-    beganOnRestoredIdentity: owner.userId === null && owner.restored,
-  });
+  const openStart = useRef({ sessionId: rawSessionId, startedAt: Date.now() });
   if (openStart.current.sessionId !== rawSessionId) {
-    openStart.current = {
-      sessionId: rawSessionId,
-      startedAt: Date.now(),
-      beganOnRestoredIdentity: owner.userId === null && owner.restored,
-    };
+    openStart.current = { sessionId: rawSessionId, startedAt: Date.now() };
   }
   const sessionRendered = useRef<string | null>(null);
   if (sessionRendered.current !== null && sessionRendered.current !== rawSessionId) {
@@ -163,25 +145,20 @@ export default function SessionDetailScreen() {
         { session_id: sessionId ?? '' },
         {
           retry: (failureCount, error) => {
-            // The restored-scope path must not get the young-route retry: its
-            // terminal retirement (the hint's transcript retires the moment the
-            // live account is denied) is a deliberate account-boundary signal,
-            // and delaying it for 8s would leave the hint's scope on screen.
-            // The skip is scoped to the OPEN that began on the restored
-            // identity, not to the resolved id: after the live confirmation a
-            // cold-start-restored process resolves a non-null id, and every
-            // later open on that confirmed owner must still get the retry.
+            // One predicate answers for every open: a `NOT_FOUND` repeats
+            // within the shared 8×1s budget, whichever screen or link started
+            // the open, including an open that began on the identity restored
+            // from storage. The account boundary stays immediate because an
+            // access denial is `UNAUTHORIZED`/`FORBIDDEN`, which the predicate
+            // never retries.
             const errorCode =
               (error as { data?: { code?: string } } | null)?.data?.code ??
               (error as { code?: string } | null)?.code;
-            return (
-              shouldRetryNotFoundOnSpawnedRoute({ spawned, attempt: failureCount, errorCode }) ||
-              (!openStart.current.beganOnRestoredIdentity &&
-                shouldRetryNotFoundOnYoungRoute({
-                  attempt: failureCount,
-                  errorCode,
-                }))
-            );
+            return shouldRetrySessionNotFound({
+              spawned,
+              attempt: failureCount,
+              errorCode,
+            });
           },
           // kilocode_change - C3b: TanStack Query's default retryDelay is
           // exponential backoff (1s, 2s, 4s, 8s, ... capped at 30s), which
@@ -189,10 +166,9 @@ export default function SessionDetailScreen() {
           // generous" budget the spawned-row window actually needs. Pin a
           // flat 1s cadence so 8 attempts stay close to 8 seconds elapsed,
           // matching the plan's stated timing. Only in effect while a retry is
-          // allowed at all (the `spawned=1` NOT_FOUND path, or the young-route
-          // NOT_FOUND path when the scope is not a restored identity) —
-          // everywhere else `retry` already returns `false` on the first
-          // failure, so this delay is never consulted.
+          // allowed at all (a `NOT_FOUND` within the budget) — every other code
+          // returns `false` on the first failure, so this delay is never
+          // consulted.
           retryDelay: 1000,
         }
       ),
@@ -340,10 +316,13 @@ export default function SessionDetailScreen() {
       metadataAccessDenied &&
       sessionRendered.current !== rawSessionId)
   ) {
-    // An identity failure stays retriable. An authoritative metadata denial
-    // (NOT_FOUND / UNAUTHORIZED / FORBIDDEN) and an id the store cannot address
-    // can't be recovered by retrying, so they show a permanent state with no
-    // Retry. All of them get Back and Copy.
+    // An identity failure stays retriable. An access denial (UNAUTHORIZED /
+    // FORBIDDEN) and an id the store cannot address can't be recovered by
+    // retrying, so they show a permanent state with no Retry. A NOT_FOUND keeps
+    // Retry: the lookup can be unsettled — the row can lag the read on a resume
+    // or a cold start — so the screen must be able to ask again instead of
+    // holding a dead end for a session the account still lists. All of them get
+    // Back and Copy.
     displayedProviderKey.current = null;
     // An identity failure owns its own copy. An id the store cannot address
     // never reached a read, so it answers the same denial a missing session
@@ -377,6 +356,9 @@ export default function SessionDetailScreen() {
       variant = 'permission';
     }
     const retry = identityFailed ? confirmation.retry : () => void sessionQuery.refetch();
+    // An id the store cannot address never reached a read: there is nothing to
+    // ask again, so its answer is as final as an access denial's.
+    const terminal = unauthorized || !addressable;
     const copyText = buildTerminalErrorCopyText({ sessionId, title, message });
     return (
       <View className="flex-1 bg-background">
@@ -391,7 +373,7 @@ export default function SessionDetailScreen() {
           variant={variant}
           title={title}
           message={message}
-          retry={notFound || unauthorized ? undefined : retry}
+          retry={terminal ? undefined : retry}
           isRetrying={identityFailed ? confirmation.isPending : sessionQuery.isFetching}
           copyText={copyText}
           restoredRouteOpen={restoredOpen && (notFound || unauthorized)}

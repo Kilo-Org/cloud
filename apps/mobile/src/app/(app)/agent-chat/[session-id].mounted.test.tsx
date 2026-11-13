@@ -36,6 +36,7 @@ import {
   markRestoredAuthenticatedOwner,
 } from '@/lib/context-scope';
 import { _resetLastRouteForTests, noteRestoredRouteOpen } from '@/lib/last-route';
+import type * as SpawnedNotFoundRetry from '@/lib/spawned-not-found-retry';
 import SessionDetailScreen from './[session-id]';
 
 const useLocalSearchParamsMock = vi.hoisted(() => vi.fn());
@@ -348,8 +349,10 @@ vi.mock('@/components/ui/text', async () => {
   return { Text: 'Text', TextClassContext: createContext<string | undefined>(undefined) };
 });
 
-vi.mock('@/lib/spawned-not-found-retry', () => ({
-  shouldRetryNotFoundOnSpawnedRoute: () => false,
+// The route's retry decision is a pure helper with its own suite; this suite
+// drives the query options it receives, so answer with the helper as loaded.
+vi.mock('@/lib/spawned-not-found-retry', async importOriginal => ({
+  ...(await importOriginal<typeof SpawnedNotFoundRetry>()),
 }));
 
 function findByType(
@@ -773,11 +776,18 @@ describe('SessionDetailScreen display scope', () => {
         expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
         expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
       } else if (state !== 'pending') {
-        expect(Boolean(propOf(findByType(renderer.root, 'QueryError')[0], 'onRetry'))).toBe(false);
+        // A not-found read can be unsettled, so that body keeps its Retry; an
+        // access denial is final and keeps only Copy and Back.
+        const retryable = state === 'NOT_FOUND';
+        expect(Boolean(propOf(findByType(renderer.root, 'QueryError')[0], 'onRetry'))).toBe(
+          retryable
+        );
         const buttonLabels = findByType(renderer.root, 'Button').flatMap(button =>
           findByType(button, 'Text').flatMap(node => node.children)
         );
-        expect(buttonLabels).toEqual(['Copy', 'Back to sessions']);
+        expect(buttonLabels).toEqual(
+          retryable ? ['Retry', 'Copy', 'Back to sessions'] : ['Copy', 'Back to sessions']
+        );
       }
       expect(globalContext.organizationId).toBe('global-org');
       expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
@@ -980,7 +990,7 @@ describe('SessionDetailScreen restored scope', () => {
     expect(managers.at(-1)?.manager).not.toBe(restoredManager);
   });
 
-  it.each(['NOT_FOUND', 'FORBIDDEN', 'UNAUTHORIZED'])(
+  it.each(['FORBIDDEN', 'UNAUTHORIZED'])(
     'retires a restored session when metadata returns %s after confirmation',
     async code => {
       const renderer = await mountRestoredScope();
@@ -999,6 +1009,28 @@ describe('SessionDetailScreen restored scope', () => {
       expect(propOf(findByType(renderer.root, 'QueryError')[0], 'onRetry')).toBeUndefined();
     }
   );
+
+  it('keeps a way out of a restored session whose metadata says NOT_FOUND', async () => {
+    // The lookup can be unsettled — the restored open starts before the row it
+    // reads is confirmed — so the not-found body must be able to ask again. The
+    // access denials above stay final, which is where the account boundary is
+    // enforced.
+    const renderer = await mountRestoredScope();
+    queryState.fetchStatus = 'fetching';
+    act(() => {
+      confirmAuthenticatedOwner(getAuthenticatedOwner(), 'user-A');
+    });
+
+    queryState.isPending = false;
+    queryState.isError = true;
+    queryState.error = { data: { code: 'NOT_FOUND' } };
+    await updateRoute(renderer);
+
+    const errors = findByType(renderer.root, 'QueryError');
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+    expect(propOf(errors[0], 'variant')).toBe('not-found');
+    expect(propOf(errors[0], 'onRetry')).toBeTypeOf('function');
+  });
 
   it('does not mount the previous account restored scope during a direct credential switch', async () => {
     const renderer = await mountRestoredScope();
@@ -1083,7 +1115,7 @@ describe('SessionDetailScreen valid session-id', () => {
     await updateRoute(renderer);
 
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
-    expect(propOf(findByType(renderer.root, 'QueryError')[0], 'onRetry')).toBeUndefined();
+    expect(propOf(findByType(renderer.root, 'QueryError')[0], 'onRetry')).toBeTypeOf('function');
   });
 
   it('renders the session content with the parsed session-id and enables the query', async () => {
@@ -1164,6 +1196,42 @@ describe('SessionDetailScreen foreground refresh scope', () => {
     // The whole-procedure prefix would refetch every retained `cliSessionsV2`
     // query — the stored `cliSessionsV2.list` pages behind this pushed route.
     expect(keys).not.toContainEqual([['cliSessionsV2']]);
+  });
+});
+
+describe('SessionDetailScreen metadata retry', () => {
+  type Retry = (failureCount: number, error: unknown) => boolean;
+
+  function setSessionParam(): void {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
+  }
+
+  function retryOption(): Retry {
+    const options: unknown = queryOptionsMock.mock.calls[0]?.[1];
+    if (typeof options !== 'object' || options === null || !('retry' in options)) {
+      throw new Error('the route passed no retry to the metadata read');
+    }
+    const { retry } = options;
+    if (typeof retry !== 'function') {
+      throw new TypeError('the metadata retry is not a function');
+    }
+    return (failureCount, error) => Boolean(Reflect.apply(retry, undefined, [failureCount, error]));
+  }
+
+  it('repeats an unsettled NOT_FOUND', async () => {
+    setSessionParam();
+    await mountRoute();
+
+    expect(retryOption()(0, { data: { code: 'NOT_FOUND' } })).toBe(true);
+  });
+
+  it('does not repeat an access denial, so the account boundary stays immediate', async () => {
+    setSessionParam();
+    await mountRoute();
+    const retry = retryOption();
+
+    expect(retry(0, { data: { code: 'UNAUTHORIZED' } })).toBe(false);
+    expect(retry(0, { data: { code: 'FORBIDDEN' } })).toBe(false);
   });
 });
 
@@ -1474,24 +1542,39 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
   });
 
-  it.each([
-    { code: 'NOT_FOUND', variant: 'not-found' },
-    { code: 'UNAUTHORIZED', variant: 'permission' },
-  ])('keeps $code terminal with no retry action', async ({ code, variant }) => {
+  it.each([{ code: 'UNAUTHORIZED', variant: 'permission' }])(
+    'keeps $code terminal with no retry action',
+    async ({ code, variant }) => {
+      useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
+      // First-load denial: no cached metadata beside the error (the
+      // background-refetch denial with cached data keeps the session mounted —
+      // see the mounted-transcript suite above).
+      queryState.data = null;
+      queryState.isError = true;
+      queryState.error = { data: { code } };
+      const renderer = await mountRoute();
+      const error = findByType(renderer.root, 'QueryError')[0];
+
+      expect(propOf(error, 'variant')).toBe(variant);
+      expect(propOf(error, 'onRetry')).toBeUndefined();
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+      expect(findByType(renderer.root, 'Button')).toHaveLength(2);
+    }
+  );
+
+  it('answers a first-load NOT_FOUND with the not-found body and a retry', async () => {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
-    // First-load denial: no cached metadata beside the error (the
-    // background-refetch denial with cached data keeps the session mounted —
-    // see the mounted-transcript suite above).
     queryState.data = null;
     queryState.isError = true;
-    queryState.error = { data: { code } };
+    queryState.error = { data: { code: 'NOT_FOUND' } };
     const renderer = await mountRoute();
     const error = findByType(renderer.root, 'QueryError')[0];
 
-    expect(propOf(error, 'variant')).toBe(variant);
-    expect(propOf(error, 'onRetry')).toBeUndefined();
+    // The read can be unsettled, so the body keeps a way to ask again instead
+    // of holding a dead end for a session the account still lists.
+    expect(propOf(error, 'variant')).toBe('not-found');
+    expect(propOf(error, 'onRetry')).toBeTypeOf('function');
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
-    expect(findByType(renderer.root, 'Button')).toHaveLength(2);
   });
 });
 

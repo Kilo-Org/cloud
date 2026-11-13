@@ -1245,17 +1245,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
   }
 
-  async registerSession(input: ControlPlaneSessionRegistration): Promise<{ ok: true }> {
-    await this.initialized;
-    const registration = controlPlaneSessionRegistrationSchema.parse(input);
-    await this.enqueue(async () => {
-      if (this.registration === null) markHistoryHydrated(this.ctx.storage);
-      await this.ctx.storage.put(REGISTRATION_KEY, registration);
-      this.registration = registration;
-    });
-    return { ok: true };
-  }
-
   /**
    * Worker-facing create RPC (spec §5, plan B4). Stores grouped metadata and the
    * registration derived from it (the Worker selected the sandbox), then admits

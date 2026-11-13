@@ -220,6 +220,14 @@ async function readRegistration(stub: DurableObjectStub<SandboxSessionV2>): Prom
   return runInDurableObject(stub, (_instance, state) => state.storage.get('control_plane_session'));
 }
 
+async function readStoredRegistration(
+  stub: DurableObjectStub<SandboxSessionV2>
+): Promise<ControlPlaneSessionRegistration | undefined> {
+  return runInDurableObject(stub, (_instance, state) =>
+    state.storage.get<ControlPlaneSessionRegistration>('control_plane_session')
+  );
+}
+
 const GENERATED_TITLE_AI_CALLS_KEY = 'test:generated-title:ai-calls';
 const GENERATED_TITLE_PERSISTS_KEY = 'test:generated-title:persists';
 const LIST_STATUS_PUBLISHES_KEY = 'test:list-status:publishes';
@@ -1040,10 +1048,9 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       const stored =
         await state.storage.get<ControlPlaneSessionRegistration>('control_plane_session');
       if (!stored) throw new Error('expected a stored registration');
-      await instance.registerSession({
-        ...stored,
-        spec: { ...stored.spec, directory: storedDirectory },
-      });
+      const legacy = { ...stored, spec: { ...stored.spec, directory: storedDirectory } };
+      await state.storage.put('control_plane_session', legacy);
+      Object.assign(instance, { registration: legacy });
     });
 
     await expect(
@@ -1098,6 +1105,102 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       code: 'BAD_REQUEST',
       failureBoundary: 'registration',
     });
+  });
+
+  it('gives a session one registration across repeated create and register calls', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId(sessionId);
+    const otherSandboxId = await generateSandboxId(`${sessionId}_other`);
+    const kiloId = kiloSessionId();
+    const sessionStub = sessions.getByName(sessionId);
+    const first = messageId();
+    const createInput = (input: {
+      sandboxId: string;
+      kiloToken?: string;
+      egressAllowlist?: string[];
+    }) => ({
+      metadata: metadata({
+        sessionId,
+        kiloSessionId: kiloId,
+        sandboxId: input.sandboxId,
+        ...(input.kiloToken === undefined ? {} : { kiloToken: input.kiloToken }),
+        ...(input.egressAllowlist === undefined
+          ? {}
+          : { egressMode: 'allowlist' as const, egressAllowlist: input.egressAllowlist }),
+      }),
+      message: promptPayload(first),
+      sandboxSelection: {
+        provider: 'cloudflare-containers' as const,
+        ...(input.egressAllowlist === undefined
+          ? {}
+          : { egressMode: 'allowlist' as const, egressAllowlist: input.egressAllowlist }),
+      },
+    });
+
+    await expect(
+      sessionStub.createSessionWithInitialAdmission(createInput({ sandboxId }))
+    ).resolves.toMatchObject({ success: true, messageId: first });
+    const stored = await readStoredRegistration(sessionStub);
+    expect(stored?.sandboxId).toBe(sandboxId);
+
+    // A repeat that names another sandbox is a different intent.
+    await expect(
+      sessionStub.createSessionWithInitialAdmission(createInput({ sandboxId: otherSandboxId }))
+    ).resolves.toMatchObject({
+      success: false,
+      code: 'BAD_REQUEST',
+      failureBoundary: 'registration',
+    });
+    // A repeat that names another egress policy is a different intent too.
+    await expect(
+      sessionStub.createSessionWithInitialAdmission(
+        createInput({ sandboxId, egressAllowlist: ['other.example.com'] })
+      )
+    ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
+
+    // A repeat with the same parameters returns the ack, whatever token it carries.
+    await expect(
+      sessionStub.createSessionWithInitialAdmission(
+        createInput({ sandboxId, kiloToken: 'rotated-create-token' })
+      )
+    ).resolves.toMatchObject({ success: true, messageId: first });
+
+    await expect(readStoredRegistration(sessionStub)).resolves.toEqual(stored);
+
+    // The register call follows the same rules.
+    const siblingId = newSessionId();
+    const siblingSandboxId = await generateSandboxId(siblingId);
+    const siblingOtherSandboxId = await generateSandboxId(`${siblingId}_other`);
+    const siblingStub = sessions.getByName(siblingId);
+    const siblingKiloId = kiloSessionId();
+    const registerInput = (input: { sandboxId: string; kiloToken?: string }) => ({
+      metadata: metadata({
+        sessionId: siblingId,
+        kiloSessionId: siblingKiloId,
+        sandboxId: input.sandboxId,
+        ...(input.kiloToken === undefined ? {} : { kiloToken: input.kiloToken }),
+      }),
+      sandboxSelection: { provider: 'cloudflare-containers' as const },
+    });
+
+    await expect(
+      siblingStub.registerSessionFromMetadata(registerInput({ sandboxId: siblingSandboxId }))
+    ).resolves.toEqual({ success: true });
+    const siblingStored = await readStoredRegistration(siblingStub);
+    const siblingMetadata = await siblingStub.getMetadata();
+    expect(siblingStored?.sandboxId).toBe(siblingSandboxId);
+
+    await expect(
+      siblingStub.registerSessionFromMetadata(registerInput({ sandboxId: siblingOtherSandboxId }))
+    ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
+    await expect(
+      siblingStub.registerSessionFromMetadata(
+        registerInput({ sandboxId: siblingSandboxId, kiloToken: 'rotated-sibling-token' })
+      )
+    ).resolves.toEqual({ success: true });
+
+    await expect(readStoredRegistration(siblingStub)).resolves.toEqual(siblingStored);
+    await expect(siblingStub.getMetadata()).resolves.toEqual(siblingMetadata);
   });
 
   it('rejects invalid create input with the legacy failure shape (M2)', async () => {

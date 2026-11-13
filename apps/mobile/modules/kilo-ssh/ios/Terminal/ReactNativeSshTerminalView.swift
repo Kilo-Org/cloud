@@ -10,6 +10,11 @@ private let zoomStep: CGFloat = 1.15
 
 final class SshTerminalView: TerminalView {
   var onSelectionChanged: ((Bool) -> Void)?
+  var acceptsFocus = true
+
+  override var canBecomeFirstResponder: Bool {
+    return acceptsFocus && super.canBecomeFirstResponder
+  }
 
   override func selectionChanged(source: Terminal) {
     super.selectionChanged(source: source)
@@ -38,6 +43,7 @@ public final class ReactNativeSshTerminalView: ExpoView, TerminalViewDelegate, T
   private var appliedCols = 0
   private var appliedRows = 0
   private var transportClosed = false
+  private var autoFocus = false
 
   public required init(appContext: AppContext? = nil) {
     super.init(appContext: appContext)
@@ -57,6 +63,8 @@ public final class ReactNativeSshTerminalView: ExpoView, TerminalViewDelegate, T
       }
       source?.setSink(nil)
       source = nil
+      terminalView.acceptsFocus = false
+      _ = terminalView.resignFirstResponder()
       return
     }
 
@@ -66,14 +74,28 @@ public final class ReactNativeSshTerminalView: ExpoView, TerminalViewDelegate, T
       }
     }
     rebindSource()
-    DispatchQueue.main.async { [weak self] in
-      _ = self?.terminalView.becomeFirstResponder()
-    }
+    updateFocus()
   }
 
   func bindSource(_ sourceId: String?) {
     self.sourceId = sourceId
     rebindSource()
+  }
+
+  func applyAutoFocus(_ value: Bool) {
+    guard autoFocus != value else {
+      return
+    }
+    autoFocus = value
+    updateFocus()
+  }
+
+  func focus() {
+    requestTerminalFocus()
+  }
+
+  func blur() {
+    _ = terminalView.resignFirstResponder()
   }
 
   func applyFontFamily(_ family: String?) {
@@ -217,7 +239,7 @@ public final class ReactNativeSshTerminalView: ExpoView, TerminalViewDelegate, T
       onLinkPress(["url": url])
       return
     }
-    _ = terminalView.becomeFirstResponder()
+    requestTerminalFocus()
   }
 
   private func link(at point: CGPoint) -> String? {
@@ -263,6 +285,7 @@ public final class ReactNativeSshTerminalView: ExpoView, TerminalViewDelegate, T
       return
     }
     transportClosed = true
+    updateFocus()
     feedCloseNotice(exitStatus: exitStatus, error: error)
     let errorValue: Any = error.map { $0 as Any } ?? NSNull()
     onClosed(["exitStatus": exitStatus ?? 0, "error": errorValue])
@@ -338,7 +361,6 @@ public final class ReactNativeSshTerminalView: ExpoView, TerminalViewDelegate, T
     terminalView.removeFromSuperview()
     terminalView.terminalDelegate = nil
     installTerminal()
-    _ = terminalView.becomeFirstResponder()
   }
 
   private func rebindSource() {
@@ -359,6 +381,28 @@ public final class ReactNativeSshTerminalView: ExpoView, TerminalViewDelegate, T
     if next != nil, appliedCols > 0 {
       next?.resize(cols: appliedCols, rows: appliedRows)
     }
+    updateFocus()
+  }
+
+  private func updateFocus() {
+    let accepting = canAcceptInput()
+    terminalView.acceptsFocus = accepting
+    if autoFocus, accepting {
+      requestTerminalFocus()
+    } else {
+      _ = terminalView.resignFirstResponder()
+    }
+  }
+
+  private func canAcceptInput() -> Bool {
+    return source != nil && !transportClosed
+  }
+
+  private func requestTerminalFocus() {
+    guard canAcceptInput(), window != nil, !terminalView.isFirstResponder else {
+      return
+    }
+    _ = terminalView.becomeFirstResponder()
   }
 }
 

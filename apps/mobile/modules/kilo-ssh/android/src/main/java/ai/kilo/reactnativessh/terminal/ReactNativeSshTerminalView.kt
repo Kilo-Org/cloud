@@ -35,6 +35,7 @@ class ReactNativeSshTerminalView(context: Context, appContext: AppContext) : Exp
   private var appliedRows = 0
   private var scaleAccumulator = 1f
   private var transportClosed = false
+  private var autoFocus = false
 
   internal var cursorStyleValue: Int = TerminalEmulator.DEFAULT_TERMINAL_CURSOR_STYLE
 
@@ -49,6 +50,7 @@ class ReactNativeSshTerminalView(context: Context, appContext: AppContext) : Exp
         // every later close report, and a rebound source starts a new cycle.
         if (transportClosed) return@post
         transportClosed = true
+        updateFocus()
         session.notifyTransportClosed(exitStatus ?: 0, error)
         TerminalViewEvents.emit(this@ReactNativeSshTerminalView, "onClosed", Bundle().apply {
           putInt("exitStatus", exitStatus ?: 0)
@@ -104,19 +106,26 @@ class ReactNativeSshTerminalView(context: Context, appContext: AppContext) : Exp
     super.onAttachedToWindow()
     TerminalSourceRegistry.addListener(sourceListener)
     rebindSource()
-    terminal.post { showKeyboard() }
+    updateFocus()
   }
 
   override fun onDetachedFromWindow() {
     TerminalSourceRegistry.removeListener(sourceListener)
     source?.setSink(null)
     source = null
+    updateFocus()
     super.onDetachedFromWindow()
   }
 
   fun bindSource(sourceId: String?) {
     this.sourceId = sourceId
     rebindSource()
+  }
+
+  fun applyAutoFocus(value: Boolean) {
+    if (autoFocus == value) return
+    autoFocus = value
+    updateFocus()
   }
 
   fun applyFontFamily(fontFamily: String?) {
@@ -219,7 +228,7 @@ class ReactNativeSshTerminalView(context: Context, appContext: AppContext) : Exp
         return
       }
     }
-    showKeyboard()
+    requestTerminalFocus()
   }
 
   internal fun handleMetaKey(event: KeyEvent, session: TerminalSession): Boolean {
@@ -271,6 +280,7 @@ class ReactNativeSshTerminalView(context: Context, appContext: AppContext) : Exp
 
     val emulator = session.emulator
     if (next != null && emulator != null) next.resize(emulator.mColumns, emulator.mRows)
+    updateFocus()
   }
 
   private fun changeFontSize(deltaDp: Int) {
@@ -284,12 +294,28 @@ class ReactNativeSshTerminalView(context: Context, appContext: AppContext) : Exp
     scaleAccumulator = 1f
   }
 
-  private fun showKeyboard() {
+  private fun updateFocus() {
+    val accepting = canAcceptInput()
+    terminal.isFocusable = accepting
+    terminal.isFocusableInTouchMode = accepting
+    if (autoFocus && accepting) requestTerminalFocus() else clearTerminalFocus()
+  }
+
+  private fun canAcceptInput(): Boolean = source != null && !transportClosed
+
+  internal fun requestTerminalFocus() {
+    if (!canAcceptInput() || !isAttachedToWindow) return
     terminal.requestFocus()
     terminal.post {
-      context.getSystemService(InputMethodManager::class.java)
-        ?.showSoftInput(terminal, 0)
+      if (!canAcceptInput() || !terminal.isFocused) return@post
+      context.getSystemService(InputMethodManager::class.java)?.showSoftInput(terminal, 0)
     }
+  }
+
+  internal fun clearTerminalFocus() {
+    terminal.clearFocus()
+    context.getSystemService(InputMethodManager::class.java)
+      ?.hideSoftInputFromWindow(terminal.windowToken, 0)
   }
 
   private fun resolveTypeface(fontFamily: String?): Typeface {

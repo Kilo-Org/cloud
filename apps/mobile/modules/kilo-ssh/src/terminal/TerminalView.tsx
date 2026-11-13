@@ -15,6 +15,7 @@ const NativeTerminalView = requireNativeViewManager<
 export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function TerminalView(
   {
     sourceId,
+    autoFocus,
     fontFamily,
     fontSize,
     theme,
@@ -37,6 +38,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       {...viewProps}
       ref={ref}
       sourceId={sourceId}
+      autoFocus={autoFocus ?? false}
       fontFamily={fontFamily}
       fontSize={fontSize}
       cursorStyle={cursorStyle}

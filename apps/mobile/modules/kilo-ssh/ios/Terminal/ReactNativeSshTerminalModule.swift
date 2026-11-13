@@ -37,6 +37,10 @@ public class ReactNativeSshTerminalModule: Module {
         view.bindSource(sourceId)
       }
 
+      Prop("autoFocus") { (view: ReactNativeSshTerminalView, autoFocus: Bool) in
+        view.applyAutoFocus(autoFocus)
+      }
+
       Prop("fontFamily") { (view: ReactNativeSshTerminalView, fontFamily: String?) in
         view.applyFontFamily(fontFamily)
       }
@@ -71,6 +75,14 @@ public class ReactNativeSshTerminalModule: Module {
 
       AsyncFunction("scrollToBottom") { (view: ReactNativeSshTerminalView) in
         view.scrollToBottom()
+      }.runOnQueue(.main)
+
+      AsyncFunction("focus") { (view: ReactNativeSshTerminalView) in
+        view.focus()
+      }.runOnQueue(.main)
+
+      AsyncFunction("blur") { (view: ReactNativeSshTerminalView) in
+        view.blur()
       }.runOnQueue(.main)
     }
   }

@@ -34,10 +34,13 @@ export type TerminalViewHandle = {
   paste(text: string): Promise<void>;
   pasteFromClipboard(): Promise<void>;
   scrollToBottom(): Promise<void>;
+  focus(): Promise<void>;
+  blur(): Promise<void>;
 };
 
 export type TerminalViewProps = Omit<ViewProps, 'children'> & {
   sourceId: string;
+  autoFocus?: boolean;
   fontFamily?: string;
   fontSize?: number;
   theme?: TerminalTheme;

@@ -77,6 +77,23 @@ function tagAt(dir, name, unixSeconds) {
   });
 }
 
+// The version-bump branch the release workflow creates: main plus a commit that
+// changes the app.config.ts version line and nothing else. A land only accepts
+// a branch of that shape.
+function pushBumpBranch(seed, branch, fromVersion, toVersion) {
+  const configPath = 'apps/mobile/app.config.ts';
+  const config = readFileSync(join(seed, configPath), 'utf8');
+  git(seed, ['checkout', '-q', '-b', branch]);
+  writeFixture(
+    seed,
+    configPath,
+    config.replace(`  version: '${fromVersion}',`, `  version: '${toVersion}',`)
+  );
+  git(seed, ['add', '-A']);
+  git(seed, ['commit', '-q', '-m', `chore(kilo-app): bump version to ${toVersion}`]);
+  git(seed, ['push', '-q', 'origin', branch]);
+}
+
 function cleanup(dir) {
   rmSync(dir, { recursive: true, force: true });
 }
@@ -531,8 +548,7 @@ test('write --land retries a rejected push once and lands one section', () => {
     git(seed, ['commit', '-q', '-m', 'chore: seed']);
     git(seed, ['branch', '-M', 'main']);
     git(seed, ['push', '-q', 'origin', 'main']);
-    git(seed, ['checkout', '-q', '-b', 'bump']);
-    git(seed, ['push', '-q', 'origin', 'bump']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
 
     // A second writer that advances the branch between the script's attempts.
     const other = join(root, 'other');
@@ -601,9 +617,11 @@ test('write --land exits 1 when the section can be neither landed nor carried', 
     git(seed, ['config', 'user.email', 'test@kilo.ai']);
     git(seed, ['config', 'commit.gpgsign', 'false']);
     writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\nprose\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
     git(seed, ['add', '-A']);
     git(seed, ['commit', '-q', '-m', 'chore: seed']);
-    git(seed, ['push', '-q', 'origin', 'HEAD:bump']);
+    git(seed, ['push', '-q', 'origin', 'HEAD:main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
 
     // Every push is refused, the pending carry included: nothing can be saved,
     // so the failure is real and must be reported.
@@ -651,10 +669,11 @@ test('a land whose branch is gone carries the section to the pending branch', ()
       'apps/mobile/CHANGELOG.md',
       '# Kilo App Changelog\n\nprose\n\n## 1.0.11 (build 41)\n\n- old (#90)\n\n'
     );
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
     git(seed, ['add', '-A']);
     git(seed, ['commit', '-q', '-m', 'chore: seed']);
     git(seed, ['push', '-q', 'origin', 'HEAD:main']);
-    git(seed, ['push', '-q', 'origin', 'HEAD:bump']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
 
     // The bump branch was merged and auto-deleted while the build ran: its push
     // is refused, but the pending branch still accepts the section.
@@ -767,9 +786,11 @@ test('two failed lands accumulate in the pending branch, newest first', () => {
       'apps/mobile/CHANGELOG.md',
       '# Kilo App Changelog\n\n## 1.0.11 (build 41)\n\n- old (#90)\n\n'
     );
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
     git(seed, ['add', '-A']);
     git(seed, ['commit', '-q', '-m', 'chore: seed']);
-    git(seed, ['push', '-q', 'origin', 'HEAD:bump']);
+    git(seed, ['push', '-q', 'origin', 'HEAD:main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
 
     const hook = join(seed, '.git', 'hooks', 'pre-push');
     writeFileSync(
@@ -849,6 +870,324 @@ test('two failed lands accumulate in the pending branch, newest first', () => {
   }
 });
 
+test('write --land refuses a branch that carries files the version bump did not write', () => {
+  const root = tempDir('kilo-notes-verify-files-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\nprose\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['branch', '-M', 'main']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
+
+    // A commit that is not part of the version bump rides on the same ref.
+    writeFixture(seed, 'apps/mobile/src/a.ts', 'export const a = 1;\n');
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'feat(kilo-app): unrelated change']);
+    git(seed, ['push', '-q', 'origin', 'bump']);
+    const before = git(seed, ['ls-remote', 'origin', 'refs/heads/bump']);
+
+    writeFixture(seed, 'notes.md', '- new (#91)\n');
+    const result = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.13',
+        '--ios-build',
+        '43',
+        '--body-file',
+        'notes.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /refusing to land ## 1\.0\.13 \(build 43\) on bump/);
+    assert.match(result.stderr, /apps\/mobile\/src\/a\.ts/);
+    assert.equal(git(seed, ['ls-remote', 'origin', 'refs/heads/bump']), before);
+
+    git(seed, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.pending.md']),
+      '## 1.0.13 (build 43)\n\n- new (#91)\n\n'
+    );
+
+    const tip = before.split(/\s/)[0];
+    assert.doesNotMatch(
+      git(seed, ['show', `${tip}:apps/mobile/CHANGELOG.md`]),
+      /## 1\.0\.13 \(build 43\)/
+    );
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('write --land refuses a branch whose version line is not the only config change', () => {
+  const root = tempDir('kilo-notes-verify-config-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\nprose\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n  name: 'kilo',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['branch', '-M', 'main']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
+
+    // The bump commit also renames the app: the diff is not the version line.
+    writeFixture(
+      seed,
+      'apps/mobile/app.config.ts',
+      "  version: '1.0.13',\n  name: 'kilo-renamed',\n"
+    );
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore(kilo-app): rename']);
+    git(seed, ['push', '-q', 'origin', 'bump']);
+    const before = git(seed, ['ls-remote', 'origin', 'refs/heads/bump']);
+
+    writeFixture(seed, 'notes.md', '- new (#91)\n');
+    const result = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.13',
+        '--ios-build',
+        '43',
+        '--body-file',
+        'notes.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(result.status, 1);
+    assert.match(
+      result.stderr,
+      /its apps\/mobile\/app\.config\.ts diff changes more than the version line/
+    );
+    assert.equal(git(seed, ['ls-remote', 'origin', 'refs/heads/bump']), before);
+
+    git(seed, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.pending.md']),
+      '## 1.0.13 (build 43)\n\n- new (#91)\n\n'
+    );
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('write --land accepts a conforming branch and reports the verified head and files', () => {
+  const root = tempDir('kilo-notes-verify-report-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\nprose\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['branch', '-M', 'main']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
+
+    writeFixture(seed, 'notes.md', '- new (#91)\n');
+    const land = (version, iosBuild) =>
+      runScript(
+        NOTES,
+        [
+          'write',
+          '--version',
+          version,
+          '--ios-build',
+          iosBuild,
+          '--body-file',
+          'notes.md',
+          '--land',
+          'origin:bump',
+        ],
+        { cwd: seed }
+      );
+
+    const expectedFiles = ['apps/mobile/CHANGELOG.md', 'apps/mobile/app.config.ts'];
+    const reportedFiles = stdout => {
+      const match = stdout.match(/^changelog-files=(.*)$/m);
+      assert.ok(match, `no changelog-files line in:\n${stdout}`);
+      const files = match[1].split(', ');
+      assert.equal(files.length, 2, `expected two files, got ${files.join(', ')}`);
+      assert.deepEqual([...files].sort(), [...expectedFiles].sort());
+    };
+
+    const first = land('1.0.13', '43');
+    assert.equal(first.status, 0, first.stderr);
+    assert.match(first.stdout, /changelog: landed/);
+    const firstHead = first.stdout.match(/^changelog-head=([0-9a-f]{40})$/m);
+    assert.ok(firstHead, `no changelog-head line in:\n${first.stdout}`);
+    assert.equal(
+      firstHead[1],
+      git(seed, ['ls-remote', 'origin', 'refs/heads/bump']).split(/\s/)[0]
+    );
+    reportedFiles(first.stdout);
+
+    const second = land('1.0.14', '44');
+    assert.equal(second.status, 0, second.stderr);
+    const secondHead = second.stdout.match(/^changelog-head=([0-9a-f]{40})$/m);
+    assert.ok(secondHead, `no changelog-head line in:\n${second.stdout}`);
+    assert.notEqual(secondHead[1], firstHead[1]);
+    assert.equal(
+      secondHead[1],
+      git(seed, ['ls-remote', 'origin', 'refs/heads/bump']).split(/\s/)[0]
+    );
+    reportedFiles(second.stdout);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('write --land accepts a conforming branch in a shallow clone and after main advanced', () => {
+  const root = tempDir('kilo-notes-verify-shallow-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\nprose\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['branch', '-M', 'main']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
+
+    // Main advances during the build window, so the branch base is two commits
+    // behind main's tip when the changelog job checks out.
+    git(seed, ['checkout', '-q', 'main']);
+    writeFixture(seed, 'README.md', 'first\n');
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'docs: first']);
+    writeFixture(seed, 'README.md', 'second\n');
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'docs: second']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+
+    // The changelog job's checkout: fetch-depth 1.
+    const shallow = join(root, 'shallow');
+    git(root, ['clone', '-q', '--depth=1', '--branch', 'main', `file://${remote}`, shallow]);
+    git(shallow, ['config', 'user.name', 'Kilo Test']);
+    git(shallow, ['config', 'user.email', 'test@kilo.ai']);
+    git(shallow, ['config', 'commit.gpgsign', 'false']);
+    assert.equal(git(shallow, ['rev-parse', '--is-shallow-repository']).trim(), 'true');
+
+    writeFixture(shallow, 'notes.md', '- new (#91)\n');
+    const result = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.13',
+        '--ios-build',
+        '43',
+        '--body-file',
+        'notes.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: shallow }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /changelog: landed/);
+    assert.match(result.stdout, /^changelog-head=[0-9a-f]{40}$/m);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('write --land refuses a branch that shares no history with main', () => {
+  const root = tempDir('kilo-notes-verify-orphan-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\nprose\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['branch', '-M', 'main']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+
+    // An unrelated tree that still looks like a version bump by its files.
+    git(seed, ['checkout', '-q', '--orphan', 'orphan-bump']);
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Other Changelog\n\n## 9.9.9\n\n- other\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '9.9.9',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'feat: unrelated history']);
+    git(seed, ['push', '-q', 'origin', 'orphan-bump:bump']);
+    const before = git(seed, ['ls-remote', 'origin', 'refs/heads/bump']);
+
+    writeFixture(seed, 'notes.md', '- new (#91)\n');
+    const result = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.13',
+        '--ios-build',
+        '43',
+        '--body-file',
+        'notes.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /refusing to land/);
+    assert.match(result.stderr, /shares no history with main|no checkable history/);
+    assert.equal(git(seed, ['ls-remote', 'origin', 'refs/heads/bump']), before);
+
+    git(seed, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.pending.md']),
+      '## 1.0.13 (build 43)\n\n- new (#91)\n\n'
+    );
+  } finally {
+    cleanup(root);
+  }
+});
+
 // Two runs can fail to land in the same window. Each one carries the sections it
 // read and writes the whole pending branch, so without a compare-and-swap on the
 // commit it read, the second push would drop the section the first one just
@@ -864,9 +1203,11 @@ test('a carry whose pending branch advanced under it keeps both sections', () =>
     git(seed, ['config', 'user.email', 'test@kilo.ai']);
     git(seed, ['config', 'commit.gpgsign', 'false']);
     writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
     git(seed, ['add', '-A']);
     git(seed, ['commit', '-q', '-m', 'chore: seed']);
-    git(seed, ['push', '-q', 'origin', 'HEAD:bump']);
+    git(seed, ['push', '-q', 'origin', 'HEAD:main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
     const seedBranch = git(seed, ['rev-parse', '--abbrev-ref', 'HEAD']).trim();
 
     // An earlier build already carried one section to the pending branch.
@@ -972,9 +1313,11 @@ test('a land keeps a pending branch that advanced after its snapshot', () => {
       'apps/mobile/CHANGELOG.md',
       '# Kilo App Changelog\n\n## 1.0.10 (build 40)\n\n- oldest (#89)\n\n'
     );
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
     git(seed, ['add', '-A']);
     git(seed, ['commit', '-q', '-m', 'chore: seed']);
-    git(seed, ['push', '-q', 'origin', 'HEAD:bump']);
+    git(seed, ['push', '-q', 'origin', 'HEAD:main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
     const seedBranch = git(seed, ['rev-parse', '--abbrev-ref', 'HEAD']).trim();
 
     const carried = '## 1.0.11 (build 41)\n\n- older (#90)\n\n';
@@ -1109,9 +1452,11 @@ test('a retry of a carried build writes its section once', () => {
     git(seed, ['config', 'user.email', 'test@kilo.ai']);
     git(seed, ['config', 'commit.gpgsign', 'false']);
     writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
     git(seed, ['add', '-A']);
     git(seed, ['commit', '-q', '-m', 'chore: seed']);
-    git(seed, ['push', '-q', 'origin', 'HEAD:bump']);
+    git(seed, ['push', '-q', 'origin', 'HEAD:main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
 
     const hook = join(seed, '.git', 'hooks', 'pre-push');
     writeFileSync(

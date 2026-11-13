@@ -17,6 +17,17 @@
  * `--config`, `--ipa`, `--build-json` and `--body-file` are relative to the
  * current directory.
  *
+ * A `--land` verifies the branch before it writes onto it: a merge base with
+ * main must exist, and the branch's diff from that base must be the version
+ * line and the changelog only. A branch that fails the check receives nothing,
+ * the section is carried to the `--pending` branch so the finished build's line
+ * is not lost, and the run exits 1; every later run refuses the same branch
+ * until a human removes it. A land that succeeds prints two lines after its
+ * `changelog: landed ...` line, which the release workflow parses:
+ *
+ *   changelog-head=<sha the section now sits on>
+ *   changelog-files=<the files that commit changes, comma separated>
+ *
  * A `--land` whose branch is gone or cannot be pushed is not a failed build:
  * the composed section is carried to the `--pending` branch and the next build
  * writes it above its own section. The store submission already succeeded, so
@@ -33,8 +44,9 @@
  *       carried to the pending branch
  *   1 - the store build identity cannot be resolved (the IPA is unreadable, has
  *       no CFBundleVersion, or disagrees with the configured version; or a
- *       supplied --build-json names no Android build), or the section could be
- *       neither landed nor carried
+ *       supplied --build-json names no Android build), the version-bump branch
+ *       failed the land-time check, or the section could be neither landed nor
+ *       carried
  *   2 - usage error, or a --from ref that does not resolve
  */
 import { execFileSync } from 'node:child_process';
@@ -645,68 +657,150 @@ function clearPending(remote, branch, expectedSha) {
   }
 }
 
-function landSection(options, heading, section) {
-  const separator = options.land.lastIndexOf(':');
-  const remote = options.land.slice(0, separator);
-  const branch = options.land.slice(separator + 1);
-  if (separator < 0 || !remote || !branch) {
-    return usage(`--land must be <remote>:<branch>, got ${options.land}`);
+// Only the shallow checkout the changelog job makes (`fetch-depth: 1`) uses this
+// ladder: it has to deepen before a common base with main is reachable. The
+// measured version-bump branch sat 434 commits behind its merge base with main,
+// and a --depth=200 fetch of both refs still produced no merge base, so the
+// ladder starts above that case. A complete clone already holds the objects, so
+// it gets one plain fetch (`0`) instead and its history is never truncated.
+const VERIFY_DEPTHS = [512, 2048, 8192, 0];
+
+/**
+ * Fetch one ref for the provenance check, and the tip it now names.
+ *
+ * The ref is fetched by plain name (`main`, the branch) rather than by the sha
+ * the run already knows, because GitHub does not serve an unadvertised sha. A
+ * missing ref is `{ error }` rather than a throw: the caller turns it into a
+ * refusal, so a git failure never hides behind an exception.
+ */
+function fetchForVerify(remote, ref, depth) {
+  const args = ['fetch', '--no-tags', '--quiet'];
+  try {
+    if (depth > 0) {
+      args.push(`--depth=${depth}`);
+    } else if (git(['rev-parse', '--is-shallow-repository']).trim() === 'true') {
+      args.push('--unshallow');
+    }
+    args.push(remote, ref);
+    git(args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    return { sha: git(['rev-parse', 'FETCH_HEAD']).trim() };
+  } catch (error) {
+    if (isMissingRef(error)) {
+      return { error: `${ref} does not exist on ${remote}` };
+    }
+    return { error: reasonOf(error) };
   }
+}
 
-  const message = `docs(kilo-app): changelog for ${options.version} (build ${options.iosBuild})`;
-  console.log(section.replace(/\n$/, ''));
+/** Every path `tip` changes relative to `base`. */
+function replacedFiles(base, tip) {
+  return git(['diff', '--name-only', base, tip])
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+}
 
-  // Sections an earlier build could not land ride along above their own, so a
-  // branch that was merged during that build never loses its changelog line.
-  // A pending branch that exists but cannot be read is not an empty one: the
-  // carry path below replaces the branch, and overwriting content that could
-  // not be read would drop the sections an earlier build carried there.
-  const pendingRead = readPending(remote, options.pending);
-  const pending = pendingRead.sections;
+/** The app.config.ts diff between `base` and `tip`, for the version-line rule. */
+function replacedConfigDiff(base, tip) {
+  return git(['diff', '-U0', base, tip, '--', 'apps/mobile/app.config.ts']);
+}
 
-  for (let attempt = 1; attempt <= MAX_LAND_RETRIES + 1; attempt += 1) {
-    try {
-      git(['fetch', remote, branch]);
-    } catch (error) {
-      console.log(`changelog: attempt ${attempt} rejected (${reasonOf(error)})`);
+/**
+ * The provenance of the version-bump branch, as `{ ok: true, base }` or
+ * `{ ok: false, reason }`.
+ *
+ * A merge base between main and the branch must exist: the branch must be the
+ * version bump this run built. Main's own tip need not be an ancestor, because
+ * main advances during the ~60-minute build window. The branch's diff from that
+ * base must be the version line and the changelog only, the same shape
+ * `isVersionBumpCommit` guards for the release detection. An empty diff carries
+ * nothing along and is accepted.
+ *
+ * `tip` is the branch commit the section is about to be written onto. A branch
+ * that moved since the caller fetched it is reported as such, so the caller can
+ * retry instead of writing the section onto a commit nobody checked.
+ */
+function verifyBumpBranch(remote, branch, tip) {
+  let base;
+  let fetchFailure;
+  // A complete repository already has every object, and deepening it would turn
+  // a previous complete clone into a shallow one: one plain fetch is enough. The
+  // ladder only helps a shallow checkout reach the fork point.
+  const shallow = git(['rev-parse', '--is-shallow-repository']).trim() === 'true';
+  for (const depth of shallow ? VERIFY_DEPTHS : [0]) {
+    const main = fetchForVerify(remote, 'main', depth);
+    if (main.error) {
+      fetchFailure = main.error;
       continue;
     }
-    const parent = git(['rev-parse', 'FETCH_HEAD']).trim();
-    const content = treeFile(parent, options.changelog);
-    // A re-run of a build whose section was carried would otherwise write it
-    // twice: drop a carried section that names this build.
-    const carried = pending.filter(
-      item => headingOf(item) !== heading && !hasSectionHeading(content, headingOf(item))
-    );
-    const block = hasSectionHeading(content, heading)
-      ? carried.join('')
-      : section + carried.join('');
-    if (block === '') {
-      console.log(`changelog: landed ${heading} on ${branch} (already present)`);
-      if (pending.length > 0) {
-        clearPending(remote, options.pending, pendingRead.sha);
-      }
-      return 0;
+    const head = fetchForVerify(remote, branch, depth);
+    if (head.error) {
+      fetchFailure = head.error;
+      continue;
     }
-    const sha = commitOn(parent, options.changelog, insertSection(content, block), message);
+    if (head.sha !== tip) {
+      return {
+        ok: false,
+        moved: true,
+        reason: 'the branch moved while the changelog was being composed',
+      };
+    }
     try {
-      git(['push', remote, `${sha}:refs/heads/${branch}`]);
-      console.log(`changelog: landed ${heading} on ${branch} as ${sha}`);
-      if (pending.length > 0) {
-        clearPending(remote, options.pending, pendingRead.sha);
-      }
-      return 0;
-    } catch (error) {
-      console.log(`changelog: attempt ${attempt} rejected (${reasonOf(error)})`);
+      base = git(['merge-base', main.sha, head.sha]).trim();
+      break;
+    } catch {
+      // A shallow history that does not reach the fork point has no base yet:
+      // the next rung fetches deeper.
     }
   }
+  if (!base) {
+    const reason = fetchFailure
+      ? `it has no checkable history: ${fetchFailure}`
+      : 'it shares no history with main';
+    return { ok: false, reason };
+  }
 
-  // The branch was merged and deleted while the build ran. The submission
-  // already succeeded, so the run stays green: the section waits for the next
-  // build's section instead of being lost.
+  let files;
+  let configDiff;
+  try {
+    files = replacedFiles(base, tip);
+    configDiff = replacedConfigDiff(base, tip);
+  } catch (error) {
+    return { ok: false, reason: reasonOf(error) };
+  }
+  if (files.length === 0) {
+    // Nothing rides along with the merge, so there is no shape to refuse.
+    return { ok: true, base };
+  }
+  if (!isVersionBumpCommit(files, configDiff)) {
+    const offending = files.filter(file => !VERSION_BUMP_FILES.has(file));
+    if (offending.length > 0) {
+      return {
+        ok: false,
+        reason: `it changes files other than the version line and the changelog: ${offending.join(', ')}`,
+      };
+    }
+    return {
+      ok: false,
+      reason: files.includes('apps/mobile/app.config.ts')
+        ? 'its apps/mobile/app.config.ts diff changes more than the version line'
+        : 'it carries no apps/mobile/app.config.ts version line',
+    };
+  }
+  return { ok: true, base };
+}
+
+/**
+ * Carry the composed section to the pending branch, and return 0 or a failure
+ * status. `opener` is the leading phrase of a failure message, so the refusal
+ * and the exhausted-retry paths each say why they are carrying.
+ */
+function carryToPending(options, heading, section, pendingRead, opener) {
+  const separator = options.land.lastIndexOf(':');
+  const remote = options.land.slice(0, separator);
   if (pendingRead.error) {
     return fail(
-      `could not land ${heading} on ${branch}, and ${options.pending} could not be read (${pendingRead.error}); refusing to overwrite the sections it carries`
+      `${opener}, and ${options.pending} could not be read (${pendingRead.error}); refusing to overwrite the sections it carries`
     );
   }
 
@@ -739,8 +833,101 @@ function landSection(options, heading, section) {
       snapshot = reread;
     }
   }
-  return fail(
-    `could not land ${heading} on ${branch} or carry it to ${options.pending} (${carryFailure})`
+  return fail(`${opener} or carry it to ${options.pending} (${carryFailure})`);
+}
+
+/**
+ * The two machine-readable lines the release workflow parses after a land: the
+ * verified head the section now sits on and the files it changed.
+ */
+function printVerifiedLand(sha, files) {
+  console.log(`changelog-head=${sha}`);
+  console.log(`changelog-files=${files.join(', ')}`);
+}
+
+function landSection(options, heading, section) {
+  const separator = options.land.lastIndexOf(':');
+  const remote = options.land.slice(0, separator);
+  const branch = options.land.slice(separator + 1);
+  if (separator < 0 || !remote || !branch) {
+    return usage(`--land must be <remote>:<branch>, got ${options.land}`);
+  }
+
+  const message = `docs(kilo-app): changelog for ${options.version} (build ${options.iosBuild})`;
+  console.log(section.replace(/\n$/, ''));
+
+  // Sections an earlier build could not land ride along above their own, so a
+  // branch that was merged during that build never loses its changelog line.
+  // A pending branch that exists but cannot be read is not an empty one: the
+  // carry path below replaces the branch, and overwriting content that could
+  // not be read would drop the sections an earlier build carried there.
+  const pendingRead = readPending(remote, options.pending);
+  const pending = pendingRead.sections;
+
+  for (let attempt = 1; attempt <= MAX_LAND_RETRIES + 1; attempt += 1) {
+    try {
+      git(['fetch', remote, branch]);
+    } catch (error) {
+      console.log(`changelog: attempt ${attempt} rejected (${reasonOf(error)})`);
+      continue;
+    }
+    const parent = git(['rev-parse', 'FETCH_HEAD']).trim();
+    // The land-time check requires the branch to carry only the version line
+    // and the changelog from its merge base with main. A branch that does not
+    // receives the section neither now nor on a later run, until it is replaced.
+    const check = verifyBumpBranch(remote, branch, parent);
+    if (!check.ok) {
+      if (check.moved) {
+        console.log(`changelog: attempt ${attempt} rejected (${check.reason})`);
+        continue;
+      }
+      const refusal = `refusing to land ${heading} on ${branch}: ${check.reason}`;
+      const carried = carryToPending(options, heading, section, pendingRead, refusal);
+      if (carried !== 0) {
+        return carried;
+      }
+      return fail(`${refusal}; the section was carried to ${options.pending}`);
+    }
+    const content = treeFile(parent, options.changelog);
+    // A re-run of a build whose section was carried would otherwise write it
+    // twice: drop a carried section that names this build.
+    const carried = pending.filter(
+      item => headingOf(item) !== heading && !hasSectionHeading(content, headingOf(item))
+    );
+    const block = hasSectionHeading(content, heading)
+      ? carried.join('')
+      : section + carried.join('');
+    if (block === '') {
+      console.log(`changelog: landed ${heading} on ${branch} (already present)`);
+      if (pending.length > 0) {
+        clearPending(remote, options.pending, pendingRead.sha);
+      }
+      printVerifiedLand(parent, replacedFiles(check.base, parent));
+      return 0;
+    }
+    const sha = commitOn(parent, options.changelog, insertSection(content, block), message);
+    try {
+      git(['push', remote, `${sha}:refs/heads/${branch}`]);
+      console.log(`changelog: landed ${heading} on ${branch} as ${sha}`);
+      if (pending.length > 0) {
+        clearPending(remote, options.pending, pendingRead.sha);
+      }
+      printVerifiedLand(sha, replacedFiles(check.base, sha));
+      return 0;
+    } catch (error) {
+      console.log(`changelog: attempt ${attempt} rejected (${reasonOf(error)})`);
+    }
+  }
+
+  // The branch was merged and deleted while the build ran. The submission
+  // already succeeded, so the run stays green: the section waits for the next
+  // build's section instead of being lost.
+  return carryToPending(
+    options,
+    heading,
+    section,
+    pendingRead,
+    `could not land ${heading} on ${branch}`
   );
 }
 

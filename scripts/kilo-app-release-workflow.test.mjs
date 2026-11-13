@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -741,6 +741,118 @@ test('release retries preserve shipped sections on a bump branch without a PR', 
         error.status === 128 &&
         /missing\.git.*does not appear to be a git repository/.test(error.stderr.toString())
     );
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+test('the changelog land step reports the verified head and refuses an unverified branch', () => {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-app-land-'));
+  const output = join(work, 'output');
+  const runnerTemp = join(work, 'temp');
+  const branch = 'kilo-app-version-bump-1.0.13';
+  const land = step(readWorkflow(), 'changelog', 'land');
+  // The step runs the script from the checkout root, so each fixture repo needs
+  // the real script copied in at the same path.
+  const scriptSource = new URL('../scripts/kilo-app-release-notes.mjs', import.meta.url);
+  const scriptPath = 'scripts/kilo-app-release-notes.mjs';
+  const outputs = {
+    'check-changes': { version: '1.0.13' },
+    'build-and-submit': { ios_build: '43', android_build: '43' },
+  };
+  const body = land.run.replaceAll(
+    /\$\{\{\s*needs\.([^.]+)\.outputs\.([a-z_]+)\s*\}\}/g,
+    (_, job, key) => outputs[job][key]
+  );
+  const git = (cwd, args) =>
+    execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+
+  // A repository whose main carries the app, the script and a conforming
+  // version-bump branch; `extra` adds one more commit to that branch.
+  const makeRepo = (name, extra) => {
+    const repo = join(work, name);
+    const remote = join(work, `${name}-remote.git`);
+    execFileSync('git', ['init', '-q', '--bare', remote], { stdio: 'pipe' });
+    execFileSync('git', ['clone', '-q', remote, repo], { stdio: 'pipe' });
+    git(repo, ['config', 'user.name', 'Release Test']);
+    git(repo, ['config', 'user.email', 'release@example.invalid']);
+    git(repo, ['config', 'commit.gpgsign', 'false']);
+    mkdirSync(join(repo, 'apps/mobile'), { recursive: true });
+    mkdirSync(join(repo, 'scripts'), { recursive: true });
+    copyFileSync(scriptSource, join(repo, scriptPath));
+    writeFileSync(join(repo, 'apps/mobile/CHANGELOG.md'), '# Kilo App Changelog\n\nprose\n');
+    writeFileSync(join(repo, 'apps/mobile/app.config.ts'), "  version: '1.0.12',\n");
+    git(repo, ['add', '-A']);
+    git(repo, ['commit', '-q', '-m', 'chore: seed']);
+    git(repo, ['branch', '-M', 'main']);
+    git(repo, ['push', '-q', 'origin', 'main']);
+
+    git(repo, ['checkout', '-q', '-b', branch]);
+    writeFileSync(join(repo, 'apps/mobile/app.config.ts'), "  version: '1.0.13',\n");
+    git(repo, ['add', '-A']);
+    git(repo, ['commit', '-q', '-m', 'chore(kilo-app): bump version to 1.0.13']);
+    if (extra) {
+      mkdirSync(join(repo, 'apps/mobile/src'), { recursive: true });
+      writeFileSync(join(repo, 'apps/mobile/src/a.ts'), 'export const a = 1;\n');
+      git(repo, ['add', '-A']);
+      git(repo, ['commit', '-q', '-m', 'feat(kilo-app): extra change']);
+    }
+    git(repo, ['push', '-q', 'origin', branch]);
+    git(repo, ['checkout', '-q', 'main']);
+    const tip = () => git(remote, ['rev-parse', `refs/heads/${branch}`]);
+    return { repo, remote, tip };
+  };
+
+  const runLand = repo => {
+    writeFileSync(output, '');
+    try {
+      execFileSync('bash', ['-e', '-o', 'pipefail', '-c', body], {
+        cwd: repo,
+        env: {
+          ...process.env,
+          GITHUB_OUTPUT: output,
+          RUNNER_TEMP: runnerTemp,
+          BRANCH: branch,
+          NOTES: '- a shipped change (#91)',
+          PENDING: 'kilo-app-changelog-pending',
+        },
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      return 0;
+    } catch (error) {
+      return error.status;
+    }
+  };
+
+  try {
+    mkdirSync(runnerTemp, { recursive: true });
+
+    const conforming = makeRepo('conforming', false);
+    const before = conforming.tip();
+    assert.equal(runLand(conforming.repo), 0);
+    const published = Object.fromEntries(
+      readFileSync(output, 'utf8')
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map(line => line.split('='))
+    );
+    assert.equal(published.landed, 'true');
+    assert.match(published.head ?? '', /^[0-9a-f]{40}$/);
+    assert.equal(published.head, conforming.tip());
+    assert.notEqual(published.head, before);
+    const files = (published.files ?? '').split(', ');
+    assert.equal(files.length, 2, `expected two files, got ${published.files}`);
+    assert.deepEqual(
+      [...files].sort(),
+      ['apps/mobile/CHANGELOG.md', 'apps/mobile/app.config.ts'].sort()
+    );
+
+    const unverified = makeRepo('unverified', true);
+    const unverifiedTip = unverified.tip();
+    assert.notEqual(runLand(unverified.repo), 0);
+    assert.doesNotMatch(readFileSync(output, 'utf8'), /^landed=true$/m);
+    assert.equal(unverified.tip(), unverifiedTip);
   } finally {
     rmSync(work, { recursive: true, force: true });
   }

@@ -817,8 +817,19 @@ jobs:
             --land "origin:$BRANCH" \
             --pending "$PENDING")
           printf '%s\n' "$OUT"
+          # The land prints the head it verified and the files that commit
+          # changes; the PR body reports them instead of asserting a shape
+          # nobody checked.
+          HEAD=$(printf '%s\n' "$OUT" | sed -n 's/^changelog-head=//p')
+          FILES=$(printf '%s\n' "$OUT" | sed -n 's/^changelog-files=//p')
           if printf '%s\n' "$OUT" | grep -q '^changelog: landed '; then
             echo "landed=true" >> "$GITHUB_OUTPUT"
+            echo "head=$HEAD" >> "$GITHUB_OUTPUT"
+            echo "files=$FILES" >> "$GITHUB_OUTPUT"
+            if [ -z "$HEAD" ] || [ -z "$FILES" ]; then
+              echo "::error::The section landed without reporting the verified head and files"
+              exit 1
+            fi
           else
             echo "landed=false" >> "$GITHUB_OUTPUT"
             echo "::notice::The version-bump branch was already merged — this build's changelog section waits on $PENDING for the next build's section. The submission itself succeeded."
@@ -832,9 +843,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH: ${{ needs.bump-version.outputs.branch }}
           OLD: ${{ needs.check-changes.outputs.version }}
+          HEAD_SHA: ${{ steps.land.outputs.head }}
+          FILES: ${{ steps.land.outputs.files }}
         run: |
           NEW="${BRANCH#kilo-app-version-bump-}"
           RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          # The files and the head come from the land-time check, so the body
+          # reports what was verified instead of asserting a shape nobody checked.
           cat > "$RUNNER_TEMP/kilo-app-bump-pr.md" <<EOF
           ## What
 
@@ -853,8 +868,8 @@ jobs:
           1. Required checks show as pending: PRs opened with the default GITHUB_TOKEN
              do not trigger workflow runs. Close and reopen this PR (or push an empty
              commit) to start CI.
-          2. Review and merge. Only the version line and the changelog section
-             changed; no product code.
+          2. Review and merge. Against main this branch changes only $FILES.
+             Verified head $HEAD_SHA. No product code.
           EOF
           # Only a PR opened from this repository is the version-bump PR.
           PR=$(gh pr list --head "$BRANCH" --state open --json number,isCrossRepository \

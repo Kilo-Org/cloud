@@ -560,24 +560,36 @@ function canPublish(epoch: number): boolean {
  * run.
  */
 function reconcileWithDisk(state: MirrorSyncState, deps: ArtifactMirrorSyncDeps): MirrorSyncState {
+  const sessions: Record<string, MirrorSyncSessionState> = {};
+  for (const [sessionId, session] of Object.entries(state.sessions)) {
+    sessions[sessionId] = reconcileSession(sessionId, session, deps);
+  }
+  return { lastRunAt: state.lastRunAt, sessions };
+}
+
+/**
+ * One session's state after the disk check. A session the probe cannot read
+ * keeps its stored state, so one unreadable folder never costs the other
+ * sessions their reconciliation or fails the run.
+ */
+function reconcileSession(
+  sessionId: string,
+  session: MirrorSyncSessionState,
+  deps: ArtifactMirrorSyncDeps
+): MirrorSyncSessionState {
   try {
-    const sessions: Record<string, MirrorSyncSessionState> = {};
-    for (const [sessionId, session] of Object.entries(state.sessions)) {
-      const directory = deps.mirrorSessionDir(sessionId);
-      // No browsable container means nothing was ever materialized there, so
-      // the state is kept as it is.
-      const present =
-        directory === null
-          ? session.files
-          : session.files.filter(file => new File(directory, file.id).exists);
-      sessions[sessionId] =
-        present.length === session.files.length
-          ? session
-          : { cursor: null, done: false, files: present, updatedAt: session.updatedAt };
-    }
-    return { lastRunAt: state.lastRunAt, sessions };
+    const directory = deps.mirrorSessionDir(sessionId);
+    // No browsable container means nothing was ever materialized there, so the
+    // state is kept as it is.
+    const present =
+      directory === null
+        ? session.files
+        : session.files.filter(file => new File(directory, file.id).exists);
+    return present.length === session.files.length
+      ? session
+      : { cursor: null, done: false, files: present, updatedAt: session.updatedAt };
   } catch {
-    return state;
+    return session;
   }
 }
 

@@ -474,6 +474,33 @@ describe('syncArtifactMirror crawling', () => {
     expect(sessionFiles(h.lastManifest(), 's1').toSorted()).toEqual(['f1', 'f2']);
   });
 
+  it('keeps reconciling the other sessions when one cannot be inspected', async () => {
+    // The probe reads the filesystem, so one folder can refuse it. That session
+    // keeps its stored state; every other session is still checked.
+    const h = harness();
+    h.sessions.push({ id: 's1', updatedAt: T1 }, { id: 's2', updatedAt: T1 });
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
+    setFiles(h, 's2', [{ id: 'f2', size: 10, url: `${STORAGE_ORIGIN}/f2` }]);
+
+    await syncArtifactMirror({ deps: h.deps });
+    fakeFs.remove('file:///mirror/sessions/f1');
+    h.deps.mirrorSessionDir = (sessionId: string) => {
+      if (sessionId === 's2') {
+        throw new Error('the folder could not be read');
+      }
+      return new Directory('file:///mirror/sessions');
+    };
+
+    h.setNow(NOW + MIRROR_SYNC_MIN_INTERVAL_MS);
+    const outcome = await syncArtifactMirror({ deps: h.deps });
+
+    expect(outcome).toMatchObject({ status: 'synced' });
+    expect(h.getSessionMessagesPage).toHaveBeenCalledTimes(3);
+    expect(h.downloadFile).toHaveBeenCalledTimes(3);
+    expect(sessionFiles(h.lastManifest(), 's1')).toEqual(['f1']);
+    expect(sessionFiles(h.lastManifest(), 's2')).toEqual(['f2']);
+  });
+
   it('restarts a session whose head changed while its crawl was in progress', async () => {
     const h = harness();
     h.sessions.push({ id: 's1', updatedAt: T1 });

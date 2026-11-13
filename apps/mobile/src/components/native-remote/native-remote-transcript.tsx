@@ -54,8 +54,9 @@ export function NativeRemoteTranscript({
       {pending.unreadablePermissions.length > 0 ? (
         // No consent card for these: the app never read the request's scope, so
         // offering allow/deny would decide a permission nobody parsed. The
-        // notice points the user at the CLI, which can still answer it.
-        <PermissionUnreadableNotice />
+        // notice points the user at the CLI, which can still answer it. The
+        // screen already pads this column, so the notice drops its own margin.
+        <PermissionUnreadableNotice inset={false} />
       ) : null}
       {pending.permissions.map(permission => (
         <View key={permission.id} className="gap-2 rounded-lg border border-border p-3">

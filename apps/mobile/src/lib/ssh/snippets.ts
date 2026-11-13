@@ -1,6 +1,13 @@
 import { z } from 'zod';
 
-import { booleanColumn, readRow, readRows, type SshDatabase } from './database';
+import {
+  booleanColumn,
+  booleanValue,
+  readRow,
+  readRows,
+  type SshDatabase,
+  updateRow,
+} from './database';
 import { newId } from './id';
 
 const COLUMNS = `
@@ -81,4 +88,61 @@ export function createSnippet(
     throw new Error(`ssh_snippets: row ${id} is missing after its own insert`);
   }
   return created;
+}
+
+const snippetPatchSchema = snippetInputSchema.omit({ sortOrder: true }).partial();
+
+type SshSnippetPatch = z.input<typeof snippetPatchSchema>;
+
+export function updateSnippet(
+  db: SshDatabase,
+  id: string,
+  patch: SshSnippetPatch
+): SshSnippet | null {
+  const snippet = snippetPatchSchema.parse(patch);
+  updateRow({
+    db,
+    table: 'ssh_snippets',
+    id,
+    updates: {
+      label: snippet.label,
+      command: snippet.command,
+      append_newline: booleanValue(snippet.appendNewline),
+      host_id: snippet.hostId,
+      updated_at: Date.now(),
+    },
+  });
+  return getSnippet(db, id);
+}
+
+export function deleteSnippet(db: SshDatabase, id: string): void {
+  db.runSync('delete from ssh_snippets where id = ?', [id]);
+}
+
+/**
+ * Writes the list's order into `sort_order`, as one transaction.
+ *
+ * The caller hands every stored snippet back in its new order, so the write is
+ * a whole-list statement rather than a swap: a swap between two rows leaves the
+ * old order wherever the list was renumbered, and a partial order would tie two
+ * rows at one position. A list that does not name exactly the stored snippets is
+ * refused before anything is written.
+ */
+export function reorderSnippets(db: SshDatabase, orderedIds: readonly string[]): void {
+  const storedIds = new Set(listSnippets(db).map(snippet => snippet.id));
+  const seen = new Set<string>();
+  for (const id of orderedIds) {
+    if (!storedIds.has(id) || seen.has(id)) {
+      throw new Error(`ssh_snippets: ${id} is not one snippet of this list`);
+    }
+    seen.add(id);
+  }
+  if (seen.size !== storedIds.size) {
+    throw new Error('ssh_snippets: the new order must name every snippet');
+  }
+  db.withTransactionSync(() => {
+    for (const [index, id] of orderedIds.entries()) {
+      db.runSync('update ssh_snippets set sort_order = ? where id = ?', [index, id]);
+    }
+  });
 }

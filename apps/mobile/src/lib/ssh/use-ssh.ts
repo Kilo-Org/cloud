@@ -6,12 +6,20 @@ import { importSshConfig, type SshConfigPlan } from './config-import';
 import { createHost, deleteHost, getHost, listHosts, type SshHostInput, updateHost } from './hosts';
 import { createKey, listKeys, type SshKeyInput } from './keys';
 import { listKnownHosts, removeKnownHost } from './known-hosts';
+import {
+  createSnippet,
+  deleteSnippet,
+  listSnippets,
+  reorderSnippets,
+  updateSnippet,
+} from './snippets';
 import { sshDatabase } from './store';
 
 /** Every ssh query lives under this key, so one invalidation refreshes a screen. */
 export const SSH_KEY = ['ssh'] as const;
 const HOSTS_KEY = [...SSH_KEY, 'hosts'] as const;
 const KNOWN_HOSTS_KEY = [...SSH_KEY, 'known-hosts'] as const;
+const SNIPPETS_KEY = [...SSH_KEY, 'snippets'] as const;
 
 /**
  * The stored hosts, in the order the store keeps them.
@@ -34,6 +42,18 @@ export function useSshKnownHosts() {
     queryKey: KNOWN_HOSTS_KEY,
     networkMode: 'always',
     queryFn: async () => listKnownHosts(await sshDatabase()),
+  });
+}
+
+/**
+ * Every stored snippet in the store's own order. A terminal shows the global
+ * ones plus its host's; the manage screen shows them all.
+ */
+export function useSshSnippets() {
+  return useQuery({
+    queryKey: SNIPPETS_KEY,
+    networkMode: 'always',
+    queryFn: async () => listSnippets(await sshDatabase()),
   });
 }
 
@@ -99,6 +119,45 @@ export function useSshKeyMutations() {
     onError: error => toast.error(error.message),
   });
   return { create };
+}
+
+type SaveSnippetInput = Readonly<{
+  /** The snippet being edited; null creates one. */
+  id: string | null;
+  label: string;
+  command: string;
+  appendNewline: boolean;
+  /** The snippet's host, or null for a snippet every host offers. */
+  hostId: string | null;
+  /** Where a new snippet lands in the store's order. */
+  sortOrder: number;
+}>;
+
+export function useSshSnippetMutations() {
+  const invalidate = useSshInvalidation();
+  const save = useMutation({
+    mutationFn: async (input: SaveSnippetInput) => {
+      const db = await sshDatabase();
+      return input.id === null ? createSnippet(db, input) : updateSnippet(db, input.id, input);
+    },
+    onSuccess: () => void invalidate(),
+    onError: error => toast.error(error.message),
+  });
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      deleteSnippet(await sshDatabase(), id);
+    },
+    onSuccess: () => void invalidate(),
+    onError: error => toast.error(error.message),
+  });
+  const reorder = useMutation({
+    mutationFn: async (orderedIds: readonly string[]) => {
+      reorderSnippets(await sshDatabase(), orderedIds);
+    },
+    onSuccess: () => void invalidate(),
+    onError: error => toast.error(error.message),
+  });
+  return { save, remove, reorder };
 }
 
 export function useSshConfigImport() {

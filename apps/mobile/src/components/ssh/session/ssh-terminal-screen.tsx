@@ -1,23 +1,24 @@
 import { type TerminalViewHandle } from '@kilocode/react-native-ssh';
-import * as Clipboard from 'expo-clipboard';
 import { usePathname, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Keyboard, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
+import { SnippetsSheet } from '@/components/ssh/snippets/snippets-sheet';
 import { SshHostKeyBlocked } from '@/components/ssh/session/ssh-host-key-blocked';
 import { SshSessionNotice } from '@/components/ssh/session/ssh-session-notice';
 import { SshSessionStage } from '@/components/ssh/session/ssh-session-stage';
 import { SshSessionSwitcher } from '@/components/ssh/session/ssh-session-switcher';
 import { TerminalKeyBar } from '@/components/ssh/session/terminal-key-bar';
+import { sendToShell } from '@/components/ssh/session/terminal-input';
+import { useTerminalPaste } from '@/components/ssh/session/terminal-paste';
 import { TerminalSurface } from '@/components/ssh/session/terminal-surface';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { RefreshCw, Rows3, Terminal, WifiOff } from '@/components/ui/icons';
-import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { openExternalUrl } from '@/lib/external-link';
@@ -36,9 +37,11 @@ import { useSshSession, useSshSessions } from '@/lib/ssh/session/use-sessions';
 import {
   SSH_HOSTS_ROUTE,
   SSH_KNOWN_HOSTS_ROUTE,
+  SSH_SNIPPETS_ROUTE,
   sshPromptPath,
   sshSessionPath,
 } from '@/lib/ssh/routes';
+import { type SshSnippet } from '@/lib/ssh/snippets';
 import { encodeTerminalInput } from '@/lib/ssh/terminal-bytes';
 
 type SshTerminalScreenProps = Readonly<{ sessionId: string }>;
@@ -58,8 +61,9 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
   const { fontSize, setFontSize } = useTerminalFontSize();
   const terminalRef = useRef<TerminalViewHandle>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
-  const [pasteText, setPasteText] = useState<string | null>(null);
+  const [snippetsOpen, setSnippetsOpen] = useState(false);
   const [shellTitle, setShellTitle] = useState<string | null>(null);
+  const paste = useTerminalPaste(terminalRef);
 
   const phase: SshSessionPhase | null = session?.phase ?? null;
   const promptWaiting = phase !== null && needsPrompt(phase);
@@ -91,20 +95,13 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
     void typeOnce(terminal, sessionId, pendingCommand);
   }, [pendingCommand, shellId, sessionId]);
 
-  const send = useCallback((text: string) => {
-    void sendToShell(terminalRef.current, text);
-  }, []);
-
-  async function pasteFromClipboard() {
-    const text = await Clipboard.getStringAsync().catch(() => '');
-    if (text.length === 0) {
-      return;
+  async function sendSnippet(snippet: SshSnippet) {
+    setSnippetsOpen(false);
+    const terminal = terminalRef.current;
+    await sendToShell(terminal, snippet.command);
+    if (snippet.appendNewline) {
+      await sendToShell(terminal, '\r');
     }
-    if (text.includes('\n')) {
-      setPasteText(text);
-      return;
-    }
-    await terminalRef.current?.paste(text).catch(() => undefined);
   }
 
   if (session === null || phase === null) {
@@ -218,9 +215,14 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
           {shellId === null ? null : (
             <TerminalKeyBar
               disabled={phase.kind !== 'connected'}
-              onSend={send}
+              onSend={text => {
+                void sendToShell(terminalRef.current, text);
+              }}
               onPaste={() => {
-                void pasteFromClipboard();
+                void paste.pasteFromClipboard();
+              }}
+              onSnippets={() => {
+                setSnippetsOpen(true);
               }}
             />
           )}
@@ -258,40 +260,22 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
         }}
       />
 
-      <Sheet
-        visible={pasteText !== null}
-        onClose={() => {
-          setPasteText(null);
+      <SnippetsSheet
+        visible={snippetsOpen}
+        hostId={session.hostId}
+        onSelect={snippet => {
+          void sendSnippet(snippet);
         }}
-      >
-        <View className="gap-4 px-4 pb-4">
-          <Text className="text-sm font-medium text-foreground">{t('ssh.session.pasteTitle')}</Text>
-          <Text className="text-sm text-muted-foreground">{t('ssh.session.pasteMultiLine')}</Text>
-          <View className="flex-row gap-2">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onPress={() => {
-                setPasteText(null);
-              }}
-            >
-              <Text>{t('common.cancel')}</Text>
-            </Button>
-            <Button
-              className="flex-1"
-              onPress={() => {
-                const text = pasteText;
-                setPasteText(null);
-                if (text !== null) {
-                  void pasteToShell(terminalRef.current, text);
-                }
-              }}
-            >
-              <Text>{t('ssh.session.paste')}</Text>
-            </Button>
-          </View>
-        </View>
-      </Sheet>
+        onManage={() => {
+          setSnippetsOpen(false);
+          router.push(SSH_SNIPPETS_ROUTE);
+        }}
+        onClose={() => {
+          setSnippetsOpen(false);
+        }}
+      />
+
+      {paste.sheet}
     </View>
   );
 }
@@ -311,23 +295,5 @@ async function typeOnce(
     consumePendingCommand(sessionId, command);
   } catch {
     // The shell closed before the command reached it.
-  }
-}
-
-/** Sends one key sequence to the shell, ignoring a shell that already closed. */
-async function sendToShell(terminal: TerminalViewHandle | null, text: string): Promise<void> {
-  try {
-    await terminal?.sendInput(encodeTerminalInput(text));
-  } catch {
-    // The shell closed under this key.
-  }
-}
-
-/** Sends pasted text through the view's own paste, ignoring a closed shell. */
-async function pasteToShell(terminal: TerminalViewHandle | null, text: string): Promise<void> {
-  try {
-    await terminal?.paste(text);
-  } catch {
-    // The shell closed before the paste.
   }
 }

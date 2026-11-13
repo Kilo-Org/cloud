@@ -1,4 +1,5 @@
 import { createMiddleware } from 'hono/factory';
+import { timingSafeEqual } from '@kilocode/encryption';
 import { logger } from './logger';
 import type { HonoContext } from '../ai-attribution.worker';
 
@@ -12,7 +13,7 @@ export function validateAdminSecret(
     return { success: false, error: `Missing ${ADMIN_SECRET_HEADER} header` };
   }
 
-  if (secretHeader !== expectedSecret) {
+  if (!timingSafeEqual(secretHeader, expectedSecret)) {
     return { success: false, error: 'Invalid admin secret' };
   }
 

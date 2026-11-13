@@ -341,6 +341,26 @@ describe('BYOK stored-key test toasts', () => {
     expect(toast.error).toHaveBeenCalledWith('API key test failed: upstream said 401');
   });
 
+  it('drops the terminal colour codes a provider SDK puts in its sentence', async () => {
+    const onSuccess = await mount();
+
+    await act(async () => {
+      onSuccess(
+        {
+          outcome: 'failed',
+          detail: '\u001b[1m\u001b[31mUnauthenticated request.\u001b[0m Check the key.',
+          success: false,
+          message: 'legacy',
+        },
+        { id: 'anthropic-key' }
+      );
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(
+      'API key test failed: Unauthenticated request. Check the key.'
+    );
+  });
+
   it('names the provider that is still listed when its id is gone from the catalog', async () => {
     const onSuccess = await mount();
 

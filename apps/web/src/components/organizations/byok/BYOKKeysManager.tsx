@@ -276,10 +276,21 @@ function updateBYOKDialogState(state: BYOKDialogState, update: Partial<BYOKDialo
 }
 
 /**
+ * Provider SDKs colour their error text for a terminal. A toast shows those
+ * escape sequences as characters, so they are removed before the sentence is
+ * rendered.
+ */
+function stripAnsi(text: string): string {
+  // eslint-disable-next-line no-control-regex -- the escape byte is the target
+  return text.replace(/\u001b\[[0-9;]*m/g, '');
+}
+
+/**
  * The stored-key test reports an outcome rather than a message, so this copy
  * lives here. `rejected` names the credential problem itself and drops the
  * provider's `detail`, which is SDK setup text for a different audience.
- * `failed` keeps the provider's own sentence, which is where its reason lives.
+ * `failed` keeps the provider's own sentence, which is where its reason lives,
+ * with any terminal colour codes removed: a toast renders them as characters.
  */
 function byokKeyTestMessage(result: BYOKKeyTestResult, providerId: string | undefined): string {
   switch (result.outcome) {
@@ -299,7 +310,7 @@ function byokKeyTestMessage(result: BYOKKeyTestResult, providerId: string | unde
       return 'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.';
     case 'failed':
       return result.detail
-        ? `API key test failed: ${result.detail}`
+        ? `API key test failed: ${stripAnsi(result.detail)}`
         : 'API key test failed. Check the credential and try again.';
   }
 }

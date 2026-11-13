@@ -92,6 +92,20 @@ describe('shouldDeliverPendingDeepLink', () => {
     ).toBe(false);
   });
 
+  it('delivers a recovered destination already showing under a layout group', () => {
+    // The focused route lists the `(edit)` layout in its segments while the
+    // href that reaches the slot never carries it, because it adds no URL
+    // segment.
+    expect(
+      shouldDeliverPendingDeepLink({
+        arrival: 'restored',
+        href: '/(app)/code-reviewer/personal/github/instructions',
+        atLandingRoute: false,
+        segments: ['(app)', 'code-reviewer', 'personal', 'github', '(edit)', 'instructions'],
+      })
+    ).toBe(true);
+  });
+
   it('keeps two different tabs apart', () => {
     // The pathname of both tab roots is `/`, so a comparison on it would treat
     // the Profile tab as the screen already showing.

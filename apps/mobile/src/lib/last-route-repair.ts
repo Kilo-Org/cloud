@@ -40,10 +40,17 @@ export function shouldRepairRestoredRoute(input: {
  */
 export const RESTORED_ROUTE_FALLBACK_HREF = '/(app)/(tabs)/(0_home)' as Href;
 
-/** Route groups that name a layout, not a destination. */
+/**
+ * Route groups that name a layout, not a destination: they add no URL segment,
+ * so a route inside one is addressed without the group and only the focused
+ * route's own segment list carries it. Every other parenthesised segment is a
+ * destination — a tab names which tab is open — so it stays and keeps two
+ * screens apart.
+ */
 const LAYOUT_GROUPS = {
   '(app)': true,
   '(auth)': true,
+  '(edit)': true,
   '(tabs)': true,
 } as const;
 

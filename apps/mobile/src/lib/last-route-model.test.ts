@@ -232,6 +232,19 @@ describe('shouldRepairRestoredRoute', () => {
     ).toBe(false);
   });
 
+  it('ignores a layout group that adds no URL segment', () => {
+    // The focused route reports its groups in the segment list, while the href
+    // a record stores is addressed without them: `(edit)` is a layout, so the
+    // same screen must compare equal either way.
+    expect(
+      shouldRepairRestoredRoute({
+        recordedHref: '/(app)/code-reviewer/personal/github/instructions',
+        restoredRoute: '/(app)/code-reviewer/personal/github/(edit)/instructions',
+        launchOpenedAppRoute: false,
+      })
+    ).toBe(false);
+  });
+
   it('ignores a query string on the recorded href', () => {
     expect(
       shouldRepairRestoredRoute({

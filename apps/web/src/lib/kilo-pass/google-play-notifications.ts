@@ -1,7 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm';
 
 import { credit_transactions, kilo_pass_store_events } from '@kilocode/db/schema';
-import type { BouncerCreditEventOutboxDatabase } from '@kilocode/db/bouncer-credit-event-outbox';
+import type { BouncerCreditEventOutboxTransaction } from '@kilocode/db/bouncer-credit-event-outbox';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   KiloPassAuditLogAction,
@@ -202,7 +202,7 @@ function googlePlayEventTime(eventTimeMillis: string | number | null): Date | un
  * event instead of losing the report.
  */
 async function enqueueGooglePlayCreditEventToBouncer(
-  database: BouncerCreditEventOutboxDatabase,
+  database: BouncerCreditEventOutboxTransaction,
   params: {
     environment: string;
     eventId: string;

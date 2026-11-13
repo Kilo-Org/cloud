@@ -876,6 +876,71 @@ describe('kiloPassRouter', () => {
       expect(stripeMock.subscriptions.retrieve).not.toHaveBeenCalled();
     });
 
+    it('reports no end date when the provider ends a pass without a timestamp', async () => {
+      const stripeMock = getStripeMock();
+      // A terminal provider status can reach a row whose webhook never landed,
+      // and Stripe does not always report an end date for such a subscription.
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_test_provider_ended_no_date',
+        status: 'unpaid',
+        ended_at: null,
+        canceled_at: null,
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-get-state-provider-ended-no-date@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_provider_ended_no_date',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getState();
+
+      expect(result.subscription).toEqual(
+        expect.objectContaining({
+          status: 'unpaid',
+          endedAt: null,
+        })
+      );
+    });
+
+    it('reports the provider canceled_at date when the provider has no ended_at', async () => {
+      const stripeMock = getStripeMock();
+      const canceledAtSeconds = 1_760_000_000;
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_test_provider_ended_canceled_at',
+        status: 'unpaid',
+        ended_at: null,
+        canceled_at: canceledAtSeconds,
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-get-state-provider-ended-canceled-at@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_provider_ended_canceled_at',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getState();
+
+      expect(result.subscription).toEqual(
+        expect.objectContaining({
+          status: 'unpaid',
+          endedAt: new Date(canceledAtSeconds * 1000).toISOString(),
+        })
+      );
+    });
+
     it('throws BAD_REQUEST when subscription exists but user has no stripe customer', async () => {
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-get-state-no-stripe@example.com',

@@ -79,7 +79,7 @@ import { getMonthlyPriceUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import { computeKiloPassBonusCreditsUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus-decision';
 import { KiloPassError } from '@/lib/kilo-pass/errors';
 import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
-import { getStripeEndedAtIso } from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-utils';
+import { getStripeReportedEndedAtIso } from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-utils';
 import { createOrReuseKiloPassCheckoutSession } from '@/lib/kilo-pass/checkout-session';
 import {
   isTerminalKiloPassScheduleStatus,
@@ -1446,7 +1446,7 @@ export const kiloPassRouter = createTRPCRouter({
           kiloUserId: ctx.user.id,
           subscription: subscriptionBase,
           status: stripeSubscription.status,
-          providerEndedAt: getStripeEndedAtIso(stripeSubscription),
+          providerEndedAt: getStripeReportedEndedAtIso(stripeSubscription),
         }),
         isEligibleForFirstMonthPromo: false,
       };

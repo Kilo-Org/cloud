@@ -3,9 +3,9 @@
  * whose row still has a null end date.
  *
  * The end date comes from the Stripe subscription's own `ended_at`/`canceled_at`
- * fields. `getStripeEndedAtIso()` is deliberately not used: it returns the
- * current time when Stripe has neither field, and inventing a date is worse than
- * leaving the column null, so such a row is skipped and counted as `undatable`.
+ * fields via `getStripeReportedEndedAtIso()`, which returns null when Stripe
+ * reports neither. A row whose provider date is unknown is skipped and counted
+ * as `undatable`: inventing a date is worse than leaving the column null.
  *
  * Dry run by default. Pass `--apply` to write, and `--resume=<row id>` to
  * continue after the `afterId` printed by an earlier run. Rows that failed are
@@ -18,8 +18,8 @@
 import '@/lib/load-env';
 import { kilo_pass_subscriptions } from '@kilocode/db/schema';
 import { closeAllDrizzleConnections, db } from '@kilocode/web-shared/lib/drizzle';
-import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { getStripeReportedEndedAtIso } from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-utils';
 import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
 import { and, asc, eq, gt, inArray, isNotNull, isNull } from 'drizzle-orm';
 
@@ -49,11 +49,7 @@ type Summary = {
  */
 async function providerEndedAtIso(stripeSubscriptionId: string): Promise<string | null> {
   const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-  const seconds = subscription.ended_at ?? subscription.canceled_at ?? null;
-  if (seconds === null) {
-    return null;
-  }
-  return dayjs.unix(seconds).utc().toISOString();
+  return getStripeReportedEndedAtIso(subscription);
 }
 
 async function run(): Promise<Summary> {

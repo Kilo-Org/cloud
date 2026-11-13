@@ -2,10 +2,10 @@
 // `SettingsSaveButton` swallows the save's rejection, so the toast was the only
 // trace of a refusal: a few seconds of copy, then the unchanged screen with the
 // draft still dirty. This suite drives the shared hook behind that line: it
-// keeps a one-line slot reserved before anything is refused, fills that slot in
-// place with the error's sentence (re-translated from the catalog, never the
-// server's English text) until a save succeeds, and hands the rejection back to
-// the caller that decides navigation from it.
+// renders nothing until something is refused, then shows the error's sentence
+// (re-translated from the catalog, never the server's English text) in a line
+// pinned above the scrolling body until a save succeeds, and hands the
+// rejection back to the caller that decides navigation from it.
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -59,20 +59,15 @@ function statusMessage(renderer: TestRenderer.ReactTestRenderer): string | null 
   return String(first.props.children);
 }
 
-/** The line's slot — the wrapper the hook renders in every state. */
-function slot(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
-  const slots = renderer.root.findAll(
-    node =>
-      (node.type as string) === 'View' &&
-      typeof node.props.className === 'string' &&
-      node.props.className.includes('justify-center px-6')
+/** The line's pinned wrapper — rendered only while a refusal is parked. */
+function pinnedLine(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
+  const wrappers = renderer.root.findAll(
+    node => (node.type as string) === 'View' && node.props.className === 'px-6'
   );
-  if (slots.length !== 1) {
-    throw new Error(`expected one reserved slot, found ${slots.length}`);
-  }
-  const [only] = slots;
+  expect(wrappers).toHaveLength(1);
+  const [only] = wrappers;
   if (!only) {
-    throw new Error('the reserved slot is missing');
+    throw new Error('the refusal line is missing');
   }
   return only;
 }
@@ -83,15 +78,12 @@ describe('useSettingsSaveFeedback', () => {
     await i18n.changeLanguage('en');
   });
 
-  it('reserves the line height before a save fails', () => {
+  it('renders no line before a save fails', () => {
     const renderer = mount();
 
-    // The slot is there from the first commit, tall enough for the two lines
-    // this copy wraps to, so the body the hook sits above never moves when the
-    // line fills in.
-    expect(slot(renderer).props.className).toBe('min-h-10 justify-center px-6');
-    // ...and it says nothing: an empty message renders no text and announces
-    // nothing, rather than leaving an empty live region behind.
+    // Nothing is refused, so the hook mounts nothing: no wrapper and no text,
+    // which leaves the first card at the scroller's own top padding.
+    expect(renderer.root.findAllByType('View')).toHaveLength(0);
     expect(renderer.root.findAllByType('Text')).toHaveLength(0);
 
     act(() => {
@@ -99,7 +91,7 @@ describe('useSettingsSaveFeedback', () => {
     });
   });
 
-  it('fills the slot with the catalog sentence for a lapsed organization trial', async () => {
+  it('shows the catalog sentence for a lapsed organization trial', async () => {
     const refusal = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
       data: { code: 'FORBIDDEN' },
     });
@@ -110,12 +102,11 @@ describe('useSettingsSaveFeedback', () => {
     });
 
     expect(statusMessage(renderer)).toBe(i18n.t('common.organizationTrialEnded'));
-    // The same slot holds the sentence: the line swaps in place instead of
-    // pushing the scrolling body down.
-    expect(slot(renderer).findAllByType('Text')).toHaveLength(1);
+    // The pinned wrapper appears with the sentence and holds exactly that copy.
+    expect(pinnedLine(renderer).findAllByType('Text')).toHaveLength(1);
     // A raised OS text size may enlarge the line only up to the cap, so a long
-    // refusal cannot squeeze the settings body out of its room.
-    expect(slot(renderer).findAllByType('Text')[0]?.props.maxFontSizeMultiplier).toBe(1.6);
+    // refusal cannot take the settings body's room without limit.
+    expect(pinnedLine(renderer).findAllByType('Text')[0]?.props.maxFontSizeMultiplier).toBe(1.6);
 
     act(() => {
       renderer.unmount();
@@ -184,9 +175,10 @@ describe('useSettingsSaveFeedback', () => {
       await retry;
     });
 
-    // The sentence clears; the slot stays, so the body does not move back up.
+    // A successful save takes the line and its wrapper away, so the body gets
+    // that room back.
     expect(renderer.root.findAllByType('Text')).toHaveLength(0);
-    expect(slot(renderer).props.className).toBe('min-h-10 justify-center px-6');
+    expect(renderer.root.findAllByType('View')).toHaveLength(0);
 
     act(() => {
       renderer.unmount();

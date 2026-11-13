@@ -7,16 +7,15 @@ import { securityConfigMutationMessage } from '@/lib/security-agent-ledger';
 /**
  * Largest OS font scale the refusal line grows to. It is a status line whose
  * copy length the catalog does not bound, so it carries a cap on how far a
- * raised text size can grow it — the same rule the cannot-send reason uses, and
- * the reason the settings body below keeps its room.
+ * raised text size can grow it — the same rule the cannot-send reason uses.
  */
 const REFUSAL_MAX_FONT_SCALE = 1.6;
 
 type SettingsSaveFeedback = {
   /** Await a settings save, keep its refusal for the inline line, and rethrow it. */
   run: (save: () => Promise<void>) => Promise<void>;
-  /** The line's reserved slot: blank until a save is refused, then the refusal. */
-  node: ReactElement;
+  /** The refusal line: `null` until a save is refused, then the parked refusal. */
+  node: ReactElement | null;
 };
 
 /**
@@ -29,17 +28,23 @@ type SettingsSaveFeedback = {
  * the scrolling body; a refused save parks its error there until a save
  * succeeds, so the reader keeps the reason next to the draft that caused it.
  *
+ * The line costs the body nothing while no save is refused: `node` is `null`
+ * and the first card starts at the scroller's own top padding, because the
+ * design review rejected a permanent band above the body on these short
+ * screens. The line sits between the header and the scroller rather than inside
+ * the scroller, so a parked refusal stays in view at any scroll position; it
+ * costs the body the line's own height until a save clears it.
+ *
+ * A parked sentence is never clipped — the tail is the part that says what to
+ * do next — so the line grows with its copy instead of losing it, and that
+ * growth is bounded by `REFUSAL_MAX_FONT_SCALE` so a raised text size cannot
+ * take the body's room without limit.
+ *
  * The refusal is stored as the error itself and its sentence is re-derived on
  * every render, so a language change re-translates the line instead of freezing
  * one catalog's copy in state. The stored error survives a re-render and a
  * later attempt: a retry in flight keeps the previous line up rather than
  * blinking it off and back.
- *
- * The slot is reserved in every state, at one line of the status copy's
- * height, so the body below it never moves when a refusal arrives or clears
- * (apps/mobile/AGENTS.md: never shift layout when state changes). The empty
- * state is that blank slot and nothing else: no line, no live region, and so
- * nothing announced.
  *
  * `AccessibleStatus` is the single announcement owner here — a live region where
  * the platform has one, an imperative announcement otherwise — so the save hook
@@ -59,36 +64,21 @@ export function useSettingsSaveFeedback(): SettingsSaveFeedback {
     }
   }, []);
 
-  // The slot reserves the height this copy takes, so a refusal does not move
-  // the body: `text-sm` at the 14pt rem is a 1.25rem (17.5dp) line, and the
-  // sentences these screens show wrap to two lines at the app's widths, so the
-  // reserve is `min-h-10` (2.5rem = 35dp).
-  //
-  // The line is never clipped: a longer sentence — another language, or a larger
-  // text size — grows the slot instead of losing its tail. The tail is the part
-  // that says what to do next, and a refusal the reader cannot finish reading is
-  // the defect this line exists to remove. The growth is bounded by the font
-  // cap instead: like the cannot-send reason, this is a status line whose copy
-  // length the catalog does not bound, so a raised text size may enlarge it only
-  // so far and the settings body below keeps its room.
-  //
-  // This slot sits above the screen's scroller, not inside it, so the design
-  // gate's leading-gap rule — which measures the gap below a scroller's own top
-  // padding — does not see it; the reserve costs the body no allowance.
-  const node = (
-    <View className="min-h-10 justify-center px-6">
-      {/* Nothing to report mounts nothing at all: the empty state is the slot's
-          reserved height, with no live region and no announcement to clear. */}
-      {failure === null ? null : (
+  // Nothing to report mounts nothing at all: no wrapper, no live region, no
+  // announcement to clear, and no gap between the header and the first card.
+  // The wrapper appears only with a parked refusal and takes exactly the
+  // sentence's height, so the body gives up that room only while it is needed.
+  const node =
+    failure === null ? null : (
+      <View className="px-6">
         <AccessibleStatus
           message={securityConfigMutationMessage(failure)}
           tone="error"
           className="text-sm"
           maxFontSizeMultiplier={REFUSAL_MAX_FONT_SCALE}
         />
-      )}
-    </View>
-  );
+      </View>
+    );
 
   return { run, node };
 }

@@ -42,6 +42,7 @@ import {
   enkryptUsageRecordForNewOrganization,
 } from '@kilocode/web-shared/tests/helpers/enkrypt-usage.helper';
 import { recordEnkryptUsage } from './usage';
+import { readJsonBody, requestUrlOf } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 
 const INGEST_URL = 'https://ingest.example.test/enkrypt-usage';
 const HANDOFF_URL = 'https://app.example.com/api/internal/enkrypt-usage/record';
@@ -62,11 +63,11 @@ function enableQueue(overrides: Partial<typeof mockConfig> = {}) {
 }
 
 function callsTo(url: string) {
-  return mockFetch.mock.calls.filter(([target]) => String(target) === url);
+  return mockFetch.mock.calls.filter(([target]) => requestUrlOf(target) === url);
 }
 
 function publishedBodies() {
-  return callsTo(INGEST_URL).map(([, init]) => JSON.parse(String(init?.body)) as unknown);
+  return callsTo(INGEST_URL).map(([, init]) => readJsonBody(init?.body));
 }
 
 function droppedLogs() {

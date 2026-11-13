@@ -202,6 +202,14 @@ export const readDb = replica.db;
  * consider using `readDb` instead for better performance in US regions.
  */
 export const db = primaryDb;
+
+/**
+ * A database connection: `db`, or `readDb` when a separate replica is configured. Both come from
+ * the same client factory, so they share one type, and `DrizzleTransaction` is the narrower
+ * connection a transaction hands to its callback.
+ */
+export type DrizzleDatabase = typeof db;
+
 export { sql } from 'drizzle-orm';
 
 // Helper for automatically updating the deleted_at column with database server time

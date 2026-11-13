@@ -1,6 +1,9 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type OpenAI from 'openai';
-import type { ReasoningDetailUnion } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
+import {
+  ReasoningDetailType,
+  type ReasoningDetailUnion,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
 import type {
   GatewayMessagesRequest,
   GatewayRequest,
@@ -150,10 +153,10 @@ function chatContentPieces(
 /** Summaries restate the raw reasoning, and encrypted reasoning cannot be read. */
 function reasoningDetailTexts(detail: ReasoningDetailUnion): Text[] {
   switch (detail.type) {
-    case 'reasoning.text':
+    case ReasoningDetailType.Text:
       return [detail.text];
-    case 'reasoning.summary':
-    case 'reasoning.encrypted':
+    case ReasoningDetailType.Summary:
+    case ReasoningDetailType.Encrypted:
       return [];
     default:
       return jsonTexts(detail satisfies never);

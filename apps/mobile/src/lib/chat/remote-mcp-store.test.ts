@@ -94,19 +94,9 @@ describe('parseRemoteMcpServers', () => {
   });
 
   it('drops an entry whose id is not callable-name safe', () => {
-    expect(
-      parseRemoteMcpServers(
-        JSON.stringify([
-          {
-            id: 'has space',
-            name: 'Bad',
-            url: 'https://bad.example/mcp',
-            auth: { type: 'none' },
-            enabled: true,
-          },
-        ])
-      )
-    ).toEqual([]);
+    const unsafe = row('has space', { name: 'Bad', url: 'https://bad.example/mcp' });
+
+    expect(parseRemoteMcpServers(JSON.stringify([unsafe]))).toEqual([]);
   });
 
   it('loads a reserved entry beside a free one, each under its own id', () => {
@@ -136,6 +126,16 @@ describe('parseRemoteMcpServers', () => {
       { ...first, id: expect.any(String) },
       { ...second, id: expect.any(String) },
     ]);
+    expectFreeIds(servers.map(server => server.id));
+  });
+
+  it('keeps an endpoint for the row written first, whichever id it carries', () => {
+    const first = row('kilo', { name: 'Kilo', url: 'https://one.example/mcp' });
+    const servers = parseRemoteMcpServers(
+      JSON.stringify([first, row('notes', { name: 'Notes', url: 'https://one.example/mcp' })])
+    );
+
+    expect(servers).toEqual([{ ...first, id: expect.any(String) }]);
     expectFreeIds(servers.map(server => server.id));
   });
 

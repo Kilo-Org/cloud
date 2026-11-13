@@ -168,30 +168,42 @@ export function parseRemoteMcpServers(raw: string | null): StoredRemoteMcpServer
         }
       }
     }
-    // The ids are claimed in two passes. Every entry already carrying an id of
-    // its own keeps it, in stored order, so a row that is free keeps the id the
-    // list was written with. Only then does an entry whose id belongs to the
-    // built-in server take a free one, against every id claimed so far, so it
-    // can never take the id an entry later in the list already holds. The
-    // accepted list is then drawn in the persisted order, whatever pass wrote
-    // each row.
+    // Every entry is considered in stored order, so an endpoint belongs to the
+    // row that was written first, whichever kind of id that row carries. An
+    // entry already carrying an id of its own keeps it, and claims it before any
+    // entry whose id has to be derived. Only then does an entry whose id belongs
+    // to the built-in server take a free one, against every id claimed so far, so
+    // it can never take the id another entry holds. An entry with no free endpoint
+    // or a duplicated id of its own is left out, which is the same rule a
+    // persisted list has always followed. The accepted list is then drawn in the
+    // persisted order.
     const ids = new Set<string>();
     const urls = new Set<string>();
     const accepted: (StoredRemoteMcpServer | undefined)[] = readable.map(() => undefined);
+    const reserving: {
+      readonly index: number;
+      readonly server: StoredRemoteMcpServer;
+      readonly url: string;
+    }[] = [];
     for (const [index, { server, url }] of readable.entries()) {
-      if (!isReservedMcpServerId(server.id) && !ids.has(server.id) && !urls.has(url)) {
-        ids.add(server.id);
-        urls.add(url);
-        accepted[index] = { ...server, url };
+      const takenEndpoint = urls.has(url);
+      const builtInId = isReservedMcpServerId(server.id);
+      const takenId = ids.has(server.id);
+      if (!takenEndpoint) {
+        if (builtInId) {
+          urls.add(url);
+          reserving.push({ index, server, url });
+        } else if (!takenId) {
+          ids.add(server.id);
+          urls.add(url);
+          accepted[index] = { ...server, url };
+        }
       }
     }
-    for (const [index, { server, url }] of readable.entries()) {
-      if (isReservedMcpServerId(server.id) && !urls.has(url)) {
-        const id = uniqueId(server.name, ids);
-        ids.add(id);
-        urls.add(url);
-        accepted[index] = { ...server, id, url };
-      }
+    for (const { index, server, url } of reserving) {
+      const id = uniqueId(server.name, ids);
+      ids.add(id);
+      accepted[index] = { ...server, id, url };
     }
     const servers: StoredRemoteMcpServer[] = [];
     for (const server of accepted) {

@@ -652,6 +652,23 @@ vi.mock('@/lib/hooks/use-remote-model-catalog-retry', () => ({
 vi.mock('@/lib/hooks/use-session-raise-reader', () => ({
   useSessionRaiseReader: () => () => null,
 }));
+// The header pill adds the session's compute charges to its total; this screen
+// test supplies the model cost only, so the read is pinned to "nothing recorded"
+// while its arguments are recorded for the polling test.
+const computeReadArgs = vi.hoisted(() => ({ calls: [] as { poll?: boolean }[] }));
+vi.mock('@/lib/hooks/use-session-compute', () => ({
+  useSessionComputeCharges: (args: { poll?: boolean } = {}) => {
+    computeReadArgs.calls.push(args);
+    return { data: undefined, isError: false, refetch: vi.fn() };
+  },
+  useComputeRates: () => ({ data: undefined }),
+}));
+// The poll follows the screen's focus and the app's foreground state; that hook
+// has its own mounted suite, so this screen test supplies the reading.
+const computePolling = vi.hoisted(() => ({ focusedAndActive: true }));
+vi.mock('@/lib/hooks/use-app-active-and-focused', () => ({
+  useAppActiveAndFocused: () => computePolling.focusedAndActive,
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/lib/persist/drafts', () => ({ agentComposerDraftKey: (id: string) => id }));
 vi.mock('@/lib/persist/use-draft-load', () => ({
@@ -6008,3 +6025,19 @@ describe('session detail duplicate failure state', () => {
 function indicatorNodes(view: Awaited<ReturnType<typeof mountDetails>>) {
   return view.renderer.root.findAll(node => Object.is(node.type, 'SessionStatusIndicator'));
 }
+
+describe('session detail compute polling', () => {
+  it('polls the compute read only while the screen is focused and the app is active', async () => {
+    computeReadArgs.calls.length = 0;
+    computePolling.focusedAndActive = true;
+    await mountDetails();
+    expect(computeReadArgs.calls.at(-1)?.poll).toBe(true);
+
+    // A screen left on the navigation stack keeps mounting its reads; a blurred
+    // one must leave the shared timer to whichever surface is on screen.
+    computeReadArgs.calls.length = 0;
+    computePolling.focusedAndActive = false;
+    await mountDetails();
+    expect(computeReadArgs.calls.at(-1)?.poll).toBe(false);
+  });
+});

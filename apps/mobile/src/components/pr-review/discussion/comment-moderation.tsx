@@ -13,11 +13,13 @@
 // reader throws rather than falling back to a private set of mutations.
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { reportReceiptRoute } from '@/lib/report-receipt-route';
 import { useTRPC } from '@/lib/trpc';
 import { isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
 import { Alert } from 'react-native';
@@ -95,6 +97,7 @@ function useCommentModeration(): CommentModeration {
   const { t } = useTranslation();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const invalidateHiddenUsers = () => {
     void queryClient.invalidateQueries({ queryKey: trpc.moderation.listHiddenUsers.queryKey() });
@@ -104,7 +107,15 @@ function useCommentModeration(): CommentModeration {
     trpc.moderation.reportContent.mutationOptions({
       onSuccess: result =>
         announcingToast.success(
-          t('common.reportSubmittedReceipt', { receiptId: result.receiptId })
+          t('common.reportSubmittedReceipt', { receiptId: result.receiptId }),
+          {
+            action: {
+              label: t('profile.reportReceipt.viewReceipt'),
+              onClick: () => {
+                router.push(reportReceiptRoute(result.receiptId));
+              },
+            },
+          }
         ),
       onError: (error, variables) => {
         showModerationFailure('report-content', error, () => {
@@ -117,7 +128,15 @@ function useCommentModeration(): CommentModeration {
     trpc.moderation.reportUser.mutationOptions({
       onSuccess: result =>
         announcingToast.success(
-          t('common.reportSubmittedReceipt', { receiptId: result.receiptId })
+          t('common.reportSubmittedReceipt', { receiptId: result.receiptId }),
+          {
+            action: {
+              label: t('profile.reportReceipt.viewReceipt'),
+              onClick: () => {
+                router.push(reportReceiptRoute(result.receiptId));
+              },
+            },
+          }
         ),
       onError: (error, variables) => {
         showModerationFailure('report-user', error, () => {

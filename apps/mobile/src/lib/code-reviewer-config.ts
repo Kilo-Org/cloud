@@ -158,8 +158,6 @@ export type ReviewConfigData =
 
 /** The council config a `getReviewConfig` read returns (organizations only). */
 export type CouncilConfig = NonNullable<OrgReviewConfig['council']>;
-/** One persisted council specialist, in the wire's snake_case shape. */
-export type CouncilSpecialistConfig = CouncilConfig['specialists'][number];
 
 // The save/optimistic-cache patch. The mobile patch fields come from the
 // shared app-shared contract so the personal and org save paths cannot drift

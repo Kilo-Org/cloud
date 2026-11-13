@@ -234,17 +234,9 @@ vi.mock('@/lib/hooks/use-reviewer-council', () => ({
   useCouncilGate: () => ({ allowed: false, pending: false }),
   useCouncilUiEnabled: () => false,
 }));
-vi.mock('@/lib/hooks/use-repository-access-sync', () => ({
-  useRepositoryAccessSync: (_scope: string, _platform: string) => ({
-    manageAccess: undefined,
-    resync: state.resync,
-    resyncing: false,
-    refreshing: false,
-    refreshRepositories: () => void state.resync(),
-  }),
-}));
 vi.mock('@/components/agents/model-selector', () => ({ openModelPicker: vi.fn() }));
 vi.mock('@/lib/hooks/use-available-models', () => ({
+  useAvailableModels: () => ({ models: [], isLoading: false }),
   modelLabelFromCatalogue: () => 'default model',
   thinkingEffortLabel: (effort: string) => effort,
 }));

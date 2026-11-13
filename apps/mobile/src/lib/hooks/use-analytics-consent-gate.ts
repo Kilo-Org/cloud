@@ -1,11 +1,19 @@
 import { useEffect } from 'react';
 
-import { discardPostHog, identifyUser, initPostHog, resumePostHog } from '@/lib/analytics/posthog';
+import {
+  discardPostHog,
+  identifyUser,
+  initPostHog,
+  livePostHogClient,
+  resumePostHog,
+} from '@/lib/analytics/posthog';
 import { initAppsFlyer, resetAppsFlyerState } from '@/lib/appsflyer';
 import {
+  allowsOptional,
   clearTelemetryDecision,
   currentAccountId,
   currentEpoch,
+  currentGeneration,
   setTelemetryDecision,
 } from '@/lib/telemetry/controller';
 import { purgePostHogPersistence } from '@/lib/telemetry/posthog-storage';
@@ -33,15 +41,54 @@ async function discardOptionalTelemetry(epoch: number): Promise<void> {
   purgePostHogPersistence();
 }
 
-async function startOptionalTelemetry(epoch: number, email: string | undefined): Promise<void> {
+/**
+ * Bring telemetry up for the signed-in account once the user has answered the
+ * consent screen. The client only needs rebuilding when what it was built for
+ * changes: another account (a different controller generation) or another
+ * optional-consent level. The consent level, not the derived capture flag, is
+ * the key: a development build cannot capture either way, and a consent change
+ * still has to reach Appsflyer. An unchanged build keeps its client and its
+ * queued events, and a caller that only learned the email a moment later
+ * identifies the running client instead.
+ *
+ * When a rebuild is needed, a client already running under another account, or
+ * another consent state, is torn down first: its queue may hold events the
+ * current consent forbids, and the capture options are constructor-only. A cold
+ * start has no client, so its storage survives.
+ *
+ * `initPostHog` then creates the client the current consent allows — capture on
+ * with optional consent, flags-only without it. A flags-only client still
+ * resolves feature flags for the identified person, so a flag-gated surface
+ * shows the rollout decision the web shows for that account.
+ */
+async function startTelemetry(epoch: number, email: string | undefined): Promise<void> {
   if (currentEpoch() !== epoch) {
     return;
+  }
+  const live = livePostHogClient();
+  if (
+    live &&
+    live.generation === currentGeneration() &&
+    live.optionalConsent === allowsOptional()
+  ) {
+    if (email !== undefined && live.identifiedEmail !== email) {
+      identifyUser(email);
+    }
+    return;
+  }
+  if (live) {
+    await discardOptionalTelemetry(epoch);
+    if (currentEpoch() !== epoch) {
+      return;
+    }
   }
   await resumePostHog();
   if (currentEpoch() !== epoch) {
     return;
   }
-  initAppsFlyer();
+  if (allowsOptional()) {
+    initAppsFlyer();
+  }
   initPostHog();
   if (email) {
     identifyUser(email);
@@ -79,15 +126,24 @@ export function useAnalyticsConsentGate({
       void discardOptionalTelemetry(epoch);
       return;
     }
-    if (needsConsent || !optionalConsent) {
+    if (needsConsent) {
+      // The consent screen is up and the user has not answered: start nothing,
+      // capture or flag evaluation. The answer arrives as `needsConsent: false`.
       setTelemetryDecision(accountId, false);
       const epoch = currentEpoch();
       resetAppsFlyerState();
       void discardOptionalTelemetry(epoch);
       return;
     }
+    if (!optionalConsent) {
+      setTelemetryDecision(accountId, false);
+      const epoch = currentEpoch();
+      resetAppsFlyerState();
+      void startTelemetry(epoch, email);
+      return;
+    }
     setTelemetryDecision(accountId, true);
     const epoch = currentEpoch();
-    void startOptionalTelemetry(epoch, email);
+    void startTelemetry(epoch, email);
   }, [resolving, hasToken, consentChecked, needsConsent, email, accountId, optionalConsent]);
 }

@@ -44,6 +44,9 @@ export type EventServiceConfig = {
    * browsers do not expose the HTTP status of a failed handshake). Return
    * 'retry' after clearing cached token state to let the client reconnect with
    * a fresh token, or 'stop' to permanently stop reconnecting.
+   *
+   * Without this handler a refused connection ticket stops the client from
+   * reconnecting, because the client cannot refresh the credential itself.
    */
   onUnauthorized?: () =>
     | void

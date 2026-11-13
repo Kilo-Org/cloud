@@ -116,6 +116,7 @@ vi.mock('@/components/ui/icons', () => ({
   Smartphone: 'Smartphone',
   Trash2: 'Trash2',
   Users: 'Users',
+  Workflow: 'Workflow',
 }));
 vi.mock('@/components/profile-action-tile', () => ({ ActionTile: 'ActionTile' }));
 vi.mock('@/components/profile-credits-card', () => ({ CreditsCard: 'CreditsCard' }));

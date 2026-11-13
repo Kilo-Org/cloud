@@ -2,12 +2,13 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
 
+import { callerAddressFromHeaders } from '@/lib/auth/caller-address';
+import { checkFirewallRateLimit } from '@/lib/auth/firewall-rate-limit';
 import {
   createAuthenticationOptions,
   verifyAuthentication,
   PasskeyVerificationError,
 } from '@/lib/auth/passkey';
-import { checkFirewallRateLimit } from '@/lib/auth/firewall-rate-limit';
 import { authenticationResponseSchema } from '@/lib/auth/passkey-response';
 
 /**
@@ -21,15 +22,6 @@ import { authenticationResponseSchema } from '@/lib/auth/passkey-response';
  */
 const OPTIONS_RATE_LIMIT_ID = 'passkey-authentication-options';
 const VERIFY_RATE_LIMIT_ID = 'passkey-authentication-verify';
-
-/** The client address the firewall rule counts against, from the proxy headers. */
-function clientIpAddress(request: NextRequest): string {
-  return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
-    'unknown'
-  );
-}
 
 /**
  * Usernameless passkey sign-in. `{ action: 'options' }` mints discoverable
@@ -64,7 +56,7 @@ export async function POST(request: NextRequest) {
       const limit = await checkFirewallRateLimit(OPTIONS_RATE_LIMIT_ID, {
         source: 'passkey_authenticate_options',
         request,
-        rateLimitKey: `passkey-options:${clientIpAddress(request)}`,
+        rateLimitKey: `passkey-options:${callerAddressFromHeaders(request.headers)}`,
       });
       if (limit === 'limited') {
         return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
@@ -80,7 +72,7 @@ export async function POST(request: NextRequest) {
     const limit = await checkFirewallRateLimit(VERIFY_RATE_LIMIT_ID, {
       source: 'passkey_authenticate_verify',
       request,
-      rateLimitKey: `passkey-verify:${clientIpAddress(request)}`,
+      rateLimitKey: `passkey-verify:${callerAddressFromHeaders(request.headers)}`,
     });
     if (limit === 'limited') {
       return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });

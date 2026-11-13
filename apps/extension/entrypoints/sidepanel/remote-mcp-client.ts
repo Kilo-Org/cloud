@@ -1,3 +1,4 @@
+/* eslint-disable import/max-dependencies, max-lines -- one transport adapter per MCP concern; the connect/retry flow reads better in one file */
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import {
@@ -8,6 +9,7 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { jsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/types.js';
+import { describeFetchError } from '../../src/shared/agent-turn-error';
 import type {
   RemoteMcpAuth,
   RemoteMcpCachedTool,
@@ -21,9 +23,64 @@ import {
 import type { RemoteMcpStorageArea } from '../../src/shared/remote-mcp-storage';
 import type { RemoteMcpToolRoute } from '../../src/shared/remote-mcp-tools';
 import type { RemoteMcpOAuthProvider } from './remote-mcp-oauth-provider';
-import { createRemoteMcpOAuthProvider } from './remote-mcp-oauth-provider';
+import { AUTH_INCOMPLETE_MESSAGE, createRemoteMcpOAuthProvider } from './remote-mcp-oauth-provider';
 
 type FetchLike = typeof fetch;
+
+const NEEDS_CREDENTIALS_MESSAGE =
+  'This server needs credentials. Add a bearer token, a custom header, or OAuth in Edit.';
+const UNREACHABLE_MESSAGE =
+  "Kilo couldn't reach this server. Check the URL and that the server is running.";
+
+const STREAMABLE_HTTP_PREFIX = 'Streamable HTTP error: ';
+const POSTING_PREFIX = /^Error POSTing to endpoint(?: \(HTTP \d+\))?: /u;
+
+/*
+ * The SDK wraps the server's own reason in transport boilerplate
+ * ("Streamable HTTP error: Error POSTing to endpoint: <body>"). Show only the
+ * reason, and drop an empty remainder so the row never renders bare scaffolding.
+ */
+const extractServerReason = (message: string): string | undefined => {
+  let reason = message.startsWith(STREAMABLE_HTTP_PREFIX)
+    ? message.slice(STREAMABLE_HTTP_PREFIX.length)
+    : message;
+  reason = reason.replace(POSTING_PREFIX, '').trim();
+
+  return reason === '' ? undefined : reason;
+};
+
+/*
+ * A remote MCP server is a third party, so the copy names it rather than Kilo:
+ * the user's next step is the server URL, its credentials, or its health.
+ */
+const describeConnectFailure = (error: unknown) => {
+  const needsAuth =
+    (error instanceof StreamableHTTPError && error.code === 401) ||
+    error instanceof UnauthorizedError;
+
+  if (needsAuth) {
+    return { message: NEEDS_CREDENTIALS_MESSAGE, needsAuth };
+  }
+
+  // The interactive sign-in opened but never handed back a code: retrying Connect is the next step.
+  if (error instanceof Error && error.message === AUTH_INCOMPLETE_MESSAGE) {
+    return { message: AUTH_INCOMPLETE_MESSAGE, needsAuth: true };
+  }
+
+  // A fetch network failure is a TypeError; no HTTP layer answered at all.
+  if (error instanceof TypeError) {
+    return { message: UNREACHABLE_MESSAGE, needsAuth };
+  }
+
+  const status = error instanceof StreamableHTTPError ? error.code : undefined;
+  const described = describeFetchError(error, status);
+  const reason = error instanceof Error ? extractServerReason(error.message) : undefined;
+
+  return {
+    message: reason === undefined ? described.title : `${described.title} ${reason}`,
+    needsAuth,
+  };
+};
 
 const buildAuthHeaders = (auth: RemoteMcpAuth) => {
   if (auth.type === 'bearer' && auth.token !== undefined) {
@@ -128,7 +185,7 @@ export const connectRemoteMcpServer = async ({
       }
       const code = authProvider.takeAuthorizationCode();
       if (code === undefined) {
-        throw error;
+        throw new Error(AUTH_INCOMPLETE_MESSAGE, { cause: error });
       }
       await transport.finishAuth(code);
       await client.connect(asTransport(makeTransport(server, fetchFn, authProvider)), {
@@ -155,11 +212,7 @@ export const connectRemoteMcpServer = async ({
       status: 'connected',
     };
   } catch (error) {
-    const is401 = error instanceof StreamableHTTPError && error.code === 401;
-    const needsAuth = is401 || error instanceof UnauthorizedError;
-    // Is401 implies error instanceof StreamableHTTPError extends Error, so error.message is safe
-    const errorText = error instanceof Error ? error.message : String(error);
-    const message: string = is401 ? `401: ${errorText}` : errorText;
+    const { message, needsAuth } = describeConnectFailure(error);
 
     return {
       ...server,
@@ -240,8 +293,10 @@ export const callRemoteMcpTool = async ({
      */
     return CallToolResultSchema.parse(result);
   } catch (error) {
-    const text = error instanceof Error ? error.message : String(error);
-    return { content: [{ text, type: 'text' }], isError: true };
+    return {
+      content: [{ text: describeConnectFailure(error).message, type: 'text' }],
+      isError: true,
+    };
   } finally {
     await client.close();
   }

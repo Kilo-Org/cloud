@@ -12,16 +12,22 @@
  */
 const RIGHT_TO_LEFT_MARK = '\u200F';
 
-/** A fence opener or closer: up to three spaces, then three or more marks. */
-const FENCE = /^[ \t]{0,3}(`{3,}|~{3,})/;
+/** Up to three spaces and any blockquote markers in front of a line's content. */
+const BLOCKQUOTE = /^[ \t]{0,3}(?:>[ \t]?)*/;
+
+/** A fence opener: up to three spaces, then three or more marks and an info string. */
+const FENCE_OPEN = /^[ \t]{0,3}(`{3,}|~{3,})/;
+
+/** A fence closer: the same shape with nothing after the marks. */
+const FENCE_CLOSE = /^[ \t]{0,3}(`{3,}|~{3,})[ \t]*$/;
 
 /**
- * A list item and the text before its content: up to three spaces of
- * indentation, any blockquote markers, the bullet or number, its space, and a
- * task-list checkbox when the item opens with one. The checkbox stays first, so
- * the renderer still reads the item as a task.
+ * A list item and the text before its content: any indentation, any blockquote
+ * markers, the bullet or number, its space, and a task-list checkbox when the
+ * item opens with one. Indented code is excluded before this runs. The checkbox
+ * stays first, so the renderer still reads the item as a task.
  */
-const LIST_ITEM = /^([ \t]{0,3}(?:>[ \t]?)*)([-*+]|\d{1,9}[.)])([ \t]+)(\[[ xX]\][ \t]+)?/;
+const LIST_ITEM = /^([ \t]*(?:>[ \t]?)*)([-*+]|\d{1,9}[.)])([ \t]+)(\[[ xX]\][ \t]+)?/;
 
 /** Four spaces or a tab after a blank line opens an indented code block. */
 const INDENTED_CODE = /^([ \t]{4}|[ \t]*\t)/;
@@ -35,9 +41,9 @@ const THEMATIC_BREAK = /^[ \t]{0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]
 
 type Fence = { readonly mark: string; readonly length: number };
 
-/** The fence line that closes `open`, or `null` for any other line. */
-function closingFence(open: Fence, line: string): Fence | null {
-  const found = FENCE.exec(line);
+/** The fence that closes `open`, or `null` for any other line. */
+function closingFence(open: Fence, content: string): Fence | null {
+  const found = FENCE_CLOSE.exec(content);
   const run = found?.[1];
   if (run === undefined) {
     return null;
@@ -46,7 +52,7 @@ function closingFence(open: Fence, line: string): Fence | null {
 }
 
 function withStartEdge(line: string): string {
-  if (THEMATIC_BREAK.test(line)) {
+  if (THEMATIC_BREAK.test(line.replace(BLOCKQUOTE, ''))) {
     return line;
   }
   const item = LIST_ITEM.exec(line);
@@ -66,25 +72,34 @@ function withStartEdge(line: string): string {
  */
 export function rtlListItems(markdown: string): string {
   let open: Fence | null = null;
+  let indentedCode = false;
   let afterBlankLine = true;
   return markdown
     .split('\n')
     .map(line => {
+      const content = line.replace(BLOCKQUOTE, '');
       if (open !== null) {
-        const close = closingFence(open, line);
+        const close = closingFence(open, content);
         if (close !== null && close.length >= open.length) {
           open = null;
         }
         afterBlankLine = false;
         return line;
       }
-      const fence = FENCE.exec(line)?.[1];
+      if (indentedCode) {
+        if (line.trim() === '' || INDENTED_CODE.test(line)) {
+          return line;
+        }
+        indentedCode = false;
+      }
+      const fence = FENCE_OPEN.exec(content)?.[1];
       if (fence !== undefined) {
         open = { mark: fence, length: fence.length };
         afterBlankLine = false;
         return line;
       }
       if (afterBlankLine && INDENTED_CODE.test(line)) {
+        indentedCode = true;
         afterBlankLine = false;
         return line;
       }

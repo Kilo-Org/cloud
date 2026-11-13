@@ -43,9 +43,30 @@ describe('rtlListItems', () => {
     expect(rtlListItems(value)).toBe(`~~~\n- item\n~~~\n- ${MARK}item`);
   });
 
+  it('does not close a fence on a line carrying an info string', () => {
+    const value = '```md\n```js\n- item\n```\n- item';
+    expect(rtlListItems(value)).toBe(`\`\`\`md\n\`\`\`js\n- item\n\`\`\`\n- ${MARK}item`);
+  });
+
+  it('tracks a fence inside a blockquote', () => {
+    const value = '> ```md\n> - item\n> ```\n- item';
+    expect(rtlListItems(value)).toBe(`> \`\`\`md\n> - item\n> \`\`\`\n- ${MARK}item`);
+  });
+
   it('keeps an indented code block exactly', () => {
     const value = 'Example:\n\n    - item\n\n- item';
     expect(rtlListItems(value)).toBe(`Example:\n\n    - item\n\n- ${MARK}item`);
+  });
+
+  it('keeps every line of a tab-indented code block exactly', () => {
+    const value = 'Example:\n\n\t- first\n\t- second\n';
+    expect(rtlListItems(value)).toBe(value);
+  });
+
+  it('names the start edge in a deeply indented item', () => {
+    expect(rtlListItems('- one\n  - two\n    - three')).toBe(
+      `- ${MARK}one\n  - ${MARK}two\n    - ${MARK}three`
+    );
   });
 
   it('leaves a thematic break alone', () => {
@@ -53,6 +74,11 @@ describe('rtlListItems', () => {
     expect(rtlListItems('* * *')).toBe('* * *');
     expect(rtlListItems('---')).toBe('---');
     expect(rtlListItems('_ _ _')).toBe('_ _ _');
+  });
+
+  it('leaves a blockquoted thematic break alone', () => {
+    expect(rtlListItems('> - - -')).toBe('> - - -');
+    expect(rtlListItems('> * * *')).toBe('> * * *');
   });
 
   it('returns markdown without a list unchanged', () => {

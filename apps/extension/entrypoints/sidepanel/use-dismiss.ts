@@ -24,22 +24,48 @@ const useLatestRef = <TValue>(value: TValue): RefObject<TValue> => {
   return valueRef;
 };
 
+/**
+ * Paint order of the surfaces that dismiss on Escape or an outside click,
+ * mirroring their z-index: an inline card (`z-[25]`) covers a popover
+ * (`z-20`), a full-surface dialog or the history overlay (`z-30`) covers
+ * both, and a popover rendered inside a dialog paints on top of that dialog.
+ */
+export const dismissLayer = {
+  card: 25,
+  dialog: 30,
+  popover: 20,
+  popoverInDialog: 40,
+} as const;
+
+type DismissLayerRank = (typeof dismissLayer)[keyof typeof dismissLayer];
+
 interface DismissLayer {
   readonly dismissOnEscape?: () => void;
   readonly dismissOnPointerDown?: (event: PointerEvent) => void;
+  readonly rank: DismissLayerRank;
 }
 
 /*
  * A surface joins the stack when it becomes dismissible and leaves when it
- * stops. Only the topmost surface that handles a gesture acts on it, so a
- * modal covering a popover takes the Escape that closes the modal instead of
- * both, and the ordering follows the order the surfaces opened.
+ * stops. Only the surface that paints highest handles a gesture, so a dialog
+ * covering a card takes the Escape that closes the dialog instead of both,
+ * even when the card became dismissible after the dialog opened; equal ranks
+ * fall back to the most recently opened surface.
  */
 const dismissLayers: DismissLayer[] = [];
 let isListening = false;
 
-const findTopLayer = (matches: (layer: DismissLayer) => boolean): DismissLayer | undefined =>
-  dismissLayers.findLast(layer => matches(layer));
+const findTopLayer = (matches: (layer: DismissLayer) => boolean): DismissLayer | undefined => {
+  let top: DismissLayer | undefined = undefined;
+
+  for (const layer of dismissLayers) {
+    if (matches(layer) && (top === undefined || layer.rank >= top.rank)) {
+      top = layer;
+    }
+  }
+
+  return top;
+};
 
 const handleKeyDown = (event: KeyboardEvent): void => {
   if (event.key !== 'Escape' || event.defaultPrevented) {
@@ -84,7 +110,11 @@ const removeLayer = (layer: DismissLayer): void => {
   }
 };
 
-export const useEscapeKey = (enabled: boolean, onEscape: () => void): void => {
+export const useEscapeKey = (
+  enabled: boolean,
+  onEscape: () => void,
+  rank: DismissLayerRank
+): void => {
   const onEscapeRef = useLatestRef(onEscape);
 
   useEffect(() => {
@@ -96,22 +126,25 @@ export const useEscapeKey = (enabled: boolean, onEscape: () => void): void => {
       dismissOnEscape: () => {
         onEscapeRef.current();
       },
+      rank,
     };
     pushLayer(layer);
 
     return () => {
       removeLayer(layer);
     };
-  }, [enabled, onEscapeRef]);
+  }, [enabled, onEscapeRef, rank]);
 };
 
 export const useDismissOnOutsideClick = ({
   enabled,
   onDismiss,
+  rank,
   targetRef,
 }: {
   enabled: boolean;
   onDismiss: () => void;
+  rank: DismissLayerRank;
   targetRef: RefObject<HTMLElement | null>;
 }): void => {
   const onDismissRef = useLatestRef(onDismiss);
@@ -134,13 +167,14 @@ export const useDismissOnOutsideClick = ({
 
         onDismissRef.current();
       },
+      rank,
     };
     pushLayer(layer);
 
     return () => {
       removeLayer(layer);
     };
-  }, [enabled, onDismissRef, targetRef]);
+  }, [enabled, onDismissRef, rank, targetRef]);
 };
 
 /**
@@ -213,6 +247,7 @@ export const useModalDialog = ({
       dismissOnEscape: () => {
         onCloseRef.current();
       },
+      rank: dismissLayer.dialog,
     };
     pushLayer(layer);
 

@@ -1,11 +1,16 @@
-/* eslint-disable vitest/no-hooks, vitest/require-top-level-describe -- every test here mounts a surface with a document-level listener, so the DOM must be cleaned between tests */
+/* eslint-disable max-lines, vitest/no-hooks, vitest/require-top-level-describe -- every test here mounts a surface with a document-level listener, so the DOM must be cleaned between tests */
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { useRef, useState } from 'react';
 import type { JSX } from 'react';
-import { useDismissOnOutsideClick, useEscapeKey, useModalDialog } from './use-dismiss';
+import {
+  dismissLayer,
+  useDismissOnOutsideClick,
+  useEscapeKey,
+  useModalDialog,
+} from './use-dismiss';
 
 afterEach(cleanup);
 
@@ -62,9 +67,13 @@ const DialogHarness = ({
 
 const EscapeHarness = ({ enabled }: { enabled: boolean }): JSX.Element => {
   const [count, setCount] = useState(0);
-  useEscapeKey(enabled, () => {
-    setCount(current => current + 1);
-  });
+  useEscapeKey(
+    enabled,
+    () => {
+      setCount(current => current + 1);
+    },
+    dismissLayer.popover
+  );
 
   return (
     <div>
@@ -92,10 +101,14 @@ const NestedHarness = ({
     },
     open: isDialogOpen,
   });
-  useEscapeKey(isPopoverOpen, () => {
-    setIsPopoverOpen(false);
-    onClosePopover();
-  });
+  useEscapeKey(
+    isPopoverOpen,
+    () => {
+      setIsPopoverOpen(false);
+      onClosePopover();
+    },
+    dismissLayer.popoverInDialog
+  );
 
   return (
     <div>
@@ -132,6 +145,7 @@ const OutsideClickHarness = ({ enabled }: { enabled: boolean }): JSX.Element => 
     onDismiss: () => {
       setDismissed(current => current + 1);
     },
+    rank: dismissLayer.popover,
     targetRef: containerRef,
   });
 
@@ -225,6 +239,29 @@ describe('dismiss layer order', () => {
     // eslint-disable-next-line vitest/prefer-called-times -- vitest/prefer-called-once is also enabled and prefers the singular matcher.
     expect(onCloseDialog).toHaveBeenCalledOnce();
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('ignores a lower-ranked surface opened after a higher-ranked one', () => {
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <div>
+        <DialogHarness onClose={onClose} />
+        <EscapeHarness enabled={false} />
+      </div>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Open settings' }));
+    rerender(
+      <div>
+        <DialogHarness onClose={onClose} />
+        <EscapeHarness enabled />
+      </div>
+    );
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    // eslint-disable-next-line vitest/prefer-called-times -- vitest/prefer-called-once is also enabled and prefers the singular matcher.
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Dismissed 0' })).toBeDefined();
   });
 
   it('gives Escape to a dialog opened over an open popover', () => {

@@ -7,7 +7,7 @@ import { thinkingEffortLabel } from '@/src/shared/kilo-api-client';
 import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
 import type { InspectableTab } from '@/src/shared/tab-debugger';
 import { ModelPicker } from './model-picker';
-import { useDismissOnOutsideClick, useEscapeKey } from './use-dismiss';
+import { dismissLayer, useDismissOnOutsideClick, useEscapeKey } from './use-dismiss';
 
 const modeOptions = [
   { label: 'Safe', value: 'safe' },
@@ -73,14 +73,19 @@ const ModeControl = ({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  useEscapeKey(isOpen, () => {
-    setIsOpen(false);
-  });
+  useEscapeKey(
+    isOpen,
+    () => {
+      setIsOpen(false);
+    },
+    dismissLayer.popover
+  );
   useDismissOnOutsideClick({
     enabled: isOpen,
     onDismiss: () => {
       setIsOpen(false);
     },
+    rank: dismissLayer.popover,
     targetRef: containerRef,
   });
 

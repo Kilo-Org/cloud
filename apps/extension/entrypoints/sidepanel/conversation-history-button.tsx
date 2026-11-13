@@ -1,12 +1,10 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useAtom } from 'jotai';
 import { History, Trash2, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { CSSProperties, JSX } from 'react';
 import { getStoredConversationTitle, isStoredConversationOpen } from './agent-conversation-storage';
 import type { StoredAgentConversation } from './agent-conversation-storage';
-import { conversationHistoryOpenAtom } from './settings-dialog-state';
-import { useEscapeKey } from './use-dismiss';
+import { dismissLayer, useEscapeKey } from './use-dismiss';
 import type { StoredAgentConversationStore } from '@/src/shared/agent-conversation-tabs';
 
 const historyPageSize = 100;
@@ -47,19 +45,16 @@ export const ConversationHistoryButton = ({
   onDeleteConversation: (conversationId: string) => void;
   onOpenConversation: (conversationId: string) => void;
 }): JSX.Element => {
-  const [isOpen, setIsOpen] = useAtom(conversationHistoryOpenAtom);
+  const [isOpen, setIsOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(historyPageSize);
   const historyRef = useRef<HTMLDivElement | null>(null);
-  // The panel's other surfaces key their Escape handling off this atom, so a closed panel must not leave it set.
-  useEffect(
-    () => () => {
+  useEscapeKey(
+    isOpen,
+    () => {
       setIsOpen(false);
     },
-    [setIsOpen]
+    dismissLayer.dialog
   );
-  useEscapeKey(isOpen, () => {
-    setIsOpen(false);
-  });
   const visibleConversations = useMemo(
     () => conversations.slice(0, Math.min(visibleCount, conversations.length)),
     [conversations, visibleCount]

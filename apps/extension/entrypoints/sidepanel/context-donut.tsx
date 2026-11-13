@@ -3,7 +3,7 @@ import type { JSX } from 'react';
 import { formatContextSummary, getContextRatio, getContextTone } from '@/src/shared/context-usage';
 import { formatSessionCost } from '@/src/shared/session-cost';
 import { DESIGN_TOKENS } from './design-tokens';
-import { useDismissOnOutsideClick, useEscapeKey } from './use-dismiss';
+import { dismissLayer, useDismissOnOutsideClick, useEscapeKey } from './use-dismiss';
 
 const toneStroke = {
   danger: DESIGN_TOKENS.statusRed500,
@@ -46,8 +46,13 @@ export const ContextDonut = ({
   const label = `Context usage: ${summary}`;
   const sessionCostLabel = formatSessionCost(sessionCostUsd);
 
-  useDismissOnOutsideClick({ enabled: isOpen, onDismiss: closePopover, targetRef: detailsRef });
-  useEscapeKey(isOpen, closePopover);
+  useDismissOnOutsideClick({
+    enabled: isOpen,
+    onDismiss: closePopover,
+    rank: dismissLayer.popover,
+    targetRef: detailsRef,
+  });
+  useEscapeKey(isOpen, closePopover, dismissLayer.popover);
 
   return (
     <details

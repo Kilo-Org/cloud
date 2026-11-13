@@ -12,9 +12,9 @@ import {
   deriveNoteCharacterCount,
   deriveSaveCardState,
 } from './pending-memory-save-card-state';
-import { conversationHistoryOpenAtom, settingsDialogOpenAtom } from './settings-dialog-state';
+import { settingsDialogOpenAtom } from './settings-dialog-state';
 import { useAgentMemories } from './use-agent-memories';
-import { useEscapeKey } from './use-dismiss';
+import { dismissLayer, useEscapeKey } from './use-dismiss';
 const SAVE_ERROR_MESSAGE = "Couldn't save memory. Try again.";
 const LOAD_ERROR_MESSAGE = "Couldn't load memories. Try again.";
 const FULL_MESSAGE = 'Memory is full. Delete memories to save new ones.';
@@ -30,7 +30,6 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
   const { isLoaded, loadError, memories, pendingDraft, reload } = useAgentMemories();
   const [approvalEntry, setApprovalEntry] = useAtom(pendingApprovalAtom);
   const settingsDialogOpen = useAtomValue(settingsDialogOpenAtom);
-  const isHistoryOpen = useAtomValue(conversationHistoryOpenAtom);
   const setSettingsOpen = useSetAtom(settingsDialogOpenAtom);
   const [savedConfirmation, setSavedConfirmation] = useState(false);
   const [saveError, setSaveError] = useState<string | undefined>();
@@ -122,14 +121,18 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
     setFullOutcome(false);
   };
 
-  useEscapeKey(!settingsDialogOpen && !isHistoryOpen && view.kind !== 'hidden', () => {
-    if (view.kind === 'confirmation') {
-      handleDone();
-      return;
-    }
+  useEscapeKey(
+    !settingsDialogOpen && view.kind !== 'hidden',
+    () => {
+      if (view.kind === 'confirmation') {
+        handleDone();
+        return;
+      }
 
-    handleCancel();
-  });
+      handleCancel();
+    },
+    dismissLayer.card
+  );
 
   if (view.kind === 'hidden') {
     return null;

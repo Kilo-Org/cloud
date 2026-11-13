@@ -121,9 +121,8 @@ function sessionPublicShape(value: unknown, kiloSessionId: string): NativeReadOu
 }
 
 /**
- * Projects the requested session's transcript window. A row whose session
- * identity cannot be proven refuses the read; a row that names another session
- * is dropped rather than returned for an id-scoped caller.
+ * Projects only the requested session's transcript window. A row with no session
+ * identity refuses the read.
  */
 function messagesPublicShape(
   value: unknown,

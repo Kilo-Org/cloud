@@ -85,7 +85,7 @@ describe('readNativeLiveOperation', () => {
     expect(outcome).toEqual({ kind: 'ok', body: { [kiloSessionId]: { type: 'busy' } } });
   });
 
-  it('answers an empty status read when the runtime reports only another session', async () => {
+  it('answers an empty status read when the runtime reports no entry for the session', async () => {
     const outcome = await readNativeLiveOperation(
       readParams({ name: 'session.status' }, async () => ({
         ok: true,
@@ -302,7 +302,7 @@ describe('readNativeLiveOperation', () => {
     });
   });
 
-  it('returns an empty transcript when the runtime reports only another session', async () => {
+  it('returns an empty transcript when the runtime reports no row for the session', async () => {
     const outcome = await readNativeLiveOperation(
       readParams({ name: 'session.messages' }, async () => ({
         ok: true,

@@ -8,6 +8,7 @@ import { DetailScreenScrollView } from '@/components/detail-screen';
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { HostListRow } from '@/components/ssh/host-list-row';
+import { SandboxListRow } from '@/components/ssh/sandbox-list-row';
 import { SshStorageError } from '@/components/ssh/ssh-storage-error';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -17,6 +18,8 @@ import { MenuSheet, type MenuSheetOption } from '@/components/ui/menu-sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
+import { useActiveSessions } from '@/lib/active-sessions-query';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SshHost } from '@/lib/ssh/hosts';
 import {
@@ -24,6 +27,7 @@ import {
   SSH_HOST_NEW_ROUTE,
   SSH_KNOWN_HOSTS_ROUTE,
   sshHostPath,
+  sshSandboxPath,
   sshSessionPath,
 } from '@/lib/ssh/routes';
 import { openSession } from '@/lib/ssh/session/manager';
@@ -38,6 +42,7 @@ export function SshHostsScreen() {
   const colors = useThemeColors();
   const { confirm, dialog } = useConfirmDialog();
   const hosts = useSshHosts();
+  const activeSessions = useActiveSessions();
   const { remove } = useSshHostMutations();
   const [menuHost, setMenuHost] = useState<SshHost | null>(null);
 
@@ -50,6 +55,20 @@ export function SshHostsScreen() {
   const hostsById = useMemo(
     () => new Map((hosts.data ?? []).map(host => [host.id, host])),
     [hosts.data]
+  );
+  // A live cloud session is a sandbox a terminal can open into. The tray lists
+  // the live ones already; only a row that carries its runtime id can be
+  // addressed.
+  const sandboxes = useMemo(
+    () =>
+      (activeSessions.data?.sessions ?? []).flatMap(session => {
+        const cloudAgentSessionId = session.cloudAgentSessionId;
+        return session.connectionId === CLOUD_AGENT_CONNECTION_ID &&
+          cloudAgentSessionId !== undefined
+          ? [{ session, cloudAgentSessionId }]
+          : [];
+      }),
+    [activeSessions.data]
   );
 
   function runPendingAction() {
@@ -70,7 +89,7 @@ export function SshHostsScreen() {
 
   function confirmDelete(host: SshHost) {
     confirm({
-      title: t('ssh.hosts.deleteTitle', { label: host.label }),
+      title: t('common.deleteTitle', { label: host.label }),
       message: t('ssh.hosts.deleteMessage'),
       confirmLabel: t('common.delete'),
       onConfirm: () => {
@@ -97,7 +116,7 @@ export function SshHostsScreen() {
     return null;
   }
 
-  const showAdd = (hosts.data?.length ?? 0) > 0;
+  const showAdd = (hosts.data?.length ?? 0) > 0 || sandboxes.length > 0;
   let body: ReactNode = null;
   if (hosts.isPending) {
     body = (
@@ -115,7 +134,7 @@ export function SshHostsScreen() {
         isRetrying={hosts.isFetching}
       />
     );
-  } else if (hosts.data.length === 0) {
+  } else if (hosts.data.length === 0 && sandboxes.length === 0) {
     body = (
       <EmptyState
         icon={Server}
@@ -152,19 +171,67 @@ export function SshHostsScreen() {
         contentContainerClassName="gap-2 px-4 pt-4"
         showsVerticalScrollIndicator={false}
       >
-        {hosts.data.map(host => (
-          <HostListRow
-            key={host.id}
-            host={host}
-            jumpHost={host.jumpHostId === null ? null : (hostsById.get(host.jumpHostId) ?? null)}
-            onPress={() => {
-              router.push(sshSessionPath(openSession(host)));
-            }}
-            onLongPress={() => {
-              setMenuHost(host);
-            }}
+        {sandboxes.length > 0 ? (
+          <View className="gap-2 pb-2">
+            <Text className="text-xs uppercase tracking-wide text-muted-foreground">
+              {t('ssh.sandboxes.title')}
+            </Text>
+            {sandboxes.map(({ session, cloudAgentSessionId }) => {
+              const title = session.title.length > 0 ? session.title : session.id;
+              return (
+                <SandboxListRow
+                  key={session.id}
+                  session={session}
+                  accessibilityLabel={t('ssh.sandboxes.open', { title })}
+                  onPress={() => {
+                    router.push(
+                      sshSandboxPath({
+                        cloudAgentSessionId,
+                        title,
+                        ...(session.organizationId == null
+                          ? {}
+                          : { organizationId: session.organizationId }),
+                      })
+                    );
+                  }}
+                />
+              );
+            })}
+          </View>
+        ) : null}
+        {hosts.data.length === 0 ? (
+          <EmptyState
+            placement="top"
+            icon={Server}
+            title={t('ssh.hosts.emptyTitle')}
+            description={t('ssh.hosts.emptyDescription')}
+            action={
+              <Button
+                className={STATE_ACTION_CLASS}
+                onPress={() => {
+                  router.push(SSH_HOST_NEW_ROUTE);
+                }}
+              >
+                <Plus size={16} color={colors.primaryForeground} />
+                <Text>{t('ssh.hosts.addHost')}</Text>
+              </Button>
+            }
           />
-        ))}
+        ) : (
+          hosts.data.map(host => (
+            <HostListRow
+              key={host.id}
+              host={host}
+              jumpHost={host.jumpHostId === null ? null : (hostsById.get(host.jumpHostId) ?? null)}
+              onPress={() => {
+                router.push(sshSessionPath(openSession(host)));
+              }}
+              onLongPress={() => {
+                setMenuHost(host);
+              }}
+            />
+          ))
+        )}
       </DetailScreenScrollView>
     );
   }

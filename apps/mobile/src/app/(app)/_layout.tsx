@@ -215,6 +215,13 @@ export default function AppLayout() {
             <Stack.Screen name="ssh/key/new" />
             <Stack.Screen name="ssh/key/import" />
             <Stack.Screen name="ssh/known-hosts" />
+            <Stack.Screen name="ssh/snippets" />
+            {/* A sandbox terminal is a live shell too: a swipe back would end
+                its pty, and the session it belongs to is where it is reopened. */}
+            <Stack.Screen
+              name="ssh/sandbox/[session-id]"
+              options={{ gestureEnabled: false, headerShown: false }}
+            />
             {/* A session screen is a live shell: a swipe back would hide it,
                 not end it, and the switcher is how a person leaves one. */}
             <Stack.Screen

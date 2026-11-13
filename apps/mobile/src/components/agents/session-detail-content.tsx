@@ -2784,6 +2784,8 @@ export function SessionDetailContent({
               visible={sheetMountState.visible}
               info={sheetMountState.info}
               sessionId={sessionId}
+              cloudAgentSessionId={fetchedData?.cloudAgentSessionId ?? null}
+              organizationId={organizationId}
               anchorMessageId={anchor ?? resumeAnchor}
               sessionTitle={rename.title}
               activeSessionType={activeSessionType}

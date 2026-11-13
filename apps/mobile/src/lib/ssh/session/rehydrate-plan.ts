@@ -22,6 +22,12 @@ export function nativeTarget(info: Pick<SessionInfo, 'username' | 'host' | 'port
 
 type AdoptedSession = {
   readonly native: SessionInfo;
+  /**
+   * The row this connection belongs to: the id the runtime that opened it wrote,
+   * which a route restored by the navigation state still names, or `null` for a
+   * connection that never had one.
+   */
+  readonly appSessionId: string | null;
   readonly host: SshHost;
   /** The shell the terminal reattaches to; `null` when the shell closed first. */
   readonly shellId: string | null;
@@ -53,7 +59,12 @@ export function planSessions(
       if (host === undefined) {
         unmatched.push(native);
       } else {
-        adopt.push({ native, host, shellId: native.shellIds[0] ?? null });
+        adopt.push({
+          native,
+          host,
+          shellId: native.shellIds[0] ?? null,
+          appSessionId: native.appSessionId === '' ? null : native.appSessionId,
+        });
       }
     }
   }

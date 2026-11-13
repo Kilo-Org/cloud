@@ -273,7 +273,12 @@ class ReactNativeSshModule : Module() {
       },
     )
 
-    val target = SessionTarget(host = config.host, port = config.port, username = config.username)
+    val target = SessionTarget(
+      host = config.host,
+      port = config.port,
+      username = config.username,
+      appSessionId = config.appSessionId,
+    )
     sshRegistry.putSession(sessionId, translateSuspendFailures { connect(handler) }, target)
     sshRegistry.sync()
 

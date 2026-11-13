@@ -53,6 +53,9 @@ async function openChain(
     return false;
   }
   const options: ConnectOptions = {
+    // Only the session the person opened carries its row's id: a jump hop's
+    // connection has no screen of its own, so a reload must not adopt it.
+    appSessionId: via === null ? entry.id : '',
     host: hop.hostname,
     port: hop.port,
     username: hop.username,

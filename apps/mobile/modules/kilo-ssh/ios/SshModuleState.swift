@@ -5,6 +5,8 @@ struct SessionTarget: Sendable {
   let host: String
   let port: Int
   let username: String
+  /// The JavaScript session this connection belongs to, so a reload adopts its row.
+  let appSessionId: String
 }
 
 /// A forward together with what it was asked to do, so it can be described later.
@@ -80,6 +82,7 @@ final class SshModuleState: @unchecked Sendable {
       }
       var record = SessionInfoRecord()
       record.sessionId = sessionId
+      record.appSessionId = target.appSessionId
       record.host = target.host
       record.port = target.port
       record.username = target.username

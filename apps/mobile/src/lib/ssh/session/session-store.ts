@@ -10,6 +10,7 @@ import { type SshSession } from './types';
 const sessions = new Map<string, SshSession>();
 const listeners = new Set<() => void>();
 let snapshot: readonly SshSession[] = [];
+let rehydrated = false;
 
 export function subscribeSessions(listener: () => void): () => void {
   listeners.add(listener);
@@ -21,6 +22,26 @@ export function subscribeSessions(listener: () => void): () => void {
 /** Oldest first: the order the switcher lists them in. */
 export function sessionList(): readonly SshSession[] {
   return snapshot;
+}
+
+/**
+ * Whether this runtime has finished adopting what the native registry kept.
+ *
+ * The store starts empty in every runtime, so before this turns true a missing
+ * session means "not read yet", not "ended": a screen restored onto a live
+ * connection must not report its absence as a close.
+ */
+export function sessionsRehydrated(): boolean {
+  return rehydrated;
+}
+
+/** Marks the adoption pass finished, so a screen may trust an absent session. */
+export function markSessionsRehydrated(): void {
+  if (rehydrated) {
+    return;
+  }
+  rehydrated = true;
+  publish();
 }
 
 export function sessionById(id: string): SshSession | null {

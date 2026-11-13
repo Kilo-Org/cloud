@@ -34,7 +34,11 @@ import {
 import { useIdleNotifyArming } from '@/lib/ssh/session/use-idle-notify-arming';
 import { closeReasonMessage } from '@/lib/ssh/session/phase-copy';
 import { needsPrompt, type SshSessionPhase } from '@/lib/ssh/session/types';
-import { useSshSession, useSshSessions } from '@/lib/ssh/session/use-sessions';
+import {
+  useSshSession,
+  useSshSessions,
+  useSshSessionsRehydrated,
+} from '@/lib/ssh/session/use-sessions';
 import {
   SSH_HOSTS_ROUTE,
   SSH_KNOWN_HOSTS_ROUTE,
@@ -60,6 +64,7 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
   const colors = useThemeColors();
   const session = useSshSession(sessionId);
   const sessions = useSshSessions();
+  const rehydrated = useSshSessionsRehydrated();
   const { fontSize, setFontSize } = useTerminalFontSize();
   const terminalRef = useRef<TerminalViewHandle>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -111,7 +116,10 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
   }
 
   if (session === null || phase === null) {
-    return <SshTerminalClosed />;
+    // A reload empties the JS store before the registry's sessions are adopted,
+    // and the router restores this route in that window: an absent session here
+    // is not yet a closed one, so the ending waits for the adoption pass.
+    return rehydrated ? <SshTerminalClosed /> : null;
   }
 
   // A shell that exists keeps its view — and its buffer — through a reconnect,

@@ -16,7 +16,12 @@ import {
   planSessions,
   planStale,
 } from './rehydrate-plan';
-import { patchSession, writeSession } from './session-store';
+import {
+  markSessionsRehydrated,
+  patchSession,
+  sessionsRehydrated,
+  writeSession,
+} from './session-store';
 
 export type Rehydration = {
   readonly adopted: number;
@@ -41,6 +46,21 @@ type RegistrySnapshot = Readonly<{
  * something a session may fail on.
  */
 export async function rehydrateSshSessions(): Promise<Rehydration> {
+  if (sessionsRehydrated()) {
+    return NOTHING;
+  }
+  try {
+    return await adoptRegistrySessions();
+  } catch {
+    // A store that would not open is the storage error's own screen to report;
+    // this pass still ends, so no terminal keeps a "not read yet" placeholder.
+    return NOTHING;
+  } finally {
+    markSessionsRehydrated();
+  }
+}
+
+async function adoptRegistrySessions(): Promise<Rehydration> {
   const registry = await readRegistry();
   if (registry === null) {
     return NOTHING;
@@ -61,7 +81,9 @@ export async function rehydrateSshSessions(): Promise<Rehydration> {
   const adoptedTargets = new Map<string, ForwardTarget>();
 
   for (const item of plan.adopt) {
-    const id = newId();
+    // The row keeps the id its screen already names, so a route restored from
+    // the navigation state resolves to this connection instead of a closed one.
+    const id = item.appSessionId ?? newId();
     live.set(id, {
       id,
       host: item.host,

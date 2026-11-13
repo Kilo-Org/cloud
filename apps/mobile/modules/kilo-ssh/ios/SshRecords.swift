@@ -11,6 +11,7 @@ struct ConnectConfigRecord: Record, @unchecked Sendable {
   @Field var port: Int = 22
   @Field var username: String = ""
   @Field var auth: AuthRecord = AuthRecord()
+  @Field var appSessionId: String = ""
   @Field var connectTimeoutMs: Int = 15_000
   @Field var keepaliveIntervalS: Int = 15
 }
@@ -95,6 +96,7 @@ struct ForwardStartRecord: Record, @unchecked Sendable {
 /// A live session as the registry holds it, for a runtime that just started.
 struct SessionInfoRecord: Record, @unchecked Sendable {
   @Field var sessionId: String = ""
+  @Field var appSessionId: String = ""
   @Field var host: String = ""
   @Field var port: Int = 22
   @Field var username: String = ""

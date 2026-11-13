@@ -15,7 +15,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /** What a session was opened against, kept so a later runtime can name it. */
-internal data class SessionTarget(val host: String, val port: Int, val username: String)
+internal data class SessionTarget(
+  val host: String,
+  val port: Int,
+  val username: String,
+  /** The JavaScript session this connection belongs to, so a reload adopts its row. */
+  val appSessionId: String,
+)
 
 /** A forward together with what it was asked to do, so it can be described later. */
 internal class ForwardEntry(
@@ -172,6 +178,7 @@ internal object SshRegistry {
 
       SessionInfoRecord(
         sessionId = sessionId,
+        appSessionId = target.appSessionId,
         host = target.host,
         port = target.port,
         username = target.username,

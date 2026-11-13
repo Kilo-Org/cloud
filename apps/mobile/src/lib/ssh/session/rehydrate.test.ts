@@ -27,6 +27,7 @@ function host(overrides: Partial<SshHost> & { id: string }): SshHost {
 
 function session(overrides: Partial<SessionInfo> & { sessionId: string }): SessionInfo {
   return {
+    appSessionId: '',
     host: 'web.test',
     port: 22,
     username: 'igor',
@@ -80,11 +81,22 @@ describe('adopting native sessions', () => {
     expect(plan.adopt).toEqual([
       {
         native: expect.objectContaining({ sessionId: 'session-1' }),
+        appSessionId: null,
         host: web,
         shellId: 'shell-1',
       },
     ]);
     expect(plan.unmatched).toEqual([]);
+  });
+
+  it('carries the row id the connection was opened for', () => {
+    const plan = planSessions(
+      [session({ sessionId: 'session-1', appSessionId: 'app-session-1' })],
+      [host({ id: 'web' })],
+      new Set()
+    );
+
+    expect(plan.adopt[0]?.appSessionId).toBe('app-session-1');
   });
 
   it('adopts a connection whose shell is not open as connected without a shell', () => {

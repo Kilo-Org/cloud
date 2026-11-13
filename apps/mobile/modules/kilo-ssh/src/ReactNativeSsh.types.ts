@@ -43,6 +43,13 @@ export type SshAuth =
   | { type: 'keyboardInteractive' };
 
 export type ConnectOptions = {
+  /**
+   * The JavaScript session this connection belongs to. The native registry
+   * keeps it, so a runtime that starts after a reload adopts the row its screen
+   * names instead of minting a second id for one connection. Omit it for a
+   * connection with no row of its own, such as a jump hop.
+   */
+  appSessionId?: string;
   host: string;
   /** Defaults to 22. */
   port?: number;
@@ -118,6 +125,8 @@ export type DisconnectNotice = {
  */
 export type SessionInfo = {
   sessionId: string;
+  /** The JavaScript session that opened it, or '' for a connection with no row. */
+  appSessionId: string;
   host: string;
   port: number;
   username: string;
@@ -221,6 +230,12 @@ export type NativeAuth =
   | { type: 'keyboardInteractive' };
 
 export type NativeConnectConfig = {
+  /**
+   * The JavaScript session this connection belongs to. The registry keeps it, so
+   * a runtime that starts after a reload adopts the row the open screen names
+   * instead of minting a second id for one connection.
+   */
+  appSessionId: string;
   host: string;
   port: number;
   username: string;

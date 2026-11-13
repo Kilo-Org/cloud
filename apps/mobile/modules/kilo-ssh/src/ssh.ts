@@ -151,6 +151,7 @@ export type {
 
 function nativeConnectConfig(options: ConnectOptions): NativeConnectConfig {
   return {
+    appSessionId: options.appSessionId ?? '',
     host: options.host,
     port: options.port ?? DEFAULT_PORT,
     username: options.username,

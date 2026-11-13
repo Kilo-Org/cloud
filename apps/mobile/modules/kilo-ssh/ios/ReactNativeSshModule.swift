@@ -238,7 +238,12 @@ public final class ReactNativeSshModule: Module {
     via jumpSessionId: String? = nil
   ) async throws -> String {
     let sessionId = state.sessionIds.next()
-    let target = SessionTarget(host: config.host, port: config.port, username: config.username)
+    let target = SessionTarget(
+      host: config.host,
+      port: config.port,
+      username: config.username,
+      appSessionId: config.appSessionId
+    )
     let handler = JsSessionHandler(
       sessionId: sessionId,
       requestHostKey: { [weak self] request in

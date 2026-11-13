@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentMemory } from '@/src/shared/agent-memories';
+import { formatLocalListDate } from './format-local-date';
 import {
   deriveMemoriesSettingsView,
-  formatMemoryListDate,
   formatMemorySourceDomain,
   toMemorySettingsListItem,
 } from './memory-settings-state';
@@ -30,8 +30,9 @@ describe('memory source domain formatting', () => {
 });
 
 describe('memory list date formatting', () => {
-  it('formats UTC YYYY-MM-DD', () => {
-    expect(formatMemoryListDate(Date.UTC(2024, 0, 15, 12, 0, 0))).toBe('2024-01-15');
+  it('formats the local calendar date, not the UTC date', () => {
+    expect(formatLocalListDate(new Date(2024, 0, 15, 0, 30).getTime())).toBe('2024-01-15');
+    expect(formatLocalListDate(new Date(2024, 0, 15, 23, 30).getTime())).toBe('2024-01-15');
   });
 });
 
@@ -57,6 +58,7 @@ describe('memories settings view selection', () => {
         isLoaded: false,
         loadError: false,
         memories: [memory()],
+        query: '',
       })
     ).toStrictEqual({ kind: 'loading' });
   });
@@ -67,6 +69,7 @@ describe('memories settings view selection', () => {
         isLoaded: true,
         loadError: true,
         memories: [],
+        query: '',
       })
     ).toStrictEqual({ kind: 'loadError' });
   });
@@ -77,6 +80,7 @@ describe('memories settings view selection', () => {
         isLoaded: true,
         loadError: false,
         memories: [],
+        query: '',
       })
     ).toStrictEqual({ kind: 'empty' });
   });
@@ -88,19 +92,20 @@ describe('memories settings view selection', () => {
       isLoaded: true,
       loadError: false,
       memories: [older, newer],
+      query: '',
     });
 
     expect(view).toStrictEqual({
       items: [
         {
-          dateLabel: formatMemoryListDate(200),
+          dateLabel: formatLocalListDate(200),
           deleteAriaLabel: 'Delete memory "Newer"',
           domain: 'example.com',
           id: 'new',
           preview: 'Newer',
         },
         {
-          dateLabel: formatMemoryListDate(100),
+          dateLabel: formatLocalListDate(100),
           deleteAriaLabel: 'Delete memory "Older"',
           domain: 'example.com',
           id: 'old',
@@ -118,7 +123,54 @@ describe('memories settings view selection', () => {
         isLoaded: true,
         loadError: true,
         memories: [memory()],
+        query: '',
       })
     ).toStrictEqual({ kind: 'loadError' });
+  });
+
+  it('filters the list by token with case-insensitive prefixes', () => {
+    const reply = memory({
+      createdAt: 300,
+      id: 'reply',
+      note: 'Reply style',
+      pageUrl: 'https://example.com/chat',
+      text: 'User prefers concise replies and metric units.',
+    });
+    const other = memory({ createdAt: 200, id: 'other', text: 'Unrelated note about widgets' });
+
+    expect(
+      deriveMemoriesSettingsView({
+        isLoaded: true,
+        loadError: false,
+        memories: [reply, other],
+        query: 'REPLY preferences',
+      })
+    ).toStrictEqual({
+      items: [toMemorySettingsListItem(reply)],
+      kind: 'list',
+    });
+
+    expect(
+      deriveMemoriesSettingsView({
+        isLoaded: true,
+        loadError: false,
+        memories: [reply, other],
+        query: 'widgets',
+      })
+    ).toStrictEqual({
+      items: [toMemorySettingsListItem(other)],
+      kind: 'list',
+    });
+  });
+
+  it('reports no matches when the filter excludes every memory', () => {
+    expect(
+      deriveMemoriesSettingsView({
+        isLoaded: true,
+        loadError: false,
+        memories: [memory()],
+        query: 'zzzz',
+      })
+    ).toStrictEqual({ kind: 'noMatches' });
   });
 });

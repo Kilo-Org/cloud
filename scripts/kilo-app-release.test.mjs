@@ -181,7 +181,7 @@ function ipaFixture(dir, plist) {
   return path;
 }
 
-test('body lists app PRs oldest first and drops bumps, non-app, changelog and unnumbered commits', () => {
+test('body lists app PRs oldest first and drops bumps, non-app, app-local, changelog and unnumbered commits', () => {
   const dir = initRepo('kilo-notes-body-');
   try {
     commit(dir, { 'apps/mobile/src/first.ts': 'first\n' }, 'feat(mobile): first (#100)');
@@ -199,6 +199,11 @@ test('body lists app PRs oldest first and drops bumps, non-app, changelog and un
       'docs(kilo-app): changelog for 1.0.12 (build 42) (#104)'
     );
     commit(dir, { 'apps/mobile/src/fourth.ts': 'fourth\n' }, 'fix(mobile): no pull request ref');
+    // App-local files cannot reach the bundle, so the release workflow does not
+    // treat them as a release reason and the notes must not list them either.
+    commit(dir, { 'apps/mobile/src/second.test.ts': 'test\n' }, 'test(mobile): second (#105)');
+    commit(dir, { 'apps/mobile/.oxlintrc.json': '{}\n' }, 'chore(mobile): lint config (#106)');
+    commit(dir, { 'apps/mobile/README.md': '# readme\n' }, 'docs(mobile): readme (#107)');
     git(dir, ['tag', 'nopr']);
 
     const result = runScript(NOTES, ['body', '--from', 'base'], { cwd: dir });

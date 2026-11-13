@@ -127,12 +127,25 @@ describe('getKiloPassDetailState', () => {
     if (detail.kind !== 'active') {
       throw new Error(`unexpected state: ${detail.kind}`);
     }
-    expect(detail.statusLabel).toBe('Canceling');
+    expect(detail.statusLabel).toBe('Cancels on Dec 5, 2026');
     expect(detail.rows[0]).toEqual({
       id: 'renewal',
       label: 'Active until',
       value: 'Dec 5, 2026',
     });
+  });
+
+  it('keeps the plain cancellation label when the provider reports no paid-through date', () => {
+    const detail = getKiloPassDetailState({
+      subscription: subscription({ cancelAtPeriodEnd: true, nextBillingAt: null }),
+      isError: false,
+      isPending: false,
+    });
+
+    if (detail.kind !== 'active') {
+      throw new Error(`unexpected state: ${detail.kind}`);
+    }
+    expect(detail.statusLabel).toBe('Canceling');
   });
 
   it('flags a failed payment with the danger tone', () => {
@@ -184,7 +197,7 @@ describe('getKiloPassDetailState', () => {
     if (detail.kind !== 'active') {
       throw new Error(`unexpected state: ${detail.kind}`);
     }
-    expect(detail.statusLabel).toBe('Canceling');
+    expect(detail.statusLabel).toBe('Cancels on Dec 5, 2026');
     expect(detail.rows[0]).toEqual({
       id: 'renewal',
       label: 'Active until',

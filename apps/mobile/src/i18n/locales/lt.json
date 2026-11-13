@@ -22,6 +22,9 @@
     "expired": "Galiojimas baigėsi"
   },
   "common": {
+    "creditHistory": "Kreditų istorija",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Atšaukti",
@@ -118,6 +121,7 @@
     "copyLink": "Kopijuoti nuorodą",
     "couldNotLoadOrganizations": "Nepavyko įkelti organizacijų.",
     "couldNotLoadSessions": "Nepavyko įkelti sesijų.",
+    "couldnTLoad": "Nepavyko įkelti.",
     "couldnTLoadMore": "Nepavyko įkelti daugiau.",
     "deviceSessions": "Įrenginių sesijos",
     "disabled": "Išjungta",
@@ -245,6 +249,10 @@
     "notAdded": "Esi prisijungęs. {{provider}} nepridėtas prie tavo paskyros."
   },
   "profile": {
+    "creditHistorySubtitle": "Pirkimai, kvitai ir kreditų veikla",
+    "invoicesSubtitle": "Atsisiųskite savo pirkimų sąskaitas faktūras",
+    "manageBilling": "Tvarkyti atsiskaitymą kilo.ai",
+    "manageBillingIosNote": "Mokėjimo būdai, automatinis papildymas ir atsiskaitymo informacija tvarkomi kilo.ai.",
     "codeReviewerSubtitle": "Automatinės PR peržiūros",
     "securityAgentSubtitle": "Rasti ir pašalinti pažeidžiamumus",
     "reviews": "Peržiūros",
@@ -2966,6 +2974,26 @@
     "onlyFirstFilesAttached_many": "Bus pridėti tik pirmieji failai ({{displayCount}})."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Atsiskaitymų istorija",
+      "billingHistoryEmpty": "Atsiskaitymų istorijos dar nėra.",
+      "cancel": "Atšaukti prenumeratą",
+      "cancelDescription": "Jūsų Kilo Pass liks aktyvus iki atsiskaitymo laikotarpio pabaigos ir nebus atnaujintas.",
+      "cancelScheduled": "Bus atšaukta {{date}}",
+      "cancelScheduledChange": "Atšaukti suplanuotą pakeitimą",
+      "cancelled": "Prenumerata atšaukta",
+      "changePlan": "Keisti planą kilo.ai",
+      "changePlanIosNote": "Mokamus planus galima keisti kilo.ai.",
+      "creditHistoryEmpty": "Kilo Pass kreditų dar nėra.",
+      "manageInStore": "Tvarkyti per {{store}}",
+      "resume": "Tęsti prenumeratą",
+      "resumeCancelledDescription": "Jūsų Kilo Pass vėl bus atnaujinamas automatiškai.",
+      "resumePausedDescription": "Jūsų Kilo Pass bus tęsiamas dabar, anksčiau nei suplanuota.",
+      "resumed": "Prenumerata vėl aktyvi",
+      "scheduledChange": "Suplanuotas pakeitimas",
+      "scheduledChangeCancelDescription": "Jūsų Kilo Pass liks dabartiniame plane ir bus atnaujinamas kaip iki šiol.",
+      "scheduledChangeSummary": "{{plan}} nuo {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass nepasiekiamas.",
     "couldNotLoad": "Nepavyko įkelti Kilo Pass. Bandyk dar kartą.",
@@ -3996,6 +4024,25 @@
     "importConfigApplied": "Konfigūracija importuota"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Nepavyko įkelti kredito aktyvumo.",
+      "appStoreReceipt": "Kvitas iš App Store",
+      "deductionFallback": "Kreditų nurašymas",
+      "emptyDescription": "Čia bus rodomi kreditų pirkimai, kvitai ir naudojimas.",
+      "emptyTitle": "Kreditų istorijos nėra",
+      "googlePlayReceipt": "Kvitas iš Google Play",
+      "kind": {
+        "adjustment": "Koregavimas",
+        "balanceNeutral": "Balanso nekeičia",
+        "deduction": "Nurašymas",
+        "grant": "Kreditų suteikimas",
+        "purchase": "Pirkimas"
+      },
+      "purchaseFallback": "Kreditų pirkimas",
+      "receipt": "Kvitas",
+      "receiptA11y": "Atidaryti kvitą: {{description}}",
+      "receiptUnavailable": "Šiam pirkimui kvito nėra."
+    },
     "title": "Pirkti kreditus",
     "description": "Kreditai yra vienkartinis pirkinys, pridedamas prie jūsų Kilo balanso AI kodavimo sesijoms Kilo programoje vykdyti. Parduotuvė nuskaito lėšas iš jūsų paskyros, o kreditai pridedami po to, kai parduotuvė patvirtina mokėjimą.",
     "nextExpiry": "Kreditai ({{amount}}) baigia galioti {{date}} (UTC). Pirmiausia naudojami anksčiausiai baigiantys galioti kreditai.",
@@ -4185,6 +4232,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nepavyko atidaryti šio paieškos rezultato"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Jūsų asmeninių pirkimų sąskaitos faktūros bus rodomos čia, kai jums bus išrašyta sąskaita."
   },
   "cloudAgent": {
     "compute": {

@@ -22,6 +22,9 @@
     "expired": "Muddati tugagan"
   },
   "common": {
+    "creditHistory": "Kreditlar tarixi",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Bekor qilish",
@@ -118,6 +121,7 @@
     "copyLink": "Havolani nusxalash",
     "couldNotLoadOrganizations": "Tashkilotlarni yuklab bo‘lmadi.",
     "couldNotLoadSessions": "Seanslarni yuklab bo‘lmadi.",
+    "couldnTLoad": "Yuklab bo‘lmadi.",
     "couldnTLoadMore": "Qolganlarini yuklab bo‘lmadi.",
     "deviceSessions": "Qurilma seanslari",
     "disabled": "O‘chirilgan",
@@ -245,6 +249,10 @@
     "notAdded": "Siz tizimga kirdingiz. {{provider}} hisobingizga qo'shilmadi."
   },
   "profile": {
+    "creditHistorySubtitle": "Xaridlar, cheklar va kredit harakatlari",
+    "invoicesSubtitle": "Xaridlaringiz uchun hisob-fakturalarni yuklab oling",
+    "manageBilling": "To‘lovlarni kilo.ai saytida boshqarish",
+    "manageBillingIosNote": "To‘lov usullari, avtomatik to‘ldirish va hisob-kitob ma’lumotlari kilo.ai saytida boshqariladi.",
     "codeReviewerSubtitle": "PR tekshiruvlarini avtomatik bajarish",
     "securityAgentSubtitle": "Zaifliklarni topish va bartaraf etish",
     "reviews": "Tekshiruvlar",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "Faqat birinchi {{displayCount}} ta fayl biriktiriladi."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "To‘lovlar tarixi",
+      "billingHistoryEmpty": "Hozircha to‘lovlar tarixi yo‘q.",
+      "cancel": "Obunani bekor qilish",
+      "cancelDescription": "Kilo Pass to‘lov davri oxirigacha faol qoladi va yangilanmaydi.",
+      "cancelScheduled": "{{date}} kuni bekor qilinadi",
+      "cancelScheduledChange": "Rejalashtirilgan o‘zgarishni bekor qilish",
+      "cancelled": "Obuna bekor qilindi",
+      "changePlan": "Tarifni kilo.ai saytida o‘zgartirish",
+      "changePlanIosNote": "Pullik tariflarni kilo.ai saytida o‘zgartirish mumkin.",
+      "creditHistoryEmpty": "Hozircha Kilo Pass kreditlari yo‘q.",
+      "manageInStore": "{{store}} orqali boshqarish",
+      "resume": "Obunani davom ettirish",
+      "resumeCancelledDescription": "Kilo Pass yana avtomatik ravishda yangilana boshlaydi.",
+      "resumePausedDescription": "Kilo Pass rejalashtirilgan sanani kutmasdan, hoziroq davom etadi.",
+      "resumed": "Obuna davom ettirildi",
+      "scheduledChange": "Rejalashtirilgan o‘zgarish",
+      "scheduledChangeCancelDescription": "Kilo Pass joriy tarifda qoladi va hozirgidek yangilanib boradi.",
+      "scheduledChangeSummary": "{{date}} kuni {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass mavjud emas.",
     "couldNotLoad": "Kilo Passni yuklab bo'lmadi. Qayta urinib ko'ring.",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Config import qilindi"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Kredit harakatini yuklab bo‘lmadi.",
+      "appStoreReceipt": "Chek App Store’da",
+      "deductionFallback": "Kredit yechilishi",
+      "emptyDescription": "Kredit xaridlari, cheklar va sarflar shu yerda ko‘rinadi.",
+      "emptyTitle": "Kreditlar tarixi yo‘q",
+      "googlePlayReceipt": "Chek Google Play’da",
+      "kind": {
+        "adjustment": "Tuzatish",
+        "balanceNeutral": "Balansga ta’sir qilmaydi",
+        "deduction": "Yechib olish",
+        "grant": "Bepul kredit",
+        "purchase": "Xarid"
+      },
+      "purchaseFallback": "Kredit xaridi",
+      "receipt": "Chek",
+      "receiptA11y": "{{description}} chekini ochish",
+      "receiptUnavailable": "Bu xarid uchun chek mavjud emas."
+    },
     "title": "Kredit sotib olish",
     "description": "Kreditlar Kilo App'da AI kodlash sessiyalarini ishga tushirish uchun Kilo balansingizga qo'shiladigan bir martalik xariddir. Do'kon hisobingizdan to'lov oladi va do'kon to'lovni tasdiqlaganidan keyin kreditlar qo'shiladi.",
     "nextExpiry": "{{amount}} miqdoridagi kreditlarning muddati {{date}} (UTC) sanasida tugaydi. Muddati eng erta tugaydigan kreditlar birinchi sarflanadi.",
@@ -4055,6 +4102,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu qidiruv natijasini ochib bo'lmadi"
+  },
+  "invoices": {
+    "personalEmptyDescription": "To‘lov amalga oshirilgach, shaxsiy xaridlaringiz uchun hisob-fakturalar shu yerda ko‘rinadi."
   },
   "cloudAgent": {
     "compute": {

@@ -22,6 +22,9 @@
     "expired": "Wedi dod i ben"
   },
   "common": {
+    "creditHistory": "Hanes credydau",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Canslo",
@@ -118,6 +121,7 @@
     "copyLink": "Copïo dolen",
     "couldNotLoadOrganizations": "Doedd dim modd llwytho'r sefydliadau.",
     "couldNotLoadSessions": "Doedd dim modd llwytho'r sesiynau.",
+    "couldnTLoad": "Doedd dim modd llwytho.",
     "couldnTLoadMore": "Doedd dim modd llwytho mwy.",
     "deviceSessions": "Sesiynau dyfeisiau",
     "disabled": "Wedi'i analluogi",
@@ -245,6 +249,10 @@
     "notAdded": "Rydych chi wedi mewngofnodi. Chafodd {{provider}} mo'i ychwanegu at eich cyfrif."
   },
   "profile": {
+    "creditHistorySubtitle": "Pryniannau, derbynebau a gweithgarwch credydau",
+    "invoicesSubtitle": "Lawrlwytho anfonebau ar gyfer eich pryniannau",
+    "manageBilling": "Rheoli bilio ar kilo.ai",
+    "manageBillingIosNote": "Mae dulliau talu, ychwanegu credyd yn awtomatig a manylion bilio yn cael eu rheoli ar kilo.ai.",
     "codeReviewerSubtitle": "Adolygiadau PR awtomatig",
     "securityAgentSubtitle": "Darganfod a thrwsio gwendidau",
     "reviews": "Adolygiadau",
@@ -3072,6 +3080,26 @@
     "onlyFirstFilesAttached_many": "Dim ond y {{displayCount}} ffeil gyntaf fydd yn cael eu hatodi."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Hanes bilio",
+      "billingHistoryEmpty": "Dim hanes bilio eto.",
+      "cancel": "Canslo tanysgrifiad",
+      "cancelDescription": "Bydd eich Kilo Pass yn parhau'n weithredol tan ddiwedd y cyfnod bilio ac ni fydd yn adnewyddu.",
+      "cancelScheduled": "Yn cael ei ganslo ar {{date}}",
+      "cancelScheduledChange": "Canslo'r newid a drefnwyd",
+      "cancelled": "Tanysgrifiad wedi'i ganslo",
+      "changePlan": "Newid cynllun ar kilo.ai",
+      "changePlanIosNote": "Mae newidiadau i gynlluniau taledig ar gael ar kilo.ai.",
+      "creditHistoryEmpty": "Dim credydau Kilo Pass eto.",
+      "manageInStore": "Rheoli yn {{store}}",
+      "resume": "Ailddechrau tanysgrifiad",
+      "resumeCancelledDescription": "Bydd eich Kilo Pass yn dechrau adnewyddu'n awtomatig eto.",
+      "resumePausedDescription": "Bydd eich Kilo Pass yn ailddechrau nawr, cyn y dyddiad ailddechrau a drefnwyd.",
+      "resumed": "Tanysgrifiad wedi ailddechrau",
+      "scheduledChange": "Newid wedi'i drefnu",
+      "scheduledChangeCancelDescription": "Bydd eich Kilo Pass yn aros ar ei gynllun presennol ac yn adnewyddu fel y mae heddiw.",
+      "scheduledChangeSummary": "{{plan}} ar {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Nid yw Kilo Pass ar gael.",
     "couldNotLoad": "Ni ellid llwytho Kilo Pass. Ceisiwch eto.",
@@ -4118,6 +4146,25 @@
     "importConfigApplied": "Config wedi'i fewnforio"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Methwyd llwytho gweithgarwch credyd.",
+      "appStoreReceipt": "Derbynneb gan yr App Store",
+      "deductionFallback": "Didyniad credyd",
+      "emptyDescription": "Bydd pryniannau credyd, derbynebau a defnydd yn ymddangos yma.",
+      "emptyTitle": "Dim hanes credydau",
+      "googlePlayReceipt": "Derbynneb gan Google Play",
+      "kind": {
+        "adjustment": "Addasiad",
+        "balanceNeutral": "Dim effaith ar y balans",
+        "deduction": "Didyniad",
+        "grant": "Credyd am ddim",
+        "purchase": "Pryniant"
+      },
+      "purchaseFallback": "Pryniant credyd",
+      "receipt": "Derbynneb",
+      "receiptA11y": "Agor y dderbynneb ar gyfer {{description}}",
+      "receiptUnavailable": "Nid oes derbynneb ar gael ar gyfer y pryniant hwn."
+    },
     "title": "Prynu credydau",
     "description": "Mae credydau yn bryniant un-tro sy'n cael ei ychwanegu at eich balans Kilo ar gyfer rhedeg sesiynau codio AI yn Kilo App. Mae'r siop yn codi eich cyfrif ac mae credydau'n cael eu hychwanegu ar ôl i'r siop gadarnhau'r taliad.",
     "nextExpiry": "Mae {{amount}} o gredydau yn dod i ben ar {{date}} (UTC). Defnyddir y credydau sy'n dod i ben gyntaf yn gyntaf.",
@@ -4315,6 +4362,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ni lwyddwyd i agor canlyniad chwilio hwn"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Bydd anfonebau ar gyfer eich pryniannau eich hun yn ymddangos yma unwaith y cewch eich bilio."
   },
   "cloudAgent": {
     "compute": {

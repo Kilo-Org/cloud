@@ -22,6 +22,9 @@
     "expired": "കാലഹരണപ്പെട്ടു"
   },
   "common": {
+    "creditHistory": "ക്രെഡിറ്റ് ചരിത്രം",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "റദ്ദാക്കുക",
@@ -118,6 +121,7 @@
     "copyLink": "ലിങ്ക് പകർത്തുക",
     "couldNotLoadOrganizations": "സ്ഥാപനങ്ങൾ ലോഡ് ചെയ്യാനായില്ല.",
     "couldNotLoadSessions": "സെഷനുകൾ ലോഡ് ചെയ്യാനായില്ല.",
+    "couldnTLoad": "ലോഡ് ചെയ്യാനായില്ല.",
     "couldnTLoadMore": "കൂടുതൽ ലോഡ് ചെയ്യാനായില്ല.",
     "deviceSessions": "ഉപകരണ സെഷനുകൾ",
     "disabled": "പ്രവർത്തനരഹിതം",
@@ -245,6 +249,10 @@
     "notAdded": "നിങ്ങൾ സൈൻ ഇൻ ചെയ്തിട്ടുണ്ട്. {{provider}} നിങ്ങളുടെ അക്കൗണ്ടിലേക്ക് ചേർത്തില്ല."
   },
   "profile": {
+    "creditHistorySubtitle": "വാങ്ങലുകൾ, രസീതുകൾ, ക്രെഡിറ്റ് പ്രവർത്തനങ്ങൾ",
+    "invoicesSubtitle": "നിങ്ങളുടെ വാങ്ങലുകളുടെ ഇൻവോയ്‌സുകൾ ഡൗൺലോഡ് ചെയ്യുക",
+    "manageBilling": "kilo.ai-ൽ ബില്ലിംഗ് നിയന്ത്രിക്കുക",
+    "manageBillingIosNote": "പേയ്‌മെന്റ് രീതികൾ, ഓട്ടോ ടോപ്പ്-അപ്പ്, ബില്ലിംഗ് വിശദാംശങ്ങൾ എന്നിവ kilo.ai-ലാണ് നിയന്ത്രിക്കുന്നത്.",
     "codeReviewerSubtitle": "സ്വയമേവയുള്ള PR അവലോകനങ്ങൾ",
     "securityAgentSubtitle": "സുരക്ഷാ ദൗർബല്യങ്ങൾ കണ്ടെത്തി പരിഹരിക്കുക",
     "reviews": "അവലോകനങ്ങൾ",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "ആദ്യത്തെ {{displayCount}} ഫയലുകൾ മാത്രമേ അറ്റാച്ച് ചെയ്യൂ."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "ബില്ലിംഗ് ചരിത്രം",
+      "billingHistoryEmpty": "ഇതുവരെ ബില്ലിംഗ് ചരിത്രമൊന്നുമില്ല.",
+      "cancel": "സബ്‌സ്‌ക്രിപ്‌ഷൻ റദ്ദാക്കുക",
+      "cancelDescription": "ബില്ലിംഗ് കാലയളവ് അവസാനിക്കുന്നത് വരെ നിങ്ങളുടെ Kilo Pass സജീവമായിരിക്കും, അത് പുതുക്കില്ല.",
+      "cancelScheduled": "{{date}}-ന് റദ്ദാകും",
+      "cancelScheduledChange": "ഷെഡ്യൂൾ ചെയ്ത മാറ്റം റദ്ദാക്കുക",
+      "cancelled": "സബ്‌സ്‌ക്രിപ്‌ഷൻ റദ്ദാക്കി",
+      "changePlan": "kilo.ai-ൽ പ്ലാൻ മാറ്റുക",
+      "changePlanIosNote": "പണമടച്ചുള്ള പ്ലാൻ മാറ്റങ്ങൾ kilo.ai-ൽ ലഭ്യമാണ്.",
+      "creditHistoryEmpty": "ഇതുവരെ Kilo Pass ക്രെഡിറ്റുകളൊന്നുമില്ല.",
+      "manageInStore": "{{store}}-ൽ നിയന്ത്രിക്കുക",
+      "resume": "സബ്‌സ്‌ക്രിപ്‌ഷൻ പുനരാരംഭിക്കുക",
+      "resumeCancelledDescription": "നിങ്ങളുടെ Kilo Pass വീണ്ടും സ്വയമേവ പുതുക്കാൻ തുടങ്ങും.",
+      "resumePausedDescription": "ഷെഡ്യൂൾ ചെയ്ത പുനരാരംഭ തീയതിക്ക് മുമ്പായി, നിങ്ങളുടെ Kilo Pass ഇപ്പോൾ പുനരാരംഭിക്കും.",
+      "resumed": "സബ്‌സ്‌ക്രിപ്‌ഷൻ പുനരാരംഭിച്ചു",
+      "scheduledChange": "ഷെഡ്യൂൾ ചെയ്ത മാറ്റം",
+      "scheduledChangeCancelDescription": "നിങ്ങളുടെ Kilo Pass നിലവിലെ പ്ലാനിൽ തുടരുകയും ഇപ്പോഴത്തെ പോലെ തന്നെ പുതുക്കുകയും ചെയ്യും.",
+      "scheduledChangeSummary": "{{date}}-ന് {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass ലഭ്യമല്ല.",
     "couldNotLoad": "Kilo Pass ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Config ഇമ്പോർട്ട് ചെയ്തു"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "ക്രെഡിറ്റ് പ്രവർത്തനം ലോഡ് ചെയ്യാനായില്ല.",
+      "appStoreReceipt": "App Store-ൽ നിന്നുള്ള രസീത്",
+      "deductionFallback": "ക്രെഡിറ്റ് കിഴിവ്",
+      "emptyDescription": "ക്രെഡിറ്റ് വാങ്ങലുകൾ, രസീതുകൾ, ഉപയോഗം എന്നിവ ഇവിടെ ദൃശ്യമാകും.",
+      "emptyTitle": "ക്രെഡിറ്റ് ചരിത്രമില്ല",
+      "googlePlayReceipt": "Google Play-ൽ നിന്നുള്ള രസീത്",
+      "kind": {
+        "adjustment": "ക്രമീകരണം",
+        "balanceNeutral": "ബാലൻസിൽ മാറ്റമില്ല",
+        "deduction": "കിഴിവ്",
+        "grant": "ക്രെഡിറ്റ് ഗ്രാന്റ്",
+        "purchase": "വാങ്ങൽ"
+      },
+      "purchaseFallback": "ക്രെഡിറ്റ് വാങ്ങൽ",
+      "receipt": "രസീത്",
+      "receiptA11y": "{{description}} എന്നതിന്റെ രസീത് തുറക്കുക",
+      "receiptUnavailable": "ഈ വാങ്ങലിന് രസീത് ലഭ്യമല്ല."
+    },
     "title": "ക്രെഡിറ്റുകൾ വാങ്ങുക",
     "description": "ക്രെഡിറ്റുകൾ എന്നത് Kilo App-ൽ AI കോഡിംഗ് സെഷനുകൾ പ്രവർത്തിപ്പിക്കാൻ നിങ്ങളുടെ Kilo ബാലൻസിലേക്ക് ചേർക്കുന്ന ഒറ്റത്തവണ വാങ്ങൽ ആണ്. സ്റ്റോർ നിങ്ങളുടെ അക്കൗണ്ടിൽ നിന്ന് ഈടാക്കുകയും സ്റ്റോർ പേയ്മെന്റ് സ്ഥിരീകരിച്ചതിന് ശേഷം ക്രെഡിറ്റുകൾ ചേർക്കുകയും ചെയ്യുന്നു.",
     "nextExpiry": "{{amount}} ക്രെഡിറ്റുകൾ {{date}} (UTC)-ന് കാലഹരണപ്പെടും. ഏറ്റവും നേരത്തെ കാലഹരണപ്പെടുന്ന ക്രെഡിറ്റുകളാണ് ആദ്യം ഉപയോഗിക്കുക.",
@@ -4055,6 +4102,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ഈ തിരച്ചിൽ ഫലം തുറക്കാനായില്ല"
+  },
+  "invoices": {
+    "personalEmptyDescription": "നിങ്ങളിൽ നിന്ന് ബിൽ ഈടാക്കിക്കഴിഞ്ഞാൽ, നിങ്ങളുടെ സ്വന്തം വാങ്ങലുകളുടെ ഇൻവോയ്‌സുകൾ ഇവിടെ ദൃശ്യമാകും."
   },
   "cloudAgent": {
     "compute": {

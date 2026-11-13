@@ -9,6 +9,7 @@ import {
   type Href,
   useFocusEffect,
   useIsFocused,
+  useNavigation,
   useNavigationContainerRef,
   useRouter,
 } from 'expo-router';
@@ -238,6 +239,10 @@ import {
 } from '@/components/agents/new-session-prefill';
 import { type ForkCut, resolveForkCut } from '@/components/agents/fork-cut';
 import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
+import {
+  type AgentStackState,
+  openComposerWithOutcome,
+} from '@/components/agents/new-session-navigation-outcome';
 import { AGENTS_SESSIONS_HREF, AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
@@ -289,6 +294,21 @@ type CancelQueuedStatus = {
   attempt: number;
 };
 
+/**
+ * How long a held Continue press waits for the session's own row before the
+ * footer states the failure instead of staying busy. The row is one metadata
+ * read that normally lands within the screen's first paint; a read that has not
+ * answered by this bound is not going to place the destination's organization,
+ * and the press already has a Retry.
+ */
+export const CONTINUE_SCOPE_WAIT_MS = 10_000;
+
+/**
+ * The state of the read-only footer's Continue control: idle, waiting for the
+ * composer to appear, or failed with a Retry on offer.
+ */
+type ContinueOpen = 'idle' | 'pending' | 'failed';
+
 const EMPTY_IDS: ReadonlySet<string> = new Set();
 
 export function SessionDetailContent({
@@ -310,7 +330,10 @@ export function SessionDetailContent({
   // component" otherwise (KILO-APP-6VA). The debounced publish below is the one
   // call that can outlive the container.
   const navigationRef = useNavigationContainerRef();
-  const { openNewSessionHref } = useNewSessionNavigator();
+  // This screen's own navigator, for reading back whether a composer push
+  // landed, and the single-push guard every composer entry point shares.
+  const navigation = useNavigation();
+  const { beginNewSessionNavigation, resetNewSessionGuard } = useNewSessionNavigator();
   const { confirm, dialog } = useConfirmDialog();
   // The router behind the failure row's one navigation. Read through a ref so a
   // callback the memoized rows receive keeps its identity: a router object
@@ -2342,19 +2365,27 @@ export function SessionDetailContent({
   // placeholders, so neither offers a control. A failure, an agent status or a
   // pending ask is the session speaking, and each keeps the composer it already
   // has.
-  // The slot switches from its reserve to the session's own control only once
-  // the transcript is painted, not merely once the open resolves: a read-only
-  // footer above rows that are still skeletons is the same two states at once,
-  // so the reserve holds for that window too (see `isSessionChromePending`).
-  // Continue opens a new session in this session's organization, so its control
-  // waits for the session's own row the same way the scoped reads do. Until that
-  // row names this open, the read-only slot keeps the reserve it already holds
-  // rather than painting a control that cannot act.
-  const isReadOnlyFooterPending = isSessionChromePending || !sessionDataLoaded;
+  // The slot switches from its reserve to the session's own control once the
+  // kind resolves, not once the transcript is painted. The read-only footer
+  // used to wait for the body too, and its own button was the screen's only
+  // control: while the rows were still measuring, the footer swapped between
+  // the live control and the inert placeholder that reserves its shape — a
+  // press in that window landed on a skeleton with no press handler and did
+  // nothing, with no way to tell that apart from a dead button (measured on
+  // the emulator: live at ~0.4 s, inert at ~0.6-2.9 s, live again at ~3 s).
+  // The footer now goes live with the kind and stays live, so the press is
+  // always either answered or stated. The writable composer keeps the reserve
+  // (see `isSessionChromePending`): a composer above skeleton rows would hold a
+  // send the open cannot answer yet.
+  //
+  // Continue opens a new session in this session's organization, so the
+  // destination needs the session's own row the same way the scoped reads do.
+  // The control is live before that row lands and holds the press until it
+  // does (see `heldContinueRef`): the reserve is a shape, and a press on it was
+  // the defect this footer had.
   const isComposerVisible =
     !hasBlockingInteraction && !isReadOnlySession && !isSessionChromePending;
-  const isReadOnlyContinueVisible =
-    isReadOnlySession && !hasBlockingInteraction && !isReadOnlyFooterPending;
+  const isReadOnlyContinueVisible = isReadOnlySession && !hasBlockingInteraction;
   // The pending slot holds the shape its session will end in. The kind is only
   // set once the transport answers, but the metadata read lands before that and
   // names a cloud-agent session, which is writable by construction; the id
@@ -2369,7 +2400,11 @@ export function SessionDetailContent({
   // The reserve never shares the slot with a live control: a settled composer
   // already holds it, and the hold only owns the slot when nothing else does.
   const isReadOnlyFooterPlaceholderVisible =
-    isReadOnlyFooterPending && !hasBlockingInteraction && !isPendingComposer && !isComposerVisible;
+    isSessionChromePending &&
+    !hasBlockingInteraction &&
+    !isPendingComposer &&
+    !isComposerVisible &&
+    !isReadOnlyContinueVisible;
   const isComposerSkeletonVisible =
     isSessionChromePending && !hasBlockingInteraction && isPendingComposer;
   // Structural locks only. The live send capability is passed separately so a
@@ -2626,32 +2661,77 @@ export function SessionDetailContent({
     })();
   }, [exitFailure]);
 
+  // The read-only footer's one control. `pending` covers a press that has not
+  // produced the composer yet: the destination's organization can still be
+  // unresolved, and the push is not a promise. `failed` is a press that
+  // produced no composer while this screen is still the one the person sees.
+  const [continueOpen, setContinueOpen] = useState<ContinueOpen>('idle');
+  // A press that arrived before this session's own row resolved. It is held,
+  // not dropped: the row supplies the destination's organization, so the press
+  // acts as soon as the row lands. Dropping it is the defect the footer had —
+  // the person pressed the only control on the screen and nothing happened.
+  const heldContinueRef = useRef<{ cut: ForkCut | null } | null>(null);
+  // The cut of the press that owns the footer's current state, so Retry repeats
+  // that press: a failed fork retries as a fork, not as a plain Continue.
+  const [continueCut, setContinueCut] = useState<ForkCut | null>(null);
+  // How many times the footer was reset because the composer was the
+  // destination. A press that returns after such a reset (the person opened the
+  // composer and came back) must not paint a failure for a press that already
+  // resolved.
+  const continueResetRef = useRef(0);
+
+  // Open the composer. The destination carries this session's organization, so
+  // it needs the session's own row; every entry point below reaches this only
+  // once that row names the displayed session. The guard states that invariant
+  // for the type system too.
   const pushContinue = useCallback(
-    (cut: ForkCut | null) => {
-      // Continue and fork open a new session in this session's organization, so
-      // both need the scope resolved before they open a destination.
+    async (cut: ForkCut | null) => {
+      const generation = continueResetRef.current;
       if (!sessionDataLoaded) {
         return;
       }
-      openNewSessionHref(
-        buildContinueHref({
-          organizationId,
-          cloneFromKiloSessionId: sessionId,
-          cloneSourceTitle: rename.title,
-          cloneUpToMessageId: cut?.cloneUpToMessageId,
-          forkPrefillText: cut?.forkPrefillText,
-          forkSourceIsCloudAgent: Boolean(fetchedData.cloudAgentSessionId),
-          prefill: buildContinuePrefillParams({
-            gitUrl: fetchedData.gitUrl,
-            mode: currentMode,
-            model: currentModel,
-            variant: currentVariant,
-          }),
-        }) as Href
-      );
+      const href = buildContinueHref({
+        organizationId,
+        cloneFromKiloSessionId: sessionId,
+        cloneSourceTitle: rename.title,
+        cloneUpToMessageId: cut?.cloneUpToMessageId,
+        forkPrefillText: cut?.forkPrefillText,
+        forkSourceIsCloudAgent: Boolean(fetchedData.cloudAgentSessionId),
+        prefill: buildContinuePrefillParams({
+          gitUrl: fetchedData.gitUrl,
+          mode: currentMode,
+          model: currentModel,
+          variant: currentVariant,
+        }),
+      }) as Href;
+      const outcome = await openComposerWithOutcome({
+        claim: beginNewSessionNavigation,
+        push: () => {
+          router.push(href);
+        },
+        readState: () => navigation.getState() as AgentStackState | undefined,
+      });
+      // A press the single-push guard answered belongs to the press that owns
+      // the window: it owns this state too, and must not have its busy state
+      // cleared under it. An opened composer leaves this screen behind it, and
+      // only a push the navigator dropped leaves the person here with nothing
+      // to show for the press.
+      if (continueResetRef.current !== generation) {
+        return;
+      }
+      if (outcome === 'opened') {
+        setContinueOpen('idle');
+      } else if (outcome === 'failed') {
+        // A push that did not land leaves nothing for the window to protect: a
+        // retry must be able to go straight out.
+        resetNewSessionGuard();
+        setContinueOpen('failed');
+      }
     },
     [
-      openNewSessionHref,
+      beginNewSessionNavigation,
+      router,
+      navigation,
       organizationId,
       sessionId,
       rename.title,
@@ -2661,20 +2741,105 @@ export function SessionDetailContent({
       currentModel,
       currentVariant,
       sessionDataLoaded,
+      resetNewSessionGuard,
     ]
   );
 
+  /**
+   * Answer one press. `pending` from here to the composer (or its failure), and
+   * the press owns that window: a second tap is the same press, so it opens the
+   * same one composer.
+   */
+  const startContinue = useCallback(
+    (cut: ForkCut | null) => {
+      if (continueOpen === 'pending') {
+        return;
+      }
+      setContinueOpen('pending');
+      setContinueCut(cut);
+      if (!sessionDataLoaded) {
+        heldContinueRef.current = { cut };
+        return;
+      }
+      void pushContinue(cut);
+    },
+    [continueOpen, pushContinue, sessionDataLoaded]
+  );
+
+  // The held press runs the moment the row that carries its destination
+  // resolves, so the footer's busy state ends in the composer.
+  useEffect(() => {
+    if (!sessionDataLoaded) {
+      return;
+    }
+    const held = heldContinueRef.current;
+    if (held === null) {
+      return;
+    }
+    heldContinueRef.current = null;
+    void pushContinue(held.cut);
+  }, [sessionDataLoaded, pushContinue]);
+
+  // A held press is only as good as the row it waits for: one that never lands
+  // must not leave the footer busy for good, so the wait ends in the stated
+  // failure the press already has a Retry for.
+  useEffect(() => {
+    if (continueOpen !== 'pending') {
+      return undefined;
+    }
+    const held = heldContinueRef.current;
+    if (held === null) {
+      return undefined;
+    }
+    const handle = setTimeout(() => {
+      if (heldContinueRef.current !== held) {
+        return;
+      }
+      heldContinueRef.current = null;
+      setContinueOpen('failed');
+    }, CONTINUE_SCOPE_WAIT_MS);
+    return () => {
+      clearTimeout(handle);
+    };
+  }, [continueOpen]);
+
   const handleContinueInNewSession = useCallback(() => {
-    pushContinue(null);
-  }, [pushContinue]);
+    startContinue(null);
+  }, [startContinue]);
+
+  // Retry repeats the press the footer is reporting on: a fork that failed
+  // still opens the composer cut at the message it was forked from.
+  const handleRetryContinue = useCallback(() => {
+    startContinue(continueCut);
+  }, [continueCut, startContinue]);
 
   const handleForkFromHere = useCallback(() => {
     if (detailsForkCut === null) {
       return;
     }
     handleCloseDetails();
-    pushContinue(detailsForkCut);
-  }, [detailsForkCut, handleCloseDetails, pushContinue]);
+    startContinue(detailsForkCut);
+  }, [detailsForkCut, handleCloseDetails, startContinue]);
+
+  // The composer was the destination: coming back here means the press spent
+  // what the footer was reporting, so the footer offers a fresh one. That
+  // includes a press whose composer arrived after the read-back gave up on it —
+  // the navigator can apply a push later than the wait, and the person then sees
+  // the composer, not this screen. A push the navigator really dropped leaves
+  // the person here, so no focus event follows and its error stays until they
+  // retry it or leave.
+  useFocusEffect(
+    useCallback(() => {
+      // Setting the state it already holds is a no-op render, so this is safe
+      // on the mount focus too. The press counter moves with it, so a read-back
+      // that returns after this reset cannot paint a failure for a press the
+      // person already left behind.
+      continueResetRef.current += 1;
+      heldContinueRef.current = null;
+      setContinueCut(null);
+      setContinueOpen('idle');
+    }, [])
+  );
 
   const isFocused = useIsFocused();
   const keepScreenAwake = shouldKeepSessionAwake({
@@ -3049,17 +3214,40 @@ export function SessionDetailContent({
                 <Text className="text-center text-sm text-muted-foreground">
                   {t('agentChat.session.readOnly')}
                 </Text>
+                {/* A push the navigator dropped leaves the person on this screen.
+                    Say so, and keep the action: the same control retries it. */}
+                {continueOpen === 'failed' ? (
+                  <View className="flex-row items-center justify-center gap-2">
+                    <AccessibleStatus
+                      message={t('common.somethingWentWrong')}
+                      tone="error"
+                      className="shrink text-sm"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="action"
+                      className="shrink-0"
+                      accessibilityLabel={t('common.retry')}
+                      onPress={handleRetryContinue}
+                    >
+                      <Text>{t('common.retry')}</Text>
+                    </Button>
+                  </View>
+                ) : null}
                 {/* The footer's one action, and the only control on this screen:
                     a filled primary. Light already fills it with the palette's
                     muted olive; dark's primary (#ffdd00) is the full brand accent
                     and glares as a full-width fill under the near-black page. Dark
                     takes `--selection` instead — the same olive hue lifted to stand
                     off the page — with its own label tone, so the control keeps the
-                    light mode's weight in both schemes. */}
+                    light mode's weight in both schemes. While the composer is
+                    opening, the button is busy in place: a press is never a
+                    no-op. */}
                 <Button
                   variant="default"
                   size="action"
                   className="bg-primary dark:bg-selection"
+                  loading={continueOpen === 'pending'}
                   accessibilityLabel={t('agentChat.session.continueInNewSession')}
                   onPress={handleContinueInNewSession}
                 >

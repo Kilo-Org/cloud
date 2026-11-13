@@ -22,6 +22,9 @@
     "expired": "Истечено"
   },
   "common": {
+    "creditHistory": "Историја на кредити",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Откажи",
@@ -118,6 +121,7 @@
     "copyLink": "Копирај врска",
     "couldNotLoadOrganizations": "Организациите не се вчитаа.",
     "couldNotLoadSessions": "Сесиите не се вчитаа.",
+    "couldnTLoad": "Не се вчита.",
     "couldnTLoadMore": "Не се вчитаа дополнителни ставки.",
     "deviceSessions": "Сесии на уреди",
     "disabled": "Оневозможено",
@@ -245,6 +249,10 @@
     "notAdded": "Најавен си. {{provider}} не е додаден на твојата сметка."
   },
   "profile": {
+    "creditHistorySubtitle": "Купувања, сметки и активност на кредити",
+    "invoicesSubtitle": "Преземете фактури за вашите купувања",
+    "manageBilling": "Управувајте со плаќањето на kilo.ai",
+    "manageBillingIosNote": "Начините на плаќање, автоматското дополнување и деталите за плаќање се управуваат на kilo.ai.",
     "codeReviewerSubtitle": "Автоматски прегледи на PR",
     "securityAgentSubtitle": "Пронаоѓај и отстранувај ранливости",
     "reviews": "Прегледи",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "Ќе се прикачат само првите {{displayCount}} датотеки."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Историја на плаќања",
+      "billingHistoryEmpty": "Сè уште нема историја на плаќања.",
+      "cancel": "Откажи претплата",
+      "cancelDescription": "Вашиот Kilo Pass останува активен до крајот на периодот на наплата и нема да се обнови.",
+      "cancelScheduled": "Се откажува на {{date}}",
+      "cancelScheduledChange": "Откажи ја закажаната промена",
+      "cancelled": "Претплатата е откажана",
+      "changePlan": "Променете го планот на kilo.ai",
+      "changePlanIosNote": "Промените на платените планови се достапни на kilo.ai.",
+      "creditHistoryEmpty": "Сè уште нема кредити од Kilo Pass.",
+      "manageInStore": "Управувајте во {{store}}",
+      "resume": "Продолжи ја претплатата",
+      "resumeCancelledDescription": "Вашиот Kilo Pass повторно ќе се обновува автоматски.",
+      "resumePausedDescription": "Вашиот Kilo Pass продолжува сега, пред закажаниот датум за продолжување.",
+      "resumed": "Претплатата е продолжена",
+      "scheduledChange": "Закажана промена",
+      "scheduledChangeCancelDescription": "Вашиот Kilo Pass останува на тековниот план и се обновува како и досега.",
+      "scheduledChangeSummary": "{{plan}} на {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass не е достапен.",
     "couldNotLoad": "Не успеа вчитувањето на Kilo Pass. Обиди се повторно.",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Конфигурацијата е увезена"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Не може да се вчитаат активностите со кредити.",
+      "appStoreReceipt": "Сметка од App Store",
+      "deductionFallback": "Одбивање кредити",
+      "emptyDescription": "Купувањата на кредити, сметките и користењето ќе се појават тука.",
+      "emptyTitle": "Нема историја на кредити",
+      "googlePlayReceipt": "Сметка од Google Play",
+      "kind": {
+        "adjustment": "Корекција",
+        "balanceNeutral": "Без промена на салдото",
+        "deduction": "Одбивање",
+        "grant": "Доделени кредити",
+        "purchase": "Купување"
+      },
+      "purchaseFallback": "Купување кредити",
+      "receipt": "Сметка",
+      "receiptA11y": "Отвори ја сметката за {{description}}",
+      "receiptUnavailable": "Не е достапна сметка за ова купување."
+    },
     "title": "Купи кредити",
     "description": "Кредитите се еднократна набавка што се додава на вашата Kilo состојба за извршување на AI сесии за кодирање во Kilo App. Продавницата ви го наплатува сметката и кредитите се додаваат откако продавницата ќе го потврди плаќањето.",
     "nextExpiry": "Кредитите во износ од {{amount}} истекуваат на {{date}} (UTC). Прво се користат кредитите со најран рок на истекување.",
@@ -4055,6 +4102,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Не успеа отворањето на овој резултат од пребарувањето"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Фактурите за вашите лични купувања ќе се појават тука откако ќе ви биде наплатено."
   },
   "cloudAgent": {
     "compute": {

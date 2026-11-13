@@ -22,6 +22,9 @@
     "expired": "Waqtigiisu dhacay"
   },
   "common": {
+    "creditHistory": "Taariikhda kiredit-ka",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Jooji",
@@ -118,6 +121,7 @@
     "copyLink": "Nuqul ka samee xiriiriyaha",
     "couldNotLoadOrganizations": "Ururrada lama soo rari karin.",
     "couldNotLoadSessions": "Kalfadhiyada lama soo rari karin.",
+    "couldnTLoad": "Lama soo rari karin.",
     "couldnTLoadMore": "Kuwo kale lama soo rari karin.",
     "deviceSessions": "Kalfadhiyada aaladaha",
     "disabled": "La damiyay",
@@ -245,6 +249,10 @@
     "notAdded": "Waad soo gashay. {{provider}} laguma darin akoonkaaga."
   },
   "profile": {
+    "creditHistorySubtitle": "Iibsiyada, rasiidhada, iyo dhaqdhaqaaqa kiredit-ka",
+    "invoicesSubtitle": "Soo dejiso qaansheegyada iibsiyadaada",
+    "manageBilling": "Ku maamul lacag-bixinta kilo.ai",
+    "manageBillingIosNote": "Hababka lacag-bixinta, ku-shubista tooska ah, iyo faahfaahinta biilasha waxaa lagu maamulaa kilo.ai.",
     "codeReviewerSubtitle": "Dib-u-eegisyada tooska ah ee PR",
     "securityAgentSubtitle": "Raadi oo sax nuglaanta amniga",
     "reviews": "Dib-u-eegisyo",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "Waxaa lagu lifaaqi doonaa oo keliya {{displayCount}}-kii fayl ee ugu horreeyay."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Taariikhda biilasha",
+      "billingHistoryEmpty": "Weli ma jirto taariikh biil.",
+      "cancel": "Jooji rukummada",
+      "cancelDescription": "Kilo Pass-kaagu wuu shaqaynayaa ilaa dhammaadka muddada biilka mana cusboonaysiin doono.",
+      "cancelScheduled": "Wuu joogsanayaa {{date}}",
+      "cancelScheduledChange": "Jooji isbeddelka la qorsheeyay",
+      "cancelled": "Rukummada waa la joojiyay",
+      "changePlan": "Ka beddel qorshaha kilo.ai",
+      "changePlanIosNote": "Beddelka qorshayaasha lacagta ah waxaa laga heli karaa kilo.ai.",
+      "creditHistoryEmpty": "Weli ma jiraan kiredit Kilo Pass ah.",
+      "manageInStore": "Ku maamul {{store}}",
+      "resume": "Sii wad rukummada",
+      "resumeCancelledDescription": "Kilo Pass-kaagu mar kale si toos ah ayuu u cusboonaysiinayaa.",
+      "resumePausedDescription": "Kilo Pass-kaagu hadda ayuu dib u bilaabanayaa, ka hor taariikhdii loo qorsheeyay.",
+      "resumed": "Rukummada dib ayaa loo bilaabay",
+      "scheduledChange": "Isbeddel la qorsheeyay",
+      "scheduledChangeCancelDescription": "Kilo Pass-kaagu wuxuu ku sii jirayaa qorshihiisa hadda, wuxuuna u cusboonaysiinayaa sidii hore.",
+      "scheduledChangeSummary": "{{plan}} laga bilaabo {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass lama heli karo.",
     "couldNotLoad": "Kilo Pass lama soo dejin karin. Mar kale isku day.",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Config la soo dejiyay"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Dhaqdhaqaaqa kireditka lama rari karin.",
+      "appStoreReceipt": "Rasiid ka yimid App Store",
+      "deductionFallback": "Ka-goynta kiredit-ka",
+      "emptyDescription": "Iibsiyada kiredit-ka, rasiidhada, iyo isticmaalka halkan ayay ka muuqan doonaan.",
+      "emptyTitle": "Ma jirto taariikh kiredit",
+      "googlePlayReceipt": "Rasiid ka yimid Google Play",
+      "kind": {
+        "adjustment": "Hagaajin",
+        "balanceNeutral": "Aan saamaynin haraaga",
+        "deduction": "Ka-goyn",
+        "grant": "Deeq kiredit",
+        "purchase": "Iibsasho"
+      },
+      "purchaseFallback": "Iibsashada kiredit",
+      "receipt": "Rasiid",
+      "receiptA11y": "Fur rasiidka {{description}}",
+      "receiptUnavailable": "Iibsashadan rasiid looma hayo."
+    },
     "title": "Iibso lacag adeeg",
     "description": "Lacagta adeeg waa iib hal mar ah oo lagu daraa dheelitirkaaga Kilo si loogu shaqeeyo kalfadhiyada codeynta AI ee app-ka Kilo. Dukaanku wuxuu ka qaadaa akoonkaaga, lacagta adeegna waxaa lagu daraa ka dib marka dukaanku xaqiijiyo lacag bixinta.",
     "nextExpiry": "Lacag adeeg ah oo dhan {{amount}} ayaa dhacaysa {{date}} (UTC). Lacagta adeegga ee ugu horreysa ee dhacaysa ayaa marka hore la isticmaalaa.",
@@ -4055,6 +4102,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Natiijadan raadinta lama furi karin"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Qaansheegyada iibsiyadaada gaarka ah halkan ayay ka muuqan doonaan marka lacag lagaa qaado."
   },
   "cloudAgent": {
     "compute": {

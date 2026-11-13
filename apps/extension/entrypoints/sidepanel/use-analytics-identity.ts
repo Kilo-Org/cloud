@@ -1,6 +1,11 @@
 import { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
-import { EXTENSION_SIGNED_IN_EVENT, captureEvent, initAnalytics } from '@/src/shared/analytics';
+import {
+  EXTENSION_SIGNED_IN_EVENT,
+  captureDailyActive,
+  captureEvent,
+  initAnalytics,
+} from '@/src/shared/analytics';
 import type { AnalyticsStorageArea } from '@/src/shared/analytics';
 
 export interface ObservedAuthState {
@@ -67,6 +72,12 @@ export const createAnalyticsIdentityTracker = ({
 
       if (activated) {
         emitSignedIn(signInSource);
+        /*
+         * Panel open is the only WAU signal that includes users who never send a
+         * message. `captureDailyActive` persists the local day, so a same-day
+         * reopen — which is a fresh document with a fresh client — stays silent.
+         */
+        await captureDailyActive(storageArea);
       }
     },
   };

@@ -102,7 +102,7 @@ export function ProfileScreen() {
   const agentScope = organizationContextLoaded
     ? getProfileAgentScope(organizationId, orgs)
     : undefined;
-  const { openPicker, picker } = useContextPicker(orgs);
+  const { openPicker } = useContextPicker(orgs);
   const selectedOrg = orgs?.find(org => org.organizationId === organizationId);
   const orgRole = selectedOrg?.role;
   // The Organization section stays on Profile in every credit-account context:
@@ -336,7 +336,6 @@ export function ProfileScreen() {
             ) : (
               organizationRow
             )}
-            {picker}
           </View>
         )}
 

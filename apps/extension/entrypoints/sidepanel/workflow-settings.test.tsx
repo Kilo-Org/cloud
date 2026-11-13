@@ -702,6 +702,35 @@ describe('workflow settings', () => {
     });
   });
 
+  it('explains safe mode blocking inline and enables it from the row', async () => {
+    mockUseAgentWorkflows.mockReturnValue({
+      ...emptyResult,
+      workflows: [approvedWorkflow],
+    });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: false,
+    });
+    store.set(conversationModeAtom, 'safe');
+
+    const { findByText, getByLabelText, getByRole } = render(createElement(WorkflowSettings), {
+      wrapper: createWrapper(store),
+    });
+
+    await findByText("Workflows can't run in safe mode until you allow them.");
+    const runButton = getByLabelText('Run workflow "Order pizza"');
+    expect(runButton.getAttribute('aria-describedby')).toBe('workflow-run-reason-wf-1');
+
+    fireEvent.click(getByRole('button', { name: 'Allow in safe mode' }));
+
+    await waitFor(() => {
+      expect(mockSaveWorkflowSettings).toHaveBeenLastCalledWith(expect.anything(), {
+        ...DEFAULT_WORKFLOW_SETTINGS,
+        allowWorkflowsInSafeMode: true,
+      });
+    });
+  });
+
   it('enables Run in dangerous mode with safe toggle off', async () => {
     mockUseAgentWorkflows.mockReturnValue({
       ...emptyResult,

@@ -6,6 +6,14 @@ import { useQuery } from '@tanstack/react-query';
 import { CenteredState } from '@/components/centered-state';
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { EmptyState } from '@/components/empty-state';
+import {
+  KiloPassBillingHistorySection,
+  KiloPassCreditHistorySection,
+} from '@/components/kilo-pass/kilo-pass-history-sections';
+import {
+  KiloPassManagementSections,
+  type KiloPassScheduledChange,
+} from '@/components/kilo-pass/kilo-pass-management';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Crown } from '@/components/ui/icons';
@@ -13,7 +21,15 @@ import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useSheetHeaderTopClearance } from '@/lib/form-sheet';
+import {
+  type KiloPassBillingHistory,
+  type KiloPassCreditHistory,
+  useKiloPassBillingHistory,
+  useKiloPassCreditHistory,
+} from '@/lib/hooks/use-kilo-pass-history';
+import { isStoreManagedPass, type KiloPassSubscriptionState } from '@/lib/kilo-pass/management';
 import { getKiloPassDetailState, type KiloPassDetail } from '@/lib/kilo-pass/state';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -53,11 +69,21 @@ function KiloPassLoadingScreen() {
             cannot paint the reserved blocks under the sensor area. */}
         <DetailScreenScrollView
           className="-mx-1 flex-1"
-          contentContainerClassName="grow justify-center gap-3 px-1"
+          contentContainerClassName="grow gap-5 px-1 py-4"
           showsVerticalScrollIndicator={false}
         >
-          <Skeleton className="h-4 w-64 rounded" />
+          {/* The page prints once, at its final height: every block the pass
+              state introduces is held until it has one answer, so this
+              skeleton stands in for a page that would otherwise grow under
+              the reader and push the ledgers down. */}
+          <View className="gap-1">
+            <Skeleton className="h-5 w-40 rounded" />
+            <Skeleton className="h-4 w-24 rounded" />
+          </View>
           <Skeleton className="h-[132px] w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-[104px] w-full rounded-lg" />
+          <Skeleton className="h-[104px] w-full rounded-lg" />
         </DetailScreenScrollView>
       </View>
     </KiloPassFrame>
@@ -90,14 +116,25 @@ function KiloPassErrorScreen({ onRetry }: { onRetry: () => void }) {
 }
 
 /**
- * The two states this surface can show for a resolved account: a pass with the
- * same details the web console prints, or the message that the app does not
- * offer one. Nothing here manages, cancels, or buys a pass.
+ * A resolved pass: the same details the web console prints, the actions the
+ * subscriber can take from the phone, and both ledgers.
  */
-function KiloPassDetailBody({ detail }: { detail: Extract<KiloPassDetail, { kind: 'active' }> }) {
+function KiloPassDetailBody({
+  subscription,
+  detail,
+  scheduledChange,
+  creditHistory,
+  billingHistory,
+}: Readonly<{
+  subscription: KiloPassSubscriptionState;
+  detail: Extract<KiloPassDetail, { kind: 'active' }>;
+  scheduledChange: KiloPassScheduledChange | null;
+  creditHistory: KiloPassCreditHistory;
+  billingHistory: KiloPassBillingHistory;
+}>) {
   return (
     <KiloPassFrame>
-      <DetailScreenScrollView contentContainerClassName="grow justify-center gap-4 px-5">
+      <DetailScreenScrollView contentContainerClassName="grow gap-5 px-5 pb-8">
         <View className="gap-1">
           <Text className="text-base font-semibold text-foreground">{detail.planLabel}</Text>
           <Text
@@ -123,6 +160,12 @@ function KiloPassDetailBody({ detail }: { detail: Extract<KiloPassDetail, { kind
             ))}
           </View>
         ) : null}
+        <KiloPassManagementSections subscription={subscription} scheduledChange={scheduledChange} />
+        <KiloPassCreditHistorySection history={creditHistory} />
+        {/* A store-sold pass has no Stripe invoices, and the read rejects one. */}
+        {!isStoreManagedPass(subscription) && (
+          <KiloPassBillingHistorySection history={billingHistory} />
+        )}
       </DetailScreenScrollView>
     </KiloPassFrame>
   );
@@ -159,14 +202,38 @@ function KiloPassEndedBody({ detail }: { detail: Extract<KiloPassDetail, { kind:
 export function KiloPassSubscriptionScreen() {
   const trpc = useTRPC();
   const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
+  const subscription = stateQuery.data?.subscription;
   const detail = getKiloPassDetailState({
-    subscription: stateQuery.data?.subscription,
+    subscription,
     isError: stateQuery.isError,
     isPending: stateQuery.isPending,
   });
   const { t } = useTranslation();
 
-  if (detail.kind === 'loading') {
+  // The pass state introduces three more reads, and each one adds or removes
+  // height below the state rows. Hold the page until all three answer so its
+  // first frame is its last: a ledger or a scheduled plan change that landed
+  // afterwards would push the blocks under it.
+  const isDetail = detail.kind === 'active' && subscription != null;
+  const storeManaged = subscription != null && isStoreManagedPass(subscription);
+  const creditHistory = useKiloPassCreditHistory(isDetail);
+  const billingHistory = useKiloPassBillingHistory(isDetail && !storeManaged);
+  // The page waits on this read before it prints, so it must settle even while
+  // the online manager reports offline: a paused query never errors and never
+  // answers, and the screen would hold its loading state with no retry.
+  const scheduledChangeQuery = useQuery({
+    ...trpc.kiloPass.getScheduledChange.queryOptions(),
+    enabled: isDetail && !storeManaged,
+    ...SETTLE_WHILE_OFFLINE,
+  });
+  // A store-managed pass has neither a Stripe schedule nor invoices, so those
+  // two stay disabled and their pending status says nothing.
+  const blocksPending =
+    isDetail &&
+    (creditHistory.query.isPending ||
+      (!storeManaged && (billingHistory.query.isPending || scheduledChangeQuery.isPending)));
+
+  if (detail.kind === 'loading' || blocksPending) {
     return <KiloPassLoadingScreen />;
   }
   if (detail.kind === 'error') {
@@ -184,5 +251,18 @@ export function KiloPassSubscriptionScreen() {
   if (detail.kind === 'ended') {
     return <KiloPassEndedBody detail={detail} />;
   }
-  return <KiloPassDetailBody detail={detail} />;
+  if (subscription == null) {
+    // An active detail is derived from a subscription, so this only narrows the
+    // type; the message keeps the screen total rather than throwing on it.
+    return <KiloPassMessageBody message={t('kiloPass.notAvailableInApp')} />;
+  }
+  return (
+    <KiloPassDetailBody
+      subscription={subscription}
+      detail={detail}
+      scheduledChange={scheduledChangeQuery.data?.scheduledChange ?? null}
+      creditHistory={creditHistory}
+      billingHistory={billingHistory}
+    />
+  );
 }

@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react';
 import type { CSSProperties, JSX } from 'react';
 import { getStoredConversationTitle, isStoredConversationOpen } from './agent-conversation-storage';
 import type { StoredAgentConversation } from './agent-conversation-storage';
+import { dismissLayer, useEscapeKey } from './use-dismiss';
 import type { StoredAgentConversationStore } from '@/src/shared/agent-conversation-tabs';
 
 const historyPageSize = 100;
@@ -47,6 +48,13 @@ export const ConversationHistoryButton = ({
   const [isOpen, setIsOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(historyPageSize);
   const historyRef = useRef<HTMLDivElement | null>(null);
+  useEscapeKey(
+    isOpen,
+    () => {
+      setIsOpen(false);
+    },
+    dismissLayer.dialog
+  );
   const visibleConversations = useMemo(
     () => conversations.slice(0, Math.min(visibleCount, conversations.length)),
     [conversations, visibleCount]

@@ -22,6 +22,9 @@
     "expired": "Isteklo"
   },
   "common": {
+    "creditHistory": "Povijest kredita",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Odustani",
@@ -118,6 +121,7 @@
     "copyLink": "Kopiraj poveznicu",
     "couldNotLoadOrganizations": "Nije moguće učitati organizacije.",
     "couldNotLoadSessions": "Nije moguće učitati sesije.",
+    "couldnTLoad": "Nije moguće učitati.",
     "couldnTLoadMore": "Nije moguće učitati više.",
     "deviceSessions": "Sesije na uređajima",
     "disabled": "Onemogućeno",
@@ -245,6 +249,10 @@
     "notAdded": "Prijavljen si. {{provider}} nije dodan tvom računu."
   },
   "profile": {
+    "creditHistorySubtitle": "Kupnje, računi i aktivnost kredita",
+    "invoicesSubtitle": "Preuzmite račune za svoje kupnje",
+    "manageBilling": "Upravljajte naplatom na kilo.ai",
+    "manageBillingIosNote": "Načinima plaćanja, automatskom nadoplatom i podacima za naplatu upravlja se na kilo.ai.",
     "codeReviewerSubtitle": "Automatski pregledi PR-ova",
     "securityAgentSubtitle": "Pronađi i otkloni ranjivosti",
     "reviews": "Pregledi koda",
@@ -2913,6 +2921,26 @@
     "onlyFirstFilesAttached_few": "Samo će prvih {{displayCount}} datoteke biti priloženo."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Povijest naplate",
+      "billingHistoryEmpty": "Još nema povijesti naplate.",
+      "cancel": "Otkaži pretplatu",
+      "cancelDescription": "Vaš Kilo Pass ostaje aktivan do kraja obračunskog razdoblja i neće se obnoviti.",
+      "cancelScheduled": "Otkazuje se {{date}}",
+      "cancelScheduledChange": "Otkaži zakazanu promjenu",
+      "cancelled": "Pretplata je otkazana",
+      "changePlan": "Promijenite plan na kilo.ai",
+      "changePlanIosNote": "Promjene plaćenog plana dostupne su na kilo.ai.",
+      "creditHistoryEmpty": "Još nema kredita iz Kilo Passa.",
+      "manageInStore": "Upravljajte u trgovini {{store}}",
+      "resume": "Nastavi pretplatu",
+      "resumeCancelledDescription": "Vaš Kilo Pass ponovno će se automatski obnavljati.",
+      "resumePausedDescription": "Vaš Kilo Pass nastavlja se odmah, prije zakazanog datuma nastavka.",
+      "resumed": "Pretplata je nastavljena",
+      "scheduledChange": "Zakazana promjena",
+      "scheduledChangeCancelDescription": "Vaš Kilo Pass ostaje na trenutačnom planu i obnavlja se kao i dosad.",
+      "scheduledChangeSummary": "{{plan}} od {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass nije dostupan.",
     "couldNotLoad": "Kilo Pass nije moguće učitati. Pokušaj ponovno.",
@@ -3935,6 +3963,25 @@
     "importConfigApplied": "Konfiguracija je uvezena"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Nije moguće učitati aktivnost kredita.",
+      "appStoreReceipt": "Račun iz trgovine App Store",
+      "deductionFallback": "Oduzimanje kredita",
+      "emptyDescription": "Ovdje će se prikazivati kupnje kredita, računi i potrošnja.",
+      "emptyTitle": "Nema povijesti kredita",
+      "googlePlayReceipt": "Račun iz trgovine Google Play",
+      "kind": {
+        "adjustment": "Prilagodba",
+        "balanceNeutral": "Bez utjecaja na stanje",
+        "deduction": "Oduzimanje",
+        "grant": "Dodijeljeni krediti",
+        "purchase": "Kupnja"
+      },
+      "purchaseFallback": "Kupnja kredita",
+      "receipt": "Račun",
+      "receiptA11y": "Otvori račun za {{description}}",
+      "receiptUnavailable": "Račun za ovu kupnju nije dostupan."
+    },
     "title": "Kupi kredite",
     "description": "Krediti su jednokratna kupnja koja se dodaje tvom Kilo saldu za pokretanje AI sesija kodiranja u aplikaciji Kilo. Trgovina naplaćuje tvoj račun, a krediti se dodaju nakon što trgovina potvrdi plaćanje.",
     "nextExpiry": "Krediti u iznosu od {{amount}} istječu {{date}} (UTC). Najprije se troše krediti s najranijim istekom.",
@@ -4120,6 +4167,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nije moguće otvoriti ovaj rezultat pretrage"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Računi za vaše osobne kupnje prikazat će se ovdje nakon prve naplate."
   },
   "cloudAgent": {
     "compute": {

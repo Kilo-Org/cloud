@@ -22,6 +22,9 @@
     "expired": "Imithe in éag"
   },
   "common": {
+    "creditHistory": "Stair chreidmheasa",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cealaigh",
@@ -118,6 +121,7 @@
     "copyLink": "Cóipeáil an nasc",
     "couldNotLoadOrganizations": "Níorbh fhéidir na heagraíochtaí a lódáil.",
     "couldNotLoadSessions": "Níorbh fhéidir na seisiúin a lódáil.",
+    "couldnTLoad": "Níorbh fhéidir é a lódáil.",
     "couldnTLoadMore": "Níorbh fhéidir tuilleadh a lódáil.",
     "deviceSessions": "Seisiúin ar ghléasanna",
     "disabled": "Díchumasaithe",
@@ -245,6 +249,10 @@
     "notAdded": "Tá tú sínithe isteach. Níor cuireadh {{provider}} le do chuntas."
   },
   "profile": {
+    "creditHistorySubtitle": "Ceannacháin, admhálacha agus gníomhaíocht chreidmheasa",
+    "invoicesSubtitle": "Íoslódáil sonraisc do do cheannacháin",
+    "manageBilling": "Bainistigh billeáil ar kilo.ai",
+    "manageBillingIosNote": "Déantar modhanna íocaíochta, barrú uathoibríoch agus sonraí billeála a bhainistiú ar kilo.ai.",
     "codeReviewerSubtitle": "Athbhreithnithe PR uathoibríocha",
     "securityAgentSubtitle": "Aimsigh agus réitigh leochaileachtaí",
     "reviews": "Athbhreithnithe",
@@ -3019,6 +3027,26 @@
     "onlyFirstFilesAttached_many": "Ní cheanglófar ach na chéad {{displayCount}} chomhad."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Stair bhilleála",
+      "billingHistoryEmpty": "Níl aon stair bhilleála ann fós.",
+      "cancel": "Cealaigh an síntiús",
+      "cancelDescription": "Fanfaidh do Kilo Pass gníomhach go dtí deireadh na tréimhse billeála agus ní athnuafar é.",
+      "cancelScheduled": "Cealófar ar {{date}}",
+      "cancelScheduledChange": "Cealaigh an t-athrú sceidealaithe",
+      "cancelled": "Cealaíodh an síntiús",
+      "changePlan": "Athraigh an plean ar kilo.ai",
+      "changePlanIosNote": "Is féidir pleananna íoctha a athrú ar kilo.ai.",
+      "creditHistoryEmpty": "Níl aon chreidmheas Kilo Pass ann fós.",
+      "manageInStore": "Bainistigh trí {{store}}",
+      "resume": "Atosaigh an síntiús",
+      "resumeCancelledDescription": "Tosóidh do Kilo Pass ag athnuachan go huathoibríoch arís.",
+      "resumePausedDescription": "Atosóidh do Kilo Pass anois, roimh an dáta atosaithe sceidealaithe.",
+      "resumed": "Atosaíodh an síntiús",
+      "scheduledChange": "Athrú sceidealaithe",
+      "scheduledChangeCancelDescription": "Fanfaidh do Kilo Pass ar a phlean reatha agus athnuafar é díreach mar a dhéantar faoi láthair.",
+      "scheduledChangeSummary": "{{plan}} ar {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Níl Kilo Pass ar fáil.",
     "couldNotLoad": "Níorbh fhéidir Kilo Pass a lódáil. Bain triail as arís.",
@@ -4057,6 +4085,25 @@
     "importConfigApplied": "Iompórtáladh an chumraíocht"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Níorbh fhéidir gníomhaíocht chreidmheasa a lódáil.",
+      "appStoreReceipt": "Admháil ón App Store",
+      "deductionFallback": "Asbhaint chreidmheasa",
+      "emptyDescription": "Taispeánfar ceannacháin chreidmheasa, admhálacha agus úsáid anseo.",
+      "emptyTitle": "Gan stair chreidmheasa",
+      "googlePlayReceipt": "Admháil ó Google Play",
+      "kind": {
+        "adjustment": "Coigeartú",
+        "balanceNeutral": "Neodrach don iarmhéid",
+        "deduction": "Asbhaint",
+        "grant": "Deontas creidmheasa",
+        "purchase": "Ceannach"
+      },
+      "purchaseFallback": "Ceannach creidmheasa",
+      "receipt": "Admháil",
+      "receiptA11y": "Oscail an admháil do {{description}}",
+      "receiptUnavailable": "Níl admháil ar fáil don cheannach seo."
+    },
     "title": "Ceannaigh creidmheasanna",
     "description": "Is ceannach aonuaire iad creidmheasanna a chuirtear le do chothromas Kilo chun seisiúin chódaithe AI a rith in Kilo App. Gearrann an siopa do chuntas agus cuirtear creidmheasanna leis tar éis don siopa an íocaíocht a dhearbhú.",
     "nextExpiry": "Rachaidh {{amount}} de chreidmheasanna in éag {{date}} (UTC). Úsáidtear na creidmheasanna is luaithe a rachaidh in éag ar dtús.",
@@ -4250,6 +4297,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Níorbh fhéidir an toradh cuardaigh seo a oscailt"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Taispeánfar sonraisc do do cheannacháin féin anseo nuair a bheidh bille curtha chugat."
   },
   "cloudAgent": {
     "compute": {

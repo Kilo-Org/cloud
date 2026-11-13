@@ -22,8 +22,10 @@ jobs:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     env:
-      # Works the day a human adds the secret; wxt.config.ts only warns and
-      # disables analytics when it is empty. Do not fail when unset.
+      # Store builds MUST ship analytics so extension WAU is measurable; the
+      # "Require PostHog key for store builds" step fails the run when the secret
+      # is empty. wxt.config.ts stays warn-only so local, e2e and fork builds
+      # still build without a key.
       VITE_POSTHOG_API_KEY: ${{ secrets.VITE_POSTHOG_API_KEY }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -53,6 +55,22 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # Store artifacts are the only builds real users run, so an empty key here
+      # silently ships an extension that reports nothing. Never echoes the key.
+      - name: Require PostHog key for store builds
+        run: |
+          if [ -z "${VITE_POSTHOG_API_KEY:-}" ]; then
+            echo "::error::VITE_POSTHOG_API_KEY is empty. Store builds must ship extension analytics, or extension WAU cannot be measured. Set the Kilo-Org/cloud repository secret, then press again."
+            exit 1
+          fi
+          case "$VITE_POSTHOG_API_KEY" in
+            phc_*) ;;
+            *)
+              echo "::error::VITE_POSTHOG_API_KEY is set but is not a PostHog project key (expected a phc_ prefix)."
+              exit 1
+              ;;
+          esac
 
       - name: Verify (typecheck, lint, unit tests)
         run: pnpm --filter kilo-extension verify

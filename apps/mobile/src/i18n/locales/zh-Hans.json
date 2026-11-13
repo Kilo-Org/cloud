@@ -355,7 +355,7 @@
       "add": "添加密钥",
       "added": "密钥已添加",
       "emptyTitle": "暂无提供商密钥",
-      "emptyDescription": "添加密钥，将请求费用计入你自己的提供商账户。",
+      "emptyDescription": "添加密钥，开始使用。",
       "chooseProvider": "选择提供商",
       "searchProviders": "搜索提供商",
       "noProvidersTitle": "没有匹配的提供商",

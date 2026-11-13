@@ -1,4 +1,16 @@
-import type { z } from 'zod';
+import { z } from 'zod';
+
+import { nonEmptyStringSchema } from './non-empty-string';
+
+/**
+ * The scope/id pair every spend-alert payload carries. It is declared once, next
+ * to the rule that checks the two agree, so a new scope or a changed id bound
+ * reaches the push payload and the internal dispatch request together.
+ */
+export const spendAlertScopeShape = {
+  scope: z.enum(['personal', 'organization']),
+  organizationId: nonEmptyStringSchema.optional(),
+};
 
 /**
  * A spend alert's scope and its id must agree. The tap routes by the scope, so

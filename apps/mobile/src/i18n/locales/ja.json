@@ -355,7 +355,7 @@
       "add": "キーを追加",
       "added": "キーを追加しました",
       "emptyTitle": "プロバイダーキーがありません",
-      "emptyDescription": "キーを追加すると、リクエストを自分のプロバイダーアカウントに請求できます。",
+      "emptyDescription": "キーを追加して始める。",
       "chooseProvider": "プロバイダーを選択",
       "searchProviders": "プロバイダーを検索",
       "noProvidersTitle": "一致するプロバイダーがありません",

@@ -1,3 +1,4 @@
+/* eslint-disable require-await, @typescript-eslint/require-await -- the fake KV factories settle without await because they resolve immediately */
 /* eslint-disable max-lines */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -52,6 +53,21 @@ const expoFileSystemMock = vi.hoisted(() => {
 vi.mock('expo-file-system', () => ({
   File: expoFileSystemMock.File,
   Paths: expoFileSystemMock.Paths,
+}));
+
+// The drafts module is lazily required by the store helpers, so it must not
+// evaluate the native encrypted-kv / sentry chain.
+const kvMock = vi.hoisted(() => ({
+  getItem: vi.fn(async (_scope: string, _k: string): Promise<string | null> => null),
+  setItem: vi.fn(async (_scope: string, _k: string, _v: string): Promise<void> => undefined),
+  removeItem: vi.fn(async (_scope: string, _k: string): Promise<void> => undefined),
+  listEntries: vi.fn(async (_scope: string): Promise<{ k: string; updatedAt: number }[]> => []),
+}));
+
+vi.mock('@/lib/persist/encrypted-kv', () => kvMock);
+
+vi.mock('@sentry/react-native', () => ({
+  captureException: vi.fn(),
 }));
 
 // share-prefill also exports the React hook (expo-router). Keep the pure core

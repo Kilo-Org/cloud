@@ -154,7 +154,7 @@ export function AccountSettingsScreen() {
           subtitle={t('profile.deviceSessionsSubtitle')}
           className={rowClassName}
           onPress={() => {
-            router.push('/(app)/device-sessions' as Href);
+            router.push('/(app)/(tabs)/(3_profile)/device-sessions' as Href);
           }}
         />
         <ConfigureRow

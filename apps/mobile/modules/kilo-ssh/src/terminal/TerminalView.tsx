@@ -1,4 +1,4 @@
-import { requireNativeViewManager } from 'expo-modules-core';
+import { requireNativeView } from 'expo';
 import { type Ref, forwardRef, useMemo } from 'react';
 
 import type {
@@ -8,7 +8,7 @@ import type {
 } from './terminal.types';
 import { resolveTheme } from './theme';
 
-const NativeTerminalView = requireNativeViewManager<
+const NativeTerminalView = requireNativeView<
   NativeTerminalViewProps & { ref?: Ref<TerminalViewHandle> }
 >('ReactNativeSshTerminal', 'ReactNativeSshTerminalView');
 

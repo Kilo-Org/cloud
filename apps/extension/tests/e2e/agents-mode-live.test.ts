@@ -472,7 +472,7 @@ const readExtensionToken = async (sidePanel: Page): Promise<string> => {
     throw new Error('the extension stored no kiloAuth token the session lists can use');
   }
 
-  return stored.data.token;
+  return stored.data.kiloAuth.token;
 };
 
 /** Session ids the user already has, from both lists the Agents view reads. */

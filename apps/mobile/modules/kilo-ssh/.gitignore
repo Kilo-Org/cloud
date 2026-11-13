@@ -4,3 +4,7 @@
 /android/src/main/java/ai/kilo/reactnativessh/uniffi/
 /ios/Generated/
 /ios/Frameworks/
+
+# The root and app ignore lists drop *.pem as key material. These are committed
+# test keys the Rust suites read, and the suites fail without them.
+!/rust/ssh-core/tests/fixtures/*.pem

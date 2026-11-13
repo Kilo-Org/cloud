@@ -162,6 +162,25 @@ describe('Exa Usage Tracking', () => {
       expect(rows[0].free_allowance_microdollars).toBe(10_000_000);
     });
 
+    test('records with a caller deadline', async () => {
+      const user = await insertTestUser();
+
+      await expect(
+        recordExaUsage(
+          {
+            ...usageIdentity(),
+            userId: user.id,
+            organizationId: null,
+            path: '/search',
+            costMicrodollars: 7000,
+            chargedToBalance: false,
+            freeAllowanceMicrodollars: 10_000_000,
+          },
+          { deadlineMs: 5_000 }
+        )
+      ).resolves.toBe('recorded');
+    });
+
     test('increments existing counter on subsequent requests', async () => {
       const user = await insertTestUser();
 

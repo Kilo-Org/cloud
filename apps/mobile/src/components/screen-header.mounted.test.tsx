@@ -1390,4 +1390,15 @@ describe('shouldStackHeaderActions', () => {
       true
     );
   });
+
+  it('counts the row space the caller declares before its title', () => {
+    // The default inset is the widest list gutter, which a header that shows a
+    // back control beside its title does not charge. Declaring the real inset
+    // reflows a window the default keeps on one row with a title too narrow to
+    // paint, and leaves the compact phone width on a single row.
+    const widths = { headerRightWidth: 238, titleMinWidth: 40 };
+    expect(shouldStackHeaderActions(340, 1, widths)).toBe(false);
+    expect(shouldStackHeaderActions(340, 1, { ...widths, contentInset: 65.5 })).toBe(true);
+    expect(shouldStackHeaderActions(360, 1, { ...widths, contentInset: 65.5 })).toBe(false);
+  });
 });

@@ -506,17 +506,20 @@ describe('the chat header', () => {
   it('declares its trailing cluster and its own title width to the header', async () => {
     state.status = 'idle';
     const tree = await mount();
-    const { headerRightWidth, titleMinWidth } = headerPropsOf(tree);
+    const widths = headerPropsOf(tree);
 
     // The header reflows this cluster only when the screen declares how wide
-    // the cluster lays out and what the title needs. A 360dp window cannot hold
-    // a readable "Chat" beside the pill and its two controls, so those numbers
-    // are what moves them to their own row instead of the title painting a
-    // lone character.
-    expect(shouldStackHeaderActions(360, 1, { headerRightWidth, titleMinWidth })).toBe(true);
-    // The same row holds both at an ordinary phone width, so the header keeps
-    // the single-row layout it has everywhere else.
-    expect(shouldStackHeaderActions(411, 1, { headerRightWidth, titleMinWidth })).toBe(false);
+    // the cluster lays out, what the title needs, and the space the row loses
+    // before the title. The compact phone width still holds the chat's name
+    // beside the pill and its two controls, so the header keeps one row there
+    // and the Beta notice yields instead (see `ChatTitle`).
+    expect(shouldStackHeaderActions(360, 1, widths)).toBe(false);
+    // An ordinary phone width holds the name and its notice, so the header
+    // keeps the single-row layout it has everywhere else.
+    expect(shouldStackHeaderActions(411, 1, widths)).toBe(false);
+    // Below the compact width the name no longer fits beside the cluster, so
+    // the controls take their own row instead of painting over a lone glyph.
+    expect(shouldStackHeaderActions(320, 1, widths)).toBe(true);
   });
 
   it('reserves the cluster at the scale its readings paint at', async () => {
@@ -534,20 +537,20 @@ describe('the chat header', () => {
     // A window the unscaled reserve keeps on one row is too narrow for the row
     // at this scale, and the header must reflow it rather than squeeze the
     // title below the width its own text needs.
-    expect(shouldStackHeaderActions(560, 2, atDefaultScale)).toBe(false);
-    expect(shouldStackHeaderActions(560, 2, atLargeScale)).toBe(true);
+    expect(shouldStackHeaderActions(411, 2, atDefaultScale)).toBe(false);
+    expect(shouldStackHeaderActions(411, 2, atLargeScale)).toBe(true);
   });
 });
 
-type HeaderProps = { headerRightWidth: number; titleMinWidth: number };
+type HeaderProps = { headerRightWidth: number; titleMinWidth: number; contentInset: number };
 
 function headerPropsOf(tree: ReactTestRenderer): HeaderProps {
   const header = tree.root.find(node => (node.type as string) === 'ScreenHeader');
-  const { headerRightWidth, titleMinWidth } = header.props as Partial<HeaderProps>;
-  if (headerRightWidth === undefined || titleMinWidth === undefined) {
+  const { headerRightWidth, titleMinWidth, contentInset } = header.props as Partial<HeaderProps>;
+  if (headerRightWidth === undefined || titleMinWidth === undefined || contentInset === undefined) {
     throw new Error('the header was given no widths');
   }
-  return { headerRightWidth, titleMinWidth };
+  return { headerRightWidth, titleMinWidth, contentInset };
 }
 
 function details(tree: ReactTestRenderer) {

@@ -84,11 +84,29 @@ const CHAT_LIST_HREF: Href = '/(app)/(tabs)/(4_chat)';
 const HEADER_CONTROL_GAP = 7;
 
 /**
- * The content width this title needs to stay readable: "Chat" in the 18px
- * header style beside its beta pill. The header's default reserves the 30px
- * list title's width, which is wider than this screen ever paints.
+ * The content width this title needs to stay readable: the chat's name in the
+ * 18px header style, which paints "Chat" at 33.5 dp. Below about 40 dp the name
+ * can only ellipsize into a glyph or two, so that is the point the header
+ * reflows. The header's default reserves the 30px list title's width, which is
+ * wider than this screen ever paints.
+ *
+ * The Beta notice beside the name is not part of this minimum. It is a label
+ * about the screen and yields before the name does (`ChatTitle` measures the
+ * pair and drops the notice when both cannot fit), so a compact row keeps the
+ * name whole and the notice gives up its place.
  */
-const CHAT_HEADER_TITLE_MIN_WIDTH = 104;
+const CHAT_HEADER_TITLE_MIN_WIDTH = 40;
+
+/**
+ * The horizontal space the chat header's row loses before its title, in dp: the
+ * header's own `px-4` padding (14 a side), and the back control that shares the
+ * title's row — its 48 dp target, pulled 14 dp into the gutter by `-ms-4`, plus
+ * the row's `gap-1`. The shared row check reserves the widest list gutter alone,
+ * which counts the padding but not the back control, so this header declares
+ * what it really loses: the check then reflows where the name stops fitting
+ * instead of a whole back control too late.
+ */
+const CHAT_HEADER_CONTENT_INSET = 2 * 14 + (ICON_TARGET_DP - 14) + 3.5;
 
 export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const { t } = useTranslation();
@@ -376,6 +394,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
         }
         headerRightWidth={headerActionsWidth}
         titleMinWidth={CHAT_HEADER_TITLE_MIN_WIDTH}
+        contentInset={CHAT_HEADER_CONTENT_INSET}
         showBackButton
       />
       <KeyboardAvoidingView className="flex-1" behavior="padding">

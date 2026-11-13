@@ -51,10 +51,12 @@ const HEADER_TOP_GAP = 8;
 const HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH = 120;
 
 /**
- * The horizontal gutter a header's content sits inside. The list screens use
- * the widest one in service (`px-[22px]`, 44dp); the default `px-4` is
- * narrower, so the check reflows a hair early for those callers instead of
- * squeezing them.
+ * The horizontal gutter a header's content sits inside, and the default for the
+ * stacking check's `contentInset`. The list screens use the widest one in
+ * service (`px-[22px]`, 44dp); the default `px-4` is narrower, so the check
+ * reflows a hair early for those callers instead of squeezing them. A header
+ * that shows a leading control beside its title, or needs an exact decision,
+ * declares its own inset instead of inheriting this one.
  */
 const HEADER_CONTENT_GUTTER = 44;
 
@@ -81,6 +83,15 @@ type HeaderStackingWidths = {
    * one row where the larger default would already have reflowed it.
    */
   titleMinWidth?: number;
+  /**
+   * Horizontal space, in dp, the caller's row loses before its title: the
+   * gutter its own padding paints plus the width of a leading control that
+   * shares the title's row, such as a back button. It defaults to the widest
+   * list gutter, which the check takes as covering both. A caller that declares
+   * the space it really loses makes the check exact: it neither reflows a row
+   * that still holds the title nor squeezes a title that no longer fits.
+   */
+  contentInset?: number;
 };
 
 /**
@@ -96,9 +107,13 @@ export function shouldStackHeaderActions(
   if (!Number.isFinite(width)) {
     return false;
   }
-  const { headerRightWidth = 0, titleMinWidth = HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH } = widths;
+  const {
+    headerRightWidth = 0,
+    titleMinWidth = HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH,
+    contentInset = HEADER_CONTENT_GUTTER,
+  } = widths;
   const scale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
-  const titleWidth = width - HEADER_CONTENT_GUTTER - HEADER_ACTIONS_GAP - headerRightWidth;
+  const titleWidth = width - contentInset - HEADER_ACTIONS_GAP - headerRightWidth;
   return titleWidth < titleMinWidth * scale;
 }
 
@@ -193,6 +208,16 @@ type ScreenHeaderProps = {
    * still leaves the title its own text does not reflow the header.
    */
   titleMinWidth?: number;
+  /**
+   * Horizontal space (dp) the title's row loses before the title, for the
+   * stacking decision above: this header's own content gutter plus the width of
+   * a leading control such as the back button. It defaults to the 44 dp list
+   * gutter, which the check takes as covering both. A header that paints a
+   * narrower gutter, or shows a back control beside its title, declares the
+   * space it really loses so the check reflows where its title stops fitting
+   * rather than a whole control-width late.
+   */
+  contentInset?: number;
   /** Keep compact fixed-width controls beside the title even on narrow screens. */
   allowHeaderRightStacking?: boolean;
   /**
@@ -340,6 +365,7 @@ export function ScreenHeader({
   headerRight,
   headerRightWidth,
   titleMinWidth,
+  contentInset,
   allowHeaderRightStacking = true,
   headerRightShrinks = false,
   inlineActions,
@@ -377,6 +403,7 @@ export function ScreenHeader({
     shouldStackHeaderActions(windowWidth, fontScale, {
       headerRightWidth: headerRightWidth ?? 0,
       titleMinWidth,
+      contentInset,
     });
   // The inline controls row reflows the same way: a caller that declares its
   // width drops it beneath the title before it squeezes the title's own
@@ -387,6 +414,7 @@ export function ScreenHeader({
     shouldStackHeaderActions(windowWidth, fontScale, {
       headerRightWidth: inlineActionsWidth ?? 0,
       titleMinWidth,
+      contentInset,
     });
 
   // A surface that reaches the window top (a full-window modal) needs the

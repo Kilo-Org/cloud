@@ -17,6 +17,7 @@
     "./images-schema": "./src/images-schema.ts",
     "./cloud-agent": "./src/cloud-agent.ts",
     "./analytics": "./src/analytics/index.ts",
+    "./feature-flags": "./src/feature-flags.ts",
     "./app-version": "./src/app-version.ts",
     "./control-plane": "./src/control-plane.ts",
     "./pr-review": "./src/pr-review/index.ts",

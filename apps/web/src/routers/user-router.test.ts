@@ -674,13 +674,13 @@ describe('user router - credit purchase history', () => {
     expect(result.entries).toEqual([
       expect.objectContaining({
         id: automaticPurchaseId,
-        description: 'Automatic top-up',
+        kind: 'auto_top_up',
         amount_mUsd: 15_000_000,
         expiryDate: null,
       }),
       expect.objectContaining({
         id: manualPurchaseId,
-        description: 'Credit purchase',
+        kind: 'purchase',
         amount_mUsd: 20_000_000,
         expiryDate: '2027-06-20T10:00:00.000Z',
       }),

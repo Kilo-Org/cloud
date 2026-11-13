@@ -31,7 +31,7 @@ const AppleAppAppleIdSchema = z
 
 function getAppleEnvironment(): Environment {
   const value = requireEnv('APPLE_IAP_ENVIRONMENT', getEnvVariable('APPLE_IAP_ENVIRONMENT'));
-  const parsed = AppleIapEnvironmentSchema.safeParse(value);
+  const parsed = AppleIapEnvironmentSchema.safeParse(value.trim());
   if (!parsed.success) {
     throw new Error(
       `APPLE_IAP_ENVIRONMENT must be one of ${AppleIapEnvironmentSchema.options.join(', ')}`

@@ -1,11 +1,34 @@
 /* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted React Native layout regression tests. */
+// eslint-disable-next-line import/no-nodejs-modules -- The compiler's CommonJS export is the only way to load it under vitest.
+import { createRequire } from 'node:module';
+import tailwindcss from '@tailwindcss/postcss';
+import postcss from 'postcss';
 import { createElement } from 'react';
+import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Globe } from '@/components/ui/icons';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { ConfigureRow } from './configure-row';
+
+const { compile } = createRequire(import.meta.url)(
+  'react-native-css/compiler'
+) as typeof NativeCSSCompiler;
+
+/** The compiled declarations of one className, through the app's own pipeline. */
+async function compiledDeclarations(classes: string): Promise<unknown[]> {
+  const { css } = await postcss([tailwindcss()]).process(
+    `@reference "../../global.css"; .target { @apply ${classes}; }`,
+    { from: import.meta.filename }
+  );
+  return (
+    compile(css, { inlineVariables: false })
+      .stylesheet()
+      .s?.find(([name]) => name === 'target')?.[1]
+      .flatMap(rule => rule.d ?? []) ?? []
+  );
+}
 
 const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, scale: 2 }));
 
@@ -254,7 +277,7 @@ describe('ConfigureRow disabled cue', () => {
 describe('ConfigureRow note', () => {
   const NOTE = 'Only organization owners and billing managers can change this connection.';
 
-  it('renders the note below the icon-aligned line, inset to the title column', () => {
+  it('renders the note below the icon-aligned line, inset to the title column', async () => {
     const root = renderRow({ note: NOTE });
 
     expect(textOf(root, NOTE)).toEqual(
@@ -265,7 +288,11 @@ describe('ConfigureRow note', () => {
     const note = root.find(
       node => Object.is(node.type, 'Text') && Object.is(node.props.children, NOTE)
     );
-    expect(String(note.props.className)).toContain('ps-[40.5px]');
+    // The inset must compile to the START edge, not the left one: the row's
+    // icon tile and title column move to the physical right under RTL, so a
+    // `pl-` utility would put the note under the tile there.
+    expect(await compiledDeclarations('ps-[40.5px]')).toContainEqual({ paddingInlineStart: 40.5 });
+    expect(await compiledDeclarations('pl-[40.5px]')).toContainEqual({ paddingLeft: 40.5 });
     // It is a sentence, so it wraps instead of ellipsizing like a value does.
     expect(note.props.numberOfLines).toBe(3);
     expect(textOf(root, 'Transcribe')).toContain('mt-0.5');

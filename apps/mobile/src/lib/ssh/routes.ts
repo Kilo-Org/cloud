@@ -16,6 +16,19 @@ export function sshSessionPath(sessionId: string): Href {
   return `/(app)/ssh/session/${encodeURIComponent(sessionId)}` as Href;
 }
 
+/** The session's remote files, optionally opened at one of its folders. */
+export function sshFilesPath(sessionId: string, options: { path?: string; dev?: string } = {}): Href {
+  const href: Href = {
+    pathname: '/(app)/ssh/session/[session-id]/files',
+    params: {
+      'session-id': sessionId,
+      ...(options.path === undefined ? {} : { path: options.path }),
+      ...(options.dev === undefined ? {} : { dev: options.dev }),
+    },
+  };
+  return href;
+}
+
 export function sshPromptPath(sessionId: string): Href {
   return `/(app)/ssh/prompt/${encodeURIComponent(sessionId)}` as Href;
 }

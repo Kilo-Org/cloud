@@ -9,7 +9,13 @@ import { createHost, type SshHost } from './hosts';
 import { createKey } from './keys';
 import { trustHostKey } from './known-hosts';
 import { sshPackage } from './native';
-import { SSH_HOSTS_ROUTE, SSH_KNOWN_HOSTS_ROUTE, sshHostPath, sshSessionPath } from './routes';
+import {
+  SSH_HOSTS_ROUTE,
+  SSH_KNOWN_HOSTS_ROUTE,
+  sshFilesPath,
+  sshHostPath,
+  sshSessionPath,
+} from './routes';
 import { writeSession } from './session/session-store';
 import { type SshSessionPhase } from './session/types';
 import { sshDatabase } from './store';
@@ -240,7 +246,7 @@ function fixturePhase(name: string): SshSessionPhase | null {
       };
     }
     case 'password': {
-      return { kind: 'awaiting-password', failed: true };
+      return { kind: 'awaiting-password', failed: true, label: null };
     }
     case 'reconnecting': {
       return { kind: 'reconnecting', attempt: 2, reason: 'Network' };
@@ -275,6 +281,7 @@ async function seedSession(name: string): Promise<string> {
     startedAt: Date.now(),
     phase,
     shellId,
+    nativeSessionId: null,
     pendingCommand: null,
   });
   return sessionId;
@@ -301,9 +308,61 @@ async function openSampleShell(label: string): Promise<string> {
     startedAt: Date.now() - 60_000,
     phase: { kind: 'closed', reason: 'disconnected', retryable: true },
     shellId: null,
+    nativeSessionId: null,
     pendingCommand: null,
   });
   return source.sourceId;
+}
+
+/**
+ * One host with forwards and a session whose files screen the gate can open.
+ * The session has no native connection, so the browser itself stays in its
+ * waiting state; the surfaces the gate photographs are the tray, the preview
+ * and the forwards sheet over it.
+ */
+async function seedFilesSurfaces(): Promise<{ sessionId: string; hostId: string }> {
+  const db = await sshDatabase();
+  const host = createHost(db, { ...SESSION_HOST, authMethod: 'password' });
+  createForward(db, {
+    hostId: host.id,
+    direction: 'local',
+    bindPort: 8080,
+    destinationHost: '127.0.0.1',
+    destinationPort: 80,
+    autoStart: true,
+    label: 'Web app',
+  });
+  createForward(db, {
+    hostId: host.id,
+    direction: 'remote',
+    bindPort: 9000,
+    destinationHost: '127.0.0.1',
+    destinationPort: 3000,
+    autoStart: false,
+    label: null,
+  });
+  createForward(db, {
+    hostId: host.id,
+    direction: 'local',
+    bindPort: 5432,
+    destinationHost: 'db.internal',
+    destinationPort: 5432,
+    autoStart: false,
+    label: 'Postgres',
+  });
+  const sessionId = 'fixture-files-session';
+  writeSession({
+    id: sessionId,
+    hostId: host.id,
+    label: host.label,
+    target: hostTarget(host),
+    startedAt: Date.now(),
+    phase: { kind: 'connected' },
+    shellId: null,
+    nativeSessionId: null,
+    pendingCommand: null,
+  });
+  return { sessionId, hostId: host.id };
 }
 
 /**
@@ -352,6 +411,15 @@ export function handleSshFixturePath(path: string): boolean {
       const host = await seedEditor(name === 'editor-key');
       await resetSshQueries();
       router.replace(sshHostPath(host.id));
+    } else if (name === 'files-transfers' || name === 'files-preview' || name === 'forwards') {
+      const seeded = await seedFilesSurfaces();
+      await resetSshQueries();
+      const dev = name === 'forwards' ? 'forwards' : name === 'files-preview' ? 'preview' : 'transfers';
+      router.replace(sshFilesPath(seeded.sessionId, { dev }));
+    } else if (name === 'forwards-editor') {
+      const seeded = await seedFilesSurfaces();
+      await resetSshQueries();
+      router.replace(sshHostPath(seeded.hostId));
     } else if (name.startsWith('session-')) {
       const state = name.slice('session-'.length);
       const sessionId = await seedSession(state);

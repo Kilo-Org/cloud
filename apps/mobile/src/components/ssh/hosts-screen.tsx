@@ -26,6 +26,7 @@ import {
   SSH_HOST_IMPORT_ROUTE,
   SSH_HOST_NEW_ROUTE,
   SSH_KNOWN_HOSTS_ROUTE,
+  sshFilesPath,
   sshHostPath,
   sshSandboxPath,
   sshSessionPath,
@@ -104,11 +105,18 @@ export function SshHostsScreen() {
 
   function actionFor(host: SshHost, index: number): (() => void) | null {
     if (index === 0) {
+      // The browser reads the files of a session, so this opens one and lands
+      // on its files instead of its terminal.
+      return () => {
+        router.push(sshFilesPath(openSession(host)));
+      };
+    }
+    if (index === 1) {
       return () => {
         router.push(sshHostPath(host.id));
       };
     }
-    if (index === 1) {
+    if (index === 2) {
       return () => {
         confirmDelete(host);
       };
@@ -239,7 +247,11 @@ export function SshHostsScreen() {
   const menuOptions: MenuSheetOption[] =
     menuHost === null
       ? []
-      : [{ label: t('ssh.editor.editTitle') }, { label: t('common.delete'), destructive: true }];
+      : [
+          { label: t('ssh.files.openAction') },
+          { label: t('ssh.editor.editTitle') },
+          { label: t('common.delete'), destructive: true },
+        ];
 
   return (
     <View className="flex-1 bg-background">

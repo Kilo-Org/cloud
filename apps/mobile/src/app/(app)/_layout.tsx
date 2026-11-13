@@ -225,7 +225,13 @@ export default function AppLayout() {
             {/* A session screen is a live shell: a swipe back would hide it,
                 not end it, and the switcher is how a person leaves one. */}
             <Stack.Screen
-              name="ssh/session/[session-id]"
+              name="ssh/session/[session-id]/index"
+              options={{ gestureEnabled: false, headerShown: false }}
+            />
+            {/* The file browser is a view of the same live session: leaving it
+                returns to the terminal, and a swipe back must not end it. */}
+            <Stack.Screen
+              name="ssh/session/[session-id]/files"
               options={{ gestureEnabled: false, headerShown: false }}
             />
             {/* A prompt is a question the connection cannot proceed without, so

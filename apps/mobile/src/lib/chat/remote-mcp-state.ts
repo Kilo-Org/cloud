@@ -108,22 +108,21 @@ export function connectingOf(state: RemoteMcpServerState): RemoteMcpServerState 
 }
 
 /**
- * The servers whose discovery answered, in stored order, with what each
- * answered. A disabled server is left out whatever a cached entry says, because
- * it is the list that decides and the entry is left for `reconcile` to drop. A
- * server with no entry has not been asked yet, and a failed discovery is a
- * server the app cannot currently reach, so neither of them has an answer to
- * offer.
+ * What the enabled servers whose discovery answered offered, in stored order.
+ * A disabled server is left out whatever a cached entry says, because it is the
+ * list that decides and the entry is left for `reconcile` to drop. A server
+ * with no entry has not been asked yet, and a failed discovery is a server the
+ * app cannot currently reach, so neither of them has an answer to offer.
  */
-function answeredServers(
+function answeredDiscoveries(
   servers: readonly StoredRemoteMcpServer[],
   discovered: ReadonlyMap<string, RemoteMcpDiscovery>
-): readonly (readonly [StoredRemoteMcpServer, RemoteMcpDiscovery])[] {
-  const answered: (readonly [StoredRemoteMcpServer, RemoteMcpDiscovery])[] = [];
+): readonly RemoteMcpDiscovery[] {
+  const answered: RemoteMcpDiscovery[] = [];
   for (const server of servers) {
     const found = server.enabled ? discovered.get(server.id) : undefined;
     if (found !== undefined && found.failed !== true) {
-      answered.push([server, found]);
+      answered.push(found);
     }
   }
   return answered;
@@ -148,7 +147,7 @@ export function remoteServerToolsFor(
 ): readonly Tool[] {
   const tools: Tool[] = [];
   const seen = new Set<string>();
-  for (const [, found] of answeredServers(servers, discovered)) {
+  for (const found of answeredDiscoveries(servers, discovered)) {
     for (const tool of found.tools) {
       const name = tool.definition.name;
       if (!seen.has(name)) {
@@ -200,7 +199,7 @@ export function remoteServerViewsFor(
 ): ReadonlyMap<string, RemoteMcpToolView> {
   const views = new Map<string, RemoteMcpToolView>();
   const seen = new Set<string>();
-  for (const [, found] of answeredServers(servers, discovered)) {
+  for (const found of answeredDiscoveries(servers, discovered)) {
     for (const tool of found.tools) {
       const name = tool.definition.name;
       if (!seen.has(name)) {

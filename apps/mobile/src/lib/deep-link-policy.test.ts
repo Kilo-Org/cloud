@@ -9,6 +9,7 @@ describe('browserHandoffUrl', () => {
   it.each([
     ['https://app.kilo.ai/organizations/new', 'https://app.kilo.ai/organizations/new'],
     ['https://app.kilo.ai/organizations/create', 'https://app.kilo.ai/organizations/create'],
+    ['kiloapp:///organizations/create', 'https://app.kilo.ai/organizations/create'],
   ])('%s → %s', (raw, expected) => {
     expect(browserHandoffUrl(raw)).toBe(expected);
   });
@@ -34,6 +35,24 @@ describe('browserHandoffUrl', () => {
     expect(browserHandoffUrl('https://app.kilo.ai/profile')).toBeNull();
     expect(browserHandoffUrl('https://example.com/organizations/new')).toBeNull();
     expect(browserHandoffUrl('https://app.kilo.ai/organizations/%E0%A4%A')).toBeNull();
+  });
+
+  // The handoff origin is never the link's raw authority: `evil.com` is the
+  // real host of the first link, so echoing it would open the attacker page.
+  it('never hands off a URL carrying userinfo or a foreign host', () => {
+    expect(browserHandoffUrl('https://app.kilo.ai:pass@evil.com/organizations/new')).toBeNull();
+    expect(browserHandoffUrl('https://user@app.kilo.ai/organizations/new')).toBeNull();
+    expect(browserHandoffUrl('https://evil.com/organizations/new')).toBeNull();
+    expect(browserHandoffUrl('http://localhost@evil.com/organizations/create')).toBeNull();
+  });
+
+  it('builds the handoff origin from the validated host only', () => {
+    expect(browserHandoffUrl('https://app.kilo.ai:8443/organizations/new')).toBe(
+      'https://app.kilo.ai/organizations/new'
+    );
+    expect(browserHandoffUrl('http://127.0.0.1:3000/organizations/new')).toBe(
+      'http://127.0.0.1:3000/organizations/new'
+    );
   });
 
   it('keeps the removed-family policy untouched', () => {

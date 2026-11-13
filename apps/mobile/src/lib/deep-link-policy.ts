@@ -14,10 +14,23 @@ const KILO_WEB_ORIGIN = 'https://app.kilo.ai';
  */
 const BROWSER_ONLY_ORGANIZATION_PATHS = new Set(['/organizations/new', '/organizations/create']);
 
+/** Loopback development authority, as `pathnameOf` accepts it. */
+const LOOPBACK_AUTHORITY = /^(localhost|127\.0\.0\.1)(?::(\d{1,5}))?$/i;
+
+/**
+ * Origin to hand a browser page: the production origin, or the loopback
+ * development one. Built from a host this module validated — never from the
+ * raw authority, because `https://app.kilo.ai:pass@evil.com/…` starts with the
+ * Kilo host but its real host is `evil.com`.
+ */
 function webOrigin(raw: string): string {
-  // An https link keeps its own origin, so a non-production host stays there.
-  const origin = /^https?:\/\/[^/?#]+/i.exec(raw.trim());
-  return origin?.[0] ?? KILO_WEB_ORIGIN;
+  const authority = /^https?:\/\/([^/?#]+)/i.exec(raw.trim())?.[1];
+  const loopback = authority === undefined ? null : LOOPBACK_AUTHORITY.exec(authority);
+  if (loopback === null) {
+    return KILO_WEB_ORIGIN;
+  }
+  const port = loopback[2] === undefined ? '' : `:${loopback[2]}`;
+  return `http://${loopback[1]?.toLowerCase() ?? ''}${port}`;
 }
 
 /**
@@ -34,7 +47,7 @@ function pathnameOf(raw: string): string | null {
   if (absolute === null) {
     return raw.split(/[?#]/, 1)[0] ?? '';
   }
-  if (!/^(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(absolute[1] ?? '')) {
+  if (!LOOPBACK_AUTHORITY.test(absolute[1] ?? '')) {
     return null;
   }
   return absolute[2] ?? '/';

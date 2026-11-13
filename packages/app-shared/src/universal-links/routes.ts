@@ -185,9 +185,18 @@ function parseHttpsPath(authorityAndPath: string): string | null {
   const authority = slash < 0 ? authorityAndPath : authorityAndPath.slice(0, slash);
   const pathPart = slash < 0 ? '' : authorityAndPath.slice(slash);
 
-  // Strip optional port for host comparison.
+  // `https://app.kilo.ai:pass@evil.com/x` puts a foreign host after the first
+  // `:` — an authority carrying userinfo is never ours.
+  if (authority.includes('@')) {
+    return null;
+  }
+
+  // Strip optional port for host comparison; a port is digits only.
   const colon = authority.indexOf(':');
   const host = (colon >= 0 ? authority.slice(0, colon) : authority).toLowerCase();
+  if (colon >= 0 && !/^\d{1,5}$/.test(authority.slice(colon + 1))) {
+    return null;
+  }
 
   if (host !== KILO_WEB_HOST) {
     return null;

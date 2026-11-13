@@ -368,6 +368,19 @@ describe('parseKiloWebPath', () => {
   it('rejects www.kilo.ai and other hosts', () => {
     expect(parseKiloWebPath('https://www.kilo.ai/profile')).toBeNull();
   });
+
+  // Userinfo hides a foreign host after the first `:` (`app.kilo.ai:pass@evil.com`),
+  // so an authority carrying `@` is rejected before the host is read.
+  it('rejects userinfo in the authority', () => {
+    expect(parseKiloWebPath('https://app.kilo.ai:pass@evil.com/profile')).toBeNull();
+    expect(parseKiloWebPath('https://user@app.kilo.ai/profile')).toBeNull();
+    expect(resolveIncomingUrl('https://app.kilo.ai:pass@evil.com/organizations/org_1')).toBeNull();
+  });
+
+  it('accepts a numeric port and rejects a non-numeric one', () => {
+    expect(parseKiloWebPath('https://app.kilo.ai:443/profile')).toBe('/profile');
+    expect(parseKiloWebPath('https://app.kilo.ai:not_a_port/profile')).toBeNull();
+  });
 });
 
 describe('aasaComponents', () => {

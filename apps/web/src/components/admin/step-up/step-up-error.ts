@@ -77,13 +77,25 @@ export function stepUpDialogDescription(requirement: StepUpRequirement): string 
     case 'BEARER_NOT_ALLOWED':
       return 'API tokens cannot complete MFA. Use the Kilo web console with a browser session.';
     case 'REAUTH_REQUIRED':
-      return 'Sign in again before adding another passkey. Signing out signs you out of every browser.';
+      return stepUpEnrollmentMessage('REAUTH_REQUIRED');
     case 'STEP_UP_UNAVAILABLE':
       return 'MFA verification could not be checked. Try again in a moment. If it keeps failing, contact support.';
     case 'MFA_EXPIRED':
       return 'Confirm it is you with your passkey to continue.';
     case 'MFA_REQUIRED':
       return 'Confirm it is you with your passkey to continue.';
+  }
+}
+
+/**
+ * The enrollment copy the REAUTH_REQUIRED refusals show on the profile card
+ * and in the step-up dialog. One message for every account: the freshness rule
+ * is no longer an admin-only condition, so the copy keeps mentioning none.
+ */
+export function stepUpEnrollmentMessage(code: 'REAUTH_REQUIRED'): string {
+  switch (code) {
+    case 'REAUTH_REQUIRED':
+      return 'Sign in again before adding a passkey. Signing out signs you out of every browser.';
   }
 }
 

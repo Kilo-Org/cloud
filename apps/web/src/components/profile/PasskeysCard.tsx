@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTRPC } from '@/lib/trpc/utils';
 import { StepUpSignInAgainButton } from '@/components/admin/step-up/StepUpSignInAgainButton';
+import { stepUpEnrollmentMessage } from '@/components/admin/step-up/step-up-error';
 
 /** The one route that mints registration options and verifies the attestation. */
 const REGISTER_ROUTE = '/api/auth/passkey/register';
@@ -32,8 +33,8 @@ const REGISTER_ROUTE = '/api/auth/passkey/register';
  *   a fresh attempt is a new ceremony rather than a retry of this one.
  * - `failed`: the request or the verification failed. Nothing was stored, and
  *   the "Add a passkey" control is a working retry.
- * - `reauth_required`: an admin enrollment needs a fresh sign-in or a live
- *   step-up proof. Retrying the same session cannot succeed.
+ * - `reauth_required`: the enrollment needs a fresh sign-in or a live step-up
+ *   proof. Retrying the same session cannot succeed.
  */
 export type PasskeyRegistrationFailure = 'cancelled' | 'failed' | 'reauth_required';
 
@@ -216,7 +217,7 @@ export function PasskeysCard() {
       : addFailure === 'cancelled'
         ? 'Passkey creation was cancelled. No passkey was added.'
         : addFailure === 'reauth_required'
-          ? 'Sign in again before adding a passkey. Signing out signs you out of every browser.'
+          ? stepUpEnrollmentMessage('REAUTH_REQUIRED')
           : null;
 
   return (

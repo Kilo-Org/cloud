@@ -14,6 +14,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import {
   stepUpDialogDescription,
   stepUpDialogTitle,
+  stepUpEnrollmentMessage,
   type StepUpRequirement,
 } from './step-up-error';
 import { runStepUpCeremony, type StepUpOptions } from './step-up-ceremony';
@@ -137,9 +138,7 @@ export function StepUpCeremonyContent({
         caught.failure === 'reauth_required'
       ) {
         setReauthRequired(true);
-        setError(
-          'Sign in again before adding a passkey to an admin account. Signing out signs you out of every browser.'
-        );
+        setError(stepUpEnrollmentMessage('REAUTH_REQUIRED'));
       } else {
         setError('Passkey verification did not complete. Try again.');
       }

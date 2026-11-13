@@ -3,6 +3,7 @@ import {
   formatStepUpRemaining,
   stepUpDialogDescription,
   stepUpDialogTitle,
+  stepUpEnrollmentMessage,
   stepUpRequirementFromError,
 } from './step-up-error';
 
@@ -39,6 +40,15 @@ describe('stepUpRequirementFromError', () => {
 });
 
 describe('step-up dialog copy', () => {
+  it('uses one enrollment message for the profile card and the dialog', () => {
+    expect(stepUpEnrollmentMessage('REAUTH_REQUIRED')).toBe(
+      'Sign in again before adding a passkey. Signing out signs you out of every browser.'
+    );
+    expect(stepUpDialogDescription({ code: 'REAUTH_REQUIRED' })).toBe(
+      stepUpEnrollmentMessage('REAUTH_REQUIRED')
+    );
+  });
+
   it('names the action for every refusal', () => {
     for (const code of [
       'MFA_REQUIRED',

@@ -7,9 +7,7 @@ import {
   SESSION_RESUME_ANCHOR_PARAM,
 } from '@kilocode/app-shared/universal-links';
 
-import { i18n } from '@/i18n';
-import { browserHandoffUrl, isRemovedMobileDeepLink } from './deep-link-policy';
-import { openExternalUrl } from './external-link';
+import { browserHandoffUrl, isRemovedMobileDeepLink, openBrowserHandoff } from './deep-link-policy';
 import { parsePendingDeepLinkRecord, type PendingDeepLinkRecord } from './deep-link-record';
 import { currentRouteHref } from './current-route-href';
 import { opensDestination, shellRouteHref } from './deep-link-destination';
@@ -499,7 +497,7 @@ export function captureLaunchDeepLink(): void {
   // in the browser the link was meant for, exactly as a warm arrival does.
   const handoffUrl = browserHandoffUrl(url);
   if (handoffUrl !== null) {
-    void openExternalUrl(handoffUrl, { label: i18n.t('organization.create.title') });
+    void openBrowserHandoff(handoffUrl);
     return;
   }
   const resume = resolveIncomingResume(url);

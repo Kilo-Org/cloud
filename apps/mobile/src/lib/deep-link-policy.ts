@@ -64,6 +64,16 @@ export function browserHandoffUrl(raw: string): string | null {
   return `${webOrigin(raw)}${decoded}`;
 }
 
+/**
+ * Open a page the app cannot show. The opener is imported lazily: it pulls in
+ * Expo's Linking and reads the build-time `__DEV__` global, and this module is
+ * imported by pure suites that only map link paths.
+ */
+export async function openBrowserHandoff(url: string): Promise<void> {
+  const { openExternalUrl } = await import('./external-link');
+  await openExternalUrl(url);
+}
+
 export function isRemovedMobileDeepLink(raw: string): boolean {
   const pathname = (parseKiloWebPath(raw) ?? raw).split(/[?#]/, 1)[0] ?? '';
   try {

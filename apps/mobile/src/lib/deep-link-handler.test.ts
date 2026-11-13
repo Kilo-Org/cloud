@@ -546,7 +546,7 @@ describe('redirectSystemPath', () => {
 describe('organization pages the app has no screen for', () => {
   it.each(['new', 'create'])(
     'hands /organizations/%s to the browser instead of navigating',
-    page => {
+    async page => {
       _resetDeepLinkLaunchForTests();
       vi.mocked(openExternalUrl).mockClear();
 
@@ -558,10 +558,9 @@ describe('organization pages the app has no screen for', () => {
       // Falsy, like every handled link: a truthy return re-dispatches the
       // linking resolver and races our navigation.
       expect(result).toBeNull();
-      expect(openExternalUrl).toHaveBeenCalledWith(
-        `https://app.kilo.ai/organizations/${page}`,
-        expect.objectContaining({ label: expect.any(String) })
-      );
+      await vi.waitFor(() => {
+        expect(openExternalUrl).toHaveBeenCalledWith(`https://app.kilo.ai/organizations/${page}`);
+      });
       expect(getPendingDeepLink()).toBeNull();
     }
   );

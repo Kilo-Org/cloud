@@ -1050,17 +1050,16 @@ describe('deep-link-launch', () => {
 describe('organization create pages from the org-root Android filter', () => {
   it.each(['new', 'create'])(
     'opens /organizations/%s in the browser instead of stashing it',
-    page => {
+    async page => {
       _resetDeepLinkLaunchForTests();
       vi.mocked(openExternalUrl).mockClear();
       _setGetLinkingURLForTests(() => `https://app.kilo.ai/organizations/${page}`);
 
       captureLaunchDeepLink();
 
-      expect(openExternalUrl).toHaveBeenCalledWith(
-        `https://app.kilo.ai/organizations/${page}`,
-        expect.objectContaining({ label: expect.any(String) })
-      );
+      await vi.waitFor(() => {
+        expect(openExternalUrl).toHaveBeenCalledWith(`https://app.kilo.ai/organizations/${page}`);
+      });
       expect(getPendingDeepLink()).toBeNull();
     }
   );

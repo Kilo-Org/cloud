@@ -1,10 +1,8 @@
 import { resolveIncomingResume } from '@kilocode/app-shared/universal-links';
 
-import { i18n } from '@/i18n';
 import { opensAppRoutePath, opensDestination, shellRouteHref } from './deep-link-destination';
 import { resumeDeepLinkHref, setPendingDeepLink, wasLaunchLinkHandled } from './deep-link-launch';
-import { browserHandoffUrl, isRemovedMobileDeepLink } from './deep-link-policy';
-import { openExternalUrl } from './external-link';
+import { browserHandoffUrl, isRemovedMobileDeepLink, openBrowserHandoff } from './deep-link-policy';
 import { parseGitHubReturnParams, setGitHubInstallReturnOutcome } from './github-install-return';
 import { isSystemSearchFamilyLink } from './system-search-families';
 
@@ -60,7 +58,7 @@ export function redirectSystemPath({
     // opens there. Falsy, like every handled link (see critical point 2).
     const handoffUrl = browserHandoffUrl(path);
     if (handoffUrl !== null) {
-      void openExternalUrl(handoffUrl, { label: i18n.t('organization.create.title') });
+      void openBrowserHandoff(handoffUrl);
       return initial ? '/' : null;
     }
     const resume = resolveIncomingResume(path);

@@ -10,7 +10,17 @@ import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
-import { wrapInSafeNextResponse } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import {
+  managedGatewayDisabledResponse,
+  wrapInSafeNextResponse,
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import {
+  getManagedGatewayFromUrl,
+  getOrganizationGatewaySettings,
+  isManagedGatewayDisabled,
+  NO_ORGANIZATION_GATEWAY_SETTINGS,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
 import {
   gatewayUsageContextBase,
   organizationProviderPreferences,
@@ -137,6 +147,24 @@ export async function handleSystemOneRequest(request: NextRequest) {
   // blocks them at a zero balance too.
   const account = await getBalanceAndOrgSettings(organizationId, user, readDb, 'usage');
   const { balance, settings, plan, payer } = account;
+
+  // The organization's disabled-gateway settings govern which gateways its funded
+  // requests may use. Apply them to System One's upstream before any call or charge.
+  const organizationGatewaySettings = organizationId
+    ? getOrganizationGatewaySettings(
+        await getRuntimeOrganizationFeatures(),
+        organizationId,
+        settings
+      )
+    : NO_ORGANIZATION_GATEWAY_SETTINGS;
+  if (isManagedGatewayDisabled(organizationGatewaySettings, OPENROUTER.type)) {
+    return managedGatewayDisabledResponse(OPENROUTER.type);
+  }
+  const gatewayByDomain = getManagedGatewayFromUrl(OPENROUTER.apiUrl);
+  if (gatewayByDomain && isManagedGatewayDisabled(organizationGatewaySettings, gatewayByDomain)) {
+    return managedGatewayDisabledResponse(gatewayByDomain);
+  }
+
   const creditsBlocked = paidUsageRejection({ user, organizationId, account, exempt: false });
   if (creditsBlocked) return await creditsBlocked();
 

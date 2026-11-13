@@ -5,6 +5,7 @@ import type * as Sentry from '@sentry/nextjs';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { TypeSafeClient, choice, noul, score } from '@typesafe-ai/sdk';
 import type { User } from '@kilocode/db/schema';
+import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { after, NextRequest, NextResponse } from 'next/server';
@@ -13,6 +14,8 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
@@ -83,6 +86,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
   resolveOpenRouterModelAlias: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
+  ...(jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/organization-features'
+  ) as Record<string, unknown>),
+  getRuntimeOrganizationFeatures: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: jest.fn(),
 }));
@@ -284,6 +293,7 @@ describe('handleSystemOneRequest', () => {
     jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(false);
     jest.mocked(gatewayRateLimitKey).mockReturnValue('test-rate-limit-key');
     jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue(memberDecision);
+    jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     jest
       .mocked(getOpenRouterSystemOneModelsFromDatabase)
       .mockResolvedValue(new Set([TYPESAFE_MODEL, OTHER_SYSTEM_ONE_MODEL, SYSTEM_ONE_ALIAS]));
@@ -1435,5 +1445,91 @@ describe('handleSystemOneRequest', () => {
     expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(deferredUsageCallbacks()).toHaveLength(0);
+  });
+
+  describe('organization gateway settings', () => {
+    const openRouterDisabledSettings = {
+      data_collection: 'deny',
+      disable_openrouter: true,
+    } satisfies OrganizationSettings;
+    const gatewaySettingsEnabledFeatures = {
+      ...DEFAULT_ORGANIZATION_FEATURES,
+      gateway_settings: ['org-123'],
+    };
+
+    it('refuses a request when the organization disabled OpenRouter', async () => {
+      setAuth('org-123');
+      jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
+        balance: 1000,
+        settings: openRouterDisabledSettings,
+      });
+      jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(gatewaySettingsEnabledFeatures);
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error_type: 'provider_not_allowed',
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(deferredUsageCallbacks()).toHaveLength(0);
+    });
+
+    it('serves a request when the organization allows OpenRouter', async () => {
+      setAuth('org-123');
+      jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
+        balance: 1000,
+        settings: { data_collection: 'deny', disable_openrouter: false },
+      });
+      jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(gatewaySettingsEnabledFeatures);
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores the disabled setting while the feature does not list the organization', async () => {
+      setAuth('org-123');
+      jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
+        balance: 1000,
+        settings: openRouterDisabledSettings,
+      });
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves a personal request outside the organization settings', async () => {
+      jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
+        balance: 1000,
+        settings: openRouterDisabledSettings,
+      });
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses the disabled gateway before the credits check', async () => {
+      setAuth('org-123');
+      jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
+        balance: 0,
+        settings: openRouterDisabledSettings,
+      });
+      jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(gatewaySettingsEnabledFeatures);
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error_type: 'provider_not_allowed',
+      });
+      expect(creditsBlockedResponse).not.toHaveBeenCalled();
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
   });
 });

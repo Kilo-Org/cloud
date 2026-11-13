@@ -9,6 +9,7 @@ import { createTarStream, type TarArchiveEntry } from '../log-uploader.js';
 const MAX_FILE_BYTES = 1024 * 1024;
 const MAX_CONTENT_BYTES = 4 * 1024 * 1024;
 const MAX_FILES = 64;
+const MIN_FILE_BUDGET_BYTES = 4 * 1024;
 const TRUNCATED = '\n[TRUNCATED: retained complete log lines within the capture limit]\n';
 const OMITTED = '[TRUNCATED: additional log files omitted by the total capture limit]\n';
 
@@ -105,7 +106,7 @@ export async function collectControlFileLogArchive(input: {
     let remaining = MAX_CONTENT_BYTES - Buffer.byteLength(OMITTED);
     for (const [index, file] of files.entries()) {
       input.signal.throwIfAborted();
-      if (index >= MAX_FILES || remaining < Buffer.byteLength(TRUNCATED)) {
+      if (index >= MAX_FILES || remaining < MIN_FILE_BUDGET_BYTES) {
         await writeFile(path.join(staging, 'TRUNCATED.txt'), OMITTED, { mode: 0o600 });
         entries.push({ directory: staging, name: 'TRUNCATED.txt' });
         break;

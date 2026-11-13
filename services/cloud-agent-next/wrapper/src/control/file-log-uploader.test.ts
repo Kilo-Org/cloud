@@ -11,6 +11,7 @@ import {
   utimes,
   writeFile,
 } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import {
@@ -37,7 +38,7 @@ afterEach(async () => {
 });
 
 async function fixture() {
-  const root = await mkdtemp('/tmp/kilo2/control-file-logs-');
+  const root = await mkdtemp(path.join(os.tmpdir(), 'control-file-logs-'));
   directories.push(root);
   const homeRoot = path.join(root, 'homes');
   const directory = path.join(root, 'workspace');
@@ -283,7 +284,7 @@ describe('control-plane file log archive', () => {
     const files = await fixture();
     const line = `${randomBytes(120).toString('hex')}\n`;
     for (let index = 0; index < 10; index++) {
-      await writeFile(path.join(files.nativeLogDir, `${index}.log`), line.repeat(5_000));
+      await writeFile(path.join(files.nativeLogDir, `${index}.log`), line.repeat(2_500));
     }
     await writeFile(path.join(files.nativeLogDir, 'latest.log'), 'latest native drain evidence\n');
     const newest = new Date('2030-01-01T00:00:00Z');
@@ -310,7 +311,7 @@ describe('control-plane file log archive', () => {
     expect(
       [...archive.values()].some(value => value.includes('latest native drain evidence'))
     ).toBe(true);
-    expect([...archive.values()].some(value => value.includes('[TRUNCATED'))).toBe(true);
+    expect(archive.get('TRUNCATED.txt')?.toString()).toContain('[TRUNCATED');
     expect(
       [...archive.values()].reduce((sum, value) => sum + value.byteLength, 0)
     ).toBeLessThanOrEqual(4 * 1024 * 1024);
@@ -348,7 +349,7 @@ describe('control-plane file log archive', () => {
   it('redacts known launch secrets before truncation and drops oversized partial lines', async () => {
     const files = await fixture();
     const environment: Record<string, string> = {
-      CONTROL_LOG_UPLOAD_GRANT: 'synthetic-opaque-secret',
+      SANDBOX_CONTROL_CREDENTIAL: 'synthetic-opaque-secret',
     };
     const largeLine = `${'x'.repeat(2 * 1024 * 1024)}partial-sensitive-suffix\n`;
     await writeFile(
@@ -359,7 +360,7 @@ describe('control-plane file log archive', () => {
     let body = Buffer.alloc(0);
     const uploader = createControlFileLogUploader({
       uploadUrl: 'https://control.example/logs',
-      uploadGrant: environment.CONTROL_LOG_UPLOAD_GRANT,
+      uploadGrant: 'synthetic-grant',
       environment,
       wrapperLogPath: files.wrapperLogPath,
       homeRoots: [files.homeRoot],
@@ -369,7 +370,7 @@ describe('control-plane file log archive', () => {
       },
     });
     uploaders.push(uploader);
-    delete environment.CONTROL_LOG_UPLOAD_GRANT;
+    delete environment.SANDBOX_CONTROL_CREDENTIAL;
     await uploader.uploadNow();
     const archive = await extract(body, files.root);
     expect(archive.get('kilocode-control-wrapper.log')?.toString()).toBe('unlabeled [REDACTED]\n');

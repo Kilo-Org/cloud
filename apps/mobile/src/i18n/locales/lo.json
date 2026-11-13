@@ -22,6 +22,10 @@
     "expired": "ໝົດອາຍຸແລ້ວ"
   },
   "common": {
+    "manageOnWeb": "ຈັດການໃນເວັບ",
+    "creditHistory": "ປະຫວັດເຄຣດິດ",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "ຍົກເລີກ",
@@ -118,6 +122,7 @@
     "copyLink": "ຄັດລອກລິ້ງ",
     "couldNotLoadOrganizations": "ບໍ່ສາມາດໂຫຼດລາຍຊື່ອົງກອນໄດ້.",
     "couldNotLoadSessions": "ບໍ່ສາມາດໂຫຼດເຊສຊັນໄດ້.",
+    "couldnTLoad": "ບໍ່ສາມາດໂຫຼດໄດ້.",
     "couldnTLoadMore": "ບໍ່ສາມາດໂຫຼດເພີ່ມເຕີມໄດ້.",
     "deviceSessions": "ເຊສຊັນຂອງອຸປະກອນ",
     "disabled": "ປິດໃຊ້ແລ້ວ",
@@ -245,6 +250,10 @@
     "notAdded": "ທ່ານເຂົ້າສູ່ລະບົບແລ້ວ. ບໍ່ໄດ້ເພີ່ມ {{provider}} ໃສ່ບັນຊີຂອງທ່ານ."
   },
   "profile": {
+    "creditHistorySubtitle": "ການຊື້, ໃບຮັບເງິນ ແລະ ການເຄື່ອນໄຫວເຄຣດິດ",
+    "invoicesSubtitle": "ດາວໂຫຼດໃບແຈ້ງໜີ້ສຳລັບການຊື້ຂອງທ່ານ",
+    "manageBilling": "ຈັດການການຮຽກເກັບເງິນໃນ kilo.ai",
+    "manageBillingIosNote": "ວິທີຊຳລະເງິນ, ການເຕີມເງິນອັດຕະໂນມັດ ແລະ ລາຍລະອຽດການຮຽກເກັບເງິນແມ່ນຈັດການໃນ kilo.ai.",
     "codeReviewerSubtitle": "ການກວດສອບ PR ອັດຕະໂນມັດ",
     "securityAgentSubtitle": "ຊອກຫາ ແລະ ແກ້ໄຂຈຸດອ່ອນດ້ານຄວາມປອດໄພ",
     "reviews": "ການກວດສອບ",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "ຄີຂອງຜູ້ໃຫ້ບໍລິການ",
       "rowSubtitle": "ໃຊ້ການຮຽກເກັບເງິນຂອງຜູ້ໃຫ້ບໍລິການຂອງທ່ານເອງ",
-      "manageOnWeb": "ຈັດການໃນເວັບ",
       "manageOnWebReason": "ຜູ້ໃຫ້ບໍລິການເຫຼົ່ານີ້ຕ້ອງການຂໍ້ມູນຮັບຮອງແບບມີໂຄງສ້າງ",
       "description": "ຄຳຂໍທີ່ສົ່ງຜ່ານຄີເຫຼົ່ານີ້ຈະຖືກຮຽກເກັບເງິນຈາກບັນຊີຜູ້ໃຫ້ບໍລິການຂອງທ່ານ ແທນຍອດເງິນ Kilo ຂອງທ່ານ.",
       "enabled": "ກຳລັງໃຊ້ງານ",
@@ -2551,7 +2559,8 @@
       "cancelQueued": "ຍົກເລີກຂໍ້ຄວາມ",
       "cancelQueuedAccessibility": "ຍົກເລີກຂໍ້ຄວາມທີ່ລໍຖ້າສົ່ງ",
       "restoreQueued": "ກູ້ຄືນ",
-      "restoreQueuedAccessibility": "ນຳຂໍ້ຄວາມທີ່ຍົກເລີກກັບຄືນສູ່ຊ່ອງປ້ອນຂໍ້ຄວາມ"
+      "restoreQueuedAccessibility": "ນຳຂໍ້ຄວາມທີ່ຍົກເລີກກັບຄືນສູ່ຊ່ອງປ້ອນຂໍ້ຄວາມ",
+      "noReplyRecorded": "ບໍ່ມີການບັນທຶກຄຳຕອບສຳລັບຂໍ້ຄວາມນີ້."
     },
     "olderMessages": {
       "arrived": "ໂຫຼດຂໍ້ຄວາມກ່ອນໜ້າແລ້ວ",
@@ -2944,6 +2953,26 @@
     "onlyFirstFilesAttached_other": "ຈະແນບສະເພາະໄຟລ໌ {{displayCount}} ໄຟລ໌ທຳອິດເທົ່ານັ້ນ."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "ປະຫວັດການຮຽກເກັບເງິນ",
+      "billingHistoryEmpty": "ຍັງບໍ່ມີປະຫວັດການຮຽກເກັບເງິນ.",
+      "cancel": "ຍົກເລີກການສະໝັກສະມາຊິກ",
+      "cancelDescription": "Kilo Pass ຂອງທ່ານຈະຍັງໃຊ້ງານໄດ້ຈົນຮອດທ້າຍຮອບການຮຽກເກັບເງິນ ແລະ ຈະບໍ່ຕໍ່ອາຍຸ.",
+      "cancelScheduled": "ຈະຍົກເລີກໃນວັນທີ {{date}}",
+      "cancelScheduledChange": "ຍົກເລີກການປ່ຽນແປງທີ່ກຳນົດໄວ້",
+      "cancelled": "ຍົກເລີກການສະໝັກສະມາຊິກແລ້ວ",
+      "changePlan": "ປ່ຽນແຜນໃນ kilo.ai",
+      "changePlanIosNote": "ການປ່ຽນແຜນແບບເສຍເງິນສາມາດເຮັດໄດ້ໃນ kilo.ai.",
+      "creditHistoryEmpty": "ຍັງບໍ່ມີເຄຣດິດ Kilo Pass.",
+      "manageInStore": "ຈັດການໃນ {{store}}",
+      "resume": "ສືບຕໍ່ການສະໝັກສະມາຊິກ",
+      "resumeCancelledDescription": "Kilo Pass ຂອງທ່ານຈະເລີ່ມຕໍ່ອາຍຸອັດຕະໂນມັດອີກຄັ້ງ.",
+      "resumePausedDescription": "Kilo Pass ຂອງທ່ານຈະສືບຕໍ່ດຽວນີ້ ກ່ອນວັນທີສືບຕໍ່ທີ່ກຳນົດໄວ້.",
+      "resumed": "ສືບຕໍ່ການສະໝັກສະມາຊິກແລ້ວ",
+      "scheduledChange": "ການປ່ຽນແປງທີ່ກຳນົດໄວ້",
+      "scheduledChangeCancelDescription": "Kilo Pass ຂອງທ່ານຈະຢູ່ໃນແຜນປັດຈຸບັນ ແລະ ຕໍ່ອາຍຸຄືເກົ່າ.",
+      "scheduledChangeSummary": "{{plan}} ໃນວັນທີ {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "ບໍ່ສາມາດໃຊ້ Kilo Pass ໄດ້.",
     "couldNotLoad": "ບໍ່ສາມາດໂຫຼດ Kilo Pass ໄດ້. ລອງອີກຄັ້ງ.",
@@ -2998,6 +3027,11 @@
     "accountDescription": "ລະຫັດບັນຊີ Kilo ແລະ ຂໍ້ມູນປະກອບຄຳຂໍຂອງທ່ານ ໃຊ້ເພື່ອຢັ້ງຢືນຕົວຕົນ ແລະ ວັດແທກປະລິມານການໃຊ້ງານ.",
     "diagnosticsTitle": "ຂໍ້ມູນກວດສອບບັນຫາແອັບ",
     "diagnosticsDescription": "ລາຍງານແອັບຂັດຂ້ອງ ແລະ ຂໍ້ຜິດພາດທີ່ລຶບເນື້ອຫາໃນແອັບອອກແລ້ວ ໃຊ້ເພື່ອໃຫ້ແອັບເຮັດວຽກໄດ້ຢ່າງສະຖຽນ.",
+    "featureFlagsTitle": "ການເປີດໃຊ້ຟີເຈີ",
+    "featureFlagsDescription": "ອີເມວບັນຊີຂອງທ່ານ ທີ່ PostHog ໃຊ້ເພື່ອກຳນົດວ່າທ່ານຈະເຫັນຟີເຈີໃດແດ່.",
+    "featureFlagsWhat": "ອີເມວບັນຊີຂອງທ່ານ.",
+    "featureFlagsWhy": "ເພື່ອກຳນົດວ່າທ່ານຈະເຫັນຟີເຈີໃດແດ່, ລວມທັງຟີເຈີທີ່ພວກເຮົາຍັງທະຍອຍເປີດໃຊ້ຢູ່.",
+    "featureFlagsWho": "PostHog, ບໍລິການເປີດປິດຟີເຈີ.",
     "helpImprove": "ຊ່ວຍປັບປຸງ Kilo",
     "helpImproveDescription": "ແບ່ງປັນຂໍ້ມູນວິເຄາະການໃຊ້ແອັບແບບບໍ່ລະບຸຕົວຕົນ ແລະ ແຫຼ່ງທີ່ມາຂອງການຕິດຕັ້ງ. ທ່ານປ່ຽນຕົວເລືອກນີ້ໄດ້ທຸກເວລາໃນການຕັ້ງຄ່າ.",
     "seeFullDetails": "ເບິ່ງລາຍລະອຽດທັງໝົດ",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "ນຳເຂົ້າ config ແລ້ວ"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "ບໍ່ສາມາດໂຫລດກິດຈະກຳເຄຣດິດໄດ້.",
+      "appStoreReceipt": "ໃບຮັບເງິນຈາກ App Store",
+      "deductionFallback": "ການຫັກເຄຣດິດ",
+      "emptyDescription": "ການຊື້ເຄຣດິດ, ໃບຮັບເງິນ ແລະ ການນຳໃຊ້ຈະສະແດງຢູ່ບ່ອນນີ້.",
+      "emptyTitle": "ບໍ່ມີປະຫວັດເຄຣດິດ",
+      "googlePlayReceipt": "ໃບຮັບເງິນຈາກ Google Play",
+      "kind": {
+        "adjustment": "ການປັບປຸງ",
+        "balanceNeutral": "ບໍ່ກະທົບຍອດເງິນ",
+        "deduction": "ການຫັກ",
+        "grant": "ເຄຣດິດທີ່ໄດ້ຮັບ",
+        "purchase": "ການຊື້"
+      },
+      "purchaseFallback": "ການຊື້ເຄຣດິດ",
+      "receipt": "ໃບຮັບເງິນ",
+      "receiptA11y": "ເປີດໃບຮັບເງິນສຳລັບ {{description}}",
+      "receiptUnavailable": "ບໍ່ມີໃບຮັບເງິນສຳລັບການຊື້ນີ້."
+    },
     "title": "ຊື້ເຄຣດິດ",
     "description": "ເຄຣດິດເປັນການຊື້ຄັ້ງດຽວທີ່ເພີ່ມໃສ່ຍອດ Kilo ຂອງທ່ານສຳລັບການແລ່ນເຊດຊັນການຂຽນໂຄ້ດ AI ໃນ Kilo App. ຮ້ານຄ້າຄິດຄ່າຈາກບັນຊີຂອງທ່ານ ແລະ ເຄຣດິດຈະຖືກເພີ່ມຫຼັງຈາກຮ້ານຄ້າຢືນຢັນການຊຳລະ.",
     "nextExpiry": "ເຄຣດິດ {{amount}} ຈະໝົດອາຍຸ {{date}} (UTC). ເຄຣດິດທີ່ໝົດອາຍຸກ່ອນຈະຖືກໃຊ້ກ່ອນ.",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ບໍ່ສາມາດເປີດຜົນການຄົ້ນຫານີ້ໄດ້"
+  },
+  "usage": {
+    "title": "ການນຳໃຊ້",
+    "orgTitle": "ການນຳໃຊ້ຂອງອົງກອນ",
+    "entrySubtitle": "ຄ່າໃຊ້ຈ່າຍ, ຄຳຂໍ ແລະ ໂທເຄັນ",
+    "rangePicker": "ຊ່ວງເວລາ",
+    "range90d": "90 ວັນ",
+    "metricPicker": "ຕົວຊີ້ວັດແຜນພູມ",
+    "chartA11y": "{{metric}} ຕໍ່ວັນ",
+    "avgCostPerRequest": "ຄ່າໃຊ້ຈ່າຍສະເລ່ຍ / ຄຳຂໍ",
+    "topModels": "ໂມເດວທີ່ໃຊ້ຫຼາຍສຸດ",
+    "topFeatures": "ຄຸນສົມບັດທີ່ໃຊ້ຫຼາຍສຸດ",
+    "emptyTitle": "ບໍ່ມີການນຳໃຊ້ໃນຊ່ວງເວລານີ້",
+    "orgSelfNotice": "ທ່ານກຳລັງເບິ່ງການນຳໃຊ້ຂອງທ່ານເອງໃນອົງກອນນີ້.",
+    "viewDetails": "ເບິ່ງລາຍລະອຽດການນຳໃຊ້"
+  },
+  "integrations": {
+    "title": "ການເຊື່ອມໂຍງ",
+    "sectionTitle": "ບໍລິການທີ່ເຊື່ອມຕໍ່ແລ້ວ",
+    "entrySubtitle": "GitHub, Slack, Linear ແລະ ອື່ນໆ",
+    "subtitle": "ເຊື່ອມຕໍ່ເຄື່ອງມືພັດທະນາ ແລະ ຂັ້ນຕອນການເຮັດວຽກຂອງທ່ານກັບ Kilo",
+    "emptyHint": "ຍັງບໍ່ມີການເຊື່ອມໂຍງໃດໆເທື່ອ.",
+    "disconnect": "ຕັດການເຊື່ອມຕໍ່",
+    "disconnectTitle": "ຕັດການເຊື່ອມຕໍ່ {{provider}} ບໍ?",
+    "disconnectMessage": "Kilo ຈະຢຸດຕອບກັບໃນ {{provider}}. ທ່ານສາມາດເຊື່ອມຕໍ່ຄືນໄດ້ທຸກເວລາ.",
+    "connectedTo": "ເຊື່ອມຕໍ່ກັບ {{account}} ແລ້ວ",
+    "disconnected": "ຕັດການເຊື່ອມຕໍ່ {{provider}} ແລ້ວ",
+    "disconnectFailed": "ບໍ່ສາມາດຕັດການເຊື່ອມຕໍ່ {{provider}} ໄດ້",
+    "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການເຊື່ອມໂຍງໄດ້",
+    "permissionDenied": "ທ່ານບໍ່ມີສິດຈັດການການເຊື່ອມໂຍງເຫຼົ່ານີ້.",
+    "memberHint": "ກະລຸນາຂໍໃຫ້ເຈົ້າຂອງ ຫຼື ຜູ້ດູແລອົງກອນປ່ຽນແປງການເຊື່ອມຕໍ່ເຫຼົ່ານີ້.",
+    "connectFailed": "ບໍ່ສາມາດເປີດໜ້າການເຊື່ອມຕໍ່ໄດ້"
+  },
+  "invoices": {
+    "personalEmptyDescription": "ໃບແຈ້ງໜີ້ສຳລັບການຊື້ຂອງທ່ານເອງຈະສະແດງຢູ່ບ່ອນນີ້ເມື່ອມີການຮຽກເກັບເງິນ."
   },
   "cloudAgent": {
     "compute": {

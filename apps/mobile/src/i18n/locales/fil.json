@@ -22,6 +22,10 @@
     "expired": "Nag-expire"
   },
   "common": {
+    "manageOnWeb": "Pamahalaan sa web",
+    "creditHistory": "Kasaysayan ng credit",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Kanselahin",
@@ -118,6 +122,7 @@
     "copyLink": "Kopyahin ang link",
     "couldNotLoadOrganizations": "Hindi ma-load ang mga organisasyon.",
     "couldNotLoadSessions": "Hindi ma-load ang mga sesyon.",
+    "couldnTLoad": "Hindi ma-load.",
     "couldnTLoadMore": "Hindi ma-load ang iba pa.",
     "deviceSessions": "Mga sesyon sa aparato",
     "disabled": "Naka-disable",
@@ -245,6 +250,10 @@
     "notAdded": "Naka-sign in ka na. Hindi naidagdag ang {{provider}} sa iyong account."
   },
   "profile": {
+    "creditHistorySubtitle": "Mga pagbili, resibo, at aktibidad ng credit",
+    "invoicesSubtitle": "I-download ang mga invoice ng iyong mga binili",
+    "manageBilling": "Pamahalaan ang billing sa kilo.ai",
+    "manageBillingIosNote": "Ang mga paraan ng pagbabayad, auto top-up, at mga detalye ng billing ay pinamamahalaan sa kilo.ai.",
     "codeReviewerSubtitle": "Awtomatikong pagsusuri ng PR",
     "securityAgentSubtitle": "Hanapin at ayusin ang mga kahinaan sa seguridad",
     "reviews": "Mga pagsusuri",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Mga key ng provider",
       "rowSubtitle": "Gamitin ang sarili mong billing sa provider",
-      "manageOnWeb": "Pamahalaan sa web",
       "manageOnWebReason": "Kailangan ng mga provider na ito ng mga structured na credential.",
       "description": "Ang mga request na dumadaan sa mga key na ito ay sisingilin sa akawnt mo sa provider sa halip na sa balanse mo sa Kilo.",
       "enabled": "Ginagamit",
@@ -2551,7 +2559,8 @@
       "cancelQueued": "Kanselahin ang mensahe",
       "cancelQueuedAccessibility": "Kanselahin ang nakapilang mensahe",
       "restoreQueued": "Ibalik",
-      "restoreQueuedAccessibility": "Ibalik ang kinanselang mensahe sa sulatan ng mensahe"
+      "restoreQueuedAccessibility": "Ibalik ang kinanselang mensahe sa sulatan ng mensahe",
+      "noReplyRecorded": "Walang naitalang tugon para sa mensaheng ito."
     },
     "olderMessages": {
       "arrived": "Na-load ang mga naunang mensahe",
@@ -2944,6 +2953,26 @@
     "onlyFirstFilesAttached_other": "Ang unang {{displayCount}} na file lang ang ilalakip."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Kasaysayan ng billing",
+      "billingHistoryEmpty": "Wala pang kasaysayan ng billing.",
+      "cancel": "Kanselahin ang subscription",
+      "cancelDescription": "Mananatiling aktibo ang iyong Kilo Pass hanggang sa katapusan ng billing period at hindi na ito magre-renew.",
+      "cancelScheduled": "Makakansela sa {{date}}",
+      "cancelScheduledChange": "Kanselahin ang nakaiskedyul na pagbabago",
+      "cancelled": "Nakansela na ang subscription",
+      "changePlan": "Palitan ang plan sa kilo.ai",
+      "changePlanIosNote": "Magagawa ang pagpapalit ng bayad na plan sa kilo.ai.",
+      "creditHistoryEmpty": "Wala pang Kilo Pass credit.",
+      "manageInStore": "Pamahalaan sa {{store}}",
+      "resume": "Ituloy ang subscription",
+      "resumeCancelledDescription": "Muling awtomatikong magre-renew ang iyong Kilo Pass.",
+      "resumePausedDescription": "Itutuloy na ngayon ang iyong Kilo Pass, bago ang nakaiskedyul na petsa ng pagtuloy nito.",
+      "resumed": "Naituloy na ang subscription",
+      "scheduledChange": "Nakaiskedyul na pagbabago",
+      "scheduledChangeCancelDescription": "Mananatili ang iyong Kilo Pass sa kasalukuyang plan nito at magre-renew gaya ng dati.",
+      "scheduledChangeSummary": "{{plan}} sa {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Hindi magagamit ang Kilo Pass.",
     "couldNotLoad": "Hindi ma-load ang Kilo Pass. Subukang muli.",
@@ -2998,6 +3027,11 @@
     "accountDescription": "Ang ID ng iyong akawnt sa Kilo at metadata ng kahilingan, na ginagamit para patunayan ang iyong pagkakakilanlan at sukatin ang paggamit.",
     "diagnosticsTitle": "Pagsusuri sa mga problema ng app",
     "diagnosticsDescription": "Mga ulat ng pag-crash at error na ginagamit para panatilihing maayos ang app. Inaalis ang nilalaman ng app sa mga ulat.",
+    "featureFlagsTitle": "Paglulunsad ng mga tampok",
+    "featureFlagsDescription": "Ang email ng iyong akawnt, na ginagamit ng PostHog para pagpasyahan kung aling mga tampok ang makikita mo.",
+    "featureFlagsWhat": "Ang email ng iyong akawnt.",
+    "featureFlagsWhy": "Para pagpasyahan kung aling mga tampok ang makikita mo, kasama ang mga inilulunsad pa lang namin.",
+    "featureFlagsWho": "PostHog, ang serbisyo para sa feature flag.",
     "helpImprove": "Tumulong na mapabuti ang Kilo",
     "helpImproveDescription": "Ibahagi ang datos sa paggamit ng produkto na walang pagkakakilanlan mo, pati ang pinagmulan ng pag-install. Maaari mo itong baguhin anumang oras sa mga setting.",
     "seeFullDetails": "Tingnan ang lahat ng detalye",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "Na-import ang config"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Hindi ma-load ang aktibidad ng credit.",
+      "appStoreReceipt": "Resibo mula sa App Store",
+      "deductionFallback": "Bawas sa credit",
+      "emptyDescription": "Lalabas dito ang mga pagbili, resibo, at paggamit ng credit.",
+      "emptyTitle": "Walang kasaysayan ng credit",
+      "googlePlayReceipt": "Resibo mula sa Google Play",
+      "kind": {
+        "adjustment": "Adjustment",
+        "balanceNeutral": "Walang epekto sa balanse",
+        "deduction": "Bawas",
+        "grant": "Libreng credit",
+        "purchase": "Pagbili"
+      },
+      "purchaseFallback": "Pagbili ng credit",
+      "receipt": "Resibo",
+      "receiptA11y": "Buksan ang resibo para sa {{description}}",
+      "receiptUnavailable": "Walang available na resibo para sa pagbiling ito."
+    },
     "title": "Bumili ng kredito",
     "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",
     "nextExpiry": "Mawawalan ng bisa sa {{date}} (UTC) ang {{amount}} na kredito. Unang ginagamit ang mga kreditong pinakamaagang mawawalan ng bisa.",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Hindi mabuksan ang resulta ng paghahanap na ito"
+  },
+  "usage": {
+    "title": "Paggamit",
+    "orgTitle": "Paggamit ng organisasyon",
+    "entrySubtitle": "Gastos, mga kahilingan, at mga token",
+    "rangePicker": "Saklaw ng panahon",
+    "range90d": "90 araw",
+    "metricPicker": "Sukatan ng chart",
+    "chartA11y": "{{metric}} bawat araw",
+    "avgCostPerRequest": "Avg na gastos / kahilingan",
+    "topModels": "Nangungunang mga model",
+    "topFeatures": "Nangungunang mga feature",
+    "emptyTitle": "Walang paggamit sa panahong ito",
+    "orgSelfNotice": "Nakikita mo ang sarili mong paggamit sa organisasyong ito.",
+    "viewDetails": "Tingnan ang detalye ng paggamit"
+  },
+  "integrations": {
+    "title": "Mga Integration",
+    "sectionTitle": "Mga nakakonektang serbisyo",
+    "entrySubtitle": "GitHub, Slack, Linear at iba pa",
+    "subtitle": "Ikonekta ang iyong mga development tool at workflow sa Kilo",
+    "emptyHint": "Wala pang nakakonektang integration.",
+    "disconnect": "Idiskonekta",
+    "disconnectTitle": "Idiskonekta ang {{provider}}?",
+    "disconnectMessage": "Hihinto na ang Kilo sa pagtugon sa {{provider}}. Maaari kang kumonekta muli anumang oras.",
+    "connectedTo": "Nakakonekta sa {{account}}",
+    "disconnected": "Nadiskonekta ang {{provider}}",
+    "disconnectFailed": "Hindi ma-diskonekta ang {{provider}}",
+    "couldNotLoad": "Hindi ma-load ang mga integration",
+    "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga integration na ito.",
+    "memberHint": "Hilingin sa isang may-ari o admin ng organisasyon na baguhin ang mga koneksyong ito.",
+    "connectFailed": "Hindi mabuksan ang pahina ng koneksyon"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Lalabas dito ang mga invoice ng sarili mong mga binili kapag nasingil ka na."
   },
   "cloudAgent": {
     "compute": {

@@ -22,6 +22,10 @@
     "expired": "Expirée"
   },
   "common": {
+    "manageOnWeb": "Gérer sur le web",
+    "creditHistory": "Historique des crédits",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Annuler",
@@ -118,6 +122,7 @@
     "copyLink": "Copier le lien",
     "couldNotLoadOrganizations": "Impossible de charger les organisations",
     "couldNotLoadSessions": "Impossible de charger les sessions",
+    "couldnTLoad": "Le chargement a échoué",
     "couldnTLoadMore": "Impossible de charger la suite",
     "deviceSessions": "Sessions sur les appareils",
     "disabled": "Désactivé",
@@ -245,6 +250,10 @@
     "notAdded": "Vous êtes connecté. {{provider}} n'a pas été ajouté à votre compte."
   },
   "profile": {
+    "creditHistorySubtitle": "Achats, reçus et activité des crédits",
+    "invoicesSubtitle": "Téléchargez les factures de vos achats",
+    "manageBilling": "Gérer la facturation sur kilo.ai",
+    "manageBillingIosNote": "Les moyens de paiement, la recharge automatique et les informations de facturation se gèrent sur kilo.ai.",
     "codeReviewerSubtitle": "Revues automatiques de PR",
     "securityAgentSubtitle": "Trouver et corriger les vulnérabilités",
     "reviews": "Revues",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Clés de fournisseur",
       "rowSubtitle": "Utiliser votre propre facturation fournisseur",
-      "manageOnWeb": "Gérer sur le web",
       "manageOnWebReason": "Ces fournisseurs nécessitent des identifiants structurés.",
       "description": "Les requêtes effectuées avec ces clés sont facturées sur votre compte fournisseur au lieu de votre solde Kilo.",
       "enabled": "Utilisée",
@@ -1930,7 +1938,8 @@
       "cancelQueued": "Annuler le message",
       "cancelQueuedAccessibility": "Annuler le message en attente",
       "restoreQueued": "Restaurer",
-      "restoreQueuedAccessibility": "Restaurer le message annulé dans le champ de saisie"
+      "restoreQueuedAccessibility": "Restaurer le message annulé dans le champ de saisie",
+      "noReplyRecorded": "Aucune réponse n'a été enregistrée pour ce message."
     },
     "olderMessages": {
       "arrived": "Messages précédents chargés",
@@ -2360,6 +2369,26 @@
     "onlyFirstFilesAttached_many": "Seuls les {{displayCount}} premiers fichiers seront joints."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Historique de facturation",
+      "billingHistoryEmpty": "Aucun historique de facturation pour le moment.",
+      "cancel": "Résilier l'abonnement",
+      "cancelDescription": "Votre Kilo Pass reste actif jusqu'à la fin de la période de facturation et ne sera pas renouvelé.",
+      "cancelScheduled": "Prend fin le {{date}}",
+      "cancelScheduledChange": "Annuler le changement prévu",
+      "cancelled": "Abonnement résilié",
+      "changePlan": "Changer de forfait sur kilo.ai",
+      "changePlanIosNote": "Les changements de forfait payant sont disponibles sur kilo.ai.",
+      "creditHistoryEmpty": "Aucun crédit Kilo Pass pour le moment.",
+      "manageInStore": "Gérer dans {{store}}",
+      "resume": "Réactiver l'abonnement",
+      "resumeCancelledDescription": "Votre Kilo Pass sera de nouveau renouvelé automatiquement.",
+      "resumePausedDescription": "Votre Kilo Pass reprend dès maintenant, avant la date de reprise prévue.",
+      "resumed": "Abonnement réactivé",
+      "scheduledChange": "Changement prévu",
+      "scheduledChangeCancelDescription": "Votre Kilo Pass conserve son forfait actuel et se renouvelle comme aujourd'hui.",
+      "scheduledChangeSummary": "{{plan}} le {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass n'a pas pu être chargé.",
     "couldNotLoad": "Impossible de charger Kilo Pass. Réessayez.",
@@ -2414,6 +2443,11 @@
     "accountDescription": "Votre identifiant de compte Kilo et les métadonnées des requêtes, utilisés pour vous authentifier et mesurer l'utilisation.",
     "diagnosticsTitle": "Diagnostics de l'application",
     "diagnosticsDescription": "Rapports de plantage et d'erreur, sans le contenu de l'application, utilisés pour assurer sa stabilité.",
+    "featureFlagsTitle": "Déploiement des fonctionnalités",
+    "featureFlagsDescription": "L'adresse e-mail de votre compte, utilisée par PostHog pour déterminer les fonctionnalités que vous voyez.",
+    "featureFlagsWhat": "L'adresse e-mail de votre compte.",
+    "featureFlagsWhy": "Déterminer les fonctionnalités que vous voyez, y compris celles que nous sommes encore en train de déployer.",
+    "featureFlagsWho": "PostHog, le service de feature flags.",
     "helpImprove": "Aider à améliorer Kilo",
     "helpImproveDescription": "Partager des données d'utilisation anonymes et l'origine de l'installation. Vous pouvez modifier ce choix à tout moment dans les réglages.",
     "seeFullDetails": "Voir tous les détails",
@@ -4014,6 +4048,25 @@
     "importConfigApplied": "Config importée"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Impossible de charger l'activité de crédits.",
+      "appStoreReceipt": "Reçu disponible sur l'App Store",
+      "deductionFallback": "Déduction de crédits",
+      "emptyDescription": "Vos achats de crédits, reçus et consommations apparaîtront ici.",
+      "emptyTitle": "Aucun historique de crédits",
+      "googlePlayReceipt": "Reçu disponible sur Google Play",
+      "kind": {
+        "adjustment": "Ajustement",
+        "balanceNeutral": "Sans effet sur le solde",
+        "deduction": "Déduction",
+        "grant": "Crédits offerts",
+        "purchase": "Achat"
+      },
+      "purchaseFallback": "Achat de crédits",
+      "receipt": "Reçu",
+      "receiptA11y": "Ouvrir le reçu pour {{description}}",
+      "receiptUnavailable": "Aucun reçu n'est disponible pour cet achat."
+    },
     "title": "Acheter des crédits",
     "description": "Les crédits sont un achat unique ajouté à votre solde Kilo pour lancer des sessions de codage IA dans Kilo App. La boutique débite votre compte et les crédits sont ajoutés après confirmation du paiement par la boutique.",
     "nextExpiry": "{{amount}} de crédits expirent le {{date}} (UTC). Les crédits dont l'expiration est la plus proche sont utilisés en premier.",
@@ -4199,6 +4252,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Impossible d'ouvrir ce résultat de recherche"
+  },
+  "usage": {
+    "title": "Utilisation",
+    "orgTitle": "Utilisation de l'organisation",
+    "entrySubtitle": "Dépenses, requêtes et jetons",
+    "rangePicker": "Période",
+    "range90d": "90 jours",
+    "metricPicker": "Métrique du graphique",
+    "chartA11y": "{{metric}} par jour",
+    "avgCostPerRequest": "Coût moy. / requête",
+    "topModels": "Principaux modèles",
+    "topFeatures": "Principales fonctionnalités",
+    "emptyTitle": "Aucune utilisation sur cette période",
+    "orgSelfNotice": "Vous voyez votre propre utilisation dans cette organisation.",
+    "viewDetails": "Voir les détails d'utilisation"
+  },
+  "integrations": {
+    "title": "Intégrations",
+    "sectionTitle": "Services connectés",
+    "entrySubtitle": "GitHub, Slack, Linear et plus encore",
+    "subtitle": "Connectez vos outils et flux de travail de développement à Kilo",
+    "emptyHint": "Aucune intégration connectée pour le moment.",
+    "disconnect": "Déconnecter",
+    "disconnectTitle": "Déconnecter {{provider}} ?",
+    "disconnectMessage": "Kilo ne répondra plus dans {{provider}}. Vous pouvez le reconnecter à tout moment.",
+    "connectedTo": "Connecté à {{account}}",
+    "disconnected": "{{provider}} déconnecté",
+    "disconnectFailed": "Impossible de déconnecter {{provider}}",
+    "couldNotLoad": "Impossible de charger les intégrations",
+    "permissionDenied": "Vous n'avez pas l'autorisation de gérer ces intégrations.",
+    "memberHint": "Demandez à un propriétaire ou à un administrateur de l'organisation de modifier ces connexions.",
+    "connectFailed": "Impossible d'ouvrir la page de connexion"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Les factures de vos achats personnels apparaîtront ici dès votre première facturation."
   },
   "cloudAgent": {
     "compute": {

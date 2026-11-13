@@ -85,6 +85,15 @@ export type NewSessionConfigureFormProps = {
   // Repository (Cloud Agent only).
   groups: RepositoryGroup[];
   isRetrying: boolean;
+  /**
+   * Whether the repository section's final height is known: every provider query
+   * has answered, the persisted connect-card collapse list and the repository
+   * draft have loaded, and the selection the cards depend on is settled. The
+   * provider cards and the rows below the section paint on this signal together,
+   * because a card's height is data-dependent and would otherwise push the rows
+   * below it after the form has settled.
+   */
+  repositoryRegionSettled: boolean;
   onChangeRepo: (fullName: string) => void;
   onConnectProvider: (platform: RepositoryPlatform) => void;
   /**

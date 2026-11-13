@@ -22,6 +22,10 @@
     "expired": "Срок истёк"
   },
   "common": {
+    "manageOnWeb": "Управление в веб-версии",
+    "creditHistory": "История кредитов",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Отмена",
@@ -118,6 +122,7 @@
     "copyLink": "Скопировать ссылку",
     "couldNotLoadOrganizations": "Не удалось загрузить организации.",
     "couldNotLoadSessions": "Не удалось загрузить сеансы.",
+    "couldnTLoad": "Не удалось загрузить.",
     "couldnTLoadMore": "Не удалось загрузить следующие записи.",
     "deviceSessions": "Сеансы на устройствах",
     "disabled": "Отключено",
@@ -245,6 +250,10 @@
     "notAdded": "Вход выполнен. {{provider}} не добавлен в ваш аккаунт."
   },
   "profile": {
+    "creditHistorySubtitle": "Покупки, чеки и операции с кредитами",
+    "invoicesSubtitle": "Скачивайте счета за покупки",
+    "manageBilling": "Управление оплатой на kilo.ai",
+    "manageBillingIosNote": "Способы оплаты, автопополнение и платёжные данные настраиваются на kilo.ai.",
     "codeReviewerSubtitle": "Автоматические проверки PR",
     "securityAgentSubtitle": "Поиск и устранение уязвимостей",
     "reviews": "Проверки",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Ключи провайдеров",
       "rowSubtitle": "Оплата через ваш аккаунт провайдера",
-      "manageOnWeb": "Управление в веб-версии",
       "manageOnWebReason": "Этим провайдерам нужны структурированные учётные данные.",
       "description": "Запросы с этими ключами оплачиваются через ваш аккаунт провайдера, а не с баланса Kilo.",
       "enabled": "Используется",
@@ -2053,7 +2061,8 @@
       "cancelQueued": "Отменить отправку",
       "cancelQueuedAccessibility": "Отменить отправку сообщения из очереди",
       "restoreQueued": "Восстановить",
-      "restoreQueuedAccessibility": "Вернуть отменённое сообщение в поле ввода"
+      "restoreQueuedAccessibility": "Вернуть отменённое сообщение в поле ввода",
+      "noReplyRecorded": "Ответ на это сообщение не был записан."
     },
     "olderMessages": {
       "arrived": "Более ранние сообщения загружены",
@@ -2462,6 +2471,26 @@
     "onlyFirstFilesAttached_many": "Будут прикреплены только файлы в начале списка: {{displayCount}}."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "История платежей",
+      "billingHistoryEmpty": "Платежей пока нет.",
+      "cancel": "Отменить подписку",
+      "cancelDescription": "Kilo Pass останется активным до конца расчётного периода и не будет продлён.",
+      "cancelScheduled": "Отменяется {{date}}",
+      "cancelScheduledChange": "Отменить запланированное изменение",
+      "cancelled": "Подписка отменена",
+      "changePlan": "Сменить тариф на kilo.ai",
+      "changePlanIosNote": "Сменить платный тариф можно на kilo.ai.",
+      "creditHistoryEmpty": "Кредитов Kilo Pass пока нет.",
+      "manageInStore": "Управлять в {{store}}",
+      "resume": "Возобновить подписку",
+      "resumeCancelledDescription": "Kilo Pass снова будет продлеваться автоматически.",
+      "resumePausedDescription": "Kilo Pass возобновится сейчас, не дожидаясь запланированной даты.",
+      "resumed": "Подписка возобновлена",
+      "scheduledChange": "Запланированное изменение",
+      "scheduledChangeCancelDescription": "Kilo Pass останется на текущем тарифе и будет продлеваться как сейчас.",
+      "scheduledChangeSummary": "{{plan}} с {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass недоступен.",
     "couldNotLoad": "Не удалось загрузить Kilo Pass. Попробуйте снова.",
@@ -2516,6 +2545,11 @@
     "accountDescription": "Идентификатор вашего аккаунта Kilo и метаданные запросов нужны для проверки подлинности и учёта использования.",
     "diagnosticsTitle": "Диагностика приложения",
     "diagnosticsDescription": "Отчёты о сбоях и ошибках помогают поддерживать стабильную работу приложения. Содержимое приложения из них удаляется.",
+    "featureFlagsTitle": "Поэтапный запуск функций",
+    "featureFlagsDescription": "Адрес электронной почты вашего аккаунта, с помощью которого PostHog определяет, какие функции вам показывать.",
+    "featureFlagsWhat": "Адрес электронной почты вашего аккаунта.",
+    "featureFlagsWhy": "Чтобы определять, какие функции вам показывать, в том числе те, которые мы ещё постепенно запускаем.",
+    "featureFlagsWho": "PostHog, сервис управления флагами функций.",
     "helpImprove": "Помочь улучшить Kilo",
     "helpImproveDescription": "Разрешите отправлять анонимные данные об использовании приложения и источнике установки. Этот выбор можно изменить в настройках в любой момент.",
     "seeFullDetails": "Подробнее",
@@ -4075,6 +4109,25 @@
     "importConfigApplied": "Конфигурация импортирована"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Не удалось загрузить кредитную активность.",
+      "appStoreReceipt": "Чек в App Store",
+      "deductionFallback": "Списание кредитов",
+      "emptyDescription": "Здесь появятся покупки кредитов, чеки и расход.",
+      "emptyTitle": "Истории кредитов нет",
+      "googlePlayReceipt": "Чек в Google Play",
+      "kind": {
+        "adjustment": "Корректировка",
+        "balanceNeutral": "Без изменения баланса",
+        "deduction": "Списание",
+        "grant": "Начисление кредитов",
+        "purchase": "Покупка"
+      },
+      "purchaseFallback": "Покупка кредитов",
+      "receipt": "Чек",
+      "receiptA11y": "Открыть чек: {{description}}",
+      "receiptUnavailable": "Чек для этой покупки недоступен."
+    },
     "title": "Купить кредиты",
     "description": "Кредиты — это разовая покупка, которая добавляется на ваш баланс Kilo для проведения ИИ-сессий кодинга в Kilo App. Магазин списывает средства с вашего аккаунта, и кредиты начисляются после подтверждения оплаты магазином.",
     "nextExpiry": "Срок действия кредитов на сумму {{amount}} истекает {{date}} (UTC). Сначала расходуются кредиты с самым ранним сроком действия.",
@@ -4264,6 +4317,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Не удалось открыть результат поиска"
+  },
+  "usage": {
+    "title": "Использование",
+    "orgTitle": "Использование организации",
+    "entrySubtitle": "Расходы, запросы и токены",
+    "rangePicker": "Период",
+    "range90d": "90 дней",
+    "metricPicker": "Показатель графика",
+    "chartA11y": "{{metric}} по дням",
+    "avgCostPerRequest": "Ср. стоимость запроса",
+    "topModels": "Топ моделей",
+    "topFeatures": "Топ функций",
+    "emptyTitle": "Нет использования за этот период",
+    "orgSelfNotice": "Показано ваше собственное использование в этой организации.",
+    "viewDetails": "Подробнее об использовании"
+  },
+  "integrations": {
+    "title": "Интеграции",
+    "sectionTitle": "Подключённые сервисы",
+    "entrySubtitle": "GitHub, Slack, Linear и другие",
+    "subtitle": "Подключите к Kilo свои инструменты разработки и рабочие процессы",
+    "emptyHint": "Интеграции пока не подключены.",
+    "disconnect": "Отключить",
+    "disconnectTitle": "Отключить {{provider}}?",
+    "disconnectMessage": "Kilo перестанет отвечать в {{provider}}. Вы можете подключиться снова в любое время.",
+    "connectedTo": "Подключено к {{account}}",
+    "disconnected": "{{provider}} отключён",
+    "disconnectFailed": "Не удалось отключить {{provider}}",
+    "couldNotLoad": "Не удалось загрузить интеграции",
+    "permissionDenied": "У вас нет прав на управление этими интеграциями.",
+    "memberHint": "Чтобы изменить эти подключения, обратитесь к владельцу или администратору организации.",
+    "connectFailed": "Не удалось открыть страницу подключения"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Счета за ваши личные покупки появятся здесь после первого списания."
   },
   "cloudAgent": {
     "compute": {

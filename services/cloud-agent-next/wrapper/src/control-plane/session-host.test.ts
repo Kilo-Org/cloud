@@ -1402,7 +1402,7 @@ describe('completion feed continuity and idle allocation', () => {
         }
       }
       expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
-        { status: 'failed', reason: 'no_outcome', lastMessageId: 'm1' },
+        { status: 'failed', reason: 'completion_unconfirmed', lastMessageId: 'm1' },
       ]);
       expect(f.host.getHeartbeat().active).toBe(true);
     } finally {

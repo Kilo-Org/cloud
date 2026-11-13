@@ -15,6 +15,7 @@ import {
   isStoredRepoSelectionGone,
   resetSelectedBranchOverrides,
 } from '@/components/agents/new-session-repository-state';
+import { isRepositoryRegionSettled } from '@/components/agents/new-session-repository-settle';
 import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
 import {
   type NewSessionPromptSeed,
@@ -76,6 +77,7 @@ import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-and
 import { hasVisibleComposerText } from '@/lib/composer-text';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCliAgents } from '@/lib/hooks/use-cli-agents';
+import { useCollapsedConnectCtas } from '@/lib/hooks/use-collapsed-connect-ctas-preference';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useInstanceModelCatalog } from '@/lib/hooks/use-instance-model-catalog';
 import { useLaunchFolder } from '@/lib/hooks/use-launch-folder';
@@ -456,6 +458,7 @@ export function NewSessionScreenBody() {
     groups,
     isRetrying,
     reposSettled,
+    providerQueriesResolved,
     openIntegration,
     connectingProvider,
     refreshReposForceFresh,
@@ -473,9 +476,10 @@ export function NewSessionScreenBody() {
     entityKey: repositoryDraftKey,
   });
 
-  const { selectedRepo, setSelectedRepo } = useNewSessionPrefillTargets({
+  const { selectedRepo, setSelectedRepo, repoSeedPending } = useNewSessionPrefillTargets({
     repositories,
     reposSettled,
+    providerQueriesResolved,
     models,
     modelsSettled: !isLoadingModels && !isModelsError && models.length > 0,
     storedRepo: repositoryDraft.settled ? repositoryDraft.value : null,
@@ -578,6 +582,18 @@ export function NewSessionScreenBody() {
       void clearDraft(userId, repositoryDraftKey);
     }
   }, [dropUnresolvedRepo, repositoryDraftKey, setSelectedRepo, userId]);
+
+  // The repository section's own height is data-dependent (connect cards, the
+  // branch row), so the form paints the cards and the rows below the section on
+  // this one signal instead of letting a late card push those rows down.
+  const { hasLoaded: connectCtasLoaded } = useCollapsedConnectCtas();
+  const repositoryRegionSettled = isRepositoryRegionSettled({
+    providerQueriesResolved,
+    connectCtasLoaded,
+    draftSettled: repositoryDraft.settled,
+    seedPending: repoSeedPending,
+    storedSelectionGone: dropUnresolvedRepo,
+  });
 
   const {
     profile,
@@ -1440,6 +1456,7 @@ export function NewSessionScreenBody() {
         autoFocusPrompt={autoFocusPrompt}
         groups={groups}
         isRetrying={isRetrying}
+        repositoryRegionSettled={repositoryRegionSettled}
         onChangeRepo={handleRepoChange}
         onConnectProvider={openIntegration}
         connectingProvider={connectingProvider}

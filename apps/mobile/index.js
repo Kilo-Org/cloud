@@ -7,6 +7,11 @@
 // `require`, not `import`: ESM hoisting would run `expo-router/entry` first.
 const { AppRegistry, LogBox, Platform } = require('react-native');
 
+// Every JavaScript instance hands out React view tags from its first tag, and Android keeps
+// state keyed by them for the life of the process, so a reloaded instance must not reuse the
+// tags the previous one issues. Claim this instance's range before the first render.
+require('./src/lib/view-tag-range').claimViewTagRange();
+
 // A push or a background task can start this bundle while the device is
 // locked. Record the iOS protected-data state before any module reads the
 // keychain: the auth preload runs at import time (src/lib/protected-data.ts).

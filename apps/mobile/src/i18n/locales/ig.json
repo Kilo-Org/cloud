@@ -22,6 +22,10 @@
     "expired": "Oge agwụla"
   },
   "common": {
+    "manageOnWeb": "Jikwaa na weebụ",
+    "creditHistory": "Akụkọ kredit",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Kagbuo",
@@ -118,6 +122,7 @@
     "copyLink": "Detuo njikọ",
     "couldNotLoadOrganizations": "Enweghị ike ibudata òtù.",
     "couldNotLoadSessions": "Enweghị ike ibudata nnọkọ.",
+    "couldnTLoad": "Enweghị ike ibudata.",
     "couldnTLoadMore": "Enweghị ike ibudata ọzọ.",
     "deviceSessions": "Nnọkọ ngwaọrụ",
     "disabled": "Agbanyụrụ",
@@ -245,6 +250,10 @@
     "notAdded": "Ị banyela. Etinyeghị {{provider}} na akaụntụ gị."
   },
   "profile": {
+    "creditHistorySubtitle": "Ịzụ ahịa, rịsịt, na ihe omume kredit",
+    "invoicesSubtitle": "Budata akwụkwọ ụgwọ maka ihe ị zụrụ",
+    "manageBilling": "Jikwaa ịkwụ ụgwọ na kilo.ai",
+    "manageBillingIosNote": "A na-ejikwa ụzọ ịkwụ ụgwọ, itinye kredit na-akpaghị aka, na nkọwa ịkwụ ụgwọ na kilo.ai.",
     "codeReviewerSubtitle": "Nyocha PR akpaghị aka",
     "securityAgentSubtitle": "Chọta ma dozie adịghị ike nchebe",
     "reviews": "Nyocha",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Igodo ndị na-enye ọrụ",
       "rowSubtitle": "Jiri ịkwụ ụgwọ nke onye na-enye ọrụ gị",
-      "manageOnWeb": "Jikwaa na weebụ",
       "manageOnWebReason": "Ndị na-enye ọrụ ndị a chọrọ ozi nbanye ahaziri ahazi",
       "description": "A na-akwụ ụgwọ arịrịọ site n'igodo ndị a n'akaụntụ onye na-enye ọrụ gị kama n'ego fọdụrụ gị na Kilo.",
       "enabled": "Na-eji ya",
@@ -2551,7 +2559,8 @@
       "cancelQueued": "Kagbuo ozi",
       "cancelQueuedAccessibility": "Kagbuo ozi na-echere",
       "restoreQueued": "Weghachite",
-      "restoreQueuedAccessibility": "Weghachite ozi a kagburu n'ebe ide ozi"
+      "restoreQueuedAccessibility": "Weghachite ozi a kagburu n'ebe ide ozi",
+      "noReplyRecorded": "Edekọghị nzaghachi ọ bụla maka ozi a."
     },
     "olderMessages": {
       "arrived": "Ebudatala ozi ndị gara aga",
@@ -2944,6 +2953,26 @@
     "onlyFirstFilesAttached_other": "Naanị faịlụ {{displayCount}} mbụ ka a ga-etinye."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Akụkọ ịkwụ ụgwọ",
+      "billingHistoryEmpty": "Enweghị akụkọ ịkwụ ụgwọ ka ugbu a.",
+      "cancel": "Kagbuo ndenye aha",
+      "cancelDescription": "Kilo Pass gị ga-anọgide na-arụ ọrụ ruo ngwụcha oge ịkwụ ụgwọ, a gaghịkwa emeghari ya ọhụrụ.",
+      "cancelScheduled": "Ọ ga-akagbu na {{date}}",
+      "cancelScheduledChange": "Kagbuo mgbanwe a haziri",
+      "cancelled": "Akagburu ndenye aha",
+      "changePlan": "Gbanwee atụmatụ na kilo.ai",
+      "changePlanIosNote": "Mgbanwe atụmatụ a na-akwụ ụgwọ dị na kilo.ai.",
+      "creditHistoryEmpty": "Enweghị kredit Kilo Pass ka ugbu a.",
+      "manageInStore": "Jikwaa na {{store}}",
+      "resume": "Maliteghachi ndenye aha",
+      "resumeCancelledDescription": "Kilo Pass gị ga-amaliteghachi imeghari ọhụrụ na-akpaghị aka.",
+      "resumePausedDescription": "Kilo Pass gị ga-amaliteghachi ugbu a, tupu ụbọchị a haziri maka ịmaliteghachi ya.",
+      "resumed": "Amaliteghachiri ndenye aha",
+      "scheduledChange": "Mgbanwe a haziri",
+      "scheduledChangeCancelDescription": "Kilo Pass gị ga-anọgide na atụmatụ ya ugbu a ma meghari ọhụrụ dịka o si eme taa.",
+      "scheduledChangeSummary": "{{plan}} na {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "A budataghị Kilo Pass.",
     "couldNotLoad": "Enweghị ike ibudata Kilo Pass. Nwaa ọzọ.",
@@ -2998,6 +3027,11 @@
     "accountDescription": "A na-eji ID akaụntụ Kilo gị na nkọwa data arịrịọ iji nyochaa njirimara gị ma tụọ ojiji.",
     "diagnosticsTitle": "Nchọpụta nsogbu ngwa",
     "diagnosticsDescription": "A na-eji akụkọ mmebi na njehie eme ka ngwa rụọ ọrụ nke ọma, mgbe e wepụchara ọdịnaya ngwa na ha.",
+    "featureFlagsTitle": "Mwepụta njirimara",
+    "featureFlagsDescription": "Email akaụntụ gị, nke PostHog na-eji ekpebi njirimara ndị ị na-ahụ.",
+    "featureFlagsWhat": "Email akaụntụ gị.",
+    "featureFlagsWhy": "Iji kpebie njirimara ndị ị na-ahụ, gụnyere ndị anyị ka na-ewepụta nke nta nke nta.",
+    "featureFlagsWho": "PostHog, ọrụ na-achịkwa njirimara.",
     "helpImprove": "Nyere aka melite Kilo",
     "helpImproveDescription": "Kekọrịta data nyocha ojiji ngwa na-enweghị njirimara gị, yana ebe ị si nweta ngwa ahụ. Ị nwere ike ịgbanwe nke a oge ọ bụla na Ntọala.",
     "seeFullDetails": "Hụ nkọwa zuru ezu",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "Ebubere nhazi"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Enweghị ike ibudata mmemme kredit.",
+      "appStoreReceipt": "Rịsịt sitere na App Store",
+      "deductionFallback": "Mwepụ kredit",
+      "emptyDescription": "Ịzụ kredit, rịsịt, na ojiji ga-apụta ebe a.",
+      "emptyTitle": "Enweghị akụkọ kredit",
+      "googlePlayReceipt": "Rịsịt sitere na Google Play",
+      "kind": {
+        "adjustment": "Mmezi",
+        "balanceNeutral": "Enweghị mmetụta n'ego fọdụrụ",
+        "deduction": "Mwepụ",
+        "grant": "Onyinye kredit",
+        "purchase": "Ịzụ ahịa"
+      },
+      "purchaseFallback": "Ịzụ kredit",
+      "receipt": "Rịsịt",
+      "receiptA11y": "Mepee rịsịt maka {{description}}",
+      "receiptUnavailable": "Enweghị rịsịt maka ihe a zụrụ a."
+    },
     "title": "Zụta ego ojiji",
     "description": "Ego ojiji bụ azụmahịa otu oge nke a na-agbakwunye na nguzozi Kilo gị maka ịgba nnọkọ ịde koodu AI na Kilo App. Ụlọ ahịa na-akwụ ụgwọ na akaụntụ gị, a na-agbakwunye ego ojiji mgbe ụlọ ahịa kwadoro ịkwụ ụgwọ ahụ.",
     "nextExpiry": "Ego ojiji ruru {{amount}} ga-agwụ na {{date}} (UTC). A na-ebu ụzọ jiri ego ojiji nke ga-akacha agwụ ngwa ngwa.",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Enweghị ike imepe nsonaazụ ọchụchọ a"
+  },
+  "usage": {
+    "title": "Ojiji",
+    "orgTitle": "Ojiji nzukọ",
+    "entrySubtitle": "Mmefu, arịrịọ, na tokin",
+    "rangePicker": "Oke oge",
+    "range90d": "Ụbọchị 90",
+    "metricPicker": "Ihe eserese na-egosi",
+    "chartA11y": "{{metric}} kwa ụbọchị",
+    "avgCostPerRequest": "Ọnụ ahịa nkezi / arịrịọ",
+    "topModels": "Ụdị a kacha eji",
+    "topFeatures": "Njirimara a kacha eji",
+    "emptyTitle": "Enweghị ojiji n'oge a",
+    "orgSelfNotice": "Ị na-ahụ ojiji nke gị n'ime nzukọ a.",
+    "viewDetails": "Lee nkọwa ojiji"
+  },
+  "integrations": {
+    "title": "Njikọ",
+    "sectionTitle": "Ọrụ ejikọrọ",
+    "entrySubtitle": "GitHub, Slack, Linear na ndị ọzọ",
+    "subtitle": "Jikọọ ngwaọrụ mmepe gị na usoro ọrụ gị na Kilo",
+    "emptyHint": "Enwebeghị njikọ ọ bụla.",
+    "disconnect": "Kwụsị njikọ",
+    "disconnectTitle": "Kwụsị njikọ {{provider}}?",
+    "disconnectMessage": "Kilo agaghị azaghachi ọzọ na {{provider}}. Ị nwere ike ijikọ ọzọ mgbe ọ bụla.",
+    "connectedTo": "Ejikọrọ na {{account}}",
+    "disconnected": "Akwụsịla njikọ {{provider}}",
+    "disconnectFailed": "Enweghị ike ịkwụsị njikọ {{provider}}",
+    "couldNotLoad": "Enweghị ike ibudata njikọ",
+    "permissionDenied": "Ị nweghị ikike ijikwa njikọ ndị a.",
+    "memberHint": "Gwa onye nwe nzukọ ma ọ bụ onye nchịkwa ka ọ gbanwee njikọ ndị a.",
+    "connectFailed": "Enweghị ike imepe ibe njikọ"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Akwụkwọ ụgwọ maka ihe gị onwe gị zụrụ ga-apụta ebe a ozugbo a nara gị ụgwọ."
   },
   "cloudAgent": {
     "compute": {

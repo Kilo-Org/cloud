@@ -1,20 +1,36 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
-import { useAtomValue, type Atom } from 'jotai';
+import { useEffect, useState, type ReactNode } from 'react';
+import { atom, useAtomValue, type Atom } from 'jotai';
 import { ChevronRight, ChevronDown, Bot, CornerDownRight } from 'lucide-react';
 import { StatusSpinner } from '@/components/shared/StatusSpinner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
-import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
+import type { ChildSessionHydrationState, KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { formatModelRefName } from '@/lib/format-model-name';
 import { useOptionalManager } from './CloudAgentProvider';
 import type { SubtaskPart, StoredMessage, ToolPart } from './types';
 import { isToolPart } from './types';
 import { getToolArguments, getToolInputPath } from './toolCardUtils';
+import { getChildSessionTaskStatus, isBackgroundChildTask } from './child-session-status';
+import type { SessionStatus } from '@kilocode/cloud-agent-sdk/schemas';
 
 const MAX_NESTING_DEPTH = 5;
+const emptyChildSessionStatusAtom = atom(
+  () =>
+    (_sessionId: string): SessionStatus | undefined =>
+      undefined
+);
+const emptyChildSessionErrorAtom = atom(
+  () =>
+    (_sessionId: string): string | null =>
+      null
+);
+const emptyChildSessionHydrationStateAtom = atom(
+  () =>
+    (_sessionId: string): ChildSessionHydrationState | undefined =>
+      undefined
+);
 
 export type ChildSessionDrawerEntry = {
   sessionId: KiloSessionId;
@@ -30,6 +46,9 @@ type ChildSessionSectionProps = {
   taskToolPart?: ToolPart;
   sessionId?: KiloSessionId;
   childMessages?: StoredMessage[];
+  sessionStatus?: SessionStatus;
+  childError?: string | null;
+  hydrationState?: ChildSessionHydrationState;
   depth?: number;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   renderChildTranscript?: (
@@ -47,6 +66,10 @@ export function ChildSessionSection(props: ChildSessionSectionProps) {
     return (
       <LiveChildSessionSection
         childMessagesAtom={childMessagesAtom}
+        childSessionStatusAtom={manager?.atoms.childSessionStatus}
+        childSessionErrorAtom={manager?.atoms.childSessionError}
+        childSessionHydrationStateAtom={manager?.atoms.childSessionHydrationState}
+        hydrateChildSession={manager?.hydrateChildSession}
         sessionId={props.sessionId}
         {...props}
       />
@@ -57,18 +80,41 @@ export function ChildSessionSection(props: ChildSessionSectionProps) {
 
 function LiveChildSessionSection({
   childMessagesAtom,
+  childSessionStatusAtom,
+  childSessionErrorAtom,
+  childSessionHydrationStateAtom,
+  hydrateChildSession,
   sessionId,
   ...props
 }: ChildSessionSectionProps & {
   childMessagesAtom: Atom<(childSessionId: string) => StoredMessage[]>;
+  childSessionStatusAtom?: Atom<(childSessionId: string) => SessionStatus | undefined>;
+  childSessionErrorAtom?: Atom<(childSessionId: string) => string | null>;
+  childSessionHydrationStateAtom?: Atom<(childSessionId: string) => ChildSessionHydrationState>;
+  hydrateChildSession?: (sessionId: KiloSessionId) => Promise<void>;
   sessionId: KiloSessionId;
 }) {
   const getChildMessages = useAtomValue(childMessagesAtom);
+  const getChildStatus = useAtomValue(childSessionStatusAtom ?? emptyChildSessionStatusAtom);
+  const getChildError = useAtomValue(childSessionErrorAtom ?? emptyChildSessionErrorAtom);
+  const getChildHydrationState = useAtomValue(
+    childSessionHydrationStateAtom ?? emptyChildSessionHydrationStateAtom
+  );
+  const childMessages = getChildMessages(sessionId);
+  const sessionStatus = getChildStatus(sessionId);
+  const taskToolPart = props.taskToolPart;
+  useEffect(() => {
+    if (sessionStatus || childMessages.length > 0 || !isBackgroundChildTask(taskToolPart)) return;
+    void hydrateChildSession?.(sessionId);
+  }, [sessionStatus, childMessages.length, taskToolPart, hydrateChildSession, sessionId]);
   return (
     <ChildSessionSectionBody
       {...props}
       sessionId={sessionId}
-      childMessages={getChildMessages(sessionId)}
+      childMessages={childMessages}
+      sessionStatus={sessionStatus}
+      childError={getChildError(sessionId)}
+      hydrationState={getChildHydrationState(sessionId)}
       getChildMessages={getChildMessages}
     />
   );
@@ -79,6 +125,9 @@ function ChildSessionSectionBody({
   taskToolPart,
   sessionId,
   childMessages = [],
+  sessionStatus,
+  childError,
+  hydrationState,
   depth = 0,
   getChildMessages,
   renderChildTranscript,
@@ -90,14 +139,25 @@ function ChildSessionSectionBody({
   const model = subtaskPart?.model
     ? formatModelRefName(subtaskPart.model)
     : getTaskModel(taskToolPart);
-  const taskStatus = taskToolPart?.state?.status;
-  const isCompleted = taskStatus === 'completed';
+  const taskStatus = getChildSessionTaskStatus({
+    taskToolPart,
+    childMessages,
+    sessionStatus,
+    childError,
+    hydrationState,
+  });
   const isRunning = taskStatus === 'running' || taskStatus === 'pending';
   const latestTool = isRunning ? getLatestToolActivity(childMessages) : undefined;
   const agentLabel = agent ? agent.charAt(0).toUpperCase() + agent.slice(1) : undefined;
-  const progress = latestTool ?? (taskStatus === 'pending' ? 'Delegating...' : 'Working...');
-  const statusLabel =
-    taskStatus === 'completed' ? 'Completed' : taskStatus === 'error' ? 'Failed' : undefined;
+  const statusLabel = taskStatus
+    ? {
+        completed: 'Completed',
+        error: 'Failed',
+        pending: 'Delegating',
+        running: 'Working',
+        unavailable: 'Status unavailable',
+      }[taskStatus]
+    : undefined;
   const toolCount = childMessages.reduce(
     (total, message) => total + message.parts.filter(isToolPart).length,
     0
@@ -120,7 +180,10 @@ function ChildSessionSectionBody({
   const summary = (statusLabel || toolCount > 0) && (
     <span className="flex shrink-0 items-center gap-2 font-normal whitespace-nowrap">
       {statusLabel && (
-        <span className={taskStatus === 'error' ? 'text-destructive' : undefined}>
+        <span
+          className={taskStatus === 'error' ? 'text-destructive' : undefined}
+          title={taskStatus === 'unavailable' ? 'Sub-agent status is unavailable.' : undefined}
+        >
           {statusLabel}
         </span>
       )}
@@ -144,25 +207,14 @@ function ChildSessionSectionBody({
         ) : (
           <Bot className="size-4 shrink-0" aria-hidden="true" />
         )}
-        <span
-          className={cn(
-            'flex min-w-0 flex-1 items-center gap-x-2 gap-y-1',
-            !isCompleted && 'flex-wrap'
-          )}
-        >
-          <span
-            className={cn('min-w-0 font-normal', isCompleted ? 'truncate' : 'wrap-anywhere')}
-            title={description}
-          >
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="min-w-0 truncate font-normal" title={description}>
             {description || 'Subagent task'}
           </span>
           {agentLabel && (
             <Badge
               variant="outline"
-              className={cn(
-                'px-1.5 py-0 text-xs font-normal',
-                isCompleted ? 'max-w-[45%] shrink-0' : 'max-w-full'
-              )}
+              className="max-w-[45%] shrink-0 px-1.5 py-0 text-xs font-normal"
             >
               <span className="truncate" title={agentLabel}>
                 {agentLabel}
@@ -170,7 +222,7 @@ function ChildSessionSectionBody({
             </Badge>
           )}
         </span>
-        {isCompleted && summary}
+        {summary}
         {isInteractive &&
           (canExpandInline && isExpanded ? (
             <ChevronDown className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
@@ -178,17 +230,12 @@ function ChildSessionSectionBody({
             <ChevronRight className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
           ))}
       </span>
-      {!isCompleted && (isRunning || statusLabel || toolCount > 0) && (
-        <span className="text-muted-foreground ml-6 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 font-normal">
-          {isRunning && (
-            <span className="flex min-w-0 items-center gap-2">
-              {latestTool && <CornerDownRight className="size-4 shrink-0" aria-hidden="true" />}
-              <span className="truncate" title={progress}>
-                {progress}
-              </span>
-            </span>
-          )}
-          {summary}
+      {latestTool && (
+        <span className="text-muted-foreground ml-6 flex min-w-0 items-center gap-2 font-normal">
+          <CornerDownRight className="size-4 shrink-0" aria-hidden="true" />
+          <span className="truncate" title={latestTool}>
+            {latestTool}
+          </span>
         </span>
       )}
     </>

@@ -87,3 +87,25 @@ describe('PreparationRow output ticker', () => {
     expect(markup).toContain('class="w-full truncate"');
   });
 });
+
+describe('PreparationRow stopped state', () => {
+  it('shows a neutral stop instead of the raw cancellation reason', () => {
+    const attempt: PreparationAttempt = {
+      id: 'attempt-1',
+      triggerMessageId: 'message-1',
+      status: 'failed',
+      startedAt: 1000,
+      completedAt: 13_400,
+      revision: 2,
+      safeError: 'preparation_cancelled',
+      steps: [],
+    };
+    const markup = renderToStaticMarkup(
+      React.createElement(PreparationRow, { attempt, onOpenDetails: jest.fn() })
+    );
+
+    expect(markup).toContain('Preparation stopped');
+    expect(markup).not.toContain('preparation_cancelled');
+    expect(markup).not.toContain('Preparation failed');
+  });
+});

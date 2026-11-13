@@ -22,6 +22,10 @@
     "expired": "Kua pau te wā"
   },
   "common": {
+    "manageOnWeb": "Whakahaerehia i te ipurangi",
+    "creditHistory": "Hītori kiredita",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Whakakore",
@@ -118,6 +122,7 @@
     "copyLink": "Tāruatia te hononga",
     "couldNotLoadOrganizations": "Kāore i taea te uta i ngā whakahaerenga.",
     "couldNotLoadSessions": "Kāore i taea te uta i ngā wātū.",
+    "couldnTLoad": "Kāore i taea te uta.",
     "couldnTLoadMore": "Kāore i taea te uta i ētahi atu.",
     "deviceSessions": "Ngā wātū pūrere",
     "disabled": "Kua monokia",
@@ -245,6 +250,10 @@
     "notAdded": "Kua takiuru koe. Kāore i tāpirihia a {{provider}} ki tō pūkete."
   },
   "profile": {
+    "creditHistorySubtitle": "Ngā hoko, ngā rihīti, me ngā mahi kiredita",
+    "invoicesSubtitle": "Tikiake i ngā pire mō āu hoko",
+    "manageBilling": "Whakahaere utu ki kilo.ai",
+    "manageBillingIosNote": "Ko ngā tikanga utu, te whakakī aunoa, me ngā taipitopito utu ka whakahaerehia ki kilo.ai.",
     "codeReviewerSubtitle": "Ngā arotake PR aunoa",
     "securityAgentSubtitle": "Rapua, whakatikahia hoki ngā whakaraeraetanga",
     "reviews": "Ngā arotake",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Ngā kī kaiwhakarato",
       "rowSubtitle": "Whakamahia te pire o tō ake kaiwhakarato",
-      "manageOnWeb": "Whakahaerehia i te ipurangi",
       "manageOnWebReason": "E hiahia ana ēnei kaiwhakarato ki ngā tohu tuakiri whai hanganga.",
       "description": "Ko ngā tono mā ēnei kī ka pirehia ki tō pūkete kaiwhakarato, kaua ki tō toenga Kilo.",
       "enabled": "E whakamahia ana",
@@ -2551,7 +2559,8 @@
       "cancelQueued": "Whakakorea te karere",
       "cancelQueuedAccessibility": "Whakakorea te karere e tatari ana",
       "restoreQueued": "Whakahokia",
-      "restoreQueuedAccessibility": "Whakahokia te karere kua whakakorea ki te pouaka karere"
+      "restoreQueuedAccessibility": "Whakahokia te karere kua whakakorea ki te pouaka karere",
+      "noReplyRecorded": "Kāore i tuhia he whakautu mō tēnei karere."
     },
     "olderMessages": {
       "arrived": "Kua utaina ngā karere o mua",
@@ -2944,6 +2953,26 @@
     "onlyFirstFilesAttached_other": "Ka whakapirihia ngā kōnae {{displayCount}} tuatahi anake."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Hītori utu",
+      "billingHistoryEmpty": "Kāore anō he hītori utu.",
+      "cancel": "Whakakore ohaurunga",
+      "cancelDescription": "Ka mau tonu tō Kilo Pass ā tae noa ki te mutunga o te wā utu, ā, kāore e whakahoutia.",
+      "cancelScheduled": "Ka whakakorea hei te {{date}}",
+      "cancelScheduledChange": "Whakakore i te panoni kua whakaritea",
+      "cancelled": "Kua whakakorea te ohaurunga",
+      "changePlan": "Panoni mahere ki kilo.ai",
+      "changePlanIosNote": "Kei kilo.ai ngā panonitanga mahere utu.",
+      "creditHistoryEmpty": "Kāore anō he kiredita Kilo Pass.",
+      "manageInStore": "Whakahaere ki {{store}}",
+      "resume": "Tīmata anō i te ohaurunga",
+      "resumeCancelledDescription": "Ka tīmata anō te whakahou aunoa o tō Kilo Pass.",
+      "resumePausedDescription": "Ka tīmata anō tō Kilo Pass ināianei, i mua i tōna rā tīmata anō kua whakaritea.",
+      "resumed": "Kua tīmata anō te ohaurunga",
+      "scheduledChange": "Panoni kua whakaritea",
+      "scheduledChangeCancelDescription": "Ka noho tonu tō Kilo Pass ki tōna mahere o nāianei, ā, ka whakahou pērā i tēnei rā.",
+      "scheduledChangeSummary": "{{plan}} hei te {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kāore e wātea ana a Kilo Pass.",
     "couldNotLoad": "Kāore i taea te uta a Kilo Pass. Whakamātau anō.",
@@ -2998,6 +3027,11 @@
     "accountDescription": "Te ID o tō pūkete Kilo me ngā raraungameta o ngā tono, hei manatoko i a koe, hei ine hoki i te whakamahinga.",
     "diagnosticsTitle": "Ngā tātaritanga hapa o te taupānga",
     "diagnosticsDescription": "Ngā pūrongo tukinga me ngā hapa, kua tangohia ngā ihirangi o te taupānga, hei whakapūmau i te taupānga.",
+    "featureFlagsTitle": "Te tukunga āhuatanga",
+    "featureFlagsDescription": "Te īmēra o tō pūkete, hei whakatau mā PostHog ko ēhea āhuatanga ka kitea e koe.",
+    "featureFlagsWhat": "Te īmēra o tō pūkete.",
+    "featureFlagsWhy": "Hei whakatau ko ēhea āhuatanga ka kitea e koe, tae atu ki ērā kei te tukuna haere tonu e mātou.",
+    "featureFlagsWho": "PostHog, te ratonga haki āhuatanga.",
     "helpImprove": "Āwhina ki te whakapai ake i a Kilo",
     "helpImproveDescription": "Tuaritia ngā tātaritanga whakamahinga kāore he ingoa, me te pūtake tāuta. Ka taea e koe te huri i tēnei i ngā tautuhinga ahakoa te wā.",
     "seeFullDetails": "Tirohia ngā taipitopito katoa",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "Kua kawemai te whirihoranga"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Kāore i taea te uta ngā mahi kiredita.",
+      "appStoreReceipt": "Rihīti mai i te App Store",
+      "deductionFallback": "Tangohanga kiredita",
+      "emptyDescription": "Ka puta mai ki konei ngā hoko kiredita, ngā rihīti, me te whakamahinga.",
+      "emptyTitle": "Kāore he hītori kiredita",
+      "googlePlayReceipt": "Rihīti mai i Google Play",
+      "kind": {
+        "adjustment": "Whakatikatika",
+        "balanceNeutral": "Kāore e pā ki te toenga",
+        "deduction": "Tangohanga",
+        "grant": "Kiredita koha",
+        "purchase": "Hoko"
+      },
+      "purchaseFallback": "Hoko kiredita",
+      "receipt": "Rihīti",
+      "receiptA11y": "Huakina te rihīti mō {{description}}",
+      "receiptUnavailable": "Kāore he rihīti mō tēnei hoko."
+    },
     "title": "Hoko whiwhinga",
     "description": "He hokonga kotahi ngā whiwhinga ka tāpirihia ki tō toenga Kilo hei whakahaere i ngā wātū whakawaehere AI i te Taupānga Kilo. Ka utu te toa i tō pūkete, ā, ka tāpirihia ngā whiwhinga i muri i te whakamanatanga a te toa i te utu.",
     "nextExpiry": "Ka mōnehu ā te {{date}} (UTC) ngā whiwhinga {{amount}}. Ka whakamahia tuatahitia ngā whiwhinga ka mōnehu tuatahi.",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Kāore i taea te whakatuwhera i tēnei hua kimi"
+  },
+  "usage": {
+    "title": "Whakamahinga",
+    "orgTitle": "Whakamahinga o te whakahaere",
+    "entrySubtitle": "Ngā whakapaunga, ngā tono, me ngā tōkena",
+    "rangePicker": "Awhe wā",
+    "range90d": "90 rā",
+    "metricPicker": "Ine o te kauwhata",
+    "chartA11y": "{{metric}} ia rā",
+    "avgCostPerRequest": "Utu toharite / tono",
+    "topModels": "Ngā tauira matua",
+    "topFeatures": "Ngā āhuatanga matua",
+    "emptyTitle": "Kāore he whakamahinga i tēnei wā",
+    "orgSelfNotice": "Ko tāu ake whakamahinga i tēnei whakahaere e kitea ana e koe.",
+    "viewDetails": "Tirohia ngā taipitopito whakamahinga"
+  },
+  "integrations": {
+    "title": "Ngā Tūhononga",
+    "sectionTitle": "Ngā ratonga kua honoa",
+    "entrySubtitle": "GitHub, Slack, Linear me ētahi atu",
+    "subtitle": "Honoa ō taputapu whakawhanake me ō rerenga mahi ki Kilo",
+    "emptyHint": "Kāore anō kia honoa he tūhononga.",
+    "disconnect": "Wetekia",
+    "disconnectTitle": "Wetekia a {{provider}}?",
+    "disconnectMessage": "Ka mutu tā Kilo whakautu i roto i {{provider}}. Ka taea e koe te hono anō i ngā wā katoa.",
+    "connectedTo": "Kua hono ki {{account}}",
+    "disconnected": "Kua wetekia a {{provider}}",
+    "disconnectFailed": "Kāore i taea te wetewete i {{provider}}",
+    "couldNotLoad": "Kāore i taea te uta i ngā tūhononga",
+    "permissionDenied": "Kāore ōu whakaaetanga ki te whakahaere i ēnei tūhononga.",
+    "memberHint": "Tonoa tētahi kaipupuri, kaiwhakahaere rānei o te rōpū kia whakarerekē i ēnei hononga.",
+    "connectFailed": "Kāore i taea te huaki i te whārangi hononga"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Ka puta mai ki konei ngā pire mō āu ake hoko ina tukuna he pire ki a koe."
   },
   "cloudAgent": {
     "compute": {

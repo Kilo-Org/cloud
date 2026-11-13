@@ -22,6 +22,10 @@
     "expired": "ጊዜው አልፏል"
   },
   "common": {
+    "manageOnWeb": "በድር ላይ ያስተዳድሩ",
+    "creditHistory": "የክሬዲት ታሪክ",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": "። ",
     "listJoiner": "፣ ",
     "cancel": "ተው",
@@ -118,6 +122,7 @@
     "copyLink": "አገናኙን ቅዳ",
     "couldNotLoadOrganizations": "ድርጅቶችን መጫን አልተቻለም።",
     "couldNotLoadSessions": "ክፍለ ጊዜዎችን መጫን አልተቻለም።",
+    "couldnTLoad": "መጫን አልተቻለም።",
     "couldnTLoadMore": "ተጨማሪ መጫን አልተቻለም።",
     "deviceSessions": "የመሣሪያ ክፍለ ጊዜዎች",
     "disabled": "ተሰናክሏል",
@@ -245,6 +250,10 @@
     "notAdded": "ገብተዋል። {{provider}} ወደ መለያዎ አልታከለም።"
   },
   "profile": {
+    "creditHistorySubtitle": "ግዢዎች፣ ደረሰኞች እና የክሬዲት እንቅስቃሴ",
+    "invoicesSubtitle": "ለግዢዎችዎ የክፍያ መጠየቂያዎችን ያውርዱ",
+    "manageBilling": "ክፍያን በkilo.ai ላይ ያስተዳድሩ",
+    "manageBillingIosNote": "የመክፈያ ዘዴዎች፣ ራስ-ሰር መሙላት እና የክፍያ ዝርዝሮች የሚተዳደሩት በkilo.ai ላይ ነው።",
     "codeReviewerSubtitle": "በራስ ሰር የሚደረጉ የPR ግምገማዎች",
     "securityAgentSubtitle": "ተጋላጭነቶችን ፈልገው ያስተካክሉ",
     "reviews": "ግምገማዎች",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "የአቅራቢ ቁልፎች",
       "rowSubtitle": "የራስዎን የአቅራቢ ክፍያ ይጠቀሙ",
-      "manageOnWeb": "በድር ላይ ያስተዳድሩ",
       "manageOnWebReason": "እነዚህ አቅራቢዎች የተዋቀሩ የማረጋገጫ መረጃዎችን ይፈልጋሉ።",
       "description": "በእነዚህ ቁልፎች የሚላኩ ጥያቄዎች ከKilo ቀሪ ሂሳብዎ ይልቅ በአቅራቢ መለያዎ ይከፈላሉ።",
       "enabled": "በጥቅም ላይ",
@@ -2551,7 +2559,8 @@
       "cancelQueued": "መልእክቱን ይሰርዙ",
       "cancelQueuedAccessibility": "ወረፋ ላይ ያለውን መልእክት ይሰርዙ",
       "restoreQueued": "ይመልሱ",
-      "restoreQueuedAccessibility": "የተሰረዘውን መልእክት ወደ መልእክት ማስገቢያው ይመልሱ"
+      "restoreQueuedAccessibility": "የተሰረዘውን መልእክት ወደ መልእክት ማስገቢያው ይመልሱ",
+      "noReplyRecorded": "ለዚህ መልእክት ምንም ምላሽ አልተመዘገበም።"
     },
     "olderMessages": {
       "arrived": "የቀደሙ መልእክቶች ተጭነዋል",
@@ -2944,6 +2953,26 @@
     "onlyFirstFilesAttached_other": "የመጀመሪያዎቹ {{displayCount}} ፋይሎች ብቻ ይያያዛሉ።"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "የክፍያ ታሪክ",
+      "billingHistoryEmpty": "እስካሁን የክፍያ ታሪክ የለም።",
+      "cancel": "የደንበኝነት ምዝገባን ሰርዝ",
+      "cancelDescription": "የእርስዎ Kilo Pass እስከ የክፍያ ጊዜው መጨረሻ ድረስ ንቁ ሆኖ ይቆያል፣ እና አይታደስም።",
+      "cancelScheduled": "በ{{date}} ይሰረዛል",
+      "cancelScheduledChange": "የታቀደውን ለውጥ ሰርዝ",
+      "cancelled": "የደንበኝነት ምዝገባ ተሰርዟል",
+      "changePlan": "እቅድን በkilo.ai ላይ ይቀይሩ",
+      "changePlanIosNote": "የሚከፈልባቸው እቅዶች ለውጦች በkilo.ai ላይ ይገኛሉ።",
+      "creditHistoryEmpty": "እስካሁን ምንም የKilo Pass ክሬዲቶች የሉም።",
+      "manageInStore": "በ{{store}} ውስጥ ያስተዳድሩ",
+      "resume": "የደንበኝነት ምዝገባን ቀጥል",
+      "resumeCancelledDescription": "የእርስዎ Kilo Pass እንደገና በራስ-ሰር መታደስ ይጀምራል።",
+      "resumePausedDescription": "የእርስዎ Kilo Pass ከታቀደው የመቀጠያ ቀን በፊት አሁን ይቀጥላል።",
+      "resumed": "የደንበኝነት ምዝገባ ቀጥሏል",
+      "scheduledChange": "የታቀደ ለውጥ",
+      "scheduledChangeCancelDescription": "የእርስዎ Kilo Pass አሁን ባለው እቅድ ላይ ይቆያል፣ እና እንደ አሁኑ ይታደሳል።",
+      "scheduledChangeSummary": "{{plan}} በ{{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass አይገኝም።",
     "couldNotLoad": "Kilo Pass መጫን አልተቻለም። እንደገና ይሞክሩ።",
@@ -2998,6 +3027,11 @@
     "accountDescription": "የKilo መለያዎ መለያ ቁጥር እና የጥያቄዎች ተጨማሪ መረጃ ማንነትዎን ለማረጋገጥና አጠቃቀምን ለመለካት ያገለግላሉ።",
     "diagnosticsTitle": "የመተግበሪያ ምርመራዎች",
     "diagnosticsDescription": "የመተግበሪያው ይዘት የተወገደላቸው የብልሽትና የስህተት ሪፖርቶች መተግበሪያው በተረጋጋ ሁኔታ እንዲሠራ ያገለግላሉ።",
+    "featureFlagsTitle": "የተግባሮች ደረጃ በደረጃ ልቀት",
+    "featureFlagsDescription": "የመለያዎ ኢሜይል፣ PostHog የትኞቹን ተግባሮች እንደሚያዩ ለመወሰን ይጠቀምበታል።",
+    "featureFlagsWhat": "የመለያዎ ኢሜይል።",
+    "featureFlagsWhy": "የትኞቹን ተግባሮች እንደሚያዩ ለመወሰን፣ አሁንም በመልቀቅ ላይ ያሉትንም ጨምሮ።",
+    "featureFlagsWho": "PostHog፣ ተግባሮችን የሚያበራና የሚያጠፋ አገልግሎት።",
     "helpImprove": "Kiloን ለማሻሻል ይርዱ",
     "helpImproveDescription": "ማንነትዎን የማይገልጽ የአጠቃቀም ትንታኔ ውሂብ እና መተግበሪያውን ያገኙበትን ምንጭ ያጋሩ። ይህን በማንኛውም ጊዜ በቅንብሮች ውስጥ መቀየር ይችላሉ።",
     "seeFullDetails": "ሙሉ ዝርዝሮችን ይመልከቱ",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "Config ገብቷል"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "የክሬዲት እንቅስቃሴ ማምጣት አልተቻለም።",
+      "appStoreReceipt": "ደረሰኝ ከApp Store",
+      "deductionFallback": "የክሬዲት ቅነሳ",
+      "emptyDescription": "የክሬዲት ግዢዎች፣ ደረሰኞች እና አጠቃቀም እዚህ ይታያሉ።",
+      "emptyTitle": "የክሬዲት ታሪክ የለም",
+      "googlePlayReceipt": "ደረሰኝ ከGoogle Play",
+      "kind": {
+        "adjustment": "ማስተካከያ",
+        "balanceNeutral": "ቀሪ ሂሳብን የማይቀይር",
+        "deduction": "ቅነሳ",
+        "grant": "የክሬዲት ስጦታ",
+        "purchase": "ግዢ"
+      },
+      "purchaseFallback": "የክሬዲት ግዢ",
+      "receipt": "ደረሰኝ",
+      "receiptA11y": "የ{{description}} ደረሰኝን ክፈት",
+      "receiptUnavailable": "ለዚህ ግዢ ደረሰኝ አይገኝም።"
+    },
     "title": "ክሬዲት ይግዙ",
     "description": "ክሬዲት በKilo App ውስጥ የAI ኮዲንግ ክፍለ-ጊዜዎችን ለማስኬድ ወደ Kilo ቀሪ ሂሳብዎ የሚጨመር የአንድ ጊዜ ግዢ ነው። መደብሩ ሂሳብዎን ይከፍላል፣ እና መደብሩ ክፍያውን ካረጋገጠ በኋላ ክሬዲት ይጨመራል።",
     "nextExpiry": "{{amount}} ክሬዲት በ{{date}} (UTC) ጊዜው ያበቃል። ቀድሞ ጊዜው የሚያበቃው ክሬዲት መጀመሪያ ጥቅም ላይ ይውላል።",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ይህን የፍለጋ ውጤት መክፈት አልተቻለም"
+  },
+  "usage": {
+    "title": "አጠቃቀም",
+    "orgTitle": "የድርጅት አጠቃቀም",
+    "entrySubtitle": "ወጪ፣ ጥያቄዎች እና ቶከኖች",
+    "rangePicker": "የጊዜ ክልል",
+    "range90d": "90 ቀናት",
+    "metricPicker": "የገበታ መለኪያ",
+    "chartA11y": "{{metric}} በቀን",
+    "avgCostPerRequest": "አማካይ ወጪ / ጥያቄ",
+    "topModels": "ዋና ሞዴሎች",
+    "topFeatures": "ዋና ባህሪያት",
+    "emptyTitle": "በዚህ ጊዜ ውስጥ ምንም አጠቃቀም የለም",
+    "orgSelfNotice": "በዚህ ድርጅት ውስጥ የራስዎን አጠቃቀም እያዩ ነው።",
+    "viewDetails": "የአጠቃቀም ዝርዝሮችን ይመልከቱ"
+  },
+  "integrations": {
+    "title": "ውህደቶች",
+    "sectionTitle": "የተገናኙ አገልግሎቶች",
+    "entrySubtitle": "GitHub፣ Slack፣ Linear እና ሌሎችም",
+    "subtitle": "የልማት መሣሪያዎችዎን እና የሥራ ሂደቶችዎን ከKilo ጋር ያገናኙ",
+    "emptyHint": "እስካሁን ምንም የተገናኘ ውህደት የለም።",
+    "disconnect": "ግንኙነት አቋርጥ",
+    "disconnectTitle": "የ{{provider}} ግንኙነት ይቋረጥ?",
+    "disconnectMessage": "Kilo በ{{provider}} ውስጥ ምላሽ መስጠት ያቆማል። በማንኛውም ጊዜ እንደገና ማገናኘት ይችላሉ።",
+    "connectedTo": "ከ{{account}} ጋር ተገናኝቷል",
+    "disconnected": "የ{{provider}} ግንኙነት ተቋርጧል",
+    "disconnectFailed": "የ{{provider}} ግንኙነትን ማቋረጥ አልተቻለም",
+    "couldNotLoad": "ውህደቶችን መጫን አልተቻለም",
+    "permissionDenied": "እነዚህን ውህደቶች የማስተዳደር ፈቃድ የለዎትም።",
+    "memberHint": "እነዚህን ግንኙነቶች ለመቀየር የድርጅቱን ባለቤት ወይም አስተዳዳሪ ይጠይቁ።",
+    "connectFailed": "የግንኙነት ገጹን መክፈት አልተቻለም"
+  },
+  "invoices": {
+    "personalEmptyDescription": "ክፍያ ከተጠየቀብዎ በኋላ ለራስዎ ግዢዎች የሚወጡ የክፍያ መጠየቂያዎች እዚህ ይታያሉ።"
   },
   "cloudAgent": {
     "compute": {

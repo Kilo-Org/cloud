@@ -22,6 +22,10 @@
     "expired": "Мерзімі өтті"
   },
   "common": {
+    "manageOnWeb": "Вебте басқару",
+    "creditHistory": "Кредиттер тарихы",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Болдырмау",
@@ -118,6 +122,7 @@
     "copyLink": "Сілтемені көшіру",
     "couldNotLoadOrganizations": "Ұйымдарды жүктеу мүмкін болмады.",
     "couldNotLoadSessions": "Сессияларды жүктеу мүмкін болмады.",
+    "couldnTLoad": "Жүктеу мүмкін болмады.",
     "couldnTLoadMore": "Қосымша деректерді жүктеу мүмкін болмады.",
     "deviceSessions": "Құрылғылардағы сессиялар",
     "disabled": "Өшірілген",
@@ -245,6 +250,10 @@
     "notAdded": "Сіз кірдіңіз. {{provider}} аккаунтыңызға қосылмады."
   },
   "profile": {
+    "creditHistorySubtitle": "Сатып алулар, түбіртектер және кредит әрекеттері",
+    "invoicesSubtitle": "Сатып алуларыңыздың шот-фактураларын жүктеп алыңыз",
+    "manageBilling": "Төлемдерді kilo.ai сайтында басқару",
+    "manageBillingIosNote": "Төлем әдістері, автоматты толтыру және төлем деректері kilo.ai сайтында басқарылады.",
     "codeReviewerSubtitle": "PR сұрауларын автоматты тексеру",
     "securityAgentSubtitle": "Осалдықтарды табу және жою",
     "reviews": "Тексерулер",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Провайдер кілттері",
       "rowSubtitle": "Провайдердегі өз шотыңыз арқылы төлеу",
-      "manageOnWeb": "Вебте басқару",
       "manageOnWebReason": "Бұл провайдерлерге құрылымдалған тіркелгі деректері қажет.",
       "description": "Осы кілттер арқылы жіберілген сұраулардың төлемі Kilo теңгеріміңізден емес, провайдердегі тіркелгіңізден алынады.",
       "enabled": "Қолданыста",
@@ -2551,7 +2559,8 @@
       "cancelQueued": "Жіберуден бас тарту",
       "cancelQueuedAccessibility": "Кезектегі хабарламаны жіберуден бас тарту",
       "restoreQueued": "Қалпына келтіру",
-      "restoreQueuedAccessibility": "Жіберілмеген хабарламаны енгізу өрісіне қайтару"
+      "restoreQueuedAccessibility": "Жіберілмеген хабарламаны енгізу өрісіне қайтару",
+      "noReplyRecorded": "Бұл хабарламаға жауап тіркелмеді."
     },
     "olderMessages": {
       "arrived": "Алдыңғы хабарламалар жүктелді",
@@ -2944,6 +2953,26 @@
     "onlyFirstFilesAttached_other": "Тек алғашқы {{displayCount}} файл тіркеледі."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Төлемдер тарихы",
+      "billingHistoryEmpty": "Төлемдер тарихы әзірге жоқ.",
+      "cancel": "Жазылымнан бас тарту",
+      "cancelDescription": "Kilo Pass төлем кезеңінің соңына дейін белсенді болып қалады және ұзартылмайды.",
+      "cancelScheduled": "{{date}} күні тоқтатылады",
+      "cancelScheduledChange": "Жоспарланған өзгерісті болдырмау",
+      "cancelled": "Жазылымнан бас тартылды",
+      "changePlan": "Жоспарды kilo.ai сайтында өзгерту",
+      "changePlanIosNote": "Ақылы жоспарды өзгерту kilo.ai сайтында қолжетімді.",
+      "creditHistoryEmpty": "Kilo Pass кредиттері әзірге жоқ.",
+      "manageInStore": "{{store}} арқылы басқару",
+      "resume": "Жазылымды жалғастыру",
+      "resumeCancelledDescription": "Kilo Pass қайтадан автоматты түрде ұзартыла бастайды.",
+      "resumePausedDescription": "Kilo Pass жоспарланған жалғасу күнін күтпей, қазір жалғасады.",
+      "resumed": "Жазылым жалғастырылды",
+      "scheduledChange": "Жоспарланған өзгеріс",
+      "scheduledChangeCancelDescription": "Kilo Pass ағымдағы жоспарында қалады және қазіргідей ұзартыла береді.",
+      "scheduledChangeSummary": "{{plan}}, {{date}} күні"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass қолжетімсіз.",
     "couldNotLoad": "Kilo Pass деректерін жүктеу мүмкін болмады. Қайталап көріңіз.",
@@ -2998,6 +3027,11 @@
     "accountDescription": "Kilo тіркелгіңіздің идентификаторы мен сұрау метадеректері. Олар жеке басыңызды растауға және қолданысты есепке алуға қажет.",
     "diagnosticsTitle": "Қолданба диагностикасы",
     "diagnosticsDescription": "Қолданбаның тұрақты жұмысын қамтамасыз етуге арналған істен шығу мен қателер туралы есептер. Қолданба мазмұны есептерден алынып тасталады.",
+    "featureFlagsTitle": "Мүмкіндіктерді кезеңмен енгізу",
+    "featureFlagsDescription": "Тіркелгіңіздің электрондық пошта мекенжайы, PostHog оны сізге қандай мүмкіндіктер көрсетілетінін анықтау үшін пайдаланады.",
+    "featureFlagsWhat": "Тіркелгіңіздің электрондық пошта мекенжайы.",
+    "featureFlagsWhy": "Сізге қандай мүмкіндіктер көрсетілетінін, соның ішінде әлі кезеңмен енгізіліп жатқандарын анықтау үшін.",
+    "featureFlagsWho": "PostHog, мүмкіндіктерді қосу-өшіруді басқару қызметі.",
     "helpImprove": "Kilo қолданбасын жақсартуға көмектесу",
     "helpImproveDescription": "Өнім қолданысы туралы анонимді деректерді және қолданбаны қайдан орнатқаныңыз туралы мәліметті жіберу. Мұны баптаулардан кез келген уақытта өзгерте аласыз.",
     "seeFullDetails": "Толық мәліметтерді қарау",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "Конфигурация импортталды"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Кредит белсенділігін жүктеу мүмкін болмады.",
+      "appStoreReceipt": "App Store түбіртегі",
+      "deductionFallback": "Кредит шегерімі",
+      "emptyDescription": "Кредит сатып алулары, түбіртектер және пайдалану осында көрсетіледі.",
+      "emptyTitle": "Кредиттер тарихы жоқ",
+      "googlePlayReceipt": "Google Play түбіртегі",
+      "kind": {
+        "adjustment": "Түзету",
+        "balanceNeutral": "Балансқа әсер етпейді",
+        "deduction": "Шегерім",
+        "grant": "Берілген кредит",
+        "purchase": "Сатып алу"
+      },
+      "purchaseFallback": "Кредит сатып алу",
+      "receipt": "Түбіртек",
+      "receiptA11y": "Түбіртекті ашу: {{description}}",
+      "receiptUnavailable": "Бұл сатып алу үшін түбіртек қолжетімді емес."
+    },
     "title": "Кредит сатып алу",
     "description": "Кредиттер — Kilo App-те AI бағдарламалау сессияларын жүргізу үшін Kilo балансына қосылатын бір реттік сатып алу. Дүкен шотыңыздан ақша алады және дүкен төлемді растағаннан кейін кредиттер қосылады.",
     "nextExpiry": "{{amount}} көлеміндегі кредиттердің мерзімі {{date}} (UTC) күні аяқталады. Мерзімі ең ерте аяқталатын кредиттер бірінші жұмсалады.",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Бұл іздеу нәтижесі ашылмады"
+  },
+  "usage": {
+    "title": "Пайдалану",
+    "orgTitle": "Ұйым бойынша пайдалану",
+    "entrySubtitle": "Шығындар, сұраулар және токендер",
+    "rangePicker": "Уақыт аралығы",
+    "range90d": "90 күн",
+    "metricPicker": "Диаграмма көрсеткіші",
+    "chartA11y": "Күніне {{metric}}",
+    "avgCostPerRequest": "Орт. құн / сұрау",
+    "topModels": "Жиі қолданылатын модельдер",
+    "topFeatures": "Жиі қолданылатын функциялар",
+    "emptyTitle": "Бұл кезеңде пайдалану жоқ",
+    "orgSelfNotice": "Сіз осы ұйымдағы өз пайдалануыңызды көріп отырсыз.",
+    "viewDetails": "Пайдалану мәліметтерін көру"
+  },
+  "integrations": {
+    "title": "Интеграциялар",
+    "sectionTitle": "Қосылған қызметтер",
+    "entrySubtitle": "GitHub, Slack, Linear және басқалары",
+    "subtitle": "Әзірлеу құралдары мен жұмыс процестеріңізді Kilo қызметіне қосыңыз",
+    "emptyHint": "Әзірге ешбір интеграция қосылмаған.",
+    "disconnect": "Ажырату",
+    "disconnectTitle": "{{provider}} қызметін ажырату керек пе?",
+    "disconnectMessage": "Kilo {{provider}} ішінде жауап беруді тоқтатады. Кез келген уақытта қайта қоса аласыз.",
+    "connectedTo": "Қосылған тіркелгі: {{account}}",
+    "disconnected": "{{provider}} ажыратылды",
+    "disconnectFailed": "{{provider}} қызметін ажырату мүмкін болмады",
+    "couldNotLoad": "Интеграцияларды жүктеу мүмкін болмады",
+    "permissionDenied": "Бұл интеграцияларды басқаруға рұқсатыңыз жоқ.",
+    "memberHint": "Бұл қосылымдарды өзгертуді ұйым иесінен немесе әкімшісінен сұраңыз.",
+    "connectFailed": "Қосылу бетін ашу мүмкін болмады"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Сізге төлем есептелгеннен кейін жеке сатып алуларыңыздың шот-фактуралары осында көрсетіледі."
   },
   "cloudAgent": {
     "compute": {

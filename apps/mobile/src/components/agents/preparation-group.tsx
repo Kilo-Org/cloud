@@ -3,8 +3,12 @@ import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { type TFunction } from 'i18next';
-import { AlertCircle, Check, ChevronDown, Terminal } from '@/components/ui/icons';
-import { type PreparationAttempt, type PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
+import { AlertCircle, Check, ChevronDown, Square, Terminal } from '@/components/ui/icons';
+import {
+  isPreparationCancellation,
+  type PreparationAttempt,
+  type PreparationStepSnapshot,
+} from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
@@ -77,7 +81,11 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
         ) : (
           <DirectionalChevronRight size={16} color={colors.mutedForeground} />
         )}
-        <AttemptIcon status={attempt.status} incomplete={incompleteReport !== undefined} />
+        <AttemptIcon
+          status={attempt.status}
+          incomplete={incompleteReport !== undefined}
+          stopped={copy.stopped}
+        />
         <Text numberOfLines={1} className="min-w-0 flex-1 text-sm font-medium">
           {copy.title}
         </Text>
@@ -116,15 +124,20 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
 function AttemptIcon({
   status,
   incomplete,
+  stopped = false,
   spinnerSize = 20,
 }: {
   status: PreparationAttempt['status'];
   incomplete: boolean;
+  stopped?: boolean;
   spinnerSize?: number;
 }) {
   const colors = useThemeColors();
   if (incomplete) {
     return <AlertCircle size={16} color={colors.destructive} />;
+  }
+  if (stopped) {
+    return <Square size={16} color={colors.mutedForeground} />;
   }
   if (status === 'running') {
     return <ActivityIndicator size={spinnerSize} color={colors.mutedForeground} />;
@@ -135,20 +148,25 @@ function AttemptIcon({
   return <AlertCircle size={16} color={colors.destructive} />;
 }
 
-/** A group's header line, the body line under it, and the step it has named. */
+/**
+ * A group's header line, the body line under it, the step it has named, and
+ * whether the header reports a stop.
+ */
 type GroupCopy = {
   title: string;
   detail: string | undefined;
   namedStep: PreparationStepSnapshot | undefined;
+  stopped: boolean;
 };
 
 /**
  * What a group's header says, and the step it has thereby already named. The
  * restore status owns both when the attempt carries it. Otherwise the header
- * states the attempt's own state: a failed attempt names the stage that failed,
- * and an attempt that failed before any stage ran takes the failure's own first
- * sentence as its title, which is what tells two of them apart, leaving the
- * rest of that sentence in the body.
+ * states the attempt's own state: a user stop is a neutral outcome, so it takes
+ * its own title and never names the stage it interrupted; a failed attempt
+ * names the stage that failed; and an attempt that failed before any stage ran
+ * takes the failure's own first sentence as its title, which is what tells two
+ * of them apart, leaving the rest of that sentence in the body.
  *
  * A named step's evidence is shown in the body instead of a repeated row, so
  * the body carries no separate cause line: the step's own error is that cause.
@@ -163,6 +181,7 @@ function groupCopy(
       title: t('agentChat.preparation.stepRestoreIncomplete'),
       detail: undefined,
       namedStep: findRestoreIncompleteStep(attempt),
+      stopped: false,
     };
   }
   if (attempt.status === 'running') {
@@ -170,6 +189,7 @@ function groupCopy(
       title: t('agentChat.preparation.preparingEnvironment'),
       detail: undefined,
       namedStep: undefined,
+      stopped: false,
     };
   }
   if (attempt.status === 'completed') {
@@ -177,6 +197,20 @@ function groupCopy(
       title: t('agentChat.preparation.preparationComplete'),
       detail: undefined,
       namedStep: undefined,
+      stopped: false,
+    };
+  }
+  const cancelled =
+    isPreparationCancellation(attempt.safeError) ||
+    attempt.steps.some(
+      step => step.status === 'failed' && isPreparationCancellation(step.safeError)
+    );
+  if (cancelled) {
+    return {
+      title: t('agentChat.session.stopped'),
+      detail: undefined,
+      namedStep: undefined,
+      stopped: true,
     };
   }
   const stage = failedStageStep(attempt);
@@ -187,6 +221,7 @@ function groupCopy(
       }),
       detail: undefined,
       namedStep: stage,
+      stopped: false,
     };
   }
   if (attempt.safeError === undefined || attempt.safeError === '') {
@@ -194,10 +229,11 @@ function groupCopy(
       title: t('agentChat.preparation.preparationFailed'),
       detail: undefined,
       namedStep: undefined,
+      stopped: false,
     };
   }
   const sentence = splitFailureSentence(preparationErrorText(attempt.safeError, t));
-  return { title: sentence.title, detail: sentence.detail, namedStep: undefined };
+  return { title: sentence.title, detail: sentence.detail, namedStep: undefined, stopped: false };
 }
 
 function setupCommandLabel(step: PreparationStepSnapshot, t: TFunction): string | null {
@@ -230,6 +266,7 @@ function PreparationStepRow({
     setExpanded(step.status !== 'completed');
   }, [step.id, step.status]);
   const hasDetails = hasStepDetails(step, true);
+  const cancelled = isPreparationCancellation(step.safeError);
   const label =
     step.kind === 'setup_command' && phaseKey === START_COMMANDS_STEP_KEY
       ? (step.command ?? preparationStepLabel(step, t))
@@ -266,7 +303,8 @@ function PreparationStepRow({
           // the status column keeps one width across rows.
           <AttemptIcon
             status={step.status}
-            incomplete={step.safeError !== undefined && step.safeError !== ''}
+            incomplete={!cancelled && step.safeError !== undefined && step.safeError !== ''}
+            stopped={cancelled}
             spinnerSize={STEP_STATUS_SIZE}
           />
         )}

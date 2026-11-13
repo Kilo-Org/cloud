@@ -59,7 +59,7 @@ export function PrReviewContextLine({
   const { organizationId } = useOrganization();
   const organizations = useOrganizationsList();
   const orgs = organizations.data;
-  const { openPicker, picker } = useContextPicker(orgs);
+  const { openPicker } = useContextPicker(orgs);
 
   const selected = orgs?.find(entry => entry.organizationId === organizationId);
   // While the list resolves the line falls back to the generic noun, matching
@@ -155,7 +155,6 @@ export function PrReviewContextLine({
           {instanceHint}
         </Text>
       ) : null}
-      {picker}
     </View>
   );
 }

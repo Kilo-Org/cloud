@@ -22,6 +22,10 @@
     "expired": "Abgelaufen"
   },
   "common": {
+    "manageOnWeb": "Im Web verwalten",
+    "creditHistory": "Credit-Verlauf",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Abbrechen",
@@ -118,6 +122,7 @@
     "copyLink": "Link kopieren",
     "couldNotLoadOrganizations": "Die Organisationen konnten nicht geladen werden.",
     "couldNotLoadSessions": "Die Sitzungen konnten nicht geladen werden.",
+    "couldnTLoad": "Einträge konnten nicht geladen werden.",
     "couldnTLoadMore": "Weitere Einträge konnten nicht geladen werden.",
     "deviceSessions": "Gerätesitzungen",
     "disabled": "Deaktiviert",
@@ -245,6 +250,10 @@
     "notAdded": "Du bist angemeldet. {{provider}} wurde deinem Konto nicht hinzugefügt."
   },
   "profile": {
+    "creditHistorySubtitle": "Käufe, Belege und Credit-Aktivität",
+    "invoicesSubtitle": "Rechnungen für deine Käufe herunterladen",
+    "manageBilling": "Abrechnung auf kilo.ai verwalten",
+    "manageBillingIosNote": "Zahlungsmethoden, automatisches Aufladen und Rechnungsdetails werden auf kilo.ai verwaltet.",
     "codeReviewerSubtitle": "Automatische PR-Prüfungen",
     "securityAgentSubtitle": "Schwachstellen finden und beheben",
     "reviews": "Code-Prüfungen",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Anbieterschlüssel",
       "rowSubtitle": "Eigene Anbieterabrechnung nutzen",
-      "manageOnWeb": "Im Web verwalten",
       "manageOnWebReason": "Diese Anbieter benötigen strukturierte Anmeldedaten.",
       "description": "Anfragen über diese Schlüssel werden über dein Anbieterkonto statt über dein Kilo-Guthaben abgerechnet.",
       "enabled": "Aktiv",
@@ -2009,7 +2017,8 @@
       "cancelQueued": "Nachricht abbrechen",
       "cancelQueuedAccessibility": "Nachricht in der Warteschlange abbrechen",
       "restoreQueued": "Wiederherstellen",
-      "restoreQueuedAccessibility": "Abgebrochene Nachricht im Eingabefeld wiederherstellen"
+      "restoreQueuedAccessibility": "Abgebrochene Nachricht im Eingabefeld wiederherstellen",
+      "noReplyRecorded": "Für diese Nachricht wurde keine Antwort aufgezeichnet."
     },
     "olderMessages": {
       "arrived": "Frühere Nachrichten geladen",
@@ -2402,6 +2411,26 @@
     "onlyFirstFilesAttached_other": "Nur die ersten {{displayCount}} Dateien werden angehängt."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Abrechnungsverlauf",
+      "billingHistoryEmpty": "Noch kein Abrechnungsverlauf.",
+      "cancel": "Abo kündigen",
+      "cancelDescription": "Dein Kilo Pass bleibt bis zum Ende des Abrechnungszeitraums aktiv und wird nicht verlängert.",
+      "cancelScheduled": "Endet am {{date}}",
+      "cancelScheduledChange": "Geplante Änderung abbrechen",
+      "cancelled": "Abo gekündigt",
+      "changePlan": "Tarif auf kilo.ai ändern",
+      "changePlanIosNote": "Änderungen an kostenpflichtigen Tarifen sind auf kilo.ai möglich.",
+      "creditHistoryEmpty": "Noch keine Credits aus Kilo Pass.",
+      "manageInStore": "In {{store}} verwalten",
+      "resume": "Abo fortsetzen",
+      "resumeCancelledDescription": "Dein Kilo Pass wird wieder automatisch verlängert.",
+      "resumePausedDescription": "Dein Kilo Pass wird ab sofort fortgesetzt, noch vor dem geplanten Datum.",
+      "resumed": "Abo fortgesetzt",
+      "scheduledChange": "Geplante Änderung",
+      "scheduledChangeCancelDescription": "Dein Kilo Pass bleibt in seinem aktuellen Tarif und wird wie bisher verlängert.",
+      "scheduledChangeSummary": "{{plan}} ab {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass ist nicht verfügbar.",
     "couldNotLoad": "Kilo Pass konnte nicht geladen werden. Versuche es erneut.",
@@ -2456,6 +2485,11 @@
     "accountDescription": "Deine Kilo-Konto-ID und die Metadaten deiner Anfragen dienen dazu, dich zu authentifizieren und deine Nutzung zu erfassen.",
     "diagnosticsTitle": "App-Diagnosedaten",
     "diagnosticsDescription": "Absturz- und Fehlerberichte helfen uns, die App stabil zu halten. App-Inhalte werden daraus entfernt.",
+    "featureFlagsTitle": "Einführung neuer Funktionen",
+    "featureFlagsDescription": "Deine Konto-E-Mail-Adresse, mit der PostHog entscheidet, welche Funktionen du siehst.",
+    "featureFlagsWhat": "Deine Konto-E-Mail-Adresse.",
+    "featureFlagsWhy": "Festlegen, welche Funktionen du siehst, einschließlich solcher, die wir noch schrittweise einführen.",
+    "featureFlagsWho": "PostHog, der Feature-Flag-Dienst.",
     "helpImprove": "Zur Verbesserung von Kilo beitragen",
     "helpImproveDescription": "Teile anonyme Daten zur Produktnutzung und zur Installationsquelle. Du kannst das jederzeit in den Einstellungen ändern.",
     "seeFullDetails": "Vollständige Details ansehen",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "Config importiert"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Credit-Aktivität konnte nicht geladen werden.",
+      "appStoreReceipt": "Beleg im App Store",
+      "deductionFallback": "Credit-Abzug",
+      "emptyDescription": "Credit-Käufe, Belege und Nutzung werden hier angezeigt.",
+      "emptyTitle": "Kein Credit-Verlauf",
+      "googlePlayReceipt": "Beleg bei Google Play",
+      "kind": {
+        "adjustment": "Anpassung",
+        "balanceNeutral": "Saldoneutral",
+        "deduction": "Abzug",
+        "grant": "Credit-Gutschrift",
+        "purchase": "Kauf"
+      },
+      "purchaseFallback": "Credit-Kauf",
+      "receipt": "Beleg",
+      "receiptA11y": "Beleg für {{description}} öffnen",
+      "receiptUnavailable": "Für diesen Kauf ist kein Beleg verfügbar."
+    },
     "title": "Guthaben kaufen",
     "description": "Guthaben ist ein einmaliger Kauf, der deinem Kilo-Guthaben für AI-Codierungssitzungen in der Kilo App hinzugefügt wird. Der Store belastet dein Konto, und das Guthaben wird gutgeschrieben, sobald der Store die Zahlung bestätigt.",
     "nextExpiry": "{{amount}} Guthaben verfällt am {{date}} (UTC). Guthaben mit dem frühesten Ablaufdatum wird zuerst verbraucht.",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Dieses Suchergebnis konnte nicht geöffnet werden"
+  },
+  "usage": {
+    "title": "Nutzung",
+    "orgTitle": "Organisationsnutzung",
+    "entrySubtitle": "Kosten, Anfragen und Tokens",
+    "rangePicker": "Zeitraum",
+    "range90d": "90 Tage",
+    "metricPicker": "Diagramm-Kennzahl",
+    "chartA11y": "{{metric}} pro Tag",
+    "avgCostPerRequest": "Ø Kosten/Anfrage",
+    "topModels": "Top-Modelle",
+    "topFeatures": "Top-Funktionen",
+    "emptyTitle": "Keine Nutzung in diesem Zeitraum",
+    "orgSelfNotice": "Du siehst deine eigene Nutzung in dieser Organisation.",
+    "viewDetails": "Nutzungsdetails anzeigen"
+  },
+  "integrations": {
+    "title": "Integrationen",
+    "sectionTitle": "Verbundene Dienste",
+    "entrySubtitle": "GitHub, Slack, Linear und mehr",
+    "subtitle": "Verbinde deine Entwicklungstools und Workflows mit Kilo",
+    "emptyHint": "Noch keine Integrationen verbunden.",
+    "disconnect": "Trennen",
+    "disconnectTitle": "{{provider}} trennen?",
+    "disconnectMessage": "Kilo reagiert dann nicht mehr in {{provider}}. Du kannst die Verbindung jederzeit wiederherstellen.",
+    "connectedTo": "Verbunden mit {{account}}",
+    "disconnected": "{{provider}} getrennt",
+    "disconnectFailed": "{{provider}} konnte nicht getrennt werden",
+    "couldNotLoad": "Integrationen konnten nicht geladen werden",
+    "permissionDenied": "Du hast keine Berechtigung, diese Integrationen zu verwalten.",
+    "memberHint": "Bitte eine Person mit Inhaber- oder Admin-Rechten in der Organisation, diese Verbindungen zu ändern.",
+    "connectFailed": "Die Verbindungsseite konnte nicht geöffnet werden"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Rechnungen für deine eigenen Käufe werden hier angezeigt, sobald dir etwas in Rechnung gestellt wurde."
   },
   "cloudAgent": {
     "compute": {

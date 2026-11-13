@@ -22,6 +22,10 @@
     "expired": "समय समाप्त"
   },
   "common": {
+    "manageOnWeb": "वेब पर प्रबंधित करें",
+    "creditHistory": "क्रेडिट हिस्ट्री",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": "। ",
     "listJoiner": ", ",
     "cancel": "रद्द करें",
@@ -118,6 +122,7 @@
     "copyLink": "लिंक कॉपी करें",
     "couldNotLoadOrganizations": "संगठन लोड नहीं हो सके।",
     "couldNotLoadSessions": "सत्र लोड नहीं हो सके।",
+    "couldnTLoad": "लोड नहीं हो सका।",
     "couldnTLoadMore": "और नतीजे लोड नहीं हो सके।",
     "deviceSessions": "डिवाइस के सत्र",
     "disabled": "बंद",
@@ -245,6 +250,10 @@
     "notAdded": "आपने साइन इन कर लिया है। {{provider}} आपके खाते में नहीं जोड़ा गया।"
   },
   "profile": {
+    "creditHistorySubtitle": "खरीदारी, रसीदें और क्रेडिट गतिविधि",
+    "invoicesSubtitle": "अपनी खरीदारी के इनवॉइस डाउनलोड करें",
+    "manageBilling": "kilo.ai पर बिलिंग मैनेज करें",
+    "manageBillingIosNote": "पेमेंट के तरीके, ऑटो टॉप-अप और बिलिंग की जानकारी kilo.ai पर मैनेज की जाती है।",
     "codeReviewerSubtitle": "स्वचालित PR समीक्षाएँ",
     "securityAgentSubtitle": "सुरक्षा की कमियाँ खोजें और ठीक करें",
     "reviews": "समीक्षाएँ",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "प्रदाता कुंजियाँ",
       "rowSubtitle": "अपने प्रदाता की बिलिंग का उपयोग करें",
-      "manageOnWeb": "वेब पर प्रबंधित करें",
       "manageOnWebReason": "इन प्रदाताओं को संरचित क्रेडेंशियल की आवश्यकता होती है।",
       "description": "इन कुंजियों से किए गए अनुरोधों का बिल आपके Kilo बैलेंस के बजाय आपके प्रदाता खाते में जाएगा।",
       "enabled": "उपयोग में",
@@ -1965,7 +1973,8 @@
       "cancelQueued": "संदेश रद्द करें",
       "cancelQueuedAccessibility": "कतार में लगा संदेश रद्द करें",
       "restoreQueued": "वापस लाएँ",
-      "restoreQueuedAccessibility": "रद्द किया गया संदेश लिखने के बॉक्स में वापस लाएँ"
+      "restoreQueuedAccessibility": "रद्द किया गया संदेश लिखने के बॉक्स में वापस लाएँ",
+      "noReplyRecorded": "इस संदेश के लिए कोई उत्तर दर्ज नहीं किया गया।"
     },
     "olderMessages": {
       "arrived": "पहले के संदेश लोड हो गए",
@@ -2402,6 +2411,26 @@
     "onlyFirstFilesAttached_other": "केवल पहली {{displayCount}} फ़ाइलें संलग्न की जाएँगी।"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "बिलिंग हिस्ट्री",
+      "billingHistoryEmpty": "अभी कोई बिलिंग हिस्ट्री नहीं है।",
+      "cancel": "सब्सक्रिप्शन रद्द करें",
+      "cancelDescription": "आपका Kilo Pass बिलिंग अवधि खत्म होने तक चालू रहेगा और रिन्यू नहीं होगा।",
+      "cancelScheduled": "{{date}} को रद्द होगा",
+      "cancelScheduledChange": "शेड्यूल किया गया बदलाव रद्द करें",
+      "cancelled": "सब्सक्रिप्शन रद्द हो गया",
+      "changePlan": "kilo.ai पर प्लान बदलें",
+      "changePlanIosNote": "पेड प्लान में बदलाव kilo.ai पर किए जा सकते हैं।",
+      "creditHistoryEmpty": "अभी कोई Kilo Pass क्रेडिट नहीं है।",
+      "manageInStore": "{{store}} में मैनेज करें",
+      "resume": "सब्सक्रिप्शन फिर से शुरू करें",
+      "resumeCancelledDescription": "आपका Kilo Pass फिर से अपने-आप रिन्यू होने लगेगा।",
+      "resumePausedDescription": "आपका Kilo Pass अपनी तय तारीख से पहले, अभी फिर से शुरू हो जाएगा।",
+      "resumed": "सब्सक्रिप्शन फिर से शुरू हो गया",
+      "scheduledChange": "शेड्यूल किया गया बदलाव",
+      "scheduledChangeCancelDescription": "आपका Kilo Pass मौजूदा प्लान पर ही रहेगा और पहले की तरह रिन्यू होगा।",
+      "scheduledChangeSummary": "{{date}} को {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass उपलब्ध नहीं है।",
     "couldNotLoad": "Kilo Pass लोड नहीं हो सका। फिर से कोशिश करें।",
@@ -2456,6 +2485,11 @@
     "accountDescription": "आपके Kilo खाते की ID और अनुरोध का मेटाडेटा। इनसे आपकी पहचान की पुष्टि होती है और उपयोग मापा जाता है।",
     "diagnosticsTitle": "ऐप की जाँच का डेटा",
     "diagnosticsDescription": "क्रैश और त्रुटि की रिपोर्ट से ऐप की सामग्री हटा दी जाती है। इन रिपोर्ट का उपयोग ऐप को स्थिर रखने के लिए होता है।",
+    "featureFlagsTitle": "सुविधाओं का रोलआउट",
+    "featureFlagsDescription": "आपके खाते का ईमेल, जिसका उपयोग PostHog यह तय करने के लिए करता है कि आपको कौन-सी सुविधाएँ दिखें।",
+    "featureFlagsWhat": "आपके खाते का ईमेल।",
+    "featureFlagsWhy": "यह तय करने के लिए कि आपको कौन-सी सुविधाएँ दिखें, जिनमें वे सुविधाएँ भी शामिल हैं जिन्हें हम अभी धीरे-धीरे जारी कर रहे हैं।",
+    "featureFlagsWho": "PostHog, फ़ीचर-फ़्लैग सेवा।",
     "helpImprove": "Kilo को बेहतर बनाने में मदद करें",
     "helpImproveDescription": "अपनी पहचान बताए बिना उत्पाद के उपयोग का डेटा और इंस्टॉल का स्रोत साझा करें। इसे आप कभी भी सेटिंग में बदल सकते हैं।",
     "seeFullDetails": "पूरा विवरण देखें",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "Config आयात हो गया"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "क्रेडिट गतिविधि लोड नहीं हो सकी।",
+      "appStoreReceipt": "App Store की रसीद",
+      "deductionFallback": "क्रेडिट कटौती",
+      "emptyDescription": "क्रेडिट की खरीदारी, रसीदें और इस्तेमाल यहां दिखेंगे।",
+      "emptyTitle": "कोई क्रेडिट हिस्ट्री नहीं",
+      "googlePlayReceipt": "Google Play की रसीद",
+      "kind": {
+        "adjustment": "समायोजन",
+        "balanceNeutral": "बैलेंस पर असर नहीं",
+        "deduction": "कटौती",
+        "grant": "मुफ़्त क्रेडिट",
+        "purchase": "खरीदारी"
+      },
+      "purchaseFallback": "क्रेडिट खरीदारी",
+      "receipt": "रसीद",
+      "receiptA11y": "{{description}} की रसीद खोलें",
+      "receiptUnavailable": "इस खरीदारी की रसीद उपलब्ध नहीं है।"
+    },
     "title": "क्रेडिट खरीदें",
     "description": "क्रेडिट एक बार की खरीद है जो Kilo App में AI कोडिंग सत्र चलाने के लिए आपके Kilo बैलेंस में जोड़ी जाती है। स्टोर आपके खाते से शुल्क लेता है और स्टोर द्वारा भुगतान की पुष्टि के बाद क्रेडिट जोड़े जाते हैं।",
     "nextExpiry": "{{amount}} के क्रेडिट की समय-सीमा {{date}} (UTC) को समाप्त होगी। सबसे पहले समाप्त होने वाले क्रेडिट पहले इस्तेमाल होते हैं।",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "यह खोज परिणाम खोला नहीं जा सका"
+  },
+  "usage": {
+    "title": "उपयोग",
+    "orgTitle": "संगठन का उपयोग",
+    "entrySubtitle": "खर्च, अनुरोध और टोकन",
+    "rangePicker": "समय अवधि",
+    "range90d": "90 दिन",
+    "metricPicker": "चार्ट मीट्रिक",
+    "chartA11y": "प्रति दिन {{metric}}",
+    "avgCostPerRequest": "औसत लागत / अनुरोध",
+    "topModels": "शीर्ष मॉडल",
+    "topFeatures": "शीर्ष सुविधाएँ",
+    "emptyTitle": "इस अवधि में कोई उपयोग नहीं",
+    "orgSelfNotice": "आप इस संगठन में अपना उपयोग देख रहे हैं।",
+    "viewDetails": "उपयोग विवरण देखें"
+  },
+  "integrations": {
+    "title": "इंटीग्रेशन",
+    "sectionTitle": "कनेक्ट की गई सेवाएँ",
+    "entrySubtitle": "GitHub, Slack, Linear और अन्य",
+    "subtitle": "अपने डेवलपमेंट टूल और वर्कफ़्लो को Kilo से कनेक्ट करें",
+    "emptyHint": "अभी तक कोई इंटीग्रेशन कनेक्ट नहीं किया गया है।",
+    "disconnect": "डिस्कनेक्ट करें",
+    "disconnectTitle": "{{provider}} को डिस्कनेक्ट करें?",
+    "disconnectMessage": "Kilo अब {{provider}} में जवाब नहीं देगा। आप कभी भी फिर से कनेक्ट कर सकते हैं।",
+    "connectedTo": "{{account}} से कनेक्ट है",
+    "disconnected": "{{provider}} डिस्कनेक्ट हो गया",
+    "disconnectFailed": "{{provider}} को डिस्कनेक्ट नहीं किया जा सका",
+    "couldNotLoad": "इंटीग्रेशन लोड नहीं किए जा सके",
+    "permissionDenied": "आपके पास इन इंटीग्रेशन को प्रबंधित करने की अनुमति नहीं है।",
+    "memberHint": "इन कनेक्शन को बदलने के लिए संगठन के किसी मालिक या एडमिन से कहें।",
+    "connectFailed": "कनेक्शन पेज नहीं खोला जा सका"
+  },
+  "invoices": {
+    "personalEmptyDescription": "आपसे बिलिंग होने के बाद, आपकी अपनी खरीदारी के इनवॉइस यहां दिखेंगे।"
   },
   "cloudAgent": {
     "compute": {

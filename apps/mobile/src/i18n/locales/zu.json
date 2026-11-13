@@ -22,6 +22,10 @@
     "expired": "Kuphelelwe yisikhathi"
   },
   "common": {
+    "manageOnWeb": "Phatha kuwebhu",
+    "creditHistory": "Umlando wamakhredithi",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Khansela",
@@ -118,6 +122,7 @@
     "copyLink": "Kopisha isixhumanisi",
     "couldNotLoadOrganizations": "Asikwazanga ukulayisha izinhlangano.",
     "couldNotLoadSessions": "Asikwazanga ukulayisha amaseshini.",
+    "couldnTLoad": "Asikwazanga ukulayisha.",
     "couldnTLoadMore": "Asikwazanga ukulayisha okwengeziwe.",
     "deviceSessions": "Amaseshini edivayisi",
     "disabled": "Kucishiwe",
@@ -245,6 +250,10 @@
     "notAdded": "Ungenile. I-{{provider}} ayizange yengezwe ku-akhawunti yakho."
   },
   "profile": {
+    "creditHistorySubtitle": "Ukuthenga, amarisidi, nomsebenzi wamakhredithi",
+    "invoicesSubtitle": "Landa ama-invoyisi okuthenga kwakho",
+    "manageBilling": "Phatha ukukhokha ku-kilo.ai",
+    "manageBillingIosNote": "Izindlela zokukhokha, ukugcwalisa okuzenzakalelayo, nemininingwane yokukhokha kuphathwa ku-kilo.ai.",
     "codeReviewerSubtitle": "Ukuhlolwa kwe-PR okuzenzakalelayo",
     "securityAgentSubtitle": "Thola futhi ulungise ubungozi",
     "reviews": "Ukuhlolwa",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Okhiye babahlinzeki",
       "rowSubtitle": "Sebenzisa ukukhokhisa komhlinzeki wakho",
-      "manageOnWeb": "Phatha kuwebhu",
       "manageOnWebReason": "Laba bahlinzeki badinga imininingwane yokungena ehlelekile.",
       "description": "Izicelo ezenziwa ngalaba khiye zikhokhiswa ku-akhawunti yakho yomhlinzeki esikhundleni sebhalansi yakho ye-Kilo.",
       "enabled": "Uyasetshenziswa",
@@ -2551,7 +2559,8 @@
       "cancelQueued": "Khansela umlayezo",
       "cancelQueuedAccessibility": "Khansela umlayezo olinde ukuthunyelwa",
       "restoreQueued": "Buyisela",
-      "restoreQueuedAccessibility": "Buyisela umlayezo okhanseliwe endaweni yokubhala"
+      "restoreQueuedAccessibility": "Buyisela umlayezo okhanseliwe endaweni yokubhala",
+      "noReplyRecorded": "Ayikho impendulo erekhodiwe yale mlayezo."
     },
     "olderMessages": {
       "arrived": "Imilayezo yangaphambili ilayishiwe",
@@ -2944,6 +2953,26 @@
     "onlyFirstFilesAttached_other": "Amafayela okuqala angu-{{displayCount}} kuphela azonamathiselwa."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Umlando wokukhokha",
+      "billingHistoryEmpty": "Awukabi nomlando wokukhokha.",
+      "cancel": "Khansela ukubhalisa",
+      "cancelDescription": "I-Kilo Pass yakho ihlala isebenza kuze kuphele isikhathi sokukhokha futhi ngeke iphinde ivuselelwe.",
+      "cancelScheduled": "Izokhanselwa ngo-{{date}}",
+      "cancelScheduledChange": "Khansela ushintsho oluhleliwe",
+      "cancelled": "Ukubhalisa kukhanseliwe",
+      "changePlan": "Shintsha uhlelo ku-kilo.ai",
+      "changePlanIosNote": "Ukushintsha izinhlelo ezikhokhelwayo kuyatholakala ku-kilo.ai.",
+      "creditHistoryEmpty": "Awukabi namakhredithi e-Kilo Pass.",
+      "manageInStore": "Phatha ku-{{store}}",
+      "resume": "Qhubeka nokubhalisa",
+      "resumeCancelledDescription": "I-Kilo Pass yakho izophinde iqale ukuvuselelwa ngokuzenzakalelayo.",
+      "resumePausedDescription": "I-Kilo Pass yakho iyaqhubeka manje, ngaphambi kosuku obekwe ukuthi iqhubeke ngalo.",
+      "resumed": "Ukubhalisa kuqhubekile",
+      "scheduledChange": "Ushintsho oluhleliwe",
+      "scheduledChangeCancelDescription": "I-Kilo Pass yakho ihlala ohlelweni lwayo lwamanje futhi ivuselelwa njengamanje.",
+      "scheduledChangeSummary": "{{plan}} ngo-{{date}}"
+    },
     "title": "I-Kilo Pass",
     "unavailable": "I-Kilo Pass ayitholakali.",
     "couldNotLoad": "I-Kilo Pass ayikwazanga ukulayishwa. Zama futhi.",
@@ -2998,6 +3027,11 @@
     "accountDescription": "I-ID ye-akhawunti yakho ye-Kilo nemininingwane yezicelo, okusetshenziselwa ukuqinisekisa ubuwena nokulinganisa ukusetshenziswa.",
     "diagnosticsTitle": "Ukuhlolwa kohlelo lokusebenza",
     "diagnosticsDescription": "Imibiko yokuphahlazeka namaphutha, okususiwe kuyo okuqukethwe kohlelo lokusebenza, esetshenziselwa ukugcina uhlelo lokusebenza luzinzile.",
+    "featureFlagsTitle": "Ukwethulwa kwezici",
+    "featureFlagsDescription": "I-imeyili ye-akhawunti yakho, esetshenziswa yi-PostHog ukunquma ukuthi yiziphi izici ozibonayo.",
+    "featureFlagsWhat": "I-imeyili ye-akhawunti yakho.",
+    "featureFlagsWhy": "Ukunquma ukuthi yiziphi izici ozibonayo, kuhlanganise nalezo esisazethula kancane kancane.",
+    "featureFlagsWho": "I-PostHog, isevisi yamafulegi ezici.",
     "helpImprove": "Siza ukuthuthukisa i-Kilo",
     "helpImproveDescription": "Yabelana ngedatha yokusetshenziswa komkhiqizo engakuvezi ukuthi ungubani kanye nomthombo owufake kuwo. Ungakushintsha lokhu noma nini ezilungiselelweni.",
     "seeFullDetails": "Bona yonke imininingwane",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "Ikhonsifigi ingenisiwe"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Ayikwazanga ukulayisha umsebenzi wamakhredithi.",
+      "appStoreReceipt": "Irisidi evela ku-App Store",
+      "deductionFallback": "Ukudonswa kwamakhredithi",
+      "emptyDescription": "Ukuthengwa kwamakhredithi, amarisidi, nokusetshenziswa kuzovela lapha.",
+      "emptyTitle": "Awukho umlando wamakhredithi",
+      "googlePlayReceipt": "Irisidi evela ku-Google Play",
+      "kind": {
+        "adjustment": "Ulungiso",
+        "balanceNeutral": "Akuthinti ibhalansi",
+        "deduction": "Ukudonswa",
+        "grant": "Isibonelelo samakhredithi",
+        "purchase": "Ukuthenga"
+      },
+      "purchaseFallback": "Ukuthengwa kwamakhredithi",
+      "receipt": "Irisidi",
+      "receiptA11y": "Vula irisidi ye-{{description}}",
+      "receiptUnavailable": "Ayikho irisidi etholakalayo yalokhu kuthenga."
+    },
     "title": "Thenga amakhredithi",
     "description": "Amakhredithi ukuthenga kwesikhathi esisodwa okwengezwa kubhalansi yakho ye-Kilo ukuze usebenzise amaseshini okubhala ikhodi e-AI ku-Kilo App. Isitolo sikhokhisa i-akhawunti yakho futhi amakhredithi engezwa ngemva kokuba isitolo siqinisekise inkokhelo.",
     "nextExpiry": "Amakhredithi angu-{{amount}} aphelelwa yisikhathi ngo-{{date}} (UTC). Amakhredithi aphelelwa yisikhathi kuqala asetshenziswa kuqala.",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Asikwazanga ukuvula leli phumela lokusesha"
+  },
+  "usage": {
+    "title": "Ukusetshenziswa",
+    "orgTitle": "Ukusetshenziswa kwenhlangano",
+    "entrySubtitle": "Izindleko, izicelo, namathokheni",
+    "rangePicker": "Isikhawu sesikhathi",
+    "range90d": "Izinsuku ezingu-90",
+    "metricPicker": "Isilinganiso seshadi",
+    "chartA11y": "{{metric}} ngosuku",
+    "avgCostPerRequest": "Izindleko ezimaphakathi / isicelo",
+    "topModels": "Amamodeli aphezulu",
+    "topFeatures": "Izici eziphezulu",
+    "emptyTitle": "Akukho ukusetshenziswa kulesi sikhathi",
+    "orgSelfNotice": "Ubona ukusetshenziswa kwakho kule nhlangano.",
+    "viewDetails": "Buka imininingwane yokusetshenziswa"
+  },
+  "integrations": {
+    "title": "Ukuhlanganiswa",
+    "sectionTitle": "Amasevisi axhunyiwe",
+    "entrySubtitle": "GitHub, Slack, Linear nokunye",
+    "subtitle": "Xhuma amathuluzi akho okuthuthukisa nezinqubo zokusebenza ku-Kilo",
+    "emptyHint": "Akukabi khona ukuhlanganiswa okuxhunyiwe.",
+    "disconnect": "Nqamula",
+    "disconnectTitle": "Nqamula i-{{provider}}?",
+    "disconnectMessage": "I-Kilo izoyeka ukuphendula ku-{{provider}}. Ungaphinda uxhume noma nini.",
+    "connectedTo": "Ixhunywe ku-{{account}}",
+    "disconnected": "I-{{provider}} inqanyuliwe",
+    "disconnectFailed": "Akukwazekanga ukunqamula i-{{provider}}",
+    "couldNotLoad": "Akukwazekanga ukulayisha ukuhlanganiswa",
+    "permissionDenied": "Awunayo imvume yokuphatha lokhu kuhlanganiswa.",
+    "memberHint": "Cela umnikazi wenhlangano noma umphathi ukuthi ashintshe lokhu kuxhumana.",
+    "connectFailed": "Akukwazekanga ukuvula ikhasi lokuxhuma"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Ama-invoyisi okuthenga kwakho azovela lapha uma usukhokhisiwe."
   },
   "cloudAgent": {
     "compute": {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
-import { randomInt } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   github_app_installations,
@@ -7,12 +7,14 @@ import {
   platform_integrations,
   type PlatformIntegration,
 } from '@kilocode/db/schema';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { assertGitHubInstallationRuntimeAuthorized } from '@/lib/integrations/github/runtime-authorization';
 import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import {
   getGitHubConnectionStatusForOwner,
   getIntegrationsByOrganization,
+  getIntegrationForOwner,
   getPrimaryGitHubIntegrationForOrganization,
 } from './platform-integrations';
 
@@ -30,6 +32,8 @@ type AssociationScenario = {
   role?: 'workflow' | 'agent_only' | null;
   canonicalInstallationId?: string | null;
   createdAt?: string;
+  updatedAt?: string;
+  id?: string;
   accountLogin?: string;
 };
 
@@ -39,7 +43,7 @@ function organizationAssociation(
 ): typeof platform_integrations.$inferInsert {
   return {
     owned_by_organization_id: organizationId,
-    platform: 'github',
+    platform: PLATFORM.GITHUB,
     integration_type: 'app',
     github_connection_role: scenario.role ?? null,
     github_installation_id: scenario.canonicalInstallationId ?? null,
@@ -58,6 +62,8 @@ function organizationAssociation(
     ],
     repositories_synced_at: '2026-04-01T00:00:00.000Z',
     created_at: scenario.createdAt,
+    updated_at: scenario.updatedAt,
+    id: scenario.id,
   };
 }
 
@@ -326,5 +332,50 @@ describe('organization GitHub workflow connection lookups', () => {
 
     await expect(listedIntegrationIds(organization.id, 'workflow')).resolves.toHaveLength(1);
     await expect(listedIntegrationIds(organization.id, 'agent')).resolves.toEqual([]);
+  });
+
+  test('breaks identical personal workflow associations by ascending id for connection status', async () => {
+    // Sort the generated ids so the lower id is known up front; v4 ids are not
+    // ordered by generation time.
+    const [lowerId, higherId] = [randomUUID(), randomUUID()].sort();
+    expect(lowerId).not.toEqual(higherId);
+
+    // Insert the higher-id association first, so the lookup cannot pass
+    // through insertion order: equal health and `updated_at` must fall
+    // through to the shared order's deterministic ascending-id tie-break.
+    await insertAssociation(
+      personalAssociation(ownerId, {
+        installationId: nextInstallationId(),
+        role: 'workflow',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        id: higherId,
+        accountLogin: 'higher-id-association',
+      })
+    );
+    const lower = await insertAssociation(
+      personalAssociation(ownerId, {
+        installationId: nextInstallationId(),
+        role: 'workflow',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        id: lowerId,
+        accountLogin: 'lower-id-association',
+      })
+    );
+
+    await expect(getGitHubConnectionStatusForOwner({ type: 'user', id: ownerId })).resolves.toEqual(
+      {
+        connected: true,
+        integration: {
+          accountLogin: 'lower-id-association',
+          repositorySelection: 'selected',
+          installedAt: lower.installed_at,
+        },
+      }
+    );
+    await expect(
+      getIntegrationForOwner({ type: 'user', id: ownerId }, PLATFORM.GITHUB)
+    ).resolves.toMatchObject({ id: lowerId });
   });
 });

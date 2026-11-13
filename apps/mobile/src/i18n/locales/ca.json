@@ -22,6 +22,10 @@
     "expired": "Caducada"
   },
   "common": {
+    "manageOnWeb": "Gestiona-ho al web",
+    "creditHistory": "Historial de crèdits",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancel·la",
@@ -118,6 +122,7 @@
     "copyLink": "Copia l'enllaç",
     "couldNotLoadOrganizations": "No s'han pogut carregar les organitzacions.",
     "couldNotLoadSessions": "No s'han pogut carregar les sessions.",
+    "couldnTLoad": "No s'ha pogut carregar.",
     "couldnTLoadMore": "No se n'han pogut carregar més.",
     "deviceSessions": "Sessions als dispositius",
     "disabled": "Desactivat",
@@ -245,6 +250,10 @@
     "notAdded": "Has iniciat la sessió. No s'ha afegit {{provider}} al teu compte."
   },
   "profile": {
+    "creditHistorySubtitle": "Compres, rebuts i activitat de crèdits",
+    "invoicesSubtitle": "Baixa les factures de les teves compres",
+    "manageBilling": "Gestiona la facturació a kilo.ai",
+    "manageBillingIosNote": "Els mètodes de pagament, la recàrrega automàtica i les dades de facturació es gestionen a kilo.ai.",
     "codeReviewerSubtitle": "Revisions automàtiques de PR",
     "securityAgentSubtitle": "Troba i corregeix vulnerabilitats",
     "reviews": "Revisions",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Claus de proveïdor",
       "rowSubtitle": "Utilitza la facturació del teu proveïdor",
-      "manageOnWeb": "Gestiona-ho al web",
       "manageOnWebReason": "Aquests proveïdors necessiten credencials estructurades.",
       "description": "Les sol·licituds fetes amb aquestes claus es facturen al teu compte del proveïdor en lloc del saldo de Kilo.",
       "enabled": "En ús",
@@ -2596,7 +2604,8 @@
       "cancelQueued": "Cancel·la el missatge",
       "cancelQueuedAccessibility": "Cancel·la el missatge en cua",
       "restoreQueued": "Restaura",
-      "restoreQueuedAccessibility": "Restaura el missatge cancel·lat al camp de missatge"
+      "restoreQueuedAccessibility": "Restaura el missatge cancel·lat al camp de missatge",
+      "noReplyRecorded": "No s'ha registrat cap resposta per a aquest missatge."
     },
     "olderMessages": {
       "arrived": "S'han carregat els missatges anteriors",
@@ -2997,6 +3006,26 @@
     "onlyFirstFilesAttached_many": "Només s'adjuntaran els primers {{displayCount}} fitxers."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Historial de facturació",
+      "billingHistoryEmpty": "Encara no hi ha historial de facturació.",
+      "cancel": "Cancel·la la subscripció",
+      "cancelDescription": "El teu Kilo Pass continuarà actiu fins al final del període de facturació i no es renovarà.",
+      "cancelScheduled": "Es cancel·la el {{date}}",
+      "cancelScheduledChange": "Cancel·la el canvi programat",
+      "cancelled": "Subscripció cancel·lada",
+      "changePlan": "Canvia de pla a kilo.ai",
+      "changePlanIosNote": "Els canvis de pla de pagament estan disponibles a kilo.ai.",
+      "creditHistoryEmpty": "Encara no hi ha crèdits del Kilo Pass.",
+      "manageInStore": "Gestiona a {{store}}",
+      "resume": "Reprèn la subscripció",
+      "resumeCancelledDescription": "El teu Kilo Pass tornarà a renovar-se automàticament.",
+      "resumePausedDescription": "El teu Kilo Pass es reprèn ara, abans de la data de represa programada.",
+      "resumed": "Subscripció represa",
+      "scheduledChange": "Canvi programat",
+      "scheduledChangeCancelDescription": "El teu Kilo Pass es manté en el pla actual i es renova com fins ara.",
+      "scheduledChangeSummary": "{{plan}} el {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass no està disponible.",
     "couldNotLoad": "No s'ha pogut carregar Kilo Pass. Torna-ho a provar.",
@@ -3051,6 +3080,11 @@
     "accountDescription": "L'identificador del teu compte de Kilo i les metadades de les sol·licituds, que s'utilitzen per autenticar-te i mesurar l'ús.",
     "diagnosticsTitle": "Diagnòstics de l'aplicació",
     "diagnosticsDescription": "Informes d'errors i de fallades, sense contingut de l'aplicació, utilitzats per mantenir l'aplicació estable.",
+    "featureFlagsTitle": "Desplegament de funcions",
+    "featureFlagsDescription": "El correu electrònic del teu compte, que PostHog utilitza per decidir quines funcions veus.",
+    "featureFlagsWhat": "El correu electrònic del teu compte.",
+    "featureFlagsWhy": "Per decidir quines funcions veus, incloses les que encara estem desplegant.",
+    "featureFlagsWho": "PostHog, el servei d'indicadors de funcions.",
     "helpImprove": "Ajuda a millorar Kilo",
     "helpImproveDescription": "Comparteix dades anònimes d'ús del producte i l'origen de la instal·lació. Pots canviar-ho en qualsevol moment a la configuració.",
     "seeFullDetails": "Mostra tots els detalls",
@@ -4014,6 +4048,25 @@
     "importConfigApplied": "Configuració importada"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "No s'ha pogut carregar l'activitat de crèdit.",
+      "appStoreReceipt": "Rebut de l'App Store",
+      "deductionFallback": "Deducció de crèdits",
+      "emptyDescription": "Les compres de crèdits, els rebuts i l'ús apareixeran aquí.",
+      "emptyTitle": "No hi ha historial de crèdits",
+      "googlePlayReceipt": "Rebut de Google Play",
+      "kind": {
+        "adjustment": "Ajust",
+        "balanceNeutral": "Sense efecte en el saldo",
+        "deduction": "Deducció",
+        "grant": "Concessió de crèdits",
+        "purchase": "Compra"
+      },
+      "purchaseFallback": "Compra de crèdits",
+      "receipt": "Rebut",
+      "receiptA11y": "Obre el rebut de {{description}}",
+      "receiptUnavailable": "No hi ha cap rebut disponible per a aquesta compra."
+    },
     "title": "Compra crèdits",
     "description": "Els crèdits són una compra única que s'afegeix al teu saldo de Kilo per executar sessions de programació amb IA a l'aplicació Kilo. La botiga cobra al teu compte i els crèdits s'afegeixen quan la botiga confirma el pagament.",
     "nextExpiry": "{{amount}} en crèdits caduquen el {{date}} (UTC). Els crèdits amb la caducitat més propera s'utilitzen primer.",
@@ -4199,6 +4252,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "No s'ha pogut obrir aquest resultat de la cerca"
+  },
+  "usage": {
+    "title": "Ús",
+    "orgTitle": "Ús de l'organització",
+    "entrySubtitle": "Despesa, sol·licituds i tòkens",
+    "rangePicker": "Període",
+    "range90d": "90 dies",
+    "metricPicker": "Mètrica del gràfic",
+    "chartA11y": "{{metric}} per dia",
+    "avgCostPerRequest": "Import mitjà / sol·l.",
+    "topModels": "Models més usats",
+    "topFeatures": "Funcions més usades",
+    "emptyTitle": "Cap ús en aquest període",
+    "orgSelfNotice": "Estàs veient el teu propi ús en aquesta organització.",
+    "viewDetails": "Mostra els detalls d'ús"
+  },
+  "integrations": {
+    "title": "Integracions",
+    "sectionTitle": "Serveis connectats",
+    "entrySubtitle": "GitHub, Slack, Linear i més",
+    "subtitle": "Connecta les teves eines i fluxos de treball de desenvolupament a Kilo",
+    "emptyHint": "Encara no hi ha cap integració connectada.",
+    "disconnect": "Desconnecta",
+    "disconnectTitle": "Vols desconnectar {{provider}}?",
+    "disconnectMessage": "Kilo deixarà de respondre a {{provider}}. Pots tornar a connectar-lo en qualsevol moment.",
+    "connectedTo": "Connectat a {{account}}",
+    "disconnected": "S'ha desconnectat {{provider}}",
+    "disconnectFailed": "No s'ha pogut desconnectar {{provider}}",
+    "couldNotLoad": "No s'han pogut carregar les integracions",
+    "permissionDenied": "No tens permís per gestionar aquestes integracions.",
+    "memberHint": "Demana a un propietari o administrador de l'organització que canviï aquestes connexions.",
+    "connectFailed": "No s'ha pogut obrir la pàgina de connexió"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Les factures de les teves compres apareixeran aquí quan se't facturi."
   },
   "cloudAgent": {
     "compute": {

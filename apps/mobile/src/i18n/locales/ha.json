@@ -22,6 +22,10 @@
     "expired": "Lokaci ya ƙare"
   },
   "common": {
+    "manageOnWeb": "Sarrafa a yanar gizo",
+    "creditHistory": "Tarihin kiredit",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Soke",
@@ -118,6 +122,7 @@
     "copyLink": "Kwafa hanyar haɗi",
     "couldNotLoadOrganizations": "An kasa loda ƙungiyoyi.",
     "couldNotLoadSessions": "An kasa loda zamanni.",
+    "couldnTLoad": "An kasa loda.",
     "couldnTLoadMore": "An kasa loda ƙari.",
     "deviceSessions": "Zaman na'urori",
     "disabled": "An kashe",
@@ -245,6 +250,10 @@
     "notAdded": "Ka shiga. Ba a ƙara {{provider}} zuwa asusunka ba."
   },
   "profile": {
+    "creditHistorySubtitle": "Sayayya, rasitai, da ayyukan kiredit",
+    "invoicesSubtitle": "Sauke takardun kuɗi na sayayyarka",
+    "manageBilling": "Sarrafa biyan kuɗi a kilo.ai",
+    "manageBillingIosNote": "Ana sarrafa hanyoyin biyan kuɗi, cika kiredit kai tsaye, da bayanan biyan kuɗi a kilo.ai.",
     "codeReviewerSubtitle": "Bitar PR ta atomatik",
     "securityAgentSubtitle": "Nemo raunin tsaro ka gyara su",
     "reviews": "Bita",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Maɓallan masu samarwa",
       "rowSubtitle": "Yi amfani da biyan kuɗin mai samarwarka",
-      "manageOnWeb": "Sarrafa a yanar gizo",
       "manageOnWebReason": "Waɗannan masu samarwa suna buƙatar takardun shaida masu tsari.",
       "description": "Ana cajin buƙatun da ke bi ta waɗannan maɓallan zuwa asusun mai samarwarka maimakon ragowar kuɗinka na Kilo.",
       "enabled": "Ana amfani",
@@ -2551,7 +2559,8 @@
       "cancelQueued": "Soke saƙo",
       "cancelQueuedAccessibility": "Soke saƙon da ke jira",
       "restoreQueued": "Maido",
-      "restoreQueuedAccessibility": "Maido da saƙon da aka soke zuwa wurin rubuta saƙo"
+      "restoreQueuedAccessibility": "Maido da saƙon da aka soke zuwa wurin rubuta saƙo",
+      "noReplyRecorded": "Ba a rubuta wani amsa ba don wannan saƙon."
     },
     "olderMessages": {
       "arrived": "An loda saƙonnin da suka gabata",
@@ -2944,6 +2953,26 @@
     "onlyFirstFilesAttached_other": "Fayiloli {{displayCount}} na farko kawai za a haɗa."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Tarihin biyan kuɗi",
+      "billingHistoryEmpty": "Babu tarihin biyan kuɗi tukuna.",
+      "cancel": "Soke rajista",
+      "cancelDescription": "Kilo Pass ɗinka zai ci gaba da aiki har zuwa ƙarshen lokacin biyan kuɗi kuma ba zai sabunta ba.",
+      "cancelScheduled": "Za a soke a ranar {{date}}",
+      "cancelScheduledChange": "Soke canjin da aka tsara",
+      "cancelled": "An soke rajista",
+      "changePlan": "Canja tsari a kilo.ai",
+      "changePlanIosNote": "Ana iya canja tsare-tsaren da ake biya a kilo.ai.",
+      "creditHistoryEmpty": "Babu kiredit na Kilo Pass tukuna.",
+      "manageInStore": "Sarrafa a {{store}}",
+      "resume": "Ci gaba da rajista",
+      "resumeCancelledDescription": "Kilo Pass ɗinka zai sake fara sabuntawa kai tsaye.",
+      "resumePausedDescription": "Kilo Pass ɗinka zai ci gaba yanzu, kafin ranar da aka tsara zai ci gaba.",
+      "resumed": "An ci gaba da rajista",
+      "scheduledChange": "Canjin da aka tsara",
+      "scheduledChangeCancelDescription": "Kilo Pass ɗinka zai ci gaba a tsarinsa na yanzu kuma zai sabunta kamar yadda yake yi a yau.",
+      "scheduledChangeSummary": "{{plan}} a ranar {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Ba a iya samun Kilo Pass a yanzu.",
     "couldNotLoad": "An kasa loda Kilo Pass. Sake gwadawa.",
@@ -2998,6 +3027,11 @@
     "accountDescription": "Ana amfani da ID ɗin asusunka na Kilo da ƙarin bayanan buƙata don tantance ka da auna amfani.",
     "diagnosticsTitle": "Bayanan binciken matsalar manhaja",
     "diagnosticsDescription": "Ana amfani da rahotannin tsayawar manhaja da kurakurai don tabbatar da cewa manhajar tana aiki yadda ya kamata. An cire abubuwan da ke cikin manhajar daga rahotannin.",
+    "featureFlagsTitle": "Ƙaddamar da fasaloli",
+    "featureFlagsDescription": "Imel ɗin asusunka, wanda PostHog ke amfani da shi don yanke shawarar fasalolin da za ka gani.",
+    "featureFlagsWhat": "Imel ɗin asusunka.",
+    "featureFlagsWhy": "Don yanke shawarar fasalolin da za ka gani, har da waɗanda muke ci gaba da ƙaddamarwa.",
+    "featureFlagsWho": "PostHog, sabis ɗin tutocin fasaloli.",
     "helpImprove": "Taimaka wajen inganta Kilo",
     "helpImproveDescription": "Raba bayanan amfani da manhaja da ba sa bayyana ko kai wane ne, da inda ka samo manhajar. Za ka iya canza wannan a Saituna a kowane lokaci.",
     "seeFullDetails": "Duba cikakkun bayanai",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "An shigo da Config ɗin"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Ba a iya loda ayyukan kiredit ba.",
+      "appStoreReceipt": "Rasiti daga App Store",
+      "deductionFallback": "Cire kiredit",
+      "emptyDescription": "Sayayyar kiredit, rasitai, da amfani za su bayyana a nan.",
+      "emptyTitle": "Babu tarihin kiredit",
+      "googlePlayReceipt": "Rasiti daga Google Play",
+      "kind": {
+        "adjustment": "Gyara",
+        "balanceNeutral": "Ba ya canja ma'auni",
+        "deduction": "Cirewa",
+        "grant": "Kyautar kiredit",
+        "purchase": "Saye"
+      },
+      "purchaseFallback": "Sayen kiredit",
+      "receipt": "Rasiti",
+      "receiptA11y": "Buɗe rasitin {{description}}",
+      "receiptUnavailable": "Babu rasiti don wannan sayayya."
+    },
     "title": "Sayi kuɗin amfani",
     "description": "Kuɗin amfani saye ne na lokaci ɗaya da ake ƙarawa a ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App. Shagon yana cajin asusunka kuma ana ƙara kuɗin amfani bayan shagon ya tabbatar da biyan kuɗi.",
     "nextExpiry": "Kuɗin amfani {{amount}} za su ƙare {{date}} (UTC). Ana fara amfani da kuɗin amfani da za su fi saurin ƙarewa.",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ba a iya buɗe wannan sakamakon binciken ba"
+  },
+  "usage": {
+    "title": "Amfani",
+    "orgTitle": "Amfanin ƙungiya",
+    "entrySubtitle": "Kuɗin da aka kashe, buƙatu da guntayen rubutu",
+    "rangePicker": "Tsawon lokaci",
+    "range90d": "Kwanaki 90",
+    "metricPicker": "Ma'aunin jadawali",
+    "chartA11y": "{{metric}} a kowace rana",
+    "avgCostPerRequest": "Matsakaicin farashi / buƙata",
+    "topModels": "Manyan samfura",
+    "topFeatures": "Manyan fasaloli",
+    "emptyTitle": "Babu amfani a wannan lokaci",
+    "orgSelfNotice": "Kuna ganin amfaninku na kanku a wannan ƙungiyar.",
+    "viewDetails": "Duba bayanan amfani"
+  },
+  "integrations": {
+    "title": "Haɗe-haɗe",
+    "sectionTitle": "Ayyukan da aka haɗa",
+    "entrySubtitle": "GitHub, Slack, Linear da sauransu",
+    "subtitle": "Haɗa kayan aikin haɓaka manhaja da tsarin aikinka da Kilo",
+    "emptyHint": "Babu wani haɗi tukuna.",
+    "disconnect": "Cire haɗi",
+    "disconnectTitle": "A cire haɗin {{provider}}?",
+    "disconnectMessage": "Kilo zai daina amsawa a {{provider}}. Kana iya sake haɗawa a kowane lokaci.",
+    "connectedTo": "An haɗa da {{account}}",
+    "disconnected": "An cire haɗin {{provider}}",
+    "disconnectFailed": "Ba a iya cire haɗin {{provider}} ba",
+    "couldNotLoad": "Ba a iya loda haɗe-haɗe ba",
+    "permissionDenied": "Ba ka da izinin sarrafa waɗannan haɗe-haɗe.",
+    "memberHint": "Ka roƙi mamallakin ƙungiya ko mai gudanarwa ya canza waɗannan haɗe-haɗe.",
+    "connectFailed": "Ba a iya buɗe shafin haɗi ba"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Takardun kuɗi na sayayyarka za su bayyana a nan da zarar an caje ka."
   },
   "cloudAgent": {
     "compute": {

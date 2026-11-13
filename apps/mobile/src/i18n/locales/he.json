@@ -22,6 +22,10 @@
     "expired": "פג התוקף"
   },
   "common": {
+    "manageOnWeb": "ניהול באתר",
+    "creditHistory": "היסטוריית קרדיטים",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "ביטול",
@@ -118,6 +122,7 @@
     "copyLink": "העתקת קישור",
     "couldNotLoadOrganizations": "לא הצלחנו לטעון את הארגונים.",
     "couldNotLoadSessions": "לא הצלחנו לטעון את הסשנים.",
+    "couldnTLoad": "לא הצלחנו לטעון.",
     "couldnTLoadMore": "לא הצלחנו לטעון פריטים נוספים.",
     "deviceSessions": "סשנים במכשירים",
     "disabled": "מושבת",
@@ -245,6 +250,10 @@
     "notAdded": "נכנסת לחשבון. {{provider}} לא נוסף לחשבון שלך."
   },
   "profile": {
+    "creditHistorySubtitle": "רכישות, קבלות ופעילות קרדיטים",
+    "invoicesSubtitle": "הורדת חשבוניות עבור הרכישות שלך",
+    "manageBilling": "ניהול החיוב ב-kilo.ai",
+    "manageBillingIosNote": "אמצעי תשלום, טעינה אוטומטית ופרטי חיוב מנוהלים ב-kilo.ai.",
     "codeReviewerSubtitle": "סקירות PR אוטומטיות",
     "securityAgentSubtitle": "איתור ותיקון של חולשות אבטחה",
     "reviews": "סקירות",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "מפתחות ספקים",
       "rowSubtitle": "שימוש בחיוב דרך הספק שלך",
-      "manageOnWeb": "ניהול באתר",
       "manageOnWebReason": "ספקים אלה דורשים פרטי גישה מובנים.",
       "description": "בקשות שנשלחות באמצעות מפתחות אלה מחויבות בחשבון הספק שלך במקום ביתרת Kilo שלך.",
       "enabled": "בשימוש",
@@ -2031,7 +2039,8 @@
       "cancelQueued": "ביטול ההודעה",
       "cancelQueuedAccessibility": "ביטול ההודעה שבתור",
       "restoreQueued": "שחזור",
-      "restoreQueuedAccessibility": "שחזור ההודעה שבוטלה לשדה ההודעה"
+      "restoreQueuedAccessibility": "שחזור ההודעה שבוטלה לשדה ההודעה",
+      "noReplyRecorded": "לא נרשמה תשובה להודעה הזו."
     },
     "olderMessages": {
       "arrived": "הודעות קודמות נטענו",
@@ -2432,6 +2441,26 @@
     "onlyFirstFilesAttached_two": "רק {{displayCount}} הקבצים הראשונים יצורפו."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "היסטוריית חיובים",
+      "billingHistoryEmpty": "אין עדיין היסטוריית חיובים.",
+      "cancel": "ביטול המינוי",
+      "cancelDescription": "ה-Kilo Pass שלך יישאר פעיל עד סוף תקופת החיוב ולא יתחדש.",
+      "cancelScheduled": "יבוטל בתאריך {{date}}",
+      "cancelScheduledChange": "ביטול השינוי המתוזמן",
+      "cancelled": "המינוי בוטל",
+      "changePlan": "שינוי תוכנית ב-kilo.ai",
+      "changePlanIosNote": "שינויים בתוכניות בתשלום זמינים ב-kilo.ai.",
+      "creditHistoryEmpty": "עדיין אין קרדיטים מ-Kilo Pass.",
+      "manageInStore": "ניהול ב-{{store}}",
+      "resume": "חידוש המינוי",
+      "resumeCancelledDescription": "ה-Kilo Pass שלך יתחיל שוב להתחדש אוטומטית.",
+      "resumePausedDescription": "ה-Kilo Pass שלך יחודש עכשיו, לפני מועד החידוש המתוזמן.",
+      "resumed": "המינוי חודש",
+      "scheduledChange": "שינוי מתוזמן",
+      "scheduledChangeCancelDescription": "ה-Kilo Pass שלך יישאר בתוכנית הנוכחית ויתחדש כמו היום.",
+      "scheduledChangeSummary": "{{plan}} בתאריך {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass אינו זמין.",
     "couldNotLoad": "לא ניתן לטעון את Kilo Pass. נסה שוב.",
@@ -2486,6 +2515,11 @@
     "accountDescription": "מזהה החשבון שלך ב-Kilo והמטא-נתונים של הבקשות, שמשמשים לאימות הזהות שלך ולמדידת השימוש.",
     "diagnosticsTitle": "נתוני אבחון של האפליקציה",
     "diagnosticsDescription": "דוחות קריסה ושגיאות שתוכן האפליקציה הוסר מהם, לצורך שמירה על יציבות האפליקציה.",
+    "featureFlagsTitle": "השקה הדרגתית של תכונות",
+    "featureFlagsDescription": "כתובת האימייל של החשבון שלך, ש-PostHog משתמשת בה כדי לקבוע אילו תכונות יוצגו לך.",
+    "featureFlagsWhat": "כתובת האימייל של החשבון שלך.",
+    "featureFlagsWhy": "כדי לקבוע אילו תכונות יוצגו לך, כולל תכונות שאנחנו עדיין משיקים בהדרגה.",
+    "featureFlagsWho": "PostHog, שירות לניהול דגלי תכונות.",
     "helpImprove": "עזרה בשיפור Kilo",
     "helpImproveDescription": "שתף נתוני שימוש אנונימיים ואת מקור ההתקנה. אפשר לשנות את הבחירה בכל עת בהגדרות.",
     "seeFullDetails": "לפרטים המלאים",
@@ -4014,6 +4048,25 @@
     "importConfigApplied": "ההגדרות יובאו"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "לא ניתן לטעון פעילות קרדיט.",
+      "appStoreReceipt": "קבלה מ-App Store",
+      "deductionFallback": "ניכוי קרדיטים",
+      "emptyDescription": "רכישות קרדיטים, קבלות ושימוש יופיעו כאן.",
+      "emptyTitle": "אין היסטוריית קרדיטים",
+      "googlePlayReceipt": "קבלה מ-Google Play",
+      "kind": {
+        "adjustment": "התאמה",
+        "balanceNeutral": "ללא השפעה על היתרה",
+        "deduction": "ניכוי",
+        "grant": "הענקת קרדיטים",
+        "purchase": "רכישה"
+      },
+      "purchaseFallback": "רכישת קרדיטים",
+      "receipt": "קבלה",
+      "receiptA11y": "פתיחת הקבלה עבור {{description}}",
+      "receiptUnavailable": "אין קבלה זמינה עבור רכישה זו."
+    },
     "title": "קניית קרדיטים",
     "description": "קרדיטים הם רכישה חד-פעמית שמתווספת ליתרת ה-Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App. החנות מחייבת את החשבון שלך והקרדיטים מתווספים לאחר שהחנות מאשרת את התשלום.",
     "nextExpiry": "תוקפם של קרדיטים בסך {{amount}} יפוג ב-{{date}} (UTC). קרדיטים שתוקפם יפוג ראשון מנוצלים קודם.",
@@ -4199,6 +4252,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "לא ניתן היה לפתוח את תוצאת החיפוש הזו"
+  },
+  "usage": {
+    "title": "שימוש",
+    "orgTitle": "שימוש בארגון",
+    "entrySubtitle": "הוצאות, בקשות וטוקנים",
+    "rangePicker": "טווח זמן",
+    "range90d": "90 ימים",
+    "metricPicker": "מדד התרשים",
+    "chartA11y": "{{metric}} ליום",
+    "avgCostPerRequest": "עלות ממוצעת לבקשה",
+    "topModels": "מודלים מובילים",
+    "topFeatures": "תכונות מובילות",
+    "emptyTitle": "אין שימוש בתקופה זו",
+    "orgSelfNotice": "מוצג השימוש שלך בארגון זה.",
+    "viewDetails": "הצגת פרטי השימוש"
+  },
+  "integrations": {
+    "title": "אינטגרציות",
+    "sectionTitle": "שירותים מחוברים",
+    "entrySubtitle": "GitHub, Slack, Linear ועוד",
+    "subtitle": "חיבור כלי הפיתוח ותהליכי העבודה שלך ל-Kilo",
+    "emptyHint": "עדיין לא חוברו אינטגרציות.",
+    "disconnect": "ניתוק",
+    "disconnectTitle": "לנתק את {{provider}}?",
+    "disconnectMessage": "Kilo יפסיק להגיב ב-{{provider}}. אפשר להתחבר מחדש בכל עת.",
+    "connectedTo": "מחובר ל-{{account}}",
+    "disconnected": "החיבור ל-{{provider}} נותק",
+    "disconnectFailed": "לא ניתן לנתק את {{provider}}",
+    "couldNotLoad": "לא ניתן לטעון את האינטגרציות",
+    "permissionDenied": "אין לך הרשאה לנהל את האינטגרציות האלה.",
+    "memberHint": "כדי לשנות את החיבורים האלה, יש לפנות לבעלים או למנהל של הארגון.",
+    "connectFailed": "לא ניתן לפתוח את דף החיבור"
+  },
+  "invoices": {
+    "personalEmptyDescription": "חשבוניות על הרכישות האישיות שלך יופיעו כאן לאחר החיוב."
   },
   "cloudAgent": {
     "compute": {

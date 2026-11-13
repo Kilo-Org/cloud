@@ -22,6 +22,10 @@
     "expired": "Wedi dod i ben"
   },
   "common": {
+    "manageOnWeb": "Rheoli ar y we",
+    "creditHistory": "Hanes credydau",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Canslo",
@@ -118,6 +122,7 @@
     "copyLink": "Copïo dolen",
     "couldNotLoadOrganizations": "Doedd dim modd llwytho'r sefydliadau.",
     "couldNotLoadSessions": "Doedd dim modd llwytho'r sesiynau.",
+    "couldnTLoad": "Doedd dim modd llwytho.",
     "couldnTLoadMore": "Doedd dim modd llwytho mwy.",
     "deviceSessions": "Sesiynau dyfeisiau",
     "disabled": "Wedi'i analluogi",
@@ -245,6 +250,10 @@
     "notAdded": "Rydych chi wedi mewngofnodi. Chafodd {{provider}} mo'i ychwanegu at eich cyfrif."
   },
   "profile": {
+    "creditHistorySubtitle": "Pryniannau, derbynebau a gweithgarwch credydau",
+    "invoicesSubtitle": "Lawrlwytho anfonebau ar gyfer eich pryniannau",
+    "manageBilling": "Rheoli bilio ar kilo.ai",
+    "manageBillingIosNote": "Mae dulliau talu, ychwanegu credyd yn awtomatig a manylion bilio yn cael eu rheoli ar kilo.ai.",
     "codeReviewerSubtitle": "Adolygiadau PR awtomatig",
     "securityAgentSubtitle": "Darganfod a thrwsio gwendidau",
     "reviews": "Adolygiadau",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Allweddi darparwr",
       "rowSubtitle": "Defnyddio bilio eich darparwr eich hun",
-      "manageOnWeb": "Rheoli ar y we",
       "manageOnWebReason": "Mae angen manylion adnabod strwythuredig ar y darparwyr hyn.",
       "description": "Codir tâl am geisiadau drwy'r allweddi hyn ar eich cyfrif darparwr yn lle eich balans Kilo.",
       "enabled": "Yn cael ei defnyddio",
@@ -2731,7 +2739,8 @@
       "cancelQueued": "Canslo neges",
       "cancelQueuedAccessibility": "Canslo neges yn y ciw",
       "restoreQueued": "Adfer",
-      "restoreQueuedAccessibility": "Adfer y neges a ganslwyd i'r blwch neges"
+      "restoreQueuedAccessibility": "Adfer y neges a ganslwyd i'r blwch neges",
+      "noReplyRecorded": "Ni chofnodwyd ymateb ar gyfer y neges hon."
     },
     "olderMessages": {
       "arrived": "Llwythwyd negeseuon cynharach",
@@ -3156,6 +3165,26 @@
     "onlyFirstFilesAttached_many": "Dim ond y {{displayCount}} ffeil gyntaf fydd yn cael eu hatodi."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Hanes bilio",
+      "billingHistoryEmpty": "Dim hanes bilio eto.",
+      "cancel": "Canslo tanysgrifiad",
+      "cancelDescription": "Bydd eich Kilo Pass yn parhau'n weithredol tan ddiwedd y cyfnod bilio ac ni fydd yn adnewyddu.",
+      "cancelScheduled": "Yn cael ei ganslo ar {{date}}",
+      "cancelScheduledChange": "Canslo'r newid a drefnwyd",
+      "cancelled": "Tanysgrifiad wedi'i ganslo",
+      "changePlan": "Newid cynllun ar kilo.ai",
+      "changePlanIosNote": "Mae newidiadau i gynlluniau taledig ar gael ar kilo.ai.",
+      "creditHistoryEmpty": "Dim credydau Kilo Pass eto.",
+      "manageInStore": "Rheoli yn {{store}}",
+      "resume": "Ailddechrau tanysgrifiad",
+      "resumeCancelledDescription": "Bydd eich Kilo Pass yn dechrau adnewyddu'n awtomatig eto.",
+      "resumePausedDescription": "Bydd eich Kilo Pass yn ailddechrau nawr, cyn y dyddiad ailddechrau a drefnwyd.",
+      "resumed": "Tanysgrifiad wedi ailddechrau",
+      "scheduledChange": "Newid wedi'i drefnu",
+      "scheduledChangeCancelDescription": "Bydd eich Kilo Pass yn aros ar ei gynllun presennol ac yn adnewyddu fel y mae heddiw.",
+      "scheduledChangeSummary": "{{plan}} ar {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Nid yw Kilo Pass ar gael.",
     "couldNotLoad": "Ni ellid llwytho Kilo Pass. Ceisiwch eto.",
@@ -3210,6 +3239,11 @@
     "accountDescription": "ID eich cyfrif Kilo a metadata'r ceisiadau, a ddefnyddir i'ch dilysu a mesur y defnydd.",
     "diagnosticsTitle": "Diagnosteg yr ap",
     "diagnosticsDescription": "Adroddiadau am chwalfa a gwallau, heb gynnwys yr ap, a ddefnyddir i gadw'r ap yn sefydlog.",
+    "featureFlagsTitle": "Cyflwyno nodweddion",
+    "featureFlagsDescription": "E-bost eich cyfrif, a ddefnyddir gan PostHog i benderfynu pa nodweddion a welwch.",
+    "featureFlagsWhat": "E-bost eich cyfrif.",
+    "featureFlagsWhy": "Penderfynu pa nodweddion a welwch, gan gynnwys rhai rydyn ni'n dal i'w cyflwyno.",
+    "featureFlagsWho": "PostHog, y gwasanaeth baneri nodweddion.",
     "helpImprove": "Helpu i wella Kilo",
     "helpImproveDescription": "Rhannwch ddata dadansoddeg dienw am y cynnyrch a ffynhonnell y gosodiad. Gallwch newid hyn unrhyw bryd yn y gosodiadau.",
     "seeFullDetails": "Gweld y manylion llawn",
@@ -4197,6 +4231,25 @@
     "importConfigApplied": "Config wedi'i fewnforio"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Methwyd llwytho gweithgarwch credyd.",
+      "appStoreReceipt": "Derbynneb gan yr App Store",
+      "deductionFallback": "Didyniad credyd",
+      "emptyDescription": "Bydd pryniannau credyd, derbynebau a defnydd yn ymddangos yma.",
+      "emptyTitle": "Dim hanes credydau",
+      "googlePlayReceipt": "Derbynneb gan Google Play",
+      "kind": {
+        "adjustment": "Addasiad",
+        "balanceNeutral": "Dim effaith ar y balans",
+        "deduction": "Didyniad",
+        "grant": "Credyd am ddim",
+        "purchase": "Pryniant"
+      },
+      "purchaseFallback": "Pryniant credyd",
+      "receipt": "Derbynneb",
+      "receiptA11y": "Agor y dderbynneb ar gyfer {{description}}",
+      "receiptUnavailable": "Nid oes derbynneb ar gael ar gyfer y pryniant hwn."
+    },
     "title": "Prynu credydau",
     "description": "Mae credydau yn bryniant un-tro sy'n cael ei ychwanegu at eich balans Kilo ar gyfer rhedeg sesiynau codio AI yn Kilo App. Mae'r siop yn codi eich cyfrif ac mae credydau'n cael eu hychwanegu ar ôl i'r siop gadarnhau'r taliad.",
     "nextExpiry": "Mae {{amount}} o gredydau yn dod i ben ar {{date}} (UTC). Defnyddir y credydau sy'n dod i ben gyntaf yn gyntaf.",
@@ -4394,6 +4447,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ni lwyddwyd i agor canlyniad chwilio hwn"
+  },
+  "usage": {
+    "title": "Defnydd",
+    "orgTitle": "Defnydd y sefydliad",
+    "entrySubtitle": "Gwariant, ceisiadau a thocynnau",
+    "rangePicker": "Cyfnod amser",
+    "range90d": "90 diwrnod",
+    "metricPicker": "Mesur y siart",
+    "chartA11y": "{{metric}} y dydd",
+    "avgCostPerRequest": "Cost gyfartalog / cais",
+    "topModels": "Prif fodelau",
+    "topFeatures": "Prif nodweddion",
+    "emptyTitle": "Dim defnydd yn y cyfnod hwn",
+    "orgSelfNotice": "Rydych chi'n gweld eich defnydd eich hun yn y sefydliad hwn.",
+    "viewDetails": "Gweld manylion defnydd"
+  },
+  "integrations": {
+    "title": "Integreiddiadau",
+    "sectionTitle": "Gwasanaethau cysylltiedig",
+    "entrySubtitle": "GitHub, Slack, Linear a mwy",
+    "subtitle": "Cysylltwch eich offer datblygu a'ch llifoedd gwaith â Kilo",
+    "emptyHint": "Does dim integreiddiadau wedi'u cysylltu eto.",
+    "disconnect": "Datgysylltu",
+    "disconnectTitle": "Datgysylltu {{provider}}?",
+    "disconnectMessage": "Bydd Kilo yn peidio ag ymateb yn {{provider}}. Gallwch ailgysylltu unrhyw bryd.",
+    "connectedTo": "Wedi cysylltu â {{account}}",
+    "disconnected": "Wedi datgysylltu {{provider}}",
+    "disconnectFailed": "Methu datgysylltu {{provider}}",
+    "couldNotLoad": "Methu llwytho'r integreiddiadau",
+    "permissionDenied": "Does gennych chi ddim caniatâd i reoli'r integreiddiadau hyn.",
+    "memberHint": "Gofynnwch i berchennog neu weinyddwr y sefydliad newid y cysylltiadau hyn.",
+    "connectFailed": "Methu agor y dudalen gysylltu"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Bydd anfonebau ar gyfer eich pryniannau eich hun yn ymddangos yma unwaith y cewch eich bilio."
   },
   "cloudAgent": {
     "compute": {

@@ -22,6 +22,10 @@
     "expired": "Lany fe-potoana"
   },
   "common": {
+    "manageOnWeb": "Tantano amin'ny tranonkala",
+    "creditHistory": "Tantaran'ny kredita",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Foano",
@@ -118,6 +122,7 @@
     "copyLink": "Adikao ny rohy",
     "couldNotLoadOrganizations": "Tsy tafiditra ny fikambanana.",
     "couldNotLoadSessions": "Tsy tafiditra ny fotoam-piasana.",
+    "couldnTLoad": "Tsy tafiditra.",
     "couldnTLoadMore": "Tsy tafiditra ny manaraka.",
     "deviceSessions": "Fotoam-piasana amin'ny fitaovana",
     "disabled": "Tsy mandeha",
@@ -245,6 +250,10 @@
     "notAdded": "Tafiditra ianao. Tsy nampiana tao amin'ny kaontinao {{provider}}."
   },
   "profile": {
+    "creditHistorySubtitle": "Fividianana, rosia ary hetsika momba ny kredita",
+    "invoicesSubtitle": "Ampidino ny faktioran'ny fividiananao",
+    "manageBilling": "Tantano ny fandoavam-bola ao amin'ny kilo.ai",
+    "manageBillingIosNote": "Ao amin'ny kilo.ai no itantanana ny fomba fandoavam-bola, ny famenoana ho azy ary ny antsipirian'ny fandoavam-bola.",
     "codeReviewerSubtitle": "Fandinihana PR mandeha ho azy",
     "securityAgentSubtitle": "Tadiavo sy ahitsio ny fahalemena ara-piarovana",
     "reviews": "Fandinihana",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Lakilen'ny mpamatsy",
       "rowSubtitle": "Ampiasao ny fandoavam-bola amin'ny mpamatsinao",
-      "manageOnWeb": "Tantano amin'ny tranonkala",
       "manageOnWebReason": "Mila mari-panamarinana voarafitra ireo mpamatsy ireo.",
       "description": "Ny fangatahana mampiasa ireo lakile ireo dia aloa amin'ny kaontinao ao amin'ny mpamatsy fa tsy amin'ny ambim-bola Kilo anananao.",
       "enabled": "Ampiasaina",
@@ -2551,7 +2559,8 @@
       "cancelQueued": "Foano ny hafatra",
       "cancelQueuedAccessibility": "Foano ny hafatra miandry",
       "restoreQueued": "Avereno",
-      "restoreQueuedAccessibility": "Avereno ao amin'ny faritra fanoratana hafatra ny hafatra nofoanana"
+      "restoreQueuedAccessibility": "Avereno ao amin'ny faritra fanoratana hafatra ny hafatra nofoanana",
+      "noReplyRecorded": "Tsy nisy famaliana voarakitra ho an'ity hafatra ity."
     },
     "olderMessages": {
       "arrived": "Voaray ny hafatra taloha",
@@ -2944,6 +2953,26 @@
     "onlyFirstFilesAttached_other": "Ny rakitra {{displayCount}} voalohany ihany no hatambatra amin'ny hafatra."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Tantaran'ny fandoavam-bola",
+      "billingHistoryEmpty": "Mbola tsy misy tantaran'ny fandoavam-bola.",
+      "cancel": "Foano ny famandrihana",
+      "cancelDescription": "Mijanona ho mavitrika hatramin'ny fiafaran'ny vanim-potoana fandoavam-bola ny Kilo Pass anao ary tsy havaozina intsony.",
+      "cancelScheduled": "Hofoanana amin'ny {{date}}",
+      "cancelScheduledChange": "Foano ny fanovana voalahatra",
+      "cancelled": "Voafoana ny famandrihana",
+      "changePlan": "Ovay ny tolotra ao amin'ny kilo.ai",
+      "changePlanIosNote": "Azo atao ao amin'ny kilo.ai ny fanovana tolotra mandoa vola.",
+      "creditHistoryEmpty": "Mbola tsy misy kredita Kilo Pass.",
+      "manageInStore": "Tantano ao amin'ny {{store}}",
+      "resume": "Tohizo ny famandrihana",
+      "resumeCancelledDescription": "Hiverina havaozina ho azy indray ny Kilo Pass anao.",
+      "resumePausedDescription": "Mitohy izao ny Kilo Pass anao, alohan'ny daty voalahatra hitohizany.",
+      "resumed": "Nitohy ny famandrihana",
+      "scheduledChange": "Fanovana voalahatra",
+      "scheduledChangeCancelDescription": "Mijanona amin'ny tolotra misy azy ankehitriny ny Kilo Pass anao ary havaozina toy ny amin'izao.",
+      "scheduledChangeSummary": "{{plan}} amin'ny {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Tsy azo ampiasaina ny Kilo Pass.",
     "couldNotLoad": "Tsy nety nampidirina ny Kilo Pass. Andramo indray.",
@@ -2998,6 +3027,11 @@
     "accountDescription": "Ny famantarana ny kaontinao Kilo sy ny angona mamaritra ny fangatahana, ampiasaina hanamarinana anao sy handrefesana ny fampiasana.",
     "diagnosticsTitle": "Fitiliana ny rindranasa",
     "diagnosticsDescription": "Tatitry ny fijanonana tampoka sy ny hadisoana, izay nesorina ny votoatin'ny rindranasa, mba hiantohana ny fiasan'ny rindranasa.",
+    "featureFlagsTitle": "Famoahana endri-javatra",
+    "featureFlagsDescription": "Ny adiresy mailaky ny kaontinao, ampiasain'ny PostHog hamaritana izay endri-javatra hitanao.",
+    "featureFlagsWhat": "Ny adiresy mailaky ny kaontinao.",
+    "featureFlagsWhy": "Mba hamaritana izay endri-javatra hitanao, anisan'izany ireo mbola avoakanay tsikelikely.",
+    "featureFlagsWho": "PostHog, ilay tolotra fitantanana endri-javatra.",
     "helpImprove": "Ampio hanatsara ny Kilo",
     "helpImproveDescription": "Zarao ny antontanisa fampiasana tsy ahafantarana anao sy ny loharanon'ny fametrahana. Azonao ovaina ao amin'ny Fikirana izany amin'ny fotoana rehetra.",
     "seeFullDetails": "Jereo ny antsipiriany feno",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "Voadika ny config"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Tsy afaka nampidirina ny hetsika momba ny trosa.",
+      "appStoreReceipt": "Rosia avy amin'ny App Store",
+      "deductionFallback": "Fanalana kredita",
+      "emptyDescription": "Hiseho eto ny fividianana kredita, ny rosia ary ny fampiasana.",
+      "emptyTitle": "Tsy misy tantaran'ny kredita",
+      "googlePlayReceipt": "Rosia avy amin'ny Google Play",
+      "kind": {
+        "adjustment": "Fanitsiana",
+        "balanceNeutral": "Tsy manova ny sisa",
+        "deduction": "Fanalana",
+        "grant": "Kredita nomena",
+        "purchase": "Fividianana"
+      },
+      "purchaseFallback": "Fividianana kredita",
+      "receipt": "Rosia",
+      "receiptA11y": "Sokafy ny rosia ho an'ny {{description}}",
+      "receiptUnavailable": "Tsy misy rosia ho an'ity fividianana ity."
+    },
     "title": "Hividy kireditra",
     "description": "Ny kireditra dia fividianana indray mandeha ampiana amin'ny balan Kilo anao hanaovana session coding AI ao amin'ny Kilo App. Ny fivarotana no maka vola amin'ny kaontinao ary ampiana ny kireditra rehefa manamarina ny fandoavam-bola ny fivarotana.",
     "nextExpiry": "Kireditra {{amount}} ho lany daty amin'ny {{date}} (UTC). Ny kireditra ho lany daty voalohany no ampiasaina aloha.",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Tsy voasokatra ity valim-pikarohana ity"
+  },
+  "usage": {
+    "title": "Fampiasana",
+    "orgTitle": "Fampiasana ny fikambanana",
+    "entrySubtitle": "Fandaniana, fangatahana ary sombin-tsoratra",
+    "rangePicker": "Elanelam-potoana",
+    "range90d": "90 andro",
+    "metricPicker": "Refy amin'ny kisary",
+    "chartA11y": "{{metric}} isan'andro",
+    "avgCostPerRequest": "Sarany antonony / fangatahana",
+    "topModels": "Modely be ampiasaina",
+    "topFeatures": "Endri-javatra be ampiasaina",
+    "emptyTitle": "Tsy nisy fampiasana tamin'io fe-potoana io",
+    "orgSelfNotice": "Ny fampiasanao manokana ato amin'ity fikambanana ity no hitanao.",
+    "viewDetails": "Hijery ny antsipirian'ny fampiasana"
+  },
+  "integrations": {
+    "title": "Fampifandraisana",
+    "sectionTitle": "Serivisy mifandray",
+    "entrySubtitle": "GitHub, Slack, Linear sy ny hafa",
+    "subtitle": "Ampifandraiso amin'i Kilo ireo fitaovana sy fomba fiasanao amin'ny fampandrosoana",
+    "emptyHint": "Mbola tsy misy fampifandraisana mifandray.",
+    "disconnect": "Esory",
+    "disconnectTitle": "Hanapaka ny fifandraisana amin'i {{provider}}?",
+    "disconnectMessage": "Tsy hamaly intsony ao amin'i {{provider}} i Kilo. Afaka mampifandray indray ianao amin'ny fotoana rehetra.",
+    "connectedTo": "Mifandray amin'i {{account}}",
+    "disconnected": "Tapaka ny fifandraisana amin'i {{provider}}",
+    "disconnectFailed": "Tsy afaka nanapaka ny fifandraisana amin'i {{provider}}",
+    "couldNotLoad": "Tsy afaka nampiditra ireo fampifandraisana",
+    "permissionDenied": "Tsy manana alalana hitantana ireo fampifandraisana ireo ianao.",
+    "memberHint": "Angataho amin'ny tompon'ny fikambanana na mpitantana ny fanovana ireo fifandraisana ireo.",
+    "connectFailed": "Tsy afaka nanokatra ny pejy fampifandraisana"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Hiseho eto ny faktioran'ny fividiananao manokana rehefa voaloa ianao."
   },
   "cloudAgent": {
     "compute": {

@@ -2,6 +2,7 @@ import 'server-only';
 import { checkRateLimit } from '@vercel/firewall';
 import { createHmac } from 'node:crypto';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { callerAddressFromHeaders } from './caller-address';
 import { reportFirewallRateLimitIssue } from './firewall-rate-limit';
 
 /**
@@ -53,10 +54,7 @@ function reportAddressRuleIssue(error: 'not-found' | 'blocked'): void {
 
 /** True when one client address is exchanging device credentials too fast. */
 export async function isNativeTokenAddressRateLimited(request: Request): Promise<boolean> {
-  const address =
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
-    'unknown';
+  const address = callerAddressFromHeaders(request.headers);
   const { rateLimited, error } = await checkRateLimit(ADDRESS_RATE_LIMIT_ID, {
     request,
     rateLimitKey: `${ADDRESS_RATE_LIMIT_ID}:${address}`,

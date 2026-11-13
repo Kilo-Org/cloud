@@ -22,6 +22,10 @@
     "expired": "Platnosť vypršala"
   },
   "common": {
+    "manageOnWeb": "Spravovať na webe",
+    "creditHistory": "História kreditov",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Zrušiť",
@@ -118,6 +122,7 @@
     "copyLink": "Kopírovať odkaz",
     "couldNotLoadOrganizations": "Nepodarilo sa načítať organizácie.",
     "couldNotLoadSessions": "Nepodarilo sa načítať relácie.",
+    "couldnTLoad": "Nepodarilo sa načítať.",
     "couldnTLoadMore": "Nepodarilo sa načítať ďalšie položky.",
     "deviceSessions": "Relácie zariadení",
     "disabled": "Vypnuté",
@@ -245,6 +250,10 @@
     "notAdded": "Ste prihlásený. {{provider}} nebol pridaný do vášho účtu."
   },
   "profile": {
+    "creditHistorySubtitle": "Nákupy, doklady a pohyby kreditov",
+    "invoicesSubtitle": "Stiahnite si faktúry za svoje nákupy",
+    "manageBilling": "Spravovať fakturáciu na kilo.ai",
+    "manageBillingIosNote": "Spôsoby platby, automatické dobíjanie a fakturačné údaje sa spravujú na kilo.ai.",
     "codeReviewerSubtitle": "Automatické kontroly PR",
     "securityAgentSubtitle": "Vyhľadávať a odstraňovať zraniteľnosti",
     "reviews": "Kontroly",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Kľúče poskytovateľov",
       "rowSubtitle": "Používať vlastnú fakturáciu u poskytovateľa",
-      "manageOnWeb": "Spravovať na webe",
       "manageOnWebReason": "Títo poskytovatelia vyžadujú štruktúrované prihlasovacie údaje.",
       "description": "Požiadavky cez tieto kľúče sa účtujú na tvoj účet u poskytovateľa namiesto tvojho zostatku v Kilo.",
       "enabled": "Používa sa",
@@ -2641,7 +2649,8 @@
       "cancelQueued": "Zrušiť správu",
       "cancelQueuedAccessibility": "Zrušiť správu vo fronte",
       "restoreQueued": "Obnoviť",
-      "restoreQueuedAccessibility": "Vrátiť zrušenú správu do poľa na správu"
+      "restoreQueuedAccessibility": "Vrátiť zrušenú správu do poľa na správu",
+      "noReplyRecorded": "Pre túto správu nebola zaznamenaná žiadna odpoveď."
     },
     "olderMessages": {
       "arrived": "Staršie správy sa načítali",
@@ -3050,6 +3059,26 @@
     "onlyFirstFilesAttached_many": "Priložia sa len prvé súbory ({{displayCount}})."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "História fakturácie",
+      "billingHistoryEmpty": "Zatiaľ žiadna história fakturácie.",
+      "cancel": "Zrušiť predplatné",
+      "cancelDescription": "Váš Kilo Pass zostane aktívny do konca fakturačného obdobia a nebude sa obnovovať.",
+      "cancelScheduled": "Zruší sa {{date}}",
+      "cancelScheduledChange": "Zrušiť naplánovanú zmenu",
+      "cancelled": "Predplatné bolo zrušené",
+      "changePlan": "Zmeniť plán na kilo.ai",
+      "changePlanIosNote": "Zmeny platených plánov sú dostupné na kilo.ai.",
+      "creditHistoryEmpty": "Zatiaľ žiadne kredity z Kilo Pass.",
+      "manageInStore": "Spravovať v obchode {{store}}",
+      "resume": "Obnoviť predplatné",
+      "resumeCancelledDescription": "Váš Kilo Pass sa bude opäť automaticky obnovovať.",
+      "resumePausedDescription": "Váš Kilo Pass sa obnoví hneď, ešte pred plánovaným dátumom obnovenia.",
+      "resumed": "Predplatné bolo obnovené",
+      "scheduledChange": "Naplánovaná zmena",
+      "scheduledChangeCancelDescription": "Váš Kilo Pass zostane na aktuálnom pláne a bude sa obnovovať ako doteraz.",
+      "scheduledChangeSummary": "{{plan}} od {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass nie je dostupný.",
     "couldNotLoad": "Kilo Pass sa nepodarilo načítať. Skúste to znova.",
@@ -3104,6 +3133,11 @@
     "accountDescription": "ID tvojho účtu Kilo a metaúdaje požiadaviek, ktoré slúžia na overenie tvojej identity a meranie spotreby.",
     "diagnosticsTitle": "Diagnostika aplikácie",
     "diagnosticsDescription": "Hlásenia o pádoch a chybách bez obsahu aplikácie, ktoré pomáhajú udržiavať aplikáciu stabilnú.",
+    "featureFlagsTitle": "Postupné zavádzanie funkcií",
+    "featureFlagsDescription": "E-mail tvojho účtu, ktorý PostHog používa na rozhodnutie, ktoré funkcie uvidíš.",
+    "featureFlagsWhat": "E-mail tvojho účtu.",
+    "featureFlagsWhy": "Rozhodnúť, ktoré funkcie uvidíš, vrátane tých, ktoré ešte postupne zavádzame.",
+    "featureFlagsWho": "PostHog, služba pre príznaky funkcií.",
     "helpImprove": "Pomôcť vylepšiť Kilo",
     "helpImproveDescription": "Zdieľaj anonymné údaje o používaní aplikácie a zdroj inštalácie. Túto voľbu môžeš kedykoľvek zmeniť v nastaveniach.",
     "seeFullDetails": "Zobraziť všetky podrobnosti",
@@ -4075,6 +4109,25 @@
     "importConfigApplied": "Konfigurácia importovaná"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Aktivitu kreditov sa nepodarilo načítať.",
+      "appStoreReceipt": "Doklad v obchode App Store",
+      "deductionFallback": "Odpočet kreditov",
+      "emptyDescription": "Tu sa zobrazia nákupy kreditov, doklady a ich využitie.",
+      "emptyTitle": "Žiadna história kreditov",
+      "googlePlayReceipt": "Doklad v obchode Google Play",
+      "kind": {
+        "adjustment": "Úprava",
+        "balanceNeutral": "Bez vplyvu na zostatok",
+        "deduction": "Odpočet",
+        "grant": "Pridelené kredity",
+        "purchase": "Nákup"
+      },
+      "purchaseFallback": "Nákup kreditov",
+      "receipt": "Doklad",
+      "receiptA11y": "Otvoriť doklad za {{description}}",
+      "receiptUnavailable": "Pre tento nákup nie je k dispozícii doklad."
+    },
     "title": "Kúpiť kredity",
     "description": "Kredity sú jednorazový nákup pridaný do vášho zostatku Kilo na spúšťanie AI programovacích relácií v aplikácii Kilo. Obchod vám strhne platbu z účtu a kredity sa pripíšu po potvrdení platby obchodom.",
     "nextExpiry": "Platnosť kreditov v hodnote {{amount}} sa skončí {{date}} (UTC). Najprv sa čerpajú kredity s najskorším koncom platnosti.",
@@ -4264,6 +4317,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nepodarilo sa otvoriť tento výsledok vyhľadávania"
+  },
+  "usage": {
+    "title": "Využitie",
+    "orgTitle": "Využitie organizácie",
+    "entrySubtitle": "Výdavky, požiadavky a tokeny",
+    "rangePicker": "Časové obdobie",
+    "range90d": "90 dní",
+    "metricPicker": "Metrika grafu",
+    "chartA11y": "{{metric}} za deň",
+    "avgCostPerRequest": "Priem. cena / požiadavka",
+    "topModels": "Najpoužívanejšie modely",
+    "topFeatures": "Najpoužívanejšie funkcie",
+    "emptyTitle": "V tomto období žiadne využitie",
+    "orgSelfNotice": "Vidíte svoje vlastné využitie v tejto organizácii.",
+    "viewDetails": "Zobraziť podrobnosti o využití"
+  },
+  "integrations": {
+    "title": "Integrácie",
+    "sectionTitle": "Pripojené služby",
+    "entrySubtitle": "GitHub, Slack, Linear a ďalšie",
+    "subtitle": "Prepojte svoje vývojárske nástroje a pracovné postupy s Kilo",
+    "emptyHint": "Zatiaľ nie sú pripojené žiadne integrácie.",
+    "disconnect": "Odpojiť",
+    "disconnectTitle": "Odpojiť {{provider}}?",
+    "disconnectMessage": "Kilo prestane reagovať v službe {{provider}}. Kedykoľvek ju môžete znova pripojiť.",
+    "connectedTo": "Pripojené k účtu {{account}}",
+    "disconnected": "Služba {{provider}} bola odpojená",
+    "disconnectFailed": "Službu {{provider}} sa nepodarilo odpojiť",
+    "couldNotLoad": "Integrácie sa nepodarilo načítať",
+    "permissionDenied": "Nemáte oprávnenie spravovať tieto integrácie.",
+    "memberHint": "Požiadajte vlastníka alebo správcu organizácie, aby tieto pripojenia zmenil.",
+    "connectFailed": "Stránku pripojenia sa nepodarilo otvoriť"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Faktúry za vaše vlastné nákupy sa tu zobrazia po vyúčtovaní."
   },
   "cloudAgent": {
     "compute": {

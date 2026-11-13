@@ -22,6 +22,10 @@
     "expired": "Tamat tempoh"
   },
   "common": {
+    "manageOnWeb": "Urus di web",
+    "creditHistory": "Sejarah kredit",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Batal",
@@ -118,6 +122,7 @@
     "copyLink": "Salin pautan",
     "couldNotLoadOrganizations": "Tidak dapat memuatkan organisasi.",
     "couldNotLoadSessions": "Tidak dapat memuatkan sesi.",
+    "couldnTLoad": "Tidak dapat memuatkan.",
     "couldnTLoadMore": "Tidak dapat memuatkan lebih banyak item.",
     "deviceSessions": "Sesi peranti",
     "disabled": "Tidak aktif",
@@ -245,6 +250,10 @@
     "notAdded": "Anda telah log masuk. {{provider}} tidak ditambah pada akaun anda."
   },
   "profile": {
+    "creditHistorySubtitle": "Pembelian, resit dan aktiviti kredit",
+    "invoicesSubtitle": "Muat turun invois untuk pembelian anda",
+    "manageBilling": "Urus pengebilan di kilo.ai",
+    "manageBillingIosNote": "Kaedah pembayaran, tambah nilai automatik dan butiran pengebilan diuruskan di kilo.ai.",
     "codeReviewerSubtitle": "Semakan PR automatik",
     "securityAgentSubtitle": "Cari dan baiki kelemahan",
     "reviews": "Semakan",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Kunci pembekal",
       "rowSubtitle": "Gunakan pengebilan pembekal anda sendiri",
-      "manageOnWeb": "Urus di web",
       "manageOnWebReason": "Pembekal ini memerlukan kelayakan berstruktur.",
       "description": "Permintaan melalui kunci ini dibilkan kepada akaun pembekal anda dan bukannya baki Kilo anda.",
       "enabled": "Sedang digunakan",
@@ -2551,7 +2559,8 @@
       "cancelQueued": "Batalkan mesej",
       "cancelQueuedAccessibility": "Batalkan mesej dalam baris gilir",
       "restoreQueued": "Pulihkan",
-      "restoreQueuedAccessibility": "Pulihkan mesej yang dibatalkan ke ruang mesej"
+      "restoreQueuedAccessibility": "Pulihkan mesej yang dibatalkan ke ruang mesej",
+      "noReplyRecorded": "Tiada respons direkodkan untuk mesej ini."
     },
     "olderMessages": {
       "arrived": "Mesej terdahulu dimuatkan",
@@ -2944,6 +2953,26 @@
     "onlyFirstFilesAttached_other": "Hanya {{displayCount}} fail pertama akan dilampirkan."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Sejarah pengebilan",
+      "billingHistoryEmpty": "Belum ada sejarah pengebilan.",
+      "cancel": "Batalkan langganan",
+      "cancelDescription": "Kilo Pass anda kekal aktif sehingga akhir tempoh pengebilan dan tidak akan diperbaharui.",
+      "cancelScheduled": "Dibatalkan pada {{date}}",
+      "cancelScheduledChange": "Batalkan perubahan berjadual",
+      "cancelled": "Langganan dibatalkan",
+      "changePlan": "Tukar pelan di kilo.ai",
+      "changePlanIosNote": "Perubahan pelan berbayar tersedia di kilo.ai.",
+      "creditHistoryEmpty": "Belum ada kredit Kilo Pass.",
+      "manageInStore": "Urus di {{store}}",
+      "resume": "Sambung semula langganan",
+      "resumeCancelledDescription": "Kilo Pass anda akan mula diperbaharui secara automatik semula.",
+      "resumePausedDescription": "Kilo Pass anda disambung semula sekarang, sebelum tarikh sambung semula yang dijadualkan.",
+      "resumed": "Langganan disambung semula",
+      "scheduledChange": "Perubahan berjadual",
+      "scheduledChangeCancelDescription": "Kilo Pass anda kekal pada pelan semasa dan diperbaharui seperti biasa.",
+      "scheduledChangeSummary": "{{plan}} pada {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass tidak tersedia.",
     "couldNotLoad": "Kilo Pass tidak dapat dimuatkan. Cuba lagi.",
@@ -2998,6 +3027,11 @@
     "accountDescription": "ID akaun Kilo dan metadata permintaan anda digunakan untuk mengesahkan identiti anda dan mengukur penggunaan.",
     "diagnosticsTitle": "Diagnostik apl",
     "diagnosticsDescription": "Laporan ranap dan ralat tanpa kandungan apl digunakan untuk mengekalkan kestabilan apl.",
+    "featureFlagsTitle": "Pelancaran ciri",
+    "featureFlagsDescription": "E-mel akaun anda, digunakan oleh PostHog untuk menentukan ciri yang anda lihat.",
+    "featureFlagsWhat": "E-mel akaun anda.",
+    "featureFlagsWhy": "Untuk menentukan ciri yang anda lihat, termasuk ciri yang masih kami lancarkan secara berperingkat.",
+    "featureFlagsWho": "PostHog, perkhidmatan bendera ciri.",
     "helpImprove": "Bantu menambah baik Kilo",
     "helpImproveDescription": "Kongsi analitik produk tanpa nama dan sumber pemasangan. Anda boleh mengubahnya pada bila-bila masa dalam Tetapan.",
     "seeFullDetails": "Lihat butiran penuh",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "Konfigurasi diimport"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Aktiviti kredit tidak dapat dimuatkan.",
+      "appStoreReceipt": "Resit daripada App Store",
+      "deductionFallback": "Potongan kredit",
+      "emptyDescription": "Pembelian kredit, resit dan penggunaan akan dipaparkan di sini.",
+      "emptyTitle": "Tiada sejarah kredit",
+      "googlePlayReceipt": "Resit daripada Google Play",
+      "kind": {
+        "adjustment": "Pelarasan",
+        "balanceNeutral": "Neutral baki",
+        "deduction": "Potongan",
+        "grant": "Pemberian kredit",
+        "purchase": "Pembelian"
+      },
+      "purchaseFallback": "Pembelian kredit",
+      "receipt": "Resit",
+      "receiptA11y": "Buka resit untuk {{description}}",
+      "receiptUnavailable": "Resit tidak tersedia untuk pembelian ini."
+    },
     "title": "Beli kredit",
     "description": "Kredit ialah pembelian sekali sahaja yang ditambah pada baki Kilo anda untuk menjalankan sesi pengekodan AI dalam Apl Kilo. Kedai mengenakan caj pada akaun anda dan kredit ditambah selepas kedai mengesahkan pembayaran.",
     "nextExpiry": "Kredit sebanyak {{amount}} akan tamat tempoh pada {{date}} (UTC). Kredit yang paling awal tamat tempoh digunakan dahulu.",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Tidak dapat membuka hasil carian ini"
+  },
+  "usage": {
+    "title": "Penggunaan",
+    "orgTitle": "Penggunaan organisasi",
+    "entrySubtitle": "Perbelanjaan, permintaan dan token",
+    "rangePicker": "Julat masa",
+    "range90d": "90 hari",
+    "metricPicker": "Metrik carta",
+    "chartA11y": "{{metric}} sehari",
+    "avgCostPerRequest": "Purata kos / permintaan",
+    "topModels": "Model teratas",
+    "topFeatures": "Ciri teratas",
+    "emptyTitle": "Tiada penggunaan dalam tempoh ini",
+    "orgSelfNotice": "Anda sedang melihat penggunaan anda sendiri dalam organisasi ini.",
+    "viewDetails": "Lihat butiran penggunaan"
+  },
+  "integrations": {
+    "title": "Integrasi",
+    "sectionTitle": "Perkhidmatan yang disambungkan",
+    "entrySubtitle": "GitHub, Slack, Linear dan banyak lagi",
+    "subtitle": "Sambungkan alat dan aliran kerja pembangunan anda kepada Kilo",
+    "emptyHint": "Belum ada integrasi yang disambungkan.",
+    "disconnect": "Putuskan sambungan",
+    "disconnectTitle": "Putuskan sambungan {{provider}}?",
+    "disconnectMessage": "Kilo akan berhenti memberikan respons dalam {{provider}}. Anda boleh menyambung semula pada bila-bila masa.",
+    "connectedTo": "Disambungkan kepada {{account}}",
+    "disconnected": "Sambungan {{provider}} telah diputuskan",
+    "disconnectFailed": "Tidak dapat memutuskan sambungan {{provider}}",
+    "couldNotLoad": "Tidak dapat memuatkan integrasi",
+    "permissionDenied": "Anda tidak mempunyai kebenaran untuk mengurus integrasi ini.",
+    "memberHint": "Minta pemilik atau pentadbir organisasi untuk menukar sambungan ini.",
+    "connectFailed": "Tidak dapat membuka halaman sambungan"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Invois untuk pembelian anda sendiri akan dipaparkan di sini setelah anda dibilkan."
   },
   "cloudAgent": {
     "compute": {

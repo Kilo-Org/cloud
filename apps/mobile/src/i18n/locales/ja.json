@@ -22,6 +22,10 @@
     "expired": "期限切れ"
   },
   "common": {
+    "manageOnWeb": "Webで管理",
+    "creditHistory": "クレジット履歴",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": "。",
     "listJoiner": "、",
     "cancel": "キャンセル",
@@ -118,6 +122,7 @@
     "copyLink": "リンクをコピー",
     "couldNotLoadOrganizations": "組織を読み込めませんでした。",
     "couldNotLoadSessions": "セッションを読み込めませんでした。",
+    "couldnTLoad": "読み込めませんでした。",
     "couldnTLoadMore": "続きを読み込めませんでした。",
     "deviceSessions": "デバイスのセッション",
     "disabled": "無効",
@@ -245,6 +250,10 @@
     "notAdded": "サインインしました。{{provider}} はアカウントに追加されませんでした。"
   },
   "profile": {
+    "creditHistorySubtitle": "購入、領収書、クレジットのアクティビティ",
+    "invoicesSubtitle": "購入の請求書をダウンロード",
+    "manageBilling": "kilo.ai で支払いを管理",
+    "manageBillingIosNote": "支払い方法、自動チャージ、請求情報は kilo.ai で管理されます。",
     "codeReviewerSubtitle": "PRの自動レビュー",
     "securityAgentSubtitle": "脆弱性を検出して修正",
     "reviews": "レビュー",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "プロバイダーキー",
       "rowSubtitle": "自分のプロバイダーアカウントで課金",
-      "manageOnWeb": "Webで管理",
       "manageOnWebReason": "これらのプロバイダーには構造化された認証情報が必要です",
       "description": "これらのキーを使ったリクエストは、Kiloの残高ではなくプロバイダーのアカウントに請求されます。",
       "enabled": "使用中",
@@ -2009,7 +2017,8 @@
       "cancelQueued": "メッセージをキャンセル",
       "cancelQueuedAccessibility": "送信待ちのメッセージをキャンセル",
       "restoreQueued": "復元",
-      "restoreQueuedAccessibility": "キャンセルしたメッセージをメッセージ入力欄に復元"
+      "restoreQueuedAccessibility": "キャンセルしたメッセージをメッセージ入力欄に復元",
+      "noReplyRecorded": "このメッセージには応答が記録されていません。"
     },
     "olderMessages": {
       "arrived": "以前のメッセージを読み込みました",
@@ -2402,6 +2411,26 @@
     "onlyFirstFilesAttached_other": "最初の{{displayCount}}件のファイルのみが添付されます。"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "請求履歴",
+      "billingHistoryEmpty": "請求履歴はまだありません。",
+      "cancel": "サブスクリプションを解約",
+      "cancelDescription": "Kilo Pass は請求期間の終了まで有効で、その後は更新されません。",
+      "cancelScheduled": "{{date}} に解約予定",
+      "cancelScheduledChange": "予定された変更を取り消す",
+      "cancelled": "サブスクリプションを解約しました",
+      "changePlan": "kilo.ai でプランを変更",
+      "changePlanIosNote": "有料プランの変更は kilo.ai で行えます。",
+      "creditHistoryEmpty": "Kilo Pass のクレジットはまだありません。",
+      "manageInStore": "{{store}} で管理",
+      "resume": "サブスクリプションを再開",
+      "resumeCancelledDescription": "Kilo Pass の自動更新が再び有効になります。",
+      "resumePausedDescription": "Kilo Pass は予定の再開日を待たずに今すぐ再開されます。",
+      "resumed": "サブスクリプションを再開しました",
+      "scheduledChange": "予定された変更",
+      "scheduledChangeCancelDescription": "Kilo Pass は現在のプランのまま、これまでどおり更新されます。",
+      "scheduledChangeSummary": "{{date}} に {{plan}} へ変更"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Passを利用できません。",
     "couldNotLoad": "Kilo Passを読み込めませんでした。もう一度お試しください。",
@@ -2456,6 +2485,11 @@
     "accountDescription": "KiloのアカウントIDとリクエストのメタデータを、認証と利用量の計測に使用します。",
     "diagnosticsTitle": "アプリの診断情報",
     "diagnosticsDescription": "アプリ内のコンテンツを除いたクラッシュやエラーのレポートを、アプリの安定性を保つために使用します。",
+    "featureFlagsTitle": "機能の段階的な提供",
+    "featureFlagsDescription": "アカウントのメールアドレスを、PostHogがあなたに表示する機能を決めるために使用します。",
+    "featureFlagsWhat": "アカウントのメールアドレス。",
+    "featureFlagsWhy": "段階的に提供中の機能も含め、あなたに表示する機能を決めるため。",
+    "featureFlagsWho": "機能フラグサービスのPostHog。",
     "helpImprove": "Kiloの改善に協力",
     "helpImproveDescription": "匿名の利用状況データとインストール元の情報を共有します。この設定はいつでも変更できます。",
     "seeFullDetails": "詳細を表示",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "Configをインポートしました"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "クレジットアクティビティを読み込めませんでした。",
+      "appStoreReceipt": "領収書は App Store にあります",
+      "deductionFallback": "クレジットの差し引き",
+      "emptyDescription": "クレジットの購入、領収書、使用状況がここに表示されます。",
+      "emptyTitle": "クレジット履歴はありません",
+      "googlePlayReceipt": "領収書は Google Play にあります",
+      "kind": {
+        "adjustment": "調整",
+        "balanceNeutral": "残高変動なし",
+        "deduction": "差し引き",
+        "grant": "クレジット付与",
+        "purchase": "購入"
+      },
+      "purchaseFallback": "クレジットの購入",
+      "receipt": "領収書",
+      "receiptA11y": "{{description}} の領収書を開く",
+      "receiptUnavailable": "この購入の領収書はありません。"
+    },
     "title": "クレジットを購入",
     "description": "クレジットは、Kilo AppでAIコーディングセッションを実行するためにKilo残高に追加される買い切りの購入です。ストアがアカウントに請求し、ストアが支払いを確認した後にクレジットが追加されます。",
     "nextExpiry": "{{amount}}のクレジットが{{date}}（UTC）に失効します。有効期限が早いクレジットから先に使用されます。",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "この検索結果を開けませんでした"
+  },
+  "usage": {
+    "title": "使用状況",
+    "orgTitle": "組織の使用状況",
+    "entrySubtitle": "コスト、リクエスト、トークン",
+    "rangePicker": "期間",
+    "range90d": "90日間",
+    "metricPicker": "グラフの指標",
+    "chartA11y": "1日あたりの{{metric}}",
+    "avgCostPerRequest": "平均コスト/リクエスト",
+    "topModels": "上位のモデル",
+    "topFeatures": "上位の機能",
+    "emptyTitle": "この期間の使用はありません",
+    "orgSelfNotice": "この組織でのあなた自身の使用状況を表示しています。",
+    "viewDetails": "使用状況の詳細を表示"
+  },
+  "integrations": {
+    "title": "連携",
+    "sectionTitle": "接続済みのサービス",
+    "entrySubtitle": "GitHub、Slack、Linear など",
+    "subtitle": "開発ツールやワークフローを Kilo に接続します",
+    "emptyHint": "接続済みの連携はまだありません。",
+    "disconnect": "接続を解除",
+    "disconnectTitle": "{{provider}} の接続を解除しますか？",
+    "disconnectMessage": "Kilo は {{provider}} で応答しなくなります。いつでも再接続できます。",
+    "connectedTo": "{{account}} に接続済み",
+    "disconnected": "{{provider}} の接続を解除しました",
+    "disconnectFailed": "{{provider}} の接続を解除できませんでした",
+    "couldNotLoad": "連携を読み込めませんでした",
+    "permissionDenied": "これらの連携を管理する権限がありません。",
+    "memberHint": "これらの接続を変更するには、組織のオーナーまたは管理者に依頼してください。",
+    "connectFailed": "接続ページを開けませんでした"
+  },
+  "invoices": {
+    "personalEmptyDescription": "ご自身の購入に対する請求書は、請求が発生するとここに表示されます。"
   },
   "cloudAgent": {
     "compute": {

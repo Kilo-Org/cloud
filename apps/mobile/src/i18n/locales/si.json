@@ -22,6 +22,10 @@
     "expired": "කල් ඉකුත් වී ඇත"
   },
   "common": {
+    "manageOnWeb": "වෙබයේ කළමනාකරණය කරන්න",
+    "creditHistory": "ක්‍රෙඩිට් ඉතිහාසය",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "අවලංගු කරන්න",
@@ -118,6 +122,7 @@
     "copyLink": "සබැඳිය පිටපත් කරන්න",
     "couldNotLoadOrganizations": "සංවිධාන පූරණය කළ නොහැකි විය.",
     "couldNotLoadSessions": "සැසි පූරණය කළ නොහැකි විය.",
+    "couldnTLoad": "පූරණය කළ නොහැකි විය.",
     "couldnTLoadMore": "තවත් පූරණය කළ නොහැකි විය.",
     "deviceSessions": "උපාංග සැසි",
     "disabled": "අක්‍රීයයි",
@@ -245,6 +250,10 @@
     "notAdded": "ඔබ පිවිස ඇත. {{provider}} ඔබේ ගිණුමට එක් නොකෙරිණි."
   },
   "profile": {
+    "creditHistorySubtitle": "මිලදී ගැනීම්, රිසිට්පත් සහ ක්‍රෙඩිට් ක්‍රියාකාරකම්",
+    "invoicesSubtitle": "ඔබේ මිලදී ගැනීම් සඳහා ඉන්වොයිස් බාගන්න",
+    "manageBilling": "kilo.ai හි බිල්පත් කළමනාකරණය කරන්න",
+    "manageBillingIosNote": "ගෙවීම් ක්‍රම, ස්වයංක්‍රීය ටොප්-අප් සහ බිල්පත් විස්තර kilo.ai හි කළමනාකරණය කෙරේ.",
     "codeReviewerSubtitle": "ස්වයංක්‍රීය PR සමාලෝචන",
     "securityAgentSubtitle": "ආරක්ෂක දුර්වලතා සොයා පිළියම් යොදන්න",
     "reviews": "සමාලෝචන",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "සපයන්නාගේ යතුරු",
       "rowSubtitle": "ඔබේම සපයන්නාගේ බිල්පත් ක්‍රමය භාවිත කරන්න",
-      "manageOnWeb": "වෙබයේ කළමනාකරණය කරන්න",
       "manageOnWebReason": "මෙම සපයන්නන්ට ව්‍යුහගත අක්තපත්‍ර අවශ්‍ය වේ.",
       "description": "මෙම යතුරු හරහා යන ඉල්ලීම් ඔබේ Kilo ශේෂය වෙනුවට ඔබේ සපයන්නාගේ ගිණුමට බිල් කෙරේ.",
       "enabled": "භාවිතයේ ඇත",
@@ -2551,7 +2559,8 @@
       "cancelQueued": "පණිවිඩය අවලංගු කරන්න",
       "cancelQueuedAccessibility": "පෝලිමේ ඇති පණිවිඩය අවලංගු කරන්න",
       "restoreQueued": "යළි ගෙන එන්න",
-      "restoreQueuedAccessibility": "අවලංගු කළ පණිවිඩය පණිවිඩ කොටුවට යළි ගෙන එන්න"
+      "restoreQueuedAccessibility": "අවලංගු කළ පණිවිඩය පණිවිඩ කොටුවට යළි ගෙන එන්න",
+      "noReplyRecorded": "මෙම පණිවිඩය සඳහා ප්‍රතිචාරයක් සටහන් වී නොමැත."
     },
     "olderMessages": {
       "arrived": "පෙර පණිවිඩ පූරණය විය",
@@ -2944,6 +2953,26 @@
     "onlyFirstFilesAttached_other": "පළමු ගොනු {{displayCount}} ක් පමණක් අමුණනු ඇත."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "බිල්පත් ඉතිහාසය",
+      "billingHistoryEmpty": "තවම බිල්පත් ඉතිහාසයක් නැත.",
+      "cancel": "දායකත්වය අවලංගු කරන්න",
+      "cancelDescription": "ඔබේ Kilo Pass බිල්පත් කාලපරිච්ඡේදය අවසන් වන තෙක් සක්‍රියව පවතින අතර නැවත අලුත් නොකෙරේ.",
+      "cancelScheduled": "{{date}} දින අවලංගු වේ",
+      "cancelScheduledChange": "සැලසුම් කළ වෙනස අවලංගු කරන්න",
+      "cancelled": "දායකත්වය අවලංගු කරන ලදී",
+      "changePlan": "kilo.ai හි සැලැස්ම වෙනස් කරන්න",
+      "changePlanIosNote": "ගෙවන සැලසුම් වෙනස් කිරීම් kilo.ai හි ලබා ගත හැක.",
+      "creditHistoryEmpty": "තවම Kilo Pass ක්‍රෙඩිට් නැත.",
+      "manageInStore": "{{store}} හි කළමනාකරණය කරන්න",
+      "resume": "දායකත්වය නැවත අරඹන්න",
+      "resumeCancelledDescription": "ඔබේ Kilo Pass නැවතත් ස්වයංක්‍රීයව අලුත් වීමට පටන් ගනී.",
+      "resumePausedDescription": "ඔබේ Kilo Pass එහි නියමිත නැවත ආරම්භ දිනයට පෙර, දැන්ම නැවත ආරම්භ වේ.",
+      "resumed": "දායකත්වය නැවත ආරම්භ විය",
+      "scheduledChange": "සැලසුම් කළ වෙනස",
+      "scheduledChangeCancelDescription": "ඔබේ Kilo Pass එහි වත්මන් සැලැස්මේම පවතින අතර දැනට මෙන්ම අලුත් වේ.",
+      "scheduledChangeSummary": "{{date}} දින {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass ලබාගත නොහැක.",
     "couldNotLoad": "Kilo Pass පූරණය කළ නොහැකි විය. නැවත උත්සාහ කරන්න.",
@@ -2998,6 +3027,11 @@
     "accountDescription": "ඔබව සත්‍යාපනය කිරීමට සහ භාවිතය මැනීමට ඔබේ Kilo ගිණුම් හැඳුනුම සහ ඉල්ලීම් පාරදත්ත භාවිත කරයි.",
     "diagnosticsTitle": "යෙදුමේ දෝෂ හඳුනාගැනීම",
     "diagnosticsDescription": "යෙදුම ස්ථාවරව තබා ගැනීමට බිඳවැටීම් සහ දෝෂ වාර්තා භාවිත කරයි. ඒවායින් යෙදුමේ අන්තර්ගතය ඉවත් කර ඇත.",
+    "featureFlagsTitle": "විශේෂාංග නිකුත් කිරීම",
+    "featureFlagsDescription": "ඔබේ ගිණුම් ඊමේල් ලිපිනය, ඔබට පෙනෙන විශේෂාංග මොනවාදැයි තීරණය කිරීමට PostHog භාවිත කරයි.",
+    "featureFlagsWhat": "ඔබේ ගිණුම් ඊමේල් ලිපිනය.",
+    "featureFlagsWhy": "ඔබට පෙනෙන විශේෂාංග මොනවාදැයි තීරණය කිරීමට, අප තවමත් ක්‍රමයෙන් නිකුත් කරමින් සිටින ඒවා ද ඇතුළුව.",
+    "featureFlagsWho": "PostHog, විශේෂාංග ධජ සේවාව.",
     "helpImprove": "Kilo වැඩිදියුණු කිරීමට උදව් කරන්න",
     "helpImproveDescription": "යෙදුම භාවිත කරන ආකාරය පිළිබඳ නිර්නාමික දත්ත සහ ස්ථාපන මූලාශ්‍රය බෙදාගන්න. සැකසුම් වෙතින් මෙය ඕනෑම වේලාවක වෙනස් කළ හැක.",
     "seeFullDetails": "සම්පූර්ණ විස්තර බලන්න",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "Config ආයාත කරන ලදි"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "ක්‍රෙඩිට් ක්‍රියාකාරකම් පූරණය කළ නොහැක.",
+      "appStoreReceipt": "App Store වෙතින් ලැබුණු රිසිට්පත",
+      "deductionFallback": "ක්‍රෙඩිට් අඩු කිරීම",
+      "emptyDescription": "ක්‍රෙඩිට් මිලදී ගැනීම්, රිසිට්පත් සහ භාවිතය මෙහි දිස් වේ.",
+      "emptyTitle": "ක්‍රෙඩිට් ඉතිහාසයක් නැත",
+      "googlePlayReceipt": "Google Play වෙතින් ලැබුණු රිසිට්පත",
+      "kind": {
+        "adjustment": "ගැලපීම",
+        "balanceNeutral": "ශේෂයට බලපෑමක් නැත",
+        "deduction": "අඩු කිරීම",
+        "grant": "ක්‍රෙඩිට් ප්‍රදානය",
+        "purchase": "මිලදී ගැනීම"
+      },
+      "purchaseFallback": "ක්‍රෙඩිට් මිලදී ගැනීම",
+      "receipt": "රිසිට්පත",
+      "receiptA11y": "{{description}} සඳහා රිසිට්පත විවෘත කරන්න",
+      "receiptUnavailable": "මෙම මිලදී ගැනීම සඳහා රිසිට්පතක් නොමැත."
+    },
     "title": "ක්‍රෙඩිට් මිලදී ගන්න",
     "description": "ක්‍රෙඩිට් යනු Kilo App හි AI කේතීකරණ සැසි ක්‍රියාත්මක කිරීම සඳහා ඔබේ Kilo ශේෂයට එක් කරන එක්-වරක් මිලදී ගැනීමකි. ගබඩාව ඔබේ ගිණුමෙන් අය කරන අතර ගබඩාව ගෙවීම තහවුරු කිරීමෙන් පසු ක්‍රෙඩිට් එක් කෙරේ.",
     "nextExpiry": "{{amount}} ක ක්‍රෙඩිට් {{date}} (UTC) දින කල් ඉකුත් වේ. ඉක්මනින්ම කල් ඉකුත් වන ක්‍රෙඩිට් පළමුව භාවිත කෙරේ.",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "මෙම සෙවුම් ප්‍රතිඵලය විවෘත කිරීමට නොහැකි විය"
+  },
+  "usage": {
+    "title": "භාවිතය",
+    "orgTitle": "සංවිධාන භාවිතය",
+    "entrySubtitle": "වියදම, ඉල්ලීම් සහ ටෝකන",
+    "rangePicker": "කාල පරාසය",
+    "range90d": "දින 90",
+    "metricPicker": "ප්‍රස්ථාර මිනුම",
+    "chartA11y": "දිනකට {{metric}}",
+    "avgCostPerRequest": "සාමාන්‍ය පිරිවැය / ඉල්ලීම",
+    "topModels": "ප්‍රමුඛ ආකෘති",
+    "topFeatures": "ප්‍රමුඛ විශේෂාංග",
+    "emptyTitle": "මෙම කාලය තුළ භාවිතයක් නැත",
+    "orgSelfNotice": "ඔබ දකින්නේ මෙම සංවිධානයේ ඔබගේම භාවිතයයි.",
+    "viewDetails": "භාවිත විස්තර බලන්න"
+  },
+  "integrations": {
+    "title": "ඒකාබද්ධ කිරීම්",
+    "sectionTitle": "සම්බන්ධිත සේවා",
+    "entrySubtitle": "GitHub, Slack, Linear සහ තවත් බොහෝ දේ",
+    "subtitle": "ඔබේ සංවර්ධන මෙවලම් සහ කාර්ය ප්‍රවාහ Kilo වෙත සම්බන්ධ කරන්න",
+    "emptyHint": "තවම කිසිදු ඒකාබද්ධ කිරීමක් සම්බන්ධ කර නැත.",
+    "disconnect": "විසන්ධි කරන්න",
+    "disconnectTitle": "{{provider}} විසන්ධි කරන්නද?",
+    "disconnectMessage": "Kilo {{provider}} තුළ ප්‍රතිචාර දැක්වීම නවත්වනු ඇත. ඔබට ඕනෑම වේලාවක නැවත සම්බන්ධ විය හැක.",
+    "connectedTo": "{{account}} වෙත සම්බන්ධිතයි",
+    "disconnected": "{{provider}} විසන්ධි කරන ලදී",
+    "disconnectFailed": "{{provider}} විසන්ධි කළ නොහැකි විය",
+    "couldNotLoad": "ඒකාබද්ධ කිරීම් පූරණය කළ නොහැකි විය",
+    "permissionDenied": "මෙම ඒකාබද්ධ කිරීම් කළමනාකරණය කිරීමට ඔබට අවසර නැත.",
+    "memberHint": "මෙම සම්බන්ධතා වෙනස් කිරීමට සංවිධානයේ හිමිකරුවෙකුගෙන් හෝ පරිපාලකවරයෙකුගෙන් ඉල්ලා සිටින්න.",
+    "connectFailed": "සම්බන්ධතා පිටුව විවෘත කළ නොහැකි විය"
+  },
+  "invoices": {
+    "personalEmptyDescription": "ඔබෙන් බිල්පත් අය කළ පසු, ඔබේම මිලදී ගැනීම් සඳහා ඉන්වොයිස් මෙහි දිස් වේ."
   },
   "cloudAgent": {
     "compute": {

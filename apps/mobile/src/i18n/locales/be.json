@@ -22,6 +22,10 @@
     "expired": "Тэрмін дзеяння скончыўся"
   },
   "common": {
+    "manageOnWeb": "Кіраваць у вэб-версіі",
+    "creditHistory": "Гісторыя крэдытаў",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Адмяніць",
@@ -118,6 +122,7 @@
     "copyLink": "Скапіяваць спасылку",
     "couldNotLoadOrganizations": "Не атрымалася загрузіць арганізацыі.",
     "couldNotLoadSessions": "Не атрымалася загрузіць сеансы.",
+    "couldnTLoad": "Не атрымалася загрузіць.",
     "couldnTLoadMore": "Не атрымалася загрузіць наступныя запісы.",
     "deviceSessions": "Сеансы на прыладах",
     "disabled": "Адключана",
@@ -245,6 +250,10 @@
     "notAdded": "Вы ўвайшлі. {{provider}} не дададзены да вашага ўліковага запісу."
   },
   "profile": {
+    "creditHistorySubtitle": "Пакупкі, чэкі і аперацыі з крэдытамі",
+    "invoicesSubtitle": "Спампуйце рахункі за свае пакупкі",
+    "manageBilling": "Кіраваць аплатай на kilo.ai",
+    "manageBillingIosNote": "Спосабамі аплаты, аўтапапаўненнем і плацёжнымі данымі можна кіраваць на kilo.ai.",
     "codeReviewerSubtitle": "Аўтаматычныя праверкі PR",
     "securityAgentSubtitle": "Знаходзіць і ліквідаваць уразлівасці",
     "reviews": "Праверкі кода",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Ключы пастаўшчыкоў",
       "rowSubtitle": "Аплата праз уласны ўліковы запіс пастаўшчыка",
-      "manageOnWeb": "Кіраваць у вэб-версіі",
       "manageOnWebReason": "Гэтым пастаўшчыкам патрэбныя структураваныя ўліковыя даныя.",
       "description": "Запыты з гэтымі ключамі аплачваюцца праз ваш уліковы запіс пастаўшчыка, а не з балансу Kilo.",
       "enabled": "Выкарыстоўваецца",
@@ -2641,7 +2649,8 @@
       "cancelQueued": "Адмяніць паведамленне",
       "cancelQueuedAccessibility": "Адмяніць паведамленне ў чарзе",
       "restoreQueued": "Аднавіць",
-      "restoreQueuedAccessibility": "Вярнуць адмененае паведамленне ў поле ўводу"
+      "restoreQueuedAccessibility": "Вярнуць адмененае паведамленне ў поле ўводу",
+      "noReplyRecorded": "Для гэтага паведамлення адказ не запісаны."
     },
     "olderMessages": {
       "arrived": "Ранейшыя паведамленні загружаныя",
@@ -3050,6 +3059,26 @@
     "onlyFirstFilesAttached_many": "Будуць далучаны толькі першыя файлы ў колькасці {{displayCount}}."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Гісторыя плацяжоў",
+      "billingHistoryEmpty": "Гісторыі плацяжоў пакуль няма.",
+      "cancel": "Скасаваць падпіску",
+      "cancelDescription": "Kilo Pass застанецца актыўным да канца плацёжнага перыяду і не будзе падоўжаны.",
+      "cancelScheduled": "Будзе скасавана {{date}}",
+      "cancelScheduledChange": "Скасаваць запланаваную змену",
+      "cancelled": "Падпіска скасавана",
+      "changePlan": "Змяніць тарыф на kilo.ai",
+      "changePlanIosNote": "Змяніць платны тарыф можна на kilo.ai.",
+      "creditHistoryEmpty": "Крэдытаў Kilo Pass пакуль няма.",
+      "manageInStore": "Кіраваць у {{store}}",
+      "resume": "Аднавіць падпіску",
+      "resumeCancelledDescription": "Kilo Pass зноў будзе падаўжацца аўтаматычна.",
+      "resumePausedDescription": "Kilo Pass адновіцца зараз, раней за запланаваную дату аднаўлення.",
+      "resumed": "Падпіска адноўлена",
+      "scheduledChange": "Запланаваная змена",
+      "scheduledChangeCancelDescription": "Kilo Pass застанецца на бягучым тарыфе і будзе падаўжацца, як і цяпер.",
+      "scheduledChangeSummary": "{{plan}} з {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass недаступны.",
     "couldNotLoad": "Не атрымалася загрузіць Kilo Pass. Паспрабуйце яшчэ раз.",
@@ -3104,6 +3133,11 @@
     "accountDescription": "Ідэнтыфікатар вашага ўліковага запісу Kilo і метаданыя запытаў для аўтэнтыфікацыі і ўліку выкарыстання.",
     "diagnosticsTitle": "Дыягностыка праграмы",
     "diagnosticsDescription": "Справаздачы аб збоях і памылках без змесціва праграмы, якія дапамагаюць забяспечваць яе стабільную працу.",
+    "featureFlagsTitle": "Паступовае ўкараненне функцый",
+    "featureFlagsDescription": "Электронная пошта вашага ўліковага запісу, з дапамогай якой PostHog вызначае, якія функцыі вы бачыце.",
+    "featureFlagsWhat": "Электронная пошта вашага ўліковага запісу.",
+    "featureFlagsWhy": "Каб вызначаць, якія функцыі вы бачыце, у тым ліку тыя, што мы яшчэ паступова ўкараняем.",
+    "featureFlagsWho": "PostHog, сэрвіс сцягоў функцый.",
     "helpImprove": "Дапамагчы палепшыць Kilo",
     "helpImproveDescription": "Дазвольце перадаваць ананімныя даныя аб выкарыстанні праграмы і крыніцы яе ўсталявання. Вы можаце змяніць гэта ў любы час у наладах.",
     "seeFullDetails": "Паказаць усе падрабязнасці",
@@ -4075,6 +4109,25 @@
     "importConfigApplied": "Config імпартаваны"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Не ўдалося загрузіць крэдытную актыўнасць.",
+      "appStoreReceipt": "Чэк у App Store",
+      "deductionFallback": "Спісанне крэдытаў",
+      "emptyDescription": "Тут будуць адлюстроўвацца пакупкі крэдытаў, чэкі і выкарыстанне.",
+      "emptyTitle": "Гісторыі крэдытаў няма",
+      "googlePlayReceipt": "Чэк у Google Play",
+      "kind": {
+        "adjustment": "Карэкціроўка",
+        "balanceNeutral": "Без змены балансу",
+        "deduction": "Спісанне",
+        "grant": "Начысленне крэдытаў",
+        "purchase": "Пакупка"
+      },
+      "purchaseFallback": "Пакупка крэдытаў",
+      "receipt": "Чэк",
+      "receiptA11y": "Адкрыць чэк: {{description}}",
+      "receiptUnavailable": "Чэк для гэтай пакупкі недаступны."
+    },
     "title": "Купіць крэдыты",
     "description": "Крэдыты — гэта аднаразовая пакупка, якая дадаецца на ваш баланс Kilo для запуску AI-сеансаў праграмавання ў дадатку Kilo. Крама спісвае сродкі з вашага рахунку, і крэдыты дадаюцца пасля пацверджання аплаты крамай.",
     "nextExpiry": "Тэрмін дзеяння крэдытаў на суму {{amount}} скончыцца {{date}} (UTC). Спачатку выкарыстоўваюцца крэдыты з самым раннім тэрмінам дзеяння.",
@@ -4264,6 +4317,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Не атрымалася адкрыць гэты вынік пошуку"
+  },
+  "usage": {
+    "title": "Выкарыстанне",
+    "orgTitle": "Выкарыстанне арганізацыі",
+    "entrySubtitle": "Выдаткі, запыты і токены",
+    "rangePicker": "Перыяд",
+    "range90d": "90 дзён",
+    "metricPicker": "Паказчык графіка",
+    "chartA11y": "{{metric}} за дзень",
+    "avgCostPerRequest": "Сяр. кошт / запыт",
+    "topModels": "Топ мадэляў",
+    "topFeatures": "Топ функцый",
+    "emptyTitle": "Няма выкарыстання за гэты перыяд",
+    "orgSelfNotice": "Вы бачыце ўласнае выкарыстанне ў гэтай арганізацыі.",
+    "viewDetails": "Падрабязнасці выкарыстання"
+  },
+  "integrations": {
+    "title": "Інтэграцыі",
+    "sectionTitle": "Падключаныя сэрвісы",
+    "entrySubtitle": "GitHub, Slack, Linear і іншыя",
+    "subtitle": "Падключыце свае інструменты распрацоўкі і працоўныя працэсы да Kilo",
+    "emptyHint": "Пакуль няма падключаных інтэграцый.",
+    "disconnect": "Адключыць",
+    "disconnectTitle": "Адключыць {{provider}}?",
+    "disconnectMessage": "Kilo перастане адказваць у {{provider}}. Падключыцца зноў можна ў любы час.",
+    "connectedTo": "Падключана да {{account}}",
+    "disconnected": "Адключана: {{provider}}",
+    "disconnectFailed": "Не ўдалося адключыць {{provider}}",
+    "couldNotLoad": "Не ўдалося загрузіць інтэграцыі",
+    "permissionDenied": "У вас няма правоў на кіраванне гэтымі інтэграцыямі.",
+    "memberHint": "Папрасіце ўладальніка або адміністратара арганізацыі змяніць гэтыя падключэнні.",
+    "connectFailed": "Не ўдалося адкрыць старонку падключэння"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Рахункі за вашы асабістыя пакупкі з'явяцца тут пасля першага спісання аплаты."
   },
   "cloudAgent": {
     "compute": {

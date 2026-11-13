@@ -22,6 +22,10 @@
     "expired": "Verlopen"
   },
   "common": {
+    "manageOnWeb": "Beheren op het web",
+    "creditHistory": "Tegoedgeschiedenis",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Annuleren",
@@ -118,6 +122,7 @@
     "copyLink": "Link kopiëren",
     "couldNotLoadOrganizations": "De organisaties konden niet worden geladen.",
     "couldNotLoadSessions": "De sessies konden niet worden geladen.",
+    "couldnTLoad": "Laden is mislukt.",
     "couldnTLoadMore": "Meer laden is mislukt.",
     "deviceSessions": "Apparaatsessies",
     "disabled": "Uitgeschakeld",
@@ -245,6 +250,10 @@
     "notAdded": "Je bent aangemeld. {{provider}} is niet aan je account toegevoegd."
   },
   "profile": {
+    "creditHistorySubtitle": "Aankopen, bonnen en tegoedactiviteit",
+    "invoicesSubtitle": "Download facturen voor je aankopen",
+    "manageBilling": "Facturering beheren op kilo.ai",
+    "manageBillingIosNote": "Betaalmethoden, automatisch opwaarderen en factuurgegevens worden beheerd op kilo.ai.",
     "codeReviewerSubtitle": "Automatische PR-beoordelingen",
     "securityAgentSubtitle": "Kwetsbaarheden vinden en verhelpen",
     "reviews": "Beoordelingen",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Providersleutels",
       "rowSubtitle": "Facturering via je eigen provider",
-      "manageOnWeb": "Beheren op het web",
       "manageOnWebReason": "Deze providers hebben gestructureerde inloggegevens nodig.",
       "description": "Verzoeken via deze sleutels worden gefactureerd aan je provideraccount in plaats van afgeschreven van je Kilo-saldo.",
       "enabled": "In gebruik",
@@ -2009,7 +2017,8 @@
       "cancelQueued": "Bericht annuleren",
       "cancelQueuedAccessibility": "Bericht in de wachtrij annuleren",
       "restoreQueued": "Herstellen",
-      "restoreQueuedAccessibility": "Geannuleerd bericht terugzetten in het berichtveld"
+      "restoreQueuedAccessibility": "Geannuleerd bericht terugzetten in het berichtveld",
+      "noReplyRecorded": "Er is geen antwoord geregistreerd voor dit bericht."
     },
     "olderMessages": {
       "arrived": "Eerdere berichten geladen",
@@ -2402,6 +2411,26 @@
     "onlyFirstFilesAttached_other": "Alleen de eerste {{displayCount}} bestanden worden bijgevoegd."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Factuurgeschiedenis",
+      "billingHistoryEmpty": "Nog geen factuurgeschiedenis.",
+      "cancel": "Abonnement opzeggen",
+      "cancelDescription": "Je Kilo Pass blijft actief tot het einde van de factuurperiode en wordt niet verlengd.",
+      "cancelScheduled": "Eindigt op {{date}}",
+      "cancelScheduledChange": "Geplande wijziging annuleren",
+      "cancelled": "Abonnement opgezegd",
+      "changePlan": "Abonnement wijzigen op kilo.ai",
+      "changePlanIosNote": "Betaalde abonnementswijzigingen zijn beschikbaar op kilo.ai.",
+      "creditHistoryEmpty": "Nog geen Kilo Pass-tegoed.",
+      "manageInStore": "Beheren in {{store}}",
+      "resume": "Abonnement hervatten",
+      "resumeCancelledDescription": "Je Kilo Pass wordt weer automatisch verlengd.",
+      "resumePausedDescription": "Je Kilo Pass wordt nu hervat, vóór de geplande hervattingsdatum.",
+      "resumed": "Abonnement hervat",
+      "scheduledChange": "Geplande wijziging",
+      "scheduledChangeCancelDescription": "Je Kilo Pass blijft op het huidige abonnement en wordt verlengd zoals nu.",
+      "scheduledChangeSummary": "{{plan}} op {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass is niet beschikbaar.",
     "couldNotLoad": "Kilo Pass kon niet worden geladen. Probeer het opnieuw.",
@@ -2456,6 +2485,11 @@
     "accountDescription": "Je Kilo-account-ID en metadata van verzoeken om je identiteit te controleren en het gebruik te meten.",
     "diagnosticsTitle": "Diagnostische appgegevens",
     "diagnosticsDescription": "Crash- en foutrapporten zonder app-inhoud om de app stabiel te houden.",
+    "featureFlagsTitle": "Uitrol van functies",
+    "featureFlagsDescription": "Het e-mailadres van je account, dat PostHog gebruikt om te bepalen welke functies je ziet.",
+    "featureFlagsWhat": "Het e-mailadres van je account.",
+    "featureFlagsWhy": "Bepalen welke functies je ziet, ook functies die we nog aan het uitrollen zijn.",
+    "featureFlagsWho": "PostHog, de dienst voor feature flags.",
     "helpImprove": "Kilo helpen verbeteren",
     "helpImproveDescription": "Deel anonieme gebruiksstatistieken en de installatiebron. Je kunt dit op elk moment wijzigen in de instellingen.",
     "seeFullDetails": "Volledige details bekijken",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "Config geïmporteerd"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Kan tegoedactiviteit niet laden.",
+      "appStoreReceipt": "Bon in de App Store",
+      "deductionFallback": "Tegoedafschrijving",
+      "emptyDescription": "Tegoedaankopen, bonnen en verbruik verschijnen hier.",
+      "emptyTitle": "Geen tegoedgeschiedenis",
+      "googlePlayReceipt": "Bon in Google Play",
+      "kind": {
+        "adjustment": "Correctie",
+        "balanceNeutral": "Saldoneutraal",
+        "deduction": "Afschrijving",
+        "grant": "Tegoedtoekenning",
+        "purchase": "Aankoop"
+      },
+      "purchaseFallback": "Tegoedaankoop",
+      "receipt": "Bon",
+      "receiptA11y": "Open de bon voor {{description}}",
+      "receiptUnavailable": "Er is geen bon beschikbaar voor deze aankoop."
+    },
     "title": "Credits kopen",
     "description": "Credits zijn een eenmalige aankoop die aan je Kilo-saldo wordt toegevoegd voor AI-coderingssessies in Kilo App. De store belast je account en de credits worden toegevoegd nadat de store de betaling bevestigt.",
     "nextExpiry": "{{amount}} aan credits verloopt op {{date}} (UTC). Credits die het eerst verlopen, worden eerst gebruikt.",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Dit zoekresultaat kon niet worden geopend"
+  },
+  "usage": {
+    "title": "Gebruik",
+    "orgTitle": "Organisatiegebruik",
+    "entrySubtitle": "Kosten, verzoeken en tokens",
+    "rangePicker": "Periode",
+    "range90d": "90 dagen",
+    "metricPicker": "Grafiekwaarde",
+    "chartA11y": "{{metric}} per dag",
+    "avgCostPerRequest": "Gem. kosten / verzoek",
+    "topModels": "Topmodellen",
+    "topFeatures": "Topfuncties",
+    "emptyTitle": "Geen gebruik in deze periode",
+    "orgSelfNotice": "Je ziet je eigen gebruik in deze organisatie.",
+    "viewDetails": "Gebruiksdetails bekijken"
+  },
+  "integrations": {
+    "title": "Integraties",
+    "sectionTitle": "Gekoppelde services",
+    "entrySubtitle": "GitHub, Slack, Linear en meer",
+    "subtitle": "Koppel je ontwikkeltools en workflows aan Kilo",
+    "emptyHint": "Nog geen integraties gekoppeld.",
+    "disconnect": "Ontkoppelen",
+    "disconnectTitle": "{{provider}} ontkoppelen?",
+    "disconnectMessage": "Kilo reageert niet meer in {{provider}}. Je kunt op elk moment opnieuw koppelen.",
+    "connectedTo": "Gekoppeld aan {{account}}",
+    "disconnected": "{{provider}} ontkoppeld",
+    "disconnectFailed": "Kan {{provider}} niet ontkoppelen",
+    "couldNotLoad": "Kan integraties niet laden",
+    "permissionDenied": "Je hebt geen toestemming om deze integraties te beheren.",
+    "memberHint": "Vraag een eigenaar of beheerder van de organisatie om deze koppelingen te wijzigen.",
+    "connectFailed": "Kan de koppelingspagina niet openen"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Facturen voor je eigen aankopen verschijnen hier zodra je wordt gefactureerd."
   },
   "cloudAgent": {
     "compute": {

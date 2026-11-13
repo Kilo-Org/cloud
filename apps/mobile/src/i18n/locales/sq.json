@@ -22,6 +22,10 @@
     "expired": "Skaduar"
   },
   "common": {
+    "manageOnWeb": "Menaxho në ueb",
+    "creditHistory": "Historiku i kredive",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Anulo",
@@ -118,6 +122,7 @@
     "copyLink": "Kopjo lidhjen",
     "couldNotLoadOrganizations": "Organizatat nuk u ngarkuan.",
     "couldNotLoadSessions": "Sesionet nuk u ngarkuan.",
+    "couldnTLoad": "Nuk u ngarkuan të dhënat.",
     "couldnTLoadMore": "Nuk u ngarkuan më shumë të dhëna.",
     "deviceSessions": "Sesionet në pajisje",
     "disabled": "Çaktivizuar",
@@ -245,6 +250,10 @@
     "notAdded": "Ke hyrë. {{provider}} nuk u shtua në llogarinë tënde."
   },
   "profile": {
+    "creditHistorySubtitle": "Blerjet, dëftesat dhe aktiviteti i kredive",
+    "invoicesSubtitle": "Shkarko faturat për blerjet e tua",
+    "manageBilling": "Menaxho faturimin në kilo.ai",
+    "manageBillingIosNote": "Metodat e pagesës, rimbushja automatike dhe detajet e faturimit menaxhohen në kilo.ai.",
     "codeReviewerSubtitle": "Rishikime automatike të PR",
     "securityAgentSubtitle": "Gjej dhe korrigjo cenueshmëritë",
     "reviews": "Rishikimet",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Çelësat e ofruesve",
       "rowSubtitle": "Përdor faturimin e ofruesit tënd",
-      "manageOnWeb": "Menaxho në ueb",
       "manageOnWebReason": "Këta ofrues kërkojnë kredenciale të strukturuara.",
       "description": "Kërkesat përmes këtyre çelësave faturohen në llogarinë tënde te ofruesi, në vend të gjendjes tënde në Kilo.",
       "enabled": "Në përdorim",
@@ -2551,7 +2559,8 @@
       "cancelQueued": "Anulo mesazhin",
       "cancelQueuedAccessibility": "Anulo mesazhin në pritje",
       "restoreQueued": "Rikthe",
-      "restoreQueuedAccessibility": "Rikthe mesazhin e anuluar në fushën e mesazhit"
+      "restoreQueuedAccessibility": "Rikthe mesazhin e anuluar në fushën e mesazhit",
+      "noReplyRecorded": "Nuk u regjistrua asnjë përgjigje për këtë mesazh."
     },
     "olderMessages": {
       "arrived": "U ngarkuan mesazhet e mëparshme",
@@ -2944,6 +2953,26 @@
     "onlyFirstFilesAttached_other": "Vetëm {{displayCount}} skedarët e parë do të bashkëngjiten."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Historiku i faturimit",
+      "billingHistoryEmpty": "Ende nuk ka historik faturimi.",
+      "cancel": "Anulo abonimin",
+      "cancelDescription": "Kilo Pass mbetet aktiv deri në fund të periudhës së faturimit dhe nuk do të rinovohet.",
+      "cancelScheduled": "Anulohet më {{date}}",
+      "cancelScheduledChange": "Anulo ndryshimin e planifikuar",
+      "cancelled": "Abonimi u anulua",
+      "changePlan": "Ndrysho planin në kilo.ai",
+      "changePlanIosNote": "Ndryshimet e planeve me pagesë mund të bëhen në kilo.ai.",
+      "creditHistoryEmpty": "Ende nuk ka kredite nga Kilo Pass.",
+      "manageInStore": "Menaxho në {{store}}",
+      "resume": "Rifillo abonimin",
+      "resumeCancelledDescription": "Kilo Pass fillon sërish të rinovohet automatikisht.",
+      "resumePausedDescription": "Kilo Pass rifillon tani, përpara datës së planifikuar të rifillimit.",
+      "resumed": "Abonimi rifilloi",
+      "scheduledChange": "Ndryshim i planifikuar",
+      "scheduledChangeCancelDescription": "Kilo Pass mbetet në planin aktual dhe rinovohet si deri tani.",
+      "scheduledChangeSummary": "{{plan}} më {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass nuk është i disponueshëm.",
     "couldNotLoad": "Nuk u ngarkua Kilo Pass. Provo përsëri.",
@@ -2998,6 +3027,11 @@
     "accountDescription": "ID-ja e llogarisë tënde Kilo dhe metadatat e kërkesave përdoren për të verifikuar identitetin tënd dhe për të matur përdorimin.",
     "diagnosticsTitle": "Diagnostika e aplikacionit",
     "diagnosticsDescription": "Raportet e ndërprerjeve të papritura dhe të gabimeve, pa përmbajtjen e aplikacionit, përdoren për ta mbajtur aplikacionin të qëndrueshëm.",
+    "featureFlagsTitle": "Lançimi gradual i veçorive",
+    "featureFlagsDescription": "Email-i i llogarisë tënde, i përdorur nga PostHog për të vendosur cilat veçori sheh.",
+    "featureFlagsWhat": "Email-i i llogarisë tënde.",
+    "featureFlagsWhy": "Për të vendosur cilat veçori sheh, përfshirë ato që ende po i lançojmë gradualisht.",
+    "featureFlagsWho": "PostHog, shërbimi i flamujve të veçorive.",
     "helpImprove": "Ndihmo në përmirësimin e Kilo",
     "helpImproveDescription": "Ndaj të dhëna anonime për përdorimin e produktit dhe burimin e instalimit. Mund ta ndryshosh këtë në çdo kohë te cilësimet.",
     "seeFullDetails": "Shiko detajet e plota",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "Konfigurimi u importua"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Nuk u aktivizua dot veprimtaria e kredisë.",
+      "appStoreReceipt": "Dëftesë nga App Store",
+      "deductionFallback": "Zbritje kredish",
+      "emptyDescription": "Blerjet e kredive, dëftesat dhe përdorimi do të shfaqen këtu.",
+      "emptyTitle": "Nuk ka historik kredish",
+      "googlePlayReceipt": "Dëftesë nga Google Play",
+      "kind": {
+        "adjustment": "Rregullim",
+        "balanceNeutral": "Pa ndikim në bilanc",
+        "deduction": "Zbritje",
+        "grant": "Kredi të dhuruara",
+        "purchase": "Blerje"
+      },
+      "purchaseFallback": "Blerje kredish",
+      "receipt": "Dëftesë",
+      "receiptA11y": "Hap dëftesën për {{description}}",
+      "receiptUnavailable": "Nuk ka dëftesë për këtë blerje."
+    },
     "title": "Bli kredite",
     "description": "Kreditet janë një blerje e njëhershme që shtohet në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App. Dyqani të faturova llogarinë dhe kreditet shtohen pasi dyqani konfirmon pagesën.",
     "nextExpiry": "Kredite në vlerën {{amount}} skadojnë më {{date}} (UTC). Kreditet që skadojnë më herët përdoren të parat.",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nuk u hap dot ky rezultat kërkimi"
+  },
+  "usage": {
+    "title": "Përdorimi",
+    "orgTitle": "Përdorimi i organizatës",
+    "entrySubtitle": "Shpenzimet, kërkesat dhe tokenët",
+    "rangePicker": "Periudha kohore",
+    "range90d": "90 ditë",
+    "metricPicker": "Metrika e grafikut",
+    "chartA11y": "{{metric}} në ditë",
+    "avgCostPerRequest": "Kosto mesatare / kërkesë",
+    "topModels": "Modelet kryesore",
+    "topFeatures": "Veçoritë kryesore",
+    "emptyTitle": "Asnjë përdorim në këtë periudhë",
+    "orgSelfNotice": "Po shihni përdorimin tuaj në këtë organizatë.",
+    "viewDetails": "Shiko detajet e përdorimit"
+  },
+  "integrations": {
+    "title": "Integrimet",
+    "sectionTitle": "Shërbimet e lidhura",
+    "entrySubtitle": "GitHub, Slack, Linear dhe të tjera",
+    "subtitle": "Lidh mjetet dhe proceset e tua të zhvillimit me Kilo",
+    "emptyHint": "Ende nuk ka asnjë integrim të lidhur.",
+    "disconnect": "Shkëput",
+    "disconnectTitle": "Të shkëputet {{provider}}?",
+    "disconnectMessage": "Kilo do të ndalojë së përgjigjuri në {{provider}}. Mund ta lidhësh sërish në çdo kohë.",
+    "connectedTo": "I lidhur me {{account}}",
+    "disconnected": "{{provider}} u shkëput",
+    "disconnectFailed": "{{provider}} nuk mund të shkëputej",
+    "couldNotLoad": "Integrimet nuk mund të ngarkoheshin",
+    "permissionDenied": "Nuk ke leje për të menaxhuar këto integrime.",
+    "memberHint": "Kërkoji një pronari ose administratori të organizatës t'i ndryshojë këto lidhje.",
+    "connectFailed": "Faqja e lidhjes nuk mund të hapej"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Faturat për blerjet e tua personale do të shfaqen këtu pasi të faturohesh."
   },
   "cloudAgent": {
     "compute": {

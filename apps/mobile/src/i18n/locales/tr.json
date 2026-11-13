@@ -22,6 +22,10 @@
     "expired": "Süresi doldu"
   },
   "common": {
+    "manageOnWeb": "Web'de yönet",
+    "creditHistory": "Kredi geçmişi",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "İptal",
@@ -118,6 +122,7 @@
     "copyLink": "Bağlantıyı kopyala",
     "couldNotLoadOrganizations": "Kuruluşlar yüklenemedi.",
     "couldNotLoadSessions": "Oturumlar yüklenemedi.",
+    "couldnTLoad": "Yüklenemedi.",
     "couldnTLoadMore": "Daha fazlası yüklenemedi.",
     "deviceSessions": "Cihaz oturumları",
     "disabled": "Devre dışı",
@@ -245,6 +250,10 @@
     "notAdded": "Oturum açtın. {{provider}} hesabına eklenmedi."
   },
   "profile": {
+    "creditHistorySubtitle": "Satın alımlar, makbuzlar ve kredi hareketleri",
+    "invoicesSubtitle": "Satın alımlarınızın faturalarını indirin",
+    "manageBilling": "Faturalandırmayı kilo.ai üzerinden yönet",
+    "manageBillingIosNote": "Ödeme yöntemleri, otomatik yükleme ve fatura bilgileri kilo.ai üzerinden yönetilir.",
     "codeReviewerSubtitle": "Otomatik PR incelemeleri",
     "securityAgentSubtitle": "Güvenlik açıklarını bul ve gider",
     "reviews": "İncelemeler",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Sağlayıcı anahtarları",
       "rowSubtitle": "Kendi sağlayıcı faturalandırmanı kullan",
-      "manageOnWeb": "Web'de yönet",
       "manageOnWebReason": "Bu sağlayıcılar yapılandırılmış kimlik bilgileri gerektirir.",
       "description": "Bu anahtarlar üzerinden yapılan istekler Kilo bakiyen yerine sağlayıcı hesabına faturalandırılır.",
       "enabled": "Kullanımda",
@@ -2009,7 +2017,8 @@
       "cancelQueued": "Mesajı iptal et",
       "cancelQueuedAccessibility": "Kuyruktaki mesajı iptal et",
       "restoreQueued": "Geri yükle",
-      "restoreQueuedAccessibility": "İptal edilen mesajı mesaj alanına geri yükle"
+      "restoreQueuedAccessibility": "İptal edilen mesajı mesaj alanına geri yükle",
+      "noReplyRecorded": "Bu mesaj için yanıt kaydedilmedi."
     },
     "olderMessages": {
       "arrived": "Önceki mesajlar yüklendi",
@@ -2402,6 +2411,26 @@
     "onlyFirstFilesAttached_other": "Yalnızca ilk {{displayCount}} dosya eklenecek."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Fatura geçmişi",
+      "billingHistoryEmpty": "Henüz fatura geçmişi yok.",
+      "cancel": "Aboneliği iptal et",
+      "cancelDescription": "Kilo Pass'ınız fatura döneminin sonuna kadar etkin kalır ve yenilenmez.",
+      "cancelScheduled": "{{date}} tarihinde iptal edilecek",
+      "cancelScheduledChange": "Planlanan değişikliği iptal et",
+      "cancelled": "Abonelik iptal edildi",
+      "changePlan": "Planı kilo.ai üzerinden değiştir",
+      "changePlanIosNote": "Ücretli plan değişiklikleri kilo.ai üzerinden yapılabilir.",
+      "creditHistoryEmpty": "Henüz Kilo Pass kredisi yok.",
+      "manageInStore": "{{store}} üzerinden yönet",
+      "resume": "Aboneliği sürdür",
+      "resumeCancelledDescription": "Kilo Pass'ınız yeniden otomatik olarak yenilenmeye başlar.",
+      "resumePausedDescription": "Kilo Pass'ınız planlanan devam tarihini beklemeden şimdi devam eder.",
+      "resumed": "Abonelik sürdürüldü",
+      "scheduledChange": "Planlanan değişiklik",
+      "scheduledChangeCancelDescription": "Kilo Pass'ınız mevcut planında kalır ve şu anki gibi yenilenmeye devam eder.",
+      "scheduledChangeSummary": "{{date}} tarihinde {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass kullanılamıyor.",
     "couldNotLoad": "Kilo Pass yüklenemedi. Tekrar dene.",
@@ -2456,6 +2485,11 @@
     "accountDescription": "Kimliğini doğrulamak ve kullanımı ölçmek için kullanılan Kilo hesap kimliğin ve istek meta verileri.",
     "diagnosticsTitle": "Uygulama tanılama verileri",
     "diagnosticsDescription": "Uygulamanın kararlı çalışması için kullanılan, uygulama içeriğinden arındırılmış çökme ve hata raporları.",
+    "featureFlagsTitle": "Özellik dağıtımı",
+    "featureFlagsDescription": "PostHog'un hangi özellikleri göreceğine karar vermek için kullandığı hesap e-posta adresin.",
+    "featureFlagsWhat": "Hesap e-posta adresin.",
+    "featureFlagsWhy": "Hâlâ kademeli olarak sunduğumuz özellikler de dahil olmak üzere hangi özellikleri göreceğine karar vermek için.",
+    "featureFlagsWho": "PostHog, özellik bayrağı hizmeti.",
     "helpImprove": "Kilo'yu iyileştirmeye yardımcı ol",
     "helpImproveDescription": "Anonim ürün analizi verilerini ve uygulamayı yüklediğin kaynağı paylaş. Bu tercihi ayarlardan istediğin zaman değiştirebilirsin.",
     "seeFullDetails": "Tüm ayrıntıları gör",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "Config içe aktarıldı"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Kredi hareketleri yüklenemedi.",
+      "appStoreReceipt": "Makbuz App Store'da",
+      "deductionFallback": "Kredi düşümü",
+      "emptyDescription": "Kredi satın alımları, makbuzlar ve kullanım burada görünecek.",
+      "emptyTitle": "Kredi geçmişi yok",
+      "googlePlayReceipt": "Makbuz Google Play'de",
+      "kind": {
+        "adjustment": "Düzeltme",
+        "balanceNeutral": "Bakiyeyi etkilemez",
+        "deduction": "Düşüm",
+        "grant": "Kredi hediyesi",
+        "purchase": "Satın alım"
+      },
+      "purchaseFallback": "Kredi satın alımı",
+      "receipt": "Makbuz",
+      "receiptA11y": "{{description}} için makbuzu aç",
+      "receiptUnavailable": "Bu satın alım için makbuz mevcut değil."
+    },
     "title": "Kredi satın al",
     "description": "Krediler, Kilo App'te AI kodlama oturumları yürütmek için Kilo bakiyenize eklenen tek seferlik bir satın alımdır. Mağaza hesabınızdan ücret alır ve mağaza ödemeyi onayladıktan sonra krediler eklenir.",
     "nextExpiry": "{{amount}} tutarındaki kredinin süresi {{date}} (UTC) tarihinde dolacak. Süresi en erken dolan krediler önce kullanılır.",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu arama sonucu açılamadı"
+  },
+  "usage": {
+    "title": "Kullanım",
+    "orgTitle": "Organizasyon kullanımı",
+    "entrySubtitle": "Harcama, istekler ve tokenlar",
+    "rangePicker": "Zaman aralığı",
+    "range90d": "90 gün",
+    "metricPicker": "Grafik ölçütü",
+    "chartA11y": "Günlük {{metric}}",
+    "avgCostPerRequest": "Ort. maliyet / istek",
+    "topModels": "En çok kullanılan modeller",
+    "topFeatures": "En çok kullanılan özellikler",
+    "emptyTitle": "Bu dönemde kullanım yok",
+    "orgSelfNotice": "Bu organizasyondaki kendi kullanımınızı görüyorsunuz.",
+    "viewDetails": "Kullanım ayrıntılarını görüntüle"
+  },
+  "integrations": {
+    "title": "Entegrasyonlar",
+    "sectionTitle": "Bağlı hizmetler",
+    "entrySubtitle": "GitHub, Slack, Linear ve daha fazlası",
+    "subtitle": "Geliştirme araçlarınızı ve iş akışlarınızı Kilo'ya bağlayın",
+    "emptyHint": "Henüz bağlı entegrasyon yok.",
+    "disconnect": "Bağlantıyı kes",
+    "disconnectTitle": "{{provider}} bağlantısı kesilsin mi?",
+    "disconnectMessage": "Kilo, {{provider}} üzerinde yanıt vermeyi bırakacak. İstediğiniz zaman yeniden bağlanabilirsiniz.",
+    "connectedTo": "Bağlı hesap: {{account}}",
+    "disconnected": "{{provider}} bağlantısı kesildi",
+    "disconnectFailed": "{{provider}} bağlantısı kesilemedi",
+    "couldNotLoad": "Entegrasyonlar yüklenemedi",
+    "permissionDenied": "Bu entegrasyonları yönetme izniniz yok.",
+    "memberHint": "Bu bağlantıları değiştirmek için bir kuruluş sahibine veya yöneticisine başvurun.",
+    "connectFailed": "Bağlantı sayfası açılamadı"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Kendi satın alımlarınıza ait faturalar, faturalandırıldığınızda burada görünecek."
   },
   "cloudAgent": {
     "compute": {

@@ -1111,6 +1111,96 @@ describe('queued message cancellation replay', () => {
     }
   );
 
+  it('retains a failed unaccepted command row after replay', async () => {
+    const session = createCloudAgentResolvedSession(createMockApi());
+    await connectSession(session);
+    for (const [streamEventType, data] of [
+      ['cloud.message.queued', { messageId: 'command', content: '/review main' }],
+      [
+        'cloud.message.failed',
+        {
+          messageId: 'command',
+          accepted: false,
+          delivery: 'queued',
+          reason: 'preparation_timeout',
+        },
+      ],
+      ['connected', {}],
+    ]) {
+      mockWs.onmessage?.({
+        data: JSON.stringify({
+          eventId: 0,
+          sessionId: cloudAgentSessionId,
+          streamEventType,
+          timestamp: new Date().toISOString(),
+          data,
+        }),
+      } as MessageEvent);
+    }
+    expect(session.storage.getMessageIds()).toEqual(['command']);
+    expect(session.storage.getParts('command')).toEqual([
+      expect.objectContaining({ text: '/review main' }),
+    ]);
+    expect(session.state.getPendingMessages().get('command')).toMatchObject({ status: 'failed' });
+    session.destroy();
+  });
+
+  it('keeps a confirmed command message when acceptance arrives after its native echo', async () => {
+    const session = createCloudAgentResolvedSession(createMockApi());
+    await connectSession(session);
+    const deliver = (streamEventType: string, data: unknown) => {
+      mockWs.onmessage?.({
+        data: JSON.stringify({
+          eventId: 0,
+          sessionId: cloudAgentSessionId,
+          streamEventType,
+          timestamp: new Date().toISOString(),
+          data,
+        }),
+      } as MessageEvent);
+    };
+    deliver('connected', {});
+    deliver('cloud.message.queued', { messageId: 'command', content: '/review main' });
+    deliver('kilocode', {
+      type: 'message.updated',
+      properties: { info: stubUserMessage({ id: 'command', sessionID: kiloSessionId }) },
+    });
+    deliver('cloud.message.sent', { messageId: 'command', turnType: 'command' });
+    expect(session.storage.getMessageIds()).toEqual(['command']);
+    expect(session.storage.getMessageInfo('command')).not.toHaveProperty('synthetic', true);
+    session.destroy();
+  });
+
+  it.each([false, true])(
+    'removes only the accepted command placeholder during replay=%s',
+    async replaying => {
+      const session = createCloudAgentResolvedSession(createMockApi());
+      await connectSession(session);
+      const deliver = (streamEventType: string, data: unknown) => {
+        mockWs.onmessage?.({
+          data: JSON.stringify({
+            eventId: 0,
+            sessionId: cloudAgentSessionId,
+            streamEventType,
+            timestamp: new Date().toISOString(),
+            data,
+          }),
+        } as MessageEvent);
+      };
+      deliver('connected', replaying ? { bootstrapPending: true } : {});
+      deliver('cloud.message.queued', { messageId: 'command', content: '/review main' });
+      deliver('cloud.message.queued', { messageId: 'prompt', content: '/not-a-command main' });
+      if (!replaying) {
+        expect(session.storage.getMessageIds()).toEqual(['command', 'prompt']);
+        expect(session.state.getPendingMessages().get('command')).toEqual({ status: 'queued' });
+      }
+      deliver('cloud.message.sent', { messageId: 'command', turnType: 'command' });
+      if (replaying) deliver('bootstrap.complete', {});
+      expect(session.storage.getMessageIds()).toEqual(['prompt']);
+      session.destroy();
+    }
+  );
+
   it('materializes only final delivery rows and publishes service state at bootstrap completion', async () => {
     const session = createCloudAgentResolvedSession(createMockApi());
     await connectSession(session);

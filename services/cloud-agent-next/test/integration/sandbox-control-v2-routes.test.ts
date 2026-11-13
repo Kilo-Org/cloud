@@ -856,6 +856,9 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(await stub.status({ sessionId: SESSION })).toEqual({
       sessionId: SESSION,
       view: { state: 'ready', attemptId: expect.any(String) },
+      workspacePreparing: false,
+      workspaceStopEpoch: 0,
+      workspaceStopAt: 0,
     });
   });
 
@@ -1906,6 +1909,300 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(await readRouteRow(stub, SESSION)).toBeNull();
   });
 
+  it('cancels every chat in the workspace and stops the physical sandbox', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    await stub.prepare(prepareInput(SESSION_NEXT));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION_NEXT });
+    await waitFor(async () => {
+      expect((await readRouteRow(stub, SESSION_NEXT))?.state).toBe('ready');
+    });
+
+    const result = await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+
+    expect(result.stopEpoch).toBe(1);
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+    expect(await readRouteRow(stub, SESSION_NEXT)).toBeNull();
+    await waitFor(() => expect(provider.stopCalls).toEqual([provider.refs[0]]));
+    await waitFor(() =>
+      expect(peer.workspaceStops.map(entry => entry.sessionId).sort()).toEqual(
+        [SESSION, SESSION_NEXT].sort()
+      )
+    );
+    expect(peer.workspaceStops.every(entry => entry.payload.stopEpoch === 1)).toBe(true);
+    expect(peer.routeUpdatesFor(SESSION_NEXT).some(update => update.state === 'lost')).toBe(false);
+  });
+
+  it('replays a dropped workspace_stopped from the alarm until acknowledged', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    await stub.prepare(prepareInput(SESSION_NEXT));
+    peer.workspaceStopOnline = false;
+
+    await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    expect(peer.workspaceStops).toEqual([]);
+    const prefix = 'control_plane_pending_workspace_stop/';
+    const pending = await runInDurableObject(stub, (_instance, state) =>
+      Array.from(state.storage.kv.list<unknown>({ prefix }))
+    );
+    expect(pending).toHaveLength(2);
+    expect(await readAlarm(stub)).not.toBeNull();
+
+    await runInDurableObject(stub, (_instance, state) => {
+      for (const [key, value] of state.storage.kv.list<{ dueAt: number }>({ prefix })) {
+        state.storage.kv.put(key, { ...value, dueAt: 0 });
+      }
+    });
+    peer.workspaceStopOnline = true;
+    await runAlarm(stub);
+
+    await waitFor(() =>
+      expect(peer.workspaceStops.map(entry => entry.sessionId).sort()).toEqual(
+        [SESSION, SESSION_NEXT].sort()
+      )
+    );
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        Array.from(state.storage.kv.list<unknown>({ prefix }))
+      )
+    ).toEqual([]);
+  });
+
+  it('does not let an old acknowledgement clear a newer workspace stop', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const original = peer.forSession.bind(peer);
+    peer.forSession = sessionId => {
+      const target = original(sessionId);
+      if (sessionId !== SESSION) return target;
+      return {
+        ...target,
+        onWorkspaceStopped: async payload => {
+          started.resolve();
+          await release.promise;
+          return target.onWorkspaceStopped(payload);
+        },
+      };
+    };
+
+    await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+    await started.promise;
+    const prefix = 'control_plane_pending_workspace_stop/';
+    const key = `${prefix}${SESSION}`;
+    await runInDurableObject(stub, (_instance, state) => {
+      state.storage.kv.put(key, {
+        payload: { requestedAt: Date.now() + 10, stopEpoch: 2, attemptId: 'attempt-newer' },
+        dueAt: 0,
+      });
+    });
+    release.resolve();
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        Array.from(state.storage.kv.list<unknown>({ prefix }))
+      )
+    ).toHaveLength(1);
+
+    await runAlarm(stub);
+
+    await waitFor(() =>
+      expect(peer.workspaceStops.at(-1)?.payload).toMatchObject({
+        stopEpoch: 2,
+        attemptId: 'attempt-newer',
+      })
+    );
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        Array.from(state.storage.kv.list<unknown>({ prefix }))
+      )
+    ).toEqual([]);
+  });
+
+  it('deletes malformed pending workspace stops instead of replaying them', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    const prefix = 'control_plane_pending_workspace_stop/';
+    await runInDurableObject(stub, (_instance, state) => {
+      state.storage.kv.put(`${prefix}fractional-epoch`, {
+        payload: { requestedAt: 1, stopEpoch: 1.5, attemptId: 'attempt-fractional' },
+        dueAt: 0,
+      });
+      state.storage.kv.put(`${prefix}overlong-attempt`, {
+        payload: { requestedAt: 1, stopEpoch: 1, attemptId: 'a'.repeat(129) },
+        dueAt: 0,
+      });
+      state.storage.kv.put(`${prefix}empty-attempt`, {
+        payload: { requestedAt: 1, stopEpoch: 1, attemptId: '' },
+        dueAt: 0,
+      });
+    });
+
+    await runAlarm(stub);
+
+    expect(peer.workspaceStops).toEqual([]);
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        Array.from(state.storage.kv.list<unknown>({ prefix }))
+      )
+    ).toEqual([]);
+  });
+
+  it('treats a malformed stored workspace stop as unset', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await runInDurableObject(stub, (_instance, state) =>
+      state.storage.put('control_plane_workspace_stop', { epoch: 2.5, at: -1 })
+    );
+
+    const result = await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+
+    expect(result.stopEpoch).toBe(1);
+    expect(Number.isInteger(result.stopAt)).toBe(true);
+  });
+
+  it('refuses stale work after a workspace stop but lets new intent restart it', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const stoppedAt = Date.now();
+    const { stopEpoch, stopAt } = await stub.cancelWorkspace({
+      sessionId: SESSION,
+      requestedAt: stoppedAt,
+    });
+
+    await expect(
+      stub.prepare({
+        ...prepareInput(SESSION_NEXT),
+        stopEpoch: 0,
+        intentAt: stoppedAt,
+      })
+    ).resolves.toEqual({ state: 'unknown', stopEpoch, stopAt });
+    expect(await readRouteRow(stub, SESSION_NEXT)).toBeNull();
+
+    const fresh = await stub.prepare({
+      ...prepareInput(SESSION_NEXT),
+      stopEpoch,
+      intentAt: stoppedAt + 1,
+    });
+    expect(fresh.state).toBe('preparing');
+    expect((await readRouteRow(stub, SESSION_NEXT))?.state).toBe('preparing');
+  });
+
+  it('accepts a private restart while the sibling never observed the stop', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const stoppedAt = Date.now();
+    const { stopEpoch } = await stub.cancelWorkspace({
+      sessionId: SESSION,
+      requestedAt: stoppedAt,
+    });
+
+    // A message created after Stop is new intent even when this chat still
+    // carries the old epoch because the stop notification was lost.
+    const view = await stub.prepare({
+      ...prepareInput(SESSION_NEXT),
+      stopEpoch: 0,
+      intentAt: Date.now() + 5,
+    });
+    expect(view.state).toBe('preparing');
+    expect(stopEpoch).toBe(1);
+  });
+
+  it('keeps a retried Stop idempotent so it cannot cancel a newer attempt', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const requestedAt = Date.now();
+    const first = await stub.cancelWorkspace({ sessionId: SESSION, requestedAt });
+    await waitFor(() => expect(provider.stopCalls).toHaveLength(1));
+
+    const fresh = await stub.prepare({
+      ...prepareInput(SESSION_NEXT),
+      stopEpoch: first.stopEpoch,
+      intentAt: requestedAt + 1,
+    });
+    expect(fresh.state).toBe('preparing');
+    expect((await readRouteRow(stub, SESSION_NEXT))?.state).toBe('preparing');
+
+    // The same accepted Stop arrives again (retry after a lost response).
+    await expect(stub.cancelWorkspace({ sessionId: SESSION, requestedAt })).resolves.toEqual(first);
+    expect((await readRouteRow(stub, SESSION_NEXT))?.state).toBe('preparing');
+    expect(provider.stopCalls).toHaveLength(1);
+  });
+
+  it('retires preparation that started after requestedAt but before the Stop ran', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const requestedAt = Date.now() - 10;
+    await stub.prepare(prepareInput(SESSION));
+
+    const result = await stub.cancelWorkspace({ sessionId: SESSION, requestedAt });
+
+    expect(result.stopAt).toBeGreaterThan(requestedAt);
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+    await waitFor(() => expect(provider.stopCalls).toHaveLength(1));
+  });
+
+  it('does not prepare a cancelled workspace when a wrapper connects afterwards', async () => {
+    const provider = createFakeProvider({ gateStop: true });
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const launchEnv = provider.launchEnvs[0];
+    const credential = launchEnv?.SANDBOX_CONTROL_CREDENTIAL;
+    const allocationId = launchEnv?.CONTROL_PLANE_ALLOCATION_ID;
+    if (!credential || !allocationId) throw new Error('launch environment is missing identity');
+
+    await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+
+    // A wrapper that opens its socket after Stop finds no route to prepare.
+    const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const reply = await wrapper.hello({ wrapperId: 'wr_late', allocationId });
+    if (reply?.type === 'welcome') expect(await wrapper.next(100)).toBeNull();
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+
+    await waitFor(() => expect(provider.stopGates).toHaveLength(1));
+    await releaseGate(stub, () => provider.stopGates[0]?.('terminal'));
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+  });
+
+  it('leaves an independently placed workspace sandbox untouched', async () => {
+    const provider = createFakeProvider();
+    const otherProvider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const otherStub = sandboxNamespace.getByName(`${SANDBOX_ID}_other`);
+    const otherPeer = new FakeSessionPeer();
+    await runInDurableObject(otherStub, async instance => {
+      await instance.getAllocationState();
+      installFakeSandboxEnv(instance, createFakeCredentialBroker());
+      Object.assign(instance, {
+        createProviderAdapter: () => otherProvider.adapter,
+        provider: otherProvider.adapter,
+        sessionPeerFor: (_ownerId: string, sessionId: string) => otherPeer.forSession(sessionId),
+      });
+    });
+    await stub.prepare(prepareInput(SESSION));
+    await otherStub.prepare(prepareInput(SESSION_THIRD));
+
+    await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+
+    expect((await readRouteRow(otherStub, SESSION_THIRD))?.state).toBe('preparing');
+    expect(provider.stopCalls).toHaveLength(1);
+    expect(otherProvider.stopCalls).toEqual([]);
+  });
+
   it.each([
     'code-review',
     'slack',
@@ -2475,6 +2772,9 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(await stub.status({ sessionId: SESSION })).toEqual({
       sessionId: SESSION,
       view: { state: 'unknown' },
+      workspacePreparing: false,
+      workspaceStopEpoch: 0,
+      workspaceStopAt: 0,
     });
   });
 
@@ -2769,6 +3069,9 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(await stub.status({ sessionId: SESSION })).toEqual({
       sessionId: SESSION,
       view: { state: 'ready', attemptId: expect.any(String) },
+      workspacePreparing: false,
+      workspaceStopEpoch: 0,
+      workspaceStopAt: 0,
     });
     expect(peer.routeUpdatesFor(SESSION).some(update => update.state === 'failed')).toBe(false);
   });

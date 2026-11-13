@@ -22,6 +22,10 @@
     "expired": "Isteklo"
   },
   "common": {
+    "manageOnWeb": "Upravljaj na webu",
+    "creditHistory": "Historija kredita",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Otkaži",
@@ -118,6 +122,7 @@
     "copyLink": "Kopiraj vezu",
     "couldNotLoadOrganizations": "Nije moguće učitati organizacije.",
     "couldNotLoadSessions": "Nije moguće učitati sesije.",
+    "couldnTLoad": "Nije moguće učitati.",
     "couldnTLoadMore": "Nije moguće učitati više stavki.",
     "deviceSessions": "Sesije na uređajima",
     "disabled": "Onemogućeno",
@@ -245,6 +250,10 @@
     "notAdded": "Prijavljen si. {{provider}} nije dodan na tvoj račun."
   },
   "profile": {
+    "creditHistorySubtitle": "Kupovine, potvrde i aktivnost kredita",
+    "invoicesSubtitle": "Preuzmite fakture za svoje kupovine",
+    "manageBilling": "Upravljanje naplatom na kilo.ai",
+    "manageBillingIosNote": "Načinima plaćanja, automatskom dopunom i podacima o naplati upravlja se na kilo.ai.",
     "codeReviewerSubtitle": "Automatski pregledi PR-ova",
     "securityAgentSubtitle": "Pronađi i otkloni ranjivosti",
     "reviews": "Pregledi",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Ključevi pružalaca",
       "rowSubtitle": "Koristi naplatu vlastitog pružaoca",
-      "manageOnWeb": "Upravljaj na webu",
       "manageOnWebReason": "Ovi pružaoci zahtijevaju strukturirane akreditive.",
       "description": "Zahtjevi putem ovih ključeva naplaćuju se na tvoj nalog kod pružaoca umjesto s tvog Kilo salda.",
       "enabled": "U upotrebi",
@@ -2596,7 +2604,8 @@
       "cancelQueued": "Otkaži poruku",
       "cancelQueuedAccessibility": "Otkaži poruku na čekanju",
       "restoreQueued": "Vrati",
-      "restoreQueuedAccessibility": "Vrati otkazanu poruku u polje za unos poruke"
+      "restoreQueuedAccessibility": "Vrati otkazanu poruku u polje za unos poruke",
+      "noReplyRecorded": "Za ovu poruku nije zabilježen odgovor."
     },
     "olderMessages": {
       "arrived": "Ranije poruke su učitane",
@@ -2997,6 +3006,26 @@
     "onlyFirstFilesAttached_few": "Samo prvih {{displayCount}} datoteke bit će priloženo."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Historija naplate",
+      "billingHistoryEmpty": "Još nema historije naplate.",
+      "cancel": "Otkaži pretplatu",
+      "cancelDescription": "Vaš Kilo Pass ostaje aktivan do kraja obračunskog perioda i neće se obnoviti.",
+      "cancelScheduled": "Otkazuje se {{date}}",
+      "cancelScheduledChange": "Otkaži zakazanu promjenu",
+      "cancelled": "Pretplata je otkazana",
+      "changePlan": "Promijeni plan na kilo.ai",
+      "changePlanIosNote": "Promjene plaćenog plana dostupne su na kilo.ai.",
+      "creditHistoryEmpty": "Još nema Kilo Pass kredita.",
+      "manageInStore": "Upravljaj u trgovini {{store}}",
+      "resume": "Nastavi pretplatu",
+      "resumeCancelledDescription": "Vaš Kilo Pass će se ponovo automatski obnavljati.",
+      "resumePausedDescription": "Vaš Kilo Pass se nastavlja odmah, prije zakazanog datuma nastavka.",
+      "resumed": "Pretplata je nastavljena",
+      "scheduledChange": "Zakazana promjena",
+      "scheduledChangeCancelDescription": "Vaš Kilo Pass ostaje na trenutnom planu i obnavlja se kao i dosad.",
+      "scheduledChangeSummary": "{{plan}} od {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass nije dostupan.",
     "couldNotLoad": "Nije moguće učitati Kilo Pass. Pokušaj ponovo.",
@@ -3051,6 +3080,11 @@
     "accountDescription": "ID tvog Kilo naloga i metapodaci zahtjeva koriste se za provjeru tvog identiteta i mjerenje potrošnje.",
     "diagnosticsTitle": "Dijagnostika aplikacije",
     "diagnosticsDescription": "Izvještaji o rušenjima i greškama, s uklonjenim sadržajem aplikacije, koriste se za održavanje stabilnosti aplikacije.",
+    "featureFlagsTitle": "Postepeno uvođenje funkcija",
+    "featureFlagsDescription": "Email adresa tvog naloga, koju PostHog koristi da odluči koje funkcije vidiš.",
+    "featureFlagsWhat": "Email adresa tvog naloga.",
+    "featureFlagsWhy": "Za odlučivanje koje funkcije vidiš, uključujući one koje još postepeno uvodimo.",
+    "featureFlagsWho": "PostHog, servis za zastavice funkcija.",
     "helpImprove": "Pomozi poboljšati Kilo",
     "helpImproveDescription": "Podijeli anonimne analitičke podatke o korištenju aplikacije i izvoru instalacije. Ovo možeš promijeniti u postavkama u bilo kojem trenutku.",
     "seeFullDetails": "Pogledaj sve detalje",
@@ -4014,6 +4048,25 @@
     "importConfigApplied": "Konfiguracija je uvezena"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Nije moguće učitati aktivnost kredita.",
+      "appStoreReceipt": "Potvrda iz trgovine App Store",
+      "deductionFallback": "Odbitak kredita",
+      "emptyDescription": "Kupovine kredita, potvrde i potrošnja pojavit će se ovdje.",
+      "emptyTitle": "Nema historije kredita",
+      "googlePlayReceipt": "Potvrda iz trgovine Google Play",
+      "kind": {
+        "adjustment": "Korekcija",
+        "balanceNeutral": "Bez uticaja na stanje",
+        "deduction": "Odbitak",
+        "grant": "Dodjela kredita",
+        "purchase": "Kupovina"
+      },
+      "purchaseFallback": "Kupovina kredita",
+      "receipt": "Potvrda",
+      "receiptA11y": "Otvori potvrdu za {{description}}",
+      "receiptUnavailable": "Potvrda nije dostupna za ovu kupovinu."
+    },
     "title": "Kupi kredite",
     "description": "Krediti su jednokratna kupovina koja se dodaje na tvoj Kilo saldo za pokretanje AI sesija kodiranja u Kilo App. Trgovina naplaćuje tvoj račun, a krediti se dodaju nakon što trgovina potvrdi plaćanje.",
     "nextExpiry": "Krediti u iznosu od {{amount}} istječu {{date}} (UTC). Prvo se koriste krediti s najranijim rokom isteka.",
@@ -4199,6 +4252,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nije moguće otvoriti ovaj rezultat pretrage"
+  },
+  "usage": {
+    "title": "Potrošnja",
+    "orgTitle": "Potrošnja organizacije",
+    "entrySubtitle": "Troškovi, zahtjevi i tokeni",
+    "rangePicker": "Vremenski period",
+    "range90d": "90 dana",
+    "metricPicker": "Metrika grafikona",
+    "chartA11y": "{{metric}} po danu",
+    "avgCostPerRequest": "Prosj. trošak / zahtjev",
+    "topModels": "Najčešći modeli",
+    "topFeatures": "Najčešće funkcije",
+    "emptyTitle": "Nema potrošnje u ovom periodu",
+    "orgSelfNotice": "Vidite vlastitu potrošnju u ovoj organizaciji.",
+    "viewDetails": "Prikaži detalje potrošnje"
+  },
+  "integrations": {
+    "title": "Integracije",
+    "sectionTitle": "Povezane usluge",
+    "entrySubtitle": "GitHub, Slack, Linear i drugo",
+    "subtitle": "Povežite svoje razvojne alate i tokove rada s Kilo",
+    "emptyHint": "Još nema povezanih integracija.",
+    "disconnect": "Prekini vezu",
+    "disconnectTitle": "Prekinuti vezu s {{provider}}?",
+    "disconnectMessage": "Kilo će prestati odgovarati u {{provider}}. Možete se ponovo povezati u bilo kojem trenutku.",
+    "connectedTo": "Povezano s {{account}}",
+    "disconnected": "Veza s {{provider}} je prekinuta",
+    "disconnectFailed": "Nije moguće prekinuti vezu s {{provider}}",
+    "couldNotLoad": "Nije moguće učitati integracije",
+    "permissionDenied": "Nemate dozvolu za upravljanje ovim integracijama.",
+    "memberHint": "Zamolite vlasnika ili administratora organizacije da promijeni ove veze.",
+    "connectFailed": "Nije moguće otvoriti stranicu za povezivanje"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Fakture za vaše lične kupovine pojavit će se ovdje nakon što vam se izvrši naplata."
   },
   "cloudAgent": {
     "compute": {

@@ -20,7 +20,7 @@ import {
   type BriefingPreferences,
   type BriefingReport,
 } from '@kilocode/app-shared/agent-briefing';
-import { briefingFactsSchema } from './evidence';
+import { briefingFactsSchema, type BriefingFacts } from './evidence';
 import { nextBriefingTime, validateBriefingSchedule } from './schedule';
 const DEFAULT_BRIEFING_MODEL = '~deepseek/deepseek-flash-latest';
 export type BriefingReportRow = typeof agent_briefing_snapshots.$inferSelect;
@@ -186,7 +186,6 @@ export async function briefingContextSettings(userId: string, organizationId?: s
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Briefing context is no longer accessible' });
   return setting;
 }
-type BriefingFacts = z.infer<typeof briefingFactsSchema>;
 type SourceSession = Pick<
   typeof cli_sessions_v2.$inferSelect,
   'session_id' | 'organization_id' | 'briefing_excerpt_scope_changed_at'

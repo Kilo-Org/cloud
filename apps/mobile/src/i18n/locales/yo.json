@@ -22,6 +22,10 @@
     "expired": "Àkókò ti kọjá"
   },
   "common": {
+    "manageOnWeb": "Ṣàkóso lórí wẹ́ẹ̀bù",
+    "creditHistory": "Ìtàn kírẹ́dítì",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Fagilé",
@@ -118,6 +122,7 @@
     "copyLink": "Da ìjápọ̀ kọ",
     "couldNotLoadOrganizations": "A kò lè gbé àwọn àjọ wọlé.",
     "couldNotLoadSessions": "A kò lè gbé àwọn ìgbà iṣẹ́ wọlé.",
+    "couldnTLoad": "A kò lè gbé e wọlé.",
     "couldnTLoadMore": "A kò lè gbé síi wọlé.",
     "deviceSessions": "Àwọn ìgbà iṣẹ́ ẹ̀rọ",
     "disabled": "A ti pa",
@@ -245,6 +250,10 @@
     "notAdded": "O ti wọlé. A kò ṣàfikún {{provider}} sí àkọọ́lẹ̀ rẹ."
   },
   "profile": {
+    "creditHistorySubtitle": "Àwọn ìrajà, ìwé ẹ̀rí ìsanwó, àti ìgbòkègbodò kírẹ́dítì",
+    "invoicesSubtitle": "Ṣe ìgbàsílẹ̀ àwọn ìwé owó fún àwọn ìrajà rẹ",
+    "manageBilling": "Ṣàkóso ìsanwó lórí kilo.ai",
+    "manageBillingIosNote": "A ń ṣàkóso àwọn ọ̀nà ìsanwó, àfikún owó aládàáṣe, àti àwọn àlàyé ìsanwó lórí kilo.ai.",
     "codeReviewerSubtitle": "Àtúnyẹ̀wò PR láìfọwọ́yí",
     "securityAgentSubtitle": "Wá àwọn àlàfo ààbò kí o sì ṣàtúnṣe wọn",
     "reviews": "Àwọn àtúnyẹ̀wò",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Àwọn kọ́kọ́rọ́ olùpèsè",
       "rowSubtitle": "Lo ìsanwó olùpèsè tìrẹ",
-      "manageOnWeb": "Ṣàkóso lórí wẹ́ẹ̀bù",
       "manageOnWebReason": "Àwọn olùpèsè wọ̀nyí nílò àwọn ìwé-ẹ̀rí ìwọlé tí a ṣètò.",
       "description": "Àwọn ìbéèrè tí ó gba àwọn kọ́kọ́rọ́ wọ̀nyí kọjá ni a ó gba owó wọn lórí àkọọ́lẹ̀ olùpèsè rẹ dípò owó Kilo rẹ tó kù.",
       "enabled": "Ní lílò",
@@ -2551,7 +2559,8 @@
       "cancelQueued": "Fagilé ìfiránṣẹ́",
       "cancelQueuedAccessibility": "Fagilé ìfiránṣẹ́ tó wà ní ìlà",
       "restoreQueued": "Mú padà",
-      "restoreQueuedAccessibility": "Dá ìfiránṣẹ́ tí a fagilé padà sí ààyè ìkọ̀wé"
+      "restoreQueuedAccessibility": "Dá ìfiránṣẹ́ tí a fagilé padà sí ààyè ìkọ̀wé",
+      "noReplyRecorded": "A kò gba ìdáhùn kankan sílẹ̀ fún ìfiránṣẹ́ yìí."
     },
     "olderMessages": {
       "arrived": "A ti gbé àwọn ìfiránṣẹ́ tó ṣáájú wọlé",
@@ -2944,6 +2953,26 @@
     "onlyFirstFilesAttached_other": "Fáìlì {{displayCount}} àkọ́kọ́ nìkan ni a ó so mọ́ ọn."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Ìtàn ìsanwó",
+      "billingHistoryEmpty": "Kò sí ìtàn ìsanwó síbẹ̀.",
+      "cancel": "Fagilé ìforúkọsílẹ̀",
+      "cancelDescription": "Kilo Pass rẹ yóò máa ṣiṣẹ́ títí di òpin àkókò ìsanwó, kò sì ní sọ ara rẹ̀ dọ̀tun.",
+      "cancelScheduled": "Yóò parí ní {{date}}",
+      "cancelScheduledChange": "Fagilé àyípadà tí a ṣètò",
+      "cancelled": "A ti fagilé ìforúkọsílẹ̀",
+      "changePlan": "Yí ètò padà lórí kilo.ai",
+      "changePlanIosNote": "Àwọn àyípadà ètò tí a ń sanwó fún wà lórí kilo.ai.",
+      "creditHistoryEmpty": "Kò sí kírẹ́dítì Kilo Pass síbẹ̀.",
+      "manageInStore": "Ṣàkóso nínú {{store}}",
+      "resume": "Tún ìforúkọsílẹ̀ bẹ̀rẹ̀",
+      "resumeCancelledDescription": "Kilo Pass rẹ yóò tún bẹ̀rẹ̀ sí í sọ ara rẹ̀ dọ̀tun láìfọwọ́yí.",
+      "resumePausedDescription": "Kilo Pass rẹ yóò tún bẹ̀rẹ̀ báyìí, ṣáájú ọjọ́ tí a ṣètò fún un láti tún bẹ̀rẹ̀.",
+      "resumed": "Ìforúkọsílẹ̀ ti tún bẹ̀rẹ̀",
+      "scheduledChange": "Àyípadà tí a ṣètò",
+      "scheduledChangeCancelDescription": "Kilo Pass rẹ yóò dúró lórí ètò rẹ̀ lọ́wọ́lọ́wọ́, yóò sì máa sọ ara rẹ̀ dọ̀tun bí ó ti ń ṣe báyìí.",
+      "scheduledChangeSummary": "{{plan}} ní {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass kò sí.",
     "couldNotLoad": "A kò lè gbé Kilo Pass wọlé. Gbìyànjú lẹ́ẹ̀kan sí i.",
@@ -2998,6 +3027,11 @@
     "accountDescription": "Ìdánimọ̀ àkọọ́lẹ̀ Kilo rẹ àti àwọn àlàyé àfikún ìbéèrè, tí a lò láti jẹ́rìí ẹni tí o jẹ́ àti láti wọ́n ìwọ̀n lílo rẹ.",
     "diagnosticsTitle": "Àyẹ̀wò ìṣòro ohun èlò",
     "diagnosticsDescription": "Àwọn ìròyìn ìdákú àti àṣìṣe, tí a ti yọ àkóónú ohun èlò kúrò nínú wọn, tí a lò láti mú kí ohun èlò ṣiṣẹ́ dáadáa.",
+    "featureFlagsTitle": "Ìfilọ́lẹ̀ àwọn iṣẹ́ díẹ̀díẹ̀",
+    "featureFlagsDescription": "Ímeèlì àkọọ́lẹ̀ rẹ, tí PostHog ń lò láti pinnu àwọn iṣẹ́ tí o máa rí.",
+    "featureFlagsWhat": "Ímeèlì àkọọ́lẹ̀ rẹ.",
+    "featureFlagsWhy": "Láti pinnu àwọn iṣẹ́ tí o máa rí, pẹ̀lú àwọn tí a ṣì ń fi lọ́lẹ̀ díẹ̀díẹ̀.",
+    "featureFlagsWho": "PostHog, iṣẹ́ tí ń ṣàkóso àsíá àwọn iṣẹ́ ohun èlò.",
     "helpImprove": "Ṣèrànwọ́ láti mú Kilo dára sí i",
     "helpImproveDescription": "Pín ìṣirò lílo tí kò fi ìdánimọ̀ rẹ hàn àti orísun fífi ohun èlò sórí ẹ̀rọ. O lè yí èyí padà nígbàkigbà nínú Àwọn ètò.",
     "seeFullDetails": "Wo àlàyé kíkún",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "A ti gba Config wọlé"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Kò lè gbé ìgbòkègbodò kírẹ́dítì wọ̀.",
+      "appStoreReceipt": "Ìwé ẹ̀rí ìsanwó láti App Store",
+      "deductionFallback": "Ìyọkúrò kírẹ́dítì",
+      "emptyDescription": "Àwọn ìrajà kírẹ́dítì, ìwé ẹ̀rí ìsanwó, àti ìlò yóò hàn níbí.",
+      "emptyTitle": "Kò sí ìtàn kírẹ́dítì",
+      "googlePlayReceipt": "Ìwé ẹ̀rí ìsanwó láti Google Play",
+      "kind": {
+        "adjustment": "Àtúnṣe",
+        "balanceNeutral": "Kò yí ìyókù padà",
+        "deduction": "Ìyọkúrò",
+        "grant": "Ẹ̀bùn kírẹ́dítì",
+        "purchase": "Ìrajà"
+      },
+      "purchaseFallback": "Ìrajà kírẹ́dítì",
+      "receipt": "Ìwé ẹ̀rí ìsanwó",
+      "receiptA11y": "Ṣí ìwé ẹ̀rí ìsanwó fún {{description}}",
+      "receiptUnavailable": "Kò sí ìwé ẹ̀rí ìsanwó fún ìrajà yìí."
+    },
     "title": "Ra kírẹ́dítì",
     "description": "Kírẹ́dítì jẹ́ rírà ẹ̀ẹ̀kan tí a fi kún iwọntunwọnsi Kilo rẹ fún ṣíṣe àwọn ìpàdé kíkọ kóòdù AI nínú Kilo App. Ṣọ́ọ̀bù gba owó láti inú àkọọ́lẹ̀ rẹ, a sì fi kírẹ́dítì kún un lẹ́yìn tí ṣọ́ọ̀bù bá fọwọ́sí ìsanwó.",
     "nextExpiry": "Kírẹ́dítì {{amount}} yóò dópin {{date}} (UTC). A máa kọ́kọ́ lo kírẹ́dítì tí yóò tètè dópin.",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "A kò lè ṣí àbájọ́ ìwádìí yìí"
+  },
+  "usage": {
+    "title": "Ìlò",
+    "orgTitle": "Ìlò àjọ",
+    "entrySubtitle": "Ìnáwó, àwọn ìbéèrè, àti àwọn ìpín ọ̀rọ̀",
+    "rangePicker": "Sáà àkókò",
+    "range90d": "Ọjọ́ 90",
+    "metricPicker": "Ìwọ̀n àtẹ àwòrán",
+    "chartA11y": "{{metric}} lójoojúmọ́",
+    "avgCostPerRequest": "Iye owó àpapọ̀ / ìbéèrè",
+    "topModels": "Àwọn àwòṣe tó ga jù",
+    "topFeatures": "Àwọn ẹ̀yà tó ga jù",
+    "emptyTitle": "Kò sí ìlò ní sáà yìí",
+    "orgSelfNotice": "Ìlò tìrẹ nínú àjọ yìí ni ò ń rí.",
+    "viewDetails": "Wo àlàyé ìlò"
+  },
+  "integrations": {
+    "title": "Àwọn Ìsopọ̀",
+    "sectionTitle": "Àwọn iṣẹ́ tí a so pọ̀",
+    "entrySubtitle": "GitHub, Slack, Linear àti àwọn mìíràn",
+    "subtitle": "So àwọn irinṣẹ́ ìdàgbàsókè àti ìlànà iṣẹ́ rẹ pọ̀ mọ́ Kilo",
+    "emptyHint": "Kò tíì sí ìsopọ̀ kankan.",
+    "disconnect": "Já ìsopọ̀",
+    "disconnectTitle": "Ṣé o fẹ́ já ìsopọ̀ {{provider}}?",
+    "disconnectMessage": "Kilo kò ní dáhùn mọ́ nínú {{provider}}. O lè tún un so pọ̀ nígbàkígbà.",
+    "connectedTo": "Ti so pọ̀ mọ́ {{account}}",
+    "disconnected": "A ti já ìsopọ̀ {{provider}}",
+    "disconnectFailed": "Kò ṣeé ṣe láti já ìsopọ̀ {{provider}}",
+    "couldNotLoad": "Kò ṣeé ṣe láti gbé àwọn ìsopọ̀ wá",
+    "permissionDenied": "O kò ní àṣẹ láti ṣàkóso àwọn ìsopọ̀ wọ̀nyí.",
+    "memberHint": "Bèèrè lọ́wọ́ ẹni tó ni àjọ náà tàbí alákòóso láti yí àwọn ìsopọ̀ wọ̀nyí padà.",
+    "connectFailed": "Kò ṣeé ṣe láti ṣí ojú-ìwé ìsopọ̀"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Àwọn ìwé owó fún àwọn ìrajà tìrẹ yóò hàn níbí nígbà tí a bá ti gba owó lọ́wọ́ rẹ."
   },
   "cloudAgent": {
     "compute": {

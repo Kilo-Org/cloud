@@ -336,6 +336,13 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           });
         }
       }
+      if (event.type === 'cloud.message.sent' && event.turnType === 'command') {
+        replayedQueuedMessages.delete(event.messageId);
+        const message = storage.getMessageInfo(event.messageId);
+        if (message?.role === 'user' && message.synthetic === true) {
+          storage.deleteMessage(event.messageId);
+        }
+      }
       // `cloud.message.canceled` removes the synthetic (or real) local row the
       // queued event materialized, so a replay of queued then canceled nets empty.
       if (event.type === 'cloud.message.canceled') {

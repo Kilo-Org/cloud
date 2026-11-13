@@ -57,6 +57,7 @@ export const TOKEN_KEYS = [
   ['rowSage', '--row-sage'],
   ['rowMoss', '--row-moss'],
   ['rowFern', '--row-fern'],
+  ['rowPine', '--row-pine'],
 ];
 
 function collectDeclarations(rule) {

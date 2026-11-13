@@ -22,6 +22,10 @@
     "expired": "Ekspire"
   },
   "common": {
+    "manageOnWeb": "Jere sou entènèt la",
+    "creditHistory": "Istorik kredi",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Anile",
@@ -118,6 +122,7 @@
     "copyLink": "Kopye lyen an",
     "couldNotLoadOrganizations": "Nou pa t kapab chaje òganizasyon yo.",
     "couldNotLoadSessions": "Nou pa t kapab chaje sesyon yo.",
+    "couldnTLoad": "Nou pa t kapab chaje.",
     "couldnTLoadMore": "Nou pa t kapab chaje plis.",
     "deviceSessions": "Sesyon aparèy",
     "disabled": "Dezaktive",
@@ -245,6 +250,10 @@
     "notAdded": "Ou konekte. Yo pa t ajoute {{provider}} nan kont ou."
   },
   "profile": {
+    "creditHistorySubtitle": "Acha, resi, ak aktivite kredi",
+    "invoicesSubtitle": "Telechaje fakti pou acha ou yo",
+    "manageBilling": "Jere faktirasyon sou kilo.ai",
+    "manageBillingIosNote": "Mwayen peman, rechaj otomatik, ak detay faktirasyon yo jere sou kilo.ai.",
     "codeReviewerSubtitle": "Revizyon otomatik PR yo",
     "securityAgentSubtitle": "Jwenn epi korije vilnerabilite",
     "reviews": "Revizyon",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Kle founisè",
       "rowSubtitle": "Sèvi ak pwòp faktirasyon founisè w",
-      "manageOnWeb": "Jere sou entènèt la",
       "manageOnWebReason": "Founisè sa yo bezwen idantifyan ki estriktire.",
       "description": "Demann ki pase nan kle sa yo ap faktire sou kont founisè w la olye de balans Kilo w la.",
       "enabled": "Ap itilize",
@@ -2551,7 +2559,8 @@
       "cancelQueued": "Anile mesaj la",
       "cancelQueuedAccessibility": "Anile mesaj annatant lan",
       "restoreQueued": "Retabli",
-      "restoreQueuedAccessibility": "Retabli mesaj anile a nan chan mesaj la"
+      "restoreQueuedAccessibility": "Retabli mesaj anile a nan chan mesaj la",
+      "noReplyRecorded": "Pa gen okenn repons ki anrejistre pou mesaj sa a."
     },
     "olderMessages": {
       "arrived": "Mesaj anvan yo chaje",
@@ -2944,6 +2953,26 @@
     "onlyFirstFilesAttached_other": "Se sèlman premye {{displayCount}} fichye yo k ap tache."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Istorik faktirasyon",
+      "billingHistoryEmpty": "Poko gen istorik faktirasyon.",
+      "cancel": "Anile abònman",
+      "cancelDescription": "Kilo Pass ou a rete aktif jiska fen peryòd faktirasyon an epi li p ap renouvle.",
+      "cancelScheduled": "Ap anile {{date}}",
+      "cancelScheduledChange": "Anile chanjman ki pwograme a",
+      "cancelled": "Abònman anile",
+      "changePlan": "Chanje plan sou kilo.ai",
+      "changePlanIosNote": "Chanjman plan peye yo disponib sou kilo.ai.",
+      "creditHistoryEmpty": "Poko gen kredi Kilo Pass.",
+      "manageInStore": "Jere nan {{store}}",
+      "resume": "Rekòmanse abònman",
+      "resumeCancelledDescription": "Kilo Pass ou a ap kòmanse renouvle otomatikman ankò.",
+      "resumePausedDescription": "Kilo Pass ou a rekòmanse kounye a, anvan dat li te pwograme pou l rekòmanse a.",
+      "resumed": "Abònman rekòmanse",
+      "scheduledChange": "Chanjman pwograme",
+      "scheduledChangeCancelDescription": "Kilo Pass ou a rete sou plan aktyèl li epi l ap renouvle menm jan li fè jodi a.",
+      "scheduledChangeSummary": "{{plan}} nan dat {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass pa disponib.",
     "couldNotLoad": "Nou pa t ka chaje Kilo Pass. Eseye ankò.",
@@ -2998,6 +3027,11 @@
     "accountDescription": "ID kont Kilo ou a ak metadone demann yo sèvi pou verifye idantite ou epi mezire itilizasyon ou.",
     "diagnosticsTitle": "Diyagnostik aplikasyon",
     "diagnosticsDescription": "Rapò pann ak erè ede kenbe aplikasyon an estab. Yo pa gen kontni aplikasyon an ladan yo.",
+    "featureFlagsTitle": "Lansman fonksyon",
+    "featureFlagsDescription": "Imèl kont ou a, PostHog itilize pou deside ki fonksyon ou wè.",
+    "featureFlagsWhat": "Imèl kont ou a.",
+    "featureFlagsWhy": "Pou deside ki fonksyon ou wè, enkli fonksyon n ap lanse piti piti toujou.",
+    "featureFlagsWho": "PostHog, sèvis drapo fonksyon yo.",
     "helpImprove": "Ede amelyore Kilo",
     "helpImproveDescription": "Pataje done anonim sou itilizasyon aplikasyon an ak sous enstalasyon an. Ou ka chanje sa nenpòt lè nan Paramèt.",
     "seeFullDetails": "Gade tout detay yo",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "Config enpòte"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Pa t ka chaje aktivite kredi.",
+      "appStoreReceipt": "Resi ki nan App Store",
+      "deductionFallback": "Dediksyon kredi",
+      "emptyDescription": "Acha kredi, resi, ak itilizasyon ap parèt isit la.",
+      "emptyTitle": "Pa gen istorik kredi",
+      "googlePlayReceipt": "Resi ki nan Google Play",
+      "kind": {
+        "adjustment": "Ajisteman",
+        "balanceNeutral": "San efè sou balans",
+        "deduction": "Dediksyon",
+        "grant": "Kredi gratis",
+        "purchase": "Acha"
+      },
+      "purchaseFallback": "Acha kredi",
+      "receipt": "Resi",
+      "receiptA11y": "Louvri resi pou {{description}}",
+      "receiptUnavailable": "Pa gen resi disponib pou acha sa a."
+    },
     "title": "Achte kredi",
     "description": "Kredi se yon acha yon sèl fwa ki ajoute nan balans Kilo ou pou kouri sesyon kodaj AI nan Kilo App. Magazen an chaje kont ou epi kredi yo ajoute apre magazen an konfime peman an.",
     "nextExpiry": "{{amount}} nan kredi ap ekspire {{date}} (UTC). Kredi ki ekspire pi bonè yo itilize an premye.",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Pa t ka louvri rezilta rechèch sa a"
+  },
+  "usage": {
+    "title": "Itilizasyon",
+    "orgTitle": "Itilizasyon òganizasyon",
+    "entrySubtitle": "Depans, demann ak jeton",
+    "rangePicker": "Peryòd tan",
+    "range90d": "90 jou",
+    "metricPicker": "Mezi grafik la",
+    "chartA11y": "{{metric}} pa jou",
+    "avgCostPerRequest": "Pri mwayen / demann",
+    "topModels": "Modèl ki pi itilize",
+    "topFeatures": "Fonksyon ki pi itilize",
+    "emptyTitle": "Pa gen itilizasyon nan peryòd sa a",
+    "orgSelfNotice": "W ap wè pwòp itilizasyon pa w nan òganizasyon sa a.",
+    "viewDetails": "Wè detay itilizasyon"
+  },
+  "integrations": {
+    "title": "Entegrasyon",
+    "sectionTitle": "Sèvis ki konekte",
+    "entrySubtitle": "GitHub, Slack, Linear ak lòt ankò",
+    "subtitle": "Konekte zouti devlopman ak workflow ou yo ak Kilo",
+    "emptyHint": "Pa gen okenn entegrasyon ki konekte ankò.",
+    "disconnect": "Dekonekte",
+    "disconnectTitle": "Dekonekte {{provider}}?",
+    "disconnectMessage": "Kilo p ap reponn nan {{provider}} ankò. Ou ka rekonekte nenpòt ki lè.",
+    "connectedTo": "Konekte ak {{account}}",
+    "disconnected": "{{provider}} dekonekte",
+    "disconnectFailed": "Pa t ka dekonekte {{provider}}",
+    "couldNotLoad": "Pa t ka chaje entegrasyon yo",
+    "permissionDenied": "Ou pa gen pèmisyon pou jere entegrasyon sa yo.",
+    "memberHint": "Mande yon pwopriyetè oswa yon administratè òganizasyon an pou chanje koneksyon sa yo.",
+    "connectFailed": "Pa t ka louvri paj koneksyon an"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Fakti pou pwòp acha ou yo ap parèt isit la yon fwa yo faktire w."
   },
   "cloudAgent": {
     "compute": {

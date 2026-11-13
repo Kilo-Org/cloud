@@ -22,6 +22,10 @@
     "expired": "Хугацаа нь дууссан"
   },
   "common": {
+    "manageOnWeb": "Вэб дээр удирдах",
+    "creditHistory": "Кредитийн түүх",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Цуцлах",
@@ -118,6 +122,7 @@
     "copyLink": "Холбоосыг хуулах",
     "couldNotLoadOrganizations": "Байгууллагуудыг ачаалж чадсангүй.",
     "couldNotLoadSessions": "Сессүүдийг ачаалж чадсангүй.",
+    "couldnTLoad": "Ачаалж чадсангүй.",
     "couldnTLoadMore": "Цааш ачаалж чадсангүй.",
     "deviceSessions": "Төхөөрөмжийн сессүүд",
     "disabled": "Идэвхгүй",
@@ -245,6 +250,10 @@
     "notAdded": "Та нэвтэрсэн байна. {{provider}} таны бүртгэлд нэмэгдсэнгүй."
   },
   "profile": {
+    "creditHistorySubtitle": "Худалдан авалт, баримт, кредитийн гүйлгээ",
+    "invoicesSubtitle": "Худалдан авалтынхаа нэхэмжлэхийг татаж авах",
+    "manageBilling": "Төлбөрөө kilo.ai дээр удирдах",
+    "manageBillingIosNote": "Төлбөрийн хэрэгсэл, автомат цэнэглэлт болон төлбөрийн мэдээллийг kilo.ai дээр удирдана.",
     "codeReviewerSubtitle": "PR-ийн автомат хяналт",
     "securityAgentSubtitle": "Эмзэг байдлыг олж, арилгах",
     "reviews": "Кодын хяналт",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Үйлчилгээ үзүүлэгчийн түлхүүрүүд",
       "rowSubtitle": "Өөрийн үйлчилгээ үзүүлэгчийн төлбөрийг ашиглах",
-      "manageOnWeb": "Вэб дээр удирдах",
       "manageOnWebReason": "Эдгээр үйлчилгээ үзүүлэгчдэд бүтэцтэй нэвтрэх мэдээлэл шаардлагатай.",
       "description": "Эдгээр түлхүүрээр илгээсэн хүсэлтийн төлбөрийг таны Kilo үлдэгдлээс бус, үйлчилгээ үзүүлэгчийн бүртгэлээс тань тооцно.",
       "enabled": "Ашиглагдаж байна",
@@ -2551,7 +2559,8 @@
       "cancelQueued": "Мессежийг цуцлах",
       "cancelQueuedAccessibility": "Дараалалд буй мессежийг цуцлах",
       "restoreQueued": "Сэргээх",
-      "restoreQueuedAccessibility": "Цуцалсан мессежийг мессеж оруулах талбарт сэргээх"
+      "restoreQueuedAccessibility": "Цуцалсан мессежийг мессеж оруулах талбарт сэргээх",
+      "noReplyRecorded": "Энэ мессежид хариулт бүртгэгдээгүй."
     },
     "olderMessages": {
       "arrived": "Өмнөх мессежүүдийг ачааллаа",
@@ -2944,6 +2953,26 @@
     "onlyFirstFilesAttached_other": "Зөвхөн эхний {{displayCount}} файл хавсаргагдана."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Төлбөрийн түүх",
+      "billingHistoryEmpty": "Төлбөрийн түүх одоогоор алга.",
+      "cancel": "Захиалгыг цуцлах",
+      "cancelDescription": "Таны Kilo Pass төлбөрийн хугацаа дуустал идэвхтэй байх бөгөөд дахин сунгагдахгүй.",
+      "cancelScheduled": "Цуцлагдах огноо: {{date}}",
+      "cancelScheduledChange": "Товлосон өөрчлөлтийг цуцлах",
+      "cancelled": "Захиалга цуцлагдлаа",
+      "changePlan": "Багцаа kilo.ai дээр өөрчлөх",
+      "changePlanIosNote": "Төлбөртэй багцын өөрчлөлтийг kilo.ai дээр хийх боломжтой.",
+      "creditHistoryEmpty": "Kilo Pass-ын кредит одоогоор алга.",
+      "manageInStore": "{{store}} дээр удирдах",
+      "resume": "Захиалгыг сэргээх",
+      "resumeCancelledDescription": "Таны Kilo Pass дахин автоматаар сунгагдаж эхэлнэ.",
+      "resumePausedDescription": "Таны Kilo Pass товлосон огнооноосоо өмнө одоо сэргэнэ.",
+      "resumed": "Захиалга сэргэлээ",
+      "scheduledChange": "Товлосон өөрчлөлт",
+      "scheduledChangeCancelDescription": "Таны Kilo Pass одоогийн багцаараа үлдэж, одоогийнхоо адил сунгагдана.",
+      "scheduledChangeSummary": "{{date}} өдрөөс {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass-д хандах боломжгүй байна.",
     "couldNotLoad": "Kilo Pass-ыг ачаалж чадсангүй. Дахин оролдоно уу.",
@@ -2998,6 +3027,11 @@
     "accountDescription": "Таныг баталгаажуулж, хэрэглээг тооцоход ашиглах Kilo бүртгэлийн ID болон хүсэлтийн мета өгөгдөл.",
     "diagnosticsTitle": "Аппын оношилгоо",
     "diagnosticsDescription": "Аппын тогтвортой ажиллагааг хангахад ашиглах гацалт, алдааны тайлан. Эдгээрээс аппын агуулгыг арилгасан байна.",
+    "featureFlagsTitle": "Функцийн нэвтрүүлэлт",
+    "featureFlagsDescription": "Таны бүртгэлийн имэйл, PostHog үүнийг ашиглан таныг ямар функц харахыг тодорхойлно.",
+    "featureFlagsWhat": "Таны бүртгэлийн имэйл.",
+    "featureFlagsWhy": "Бидний одоо үе шаттай нэвтрүүлж буй функцуудыг оролцуулан, таныг ямар функц харахыг тодорхойлох.",
+    "featureFlagsWho": "PostHog, функцийн тугны үйлчилгээ.",
     "helpImprove": "Kilo-г сайжруулахад туслах",
     "helpImproveDescription": "Хэрэглэгчийг таних мэдээлэлгүй хэрэглээний статистик болон суулгасан эх үүсвэрийн мэдээллийг хуваалцана уу. Үүнийг тохиргооноос хүссэн үедээ өөрчилж болно.",
     "seeFullDetails": "Дэлгэрэнгүйг үзэх",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "Config импортлогдлоо"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Кредитийн гүйлгээг ачаалж чадсангүй.",
+      "appStoreReceipt": "App Store-ын баримт",
+      "deductionFallback": "Кредитийн хасалт",
+      "emptyDescription": "Кредитийн худалдан авалт, баримт, хэрэглээ энд харагдана.",
+      "emptyTitle": "Кредитийн түүх алга",
+      "googlePlayReceipt": "Google Play-н баримт",
+      "kind": {
+        "adjustment": "Залруулга",
+        "balanceNeutral": "Үлдэгдэлд нөлөөгүй",
+        "deduction": "Хасалт",
+        "grant": "Кредит олголт",
+        "purchase": "Худалдан авалт"
+      },
+      "purchaseFallback": "Кредит худалдан авалт",
+      "receipt": "Баримт",
+      "receiptA11y": "Баримтыг нээх: {{description}}",
+      "receiptUnavailable": "Энэ худалдан авалтад баримт байхгүй байна."
+    },
     "title": "Кредит худалдан авах",
     "description": "Кредит нь Kilo App дээр AI кодчилолын сессүүдийг ажиллуулахын тулд таны Kilo үлдэгдэлд нэмэгддэг нэг удаагийн худалдан авалт юм. Дэлгүүр таны данснаас төлбөр авч, дэлгүүр төлбөрийг баталгаажуулсны дараа кредит нэмэгдэнэ.",
     "nextExpiry": "{{amount}} кредитийн хугацаа {{date}} (UTC) өдөр дуусна. Хугацаа хамгийн эрт дуусах кредитийг эхэлж ашиглана.",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Энэ хайлтын үр дүнг нээж чадсангүй"
+  },
+  "usage": {
+    "title": "Ашиглалт",
+    "orgTitle": "Байгууллагын ашиглалт",
+    "entrySubtitle": "Зардал, хүсэлт, токен",
+    "rangePicker": "Хугацааны муж",
+    "range90d": "90 хоног",
+    "metricPicker": "Графикийн үзүүлэлт",
+    "chartA11y": "Өдөр бүрийн {{metric}}",
+    "avgCostPerRequest": "Дундаж зардал / хүсэлт",
+    "topModels": "Их ашигласан загварууд",
+    "topFeatures": "Их ашигласан боломжууд",
+    "emptyTitle": "Энэ хугацаанд ашиглалт байхгүй",
+    "orgSelfNotice": "Та энэ байгууллага дахь өөрийн ашиглалтыг харж байна.",
+    "viewDetails": "Ашиглалтын дэлгэрэнгүйг харах"
+  },
+  "integrations": {
+    "title": "Интеграцууд",
+    "sectionTitle": "Холбогдсон үйлчилгээнүүд",
+    "entrySubtitle": "GitHub, Slack, Linear болон бусад",
+    "subtitle": "Хөгжүүлэлтийн хэрэгсэл, ажлын урсгалаа Kilo-той холбоорой",
+    "emptyHint": "Одоогоор холбогдсон интеграц алга.",
+    "disconnect": "Салгах",
+    "disconnectTitle": "{{provider}} холболтыг салгах уу?",
+    "disconnectMessage": "Kilo {{provider}} дээр хариу өгөхөө болино. Та хүссэн үедээ дахин холбох боломжтой.",
+    "connectedTo": "Холбогдсон: {{account}}",
+    "disconnected": "{{provider}} холболтыг салгалаа",
+    "disconnectFailed": "{{provider}} холболтыг салгаж чадсангүй",
+    "couldNotLoad": "Интеграцуудыг ачаалж чадсангүй",
+    "permissionDenied": "Танд эдгээр интеграцыг удирдах эрх байхгүй байна.",
+    "memberHint": "Эдгээр холболтыг өөрчлөхийн тулд байгууллагын эзэмшигч эсвэл админд хандана уу.",
+    "connectFailed": "Холболтын хуудсыг нээж чадсангүй"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Төлбөр нэхэмжлэгдсэний дараа өөрийн худалдан авалтын нэхэмжлэхүүд энд харагдана."
   },
   "cloudAgent": {
     "compute": {

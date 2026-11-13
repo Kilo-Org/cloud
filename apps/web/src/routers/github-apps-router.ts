@@ -194,6 +194,8 @@ export const githubAppsRouter = createTRPCRouter({
     }
     const owner = resolveOwner(ctx, input?.organizationId);
     const integrations = await githubAppsService.listIntegrations(owner);
+    const nativelyUninstallable =
+      await githubAppsService.listNativelyUninstallableIds(integrations);
     return integrations.map(integration => ({
       id: integration.id,
       platform: integration.platform,
@@ -207,6 +209,9 @@ export const githubAppsRouter = createTRPCRouter({
       installed_at: integration.installed_at,
       created_at: integration.created_at,
       updated_at: integration.updated_at,
+      // Whether `uninstallApp` would accept this connection: the app shows the
+      // native Disconnect only when it would.
+      canUninstallNatively: nativelyUninstallable.has(integration.id),
     }));
   }),
 

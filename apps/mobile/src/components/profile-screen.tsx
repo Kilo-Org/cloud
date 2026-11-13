@@ -10,9 +10,10 @@ import {
   GitMerge,
   GitPullRequest,
   KeyRound,
+  LineChart,
   Lock,
-  LogOut,
   MessageSquare,
+  Plug,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -32,6 +33,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { DirectionalLogOut } from '@/components/ui/directional-icons';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -102,7 +104,7 @@ export function ProfileScreen() {
   const agentScope = organizationContextLoaded
     ? getProfileAgentScope(organizationId, orgs)
     : undefined;
-  const { openPicker, picker } = useContextPicker(orgs);
+  const { openPicker } = useContextPicker(orgs);
   const selectedOrg = orgs?.find(org => org.organizationId === organizationId);
   const orgRole = selectedOrg?.role;
   // The Organization section stays on Profile in every credit-account context:
@@ -236,6 +238,22 @@ export function ProfileScreen() {
         {/* Credits */}
         <CreditsCard orgs={orgs} enabled={isAuthenticated} />
 
+        {/* Usage: one row on the balance's own section, because spend and
+            remaining credits are the two halves of the same question. */}
+        <View className="mt-3">
+          <ConfigureRow
+            icon={LineChart}
+            title={t('usage.title')}
+            subtitle={t('usage.entrySubtitle')}
+            hue="sage"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/usage' as Href);
+            }}
+          />
+        </View>
+
         {/* Code Reviewer */}
         <View className="mt-6 gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
@@ -336,7 +354,6 @@ export function ProfileScreen() {
             ) : (
               organizationRow
             )}
-            {picker}
           </View>
         )}
 
@@ -468,6 +485,26 @@ export function ProfileScreen() {
           </View>
         )}
 
+        {/* Connected services — the integrations hub. Its own section rather
+            than a row in App: the hub manages external accounts, and its row
+            takes the next curated hue step in reading order. */}
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            {t('integrations.sectionTitle')}
+          </Text>
+          <ConfigureRow
+            icon={Plug}
+            title={t('integrations.title')}
+            subtitle={t('integrations.entrySubtitle')}
+            hue="pine"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/integrations' as Href);
+            }}
+          />
+        </View>
+
         {/* Actions — stacked full-width tiles so labels never clip side-by-side at max Dynamic Type */}
         <View className="mt-6 gap-3">
           <ActionTile
@@ -485,7 +522,7 @@ export function ProfileScreen() {
             onPress={showPrivacyChoices}
           />
           <ActionTile
-            icon={LogOut}
+            icon={DirectionalLogOut}
             label={t('common.signOut')}
             hue="fern"
             onPress={requestSignOut}

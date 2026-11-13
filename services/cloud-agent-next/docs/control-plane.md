@@ -85,7 +85,9 @@ unavailable signing secret returns 503, so ordinary bounded-backoff reconnect re
    within the transport bound and settles a known failed old attempt's existing work. It then stores
    the new message as `queued`; unavailable confirmation retains the existing queued intent.
 3. If the route is `ready`, go to step 7. Otherwise the Session DO calls `prepare` on the Sandbox DO.
-   `prepare` is idempotent and returns at once.
+   `prepare` is idempotent and returns at once. It carries this chat's newest workspace stop epoch
+   and the oldest queued message's creation time; after a workspace Stop, the Sandbox DO refuses a
+   prepare for work created before that Stop and returns `unknown` with the current epoch.
 4. The Sandbox DO makes sure an allocation is `connected`: create the sandbox, launch the
    supervisor and wrapper, wait for the wrapper to connect.
 5. The Sandbox DO sends `session.prepare` to the wrapper. The wrapper runs the workspace steps and
@@ -123,13 +125,36 @@ terminal. Nothing else.
 | Route lost (reason) | All `accepted` → `failed` with the reason. `queued` stay; if any, call `prepare`. |
 | Owner view names a replacement attempt | Before storing the new view, all old `accepted` → `failed` (`agent_restarted`). Never replay them; keep `queued` for the new owner. |
 | Outcome (status, reason, `lastMessageId`) | Every `accepted` message up to and including `lastMessageId` takes the status. If `lastMessageId` is unknown, every `accepted` message does. |
-| Stop | All `queued` and `accepted` → `cancelled`; send `abort` (best effort). |
+| Stop | If any route in the workspace is `preparing`, confirm a workspace Stop with the Sandbox DO before cancelling local work: every chat in the workspace is cancelled and the sandbox stops. Otherwise cancel this chat's `queued` and `accepted` messages and send `abort` (best effort). |
 | Cancel one queued message | That message → `cancelled`. |
 | Backstop alarm | `queued` older than its queued backstop → `failed` (`preparation_timeout`). `accepted` older than its accepted backstop → `failed` (`no_outcome`). |
 
-Stop still forwards a best-effort abort to an existing ready Kilo route when no
-message is queued or accepted and the wrapper has no active turn. It does not
-rewrite terminal message outcomes or prepare/wake a stopped sandbox.
+Environment preparation is workspace work, not chat work: one sandbox serves one
+workspace, and its preparation, runtime and physical allocation are shared by every
+chat and worktree in it. A new session's sandbox id is derived from its own root
+session, and worktree siblings inherit that id, so independent workspaces never
+share a Sandbox DO. (Retired shared sandbox keys still decode for stored metadata;
+whatever routes they host are treated as one workspace.) Stop during preparation
+therefore stops the whole workspace: a fresh Stop retires every route that exists
+when it runs (including work prepared after the caller captured `requestedAt`),
+records a durable stop epoch, notifies every Session DO so each settles its own
+queued and accepted work as cancelled, and stops the physical allocation. Sibling
+chats are cancelled, not preserved. A different workspace is a different Sandbox
+DO and is untouched. A preparation for work created before the Stop is refused by
+the recorded epoch, so a stale queued message cannot revive the workspace; a
+message created afterwards is new intent and may prepare again. A repeated Stop
+with the same `requestedAt` is idempotent and preserves routes that started after
+the accepted Stop. Before a route is deleted, its `workspace_stopped` payload is
+persisted per session; the Sandbox alarm replays it until that Session DO
+acknowledges the exact epoch/attempt, so a dropped dispatcher send or eviction does
+not leave a sibling running. `status` also carries the authoritative
+`workspacePreparing` and stop epoch/at, and the Session alarm checks it before
+applying a backstop failure. Stop on a workspace with no preparation keeps
+per-chat behaviour: it aborts the Kilo turn and does not stop the workspace. Stop
+does not rewrite terminal message outcomes. If the workspace Stop RPC fails within
+its transport bound, return an error without settling local work or reporting a
+completed Stop. The user can retry; an RPC that completed remotely still notifies
+each Session DO through the durable stop notification.
 
 Late outcomes and notifications for terminal messages are ignored. The backstop exists only for
 lost notifications; the Sandbox DO and the wrapper settle every normal case earlier. Both values
@@ -369,6 +394,7 @@ notification, so a lost notification never leaves it waiting.
 | `hello`, same `wrapperId` | Notify `ready` again for ready routes; send `session.prepare` again for preparing routes. |
 | `hello`, new `wrapperId` | Ready routes → `preparing`; notify `route lost` (`agent_restarted`); send `session.prepare` again. |
 | `release` (session deleted) | Remove the route; send `session.release`. |
+| `cancelWorkspace(sessionId, requestedAt)` | Workspace Stop during preparation. A fresh call retires every route that exists now, persists each retired session's `workspace_stopped` payload before deleting the route, notifies the Session DO, and stops the allocation when no newer route remains. The Sandbox alarm replays unacknowledged payloads. The same `requestedAt` is idempotent and preserves routes that started afterwards. |
 
 ### Forwarding
 
@@ -978,11 +1004,22 @@ the legacy profile restrictions.
   a live user-blocked tree retains its normal idle policy.
   When neither half has arrived and no publication cleanup transport budget applies, the quiet drain
   is bounded by the wrapper's `noProgressMs` (20 minutes). Foreground work clears that timer;
-  a later quiet phase starts a new timer. Expiry fails the turn as `no_outcome`.
+  a later quiet phase starts a new timer. Expiry fails with the completion-unconfirmed message below.
   The first half never extends an armed deadline. Feed gaps preserve that deadline and the
   publication cleanup transport bound.
-  Three transient attempts, with 1-second and 2-second backoff, exhaust as `no_outcome`
-  with an unconfirmed-completion warning. Native work retains the supervisor's execution bounds.
+  Drain disables Bun's socket idle timeout for this request only; a quiet HTTP connection does not
+  prove native work stopped. Three transient attempts, with 1-second and 2-second backoff, exhaust
+  with an unconfirmed-completion warning. Each retry only waits for native work again; it does not
+  submit another prompt. Fresh tokens fence late responses and markers from earlier attempts.
+  Native work retains the supervisor's execution bounds. Each failed attempt logs its number,
+  elapsed milliseconds, classification, and a bounded, redacted error/cause chain. HTTP/marker pair
+  timeouts also name the missing half and native feed gap. The sandbox-local HTTP transport is
+  separate from the wrapper-to-Worker socket.
+  Unconfirmed completion reports `completion_unconfirmed`, which maps to this user message:
+  "The assistant finished its reply, but session completion could not be confirmed. Send a new
+  message to continue." It retains the `wrapper_no_output` report and callback classification.
+  It never reports `no_outcome`, and does not claim full-tree success.
+  The Worker backstop still uses `no_outcome` for runs that send no outcome.
 - The wrapper names the last received Cloud `messageId` in its outcome. It does not reconstruct
   successful outcomes from idle snapshots. Compact's own close reconciliation only releases its
   delivery barrier; an ineligible close cannot later become completion for a queued follower.
@@ -1031,9 +1068,10 @@ the legacy profile restrictions.
   in the existing submission chain before aborting the captured client. New intake remains accepted,
   but dispatch waits until cleanup confirms abort and a fresh HTTP/marker pair. Abort gets 10 seconds;
   three post-cancel confirmations get 10 seconds each, with 1-second and 2-second backoff (43 seconds
-  maximum). Unconfirmed cleanup warns and fails `no_outcome`; it never releases dispatch through an
-  uncertain abort. Only known cleanup interruption signals are suppressed. Successful cleanup releases
-  the barrier and re-arms confirmation from the original eligible close when no newer intake exists.
+  maximum). Unconfirmed cleanup warns and fails with the completion-unconfirmed message; it never
+  releases dispatch through an uncertain abort. Only known cleanup interruption signals are suppressed.
+  Successful cleanup releases the barrier and re-arms confirmation from the original eligible close
+  when no newer intake exists.
 - Native deadline failures are reported immediately. When the interrupted batch opted into
   auto-commit, the wrapper then waits for confirmed cancellation and an idle root before committing
   and pushing with the normal repository and branch rules. Condense does not run. This cleanup has
@@ -1063,8 +1101,9 @@ it as dispatched work. The first reconcile of the same process after the loss de
   `completed` root close, and if any dispatch that no observation or close showed is still running
   at the root. An idle root with observed work and no seen close lost that close.
 - Otherwise, or if observation was already lost when the gap began, dispatched work that no native
-  proof covers fails as `no_outcome`, with a history-incomplete warning. Snapshots and new tokens
-  cannot recover missed final errors.
+  proof covers fails with a history-incomplete warning. If a seen completed root close covers the
+  latest prompt, it uses the completion-unconfirmed message, not `no_outcome`. Without that close,
+  it retains `no_outcome`. Snapshots and new tokens cannot recover missed final errors.
 
 A snapshot that began before the loss does not decide the gap. A restart decides instead of the
 gap, so a crash that ends the feed first still gets restart resubmission and its specific reason.
@@ -1073,7 +1112,7 @@ already-confirmed work during optional finalization are not failed. A newer disp
 an accepted proof is unconfirmed work again. Three edges remain. A missed root error followed by a
 queued follow-up under the same execution id completes the turn. A `completed` close that arrives
 after a later prompt was dispatched also covers that prompt. A root or child execution that ends on
-the new feed before its first reconcile finishes fails the turn as `no_outcome`.
+the new feed before its first reconcile finishes fails the turn under the same gap decision.
 
 The global feed is subscribed before a bounded initial snapshot. Reconciliation repeats
 on reconnect and every 30 seconds, single-flight with a 10-second request budget. It
@@ -1263,15 +1302,16 @@ them through one development-only override.
 | Idle 10 min, question pending | Sandbox DO | Stop the sandbox | Accepted fail (`sandbox_stopped`); a later answer is a new message |
 | Sandbox gone | Provider via Sandbox DO | New allocation on next `prepare` | Accepted fail (`sandbox_lost`); queued re-prepare |
 | Notification lost | Session DO backstop | — | Fail at the queued or accepted backstop |
-| User Stop | Session DO | Abort the Kilo session only | Queued and accepted `cancelled` |
+| User Stop while preparing | Session DO + Sandbox DO | Cancel every chat in the workspace and stop the allocation; a ready route aborts the Kilo session only | Queued and accepted `cancelled`; preparation closes as `preparation_cancelled` |
 | Auto-commit or condense fails | Wrapper | None | Warning event; turn `completed` |
 | Provider stop not confirmed | Sandbox DO | Logged; next `prepare` may create again | None; worktree deletion reports incomplete |
 
 ## 10. Interfaces
 
 Session DO → Sandbox DO (RPC, returns at once): `prepare(route spec)` → route view,
-`deliver(sessionId, messages)` → `sent` | `not_ready`, `abort(sessionId)`, `answer(sessionId,
-reply)`, terminal create/resize/close/connect requests, worktree-change requests,
+`deliver(sessionId, messages)` → `sent` | `not_ready`, `abort(sessionId)`,
+`cancelWorkspace(sessionId, requestedAt)` → stop epoch, `answer(sessionId, reply)`, terminal
+create/resize/close/connect requests, worktree-change requests,
 `release(sessionId)`, `status(sessionId)` (passive read). Preview resolves off the operation queue:
 the Session DO `resolvePreviewTarget()` does a passive read of the Sandbox DO `previewTarget` and
 returns provider coordinates; it enqueues nothing (see Preview).
@@ -1946,9 +1986,9 @@ Deploy session-ingest before cloud-agent-next; no database migration is needed.
 | `sandbox_create_failed` (create attempt budget spent) | `pre_dispatch` / `sandbox_connect_failed` |
 | `agent_unavailable` | queued: `pre_dispatch` / `kilo_server_failed`; accepted: `post_dispatch_no_activity` / `wrapper_disconnected` |
 | `connection_lost`, `sandbox_lost`, `agent_restarted`, `agent_unresponsive`, `sandbox_out_of_memory` | `post_dispatch_no_activity` / `wrapper_disconnected` |
-| `no_progress`, `no_outcome` | `post_dispatch_no_activity` / `wrapper_no_output` |
+| `no_progress`, `no_outcome`, `completion_unconfirmed` | `post_dispatch_no_activity` / `wrapper_no_output` |
 | `prompt_failed` | `post_dispatch_no_activity` / `wrapper_error_before_activity` |
-| `sandbox_stopped` (idle while waiting on the user), `execution_limit` | `interruption` / `system_interrupt` |
+| `sandbox_stopped` (idle while waiting on the user), `execution_limit`, `preparation_cancelled` | `interruption` / `system_interrupt` |
 | Kilo final error, or `no_progress` during a Kilo model retry | `agent_activity` / `assistant_error`; responsibility from the existing assistant-failure helpers, so Kilo and provider errors stay attributed to them |
 | Stop | `interruption` / `user_interrupt` |
 | `runtime_artifact_unauthorized`, `runtime_artifact_invalid`, `runtime_cli_probe_failed`, `runtime_supervisor_missing` | `pre_dispatch` / `wrapper_start_failed` |

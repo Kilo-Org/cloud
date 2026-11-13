@@ -55,6 +55,7 @@ export default defineProject({
       'src/glanceable-android/**/*.test.ts',
       'src/lib/font-scale/**/*.test.ts',
       'src/lib/hooks/**/*.test.ts',
+      'src/lib/integrations/**/*.test.ts',
       'src/lib/iap/**/*.test.ts',
       'src/lib/kilo-pass/**/*.test.ts',
       'src/lib/native-remote/**/*.test.ts',

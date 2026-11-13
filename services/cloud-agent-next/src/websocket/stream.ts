@@ -83,6 +83,8 @@ export type QueuedMessageSnapshot = {
   content: string;
   timestamp: number;
   delivery?: 'queued' | 'sent';
+  turnType?: 'command';
+  completedAt?: number;
   terminalFailure?: CloudMessageFailedPayload & { timestamp: number };
 };
 
@@ -236,6 +238,7 @@ export function createStreamHandler(
           | 'kilocode'
           | 'cloud.message.queued'
           | 'cloud.message.sent'
+          | 'cloud.message.completed'
           | 'cloud.message.failed',
         data: unknown,
         timestamp: number
@@ -265,6 +268,10 @@ export function createStreamHandler(
         );
       };
       for (const msg of queued) {
+        if (msg.completedAt !== undefined) {
+          sendSnapshot('cloud.message.completed', { messageId: msg.messageId }, msg.completedAt);
+          continue;
+        }
         if (!msg.terminalFailure) continue;
         sendSnapshot(
           'cloud.message.queued',
@@ -315,7 +322,7 @@ export function createStreamHandler(
       if (!options?.reconcileMaterializedEvents) await sendPreparationSnapshots();
 
       for (const msg of queued) {
-        if (msg.terminalFailure) continue;
+        if (msg.terminalFailure || msg.completedAt !== undefined) continue;
         sendSnapshot(
           'cloud.message.queued',
           { messageId: msg.messageId, content: msg.content, delivery: 'queued' },
@@ -324,7 +331,11 @@ export function createStreamHandler(
         if (msg.delivery === 'sent') {
           sendSnapshot(
             'cloud.message.sent',
-            { messageId: msg.messageId, delivery: 'sent' },
+            {
+              messageId: msg.messageId,
+              delivery: 'sent',
+              ...(msg.turnType === 'command' ? { turnType: 'command' } : {}),
+            },
             msg.timestamp
           );
         }

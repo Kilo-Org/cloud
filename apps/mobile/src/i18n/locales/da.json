@@ -22,6 +22,10 @@
     "expired": "Udløbet"
   },
   "common": {
+    "manageOnWeb": "Administrer på nettet",
+    "creditHistory": "Kredithistorik",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Annuller",
@@ -118,6 +122,7 @@
     "copyLink": "Kopiér link",
     "couldNotLoadOrganizations": "Organisationerne kunne ikke indlæses.",
     "couldNotLoadSessions": "Sessionerne kunne ikke indlæses.",
+    "couldnTLoad": "Det lykkedes ikke at indlæse.",
     "couldnTLoadMore": "Det lykkedes ikke at indlæse flere.",
     "deviceSessions": "Enhedssessioner",
     "disabled": "Deaktiveret",
@@ -245,6 +250,10 @@
     "notAdded": "Du er logget ind. {{provider}} blev ikke føjet til din konto."
   },
   "profile": {
+    "creditHistorySubtitle": "Køb, kvitteringer og kreditaktivitet",
+    "invoicesSubtitle": "Download fakturaer for dine køb",
+    "manageBilling": "Administrer betaling på kilo.ai",
+    "manageBillingIosNote": "Betalingsmetoder, automatisk optankning og betalingsoplysninger administreres på kilo.ai.",
     "codeReviewerSubtitle": "Automatiske PR-gennemgange",
     "securityAgentSubtitle": "Find og afhjælp sårbarheder",
     "reviews": "Kodegennemgange",
@@ -330,7 +339,6 @@
     "providerKeys": {
       "title": "Udbydernøgler",
       "rowSubtitle": "Brug din egen udbyderfakturering",
-      "manageOnWeb": "Administrer på nettet",
       "manageOnWebReason": "Disse udbydere kræver strukturerede legitimationsoplysninger.",
       "description": "Anmodninger via disse nøgler faktureres til din udbyderkonto i stedet for din Kilo-saldo.",
       "enabled": "I brug",
@@ -2551,7 +2559,8 @@
       "cancelQueued": "Annullér besked",
       "cancelQueuedAccessibility": "Annullér besked i kø",
       "restoreQueued": "Gendan",
-      "restoreQueuedAccessibility": "Gendan den annullerede besked i beskedfeltet"
+      "restoreQueuedAccessibility": "Gendan den annullerede besked i beskedfeltet",
+      "noReplyRecorded": "Der blev ikke registreret noget svar for denne besked."
     },
     "olderMessages": {
       "arrived": "Tidligere beskeder indlæst",
@@ -2944,6 +2953,26 @@
     "onlyFirstFilesAttached_other": "Kun de første {{displayCount}} filer vedhæftes."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Betalingshistorik",
+      "billingHistoryEmpty": "Ingen betalingshistorik endnu.",
+      "cancel": "Opsig abonnement",
+      "cancelDescription": "Dit Kilo Pass forbliver aktivt indtil udgangen af betalingsperioden og fornyes ikke.",
+      "cancelScheduled": "Opsiges den {{date}}",
+      "cancelScheduledChange": "Annuller planlagt ændring",
+      "cancelled": "Abonnementet er opsagt",
+      "changePlan": "Skift abonnement på kilo.ai",
+      "changePlanIosNote": "Ændringer af betalte abonnementer kan foretages på kilo.ai.",
+      "creditHistoryEmpty": "Ingen Kilo Pass-kreditter endnu.",
+      "manageInStore": "Administrer i {{store}}",
+      "resume": "Genoptag abonnement",
+      "resumeCancelledDescription": "Dit Kilo Pass begynder igen at blive fornyet automatisk.",
+      "resumePausedDescription": "Dit Kilo Pass genoptages nu, før den planlagte genoptagelsesdato.",
+      "resumed": "Abonnementet er genoptaget",
+      "scheduledChange": "Planlagt ændring",
+      "scheduledChangeCancelDescription": "Dit Kilo Pass forbliver på det nuværende abonnement og fornyes som hidtil.",
+      "scheduledChangeSummary": "{{plan}} den {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass er ikke tilgængeligt.",
     "couldNotLoad": "Kilo Pass kunne ikke indlæses. Prøv igen.",
@@ -2998,6 +3027,11 @@
     "accountDescription": "Dit Kilo-konto-id og metadata om anmodninger bruges til at bekræfte din identitet og måle forbruget.",
     "diagnosticsTitle": "Appdiagnostik",
     "diagnosticsDescription": "Rapporter om nedbrud og fejl bruges til at holde appen stabil. Indhold fra appen fjernes først.",
+    "featureFlagsTitle": "Udrulning af funktioner",
+    "featureFlagsDescription": "Din kontos e-mailadresse, som PostHog bruger til at afgøre hvilke funktioner du ser.",
+    "featureFlagsWhat": "Din kontos e-mailadresse.",
+    "featureFlagsWhy": "For at afgøre hvilke funktioner du ser, også dem vi stadig er ved at udrulle.",
+    "featureFlagsWho": "PostHog, tjenesten til funktionsflag.",
     "helpImprove": "Hjælp med at forbedre Kilo",
     "helpImproveDescription": "Del anonyme data om brugen af appen og oplysninger om installationskilden. Du kan altid ændre dette i indstillingerne.",
     "seeFullDetails": "Se alle oplysninger",
@@ -3953,6 +3987,25 @@
     "importConfigApplied": "Konfiguration importeret"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Kunne ikke indlæse kreditaktivitet.",
+      "appStoreReceipt": "Kvittering fra App Store",
+      "deductionFallback": "Kreditfradrag",
+      "emptyDescription": "Kreditkøb, kvitteringer og forbrug vises her.",
+      "emptyTitle": "Ingen kredithistorik",
+      "googlePlayReceipt": "Kvittering fra Google Play",
+      "kind": {
+        "adjustment": "Justering",
+        "balanceNeutral": "Saldoneutral",
+        "deduction": "Fradrag",
+        "grant": "Tildelt kredit",
+        "purchase": "Køb"
+      },
+      "purchaseFallback": "Kreditkøb",
+      "receipt": "Kvittering",
+      "receiptA11y": "Åbn kvitteringen for {{description}}",
+      "receiptUnavailable": "Der er ingen kvittering for dette køb."
+    },
     "title": "Køb kreditter",
     "description": "Kreditter er et engangskøb, der lægges til din Kilo-saldo til at køre AI-kodningssessioner i Kilo App. Butikken opkræver betaling på din konto, og kreditterne tilføjes, når butikken bekræfter betalingen.",
     "nextExpiry": "{{amount}} i kreditter udløber {{date}} (UTC). Kreditter med den tidligste udløbsdato bruges først.",
@@ -4134,6 +4187,41 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Kunne ikke åbne dette søgeresultat"
+  },
+  "usage": {
+    "title": "Forbrug",
+    "orgTitle": "Organisationens forbrug",
+    "entrySubtitle": "Udgifter, anmodninger og tokens",
+    "rangePicker": "Tidsperiode",
+    "range90d": "90 dage",
+    "metricPicker": "Diagrammets nøgletal",
+    "chartA11y": "{{metric}} pr. dag",
+    "avgCostPerRequest": "Gns. pris pr. anmodning",
+    "topModels": "Mest brugte modeller",
+    "topFeatures": "Mest brugte funktioner",
+    "emptyTitle": "Intet forbrug i denne periode",
+    "orgSelfNotice": "Du ser dit eget forbrug i denne organisation.",
+    "viewDetails": "Se forbrugsdetaljer"
+  },
+  "integrations": {
+    "title": "Integrationer",
+    "sectionTitle": "Forbundne tjenester",
+    "entrySubtitle": "GitHub, Slack, Linear og flere",
+    "subtitle": "Forbind dine udviklingsværktøjer og arbejdsgange med Kilo",
+    "emptyHint": "Ingen integrationer er forbundet endnu.",
+    "disconnect": "Afbryd forbindelse",
+    "disconnectTitle": "Afbryd forbindelsen til {{provider}}?",
+    "disconnectMessage": "Kilo holder op med at svare i {{provider}}. Du kan altid oprette forbindelsen igen.",
+    "connectedTo": "Forbundet med {{account}}",
+    "disconnected": "Forbindelsen til {{provider}} er afbrudt",
+    "disconnectFailed": "Forbindelsen til {{provider}} kunne ikke afbrydes",
+    "couldNotLoad": "Integrationerne kunne ikke indlæses",
+    "permissionDenied": "Du har ikke tilladelse til at administrere disse integrationer.",
+    "memberHint": "Bed en ejer eller administrator i organisationen om at ændre disse forbindelser.",
+    "connectFailed": "Siden til oprettelse af forbindelse kunne ikke åbnes"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Fakturaer for dine egne køb vises her, når du er blevet faktureret."
   },
   "cloudAgent": {
     "compute": {

@@ -45,6 +45,9 @@ type EnvironmentSheetProps = {
  * that environment's build, where a running or failed snapshot shows its state,
  * its log, and the one control the web offers — Build, Refresh, or Cancel. Back
  * returns to the list instead of stacking a second native sheet over the first.
+ * Only a press on a list row chooses: Done in either view closes the sheet and
+ * leaves the pick as it was, so opening a build to read its log cannot change
+ * the session's environment.
  */
 export function EnvironmentSheet({
   visible,
@@ -126,10 +129,7 @@ function EnvironmentSheetBody({
             onBack={() => {
               setOpenEnvironmentId(null);
             }}
-            onClose={() => {
-              onChoose(openEnvironment.id);
-              onClose();
-            }}
+            onClose={onClose}
           />
         )}
       </View>

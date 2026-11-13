@@ -38,7 +38,10 @@ type EnvironmentBuildDetailProps = {
   organizationId: string | undefined;
   onRetryBuildStatus: () => void;
   onBack: () => void;
-  /** Commits the pick: the sheet's Done both closes and chooses. */
+  /**
+   * Closes the sheet without changing the pick: reading a build's log is not
+   * choosing it, so only a press on the list row commits the environment.
+   */
   onClose: () => void;
 };
 

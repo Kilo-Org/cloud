@@ -23,10 +23,7 @@ export const USER_DELETION_SUBSTACK_TIMEOUT_MS = 15_000;
 export const USER_DELETION_SUBSTACK_USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
 export const USER_DELETION_DEFAULT_SUBSTACK_PUBLICATION_URL = 'https://blog.kilo.ai';
-export const USER_DELETION_SUBSTACK_MANUAL_URL =
-  'https://kilocode.substack.com/publish/subscribers';
 export const USER_DELETION_PYLON_DELETE_COMPLETE_TAG = 'delete-complete';
-export const USER_DELETION_PYLON_DELETE_READY_TAG = 'delete-ready';
 export const USER_DELETION_KILOCODE_APP_EMAIL = 'hi@app.kilocode.ai';
 export const USER_DELETION_STALE_REQUEST_MS = 7 * 24 * 60 * 60 * 1000;
 export const USER_DELETION_COMPLETION_HTML =

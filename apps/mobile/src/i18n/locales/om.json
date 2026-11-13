@@ -3030,6 +3030,36 @@
     "sendFeedback": "Yaada ergi"
   },
   "organization": {
+    "auditLog": {
+      "title": "Galmee odiitii",
+      "permissionDenied": "Galmee odiitii dhaabbataa kan dubbisuu danda'an abbaa dhaabbataa, bulchaa ykn hoggantoota kaffaltii karoora Enterprise irra jiran qofa.",
+      "emptyTitle": "Taateen odiitii hin jiru",
+      "emptyDescription": "Tarkaanfiiwwan dhaabbata kana keessatti fudhataman asitti mul'atu.",
+      "truncated": "Taateewwan dhihoo kana raawwataman agarsiifamaa jiru."
+    },
+    "billing": {
+      "title": "Kaffaltii",
+      "permissionDenied": "Kaffaltii dhaabbataa abbaa dhaabbataa, bulchaa ykn hoogganaa kaffaltii qofatu arguu danda'a.",
+      "subscription": "Galmee tajaajilaa",
+      "state": "Haala",
+      "stateNone": "Galmeen tajaajilaa hin jiru",
+      "statePastDue": "Yeroon kaffaltii darbeera",
+      "stateCancelsAtPeriodEnd": "Dhuma yeroo kanaatti haqama",
+      "stateTrialEndsOn": "Yaaliin {{date}} irratti xumurama",
+      "stateTrialing": "Yaalii",
+      "stateRenewsOn": "{{date}} irratti haaromfama",
+      "seatsDropTo": "{{date}} irratti bakka miseensotaa {{seats}}tti gadi bu'a",
+      "seats": "Bakka miseensotaa",
+      "autoTopUp": "Guutuu ofumaan",
+      "autoTopUpAmount": "Hanga guutuu",
+      "autoTopUpThreshold": "Yoo hafteen kanaa gadi bu'e",
+      "manageOnWeb": "Jijjiiramni weebii irratti taasifama",
+      "changePlan": "Karoora jijjiiri",
+      "buySeats": "Bakka miseensotaa bitadhu",
+      "setupAutoTopUp": "Guutuu ofumaan qindeessi",
+      "webAddress": "Teessoo weebii {{url}}",
+      "opensOnWeb": "Weebii irratti bana"
+    },
     "boundary": {
       "backToProfile": "Gara piroofaayiliitti deebi'i",
       "loadErrorMessage": "Walitti hidhamiinsa kee ilaalii irra deebi'ii yaali.",
@@ -3037,14 +3067,20 @@
       "loadErrorTitle": "Dhaabbilee kee fe'uu hin danda'amne.",
       "membershipLostNotice": "Dhaabbata kana bira ga'uuf kana booda hayyama hin qabdu. Gara {{target}} tti jijjiirame.",
       "noOrganization": "Dhaabbanni hin jiru",
-      "noOrganizationDescription": "Herregni kun dhaabbata tokko keessaa hin qoodu. Faayidaalee dhaabbataa akka affeerraa miseensotaa fi akeekkachiisa haala maallaqaa gadii fayyadamuf marsariitii irratti dhaabbata uumi yookaan tokkotti makami.",
-      "openWebOrganizations": "Dhaabbilee marsariitii irratti bani",
+      "noOrganizationDescription": "Herregni kun dhaabbata tokko keessa hin jiru. Amaloota dhaabbataa kan akka affeerraa miseensotaa fi akeekkachiisa haftee gadi aanaa fayyadamuuf dhaabbata uumi, ykn dhaabbata itti affeeramte tokkotti makamuuf weebii bani.",
       "organizationUnavailable": "Dhaabbanni hin argamu.",
       "selectDescriptionWithOrganizations": "Ati dhaabbata tokko yookaan tokkoo ol keessaa qoodda. Herrega fuulli kun fayyadamuu qabu filadhu.",
       "selectOrganization": "Dhaabbata filadhu",
       "unavailableDescription": "Dhaabbanni kun kana booda hin argamu. Itti fufuuf piroofaayilii kee irraa dhaabbata filadhu.",
       "unavailableSessionsDescription": "Dhaabbanni kun kana booda hin argamu. Seesiniin isaa hin fe'atamuu danda'u.",
       "accessDeniedDescription": "Dhaabbata kana bira ga'uuf hayyama hin qabdu."
+    },
+    "create": {
+      "title": "Dhaabbata uumi",
+      "description": "Dhaabbanni kreeditii, eejentootaa fi qindaa'ina garee kee waliin qooda.",
+      "nameLabel": "Maqaa dhaabbataa",
+      "nameRequired": "Maqaa dhaabbataa galchi.",
+      "trialNote": "Yaaliin Enterprise guyyaa 14 kee yeroo dhaabbata uumtu jalqaba. Karoorri weebii irratti bitama."
     },
     "creditActivity": {
       "emptyDescription": "Bittaan, fayyadamni fi sirreeffamni kiriiditii dhaabbata kanaa yeroo raawwataman asitti mul'atu.",
@@ -3153,6 +3189,21 @@
       "ownRoleChange": "Gahee mataa kee jijjiiruu hin dandeessu.",
       "inviteExpired": "Affeerraan kun yeroon isaa darbe.",
       "inviteAccepted": "Affeerraan kun duraan fudhatameera."
+    },
+    "settingsOnWeb": {
+      "title": "Qindaa'ina dhaabbataa weebii irratti",
+      "usageDetails": "Odeeffannoo itti fayyadamaa",
+      "providersAndModels": "Dhiyeessitootaa fi moodeelota",
+      "groups": "Gareewwan",
+      "guardrails": "Daangaa eegumsaa",
+      "byok": "Furtuu mataa keetii fayyadami",
+      "ssoAndDomain": "SSO fi doomeenii",
+      "emailPreferences": "Filannoo imeelii",
+      "dataCollection": "Funaansa daataa",
+      "auditLogs": "Galmeewwan odiitii",
+      "requestLogs": "Galmeewwan gaaffii",
+      "subOrganizations": "Dhaabbilee jalaa",
+      "distributeFunds": "Maallaqa qoodi"
     },
     "usageStats": {
       "inputTokens": "Tookanoota galtee",

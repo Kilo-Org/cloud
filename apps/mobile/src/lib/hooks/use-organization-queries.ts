@@ -93,6 +93,38 @@ export function useOrgWithMembers(organizationId: string | null) {
   );
 }
 
+/**
+ * Whether the organization is a child of another one, from the two payloads
+ * that report the link, plus the membership query those callers also read.
+ *
+ * `organizations.list` carries the parent link, so a billing screen knows from
+ * its first frame whether the organization has a Kilo Pass row instead of
+ * adding one a request later and pushing the rows under it down. A device that
+ * persisted the list before that field existed hydrates an entry without it,
+ * and an entry written before an admin moved the organization under a parent
+ * still says `null`, so the membership payload fills the gap in both
+ * directions: a parent id from either payload makes this a child, because only
+ * an admin change moves an organization under a parent after creation and that
+ * id is never the stale side. A `null` confirms a top-level organization only
+ * from the freshly fetched membership payload; the list's own `null` is a
+ * cached value and leaves the link unknown until membership answers.
+ */
+export function useOrgParentLink(
+  organizationId: string | null,
+  listParentLink: string | null | undefined
+) {
+  const membership = useOrgWithMembers(organizationId);
+  const membershipParentLink = membership.data?.parent_organization_id;
+  const reportedParentLink = listParentLink ?? membershipParentLink;
+  const topLevelConfirmed = membershipParentLink === null;
+  const parentLink = reportedParentLink ?? (topLevelConfirmed ? null : undefined);
+  // No membership payload and a failed or paused fetch: the payload that would
+  // settle anything waiting on it will not arrive on its own.
+  const membershipUnavailable =
+    membership.data == null && (membership.isError || membership.isPaused);
+  return { membership, parentLink, membershipUnavailable };
+}
+
 export type OrgWithMembers = NonNullable<ReturnType<typeof useOrgWithMembers>['data']>;
 export type OrgMember = OrgWithMembers['members'][number];
 export type ActiveOrgMember = Extract<OrgMember, { status: 'active' }>;

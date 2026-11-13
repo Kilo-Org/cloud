@@ -3030,6 +3030,36 @@
     "sendFeedback": "Aika ra'ayi"
   },
   "organization": {
+    "auditLog": {
+      "title": "Rajistar bincike",
+      "permissionDenied": "Mai ƙungiya, mai gudanarwa ko manajan biyan kuɗi a tsarin Enterprise ne kaɗai zai iya karanta rajistar binciken ƙungiyar.",
+      "emptyTitle": "Babu abubuwan bincike",
+      "emptyDescription": "Ayyukan da aka yi a wannan ƙungiya suna bayyana a nan.",
+      "truncated": "Ana nuna abubuwan baya-bayan nan."
+    },
+    "billing": {
+      "title": "Biyan kuɗi",
+      "permissionDenied": "Mai ƙungiya, mai gudanarwa ko manajan biyan kuɗi ne kaɗai zai iya ganin bayanan biyan kuɗinta.",
+      "subscription": "Rajista",
+      "state": "Matsayi",
+      "stateNone": "Babu rajista",
+      "statePastDue": "Wa'adin biya ya wuce",
+      "stateCancelsAtPeriodEnd": "Za a soke a ƙarshen wa'adi",
+      "stateTrialEndsOn": "Gwaji zai ƙare a ranar {{date}}",
+      "stateTrialing": "Gwaji",
+      "stateRenewsOn": "Za a sabunta a ranar {{date}}",
+      "seatsDropTo": "Gurabe za su ragu zuwa {{seats}} a ranar {{date}}",
+      "seats": "Gurabe",
+      "autoTopUp": "Ƙara kuɗi ta atomatik",
+      "autoTopUpAmount": "Adadin ƙarin kuɗi",
+      "autoTopUpThreshold": "Idan ragowar kuɗi ta yi ƙasa da",
+      "manageOnWeb": "Ana yin canje-canje a yanar gizo",
+      "changePlan": "Canza tsari",
+      "buySeats": "Sayi gurabe",
+      "setupAutoTopUp": "Saita ƙara kuɗi ta atomatik",
+      "webAddress": "Adireshin yanar gizo {{url}}",
+      "opensOnWeb": "Yana buɗewa a yanar gizo"
+    },
     "boundary": {
       "backToProfile": "Koma zuwa bayanan martaba",
       "loadErrorMessage": "Duba haɗin yanar gizonka, sannan ka sake gwadawa.",
@@ -3037,14 +3067,20 @@
       "loadErrorTitle": "An kasa loda ƙungiyoyinka.",
       "membershipLostNotice": "Ba ka da izinin shiga wannan ƙungiyar a yanzu. An sauya zuwa {{target}}.",
       "noOrganization": "Babu ƙungiya",
-      "noOrganizationDescription": "Wannan asusun ba ya cikin wata ƙungiya. Ƙirƙiri ko shiga wata ƙungiya a yanar gizo don amfani da fasalolin ƙungiya kamar gayyata membobi da faɗakarwar ƙarancin ma'auni.",
-      "openWebOrganizations": "Buɗe ƙungiyoyi a yanar gizo",
+      "noOrganizationDescription": "Wannan asusun ba ya cikin wata ƙungiya. Ƙirƙiri ɗaya don amfani da fasalolin ƙungiya kamar gayyatar membobi da faɗakarwar ƙarancin kuɗi, ko buɗe yanar gizo don shiga wadda aka gayyace ka.",
       "organizationUnavailable": "Ba a samun ƙungiyar.",
       "selectDescriptionWithOrganizations": "Kana cikin ƙungiya ɗaya ko fiye. Zaɓi asusun da wannan allon ya kamata ya yi amfani da shi.",
       "selectOrganization": "Zaɓi ƙungiya",
       "unavailableDescription": "An daina samun wannan ƙungiyar. Zaɓi wata daga bayanan martabarka don ci gaba.",
       "unavailableSessionsDescription": "An daina samun wannan ƙungiyar. Ba za a iya loda zamanta ba.",
       "accessDeniedDescription": "Ba ka da izinin shiga wannan ƙungiyar."
+    },
+    "create": {
+      "title": "Ƙirƙiri ƙungiya",
+      "description": "Ƙungiya na raba kiredit, wakilai da saituna da tawagarka.",
+      "nameLabel": "Sunan ƙungiya",
+      "nameRequired": "Shigar da sunan ƙungiya.",
+      "trialNote": "Gwajin Enterprise na kwanaki 14 zai fara da zarar ka ƙirƙira ta. Ana sayen tsare-tsare a yanar gizo."
     },
     "creditActivity": {
       "emptyDescription": "Sayayya, amfani da kuɗi, da gyaran kuɗin amfani na wannan ƙungiyar za su bayyana a nan yayin da suke faruwa.",
@@ -3153,6 +3189,21 @@
       "ownRoleChange": "Ba za ka iya canza matsayin kanka ba.",
       "inviteExpired": "Wannan gayyatar ta ƙare.",
       "inviteAccepted": "An riga an karɓi wannan gayyatar."
+    },
+    "settingsOnWeb": {
+      "title": "Saitunan ƙungiya a yanar gizo",
+      "usageDetails": "Bayanan amfani",
+      "providersAndModels": "Masu samar da sabis da samfura",
+      "groups": "Rukunoni",
+      "guardrails": "Matakan kariya",
+      "byok": "Kawo maɓallinka na kanka",
+      "ssoAndDomain": "SSO da yanki",
+      "emailPreferences": "Zaɓuɓɓukan imel",
+      "dataCollection": "Tattara bayanai",
+      "auditLogs": "Rajistun bincike",
+      "requestLogs": "Rajistun buƙatu",
+      "subOrganizations": "Ƙananan ƙungiyoyi",
+      "distributeFunds": "Raba kuɗi"
     },
     "usageStats": {
       "inputTokens": "Guntayen rubutun shigarwa",

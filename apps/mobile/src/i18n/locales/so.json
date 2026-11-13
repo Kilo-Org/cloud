@@ -3030,6 +3030,36 @@
     "sendFeedback": "Soo dir ra'yi"
   },
   "organization": {
+    "auditLog": {
+      "title": "Diiwaanka hubinta",
+      "permissionDenied": "Kaliya milkiilaha ururka, maamulaha ama maareeyaha biilasha ee qorshaha Enterprise ayaa akhrin kara diiwaanka hubinta.",
+      "emptyTitle": "Ma jiraan dhacdooyin hubin",
+      "emptyDescription": "Falalka lagu sameeyo ururkan halkan ayay ka muuqdaan.",
+      "truncated": "Waxaa la muujinayaa dhacdooyinkii ugu dambeeyay."
+    },
+    "billing": {
+      "title": "Biilasha",
+      "permissionDenied": "Kaliya milkiilaha ururka, maamulaha ama maareeyaha biilasha ayaa arki kara biilasha ururka.",
+      "subscription": "Isdiiwaangelinta",
+      "state": "Xaaladda",
+      "stateNone": "Isdiiwaangelin ma jirto",
+      "statePastDue": "Waqtigii bixinta wuu dhaafay",
+      "stateCancelsAtPeriodEnd": "Waa la joojinayaa dhammaadka muddada",
+      "stateTrialEndsOn": "Tijaabadu waxay dhammaanaysaa {{date}}",
+      "stateTrialing": "Tijaabo",
+      "stateRenewsOn": "Waa la cusboonaysiinayaa {{date}}",
+      "seatsDropTo": "Boosasku waxay hoos ugu dhacayaan {{seats}} {{date}}",
+      "seats": "Boosaska",
+      "autoTopUp": "Ku-shubid toos ah",
+      "autoTopUpAmount": "Qadarka ku-shubidda",
+      "autoTopUpThreshold": "Marka hadhaagu ka hooseeyo",
+      "manageOnWeb": "Isbeddellada waxaa lagu sameeyaa webka",
+      "changePlan": "Beddel qorshaha",
+      "buySeats": "Iibso boosas",
+      "setupAutoTopUp": "Deji ku-shubid toos ah",
+      "webAddress": "Cinwaanka webka {{url}}",
+      "opensOnWeb": "Waxay ku furmaysaa webka"
+    },
     "boundary": {
       "backToProfile": "Ku noqo bogga shakhsiga",
       "loadErrorMessage": "Hubi xiriirkaaga internetka oo mar kale isku day.",
@@ -3037,14 +3067,20 @@
       "loadErrorTitle": "Ururradaada lama soo shubi karin.",
       "membershipLostNotice": "Mar dambe ma lihid oggolaansho aad ku gasho ururkan. Waxaa lagu beddelay {{target}}.",
       "noOrganization": "Ma jiro urur",
-      "noOrganizationDescription": "Akoonkani qayb kama aha urur. Samee ama ku biir urur bogga internetka si aad u isticmaasho sifooyinka ururka sida casumaadka xubnaha iyo digniinaha hadhaaga hooseeya.",
-      "openWebOrganizations": "Ka fur ururada bogga internetka",
+      "noOrganizationDescription": "Akoonkan kama mid aha urur. Samee mid si aad u isticmaasho astaamaha ururka sida martiqaadka xubnaha iyo digniinaha hadhaaga yar, ama fur shabakadda si aad ugu biirto mid laguu martiqaaday.",
       "organizationUnavailable": "Ururka lama heli karo.",
       "selectDescriptionWithOrganizations": "Waxaad ka tirsan tahay hal urur ama in ka badan. Dooro akoonka ay tahay in shaashaddan isticmaasho.",
       "selectOrganization": "Dooro urur",
       "unavailableDescription": "Ururkan mar dambe lama heli karo. Boggaaga shakhsiga ka dooro urur si aad u sii socoto.",
       "unavailableSessionsDescription": "Ururkan mar dambe lama heli karo. Lama soo dejin karo munaasabadahiisa.",
       "accessDeniedDescription": "Ma lihid oggolaansho aad ku gasho ururkan."
+    },
+    "create": {
+      "title": "Samee urur",
+      "description": "Ururku wuxuu kooxdaada la wadaagaa kredit, wakiillo iyo dejin.",
+      "nameLabel": "Magaca ururka",
+      "nameRequired": "Geli magaca ururka.",
+      "trialNote": "Tijaabadaada Enterprise ee 14-ka maalmood waxay bilaabataa marka aad samayso. Qorshayaasha waxaa laga iibsadaa shabakadda."
     },
     "creditActivity": {
       "emptyDescription": "Iibsiyada, isticmaalka iyo wax ka beddelka lacagta isticmaalka ee ururkan ayaa halkan ka soo muuqan doona marka ay dhacaan.",
@@ -3153,6 +3189,21 @@
       "ownRoleChange": "Ma beddeli kartid doorkaaga.",
       "inviteExpired": "Casuumaaddan waqtigeedii wuu dhammaaday.",
       "inviteAccepted": "Casuumaaddan mar hore ayaa la aqbalay."
+    },
+    "settingsOnWeb": {
+      "title": "Dejinta ururka ee shabakadda",
+      "usageDetails": "Faahfaahinta isticmaalka",
+      "providersAndModels": "Bixiyeyaasha iyo moodellada",
+      "groups": "Kooxaha",
+      "guardrails": "Xayndaabyada",
+      "byok": "Keen furahaaga",
+      "ssoAndDomain": "SSO iyo domain",
+      "emailPreferences": "Doorbidyada iimaylka",
+      "dataCollection": "Ururinta xogta",
+      "auditLogs": "Diiwaannada hubinta",
+      "requestLogs": "Diiwaannada codsiyada",
+      "subOrganizations": "Ururrada hoose",
+      "distributeFunds": "Qaybi lacagta"
     },
     "usageStats": {
       "inputTokens": "Halbeegyada qoraalka la geliyay",

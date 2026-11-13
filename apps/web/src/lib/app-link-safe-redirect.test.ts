@@ -20,7 +20,8 @@ describe('browserLandingPath', () => {
 
   it('passes unclaimed paths through unchanged', () => {
     const unclaimed = [
-      '/organizations/abc123',
+      '/organizations/abc123/guardrails',
+      '/organizations/new',
       '/account-verification',
       '/sign-in-to-editor',
       '/users/accept-invite/x',
@@ -49,6 +50,7 @@ describe('browserLandingPath', () => {
       '/organizations/*/security-agent/findings': '/organizations/o1/security-agent/findings',
       '/organizations/*/code-reviews': '/organizations/o1/code-reviews',
       '/organizations/*/code-reviews/*': '/organizations/o1/code-reviews/r2',
+      '/organizations/*': '/organizations/o1',
       '/s/*': '/s/abc',
     };
 
@@ -90,10 +92,15 @@ describe('isAppLinkClaimed', () => {
   it('accepts claimed paths', () => {
     expect(isAppLinkClaimed('/profile')).toBe(true);
     expect(isAppLinkClaimed('/cloud/sessions')).toBe(true);
+    // The org root is the accept-invite destination the app handles; anything
+    // below it is a web-only page.
+    expect(isAppLinkClaimed('/organizations/abc123')).toBe(true);
+    expect(isAppLinkClaimed('/organizations/abc123/guardrails')).toBe(false);
   });
 
   it('rejects unclaimed paths', () => {
-    expect(isAppLinkClaimed('/organizations/abc123')).toBe(false);
+    expect(isAppLinkClaimed('/organizations/new')).toBe(false);
+    expect(isAppLinkClaimed('/organizations/abc123/request-logs')).toBe(false);
     expect(isAppLinkClaimed('/claw')).toBe(false);
     expect(isAppLinkClaimed('/account-verification')).toBe(false);
   });

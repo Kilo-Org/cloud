@@ -3110,6 +3110,36 @@
     "sendFeedback": "Send feedback"
   },
   "organization": {
+    "auditLog": {
+      "title": "Audit log",
+      "permissionDenied": "Only an organization owner, admin or billing manager on the Enterprise plan can read its audit log.",
+      "emptyTitle": "No audit events",
+      "emptyDescription": "Actions taken in this organization appear here.",
+      "truncated": "Showing the most recent events."
+    },
+    "billing": {
+      "title": "Billing",
+      "permissionDenied": "Only an organization owner, admin or billing manager can see its billing.",
+      "subscription": "Subscription",
+      "state": "State",
+      "stateNone": "No subscription",
+      "statePastDue": "Past due",
+      "stateCancelsAtPeriodEnd": "Cancels at the end of the period",
+      "stateTrialEndsOn": "Trial ends on {{date}}",
+      "stateTrialing": "Trial",
+      "stateRenewsOn": "Renews on {{date}}",
+      "seatsDropTo": "Drops to {{seats}} seats on {{date}}",
+      "seats": "Seats",
+      "autoTopUp": "Auto top-up",
+      "autoTopUpAmount": "Top-up amount",
+      "autoTopUpThreshold": "When balance drops below",
+      "manageOnWeb": "Changes are made on the web",
+      "changePlan": "Change plan",
+      "buySeats": "Buy seats",
+      "setupAutoTopUp": "Set up auto top-up",
+      "webAddress": "Web address {{url}}",
+      "opensOnWeb": "Opens on the web"
+    },
     "boundary": {
       "accessDeniedDescription": "You do not have access to this organization.",
       "backToProfile": "Back to profile",
@@ -3118,13 +3148,19 @@
       "loadErrorTitle": "Couldn't load your organizations",
       "membershipLostNotice": "You no longer have access to this organization. Switched to {{target}}.",
       "noOrganization": "No organization",
-      "noOrganizationDescription": "This account is not part of an organization. Create or join one on the web to use organization features like member invites and low-balance alerts.",
-      "openWebOrganizations": "Open organizations on web",
+      "noOrganizationDescription": "This account is not part of an organization. Create one to use organization features like member invites and low-balance alerts, or open the web to join one you were invited to.",
       "organizationUnavailable": "Organization unavailable",
       "selectDescriptionWithOrganizations": "You belong to one or more organizations. Choose the account this screen should use.",
       "selectOrganization": "Select an organization",
       "unavailableDescription": "This organization is no longer available. Choose another account from the account picker to continue.",
       "unavailableSessionsDescription": "This organization is no longer available. Sessions for it cannot be loaded."
+    },
+    "create": {
+      "title": "Create organization",
+      "description": "An organization shares credits, agents and settings with your team.",
+      "nameLabel": "Organization name",
+      "nameRequired": "Enter an organization name.",
+      "trialNote": "Your 14-day Enterprise trial starts when you create it. Plans are bought on the web."
     },
     "creditActivity": {
       "emptyDescription": "Purchases, usage, and credit adjustments for this organization will appear here as they happen.",
@@ -3233,6 +3269,21 @@
       "ownRoleChange": "You cannot change your own role.",
       "inviteExpired": "This invitation has expired.",
       "inviteAccepted": "This invitation has already been accepted."
+    },
+    "settingsOnWeb": {
+      "title": "Organization settings on the web",
+      "usageDetails": "Usage details",
+      "providersAndModels": "Providers and models",
+      "groups": "Groups",
+      "guardrails": "Guardrails",
+      "byok": "Bring your own key",
+      "ssoAndDomain": "SSO and domain",
+      "emailPreferences": "Email preferences",
+      "dataCollection": "Data collection",
+      "auditLogs": "Audit logs",
+      "requestLogs": "Request logs",
+      "subOrganizations": "Sub-organizations",
+      "distributeFunds": "Distribute funds"
     },
     "usageStats": {
       "inputTokens": "Input Tokens",

@@ -3083,6 +3083,36 @@
     "sendFeedback": "Nosūtīt atsauksmi"
   },
   "organization": {
+    "auditLog": {
+      "title": "Audita žurnāls",
+      "permissionDenied": "Organizācijas audita žurnālu var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks, ja organizācijai ir Enterprise plāns.",
+      "emptyTitle": "Nav audita notikumu",
+      "emptyDescription": "Šeit tiek rādītas šajā organizācijā veiktās darbības.",
+      "truncated": "Tiek rādīti jaunākie notikumi."
+    },
+    "billing": {
+      "title": "Norēķini",
+      "permissionDenied": "Organizācijas norēķinus var redzēt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks.",
+      "subscription": "Abonements",
+      "state": "Statuss",
+      "stateNone": "Nav abonementa",
+      "statePastDue": "Kavēts maksājums",
+      "stateCancelsAtPeriodEnd": "Tiks atcelts perioda beigās",
+      "stateTrialEndsOn": "Izmēģinājums beidzas {{date}}",
+      "stateTrialing": "Izmēģinājums",
+      "stateRenewsOn": "Tiks atjaunots {{date}}",
+      "seatsDropTo": "{{date}} vietu skaits samazināsies līdz {{seats}}",
+      "seats": "Vietas",
+      "autoTopUp": "Automātiskā papildināšana",
+      "autoTopUpAmount": "Papildināšanas summa",
+      "autoTopUpThreshold": "Kad atlikums nokrītas zem",
+      "manageOnWeb": "Izmaiņas veic tīmeklī",
+      "changePlan": "Mainīt plānu",
+      "buySeats": "Pirkt vietas",
+      "setupAutoTopUp": "Iestatīt automātisko papildināšanu",
+      "webAddress": "Tīmekļa adrese {{url}}",
+      "opensOnWeb": "Tiek atvērts tīmeklī"
+    },
     "boundary": {
       "backToProfile": "Atpakaļ uz profilu",
       "loadErrorMessage": "Pārbaudi savienojumu un mēģini vēlreiz.",
@@ -3090,14 +3120,20 @@
       "loadErrorTitle": "Neizdevās ielādēt tavas organizācijas.",
       "membershipLostNotice": "Tev vairs nav piekļuves šai organizācijai. Pārslēgts uz {{target}}.",
       "noOrganization": "Nav organizācijas",
-      "noOrganizationDescription": "Šis konts nav daļa no organizācijas. Lai izmantotu organizācijas funkcijas, piemēram, dalībnieku uzaicinājumus un brīdinājumus par zemu atlikumu, izveido vai pievienojies organizācijai tīmeklī.",
-      "openWebOrganizations": "Atvērt organizācijas tīmeklī",
+      "noOrganizationDescription": "Šis konts nepieder nevienai organizācijai. Izveidojiet organizāciju, lai izmantotu tādas organizācijas funkcijas kā dalībnieku uzaicināšana un brīdinājumi par zemu atlikumu, vai atveriet tīmekli, lai pievienotos organizācijai, kurā esat uzaicināts.",
       "organizationUnavailable": "Organizācija nav pieejama.",
       "selectDescriptionWithOrganizations": "Tu piederi vienai vai vairākām organizācijām. Izvēlies kontu, kuru šim ekrānam vajadzētu izmantot.",
       "selectOrganization": "Organizācijas izvēle",
       "unavailableDescription": "Šī organizācija vairs nav pieejama. Lai turpinātu, izvēlies citu organizāciju savā profilā.",
       "unavailableSessionsDescription": "Šī organizācija vairs nav pieejama. Tās sesijas nevar ielādēt.",
       "accessDeniedDescription": "Tev nav piekļuves šai organizācijai."
+    },
+    "create": {
+      "title": "Izveidot organizāciju",
+      "description": "Organizācija koplieto kredītus, aģentus un iestatījumus ar jūsu komandu.",
+      "nameLabel": "Organizācijas nosaukums",
+      "nameRequired": "Ievadiet organizācijas nosaukumu.",
+      "trialNote": "Jūsu 14 dienu Enterprise izmēģinājums sāksies, kad izveidosiet organizāciju. Plāni tiek iegādāti tīmeklī."
     },
     "creditActivity": {
       "emptyDescription": "Šeit parādīsies informācija par šīs organizācijas kredītu pirkumiem, patēriņu un korekcijām.",
@@ -3206,6 +3242,21 @@
       "ownRoleChange": "Jūs nevarat mainīt savu lomu.",
       "inviteExpired": "Šis uzaicinājums ir zaudējis derīgumu.",
       "inviteAccepted": "Šis uzaicinājums jau ir apstiprināts."
+    },
+    "settingsOnWeb": {
+      "title": "Organizācijas iestatījumi tīmeklī",
+      "usageDetails": "Lietojuma informācija",
+      "providersAndModels": "Nodrošinātāji un modeļi",
+      "groups": "Grupas",
+      "guardrails": "Drošības ierobežojumi",
+      "byok": "Izmantot savu atslēgu",
+      "ssoAndDomain": "SSO un domēns",
+      "emailPreferences": "E-pasta preferences",
+      "dataCollection": "Datu vākšana",
+      "auditLogs": "Audita žurnāli",
+      "requestLogs": "Pieprasījumu žurnāli",
+      "subOrganizations": "Apakšorganizācijas",
+      "distributeFunds": "Sadalīt līdzekļus"
     },
     "usageStats": {
       "inputTokens": "Ievades tokeni",

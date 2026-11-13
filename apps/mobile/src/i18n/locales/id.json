@@ -3022,6 +3022,36 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "Log audit",
+      "permissionDenied": "Hanya pemilik, admin, atau pengelola penagihan organisasi dengan paket Enterprise yang dapat membaca log auditnya.",
+      "emptyTitle": "Tidak ada peristiwa audit",
+      "emptyDescription": "Tindakan yang dilakukan di organisasi ini akan muncul di sini.",
+      "truncated": "Menampilkan peristiwa terbaru."
+    },
+    "billing": {
+      "title": "Penagihan",
+      "permissionDenied": "Hanya pemilik, admin, atau manajer penagihan organisasi yang dapat melihat penagihannya.",
+      "subscription": "Langganan",
+      "state": "Status",
+      "stateNone": "Tidak ada langganan",
+      "statePastDue": "Lewat jatuh tempo",
+      "stateCancelsAtPeriodEnd": "Dibatalkan di akhir periode",
+      "stateTrialEndsOn": "Uji coba berakhir pada {{date}}",
+      "stateTrialing": "Uji coba",
+      "stateRenewsOn": "Diperpanjang pada {{date}}",
+      "seatsDropTo": "Turun menjadi {{seats}} lisensi pada {{date}}",
+      "seats": "Lisensi pengguna",
+      "autoTopUp": "Isi ulang otomatis",
+      "autoTopUpAmount": "Jumlah isi ulang",
+      "autoTopUpThreshold": "Saat saldo di bawah",
+      "manageOnWeb": "Perubahan dilakukan di web",
+      "changePlan": "Ubah paket",
+      "buySeats": "Beli lisensi",
+      "setupAutoTopUp": "Atur isi ulang otomatis",
+      "webAddress": "Alamat web {{url}}",
+      "opensOnWeb": "Dibuka di web"
+    },
     "boundary": {
       "backToProfile": "Kembali ke profil",
       "loadErrorMessage": "Periksa koneksimu dan coba lagi.",
@@ -3029,14 +3059,20 @@
       "loadErrorTitle": "Tidak dapat memuat daftar organisasimu.",
       "membershipLostNotice": "Kamu tidak lagi memiliki akses ke organisasi ini. Beralih ke {{target}}.",
       "noOrganization": "Tidak ada organisasi",
-      "noOrganizationDescription": "Akun ini bukan bagian dari organisasi. Buat atau gabung ke organisasi di web untuk menggunakan fitur organisasi seperti undangan anggota dan peringatan saldo rendah.",
-      "openWebOrganizations": "Buka organisasi di web",
+      "noOrganizationDescription": "Akun ini bukan bagian dari organisasi. Buat organisasi untuk menggunakan fitur organisasi seperti undangan anggota dan peringatan saldo rendah, atau buka web untuk bergabung dengan organisasi yang mengundang Anda.",
       "organizationUnavailable": "Organisasi tidak tersedia.",
       "selectDescriptionWithOrganizations": "Kamu termasuk dalam satu atau beberapa organisasi. Pilih akun yang harus digunakan layar ini.",
       "selectOrganization": "Pilih organisasi",
       "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih organisasi lain dari profilmu untuk melanjutkan.",
       "unavailableSessionsDescription": "Organisasi ini tidak lagi tersedia. Sesi untuk organisasi ini tidak dapat dimuat.",
       "accessDeniedDescription": "Kamu tidak memiliki akses ke organisasi ini."
+    },
+    "create": {
+      "title": "Buat organisasi",
+      "description": "Organisasi memungkinkan tim Anda berbagi kredit, agen, dan pengaturan.",
+      "nameLabel": "Nama organisasi",
+      "nameRequired": "Masukkan nama organisasi.",
+      "trialNote": "Uji coba Enterprise 14 hari Anda dimulai saat Anda membuatnya. Paket dibeli di web."
     },
     "creditActivity": {
       "emptyDescription": "Setiap pembelian, penggunaan, dan penyesuaian kredit organisasi ini akan ditampilkan di sini.",
@@ -3158,6 +3194,21 @@
       "ownRoleChange": "Anda tidak dapat mengubah peran Anda sendiri.",
       "inviteExpired": "Undangan ini telah kedaluwarsa.",
       "inviteAccepted": "Undangan ini sudah diterima."
+    },
+    "settingsOnWeb": {
+      "title": "Pengaturan organisasi di web",
+      "usageDetails": "Detail penggunaan",
+      "providersAndModels": "Penyedia dan model",
+      "groups": "Grup",
+      "guardrails": "Guardrail",
+      "byok": "Gunakan kunci sendiri",
+      "ssoAndDomain": "SSO dan domain",
+      "emailPreferences": "Preferensi email",
+      "dataCollection": "Pengumpulan data",
+      "auditLogs": "Log audit",
+      "requestLogs": "Log permintaan",
+      "subOrganizations": "Sub-organisasi",
+      "distributeFunds": "Distribusikan dana"
     },
     "usageStats": {
       "inputTokens": "Token masukan",

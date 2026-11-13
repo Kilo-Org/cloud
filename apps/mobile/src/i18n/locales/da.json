@@ -3030,6 +3030,36 @@
     "sendFeedback": "Send din feedback"
   },
   "organization": {
+    "auditLog": {
+      "title": "Revisionslog",
+      "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i en organisation på Enterprise-planen kan se organisationens revisionslog.",
+      "emptyTitle": "Ingen revisionshændelser",
+      "emptyDescription": "Handlinger, der udføres i denne organisation, vises her.",
+      "truncated": "Viser de seneste hændelser."
+    },
+    "billing": {
+      "title": "Fakturering",
+      "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i organisationen kan se dens fakturering.",
+      "subscription": "Abonnement",
+      "state": "Status",
+      "stateNone": "Intet abonnement",
+      "statePastDue": "Forfalden",
+      "stateCancelsAtPeriodEnd": "Opsiges ved periodens udløb",
+      "stateTrialEndsOn": "Prøveperioden slutter den {{date}}",
+      "stateTrialing": "Prøveperiode",
+      "stateRenewsOn": "Fornyes den {{date}}",
+      "seatsDropTo": "Falder til {{seats}} pladser den {{date}}",
+      "seats": "Pladser",
+      "autoTopUp": "Automatisk optankning",
+      "autoTopUpAmount": "Optankningsbeløb",
+      "autoTopUpThreshold": "Når saldoen falder under",
+      "manageOnWeb": "Ændringer foretages på nettet",
+      "changePlan": "Skift plan",
+      "buySeats": "Køb pladser",
+      "setupAutoTopUp": "Konfigurer automatisk optankning",
+      "webAddress": "Webadresse {{url}}",
+      "opensOnWeb": "Åbner på nettet"
+    },
     "boundary": {
       "backToProfile": "Tilbage til profil",
       "loadErrorMessage": "Tjek din forbindelse og prøv igen.",
@@ -3037,14 +3067,20 @@
       "loadErrorTitle": "Kunne ikke indlæse dine organisationer.",
       "membershipLostNotice": "Du har ikke længere adgang til denne organisation. Skiftet til {{target}}.",
       "noOrganization": "Ingen organisation",
-      "noOrganizationDescription": "Denne konto er ikke en del af en organisation. Opret eller tilslut dig en organisation på hjemmesiden for at bruge organisationsfunktioner som medlemsinvitationer og advarsler om lav saldo.",
-      "openWebOrganizations": "Åbn organisationer på hjemmesiden",
+      "noOrganizationDescription": "Denne konto er ikke en del af en organisation. Opret en for at bruge organisationsfunktioner som invitationer til medlemmer og advarsler om lav saldo, eller åbn nettet for at blive medlem af en organisation, du er inviteret til.",
       "organizationUnavailable": "Organisationen er ikke tilgængelig.",
       "selectDescriptionWithOrganizations": "Du tilhører en eller flere organisationer. Vælg den konto, som denne skærm skal bruge.",
       "selectOrganization": "Vælg en organisation",
       "unavailableDescription": "Denne organisation er ikke længere tilgængelig. Vælg en organisation på din profil for at fortsætte.",
       "unavailableSessionsDescription": "Denne organisation er ikke længere tilgængelig. Dens sessioner kan ikke indlæses.",
       "accessDeniedDescription": "Du har ikke adgang til denne organisation."
+    },
+    "create": {
+      "title": "Opret organisation",
+      "description": "En organisation deler kreditter, agenter og indstillinger med dit team.",
+      "nameLabel": "Organisationens navn",
+      "nameRequired": "Angiv et navn til organisationen.",
+      "trialNote": "Din 14-dages Enterprise-prøveperiode starter, når du opretter organisationen. Planer købes på nettet."
     },
     "creditActivity": {
       "emptyDescription": "Her vises organisationens køb, forbrug og justeringer af kreditter løbende.",
@@ -3153,6 +3189,21 @@
       "ownRoleChange": "Du kan ikke ændre din egen rolle.",
       "inviteExpired": "Denne invitation er udløbet.",
       "inviteAccepted": "Denne invitation er allerede blevet accepteret."
+    },
+    "settingsOnWeb": {
+      "title": "Organisationsindstillinger på nettet",
+      "usageDetails": "Forbrugsdetaljer",
+      "providersAndModels": "Udbydere og modeller",
+      "groups": "Grupper",
+      "guardrails": "Sikkerhedsgrænser",
+      "byok": "Brug din egen nøgle",
+      "ssoAndDomain": "SSO og domæne",
+      "emailPreferences": "E-mailpræferencer",
+      "dataCollection": "Dataindsamling",
+      "auditLogs": "Revisionslogs",
+      "requestLogs": "Anmodningslogs",
+      "subOrganizations": "Underorganisationer",
+      "distributeFunds": "Fordel midler"
     },
     "usageStats": {
       "inputTokens": "Tokens i inddata",

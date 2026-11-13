@@ -3030,6 +3030,36 @@
     "sendFeedback": "Bidali iritzia"
   },
   "organization": {
+    "auditLog": {
+      "title": "Ikuskaritza-erregistroa",
+      "permissionDenied": "Enterprise planeko erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur dezake haren ikuskaritza-erregistroa.",
+      "emptyTitle": "Ez dago ikuskaritza-gertaerarik",
+      "emptyDescription": "Erakunde honetan egindako ekintzak hemen agertzen dira.",
+      "truncated": "Gertaera berrienak erakusten dira."
+    },
+    "billing": {
+      "title": "Fakturazioa",
+      "permissionDenied": "Erakundearen jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik ikus dezake haren fakturazioa.",
+      "subscription": "Harpidetza",
+      "state": "Egoera",
+      "stateNone": "Harpidetzarik ez",
+      "statePastDue": "Ordainketa atzeratuta",
+      "stateCancelsAtPeriodEnd": "Aldiaren amaieran bertan behera geratuko da",
+      "stateTrialEndsOn": "Proba-aldiaren amaiera: {{date}}",
+      "stateTrialing": "Proba-aldia",
+      "stateRenewsOn": "Berritze-data: {{date}}",
+      "seatsDropTo": "{{seats}} lizentziara jaitsiko da ({{date}})",
+      "seats": "Lizentziak",
+      "autoTopUp": "Birkarga automatikoa",
+      "autoTopUpAmount": "Birkargaren zenbatekoa",
+      "autoTopUpThreshold": "Saldoa honen azpitik jaistean",
+      "manageOnWeb": "Aldaketak webean egiten dira",
+      "changePlan": "Aldatu plana",
+      "buySeats": "Erosi lizentziak",
+      "setupAutoTopUp": "Konfiguratu birkarga automatikoa",
+      "webAddress": "Web-helbidea {{url}}",
+      "opensOnWeb": "Webean irekitzen da"
+    },
     "boundary": {
       "backToProfile": "Itzuli profilera",
       "loadErrorMessage": "Egiaztatu konexioa eta saiatu berriro.",
@@ -3037,14 +3067,20 @@
       "loadErrorTitle": "Ezin izan dira zure erakundeak kargatu.",
       "membershipLostNotice": "Ez duzu jada erakunde honetarako sarbiderik. Aldatu da {{target}}-ra.",
       "noOrganization": "Erakunderik ez",
-      "noOrganizationDescription": "Kontu hau ez da erakunde baten parte. Sortu edo batu erakunde bat webgunean, kideen gonbidapenak eta saldo baxuaren abisuak bezalako erakunde-funtzioak erabiltzeko.",
-      "openWebOrganizations": "Ireki erakundeak webgunean",
+      "noOrganizationDescription": "Kontu hau ez dago inongo erakundetan. Sortu bat erakundeen eginbideak erabiltzeko (adibidez, kideak gonbidatzea eta saldo baxuaren alertak), edo ireki weba gonbidatu zaituzten erakunde batean sartzeko.",
       "organizationUnavailable": "Erakundea ez dago erabilgarri.",
       "selectDescriptionWithOrganizations": "Erakunde bateko edo gehiagoko kide zara. Hautatu pantaila honek erabili behar duen kontua.",
       "selectOrganization": "Hautatu erakunde bat",
       "unavailableDescription": "Erakunde hau jada ez dago erabilgarri. Aukeratu bat zure profiletik jarraitzeko.",
       "unavailableSessionsDescription": "Erakunde hau jada ez dago erabilgarri. Ezin dira kargatu haren saioak.",
       "accessDeniedDescription": "Ez duzu erakunde honetarako sarbiderik."
+    },
+    "create": {
+      "title": "Sortu erakundea",
+      "description": "Erakunde batek kredituak, agenteak eta ezarpenak partekatzen ditu zure taldearekin.",
+      "nameLabel": "Erakundearen izena",
+      "nameRequired": "Idatzi erakundearen izen bat.",
+      "trialNote": "Zure 14 eguneko Enterprise proba erakundea sortzean hasiko da. Planak webean erosten dira."
     },
     "creditActivity": {
       "emptyDescription": "Erakunde honen erosketak, erabilera eta kreditu-doikuntzak hemen agertuko dira gertatu ahala.",
@@ -3153,6 +3189,21 @@
       "ownRoleChange": "Ezin duzu zure rola aldatu.",
       "inviteExpired": "Gonbidapen hau iraungi da.",
       "inviteAccepted": "Gonbidapen hau dagoeneko onartu da."
+    },
+    "settingsOnWeb": {
+      "title": "Erakundearen ezarpenak webean",
+      "usageDetails": "Erabileraren xehetasunak",
+      "providersAndModels": "Hornitzaileak eta ereduak",
+      "groups": "Taldeak",
+      "guardrails": "Babes-mugak",
+      "byok": "Erabili zure gakoa",
+      "ssoAndDomain": "SSO eta domeinua",
+      "emailPreferences": "Posta elektronikoaren hobespenak",
+      "dataCollection": "Datu-bilketa",
+      "auditLogs": "Ikuskaritza-erregistroak",
+      "requestLogs": "Eskaeren erregistroak",
+      "subOrganizations": "Azpierakundeak",
+      "distributeFunds": "Banatu funtsak"
     },
     "usageStats": {
       "inputTokens": "Sarrerako tokenak",

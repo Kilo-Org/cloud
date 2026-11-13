@@ -3030,6 +3030,36 @@
     "sendFeedback": "মতামত পাঠান"
   },
   "organization": {
+    "auditLog": {
+      "title": "অডিট লগ",
+      "permissionDenied": "শুধুমাত্র Enterprise প্ল্যানে থাকা সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজার এর অডিট লগ দেখতে পারেন।",
+      "emptyTitle": "কোনো অডিট ইভেন্ট নেই",
+      "emptyDescription": "এই সংস্থায় নেওয়া পদক্ষেপগুলো এখানে দেখা যাবে।",
+      "truncated": "সাম্প্রতিকতম ইভেন্টগুলো দেখানো হচ্ছে।"
+    },
+    "billing": {
+      "title": "বিলিং",
+      "permissionDenied": "শুধুমাত্র সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজার এর বিলিং দেখতে পারেন।",
+      "subscription": "সাবস্ক্রিপশন",
+      "state": "অবস্থা",
+      "stateNone": "কোনো সাবস্ক্রিপশন নেই",
+      "statePastDue": "পেমেন্ট বকেয়া",
+      "stateCancelsAtPeriodEnd": "মেয়াদ শেষে বাতিল হবে",
+      "stateTrialEndsOn": "ট্রায়াল শেষ হবে {{date}} তারিখে",
+      "stateTrialing": "ট্রায়াল",
+      "stateRenewsOn": "{{date}} তারিখে রিনিউ হবে",
+      "seatsDropTo": "{{date}} তারিখে সিট কমে {{seats}}টি হবে",
+      "seats": "সিট",
+      "autoTopUp": "অটো টপ-আপ",
+      "autoTopUpAmount": "টপ-আপের পরিমাণ",
+      "autoTopUpThreshold": "ব্যালেন্স এর নিচে নামলে",
+      "manageOnWeb": "পরিবর্তন ওয়েবে করতে হয়",
+      "changePlan": "প্ল্যান পরিবর্তন করুন",
+      "buySeats": "সিট কিনুন",
+      "setupAutoTopUp": "অটো টপ-আপ সেট আপ করুন",
+      "webAddress": "ওয়েব ঠিকানা {{url}}",
+      "opensOnWeb": "ওয়েবে খোলে"
+    },
     "boundary": {
       "backToProfile": "প্রোফাইলে ফিরে যান",
       "loadErrorMessage": "আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
@@ -3037,14 +3067,20 @@
       "loadErrorTitle": "আপনার সংস্থাগুলো লোড করা যায়নি।",
       "membershipLostNotice": "এই সংস্থায় আপনার আর অ্যাক্সেস নেই। স্যুইচ করা হয়েছে {{target}}-এ।",
       "noOrganization": "কোনো সংস্থা নেই",
-      "noOrganizationDescription": "এই অ্যাকাউন্টটি কোনো সংস্থার অংশ নয়। সদস্য আমন্ত্রণ এবং কম ব্যালেন্স সতর্কতার মতো সংস্থার বৈশিষ্ট্য ব্যবহার করতে ওয়েবে একটি সংস্থা তৈরি করুন বা যোগ দিন।",
-      "openWebOrganizations": "ওয়েবে সংস্থাগুলি খুলুন",
+      "noOrganizationDescription": "এই অ্যাকাউন্টটি কোনো সংস্থার অংশ নয়। সদস্য আমন্ত্রণ ও কম ব্যালেন্সের সতর্কতার মতো সংস্থার ফিচার ব্যবহার করতে একটি সংস্থা তৈরি করুন, অথবা যে সংস্থায় আপনাকে আমন্ত্রণ জানানো হয়েছে তাতে যোগ দিতে ওয়েব খুলুন।",
       "organizationUnavailable": "সংস্থাটি পাওয়া যাচ্ছে না।",
       "selectDescriptionWithOrganizations": "আপনি এক বা একাধিক সংস্থার সদস্য। এই স্ক্রিনটি যে অ্যাকাউন্ট ব্যবহার করবে সেটি বেছে নিন।",
       "selectOrganization": "একটি সংস্থা নির্বাচন করুন",
       "unavailableDescription": "এই সংস্থাটি আর পাওয়া যাচ্ছে না। চালিয়ে যেতে আপনার প্রোফাইল থেকে অন্য একটি সংস্থা বেছে নিন।",
       "unavailableSessionsDescription": "এই সংস্থাটি আর পাওয়া যাচ্ছে না। এর সেশনগুলো লোড করা যাবে না।",
       "accessDeniedDescription": "এই সংস্থায় আপনার অ্যাক্সেস নেই।"
+    },
+    "create": {
+      "title": "সংস্থা তৈরি করুন",
+      "description": "একটি সংস্থা আপনার টিমের সাথে ক্রেডিট, এজেন্ট ও সেটিংস শেয়ার করে।",
+      "nameLabel": "সংস্থার নাম",
+      "nameRequired": "সংস্থার একটি নাম লিখুন।",
+      "trialNote": "সংস্থা তৈরি করলেই আপনার ১৪ দিনের Enterprise ট্রায়াল শুরু হবে। প্ল্যান ওয়েবে কেনা যায়।"
     },
     "creditActivity": {
       "emptyDescription": "এই সংস্থার ক্রয়, ব্যবহার ও ক্রেডিট সমন্বয়ের তথ্য প্রতিবার এখানে দেখা যাবে।",
@@ -3153,6 +3189,21 @@
       "ownRoleChange": "আপনি নিজের ভূমিকা পরিবর্তন করতে পারবেন না।",
       "inviteExpired": "এই আমন্ত্রণটির মেয়াদ শেষ হয়ে গেছে।",
       "inviteAccepted": "এই আমন্ত্রণটি ইতিমধ্যেই গ্রহণ করা হয়েছে।"
+    },
+    "settingsOnWeb": {
+      "title": "ওয়েবে সংস্থার সেটিংস",
+      "usageDetails": "ব্যবহারের বিবরণ",
+      "providersAndModels": "প্রোভাইডার ও মডেল",
+      "groups": "গ্রুপ",
+      "guardrails": "গার্ডরেল",
+      "byok": "নিজের কী ব্যবহার করুন",
+      "ssoAndDomain": "SSO ও ডোমেইন",
+      "emailPreferences": "ইমেলের পছন্দ",
+      "dataCollection": "ডেটা সংগ্রহ",
+      "auditLogs": "অডিট লগ",
+      "requestLogs": "রিকোয়েস্ট লগ",
+      "subOrganizations": "উপ-সংস্থা",
+      "distributeFunds": "ফান্ড বণ্টন করুন"
     },
     "usageStats": {
       "inputTokens": "ইনপুট টোকেন",

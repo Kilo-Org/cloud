@@ -3030,6 +3030,36 @@
     "sendFeedback": "Rəy göndər"
   },
   "organization": {
+    "auditLog": {
+      "title": "Audit jurnalı",
+      "permissionDenied": "Audit jurnalını yalnız Enterprise planındakı təşkilatın sahibi, administratoru və ya ödəniş meneceri oxuya bilər.",
+      "emptyTitle": "Audit hadisəsi yoxdur",
+      "emptyDescription": "Bu təşkilatda edilən əməliyyatlar burada görünür.",
+      "truncated": "Ən son hadisələr göstərilir."
+    },
+    "billing": {
+      "title": "Ödənişlər",
+      "permissionDenied": "Təşkilatın ödəniş məlumatlarını yalnız sahibi, administratoru və ya ödəniş meneceri görə bilər.",
+      "subscription": "Abunəlik",
+      "state": "Vəziyyət",
+      "stateNone": "Abunəlik yoxdur",
+      "statePastDue": "Ödəniş gecikib",
+      "stateCancelsAtPeriodEnd": "Dövrün sonunda ləğv olunur",
+      "stateTrialEndsOn": "Sınaq müddəti {{date}} tarixində bitir",
+      "stateTrialing": "Sınaq müddəti",
+      "stateRenewsOn": "{{date}} tarixində yenilənir",
+      "seatsDropTo": "{{date}} tarixində istifadəçi yerlərinin sayı {{seats}} olacaq",
+      "seats": "İstifadəçi yerləri",
+      "autoTopUp": "Avtomatik artırma",
+      "autoTopUpAmount": "Artırma məbləği",
+      "autoTopUpThreshold": "Balans bu həddən aşağı düşəndə",
+      "manageOnWeb": "Dəyişikliklər vebdə edilir",
+      "changePlan": "Planı dəyiş",
+      "buySeats": "İstifadəçi yerləri al",
+      "setupAutoTopUp": "Avtomatik artırmanı qur",
+      "webAddress": "Veb ünvan {{url}}",
+      "opensOnWeb": "Vebdə açılır"
+    },
     "boundary": {
       "backToProfile": "Profilə qayıt",
       "loadErrorMessage": "Bağlantını yoxla və yenidən cəhd et.",
@@ -3037,14 +3067,20 @@
       "loadErrorTitle": "Təşkilatlarını yükləmək mümkün olmadı.",
       "membershipLostNotice": "Bu təşkilata artıq giriş icazən yoxdur. Keçid edildi: {{target}}.",
       "noOrganization": "Təşkilat yoxdur",
-      "noOrganizationDescription": "Bu hesab heç bir təşkilatın üzvü deyil. Üzv dəvətləri və aşağı balans xəbərdarlıqları kimi təşkilat funksiyalarından istifadə etmək üçün saytda təşkilat yarat və ya ona qoşul.",
-      "openWebOrganizations": "Təşkilatları saytda aç",
+      "noOrganizationDescription": "Bu hesab heç bir təşkilata aid deyil. Üzv dəvətləri və aşağı balans xəbərdarlıqları kimi təşkilat funksiyalarından istifadə etmək üçün təşkilat yaradın və ya dəvət olunduğunuz təşkilata qoşulmaq üçün vebi açın.",
       "organizationUnavailable": "Təşkilat əlçatan deyil.",
       "selectDescriptionWithOrganizations": "Sən bir və ya bir neçə təşkilatın üzvüsən. Bu ekranın istifadə etməli olduğu hesabı seç.",
       "selectOrganization": "Təşkilat seç",
       "unavailableDescription": "Bu təşkilat artıq əlçatan deyil. Davam etmək üçün profilindən başqa təşkilat seç.",
       "unavailableSessionsDescription": "Bu təşkilat artıq əlçatan deyil. Onun sessiyalarını yükləmək mümkün deyil.",
       "accessDeniedDescription": "Bu təşkilata giriş icazən yoxdur."
+    },
+    "create": {
+      "title": "Təşkilat yarat",
+      "description": "Təşkilat kreditləri, agentləri və ayarları komandanızla paylaşır.",
+      "nameLabel": "Təşkilatın adı",
+      "nameRequired": "Təşkilatın adını daxil edin.",
+      "trialNote": "14 günlük Enterprise sınaq müddətiniz təşkilatı yaratdığınız zaman başlayır. Planlar vebdə alınır."
     },
     "creditActivity": {
       "emptyDescription": "Bu təşkilatın alışları, kredit istifadəsi və kredit düzəlişləri baş verdikcə burada görünəcək.",
@@ -3153,6 +3189,21 @@
       "ownRoleChange": "Öz rolunu dəyişə bilməzsən.",
       "inviteExpired": "Bu dəvətin müddəti bitib.",
       "inviteAccepted": "Bu dəvət artıq qəbul edilib."
+    },
+    "settingsOnWeb": {
+      "title": "Vebdə təşkilat ayarları",
+      "usageDetails": "İstifadə təfərrüatları",
+      "providersAndModels": "Provayderlər və modellər",
+      "groups": "Qruplar",
+      "guardrails": "Qoruyucu qaydalar",
+      "byok": "Öz açarınızdan istifadə edin",
+      "ssoAndDomain": "SSO və domen",
+      "emailPreferences": "E-poçt tərcihləri",
+      "dataCollection": "Məlumat toplanması",
+      "auditLogs": "Audit jurnalları",
+      "requestLogs": "Sorğu jurnalları",
+      "subOrganizations": "Alt təşkilatlar",
+      "distributeFunds": "Vəsaitləri bölüşdür"
     },
     "usageStats": {
       "inputTokens": "Giriş tokenləri",

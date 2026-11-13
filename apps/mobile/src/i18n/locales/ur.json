@@ -3030,6 +3030,36 @@
     "sendFeedback": "رائے بھیجیں"
   },
   "organization": {
+    "auditLog": {
+      "title": "آڈٹ لاگ",
+      "permissionDenied": "انٹرپرائز پلان پر صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کا آڈٹ لاگ دیکھ سکتا ہے۔",
+      "emptyTitle": "کوئی آڈٹ ایونٹ نہیں",
+      "emptyDescription": "اس تنظیم میں کیے گئے اقدامات یہاں ظاہر ہوتے ہیں۔",
+      "truncated": "حالیہ ترین ایونٹس دکھائے جا رہے ہیں۔"
+    },
+    "billing": {
+      "title": "بلنگ",
+      "permissionDenied": "صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کی بلنگ دیکھ سکتا ہے۔",
+      "subscription": "سبسکرپشن",
+      "state": "حالت",
+      "stateNone": "کوئی سبسکرپشن نہیں",
+      "statePastDue": "ادائیگی واجب الادا",
+      "stateCancelsAtPeriodEnd": "مدت کے اختتام پر منسوخ ہو جائے گی",
+      "stateTrialEndsOn": "ٹرائل {{date}} کو ختم ہوگا",
+      "stateTrialing": "ٹرائل",
+      "stateRenewsOn": "{{date}} کو تجدید ہوگی",
+      "seatsDropTo": "{{date}} کو گھٹ کر {{seats}} سیٹیں رہ جائیں گی",
+      "seats": "سیٹیں",
+      "autoTopUp": "خودکار ٹاپ اپ",
+      "autoTopUpAmount": "ٹاپ اپ کی رقم",
+      "autoTopUpThreshold": "جب بیلنس اس سے کم ہو",
+      "manageOnWeb": "تبدیلیاں ویب پر کی جاتی ہیں",
+      "changePlan": "پلان تبدیل کریں",
+      "buySeats": "سیٹیں خریدیں",
+      "setupAutoTopUp": "خودکار ٹاپ اپ سیٹ اپ کریں",
+      "webAddress": "ویب ایڈریس {{url}}",
+      "opensOnWeb": "ویب پر کھلتا ہے"
+    },
     "boundary": {
       "backToProfile": "پروفائل پر واپس جائیں",
       "loadErrorMessage": "اپنا انٹرنیٹ کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
@@ -3037,14 +3067,20 @@
       "loadErrorTitle": "آپ کی تنظیمیں لوڈ نہیں ہو سکیں۔",
       "membershipLostNotice": "آپ کو اب اس تنظیم تک رسائی حاصل نہیں ہے۔ {{target}} پر منتقل کر دیا گیا۔",
       "noOrganization": "کوئی تنظیم نہیں",
-      "noOrganizationDescription": "یہ اکاؤنٹ کسی تنظیم کا حصہ نہیں ہے۔ ممبر دعوتیں اور کم بیلنس انتباہات جیسی تنظیمی خصوصیات استعمال کرنے کے لیے ویب پر ایک تنظیم بنائیں یا اس میں شامل ہوں۔",
-      "openWebOrganizations": "ویب پر تنظیمیں کھولیں",
+      "noOrganizationDescription": "یہ اکاؤنٹ کسی تنظیم کا حصہ نہیں ہے۔ اراکین کو مدعو کرنے اور کم بیلنس کے الرٹس جیسی تنظیمی خصوصیات استعمال کرنے کے لیے ایک تنظیم بنائیں، یا جس تنظیم میں آپ کو مدعو کیا گیا ہے اس میں شامل ہونے کے لیے ویب کھولیں۔",
       "organizationUnavailable": "تنظیم دستیاب نہیں ہے۔",
       "selectDescriptionWithOrganizations": "آپ ایک یا زیادہ تنظیموں سے تعلق رکھتے ہیں۔ وہ اکاؤنٹ منتخب کریں جو یہ اسکرین استعمال کرے۔",
       "selectOrganization": "ایک تنظیم منتخب کریں",
       "unavailableDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ جاری رکھنے کے لیے اپنے پروفائل سے کوئی اور تنظیم منتخب کریں۔",
       "unavailableSessionsDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ اس کے سیشنز لوڈ نہیں ہو سکتے۔",
       "accessDeniedDescription": "آپ کو اس تنظیم تک رسائی حاصل نہیں ہے۔"
+    },
+    "create": {
+      "title": "تنظیم بنائیں",
+      "description": "تنظیم آپ کی ٹیم کے ساتھ کریڈٹس، ایجنٹس اور سیٹنگز شیئر کرتی ہے۔",
+      "nameLabel": "تنظیم کا نام",
+      "nameRequired": "تنظیم کا نام درج کریں۔",
+      "trialNote": "تنظیم بناتے ہی آپ کا 14 دن کا انٹرپرائز ٹرائل شروع ہو جائے گا۔ پلانز ویب پر خریدے جاتے ہیں۔"
     },
     "creditActivity": {
       "emptyDescription": "اس تنظیم کی خریداریوں، استعمال اور کریڈٹس میں ردوبدل کی تفصیلات یہاں ظاہر ہوتی جائیں گی۔",
@@ -3153,6 +3189,21 @@
       "ownRoleChange": "آپ اپنا کردار تبدیل نہیں کر سکتے۔",
       "inviteExpired": "یہ دعوت کی میعاد ختم ہو گئی ہے۔",
       "inviteAccepted": "یہ دعوت پہلے ہی قبول کی جا چکی ہے۔"
+    },
+    "settingsOnWeb": {
+      "title": "ویب پر تنظیم کی سیٹنگز",
+      "usageDetails": "استعمال کی تفصیلات",
+      "providersAndModels": "فراہم کنندگان اور ماڈلز",
+      "groups": "گروپس",
+      "guardrails": "گارڈ ریلز",
+      "byok": "اپنی کلید خود لائیں",
+      "ssoAndDomain": "SSO اور ڈومین",
+      "emailPreferences": "ای میل کی ترجیحات",
+      "dataCollection": "ڈیٹا کا حصول",
+      "auditLogs": "آڈٹ لاگز",
+      "requestLogs": "درخواست لاگز",
+      "subOrganizations": "ذیلی تنظیمیں",
+      "distributeFunds": "فنڈز تقسیم کریں"
     },
     "usageStats": {
       "inputTokens": "ان پٹ ٹوکن",

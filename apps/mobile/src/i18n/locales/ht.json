@@ -3030,6 +3030,36 @@
     "sendFeedback": "Voye kòmantè"
   },
   "organization": {
+    "auditLog": {
+      "title": "Jounal odit",
+      "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon jesyonè faktirasyon nan yon òganizasyon ki sou plan Enterprise la ki ka li jounal odit li.",
+      "emptyTitle": "Pa gen evènman odit",
+      "emptyDescription": "Aksyon yo fè nan òganizasyon sa a ap parèt la a.",
+      "truncated": "N ap montre evènman ki pi resan yo."
+    },
+    "billing": {
+      "title": "Faktirasyon",
+      "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon jesyonè faktirasyon òganizasyon an ki ka wè faktirasyon li.",
+      "subscription": "Abònman",
+      "state": "Eta",
+      "stateNone": "Pa gen abònman",
+      "statePastDue": "Peman an reta",
+      "stateCancelsAtPeriodEnd": "Ap anile nan fen peryòd la",
+      "stateTrialEndsOn": "Esè a ap fini {{date}}",
+      "stateTrialing": "Esè",
+      "stateRenewsOn": "Ap renouvle {{date}}",
+      "seatsDropTo": "Ap desann a {{seats}} plas {{date}}",
+      "seats": "Plas",
+      "autoTopUp": "Rechaj otomatik",
+      "autoTopUpAmount": "Montan rechaj",
+      "autoTopUpThreshold": "Lè balans lan desann anba",
+      "manageOnWeb": "Chanjman yo fèt sou entènèt la",
+      "changePlan": "Chanje plan",
+      "buySeats": "Achte plas",
+      "setupAutoTopUp": "Konfigire rechaj otomatik",
+      "webAddress": "Adrès entènèt {{url}}",
+      "opensOnWeb": "Ap louvri sou entènèt la"
+    },
     "boundary": {
       "backToProfile": "Tounen nan pwofil la",
       "loadErrorMessage": "Tcheke koneksyon ou epi eseye ankò.",
@@ -3037,14 +3067,20 @@
       "loadErrorTitle": "Nou pa t ka chaje òganizasyon ou yo.",
       "membershipLostNotice": "Ou pa gen aksè nan òganizasyon sa a ankò. Chanje pou {{target}}.",
       "noOrganization": "Pa gen òganizasyon",
-      "noOrganizationDescription": "Kont sa a pa fè pati yon òganizasyon. Kreye oswa rantre nan yon òganizasyon sou sit entènèt la pou itilize fonksyon òganizasyon tankou envitasyon manm ak alèt sou balans ki ba.",
-      "openWebOrganizations": "Louvri òganizasyon sou sit entènèt la",
+      "noOrganizationDescription": "Kont sa a pa fè pati okenn òganizasyon. Kreye youn pou itilize fonksyon òganizasyon tankou envitasyon manm ak alèt balans ki ba, oswa louvri sit entènèt la pou w antre nan yon òganizasyon yo te envite w ladan l.",
       "organizationUnavailable": "Òganizasyon an pa disponib.",
       "selectDescriptionWithOrganizations": "Ou fè pati youn oswa plizyè òganizasyon. Chwazi kont ki ekran sa a dwe itilize a.",
       "selectOrganization": "Chwazi yon òganizasyon",
       "unavailableDescription": "Òganizasyon sa a pa disponib ankò. Chwazi yon lòt nan pwofil ou a pou kontinye.",
       "unavailableSessionsDescription": "Òganizasyon sa a pa disponib ankò. Sezyon yo pa ka chaje.",
       "accessDeniedDescription": "Ou pa gen aksè nan òganizasyon sa a."
+    },
+    "create": {
+      "title": "Kreye òganizasyon",
+      "description": "Yon òganizasyon pèmèt ou pataje kredi, ajan ak paramèt ak ekip ou a.",
+      "nameLabel": "Non òganizasyon an",
+      "nameRequired": "Antre yon non pou òganizasyon an.",
+      "trialNote": "Esè Enterprise 14 jou ou a ap kòmanse lè ou kreye l. Se sou entènèt yo achte plan yo."
     },
     "creditActivity": {
       "emptyDescription": "Acha, itilizasyon ak ajisteman kredi òganizasyon sa a ap parèt isit la chak fwa yo fèt.",
@@ -3153,6 +3189,21 @@
       "ownRoleChange": "Ou pa ka chanje pwòp wòl ou.",
       "inviteExpired": "Envitasyon sa a ekspire.",
       "inviteAccepted": "Yo deja aksepte envitasyon sa a."
+    },
+    "settingsOnWeb": {
+      "title": "Paramèt òganizasyon an sou entènèt",
+      "usageDetails": "Detay itilizasyon",
+      "providersAndModels": "Founisè ak modèl",
+      "groups": "Gwoup",
+      "guardrails": "Baryè sekirite",
+      "byok": "Itilize pwòp kle ou",
+      "ssoAndDomain": "SSO ak domèn",
+      "emailPreferences": "Preferans imèl",
+      "dataCollection": "Koleksyon done",
+      "auditLogs": "Jounal odit",
+      "requestLogs": "Jounal demann",
+      "subOrganizations": "Sou-òganizasyon",
+      "distributeFunds": "Distribye lajan"
     },
     "usageStats": {
       "inputTokens": "Jeton antre",

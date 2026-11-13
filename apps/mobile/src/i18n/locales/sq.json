@@ -3030,6 +3030,36 @@
     "sendFeedback": "Dërgo përshtypje"
   },
   "organization": {
+    "auditLog": {
+      "title": "Regjistri i auditimit",
+      "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate me planin Enterprise mund ta lexojë regjistrin e saj të auditimit.",
+      "emptyTitle": "Nuk ka ngjarje auditimi",
+      "emptyDescription": "Veprimet e kryera në këtë organizatë shfaqen këtu.",
+      "truncated": "Po shfaqen ngjarjet më të fundit."
+    },
+    "billing": {
+      "title": "Faturimi",
+      "permissionDenied": "Faturimin e organizatës mund ta shohë vetëm pronari, administratori ose menaxheri i faturimit.",
+      "subscription": "Abonimi",
+      "state": "Statusi",
+      "stateNone": "Pa abonim",
+      "statePastDue": "Pagesë e vonuar",
+      "stateCancelsAtPeriodEnd": "Anulohet në fund të periudhës",
+      "stateTrialEndsOn": "Prova përfundon më {{date}}",
+      "stateTrialing": "Në provë",
+      "stateRenewsOn": "Rinovohet më {{date}}",
+      "seatsDropTo": "Zbret në {{seats}} vende më {{date}}",
+      "seats": "Vendet",
+      "autoTopUp": "Rimbushje automatike",
+      "autoTopUpAmount": "Shuma e rimbushjes",
+      "autoTopUpThreshold": "Kur gjendja zbret nën",
+      "manageOnWeb": "Ndryshimet bëhen në ueb",
+      "changePlan": "Ndrysho planin",
+      "buySeats": "Bli vende",
+      "setupAutoTopUp": "Konfiguro rimbushjen automatike",
+      "webAddress": "Adresa në ueb {{url}}",
+      "opensOnWeb": "Hapet në ueb"
+    },
     "boundary": {
       "backToProfile": "Kthehu te profili",
       "loadErrorMessage": "Kontrollo lidhjen dhe provo përsëri.",
@@ -3037,14 +3067,20 @@
       "loadErrorTitle": "Nuk u ngarkuan organizatat e tua.",
       "membershipLostNotice": "Nuk ke më qasje në këtë organizatë. U kalua te {{target}}.",
       "noOrganization": "Asnjë organizatë",
-      "noOrganizationDescription": "Kjo llogari nuk është pjesë e një organizate. Krijo ose bashkohu me një organizatë në ueb për të përdorur veçoritë e organizatës si ftesat për anëtarët dhe alarmet për balancë të ulët.",
-      "openWebOrganizations": "Hap organizatat në ueb",
+      "noOrganizationDescription": "Kjo llogari nuk bën pjesë në asnjë organizatë. Krijo një për të përdorur veçoritë e organizatës, si ftesat për anëtarë dhe sinjalizimet për gjendje të ulët, ose hap uebin për t'u bashkuar me një organizatë ku je ftuar.",
       "organizationUnavailable": "Organizata nuk është e disponueshme.",
       "selectDescriptionWithOrganizations": "Ti i përket një ose më shumë organizatave. Zgjidh llogarinë që duhet të përdorë ky ekran.",
       "selectOrganization": "Zgjidh një organizatë",
       "unavailableDescription": "Kjo organizatë nuk është më e disponueshme. Zgjidh një tjetër nga profili yt për të vazhduar.",
       "unavailableSessionsDescription": "Kjo organizatë nuk është më e disponueshme. Sesionet e saj nuk mund të ngarkohen.",
       "accessDeniedDescription": "Nuk ke qasje në këtë organizatë."
+    },
+    "create": {
+      "title": "Krijo organizatë",
+      "description": "Një organizatë ndan kreditet, agjentët dhe cilësimet me ekipin tënd.",
+      "nameLabel": "Emri i organizatës",
+      "nameRequired": "Fut emrin e organizatës.",
+      "trialNote": "Prova jote 14-ditore e Enterprise fillon kur e krijon. Planet blihen në ueb."
     },
     "creditActivity": {
       "emptyDescription": "Blerjet, përdorimi dhe rregullimet e krediteve të kësaj organizate do të shfaqen këtu sapo të ndodhin.",
@@ -3153,6 +3189,21 @@
       "ownRoleChange": "Nuk mund të ndryshosh rolin tënd.",
       "inviteExpired": "Kjo ftesë ka skaduar.",
       "inviteAccepted": "Kjo ftesë është pranuar tashmë."
+    },
+    "settingsOnWeb": {
+      "title": "Cilësimet e organizatës në ueb",
+      "usageDetails": "Detajet e përdorimit",
+      "providersAndModels": "Ofruesit dhe modelet",
+      "groups": "Grupet",
+      "guardrails": "Masat mbrojtëse",
+      "byok": "Përdor çelësin tënd",
+      "ssoAndDomain": "SSO dhe domeni",
+      "emailPreferences": "Preferencat e email-it",
+      "dataCollection": "Mbledhja e të dhënave",
+      "auditLogs": "Regjistrat e auditimit",
+      "requestLogs": "Regjistrat e kërkesave",
+      "subOrganizations": "Nënorganizatat",
+      "distributeFunds": "Shpërndaj fondet"
     },
     "usageStats": {
       "inputTokens": "Tokenët hyrës",

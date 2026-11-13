@@ -3075,6 +3075,36 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "Journal d'audit",
+      "permissionDenied": "Seuls un propriétaire, un administrateur ou un responsable de la facturation d'une organisation sous formule Enterprise peuvent consulter son journal d'audit.",
+      "emptyTitle": "Aucun événement d'audit",
+      "emptyDescription": "Les actions effectuées dans cette organisation s'affichent ici.",
+      "truncated": "Affichage des événements les plus récents."
+    },
+    "billing": {
+      "title": "Facturation",
+      "permissionDenied": "Seul un propriétaire, un administrateur ou un responsable de la facturation de l'organisation peut consulter sa facturation.",
+      "subscription": "Abonnement",
+      "state": "Statut",
+      "stateNone": "Aucun abonnement",
+      "statePastDue": "Paiement en retard",
+      "stateCancelsAtPeriodEnd": "Résiliation en fin de période",
+      "stateTrialEndsOn": "Fin de l'essai le {{date}}",
+      "stateTrialing": "Essai",
+      "stateRenewsOn": "Renouvellement le {{date}}",
+      "seatsDropTo": "Passe à {{seats}} licences le {{date}}",
+      "seats": "Licences",
+      "autoTopUp": "Recharge automatique",
+      "autoTopUpAmount": "Montant de la recharge",
+      "autoTopUpThreshold": "Quand le solde passe sous",
+      "manageOnWeb": "Les modifications se font sur le web",
+      "changePlan": "Changer de formule",
+      "buySeats": "Acheter des licences",
+      "setupAutoTopUp": "Configurer la recharge automatique",
+      "webAddress": "Adresse web {{url}}",
+      "opensOnWeb": "S'ouvre sur le web"
+    },
     "boundary": {
       "backToProfile": "Retour au profil",
       "loadErrorMessage": "Vérifiez votre connexion et réessayez.",
@@ -3082,14 +3112,20 @@
       "loadErrorTitle": "Impossible de charger vos organisations",
       "membershipLostNotice": "Vous n'avez plus accès à cette organisation. Basculé vers {{target}}.",
       "noOrganization": "Aucune organisation",
-      "noOrganizationDescription": "Ce compte ne fait partie d'aucune organisation. Créez une organisation ou rejoignez-en une sur le site web pour utiliser les fonctionnalités d'organisation telles que les invitations de membres et les alertes de solde faible.",
-      "openWebOrganizations": "Ouvrir les organisations sur le site web",
+      "noOrganizationDescription": "Ce compte ne fait partie d'aucune organisation. Créez-en une pour utiliser des fonctionnalités comme les invitations de membres et les alertes de solde bas, ou ouvrez le web pour rejoindre une organisation à laquelle vous avez été invité.",
       "organizationUnavailable": "L'organisation n'est pas disponible",
       "selectDescriptionWithOrganizations": "Vous appartenez à une ou plusieurs organisations. Choisissez le compte que cet écran doit utiliser.",
       "selectOrganization": "Choix d'une organisation",
       "unavailableDescription": "Cette organisation n'est plus disponible. Choisissez un autre compte dans le sélecteur de comptes pour continuer.",
       "unavailableSessionsDescription": "Cette organisation n'est plus disponible. Ses sessions ne peuvent pas être chargées.",
       "accessDeniedDescription": "Vous n'avez pas accès à cette organisation."
+    },
+    "create": {
+      "title": "Créer une organisation",
+      "description": "Une organisation partage ses crédits, ses agents et ses paramètres avec votre équipe.",
+      "nameLabel": "Nom de l'organisation",
+      "nameRequired": "Saisissez un nom d'organisation.",
+      "trialNote": "Votre essai Enterprise de 14 jours commence dès la création de l'organisation. Les formules s'achètent sur le web."
     },
     "creditActivity": {
       "emptyDescription": "Les achats, la consommation et les ajustements de crédits de cette organisation apparaîtront ici au fur et à mesure.",
@@ -3211,6 +3247,21 @@
       "ownRoleChange": "Vous ne pouvez pas changer votre propre rôle.",
       "inviteExpired": "Cette invitation a expiré.",
       "inviteAccepted": "Cette invitation a déjà été acceptée."
+    },
+    "settingsOnWeb": {
+      "title": "Paramètres de l'organisation sur le web",
+      "usageDetails": "Détails d'utilisation",
+      "providersAndModels": "Fournisseurs et modèles",
+      "groups": "Groupes",
+      "guardrails": "Garde-fous",
+      "byok": "Utiliser votre propre clé",
+      "ssoAndDomain": "SSO et domaine",
+      "emailPreferences": "Préférences d'e-mail",
+      "dataCollection": "Collecte de données",
+      "auditLogs": "Journaux d'audit",
+      "requestLogs": "Journaux des requêtes",
+      "subOrganizations": "Sous-organisations",
+      "distributeFunds": "Répartir les fonds"
     },
     "usageStats": {
       "inputTokens": "Jetons d'entrée",

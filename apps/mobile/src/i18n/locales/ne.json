@@ -3030,6 +3030,36 @@
     "sendFeedback": "प्रतिक्रिया पठाउनुहोस्"
   },
   "organization": {
+    "auditLog": {
+      "title": "अडिट लग",
+      "permissionDenied": "Enterprise प्लानमा रहेको संस्थाको मालिक, एडमिन वा बिलिङ प्रबन्धकले मात्र यसको अडिट लग पढ्न सक्नुहुन्छ।",
+      "emptyTitle": "कुनै अडिट घटना छैन",
+      "emptyDescription": "यस संस्थामा गरिएका कार्यहरू यहाँ देखिन्छन्।",
+      "truncated": "पछिल्ला घटनाहरू देखाइँदै छ।"
+    },
+    "billing": {
+      "title": "बिलिङ",
+      "permissionDenied": "संस्थाको मालिक, एडमिन वा बिलिङ प्रबन्धकले मात्र यसको बिलिङ हेर्न सक्नुहुन्छ।",
+      "subscription": "सदस्यता",
+      "state": "स्थिति",
+      "stateNone": "सदस्यता छैन",
+      "statePastDue": "भुक्तानी बाँकी",
+      "stateCancelsAtPeriodEnd": "अवधिको अन्त्यमा रद्द हुन्छ",
+      "stateTrialEndsOn": "ट्रायल {{date}} मा सकिन्छ",
+      "stateTrialing": "ट्रायल",
+      "stateRenewsOn": "{{date}} मा नवीकरण हुन्छ",
+      "seatsDropTo": "{{date}} मा {{seats}} सिटमा घट्छ",
+      "seats": "सिटहरू",
+      "autoTopUp": "स्वतः टप-अप",
+      "autoTopUpAmount": "टप-अप रकम",
+      "autoTopUpThreshold": "मौज्दात यसभन्दा कम हुँदा",
+      "manageOnWeb": "परिवर्तनहरू वेबमा गरिन्छन्",
+      "changePlan": "प्लान बदल्नुहोस्",
+      "buySeats": "सिटहरू किन्नुहोस्",
+      "setupAutoTopUp": "स्वतः टप-अप सेट अप गर्नुहोस्",
+      "webAddress": "वेब ठेगाना {{url}}",
+      "opensOnWeb": "वेबमा खुल्छ"
+    },
     "boundary": {
       "backToProfile": "प्रोफाइलमा फर्कनुहोस्",
       "loadErrorMessage": "इन्टरनेट जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
@@ -3037,14 +3067,20 @@
       "loadErrorTitle": "तपाईंका संस्थाहरू लोड गर्न सकिएन।",
       "membershipLostNotice": "तपाईंसँग यो संस्थामा अब पहुँच छैन। {{target}} मा स्विच गरियो।",
       "noOrganization": "कुनै संस्था छैन",
-      "noOrganizationDescription": "यो खाता कुनै संस्थाको भाग होइन। सदस्य निमन्त्रणा र कम ब्यालेन्स सतर्कता जस्ता संस्था सुविधाहरू प्रयोग गर्न वेबमा संस्था सिर्जना गर्नुहोस् वा सामेल हुनुहोस्।",
-      "openWebOrganizations": "वेबमा संस्थाहरू खोल्नुहोस्",
+      "noOrganizationDescription": "यो खाता कुनै संस्थाको हिस्सा होइन। सदस्य निम्तो र कम मौज्दात सूचनाजस्ता संस्थाका सुविधाहरू प्रयोग गर्न एउटा संस्था बनाउनुहोस्, वा तपाईंलाई निम्तो गरिएको संस्थामा सामेल हुन वेब खोल्नुहोस्।",
       "organizationUnavailable": "संस्था उपलब्ध छैन।",
       "selectDescriptionWithOrganizations": "तपाईं एक वा धेरै संस्थासँग सम्बन्धित हुनुहुन्छ। यो स्क्रिनले प्रयोग गर्नुपर्ने खाता छान्नुहोस्।",
       "selectOrganization": "संस्था चयन गर्नुहोस्",
       "unavailableDescription": "यो संस्था अब उपलब्ध छैन। जारी राख्न आफ्नो प्रोफाइलबाट अर्को संस्था छान्नुहोस्।",
       "unavailableSessionsDescription": "यो संस्था अब उपलब्ध छैन। यसका सत्रहरू लोड गर्न सकिँदैन।",
       "accessDeniedDescription": "तपाईंसँग यो संस्थामा पहुँच छैन।"
+    },
+    "create": {
+      "title": "संस्था बनाउनुहोस्",
+      "description": "संस्थाले तपाईंको टोलीसँग क्रेडिट, एजेन्ट र सेटिङहरू साझा गर्छ।",
+      "nameLabel": "संस्थाको नाम",
+      "nameRequired": "संस्थाको नाम लेख्नुहोस्।",
+      "trialNote": "संस्था बनाएपछि तपाईंको १४-दिने Enterprise ट्रायल सुरु हुन्छ। प्लानहरू वेबमा किनिन्छन्।"
     },
     "creditActivity": {
       "emptyDescription": "यस संस्थाका खरिद, प्रयोग र क्रेडिट समायोजनका विवरण ती काम भएलगत्तै यहाँ देखिनेछन्।",
@@ -3153,6 +3189,21 @@
       "ownRoleChange": "तपाईं आफ्नो भूमिका परिवर्तन गर्न सक्नुहुन्न।",
       "inviteExpired": "यो निम्तोको म्याद सकिएको छ।",
       "inviteAccepted": "यो निम्तो पहिले नै स्वीकार भइसकेको छ।"
+    },
+    "settingsOnWeb": {
+      "title": "वेबमा संस्थाका सेटिङहरू",
+      "usageDetails": "प्रयोग विवरण",
+      "providersAndModels": "प्रदायक र मोडेलहरू",
+      "groups": "समूहहरू",
+      "guardrails": "गार्डरेलहरू",
+      "byok": "आफ्नै की प्रयोग गर्नुहोस्",
+      "ssoAndDomain": "SSO र डोमेन",
+      "emailPreferences": "इमेल प्राथमिकताहरू",
+      "dataCollection": "डेटा सङ्कलन",
+      "auditLogs": "अडिट लगहरू",
+      "requestLogs": "अनुरोध लगहरू",
+      "subOrganizations": "उप-संस्थाहरू",
+      "distributeFunds": "रकम बाँड्नुहोस्"
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकनहरू",

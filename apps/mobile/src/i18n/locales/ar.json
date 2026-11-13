@@ -3234,6 +3234,36 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "سجل التدقيق",
+      "permissionDenied": "يمكن فقط لمالك المؤسسة أو مسؤولها أو مدير الفوترة فيها، ضمن خطة Enterprise، قراءة سجل التدقيق الخاص بها.",
+      "emptyTitle": "لا توجد أحداث تدقيق",
+      "emptyDescription": "تظهر هنا الإجراءات المتخذة في هذه المؤسسة.",
+      "truncated": "يتم عرض أحدث الأحداث."
+    },
+    "billing": {
+      "title": "الفوترة",
+      "permissionDenied": "لا يمكن الاطلاع على فوترة المؤسسة إلا لمالكها أو مسؤولها أو مدير الفوترة فيها.",
+      "subscription": "الاشتراك",
+      "state": "الحالة",
+      "stateNone": "لا يوجد اشتراك",
+      "statePastDue": "متأخر السداد",
+      "stateCancelsAtPeriodEnd": "يُلغى في نهاية الفترة",
+      "stateTrialEndsOn": "تنتهي الفترة التجريبية في {{date}}",
+      "stateTrialing": "فترة تجريبية",
+      "stateRenewsOn": "يتجدد في {{date}}",
+      "seatsDropTo": "ينخفض إلى {{seats}} مقاعد في {{date}}",
+      "seats": "المقاعد",
+      "autoTopUp": "الشحن التلقائي",
+      "autoTopUpAmount": "مبلغ الشحن",
+      "autoTopUpThreshold": "عندما ينخفض الرصيد عن",
+      "manageOnWeb": "تُجرى التغييرات على الويب",
+      "changePlan": "تغيير الخطة",
+      "buySeats": "شراء مقاعد",
+      "setupAutoTopUp": "إعداد الشحن التلقائي",
+      "webAddress": "عنوان الويب {{url}}",
+      "opensOnWeb": "يُفتح على الويب"
+    },
     "boundary": {
       "backToProfile": "العودة إلى الملف الشخصي",
       "loadErrorMessage": "تحقق من اتصالك بالإنترنت وحاول مرة أخرى.",
@@ -3241,14 +3271,20 @@
       "loadErrorTitle": "تعذّر تحميل مؤسساتك.",
       "membershipLostNotice": "لم يعد لديك حق الوصول إلى هذه المؤسسة. تم التبديل إلى {{target}}.",
       "noOrganization": "لا توجد مؤسسة",
-      "noOrganizationDescription": "هذا الحساب ليس جزءًا من مؤسسة. أنشئ مؤسسة أو انضم إلى واحدة على الموقع لاستخدام ميزات المؤسسة مثل دعوات الأعضاء وتنبيهات الرصيد المنخفض.",
-      "openWebOrganizations": "فتح المؤسسات على الموقع",
+      "noOrganizationDescription": "هذا الحساب ليس جزءًا من أي مؤسسة. أنشئ مؤسسة لاستخدام ميزاتها مثل دعوة الأعضاء وتنبيهات انخفاض الرصيد، أو افتح الويب للانضمام إلى مؤسسة تلقيت دعوة إليها.",
       "organizationUnavailable": "المؤسسة غير متاحة.",
       "selectDescriptionWithOrganizations": "أنت عضو في مؤسسة واحدة أو أكثر. اختر الحساب الذي يجب أن تستخدمه هذه الشاشة.",
       "selectOrganization": "اختيار مؤسسة",
       "unavailableDescription": "لم تعد هذه المؤسسة متاحة. اختر واحدة من ملفك الشخصي للمتابعة.",
       "unavailableSessionsDescription": "لم تعد هذه المؤسسة متاحة. لا يمكن تحميل جلساتها.",
       "accessDeniedDescription": "ليس لديك حق الوصول إلى هذه المؤسسة."
+    },
+    "create": {
+      "title": "إنشاء مؤسسة",
+      "description": "تتيح المؤسسة مشاركة الأرصدة والوكلاء والإعدادات مع فريقك.",
+      "nameLabel": "اسم المؤسسة",
+      "nameRequired": "أدخل اسم المؤسسة.",
+      "trialNote": "تبدأ فترة تجربة Enterprise لمدة 14 يومًا عند إنشائها. تُشترى الخطط على الويب."
     },
     "creditActivity": {
       "emptyDescription": "ستظهر هنا عمليات الشراء والاستخدام وتعديلات رصيد المؤسسة فور حدوثها.",
@@ -3370,6 +3406,21 @@
       "ownRoleChange": "لا يمكنك تغيير دورك.",
       "inviteExpired": "انتهت صلاحية هذه الدعوة.",
       "inviteAccepted": "تم قبول هذه الدعوة بالفعل."
+    },
+    "settingsOnWeb": {
+      "title": "إعدادات المؤسسة على الويب",
+      "usageDetails": "تفاصيل الاستخدام",
+      "providersAndModels": "المزوّدون والنماذج",
+      "groups": "المجموعات",
+      "guardrails": "ضوابط الحماية",
+      "byok": "استخدام مفتاحك الخاص",
+      "ssoAndDomain": "SSO والنطاق",
+      "emailPreferences": "تفضيلات البريد الإلكتروني",
+      "dataCollection": "جمع البيانات",
+      "auditLogs": "سجلات التدقيق",
+      "requestLogs": "سجلات الطلبات",
+      "subOrganizations": "المؤسسات الفرعية",
+      "distributeFunds": "توزيع الأموال"
     },
     "usageStats": {
       "inputTokens": "رموز الإدخال",

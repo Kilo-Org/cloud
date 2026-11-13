@@ -3022,6 +3022,36 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "稽核記錄",
+      "permissionDenied": "只有 Enterprise 套餐組織的擁有者、管理員或帳務管理員可以查看其稽核記錄。",
+      "emptyTitle": "沒有稽核事件",
+      "emptyDescription": "在此組織中執行的操作會顯示在這裡。",
+      "truncated": "僅顯示最近的事件。"
+    },
+    "billing": {
+      "title": "帳單",
+      "permissionDenied": "只有組織擁有者、管理員或帳單管理員可以查看組織帳單。",
+      "subscription": "訂閱",
+      "state": "狀態",
+      "stateNone": "無訂閱",
+      "statePastDue": "逾期未付",
+      "stateCancelsAtPeriodEnd": "將於本期結束時取消",
+      "stateTrialEndsOn": "試用期於 {{date}} 結束",
+      "stateTrialing": "試用中",
+      "stateRenewsOn": "將於 {{date}} 續訂",
+      "seatsDropTo": "{{date}} 起減為 {{seats}} 個席次",
+      "seats": "席次",
+      "autoTopUp": "自動儲值",
+      "autoTopUpAmount": "儲值金額",
+      "autoTopUpThreshold": "餘額低於此值時",
+      "manageOnWeb": "請在網頁上進行變更",
+      "changePlan": "變更套餐",
+      "buySeats": "購買席次",
+      "setupAutoTopUp": "設定自動儲值",
+      "webAddress": "網址 {{url}}",
+      "opensOnWeb": "在網頁上開啟"
+    },
     "boundary": {
       "backToProfile": "返回個人資料",
       "loadErrorMessage": "請檢查網路連線後再試一次。",
@@ -3029,14 +3059,20 @@
       "loadErrorTitle": "無法載入你的組織清單。",
       "membershipLostNotice": "你已無法存取此組織。已切換至 {{target}}。",
       "noOrganization": "沒有組織",
-      "noOrganizationDescription": "此帳戶不屬於任何組織。請在網頁版建立或加入組織，以使用成員邀請和低餘額提醒等組織功能。",
-      "openWebOrganizations": "在網頁版開啟組織",
+      "noOrganizationDescription": "此帳號不屬於任何組織。建立組織即可使用成員邀請、低餘額提醒等組織功能，或前往網頁加入你受邀的組織。",
       "organizationUnavailable": "無法存取組織。",
       "selectDescriptionWithOrganizations": "您屬於一個或多個組織。請選取此畫面應使用的帳戶。",
       "selectOrganization": "選取組織",
       "unavailableDescription": "此組織已無法存取。請到個人資料頁面選取其他組織，即可繼續。",
       "unavailableSessionsDescription": "此組織已無法存取。無法載入其工作階段。",
       "accessDeniedDescription": "你沒有存取此組織的權限。"
+    },
+    "create": {
+      "title": "建立組織",
+      "description": "組織可讓你與團隊共用點數、代理和設定。",
+      "nameLabel": "組織名稱",
+      "nameRequired": "請輸入組織名稱。",
+      "trialNote": "建立組織後，即會開始 14 天的 Enterprise 試用。套餐需在網頁上購買。"
     },
     "creditActivity": {
       "emptyDescription": "此組織的購買、用量與點數調整記錄都會顯示在這裡。",
@@ -3158,6 +3194,21 @@
       "ownRoleChange": "您無法變更自己的角色。",
       "inviteExpired": "此邀請已過期。",
       "inviteAccepted": "此邀請已被接受。"
+    },
+    "settingsOnWeb": {
+      "title": "網頁版組織設定",
+      "usageDetails": "使用詳情",
+      "providersAndModels": "供應商與模型",
+      "groups": "群組",
+      "guardrails": "防護機制",
+      "byok": "自備金鑰",
+      "ssoAndDomain": "SSO 與網域",
+      "emailPreferences": "電子郵件偏好設定",
+      "dataCollection": "資料收集",
+      "auditLogs": "稽核記錄",
+      "requestLogs": "請求記錄",
+      "subOrganizations": "子組織",
+      "distributeFunds": "分配資金"
     },
     "usageStats": {
       "inputTokens": "輸入詞元",

@@ -3030,6 +3030,36 @@
     "sendFeedback": "પ્રતિસાદ મોકલો"
   },
   "organization": {
+    "auditLog": {
+      "title": "ઑડિટ લૉગ",
+      "permissionDenied": "Enterprise પ્લાન પરની સંસ્થાનો ઑડિટ લૉગ ફક્ત તેના માલિક, એડમિન અથવા બિલિંગ મેનેજર જ જોઈ શકે છે.",
+      "emptyTitle": "કોઈ ઑડિટ ઇવેન્ટ નથી",
+      "emptyDescription": "આ સંસ્થામાં લેવાયેલી ક્રિયાઓ અહીં દેખાય છે.",
+      "truncated": "સૌથી તાજેતરની ઇવેન્ટ બતાવી રહ્યાં છીએ."
+    },
+    "billing": {
+      "title": "બિલિંગ",
+      "permissionDenied": "ફક્ત સંસ્થાના માલિક, એડમિન અથવા બિલિંગ મેનેજર જ તેનું બિલિંગ જોઈ શકે છે.",
+      "subscription": "સબ્સ્ક્રિપ્શન",
+      "state": "સ્થિતિ",
+      "stateNone": "કોઈ સબ્સ્ક્રિપ્શન નથી",
+      "statePastDue": "ચુકવણી બાકી",
+      "stateCancelsAtPeriodEnd": "સમયગાળાના અંતે રદ થશે",
+      "stateTrialEndsOn": "ટ્રાયલ {{date}}ના રોજ સમાપ્ત થશે",
+      "stateTrialing": "ટ્રાયલ",
+      "stateRenewsOn": "{{date}}ના રોજ રિન્યૂ થશે",
+      "seatsDropTo": "{{date}}ના રોજ ઘટીને {{seats}} સીટો થશે",
+      "seats": "સીટો",
+      "autoTopUp": "ઑટો ટોપ-અપ",
+      "autoTopUpAmount": "ટોપ-અપ રકમ",
+      "autoTopUpThreshold": "જ્યારે બેલેન્સ આનાથી ઓછું થાય",
+      "manageOnWeb": "ફેરફારો વેબ પર કરવામાં આવે છે",
+      "changePlan": "પ્લાન બદલો",
+      "buySeats": "સીટો ખરીદો",
+      "setupAutoTopUp": "ઑટો ટોપ-અપ સેટ કરો",
+      "webAddress": "વેબ સરનામું {{url}}",
+      "opensOnWeb": "વેબ પર ખુલે છે"
+    },
     "boundary": {
       "backToProfile": "પ્રોફાઇલ પર પાછા જાઓ",
       "loadErrorMessage": "તમારું ઇન્ટરનેટ જોડાણ તપાસીને ફરી પ્રયાસ કરો.",
@@ -3037,14 +3067,20 @@
       "loadErrorTitle": "તમારી સંસ્થાઓ લોડ કરી શકાઈ નહીં.",
       "membershipLostNotice": "તમારી પાસે આ સંસ્થાનો ઍક્સેસ હવે નથી. {{target}} પર સ્વિચ કર્યું.",
       "noOrganization": "કોઈ સંસ્થા નથી",
-      "noOrganizationDescription": "આ એકાઉન્ટ કોઈ સંસ્થાનો ભાગ નથી. સભ્ય આમંત્રણો અને ઓછી બેલેન્સ ચેતવણીઓ જેવી સંસ્થા સુવિધાઓનો ઉપયોગ કરવા માટે વેબ પર સંસ્થા બનાવો અથવા એકમાં જોડાઓ.",
-      "openWebOrganizations": "વેબ પર સંસ્થાઓ ખોલો",
+      "noOrganizationDescription": "આ એકાઉન્ટ કોઈ સંસ્થાનો ભાગ નથી. સભ્યોને આમંત્રણ અને ઓછા બેલેન્સની ચેતવણી જેવી સંસ્થાની સુવિધાઓ વાપરવા માટે એક સંસ્થા બનાવો, અથવા તમને જે સંસ્થામાં આમંત્રણ મળ્યું છે તેમાં જોડાવા માટે વેબ ખોલો.",
       "organizationUnavailable": "સંસ્થા ઉપલબ્ધ નથી.",
       "selectDescriptionWithOrganizations": "તમે એક અથવા વધુ સંસ્થાઓના સભ્ય છો. આ સ્ક્રીન જે એકાઉન્ટનો ઉપયોગ કરવો જોઈએ તે પસંદ કરો.",
       "selectOrganization": "સંસ્થા પસંદ કરો",
       "unavailableDescription": "આ સંસ્થા હવે ઉપલબ્ધ નથી. આગળ વધવા માટે તમારી પ્રોફાઇલમાંથી બીજી સંસ્થા પસંદ કરો.",
       "unavailableSessionsDescription": "આ સંસ્થા હવે ઉપલબ્ધ નથી. તેના સત્રો લોડ કરી શકાતા નથી.",
       "accessDeniedDescription": "તમારી પાસે આ સંસ્થાનો ઍક્સેસ નથી."
+    },
+    "create": {
+      "title": "સંસ્થા બનાવો",
+      "description": "સંસ્થા તમારી ટીમ સાથે ક્રેડિટ, એજન્ટ અને સેટિંગ્સ શેર કરે છે.",
+      "nameLabel": "સંસ્થાનું નામ",
+      "nameRequired": "સંસ્થાનું નામ દાખલ કરો.",
+      "trialNote": "સંસ્થા બનાવતાં જ તમારી 14 દિવસની Enterprise ટ્રાયલ શરૂ થાય છે. પ્લાન વેબ પર ખરીદવામાં આવે છે."
     },
     "creditActivity": {
       "emptyDescription": "આ સંસ્થાની ખરીદી, વપરાશ અને ક્રેડિટમાં થતા ફેરફારો અહીં દેખાશે.",
@@ -3153,6 +3189,21 @@
       "ownRoleChange": "તમે તમારી પોતાની ભૂમિકા બદલી શકતા નથી.",
       "inviteExpired": "આ આમંત્રણની મુદત પૂરી થઈ ગઈ છે.",
       "inviteAccepted": "આ આમંત્રણ પહેલેથી જ સ્વીકારવામાં આવ્યું છે."
+    },
+    "settingsOnWeb": {
+      "title": "વેબ પર સંસ્થાના સેટિંગ્સ",
+      "usageDetails": "વપરાશની વિગતો",
+      "providersAndModels": "પ્રોવાઇડર અને મોડેલ",
+      "groups": "ગ્રુપ",
+      "guardrails": "ગાર્ડરેલ્સ",
+      "byok": "તમારી પોતાની કી વાપરો",
+      "ssoAndDomain": "SSO અને ડોમેન",
+      "emailPreferences": "ઇમેઇલ પસંદગીઓ",
+      "dataCollection": "ડેટા સંગ્રહ",
+      "auditLogs": "ઑડિટ લૉગ",
+      "requestLogs": "રિક્વેસ્ટ લૉગ",
+      "subOrganizations": "પેટા-સંસ્થાઓ",
+      "distributeFunds": "ભંડોળ વહેંચો"
     },
     "usageStats": {
       "inputTokens": "ઇનપુટ ટોકન",

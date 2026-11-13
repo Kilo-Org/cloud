@@ -3022,6 +3022,36 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "Auditlogboek",
+      "permissionDenied": "Alleen een eigenaar, beheerder of factureringsbeheerder van een organisatie met het Enterprise-plan kan het auditlogboek bekijken.",
+      "emptyTitle": "Geen auditgebeurtenissen",
+      "emptyDescription": "Acties die in deze organisatie worden uitgevoerd, verschijnen hier.",
+      "truncated": "De meest recente gebeurtenissen worden weergegeven."
+    },
+    "billing": {
+      "title": "Facturering",
+      "permissionDenied": "Alleen een eigenaar, beheerder of factuurbeheerder van de organisatie kan de facturering bekijken.",
+      "subscription": "Abonnement",
+      "state": "Status",
+      "stateNone": "Geen abonnement",
+      "statePastDue": "Achterstallig",
+      "stateCancelsAtPeriodEnd": "Wordt opgezegd aan het einde van de periode",
+      "stateTrialEndsOn": "Proefperiode eindigt op {{date}}",
+      "stateTrialing": "Proefperiode",
+      "stateRenewsOn": "Wordt verlengd op {{date}}",
+      "seatsDropTo": "Daalt op {{date}} naar {{seats}} licenties",
+      "seats": "Licenties",
+      "autoTopUp": "Automatisch opwaarderen",
+      "autoTopUpAmount": "Opwaardeerbedrag",
+      "autoTopUpThreshold": "Als saldo lager wordt dan",
+      "manageOnWeb": "Wijzigingen worden op het web doorgevoerd",
+      "changePlan": "Plan wijzigen",
+      "buySeats": "Licenties kopen",
+      "setupAutoTopUp": "Automatisch opwaarderen instellen",
+      "webAddress": "Webadres {{url}}",
+      "opensOnWeb": "Opent op het web"
+    },
     "boundary": {
       "backToProfile": "Terug naar profiel",
       "loadErrorMessage": "Controleer je verbinding en probeer het opnieuw.",
@@ -3029,14 +3059,20 @@
       "loadErrorTitle": "Je organisaties konden niet worden geladen.",
       "membershipLostNotice": "Je hebt geen toegang meer tot deze organisatie. Overgeschakeld naar {{target}}.",
       "noOrganization": "Geen organisatie",
-      "noOrganizationDescription": "Dit account maakt geen deel uit van een organisatie. Maak er een aan of word lid van een organisatie op de website om organisatiefuncties zoals liduitnodigingen en waarschuwingen bij een laag saldo te gebruiken.",
-      "openWebOrganizations": "Organisaties op de website openen",
+      "noOrganizationDescription": "Dit account hoort niet bij een organisatie. Maak er een aan om organisatiefuncties te gebruiken, zoals leden uitnodigen en meldingen bij een laag saldo, of open het web om lid te worden van een organisatie waarvoor je bent uitgenodigd.",
       "organizationUnavailable": "De organisatie is niet beschikbaar.",
       "selectDescriptionWithOrganizations": "Je behoort tot een of meer organisaties. Kies het account dat dit scherm moet gebruiken.",
       "selectOrganization": "Een organisatie selecteren",
       "unavailableDescription": "Deze organisatie is niet meer beschikbaar. Kies er een uit je profiel om door te gaan.",
       "unavailableSessionsDescription": "Deze organisatie is niet meer beschikbaar. De sessies ervan kunnen niet worden geladen.",
       "accessDeniedDescription": "Je hebt geen toegang tot deze organisatie."
+    },
+    "create": {
+      "title": "Organisatie aanmaken",
+      "description": "Een organisatie deelt tegoed, agents en instellingen met je team.",
+      "nameLabel": "Naam van organisatie",
+      "nameRequired": "Voer een naam voor de organisatie in.",
+      "trialNote": "Je proefperiode van 14 dagen voor Enterprise begint zodra je de organisatie aanmaakt. Plannen koop je op het web."
     },
     "creditActivity": {
       "emptyDescription": "Hier verschijnen aankopen, verbruik en aanpassingen van het tegoed van deze organisatie zodra ze plaatsvinden.",
@@ -3158,6 +3194,21 @@
       "ownRoleChange": "Je kunt je eigen rol niet wijzigen.",
       "inviteExpired": "Deze uitnodiging is verlopen.",
       "inviteAccepted": "Deze uitnodiging is al geaccepteerd."
+    },
+    "settingsOnWeb": {
+      "title": "Organisatie-instellingen op het web",
+      "usageDetails": "Gebruiksgegevens",
+      "providersAndModels": "Providers en modellen",
+      "groups": "Groepen",
+      "guardrails": "Guardrails",
+      "byok": "Eigen sleutel gebruiken",
+      "ssoAndDomain": "SSO en domein",
+      "emailPreferences": "E-mailvoorkeuren",
+      "dataCollection": "Gegevensverzameling",
+      "auditLogs": "Auditlogboeken",
+      "requestLogs": "Verzoeklogboeken",
+      "subOrganizations": "Suborganisaties",
+      "distributeFunds": "Tegoed verdelen"
     },
     "usageStats": {
       "inputTokens": "Invoertokens",

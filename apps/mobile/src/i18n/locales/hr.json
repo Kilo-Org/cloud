@@ -3083,6 +3083,36 @@
     "sendFeedback": "Pošalji povratne informacije"
   },
   "organization": {
+    "auditLog": {
+      "title": "Revizijski zapisnik",
+      "permissionDenied": "Revizijski zapisnik organizacije na planu Enterprise mogu čitati samo vlasnik, administrator ili upravitelj naplate.",
+      "emptyTitle": "Nema revizijskih događaja",
+      "emptyDescription": "Ovdje se prikazuju radnje poduzete u ovoj organizaciji.",
+      "truncated": "Prikazuju se najnoviji događaji."
+    },
+    "billing": {
+      "title": "Naplata",
+      "permissionDenied": "Naplatu organizacije mogu vidjeti samo njezin vlasnik, administrator ili upravitelj naplate.",
+      "subscription": "Pretplata",
+      "state": "Stanje",
+      "stateNone": "Nema pretplate",
+      "statePastDue": "Plaćanje kasni",
+      "stateCancelsAtPeriodEnd": "Otkazuje se na kraju razdoblja",
+      "stateTrialEndsOn": "Probno razdoblje završava {{date}}",
+      "stateTrialing": "Probno razdoblje",
+      "stateRenewsOn": "Obnavlja se {{date}}",
+      "seatsDropTo": "Broj korisničkih mjesta smanjuje se na {{seats}} dana {{date}}",
+      "seats": "Korisnička mjesta",
+      "autoTopUp": "Automatska nadoplata",
+      "autoTopUpAmount": "Iznos nadoplate",
+      "autoTopUpThreshold": "Kad saldo padne ispod",
+      "manageOnWeb": "Promjene se unose na webu",
+      "changePlan": "Promijeni plan",
+      "buySeats": "Kupi korisnička mjesta",
+      "setupAutoTopUp": "Postavi automatsku nadoplatu",
+      "webAddress": "Web-adresa {{url}}",
+      "opensOnWeb": "Otvara se na webu"
+    },
     "boundary": {
       "backToProfile": "Natrag na profil",
       "loadErrorMessage": "Provjeri vezu i pokušaj ponovno.",
@@ -3090,14 +3120,20 @@
       "loadErrorTitle": "Nije moguće učitati tvoje organizacije.",
       "membershipLostNotice": "Više nemaš pristup ovoj organizaciji. Prebačeno na {{target}}.",
       "noOrganization": "Nema organizacije",
-      "noOrganizationDescription": "Ovaj račun nije dio organizacije. Stvori ili se pridruži organizaciji na webu da bi koristio značajke organizacije kao što su pozivnice za članove i upozorenja o niskom saldu.",
-      "openWebOrganizations": "Otvori organizacije na webu",
+      "noOrganizationDescription": "Ovaj račun nije dio nijedne organizacije. Izradite organizaciju kako biste koristili značajke poput pozivanja članova i upozorenja o niskom saldu ili otvorite web kako biste se pridružili organizaciji u koju ste pozvani.",
       "organizationUnavailable": "Organizacija nije dostupna.",
       "selectDescriptionWithOrganizations": "Pripadaš jednoj ili više organizacija. Odaberi račun koji ovaj zaslon treba koristiti.",
       "selectOrganization": "Odaberi organizaciju",
       "unavailableDescription": "Ova organizacija više nije dostupna. Za nastavak odaberi drugu organizaciju na svom profilu.",
       "unavailableSessionsDescription": "Ova organizacija više nije dostupna. Njezine sesije nije moguće učitati.",
       "accessDeniedDescription": "Nemaš pristup ovoj organizaciji."
+    },
+    "create": {
+      "title": "Izradi organizaciju",
+      "description": "Organizacija dijeli kredite, agente i postavke s vašim timom.",
+      "nameLabel": "Naziv organizacije",
+      "nameRequired": "Unesite naziv organizacije.",
+      "trialNote": "Vaše 14-dnevno probno razdoblje plana Enterprise počinje kad izradite organizaciju. Planovi se kupuju na webu."
     },
     "creditActivity": {
       "emptyDescription": "Ovdje će se prikazivati kupnje, potrošnja i usklađenja kredita ove organizacije.",
@@ -3206,6 +3242,21 @@
       "ownRoleChange": "Ne možete promijeniti vlastitu ulogu.",
       "inviteExpired": "Ova pozivnica je istekla.",
       "inviteAccepted": "Ova pozivnica je već prihvaćena."
+    },
+    "settingsOnWeb": {
+      "title": "Postavke organizacije na webu",
+      "usageDetails": "Pojedinosti o potrošnji",
+      "providersAndModels": "Pružatelji i modeli",
+      "groups": "Grupe",
+      "guardrails": "Zaštitna ograničenja",
+      "byok": "Vlastiti ključ",
+      "ssoAndDomain": "SSO i domena",
+      "emailPreferences": "Postavke e-pošte",
+      "dataCollection": "Prikupljanje podataka",
+      "auditLogs": "Revizijski zapisnici",
+      "requestLogs": "Zapisnici zahtjeva",
+      "subOrganizations": "Podorganizacije",
+      "distributeFunds": "Raspodjela sredstava"
     },
     "usageStats": {
       "inputTokens": "Ulazni tokeni",

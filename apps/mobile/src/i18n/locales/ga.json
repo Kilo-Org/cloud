@@ -3189,6 +3189,36 @@
     "sendFeedback": "Seol aiseolas"
   },
   "organization": {
+    "auditLog": {
+      "title": "Loga iniúchta",
+      "permissionDenied": "Ní féidir ach le húinéir, riarthóir nó bainisteoir billeála eagraíochta ar an bplean Enterprise a loga iniúchta a léamh.",
+      "emptyTitle": "Níl aon imeachtaí iniúchta",
+      "emptyDescription": "Taispeántar anseo na gníomhartha a dhéantar san eagraíocht seo.",
+      "truncated": "Na himeachtaí is déanaí á dtaispeáint."
+    },
+    "billing": {
+      "title": "Billeáil",
+      "permissionDenied": "Ní féidir ach le húinéir, riarthóir nó bainisteoir billeála na heagraíochta an bhilleáil a fheiceáil.",
+      "subscription": "Síntiús",
+      "state": "Staid",
+      "stateNone": "Gan síntiús",
+      "statePastDue": "Thar téarma",
+      "stateCancelsAtPeriodEnd": "Cealófar ag deireadh na tréimhse",
+      "stateTrialEndsOn": "Críochnaíonn an triail ar {{date}}",
+      "stateTrialing": "Triail",
+      "stateRenewsOn": "Athnuachan ar {{date}}",
+      "seatsDropTo": "Laghdófar go {{seats}} suíochán ar {{date}}",
+      "seats": "Suíocháin",
+      "autoTopUp": "Breisiú uathoibríoch",
+      "autoTopUpAmount": "Méid an bhreisithe",
+      "autoTopUpThreshold": "Nuair a thiteann an t-iarmhéid faoi",
+      "manageOnWeb": "Déantar athruithe ar an ngréasán",
+      "changePlan": "Athraigh an plean",
+      "buySeats": "Ceannaigh suíocháin",
+      "setupAutoTopUp": "Socraigh breisiú uathoibríoch",
+      "webAddress": "Seoladh gréasáin {{url}}",
+      "opensOnWeb": "Osclaítear ar an ngréasán"
+    },
     "boundary": {
       "backToProfile": "Ar ais go dtí an phróifíl",
       "loadErrorMessage": "Seiceáil do nasc agus bain triail eile as.",
@@ -3196,14 +3226,20 @@
       "loadErrorTitle": "Níorbh fhéidir d'eagraíochtaí a lódáil.",
       "membershipLostNotice": "Níl rochtain agat ar an eagraíocht seo a thuilleadh. Athraithe go {{target}}.",
       "noOrganization": "Gan eagraíocht",
-      "noOrganizationDescription": "Níl an cuntas seo mar chuid d'eagraíocht. Cruthaigh eagraíocht nó bí páirteach i gceann ar an ngréasán chun gnéithe eagraíochta a úsáid ar nós cuirí do bhaill agus foláirimh maidir le hiarmhéid íseal.",
-      "openWebOrganizations": "Oscail eagraíochtaí ar an ngréasán",
+      "noOrganizationDescription": "Níl an cuntas seo mar chuid d'eagraíocht. Cruthaigh ceann chun gnéithe eagraíochta a úsáid, mar chuirí do bhaill agus foláirimh faoi iarmhéid íseal, nó oscail an gréasán chun dul isteach in eagraíocht ar tugadh cuireadh duit chuici.",
       "organizationUnavailable": "Níl an eagraíocht ar fáil.",
       "selectDescriptionWithOrganizations": "Baineann tú le heagraíocht amháin nó níos mó. Roghnaigh an cuntas ar cheart don scáileán seo a úsáid.",
       "selectOrganization": "Roghnaigh eagraíocht",
       "unavailableDescription": "Níl an eagraíocht seo ar fáil a thuilleadh. Roghnaigh ceann ó do phróifíl le leanúint ar aghaidh.",
       "unavailableSessionsDescription": "Níl an eagraíocht seo ar fáil a thuilleadh. Ní féidir a seisiúin a luchtú.",
       "accessDeniedDescription": "Níl rochtain agat ar an eagraíocht seo."
+    },
+    "create": {
+      "title": "Cruthaigh eagraíocht",
+      "description": "Roinneann eagraíocht creidmheasanna, gníomhairí agus socruithe le d'fhoireann.",
+      "nameLabel": "Ainm na heagraíochta",
+      "nameRequired": "Cuir isteach ainm eagraíochta.",
+      "trialNote": "Tosóidh do thriail 14 lá ar Enterprise nuair a chruthóidh tú í. Ceannaítear pleananna ar an ngréasán."
     },
     "creditActivity": {
       "emptyDescription": "Beidh ceannacháin, úsáid agus coigeartuithe creidmheasa na heagraíochta seo le feiceáil anseo de réir mar a tharlaíonn siad.",
@@ -3312,6 +3348,21 @@
       "ownRoleChange": "Ní féidir leat do ról féin a athrú.",
       "inviteExpired": "Tá an cuireadh seo imithe in éag.",
       "inviteAccepted": "Tá an cuireadh seo glactha cheana féin."
+    },
+    "settingsOnWeb": {
+      "title": "Socruithe eagraíochta ar an ngréasán",
+      "usageDetails": "Sonraí úsáide",
+      "providersAndModels": "Soláthraithe agus samhlacha",
+      "groups": "Grúpaí",
+      "guardrails": "Ráillí cosanta",
+      "byok": "D'eochair féin",
+      "ssoAndDomain": "SSO agus fearann",
+      "emailPreferences": "Roghanna ríomhphoist",
+      "dataCollection": "Bailiú sonraí",
+      "auditLogs": "Logaí iniúchta",
+      "requestLogs": "Logaí iarratas",
+      "subOrganizations": "Fo-eagraíochtaí",
+      "distributeFunds": "Dáil cistí"
     },
     "usageStats": {
       "inputTokens": "Comharthaí ionchuir",

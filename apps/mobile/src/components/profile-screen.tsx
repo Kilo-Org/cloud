@@ -14,6 +14,7 @@ import {
   Lock,
   MessageSquare,
   Plug,
+  Plus,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -352,7 +353,19 @@ export function ProfileScreen() {
                 isRetrying={organizationsFetching}
               />
             ) : (
-              organizationRow
+              <>
+                {organizationRow}
+                <ConfigureRow
+                  icon={Plus}
+                  title={t('organization.create.title')}
+                  hue="lime"
+                  className="rounded-lg bg-secondary px-3"
+                  last
+                  onPress={() => {
+                    router.push('/(app)/(tabs)/(3_profile)/organization/create' as Href);
+                  }}
+                />
+              </>
             )}
           </View>
         )}

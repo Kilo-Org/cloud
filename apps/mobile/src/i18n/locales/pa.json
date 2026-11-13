@@ -3030,6 +3030,36 @@
     "sendFeedback": "ਫੀਡਬੈਕ ਭੇਜੋ"
   },
   "organization": {
+    "auditLog": {
+      "title": "ਆਡਿਟ ਲੌਗ",
+      "permissionDenied": "Enterprise ਪਲਾਨ ਵਾਲੀ ਸੰਸਥਾ ਦਾ ਆਡਿਟ ਲੌਗ ਸਿਰਫ਼ ਉਸਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਪੜ੍ਹ ਸਕਦਾ ਹੈ।",
+      "emptyTitle": "ਕੋਈ ਆਡਿਟ ਇਵੈਂਟ ਨਹੀਂ",
+      "emptyDescription": "ਇਸ ਸੰਸਥਾ ਵਿੱਚ ਕੀਤੀਆਂ ਕਾਰਵਾਈਆਂ ਇੱਥੇ ਦਿਖਾਈ ਦਿੰਦੀਆਂ ਹਨ।",
+      "truncated": "ਸਭ ਤੋਂ ਹਾਲੀਆ ਇਵੈਂਟ ਦਿਖਾਏ ਜਾ ਰਹੇ ਹਨ।"
+    },
+    "billing": {
+      "title": "ਬਿਲਿੰਗ",
+      "permissionDenied": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਇਸ ਦੀ ਬਿਲਿੰਗ ਦੇਖ ਸਕਦਾ ਹੈ।",
+      "subscription": "ਸਬਸਕ੍ਰਿਪਸ਼ਨ",
+      "state": "ਸਥਿਤੀ",
+      "stateNone": "ਕੋਈ ਸਬਸਕ੍ਰਿਪਸ਼ਨ ਨਹੀਂ",
+      "statePastDue": "ਭੁਗਤਾਨ ਬਕਾਇਆ",
+      "stateCancelsAtPeriodEnd": "ਮਿਆਦ ਦੇ ਅੰਤ 'ਤੇ ਰੱਦ ਹੋਵੇਗੀ",
+      "stateTrialEndsOn": "ਟ੍ਰਾਇਲ {{date}} ਨੂੰ ਖ਼ਤਮ ਹੋਵੇਗਾ",
+      "stateTrialing": "ਟ੍ਰਾਇਲ",
+      "stateRenewsOn": "{{date}} ਨੂੰ ਰੀਨਿਊ ਹੋਵੇਗੀ",
+      "seatsDropTo": "{{date}} ਨੂੰ ਘਟ ਕੇ {{seats}} ਸੀਟਾਂ ਰਹਿ ਜਾਣਗੀਆਂ",
+      "seats": "ਸੀਟਾਂ",
+      "autoTopUp": "ਆਟੋ ਟੌਪ-ਅੱਪ",
+      "autoTopUpAmount": "ਟੌਪ-ਅੱਪ ਰਕਮ",
+      "autoTopUpThreshold": "ਜਦੋਂ ਬੈਲੰਸ ਇਸ ਤੋਂ ਘੱਟ ਹੋਵੇ",
+      "manageOnWeb": "ਬਦਲਾਅ ਵੈੱਬ 'ਤੇ ਕੀਤੇ ਜਾਂਦੇ ਹਨ",
+      "changePlan": "ਪਲਾਨ ਬਦਲੋ",
+      "buySeats": "ਸੀਟਾਂ ਖਰੀਦੋ",
+      "setupAutoTopUp": "ਆਟੋ ਟੌਪ-ਅੱਪ ਸੈੱਟ ਕਰੋ",
+      "webAddress": "ਵੈੱਬ ਪਤਾ {{url}}",
+      "opensOnWeb": "ਵੈੱਬ 'ਤੇ ਖੁੱਲ੍ਹਦਾ ਹੈ"
+    },
     "boundary": {
       "backToProfile": "ਪ੍ਰੋਫਾਈਲ 'ਤੇ ਵਾਪਸ ਜਾਓ",
       "loadErrorMessage": "ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
@@ -3037,14 +3067,20 @@
       "loadErrorTitle": "ਤੁਹਾਡੀਆਂ ਸੰਸਥਾਵਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
       "membershipLostNotice": "ਤੁਹਾਡੀ ਇਸ ਸੰਸਥਾ ਤੱਕ ਹੁਣ ਪਹੁੰਚ ਨਹੀਂ ਹੈ। {{target}} ਤੇ ਸਵਿਚ ਹੋਇਆ।",
       "noOrganization": "ਕੋਈ ਸੰਸਥਾ ਨਹੀਂ",
-      "noOrganizationDescription": "ਇਹ ਖਾਤਾ ਕਿਸੇ ਸੰਸਥਾ ਦਾ ਹਿੱਸਾ ਨਹੀਂ ਹੈ। ਮੈਂਬਰ ਸੱਦੇ ਅਤੇ ਘੱਟ ਬੈਲੰਸ ਚੇਤਾਵਨੀਆਂ ਵਰਗੀਆਂ ਸੰਸਥਾ ਸੁਵਿਧਾਵਾਂ ਦੀ ਵਰਤੋਂ ਕਰਨ ਲਈ ਵੈੱਬ 'ਤੇ ਸੰਸਥਾ ਬਣਾਓ ਜਾਂ ਇੱਕ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਵੋ।",
-      "openWebOrganizations": "ਵੈੱਬ 'ਤੇ ਸੰਸਥਾਵਾਂ ਖੋਲ੍ਹੋ",
+      "noOrganizationDescription": "ਇਹ ਖਾਤਾ ਕਿਸੇ ਸੰਸਥਾ ਦਾ ਹਿੱਸਾ ਨਹੀਂ ਹੈ। ਮੈਂਬਰਾਂ ਨੂੰ ਸੱਦਾ ਦੇਣ ਅਤੇ ਘੱਟ ਬੈਲੰਸ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਵਰਗੀਆਂ ਸੰਸਥਾ ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ ਵਰਤਣ ਲਈ ਇੱਕ ਸੰਸਥਾ ਬਣਾਓ, ਜਾਂ ਜਿਸ ਸੰਸਥਾ ਵਿੱਚ ਤੁਹਾਨੂੰ ਸੱਦਾ ਮਿਲਿਆ ਹੈ ਉਸ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਣ ਲਈ ਵੈੱਬ ਖੋਲ੍ਹੋ।",
       "organizationUnavailable": "ਸੰਸਥਾ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "selectDescriptionWithOrganizations": "ਤੁਸੀਂ ਇੱਕ ਜਾਂ ਵੱਧ ਸੰਸਥਾਵਾਂ ਨਾਲ ਸੰਬੰਧਿਤ ਹੋ। ਉਹ ਖਾਤਾ ਚੁਣੋ ਜੋ ਇਹ ਸਕ੍ਰੀਨ ਵਰਤਣਾ ਚਾਹੀਦਾ ਹੈ।",
       "selectOrganization": "ਇੱਕ ਸੰਸਥਾ ਚੁਣੋ",
       "unavailableDescription": "ਇਹ ਸੰਸਥਾ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਜਾਰੀ ਰੱਖਣ ਲਈ ਆਪਣੀ ਪ੍ਰੋਫਾਈਲ ਤੋਂ ਕੋਈ ਹੋਰ ਸੰਸਥਾ ਚੁਣੋ।",
       "unavailableSessionsDescription": "ਇਹ ਸੰਸਥਾ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਇਸ ਦੇ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕਦੇ।",
       "accessDeniedDescription": "ਤੁਹਾਡੀ ਇਸ ਸੰਸਥਾ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੈ।"
+    },
+    "create": {
+      "title": "ਸੰਸਥਾ ਬਣਾਓ",
+      "description": "ਸੰਸਥਾ ਤੁਹਾਡੀ ਟੀਮ ਨਾਲ ਕ੍ਰੈਡਿਟ, ਏਜੰਟ ਅਤੇ ਸੈਟਿੰਗਾਂ ਸਾਂਝੀਆਂ ਕਰਦੀ ਹੈ।",
+      "nameLabel": "ਸੰਸਥਾ ਦਾ ਨਾਮ",
+      "nameRequired": "ਸੰਸਥਾ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ।",
+      "trialNote": "ਸੰਸਥਾ ਬਣਾਉਂਦੇ ਹੀ ਤੁਹਾਡਾ 14-ਦਿਨਾਂ ਦਾ Enterprise ਟ੍ਰਾਇਲ ਸ਼ੁਰੂ ਹੋ ਜਾਂਦਾ ਹੈ। ਪਲਾਨ ਵੈੱਬ 'ਤੇ ਖਰੀਦੇ ਜਾਂਦੇ ਹਨ।"
     },
     "creditActivity": {
       "emptyDescription": "ਇਸ ਸੰਸਥਾ ਦੀਆਂ ਖਰੀਦਾਂ, ਕ੍ਰੈਡਿਟ ਦੀ ਵਰਤੋਂ ਅਤੇ ਕ੍ਰੈਡਿਟ ਵਿੱਚ ਹੋਈਆਂ ਹੋਰ ਤਬਦੀਲੀਆਂ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",
@@ -3153,6 +3189,21 @@
       "ownRoleChange": "ਤੁਸੀਂ ਆਪਣੀ ਭੂਮਿਕਾ ਨਹੀਂ ਬਦਲ ਸਕਦੇ।",
       "inviteExpired": "ਇਹ ਸੱਦਾ ਮਿਆਦ ਪੁੱਗ ਗਿਆ ਹੈ।",
       "inviteAccepted": "ਇਹ ਸੱਦਾ ਪਹਿਲਾਂ ਹੀ ਸਵੀਕਾਰ ਕੀਤਾ ਜਾ ਚੁੱਕਾ ਹੈ।"
+    },
+    "settingsOnWeb": {
+      "title": "ਵੈੱਬ 'ਤੇ ਸੰਸਥਾ ਦੀਆਂ ਸੈਟਿੰਗਾਂ",
+      "usageDetails": "ਵਰਤੋਂ ਦੇ ਵੇਰਵੇ",
+      "providersAndModels": "ਪ੍ਰੋਵਾਈਡਰ ਅਤੇ ਮਾਡਲ",
+      "groups": "ਗਰੁੱਪ",
+      "guardrails": "ਗਾਰਡਰੇਲ",
+      "byok": "ਆਪਣੀ ਖੁਦ ਦੀ ਕੁੰਜੀ ਵਰਤੋ",
+      "ssoAndDomain": "SSO ਅਤੇ ਡੋਮੇਨ",
+      "emailPreferences": "ਈਮੇਲ ਤਰਜੀਹਾਂ",
+      "dataCollection": "ਡਾਟਾ ਇਕੱਠਾ ਕਰਨਾ",
+      "auditLogs": "ਆਡਿਟ ਲੌਗ",
+      "requestLogs": "ਬੇਨਤੀ ਲੌਗ",
+      "subOrganizations": "ਉਪ-ਸੰਸਥਾਵਾਂ",
+      "distributeFunds": "ਫੰਡ ਵੰਡੋ"
     },
     "usageStats": {
       "inputTokens": "ਇਨਪੁੱਟ ਟੋਕਨ",

@@ -3189,6 +3189,36 @@
     "sendFeedback": "Ibgħat il-kummenti tiegħek"
   },
   "organization": {
+    "auditLog": {
+      "title": "Reġistru tal-awditjar",
+      "permissionDenied": "Il-reġistru tal-awditjar jista' jaqrah biss sid, amministratur jew maniġer tal-fatturazzjoni tal-organizzazzjoni fuq il-pjan Enterprise.",
+      "emptyTitle": "L-ebda avveniment tal-awditjar",
+      "emptyDescription": "L-azzjonijiet meħuda f'din l-organizzazzjoni jidhru hawn.",
+      "truncated": "Qed jintwerew l-aktar avvenimenti riċenti."
+    },
+    "billing": {
+      "title": "Ħlasijiet",
+      "permissionDenied": "Is-sid, amministratur jew maniġer tal-ħlasijiet tal-organizzazzjoni biss jistgħu jaraw il-ħlasijiet tagħha.",
+      "subscription": "Abbonament",
+      "state": "Stat",
+      "stateNone": "L-ebda abbonament",
+      "statePastDue": "Ħlas skadut",
+      "stateCancelsAtPeriodEnd": "Jiġi kkanċellat fl-aħħar tal-perjodu",
+      "stateTrialEndsOn": "Il-prova tispiċċa fid-data {{date}}",
+      "stateTrialing": "Prova",
+      "stateRenewsOn": "Jiġġedded fid-data {{date}}",
+      "seatsDropTo": "Jinżlu għal {{seats}} postijiet fid-data {{date}}",
+      "seats": "Postijiet",
+      "autoTopUp": "Rikarika awtomatika",
+      "autoTopUpAmount": "Ammont tar-rikarika",
+      "autoTopUpThreshold": "Meta l-bilanċ jinżel taħt",
+      "manageOnWeb": "Il-bidliet isiru fuq il-web",
+      "changePlan": "Ibdel il-pjan",
+      "buySeats": "Ixtri postijiet",
+      "setupAutoTopUp": "Issettja r-rikarika awtomatika",
+      "webAddress": "Indirizz tal-web {{url}}",
+      "opensOnWeb": "Jinfetaħ fuq il-web"
+    },
     "boundary": {
       "backToProfile": "Lura għall-profil",
       "loadErrorMessage": "Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
@@ -3196,14 +3226,20 @@
       "loadErrorTitle": "Ma setgħux jitgħabbew l-organizzazzjonijiet tiegħek.",
       "membershipLostNotice": "M'għandekx iktar aċċess għal din l-organizzazzjoni. Inbidel għal {{target}}.",
       "noOrganization": "L-ebda organizzazzjoni",
-      "noOrganizationDescription": "Dan il-kont mhuwiex parti minn organizzazzjoni. Oħloq jew ingħaqad ma' organizzazzjoni fuq il-web biex tuża karatteristiċi tal-organizzazzjoni bħal stedini għall-membri u twissijiet dwar bilanċ baxx.",
-      "openWebOrganizations": "Iftaħ l-organizzazzjonijiet fuq il-web",
+      "noOrganizationDescription": "Dan il-kont mhuwiex parti minn organizzazzjoni. Oħloq waħda biex tuża l-funzjonijiet tal-organizzazzjoni bħall-istediniet għall-membri u t-twissijiet ta' bilanċ baxx, jew iftaħ il-web biex tingħaqad ma' waħda li ġejt mistieden fiha.",
       "organizationUnavailable": "L-organizzazzjoni mhix disponibbli.",
       "selectDescriptionWithOrganizations": "Int tagħmel parti minn organizzazzjoni waħda jew aktar. Agħżel il-kont li għandha tuża dan l-iskrin.",
       "selectOrganization": "Agħżel organizzazzjoni",
       "unavailableDescription": "Din l-organizzazzjoni m'għadhiex disponibbli. Agħżel waħda mill-profil tiegħek biex tkompli.",
       "unavailableSessionsDescription": "Din l-organizzazzjoni m'għadhiex disponibbli. Is-sessjonijiet tagħha ma jistgħux jitgħabbew.",
       "accessDeniedDescription": "M'għandekx aċċess għal din l-organizzazzjoni."
+    },
+    "create": {
+      "title": "Oħloq organizzazzjoni",
+      "description": "Organizzazzjoni taqsam il-krediti, l-aġenti u l-issettjar mat-tim tiegħek.",
+      "nameLabel": "Isem l-organizzazzjoni",
+      "nameRequired": "Daħħal isem għall-organizzazzjoni.",
+      "trialNote": "Il-prova Enterprise tiegħek ta' 14-il jum tibda meta toħloqha. Il-pjanijiet jinxtraw fuq il-web."
     },
     "creditActivity": {
       "emptyDescription": "Ix-xiri, l-użu u l-aġġustamenti tal-krediti ta' din l-organizzazzjoni se jidhru hawn hekk kif iseħħu.",
@@ -3312,6 +3348,21 @@
       "ownRoleChange": "Ma tistax tibdel ir-rwol tiegħek.",
       "inviteExpired": "Din l-istedina skadiet.",
       "inviteAccepted": "Din l-istedina diġà ġiet aċċettata."
+    },
+    "settingsOnWeb": {
+      "title": "Issettjar tal-organizzazzjoni fuq il-web",
+      "usageDetails": "Dettalji tal-użu",
+      "providersAndModels": "Fornituri u mudelli",
+      "groups": "Gruppi",
+      "guardrails": "Salvagwardji",
+      "byok": "Uża ċ-ċavetta tiegħek",
+      "ssoAndDomain": "SSO u dominju",
+      "emailPreferences": "Preferenzi tal-email",
+      "dataCollection": "Ġbir tad-data",
+      "auditLogs": "Reġistri tal-awditjar",
+      "requestLogs": "Reġistri tat-talbiet",
+      "subOrganizations": "Sotto-organizzazzjonijiet",
+      "distributeFunds": "Iddistribwixxi l-fondi"
     },
     "usageStats": {
       "inputTokens": "Unitajiet tat-test tad-dħul",

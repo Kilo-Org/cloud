@@ -3083,6 +3083,36 @@
     "sendFeedback": "Envia comentaris"
   },
   "organization": {
+    "auditLog": {
+      "title": "Registre d'auditoria",
+      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització amb el pla Enterprise pot consultar-ne el registre d'auditoria.",
+      "emptyTitle": "No hi ha esdeveniments d'auditoria",
+      "emptyDescription": "Aquí apareixen les accions fetes en aquesta organització.",
+      "truncated": "Es mostren els esdeveniments més recents."
+    },
+    "billing": {
+      "title": "Facturació",
+      "permissionDenied": "Només un propietari, administrador o gestor de facturació de l'organització en pot veure la facturació.",
+      "subscription": "Subscripció",
+      "state": "Estat",
+      "stateNone": "Sense subscripció",
+      "statePastDue": "Pagament vençut",
+      "stateCancelsAtPeriodEnd": "Es cancel·la al final del període",
+      "stateTrialEndsOn": "La prova acaba el {{date}}",
+      "stateTrialing": "Prova",
+      "stateRenewsOn": "Es renova el {{date}}",
+      "seatsDropTo": "Baixa a {{seats}} llicències el {{date}}",
+      "seats": "Llicències",
+      "autoTopUp": "Recàrrega automàtica",
+      "autoTopUpAmount": "Import de la recàrrega",
+      "autoTopUpThreshold": "Quan el saldo baixi de",
+      "manageOnWeb": "Els canvis es fan al web",
+      "changePlan": "Canvia el pla",
+      "buySeats": "Compra llicències",
+      "setupAutoTopUp": "Configura la recàrrega automàtica",
+      "webAddress": "Adreça web {{url}}",
+      "opensOnWeb": "S'obre al web"
+    },
     "boundary": {
       "backToProfile": "Torna al perfil",
       "loadErrorMessage": "Comprova la connexió i torna-ho a provar.",
@@ -3090,14 +3120,20 @@
       "loadErrorTitle": "No s'han pogut carregar les teves organitzacions.",
       "membershipLostNotice": "Ja no tens accés a aquesta organització. Canviat a {{target}}.",
       "noOrganization": "Sense organització",
-      "noOrganizationDescription": "Aquest compte no forma part de cap organització. Crea'n una o uneix-te'n a una al web per utilitzar funcions d'organització com les invitacions de membres i les alertes de saldo baix.",
-      "openWebOrganizations": "Obre les organitzacions al web",
+      "noOrganizationDescription": "Aquest compte no forma part de cap organització. Crea'n una per utilitzar funcions d'organització com les invitacions de membres i les alertes de saldo baix, o obre el web per unir-te a una a la qual t'hagin convidat.",
       "organizationUnavailable": "L'organització no està disponible.",
       "selectDescriptionWithOrganizations": "Pertanys a una o més organitzacions. Tria el compte que ha d'utilitzar aquesta pantalla.",
       "selectOrganization": "Selecciona una organització",
       "unavailableDescription": "Aquesta organització ja no està disponible. Tria'n una des del teu perfil per continuar.",
       "unavailableSessionsDescription": "Aquesta organització ja no està disponible. No es poden carregar les seves sessions.",
       "accessDeniedDescription": "No tens accés a aquesta organització."
+    },
+    "create": {
+      "title": "Crea una organització",
+      "description": "Una organització comparteix crèdits, agents i configuració amb el teu equip.",
+      "nameLabel": "Nom de l'organització",
+      "nameRequired": "Introdueix un nom per a l'organització.",
+      "trialNote": "La prova d'Enterprise de 14 dies comença quan la creïs. Els plans es compren al web."
     },
     "creditActivity": {
       "emptyDescription": "Aquí apareixeran les compres, el consum i els ajustos de crèdits d'aquesta organització a mesura que es produeixin.",
@@ -3206,6 +3242,21 @@
       "ownRoleChange": "No pots canviar el teu propi rol.",
       "inviteExpired": "Aquesta invitació ha caducat.",
       "inviteAccepted": "Aquesta invitació ja s'ha acceptat."
+    },
+    "settingsOnWeb": {
+      "title": "Configuració de l'organització al web",
+      "usageDetails": "Detalls d'ús",
+      "providersAndModels": "Proveïdors i models",
+      "groups": "Grups",
+      "guardrails": "Salvaguardes",
+      "byok": "Utilitza la teva pròpia clau",
+      "ssoAndDomain": "SSO i domini",
+      "emailPreferences": "Preferències de correu electrònic",
+      "dataCollection": "Recollida de dades",
+      "auditLogs": "Registres d'auditoria",
+      "requestLogs": "Registres de sol·licituds",
+      "subOrganizations": "Suborganitzacions",
+      "distributeFunds": "Distribueix fons"
     },
     "usageStats": {
       "inputTokens": "Tòkens d'entrada",

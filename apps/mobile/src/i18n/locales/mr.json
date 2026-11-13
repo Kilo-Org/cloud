@@ -3030,6 +3030,36 @@
     "sendFeedback": "अभिप्राय पाठवा"
   },
   "organization": {
+    "auditLog": {
+      "title": "ऑडिट लॉग",
+      "permissionDenied": "Enterprise प्लॅनवरील संस्थेचा मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच तिचा ऑडिट लॉग पाहू शकतो.",
+      "emptyTitle": "कोणत्याही ऑडिट घटना नाहीत",
+      "emptyDescription": "या संस्थेत केलेल्या कृती येथे दिसतात.",
+      "truncated": "सर्वात अलीकडील घटना दाखवत आहे."
+    },
+    "billing": {
+      "title": "बिलिंग",
+      "permissionDenied": "संस्थेचे बिलिंग फक्त तिचे मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच पाहू शकतात.",
+      "subscription": "सदस्यता",
+      "state": "स्थिती",
+      "stateNone": "सदस्यता नाही",
+      "statePastDue": "थकीत",
+      "stateCancelsAtPeriodEnd": "कालावधी संपल्यावर रद्द होईल",
+      "stateTrialEndsOn": "चाचणी {{date}} रोजी संपेल",
+      "stateTrialing": "चाचणी",
+      "stateRenewsOn": "{{date}} रोजी नूतनीकरण होईल",
+      "seatsDropTo": "{{date}} रोजी जागा {{seats}} पर्यंत कमी होतील",
+      "seats": "जागा",
+      "autoTopUp": "ऑटो टॉप-अप",
+      "autoTopUpAmount": "टॉप-अप रक्कम",
+      "autoTopUpThreshold": "शिल्लक यापेक्षा कमी झाल्यावर",
+      "manageOnWeb": "बदल वेबवर केले जातात",
+      "changePlan": "प्लॅन बदला",
+      "buySeats": "जागा खरेदी करा",
+      "setupAutoTopUp": "ऑटो टॉप-अप सेट करा",
+      "webAddress": "वेब पत्ता {{url}}",
+      "opensOnWeb": "वेबवर उघडते"
+    },
     "boundary": {
       "backToProfile": "प्रोफाइलवर परत जा",
       "loadErrorMessage": "इंटरनेट जोडणी तपासा आणि पुन्हा प्रयत्न करा.",
@@ -3037,14 +3067,20 @@
       "loadErrorTitle": "तुमच्या संस्था लोड करता आल्या नाहीत.",
       "membershipLostNotice": "तुम्हाला या संस्थेमध्ये आता प्रवेश नाही. {{target}} वर स्विच केले.",
       "noOrganization": "कोणतीही संस्था नाही",
-      "noOrganizationDescription": "हे खाते कोणत्याही संस्थेचा भाग नाही. सदस्य आमंत्रणे आणि कमी शिल्लक सूचना यांसारखी संस्था वैशिष्ट्ये वापरण्यासाठी वेबवर संस्था तयार करा किंवा एकात सामील व्हा.",
-      "openWebOrganizations": "वेबवर संस्था उघडा",
+      "noOrganizationDescription": "हे खाते कोणत्याही संस्थेचा भाग नाही. सदस्यांना आमंत्रणे आणि कमी शिल्लक सूचना यांसारखी संस्थेची वैशिष्ट्ये वापरण्यासाठी एक संस्था तयार करा, किंवा तुम्हाला आमंत्रित केलेल्या संस्थेत सामील होण्यासाठी वेब उघडा.",
       "organizationUnavailable": "संस्था उपलब्ध नाही",
       "selectDescriptionWithOrganizations": "तुम्ही एक किंवा अधिक संस्थांचे सदस्य आहात. ही स्क्रीन जे खाते वापरावे ते निवडा.",
       "selectOrganization": "संस्था निवडा",
       "unavailableDescription": "ही संस्था आता उपलब्ध नाही. पुढे जाण्यासाठी खाते निवडण्याच्या सूचीतून दुसरे खाते निवडा.",
       "unavailableSessionsDescription": "ही संस्था आता उपलब्ध नाही. तिचे सत्र लोड केले जाऊ शकत नाहीत.",
       "accessDeniedDescription": "तुम्हाला या संस्थेमध्ये प्रवेश नाही."
+    },
+    "create": {
+      "title": "संस्था तयार करा",
+      "description": "संस्था तुमच्या टीमसोबत क्रेडिट्स, एजंट्स आणि सेटिंग्ज शेअर करते.",
+      "nameLabel": "संस्थेचे नाव",
+      "nameRequired": "संस्थेचे नाव टाका.",
+      "trialNote": "संस्था तयार केल्यावर तुमची 14 दिवसांची Enterprise चाचणी सुरू होते. प्लॅन वेबवर खरेदी केले जातात."
     },
     "creditActivity": {
       "emptyDescription": "या संस्थेची खरेदी, वापर आणि क्रेडिटमधील फेरबदल यांची नोंद होताच ती येथे दिसेल.",
@@ -3153,6 +3189,21 @@
       "ownRoleChange": "तुम्ही तुमची स्वतःची भूमिका बदलू शकत नाही.",
       "inviteExpired": "हे आमंत्रण कालबाह्य झाले आहे.",
       "inviteAccepted": "हे आमंत्रण आधीच स्वीकारले गेले आहे."
+    },
+    "settingsOnWeb": {
+      "title": "वेबवरील संस्थेची सेटिंग्ज",
+      "usageDetails": "वापराचा तपशील",
+      "providersAndModels": "प्रोव्हायडर आणि मॉडेल्स",
+      "groups": "गट",
+      "guardrails": "गार्डरेल्स",
+      "byok": "तुमची स्वतःची की वापरा",
+      "ssoAndDomain": "SSO आणि डोमेन",
+      "emailPreferences": "ईमेल प्राधान्ये",
+      "dataCollection": "डेटा संकलन",
+      "auditLogs": "ऑडिट लॉग",
+      "requestLogs": "विनंती लॉग",
+      "subOrganizations": "उप-संस्था",
+      "distributeFunds": "निधी वाटप करा"
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकन",

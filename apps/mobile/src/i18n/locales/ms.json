@@ -3030,6 +3030,36 @@
     "sendFeedback": "Hantar maklum balas"
   },
   "organization": {
+    "auditLog": {
+      "title": "Log audit",
+      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi pada pelan Enterprise boleh membaca log auditnya.",
+      "emptyTitle": "Tiada peristiwa audit",
+      "emptyDescription": "Tindakan yang diambil dalam organisasi ini dipaparkan di sini.",
+      "truncated": "Memaparkan peristiwa terkini."
+    },
+    "billing": {
+      "title": "Pengebilan",
+      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh melihat pengebilannya.",
+      "subscription": "Langganan",
+      "state": "Status",
+      "stateNone": "Tiada langganan",
+      "statePastDue": "Tertunggak",
+      "stateCancelsAtPeriodEnd": "Dibatalkan pada akhir tempoh",
+      "stateTrialEndsOn": "Percubaan tamat pada {{date}}",
+      "stateTrialing": "Percubaan",
+      "stateRenewsOn": "Diperbaharui pada {{date}}",
+      "seatsDropTo": "Berkurang kepada {{seats}} slot pada {{date}}",
+      "seats": "Slot pengguna",
+      "autoTopUp": "Tambah nilai automatik",
+      "autoTopUpAmount": "Amaun tambah nilai",
+      "autoTopUpThreshold": "Apabila baki di bawah",
+      "manageOnWeb": "Perubahan dibuat di web",
+      "changePlan": "Tukar pelan",
+      "buySeats": "Beli slot pengguna",
+      "setupAutoTopUp": "Sediakan tambah nilai automatik",
+      "webAddress": "Alamat web {{url}}",
+      "opensOnWeb": "Dibuka di web"
+    },
     "boundary": {
       "backToProfile": "Kembali ke profil",
       "loadErrorMessage": "Semak sambungan anda dan cuba lagi.",
@@ -3037,14 +3067,20 @@
       "loadErrorTitle": "Tidak dapat memuatkan organisasi anda.",
       "membershipLostNotice": "Anda tidak lagi mempunyai akses kepada organisasi ini. Ditukar kepada {{target}}.",
       "noOrganization": "Tiada organisasi",
-      "noOrganizationDescription": "Akaun ini bukan sebahagian daripada organisasi. Cipta atau sertai organisasi di laman web untuk menggunakan ciri organisasi seperti jemputan ahli dan amaran baki rendah.",
-      "openWebOrganizations": "Buka organisasi di laman web",
+      "noOrganizationDescription": "Akaun ini bukan sebahagian daripada mana-mana organisasi. Cipta satu untuk menggunakan ciri organisasi seperti jemputan ahli dan amaran baki rendah, atau buka web untuk menyertai organisasi yang anda telah dijemput.",
       "organizationUnavailable": "Organisasi tidak tersedia.",
       "selectDescriptionWithOrganizations": "Anda tergolong dalam satu atau lebih organisasi. Pilih akaun yang patut digunakan oleh skrin ini.",
       "selectOrganization": "Pilih organisasi",
       "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih satu daripada profil anda untuk meneruskan.",
       "unavailableSessionsDescription": "Organisasi ini tidak lagi tersedia. Sesi untuk organisasi ini tidak dapat dimuatkan.",
       "accessDeniedDescription": "Anda tidak mempunyai akses kepada organisasi ini."
+    },
+    "create": {
+      "title": "Cipta organisasi",
+      "description": "Organisasi berkongsi kredit, ejen dan tetapan dengan pasukan anda.",
+      "nameLabel": "Nama organisasi",
+      "nameRequired": "Masukkan nama organisasi.",
+      "trialNote": "Percubaan Enterprise 14 hari anda bermula sebaik sahaja anda menciptanya. Pelan dibeli di web."
     },
     "creditActivity": {
       "emptyDescription": "Pembelian, penggunaan dan pelarasan kredit organisasi ini akan dipaparkan di sini apabila berlaku.",
@@ -3153,6 +3189,21 @@
       "ownRoleChange": "Anda tidak boleh menukar peranan anda sendiri.",
       "inviteExpired": "Jemputan ini telah tamat tempoh.",
       "inviteAccepted": "Jemputan ini telah pun diterima."
+    },
+    "settingsOnWeb": {
+      "title": "Tetapan organisasi di web",
+      "usageDetails": "Butiran penggunaan",
+      "providersAndModels": "Penyedia dan model",
+      "groups": "Kumpulan",
+      "guardrails": "Kawalan keselamatan",
+      "byok": "Bawa kunci anda sendiri",
+      "ssoAndDomain": "SSO dan domain",
+      "emailPreferences": "Keutamaan e-mel",
+      "dataCollection": "Pengumpulan data",
+      "auditLogs": "Log audit",
+      "requestLogs": "Log permintaan",
+      "subOrganizations": "Suborganisasi",
+      "distributeFunds": "Agihkan dana"
     },
     "usageStats": {
       "inputTokens": "Token masukan",

@@ -3136,6 +3136,36 @@
     "sendFeedback": "Odoslať spätnú väzbu"
   },
   "organization": {
+    "auditLog": {
+      "title": "Protokol auditu",
+      "permissionDenied": "Protokol auditu si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie s plánom Enterprise.",
+      "emptyTitle": "Žiadne udalosti auditu",
+      "emptyDescription": "Tu sa zobrazia akcie vykonané v tejto organizácii.",
+      "truncated": "Zobrazujú sa najnovšie udalosti."
+    },
+    "billing": {
+      "title": "Fakturácia",
+      "permissionDenied": "Fakturáciu organizácie môže zobraziť iba jej vlastník, administrátor alebo správca fakturácie.",
+      "subscription": "Predplatné",
+      "state": "Stav",
+      "stateNone": "Bez predplatného",
+      "statePastDue": "Po splatnosti",
+      "stateCancelsAtPeriodEnd": "Zruší sa na konci obdobia",
+      "stateTrialEndsOn": "Skúšobné obdobie končí {{date}}",
+      "stateTrialing": "Skúšobné obdobie",
+      "stateRenewsOn": "Obnoví sa {{date}}",
+      "seatsDropTo": "Počet miest klesne {{date}} na {{seats}}",
+      "seats": "Miesta",
+      "autoTopUp": "Automatické dobíjanie",
+      "autoTopUpAmount": "Suma dobitia",
+      "autoTopUpThreshold": "Keď zostatok klesne pod",
+      "manageOnWeb": "Zmeny sa vykonávajú na webe",
+      "changePlan": "Zmeniť plán",
+      "buySeats": "Kúpiť miesta",
+      "setupAutoTopUp": "Nastaviť automatické dobíjanie",
+      "webAddress": "Webová adresa {{url}}",
+      "opensOnWeb": "Otvorí sa na webe"
+    },
     "boundary": {
       "backToProfile": "Späť na profil",
       "loadErrorMessage": "Skontroluj pripojenie a skús to znova.",
@@ -3143,14 +3173,20 @@
       "loadErrorTitle": "Tvoje organizácie sa nepodarilo načítať.",
       "membershipLostNotice": "Už nemáš prístup k tejto organizácii. Prepnuté na {{target}}.",
       "noOrganization": "Žiadna organizácia",
-      "noOrganizationDescription": "Tento účet nie je súčasťou organizácie. Vytvor organizáciu alebo sa k nej pripoj na webe, aby si mohol používať funkcie organizácie, ako sú pozvánky pre členov a upozornenia na nízky zostatok.",
-      "openWebOrganizations": "Otvoriť organizácie na webe",
+      "noOrganizationDescription": "Tento účet nie je súčasťou žiadnej organizácie. Vytvorte si ju, ak chcete používať funkcie organizácie, ako sú pozvánky pre členov a upozornenia na nízky zostatok, alebo otvorte web a pripojte sa k organizácii, do ktorej ste dostali pozvánku.",
       "organizationUnavailable": "Organizácia nie je dostupná.",
       "selectDescriptionWithOrganizations": "Patríš k jednej alebo viacerým organizáciám. Vyber účet, ktorý má táto obrazovka používať.",
       "selectOrganization": "Vybrať organizáciu",
       "unavailableDescription": "Táto organizácia už nie je dostupná. Ak chceš pokračovať, vyber inú vo svojom profile.",
       "unavailableSessionsDescription": "Táto organizácia už nie je dostupná. Jej relácie nie je možné načítať.",
       "accessDeniedDescription": "Nemáš prístup k tejto organizácii."
+    },
+    "create": {
+      "title": "Vytvoriť organizáciu",
+      "description": "Organizácia zdieľa kredity, agentov a nastavenia s vaším tímom.",
+      "nameLabel": "Názov organizácie",
+      "nameRequired": "Zadajte názov organizácie.",
+      "trialNote": "Po jej vytvorení sa spustí vaše 14-dňové skúšobné obdobie plánu Enterprise. Plány sa kupujú na webe."
     },
     "creditActivity": {
       "emptyDescription": "Tu sa budú priebežne zobrazovať nákupy, spotreba a úpravy kreditov tejto organizácie.",
@@ -3259,6 +3295,21 @@
       "ownRoleChange": "Nemôžete si zmeniť vlastnú rolu.",
       "inviteExpired": "Tejto pozvánke vypršila platnosť.",
       "inviteAccepted": "Táto pozvánka už bola prijatá."
+    },
+    "settingsOnWeb": {
+      "title": "Nastavenia organizácie na webe",
+      "usageDetails": "Podrobnosti o využití",
+      "providersAndModels": "Poskytovatelia a modely",
+      "groups": "Skupiny",
+      "guardrails": "Ochranné pravidlá",
+      "byok": "Vlastný kľúč",
+      "ssoAndDomain": "SSO a doména",
+      "emailPreferences": "Predvoľby e-mailov",
+      "dataCollection": "Zber údajov",
+      "auditLogs": "Protokoly auditu",
+      "requestLogs": "Protokoly požiadaviek",
+      "subOrganizations": "Podorganizácie",
+      "distributeFunds": "Rozdeliť prostriedky"
     },
     "usageStats": {
       "inputTokens": "Vstupné tokeny",

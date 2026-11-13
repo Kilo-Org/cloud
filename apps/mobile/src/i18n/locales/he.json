@@ -3075,6 +3075,36 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "יומן ביקורת",
+      "permissionDenied": "רק בעלים, אדמין או מנהל חיובים של ארגון בתוכנית Enterprise יכולים לצפות ביומן הביקורת שלו.",
+      "emptyTitle": "אין אירועי ביקורת",
+      "emptyDescription": "פעולות שמתבצעות בארגון הזה יופיעו כאן.",
+      "truncated": "מוצגים האירועים האחרונים."
+    },
+    "billing": {
+      "title": "חיוב",
+      "permissionDenied": "רק בעלים, מנהל או מנהל חיובים של הארגון יכולים לראות את פרטי החיוב שלו.",
+      "subscription": "מינוי",
+      "state": "סטטוס",
+      "stateNone": "אין מינוי",
+      "statePastDue": "תשלום באיחור",
+      "stateCancelsAtPeriodEnd": "יבוטל בסוף התקופה",
+      "stateTrialEndsOn": "תקופת הניסיון מסתיימת ב-{{date}}",
+      "stateTrialing": "תקופת ניסיון",
+      "stateRenewsOn": "יחודש ב-{{date}}",
+      "seatsDropTo": "יופחת ל-{{seats}} רישיונות ב-{{date}}",
+      "seats": "רישיונות",
+      "autoTopUp": "טעינה אוטומטית",
+      "autoTopUpAmount": "סכום הטעינה",
+      "autoTopUpThreshold": "כשהיתרה יורדת מתחת",
+      "manageOnWeb": "השינויים מתבצעים באתר",
+      "changePlan": "שינוי תוכנית",
+      "buySeats": "רכישת רישיונות",
+      "setupAutoTopUp": "הגדרת טעינה אוטומטית",
+      "webAddress": "כתובת אינטרנט {{url}}",
+      "opensOnWeb": "נפתח באתר"
+    },
     "boundary": {
       "backToProfile": "חזרה לפרופיל",
       "loadErrorMessage": "כדאי לבדוק את החיבור לאינטרנט ולנסות שוב.",
@@ -3082,14 +3112,20 @@
       "loadErrorTitle": "לא ניתן היה לטעון את הארגונים שלך.",
       "membershipLostNotice": "אין לך גישה לארגון זה עוד. הוחלף ל-{{target}}.",
       "noOrganization": "אין ארגון",
-      "noOrganizationDescription": "החשבון הזה אינו חלק מארגון. צור ארגון או הצטרף לאחד באתר כדי להשתמש בתכונות של ארגון כמו הזמנת חברים והתראות על יתרה נמוכה.",
-      "openWebOrganizations": "פתיחת ארגונים באתר",
+      "noOrganizationDescription": "החשבון הזה לא משויך לארגון. אפשר ליצור ארגון כדי להשתמש בתכונות ארגוניות כמו הזמנת חברים והתראות על יתרה נמוכה, או לפתוח את האתר כדי להצטרף לארגון שהוזמנת אליו.",
       "organizationUnavailable": "הארגון אינו זמין.",
       "selectDescriptionWithOrganizations": "אתה שייך לארגון אחד או יותר. בחר את החשבון שהמסך הזה אמור להשתמש בו.",
       "selectOrganization": "בחירת ארגון",
       "unavailableDescription": "הארגון הזה כבר אינו זמין. בחר ארגון אחר מהפרופיל שלך כדי להמשיך.",
       "unavailableSessionsDescription": "הארגון הזה כבר אינו זמין. לא ניתן לטעון את הסשנים שלו.",
       "accessDeniedDescription": "אין לך גישה לארגון זה."
+    },
+    "create": {
+      "title": "יצירת ארגון",
+      "description": "ארגון מאפשר לשתף קרדיטים, סוכנים והגדרות עם הצוות שלך.",
+      "nameLabel": "שם הארגון",
+      "nameRequired": "יש להזין שם לארגון.",
+      "trialNote": "תקופת הניסיון של Enterprise ל-14 יום מתחילה עם יצירת הארגון. רכישת תוכניות מתבצעת באתר."
     },
     "creditActivity": {
       "emptyDescription": "כאן יופיעו רכישות, שימוש ועדכוני יתרת קרדיטים של הארגון, עם ביצועם.",
@@ -3211,6 +3247,21 @@
       "ownRoleChange": "אינך יכול לשנות את התפקיד שלך.",
       "inviteExpired": "ההזמנה הזו פגה.",
       "inviteAccepted": "ההזמנה הזו כבר התקבלה."
+    },
+    "settingsOnWeb": {
+      "title": "הגדרות הארגון באתר",
+      "usageDetails": "פרטי שימוש",
+      "providersAndModels": "ספקים ומודלים",
+      "groups": "קבוצות",
+      "guardrails": "מעקות בטיחות",
+      "byok": "שימוש במפתח משלך",
+      "ssoAndDomain": "SSO ודומיין",
+      "emailPreferences": "העדפות אימייל",
+      "dataCollection": "איסוף נתונים",
+      "auditLogs": "יומני ביקורת",
+      "requestLogs": "יומני בקשות",
+      "subOrganizations": "ארגוני משנה",
+      "distributeFunds": "חלוקת כספים"
     },
     "usageStats": {
       "inputTokens": "טוקני קלט",

@@ -11285,6 +11285,33 @@
     ],
     "searchBlob": "computeBilling.codeReviewRate Check whether code review compute billing is enabled for a user or organization, and get the hourly USD rate charged for code review sandbox containers if it is. computebilling codereviewrate organizationid organizationId"
   },
+  "computeBilling.personalBillingMode": {
+    "path": "computeBilling.personalBillingMode",
+    "kind": "query",
+    "summary": "Look up the signed-in user's billing mode for a Kilo-hosted container instance: shadow (usage is metered but not charged yet) or paid (usage is charged).",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "instance": {
+          "type": "string",
+          "enum": [
+            "standard-3",
+            "standard-4"
+          ]
+        }
+      },
+      "required": [
+        "instance"
+      ]
+    },
+    "tags": [
+      "computebilling",
+      "personalbillingmode",
+      "instance"
+    ],
+    "searchBlob": "computeBilling.personalBillingMode Look up the signed-in user's billing mode for a Kilo-hosted container instance: shadow (usage is metered but not charged yet) or paid (usage is charged). computebilling personalbillingmode instance instance"
+  },
   "computeBilling.rates": {
     "path": "computeBilling.rates",
     "kind": "query",

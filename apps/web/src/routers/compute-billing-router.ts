@@ -9,7 +9,9 @@ import { TRPCError } from '@trpc/server';
 import { cloud_billing_sku } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { SANDBOX_USAGE_SKUS } from '@kilocode/worker-utils/cloud-agent-compute';
+import { CLOUDFLARE_CONTAINERS_INSTANCES } from '@kilocode/worker-utils/sandbox-allocation';
 import { isCodeReviewComputeBillingEnabled } from '@/lib/code-reviews/compute-billing';
+import { readPersonalContainersBillingMode } from '@/lib/cloud-agent/compute-billing-mode';
 import {
   COMPUTE_CHARGE_MAX_PAGE,
   readComputeCharges,
@@ -56,6 +58,11 @@ export const computeBillingRouter = createTRPCRouter({
       return { enabled: true, hourlyUsd: rate ? Number(rate.rate) * 36 : null };
     }),
   rates: baseProcedure.query(() => readComputeRates(db)),
+  personalBillingMode: baseProcedure
+    .input(z.object({ instance: z.enum(CLOUDFLARE_CONTAINERS_INSTANCES) }))
+    .query(async ({ ctx, input }) => ({
+      billingMode: await readPersonalContainersBillingMode(ctx.user.id, input.instance),
+    })),
   sessionCharges: baseProcedure
     .input(
       z.object({

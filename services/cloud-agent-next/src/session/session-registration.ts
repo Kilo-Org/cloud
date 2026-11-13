@@ -979,7 +979,7 @@ async function allocateNewSession(
   // it or saved settings resolved it, so a pinned retry cannot outlive the
   // owner's access to sandbox selection.
   if (requestedAllocation !== undefined) {
-    assertSandboxAllocationAvailable(
+    await assertSandboxAllocationAvailable(
       ctx.env,
       { userId: ctx.userId, orgId },
       requestedAllocation,
@@ -1931,7 +1931,15 @@ async function withLedgerSavedAllocation(
   }
   // Admission always writes a canonical result, so its presence no longer means
   // progress was recorded; only a fresh admission may still read owner settings.
-  if (freshAdmission) return withSavedSandboxAllocation(input, savedAllocationArgs(ctx, options));
+  if (freshAdmission) {
+    try {
+      return await withSavedSandboxAllocation(input, savedAllocationArgs(ctx, options));
+    } catch (error) {
+      const hooks = await buildLedgerHooks(input, ctx, options, getPgDb(ctx.env), row, 'new');
+      await hooks.onFailure('sandbox', 'sandbox');
+      throw error;
+    }
+  }
   return { ...input, savedSandboxAllocation: null };
 }
 
@@ -2231,7 +2239,7 @@ export async function createSessionWithLedger(
     const owner = { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId };
     const capability = allocationCapabilityFor(input, options.billingOrigin);
     const available = isSandboxAllocationAvailable(
-      getSandboxSelectionCapabilities(ctx.env, owner, {
+      await getSandboxSelectionCapabilities(ctx.env, owner, {
         repositoryType: input.repository.type,
         ...(capability ? { capability } : {}),
       }),
@@ -2250,7 +2258,7 @@ export async function createSessionWithLedger(
         )
         .limit(1);
       if (!existing || new Date(existing.expires_at).getTime() <= Date.now()) {
-        assertSandboxAllocationAvailable(
+        await assertSandboxAllocationAvailable(
           ctx.env,
           owner,
           allocation,

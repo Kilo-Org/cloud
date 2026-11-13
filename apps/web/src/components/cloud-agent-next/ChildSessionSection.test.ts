@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
-import React, { act, createElement } from 'react';
+import React, { act, createElement, startTransition } from 'react';
+import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { atom, createStore, Provider } from 'jotai';
 import type {
@@ -208,6 +209,250 @@ describe('ChildSessionSection live subscription', () => {
       store.set(sourceAtom, { getter: () => [childMessageWithTools(2)] });
     });
     expect(container.textContent).toContain('2 tool calls');
+  });
+
+  it('keeps a completed background launch working until its child finishes', () => {
+    const child = childMessageWithTools(1);
+    if (child.info.role !== 'assistant') throw new Error('Expected assistant fixture');
+    child.info = { ...child.info, time: { created: 3 } };
+    const source = atom<StoredMessage[]>([child]);
+    const store = createStore();
+    jest.mocked(useOptionalManager).mockReturnValue({
+      atoms: {
+        childMessages: atom(get => {
+          const messages = get(source);
+          return () => messages;
+        }),
+      },
+    } as unknown as SessionManager);
+    act(() =>
+      root?.render(
+        createElement(
+          Provider,
+          { store },
+          createElement(ChildSessionSection, {
+            taskToolPart: taskToolPart({ sessionId: childSessionId, status: 'running' }),
+            sessionId: childSessionId,
+            onOpenChildSession: jest.fn(),
+          })
+        )
+      )
+    );
+    expect(container.textContent).not.toContain('Completed');
+    expect(container.querySelector('button')?.getAttribute('aria-busy')).toBe('true');
+    const finished: StoredMessage = {
+      ...child,
+      info: { ...child.info, time: { created: 3, completed: 4 } },
+    };
+    act(() => store.set(source, [finished]));
+    expect(container.textContent).toContain('Completed');
+    expect(container.querySelector('button')?.hasAttribute('aria-busy')).toBe(false);
+  });
+
+  it('updates a background row from live child status without transcript changes', () => {
+    const status = atom({ type: 'busy' });
+    const store = createStore();
+    jest.mocked(useOptionalManager).mockReturnValue({
+      atoms: {
+        childMessages: atom(() => () => [childMessageWithTools(1)]),
+        childSessionStatus: atom(get => {
+          const current = get(status);
+          return (id: string) => (id === childSessionId ? current : undefined);
+        }),
+      },
+    } as unknown as SessionManager);
+    act(() =>
+      root?.render(
+        createElement(
+          Provider,
+          { store },
+          createElement(ChildSessionSection, {
+            taskToolPart: taskToolPart({ sessionId: childSessionId, status: 'running' }),
+            sessionId: childSessionId,
+            onOpenChildSession: jest.fn(),
+          })
+        )
+      )
+    );
+    expect(container.textContent).not.toContain('Completed');
+    act(() => store.set(status, { type: 'idle' }));
+    expect(container.textContent).toContain('Completed');
+    act(() => store.set(status, { type: 'busy' }));
+    expect(container.textContent).not.toContain('Completed');
+    expect(container.querySelector('button')?.getAttribute('aria-busy')).toBe('true');
+  });
+
+  it.each([
+    ['running', 'Working'],
+    ['completed', 'Completed'],
+    ['pending', 'Delegating'],
+    ['error', 'Failed'],
+  ] as const)(
+    'keeps the %s status in the header without an empty activity line',
+    (status, label) => {
+      const state: ToolPart['state'] =
+        status === 'running'
+          ? { status, input: {}, time: { start: 1 } }
+          : status === 'completed'
+            ? {
+                status,
+                input: {},
+                output: 'done',
+                title: 'done',
+                metadata: {},
+                time: { start: 1, end: 2 },
+              }
+            : status === 'error'
+              ? { status, input: {}, error: 'Task failed', time: { start: 1, end: 2 } }
+              : { status, input: {}, raw: '' };
+      act(() =>
+        root?.render(
+          createElement(ChildSessionSection, {
+            taskToolPart: { ...parentPart, state },
+            sessionId: childSessionId,
+            onOpenChildSession: jest.fn(),
+          })
+        )
+      );
+      const button = container.querySelector('button');
+      const summary = button?.firstElementChild?.children[2];
+      expect(summary?.firstElementChild?.textContent).toBe(label);
+      expect(button?.children).toHaveLength(1);
+    }
+  );
+
+  it('keeps the status and tool count in the header and only tool activity below it', () => {
+    act(() =>
+      root?.render(
+        createElement(ChildSessionSection, {
+          taskToolPart: parentPart,
+          sessionId: childSessionId,
+          childMessages: [childMessageWithTools(1)],
+          onOpenChildSession: jest.fn(),
+        })
+      )
+    );
+    const button = container.querySelector('button');
+    const summary = button?.firstElementChild?.children[2];
+    expect(summary?.firstElementChild?.textContent).toBe('Working');
+    expect(summary?.lastElementChild?.textContent).toBe('1 tool call');
+    expect(button?.children).toHaveLength(2);
+    expect(button?.lastElementChild?.textContent).toBe('Read /repo/file.ts');
+  });
+
+  it('loads child history after reload instead of keeping completed background work active', async () => {
+    const store = createStore();
+    const messages = atom<StoredMessage[]>([]);
+    const hydrateChildSession = jest.fn(async () => {
+      store.set(messages, [childMessageWithTools(1)]);
+    });
+    jest.mocked(useOptionalManager).mockReturnValue({
+      atoms: {
+        childMessages: atom(get => {
+          const current = get(messages);
+          return () => current;
+        }),
+      },
+      hydrateChildSession,
+    } as unknown as SessionManager);
+    await act(async () =>
+      root?.render(
+        createElement(
+          Provider,
+          { store },
+          createElement(ChildSessionSection, {
+            taskToolPart: taskToolPart({ sessionId: childSessionId, status: 'running' }),
+            sessionId: childSessionId,
+            onOpenChildSession: jest.fn(),
+          })
+        )
+      )
+    );
+    expect(hydrateChildSession).toHaveBeenCalledTimes(1);
+    expect(hydrateChildSession).toHaveBeenCalledWith(childSessionId);
+    expect(container.textContent).toContain('Completed');
+    expect(container.querySelector('button')?.hasAttribute('aria-busy')).toBe(false);
+  });
+
+  it.each([
+    { status: 'error', message: 'Synthetic history failure' },
+    {
+      status: 'ready',
+      cursor: null,
+      hasOlder: false,
+      isLoadingOlder: false,
+      olderError: null,
+      omittedItemCount: 0,
+    },
+  ] satisfies ChildSessionHydrationState[])(
+    'shows unavailable status after history becomes $status without messages and recovers when messages arrive',
+    async hydrationResult => {
+      const store = createStore();
+      const messages = atom<StoredMessage[]>([]);
+      const hydration = atom<ChildSessionHydrationState>({ status: 'idle' });
+      const hydrateChildSession = jest.fn(async () => {
+        store.set(hydration, hydrationResult);
+      });
+      const onOpenChildSession = jest.fn();
+      jest.mocked(useOptionalManager).mockReturnValue({
+        atoms: {
+          childMessages: atom(get => {
+            const current = get(messages);
+            return () => current;
+          }),
+          childSessionHydrationState: atom(get => {
+            const current = get(hydration);
+            return () => current;
+          }),
+        },
+        hydrateChildSession,
+      } as unknown as SessionManager);
+      await act(async () =>
+        root?.render(
+          createElement(
+            Provider,
+            { store },
+            createElement(ChildSessionSection, {
+              taskToolPart: taskToolPart({ sessionId: childSessionId, status: 'running' }),
+              sessionId: childSessionId,
+              onOpenChildSession,
+            })
+          )
+        )
+      );
+      expect(container.textContent).toContain('Status unavailable');
+      expect(container.textContent).not.toContain('Failed');
+      const button = container.querySelector('button');
+      if (!button) throw new Error('Missing child transcript control');
+      expect(button.hasAttribute('aria-busy')).toBe(false);
+      expect(hydrateChildSession).toHaveBeenCalledTimes(1);
+      click(button);
+      expect(onOpenChildSession).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionId: childSessionId })
+      );
+      act(() => store.set(hydration, { status: 'loading' }));
+      expect(container.textContent).toContain('Working');
+      expect(button.getAttribute('aria-busy')).toBe('true');
+      act(() => store.set(messages, [childMessageWithTools(1)]));
+      expect(container.textContent).toContain('Completed');
+      expect(container.textContent).not.toContain('Status unavailable');
+      expect(button.hasAttribute('aria-busy')).toBe(false);
+      expect(hydrateChildSession).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('uses completed tool status for a background task without a manager or child history', () => {
+    act(() =>
+      root?.render(
+        createElement(ChildSessionSection, {
+          taskToolPart: taskToolPart({ sessionId: childSessionId, status: 'running' }),
+          sessionId: childSessionId,
+        })
+      )
+    );
+    expect(container.textContent).toContain('Completed');
+    expect(container.textContent).not.toContain('Working');
+    expect(container.querySelector('[aria-busy="true"]')).toBeNull();
   });
 
   it('passes the current live getter into an open recursive transcript and refreshes it from SDK state', () => {
@@ -511,6 +756,7 @@ describe('ChildSessionDrawer header', () => {
   let cleanup: () => void;
   const readDrawerMessages = jest.fn((messages: StoredMessage[]) => [...messages]);
   const drawerSource = atom<StoredMessage[]>([]);
+  const hasOlderMessages = atom(false);
   const drawerStore = createStore();
   const manager = {
     atoms: {
@@ -520,14 +766,17 @@ describe('ChildSessionDrawer header', () => {
         const messages = get(drawerSource);
         return (_sessionId: string): StoredMessage[] => readDrawerMessages(messages);
       }),
-      childSessionHydrationState: atom(() => (_sessionId: string): ChildSessionHydrationState => ({
-        status: 'ready',
-        cursor: null,
-        hasOlder: false,
-        isLoadingOlder: false,
-        olderError: null,
-        omittedItemCount: 0,
-      })),
+      childSessionHydrationState: atom(get => {
+        const hasOlder = get(hasOlderMessages);
+        return (_sessionId: string): ChildSessionHydrationState => ({
+          status: 'ready',
+          cursor: null,
+          hasOlder,
+          isLoadingOlder: false,
+          olderError: null,
+          omittedItemCount: 0,
+        });
+      }),
     },
     hydrateChildSession: jest.fn(),
     loadOlderChildMessages: jest.fn(),
@@ -545,6 +794,7 @@ describe('ChildSessionDrawer header', () => {
   afterEach(() => {
     act(() => root?.unmount());
     root = undefined;
+    drawerStore.set(hasOlderMessages, false);
   });
 
   afterAll(() => {
@@ -578,6 +828,44 @@ describe('ChildSessionDrawer header', () => {
     act(() => drawerStore.set(drawerSource, [childMessageWithTools(2)]));
     expect(readDrawerMessages).toHaveBeenCalledTimes(1);
     expect(container.querySelectorAll('[data-message-id="child-1"]')).toHaveLength(1);
+  });
+
+  it('keeps a reader above the bottom when a message commits before the scroll state', () => {
+    drawerStore.set(drawerSource, [childMessageWithTools(1)]);
+    renderDrawer({ sessionId: childSessionId, description: 'Reading child history' });
+    const scroller = container.querySelector<HTMLElement>('.overflow-y-auto');
+    if (!scroller) throw new Error('Child drawer scroller missing');
+    Object.defineProperties(scroller, {
+      clientHeight: { value: 100 },
+      scrollHeight: { value: 1000 },
+    });
+    act(() => drawerStore.set(drawerSource, [childMessageWithTools(2)]));
+    expect(scroller.scrollTop).toBe(1000);
+    const propsKey = Object.keys(scroller).find(key => key.startsWith('__reactProps$'));
+    if (!propsKey) throw new Error('Child drawer scroll handler missing');
+    const props = (scroller as unknown as Record<string, { onScroll: () => void }>)[propsKey];
+
+    act(() => {
+      scroller.scrollTop = 500;
+      startTransition(() => props.onScroll());
+      flushSync(() => drawerStore.set(drawerSource, [childMessageWithTools(3)]));
+      expect(readDrawerMessages).toHaveBeenLastCalledWith([childMessageWithTools(3)]);
+      expect(scroller.scrollTop).toBe(500);
+    });
+    expect(scroller.scrollTop).toBe(500);
+  });
+
+  it('keeps earlier child history available through an explicit load button', () => {
+    drawerStore.set(hasOlderMessages, true);
+    manager.loadOlderChildMessages.mockClear();
+    renderDrawer({ sessionId: childSessionId, description: 'Earlier child history' });
+    const loadButton = [...container.querySelectorAll('button')].find(
+      button => button.textContent === 'Load earlier messages'
+    );
+    if (!loadButton) throw new Error('Earlier child history button missing');
+    expect(manager.loadOlderChildMessages).not.toHaveBeenCalled();
+    click(loadButton);
+    expect(manager.loadOlderChildMessages).toHaveBeenCalledWith(childSessionId);
   });
 
   it('shows the routed model next to the agent', () => {

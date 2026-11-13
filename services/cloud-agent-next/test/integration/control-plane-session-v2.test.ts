@@ -693,7 +693,13 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
       const preparesBefore = peer.prepareCalls.length;
 
       const oldAttempt = peer.attemptId;
-      peer.status = async input => ({ sessionId: input.sessionId, view: { state: 'unknown' } });
+      peer.status = async input => ({
+        sessionId: input.sessionId,
+        view: { state: 'unknown' },
+        workspacePreparing: false,
+        workspaceStopEpoch: 0,
+        workspaceStopAt: 0,
+      });
       peer.attemptId = crypto.randomUUID();
       peer.prepareView = peer.view('preparing');
       const billingFailure =
@@ -814,7 +820,7 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     expect(await readAlarm(stub)).toBeNull();
   });
 
-  it('clears the backstop alarm on stop and cancels open messages', async () => {
+  it('stops the whole workspace when its preparation is cancelled', async () => {
     const { sessionId, stub, peer } = await setup();
     peer.prepareView = peer.view('preparing');
     await stub.send(promptPayload('m1'));
@@ -823,7 +829,312 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     await stub.stop();
     expect(await messageStatus(stub, 'm1')).toBe('interrupted');
     expect(await readAlarm(stub)).toBeNull();
-    expect(peer.abortCalls).toEqual([sessionId]);
+    expect(peer.cancelWorkspaceCalls).toEqual([{ sessionId, requestedAt: expect.any(Number) }]);
+    expect(peer.abortCalls).toEqual([]);
+    await expect(stub.getSession()).resolves.toMatchObject({
+      type: 'found',
+      route: { state: 'unknown' },
+    });
+  });
+
+  it('stops the workspace from a ready chat when a sibling is preparing', async () => {
+    const { sessionId, stub, peer } = await setup();
+    peer.prepareView = peer.view('ready');
+    await stub.send(promptPayload('m1'));
+    await waitFor(async () => expect(await messageStatus(stub, 'm1')).toBe('running'));
+    peer.workspacePreparing = true;
+
+    await expect(stub.stop()).resolves.toEqual({ interrupted: true });
+
+    expect(peer.cancelWorkspaceCalls).toEqual([{ sessionId, requestedAt: expect.any(Number) }]);
+    expect(peer.abortCalls).toEqual([]);
+    expect(await messageStatus(stub, 'm1')).toBe('interrupted');
+  });
+
+  it('ignores a duplicate workspace stop notification after a later message', async () => {
+    const { stub, peer } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    const requestedAt = Date.now();
+    await stub.stop();
+    const stopEpoch = peer.stopEpoch;
+
+    peer.prepareView = peer.view('ready');
+    await stub.send(promptPayload('m2'));
+    await waitFor(async () => expect(await messageStatus(stub, 'm2')).toBe('running'));
+
+    await stub.onWorkspaceStopped({ stopEpoch, requestedAt, attemptId: peer.attemptId });
+    expect(await messageStatus(stub, 'm2')).toBe('running');
+  });
+
+  it('does not cancel a message created after an older stop notification', async () => {
+    const { stub, peer } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+
+    await stub.onWorkspaceStopped({
+      stopEpoch: 1,
+      requestedAt: Date.now() - 5_000,
+      attemptId: peer.attemptId,
+    });
+
+    expect(await messageStatus(stub, 'm1')).not.toBe('interrupted');
+    await expect(stub.getSession()).resolves.toMatchObject({
+      type: 'found',
+      route: { state: 'preparing' },
+    });
+  });
+
+  it('closes an interrupted preparation as cancelled in the session history', async () => {
+    const { sessionId, stub, peer } = await setup();
+    const stream = await connectStream(sessionId);
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    const attemptId = peer.attemptId;
+    await stub.onRoute({ state: 'preparing', step: 'clone', attemptId });
+
+    await stub.stop();
+
+    const messages = await drainStream(stream);
+    const rows = preparingRows(messages);
+    expect(rows.find(row => row.action === 'attempt_failed')).toMatchObject({
+      attemptId,
+      safeError: 'preparation_cancelled',
+    });
+    expect(rows.some(row => row.action === 'attempt_completed')).toBe(false);
+    expect(
+      messages.some(
+        message =>
+          message.streamEventType === 'cloud.status' &&
+          (message.data as { cloudStatus?: { message?: string } }).cloudStatus?.message ===
+            'preparation_cancelled'
+      )
+    ).toBe(true);
+    expect(await messageStatus(stub, 'm1')).toBe('interrupted');
+    stream.close();
+  });
+
+  it('lets a new message restart after a workspace stop with the current epoch', async () => {
+    const { stub, peer } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    await stub.stop();
+    const stopEpoch = peer.stopEpoch;
+
+    peer.prepareView = peer.view('ready');
+    await stub.send(promptPayload('m2'));
+    await waitFor(async () => expect(await messageStatus(stub, 'm2')).toBe('running'));
+
+    expect(peer.prepareCalls.at(-1)).toMatchObject({ stopEpoch });
+    expect(peer.prepareCalls.at(-1)?.intentAt).toEqual(expect.any(Number));
+    expect(await messageStatus(stub, 'm1')).toBe('interrupted');
+  });
+
+  it('does not fence a newer preparation when a delayed stop names the old attempt', async () => {
+    const { stub, peer } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    const stopAt = Date.now();
+    await new Promise(resolve => setTimeout(resolve, 5));
+
+    peer.attemptId = 'attempt-B';
+    peer.prepareView = peer.view('ready');
+    await stub.send(promptPayload('m2'));
+    await waitFor(async () => expect(await messageStatus(stub, 'm2')).toBe('running'));
+
+    await stub.onWorkspaceStopped({
+      stopEpoch: 1,
+      requestedAt: stopAt,
+      attemptId: 'attempt-A',
+    });
+
+    expect(await messageStatus(stub, 'm1')).toBe('interrupted');
+    expect(await messageStatus(stub, 'm2')).toBe('running');
+    await expect(stub.getSession()).resolves.toMatchObject({
+      type: 'found',
+      route: { state: 'ready', attemptId: 'attempt-B' },
+    });
+
+    await stub.send(promptPayload('m3'));
+    await waitFor(async () => expect(await messageStatus(stub, 'm3')).toBe('running'));
+  });
+
+  it('continues a newer Stop after reconciling a missed workspace stop', async () => {
+    const { stub, peer } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    await stub.stop();
+    expect(await messageStatus(stub, 'm1')).toBe('interrupted');
+
+    const reconcileAt = Date.now() - 1;
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m2'));
+    peer.stopEpoch = 2;
+    peer.stopAt = reconcileAt;
+
+    await stub.stop();
+
+    expect(peer.cancelWorkspaceCalls).toHaveLength(2);
+    expect(await messageStatus(stub, 'm2')).toBe('interrupted');
+  });
+
+  it('issues a fresh Stop when a concurrent Stop completes during the status read', async () => {
+    const { stub, peer, sessionId } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    let concurrentStopAt = 0;
+    peer.status = async () => {
+      await new Promise(resolve => setTimeout(resolve, 10));
+      concurrentStopAt = Date.now();
+      peer.stopEpoch = 1;
+      peer.stopAt = concurrentStopAt;
+      peer.workspacePreparing = true;
+      return {
+        sessionId,
+        view: { state: 'unknown' },
+        workspacePreparing: true,
+        workspaceStopEpoch: 1,
+        workspaceStopAt: concurrentStopAt,
+      };
+    };
+
+    await expect(stub.stop()).resolves.toEqual({ interrupted: true });
+
+    expect(peer.cancelWorkspaceCalls).toHaveLength(1);
+    expect(peer.cancelWorkspaceCalls[0]?.requestedAt).toBeGreaterThan(concurrentStopAt);
+    expect(peer.stopEpoch).toBe(2);
+    expect(await messageStatus(stub, 'm1')).toBe('interrupted');
+  });
+
+  it('re-prepares newer work after a refused stale preparation', async () => {
+    const { stub, peer } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    const stopAt = Date.now();
+    await new Promise(resolve => setTimeout(resolve, 5));
+    peer.stopEpoch = 1;
+    peer.stopAt = stopAt;
+    peer.prepareViews.push({ state: 'unknown', stopEpoch: 1, stopAt }, peer.view('ready'));
+
+    await stub.send(promptPayload('m2'));
+    await waitFor(async () => expect(await messageStatus(stub, 'm2')).toBe('running'));
+
+    expect(await messageStatus(stub, 'm1')).toBe('interrupted');
+  });
+
+  it('recovers queued work when a stale route frame meets an unknown route', async () => {
+    const { stub, peer } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    await stub.stop();
+
+    peer.prepareError = new Error('unreachable');
+    await stub.send(promptPayload('m2'));
+    peer.prepareError = null;
+    peer.prepareView = { state: 'unknown' };
+    peer.prepareViews.push(peer.view('ready'));
+
+    await stub.onRoute({ state: 'ready', attemptId: 'stale-attempt' });
+    await waitFor(async () => expect(await messageStatus(stub, 'm2')).toBe('running'));
+  });
+
+  it.each(['running', 'queued'] as const)(
+    'reconciles a dropped workspace stop before failing due %s work',
+    async state => {
+      const { stub, peer } = await setup();
+      peer.prepareView = peer.view(state === 'running' ? 'ready' : 'preparing');
+      await stub.send(promptPayload('m1'));
+      expect(await messageStatus(stub, 'm1')).toBe(state);
+      peer.stopEpoch = 1;
+      peer.stopAt = Date.now();
+      await setMessageTimes(stub, 'm1', {
+        ...(state === 'running'
+          ? { accepted_at: Date.now() - ACCEPTED_BACKSTOP_MS - 1 }
+          : { created_at: Date.now() - QUEUED_BACKSTOP_MS - 1 }),
+      });
+
+      await runSessionAlarm(stub);
+
+      expect(await messageStatus(stub, 'm1')).toBe('interrupted');
+      await expect(stub.getSession()).resolves.toMatchObject({
+        type: 'found',
+        route: { state: 'unknown' },
+      });
+    }
+  );
+
+  it('settles a stale prepare refused by a newer workspace stop epoch', async () => {
+    const { stub, peer } = await setup();
+    peer.stopEpoch = 3;
+    peer.prepareViews.push({ state: 'unknown', stopEpoch: 4 });
+    await stub.send(promptPayload('m1'));
+
+    expect(await messageStatus(stub, 'm1')).toBe('interrupted');
+    await expect(stub.getSession()).resolves.toMatchObject({
+      type: 'found',
+      route: { state: 'unknown' },
+    });
+
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m2'));
+    expect(peer.prepareCalls.at(-1)).toMatchObject({ stopEpoch: 4 });
+  });
+
+  it('settles a sibling chat from the workspace stop notification without retrying', async () => {
+    const { stub, peer } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    const preparesBefore = peer.prepareCalls.length;
+
+    await stub.onWorkspaceStopped({
+      stopEpoch: 7,
+      requestedAt: Date.now(),
+      attemptId: peer.attemptId,
+    });
+
+    expect(await messageStatus(stub, 'm1')).toBe('interrupted');
+    await expect(stub.getSession()).resolves.toMatchObject({
+      type: 'found',
+      route: { state: 'unknown' },
+    });
+    expect(peer.prepareCalls).toHaveLength(preparesBefore);
+    expect(await readAlarm(stub)).toBeNull();
+
+    peer.prepareView = peer.view('ready');
+    await stub.send(promptPayload('m2'));
+    expect(peer.prepareCalls.at(-1)).toMatchObject({ stopEpoch: 7 });
+  });
+
+  it.each([
+    { stopEpoch: 1.5 },
+    { requestedAt: -1 },
+    { attemptId: '' },
+    { attemptId: 'a'.repeat(129) },
+  ])('rejects malformed workspace stop notifications: %j', async invalid => {
+    const { stub, peer } = await setup();
+    await stub.send(promptPayload('m1'));
+
+    await runInDurableObject(stub, async instance => {
+      await expect(
+        instance.onWorkspaceStopped({
+          stopEpoch: 1,
+          requestedAt: Date.now(),
+          attemptId: peer.attemptId,
+          ...invalid,
+        })
+      ).rejects.toThrow();
+    });
+
+    expect(await messageStatus(stub, 'm1')).toBe('queued');
+    await expect(stub.getSession()).resolves.toMatchObject({
+      type: 'found',
+      route: { state: 'preparing', attemptId: peer.attemptId },
+    });
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        state.storage.get('control_plane_workspace_stop_state')
+      )
+    ).toBeUndefined();
   });
 
   it('aborts the live route on stop when no message is queued or accepted', async () => {
@@ -3156,9 +3467,14 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     reconnected.close();
   });
 
-  it.each(['fail', 'pass', undefined] as const)(
-    'forwards a completed wrapper outcome through the Sandbox DO to the callback with gateResult %s',
-    async gateResult => {
+  it.each([
+    { status: 'completed', gateResult: 'fail', reason: undefined },
+    { status: 'completed', gateResult: 'pass', reason: undefined },
+    { status: 'completed', gateResult: undefined, reason: undefined },
+    { status: 'failed', gateResult: undefined, reason: 'completion_unconfirmed' },
+  ] as const)(
+    'forwards a $status wrapper outcome through the Sandbox DO to the callback with gateResult $gateResult',
+    async ({ status, gateResult, reason }) => {
       const sessionId = newSessionId();
       const sandboxId = isolatedSandboxId();
       const provider = createFakeProvider();
@@ -3192,8 +3508,13 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         sandboxSelection: { provider: 'cloudflare-containers' },
       });
       const callbacks: CallbackJob[] = [];
+      const reports: CloudAgentQueueReport[] = [];
       await runInDurableObject(sessionStub, instance => {
-        instance.env.CLOUD_AGENT_REPORT_QUEUE = { send: async () => {} } as never;
+        instance.env.CLOUD_AGENT_REPORT_QUEUE = {
+          send: async (report: CloudAgentQueueReport) => {
+            reports.push(report);
+          },
+        } as never;
         instance.env.CALLBACK_QUEUE = {
           send: async (job: CallbackJob) => {
             callbacks.push(job);
@@ -3228,20 +3549,38 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         wrapper.send({
           type: 'session.outcome',
           sessionId,
-          status: 'completed',
+          status,
           lastMessageId: 'm1',
+          ...(reason === undefined ? {} : { reason }),
           ...(gateResult === undefined ? {} : { gateResult }),
         });
-        await waitFor(async () => expect(await messageStatus(sessionStub, 'm1')).toBe('completed'));
+        await waitFor(async () => expect(await messageStatus(sessionStub, 'm1')).toBe(status));
         await runSessionAlarm(sessionStub);
         expect(callbacks).toHaveLength(1);
         expect(callbacks[0]?.payload).toMatchObject({
           sessionId,
           cloudAgentSessionId: sessionId,
           messageId: 'm1',
-          status: 'completed',
+          status,
         });
         expect(callbacks[0]?.payload.gateResult).toBe(gateResult);
+        if (status === 'failed') {
+          expect(await readMessageReason(sessionStub, 'm1')).toBe('completion_unconfirmed');
+          expect(callbacks[0]?.payload).toMatchObject({
+            errorMessage:
+              'The assistant finished its reply, but session completion could not be confirmed. Send a new message to continue.',
+            failureStage: 'post_dispatch_no_activity',
+            failure: { stage: 'post_dispatch_no_activity', code: 'wrapper_no_output' },
+          });
+          expect(reports).toHaveLength(1);
+          expect(reports[0]?.run).toMatchObject({
+            status: 'failed',
+            failureStage: 'post_dispatch_no_activity',
+            failureCode: 'wrapper_no_output',
+            failureResponsibility: 'platform',
+            failureReason: 'wrapper_liveness',
+          });
+        }
       } finally {
         wrapper.close();
       }
@@ -3374,6 +3713,9 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     expect(await sandboxStub.status({ sessionId })).toEqual({
       sessionId,
       view: { state: 'ready', attemptId: expect.any(String) },
+      workspacePreparing: false,
+      workspaceStopEpoch: 0,
+      workspaceStopAt: 0,
     });
     expect(await readGrantAlias(sandboxStub, sessionId)).toBe(aliasBefore);
 

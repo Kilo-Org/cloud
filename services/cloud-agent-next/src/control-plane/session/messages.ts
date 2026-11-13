@@ -229,10 +229,10 @@ export function nextBackstopAt(
   return deadlines.length === 0 ? null : Math.min(...deadlines);
 }
 
-/** Public `cloud.message.queued` snapshot content for a stored intent. */
-export function renderTurnContent(intent: ControlPlanePromptPayload): string {
-  if (intent.turn.type === 'command') {
-    return `/${intent.turn.command}${intent.turn.arguments ? ` ${intent.turn.arguments}` : ''}`;
-  }
-  return intent.turn.prompt;
+export function renderQueuedMessageContent(message: SessionMessage): string {
+  const { turn } = message.intent;
+  if (turn.type === 'prompt') return turn.prompt;
+  // Kilo v2 commands can expand under a different id; unaccepted commands still need queue and failure controls.
+  if (message.acceptedAt !== null) return '';
+  return `/${turn.command}${turn.arguments ? ` ${turn.arguments}` : ''}`;
 }

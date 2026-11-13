@@ -1890,7 +1890,8 @@
       "cancelQueued": "संदेश रद्द करें",
       "cancelQueuedAccessibility": "कतार में लगा संदेश रद्द करें",
       "restoreQueued": "वापस लाएँ",
-      "restoreQueuedAccessibility": "रद्द किया गया संदेश लिखने के बॉक्स में वापस लाएँ"
+      "restoreQueuedAccessibility": "रद्द किया गया संदेश लिखने के बॉक्स में वापस लाएँ",
+      "noReplyRecorded": "इस संदेश के लिए कोई उत्तर दर्ज नहीं किया गया।"
     },
     "olderMessages": {
       "arrived": "पहले के संदेश लोड हो गए",

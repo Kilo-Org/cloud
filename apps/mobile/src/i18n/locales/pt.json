@@ -2527,7 +2527,8 @@
       "cancelQueued": "Cancelar mensagem",
       "cancelQueuedAccessibility": "Cancelar mensagem em fila",
       "restoreQueued": "Restaurar",
-      "restoreQueuedAccessibility": "Restaurar a mensagem cancelada no campo de mensagem"
+      "restoreQueuedAccessibility": "Restaurar a mensagem cancelada no campo de mensagem",
+      "noReplyRecorded": "Nenhuma resposta foi registrada para esta mensagem."
     },
     "olderMessages": {
       "arrived": "Mensagens anteriores carregadas",

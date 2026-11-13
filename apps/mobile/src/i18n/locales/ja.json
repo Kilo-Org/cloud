@@ -1934,7 +1934,8 @@
       "cancelQueued": "メッセージをキャンセル",
       "cancelQueuedAccessibility": "送信待ちのメッセージをキャンセル",
       "restoreQueued": "復元",
-      "restoreQueuedAccessibility": "キャンセルしたメッセージをメッセージ入力欄に復元"
+      "restoreQueuedAccessibility": "キャンセルしたメッセージをメッセージ入力欄に復元",
+      "noReplyRecorded": "このメッセージには応答が記録されていません。"
     },
     "olderMessages": {
       "arrived": "以前のメッセージを読み込みました",

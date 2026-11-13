@@ -612,6 +612,24 @@ describe('newestGlanceableResult', () => {
   });
 });
 
+describe('extreme timestamp ties', () => {
+  // A tie can only change an aggregate whose result carries more than the
+  // instant. The newest-result kind is read from the winning row, so the first
+  // row of a tie must win: only a strictly later value replaces the winner.
+  // The two ISO-returning aggregates serialise whichever tied row wins to the
+  // same string, so no assertion on them can distinguish the tie-break.
+  const instant = new Date(NOW).toISOString();
+
+  it('takes the newest-result kind from the first row of a tie', () => {
+    expect(
+      newestGlanceableResult([
+        { status: 'permission', statusUpdatedAt: instant },
+        { status: 'busy', statusUpdatedAt: instant },
+      ])
+    ).toEqual({ kind: 'needsInput', at: instant });
+  });
+});
+
 describe('session timestamp parsing', () => {
   // A producer can hand the rows a PostgreSQL timestamp rather than ISO 8601,
   // and Hermes cannot parse that form, so every helper reads the instant

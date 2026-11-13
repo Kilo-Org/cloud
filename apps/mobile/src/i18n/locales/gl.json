@@ -2476,7 +2476,8 @@
       "cancelQueued": "Cancelar mensaxe",
       "cancelQueuedAccessibility": "Cancelar a mensaxe na cola",
       "restoreQueued": "Restaurar",
-      "restoreQueuedAccessibility": "Restaurar a mensaxe cancelada no campo de mensaxe"
+      "restoreQueuedAccessibility": "Restaurar a mensaxe cancelada no campo de mensaxe",
+      "noReplyRecorded": "Non se rexistrou ningunha resposta para esta mensaxe."
     },
     "olderMessages": {
       "arrived": "Cargáronse as mensaxes anteriores",

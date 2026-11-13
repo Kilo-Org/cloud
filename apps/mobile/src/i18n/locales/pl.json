@@ -1978,7 +1978,8 @@
       "cancelQueued": "Anuluj wiadomość",
       "cancelQueuedAccessibility": "Anuluj wiadomość w kolejce",
       "restoreQueued": "Przywróć",
-      "restoreQueuedAccessibility": "Przywróć anulowaną wiadomość do pola wiadomości"
+      "restoreQueuedAccessibility": "Przywróć anulowaną wiadomość do pola wiadomości",
+      "noReplyRecorded": "Dla tej wiadomości nie zapisano odpowiedzi."
     },
     "olderMessages": {
       "arrived": "Wczytano wcześniejsze wiadomości",

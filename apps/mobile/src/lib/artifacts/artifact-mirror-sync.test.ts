@@ -25,6 +25,7 @@ import { setSignOutActive } from '@/lib/auth/sign-out-state';
 const fakeFs = vi.hoisted(() => {
   type Tracked = { created: boolean; deleted: boolean; path: string; size: number };
   const entries: Tracked[] = [];
+  const createdPaths = new Set<string>();
   const deletedPaths = new Set<string>();
 
   class EntryMock {
@@ -48,8 +49,15 @@ const fakeFs = vi.hoisted(() => {
       entries.push(this);
     }
 
+    // Path-based, like the real filesystem: a reader that builds a fresh entry
+    // for a path sees what an earlier entry wrote there.
+    get exists(): boolean {
+      return createdPaths.has(this.path) && !deletedPaths.has(this.path);
+    }
+
     create(): void {
       this.created = true;
+      createdPaths.add(this.path);
     }
 
     // A `data:` URL writes its decoded payload through this; the sync suite
@@ -67,16 +75,23 @@ const fakeFs = vi.hoisted(() => {
       this.deleted = true;
       deletedPaths.add(this.path);
       destination.created = true;
+      createdPaths.add(destination.path);
     }
   }
 
   return {
     Directory: EntryMock,
     File: EntryMock,
+    created: (path: string) => createdPaths.has(path),
     deleted: (path: string) => deletedPaths.has(path),
+    /** Removes bytes the way the device does: outside the sync's own writes. */
+    remove: (path: string) => {
+      deletedPaths.add(path);
+    },
     entries,
     reset: () => {
       entries.length = 0;
+      createdPaths.clear();
       deletedPaths.clear();
     },
   };
@@ -416,7 +431,7 @@ describe('syncArtifactMirror crawling', () => {
       failed: 0,
       files: 1,
     });
-    expect(sessionFiles(h.lastManifest(), 's1')).toEqual(['f1', 'f2']);
+    expect(sessionFiles(h.lastManifest(), 's1').toSorted()).toEqual(['f1', 'f2']);
     expect(h.getSessionMessagesPage).toHaveBeenCalledTimes(3);
   });
 
@@ -431,6 +446,59 @@ describe('syncArtifactMirror crawling', () => {
 
     expect(h.getSessionMessagesPage).toHaveBeenCalledTimes(1);
     expect(sessionFiles(h.lastManifest(), 's1')).toEqual(['f1']);
+  });
+
+  it('re-reads a session whose mirrored bytes are gone and keeps the ones left', async () => {
+    // The mirror is derived data: the file browser or the OS can remove it.
+    // Stored crawl state that still names the file would skip re-materializing
+    // it and publish it in the index anyway, so the run checks the disk first.
+    // The session's surviving files stay indexed and are not fetched again.
+    const h = harness();
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+    setFiles(h, 's1', [
+      { id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` },
+      { id: 'f2', size: 20, url: `${STORAGE_ORIGIN}/f2` },
+    ]);
+
+    await syncArtifactMirror({ deps: h.deps });
+    expect(h.downloadFile).toHaveBeenCalledTimes(2);
+    fakeFs.remove('file:///mirror/sessions/f1');
+
+    h.setNow(NOW + MIRROR_SYNC_MIN_INTERVAL_MS);
+    await syncArtifactMirror({ deps: h.deps });
+
+    expect(h.getSessionMessagesPage).toHaveBeenCalledTimes(2);
+    expect(
+      h.downloadFile.mock.calls.filter(([url]) => url === `${STORAGE_ORIGIN}/f2`)
+    ).toHaveLength(1);
+    expect(sessionFiles(h.lastManifest(), 's1').toSorted()).toEqual(['f1', 'f2']);
+  });
+
+  it('keeps reconciling the other sessions when one cannot be inspected', async () => {
+    // The probe reads the filesystem, so one folder can refuse it. That session
+    // keeps its stored state; every other session is still checked.
+    const h = harness();
+    h.sessions.push({ id: 's1', updatedAt: T1 }, { id: 's2', updatedAt: T1 });
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
+    setFiles(h, 's2', [{ id: 'f2', size: 10, url: `${STORAGE_ORIGIN}/f2` }]);
+
+    await syncArtifactMirror({ deps: h.deps });
+    fakeFs.remove('file:///mirror/sessions/f1');
+    h.deps.mirrorSessionDir = (sessionId: string) => {
+      if (sessionId === 's2') {
+        throw new Error('the folder could not be read');
+      }
+      return new Directory('file:///mirror/sessions');
+    };
+
+    h.setNow(NOW + MIRROR_SYNC_MIN_INTERVAL_MS);
+    const outcome = await syncArtifactMirror({ deps: h.deps });
+
+    expect(outcome).toMatchObject({ status: 'synced' });
+    expect(h.getSessionMessagesPage).toHaveBeenCalledTimes(3);
+    expect(h.downloadFile).toHaveBeenCalledTimes(3);
+    expect(sessionFiles(h.lastManifest(), 's1')).toEqual(['f1']);
+    expect(sessionFiles(h.lastManifest(), 's2')).toEqual(['f2']);
   });
 
   it('restarts a session whose head changed while its crawl was in progress', async () => {

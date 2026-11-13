@@ -2476,7 +2476,8 @@
       "cancelQueued": "Jooji farriinta",
       "cancelQueuedAccessibility": "Jooji farriinta safka ku jirta",
       "restoreQueued": "Soo celi",
-      "restoreQueuedAccessibility": "Farriinta la joojiyay ku soo celi goobta farriinta lagu qoro"
+      "restoreQueuedAccessibility": "Farriinta la joojiyay ku soo celi goobta farriinta lagu qoro",
+      "noReplyRecorded": "Jawaab lama diiwaangelin farriintan."
     },
     "olderMessages": {
       "arrived": "Farriimihii hore waa la soo shubay",

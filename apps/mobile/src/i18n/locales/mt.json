@@ -2611,7 +2611,8 @@
       "cancelQueued": "Ikkanċella l-messaġġ",
       "cancelQueuedAccessibility": "Ikkanċella l-messaġġ fil-kju",
       "restoreQueued": "Irrestawra",
-      "restoreQueuedAccessibility": "Irrestawra l-messaġġ ikkanċellat fil-qasam tal-messaġġ"
+      "restoreQueuedAccessibility": "Irrestawra l-messaġġ ikkanċellat fil-qasam tal-messaġġ",
+      "noReplyRecorded": "Ma ġiet irreġistrata l-ebda tweġiba għal dan il-messaġġ."
     },
     "olderMessages": {
       "arrived": "Il-messaġġi ta' qabel tgħabbew",

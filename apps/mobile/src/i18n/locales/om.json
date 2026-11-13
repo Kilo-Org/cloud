@@ -2476,7 +2476,8 @@
       "cancelQueued": "Ergaa haqi",
       "cancelQueuedAccessibility": "Ergaa tarree eegumsaa keessa jiru haqi",
       "restoreQueued": "Deebisi",
-      "restoreQueuedAccessibility": "Ergaa haqame gara iddoo ergaa barreessuutti deebisi"
+      "restoreQueuedAccessibility": "Ergaa haqame gara iddoo ergaa barreessuutti deebisi",
+      "noReplyRecorded": "Ergaa kanaaf deebiin hin galmeeffamne."
     },
     "olderMessages": {
       "arrived": "Ergaawwan duraanii fe'amaniiru",

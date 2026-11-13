@@ -2476,7 +2476,8 @@
       "cancelQueued": "Annullér besked",
       "cancelQueuedAccessibility": "Annullér besked i kø",
       "restoreQueued": "Gendan",
-      "restoreQueuedAccessibility": "Gendan den annullerede besked i beskedfeltet"
+      "restoreQueuedAccessibility": "Gendan den annullerede besked i beskedfeltet",
+      "noReplyRecorded": "Der blev ikke registreret noget svar for denne besked."
     },
     "olderMessages": {
       "arrived": "Tidligere beskeder indlæst",

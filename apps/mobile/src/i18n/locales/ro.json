@@ -2521,7 +2521,8 @@
       "cancelQueued": "Anulează mesajul",
       "cancelQueuedAccessibility": "Anulează mesajul în așteptare",
       "restoreQueued": "Restabilește",
-      "restoreQueuedAccessibility": "Restabilește mesajul anulat în câmpul de mesaj"
+      "restoreQueuedAccessibility": "Restabilește mesajul anulat în câmpul de mesaj",
+      "noReplyRecorded": "Nu a fost înregistrat niciun răspuns pentru acest mesaj."
     },
     "olderMessages": {
       "arrived": "Mesajele anterioare au fost încărcate",

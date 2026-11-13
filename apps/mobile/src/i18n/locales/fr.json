@@ -1855,7 +1855,8 @@
       "cancelQueued": "Annuler le message",
       "cancelQueuedAccessibility": "Annuler le message en attente",
       "restoreQueued": "Restaurer",
-      "restoreQueuedAccessibility": "Restaurer le message annulé dans le champ de saisie"
+      "restoreQueuedAccessibility": "Restaurer le message annulé dans le champ de saisie",
+      "noReplyRecorded": "Aucune réponse n'a été enregistrée pour ce message."
     },
     "olderMessages": {
       "arrived": "Messages précédents chargés",

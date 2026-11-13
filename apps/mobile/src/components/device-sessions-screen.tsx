@@ -5,11 +5,12 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { DetailScreenScrollView } from '@/components/detail-screen';
 import { EmptyState } from '@/components/empty-state';
-import { LogOut, Smartphone } from '@/components/ui/icons';
+import { DirectionalLogOut } from '@/components/ui/directional-icons';
+import { Smartphone } from '@/components/ui/icons';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { IconTile } from '@/components/ui/icon-tile';
@@ -91,7 +92,7 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
         }
         className="min-h-[28px] min-w-[28px] shrink-0 items-center justify-center active:opacity-70"
       >
-        <LogOut size={16} color={colors.destructive} />
+        <DirectionalLogOut size={16} color={colors.destructive} />
       </Pressable>
     </View>
   );
@@ -189,7 +190,7 @@ export function DeviceSessionsScreen() {
     );
   } else {
     body = (
-      <DetailScreenScrollView
+      <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-6 px-4 pt-4"
         showsVerticalScrollIndicator={false}
@@ -238,7 +239,7 @@ export function DeviceSessionsScreen() {
             </Text>
           </View>
         )}
-      </DetailScreenScrollView>
+      </TabScreenScrollView>
     );
   }
 

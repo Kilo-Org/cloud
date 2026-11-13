@@ -1,12 +1,11 @@
 import type Stripe from 'stripe';
 import {
-  addOneMonthToIssueMonth,
   getInvoiceIssueMonth,
   getInvoiceSubscription,
-  getPreviousIssueMonth,
   getStripeEndedAtIso,
   resolveSettledInvoicePayment,
 } from './stripe-handlers-utils';
+import { addOneMonthToIssueMonth, getPreviousIssueMonth } from './issue-month';
 import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
 
 describe('addOneMonthToIssueMonth', () => {
@@ -358,6 +357,55 @@ describe('resolveSettledInvoicePayment', () => {
       kind: 'settled',
       paymentMethod: { kind: 'reusable', paymentMethodType: 'card', fingerprint: 'fp_charge' },
       refundableTarget: { kind: 'charge', id: 'ch_exact' },
+    });
+  });
+
+  it.each([
+    ['card', 'card'],
+    ['sepa_debit', 'sepa_debit'],
+    ['us_bank_account', 'us_bank_account'],
+    ['bacs_debit', 'bacs_debit'],
+    ['au_becs_debit', 'au_becs_debit'],
+  ])('maps %s settlement fingerprints on the payment-method and charge paths', async type => {
+    const fingerprint = `fp_${type}`;
+    const viaPaymentMethod = makeInvoice([
+      makeInvoicePayment({
+        type: 'payment_intent',
+        payment_intent: {
+          id: `pi_${type}`,
+          object: 'payment_intent',
+          payment_method: {
+            id: `pm_${type}`,
+            object: 'payment_method',
+            type,
+            [type]: { fingerprint },
+          },
+        } as unknown as Stripe.PaymentIntent,
+      }),
+    ]);
+    const viaCharge = makeInvoice([
+      makeInvoicePayment({
+        type: 'charge',
+        charge: {
+          id: `ch_${type}`,
+          object: 'charge',
+          payment_method_details: { type, [type]: { fingerprint } },
+        } as unknown as Stripe.Charge,
+      }),
+    ]);
+
+    const stripe = {} as Stripe;
+    await expect(
+      resolveSettledInvoicePayment({ invoice: viaPaymentMethod, stripe })
+    ).resolves.toMatchObject({
+      kind: 'settled',
+      paymentMethod: { kind: 'reusable', paymentMethodType: type, fingerprint },
+    });
+    await expect(
+      resolveSettledInvoicePayment({ invoice: viaCharge, stripe })
+    ).resolves.toMatchObject({
+      kind: 'settled',
+      paymentMethod: { kind: 'reusable', paymentMethodType: type, fingerprint },
     });
   });
 

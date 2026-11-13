@@ -2476,7 +2476,8 @@
       "cancelQueued": "លុបចោលសារ",
       "cancelQueuedAccessibility": "លុបចោលសារដែលកំពុងរង់ចាំផ្ញើ",
       "restoreQueued": "ស្តារ",
-      "restoreQueuedAccessibility": "ស្តារសារដែលបានលុបចោលទៅក្នុងប្រអប់សរសេរសារ"
+      "restoreQueuedAccessibility": "ស្តារសារដែលបានលុបចោលទៅក្នុងប្រអប់សរសេរសារ",
+      "noReplyRecorded": "មិនមានចម្លើយត្រូវបានកត់ត្រាសម្រាប់សារនេះទេ។"
     },
     "olderMessages": {
       "arrived": "បានផ្ទុកសារមុនៗ",

@@ -2566,7 +2566,8 @@
       "cancelQueued": "Atšaukti žinutę",
       "cancelQueuedAccessibility": "Atšaukti eilėje esančią žinutę",
       "restoreQueued": "Atkurti",
-      "restoreQueuedAccessibility": "Grąžinti atšauktą žinutę į žinutės įvesties lauką"
+      "restoreQueuedAccessibility": "Grąžinti atšauktą žinutę į žinutės įvesties lauką",
+      "noReplyRecorded": "Šiai žinutei nebuvo įrašytas atsakymas."
     },
     "olderMessages": {
       "arrived": "Ankstesnės žinutės įkeltos",

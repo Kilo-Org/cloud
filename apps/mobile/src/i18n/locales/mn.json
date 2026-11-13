@@ -2476,7 +2476,8 @@
       "cancelQueued": "Мессежийг цуцлах",
       "cancelQueuedAccessibility": "Дараалалд буй мессежийг цуцлах",
       "restoreQueued": "Сэргээх",
-      "restoreQueuedAccessibility": "Цуцалсан мессежийг мессеж оруулах талбарт сэргээх"
+      "restoreQueuedAccessibility": "Цуцалсан мессежийг мессеж оруулах талбарт сэргээх",
+      "noReplyRecorded": "Энэ мессежид хариулт бүртгэгдээгүй."
     },
     "olderMessages": {
       "arrived": "Өмнөх мессежүүдийг ачааллаа",

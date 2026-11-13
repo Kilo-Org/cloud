@@ -2476,7 +2476,8 @@
       "cancelQueued": "ยกเลิกข้อความ",
       "cancelQueuedAccessibility": "ยกเลิกข้อความที่อยู่ในคิว",
       "restoreQueued": "กู้คืน",
-      "restoreQueuedAccessibility": "กู้คืนข้อความที่ยกเลิกไปยังช่องป้อนข้อความ"
+      "restoreQueuedAccessibility": "กู้คืนข้อความที่ยกเลิกไปยังช่องป้อนข้อความ",
+      "noReplyRecorded": "ไม่มีบันทึกคำตอบสำหรับข้อความนี้"
     },
     "olderMessages": {
       "arrived": "โหลดข้อความก่อนหน้าแล้ว",

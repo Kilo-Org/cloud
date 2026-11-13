@@ -1978,7 +1978,8 @@
       "cancelQueued": "Отменить отправку",
       "cancelQueuedAccessibility": "Отменить отправку сообщения из очереди",
       "restoreQueued": "Восстановить",
-      "restoreQueuedAccessibility": "Вернуть отменённое сообщение в поле ввода"
+      "restoreQueuedAccessibility": "Вернуть отменённое сообщение в поле ввода",
+      "noReplyRecorded": "Ответ на это сообщение не был записан."
     },
     "olderMessages": {
       "arrived": "Более ранние сообщения загружены",

@@ -77,6 +77,7 @@ type CompletionInput = {
   autoCommit: (client: Harness, signal: AbortSignal) => Promise<void>;
   condense: (client: Harness, signal: AbortSignal) => Promise<void>;
   finalizing(): void;
+  log(message: string): void;
   warn(message: string): void;
   outcome(status: 'completed' | 'failed', reason?: string): void;
   nativeFailure(error: unknown): void;
@@ -219,7 +220,7 @@ export function createTurnCompletion(input: CompletionInput) {
               finish(
                 new DrainSessionError(
                   'transient',
-                  'native completion HTTP/marker pair was not confirmed'
+                  `native completion HTTP/marker pair was not confirmed (http=${http}, marker=${marker}, nativeFeedInterrupted=${turn.gap !== undefined})`
                 )
               ),
             transportBudget ?? 10_000
@@ -268,6 +269,15 @@ export function createTurnCompletion(input: CompletionInput) {
       {
         slowFailureResetMs: Infinity,
         scheduler,
+        onFailure: diagnostic =>
+          input.log(
+            `turn: drain failure ${JSON.stringify({
+              sessionId: turn.route.sessionId,
+              nativeRuntimeId: request.nativeRuntimeId,
+              transport: 'sandbox_local_http',
+              ...diagnostic,
+            })}`
+          ),
       }
     );
     request.waiter = waiter;
@@ -354,7 +364,7 @@ export function createTurnCompletion(input: CompletionInput) {
           if (!isCurrent(turn, request) || !ownsNativeClient(turn, request)) continue;
           if (drained.state === 'failed') {
             input.warn(`Session completion was not confirmed: ${drained.reason}`);
-            input.outcome('failed', 'no_outcome');
+            input.outcome('failed', 'completion_unconfirmed');
             return;
           }
           if (drained.state !== 'drained') continue;
@@ -385,7 +395,7 @@ export function createTurnCompletion(input: CompletionInput) {
           invalidateCompletion(turn);
         } else if (isCurrent(turn, request) && ownsNativeClient(turn, request)) {
           input.warn(`Session completion was not confirmed: ${String(error)}`);
-          input.outcome('failed', 'no_outcome');
+          input.outcome('failed', 'completion_unconfirmed');
         }
       } finally {
         if (turn.completion === request) turn.completion = undefined;
@@ -451,7 +461,10 @@ export function createTurnCompletion(input: CompletionInput) {
     input.warn(
       `Session completion history is incomplete: native event feed interrupted (${gap.nativeRuntimeId})`
     );
-    input.outcome('failed', 'no_outcome');
+    input.outcome(
+      'failed',
+      turn.closedThrough === turn.prompts.at(-1) ? 'completion_unconfirmed' : 'no_outcome'
+    );
     return true;
   }
 
@@ -509,7 +522,7 @@ export function createTurnCompletion(input: CompletionInput) {
     } catch (error) {
       if (input.isActive() && ownsNativeClient(turn, request)) {
         input.warn(error instanceof Error ? error.message : String(error));
-        input.outcome('failed', 'no_outcome');
+        input.outcome('failed', 'completion_unconfirmed');
       }
     } finally {
       scheduler.clearTimeout(timer);

@@ -2476,7 +2476,8 @@
       "cancelQueued": "संदेश रद्द करा",
       "cancelQueuedAccessibility": "रांगेतील संदेश रद्द करा",
       "restoreQueued": "परत आणा",
-      "restoreQueuedAccessibility": "रद्द केलेला संदेश संदेशपेटीत परत आणा"
+      "restoreQueuedAccessibility": "रद्द केलेला संदेश संदेशपेटीत परत आणा",
+      "noReplyRecorded": "या संदेशासाठी कोणताही प्रतिसाद नोंदवला गेला नाही."
     },
     "olderMessages": {
       "arrived": "आधीचे संदेश लोड झाले",

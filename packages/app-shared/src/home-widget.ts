@@ -195,7 +195,7 @@ export function buildHomeWidgetPresentation(
     terminal || (primaryKind === null && snapshot.status !== 'empty') ? null : snapshot.updatedAt;
   const confirmedAt = timestampMs(checkedAt);
   const wake = snapshot.scheduled > 0 ? timestampMs(snapshot.scheduledAt) : null;
-  const scheduledAt = wake === null ? null : new Date(wake).toISOString();
+  const scheduledAt = snapshot.scheduled > 0 ? timestampToIso(snapshot.scheduledAt) : null;
   return {
     status: terminal
       ? snapshot.status === 'privacy'

@@ -2476,7 +2476,8 @@
       "cancelQueued": "پیغام لغوه کړئ",
       "cancelQueuedAccessibility": "په کتار کې پروت پیغام لغوه کړئ",
       "restoreQueued": "بېرته راوړئ",
-      "restoreQueuedAccessibility": "لغوه شوی پیغام د پیغام لیکلو ځای ته بېرته راوړئ"
+      "restoreQueuedAccessibility": "لغوه شوی پیغام د پیغام لیکلو ځای ته بېرته راوړئ",
+      "noReplyRecorded": "د دې پیغام لپاره ځواب نه دی ثبت شوی."
     },
     "olderMessages": {
       "arrived": "پخواني پیغامونه بار شول",

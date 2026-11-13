@@ -288,34 +288,24 @@ export function effectiveLatencyMs(c: {
   return c.p50TtftMs == null ? c.p50LatencyMs : c.p50TtftMs + LATENCY_TOTAL_WEIGHT * c.p50LatencyMs;
 }
 
-export function rankValue(c: {
-  avgCostUsd: number;
+type ValueInput = {
   accuracy: number;
+  // Lowered to the small-sample bound when present, so a small sample cannot outrank a
+  // measured one.
   cases?: number | null;
   p50LatencyMs: number | null;
   p50TtftMs?: number | null;
   ignoreLatency?: boolean;
-}) {
-  const accuracy = c.cases == null ? c.accuracy : wilsonLowerBound(c.accuracy, c.cases);
-  const effectiveLatency = c.ignoreLatency ? 1 : effectiveLatencyMs(c);
-  if (effectiveLatency === null || accuracy <= 0) return Number.POSITIVE_INFINITY;
-  return (c.avgCostUsd * effectiveLatency ** LATENCY_WEIGHT) / accuracy ** ACCURACY_WEIGHT;
-}
+};
 
 // ADR 0005: within the accuracy band a $0 candidate beats every paid one and takes no cost
-// term. `estimatedRequestCostUsd === 0` is the only source, so observed paid cost keeps the
-// value formula.
-export function rankFreeValue(c: {
-  accuracy: number;
-  cases?: number | null;
-  p50LatencyMs: number | null;
-  p50TtftMs?: number | null;
-  ignoreLatency?: boolean;
-}) {
+// term, so it omits `avgCostUsd` and scores `effectiveLatency^1.5 / accuracy^15`. Observed paid
+// cost keeps the value formula. One guard and one pair of exponents decide every score.
+export function rankValue(c: ValueInput & { avgCostUsd?: number }): number {
   const accuracy = c.cases == null ? c.accuracy : wilsonLowerBound(c.accuracy, c.cases);
   const effectiveLatency = c.ignoreLatency ? 1 : effectiveLatencyMs(c);
   if (effectiveLatency === null || accuracy <= 0) return Number.POSITIVE_INFINITY;
-  return effectiveLatency ** LATENCY_WEIGHT / accuracy ** ACCURACY_WEIGHT;
+  return ((c.avgCostUsd ?? 1) * effectiveLatency ** LATENCY_WEIGHT) / accuracy ** ACCURACY_WEIGHT;
 }
 
 // Candidates within ACCURACY_NOISE_BAND of the threshold come first, best
@@ -356,22 +346,15 @@ export function rankCandidates(
         },
         competes,
         free,
-        value: free
-          ? rankFreeValue({
-              accuracy: c.accuracy,
-              cases: c.cases,
-              p50LatencyMs,
-              p50TtftMs: c.p50TtftMs,
-              ignoreLatency: options?.ignoreLatency,
-            })
-          : rankValue({
-              avgCostUsd: estimatedRequestCostUsd,
-              accuracy: c.accuracy,
-              cases: c.cases,
-              p50LatencyMs,
-              p50TtftMs: c.p50TtftMs,
-              ignoreLatency: options?.ignoreLatency,
-            }),
+        value: rankValue({
+          // ADR 0005: a $0 candidate takes no cost term.
+          avgCostUsd: free ? undefined : estimatedRequestCostUsd,
+          accuracy: c.accuracy,
+          cases: c.cases,
+          p50LatencyMs,
+          p50TtftMs: c.p50TtftMs,
+          ignoreLatency: options?.ignoreLatency,
+        }),
       };
     })
     .toSorted((a, b) => {

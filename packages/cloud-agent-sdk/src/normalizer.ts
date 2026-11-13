@@ -233,6 +233,7 @@ export type ServiceEvent =
       type: 'cloud.message.sent';
       messageId: string;
       executionId?: string | undefined;
+      turnType?: 'command' | undefined;
     }
   | {
       type: 'cloud.message.completed';
@@ -661,6 +662,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         type: 'cloud.message.sent',
         messageId: r.data.messageId,
         executionId: r.data.executionId,
+        ...(r.data.turnType === 'command' ? { turnType: r.data.turnType } : {}),
       };
     }
 

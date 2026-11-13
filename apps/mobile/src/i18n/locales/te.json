@@ -2476,7 +2476,8 @@
       "cancelQueued": "సందేశాన్ని రద్దు చేయండి",
       "cancelQueuedAccessibility": "వరుసలో ఉన్న సందేశాన్ని రద్దు చేయండి",
       "restoreQueued": "పునరుద్ధరించండి",
-      "restoreQueuedAccessibility": "రద్దు చేసిన సందేశాన్ని సందేశ పెట్టెలో పునరుద్ధరించండి"
+      "restoreQueuedAccessibility": "రద్దు చేసిన సందేశాన్ని సందేశ పెట్టెలో పునరుద్ధరించండి",
+      "noReplyRecorded": "ఈ సందేశానికి ఎటువంటి ప్రతిస్పందన నమోదు కాలేదు."
     },
     "olderMessages": {
       "arrived": "మునుపటి సందేశాలు లోడ్ అయ్యాయి",

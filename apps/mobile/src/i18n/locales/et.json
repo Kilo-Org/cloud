@@ -2476,7 +2476,8 @@
       "cancelQueued": "Tühista sõnum",
       "cancelQueuedAccessibility": "Tühista ootel sõnum",
       "restoreQueued": "Taasta",
-      "restoreQueuedAccessibility": "Taasta tühistatud sõnum sõnumi sisestusväljale"
+      "restoreQueuedAccessibility": "Taasta tühistatud sõnum sõnumi sisestusväljale",
+      "noReplyRecorded": "Sellele sõnumile ei salvestatud vastust."
     },
     "olderMessages": {
       "arrived": "Varasemad sõnumid laaditud",

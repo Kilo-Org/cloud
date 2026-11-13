@@ -2476,7 +2476,8 @@
       "cancelQueued": "Жіберуден бас тарту",
       "cancelQueuedAccessibility": "Кезектегі хабарламаны жіберуден бас тарту",
       "restoreQueued": "Қалпына келтіру",
-      "restoreQueuedAccessibility": "Жіберілмеген хабарламаны енгізу өрісіне қайтару"
+      "restoreQueuedAccessibility": "Жіберілмеген хабарламаны енгізу өрісіне қайтару",
+      "noReplyRecorded": "Бұл хабарламаға жауап тіркелмеді."
     },
     "olderMessages": {
       "arrived": "Алдыңғы хабарламалар жүктелді",

@@ -34,6 +34,7 @@ function notifiedRow(over: Partial<NeedsInputNotificationRow> = {}): NeedsInputN
     sessionId: 'ses_1',
     title: 'Fix the bug',
     kind: 'question',
+    raiseId: null,
     prUrl: null,
     organizationId: null,
     previews: 'generic',
@@ -108,6 +109,7 @@ describe('planNeedsInputNotifications', () => {
           sessionId: 'ses_1',
           title: 'Fix the bug',
           kind: 'question',
+          raiseId: null,
           prUrl: null,
           organizationId: null,
           previews: 'generic',
@@ -137,6 +139,7 @@ describe('planNeedsInputNotifications', () => {
         sessionId: 'ses_1',
         title: 'Untitled session',
         kind: 'question',
+        raiseId: null,
         prUrl: null,
         organizationId: null,
         previews: 'generic',
@@ -179,6 +182,7 @@ describe('planNeedsInputNotifications', () => {
         sessionId: 'ses_2',
         title: 'Deploy',
         kind: 'permission',
+        raiseId: null,
         prUrl: 'https://github.com/org/repo/pull/7',
         organizationId: null,
         previews: 'generic',
@@ -607,6 +611,53 @@ describe('applyNeedsInputNotifications', () => {
         }),
       })
     );
+  });
+
+  it('carries the raise the row presents into the posted payload', async () => {
+    const raiseId = '2026-09-18T21:00:00.000Z';
+    const plan = planNeedsInputNotifications({
+      previous: [],
+      next: [
+        makeCached({
+          id: 'ses_1',
+          title: 'Fix the bug',
+          status: 'permission',
+          statusUpdatedAt: raiseId,
+        }),
+      ],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+    });
+    expect(plan.publish).toEqual([notifiedRow({ kind: 'permission', raiseId })]);
+
+    await applyNeedsInputNotifications(plan);
+
+    const [request] = mocks.scheduleNotificationAsync.mock.calls[0] as [
+      { content: { data: Record<string, unknown> } },
+    ];
+    // The posted actions answer the raise this notification presents.
+    expect(request.content.data.raiseId).toBe(raiseId);
+  });
+
+  it('re-posts the standing notification when the row presents a new raise', () => {
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow({ raiseId: '2026-09-18T21:00:00.000Z' })],
+      next: [
+        makeCached({
+          id: 'ses_1',
+          title: 'Fix the bug',
+          status: 'question',
+          statusUpdatedAt: '2026-09-18T21:05:00.000Z',
+        }),
+      ],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+    });
+
+    expect(plan.publish).toEqual([notifiedRow({ raiseId: '2026-09-18T21:05:00.000Z' })]);
+    expect(plan.updates).toEqual(['ses_1']);
   });
 
   it('re-posts an already-posted raise quietly so a status change never alerts again', async () => {

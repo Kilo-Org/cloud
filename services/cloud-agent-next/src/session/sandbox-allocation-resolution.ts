@@ -79,23 +79,26 @@ export async function resolveSavedSandboxAllocation(args: {
       ? { vercelUnavailableReason: args.readiness.vercelUnavailableReason }
       : {}),
   };
-  let capabilities = getSandboxSelectionCapabilities(env, owner, selectionOptions);
-  if (!capabilities.enabled) return undefined;
-
   const candidates = await getSandboxAllocationCandidates(db, profileOwner(owner), target);
-  let readiness = args.readiness;
   const ownerAllocations = [candidates.repositoryAllocation, candidates.contextAllocation]
     .filter((candidate): candidate is string => candidate !== undefined)
     .map(candidate => candidate as SandboxAllocation)
     .filter(isSelectableSandboxAllocation)
     .filter(allocation => !needsMultiRepository || allocationSupportsMultiRepository(allocation));
-  for (const candidate of [environmentAllocation, ...ownerAllocations]) {
-    if (candidate === undefined) continue;
-    const allocation = candidate as SandboxAllocation;
-    if (!isSelectableSandboxAllocation(allocation)) continue;
+  const allocations = [environmentAllocation, ...ownerAllocations]
+    .filter((candidate): candidate is string => candidate !== undefined)
+    .map(candidate => candidate as SandboxAllocation)
+    .filter(isSelectableSandboxAllocation);
+  if (allocations.length === 0) return undefined;
+
+  let capabilities = await getSandboxSelectionCapabilities(env, owner, selectionOptions);
+  if (!capabilities.enabled) return undefined;
+
+  let readiness = args.readiness;
+  for (const allocation of allocations) {
     if (getSandboxAllocationProvider(allocation) === 'vercel' && readiness === undefined) {
       readiness = await resolveVercelSelectionReadiness(env, owner);
-      capabilities = getSandboxSelectionCapabilities(env, owner, {
+      capabilities = await getSandboxSelectionCapabilities(env, owner, {
         ...selectionOptions,
         ...(readiness.vercelUnavailableReason
           ? { vercelUnavailableReason: readiness.vercelUnavailableReason }

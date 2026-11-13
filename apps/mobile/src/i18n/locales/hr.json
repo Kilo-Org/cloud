@@ -2521,7 +2521,8 @@
       "cancelQueued": "Otkaži poruku",
       "cancelQueuedAccessibility": "Otkaži poruku na čekanju",
       "restoreQueued": "Vrati",
-      "restoreQueuedAccessibility": "Vrati otkazanu poruku u polje za unos poruke"
+      "restoreQueuedAccessibility": "Vrati otkazanu poruku u polje za unos poruke",
+      "noReplyRecorded": "Za ovu poruku nije zabilježen odgovor."
     },
     "olderMessages": {
       "arrived": "Ranije poruke učitane",

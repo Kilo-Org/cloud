@@ -536,6 +536,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
             { type: CONTROL_PLANE_WRAPPER_FINALIZING_EVENT, properties: {} },
           ]),
         warn: message => emitWarning(route.sessionId, message),
+        log,
         outcome: (status, reason) => sendOutcome(turn, status, reason),
         nativeFailure: error => onKiloError(turn, { error }),
       });

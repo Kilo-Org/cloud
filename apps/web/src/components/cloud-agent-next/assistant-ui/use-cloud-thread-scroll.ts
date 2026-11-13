@@ -115,6 +115,7 @@ export function useCloudThreadScroll({
   const loadOlderMessages = useCallback(() => manager.loadOlderMessages(), [manager]);
   const { requestOlderMessages, tryLoadOlderFromScroll } = useOlderMessagesPagination({
     scrollElementRef: scrollContainerRef,
+    scrollContentRef: messagesContentRef,
     hasOlderMessages,
     isLoadingOlderMessages,
     olderMessagesError,
@@ -124,7 +125,6 @@ export function useCloudThreadScroll({
     resetKey: sessionIdFromParams,
     overflowCheckKey: `${chatTabActive}:${staticMessages.length + dynamicMessages.length}`,
     ready: transcriptReady,
-    autoloadOnMount: false,
     initialPositionedRef: transcriptPositionedRef,
   });
 

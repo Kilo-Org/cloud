@@ -2476,7 +2476,8 @@
       "cancelQueued": "پیغام منسوخ کریں",
       "cancelQueuedAccessibility": "قطار میں موجود پیغام منسوخ کریں",
       "restoreQueued": "بحال کریں",
-      "restoreQueuedAccessibility": "منسوخ شدہ پیغام واپس پیغام لکھنے کے خانے میں لائیں"
+      "restoreQueuedAccessibility": "منسوخ شدہ پیغام واپس پیغام لکھنے کے خانے میں لائیں",
+      "noReplyRecorded": "اس پیغام کے لیے کوئی جواب درج نہیں ہوا۔"
     },
     "olderMessages": {
       "arrived": "پہلے کے پیغامات لوڈ ہو گئے",

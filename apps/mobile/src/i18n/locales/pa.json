@@ -2476,7 +2476,8 @@
       "cancelQueued": "ਸੁਨੇਹਾ ਰੱਦ ਕਰੋ",
       "cancelQueuedAccessibility": "ਕਤਾਰ ਵਿੱਚ ਪਿਆ ਸੁਨੇਹਾ ਰੱਦ ਕਰੋ",
       "restoreQueued": "ਬਹਾਲ ਕਰੋ",
-      "restoreQueuedAccessibility": "ਰੱਦ ਕੀਤਾ ਸੁਨੇਹਾ ਮੁੜ ਸੁਨੇਹਾ ਲਿਖਣ ਵਾਲੇ ਖਾਨੇ ਵਿੱਚ ਲਿਆਓ"
+      "restoreQueuedAccessibility": "ਰੱਦ ਕੀਤਾ ਸੁਨੇਹਾ ਮੁੜ ਸੁਨੇਹਾ ਲਿਖਣ ਵਾਲੇ ਖਾਨੇ ਵਿੱਚ ਲਿਆਓ",
+      "noReplyRecorded": "ਇਸ ਸੁਨੇਹੇ ਲਈ ਕੋਈ ਜਵਾਬ ਰਿਕਾਰਡ ਨਹੀਂ ਕੀਤਾ ਗਿਆ।"
     },
     "olderMessages": {
       "arrived": "ਪੁਰਾਣੇ ਸੁਨੇਹੇ ਲੋਡ ਹੋ ਗਏ",

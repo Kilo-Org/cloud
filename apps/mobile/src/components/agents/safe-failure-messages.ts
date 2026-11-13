@@ -74,6 +74,7 @@ const SAFE_FAILURE_MESSAGES = new Set([
   'Kilo was not responding and was restarted',
   'The turn made no progress',
   'The turn did not complete',
+  'The assistant finished its reply, but session completion could not be confirmed. Send a new message to continue.',
   'Prompt delivery failed',
   'The sandbox stopped while waiting for an answer',
   'The turn exceeded its time limit',

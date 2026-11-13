@@ -2476,7 +2476,8 @@
       "cancelQueued": "Üzenet visszavonása",
       "cancelQueuedAccessibility": "Várakozó üzenet visszavonása",
       "restoreQueued": "Visszaállítás",
-      "restoreQueuedAccessibility": "Visszavont üzenet visszaállítása az üzenetbeviteli mezőbe"
+      "restoreQueuedAccessibility": "Visszavont üzenet visszaállítása az üzenetbeviteli mezőbe",
+      "noReplyRecorded": "Ehhez az üzenethez nem lett válasz rögzítve."
     },
     "olderMessages": {
       "arrived": "Korábbi üzenetek betöltve",

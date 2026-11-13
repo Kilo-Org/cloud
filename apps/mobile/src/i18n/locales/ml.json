@@ -2476,7 +2476,8 @@
       "cancelQueued": "സന്ദേശം റദ്ദാക്കുക",
       "cancelQueuedAccessibility": "ക്യൂവിലുള്ള സന്ദേശം റദ്ദാക്കുക",
       "restoreQueued": "പുനഃസ്ഥാപിക്കുക",
-      "restoreQueuedAccessibility": "റദ്ദാക്കിയ സന്ദേശം സന്ദേശ ബോക്സിൽ തിരികെ ചേർക്കുക"
+      "restoreQueuedAccessibility": "റദ്ദാക്കിയ സന്ദേശം സന്ദേശ ബോക്സിൽ തിരികെ ചേർക്കുക",
+      "noReplyRecorded": "ഈ സന്ദേശത്തിന് മറുപടിയൊന്നും രേഖപ്പെടുത്തിയിട്ടില്ല."
     },
     "olderMessages": {
       "arrived": "മുൻപത്തെ സന്ദേശങ്ങൾ ലോഡ് ചെയ്തു",

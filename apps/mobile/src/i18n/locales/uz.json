@@ -2476,7 +2476,8 @@
       "cancelQueued": "Xabarni bekor qilish",
       "cancelQueuedAccessibility": "Navbatdagi xabarni bekor qilish",
       "restoreQueued": "Tiklash",
-      "restoreQueuedAccessibility": "Bekor qilingan xabarni xabar kiritish maydoniga qaytarish"
+      "restoreQueuedAccessibility": "Bekor qilingan xabarni xabar kiritish maydoniga qaytarish",
+      "noReplyRecorded": "Bu xabar uchun javob qayd etilmagan."
     },
     "olderMessages": {
       "arrived": "Oldingi xabarlar yuklandi",

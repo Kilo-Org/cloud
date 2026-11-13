@@ -1956,7 +1956,8 @@
       "cancelQueued": "Cancelar mensaje",
       "cancelQueuedAccessibility": "Cancelar mensaje en cola",
       "restoreQueued": "Restaurar",
-      "restoreQueuedAccessibility": "Restaurar el mensaje cancelado en el campo de mensaje"
+      "restoreQueuedAccessibility": "Restaurar el mensaje cancelado en el campo de mensaje",
+      "noReplyRecorded": "No se registró ninguna respuesta para este mensaje."
     },
     "olderMessages": {
       "arrived": "Mensajes anteriores cargados",

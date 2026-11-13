@@ -2476,7 +2476,8 @@
       "cancelQueued": "Kanselleer boodskap",
       "cancelQueuedAccessibility": "Kanselleer boodskap in die wagry",
       "restoreQueued": "Herstel",
-      "restoreQueuedAccessibility": "Plaas die gekanselleerde boodskap terug in die boodskapinvoer"
+      "restoreQueuedAccessibility": "Plaas die gekanselleerde boodskap terug in die boodskapinvoer",
+      "noReplyRecorded": "Geen antwoord is vir hierdie boodskap aangeteken nie."
     },
     "olderMessages": {
       "arrived": "Vroeëre boodskappe gelaai",

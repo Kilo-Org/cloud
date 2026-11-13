@@ -2476,7 +2476,8 @@
       "cancelQueued": "Batalkan mesej",
       "cancelQueuedAccessibility": "Batalkan mesej dalam baris gilir",
       "restoreQueued": "Pulihkan",
-      "restoreQueuedAccessibility": "Pulihkan mesej yang dibatalkan ke ruang mesej"
+      "restoreQueuedAccessibility": "Pulihkan mesej yang dibatalkan ke ruang mesej",
+      "noReplyRecorded": "Tiada respons direkodkan untuk mesej ini."
     },
     "olderMessages": {
       "arrived": "Mesej terdahulu dimuatkan",

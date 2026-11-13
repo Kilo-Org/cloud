@@ -256,10 +256,11 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               // direction, so the run carries its own left-to-right order.
               valueDirection="ltr"
               // An empty balance offers the top-up on the amount's own line: a
-              // row of its own would hold nothing but this control.
+              // row of its own would hold nothing but this control, and
+              // `lineAction` keeps that line one text line tall.
               trailing={
                 org.balance === 0 ? (
-                  <AddCreditsRow inline url={organizationBillingUrl(organizationId)} />
+                  <AddCreditsRow inline lineAction url={organizationBillingUrl(organizationId)} />
                 ) : undefined
               }
               // Always pass the label: a node React Native stops handing a

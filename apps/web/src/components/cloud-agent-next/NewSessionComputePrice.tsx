@@ -40,7 +40,7 @@ export function NewSessionComputePrice({
   if (!note || !destination) return null;
 
   return (
-    <p className="text-muted-foreground flex items-center gap-1.5 text-xs tabular-nums">
+    <p className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs tabular-nums">
       <Box className="size-3 shrink-0" aria-hidden="true" />
       <span>
         <span className="text-foreground font-medium">

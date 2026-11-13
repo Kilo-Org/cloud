@@ -322,33 +322,86 @@ function supportedLanguages(root) {
 }
 
 /**
+ * The keys each object of a catalog declares, read in one pass over its text.
+ *
+ * A string is content from its opening quote to its closing quote, escapes
+ * included, so a message that carries braces or a `"key":`-shaped run is never
+ * mistaken for nesting or for a key. Only a brace outside a string opens or
+ * closes an object. A catalog that ends inside a string, or whose braces do not
+ * balance, is unreadable: no key scope can be trusted, so the scan stops.
+ */
+function scanCatalogKeys(text) {
+  const duplicates = [];
+  const stack = [new Set()];
+  let index = 0;
+  while (index < text.length) {
+    const char = text[index];
+    if (char === '"') {
+      let end = index + 1;
+      while (end < text.length && text[end] !== '"') {
+        end += text[end] === '\\' ? 2 : 1;
+      }
+      if (end >= text.length) {
+        return { duplicates, readable: false };
+      }
+      let after = end + 1;
+      while (/\s/.test(text[after] ?? '')) {
+        after += 1;
+      }
+      // A string followed by a colon is a key; a string on the value side is
+      // content, whatever it reads.
+      if (text[after] === ':') {
+        const key = text.slice(index + 1, end);
+        const scope = stack.at(-1);
+        if (scope.has(key)) {
+          duplicates.push(key);
+        }
+        scope.add(key);
+      }
+      index = end + 1;
+      continue;
+    }
+    if (char === '{') {
+      stack.push(new Set());
+    } else if (char === '}') {
+      if (stack.length === 1) {
+        return { duplicates, readable: false };
+      }
+      stack.pop();
+    }
+    index += 1;
+  }
+  return { duplicates, readable: stack.length === 1 };
+}
+
+/**
  * Parse a catalog and report a key that appears twice in one object. JSON.parse
  * keeps the last duplicate silently, so the raw text is the only witness.
+ *
+ * A catalog this cannot read is reported once and skipped, the way
+ * `check-plurals.mjs` treats a locale it cannot audit: an unbalanced scan or a
+ * file JSON.parse rejects leaves one problem line instead of a stack trace and a
+ * cascade of missing-key findings.
  */
 function parseCatalog(file, label) {
   const text = readFileSync(file, 'utf8');
-  const seen = [];
-  // Walk the raw text: a duplicate key inside one object survives only here.
-  const stack = [new Set()];
-  const tokens = text.matchAll(/"((?:[^"\\]|\\.)*)"\s*:|[{}]/g);
-  for (const token of tokens) {
-    if (token[0] === '{') {
-      stack.push(new Set());
-    } else if (token[0] === '}') {
-      stack.pop();
-    } else {
-      const key = token[1];
-      const scope = stack.at(-1);
-      if (scope.has(key)) {
-        seen.push(key);
-      }
-      scope.add(key);
-    }
+  const { duplicates, readable } = scanCatalogKeys(text);
+  if (!readable) {
+    fail(`${label}: cannot audit catalog: its strings and braces do not balance`);
+    return null;
   }
-  for (const key of seen) {
+  let catalog;
+  try {
+    catalog = flattenCatalog(JSON.parse(text));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    fail(`${label}: cannot audit catalog: ${message}`);
+    return null;
+  }
+  for (const key of duplicates) {
     fail(`${label}: duplicate key "${key}"`);
   }
-  return JSON.parse(text);
+  return catalog;
 }
 
 /**
@@ -471,12 +524,19 @@ function checkArmenianSentenceTerminator(tag, values, label) {
   }
 }
 
+/** The `{{token}}` list of one string, in the order it writes them. */
+function placeholderTokens(value) {
+  return [...value.matchAll(/\{\{\s*([^}\s]+)\s*\}\}/g)].map(match => match[1]);
+}
+
 /** The `{{token}}` set of one string, as a sorted, counted signature. */
 function placeholders(value) {
-  return [...value.matchAll(/\{\{\s*([^}\s]+)\s*\}\}/g)]
-    .map(match => match[1])
-    .sort()
-    .join(',');
+  return placeholderTokens(value).sort().join(',');
+}
+
+/** The tokens of a `placeholders` signature. */
+function signatureTokens(signature) {
+  return signature === '' ? [] : signature.split(',');
 }
 
 /** The `$t(key)` set of one string. A copy names a label; it never spells it. */
@@ -973,26 +1033,6 @@ function pushBaseKey(key) {
 const COUNT_PLACEHOLDERS = new Set(['count', 'displayCount', 'itemCount', 'steps']);
 
 /**
- * The visible-count placeholders an English family declares, e.g.
- * `displayCount`. A translated form must carry each one unless a reviewed
- * worded form spells the number out instead.
- */
-function familyVisibleCounts(english, base) {
-  const names = new Set();
-  for (const [key, value] of english) {
-    if (key !== base && pluralBaseKey(key) !== base) {
-      continue;
-    }
-    for (const name of placeholders(value).split(',').filter(Boolean)) {
-      if (COUNT_PLACEHOLDERS.has(name)) {
-        names.add(name);
-      }
-    }
-  }
-  return names;
-}
-
-/**
  * Every `{{token}}` an English plural family uses, across the base key and all
  * of its categories. A language may need one of those tokens in a category
  * where English spells the number out: English's `_one` only ever renders at 1,
@@ -1008,11 +1048,22 @@ function familyPlaceholders(english, base) {
     if (key !== base && pluralBaseKey(key) !== base) {
       continue;
     }
-    for (const token of placeholders(value).split(',').filter(Boolean)) {
+    for (const token of placeholderTokens(value)) {
       tokens.add(token);
     }
   }
   return tokens;
+}
+
+/**
+ * The visible-count placeholders an English family declares, e.g.
+ * `displayCount`. A translated form must carry each one unless a reviewed
+ * worded form spells the number out instead.
+ */
+function familyVisibleCounts(english, base) {
+  return new Set(
+    [...familyPlaceholders(english, base)].filter(name => COUNT_PLACEHOLDERS.has(name))
+  );
 }
 
 /**
@@ -1025,8 +1076,8 @@ function addsFamilyPlaceholderOnly(english, key, actual, expected) {
   if (!parts) {
     return false;
   }
-  const required = new Set(expected.split(',').filter(Boolean));
-  const used = new Set(actual.split(',').filter(Boolean));
+  const required = new Set(signatureTokens(expected));
+  const used = new Set(signatureTokens(actual));
   if (used.size <= required.size) {
     return false;
   }
@@ -1197,9 +1248,10 @@ export function checkCatalogs(root = ROOT) {
       }
     }
 
-    const english = flattenCatalog(
-      parseCatalog(join(catalog.dir, 'en.json'), `${catalog.name}/en`)
-    );
+    const english = parseCatalog(join(catalog.dir, 'en.json'), `${catalog.name}/en`);
+    if (english === null) {
+      continue;
+    }
     // One scan of this catalog's own source roots serves the usage check, and
     // its destructive-confirm rule for the mobile catalog.
     const source = scanSource(catalog, root);
@@ -1292,7 +1344,10 @@ export function checkCatalogs(root = ROOT) {
         continue;
       }
       const label = `${catalog.name}/${tag}`;
-      const translated = flattenCatalog(parseCatalog(join(catalog.dir, `${tag}.json`), label));
+      const translated = parseCatalog(join(catalog.dir, `${tag}.json`), label);
+      if (translated === null) {
+        continue;
+      }
       localeValues.set(tag, translated);
       checkAgentEditorCopy(translated, english, label);
       checkPullRequestTerm(translated, label);
@@ -1369,12 +1424,8 @@ export function checkCatalogs(root = ROOT) {
           english.get(`${parts.base}_${parts.category}`) ??
           english.get(`${parts.base}_other`) ??
           english.get(parts.base);
-        const allowed = new Set(
-          placeholders(englishRef ?? '')
-            .split(',')
-            .filter(Boolean)
-        );
-        for (const ph of placeholders(value).split(',').filter(Boolean)) {
+        const allowed = new Set(placeholderTokens(englishRef ?? ''));
+        for (const ph of placeholderTokens(value)) {
           if (!allowed.has(ph)) {
             fail(
               `${label}: "${key}" uses placeholder {{${ph}}}, which the English family does not`
@@ -1391,7 +1442,7 @@ export function checkCatalogs(root = ROOT) {
           !WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`)
         ) {
           for (const ph of familyVisibleCounts(english, parts.base)) {
-            if (!placeholders(value).split(',').includes(ph)) {
+            if (!placeholderTokens(value).includes(ph)) {
               fail(
                 `${label}: "${key}" drops {{${ph}}} without a reviewed worded form (WORDED_COUNTS)`
               );
@@ -1424,8 +1475,8 @@ export function checkCatalogs(root = ROOT) {
         }
         const expected = placeholders(englishValue);
         const actual = placeholders(value);
-        const expectedSet = expected.split(',').filter(Boolean);
-        const actualSet = actual.split(',').filter(Boolean);
+        const expectedSet = placeholderTokens(englishValue);
+        const actualSet = placeholderTokens(value);
         // Only a reviewed (key, category, locale) entry may say its number as a
         // word; every other form keeps its language's exact placeholder set.
         const parts = pluralParts(key);
@@ -1601,18 +1652,16 @@ export function checkCatalogs(root = ROOT) {
 
     // A mobile key whose value equals English in every non-English locale was
     // never translated. Allowlist the proper nouns and format-only strings that
-    // are legitimately identical; fail everything else.
-    if (catalog.name === 'mobile') {
+    // are legitimately identical; fail everything else. Only a catalog that was
+    // read can say a key was never translated, so an unreadable one is left out.
+    if (catalog.name === 'mobile' && localeValues.size > 0) {
       for (const [key, englishValue] of english) {
         if (ENGLISH_IDENTICAL_ALLOWLIST.has(key)) {
           continue;
         }
         let allEqual = true;
-        for (const tag of present) {
-          if (tag === 'en') {
-            continue;
-          }
-          if (localeValues.get(tag).get(key) !== englishValue) {
+        for (const translated of localeValues.values()) {
+          if (translated.get(key) !== englishValue) {
             allEqual = false;
             break;
           }
@@ -1632,8 +1681,8 @@ export function checkCatalogs(root = ROOT) {
         if (englishValue.trim().split(/\s+/).length < 2) {
           continue;
         }
-        for (const tag of present) {
-          if (tag === 'en' || localeValues.get(tag).get(key) !== englishValue) {
+        for (const [tag, translated] of localeValues) {
+          if (translated.get(key) !== englishValue) {
             continue;
           }
           if ((NOTIFICATIONS_ENGLISH_COPY_EXCEPTIONS[tag] ?? []).includes(englishValue)) {

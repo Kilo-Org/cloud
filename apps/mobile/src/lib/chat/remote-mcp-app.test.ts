@@ -209,6 +209,14 @@ describe('the document a view draws', () => {
     expect(document.startsWith('\uFEFF<meta ')).toBe(true);
     expect(document.indexOf('Content-Security-Policy')).toBeLessThan(document.indexOf('<script>'));
   });
+
+  it('reads a comment that never closes as the rest of the document', () => {
+    const document = viewDocument(
+      '<!-- open <!doctype html><html><head></head></html>',
+      "default-src 'none'"
+    );
+    expect(document.startsWith('<meta ')).toBe(true);
+  });
 });
 
 describe('the page a view is drawn in', () => {

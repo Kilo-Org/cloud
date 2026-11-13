@@ -132,6 +132,9 @@ const PROLOGUE_SPACE = /[ \t\n\f\r]*/y;
 /** A doctype ends at the first `>`, whatever it names. */
 const PROLOGUE_DOCTYPE = /<!doctype[^>]*>/iy;
 
+/** The characters that open a comment, and the rule that reads its body. */
+const COMMENT_OPEN = '<!--';
+
 /**
  * One comment: `<!-->` and `<!--->` close an empty comment at once, and any
  * other comment ends at the first `-->` or `--!>`.
@@ -152,6 +155,11 @@ const PROLOGUE_BOGUS = /<[!?][^>]*>/y;
  * doctype past that content is a doctype the parser ignores, so it never moves
  * the policy behind the content.
  *
+ * A comment is read as one token and nothing else is tried where it starts: a
+ * comment with no terminator reads the rest of the document, so no token after
+ * it is part of the prologue, and the scan reads a document once rather than
+ * hunting a terminator again from every `<!--` it passes.
+ *
  * A document with no doctype keeps its byte-order mark first, because a mark
  * the policy got in front of would be read as a stray character of the document.
  */
@@ -164,17 +172,26 @@ function policyIndex(html: string): number {
     PROLOGUE_SPACE.lastIndex = at;
     PROLOGUE_SPACE.exec(html);
     at = PROLOGUE_SPACE.lastIndex;
-    PROLOGUE_DOCTYPE.lastIndex = at;
-    PROLOGUE_COMMENT.lastIndex = at;
-    PROLOGUE_BOGUS.lastIndex = at;
-    const held = PROLOGUE_DOCTYPE.exec(html);
-    const token = held ?? PROLOGUE_COMMENT.exec(html) ?? PROLOGUE_BOGUS.exec(html);
-    if (token === null) {
-      done = true;
+    if (html.startsWith(COMMENT_OPEN, at)) {
+      PROLOGUE_COMMENT.lastIndex = at;
+      const comment = PROLOGUE_COMMENT.exec(html);
+      if (comment === null) {
+        done = true;
+      } else {
+        at = comment.index + comment[0].length;
+      }
     } else {
-      at = token.index + token[0].length;
-      if (held !== null) {
-        doctype = at;
+      PROLOGUE_DOCTYPE.lastIndex = at;
+      PROLOGUE_BOGUS.lastIndex = at;
+      const held = PROLOGUE_DOCTYPE.exec(html);
+      const token = held ?? PROLOGUE_BOGUS.exec(html);
+      if (token === null) {
+        done = true;
+      } else {
+        at = token.index + token[0].length;
+        if (held !== null) {
+          doctype = at;
+        }
       }
     }
   }

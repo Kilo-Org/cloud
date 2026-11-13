@@ -978,11 +978,22 @@ the legacy profile restrictions.
   a live user-blocked tree retains its normal idle policy.
   When neither half has arrived and no publication cleanup transport budget applies, the quiet drain
   is bounded by the wrapper's `noProgressMs` (20 minutes). Foreground work clears that timer;
-  a later quiet phase starts a new timer. Expiry fails the turn as `no_outcome`.
+  a later quiet phase starts a new timer. Expiry fails with the completion-unconfirmed message below.
   The first half never extends an armed deadline. Feed gaps preserve that deadline and the
   publication cleanup transport bound.
-  Three transient attempts, with 1-second and 2-second backoff, exhaust as `no_outcome`
-  with an unconfirmed-completion warning. Native work retains the supervisor's execution bounds.
+  Drain disables Bun's socket idle timeout for this request only; a quiet HTTP connection does not
+  prove native work stopped. Three transient attempts, with 1-second and 2-second backoff, exhaust
+  with an unconfirmed-completion warning. Each retry only waits for native work again; it does not
+  submit another prompt. Fresh tokens fence late responses and markers from earlier attempts.
+  Native work retains the supervisor's execution bounds. Each failed attempt logs its number,
+  elapsed milliseconds, classification, and a bounded, redacted error/cause chain. HTTP/marker pair
+  timeouts also name the missing half and native feed gap. The sandbox-local HTTP transport is
+  separate from the wrapper-to-Worker socket.
+  Unconfirmed completion reports `completion_unconfirmed`, which maps to this user message:
+  "The assistant finished its reply, but session completion could not be confirmed. Send a new
+  message to continue." It retains the `wrapper_no_output` report and callback classification.
+  It never reports `no_outcome`, and does not claim full-tree success.
+  The Worker backstop still uses `no_outcome` for runs that send no outcome.
 - The wrapper names the last received Cloud `messageId` in its outcome. It does not reconstruct
   successful outcomes from idle snapshots. Compact's own close reconciliation only releases its
   delivery barrier; an ineligible close cannot later become completion for a queued follower.
@@ -1031,9 +1042,10 @@ the legacy profile restrictions.
   in the existing submission chain before aborting the captured client. New intake remains accepted,
   but dispatch waits until cleanup confirms abort and a fresh HTTP/marker pair. Abort gets 10 seconds;
   three post-cancel confirmations get 10 seconds each, with 1-second and 2-second backoff (43 seconds
-  maximum). Unconfirmed cleanup warns and fails `no_outcome`; it never releases dispatch through an
-  uncertain abort. Only known cleanup interruption signals are suppressed. Successful cleanup releases
-  the barrier and re-arms confirmation from the original eligible close when no newer intake exists.
+  maximum). Unconfirmed cleanup warns and fails with the completion-unconfirmed message; it never
+  releases dispatch through an uncertain abort. Only known cleanup interruption signals are suppressed.
+  Successful cleanup releases the barrier and re-arms confirmation from the original eligible close
+  when no newer intake exists.
 - Native deadline failures are reported immediately. When the interrupted batch opted into
   auto-commit, the wrapper then waits for confirmed cancellation and an idle root before committing
   and pushing with the normal repository and branch rules. Condense does not run. This cleanup has
@@ -1063,8 +1075,9 @@ it as dispatched work. The first reconcile of the same process after the loss de
   `completed` root close, and if any dispatch that no observation or close showed is still running
   at the root. An idle root with observed work and no seen close lost that close.
 - Otherwise, or if observation was already lost when the gap began, dispatched work that no native
-  proof covers fails as `no_outcome`, with a history-incomplete warning. Snapshots and new tokens
-  cannot recover missed final errors.
+  proof covers fails with a history-incomplete warning. If a seen completed root close covers the
+  latest prompt, it uses the completion-unconfirmed message, not `no_outcome`. Without that close,
+  it retains `no_outcome`. Snapshots and new tokens cannot recover missed final errors.
 
 A snapshot that began before the loss does not decide the gap. A restart decides instead of the
 gap, so a crash that ends the feed first still gets restart resubmission and its specific reason.
@@ -1073,7 +1086,7 @@ already-confirmed work during optional finalization are not failed. A newer disp
 an accepted proof is unconfirmed work again. Three edges remain. A missed root error followed by a
 queued follow-up under the same execution id completes the turn. A `completed` close that arrives
 after a later prompt was dispatched also covers that prompt. A root or child execution that ends on
-the new feed before its first reconcile finishes fails the turn as `no_outcome`.
+the new feed before its first reconcile finishes fails the turn under the same gap decision.
 
 The global feed is subscribed before a bounded initial snapshot. Reconciliation repeats
 on reconnect and every 30 seconds, single-flight with a 10-second request budget. It
@@ -1946,7 +1959,7 @@ Deploy session-ingest before cloud-agent-next; no database migration is needed.
 | `sandbox_create_failed` (create attempt budget spent) | `pre_dispatch` / `sandbox_connect_failed` |
 | `agent_unavailable` | queued: `pre_dispatch` / `kilo_server_failed`; accepted: `post_dispatch_no_activity` / `wrapper_disconnected` |
 | `connection_lost`, `sandbox_lost`, `agent_restarted`, `agent_unresponsive`, `sandbox_out_of_memory` | `post_dispatch_no_activity` / `wrapper_disconnected` |
-| `no_progress`, `no_outcome` | `post_dispatch_no_activity` / `wrapper_no_output` |
+| `no_progress`, `no_outcome`, `completion_unconfirmed` | `post_dispatch_no_activity` / `wrapper_no_output` |
 | `prompt_failed` | `post_dispatch_no_activity` / `wrapper_error_before_activity` |
 | `sandbox_stopped` (idle while waiting on the user), `execution_limit` | `interruption` / `system_interrupt` |
 | Kilo final error, or `no_progress` during a Kilo model retry | `agent_activity` / `assistant_error`; responsibility from the existing assistant-failure helpers, so Kilo and provider errors stay attributed to them |

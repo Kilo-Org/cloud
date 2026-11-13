@@ -200,6 +200,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'agent_unresponsive',
   'no_progress',
   'no_outcome',
+  'completion_unconfirmed',
   'prompt_failed',
   'sandbox_stopped',
   'execution_limit',

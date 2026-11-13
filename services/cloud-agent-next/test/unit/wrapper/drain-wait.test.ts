@@ -35,6 +35,76 @@ describe('createDrainWaiter', () => {
     vi.useRealTimers();
   });
 
+  it('diagnoses each attempt with elapsed time and the bounded underlying socket cause', async () => {
+    const onFailure = vi.fn();
+    const cause = Object.assign(new Error('socket connection closed'), { code: 'ECONNRESET' });
+    const drain = vi
+      .fn<(signal: AbortSignal) => Promise<boolean>>()
+      .mockImplementationOnce(async () => {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        throw new DrainSessionError('transient', 'Kilo v2 drain request failed', {
+          cause: new TypeError('fetch failed', { cause }),
+        });
+      })
+      .mockRejectedValueOnce(new DrainSessionError('transient', 'HTTP 503', { status: 503 }))
+      .mockResolvedValue(true);
+    const result = createDrainWaiter(drain, { onFailure }).start();
+    await vi.advanceTimersByTimeAsync(3_050);
+    await expect(result).resolves.toEqual({ state: 'drained' });
+    expect(onFailure.mock.calls.map(([diagnostic]) => diagnostic)).toEqual([
+      {
+        attempt: 1,
+        elapsedMs: 50,
+        kind: 'transient',
+        errors: [
+          { name: 'DrainSessionError', message: 'Kilo v2 drain request failed' },
+          { name: 'TypeError', message: 'fetch failed' },
+          { name: 'Error', message: 'socket connection closed', code: 'ECONNRESET' },
+        ],
+      },
+      {
+        attempt: 2,
+        elapsedMs: 0,
+        kind: 'transient',
+        errors: [{ name: 'DrainSessionError', message: 'HTTP 503', status: 503 }],
+      },
+    ]);
+  });
+
+  it('redacts credentials, URLs, and response bodies and bounds cyclic causes', async () => {
+    const cause = new Error(
+      'Authorization: Basic synthetic-credential\nhttps://localhost/?token=synthetic-query ' +
+        'x'.repeat(512)
+    );
+    cause.cause = cause;
+    const onFailure = vi.fn();
+    const waiter = createDrainWaiter(
+      async () => {
+        throw new DrainSessionError('definitive', 'request failed', { cause });
+      },
+      { onFailure }
+    );
+    await waiter.start();
+    const diagnostic = onFailure.mock.calls[0][0];
+    expect(diagnostic.errors).toHaveLength(4);
+    expect(JSON.stringify(diagnostic)).not.toContain('synthetic-credential');
+    expect(JSON.stringify(diagnostic)).not.toContain('synthetic-query');
+    expect(
+      diagnostic.errors.every((error: { message: string }) => error.message.length <= 256)
+    ).toBe(true);
+    for (const name of ['ZodError', 'SyntaxError']) {
+      const responseError = new Error('synthetic-private-body');
+      responseError.name = name;
+      await createDrainWaiter(
+        async () => {
+          throw new DrainSessionError('anomalous', 'invalid result', { cause: responseError });
+        },
+        { onFailure }
+      ).start();
+    }
+    expect(JSON.stringify(onFailure.mock.calls)).not.toContain('synthetic-private-body');
+  });
+
   it('retries a settled transient only after the 1s backoff and can then drain', async () => {
     const second = deferred<boolean>();
     const drain = vi

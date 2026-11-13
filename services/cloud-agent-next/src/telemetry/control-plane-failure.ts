@@ -129,6 +129,7 @@ export function classifyControlPlaneFailure(
       return POST_DISPATCH_WRAPPER_DISCONNECTED;
     case 'no_progress':
     case 'no_outcome':
+    case 'completion_unconfirmed':
       return POST_DISPATCH_WRAPPER_NO_OUTPUT;
     case 'prompt_failed':
       return POST_DISPATCH_WRAPPER_ERROR_BEFORE_ACTIVITY;

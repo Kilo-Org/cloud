@@ -597,9 +597,6 @@ const config: ExpoConfig = {
     ],
     // No-op until slice `and` writes src/glanceable-android/widget-config.json.
     './plugins/withActiveAgentsAndroidWidget',
-    // Local Expo module for SSH: writes the foreground-service entry and the
-    // permissions its background sessions need into the Android manifest.
-    './modules/kilo-ssh/app.plugin',
     // Registered only when GOOGLE_IOS_CLIENT_ID is set — a guard for checkouts
     // whose environment does not provide it.
     ...googleSignInPlugins,

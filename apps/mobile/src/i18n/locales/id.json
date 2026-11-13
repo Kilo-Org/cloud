@@ -355,7 +355,7 @@
       "add": "Tambah kunci",
       "added": "Kunci ditambahkan",
       "emptyTitle": "Tidak ada kunci penyedia",
-      "emptyDescription": "Tambahkan kunci untuk menagihkan permintaan ke akun penyediamu sendiri.",
+      "emptyDescription": "Tambah kunci untuk memulai.",
       "chooseProvider": "Pilih penyedia",
       "searchProviders": "Cari penyedia",
       "noProvidersTitle": "Tidak ada penyedia yang cocok",

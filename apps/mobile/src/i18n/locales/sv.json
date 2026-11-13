@@ -355,7 +355,7 @@
       "add": "Lägg till nyckel",
       "added": "Nyckeln har lagts till",
       "emptyTitle": "Inga leverantörsnycklar",
-      "emptyDescription": "Lägg till en nyckel för att fakturera förfrågningar till ditt eget leverantörskonto.",
+      "emptyDescription": "Lägg till en nyckel för att komma igång.",
       "chooseProvider": "Välj en leverantör",
       "searchProviders": "Sök leverantörer",
       "noProvidersTitle": "Inga matchande leverantörer",

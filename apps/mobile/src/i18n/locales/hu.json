@@ -355,7 +355,7 @@
       "add": "Kulcs hozzáadása",
       "added": "Kulcs hozzáadva",
       "emptyTitle": "Nincsenek szolgáltatói kulcsok",
-      "emptyDescription": "Adj hozzá egy kulcsot, hogy a kérések a saját szolgáltatói fiókodat terheljék.",
+      "emptyDescription": "Kulcs hozzáadása a kezdéshez.",
       "chooseProvider": "Válassz szolgáltatót",
       "searchProviders": "Szolgáltatók keresése",
       "noProvidersTitle": "Nincs egyező szolgáltató",

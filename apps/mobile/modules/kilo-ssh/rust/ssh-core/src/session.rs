@@ -1,7 +1,7 @@
 //! Sessions: connect, authenticate, run commands, and open shell channels.
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use russh::client::{
@@ -11,6 +11,7 @@ use russh::client::{
 use russh::keys::ssh_key;
 use russh::keys::{HashAlg, PrivateKeyWithHashAlg, PublicKeyBase64, PublicKeyOrCertificate};
 use russh::{Channel, ChannelMsg, ChannelOpenFailure, Disconnect};
+use tokio::sync::Notify;
 use tokio::time::Instant;
 
 use crate::error::SshError;
@@ -31,8 +32,8 @@ pub struct ConnectConfig {
     pub port: u16,
     pub username: String,
     pub auth: AuthMethod,
-    /// Budget for reaching an authenticated session. Prompts answered by the
-    /// session handler do not count against it.
+    /// Server-wait budget. Time spent answering host-key and authentication
+    /// prompts is excluded; server time before and between prompts still counts.
     pub connect_timeout_ms: u32,
     /// Idle keepalive period; `0` disables keepalives.
     pub keepalive_interval_s: u32,
@@ -110,11 +111,27 @@ pub struct SshSession {
     forwards: Arc<RemoteForwards>,
 }
 
+#[derive(Clone, Copy, Default)]
+struct UserWait {
+    started: Option<Instant>,
+    elapsed: Duration,
+}
+
+impl UserWait {
+    fn elapsed_at(&self, now: Instant) -> Duration {
+        self.elapsed
+            + self.started.map_or(Duration::ZERO, |started| {
+                now.saturating_duration_since(started)
+            })
+    }
+}
+
 struct Handshake {
     host: String,
     port: u16,
     timeout_ms: u32,
-    awaiting_user: AtomicBool,
+    user_wait: Mutex<UserWait>,
+    user_wait_changed: Notify,
     host_key_rejected: AtomicBool,
     closed_by_app: AtomicBool,
 }
@@ -125,18 +142,23 @@ impl Handshake {
             host: config.host.clone(),
             port: config.port,
             timeout_ms: config.connect_timeout_ms.max(1),
-            awaiting_user: AtomicBool::new(false),
+            user_wait: Mutex::new(UserWait::default()),
+            user_wait_changed: Notify::new(),
             host_key_rejected: AtomicBool::new(false),
             closed_by_app: AtomicBool::new(false),
         }
     }
 
-    /// Asks the session handler a question, marking the wait so the connect
-    /// budget pauses while the user decides.
     async fn ask_user<T>(&self, question: impl Future<Output = T>) -> T {
-        self.awaiting_user.store(true, Ordering::SeqCst);
+        self.user_wait.lock().expect("user wait").started = Some(Instant::now());
+        self.user_wait_changed.notify_one();
         let answer = question.await;
-        self.awaiting_user.store(false, Ordering::SeqCst);
+        {
+            let mut wait = self.user_wait.lock().expect("user wait");
+            let started = wait.started.take().expect("an open question");
+            wait.elapsed += started.elapsed();
+        }
+        self.user_wait_changed.notify_one();
         answer
     }
 }
@@ -389,23 +411,32 @@ where
     .await
 }
 
-/// Runs one step of connecting within the connection budget, extending the
-/// budget while the session handler has a question open with the user.
 async fn bound_by<T, C>(work: C, handshake: &Handshake, description: &str) -> Result<T, SshError>
 where
     C: Future<Output = Result<T, SshError>>,
 {
     let timeout = Duration::from_millis(u64::from(handshake.timeout_ms));
     let mut work = std::pin::pin!(work);
-    let mut deadline = Instant::now() + timeout;
+    let (started, waited_before) = {
+        let wait = handshake.user_wait.lock().expect("user wait");
+        let started = Instant::now();
+        (started, wait.elapsed_at(started))
+    };
+    let deadline = started + timeout;
 
     loop {
+        let changed = handshake.user_wait_changed.notified();
+        let wait = *handshake.user_wait.lock().expect("user wait");
+        let resumed_deadline = deadline + wait.elapsed.saturating_sub(waited_before);
+
         tokio::select! {
             outcome = &mut work => return outcome,
-            () = tokio::time::sleep_until(deadline) => {
-                if handshake.awaiting_user.load(Ordering::SeqCst) {
-                    deadline = Instant::now() + timeout;
-                } else {
+            () = changed => {}
+            () = tokio::time::sleep_until(resumed_deadline), if wait.started.is_none() => {
+                let wait = handshake.user_wait.lock().expect("user wait");
+                if wait.started.is_none()
+                    && Instant::now() >= deadline + wait.elapsed.saturating_sub(waited_before)
+                {
                     return Err(SshError::Timeout {
                         message: description.to_string(),
                     });
@@ -822,5 +853,130 @@ mod tests {
             started.elapsed() >= Duration::from_secs(30),
             "the budget expired while the user was answering"
         );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_connect_budget_preserves_time_after_a_prompt() {
+        let handshake = Handshake::new(&config(0, 1_000));
+
+        let answer = bound_by(
+            async {
+                handshake
+                    .ask_user(tokio::time::sleep(Duration::from_millis(1_500)))
+                    .await;
+                tokio::time::sleep(Duration::from_millis(750)).await;
+                Ok(())
+            },
+            &handshake,
+            "authenticating",
+        )
+        .await;
+
+        assert!(answer.is_ok(), "only 750 ms of the budget was used");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_connect_budget_excludes_prompts_shorter_than_the_budget() {
+        let handshake = Handshake::new(&config(0, 1_000));
+
+        let answer = bound_by(
+            async {
+                for _ in 0..2 {
+                    handshake
+                        .ask_user(tokio::time::sleep(Duration::from_millis(200)))
+                        .await;
+                    tokio::time::sleep(Duration::from_millis(350)).await;
+                }
+                Ok(())
+            },
+            &handshake,
+            "authenticating",
+        )
+        .await;
+
+        assert!(answer.is_ok(), "only 700 ms of the budget was used");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_connect_budget_bounds_server_time_across_prompts() {
+        let handshake = Handshake::new(&config(0, 1_000));
+        let started = Instant::now();
+
+        let error = bound_by(
+            async {
+                tokio::time::sleep(Duration::from_millis(750)).await;
+                handshake
+                    .ask_user(tokio::time::sleep(Duration::from_millis(1_500)))
+                    .await;
+                std::future::pending::<Result<(), SshError>>().await
+            },
+            &handshake,
+            "authenticating",
+        )
+        .await
+        .expect_err("server time still consumes the budget");
+
+        assert!(matches!(error, SshError::Timeout { .. }));
+        assert!(
+            (Duration::from_millis(2_500)..Duration::from_millis(2_510))
+                .contains(&started.elapsed()),
+            "the timeout must exclude exactly the user wait: {:?}",
+            started.elapsed()
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_connect_budget_observes_prompts_on_another_task() {
+        let handshake = Arc::new(Handshake::new(&config(0, 1_000)));
+        let prompt_handshake = Arc::clone(&handshake);
+        let prompt = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(500)).await;
+            prompt_handshake
+                .ask_user(tokio::time::sleep(Duration::from_millis(1_500)))
+                .await;
+        });
+        let started = Instant::now();
+
+        let error = bound_by(
+            std::future::pending::<Result<(), SshError>>(),
+            &handshake,
+            "connecting",
+        )
+        .await
+        .expect_err("host-key verification cannot unbound server time");
+        prompt.await.expect("prompt task");
+
+        assert!(matches!(error, SshError::Timeout { .. }));
+        assert!(
+            (Duration::from_millis(2_500)..Duration::from_millis(2_510))
+                .contains(&started.elapsed()),
+            "the timeout must exclude exactly the user wait: {:?}",
+            started.elapsed()
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_connect_budget_bounds_time_before_the_first_prompt() {
+        let handshake = Handshake::new(&config(0, 1_000));
+        let asked = AtomicBool::new(false);
+
+        let error = bound_by(
+            async {
+                tokio::time::sleep(Duration::from_millis(1_100)).await;
+                handshake
+                    .ask_user(async {
+                        asked.store(true, Ordering::SeqCst);
+                    })
+                    .await;
+                Ok(())
+            },
+            &handshake,
+            "authenticating",
+        )
+        .await
+        .expect_err("waiting for the first prompt consumes the budget");
+
+        assert!(matches!(error, SshError::Timeout { .. }));
+        assert!(!asked.load(Ordering::SeqCst));
     }
 }

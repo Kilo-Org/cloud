@@ -98,13 +98,22 @@ describe('getOrgSubscriptionState', () => {
     });
   });
 
-  it('reports every terminal status as ended', () => {
-    for (const status of ['canceled', 'unpaid', 'incomplete_expired']) {
+  it('reports the statuses billing has stopped on as ended', () => {
+    for (const status of ['canceled', 'incomplete_expired']) {
       expect(getOrgSubscriptionState(withStatus(status))).toEqual({
         label: 'Ended',
         tone: 'muted',
       });
     }
+  });
+
+  it('reports an unpaid subscription as the payment failure it is', () => {
+    // Stripe keeps the invoice open and collectible, so this is the past-due
+    // row rather than "Ended" — the web paints both red for the same reason.
+    expect(getOrgSubscriptionState(withStatus('unpaid'))).toEqual({
+      label: 'Past due',
+      tone: 'danger',
+    });
   });
 
   it('reports a trial on its end date', () => {

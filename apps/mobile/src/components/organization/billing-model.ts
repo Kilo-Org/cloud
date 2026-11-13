@@ -44,9 +44,14 @@ export type BillingState = Readonly<{ label: string; tone: BillingStateTone }>;
 /**
  * Statuses Stripe reports after it stops billing: the subscription exists in
  * the record, so the row states that it ended instead of pretending none was
- * ever bought.
+ * ever bought. `unpaid` is not one of them: Stripe keeps the unpaid invoice
+ * open and collectible, so that subscription is a payment failure the reader
+ * can still fix rather than a plan that ended.
  */
-const TERMINAL_STATUSES = new Set<string>(['canceled', 'incomplete_expired', 'unpaid']);
+const TERMINAL_STATUSES = {
+  canceled: true,
+  incomplete_expired: true,
+} as const satisfies Record<string, true>;
 
 /** The date the paid period ends, in whole seconds, from the seat line item. */
 function periodEndSeconds(input: OrgSeatSubscription): number | null {
@@ -84,7 +89,10 @@ export function getOrgSubscriptionState(input: OrgSeatSubscription): BillingStat
   }
   const { status } = subscription;
   const periodEnd = formattedPeriodEnd(input);
-  if (status === 'past_due') {
+  // `unpaid` is the same money problem one step further on — Stripe stopped
+  // retrying the card and left the invoice open — so it carries the past-due
+  // row, as the web's `subscriptionStatusConfig` paints both red.
+  if (status === 'past_due' || status === 'unpaid') {
     return { label: i18n.t('organization.billing.statePastDue'), tone: 'danger' };
   }
   if (status === 'incomplete') {
@@ -93,13 +101,13 @@ export function getOrgSubscriptionState(input: OrgSeatSubscription): BillingStat
   if (status === 'paused') {
     return { label: i18n.t('kiloPass.statusPaused'), tone: 'warn' };
   }
-  if (TERMINAL_STATUSES.has(status)) {
+  if (Object.hasOwn(TERMINAL_STATUSES, status)) {
     return { label: i18n.t('organization.kiloPass.ended'), tone: 'muted' };
   }
   if (subscription.cancel_at_period_end === true) {
     return {
       label: periodEnd
-        ? i18n.t('organization.billing.stateCancelsOn', { date: periodEnd })
+        ? i18n.t('kiloPass.manage.cancelScheduled', { date: periodEnd })
         : i18n.t('organization.billing.stateCancelsAtPeriodEnd'),
       tone: 'warn',
     };

@@ -43,7 +43,7 @@ export function rowWaitsOnPresentedRaise(
  * The presented raise's side of a session that holds no pending ask: `raised`
  * only while the row waits on the raise the notification presents.
  */
-export function presentedRaiseState(
+function presentedRaiseState(
   row: SessionRaiseRow,
   action: 'approve' | 'reply',
   raiseId: string | undefined

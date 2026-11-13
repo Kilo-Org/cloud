@@ -4,6 +4,7 @@ import { useId } from 'react';
 import { Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
 import {
   useSetContextAllocationMutation,
   type CloudAgentSettingsData,
@@ -18,15 +19,42 @@ import {
 type DefaultSandboxSectionProps = {
   organizationId?: string;
   settings: CloudAgentSettingsData;
+  onRetry: () => void;
 };
 
-export function DefaultSandboxSection({ organizationId, settings }: DefaultSandboxSectionProps) {
+export function DefaultSandboxSection({
+  organizationId,
+  settings,
+  onRetry,
+}: DefaultSandboxSectionProps) {
   const headingId = useId();
   const setContextAllocation = useSetContextAllocationMutation(organizationId);
-  const canChoose = settings.capabilities.enabled;
+  const capabilities = settings.capabilities;
   const value = setContextAllocation.isPending
     ? (setContextAllocation.variables?.allocation ?? null)
     : toSelectableAllocation(settings.contextAllocation);
+
+  if (!capabilities) {
+    return (
+      <section aria-labelledby={headingId} className="flex flex-col gap-3">
+        <h4 id={headingId} className="text-sm font-medium">
+          Default sandbox
+        </h4>
+        <div role="alert" className="flex flex-col items-start gap-3">
+          <p className="text-sm">
+            Could not load sandbox options. Saved settings have not changed.
+          </p>
+          <p className="text-muted-foreground text-xs">
+            Saved default: {settings.contextAllocation ?? 'Platform default'}
+          </p>
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            Retry sandbox options
+          </Button>
+        </div>
+      </section>
+    );
+  }
+  const canChoose = capabilities.enabled;
 
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-3">
@@ -46,11 +74,11 @@ export function DefaultSandboxSection({ organizationId, settings }: DefaultSandb
       <SandboxSelect
         className="sm:max-w-sm"
         value={value}
-        choices={getEligibleAllocationChoices(settings.capabilities)}
+        choices={getEligibleAllocationChoices(capabilities)}
         unavailableReason={settings.contextUnavailableReason}
         noneLabel="Platform default"
-        noneDescription={describeDefaultSandbox(settings.capabilities.defaultDestination)}
-        noneDestination={settings.capabilities.defaultDestination}
+        noneDescription={describeDefaultSandbox(capabilities.defaultDestination)}
+        noneDestination={capabilities.defaultDestination}
         labelledBy={headingId}
         disabled={!settings.canManage || setContextAllocation.isPending}
         onChange={allocation =>

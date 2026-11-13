@@ -1253,7 +1253,17 @@
       "changeRequestMissingPermissions": "A Kilo GitHub-alkalmazása nem tud pull requesteket nyitni ebben a tárolóban. A tároló tulajdonosának írási hozzáférést kell adnia az alkalmazásnak a tartalmakhoz és a pull requestekhez, majd próbáld újra.",
       "changeRequestFailed": "A Kilo nem tudta megnyitni a pull requestet. Próbáld újra egy pillanat múlva.",
       "proposalConflict": "Ehhez a tárolóhoz egy másik javaslat is aktív, ezért ezt még nem lehet menteni.",
-      "offAction": "A kódellenőrzési memória ki van kapcsolva. Kapcsold be, majd próbáld újra."
+      "offAction": "A kódellenőrzési memória ki van kapcsolva. Kapcsold be, majd próbáld újra.",
+      "analyze": {
+        "title": "Visszajelzések elemzése",
+        "description": "Válassz egy adattárat friss karbantartói válaszokkal, majd keress egy ismétlődő útmutatási mintát.",
+        "chooseRepository": "Adattár kiválasztása",
+        "action": "Elemzés most",
+        "noRepositories": "Még egyik adattárhoz sincs friss karbantartói válasz.",
+        "proposed": "Kódellenőrzési memóriajavaslat létrejött",
+        "noFeedback": "Ehhez az adattárhoz nincs friss visszajelzés",
+        "noPattern": "Nem található egyértelmű ismétlődő minta"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Adj meg egy érvényes URL-t a merge request-hez.",
@@ -1385,7 +1395,63 @@
       "title": "A kódellenőrző beavatkozást igényel.",
       "recoveryLabel": "Kapcsolatfelvétel az ügyfélszolgálattal"
     },
-    "unknownError": "Ismeretlen hiba"
+    "unknownError": "Ismeretlen hiba",
+    "skipBotPullRequests": {
+      "title": "Botok által nyitott PR-ek kihagyása",
+      "subtitle": "Ne futtass automatikus kódellenőrzést a botok, például a Dependabot vagy a Renovate által nyitott PR-eken. Kapcsold ki, ha a botok PR-jeit is ellenőrizni szeretnéd."
+    },
+    "repoModels": {
+      "title": "Adattárankénti modell",
+      "description": "Egyes adattárak ellenőrzéseit más modellen, más gondolkodási szinten vagy mindkettőn futtathatod.",
+      "defaultModel": "Az alapértelmezett modellt használja",
+      "resetLabel": "A(z) {{repository}} modelljének visszaállítása",
+      "changeHint": "Megnyitja a modellválasztót"
+    },
+    "analytics": {
+      "title": "Statisztika",
+      "trackedReviews": "Követett kódellenőrzések",
+      "findingsRaised": "Felvetett találatok",
+      "highImpactChanges": "Nagy hatású változások",
+      "impactPoints": "Hatáspontok",
+      "repositoryLine": "Kódellenőrzések: {{reviews}} · Találatok: {{findings}}",
+      "empty": "Még nincs statisztikával rendelkező kódellenőrzés",
+      "emptyDescription": "A statisztika a befejezett kódellenőrzéseket rögzíti, amíg be van kapcsolva a szervezetnél.",
+      "off": "A statisztika ki van kapcsolva ennél a szervezetnél.",
+      "couldNotLoad": "Nem sikerült betölteni a statisztikát"
+    },
+    "council": {
+      "title": "Tanácsellenőrzés",
+      "subtitle": "Több szakértő ellenőrzi az egyes PR-eket, és szavazataik egyetlen döntéssé állnak össze.",
+      "unavailable": "A tanácsellenőrzés nem érhető el ennél a szervezetnél.",
+      "noRepositories": "Még nincs kiválasztott adattár. Először válassz adattárakat az adattárbeállításokban.",
+      "specialists": "Szakértők",
+      "labels": "A tanácsellenőrzést kiváltó címkék",
+      "labelsPlaceholder": "pl. tanács, mély ellenőrzés",
+      "labelsDescription": "A címkéket vesszővel válaszd el. A tanácsellenőrzést engedélyező adattár ezután csak azoknál a PR-eknél futtat tanácsellenőrzést, amelyek legalább egy ilyen címkét viselnek. Hagyd üresen minden jogosult PR esetén.",
+      "tooManyLabels": "Túl sok a tanácsellenőrzést kiváltó címke. Legfeljebb {{maximum}} címkét adj meg.",
+      "labelTooLong": "Túl hosszú a tanácsellenőrzést kiváltó címke. Egy címke legfeljebb {{maximum}} karakterből állhat.",
+      "minSpecialists": "Válassz legalább {{minimum}} szakértőt. Kiválasztva: {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Tesztlefedettség",
+        "correctness": "Helyesség",
+        "custom": "Szakértő"
+      },
+      "specialist": {
+        "security": "Jogosultságmegkerülés, titkok kezelése és nem biztonságos bemenet.",
+        "performance": "Forró útvonalak, N+1 lekérdezések és nagy memóriafoglalások.",
+        "testing": "Hiányzó vagy gyenge lefedettség az új viselkedéshez.",
+        "correctness": "Logikai hibák, szélsőséges esetek és versenyhelyzetek.",
+        "custom": "A saját területén lévő problémákat vizsgálja."
+      },
+      "strategy": {
+        "advisory": "Tanácsadó",
+        "advisoryDescription": "Jelenti a találatokat és szavaz, de nem blokkolja az összevonást.",
+        "unanimous": "Egyhangú",
+        "unanimousDescription": "Blokkolja az összevonást, ha bármely szakértő kritikus problémát jelez.",
+        "majority": "Többségi",
+        "majorityDescription": "Csak akkor blokkolja az összevonást, ha a szakértők többsége kritikus problémát jelez."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1888,6 +1954,16 @@
       "auto": "Automatikus",
       "shallow": "Alapszintű",
       "deep": "Részletes"
+    },
+    "orphanedFindings": {
+      "title": "Eltávolított adattárak találatai",
+      "description": "Ezek az adattárak már nem érhetők el a GitHub-integráción keresztül. Találataik továbbra is beleszámítanak az irányítópultokba és a jelentésekbe.",
+      "count": "Találatok: {{count}}",
+      "clearLabel": "A(z) {{repository}} találatainak törlése",
+      "confirmTitle": "Törlöd a találatokat?",
+      "confirmMessage": "A(z) {{repository}} adattárhoz rögzített összes találat törlődik. Ez nem vonható vissza.",
+      "confirmAction": "Találatok törlése",
+      "cleared": "Találatok törölve: {{count}}"
     }
   },
   "agents": {

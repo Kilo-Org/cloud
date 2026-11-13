@@ -1253,7 +1253,17 @@
       "changeRequestMissingPermissions": "Appiin GitHub Kilo repository kana keessatti pull request banuu hin danda'u. Abbaan repository appii sanatti qabeenyaa fi pull request irratti afoomicha barreessuu kennuu qaba, sana booda irra deebi'ii yaali.",
       "changeRequestFailed": "Kilo pull request banuu hin dandeenye. Yeroo gabaabaa booda irra deebi'ii yaali.",
       "proposalConflict": "Yaadni biraa repository kanaaf amma illee hojiirra jira.",
-      "offAction": "Yaadannoon sakatta'aa cufameera. Isa bani, sana booda irra deebi'ii yaali."
+      "offAction": "Yaadannoon sakatta'aa cufameera. Isa bani, sana booda irra deebi'ii yaali.",
+      "analyze": {
+        "title": "Deebii xiinxali",
+        "description": "Kuusaa koodii deebii kunuunsitootaa dhihoo qabu filadhu, sana booda mala qajeelfamaa irra deddeebi'u tokko barbaadi.",
+        "chooseRepository": "Kuusaa koodii filadhu",
+        "action": "Amma xiinxali",
+        "noRepositories": "Ammatti kuusaan koodii deebii kunuunsitootaa dhihoo qabu hin jiru.",
+        "proposed": "Yaadni yaadannoo sakatta'aa dhihaate uumameera",
+        "noFeedback": "Kuusaa koodii kanaaf deebiin dhihoo hin argamne",
+        "noPattern": "Malli irra deddeebi'u ifa ta'e hin argamne"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "URL gaaffii makuu sirrii galchi.",
@@ -1385,7 +1395,63 @@
       "title": "Sakatta'aan koodii xiyyeeffannoo barbaada.",
       "recoveryLabel": "Deeggarsa qunnami"
     },
-    "unknownError": "Dogoggora hin beekamne"
+    "unknownError": "Dogoggora hin beekamne",
+    "skipBotPullRequests": {
+      "title": "PR-wwan bootiiwwan irraa dhufan darbi",
+      "subtitle": "PR-wwan bootiiwwan akka Dependabot ykn Renovate banan irratti sakatta'a ofumaan hin raawwatiin. PR-wwan bootiiwwanii sakatta'uuf kana dhaabi."
+    },
+    "repoModels": {
+      "title": "Moodeela kuusaa koodii tokkoon tokkoo",
+      "description": "Sakatta'a kuusaawwan koodii muraasa moodeela biraa, yaada cimaa biraa, ykn lamaan isaanii irratti raawwadhu.",
+      "defaultModel": "Moodeela durtii fayyadama",
+      "resetLabel": "Moodeela {{repository}} irra deebi'ii qindeessi",
+      "changeHint": "Filannoo moodeelaa bana"
+    },
+    "analytics": {
+      "title": "Istaatiksii",
+      "trackedReviews": "Sakatta'awwan hordofaman",
+      "findingsRaised": "Argamoota ol kaafaman",
+      "highImpactChanges": "Jijjiiramoota dhiibbaa ol'aanaa qaban",
+      "impactPoints": "Qabxiiwwan dhiibbaa",
+      "repositoryLine": "Sakatta'a: {{reviews}} · Argamoota: {{findings}}",
+      "empty": "Ammatti sakatta'a istaatiksii qabu hin jiru",
+      "emptyDescription": "Istaatiksiin sakatta'awwan xumuraman yeroo dhaabbataaf banamu galmeessa.",
+      "off": "Istaatiksiin dhaabbata kanaaf cufameera.",
+      "couldNotLoad": "Istaatiksii fe'uun hin danda'amne"
+    },
+    "council": {
+      "title": "Sakatta'a gumii",
+      "subtitle": "Ogeessota hedduun PR tokkoon tokkoo sakatta'u, sagaleen isaanii immoo murtee tokko ta'a.",
+      "unavailable": "Sakatta'aan gumii dhaabbata kanaaf hin argamu.",
+      "noRepositories": "Ammatti kuusaan koodii filatame hin jiru. Dura qindaa'ina kuusaa koodii keessatti kuusaawwan koodii filadhu.",
+      "specialists": "Ogeessota",
+      "labels": "Mallattoowwan sakatta'a gumii kakaasan",
+      "labelsPlaceholder": "fkn: gumii, sakatta'a gadi fagoo",
+      "labelsDescription": "Mallattoowwan komaan addan baasi. Kuusaan koodii gumii banu sana booda PR mallattoowwan kana keessaa yoo xiqqaate tokko qabatan qofaaf gumii raawwata. PR ulaagaa guutuuf hundaan duwwaa dhiisi.",
+      "tooManyLabels": "Mallattoowwan gumii garmalee baay'ataniiru. Yoo baay'ate mallattoo {{maximum}} fayyadami.",
+      "labelTooLong": "Mallattoon gumii garmalee dheeraadha. Mallattoon hundi arfii {{maximum}} yookaan isaa gadi qabaachuu qaba.",
+      "minSpecialists": "Yoo xiqqaate ogeessota {{minimum}} filadhu. {{selected}} filatamaniiru.",
+      "specialistName": {
+        "testCoverage": "Hammanga qorannoo",
+        "correctness": "Sirrii ta'uu",
+        "custom": "Ogeessa"
+      },
+      "specialist": {
+        "security": "Hayyama darbuu, qabeenya iccitii bulchuu fi galtee nageenya hin qabne.",
+        "performance": "Daandiiwwan hojiin itti baay'ee raawwatamu, gaaffiiwwan N+1 fi qoodamuu guddaa.",
+        "testing": "Hammanga dhabame ykn laafaa amala haaraaf.",
+        "correctness": "Dogoggoroota yaadaa, haalota daangaa fi dorgommii yeroo.",
+        "custom": "Rakkoolee naannoo mataa isaa keessatti sakatta'a."
+      },
+      "strategy": {
+        "advisory": "Gorsa",
+        "advisoryDescription": "Argamoota gabaasa, sagalee kennas ta'e walitti makuu hin uggurtu.",
+        "unanimous": "Waliigaltee",
+        "unanimousDescription": "Yoo ogeessi kamiyyuu rakkoo cimaa gabaase walitti makuu uggura.",
+        "majority": "Baay'ina",
+        "majorityDescription": "Yoo ogeessota baay'een rakkoo cimaa gabaasan qofa walitti makuu uggura."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1888,6 +1954,16 @@
       "auto": "Ofumaan",
       "shallow": "Gad hin fagaanne",
       "deep": "Gad fagoo"
+    },
+    "orphanedFindings": {
+      "title": "Argamoota kuusaawwan koodii haqamanii",
+      "description": "Kuusaawwan koodiin kunniin walqabsiisa GitHub timmadhaan akka hin argamneef. Argamoonni isaanii gabatee to'annoo fi gabaasota keessatti lakkaa'amuu itti fufu.",
+      "count": "Argamoota: {{count}}",
+      "clearLabel": "Argamoota {{repository}} haqi",
+      "confirmTitle": "Argamoota haquu?",
+      "confirmMessage": "Argamni galmaa'e hundi {{repository}} irraa ni haqama. Kun deebisuu hin danda'amu.",
+      "confirmAction": "Argamoota haqi",
+      "cleared": "Argamoota haqaman: {{count}}"
     }
   },
   "agents": {

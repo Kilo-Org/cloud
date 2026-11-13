@@ -1253,7 +1253,17 @@
       "changeRequestMissingPermissions": "Kilo GitHubi rakendus ei saa selles hoidlas tõmbetaotlusi avada. Hoidla omanik peab andma rakendusele kirjutamisõiguse sisule ja tõmbetaotlustele, seejärel proovi uuesti.",
       "changeRequestFailed": "Kilol ei õnnestunud tõmbetaotlust avada. Proovi hetke pärast uuesti.",
       "proposalConflict": "Selle sama hoidla jaoks on veel üks ülevaatuste mälu ettepanek endiselt aktiivne.",
-      "offAction": "Ülevaatuste mälu on välja lülitatud. Lülita see sisse ja proovi uuesti."
+      "offAction": "Ülevaatuste mälu on välja lülitatud. Lülita see sisse ja proovi uuesti.",
+      "analyze": {
+        "title": "Analüüsi tagasisidet",
+        "description": "Vali hoidla, kus on hiljutisi hooldajate vastuseid, ja otsi üht korduvat juhiste mustrit.",
+        "chooseRepository": "Vali hoidla",
+        "action": "Analüüsi kohe",
+        "noRepositories": "Üheski hoidlas pole veel hiljutisi hooldajate vastuseid.",
+        "proposed": "Ülevaatusmälu ettepanek on loodud",
+        "noFeedback": "Selle hoidla kohta ei leitud hiljutist tagasisidet",
+        "noPattern": "Selget korduvat mustrit ei leitud"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Sisesta kehtiv liitmistaotluse URL.",
@@ -1385,7 +1395,63 @@
       "title": "Koodiülevaataja vajab tähelepanu",
       "recoveryLabel": "Võta ühendust toega"
     },
-    "unknownError": "Tundmatu viga"
+    "unknownError": "Tundmatu viga",
+    "skipBotPullRequests": {
+      "title": "Jäta robotite tõmbetaotlused vahele",
+      "subtitle": "Ära käivita automaatseid ülevaatusi robotite (nt Dependabot või Renovate) avatud tõmbetaotlustel. Lülita see välja, et vaadata üle ka robotite tõmbetaotlused."
+    },
+    "repoModels": {
+      "title": "Hoidlapõhine mudel",
+      "description": "Käivita mõne hoidla ülevaatused teise mudeli, mõtlemistaseme või mõlemaga.",
+      "defaultModel": "Kasutab vaikemudelit",
+      "resetLabel": "Lähtesta hoidla {{repository}} mudel",
+      "changeHint": "Avab mudelivalija"
+    },
+    "analytics": {
+      "title": "Analüütika",
+      "trackedReviews": "Jälgitud ülevaatused",
+      "findingsRaised": "Esitatud leiud",
+      "highImpactChanges": "Suure mõjuga muudatused",
+      "impactPoints": "Mõjupunktid",
+      "repositoryLine": "Ülevaatused: {{reviews}} · Leiud: {{findings}}",
+      "empty": "Analüütikaga ülevaatusi veel pole",
+      "emptyDescription": "Analüütika salvestab lõpetatud ülevaatused, kui see on organisatsioonis lubatud.",
+      "off": "Analüütika on selles organisatsioonis välja lülitatud.",
+      "couldNotLoad": "Analüütikat ei õnnestunud laadida"
+    },
+    "council": {
+      "title": "Nõukogu ülevaatus",
+      "subtitle": "Iga tõmbetaotluse vaatavad üle mitu spetsialisti ja nende hääled liidetakse üheks otsuseks.",
+      "unavailable": "Nõukogu ülevaatus pole selles organisatsioonis saadaval.",
+      "noRepositories": "Hoidlaid pole veel valitud. Vali esmalt hoidlad hoidla seadetes.",
+      "specialists": "Spetsialistid",
+      "labels": "Nõukogu ülevaatuse käivitavad sildid",
+      "labelsPlaceholder": "nt nõukogu, põhjalik ülevaatus",
+      "labelsDescription": "Eralda sildid komadega. Siis käivitab nõukoguga hoidla nõukogu ainult tõmbetaotlustel, millel on vähemalt üks neist siltidest. Jäta tühjaks, et hõlmata kõik sobivad tõmbetaotlused.",
+      "tooManyLabels": "Nõukogu ülevaatuse silte on liiga palju. Kasuta kuni {{maximum}} silti.",
+      "labelTooLong": "Nõukogu ülevaatuse silt on liiga pikk. Iga silt võib olla kuni {{maximum}} märki pikk.",
+      "minSpecialists": "Vali vähemalt {{minimum}} spetsialisti. Valitud: {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Testikatvus",
+        "correctness": "Korrektsus",
+        "custom": "Spetsialist"
+      },
+      "specialist": {
+        "security": "Autoriseerimisest möödahiilimine, saladuste käsitlemine ja ohtlik sisend.",
+        "performance": "Kuumad teed, N+1 päringud ja mahukad mälueraldused.",
+        "testing": "Uue käitumise puuduv või nõrk testikatvus.",
+        "correctness": "Loogikavead, äärejuhud ja võidujooksud.",
+        "custom": "Vaatab üle oma valdkonna probleeme."
+      },
+      "strategy": {
+        "advisory": "Nõuandev",
+        "advisoryDescription": "Esitab leiud ja hääled ühendamist blokeerimata.",
+        "unanimous": "Ühehäälne",
+        "unanimousDescription": "Blokeerib ühendamise, kui mõni spetsialist teatab kriitilisest probleemist.",
+        "majority": "Enamus",
+        "majorityDescription": "Blokeerib ühendamise ainult siis, kui enamik spetsialiste teatab kriitilisest probleemist."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1888,6 +1954,16 @@
       "auto": "Automaatne",
       "shallow": "Pindmine",
       "deep": "Põhjalik"
+    },
+    "orphanedFindings": {
+      "title": "Eemaldatud hoidlate leiud",
+      "description": "Need hoidlad pole GitHubi integratsiooni kaudu enam kättesaadavad. Nende leide arvestatakse endiselt juhtpaneelidel ja aruannetes.",
+      "count": "Leiud: {{count}}",
+      "clearLabel": "Tühjenda hoidla {{repository}} leiud",
+      "confirmTitle": "Kas tühjendada leiud?",
+      "confirmMessage": "Kõik hoidla {{repository}} salvestatud leiud kustutatakse. Seda ei saa tagasi võtta.",
+      "confirmAction": "Kustuta leiud",
+      "cleared": "Tühjendatud leide: {{count}}"
     }
   },
   "agents": {

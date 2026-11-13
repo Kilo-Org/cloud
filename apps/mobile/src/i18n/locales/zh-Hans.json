@@ -768,6 +768,16 @@
       "changeRequestFailed": "Kilo 无法创建拉取请求。请稍后再试。",
       "proposalConflict": "此仓库的另一个审查记忆建议仍处于活跃状态，因此暂时无法保存此建议。",
       "offAction": "审查记忆已关闭。请开启后重试。",
+      "analyze": {
+        "title": "分析反馈",
+        "description": "选择一个最近有维护者回复的仓库，然后查找一种重复出现的指导模式。",
+        "chooseRepository": "选择仓库",
+        "action": "立即分析",
+        "noRepositories": "还没有任何仓库有维护者的最新回复。",
+        "proposed": "已创建审查记忆建议",
+        "noFeedback": "未找到此仓库的近期反馈",
+        "noPattern": "未发现明确的重复模式"
+      },
       "off": "审查记忆已关闭。",
       "on": "审查记忆已开启。",
       "offDescription": "启用审查记忆后，Kilo 可以从维护者的回复中学习，并为 REVIEW.md 提出审查准则建议。",
@@ -843,7 +853,63 @@
       "title": "代码审查器有问题需要处理",
       "recoveryLabel": "联系技术支持"
     },
-    "unknownError": "未知错误"
+    "unknownError": "未知错误",
+    "skipBotPullRequests": {
+      "title": "跳过来自机器人的拉取请求",
+      "subtitle": "不要对 Dependabot 或 Renovate 等机器人打开的拉取请求运行自动审查。关闭此选项即可连机器人的拉取请求一起审查。"
+    },
+    "repoModels": {
+      "title": "按仓库设置模型",
+      "description": "让部分仓库的审查使用不同的模型、思考强度或两者兼有。",
+      "defaultModel": "使用默认模型",
+      "resetLabel": "重置 {{repository}} 的模型",
+      "changeHint": "打开模型选择器"
+    },
+    "analytics": {
+      "title": "分析",
+      "trackedReviews": "已跟踪的审查",
+      "findingsRaised": "提出的问题",
+      "highImpactChanges": "高影响变更",
+      "impactPoints": "影响分",
+      "repositoryLine": "审查：{{reviews}} · 问题：{{findings}}",
+      "empty": "还没有带分析数据的审查",
+      "emptyDescription": "在组织启用分析期间，系统会记录已完成的审查。",
+      "off": "此组织已关闭分析。",
+      "couldNotLoad": "无法加载分析数据"
+    },
+    "council": {
+      "title": "评审团审查",
+      "subtitle": "多位专家分别审查每个拉取请求，他们的投票汇总为一个决定。",
+      "unavailable": "此组织无法使用评审团审查。",
+      "noRepositories": "尚未选择任何仓库。请先在仓库设置中选择仓库。",
+      "specialists": "专家",
+      "labels": "触发评审团审查的标签",
+      "labelsPlaceholder": "例如：评审团、深度审查",
+      "labelsDescription": "用逗号分隔标签。启用评审团的仓库随后只对带有至少一个上述标签的拉取请求运行评审团。留空则适用于所有符合条件的拉取请求。",
+      "tooManyLabels": "触发评审团审查的标签过多。最多可使用 {{maximum}} 个标签。",
+      "labelTooLong": "触发评审团审查的标签过长。每个标签不得超过 {{maximum}} 个字符。",
+      "minSpecialists": "请至少选择 {{minimum}} 位专家。已选择 {{selected}} 位。",
+      "specialistName": {
+        "testCoverage": "测试覆盖率",
+        "correctness": "正确性",
+        "custom": "专家"
+      },
+      "specialist": {
+        "security": "权限绕过、密钥处理和不安全的输入。",
+        "performance": "热路径、N+1 查询和大量内存分配。",
+        "testing": "新行为缺少覆盖或覆盖不足。",
+        "correctness": "逻辑错误、边界情况和竞态条件。",
+        "custom": "审查其自身领域内的问题。"
+      },
+      "strategy": {
+        "advisory": "建议性",
+        "advisoryDescription": "报告问题并投票，但不阻止合并。",
+        "unanimous": "全体一致",
+        "unanimousDescription": "任何专家报告严重问题时阻止合并。",
+        "majority": "多数决定",
+        "majorityDescription": "只有在多数专家报告严重问题时才阻止合并。"
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1346,6 +1412,16 @@
       "auto": "自动",
       "shallow": "浅度",
       "deep": "深度"
+    },
+    "orphanedFindings": {
+      "title": "已移除仓库的问题",
+      "description": "这些仓库已无法通过 GitHub 集成访问。它们的问题仍会计入仪表板和报告。",
+      "count": "问题：{{count}}",
+      "clearLabel": "清除 {{repository}} 的问题",
+      "confirmTitle": "清除问题？",
+      "confirmMessage": "{{repository}} 的所有已记录问题都会被删除，且无法撤销。",
+      "confirmAction": "删除问题",
+      "cleared": "已清除问题：{{count}}"
     }
   },
   "agents": {

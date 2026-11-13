@@ -52,6 +52,8 @@ export type CodeReviewCouncilConfigInput = {
     model_slug?: string;
     thinking_effort?: string | null;
   }>;
+  /** Label gate for automated reviews; absent/empty means every eligible PR runs council. */
+  required_labels?: string[];
 };
 
 // Mobile/personal-org save patch. All keys are optional; omission preserves the
@@ -70,6 +72,8 @@ export type CodeReviewConfigPatch = Partial<{
   selectedRepositoryIds: (number | string)[];
   repositoryModelOverrides: RepositoryModelOverrideInput[];
   disableReviewMd: boolean;
+  /** GitHub only: skip automated reviews of PRs opened by bot accounts. */
+  skipBotPullRequests: boolean;
 }>;
 
 // Field-merge PATCH surface. Extends the save patch with the org-only fields
@@ -97,6 +101,7 @@ export type CodeReviewStoredConfig = {
   selectedRepositoryIds?: (number | string)[];
   repositoryModelOverrides?: RepositoryModelOverrideInput[];
   disableReviewMd?: boolean;
+  skipBotPullRequests?: boolean;
   // Org-only fields. Personal configs never have these in storage, so the
   // stored snapshot can omit them and the helper still works.
   manuallyAddedRepositories?: ManuallyAddedRepositoryInput[];

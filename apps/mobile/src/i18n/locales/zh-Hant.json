@@ -768,6 +768,16 @@
       "changeRequestFailed": "Kilo 無法開啟提取請求。請稍後再試。",
       "proposalConflict": "此儲存庫已有另一個審查記憶提案仍在進行中，因此目前無法儲存此提案。",
       "offAction": "審查記憶已關閉。請啟用後再試一次。",
+      "analyze": {
+        "title": "分析意見回饋",
+        "description": "選擇一個最近有維護者回覆的存放庫，然後找出一個重複出現的指引模式。",
+        "chooseRepository": "選擇存放庫",
+        "action": "立即分析",
+        "noRepositories": "目前還沒有任何存放庫有維護者的最新回覆。",
+        "proposed": "已建立審查記憶提案",
+        "noFeedback": "找不到此存放庫最近的意見回饋",
+        "noPattern": "找不到明確的重複模式"
+      },
       "off": "審查記憶已關閉。",
       "on": "審查記憶已開啟。",
       "offDescription": "啟用後，Kilo 會從維護者的回覆中學習，並提出 REVIEW.md 指引建議。",
@@ -843,7 +853,63 @@
       "title": "程式碼審查助手有問題需要處理。",
       "recoveryLabel": "聯絡客服"
     },
-    "unknownError": "未知錯誤"
+    "unknownError": "未知錯誤",
+    "skipBotPullRequests": {
+      "title": "略過來自機器人的提取要求",
+      "subtitle": "不要對 Dependabot 或 Renovate 等機器人開啟的提取要求執行自動審查。關閉此選項即可連機器人的提取要求一起審查。"
+    },
+    "repoModels": {
+      "title": "依存放庫設定模型",
+      "description": "讓部分存放庫的審查使用不同的模型、思考強度或兩者。",
+      "defaultModel": "使用預設模型",
+      "resetLabel": "重設 {{repository}} 的模型",
+      "changeHint": "開啟模型選擇器"
+    },
+    "analytics": {
+      "title": "分析",
+      "trackedReviews": "已追蹤的審查",
+      "findingsRaised": "提出的問題",
+      "highImpactChanges": "高影響變更",
+      "impactPoints": "影響分數",
+      "repositoryLine": "審查：{{reviews}} · 問題：{{findings}}",
+      "empty": "尚無含有分析資料的審查",
+      "emptyDescription": "在組織啟用分析期間，系統會記錄已完成的審查。",
+      "off": "此組織已關閉分析。",
+      "couldNotLoad": "無法載入分析資料"
+    },
+    "council": {
+      "title": "審查小組審查",
+      "subtitle": "多位專家分別審查每個提取要求，他們的投票會彙整成一項決定。",
+      "unavailable": "此組織無法使用審查小組審查。",
+      "noRepositories": "尚未選取任何存放庫。請先在存放庫設定中選取存放庫。",
+      "specialists": "專家",
+      "labels": "觸發審查小組審查的標籤",
+      "labelsPlaceholder": "例如：審查小組、深入審查",
+      "labelsDescription": "以逗號分隔標籤。啟用審查小組的存放庫接著只會對帶有至少一個這些標籤的提取要求執行審查小組。留空則適用於所有符合條件的提取要求。",
+      "tooManyLabels": "審查小組標籤過多。最多可使用 {{maximum}} 個標籤。",
+      "labelTooLong": "審查小組標籤過長。每個標籤不得超過 {{maximum}} 個字元。",
+      "minSpecialists": "請至少選取 {{minimum}} 位專家。已選取 {{selected}} 位。",
+      "specialistName": {
+        "testCoverage": "測試涵蓋範圍",
+        "correctness": "正確性",
+        "custom": "專家"
+      },
+      "specialist": {
+        "security": "權限繞過、密鑰處理與不安全的輸入。",
+        "performance": "熱路徑、N+1 查詢與大量記憶體配置。",
+        "testing": "新行為缺少涵蓋或涵蓋不足。",
+        "correctness": "邏輯錯誤、邊界情況與競爭條件。",
+        "custom": "審查其自身領域的問題。"
+      },
+      "strategy": {
+        "advisory": "建議性",
+        "advisoryDescription": "回報問題並投票，但不阻止合併。",
+        "unanimous": "全體一致",
+        "unanimousDescription": "任何專家回報嚴重問題時阻止合併。",
+        "majority": "多數決",
+        "majorityDescription": "只有在多數專家回報嚴重問題時才阻止合併。"
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1346,6 +1412,16 @@
       "auto": "自動",
       "shallow": "初步",
       "deep": "深度"
+    },
+    "orphanedFindings": {
+      "title": "已移除存放庫的問題",
+      "description": "這些存放庫已無法透過 GitHub 整合存取。它們的問題仍會計入儀表板與報告。",
+      "count": "問題：{{count}}",
+      "clearLabel": "清除 {{repository}} 的問題",
+      "confirmTitle": "清除問題？",
+      "confirmMessage": "{{repository}} 的所有已記錄問題都會被刪除，且無法復原。",
+      "confirmAction": "刪除問題",
+      "cleared": "已清除問題：{{count}}"
     }
   },
   "agents": {

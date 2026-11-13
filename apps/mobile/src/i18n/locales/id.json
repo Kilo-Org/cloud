@@ -768,6 +768,16 @@
       "changeRequestFailed": "Kilo tidak dapat membuka pull request. Coba lagi sebentar.",
       "proposalConflict": "Usulan memori tinjauan lain untuk repositori ini masih aktif, jadi usulan ini belum dapat disimpan.",
       "offAction": "Memori tinjauan nonaktif. Aktifkan, lalu coba lagi.",
+      "analyze": {
+        "title": "Analisis umpan balik",
+        "description": "Pilih repositori dengan balasan pengelola terbaru, lalu cari satu pola panduan yang berulang.",
+        "chooseRepository": "Pilih repositori",
+        "action": "Analisis sekarang",
+        "noRepositories": "Belum ada repositori dengan balasan pengelola terbaru.",
+        "proposed": "Usulan memori tinjauan dibuat",
+        "noFeedback": "Tidak ada umpan balik terbaru untuk repositori ini",
+        "noPattern": "Tidak ditemukan pola berulang yang jelas"
+      },
       "off": "Memori tinjauan nonaktif.",
       "on": "Memori tinjauan aktif.",
       "offDescription": "Aktifkan agar Kilo dapat belajar dari balasan pengelola repositori dan mengusulkan panduan untuk REVIEW.md.",
@@ -843,7 +853,63 @@
       "title": "Peninjau kode perlu ditangani.",
       "recoveryLabel": "Hubungi tim dukungan"
     },
-    "unknownError": "Terjadi kesalahan yang tidak diketahui."
+    "unknownError": "Terjadi kesalahan yang tidak diketahui.",
+    "skipBotPullRequests": {
+      "title": "Lewati PR dari bot",
+      "subtitle": "Jangan jalankan tinjauan otomatis pada PR yang dibuka bot seperti Dependabot atau Renovate. Matikan opsi ini untuk turut meninjau PR bot."
+    },
+    "repoModels": {
+      "title": "Model per repositori",
+      "description": "Jalankan tinjauan sebagian repositori dengan model, tingkat penalaran, atau keduanya yang berbeda.",
+      "defaultModel": "Menggunakan model bawaan",
+      "resetLabel": "Atur ulang model untuk {{repository}}",
+      "changeHint": "Membuka pemilih model"
+    },
+    "analytics": {
+      "title": "Analitik",
+      "trackedReviews": "Tinjauan dilacak",
+      "findingsRaised": "Temuan yang dilaporkan",
+      "highImpactChanges": "Perubahan berdampak tinggi",
+      "impactPoints": "Poin dampak",
+      "repositoryLine": "Tinjauan: {{reviews}} · Temuan: {{findings}}",
+      "empty": "Belum ada tinjauan dengan analitik",
+      "emptyDescription": "Analitik mencatat tinjauan yang selesai selama fitur ini aktif untuk organisasi.",
+      "off": "Analitik nonaktif untuk organisasi ini.",
+      "couldNotLoad": "Tidak dapat memuat analitik"
+    },
+    "council": {
+      "title": "Tinjauan dewan",
+      "subtitle": "Beberapa spesialis meninjau setiap PR, dan suara mereka digabungkan menjadi satu keputusan.",
+      "unavailable": "Tinjauan dewan tidak tersedia untuk organisasi ini.",
+      "noRepositories": "Belum ada repositori yang dipilih. Pilih repositori di setelan repositori terlebih dahulu.",
+      "specialists": "Spesialis",
+      "labels": "Label yang memicu tinjauan dewan",
+      "labelsPlaceholder": "mis. dewan, tinjauan mendalam",
+      "labelsDescription": "Pisahkan label dengan koma. Repositori yang mengaktifkan dewan kemudian hanya menjalankan dewan untuk PR yang membawa setidaknya satu dari label ini. Biarkan kosong untuk setiap PR yang memenuhi syarat.",
+      "tooManyLabels": "Terlalu banyak label dewan. Gunakan maksimal {{maximum}} label.",
+      "labelTooLong": "Label dewan terlalu panjang. Setiap label harus terdiri dari maksimal {{maximum}} karakter.",
+      "minSpecialists": "Pilih setidaknya {{minimum}} spesialis. {{selected}} dipilih.",
+      "specialistName": {
+        "testCoverage": "Cakupan pengujian",
+        "correctness": "Ketepatan",
+        "custom": "Spesialis"
+      },
+      "specialist": {
+        "security": "Bypass otorisasi, penanganan rahasia, dan input yang tidak aman.",
+        "performance": "Jalur kritis, kueri N+1, dan alokasi memori berat.",
+        "testing": "Cakupan yang hilang atau lemah untuk perilaku baru.",
+        "correctness": "Kesalahan logika, kasus tepi, dan kondisi balapan.",
+        "custom": "Meninjau masalah di areanya sendiri."
+      },
+      "strategy": {
+        "advisory": "Saran",
+        "advisoryDescription": "Melaporkan temuan dan memberikan suara tanpa memblokir penggabungan.",
+        "unanimous": "Suara bulat",
+        "unanimousDescription": "Memblokir penggabungan jika ada spesialis yang melaporkan masalah kritis.",
+        "majority": "Mayoritas",
+        "majorityDescription": "Memblokir penggabungan hanya jika sebagian besar spesialis melaporkan masalah kritis."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1346,6 +1412,16 @@
       "auto": "Otomatis",
       "shallow": "Dasar",
       "deep": "Mendalam"
+    },
+    "orphanedFindings": {
+      "title": "Temuan untuk repositori yang dihapus",
+      "description": "Repositori ini tidak lagi dapat dijangkau melalui integrasi GitHub. Temuannya tetap dihitung di dasbor dan laporan.",
+      "count": "Temuan: {{count}}",
+      "clearLabel": "Hapus temuan untuk {{repository}}",
+      "confirmTitle": "Hapus temuan?",
+      "confirmMessage": "Setiap temuan yang tercatat untuk {{repository}} akan dihapus. Tindakan ini tidak dapat dibatalkan.",
+      "confirmAction": "Hapus temuan",
+      "cleared": "Temuan dihapus: {{count}}"
     }
   },
   "agents": {

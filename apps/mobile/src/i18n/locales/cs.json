@@ -1299,7 +1299,17 @@
       "changeRequestMissingPermissions": "GitHub App od Kilo nemůže v tomto repozitáři otevírat pull requesty. Vlastník repozitáře musí aplikaci udělit přístup pro zápis k obsahu a pull requestům. Poté to zkuste znovu.",
       "changeRequestFailed": "Kilo nedokázalo otevřít pull request. Zkuste to znovu za chvíli.",
       "proposalConflict": "Pro tento repozitář je stále aktivní jiný návrh paměti kontrol, takže tento zatím nelze uložit.",
-      "offAction": "Paměť kontrol je vypnutá. Zapněte ji a zkuste to znovu."
+      "offAction": "Paměť kontrol je vypnutá. Zapněte ji a zkuste to znovu.",
+      "analyze": {
+        "title": "Analyzovat zpětnou vazbu",
+        "description": "Vyberte repozitář s nedávnými odpověďmi správců a vyhledejte jeden opakující se vzor pokynů.",
+        "chooseRepository": "Vyberte repozitář",
+        "action": "Analyzovat nyní",
+        "noRepositories": "Žádný repozitář zatím nemá nedávné odpovědi správců.",
+        "proposed": "Návrh do paměti kontrol byl vytvořen",
+        "noFeedback": "Pro tento repozitář nebyla nalezena žádná nedávná zpětná vazba",
+        "noPattern": "Nebyl nalezen žádný jasný opakující se vzor"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Zadejte platnou URL adresu merge request.",
@@ -1433,7 +1443,63 @@
       "title": "Kontrola kódu vyžaduje tvou pozornost.",
       "recoveryLabel": "Kontaktovat podporu"
     },
-    "unknownError": "Neznámá chyba"
+    "unknownError": "Neznámá chyba",
+    "skipBotPullRequests": {
+      "title": "Přeskakovat pull requesty od botů",
+      "subtitle": "Nespouštět automatické kontroly u pull requestů otevřených boty, jako je Dependabot nebo Renovate. Po vypnutí se budou kontrolovat i pull requesty od botů."
+    },
+    "repoModels": {
+      "title": "Model pro jednotlivé repozitáře",
+      "description": "Spouštějte kontroly některých repozitářů s jiným modelem, jinou intenzitou uvažování nebo obojím.",
+      "defaultModel": "Používá výchozí model",
+      "resetLabel": "Obnovit model pro {{repository}}",
+      "changeHint": "Otevře výběr modelu"
+    },
+    "analytics": {
+      "title": "Analytika",
+      "trackedReviews": "Sledované kontroly",
+      "findingsRaised": "Zjištěné nálezy",
+      "highImpactChanges": "Změny s velkým dopadem",
+      "impactPoints": "Body dopadu",
+      "repositoryLine": "Kontroly: {{reviews}} · Nálezy: {{findings}}",
+      "empty": "Zatím žádné kontroly s analytikou",
+      "emptyDescription": "Analytika zaznamenává dokončené kontroly, pokud je pro organizaci zapnutá.",
+      "off": "Analytika je pro tuto organizaci vypnutá.",
+      "couldNotLoad": "Analytiku se nepodařilo načíst"
+    },
+    "council": {
+      "title": "Kontrola radou",
+      "subtitle": "Každý pull request zkontroluje několik specialistů a jejich hlasy se spojí do jednoho rozhodnutí.",
+      "unavailable": "Kontrola radou není pro tuto organizaci dostupná.",
+      "noRepositories": "Zatím nejsou vybrány žádné repozitáře. Nejprve je vyberte v nastavení repozitářů.",
+      "specialists": "Specialisté",
+      "labels": "Štítky spouštějící kontrolu radou",
+      "labelsPlaceholder": "např. rada, hloubková kontrola",
+      "labelsDescription": "Štítky oddělte čárkami. Repozitář se zapnutou radou ji pak spustí jen u pull requestů s alespoň jedním z těchto štítků. Ponechte prázdné pro všechny způsobilé pull requesty.",
+      "tooManyLabels": "Příliš mnoho štítků spouštějících kontrolu radou. Použijte nejvýše {{maximum}} štítků.",
+      "labelTooLong": "Štítek spouštějící kontrolu radou je příliš dlouhý. Každý štítek smí mít nejvýše {{maximum}} znaků.",
+      "minSpecialists": "Minimální počet specialistů: {{minimum}}. Vybráno: {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Pokrytí testy",
+        "correctness": "Správnost",
+        "custom": "Specialista"
+      },
+      "specialist": {
+        "security": "Obcházení autorizace, práce s tajnými údaji a nebezpečné vstupy.",
+        "performance": "Kritické cesty, dotazy N+1 a náročné alokace.",
+        "testing": "Chybějící nebo slabé pokrytí nového chování testy.",
+        "correctness": "Logické chyby, okrajové případy a souběhové chyby.",
+        "custom": "Kontroluje problémy ve své oblasti."
+      },
+      "strategy": {
+        "advisory": "Poradní",
+        "advisoryDescription": "Hlásí nálezy a hlasy, ale neblokuje sloučení.",
+        "unanimous": "Jednomyslné",
+        "unanimousDescription": "Zablokuje sloučení, když kterýkoli specialista nahlásí kritický problém.",
+        "majority": "Většinové",
+        "majorityDescription": "Zablokuje sloučení, jen když většina specialistů nahlásí kritický problém."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1966,6 +2032,16 @@
       "auto": "Automaticky",
       "shallow": "Základní",
       "deep": "Hloubková"
+    },
+    "orphanedFindings": {
+      "title": "Nálezy pro odebrané repozitáře",
+      "description": "Tyto repozitáře už nejsou přes integraci GitHub dostupné. Jejich nálezy se stále započítávají do přehledů a sestav.",
+      "count": "Nálezy: {{count}}",
+      "clearLabel": "Vymazat nálezy pro {{repository}}",
+      "confirmTitle": "Vymazat nálezy?",
+      "confirmMessage": "Všechny zaznamenané nálezy pro {{repository}} budou smazány. Tuto akci nelze vrátit zpět.",
+      "confirmAction": "Smazat nálezy",
+      "cleared": "Vymazané nálezy: {{count}}"
     }
   },
   "agents": {

@@ -1276,7 +1276,17 @@
       "changeRequestMissingPermissions": "Kilo GitHub lietotne nevar atvērt PR šajā repozitorijā. Repozitorija īpašniekam ir jāpiešķir lietotnei rakstīšanas piekļuve saturam un PR, pēc tam mēģini vēlreiz.",
       "changeRequestFailed": "Kilo neizdevās atvērt PR. Mēģini vēlreiz pēc brīža.",
       "proposalConflict": "Šim repozitorijam joprojām ir vēl viens aktīvs koda pārskatīšanas atmiņas priekšlikums, tāpēc šo vēl nevar saglabāt.",
-      "offAction": "Koda pārskatīšanas atmiņa ir izslēgta. Ieslēdz to, tad mēģini vēlreiz."
+      "offAction": "Koda pārskatīšanas atmiņa ir izslēgta. Ieslēdz to, tad mēģini vēlreiz.",
+      "analyze": {
+        "title": "Analizēt atsauksmes",
+        "description": "Izvēlies repozitoriju ar nesenām uzturētāju atbildēm un pēc tam meklē vienu atkārtotu norādījumu modeli.",
+        "chooseRepository": "Izvēlies repozitoriju",
+        "action": "Analizēt tagad",
+        "noRepositories": "Nevienam repozitorijam vēl nav nesen uzturētāju atbilžu.",
+        "proposed": "Izveidots koda pārskatīšanas atmiņas priekšlikums",
+        "noFeedback": "Šim repozitorijam nav atrasta nesena atsauksme",
+        "noPattern": "Nav atrasts skaidrs atkārtots modelis"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Ievadi derīgu merge request URL.",
@@ -1409,7 +1419,63 @@
       "title": "Lai koda pārskatītājs turpinātu darbu, nepieciešama tava rīcība.",
       "recoveryLabel": "Sazināties ar atbalsta dienestu"
     },
-    "unknownError": "Nezināma kļūda"
+    "unknownError": "Nezināma kļūda",
+    "skipBotPullRequests": {
+      "title": "Izlaist botu izmaiņu pieprasījumus",
+      "subtitle": "Neveic automātisku koda pārskatīšanu izmaiņu pieprasījumiem, ko atver boti, piemēram, Dependabot vai Renovate. Izslēdz to, ja vēlies pārskatīt arī botu izmaiņu pieprasījumus."
+    },
+    "repoModels": {
+      "title": "Modelis katram repozitorijam",
+      "description": "Dažu repozitoriju pārskatīšanu veic ar citu modeli, domāšanas intensitāti vai abiem.",
+      "defaultModel": "Izmanto noklusējuma modeli",
+      "resetLabel": "Atiestatīt modeli repozitorijam {{repository}}",
+      "changeHint": "Atver modeļa izvēlni"
+    },
+    "analytics": {
+      "title": "Analītika",
+      "trackedReviews": "Sekotās pārskatīšanas",
+      "findingsRaised": "Iesniegtie konstatējumi",
+      "highImpactChanges": "Lielas ietekmes izmaiņas",
+      "impactPoints": "Ietekmes punkti",
+      "repositoryLine": "Pārskatīšanas: {{reviews}} · Konstatējumi: {{findings}}",
+      "empty": "Vēl nav pārskatīšanu ar analītiku",
+      "emptyDescription": "Analītika reģistrē pabeigtas pārskatīšanas, kamēr tā ir iespējota organizācijai.",
+      "off": "Analītika šai organizācijai ir izslēgta.",
+      "couldNotLoad": "Neizdevās ielādēt analītiku"
+    },
+    "council": {
+      "title": "Padomes pārskatīšana",
+      "subtitle": "Katru izmaiņu pieprasījumu pārskata vairāki speciālisti, un viņu balsis apvienojas vienā lēmumā.",
+      "unavailable": "Padomes pārskatīšana šai organizācijai nav pieejama.",
+      "noRepositories": "Vēl nav izvēlēts neviens repozitorijs. Vispirms izvēlies repozitorijus repozitoriju iestatījumos.",
+      "specialists": "Speciālisti",
+      "labels": "Etiķetes, kas aktivizē padomes pārskatīšanu",
+      "labelsPlaceholder": "piem., padome, padziļināta pārskatīšana",
+      "labelsDescription": "Atdala etiķetes ar komatiem. Repozitorijs ar iespējotu padomi tad veic padomes pārskatīšanu tikai tiem izmaiņu pieprasījumiem, kuriem ir vismaz viena no šīm etiķetēm. Atstāj tukšu visiem atbilstošajiem izmaiņu pieprasījumiem.",
+      "tooManyLabels": "Pārāk daudz padomes etiķešu. Izmanto ne vairāk kā {{maximum}} etiķešu.",
+      "labelTooLong": "Padomes etiķete ir pārāk gara. Katrā etiķetē drīkst būt ne vairāk kā {{maximum}} rakstzīmju.",
+      "minSpecialists": "Izvēlies vismaz {{minimum}} speciālistus. Izvēlēti: {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Testu pārklājums",
+        "correctness": "Korektums",
+        "custom": "Speciālists"
+      },
+      "specialist": {
+        "security": "Autorizācijas apiešana, noslēpumu apstrāde un nedroša ievade.",
+        "performance": "Karstie ceļi, N+1 vaicājumi un lielas atmiņas atvēlēšanas.",
+        "testing": "Trūkstošs vai vājš jaunās uzvedības pārklājums.",
+        "correctness": "Loģikas kļūdas, malas gadījumi un sacensības stāvokļi.",
+        "custom": "Pārskata problēmas savā jomā."
+      },
+      "strategy": {
+        "advisory": "Konsultatīva",
+        "advisoryDescription": "Ziņo konstatējumus un balso, nebloķējot apvienošanu.",
+        "unanimous": "Vienprātīga",
+        "unanimousDescription": "Bloķē apvienošanu, ja kāds speciālists ziņo kritisku problēmu.",
+        "majority": "Vairākums",
+        "majorityDescription": "Bloķē apvienošanu tikai tad, ja vairākums speciālistu ziņo kritisku problēmu."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,16 @@
       "auto": "Automātiska",
       "shallow": "Virspusēja",
       "deep": "Padziļināta"
+    },
+    "orphanedFindings": {
+      "title": "Noņemto repozitoriju konstatējumi",
+      "description": "Šie repozitoriji vairs nav sasniedzami, izmantojot GitHub integrāciju. To konstatējumi joprojām tiek ieskaitīti informācijas paneļos un pārskatos.",
+      "count": "Konstatējumi: {{count}}",
+      "clearLabel": "Notīrīt repozitorija {{repository}} konstatējumus",
+      "confirmTitle": "Notīrīt konstatējumus?",
+      "confirmMessage": "Visi reģistrētie repozitorija {{repository}} konstatējumi tiks dzēsti. To nevar atsaukt.",
+      "confirmAction": "Dzēst konstatējumus",
+      "cleared": "Konstatējumi notīrīti: {{count}}"
     }
   },
   "agents": {

@@ -768,6 +768,16 @@
       "changeRequestFailed": "Kilo konnte den Pull-Request nicht öffnen. Versuche es gleich noch einmal.",
       "proposalConflict": "Ein weiterer Vorschlag für dieses Repository ist noch aktiv.",
       "offAction": "Gespeicherte Prüfhinweise sind deaktiviert. Aktiviere sie und versuche es dann erneut.",
+      "analyze": {
+        "title": "Feedback analysieren",
+        "description": "Wähle ein Code-Repository mit aktuellen Antworten der Projektverantwortlichen und suche nach einem wiederkehrenden Richtlinienmuster.",
+        "chooseRepository": "Code-Repository auswählen",
+        "action": "Jetzt analysieren",
+        "noRepositories": "Noch kein Code-Repository hat aktuelle Antworten der Projektverantwortlichen.",
+        "proposed": "Vorschlag für Review-Gedächtnis erstellt",
+        "noFeedback": "Kein aktuelles Feedback für dieses Code-Repository gefunden",
+        "noPattern": "Kein eindeutiges wiederkehrendes Muster gefunden"
+      },
       "off": "Gespeicherte Prüfhinweise sind deaktiviert.",
       "on": "Gespeicherte Prüfhinweise sind aktiviert.",
       "offDescription": "Aktiviere sie, damit Kilo aus den Antworten der Projektverantwortlichen lernt und Richtlinien für REVIEW.md vorschlägt.",
@@ -843,7 +853,63 @@
       "title": "Beim Code-Prüfer musst du eingreifen.",
       "recoveryLabel": "Support kontaktieren"
     },
-    "unknownError": "Unbekannter Fehler"
+    "unknownError": "Unbekannter Fehler",
+    "skipBotPullRequests": {
+      "title": "Pull-Requests von Bots überspringen",
+      "subtitle": "Keine automatischen Reviews für Pull-Requests von Bots wie Dependabot oder Renovate. Deaktiviere dies, um auch Bot-Pull-Requests zu prüfen."
+    },
+    "repoModels": {
+      "title": "Modell pro Code-Repository",
+      "description": "Führe Reviews einzelner Code-Repositories mit einem anderen Modell, einem anderen Denkaufwand oder beidem aus.",
+      "defaultModel": "Verwendet das Standardmodell",
+      "resetLabel": "Modell für {{repository}} zurücksetzen",
+      "changeHint": "Öffnet die Modellauswahl"
+    },
+    "analytics": {
+      "title": "Analysen",
+      "trackedReviews": "Erfasste Reviews",
+      "findingsRaised": "Gemeldete Befunde",
+      "highImpactChanges": "Änderungen mit großer Auswirkung",
+      "impactPoints": "Auswirkungspunkte",
+      "repositoryLine": "Reviews: {{reviews}} · Befunde: {{findings}}",
+      "empty": "Noch keine Reviews mit Analysen",
+      "emptyDescription": "Analysen erfassen abgeschlossene Reviews, solange sie für die Organisation aktiviert sind.",
+      "off": "Analysen sind für diese Organisation deaktiviert.",
+      "couldNotLoad": "Analysen konnten nicht geladen werden"
+    },
+    "council": {
+      "title": "Gremium-Review",
+      "subtitle": "Mehrere Spezialisten prüfen jeden Pull-Request, und ihre Stimmen ergeben eine gemeinsame Entscheidung.",
+      "unavailable": "Gremium-Review ist für diese Organisation nicht verfügbar.",
+      "noRepositories": "Noch keine Code-Repositories ausgewählt. Wähle zuerst Code-Repositories in den Repository-Einstellungen aus.",
+      "specialists": "Spezialisten",
+      "labels": "Labels, die ein Gremium-Review auslösen",
+      "labelsPlaceholder": "z. B. gremium, tiefenreview",
+      "labelsDescription": "Trenne Labels mit Kommas. Ein Code-Repository mit aktiviertem Gremium führt das Gremium-Review dann nur für Pull-Requests mit mindestens einem dieser Labels aus. Leer lassen für alle infrage kommenden Pull-Requests.",
+      "tooManyLabels": "Zu viele Labels für das Gremium-Review. Verwende höchstens {{maximum}} Labels.",
+      "labelTooLong": "Label für das Gremium-Review zu lang. Jedes Label darf höchstens {{maximum}} Zeichen enthalten.",
+      "minSpecialists": "Wähle mindestens {{minimum}} Spezialisten aus. {{selected}} ausgewählt.",
+      "specialistName": {
+        "testCoverage": "Testabdeckung",
+        "correctness": "Korrektheit",
+        "custom": "Spezialist"
+      },
+      "specialist": {
+        "security": "Umgehung der Autorisierung, Umgang mit Geheimnissen und unsichere Eingaben.",
+        "performance": "Hot Paths, N+1-Abfragen und aufwendige Speicherzuweisungen.",
+        "testing": "Fehlende oder schwache Testabdeckung für neues Verhalten.",
+        "correctness": "Logikfehler, Grenzfälle und Race Conditions.",
+        "custom": "Prüft Probleme im eigenen Fachbereich."
+      },
+      "strategy": {
+        "advisory": "Beratend",
+        "advisoryDescription": "Meldet Befunde und Stimmen, ohne den Merge zu blockieren.",
+        "unanimous": "Einstimmig",
+        "unanimousDescription": "Blockiert den Merge, sobald ein Spezialist ein kritisches Problem meldet.",
+        "majority": "Mehrheit",
+        "majorityDescription": "Blockiert den Merge nur, wenn die meisten Spezialisten ein kritisches Problem melden."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1346,6 +1412,16 @@
       "auto": "Automatisch",
       "shallow": "Oberflächlich",
       "deep": "Gründlich"
+    },
+    "orphanedFindings": {
+      "title": "Befunde für entfernte Code-Repositories",
+      "description": "Diese Code-Repositories sind über die GitHub-Integration nicht mehr erreichbar. Ihre Befunde zählen weiterhin in Dashboards und Berichten.",
+      "count": "Befunde: {{count}}",
+      "clearLabel": "Befunde für {{repository}} entfernen",
+      "confirmTitle": "Befunde entfernen?",
+      "confirmMessage": "Alle erfassten Befunde für {{repository}} werden gelöscht. Dies kann nicht rückgängig gemacht werden.",
+      "confirmAction": "Befunde löschen",
+      "cleared": "Entfernte Befunde: {{count}}"
     }
   },
   "agents": {

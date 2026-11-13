@@ -1253,7 +1253,17 @@
       "changeRequestMissingPermissions": "Kāore e taea e te GitHub App a Kilo te whakatuwhera PR i tēnei pātaka. Me hoatu e te kaipupuri o te pātaka te āheitanga tuhi ki ngā ihirangi me ngā PR, kātahi ka whakamātauria anō.",
       "changeRequestFailed": "Kāore i taea e Kilo te whakatuwhera i te PR. Whakamātauria anō ā te wā poto nei.",
       "proposalConflict": "Kei te hohe tonu tētahi atu tono mahara arotake mō tēnei pātaka, nō reira kāore anō tēnei e taea te tiaki.",
-      "offAction": "Kua monoa te mahara arotake. Whakahohea, kātahi ka whakamātauria anō."
+      "offAction": "Kua monoa te mahara arotake. Whakahohea, kātahi ka whakamātauria anō.",
+      "analyze": {
+        "title": "Tātaritia ngā urupare",
+        "description": "Kōwhiria tētahi pūranga waehere e whai urupare hou ana a ngā kaitiaki, kātahi ka kimi i tētahi tauira aratohu tukurua.",
+        "chooseRepository": "Kōwhiria tētahi pūranga waehere",
+        "action": "Tātaritia ināianei",
+        "noRepositories": "Kāore anō he pūranga waehere e whai urupare hou ana a ngā kaitiaki.",
+        "proposed": "Kua hangaia te tono mahara arotake",
+        "noFeedback": "Kāore he urupare hou i kitea mō tēnei pūranga waehere",
+        "noPattern": "Kāore i kitea he tauira tukurua e mārama ana"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Whakaurua he URL tika mō te tono whakakotahi.",
@@ -1385,7 +1395,63 @@
       "title": "Me aro ki te kaiarotake waehere.",
       "recoveryLabel": "Whakapā ki te rōpū tautoko"
     },
-    "unknownError": "Hapa kāore e mōhiotia"
+    "unknownError": "Hapa kāore e mōhiotia",
+    "skipBotPullRequests": {
+      "title": "Tīpoka ngā tono kume a ngā karetao",
+      "subtitle": "Kaua e whakahaere arotake aunoa i ngā tono kume ka whakatuwheratia e ngā karetao pēnei i a Dependabot, i a Renovate rānei. Ina weto tēnei, ka arotakehia hoki ngā tono kume a ngā karetao."
+    },
+    "repoModels": {
+      "title": "Tauira mō ia pūranga waehere",
+      "description": "Whakahaerehia ngā arotake o ētahi pūranga waehere mā tētahi atu tauira, mā tētahi atu kaha whakaaro, mā ngā mea e rua rānei.",
+      "defaultModel": "Ka whakamahi i te tauira taunoa",
+      "resetLabel": "Tautuhia anō te tauira mō {{repository}}",
+      "changeHint": "Ka whakatuwhera i te pūkōwhiri tauira"
+    },
+    "analytics": {
+      "title": "Ngā tātaritanga",
+      "trackedReviews": "Ngā arotake kua aroturukitia",
+      "findingsRaised": "Ngā kitenga kua puta",
+      "highImpactChanges": "Ngā huringa whai pānga nui",
+      "impactPoints": "Ngā tohu pānga",
+      "repositoryLine": "Ngā arotake: {{reviews}} · Ngā kitenga: {{findings}}",
+      "empty": "Kāore anō he arotake whai tātaritanga",
+      "emptyDescription": "Ka tuhia e ngā tātaritanga ngā arotake kua oti i te wā e whakahohea ana mō te rōpū.",
+      "off": "Kua weto ngā tātaritanga mō tēnei rōpū.",
+      "couldNotLoad": "Kāore i taea te uta i ngā tātaritanga"
+    },
+    "council": {
+      "title": "Arotake kaunihera",
+      "subtitle": "Ka arotakehia ia tono kume e ētahi mātanga maha, ā, ka whakakotahitia ō rātou pōti hei whakatau kotahi.",
+      "unavailable": "Kāore te arotake kaunihera e wātea ana mō tēnei rōpū.",
+      "noRepositories": "Kāore anō he pūranga waehere kia kōwhiria. Kōwhiria ngā pūranga waehere i ngā tautuhinga pūranga waehere i te tuatahi.",
+      "specialists": "Ngā mātanga",
+      "labels": "Ngā tapanga e whakaoho ana i te arotake kaunihera",
+      "labelsPlaceholder": "hei tauira, kaunihera, arotake hōhonu",
+      "labelsDescription": "Wehea ngā tapanga ki ngā pīhono. Kātahi ka whakahaere te pūranga waehere kua whakahohea mō te kaunihera i te kaunihera anake mō ngā tono kume e mau ana i tētahi o ēnei tapanga, neke atu rānei. Waiho kia wātea mō ia tono kume e tika ana.",
+      "tooManyLabels": "He nui rawa ngā tapanga kaunihera. Kia {{maximum}} ngā tapanga, iti iho rānei.",
+      "labelTooLong": "He roa rawa te tapanga kaunihera. Kia {{maximum}} ngā pūāhua o ia tapanga, iti iho rānei.",
+      "minSpecialists": "Kōwhiria kia {{minimum}} mātanga neke atu. Kua kōwhiria {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Te kapinga whakamātautau",
+        "correctness": "Te tika",
+        "custom": "Mātanga"
+      },
+      "specialist": {
+        "security": "Te hipa i te whakamanatanga, te tiaki muna me te tāuru kāore i te haumaru.",
+        "performance": "Ngā ara wera, ngā pātai N+1 me ngā whakamahinga mahara nui.",
+        "testing": "Te kore, te ngoikore rānei o te kapinga mō ngā whanonga hou.",
+        "correctness": "Ngā hapa arorau, ngā take taitapa me ngā raruraru wā.",
+        "custom": "Ka arotake i ngā take i roto i tōna ake wāhanga."
+      },
+      "strategy": {
+        "advisory": "Tohutohu",
+        "advisoryDescription": "Ka pūrongo i ngā kitenga me te pōti, engari kāore e ārai i te whakakotahitanga.",
+        "unanimous": "Whakaaetanga katoa",
+        "unanimousDescription": "Ka ārai i te whakakotahitanga ina pūrongohia e tētahi mātanga he take tino kino.",
+        "majority": "Nuinga",
+        "majorityDescription": "Ka ārai i te whakakotahitanga anake ina pūrongohia e te nuinga o ngā mātanga he take tino kino."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1888,6 +1954,16 @@
       "auto": "Aunoa",
       "shallow": "Pāpaku",
       "deep": "Hōhonu"
+    },
+    "orphanedFindings": {
+      "title": "Ngā kitenga mō ngā pūranga waehere kua tangohia",
+      "description": "Kāore ēnei pūranga waehere e taea te toro atu mā te hononga GitHub. Ka tatau tonu ō rātou kitenga ki ngā papatohu me ngā pūrongo.",
+      "count": "Ngā kitenga: {{count}}",
+      "clearLabel": "Mukua ngā kitenga mō {{repository}}",
+      "confirmTitle": "Muku ngā kitenga?",
+      "confirmMessage": "Ka mukua ngā kitenga katoa kua tuhia mō {{repository}}. Kāore e taea te whakahoki mai.",
+      "confirmAction": "Muku ngā kitenga",
+      "cleared": "Kua mukua ngā kitenga: {{count}}"
     }
   },
   "agents": {

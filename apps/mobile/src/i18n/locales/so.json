@@ -1253,7 +1253,17 @@
       "changeRequestMissingPermissions": "App-ka GitHub ee Kilo ma furi karo pull request-yo kaydkan. Milkiilaha kaydku waa inuu app-ka siiyo helitaan qoraal ah oo ku saabsan waxa ku jira iyo pull request-yada, kadibna isku day mar kale.",
       "changeRequestFailed": "Kilo ma furi karin pull request-ka. Isku day mar kale wax yar kadib.",
       "proposalConflict": "Soo-jeedin kale oo ku saabsan xusuusta dib-u-eegista ee kaydkan ayaa weli firfircoon.",
-      "offAction": "Xusuusta dib-u-eegistu way dansan tahay. Shid, ka dibna isku day mar kale."
+      "offAction": "Xusuusta dib-u-eegistu way dansan tahay. Shid, ka dibna isku day mar kale.",
+      "analyze": {
+        "title": "Falanqee jawaabaha",
+        "description": "Dooro kayd leh jawaabo daryeelayaal oo dhowaan la helay, ka dibna raadi hal qaab tilmaameed oo soo noqnoqda.",
+        "chooseRepository": "Dooro kayd",
+        "action": "Hadda falanqee",
+        "noRepositories": "Weli ma jiro kayd leh jawaabo daryeelayaal oo dhowaan la helay.",
+        "proposed": "Soo-jeedinta xusuusta dib-u-eegista waa la abuuray",
+        "noFeedback": "Jawaabo dhowaan la helay lama helin kaydkan",
+        "noPattern": "Qaab soo noqnoqda oo cad lama helin"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Geli URL ansax ah oo merge request ah.",
@@ -1385,7 +1395,63 @@
       "title": "Dib-u-eegaha koodhka wuxuu u baahan yahay in wax laga qabto.",
       "recoveryLabel": "La xiriir taageerada"
     },
-    "unknownError": "Khalad aan la aqoon"
+    "unknownError": "Khalad aan la aqoon",
+    "skipBotPullRequests": {
+      "title": "Ka bood PR-yada ka yimaada bot-yada",
+      "subtitle": "Ha ku socodsiin dib-u-eegis otomaatig ah PR-yada ay furaan bot-yada sida Dependabot ama Renovate. Dami tan si aad sidoo kale u dib-u-eegto PR-yada bot-yada."
+    },
+    "repoModels": {
+      "title": "Moodeel kayd kasta",
+      "description": "Ku socodsii dib-u-eegista kaydadka qaarkood moodeel kale, dadaal fikradeed kale, ama labadaba.",
+      "defaultModel": "Waxay isticmaashaa moodeelka caadiga ah",
+      "resetLabel": "Dib u deji moodeelka {{repository}}",
+      "changeHint": "Waxay furaysaa doorashada moodeelka"
+    },
+    "analytics": {
+      "title": "Tirakoob",
+      "trackedReviews": "Dib-u-eegisyo la la socdo",
+      "findingsRaised": "Natiijooyin la soo bandhigay",
+      "highImpactChanges": "Isbeddello saameyn sare leh",
+      "impactPoints": "Dhibcaha saameynta",
+      "repositoryLine": "Dib-u-eegisyo: {{reviews}} · Natiijooyin: {{findings}}",
+      "empty": "Weli ma jiro dib-u-eegis leh tirakoob",
+      "emptyDescription": "Tirakoobku wuxuu diiwaangeliyaa dib-u-eegisyo dhammaaday inta uu ururka u shidan yahay.",
+      "off": "Tirakoobku wuu dansan yahay ururkan.",
+      "couldNotLoad": "Tirakoobka lama soo dejin karin"
+    },
+    "council": {
+      "title": "Dib-u-eegista golaha",
+      "subtitle": "Takhasusleyaal badan ayaa dib u eega PR kasta, codadkoodana waxay isu yimaadaan hal go'aan.",
+      "unavailable": "Dib-u-eegista golaha looma heli karo ururkan.",
+      "noRepositories": "Weli lama dooran kayd. Marka hore dooro kaydadka dejinta kaydka dhexdeeda.",
+      "specialists": "Takhasusleyaal",
+      "labels": "Calaamadaha kiciya dib-u-eegista golaha",
+      "labelsPlaceholder": "tusaale: gola, dib-u-eegis qoto dheer",
+      "labelsDescription": "Kala sooc calaamadaha comma. Kaydka golaha shidan wuxuu markaas gola ku socodsiiyaa oo kaliya PR-yada sita ugu yaraan mid ka mid ah calaamadahan. Ka tag madhan PR kasta oo u qalma.",
+      "tooManyLabels": "Calaamadaha golaha ayaa aad u badan. Isticmaal ugu badnaan {{maximum}} calaamadood.",
+      "labelTooLong": "Calaamadda golaha ayaa aad u dheer. Calaamad kasta waa inay ka koobnaataa {{maximum}} xaraf ama ka yar.",
+      "minSpecialists": "Dooro ugu yaraan takhasusleyaal {{minimum}}. {{selected}} ayaa la doortay.",
+      "specialistName": {
+        "testCoverage": "Daboolka tijaabada",
+        "correctness": "Saxnaanta",
+        "custom": "Takhasusle"
+      },
+      "specialist": {
+        "security": "Ka gudubka oggolaanshaha, maaraynta sirta iyo gelinta aan ammaan ahayn.",
+        "performance": "Waddooyinka culculus, weydiimaha N+1 iyo qoondaynta culus.",
+        "testing": "Daboolka maqan ama daciifka ah ee hab-dhaqanka cusub.",
+        "correctness": "Khaladaadka macquulka ah, xaaladaha cidhifka iyo tartanka waqtiga.",
+        "custom": "Wuxuu dib u eegaa arrimaha aagga u gaar ah."
+      },
+      "strategy": {
+        "advisory": "Talo",
+        "advisoryDescription": "Waxay soo sheegtaa natiijooyinka waxayna codaysaa iyada oo aan xannibin isku-darka.",
+        "unanimous": "Isku raacsan",
+        "unanimousDescription": "Waxay xannibtaa isku-darka marka takhasusle kasta uu soo sheego arrin halis daran ah.",
+        "majority": "Aqlabiyad",
+        "majorityDescription": "Waxay xannibtaa isku-darka oo kaliya marka aqlabiyadda takhasusleyaashu ay soo sheegto arrin halis daran ah."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1888,6 +1954,16 @@
       "auto": "Otomaatig",
       "shallow": "Dusha sare",
       "deep": "Qoto dheer"
+    },
+    "orphanedFindings": {
+      "title": "Natiijooyinka kaydadka la saaray",
+      "description": "Kaydadkan lama gaari karo iyada oo loo marayo xiriirka GitHub. Natiijooyinkoodu weli waxay ku tiriyaan bogagga guud iyo warbixinnada.",
+      "count": "Natiijooyin: {{count}}",
+      "clearLabel": "Nadiifi natiijooyinka {{repository}}",
+      "confirmTitle": "Ma nadiifinayaa natiijooyinka?",
+      "confirmMessage": "Natiijo kasta oo diiwaangashan oo {{repository}} ah waa la tirtiri doonaa. Tan lama soo celin karo.",
+      "confirmAction": "Tirtir natiijooyinka",
+      "cleared": "Natiijooyinka waa la nadiifiyay: {{count}}"
     }
   },
   "agents": {

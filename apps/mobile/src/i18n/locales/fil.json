@@ -1253,7 +1253,17 @@
       "changeRequestMissingPermissions": "Hindi makapagbukas ng pull request ang GitHub App ng Kilo sa repositoryong ito. Kailangang bigyan ng may-ari ng repositoryo ang app ng write access sa contents at pull requests, pagkatapos ay subukan ulit.",
       "changeRequestFailed": "Hindi nabuksan ng Kilo ang pull request. Subukan ulit sa ilang sandali.",
       "proposalConflict": "Aktibo pa ang isa pang mungkahi sa memorya ng pagsusuri para sa repositoryong ito, kaya hindi pa ito mai-save.",
-      "offAction": "Hindi pinagana ang memorya ng pagsusuri. Paganahin ito, pagkatapos subukan ulit."
+      "offAction": "Hindi pinagana ang memorya ng pagsusuri. Paganahin ito, pagkatapos subukan ulit.",
+      "analyze": {
+        "title": "Suriin ang mga puna",
+        "description": "Pumili ng repositoryong may mga bagong tugon mula sa tagapangalaga, saka maghanap ng isang paulit-ulit na pattern ng gabay.",
+        "chooseRepository": "Pumili ng repositoryo",
+        "action": "Suriin ngayon",
+        "noRepositories": "Wala pang repositoryong may mga bagong tugon mula sa tagapangalaga.",
+        "proposed": "Nagawa ang mungkahi para sa memorya ng pagsusuri",
+        "noFeedback": "Walang nahanap na bagong puna para sa repositoryong ito",
+        "noPattern": "Walang nahanap na malinaw na paulit-ulit na pattern"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Maglagay ng wastong URL ng merge request.",
@@ -1385,7 +1395,63 @@
       "title": "Kailangang asikasuhin ang tagasuri ng code.",
       "recoveryLabel": "Makipag-ugnayan sa suporta"
     },
-    "unknownError": "May problemang hindi matukoy."
+    "unknownError": "May problemang hindi matukoy.",
+    "skipBotPullRequests": {
+      "title": "Laktawan ang mga pull request mula sa bot",
+      "subtitle": "Huwag magpatakbo ng awtomatikong pagsusuri sa mga pull request na binuksan ng mga bot gaya ng Dependabot o Renovate. I-off ito para masuri rin ang mga pull request ng bot."
+    },
+    "repoModels": {
+      "title": "Modelo kada repositoryo",
+      "description": "Patakbuhin ang pagsusuri ng ilang repositoryo sa ibang modelo, antas ng pag-iisip, o pareho.",
+      "defaultModel": "Gumagamit ng default na modelo",
+      "resetLabel": "I-reset ang modelo para sa {{repository}}",
+      "changeHint": "Binubuksan ang pagpili ng modelo"
+    },
+    "analytics": {
+      "title": "Analitika",
+      "trackedReviews": "Mga nasubaybayang pagsusuri",
+      "findingsRaised": "Mga naiulat na natuklasan",
+      "highImpactChanges": "Mga pagbabagong may malaking epekto",
+      "impactPoints": "Mga puntos ng epekto",
+      "repositoryLine": "Mga pagsusuri: {{reviews}} · Mga natuklasan: {{findings}}",
+      "empty": "Wala pang pagsusuring may analitika",
+      "emptyDescription": "Itinatala ng analitika ang mga natapos na pagsusuri habang pinagana ito para sa organisasyon.",
+      "off": "Naka-off ang analitika para sa organisasyong ito.",
+      "couldNotLoad": "Hindi ma-load ang analitika"
+    },
+    "council": {
+      "title": "Pagsusuri ng konseho",
+      "subtitle": "Sinusuri ng ilang espesyalista ang bawat pull request, at pinagsasama ang kanilang mga boto sa iisang desisyon.",
+      "unavailable": "Hindi magagamit ang pagsusuri ng konseho sa organisasyong ito.",
+      "noRepositories": "Wala pang napiling repositoryo. Pumili muna ng mga repositoryo sa mga setting ng repositoryo.",
+      "specialists": "Mga espesyalista",
+      "labels": "Mga label na nagpapasimula ng pagsusuri ng konseho",
+      "labelsPlaceholder": "hal. konseho, malalim na pagsusuri",
+      "labelsDescription": "Paghiwalayin ang mga label gamit ang kuwit. Sa repositoryong may pinaganang konseho, tatakbo lang ang konseho para sa mga pull request na may kahit isa sa mga label na ito. Iwanang blangko para sa lahat ng kwalipikadong pull request.",
+      "tooManyLabels": "Masyadong maraming label ng konseho. Gumamit ng hindi hihigit sa {{maximum}} label.",
+      "labelTooLong": "Masyadong mahaba ang label ng konseho. Hindi dapat lumampas sa {{maximum}} karakter ang bawat label.",
+      "minSpecialists": "Pumili ng hindi bababa sa {{minimum}} espesyalista. {{selected}} ang napili.",
+      "specialistName": {
+        "testCoverage": "Saklaw ng pagsubok",
+        "correctness": "Kawastuhan",
+        "custom": "Espesyalista"
+      },
+      "specialist": {
+        "security": "Pag-bypass ng awtorisasyon, paghawak ng sikreto at hindi ligtas na input.",
+        "performance": "Mga hot path, N+1 query at mabibigat na alokasyon.",
+        "testing": "Kulang o mahinang saklaw ng pagsubok para sa bagong gawi.",
+        "correctness": "Mga lohikal na error, edge case at race condition.",
+        "custom": "Sinusuri ang mga isyu sa sarili nitong larangan."
+      },
+      "strategy": {
+        "advisory": "Pagpapayo",
+        "advisoryDescription": "Iniuulat ang mga natuklasan at boto nang hindi hinaharangan ang merge.",
+        "unanimous": "Nagkakaisa",
+        "unanimousDescription": "Hinaharangan ang merge kapag may kahit isang espesyalistang nag-ulat ng kritikal na isyu.",
+        "majority": "Nakararami",
+        "majorityDescription": "Hinaharangan lang ang merge kapag karamihan ng espesyalista ay nag-ulat ng kritikal na isyu."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1888,6 +1954,16 @@
       "auto": "Awtomatiko",
       "shallow": "Mababaw",
       "deep": "Malalim"
+    },
+    "orphanedFindings": {
+      "title": "Mga natuklasan para sa mga inalis na repositoryo",
+      "description": "Hindi na maaabot ang mga repositoryong ito sa pamamagitan ng GitHub integration. Kasama pa rin ang kanilang mga natuklasan sa mga dashboard at ulat.",
+      "count": "Mga natuklasan: {{count}}",
+      "clearLabel": "I-clear ang mga natuklasan para sa {{repository}}",
+      "confirmTitle": "I-clear ang mga natuklasan?",
+      "confirmMessage": "Buburahin ang lahat ng naitalang natuklasan para sa {{repository}}. Hindi na ito maaaring bawiin.",
+      "confirmAction": "Burahin ang mga natuklasan",
+      "cleared": "Mga na-clear na natuklasan: {{count}}"
     }
   },
   "agents": {

@@ -19,6 +19,11 @@ export type ReviewerPlatform = CodeReviewPlatform;
 
 export const PERSONAL_SCOPE = 'personal';
 
+/** Whether the scope names the caller's own account rather than an organization. */
+export function isPersonal(scope: string) {
+  return scope === PERSONAL_SCOPE;
+}
+
 export const PLATFORM_CAPABILITIES = {
   github: {
     scopes: 'all',
@@ -26,6 +31,8 @@ export const PLATFORM_CAPABILITIES = {
     gateRow: true,
     reviewMd: true,
     manualReview: true,
+    skipBotPullRequests: true,
+    council: true,
     label: 'GitHub',
   },
   gitlab: {
@@ -34,6 +41,8 @@ export const PLATFORM_CAPABILITIES = {
     gateRow: true,
     reviewMd: true,
     manualReview: true,
+    skipBotPullRequests: false,
+    council: true,
     label: 'GitLab',
   },
   bitbucket: {
@@ -42,6 +51,8 @@ export const PLATFORM_CAPABILITIES = {
     gateRow: false,
     reviewMd: false,
     manualReview: false,
+    skipBotPullRequests: false,
+    council: false,
     label: 'Bitbucket',
   },
 } satisfies Record<
@@ -52,6 +63,8 @@ export const PLATFORM_CAPABILITIES = {
     gateRow: boolean;
     reviewMd: boolean;
     manualReview: boolean;
+    skipBotPullRequests: boolean;
+    council: boolean;
     label: string;
   }
 >;
@@ -143,6 +156,16 @@ export type ReviewConfigData =
   | (Omit<OrgReviewConfig, keyof ReviewConfigIdFields | 'actionRequired'> &
       ReviewConfigIdFields & { actionRequired: CodeReviewActionRequiredState | null });
 
-// The save/optimistic-cache patch. Kept as the shared app-shared contract so
-// the personal and org save paths cannot drift apart.
-export type ConfigPatch = CodeReviewConfigPatch;
+/** The council config a `getReviewConfig` read returns (organizations only). */
+export type CouncilConfig = NonNullable<OrgReviewConfig['council']>;
+
+// The save/optimistic-cache patch. The mobile patch fields come from the
+// shared app-shared contract so the personal and org save paths cannot drift
+// apart; the council fields are the org-only ones the org PATCH procedure
+// accepts (its personal counterpart does not, so `useSaveReviewConfig` forwards
+// them on the org branch only).
+export type ConfigPatch = CodeReviewConfigPatch &
+  Partial<{
+    council: CouncilConfig | null;
+    councilEnabledRepositoryIds: (number | string)[];
+  }>;

@@ -1253,7 +1253,17 @@
       "changeRequestMissingPermissions": "Programu ya GitHub ya Kilo haiwezi kufungua maombi ya kuunganisha mabadiliko kwenye hazina hii. Mmiliki wa hazina lazima aipe programu ruhusa ya kuandika maudhui na maombi ya kuunganisha mabadiliko, kisha ujaribu tena.",
       "changeRequestFailed": "Kilo imeshindikana kufungua ombi la kuunganisha mabadiliko. Jaribu tena baada ya muda mfupi.",
       "proposalConflict": "Pendekezo lingine la kumbukumbu ya ukaguzi kwa hazina hii bado linaendelea, kwa hivyo hili haliwezi kuhifadhiwa bado.",
-      "offAction": "Kumbukumbu ya ukaguzi imezimwa. Iwashe, kisha jaribu tena."
+      "offAction": "Kumbukumbu ya ukaguzi imezimwa. Iwashe, kisha jaribu tena.",
+      "analyze": {
+        "title": "Changanua maoni",
+        "description": "Chagua hazina iliyo na majibu ya hivi karibuni ya watunzaji wa mradi, kisha utafute mtindo mmoja wa mwongozo unaojirudia.",
+        "chooseRepository": "Chagua hazina",
+        "action": "Changanua sasa",
+        "noRepositories": "Hakuna hazina yenye majibu ya hivi karibuni ya watunzaji wa mradi bado.",
+        "proposed": "Pendekezo la kumbukumbu ya ukaguzi limeundwa",
+        "noFeedback": "Hakuna maoni ya hivi karibuni yaliyopatikana kwa hazina hii",
+        "noPattern": "Hakuna mtindo unaojirudia ulio wazi uliopatikana"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Ingiza URL halali ya ombi la kuunganisha.",
@@ -1385,7 +1395,63 @@
       "title": "Mkaguzi wa msimbo anahitaji uangalizi wako.",
       "recoveryLabel": "Wasiliana na timu ya usaidizi"
     },
-    "unknownError": "Hitilafu isiyojulikana"
+    "unknownError": "Hitilafu isiyojulikana",
+    "skipBotPullRequests": {
+      "title": "Ruka PR kutoka kwa roboti",
+      "subtitle": "Usifanye ukaguzi wa kiotomatiki kwenye PR zilizofunguliwa na roboti kama Dependabot au Renovate. Zima hili ili ukague na PR za roboti pia."
+    },
+    "repoModels": {
+      "title": "Modeli kwa kila hazina",
+      "description": "Endesha ukaguzi wa hazina zingine kwa modeli tofauti, juhudi tofauti za kufikiri, au zote mbili.",
+      "defaultModel": "Hutumia modeli chaguo-msingi",
+      "resetLabel": "Weka upya modeli ya {{repository}}",
+      "changeHint": "Hufungua kichaguzi cha modeli"
+    },
+    "analytics": {
+      "title": "Takwimu",
+      "trackedReviews": "Ukaguzi unaofuatiliwa",
+      "findingsRaised": "Matatizo yaliyoibuliwa",
+      "highImpactChanges": "Mabadiliko yenye athari kubwa",
+      "impactPoints": "Alama za athari",
+      "repositoryLine": "Ukaguzi: {{reviews}} · Matatizo: {{findings}}",
+      "empty": "Hakuna ukaguzi wenye takwimu bado",
+      "emptyDescription": "Takwimu hurekodi ukaguzi uliokamilika wakati imewashwa kwa shirika.",
+      "off": "Takwimu zimezimwa kwa shirika hili.",
+      "couldNotLoad": "Imeshindwa kupakia takwimu"
+    },
+    "council": {
+      "title": "Ukaguzi wa baraza",
+      "subtitle": "Wataalamu kadhaa hukagua kila PR, na kura zao huunganika kuwa uamuzi mmoja.",
+      "unavailable": "Ukaguzi wa baraza haupatikani kwa shirika hili.",
+      "noRepositories": "Hakuna hazina zilizochaguliwa bado. Chagua hazina katika mipangilio ya hazina kwanza.",
+      "specialists": "Wataalamu",
+      "labels": "Lebo zinazowasha ukaguzi wa baraza",
+      "labelsPlaceholder": "k.m. baraza, ukaguzi wa kina",
+      "labelsDescription": "Tenganisha lebo kwa koma. Hazina iliyowashwa baraza hufanya baraza tu kwa PR zenye angalau moja ya lebo hizi. Acha wazi kwa kila PR inayostahili.",
+      "tooManyLabels": "Lebo za baraza ni nyingi mno. Tumia lebo {{maximum}} au chache zaidi.",
+      "labelTooLong": "Lebo ya baraza ni ndefu mno. Kila lebo lazima iwe na vibambo {{maximum}} au vichache zaidi.",
+      "minSpecialists": "Chagua angalau wataalamu {{minimum}}. {{selected}} wamechaguliwa.",
+      "specialistName": {
+        "testCoverage": "Ufuniko wa upimaji",
+        "correctness": "Usahihi",
+        "custom": "Mtaalamu"
+      },
+      "specialist": {
+        "security": "Kupitisha idhini, utunzaji wa siri na ingizo lisilo salama.",
+        "performance": "Njia zinazotumika sana, hoji za N+1 na ugawaji mkubwa wa kumbukumbu.",
+        "testing": "Ufuniko hafifu au unaokosekana kwa tabia mpya.",
+        "correctness": "Hitilafu za mantiki, hali za pembezoni na mashindano ya wakati.",
+        "custom": "Hukagua masuala katika eneo lake mwenyewe."
+      },
+      "strategy": {
+        "advisory": "Ushauri",
+        "advisoryDescription": "Hutoa matatizo na kura bila kuzuia muunganisho.",
+        "unanimous": "Kwa kauli moja",
+        "unanimousDescription": "Huzuia muunganisho wakati mtaalamu yeyote anaripoti suala la hatari sana.",
+        "majority": "Wengi",
+        "majorityDescription": "Huzuia muunganisho tu wakati wataalamu wengi wanaripoti suala la hatari sana."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1888,6 +1954,16 @@
       "auto": "Kiotomatiki",
       "shallow": "Wa juu juu",
       "deep": "Wa kina"
+    },
+    "orphanedFindings": {
+      "title": "Matatizo ya hazina zilizoondolewa",
+      "description": "Hazina hizi hazifikiki tena kupitia muunganisho wa GitHub. Matatizo yake bado yanahesabiwa kwenye dashibodi na ripoti.",
+      "count": "Matatizo: {{count}}",
+      "clearLabel": "Futa matatizo ya {{repository}}",
+      "confirmTitle": "Futa matatizo?",
+      "confirmMessage": "Kila tatizo lililorekodiwa kwa {{repository}} litafutwa. Hili haliwezi kutenduliwa.",
+      "confirmAction": "Futa matatizo",
+      "cleared": "Matatizo yamefutwa: {{count}}"
     }
   },
   "agents": {

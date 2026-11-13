@@ -735,6 +735,16 @@
       "changeRequestFailed": "Kilo non è riuscito ad aprire la pull request. Riprova tra un momento.",
       "proposalConflict": "Un'altra proposta per questo repository è ancora attiva.",
       "offAction": "La memoria di revisione è disattivata. Attivala, poi riprova.",
+      "analyze": {
+        "title": "Analizza i feedback",
+        "description": "Scegli un repository con risposte recenti dei responsabili del progetto, poi cerca un unico schema di indicazioni ricorrente.",
+        "chooseRepository": "Scegli un repository",
+        "action": "Analizza ora",
+        "noRepositories": "Nessun repository ha ancora risposte recenti dei responsabili del progetto.",
+        "proposed": "Proposta della memoria di revisione creata",
+        "noFeedback": "Nessun feedback recente trovato per questo repository",
+        "noPattern": "Nessuno schema ricorrente chiaro trovato"
+      },
       "off": "La memoria di revisione è disattivata.",
       "on": "La memoria di revisione è attivata.",
       "offDescription": "Attivala per consentire a Kilo di imparare dalle risposte dei responsabili del progetto e proporre indicazioni per REVIEW.md.",
@@ -811,7 +821,63 @@
       "title": "Il revisore di codice richiede un intervento.",
       "recoveryLabel": "Contatta l'assistenza"
     },
-    "unknownError": "Errore sconosciuto."
+    "unknownError": "Errore sconosciuto.",
+    "skipBotPullRequests": {
+      "title": "Ignora le pull request dei bot",
+      "subtitle": "Non eseguire revisioni automatiche sulle pull request aperte da bot come Dependabot o Renovate. Disattiva questa opzione per revisionare anche le pull request dei bot."
+    },
+    "repoModels": {
+      "title": "Modello per repository",
+      "description": "Esegui le revisioni di alcuni repository con un modello diverso, un livello di ragionamento diverso o entrambi.",
+      "defaultModel": "Usa il modello predefinito",
+      "resetLabel": "Reimposta il modello per {{repository}}",
+      "changeHint": "Apre il selettore del modello"
+    },
+    "analytics": {
+      "title": "Statistiche",
+      "trackedReviews": "Revisioni monitorate",
+      "findingsRaised": "Segnalazioni rilevate",
+      "highImpactChanges": "Modifiche ad alto impatto",
+      "impactPoints": "Punti di impatto",
+      "repositoryLine": "Revisioni: {{reviews}} · Segnalazioni: {{findings}}",
+      "empty": "Nessuna revisione con statistiche",
+      "emptyDescription": "Le statistiche registrano le revisioni completate mentre sono attive per l'organizzazione.",
+      "off": "Le statistiche sono disattivate per questa organizzazione.",
+      "couldNotLoad": "Impossibile caricare le statistiche"
+    },
+    "council": {
+      "title": "Revisione del gruppo di revisori",
+      "subtitle": "Diversi specialisti revisionano ogni pull request e i loro voti si combinano in un'unica decisione.",
+      "unavailable": "La revisione del gruppo di revisori non è disponibile per questa organizzazione.",
+      "noRepositories": "Nessun repository selezionato. Scegli prima i repository nelle impostazioni dei repository.",
+      "specialists": "Specialisti",
+      "labels": "Etichette che attivano la revisione del gruppo di revisori",
+      "labelsPlaceholder": "ad es. consiglio, revisione approfondita",
+      "labelsDescription": "Separa le etichette con virgole. Un repository con il gruppo di revisori attivo esegue la revisione solo per le pull request che riportano almeno una di queste etichette. Lascia vuoto per tutte le pull request idonee.",
+      "tooManyLabels": "Troppe etichette per la revisione del gruppo di revisori. Usa al massimo {{maximum}} etichette.",
+      "labelTooLong": "Etichetta per la revisione del gruppo di revisori troppo lunga. Ogni etichetta deve contenere al massimo {{maximum}} caratteri.",
+      "minSpecialists": "Seleziona almeno {{minimum}} specialisti. Selezionati: {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Copertura dei test",
+        "correctness": "Correttezza",
+        "custom": "Specialista"
+      },
+      "specialist": {
+        "security": "Aggiramento delle autorizzazioni, gestione dei segreti e input non sicuri.",
+        "performance": "Percorsi critici, query N+1 e allocazioni pesanti.",
+        "testing": "Copertura assente o debole per il nuovo comportamento.",
+        "correctness": "Errori logici, casi limite e condizioni di gara.",
+        "custom": "Esamina i problemi della propria area."
+      },
+      "strategy": {
+        "advisory": "Consultivo",
+        "advisoryDescription": "Segnala i risultati e vota senza bloccare l'unione.",
+        "unanimous": "Unanime",
+        "unanimousDescription": "Blocca l'unione se qualsiasi specialista segnala un problema critico.",
+        "majority": "Maggioranza",
+        "majorityDescription": "Blocca l'unione solo se la maggior parte degli specialisti segnala un problema critico."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1329,6 +1395,16 @@
       "auto": "Auto",
       "shallow": "Superficiale",
       "deep": "Approfondita"
+    },
+    "orphanedFindings": {
+      "title": "Segnalazioni per repository rimossi",
+      "description": "Questi repository non sono più raggiungibili tramite l'integrazione GitHub. Le loro segnalazioni contano ancora nelle dashboard e nei report.",
+      "count": "Segnalazioni: {{count}}",
+      "clearLabel": "Elimina le segnalazioni per {{repository}}",
+      "confirmTitle": "Eliminare le segnalazioni?",
+      "confirmMessage": "Ogni segnalazione registrata per {{repository}} verrà eliminata. L'operazione non può essere annullata.",
+      "confirmAction": "Elimina segnalazioni",
+      "cleared": "Segnalazioni eliminate: {{count}}"
     }
   },
   "agents": {

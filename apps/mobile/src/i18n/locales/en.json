@@ -1320,7 +1320,17 @@
       "changeRequestMissingPermissions": "Kilo's GitHub App cannot open pull requests in this repository. A repository owner must give the app write access to contents and pull requests, then try again.",
       "changeRequestFailed": "Kilo could not open the pull request. Try again in a moment.",
       "proposalConflict": "Another proposal for this repository is still active.",
-      "offAction": "Review memory is off. Turn it on, then try again."
+      "offAction": "Review memory is off. Turn it on, then try again.",
+      "analyze": {
+        "title": "Analyze feedback",
+        "description": "Pick a repository with recent maintainer replies, then look for one repeated guidance pattern.",
+        "chooseRepository": "Choose a repository",
+        "action": "Analyze now",
+        "noRepositories": "No repository has recent maintainer replies yet.",
+        "proposed": "Review memory proposal created",
+        "noFeedback": "No recent feedback found for this repository",
+        "noPattern": "No clear repeated pattern found"
+      }
     },
     "manualReview": {
       "title": "Manual review",
@@ -1452,7 +1462,63 @@
       "title": "Code Reviewer needs attention",
       "recoveryLabel": "Contact support"
     },
-    "unknownError": "Unknown error"
+    "unknownError": "Unknown error",
+    "skipBotPullRequests": {
+      "title": "Skip pull requests from bots",
+      "subtitle": "Do not run automated reviews on pull requests opened by bots such as Dependabot or Renovate. Turn this off to review bot pull requests too."
+    },
+    "repoModels": {
+      "title": "Per-repository model",
+      "description": "Run some repositories' reviews on a different model, thinking effort, or both.",
+      "defaultModel": "Uses the default model",
+      "resetLabel": "Reset model for {{repository}}",
+      "changeHint": "Opens the model picker"
+    },
+    "analytics": {
+      "title": "Analytics",
+      "trackedReviews": "Reviews tracked",
+      "findingsRaised": "Findings raised",
+      "highImpactChanges": "High-impact changes",
+      "impactPoints": "Impact points",
+      "repositoryLine": "Reviews: {{reviews}} · Findings: {{findings}}",
+      "empty": "No reviews with analytics yet",
+      "emptyDescription": "Analytics records completed reviews while it is enabled for the organization.",
+      "off": "Analytics is off for this organization.",
+      "couldNotLoad": "Could not load analytics"
+    },
+    "council": {
+      "title": "Council review",
+      "subtitle": "Several specialists review each pull request, and their votes combine into one decision.",
+      "unavailable": "Council review is not available for this organization.",
+      "noRepositories": "No repositories selected yet. Choose repositories in the repository settings first.",
+      "specialists": "Specialists",
+      "labels": "Labels that trigger council review",
+      "labelsPlaceholder": "e.g. council, deep review",
+      "labelsDescription": "Separate labels with commas. A council-enabled repository then runs council only for pull requests carrying at least one of these labels. Leave blank for every eligible pull request.",
+      "tooManyLabels": "Too many council labels. Use at most {{maximum}} labels.",
+      "labelTooLong": "Council label too long. Each label must be {{maximum}} characters or fewer.",
+      "minSpecialists": "Select at least {{minimum}} specialists. {{selected}} selected.",
+      "specialistName": {
+        "testCoverage": "Test coverage",
+        "correctness": "Correctness",
+        "custom": "Specialist"
+      },
+      "specialist": {
+        "security": "Authorization bypass, secret handling and unsafe input.",
+        "performance": "Hot paths, N+1 queries and heavy allocations.",
+        "testing": "Missing or weak coverage for new behavior.",
+        "correctness": "Logic errors, edge cases and race conditions.",
+        "custom": "Reviews issues in its own area."
+      },
+      "strategy": {
+        "advisory": "Advisory",
+        "advisoryDescription": "Reports findings and votes without blocking the merge.",
+        "unanimous": "Unanimous",
+        "unanimousDescription": "Blocks the merge when any specialist reports a critical issue.",
+        "majority": "Majority",
+        "majorityDescription": "Blocks the merge only when most specialists report a critical issue."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1955,6 +2021,16 @@
       "auto": "Auto",
       "shallow": "Shallow",
       "deep": "Deep"
+    },
+    "orphanedFindings": {
+      "title": "Findings for removed repositories",
+      "description": "These repositories are no longer reachable through the GitHub integration. Their findings still count in dashboards and reports.",
+      "count": "Findings: {{count}}",
+      "clearLabel": "Clear findings for {{repository}}",
+      "confirmTitle": "Clear findings?",
+      "confirmMessage": "Every recorded finding for {{repository}} will be deleted. This cannot be undone.",
+      "confirmAction": "Delete findings",
+      "cleared": "Findings cleared: {{count}}"
     }
   },
   "agents": {

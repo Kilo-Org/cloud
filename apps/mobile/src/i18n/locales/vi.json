@@ -768,6 +768,16 @@
       "changeRequestFailed": "Kilo không thể mở pull request. Vui lòng thử lại sau giây lát.",
       "proposalConflict": "Một đề xuất bộ nhớ rà soát khác cho kho lưu trữ này vẫn đang hoạt động.",
       "offAction": "Bộ nhớ rà soát đang tắt. Bật tính năng này rồi thử lại.",
+      "analyze": {
+        "title": "Phân tích phản hồi",
+        "description": "Chọn một kho lưu trữ có phản hồi gần đây từ người bảo trì, sau đó tìm một mẫu hướng dẫn lặp lại.",
+        "chooseRepository": "Chọn kho lưu trữ",
+        "action": "Phân tích ngay",
+        "noRepositories": "Chưa có kho lưu trữ nào có phản hồi gần đây từ người bảo trì.",
+        "proposed": "Đã tạo đề xuất bộ nhớ rà soát",
+        "noFeedback": "Không tìm thấy phản hồi gần đây cho kho lưu trữ này",
+        "noPattern": "Không tìm thấy mẫu lặp lại rõ ràng"
+      },
       "off": "Bộ nhớ rà soát đang tắt.",
       "on": "Bộ nhớ rà soát đang bật.",
       "offDescription": "Bật tính năng này để Kilo học từ phản hồi của người bảo trì và đề xuất hướng dẫn cho tệp REVIEW.md.",
@@ -843,7 +853,63 @@
       "title": "Trợ lý rà soát mã cần bạn xử lý sự cố.",
       "recoveryLabel": "Liên hệ hỗ trợ"
     },
-    "unknownError": "Lỗi không xác định"
+    "unknownError": "Lỗi không xác định",
+    "skipBotPullRequests": {
+      "title": "Bỏ qua yêu cầu hợp nhất từ bot",
+      "subtitle": "Không chạy rà soát tự động trên các yêu cầu hợp nhất do bot mở như Dependabot hoặc Renovate. Tắt tùy chọn này để rà soát cả yêu cầu hợp nhất từ bot."
+    },
+    "repoModels": {
+      "title": "Mô hình theo kho lưu trữ",
+      "description": "Chạy rà soát của một số kho lưu trữ bằng mô hình, mức độ suy luận hoặc cả hai khác nhau.",
+      "defaultModel": "Dùng mô hình mặc định",
+      "resetLabel": "Đặt lại mô hình cho {{repository}}",
+      "changeHint": "Mở trình chọn mô hình"
+    },
+    "analytics": {
+      "title": "Phân tích",
+      "trackedReviews": "Các lượt rà soát được theo dõi",
+      "findingsRaised": "Vấn đề được nêu",
+      "highImpactChanges": "Thay đổi có tác động cao",
+      "impactPoints": "Điểm tác động",
+      "repositoryLine": "Rà soát: {{reviews}} · Vấn đề: {{findings}}",
+      "empty": "Chưa có lượt rà soát nào có dữ liệu phân tích",
+      "emptyDescription": "Phân tích ghi lại các lượt rà soát đã hoàn tất khi tính năng này được bật cho tổ chức.",
+      "off": "Phân tích đang tắt cho tổ chức này.",
+      "couldNotLoad": "Không thể tải dữ liệu phân tích"
+    },
+    "council": {
+      "title": "Rà soát hội đồng",
+      "subtitle": "Nhiều chuyên gia rà soát từng yêu cầu hợp nhất và phiếu của họ được tổng hợp thành một quyết định.",
+      "unavailable": "Rà soát hội đồng không khả dụng cho tổ chức này.",
+      "noRepositories": "Chưa chọn kho lưu trữ nào. Hãy chọn kho lưu trữ trong cài đặt kho lưu trữ trước.",
+      "specialists": "Chuyên gia",
+      "labels": "Nhãn kích hoạt rà soát hội đồng",
+      "labelsPlaceholder": "ví dụ: hội đồng, rà soát chuyên sâu",
+      "labelsDescription": "Phân tách các nhãn bằng dấu phẩy. Kho lưu trữ đã bật hội đồng sau đó chỉ chạy hội đồng cho các yêu cầu hợp nhất có ít nhất một trong các nhãn này. Để trống để áp dụng cho mọi yêu cầu hợp nhất đủ điều kiện.",
+      "tooManyLabels": "Có quá nhiều nhãn kích hoạt rà soát hội đồng. Sử dụng tối đa {{maximum}} nhãn.",
+      "labelTooLong": "Nhãn kích hoạt rà soát hội đồng quá dài. Mỗi nhãn không được vượt quá {{maximum}} ký tự.",
+      "minSpecialists": "Chọn ít nhất {{minimum}} chuyên gia. Đã chọn {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Độ bao phủ kiểm thử",
+        "correctness": "Tính đúng đắn",
+        "custom": "Chuyên gia"
+      },
+      "specialist": {
+        "security": "Vượt qua kiểm soát quyền, xử lý thông tin bí mật và dữ liệu đầu vào không an toàn.",
+        "performance": "Đường dẫn nóng, truy vấn N+1 và cấp phát bộ nhớ nặng.",
+        "testing": "Thiếu hoặc yếu độ bao phủ cho hành vi mới.",
+        "correctness": "Lỗi logic, trường hợp biên và điều kiện tranh chấp.",
+        "custom": "Rà soát các vấn đề trong lĩnh vực của chính nó."
+      },
+      "strategy": {
+        "advisory": "Tư vấn",
+        "advisoryDescription": "Báo cáo vấn đề và bỏ phiếu mà không chặn việc hợp nhất.",
+        "unanimous": "Nhất trí",
+        "unanimousDescription": "Chặn việc hợp nhất khi bất kỳ chuyên gia nào báo cáo vấn đề nghiêm trọng.",
+        "majority": "Đa số",
+        "majorityDescription": "Chỉ chặn việc hợp nhất khi đa số chuyên gia báo cáo vấn đề nghiêm trọng."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1346,6 +1412,16 @@
       "auto": "Tự động",
       "shallow": "Sơ bộ",
       "deep": "Chuyên sâu"
+    },
+    "orphanedFindings": {
+      "title": "Vấn đề của các kho lưu trữ đã bị xóa",
+      "description": "Các kho lưu trữ này không còn truy cập được qua tích hợp GitHub. Vấn đề của chúng vẫn được tính trong bảng điều khiển và báo cáo.",
+      "count": "Vấn đề: {{count}}",
+      "clearLabel": "Xóa vấn đề cho {{repository}}",
+      "confirmTitle": "Xóa vấn đề?",
+      "confirmMessage": "Mọi vấn đề đã ghi nhận cho {{repository}} sẽ bị xóa. Không thể hoàn tác thao tác này.",
+      "confirmAction": "Xóa vấn đề",
+      "cleared": "Đã xóa vấn đề: {{count}}"
     }
   },
   "agents": {

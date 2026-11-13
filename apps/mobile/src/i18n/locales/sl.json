@@ -1299,7 +1299,17 @@
       "changeRequestMissingPermissions": "Kiloova aplikacija GitHub ne more odpirati zahtevkov za združitev v tem repozitoriju. Lastnik repozitorija mora aplikaciji dati pravico pisanja do vsebine in zahtevkov za združitev, nato poskusite znova.",
       "changeRequestFailed": "Kilu ni uspelo odpreti zahtevka za združitev. Poskusite znova čez trenutek.",
       "proposalConflict": "Drug predlog za ta repozitorij je še vedno aktiven.",
-      "offAction": "Pomnjenje pregledov je izklopljeno. Vklopi ga, nato poskusi znova."
+      "offAction": "Pomnjenje pregledov je izklopljeno. Vklopi ga, nato poskusi znova.",
+      "analyze": {
+        "title": "Analiziraj povratne informacije",
+        "description": "Izberi skladišče z nedavnimi odgovori vzdrževalcev in nato poišči en ponavljajoči se vzorec smernic.",
+        "chooseRepository": "Izberi skladišče",
+        "action": "Analiziraj zdaj",
+        "noRepositories": "Nobeno skladišče še nima nedavnih odgovorov vzdrževalcev.",
+        "proposed": "Predlog pomnjenja pregledov je ustvarjen",
+        "noFeedback": "Za to skladišče ni bilo najdenih nedavnih povratnih informacij",
+        "noPattern": "Ni jasnega ponavljajočega se vzorca"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Vnesi veljaven URL merge requesta.",
@@ -1433,7 +1443,63 @@
       "title": "Pri pregledovalcu kode je potrebno ukrepanje.",
       "recoveryLabel": "Obrni se na podporo"
     },
-    "unknownError": "Prišlo je do neznane napake."
+    "unknownError": "Prišlo je do neznane napake.",
+    "skipBotPullRequests": {
+      "title": "Preskoči zahtevke za združitev od botov",
+      "subtitle": "Ne izvajaj samodejnih pregledov za zahtevke za združitev, ki jih odpirajo boti, kot sta Dependabot ali Renovate. To izklopi, če želiš pregledati tudi zahtevke botov."
+    },
+    "repoModels": {
+      "title": "Model za posamezno skladišče",
+      "description": "Preglede nekaterih skladišč izvajaj z drugim modelom, stopnjo razmišljanja ali obojim.",
+      "defaultModel": "Uporablja privzeti model",
+      "resetLabel": "Ponastavi model za {{repository}}",
+      "changeHint": "Odpre izbirnik modela"
+    },
+    "analytics": {
+      "title": "Analitika",
+      "trackedReviews": "Sledeni pregledi",
+      "findingsRaised": "Prijavljene ugotovitve",
+      "highImpactChanges": "Spremembe z velikim vplivom",
+      "impactPoints": "Točke vpliva",
+      "repositoryLine": "Pregledi: {{reviews}} · Ugotovitve: {{findings}}",
+      "empty": "Še ni pregledov z analitiko",
+      "emptyDescription": "Analitika beleži dokončane preglede, dokler je omogočena za organizacijo.",
+      "off": "Analitika je za to organizacijo izklopljena.",
+      "couldNotLoad": "Analitike ni bilo mogoče naložiti"
+    },
+    "council": {
+      "title": "Kolegijski pregled",
+      "subtitle": "Vsak zahtevek za združitev pregleda več strokovnjakov, njihovi glasovi pa se združijo v eno odločitev.",
+      "unavailable": "Kolegijski pregled za to organizacijo ni na voljo.",
+      "noRepositories": "Nobeno skladišče še ni izbrano. Najprej izberi skladišča v nastavitvah skladišč.",
+      "specialists": "Strokovnjaki",
+      "labels": "Oznake, ki sprožijo kolegijski pregled",
+      "labelsPlaceholder": "npr. kolegij, poglobljen pregled",
+      "labelsDescription": "Oznake loči z vejicami. Skladišče z omogočenim kolegijem nato izvaja kolegijski pregled samo za zahtevke za združitev, ki imajo vsaj eno od teh oznak. Pusti prazno za vsak ustrezen zahtevek za združitev.",
+      "tooManyLabels": "Preveč oznak za kolegijski pregled. Uporabi največ {{maximum}} oznak.",
+      "labelTooLong": "Oznaka za kolegijski pregled je predolga. Vsaka oznaka ima lahko največ {{maximum}} znakov.",
+      "minSpecialists": "Izberi vsaj {{minimum}} strokovnjakov. Izbranih: {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Pokritost s testi",
+        "correctness": "Pravilnost",
+        "custom": "Strokovnjak"
+      },
+      "specialist": {
+        "security": "Obhod avtorizacije, ravnanje s skrivnostmi in nevarni vnosi.",
+        "performance": "Vroče poti, poizvedbe N+1 in obilne alokacije.",
+        "testing": "Manjkajoča ali šibka pokritost novega vedenja.",
+        "correctness": "Logične napake, robni primeri in stanja tekmovanja.",
+        "custom": "Pregleduje težave na svojem področju."
+      },
+      "strategy": {
+        "advisory": "Svetovalno",
+        "advisoryDescription": "Prijavi ugotovitve in glasuje, ne da bi blokiral združitev.",
+        "unanimous": "Soglasno",
+        "unanimousDescription": "Blokira združitev, ko kateri koli strokovnjak prijavi kritično težavo.",
+        "majority": "Večina",
+        "majorityDescription": "Blokira združitev le, ko večina strokovnjakov prijavi kritično težavo."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1966,6 +2032,16 @@
       "auto": "Samodejno",
       "shallow": "Površinsko",
       "deep": "Poglobljeno"
+    },
+    "orphanedFindings": {
+      "title": "Ugotovitve za odstranjene repozitorije",
+      "description": "Ti repozitoriji prek integracije GitHub niso več dosegljivi. Njihove ugotovitve se še vedno štejejo na nadzornih ploščah in v poročilih.",
+      "count": "Ugotovitve: {{count}}",
+      "clearLabel": "Počisti ugotovitve za {{repository}}",
+      "confirmTitle": "Želite počistiti ugotovitve?",
+      "confirmMessage": "Vse zabeležene ugotovitve za {{repository}} bodo izbrisane. Tega ni mogoče razveljaviti.",
+      "confirmAction": "Izbriši ugotovitve",
+      "cleared": "Počiščene ugotovitve: {{count}}"
     }
   },
   "agents": {

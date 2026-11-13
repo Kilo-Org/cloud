@@ -1253,7 +1253,17 @@
       "changeRequestMissingPermissions": "Tsy afaka manokatra PR ao amin'ity repositera ity ny GitHub App an'i Kilo. Tsy maintsy omen'ny tompon'ny repositera ny zo hanoratra amin'ny votoaty sy amin'ny PR ny app, dia andramo indray.",
       "changeRequestFailed": "Tsy nety nosokafan'i Kilo ny PR. Andramo indray afaka kelikely.",
       "proposalConflict": "Mbola mavitrika ny soso-kevitra iray hafa ho an'ity repositera ity, ka tsy mbola azo tehirizina ity iray ity.",
-      "offAction": "Tsy mandeha ny fitadidiana ny fanamarinana. Alefaso izany, dia andramo indray."
+      "offAction": "Tsy mandeha ny fitadidiana ny fanamarinana. Alefaso izany, dia andramo indray.",
+      "analyze": {
+        "title": "Diniho ny hevitra",
+        "description": "Misafidiana tahirin-kaody misy valiny vaovao avy amin'ny mpikojakoja, dia karohy ny lamina torolalana iray miverimberina.",
+        "chooseRepository": "Misafidiana tahirin-kaody",
+        "action": "Diniho izao",
+        "noRepositories": "Tsy mbola misy tahirin-kaody manana valiny vaovao avy amin'ny mpikojakoja.",
+        "proposed": "Noforonina ny soso-kevitra ho fitadidiana fandinihana",
+        "noFeedback": "Tsy misy hevitra vaovao hita ho an'ity tahirin-kaody ity",
+        "noPattern": "Tsy misy lamina miverimberina mazava hita"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Ampidiro ny URL manan-kery an'ny fangatahana fampiraisana.",
@@ -1385,7 +1395,63 @@
       "title": "Mila jerena ny mpandinika kaody.",
       "recoveryLabel": "Mifandraisa amin'ny mpanohana"
     },
-    "unknownError": "Hadisoana tsy fantatra"
+    "unknownError": "Hadisoana tsy fantatra",
+    "skipBotPullRequests": {
+      "title": "Dingano ny PR avy amin'ny bot",
+      "subtitle": "Aza manao fandinihana mandeha ho azy amin'ny PR nosokafan'ny bot toy ny Dependabot na Renovate. Vonoy ity safidy ity raha te-handinika PR an'ny bot koa."
+    },
+    "repoModels": {
+      "title": "Modely isaky ny tahirin-kaody",
+      "description": "Alefaso amin'ny modely hafa, ezaka fisainana hafa, na izy roa, ny fandinihana ny tahirin-kaody sasany.",
+      "defaultModel": "Mampiasa ny modely mahazatra",
+      "resetLabel": "Avereno ny modely ho an'ny {{repository}}",
+      "changeHint": "Manokatra ny mpifidy modely"
+    },
+    "analytics": {
+      "title": "Antontan'isa",
+      "trackedReviews": "Fandinihana arahina",
+      "findingsRaised": "Olana hita navoaka",
+      "highImpactChanges": "Fiovana misy fiantraikany lehibe",
+      "impactPoints": "Isa fiantraikany",
+      "repositoryLine": "Fandinihana: {{reviews}} · Olana hita: {{findings}}",
+      "empty": "Tsy mbola misy fandinihana misy antontan'isa",
+      "emptyDescription": "Mirakitra ny fandinihana vita ny antontan'isa rehefa velona ho an'ny fikambanana izy.",
+      "off": "Maty ny antontan'isa ho an'ity fikambanana ity.",
+      "couldNotLoad": "Tsy afaka nampiditra ny antontan'isa"
+    },
+    "council": {
+      "title": "Fandinihan'ny filankevitra",
+      "subtitle": "Manam-pahaizana maro no mandinika ny PR tsirairay, ary mitambatra ho fanapahan-kevitra iray ny latsa-batony.",
+      "unavailable": "Tsy misy ny fandinihan'ny filankevitra ho an'ity fikambanana ity.",
+      "noRepositories": "Tsy mbola misy tahirin-kaody voafidy. Misafidiana tahirin-kaody ao amin'ny fikirana tahirin-kaody aloha.",
+      "specialists": "Manam-pahaizana",
+      "labels": "Marika mampandeha ny fandinihan'ny filankevitra",
+      "labelsPlaceholder": "ohatra: filankevitra, fandinihana lalina",
+      "labelsDescription": "Saraho amin'ny faingo ny marika. Ny tahirin-kaody misy filankevitra dia manao filankevitra ihany ho an'ny PR mitondra farafahakeliny iray amin'ireo marika ireo. Avelao foana ho an'ny PR rehetra mendrika.",
+      "tooManyLabels": "Be loatra ny mariky ny filankevitra. Mampiasà marika {{maximum}} raha be indrindra.",
+      "labelTooLong": "Lava loatra ny mariky ny filankevitra. Tsy mahazo mihoatra ny tarehintsoratra {{maximum}} ny marika tsirairay.",
+      "minSpecialists": "Misafidiana manam-pahaizana {{minimum}} farafahakeliny. {{selected}} no voafidy.",
+      "specialistName": {
+        "testCoverage": "Faritra voarakotra amin'ny fitsapana",
+        "correctness": "Fahamarinana",
+        "custom": "Manam-pahaizana"
+      },
+      "specialist": {
+        "security": "Fandosirana ny fahazoan-dalana, fitantanana ny tsiambaratelo ary fampidirana tsy azo antoka.",
+        "performance": "Lalana be mpampiasa, fanontaniana N+1 ary fizarana lehibe.",
+        "testing": "Faritra voarakotra tsy ampy na malemy ho an'ny fitondran-tena vaovao.",
+        "correctness": "Hadisoana lojika, tranga sisiny ary fifaninanana fotoana.",
+        "custom": "Mandini-draharaha ao amin'ny sehatry ny tenany."
+      },
+      "strategy": {
+        "advisory": "Torohevitra",
+        "advisoryDescription": "Mitantara olana sy mifidy latsa-bato tsy manakana ny fampiraisana.",
+        "unanimous": "Miombon-kevitra",
+        "unanimousDescription": "Manakana ny fampiraisana raha misy manam-pahaizana mitatitra olana mafy.",
+        "majority": "Maro an'isa",
+        "majorityDescription": "Manakana ny fampiraisana ihany raha ny ankamaroan'ny manam-pahaizana no mitatitra olana mafy."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1888,6 +1954,16 @@
       "auto": "Ho azy",
       "shallow": "Marivo",
       "deep": "Lalina"
+    },
+    "orphanedFindings": {
+      "title": "Olana hita ho an'ny tahirin-kaody nesorina",
+      "description": "Tsy azo idirana intsony amin'ny alalan'ny fifandraisana GitHub ireo tahirin-kaody ireo. Mbola isaina ao amin'ny tabilao fanaraha-maso sy ny tatitra ny olana hita azy.",
+      "count": "Olana hita: {{count}}",
+      "clearLabel": "Fafao ny olana hita ho an'ny {{repository}}",
+      "confirmTitle": "Hamafa ny olana hita?",
+      "confirmMessage": "Ho voafafa ny olana hita rehetra voarakitra ho an'ny {{repository}}. Tsy azo averina izany.",
+      "confirmAction": "Fafao ny olana hita",
+      "cleared": "Voafafa ny olana hita: {{count}}"
     }
   },
   "agents": {

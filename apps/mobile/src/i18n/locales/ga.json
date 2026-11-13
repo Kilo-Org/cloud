@@ -1322,7 +1322,17 @@
       "changeRequestMissingPermissions": "Ní féidir le hAip GitHub Kilo iarratais tarraingthe a oscailt sa stór seo. Caithfidh úinéir an stóir rochtain scríofa ar ábhair agus ar iarratais tarraingthe a thabhairt don aip, ansin bain triail eile as.",
       "changeRequestFailed": "Níorbh fhéidir le Kilo an t-iarratas tarraingthe a oscailt. Bain triail eile as ar ball.",
       "proposalConflict": "Tá togra cuimhne athbhreithnithe eile don stór céanna seo fós gníomhach, mar sin ní féidir an ceann seo a shábháil go fóill.",
-      "offAction": "Tá cuimhne athbhreithnithe múchta. Cumasaigh í, ansin bain triail eile as."
+      "offAction": "Tá cuimhne athbhreithnithe múchta. Cumasaigh í, ansin bain triail eile as.",
+      "analyze": {
+        "title": "Déan anailís ar aiseolas",
+        "description": "Roghnaigh stór a bhfuil freagraí le déanaí ó chothaitheoirí ann, ansin cuardaigh patrún treorach athfhillteach amháin.",
+        "chooseRepository": "Roghnaigh stór",
+        "action": "Déan anailís anois",
+        "noRepositories": "Níl freagraí le déanaí ó chothaitheoirí ag aon stór fós.",
+        "proposed": "Cruthaíodh moladh do chuimhne athbhreithnithe",
+        "noFeedback": "Níor aimsíodh aiseolas le déanaí don stór seo",
+        "noPattern": "Níor aimsíodh aon phatrún athfhillteach soiléir"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Cuir isteach URL bailí d'iarratas cumaisc.",
@@ -1457,7 +1467,63 @@
       "title": "Ní mór aird a thabhairt ar an athbhreithneoir cóid.",
       "recoveryLabel": "Déan teagmháil leis an bhfoireann tacaíochta"
     },
-    "unknownError": "Earráid anaithnid."
+    "unknownError": "Earráid anaithnid.",
+    "skipBotPullRequests": {
+      "title": "Scipeáil iarratais tarraingthe ó bhotanna",
+      "subtitle": "Ná rith athbhreithnithe uathoibrithe ar iarratais tarraingthe a d'oscail botanna ar nós Dependabot nó Renovate. Múch é seo chun iarratais tarraingthe ó bhotanna a athbhreithniú freisin."
+    },
+    "repoModels": {
+      "title": "Samhail in aghaidh an stóir",
+      "description": "Rith athbhreithnithe roinnt stór le samhail dhifriúil, le hiarracht smaointeoireachta dhifriúil, nó leis an dá cheann.",
+      "defaultModel": "Úsáideann sé an tsamhail réamhshocraithe",
+      "resetLabel": "Athshocraigh an tsamhail do {{repository}}",
+      "changeHint": "Osclaíonn sé roghnóir na samhla"
+    },
+    "analytics": {
+      "title": "Anailísíocht",
+      "trackedReviews": "Athbhreithnithe rianaithe",
+      "findingsRaised": "Torthaí ardaithe",
+      "highImpactChanges": "Athruithe ardtionchair",
+      "impactPoints": "Pointí tionchair",
+      "repositoryLine": "Athbhreithnithe: {{reviews}} · Torthaí: {{findings}}",
+      "empty": "Níl aon athbhreithniú le hanailísíocht fós",
+      "emptyDescription": "Taifeadann an anailísíocht athbhreithnithe críochnaithe fad atá sí cumasaithe don eagraíocht.",
+      "off": "Tá an anailísíocht múchta don eagraíocht seo.",
+      "couldNotLoad": "Níorbh fhéidir an anailísíocht a lódáil"
+    },
+    "council": {
+      "title": "Athbhreithniú comhairle",
+      "subtitle": "Déanann roinnt speisialtóirí athbhreithniú ar gach iarratas tarraingthe, agus cuirtear a vótaí le chéile in aon chinneadh amháin.",
+      "unavailable": "Níl athbhreithniú comhairle ar fáil don eagraíocht seo.",
+      "noRepositories": "Níl aon stór roghnaithe fós. Roghnaigh stóir i socruithe na stór ar dtús.",
+      "specialists": "Speisialtóirí",
+      "labels": "Lipéid a spreagann athbhreithniú comhairle",
+      "labelsPlaceholder": "m.sh. comhairle, athbhreithniú domhain",
+      "labelsDescription": "Scar lipéid le camóga. Ansin ní ritheann stór a bhfuil an chomhairle cumasaithe ann an chomhairle ach d'iarratais tarraingthe a bhfuil ceann amháin ar a laghad de na lipéid seo orthu. Fág bán é do gach iarratas tarraingthe incháilithe.",
+      "tooManyLabels": "Tá an iomarca lipéad comhairle ann. Úsáid {{maximum}} lipéad ar a mhéad.",
+      "labelTooLong": "Tá lipéad comhairle rófhada. Ní cheadaítear níos mó ná {{maximum}} carachtar in aon lipéad.",
+      "minSpecialists": "Roghnaigh ar a laghad {{minimum}} speisialtóir. Roghnaithe: {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Clúdach tástála",
+        "correctness": "Cruinneas",
+        "custom": "Speisialtóir"
+      },
+      "specialist": {
+        "security": "Seachródú údaraithe, láimhseáil rún agus ionchur neamhshábháilte.",
+        "performance": "Cosáin the, fiosruithe N+1 agus leithdháiltí troma.",
+        "testing": "Clúdach in easnamh nó lag d'iompar nua.",
+        "correctness": "Earráidí loighice, cásanna imeallacha agus coinníollacha rásaíochta.",
+        "custom": "Déanann sé athbhreithniú ar fhadhbanna ina réimse féin."
+      },
+      "strategy": {
+        "advisory": "Comhairleach",
+        "advisoryDescription": "Tuairiscíonn sé torthaí agus vótaí gan an cumasc a bhac.",
+        "unanimous": "D'aon toil",
+        "unanimousDescription": "Bacann sé an cumasc nuair a thuairiscíonn speisialtóir ar bith fadhb chriticiúil.",
+        "majority": "Tromlach",
+        "majorityDescription": "Ní bhacann sé an cumasc ach nuair a thuairiscíonn formhór na speisialtóirí fadhb chriticiúil."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -2005,6 +2071,16 @@
       "auto": "Uathoibríoch",
       "shallow": "Bunúsach",
       "deep": "Mionsonraithe"
+    },
+    "orphanedFindings": {
+      "title": "Torthaí do stóir a baineadh",
+      "description": "Níl teacht ar na stóir seo a thuilleadh trí chomhtháthú GitHub. Áirítear a dtorthaí fós i ndeaiscanna agus i dtuarascálacha.",
+      "count": "Torthaí: {{count}}",
+      "clearLabel": "Glan torthaí do {{repository}}",
+      "confirmTitle": "Torthaí a ghlanadh?",
+      "confirmMessage": "Scriosfar gach toradh taifeadta do {{repository}}. Ní féidir é seo a chealú.",
+      "confirmAction": "Scrios torthaí",
+      "cleared": "Torthaí glanta: {{count}}"
     }
   },
   "agents": {

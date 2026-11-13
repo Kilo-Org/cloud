@@ -1253,7 +1253,17 @@
       "changeRequestMissingPermissions": "የKilo GitHub App በዚህ ማከማቻ ውስጥ pull request መክፈት አይችልም። የማከማቻ ባለቤት ለመተግበሪያው የይዘት እና pull request የመጻፍ መዳረሻ መስጠት አለበት፣ ከዚያ እንደገና ይሞክሩ።",
       "changeRequestFailed": "Kilo pull request መክፈት አልቻለም። ከጥቂት ጊዜ በኋላ እንደገና ይሞክሩ።",
       "proposalConflict": "ለዚህ ማከማቻ ሌላ ሐሳብ አሁንም ንቁ ነው።",
-      "offAction": "የግምገማ ትውስታ ተሰናክሏል። ያንቁት፣ ከዚያ እንደገና ይሞክሩ።"
+      "offAction": "የግምገማ ትውስታ ተሰናክሏል። ያንቁት፣ ከዚያ እንደገና ይሞክሩ።",
+      "analyze": {
+        "title": "ግብረመልስ ትንተና",
+        "description": "የቅርብ ጊዜ የተንከባካቢ ምላሾች ያሉት ማከማቻ ይምረጡ፤ ከዚያም አንድ ተደጋጋሚ የመመሪያ ስርዓተ-ጥለት ይፈልጉ።",
+        "chooseRepository": "ማከማቻ ይምረጡ",
+        "action": "አሁን ተንትን",
+        "noRepositories": "እስካሁን የቅርብ ጊዜ የተንከባካቢ ምላሾች ያሉት ማከማቻ የለም።",
+        "proposed": "የግምገማ ማህደረ ትውስታ ሀሳብ ተፈጥሯል",
+        "noFeedback": "ለዚህ ማከማቻ የቅርብ ጊዜ ግብረመልስ አልተገኘም",
+        "noPattern": "ግልጽ ተደጋጋሚ ስርዓተ-ጥለት አልተገኘም"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "ትክክለኛ የማዋሃድ ጥያቄ URL ያስገቡ።",
@@ -1385,7 +1395,63 @@
       "title": "የኮድ ገምጋሚው ትኩረትህን ይፈልጋል።",
       "recoveryLabel": "የድጋፍ ቡድኑን አግኝ"
     },
-    "unknownError": "የማይታወቅ ስህተት"
+    "unknownError": "የማይታወቅ ስህተት",
+    "skipBotPullRequests": {
+      "title": "ከቦቶች የሚመጡ የመሳብ ጥያቄዎችን መዝለል",
+      "subtitle": "እንደ Dependabot ወይም Renovate ባሉ ቦቶች በተከፈቱ የመሳብ ጥያቄዎች ላይ ራስ-ሰር ግምገማዎችን አያሂዱ። የቦት የመሳብ ጥያቄዎችንም ለመገምገም ይህን ያጥፉት።"
+    },
+    "repoModels": {
+      "title": "ለእያንዳንዱ ማከማቻ የተለየ ሞዴል",
+      "description": "የአንዳንድ ማከማቻዎችን ግምገማዎች በተለየ ሞዴል፣ በተለየ የአስተሳሰብ ጥረት ወይም በሁለቱም ያሂዱ።",
+      "defaultModel": "ነባሪውን ሞዴል ይጠቀማል",
+      "resetLabel": "የ{{repository}} ሞዴልን ዳግም አስጀምር",
+      "changeHint": "የሞዴል መምረጫውን ይከፍታል"
+    },
+    "analytics": {
+      "title": "ትንታኔ",
+      "trackedReviews": "ክትትል የተደረገባቸው ግምገማዎች",
+      "findingsRaised": "የተነሱ ግኝቶች",
+      "highImpactChanges": "ከፍተኛ ተጽዕኖ ያላቸው ለውጦች",
+      "impactPoints": "የተጽዕኖ ነጥቦች",
+      "repositoryLine": "ግምገማዎች፦ {{reviews}} · ግኝቶች፦ {{findings}}",
+      "empty": "እስካሁን ትንታኔ ያላቸው ግምገማዎች የሉም",
+      "emptyDescription": "ትንታኔ ለድርጅቱ ነቅቶ እያለ የተጠናቀቁ ግምገማዎችን ይመዘግባል።",
+      "off": "ለዚህ ድርጅት ትንታኔ ጠፍቷል።",
+      "couldNotLoad": "ትንታኔን መጫን አልተቻለም"
+    },
+    "council": {
+      "title": "የጉባኤ ግምገማ",
+      "subtitle": "በርካታ ባለሙያዎች እያንዳንዱን የመሳብ ጥያቄ ይገመግማሉ፤ ድምፆቻቸውም ወደ አንድ ውሳኔ ይጣመራሉ።",
+      "unavailable": "የጉባኤ ግምገማ ለዚህ ድርጅት አይገኝም።",
+      "noRepositories": "እስካሁን ምንም ማከማቻ አልተመረጠም። መጀመሪያ በማከማቻ ቅንብሮች ውስጥ ማከማቻዎችን ይምረጡ።",
+      "specialists": "ባለሙያዎች",
+      "labels": "የጉባኤ ግምገማን የሚያስጀምሩ መለያዎች",
+      "labelsPlaceholder": "ለምሳሌ፦ ጉባኤ, ጥልቅ ግምገማ",
+      "labelsDescription": "መለያዎችን በኮማ (,) ይለዩ። ከዚያም ጉባኤ የነቃለት ማከማቻ ከእነዚህ መለያዎች ቢያንስ አንዱን ለያዙ የመሳብ ጥያቄዎች ብቻ ጉባኤን ያሂዳል። ለሁሉም ብቁ የመሳብ ጥያቄዎች ባዶ ይተዉት።",
+      "tooManyLabels": "የጉባኤ መለያዎች በዝተዋል። ቢበዛ {{maximum}} መለያዎችን ይጠቀሙ።",
+      "labelTooLong": "የጉባኤ መለያው በጣም ረጅም ነው። እያንዳንዱ መለያ ቢበዛ {{maximum}} ቁምፊዎች ሊኖሩት ይገባል።",
+      "minSpecialists": "ቢያንስ {{minimum}} ባለሙያዎችን ይምረጡ። {{selected}} ተመርጠዋል።",
+      "specialistName": {
+        "testCoverage": "የሙከራ ሽፋን",
+        "correctness": "ትክክለኛነት",
+        "custom": "ባለሙያ"
+      },
+      "specialist": {
+        "security": "የፈቃድ ማለፍ፣ የሚስጥር አያያዝ እና ደህንነቱ ያልተጠበቀ ግብዓት።",
+        "performance": "በተደጋጋሚ የሚሄዱ የኮድ መንገዶች፣ N+1 መጠይቆች እና ከባድ የማህደረ ትውስታ ምደባዎች።",
+        "testing": "ለአዲስ ባህሪ የጎደለ ወይም ደካማ የሙከራ ሽፋን።",
+        "correctness": "የአመክንዮ ስህተቶች፣ ልዩ ሁኔታዎች እና የፉክክር ሁኔታዎች።",
+        "custom": "በራሱ ዘርፍ ያሉ ችግሮችን ይገመግማል።"
+      },
+      "strategy": {
+        "advisory": "አማካሪ",
+        "advisoryDescription": "ውህደቱን ሳያግድ ግኝቶችንና ድምፆችን ሪፖርት ያደርጋል።",
+        "unanimous": "በሙሉ ድምፅ",
+        "unanimousDescription": "ማንኛውም ባለሙያ ወሳኝ ችግር ሪፖርት ሲያደርግ ውህደቱን ያግዳል።",
+        "majority": "በአብላጫ ድምፅ",
+        "majorityDescription": "አብዛኞቹ ባለሙያዎች ወሳኝ ችግር ሪፖርት ሲያደርጉ ብቻ ውህደቱን ያግዳል።"
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1888,6 +1954,16 @@
       "auto": "ራስ-ሰር",
       "shallow": "ጥልቀት የሌለው ትንተና",
       "deep": "ጥልቅ"
+    },
+    "orphanedFindings": {
+      "title": "የተወገዱ ማከማቻዎች ግኝቶች",
+      "description": "እነዚህ ማከማቻዎች ከአሁን በኋላ በGitHub ትስስር በኩል ተደራሽ አይደሉም። ግኝቶቻቸው አሁንም በዳሽቦርዶችና በሪፖርቶች ውስጥ ይቆጠራሉ።",
+      "count": "ግኝቶች፦ {{count}}",
+      "clearLabel": "የ{{repository}} ግኝቶችን አጽዳ",
+      "confirmTitle": "ግኝቶቹ ይጽዱ?",
+      "confirmMessage": "ለ{{repository}} የተመዘገቡ ሁሉም ግኝቶች ይሰረዛሉ። ይህ ሊቀለበስ አይችልም።",
+      "confirmAction": "ግኝቶችን ሰርዝ",
+      "cleared": "የተጸዱ ግኝቶች፦ {{count}}"
     }
   },
   "agents": {

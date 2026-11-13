@@ -1253,7 +1253,17 @@
       "changeRequestMissingPermissions": "Kilo se GitHub-app kan nie pull requests in hierdie bewaarplek oopmaak nie. 'n Eienaar van die bewaarplek moet die app skryftoegang tot inhoud en pull requests gee en dan weer probeer.",
       "changeRequestFailed": "Kilo kon nie die pull request oopmaak nie. Probeer weer oor 'n oomblik.",
       "proposalConflict": "Nog 'n voorstel vir hierdie bewaarplek is steeds aktief.",
-      "offAction": "Die hersieningsgeheue is af. Skakel dit aan en probeer dan weer."
+      "offAction": "Die hersieningsgeheue is af. Skakel dit aan en probeer dan weer.",
+      "analyze": {
+        "title": "Ontleed terugvoer",
+        "description": "Kies 'n bewaarplek met onlangse antwoorde van instandhouers en soek dan na een herhaalde riglynpatroon.",
+        "chooseRepository": "Kies 'n bewaarplek",
+        "action": "Ontleed nou",
+        "noRepositories": "Geen bewaarplek het nog onlangse antwoorde van instandhouers nie.",
+        "proposed": "Voorstel vir hersieningsgeheue geskep",
+        "noFeedback": "Geen onlangse terugvoer vir hierdie bewaarplek gevind nie",
+        "noPattern": "Geen duidelike herhaalde patroon gevind nie"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Voer 'n geldige URL vir 'n merge request in.",
@@ -1385,7 +1395,63 @@
       "title": "Die kodehersiener het aandag nodig.",
       "recoveryLabel": "Kontak ondersteuning"
     },
-    "unknownError": "Onbekende fout"
+    "unknownError": "Onbekende fout",
+    "skipBotPullRequests": {
+      "title": "Slaan trekversoeke van bots oor",
+      "subtitle": "Moenie outomatiese hersienings uitvoer op trekversoeke wat deur bots soos Dependabot of Renovate oopgemaak is nie. Skakel dit af om ook bots se trekversoeke te hersien."
+    },
+    "repoModels": {
+      "title": "Model per bewaarplek",
+      "description": "Voer hersienings vir sommige bewaarplekke uit met 'n ander model, denkinspanning of albei.",
+      "defaultModel": "Gebruik die verstekmodel",
+      "resetLabel": "Stel model vir {{repository}} terug",
+      "changeHint": "Maak die modelkieser oop"
+    },
+    "analytics": {
+      "title": "Ontleding",
+      "trackedReviews": "Hersienings nagespoor",
+      "findingsRaised": "Bevindings geopper",
+      "highImpactChanges": "Veranderinge met hoë impak",
+      "impactPoints": "Impakpunte",
+      "repositoryLine": "Hersienings: {{reviews}} · Bevindings: {{findings}}",
+      "empty": "Nog geen hersienings met ontleding nie",
+      "emptyDescription": "Ontleding teken voltooide hersienings aan terwyl dit vir die organisasie geaktiveer is.",
+      "off": "Ontleding is af vir hierdie organisasie.",
+      "couldNotLoad": "Kon nie ontleding laai nie"
+    },
+    "council": {
+      "title": "Raadhersiening",
+      "subtitle": "Verskeie spesialiste hersien elke trekversoek, en hul stemme word tot een besluit saamgevoeg.",
+      "unavailable": "Raadhersiening is nie vir hierdie organisasie beskikbaar nie.",
+      "noRepositories": "Nog geen bewaarplekke gekies nie. Kies eers bewaarplekke in die bewaarplekinstellings.",
+      "specialists": "Spesialiste",
+      "labels": "Etikette wat raadhersiening aktiveer",
+      "labelsPlaceholder": "bv. raad, diep hersiening",
+      "labelsDescription": "Skei etikette met kommas. 'n Bewaarplek met raadhersiening aan voer dit dan net uit vir trekversoeke met minstens een van hierdie etikette. Laat leeg vir elke geskikte trekversoek.",
+      "tooManyLabels": "Te veel etikette vir raadhersiening. Gebruik hoogstens {{maximum}} etikette.",
+      "labelTooLong": "Die etiket vir raadhersiening is te lank. Elke etiket mag hoogstens {{maximum}} karakters bevat.",
+      "minSpecialists": "Kies minstens {{minimum}} spesialiste. {{selected}} gekies.",
+      "specialistName": {
+        "testCoverage": "Toetsdekking",
+        "correctness": "Korrektheid",
+        "custom": "Spesialis"
+      },
+      "specialist": {
+        "security": "Magtigingsomseiling, hantering van geheime en onveilige invoer.",
+        "performance": "Warm paaie, N+1-navrae en swaar geheuetoewysings.",
+        "testing": "Ontbrekende of swak dekking vir nuwe gedrag.",
+        "correctness": "Logikafoute, randgevalle en wedrentoestande.",
+        "custom": "Hersien kwessies in sy eie gebied."
+      },
+      "strategy": {
+        "advisory": "Raadgewend",
+        "advisoryDescription": "Rapporteer bevindings en stemme sonder om die samesmelting te blokkeer.",
+        "unanimous": "Eenparig",
+        "unanimousDescription": "Blokkeer die samesmelting wanneer enige spesialis 'n kritieke kwessie rapporteer.",
+        "majority": "Meerderheid",
+        "majorityDescription": "Blokkeer die samesmelting net wanneer die meeste spesialiste 'n kritieke kwessie rapporteer."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1888,6 +1954,16 @@
       "auto": "Outo",
       "shallow": "Vlak",
       "deep": "Diep"
+    },
+    "orphanedFindings": {
+      "title": "Bevindings vir verwyderde bewaarplekke",
+      "description": "Hierdie bewaarplekke is nie meer via die GitHub-integrasie bereikbaar nie. Hul bevindings tel steeds in kontroleskerms en verslae.",
+      "count": "Bevindings: {{count}}",
+      "clearLabel": "Vee bevindings vir {{repository}} uit",
+      "confirmTitle": "Vee bevindings uit?",
+      "confirmMessage": "Elke aangetekende bevinding vir {{repository}} sal geskrap word. Dit kan nie ontdoen word nie.",
+      "confirmAction": "Skrap bevindings",
+      "cleared": "Bevindings uitgevee: {{count}}"
     }
   },
   "agents": {

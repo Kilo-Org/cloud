@@ -1,6 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { type Href } from 'expo-router';
-import { CirclePlus, GitBranch, GitMerge, GitPullRequest, History } from '@/components/ui/icons';
+import {
+  CirclePlus,
+  GitBranch,
+  GitMerge,
+  GitPullRequest,
+  History,
+  LineChart,
+} from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -171,11 +178,23 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
             <ConfigureRow
               icon={CirclePlus}
               title={t('codeReviewer.manualReview.title')}
-              last
+              last={isPersonal}
               onPress={() => {
                 pushOnce(`/(app)/code-reviewer/${scope}/manual-review` as Href);
               }}
             />
+            {/* Review analytics is an organization surface (the dashboard query
+                needs an organization id), so a personal scope has no row. */}
+            {!isPersonal && (
+              <ConfigureRow
+                icon={LineChart}
+                title={t('codeReviewer.analytics.title')}
+                last
+                onPress={() => {
+                  pushOnce(`/(app)/code-reviewer/${scope}/analytics` as Href);
+                }}
+              />
+            )}
           </View>
         </View>
       </TabScreenScrollView>

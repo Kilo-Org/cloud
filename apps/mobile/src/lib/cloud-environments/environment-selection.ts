@@ -59,11 +59,6 @@ export function environmentChoiceKey(
   return `${scope}|${repository.platform}|${repository.fullName.toLowerCase()}`;
 }
 
-/** How many repositories an environment clones; a V1 environment has one. */
-export function environmentRepositoryCount(environment: EnvironmentSummaryRow): number {
-  return 'repositories' in environment ? environment.repositories.length : 1;
-}
-
 /**
  * The environment decision for one repository. `idle` is a form with no
  * repository yet, which asks the server nothing.
@@ -75,6 +70,28 @@ export type EnvironmentSelection =
   | { status: 'none' }
   | { status: 'selected'; environment: EnvironmentSummaryRow; chosen: boolean }
   | { status: 'choose'; environments: EnvironmentSummaryRow[] };
+
+/**
+ * The environment id the form is working with: a pick made on this screen
+ * first, then the one remembered for this repository and scope.
+ *
+ * The stored map only moves when its write lands, and a refused write drops the
+ * pending value, so a pick that waits for storage would put the picker back on
+ * "choose" — and keep Start disabled — with no way out.
+ */
+export function chosenEnvironmentId(
+  madeChoice: { key: string; environmentId: string } | null,
+  stored: Record<string, string>,
+  choiceKey: string | null
+): string | null {
+  if (choiceKey === null) {
+    return null;
+  }
+  if (madeChoice?.key === choiceKey) {
+    return madeChoice.environmentId;
+  }
+  return stored[choiceKey] ?? null;
+}
 
 /**
  * `matches` is the repository's environments. It is undefined while they load

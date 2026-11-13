@@ -1,5 +1,6 @@
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { type TFunction } from 'i18next';
 
 import { ChevronDown } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -17,11 +18,14 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 type NewSessionCloudEnvironmentRowProps = {
-  selection: EnvironmentSelection;
+  /** `idle` never reaches this row: the form hides it until a repository is picked. */
+  selection: Exclude<EnvironmentSelection, { status: 'idle' }>;
   /** The list failed to load; Retry re-reads it. */
   isError: boolean;
   /** The chosen (or only) environment's build, when there is one. */
   buildStatus: EnvironmentBuildStatusRow | undefined;
+  /** The build status read failed, so the row must not claim to be loading it. */
+  buildStatusFailed: boolean;
   /** A create is in flight, so the picker must not open. */
   disabled: boolean;
   onRetry: () => void;
@@ -32,6 +36,30 @@ const CARD_CLASS = cn(
   ROW_TARGET_CLASS,
   'flex-row items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5'
 );
+
+/**
+ * The build line under the picked environment: a failed list, a failed build
+ * status, or the build itself. A failed read must not read as still loading.
+ */
+function selectedBuildDetail({
+  isError,
+  buildStatusFailed,
+  buildStatus,
+  t,
+}: {
+  isError: boolean;
+  buildStatusFailed: boolean;
+  buildStatus: EnvironmentBuildStatusRow | undefined;
+  t: TFunction;
+}): string {
+  if (isError) {
+    return t('agentChat.environment.couldNotLoadEnvironments');
+  }
+  if (buildStatusFailed) {
+    return t('agentChat.environment.couldNotLoadBuild');
+  }
+  return buildSummaryLabel(buildStatus, t);
+}
 
 /**
  * The new-session Environment row: the cloud environment the session starts
@@ -47,6 +75,7 @@ export function NewSessionCloudEnvironmentRow({
   selection,
   isError,
   buildStatus,
+  buildStatusFailed,
   disabled,
   onRetry,
   onOpen,
@@ -69,9 +98,7 @@ export function NewSessionCloudEnvironmentRow({
     opensPicker = true;
   } else if (selection.status === 'selected') {
     label = selection.environment.name;
-    detail = isError
-      ? t('agentChat.environment.couldNotLoadEnvironments')
-      : buildSummaryLabel(buildStatus, t);
+    detail = selectedBuildDetail({ isError, buildStatusFailed, buildStatus, t });
     opensPicker = true;
   }
 

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  chosenEnvironmentId,
   environmentBlocksStart,
   environmentChoiceKey,
-  environmentRepositoryCount,
   type EnvironmentSelection,
   type EnvironmentSummaryRow,
   requestedEnvironmentForSelection,
@@ -13,8 +13,8 @@ import {
   toEnvironmentRepositoryInput,
 } from './environment-selection';
 
-function environment(id: string, repositories?: number): EnvironmentSummaryRow {
-  const base = {
+function environment(id: string): EnvironmentSummaryRow {
+  return {
     id,
     name: `Environment ${id}`,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -24,28 +24,12 @@ function environment(id: string, repositories?: number): EnvironmentSummaryRow {
     commandCount: 0,
     configurationRevision: 1,
     sandboxAllocation: null,
+    platform: 'github',
+    repoFullName: 'acme/widgets',
+    gitlabCloneUrl: null,
+    bitbucketWorkspaceUuid: null,
+    bitbucketRepositoryUuid: null,
   };
-  return (
-    repositories === undefined
-      ? {
-          ...base,
-          platform: 'github',
-          repoFullName: 'acme/widgets',
-          gitlabCloneUrl: null,
-          bitbucketWorkspaceUuid: null,
-          bitbucketRepositoryUuid: null,
-        }
-      : {
-          ...base,
-          repositories: Array.from({ length: repositories }, (_, index) => ({
-            platform: 'github' as const,
-            repoFullName: `acme/widgets-${index}`,
-            gitlabCloneUrl: null,
-            bitbucketWorkspaceUuid: null,
-            bitbucketRepositoryUuid: null,
-          })),
-        }
-  ) as EnvironmentSummaryRow;
 }
 
 describe('toEnvironmentRepositoryInput', () => {
@@ -106,10 +90,25 @@ describe('environmentChoiceKey', () => {
   });
 });
 
-describe('environmentRepositoryCount', () => {
-  it('counts the members of a multi-repository environment and one otherwise', () => {
-    expect(environmentRepositoryCount(environment('v1'))).toBe(1);
-    expect(environmentRepositoryCount(environment('v2', 3))).toBe(3);
+describe('chosenEnvironmentId', () => {
+  const KEY = 'personal|github|acme/widgets';
+
+  it('reads the pick made on this screen before the remembered one', () => {
+    // A refused storage write leaves the remembered map on the old value; the
+    // pick the person just made must still be the one that counts.
+    expect(
+      chosenEnvironmentId({ key: KEY, environmentId: 'env-new' }, { [KEY]: 'env-old' }, KEY)
+    ).toBe('env-new');
+  });
+
+  it('falls back to the remembered pick and ignores another repository', () => {
+    expect(chosenEnvironmentId(null, { [KEY]: 'env-old' }, KEY)).toBe('env-old');
+    expect(chosenEnvironmentId(null, { [KEY]: 'env-old' }, 'org-1|github|acme/widgets')).toBeNull();
+    expect(chosenEnvironmentId({ key: 'other', environmentId: 'env-new' }, {}, KEY)).toBeNull();
+  });
+
+  it('has no pick without a repository', () => {
+    expect(chosenEnvironmentId({ key: KEY, environmentId: 'env-new' }, {}, null)).toBeNull();
   });
 });
 

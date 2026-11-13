@@ -31,7 +31,8 @@ type EnvironmentSheetProps = {
   organizationId: string | undefined;
   /** The build of one environment, owned by the form that opened this sheet. */
   buildStatusFor: (environmentId: string) => EnvironmentBuildStatusRow | undefined;
-  buildStatusFailed: boolean;
+  /** Whether one environment's build status read failed. */
+  buildStatusFailedFor: (environmentId: string) => boolean;
   onRetryBuildStatus: () => void;
   onChoose: (environmentId: string) => void;
 };
@@ -53,22 +54,20 @@ export function EnvironmentSheet({
   repositoryLabel,
   organizationId,
   buildStatusFor,
-  buildStatusFailed,
+  buildStatusFailedFor,
   onRetryBuildStatus,
   onChoose,
 }: Readonly<EnvironmentSheetProps>) {
-  if (!visible) {
-    return null;
-  }
   return (
     <EnvironmentSheetBody
+      visible={visible}
       onClose={onClose}
       environments={environments}
       selectedEnvironmentId={selectedEnvironmentId}
       repositoryLabel={repositoryLabel}
       organizationId={organizationId}
       buildStatusFor={buildStatusFor}
-      buildStatusFailed={buildStatusFailed}
+      buildStatusFailedFor={buildStatusFailedFor}
       onRetryBuildStatus={onRetryBuildStatus}
       onChoose={onChoose}
     />
@@ -76,22 +75,32 @@ export function EnvironmentSheet({
 }
 
 function EnvironmentSheetBody({
+  visible,
   onClose,
   environments,
   selectedEnvironmentId,
   repositoryLabel,
   organizationId,
   buildStatusFor,
-  buildStatusFailed,
+  buildStatusFailedFor,
   onRetryBuildStatus,
   onChoose,
-}: Readonly<Omit<EnvironmentSheetProps, 'visible'>>) {
+}: Readonly<EnvironmentSheetProps>) {
   const insets = useSafeAreaInsets();
   const [openEnvironmentId, setOpenEnvironmentId] = useState<string | null>(null);
   const openEnvironment = environments.find(environment => environment.id === openEnvironmentId);
 
   return (
-    <Sheet visible onClose={onClose}>
+    // `Sheet` stays mounted through its own dismissal — it holds the app-wide
+    // touch gate until the native animation reports — so this surface hands it
+    // `visible` and resets the open build once that report arrives.
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      onDismiss={() => {
+        setOpenEnvironmentId(null);
+      }}
+    >
       <View style={{ paddingBottom: insets.bottom }}>
         {openEnvironment === undefined ? (
           <EnvironmentList
@@ -99,7 +108,7 @@ function EnvironmentSheetBody({
             selectedEnvironmentId={selectedEnvironmentId}
             repositoryLabel={repositoryLabel}
             buildStatusFor={buildStatusFor}
-            buildStatusFailed={buildStatusFailed}
+            buildStatusFailedFor={buildStatusFailedFor}
             onChoose={environmentId => {
               onChoose(environmentId);
               onClose();
@@ -111,7 +120,7 @@ function EnvironmentSheetBody({
           <EnvironmentBuildDetail
             environment={openEnvironment}
             status={buildStatusFor(openEnvironment.id)}
-            buildStatusFailed={buildStatusFailed}
+            buildStatusFailed={buildStatusFailedFor(openEnvironment.id)}
             organizationId={organizationId}
             onRetryBuildStatus={onRetryBuildStatus}
             onBack={() => {
@@ -133,7 +142,7 @@ function EnvironmentList({
   selectedEnvironmentId,
   repositoryLabel,
   buildStatusFor,
-  buildStatusFailed,
+  buildStatusFailedFor,
   onChoose,
   onOpenBuild,
   onClose,
@@ -142,7 +151,8 @@ function EnvironmentList({
   selectedEnvironmentId: string | null;
   repositoryLabel: string;
   buildStatusFor: (environmentId: string) => EnvironmentBuildStatusRow | undefined;
-  buildStatusFailed: boolean;
+  /** Whether one environment's build status read failed. */
+  buildStatusFailedFor: (environmentId: string) => boolean;
   onChoose: (environmentId: string) => void;
   onOpenBuild: (environmentId: string) => void;
   onClose: () => void;
@@ -161,7 +171,7 @@ function EnvironmentList({
             key={environment.id}
             environment={environment}
             status={buildStatusFor(environment.id)}
-            statusFailed={buildStatusFailed}
+            statusFailed={buildStatusFailedFor(environment.id)}
             selected={environment.id === selectedEnvironmentId}
             onChoose={onChoose}
             onOpenBuild={onOpenBuild}

@@ -41,12 +41,14 @@ const OTHER_ENVIRONMENT: EnvironmentSummaryRow = {
   name: 'Broken build lab',
 };
 
-const CHOOSE: EnvironmentSelection = {
+type PickerSelection = Exclude<EnvironmentSelection, { status: 'idle' }>;
+
+const CHOOSE: PickerSelection = {
   status: 'choose',
   environments: [ENVIRONMENT, OTHER_ENVIRONMENT],
 };
 
-const SELECTED: EnvironmentSelection = {
+const SELECTED: PickerSelection = {
   status: 'selected',
   environment: ENVIRONMENT,
   chosen: true,
@@ -65,6 +67,7 @@ function renderRow(overrides: Partial<RowProps> = {}) {
       selection={CHOOSE}
       isError={false}
       buildStatus={undefined}
+      buildStatusFailed={false}
       disabled={false}
       onRetry={vi.fn<() => void>()}
       onOpen={vi.fn<() => void>()}
@@ -146,6 +149,15 @@ describe('NewSessionCloudEnvironmentRow picker entry', () => {
     expect(node.props.onPress).toBeUndefined();
     expect(node.props.accessibilityState).toEqual({ disabled: true });
     expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it('says the build status could not be read instead of loading it forever', () => {
+    const root = renderRow({ selection: SELECTED, buildStatusFailed: true });
+    const values = renderedTexts(root);
+
+    expect(values).toContain('Mobile parity lab');
+    expect(values).toContain(i18n.t('agentChat.environment.couldNotLoadBuild'));
+    expect(values).not.toContain(i18n.t('common.loading'));
   });
 
   it('renders no picker for a repository without environments and retries a failed list', () => {

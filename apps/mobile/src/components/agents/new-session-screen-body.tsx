@@ -516,26 +516,35 @@ export function NewSessionScreenBody() {
   });
   const [environmentSheetOpen, setEnvironmentSheetOpen] = useState(false);
   const isCloudTarget = runOnInstance === null && !computerTargetSelected;
+  const environmentSelection = sessionEnvironment.selection;
+  const selectedEnvironmentId = sessionEnvironment.environment?.id ?? null;
   const environmentBlocked =
-    !isCloneEntry && isCloudTarget && environmentBlocksStart(sessionEnvironment.selection);
-  const environmentSection = isCloneEntry ? undefined : (
-    <NewSessionCloudEnvironmentRow
-      selection={sessionEnvironment.selection}
-      isError={sessionEnvironment.isError}
-      buildStatus={
-        sessionEnvironment.environment === undefined || sessionEnvironment.environment === null
-          ? undefined
-          : sessionEnvironment.buildStatusFor(sessionEnvironment.environment.id)
-      }
-      disabled={isCreating || isSubmitting}
-      onRetry={() => {
-        sessionEnvironment.retryEnvironmentList();
-      }}
-      onOpen={() => {
-        setEnvironmentSheetOpen(true);
-      }}
-    />
-  );
+    !isCloneEntry && isCloudTarget && environmentBlocksStart(environmentSelection);
+  // `idle` is a form with no repository yet: the row would have nothing to say
+  // and no picker to open, so it appears with the repository it describes.
+  const environmentSection =
+    isCloneEntry || environmentSelection.status === 'idle' ? undefined : (
+      <NewSessionCloudEnvironmentRow
+        selection={environmentSelection}
+        isError={sessionEnvironment.isError}
+        buildStatusFailed={
+          selectedEnvironmentId !== null &&
+          sessionEnvironment.buildStatusFailedFor(selectedEnvironmentId)
+        }
+        buildStatus={
+          selectedEnvironmentId === null
+            ? undefined
+            : sessionEnvironment.buildStatusFor(selectedEnvironmentId)
+        }
+        disabled={isCreating || isSubmitting}
+        onRetry={() => {
+          sessionEnvironment.retryEnvironmentList();
+        }}
+        onOpen={() => {
+          setEnvironmentSheetOpen(true);
+        }}
+      />
+    );
 
   // A repository is one discrete choice, not a keystroke burst, so it is
   // written through the debounce immediately: a restart in the next half second
@@ -1480,9 +1489,9 @@ export function NewSessionScreenBody() {
         repositoryLabel={selectedRepository?.fullName ?? ''}
         organizationId={organizationId}
         buildStatusFor={sessionEnvironment.buildStatusFor}
-        buildStatusFailed={sessionEnvironment.buildStatusFailed}
+        buildStatusFailedFor={sessionEnvironment.buildStatusFailedFor}
         onRetryBuildStatus={() => {
-          sessionEnvironment.retryEnvironmentList();
+          sessionEnvironment.retryBuildStatus();
         }}
         onChoose={environmentId => {
           sessionEnvironment.chooseEnvironment(environmentId);

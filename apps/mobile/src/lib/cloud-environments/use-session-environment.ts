@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { type NewSessionRepository } from '@/components/agents/new-session-repository-state';
 import {
+  chosenEnvironmentId,
   environmentChoiceKey,
   type EnvironmentSelection,
   type EnvironmentSummaryRow,
@@ -34,8 +35,10 @@ export type SessionEnvironment = {
   /** The environment the session uses: null when none, undefined while unknown. */
   environment: EnvironmentSummaryRow | null | undefined;
   buildStatusFor: (environmentId: string) => EnvironmentBuildStatusRow | undefined;
-  /** A build status read failed; the sheet offers a retry instead of waiting. */
-  buildStatusFailed: boolean;
+  /** This environment's build status read failed; its views show that, not a load. */
+  buildStatusFailedFor: (environmentId: string) => boolean;
+  /** Re-reads every match's build status. */
+  retryBuildStatus: () => void;
   chooseEnvironment: (environmentId: string) => void;
 };
 
@@ -56,6 +59,7 @@ export function useSessionEnvironment({
   repository: NewSessionRepository | null;
 }): SessionEnvironment {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const wire = toEnvironmentRepositoryInput(repository);
   const choiceKey = repository === null ? null : environmentChoiceKey(organizationId, repository);
   const scope = organizationId ? { organizationId } : {};
@@ -66,7 +70,13 @@ export function useSessionEnvironment({
     )
   );
   const { stored, saveEnvironmentChoice } = usePersistedEnvironmentChoice();
-  const chosenId = choiceKey === null ? null : (stored[choiceKey] ?? null);
+  // A pick the person just made, before (or instead of) the write that records
+  // it: the stored map only moves when its write lands, and a failed write drops
+  // the pending value, which would leave the picker on "choose" and Start
+  // disabled with no way out. The web keeps the same pick in React state and
+  // treats storage as best effort.
+  const [madeChoice, setMadeChoice] = useState<{ key: string; environmentId: string } | null>(null);
+  const chosenId = chosenEnvironmentId(madeChoice, stored, choiceKey);
   const matches = list.data;
   const selection: EnvironmentSelection =
     wire === null ? { status: 'idle' } : selectEnvironment(matches, chosenId, list.isLoading);
@@ -86,12 +96,16 @@ export function useSessionEnvironment({
     ),
   });
 
-  const buildStatusById = useMemo(() => {
+  const buildStatusIndex = useMemo(() => {
     const byId = new Map<string, EnvironmentBuildStatusRow | undefined>();
+    const failed = new Set<string>();
     for (const [index, environment] of (matches ?? []).entries()) {
       byId.set(environment.id, buildStatus[index]?.data);
+      if (buildStatus[index]?.isError) {
+        failed.add(environment.id);
+      }
     }
-    return byId;
+    return { byId, failed };
   }, [matches, buildStatus]);
 
   return {
@@ -102,12 +116,18 @@ export function useSessionEnvironment({
     },
     selection,
     environment: selectedEnvironment(selection),
-    buildStatusFor: (environmentId: string) => buildStatusById.get(environmentId),
-    buildStatusFailed: buildStatus.some(query => query.isError),
+    buildStatusFor: (environmentId: string) => buildStatusIndex.byId.get(environmentId),
+    buildStatusFailedFor: (environmentId: string) => buildStatusIndex.failed.has(environmentId),
+    retryBuildStatus: () => {
+      void queryClient.refetchQueries({
+        queryKey: trpc.cloudEnvironments.buildStatus.queryKey(),
+      });
+    },
     chooseEnvironment: (environmentId: string) => {
       if (choiceKey === null) {
         return;
       }
+      setMadeChoice({ key: choiceKey, environmentId });
       saveEnvironmentChoice(choiceKey, environmentId);
     },
   };

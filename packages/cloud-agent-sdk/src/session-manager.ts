@@ -6,6 +6,7 @@ import {
   cloudSessionMessagesPageSchema,
   parseCustomerBillingFailure,
   type CustomerBillingFailure,
+  type SessionStatus,
 } from './schemas';
 import type {
   CreateRemoteSessionInput,
@@ -610,6 +611,7 @@ type SessionManagerAtoms = {
   totalCost: Atom<number>;
   contextUsage: Atom<ContextUsage | undefined>;
   childMessages: Atom<(childSessionId: string) => StoredMessage[]>;
+  childSessionStatus: Atom<(childSessionId: string) => SessionStatus | undefined>;
   childSessionHydrationState: Atom<(childSessionId: string) => ChildSessionHydrationState>;
   childSessionError: Atom<(childSessionId: string) => string | null>;
   /** True when the latest page left a non-null cursor (more history to load). */
@@ -1208,6 +1210,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const worktreeChangesRefreshAtom = atom<WorktreeChangesRefresh | null>(null);
   const childSessionHydrationStatesAtom = atom<Map<string, ChildSessionHydrationState>>(new Map());
   const childSessionErrorsAtom = atom<Map<string, string>>(new Map());
+  const childSessionStatusesAtom = atom<ReadonlyMap<string, SessionStatus>>(new Map());
   const hasOlderMessagesAtom = atom<boolean>(false);
   const isLoadingOlderMessagesAtom = atom<boolean>(false);
   const olderMessagesErrorAtom = atom<OlderMessagesError | null>(null);
@@ -1477,6 +1480,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const errors = get(childSessionErrorsAtom);
     return (childSessionId: string): string | null => errors.get(childSessionId) ?? null;
   });
+  const childSessionStatusAtom = atom(get => {
+    const statuses = get(childSessionStatusesAtom);
+    return (childSessionId: string): SessionStatus | undefined => statuses.get(childSessionId);
+  });
 
   let activeSessionId: KiloSessionId | null = null;
   let switchGeneration = 0;
@@ -1722,6 +1729,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(fetchedSessionDataAtom, null);
     store.set(childSessionHydrationStatesAtom, new Map());
     store.set(childSessionErrorsAtom, new Map());
+    store.set(childSessionStatusesAtom, new Map());
     store.set(availableCommandsAtom, []);
     store.set(availableCommandsCatalogStatusAtom, null);
     store.set(worktreeChangesRefreshAtom, null);
@@ -1758,6 +1766,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     childSessionHydrationRequests.clear();
     store.set(childSessionHydrationStatesAtom, new Map());
     store.set(childSessionErrorsAtom, new Map());
+    store.set(childSessionStatusesAtom, new Map());
   }
 
   function setChildSessionHydrationState(
@@ -3486,6 +3495,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
             settlePendingSendConfirmation(open.kiloSessionId, event.messageId);
           });
         }
+        if (event.type === 'session.status' && event.sessionId !== store.get(rootSessionIdAtom)) {
+          const statuses = new Map(store.get(childSessionStatusesAtom));
+          statuses.set(event.sessionId, event.status);
+          store.set(childSessionStatusesAtom, statuses);
+          if (event.status.type === 'busy') {
+            const errors = new Map(store.get(childSessionErrorsAtom));
+            errors.delete(event.sessionId);
+            store.set(childSessionErrorsAtom, errors);
+          }
+        }
         if (event.type === 'cloud.message.failed' && !open.resolvedFailures.has(event.messageId)) {
           store.set(billingFailureAtom, event.billingFailure ?? null);
         } else if (
@@ -4516,6 +4535,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       totalCost: totalCostAtom,
       contextUsage: contextUsageAtom,
       childMessages: childMessagesAtom,
+      childSessionStatus: childSessionStatusAtom,
       childSessionHydrationState: childSessionHydrationStateAtom,
       childSessionError: childSessionErrorAtom,
       hasOlderMessages: hasOlderMessagesAtom,

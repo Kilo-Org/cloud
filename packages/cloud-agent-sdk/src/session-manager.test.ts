@@ -5271,6 +5271,51 @@ describe('createSessionManager', () => {
   });
 
   describe('message filtering', () => {
+    it('tracks child lifecycle status independently from root activity and clears it on switch', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-root'));
+      const childStatus = () => config.store.get(mgr.atoms.childSessionStatus)('ses-child');
+      const rootStatus = () => config.store.get(mgr.atoms.childSessionStatus)('ses-root');
+      expect(childStatus()).toBeUndefined();
+      mockSessionCallbacks.onEvent?.({
+        type: 'session.status',
+        sessionId: 'ses-child',
+        status: { type: 'busy' },
+      });
+      expect(childStatus()).toEqual({ type: 'busy' });
+      expect(config.store.get(mgr.atoms.isStreaming)).toBe(false);
+      mockSessionCallbacks.onEvent?.({
+        type: 'session.status',
+        sessionId: 'ses-root',
+        status: { type: 'idle' },
+      });
+      expect(rootStatus()).toBeUndefined();
+      expect(childStatus()).toEqual({ type: 'busy' });
+      mockSessionCallbacks.onEvent?.({
+        type: 'session.status',
+        sessionId: 'ses-child',
+        status: { type: 'idle' },
+      });
+      expect(childStatus()).toEqual({ type: 'idle' });
+      await mgr.switchSession(kiloId('ses-other'));
+      expect(childStatus()).toBeUndefined();
+    });
+
+    it('clears a stale child error when that child starts again', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-root'));
+      mockSessionCallbacks.onChildSessionError?.('ses-child', 'Synthetic failure');
+      expect(config.store.get(mgr.atoms.childSessionError)('ses-child')).toBe('Synthetic failure');
+      mockSessionCallbacks.onEvent?.({
+        type: 'session.status',
+        sessionId: 'ses-child',
+        status: { type: 'busy' },
+      });
+      expect(config.store.get(mgr.atoms.childSessionError)('ses-child')).toBeNull();
+    });
+
     it('main chat excludes child messages even if child session.created never arrived', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

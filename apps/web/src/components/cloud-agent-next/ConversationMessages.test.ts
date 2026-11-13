@@ -1124,7 +1124,7 @@ describe('ConversationMessages', () => {
   );
 
   it.each(['pending', 'running'] as const)(
-    'keeps a progress line before %s child activity arrives',
+    'keeps the header status before %s child activity arrives',
     status => {
       const state: ToolPart['state'] =
         status === 'pending'
@@ -1134,7 +1134,8 @@ describe('ConversationMessages', () => {
         assistantMessage('parent', [toolPart('task', 'task', state)]),
       ]);
 
-      expect(html).toContain(status === 'pending' ? 'Delegating...' : 'Working...');
+      expect(html).toContain(`<span>${status === 'pending' ? 'Delegating' : 'Working'}</span>`);
+      expect(html).not.toContain('ml-6');
       expect(html).toContain(`<title>${status === 'pending' ? 'Delegating' : 'Working'}</title>`);
       expect(html).toContain('aria-busy="true"');
       expect(html).not.toContain('0 tool calls');

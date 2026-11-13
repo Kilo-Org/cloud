@@ -192,6 +192,7 @@ describe('the document a view draws', () => {
       '<!---><script>run()</script><!doctype html><html><head></head></html>',
       '<!note><script>run()</script><!doctype html><html><head></head></html>',
       '<!----><script>run()</script><!doctype html><html><head></head></html>',
+      '<!-- a --!><script>run()</script><!-- b --><!doctype html><html><head></head></html>',
       '<!-- never closed <script>run()</script>',
     ];
     for (const html of documents) {

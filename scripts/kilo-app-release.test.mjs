@@ -771,6 +771,79 @@ test('a land whose branch is gone carries the section to the pending branch', ()
   }
 });
 
+test('write --land retries a branch it cannot read and carries the section instead of failing', () => {
+  const root = tempDir('kilo-notes-land-retry-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\nprose\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['branch', '-M', 'main']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+    pushBumpBranch(seed, 'bump', '1.0.12', '1.0.13');
+
+    // The branch is deleted from the remote while the land runs, after the
+    // composition fetch but before the provenance check's own fetches: the check
+    // cannot read it, which says nothing about its shape, so the land retries
+    // and finally carries the section instead of refusing it.
+    const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+    const bin = join(root, 'bin');
+    mkdirSync(bin, { recursive: true });
+    const marker = join(root, 'fetch-intercepted');
+    const wrapper = join(bin, 'git');
+    writeFileSync(
+      wrapper,
+      `#!/bin/sh\nif [ ! -f '${marker}' ]; then\n  for arg in "$@"; do\n    if [ "$arg" = '--no-tags' ]; then\n      : > '${marker}'\n      '${realGit}' -C '${remote}' update-ref -d refs/heads/bump\n      break\n    fi\n  done\nfi\nexec '${realGit}' "$@"\n`
+    );
+    chmodSync(wrapper, 0o755);
+
+    writeFixture(seed, 'notes.md', '- new (#91)\n');
+    const result = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.13',
+        '--ios-build',
+        '43',
+        '--body-file',
+        'notes.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed, env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } }
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(
+      result.stdout,
+      /changelog: attempt 1 rejected \(it could not be read: bump does not exist on origin\)/
+    );
+    assert.match(result.stdout, /carried to kilo-app-changelog-pending/);
+    assert.doesNotMatch(result.stdout, /changelog: landed/);
+    // Back to refusing would carry and exit 1; the run must stay green instead.
+    assert.doesNotMatch(result.stdout, /refusing to land/);
+    assert.doesNotMatch(result.stderr, /refusing to land/);
+
+    assert.equal(git(seed, ['ls-remote', '--heads', 'origin', 'refs/heads/bump']), '');
+
+    git(seed, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.pending.md']),
+      '## 1.0.13 (build 43)\n\n- new (#91)\n\n'
+    );
+  } finally {
+    cleanup(root);
+  }
+});
+
 test('two failed lands accumulate in the pending branch, newest first', () => {
   const root = tempDir('kilo-notes-carry-many-');
   try {

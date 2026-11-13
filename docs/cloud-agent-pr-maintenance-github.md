@@ -10,7 +10,7 @@ The repository does not contain a GitHub App registration manifest. An App admin
 Both Apps need these subscriptions:
 
 | Event | Use |
-| --- | --- |
+|---|---|
 | `pull_request` | Head, target, closure, and merge changes |
 | `pull_request_review` | Submitted or edited review bodies |
 | `pull_request_review_comment` | Inline feedback, edits, and deletions |

@@ -11,10 +11,16 @@ jest.mock('./PrHoverCardContent', () => ({
 
 it('keeps real portaled overlay clicks out of the sidebar row navigation handler', async () => {
   const requireFromHere = createRequire(__filename);
-  const { parseHTML } = requireFromHere(
+  const {
+    parseHTML,
+    Event: DOMEvent,
+    CustomEvent: DOMCustomEvent,
+  } = requireFromHere(
     '../../../../../node_modules/.pnpm/linkedom@0.18.12/node_modules/linkedom'
   ) as {
     parseHTML: (html: string) => { window: typeof globalThis; document: Document };
+    Event: typeof Event;
+    CustomEvent: typeof CustomEvent;
   };
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>');
   const values = {
@@ -25,8 +31,8 @@ it('keeps real portaled overlay clicks out of the sidebar row navigation handler
     Element: window.Element,
     Node: window.Node,
     MutationObserver: window.MutationObserver,
-    CustomEvent: window.CustomEvent,
-    Event: window.Event,
+    CustomEvent: DOMCustomEvent,
+    Event: DOMEvent,
     NodeFilter: { SHOW_ELEMENT: 1, FILTER_ACCEPT: 1, FILTER_REJECT: 2, FILTER_SKIP: 3 },
     getComputedStyle: () => ({
       animationName: 'none',
@@ -80,20 +86,20 @@ it('keeps real portaled overlay clicks out of the sidebar row navigation handler
     const trigger = container.querySelector('button');
     if (!trigger) throw new Error('Missing PR badge trigger');
     await act(async () => {
-      trigger.dispatchEvent(new window.Event('click', { bubbles: true }));
+      trigger.dispatchEvent(new DOMEvent('click', { bubbles: true }));
     });
     const overlay = document.querySelector('div[data-state="open"].inset-0');
     if (!overlay) throw new Error('Missing actual portaled dialog overlay');
     expect(container.contains(overlay)).toBe(false);
     expect(onOpenOtherChat).not.toHaveBeenCalled();
     await act(async () => {
-      overlay.dispatchEvent(new window.Event('click', { bubbles: true }));
+      overlay.dispatchEvent(new DOMEvent('click', { bubbles: true }));
     });
     expect(onOpenOtherChat).not.toHaveBeenCalled();
     const close = document.querySelector('button[aria-label="Close dialog"]');
     if (!close) throw new Error('Missing accessible dialog dismissal');
     await act(async () => {
-      close.dispatchEvent(new window.Event('click', { bubbles: true }));
+      close.dispatchEvent(new DOMEvent('click', { bubbles: true }));
     });
     expect(onOpenOtherChat).not.toHaveBeenCalled();
   } finally {

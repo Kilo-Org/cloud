@@ -175,6 +175,9 @@ describe('maintenance presentation', () => {
     expect(getMaintenanceEvidenceUrl('http://localhost:3000/evidence')).toBe(
       'http://localhost:3000/evidence'
     );
+    const credentialUrl = new URL('https://ci.example.com/proof');
+    credentialUrl.username = 'synthetic-user';
+    credentialUrl.password = 'synthetic-password';
     for (const url of [
       'javascript:alert(1)',
       'data:text/html,proof',
@@ -183,7 +186,7 @@ describe('maintenance presentation', () => {
       '//ci.example.com/proof',
       '/proof',
       'not a URL',
-      'https://user:password@ci.example.com/proof',
+      credentialUrl.href,
     ]) {
       expect(getMaintenanceEvidenceUrl(url)).toBeNull();
     }

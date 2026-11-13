@@ -108,7 +108,10 @@ does not wait for other chats. Normal user messages also continue that maintenan
 ## 4. Shared storage and contracts
 
 Import runtime-safe validation and types from `@kilocode/db/cloud-agent-pr-maintenance`.
-The module has no database connection or web/runtime dependency. The existing
+That entry point re-exports the platform-independent contracts in
+`services/cloud-agent-next/src/shared/pr-maintenance-contracts.ts`. The wrapper uses
+that shared module directly so its isolated build needs no database package.
+The module has no database connection or platform dependency. The existing
 `schema-types` entry point re-exports `watchPrPolicySchema`, `WatchPrPolicy`, and
 `WatchPrStatus` for compatibility.
 

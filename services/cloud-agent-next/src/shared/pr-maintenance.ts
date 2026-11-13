@@ -4,7 +4,7 @@ import {
   watchPrPublicationEvidenceSchema,
   watchPrMaintenanceInputSchema,
   watchPrOwnedRebaseEvidenceSchema,
-} from '@kilocode/db/cloud-agent-pr-maintenance';
+} from './pr-maintenance-contracts.js';
 
 export {
   watchPrMaintenanceResultSchema,
@@ -15,7 +15,7 @@ export type {
   WatchPrMaintenanceResult,
   WatchPrPublicationEvidence,
   WatchPrOwnedRebaseEvidence,
-} from '@kilocode/db/cloud-agent-pr-maintenance';
+} from './pr-maintenance-contracts.js';
 
 const repository = watchPrMaintenanceInputSchema.unwrap().shape.repository;
 export const maintenancePublicationTargetSchema = repository

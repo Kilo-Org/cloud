@@ -565,6 +565,22 @@ function validate(workflow) {
     'the PR must not be opened when the section did not land'
   );
   assert.match(pr.run, /\bgh pr edit\b/, 'an already open PR must be refreshed, not duplicated');
+  // The lookup asks for the head repository relationship and keeps only a PR
+  // that comes from this repository before it refreshes anything.
+  assert.match(
+    pr.run,
+    /gh pr list --head "\$BRANCH"[^\n]*--json number,isCrossRepository/,
+    'the version-bump PR lookup must request the head repository relationship'
+  );
+  assert.match(
+    pr.run,
+    /\[\.\[\] \| select\(\.isCrossRepository \| not\)\]\[0\]\.number/,
+    'the version-bump PR lookup must keep only a PR from this repository'
+  );
+  assert.ok(
+    pr.run.indexOf('gh pr list') < pr.run.indexOf('gh pr edit'),
+    'the version-bump PR must be selected before it is refreshed'
+  );
   // This job checks out main, and `gh pr create` reads the head from the
   // checked-out branch when --head is absent: the API then refuses the PR with
   // "No commits between main and main" and the version bump is never offered.
@@ -1510,6 +1526,17 @@ const mutations = {
   'the changelog opens the PR on the checked-out branch': workflow => {
     const pr = workflow.jobs.changelog.steps.find(item => /\bgh pr create\b/.test(item.run ?? ''));
     pr.run = pr.run.replace(/(gh pr create[\s\S]*?)--head "\$BRANCH" \\\n/, '$1');
+  },
+  'the changelog refreshes any PR on the branch': workflow => {
+    const pr = workflow.jobs.changelog.steps.find(item => /\bgh pr create\b/.test(item.run ?? ''));
+    pr.run = pr.run.replace(
+      `--json number,isCrossRepository \\\n  --jq '[.[] | select(.isCrossRepository | not)][0].number // empty'`,
+      "--json number --jq '.[0].number // empty'"
+    );
+  },
+  'the changelog refreshes a cross-repository PR': workflow => {
+    const pr = workflow.jobs.changelog.steps.find(item => /\bgh pr create\b/.test(item.run ?? ''));
+    pr.run = pr.run.replace('select(.isCrossRepository | not)', 'select(true)');
   },
   'the changelog drops the pending carry': workflow => {
     const write = workflow.jobs.changelog.steps.find(item =>

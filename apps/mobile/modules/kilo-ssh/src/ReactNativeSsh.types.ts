@@ -26,6 +26,7 @@ export const SSH_ERROR_CODES = [
   'InvalidExport',
   'ChannelClosed',
   'Protocol',
+  'OutputLimit',
   'KeyGeneration',
   'NotFound',
   'PermissionDenied',

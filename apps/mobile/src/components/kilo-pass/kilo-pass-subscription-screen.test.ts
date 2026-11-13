@@ -43,6 +43,7 @@ function subscription(overrides: Partial<KiloPassSubscription> = {}): KiloPassSu
     status: 'active',
     cancelAtPeriodEnd: false,
     resumesAt: null,
+    endedAt: null,
     nextBillingAt: '2026-12-05T12:00:00.000Z',
     refillAt: '2026-12-05T12:00:00.000Z',
     currentPeriodBaseCreditsUsd: 49,
@@ -123,15 +124,21 @@ describe('KiloPassSubscriptionScreen', () => {
     renderer.unmount();
   });
 
-  it('states that a lapsed pass ended', async () => {
+  it('names the plan and the day a lapsed pass ended', async () => {
     mocks.state.data = {
-      subscription: subscription({ status: 'canceled' }),
+      subscription: subscription({
+        status: 'canceled',
+        endedAt: '2026-11-08T04:05:06.000Z',
+      }),
       isEligibleForFirstMonthPromo: false,
     };
     const renderer = await renderScreen();
-    const emptyState = nodesOfType(renderer, 'EmptyState');
-    expect(emptyState).toHaveLength(1);
-    expect(emptyState[0]?.props.title).toBe('Your Kilo Pass has ended.');
+    const text = allText(renderer);
+    expect(text).toContain('Pro · Monthly');
+    expect(text).toContain('Ended Nov 8, 2026');
+    // The ended surface reports state only: no manage, cancel, or buy action.
+    expect(nodesOfType(renderer, 'Button')).toHaveLength(0);
+    expect(nodesOfType(renderer, 'KvRow')).toHaveLength(0);
     renderer.unmount();
   });
 

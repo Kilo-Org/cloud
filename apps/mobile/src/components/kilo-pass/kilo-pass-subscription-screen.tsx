@@ -138,6 +138,24 @@ function KiloPassMessageBody({ message }: { message: string }) {
   );
 }
 
+/**
+ * A lapsed pass keeps the plan line and the day it stopped, in the same frame
+ * the active details use, so the reader sees where their pass stands instead
+ * of a bare "ended" message.
+ */
+function KiloPassEndedBody({ detail }: { detail: Extract<KiloPassDetail, { kind: 'ended' }> }) {
+  return (
+    <KiloPassFrame>
+      <DetailScreenScrollView contentContainerClassName="grow justify-center gap-4 px-5">
+        <View className="gap-1">
+          <Text className="text-base font-semibold text-foreground">{detail.planLabel}</Text>
+          <Text className="text-sm text-muted-foreground">{detail.endedLabel}</Text>
+        </View>
+      </DetailScreenScrollView>
+    </KiloPassFrame>
+  );
+}
+
 export function KiloPassSubscriptionScreen() {
   const trpc = useTRPC();
   const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
@@ -164,7 +182,7 @@ export function KiloPassSubscriptionScreen() {
     return <KiloPassMessageBody message={t('kiloPass.notAvailableInApp')} />;
   }
   if (detail.kind === 'ended') {
-    return <KiloPassMessageBody message={t('kiloPass.purchaseUnavailableEnded')} />;
+    return <KiloPassEndedBody detail={detail} />;
   }
   return <KiloPassDetailBody detail={detail} />;
 }

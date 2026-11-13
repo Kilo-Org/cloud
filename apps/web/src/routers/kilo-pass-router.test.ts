@@ -846,6 +846,36 @@ describe('kiloPassRouter', () => {
       });
     });
 
+    it('answers an ended pass from stored state without reading the provider', async () => {
+      const stripeMock = getStripeMock();
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-get-state-ended@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_ended_read',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        status: 'canceled',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getState();
+
+      expect(result.subscription).toEqual(
+        expect.objectContaining({
+          status: 'canceled',
+          tier: KiloPassTier.Tier49,
+          cadence: KiloPassCadence.Monthly,
+          endedAt: expect.any(String),
+          currentPeriodUsageUsd: 0,
+        })
+      );
+      // A lapsed pass must resolve even when the provider read would fail: the
+      // stored status and end date are the whole answer.
+      expect(stripeMock.subscriptions.retrieve).not.toHaveBeenCalled();
+    });
+
     it('throws BAD_REQUEST when subscription exists but user has no stripe customer', async () => {
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-get-state-no-stripe@example.com',

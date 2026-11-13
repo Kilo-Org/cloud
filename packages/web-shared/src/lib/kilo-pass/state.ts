@@ -30,6 +30,8 @@ export type KiloPassSubscriptionState = {
   currentStreakMonths: number;
   nextYearlyIssueAt: string | null;
   startedAt: string | null;
+  /** Absent on a state a caller assembles rather than reads from a row. */
+  endedAt?: string | null;
   resumesAt: string | null;
 };
 
@@ -45,6 +47,7 @@ type KiloPassSubscriptionRowForState = {
   currentStreakMonths: number;
   nextYearlyIssueAt: string | null;
   startedAt: string | null;
+  endedAt: string | null;
   createdAt: string;
 };
 
@@ -135,6 +138,7 @@ export async function getKiloPassStateForUser(
       currentStreakMonths: kilo_pass_subscriptions.current_streak_months,
       nextYearlyIssueAt: kilo_pass_subscriptions.next_yearly_issue_at,
       startedAt: kilo_pass_subscriptions.started_at,
+      endedAt: kilo_pass_subscriptions.ended_at,
       createdAt: kilo_pass_subscriptions.created_at,
     })
     .from(kilo_pass_subscriptions)
@@ -171,6 +175,9 @@ export async function getKiloPassStateForUser(
         currentStreakMonths: selected.currentStreakMonths,
         nextYearlyIssueAt: normalizeTimestampToIso(selected.nextYearlyIssueAt),
         startedAt: normalizeTimestampToIso(selected.startedAt),
+        // A store pass ends when its last recorded purchase expires, so that
+        // expiry is the date the pass ended.
+        endedAt: normalizeTimestampToIso(latestStorePurchase?.expires_at ?? null),
         resumesAt: null,
       };
     }
@@ -198,6 +205,7 @@ export async function getKiloPassStateForUser(
     currentStreakMonths: selected.currentStreakMonths,
     nextYearlyIssueAt: normalizeTimestampToIso(selected.nextYearlyIssueAt),
     startedAt: normalizeTimestampToIso(selected.startedAt),
+    endedAt: normalizeTimestampToIso(selected.endedAt),
     resumesAt,
   };
 }

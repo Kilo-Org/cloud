@@ -79,6 +79,7 @@ import { getMonthlyPriceUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import { computeKiloPassBonusCreditsUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus-decision';
 import { KiloPassError } from '@/lib/kilo-pass/errors';
 import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
+import { getStripeEndedAtIso } from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-utils';
 import { createOrReuseKiloPassCheckoutSession } from '@/lib/kilo-pass/checkout-session';
 import {
   isTerminalKiloPassScheduleStatus,
@@ -179,6 +180,8 @@ const KiloPassSubscriptionStateBaseSchema = z.object({
   currentStreakMonths: z.number(),
   nextYearlyIssueAt: z.string().nullable(),
   startedAt: z.string().nullable(),
+  /** The date the pass stopped, for a pass that already ended. */
+  endedAt: z.string().nullable(),
   resumesAt: z.string().nullable(),
 });
 
@@ -820,6 +823,11 @@ async function buildEndedKiloPassSubscriptionState(params: {
   kiloUserId: string;
   subscription: KiloPassSubscriptionState;
   status: Stripe.Subscription.Status;
+  /**
+   * The provider's end date, when the status came from a provider read. The
+   * stored date wins when the provider has none.
+   */
+  providerEndedAt?: string | null;
 }): Promise<KiloPassSubscriptionStateResponse> {
   const baseAmountUsd = getMonthlyPriceUsd(params.subscription.tier);
   const isFirstTimeSubscriberEver = await getIsFirstTimeSubscriberEver({
@@ -830,6 +838,7 @@ async function buildEndedKiloPassSubscriptionState(params: {
   return {
     ...params.subscription,
     status: params.status,
+    endedAt: params.subscription.endedAt ?? params.providerEndedAt ?? null,
     nextBonusCreditsUsd: null,
     nextBillingAt: null,
     isFirstTimeSubscriberEver,
@@ -1369,18 +1378,22 @@ export const kiloPassRouter = createTRPCRouter({
       };
     }
 
-    if (subscriptionBase.paymentProvider !== KiloPassPaymentProvider.Stripe) {
-      if (isStripeSubscriptionEnded(subscriptionBase.status)) {
-        return {
-          subscription: await buildEndedKiloPassSubscriptionState({
-            kiloUserId: ctx.user.id,
-            subscription: subscriptionBase,
-            status: subscriptionBase.status,
-          }),
-          isEligibleForFirstMonthPromo: false,
-        };
-      }
+    // A pass that already ended is final: the stored status and end date are
+    // the whole answer, and no provider read can revive it. Reading the
+    // provider here turned a lapsed pass into a load error whenever that read
+    // failed, so every terminal state answers before the provider is touched.
+    if (isStripeSubscriptionEnded(subscriptionBase.status)) {
+      return {
+        subscription: await buildEndedKiloPassSubscriptionState({
+          kiloUserId: ctx.user.id,
+          subscription: subscriptionBase,
+          status: subscriptionBase.status,
+        }),
+        isEligibleForFirstMonthPromo: false,
+      };
+    }
 
+    if (subscriptionBase.paymentProvider !== KiloPassPaymentProvider.Stripe) {
       const latestStorePurchase = await db.query.kilo_pass_store_purchases.findFirst({
         where: and(
           eq(kilo_pass_store_purchases.kilo_pass_subscription_id, subscriptionBase.subscriptionId),
@@ -1431,6 +1444,7 @@ export const kiloPassRouter = createTRPCRouter({
           kiloUserId: ctx.user.id,
           subscription: subscriptionBase,
           status: stripeSubscription.status,
+          providerEndedAt: getStripeEndedAtIso(stripeSubscription),
         }),
         isEligibleForFirstMonthPromo: false,
       };

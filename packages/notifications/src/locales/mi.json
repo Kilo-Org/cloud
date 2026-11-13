@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "He whakahoutanga tā ngā māngai hohe"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Kua oti te mahi"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "I rahua: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "I haukotia: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

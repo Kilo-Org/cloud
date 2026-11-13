@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "සක්‍රිය නියෝජිතයන්ට යාවත්කාලීනයක් ඇත"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "කාර්යය සම්පූර්ණයි"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "අසාර්ථකයි: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "බාධා විය: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

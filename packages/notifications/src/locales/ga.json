@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Tá nuashonrú ar ghníomhairí gníomhacha"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Tasc críochnaithe"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Theip: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Curtha isteach: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

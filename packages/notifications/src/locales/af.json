@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Aktiewe agente het 'n opdatering"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Taak voltooi"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Misluk: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Onderbreek: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

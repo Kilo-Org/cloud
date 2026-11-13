@@ -70,6 +70,10 @@ const TWO_SENSE_COPY = new Map([
     'the verb on a button and an alert action, versus the state of a pull request, a finding and an invoice, versus the state of a review-memory proposal awaiting a decision',
   ],
   ['comment', 'the verb on a button, versus the noun on a row label and a badge'],
+  [
+    'receipt',
+    'the confirmation a moderation report produces, versus the proof of payment for a credit purchase',
+  ],
   ['block', 'the verb, block a discussion participant, versus the reviewer decision to block'],
   ['merge', 'the verb in the merge section header, versus the name of the merge method on a badge'],
   ['review', 'the noun, a review, versus the verb in the onboarding step'],

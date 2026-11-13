@@ -83,6 +83,9 @@ test('Android fingerprint skips only Expo extra beyond defaults', () => {
     'modules/**/build/**',
     'modules/*/src/**',
     'modules/**/*.test.ts',
+    'modules/kilo-ssh/rust/target/**',
+    'modules/kilo-ssh/android/src/main/jniLibs/**',
+    'modules/kilo-ssh/android/src/main/java/ai/kilo/reactnativessh/uniffi/**',
   ]);
   assert.deepEqual(
     options.extraSources.map(source => ({

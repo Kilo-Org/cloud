@@ -76,6 +76,12 @@ export function buildAndroidFingerprintOptions(): {
       'modules/**/build/**',
       'modules/*/src/**',
       'modules/**/*.test.ts',
+      // The SSH module's Rust artifacts: scripts/build-android.sh writes the
+      // libraries, the bindings and a multi-gigabyte cargo target tree, and
+      // the versions of those bytes depend on the host that built them.
+      'modules/kilo-ssh/rust/target/**',
+      'modules/kilo-ssh/android/src/main/jniLibs/**',
+      'modules/kilo-ssh/android/src/main/java/ai/kilo/reactnativessh/uniffi/**',
     ],
     extraSources: [
       {

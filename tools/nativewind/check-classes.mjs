@@ -27,8 +27,8 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { lineIndex, parseProblems, parseSourceFile, walk } from '../lib/ast.mjs';
-import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
+import { lineIndex, walk } from '../lib/ast.mjs';
+import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 
 // Resolve from the app: react-native-css is the app's dependency, not the repo root's.
 const require = createRequire(new URL('../../apps/mobile/package.json', import.meta.url));
@@ -449,25 +449,24 @@ export function checkCompilerStillDropsThese() {
 }
 
 /**
- * Every problem one source file has, from every rule this checker owns. The
- * problems are returned, not kept in module state, so one file's findings
+ * Every problem one parsed source file has, from every rule this checker owns.
+ * The problems are returned, not kept in module state, so one file's findings
  * cannot leak into the next call.
  *
- * `relative` is the path from the repository root without a leading separator;
- * a `./` or `/` prefix is stripped here, once, so every exemption lookup,
- * prefix test and diagnostic below reads the same spelling of the path. The
- * file is parsed here too, and a file the parser refuses is a problem of its
- * own: its tree is empty, so leaving it out would report the file as clean.
+ * The entry is one `parseSourceTree` step (tools/lib/source-files.mjs): the
+ * normalised `path` every exemption lookup, prefix test and diagnostic reads,
+ * the absolute `file` the Intl rule scopes itself by, the `text`, the syntax
+ * tree `program`, and the `problems` the parser reported. A file the parser
+ * refused is reported here, once: its tree is empty, so leaving it out would
+ * report the file as clean.
  */
-export function checkSourceFile(relative, absolute, text) {
-  const path = relative.replace(/^(?:\.?\/)+/, '');
+export function checkParsedFile({ file, path, text, program, problems }) {
   const lineOf = lineIndex(text);
-  const { program, errors } = parseSourceFile(path, text);
   return [
-    ...parseProblems(path, errors, lineOf),
+    ...problems,
     ...checkScrollPadding(path, program, text, lineOf),
     ...checkRawText(path, program, lineOf),
-    ...checkDirectIntl(path, absolute, program, lineOf),
+    ...checkDirectIntl(path, file, program, lineOf),
     ...checkRules(path, program, text, lineOf),
   ];
 }
@@ -476,8 +475,8 @@ export function checkSourceFile(relative, absolute, text) {
 function run() {
   const problems = [];
   for (const dir of SOURCE_DIRS) {
-    for (const file of sourceFiles(dir, isTestArtifact)) {
-      problems.push(...checkSourceFile(file.slice(ROOT.length), file, readFileSync(file, 'utf8')));
+    for (const entry of parseSourceTree(dir, ROOT, isTestArtifact)) {
+      problems.push(...checkParsedFile(entry));
     }
   }
   problems.push(...checkCompilerStillDropsThese());

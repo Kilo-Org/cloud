@@ -160,6 +160,7 @@ function findByType(
   return root.findAll(node => typeof node.type === 'string' && node.type === type);
 }
 
+/** The style the list applies to its own content box, as rendered. */
 function findChoiceRow(
   root: TestRenderer.ReactTestInstance,
   endonym: string
@@ -275,12 +276,23 @@ describe('LanguagePickerSheet apply', () => {
     // the typed query.
     expect(findByType(renderer.root, 'FlashList')).toHaveLength(1);
     expect(findByType(renderer.root, 'TextInput')[0]).toBe(input);
-    expect(emptyState?.props.placement).toBeUndefined();
+    // The list's content box owns where the state sits: it fills the sheet body
+    // and centres the state in it, and the state itself opens no scroller of
+    // its own that would collapse to its own height.
+    expect(emptyState?.props.placement).toBe('static');
+    const emptyContentStyle = renderer.root.findByType(flashListMock).props.contentContainerStyle;
+    expect(emptyContentStyle.flexGrow).toBe(1);
+    expect(emptyContentStyle.justifyContent).toBe('center');
 
     act(() => {
       (input.props.onChangeText as (value: string) => void)('');
     });
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(0);
+    // Rows keep the box at its own height, so the first row starts where the
+    // list starts instead of being pushed down a filled body.
+    const listContentStyle = renderer.root.findByType(flashListMock).props.contentContainerStyle;
+    expect(listContentStyle.flexGrow).toBeUndefined();
+    expect(listContentStyle.justifyContent).toBeUndefined();
 
     renderer.unmount();
   });
@@ -372,6 +384,11 @@ describe('LanguagePickerSheet apply', () => {
     expect(findByType(renderer.root, 'FlashList')).toHaveLength(1);
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(1);
     expect(findByType(renderer.root, 'TextInput')[0]).toBe(input);
+    // The field is the list's own header here, so the content box must stay
+    // top-aligned: centring the empty state would push the field off the top.
+    const compactContentStyle = renderer.root.findByType(flashListMock).props.contentContainerStyle;
+    expect(compactContentStyle.flexGrow).toBeUndefined();
+    expect(compactContentStyle.justifyContent).toBeUndefined();
 
     act(() => {
       (input.props.onChangeText as (value: string) => void)('');

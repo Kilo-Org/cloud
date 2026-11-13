@@ -46,6 +46,18 @@ const listContentContainerStyle = {
   paddingHorizontal: 16,
   paddingBottom: 16,
 } satisfies ViewStyle;
+// A query that matches nothing leaves the no-match state as the list's only
+// content, and the sheet body is far taller than it. Without this the content
+// box shrinks to the state's own height, so the state's own centring collapses
+// and the message hugs the top of a blank sheet. The box then fills the body and
+// centres the state in it. Rows keep the box at its own height, so the first row
+// starts at the list's first pixel; a search field that leads the list is
+// content too, and must stay at the top, so that list keeps the plain style.
+const emptyListContentContainerStyle = {
+  ...listContentContainerStyle,
+  flexGrow: 1,
+  justifyContent: 'center',
+} satisfies ViewStyle;
 
 type RestartFailure = 'reload-failed' | 'restart-skipped';
 
@@ -367,12 +379,19 @@ export function LanguagePickerSheet({
         `ref` above), so a branch that re-parents it between the list header and
         an empty-state wrapper remounts the native input: a query that matched
         nothing would close the keyboard and drop the typed text. The empty
-        state is the list's own empty component, which leaves the field in place.
+        state is the list's own empty component, which leaves the field in
+        place; `placement="static"` keeps it out of a scroller of its own, so the
+        list's content box owns where it sits (see
+        `emptyListContentContainerStyle`).
       */}
       <FlashList
         nestedScrollEnabled
         style={listStyle}
-        contentContainerStyle={listContentContainerStyle}
+        contentContainerStyle={
+          items.length === 0 && !searchInList
+            ? emptyListContentContainerStyle
+            : listContentContainerStyle
+        }
         data={items}
         extraData={rowExtraData}
         keyExtractor={item => item.key}
@@ -380,6 +399,7 @@ export function LanguagePickerSheet({
         ListHeaderComponent={searchInList ? searchField : undefined}
         ListEmptyComponent={
           <EmptyState
+            placement="static"
             icon={SearchX}
             title={t('language.noMatches')}
             description={t('agents.sessionList.tryDifferentSearch')}

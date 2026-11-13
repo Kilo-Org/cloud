@@ -179,9 +179,9 @@ describe('shouldRetrySessionNotFound', () => {
   });
 
   it('keeps the spawned open on its own budget', () => {
-    expect(
-      shouldRetrySessionNotFound({ spawned: '1', attempt: 0, errorCode: 'NOT_FOUND' })
-    ).toBe(true);
+    expect(shouldRetrySessionNotFound({ spawned: '1', attempt: 0, errorCode: 'NOT_FOUND' })).toBe(
+      true
+    );
     expect(
       shouldRetrySessionNotFound({
         spawned: '1',

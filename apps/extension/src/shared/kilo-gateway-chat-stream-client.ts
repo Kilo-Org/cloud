@@ -53,12 +53,14 @@ export class KiloGatewayHttpError extends Error {
 const DEFAULT_STALL_TIMEOUT_MS = 45_000;
 const DEFAULT_COMPLETION_TIMEOUT_MS = 90_000;
 
-// A failed response still carries the reason (a rejected key, exhausted credits). Parse the whole body: a sliced one ends mid-token, so exactly the larger bodies lose the message. `agent-turn-error.ts` caps the text it extracts.
+// A failed response still carries the reason (a rejected key, exhausted credits). Parse the whole body so a large payload keeps its message, but skip anything past this ceiling: the reason is small, and parsing a gateway-sized page would block the panel.
+const MAX_ERROR_BODY_CHARS = 64 * 1024;
+
 // oxlint-disable-next-line anti-slop/no-unknown-returns -- a failed response body is JSON of unknown shape; the caller walks it with its own schema.
 const readErrorBody = async (response: Response): Promise<unknown> => {
   try {
     const text = await response.text();
-    if (text.trim() === '') {
+    if (text.trim() === '' || text.length > MAX_ERROR_BODY_CHARS) {
       return undefined;
     }
     const parsed: unknown = JSON.parse(text);

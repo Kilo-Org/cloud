@@ -887,6 +887,30 @@ describe('stall watchdog', () => {
     });
   });
 
+  it('drops an error body past the parse ceiling instead of blocking on it', async () => {
+    const body = JSON.stringify({
+      error: { message: 'Insufficient credits.' },
+      padding: 'x'.repeat(64 * 1024),
+    });
+    const fetch: FetchLike = () => Promise.resolve(new Response(body, { status: 402 }));
+
+    const failure = await fetchKiloGatewayChatCompletionStream({
+      apiBaseUrl: 'https://gateway.test',
+      fetch,
+      messages: [],
+      model: 'test-model',
+      onContentDelta: () => {},
+      token: 'token',
+      tools: [],
+    }).then(
+      () => {},
+      (error: unknown) => error
+    );
+
+    expect(failure).toBeInstanceOf(KiloGatewayHttpError);
+    expect(failure instanceof KiloGatewayHttpError ? failure.body : null).toBeUndefined();
+  });
+
   it('reports a caller abort as an abort, not a stall', async () => {
     const controller = new AbortController();
     const fetch: FetchLike = (_input, init) =>

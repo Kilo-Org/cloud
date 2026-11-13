@@ -121,6 +121,7 @@
     "copyLink": "Copier le lien",
     "couldNotLoadOrganizations": "Impossible de charger les organisations",
     "couldNotLoadSessions": "Impossible de charger les sessions",
+    "couldnTLoad": "Le chargement a échoué",
     "couldnTLoadMore": "Impossible de charger la suite",
     "deviceSessions": "Sessions sur les appareils",
     "disabled": "Désactivé",

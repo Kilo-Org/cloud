@@ -121,6 +121,7 @@
     "copyLink": "Kopeeri link",
     "couldNotLoadOrganizations": "Organisatsioone ei õnnestunud laadida.",
     "couldNotLoadSessions": "Seansse ei õnnestunud laadida.",
+    "couldnTLoad": "Andmeid ei õnnestunud laadida.",
     "couldnTLoadMore": "Rohkem andmeid ei õnnestunud laadida.",
     "deviceSessions": "Seadmete seansid",
     "disabled": "Välja lülitatud",

@@ -121,6 +121,7 @@
     "copyLink": "リンクをコピー",
     "couldNotLoadOrganizations": "組織を読み込めませんでした。",
     "couldNotLoadSessions": "セッションを読み込めませんでした。",
+    "couldnTLoad": "読み込めませんでした。",
     "couldnTLoadMore": "続きを読み込めませんでした。",
     "deviceSessions": "デバイスのセッション",
     "disabled": "無効",

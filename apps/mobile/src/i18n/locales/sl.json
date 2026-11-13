@@ -121,6 +121,7 @@
     "copyLink": "Kopiraj povezavo",
     "couldNotLoadOrganizations": "Organizacij ni bilo mogoče naložiti.",
     "couldNotLoadSessions": "Sej ni bilo mogoče naložiti.",
+    "couldnTLoad": "Podatkov ni bilo mogoče naložiti.",
     "couldnTLoadMore": "Dodatnih podatkov ni bilo mogoče naložiti.",
     "deviceSessions": "Seje v napravah",
     "disabled": "Onemogočeno",

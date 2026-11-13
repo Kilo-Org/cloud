@@ -121,6 +121,7 @@
     "copyLink": "Kopírovat odkaz",
     "couldNotLoadOrganizations": "Organizace se nepodařilo načíst.",
     "couldNotLoadSessions": "Relace se nepodařilo načíst.",
+    "couldnTLoad": "Načtení se nezdařilo.",
     "couldnTLoadMore": "Další položky se nepodařilo načíst.",
     "deviceSessions": "Přihlášená zařízení",
     "disabled": "Vypnuto",

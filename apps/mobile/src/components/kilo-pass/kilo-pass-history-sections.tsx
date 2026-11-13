@@ -57,10 +57,13 @@ function SectionPending({ children }: Readonly<{ children: ReactNode }>) {
 }
 
 /**
- * A page that failed keeps the rows it already has and offers a retry under
- * them, the same way the paged lists elsewhere do.
+ * A load that failed: the reason, and a retry beside it.
+ *
+ * A failed later page keeps the rows the list already has and says more could
+ * not be loaded; a failed first page has nothing on screen and says so, rather
+ * than claiming more could not be loaded when nothing loaded at all.
  */
-function SectionError({ onRetry }: Readonly<{ onRetry: () => void }>) {
+function SectionError({ message, onRetry }: Readonly<{ message: string; onRetry: () => void }>) {
   const { t } = useTranslation();
   return (
     <Pressable
@@ -69,7 +72,7 @@ function SectionError({ onRetry }: Readonly<{ onRetry: () => void }>) {
       accessibilityLabel={t('common.retry')}
       onPress={onRetry}
     >
-      <Text className="text-sm text-muted-foreground">{t('common.couldnTLoadMore')}</Text>
+      <Text className="text-sm text-muted-foreground">{message}</Text>
       <Text className="text-sm text-primary">{t('common.retry')}</Text>
     </Pressable>
   );
@@ -118,6 +121,7 @@ export function KiloPassCreditHistorySection({
   } else if (firstPageFailed) {
     body = (
       <SectionError
+        message={t('common.couldnTLoad')}
         onRetry={() => {
           query.refetch();
         }}
@@ -151,6 +155,7 @@ export function KiloPassCreditHistorySection({
       )}
       {query.isFetchNextPageError && (
         <SectionError
+          message={t('common.couldnTLoadMore')}
           onRetry={() => {
             query.fetchNextPage();
           }}
@@ -179,6 +184,7 @@ export function KiloPassBillingHistorySection({
   } else if (firstPageFailed) {
     body = (
       <SectionError
+        message={t('common.couldnTLoad')}
         onRetry={() => {
           query.refetch();
         }}
@@ -212,6 +218,7 @@ export function KiloPassBillingHistorySection({
       )}
       {query.isFetchNextPageError && (
         <SectionError
+          message={t('common.couldnTLoadMore')}
           onRetry={() => {
             query.fetchNextPage();
           }}

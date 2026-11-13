@@ -121,6 +121,7 @@
     "copyLink": "링크 복사",
     "couldNotLoadOrganizations": "조직을 불러오지 못했습니다.",
     "couldNotLoadSessions": "세션을 불러오지 못했습니다.",
+    "couldnTLoad": "불러오지 못했습니다.",
     "couldnTLoadMore": "추가 항목을 불러오지 못했습니다.",
     "deviceSessions": "기기 세션",
     "disabled": "비활성화됨",

@@ -121,6 +121,7 @@
     "copyLink": "লিঙ্ক কপি করুন",
     "couldNotLoadOrganizations": "সংস্থাগুলো লোড করা যায়নি।",
     "couldNotLoadSessions": "সেশন লোড করা যায়নি।",
+    "couldnTLoad": "লোড করা যায়নি।",
     "couldnTLoadMore": "আরও লোড করা যায়নি।",
     "deviceSessions": "ডিভাইসের সেশন",
     "disabled": "বন্ধ",

@@ -121,6 +121,7 @@
     "copyLink": "Копирай връзката",
     "couldNotLoadOrganizations": "Организациите не се заредиха.",
     "couldNotLoadSessions": "Сесиите не се заредиха.",
+    "couldnTLoad": "Не успяхме да заредим.",
     "couldnTLoadMore": "Не успяхме да заредим още резултати.",
     "deviceSessions": "Сесии на устройства",
     "disabled": "Изключено",

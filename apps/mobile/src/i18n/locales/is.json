@@ -121,6 +121,7 @@
     "copyLink": "Afrita tengil",
     "couldNotLoadOrganizations": "Tókst ekki að sækja fyrirtæki.",
     "couldNotLoadSessions": "Tókst ekki að sækja lotur.",
+    "couldnTLoad": "Tókst ekki að sækja.",
     "couldnTLoadMore": "Tókst ekki að sækja meira.",
     "deviceSessions": "Innskráningar í tækjum",
     "disabled": "Óvirkt",

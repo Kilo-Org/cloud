@@ -121,6 +121,7 @@
     "copyLink": "Kopiér link",
     "couldNotLoadOrganizations": "Organisationerne kunne ikke indlæses.",
     "couldNotLoadSessions": "Sessionerne kunne ikke indlæses.",
+    "couldnTLoad": "Det lykkedes ikke at indlæse.",
     "couldnTLoadMore": "Det lykkedes ikke at indlæse flere.",
     "deviceSessions": "Enhedssessioner",
     "disabled": "Deaktiveret",

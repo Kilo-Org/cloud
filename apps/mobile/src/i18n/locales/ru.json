@@ -121,6 +121,7 @@
     "copyLink": "Скопировать ссылку",
     "couldNotLoadOrganizations": "Не удалось загрузить организации.",
     "couldNotLoadSessions": "Не удалось загрузить сеансы.",
+    "couldnTLoad": "Не удалось загрузить.",
     "couldnTLoadMore": "Не удалось загрузить следующие записи.",
     "deviceSessions": "Сеансы на устройствах",
     "disabled": "Отключено",

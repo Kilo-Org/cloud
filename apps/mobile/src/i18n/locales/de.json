@@ -121,6 +121,7 @@
     "copyLink": "Link kopieren",
     "couldNotLoadOrganizations": "Die Organisationen konnten nicht geladen werden.",
     "couldNotLoadSessions": "Die Sitzungen konnten nicht geladen werden.",
+    "couldnTLoad": "Einträge konnten nicht geladen werden.",
     "couldnTLoadMore": "Weitere Einträge konnten nicht geladen werden.",
     "deviceSessions": "Gerätesitzungen",
     "disabled": "Deaktiviert",

@@ -121,6 +121,7 @@
     "copyLink": "Copia l'enllaç",
     "couldNotLoadOrganizations": "No s'han pogut carregar les organitzacions.",
     "couldNotLoadSessions": "No s'han pogut carregar les sessions.",
+    "couldnTLoad": "No s'ha pogut carregar.",
     "couldnTLoadMore": "No se n'han pogut carregar més.",
     "deviceSessions": "Sessions als dispositius",
     "disabled": "Desactivat",

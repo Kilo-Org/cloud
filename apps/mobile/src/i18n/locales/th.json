@@ -121,6 +121,7 @@
     "copyLink": "คัดลอกลิงก์",
     "couldNotLoadOrganizations": "ไม่สามารถโหลดรายชื่อองค์กรได้",
     "couldNotLoadSessions": "ไม่สามารถโหลดเซสชันได้",
+    "couldnTLoad": "ไม่สามารถโหลดได้",
     "couldnTLoadMore": "ไม่สามารถโหลดเพิ่มได้",
     "deviceSessions": "เซสชันบนอุปกรณ์",
     "disabled": "ปิดใช้งานแล้ว",

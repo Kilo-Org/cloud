@@ -121,6 +121,7 @@
     "copyLink": "Kopiera länk",
     "couldNotLoadOrganizations": "Det gick inte att läsa in organisationerna.",
     "couldNotLoadSessions": "Det gick inte att läsa in sessionerna.",
+    "couldnTLoad": "Det gick inte att läsa in.",
     "couldnTLoadMore": "Det gick inte att läsa in fler.",
     "deviceSessions": "Enhetssessioner",
     "disabled": "Inaktiverad",

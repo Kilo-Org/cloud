@@ -121,6 +121,7 @@
     "copyLink": "Kopiraj link",
     "couldNotLoadOrganizations": "Nije moguće učitati organizacije.",
     "couldNotLoadSessions": "Nije moguće učitati sesije.",
+    "couldnTLoad": "Učitavanje nije uspelo.",
     "couldnTLoadMore": "Učitavanje dodatnih stavki nije uspelo.",
     "deviceSessions": "Sesije na uređajima",
     "disabled": "Isključeno",

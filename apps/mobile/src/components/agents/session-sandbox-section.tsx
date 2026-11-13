@@ -10,6 +10,7 @@ import {
   sandboxDetailText,
   sandboxStatusLabel,
 } from '@/lib/cloud-environments/sandbox-status-copy';
+import { workspaceSnapshotRecoveryOffered } from '@/lib/cloud-environments/workspace-snapshot-recovery';
 import { formatDate } from '@/lib/format';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -106,7 +107,13 @@ export function SessionSandboxSection({
   }
   const data = statusQuery.data;
   const detail = data === undefined ? null : sandboxDetailText(data.detailCode, t);
-  const capturedAt = startFailed ? (recoveryQuery.data?.capturedAt ?? null) : null;
+  // The snapshot this failure would discard, from an answer about this failure.
+  const recovery = workspaceSnapshotRecoveryOffered({
+    startFailed,
+    recovery: recoveryQuery.data,
+    recoveryIsFresh: recoveryQuery.isSuccess && !recoveryQuery.isFetching,
+  });
+  const capturedAt = recovery?.capturedAt ?? null;
   const capturedLabel =
     capturedAt === null
       ? null
@@ -115,12 +122,15 @@ export function SessionSandboxSection({
           timeStyle: 'short',
         });
   const discard = () => {
-    if (capturedLabel === null) {
+    if (recovery === null) {
       return;
     }
     confirm({
       title: t('agentChat.environment.startFreshTitle'),
-      message: t('agentChat.environment.startFreshMessage', { when: capturedLabel }),
+      message:
+        capturedLabel === null
+          ? t('agentChat.environment.startFreshMessageUnknown')
+          : t('agentChat.environment.startFreshMessage', { when: capturedLabel }),
       confirmLabel: t('agentChat.environment.startFresh'),
       cancelLabel: t('common.cancel'),
       onConfirm: () => {
@@ -156,11 +166,13 @@ export function SessionSandboxSection({
           </Text>
         </>
       )}
-      {capturedLabel === null ? null : (
+      {recovery === null ? null : (
         <View className="gap-2">
-          <Text className="text-sm text-muted-foreground">
-            {t('agentChat.environment.snapshotCaptured', { when: capturedLabel })}
-          </Text>
+          {capturedLabel === null ? null : (
+            <Text className="text-sm text-muted-foreground">
+              {t('agentChat.environment.snapshotCaptured', { when: capturedLabel })}
+            </Text>
+          )}
           <Button variant="outline" size="sm" loading={removeSnapshot.isPending} onPress={discard}>
             <Text>{t('agentChat.environment.startFresh')}</Text>
           </Button>

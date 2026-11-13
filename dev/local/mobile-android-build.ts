@@ -82,6 +82,11 @@ export function buildAndroidFingerprintOptions(): {
       'modules/kilo-ssh/rust/target/**',
       'modules/kilo-ssh/android/src/main/jniLibs/**',
       'modules/kilo-ssh/android/src/main/java/ai/kilo/reactnativessh/uniffi/**',
+      // The same module's iOS artifacts, which the Android hash covers because
+      // it hashes the whole modules/ tree: only a Mac that ran the iOS build
+      // has them, so they would key Android builds on the producer's machine.
+      'modules/kilo-ssh/ios/Generated/**',
+      'modules/kilo-ssh/ios/Frameworks/**',
     ],
     extraSources: [
       {

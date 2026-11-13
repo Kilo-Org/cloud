@@ -506,6 +506,9 @@ importers:
       '@expo-google-fonts/jetbrains-mono':
         specifier: 0.4.1
         version: 0.4.1
+      '@expo-google-fonts/roboto-mono':
+        specifier: 0.4.1
+        version: 0.4.1
       '@expo/app-integrity':
         specifier: ~58.0.2
         version: 58.0.2(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))
@@ -5548,6 +5551,9 @@ packages:
 
   '@expo-google-fonts/jetbrains-mono@0.4.1':
     resolution: {integrity: sha512-CslACrtMOcRwoWXCO7OMEI+9w3fukWSoBtvNz46OqPoogEuuoY0tkDY1O8sFumk8t0pC6Cx0Xr95O0TOQhpkug==}
+
+  '@expo-google-fonts/roboto-mono@0.4.1':
+    resolution: {integrity: sha512-vVTGi93KBS/ypBvZaM6wxhgV2CWOiZjow6X7F6wMBPdtR1WasLELGrtiptgCTPipPkR5o5xpl2+3teTV1ffJGg==}
 
   '@expo/agent-cli@1.0.22':
     resolution: {integrity: sha512-ErNm/+D1uTvCeyWbOGxK9YJ2AqVZtWivrC+WSKsvWvDjSIlVhLxEr7xeCAEHyvFoMO7fIHmpHzXFy7kAanQCiw==}
@@ -25213,6 +25219,8 @@ snapshots:
   '@exodus/bytes@1.15.1': {}
 
   '@expo-google-fonts/jetbrains-mono@0.4.1': {}
+
+  '@expo-google-fonts/roboto-mono@0.4.1': {}
 
   '@expo/agent-cli@1.0.22': {}
 

@@ -5,13 +5,11 @@ import { StyleSheet } from 'react-native';
 import { TERMINAL_BACKGROUND, TERMINAL_THEME } from '@/lib/ssh/terminal-theme';
 
 /**
- * JetBrains Mono is the app's loaded monospace face (the PR diff renders it),
- * and it carries the block glyphs a terminal draws. DESIGN.md names Roboto Mono
- * for terminal text; that family is not installed in this app
- * (`@expo-google-fonts/roboto-mono` is not a dependency), so the loaded face is
- * the one available.
+ * DESIGN.md names Roboto Mono for terminal text. It is loaded beside JetBrains
+ * Mono in the root layout; the PR diff keeps JetBrains Mono, which is why both
+ * families are in the bundle.
  */
-const FONT_FAMILY = 'JetBrainsMono_500Medium';
+const FONT_FAMILY = 'RobotoMono_500Medium';
 
 /** The inset the shell's glyphs stay clear of, matched by the key bar's padding. */
 const HORIZONTAL_INSET = 8;

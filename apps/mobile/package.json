@@ -29,6 +29,7 @@
   "dependencies": {
     "@bsky.app/react-native-uitextview": "2.7.1",
     "@expo-google-fonts/jetbrains-mono": "0.4.1",
+    "@expo-google-fonts/roboto-mono": "0.4.1",
     "@expo/app-integrity": "~58.0.2",
     "@expo/react-native-action-sheet": "4.1.1",
     "@expo/ui": "~58.0.17",

@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -29,6 +29,15 @@ export function SshKeyCreateScreen() {
   const label = useRef('');
   const { create } = useSshKeyMutations();
   const [state, setState] = useState<GeneratedState>({ kind: 'idle' });
+  // The screen can be left while the native key generation is still running;
+  // a result that arrives afterwards has no screen to render it.
+  const alive = useRef(true);
+  useEffect(
+    () => () => {
+      alive.current = false;
+    },
+    []
+  );
 
   const busy = state.kind === 'generating' || create.isPending;
 
@@ -47,14 +56,21 @@ export function SshKeyCreateScreen() {
       const name = label.current.trim() || t('ssh.editor.key');
       const generated = await ssh.default.generateEd25519Key(name);
       const created = await create.mutateAsync(generatedKeyInput(name, generated));
+      // The created key still reaches the editor that pushed this screen, even
+      // when this screen has already gone.
       setCreatedKeyId(created.id);
+      if (!alive.current) {
+        return;
+      }
       setState({
         kind: 'ready',
         publicKey: generated.publicKeyOpenssh,
         fingerprint: generated.fingerprintSha256,
       });
     } catch {
-      setState({ kind: 'failed' });
+      if (alive.current) {
+        setState({ kind: 'failed' });
+      }
     }
   }
 

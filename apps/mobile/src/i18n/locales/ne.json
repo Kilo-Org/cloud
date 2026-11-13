@@ -2604,7 +2604,7 @@
     "thisDevice": "यो यन्त्र",
     "viewProfile": "प्रोफाइल हेर्नुहोस्",
     "signOutThisDevice": "यो यन्त्रबाट साइन आउट गर्नुहोस्",
-    "signOutSessionLabel": "{{device}} बाट साइन आउट गर्नुहोस्, साइन इन: {{signedIn}}",
+    "signOutSessionLabel": "{{device}} बाट साइन आउट गर्नुहोस्, साइन इन: {{signedIn}}, अन्तिम पटक देखिएको: {{lastSeen}}",
     "sessionSignedOut": "सत्रबाट साइन आउट गरियो।",
     "signOutThisDeviceTitle": "यो यन्त्रबाट साइन आउट गर्ने?",
     "signOutThisSessionTitle": "यो सत्रबाट साइन आउट गर्ने?",

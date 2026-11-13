@@ -2179,7 +2179,7 @@
     "webBrowser": "متصفح الويب",
     "viewProfile": "عرض الملف الشخصي",
     "signOutThisDevice": "تسجيل الخروج من هذا الجهاز",
-    "signOutSessionLabel": "تسجيل الخروج من {{device}}، تسجيل الدخول: {{signedIn}}",
+    "signOutSessionLabel": "تسجيل الخروج من {{device}}، تسجيل الدخول: {{signedIn}}، آخر ظهور: {{lastSeen}}",
     "sessionSignedOut": "تم تسجيل الخروج من الجلسة.",
     "signOutThisDeviceTitle": "تسجيل الخروج من هذا الجهاز؟",
     "signOutThisSessionTitle": "تسجيل الخروج من هذه الجلسة؟",

@@ -2023,7 +2023,7 @@
     "thisDevice": "Cet appareil",
     "viewProfile": "Voir le profil",
     "signOutThisDevice": "Déconnecter cet appareil",
-    "signOutSessionLabel": "Déconnecter {{device}}, connexion : {{signedIn}}",
+    "signOutSessionLabel": "Déconnecter {{device}}, connexion : {{signedIn}}, dernière activité : {{lastSeen}}",
     "sessionSignedOut": "Session déconnectée.",
     "signOutThisDeviceTitle": "Déconnecter cet appareil ?",
     "signOutThisSessionTitle": "Déconnecter cette session ?",

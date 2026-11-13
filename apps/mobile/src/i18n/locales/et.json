@@ -2604,7 +2604,7 @@
     "thisDevice": "See seade",
     "viewProfile": "Vaata profiili",
     "signOutThisDevice": "Logi sellest seadmest välja",
-    "signOutSessionLabel": "Logi seadmest {{device}} välja, sisse logitud {{signedIn}}",
+    "signOutSessionLabel": "Logi seadmest {{device}} välja, sisse logitud {{signedIn}}, viimati nähtud {{lastSeen}}",
     "sessionSignedOut": "Seansist on välja logitud.",
     "signOutThisDeviceTitle": "Kas logida sellest seadmest välja?",
     "signOutThisSessionTitle": "Kas logida sellest seansist välja?",

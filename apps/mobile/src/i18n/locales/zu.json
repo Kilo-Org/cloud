@@ -2605,7 +2605,7 @@
     "webBrowser": "Isiphequluli sewebhu",
     "viewProfile": "Buka iphrofayili",
     "signOutThisDevice": "Phuma ngemvume kule divayisi",
-    "signOutSessionLabel": "Phuma ngemvume ku-{{device}}, kungene ngemvume: {{signedIn}}",
+    "signOutSessionLabel": "Phuma ngemvume ku-{{device}}, kungene ngemvume: {{signedIn}}, kugcine ukubonwa: {{lastSeen}}",
     "sessionSignedOut": "Iseshini ikhishiwe ku-akhawunti.",
     "signOutThisDeviceTitle": "Uyafuna ukuphuma ngemvume kule divayisi?",
     "signOutThisSessionTitle": "Uyafuna ukuphuma ngemvume kule seshini?",

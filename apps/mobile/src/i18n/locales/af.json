@@ -2605,7 +2605,7 @@
     "webBrowser": "Webblaaier",
     "viewProfile": "Bekyk profiel",
     "signOutThisDevice": "Teken hierdie toestel uit",
-    "signOutSessionLabel": "Teken {{device}} uit, ingeteken {{signedIn}}",
+    "signOutSessionLabel": "Teken {{device}} uit, ingeteken {{signedIn}}, laas gesien {{lastSeen}}",
     "sessionSignedOut": "Sessie uitgeteken.",
     "signOutThisDeviceTitle": "Hierdie toestel uitteken?",
     "signOutThisSessionTitle": "Hierdie sessie uitteken?",

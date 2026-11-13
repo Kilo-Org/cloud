@@ -2062,7 +2062,7 @@
     "thisDevice": "Dieses Gerät",
     "viewProfile": "Profil ansehen",
     "signOutThisDevice": "Dieses Gerät abmelden",
-    "signOutSessionLabel": "{{device}} abmelden, angemeldet: {{signedIn}}",
+    "signOutSessionLabel": "{{device}} abmelden, angemeldet: {{signedIn}}, zuletzt aktiv: {{lastSeen}}",
     "sessionSignedOut": "Sitzung abgemeldet.",
     "signOutThisDeviceTitle": "Dieses Gerät abmelden?",
     "signOutThisSessionTitle": "Diese Sitzung abmelden?",

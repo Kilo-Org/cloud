@@ -2605,7 +2605,7 @@
     "webBrowser": "የድር አሳሽ",
     "viewProfile": "መገለጫ ይመልከቱ",
     "signOutThisDevice": "ከዚህ መሣሪያ ይውጡ",
-    "signOutSessionLabel": "ከ{{device}} ይውጡ፣ የገቡበት ጊዜ፦ {{signedIn}}",
+    "signOutSessionLabel": "ከ{{device}} ይውጡ፣ የገቡበት ጊዜ፦ {{signedIn}}፣ ለመጨረሻ ጊዜ የታየበት፦ {{lastSeen}}",
     "sessionSignedOut": "ከክፍለ ጊዜው ወጥተዋል።",
     "signOutThisDeviceTitle": "ከዚህ መሣሪያ መውጣት ይፈልጋሉ?",
     "signOutThisSessionTitle": "ከዚህ ክፍለ ጊዜ መውጣት ይፈልጋሉ?",

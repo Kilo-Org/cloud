@@ -2605,7 +2605,7 @@
     "webBrowser": "وێبگەڕ",
     "viewProfile": "بینینی پڕۆفایل",
     "signOutThisDevice": "دەرچوون لەم ئامێرە",
-    "signOutSessionLabel": "دەرچوون لە {{device}}، چوونەژوورەوە: {{signedIn}}",
+    "signOutSessionLabel": "دەرچوون لە {{device}}، چوونەژوورەوە: {{signedIn}}، دوایین بینین: {{lastSeen}}",
     "sessionSignedOut": "دەرچوون لە سێشنەکە تەواو بوو.",
     "signOutThisDeviceTitle": "دەرچوون لەم ئامێرە؟",
     "signOutThisSessionTitle": "دەرچوون لەم سێشنە؟",

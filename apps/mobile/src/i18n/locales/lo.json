@@ -2604,7 +2604,7 @@
     "thisDevice": "ອຸປະກອນນີ້",
     "viewProfile": "ເບິ່ງໂປຣໄຟລ໌",
     "signOutThisDevice": "ອອກຈາກລະບົບໃນອຸປະກອນນີ້",
-    "signOutSessionLabel": "ອອກຈາກລະບົບໃນ {{device}}, ເຂົ້າສູ່ລະບົບ {{signedIn}}",
+    "signOutSessionLabel": "ອອກຈາກລະບົບໃນ {{device}}, ເຂົ້າສູ່ລະບົບ {{signedIn}}, ໃຊ້ງານຫຼ້າສຸດ {{lastSeen}}",
     "sessionSignedOut": "ອອກຈາກລະບົບໃນເຊສຊັນແລ້ວ.",
     "signOutThisDeviceTitle": "ອອກຈາກລະບົບໃນອຸປະກອນນີ້ບໍ?",
     "signOutThisSessionTitle": "ອອກຈາກລະບົບໃນເຊສຊັນນີ້ບໍ?",

@@ -2120,7 +2120,7 @@
     "thisDevice": "Это устройство",
     "viewProfile": "Открыть профиль",
     "signOutThisDevice": "Выйти на этом устройстве",
-    "signOutSessionLabel": "Выйти на {{device}}, вход выполнен {{signedIn}}",
+    "signOutSessionLabel": "Выйти на {{device}}, вход выполнен {{signedIn}}, последняя активность {{lastSeen}}",
     "sessionSignedOut": "Сеанс завершён.",
     "signOutThisDeviceTitle": "Выйти на этом устройстве?",
     "signOutThisSessionTitle": "Завершить этот сеанс?",

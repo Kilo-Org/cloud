@@ -2605,7 +2605,7 @@
     "webBrowser": "Veb-brauzer",
     "viewProfile": "Profilni ko'rish",
     "signOutThisDevice": "Bu qurilmada tizimdan chiqish",
-    "signOutSessionLabel": "{{device}} qurilmasida tizimdan chiqish, kirilgan vaqt: {{signedIn}}",
+    "signOutSessionLabel": "{{device}} qurilmasida tizimdan chiqish, kirilgan vaqt: {{signedIn}}, oxirgi faollik: {{lastSeen}}",
     "sessionSignedOut": "Sessiyadan chiqildi.",
     "signOutThisDeviceTitle": "Bu qurilmada tizimdan chiqilsinmi?",
     "signOutThisSessionTitle": "Bu sessiya tugatilsinmi?",

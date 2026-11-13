@@ -2605,7 +2605,7 @@
     "webBrowser": "Veb brauzer",
     "viewProfile": "Profilə bax",
     "signOutThisDevice": "Bu cihazdan çıxış et",
-    "signOutSessionLabel": "{{device}} cihazından çıxış et, Giriş: {{signedIn}}",
+    "signOutSessionLabel": "{{device}} cihazından çıxış et, Giriş: {{signedIn}}, Son fəaliyyət: {{lastSeen}}",
     "sessionSignedOut": "Sessiyadan çıxıldı.",
     "signOutThisDeviceTitle": "Bu cihazdan çıxış edilsin?",
     "signOutThisSessionTitle": "Bu sessiyadan çıxış edilsin?",

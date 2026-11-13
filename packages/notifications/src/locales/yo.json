@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Awọn aṣoju to n ṣiṣẹ ni imudojuiwọn"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Iṣẹ-ṣiṣe ti pari"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Kuna: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Ti da duro: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

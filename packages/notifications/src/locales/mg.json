@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Misy fanavaozana ny agent mavitrika"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Vita ny asa"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Tsy nahomby: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Voasakana: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

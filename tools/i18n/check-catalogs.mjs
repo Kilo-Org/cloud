@@ -6,6 +6,12 @@
  * every key the source uses must exist. This runs in CI, so a locale can never
  * drift from English without the build saying so.
  *
+ * Two catalogs share the audit: the mobile app's copy, read against
+ * `apps/mobile/src`, and the notifications push copy, read against
+ * `packages/notifications/src` and `services`. Each catalog is read against its
+ * own source roots and its own translate call, so a key is judged used, or
+ * missing, by the code that actually renders it.
+ *
  * The value checks are mechanical, so they hold for a language nobody here
  * reads: placeholders, `$t(key)` references, edge spacing, double spaces and
  * direction marks must match English, and a message must never quote an
@@ -38,14 +44,23 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 let problems = [];
 const fail = message => problems.push(message);
 
-/** The two catalogs the audit compares against their English files. */
+/**
+ * The two catalogs the audit compares against their English files, with the
+ * source trees whose calls and literals name their keys. The mobile app reads
+ * its own tree; the push catalog is rendered on both sides of the wire, from
+ * `packages/notifications/src` and from the workers under `services`.
+ */
 function catalogsOf(root) {
   return [
-    { name: 'mobile', dir: join(root, 'apps/mobile/src/i18n/locales'), checkUsage: true },
+    {
+      name: 'mobile',
+      dir: join(root, 'apps/mobile/src/i18n/locales'),
+      sourceRoots: [join(root, 'apps/mobile/src')],
+    },
     {
       name: 'notifications',
       dir: join(root, 'packages/notifications/src/locales'),
-      checkUsage: false,
+      sourceRoots: [join(root, 'packages/notifications/src'), join(root, 'services')],
     },
   ];
 }
@@ -248,6 +263,23 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'organization.hub.planTeams',
   'organization.hub.planEnterprise',
 ]);
+
+/**
+ * Push copy that is English on purpose, per catalog. A value listed for a tag
+ * is not reported as untranslated for that tag.
+ *
+ * These four languages write the security-finding body
+ * `{{findingTitle}} in {{repoFullName}}` with the same preposition word English
+ * uses — "in" is the native word in each — so the copy is already right and
+ * there is nothing to translate. Irish is not one of them: its preposition is
+ * "i", so that catalog carries the translated body instead.
+ */
+const NOTIFICATIONS_ENGLISH_COPY_EXCEPTIONS = {
+  af: ['{{findingTitle}} in {{repoFullName}}'],
+  de: ['{{findingTitle}} in {{repoFullName}}'],
+  it: ['{{findingTitle}} in {{repoFullName}}'],
+  nl: ['{{findingTitle}} in {{repoFullName}}'],
+};
 
 /**
  * Counted bucket phrases that two dashboard lines render. The repository row
@@ -645,64 +677,118 @@ function destructiveLabels(object) {
 }
 
 /**
- * Three sets:
- * - `called`: keys passed to t() or i18n.t() as a plain string. Each must exist.
+ * Three sets, read from every source root of one catalog:
+ * - `called`: keys the catalog's own translate call names as a plain string.
+ *   Each must exist.
  * - `referenced`: every string literal in the source. A key named in a lookup
  *   table and passed to t() through a variable is used, so the dead-key check
  *   reads this wider set and never asks anyone to delete a live key.
  * - `destructiveKeys`: keys an object literal paints on a destructive button
  *   while the dialog can also paint the generic Cancel label. See the rule that
- *   reads this set, `destructiveConfirmKeys` below.
+ *   reads this set, `destructiveConfirmKeys` below. Only the mobile catalog
+ *   collects it: a destructive button is mobile copy, and the push catalog must
+ *   not raise a finding on a key it does not paint.
  *
  * All three come from the syntax tree (tools/lib/ast.mjs), so text that only
  * looks like a call — in a comment, in a string, in a type annotation — moves no
  * key, and an apostrophe in prose cannot throw the quote pairing out of step.
  */
-function scanSource(root) {
+function scanSource(catalog, root) {
   const called = new Set();
   const referenced = new Set();
   const destructiveKeys = new Set();
-  for (const { file, program, problems: unparsed } of parseSourceTree(
-    join(root, 'apps/mobile/src'),
-    root,
-    isTestArtifact
-  )) {
-    // A file the parser refused has an empty tree, so its keys would leave
-    // both sets without a word. `check:i18n` runs oxlint first, so this
-    // normally reports nothing.
-    for (const problem of unparsed) {
-      fail(problem);
+  const mobile = catalog.name === 'mobile';
+  const calledKey = mobile ? mobileCalledKey : pushCalledKey;
+  for (const sourceRoot of catalog.sourceRoots) {
+    // A fixture tree holds only the parts a test gives it; a root the tree does
+    // not have has nothing to scan.
+    if (!existsSync(sourceRoot)) {
+      continue;
     }
-    walk(program, node => {
-      if (node.type === 'Literal' && typeof node.value === 'string') {
-        if (node.value !== '') {
-          referenced.add(node.value);
+    for (const { file, program, problems: unparsed } of parseSourceTree(
+      sourceRoot,
+      root,
+      isTestArtifact
+    )) {
+      // A file the parser refused has an empty tree, so its keys would leave
+      // both sets without a word. `check:i18n` runs oxlint first, so this
+      // normally reports nothing.
+      for (const problem of unparsed) {
+        fail(problem);
+      }
+      walk(program, node => {
+        if (node.type === 'Literal' && typeof node.value === 'string') {
+          if (node.value !== '') {
+            referenced.add(node.value);
+          }
+          return;
         }
-        return;
-      }
-      if (node.type === 'ObjectExpression') {
-        for (const key of destructiveLabels(node)) {
-          destructiveKeys.add(key);
+        if (node.type === 'ObjectExpression') {
+          if (mobile) {
+            for (const key of destructiveLabels(node)) {
+              destructiveKeys.add(key);
+            }
+          }
+          return;
         }
-        return;
-      }
-      if (node.type !== 'CallExpression' || !isTranslateCallee(node.callee)) {
-        return;
-      }
-      const [first] = node.arguments;
-      if (first === undefined) {
-        return;
-      }
-      // A template-literal key would make the both-ways check unsound.
-      const key = unwrap(first);
-      if (key.type === 'TemplateLiteral') {
-        fail(`${file}: t() called with a template literal; the key check cannot see it`);
-      } else if (key.type === 'Literal' && typeof key.value === 'string' && key.value !== '') {
-        called.add(key.value);
-      }
-    });
+        if (node.type !== 'CallExpression') {
+          return;
+        }
+        const key = calledKey(node, file);
+        if (key !== null) {
+          called.add(key);
+        }
+      });
+    }
   }
   return { called, referenced, destructiveKeys };
+}
+
+/**
+ * The key one mobile `t()` call names, or null when the call is not a translate
+ * call or carries no plain key. A template-literal key would make the both-ways
+ * check unsound, so it fails instead of passing silently.
+ */
+function mobileCalledKey(call, file) {
+  if (!isTranslateCallee(call.callee)) {
+    return null;
+  }
+  const [first] = call.arguments;
+  if (first === undefined) {
+    return null;
+  }
+  const key = unwrap(first);
+  if (key.type === 'TemplateLiteral') {
+    fail(`${file}: t() called with a template literal; the key check cannot see it`);
+    return null;
+  }
+  return key.type === 'Literal' && typeof key.value === 'string' && key.value !== ''
+    ? key.value
+    : null;
+}
+
+/**
+ * The key one `translatePush(locale, key, …)` call names, or null when the call
+ * is not one or its key is not a plain string.
+ *
+ * A non-literal key is the payload form the catalog exists to serve: two workers
+ * build `` `${i18nKey}.title` `` and `` `${i18nKey}.body` `` from a field they
+ * were handed, so nothing there names a key the catalog could miss and it passes
+ * silently. The keys those payloads carry arrive as literals elsewhere in the
+ * same tree.
+ */
+function pushCalledKey(call) {
+  if (call.callee.type !== 'Identifier' || call.callee.name !== 'translatePush') {
+    return null;
+  }
+  const key = call.arguments[1];
+  if (key === undefined) {
+    return null;
+  }
+  const value = unwrap(key);
+  return value.type === 'Literal' && typeof value.value === 'string' && value.value !== ''
+    ? value.value
+    : null;
 }
 
 /**
@@ -865,6 +951,16 @@ function wording(value, language = 'en') {
 
 function pluralBaseKey(key) {
   return pluralParts(key)?.base ?? key;
+}
+
+/**
+ * The key a push payload names when the runtime appends the part it renders.
+ * A worker is handed `internal.lowBalance` and builds `…title` and `…body` from
+ * it, so a source file that names the bare key has used every part the catalog
+ * defines under it.
+ */
+function pushBaseKey(key) {
+  return key.replace(/\.(?:title|body)$/, '');
 }
 
 /**
@@ -1105,9 +1201,12 @@ export function checkCatalogs(root = ROOT) {
     const english = flattenCatalog(
       parseCatalog(join(catalog.dir, 'en.json'), `${catalog.name}/en`)
     );
-    // One parse of the mobile source serves the usage check and the
-    // destructive-confirm rule; the notifications catalog reads no source.
-    const source = catalog.checkUsage ? scanSource(root) : null;
+    // One scan of this catalog's own source roots serves the usage check, and
+    // its destructive-confirm rule for the mobile catalog.
+    const source = scanSource(catalog, root);
+    // The base each catalog's consumers append their own part to: a plural stem
+    // in the app, a `.title`/`.body` part in the push runtime.
+    const baseKeyOf = catalog.name === 'mobile' ? pluralBaseKey : pushBaseKey;
     const englishFamilies = new Set(
       [...english.keys()]
         .map(pluralParts)
@@ -1524,16 +1623,37 @@ export function checkCatalogs(root = ROOT) {
       }
     }
 
-    if (source !== null) {
-      for (const key of source.called) {
-        if (!english.has(key) && !englishFamilies.has(key)) {
-          fail(`${catalog.name}: source uses "${key}", which en.json does not define`);
+    // Push copy is short, and a value that still reads as English was never
+    // translated. A single token carries no grammar — a product name or a bare
+    // placeholder has nothing to translate — so only a value with words is
+    // judged.
+    if (catalog.name === 'notifications') {
+      for (const [key, englishValue] of english) {
+        if (englishValue.trim().split(/\s+/).length < 2) {
+          continue;
+        }
+        for (const tag of present) {
+          if (tag === 'en' || localeValues.get(tag).get(key) !== englishValue) {
+            continue;
+          }
+          if ((NOTIFICATIONS_ENGLISH_COPY_EXCEPTIONS[tag] ?? []).includes(englishValue)) {
+            continue;
+          }
+          fail(
+            `${catalog.name}/${tag}: "${key}" is English; translate it, or list the value in NOTIFICATIONS_ENGLISH_COPY_EXCEPTIONS under "${tag}"`
+          );
         }
       }
-      for (const key of english.keys()) {
-        if (!source.referenced.has(key) && !source.referenced.has(pluralBaseKey(key))) {
-          fail(`${catalog.name}: en.json defines "${key}", which no source file uses`);
-        }
+    }
+
+    for (const key of source.called) {
+      if (!english.has(key) && !englishFamilies.has(key)) {
+        fail(`${catalog.name}: source uses "${key}", which en.json does not define`);
+      }
+    }
+    for (const key of english.keys()) {
+      if (!source.referenced.has(key) && !source.referenced.has(baseKeyOf(key))) {
+        fail(`${catalog.name}: en.json defines "${key}", which no source file uses`);
       }
     }
   }

@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "ຕົວແທນທີ່ກຳລັງເຮັດວຽກມີການອັບເດດ"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "ວຽກສຳເລັດແລ້ວ"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "ລົ້ມເຫລວ: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "ຖືກຂັດຈັງຫວະ: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

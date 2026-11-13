@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Aktiv agentlərdə yenilənmə var"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Tapşırıq tamamlandı"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Uğursuz oldu: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Kəsildi: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

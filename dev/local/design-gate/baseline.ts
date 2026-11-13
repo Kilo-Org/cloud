@@ -439,11 +439,20 @@ export function targetReadiness(
                 node.visibleRect[2] > 0 &&
                 node.visibleRect[3] > 0
             );
+      // A tab route keeps the URL at its group root, so opening it need not change
+      // the route and the runner reports `env-mismatch`. For a marker-less target
+      // the declared screen identity below is what proves the link landed, so that
+      // rule only fails a target that also declares a marker. The rules that mean
+      // the capture itself is unusable always apply.
       const warning = outcome.findings.some(
         finding =>
           finding.cell === cell.id &&
           finding.target === target.id &&
-          ['env-mismatch', 'unsettled', 'capture-alignment', 'blank-frame'].includes(finding.rule)
+          (target.readyTestID === undefined
+            ? ['unsettled', 'capture-alignment', 'blank-frame'].includes(finding.rule)
+            : ['env-mismatch', 'unsettled', 'capture-alignment', 'blank-frame'].includes(
+                finding.rule
+              ))
       );
       if (
         blocked ||

@@ -610,6 +610,48 @@ test('a target with readyTestID is not ready when that node is absent', t => {
   ]);
 });
 
+test('a tab route keeps a marker-less target ready when the link leaves the route unchanged', t => {
+  const run = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({
+      route: UNMARKED.route,
+      screen: UNMARKED.screen,
+      nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800] }],
+    })
+  );
+  run.outcome.findings.push({
+    cell: 'base',
+    target: UNMARKED.id,
+    rule: 'env-mismatch',
+    severity: 'warning',
+    message: 'deep link did not open',
+  } as never);
+  assert.deepEqual(targetReadiness(run.outcome, unmarkedManifest, run.out), []);
+});
+
+test('a marker-less target stays not ready when the capture itself is unusable', t => {
+  const run = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({
+      route: UNMARKED.route,
+      screen: UNMARKED.screen,
+      nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800] }],
+    })
+  );
+  run.outcome.findings.push({
+    cell: 'base',
+    target: UNMARKED.id,
+    rule: 'unsettled',
+    severity: 'warning',
+    message: 'layout kept changing',
+  } as never);
+  assert.deepEqual(targetReadiness(run.outcome, unmarkedManifest, run.out), [
+    `base/${UNMARKED.id}: target not ready or screen identity differs (${UNMARKED.route}, ${UNMARKED.screen})`,
+  ]);
+});
+
 test('a target ready by its route keeps the comparison inconclusive when it never reached that screen', async t => {
   const fixture = syntheticRepo(t, unmarkedManifest);
   const preparation = await prepareProof(fixture);

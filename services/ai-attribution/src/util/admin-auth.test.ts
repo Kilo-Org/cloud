@@ -14,7 +14,6 @@ const mockedTimingSafeEqual = timingSafeEqual as jest.MockedFunction<typeof timi
 
 const SECRET = 'local-test-admin-secret-value';
 
-// Same length as SECRET so a length-insensitive comparison is exercised too.
 const SAME_LENGTH_WRONG_SECRET = 'local-test-admin-secret-VALUE';
 
 describe('validateAdminSecret', () => {

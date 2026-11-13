@@ -17,14 +17,14 @@ final class SshShellSource: TerminalByteSource, @unchecked Sendable {
     sessionId: String,
     session: SshSession,
     term: String,
-    cols: Int,
-    rows: Int
+    cols: UInt32,
+    rows: UInt32
   ) async throws -> SshShellSource {
     let delivery = SinkDelivery()
     let channel = try await session.openShell(
       term: term,
-      cols: UInt32(cols),
-      rows: UInt32(rows),
+      cols: cols,
+      rows: rows,
       sink: delivery
     )
 
@@ -40,8 +40,17 @@ final class SshShellSource: TerminalByteSource, @unchecked Sendable {
   }
 
   func resize(cols: Int, rows: Int) {
+    guard
+      let cols = UInt32(exactly: cols),
+      let rows = UInt32(exactly: rows),
+      cols > 0,
+      rows > 0
+    else {
+      return
+    }
+
     do {
-      try channel.resize(cols: UInt32(cols), rows: UInt32(rows))
+      try channel.resize(cols: cols, rows: rows)
     } catch {
       delivery.onClosed(exitStatus: nil, error: message(for: error))
     }

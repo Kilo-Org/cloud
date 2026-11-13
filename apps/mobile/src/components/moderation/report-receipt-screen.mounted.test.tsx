@@ -115,7 +115,7 @@ function texts(root: ReactTestRenderer['root']) {
 
 function textNode(root: ReactTestRenderer['root'], value: string) {
   const [node] = root.findAll(
-    node => Object.is(node.type, 'Text') && node.props.children === value
+    candidate => Object.is(candidate.type, 'Text') && candidate.props.children === value
   );
   if (!node) {
     throw new Error(`missing text node for ${value}`);

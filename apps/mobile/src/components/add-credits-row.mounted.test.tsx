@@ -4,6 +4,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
+import {
+  LINE_ACTION_BOX_CLASS,
+  LINE_ACTION_HIT_SLOP,
+  MIN_TAP_TARGET_DP,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
+
 import { AddCreditsButton, AddCreditsRow } from './add-credits-row';
 
 const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, scale: 2 }));
@@ -131,5 +138,45 @@ describe('AddCreditsRow inline placement', () => {
   it('keeps the App Store gate', () => {
     platform.OS = 'ios';
     expect(renderInline().findAllByType(BUTTON)).toHaveLength(0);
+  });
+});
+
+describe('AddCreditsRow line action', () => {
+  /** The top-up in the caller's own row, on the caller's own text line. */
+  function renderLineAction() {
+    act(() => {
+      const element = createElement(AddCreditsRow, {
+        url: 'https://example.com/credits',
+        inline: true,
+        lineAction: true,
+      });
+      if (renderer) {
+        renderer.update(element);
+      } else {
+        renderer = TestRenderer.create(element);
+      }
+    });
+    if (!renderer) {
+      throw new Error('Missing AddCreditsRow renderer');
+    }
+    return renderer.root;
+  }
+
+  it('draws the shared line-action box instead of the state surface', () => {
+    const classes = String(renderLineAction().findByType(BUTTON).props.className).split(' ');
+    // Every token, so the negative margin that cancels the box's overflow
+    // cannot be dropped while the height alone still matches.
+    expect(classes).toEqual(expect.arrayContaining(LINE_ACTION_BOX_CLASS.split(' ')));
+    expect(classes).not.toContain('min-h-[48px]');
+  });
+
+  it('carries the line-action slop the box needs', () => {
+    expect(renderLineAction().findByType(BUTTON).props.hitSlop).toEqual(LINE_ACTION_HIT_SLOP);
+  });
+
+  it('reaches the 44pt touch target from the box and its slop', () => {
+    expect(
+      MIN_TAP_TARGET_DP + LINE_ACTION_HIT_SLOP.top + LINE_ACTION_HIT_SLOP.bottom
+    ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
   });
 });

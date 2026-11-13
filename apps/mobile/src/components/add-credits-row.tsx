@@ -3,7 +3,11 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import {
+  LINE_ACTION_BOX_CLASS,
+  LINE_ACTION_HIT_SLOP,
+  STATE_ACTION_CLASS,
+} from '@/lib/a11y/tap-target';
 import { canOpenExternalBilling } from '@/lib/credits/external-billing-link';
 import { openExternalUrl } from '@/lib/external-link';
 import { isNarrowLayout } from '@/lib/narrow-layout';
@@ -21,6 +25,13 @@ type AddCreditsButtonProps = Readonly<{
   onPress: () => void;
   emphasis?: AddCreditsEmphasis;
   className?: string;
+  /**
+   * Share the caller's text line: a 28 dp frame whose negative margins cancel
+   * its overflow, with `hitSlop` carrying the rest of the 44 pt target. The
+   * line then stays one text line tall instead of growing to a control's touch
+   * size (`apps/mobile/AGENTS.md`).
+   */
+  lineAction?: boolean;
 }>;
 
 /**
@@ -42,6 +53,7 @@ export function AddCreditsButton({
   onPress,
   emphasis = 'quiet',
   className,
+  lineAction = false,
 }: AddCreditsButtonProps) {
   const { t } = useTranslation();
   const primary = emphasis === 'primary';
@@ -55,8 +67,11 @@ export function AddCreditsButton({
         // the surface the person's own bubble uses instead.
         primary ? 'bg-accent-soft' : 'dark:bg-secondary-fill',
         className,
-        STATE_ACTION_CLASS
+        lineAction ? LINE_ACTION_BOX_CLASS : STATE_ACTION_CLASS
       )}
+      // Undefined keeps the shared `Button`'s own `sm` default; a line action
+      // draws a smaller frame, so it carries the flush-to-44pt slop itself.
+      hitSlop={lineAction ? LINE_ACTION_HIT_SLOP : undefined}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={t('addCredits.cta')}
@@ -82,6 +97,8 @@ type AddCreditsRowProps = Readonly<{
    * that caller, so the button sits at its natural size beside the amount.
    */
   inline?: boolean;
+  /** Keep the caller's line one text line tall; see `AddCreditsButton`. */
+  lineAction?: boolean;
 }>;
 
 /**
@@ -100,7 +117,14 @@ type AddCreditsRowProps = Readonly<{
  * button is returned alone, at its natural size, so it can sit on the balance
  * line instead of filling a block of its own.
  */
-export function AddCreditsRow({ url, onPress, className, emphasis, inline }: AddCreditsRowProps) {
+export function AddCreditsRow({
+  url,
+  onPress,
+  className,
+  emphasis,
+  inline,
+  lineAction,
+}: AddCreditsRowProps) {
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const narrow = isNarrowLayout(width);
@@ -122,6 +146,7 @@ export function AddCreditsRow({ url, onPress, className, emphasis, inline }: Add
         })
       }
       emphasis={emphasis}
+      lineAction={lineAction}
       className={inline || !narrow ? undefined : 'w-full'}
     />
   );

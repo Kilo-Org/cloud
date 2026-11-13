@@ -16,6 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useTRPC } from '@/lib/trpc/utils';
+import { KiloclawStripeRenewalPreview } from './KiloclawStripeRenewalPreview';
 
 const CONFIRMATION = 'STOP STRIPE RENEWALS';
 
@@ -155,9 +156,8 @@ function StripeRenewalControls() {
           )}
           {preview.data && (
             <div className="space-y-4">
-              <p className="text-sm tabular-nums">
-                <strong>{preview.data.total}</strong> Stripe-backed subscriptions will be checked.
-                Subscriptions already canceled or ending by the current term are left stopped.
+              <KiloclawStripeRenewalPreview counts={preview.data} />
+              <p className="text-muted-foreground text-sm">
                 Attached plan schedules are released where needed.
               </p>
               <p className="text-muted-foreground text-sm">

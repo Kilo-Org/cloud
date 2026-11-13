@@ -4133,7 +4133,7 @@
     "disconnectFailed": "Non se puido desconectar {{provider}}",
     "couldNotLoad": "Non se puideron cargar as integracións",
     "permissionDenied": "Non tes permiso para xestionar estas integracións.",
-    "memberHint": "Pídelle a unha persoa propietaria ou administradora da organización que cambie estas conexións.",
+    "rowManagedByOwnerOrAdmin": "Pídelle a unha persoa propietaria ou administradora da organización que cambie esta conexión.",
     "rowManagedByOwnersAndBilling": "Só os propietarios e os xestores de facturación da organización poden cambiar esta conexión.",
     "connectFailed": "Non se puido abrir a páxina de conexión"
   },

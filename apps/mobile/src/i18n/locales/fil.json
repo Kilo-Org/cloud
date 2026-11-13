@@ -4133,7 +4133,7 @@
     "disconnectFailed": "Hindi ma-diskonekta ang {{provider}}",
     "couldNotLoad": "Hindi ma-load ang mga integration",
     "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga integration na ito.",
-    "memberHint": "Hilingin sa isang may-ari o admin ng organisasyon na baguhin ang mga koneksyong ito.",
+    "rowManagedByOwnerOrAdmin": "Hilingin sa isang may-ari o admin ng organisasyon na baguhin ang koneksyong ito.",
     "rowManagedByOwnersAndBilling": "Maaari lamang baguhin ng mga may-ari ng organisasyon at mga tagapamahala ng pagsingil ang koneksyong ito.",
     "connectFailed": "Hindi mabuksan ang pahina ng koneksyon"
   },

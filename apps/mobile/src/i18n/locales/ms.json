@@ -4133,7 +4133,7 @@
     "disconnectFailed": "Tidak dapat memutuskan sambungan {{provider}}",
     "couldNotLoad": "Tidak dapat memuatkan integrasi",
     "permissionDenied": "Anda tidak mempunyai kebenaran untuk mengurus integrasi ini.",
-    "memberHint": "Minta pemilik atau pentadbir organisasi untuk menukar sambungan ini.",
+    "rowManagedByOwnerOrAdmin": "Minta pemilik atau pentadbir organisasi untuk menukar sambungan ini.",
     "rowManagedByOwnersAndBilling": "Hanya pemilik organisasi dan pengurus pengebilan boleh menukar sambungan ini.",
     "connectFailed": "Tidak dapat membuka halaman sambungan"
   },

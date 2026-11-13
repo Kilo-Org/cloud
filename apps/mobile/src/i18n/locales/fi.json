@@ -4133,7 +4133,7 @@
     "disconnectFailed": "Yhteyttä palveluun {{provider}} ei voitu katkaista",
     "couldNotLoad": "Integraatioita ei voitu ladata",
     "permissionDenied": "Sinulla ei ole oikeutta hallita näitä integraatioita.",
-    "memberHint": "Pyydä organisaation omistajaa tai järjestelmänvalvojaa muuttamaan näitä yhteyksiä.",
+    "rowManagedByOwnerOrAdmin": "Pyydä organisaation omistajaa tai järjestelmänvalvojaa muuttamaan tätä yhteyttä.",
     "rowManagedByOwnersAndBilling": "Vain organisaation omistajat ja laskutusvastaavat voivat muuttaa tämän yhteyden.",
     "connectFailed": "Yhdistämissivua ei voitu avata"
   },

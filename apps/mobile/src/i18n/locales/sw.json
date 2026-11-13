@@ -4133,7 +4133,7 @@
     "disconnectFailed": "Imeshindwa kutenganisha {{provider}}",
     "couldNotLoad": "Imeshindwa kupakia miunganisho",
     "permissionDenied": "Huna ruhusa ya kudhibiti miunganisho hii.",
-    "memberHint": "Mwombe mmiliki au msimamizi wa shirika abadilishe miunganisho hii.",
+    "rowManagedByOwnerOrAdmin": "Mwombe mmiliki au msimamizi wa shirika abadilishe muunganisho huu.",
     "rowManagedByOwnersAndBilling": "Ni wamiliki wa shirika na wasimamizi wa bili pekee wanaoweza kubadilisha muunganisho huu.",
     "connectFailed": "Imeshindwa kufungua ukurasa wa kuunganisha"
   },

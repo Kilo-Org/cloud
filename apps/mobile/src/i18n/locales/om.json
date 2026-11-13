@@ -4133,7 +4133,7 @@
     "disconnectFailed": "{{provider}} addaan kutuun hin danda'amne",
     "couldNotLoad": "Walitti hidhamiinsota fe'uun hin danda'amne",
     "permissionDenied": "Walitti hidhamiinsota kana bulchuuf hayyama hin qabdu.",
-    "memberHint": "Walitti hidhamiinsota kana jijjiiruuf abbaa dhaabbataa ykn bulchaa gaafadhu.",
+    "rowManagedByOwnerOrAdmin": "Walitti hidhamiinsa kana jijjiiruuf abbaa dhaabbataa ykn bulchaa gaafadhu.",
     "rowManagedByOwnersAndBilling": "Abbootiin dhaabbataa fi bulchoonni kaffaltii qofa walitti hidhamiinsa kana jijjiiruu danda'u.",
     "connectFailed": "Fuula walitti hidhamiinsaa banuun hin danda'amne"
   },

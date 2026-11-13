@@ -140,7 +140,7 @@ describe('providerBlockedNoteKey', () => {
     for (const provider of ['github', 'slack'] as const) {
       for (const action of ['connect', 'disconnect'] as const) {
         expect(providerBlockedNoteKey({ provider, action, installed: true })).toBe(
-          'integrations.memberHint'
+          'integrations.rowManagedByOwnerOrAdmin'
         );
       }
     }
@@ -150,7 +150,7 @@ describe('providerBlockedNoteKey', () => {
     for (const provider of ['gitlab', 'discord', 'linear'] as const) {
       for (const action of ['connect', 'disconnect'] as const) {
         expect(providerBlockedNoteKey({ provider, action, installed: true })).toBe(
-          'integrations.memberHint'
+          'integrations.rowManagedByOwnerOrAdmin'
         );
       }
     }

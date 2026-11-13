@@ -28,13 +28,11 @@ import { cn } from '@/lib/utils';
 const CONFIGURE_ROW_STACK_FONT_SCALE = 1.8;
 
 /**
- * The indent that puts a row's note under its title: the icon tile's 30 dp plus
- * the icon-aligned line's `gap-3`, which is 10.5 dp at this app's 14 pt rem.
- * It is a start inset, so the note keeps to the title's column when the row
- * mirrors. It rides in `style` because the class name is a computed value no
- * utility carries exactly.
+ * The note's inset: the icon tile's 30 dp plus the icon-aligned line's `gap-3`,
+ * which is 10.5 dp at this app's 14 pt rem. It is the start edge, so the note
+ * keeps to the title's column when the row mirrors.
  */
-const NOTE_INDENT_DP = 30 + 10.5;
+const NOTE_INDENT_CLASS = 'ps-[40.5px]';
 
 type ConfigureRowProps = {
   icon: LucideIcon;
@@ -177,11 +175,10 @@ export function ConfigureRow({
   // tile and the trailing control on title+subtitle+note, so a row with a note
   // sat its icon lower than a row without one. It renders below the
   // icon-aligned line instead, inset to the title's column by
-  // NOTE_INDENT_DP.
+  // NOTE_INDENT_CLASS.
   const noteNode = note ? (
     <Text
-      className="mt-1 text-xs text-muted-foreground"
-      style={stack ? undefined : { paddingStart: NOTE_INDENT_DP }}
+      className={cn('mt-1 text-xs text-muted-foreground', stack ? undefined : NOTE_INDENT_CLASS)}
       numberOfLines={3}
     >
       {note}

@@ -4133,7 +4133,7 @@
     "disconnectFailed": "{{provider}} の接続を解除できませんでした",
     "couldNotLoad": "連携を読み込めませんでした",
     "permissionDenied": "これらの連携を管理する権限がありません。",
-    "memberHint": "これらの接続を変更するには、組織のオーナーまたは管理者に依頼してください。",
+    "rowManagedByOwnerOrAdmin": "この接続を変更するには、組織のオーナーまたは管理者に依頼してください。",
     "rowManagedByOwnersAndBilling": "この接続を変更できるのは、組織のオーナーおよび請求管理者のみです。",
     "connectFailed": "接続ページを開けませんでした"
   },

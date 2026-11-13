@@ -4133,7 +4133,7 @@
     "disconnectFailed": "{{provider}} konnte nicht getrennt werden",
     "couldNotLoad": "Integrationen konnten nicht geladen werden",
     "permissionDenied": "Du hast keine Berechtigung, diese Integrationen zu verwalten.",
-    "memberHint": "Bitte eine Person mit Inhaber- oder Admin-Rechten in der Organisation, diese Verbindungen zu ändern.",
+    "rowManagedByOwnerOrAdmin": "Bitte eine Person mit Inhaber- oder Admin-Rechten in der Organisation, diese Verbindung zu ändern.",
     "rowManagedByOwnersAndBilling": "Nur Inhaber und Abrechnungsmanager der Organisation können diese Verbindung ändern.",
     "connectFailed": "Die Verbindungsseite konnte nicht geöffnet werden"
   },

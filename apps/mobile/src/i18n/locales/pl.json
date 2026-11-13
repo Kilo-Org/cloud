@@ -4263,7 +4263,7 @@
     "disconnectFailed": "Nie udało się odłączyć usługi {{provider}}",
     "couldNotLoad": "Nie udało się wczytać integracji",
     "permissionDenied": "Nie masz uprawnień do zarządzania tymi integracjami.",
-    "memberHint": "Poproś właściciela lub administratora organizacji o zmianę tych połączeń.",
+    "rowManagedByOwnerOrAdmin": "Poproś właściciela lub administratora organizacji o zmianę tego połączenia.",
     "rowManagedByOwnersAndBilling": "Tylko właściciele organizacji i osoby zarządzające rozliczeniami mogą zmienić to połączenie.",
     "connectFailed": "Nie udało się otworzyć strony połączenia"
   },

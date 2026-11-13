@@ -13,7 +13,7 @@ import { IntegrationsScreen } from './integrations-screen';
 
 type SetupStatusRow = { platform: string; installed: boolean; installation?: unknown };
 
-const MEMBER_HINT = 'Ask an organization owner or admin to change these connections.';
+const ROW_NOTE = 'Ask an organization owner or admin to change this connection.';
 // Bitbucket's page admits owners and billing managers, so its row cannot use
 // the ask-form: the note names the set that can change it.
 const BITBUCKET_NOTE = 'Only organization owners and billing managers can change this connection.';
@@ -304,11 +304,11 @@ describe('IntegrationsScreen', () => {
     // the narrower set. No sentence above the rows contradicts either.
     for (const title of ['GitHub', 'Slack', 'GitLab', 'Linear']) {
       expect(actionOf(rowTitled(root, title))).toBeNull();
-      expect(rowTitled(root, title).props.note).toBe(MEMBER_HINT);
+      expect(rowTitled(root, title).props.note).toBe(ROW_NOTE);
     }
     expect(actionOf(rowTitled(root, 'Bitbucket'))).toBeNull();
     expect(rowTitled(root, 'Bitbucket').props.note).toBe(BITBUCKET_NOTE);
-    expect(texts(root)).not.toContain(MEMBER_HINT);
+    expect(texts(root)).not.toContain(ROW_NOTE);
   });
 
   it('lets a member make the first GitLab connect without a note on that row', () => {
@@ -325,7 +325,7 @@ describe('IntegrationsScreen', () => {
     // nothing: a note there would contradict the action it offers.
     expect(actionOf(rowTitled(root, 'GitLab'))?.props.accessibilityLabel).toBe('Connect. GitLab');
     expect(rowTitled(root, 'GitLab').props.note).toBeUndefined();
-    expect(texts(root)).not.toContain(MEMBER_HINT);
+    expect(texts(root)).not.toContain(ROW_NOTE);
   });
 
   it('offers every row to an owner and leaves each row quiet', () => {
@@ -337,7 +337,7 @@ describe('IntegrationsScreen', () => {
 
     expect(findOne(root, 'RowMock').every(row => actionOf(row) != null)).toBe(true);
     expect(findOne(root, 'RowMock').every(row => row.props.note === undefined)).toBe(true);
-    expect(texts(root)).not.toContain(MEMBER_HINT);
+    expect(texts(root)).not.toContain(ROW_NOTE);
   });
 
   it('names the owners-and-billing set on the Bitbucket row an admin cannot change', () => {
@@ -372,7 +372,7 @@ describe('IntegrationsScreen', () => {
     const root = mount().root;
 
     expect(findOne(root, 'RowMock').every(row => actionOf(row) != null)).toBe(true);
-    expect(texts(root)).not.toContain(MEMBER_HINT);
+    expect(texts(root)).not.toContain(ROW_NOTE);
     // The personal scope belongs to the viewer, so no row is blocked.
     expect(findOne(root, 'RowMock').every(row => row.props.note === undefined)).toBe(true);
   });

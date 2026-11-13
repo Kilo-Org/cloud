@@ -4133,7 +4133,7 @@
     "disconnectFailed": "{{provider}} bağlantısı kesilemedi",
     "couldNotLoad": "Entegrasyonlar yüklenemedi",
     "permissionDenied": "Bu entegrasyonları yönetme izniniz yok.",
-    "memberHint": "Bu bağlantıları değiştirmek için bir kuruluş sahibine veya yöneticisine başvurun.",
+    "rowManagedByOwnerOrAdmin": "Bu bağlantıyı değiştirmek için bir kuruluş sahibine veya yöneticisine başvurun.",
     "rowManagedByOwnersAndBilling": "Bu bağlantıyı yalnızca kuruluş sahipleri ve faturalandırma yöneticileri değiştirebilir.",
     "connectFailed": "Bağlantı sayfası açılamadı"
   },

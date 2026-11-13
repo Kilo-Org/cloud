@@ -260,12 +260,12 @@ describe('ConfigureRow note', () => {
     expect(textOf(root, NOTE)).toEqual(
       expect.arrayContaining(['mt-1', 'text-xs', 'text-muted-foreground'])
     );
-    // The start inset is the tile's 30 dp plus the row's gap, not a physical
-    // left padding: under RTL the tile sits on the physical right.
+    // The inset is the start edge (the tile's 30 dp plus the row's gap), so the
+    // note keeps to the title's column when the row mirrors.
     const note = root.find(
       node => Object.is(node.type, 'Text') && Object.is(node.props.children, NOTE)
     );
-    expect(note.props.style).toEqual({ paddingStart: 40.5 });
+    expect(String(note.props.className)).toContain('ps-[40.5px]');
     // It is a sentence, so it wraps instead of ellipsizing like a value does.
     expect(note.props.numberOfLines).toBe(3);
     expect(textOf(root, 'Transcribe')).toContain('mt-0.5');
@@ -282,9 +282,11 @@ describe('ConfigureRow note', () => {
     const root = renderRow({ note: NOTE });
 
     expect(
-      root.find(node => Object.is(node.type, 'Text') && Object.is(node.props.children, NOTE)).props
-        .style
-    ).toBeUndefined();
+      String(
+        root.find(node => Object.is(node.type, 'Text') && Object.is(node.props.children, NOTE))
+          .props.className
+      )
+    ).not.toContain('ps-[40.5px]');
   });
 
   it('renders only the title and subtitle when a row has no note', () => {

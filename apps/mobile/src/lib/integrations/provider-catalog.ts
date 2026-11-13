@@ -130,18 +130,19 @@ function rolesFor(
 
 /**
  * The row note each organization role set names. A blocked row says which roles
- * can change it, so the sentence follows the action's server procedure instead
- * of one screen-wide hint. The ask-form holds wherever an owner or an admin can
- * act: it names a role that can change the row and does not claim to list them
- * all. Only a page that turns an admin away gets a note naming the narrower
- * set, so a member is never sent to a role that cannot change the connection.
+ * can change it, so the sentence follows the action's server procedure. It is
+ * written for one row's connection, because it renders under that row. The
+ * ask-form holds wherever an owner or an admin can act: it names a role that
+ * can change the row and does not claim to list them all. Only a page that
+ * turns an admin away gets a note naming the narrower set, so a member is never
+ * sent to a role that cannot change the connection.
  */
 const NOTE_KEYS_BY_ROLE_SET: readonly {
   roles: readonly OrganizationRole[];
   key: string;
 }[] = [
-  { roles: ORGANIZATION_MANAGE_ROLES, key: 'integrations.memberHint' },
-  { roles: ORGANIZATION_BILLING_ROLES, key: 'integrations.memberHint' },
+  { roles: ORGANIZATION_MANAGE_ROLES, key: 'integrations.rowManagedByOwnerOrAdmin' },
+  { roles: ORGANIZATION_BILLING_ROLES, key: 'integrations.rowManagedByOwnerOrAdmin' },
   { roles: BITBUCKET_ROLES, key: 'integrations.rowManagedByOwnersAndBilling' },
 ];
 

@@ -4133,7 +4133,7 @@
     "disconnectFailed": "Enweghị ike ịkwụsị njikọ {{provider}}",
     "couldNotLoad": "Enweghị ike ibudata njikọ",
     "permissionDenied": "Ị nweghị ikike ijikwa njikọ ndị a.",
-    "memberHint": "Gwa onye nwe nzukọ ma ọ bụ onye nchịkwa ka ọ gbanwee njikọ ndị a.",
+    "rowManagedByOwnerOrAdmin": "Gwa onye nwe nzukọ ma ọ bụ onye nchịkwa ka ọ gbanwee njikọ a.",
     "rowManagedByOwnersAndBilling": "Naanị ndị nwe nzukọ na ndị njikwa ịgba ụgwọ nwere ike ịgbanwe njikọ a.",
     "connectFailed": "Enweghị ike imepe ibe njikọ"
   },

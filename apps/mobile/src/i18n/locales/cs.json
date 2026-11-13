@@ -4263,7 +4263,7 @@
     "disconnectFailed": "{{provider}} se nepodařilo odpojit",
     "couldNotLoad": "Integrace se nepodařilo načíst",
     "permissionDenied": "Nemáte oprávnění spravovat tyto integrace.",
-    "memberHint": "Požádejte vlastníka nebo správce organizace o změnu těchto připojení.",
+    "rowManagedByOwnerOrAdmin": "Požádejte vlastníka nebo správce organizace o změnu tohoto připojení.",
     "rowManagedByOwnersAndBilling": "Toto připojení mohou změnit pouze vlastníci organizace a správci fakturace.",
     "connectFailed": "Stránku pro připojení se nepodařilo otevřít"
   },

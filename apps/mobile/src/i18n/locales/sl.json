@@ -4263,7 +4263,7 @@
     "disconnectFailed": "Povezave s storitvijo {{provider}} ni bilo mogoče prekiniti",
     "couldNotLoad": "Integracij ni bilo mogoče naložiti",
     "permissionDenied": "Nimate dovoljenja za upravljanje teh integracij.",
-    "memberHint": "Za spremembo teh povezav prosite lastnika ali skrbnika organizacije.",
+    "rowManagedByOwnerOrAdmin": "Za spremembo te povezave prosite lastnika ali skrbnika organizacije.",
     "rowManagedByOwnersAndBilling": "Samo lastniki organizacije in skrbniki obračunavanja lahko spremenijo to povezavo.",
     "connectFailed": "Strani za povezavo ni bilo mogoče odpreti"
   },

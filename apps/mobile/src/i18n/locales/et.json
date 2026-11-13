@@ -4133,7 +4133,7 @@
     "disconnectFailed": "Ühendust teenusega {{provider}} ei õnnestunud katkestada",
     "couldNotLoad": "Integratsioone ei õnnestunud laadida",
     "permissionDenied": "Sul pole õigust neid integratsioone hallata.",
-    "memberHint": "Nende ühenduste muutmiseks pöördu organisatsiooni omaniku või administraatori poole.",
+    "rowManagedByOwnerOrAdmin": "Selle ühenduse muutmiseks pöördu organisatsiooni omaniku või administraatori poole.",
     "rowManagedByOwnersAndBilling": "Ainult organisatsiooni omanikud ja arveldushaldurid saavad seda ühendust muuta.",
     "connectFailed": "Ühendamise lehte ei õnnestunud avada"
   },

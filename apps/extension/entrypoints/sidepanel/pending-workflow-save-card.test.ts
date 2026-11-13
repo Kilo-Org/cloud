@@ -48,6 +48,7 @@ import type { AgentMemory, PendingAgentMemoryDraft } from '@/src/shared/agent-me
 import { addAgentMemory, clearPendingAgentMemoryDraft } from '@/src/shared/agent-memories-storage';
 import { useAgentMemories } from './use-agent-memories';
 import { pendingApprovalAtom } from './pending-approval';
+import { conversationHistoryOpenAtom } from './settings-dialog-state';
 import { PendingMemorySaveCard } from './pending-memory-save-card';
 import { PendingWorkflowSaveCard } from './pending-workflow-save-card';
 
@@ -962,5 +963,72 @@ describe('memory save card retryable error for generic failure', () => {
     expect(settle).toHaveBeenCalledWith(
       expect.objectContaining({ reason: 'quota exceeded', status: 'failed' })
     );
+  });
+});
+
+describe('memory save card escape with the history overlay open', () => {
+  let store = createStore();
+  const reload = vi.fn();
+  const settle = vi.fn();
+  const memDraft = memoryDraft();
+
+  beforeEach(() => {
+    cleanup();
+    store = createStore();
+    vi.clearAllMocks();
+    mockUseAgentMemories.mockReturnValue({
+      isLoaded: true,
+      loadError: false,
+      memories: emptyMemories,
+      pendingDraft: memDraft,
+      reload,
+    });
+    mockClearPendingAgentMemoryDraft.mockResolvedValue(void 0);
+    settle.mockReset();
+    reload.mockReset();
+
+    store.set(pendingApprovalAtom, {
+      draft: memDraft,
+      kind: 'memory',
+      settle,
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('leaves the pending save alone when the history overlay takes the Escape', async () => {
+    store.set(conversationHistoryOpenAtom, true);
+
+    const { getByText } = render(createElement(PendingMemorySaveCard), {
+      wrapper: createWrapper(store),
+    });
+
+    await waitFor(() => {
+      expect(getByText('Save memory')).toBeDefined();
+    });
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(settle).not.toHaveBeenCalled();
+    expect(mockClearPendingAgentMemoryDraft).not.toHaveBeenCalled();
+  });
+
+  it('rejects the pending save when no overlay sits above the card', async () => {
+    const { getByText } = render(createElement(PendingMemorySaveCard), {
+      wrapper: createWrapper(store),
+    });
+
+    await waitFor(() => {
+      expect(getByText('Save memory')).toBeDefined();
+    });
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    await waitFor(() => {
+      expect(settle).toHaveBeenCalledWith({ status: 'rejected' });
+    });
+    expect(mockClearPendingAgentMemoryDraft).toHaveBeenCalledWith(expect.anything());
   });
 });

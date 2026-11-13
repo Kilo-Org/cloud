@@ -12,7 +12,7 @@ import {
   deriveNoteCharacterCount,
   deriveSaveCardState,
 } from './pending-memory-save-card-state';
-import { settingsDialogOpenAtom } from './settings-dialog-state';
+import { conversationHistoryOpenAtom, settingsDialogOpenAtom } from './settings-dialog-state';
 import { useAgentMemories } from './use-agent-memories';
 import { useEscapeKey } from './use-dismiss';
 const SAVE_ERROR_MESSAGE = "Couldn't save memory. Try again.";
@@ -30,6 +30,7 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
   const { isLoaded, loadError, memories, pendingDraft, reload } = useAgentMemories();
   const [approvalEntry, setApprovalEntry] = useAtom(pendingApprovalAtom);
   const settingsDialogOpen = useAtomValue(settingsDialogOpenAtom);
+  const isHistoryOpen = useAtomValue(conversationHistoryOpenAtom);
   const setSettingsOpen = useSetAtom(settingsDialogOpenAtom);
   const [savedConfirmation, setSavedConfirmation] = useState(false);
   const [saveError, setSaveError] = useState<string | undefined>();
@@ -121,7 +122,7 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
     setFullOutcome(false);
   };
 
-  useEscapeKey(!settingsDialogOpen && view.kind !== 'hidden', () => {
+  useEscapeKey(!settingsDialogOpen && !isHistoryOpen && view.kind !== 'hidden', () => {
     if (view.kind === 'confirmation') {
       handleDone();
       return;

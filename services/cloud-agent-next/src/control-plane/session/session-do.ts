@@ -4606,8 +4606,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * The stream rows the first history page appends, trimmed to
    * `MAX_SNAPSHOT_ROWS_BYTES` newest first, and their measured size. The page's
    * own budget is reduced by that size so the response stays inside
-   * `MAX_SESSION_PAGE_BYTES`. Preparation attempts give way before queued turns,
-   * so a failed run keeps the question row it is answering.
+   * `MAX_SESSION_PAGE_BYTES`. Queued turns are reserved first, so a failed run
+   * always keeps the question row it is answering; preparation attempts give way.
    */
   private readSnapshotRows(): {
     preparationAttempts: PreparationAttempt[];
@@ -4629,8 +4629,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       }
       return kept.reverse();
     };
-    const preparationAttempts = keepNewest(listPreparationAttempts(this.eventQueries));
     const queuedMessages = keepNewest(this.deriveQueuedMessages());
+    const preparationAttempts = keepNewest(listPreparationAttempts(this.eventQueries));
     return {
       preparationAttempts,
       queuedMessages,

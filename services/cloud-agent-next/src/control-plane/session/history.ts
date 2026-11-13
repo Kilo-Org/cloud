@@ -135,8 +135,8 @@ export type SessionMessagesPage = V1SessionMessagesPage | Kilo2MessagesPage;
 /**
  * Reads one stored history page under `MAX_SESSION_PAGE_BYTES`. `reservedBytes`
  * is the size the caller appends to the page after it is built (the first
- * page's stream rows), so the v1 reader's hard limits leave that room free and
- * the whole response stays inside the bound. The v2 reader keeps its own cap.
+ * page's stream rows), so the readers' hard limits leave that room free and
+ * the whole response stays inside the bound.
  */
 export function readSessionMessagesPage(input: {
   db: DrizzleSqliteDODatabase;

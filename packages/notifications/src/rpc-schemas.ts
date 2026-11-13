@@ -7,7 +7,7 @@ import {
 } from './notification-events';
 import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
 import { pushDataSchema, cloudAgentSessionCategorySchema, nonEmptyStringSchema } from './push-data';
-import { refineSpendAlertScope } from './spend-alert-scope';
+import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope';
 
 // ── sendPushForConversation ─────────────────────────────────────────
 
@@ -100,12 +100,17 @@ export type SendInstanceLifecycleNotificationParams = z.infer<
   typeof sendInstanceLifecycleNotificationInputSchema
 >;
 
-export const sendInstanceLifecycleNotificationOutputSchema = z.object({
+// Per-token delivery counters. Both send RPCs report the same tally, so it is
+// declared once here and each result adds only the field that RPC owns.
+const sendCountersSchema = z.object({
   tokenCount: z.number().int().nonnegative(),
   sent: z.number().int().nonnegative(),
   staleTokens: z.number().int().nonnegative(),
   receiptCount: z.number().int().nonnegative(),
   suppressedByPreference: z.boolean().optional(),
+});
+
+export const sendInstanceLifecycleNotificationOutputSchema = sendCountersSchema.extend({
   ticketErrors: z.object({
     total: z.number().int().nonnegative(),
     retryable: z.number().int().nonnegative(),
@@ -129,13 +134,7 @@ export const sendScheduledActionNoticeInputSchema = z.object({
 });
 export type SendScheduledActionNoticeParams = z.infer<typeof sendScheduledActionNoticeInputSchema>;
 
-export const sendScheduledActionNoticeOutputSchema = z.object({
-  tokenCount: z.number().int().nonnegative(),
-  sent: z.number().int().nonnegative(),
-  staleTokens: z.number().int().nonnegative(),
-  receiptCount: z.number().int().nonnegative(),
-  suppressedByPreference: z.boolean().optional(),
-});
+export const sendScheduledActionNoticeOutputSchema = sendCountersSchema;
 export type SendScheduledActionNoticeResult = z.infer<typeof sendScheduledActionNoticeOutputSchema>;
 
 // ── sendCloudAgentSessionNotification ───────────────────────────────
@@ -351,8 +350,7 @@ export const internalDispatchSpendAlertRequestSchema = z
   .object({
     kind: z.literal('spend_alert'),
     recipientUserIds: z.array(nonEmptyStringSchema).min(1),
-    scope: z.enum(['personal', 'organization']),
-    organizationId: nonEmptyStringSchema.optional(),
+    ...spendAlertScopeShape,
     alertKind: z.enum(['threshold', 'anomaly']),
     scopeName: nonEmptyStringSchema,
     amountUsd: z.number().nonnegative(),

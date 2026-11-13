@@ -6577,6 +6577,31 @@
     ],
     "searchBlob": "cloudAgentNext.getAttachmentUploadUrl Get a presigned URL to upload a file attachment for a cloud agent message. cloudagentnext getattachmentuploadurl messageuuid attachmentid contenttype contentlength extension messageUuid attachmentId contentType contentLength extension"
   },
+  "cloudAgentNext.getBackgroundActivity": {
+    "path": "cloudAgentNext.getBackgroundActivity",
+    "kind": "query",
+    "summary": "Get the background activity inventory for a Cloud Agent session, such as running or pending background tasks and process work associated with that session. Use to see what a session is doing in the background or whether background work is still active.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_[\\w-]+$"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudagentnext",
+      "getbackgroundactivity",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "cloudAgentNext.getBackgroundActivity Get the background activity inventory for a Cloud Agent session, such as running or pending background tasks and process work associated with that session. Use to see what a session is doing in the background or whether background work is still active. cloudagentnext getbackgroundactivity cloudagentsessionid cloudAgentSessionId"
+  },
   "cloudAgentNext.getEgressAudit": {
     "path": "cloudAgentNext.getEgressAudit",
     "kind": "query",
@@ -18351,6 +18376,56 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.getAttachmentUploadUrl Get a presigned URL to upload a file attachment for a cloud agent message. Use to attach a file. organizations cloudagentnext getattachmentuploadurl organizationid messageuuid attachmentid contenttype contentlength extension organizationId messageUuid attachmentId contentType contentLength extension"
   },
+  "organizations.cloudAgentNext.getBackgroundActivity": {
+    "path": "organizations.cloudAgentNext.getBackgroundActivity",
+    "kind": "query",
+    "summary": "Get the background activity inventory for a Cloud Agent session, including background tasks or processes running for that session. Use to check what work is happening in the background of an agent session.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cloudAgentSessionId": {
+              "type": "string",
+              "pattern": "^workspace_[\\w-]+$"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "cloudAgentSessionId",
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getbackgroundactivity",
+      "organizationid",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getBackgroundActivity Get the background activity inventory for a Cloud Agent session, including background tasks or processes running for that session. Use to check what work is happening in the background of an agent session. organizations cloudagentnext getbackgroundactivity organizationid cloudagentsessionid organizationId cloudAgentSessionId"
+  },
   "organizations.cloudAgentNext.getEgressAudit": {
     "path": "organizations.cloudAgentNext.getEgressAudit",
     "kind": "query",
@@ -27125,6 +27200,9 @@
         "disableReviewMd": {
           "type": "boolean"
         },
+        "skipBotPullRequests": {
+          "type": "boolean"
+        },
         "gateThreshold": {
           "type": "string",
           "enum": [
@@ -27281,12 +27359,13 @@
       "manuallyaddedrepositories",
       "repositorymodeloverrides",
       "disablereviewmd",
+      "skipbotpullrequests",
       "gatethreshold",
       "council",
       "councilenabledrepositoryids",
       "autoconfigurewebhooks"
     ],
-    "searchBlob": "organizations.reviewAgent.patchReviewConfig Update specific settings on an existing organization code review agent configuration. Use to tweak the review agent without replacing the whole config. organizations reviewagent patchreviewconfig organizationid platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd gatethreshold council councilenabledrepositoryids autoconfigurewebhooks organizationId platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd gateThreshold council councilEnabledRepositoryIds autoConfigureWebhooks"
+    "searchBlob": "organizations.reviewAgent.patchReviewConfig Update specific settings on an existing organization code review agent configuration. Use to tweak the review agent without replacing the whole config. organizations reviewagent patchreviewconfig organizationid platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd skipbotpullrequests gatethreshold council councilenabledrepositoryids autoconfigurewebhooks organizationId platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd skipBotPullRequests gateThreshold council councilEnabledRepositoryIds autoConfigureWebhooks"
   },
   "organizations.reviewAgent.rotateGitLabWebhookSecret": {
     "path": "organizations.reviewAgent.rotateGitLabWebhookSecret",
@@ -31097,6 +31176,9 @@
         "disableReviewMd": {
           "type": "boolean"
         },
+        "skipBotPullRequests": {
+          "type": "boolean"
+        },
         "gateThreshold": {
           "type": "string",
           "enum": [
@@ -31126,10 +31208,11 @@
       "manuallyaddedrepositories",
       "repositorymodeloverrides",
       "disablereviewmd",
+      "skipbotpullrequests",
       "gatethreshold",
       "autoconfigurewebhooks"
     ],
-    "searchBlob": "personalReviewAgent.patchReviewConfig Update individual fields of an existing personal code review agent configuration without replacing the whole config. Use it to change one or a few settings, including adding or removing selected repositories. personalreviewagent patchreviewconfig platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd gatethreshold autoconfigurewebhooks platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd gateThreshold autoConfigureWebhooks"
+    "searchBlob": "personalReviewAgent.patchReviewConfig Update individual fields of an existing personal code review agent configuration without replacing the whole config. Use it to change one or a few settings, including adding or removing selected repositories. personalreviewagent patchreviewconfig platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd skipbotpullrequests gatethreshold autoconfigurewebhooks platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd skipBotPullRequests gateThreshold autoConfigureWebhooks"
   },
   "personalReviewAgent.saveReviewConfig": {
     "path": "personalReviewAgent.saveReviewConfig",

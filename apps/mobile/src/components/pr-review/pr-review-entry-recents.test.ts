@@ -77,6 +77,35 @@ describe('recents identity across providers', () => {
     ]);
   });
 
+  it('opens one review route for two presses on the same recent row in one burst', async () => {
+    store.clear();
+    seedRecents([
+      { ...SAME_TRIPLE, owner: 'octocat', repo: 'hello-world', number: 42, title: 'GitHub one' },
+    ]);
+    const tree = await renderLoaded();
+    const rowPressable = () => {
+      const row = findAll(tree, 'View').find(candidate => candidate.props?.testID === 'recent-row');
+      return find(row, 'Pressable', p => p.accessibilityRole === 'button');
+    };
+    const press = propsOf(rowPressable()).onPress as () => void;
+    // Both presses belong to one burst: the same tick, no render between them.
+    press();
+    press();
+    expect(mocks.push).toHaveBeenCalledTimes(1);
+    expect(mocks.push).toHaveBeenCalledWith('/(app)/pr-review/octocat/hello-world/42');
+
+    // This harness runs the focus effect on every render, so this render is the
+    // screen regaining focus: the guard window is gone and the row navigates.
+    const refocused = render();
+    const again = find(
+      findAll(refocused, 'View').find(candidate => candidate.props?.testID === 'recent-row'),
+      'Pressable',
+      p => p.accessibilityRole === 'button'
+    );
+    (propsOf(again).onPress as () => void)();
+    expect(mocks.push).toHaveBeenCalledTimes(2);
+  });
+
   it('long press confirms removal without opening the review and deletes only the targeted row', async () => {
     const tree = await renderLoaded();
     const rows = findAll(tree, 'View').filter(row => row.props?.testID === 'recent-row');

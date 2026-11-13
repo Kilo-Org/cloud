@@ -472,9 +472,11 @@ test('successful main CI selects the tested deployment SHA', () => {
   assert.match(check.run, /git hash-object -t tree \/dev\/null/);
   assert.match(check.run, /git merge-base --is-ancestor "\$base_sha" "\$target_sha"/);
   const predicate = check.run.replace(/\\\n\s*/g, ' ');
-  assert.match(
-    predicate,
-    /git diff --quiet "\$base_sha" "\$target_sha" -- \.( +':\(exclude\)[\w.*\/,-]+')+; then/
+  assert.ok(
+    predicate.includes(
+      'git diff --quiet "$base_sha" "$target_sha" -- .'
+    ),
+    'the deploy predicate must diff the whole tree'
   );
   for (const excluded of [
     'apps/mobile',
@@ -496,9 +498,9 @@ test('successful main CI selects the tested deployment SHA', () => {
     '.plans',
     '(glob)*.md',
   ]) {
-    assert.match(
-      predicate,
-      new RegExp(`':\\(exclude\\)${excluded.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'`)
+    assert.ok(
+      predicate.includes(`':(exclude${excluded === '(glob)*.md' ? ',glob' : ''})${excluded === '(glob)*.md' ? '*.md' : excluded}'`),
+      `the deploy predicate must exclude ${excluded}`
     );
   }
   assert.match(check.run, /should_deploy=false/);
@@ -1036,15 +1038,6 @@ test('deployment gate only deploys changes since the last complete run', () => {
     commit('docs');
     assert.equal(runGate(deployedSha).should_deploy, 'false');
 
-    // A markdown file inside apps/web is a deploy input: the web app compiles
-    // page.md and page.mdx under its app directory into routes
-    // (pageExtensions in apps/web/next.config.mjs), so only root-level
-    // markdown is excluded.
-    mkdirSync(join(directory, 'apps/web/src/app'), { recursive: true });
-    writeFileSync(join(directory, 'apps/web/src/app', 'page.md'), 'route');
-    commit('web route');
-    assert.equal(runGate(deployedSha).should_deploy, 'true');
-
     mkdirSync(join(directory, '.github'), { recursive: true });
     writeFileSync(join(directory, '.github', 'workflows-ci.yml'), 'ci');
     commit('ci');
@@ -1054,6 +1047,15 @@ test('deployment gate only deploys changes since the last complete run', () => {
     writeFileSync(join(directory, 'scripts', 'tool.sh'), 'scripts');
     commit('scripts');
     assert.equal(runGate(deployedSha).should_deploy, 'false');
+
+    // A markdown file inside apps/web is a deploy input: the web app compiles
+    // page.md and page.mdx under its app directory into routes
+    // (pageExtensions in apps/web/next.config.mjs), so only root-level
+    // markdown is excluded.
+    mkdirSync(join(directory, 'apps/web/src/app'), { recursive: true });
+    writeFileSync(join(directory, 'apps/web/src/app', 'page.md'), 'route');
+    commit('web route');
+    assert.equal(runGate(deployedSha).should_deploy, 'true');
 
     // Root build inputs stay deploy-triggering.
     writeFileSync(

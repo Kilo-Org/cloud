@@ -1855,7 +1855,14 @@ export default function CloudChatPage({
 
                           <div hidden={!chatTabActive} className={chatTabActive ? '' : 'hidden'}>
                             {transcriptPhase !== 'opening' && (
-                              <div className="px-[max(1rem,calc(50%_-_27rem))]">
+                              <div className="flex min-w-0 items-center gap-3 px-[max(1rem,calc(50%_-_27rem))] has-[button]:mb-1">
+                                <CurrentTaskList
+                                  todos={
+                                    isReadOnly || activeQuestion || activePermission
+                                      ? null
+                                      : currentTodos
+                                  }
+                                />
                                 <SessionBackgroundActivityStrip
                                   onOpenChildSession={handleOpenTopLevelChildSession}
                                 />
@@ -1916,9 +1923,6 @@ export default function CloudChatPage({
                                     />
                                   </div>
                                 )}
-                                <div className="px-[max(1rem,calc(50%_-_27rem))]">
-                                  <CurrentTaskList todos={currentTodos} />
-                                </div>
                                 {sessionErrorMessage !== null && (
                                   <div className="-mb-2 px-[max(1rem,calc(50%_-_27rem))]">
                                     <SessionErrorNotice

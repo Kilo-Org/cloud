@@ -2,6 +2,7 @@ import {
   createBackgroundActivityReader,
   selectBackgroundActivity,
   backgroundActivityLabel,
+  backgroundActivitySummary,
   serializeBackgroundActivityReads,
   type BackgroundActivityState,
 } from './background-activity';
@@ -68,6 +69,7 @@ test('counts only running root and descendant jobs, deduplicated by native ident
   expect(backgroundActivityLabel({ status: 'current', inventory })).toBe(
     'Background · 1 agent running · 1 shell running'
   );
+  expect(backgroundActivitySummary({ status: 'current', inventory })).toBe('1 agent · 1 shell');
 });
 
 test.each(['question', 'permission'] as const)('%s waits are separate from runnable work', kind => {
@@ -76,6 +78,26 @@ test.each(['question', 'permission'] as const)('%s waits are separate from runna
   expect(backgroundActivityLabel({ status: 'current', inventory: value })).toBe(
     'Background · 1 shell running · 1 needs input'
   );
+  expect(backgroundActivitySummary({ status: 'current', inventory: value })).toBe(
+    '1 shell · 1 needs input'
+  );
+});
+
+test('the compact summary pluralizes counts and names unknown status', () => {
+  const shell = inventory.jobs[1]!;
+  const value = {
+    ...inventory,
+    jobs: [
+      ...inventory.jobs,
+      { ...shell, id: 'job_shell_2', shellID: 'sh_child_2' },
+      { ...inventory.jobs[0]!, id: 'job_agent_2', childSessionID: 'ses_grandchild' },
+    ],
+  };
+  expect(backgroundActivitySummary({ status: 'current', inventory: value })).toBe(
+    '2 agents · 2 shells'
+  );
+  expect(backgroundActivitySummary({ status: 'loading' })).toBe('Checking status');
+  expect(backgroundActivitySummary({ status: 'unavailable' })).toBe('Status unavailable');
 });
 
 test('switching back waits for the old request, then makes a fresh read instead of reusing its inventory', async () => {

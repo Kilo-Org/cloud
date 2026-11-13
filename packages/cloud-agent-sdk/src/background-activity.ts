@@ -67,16 +67,37 @@ export function selectBackgroundActivity(
     }));
 }
 
+function countBackgroundActivity(inventory: BackgroundActivityInventory) {
+  const items = selectBackgroundActivity(inventory);
+  return {
+    agents: items.filter(item => item.kind === 'subagent' && !item.waiting).length,
+    shells: items.filter(item => item.kind === 'shell' && !item.waiting).length,
+    waiting: items.filter(item => item.waiting).length,
+  };
+}
+
+function plural(count: number, noun: string) {
+  return `${count} ${count === 1 ? noun : `${noun}s`}`;
+}
+
 export function backgroundActivityLabel(state: BackgroundActivityState): string {
   if (state.status === 'unavailable') return 'Background · Status unavailable';
   if (state.status !== 'current') return 'Background · Checking status';
-  const items = selectBackgroundActivity(state.inventory);
-  const agents = items.filter(item => item.kind === 'subagent' && !item.waiting).length;
-  const shells = items.filter(item => item.kind === 'shell' && !item.waiting).length;
-  const waiting = items.filter(item => item.waiting).length;
+  const { agents, shells, waiting } = countBackgroundActivity(state.inventory);
   const labels = ['Background'];
-  if (agents) labels.push(`${agents} ${agents === 1 ? 'agent' : 'agents'} running`);
-  if (shells) labels.push(`${shells} ${shells === 1 ? 'shell' : 'shells'} running`);
+  if (agents) labels.push(`${plural(agents, 'agent')} running`);
+  if (shells) labels.push(`${plural(shells, 'shell')} running`);
+  if (waiting) labels.push(`${waiting} needs input`);
+  return labels.join(' · ');
+}
+
+export function backgroundActivitySummary(state: BackgroundActivityState): string {
+  if (state.status === 'unavailable') return 'Status unavailable';
+  if (state.status !== 'current') return 'Checking status';
+  const { agents, shells, waiting } = countBackgroundActivity(state.inventory);
+  const labels: string[] = [];
+  if (agents) labels.push(plural(agents, 'agent'));
+  if (shells) labels.push(plural(shells, 'shell'));
   if (waiting) labels.push(`${waiting} needs input`);
   return labels.join(' · ');
 }

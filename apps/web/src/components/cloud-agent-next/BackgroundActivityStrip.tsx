@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useAtomValue } from 'jotai';
-import { Activity, ChevronDown } from 'lucide-react';
+import { Activity, ChevronUp } from 'lucide-react';
 import {
   backgroundActivityLabel,
+  backgroundActivitySummary,
   selectBackgroundActivity,
   type BackgroundActivityState,
   type BackgroundActivityItem,
@@ -128,14 +129,13 @@ export function BackgroundActivityStrip({
             <button
               ref={trigger}
               type="button"
-              className="text-muted-foreground hover:text-foreground hover:bg-muted/40 focus-visible:ring-ring flex min-h-11 w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs focus-visible:ring-2 focus-visible:outline-none"
+              className="text-muted-foreground hover:text-foreground hover:bg-muted/40 focus-visible:ring-ring ml-auto flex min-h-8 shrink-0 items-center gap-2 rounded-md px-2 py-1 text-left text-xs whitespace-nowrap focus-visible:ring-2 focus-visible:outline-none pointer-coarse:min-h-11"
               aria-label={label}
+              title={label}
             >
               <Activity className="size-3.5 shrink-0" aria-hidden="true" />
-              <span className="min-w-0 truncate" title={label}>
-                {label}
-              </span>
-              <ChevronDown className="ml-auto size-3.5 shrink-0" aria-hidden="true" />
+              <span>{backgroundActivitySummary(state)}</span>
+              <ChevronUp className="size-3.5 shrink-0" aria-hidden="true" />
             </button>
           </PopoverTrigger>
           <PopoverContent
@@ -143,9 +143,10 @@ export function BackgroundActivityStrip({
               if (openingTranscript.current) event.preventDefault();
             }}
             side="top"
-            align="start"
+            align="end"
+            collisionPadding={16}
             aria-label="Background activity"
-            className="max-h-[min(24rem,var(--radix-popover-content-available-height))] w-[min(32rem,var(--radix-popover-trigger-width))] overflow-auto p-3"
+            className="max-h-[min(24rem,var(--radix-popover-content-available-height))] w-[min(32rem,var(--radix-popover-content-available-width))] overflow-auto p-3"
           >
             {state.status === 'unavailable' ? (
               <div className="space-y-2 text-xs">

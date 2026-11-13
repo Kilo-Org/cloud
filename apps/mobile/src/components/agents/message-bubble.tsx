@@ -249,16 +249,23 @@ function MessageBubbleImpl({
             <View className={cn('flex-row items-center gap-1.5', trailingFailure && 'justify-end')}>
               {failure.error ? (
                 // Every failure that reports an error carries the same marker; a
-                // message the person stopped reports a neutral status and carries
-                // none. The marker is the state, not copy: the title beside it says
-                // what happened, so it carries no text of its own for a screen
-                // reader.
+                // message the person stopped, and a response the person stopped,
+                // report a neutral status and carry none. The marker is the
+                // state, not copy: the title beside it says what happened, so it
+                // carries no text of its own for a screen reader.
                 <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
                   <AlertCircle size={14} color={colors.destructive} />
                 </View>
               ) : null}
               <Text
-                className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
+                className={cn(
+                  'text-sm',
+                  // The ink is the state too: a neutral status takes the muted
+                  // ink every other status line in a turn uses, so a stop never
+                  // reads as a failure.
+                  failure.error ? 'text-destructive' : 'text-muted-foreground',
+                  trailingFailure && 'text-right'
+                )}
                 accessibilityLabel={messageFailureLabel(failure)}
               >
                 {failure.title}

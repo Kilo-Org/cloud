@@ -11,7 +11,7 @@ import {
   type RemoteMcpServerDraft,
   type StoredRemoteMcpServer,
 } from '@/lib/chat/remote-mcp-store';
-import { sameRemoteMcpEndpoint } from '@/lib/chat/remote-mcp-url';
+import { normalizeRemoteMcpUrl, sameRemoteMcpEndpoint } from '@/lib/chat/remote-mcp-url';
 
 import { mcpServerFormError, type McpServerFormErrors } from './mcp-settings-state';
 
@@ -76,6 +76,19 @@ function draftOf(
   return server === undefined ? draft : { ...draft, id: server.id };
 }
 
+/**
+ * The endpoint a URL text names, normalized the way the store normalizes it, or
+ * null when the text names none. The form compares these to decide whether a
+ * bearer value belongs to the endpoint the URL now names.
+ */
+function endpointOf(url: string): string | null {
+  try {
+    return normalizeRemoteMcpUrl(url);
+  } catch {
+    return null;
+  }
+}
+
 export function RemoteMcpServerForm({
   server,
   onSave,
@@ -91,16 +104,25 @@ export function RemoteMcpServerForm({
   const url = useRef(initialUrl);
   const token = useRef(initialToken);
   /**
-   * The token field's mount key. A value saved for one endpoint is not a value
-   * for another, so the field is mounted again whenever the URL names a
-   * different endpoint: empty for the new one, and the saved value again when
-   * the URL returns to the saved endpoint. The field is uncontrolled, so the
-   * key is what makes the new default take effect.
+   * The token field's mount key. The field starts from the value saved for the
+   * endpoint the URL names: a value saved for one endpoint is not a value for
+   * another, so the field is mounted again whenever the URL names a different
+   * endpoint — empty for the new one, and the saved value again when the URL
+   * returns to the saved endpoint. The field is uncontrolled, so the key is
+   * what makes the new default take effect.
    */
   const [tokenFieldKey, setTokenFieldKey] = useState(0);
   const tokenDefault = useRef(initialToken);
-  /** Whether the person typed in the token field during this edit. */
-  const tokenTyped = useRef(false);
+  /**
+   * The endpoint the URL named, normalized, when the person last typed in the
+   * token field; null while the field still holds the value the server was
+   * saved with. A value the person types belongs to the endpoint the URL named
+   * at that moment: the field keeps it while the URL keeps naming that
+   * endpoint, and the save reports it as entered for it. A URL that names
+   * another endpoint clears the field rather than carrying the value to a
+   * server it was not entered for.
+   */
+  const tokenEnteredFor = useRef<string | null>(null);
   /**
    * Whether the token field was cleared because the URL left the saved
    * endpoint. The field then shows why it is empty, rather than leaving a greyed
@@ -141,17 +163,31 @@ export function RemoteMcpServerForm({
   );
 
   /**
-   * Points the token field at the endpoint the URL text now names. While the URL
-   * still names the saved endpoint the saved value stands; a URL that names
-   * another endpoint starts from an empty field, so the saved value is never
-   * offered for a different host, and the required-token rule holds Save until
-   * a value is entered for it. A value the person typed belongs to the edit and
-   * is never replaced, so returning the URL to the saved endpoint puts the
-   * saved value back only while the field still held it.
+   * Points the token field at the endpoint the URL text now names. A value the
+   * person typed belongs to the endpoint the URL named when it was typed: the
+   * field keeps it while the URL still names that endpoint, and clears it for
+   * any other, so the value is never carried to a server it was not entered
+   * for and the required-token rule holds Save until a value is entered for the
+   * new one. While the field still holds the value the server was saved with, a
+   * URL that names the saved endpoint restores it — respelling the saved URL is
+   * not an edit — and a URL that names another endpoint starts from an empty
+   * field.
    */
   const retargetToken = useCallback(
     (nextUrl: string) => {
-      if (server === undefined || tokenTyped.current) {
+      if (server === undefined) {
+        return;
+      }
+      const enteredFor = tokenEnteredFor.current;
+      if (enteredFor !== null) {
+        if (enteredFor === endpointOf(nextUrl)) {
+          return;
+        }
+        token.current = '';
+        tokenDefault.current = '';
+        tokenEnteredFor.current = null;
+        setTokenRetargeted(initialToken !== '');
+        setTokenFieldKey(key => key + 1);
         return;
       }
       if (sameRemoteMcpEndpoint(initialUrl, nextUrl)) {
@@ -204,9 +240,9 @@ export function RemoteMcpServerForm({
     const found = mcpServerFormError(draft);
     setErrors(found);
     if (found === null) {
-      // The token typed in this edit belongs to the endpoint the draft names,
-      // so it is reported as entered.
-      onSave({ ...draft, tokenEntered: tokenTyped.current });
+      // The field holds a value entered for the endpoint the draft names only
+      // when the person typed it there, and that is what the store is told.
+      onSave({ ...draft, tokenEntered: tokenEnteredFor.current !== null });
     }
   }, [fieldsWith, onSave, server]);
 
@@ -267,7 +303,7 @@ export function RemoteMcpServerForm({
           secureTextEntry
           onChangeText={value => {
             token.current = value;
-            tokenTyped.current = true;
+            tokenEnteredFor.current = endpointOf(url.current);
             if (value.trim() !== '') {
               setTokenRetargeted(false);
             }

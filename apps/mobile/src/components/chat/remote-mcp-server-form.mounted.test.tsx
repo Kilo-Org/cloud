@@ -102,6 +102,13 @@ async function pressSave(): Promise<void> {
   });
 }
 
+/** The token field was cleared for an endpoint the value does not belong to. */
+function expectTokenCleared(): void {
+  expect(mountedTokenValues.at(-1)).toBe('');
+  expect(fields()[2]?.error).toBe('common.required');
+  expect(saveButton().disabled).toBe(true);
+}
+
 type SegmentedProps = {
   readonly onChange: (value: string) => void;
 };
@@ -135,6 +142,18 @@ const savedBearer = {
   auth: { type: 'bearer', token: 'secret' },
   enabled: true,
 } as const;
+
+/** A server saved with no sign-in and switched off, so the edit case names only its edit. */
+const savedPlain = {
+  id: 'remote',
+  name: 'Old',
+  url: 'https://remote.example/mcp',
+  auth: { type: 'none' },
+  enabled: false,
+} as const;
+
+/** The same server saved with OAuth, so the sign-in case names only its edit. */
+const savedOAuth = { ...savedBearer, auth: { type: 'oauth' } } as const;
 
 describe('the remote MCP server form', () => {
   it('gates Save until the name and the URL are there', async () => {
@@ -205,32 +224,14 @@ describe('the remote MCP server form', () => {
   });
 
   it('edits a server without changing its id or its switch', async () => {
-    await mount({
-      server: {
-        id: 'remote',
-        name: 'Old',
-        url: 'https://remote.example/mcp',
-        auth: { type: 'none' },
-        enabled: false,
-      },
-      onSave,
-    });
+    await mount({ server: savedPlain, onSave });
 
     expect(saveButton().disabled).toBe(false);
 
     await type(0, 'New');
     await pressSave();
 
-    expect(saved).toEqual([
-      {
-        id: 'remote',
-        name: 'New',
-        url: 'https://remote.example/mcp',
-        auth: { type: 'none' },
-        enabled: false,
-        tokenEntered: false,
-      },
-    ]);
+    expect(saved).toEqual([{ ...savedPlain, name: 'New', tokenEntered: false }]);
   });
 
   it('shows Save working while a save is in flight', async () => {
@@ -261,21 +262,59 @@ describe('the remote MCP server form', () => {
     expect(dirty.at(-1)).toBe(false);
   });
 
-  it('keeps a value the person typed through later URL edits', async () => {
+  it('keeps a typed value when the URL only respells the endpoint it was typed for', async () => {
     await mount({ server: savedBearer, onSave });
 
     await type(2, 'rotated');
-    // Respelling the saved URL must not put the saved value back over the edit.
+    // Respelling the saved URL names the endpoint the value was typed for, so
+    // the field keeps it and no remount puts the saved value back over it.
     await type(1, 'https://remote.example/mcp/');
-    await type(1, 'https://two.example/mcp');
 
     expect(mountedTokenValues).toEqual(['secret']);
     expect(saveButton().disabled).toBe(false);
 
     await pressSave();
 
+    expect(saved[0]?.auth).toEqual({ type: 'bearer', token: 'rotated' });
+    expect(saved[0]?.tokenEntered).toBe(true);
+  });
+
+  it('does not carry a typed value to another endpoint', async () => {
+    await mount({ server: savedBearer, onSave });
+
+    await type(2, 'rotated');
+    await type(1, 'https://two.example/mcp');
+
+    // The value was typed for the saved endpoint, so the new one starts empty.
+    expectTokenCleared();
+
+    await type(2, 'rotated');
+    await pressSave();
+
     expect(saved[0]?.url).toBe('https://two.example/mcp');
     expect(saved[0]?.auth).toEqual({ type: 'bearer', token: 'rotated' });
+    expect(saved[0]?.tokenEntered).toBe(true);
+  });
+
+  it('does not carry a saved value that was typed and erased to another endpoint', async () => {
+    await mount({ server: savedBearer, onSave });
+
+    // Typing a character and erasing it leaves the field showing the saved
+    // value, but the value was touched, so it belongs to the endpoint the URL
+    // names, not to whatever endpoint a later edit names.
+    await type(2, 'secre');
+    await type(2, 'secret');
+    await type(1, 'https://two.example/mcp');
+
+    expectTokenCleared();
+    await pressSave();
+    expect(saved).toEqual([]);
+
+    // A draft the new endpoint can save says no value was entered for it.
+    await choose('none');
+    await pressSave();
+    expect(saved[0]?.url).toBe('https://two.example/mcp');
+    expect(saved[0]?.tokenEntered).toBe(false);
   });
 
   it('asks for the token again when the URL names another endpoint', async () => {
@@ -335,55 +374,30 @@ describe('the remote MCP server form', () => {
     expect(saved[0]?.auth).toEqual({ type: 'bearer', token: 'secret' });
   });
 
-  it('counts a bearer token edit and clears it when the token is restored', async () => {
+  it('reports only the name and token edits the saved draft keeps', async () => {
     const dirty: boolean[] = [];
-    await mount({
-      server: savedBearer,
-      onSave,
-      onDirtyChange: value => void dirty.push(value),
-    });
+    await mount({ server: savedBearer, onSave, onDirtyChange: value => void dirty.push(value) });
 
     await type(2, 'another');
     expect(dirty.at(-1)).toBe(true);
 
     await type(2, 'secret');
     expect(dirty.at(-1)).toBe(false);
-  });
 
-  it('does not report whitespace the saved draft trims away', async () => {
-    const dirty: boolean[] = [];
-    await mount({
-      server: savedBearer,
-      onSave,
-      onDirtyChange: value => void dirty.push(value),
-    });
-
+    // Whitespace the saved draft trims away is not an edit.
     await type(0, 'Remote ');
     expect(dirty.at(-1)).toBe(false);
 
     await type(2, ' secret ');
     expect(dirty.at(-1)).toBe(false);
 
-    // A real edit still reports.
     await type(2, 'secret2');
     expect(dirty.at(-1)).toBe(true);
   });
 
   it('drops a bearer token from the dirty check when an OAuth server is left selected', async () => {
     const dirty: boolean[] = [];
-    await mount({
-      server: {
-        id: 'remote',
-        name: 'Remote',
-        url: 'https://remote.example/mcp',
-        auth: { type: 'oauth' },
-        enabled: true,
-      },
-      onSave,
-      onDirtyChange: value => {
-        dirty.push(value);
-      },
-    });
+    await mount({ server: savedOAuth, onSave, onDirtyChange: value => void dirty.push(value) });
 
     // A bearer token typed on the way past must not outlive the bearer method.
     await choose('bearer');

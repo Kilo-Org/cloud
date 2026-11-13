@@ -473,9 +473,7 @@ test('successful main CI selects the tested deployment SHA', () => {
   assert.match(check.run, /git merge-base --is-ancestor "\$base_sha" "\$target_sha"/);
   const predicate = check.run.replace(/\\\n\s*/g, ' ');
   assert.ok(
-    predicate.includes(
-      'git diff --quiet "$base_sha" "$target_sha" -- .'
-    ),
+    predicate.includes('git diff --quiet "$base_sha" "$target_sha" -- .'),
     'the deploy predicate must diff the whole tree'
   );
   for (const excluded of [
@@ -499,7 +497,9 @@ test('successful main CI selects the tested deployment SHA', () => {
     '(glob)*.md',
   ]) {
     assert.ok(
-      predicate.includes(`':(exclude${excluded === '(glob)*.md' ? ',glob' : ''})${excluded === '(glob)*.md' ? '*.md' : excluded}'`),
+      predicate.includes(
+        `':(exclude${excluded === '(glob)*.md' ? ',glob' : ''})${excluded === '(glob)*.md' ? '*.md' : excluded}'`
+      ),
       `the deploy predicate must exclude ${excluded}`
     );
   }

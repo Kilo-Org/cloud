@@ -52,6 +52,9 @@ class ReactNativeSshModule : Module() {
   private val promptRequests = ConcurrentHashMap<String, CompletableDeferred<List<String>?>>()
   private val sessionIds = IdSequence("session-")
   private val shellIds = IdSequence("shell-")
+  // One sequence for every session: the pending host-key and prompt maps are
+  // keyed by request id alone, so a per-session counter would collide.
+  private val requestIds = IdSequence("request-")
   private var reportedSessionCount = 0
   private val sftpIds = IdSequence("sftp-")
   private val forwardIds = IdSequence("forward-")
@@ -265,6 +268,7 @@ class ReactNativeSshModule : Module() {
     val sessionId = sessionIds.next()
     val handler = JsSessionHandler(
       sessionId = sessionId,
+      requestIds = requestIds,
       requestHostKey = ::requestHostKey,
       requestPrompts = ::requestPrompts,
       notifyDisconnect = { record ->

@@ -29,8 +29,11 @@ export type UniversalLinkRoute = {
    * wildcard segment" must stay exact, and put every deeper path the app DOES
    * handle earlier in this table: AASA's first match wins, so those rows still
    * associate, and everything below them falls through to the exclusion.
-   * Android needs no counterpart — `androidPathPatterns()` compiles `*` to
-   * `[^/]+`, and the runtime matcher already compares segments.
+   * Android needs no counterpart here: the row below states its own
+   * one-segment `androidPathPattern`, and the runtime matcher compares
+   * segments. An Android `pathPattern` cannot express exclusions at all, so the
+   * literal pages under the row still reach the app and the mobile deep-link
+   * handler opens them in the browser (`browserHandoffUrl`).
    */
   readonly excludeDeeperAasaPaths?: boolean;
   /**
@@ -94,7 +97,10 @@ export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
   // literal pages under the same shape are not ids either: the create form
   // must open where the account is asked. On iOS `*` crosses `/`, hence
   // `excludeDeeperAasaPaths`; on Android the explicit `[^/]+` override keeps
-  // the filter to one segment without touching any other row's pattern.
+  // the filter to one segment without touching any other row's pattern. Android
+  // `pathPattern` cannot exclude, so `/organizations/new` and
+  // `/organizations/create` still arrive in the app — the mobile deep-link
+  // handler opens those two in the browser instead of navigating.
   {
     webPath: '/organizations/*',
     appPath: '/(app)/(tabs)/(3_profile)/organization/<1>',

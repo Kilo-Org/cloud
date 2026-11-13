@@ -1,8 +1,10 @@
 import { resolveIncomingResume } from '@kilocode/app-shared/universal-links';
 
+import { i18n } from '@/i18n';
 import { opensAppRoutePath, opensDestination, shellRouteHref } from './deep-link-destination';
 import { resumeDeepLinkHref, setPendingDeepLink, wasLaunchLinkHandled } from './deep-link-launch';
-import { isRemovedMobileDeepLink } from './deep-link-policy';
+import { browserHandoffUrl, isRemovedMobileDeepLink } from './deep-link-policy';
+import { openExternalUrl } from './external-link';
 import { parseGitHubReturnParams, setGitHubInstallReturnOutcome } from './github-install-return';
 import { isSystemSearchFamilyLink } from './system-search-families';
 
@@ -50,6 +52,15 @@ export function redirectSystemPath({
 }): string | null {
   try {
     if (isRemovedMobileDeepLink(path)) {
+      return initial ? '/' : null;
+    }
+    // Android's intent filter cannot exclude the two organization create pages,
+    // so they arrive here like the org root. The app has no screen for them: the
+    // browser page is where the account and the plan are asked, so the link
+    // opens there. Falsy, like every handled link (see critical point 2).
+    const handoffUrl = browserHandoffUrl(path);
+    if (handoffUrl !== null) {
+      void openExternalUrl(handoffUrl, { label: i18n.t('organization.create.title') });
       return initial ? '/' : null;
     }
     const resume = resolveIncomingResume(path);

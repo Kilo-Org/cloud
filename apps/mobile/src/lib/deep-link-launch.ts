@@ -7,7 +7,9 @@ import {
   SESSION_RESUME_ANCHOR_PARAM,
 } from '@kilocode/app-shared/universal-links';
 
-import { isRemovedMobileDeepLink } from './deep-link-policy';
+import { i18n } from '@/i18n';
+import { browserHandoffUrl, isRemovedMobileDeepLink } from './deep-link-policy';
+import { openExternalUrl } from './external-link';
 import { parsePendingDeepLinkRecord, type PendingDeepLinkRecord } from './deep-link-record';
 import { currentRouteHref } from './current-route-href';
 import { opensDestination, shellRouteHref } from './deep-link-destination';
@@ -490,6 +492,14 @@ export function captureLaunchDeepLink(): void {
   }
   const url = readLaunchUrl();
   if (!url || isRemovedMobileDeepLink(url)) {
+    return;
+  }
+  // The organization create pages reach the app through the org-root Android
+  // intent filter, which cannot exclude them. Nothing is stashed: the page opens
+  // in the browser the link was meant for, exactly as a warm arrival does.
+  const handoffUrl = browserHandoffUrl(url);
+  if (handoffUrl !== null) {
+    void openExternalUrl(handoffUrl, { label: i18n.t('organization.create.title') });
     return;
   }
   const resume = resolveIncomingResume(url);

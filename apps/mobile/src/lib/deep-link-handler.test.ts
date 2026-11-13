@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as UniversalLinks from '@kilocode/app-shared/universal-links';
 
 import { redirectSystemPath } from './deep-link-handler';
+import { openExternalUrl } from './external-link';
 import {
   _resetDeepLinkLaunchForTests,
   _setGetLinkingURLForTests,
@@ -31,6 +32,10 @@ vi.mock('expo-router', () => ({
 vi.mock('@sentry/react-native', () => ({
   captureException: vi.fn(),
 }));
+
+// `openExternalUrl` reads the build-time `__DEV__` global this node project does
+// not define; the browser handoff only needs the call it makes.
+vi.mock('./external-link', () => ({ openExternalUrl: vi.fn() }));
 
 vi.mock('@kilocode/app-shared/universal-links', async importOriginal => {
   const actual = await importOriginal<typeof UniversalLinks>();
@@ -532,5 +537,37 @@ describe('redirectSystemPath', () => {
       // Read clears the slot — subsequent reads return null.
       expect(mod.getGitHubInstallReturnOutcome()).toBeNull();
     });
+  });
+});
+
+// Android's intent filter for the organization root also matches the two web
+// create pages (a `pathPattern` cannot exclude segments), so the app has to
+// hand them back to the browser instead of navigating nowhere.
+describe('organization pages the app has no screen for', () => {
+  it.each(['new', 'create'])(
+    'hands /organizations/%s to the browser instead of navigating',
+    page => {
+      _resetDeepLinkLaunchForTests();
+      vi.mocked(openExternalUrl).mockClear();
+
+      const result = redirectSystemPath({
+        path: `https://app.kilo.ai/organizations/${page}`,
+        initial: false,
+      });
+
+      // Falsy, like every handled link: a truthy return re-dispatches the
+      // linking resolver and races our navigation.
+      expect(result).toBeNull();
+      expect(openExternalUrl).toHaveBeenCalledWith(
+        `https://app.kilo.ai/organizations/${page}`,
+        expect.objectContaining({ label: expect.any(String) })
+      );
+      expect(getPendingDeepLink()).toBeNull();
+    }
+  );
+
+  it('still stashes the organization root itself', () => {
+    redirectSystemPath({ path: 'https://app.kilo.ai/organizations/org_1', initial: false });
+    expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)/organization/org_1');
   });
 });

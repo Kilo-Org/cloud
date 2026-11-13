@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { OrganizationCreditActivityScreen } from './credit-activity-screen';
 import CreditActivityRoute from '@/app/(app)/(tabs)/(3_profile)/organization/credit-activity';
 
@@ -245,6 +245,12 @@ async function renderScreen(): Promise<string[]> {
   return collectText(renderer.toJSON());
 }
 
+// The zone marker carries a bidi isolate and the date a no-break space; these
+// assertions are about the sentence, not that carriage.
+function readable(text: string): string {
+  return text.replaceAll(/[\u2066\u2068\u2069]/g, '').replaceAll('\u00A0', ' ');
+}
+
 beforeEach(() => {
   pageQuery.isPending = false;
   pageQuery.isError = false;
@@ -361,10 +367,26 @@ describe('OrganizationCreditActivityScreen pagination', () => {
     ];
     pageQuery.data = { pages: [{ entries: pageHook.entries, nextCursor: null, hasMore: false }] };
     const texts = await renderScreen();
-    const expiryLabels = texts.filter(text => text.startsWith('Expires '));
+    const expiryLabels = texts
+      .map(text => readable(text))
+      .filter(text => text.startsWith('Expires '));
     expect(expiryLabels).toHaveLength(1);
     expect(expiryLabels[0]).toContain('2027');
     expect(expiryLabels[0]).toContain('(UTC)');
+  });
+
+  it('keeps the Arabic zone marker on the date line, in its own direction', async () => {
+    pageHook.entries = [{ ...TRANSACTION, expiry_date: '2027-10-15T00:00:00Z' }];
+    pageQuery.data = { pages: [{ entries: pageHook.entries, nextCursor: null, hasMore: false }] };
+    await i18n.changeLanguage('ar');
+    try {
+      const texts = await renderScreen();
+      const expiry = texts.find(text => text.includes('(UTC)'));
+      expect(expiry).toContain('\u00A0\u2068(UTC)\u2069');
+      expect(expiry).not.toContain(' (UTC)');
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 
   it('keeps pagination available when a loaded page has no visible entries', async () => {

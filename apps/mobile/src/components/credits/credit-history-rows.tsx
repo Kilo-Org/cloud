@@ -14,6 +14,7 @@ import {
   creditPurchaseChannel,
   type CreditPurchaseEntry,
 } from '@/lib/credits/credit-history';
+import { keepZoneWithDate } from '@/lib/credits/expiry-zone';
 import { formatDate, formatPrefixedMoney } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { firstNonEmpty, parseTimestamp } from '@/lib/utils';
@@ -109,9 +110,11 @@ export const PurchaseHistoryRow = memo(function PurchaseHistoryRow({
   const storeReceiptKey = lookup(STORE_RECEIPT_KEYS, channel);
   const storeReceiptNote = storeReceiptKey ? t(storeReceiptKey) : null;
   const expiryLabel = entry.expiryDate
-    ? t('organization.creditActivity.expiresUtc', {
-        date: formatDate(parseTimestamp(entry.expiryDate), i18n.language, { timeZone: 'UTC' }),
-      })
+    ? keepZoneWithDate(
+        t('organization.creditActivity.expiresUtc', {
+          date: formatDate(parseTimestamp(entry.expiryDate), i18n.language, { timeZone: 'UTC' }),
+        })
+      )
     : null;
 
   return (

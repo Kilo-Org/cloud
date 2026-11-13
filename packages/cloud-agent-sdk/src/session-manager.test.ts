@@ -3521,6 +3521,106 @@ describe('createSessionManager', () => {
       }
     );
 
+    it.each([
+      { type: 'cloud.message.completed' },
+      { type: 'cloud.message.failed', accepted: true },
+      { type: 'cloud.message.failed', delivery: 'sent' },
+    ] as const)(
+      'retires a rowless command draft after reopening from $type $accepted $delivery',
+      async receipt => {
+        const clearPendingSendConfirmation = jest.fn();
+        const config = createMockConfig({ clearPendingSendConfirmation });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        mockSession.send.mockRejectedValueOnce(new Error('ECONNRESET'));
+        await expect(
+          mgr.send({ payload: { type: 'command', command: 'review', arguments: 'main' } })
+        ).resolves.toBe(false);
+        const messageId = mockSession.send.mock.calls[0][0].messageId;
+        if (!messageId) throw new Error('Expected command submission');
+        await mgr.switchSession(kiloId('ses-2'));
+        await mgr.switchSession(kiloId('ses-1'));
+        expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('/review main');
+        mockSessionCallbacks.onEvent?.({ type: 'cloud.message.queued', messageId, content: '' });
+        mockSessionCallbacks.onEvent?.(
+          receipt.type === 'cloud.message.completed'
+            ? { ...receipt, messageId }
+            : { ...receipt, messageId, error: 'Runtime failed', reason: 'execution' }
+        );
+        expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+        expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBeNull();
+        expect(clearPendingSendConfirmation).toHaveBeenCalledWith(kiloId('ses-1'), messageId);
+        expect(atomValue(config.store, mgr.atoms.deliveredFailedPrompt)).toMatchObject({
+          messageId,
+          text: '/review main',
+        });
+        await mgr.switchSession(kiloId('ses-2'));
+        await mgr.switchSession(kiloId('ses-1'));
+        expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBeNull();
+      }
+    );
+
+    it.each([
+      {},
+      { accepted: false, delivery: 'queued' },
+      { accepted: false, delivery: 'sent' },
+    ] as const)('retains an unconfirmed command draft for failure %j', async failure => {
+      const clearPendingSendConfirmation = jest.fn();
+      const config = createMockConfig({ clearPendingSendConfirmation });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSession.send.mockRejectedValueOnce(new Error('ECONNRESET'));
+      await mgr.send({ payload: { type: 'command', command: 'review', arguments: 'main' } });
+      const messageId = mockSession.send.mock.calls[0][0].messageId;
+      if (!messageId) throw new Error('Expected command submission');
+      mockSessionCallbacks.onEvent?.({
+        type: 'cloud.message.failed',
+        messageId,
+        error: 'Preparation failed',
+        reason: 'execution',
+        ...failure,
+      });
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('/review main');
+      expect(clearPendingSendConfirmation).not.toHaveBeenCalled();
+    });
+
+    it.each(['sent', 'completed', 'failed'] as const)(
+      'settles a persisted command confirmation loaded after its %s receipt',
+      async status => {
+        const pendingRead = deferred<readonly { messageId: string; text: string }[]>();
+        const clearPendingSendConfirmation = jest.fn();
+        const config = createMockConfig({
+          readPendingSendConfirmations: () => pendingRead.promise,
+          clearPendingSendConfirmation,
+        });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        const messageId = 'msg_command';
+        const receipt: NormalizedEvent =
+          status === 'sent'
+            ? { type: 'cloud.message.sent', messageId, turnType: 'command' }
+            : status === 'completed'
+              ? { type: 'cloud.message.completed', messageId }
+              : {
+                  type: 'cloud.message.failed',
+                  messageId,
+                  accepted: true,
+                  error: 'Runtime failed',
+                  reason: 'execution',
+                };
+        mockSessionCallbacks.onEvent?.(receipt);
+        pendingRead.resolve([{ messageId, text: '/review main' }]);
+        await pendingRead.promise;
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(clearPendingSendConfirmation).toHaveBeenCalledWith(kiloId('ses-1'), messageId);
+        expect(atomValue(config.store, mgr.atoms.deliveredFailedPrompt)).toMatchObject({
+          messageId,
+          text: '/review main',
+        });
+      }
+    );
+
     it('inserts one optimistic row before cloud.message.queued arrives', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

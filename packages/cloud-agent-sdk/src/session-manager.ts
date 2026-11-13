@@ -1052,6 +1052,7 @@ type SessionOpen = {
   initialPageGeneration: number;
   storage: JotaiSessionStorage;
   resolvedFailures: Set<string>;
+  pendingSendConfirmationsReady: Promise<void>;
   /** False once live replay can start, so a slower cache cannot overwrite it. */
   acceptCachedPage: boolean;
   cacheReadPending: boolean;
@@ -2694,7 +2695,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   /**
    * A server row or command receipt confirms an unknown-outcome send. Kilo v2
-   * commands can use another native id, so their sent receipt must also retire
+   * commands can use another native id, so their delivery receipts must also retire
    * the restored draft. Only the active session publishes its composer state.
    */
   function settlePendingSendConfirmation(kiloSessionId: KiloSessionId, messageId: string): void {
@@ -2861,7 +2862,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const preserveTranscript = preserveTranscriptOnOpen(kiloSessionId);
     const expectedGeneration = beginSessionOpen(kiloSessionId);
     const resolvedFailures = seedResolvedDeliveryFailures(kiloSessionId, expectedGeneration);
-    seedPendingSendConfirmations(kiloSessionId, expectedGeneration);
 
     const open = startCleanSessionOpen(
       kiloSessionId,
@@ -2976,14 +2976,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   function seedPendingSendConfirmations(
     kiloSessionId: KiloSessionId,
     expectedGeneration: number
-  ): void {
-    if (!config.readPendingSendConfirmations) return;
+  ): Promise<void> {
+    if (!config.readPendingSendConfirmations) return Promise.resolve();
     // Nothing is stored for this session unless something is read back: one
     // entry per session ever opened would outlive every one of them.
     const pending = pendingConfirmationBySession.get(kiloSessionId) ?? new Map<string, string>();
     // Not awaited: the first page arrives on its own schedule, and the
     // transcript subscription settles whatever is pending when it does.
-    void config
+    return config
       .readPendingSendConfirmations(kiloSessionId)
       .then(entries => {
         if (expectedGeneration !== switchGeneration) return;
@@ -3031,6 +3031,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       initialPageGeneration: loadOlderGeneration,
       storage: jotaiStorage,
       resolvedFailures,
+      pendingSendConfirmationsReady: seedPendingSendConfirmations(
+        kiloSessionId,
+        expectedGeneration
+      ),
       // A session the server already refused does not use the caller's page
       // until it confirms access again.
       acceptCachedPage: !deniedSessionIds.has(kiloSessionId),
@@ -3446,8 +3450,18 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           const receipt = commandReceiptsAwaitingResponse.get(event.messageId);
           if (receipt) receipt.acknowledged = true;
         }
-        if (event.type === 'cloud.message.sent' && event.turnType === 'command') {
+        if (
+          (event.type === 'cloud.message.sent' && event.turnType === 'command') ||
+          event.type === 'cloud.message.completed' ||
+          (event.type === 'cloud.message.failed' &&
+            event.accepted !== false &&
+            (event.accepted === true || event.delivery === 'sent'))
+        ) {
           settlePendingSendConfirmation(open.kiloSessionId, event.messageId);
+          void open.pendingSendConfirmationsReady.then(() => {
+            if (open.expectedGeneration !== switchGeneration) return;
+            settlePendingSendConfirmation(open.kiloSessionId, event.messageId);
+          });
         }
         if (event.type === 'cloud.message.failed' && !open.resolvedFailures.has(event.messageId)) {
           store.set(billingFailureAtom, event.billingFailure ?? null);

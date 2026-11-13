@@ -4346,7 +4346,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return this.messages
       .filter(
         message =>
-          message.state === 'queued' || message.state === 'accepted' || message.state === 'failed'
+          message.state === 'queued' ||
+          message.state === 'accepted' ||
+          message.state === 'failed' ||
+          (message.intent.turn.type === 'command' && message.acceptedAt !== null)
       )
       .map(message => {
         const timestamp = message.acceptedAt ?? message.createdAt;
@@ -4357,10 +4360,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           ...(message.intent.turn.type === 'command' ? { turnType: 'command' as const } : {}),
           ...(message.state === 'accepted' ? { delivery: 'sent' as const } : {}),
         };
-        if (message.state === 'failed') {
+        if (message.state === 'completed') {
+          snapshot.completedAt = message.settledAt ?? timestamp;
+        }
+        if (message.state === 'failed' || message.state === 'cancelled') {
           snapshot.terminalFailure = {
             messageId: message.messageId,
-            status: 'failed',
+            status: message.state === 'cancelled' ? 'interrupted' : 'failed',
             delivery: message.acceptedAt === null ? 'queued' : 'sent',
             accepted: message.acceptedAt !== null,
             ...(message.billingFailure === undefined

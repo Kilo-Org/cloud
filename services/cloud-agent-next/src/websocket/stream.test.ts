@@ -1410,6 +1410,59 @@ describe('stream handler handleStreamRequest', () => {
 
   it.each([
     {
+      query: '',
+      expected: [
+        'cloud.message.completed',
+        'connected',
+        'cloud.message.queued',
+        'cloud.message.sent',
+      ],
+    },
+    {
+      query: '&eventTypes=cloud.message.completed',
+      expected: ['cloud.message.completed', 'connected'],
+    },
+    { query: '&eventTypes=cloud.message.sent', expected: ['connected', 'cloud.message.sent'] },
+  ])(
+    'restores completed command receipts without making them active for $query',
+    async ({ query, expected }) => {
+      const serverWs = makeFakeWebSocket();
+      mockWebSocketPair(serverWs);
+      const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries([]), SESSION_ID, {
+        reconcileMaterializedEvents: true,
+        deriveQueuedMessages: async () => [
+          {
+            messageId: 'command',
+            content: '',
+            timestamp: 1000,
+            completedAt: 1005,
+            turnType: 'command',
+          },
+          { messageId: 'active', content: 'Still running', timestamp: 1010, delivery: 'sent' },
+        ],
+      });
+      await handler.handleStreamRequest(
+        new Request(`https://example.com/stream?replay=false${query}`, {
+          headers: { Upgrade: 'websocket' },
+        })
+      );
+      const events = parseSentMessages(serverWs);
+      expect(events.map(event => event.streamEventType)).toEqual(expected);
+      expect(
+        events.find(event => event.streamEventType === 'connected')?.data.activeMessageId
+      ).toBe('active');
+      const completion = events.find(event => event.streamEventType === 'cloud.message.completed');
+      if (completion)
+        expect(completion).toMatchObject({
+          eventId: 0,
+          timestamp: new Date(1005).toISOString(),
+          data: { messageId: 'command' },
+        });
+    }
+  );
+
+  it.each([
+    {
       query: 'eventTypes=cloud.message.queued,cloud.message.sent',
       expected: ['cloud.message.queued', 'cloud.message.sent'],
     },

@@ -196,8 +196,10 @@ describe('ProviderKeyProviderPickerScreen', () => {
     state.providers = [
       { id: 'anthropic', name: 'Anthropic' },
       { id: 'azure', name: 'Azure Foundry' },
-      { id: 'bedrock-byok', name: 'AWS Bedrock' },
-      { id: 'vertex-byok', name: 'Google Vertex AI' },
+      { id: 'bedrock', name: 'Amazon Bedrock' },
+      { id: 'bedrock-byok', name: 'AWS Bedrock (direct)' },
+      { id: 'vertex', name: 'Google Vertex AI' },
+      { id: 'vertex-byok', name: 'Google Vertex AI (direct)' },
     ];
     const root = await mount();
 

@@ -20,6 +20,7 @@ import { SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { isStructuredCredentialProvider } from '@kilocode/app-shared/byok-credentials';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -27,18 +28,6 @@ type ProviderOption = inferRouterOutputs<MobileRouter>['byok']['listProviders'][
 
 /** Ids are ASCII slugs: folding them here keeps the comparison locale-independent. */
 const ID_FOLD_LOCALE = 'en';
-
-/**
- * Providers whose credential is a structured JSON document rather than a single
- * key: the web form collects each field separately (Azure Foundry, Amazon
- * Bedrock, Google Vertex AI). The app has one masked field, so it points at the
- * web page instead of failing every paste.
- */
-const STRUCTURED_CREDENTIAL_PROVIDER_IDS: ReadonlySet<string> = new Set([
-  'azure',
-  'bedrock-byok',
-  'vertex-byok',
-]);
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = {
@@ -92,8 +81,9 @@ export function ProviderKeyProviderPickerScreen() {
   const providers = useQuery(trpc.byok.listProviders.queryOptions({}));
 
   const filtered = useMemo(() => {
+    // The web form owns this rule; the app reads the same predicate.
     const rows = (providers.data ?? []).filter(
-      provider => !STRUCTURED_CREDENTIAL_PROVIDER_IDS.has(provider.id)
+      provider => !isStructuredCredentialProvider(provider.id)
     );
     const trimmed = query.trim();
     if (trimmed === '') {
@@ -113,7 +103,7 @@ export function ProviderKeyProviderPickerScreen() {
   }, [providers.data, query, i18n.language]);
 
   const offersWebOnlyProviders =
-    providers.data?.some(provider => STRUCTURED_CREDENTIAL_PROVIDER_IDS.has(provider.id)) ?? false;
+    providers.data?.some(provider => isStructuredCredentialProvider(provider.id)) ?? false;
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<ProviderOption>) => <ProviderRow provider={item} />,

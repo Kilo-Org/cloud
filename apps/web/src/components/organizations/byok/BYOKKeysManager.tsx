@@ -44,7 +44,6 @@ import { toast } from 'sonner';
 import {
   DirectUserByokInferenceProviderIdSchema,
   UserByokProviderIdSchema,
-  VercelUserByokInferenceProviderIdSchema,
   AzureCredentialsSchema,
   BedrockCredentialsSchema,
   DirectVertexCredentialsSchema,
@@ -52,6 +51,7 @@ import {
   isExperimentalByokProviderId,
   isGatewayUserByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { getStructuredCredentialKind } from '@kilocode/app-shared/byok-credentials';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import { getCodingPlanManagedKeyLabel } from '@/components/subscriptions/coding-plans/coding-plan-provider';
 import { BYOKRoutingPreview } from '@/components/organizations/byok/BYOKRoutingPreview';
@@ -64,23 +64,10 @@ import {
 import { cn } from '@/lib/utils';
 import * as z from 'zod';
 
-type StructuredCredentialKind = 'azure' | 'bedrock' | 'vertex';
-
-/** Providers whose credential is a JSON object rather than a single API key. */
-export function getStructuredCredentialKind(providerId: string): StructuredCredentialKind | null {
-  switch (providerId) {
-    case VercelUserByokInferenceProviderIdSchema.enum.azure:
-      return 'azure';
-    case VercelUserByokInferenceProviderIdSchema.enum.bedrock:
-    case DirectUserByokInferenceProviderIdSchema.enum['bedrock-byok']:
-      return 'bedrock';
-    case VercelUserByokInferenceProviderIdSchema.enum.vertex:
-    case DirectUserByokInferenceProviderIdSchema.enum['vertex-byok']:
-      return 'vertex';
-    default:
-      return null;
-  }
-}
+export {
+  getStructuredCredentialKind,
+  type StructuredCredentialKind,
+} from '@kilocode/app-shared/byok-credentials';
 
 /**
  * The object of a key-row action ("Anthropic API key"). A display name that

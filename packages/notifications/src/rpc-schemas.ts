@@ -3,11 +3,19 @@ import { z } from 'zod';
 import {
   instanceLifecycleEventSchema,
   scheduledActionEventSchema,
-  securityLifecycleEventSchema,
+  securityLifecyclePayloadShape,
 } from './notification-events';
 import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
-import { pushDataSchema, cloudAgentSessionCategorySchema, nonEmptyStringSchema } from './push-data';
+import { nonEmptyStringSchema } from './non-empty-string';
+import { pushDataSchema, cloudAgentSessionCategorySchema } from './push-data';
 import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope';
+
+// The pre-localized copy a producer may attach to a push.
+// Old producers omit these; remove the optionals when every producer sends keys.
+const i18nCopyFields = {
+  i18nKey: nonEmptyStringSchema.optional(),
+  i18nParams: z.record(z.string(), z.string()).optional(),
+};
 
 // ── sendPushForConversation ─────────────────────────────────────────
 
@@ -19,9 +27,7 @@ export const sendPushForConversationInputSchema = z.object({
   title: z.string().max(200),
   bodyPreview: z.string().max(200),
   messageId: nonEmptyStringSchema,
-  // Old producers omit these; remove the optionals when every producer sends keys.
-  i18nKey: nonEmptyStringSchema.optional(),
-  i18nParams: z.record(z.string(), z.string()).optional(),
+  ...i18nCopyFields,
 });
 export type SendPushForConversationInput = z.infer<typeof sendPushForConversationInputSchema>;
 
@@ -155,9 +161,7 @@ export const sendCloudAgentSessionNotificationInputSchema = z.object({
   // that can be opened from the notification. Absent on status pushes.
   attentionKind: z.enum(NEEDS_INPUT_ATTENTION_KINDS).optional(),
   prUrl: nonEmptyStringSchema.optional(),
-  // Old producers omit these; remove the optionals when every producer sends keys.
-  i18nKey: nonEmptyStringSchema.optional(),
-  i18nParams: z.record(z.string(), z.string()).optional(),
+  ...i18nCopyFields,
 });
 export type SendCloudAgentSessionNotificationParams = z.infer<
   typeof sendCloudAgentSessionNotificationInputSchema
@@ -291,9 +295,7 @@ export const dispatchPushInputSchema = z.object({
     data: pushDataSchema,
     sound: z.union([z.literal('default'), z.null()]).optional(),
     priority: z.enum(['default', 'high']).optional(),
-    // Old producers omit these; remove the optionals when every producer sends keys.
-    i18nKey: nonEmptyStringSchema.optional(),
-    i18nParams: z.record(z.string(), z.string()).optional(),
+    ...i18nCopyFields,
   }),
   // Optional per-call rate limit (sliding window). When set, the DO checks
   // the sliding window after idempotency/presence and before the Expo send;
@@ -384,11 +386,7 @@ export type InternalDispatchSecurityFindingRequest = z.infer<
 
 export const internalDispatchSecurityLifecycleRequestSchema = z.object({
   kind: z.literal('security_lifecycle'),
-  event: securityLifecycleEventSchema,
-  findingId: nonEmptyStringSchema,
-  scope: nonEmptyStringSchema,
-  remediationId: nonEmptyStringSchema.optional(),
-  prUrl: nonEmptyStringSchema.optional(),
+  ...securityLifecyclePayloadShape,
   recipientUserIds: z.array(nonEmptyStringSchema).min(1),
 });
 export type InternalDispatchSecurityLifecycleRequest = z.infer<

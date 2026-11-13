@@ -14,7 +14,7 @@ import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
 import {
   instanceLifecycleEventSchema,
   scheduledActionEventSchema,
-  securityLifecycleEventSchema,
+  securityLifecyclePayloadShape,
 } from './notification-events';
 import { SESSION_CARD_STATUS_KINDS, sessionLiveOutcomeSchema } from './session-live-content';
 import { nonEmptyStringSchema } from './non-empty-string';
@@ -149,11 +149,7 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   // for the event-to-action mapping and the FindingCreated rationale.
   z.object({
     type: z.literal('security_lifecycle'),
-    event: securityLifecycleEventSchema,
-    findingId: nonEmptyStringSchema,
-    scope: nonEmptyStringSchema,
-    remediationId: nonEmptyStringSchema.optional(),
-    prUrl: nonEmptyStringSchema.optional(),
+    ...securityLifecyclePayloadShape,
   }),
   // Aggregate snapshot remains privacy-minimal. Optional Home-only details
   // travel beside it for background Home widget updates and are never copied

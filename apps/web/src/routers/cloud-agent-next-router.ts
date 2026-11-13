@@ -107,6 +107,7 @@ import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session
 import { TRPCError } from '@trpc/server';
 import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import { isMobileClient } from '@kilocode/web-shared/lib/trpc/min-version';
+import { backgroundActivityInventorySchema } from '@kilocode/session-ingest-contracts';
 import { buildCloudAgentNextEligibility } from './cloud-agent-next-eligibility';
 import {
   getWorktreeChangesOutputSchema,
@@ -957,6 +958,15 @@ export const cloudAgentNextRouter = createTRPCRouter({
       await assertUserOwnsSession(ctx.user.id, input.sessionId);
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
       return createCloudAgentNextClient(authToken).getSessionMessagesPage(input);
+    }),
+
+  getBackgroundActivity: baseProcedure
+    .input(z.object({ cloudAgentSessionId: z.string().regex(/^workspace_[\w-]+$/) }).strict())
+    .output(backgroundActivityInventorySchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      const token = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      return createCloudAgentNextClient(token).getBackgroundActivity(input.cloudAgentSessionId);
     }),
 
   /** Complete stored details for an expanded tool preview; authorized on every read. */

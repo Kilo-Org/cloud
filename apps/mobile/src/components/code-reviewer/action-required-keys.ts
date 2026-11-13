@@ -1,4 +1,4 @@
-import { type CodeReviewActionRequiredReason } from '@kilocode/app-shared/code-reviews';
+import { type CodeReviewActionRequiredReason } from '@kilocode/app-shared/code-review';
 
 // Catalog keys for the needs-attention banner. packages/app-shared keeps its
 // English for web; mobile renders the translated copy for the same reason code.

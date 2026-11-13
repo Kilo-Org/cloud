@@ -4,7 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { createElement, Fragment, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-review';
 
 import { ReviewMemoryScreen } from './review-memory-screen';
 import { collectText } from './review-memory-screen.test-helpers';

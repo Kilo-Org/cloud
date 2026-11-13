@@ -44,6 +44,17 @@ function textLines(root: TestRenderer.ReactTestInstance): string[] {
     .flatMap(node => node.children.filter((value: unknown) => typeof value === 'string'));
 }
 
+/**
+ * The characters the card puts around a displayed value, written as code points
+ * so an expectation states the exact characters.
+ */
+const ISOLATE_OPEN = '\u2066';
+const ISOLATE_CLOSE = '\u2069';
+
+function isolated(text: string): string {
+  return `${ISOLATE_OPEN}${text}${ISOLATE_CLOSE}`;
+}
+
 type CardOverrides = {
   permission?: string;
   patterns?: string[];
@@ -84,9 +95,39 @@ describe('PermissionCard mounted', () => {
     const lines = textLines(renderer.root);
 
     expect(lines).not.toContain(i18n.t('agentChat.permissionCard.appliesTo'));
-    expect(lines).not.toContain('rg todo 2_/dev/null');
+    expect(lines).not.toContain(isolated('rg todo 2_/dev/null'));
     expect(lines).toContain(i18n.t('profiles.commandLabel'));
-    expect(lines).toContain('rg todo 2>/dev/null');
+    expect(lines).toContain(isolated('rg todo 2>/dev/null'));
+  });
+
+  it('renders an ordinary command unchanged', async () => {
+    const renderer = await renderCard({ metadata: { command: 'pnpm test --filter api' } });
+    const lines = textLines(renderer.root);
+
+    expect(lines).toContain(isolated('pnpm test --filter api'));
+  });
+
+  it('wraps a displayed command', async () => {
+    const command = 'echo \u202Ehello\u0000';
+
+    const renderer = await renderCard({ metadata: { command } });
+    const lines = textLines(renderer.root);
+
+    expect(lines).toContain(`${ISOLATE_OPEN}echo \\u202ehello\\x00${ISOLATE_CLOSE}`);
+    expect(lines).not.toContain(command);
+  });
+
+  it('wraps a displayed pattern when the request has no command', async () => {
+    const renderer = await renderCard({
+      permission: 'external_directory',
+      patterns: ['/var/tmp/\u200Escope/**'],
+    });
+    const lines = textLines(renderer.root);
+
+    expect(lines).toContain(i18n.t('agentChat.permissionCard.appliesTo'));
+    expect(lines).toContain('• ');
+    expect(lines).toContain(`${ISOLATE_OPEN}/var/tmp/\\u200escope/**${ISOLATE_CLOSE}`);
+    expect(lines).not.toContain('/var/tmp/\u200Escope/**');
   });
 
   it('keeps the patterns for a request that has no command', async () => {
@@ -97,7 +138,8 @@ describe('PermissionCard mounted', () => {
     const lines = textLines(renderer.root);
 
     expect(lines).toContain(i18n.t('agentChat.permissionCard.appliesTo'));
-    expect(lines).toContain('/var/tmp/scope/**');
+    expect(lines).toContain('• ');
+    expect(lines).toContain(isolated('/var/tmp/scope/**'));
     expect(lines).not.toContain(i18n.t('profiles.commandLabel'));
   });
 

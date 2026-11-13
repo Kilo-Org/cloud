@@ -62,6 +62,7 @@ const mockRepository = {
 };
 let mockRepositories = [mockRepository];
 let mockEnvironments: EnvironmentSummary[] = [];
+let mockBillingMode: 'shadow' | 'paid' | undefined;
 
 function mockQueryResult(options: { __testKind?: string }) {
   const kind = options.__testKind ?? '';
@@ -93,6 +94,27 @@ function mockQueryResult(options: { __testKind?: string }) {
   }
   if (kind.endsWith('recentRepositories')) {
     return { ...base, data: { repositories: [] } };
+  }
+  if (kind === 'cloudAgentNext.getSandboxSelectionOptions') {
+    return {
+      ...base,
+      data: {
+        enabled: false,
+        defaultDestination: {
+          provider: { id: 'cloudflare-containers', account: 'kilo' },
+          instanceType: 'standard-3',
+        },
+        options: [],
+      },
+    };
+  }
+  if (kind === 'computeBilling.rates') {
+    return { ...base, data: [{ instance: 'standard-3', hourlyUsd: 0.18, available: true }] };
+  }
+  if (kind === 'computeBilling.personalBillingMode') {
+    return mockBillingMode
+      ? { ...base, data: { billingMode: mockBillingMode } }
+      : { ...base, isError: true };
   }
   if (kind === 'cloudEnvironments.list') {
     return {
@@ -511,8 +533,9 @@ describe.each(scenarios)('$label NewSessionPanel attachment handoff', scenario =
 });
 
 describe.each(scenarios)('$label NewSessionPanel context layout', scenario => {
-  it('keeps responsive context controls without composer pricing or pricing queries', async () => {
+  it('keeps responsive context controls', async () => {
     jest.clearAllMocks();
+    mockBillingMode = undefined;
     mockRepositories = [mockRepository];
     mockEnvironments = [];
     mockEnvironmentListFailed = false;
@@ -539,14 +562,71 @@ describe.each(scenarios)('$label NewSessionPanel context layout', scenario => {
       expect(contextRow?.className).not.toContain('flex-wrap');
       expect(context?.children).toHaveLength(1);
       expect(context?.textContent).not.toContain('Compute');
-      expect(mockQueryOptions).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          __testKind: expect.stringMatching(/getSandboxSelectionOptions$|^computeBilling\.rates$/),
-        })
-      );
     } finally {
       act(() => root.unmount());
       dom.cleanup();
+    }
+  });
+});
+
+describe('NewSessionPanel compute price', () => {
+  async function renderContext(organizationId?: string) {
+    jest.clearAllMocks();
+    mockRepositories = [mockRepository];
+    mockEnvironments = [];
+    mockEnvironmentListFailed = false;
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    act(() => root.render(createElement(NewSessionPanel, { organizationId })));
+    await waitForStartButton(dom.container);
+    const context = dom.container.querySelector('[class*="@container/context"]');
+    return {
+      context,
+      cleanup: () => {
+        act(() => root.unmount());
+        dom.cleanup();
+      },
+    };
+  }
+
+  it.each([
+    ['shadow', 'Upcoming compute price: ~$0.18/hr · 2 vCPU / 8 GiB'],
+    ['paid', 'Compute price: ~$0.18/hr · 2 vCPU / 8 GiB'],
+  ] as const)('shows the personal %s-mode price with the container specs', async (mode, text) => {
+    mockBillingMode = mode;
+    const { context, cleanup } = await renderContext();
+    try {
+      expect(context?.lastElementChild?.textContent).toBe(text);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('hides the price when the billing check fails', async () => {
+    mockBillingMode = undefined;
+    const { context, cleanup } = await renderContext();
+    try {
+      expect(context?.children).toHaveLength(1);
+      expect(context?.textContent).not.toContain('Compute');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('shows no price and runs no pricing queries for organizations', async () => {
+    mockBillingMode = 'shadow';
+    const { context, cleanup } = await renderContext('org-123');
+    try {
+      expect(context?.textContent).not.toContain('Compute');
+      expect(mockQueryOptions).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          __testKind: expect.stringMatching(
+            /getSandboxSelectionOptions$|^computeBilling\.(rates|personalBillingMode)$/
+          ),
+        })
+      );
+    } finally {
+      cleanup();
     }
   });
 });

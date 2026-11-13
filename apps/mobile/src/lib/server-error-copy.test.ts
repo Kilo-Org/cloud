@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-review';
 import { i18n } from '@/i18n';
 import {
   knownServerErrorMessage,

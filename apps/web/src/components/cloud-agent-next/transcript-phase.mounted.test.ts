@@ -398,6 +398,7 @@ describe('CloudChatPage route-aware transcript phase', () => {
       sessionId: null,
       fetchedSessionData: null,
       activity: { type: 'idle' },
+      backgroundActivity: { status: 'inactive' },
       activeSessionType: 'cloud-agent',
       isReadOnly: false,
       staticMessages: [],

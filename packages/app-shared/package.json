@@ -10,7 +10,6 @@
     "./security-agent": "./src/security-agent/index.ts",
     "./auth": "./src/auth/index.ts",
     "./code-review": "./src/code-review/index.ts",
-    "./code-reviews": "./src/code-reviews/index.ts",
     "./organizations": "./src/organizations/index.ts",
     "./platforms": "./src/platforms.ts",
     "./universal-links": "./src/universal-links/index.ts",
@@ -32,6 +31,7 @@
     "./approval-key": "./src/approval-key.ts",
     "./byok-credentials": "./src/byok-credentials.ts",
     "./home-widget": "./src/home-widget.ts",
+    "./display-text": "./src/display-text.ts",
     "./tool-detail": "./src/tool-detail/index.ts",
     "./worktree-review": "./src/worktree-review/index.ts"
   },

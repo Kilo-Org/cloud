@@ -46,7 +46,6 @@ import {
   familiesOwedByEveryLocale,
   flattenCatalog,
   pluralFamilyBases,
-  pluralParts,
 } from '../lib/catalogs.mjs';
 import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 
@@ -207,8 +206,12 @@ function countedCall(node, text) {
   return countedKey(unwrap(node.arguments[0]), text);
 }
 
-/** One traversal of the source tree: every counted call, and every file the parser refused. */
-function auditTree(rootDir) {
+/**
+ * One traversal of the source tree: every counted call, and every file the
+ * parser refused. It is the one traversal the accessors below project from, so
+ * an audit that asks several questions of the same tree scans it once.
+ */
+export function auditCountedCalls(rootDir = SOURCE_DIR) {
   const calls = [];
   const problems = [];
   // The app's sources read the way every other diagnostic names them; a
@@ -229,9 +232,12 @@ function auditTree(rootDir) {
   return { calls, problems };
 }
 
-/** Every static counted key: `t('key', { … count … })` and its quoted variants. */
-export function collectCountedKeys(rootDir = SOURCE_DIR) {
-  return countedKeysFrom(auditTree(rootDir).calls);
+/**
+ * Every static counted key: `t('key', { … count … })` and its quoted variants.
+ * It projects a scan the caller made once with `auditCountedCalls`.
+ */
+export function collectCountedKeys(scan) {
+  return countedKeysFrom(scan.calls);
 }
 
 /**
@@ -239,18 +245,20 @@ export function collectCountedKeys(rootDir = SOURCE_DIR) {
  * source writes it, whitespace-normalized. A listed expression in
  * `DYNAMIC_COUNTED_KEYS` names the keys it can produce; an unlisted one is an
  * audit problem, because the audit cannot see which messages a count reaches.
+ * It projects a scan the caller made once with `auditCountedCalls`.
  */
-export function collectDynamicCountedCalls(rootDir = SOURCE_DIR) {
-  return dynamicCallsFrom(auditTree(rootDir).calls);
+export function collectDynamicCountedCalls(scan) {
+  return dynamicCallsFrom(scan.calls);
 }
 
 /**
  * Every source file the parser refused, as one problem line per error. The
  * tree of such a file is empty, so its counted messages are invisible; saying
- * so keeps a syntax error from passing as a clean audit.
+ * so keeps a syntax error from passing as a clean audit. It projects a scan the
+ * caller made once with `auditCountedCalls`.
  */
-export function findUnparsedFiles(rootDir = SOURCE_DIR) {
-  return auditTree(rootDir).problems;
+export function findUnparsedFiles(scan) {
+  return scan.problems;
 }
 
 /** The literal-key view of one collection of counted calls. */
@@ -376,11 +384,6 @@ export function readEnglishCatalog(localesDir = LOCALES_DIR) {
   return flattenCatalog(JSON.parse(readFileSync(join(localesDir, 'en.json'), 'utf8')));
 }
 
-/** The base key of a plural family, or null when the key is not a category. */
-export function pluralFamilyBase(key) {
-  return pluralParts(key)?.base ?? null;
-}
-
 /**
  * Every counted key the audit is responsible for: the literal ones and every
  * key a reviewed dynamic call can produce.
@@ -412,20 +415,22 @@ function countlessFamilies(calls, english) {
 
 /**
  * The variable-key counted calls that are not in `DYNAMIC_COUNTED_KEYS`. Each
- * one is a call whose possible messages the audit cannot see.
+ * one is a call whose possible messages the audit cannot see. It projects a
+ * scan the caller made once with `auditCountedCalls`.
  */
-export function findUnlistedDynamicCalls(rootDir = SOURCE_DIR) {
-  return unlistedDynamicCalls(auditTree(rootDir).calls);
+export function findUnlistedDynamicCalls(scan) {
+  return unlistedDynamicCalls(scan.calls);
 }
 
 /**
  * The counted keys — literal, or produced by a reviewed dynamic call — that
  * are neither a plural family in English nor a reviewed `NO_AGREEMENT` entry.
  * Empty on a healthy tree; every entry is a message whose count cannot select
- * a form.
+ * a form. It projects a scan the caller made once with `auditCountedCalls`,
+ * and reads the English catalog per call.
  */
-export function findCountlessFamilies(rootDir = SOURCE_DIR, localesDir = LOCALES_DIR) {
-  return countlessFamilies(auditTree(rootDir).calls, readEnglishCatalog(localesDir));
+export function findCountlessFamilies(scan, localesDir = LOCALES_DIR) {
+  return countlessFamilies(scan.calls, readEnglishCatalog(localesDir));
 }
 
 /** The locale tags present on disk, without the `.json` extension. */
@@ -440,7 +445,7 @@ function run() {
   const sourceOnly = process.argv.includes('--source-only');
   const problems = [];
   const report = [];
-  const { calls, problems: unparsed } = auditTree(SOURCE_DIR);
+  const { calls, problems: unparsed } = auditCountedCalls(SOURCE_DIR);
   const english = readEnglishCatalog();
 
   for (const problem of unparsed) {
@@ -479,13 +484,7 @@ function run() {
         problems.push(`${tag}: cannot audit catalog: ${message}`);
         continue;
       }
-      const localeFamilyBases = new Set();
-      for (const key of catalog.keys()) {
-        const base = pluralFamilyBase(key);
-        if (base !== null) {
-          localeFamilyBases.add(base);
-        }
-      }
+      const localeFamilyBases = pluralFamilyBases(catalog);
       let flagged = 0;
       for (const family of families) {
         // A locale may keep the flat counted key and fall back to it when the

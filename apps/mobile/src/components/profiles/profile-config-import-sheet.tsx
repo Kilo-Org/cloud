@@ -28,6 +28,7 @@ import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { configImportArchiveFromText } from '@/lib/config-import-archive';
 import { useConfigImportMutations } from '@/lib/hooks/use-config-import-mutations';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type ProfileConfigImportSheetProps = Readonly<{
   profileId: string;
@@ -64,6 +65,7 @@ export function ProfileConfigImportSheet({
   const insets = useSafeAreaInsets();
   const { confirm, dialog } = useConfirmDialog();
   const { previewConfigImport, applyConfigImport } = useConfigImportMutations(organizationId);
+  const colors = useThemeColors();
 
   const textRef = useRef('');
   const archiveRef = useRef<string | null>(null);
@@ -233,7 +235,7 @@ export function ProfileConfigImportSheet({
           }}
           disabled={busy || hasPreview}
         >
-          <ClipboardPaste size={16} />
+          <ClipboardPaste size={16} color={colors.foreground} />
           <Text>{t('profiles.importConfigPasteAction')}</Text>
         </Button>
 

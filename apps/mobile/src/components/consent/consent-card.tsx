@@ -73,6 +73,9 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0),
   };
   const [pendingAction, setPendingAction] = useState<'primary' | 'secondary' | null>(null);
+  // The catalogue key, not the copy: the card translates it at render, so the
+  // line follows an applied language instead of keeping the words of the
+  // language the action failed under.
   const [error, setError] = useState<string | null>(null);
   // Onboarding pre-selects optional telemetry; review mode starts off. The
   // stored value loads over either default, so a stored decline never flashes
@@ -123,14 +126,14 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           // The error names the unreliability, so the switch may show its
           // default; the placeholder only covers the silent loading window.
           setStoredValueLoaded(true);
-          setError(t('consent.couldNotLoadConsentSettings'));
+          setError('consent.couldNotLoadConsentSettings');
         }
       }
     );
     return () => {
       active = false;
     };
-  }, [mode, userId, t]);
+  }, [mode, userId]);
 
   const handlePrimaryAction = async () => {
     if (mode === 'review') {
@@ -139,7 +142,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     }
 
     if (!userId) {
-      setError(t('consent.couldNotLoadAccount'));
+      setError('consent.couldNotLoadAccount');
       return;
     }
 
@@ -149,7 +152,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
       await acceptConsent(userId, optionalToggle);
       router.replace('/(app)/(tabs)' as Href);
     } catch {
-      setError(t('consent.couldNotSaveConsent'));
+      setError('consent.couldNotSaveConsent');
       setPendingAction(null);
     }
   };
@@ -160,7 +163,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
 
     if (mode === 'review') {
       if (!userId) {
-        setError(t('consent.couldNotLoadAccount'));
+        setError('consent.couldNotLoadAccount');
         setPendingAction(null);
         return;
       }
@@ -168,7 +171,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
       try {
         await revokeConsent(userId);
       } catch {
-        setError(t('consent.couldNotRevokeConsent'));
+        setError('consent.couldNotRevokeConsent');
         setPendingAction(null);
         return;
       }
@@ -177,9 +180,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     try {
       await signOut();
     } catch {
-      setError(
-        mode === 'review' ? t('consent.revokedSignOutFailed') : t('consent.couldNotSignOut')
-      );
+      setError(mode === 'review' ? 'consent.revokedSignOutFailed' : 'consent.couldNotSignOut');
       setPendingAction(null);
     }
   };
@@ -218,13 +219,13 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           },
           () => {
             setOptionalToggle(!next);
-            setError(t('consent.couldNotSaveChoice'));
+            setError('consent.couldNotSaveChoice');
             setSavingOptional(false);
           }
         );
       } else if (mode === 'review') {
         setOptionalToggle(!next);
-        setError(t('consent.couldNotLoadAccount'));
+        setError('consent.couldNotLoadAccount');
       } else {
         // Onboarding: the switch is the user's own answer. The stored read can
         // still land later — the account id may resolve after this render — and
@@ -232,7 +233,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
         userToggledRef.current = true;
       }
     },
-    [mode, userId, t]
+    [mode, userId]
   );
 
   return (
@@ -342,7 +343,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           onOpenPolicy={handleOpenPrivacy}
         />
         <View className="min-h-5 justify-center">
-          <AccessibleStatus message={error} className="text-sm" />
+          <AccessibleStatus message={error ? t(error) : null} className="text-sm" />
         </View>
         <Button
           onPress={() => {

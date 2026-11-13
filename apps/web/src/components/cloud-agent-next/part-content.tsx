@@ -7,6 +7,8 @@ import { createContext, memo, useContext } from 'react';
 import { Brain, Loader2 } from 'lucide-react';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { ToolCardShell } from './ToolCardShell';
+import { BackgroundResultCard } from './BackgroundResultCard';
+import { readBackgroundResult } from '@kilocode/cloud-agent-sdk/background-result';
 import { ToolPartDetailBoundary } from './ToolPartDetail';
 import { ReadToolCard } from './ReadToolCard';
 import { EditToolCard } from './EditToolCard';
@@ -236,6 +238,8 @@ function renderToolPart(part: Extract<Part, { type: 'tool' }>) {
 }
 
 function ToolPartCard({ part }: { part: Extract<Part, { type: 'tool' }> }) {
+  const backgroundResult = readBackgroundResult(part);
+  if (backgroundResult) return <BackgroundResultCard part={part} result={backgroundResult} />;
   if (
     part.state.status === 'error' &&
     !['question', 'suggest', 'chart', 'permission'].includes(part.tool)

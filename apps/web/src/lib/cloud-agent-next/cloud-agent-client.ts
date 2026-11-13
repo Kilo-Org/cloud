@@ -1,5 +1,9 @@
 import type { CloudSessionMessagesWirePage } from '@kilocode/cloud-agent-sdk/schemas';
 import {
+  backgroundActivityInventorySchema,
+  type BackgroundActivityInventory,
+} from '@kilocode/session-ingest-contracts';
+import {
   cloudToolPartDetailInputSchema,
   cloudToolPartDetailWireSchema,
   type CloudToolPartDetailInput,
@@ -716,6 +720,9 @@ type CloudAgentNextTRPCClient = {
   getSessionMessagesPage: {
     query: (input: GetSessionMessagesPageInput) => Promise<unknown>;
   };
+  getBackgroundActivity: {
+    query: (input: GetSessionInput) => Promise<unknown>;
+  };
   getSessionToolPartDetail: {
     query: (input: CloudToolPartDetailInput) => Promise<unknown>;
   };
@@ -1078,6 +1085,12 @@ export class CloudAgentNextClient {
     const request = cloudSessionMessagesPageInputSchema.parse(input);
     return cloudSessionMessagesPageWireSchema.parse(
       await this.client.getSessionMessagesPage.query(request)
+    );
+  }
+
+  async getBackgroundActivity(cloudAgentSessionId: string): Promise<BackgroundActivityInventory> {
+    return backgroundActivityInventorySchema.parse(
+      await this.client.getBackgroundActivity.query({ cloudAgentSessionId })
     );
   }
 

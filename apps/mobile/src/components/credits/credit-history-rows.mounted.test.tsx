@@ -63,11 +63,17 @@ function texts(renderer: TestRenderer.ReactTestRenderer): string[] {
   return collected;
 }
 
+// The zone marker carries a bidi isolate and the date a no-break space; these
+// assertions are about the sentence, not that carriage.
+function readable(text: string): string {
+  return text.replaceAll(/[\u2066\u2068\u2069]/g, '').replaceAll('\u00A0', ' ');
+}
+
 describe('PurchaseHistoryRow', () => {
   it('keeps the expiry line of a store-sold pack beside its store receipt note', async () => {
     const renderer = await renderRow(entry());
 
-    const painted = texts(renderer);
+    const painted = texts(renderer).map(text => readable(text));
     // Play credits expire a year after purchase, so the receipt note cannot
     // replace the date the pack runs out: both lines belong on the row.
     expect(painted.some(text => text.startsWith('Expires') && text.endsWith('(UTC)'))).toBe(true);
@@ -78,7 +84,7 @@ describe('PurchaseHistoryRow', () => {
   it('keeps the store note for an App Store pack and the expiry beside it', async () => {
     const renderer = await renderRow(entry({ creditSource: 'apple' }));
 
-    const painted = texts(renderer);
+    const painted = texts(renderer).map(text => readable(text));
     expect(painted.some(text => text.startsWith('Expires') && text.endsWith('(UTC)'))).toBe(true);
     expect(painted).toContain('Receipt from the App Store');
     renderer.unmount();
@@ -87,7 +93,7 @@ describe('PurchaseHistoryRow', () => {
   it('prints the expiry of a card purchase and its receipt action', async () => {
     const renderer = await renderRow(entry({ creditSource: 'stripe' }));
 
-    const painted = texts(renderer);
+    const painted = texts(renderer).map(text => readable(text));
     expect(painted.some(text => text.startsWith('Expires') && text.endsWith('(UTC)'))).toBe(true);
     expect(painted.some(text => text.startsWith('Receipt from'))).toBe(false);
     expect(renderer.root.findAll(node => String(node.type) === 'Pressable').length).toBeGreaterThan(
@@ -147,5 +153,24 @@ describe('PurchaseHistoryRow in the reader language', () => {
     const purchase = await renderRow(entry({ kind: 'purchase', creditSource: 'stripe' }));
     expect(texts(purchase)).toContain('Credit purchase');
     purchase.unmount();
+  });
+
+  it('keeps the Arabic zone marker on the date line, in its own direction', async () => {
+    try {
+      await act(async () => {
+        await i18n.changeLanguage('ar');
+      });
+      const renderer = await renderRow(entry());
+
+      const painted = texts(renderer);
+      const expiry = painted.find(text => text.includes('(UTC)'));
+      expect(expiry).toContain('\u00A0\u2068(UTC)\u2069');
+      expect(expiry).not.toContain(' (UTC)');
+      renderer.unmount();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
   });
 });

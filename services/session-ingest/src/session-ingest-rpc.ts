@@ -611,9 +611,9 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
 
   async recordCloudAgentSessionHarness(
     params: RecordCloudAgentSessionHarnessParams
-  ): Promise<void> {
+  ): Promise<boolean> {
     const input = recordCloudAgentSessionHarnessSchema.parse(params);
-    await setCloudAgentSessionVersion(getWorkerDb(this.env.HYPERDRIVE.connectionString), input);
+    return setCloudAgentSessionVersion(getWorkerDb(this.env.HYPERDRIVE.connectionString), input);
   }
 
   async setGeneratedTitleForCloudAgent(params: {

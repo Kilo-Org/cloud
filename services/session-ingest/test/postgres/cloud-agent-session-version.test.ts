@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createDrizzleClient, type DrizzleClient } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
+import type { RecordCloudAgentSessionHarnessParams } from '@kilocode/session-ingest-contracts';
 import { asc, sql } from 'drizzle-orm';
 import { setCloudAgentSessionVersion } from '../../src/services/cloud-agent-session-version';
 
@@ -58,12 +59,14 @@ describe('setCloudAgentSessionVersion', () => {
   ] as const)(
     'records %s as version %i without moving the session in the list',
     async (runtimeHarness, version) => {
-      await setCloudAgentSessionVersion(client.db, {
+      const input: RecordCloudAgentSessionHarnessParams = {
         sessionId,
         kiloUserId: userId,
         cloudAgentSessionId,
         runtimeHarness,
-      });
+      };
+      expect(await setCloudAgentSessionVersion(client.db, input)).toBe(true);
+      expect(await setCloudAgentSessionVersion(client.db, input)).toBe(true);
 
       const rows = await readRows();
       expect(rows.map(row => [row.kilo_user_id, row.version])).toEqual([
@@ -74,13 +77,20 @@ describe('setCloudAgentSessionVersion', () => {
     }
   );
 
-  it('does not write a row owned by another Cloud Agent session', async () => {
-    await setCloudAgentSessionVersion(client.db, {
-      sessionId,
-      kiloUserId: userId,
-      cloudAgentSessionId: 'workspace_22222222-2222-4222-8222-222222222222',
-      runtimeHarness: 'kilo2',
-    });
+  it.each([
+    { cloudAgentSessionId: 'workspace_22222222-2222-4222-8222-222222222222' },
+    { kiloUserId: 'oauth/someone-else' },
+    { sessionId: 'ses_00000000000000000000000000' },
+  ] as const)('reports an unmatched row without changing it (%j)', async mismatch => {
+    expect(
+      await setCloudAgentSessionVersion(client.db, {
+        sessionId,
+        kiloUserId: userId,
+        cloudAgentSessionId,
+        runtimeHarness: 'kilo2',
+        ...mismatch,
+      })
+    ).toBe(false);
 
     expect((await readRows()).map(row => row.version)).toEqual([0, 0]);
   });

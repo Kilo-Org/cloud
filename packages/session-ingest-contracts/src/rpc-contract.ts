@@ -1392,7 +1392,9 @@ export type GetSessionMessagesResult = AuthorizedSessionMessages | null;
 
 export type SessionIngestRpcMethods = {
   publishCloudAgentSessionStatus: (params: PublishCloudAgentSessionStatusParams) => Promise<void>;
-  recordCloudAgentSessionHarness: (params: RecordCloudAgentSessionHarnessParams) => Promise<void>;
+  recordCloudAgentSessionHarness: (
+    params: RecordCloudAgentSessionHarnessParams
+  ) => Promise<boolean>;
   beginCloudAgentWorktreeDeletion: (
     params: CloudAgentWorktreeDeletionParams
   ) => Promise<CloudAgentWorktreeDeletionState>;

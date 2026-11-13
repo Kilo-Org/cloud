@@ -770,7 +770,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
   private readonly listStatusOutbox: ReturnType<typeof createSessionListStatusOutbox>;
-  private readonly recordRuntimeHarness: ReturnType<typeof createRuntimeHarnessRecorder>;
+  private readonly runtimeHarnessRecorder: ReturnType<typeof createRuntimeHarnessRecorder>;
   /** Terminal callback outbox (plan B5); one job per drained batch. */
   private readonly messageCallbacks: MessageCallbacks;
   /** Worktree-changes projection from the shared event log (plan B10). */
@@ -820,9 +820,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       storage: ctx.storage,
       publish: update => this.env.SESSION_INGEST.publishCloudAgentSessionStatus(update),
     });
-    this.recordRuntimeHarness = createRuntimeHarnessRecorder(params =>
-      this.env.SESSION_INGEST.recordCloudAgentSessionHarness(params)
-    );
+    this.runtimeHarnessRecorder = createRuntimeHarnessRecorder({
+      storage: ctx.storage,
+      record: params => this.env.SESSION_INGEST.recordCloudAgentSessionHarness(params),
+    });
     this.messageCallbacks = createMessageCallbacks({
       storage: ctx.storage,
       getMetadata: () => this.metadata,
@@ -2556,23 +2557,27 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (!this.messages.some(message => message.state === 'queued')) {
       await this.clearTransportRecovery();
     }
+    const harnessDueAt = this.runtimeHarnessRecorder.nextDueAt();
     const candidates = [
       this.transportRecoveryAt,
       nextBackstopAt(this.messages, this.sessionTimers()),
       this.reportOutbox.nextDueAt() ?? null,
       this.messageCallbacks.nextCallbackDueAt() ?? null,
       statusDueAt,
+      harnessDueAt,
     ].filter((value): value is number => value !== null);
     if (candidates.length === 0) {
       await this.ctx.storage.deleteAlarm();
       return;
     }
     await this.ctx.storage.setAlarm(Math.min(...candidates));
-    if (statusDueAt !== null && statusDueAt <= Date.now()) {
+    if (
+      (statusDueAt !== null && statusDueAt <= Date.now()) ||
+      (harnessDueAt !== null && harnessDueAt <= Date.now())
+    ) {
       // Metadata publication never holds up preparation, answers, or outcomes.
       this.ctx.waitUntil(
-        this.listStatusOutbox
-          .repair()
+        Promise.all([this.listStatusOutbox.repair(), this.runtimeHarnessRecorder.repair()])
           .then(() =>
             this.enqueue(async () => {
               // The serialized finalizer re-arms the alarm after publication.
@@ -2581,7 +2586,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           .catch(() => {
             logger
               .withFields({ sessionId: this.sessionId })
-              .warn('Session list status repair failed');
+              .warn('Session list metadata repair failed');
           })
       );
     }
@@ -3677,10 +3682,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.applyView(view, pass);
   }
 
-  /**
-   * A ready route's container reports the harness its connected wrapper runs.
-   * Recording never delays delivery; a failure is retried by the next delivery.
-   */
   private recordDeliveredRuntimeHarness(): void {
     const runtimeHarness =
       this.route.state === 'ready' ? this.route.container?.runtimeHarness : undefined;
@@ -3691,14 +3692,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       this.env.SESSION_INGEST === undefined
     )
       return;
-    this.ctx.waitUntil(
-      this.recordRuntimeHarness({
-        sessionId: this.registration.spec.kiloSessionId,
-        kiloUserId: this.metadata.identity.userId,
-        cloudAgentSessionId: this.sessionId,
-        runtimeHarness,
-      })
-    );
+    this.runtimeHarnessRecorder.record({
+      sessionId: this.registration.spec.kiloSessionId,
+      kiloUserId: this.metadata.identity.userId,
+      cloudAgentSessionId: this.sessionId,
+      runtimeHarness,
+    });
   }
 
   private async persistQueuedContainer(

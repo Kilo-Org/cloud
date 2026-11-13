@@ -1935,6 +1935,15 @@ deleted sessions are never recreated. Notifications remain best effort, with the
 existing list reconciliation and reconnect fetch repairing missed notifications.
 Deploy session-ingest before cloud-agent-next; no database migration is needed.
 
+The session list also records the session's Kilo runtime in `cli_sessions_v2.version`
+(`CLI_SESSION_VERSION_BY_RUNTIME_HARNESS`: `1` Kilo v1, `2` Kilo v2, `0` unknown).
+After a delivery to a `ready` route, the Session DO sends that route container's
+`runtimeHarness`, which the connected wrapper reported, through
+`SESSION_INGEST.recordCloudAgentSessionHarness`. Ingest writes only the row that
+matches the user and Cloud Agent session, and keeps `updated_at`. The record is
+best effort and never delays delivery. Each Session DO instance records once; a
+failure is retried by the next delivery. Rows created before this record stay `0`.
+
 | Reason | Stage / code |
 |---|---|
 | `preparation_timeout` | `pre_dispatch` / `wrapper_start_failed` |

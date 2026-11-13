@@ -6708,6 +6708,8 @@ export const cli_sessions_v2 = pgTable(
     kilo_user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'restrict' }),
+    // See CLI_SESSION_VERSION_BY_RUNTIME_HARNESS: Cloud Agent sets 1 (Kilo v1) or
+    // 2 (Kilo v2) after it delivers a message to a ready sandbox; 0 means unknown.
     version: integer().notNull().default(0),
     title: text(),
     public_id: uuid(),

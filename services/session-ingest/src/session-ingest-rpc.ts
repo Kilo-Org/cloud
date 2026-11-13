@@ -36,6 +36,8 @@ import {
   createSessionForCloudAgentSchema,
   publishCloudAgentSessionStatusSchema,
   type PublishCloudAgentSessionStatusParams,
+  recordCloudAgentSessionHarnessSchema,
+  type RecordCloudAgentSessionHarnessParams,
   cloudAgentSessionIdSchema,
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeDeletionManifestSchema,
@@ -129,6 +131,7 @@ import {
   HostedWorkspaceSessionDeleteError,
 } from './services/hosted-workspace-session';
 import { clearSessionLocalState } from './services/session-local-state';
+import { setCloudAgentSessionVersion } from './services/cloud-agent-session-version';
 import { applyReportedSessionTitle, reportSessionTitleSchema } from './services/session-title';
 import { applyMetadataChanges } from './ingest/metadata';
 
@@ -604,6 +607,13 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       this.ctx,
       input.cloudAgentSessionId
     );
+  }
+
+  async recordCloudAgentSessionHarness(
+    params: RecordCloudAgentSessionHarnessParams
+  ): Promise<void> {
+    const input = recordCloudAgentSessionHarnessSchema.parse(params);
+    await setCloudAgentSessionVersion(getWorkerDb(this.env.HYPERDRIVE.connectionString), input);
   }
 
   async setGeneratedTitleForCloudAgent(params: {

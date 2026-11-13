@@ -22,7 +22,10 @@ import {
 } from '../../src/persistence/session-metadata.js';
 import { getWorktreeWorkspacePath } from '../../src/workspace.js';
 import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
-import type { PublishCloudAgentSessionStatusParams } from '@kilocode/session-ingest-contracts';
+import type {
+  PublishCloudAgentSessionStatusParams,
+  RecordCloudAgentSessionHarnessParams,
+} from '@kilocode/session-ingest-contracts';
 import {
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINERS_NAMESPACE,
@@ -223,6 +226,7 @@ async function readRegistration(stub: DurableObjectStub<SandboxSessionV2>): Prom
 const GENERATED_TITLE_AI_CALLS_KEY = 'test:generated-title:ai-calls';
 const GENERATED_TITLE_PERSISTS_KEY = 'test:generated-title:persists';
 const LIST_STATUS_PUBLISHES_KEY = 'test:list-status:publishes';
+const HARNESS_RECORDS_KEY = 'test:runtime-harness:records';
 
 type GeneratedTitleAiInput = {
   messages?: unknown;
@@ -422,6 +426,65 @@ describe('SandboxSessionV2 worker RPC surface', () => {
         (update, index) => index === 0 || update.transitionId > updates[index - 1].transitionId
       )
     ).toBe(true);
+  });
+
+  it('records the ready route runtime in the session list once and retries a failed record on the next delivery', async () => {
+    const { stub, peer, sessionId, kiloId, sessionMetadata, sandboxSelection } =
+      await setupGeneratedTitleSession();
+    await runInDurableObject(stub, async (instance, state) => {
+      await state.storage.put(HARNESS_RECORDS_KEY, []);
+      Object.assign(instance.env.SESSION_INGEST, {
+        async recordCloudAgentSessionHarness(params: RecordCloudAgentSessionHarnessParams) {
+          const records =
+            (await state.storage.get<RecordCloudAgentSessionHarnessParams[]>(
+              HARNESS_RECORDS_KEY
+            )) ?? [];
+          await state.storage.put(HARNESS_RECORDS_KEY, [...records, params]);
+          if (records.length === 0) throw new Error('ingest unavailable');
+        },
+      });
+    });
+    const readRecords = () =>
+      runInDurableObject(
+        stub,
+        async (_instance, state) =>
+          (await state.storage.get<RecordCloudAgentSessionHarnessParams[]>(HARNESS_RECORDS_KEY)) ??
+          []
+      );
+    peer.prepareView = {
+      state: 'ready',
+      attemptId: peer.attemptId,
+      container: {
+        provider: 'cloudflare-containers',
+        sandboxId: 'sandbox-harness',
+        runtimeHarness: 'kilo2',
+      },
+    };
+    const expected = {
+      sessionId: kiloId,
+      kiloUserId: USER_ID,
+      cloudAgentSessionId: sessionId,
+      runtimeHarness: 'kilo2',
+    };
+
+    const firstMessage = messageId();
+    await stub.createSessionWithInitialAdmission({
+      metadata: sessionMetadata,
+      sandboxSelection,
+      message: promptPayload(firstMessage),
+    });
+    await waitFor(async () => expect(await readRecords()).toEqual([expected]));
+
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: firstMessage });
+    const secondMessage = messageId();
+    await stub.send(promptPayload(secondMessage));
+    await waitFor(async () => expect(await readRecords()).toEqual([expected, expected]));
+
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: secondMessage });
+    await stub.send(promptPayload(messageId()));
+    await waitFor(async () => expect(peer.deliverCalls).toHaveLength(3));
+    await new Promise(resolve => setTimeout(resolve, 250));
+    expect(await readRecords()).toEqual([expected, expected]);
   });
 
   it('does not publish idle for registration alone, but still publishes autonomous native work', async () => {

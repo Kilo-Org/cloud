@@ -29,6 +29,7 @@ import {
 } from '@kilocode/worker-utils/cloud-agent-authority';
 import { sessionCallbackContext } from './callback-context.js';
 import { createSessionListStatusOutbox, deriveSessionListStatus } from './list-status.js';
+import { createRuntimeHarnessRecorder } from './runtime-harness-record.js';
 import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
@@ -769,6 +770,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
   private readonly listStatusOutbox: ReturnType<typeof createSessionListStatusOutbox>;
+  private readonly recordRuntimeHarness: ReturnType<typeof createRuntimeHarnessRecorder>;
   /** Terminal callback outbox (plan B5); one job per drained batch. */
   private readonly messageCallbacks: MessageCallbacks;
   /** Worktree-changes projection from the shared event log (plan B10). */
@@ -818,6 +820,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       storage: ctx.storage,
       publish: update => this.env.SESSION_INGEST.publishCloudAgentSessionStatus(update),
     });
+    this.recordRuntimeHarness = createRuntimeHarnessRecorder(params =>
+      this.env.SESSION_INGEST.recordCloudAgentSessionHarness(params)
+    );
     this.messageCallbacks = createMessageCallbacks({
       storage: ctx.storage,
       getMetadata: () => this.metadata,
@@ -3653,6 +3658,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           runtimeHarness: message.container?.runtimeHarness,
         });
       }
+      this.recordDeliveredRuntimeHarness();
       await this.armAlarm();
       return;
     }
@@ -3669,6 +3675,30 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       return;
     }
     await this.applyView(view, pass);
+  }
+
+  /**
+   * A ready route's container reports the harness its connected wrapper runs.
+   * Recording never delays delivery; a failure is retried by the next delivery.
+   */
+  private recordDeliveredRuntimeHarness(): void {
+    const runtimeHarness =
+      this.route.state === 'ready' ? this.route.container?.runtimeHarness : undefined;
+    if (
+      runtimeHarness === undefined ||
+      this.registration === null ||
+      this.metadata === null ||
+      this.env.SESSION_INGEST === undefined
+    )
+      return;
+    this.ctx.waitUntil(
+      this.recordRuntimeHarness({
+        sessionId: this.registration.spec.kiloSessionId,
+        kiloUserId: this.metadata.identity.userId,
+        cloudAgentSessionId: this.sessionId,
+        runtimeHarness,
+      })
+    );
   }
 
   private async persistQueuedContainer(

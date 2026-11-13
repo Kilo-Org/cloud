@@ -2,12 +2,20 @@ import { androidpublisher } from '@googleapis/androidpublisher';
 import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 import { GoogleAuth } from 'google-auth-library';
 import type { JWTInput } from 'google-auth-library';
+import * as z from 'zod';
 
-import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { getEnvVariable, requireEnv } from '@kilocode/web-shared/lib/dotenvx';
 
 export const GOOGLE_PLAY_PACKAGE_NAME = 'com.kilocode.kiloapp';
 
 const ANDROID_PUBLISHER_SCOPE = 'https://www.googleapis.com/auth/androidpublisher';
+
+const GOOGLE_PLAY_CREDENTIALS_INVALID = 'GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid';
+
+const GooglePlayServiceAccountSchema = z.looseObject({
+  client_email: z.string().min(1),
+  private_key: z.string().min(1),
+});
 
 type CachedValue<T> = {
   key: string;
@@ -16,38 +24,26 @@ type CachedValue<T> = {
 
 let cachedPublisherClient: CachedValue<androidpublisher_v3.Androidpublisher> | null = null;
 
-function requiredEnv(name: string): string {
-  const value = getEnvVariable(name);
-  if (!value) throw new Error(`${name} is not set`);
-  return value;
-}
-
 function parseGooglePlayServiceAccountCredentials(json: string): JWTInput {
   let value: unknown;
   try {
     value = JSON.parse(json);
   } catch {
-    throw new Error('GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid');
+    throw new Error(GOOGLE_PLAY_CREDENTIALS_INVALID);
   }
 
-  if (
-    typeof value !== 'object' ||
-    value === null ||
-    !('client_email' in value) ||
-    !('private_key' in value)
-  ) {
-    throw new Error('GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid');
+  const parsed = GooglePlayServiceAccountSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new Error(GOOGLE_PLAY_CREDENTIALS_INVALID);
   }
-
-  const credentials = value as JWTInput;
-  if (!credentials.client_email || !credentials.private_key) {
-    throw new Error('GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid');
-  }
-  return credentials;
+  return parsed.data;
 }
 
 export function createGooglePlayAndroidPublisherClient(): androidpublisher_v3.Androidpublisher {
-  const serviceAccountJson = requiredEnv('GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON');
+  const serviceAccountJson = requireEnv(
+    'GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON',
+    getEnvVariable('GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON')
+  );
   if (cachedPublisherClient?.key === serviceAccountJson) {
     return cachedPublisherClient.value;
   }

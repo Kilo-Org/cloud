@@ -41,6 +41,7 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
   const { t, i18n } = useTranslation();
   const device = deviceSessionLabel(session.user_agent);
   const signedIn = formatDate(parseTimestamp(session.created_at), i18n.language);
+  const lastSeen = formatDate(parseTimestamp(session.last_seen_at), i18n.language);
 
   return (
     <View className="flex-row items-center gap-3 rounded-lg bg-secondary px-4 py-3">
@@ -59,10 +60,7 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
           )}
         </View>
         <Text variant="muted" className="mt-0.5 text-xs">
-          {t('deviceSessions.signedIn', {
-            signedIn,
-            lastSeen: formatDate(parseTimestamp(session.last_seen_at), i18n.language),
-          })}
+          {t('deviceSessions.signedIn', { signedIn, lastSeen })}
         </Text>
       </View>
       {/* The control box hugs its 16 pt glyph: a 44 dp box centred the glyph,
@@ -84,6 +82,7 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
             : t('deviceSessions.signOutSessionLabel', {
                 device: isolateBidiText(device),
                 signedIn,
+                lastSeen,
               })
         }
         className="min-h-[28px] min-w-[28px] shrink-0 items-center justify-center active:opacity-70"

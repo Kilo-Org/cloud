@@ -616,6 +616,26 @@ export const userRouter = createTRPCRouter({
     });
   }),
 
+  /**
+   * The profile links the account form edits. Separate from `getMe`, which
+   * every screen reads on boot and would otherwise carry fields only one form
+   * needs.
+   */
+  getProfileLinks: baseProcedure
+    .output(z.object({ linkedinUrl: z.string().nullable(), githubUrl: z.string().nullable() }))
+    .query(async ({ ctx }) => {
+      const [row] = await db
+        .select({
+          linkedin_url: kilocode_users.linkedin_url,
+          github_url: kilocode_users.github_url,
+        })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, ctx.user.id))
+        .limit(1);
+
+      return { linkedinUrl: row?.linkedin_url ?? null, githubUrl: row?.github_url ?? null };
+    }),
+
   // Whether the caller has any Kilo gateway usage. Any `microdollar_usage` row
   // for the user counts (org-scoped and zero-cost free-model rows included), so
   // this reads the primary DB rather than a replica that may lag the first

@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
+import { callerAddressFromHeaders } from '@/lib/auth/caller-address';
 import { issueAdmissionChallenge, ChallengeRateLimitError } from '@/lib/auth/native-admission';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
@@ -28,10 +29,7 @@ export const POST = withRestTiming(
     }
 
     // Extract client IP for rate limiting
-    const ipAddress =
-      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-      request.headers.get('x-real-ip') ||
-      'unknown';
+    const ipAddress = callerAddressFromHeaders(request.headers);
 
     try {
       const result = await issueAdmissionChallenge(request as NextRequest, ipAddress);

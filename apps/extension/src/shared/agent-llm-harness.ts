@@ -453,6 +453,8 @@ export const buildGatewayMessagesFromEvents = (
           messages.push({ content: getGatewayMessageText(event), role: event.role });
           break;
         }
+        // Error events are UI-only retryables: they never belong in the gateway replay.
+        case 'error':
         case 'thinking': {
           break;
         }

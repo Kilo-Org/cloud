@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- card states + draft form push past 300, and splitting would scatter related logic */
 import { storage } from '#imports';
-import { useAtom, useSetAtom } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { MAX_MEMORY_NOTE_LENGTH } from '@/src/shared/agent-memories';
@@ -14,6 +14,7 @@ import {
 } from './pending-memory-save-card-state';
 import { settingsDialogOpenAtom } from './settings-dialog-state';
 import { useAgentMemories } from './use-agent-memories';
+import { dismissLayer, useEscapeKey } from './use-dismiss';
 const SAVE_ERROR_MESSAGE = "Couldn't save memory. Try again.";
 const LOAD_ERROR_MESSAGE = "Couldn't load memories. Try again.";
 const FULL_MESSAGE = 'Memory is full. Delete memories to save new ones.';
@@ -28,6 +29,7 @@ const primaryButtonClass =
 export const PendingMemorySaveCard = (): JSX.Element | null => {
   const { isLoaded, loadError, memories, pendingDraft, reload } = useAgentMemories();
   const [approvalEntry, setApprovalEntry] = useAtom(pendingApprovalAtom);
+  const settingsDialogOpen = useAtomValue(settingsDialogOpenAtom);
   const setSettingsOpen = useSetAtom(settingsDialogOpenAtom);
   const [savedConfirmation, setSavedConfirmation] = useState(false);
   const [saveError, setSaveError] = useState<string | undefined>();
@@ -94,10 +96,6 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
     noteTextareaRef.current?.focus();
   }, [pendingDraft, showsDraftForm]);
 
-  if (view.kind === 'hidden') {
-    return null;
-  }
-
   const handleCancel = (): void => {
     // Settle the atom first if one exists for memory kind.
     if (approvalEntry !== undefined && approvalEntry.kind === 'memory' && !settledRef.current) {
@@ -122,6 +120,23 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
     setNote('');
     setFullOutcome(false);
   };
+
+  useEscapeKey(
+    !settingsDialogOpen && view.kind !== 'hidden',
+    () => {
+      if (view.kind === 'confirmation') {
+        handleDone();
+        return;
+      }
+
+      handleCancel();
+    },
+    dismissLayer.card
+  );
+
+  if (view.kind === 'hidden') {
+    return null;
+  }
 
   const handleSave = async (): Promise<void> => {
     if (pendingDraft === undefined || isSaving) {
@@ -190,7 +205,7 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
       className="fixed inset-0 z-[25] flex items-center justify-center bg-black/50 p-4"
       role="dialog"
     >
-      <div className="w-full max-w-sm rounded-xl border border-border bg-surface-raised p-3 shadow-lg shadow-black/50">
+      <div className="flex max-h-full w-full max-w-sm flex-col rounded-xl border border-border bg-surface-raised p-3 shadow-lg shadow-black/50">
         {view.kind === 'confirmation' ? (
           <div className="flex flex-col gap-3">
             <p className="type-body text-foreground">{CONFIRMATION_MESSAGE}</p>
@@ -212,91 +227,97 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
           </div>
         ) : null}
         {view.kind === 'full' || view.kind === 'saveError' || view.kind === 'draft' ? (
-          <div className="flex flex-col gap-3">
-            {view.kind === 'full' ? (
-              <div className="flex flex-col gap-2">
-                <p className="type-body text-foreground">{FULL_MESSAGE}</p>
-                <div className="flex justify-end">
-                  <button
-                    className={secondaryButtonClass}
-                    onClick={() => {
-                      setSettingsOpen(true);
-                    }}
-                    type="button"
-                  >
-                    Manage memories
-                  </button>
-                </div>
+          <>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="flex flex-col gap-3">
+                {view.kind === 'full' ? (
+                  <div className="flex flex-col gap-2">
+                    <p className="type-body text-foreground">{FULL_MESSAGE}</p>
+                    <div className="flex justify-end">
+                      <button
+                        className={secondaryButtonClass}
+                        onClick={() => {
+                          setSettingsOpen(true);
+                        }}
+                        type="button"
+                      >
+                        Manage memories
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+                {view.kind === 'saveError' ? (
+                  <div className="flex flex-col gap-2">
+                    <p className="type-body text-status-red-400">{view.message}</p>
+                    <div className="flex justify-end">
+                      <button
+                        className={primaryButtonClass}
+                        disabled={isSaving}
+                        onClick={() => {
+                          void handleSave();
+                        }}
+                        type="button"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {pendingDraft === undefined ? null : (
+                  <>
+                    <div className="space-y-1">
+                      <p className="type-label text-foreground-muted">Selection</p>
+                      <p className="type-body whitespace-pre-wrap break-words text-foreground">
+                        {buildDraftSelectionPreview(pendingDraft.text)}
+                      </p>
+                      {pendingDraft.truncated === true ? (
+                        <p className="type-label text-foreground-muted">{TRUNCATION_NOTICE}</p>
+                      ) : null}
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="type-label text-foreground-muted" htmlFor="memory-note">
+                        Note (optional)
+                      </label>
+                      <textarea
+                        aria-label="Memory note (optional)"
+                        className="type-body min-h-16 w-full resize-y rounded-md border border-border-strong bg-input-bg px-2 py-1.5 text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
+                        id="memory-note"
+                        maxLength={MAX_MEMORY_NOTE_LENGTH}
+                        onChange={event => {
+                          setNote(event.target.value);
+                        }}
+                        ref={noteTextareaRef}
+                        value={note}
+                      />
+                      <p className="type-label text-right text-foreground-muted">
+                        {noteCount.count}/{noteCount.max}
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
-            ) : null}
-            {view.kind === 'saveError' ? (
-              <div className="flex flex-col gap-2">
-                <p className="type-body text-status-red-400">{view.message}</p>
-                <div className="flex justify-end">
-                  <button
-                    className={primaryButtonClass}
-                    disabled={isSaving}
-                    onClick={() => {
-                      void handleSave();
-                    }}
-                    type="button"
-                  >
-                    Retry
-                  </button>
-                </div>
-              </div>
-            ) : null}
+            </div>
 
             {pendingDraft === undefined ? null : (
-              <>
-                <div className="space-y-1">
-                  <p className="type-label text-foreground-muted">Selection</p>
-                  <p className="type-body whitespace-pre-wrap break-words text-foreground">
-                    {buildDraftSelectionPreview(pendingDraft.text)}
-                  </p>
-                  {pendingDraft.truncated === true ? (
-                    <p className="type-label text-foreground-muted">{TRUNCATION_NOTICE}</p>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="type-label text-foreground-muted" htmlFor="memory-note">
-                    Note (optional)
-                  </label>
-                  <textarea
-                    aria-label="Memory note (optional)"
-                    className="type-body min-h-16 w-full resize-y rounded-md border border-border-strong bg-input-bg px-2 py-1.5 text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
-                    id="memory-note"
-                    maxLength={MAX_MEMORY_NOTE_LENGTH}
-                    onChange={event => {
-                      setNote(event.target.value);
-                    }}
-                    ref={noteTextareaRef}
-                    value={note}
-                  />
-                  <p className="type-label text-right text-foreground-muted">
-                    {noteCount.count}/{noteCount.max}
-                  </p>
-                </div>
-
-                <div className="flex justify-end gap-2">
-                  <button className={secondaryButtonClass} onClick={handleCancel} type="button">
-                    Cancel
-                  </button>
-                  <button
-                    className={primaryButtonClass}
-                    disabled={isSaving}
-                    onClick={() => {
-                      void handleSave();
-                    }}
-                    type="button"
-                  >
-                    Save memory
-                  </button>
-                </div>
-              </>
+              <div className="mt-3 flex shrink-0 justify-end gap-2">
+                <button className={secondaryButtonClass} onClick={handleCancel} type="button">
+                  Cancel
+                </button>
+                <button
+                  className={primaryButtonClass}
+                  disabled={isSaving}
+                  onClick={() => {
+                    void handleSave();
+                  }}
+                  type="button"
+                >
+                  Save memory
+                </button>
+              </div>
             )}
-          </div>
+          </>
         ) : null}
       </div>
     </div>

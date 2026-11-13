@@ -27,7 +27,7 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { lineIndex, walk } from '../lib/ast.mjs';
+import { walk } from '../lib/ast.mjs';
 import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 
 // Resolve from the app: react-native-css is the app's dependency, not the repo root's.
@@ -456,12 +456,12 @@ export function checkCompilerStillDropsThese() {
  * The entry is one `parseSourceTree` step (tools/lib/source-files.mjs): the
  * normalised `path` every exemption lookup, prefix test and diagnostic reads,
  * the absolute `file` the Intl rule scopes itself by, the `text`, the syntax
- * tree `program`, and the `problems` the parser reported. A file the parser
- * refused is reported here, once: its tree is empty, so leaving it out would
- * report the file as clean.
+ * tree `program`, the `problems` the parser reported, and the `lineOf` lookup
+ * those problems were built with, which the rules reuse so the text is scanned
+ * for lines once. A file the parser refused is reported here, once: its tree is
+ * empty, so leaving it out would report the file as clean.
  */
-export function checkParsedFile({ file, path, text, program, problems }) {
-  const lineOf = lineIndex(text);
+export function checkParsedFile({ file, path, text, program, lineOf, problems }) {
   return [
     ...problems,
     ...checkScrollPadding(path, program, text, lineOf),

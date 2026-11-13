@@ -56,8 +56,9 @@ function collect(dir, skip, files) {
 /**
  * One source file, parsed and named the way the walk below does it: its
  * absolute path `file`, the normalised path `path` a diagnostic names it by,
- * its `text`, its syntax tree `program`, and one `problems` line per parse
- * error.
+ * its `text`, its syntax tree `program`, one `problems` line per parse error,
+ * and `lineOf`, the offset-to-line lookup the parse problems were built with,
+ * so a caller reuses it instead of scanning the text again.
  *
  * `text` is the caller's, so a caller that already holds the text — an audit
  * whose rules take the source it was given — parses it through the same step
@@ -70,12 +71,14 @@ export function parseSourceEntry(dir, root, file, text) {
   const path = (fromRoot.startsWith('..') ? relativePath(dir, file) : fromRoot)
     .split(sep)
     .join('/');
+  const lineOf = lineIndex(text);
   return {
     file,
     path,
     text,
     program,
-    problems: parseProblems(path, errors, lineIndex(text)),
+    lineOf,
+    problems: parseProblems(path, errors, lineOf),
   };
 }
 

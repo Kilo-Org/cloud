@@ -929,22 +929,20 @@ export const userRouter = createTRPCRouter({
         .offset(input.cursor);
 
       const hasMore = transactions.length > CREDIT_PURCHASE_HISTORY_PAGE_SIZE;
-      const entries = transactions
-        .slice(0, CREDIT_PURCHASE_HISTORY_PAGE_SIZE)
-        .map(transaction => {
-          const kind: CreditPurchaseKind =
-            transaction.description === AUTO_TOP_UP_DESCRIPTION ? 'auto_top_up' : 'purchase';
-          return {
-            id: transaction.id,
-            date: new Date(transaction.date).toISOString(),
-            kind,
-            amount_mUsd: transaction.amount_mUsd,
-            expiryDate: transaction.expiryDate
-              ? new Date(transaction.expiryDate).toISOString()
-              : null,
-            creditSource: transaction.creditSource,
-          };
-        });
+      const entries = transactions.slice(0, CREDIT_PURCHASE_HISTORY_PAGE_SIZE).map(transaction => {
+        const kind: CreditPurchaseKind =
+          transaction.description === AUTO_TOP_UP_DESCRIPTION ? 'auto_top_up' : 'purchase';
+        return {
+          id: transaction.id,
+          date: new Date(transaction.date).toISOString(),
+          kind,
+          amount_mUsd: transaction.amount_mUsd,
+          expiryDate: transaction.expiryDate
+            ? new Date(transaction.expiryDate).toISOString()
+            : null,
+          creditSource: transaction.creditSource,
+        };
+      });
 
       return {
         entries,

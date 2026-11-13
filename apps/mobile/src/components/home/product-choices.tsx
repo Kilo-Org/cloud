@@ -1,3 +1,4 @@
+import { SSH_CLIENT_FLAG } from '@kilocode/app-shared/feature-flags';
 import { PERSONAL_SECURITY_SCOPE } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -7,7 +8,6 @@ import { SectionHeader } from '@/components/home/section-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { GitMerge, GitPullRequest, ShieldCheck, Terminal } from '@/components/ui/icons';
 import { useFeatureFlag } from '@/lib/analytics/posthog';
-import { FEATURE_FLAG_SSH_CLIENT } from '@/lib/feature-flags';
 import { getCodeReviewerProfilePath, getPrReviewEntryPath } from '@/lib/profile-agent-navigation';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useSshFixtureFlag } from '@/lib/ssh/fixture';
@@ -22,7 +22,7 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
   const router = useRouter();
   const { t } = useTranslation();
   const scope = organizationId ?? PERSONAL_SECURITY_SCOPE;
-  const remoteFlag = useFeatureFlag(FEATURE_FLAG_SSH_CLIENT, false);
+  const remoteFlag = useFeatureFlag(SSH_CLIENT_FLAG, false);
   const fixtureFlag = useSshFixtureFlag();
   const sshEnabled = remoteFlag || fixtureFlag;
 

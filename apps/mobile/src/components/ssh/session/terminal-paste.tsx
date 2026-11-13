@@ -1,4 +1,4 @@
-import { type TerminalViewHandle } from '@kilocode/react-native-ssh';
+import { type TerminalViewHandle } from '../../../../modules/kilo-ssh/src';
 import * as Clipboard from 'expo-clipboard';
 import { type ReactNode, type RefObject, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';

@@ -1,4 +1,4 @@
-import { type SftpEntry } from '@kilocode/react-native-ssh';
+import { type SftpEntry } from '../../../../modules/kilo-ssh/src';
 import { type TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';

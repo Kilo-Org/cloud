@@ -1,4 +1,4 @@
-import { type GeneratedKey, type ParsedKey } from '@kilocode/react-native-ssh';
+import { type GeneratedKey, type ParsedKey } from '../../../modules/kilo-ssh/src';
 
 import { type SSH_KEY_ALGORITHMS } from '@/lib/persist/schema';
 

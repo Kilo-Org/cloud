@@ -1,5 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
-import { type SftpEntry } from '@kilocode/react-native-ssh';
+import { type SftpEntry } from '../../../../modules/kilo-ssh/src';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 

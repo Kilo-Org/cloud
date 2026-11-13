@@ -1,4 +1,4 @@
-import { type SftpEntry } from '@kilocode/react-native-ssh';
+import { type SftpEntry } from '../../../../modules/kilo-ssh/src';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { type Cancellation } from '../cancellation';

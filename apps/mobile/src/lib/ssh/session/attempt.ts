@@ -1,5 +1,5 @@
-import type * as SshPackage from '@kilocode/react-native-ssh';
-import { type ConnectOptions, type SshAuth, type SshErrorCode } from '@kilocode/react-native-ssh';
+import type * as SshPackage from '../../../../modules/kilo-ssh/src';
+import { type ConnectOptions, type SshAuth, type SshErrorCode } from '../../../../modules/kilo-ssh/src';
 
 import { i18n } from '@/i18n';
 
@@ -72,11 +72,12 @@ async function openChain(
 }
 
 /**
- * The core's failure codes, restated so a rejected promise can be classified
- * without loading the native module. Keep in step with `SSH_ERROR_CODES` in
- * `@kilocode/react-native-ssh`.
+ * The core's failure codes a connection can end with, restated so a rejected
+ * promise can be classified without loading the native module. Keep in step
+ * with `SSH_ERROR_CODES` in the ssh module's `SshErrors`; `InvalidExport` is
+ * left out because it belongs to the encrypted export, not to a connection.
  */
-const ERROR_CODES: readonly SshErrorCode[] = [
+const ERROR_CODES: readonly Exclude<SshErrorCode, 'InvalidExport'>[] = [
   'Network',
   'Timeout',
   'HostKeyRejected',

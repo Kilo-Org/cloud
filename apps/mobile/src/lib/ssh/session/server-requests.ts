@@ -2,7 +2,7 @@ import {
   type DisconnectNotice,
   type HostKeyRequest,
   type KeyboardInteractiveRequest,
-} from '@kilocode/react-native-ssh';
+} from '../../../../modules/kilo-ssh/src';
 
 import { hostPattern } from '../known-host-pattern';
 import { findKnownHost, trustHostKey } from '../known-hosts';

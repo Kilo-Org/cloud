@@ -1,4 +1,4 @@
-import { createFeedSource, type FeedSource } from '@kilocode/react-native-ssh';
+import { createFeedSource, type FeedSource } from '../../../../modules/kilo-ssh/src';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { CLOUD_AGENT_WS_URL } from '@/lib/config';

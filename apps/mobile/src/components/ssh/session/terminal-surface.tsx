@@ -1,4 +1,4 @@
-import { TerminalView, type TerminalViewHandle } from '@kilocode/react-native-ssh';
+import { TerminalView, type TerminalViewHandle } from '../../../../modules/kilo-ssh/src';
 import { type RefObject, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 

@@ -1,4 +1,4 @@
-import { type SftpEntry } from '@kilocode/react-native-ssh';
+import { type SftpEntry } from '../../../../modules/kilo-ssh/src';
 
 /** The largest file the text preview opens; larger files are shared, not read. */
 export const MAX_PREVIEW_BYTES = 1024 * 1024;

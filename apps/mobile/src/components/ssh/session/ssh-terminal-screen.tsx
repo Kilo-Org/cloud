@@ -1,4 +1,4 @@
-import { type TerminalViewHandle } from '@kilocode/react-native-ssh';
+import { type TerminalViewHandle } from '../../../../modules/kilo-ssh/src';
 import { usePathname, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';

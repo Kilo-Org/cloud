@@ -1,4 +1,4 @@
-import type * as SshPackage from '@kilocode/react-native-ssh';
+import type * as SshPackage from '../../../modules/kilo-ssh/src';
 import { z } from 'zod';
 
 /**
@@ -14,7 +14,7 @@ import { z } from 'zod';
 let loading: Promise<typeof SshPackage> | null = null;
 
 export function sshPackage(): Promise<typeof SshPackage> {
-  loading ??= import('@kilocode/react-native-ssh');
+  loading ??= import('../../../modules/kilo-ssh/src');
   return loading;
 }
 

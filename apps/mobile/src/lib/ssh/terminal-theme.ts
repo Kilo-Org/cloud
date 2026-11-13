@@ -1,4 +1,4 @@
-import { type TerminalTheme } from '@kilocode/react-native-ssh';
+import { type TerminalTheme } from '../../../modules/kilo-ssh/src';
 
 /**
  * The terminal is dark in both app schemes, which is DESIGN.md's terminal

@@ -46,7 +46,6 @@
     "@kilocode/event-service": "workspace:*",
     "@kilocode/harness-sdk": "workspace:*",
     "@kilocode/notifications": "workspace:*",
-    "@kilocode/react-native-ssh": "file:/home/igor/work/react-native-ssh",
     "@kilocode/session-ingest-contracts": "workspace:*",
     "@kilocode/trpc": "workspace:*",
     "@native-html/render": "1.0.3",

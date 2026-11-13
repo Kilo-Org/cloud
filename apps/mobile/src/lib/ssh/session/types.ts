@@ -1,11 +1,12 @@
-import { type SshErrorCode } from '@kilocode/react-native-ssh';
+import { type SshErrorCode } from '../../../../modules/kilo-ssh/src';
 
 /**
  * Why a session stopped. `SshErrorCode` names what the Rust core reports; the
- * rest are this app's own endings.
+ * rest are this app's own endings. `InvalidExport` is excluded: it belongs to
+ * the encrypted export, so no connection can ever end with it.
  */
 export type SshCloseReason =
-  | SshErrorCode
+  | Exclude<SshErrorCode, 'InvalidExport'>
   | 'disconnected'
   | 'user'
   | 'key-missing'

@@ -1,4 +1,4 @@
-import { type TerminalViewHandle } from '@kilocode/react-native-ssh';
+import { type TerminalViewHandle } from '../../../../modules/kilo-ssh/src';
 
 import { encodeTerminalInput } from '@/lib/ssh/terminal-bytes';
 

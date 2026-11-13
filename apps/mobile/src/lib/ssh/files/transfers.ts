@@ -1,4 +1,4 @@
-import { type SshErrorCode } from '@kilocode/react-native-ssh';
+import { type SshErrorCode } from '../../../../modules/kilo-ssh/src';
 import { Directory, File, Paths } from 'expo-file-system';
 
 import { getSafeCacheFilename } from '@/lib/share-remote-file';

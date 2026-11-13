@@ -1,4 +1,6 @@
 import { deleteStepUpRowsForUser } from '@kilocode/web-shared/lib/admin/step-up-store';
+import { SIGN_IN_METHOD_REFUSAL_CODES } from '@kilocode/app-shared/auth';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import { createStripeCustomer, deleteStripeCustomer } from '@kilocode/web-shared/lib/stripe-client';
 import { randomUUID } from 'crypto';
 import { createTimer } from '@kilocode/web-shared/lib/timer';
@@ -2580,6 +2582,7 @@ export async function unlinkAuthProviderFromUser(
     return trpcFailure({
       code: 'BAD_REQUEST',
       message: 'Cannot unlink the last authentication method',
+      cause: new UpstreamApiError(SIGN_IN_METHOD_REFUSAL_CODES.lastMethod),
     });
 
   const providerToUnlink = userProviders.find(p => p.provider === provider);
@@ -2587,6 +2590,7 @@ export async function unlinkAuthProviderFromUser(
     return trpcFailure({
       code: 'BAD_REQUEST',
       message: `User does not have a linked ${provider} account`,
+      cause: new UpstreamApiError(SIGN_IN_METHOD_REFUSAL_CODES.notLinked),
     });
   }
 

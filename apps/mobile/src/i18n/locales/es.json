@@ -332,6 +332,8 @@
       "unlinkTitle": "¿Desvincular {{provider}}?",
       "unlinkMessage": "Ya no podrás iniciar sesión con {{provider}}. Tus otros métodos no cambiarán.",
       "unlinked": "{{provider}} desvinculado",
+      "lastMethod": "No puedes desvincular tu único método de inicio de sesión. Vincula primero otro método.",
+      "notLinked": "{{provider}} ya no está vinculado a tu cuenta.",
       "linkAnother": "Vincular otro proveedor",
       "linkAnotherSubtitle": "Abre la página de cuentas conectadas en kilo.ai",
       "emptyTitle": "No hay métodos de inicio de sesión",

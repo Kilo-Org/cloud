@@ -40,8 +40,14 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { isTranslateCallee, unwrap, walk } from '../lib/ast.mjs';
-import { countPlaceholderBases, flattenCatalog, pluralParts } from '../lib/catalogs.mjs';
+import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
+import {
+  declaresPluralFamily,
+  familiesOwedByEveryLocale,
+  flattenCatalog,
+  pluralFamilyBases,
+  pluralParts,
+} from '../lib/catalogs.mjs';
 import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -161,30 +167,6 @@ export const NO_AGREEMENT = new Map([
 ]);
 
 /**
- * The property names written in key position on the options object.
- *
- * Only a property's own key counts: `{ label: count }` names `label`, and
- * `{ format: () => count }` names `format`. A computed key holds an expression,
- * which this audit cannot read, so it names nothing; the audit reports a
- * counted call only through the names it can see.
- */
-function optionNames(options) {
-  const names = new Set();
-  for (const property of options.properties) {
-    if (property.type !== 'Property' || property.computed) {
-      continue;
-    }
-    const { key } = property;
-    if (key.type === 'Identifier') {
-      names.add(key.name);
-    } else if (key.type === 'Literal' && typeof key.value === 'string') {
-      names.add(key.value);
-    }
-  }
-  return names;
-}
-
-/**
  * The call's key: a string or a template literal without an interpolation is
  * the key itself, and anything else is the expression the key comes from,
  * written the way the source writes it with its whitespace collapsed.
@@ -216,7 +198,9 @@ function countedCall(node, text) {
   if (options.type !== 'ObjectExpression') {
     return null;
   }
-  const names = optionNames(options);
+  // Only a property's own key counts: `{ label: count }` names `label`. An
+  // empty string key is a name too, so the filter keeps `''`.
+  const names = new Set(options.properties.map(propertyName).filter(name => name !== null));
   if (!COUNTED_OPTIONS.some(name => names.has(name))) {
     return null;
   }
@@ -397,39 +381,6 @@ export function pluralFamilyBase(key) {
   return pluralParts(key)?.base ?? null;
 }
 
-/** Every plural family English declares, as its base key. */
-export function englishPluralFamilies(english = readEnglishCatalog()) {
-  return [...new Set([...english.keys()].map(pluralFamilyBase).filter(Boolean))].sort();
-}
-
-/**
- * Whether English declares a plural family for `key`. English needs the `_one`
- * and `_other` categories, so a family is complete only when both are present.
- */
-function hasFamily(english, key) {
-  return english.has(`${key}_one`) && english.has(`${key}_other`);
-}
-
-/**
- * The families every locale owes the categories its own plural rules require.
- *
- * A family English declares is owed, unless English builds its copy from
- * `{{count}}` — the variable that is the count. Those families were accepted
- * with the flat-key fallback: a locale whose wording inflects no word keeps the
- * one string and renders it at every count, so it owes no categories until it
- * declares a member itself. A family built from `{{displayCount}}` or
- * `{{itemCount}}` carries the caller's formatted number instead and gets no such
- * fallback.
- */
-function familiesOwedByEveryLocale(english) {
-  const numeralFamilies = countPlaceholderBases(english);
-  return new Set(
-    englishPluralFamilies(english).filter(
-      family => hasFamily(english, family) && !numeralFamilies.has(family)
-    )
-  );
-}
-
 /**
  * Every counted key the audit is responsible for: the literal ones and every
  * key a reviewed dynamic call can produce.
@@ -454,7 +405,9 @@ function unlistedDynamicCalls(calls) {
 
 /** The countless counted keys among one collection, checked against `english`. */
 function countlessFamilies(calls, english) {
-  return auditKeys(calls).filter(key => !NO_AGREEMENT.has(key) && !hasFamily(english, key));
+  return auditKeys(calls).filter(
+    key => !NO_AGREEMENT.has(key) && !declaresPluralFamily(english, key)
+  );
 }
 
 /**
@@ -507,7 +460,7 @@ function run() {
   }
 
   if (!sourceOnly) {
-    const families = englishPluralFamilies(english);
+    const families = pluralFamilyBases(english);
     const owed = familiesOwedByEveryLocale(english);
     let totalKeys = 0;
     for (const tag of localeTags()) {

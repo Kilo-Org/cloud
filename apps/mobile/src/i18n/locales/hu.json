@@ -332,6 +332,8 @@
       "unlinkTitle": "Leválasztod a(z) {{provider}} fiókot?",
       "unlinkMessage": "A(z) {{provider}} szolgáltatással többé nem tudsz bejelentkezni. A többi bejelentkezési módod változatlan marad.",
       "unlinked": "{{provider}} leválasztva",
+      "lastMethod": "Nem tudod leválasztani az egyetlen bejelentkezési módodat. Előbb kapcsolj össze egy másik módot.",
+      "notLinked": "A(z) {{provider}} már nincs összekapcsolva a fiókoddal.",
       "linkAnother": "Másik szolgáltató összekapcsolása",
       "linkAnotherSubtitle": "Megnyitja az összekapcsolt fiókok oldalát a kilo.ai-on",
       "emptyTitle": "Nincsenek bejelentkezési módok",

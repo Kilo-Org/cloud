@@ -332,6 +332,8 @@
       "unlinkTitle": "إلغاء ربط {{provider}}؟",
       "unlinkMessage": "لن تتمكن بعد الآن من تسجيل الدخول باستخدام {{provider}}. ستبقى طرقك الأخرى كما هي.",
       "unlinked": "تم إلغاء ربط {{provider}}",
+      "lastMethod": "لا يمكنك إلغاء ربط طريقة تسجيل الدخول الوحيدة لديك. اربط طريقة أخرى أولاً.",
+      "notLinked": "لم يعد {{provider}} مربوطًا بحسابك.",
       "linkAnother": "ربط مزوّد آخر",
       "linkAnotherSubtitle": "يفتح صفحة الحسابات المتصلة على kilo.ai",
       "emptyTitle": "لا توجد طرق لتسجيل الدخول",

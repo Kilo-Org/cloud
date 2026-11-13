@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { type CreditPurchaseEntry } from '@/lib/credits/credit-history';
 
 import { PurchaseHistoryRow } from './credit-history-rows';
@@ -20,7 +20,7 @@ function entry(overrides: Partial<CreditPurchaseEntry> = {}): CreditPurchaseEntr
   return {
     id: 'purchase-1',
     date: '2026-11-12T10:00:00.000Z',
-    description: 'Credit purchase',
+    kind: 'purchase',
     amount_mUsd: 10_000_000,
     expiryDate: '2027-11-12T00:00:00.000Z',
     creditSource: 'google_play',
@@ -94,5 +94,58 @@ describe('PurchaseHistoryRow', () => {
       0
     );
     renderer.unmount();
+  });
+});
+
+/** The row's own receipt action, which is the only pressable a card purchase paints. */
+function receiptLabelOf(renderer: TestRenderer.ReactTestRenderer): unknown {
+  const pressables = renderer.root.findAll(node => String(node.type) === 'Pressable');
+  expect(pressables).toHaveLength(1);
+  return pressables[0]?.props.accessibilityLabel;
+}
+
+describe('PurchaseHistoryRow in the reader language', () => {
+  it('titles a card purchase in Arabic and opens its receipt in Arabic', async () => {
+    try {
+      await act(async () => {
+        await i18n.changeLanguage('ar');
+      });
+      const renderer = await renderRow(entry({ kind: 'purchase', creditSource: 'stripe' }));
+
+      expect(texts(renderer)).toContain('شراء رصيد');
+      expect(receiptLabelOf(renderer)).toBe('فتح إيصال شراء رصيد');
+      renderer.unmount();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
+  });
+
+  it('titles an automatic top-up in Arabic and opens its receipt in Arabic', async () => {
+    try {
+      await act(async () => {
+        await i18n.changeLanguage('ar');
+      });
+      const renderer = await renderRow(entry({ kind: 'auto_top_up', creditSource: 'stripe' }));
+
+      expect(texts(renderer)).toContain('الشحن التلقائي');
+      expect(receiptLabelOf(renderer)).toBe('فتح إيصال الشحن التلقائي');
+      renderer.unmount();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
+  });
+
+  it('titles an automatic top-up and a purchase in English', async () => {
+    const topUp = await renderRow(entry({ kind: 'auto_top_up', creditSource: 'stripe' }));
+    expect(texts(topUp)).toContain('Auto top-up');
+    topUp.unmount();
+
+    const purchase = await renderRow(entry({ kind: 'purchase', creditSource: 'stripe' }));
+    expect(texts(purchase)).toContain('Credit purchase');
+    purchase.unmount();
   });
 });

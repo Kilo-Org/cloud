@@ -332,6 +332,8 @@
       "unlinkTitle": "Hủy liên kết {{provider}}?",
       "unlinkMessage": "Bạn sẽ không thể đăng nhập bằng {{provider}} nữa. Các phương thức khác của bạn vẫn giữ nguyên.",
       "unlinked": "Đã hủy liên kết {{provider}}",
+      "lastMethod": "Bạn không thể hủy liên kết phương thức đăng nhập duy nhất của mình. Hãy liên kết một phương thức khác trước.",
+      "notLinked": "{{provider}} không còn được liên kết với tài khoản của bạn nữa.",
       "linkAnother": "Liên kết nhà cung cấp khác",
       "linkAnotherSubtitle": "Mở trang tài khoản đã kết nối trên kilo.ai",
       "emptyTitle": "Chưa có phương thức đăng nhập",

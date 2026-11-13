@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "ንቁ ወኪሎች ማዘመኛ አላቸው"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "ተግባር ተጠናቋል"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "አልተሳካም፦ {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "ተቋርጧል፦ {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

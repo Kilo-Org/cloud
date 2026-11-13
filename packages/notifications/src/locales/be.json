@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Актыўныя агенты маюць абнаўленне"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Задача завершаная"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Не ўдалося: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Перарвана: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

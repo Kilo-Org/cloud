@@ -75,8 +75,9 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:postgres": "vitest run --config vitest.postgres.config.ts",
     "typecheck": "tsgo --noEmit",
-    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/worker-utils/src"
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/worker-utils/src packages/worker-utils/test/postgres"
   },
   "dependencies": {
     "@kilocode/app-shared": "workspace:*",

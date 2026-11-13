@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "เอเจนต์ที่กำลังทำงานมีการอัปเดต"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "งานเสร็จสมบูรณ์"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "ล้มเหลว: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "ถูกขัดจังหวะ: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

@@ -332,6 +332,8 @@
       "unlinkTitle": "Atsaistīt {{provider}}?",
       "unlinkMessage": "Tu vairs nevarēsi pierakstīties ar {{provider}}. Pārējās metodes paliks nemainīgas.",
       "unlinked": "{{provider}} atsaistīts",
+      "lastMethod": "Tu nevari atsaistīt savu vienīgo pierakstīšanās metodi. Vispirms saisti citu metodi.",
+      "notLinked": "{{provider}} vairs nav saistīts ar tavu kontu.",
       "linkAnother": "Saistīt citu nodrošinātāju",
       "linkAnotherSubtitle": "Atver saistīto kontu lapu vietnē kilo.ai",
       "emptyTitle": "Nav pierakstīšanās metožu",

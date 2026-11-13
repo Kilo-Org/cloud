@@ -60,9 +60,19 @@ export const ClaudeBillingPayerStateSchema = z.object({
   status: z.enum(ClaudeBillingConnectionStatus),
   user_profile_id: z.string().min(1),
   connected_at: z.iso.datetime().nullable(),
-  /** The person the row belongs to; absent from the previous web app release. */
+  /**
+   * The person the row belongs to, null for a row that belongs to an
+   * organization. Every web app release since #10300 answers with it, and the
+   * cross-region read binds a personal or member row by it.
+   */
   kilo_user_id: z.string().nullable().optional(),
-  /** The person who linked it last; absent from the previous web app release. */
+  /**
+   * The organization an organization-owned connection belongs to; null for a
+   * personal row. The gateway tolerates its absence, because a web app release
+   * that does not send it still answers the shared-services read.
+   */
+  organization_id: z.uuid().nullable().optional(),
+  /** The person who linked it last; every release since #10300 answers with it. */
   created_by: z.string().min(1).optional(),
 });
 export type ClaudeBillingPayerState = z.infer<typeof ClaudeBillingPayerStateSchema>;
@@ -77,6 +87,7 @@ export function claudeBillingPayerState(
         user_profile_id: row.user_profile_id,
         connected_at: row.connected_at ? new Date(row.connected_at).toISOString() : null,
         kilo_user_id: row.kilo_user_id,
+        organization_id: row.organization_id,
         created_by: row.created_by,
       }
     : null;
@@ -103,8 +114,20 @@ export async function getAuthoritativeClaudeBillingState(
   );
   if (!response.ok) throw new Error(`Claude payer-state read failed with HTTP ${response.status}`);
   const { connection } = responseSchema.parse(await response.json());
-  // A member connection is that person's row. The previous web app release
-  // answers a member query with the organization's row, which is never it.
-  if (owner.kind === 'member' && connection?.kilo_user_id !== owner.kiloUserId) return null;
+  // A personal or member row belongs to the person it names, so the read
+  // returns it only for that person. A shared-services row belongs to an
+  // organization, so it must name the organization the caller asked about when
+  // the answer carries one; an older web app release sends no organization and
+  // is accepted.
+  if (owner.kind !== 'shared_services' && connection?.kilo_user_id !== owner.kiloUserId) {
+    return null;
+  }
+  if (
+    owner.kind === 'shared_services' &&
+    connection?.organization_id &&
+    connection.organization_id !== owner.organizationId
+  ) {
+    return null;
+  }
   return connection;
 }

@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "عامل‌های فعال به‌روزرسانی دارند"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "وظیفه کامل شد"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "ناموفق: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "قطع شد: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

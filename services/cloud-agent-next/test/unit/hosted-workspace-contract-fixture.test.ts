@@ -32,7 +32,7 @@ import {
 import {
   refreshHostedWorkspacePullRequestInput,
   refreshHostedWorkspacePullRequestOutput,
-} from '../../src/router/handlers/hosted-workspace-pull-request.js';
+} from '../../src/router/handlers/hosted-workspace-pull-request-refresh.js';
 import {
   getHostedWorkspaceStatusInput,
   getHostedWorkspaceStatusOutput,
@@ -53,6 +53,17 @@ import {
   DeleteWorktreeInput,
   DeleteWorktreeOutput,
 } from '../../src/router/handlers/worktree-deletion.js';
+import {
+  getHostedWorkspaceChangeFileInput,
+  getHostedWorkspaceChangeFileOutput,
+  getHostedWorkspaceChangesInput,
+  getHostedWorkspaceChangesOutput,
+  getHostedWorkspacePullRequestFileInput,
+  getHostedWorkspacePullRequestFileOutput,
+  getHostedWorkspacePullRequestInput,
+  getHostedWorkspacePullRequestOutput,
+  refreshHostedWorkspaceChangesOutput,
+} from '../../src/shared/hosted-workspace-changes.js';
 import { appRouter } from '../../src/router.js';
 import {
   SandboxLifecycleStatusSchema,
@@ -126,6 +137,11 @@ const requestSchemas: Record<string, unknown> = {
   clearHostedWorkspacePersonalDefaultProfile: clearHostedWorkspacePersonalDefaultProfileInput,
   deleteWorktree: DeleteWorktreeInput,
   refreshHostedWorkspacePullRequest: refreshHostedWorkspacePullRequestInput,
+  getHostedWorkspaceChanges: getHostedWorkspaceChangesInput,
+  refreshHostedWorkspaceChanges: getHostedWorkspaceChangesInput,
+  getHostedWorkspaceChangeFile: getHostedWorkspaceChangeFileInput,
+  getHostedWorkspacePullRequest: getHostedWorkspacePullRequestInput,
+  getHostedWorkspacePullRequestFile: getHostedWorkspacePullRequestFileInput,
 };
 
 const responseSchemas: Record<string, unknown> = {
@@ -141,6 +157,11 @@ const responseSchemas: Record<string, unknown> = {
   clearHostedWorkspacePersonalDefaultProfile: clearHostedWorkspacePersonalDefaultProfileOutput,
   deleteWorktree: DeleteWorktreeOutput,
   refreshHostedWorkspacePullRequest: refreshHostedWorkspacePullRequestOutput,
+  getHostedWorkspaceChanges: getHostedWorkspaceChangesOutput,
+  refreshHostedWorkspaceChanges: refreshHostedWorkspaceChangesOutput,
+  getHostedWorkspaceChangeFile: getHostedWorkspaceChangeFileOutput,
+  getHostedWorkspacePullRequest: getHostedWorkspacePullRequestOutput,
+  getHostedWorkspacePullRequestFile: getHostedWorkspacePullRequestFileOutput,
 };
 
 const legacyWorkspaceSummarySchema = hostedWorkspaceSummarySchema.omit({ pullRequest: true });
@@ -171,7 +192,7 @@ function enumOptions(schema: unknown): readonly string[] {
 }
 
 async function loadFixture(
-  contractVersion: 1 | 2 | 3
+  contractVersion: 1 | 2 | 3 | 4
 ): Promise<{ fixture: Fixture; source: string }> {
   const [raw, ...sources] = await Promise.all([
     readFile(path.join(fixtureDir, `v${contractVersion}.json`), 'utf8'),
@@ -180,6 +201,9 @@ async function loadFixture(
     readFile(path.join(handlerDir, 'hosted-workspace-list.ts'), 'utf8'),
     readFile(path.join(handlerDir, 'session-worktree.ts'), 'utf8'),
     readFile(path.join(handlerDir, 'worktree-deletion.ts'), 'utf8'),
+    readFile(path.join(handlerDir, 'hosted-workspace-changes.ts'), 'utf8'),
+    readFile(path.join(handlerDir, 'hosted-workspace-pull-request.ts'), 'utf8'),
+    readFile(path.join(handlerDir, 'hosted-workspace-pull-request-refresh.ts'), 'utf8'),
     readFile(sessionRegistrationSource, 'utf8'),
     readFile(contractSource, 'utf8'),
   ]);
@@ -201,9 +225,9 @@ function expectFieldLists(entries: FixtureEntry[], schemas: Record<string, unkno
 }
 
 describe('hosted workspace contract fixture', () => {
-  it('covers every registered workspace procedure exactly once in v3', async () => {
-    const { fixture } = await loadFixture(3);
-    expect(fixture.contractVersion).toBe(3);
+  it('covers every registered workspace procedure exactly once in the latest contract', async () => {
+    const { fixture } = await loadFixture(4);
+    expect(fixture.contractVersion).toBe(4);
     const expected = Object.keys(fixture.procedures).sort();
     const registered = Object.entries(appRouter._def.procedures)
       .filter(([name]) => name.includes('HostedWorkspace') || name === 'deleteWorktree')
@@ -219,7 +243,16 @@ describe('hosted workspace contract fixture', () => {
     }
   });
 
-  it.each([1, 2] as const)(
+  it.each([1, 2, 3] as const)('keeps released contract versions append-only', async version => {
+    const { fixture } = await loadFixture(version);
+    for (const [name, kind] of Object.entries(fixture.procedures)) {
+      const procedure = appRouter._def.procedures[name];
+      expect(procedure, `v${version} procedure ${name} must remain registered`).toBeDefined();
+      expect(procedure?._def.type, `v${version} ${name} procedure kind drift`).toBe(kind);
+    }
+  });
+
+  it.each([1, 2, 3, 4] as const)(
     'matches every v%i request schema field list and example',
     async version => {
       const { fixture } = await loadFixture(version);
@@ -228,7 +261,7 @@ describe('hosted workspace contract fixture', () => {
     }
   );
 
-  it.each([1, 2] as const)(
+  it.each([1, 2, 3] as const)(
     'matches every legacy v%i response schema field list and example',
     async version => {
       const { fixture } = await loadFixture(version);
@@ -237,14 +270,14 @@ describe('hosted workspace contract fixture', () => {
     }
   );
 
-  it('matches every v3 response schema field list and example', async () => {
-    const { fixture } = await loadFixture(3);
-    expect(fixture.contractVersion).toBe(3);
+  it('matches every v4 response schema field list and example', async () => {
+    const { fixture } = await loadFixture(4);
+    expect(fixture.contractVersion).toBe(4);
     expectFieldLists(fixture.responses, responseSchemas);
   });
 
   it('pins the status enums to the production schemas', async () => {
-    const { fixture } = await loadFixture(3);
+    const { fixture } = await loadFixture(4);
     expect([...fixture.status.computeStatuses].sort()).toEqual(
       [...SandboxLifecycleStatusSchema.options].sort()
     );
@@ -267,14 +300,14 @@ describe('hosted workspace contract fixture', () => {
   });
 
   it('keeps every documented error code in handler or contract source', async () => {
-    const { fixture, source } = await loadFixture(3);
+    const { fixture, source } = await loadFixture(4);
     for (const code of fixture.errorCodes) {
       expect(source.includes(code), `${code} must remain a literal contract code`).toBe(true);
     }
   });
 
   it('pins the deletion manifest version and rejects an unknown version', async () => {
-    const { fixture } = await loadFixture(3);
+    const { fixture } = await loadFixture(4);
     expect(() =>
       cloudAgentWorktreeDeletionManifestSchema.parse({
         version: fixture.deletionManifestVersion,

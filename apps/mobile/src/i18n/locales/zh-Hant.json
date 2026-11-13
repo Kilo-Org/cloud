@@ -332,6 +332,8 @@
       "unlinkTitle": "取消連結 {{provider}}？",
       "unlinkMessage": "你將無法再使用 {{provider}} 登入。其他登入方式不受影響。",
       "unlinked": "已取消連結 {{provider}}",
+      "lastMethod": "你無法取消連結唯一的登入方式。請先連結其他登入方式。",
+      "notLinked": "{{provider}} 已不再與你的帳號連結。",
       "linkAnother": "連結其他供應商",
       "linkAnotherSubtitle": "開啟 kilo.ai 上的已連結帳戶頁面",
       "emptyTitle": "沒有登入方式",

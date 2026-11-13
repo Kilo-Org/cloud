@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Ejen aktif ada kemas kini"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Tugas selesai"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Gagal: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Diganggu: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

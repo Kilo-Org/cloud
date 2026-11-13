@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Wakilai da ke aiki suna da sabuntawa"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "An kammala aikin"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Ya gaza: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "An katse: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

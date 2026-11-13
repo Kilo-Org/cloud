@@ -123,12 +123,70 @@ export function contentSecurityPolicy(meta: Readonly<Record<string, unknown>> | 
   ].join('; ');
 }
 
+/** A document may start with a byte-order mark, which the parser drops. */
+const BYTE_ORDER_MARK = '\uFEFF';
+
+/** The whitespace the tokenizer skips before content, and only that. */
+const PROLOGUE_SPACE = /[ \t\n\f\r]*/y;
+
+/** A doctype ends at the first `>`, whatever it names. */
+const PROLOGUE_DOCTYPE = /<!doctype[^>]*>/iy;
+
+/**
+ * One comment: `<!-->` and `<!--->` close an empty comment at once, and any
+ * other comment ends at the first `-->` or `--!>`.
+ */
+const PROLOGUE_COMMENT = /<!--(?:>|->|[\s\S]*?--!?>)/y;
+
+/** `<?` and any `<!` that is not a doctype are bogus comments: up to the first `>`. */
+const PROLOGUE_BOGUS = /<[!?][^>]*>/y;
+
+/**
+ * Where the policy goes: after the prologue the tokenizer reads before the
+ * document's own content, which is after a doctype when the prologue reaches
+ * one.
+ *
+ * Each token is consumed by the tokenizer's own rule, so a document cannot talk
+ * the scan past markup. A token that ends without a terminator, or one that is
+ * none of these, ends the prologue: everything from there is content. A
+ * doctype past that content is a doctype the parser ignores, so it never moves
+ * the policy behind the content.
+ *
+ * A document with no doctype keeps its byte-order mark first, because a mark
+ * the policy got in front of would be read as a stray character of the document.
+ */
+function policyIndex(html: string): number {
+  const start = html.startsWith(BYTE_ORDER_MARK) ? BYTE_ORDER_MARK.length : 0;
+  let at = start;
+  let doctype = start;
+  let done = false;
+  while (!done) {
+    PROLOGUE_SPACE.lastIndex = at;
+    PROLOGUE_SPACE.exec(html);
+    at = PROLOGUE_SPACE.lastIndex;
+    PROLOGUE_DOCTYPE.lastIndex = at;
+    PROLOGUE_COMMENT.lastIndex = at;
+    PROLOGUE_BOGUS.lastIndex = at;
+    const held = PROLOGUE_DOCTYPE.exec(html);
+    const token = held ?? PROLOGUE_COMMENT.exec(html) ?? PROLOGUE_BOGUS.exec(html);
+    if (token === null) {
+      done = true;
+    } else {
+      at = token.index + token[0].length;
+      if (held !== null) {
+        doctype = at;
+      }
+    }
+  }
+  return doctype;
+}
+
 /**
  * The view's HTML with its policy in front of it.
  *
  * The policy is a meta element, because the document is loaded as `srcdoc`
  * with no headers of its own. It goes before everything the resource wrote, and
- * after the resource's doctype when it has one, so:
+ * after the resource's doctype when the parser honours one, so:
  *
  * - the parser reads the meta while it is still building the head, which puts
  *   the meta in the head of the document it draws;
@@ -137,23 +195,14 @@ export function contentSecurityPolicy(meta: Readonly<Record<string, unknown>> | 
  * - a document with no head is still a document the parser gives one, with the
  *   policy already in it.
  *
- * Nothing in the resource's own markup, wherever it sits, decides where the
- * policy goes.
+ * The resource's own markup cannot move the policy behind any of it: the
+ * insertion point is the prologue the tokenizer actually reads, so text that
+ * looks like a head or a doctype inside a comment, a script or an attribute is
+ * never mistaken for one.
  */
 export function viewDocument(html: string, policy: string): string {
   const meta = `<meta http-equiv="Content-Security-Policy" content="${policy.replaceAll('"', '&quot;')}">`;
-  /* The prologue a parser reads before a doctype it honours: a byte-order mark,
-     whitespace, comments and processing instructions. The doctype is sought
-     past all of it, one token at a time, so a large document is scanned once. */
-  const prologue = /(?:\uFEFF|\s+|<!--[\s\S]*?-->|<\?[\s\S]*?\?>)/uy;
-  let afterPrologue = 0;
-  while (prologue.exec(html) !== null) {
-    afterPrologue = prologue.lastIndex;
-  }
-  const doctype = /<!doctype[^>]*>/iuy;
-  doctype.lastIndex = afterPrologue;
-  const found = doctype.exec(html);
-  const at = found === null ? 0 : found.index + found[0].length;
+  const at = policyIndex(html);
   return `${html.slice(0, at)}${meta}${html.slice(at)}`;
 }
 

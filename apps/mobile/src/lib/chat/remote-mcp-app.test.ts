@@ -181,6 +181,34 @@ describe('the document a view draws', () => {
       document.indexOf('<p>a view</p>')
     );
   });
+
+  it('places the policy in front of every token the document’s prologue does not own', () => {
+    /* Each document starts with a declaration that a parser reads as a comment
+       of some length, and then with markup of its own. The policy follows the
+       prologue the parser actually reads, so it comes before that markup. */
+    const documents = [
+      '<?x><script>run()</script>?><!doctype html><html><head></head></html>',
+      '<!--><script>run()</script>--><!doctype html><html><head></head></html>',
+      '<!---><script>run()</script><!doctype html><html><head></head></html>',
+      '<!note><script>run()</script><!doctype html><html><head></head></html>',
+      '<!----><script>run()</script><!doctype html><html><head></head></html>',
+      '<!-- never closed <script>run()</script>',
+    ];
+    for (const html of documents) {
+      const document = viewDocument(html, "default-src 'none'");
+      expect(document.startsWith('<meta http-equiv="Content-Security-Policy"')).toBe(true);
+      expect(document.indexOf('Content-Security-Policy')).toBeLessThan(
+        document.indexOf('<script>')
+      );
+      expect(document.split('Content-Security-Policy')).toHaveLength(2);
+    }
+  });
+
+  it('keeps a byte-order mark first when the document has no doctype', () => {
+    const document = viewDocument('\uFEFF<script></script>', "default-src 'none'");
+    expect(document.startsWith('\uFEFF<meta ')).toBe(true);
+    expect(document.indexOf('Content-Security-Policy')).toBeLessThan(document.indexOf('<script>'));
+  });
 });
 
 describe('the page a view is drawn in', () => {

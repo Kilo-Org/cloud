@@ -33,6 +33,14 @@ export function useNewSessionNavigator() {
     []
   );
 
+  // A push the navigator dropped leaves nothing for the window to protect, so
+  // the next press must be able to go straight out. Only a caller that can tell
+  // a dropped push from an accepted one releases the window early; every other
+  // entry point keeps the plain guard, which clears on the caller's next focus.
+  const resetNewSessionGuard = useCallback(() => {
+    guardRef.current.lastPushAt = 0;
+  }, []);
+
   const openNewSessionHref = useCallback(
     (href: Href) => {
       if (beginNewSessionNavigation()) {
@@ -49,5 +57,10 @@ export function useNewSessionNavigator() {
     [openNewSessionHref]
   );
 
-  return { openNewSession, openNewSessionHref, beginNewSessionNavigation };
+  return {
+    openNewSession,
+    openNewSessionHref,
+    beginNewSessionNavigation,
+    resetNewSessionGuard,
+  };
 }

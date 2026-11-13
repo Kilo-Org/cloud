@@ -3325,6 +3325,7 @@
       "changePlan": "Změnit plán",
       "buySeats": "Koupit uživatelská místa",
       "setupAutoTopUp": "Nastavit automatické dobití",
+      "manageAutoTopUp": "Spravovat automatické dobití",
       "webAddress": "Webová adresa {{url}}",
       "opensOnWeb": "Otevře se na webu"
     },

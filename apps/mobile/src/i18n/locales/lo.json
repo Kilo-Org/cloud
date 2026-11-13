@@ -3219,6 +3219,7 @@
       "changePlan": "ປ່ຽນແຜນ",
       "buySeats": "ຊື້ສິດຜູ້ໃຊ້",
       "setupAutoTopUp": "ຕັ້ງຄ່າການເຕີມເງິນອັດຕະໂນມັດ",
+      "manageAutoTopUp": "ຈັດການການເຕີມເງິນອັດຕະໂນມັດ",
       "webAddress": "ທີ່ຢູ່ເວັບ {{url}}",
       "opensOnWeb": "ເປີດໃນເວັບ"
     },

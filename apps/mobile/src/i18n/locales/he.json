@@ -3264,6 +3264,7 @@
       "changePlan": "שינוי תוכנית",
       "buySeats": "רכישת רישיונות",
       "setupAutoTopUp": "הגדרת טעינה אוטומטית",
+      "manageAutoTopUp": "ניהול טעינה אוטומטית",
       "webAddress": "כתובת אינטרנט {{url}}",
       "opensOnWeb": "נפתח באתר"
     },

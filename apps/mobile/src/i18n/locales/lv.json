@@ -3272,6 +3272,7 @@
       "changePlan": "Mainīt plānu",
       "buySeats": "Pirkt vietas",
       "setupAutoTopUp": "Iestatīt automātisko papildināšanu",
+      "manageAutoTopUp": "Pārvaldi automātisko papildināšanu",
       "webAddress": "Tīmekļa adrese {{url}}",
       "opensOnWeb": "Tiek atvērts tīmeklī"
     },

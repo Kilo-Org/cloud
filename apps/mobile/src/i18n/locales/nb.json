@@ -3219,6 +3219,7 @@
       "changePlan": "Endre plan",
       "buySeats": "Kjøp brukerplasser",
       "setupAutoTopUp": "Sett opp automatisk påfylling",
+      "manageAutoTopUp": "Administrer automatisk påfylling",
       "webAddress": "Nettadresse {{url}}",
       "opensOnWeb": "Åpnes på nettet"
     },

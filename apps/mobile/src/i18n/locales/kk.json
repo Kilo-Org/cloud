@@ -3219,6 +3219,7 @@
       "changePlan": "Жоспарды өзгерту",
       "buySeats": "Орын сатып алу",
       "setupAutoTopUp": "Автотолықтыруды баптау",
+      "manageAutoTopUp": "Автотолықтыруды басқару",
       "webAddress": "Веб-мекенжай: {{url}}",
       "opensOnWeb": "Вебте ашылады"
     },

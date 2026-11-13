@@ -3378,6 +3378,7 @@
       "changePlan": "Ibdel il-pjan",
       "buySeats": "Ixtri postijiet",
       "setupAutoTopUp": "Issettja r-rikarika awtomatika",
+      "manageAutoTopUp": "Immaniġġja r-rikarika awtomatika",
       "webAddress": "Indirizz tal-web {{url}}",
       "opensOnWeb": "Jinfetaħ fuq il-web"
     },

@@ -3219,6 +3219,7 @@
       "changePlan": "Csomag módosítása",
       "buySeats": "Férőhelyek vásárlása",
       "setupAutoTopUp": "Automatikus feltöltés beállítása",
+      "manageAutoTopUp": "Automatikus feltöltés kezelése",
       "webAddress": "Webcím: {{url}}",
       "opensOnWeb": "A weben nyílik meg"
     },

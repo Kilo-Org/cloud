@@ -3317,6 +3317,7 @@
       "changePlan": "Сменить план",
       "buySeats": "Купить места",
       "setupAutoTopUp": "Настроить автопополнение",
+      "manageAutoTopUp": "Управлять автопополнением",
       "webAddress": "Веб-адрес {{url}}",
       "opensOnWeb": "Открывается в браузере"
     },

@@ -3219,6 +3219,7 @@
       "changePlan": "Ndrysho planin",
       "buySeats": "Bli vende",
       "setupAutoTopUp": "Konfiguro rimbushjen automatike",
+      "manageAutoTopUp": "Menaxho rimbushjen automatike",
       "webAddress": "Adresa në ueb {{url}}",
       "opensOnWeb": "Hapet në ueb"
     },

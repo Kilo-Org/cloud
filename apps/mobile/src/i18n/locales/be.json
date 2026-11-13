@@ -3325,6 +3325,7 @@
       "changePlan": "Змяніць план",
       "buySeats": "Купіць месцы",
       "setupAutoTopUp": "Наладзіць аўтапапаўненне",
+      "manageAutoTopUp": "Кіраваць аўтапапаўненнем",
       "webAddress": "Вэб-адрас {{url}}",
       "opensOnWeb": "Адкрываецца ў вэб-версіі"
     },

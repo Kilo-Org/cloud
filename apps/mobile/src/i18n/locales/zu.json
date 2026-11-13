@@ -3219,6 +3219,7 @@
       "changePlan": "Shintsha uhlelo",
       "buySeats": "Thenga izikhala",
       "setupAutoTopUp": "Setha ukugcwalisa okuzenzakalelayo",
+      "manageAutoTopUp": "Phatha ukugcwalisa okuzenzakalelayo",
       "webAddress": "Ikheli lewebhu {{url}}",
       "opensOnWeb": "Kuvuleka kuwebhu"
     },

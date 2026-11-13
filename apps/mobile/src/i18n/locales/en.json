@@ -3299,6 +3299,7 @@
       "changePlan": "Change plan",
       "buySeats": "Buy seats",
       "setupAutoTopUp": "Set up auto top-up",
+      "manageAutoTopUp": "Manage auto top-up",
       "webAddress": "Web address {{url}}",
       "opensOnWeb": "Opens on the web"
     },

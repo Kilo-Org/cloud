@@ -3270,6 +3270,7 @@
       "changePlan": "Alterar plano",
       "buySeats": "Comprar licenças",
       "setupAutoTopUp": "Configurar recarga automática",
+      "manageAutoTopUp": "Gerenciar recarga automática",
       "webAddress": "Endereço web {{url}}",
       "opensOnWeb": "Abre na web"
     },

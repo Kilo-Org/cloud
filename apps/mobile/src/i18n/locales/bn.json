@@ -3219,6 +3219,7 @@
       "changePlan": "প্ল্যান পরিবর্তন করুন",
       "buySeats": "সিট কিনুন",
       "setupAutoTopUp": "অটো টপ-আপ সেট আপ করুন",
+      "manageAutoTopUp": "অটো টপ-আপ পরিচালনা করুন",
       "webAddress": "ওয়েব ঠিকানা {{url}}",
       "opensOnWeb": "ওয়েবে খোলে"
     },

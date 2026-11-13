@@ -3211,6 +3211,7 @@
       "changePlan": "Plan ändern",
       "buySeats": "Nutzerplätze kaufen",
       "setupAutoTopUp": "Automatische Aufladung einrichten",
+      "manageAutoTopUp": "Automatische Aufladung verwalten",
       "webAddress": "Webadresse {{url}}",
       "opensOnWeb": "Wird im Web geöffnet"
     },

@@ -3317,6 +3317,7 @@
       "changePlan": "Zmień plan",
       "buySeats": "Kup miejsca",
       "setupAutoTopUp": "Skonfiguruj automatyczne doładowanie",
+      "manageAutoTopUp": "Zarządzaj automatycznym doładowaniem",
       "webAddress": "Adres internetowy {{url}}",
       "opensOnWeb": "Otwiera się w przeglądarce"
     },

@@ -3219,6 +3219,7 @@
       "changePlan": "प्लॅन बदला",
       "buySeats": "जागा खरेदी करा",
       "setupAutoTopUp": "ऑटो टॉप-अप सेट करा",
+      "manageAutoTopUp": "ऑटो टॉप-अप व्यवस्थापित करा",
       "webAddress": "वेब पत्ता {{url}}",
       "opensOnWeb": "वेबवर उघडते"
     },

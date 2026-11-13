@@ -3219,6 +3219,7 @@
       "changePlan": "Verander plan",
       "buySeats": "Koop gebruikersplekke",
       "setupAutoTopUp": "Stel outomatiese aanvulling op",
+      "manageAutoTopUp": "Bestuur outomatiese aanvulling",
       "webAddress": "Webadres {{url}}",
       "opensOnWeb": "Maak op die web oop"
     },

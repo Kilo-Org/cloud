@@ -3219,6 +3219,7 @@
       "changePlan": "Tukar pelan",
       "buySeats": "Beli slot pengguna",
       "setupAutoTopUp": "Sediakan tambah nilai automatik",
+      "manageAutoTopUp": "Urus tambah nilai automatik",
       "webAddress": "Alamat web {{url}}",
       "opensOnWeb": "Dibuka di web"
     },

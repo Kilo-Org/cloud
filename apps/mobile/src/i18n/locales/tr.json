@@ -3211,6 +3211,7 @@
       "changePlan": "Planı değiştir",
       "buySeats": "Lisans satın al",
       "setupAutoTopUp": "Otomatik yüklemeyi ayarla",
+      "manageAutoTopUp": "Otomatik yüklemeyi yönet",
       "webAddress": "Web adresi {{url}}",
       "opensOnWeb": "Web'de açılır"
     },

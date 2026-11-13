@@ -19,11 +19,15 @@
  *
  * A `--land` verifies the branch before it writes onto it: a merge base with
  * main must exist, and the branch's diff from that base must be the version
- * line and the changelog only. A branch that fails the check receives nothing,
- * the section is carried to the `--pending` branch so the finished build's line
- * is not lost, and the run exits 1; every later run refuses the same branch
- * until a human removes it. A land that succeeds prints two lines after its
- * `changelog: landed ...` line, which the release workflow parses:
+ * line and the changelog only. An empty diff carries no version line, so it is
+ * refused too. A branch that fails the check receives nothing, the section is
+ * carried to the `--pending` branch so the finished build's line is not lost,
+ * and the run exits 1; every later run refuses the same branch until a human
+ * removes it. A branch that could not be read - a deleted ref, a failed fetch -
+ * is not a verdict on its shape: the attempt is retried, and when the retries
+ * run out the section is carried exactly as for a gone branch and the run stays
+ * green. A land that succeeds prints two lines after its `changelog: landed
+ * ...` line, which the release workflow parses:
  *
  *   changelog-head=<sha the section now sits on>
  *   changelog-files=<the files that commit changes, comma separated>
@@ -670,8 +674,9 @@ const VERIFY_DEPTHS = [512, 2048, 8192, 0];
  *
  * The ref is fetched by plain name (`main`, the branch) rather than by the sha
  * the run already knows, because GitHub does not serve an unadvertised sha. A
- * missing ref is `{ error }` rather than a throw: the caller turns it into a
- * refusal, so a git failure never hides behind an exception.
+ * missing ref is `{ error }` rather than a throw: the caller retries the land,
+ * so a git failure never hides behind an exception and never becomes a verdict
+ * on the branch's shape.
  */
 function fetchForVerify(remote, ref, depth) {
   const args = ['fetch', '--no-tags', '--quiet'];
@@ -706,15 +711,22 @@ function replacedConfigDiff(base, tip) {
 }
 
 /**
- * The provenance of the version-bump branch, as `{ ok: true, base }` or
- * `{ ok: false, reason }`.
+ * The provenance of the version-bump branch, as `{ ok: true, base }`,
+ * `{ ok: false, retry: true, reason }` or `{ ok: false, reason }`.
  *
  * A merge base between main and the branch must exist: the branch must be the
  * version bump this run built. Main's own tip need not be an ancestor, because
  * main advances during the ~60-minute build window. The branch's diff from that
  * base must be the version line and the changelog only, the same shape
- * `isVersionBumpCommit` guards for the release detection. An empty diff carries
- * nothing along and is accepted.
+ * `isVersionBumpCommit` guards for the release detection.
+ *
+ * Only a branch that was actually read can be refused. A fetch that failed - a
+ * missing ref, a transient network error - says nothing about the branch's
+ * shape, so it is `retry`: the caller tries the land again and, when the
+ * attempts run out, carries the section to the pending branch. A determined
+ * refusal is reserved for a branch every rung fetched whose history has no
+ * merge base with main, whose diff touches a file outside the version-bump set,
+ * or whose apps/mobile/app.config.ts diff changes more than the version line.
  *
  * `tip` is the branch commit the section is about to be written onto. A branch
  * that moved since the caller fetched it is reported as such, so the caller can
@@ -723,6 +735,7 @@ function replacedConfigDiff(base, tip) {
 function verifyBumpBranch(remote, branch, tip) {
   let base;
   let fetchFailure;
+  let mergeBaseChecked = false;
   // A complete repository already has every object, and deepening it would turn
   // a previous complete clone into a shallow one: one plain fetch is enough. The
   // ladder only helps a shallow checkout reach the fork point.
@@ -747,17 +760,33 @@ function verifyBumpBranch(remote, branch, tip) {
     }
     try {
       base = git(['merge-base', main.sha, head.sha]).trim();
+      mergeBaseChecked = true;
       break;
     } catch {
       // A shallow history that does not reach the fork point has no base yet:
       // the next rung fetches deeper.
+      mergeBaseChecked = true;
     }
   }
   if (!base) {
-    const reason = fetchFailure
-      ? `it has no checkable history: ${fetchFailure}`
-      : 'it shares no history with main';
-    return { ok: false, reason };
+    // A branch that was not read cannot be judged, so it is retried: the caller
+    // carries the section when the retries run out. Only history every rung
+    // fetched, with no common commit with main, is a determined refusal.
+    if (fetchFailure) {
+      return {
+        ok: false,
+        retry: true,
+        reason: `it could not be read: ${fetchFailure}`,
+      };
+    }
+    if (!mergeBaseChecked) {
+      return {
+        ok: false,
+        retry: true,
+        reason: 'it could not be read: no rung fetched both refs',
+      };
+    }
+    return { ok: false, reason: 'it shares no history with main' };
   }
 
   let files;
@@ -766,11 +795,9 @@ function verifyBumpBranch(remote, branch, tip) {
     files = replacedFiles(base, tip);
     configDiff = replacedConfigDiff(base, tip);
   } catch (error) {
-    return { ok: false, reason: reasonOf(error) };
-  }
-  if (files.length === 0) {
-    // Nothing rides along with the merge, so there is no shape to refuse.
-    return { ok: true, base };
+    // A local git failure after a successful fetch is not a verdict on the
+    // branch's shape either.
+    return { ok: false, retry: true, reason: reasonOf(error) };
   }
   if (!isVersionBumpCommit(files, configDiff)) {
     const offending = files.filter(file => !VERSION_BUMP_FILES.has(file));
@@ -873,11 +900,13 @@ function landSection(options, heading, section) {
     }
     const parent = git(['rev-parse', 'FETCH_HEAD']).trim();
     // The land-time check requires the branch to carry only the version line
-    // and the changelog from its merge base with main. A branch that does not
-    // receives the section neither now nor on a later run, until it is replaced.
+    // and the changelog from its merge base with main. A branch that moved, or
+    // that could not be read, is retried; a branch that was read and does not
+    // have that shape receives the section neither now nor on a later run,
+    // until it is replaced.
     const check = verifyBumpBranch(remote, branch, parent);
     if (!check.ok) {
-      if (check.moved) {
+      if (check.moved || check.retry) {
         console.log(`changelog: attempt ${attempt} rejected (${check.reason})`);
         continue;
       }

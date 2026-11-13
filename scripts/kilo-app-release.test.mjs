@@ -1175,7 +1175,65 @@ test('write --land refuses a branch that shares no history with main', () => {
     );
     assert.equal(result.status, 1);
     assert.match(result.stderr, /refusing to land/);
-    assert.match(result.stderr, /shares no history with main|no checkable history/);
+    assert.match(result.stderr, /it shares no history with main/);
+    assert.equal(git(seed, ['ls-remote', 'origin', 'refs/heads/bump']), before);
+
+    git(seed, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    assert.equal(
+      git(seed, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.pending.md']),
+      '## 1.0.13 (build 43)\n\n- new (#91)\n\n'
+    );
+  } finally {
+    cleanup(root);
+  }
+});
+
+// A branch whose diff from its merge base is empty carries no version line, so
+// it is not the bump this run built: it must be refused, never accepted as a
+// land that reports no changed files to the workflow.
+test('write --land refuses a branch with no version bump of its own', () => {
+  const root = tempDir('kilo-notes-verify-empty-');
+  try {
+    const remote = join(root, 'remote.git');
+    git(root, ['init', '-q', '--bare', remote]);
+    const seed = join(root, 'seed');
+    git(root, ['clone', '-q', remote, seed]);
+    git(seed, ['config', 'user.name', 'Kilo Test']);
+    git(seed, ['config', 'user.email', 'test@kilo.ai']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+
+    writeFixture(seed, 'apps/mobile/CHANGELOG.md', '# Kilo App Changelog\n\nprose\n');
+    writeFixture(seed, 'apps/mobile/app.config.ts', "  version: '1.0.12',\n");
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', 'chore: seed']);
+    git(seed, ['branch', '-M', 'main']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+
+    // The ref names main's own tip: the branch has no commit of its own.
+    git(seed, ['branch', 'bump', 'main']);
+    git(seed, ['push', '-q', 'origin', 'bump']);
+    const before = git(seed, ['ls-remote', 'origin', 'refs/heads/bump']);
+
+    writeFixture(seed, 'notes.md', '- new (#91)\n');
+    const result = runScript(
+      NOTES,
+      [
+        'write',
+        '--version',
+        '1.0.13',
+        '--ios-build',
+        '43',
+        '--body-file',
+        'notes.md',
+        '--land',
+        'origin:bump',
+      ],
+      { cwd: seed }
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /refusing to land ## 1\.0\.13 \(build 43\) on bump/);
+    assert.match(result.stderr, /it carries no apps\/mobile\/app\.config\.ts version line/);
+    assert.doesNotMatch(result.stdout, /^changelog-files=/m);
     assert.equal(git(seed, ['ls-remote', 'origin', 'refs/heads/bump']), before);
 
     git(seed, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);

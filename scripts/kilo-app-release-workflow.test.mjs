@@ -818,9 +818,9 @@ test('the changelog land step reports the verified head and refuses an unverifie
         },
         stdio: ['pipe', 'pipe', 'pipe'],
       });
-      return 0;
+      return { status: 0, stderr: '' };
     } catch (error) {
-      return error.status;
+      return { status: error.status, stderr: error.stderr.toString() };
     }
   };
 
@@ -829,7 +829,8 @@ test('the changelog land step reports the verified head and refuses an unverifie
 
     const conforming = makeRepo('conforming', false);
     const before = conforming.tip();
-    assert.equal(runLand(conforming.repo), 0);
+    const landed = runLand(conforming.repo);
+    assert.equal(landed.status, 0, landed.stderr);
     const published = Object.fromEntries(
       readFileSync(output, 'utf8')
         .trim()
@@ -850,9 +851,18 @@ test('the changelog land step reports the verified head and refuses an unverifie
 
     const unverified = makeRepo('unverified', true);
     const unverifiedTip = unverified.tip();
-    assert.notEqual(runLand(unverified.repo), 0);
+    const refused = runLand(unverified.repo);
+    assert.notEqual(refused.status, 0);
+    assert.match(refused.stderr, /refusing to land ## 1\.0\.13 \(build 43\)/);
+    assert.match(refused.stderr, /apps\/mobile\/src\/a\.ts/);
     assert.doesNotMatch(readFileSync(output, 'utf8'), /^landed=true$/m);
     assert.equal(unverified.tip(), unverifiedTip);
+    // The refused section is carried, not dropped, so the next build can write
+    // it above its own.
+    git(unverified.repo, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    const carried = git(unverified.repo, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.pending.md']);
+    assert.match(carried, /## 1\.0\.13 \(build 43\)/);
+    assert.match(carried, /- a shipped change \(#91\)/);
   } finally {
     rmSync(work, { recursive: true, force: true });
   }

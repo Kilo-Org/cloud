@@ -228,6 +228,7 @@ import {
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
 import { useRemoteModelCatalogRetry } from '@/lib/hooks/use-remote-model-catalog-retry';
+import { useAppActiveAndFocused } from '@/lib/hooks/use-app-active-and-focused';
 import { computeChargesMicrodollars, sessionTotalMicrodollars } from '@/lib/session-compute-total';
 import { useSessionComputeCharges } from '@/lib/hooks/use-session-compute';
 import { useSessionRaiseReader } from '@/lib/hooks/use-session-raise-reader';
@@ -606,8 +607,19 @@ export function SessionDetailContent({
   // Compute cost is part of the session's total wherever the screen paints one:
   // the header pill and the context sheet. One read serves both, and a session
   // with no compute scope answers nothing, so the model cost stands alone.
+  //
+  // A session screen stays mounted on the navigation stack after the user
+  // leaves it, so the poll follows this screen's focus and the app's foreground
+  // state rather than its mount; a blurred screen reads the entry another
+  // surface refreshes on its own turn instead of asking every interval from the
+  // background.
   const cloudAgentSessionId = sessionDataLoaded ? (fetchedData.cloudAgentSessionId ?? null) : null;
-  const computeCharges = useSessionComputeCharges({ cloudAgentSessionId, organizationId });
+  const computePolling = useAppActiveAndFocused();
+  const computeCharges = useSessionComputeCharges({
+    cloudAgentSessionId,
+    organizationId,
+    poll: computePolling,
+  });
   const sessionCostMicrodollars = sessionTotalMicrodollars(
     totalMicrodollars,
     computeChargesMicrodollars(computeCharges.data)

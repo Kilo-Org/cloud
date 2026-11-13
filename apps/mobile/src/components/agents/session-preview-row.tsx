@@ -1,5 +1,4 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
@@ -16,48 +15,10 @@ import { isCloudAgentSessionId } from '@/lib/session-compute-total';
 import { useTRPC } from '@/lib/trpc';
 
 import { SessionPageSheet } from './session-page-sheet';
-
-/** What one sandbox service scan answers. */
-type PreviewServices = inferRouterOutputs<MobileRouter>['cloudAgentNext']['listPreviewServices'];
-type PreviewServicesStatus = PreviewServices['status'];
-type PreviewService = PreviewServices['services'][number];
-type PreviewUnavailableStatus = Exclude<PreviewServicesStatus, 'running'>;
-
-/** One state the preview sheet paints. */
-type PreviewState =
-  | { kind: 'loading' }
-  | { kind: 'failed' }
-  | { kind: 'unavailable'; status: PreviewUnavailableStatus }
-  | { kind: 'empty' }
-  | { kind: 'services'; services: PreviewService[] };
-
-/**
- * Pick the state a scan is in from its own readings. The tRPC `queryOptions`
- * result is typed as a settled success, so this selector takes the same fields
- * through the honest view (a promise that may still be pending, a scan that may
- * have failed). It is pure, so the stopped, not-ready and unsupported answers
- * are covered without a device.
- */
-function selectPreviewState(query: {
-  data: PreviewServices | undefined;
-  isError: boolean;
-  isPending: boolean;
-}): PreviewState {
-  if (query.isPending) {
-    return { kind: 'loading' };
-  }
-  if (query.isError || query.data === undefined) {
-    return { kind: 'failed' };
-  }
-  const { status } = query.data;
-  if (status !== 'running') {
-    return { kind: 'unavailable', status };
-  }
-  if (query.data.services.length === 0) {
-    return { kind: 'empty' };
-  }
-  return { kind: 'services', services: query.data.services };
-}
+import {
+  type PreviewUnavailableStatus,
+  selectPreviewState,
+} from './session-preview-services-state';
 
 /**
  * The sentence a sandbox state answers. A stopped, not-ready or unsupported

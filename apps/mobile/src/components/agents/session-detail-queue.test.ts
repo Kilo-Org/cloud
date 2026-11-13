@@ -363,6 +363,11 @@ vi.mock('@/lib/hooks/use-session-compute', () => ({
   useSessionComputeCharges: () => ({ data: undefined, isError: false, refetch: vi.fn() }),
   useComputeRates: () => ({ data: undefined }),
 }));
+// The compute poll follows the screen's focus and the app's foreground state;
+// this suite is about delivery order, so it stands in as on screen.
+vi.mock('@/lib/hooks/use-app-active-and-focused', () => ({
+  useAppActiveAndFocused: () => true,
+}));
 vi.mock('@/lib/use-github-repos-refresh', () => ({
   useGitHubReposRefresh: () => ({ openGitHubIntegration: vi.fn() }),
 }));

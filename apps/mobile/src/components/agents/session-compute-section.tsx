@@ -117,9 +117,11 @@ export function SessionComputeSection({
     );
   }
 
+  // A rate the catalogue no longer accepts new usage for is not a rate a new
+  // sandbox can be billed at, so the block only names the ones it can offer.
   const availableRates = (rates.data ?? []).filter(
     (rate): rate is SessionComputeRate & { hourlyUsd: number } =>
-      rate.hourlyUsd !== null && rate.hourlyUsd > 0
+      rate.available && rate.hourlyUsd !== null && rate.hourlyUsd > 0
   );
 
   return (

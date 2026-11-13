@@ -1,18 +1,20 @@
 import { createElement } from 'react';
 import type * as ReactI18next from 'react-i18next';
 import { act, TestRenderer } from '@/test/renderer';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatDuration } from '@/lib/format';
-import { type SessionComputeCharges } from '@/lib/session-compute-total';
+import { type SessionComputeCharges, type SessionComputeRate } from '@/lib/session-compute-total';
 
 import { SessionComputeSection } from './session-compute-section';
 
+const holder = vi.hoisted(() => ({ rates: [] as SessionComputeRate[] }));
+
 vi.mock('@/lib/hooks/use-session-compute', () => ({
   useSessionComputeCharges: () => ({ data: undefined, isError: false, refetch: vi.fn() }),
-  useComputeRates: () => ({ data: [] }),
+  useComputeRates: () => ({ data: holder.rates }),
 }));
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -80,6 +82,17 @@ function measureLine(renderer: TestRenderer.ReactTestRenderer): string {
   return line;
 }
 
+function texts(renderer: TestRenderer.ReactTestRenderer): string[] {
+  return renderer.root
+    .findAll(node => node.type === Text)
+    .map(node => node.props.children)
+    .filter((value): value is string => typeof value === 'string');
+}
+
+beforeEach(() => {
+  holder.rates = [];
+});
+
 describe('SessionComputeSection run rows', () => {
   it('omits the duration of a run that has recorded no time, so no bare separator is painted', () => {
     const renderer = renderSection(0);
@@ -94,6 +107,31 @@ describe('SessionComputeSection run rows', () => {
     const renderer = renderSection(120);
 
     expect(measureLine(renderer)).toBe(`${formatDuration(120, i18n.language)} × ${RATE}`);
+
+    renderer.unmount();
+  });
+});
+
+describe('SessionComputeSection current rates', () => {
+  it('names only the sandbox sizes the catalogue still sells', () => {
+    holder.rates = [
+      {
+        instance: 'standard-3',
+        skuId: 'cloud-agent-containers-standard-3-2026-09',
+        hourlyUsd: 7.2,
+        available: false,
+      },
+      {
+        instance: 'standard-4',
+        skuId: 'cloud-agent-containers-standard-4-2026-09',
+        hourlyUsd: 14.4,
+        available: true,
+      },
+    ];
+    const renderer = renderSection(60);
+
+    expect(texts(renderer)).toContain(i18n.t('cloudAgent.compute.largeSandbox'));
+    expect(texts(renderer)).not.toContain(i18n.t('cloudAgent.compute.mediumSandbox'));
 
     renderer.unmount();
   });

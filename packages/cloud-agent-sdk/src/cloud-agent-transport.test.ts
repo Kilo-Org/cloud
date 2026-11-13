@@ -1788,6 +1788,84 @@ describe('CloudAgentTransport page-seam', () => {
     transport.destroy();
   });
 
+  it('replays a failed queued turn from the page without a socket frame', async () => {
+    const storage = createMemoryStorage();
+    const processor = createChatProcessor(storage);
+    const state = createServiceState({ rootSessionId: 'ses-1' });
+    const page = {
+      kind: 'success' as const,
+      ...makeSnapshot({ id: 'ses-1' }),
+      nextCursor: null,
+      omittedItemCount: 0,
+      queuedMessages: [
+        {
+          messageId: 'msg-queued',
+          content: 'Fix the build',
+          timestamp: 100,
+          terminalFailure: {
+            messageId: 'msg-queued',
+            status: 'failed',
+            delivery: 'queued' as const,
+            accepted: false,
+            error: 'Workspace setup failed',
+            reason: 'workspace_setup_failed',
+            timestamp: 120,
+          },
+        },
+        // A settled command and a turn that is only queued carry no event of
+        // their own, exactly as the stream's own snapshot reports them.
+        { messageId: 'msg-done', content: '', timestamp: 60, completedAt: 70 },
+        { messageId: 'msg-pending', content: 'Next prompt', timestamp: 80 },
+      ],
+    };
+    const factory = createCloudAgentTransport({
+      sessionId: cloudAgentId('ses-1'),
+      kiloSessionId: kiloId('ses-1'),
+      api: createMockApi(),
+      getTicket: () => 'test-ticket',
+      fetchSnapshot: () => Promise.reject(new Error('should not be called')),
+      fetchSnapshotPage: () => Promise.resolve(page),
+      websocketBaseUrl: 'ws://localhost:9999',
+    });
+    const transport = factory({
+      onChatEvent: event => {
+        processor.process(event);
+      },
+      onServiceEvent: event => {
+        state.process(event);
+        // The session sink materializes the prompt row from the queued event.
+        if (event.type === 'cloud.message.queued') {
+          processor.synthesizeQueuedUserMessage({
+            messageId: event.messageId,
+            sessionId: 'ses-1',
+            content: event.content,
+            createdAt: event.createdAt,
+          });
+        }
+      },
+    });
+
+    // The socket never delivers a frame: the page alone must produce both the
+    // failed pending entry and the prompt row.
+    transport.connect();
+    await flushPromises();
+
+    expect(state.getPendingMessages().get('msg-queued')).toMatchObject({
+      status: 'failed',
+      error: 'Workspace setup failed',
+      reason: 'execution',
+    });
+    expect(storage.getMessageInfo('msg-queued')).toMatchObject({ role: 'user', synthetic: true });
+    expect(storage.getParts('msg-queued')).toEqual([
+      expect.objectContaining({ type: 'text', text: 'Fix the build' }),
+    ]);
+    expect(state.getPendingMessages().has('msg-done')).toBe(false);
+    expect(state.getPendingMessages().has('msg-pending')).toBe(false);
+    expect(storage.getMessageInfo('msg-pending')).toBeUndefined();
+
+    transport.destroy();
+  });
+
   it('falls back to fetchSnapshot when fetchSnapshotPage is not provided', async () => {
     const chatEvents: ChatEvent[] = [];
     const serviceEvents: ServiceEvent[] = [];

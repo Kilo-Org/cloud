@@ -399,6 +399,13 @@ export function describeSessionRuntimeFailure(message: string): SessionRuntimeFa
  * retryable connection failure; any other `statusIndicator` of type `error` is
  * classified by its message.
  *
+ * A failed preparation row counts as content. A run whose sandbox preparation
+ * failed has zero messages, so `messageCount` alone reads it as a failed open:
+ * the failed group is the run's own statement of what went wrong — the failed
+ * stage and the reason, with the question row's Retry and Copy — and the
+ * page-load card would replace both with a failure that did not happen. Only a
+ * FAILED attempt counts; a running or completed one still lets the card show.
+ *
  * `connectionLost` is the app-wide transport leg's answer (`reconnectExhausted`)
  * for a session whose own status atom carries nothing yet. It only counts while
  * nothing has loaded: a transcript already on screen keeps its rows and its own
@@ -408,9 +415,14 @@ export function resolveSessionTerminalError(input: {
   error: string | null;
   statusIndicator: { type: string; message: string; code?: SdkStatusMessageCode } | null;
   messageCount: number;
+  hasFailedPreparation: boolean;
   connectionLost?: boolean;
 }): SessionTerminalError | null {
-  if (input.messageCount > 0) {
+  // A session with rows on screen is not a failed open. A failed preparation
+  // group is the run's own statement of what went wrong, with the failed stage
+  // and the reason, and the question row keeps its Retry and Copy actions; the
+  // page-load card would replace both with a failure that did not happen.
+  if (input.messageCount > 0 || input.hasFailedPreparation) {
     return null;
   }
   if (input.error !== null) {

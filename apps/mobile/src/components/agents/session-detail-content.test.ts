@@ -6334,6 +6334,65 @@ describe('session detail duplicate failure state', () => {
     });
   });
 
+  it('opens a run whose preparation failed to its own failure, not the page-load card', async () => {
+    // The run never produced a message: the sandbox preparation failed before a
+    // turn could run, so the open has zero messages and an error indicator. The
+    // failed group is the run's own statement of what went wrong, with the failed
+    // stage and the reason; the page-load card would replace it with a failure
+    // that did not happen and would take the question row's Retry and Copy with
+    // it.
+    goalMountOptions.resolvedType = 'cloud-agent';
+    const view = await mountDetails([]);
+    const failedAttempt: PreparationAttempt = {
+      id: 'attempt-failed-open',
+      triggerMessageId: USER_ID,
+      status: 'failed',
+      startedAt: 0,
+      completedAt: 1,
+      safeError: 'invalid_configuration',
+      revision: 2,
+      steps: [
+        {
+          id: 'step-sandbox',
+          key: 'sandbox_provision',
+          kind: 'phase',
+          label: 'sandbox provision',
+          status: 'failed',
+          startedAt: 0,
+          completedAt: 1,
+          revision: 1,
+          latestDetail: 'Creating sandbox',
+          safeError: 'invalid_configuration',
+        },
+      ],
+    };
+    act(() => {
+      view.store.set<readonly PreparationAttempt[], [readonly PreparationAttempt[]], unknown>(
+        view.manager.atoms.preparationAttempts,
+        [failedAttempt]
+      );
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Something went wrong. Please retry in a moment.',
+          timestamp: 0,
+        }
+      );
+    });
+
+    const group = view.renderer.root.find(node => Object.is(node.type, 'PreparationGroup'));
+    expect(group.props.attempt).toMatchObject({
+      id: 'attempt-failed-open',
+      status: 'failed',
+    });
+    // The full-screen card is the failed-open surface, and this open is not one.
+    expect(view.renderer.root.findAllByType(QueryError)).toHaveLength(0);
+    const text = renderedText(view.renderer.root);
+    expect(text).not.toContain(i18n.t('agentChat.session.couldNotLoadThisSession'));
+    expect(text).not.toContain(i18n.t('agentChat.session.failedToLoadDetails'));
+  });
+
   it.each([false, true])(
     'keeps a response that failed before producing content recoverable after reopen (condensed: %s)',
     async condensed => {

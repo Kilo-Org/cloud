@@ -1,13 +1,8 @@
-import {
-  DeleteObjectCommand,
-  GetObjectCommand,
-  NoSuchKey,
-  PutObjectCommand,
-} from '@aws-sdk/client-s3';
+import { GetObjectCommand, NoSuchKey, PutObjectCommand } from '@aws-sdk/client-s3';
 
 type R2Credentials = { accessKeyId: string; secretAccessKey: string };
 
-/** In-memory stand-in for an R2 client that supports string-bodied puts, gets and deletes. */
+/** In-memory stand-in for an R2 client that supports string-bodied puts and gets. */
 export function createFakeR2Client() {
   const objects = new Map<string, string>();
   return {
@@ -28,10 +23,6 @@ export function createFakeR2Client() {
           throw new NoSuchKey({ message: 'The specified key does not exist.', $metadata: {} });
         }
         return { Body: { transformToString: async () => body } };
-      }
-      if (command instanceof DeleteObjectCommand) {
-        objects.delete(`${command.input.Bucket}/${command.input.Key}`);
-        return {};
       }
       throw new Error('Unsupported fake R2 command');
     },

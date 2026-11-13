@@ -22,7 +22,7 @@ import { api_request_log_2 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
 import { eq } from 'drizzle-orm';
-import { DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 import {
   apiRequestLogBlobKey,
   apiRequestLogBlobSchema,
@@ -3351,7 +3351,7 @@ describe('api_request_log_2 storage', () => {
     });
   });
 
-  test('deletes the uploaded blob when the row insert fails', async () => {
+  test('leaves the uploaded blob to R2 lifecycle cleanup when the row insert fails', async () => {
     const send = jest.spyOn(fakeR2, 'send');
     jest.spyOn(db, 'insert').mockImplementationOnce(() => {
       throw new Error('database unavailable');
@@ -3359,39 +3359,12 @@ describe('api_request_log_2 storage', () => {
 
     await logUpstreamResponse(jsonResponse({ error: 'upstream error' }, 400), 'all', null);
 
-    expect(send.mock.calls.map(([command]) => (command as object).constructor.name)).toEqual([
-      'PutObjectCommand',
-      'DeleteObjectCommand',
-    ]);
-    expect(fakeR2.objects.size).toBe(0);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
+    expect(fakeR2.objects.size).toBe(1);
     expect(await selectLoggedRows()).toEqual([]);
     expect(mockedLog).toHaveBeenCalledWith(
       expect.stringContaining('failed to insert api_request_log_2')
-    );
-  });
-
-  test('logs the key of a blob it could not delete after the row insert fails', async () => {
-    const send = fakeR2.send.bind(fakeR2);
-    jest.spyOn(fakeR2, 'send').mockImplementation(async command => {
-      if (command instanceof DeleteObjectCommand) throw new Error('R2 unavailable');
-      return send(command);
-    });
-    jest.spyOn(db, 'insert').mockImplementationOnce(() => {
-      throw new Error('database unavailable');
-    });
-
-    const logging = await logUpstreamResponse(
-      jsonResponse({ error: 'upstream error' }, 400),
-      'all',
-      null
-    );
-
-    const [key] = [...fakeR2.objects.keys()];
-    expect(key).toMatch(new RegExp(`^${bucket}/\\d{4}/\\d{2}/\\d{2}/${logging.usage_id}\\.json$`));
-    expect(mockedLog).toHaveBeenCalledWith(
-      expect.stringContaining(
-        `failed to delete orphaned api_request_log_2 blob ${key.slice(bucket.length + 1)} from R2: Error: R2 unavailable`
-      )
     );
   });
 

@@ -76,7 +76,9 @@ describe('drizzle', () => {
       expect(isUSRegion('iad1')).toBe(false);
       expect(isUSRegion('pdx1')).toBe(false);
       expect(isUSRegion('cle1')).toBe(false);
-      expect(isUSRegion(undefined)).toBe(false);
+      // An empty region must not reach the prefix check. Pass it explicitly, because
+      // `undefined` (or no argument) selects the module's ambient VERCEL_REGION default.
+      expect(isUSRegion('')).toBe(false);
     });
 
     it('uses the primary in local development even when replicas are configured', () => {

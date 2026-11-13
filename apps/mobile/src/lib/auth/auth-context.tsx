@@ -62,6 +62,7 @@ import { isProtectedDataAvailable, whenProtectedDataAvailable } from '@/lib/prot
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearCollapsedConnectCtasPreference } from '@/lib/hooks/use-collapsed-connect-ctas-preference';
 import { clearCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-calls-preference';
+import { clearEnvironmentChoices } from '@/lib/hooks/environment-choice';
 import { clearRunOnDestinationPreference } from '@/lib/hooks/use-persisted-run-on-destination';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { clearLiveActivityPreference } from '@/lib/hooks/use-live-activity-preference';
@@ -641,6 +642,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // the next signed-in account.
           clearAgentModelPreference();
           clearRunOnDestinationPreference();
+          clearEnvironmentChoices();
           clearReasoningPreference();
           clearHideThinkingPreference();
           clearKeepScreenOnPreference();

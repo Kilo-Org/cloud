@@ -32,16 +32,24 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: () => Promise.resolve() }),
   useMutation: () => ({ mutate: () => undefined, isPending: false }),
 }));
-vi.mock('@/lib/trpc', () => ({
-  useTRPC: () => ({
-    activeSessions: { listInstances: { queryOptions: () => ({}) } },
-    cliSessionsV2: {
-      get: { queryOptions: () => ({}), queryKey: () => ['get'] },
-      share: { mutationOptions: () => ({}) },
-      unshare: { mutationOptions: () => ({}) },
-    },
-  }),
-}));
+vi.mock('@/lib/trpc', () => {
+  const options = { queryOptions: () => ({}), queryKey: () => [] };
+  const namespace = { getSandboxStatus: options, getWorkspaceSnapshotRecovery: options };
+  return {
+    trpcClient: { cloudAgentNext: {}, organizations: { cloudAgentNext: {} } },
+    useTRPC: () => ({
+      activeSessions: { listInstances: { queryOptions: () => ({}) } },
+      cliSessionsV2: {
+        get: { queryOptions: () => ({}), queryKey: () => ['get'] },
+        share: { mutationOptions: () => ({}) },
+        unshare: { mutationOptions: () => ({}) },
+      },
+      cloudAgentNext: namespace,
+      organizations: { cloudAgentNext: namespace },
+    }),
+  };
+});
+vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 // The sheet's compute block and its total read one query; the harness pins it
 // to "nothing recorded" unless a test supplies charges.
 vi.mock('@/lib/hooks/use-session-compute', () => ({
@@ -93,6 +101,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+// The sandbox section's own button and dialog edges reach react-native through
+// modules the mounted transform cannot parse (activity-indicator -> motion ->
+// expo-battery), so both are mocked at their adapter.
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
@@ -144,6 +155,9 @@ function renderSheet(
         sessionTitle: 'Greeting',
         activeSessionType: null,
         ownerConnectionId: null,
+        cloudAgentSessionId: null,
+        cloudStatusType: null,
+        organizationId: undefined,
         modelDisplay: 'Model X',
         providerDisplay: 'Kilo',
         totalCostMicrodollars: null,
@@ -324,11 +338,12 @@ function sheetElement(
     sessionTitle: 'Greeting',
     activeSessionType: null,
     ownerConnectionId: null,
+    cloudAgentSessionId: null,
+    cloudStatusType: null,
+    organizationId: undefined,
     modelDisplay: 'Claude',
     providerDisplay: 'Kilo',
     totalCostMicrodollars: null,
-    cloudAgentSessionId: null,
-    organizationId: undefined,
     breakdownCostUsd: 0,
     messages: [],
     modelOptions: [],

@@ -52,6 +52,7 @@ import {
 import { friendlyModelName, resolveModelProviderName } from './session-model-display';
 import { Row, TokenRow } from './session-detail-rows';
 import { SessionPageSheet } from './session-page-sheet';
+import { SessionSandboxSection } from './session-sandbox-section';
 import { copySessionId, copySessionLink } from './session-row-actions';
 import { type SessionConnectionDisplay } from './session-connection-indicator-state';
 import { SessionTodoLinkRow } from '@/components/todos/session-todo-link';
@@ -69,10 +70,6 @@ type SessionContextSheetProps = {
   modelDisplay: string;
   providerDisplay: string;
   totalCostMicrodollars: number | null;
-  /** The viewed session's Cloud Agent id: the compute charges and preview address it. */
-  cloudAgentSessionId?: string | null;
-  /** The session's organization, when it is billed to one. */
-  organizationId?: string;
   breakdownCostUsd: number;
   messages: StoredMessage[];
   modelOptions: SessionModelOption[];
@@ -81,6 +78,11 @@ type SessionContextSheetProps = {
   onAutoApproveChange: (enabled: boolean) => void;
   connectionDisplay: SessionConnectionDisplay;
   onRetryConnection: () => void;
+  /** The control-plane session id; null when this session has no sandbox. */
+  cloudAgentSessionId: string | null;
+  /** See `SessionSandboxSection`: only a failed start offers a fresh start. */
+  cloudStatusType: string | null;
+  organizationId: string | undefined;
 };
 
 const SHEET_RING_SIZE = 96;
@@ -186,8 +188,6 @@ export function SessionContextSheet({
   modelDisplay,
   providerDisplay,
   totalCostMicrodollars,
-  cloudAgentSessionId,
-  organizationId,
   breakdownCostUsd,
   messages,
   modelOptions,
@@ -196,6 +196,9 @@ export function SessionContextSheet({
   onAutoApproveChange,
   connectionDisplay,
   onRetryConnection,
+  cloudAgentSessionId,
+  cloudStatusType,
+  organizationId,
 }: Readonly<SessionContextSheetProps>) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
@@ -425,6 +428,16 @@ export function SessionContextSheet({
               </Text>
             </Row>
           ) : null}
+
+          {/* The sandbox sits beside Run on: both describe where the session
+              runs. Its state and, after a failed start, the fresh-start
+              recovery come from the worker, so a lost or paused sandbox never
+              reads as a healthy session. */}
+          <SessionSandboxSection
+            cloudAgentSessionId={cloudAgentSessionId}
+            organizationId={organizationId}
+            startFailed={cloudStatusType === 'error'}
+          />
 
           {/* The row paints the combined total, so its gate is that total, not
               the model-only figure: a read-only session with no model cost can

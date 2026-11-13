@@ -7,7 +7,8 @@ import { toast } from 'sonner-native';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { EmptyState } from '@/components/empty-state';
-import { LogOut, Smartphone } from '@/components/ui/icons';
+import { DirectionalLogOut } from '@/components/ui/directional-icons';
+import { Smartphone } from '@/components/ui/icons';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -91,7 +92,7 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
         }
         className="min-h-[28px] min-w-[28px] shrink-0 items-center justify-center active:opacity-70"
       >
-        <LogOut size={16} color={colors.destructive} />
+        <DirectionalLogOut size={16} color={colors.destructive} />
       </Pressable>
     </View>
   );

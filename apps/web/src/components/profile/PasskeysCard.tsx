@@ -216,7 +216,7 @@ export function PasskeysCard() {
       : addFailure === 'cancelled'
         ? 'Passkey creation was cancelled. No passkey was added.'
         : addFailure === 'reauth_required'
-          ? 'Sign in again before adding a passkey to an admin account. Signing out signs you out of every browser.'
+          ? 'Sign in again before adding a passkey. Signing out signs you out of every browser.'
           : null;
 
   return (

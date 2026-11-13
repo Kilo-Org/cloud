@@ -306,6 +306,7 @@
     "passkeyAdded": "Jelkulcs hozzáadva.",
     "passkeyAddFailed": "Nem sikerült jelkulcsot hozzáadni. Próbáld újra.",
     "passkeyAddUnsupported": "Ez az eszköz nem tud jelkulcsokat létrehozni.",
+    "passkeyAddUnavailable": "Jelkulcsokat csak webböngészőben lehet hozzáadni.",
     "passkeyAddCancelled": "A jelkulcs létrehozását megszakították.",
     "passkeyRemoved": "Jelkulcs eltávolítva.",
     "passkeyRemoveFailed": "Ezt a jelkulcsot nem sikerült eltávolítani. Próbáld újra.",

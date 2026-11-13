@@ -306,6 +306,7 @@
     "passkeyAdded": "Ufunguo wa kuingia umeongezwa.",
     "passkeyAddFailed": "Imeshindikana kuongeza ufunguo wa kuingia. Jaribu tena.",
     "passkeyAddUnsupported": "Kifaa hiki hakiwezi kuunda vifunguo vya kuingia.",
+    "passkeyAddUnavailable": "Vifunguo vya kuingia vinaweza kuongezwa tu kwenye kivinjari cha wavuti.",
     "passkeyAddCancelled": "Uundaji wa ufunguo wa kuingia umesitishwa.",
     "passkeyRemoved": "Ufunguo wa kuingia umeondolewa.",
     "passkeyRemoveFailed": "Imeshindikana kuondoa ufunguo huo wa kuingia. Jaribu tena.",

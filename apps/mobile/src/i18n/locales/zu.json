@@ -306,6 +306,7 @@
     "passkeyAdded": "Ukhiye wokungena kungeziwe.",
     "passkeyAddFailed": "Ukhiye wokungena awukwazanga ukungezwa. Zama futhi.",
     "passkeyAddUnsupported": "Le divayisi ayikwazi ukudala amakhiye okungena.",
+    "passkeyAddUnavailable": "Amakhiye okungena angangezwa kuphela kusiphequluli sewebhu.",
     "passkeyAddCancelled": "Ukudalwa kokhiye wokungena kukhanseliwe.",
     "passkeyRemoved": "Ukhiye wokungena ususiwe.",
     "passkeyRemoveFailed": "Lowo khiye wokungena awukwazanga ukususwa. Zama futhi.",

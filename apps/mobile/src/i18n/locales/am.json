@@ -306,6 +306,7 @@
     "passkeyAdded": "ፓስኪ ተጨምሯል።",
     "passkeyAddFailed": "ፓስኪ ማከል አልተቻለም። እንደገና ይሞክሩ።",
     "passkeyAddUnsupported": "ይህ መሣሪያ ፓስኪዎችን መፍጠር አይችልም።",
+    "passkeyAddUnavailable": "ፓስኪዎች ሊጨመሩ የሚችሉት በድር አሳሽ ውስጥ ብቻ ነው።",
     "passkeyAddCancelled": "ፓስኪ መፍጠር ተሰርዟል።",
     "passkeyRemoved": "ፓስኪ ተወግዷል።",
     "passkeyRemoveFailed": "ያንን ፓስኪ ማስወገድ አልተቻለም። እንደገና ይሞክሩ።",

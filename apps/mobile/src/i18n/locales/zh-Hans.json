@@ -306,6 +306,7 @@
     "passkeyAdded": "已添加通行密钥。",
     "passkeyAddFailed": "无法添加通行密钥。请重试。",
     "passkeyAddUnsupported": "此设备无法创建通行密钥。",
+    "passkeyAddUnavailable": "通行密钥只能在网页浏览器中添加。",
     "passkeyAddCancelled": "通行密钥创建已取消。",
     "passkeyRemoved": "已移除通行密钥。",
     "passkeyRemoveFailed": "无法移除该通行密钥。请重试。",

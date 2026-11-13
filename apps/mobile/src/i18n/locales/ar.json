@@ -306,6 +306,7 @@
     "passkeyAdded": "تمت إضافة مفتاح المرور.",
     "passkeyAddFailed": "تعذّرت إضافة مفتاح المرور. حاول مرة أخرى.",
     "passkeyAddUnsupported": "لا يمكن لهذا الجهاز إنشاء مفاتيح مرور.",
+    "passkeyAddUnavailable": "لا يمكن إضافة مفاتيح المرور إلا في متصفح ويب.",
     "passkeyAddCancelled": "تم إلغاء إنشاء مفتاح المرور.",
     "passkeyRemoved": "تمت إزالة مفتاح المرور.",
     "passkeyRemoveFailed": "تعذّرت إزالة مفتاح المرور هذا. حاول مرة أخرى.",

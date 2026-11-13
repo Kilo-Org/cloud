@@ -306,6 +306,7 @@
     "passkeyAdded": "Chave de acesso adicionada.",
     "passkeyAddFailed": "Não foi possível adicionar uma chave de acesso. Tente novamente.",
     "passkeyAddUnsupported": "Este dispositivo não pode criar chaves de acesso.",
+    "passkeyAddUnavailable": "Chaves de acesso só podem ser adicionadas em um navegador web.",
     "passkeyAddCancelled": "A criação da chave de acesso foi cancelada.",
     "passkeyRemoved": "Chave de acesso removida.",
     "passkeyRemoveFailed": "Não foi possível remover essa chave de acesso. Tente novamente.",

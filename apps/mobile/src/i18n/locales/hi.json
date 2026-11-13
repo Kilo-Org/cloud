@@ -306,6 +306,7 @@
     "passkeyAdded": "पासकी जोड़ दी गई।",
     "passkeyAddFailed": "पासकी जोड़ी नहीं जा सकी। फिर से प्रयास करें।",
     "passkeyAddUnsupported": "यह डिवाइस पासकी नहीं बना सकता।",
+    "passkeyAddUnavailable": "पासकी केवल वेब ब्राउज़र में ही जोड़ी जा सकती है।",
     "passkeyAddCancelled": "पासकी बनाना रद्द कर दिया गया।",
     "passkeyRemoved": "पासकी हटा दी गई।",
     "passkeyRemoveFailed": "वह पासकी हटाई नहीं जा सकी। फिर से प्रयास करें।",

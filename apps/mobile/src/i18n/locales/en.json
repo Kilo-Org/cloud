@@ -373,6 +373,7 @@
     "passkeyAdded": "Passkey added.",
     "passkeyAddFailed": "Could not add a passkey. Try again.",
     "passkeyAddUnsupported": "This device cannot create passkeys.",
+    "passkeyAddUnavailable": "Passkeys can only be added in a web browser.",
     "passkeyAddCancelled": "Passkey creation was cancelled.",
     "passkeyRemoved": "Passkey removed.",
     "passkeyRemoveFailed": "Could not remove that passkey. Try again.",

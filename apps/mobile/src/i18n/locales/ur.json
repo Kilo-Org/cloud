@@ -306,6 +306,7 @@
     "passkeyAdded": "رسائی کلید شامل کر دی گئی۔",
     "passkeyAddFailed": "رسائی کلید شامل نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
     "passkeyAddUnsupported": "یہ ڈیوائس رسائی کلیدیں نہیں بنا سکتی۔",
+    "passkeyAddUnavailable": "رسائی کلیدیں صرف ویب براؤزر میں شامل کی جا سکتی ہیں۔",
     "passkeyAddCancelled": "رسائی کلید بنانا منسوخ ہو گیا۔",
     "passkeyRemoved": "رسائی کلید ہٹا دی گئی۔",
     "passkeyRemoveFailed": "وہ رسائی کلید ہٹائی نہیں جا سکی۔ دوبارہ کوشش کریں۔",

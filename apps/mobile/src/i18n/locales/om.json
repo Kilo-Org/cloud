@@ -306,6 +306,7 @@
     "passkeyAdded": "Furtuu seenii dabalaman.",
     "passkeyAddFailed": "Furtuu seenii dabaluun hin danda'amne. Irra deebi'ii yaali.",
     "passkeyAddUnsupported": "Meeshaan kun furtuu seenii uumuu hin danda'u.",
+    "passkeyAddUnavailable": "Furtuu seenii birawzaa weeb keessatti qofa dabaluun danda'ama.",
     "passkeyAddCancelled": "Uumaan furtuu seenii haqame.",
     "passkeyRemoved": "Furtuu seenii haqame.",
     "passkeyRemoveFailed": "Furtuu seenii sana haquun hin danda'amne. Irra deebi'ii yaali.",

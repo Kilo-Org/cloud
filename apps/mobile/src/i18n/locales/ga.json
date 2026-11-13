@@ -306,6 +306,7 @@
     "passkeyAdded": "Eochair rochtana curtha leis.",
     "passkeyAddFailed": "Níorbh fhéidir eochair rochtana a chur leis. Bain triail eile as.",
     "passkeyAddUnsupported": "Ní féidir leis an ngléas seo eochracha rochtana a chruthú.",
+    "passkeyAddUnavailable": "Ní féidir eochracha rochtana a chur leis ach amháin i mbrabhsálaí gréasáin.",
     "passkeyAddCancelled": "Cuireadh cruthú na heochrach rochtana ar ceal.",
     "passkeyRemoved": "Eochair rochtana bainte.",
     "passkeyRemoveFailed": "Níorbh fhéidir an eochair rochtana sin a bhaint. Bain triail eile as.",

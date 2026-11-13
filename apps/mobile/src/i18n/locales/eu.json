@@ -306,6 +306,7 @@
     "passkeyAdded": "Sarbide-gakoa gehituta.",
     "passkeyAddFailed": "Ezin izan da sarbide-gako bat gehitu. Saiatu berriro.",
     "passkeyAddUnsupported": "Gailu honek ezin ditu sarbide-gakoak sortu.",
+    "passkeyAddUnavailable": "Sarbide-gakoak web nabigatzaile batean soilik gehitu daitezke.",
     "passkeyAddCancelled": "Sarbide-gakoaren sorrera bertan behera utzi da.",
     "passkeyRemoved": "Sarbide-gakoa kenduta.",
     "passkeyRemoveFailed": "Ezin izan da sarbide-gako hori kendu. Saiatu berriro.",

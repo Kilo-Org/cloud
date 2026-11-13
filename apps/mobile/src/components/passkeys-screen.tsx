@@ -34,9 +34,11 @@ import { useTRPC } from '@/lib/trpc';
  * Why the Add control did not add a row. A ceremony that failed has no
  * half-written credential to clean up, so the same control is a working retry;
  * an `unsupported` result removes the control instead, because a device that
- * has just refused the ceremony cannot create one.
+ * has just refused the ceremony cannot create one. `unavailable` also removes
+ * it: the account cannot add a passkey from this app, so repeating the same
+ * request cannot succeed.
  */
-type AddFailure = 'unsupported' | 'failed';
+type AddFailure = 'unsupported' | 'unavailable' | 'failed';
 
 /** Rows the skeleton reserves so loading→content does not resize the list. */
 const SKELETON_ROWS = [0, 1, 2];
@@ -82,13 +84,13 @@ function InlineFailure({
  * its only action, happy lists a row per passkey, and a failure is either
  * retryable in place (the list request or a removal, with whatever the query
  * last rendered kept — the rows or the empty state) or non-retryable (a device
- * that cannot create passkeys: the Add control is not offered, and the
- * unsupported notice takes the hint's place while the existing rows stay). A
- * cancelled creation sheet changed nothing, so the list is left as it was and
- * the toast says so. A retry is single-flight — its control is disabled while
- * the request it starts is pending — and a removal failure is only actionable
- * while that delete runs or its row has rolled back, never after the server
- * list drops it.
+ * that cannot create passkeys, or an account that cannot add a passkey from
+ * this app: the Add control is not offered, and the notice that says why takes
+ * the hint's place while the existing rows stay). A cancelled creation sheet
+ * changed nothing, so the list is left as it was and the toast says so. A retry
+ * is single-flight — its control is disabled while the request it starts is
+ * pending — and a removal failure is only actionable while that delete runs or
+ * its row has rolled back, never after the server list drops it.
  *
  * The Add control is the screen's one action and sits outside the scrolling
  * list, in the footer above the tab bar: the header and the control then keep
@@ -128,9 +130,11 @@ export function PasskeysScreen() {
   // one, must not offer an Add control whose only possible result is the
   // unsupported notice — the login screen reads the same synchronous gate
   // before it renders its passkey button. A ceremony that comes back
-  // `unsupported` proves the same thing, so it drops the control too; any other
-  // failure keeps it, because the same control starts a fresh ceremony.
-  const canCreatePasskeys = passkeysSupported() && addFailure !== 'unsupported';
+  // `unsupported` proves the same thing, so it drops the control too, and so
+  // does `unavailable`: the request cannot succeed from this app.
+  // Any other failure keeps the control, because it starts a fresh ceremony.
+  const canCreatePasskeys =
+    passkeysSupported() && addFailure !== 'unsupported' && addFailure !== 'unavailable';
 
   const remove = useMutation(
     trpc.user.deletePasskey.mutationOptions({
@@ -227,6 +231,10 @@ export function PasskeysScreen() {
         toast.error(t('profile.passkeyAddCancelled'));
         return;
       }
+      if (result.failure === 'unavailable') {
+        setAddFailure('unavailable');
+        return;
+      }
       setAddFailure(result.failure === 'unsupported' ? 'unsupported' : 'failed');
     } catch {
       // A rejection — the request-token read behind the ceremony, say — wrote
@@ -265,7 +273,9 @@ export function PasskeysScreen() {
   if (!canCreatePasskeys) {
     addFailureNotice = (
       <Text accessibilityRole="alert" className="text-sm text-muted-foreground">
-        {t('profile.passkeyAddUnsupported')}
+        {addFailure === 'unavailable'
+          ? t('profile.passkeyAddUnavailable')
+          : t('profile.passkeyAddUnsupported')}
       </Text>
     );
   } else if (addFailure === 'failed') {

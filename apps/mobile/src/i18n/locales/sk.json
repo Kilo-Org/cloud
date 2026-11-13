@@ -306,6 +306,7 @@
     "passkeyAdded": "Prístupový kľúč pridaný.",
     "passkeyAddFailed": "Prístupový kľúč sa nepodarilo pridať. Skúste to znova.",
     "passkeyAddUnsupported": "Toto zariadenie nedokáže vytvárať prístupové kľúče.",
+    "passkeyAddUnavailable": "Prístupové kľúče je možné pridať len vo webovom prehliadači.",
     "passkeyAddCancelled": "Vytvorenie prístupového kľúča bolo zrušené.",
     "passkeyRemoved": "Prístupový kľúč odstránený.",
     "passkeyRemoveFailed": "Tento prístupový kľúč sa nepodarilo odstrániť. Skúste to znova.",

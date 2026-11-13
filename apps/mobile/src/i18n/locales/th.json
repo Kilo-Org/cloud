@@ -306,6 +306,7 @@
     "passkeyAdded": "เพิ่มพาสคีย์แล้ว",
     "passkeyAddFailed": "เพิ่มพาสคีย์ไม่สำเร็จ ลองอีกครั้ง",
     "passkeyAddUnsupported": "อุปกรณ์นี้สร้างพาสคีย์ไม่ได้",
+    "passkeyAddUnavailable": "เพิ่มพาสคีย์ได้เฉพาะในเว็บเบราว์เซอร์เท่านั้น",
     "passkeyAddCancelled": "การสร้างพาสคีย์ถูกยกเลิก",
     "passkeyRemoved": "ลบพาสคีย์แล้ว",
     "passkeyRemoveFailed": "ลบพาสคีย์นั้นไม่สำเร็จ ลองอีกครั้ง",

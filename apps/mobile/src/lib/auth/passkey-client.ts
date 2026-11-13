@@ -288,7 +288,24 @@ export async function signInWithPasskey(
 
 export type PasskeyRegistrationResult =
   | { status: 'ok' }
-  | { status: 'error'; failure: 'cancelled' | 'unsupported' | 'failed' };
+  | { status: 'error'; failure: 'cancelled' | 'unsupported' | 'unavailable' | 'failed' };
+
+/**
+ * The registration route answers a browser session only: it refuses a request
+ * that carries a bearer token, and it refuses a session that is not recent
+ * enough. Neither answer changes by repeating the request, so both map to
+ * `unavailable` instead of the retryable `failed`.
+ */
+const REGISTRATION_SESSION_REFUSAL: Record<string, true> = {
+  Unauthorized: true,
+  REAUTH_REQUIRED: true,
+};
+
+function registrationRefusal(failure: { errorCode: string | undefined }): 'unavailable' | 'failed' {
+  return failure.errorCode !== undefined && REGISTRATION_SESSION_REFUSAL[failure.errorCode] === true
+    ? 'unavailable'
+    : 'failed';
+}
 
 /** Creation has no credential to be missing yet, so `no-passkey` is just a refusal. */
 function registrationFailure(error: unknown): 'cancelled' | 'unsupported' | 'failed' {
@@ -312,7 +329,7 @@ export async function registerPasskey(
   const authHeaders = buildAuthHeaders(await getAuthTokenForRequest());
   const optionsResult = await postAuth(REGISTER_ROUTE, { action: 'options' }, authHeaders);
   if (!optionsResult.ok) {
-    return { status: 'error', failure: 'failed' };
+    return { status: 'error', failure: registrationRefusal(optionsResult) };
   }
   const ceremony = ceremonyOptionsSchema.safeParse(optionsResult.data);
   if (!ceremony.success) {
@@ -339,7 +356,7 @@ export async function registerPasskey(
     authHeaders
   );
   if (!verifyResult.ok) {
-    return { status: 'error', failure: 'failed' };
+    return { status: 'error', failure: registrationRefusal(verifyResult) };
   }
   return { status: 'ok' };
 }

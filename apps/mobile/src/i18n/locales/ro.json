@@ -306,6 +306,7 @@
     "passkeyAdded": "Cheie de acces adăugată.",
     "passkeyAddFailed": "Nu s-a putut adăuga o cheie de acces. Încearcă din nou.",
     "passkeyAddUnsupported": "Acest dispozitiv nu poate crea chei de acces.",
+    "passkeyAddUnavailable": "Cheile de acces pot fi adăugate doar într-un browser web.",
     "passkeyAddCancelled": "Crearea cheii de acces a fost anulată.",
     "passkeyRemoved": "Cheie de acces eliminată.",
     "passkeyRemoveFailed": "Nu s-a putut elimina acea cheie de acces. Încearcă din nou.",

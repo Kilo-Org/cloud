@@ -306,6 +306,7 @@
     "passkeyAdded": "Dodano klucz dostępu.",
     "passkeyAddFailed": "Nie udało się dodać klucza dostępu. Spróbuj ponownie.",
     "passkeyAddUnsupported": "To urządzenie nie może tworzyć kluczy dostępu.",
+    "passkeyAddUnavailable": "Klucze dostępu można dodawać tylko w przeglądarce internetowej.",
     "passkeyAddCancelled": "Tworzenie klucza dostępu zostało anulowane.",
     "passkeyRemoved": "Usunięto klucz dostępu.",
     "passkeyRemoveFailed": "Nie udało się usunąć tego klucza dostępu. Spróbuj ponownie.",

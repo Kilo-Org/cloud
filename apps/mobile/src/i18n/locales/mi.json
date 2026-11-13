@@ -306,6 +306,7 @@
     "passkeyAdded": "Kua tāpirihia te kī whakauru.",
     "passkeyAddFailed": "Kāore i taea te tāpiri he kī whakauru. Whakamātau anō.",
     "passkeyAddUnsupported": "Kāore e taea e tēnei pūrere ngā kī whakauru te hanga.",
+    "passkeyAddUnavailable": "Ka taea anake ngā kī whakauru te tāpiri i roto i tētahi pūtirotiro tukutuku.",
     "passkeyAddCancelled": "Kua whakakorengia te hanga kī whakauru.",
     "passkeyRemoved": "Kua tangohia te kī whakauru.",
     "passkeyRemoveFailed": "Kāore i taea taua kī whakauru te tango. Whakamātau anō.",

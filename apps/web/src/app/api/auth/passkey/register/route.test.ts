@@ -319,4 +319,111 @@ describe('POST /api/auth/passkey/register', () => {
 
     expect(response.status).toBe(200);
   });
+
+  it('refuses an enrollment from a stale session for a non-admin account', async () => {
+    mockGetUserFromAuth.mockResolvedValue({
+      user: fakeUser,
+      authFailedResponse: null,
+      webSessionId: 'session-1',
+      authenticatedAt: Math.floor(Date.now() / 1000) - 20 * 60,
+    } as never);
+    mockEvaluateStepUp.mockResolvedValue({
+      state: { status: 'required' },
+      proof: null,
+      passkeyCount: 0,
+    } as never);
+
+    const verify = await POST(
+      createRequest({ action: 'verify', challengeId, response: attestation })
+    );
+
+    expect(verify.status).toBe(401);
+    expect(await verify.json()).toEqual({ error: 'REAUTH_REQUIRED' });
+    expect(mockVerifyRegistration).not.toHaveBeenCalled();
+
+    const options = await POST(createRequest({ action: 'options' }));
+
+    expect(options.status).toBe(401);
+    expect(await options.json()).toEqual({ error: 'REAUTH_REQUIRED' });
+    expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
+    expect(mockRecordAdminAction).not.toHaveBeenCalled();
+  });
+
+  it('refuses a session with no sign-in time and no web session id', async () => {
+    mockGetUserFromAuth.mockResolvedValue({
+      user: fakeUser,
+      authFailedResponse: null,
+    } as never);
+
+    const response = await POST(
+      createRequest({ action: 'verify', challengeId, response: attestation })
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'REAUTH_REQUIRED' });
+    expect(mockEvaluateStepUp).not.toHaveBeenCalled();
+    expect(mockVerifyRegistration).not.toHaveBeenCalled();
+  });
+
+  it('allows a fresh sign-in enrollment for an account that is not an admin', async () => {
+    mockVerifyRegistration.mockResolvedValue({ credential_id: 'credential-1' } as never);
+
+    const response = await POST(
+      createRequest({ action: 'verify', challengeId, response: attestation })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ credentialId: 'credential-1' });
+    expect(mockEvaluateStepUp).not.toHaveBeenCalled();
+    expect(mockRecordAdminAction).not.toHaveBeenCalled();
+  });
+
+  it('allows a live step-up proof for an account that is not an admin', async () => {
+    mockGetUserFromAuth.mockResolvedValue({
+      user: fakeUser,
+      authFailedResponse: null,
+      webSessionId: 'session-1',
+      authenticatedAt: Math.floor(Date.now() / 1000) - 20 * 60,
+    } as never);
+    mockEvaluateStepUp.mockResolvedValue({
+      state: {
+        status: 'fresh',
+        method: 'webauthn_uv',
+        verifiedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+      proof: null,
+      passkeyCount: 1,
+    } as never);
+    mockCreateRegistrationOptions.mockResolvedValue({
+      challengeId,
+      options: { challenge: 'stored-challenge' },
+    } as never);
+
+    const response = await POST(createRequest({ action: 'options' }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      challengeId,
+      options: { challenge: 'stored-challenge' },
+    });
+  });
+
+  it('fails closed when the freshness lookup cannot answer', async () => {
+    mockGetUserFromAuth.mockResolvedValue({
+      user: fakeUser,
+      authFailedResponse: null,
+      webSessionId: 'session-1',
+      authenticatedAt: Math.floor(Date.now() / 1000) - 20 * 60,
+    } as never);
+    mockEvaluateStepUp.mockRejectedValue(new Error('drizzle down'));
+
+    const response = await POST(
+      createRequest({ action: 'verify', challengeId, response: attestation })
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'STEP_UP_UNAVAILABLE' });
+    expect(mockVerifyRegistration).not.toHaveBeenCalled();
+  });
 });

@@ -306,6 +306,7 @@
     "passkeyAdded": "Priėjimo raktas pridėtas.",
     "passkeyAddFailed": "Nepavyko pridėti priėjimo rakto. Bandykite dar kartą.",
     "passkeyAddUnsupported": "Šis įrenginys negali kurti priėjimo raktų.",
+    "passkeyAddUnavailable": "Priėjimo raktus galima pridėti tik žiniatinklio naršyklėje.",
     "passkeyAddCancelled": "Priėjimo rakto kūrimas atšauktas.",
     "passkeyRemoved": "Priėjimo raktas pašalintas.",
     "passkeyRemoveFailed": "Nepavyko pašalinti to priėjimo rakto. Bandykite dar kartą.",

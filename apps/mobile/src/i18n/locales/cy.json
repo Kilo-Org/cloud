@@ -306,6 +306,7 @@
     "passkeyAdded": "Allwedd mynediad wedi'i hychwanegu.",
     "passkeyAddFailed": "Methwyd ychwanegu allwedd mynediad. Rhowch gynnig arall arni.",
     "passkeyAddUnsupported": "Ni all y ddyfais hon greu allweddi mynediad.",
+    "passkeyAddUnavailable": "Dim ond mewn porwr gwe y gellir ychwanegu allweddi mynediad.",
     "passkeyAddCancelled": "Cafodd creu'r allwedd mynediad ei ganslo.",
     "passkeyRemoved": "Allwedd mynediad wedi'i dileu.",
     "passkeyRemoveFailed": "Methwyd dileu'r allwedd mynediad honno. Rhowch gynnig arall arni.",

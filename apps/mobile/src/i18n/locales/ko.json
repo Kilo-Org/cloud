@@ -306,6 +306,7 @@
     "passkeyAdded": "패스키가 추가되었습니다.",
     "passkeyAddFailed": "패스키를 추가하지 못했습니다. 다시 시도하세요.",
     "passkeyAddUnsupported": "이 기기에서는 패스키를 만들 수 없습니다.",
+    "passkeyAddUnavailable": "패스키는 웹 브라우저에서만 추가할 수 있습니다.",
     "passkeyAddCancelled": "패스키 생성이 취소되었습니다.",
     "passkeyRemoved": "패스키가 제거되었습니다.",
     "passkeyRemoveFailed": "해당 패스키를 제거하지 못했습니다. 다시 시도하세요.",

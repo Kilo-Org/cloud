@@ -306,6 +306,7 @@
     "passkeyAdded": "מפתח הגישה נוסף.",
     "passkeyAddFailed": "לא ניתן היה להוסיף מפתח גישה. נסו שוב.",
     "passkeyAddUnsupported": "המכשיר הזה אינו יכול ליצור מפתחות גישה.",
+    "passkeyAddUnavailable": "אפשר להוסיף מפתחות גישה רק בדפדפן אינטרנט.",
     "passkeyAddCancelled": "יצירת מפתח הגישה בוטלה.",
     "passkeyRemoved": "מפתח הגישה הוסר.",
     "passkeyRemoveFailed": "לא ניתן היה להסיר את מפתח הגישה הזה. נסו שוב.",

@@ -306,6 +306,7 @@
     "passkeyAdded": "Passnyckel tillagd.",
     "passkeyAddFailed": "Det gick inte att lägga till en passnyckel. Försök igen.",
     "passkeyAddUnsupported": "Den här enheten kan inte skapa passnycklar.",
+    "passkeyAddUnavailable": "Passnycklar kan bara läggas till i en webbläsare.",
     "passkeyAddCancelled": "Skapandet av passnyckeln avbröts.",
     "passkeyRemoved": "Passnyckel borttagen.",
     "passkeyRemoveFailed": "Det gick inte att ta bort den passnyckeln. Försök igen.",

@@ -306,6 +306,7 @@
     "passkeyAdded": "د ننوتلو کیلي اضافه شوه.",
     "passkeyAddFailed": "د ننوتلو کیلي اضافه نشوه. بیا هڅه وکړئ.",
     "passkeyAddUnsupported": "دا وسیله د ننوتلو کیلي جوړولی نشي.",
+    "passkeyAddUnavailable": "د ننوتلو کیلي یوازې په ویب براوزر کې اضافه کېدای شي.",
     "passkeyAddCancelled": "د ننوتلو کیلي جوړول لغوه شو.",
     "passkeyRemoved": "د ننوتلو کیلي لیرې شوه.",
     "passkeyRemoveFailed": "هغه د ننوتلو کیلي لیرې نشوه. بیا هڅه وکړئ.",

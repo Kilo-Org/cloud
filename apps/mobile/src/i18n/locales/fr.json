@@ -306,6 +306,7 @@
     "passkeyAdded": "Clé d'accès ajoutée.",
     "passkeyAddFailed": "Impossible d'ajouter une clé d'accès. Réessayez.",
     "passkeyAddUnsupported": "Cet appareil ne peut pas créer de clés d'accès.",
+    "passkeyAddUnavailable": "Les clés d'accès ne peuvent être ajoutées que dans un navigateur web.",
     "passkeyAddCancelled": "La création de la clé d'accès a été annulée.",
     "passkeyRemoved": "Clé d'accès supprimée.",
     "passkeyRemoveFailed": "Impossible de supprimer cette clé d'accès. Réessayez.",

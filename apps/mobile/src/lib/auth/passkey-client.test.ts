@@ -599,4 +599,25 @@ describe('registerPasskey', () => {
 
     expect(result).toEqual({ status: 'error', failure: 'failed' });
   });
+
+  it.each(['Unauthorized', 'REAUTH_REQUIRED'] as const)(
+    'reports %s as unavailable rather than a retryable failure',
+    async code => {
+      const optionsApi = fakeApi();
+      mockPostAuth.mockResolvedValueOnce(refused(code));
+      expect(await registerPasskey(optionsApi)).toEqual({
+        status: 'error',
+        failure: 'unavailable',
+      });
+      expect(optionsApi.create).not.toHaveBeenCalled();
+
+      const verifyApi = fakeApi();
+      verifyApi.create.mockResolvedValue(attestation);
+      mockPostAuth.mockResolvedValueOnce(optionsResponse).mockResolvedValueOnce(refused(code));
+      expect(await registerPasskey(verifyApi)).toEqual({
+        status: 'error',
+        failure: 'unavailable',
+      });
+    }
+  );
 });

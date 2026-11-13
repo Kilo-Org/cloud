@@ -306,6 +306,7 @@
     "passkeyAdded": "Pääsuvõti lisatud.",
     "passkeyAddFailed": "Pääsuvõtit ei õnnestunud lisada. Proovi uuesti.",
     "passkeyAddUnsupported": "See seade ei saa pääsuvõtmeid luua.",
+    "passkeyAddUnavailable": "Pääsuvõtmeid saab lisada ainult veebibrauseris.",
     "passkeyAddCancelled": "Pääsuvõtme loomine tühistati.",
     "passkeyRemoved": "Pääsuvõti eemaldatud.",
     "passkeyRemoveFailed": "Seda pääsuvõtit ei õnnestunud eemaldada. Proovi uuesti.",

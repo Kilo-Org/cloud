@@ -306,6 +306,7 @@
     "passkeyAdded": "Iċ-ċavetta tal-aċċess miżjuda.",
     "passkeyAddFailed": "Ma setgħetx tiġi miżjuda ċavetta tal-aċċess. Erġa' pprova.",
     "passkeyAddUnsupported": "Dan l-apparat ma jistax joħloq ċwievet tal-aċċess.",
+    "passkeyAddUnavailable": "Ċwievet tal-aċċess jistgħu jiġu miżjuda biss fi browser tal-web.",
     "passkeyAddCancelled": "Il-ħolqien taċ-ċavetta tal-aċċess ġie kkanċellat.",
     "passkeyRemoved": "Iċ-ċavetta tal-aċċess tneħħiet.",
     "passkeyRemoveFailed": "Dik iċ-ċavetta tal-aċċess ma setgħetx titneħħa. Erġa' pprova.",

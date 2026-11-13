@@ -306,6 +306,7 @@
     "passkeyAdded": "Ključ za dostop je dodan.",
     "passkeyAddFailed": "Ključa za dostop ni bilo mogoče dodati. Poskusi znova.",
     "passkeyAddUnsupported": "Ta naprava ne more ustvariti ključev za dostop.",
+    "passkeyAddUnavailable": "Ključe za dostop je mogoče dodati le v spletnem brskalniku.",
     "passkeyAddCancelled": "Ustvarjanje ključa za dostop je bilo preklicano.",
     "passkeyRemoved": "Ključ za dostop je odstranjen.",
     "passkeyRemoveFailed": "Tega ključa za dostop ni bilo mogoče odstraniti. Poskusi znova.",

@@ -306,6 +306,7 @@
     "passkeyAdded": "Naidagdag ang passkey.",
     "passkeyAddFailed": "Hindi maidagdag ang passkey. Subukan muli.",
     "passkeyAddUnsupported": "Hindi makakagawa ng mga passkey ang device na ito.",
+    "passkeyAddUnavailable": "Ang mga passkey ay maaari lamang idagdag sa isang web browser.",
     "passkeyAddCancelled": "Kinansela ang paggawa ng passkey.",
     "passkeyRemoved": "Naalis ang passkey.",
     "passkeyRemoveFailed": "Hindi maalis ang passkey na iyon. Subukan muli.",

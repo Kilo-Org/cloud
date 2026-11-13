@@ -122,4 +122,20 @@ describe('PasskeysScreen inline failures', () => {
     expect(buttonByLabel(view, 'Add a passkey').props.loading).toBe(false);
     view.unmount();
   });
+
+  it('withdraws the Add control when adding a passkey is unavailable in the app', async () => {
+    store.rows = [MACBOOK];
+    list.register.mockResolvedValue({ status: 'error', failure: 'unavailable' });
+    const view = await mount();
+    await waitFor(() => texts(view).includes('MacBook'));
+
+    await press(buttonByLabel(view, 'Add a passkey'));
+    await waitFor(() => texts(view).includes('Passkeys can only be added in a web browser.'));
+
+    // Repeating the same request cannot succeed, so the control is gone and the
+    // notice is the state: the rows the account already has stay listed.
+    expect(hasButtonLabel(view, 'Add a passkey')).toBe(false);
+    expect(texts(view)).toContain('MacBook');
+    view.unmount();
+  });
 });

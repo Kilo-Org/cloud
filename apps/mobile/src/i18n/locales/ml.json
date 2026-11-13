@@ -306,6 +306,7 @@
     "passkeyAdded": "പാസ്കീ ചേർത്തു.",
     "passkeyAddFailed": "പാസ്കീ ചേർക്കാനായില്ല. വീണ്ടും ശ്രമിക്കുക.",
     "passkeyAddUnsupported": "ഈ ഉപകരണത്തിന് പാസ്കീകൾ സൃഷ്ടിക്കാനാവില്ല.",
+    "passkeyAddUnavailable": "വെബ് ബ്രൗസറിൽ മാത്രമേ പാസ്കീകൾ ചേർക്കാൻ കഴിയൂ.",
     "passkeyAddCancelled": "പാസ്കീ സൃഷ്ടിക്കൽ റദ്ദാക്കി.",
     "passkeyRemoved": "പാസ്കീ നീക്കി.",
     "passkeyRemoveFailed": "ആ പാസ്കീ നീക്കാനായില്ല. വീണ്ടും ശ്രമിക്കുക.",

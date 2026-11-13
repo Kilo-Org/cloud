@@ -381,6 +381,43 @@ test('pre-existing findings are not attributed to head', async t => {
   );
 });
 
+test('a landing notice persisted in both findings artifacts still compares', async t => {
+  // The shape `warningFinding` in capture.ts writes for a tab route whose link
+  // leaves the route unchanged: a ratio warning on the root node.
+  const landing: Finding = {
+    rule: 'link-unopened',
+    severity: 'warning',
+    cell: 'base',
+    target: UNMARKED.id,
+    element: { index: 0, path: 'View', tag: 'View', rect: [0, 0, 400, 800] },
+    measured: 1,
+    expected: 'the deep link changes the screen',
+    unit: 'ratio',
+    message: 'deep link did not open',
+  };
+  const run = {
+    target: UNMARKED,
+    route: UNMARKED.route,
+    screen: UNMARKED.screen,
+    findings: [landing],
+  };
+  const fixture = syntheticRepo(t, unmarkedManifest);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'base-run');
+  const headRun = path.join(fixture.root, 'head-run');
+  capture(preparation, 'base', baseRun, run);
+  capture(preparation, 'head', headRun, run);
+  const result = await compareProof(
+    preparation,
+    baseRun,
+    headRun,
+    path.join(fixture.root, 'comparison')
+  );
+  assert.equal(result.status, 'comparable');
+  assert.deepEqual(result.introduced, []);
+  assert.deepEqual(result.reasons, []);
+});
+
 for (const state of [
   { route: '/login' },
   { route: '/splash' },

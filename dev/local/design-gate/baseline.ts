@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { evaluate, listPages, openSession, selectPage } from './cdp';
 import type { RunOutcome } from './capture';
 import { normalize, parseDump } from './tree';
-import type { Finding } from './findings';
+import { RULE_IDS, type Finding } from './findings';
 import { collapseFindings, type CollapsedFinding } from './report';
 import { baselineGit, containedProofSource } from './baseline-preflight';
 
@@ -548,25 +548,8 @@ const ElementSchema = z
   .passthrough();
 const ComparisonFindingSchema = z
   .object({
-    rule: z.enum([
-      'clipped',
-      'cut-off',
-      'overlap',
-      'touch-overlap',
-      'row-misaligned',
-      'ink-off-center',
-      'touch-target',
-      'inset-asymmetry',
-      'layout-shift',
-      'rtl-mirror',
-      'safe-area',
-      'leading-gap',
-      'unsettled',
-      'loading-placeholder',
-      'capture-alignment',
-      'blank-frame',
-      'env-mismatch',
-    ]),
+    // Shared on purpose: a new rule id cannot be forgotten here.
+    rule: z.enum(RULE_IDS),
     severity: z.enum(['error', 'warning']),
     cell: z.string(),
     target: z.string(),

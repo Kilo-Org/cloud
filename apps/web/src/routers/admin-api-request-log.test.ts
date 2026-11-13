@@ -1,7 +1,7 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { api_request_log, kilocode_users } from '@kilocode/db/schema';
+import { api_request_log_2, kilocode_users } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 
 describe('admin.apiRequestLog.getSummary authorization', () => {
@@ -43,10 +43,10 @@ describe('admin.apiRequestLog.getSummary authorization', () => {
   test('returns the summary to an API request log exporter', async () => {
     const exporter = await createUser({ is_admin: true, can_export_api_request_logs: true });
     const ownerId = `api-request-log-summary-${crypto.randomUUID()}`;
-    await db.insert(api_request_log).values({
+    await db.insert(api_request_log_2).values({
+      id: crypto.randomUUID(),
       kilo_user_id: ownerId,
-      provider: 'test-provider',
-      model: 'test/model',
+      requested_model: 'test/model',
       created_at: '2026-08-01T12:00:00.000Z',
     });
 
@@ -55,6 +55,6 @@ describe('admin.apiRequestLog.getSummary authorization', () => {
     expect(summary.recordCount).toBeGreaterThan(0);
     expect(summary.sizeBytes).toBeGreaterThan(0);
     expect(summary.oldestCreatedAt).not.toBeNull();
-    await db.delete(api_request_log).where(eq(api_request_log.kilo_user_id, ownerId));
+    await db.delete(api_request_log_2).where(eq(api_request_log_2.kilo_user_id, ownerId));
   });
 });

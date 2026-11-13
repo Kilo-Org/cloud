@@ -2921,6 +2921,7 @@ export const microdollar_usage_metadata = pgTable(
   ]
 );
 
+/** Replaced by `api_request_log_2`; no longer written or read, and will be dropped. */
 export const api_request_log = pgTable(
   'api_request_log',
   {
@@ -2944,7 +2945,33 @@ export const api_request_log = pgTable(
   table => [index('idx_api_request_log_created_at').on(table.created_at)]
 );
 
-export type ApiRequestLog = typeof api_request_log.$inferSelect;
+/**
+ * The request and response bodies are stored in R2 under a key derived from `created_at` and `id`;
+ * see `apiRequestLogBlobKey`.
+ */
+export const api_request_log_2 = pgTable(
+  'api_request_log_2',
+  {
+    /** The `microdollar_usage` id of the request. */
+    id: uuid().notNull().primaryKey(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    generation_id: text(),
+    kilo_user_id: text().notNull(),
+    organization_id: text(),
+    requested_model: text().notNull(),
+  },
+  table => [
+    index('idx_api_request_log_2_created_at').on(table.created_at),
+    index('idx_api_request_log_2_generation_id').on(table.generation_id),
+    index('idx_api_request_log_2_kilo_user_id_created_at').on(table.kilo_user_id, table.created_at),
+    index('idx_api_request_log_2_organization_id_created_at').on(
+      table.organization_id,
+      table.created_at
+    ),
+  ]
+);
+
+export type ApiRequestLog2 = typeof api_request_log_2.$inferSelect;
 
 export const http_user_agent = pgTable(
   'http_user_agent',

@@ -69,6 +69,7 @@ export async function rewriteModelResponse_Responses({
         headers,
       });
     }
+    if (typeof json.id === 'string' && json.id) capture?.setGenerationId(json.id);
     if (json.usage) {
       rewriteUsage(json.usage, usageContext, json.provider_metadata ?? json.providerMetadata);
     }
@@ -127,6 +128,7 @@ export async function rewriteModelResponse_Responses({
               json.response.provider_metadata ?? json.response.providerMetadata ?? providerMetadata;
             if (generationId === undefined && json.response.id) {
               generationId = json.response.id;
+              capture?.setGenerationId(generationId);
               logExceptInTest('[rewriteModelResponse] received generation ID', {
                 kind: 'responses',
                 generationId,

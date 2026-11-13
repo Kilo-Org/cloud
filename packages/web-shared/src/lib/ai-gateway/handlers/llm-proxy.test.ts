@@ -3,7 +3,7 @@ import type { CustomPricingTiers, OrganizationSettings } from '@kilocode/db/sche
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
-import { agent_briefing_snapshots, api_request_log, type User } from '@kilocode/db/schema';
+import { agent_briefing_snapshots, api_request_log_2, type User } from '@kilocode/db/schema';
 import { BRIEFING_SETTLEMENT_HEADER } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import { REPLACED_ANSWER_HEADER } from '@kilocode/web-shared/lib/ai-gateway/replaced-answer-header';
 import type {
@@ -134,7 +134,10 @@ import type * as GatewayConfigModule from '@kilocode/web-shared/lib/ai-gateway/g
 import { recordEnkryptUsage } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import { EnkryptOutputGuardrailReportSchema } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { apiRequestLogBlobSchema } from '@kilocode/web-shared/lib/r2/api-request-log';
+import {
+  apiRequestLogBlobKey,
+  apiRequestLogBlobSchema,
+} from '@kilocode/web-shared/lib/r2/api-request-log';
 
 jest.mock('next/server', () => {
   return {
@@ -1221,7 +1224,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
     expect(archived).not.toHaveProperty('vercel');
   });
 
-  it('passes the Vercel request ID to request logging', async () => {
+  it('passes the usage ID and Vercel request ID to request logging', async () => {
     const { handleLlmProxyRequest } = await import('./llm-proxy');
 
     const response = await handleLlmProxyRequest(
@@ -1229,9 +1232,14 @@ describe('POST /api/v1/chat/completions request handling', () => {
     );
 
     expect(response.status).toBe(200);
+    const usageId = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].usageId;
+    expect(usageId).toEqual(expect.any(String));
     expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
       expect.objectContaining({
-        logging: expect.objectContaining({ vercel_request_id: 'iad1::iad1::request-id' }),
+        logging: expect.objectContaining({
+          usage_id: usageId,
+          vercel_request_id: 'iad1::iad1::request-id',
+        }),
         responseTransforms: null,
       })
     );
@@ -5762,13 +5770,13 @@ describe('Enkrypt output guardrail', () => {
 
       const rows = await db
         .select()
-        .from(api_request_log)
-        .where(eq(api_request_log.vercel_request_id, vercelRequestId));
-      expect(rows).toEqual([
-        expect.objectContaining({ error: { guardrail_rejection: 'block', guardrail: 'output' } }),
-      ]);
-      const archived = fakeR2.objects.get(`test-api-request-log/${rows[0].request_r2_key}`) ?? '';
+        .from(api_request_log_2)
+        .where(eq(api_request_log_2.kilo_user_id, 'user-123'));
+      expect(rows).toHaveLength(1);
+      const archived =
+        fakeR2.objects.get(`test-api-request-log/${apiRequestLogBlobKey(rows[0])}`) ?? '';
       const record = apiRequestLogBlobSchema.parse(JSON.parse(archived));
+      expect(record.error).toEqual({ guardrail_rejection: 'block', guardrail: 'output' });
       expect(record.response).toBe(JSON.stringify(body));
       expect(record.enkrypt).toHaveLength(3);
       expect(record.enkrypt?.filter(call => call.guardrail === 'input')).toHaveLength(1);
@@ -5803,16 +5811,13 @@ describe('Enkrypt output guardrail', () => {
       expect(send).toHaveBeenCalledTimes(1);
       expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
       expect(fakeR2.objects.size).toBe(1);
-      expect(rows[0].response_r2_key).toBe(rows[0].request_r2_key);
       expect(archived).not.toContain('test-enkrypt-key');
       expect(archived).not.toContain('apikey');
     } finally {
       logOnlyScan.resolve();
       send.mockRestore();
       mockedGetDynamicRequestLoggingMode.mockResolvedValue(null);
-      await db
-        .delete(api_request_log)
-        .where(eq(api_request_log.vercel_request_id, vercelRequestId));
+      await db.delete(api_request_log_2).where(eq(api_request_log_2.kilo_user_id, 'user-123'));
     }
   });
 
@@ -7231,9 +7236,7 @@ describe('Enkrypt input guardrail', () => {
     afterEach(async () => {
       send.mockRestore();
       mockedGetDynamicRequestLoggingMode.mockResolvedValue(null);
-      await db
-        .delete(api_request_log)
-        .where(eq(api_request_log.vercel_request_id, vercelRequestId));
+      await db.delete(api_request_log_2).where(eq(api_request_log_2.kilo_user_id, 'user-123'));
     });
 
     async function handleLoggedRequest() {
@@ -7249,8 +7252,14 @@ describe('Enkrypt input guardrail', () => {
     function loggedRows() {
       return db
         .select()
-        .from(api_request_log)
-        .where(eq(api_request_log.vercel_request_id, vercelRequestId));
+        .from(api_request_log_2)
+        .where(eq(api_request_log_2.kilo_user_id, 'user-123'));
+    }
+
+    function archivedBlob(row: { id: string; created_at: string } | undefined) {
+      return row
+        ? (fakeR2.objects.get(`test-api-request-log/${apiRequestLogBlobKey(row)}`) ?? '')
+        : '';
     }
 
     describe.each(['input', 'output'] as const)('%s error body capture', guardrail => {
@@ -7389,9 +7398,8 @@ describe('Enkrypt input guardrail', () => {
           }
 
           const rows = await loggedRows();
-          expect(rows).toEqual([expect.objectContaining({ status_code: 503 })]);
-          const archived =
-            fakeR2.objects.get(`test-api-request-log/${rows[0].request_r2_key}`) ?? '';
+          expect(rows).toHaveLength(1);
+          const archived = archivedBlob(rows[0]);
           const record = apiRequestLogBlobSchema.parse(JSON.parse(archived));
           expect(record.response).toBe(JSON.stringify(body));
           expect(record.enkrypt).toEqual([
@@ -7441,23 +7449,23 @@ describe('Enkrypt input guardrail', () => {
         expect(mockedUpstreamRequest).not.toHaveBeenCalled();
         const rows = await loggedRows();
         expect(rows).toEqual([
-          expect.objectContaining({
+          {
+            id: mockedLogUnrewrittenResponse.mock.calls[0]?.[0].logging.usage_id,
+            created_at: expect.any(String),
+            generation_id: null,
             kilo_user_id: 'user-123',
             organization_id: 'org-1',
-            status_code: status,
-            provider: provider.type,
-            model: 'openai/gpt-4o',
-            error: { guardrail_rejection: verdict },
-          }),
+            requested_model: 'openai/gpt-4o',
+          },
         ]);
-        const archived =
-          fakeR2.objects.get(`test-api-request-log/${rows[0].response_r2_key}`) ?? '';
+        const archived = archivedBlob(rows[0]);
         const record = apiRequestLogBlobSchema.parse(JSON.parse(archived));
         const attempts = enkrypt.status >= 500 ? 2 : 1;
         expect(record).toMatchObject({
-          version: 1,
+          version: 2,
           request: expect.objectContaining({ messages: [{ role: 'user', content: 'hello' }] }),
           response: JSON.stringify(body),
+          error: { guardrail_rejection: verdict },
         });
         expect(record.enkrypt).toEqual(
           Array.from({ length: attempts }, () => ({
@@ -7478,7 +7486,6 @@ describe('Enkrypt input guardrail', () => {
         expect(send).toHaveBeenCalledTimes(1);
         expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
         expect(fakeR2.objects.size).toBe(1);
-        expect(rows[0].request_r2_key).toBe(rows[0].response_r2_key);
         expect(archived).not.toContain('test-enkrypt-key');
         expect(archived).not.toContain('apikey');
       }
@@ -7502,7 +7509,7 @@ describe('Enkrypt input guardrail', () => {
       expect(response.status).toBe(400);
       expect(mockedUpstreamRequest).not.toHaveBeenCalled();
       const [row] = await loggedRows();
-      const archived = fakeR2.objects.get(`test-api-request-log/${row?.request_r2_key}`) ?? '';
+      const archived = archivedBlob(row);
       const record = apiRequestLogBlobSchema.parse(JSON.parse(archived));
       const request = {
         text: HELLO_SCAN_TEXT,
@@ -7573,7 +7580,7 @@ describe('Enkrypt input guardrail', () => {
       expect(response.status).toBe(400);
       expect(mockedUpstreamRequest).not.toHaveBeenCalled();
       const [row] = await loggedRows();
-      const archived = fakeR2.objects.get(`test-api-request-log/${row?.response_r2_key}`) ?? '';
+      const archived = archivedBlob(row);
       const record = apiRequestLogBlobSchema.parse(JSON.parse(archived));
       expect(
         record.enkrypt

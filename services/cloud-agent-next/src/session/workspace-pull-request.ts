@@ -66,7 +66,6 @@ export type WorkspacePullRequestSummary = z.infer<typeof workspacePullRequestSum
 
 export type WorkspacePullRequestTarget = {
   workspaceId: string;
-  organizationId: string | null;
 };
 
 export type WorkspacePullRequestCacheRow = {
@@ -176,7 +175,8 @@ export function summarizeWorkspacePullRequest(
  * This is a passive Postgres read. It never opens a sandbox or asks compute to
  * start, and it never calls GitHub. A workspace whose owner has no GitHub
  * integration therefore has no source for a cache row and returns no summary.
- * Cached values can be older than `lastSyncedAt`, which is the cache write time.
+ * Completed-deletion tombstones are excluded. Cached values can be older than
+ * `lastSyncedAt`, which is the cache write time.
  */
 export async function readWorkspacePullRequestSummaries(
   env: Pick<Env, 'HYPERDRIVE'>,
@@ -220,6 +220,8 @@ export async function readWorkspacePullRequestSummaries(
       github_branch_pull_requests,
       and(
         isNotNull(github_branch_pull_requests.pr_number),
+        isNotNull(github_branch_pull_requests.pr_url),
+        isNotNull(github_branch_pull_requests.pr_last_synced_at),
         or(
           and(
             isNotNull(cloud_agent_worktrees.organization_id),
@@ -250,7 +252,8 @@ export async function readWorkspacePullRequestSummaries(
     .where(
       and(
         inArray(cloud_agent_worktrees.worktree_id, workspaceIds),
-        eq(cloud_agent_worktrees.kilo_user_id, params.userId)
+        eq(cloud_agent_worktrees.kilo_user_id, params.userId),
+        isNull(cloud_agent_worktrees.deletion_completed_at)
       )
     )
     .orderBy(

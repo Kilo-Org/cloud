@@ -271,10 +271,7 @@ describe('readWorkspacePullRequestSummaries', () => {
 
     const result = await readWorkspacePullRequestSummaries(env, {
       userId: 'user-1',
-      workspaces: [
-        { workspaceId: 'worktree_a', organizationId: null },
-        { workspaceId: 'worktree_b', organizationId: null },
-      ],
+      workspaces: [{ workspaceId: 'worktree_a' }, { workspaceId: 'worktree_b' }],
     });
 
     expect([...result.keys()]).toEqual(['worktree_a', 'worktree_b']);

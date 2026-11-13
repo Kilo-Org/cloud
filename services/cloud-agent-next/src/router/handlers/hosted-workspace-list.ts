@@ -88,10 +88,7 @@ export const listHostedWorkspaces = protectedProcedure
     });
     const pullRequests = await readWorkspacePullRequestSummaries(ctx.env, {
       userId: ctx.userId,
-      workspaces: page.items.map(workspace => ({
-        workspaceId: workspace.workspaceId,
-        organizationId: workspace.organizationId,
-      })),
+      workspaces: page.items.map(workspace => ({ workspaceId: workspace.workspaceId })),
     });
     return {
       items: page.items.map(workspace =>
@@ -112,9 +109,7 @@ export const getHostedWorkspace = protectedProcedure
     if (!workspace) return null;
     const pullRequests = await readWorkspacePullRequestSummaries(ctx.env, {
       userId: ctx.userId,
-      workspaces: [
-        { workspaceId: workspace.workspaceId, organizationId: workspace.organizationId },
-      ],
+      workspaces: [{ workspaceId: workspace.workspaceId }],
     });
     return projectWorkspace(workspace, ctx.userId, pullRequests.get(workspace.workspaceId) ?? null);
   });

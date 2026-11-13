@@ -157,7 +157,7 @@ describe('hosted workspace discovery', () => {
       expect.objectContaining({ SESSION_INGEST: expect.anything() }),
       {
         userId,
-        workspaces: [{ workspaceId, organizationId: null }],
+        workspaces: [{ workspaceId }],
       }
     );
     expect(test.durableObjectAccess).not.toHaveBeenCalled();
@@ -182,7 +182,7 @@ describe('hosted workspace discovery', () => {
     });
     expect(mocks.readWorkspacePullRequestSummaries).toHaveBeenCalledWith(expect.anything(), {
       userId,
-      workspaces: [{ workspaceId, organizationId: null }],
+      workspaces: [{ workspaceId }],
     });
     expect(test.durableObjectAccess).not.toHaveBeenCalled();
   });

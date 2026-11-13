@@ -82,12 +82,7 @@ export const refreshHostedWorkspacePullRequest = protectedProcedure
     });
     const summaries = await readWorkspacePullRequestSummaries(ctx.env, {
       userId: ctx.userId,
-      workspaces: [
-        {
-          workspaceId: input.workspaceId,
-          organizationId: workspace.organizationId,
-        },
-      ],
+      workspaces: [{ workspaceId: input.workspaceId }],
     });
     const pullRequest = summaries.get(input.workspaceId) ?? null;
 

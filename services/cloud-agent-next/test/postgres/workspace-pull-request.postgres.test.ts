@@ -22,6 +22,7 @@ const worktrees = {
   multiSession: `worktree_${randomUUID()}`,
   secondWorkspace: `worktree_${randomUUID()}`,
   unverified: `worktree_${randomUUID()}`,
+  completedDeletion: `worktree_${randomUUID()}`,
   otherOwner: `worktree_${randomUUID()}`,
 };
 const sessionIds: string[] = [];
@@ -107,6 +108,17 @@ beforeAll(async () => {
       git_branch: `${branch}-unverified`,
     },
     {
+      worktree_id: worktrees.completedDeletion,
+      kilo_user_id: owner,
+      git_url: gitUrl,
+      git_branch: branch,
+      name: null,
+      deletion_manifest: null,
+      runtime_locations: [],
+      deletion_started_at: new Date(Date.now() - 60_000).toISOString(),
+      deletion_completed_at: new Date().toISOString(),
+    },
+    {
       worktree_id: worktrees.otherOwner,
       kilo_user_id: otherUser,
       git_url: gitUrl,
@@ -180,6 +192,13 @@ beforeAll(async () => {
     prNumber: 777,
   });
   await insertSession({
+    worktreeId: worktrees.completedDeletion,
+    userId: owner,
+    prUrl: 'https://github.com/Kilo-Org/cloud/pull/142',
+    prNumber: 142,
+    prLinkVerifiedAt: '2026-10-21T12:00:00Z',
+  });
+  await insertSession({
     worktreeId: worktrees.otherOwner,
     userId: otherUser,
     prUrl: 'https://github.com/Kilo-Org/cloud/pull/999',
@@ -208,7 +227,7 @@ describe('workspace PR projection against PostgreSQL', () => {
       { HYPERDRIVE: { connectionString } as Hyperdrive },
       {
         userId: owner,
-        workspaces: [{ workspaceId: worktrees.multiSession, organizationId: null }],
+        workspaces: [{ workspaceId: worktrees.multiSession }],
       }
     );
 
@@ -227,8 +246,8 @@ describe('workspace PR projection against PostgreSQL', () => {
       {
         userId: owner,
         workspaces: [
-          { workspaceId: worktrees.multiSession, organizationId: null },
-          { workspaceId: worktrees.secondWorkspace, organizationId: null },
+          { workspaceId: worktrees.multiSession },
+          { workspaceId: worktrees.secondWorkspace },
         ],
       }
     );
@@ -242,11 +261,23 @@ describe('workspace PR projection against PostgreSQL', () => {
       { HYPERDRIVE: { connectionString } as Hyperdrive },
       {
         userId: owner,
-        workspaces: [{ workspaceId: worktrees.unverified, organizationId: null }],
+        workspaces: [{ workspaceId: worktrees.unverified }],
       }
     );
 
     expect(summaries.has(worktrees.unverified)).toBe(false);
+  });
+
+  it('does not project a completed-deletion workspace', async () => {
+    const summaries = await readWorkspacePullRequestSummaries(
+      { HYPERDRIVE: { connectionString } as Hyperdrive },
+      {
+        userId: owner,
+        workspaces: [{ workspaceId: worktrees.completedDeletion }],
+      }
+    );
+
+    expect(summaries.has(worktrees.completedDeletion)).toBe(false);
   });
 
   it("does not read another owner's workspace", async () => {
@@ -254,7 +285,7 @@ describe('workspace PR projection against PostgreSQL', () => {
       { HYPERDRIVE: { connectionString } as Hyperdrive },
       {
         userId: owner,
-        workspaces: [{ workspaceId: worktrees.otherOwner, organizationId: null }],
+        workspaces: [{ workspaceId: worktrees.otherOwner }],
       }
     );
 

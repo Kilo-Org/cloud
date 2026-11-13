@@ -69,6 +69,20 @@ const APP_PATHS = [
 ];
 const CHANGELOG_EXCLUDE = ':(exclude)apps/mobile/CHANGELOG.md';
 
+// The app-local files that cannot reach the bundle, exactly as the release
+// workflow excludes them from its change detection. They are not a release
+// reason there, so a commit that touches only them must not reach the notes of
+// the next build either: a test or lint commit is not a shipped change.
+export const APP_LOCAL_EXCLUDES = [
+  ':(exclude,glob)apps/mobile/**/*.md',
+  ':(exclude,glob)apps/mobile/**/*.test.ts',
+  ':(exclude,glob)apps/mobile/**/*.test.tsx',
+  ':(exclude,glob)apps/mobile/scripts/**',
+  ':(exclude,glob)apps/mobile/e2e/**',
+  ':(exclude)apps/mobile/.oxlintrc*.json',
+  ':(exclude)apps/mobile/vitest*.ts',
+];
+
 // The only files a squashed version-bump merge may touch. The release workflow
 // lands the changelog section on the bump branch, so the merge carries the
 // version line and the changelog together.
@@ -261,6 +275,7 @@ function shippedSubjects(from, to) {
     '--',
     ...APP_PATHS,
     CHANGELOG_EXCLUDE,
+    ...APP_LOCAL_EXCLUDES,
   ]);
   const subjects = [];
   for (const line of log.split('\n')) {

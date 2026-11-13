@@ -7,6 +7,8 @@ import test from 'node:test';
 
 import { load } from 'js-yaml';
 
+import { APP_LOCAL_EXCLUDES } from './kilo-app-release-notes.mjs';
+
 const workflowPath = '.github/workflows/kilo-app-release.yml';
 const ciWorkflowPath = '.github/workflows/kilo-app-ci.yml';
 
@@ -114,18 +116,12 @@ function validate(workflow) {
   const diffMatch = /git diff --name-only[\s\S]*?\)\n/.exec(check.run);
   assert.ok(diffMatch, 'check-changes: the change detection diff is missing');
   const diff = diffMatch[0];
-  for (const pattern of [
-    ':(exclude)apps/mobile/CHANGELOG.md',
-    ':(exclude,glob)apps/mobile/**/*.md',
-    ':(exclude,glob)apps/mobile/**/*.test.ts',
-    ':(exclude,glob)apps/mobile/**/*.test.tsx',
-    ':(exclude,glob)apps/mobile/scripts/**',
-    ':(exclude,glob)apps/mobile/e2e/**',
-    ':(exclude)apps/mobile/.oxlintrc*.json',
-    ':(exclude)apps/mobile/vitest*.ts',
-  ]) {
-    assert.ok(diff.includes(`'${pattern}'`), `change detection must exclude ${pattern}`);
-  }
+  const declared = [...diff.matchAll(/'(:[^']+)'/g)].map(match => match[1]);
+  assert.deepEqual(
+    [...declared].sort(),
+    [':(exclude)apps/mobile/CHANGELOG.md', ...APP_LOCAL_EXCLUDES].sort(),
+    'the release diff must skip exactly the app-local files the notes step skips'
+  );
   for (const kept of [
     'apps/mobile/',
     'packages/trpc/',

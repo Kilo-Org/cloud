@@ -895,6 +895,18 @@ test('accepts a flat counted key kept untranslated to a family in another locale
   assert.deepEqual(found, []);
 });
 
+test('leaves an incomplete English family unowed by a locale', () => {
+  // English declares only the `_one` category of the family, so it is not a
+  // family every locale owes. Neither value interpolates {{count}}: a locale
+  // that keeps only the flat base key owes no categories for it.
+  const found = run({
+    english: { counts: { items: 'items', items_one: 'one item' } },
+    translated: { counts: { items: 'lokal' } },
+    source: "t('counts.items', { count: 2 });",
+  });
+  assert.deepEqual(found, []);
+});
+
 test('rejects an incomplete locale-declared family for a counted key', () => {
   const found = run({
     english: COUNTED,

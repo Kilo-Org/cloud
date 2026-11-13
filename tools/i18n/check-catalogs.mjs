@@ -28,10 +28,17 @@ import {
   lineIndex,
   parseProblems,
   parseSourceFile,
+  propertyName,
   unwrap,
   walk,
 } from '../lib/ast.mjs';
-import { countPlaceholderBases, flattenCatalog, pluralParts } from '../lib/catalogs.mjs';
+import {
+  countPlaceholderBases,
+  familiesOwedByEveryLocale,
+  flattenCatalog,
+  pluralFamilyBases,
+  pluralParts,
+} from '../lib/catalogs.mjs';
 import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -593,21 +600,6 @@ function holdsLabel(values, run) {
     }
   }
   return false;
-}
-
-/** The name a plain, non-computed object property declares. */
-function propertyName(property) {
-  if (property.type !== 'Property' || property.computed) {
-    return null;
-  }
-  const { key } = property;
-  if (key.type === 'Identifier') {
-    return key.name;
-  }
-  if (key.type === 'Literal' && typeof key.value === 'string') {
-    return key.value;
-  }
-  return null;
 }
 
 /** The catalog key a property's value translates, when it is `t('literal')`. */
@@ -1207,17 +1199,14 @@ export function checkCatalogs(root = ROOT) {
     // The base each catalog's consumers append their own part to: a plural stem
     // in the app, a `.title`/`.body` part in the push runtime.
     const baseKeyOf = catalog.name === 'mobile' ? pluralBaseKey : pushBaseKey;
-    const englishFamilies = new Set(
-      [...english.keys()]
-        .map(pluralParts)
-        .filter(Boolean)
-        .map(parts => parts.base)
-    );
+    const englishFamilies = pluralFamilyBases(english);
     // English copy that interpolates {{count}} but whose words inflect none or
     // only by count, so English ships a flat key (or a family). A language whose
     // nouns do change with the count may declare a family for that base; see the
     // locale loop below.
     const englishCountedBases = countPlaceholderBases(english);
+    // The families a locale that opts into one owes its own categories for.
+    const owedFamilies = familiesOwedByEveryLocale(english);
     const englishValues = new Set(english.values());
     // Keys whose English text is identical. Short strings only: a long sentence
     // repeated verbatim is rare, and a 60-character cap keeps the groups to the
@@ -1344,12 +1333,13 @@ export function checkCatalogs(root = ROOT) {
       const requiredCategories = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
       // A locale that declares no member of an English family falls back to its
       // flat base key, so it cannot lack categories it never opted into. A
-      // locale-driven family (declared here but not in English) or an English
-      // family the locale carries must be complete.
+      // locale-driven family (declared here but not in English) must be
+      // complete, and so must an English family every locale owes once the locale
+      // carries it; an English family that is not complete yet is an English
+      // problem, not this locale's.
       for (const family of new Set([...englishFamilies, ...localeFamilies])) {
         const localeDeclared = localeFamilies.has(family);
-        const englishDriven =
-          englishFamilies.has(family) && !englishCountedBases.has(family) && translated.has(family);
+        const englishDriven = owedFamilies.has(family) && translated.has(family);
         if (!localeDeclared && !englishDriven) {
           continue;
         }

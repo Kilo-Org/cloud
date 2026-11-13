@@ -29,15 +29,19 @@ type RepositoryBranchSelectorProps = {
   disabled: boolean;
 };
 
-/** One height for every state, so the row never moves as branches arrive. */
+/** The fixed height the skeleton and the branch trigger share. */
 const ROW_HEIGHT = 'h-12';
 
 /**
  * Note rows carry full sentences, so they start at the trigger height and
  * grow with their text instead of clipping it — the same guidance must fit
  * in every language, not just English.
+ *
+ * The failed state uses the same floor: it holds the 48 dp retry action, and a
+ * fixed `h-12` box would clip that action by the row's own 1 dp border on each
+ * side. A minimum lets the row take the action's height instead.
  */
-const NOTE_MIN_HEIGHT = 'min-h-12';
+const ROW_MIN_HEIGHT = 'min-h-12';
 
 /**
  * Branch row under the repository selector. The provider's default branch is
@@ -51,9 +55,11 @@ const NOTE_MIN_HEIGHT = 'min-h-12';
  * the picker slot and dismisses the keyboard, so the sheet never floats over
  * the form translucently or under the keyboard.
  *
- * The interactive states render at the same height as the trigger row, so the
- * section below never jumps between loading, branches, and a retryable error.
- * A note row is at least that tall and grows to show its whole message.
+ * The loading skeleton and the branch trigger render at one fixed height, so
+ * the section below does not jump as branches arrive. The failed state is a
+ * minimum instead: it holds the 48 dp retry action, which a fixed box would
+ * clip by the row's own border. A note row is at least that tall too and grows
+ * to show its whole message.
  */
 export function RepositoryBranchSelector({
   repository,
@@ -126,7 +132,7 @@ export function RepositoryBranchSelector({
         return (
           <View
             className={cn(
-              ROW_HEIGHT,
+              ROW_MIN_HEIGHT,
               'flex-row items-center justify-between gap-2 rounded-lg border border-border bg-card px-3'
             )}
           >
@@ -176,7 +182,7 @@ export function RepositoryBranchSelector({
     return (
       <View
         className={cn(
-          NOTE_MIN_HEIGHT,
+          ROW_MIN_HEIGHT,
           'justify-center rounded-lg border border-border bg-card px-3 py-2'
         )}
       >

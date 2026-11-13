@@ -12,6 +12,7 @@ import {
   setSelectedBranchOverride,
 } from './new-session-repository-state';
 import { type RepositoryBranchesState, useRepositoryBranches } from '@/lib/use-new-session-repos';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { branchPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 
 const router = vi.hoisted(() => ({ push: vi.fn() }));
@@ -98,6 +99,17 @@ function pressableWithLabel(renderer: TestRenderer.ReactTestRenderer, label: str
   return renderer.root.findAll(
     node => node.props.accessibilityLabel === label && typeof node.props.onPress === 'function'
   )[0];
+}
+
+/** The class list a node renders, split into single class names. */
+function classesOf(node: TestRenderer.ReactTestInstance | undefined): string[] {
+  const className: unknown = node?.props.className;
+  return typeof className === 'string' ? className.split(' ') : [];
+}
+
+/** Nodes whose class list holds `className` as one class, not as a substring. */
+function rowsWithClass(renderer: TestRenderer.ReactTestRenderer, className: string) {
+  return renderer.root.findAll(node => classesOf(node).includes(className));
 }
 
 function branchLabel(branch: string): string {
@@ -243,20 +255,25 @@ describe('RepositoryBranchSelector', () => {
     }
   });
 
-  it('keeps skeleton, trigger, and error row at the same fixed height', () => {
-    for (const state of [
-      branchesState({ isLoading: true }),
-      branchesState(),
-      branchesState({ isRetryableError: true }),
-    ]) {
+  it('keeps the skeleton and trigger at the one fixed height', () => {
+    for (const state of [branchesState({ isLoading: true }), branchesState()]) {
       const renderer = mountSelector(githubRow, state);
-      const row = renderer.root.findAll(node => {
-        const classes =
-          typeof node.props.className === 'string' ? node.props.className.split(' ') : [];
-        return classes.includes('h-12');
-      });
-      expect(row).toHaveLength(1);
+      expect(rowsWithClass(renderer, 'h-12')).toHaveLength(1);
+      expect(rowsWithClass(renderer, 'min-h-12')).toHaveLength(0);
     }
+  });
+
+  it('gives the failed row a minimum height so its retry action fits', () => {
+    // A fixed `h-12` row clipped the 48 dp retry action by the row's own 1 dp
+    // border on each side; the row takes the action's height instead.
+    const renderer = mountSelector(githubRow, branchesState({ isRetryableError: true }));
+    const [failedRow] = rowsWithClass(renderer, 'min-h-12');
+    expect(failedRow).toBeDefined();
+    expect(classesOf(failedRow)).not.toContain('h-12');
+    expect(failedRow?.findAllByType('Button' as never)).toHaveLength(1);
+
+    const [retryAction] = renderer.root.findAllByType('Button' as never);
+    expect(classesOf(retryAction)).toContain(STATE_ACTION_CLASS);
   });
 
   it('shows the branch name and chevron once a retry loads the branches', () => {

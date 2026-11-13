@@ -8,6 +8,7 @@ import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { type SessionComputeCharges } from '@/lib/session-compute-total';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
@@ -639,6 +640,23 @@ describe('SessionContextSheet copy link row', () => {
     expect(values).not.toContain(i18n.t('agents.sessionRow.idCopied'));
     await unmount(renderer);
   });
+});
+
+describe('SessionContextSheet copy row touch targets', () => {
+  it.each(['session-context-sheet-copy-id', 'session-context-sheet-copy-link'])(
+    'renders the %s row on the shared full target',
+    async testID => {
+      // Two stacked lines of small type measured 32 dp together, so each copy
+      // row has to carry the shared target on its own pressable node.
+      const renderer = await mountSheet();
+      const target = findByType(renderer.root, 'Pressable').find(
+        node => node.props.testID === testID
+      );
+      expect(target?.props.accessibilityRole).toBe('button');
+      expect(target?.props.className).toContain(ROW_TARGET_CLASS);
+      await unmount(renderer);
+    }
+  );
 });
 
 describe('SessionContextSheet connection row', () => {

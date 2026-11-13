@@ -104,8 +104,6 @@ export const PILL_LAYOUT_TOKENS = [
   'items-center',
   'gap-1.5',
   'rounded-full',
-  // The border slot is always there; only its colour follows the reading.
-  'border',
   'px-2.5',
   // The header row hands the trailing cluster a capped 50% box, but RN's
   // default flexShrink is 0. Without these the pill keeps its natural width
@@ -113,6 +111,20 @@ export const PILL_LAYOUT_TOKENS = [
   'shrink',
   'min-w-0',
 ] as const;
+
+/**
+ * The utility that keeps the border slot one dp wide in every state. It is
+ * asserted as a whole class token, never as a substring: `border` is a prefix of
+ * both `border-transparent` and `border-border`, so a substring check would pass
+ * even if the width lived only in one of the two chrome classes — which would
+ * make the settled pill two dp narrower than the reading pill.
+ */
+export const PILL_BORDER_WIDTH_TOKEN = 'border';
+
+/** True when `className` carries `token` as its own class, not as a prefix. */
+export function hasClassToken(className: string, token: string): boolean {
+  return className.split(/\s+/).includes(token);
+}
 
 /** The capsule a pill wears only while it paints a reading. */
 export const PILL_CAPSULE_TOKENS = ['border-border', 'bg-secondary'] as const;

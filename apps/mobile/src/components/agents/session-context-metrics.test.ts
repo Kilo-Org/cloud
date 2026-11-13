@@ -5,8 +5,10 @@ import {
   classNameOf,
   expectHiddenPill,
   findAll,
+  hasClassToken,
   info,
   PILL_BARE_TOKENS,
+  PILL_BORDER_WIDTH_TOKEN,
   PILL_CAPSULE_TOKENS,
   PILL_LAYOUT_TOKENS,
   pillOf,
@@ -350,11 +352,18 @@ describe('SessionContextMetrics', () => {
   // arrives.
   it('wears the capsule only while it paints a reading', () => {
     const onPress = vi.fn<() => void>();
-    const expectBare = (root: React.ReactElement) => {
-      const className = classNameOf(pillOf(root));
+    const expectLayout = (className: string) => {
       for (const token of PILL_LAYOUT_TOKENS) {
         expect(className).toContain(token);
       }
+      // Asserted as a whole token: `border` is a prefix of both chrome classes,
+      // so a substring check could not show that the one-dp border slot is on the
+      // base class rather than on only one chrome class.
+      expect(hasClassToken(className, PILL_BORDER_WIDTH_TOKEN)).toBe(true);
+    };
+    const expectBare = (root: React.ReactElement) => {
+      const className = classNameOf(pillOf(root));
+      expectLayout(className);
       for (const token of PILL_BARE_TOKENS) {
         expect(className).toContain(token);
       }
@@ -364,9 +373,7 @@ describe('SessionContextMetrics', () => {
     };
     const expectCapsule = (root: React.ReactElement) => {
       const className = classNameOf(pillOf(root));
-      for (const token of PILL_LAYOUT_TOKENS) {
-        expect(className).toContain(token);
-      }
+      expectLayout(className);
       for (const token of PILL_CAPSULE_TOKENS) {
         expect(className).toContain(token);
       }

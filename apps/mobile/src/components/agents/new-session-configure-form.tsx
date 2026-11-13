@@ -345,7 +345,14 @@ export function NewSessionConfigureForm({
         />
       ) : null}
 
-      {isRemote ? (
+      {/* Under the folder field: only the computer target with no instance yet
+          carries the setup sentence, because that is the one state where it is
+          the instruction for connecting a computer. A bound instance already
+          runs Kilo, and the Run on row and Folder field above it already name
+          the computer, its project and its folder, so an empty slot repeats
+          nothing. A refused spawn resets the target and raises the
+          disconnected note, which owns that copy. */}
+      {isRemote && runOnInstance === null && !showInstanceDisconnectedNote ? (
         <Text className="mt-2 text-sm text-muted-foreground">
           {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
         </Text>

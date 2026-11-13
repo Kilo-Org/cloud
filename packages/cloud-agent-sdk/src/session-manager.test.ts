@@ -12036,6 +12036,31 @@ describe('createSessionManager — spawned session open', () => {
     );
   });
 
+  it('evicts a spawned entry once its grace has passed when a new id is noted', async () => {
+    const fetchSession = jest.fn().mockRejectedValue(notFound);
+    const config = createMockConfig({
+      fetchSession,
+      spawnedSessionOpen: { graceMs: 1_000, maxAttempts: 5, retryDelayMs: 10 },
+    });
+    const mgr = createSessionManager(config);
+
+    mgr.noteSpawnedSession(kiloId('ses-stale'));
+    jest.advanceTimersByTime(5_000);
+    mgr.noteSpawnedSession(kiloId('ses-fresh'));
+
+    await mgr.switchSession(kiloId('ses-stale'));
+    expect(fetchSession.mock.calls.filter(([id]) => id === kiloId('ses-stale'))).toHaveLength(1);
+    expect(atomValue<{ code?: string } | null>(config.store, mgr.atoms.statusIndicator)?.code).toBe(
+      'child-session-not-found'
+    );
+
+    await mgr.switchSession(kiloId('ses-fresh'));
+    await settle();
+    expect(
+      fetchSession.mock.calls.filter(([id]) => id === kiloId('ses-fresh')).length
+    ).toBeGreaterThan(1);
+  });
+
   it('gives up after maxAttempts so a session that never appears still surfaces', async () => {
     const config = createMockConfig({
       fetchSession: jest.fn().mockRejectedValue(notFound),

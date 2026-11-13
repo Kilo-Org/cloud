@@ -3352,6 +3352,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
     open.denied = true;
     clearSpawnedRetry(open.kiloSessionId);
+    spawnedSessions.delete(open.kiloSessionId);
     open.acceptCachedPage = false;
     open.surfaceDeferredOpenFailure = null;
     stateUnsub?.();
@@ -4532,6 +4533,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     switchGeneration += 1;
     for (const timer of spawnedRetryTimers.values()) clearTimeout(timer);
     spawnedRetryTimers.clear();
+    spawnedSessions.clear();
     stateUnsub?.();
     stateUnsub = null;
     currentSession?.destroy();
@@ -4560,8 +4562,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   return {
     switchSession,
     noteSpawnedSession: (kiloSessionId: KiloSessionId) => {
-      if (config.spawnedSessionOpen === undefined) return;
-      spawnedSessions.set(kiloSessionId, { attempts: 0, spawnedAt: Date.now() });
+      const options = config.spawnedSessionOpen;
+      if (options === undefined) return;
+      const now = Date.now();
+      for (const [id, spawned] of spawnedSessions) {
+        if (now - spawned.spawnedAt > options.graceMs) spawnedSessions.delete(id);
+      }
+      spawnedSessions.set(kiloSessionId, { attempts: 0, spawnedAt: now });
     },
     hydrateChildSession,
     loadOlderChildMessages,

@@ -1,4 +1,5 @@
 import { readKilo2Messages } from './kilo2-source-messages';
+import { buildToolDetail } from '@kilocode/app-shared/tool-detail';
 
 const session = {
   id: 'ses_root',
@@ -37,6 +38,14 @@ test.each([
       },
     },
   });
+  if (outcome === 'failed') {
+    const part = display?.parts[0];
+    if (part?.type !== 'tool') throw new Error('Expected a background subagent tool part');
+    expect(buildToolDetail(part)).toMatchObject({
+      status: 'error',
+      error: 'Explore failed\n\n## Result\nChecked commands',
+    });
+  }
   expect(native).toEqual(original);
 });
 

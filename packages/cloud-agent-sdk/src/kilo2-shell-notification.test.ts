@@ -3,6 +3,7 @@ import { applyNativeEvent } from './native-conversation-reducer';
 import { readNativeConversation } from './native-conversation-source';
 import type { NativeEvent, NativeSessionState } from './native-sync';
 import { projectKilo2ShellNotification } from './kilo2-shell-notification';
+import { buildToolDetail } from '@kilocode/app-shared/tool-detail';
 
 const session = {
   id: 'ses_shell',
@@ -67,9 +68,22 @@ test.each([1, 130])('nonzero shell exit %i is a command error, not a session fai
     tool: 'background_shell_result',
     state: {
       status: 'error',
-      error: 'Shell failed',
+      error: 'Shell failed\n\ndiagnostic output',
       metadata: { backgroundResult: { exit, outcome: 'failed', output: 'diagnostic output' } },
     },
+  });
+  const part = display?.parts[0];
+  if (part?.type !== 'tool') throw new Error('Expected a background shell tool part');
+  expect(buildToolDetail(part)).toMatchObject({
+    status: 'error',
+    error: 'Shell failed\n\ndiagnostic output',
+  });
+});
+
+test('a failed background shell with no output keeps a concise error', () => {
+  const display = readKilo2Messages(session, [notification(7, 'false', '')])[0];
+  expect(display?.parts[0]).toMatchObject({
+    state: { status: 'error', error: 'Shell failed' },
   });
 });
 

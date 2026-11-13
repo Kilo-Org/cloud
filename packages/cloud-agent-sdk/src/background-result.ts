@@ -83,7 +83,12 @@ export function projectBackgroundResult(
           ...(result.outcome === 'failed'
             ? {
                 status: 'error' as const,
-                error: { type: 'background', message: backgroundResultLabel(result) },
+                error: {
+                  type: 'background',
+                  message: [backgroundResultLabel(result), result.output]
+                    .filter(Boolean)
+                    .join('\n\n'),
+                },
               }
             : { status: 'completed' as const }),
         },

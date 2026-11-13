@@ -74,6 +74,16 @@ describe('editing the endpoint a saved value belongs to', () => {
     expect(edited.auth).toEqual({ type: 'bearer', token: 'secret' });
   });
 
+  it('keeps the value when the endpoint is respelled by case and default port', () => {
+    const server = saved('Beta', 'https://beta.example/mcp');
+
+    const edited = updateRemoteMcpServer(server.id, { url: 'https://Beta.Example:443/mcp/' });
+
+    expect(edited.url).toBe('https://beta.example/mcp');
+    expect(edited.auth).toEqual({ type: 'bearer', token: 'secret' });
+    expect(listRemoteMcpServers()[0]).toEqual(edited);
+  });
+
   it('drops the value when the endpoint changes', () => {
     const server = saved();
 

@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type RemoteMcpError } from '@kilocode/harness-sdk/plugins/remote-mcp';
+import { RemoteMcpError } from '@kilocode/harness-sdk/plugins/remote-mcp';
 
 import { credentialDeps } from './remote-mcp-credentials';
 import { type StoredRemoteMcpServer } from './remote-mcp-store';
@@ -59,13 +59,19 @@ describe('the credential one discovery carries', () => {
       server({ url: 'https://elsewhere.example/mcp', auth: { type: 'bearer', token: 'moved' } }),
     ];
 
-    await expect(Effect.runPromise(readToken())).rejects.toThrow();
+    const error = await Effect.runPromise(Effect.flip(readToken()));
+
+    expect(error).toBeInstanceOf(RemoteMcpError);
+    expect(error.kind).toBe('unauthorized');
   });
 
   it('refuses a bearer server whose stored value is gone', async () => {
     world.servers = [server({ auth: { type: 'bearer' } })];
 
-    await expect(Effect.runPromise(readToken())).rejects.toThrow();
+    const error = await Effect.runPromise(Effect.flip(readToken()));
+
+    expect(error).toBeInstanceOf(RemoteMcpError);
+    expect(error.kind).toBe('unauthorized');
   });
 
   it('hands an OAuth server its provider and no stored value', () => {

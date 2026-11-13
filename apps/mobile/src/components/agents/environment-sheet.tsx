@@ -230,7 +230,10 @@ function EnvironmentListRow({
         }}
         accessibilityRole="button"
         accessibilityLabel={t('agentChat.environment.buildDetails')}
-        className="flex-row items-center gap-1 py-3 ps-2 pe-4 active:opacity-70"
+        className={cn(
+          ROW_TARGET_CLASS,
+          'flex-row items-center gap-1 py-3 ps-2 pe-4 active:opacity-70'
+        )}
         hitSlop={{ top: 4, bottom: 4 }}
       >
         <Text className="text-xs font-medium text-primary">

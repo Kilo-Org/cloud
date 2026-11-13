@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TestRenderer } from '@/test/renderer';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { type EnvironmentSummaryRow } from '@/lib/cloud-environments/environment-selection';
 
 import { EnvironmentSheet } from './environment-sheet';
@@ -131,6 +132,21 @@ describe('EnvironmentSheet', () => {
     expect(onChoose).toHaveBeenCalledTimes(1);
     expect(onChoose).toHaveBeenCalledWith(OTHER_ENVIRONMENT.id);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives the build control the row frame a control-size audit reads', () => {
+    const { root } = renderSheet();
+
+    for (const node of root.findAll(
+      candidate =>
+        (candidate.type as string) === 'Pressable' &&
+        candidate.props.accessibilityLabel === i18n.t('agentChat.environment.buildDetails')
+    )) {
+      // The build control's own rect is what Android's control-size audit
+      // measures, and `hitSlop` does not move it. Its `py-3` frame plus one
+      // text line measured 35 dp on the emulator, under the 44 dp target.
+      expect(String(node.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
+    }
   });
 
   it('closes on Done in the build view without changing the pick', () => {

@@ -59,9 +59,14 @@ function statusMessage(renderer: TestRenderer.ReactTestRenderer): string | null 
   return String(first.props.children);
 }
 
-/** The line's slot — the one wrapper the hook renders in every state. */
+/** The line's slot — the wrapper the hook renders in every state. */
 function slot(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
-  const slots = renderer.root.findAllByType('View');
+  const slots = renderer.root.findAll(
+    node =>
+      (node.type as string) === 'View' &&
+      typeof node.props.className === 'string' &&
+      node.props.className.includes('justify-center px-6')
+  );
   if (slots.length !== 1) {
     throw new Error(`expected one reserved slot, found ${slots.length}`);
   }
@@ -78,12 +83,13 @@ describe('useSettingsSaveFeedback', () => {
     await i18n.changeLanguage('en');
   });
 
-  it('reserves an empty line before a save fails', () => {
+  it('reserves the line height before a save fails', () => {
     const renderer = mount();
 
-    // The slot is there from the first commit, at the height of one status
-    // line, so the body the hook sits above never moves when the line fills in.
-    expect(slot(renderer).props.className).toBe('min-h-5 justify-center px-6');
+    // The slot is there from the first commit, tall enough for the two lines
+    // this copy wraps to, so the body the hook sits above never moves when the
+    // line fills in.
+    expect(slot(renderer).props.className).toBe('min-h-10 justify-center px-6');
     // ...and it says nothing: an empty message renders no text and announces
     // nothing, rather than leaving an empty live region behind.
     expect(renderer.root.findAllByType('Text')).toHaveLength(0);
@@ -177,7 +183,7 @@ describe('useSettingsSaveFeedback', () => {
 
     // The sentence clears; the slot stays, so the body does not move back up.
     expect(renderer.root.findAllByType('Text')).toHaveLength(0);
-    expect(slot(renderer).props.className).toBe('min-h-5 justify-center px-6');
+    expect(slot(renderer).props.className).toBe('min-h-10 justify-center px-6');
 
     act(() => {
       renderer.unmount();

@@ -51,22 +51,28 @@ export function useSettingsSaveFeedback(): SettingsSaveFeedback {
     }
   }, []);
 
-  // `min-h-5` is one line of `text-sm` at the 14pt rem (1.25rem = 17.5dp), the
-  // reserved-status slot the app already uses for a line that comes and goes.
-  // The wrapper carries no bottom padding: 17.5dp plus the scroll view's own
-  // `pt-4` (14dp) is 31.5dp of empty band above the first block in the empty
-  // state, inside the 38dp the design gate allows (scroll padding + one 24dp
-  // section break). A `pb-2` on top would be 38.5dp and trip its leading-gap.
+  // The slot holds the tallest the line renders, so a refusal never moves the
+  // body: `text-sm` at the 14pt rem is a 1.25rem (17.5dp) line, and the copy
+  // these screens show wraps to two lines at the app's widths, so the reserve is
+  // `min-h-10` (2.5rem = 35dp). The text is clipped at that same height on a
+  // narrow screen, where a third line would otherwise grow the slot and shift
+  // the draft under the reader.
+  //
+  // This slot sits above the screen's scroller, not inside it, so the design
+  // gate's leading-gap rule — which measures the gap below a scroller's own top
+  // padding — does not see it; the reserve costs the body no allowance.
   const node = (
-    <View className="min-h-5 justify-center px-6">
+    <View className="min-h-10 justify-center px-6">
       {/* Nothing to report mounts nothing at all: the empty state is the slot's
           reserved height, with no live region and no announcement to clear. */}
       {failure === null ? null : (
-        <AccessibleStatus
-          message={securityConfigMutationMessage(failure)}
-          tone="error"
-          className="text-sm"
-        />
+        <View className="max-h-10 overflow-hidden">
+          <AccessibleStatus
+            message={securityConfigMutationMessage(failure)}
+            tone="error"
+            className="text-sm"
+          />
+        </View>
       )}
     </View>
   );

@@ -2963,13 +2963,16 @@ export const api_request_log_2 = pgTable(
   },
   table => [
     index('idx_api_request_log_2_created_at').on(table.created_at),
-    index('idx_api_request_log_2_generation_id').on(table.generation_id),
-    index('idx_api_request_log_2_session_id').on(table.session_id),
+    index('idx_api_request_log_2_generation_id')
+      .on(table.generation_id)
+      .where(isNotNull(table.generation_id)),
+    index('idx_api_request_log_2_session_id')
+      .on(table.session_id)
+      .where(isNotNull(table.session_id)),
     index('idx_api_request_log_2_kilo_user_id_created_at').on(table.kilo_user_id, table.created_at),
-    index('idx_api_request_log_2_organization_id_created_at').on(
-      table.organization_id,
-      table.created_at
-    ),
+    index('idx_api_request_log_2_organization_id_created_at')
+      .on(table.organization_id, table.created_at)
+      .where(isNotNull(table.organization_id)),
   ]
 );
 

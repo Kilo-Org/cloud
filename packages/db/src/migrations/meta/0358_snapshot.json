@@ -1,5 +1,5 @@
 {
-  "id": "3b3e5cdd-3d1a-4622-a4c6-e536cfbf6f88",
+  "id": "29c6a5f9-6fc5-4585-b3c8-be91c4a0a44a",
   "prevId": "fedf4df4-b771-47ea-bee4-4a1e65353537",
   "version": "7",
   "dialect": "postgresql",
@@ -2596,6 +2596,7 @@
             }
           ],
           "isUnique": false,
+          "where": "\"api_request_log_2\".\"generation_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -2611,6 +2612,7 @@
             }
           ],
           "isUnique": false,
+          "where": "\"api_request_log_2\".\"session_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -2653,6 +2655,7 @@
             }
           ],
           "isUnique": false,
+          "where": "\"api_request_log_2\".\"organization_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}

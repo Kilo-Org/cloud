@@ -177,9 +177,38 @@ test('leading-gap: a centred body whose block holds its text low is placement, n
   );
 });
 
+test('leading-gap: a small margin high in a filled body is a margin, not placement', () => {
+  // A centred body leaves its block near the middle of the box. A block that
+  // starts just past the allowance under the content top and runs toward the
+  // bottom of the panel is a margin the screen must drop, even though the air
+  // below it is far larger than the air above.
+  const [finding] = platformScreen({
+    content: [0, 174.48, 400, 739.81],
+    block: [0, 200, 400, 120],
+    text: [14, 200, 100, 20],
+  });
+  assert.equal(finding?.measured, 25.52);
+  assert.match(finding?.message ?? '', /top margin/);
+});
+
+test('leading-gap: a state centred above its box middle by the tab-bar reserve passes', () => {
+  // Measured on the Agents tab: the empty state is centred in the band above the
+  // fixed tab bar, which a platform dump folds into the box, so the block's
+  // middle sits 38.9 dp above the box's middle. That asymmetry is the reserve,
+  // not a margin.
+  assert.deepEqual(
+    platformScreen({
+      content: [0, 174.48, 411.43, 739.81],
+      block: [0, 375.24, 411.43, 260.57],
+      text: [112.38, 436.85, 187.05, 24.76],
+    }),
+    []
+  );
+});
+
 test('leading-gap: a block near the bottom of a filled body is still an error', () => {
-  // A margin can push the first block down without centring it: more air above
-  // the block than below it is a hole under the title, not placement.
+  // A margin can push the first block down without centring it: a block off the
+  // middle of its box is a hole under the title, not placement.
   const [finding] = platformScreen({
     block: [14, 600, 372, 120],
     text: [14, 600, 100, 20],
@@ -196,4 +225,197 @@ test('leading-gap: a taller box inside the first block is an error on a platform
   });
   assert.equal(finding?.element.text, 'Nothing running right now');
   assert.match(finding?.message ?? '', /hitSlop/);
+});
+
+/** The measured window of the emulator these frames came from, read from a dump. */
+const MEASURED_WINDOW = {
+  window: { width: 411.43, height: 914.29 },
+  source: 'uiautomator',
+} as const;
+
+/**
+ * The screen's window-scrolling wrapper, a scroller nested inside it, and the
+ * frames a platform dump reports for both. The wrapper is the `ScrollView` every
+ * screen mounts around the window; the nested one is the body that places its
+ * own content. Measured on the session route's not-found body: the wrapper and
+ * its content span the window, the body's scroller starts at 136.76, and its
+ * centred block starts at 426.29.
+ */
+function nestedScrollerScreen(options: { bodyBlock?: Rect; text: Rect }): ProbeNode[] {
+  return [
+    { parent: 0, tag: 'ScrollView', rect: [0, 0, 411.43, 914.29] },
+    { parent: 1, tag: 'ViewGroup', rect: [0, 0, 411.43, 914.29] },
+    { parent: 2, tag: 'ViewGroup', rect: [0, 0, 411.43, 914.29] },
+    { parent: 3, tag: 'ScrollView', rect: [0, 136.76, 411.43, 777.52] },
+    { parent: 4, tag: 'ViewGroup', rect: [0, 136.76, 411.43, 777.52] },
+    { parent: 5, tag: 'ViewGroup', rect: options.bodyBlock ?? [0, 426.29, 411.43, 174.48] },
+    {
+      parent: 6,
+      tag: 'Paragraph',
+      rect: options.text,
+      text: 'This item may have been removed',
+    },
+  ];
+}
+
+test('leading-gap: ink that a body inside this scroller places is not this scroller gap', () => {
+  // The reported not-found state: the window wrapper's first block is the whole
+  // app tree, and the first ink it can paint is the centred body's paragraph
+  // inside the body's own scroller. That scroller places the paragraph, so the
+  // wrapper must not report it — and the body's own frame centres it, so it is
+  // not a hole either.
+  assert.deepEqual(
+    checkScreen(
+      tree(nestedScrollerScreen({ text: [39.62, 528.38, 332.19, 17.52] }), MEASURED_WINDOW)
+    ).filter(finding => finding.rule === 'leading-gap'),
+    []
+  );
+});
+
+test('leading-gap: a body inside this scroller still reports its own pushed-down block', () => {
+  // The guard hands the ink to the nested scroller, so that scroller's own first
+  // block must still answer for a margin it did not choose: this block sits in the
+  // lower part of the panel and leaves a band of air under itself, which is a
+  // margin and not a centred body.
+  const nodes: ProbeNode[] = [...nestedScrollerScreen({ text: [14, 606, 100, 20] })];
+  nodes[5] = { parent: 5, tag: 'ViewGroup', rect: [14.1, 600, 383.2, 150] };
+  nodes[6] = { parent: 6, tag: 'Paragraph', rect: [14, 606, 100, 20], text: 'LIVE NOW' };
+  const [finding] = checkScreen(tree(nodes, MEASURED_WINDOW)).filter(
+    found => found.rule === 'leading-gap'
+  );
+  assert.equal(Math.round((finding?.measured ?? 0) * 10) / 10, 469.2);
+  assert.match(finding?.message ?? '', /top margin/);
+});
+
+test('leading-gap: a tab body inside the tab scroller is not the wrapper gap', () => {
+  // The reported Home tab shape at 472 dp: the wrapper's first ink is the live
+  // section's paragraph, placed by the tab scroller's centred body. The measured
+  // air above it belongs to that body, and the wrapper's own top padding has
+  // nothing to do with it.
+  const nodes: ProbeNode[] = [
+    { parent: 0, tag: 'ScrollView', rect: [0, 0, 411.43, 914.29] },
+    { parent: 1, tag: 'ViewGroup', rect: [0, 0, 411.43, 914.29] },
+    { parent: 2, tag: 'ViewGroup', rect: [0, 0, 411.43, 914.29] },
+    { parent: 3, tag: 'ScrollView', rect: [0, 111.24, 411.43, 724.95] },
+    { parent: 4, tag: 'ViewGroup', rect: [0, 111.24, 411.43, 724.95] },
+    { parent: 5, tag: 'ViewGroup', rect: [0, 340, 411.43, 263] },
+    { parent: 6, tag: 'ViewGroup', rect: [0, 340, 411.43, 200] },
+    { parent: 7, tag: 'Paragraph', rect: [112.38, 472, 187.05, 24.76], text: 'Nothing running' },
+  ];
+  assert.deepEqual(
+    checkScreen(tree(nodes, MEASURED_WINDOW)).filter(found => found.rule === 'leading-gap'),
+    []
+  );
+});
+
+test('leading-gap: a block the wrapper itself holds low is still an error', () => {
+  // Without a scroller between the wrapper and the text, the wrapper does own
+  // the placement: a block that holds the first line at its bottom is a touch
+  // frame grown past what it draws, and the guard must not hide it.
+  const nodes: ProbeNode[] = [
+    { parent: 0, tag: 'ScrollView', rect: [0, 0, 411.43, 914.29] },
+    { parent: 1, tag: 'ViewGroup', rect: [0, 0, 411.43, 914.29] },
+    { parent: 2, tag: 'ViewGroup', rect: [0, 0, 411.43, 600] },
+    { parent: 3, tag: 'Paragraph', rect: [14, 528.38, 332.19, 17.52], text: 'Session' },
+  ];
+  const [finding] = checkScreen(tree(nodes, MEASURED_WINDOW)).filter(
+    found => found.rule === 'leading-gap'
+  );
+  assert.equal(finding?.element.text, 'Session');
+  assert.match(finding?.message ?? '', /hitSlop/);
+});
+
+/**
+ * The transcript panel a session opens on: a scroller from 136.76 to 824.38, the
+ * content container that fills it, and the rendered rows. Measured on the
+ * development transcript fixture, whose rows render from the last row upward:
+ * the first row block starts at 510.86 and ends at 816.38, inside the content's
+ * own 8 dp bottom padding, which a platform dump folds into the content box.
+ * `contentHeight` is the compact cell's shorter panel, where the same rows start
+ * 97.5 dp under the content top.
+ */
+function transcriptScreen(options: {
+  rows: Rect;
+  text: Rect;
+  panelHeight?: number;
+  contentHeight?: number;
+}): ProbeNode[] {
+  const panel = options.panelHeight ?? 687.62;
+  return [
+    { parent: 0, tag: 'ScrollView', rect: [0, 136.76, 411.43, panel] },
+    { parent: 1, tag: 'ViewGroup', rect: [0, 136.76, 411.43, options.contentHeight ?? panel] },
+    { parent: 2, tag: 'ViewGroup', rect: options.rows },
+    { parent: 3, tag: 'Paragraph', rect: options.text, text: 'Nov 14, 2023, 10:12 PM' },
+  ];
+}
+
+test('leading-gap: a short transcript packed against the bottom of its panel passes', () => {
+  // The reported shape: a session with three rows keeps them at the bottom of the
+  // transcript panel, so the first row starts far below the content's top. That
+  // is the transcript's placement, not a top margin.
+  assert.deepEqual(
+    checkScreen(
+      tree(
+        transcriptScreen({
+          rows: [0, 510.86, 411.43, 305.52],
+          text: [124.19, 517.71, 163.05, 14.86],
+        }),
+        MEASURED_WINDOW
+      )
+    ).filter(finding => finding.rule === 'leading-gap'),
+    []
+  );
+});
+
+test('leading-gap: the same rows packed at the bottom of the compact panel pass', () => {
+  // The permission-request state's frames: the compact cell's shorter panel holds
+  // the same rows block, so the first row starts 97.5 dp under the content top and
+  // the block ends on the content's bottom edge. The panel is the placement.
+  assert.deepEqual(
+    checkScreen(
+      tree(
+        transcriptScreen({
+          panelHeight: 411.43,
+          rows: [0, 234.26, 411.43, 305.52],
+          text: [124.19, 241.11, 163.05, 14.86],
+        }),
+        MEASURED_WINDOW
+      )
+    ).filter(finding => finding.rule === 'leading-gap'),
+    []
+  );
+});
+
+test('leading-gap: a body that ends after its own card and starts under a margin is an error', () => {
+  // A content-sized body is not a packed transcript: this box holds one card and
+  // ends above the scroller's bottom, so the card's distance from the content top
+  // is a margin the screen must drop, however much air the box leaves below it.
+  const [finding] = checkScreen(
+    tree(
+      transcriptScreen({
+        contentHeight: 400,
+        rows: [0, 216.38, 411.43, 360],
+        text: [124.19, 223.23, 163.05, 14.86],
+      }),
+      MEASURED_WINDOW
+    )
+  ).filter(found => found.rule === 'leading-gap');
+  assert.equal(Math.round((finding?.measured ?? 0) * 10) / 10, 86.5);
+  assert.match(finding?.message ?? '', /top margin/);
+});
+
+test('leading-gap: rows that keep air below them are still a top margin', () => {
+  // The same panel with the rows lifted off its bottom edge: nothing packs them
+  // there, so the gap above the first row is a margin the screen must drop.
+  const [finding] = checkScreen(
+    tree(
+      transcriptScreen({
+        rows: [0, 430, 411.43, 305.52],
+        text: [124.19, 436.85, 163.05, 14.86],
+      }),
+      MEASURED_WINDOW
+    )
+  ).filter(found => found.rule === 'leading-gap');
+  assert.equal(Math.round((finding?.measured ?? 0) * 10) / 10, 300.1);
+  assert.match(finding?.message ?? '', /top margin/);
 });

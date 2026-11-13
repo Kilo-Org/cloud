@@ -6,6 +6,7 @@ import {
   type LayoutNode,
   type LayoutTree,
   type ProbeEnv,
+  type Rect,
 } from '../tree';
 import { LEADING_GAP_MAX_DP, TOLERANCE_DP } from './thresholds';
 
@@ -50,6 +51,47 @@ function oneSidedBox(ink: LayoutNode, block: LayoutNode): LayoutNode | undefined
 }
 
 /**
+ * Whether another vertical scroller inside this scroll places the ink.
+ *
+ * The screen's own scroller is not the only one a dump reports: the app mounts
+ * one ScrollView around the whole window, and a data state, a transcript or a
+ * long form nests its own scroller inside it. The outer scroller then shows, as
+ * its first block, the wrapper that holds the inner one, and the first ink it
+ * can paint belongs to the inner scroller's content: the outer scroll's top
+ * padding has nothing to do with how far down that ink sits, and a gap it reads
+ * is the inner body's placement. The inner scroller is measured on its own, so
+ * this rule leaves the ink to it.
+ */
+function placedByNestedScroller(ink: LayoutNode, scroll: LayoutNode): boolean {
+  for (let box = ink.parent; box && box !== scroll; box = box.parent) {
+    if (box.scroll.y) return true;
+  }
+  return false;
+}
+
+/**
+ * How far off the middle of its box a centred block may sit, as a fraction of the
+ * box height. `CenteredState` centres in the band the surface leaves, and that
+ * band is the scroller minus the surface's bottom reserve: the fixed tab bar and
+ * the FAB's strip on a phone, which a platform dump folds into the box. The
+ * reserve moves the block's middle above the box's own middle by half the
+ * reserve, and one eighth of the box height covers a phone's bar and strip while
+ * still rejecting a block that a margin pushed toward one edge.
+ */
+const CENTRED_OFFSET_FRACTION = 1 / 8;
+
+/**
+ * Whether the block sits in the middle of the box, which is what a centred body
+ * leaves behind. A block that keeps more air on one side than the other is
+ * displaced: a margin above it, or a taller box that holds it at its bottom.
+ */
+function centredInBox(box: Rect, rect: Rect): boolean {
+  const boxMiddle = box[1] + box[3] / 2;
+  const middle = rect[1] + rect[3] / 2;
+  return Math.abs(middle - boxMiddle) <= box[3] * CENTRED_OFFSET_FRACTION;
+}
+
+/**
  * Whether the content places its first block between two empty bands of its own
  * box, the shape a screen that centres a body leaves behind. `CenteredState`
  * centres through a measured `paddingTop` and `paddingBottom` on its scroll
@@ -58,11 +100,10 @@ function oneSidedBox(ink: LayoutNode, block: LayoutNode): LayoutNode | undefined
  * where it sits.
  *
  * The check runs only on a platform dump, where the styles are missing. A body
- * that fills its scroller and keeps more than the allowance of air above the
- * block and at least as much below it centres that block; it does not displace
- * it. A block near the bottom keeps the finding, and so does a content that
- * runs past the viewport: that is still a list whose first block sits where the
- * screen put it.
+ * that fills its scroller and keeps the block in the middle of its box centres
+ * that block; it does not displace it. A block near an edge keeps the finding,
+ * and so does a content that runs past the viewport: that is still a list whose
+ * first block sits where the screen put it.
  */
 function centeredBody(
   scroll: LayoutNode,
@@ -78,7 +119,36 @@ function centeredBody(
   if (bottom(box) > bottom(layoutRect(scroll)) + TOLERANCE_DP) return false;
   const above = rect[1] - box[1];
   const below = bottom(box) - bottom(rect);
-  return above > LEADING_GAP_MAX_DP && below > LEADING_GAP_MAX_DP && below >= above - TOLERANCE_DP;
+  return above > LEADING_GAP_MAX_DP && below > LEADING_GAP_MAX_DP && centredInBox(box, rect);
+}
+
+/**
+ * Whether the content packs its first block against the bottom of a body that
+ * fills its scroller. A session transcript renders from its last row upward, so
+ * a short transcript sits at the bottom of the panel with empty air above it
+ * that no block draws; the platform dump reports no `justifyContent`, and the
+ * block reads as pushed down by a margin it does not have.
+ *
+ * Three frames have to agree for that shape, and each excludes a body whose
+ * block a margin really displaced: the content box reaches the scroller's bottom,
+ * so the body fills the viewport instead of ending after its own card; the first
+ * block ends on the content box's bottom edge, so nothing is packed below it;
+ * and the block starts more than the allowance under the content top, so there is
+ * a gap to explain at all.
+ */
+function bottomAnchoredBody(
+  scroll: LayoutNode,
+  content: LayoutNode,
+  block: LayoutNode,
+  isRTL: boolean,
+  env: ProbeEnv
+): boolean {
+  if (env.source !== 'uiautomator' && env.source !== 'agent-device') return false;
+  const box = contentBox(content, isRTL, layoutRect(content));
+  const rect = layoutRect(block);
+  if (Math.abs(bottom(box) - bottom(layoutRect(scroll))) > TOLERANCE_DP) return false;
+  if (bottom(rect) < bottom(box) - LEADING_GAP_MAX_DP) return false;
+  return rect[1] - box[1] > LEADING_GAP_MAX_DP;
 }
 
 /**
@@ -91,8 +161,10 @@ function centeredBody(
  *
  * A screen may also place its whole body in the middle of a filled surface on
  * purpose (`CenteredState` does, with measured padding a platform dump cannot
- * report). That is the content's choice, not a hole under the title, so
- * `centeredBody` recognises it.
+ * report), or pack it against the bottom of one (`bottomAnchoredBody`). That is
+ * the content's choice, not a hole under the title, so those two helpers
+ * recognise it. Ink that another scroller inside this one places belongs to
+ * that scroller's own measurement.
  */
 export function checkLeadingGap(tree: LayoutTree): Finding[] {
   const findings: Finding[] = [];
@@ -106,11 +178,16 @@ export function checkLeadingGap(tree: LayoutTree): Finding[] {
     if (!block) continue;
     const ink = topInk(block);
     if (!ink) continue;
+    if (placedByNestedScroller(ink, scroll)) continue;
     const start = contentBox(content, tree.env.isRTL, layoutRect(content))[1];
     const margin = layoutRect(block)[1] - start;
     const holder = margin > LEADING_GAP_MAX_DP ? undefined : oneSidedBox(ink, block);
     if (margin <= LEADING_GAP_MAX_DP && !holder) continue;
-    if (!holder && centeredBody(scroll, content, block, tree.env.isRTL, tree.env)) continue;
+    if (!holder) {
+      const isRTL = tree.env.isRTL;
+      if (centeredBody(scroll, content, block, isRTL, tree.env)) continue;
+      if (bottomAnchoredBody(scroll, content, block, isRTL, tree.env)) continue;
+    }
     const measured = layoutRect(ink)[1] - start;
     const cause = holder
       ? `${holder.path} holds it at the bottom of a taller box; reach a control's touch size with hitSlop instead of a taller box.`

@@ -176,6 +176,7 @@ describe('the remote MCP server form', () => {
         url: 'https://remote.example/mcp',
         auth: { type: 'bearer', token: 'secret' },
         enabled: true,
+        tokenEntered: true,
       },
     ]);
   });
@@ -227,6 +228,7 @@ describe('the remote MCP server form', () => {
         url: 'https://remote.example/mcp',
         auth: { type: 'none' },
         enabled: false,
+        tokenEntered: false,
       },
     ]);
   });
@@ -287,18 +289,36 @@ describe('the remote MCP server form', () => {
     expect(saveButton().disabled).toBe(true);
     expect(fields()[2]?.error).toBe('common.required');
 
-    // Returning to the saved endpoint puts its value back.
+    // Returning to the saved endpoint puts its value back, and a save that
+    // enters no value reports that none was entered.
     await type(1, 'https://remote.example/mcp/');
     expect(mountedTokenValues.at(-1)).toBe('secret');
     expect(saveButton().disabled).toBe(false);
+    await pressSave();
+    expect(saved[0]?.tokenEntered).toBe(false);
 
     await type(1, 'https://elsewhere.example/mcp');
     await type(2, 'entered');
-
     await pressSave();
 
-    expect(saved[0]?.url).toBe('https://elsewhere.example/mcp');
-    expect(saved[0]?.auth).toEqual({ type: 'bearer', token: 'entered' });
+    expect(saved[1]?.url).toBe('https://elsewhere.example/mcp');
+    expect(saved[1]?.auth).toEqual({ type: 'bearer', token: 'entered' });
+    expect(saved[1]?.tokenEntered).toBe(true);
+  });
+
+  it('keeps a value entered for the endpoint the URL now names', async () => {
+    await mount({ server: savedBearer, onSave });
+    await type(1, 'https://elsewhere.example/mcp');
+    expect(saveButton().disabled).toBe(true);
+
+    // The value typed for the endpoint the URL now names belongs to that
+    // endpoint, so it is reported as entered.
+    await type(2, 'secret');
+    expect(saveButton().disabled).toBe(false);
+
+    await pressSave();
+    expect(saved[0]?.auth).toEqual({ type: 'bearer', token: 'secret' });
+    expect(saved[0]?.tokenEntered).toBe(true);
   });
 
   it('keeps a token typed while adding a server', async () => {
@@ -318,17 +338,9 @@ describe('the remote MCP server form', () => {
   it('counts a bearer token edit and clears it when the token is restored', async () => {
     const dirty: boolean[] = [];
     await mount({
-      server: {
-        id: 'remote',
-        name: 'Remote',
-        url: 'https://remote.example/mcp',
-        auth: { type: 'bearer', token: 'secret' },
-        enabled: true,
-      },
+      server: savedBearer,
       onSave,
-      onDirtyChange: value => {
-        dirty.push(value);
-      },
+      onDirtyChange: value => void dirty.push(value),
     });
 
     await type(2, 'another');
@@ -341,17 +353,9 @@ describe('the remote MCP server form', () => {
   it('does not report whitespace the saved draft trims away', async () => {
     const dirty: boolean[] = [];
     await mount({
-      server: {
-        id: 'remote',
-        name: 'Remote',
-        url: 'https://remote.example/mcp',
-        auth: { type: 'bearer', token: 'secret' },
-        enabled: true,
-      },
+      server: savedBearer,
       onSave,
-      onDirtyChange: value => {
-        dirty.push(value);
-      },
+      onDirtyChange: value => void dirty.push(value),
     });
 
     await type(0, 'Remote ');

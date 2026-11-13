@@ -204,7 +204,9 @@ export function RemoteMcpServerForm({
     const found = mcpServerFormError(draft);
     setErrors(found);
     if (found === null) {
-      onSave(draft);
+      // The token typed in this edit belongs to the endpoint the draft names,
+      // so it is reported as entered.
+      onSave({ ...draft, tokenEntered: tokenTyped.current });
     }
   }, [fieldsWith, onSave, server]);
 

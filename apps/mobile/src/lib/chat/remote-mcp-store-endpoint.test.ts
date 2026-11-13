@@ -97,6 +97,22 @@ describe('editing the endpoint a saved value belongs to', () => {
     expect(moved.auth).toEqual({ type: 'bearer' });
   });
 
+  it('keeps the value when the edit enters it for the new endpoint', () => {
+    const server = saved();
+
+    const moved = updateRemoteMcpServer(server.id, {
+      name: 'Alpha',
+      url: 'https://elsewhere.example/mcp',
+      auth: { type: 'bearer', token: 'secret' },
+      enabled: true,
+      tokenEntered: true,
+    });
+
+    expect(moved.auth).toEqual({ type: 'bearer', token: 'secret' });
+    expect(listRemoteMcpServers()[0]).toEqual(moved);
+    expect(listRemoteMcpServers()[0]).not.toHaveProperty('tokenEntered');
+  });
+
   it('keeps the value an edit enters for the new endpoint', () => {
     const server = saved();
 

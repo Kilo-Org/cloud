@@ -39,14 +39,22 @@ export type StoredRemoteMcpServer = {
   enabled: boolean;
 };
 
+/**
+ * `tokenEntered` says the bearer value in this draft or patch was entered in
+ * this edit, rather than read back from the saved server. A bearer value is
+ * kept for the endpoint the edit names, so the flag states that the value
+ * belongs to that endpoint.
+ */
+type EnteredBearerToken = { readonly tokenEntered?: boolean };
+
 /** What a caller hands over to add or edit a server. `id` is ignored on add when taken. */
 export type RemoteMcpServerDraft = Pick<
   StoredRemoteMcpServer,
   'name' | 'url' | 'auth' | 'enabled'
-> & { id?: string };
+> & { id?: string } & EnteredBearerToken;
 
 /** The fields an edit may change. The id is the handle, not a field. */
-export type RemoteMcpServerPatch = Partial<Omit<StoredRemoteMcpServer, 'id'>>;
+export type RemoteMcpServerPatch = Partial<Omit<StoredRemoteMcpServer, 'id'>> & EnteredBearerToken;
 
 /** A server id is part of a tool name a model must be able to write. */
 const CALLABLE_ID = /^[A-Za-z0-9_-]+$/u;
@@ -217,24 +225,32 @@ export function addRemoteMcpServer(draft: RemoteMcpServerDraft): StoredRemoteMcp
  * the saved auth echoed back — is dropped and the server stays `bearer` with no
  * value, so the new endpoint's value must be entered for it. This is the rule
  * the OAuth state already follows. A patch that names a different value, or
- * another method, is the patch's to set.
+ * another method, is the patch's to set, and so is the value itself when the
+ * caller states it was entered in this edit, because then it belongs to the
+ * endpoint the edit names. No auth at all keeps the method with no value.
  */
 function authAfterEdit(
   existing: StoredRemoteMcpServer,
   url: string,
-  patch: RemoteMcpAuth | undefined
+  patch: RemoteMcpServerPatch
 ): RemoteMcpAuth {
+  const auth = patch.auth;
   if (sameRemoteMcpEndpoint(existing.url, url)) {
-    return patch ?? existing.auth;
+    return auth ?? existing.auth;
   }
   const savedToken = existing.auth.type === 'bearer' ? existing.auth.token : undefined;
-  if (patch === undefined) {
+  if (auth === undefined) {
     return existing.auth.type === 'bearer' ? { type: 'bearer' } : existing.auth;
   }
-  if (patch.type === 'bearer' && savedToken !== undefined && patch.token === savedToken) {
+  if (
+    auth.type === 'bearer' &&
+    savedToken !== undefined &&
+    auth.token === savedToken &&
+    patch.tokenEntered !== true
+  ) {
     return { type: 'bearer' };
   }
-  return patch;
+  return auth;
 }
 
 /**
@@ -242,7 +258,8 @@ function authAfterEdit(
  * A rename does not change the id, so the tool names the model already read
  * stay the same. A URL another server already uses is refused. A new endpoint,
  * or a server that no longer signs in with OAuth, drops its OAuth tokens, and
- * a new endpoint also drops the saved bearer value.
+ * a new endpoint also drops the saved bearer value, keeping it only when the
+ * patch states the value as entered for that endpoint.
  */
 export function updateRemoteMcpServer(
   id: string,
@@ -261,7 +278,7 @@ export function updateRemoteMcpServer(
     id,
     name: patch.name ?? existing.name,
     url,
-    auth: authAfterEdit(existing, url, patch.auth),
+    auth: authAfterEdit(existing, url, patch),
     enabled: patch.enabled ?? existing.enabled,
   };
   store.set(current.map(server => (server.id === id ? updated : server)));

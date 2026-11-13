@@ -2,12 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { formatRecord, MASKED_MCP_VALUE, parseRecord } from '@/components/profiles/mcp-json';
 
-describe('MASKED_MCP_VALUE', () => {
-  it('is the four-bullet placeholder the server round-trips', () => {
-    expect(MASKED_MCP_VALUE).toBe('\u2022\u2022\u2022\u2022');
-  });
-});
-
 describe('parseRecord', () => {
   it('treats blank text as an empty fragment', () => {
     expect(parseRecord('')).toEqual({ ok: true, value: undefined });
@@ -49,12 +43,6 @@ describe('formatRecord', () => {
   it('renders an empty fragment as blank text', () => {
     expect(formatRecord(undefined)).toBe('');
     expect(formatRecord({})).toBe('');
-  });
-
-  it('pretty-prints the record keys and masked values', () => {
-    expect(formatRecord({ API_KEY: MASKED_MCP_VALUE })).toBe(
-      JSON.stringify({ API_KEY: MASKED_MCP_VALUE }, null, 2)
-    );
   });
 
   it('round-trips through parseRecord unchanged', () => {

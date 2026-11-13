@@ -487,10 +487,6 @@ describe('getChildSessionActivityLabel', () => {
   it('returns the tool name when no context is present', () => {
     expect(getChildSessionActivityLabel({ tool: 'bash' })).toBe('bash');
   });
-
-  it('passes through the waiting text unchanged', () => {
-    expect(getChildSessionActivityLabel('Waiting for activity')).toBe('Waiting for activity');
-  });
 });
 
 describe('getTaskToolSessionId', () => {

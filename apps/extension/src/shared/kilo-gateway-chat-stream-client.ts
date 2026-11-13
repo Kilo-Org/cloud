@@ -53,16 +53,59 @@ export class KiloGatewayHttpError extends Error {
 const DEFAULT_STALL_TIMEOUT_MS = 45_000;
 const DEFAULT_COMPLETION_TIMEOUT_MS = 90_000;
 
-// A failed response still carries the reason (a rejected key, exhausted credits). Parse the whole body so a large payload keeps its message, but skip anything past this ceiling: the reason is small, and parsing a gateway-sized page would block the panel.
-const MAX_ERROR_BODY_CHARS = 64 * 1024;
+// A failed response still carries the reason (a rejected key, exhausted credits). The body is read through its stream so the cap stops the work at the ceiling instead of after a gateway-sized page has been buffered; a body past it yields no detail.
+const MAX_ERROR_BODY_BYTES = 64 * 1024;
 
 // oxlint-disable-next-line anti-slop/no-unknown-returns -- a failed response body is JSON of unknown shape; the caller walks it with its own schema.
 const readErrorBody = async (response: Response): Promise<unknown> => {
+  if (response.body === null) {
+    return undefined;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let text = '';
+  let received = 0;
+  let isUnusable = false;
+
   try {
-    const text = await response.text();
-    if (text.trim() === '' || text.length > MAX_ERROR_BODY_CHARS) {
-      return undefined;
+    for (;;) {
+      // eslint-disable-next-line no-await-in-loop -- stream chunks arrive one at a time; the cap has to stop the read after a single chunk.
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
+      }
+
+      received += value.byteLength;
+
+      if (received > MAX_ERROR_BODY_BYTES) {
+        isUnusable = true;
+        break;
+      }
+
+      text += decoder.decode(value, { stream: true });
     }
+  } catch {
+    isUnusable = true;
+  }
+
+  if (isUnusable) {
+    try {
+      await reader.cancel();
+    } catch {
+      // The stream already ended; either way the body is not a usable JSON payload.
+    }
+    return undefined;
+  }
+
+  text += decoder.decode();
+
+  if (text.trim() === '') {
+    return undefined;
+  }
+
+  try {
     const parsed: unknown = JSON.parse(text);
     return parsed;
   } catch {

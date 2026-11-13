@@ -19,7 +19,6 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -549,8 +548,15 @@ export function ChatComposer({
   // The mount reports the floor as well. A composer remounted under another
   // key starts on that floor and would otherwise publish nothing, leaving the
   // reservation of the instance it replaced in the transcript.
+  //
+  // This is a passive effect, not a layout one: the host state lives in the
+  // screen that mounts this composer, so publishing from a layout effect
+  // updated a component whose own mount commit was still running, and React
+  // reported it as a state update on a component that has not mounted yet. The
+  // mount carries no growth to anchor, one commit later is early enough, and
+  // the growth path beside the height keeps the same-frame anchor.
   const inputBottomInset = Math.max(0, measureHeight - inputMinHeight);
-  useLayoutEffect(() => {
+  useEffect(() => {
     const previous = reportedInputBottomInsetRef.current;
     reportedInputBottomInsetRef.current = inputBottomInset;
     if (previous !== inputBottomInset) {

@@ -14,7 +14,6 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   apiRequestLogBlobKey,
-  deleteApiRequestLogBlob,
   uploadApiRequestLogBlob,
   type EnkryptRequestLog,
 } from '@kilocode/web-shared/lib/r2/api-request-log';
@@ -156,8 +155,7 @@ async function createRequestLogCapture(
       // response; Postgres text rejects NUL bytes. Stripping them, as microdollar_usage_metadata
       // does, keeps the session ID equal to the one stored there.
       stripNulBytesInPlace(row, []);
-      const key = apiRequestLogBlobKey(row);
-      const uploadError = await uploadApiRequestLogBlob(key, {
+      const uploadError = await uploadApiRequestLogBlob(apiRequestLogBlobKey(row), {
         request: redactApiRequestLogRequest(request),
         response: responseText ?? null,
         error: detectedError,
@@ -169,18 +167,7 @@ async function createRequestLogCapture(
         );
         return;
       }
-      try {
-        await db.insert(api_request_log_2).values(row);
-      } catch (insertError) {
-        // Without its row the blob can no longer be found, and retention only deletes rows.
-        const deleteError = await deleteApiRequestLogBlob(key);
-        if (deleteError !== null) {
-          logExceptInTest(
-            `[rewriteModelResponse] failed to delete orphaned api_request_log_2 blob ${key} from R2: ${deleteError.substring(0, 4000)}`
-          );
-        }
-        throw insertError;
-      }
+      await db.insert(api_request_log_2).values(row);
       logExceptInTest('[rewriteModelResponse] Inserted into api_request_log_2', usage_id);
     } catch (e) {
       const cause = e instanceof Error ? e.cause : undefined;

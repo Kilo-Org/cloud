@@ -1,10 +1,4 @@
-import {
-  DeleteObjectCommand,
-  GetObjectCommand,
-  NoSuchKey,
-  PutObjectCommand,
-  type S3Client,
-} from '@aws-sdk/client-s3';
+import { GetObjectCommand, NoSuchKey, PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
 import { z } from 'zod';
 import type { ApiRequestLog2 } from '@kilocode/db/schema';
 import {
@@ -104,17 +98,6 @@ export async function uploadApiRequestLogBlob(
     return null;
   } catch (uploadError) {
     return String(uploadError);
-  }
-}
-
-/** Returns the delete error, or null when the blob was deleted. */
-export async function deleteApiRequestLogBlob(key: string): Promise<string | null> {
-  try {
-    const { client, bucket } = getStorage();
-    await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
-    return null;
-  } catch (deleteError) {
-    return String(deleteError);
   }
 }
 

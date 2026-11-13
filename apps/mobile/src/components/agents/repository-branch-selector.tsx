@@ -15,7 +15,7 @@ import {
   setSelectedBranchOverride,
   subscribeNewSessionBranchState,
 } from '@/components/agents/new-session-repository-state';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRepositoryBranches } from '@/lib/use-new-session-repos';
 import { branchPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
@@ -29,20 +29,6 @@ type RepositoryBranchSelectorProps = {
   disabled: boolean;
 };
 
-/** The fixed height the skeleton and the branch trigger share. */
-const ROW_HEIGHT = 'h-12';
-
-/**
- * Note rows carry full sentences, so they start at the trigger height and
- * grow with their text instead of clipping it — the same guidance must fit
- * in every language, not just English.
- *
- * The failed state uses the same floor: it holds the 48 dp retry action, and a
- * fixed `h-12` box would clip that action by the row's own 1 dp border on each
- * side. A minimum lets the row take the action's height instead.
- */
-const ROW_MIN_HEIGHT = 'min-h-12';
-
 /**
  * Branch row under the repository selector. The provider's default branch is
  * preselected and marked; picking another one records a checkout override for
@@ -55,11 +41,11 @@ const ROW_MIN_HEIGHT = 'min-h-12';
  * the picker slot and dismisses the keyboard, so the sheet never floats over
  * the form translucently or under the keyboard.
  *
- * The loading skeleton and the branch trigger render at one fixed height, so
- * the section below does not jump as branches arrive. The failed state is a
- * minimum instead: it holds the 48 dp retry action, which a fixed box would
- * clip by the row's own border. A note row is at least that tall too and grows
- * to show its whole message.
+ * The loading skeleton, the branch trigger and every note render on the shared
+ * 48 px row floor, so the section below does not jump as branches arrive. The
+ * failed row takes the same floor as a minimum: its 48 dp retry action fits
+ * inside the row instead of being clipped. A note row grows past the floor to
+ * show its whole message.
  */
 export function RepositoryBranchSelector({
   repository,
@@ -119,7 +105,7 @@ export function RepositoryBranchSelector({
       case 'loading': {
         return (
           <View accessible accessibilityLabel={t('agentChat.newSession.branchLoading')}>
-            <Skeleton className={cn(ROW_HEIGHT, 'w-full')} />
+            <Skeleton className={cn(ROW_TARGET_CLASS, 'w-full')} />
           </View>
         );
       }
@@ -132,7 +118,7 @@ export function RepositoryBranchSelector({
         return (
           <View
             className={cn(
-              ROW_MIN_HEIGHT,
+              ROW_TARGET_CLASS,
               'flex-row items-center justify-between gap-2 rounded-lg border border-border bg-card px-3'
             )}
           >
@@ -179,10 +165,13 @@ export function RepositoryBranchSelector({
   }
 
   function renderNote(message: string) {
+    // Note rows carry full sentences, so they take the shared row floor and grow
+    // with their text instead of clipping it — the same guidance must fit in
+    // every language, not just English.
     return (
       <View
         className={cn(
-          ROW_MIN_HEIGHT,
+          ROW_TARGET_CLASS,
           'justify-center rounded-lg border border-border bg-card px-3 py-2'
         )}
       >
@@ -206,7 +195,7 @@ export function RepositoryBranchSelector({
         accessibilityLabel={t('agentChat.newSession.branchAccessibility', { label })}
         accessibilityState={{ disabled }}
         className={cn(
-          ROW_HEIGHT,
+          ROW_TARGET_CLASS,
           'flex-row items-center justify-between gap-2 rounded-lg border border-border bg-secondary px-3',
           disabled && 'opacity-50'
         )}

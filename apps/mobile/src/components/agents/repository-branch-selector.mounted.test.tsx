@@ -12,7 +12,7 @@ import {
   setSelectedBranchOverride,
 } from './new-session-repository-state';
 import { type RepositoryBranchesState, useRepositoryBranches } from '@/lib/use-new-session-repos';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { branchPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 
 const router = vi.hoisted(() => ({ push: vi.fn() }));
@@ -216,7 +216,7 @@ describe('RepositoryBranchSelector', () => {
     const loading = mountSelector(githubRow, branchesState({ isLoading: true }));
     const skeleton = loading.root.findAllByType('Skeleton' as never)[0];
 
-    expect(skeleton?.props.className).toContain('h-12');
+    expect(classesOf(skeleton)).toContain(ROW_TARGET_CLASS);
     expect(
       loading.root.findAll(
         node => node.props.accessibilityLabel === i18n.t('agentChat.newSession.branchLoading')
@@ -224,16 +224,16 @@ describe('RepositoryBranchSelector', () => {
     ).not.toHaveLength(0);
 
     const loaded = mountSelector(githubRow);
-    expect(pressableWithLabel(loaded, branchLabel('main'))?.props.className).toContain('h-12');
+    expect(classesOf(pressableWithLabel(loaded, branchLabel('main')))).toContain(ROW_TARGET_CLASS);
   });
 
   // Spot check e4-branch-03/04: the screenshots showed a blue "refreshing"
   // overlay floating over the prompt card and over the screen header while
   // branches loaded. That overlay belonged to the old inline picker; the row
-  // is now an in-flow fixed-height row and the picker is its own opaque
-  // formSheet route. These two tests pin the replacement: the row never
+  // is now an in-flow row on the shared 48 px floor and the picker is its own
+  // opaque formSheet route. These two tests pin the replacement: the row never
   // carries an absolute-positioned node in any state (nothing can cover the
-  // card above or the header), and the three fixed states share one height.
+  // card above or the header), and the three fixed states share one floor.
   it('renders every branch-row state in-flow — no node overlays the form', () => {
     const states: RepositoryBranchesState[] = [
       branchesState({ isLoading: true }),
@@ -255,19 +255,20 @@ describe('RepositoryBranchSelector', () => {
     }
   });
 
-  it('keeps the skeleton and trigger at the one fixed height', () => {
+  it('keeps the skeleton and trigger on the shared row target', () => {
     for (const state of [branchesState({ isLoading: true }), branchesState()]) {
       const renderer = mountSelector(githubRow, state);
-      expect(rowsWithClass(renderer, 'h-12')).toHaveLength(1);
-      expect(rowsWithClass(renderer, 'min-h-12')).toHaveLength(0);
+      expect(rowsWithClass(renderer, ROW_TARGET_CLASS)).toHaveLength(1);
+      expect(rowsWithClass(renderer, 'h-12')).toHaveLength(0);
     }
   });
 
   it('gives the failed row a minimum height so its retry action fits', () => {
-    // A fixed `h-12` row clipped the 48 dp retry action by the row's own 1 dp
-    // border on each side; the row takes the action's height instead.
+    // At this app's 14 pt rem a fixed `h-12` row rendered 42 pt — 6 pt shorter
+    // than the 48 dp retry action before the row's own 1 dp borders — so the
+    // row clipped the action. The shared floor lets the row take its height.
     const renderer = mountSelector(githubRow, branchesState({ isRetryableError: true }));
-    const [failedRow] = rowsWithClass(renderer, 'min-h-12');
+    const [failedRow] = rowsWithClass(renderer, ROW_TARGET_CLASS);
     expect(failedRow).toBeDefined();
     expect(classesOf(failedRow)).not.toContain('h-12');
     expect(failedRow?.findAllByType('Button' as never)).toHaveLength(1);
@@ -336,7 +337,7 @@ describe('RepositoryBranchSelector', () => {
       throw new Error('the permanent-failure note rendered without a row');
     }
     const classes = (row.props.className as string).split(' ');
-    expect(classes).toContain('min-h-12');
+    expect(classes).toContain(ROW_TARGET_CLASS);
     expect(classes).not.toContain('h-12');
   });
 

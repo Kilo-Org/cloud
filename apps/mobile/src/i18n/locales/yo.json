@@ -22,6 +22,7 @@
     "expired": "Àkókò ti kọjá"
   },
   "common": {
+    "manageOnWeb": "Ṣàkóso lórí wẹ́ẹ̀bù",
     "creditHistory": "Ìtàn kírẹ́dítì",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -339,7 +340,6 @@
     "providerKeys": {
       "title": "Àwọn kọ́kọ́rọ́ olùpèsè",
       "rowSubtitle": "Lo ìsanwó olùpèsè tìrẹ",
-      "manageOnWeb": "Ṣàkóso lórí wẹ́ẹ̀bù",
       "manageOnWebReason": "Àwọn olùpèsè wọ̀nyí nílò àwọn ìwé-ẹ̀rí ìwọlé tí a ṣètò.",
       "description": "Àwọn ìbéèrè tí ó gba àwọn kọ́kọ́rọ́ wọ̀nyí kọjá ni a ó gba owó wọn lórí àkọọ́lẹ̀ olùpèsè rẹ dípò owó Kilo rẹ tó kù.",
       "enabled": "Ní lílò",
@@ -4103,6 +4103,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "A kò lè ṣí àbájọ́ ìwádìí yìí"
+  },
+  "usage": {
+    "title": "Ìlò",
+    "orgTitle": "Ìlò àjọ",
+    "entrySubtitle": "Ìnáwó, àwọn ìbéèrè, àti àwọn ìpín ọ̀rọ̀",
+    "rangePicker": "Sáà àkókò",
+    "range90d": "Ọjọ́ 90",
+    "metricPicker": "Ìwọ̀n àtẹ àwòrán",
+    "chartA11y": "{{metric}} lójoojúmọ́",
+    "avgCostPerRequest": "Iye owó àpapọ̀ / ìbéèrè",
+    "topModels": "Àwọn àwòṣe tó ga jù",
+    "topFeatures": "Àwọn ẹ̀yà tó ga jù",
+    "emptyTitle": "Kò sí ìlò ní sáà yìí",
+    "orgSelfNotice": "Ìlò tìrẹ nínú àjọ yìí ni ò ń rí.",
+    "viewDetails": "Wo àlàyé ìlò"
+  },
+  "integrations": {
+    "title": "Àwọn Ìsopọ̀",
+    "sectionTitle": "Àwọn iṣẹ́ tí a so pọ̀",
+    "entrySubtitle": "GitHub, Slack, Linear àti àwọn mìíràn",
+    "subtitle": "So àwọn irinṣẹ́ ìdàgbàsókè àti ìlànà iṣẹ́ rẹ pọ̀ mọ́ Kilo",
+    "emptyHint": "Kò tíì sí ìsopọ̀ kankan.",
+    "disconnect": "Já ìsopọ̀",
+    "disconnectTitle": "Ṣé o fẹ́ já ìsopọ̀ {{provider}}?",
+    "disconnectMessage": "Kilo kò ní dáhùn mọ́ nínú {{provider}}. O lè tún un so pọ̀ nígbàkígbà.",
+    "connectedTo": "Ti so pọ̀ mọ́ {{account}}",
+    "disconnected": "A ti já ìsopọ̀ {{provider}}",
+    "disconnectFailed": "Kò ṣeé ṣe láti já ìsopọ̀ {{provider}}",
+    "couldNotLoad": "Kò ṣeé ṣe láti gbé àwọn ìsopọ̀ wá",
+    "permissionDenied": "O kò ní àṣẹ láti ṣàkóso àwọn ìsopọ̀ wọ̀nyí.",
+    "memberHint": "Bèèrè lọ́wọ́ ẹni tó ni àjọ náà tàbí alákòóso láti yí àwọn ìsopọ̀ wọ̀nyí padà.",
+    "connectFailed": "Kò ṣeé ṣe láti ṣí ojú-ìwé ìsopọ̀"
   },
   "invoices": {
     "personalEmptyDescription": "Àwọn ìwé owó fún àwọn ìrajà tìrẹ yóò hàn níbí nígbà tí a bá ti gba owó lọ́wọ́ rẹ."

@@ -22,6 +22,7 @@
     "expired": "만료됨"
   },
   "common": {
+    "manageOnWeb": "웹에서 관리",
     "creditHistory": "크레딧 내역",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -339,7 +340,6 @@
     "providerKeys": {
       "title": "제공업체 키",
       "rowSubtitle": "내 제공업체 결제 사용",
-      "manageOnWeb": "웹에서 관리",
       "manageOnWebReason": "이 제공업체에는 구조화된 자격 증명이 필요합니다.",
       "description": "이 키를 통한 요청은 Kilo 잔액 대신 제공업체 계정으로 청구됩니다.",
       "enabled": "사용 중",
@@ -4103,6 +4103,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "이 검색 결과를 열지 못했습니다"
+  },
+  "usage": {
+    "title": "사용량",
+    "orgTitle": "조직 사용량",
+    "entrySubtitle": "비용, 요청, 토큰",
+    "rangePicker": "기간",
+    "range90d": "90일",
+    "metricPicker": "차트 지표",
+    "chartA11y": "일별 {{metric}}",
+    "avgCostPerRequest": "요청당 평균 비용",
+    "topModels": "상위 모델",
+    "topFeatures": "상위 기능",
+    "emptyTitle": "이 기간에 사용량이 없습니다",
+    "orgSelfNotice": "이 조직에서 내 사용량을 보고 있습니다.",
+    "viewDetails": "사용량 세부 정보 보기"
+  },
+  "integrations": {
+    "title": "연동",
+    "sectionTitle": "연결된 서비스",
+    "entrySubtitle": "GitHub, Slack, Linear 등",
+    "subtitle": "개발 도구와 워크플로를 Kilo에 연결하세요",
+    "emptyHint": "아직 연결된 서비스가 없습니다.",
+    "disconnect": "연결 해제",
+    "disconnectTitle": "{{provider}} 연결을 해제할까요?",
+    "disconnectMessage": "Kilo가 더 이상 {{provider}}에서 응답하지 않습니다. 언제든지 다시 연결할 수 있습니다.",
+    "connectedTo": "{{account}}에 연결됨",
+    "disconnected": "{{provider}} 연결이 해제되었습니다",
+    "disconnectFailed": "{{provider}} 연결을 해제하지 못했습니다",
+    "couldNotLoad": "연동 목록을 불러오지 못했습니다",
+    "permissionDenied": "이 연동을 관리할 권한이 없습니다.",
+    "memberHint": "이 연결을 변경하려면 조직 소유자 또는 관리자에게 요청하세요.",
+    "connectFailed": "연결 페이지를 열지 못했습니다"
   },
   "invoices": {
     "personalEmptyDescription": "결제가 청구되면 본인 구매에 대한 인보이스가 여기에 표시됩니다."

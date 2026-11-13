@@ -22,6 +22,7 @@
     "expired": "Lany fe-potoana"
   },
   "common": {
+    "manageOnWeb": "Tantano amin'ny tranonkala",
     "creditHistory": "Tantaran'ny kredita",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -339,7 +340,6 @@
     "providerKeys": {
       "title": "Lakilen'ny mpamatsy",
       "rowSubtitle": "Ampiasao ny fandoavam-bola amin'ny mpamatsinao",
-      "manageOnWeb": "Tantano amin'ny tranonkala",
       "manageOnWebReason": "Mila mari-panamarinana voarafitra ireo mpamatsy ireo.",
       "description": "Ny fangatahana mampiasa ireo lakile ireo dia aloa amin'ny kaontinao ao amin'ny mpamatsy fa tsy amin'ny ambim-bola Kilo anananao.",
       "enabled": "Ampiasaina",
@@ -4103,6 +4103,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Tsy voasokatra ity valim-pikarohana ity"
+  },
+  "usage": {
+    "title": "Fampiasana",
+    "orgTitle": "Fampiasana ny fikambanana",
+    "entrySubtitle": "Fandaniana, fangatahana ary sombin-tsoratra",
+    "rangePicker": "Elanelam-potoana",
+    "range90d": "90 andro",
+    "metricPicker": "Refy amin'ny kisary",
+    "chartA11y": "{{metric}} isan'andro",
+    "avgCostPerRequest": "Sarany antonony / fangatahana",
+    "topModels": "Modely be ampiasaina",
+    "topFeatures": "Endri-javatra be ampiasaina",
+    "emptyTitle": "Tsy nisy fampiasana tamin'io fe-potoana io",
+    "orgSelfNotice": "Ny fampiasanao manokana ato amin'ity fikambanana ity no hitanao.",
+    "viewDetails": "Hijery ny antsipirian'ny fampiasana"
+  },
+  "integrations": {
+    "title": "Fampifandraisana",
+    "sectionTitle": "Serivisy mifandray",
+    "entrySubtitle": "GitHub, Slack, Linear sy ny hafa",
+    "subtitle": "Ampifandraiso amin'i Kilo ireo fitaovana sy fomba fiasanao amin'ny fampandrosoana",
+    "emptyHint": "Mbola tsy misy fampifandraisana mifandray.",
+    "disconnect": "Esory",
+    "disconnectTitle": "Hanapaka ny fifandraisana amin'i {{provider}}?",
+    "disconnectMessage": "Tsy hamaly intsony ao amin'i {{provider}} i Kilo. Afaka mampifandray indray ianao amin'ny fotoana rehetra.",
+    "connectedTo": "Mifandray amin'i {{account}}",
+    "disconnected": "Tapaka ny fifandraisana amin'i {{provider}}",
+    "disconnectFailed": "Tsy afaka nanapaka ny fifandraisana amin'i {{provider}}",
+    "couldNotLoad": "Tsy afaka nampiditra ireo fampifandraisana",
+    "permissionDenied": "Tsy manana alalana hitantana ireo fampifandraisana ireo ianao.",
+    "memberHint": "Angataho amin'ny tompon'ny fikambanana na mpitantana ny fanovana ireo fifandraisana ireo.",
+    "connectFailed": "Tsy afaka nanokatra ny pejy fampifandraisana"
   },
   "invoices": {
     "personalEmptyDescription": "Hiseho eto ny faktioran'ny fividiananao manokana rehefa voaloa ianao."

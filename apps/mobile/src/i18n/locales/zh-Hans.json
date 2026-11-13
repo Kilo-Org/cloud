@@ -22,6 +22,7 @@
     "expired": "已过期"
   },
   "common": {
+    "manageOnWeb": "在网页上管理",
     "creditHistory": "积分记录",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -339,7 +340,6 @@
     "providerKeys": {
       "title": "提供商密钥",
       "rowSubtitle": "使用你自己的提供商计费",
-      "manageOnWeb": "在网页上管理",
       "manageOnWebReason": "这些提供商需要结构化凭据。",
       "description": "通过这些密钥发出的请求将计入你的提供商账户，而不是从 Kilo 余额中扣除。",
       "enabled": "使用中",
@@ -4103,6 +4103,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "无法打开此搜索结果"
+  },
+  "usage": {
+    "title": "用量",
+    "orgTitle": "组织用量",
+    "entrySubtitle": "费用、请求和词元",
+    "rangePicker": "时间范围",
+    "range90d": "90 天",
+    "metricPicker": "图表指标",
+    "chartA11y": "每日{{metric}}",
+    "avgCostPerRequest": "平均每次请求费用",
+    "topModels": "常用模型",
+    "topFeatures": "常用功能",
+    "emptyTitle": "此期间无用量",
+    "orgSelfNotice": "你看到的是你自己在此组织中的用量。",
+    "viewDetails": "查看用量详情"
+  },
+  "integrations": {
+    "title": "集成",
+    "sectionTitle": "已连接的服务",
+    "entrySubtitle": "GitHub、Slack、Linear 等",
+    "subtitle": "将你的开发工具和工作流连接到 Kilo",
+    "emptyHint": "尚未连接任何集成。",
+    "disconnect": "断开连接",
+    "disconnectTitle": "要断开 {{provider}} 的连接吗？",
+    "disconnectMessage": "Kilo 将不再在 {{provider}} 中响应。你可以随时重新连接。",
+    "connectedTo": "已连接到 {{account}}",
+    "disconnected": "已断开 {{provider}} 的连接",
+    "disconnectFailed": "无法断开 {{provider}} 的连接",
+    "couldNotLoad": "无法加载集成",
+    "permissionDenied": "你没有管理这些集成的权限。",
+    "memberHint": "请联系组织所有者或管理员更改这些连接。",
+    "connectFailed": "无法打开连接页面"
   },
   "invoices": {
     "personalEmptyDescription": "产生扣费后，你个人购买的发票将显示在这里。"

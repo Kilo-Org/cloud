@@ -22,6 +22,7 @@
     "expired": "Utgånget"
   },
   "common": {
+    "manageOnWeb": "Hantera på webben",
     "creditHistory": "Kredithistorik",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -339,7 +340,6 @@
     "providerKeys": {
       "title": "Leverantörsnycklar",
       "rowSubtitle": "Använd din egen leverantörsfakturering",
-      "manageOnWeb": "Hantera på webben",
       "manageOnWebReason": "Dessa leverantörer kräver strukturerade autentiseringsuppgifter.",
       "description": "Förfrågningar via dessa nycklar faktureras ditt leverantörskonto i stället för ditt Kilo-saldo.",
       "enabled": "Används",
@@ -4103,6 +4103,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Kunde inte öppna det här sökresultatet"
+  },
+  "usage": {
+    "title": "Användning",
+    "orgTitle": "Organisationens användning",
+    "entrySubtitle": "Utgifter, begäranden och token",
+    "rangePicker": "Tidsperiod",
+    "range90d": "90 dagar",
+    "metricPicker": "Mätvärde i diagram",
+    "chartA11y": "{{metric}} per dag",
+    "avgCostPerRequest": "Snittkostnad / begäran",
+    "topModels": "Mest använda modeller",
+    "topFeatures": "Mest använda funktioner",
+    "emptyTitle": "Ingen användning under perioden",
+    "orgSelfNotice": "Du ser din egen användning i den här organisationen.",
+    "viewDetails": "Visa användningsdetaljer"
+  },
+  "integrations": {
+    "title": "Integrationer",
+    "sectionTitle": "Anslutna tjänster",
+    "entrySubtitle": "GitHub, Slack, Linear med flera",
+    "subtitle": "Anslut dina utvecklingsverktyg och arbetsflöden till Kilo",
+    "emptyHint": "Inga integrationer har anslutits än.",
+    "disconnect": "Koppla från",
+    "disconnectTitle": "Koppla från {{provider}}?",
+    "disconnectMessage": "Kilo slutar svara i {{provider}}. Du kan ansluta igen när som helst.",
+    "connectedTo": "Ansluten till {{account}}",
+    "disconnected": "{{provider}} har kopplats från",
+    "disconnectFailed": "Det gick inte att koppla från {{provider}}",
+    "couldNotLoad": "Det gick inte att läsa in integrationerna",
+    "permissionDenied": "Du har inte behörighet att hantera de här integrationerna.",
+    "memberHint": "Be en ägare eller administratör i organisationen att ändra de här anslutningarna.",
+    "connectFailed": "Det gick inte att öppna anslutningssidan"
   },
   "invoices": {
     "personalEmptyDescription": "Fakturor för dina egna köp visas här när du har fakturerats."

@@ -22,6 +22,7 @@
     "expired": "समय समाप्त"
   },
   "common": {
+    "manageOnWeb": "वेब पर प्रबंधित करें",
     "creditHistory": "क्रेडिट हिस्ट्री",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -339,7 +340,6 @@
     "providerKeys": {
       "title": "प्रदाता कुंजियाँ",
       "rowSubtitle": "अपने प्रदाता की बिलिंग का उपयोग करें",
-      "manageOnWeb": "वेब पर प्रबंधित करें",
       "manageOnWebReason": "इन प्रदाताओं को संरचित क्रेडेंशियल की आवश्यकता होती है।",
       "description": "इन कुंजियों से किए गए अनुरोधों का बिल आपके Kilo बैलेंस के बजाय आपके प्रदाता खाते में जाएगा।",
       "enabled": "उपयोग में",
@@ -4103,6 +4103,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "यह खोज परिणाम खोला नहीं जा सका"
+  },
+  "usage": {
+    "title": "उपयोग",
+    "orgTitle": "संगठन का उपयोग",
+    "entrySubtitle": "खर्च, अनुरोध और टोकन",
+    "rangePicker": "समय अवधि",
+    "range90d": "90 दिन",
+    "metricPicker": "चार्ट मीट्रिक",
+    "chartA11y": "प्रति दिन {{metric}}",
+    "avgCostPerRequest": "औसत लागत / अनुरोध",
+    "topModels": "शीर्ष मॉडल",
+    "topFeatures": "शीर्ष सुविधाएँ",
+    "emptyTitle": "इस अवधि में कोई उपयोग नहीं",
+    "orgSelfNotice": "आप इस संगठन में अपना उपयोग देख रहे हैं।",
+    "viewDetails": "उपयोग विवरण देखें"
+  },
+  "integrations": {
+    "title": "इंटीग्रेशन",
+    "sectionTitle": "कनेक्ट की गई सेवाएँ",
+    "entrySubtitle": "GitHub, Slack, Linear और अन्य",
+    "subtitle": "अपने डेवलपमेंट टूल और वर्कफ़्लो को Kilo से कनेक्ट करें",
+    "emptyHint": "अभी तक कोई इंटीग्रेशन कनेक्ट नहीं किया गया है।",
+    "disconnect": "डिस्कनेक्ट करें",
+    "disconnectTitle": "{{provider}} को डिस्कनेक्ट करें?",
+    "disconnectMessage": "Kilo अब {{provider}} में जवाब नहीं देगा। आप कभी भी फिर से कनेक्ट कर सकते हैं।",
+    "connectedTo": "{{account}} से कनेक्ट है",
+    "disconnected": "{{provider}} डिस्कनेक्ट हो गया",
+    "disconnectFailed": "{{provider}} को डिस्कनेक्ट नहीं किया जा सका",
+    "couldNotLoad": "इंटीग्रेशन लोड नहीं किए जा सके",
+    "permissionDenied": "आपके पास इन इंटीग्रेशन को प्रबंधित करने की अनुमति नहीं है।",
+    "memberHint": "इन कनेक्शन को बदलने के लिए संगठन के किसी मालिक या एडमिन से कहें।",
+    "connectFailed": "कनेक्शन पेज नहीं खोला जा सका"
   },
   "invoices": {
     "personalEmptyDescription": "आपसे बिलिंग होने के बाद, आपकी अपनी खरीदारी के इनवॉइस यहां दिखेंगे।"

@@ -22,6 +22,7 @@
     "expired": "Imithe in éag"
   },
   "common": {
+    "manageOnWeb": "Bainistigh ar an ngréasán",
     "creditHistory": "Stair chreidmheasa",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -339,7 +340,6 @@
     "providerKeys": {
       "title": "Eochracha soláthraí",
       "rowSubtitle": "Úsáid billeáil do sholáthraí féin",
-      "manageOnWeb": "Bainistigh ar an ngréasán",
       "manageOnWebReason": "Teastaíonn dintiúir struchtúrtha ó na soláthraithe seo.",
       "description": "Gearrtar iarratais a dhéantar trí na heochracha seo ar do chuntas soláthraí in ionad d'iarmhéid Kilo.",
       "enabled": "In úsáid",
@@ -4298,6 +4298,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Níorbh fhéidir an toradh cuardaigh seo a oscailt"
+  },
+  "usage": {
+    "title": "Úsáid",
+    "orgTitle": "Úsáid na heagraíochta",
+    "entrySubtitle": "Caiteachas, iarratais agus comharthaí",
+    "rangePicker": "Raon ama",
+    "range90d": "90 lá",
+    "metricPicker": "Méadrach na cairte",
+    "chartA11y": "{{metric}} in aghaidh an lae",
+    "avgCostPerRequest": "Meánchostas / iarratas",
+    "topModels": "Samhlacha is mó úsáid",
+    "topFeatures": "Gnéithe is mó úsáid",
+    "emptyTitle": "Níl aon úsáid sa tréimhse seo",
+    "orgSelfNotice": "Tá d'úsáid féin san eagraíocht seo á feiceáil agat.",
+    "viewDetails": "Féach ar shonraí úsáide"
+  },
+  "integrations": {
+    "title": "Comhtháthuithe",
+    "sectionTitle": "Seirbhísí ceangailte",
+    "entrySubtitle": "GitHub, Slack, Linear agus tuilleadh",
+    "subtitle": "Ceangail d'uirlisí forbartha agus do shreafaí oibre le Kilo",
+    "emptyHint": "Níl aon chomhtháthú ceangailte fós.",
+    "disconnect": "Dícheangail",
+    "disconnectTitle": "An bhfuil fonn ort {{provider}} a dhícheangal?",
+    "disconnectMessage": "Stopfaidh Kilo de bheith ag freagairt in {{provider}}. Is féidir leat athcheangal am ar bith.",
+    "connectedTo": "Ceangailte le {{account}}",
+    "disconnected": "Dícheanglaíodh {{provider}}",
+    "disconnectFailed": "Níorbh fhéidir {{provider}} a dhícheangal",
+    "couldNotLoad": "Níorbh fhéidir na comhtháthuithe a lódáil",
+    "permissionDenied": "Níl cead agat na comhtháthuithe seo a bhainistiú.",
+    "memberHint": "Iarr ar úinéir nó ar riarthóir na heagraíochta na ceangail seo a athrú.",
+    "connectFailed": "Níorbh fhéidir an leathanach ceangail a oscailt"
   },
   "invoices": {
     "personalEmptyDescription": "Taispeánfar sonraisc do do cheannacháin féin anseo nuair a bheidh bille curtha chugat."

@@ -22,6 +22,7 @@
     "expired": "Caducado"
   },
   "common": {
+    "manageOnWeb": "Gestionar en la web",
     "creditHistory": "Historial de créditos",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -339,7 +340,6 @@
     "providerKeys": {
       "title": "Claves de proveedor",
       "rowSubtitle": "Usa la facturación de tu propio proveedor",
-      "manageOnWeb": "Gestionar en la web",
       "manageOnWebReason": "Estos proveedores necesitan credenciales estructuradas.",
       "description": "Las solicitudes realizadas con estas claves se facturan a tu cuenta del proveedor en lugar de a tu saldo de Kilo.",
       "enabled": "En uso",
@@ -4168,6 +4168,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "No se pudo abrir este resultado de búsqueda"
+  },
+  "usage": {
+    "title": "Uso",
+    "orgTitle": "Uso de la organización",
+    "entrySubtitle": "Gasto, solicitudes y tokens",
+    "rangePicker": "Periodo",
+    "range90d": "90 días",
+    "metricPicker": "Métrica del gráfico",
+    "chartA11y": "{{metric}} por día",
+    "avgCostPerRequest": "Coste medio / solicitud",
+    "topModels": "Modelos más usados",
+    "topFeatures": "Funciones más usadas",
+    "emptyTitle": "Sin uso en este periodo",
+    "orgSelfNotice": "Estás viendo tu propio uso en esta organización.",
+    "viewDetails": "Ver detalles de uso"
+  },
+  "integrations": {
+    "title": "Integraciones",
+    "sectionTitle": "Servicios conectados",
+    "entrySubtitle": "GitHub, Slack, Linear y más",
+    "subtitle": "Conecta tus herramientas y flujos de trabajo de desarrollo a Kilo",
+    "emptyHint": "Aún no hay integraciones conectadas.",
+    "disconnect": "Desconectar",
+    "disconnectTitle": "¿Desconectar {{provider}}?",
+    "disconnectMessage": "Kilo dejará de responder en {{provider}}. Puedes volver a conectarlo en cualquier momento.",
+    "connectedTo": "Conectado a {{account}}",
+    "disconnected": "{{provider}} desconectado",
+    "disconnectFailed": "No se pudo desconectar {{provider}}",
+    "couldNotLoad": "No se pudieron cargar las integraciones",
+    "permissionDenied": "No tienes permiso para gestionar estas integraciones.",
+    "memberHint": "Pide a un propietario o administrador de la organización que cambie estas conexiones.",
+    "connectFailed": "No se pudo abrir la página de conexión"
   },
   "invoices": {
     "personalEmptyDescription": "Las facturas de tus compras personales aparecerán aquí cuando se te facture."

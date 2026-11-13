@@ -22,6 +22,7 @@
     "expired": "Termiņš beidzies"
   },
   "common": {
+    "manageOnWeb": "Pārvaldi tīmeklī",
     "creditHistory": "Kredītu vēsture",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -339,7 +340,6 @@
     "providerKeys": {
       "title": "Nodrošinātāju atslēgas",
       "rowSubtitle": "Izmanto sava nodrošinātāja norēķinus",
-      "manageOnWeb": "Pārvaldi tīmeklī",
       "manageOnWebReason": "Šiem nodrošinātājiem nepieciešami strukturēti akreditācijas dati.",
       "description": "Pieprasījumi, kas veikti ar šīm atslēgām, tiek iekasēti no tava nodrošinātāja konta, nevis no tava Kilo atlikuma.",
       "enabled": "Tiek izmantota",
@@ -4168,6 +4168,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Neizdevās atvērt šo meklēšanas rezultātu"
+  },
+  "usage": {
+    "title": "Lietojums",
+    "orgTitle": "Organizācijas lietojums",
+    "entrySubtitle": "Tēriņi, pieprasījumi un tokeni",
+    "rangePicker": "Laika periods",
+    "range90d": "90 dienas",
+    "metricPicker": "Diagrammas rādītājs",
+    "chartA11y": "{{metric}} dienā",
+    "avgCostPerRequest": "Vid. izmaksas / piepr.",
+    "topModels": "Populārākie modeļi",
+    "topFeatures": "Populārākās funkcijas",
+    "emptyTitle": "Šajā periodā nav lietojuma",
+    "orgSelfNotice": "Jūs redzat savu lietojumu šajā organizācijā.",
+    "viewDetails": "Skatīt lietojuma informāciju"
+  },
+  "integrations": {
+    "title": "Integrācijas",
+    "sectionTitle": "Pievienotie pakalpojumi",
+    "entrySubtitle": "GitHub, Slack, Linear un citi",
+    "subtitle": "Savienojiet savus izstrādes rīkus un darbplūsmas ar Kilo",
+    "emptyHint": "Vēl nav pievienota neviena integrācija.",
+    "disconnect": "Atvienot",
+    "disconnectTitle": "Vai atvienot {{provider}}?",
+    "disconnectMessage": "Kilo vairs neatbildēs pakalpojumā {{provider}}. Savienojumu varat atjaunot jebkurā laikā.",
+    "connectedTo": "Savienots ar {{account}}",
+    "disconnected": "Pakalpojums {{provider}} atvienots",
+    "disconnectFailed": "Neizdevās atvienot {{provider}}",
+    "couldNotLoad": "Neizdevās ielādēt integrācijas",
+    "permissionDenied": "Jums nav atļaujas pārvaldīt šīs integrācijas.",
+    "memberHint": "Lūdziet organizācijas īpašniekam vai administratoram mainīt šos savienojumus.",
+    "connectFailed": "Neizdevās atvērt savienojuma lapu"
   },
   "invoices": {
     "personalEmptyDescription": "Rēķini par jūsu pirkumiem šeit parādīsies, kad jums tiks izrakstīts rēķins."

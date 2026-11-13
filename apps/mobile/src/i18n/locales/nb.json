@@ -22,6 +22,7 @@
     "expired": "Utløpt"
   },
   "common": {
+    "manageOnWeb": "Administrer på nettet",
     "creditHistory": "Kreditthistorikk",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -339,7 +340,6 @@
     "providerKeys": {
       "title": "Leverandørnøkler",
       "rowSubtitle": "Bruk din egen leverandørfakturering",
-      "manageOnWeb": "Administrer på nettet",
       "manageOnWebReason": "Disse leverandørene trenger strukturert legitimasjon.",
       "description": "Forespørsler via disse nøklene faktureres leverandørkontoen din i stedet for Kilo-saldoen din.",
       "enabled": "I bruk",
@@ -4103,6 +4103,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Kunne ikke åpne dette søkeresultatet"
+  },
+  "usage": {
+    "title": "Forbruk",
+    "orgTitle": "Organisasjonens forbruk",
+    "entrySubtitle": "Kostnader, forespørsler og tokener",
+    "rangePicker": "Tidsperiode",
+    "range90d": "90 dager",
+    "metricPicker": "Måltall i diagram",
+    "chartA11y": "{{metric}} per dag",
+    "avgCostPerRequest": "Snittkostnad / forespørsel",
+    "topModels": "Mest brukte modeller",
+    "topFeatures": "Mest brukte funksjoner",
+    "emptyTitle": "Ikke noe forbruk i denne perioden",
+    "orgSelfNotice": "Du ser ditt eget forbruk i denne organisasjonen.",
+    "viewDetails": "Vis forbruksdetaljer"
+  },
+  "integrations": {
+    "title": "Integrasjoner",
+    "sectionTitle": "Tilkoblede tjenester",
+    "entrySubtitle": "GitHub, Slack, Linear og mer",
+    "subtitle": "Koble utviklingsverktøyene og arbeidsflytene dine til Kilo",
+    "emptyHint": "Ingen integrasjoner er koblet til ennå.",
+    "disconnect": "Koble fra",
+    "disconnectTitle": "Koble fra {{provider}}?",
+    "disconnectMessage": "Kilo slutter å svare i {{provider}}. Du kan koble til igjen når som helst.",
+    "connectedTo": "Koblet til {{account}}",
+    "disconnected": "{{provider}} er koblet fra",
+    "disconnectFailed": "Kunne ikke koble fra {{provider}}",
+    "couldNotLoad": "Kunne ikke laste inn integrasjoner",
+    "permissionDenied": "Du har ikke tillatelse til å administrere disse integrasjonene.",
+    "memberHint": "Be en eier eller administrator i organisasjonen om å endre disse tilkoblingene.",
+    "connectFailed": "Kunne ikke åpne tilkoblingssiden"
   },
   "invoices": {
     "personalEmptyDescription": "Fakturaer for dine egne kjøp vises her når du har blitt fakturert."

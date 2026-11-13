@@ -22,6 +22,7 @@
     "expired": "Iraungita"
   },
   "common": {
+    "manageOnWeb": "Kudeatu webean",
     "creditHistory": "Kredituen historia",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -339,7 +340,6 @@
     "providerKeys": {
       "title": "Hornitzaileen gakoak",
       "rowSubtitle": "Erabili zure hornitzailearen fakturazioa",
-      "manageOnWeb": "Kudeatu webean",
       "manageOnWebReason": "Hornitzaile hauek egiturazko kredentzialak behar dituzte.",
       "description": "Gako hauen bidezko eskaerak zure hornitzaile-kontuan fakturatzen dira, ez zure Kilo saldoan.",
       "enabled": "Erabiltzen",
@@ -4103,6 +4103,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ezin izan da bilaketa-emaitza hau ireki"
+  },
+  "usage": {
+    "title": "Erabilera",
+    "orgTitle": "Erakundearen erabilera",
+    "entrySubtitle": "Gastua, eskaerak eta tokenak",
+    "rangePicker": "Denbora-tartea",
+    "range90d": "90 egun",
+    "metricPicker": "Grafikoaren metrika",
+    "chartA11y": "{{metric}} eguneko",
+    "avgCostPerRequest": "Kostu ertaina / eskaera",
+    "topModels": "Eredu erabilienak",
+    "topFeatures": "Funtzio erabilienak",
+    "emptyTitle": "Ez dago erabilerarik aldi honetan",
+    "orgSelfNotice": "Erakunde honetan zure erabilera ikusten ari zara.",
+    "viewDetails": "Ikusi erabileraren xehetasunak"
+  },
+  "integrations": {
+    "title": "Integrazioak",
+    "sectionTitle": "Konektatutako zerbitzuak",
+    "entrySubtitle": "GitHub, Slack, Linear eta gehiago",
+    "subtitle": "Konektatu zure garapen-tresnak eta lan-fluxuak Kilo aplikazioarekin",
+    "emptyHint": "Oraindik ez dago integraziorik konektatuta.",
+    "disconnect": "Deskonektatu",
+    "disconnectTitle": "{{provider}} deskonektatu?",
+    "disconnectMessage": "Kilo aplikazioak ez du gehiago erantzungo {{provider}} zerbitzuan. Edonoiz konekta dezakezu berriro.",
+    "connectedTo": "Konektatuta: {{account}}",
+    "disconnected": "{{provider}} deskonektatu da",
+    "disconnectFailed": "Ezin izan da {{provider}} deskonektatu",
+    "couldNotLoad": "Ezin izan dira integrazioak kargatu",
+    "permissionDenied": "Ez duzu integrazio hauek kudeatzeko baimenik.",
+    "memberHint": "Eskatu erakundearen jabe edo administratzaile bati konexio hauek aldatzeko.",
+    "connectFailed": "Ezin izan da konexio-orria ireki"
   },
   "invoices": {
     "personalEmptyDescription": "Zure erosketen fakturak hemen agertuko dira fakturatzen zaizunean."

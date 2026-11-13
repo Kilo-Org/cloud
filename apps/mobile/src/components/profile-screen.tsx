@@ -10,9 +10,11 @@ import {
   GitMerge,
   GitPullRequest,
   KeyRound,
+  LineChart,
   Lock,
   LogOut,
   MessageSquare,
+  Plug,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -235,6 +237,22 @@ export function ProfileScreen() {
       >
         {/* Credits */}
         <CreditsCard orgs={orgs} enabled={isAuthenticated} />
+
+        {/* Usage: one row on the balance's own section, because spend and
+            remaining credits are the two halves of the same question. */}
+        <View className="mt-3">
+          <ConfigureRow
+            icon={LineChart}
+            title={t('usage.title')}
+            subtitle={t('usage.entrySubtitle')}
+            hue="sage"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/usage' as Href);
+            }}
+          />
+        </View>
 
         {/* Code Reviewer */}
         <View className="mt-6 gap-3">
@@ -466,6 +484,26 @@ export function ProfileScreen() {
             ))}
           </View>
         )}
+
+        {/* Connected services — the integrations hub. Its own section rather
+            than a row in App: the hub manages external accounts, and its row
+            takes the next curated hue step in reading order. */}
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            {t('integrations.sectionTitle')}
+          </Text>
+          <ConfigureRow
+            icon={Plug}
+            title={t('integrations.title')}
+            subtitle={t('integrations.entrySubtitle')}
+            hue="pine"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/integrations' as Href);
+            }}
+          />
+        </View>
 
         {/* Actions — stacked full-width tiles so labels never clip side-by-side at max Dynamic Type */}
         <View className="mt-6 gap-3">

@@ -1378,9 +1378,6 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     setIsGitHubIdentityHintDismissed(true);
   }, []);
 
-  // ---------------------------------------------------------------------------
-  // Integration missing view
-  // ---------------------------------------------------------------------------
   // Dev-only: with the public-repo path enabled, render the composer without an
   // integration so a public repository URL can be used instead.
   if (isIntegrationMissing && !isPublicRepoDevEnabled) {
@@ -1402,9 +1399,6 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
   return (
     <div className="relative flex h-full flex-col items-center px-4 pt-16">
       <SetPageTitle title="Cloud Agent">

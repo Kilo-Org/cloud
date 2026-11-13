@@ -287,10 +287,6 @@ export function ProfilesManager({
   );
 }
 
-// -------------------------------------------------------------------
-// ProfileListItem
-// -------------------------------------------------------------------
-
 type ProfileListItemProps = {
   profile: ProfileSummaryWithOwner;
   isSelected: boolean;
@@ -335,10 +331,6 @@ function ProfileListItem({
     </button>
   );
 }
-
-// -------------------------------------------------------------------
-// NewProfilePane
-// -------------------------------------------------------------------
 
 type NewProfilePaneProps = {
   organizationId?: string;

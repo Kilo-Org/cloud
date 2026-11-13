@@ -350,7 +350,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
 
   const userById = (id: string) => allUsers.find(u => u.id === id)!;
 
-  // --- 1. Fully spent user: expiry_date should be set
   {
     const credits = creditsFor(USER_FULLY_SPENT).filter(c => c.expiry_date != null);
     results.push({
@@ -360,7 +359,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 2. Fully spent user: next_credit_expiration_at set
   {
     const user = userById(USER_FULLY_SPENT);
     results.push({
@@ -370,7 +368,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 3. Partially spent user: expiry_date set
   {
     const credits = creditsFor(USER_PARTIALLY_SPENT).filter(c => c.expiry_date != null);
     results.push({
@@ -380,7 +377,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 4. Partially spent user: expiration_baseline set from original
   {
     const credit = creditsFor(USER_PARTIALLY_SPENT).find(c => c.expiry_date != null);
     results.push({
@@ -390,7 +386,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 5. Unspent user: expiry_date set
   {
     const credits = creditsFor(USER_UNSPENT).filter(c => c.expiry_date != null);
     results.push({
@@ -400,7 +395,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 6. Empty-desc category (referral): expiry_date set
   {
     const credits = creditsFor(USER_EMPTY_DESC_CATEGORY).filter(c => c.expiry_date != null);
     results.push({
@@ -410,7 +404,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 7. Non-free credit: NOT touched
   {
     const credits = creditsFor(USER_NON_FREE).filter(c => c.expiry_date != null);
     results.push({
@@ -420,7 +413,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 8. Org-scoped credit: NOT touched
   {
     const credits = creditsFor(USER_ORG_SCOPED);
     const untouched = credits.every(c => c.expiry_date == null);
@@ -431,7 +423,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 9. Already-expiring credit: NOT modified
   {
     const credit = creditsFor(USER_ALREADY_EXPIRING).find(c => c.expiry_date != null);
     const originalExpiry = new Date(credit!.expiry_date!).getTime();
@@ -444,7 +435,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 10. Expiry date is ~30 days from now
   {
     const credit = creditsFor(USER_PARTIALLY_SPENT).find(c => c.expiry_date != null);
     if (credit?.expiry_date) {
@@ -465,7 +455,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     }
   }
 
-  // --- 11. Wrong description: NOT touched
   {
     const credits = creditsFor(USER_WRONG_DESC).filter(c => c.expiry_date != null);
     results.push({
@@ -475,7 +464,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 12. Mixed credits: only matching one gets expiry
   {
     const credits = creditsFor(USER_MIXED);
     const withExpiry = credits.filter(c => c.expiry_date != null);
@@ -487,7 +475,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 13. Mixed credits: the non-matching one is untouched
   {
     const credits = creditsFor(USER_MIXED);
     const nonMatching = credits.find(c => c.credit_category === 'some-unrelated-category');
@@ -498,7 +485,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 14. Multiple matching credits: both get expiry
   {
     const credits = creditsFor(USER_MULTI_MATCH).filter(c => c.expiry_date != null);
     results.push({
@@ -508,7 +494,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 15. Zero-amount credit: expiry set
   {
     const credits = creditsFor(USER_ZERO_AMOUNT).filter(c => c.expiry_date != null);
     results.push({
@@ -518,7 +503,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 16. Existing next_credit_expiration_at: LEAST preserves earlier date
   {
     const user = userById(USER_EXISTING_EXPIRATION);
     if (user.next_credit_expiration_at) {
@@ -539,7 +523,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     }
   }
 
-  // --- 17. Multi-block: all 3 credits get expiry set
   {
     const credits = creditsFor(USER_MULTI_BLOCK).filter(c => c.expiry_date != null);
     results.push({
@@ -549,7 +532,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 18. Multi-block: all baselines set to 0 (from original_baseline)
   {
     const credits = creditsFor(USER_MULTI_BLOCK).filter(c => c.expiry_date != null);
     const allBaselinesZero = credits.every(c => c.expiration_baseline_microdollars_used === 0);
@@ -587,7 +569,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     return newTransactions.reduce((sum, t) => sum + Math.abs(t.amount_microdollars ?? 0), 0);
   }
 
-  // --- 19. Multi-block: verify projected expiration
   //     User has 3 x $5 = $15, spent $7 → $8 should expire
   {
     const totalExpired = simulateExpiration(USER_MULTI_BLOCK);
@@ -599,7 +580,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 20. Buy $10, use $10, get $10 free → balance $10 today, $0 after expiry
   //     Free credit has original_baseline=10 (user already spent $10 when it was granted)
   //     So the free $10 is NOT covered by usage → all $10 expires
   {
@@ -625,7 +605,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 21. Get $10 free, use $10, buy $10 → balance $10 today, $10 after expiry
   //     Free credit has original_baseline=0 (user had $0 spent when it was granted)
   //     So the free $10 IS fully covered by usage → $0 expires
   {
@@ -651,7 +630,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 22. Orb double-deduction: credit skipped, balance stays at $0
   //     User got $5 free, Orb clawed it back (acquired=0, used=0, balance=$0).
   //     Without the fix, expiring the $5 credit would push to -$5.
   //     With the fix, expiry is NOT set on the credit (skipped).
@@ -675,7 +653,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 23. Orb double-deduction with existing expiring credit:
   //     User has $5 balance. Existing $5 credit (with expiry) already covers it.
   //     New $5 credit should NOT get expiry — would push to -$5.
   {
@@ -698,7 +675,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 24. Specific FALSE overrides catch-all TRUE:
   //     referral-redeeming-bonus has catch-all TRUE, but the specific description
   //     is marked FALSE → credit should NOT have expiry_date set.
   {
@@ -710,7 +686,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
     });
   }
 
-  // --- 25. Mixed expiry headroom: two $5 credits with different EXPIRE_IN_DAYS,
   //     only $5 headroom. The earlier-expiring credit (30d, automatic-welcome-credits)
   //     should be expired; the later-expiring one (180d, custom/long-expiry-test)
   //     should be skipped.

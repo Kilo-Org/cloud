@@ -2695,7 +2695,6 @@ describe('findings list DTO narrowing', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Cached repository snapshot
 //
 // `platform_integrations.repositories` is typed `number | string` ids, and the
@@ -2703,7 +2702,6 @@ describe('findings list DTO narrowing', () => {
 // findings-decorating procedure reads the snapshot through one tolerant reader,
 // so a damaged snapshot costs those repositories their scope instead of
 // answering 500 for the whole findings surface.
-// ---------------------------------------------------------------------------
 
 const ORGANIZATION_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 

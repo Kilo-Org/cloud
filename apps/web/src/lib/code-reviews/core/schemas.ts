@@ -17,10 +17,6 @@ import { CODE_REVIEW_STATUSES } from '@kilocode/app-shared/code-review';
 import { CodeReviewAgentConfigSchema } from '@/lib/agent-config/core/types';
 import { OwnerSchema, type Owner } from '@/lib/agent-config/core/owner';
 
-// ============================================================================
-// Status and Ownership Schemas
-// ============================================================================
-
 /**
  * Code review status enum
  */
@@ -31,10 +27,6 @@ export const CodeReviewStatusSchema = z.enum(CODE_REVIEW_STATUSES);
  * `cloud_agent_code_reviews.terminal_reason` back to the shared union.
  */
 export const CodeReviewTerminalReasonSchema = z.enum(CODE_REVIEW_TERMINAL_REASONS);
-
-// ============================================================================
-// GitHub Webhook Schemas
-// ============================================================================
 
 /**
  * GitHub user schema
@@ -88,10 +80,6 @@ export const CodeReviewWebhookPayloadSchema = z.object({
   repository: GitHubRepositorySchema,
   sender: GitHubUserSchema,
 });
-
-// ============================================================================
-// Database Operation Schemas
-// ============================================================================
 
 /**
  * Platform type for code reviews
@@ -154,10 +142,6 @@ export const ListReviewsParamsSchema = z.object({
   platform: CodeReviewPlatformSchema.optional(),
 });
 
-// ============================================================================
-// tRPC Input Schemas
-// ============================================================================
-
 /**
  * List code reviews input (for organizations)
  */
@@ -202,10 +186,6 @@ export const RetriggerCodeReviewInputSchema = z.object({
   reviewId: z.string().uuid(),
 });
 
-// ============================================================================
-// Trigger Schemas
-// ============================================================================
-
 /**
  * Trigger review params schema
  */
@@ -218,10 +198,6 @@ export const TriggerReviewParamsSchema = z.object({
     })
     .passthrough(), // Allow additional fields beyond config
 });
-
-// ============================================================================
-// Inferred TypeScript Types from Zod Schemas
-// ============================================================================
 
 /**
  * Infer TypeScript types from Zod schemas for use in function signatures.

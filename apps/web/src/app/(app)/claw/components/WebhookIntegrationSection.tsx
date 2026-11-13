@@ -37,10 +37,6 @@ function generateTriggerId(): string {
   return `claw-${crypto.randomUUID().replace(/-/g, '')}`;
 }
 
-// ============================================================================
-// Main Section
-// ============================================================================
-
 export function WebhookIntegrationSection() {
   const [manageOpen, setManageOpen] = useState(false);
   const trpc = useTRPC();
@@ -135,10 +131,6 @@ export function WebhookIntegrationSection() {
     </div>
   );
 }
-
-// ============================================================================
-// Webhook Sub-Section (single trigger)
-// ============================================================================
 
 type TriggerListItem = {
   triggerId: string;
@@ -473,10 +465,6 @@ function WebhookSubSection({
   );
 }
 
-// ============================================================================
-// Scheduled Triggers Sub-Section (multiple triggers)
-// ============================================================================
-
 function ScheduledTriggersSubSection({
   instanceId,
   triggers,
@@ -645,10 +633,6 @@ function ScheduledTriggersSubSection({
   );
 }
 
-// ============================================================================
-// Scheduled Trigger Row (display + inline edit)
-// ============================================================================
-
 function ScheduledTriggerRow({
   trigger,
   isEditing,
@@ -720,10 +704,6 @@ function ScheduledTriggerRow({
     </div>
   );
 }
-
-// ============================================================================
-// Scheduled Trigger Form (create + edit)
-// ============================================================================
 
 function ScheduledTriggerForm({
   initialCron = '',

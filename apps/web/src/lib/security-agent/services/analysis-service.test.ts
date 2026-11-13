@@ -666,10 +666,6 @@ describe('analysis-service', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// extractLastAssistantMessage (pure function, no mocks needed)
-// ---------------------------------------------------------------------------
-
 function makeSnapshot(
   messages: Array<{
     role: string;

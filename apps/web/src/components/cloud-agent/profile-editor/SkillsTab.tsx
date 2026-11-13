@@ -448,10 +448,6 @@ function SkillsShForm({
   );
 }
 
-// -------------------------------------------------------------------
-// SkillForm — shared create/edit form
-// -------------------------------------------------------------------
-
 type SkillFormProps = {
   profileId: string;
   organizationId: string | undefined;

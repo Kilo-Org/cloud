@@ -807,7 +807,6 @@ function requireGraphQlOperation<T>(value: T | null | undefined, operation: stri
   return value;
 }
 
-// ----- PR operation ledger (P1-A-08c) -----------------------------------------
 
 // Shared per-intent ledger for the four PR write procedures. With an
 // `operationKey` the procedure admits a `pr`-domain row and only then runs the

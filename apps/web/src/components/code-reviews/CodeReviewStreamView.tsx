@@ -49,10 +49,6 @@ type CodeReviewAttemptSummary = {
 
 type DisplayEvent = CodeReviewDisplayEvent;
 
-// ---------------------------------------------------------------------------
-// Shared helpers
-// ---------------------------------------------------------------------------
-
 const formatTimestamp = (timestamp: string): string => {
   const date = new Date(timestamp);
   return date.toLocaleTimeString('en-US', {
@@ -88,10 +84,6 @@ function formatAttemptLabel(attempt: CodeReviewAttemptSummary): string {
   }
   return parts.join(' · ');
 }
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 
 export function CodeReviewStreamView({
   reviewId,
@@ -169,10 +161,6 @@ export function CodeReviewStreamView({
     wsManagerRef.current = null;
   }, [reviewId, effectiveAttemptId]);
 
-  // ---------------------------------------------------------------------------
-  // Step 1: Get stream info to determine which mode to use
-  // ---------------------------------------------------------------------------
-
   const {
     data: streamInfo,
     error: streamInfoError,
@@ -209,10 +197,6 @@ export function CodeReviewStreamView({
       onComplete?.();
     }
   }, [reviewStatus, onComplete]);
-
-  // ---------------------------------------------------------------------------
-  // Mode A: WebSocket streaming (cloud-agent-next)
-  // ---------------------------------------------------------------------------
 
   const getTicket = useCallback(
     async (sessionId: string): Promise<{ ticket: string; expiresAt: number }> => {
@@ -374,19 +358,11 @@ export function CodeReviewStreamView({
         (sessionMessages && !sessionMessages.success ? sessionMessages.error : null))
       : (wsError ?? (connectionState.status === 'error' ? connectionState.error : null)));
 
-  // ---------------------------------------------------------------------------
-  // Auto-scroll
-  // ---------------------------------------------------------------------------
-
   useEffect(() => {
     if (autoScroll && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [displayEvents, autoScroll]);
-
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
 
   // Waiting for stream info
   if (!streamInfo?.success && !displayError) {

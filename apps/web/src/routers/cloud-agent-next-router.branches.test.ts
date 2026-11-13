@@ -13,7 +13,6 @@ import { cloudAgentNextRouter } from './cloud-agent-next-router';
 
 const USER_ID = 'user-1';
 
-// ----- mocked seams (all factories delegate lazily) ----------------------------
 
 // The cloud-agent router's heavy runtime deps, mocked exactly as
 // cloud-agent-next-router.test.ts does so the router module loads without
@@ -97,7 +96,6 @@ jest.mock('@/lib/provider-review/bitbucket-read', () => ({
   requestBitbucketJson: (...a: unknown[]) => mockRequestBitbucketJson(...a),
 }));
 
-// ----- fixtures ---------------------------------------------------------------
 
 const activeIntegration = { id: 'int-1', integration_status: 'active' };
 

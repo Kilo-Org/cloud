@@ -27,10 +27,6 @@ import {
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 
-// ---------------------------------------------------------------------------
-// Zod schema (mirrors cloudflare-session-ingest SharedSessionSnapshotSchema)
-// ---------------------------------------------------------------------------
-
 // Mirrors SharedSessionSnapshotSchema from cloudflare-session-ingest/src/util/share-output.ts.
 // Kept in sync manually (same pattern as cloud-agent-client.ts).
 const SessionInfoSchema = z.looseObject({
@@ -61,10 +57,6 @@ const SessionSnapshotSchema = z.object({
   ),
 });
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 /**
  * Snapshot returned by the session-ingest export endpoint.
  * Contains the final compacted state of all messages — NOT streaming deltas.
@@ -72,10 +64,6 @@ const SessionSnapshotSchema = z.object({
 export type SessionSnapshot = z.infer<typeof SessionSnapshotSchema>;
 
 export type SessionMessage = SessionSnapshot['messages'][number];
-
-// ---------------------------------------------------------------------------
-// Bounded fetch
-// ---------------------------------------------------------------------------
 
 /**
  * Redact a request URL to an allow-listed route label for logging: the
@@ -150,10 +138,6 @@ async function fetchSessionIngest(requestUrl: string, init: RequestInit = {}): P
   }
 }
 
-// ---------------------------------------------------------------------------
-// Failure mapping
-// ---------------------------------------------------------------------------
-
 /**
  * The tRPC error one session-ingest call failure becomes.
  *
@@ -171,10 +155,6 @@ export function sessionIngestTrpcError(message: string, cause: unknown): TRPCErr
     cause,
   });
 }
-
-// ---------------------------------------------------------------------------
-// Fetch
-// ---------------------------------------------------------------------------
 
 /**
  * Fetch the session snapshot from the session-ingest service.
@@ -231,10 +211,6 @@ export async function fetchSessionMessages(
   const snapshot = await fetchSessionSnapshot(sessionId, user.id);
   return snapshot?.messages ?? null;
 }
-
-// ---------------------------------------------------------------------------
-// Paginated authorized session-message history
-// ---------------------------------------------------------------------------
 
 const SessionMessagesPageResponseSchema = z.object({
   success: z.literal(true),
@@ -338,10 +314,6 @@ export async function fetchSessionMessagesPage(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Session diff
-// ---------------------------------------------------------------------------
-
 const SessionDiffResponseSchema = z.object({
   success: z.literal(true),
   diff: sessionDiffReadSchema,
@@ -399,10 +371,6 @@ export async function fetchSessionDiff(
   }
   return parsed.data.diff;
 }
-
-// ---------------------------------------------------------------------------
-// Share
-// ---------------------------------------------------------------------------
 
 const ShareResponseSchema = z
   .object({
@@ -676,10 +644,6 @@ export async function fetchSharedSession(shareToken: string): Promise<SharedSess
   };
 }
 
-// ---------------------------------------------------------------------------
-// Authorization cache invalidation
-// ---------------------------------------------------------------------------
-
 export async function invalidateOrganizationSessionAccess(
   kiloUserId: string,
   organizationId: string
@@ -719,10 +683,6 @@ export async function invalidateOrganizationSessionAccess(
     throw error;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Delete
-// ---------------------------------------------------------------------------
 
 /**
  * Delete a session via the session-ingest worker.

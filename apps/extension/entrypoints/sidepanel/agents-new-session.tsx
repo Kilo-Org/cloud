@@ -25,7 +25,7 @@ import {
   formatSessionError,
   parseCreateSessionResponse,
 } from '@kilocode/cloud-agent-sdk';
-import type { CreateRemoteSessionInput } from '@kilocode/cloud-agent-sdk';
+import type { CreateRemoteSessionInput, KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import { CONVERSATION_CREATED_EVENT, captureEvent } from '@/src/shared/analytics';
 import { getKiloApiBaseUrl, loadStoredAuth } from '@/src/shared/auth';
@@ -236,7 +236,7 @@ export const AgentsNewSession = ({
   onCreated: (kiloSessionId: string, initialPrompt?: string) => void;
   onCancel: () => void;
 }): JSX.Element => {
-  const { organizationId, token, trpcClient, userWebConnection } = useExtensionAgents();
+  const { manager, organizationId, token, trpcClient, userWebConnection } = useExtensionAgents();
   const queryClient = useQueryClient();
 
   const { auth, isLoading: isAuthLoading } = useStoredAuth();
@@ -538,6 +538,7 @@ export const AgentsNewSession = ({
         });
         captureEvent(CONVERSATION_CREATED_EVENT, { mode: 'agents' });
         setIsSubmitting(false);
+        manager.noteSpawnedSession(parsed.kiloSessionId as KiloSessionId);
         onCreated(parsed.kiloSessionId, trimmed);
       } catch (error) {
         setSubmitError(error instanceof Error ? error.message : 'Failed to start the session.');
@@ -610,6 +611,7 @@ export const AgentsNewSession = ({
     trpcClient,
     queryClient,
     onCreated,
+    manager,
   ]);
 
   const creditsUrl = useMemo(() => {

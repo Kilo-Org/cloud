@@ -403,6 +403,14 @@ type SessionManagerConfig = {
    */
   isStalledTransportError?: (err: unknown) => boolean;
   /**
+   * Opt-in for a consumer that opens a session immediately after creating it
+   * (the extension's CLI target). A just-created session can answer NOT_FOUND
+   * until its row is readable, so inside the window the open keeps loading and
+   * retries instead of latching the terminal not-available state. Absent, a
+   * NOT_FOUND stays terminal, which is what web and mobile expect.
+   */
+  spawnedSessionOpen?: SpawnedSessionOpenOptions;
+  /**
    * The consumer's send path can deliver remote-CLI attachment parts: it
    * materializes the presigned GET parts and passes them as `attachmentParts`.
    * The `supportsAttachments` gate reports a `remote` session supported only
@@ -651,6 +659,12 @@ type SessionManagerAtoms = {
 
 type SessionManager = {
   switchSession(kiloSessionId: KiloSessionId): Promise<void>;
+  /**
+   * Record that the consumer just created this session, so an open that races
+   * its row can wait for it instead of latching "no longer available". Only
+   * meaningful with `spawnedSessionOpen` configured.
+   */
+  noteSpawnedSession(kiloSessionId: KiloSessionId): void;
   hydrateChildSession(childSessionId: KiloSessionId): Promise<void>;
   /**
    * Load the next page of older messages for a hydrated child session using
@@ -769,6 +783,18 @@ type SessionManager = {
   destroy(): void;
   atoms: SessionManagerAtoms;
 };
+
+export type SpawnedSessionOpenOptions = {
+  /** How long after `noteSpawnedSession` a NOT_FOUND still counts as "not readable yet". */
+  graceMs: number;
+  /** Delay before re-opening a session that answered NOT_FOUND inside the window. */
+  retryDelayMs?: number;
+  /** Cap on NOT_FOUND retries per spawned session, so a missing row still surfaces. */
+  maxAttempts?: number;
+};
+
+const DEFAULT_SPAWNED_RETRY_DELAY_MS = 1_000;
+const DEFAULT_SPAWNED_MAX_ATTEMPTS = 10;
 
 const GENERIC_ERROR = 'Something went wrong. Please retry in a moment.';
 /** Terminal message for a child session whose first page is a worker 404 (not-found). */
@@ -1528,6 +1554,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * eviction order (`rememberDeniedSession`).
    */
   const deniedSessionIds = new Set<KiloSessionId>();
+  const spawnedSessions = new Map<KiloSessionId, { attempts: number; spawnedAt: number }>();
   let activeSessionType: ActiveSessionType | null = null;
   /**
    * Latest per-session capabilities reported by the live CLI transport's
@@ -2764,6 +2791,40 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   /**
+   * Whether this NOT_FOUND belongs to a session the consumer just created and
+   * whose row may still be on its way. Consumes one retry of the budget.
+   */
+  function takeSpawnedRetry(kiloSessionId: KiloSessionId): boolean {
+    const options = config.spawnedSessionOpen;
+    const spawned = spawnedSessions.get(kiloSessionId);
+    if (options === undefined || spawned === undefined) return false;
+    if (Date.now() - spawned.spawnedAt > options.graceMs) {
+      spawnedSessions.delete(kiloSessionId);
+      return false;
+    }
+    const maxAttempts = options.maxAttempts ?? DEFAULT_SPAWNED_MAX_ATTEMPTS;
+    if (spawned.attempts >= maxAttempts) {
+      spawnedSessions.delete(kiloSessionId);
+      return false;
+    }
+    spawned.attempts += 1;
+    return true;
+  }
+
+  /**
+   * Re-open a spawned session that answered NOT_FOUND, unless the caller has
+   * moved on. The session stays in its loading state until the row is readable
+   * or the retry budget runs out.
+   */
+  function scheduleSpawnedRetry(open: SessionOpen): void {
+    const delay = config.spawnedSessionOpen?.retryDelayMs ?? DEFAULT_SPAWNED_RETRY_DELAY_MS;
+    setTimeout(() => {
+      if (open.expectedGeneration !== switchGeneration) return;
+      void switchSession(open.kiloSessionId);
+    }, delay);
+  }
+
+  /**
    * Record a session the server answered as not available. Recently touched
    * ids survive eviction; the active session is never evicted.
    */
@@ -3240,6 +3301,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (open.expectedGeneration !== switchGeneration || open.denied) return null;
     // The server confirmed this id, so its page may be used again.
     deniedSessionIds.delete(open.kiloSessionId);
+    spawnedSessions.delete(open.kiloSessionId);
     return data;
   }
 
@@ -3247,6 +3309,17 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const parsed = errorShapeSchema.safeParse(error);
     const code = parsed.success ? (parsed.data.data?.code ?? parsed.data.shape?.code) : undefined;
     if (code !== 'NOT_FOUND' && code !== 'UNAUTHORIZED' && code !== 'FORBIDDEN') return false;
+    if (code === 'NOT_FOUND' && takeSpawnedRetry(open.kiloSessionId)) {
+      open.acceptCachedPage = false;
+      stateUnsub?.();
+      stateUnsub = null;
+      currentSession?.destroy();
+      currentSession = null;
+      store.set(isLoadingAtom, true);
+      setIndicator(null);
+      scheduleSpawnedRetry(open);
+      return true;
+    }
     open.denied = true;
     open.acceptCachedPage = false;
     open.surfaceDeferredOpenFailure = null;
@@ -4453,6 +4526,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   return {
     switchSession,
+    noteSpawnedSession: (kiloSessionId: KiloSessionId) => {
+      if (config.spawnedSessionOpen === undefined) return;
+      spawnedSessions.set(kiloSessionId, { attempts: 0, spawnedAt: Date.now() });
+    },
     hydrateChildSession,
     loadOlderChildMessages,
     loadOlderMessages,

@@ -11923,3 +11923,74 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
     });
   });
 });
+
+describe('createSessionManager — spawned session open', () => {
+  const notFound = { data: { code: 'NOT_FOUND' } };
+
+  const settle = async (): Promise<void> => {
+    jest.advanceTimersByTime(10);
+    for (let tick = 0; tick < 5; tick += 1) await Promise.resolve();
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('keeps a just-spawned NOT_FOUND out of the terminal state and retries the open', async () => {
+    const fetchSession = jest
+      .fn()
+      .mockRejectedValueOnce(notFound)
+      .mockRejectedValueOnce(notFound)
+      .mockResolvedValue(defaultFetchedSession);
+    const config = createMockConfig({
+      fetchSession,
+      spawnedSessionOpen: { graceMs: 10_000, maxAttempts: 5, retryDelayMs: 1 },
+    });
+    const mgr = createSessionManager(config);
+    mgr.noteSpawnedSession(kiloId('ses-1'));
+
+    await mgr.switchSession(kiloId('ses-1'));
+
+    expect(atomValue(config.store, mgr.atoms.statusIndicator)).toBeNull();
+    await settle();
+    await settle();
+    expect(fetchSession.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(atomValue<{ code?: string } | null>(config.store, mgr.atoms.statusIndicator)?.code).not.toBe(
+      'child-session-not-found'
+    );
+  });
+
+  it('keeps NOT_FOUND terminal when the option is absent', async () => {
+    const config = createMockConfig({
+      fetchSession: jest.fn().mockRejectedValue(notFound),
+    });
+    const mgr = createSessionManager(config);
+    mgr.noteSpawnedSession(kiloId('ses-1'));
+
+    await mgr.switchSession(kiloId('ses-1'));
+
+    expect(atomValue<{ code?: string } | null>(config.store, mgr.atoms.statusIndicator)?.code).toBe(
+      'child-session-not-found'
+    );
+  });
+
+  it('gives up after maxAttempts so a session that never appears still surfaces', async () => {
+    const config = createMockConfig({
+      fetchSession: jest.fn().mockRejectedValue(notFound),
+      spawnedSessionOpen: { graceMs: 10_000, maxAttempts: 2, retryDelayMs: 1 },
+    });
+    const mgr = createSessionManager(config);
+    mgr.noteSpawnedSession(kiloId('ses-1'));
+
+    await mgr.switchSession(kiloId('ses-1'));
+    for (let attempt = 0; attempt < 6; attempt += 1) await settle();
+
+    expect(
+      atomValue<{ code?: string } | null>(config.store, mgr.atoms.statusIndicator)?.code
+    ).toBe('child-session-not-found');
+  });
+});

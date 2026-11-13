@@ -16,7 +16,7 @@ import type {
   SessionSnapshotPageOutcome,
   UserWebConnection,
 } from '@kilocode/cloud-agent-sdk';
-import type { MobileRouter, inferRouterOutputs } from '@kilocode/trpc/mobile';
+import type { MobileRouter } from '@kilocode/trpc/mobile';
 import { rememberToolImage } from './agent-tool-images';
 import { getCloudAgentWsUrl } from './cloud-agent-config';
 
@@ -100,16 +100,13 @@ export function readFetchSessionErrorCode(error: unknown): string | undefined {
   return asString(error['code']);
 }
 
-type SessionWithRuntimeState =
-  inferRouterOutputs<MobileRouter>['cliSessionsV2']['getWithRuntimeState'];
-
-export async function fetchSessionWithNotFoundRetry(
+export async function fetchSessionWithNotFoundRetry<T>(
   kiloSessionId: KiloSessionId,
   options: {
-    query: (id: KiloSessionId) => Promise<SessionWithRuntimeState>;
+    query: (id: KiloSessionId) => Promise<T>;
     sleep?: (ms: number) => Promise<void>;
   }
-): Promise<SessionWithRuntimeState> {
+): Promise<T> {
   const sleep = options.sleep ?? defaultFetchSessionSleep;
   let attempt = 0;
   for (;;) {
@@ -725,9 +722,12 @@ export function createExtensionAgentSessionManager({
     },
 
     resolveSession: async (kiloSessionId: KiloSessionId): Promise<ResolvedSession> => {
-      // CliSessionsV2.get first. A failed query propagates — it must NOT
-      // Be silently classified as read-only.
-      const session = await trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
+      // CliSessionsV2.get first, retrying a NOT_FOUND: a session the caller
+      // just created can answer before its row is readable, and a failure here
+      // must NOT be silently classified as read-only.
+      const session = await fetchSessionWithNotFoundRetry(kiloSessionId, {
+        query: id => trpcClient.cliSessionsV2.get.query({ session_id: id }),
+      });
       if (session.cloud_agent_session_id !== null && session.cloud_agent_session_id !== '') {
         return {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- server-validated branded string
@@ -756,5 +756,6 @@ export function createExtensionAgentSessionManager({
     store,
     userWebConnection,
     websocketBaseUrl: getCloudAgentWsUrl(),
+    spawnedSessionOpen: { graceMs: 30_000, maxAttempts: 15, retryDelayMs: 1_500 },
   });
 }

@@ -204,6 +204,7 @@ function targetFixture() {
         { name: 'SESSION_SYNC_TENANT_DO', class_name: 'SessionSyncTenantDO' },
         { name: 'SESSION_RELAY_DO', class_name: 'SessionRelayDO' },
         { name: 'SESSION_PRESENCE_DO', class_name: 'SessionPresenceDO' },
+        { name: 'SESSION_NOTIFICATIONS_DO', class_name: 'SessionNotificationsDO' },
       ],
     },
     secrets_store_secrets: [

@@ -109,6 +109,7 @@
       { "name": "SESSION_SYNC_TENANT_DO", "class_name": "SessionSyncTenantDO" },
       { "name": "SESSION_RELAY_DO", "class_name": "SessionRelayDO" },
       { "name": "SESSION_PRESENCE_DO", "class_name": "SessionPresenceDO" },
+      { "name": "SESSION_NOTIFICATIONS_DO", "class_name": "SessionNotificationsDO" },
     ],
   },
   "migrations": [
@@ -118,6 +119,7 @@
     },
     { "tag": "v2", "new_sqlite_classes": ["SessionSyncTenantDO"] },
     { "tag": "v3", "new_sqlite_classes": ["SessionRelayDO", "SessionPresenceDO"] },
+    { "tag": "v4", "new_sqlite_classes": ["SessionNotificationsDO"] },
   ],
   "r2_buckets": [
     {
@@ -193,6 +195,7 @@
           { "name": "SESSION_SYNC_TENANT_DO", "class_name": "SessionSyncTenantDO" },
           { "name": "SESSION_RELAY_DO", "class_name": "SessionRelayDO" },
           { "name": "SESSION_PRESENCE_DO", "class_name": "SessionPresenceDO" },
+          { "name": "SESSION_NOTIFICATIONS_DO", "class_name": "SessionNotificationsDO" },
         ],
       },
       "r2_buckets": [

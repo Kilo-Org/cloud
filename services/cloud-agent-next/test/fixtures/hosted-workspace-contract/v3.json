@@ -22,12 +22,7 @@
   "requests": [
     {
       "procedure": "listHostedWorkspaces",
-      "fields": [
-        "cursor",
-        "limit",
-        "repositoryUrl",
-        "sessionLimit"
-      ],
+      "fields": ["cursor", "limit", "repositoryUrl", "sessionLimit"],
       "example": {
         "limit": 50,
         "sessionLimit": 10
@@ -35,11 +30,7 @@
     },
     {
       "procedure": "getHostedWorkspace",
-      "fields": [
-        "sessionCursor",
-        "sessionLimit",
-        "workspaceId"
-      ],
+      "fields": ["sessionCursor", "sessionLimit", "workspaceId"],
       "example": {
         "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
         "sessionLimit": 100
@@ -47,10 +38,7 @@
     },
     {
       "procedure": "getHostedWorkspaceStatus",
-      "fields": [
-        "kilocodeOrganizationId",
-        "workspaceId"
-      ],
+      "fields": ["kilocodeOrganizationId", "workspaceId"],
       "example": {
         "workspaceId": "worktree_11111111-1111-4111-8111-111111111111"
       }
@@ -113,11 +101,7 @@
     },
     {
       "procedure": "deleteHostedWorkspaceSession",
-      "fields": [
-        "operationKey",
-        "sessionId",
-        "workspaceId"
-      ],
+      "fields": ["operationKey", "sessionId", "workspaceId"],
       "example": {
         "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
         "sessionId": "workspace_11111111-1111-4111-8111-111111111111",
@@ -155,38 +139,28 @@
     },
     {
       "procedure": "listHostedWorkspaceProfiles",
-      "fields": [
-        "kilocodeOrganizationId"
-      ],
+      "fields": ["kilocodeOrganizationId"],
       "example": {
         "kilocodeOrganizationId": "11111111-1111-4111-8111-111111111111"
       }
     },
     {
       "procedure": "setHostedWorkspacePersonalDefaultProfile",
-      "fields": [
-        "profileId"
-      ],
+      "fields": ["profileId"],
       "example": {
         "profileId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
       }
     },
     {
       "procedure": "clearHostedWorkspacePersonalDefaultProfile",
-      "fields": [
-        "profileId"
-      ],
+      "fields": ["profileId"],
       "example": {
         "profileId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
       }
     },
     {
       "procedure": "deleteWorktree",
-      "fields": [
-        "kilocodeOrganizationId",
-        "onlyIfSoleSessionId",
-        "worktreeId"
-      ],
+      "fields": ["kilocodeOrganizationId", "onlyIfSoleSessionId", "worktreeId"],
       "example": {
         "worktreeId": "worktree_11111111-1111-4111-8111-111111111111",
         "onlyIfSoleSessionId": "ses_12345678901234567890123456"
@@ -194,33 +168,21 @@
     },
     {
       "procedure": "getHostedWorkspaceChanges",
-      "fields": [
-        "kilocodeOrganizationId",
-        "workspaceId"
-      ],
+      "fields": ["kilocodeOrganizationId", "workspaceId"],
       "example": {
         "workspaceId": "worktree_11111111-1111-4111-8111-111111111111"
       }
     },
     {
       "procedure": "refreshHostedWorkspaceChanges",
-      "fields": [
-        "kilocodeOrganizationId",
-        "workspaceId"
-      ],
+      "fields": ["kilocodeOrganizationId", "workspaceId"],
       "example": {
         "workspaceId": "worktree_11111111-1111-4111-8111-111111111111"
       }
     },
     {
       "procedure": "getHostedWorkspaceChangeFile",
-      "fields": [
-        "expectedRevision",
-        "kilocodeOrganizationId",
-        "path",
-        "scope",
-        "workspaceId"
-      ],
+      "fields": ["expectedRevision", "kilocodeOrganizationId", "path", "scope", "workspaceId"],
       "example": {
         "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
         "path": "src/app.ts",
@@ -229,22 +191,14 @@
     },
     {
       "procedure": "getHostedWorkspacePullRequest",
-      "fields": [
-        "kilocodeOrganizationId",
-        "workspaceId"
-      ],
+      "fields": ["kilocodeOrganizationId", "workspaceId"],
       "example": {
         "workspaceId": "worktree_11111111-1111-4111-8111-111111111111"
       }
     },
     {
       "procedure": "getHostedWorkspacePullRequestFile",
-      "fields": [
-        "expectedHeadSha",
-        "kilocodeOrganizationId",
-        "path",
-        "workspaceId"
-      ],
+      "fields": ["expectedHeadSha", "kilocodeOrganizationId", "path", "workspaceId"],
       "example": {
         "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
         "path": "src/app.ts",
@@ -255,10 +209,7 @@
   "responses": [
     {
       "procedure": "listHostedWorkspaces",
-      "fields": [
-        "items",
-        "nextCursor"
-      ],
+      "fields": ["items", "nextCursor"],
       "example": {
         "items": [],
         "nextCursor": null
@@ -368,13 +319,7 @@
     },
     {
       "procedure": "createHostedWorkspace",
-      "fields": [
-        "cloudAgentSessionId",
-        "kiloSessionId",
-        "messageId",
-        "replayed",
-        "workspaceId"
-      ],
+      "fields": ["cloudAgentSessionId", "kiloSessionId", "messageId", "replayed", "workspaceId"],
       "example": {
         "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
         "cloudAgentSessionId": "workspace_11111111-1111-4111-8111-111111111111",
@@ -384,13 +329,7 @@
     },
     {
       "procedure": "createHostedWorkspaceSession",
-      "fields": [
-        "cloudAgentSessionId",
-        "kiloSessionId",
-        "messageId",
-        "replayed",
-        "workspaceId"
-      ],
+      "fields": ["cloudAgentSessionId", "kiloSessionId", "messageId", "replayed", "workspaceId"],
       "example": {
         "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
         "cloudAgentSessionId": "workspace_11111111-1111-4111-8111-111111111111",
@@ -400,12 +339,7 @@
     },
     {
       "procedure": "deleteHostedWorkspaceSession",
-      "fields": [
-        "cleanup",
-        "sessionId",
-        "success",
-        "workspaceId"
-      ],
+      "fields": ["cleanup", "sessionId", "success", "workspaceId"],
       "example": {
         "success": true,
         "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
@@ -415,12 +349,7 @@
     },
     {
       "procedure": "continueHostedWorkspace",
-      "fields": [
-        "activeKiloSessionId",
-        "replayed",
-        "sessions",
-        "workspaceId"
-      ],
+      "fields": ["activeKiloSessionId", "replayed", "sessions", "workspaceId"],
       "example": {
         "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
         "sessions": [
@@ -475,47 +404,30 @@
     },
     {
       "procedure": "setHostedWorkspacePersonalDefaultProfile",
-      "fields": [
-        "success"
-      ],
+      "fields": ["success"],
       "example": {
         "success": true
       }
     },
     {
       "procedure": "clearHostedWorkspacePersonalDefaultProfile",
-      "fields": [
-        "success"
-      ],
+      "fields": ["success"],
       "example": {
         "success": true
       }
     },
     {
       "procedure": "deleteWorktree",
-      "fields": [
-        "cleanup",
-        "deletedSessionIds",
-        "success"
-      ],
+      "fields": ["cleanup", "deletedSessionIds", "success"],
       "example": {
         "success": true,
-        "deletedSessionIds": [
-          "ses_12345678901234567890123456"
-        ],
+        "deletedSessionIds": ["ses_12345678901234567890123456"],
         "cleanup": "complete"
       }
     },
     {
       "procedure": "getHostedWorkspaceChanges",
-      "fields": [
-        "capturedAt",
-        "comparisons",
-        "revision",
-        "status",
-        "truncated",
-        "workspaceId"
-      ],
+      "fields": ["capturedAt", "comparisons", "revision", "status", "truncated", "workspaceId"],
       "example": {
         "status": "captured",
         "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
@@ -557,10 +469,7 @@
     },
     {
       "procedure": "refreshHostedWorkspaceChanges",
-      "fields": [
-        "changes",
-        "status"
-      ],
+      "fields": ["changes", "status"],
       "example": {
         "status": "refreshed",
         "changes": {
@@ -605,13 +514,7 @@
     },
     {
       "procedure": "getHostedWorkspaceChangeFile",
-      "fields": [
-        "capturedAt",
-        "comparison",
-        "currentRevision",
-        "file",
-        "status"
-      ],
+      "fields": ["capturedAt", "comparison", "currentRevision", "file", "status"],
       "example": {
         "status": "available",
         "file": {
@@ -639,14 +542,7 @@
     },
     {
       "procedure": "getHostedWorkspacePullRequest",
-      "fields": [
-        "files",
-        "pullRequest",
-        "reason",
-        "status",
-        "truncated",
-        "workspaceId"
-      ],
+      "fields": ["files", "pullRequest", "reason", "status", "truncated", "workspaceId"],
       "example": {
         "status": "linked",
         "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
@@ -679,14 +575,7 @@
     },
     {
       "procedure": "getHostedWorkspacePullRequestFile",
-      "fields": [
-        "headSha",
-        "omissionReason",
-        "patch",
-        "path",
-        "reason",
-        "status"
-      ],
+      "fields": ["headSha", "omissionReason", "patch", "path", "reason", "status"],
       "example": {
         "status": "available",
         "path": "src/app.ts",
@@ -718,29 +607,10 @@
       "insufficient_evidence",
       "check_needed"
     ],
-    "providers": [
-      "Cloudflare",
-      "Cloudflare Containers",
-      "Vercel",
-      "Unknown"
-    ],
-    "deletionStates": [
-      "active",
-      "deleting",
-      "deleted"
-    ],
-    "deletionPhases": [
-      "not_started",
-      "runtime_cleanup",
-      "finalizing",
-      "completed"
-    ],
-    "wakeBlockedReasons": [
-      "deleting",
-      "deleted",
-      "billing_blocked",
-      "billing_status_unavailable"
-    ]
+    "providers": ["Cloudflare", "Cloudflare Containers", "Vercel", "Unknown"],
+    "deletionStates": ["active", "deleting", "deleted"],
+    "deletionPhases": ["not_started", "runtime_cleanup", "finalizing", "completed"],
+    "wakeBlockedReasons": ["deleting", "deleted", "billing_blocked", "billing_status_unavailable"]
   },
   "errorCodes": [
     "workspace_requires_root_session",

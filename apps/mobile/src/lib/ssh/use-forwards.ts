@@ -7,6 +7,7 @@ import {
   deleteForward,
   listForwardsForHost,
   type SshForward,
+  SshForwardConflictError,
   type SshForwardInput,
   updateForward,
 } from './forwards';
@@ -46,7 +47,13 @@ export function useSshForwardMutations() {
         : updateForward(db, input.id, input.forward);
     },
     onSuccess: () => void invalidate(),
-    onError: error => toast.error(error.message),
+    // A duplicate bind address is answered on the field that holds it, so the
+    // sheet shows it inline rather than as a toast over the same form.
+    onError: error => {
+      if (!(error instanceof SshForwardConflictError)) {
+        toast.error(error.message);
+      }
+    },
   });
   const remove = useMutation({
     mutationFn: async (id: string) => {

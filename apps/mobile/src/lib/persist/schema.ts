@@ -148,5 +148,15 @@ export const sshForwards = sqliteTable(
     autoStart: integer('auto_start', { mode: 'boolean' }).notNull().default(false),
     label: text('label'),
   },
-  table => [index('ssh_forwards_host').on(table.hostId)]
+  table => [
+    index('ssh_forwards_host').on(table.hostId),
+    // One listener per address on a connection: two forwards on the same bind
+    // port would race for it, and the second would fail when the session starts.
+    uniqueIndex('ssh_forwards_bind').on(
+      table.hostId,
+      table.direction,
+      table.bindHost,
+      table.bindPort
+    ),
+  ]
 );

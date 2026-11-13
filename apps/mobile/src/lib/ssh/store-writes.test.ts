@@ -3,7 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { importSshConfig, planSshConfigImport } from './config-import';
 import { type SshDatabase } from './database';
 import { createSshTestDatabase } from './database.test-helpers';
-import { listForwards } from './forwards';
+import {
+  createForward,
+  getForward,
+  listForwards,
+  listForwardsForHost,
+  SshForwardConflictError,
+  updateForward,
+} from './forwards';
 import { createHost, getHost, listHosts, SshJumpHostCycleError, updateHost } from './hosts';
 
 const ids = vi.hoisted(() => {
@@ -57,6 +64,64 @@ describe('jump hosts', () => {
 
     expect(() => updateHost(db, outer.id, { jumpHostId: inner.id })).toThrow(SshJumpHostCycleError);
     expect(getHost(db, outer.id)?.jumpHostId).toBeNull();
+  });
+});
+
+describe('forward bind addresses', () => {
+  const forward = (hostId: string, bindPort: number, direction: 'local' | 'remote' = 'local') => ({
+    hostId,
+    direction,
+    bindHost: '127.0.0.1',
+    bindPort,
+    destinationHost: 'dep',
+    destinationPort: 80,
+    autoStart: false,
+    label: null,
+  });
+
+  it('ships the unique index the store relies on', () => {
+    const indexes = db.getAllSync<{ name: string }>(
+      "select name from sqlite_master where type = 'index' and name = 'ssh_forwards_bind'",
+      []
+    );
+
+    expect(indexes).toEqual([{ name: 'ssh_forwards_bind' }]);
+  });
+
+  it('refuses a second forward on the same address', () => {
+    const target = host('target');
+    createForward(db, forward(target.id, 18080));
+
+    expect(() => createForward(db, forward(target.id, 18080))).toThrow(SshForwardConflictError);
+    expect(listForwardsForHost(db, target.id)).toHaveLength(1);
+  });
+
+  it('refuses a second forward on the same port for the same direction only', () => {
+    const target = host('target');
+    createForward(db, forward(target.id, 18080));
+
+    expect(() => createForward(db, forward(target.id, 18080, 'remote'))).not.toThrow();
+    expect(listForwardsForHost(db, target.id)).toHaveLength(2);
+  });
+
+  it('lets one forward move to another port and leaves its own address available', () => {
+    const target = host('target');
+    const stored = createForward(db, forward(target.id, 18080));
+
+    const moved = updateForward(db, stored.id, { ...forward(target.id, 18081) });
+
+    expect(moved.bindPort).toBe(18081);
+  });
+
+  it('refuses an edit onto an address another forward holds', () => {
+    const target = host('target');
+    createForward(db, forward(target.id, 18080));
+    const second = createForward(db, forward(target.id, 18081));
+
+    expect(() => updateForward(db, second.id, forward(target.id, 18080))).toThrow(
+      SshForwardConflictError
+    );
+    expect(getForward(db, second.id)?.bindPort).toBe(18081);
   });
 });
 

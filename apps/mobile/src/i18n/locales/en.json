@@ -4137,6 +4137,7 @@
       "fieldRequired": "This field is required."
     },
     "errors": {
+      "bindTaken": "That address is already forwarded by another forward on this host.",
       "invalidPort": "Use a port from 1 to 65535",
       "jumpCycle": "That host already jumps through this one."
     },

@@ -11,7 +11,7 @@ import { Sheet } from '@/components/ui/sheet';
 import { SwitchField } from '@/components/ssh/switch-field';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { forwardLabel, type SshForward } from '@/lib/ssh/forwards';
+import { forwardLabel, type SshForward, SshForwardConflictError } from '@/lib/ssh/forwards';
 import { useSshForwardMutations } from '@/lib/ssh/use-forwards';
 
 type ForwardEditorSheetProps = Readonly<{
@@ -24,8 +24,53 @@ type ForwardEditorSheetProps = Readonly<{
 
 const DEFAULT_BIND_HOST = '127.0.0.1';
 
-/** The form behind one stored forward. A draft stays until it is saved or discarded. */
+/**
+ * The form behind one stored forward. A draft belongs to one open: the fields
+ * are uncontrolled, so opening the sheet again mounts a new body rather than
+ * resetting the last draft's text.
+ */
 export function ForwardEditorSheet({ visible, hostId, forward, onClose }: ForwardEditorSheetProps) {
+  const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
+  // A ref, not state: the generation only keys the draft below, and bumping it
+  // during a render React discards is harmless (a discarded render drafts
+  // nothing). Bumping it on every open is what starts the new draft empty.
+  const draft = useRef({ visible: false, generation: 0 });
+  if (draft.current.visible !== visible) {
+    draft.current.visible = visible;
+    if (visible) {
+      draft.current.generation += 1;
+    }
+  }
+
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      dismissGestures={false}
+      onRequestDismiss={() => {
+        confirm({
+          title: t('common.discardChangesTitle'),
+          message: t('common.discardChangesMessage'),
+          confirmLabel: t('common.discard'),
+          cancelLabel: t('common.continue'),
+          onConfirm: onClose,
+        });
+        return false;
+      }}
+    >
+      <ForwardDraft
+        key={draft.current.generation}
+        hostId={hostId}
+        forward={forward}
+        onClose={onClose}
+      />
+      {dialog}
+    </Sheet>
+  );
+}
+
+function ForwardDraft({ hostId, forward, onClose }: Omit<ForwardEditorSheetProps, 'visible'>) {
   const { t } = useTranslation();
   const { save, remove } = useSshForwardMutations();
   const { confirm, dialog } = useConfirmDialog();
@@ -68,7 +113,14 @@ export function ForwardEditorSheet({ visible, hostId, forward, onClose }: Forwar
           label: label.length === 0 ? null : label,
         },
       },
-      { onSuccess: onClose }
+      {
+        onSuccess: onClose,
+        onError: error => {
+          setIssue(
+            error instanceof SshForwardConflictError ? t('ssh.errors.bindTaken') : error.message
+          );
+        },
+      }
     );
   }
 
@@ -87,21 +139,7 @@ export function ForwardEditorSheet({ visible, hostId, forward, onClose }: Forwar
   }
 
   return (
-    <Sheet
-      visible={visible}
-      onClose={onClose}
-      dismissGestures={false}
-      onRequestDismiss={() => {
-        confirm({
-          title: t('common.discardChangesTitle'),
-          message: t('common.discardChangesMessage'),
-          confirmLabel: t('common.discard'),
-          cancelLabel: t('common.continue'),
-          onConfirm: onClose,
-        });
-        return false;
-      }}
-    >
+    <>
       <View className="gap-4 px-4 pb-6">
         <Text accessibilityRole="header" className="text-base font-semibold text-foreground">
           {forward === null ? t('ssh.forwards.addTitle') : t('ssh.forwards.editTitle')}
@@ -204,7 +242,7 @@ export function ForwardEditorSheet({ visible, hostId, forward, onClose }: Forwar
         )}
       </View>
       {dialog}
-    </Sheet>
+    </>
   );
 }
 

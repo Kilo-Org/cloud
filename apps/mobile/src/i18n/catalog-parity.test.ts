@@ -27,7 +27,8 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * cannot ship. Delete an entry the translation slice has landed in every
  * catalog.
  *
- * Empty: the `notifications.category.*Unavailable` reasons, the Agents tab
+ * Lands in every catalog, so the missing-key assertion stays strict for them:
+ * the `notifications.category.*Unavailable` reasons, the Agents tab
  * header link (`agents.sessionList.pastSessions`), the scheduled-session labels
  * the count lines, the session list and the glanceable surfaces show
  * (`common.scheduled`, `sessionRow.scheduled`, `glanceable.scheduledWakes`),
@@ -42,7 +43,11 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * credits screen have all landed in every catalog, so the missing-key
  * assertion is strict again.
  */
-const PENDING_TRANSLATION_KEYS = new Set<string>();
+const PENDING_TRANSLATION_KEYS = new Set<string>([
+  // The duplicate-bind refusal the forward editor shows inline; the translation
+  // slice lands it in the other 86 catalogs.
+  'ssh.errors.bindTaken',
+]);
 
 function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<string> {
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {

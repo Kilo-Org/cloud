@@ -36,9 +36,11 @@ function registrationRateLimitKey(userId: string): string {
  * authenticated user.
  *
  * Error contract: 400 invalid request, 401 `{ error }` with a stable
- * `PasskeyVerificationError` code on refusal, 429 when the account exceeds the
- * registration-options firewall rule, 503 `RATE_LIMIT_UNAVAILABLE` when the
- * firewall check cannot be evaluated.
+ * `PasskeyVerificationError` code on refusal, 401 `REAUTH_REQUIRED` when this
+ * session is not fresh enough to enroll, 429 when the account exceeds the
+ * registration-options firewall rule, 503 `RATE_LIMIT_UNAVAILABLE` or
+ * `STEP_UP_UNAVAILABLE` when the firewall or the freshness lookup cannot be
+ * evaluated.
  */
 const requestSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('options') }),
@@ -50,21 +52,17 @@ const requestSchema = z.discriminatedUnion('action', [
 ]);
 
 /**
- * Admins may only enroll another sign-in factor when this browser session is
- * fresh: a live step-up proof is sufficient, and a first passkey (which cannot
- * have a proof yet) requires a primary sign-in from the last ten minutes.
+ * Enrollment requires a fresh session for every account: a live step-up proof
+ * is sufficient, and a first passkey (which cannot have a proof yet) requires a
+ * primary sign-in from the last ten minutes.
  *
- * This applies to every admin, not behind a release toggle: a stolen admin
- * cookie must not be enough to add a durable sign-in factor. Non-admins are
- * unaffected.
+ * The rule applies to every account and is not behind a release toggle.
  */
-async function refuseStaleAdminEnrollment(params: {
-  user: { id: string; is_admin: boolean };
+async function refuseStaleEnrollment(params: {
+  userId: string;
   webSessionId?: string;
   authenticatedAt?: number;
 }): Promise<NextResponse | null> {
-  if (!params.user.is_admin) return null;
-
   if (
     typeof params.authenticatedAt === 'number' &&
     Date.now() - params.authenticatedAt * 1000 <= STEP_UP_ENROLLMENT_FRESH_SIGNIN_MS
@@ -75,7 +73,7 @@ async function refuseStaleAdminEnrollment(params: {
   if (params.webSessionId) {
     try {
       const evaluation = await evaluateStepUp({
-        userId: params.user.id,
+        userId: params.userId,
         webSessionId: params.webSessionId,
         actionClass: 'platform_read',
       });
@@ -83,7 +81,7 @@ async function refuseStaleAdminEnrollment(params: {
     } catch (error) {
       // The freshness rule is a security control, so an unknown answer fails
       // closed for this request. The original Drizzle error is not reported.
-      reportStepUpFailure('admin_passkey_enrollment', error);
+      reportStepUpFailure('passkey_enrollment', error);
       return NextResponse.json({ error: 'STEP_UP_UNAVAILABLE' }, { status: 503 });
     }
   }
@@ -120,8 +118,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'RATE_LIMIT_UNAVAILABLE' }, { status: 503 });
       }
 
-      const reauth = await refuseStaleAdminEnrollment({
-        user,
+      const reauth = await refuseStaleEnrollment({
+        userId: user.id,
         webSessionId,
         authenticatedAt,
       });
@@ -134,8 +132,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ challengeId, options });
     }
 
-    const reauth = await refuseStaleAdminEnrollment({
-      user,
+    const reauth = await refuseStaleEnrollment({
+      userId: user.id,
       webSessionId,
       authenticatedAt,
     });

@@ -307,6 +307,7 @@
     "passkeyAdded": "Passkey toegevoegd.",
     "passkeyAddFailed": "Een passkey kon niet worden toegevoegd. Probeer het opnieuw.",
     "passkeyAddUnsupported": "Dit apparaat kan geen passkeys aanmaken.",
+    "passkeyAddUnavailable": "Passkeys kunnen alleen in een webbrowser worden toegevoegd.",
     "passkeyAddCancelled": "Het aanmaken van de passkey is geannuleerd.",
     "passkeyRemoved": "Passkey verwijderd.",
     "passkeyRemoveFailed": "Die passkey kon niet worden verwijderd. Probeer het opnieuw.",

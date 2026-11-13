@@ -307,6 +307,7 @@
     "passkeyAdded": "Etinyela igodo nbanye.",
     "passkeyAddFailed": "Enweghị ike ịgbakwunye igodo nbanye. Nwaa ọzọ.",
     "passkeyAddUnsupported": "Ngwaọrụ a enweghị ike ịmepụta igodo nbanye.",
+    "passkeyAddUnavailable": "Enwere ike ịgbakwunye igodo nbanye naanị na ihe nchọgharị weebụ.",
     "passkeyAddCancelled": "A kagburu ịmepụta igodo nbanye.",
     "passkeyRemoved": "Ewepụla igodo nbanye.",
     "passkeyRemoveFailed": "Enweghị ike iwepụ igodo nbanye ahụ. Nwaa ọzọ.",

@@ -307,6 +307,7 @@
     "passkeyAdded": "パスキーを追加しました。",
     "passkeyAddFailed": "パスキーを追加できませんでした。もう一度お試しください。",
     "passkeyAddUnsupported": "このデバイスではパスキーを作成できません。",
+    "passkeyAddUnavailable": "パスキーはウェブブラウザでのみ追加できます。",
     "passkeyAddCancelled": "パスキーの作成がキャンセルされました。",
     "passkeyRemoved": "パスキーを削除しました。",
     "passkeyRemoveFailed": "そのパスキーを削除できませんでした。もう一度お試しください。",

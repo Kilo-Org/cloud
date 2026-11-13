@@ -307,6 +307,7 @@
     "passkeyAdded": "पासकी जोडली.",
     "passkeyAddFailed": "पासकी जोडता आली नाही. पुन्हा प्रयत्न करा.",
     "passkeyAddUnsupported": "हे डिव्हाइस पासकी तयार करू शकत नाही.",
+    "passkeyAddUnavailable": "पासक्या फक्त वेब ब्राउझरमध्येच जोडता येतात.",
     "passkeyAddCancelled": "पासकी तयार करणे रद्द झाले.",
     "passkeyRemoved": "पासकी काढली.",
     "passkeyRemoveFailed": "ती पासकी काढता आली नाही. पुन्हा प्रयत्न करा.",

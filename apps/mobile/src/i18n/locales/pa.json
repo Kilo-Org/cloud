@@ -307,6 +307,7 @@
     "passkeyAdded": "ਪਾਸਕੀ ਸ਼ਾਮਲ ਕੀਤੀ ਗਈ।",
     "passkeyAddFailed": "ਪਾਸਕੀ ਸ਼ਾਮਲ ਨਹੀਂ ਹੋ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "passkeyAddUnsupported": "ਇਹ ਡਿਵਾਈਸ ਪਾਸਕੀ ਨਹੀਂ ਬਣਾ ਸਕਦੀ।",
+    "passkeyAddUnavailable": "ਪਾਸਕੀ ਸਿਰਫ਼ ਵੈੱਬ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਹੀ ਸ਼ਾਮਲ ਕੀਤੀ ਜਾ ਸਕਦੀ ਹੈ।",
     "passkeyAddCancelled": "ਪਾਸਕੀ ਬਣਾਉਣਾ ਰੱਦ ਹੋ ਗਿਆ।",
     "passkeyRemoved": "ਪਾਸਕੀ ਹਟਾ ਦਿੱਤੀ ਗਈ।",
     "passkeyRemoveFailed": "ਉਹ ਪਾਸਕੀ ਹਟਾਈ ਨਹੀਂ ਜਾ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",

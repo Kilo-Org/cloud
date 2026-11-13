@@ -307,6 +307,7 @@
     "passkeyAdded": "Kle aksè ajoute.",
     "passkeyAddFailed": "Pa t kapab ajoute yon kle aksè. Eseye ankò.",
     "passkeyAddUnsupported": "Aparèy sa a pa ka kreye kle aksè.",
+    "passkeyAddUnavailable": "Kle aksè yo ka ajoute sèlman nan yon navigatè wèb.",
     "passkeyAddCancelled": "Yo anile kreyasyon kle aksè a.",
     "passkeyRemoved": "Kle aksè retire.",
     "passkeyRemoveFailed": "Pa t kapab retire kle aksè sa a. Eseye ankò.",

@@ -307,6 +307,7 @@
     "passkeyAdded": "Passkey hinzugefügt.",
     "passkeyAddFailed": "Passkey konnte nicht hinzugefügt werden. Versuche es erneut.",
     "passkeyAddUnsupported": "Dieses Gerät kann keine Passkeys erstellen.",
+    "passkeyAddUnavailable": "Passkeys können nur in einem Webbrowser hinzugefügt werden.",
     "passkeyAddCancelled": "Passkey-Erstellung wurde abgebrochen.",
     "passkeyRemoved": "Passkey entfernt.",
     "passkeyRemoveFailed": "Der Passkey konnte nicht entfernt werden. Versuche es erneut.",

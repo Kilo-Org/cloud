@@ -307,6 +307,7 @@
     "passkeyAdded": "Piekļuves atslēga pievienota.",
     "passkeyAddFailed": "Neizdevās pievienot piekļuves atslēgu. Mēģiniet vēlreiz.",
     "passkeyAddUnsupported": "Šī ierīce nevar izveidot piekļuves atslēgas.",
+    "passkeyAddUnavailable": "Piekļuves atslēgas var pievienot tikai tīmekļa pārlūkā.",
     "passkeyAddCancelled": "Piekļuves atslēgas izveide tika atcelta.",
     "passkeyRemoved": "Piekļuves atslēga noņemta.",
     "passkeyRemoveFailed": "Neizdevās noņemt šo piekļuves atslēgu. Mēģiniet vēlreiz.",

@@ -307,6 +307,7 @@
     "passkeyAdded": "An ƙara maɓallin shiga.",
     "passkeyAddFailed": "Ba a iya ƙara maɓallin shiga ba. Sake gwadawa.",
     "passkeyAddUnsupported": "Wannan na'urar ba za ta iya ƙirƙirar maɓallan shiga ba.",
+    "passkeyAddUnavailable": "Ba za a iya ƙara maɓallan shiga ba sai a cikin burauza na yanar gizo.",
     "passkeyAddCancelled": "An soke ƙirƙirar maɓallin shiga.",
     "passkeyRemoved": "An cire maɓallin shiga.",
     "passkeyRemoveFailed": "Ba a iya cire wannan maɓallin shiga ba. Sake gwadawa.",

@@ -307,6 +307,7 @@
     "passkeyAdded": "Aðgangslykli bætt við.",
     "passkeyAddFailed": "Tókst ekki að bæta við aðgangslykli. Reyndu aftur.",
     "passkeyAddUnsupported": "Þetta tæki getur ekki búið til aðgangslykla.",
+    "passkeyAddUnavailable": "Aðeins er hægt að bæta við aðgangslyklum í vefvafra.",
     "passkeyAddCancelled": "Hætt var við að búa til aðgangslykil.",
     "passkeyRemoved": "Aðgangslykli eytt.",
     "passkeyRemoveFailed": "Tókst ekki að eyða þessum aðgangslykli. Reyndu aftur.",

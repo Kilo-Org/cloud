@@ -307,6 +307,7 @@
     "passkeyAdded": "ପାସକି ଯୋଡ଼ାଗଲା।",
     "passkeyAddFailed": "ପାସକି ଯୋଡ଼ାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "passkeyAddUnsupported": "ଏହି ଡିଭାଇସ୍ ପାସକି ତିଆରି କରିପାରିବ ନାହିଁ।",
+    "passkeyAddUnavailable": "ପାସକି କେବଳ ଏକ ୱେବ୍ ବ୍ରାଉଜରରେ ଯୋଡ଼ାଯାଇପାରିବ।",
     "passkeyAddCancelled": "ପାସକି ତିଆରି ବାତିଲ୍ ହୋଇଛି।",
     "passkeyRemoved": "ପାସକି ହଟାଗଲା।",
     "passkeyRemoveFailed": "ସେହି ପାସକି ହଟାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",

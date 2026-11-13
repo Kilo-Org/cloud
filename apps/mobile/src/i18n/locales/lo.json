@@ -307,6 +307,7 @@
     "passkeyAdded": "ເພີ່ມກະແຈເຂົ້າແລ້ວ.",
     "passkeyAddFailed": "ບໍ່ສາມາດເພີ່ມກະແຈເຂົ້າໄດ້. ລອງອີກຄັ້ງ.",
     "passkeyAddUnsupported": "ອຸປະກອນນີ້ສ້າງກະແຈເຂົ້າບໍ່ໄດ້.",
+    "passkeyAddUnavailable": "ສາມາດເພີ່ມກະແຈເຂົ້າໄດ້ໃນບຣາວເຊີເວັບເທົ່ານັ້ນ.",
     "passkeyAddCancelled": "ການສ້າງກະແຈເຂົ້າຖືກຍົກເລິກ.",
     "passkeyRemoved": "ລຶບກະແຈເຂົ້າແລ້ວ.",
     "passkeyRemoveFailed": "ບໍ່ສາມາດລຶບກະແຈເຂົ້ານັ້ນໄດ້. ລອງອີກຄັ້ງ.",

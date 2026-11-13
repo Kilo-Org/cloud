@@ -307,6 +307,7 @@
     "passkeyAdded": "Chave de acceso engadida.",
     "passkeyAddFailed": "Non se puido engadir unha chave de acceso. Téntao de novo.",
     "passkeyAddUnsupported": "Este dispositivo non pode crear chaves de acceso.",
+    "passkeyAddUnavailable": "As chaves de acceso só se poden engadir nun navegador web.",
     "passkeyAddCancelled": "Cancelouse a creación da chave de acceso.",
     "passkeyRemoved": "Chave de acceso eliminada.",
     "passkeyRemoveFailed": "Non se puido eliminar esa chave de acceso. Téntao de novo.",

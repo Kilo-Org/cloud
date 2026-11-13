@@ -307,6 +307,7 @@
     "passkeyAdded": "Çelësi i hyrjes u shtua.",
     "passkeyAddFailed": "Nuk u arrit të shtohej një çelës hyrjeje. Provo përsëri.",
     "passkeyAddUnsupported": "Kjo pajisje nuk mund të krijojë çelësa hyrjeje.",
+    "passkeyAddUnavailable": "Çelësat e hyrjes mund të shtohen vetëm në një shfletues ueb.",
     "passkeyAddCancelled": "Krijimi i çelësit të hyrjes u anulua.",
     "passkeyRemoved": "Çelësi i hyrjes u hoq.",
     "passkeyRemoveFailed": "Ai çelës hyrjeje nuk u hoq dot. Provo përsëri.",

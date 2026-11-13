@@ -307,6 +307,7 @@
     "passkeyAdded": "Kirish kaliti qoʻshildi.",
     "passkeyAddFailed": "Kirish kaliti qoʻshib boʻlmadi. Qayta urinib koʻring.",
     "passkeyAddUnsupported": "Bu qurilma kirish kalitlarini yarata olmaydi.",
+    "passkeyAddUnavailable": "Kirish kalitlarini faqat veb-brauzerda qoʻshish mumkin.",
     "passkeyAddCancelled": "Kirish kaliti yaratish bekor qilindi.",
     "passkeyRemoved": "Kirish kaliti olib tashlandi.",
     "passkeyRemoveFailed": "Oʻsha kirish kalitini olib tashlab boʻlmadi. Qayta urinib koʻring.",

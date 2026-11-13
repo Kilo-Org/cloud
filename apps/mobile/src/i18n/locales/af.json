@@ -307,6 +307,7 @@
     "passkeyAdded": "Passkey bygevoeg.",
     "passkeyAddFailed": "Kon nie ’n passkey byvoeg nie. Probeer weer.",
     "passkeyAddUnsupported": "Hierdie toestel kan nie passkeys skep nie.",
+    "passkeyAddUnavailable": "Passkeys kan slegs in ’n webblaaier bygevoeg word.",
     "passkeyAddCancelled": "Passkey-skepping is gekanselleer.",
     "passkeyRemoved": "Passkey verwyder.",
     "passkeyRemoveFailed": "Kon nie daardie passkey verwyder nie. Probeer weer.",

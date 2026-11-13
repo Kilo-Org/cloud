@@ -307,6 +307,7 @@
     "passkeyAdded": "Kunci laluan ditambah.",
     "passkeyAddFailed": "Kunci laluan tidak dapat ditambah. Cuba lagi.",
     "passkeyAddUnsupported": "Peranti ini tidak boleh mencipta kunci laluan.",
+    "passkeyAddUnavailable": "Kunci laluan hanya boleh ditambah dalam pelayar web.",
     "passkeyAddCancelled": "Penciptaan kunci laluan dibatalkan.",
     "passkeyRemoved": "Kunci laluan dialih keluar.",
     "passkeyRemoveFailed": "Kunci laluan itu tidak dapat dialih keluar. Cuba lagi.",

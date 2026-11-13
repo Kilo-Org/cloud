@@ -307,6 +307,7 @@
     "passkeyAdded": "ಪಾಸ್ಕೀ ಸೇರಿಸಲಾಗಿದೆ.",
     "passkeyAddFailed": "ಪಾಸ್ಕೀ ಸೇರಿಸಲಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "passkeyAddUnsupported": "ಈ ಸಾಧನವು ಪಾಸ್ಕೀಗಳನ್ನು ರಚಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.",
+    "passkeyAddUnavailable": "ಪಾಸ್ಕೀಗಳನ್ನು ವೆಬ್ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಮಾತ್ರ ಸೇರಿಸಬಹುದು.",
     "passkeyAddCancelled": "ಪಾಸ್ಕೀ ರಚನೆ ರದ್ದಾಗಿದೆ.",
     "passkeyRemoved": "ಪಾಸ್ಕೀ ತೆಗೆದುಹಾಕಲಾಗಿದೆ.",
     "passkeyRemoveFailed": "ಆ ಪಾಸ್ಕೀ ತೆಗೆದುಹಾಕಲಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",

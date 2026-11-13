@@ -307,6 +307,7 @@
     "passkeyAdded": "已新增通行密鑰。",
     "passkeyAddFailed": "無法新增通行密鑰。請重試。",
     "passkeyAddUnsupported": "此裝置無法建立通行密鑰。",
+    "passkeyAddUnavailable": "通行密鑰只能在網頁瀏覽器中新增。",
     "passkeyAddCancelled": "通行密鑰建立已取消。",
     "passkeyRemoved": "已移除通行密鑰。",
     "passkeyRemoveFailed": "無法移除該通行密鑰。請重試。",

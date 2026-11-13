@@ -307,6 +307,7 @@
     "passkeyAdded": "کلید عبور افزوده شد.",
     "passkeyAddFailed": "افزودن کلید عبور ممکن نشد. دوباره تلاش کنید.",
     "passkeyAddUnsupported": "این دستگاه نمی‌تواند کلید عبور بسازد.",
+    "passkeyAddUnavailable": "کلیدهای عبور را فقط می‌توان در یک مرورگر وب افزود.",
     "passkeyAddCancelled": "ساخت کلید عبور لغو شد.",
     "passkeyRemoved": "کلید عبور حذف شد.",
     "passkeyRemoveFailed": "حذف آن کلید عبور ممکن نشد. دوباره تلاش کنید.",

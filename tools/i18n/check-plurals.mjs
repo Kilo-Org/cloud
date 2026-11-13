@@ -94,6 +94,14 @@ export const NO_AGREEMENT = new Map([
     'codeReviewer.repos.allModeCount',
     'bare count after a label: "Repositories available: {{displayCount}}" names no inflected word',
   ],
+  [
+    'securityAgent.orphanedFindings.count',
+    'bare count after a label: "Findings: {{count}}" names no inflected word',
+  ],
+  [
+    'securityAgent.orphanedFindings.cleared',
+    'bare count after a label: "Findings cleared: {{count}}" names no inflected word',
+  ],
   ['prReview.checks.pending', 'participle: "{{displayCount}} pending" has no count form'],
   [
     'prReview.discussion.reactionPill',

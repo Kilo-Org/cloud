@@ -230,6 +230,30 @@ vi.mock('@/lib/hooks/use-code-reviewer-repo-sync', () => ({
 }));
 vi.mock('@/lib/hooks/use-code-reviews', () => ({ useReviewList: () => state.reviews }));
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
+vi.mock('@/lib/hooks/use-reviewer-council', () => ({
+  useCouncilGate: () => ({ allowed: false, pending: false }),
+  useCouncilUiEnabled: () => false,
+}));
+vi.mock('@/lib/hooks/use-repository-access-sync', () => ({
+  useRepositoryAccessSync: (_scope: string, _platform: string) => ({
+    manageAccess: undefined,
+    resync: state.resync,
+    resyncing: false,
+    refreshing: false,
+    refreshRepositories: () => void state.resync(),
+  }),
+}));
+vi.mock('@/components/agents/model-selector', () => ({ openModelPicker: vi.fn() }));
+vi.mock('@/lib/hooks/use-available-models', () => ({
+  modelLabelFromCatalogue: () => 'default model',
+  thinkingEffortLabel: (effort: string) => effort,
+}));
+vi.mock('@/components/code-reviewer/repository-model-overrides', () => ({
+  RepositoryModelOverrides: 'RepositoryModelOverrides',
+}));
+vi.mock('@/components/code-reviewer/review-memory-analyze-section', () => ({
+  ReviewMemoryAnalyzeSection: 'ReviewMemoryAnalyzeSection',
+}));
 
 beforeEach(() => {
   state.insets.left = 0;

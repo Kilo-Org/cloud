@@ -234,6 +234,17 @@ vi.mock('@/lib/hooks/use-manage-repository-access', () => ({
 vi.mock('@/lib/hooks/use-code-reviewer-repo-selection', () => ({
   useRepoSelectionToggle: () => vi.fn(),
 }));
+vi.mock('@/components/agents/model-selector', () => ({ openModelPicker: vi.fn() }));
+vi.mock('@/lib/hooks/use-available-models', () => ({
+  modelLabelFromCatalogue: () => 'default model',
+  thinkingEffortLabel: (effort: string) => effort,
+}));
+vi.mock('@/lib/hooks/use-reviewer-models', () => ({
+  useReviewerModels: () => ({ models: [], isLoading: false }),
+}));
+vi.mock('@/components/code-reviewer/repository-model-overrides', () => ({
+  RepositoryModelOverrides: 'RepositoryModelOverrides',
+}));
 
 const REPOSITORIES = [
   { id: 7000001, fullName: 'acme/acme-repo-1', private: false },

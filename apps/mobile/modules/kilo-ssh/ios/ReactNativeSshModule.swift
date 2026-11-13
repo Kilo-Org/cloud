@@ -104,17 +104,20 @@ public final class ReactNativeSshModule: Module {
 
       let sftpId = self.state.sftpIds.next()
       let client = try await translateAsync { try await session.openSftp() }
-      self.state.store(sftp: client, id: sftpId)
+      self.state.store(sftp: client, sessionId: sessionId, id: sftpId)
+
+      // The session can be disconnected while the client is opening; sweeping
+      // by session only sees entries that exist, so check after storing.
+      guard self.state.session(sessionId) != nil else {
+        try? await self.closeSftp(sftpId)
+        throw channelClosed(sessionId)
+      }
 
       return sftpId
     }
 
     AsyncFunction("closeSftp") { (sftpId: String) async throws in
-      guard let client = self.state.removeSftp(sftpId) else {
-        return
-      }
-
-      try await translateAsync { try await client.shutdown() }
+      try await self.closeSftp(sftpId)
     }
 
     AsyncFunction("sftpList") { (sftpId: String, path: String) async throws -> [SftpEntryRecord] in
@@ -208,11 +211,7 @@ public final class ReactNativeSshModule: Module {
     }
 
     AsyncFunction("stopForward") { (forwardId: String) async throws in
-      guard let handle = self.state.removeForward(forwardId) else {
-        return
-      }
-
-      try await translateAsync { try await handle.stop() }
+      try await self.stopForward(forwardId)
     }
 
     OnDestroy {
@@ -282,6 +281,32 @@ public final class ReactNativeSshModule: Module {
     return client
   }
 
+  private func closeSftp(_ sftpId: String) async throws {
+    guard let client = state.removeSftp(sftpId) else {
+      return
+    }
+
+    try await translateAsync { try await client.shutdown() }
+  }
+
+  private func stopForward(_ forwardId: String) async throws {
+    guard let handle = state.removeForward(forwardId) else {
+      return
+    }
+
+    try await translateAsync { try await handle.stop() }
+  }
+
+  /** Every SFTP client and forward the session owned follows it out. */
+  private func sweep(_ sessionId: String) async {
+    for sftpId in state.sftpIds(of: sessionId) {
+      try? await closeSftp(sftpId)
+    }
+    for forwardId in state.forwardIds(of: sessionId) {
+      try? await stopForward(forwardId)
+    }
+  }
+
   private func transfer(
     _ transferId: String,
     run: (TransferProgress, CancelToken) async throws -> UInt64
@@ -312,7 +337,14 @@ public final class ReactNativeSshModule: Module {
     let handle = try await translateAsync {
       try await start(session, config.toNative(), sink)
     }
-    state.store(forward: handle, id: forwardId)
+    state.store(forward: handle, sessionId: sessionId, id: forwardId)
+
+    // The session can be disconnected while the forward is starting, and the
+    // sweep already ran; a forward nobody owns would listen forever.
+    guard state.session(sessionId) != nil else {
+      try? await stopForward(forwardId)
+      throw channelClosed(sessionId)
+    }
 
     var record = ForwardStartRecord()
     record.forwardId = forwardId
@@ -340,12 +372,15 @@ public final class ReactNativeSshModule: Module {
     }
 
     state.shellIds(of: sessionId).forEach { closeShell($0) }
+    await sweep(sessionId)
     try await translateAsync { try await session.disconnect() }
   }
 
   private func handleTransportDisconnect(_ notice: DisconnectNotice) {
     state.removeSession(notice.sessionId)
     state.shellIds(of: notice.sessionId).forEach { closeShell($0) }
+    // This runs on the core's disconnect callback thread, so the shutdowns are queued.
+    Task { await self.sweep(notice.sessionId) }
     sendEvent("onDisconnect", notice.toEvent())
   }
 

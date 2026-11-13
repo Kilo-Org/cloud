@@ -51,12 +51,16 @@ export function useSettingsSaveFeedback(): SettingsSaveFeedback {
     }
   }, []);
 
-  // The slot holds the tallest the line renders, so a refusal never moves the
-  // body: `text-sm` at the 14pt rem is a 1.25rem (17.5dp) line, and the copy
-  // these screens show wraps to two lines at the app's widths, so the reserve is
-  // `min-h-10` (2.5rem = 35dp). The text is clipped at that same height on a
-  // narrow screen, where a third line would otherwise grow the slot and shift
-  // the draft under the reader.
+  // The slot reserves the height this copy takes, so a refusal does not move
+  // the body: `text-sm` at the 14pt rem is a 1.25rem (17.5dp) line, and the
+  // sentences these screens show wrap to two lines at the app's widths, so the
+  // reserve is `min-h-10` (2.5rem = 35dp).
+  //
+  // The line is never clipped. A longer sentence — another language, or a
+  // larger text size — grows the slot instead of losing its tail, because the
+  // tail is the part that says what to do next, and a refusal the reader cannot
+  // finish reading is the defect this line exists to remove. Growth is bounded
+  // by the message itself and only happens when the copy needs it.
   //
   // This slot sits above the screen's scroller, not inside it, so the design
   // gate's leading-gap rule — which measures the gap below a scroller's own top
@@ -66,13 +70,11 @@ export function useSettingsSaveFeedback(): SettingsSaveFeedback {
       {/* Nothing to report mounts nothing at all: the empty state is the slot's
           reserved height, with no live region and no announcement to clear. */}
       {failure === null ? null : (
-        <View className="max-h-10 overflow-hidden">
-          <AccessibleStatus
-            message={securityConfigMutationMessage(failure)}
-            tone="error"
-            className="text-sm"
-          />
-        </View>
+        <AccessibleStatus
+          message={securityConfigMutationMessage(failure)}
+          tone="error"
+          className="text-sm"
+        />
       )}
     </View>
   );

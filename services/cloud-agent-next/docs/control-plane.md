@@ -1401,8 +1401,11 @@ no mixed-revision file data. GitHub authorization, rate-limit, not-found and ava
 failures stay distinct (`github_access_denied`, `github_rate_limited`,
 `pull_request_not_found`, `github_unavailable`) and never look like an empty
 PR. The PR file list discards patch text while accumulating its bounded summary,
-and the per-file patch is fenced by `expectedHeadSha`, returning `stale`,
-`not_listed` or `provider_omitted` rather than synthesizing a patch.
+bounds every GitHub request with a timeout, and keeps a short-lived per-isolate
+index keyed by the verified head so repeated file reads fetch only the page
+that holds the path. The per-file patch is fenced by `expectedHeadSha`,
+returning `stale`, `not_listed` or `provider_omitted` rather than synthesizing
+a patch.
 
 Bootstrap → Worker (HTTPS on the `WORKER_URL` host, `downloaded` mode only): `GET` one payload with
 the artifact grant, and `POST` one startup-failure report with the wrapper launch credential. The

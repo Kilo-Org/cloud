@@ -17,6 +17,7 @@ import { router } from '../auth.js';
 import {
   getHostedWorkspacePullRequest,
   getHostedWorkspacePullRequestFile,
+  resetHostedWorkspacePullRequestCachesForTest,
 } from './hosted-workspace-pull-request.js';
 
 const userId = 'usr_owner';
@@ -165,6 +166,7 @@ function fetchMock(...responses: Array<Response | Error>) {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.unstubAllGlobals();
+  resetHostedWorkspacePullRequestCachesForTest();
 });
 
 describe('getHostedWorkspacePullRequest', () => {
@@ -218,11 +220,42 @@ describe('getHostedWorkspacePullRequest', () => {
       string
     >;
     expect(headers.Authorization).toBe('Bearer installation-token');
+    const init = fetch.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
     expect(mocks.resolveAuth).toHaveBeenCalledWith(expect.anything(), {
       githubRepo: 'kilo-org/cloud',
       userId,
       allowUserAuthorization: false,
     });
+  });
+
+  it('reuses the file list for repeated reads at the same head', async () => {
+    const test = fixture({ rows: [cachedRow] });
+    const fetch = fetchMock(
+      jsonResponse(livePullRequest()),
+      jsonResponse(filesPayload),
+      jsonResponse(livePullRequest()),
+      jsonResponse(livePullRequest()),
+      jsonResponse(livePullRequest())
+    );
+
+    await test.caller.getHostedWorkspacePullRequest({ workspaceId });
+    expect(fetch).toHaveBeenCalledTimes(3);
+    await test.caller.getHostedWorkspacePullRequest({ workspaceId });
+    expect(fetch).toHaveBeenCalledTimes(5);
+  });
+
+  it('surfaces a timed-out GitHub request as unavailable', async () => {
+    const test = fixture({ rows: [cachedRow] });
+    fetchMock(
+      Object.assign(new Error('The operation was aborted due to timeout'), {
+        name: 'TimeoutError',
+      })
+    );
+
+    await expect(test.caller.getHostedWorkspacePullRequest({ workspaceId })).resolves.toMatchObject(
+      { status: 'unavailable', reason: 'github_unavailable' }
+    );
   });
 
   it('flags a stale cache head without rejecting the live publication', async () => {
@@ -429,6 +462,54 @@ describe('getHostedWorkspacePullRequestFile', () => {
         expectedHeadSha: headSha,
       })
     ).resolves.toMatchObject({ status: 'stale', headSha: otherSha, patch: null });
+  });
+
+  it('uses the cached page index to fetch only the page holding the requested file', async () => {
+    const pageOne = Array.from({ length: 50 }, (_, index) => ({
+      filename: `src/bulk-${index}.ts`,
+      status: 'modified',
+      additions: 1,
+      deletions: 0,
+      patch: '@@ -1 +1 @@\n-first\n+second\n',
+    }));
+    const pageTwo = [
+      {
+        filename: 'src/page-two.ts',
+        status: 'modified',
+        additions: 2,
+        deletions: 0,
+        patch: '@@ -1 +1 @@\n-a\n+b\n',
+      },
+    ];
+    const test = fixture({ rows: [cachedRow] });
+    const fetch = fetchMock(
+      jsonResponse(livePullRequest()),
+      jsonResponse(pageOne),
+      jsonResponse(pageTwo),
+      jsonResponse(livePullRequest())
+    );
+
+    await test.caller.getHostedWorkspacePullRequest({ workspaceId });
+    expect(fetch).toHaveBeenCalledTimes(4);
+
+    fetch.mockClear();
+    fetch.mockResolvedValueOnce(jsonResponse(livePullRequest()));
+    fetch.mockResolvedValueOnce(jsonResponse(pageTwo));
+    fetch.mockResolvedValueOnce(jsonResponse(livePullRequest()));
+
+    await expect(
+      test.caller.getHostedWorkspacePullRequestFile({
+        workspaceId,
+        path: 'src/page-two.ts',
+        expectedHeadSha: headSha,
+      })
+    ).resolves.toMatchObject({
+      status: 'available',
+      patch: '@@ -1 +1 @@\n-a\n+b\n',
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(String(fetch.mock.calls[1]?.[0])).toContain('page=2');
   });
 
   it('keeps a provider-omitted patch explicit', async () => {

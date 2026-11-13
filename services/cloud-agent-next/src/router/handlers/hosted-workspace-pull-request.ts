@@ -21,9 +21,12 @@ import { protectedProcedure } from '../auth.js';
 import { getAuthorizedHostedWorkspace } from './hosted-workspace-access.js';
 
 const GITHUB_API = 'https://api.github.com';
+const GITHUB_REQUEST_TIMEOUT_MS = 10_000;
 const FILES_PAGE_SIZE = 50;
 const FILES_MAX_PAGES = 60;
 const MAX_PR_FILES = FILES_PAGE_SIZE * FILES_MAX_PAGES;
+const FILE_INDEX_TTL_MS = 2 * 60_000;
+const FILE_INDEX_MAX_ENTRIES = 4;
 
 type GitHubFailure = 'access_denied' | 'rate_limited' | 'not_found' | 'unavailable';
 
@@ -62,6 +65,46 @@ const livePullRequestSchema = z.object({
 type PullRequestFile = z.infer<typeof pullRequestFileSchema>;
 type PullRequestFileSummary = Omit<PullRequestFile, 'patch'> & { patchAvailable: boolean };
 type LivePullRequest = z.infer<typeof livePullRequestSchema>;
+
+type PullRequestFileIndex = {
+  pathToPage: Map<string, number>;
+  summaries: PullRequestFileSummary[];
+  truncated: boolean;
+  expiresAt: number;
+};
+
+const fileIndexCache = new Map<string, PullRequestFileIndex>();
+
+function fileIndexKey(target: PullRequestTarget, headSha: string): string {
+  return `${target.repoFullName.toLowerCase()}#${target.number}@${headSha.toLowerCase()}`;
+}
+
+function readFileIndex(key: string): PullRequestFileIndex | null {
+  const cached = fileIndexCache.get(key);
+  if (cached === undefined) return null;
+  if (cached.expiresAt <= Date.now()) {
+    fileIndexCache.delete(key);
+    return null;
+  }
+  return cached;
+}
+
+function writeFileIndex(key: string, index: Omit<PullRequestFileIndex, 'expiresAt'>): void {
+  const now = Date.now();
+  for (const [cachedKey, cached] of fileIndexCache) {
+    if (cached.expiresAt <= now) fileIndexCache.delete(cachedKey);
+  }
+  while (fileIndexCache.size >= FILE_INDEX_MAX_ENTRIES) {
+    const oldest = fileIndexCache.keys().next();
+    if (oldest.done) break;
+    fileIndexCache.delete(oldest.value);
+  }
+  fileIndexCache.set(key, { ...index, expiresAt: now + FILE_INDEX_TTL_MS });
+}
+
+export function resetHostedWorkspacePullRequestCachesForTest(): void {
+  fileIndexCache.clear();
+}
 
 type PullRequestTarget = {
   owner: string;
@@ -112,6 +155,7 @@ async function githubRequest(
   let response: Response;
   try {
     response = await fetch(`${GITHUB_API}${path}`, {
+      signal: AbortSignal.timeout(GITHUB_REQUEST_TIMEOUT_MS),
       headers: {
         Accept: 'application/vnd.github+json',
         Authorization: `Bearer ${token}`,
@@ -159,34 +203,60 @@ async function readFilePage(
   };
 }
 
-async function listPullRequestFiles(
-  target: PullRequestTarget
-): Promise<{ files: PullRequestFileSummary[]; truncated: boolean }> {
-  const files: PullRequestFileSummary[] = [];
+async function buildFileIndex(
+  target: PullRequestTarget,
+  wantedPath?: string
+): Promise<{ index: Omit<PullRequestFileIndex, 'expiresAt'>; match: PullRequestFile | null }> {
+  const pathToPage = new Map<string, number>();
+  const summaries: PullRequestFileSummary[] = [];
+  let match: PullRequestFile | null = null;
   for (let page = 1; page <= FILES_MAX_PAGES; page += 1) {
     const pageResult = await readFilePage(target, page);
     for (const file of pageResult.files) {
-      if (files.length >= MAX_PR_FILES) return { files, truncated: true };
+      if (summaries.length >= MAX_PR_FILES) {
+        return { index: { pathToPage, summaries, truncated: true }, match };
+      }
+      pathToPage.set(file.filename, page);
       const { patch, ...summary } = file;
-      files.push({ ...summary, patchAvailable: patch !== undefined && patch.length > 0 });
+      summaries.push({ ...summary, patchAvailable: patch !== undefined && patch.length > 0 });
+      if (file.filename === wantedPath) match = file;
     }
-    if (!pageResult.hasNext) return { files, truncated: false };
-    if (page === FILES_MAX_PAGES) return { files, truncated: true };
+    if (!pageResult.hasNext) return { index: { pathToPage, summaries, truncated: false }, match };
+    if (page === FILES_MAX_PAGES) {
+      return { index: { pathToPage, summaries, truncated: true }, match };
+    }
   }
-  return { files, truncated: false };
+  return { index: { pathToPage, summaries, truncated: false }, match };
+}
+
+async function listPullRequestFiles(
+  target: PullRequestTarget,
+  headSha: string
+): Promise<{ files: PullRequestFileSummary[]; truncated: boolean }> {
+  const key = fileIndexKey(target, headSha);
+  const cached = readFileIndex(key);
+  if (cached !== null) return { files: cached.summaries, truncated: cached.truncated };
+  const { index } = await buildFileIndex(target);
+  writeFileIndex(key, index);
+  return { files: index.summaries, truncated: index.truncated };
 }
 
 async function findPullRequestFile(
   target: PullRequestTarget,
+  headSha: string,
   path: string
 ): Promise<PullRequestFile | null> {
-  for (let page = 1; page <= FILES_MAX_PAGES; page += 1) {
+  const key = fileIndexKey(target, headSha);
+  const cached = readFileIndex(key);
+  if (cached !== null) {
+    const page = cached.pathToPage.get(path);
+    if (page === undefined) return null;
     const pageResult = await readFilePage(target, page);
-    const match = pageResult.files.find(file => file.filename === path);
-    if (match) return match;
-    if (!pageResult.hasNext) return null;
+    return pageResult.files.find(file => file.filename === path) ?? null;
   }
-  return null;
+  const { index, match } = await buildFileIndex(target, path);
+  writeFileIndex(key, index);
+  return match;
 }
 
 function reasonForGitHubFailure(
@@ -450,7 +520,7 @@ function linkedOutput(
 async function readLinkedPullRequestFiles(
   linked: LinkedPullRequest
 ): Promise<{ files: PullRequestFileSummary[]; truncated: boolean }> {
-  return await listPullRequestFiles(linked.target);
+  return await listPullRequestFiles(linked.target, linked.output.headSha);
 }
 
 function fileFailureOutput(
@@ -528,7 +598,7 @@ export const getHostedWorkspacePullRequestFile = protectedProcedure
     }
     let file: PullRequestFile | null;
     try {
-      file = await findPullRequestFile(resolution.linked.target, input.path);
+      file = await findPullRequestFile(resolution.linked.target, headSha, input.path);
     } catch (error) {
       if (!(error instanceof GitHubRequestError)) throw error;
       return {

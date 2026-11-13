@@ -198,10 +198,15 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     !isEligibilityLoading && eligibilityData && !eligibilityData.isEligible;
   const hasLimitedAccess = !isEligibilityLoading && eligibilityData?.accessLevel === 'limited';
 
-  const { data: modelsData } = useModelSelectorList(organizationId, true, 'member', {
-    staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
-    gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
-  });
+  const { data: modelsData, error: modelsError } = useModelSelectorList(
+    organizationId,
+    true,
+    'member',
+    {
+      staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+      gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
+    }
+  );
   const { lastSelected: serverLastSelected, setLastSelected: persistServerLastSelected } =
     useModelPreferences(organizationId);
   const { data: defaultsData } = useOrganizationDefaults(organizationId);
@@ -1120,8 +1125,15 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     hasLimitedAccess &&
     !!displayModelOption &&
     (displayModelOption.isFree || displayModelOption.hasUserByokAvailable);
+  const isModelCatalogLoaded = modelsData !== undefined;
+  // Both notes require the catalog: it decides what a model costs, and the
+  // failed case has its own note.
   const submittedModelNeedsCredits =
-    hasLimitedAccess && displayModel.length > 0 && !limitedAccessModelIsAllowed;
+    hasLimitedAccess &&
+    isModelCatalogLoaded &&
+    displayModel.length > 0 &&
+    !limitedAccessModelIsAllowed;
+  const modelCatalogUnavailable = hasLimitedAccess && !isModelCatalogLoaded && !!modelsError;
 
   const creationInput = useMemo(() => {
     const trimmed = prompt.trim();
@@ -1703,6 +1715,12 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
             {hasAgentModelOverride
               ? `Agent "${selectedCustomAgent?.name}" uses a model that needs credits. Pick another agent or add credits.`
               : 'This model needs credits. Pick a free model or add credits.'}
+          </p>
+        )}
+
+        {modelCatalogUnavailable && (
+          <p className="text-muted-foreground px-1 text-xs" role="status">
+            The model list did not load, so start is unavailable. Reload the page to try again.
           </p>
         )}
 

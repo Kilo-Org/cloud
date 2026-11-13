@@ -177,28 +177,42 @@ jest.mock('@/app/api/organizations/hooks', () => ({
   useOrganizationDefaults: () => ({ data: undefined }),
 }));
 
+const mockDefaultModelCatalog = {
+  data: [
+    {
+      id: 'model-1',
+      name: 'Model One',
+      isFree: true,
+      mayTrainOnYourPrompts: false,
+      hasUserByokAvailable: false,
+      opencode: { variants: {} },
+    },
+    {
+      id: 'model-2',
+      name: 'Model Two',
+      isFree: false,
+      mayTrainOnYourPrompts: false,
+      hasUserByokAvailable: false,
+      opencode: { variants: {} },
+    },
+    {
+      id: 'model-3',
+      name: 'Model Three',
+      isFree: true,
+      mayTrainOnYourPrompts: false,
+      hasUserByokAvailable: false,
+      opencode: { variants: {} },
+    },
+  ],
+};
+let mockModelCatalog: { data: unknown[] } | undefined = mockDefaultModelCatalog;
+let mockModelCatalogError: Error | null = null;
+
 jest.mock('@/lib/hooks/use-openrouter-models', () => ({
   useModelSelectorList: () => ({
-    data: {
-      data: [
-        {
-          id: 'model-1',
-          name: 'Model One',
-          isFree: true,
-          mayTrainOnYourPrompts: false,
-          hasUserByokAvailable: false,
-          opencode: { variants: {} },
-        },
-        {
-          id: 'model-2',
-          name: 'Model Two',
-          isFree: false,
-          mayTrainOnYourPrompts: false,
-          hasUserByokAvailable: false,
-          opencode: { variants: {} },
-        },
-      ],
-    },
+    data: mockModelCatalog,
+    isLoading: false,
+    error: mockModelCatalogError,
   }),
 }));
 
@@ -683,8 +697,10 @@ describe('NewSessionPanel submitted model gating', () => {
       blocked: true,
     },
     {
+      // The default seeding picks model-1, the first free entry, so pinning a
+      // different free model shows that the agent's model decides the gate.
       label: 'accepts the pinned model within the composer rules',
-      model: 'model-1',
+      model: 'model-3',
       blocked: false,
     },
   ] as const;
@@ -754,6 +770,132 @@ describe('NewSessionPanel submitted model gating', () => {
       mounted = false;
     } finally {
       if (mounted) act(() => root.unmount());
+      dom.cleanup();
+      mockEligibility = { isEligible: true, accessLevel: 'full', balance: 0 };
+      mockProfile = undefined;
+    }
+  });
+
+  const pinnedAgentProfile = {
+    agents: [
+      {
+        slug: 'pinned-agent',
+        name: 'Pinned Agent',
+        config: { description: 'test agent', mode: 'primary', model: 'model-3' },
+      },
+    ],
+  };
+
+  function renderLimitedPanel({ withAgent = true }: { withAgent?: boolean } = {}) {
+    mockEligibility = { isEligible: false, accessLevel: 'limited', balance: 0 };
+    mockProfile = withAgent ? pinnedAgentProfile : undefined;
+    mockEnvironmentListFailed = false;
+    mockRepositories = [mockRepository];
+    mockEnvironments = [];
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    act(() => {
+      root.render(createElement(NewSessionPanel));
+    });
+    return { dom, root };
+  }
+
+  async function settle() {
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+  }
+
+  async function selectPinnedAgent(container: HTMLElement) {
+    const agentButton = Array.from(container.querySelectorAll('button')).find(
+      button => button.textContent === 'Pinned Agent'
+    );
+    if (!agentButton) throw new Error('Pinned agent button missing');
+    act(() => {
+      agentButton.click();
+    });
+    await settle();
+  }
+
+  afterEach(() => {
+    mockModelCatalog = mockDefaultModelCatalog;
+    mockModelCatalogError = null;
+  });
+
+  it('shows a credit note only once the model catalog has loaded', async () => {
+    jest.clearAllMocks();
+    mockModelCatalog = undefined;
+    const { dom, root } = renderLimitedPanel();
+
+    try {
+      await settle();
+      expect(dom.container.textContent).not.toContain('needs credits');
+      expect(
+        dom.container
+          .querySelector<HTMLButtonElement>('button[aria-label="Start session"]')
+          ?.hasAttribute('disabled')
+      ).toBe(true);
+
+      await selectPinnedAgent(dom.container);
+      expect(dom.container.textContent).not.toContain('needs credits');
+      expect(dom.container.textContent).not.toContain('model list did not load');
+      expect(
+        dom.container
+          .querySelector<HTMLButtonElement>('button[aria-label="Start session"]')
+          ?.hasAttribute('disabled')
+      ).toBe(true);
+
+      // Once the catalog arrives, the free pin keeps start available with no note.
+      mockModelCatalog = mockDefaultModelCatalog;
+      act(() => {
+        root.render(createElement(NewSessionPanel));
+      });
+      await waitForStartButton(dom.container);
+      expect(dom.container.textContent).not.toContain('needs credits');
+      expect(dom.container.textContent).not.toContain('model list did not load');
+      expect(
+        dom.container
+          .querySelector<HTMLButtonElement>('button[aria-label="Start session"]')
+          ?.hasAttribute('disabled')
+      ).toBe(false);
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+      mockEligibility = { isEligible: true, accessLevel: 'full', balance: 0 };
+      mockProfile = undefined;
+    }
+  });
+
+  it('explains that the model list did not load', async () => {
+    jest.clearAllMocks();
+    mockModelCatalog = undefined;
+    mockModelCatalogError = new Error('catalog');
+    const { dom, root } = renderLimitedPanel({ withAgent: false });
+
+    try {
+      await settle();
+      expect(dom.container.textContent).toContain('model list did not load');
+      expect(dom.container.textContent).not.toContain('needs credits');
+      expect(
+        dom.container
+          .querySelector<HTMLButtonElement>('button[aria-label="Start session"]')
+          ?.hasAttribute('disabled')
+      ).toBe(true);
+
+      mockProfile = pinnedAgentProfile;
+      act(() => {
+        root.render(createElement(NewSessionPanel));
+      });
+      await selectPinnedAgent(dom.container);
+      expect(dom.container.textContent).toContain('model list did not load');
+      expect(dom.container.textContent).not.toContain('needs credits');
+      expect(
+        dom.container
+          .querySelector<HTMLButtonElement>('button[aria-label="Start session"]')
+          ?.hasAttribute('disabled')
+      ).toBe(true);
+    } finally {
+      act(() => root.unmount());
       dom.cleanup();
       mockEligibility = { isEligible: true, accessLevel: 'full', balance: 0 };
       mockProfile = undefined;

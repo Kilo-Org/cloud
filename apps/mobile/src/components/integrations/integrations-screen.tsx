@@ -100,6 +100,7 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
     scope,
     statuses: statuses.data,
     githubConnections: githubConnections.data ?? [],
+    githubConnectionsPending: githubConnections.isPending,
   });
   const role = boundary.role ?? undefined;
   const canActOnRow = (row: IntegrationRow) =>

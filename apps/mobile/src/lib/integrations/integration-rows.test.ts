@@ -145,6 +145,44 @@ describe('buildIntegrationRows', () => {
     });
   });
 
+  it('withholds a connected GitHub row until the connections read settles', () => {
+    const pending = buildIntegrationRows({
+      scope: 'organization',
+      statuses: [setupStatus('github', true, { accountLogin: 'acme' })],
+      githubConnections: NO_CONNECTIONS,
+      githubConnectionsPending: true,
+    });
+    expect(pending.find(row => row.provider === 'github')).toMatchObject({
+      installed: true,
+      githubIntegrationId: null,
+      webManaged: false,
+      actionPending: true,
+    });
+
+    const settled = buildIntegrationRows({
+      scope: 'organization',
+      statuses: [setupStatus('github', true, { accountLogin: 'acme' })],
+      githubConnections: [githubConnection({ id: 'gh-1' })],
+    });
+    expect(settled.find(row => row.provider === 'github')).toMatchObject({
+      githubIntegrationId: 'gh-1',
+      actionPending: false,
+    });
+  });
+
+  it('connects a GitHub row before the connections read settles', () => {
+    const rows = buildIntegrationRows({
+      scope: 'personal',
+      statuses: [setupStatus('github', false)],
+      githubConnections: NO_CONNECTIONS,
+      githubConnectionsPending: true,
+    });
+    expect(rows.find(row => row.provider === 'github')).toMatchObject({
+      installed: false,
+      actionPending: false,
+    });
+  });
+
   it('omits the org-only provider from a personal scope', () => {
     const rows = buildIntegrationRows({
       scope: 'personal',

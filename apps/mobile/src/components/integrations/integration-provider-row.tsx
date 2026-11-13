@@ -12,6 +12,7 @@ import { type ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { type IntegrationRow } from '@/lib/integrations/integration-rows';
 import {
@@ -92,7 +93,11 @@ export function IntegrationProviderRow({
   // Disconnect, so it follows the disconnect roles; Connect follows the
   // connect flow's own rule, which for GitLab admits any member.
   let action: ReactNode = null;
-  if (row.installed && row.webManaged) {
+  if (row.actionPending) {
+    // The connections read that decides between Disconnect and the web page has
+    // not landed, so the row holds the button's space instead of guessing.
+    action = <Skeleton className="h-9 w-24 rounded-md" />;
+  } else if (row.installed && row.webManaged) {
     action = canDisconnect ? (
       <Button
         size="sm"

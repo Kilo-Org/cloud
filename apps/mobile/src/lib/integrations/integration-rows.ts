@@ -29,6 +29,13 @@ export type IntegrationRow = {
    * single row.
    */
   webManaged: boolean;
+  /**
+   * The connections read that names the GitHub target has not settled, so the
+   * row has no action yet. An unread list is not an empty one: the personal
+   * scope needs no id for `githubApps.uninstallApp({})`, and the organization
+   * scope cannot tell a native disconnect from the web page until it lands.
+   */
+  actionPending: boolean;
 };
 
 /**
@@ -56,6 +63,11 @@ export function buildIntegrationRows(input: {
   scope: IntegrationScope;
   statuses: readonly IntegrationSetupStatus[];
   githubConnections: readonly IntegrationGitHubConnection[];
+  /**
+   * Whether the connections read is still in flight. Omit it once the read has
+   * settled, which is what a caller holding `data` has.
+   */
+  githubConnectionsPending?: boolean;
 }): IntegrationRow[] {
   const statusByPlatform = new Map(input.statuses.map(status => [status.platform, status]));
   const installed: Partial<Record<IntegrationProvider, boolean>> = {};
@@ -76,13 +88,20 @@ export function buildIntegrationRows(input: {
 
   return visibleIntegrationProviders(input.scope, installed).map(provider => {
     const status = statusByPlatform.get(provider);
+    const connected = status?.installed === true;
+    // A disconnected GitHub row can connect without the connections read; a
+    // connected one is the row that read exists for.
+    const actionPending =
+      provider === 'github' && connected && input.githubConnectionsPending === true;
     return {
       provider,
-      installed: status?.installed === true,
+      installed: connected,
       accountLabel: status?.installation?.[ACCOUNT_FIELD[provider]] ?? null,
       githubIntegrationId: provider === 'github' ? githubIntegrationId : null,
       webManaged:
-        provider === 'bitbucket' || (provider === 'github' && githubIntegrationId == null),
+        provider === 'bitbucket' ||
+        (provider === 'github' && !actionPending && githubIntegrationId == null),
+      actionPending,
     };
   });
 }

@@ -5,7 +5,7 @@
 
 import { type ComponentType, createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { IntegrationsScreen } from './integrations-screen';
@@ -13,6 +13,13 @@ import { IntegrationsScreen } from './integrations-screen';
 type SetupStatusRow = { platform: string; installed: boolean; installation?: unknown };
 
 const MEMBER_HINT = 'Ask an organization owner or admin to change these connections.';
+
+const GITHUB_CONNECTION = {
+  id: 'gh-1',
+  integration_status: 'active',
+  suspended_at: null,
+  canUninstallNatively: true,
+};
 
 const state = vi.hoisted(() => ({
   statuses: {
@@ -22,7 +29,7 @@ const state = vi.hoisted(() => ({
     isFetching: false,
     error: undefined as unknown,
   },
-  githubConnections: { data: [] as unknown[] },
+  githubConnections: { data: [] as unknown[] | undefined, isPending: false },
   role: undefined as string | undefined,
   orgResolved: true,
   permissionDenied: false,
@@ -35,6 +42,17 @@ const calls = vi.hoisted(() => ({
   refetch: vi.fn<() => void>(),
   openExternal: vi.fn<(url: string) => void>(),
 }));
+
+function statusState(overrides: Partial<typeof state.statuses> = {}): typeof state.statuses {
+  return {
+    data: [],
+    isPending: false,
+    isError: false,
+    isFetching: false,
+    error: undefined,
+    ...overrides,
+  };
+}
 
 vi.mock('@/lib/hooks/use-integrations', () => ({
   useIntegrationStatuses: () => ({ ...state.statuses, refetch: calls.refetch }),
@@ -81,21 +99,16 @@ vi.mock('@/components/organization/organization-boundary', () => ({
 
 vi.mock('@/components/organization/permission-denied', () => ({
   PermissionDenied: (props: { description: string }) =>
-    createElement('PermissionDeniedMock', { description: props.description }),
+    createElement('PermissionDeniedMock', props),
 }));
 
 vi.mock('@/components/query-error', () => ({
   QueryError: (props: { title?: string; variant?: string; onRetry?: () => void }) =>
-    createElement('QueryErrorMock', {
-      title: props.title,
-      variant: props.variant,
-      onRetry: props.onRetry,
-    }),
+    createElement('QueryErrorMock', props),
 }));
 
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { title?: string }) =>
-    createElement('ScreenHeaderMock', { title: props.title }),
+  ScreenHeader: (props: { title?: string }) => createElement('ScreenHeaderMock', props),
 }));
 
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
@@ -132,16 +145,24 @@ vi.mock('react-native-reanimated', () => ({
 
 const Screen = IntegrationsScreen as ComponentType<{ organizationId?: string }>;
 
+let mounted: TestRenderer.ReactTestRenderer | undefined = undefined;
+
 function mount(organizationId?: string): TestRenderer.ReactTestRenderer {
-  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(createElement(Screen, { organizationId }));
+    mounted = TestRenderer.create(createElement(Screen, { organizationId }));
   });
-  if (!ref.current) {
+  if (!mounted) {
     throw new Error('integrations hub did not render');
   }
-  return ref.current;
+  return mounted;
 }
+
+afterEach(() => {
+  act(() => {
+    mounted?.unmount();
+  });
+  mounted = undefined;
+});
 
 function findOne(root: TestRenderer.ReactTestInstance, type: string) {
   return root.findAll(node => node.type === type);
@@ -175,14 +196,8 @@ function press(node: TestRenderer.ReactTestInstance | null) {
 }
 
 beforeEach(() => {
-  state.statuses = {
-    data: [],
-    isPending: false,
-    isError: false,
-    isFetching: false,
-    error: undefined,
-  };
-  state.githubConnections = { data: [] };
+  state.statuses = statusState();
+  state.githubConnections = { data: [], isPending: false };
   state.role = undefined;
   state.orgResolved = true;
   state.permissionDenied = false;
@@ -212,18 +227,11 @@ describe('IntegrationsScreen', () => {
     expect(connect?.props.accessibilityLabel).toBe('Connect. GitHub');
     press(connect);
     expect(calls.connect).toHaveBeenCalledWith('github');
-
-    act(() => {
-      renderer.unmount();
-    });
   });
 
   it('says nothing is connected yet when every status is empty', () => {
     const renderer = mount();
     expect(texts(renderer.root)).toContain('No integrations connected yet.');
-    act(() => {
-      renderer.unmount();
-    });
   });
 
   it('reports an ambiguous GitHub organization as web-managed', () => {
@@ -248,10 +256,6 @@ describe('IntegrationsScreen', () => {
     expect(calls.openExternal).toHaveBeenCalledWith(
       expect.stringContaining('/organizations/org-1/integrations/bitbucket')
     );
-
-    act(() => {
-      renderer.unmount();
-    });
   });
 
   it('disconnects an organization connection after the destructive confirmation', () => {
@@ -272,10 +276,6 @@ describe('IntegrationsScreen', () => {
       request?.onConfirm();
     });
     expect(calls.disconnect).toHaveBeenCalledWith({ provider: 'slack', githubIntegrationId: null });
-
-    act(() => {
-      renderer.unmount();
-    });
   });
 
   it('lets a member make the first GitLab connect and hides the manager actions', () => {
@@ -293,20 +293,14 @@ describe('IntegrationsScreen', () => {
     // integration, so a member's first connect is accepted.
     expect(actionOf(rowTitled(root, 'GitLab'))?.props.accessibilityLabel).toBe('Connect. GitLab');
     expect(texts(root)).not.toContain(MEMBER_HINT);
-
-    act(() => {
-      renderer.unmount();
-    });
   });
 
   it('retries a failed read from the error state', () => {
-    state.statuses = {
+    state.statuses = statusState({
       data: undefined,
-      isPending: false,
       isError: true,
-      isFetching: false,
       error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
-    };
+    });
     const renderer = mount();
 
     const error = findOne(renderer.root, 'QueryErrorMock')[0];
@@ -316,28 +310,38 @@ describe('IntegrationsScreen', () => {
       retry?.();
     });
     expect(calls.refetch).toHaveBeenCalled();
-
-    act(() => {
-      renderer.unmount();
-    });
   });
 
   it('reserves the screen for a viewer who lost access', () => {
     state.permissionDenied = true;
-    state.statuses = {
+    state.statuses = statusState({
       data: undefined,
-      isPending: false,
       isError: true,
-      isFetching: false,
       error: { data: { code: 'FORBIDDEN' } },
-    };
+    });
     const renderer = mount('org-1');
     expect(findOne(renderer.root, 'PermissionDeniedMock')[0]?.props.description).toBe(
       'You do not have permission to manage these integrations.'
     );
+  });
+
+  it('waits for an installed GitHub row’s connection list before choosing its action', () => {
+    state.statuses.data = [
+      { platform: 'github', installed: true, installation: { accountLogin: 'acme' } },
+    ];
+    // The setup-status read lands first, as it does when the connections read is
+    // slower: an unread list is not an empty one, so the row holds its action.
+    state.githubConnections = { data: undefined, isPending: true };
+    const pending = mount();
+    expect(actionOf(rowTitled(pending.root, 'GitHub'))).toBeNull();
+    expect(texts(pending.root)).not.toContain('Manage on the web');
     act(() => {
-      renderer.unmount();
+      pending.unmount();
     });
+
+    state.githubConnections = { data: [GITHUB_CONNECTION], isPending: false };
+    const settled = actionOf(rowTitled(mount().root, 'GitHub'));
+    expect(settled?.props.accessibilityLabel).toBe('Disconnect. GitHub');
   });
 
   it('waits on the organization boundary before reading any connection', () => {
@@ -345,8 +349,5 @@ describe('IntegrationsScreen', () => {
     const renderer = mount('org-unresolved');
     expect(findOne(renderer.root, 'OrganizationBoundaryMock')[0]?.props.title).toBe('Integrations');
     expect(findOne(renderer.root, 'RowMock')).toHaveLength(0);
-    act(() => {
-      renderer.unmount();
-    });
   });
 });

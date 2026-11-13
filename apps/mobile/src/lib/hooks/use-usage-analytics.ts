@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
-import { AppState } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 import {
   fillDailySeries,
+  isSameUtcDay,
   type UsageRange,
   usageRangeWindow,
   type UsageWindow,
@@ -42,9 +43,27 @@ function scopeFilters(scope: UsageScope, window: UsageWindow) {
  * comes back to the foreground. The analytics window ends "now", so a screen
  * left mounted overnight would otherwise keep asking for yesterday's last
  * bucket.
+ *
+ * Both edges only move it on a new UTC day: the window is memoized on this
+ * value, so a resume that kept the same day would rebuild it, change its
+ * `endDate`, and hand all four queries keys with no cache — the dashboard would
+ * drop to its skeleton and start four reads the route's foreground refresh is
+ * already doing in place.
  */
 function useNow(): Date {
+  const { isActive } = useAppLifecycle();
   const [now, setNow] = useState(() => new Date());
+
+  const moveToCurrentDay = useCallback(() => {
+    setNow(previous => (isSameUtcDay(previous, new Date()) ? previous : new Date()));
+  }, []);
+
+  // A resume can cross the day boundary while the midnight timer was suspended.
+  useEffect(() => {
+    if (isActive) {
+      moveToCurrentDay();
+    }
+  }, [isActive, moveToCurrentDay]);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined = undefined;
@@ -55,7 +74,7 @@ function useNow(): Date {
       nextMidnight.setUTCHours(24, 0, 0, 0);
       timer = setTimeout(
         () => {
-          setNow(new Date());
+          moveToCurrentDay();
           scheduleNextMidnight();
         },
         nextMidnight.getTime() - current.getTime() + 1_000
@@ -63,20 +82,11 @@ function useNow(): Date {
     };
 
     scheduleNextMidnight();
-    // A resume can cross the day boundary while the timer was suspended.
-    const subscription = AppState.addEventListener('change', state => {
-      if (state === 'active') {
-        setNow(new Date());
-      }
-    });
 
     return () => {
-      if (timer !== undefined) {
-        clearTimeout(timer);
-      }
-      subscription.remove();
+      clearTimeout(timer);
     };
-  }, []);
+  }, [moveToCurrentDay]);
 
   return now;
 }

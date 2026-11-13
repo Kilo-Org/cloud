@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { fillDailySeries, usageRangeWindow } from './usage-window';
+import { fillDailySeries, isSameUtcDay, usageRangeWindow } from './usage-window';
 
 // 2026-11-12T15:30:00Z: a mid-day moment, so a window that forgot to snap to
 // UTC midnight would show up as a different start.
@@ -29,6 +29,18 @@ describe('usageRangeWindow', () => {
           (24 * 60 * 60 * 1000)
       ) + 1;
     expect(days).toBe(90);
+  });
+});
+
+describe('isSameUtcDay', () => {
+  test('is true for two moments on the same UTC day', () => {
+    expect(isSameUtcDay(NOW, new Date('2026-11-12T23:59:59.999Z'))).toBe(true);
+  });
+
+  test('is false across UTC midnight, however close the moments are', () => {
+    expect(
+      isSameUtcDay(new Date('2026-11-12T23:59:59.999Z'), new Date('2026-11-13T00:00:00.000Z'))
+    ).toBe(false);
   });
 });
 

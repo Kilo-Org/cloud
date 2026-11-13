@@ -22,6 +22,14 @@ export function usageRangeWindow(range: UsageRange, now: Date = new Date()): Usa
 }
 
 /**
+ * Whether two moments fall on the same UTC bucketing day, the granularity the
+ * window is asked for.
+ */
+export function isSameUtcDay(a: Date, b: Date): boolean {
+  return a.toISOString().slice(0, 10) === b.toISOString().slice(0, 10);
+}
+
+/**
  * The served series widened to the window: the warehouse returns a bucket only
  * for a day that held usage, so placing bars by array index would compress the
  * quiet days and read a 30-day range as a short contiguous run. Every whole UTC

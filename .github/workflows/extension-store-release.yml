@@ -99,7 +99,8 @@ jobs:
           if-no-files-found: error
           overwrite: true
           # Store handoff can take weeks; 30 days beats the repo's 7-day CI-debug
-          # norm while keeping the ~74 MB sources zips from piling up forever.
+          # norm while keeping the extension's source and package zips around
+          # long enough for a reviewer to ask for the source upload again.
           retention-days: 30
 
   bump-version:

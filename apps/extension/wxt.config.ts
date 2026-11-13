@@ -42,28 +42,51 @@ export default defineConfig({
     plugins: [tailwindcss()],
   }),
   zip: {
+    // WXT globs every file under `sourcesRoot` and keeps one when it matches
+    // `includeSources` OR misses `excludeSources`, so this list only acts as
+    // the allowlist it reads like while `excludeSources` covers everything: a
+    // sources zip of the whole monorepo is about 490 MB uncompressed and AMO
+    // rejects the upload. What follows is the whole of
+    // `pnpm install --filter kilo-extension...` plus `build:firefox`; see
+    // SOURCE_BUILD.md, which ships in the zip as the reviewer instructions.
+    // Add a package here when the build starts reading its source.
     includeSources: [
+      // Tailwind v4 scans the tree for class candidates and skips the paths
+      // these files ignore, so a build without them emits utilities the release
+      // build never had.
+      '.gitignore',
+      '.nvmrc',
+      'SOURCE_BUILD.md',
       'package.json',
+      'patches/**',
       'pnpm-lock.yaml',
       'pnpm-workspace.yaml',
-      'patches/**',
+      'scripts/check-pnpm.mjs',
+      // pnpm resolves the workspace graph from the lockfile and every project
+      // manifest, even for a filtered install, so each project contributes its
+      // package.json and nothing else.
+      'apps/*/package.json',
+      'packages/*/package.json',
+      'services/**/package.json',
+      'apps/extension/.gitignore',
+      'apps/extension/.oxlintrc.json',
       'apps/extension/AGENTS.md',
       'apps/extension/SOURCE_CODE_REVIEW.md',
-      'apps/extension/package.json',
       'apps/extension/playwright.config.ts',
       'apps/extension/tsconfig.json',
       'apps/extension/vitest.config.ts',
+      'apps/extension/vitest.setup.ts',
       'apps/extension/wxt.config.ts',
       'apps/extension/entrypoints/**',
       'apps/extension/public/**',
       'apps/extension/scripts/**',
       'apps/extension/src/**',
-      'apps/extension/tests/e2e/**',
-      'packages/cloud-agent-sdk/package.json',
-      'packages/cloud-agent-sdk/src/**',
-      'packages/app-shared/package.json',
+      'apps/extension/tests/**',
       'packages/app-shared/src/**',
+      'packages/cloud-agent-sdk/src/**',
+      'packages/session-ingest-contracts/src/**',
     ],
+    excludeSources: ['*', '**/*'],
     sourcesRoot: '../..',
   },
 });

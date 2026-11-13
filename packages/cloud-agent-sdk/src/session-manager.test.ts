@@ -11959,9 +11959,9 @@ describe('createSessionManager — spawned session open', () => {
     await settle();
     await settle();
     expect(fetchSession.mock.calls.length).toBeGreaterThanOrEqual(3);
-    expect(atomValue<{ code?: string } | null>(config.store, mgr.atoms.statusIndicator)?.code).not.toBe(
-      'child-session-not-found'
-    );
+    expect(
+      atomValue<{ code?: string } | null>(config.store, mgr.atoms.statusIndicator)?.code
+    ).not.toBe('child-session-not-found');
   });
 
   it('fails immediately when the option is absent', async () => {
@@ -11989,8 +11989,8 @@ describe('createSessionManager — spawned session open', () => {
     await mgr.switchSession(kiloId('ses-1'));
     for (let attempt = 0; attempt < 6; attempt += 1) await settle();
 
-    expect(
-      atomValue<{ code?: string } | null>(config.store, mgr.atoms.statusIndicator)?.code
-    ).toBe('child-session-not-found');
+    expect(atomValue<{ code?: string } | null>(config.store, mgr.atoms.statusIndicator)?.code).toBe(
+      'child-session-not-found'
+    );
   });
 });

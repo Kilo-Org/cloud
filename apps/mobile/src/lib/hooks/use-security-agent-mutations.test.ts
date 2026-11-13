@@ -505,6 +505,39 @@ describe('useSaveSecurityAgentConfig (generation guard + scope)', () => {
       'Could not complete this action. Please try again.'
     );
   });
+
+  it('rolls back without a toast when the caller renders the refusal inline', async () => {
+    // The settings screens put the refusal on the screen itself, below the
+    // header; that line is their announcement owner, so a toast would say the
+    // same sentence a second time. The optimistic rollback is not the caller's:
+    // it runs on every failure, announced or not.
+    getQueryDataMock.mockReturnValue({ isEnabled: false, slaEnabled: false });
+    useSaveSecurityAgentConfig('personal', { announceFailed: false });
+    const context = await lastCapturedOptions?.onMutate?.({ slaEnabled: true });
+
+    setQueryDataMock.mockClear();
+    lastCapturedOptions?.onError?.(
+      new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE),
+      { slaEnabled: true },
+      context
+    );
+
+    expect(setQueryDataMock).toHaveBeenCalledTimes(1);
+    expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('toasts the refusal by default, in the catalog’s own words', () => {
+    useSaveSecurityAgentConfig('personal');
+
+    lastCapturedOptions?.onError?.(
+      new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE),
+      { slaEnabled: true },
+      undefined
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledTimes(1);
+    expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_COPY);
+  });
 });
 
 describe('useSetSecurityAgentEnabled (generation guard + scope)', () => {

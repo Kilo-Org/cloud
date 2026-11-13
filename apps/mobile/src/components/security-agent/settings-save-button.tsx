@@ -10,8 +10,9 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 /**
  * Header Save action shared by Security Agent settings screens: disabled
  * until the screen is dirty and valid, shows a spinner while the save
- * mutation is pending, then pops the screen on success. Errors are already
- * toasted by the mutation's centralized onError, so this just stays put.
+ * mutation is pending, then pops the screen on success. A refused save is
+ * announced by the calling screen's own refusal line (these screens turn the
+ * mutation's failure toast off), so this just stays put.
  *
  * Callers still decide whether to render it at all — pass `undefined` for
  * `headerRight` when `!canManage`, same as before this was extracted.
@@ -60,7 +61,7 @@ export function SettingsSaveButton({
             skipNextGuardRef.current = true;
             router.back();
           } catch {
-            // Centralized onError already toasted; stay on screen.
+            // The screen's refusal line reports the failure; stay on screen.
           }
         })();
       }}

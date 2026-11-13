@@ -644,6 +644,8 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `APPSFLYER_APP_ID` - AppsFlyer app ID for mobile attribution tracking. [PUBLIC]
 - `EVENT_SERVICE_URL` - WebSocket URL for the event service from mobile. Bundled into the binary. [PUBLIC]
 - `NOTIFICATIONS_URL` - HTTP URL for the push-notifications backend from mobile. [PUBLIC]
+- `POSTHOG_API_KEY` - PostHog public project key for the mobile app's analytics and feature-flag evaluation, read as `posthogApiKey` in `apps/mobile/src/lib/env-keys.js` and required at startup by `apps/mobile/src/lib/config.ts`. Use the same PostHog project as the web app's `NEXT_PUBLIC_POSTHOG_KEY`: one person's flag then evaluates identically on both clients. [PUBLIC]
+- `EXPO_PUBLIC_POSTHOG_DEV_HOST` - Development-only PostHog API host for flag evaluation, such as a local mock. A development build contacts no PostHog project and resolves every flag to its default unless this is set; a release build ignores it. Read in `apps/mobile/src/lib/analytics/posthog.ts`, inlined into the bundle. [PUBLIC]
 - `MOBILE_DEV_HOST` - LAN host override for mobile dev (replaces `localhost` on physical devices); read in `dev/local/mobile-env.ts`. [SERVER]
 
 ## Tests / Dev

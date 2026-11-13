@@ -258,8 +258,10 @@ describe('ConfigureRow note', () => {
     const root = renderRow({ note: NOTE });
 
     expect(textOf(root, NOTE)).toEqual(
-      expect.arrayContaining(['mt-1', 'text-xs', 'text-muted-foreground', 'pl-[42px]'])
+      expect.arrayContaining(['mt-1', 'text-xs', 'text-muted-foreground', 'ps-[42px]'])
     );
+    // The indent is the start edge, so the note keeps to the title's column
+    // when the row mirrors.
     // It is a sentence, so it wraps instead of ellipsizing like a value does.
     const note = root.find(
       node => Object.is(node.type, 'Text') && Object.is(node.props.children, NOTE)
@@ -277,7 +279,7 @@ describe('ConfigureRow note', () => {
   it('gives the stacked row its note without the tile indent', () => {
     windowDims.width = 160;
 
-    expect(textOf(renderRow({ note: NOTE }), NOTE)).not.toContain('pl-[42px]');
+    expect(textOf(renderRow({ note: NOTE }), NOTE)).not.toContain('ps-[42px]');
   });
 
   it('renders only the title and subtitle when a row has no note', () => {

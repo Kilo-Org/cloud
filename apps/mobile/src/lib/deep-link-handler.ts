@@ -1,7 +1,12 @@
 import { resolveIncomingResume } from '@kilocode/app-shared/universal-links';
 
 import { opensAppRoutePath, opensDestination, shellRouteHref } from './deep-link-destination';
-import { resumeDeepLinkHref, setPendingDeepLink, wasLaunchLinkHandled } from './deep-link-launch';
+import {
+  consumeLaunchHandoffUrl,
+  resumeDeepLinkHref,
+  setPendingDeepLink,
+  wasLaunchLinkHandled,
+} from './deep-link-launch';
 import { browserHandoffUrl, isRemovedMobileDeepLink, openBrowserHandoff } from './deep-link-policy';
 import { parseGitHubReturnParams, setGitHubInstallReturnOutcome } from './github-install-return';
 import { isSystemSearchFamilyLink } from './system-search-families';
@@ -56,9 +61,15 @@ export function redirectSystemPath({
     // so they arrive here like the org root. The app has no screen for them: the
     // browser page is where the account and the plan are asked, so the link
     // opens there. Falsy, like every handled link (see critical point 2).
+    // The cold-launch capture runs at layout module scope and opens the same
+    // launch URL, and expo-router then redirects it here; opening again would
+    // show two browser tabs for one tap, so this initial redirect consumes the
+    // capture's latch when it names the same page.
     const handoffUrl = browserHandoffUrl(path);
     if (handoffUrl !== null) {
-      void openBrowserHandoff(handoffUrl);
+      if (!(initial && consumeLaunchHandoffUrl(handoffUrl))) {
+        void openBrowserHandoff(handoffUrl);
+      }
       return initial ? '/' : null;
     }
     const resume = resolveIncomingResume(path);

@@ -569,4 +569,86 @@ describe('organization pages the app has no screen for', () => {
     redirectSystemPath({ path: 'https://app.kilo.ai/organizations/org_1', initial: false });
     expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)/organization/org_1');
   });
+
+  // One tap is one browser tab: the layout's synchronous launch capture opens
+  // the page, and expo-router's cold redirect of the same launch URL must not
+  // open it a second time. The capture's opener is awaited first because both
+  // handoffs share one lazily imported module: two concurrent dynamic imports
+  // of it race in the test environment.
+  it.each(['new', 'create'])('opens /organizations/%s once on a cold launch', async page => {
+    _resetDeepLinkLaunchForTests();
+    vi.mocked(openExternalUrl).mockClear();
+    const url = `https://app.kilo.ai/organizations/${page}`;
+    _setGetLinkingURLForTests(() => url);
+
+    captureLaunchDeepLink();
+    await vi.waitFor(() => {
+      expect(openExternalUrl).toHaveBeenCalledTimes(1);
+    });
+
+    expect(redirectSystemPath({ path: url, initial: true })).toBe('/');
+
+    expect(openExternalUrl).toHaveBeenCalledTimes(1);
+    expect(openExternalUrl).toHaveBeenCalledWith(url);
+    expect(getPendingDeepLink()).toBeNull();
+  });
+
+  // The capture reads the raw launch URL while expo-router passes its own
+  // `path`; the same page can be spelled differently, so the skip compares the
+  // normalized browser URL rather than the raw strings.
+  it('does not open an app-scheme spelling of the captured page again', async () => {
+    _resetDeepLinkLaunchForTests();
+    vi.mocked(openExternalUrl).mockClear();
+    const normalized = 'https://app.kilo.ai/organizations/new';
+    _setGetLinkingURLForTests(() => 'kiloapp:///organizations/new');
+
+    captureLaunchDeepLink();
+    await vi.waitFor(() => {
+      expect(openExternalUrl).toHaveBeenCalledWith(normalized);
+    });
+    vi.mocked(openExternalUrl).mockClear();
+
+    expect(redirectSystemPath({ path: normalized, initial: true })).toBe('/');
+    expect(openExternalUrl).not.toHaveBeenCalled();
+  });
+
+  it('still opens a different create page on an initial redirect', async () => {
+    _resetDeepLinkLaunchForTests();
+    vi.mocked(openExternalUrl).mockClear();
+    _setGetLinkingURLForTests(() => 'https://app.kilo.ai/organizations/new');
+
+    captureLaunchDeepLink();
+    await vi.waitFor(() => {
+      expect(openExternalUrl).toHaveBeenCalledTimes(1);
+    });
+    vi.mocked(openExternalUrl).mockClear();
+
+    expect(
+      redirectSystemPath({ path: 'https://app.kilo.ai/organizations/create', initial: true })
+    ).toBe('/');
+    await vi.waitFor(() => {
+      expect(openExternalUrl).toHaveBeenCalledWith('https://app.kilo.ai/organizations/create');
+    });
+  });
+
+  // A warm arrival is a live tap of its own, never the cold launch again.
+  it('still opens a warm arrival after a captured launch handoff', async () => {
+    _resetDeepLinkLaunchForTests();
+    vi.mocked(openExternalUrl).mockClear();
+    const url = 'https://app.kilo.ai/organizations/new';
+    _setGetLinkingURLForTests(() => url);
+
+    captureLaunchDeepLink();
+    await vi.waitFor(() => {
+      expect(openExternalUrl).toHaveBeenCalledTimes(1);
+    });
+
+    expect(redirectSystemPath({ path: url, initial: true })).toBe('/');
+    expect(openExternalUrl).toHaveBeenCalledTimes(1);
+
+    expect(redirectSystemPath({ path: url, initial: false })).toBeNull();
+    await vi.waitFor(() => {
+      expect(openExternalUrl).toHaveBeenCalledTimes(2);
+    });
+  });
 });

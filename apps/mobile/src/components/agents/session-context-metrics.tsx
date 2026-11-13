@@ -66,9 +66,19 @@ const RING_STROKE = 3;
  * control in the header, and the compact window gives the title exactly the
  * rest, so those few dp were the difference between the title's own badge
  * fitting and being clipped by its row.
+ *
+ * The border is always there, one dp on every side, and only its colour and the
+ * fill follow the reading: a pill that paints a reading wears the capsule, and
+ * a settled pill that paints none shows the ring alone. The box keeps its size
+ * either way, so the ring and the slots do not move by the border's width when
+ * the first reading arrives.
  */
 const PILL_CLASS =
-  'h-[44px] shrink min-w-0 flex-row items-center gap-1.5 rounded-full border border-border bg-secondary px-2.5';
+  'h-[44px] shrink min-w-0 flex-row items-center gap-1.5 rounded-full border px-2.5';
+/** The capsule a pill wears while it paints a reading. */
+const PILL_CAPSULE_CLASS = 'border-border bg-secondary';
+/** The chrome a settled pill wears while it paints nothing: the ring alone. */
+const PILL_BARE_CLASS = 'border-transparent';
 const VALUE_ROW_CLASS = 'min-w-0 shrink flex-row items-center gap-1';
 const VALUE_SLOT_CLASS = 'min-w-0 shrink justify-center';
 const PRIMARY_VALUE_CLASS = 'text-xs tabular-nums';
@@ -188,6 +198,15 @@ export function SessionContextMetrics({
   // takes its size instead of naming one.
   const valueRowLoading = content.costSlot === 'loading';
   const sizers = getPillSlotSizers();
+  // A pill that paints nothing at all wears no capsule: on a settled empty chat
+  // an empty wide capsule reads as a control that broke or never finished
+  // loading. The box keeps its full size and its border slot, so the ring stays
+  // where it is and the capsule appears around it once the first reading
+  // arrives.
+  const chromeClass =
+    content.primary !== null || costLabel !== null || valueRowLoading
+      ? PILL_CAPSULE_CLASS
+      : PILL_BARE_CLASS;
 
   const body = (
     <>
@@ -225,7 +244,7 @@ export function SessionContextMetrics({
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         hitSlop={8}
-        className={cn(PILL_CLASS, 'active:opacity-70')}
+        className={cn(PILL_CLASS, chromeClass, 'active:opacity-70')}
         testID="session-context-metrics"
       >
         {body}
@@ -239,7 +258,7 @@ export function SessionContextMetrics({
       {...(hidden
         ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
         : {})}
-      className={cn(PILL_CLASS, hidden && 'opacity-0')}
+      className={cn(PILL_CLASS, chromeClass, hidden && 'opacity-0')}
       testID="session-context-metrics"
     >
       {body}

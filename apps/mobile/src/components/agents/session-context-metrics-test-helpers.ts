@@ -104,9 +104,8 @@ export const PILL_LAYOUT_TOKENS = [
   'items-center',
   'gap-1.5',
   'rounded-full',
+  // The border slot is always there; only its colour follows the reading.
   'border',
-  'border-border',
-  'bg-secondary',
   'px-2.5',
   // The header row hands the trailing cluster a capped 50% box, but RN's
   // default flexShrink is 0. Without these the pill keeps its natural width
@@ -114,6 +113,12 @@ export const PILL_LAYOUT_TOKENS = [
   'shrink',
   'min-w-0',
 ] as const;
+
+/** The capsule a pill wears only while it paints a reading. */
+export const PILL_CAPSULE_TOKENS = ['border-border', 'bg-secondary'] as const;
+
+/** The chrome a settled pill wears while it paints nothing: the ring alone. */
+export const PILL_BARE_TOKENS = ['border-transparent'] as const;
 
 export function expectHiddenPill(root: React.ReactElement): void {
   expect(root.type).toBe('View');

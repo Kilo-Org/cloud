@@ -6,6 +6,8 @@ import {
   expectHiddenPill,
   findAll,
   info,
+  PILL_BARE_TOKENS,
+  PILL_CAPSULE_TOKENS,
   PILL_LAYOUT_TOKENS,
   pillOf,
   propsOf,
@@ -339,5 +341,51 @@ describe('SessionContextMetrics', () => {
     expect(findAll(pillOf(bare(false)), el => el.type === 'Skeleton')).toHaveLength(0);
     expect(propsOf(pillOf(bare(false))).accessibilityLabel).toContain('usage unavailable');
     expect(propsOf(pillOf(bare(true))).accessibilityLabel ?? '').not.toContain('usage unavailable');
+  });
+
+  // A pill that paints nothing wears no capsule: an empty wide capsule beside
+  // the ring reads as a control that broke or never finished loading. The
+  // border slot stays one dp wide, so the ring and the slots hold their
+  // positions and the capsule appears around the same box once a reading
+  // arrives.
+  it('wears the capsule only while it paints a reading', () => {
+    const onPress = vi.fn<() => void>();
+    const expectBare = (root: React.ReactElement) => {
+      const className = classNameOf(pillOf(root));
+      for (const token of PILL_LAYOUT_TOKENS) {
+        expect(className).toContain(token);
+      }
+      for (const token of PILL_BARE_TOKENS) {
+        expect(className).toContain(token);
+      }
+      for (const token of PILL_CAPSULE_TOKENS) {
+        expect(className).not.toContain(token);
+      }
+    };
+    const expectCapsule = (root: React.ReactElement) => {
+      const className = classNameOf(pillOf(root));
+      for (const token of PILL_LAYOUT_TOKENS) {
+        expect(className).toContain(token);
+      }
+      for (const token of PILL_CAPSULE_TOKENS) {
+        expect(className).toContain(token);
+      }
+      expect(className).not.toContain('border-transparent');
+    };
+
+    // Settled empty chat, and a transcript that reported nothing yet.
+    expectBare(render({ info: undefined, totalCostMicrodollars: null, hasMessages: false, onPress }));
+    expectBare(render({ info: undefined, totalCostMicrodollars: null, hasMessages: true, onPress }));
+    // The resolving open paints its bar, so it keeps the capsule.
+    expectCapsule(
+      render({ info: undefined, totalCostMicrodollars: null, hasMessages: false, loading: true, onPress })
+    );
+    // Any reading wears the capsule.
+    expectCapsule(
+      render({ info: info(), totalCostMicrodollars: 150_000, hasMessages: true, onPress })
+    );
+    expectCapsule(
+      render({ info: undefined, totalCostMicrodollars: 150_000, hasMessages: true, onPress })
+    );
   });
 });

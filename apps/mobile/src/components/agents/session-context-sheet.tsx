@@ -56,6 +56,7 @@ import { SessionPageSheet } from './session-page-sheet';
 import { SessionSandboxSection } from './session-sandbox-section';
 import { copySessionId, copySessionLink } from './session-row-actions';
 import { sshSandboxPath } from '@/lib/ssh/routes';
+import { useSshClientEnabled } from '@/lib/ssh/use-ssh-client-enabled';
 import { type SessionConnectionDisplay } from './session-connection-indicator-state';
 import { SessionTodoLinkRow } from '@/components/todos/session-todo-link';
 import { SessionShareSection } from './session-share-section';
@@ -205,6 +206,7 @@ export function SessionContextSheet({
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const manager = useOptionalSessionManager();
+  const sshEnabled = useSshClientEnabled();
   const runningOn = useRunningOnLabel(activeSessionType, ownerConnectionId, visible);
   const idCopy = useCopyRowFeedback(
     async () => {
@@ -400,7 +402,7 @@ export function SessionContextSheet({
 
           <SessionChangesRow sessionId={sessionId} onClose={onClose} />
 
-          {cloudAgentSessionId === null ? null : (
+          {!sshEnabled || cloudAgentSessionId === null ? null : (
             <SandboxTerminalRow
               cloudAgentSessionId={cloudAgentSessionId}
               organizationId={organizationId}

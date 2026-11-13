@@ -1,9 +1,7 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
 
 import {
   clearSshRows,
-  log,
   resetSshQueries,
   seedEditor,
   seedFilesSurfaces,
@@ -11,6 +9,7 @@ import {
   seedKnownHosts,
   seedSession,
 } from './fixture-seeds';
+import { setSshFixtureFlag } from './fixture-flag';
 import {
   SSH_HOSTS_ROUTE,
   SSH_KNOWN_HOSTS_ROUTE,
@@ -45,60 +44,26 @@ import {
 
 const FIXTURE_PATH = /(?:^|\/)dev\/ssh-fixture\/([\w-]+)\/?(?:[?#].*)?$/;
 
-let flagOn = false;
-const flagListeners = new Set<() => void>();
-
-function setFlagOn(next: boolean): void {
-  if (flagOn === next) {
-    return;
-  }
-  flagOn = next;
-  for (const listener of flagListeners) {
-    listener();
-  }
-}
-
-/**
- * The SSH flag, forced on for a dev fixture. The Home entry reads it beside the
- * remote flag, so a build with no PostHog key can still show the row the design
- * gate captures. Always false outside a development build.
- */
-export function useSshFixtureFlag(): boolean {
-  const [on, setOn] = useState(flagOn);
-  useEffect(() => {
-    if (!__DEV__) {
-      return undefined;
-    }
-    const listener = () => {
-      setOn(flagOn);
-    };
-    flagListeners.add(listener);
-    return () => {
-      flagListeners.delete(listener);
-    };
-  }, []);
-  return __DEV__ && on;
-}
-
 /**
  * Handle a fixture link. True when the path names this fixture (it seeds and
  * navigates itself), so the caller returns falsy and nothing else resolves the
  * link.
  */
 export function handleSshFixturePath(path: string): boolean {
+  if (!__DEV__) {
+    return false;
+  }
   const name = FIXTURE_PATH.exec(path)?.[1];
   if (name === undefined) {
     return false;
   }
   if (name === 'flag-on') {
-    setFlagOn(true);
-    log('flag on');
+    setSshFixtureFlag(true);
     router.replace('/');
     return true;
   }
   if (name === 'flag-off') {
-    setFlagOn(false);
-    log('flag off');
+    setSshFixtureFlag(false);
     return true;
   }
   void (async () => {
@@ -139,8 +104,6 @@ export function handleSshFixturePath(path: string): boolean {
       const sessionId = await seedSession(state);
       await resetSshQueries();
       router.replace(sshSessionPath(sessionId));
-    } else {
-      log(`unknown fixture ${name}`);
     }
   })();
   return true;

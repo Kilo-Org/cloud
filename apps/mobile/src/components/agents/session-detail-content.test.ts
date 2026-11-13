@@ -118,6 +118,7 @@ const connectionHealth = vi.hoisted(() => ({
   retryConnection: vi.fn(),
 }));
 const hideThinking = vi.hoisted(() => ({ current: false, loaded: true }));
+vi.mock('@/lib/ssh/use-ssh-client-enabled', () => ({ useSshClientEnabled: () => false }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/agents/session-provider', () => ({

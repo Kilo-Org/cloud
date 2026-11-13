@@ -18,6 +18,7 @@ import { formatSessionTotalCost } from './session-list-helpers';
 
 const holder = vi.hoisted(() => ({
   instances: [] as unknown[],
+  sshEnabled: false,
   isPending: false,
   copied: [] as string[],
   copyResult: true as boolean | Promise<boolean>,
@@ -29,13 +30,22 @@ const holder = vi.hoisted(() => ({
 }));
 
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => ({ data: { instances: holder.instances }, isPending: holder.isPending }),
+  useQuery: (options: { sandbox?: boolean }) => ({
+    data: options.sandbox ? undefined : { instances: holder.instances },
+    isPending: holder.isPending,
+  }),
   useQueryClient: () => ({ invalidateQueries: () => Promise.resolve() }),
   useMutation: () => ({ mutate: () => undefined, isPending: false }),
 }));
+vi.mock('@/lib/ssh/use-ssh-client-enabled', () => ({
+  useSshClientEnabled: () => holder.sshEnabled,
+}));
 vi.mock('@/lib/trpc', () => {
-  const options = { queryOptions: () => ({}), queryKey: () => [] };
-  const namespace = { getSandboxStatus: options, getWorkspaceSnapshotRecovery: options };
+  const sandboxOptions = { queryOptions: () => ({ sandbox: true }), queryKey: () => [] };
+  const namespace = {
+    getSandboxStatus: sandboxOptions,
+    getWorkspaceSnapshotRecovery: sandboxOptions,
+  };
   return {
     trpcClient: { cloudAgentNext: {}, organizations: { cloudAgentNext: {} } },
     useTRPC: () => ({
@@ -395,6 +405,7 @@ function pressByTestID(renderer: TestRenderer.ReactTestRenderer, testID: string)
 }
 
 beforeEach(() => {
+  holder.sshEnabled = false;
   holder.instances = [];
   holder.isPending = false;
   holder.copied = [];
@@ -405,6 +416,15 @@ beforeEach(() => {
 });
 
 describe('SessionContextSheet session id and running on', () => {
+  it.each([false, true])('only shows the Terminal row when SSH is enabled (%s)', async enabled => {
+    holder.sshEnabled = enabled;
+    const renderer = await mountSheet({ cloudAgentSessionId: 'workspace-fixture' });
+    expect(findByTestID(renderer.root, 'session-context-sheet-terminal')).toHaveLength(
+      enabled ? 1 : 0
+    );
+    await unmount(renderer);
+  });
+
   it('shows the session title above the id row so the sheet names its session', async () => {
     const renderer = await mountSheet({ sessionTitle: 'Greeting' });
     const values = textValues(renderer);

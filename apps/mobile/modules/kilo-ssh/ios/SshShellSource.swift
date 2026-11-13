@@ -115,13 +115,16 @@ final class SinkDelivery: ByteSink, @unchecked Sendable {
     let pending = buffered
     buffered = []
     bufferedBytes = 0
-    let closed = closeEvent
+    let closed = closeDelivered ? nil : closeEvent
+    if closed != nil {
+      closeDelivered = true
+    }
     lock.unlock()
 
     pending.forEach { next.onData($0) }
     if let closed {
       next.onClosed(exitStatus: closed.exitStatus, error: closed.error)
-      deliveredClose()
+      onTerminated()
     }
   }
 
@@ -147,21 +150,15 @@ final class SinkDelivery: ByteSink, @unchecked Sendable {
     }
     let target = sink
     closeEvent = (status, error)
+    if target != nil {
+      closeDelivered = true
+    }
     lock.unlock()
 
     if let target {
       target.onClosed(exitStatus: status, error: error)
-      deliveredClose()
-    }
-  }
-
-  private func deliveredClose() {
-    lock.lock()
-    let first = !closeDelivered
-    closeDelivered = true
-    lock.unlock()
-    if first {
       onTerminated()
     }
   }
+
 }

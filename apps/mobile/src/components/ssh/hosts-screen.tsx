@@ -33,6 +33,7 @@ import {
 } from '@/lib/ssh/routes';
 import { openSession } from '@/lib/ssh/session/manager';
 import { useSshHostMutations, useSshHosts } from '@/lib/ssh/use-ssh';
+import { useSshClientEnabled } from '@/lib/ssh/use-ssh-client-enabled';
 
 const SKELETON_ROWS = [0, 1, 2];
 
@@ -41,6 +42,7 @@ export function SshHostsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const colors = useThemeColors();
+  const sshEnabled = useSshClientEnabled();
   const { confirm, dialog } = useConfirmDialog();
   const hosts = useSshHosts();
   const activeSessions = useActiveSessions();
@@ -179,7 +181,7 @@ export function SshHostsScreen() {
         contentContainerClassName="gap-2 px-4 pt-4"
         showsVerticalScrollIndicator={false}
       >
-        {sandboxes.length > 0 ? (
+        {sshEnabled && sandboxes.length > 0 ? (
           <View className="gap-2 pb-2">
             <Text className="text-xs uppercase tracking-wide text-muted-foreground">
               {t('ssh.sandboxes.title')}

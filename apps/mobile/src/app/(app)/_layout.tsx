@@ -37,6 +37,7 @@ import { SystemSearchIndexMount } from '@/lib/system-search-index-mount';
 import { ToolSummaryTranslationRetryMount } from '@/lib/tool-summary-translation/tool-summary-translation-retry-mount';
 import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
 import { useTRPC } from '@/lib/trpc';
+import { useSshClientEnabled } from '@/lib/ssh/use-ssh-client-enabled';
 
 /**
  * The single owner of the app's authenticated foreground reconciliation work,
@@ -123,6 +124,7 @@ export const unstable_settings = {
 export default function AppLayout() {
   const colors = useThemeColors();
   const sheetOptions = useFormSheetScreenOptions();
+  const sshEnabled = useSshClientEnabled();
   // Android's half-height search sheets leave their results behind the IME, so
   // they keep the existing safe-area-capped full detent. iOS keeps its native
   // detent expansion on focus, except in a short window: there the half detent
@@ -163,7 +165,7 @@ export default function AppLayout() {
       <ToolSummaryTranslationRetryMount />
       <StorePurchaseRecoveryMount />
       <ForegroundReconciliationMount />
-      <SshSessionRuntime />
+      {sshEnabled ? <SshSessionRuntime /> : null}
       <AppWideFreshnessMount />
       <SharePayloadNavigator />
       <PickerLaunchRestoreMount />
@@ -208,38 +210,40 @@ export default function AppLayout() {
             <Stack.Screen name="agent-chat/new" options={{ headerShown: false }} />
             <Stack.Screen name="agent-chat/[session-id]" />
             <Stack.Screen name="native-remote" />
-            <Stack.Screen name="ssh/index" />
-            <Stack.Screen name="ssh/host/new" />
-            <Stack.Screen name="ssh/host/[host-id]" />
-            <Stack.Screen name="ssh/import" />
-            <Stack.Screen name="ssh/key/new" />
-            <Stack.Screen name="ssh/key/import" />
-            <Stack.Screen name="ssh/known-hosts" />
-            <Stack.Screen name="ssh/snippets" />
-            {/* A sandbox terminal is a live shell too: a swipe back would end
+            <Stack.Protected guard={sshEnabled}>
+              <Stack.Screen name="ssh/index" />
+              <Stack.Screen name="ssh/host/new" />
+              <Stack.Screen name="ssh/host/[host-id]" />
+              <Stack.Screen name="ssh/import" />
+              <Stack.Screen name="ssh/key/new" />
+              <Stack.Screen name="ssh/key/import" />
+              <Stack.Screen name="ssh/known-hosts" />
+              <Stack.Screen name="ssh/snippets" />
+              {/* A sandbox terminal is a live shell too: a swipe back would end
                 its pty, and the session it belongs to is where it is reopened. */}
-            <Stack.Screen
-              name="ssh/sandbox/[session-id]"
-              options={{ gestureEnabled: false, headerShown: false }}
-            />
-            {/* A session screen is a live shell: a swipe back would hide it,
+              <Stack.Screen
+                name="ssh/sandbox/[session-id]"
+                options={{ gestureEnabled: false, headerShown: false }}
+              />
+              {/* A session screen is a live shell: a swipe back would hide it,
                 not end it, and the switcher is how a person leaves one. */}
-            <Stack.Screen
-              name="ssh/session/[session-id]/index"
-              options={{ gestureEnabled: false, headerShown: false }}
-            />
-            {/* The file browser is a view of the same live session: leaving it
+              <Stack.Screen
+                name="ssh/session/[session-id]/index"
+                options={{ gestureEnabled: false, headerShown: false }}
+              />
+              {/* The file browser is a view of the same live session: leaving it
                 returns to the terminal, and a swipe back must not end it. */}
-            <Stack.Screen
-              name="ssh/session/[session-id]/files"
-              options={{ gestureEnabled: false, headerShown: false }}
-            />
-            {/* A prompt is a question the connection cannot proceed without, so
+              <Stack.Screen
+                name="ssh/session/[session-id]/files"
+                options={{ gestureEnabled: false, headerShown: false }}
+              />
+              {/* A prompt is a question the connection cannot proceed without, so
                 it presents as a sheet that cannot be swiped away. */}
-            <Stack.Screen
-              name="ssh/prompt/[session-id]"
-              options={{ ...sheetOptions, gestureEnabled: false }}
-            />
+              <Stack.Screen
+                name="ssh/prompt/[session-id]"
+                options={{ ...sheetOptions, gestureEnabled: false }}
+              />
+            </Stack.Protected>
             <Stack.Screen name="session-changes/[session-id]" options={{ headerShown: false }} />
             <Stack.Screen name="shared/[token]" options={{ headerShown: false }} />
             <Stack.Screen name="agent-chat/model-picker" options={searchSheetOptions} />

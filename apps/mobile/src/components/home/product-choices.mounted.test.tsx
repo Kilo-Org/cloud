@@ -12,6 +12,7 @@ const push = vi.hoisted(() => vi.fn());
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
 }));
+vi.mock('@/lib/ssh/use-ssh-client-enabled', () => ({ useSshClientEnabled: () => false }));
 vi.mock('react-native', () => ({
   View: 'View',
 }));

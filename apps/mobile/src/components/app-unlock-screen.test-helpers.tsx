@@ -211,7 +211,7 @@ vi.mock('expo-router', () => ({
   Stack: Object.assign(
     ({ screenLayout }: { screenLayout: typeof appUnlockScreenLayout }) =>
       createElement('Scene', null, unlockScene(<Draft />, screenLayout)),
-    { Screen: 'StackScreen' }
+    { Screen: 'StackScreen', Protected: 'StackProtected' }
   ),
   useRouter: () => ({ push: vi.fn() }),
   useNavigation: () => ({ isFocused: () => true, addListener: () => () => undefined }),

@@ -38,11 +38,6 @@ const FIXTURE_KEY = {
   fingerprintSha256: 'SHA256:laptopFixtureFingerprint',
 } as const;
 
-export function log(message: string): void {
-  // eslint-disable-next-line no-console -- dev-only harness feedback in the Metro log
-  console.info(`[ssh-fixture] ${message}`);
-}
-
 /**
  * The store writes rows behind React Query's back, so a screen seeded after it
  * mounted would keep the list it read before. Resetting the ssh key drops every

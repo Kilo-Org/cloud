@@ -1019,27 +1019,90 @@ describe('runNeedsInputInteraction', () => {
       expect(fake.respondToPermission).not.toHaveBeenCalled();
     });
 
-    it('sends nothing when the presented raise is the other kind than the action answers', async () => {
+    it("answers a tap whose action is not the kind the row reports, when the payload names the row's raise", async () => {
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activity, { type: 'idle' });
+        },
+      });
+      getSessionQuery.mockResolvedValue({
+        organization_id: 'org-1',
+        status: 'permission',
+        status_updated_at: PRESENTED,
+      });
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'reply',
+        raiseId: PRESENTED,
+        text: 'Use the staging bucket',
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      // The push offered both controls for one raise, so a reply tap on a
+      // permission row still names that raise: nothing is sent because no
+      // question is pending, and the still-waiting raise keeps its badge.
+      expect(outcome).toBe('retryable');
+      expect(fake.answerQuestion).not.toHaveBeenCalled();
+      expect(ack).not.toHaveBeenCalled();
+    });
+
+    it('reports a vanished session as gone at the pre-send gate', async () => {
       const fake = createFakeManager({
         onSwitch: seeds => {
           seeds.store.set(seeds.activePermission, { requestId: 'perm-1' });
         },
       });
-      getSessionQuery.mockResolvedValue({
-        organization_id: 'org-1',
-        status: 'question',
-        status_updated_at: PRESENTED,
-      });
+      getSessionQuery
+        .mockResolvedValueOnce({
+          organization_id: 'org-1',
+          status: 'permission',
+          status_updated_at: PRESENTED,
+        })
+        .mockRejectedValue(trpcError('NOT_FOUND'));
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
 
       const outcome = await runNeedsInputInteraction({
         kiloSessionId: SESSION_ID,
         action: 'approve',
         raiseId: PRESENTED,
-        deps: fakeManagerDeps(fake),
+        deps: fakeManagerDeps(fake, { ack }),
       });
 
       expect(outcome).toBe('unavailable');
       expect(fake.respondToPermission).not.toHaveBeenCalled();
+      expect(ack).toHaveBeenCalledWith(SESSION_ID, 'permission', PRESENTED);
+    });
+
+    it('keeps the actions when the pre-send gate read fails', async () => {
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activePermission, { requestId: 'perm-1' });
+        },
+      });
+      getSessionQuery
+        .mockResolvedValueOnce({
+          organization_id: 'org-1',
+          status: 'permission',
+          status_updated_at: PRESENTED,
+        })
+        .mockRejectedValue(new Error('deadline exceeded'));
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        raiseId: PRESENTED,
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      expect(outcome).toBe('retryable');
+      expect(fake.respondToPermission).not.toHaveBeenCalled();
+      expect(ack).not.toHaveBeenCalled();
     });
 
     it('keeps the earlier outcome when the payload names no raise', async () => {

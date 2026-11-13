@@ -209,9 +209,12 @@ export async function runNeedsInputInteraction({
   const missingRaiseSettleMs = deps?.missingRaiseSettleMs ?? DEFAULT_MISSING_RAISE_SETTLE_MS;
 
   // The raise the notification offered. A card's Approve answers a permission
-  // and a Reply answers a question, and the raise is named by the payload's
-  // `raiseId`; a payload without one falls back to the stored row's own status
-  // time, which names the raise only while the row still reads that status.
+  // and a Reply answers a question; the status the answer names is the action's
+  // kind. The raise itself is named by the payload's `raiseId` — the waiting
+  // row's own status time — which both actions of one card share, because a
+  // payload posted without an `attentionKind` offers both for the same raise.
+  // A payload without an id falls back to the stored row's own status time,
+  // which names the raise only while the row still reads that status.
   const answeredStatus = action === 'approve' ? 'permission' : 'question';
   let organizationId: string | undefined = undefined;
   let ackRaiseId: string | null = raiseId ?? null;
@@ -224,7 +227,7 @@ export async function runNeedsInputInteraction({
     ackRaiseId = raiseId ?? stored;
     // The answer is sent only while the row waits on the raise the
     // notification presents; the ack names that raise.
-    if (!rowWaitsOnPresentedRaise(session, action, raiseId)) {
+    if (!rowWaitsOnPresentedRaise(session, raiseId)) {
       ack(kiloSessionId, answeredStatus, ackRaiseId);
       return 'unavailable';
     }
@@ -470,7 +473,7 @@ async function resolveMissingRequestId(args: {
   if (!liveSnapshotLanded(store, manager) || anyRaisePending()) {
     return { kind: 'retryable' };
   }
-  const raiseState = await readPresentedRaiseState({ getSession, kiloSessionId, action, raiseId });
+  const raiseState = await readPresentedRaiseState({ getSession, kiloSessionId, raiseId });
   if (raiseState === 'unknown') {
     return { kind: 'retryable' };
   }

@@ -308,6 +308,38 @@ async fn keepalive_keeps_an_idle_session_connected() {
     session.disconnect().await.expect("disconnect");
 }
 
+/// The fixture server runs `ClientAliveInterval 5` / `ClientAliveCountMax 1`,
+/// so it disconnects a client that never answers its `keepalive@openssh.com`
+/// probes after about ten seconds. Our own keepalives are off here, so the
+/// only traffic is the server's probes: surviving a minute with the channel
+/// still usable is only possible if the client answers them.
+#[tokio::test]
+async fn server_keepalive_probes_keep_an_idle_session_connected() {
+    let server = server!();
+    let mut config = server.password_config();
+    config.keepalive_interval_s = 0;
+    let handler = Arc::new(TestHandler::accepting());
+
+    let session = SshSession::connect(config, handler.clone() as Arc<dyn SessionHandler>)
+        .await
+        .expect("session");
+
+    tokio::time::sleep(Duration::from_secs(60)).await;
+
+    let result = session
+        .exec("echo alive".to_string())
+        .await
+        .expect("the server must not drop a client that answers its keepalive probes");
+    assert_eq!(String::from_utf8_lossy(&result.stdout).trim(), "alive");
+    assert_eq!(
+        handler.disconnects.load(Ordering::SeqCst),
+        0,
+        "the server must not have dropped the session"
+    );
+
+    session.disconnect().await.expect("disconnect");
+}
+
 #[tokio::test]
 async fn connect_timeout_bounds_a_silent_listener() {
     let server = server!();

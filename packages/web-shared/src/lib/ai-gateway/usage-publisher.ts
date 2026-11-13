@@ -136,15 +136,22 @@ function reportAttempt(diagnostic: AttemptDiagnostic): void {
   }
 }
 
+const LOOPBACK_HOSTNAMES: ReadonlySet<string> = new Set(['localhost', '127.0.0.1', '[::1]']);
+
 /**
  * `fetch` only speaks http(s). `new URL` accepts any `scheme:`, so a value like
  * `localhost:3000/usage` parses as a `localhost:` URL with no host and would fail every
  * attempt. Reject it as configuration before any request is made.
+ *
+ * Endpoint policy: `https`, or plain HTTP only for a loopback host, which is what local
+ * fixtures use. Every publication path shares this one rule through this parser; any other URL
+ * counts as no publisher.
  */
 function parsePublisherUrl(value: string): URL | null {
   try {
     const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url : null;
+    if (url.protocol === 'https:') return url;
+    return url.protocol === 'http:' && LOOPBACK_HOSTNAMES.has(url.hostname) ? url : null;
   } catch {
     return null;
   }
@@ -198,19 +205,6 @@ export async function enqueueEnkryptUsage(
   );
 }
 
-const LOOPBACK_HOSTNAMES: ReadonlySet<string> = new Set(['localhost', '127.0.0.1', '[::1]']);
-
-/**
- * The Bearer secret must never cross the network in clear text, so plain HTTP is accepted only for
- * a loopback host, as in local fixtures; any other `http:` URL counts as no publisher.
- */
-function exaUsageIngestUrl(usageIngestUrl: string | undefined): string | undefined {
-  const url = usageIngestSiblingUrl(usageIngestUrl, EXA_USAGE_INGEST_PATH);
-  if (!url) return undefined;
-  const { protocol, hostname } = new URL(url);
-  return protocol === 'https:' || LOOPBACK_HOSTNAMES.has(hostname) ? url : undefined;
-}
-
 /**
  * Publishes the bare Exa usage record, with its `id` and `occurredAt` unchanged, to the
  * usage-ingest `/exa-usage` path, which wraps it in the tagged queue envelope. Like Enkrypt it is
@@ -219,7 +213,7 @@ function exaUsageIngestUrl(usageIngestUrl: string | undefined): string | undefin
 export async function enqueueExaUsage(record: ExaUsageRecord): Promise<UsageEnqueueOutcome> {
   return publishToUsageIngest(
     { usageId: record.id, usage_kind: 'exa_usage' },
-    exaUsageIngestUrl(USAGE_INGEST_URL),
+    usageIngestSiblingUrl(USAGE_INGEST_URL, EXA_USAGE_INGEST_PATH),
     record,
     { retryTransientFailures: true }
   );
@@ -235,7 +229,7 @@ async function publishToUsageIngest(
     return reportUnavailable(identity, 'publisher_not_configured');
   }
 
-  // A URL that is not an absolute http(s) endpoint is configuration, not transport: no
+  // A URL that this publisher will not send its secret to is configuration, not transport: no
   // request is attempted, so the caller must fall back exactly like a missing publisher.
   const parsedUrl = parsePublisherUrl(ingestUrl);
   if (!parsedUrl) return reportUnavailable(identity, 'publisher_not_configured');

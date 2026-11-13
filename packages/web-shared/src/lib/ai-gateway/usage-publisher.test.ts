@@ -240,6 +240,40 @@ describe('enqueueUsage', () => {
     expectUnavailableWarning('publisher_not_configured');
   });
 
+  test.each(['http://usage.example.test/usage', 'http://10.0.0.5/usage'])(
+    'reports publisher_not_configured for a plain-HTTP endpoint outside loopback: %s',
+    async value => {
+      config.USAGE_INGEST_URL = value;
+      expect(await enqueueUsage(payload, { retryTransientFailures: true })).toEqual({
+        kind: 'unavailable',
+        reason: 'publisher_not_configured',
+      });
+      expect(mockFetch).not.toHaveBeenCalled();
+      expectUnavailableWarning('publisher_not_configured');
+    }
+  );
+
+  test('applies the endpoint rule to an Enkrypt publication', async () => {
+    config.USAGE_INGEST_URL = 'http://usage.example.test/usage';
+    const usageWrite = {
+      id: 'c4b7e8f1-2d3a-4c5b-8e9f-0a1b2c3d4e5f',
+      occurredAt: '2026-11-12T12:00:00.000Z',
+      organizationId: 'd5c8f9a2-3e4b-4d5c-9f0a-1b2c3d4e5f6a',
+      kiloUserId: 'oauth/synthetic',
+      sessionId: null,
+      apiKind: 'messages',
+      decision: 'blocked',
+      creditsCost: 7,
+      addedLatencyMs: 12,
+    } satisfies EnkryptUsageWriteInput;
+
+    expect(await enqueueEnkryptUsage(usageWrite)).toEqual({
+      kind: 'unavailable',
+      reason: 'publisher_not_configured',
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   test('uses the configured URL without an additional path, query or fragment policy', async () => {
     config.USAGE_INGEST_URL = 'https://usage.example.test/proxy/usage?fixture=synthetic#fragment';
     mockFetch.mockResolvedValue(new Response(null, { status: 202 }));

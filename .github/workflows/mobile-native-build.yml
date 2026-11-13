@@ -337,7 +337,9 @@ jobs:
     needs: [gate, prepare-harness-sdk, prepare-trpc]
     if: needs.gate.outputs.need_android == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # The Gradle build cross-compiles the SSH module's Rust core for four ABIs
+    # before the variant's preBuild, which is several minutes of extra compile.
+    timeout-minutes: 90
     # Same slot rule as the ios job: one per ref for a pull_request run, one
     # per nativeHash for a push or workflow_dispatch run.
     concurrency:

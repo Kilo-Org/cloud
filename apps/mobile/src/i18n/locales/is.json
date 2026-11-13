@@ -4137,6 +4137,7 @@
       "fieldRequired": "Þetta svæði er nauðsynlegt"
     },
     "errors": {
+      "bindTaken": "Þetta heimilisfang er þegar framsent af annarri framsendingu á þessum hýsli.",
       "invalidPort": "Notaðu gátt frá 1 til 65535",
       "jumpCycle": "Sá netþjónn fer þegar í gegnum þennan."
     },

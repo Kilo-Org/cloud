@@ -4137,6 +4137,7 @@
       "fieldRequired": "Tämä kenttä on pakollinen"
     },
     "errors": {
+      "bindTaken": "Tuon osoitteen välittää jo toinen tällä isännällä oleva ohjaus.",
       "invalidPort": "Käytä porttia väliltä 1–65535",
       "jumpCycle": "Tuo isäntä hyppää jo tämän kautta."
     },

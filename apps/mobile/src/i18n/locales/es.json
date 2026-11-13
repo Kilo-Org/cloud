@@ -4202,6 +4202,7 @@
       "fieldRequired": "Este campo es obligatorio"
     },
     "errors": {
+      "bindTaken": "Esa dirección ya está siendo reenviada por otro reenvío de este host.",
       "invalidPort": "Usa un puerto del 1 al 65535",
       "jumpCycle": "Ese host ya salta a través de este."
     },

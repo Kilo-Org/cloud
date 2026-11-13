@@ -4137,6 +4137,7 @@
       "fieldRequired": "Goobtan waa loo baahan yahay"
     },
     "errors": {
+      "bindTaken": "Cinwaankaas mar hore ayuu wareejin kale oo host-kan ku yaal u wareejiyay.",
       "invalidPort": "Isticmaal port u dhexeeya 1 iyo 65535",
       "jumpCycle": "Host-kaas mar hore ayuu kan ka booday."
     },

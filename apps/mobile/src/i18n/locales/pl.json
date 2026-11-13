@@ -4267,6 +4267,7 @@
       "fieldRequired": "To pole jest wymagane"
     },
     "errors": {
+      "bindTaken": "Ten adres nasłuchu jest już zajęty przez inne przekierowanie na tym hoście.",
       "invalidPort": "Użyj portu od 1 do 65535",
       "jumpCycle": "Ten host już łączy się przez tego hosta."
     },

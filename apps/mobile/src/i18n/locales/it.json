@@ -4202,6 +4202,7 @@
       "fieldRequired": "Questo campo è obbligatorio"
     },
     "errors": {
+      "bindTaken": "Quell'indirizzo è già inoltrato da un altro inoltro su questo host.",
       "invalidPort": "Usa una porta da 1 a 65535",
       "jumpCycle": "Quell'host passa già attraverso questo."
     },

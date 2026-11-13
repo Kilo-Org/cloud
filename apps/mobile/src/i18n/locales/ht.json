@@ -4137,6 +4137,7 @@
       "fieldRequired": "Chan sa a obligatwa"
     },
     "errors": {
+      "bindTaken": "Adrès sa a deja pase atravè yon lòt redireksyon sou menm ot sa a.",
       "invalidPort": "Itilize yon pò soti 1 rive 65535",
       "jumpCycle": "Ot sa a deja pase atravè ot sa a."
     },

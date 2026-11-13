@@ -4137,6 +4137,7 @@
       "fieldRequired": "Dieses Feld ist erforderlich"
     },
     "errors": {
+      "bindTaken": "Diese Lauschadresse wird bereits von einer anderen Weiterleitung auf diesem Host verwendet.",
       "invalidPort": "Verwende einen Port von 1 bis 65535",
       "jumpCycle": "Dieser Host springt bereits über diesen."
     },

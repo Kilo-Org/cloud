@@ -4137,6 +4137,7 @@
       "fieldRequired": "Kolom ini wajib diisi"
     },
     "errors": {
+      "bindTaken": "Alamat itu sudah digunakan oleh penerusan lain pada host ini.",
       "invalidPort": "Gunakan port 1 hingga 65535",
       "jumpCycle": "Host itu sudah menggunakan host ini sebagai perantara."
     },

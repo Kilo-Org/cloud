@@ -4202,6 +4202,7 @@
       "fieldRequired": "Aquest camp és obligatori"
     },
     "errors": {
+      "bindTaken": "Aquesta adreça ja està redirigida per una altra redirecció en aquest amfitrió.",
       "invalidPort": "Fes servir un port de l'1 al 65535",
       "jumpCycle": "Aquell amfitrió ja passa per aquest."
     },

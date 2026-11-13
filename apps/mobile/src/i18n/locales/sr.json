@@ -4202,6 +4202,7 @@
       "fieldRequired": "Ovo polje je obavezno"
     },
     "errors": {
+      "bindTaken": "Ta adresa se već prosleđuje drugim prosleđivanjem na ovom hostu.",
       "invalidPort": "Koristi port od 1 do 65535",
       "jumpCycle": "Taj host već ide preko ovog hosta."
     },

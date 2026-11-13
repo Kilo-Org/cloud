@@ -4137,6 +4137,7 @@
       "fieldRequired": "Le nkambu iyadingeka"
     },
     "errors": {
+      "bindTaken": "Lelo kheli selivele lifowodwa ngenye ifowodi kule hosthi.",
       "invalidPort": "Sebenzisa iphothi esukela ku-1 kuya ku-65535",
       "jumpCycle": "Leyo hosthi isivele igxuma ngalena."
     },

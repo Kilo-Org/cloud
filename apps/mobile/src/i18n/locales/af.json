@@ -4137,6 +4137,7 @@
       "fieldRequired": "Hierdie veld is verpligtend"
     },
     "errors": {
+      "bindTaken": "Daardie adres word reeds deur 'n ander oordrag op hierdie gasheer gebruik.",
       "invalidPort": "Gebruik 'n poort van 1 tot 65535",
       "jumpCycle": "Daardie gasheer spring reeds deur hierdie een."
     },

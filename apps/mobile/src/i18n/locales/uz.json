@@ -4137,6 +4137,7 @@
       "fieldRequired": "Bu maydon to'ldirilishi shart"
     },
     "errors": {
+      "bindTaken": "O‘sha manzil allaqachon shu hostdagi boshqa yo‘naltirish tomonidan yo‘naltirilgan.",
       "invalidPort": "1 dan 65535 gacha portdan foydalaning",
       "jumpCycle": "O‘sha host allaqachon shu host orqali o‘tadi."
     },

@@ -4137,6 +4137,7 @@
       "fieldRequired": "Ana buƙatar wannan filin"
     },
     "errors": {
+      "bindTaken": "An riga an tura wannan adireshin saurare ta wata turawa a wannan host ɗin.",
       "invalidPort": "Yi amfani da port daga 1 zuwa 65535",
       "jumpCycle": "Wannan host ɗin ya riga ya bi ta wannan."
     },

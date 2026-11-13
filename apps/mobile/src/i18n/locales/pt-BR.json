@@ -4208,6 +4208,7 @@
       "fieldRequired": "Este campo é obrigatório"
     },
     "errors": {
+      "bindTaken": "Esse endereço já é encaminhado por outro encaminhamento neste host.",
       "invalidPort": "Use uma porta de 1 a 65535",
       "jumpCycle": "Esse host já salta por meio deste."
     },

@@ -4137,6 +4137,7 @@
       "fieldRequired": "Kinakailangan ang field na ito"
     },
     "errors": {
+      "bindTaken": "Na-forward na ang address na iyon ng isa pang forward sa host na ito.",
       "invalidPort": "Gumamit ng port mula 1 hanggang 65535",
       "jumpCycle": "Dumadaan na ang host na iyon sa isang ito."
     },

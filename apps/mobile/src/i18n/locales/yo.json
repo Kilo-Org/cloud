@@ -4137,6 +4137,7 @@
       "fieldRequired": "Pápá yìí pọn dandan"
     },
     "errors": {
+      "bindTaken": "A ti ń gbé àdírẹ́sì ìgbọ́ yẹn lọ síwájú nípasẹ̀ ìtẹ̀síwájú mìíràn lórí ẹ̀rọ yìí.",
       "invalidPort": "Lo port láti 1 sí 65535",
       "jumpCycle": "Sáfà yẹn ti ń fò nípasẹ̀ ẹyí."
     },

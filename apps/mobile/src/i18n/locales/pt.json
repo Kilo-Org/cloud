@@ -4208,6 +4208,7 @@
       "fieldRequired": "Este campo é obrigatório"
     },
     "errors": {
+      "bindTaken": "Esse endereço já está a ser reencaminhado por outro reencaminhamento neste anfitrião.",
       "invalidPort": "Utilize uma porta entre 1 e 65535",
       "jumpCycle": "Esse anfitrião já salta através deste."
     },

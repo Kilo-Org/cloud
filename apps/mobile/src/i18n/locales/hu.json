@@ -4137,6 +4137,7 @@
       "fieldRequired": "A mező kitöltése kötelező"
     },
     "errors": {
+      "bindTaken": "Ezt a címet már egy másik továbbítás használja ezen a gazdagépen.",
       "invalidPort": "1 és 65535 közötti portot használj",
       "jumpCycle": "Az a gazdagép már ezen a gazdagépen keresztül ugrik."
     },

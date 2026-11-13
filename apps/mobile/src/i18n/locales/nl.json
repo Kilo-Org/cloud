@@ -4137,6 +4137,7 @@
       "fieldRequired": "Dit veld is verplicht"
     },
     "errors": {
+      "bindTaken": "Dat adres is al in gebruik door een andere doorschakeling op deze host.",
       "invalidPort": "Gebruik een poort van 1 tot 65535",
       "jumpCycle": "Die host springt al via deze host."
     },

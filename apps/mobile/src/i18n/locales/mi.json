@@ -4137,6 +4137,7 @@
       "fieldRequired": "E hiahiatia ana tēnei āpure"
     },
     "errors": {
+      "bindTaken": "Kua whakamuatia kē tērā wāhitau whakarongo e tētahi atu whakamua i tēnei pou.",
       "invalidPort": "Whakamahia he tauranga mai i 1 ki 65535",
       "jumpCycle": "Kua peke kē tērā pou mā tēnei."
     },

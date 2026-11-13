@@ -4137,6 +4137,7 @@
       "fieldRequired": "此字段为必填项"
     },
     "errors": {
+      "bindTaken": "该地址已经被此主机上的另一个转发占用。",
       "invalidPort": "请使用 1 到 65535 之间的端口",
       "jumpCycle": "该主机已经通过此主机跳转。"
     },

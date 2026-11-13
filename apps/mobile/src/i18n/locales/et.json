@@ -4137,6 +4137,7 @@
       "fieldRequired": "See väli on kohustuslik"
     },
     "errors": {
+      "bindTaken": "Seda aadressi suunab juba teine suunamine sellel hostil.",
       "invalidPort": "Kasuta porti vahemikus 1–65535",
       "jumpCycle": "See host hüppab juba selle hosti kaudu."
     },

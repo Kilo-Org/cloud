@@ -4267,6 +4267,7 @@
       "fieldRequired": "Toto pole je povinné"
     },
     "errors": {
+      "bindTaken": "Tuto adresu už přesměrovává jiné přesměrování na tomto hostiteli.",
       "invalidPort": "Použijte port od 1 do 65535",
       "jumpCycle": "Tento hostitel už přes tento přeskakuje."
     },

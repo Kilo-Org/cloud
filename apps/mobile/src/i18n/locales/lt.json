@@ -4267,6 +4267,7 @@
       "fieldRequired": "Šis laukas privalomas"
     },
     "errors": {
+      "bindTaken": "Šis adresas jau peradresuojamas kitu šio hosto peradresavimu.",
       "invalidPort": "Naudokite prievadą nuo 1 iki 65535",
       "jumpCycle": "Tas hostas jau jungiasi per šį."
     },

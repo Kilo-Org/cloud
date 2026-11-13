@@ -4267,6 +4267,7 @@
       "fieldRequired": "To polje je obvezno"
     },
     "errors": {
+      "bindTaken": "Ta naslov je že preusmerjen z drugo preusmeritvijo na tem gostitelju.",
       "invalidPort": "Uporabite vrata od 1 do 65535",
       "jumpCycle": "Ta gostitelj že skače prek tega."
     },

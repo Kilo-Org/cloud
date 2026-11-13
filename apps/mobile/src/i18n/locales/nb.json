@@ -4137,6 +4137,7 @@
       "fieldRequired": "Dette feltet er påkrevd"
     },
     "errors": {
+      "bindTaken": "Denne adressen videresendes allerede av en annen videresending på denne verten.",
       "invalidPort": "Bruk en port fra 1 til 65535",
       "jumpCycle": "Den verten hopper allerede via denne."
     },

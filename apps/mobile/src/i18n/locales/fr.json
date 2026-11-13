@@ -4202,6 +4202,7 @@
       "fieldRequired": "Ce champ est obligatoire"
     },
     "errors": {
+      "bindTaken": "Cette adresse est déjà redirigée par une autre redirection sur cet hôte.",
       "invalidPort": "Utilisez un port entre 1 et 65535",
       "jumpCycle": "Cet hôte passe déjà par celui-ci."
     },

@@ -4202,6 +4202,7 @@
       "fieldRequired": "Acest câmp este obligatoriu"
     },
     "errors": {
+      "bindTaken": "Acea adresă este deja redirecționată de o altă redirecționare pe această gazdă.",
       "invalidPort": "Folosește un port de la 1 la 65535",
       "jumpCycle": "Acea gazdă trece deja prin aceasta."
     },

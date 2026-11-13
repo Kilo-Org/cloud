@@ -4137,6 +4137,7 @@
       "fieldRequired": "此欄位為必填"
     },
     "errors": {
+      "bindTaken": "該位址已由這台主機上的另一個轉送進行轉送。",
       "invalidPort": "請使用 1 到 65535 的連接埠",
       "jumpCycle": "該主機已透過這台主機跳轉。"
     },

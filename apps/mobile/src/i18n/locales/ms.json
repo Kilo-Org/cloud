@@ -4137,6 +4137,7 @@
       "fieldRequired": "Medan ini diperlukan"
     },
     "errors": {
+      "bindTaken": "Alamat itu sudah dipajukan oleh pemajuan lain pada hos ini.",
       "invalidPort": "Gunakan port 1 hingga 65535",
       "jumpCycle": "Hos itu sudah melompat melalui hos ini."
     },

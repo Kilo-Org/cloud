@@ -4137,6 +4137,7 @@
       "fieldRequired": "Achọrọ ubi a"
     },
     "errors": {
+      "bindTaken": "Adreesị ahụ na-esi na nbuga ọzọ na host a agafe ugbua.",
       "invalidPort": "Jiri port site na 1 ruo 65535",
       "jumpCycle": "Host ahụ na-esi na nke a agafe ugbua."
     },

@@ -4137,6 +4137,7 @@
       "fieldRequired": "Este campo é obrigatorio"
     },
     "errors": {
+      "bindTaken": "Ese enderezo xa está reenviado por outro reenvío neste host.",
       "invalidPort": "Usa un porto do 1 ao 65535",
       "jumpCycle": "Ese host xa salta a través deste."
     },

@@ -4137,6 +4137,7 @@
       "fieldRequired": "Trường này là bắt buộc"
     },
     "errors": {
+      "bindTaken": "Địa chỉ đó đã được chuyển tiếp bởi một chuyển tiếp khác trên máy chủ này.",
       "invalidPort": "Dùng cổng từ 1 đến 65535",
       "jumpCycle": "Máy chủ đó đã trung chuyển qua máy chủ này."
     },

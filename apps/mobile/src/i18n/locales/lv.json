@@ -4202,6 +4202,7 @@
       "fieldRequired": "Šis lauks ir obligāts"
     },
     "errors": {
+      "bindTaken": "Cita šī resursdatora pāradresācija jau izmanto šo adresi.",
       "invalidPort": "Izmantojiet portu no 1 līdz 65535",
       "jumpCycle": "Tas resursdators jau izmanto šo kā starpposmu."
     },

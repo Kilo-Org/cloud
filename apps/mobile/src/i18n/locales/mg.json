@@ -4137,6 +4137,7 @@
       "fieldRequired": "Ilaina ity saha ity"
     },
     "errors": {
+      "bindTaken": "Efa alefan'ny fandefasana hafa ao amin'ity host ity io adiresy io.",
       "invalidPort": "Ampiasao ny port 1 ka hatramin'ny 65535",
       "jumpCycle": "Efa mamakivaky ity iray ity io host io."
     },

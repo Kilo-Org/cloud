@@ -4137,6 +4137,7 @@
       "fieldRequired": "Bu alan zorunludur"
     },
     "errors": {
+      "bindTaken": "Bu adres zaten bu host üzerindeki başka bir yönlendirme tarafından yönlendiriliyor.",
       "invalidPort": "1 ile 65535 arasında bir port kullanın",
       "jumpCycle": "O host zaten bu host üzerinden atlıyor."
     },

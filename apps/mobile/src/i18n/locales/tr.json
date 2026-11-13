@@ -22,6 +22,7 @@
     "expired": "Süresi doldu"
   },
   "common": {
+    "deleteTitle": "{{label}} silinsin mi?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "İptal",
@@ -4105,7 +4106,6 @@
       "importConfig": "SSH yapılandırmasından içe aktar",
       "rowActions": "{{label}}, {{target}}. Bir terminal açar; düzenleme ve silme için uzun basın.",
       "viaJump": "{{label}} üzerinden",
-      "deleteTitle": "{{label}} silinsin mi?",
       "deleteMessage": "Ayarları ve port yönlendirmeleri de onunla birlikte kaldırılır. Bu işlem geri alınamaz.",
       "deleteFailed": "Host silinemedi."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Oturumlar",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Yapıştır",
+      "hideKeyboard": "Klavyeyi gizle",
       "pasteTitle": "Birkaç satır yapıştırılsın mı?",
       "pasteMultiLine": "Bu metin birkaç satırdan oluşuyor ve tek bir komut olarak gönderilir.",
       "hostKeyTitle": "Bilinmeyen host anahtarı",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Anahtar oluşturuldu",
       "createdDescription": "Bu açık anahtarı sunucunun authorized_keys dosyasına ekleyin, ardından bu anahtarla bağlanın.",
       "copyPublicKey": "Anahtarı kopyala"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Bulut kum havuzu",
+      "connectingTitle": "Terminal açılıyor",
+      "connectingMessage": "Kum havuzunun kabuğuna bağlanılıyor.",
+      "reconnectingMessage": "Terminal bağlantısı koptu. Kum havuzu çalışmaya devam ediyor.",
+      "stoppedTitle": "Kum havuzu durduruldu",
+      "stoppedMessage": "Uyandırmak için oturumda bir mesaj gönderin, sonra tekrar deneyin.",
+      "exitedMessage": "Kabuk sona erdi. Yeni bir terminal yeni bir kabuk başlatır.",
+      "newTerminal": "Yeni terminal",
+      "disconnectedTitle": "Terminal bağlantısı kesildi",
+      "disconnectedMessage": "Oturum terminali kapattı. Oturumdan yeniden açın.",
+      "unavailableTitle": "Terminal kullanılamıyor",
+      "unavailableMessage": "Kum havuzu bir terminal açamadı. Oturumdan tekrar deneyin.",
+      "forbiddenMessage": "Bu oturum etkileşimli bir terminale izin vermiyor.",
+      "notFoundMessage": "Bu oturumda bu hesabın açabileceği bir kum havuzu yok."
+    },
+    "sandboxes": {
+      "title": "Kilo kum havuzları",
+      "unnamed": "Adsız kum havuzu",
+      "open": "{{title}}, kum havuzunda bir terminal açar"
+    },
+    "snippets": {
+      "title": "Snippet'ler",
+      "subtitle": "Terminalde tek dokunuşla ulaşılan komutlar.",
+      "manage": "Snippet'leri yönet",
+      "emptyTitle": "Henüz snippet yok",
+      "emptyDescription": "Bir komutu bir kez kaydedin, sonra herhangi bir terminalden gönderin.",
+      "add": "Snippet ekle",
+      "newTitle": "Yeni snippet",
+      "edit": "Snippet'i düzenle",
+      "name": "Snippet adı",
+      "namePlaceholder": "Web uygulamasını dağıt",
+      "command": "Kabuk komutu",
+      "commandPlaceholder": "örn. docker compose up -d",
+      "host": "Kullanılabilir olduğu host",
+      "everyHost": "Tüm hostlar",
+      "appendNewline": "Hemen çalıştır",
+      "appendNewlineHint": "Komuttan sonra bir satır sonu gönderir, böylece komut istemde beklemeden çalışır.",
+      "send": "{{label}}, bu snippet'i gönderir",
+      "rowActions": "{{label}}, snippet'i düzenle",
+      "moveUp": "Yukarı taşı",
+      "moveDown": "Aşağı taşı",
+      "deleteMessage": "Kayıtlı komut, onu sunan her terminalden kaldırılır."
     }
   }
 }

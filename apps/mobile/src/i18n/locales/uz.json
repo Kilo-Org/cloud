@@ -22,6 +22,7 @@
     "expired": "Muddati tugagan"
   },
   "common": {
+    "deleteTitle": "{{label}} o‘chirilsinmi?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Bekor qilish",
@@ -4105,7 +4106,6 @@
       "importConfig": "SSH konfiguratsiyasidan import qilish",
       "rowActions": "{{label}}, {{target}}. Terminal ochadi; tahrirlash va o‘chirish uchun uzoq bosing.",
       "viaJump": "{{label}} orqali",
-      "deleteTitle": "{{label}} o‘chirilsinmi?",
       "deleteMessage": "U bilan birga sozlamalari va port yo‘naltirishlari ham olib tashlanadi. Buni qaytarib bo‘lmaydi.",
       "deleteFailed": "Hostni o‘chirib bo‘lmadi."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Sessiyalar",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Joylashtirish",
+      "hideKeyboard": "Klaviaturani yashirish",
       "pasteTitle": "Bir nechta qatorni joylashtirasizmi?",
       "pasteMultiLine": "Bu matn bir nechta qatordan iborat va bitta buyruq sifatida yuboriladi.",
       "hostKeyTitle": "Noma’lum host kaliti",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Kalit yaratildi",
       "createdDescription": "Ushbu ochiq kalitni serverning authorized_keys fayliga qo'shing, so'ngra ushbu kalit bilan ulaning.",
       "copyPublicKey": "Kalitni nusxalash"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Bulutli sinov muhiti",
+      "connectingTitle": "Terminal ochilmoqda",
+      "connectingMessage": "Sinov muhitining qobig‘iga ulanmoqda.",
+      "reconnectingMessage": "Terminal aloqasi uzildi. Sinov muhiti ishlashda davom etadi.",
+      "stoppedTitle": "Sinov muhiti to‘xtatilgan",
+      "stoppedMessage": "Uni uyg‘otish uchun sessiyaga xabar yuboring, so‘ng qayta urinib ko‘ring.",
+      "exitedMessage": "Qobiq tugadi. Yangi terminal yangi qobiqni ishga tushiradi.",
+      "newTerminal": "Yangi terminal",
+      "disconnectedTitle": "Terminal uzildi",
+      "disconnectedMessage": "Sessiya terminalni yopdi. Uni sessiyadan qayta oching.",
+      "unavailableTitle": "Terminal mavjud emas",
+      "unavailableMessage": "Sinov muhiti terminalni ocha olmadi. Sessiyadan qayta urinib ko‘ring.",
+      "forbiddenMessage": "Bu sessiya interaktiv terminalga ruxsat bermaydi.",
+      "notFoundMessage": "Bu sessiyada ushbu hisob ocha oladigan sinov muhiti yo‘q."
+    },
+    "sandboxes": {
+      "title": "Kilo sinov muhitlari",
+      "unnamed": "Nomsiz sinov muhiti",
+      "open": "{{title}}, o‘z sinov muhitida terminal ochadi"
+    },
+    "snippets": {
+      "title": "Parchalar",
+      "subtitle": "Terminalda buyruqlar bir bosishda.",
+      "manage": "Parchalarni boshqarish",
+      "emptyTitle": "Hozircha parcha yo‘q",
+      "emptyDescription": "Buyruqni bir marta saqlang, so‘ng uni istalgan terminaldan yuboring.",
+      "add": "Parcha qo‘shish",
+      "newTitle": "Yangi parcha",
+      "edit": "Parchani tahrirlash",
+      "name": "Parcha nomi",
+      "namePlaceholder": "Veb-ilovani joylashtirish",
+      "command": "Qobiq buyrug‘i",
+      "commandPlaceholder": "mas. docker compose up -d",
+      "host": "Mavjud:",
+      "everyHost": "Barcha hostlar",
+      "appendNewline": "Darhol ishga tushirish",
+      "appendNewlineHint": "Buyruqdan keyin yangi qator yuboradi, shuning uchun u buyruq satrida kutib qolmasdan ishga tushadi.",
+      "send": "{{label}}, ushbu parchani yuboradi",
+      "rowActions": "{{label}}, parchani tahrirlash",
+      "moveUp": "Yuqoriga ko‘chirish",
+      "moveDown": "Pastga ko‘chirish",
+      "deleteMessage": "Saqlangan buyruq uni taklif qilgan har bir terminaldan olib tashlanadi."
     }
   }
 }

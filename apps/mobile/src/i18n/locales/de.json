@@ -22,6 +22,7 @@
     "expired": "Abgelaufen"
   },
   "common": {
+    "deleteTitle": "{{label}} löschen?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Abbrechen",
@@ -4105,7 +4106,6 @@
       "importConfig": "Aus SSH-Konfiguration importieren",
       "rowActions": "{{label}}, {{target}}. Öffnet ein Terminal; langes Drücken für Bearbeiten und Löschen.",
       "viaJump": "über {{label}}",
-      "deleteTitle": "{{label}} löschen?",
       "deleteMessage": "Die Einstellung und die Portweiterleitungen werden mitgelöscht. Das kann nicht rückgängig gemacht werden.",
       "deleteFailed": "Der Host konnte nicht gelöscht werden."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Sitzungen",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Einfügen",
+      "hideKeyboard": "Tastatur ausblenden",
       "pasteTitle": "Mehrere Zeilen einfügen?",
       "pasteMultiLine": "Dieser Text umfasst mehrere Zeilen und wird als ein Befehl gesendet.",
       "hostKeyTitle": "Unbekannter Hostschlüssel",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Schlüssel erzeugt",
       "createdDescription": "Fügen Sie diesen öffentlichen Schlüssel zur authorized_keys-Datei des Servers hinzu und verbinden Sie sich dann mit diesem Schlüssel.",
       "copyPublicKey": "Schlüssel kopieren"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Cloud-Sandbox",
+      "connectingTitle": "Terminal wird geöffnet",
+      "connectingMessage": "Verbindung zur Shell der Sandbox wird hergestellt.",
+      "reconnectingMessage": "Die Terminalverbindung wurde getrennt. Die Sandbox läuft weiter.",
+      "stoppedTitle": "Die Sandbox ist gestoppt",
+      "stoppedMessage": "Sende eine Nachricht in der Sitzung, um sie aufzuwecken, und versuche es dann erneut.",
+      "exitedMessage": "Die Shell wurde beendet. Ein neues Terminal startet eine neue Shell.",
+      "newTerminal": "Neues Terminal",
+      "disconnectedTitle": "Das Terminal wurde getrennt",
+      "disconnectedMessage": "Die Sitzung hat das Terminal geschlossen. Öffne es erneut aus der Sitzung.",
+      "unavailableTitle": "Terminal nicht verfügbar",
+      "unavailableMessage": "Die Sandbox konnte kein Terminal öffnen. Versuche es erneut aus der Sitzung.",
+      "forbiddenMessage": "Diese Sitzung erlaubt kein interaktives Terminal.",
+      "notFoundMessage": "Diese Sitzung hat keine Sandbox, die dieses Konto öffnen kann."
+    },
+    "sandboxes": {
+      "title": "Kilo-Sandboxes",
+      "unnamed": "Unbenannte Sandbox",
+      "open": "{{title}}, öffnet ein Terminal in seiner Sandbox"
+    },
+    "snippets": {
+      "title": "Snippets",
+      "subtitle": "Befehle sind im Terminal nur einen Tipp entfernt.",
+      "manage": "Snippets verwalten",
+      "emptyTitle": "Noch keine Snippets",
+      "emptyDescription": "Speichere einen Befehl einmal und sende ihn dann aus jedem Terminal.",
+      "add": "Snippet hinzufügen",
+      "newTitle": "Neues Snippet",
+      "edit": "Snippet bearbeiten",
+      "name": "Snippet-Name",
+      "namePlaceholder": "Web-App bereitstellen",
+      "command": "Shell-Befehl",
+      "commandPlaceholder": "z. B. docker compose up -d",
+      "host": "Verfügbar auf",
+      "everyHost": "Jeder Host",
+      "appendNewline": "Sofort ausführen",
+      "appendNewlineHint": "Sendet nach dem Befehl einen Zeilenumbruch, damit er ausgeführt wird, statt an der Eingabeaufforderung zu stehen.",
+      "send": "{{label}}, sendet dieses Snippet",
+      "rowActions": "{{label}}, Snippet bearbeiten",
+      "moveUp": "Nach oben",
+      "moveDown": "Nach unten",
+      "deleteMessage": "Der gespeicherte Befehl wird aus jedem Terminal entfernt, das ihn angeboten hat."
     }
   }
 }

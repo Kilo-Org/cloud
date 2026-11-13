@@ -22,6 +22,7 @@
     "expired": "Wedi dod i ben"
   },
   "common": {
+    "deleteTitle": "Dileu {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Canslo",
@@ -4365,7 +4366,6 @@
       "importConfig": "Mewnforio o gyfluniad SSH",
       "rowActions": "{{label}}, {{target}}. Yn agor terfynell; pwyswch a dal i olygu a dileu.",
       "viaJump": "drwy {{label}}",
-      "deleteTitle": "Dileu {{label}}?",
       "deleteMessage": "Mae ei osodiad a'r porthladdoedd a anfonir ymlaen yn cael eu tynnu gyda hi. Ni ellir dadwneud hyn.",
       "deleteFailed": "Nid oedd modd dileu'r gwesteiwr."
     },
@@ -4444,6 +4444,7 @@
       "switcherTitle": "Sesiynau",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Gludo",
+      "hideKeyboard": "Cuddio'r bysellfwrdd",
       "pasteTitle": "Gludo sawl llinell?",
       "pasteMultiLine": "Mae'r testun hwn yn rhychwantu sawl llinell ac yn cael ei anfon fel un gorchymyn.",
       "hostKeyTitle": "Allwedd gwesteiwr anhysbys",
@@ -4505,6 +4506,51 @@
       "createdTitle": "Allwedd wedi'i chreu",
       "createdDescription": "Ychwanegwch yr allwedd gyhoeddus hon at authorized_keys y gweinydd, yna cysylltwch â'r allwedd hon.",
       "copyPublicKey": "Copïo allwedd"
+    },
+    "sandbox": {
+      "title": "Terfynell",
+      "subtitle": "Sandbox cwmwl",
+      "connectingTitle": "Wrthi'n agor terfynell",
+      "connectingMessage": "Wrthi'n cysylltu â chragen y sandbox.",
+      "reconnectingMessage": "Mae cysylltiad y derfynell wedi torri. Mae'r sandbox yn dal i redeg.",
+      "stoppedTitle": "Mae'r sandbox wedi stopio",
+      "stoppedMessage": "Anfonwch neges yn y sesiwn i'w ddeffro, yna rhowch gynnig eto.",
+      "exitedMessage": "Mae'r gragen wedi dod i ben. Mae terfynell newydd yn cychwyn cragen newydd.",
+      "newTerminal": "Terfynell newydd",
+      "disconnectedTitle": "Mae'r derfynell wedi datgysylltu",
+      "disconnectedMessage": "Mae'r sesiwn wedi cau'r derfynell. Agorwch hi eto o'r sesiwn.",
+      "unavailableTitle": "Terfynell ddim ar gael",
+      "unavailableMessage": "Nid oedd modd i'r sandbox agor terfynell. Ceisiwch eto o'r sesiwn.",
+      "forbiddenMessage": "Nid yw'r sesiwn hon yn caniatáu terfynell ryngweithiol.",
+      "notFoundMessage": "Nid oes gan y sesiwn hon sandbox y gall y cyfrif hwn ei agor."
+    },
+    "sandboxes": {
+      "title": "Sandboxau Kilo",
+      "unnamed": "Sandbox di-deitl",
+      "open": "{{title}}, yn agor terfynell yn ei sandbox"
+    },
+    "snippets": {
+      "title": "Tameidiau",
+      "subtitle": "Gorchmynion un tap i ffwrdd mewn terfynell.",
+      "manage": "Rheoli tameidiau",
+      "emptyTitle": "Dim tameidiau eto",
+      "emptyDescription": "Cadwch orchymyn unwaith, yna ei anfon o unrhyw derfynell.",
+      "add": "Ychwanegu tamaid",
+      "newTitle": "Tamaid newydd",
+      "edit": "Golygu tamaid",
+      "name": "Enw'r tamaid",
+      "namePlaceholder": "Gosod yr ap gwe",
+      "command": "Gorchymyn cragen",
+      "commandPlaceholder": "e.e. docker compose up -d",
+      "host": "Ar gael ar",
+      "everyHost": "Pob gwesteiwr",
+      "appendNewline": "Ei redeg ar unwaith",
+      "appendNewlineHint": "Yn anfon llinell newydd ar ôl y gorchymyn, fel ei fod yn rhedeg yn hytrach nag aros wrth y promt.",
+      "send": "{{label}}, yn anfon y tamaid hwn",
+      "rowActions": "{{label}}, golygu'r tamaid",
+      "moveUp": "Symud i fyny",
+      "moveDown": "Symud i lawr",
+      "deleteMessage": "Mae'r gorchymyn a storiwyd yn cael ei dynnu o bob terfynell a'i gynigiodd."
     }
   }
 }

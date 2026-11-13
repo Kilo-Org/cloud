@@ -22,6 +22,7 @@
     "expired": "Lejárt"
   },
   "common": {
+    "deleteTitle": "{{label}} törlése?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Mégse",
@@ -4105,7 +4106,6 @@
       "importConfig": "Importálás SSH-konfigurációból",
       "rowActions": "{{label}}, {{target}}. Terminált nyit; hosszú nyomásra szerkesztés és törlés.",
       "viaJump": "{{label}} ugrógazdagépen át",
-      "deleteTitle": "{{label}} törlése?",
       "deleteMessage": "A beállításai és a porttovábbításai is törlődnek vele együtt. Ez nem vonható vissza.",
       "deleteFailed": "A gazdagépet nem sikerült törölni."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Munkamenetek",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Beillesztés",
+      "hideKeyboard": "Billentyűzet elrejtése",
       "pasteTitle": "Több sort illesztesz be?",
       "pasteMultiLine": "Ez a szöveg több soros, és egyetlen parancsként küldjük el.",
       "hostKeyTitle": "Ismeretlen gazdagépkulcs",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Kulcs létrehozva",
       "createdDescription": "Adja hozzá ezt a nyilvános kulcsot a szerver authorized_keys fájljához, majd csatlakozzon ezzel a kulccsal.",
       "copyPublicKey": "Kulcs másolása"
+    },
+    "sandbox": {
+      "title": "Terminál",
+      "subtitle": "Felhő homokozó",
+      "connectingTitle": "Terminál megnyitása",
+      "connectingMessage": "Csatlakozás a homokozó shelljéhez.",
+      "reconnectingMessage": "Megszakadt a terminál kapcsolata. A homokozó tovább fut.",
+      "stoppedTitle": "A homokozó leállt",
+      "stoppedMessage": "Küldj üzenetet a munkamenetben, hogy felébresszed, majd próbáld újra.",
+      "exitedMessage": "A shell véget ért. Egy új terminál újat indít.",
+      "newTerminal": "Új terminál",
+      "disconnectedTitle": "A terminál lecsatlakozott",
+      "disconnectedMessage": "A munkamenet bezárta a terminált. Nyisd meg újra a munkamenetből.",
+      "unavailableTitle": "A terminál nem érhető el",
+      "unavailableMessage": "A homokozó nem tudott terminált nyitni. Próbáld újra a munkamenetből.",
+      "forbiddenMessage": "Ez a munkamenet nem engedélyez interaktív terminált.",
+      "notFoundMessage": "Ehhez a munkamenethez nincs olyan homokozó, amelyet ez a fiók meg tudna nyitni."
+    },
+    "sandboxes": {
+      "title": "Kilo homokozók",
+      "unnamed": "Névtelen homokozó",
+      "open": "{{title}}, terminált nyit a homokozójában"
+    },
+    "snippets": {
+      "title": "Kódrészletek",
+      "subtitle": "Parancsok egy koppintásra a terminálban.",
+      "manage": "Kódrészletek kezelése",
+      "emptyTitle": "Még nincsenek kódrészletek",
+      "emptyDescription": "Ments el egyszer egy parancsot, majd küldd el bármely terminálból.",
+      "add": "Kódrészlet hozzáadása",
+      "newTitle": "Új kódrészlet",
+      "edit": "Kódrészlet szerkesztése",
+      "name": "Kódrészlet neve",
+      "namePlaceholder": "Webalkalmazás telepítése",
+      "command": "Shell-parancs",
+      "commandPlaceholder": "pl. docker compose up -d",
+      "host": "Elérhető:",
+      "everyHost": "Minden gazdagép",
+      "appendNewline": "Azonnali futtatás",
+      "appendNewlineHint": "Sortörést küld a parancs után, így lefut ahelyett, hogy a parancssorban várakozna.",
+      "send": "{{label}}, elküldi ezt a kódrészletet",
+      "rowActions": "{{label}}, kódrészlet szerkesztése",
+      "moveUp": "Mozgatás felfelé",
+      "moveDown": "Mozgatás lefelé",
+      "deleteMessage": "A tárolt parancs minden olyan terminálból eltávolítódik, amely kínálta."
     }
   }
 }

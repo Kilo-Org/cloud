@@ -22,6 +22,7 @@
     "expired": "میعاد ختم ہو گئی"
   },
   "common": {
+    "deleteTitle": "{{label}} حذف کریں؟",
     "sentenceJoiner": "۔ ",
     "listJoiner": "، ",
     "cancel": "منسوخ کریں",
@@ -4105,7 +4106,6 @@
       "importConfig": "SSH config سے درآمد کریں",
       "rowActions": "{{label}}، {{target}}۔ ٹرمینل کھولتا ہے؛ ترمیم اور حذف کے لیے دیر تک دبائیں۔",
       "viaJump": "{{label}} کے ذریعے",
-      "deleteTitle": "{{label}} حذف کریں؟",
       "deleteMessage": "اس کی سیٹنگ اور پورٹ فارورڈز اس کے ساتھ ہٹ جائیں گے۔ اسے واپس نہیں کیا جا سکتا۔",
       "deleteFailed": "ہوسٹ حذف نہیں ہو سکا۔"
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "سیشنز",
       "switchTo": "{{label}}، {{state}}",
       "paste": "چسپاں کریں",
+      "hideKeyboard": "کی بورڈ چھپائیں",
       "pasteTitle": "کئی سطریں چسپاں کریں؟",
       "pasteMultiLine": "یہ متن کئی سطروں پر پھیلا ہے اور ایک ہی کمانڈ کے طور پر بھیجا جاتا ہے۔",
       "hostKeyTitle": "نامعلوم ہوسٹ کلید",
@@ -4245,6 +4246,51 @@
       "createdTitle": "کلید بن گئی",
       "createdDescription": "اس عوامی کلید کو سرور کے authorized_keys میں شامل کریں، پھر اس کلید سے جڑیں۔",
       "copyPublicKey": "کلید کاپی کریں"
+    },
+    "sandbox": {
+      "title": "ٹرمینل",
+      "subtitle": "کلاؤڈ سینڈباکس",
+      "connectingTitle": "ٹرمینل کھولا جا رہا ہے",
+      "connectingMessage": "سینڈباکس کے شیل سے جڑ رہا ہے۔",
+      "reconnectingMessage": "ٹرمینل کا کنکشن ٹوٹ گیا۔ سینڈباکس چلتا رہتا ہے۔",
+      "stoppedTitle": "سینڈباکس رکا ہوا ہے",
+      "stoppedMessage": "اسے جگانے کے لیے سیشن میں پیغام بھیجیں، پھر دوبارہ کوشش کریں۔",
+      "exitedMessage": "شیل ختم ہو گیا۔ نیا ٹرمینل ایک نیا شیل شروع کرتا ہے۔",
+      "newTerminal": "نیا ٹرمینل",
+      "disconnectedTitle": "ٹرمینل منقطع ہو گیا",
+      "disconnectedMessage": "سیشن نے ٹرمینل بند کر دیا۔ اسے سیشن سے دوبارہ کھولیں۔",
+      "unavailableTitle": "ٹرمینل دستیاب نہیں",
+      "unavailableMessage": "سینڈباکس ٹرمینل نہیں کھول سکا۔ سیشن سے دوبارہ کوشش کریں۔",
+      "forbiddenMessage": "یہ سیشن انٹرایکٹو ٹرمینل کی اجازت نہیں دیتا۔",
+      "notFoundMessage": "اس سیشن میں کوئی ایسا سینڈباکس نہیں ہے جو یہ اکاؤنٹ کھول سکے۔"
+    },
+    "sandboxes": {
+      "title": "Kilo سینڈباکسز",
+      "unnamed": "بلا عنوان سینڈباکس",
+      "open": "{{title}}، اس کے سینڈباکس میں ٹرمینل کھولتا ہے"
+    },
+    "snippets": {
+      "title": "اسنیپٹس",
+      "subtitle": "ٹرمینل میں ایک ٹیپ پر کمانڈز۔",
+      "manage": "اسنیپٹس کا نظم کریں",
+      "emptyTitle": "ابھی کوئی اسنیپٹ نہیں",
+      "emptyDescription": "کمانڈ کو ایک بار محفوظ کریں، پھر اسے کسی بھی ٹرمینل سے بھیجیں۔",
+      "add": "اسنیپٹ شامل کریں",
+      "newTitle": "نیا اسنیپٹ",
+      "edit": "اسنیپٹ میں ترمیم کریں",
+      "name": "اسنیپٹ کا نام",
+      "namePlaceholder": "ویب ایپ تعینات کریں",
+      "command": "شیل کمانڈ",
+      "commandPlaceholder": "مثلاً docker compose up -d",
+      "host": "دستیاب",
+      "everyHost": "ہر ہوسٹ",
+      "appendNewline": "اسے فوراً چلائیں",
+      "appendNewlineHint": "کمانڈ کے بعد ایک نیو لائن بھیجتا ہے، تاکہ یہ پرامپٹ پر رکنے کے بجائے چل پڑے۔",
+      "send": "{{label}}، یہ اسنیپٹ بھیجتا ہے",
+      "rowActions": "{{label}}، اسنیپٹ میں ترمیم کریں",
+      "moveUp": "اوپر لے جائیں",
+      "moveDown": "نیچے لے جائیں",
+      "deleteMessage": "محفوظ شدہ کمانڈ ہر اس ٹرمینل سے ہٹا دی جاتی ہے جس نے اسے پیش کیا تھا۔"
     }
   }
 }

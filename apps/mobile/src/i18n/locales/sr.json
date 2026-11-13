@@ -22,6 +22,7 @@
     "expired": "Isteklo"
   },
   "common": {
+    "deleteTitle": "Obrisati {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Otkaži",
@@ -4170,7 +4171,6 @@
       "importConfig": "Uvezi iz SSH konfiguracije",
       "rowActions": "{{label}}, {{target}}. Otvara terminal; dugi pritisak za izmenu i brisanje.",
       "viaJump": "preko {{label}}",
-      "deleteTitle": "Obrisati {{label}}?",
       "deleteMessage": "Uklanjaju se i njegova podešavanja i prosleđivanja portova. Ovo se ne može poništiti.",
       "deleteFailed": "Host nije mogao da se obriše."
     },
@@ -4249,6 +4249,7 @@
       "switcherTitle": "Sesije",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Nalepi",
+      "hideKeyboard": "Sakrij tastaturu",
       "pasteTitle": "Nalepiti nekoliko redova?",
       "pasteMultiLine": "Ovaj tekst obuhvata nekoliko redova i šalje se kao jedna komanda.",
       "hostKeyTitle": "Nepoznat ključ hosta",
@@ -4310,6 +4311,51 @@
       "createdTitle": "Ključ je generisan",
       "createdDescription": "Dodaj ovaj javni ključ u authorized_keys na serveru, a zatim se poveži ovim ključem.",
       "copyPublicKey": "Kopiraj ključ"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Peščanik u oblaku",
+      "connectingTitle": "Otvaranje terminala",
+      "connectingMessage": "Povezivanje sa ljuskom peščanika.",
+      "reconnectingMessage": "Veza sa terminalom je prekinuta. Peščanik nastavlja da radi.",
+      "stoppedTitle": "Peščanik je zaustavljen",
+      "stoppedMessage": "Pošalji poruku u sesiji da ga probudiš, pa pokušaj ponovo.",
+      "exitedMessage": "Ljuska je završena. Novi terminal pokreće novu ljusku.",
+      "newTerminal": "Novi terminal",
+      "disconnectedTitle": "Terminal je prekinuo vezu",
+      "disconnectedMessage": "Sesija je zatvorila terminal. Otvori ga ponovo iz sesije.",
+      "unavailableTitle": "Terminal nije dostupan",
+      "unavailableMessage": "Peščanik nije mogao da otvori terminal. Pokušaj ponovo iz sesije.",
+      "forbiddenMessage": "Ova sesija ne dozvoljava interaktivni terminal.",
+      "notFoundMessage": "Ova sesija nema peščanik koji ovaj nalog može da otvori."
+    },
+    "sandboxes": {
+      "title": "Kilo peščanici",
+      "unnamed": "Neimenovani peščanik",
+      "open": "{{title}}, otvara terminal u svom peščaniku"
+    },
+    "snippets": {
+      "title": "Isečci",
+      "subtitle": "Komande na jedan dodir u terminalu.",
+      "manage": "Upravljaj isečcima",
+      "emptyTitle": "Još nema isečaka",
+      "emptyDescription": "Sačuvaj komandu jednom, pa je šalji iz bilo kog terminala.",
+      "add": "Dodaj isečak",
+      "newTitle": "Novi isečak",
+      "edit": "Izmeni isečak",
+      "name": "Naziv isečka",
+      "namePlaceholder": "Postavi veb aplikaciju",
+      "command": "Komanda ljuske",
+      "commandPlaceholder": "npr. docker compose up -d",
+      "host": "Dostupno na",
+      "everyHost": "Svaki host",
+      "appendNewline": "Pokreni odmah",
+      "appendNewlineHint": "Šalje novi red nakon komande, tako da se komanda pokreće umesto da stoji na promptu.",
+      "send": "{{label}}, šalje ovaj isečak",
+      "rowActions": "{{label}}, izmeni isečak",
+      "moveUp": "Pomeri gore",
+      "moveDown": "Pomeri dole",
+      "deleteMessage": "Sačuvana komanda se uklanja iz svakog terminala koji ju je nudio."
     }
   }
 }

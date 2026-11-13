@@ -22,6 +22,7 @@
     "expired": "Expirat"
   },
   "common": {
+    "deleteTitle": "Ștergi {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Anulează",
@@ -4170,7 +4171,6 @@
       "importConfig": "Importă din configurația SSH",
       "rowActions": "{{label}}, {{target}}. Deschide un terminal; apăsare lungă pentru editare și ștergere.",
       "viaJump": "prin {{label}}",
-      "deleteTitle": "Ștergi {{label}}?",
       "deleteMessage": "Setarea și redirecționările de port se elimină împreună cu ea. Această acțiune nu poate fi anulată.",
       "deleteFailed": "Gazda nu a putut fi ștearsă."
     },
@@ -4249,6 +4249,7 @@
       "switcherTitle": "Sesiuni",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Lipește",
+      "hideKeyboard": "Ascunde tastatura",
       "pasteTitle": "Lipești mai multe linii?",
       "pasteMultiLine": "Acest text se întinde pe mai multe linii și este trimis ca o singură comandă.",
       "hostKeyTitle": "Cheie de gazdă necunoscută",
@@ -4310,6 +4311,51 @@
       "createdTitle": "Cheie creată",
       "createdDescription": "Adaugă această cheie publică la authorized_keys ale serverului, apoi conectează-te folosind această cheie.",
       "copyPublicKey": "Copiază cheia"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Sandbox cloud",
+      "connectingTitle": "Se deschide un terminal",
+      "connectingMessage": "Se conectează la shell-ul sandboxului.",
+      "reconnectingMessage": "Conexiunea terminalului s-a întrerupt. Sandboxul continuă să ruleze.",
+      "stoppedTitle": "Sandboxul este oprit",
+      "stoppedMessage": "Trimite un mesaj în sesiune pentru a-l trezi, apoi reîncearcă.",
+      "exitedMessage": "Shell-ul s-a încheiat. Un terminal nou pornește un shell nou.",
+      "newTerminal": "Terminal nou",
+      "disconnectedTitle": "Terminalul s-a deconectat",
+      "disconnectedMessage": "Sesiunea a închis terminalul. Redeschide-l din sesiune.",
+      "unavailableTitle": "Terminal indisponibil",
+      "unavailableMessage": "Sandboxul nu a putut deschide un terminal. Reîncearcă din sesiune.",
+      "forbiddenMessage": "Această sesiune nu permite un terminal interactiv.",
+      "notFoundMessage": "Această sesiune nu are niciun sandbox pe care acest cont să îl poată deschide."
+    },
+    "sandboxes": {
+      "title": "Sandboxuri Kilo",
+      "unnamed": "Sandbox fără titlu",
+      "open": "{{title}}, deschide un terminal în sandboxul său"
+    },
+    "snippets": {
+      "title": "Snippeturi",
+      "subtitle": "Comenzi la un singur tap în terminal.",
+      "manage": "Gestionează snippeturile",
+      "emptyTitle": "Încă nu există snippeturi",
+      "emptyDescription": "Salvează o comandă o dată, apoi trimite-o din orice terminal.",
+      "add": "Adaugă snippet",
+      "newTitle": "Snippet nou",
+      "edit": "Editează snippetul",
+      "name": "Nume snippet",
+      "namePlaceholder": "Publică aplicația web",
+      "command": "Comandă shell",
+      "commandPlaceholder": "de ex. docker compose up -d",
+      "host": "Disponibil pe",
+      "everyHost": "Toate gazdele",
+      "appendNewline": "Rulează imediat",
+      "appendNewlineHint": "Trimite o linie nouă după comandă, ca aceasta să ruleze în loc să rămână la prompt.",
+      "send": "{{label}}, trimite acest snippet",
+      "rowActions": "{{label}}, editează snippetul",
+      "moveUp": "Mută mai sus",
+      "moveDown": "Mută mai jos",
+      "deleteMessage": "Comanda salvată este eliminată din fiecare terminal care o oferea."
     }
   }
 }

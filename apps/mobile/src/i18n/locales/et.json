@@ -22,6 +22,7 @@
     "expired": "Aegunud"
   },
   "common": {
+    "deleteTitle": "Kustuta {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Tühista",
@@ -4105,7 +4106,6 @@
       "importConfig": "Impordi SSH-konfiguratsioonist",
       "rowActions": "{{label}}, {{target}}. Avab terminali; pika vajutusega saab muuta ja kustutada.",
       "viaJump": "läbi {{label}}",
-      "deleteTitle": "Kustuta {{label}}?",
       "deleteMessage": "Koos sellega eemaldatakse ka selle seaded ja pordisuunamised. Seda ei saa tagasi võtta.",
       "deleteFailed": "Hosti ei õnnestunud kustutada."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Seansid",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Kleebi",
+      "hideKeyboard": "Peida klaviatuur",
       "pasteTitle": "Kleebi mitu rida?",
       "pasteMultiLine": "See tekst hõlmab mitut rida ja saadetakse ühe käsuna.",
       "hostKeyTitle": "Tundmatu hosti võti",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Võti loodud",
       "createdDescription": "Lisa see avalik võti serveri authorized_keys-faili ja ühendu seejärel selle võtmega.",
       "copyPublicKey": "Kopeeri võti"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Pilveliivakast",
+      "connectingTitle": "Terminali avamine",
+      "connectingMessage": "Ühendun liivakasti kestaga.",
+      "reconnectingMessage": "Terminali ühendus katkes. Liivakast töötab edasi.",
+      "stoppedTitle": "Liivakast on peatatud",
+      "stoppedMessage": "Saada sessioonis sõnum, et liivakast äratada, ja proovi seejärel uuesti.",
+      "exitedMessage": "Kest lõppes. Uus terminal avab uue kesta.",
+      "newTerminal": "Uus terminal",
+      "disconnectedTitle": "Terminali ühendus katkes",
+      "disconnectedMessage": "Sessioon sulges terminali. Ava see uuesti sessioonist.",
+      "unavailableTitle": "Terminal pole saadaval",
+      "unavailableMessage": "Liivakast ei suutnud terminali avada. Proovi sessioonist uuesti.",
+      "forbiddenMessage": "See sessioon ei luba interaktiivset terminali.",
+      "notFoundMessage": "Sellel sessioonil pole ühtegi liivakasti, mida see konto saab avada."
+    },
+    "sandboxes": {
+      "title": "Kilo liivakastid",
+      "unnamed": "Pealkirjata liivakast",
+      "open": "{{title}}, avab terminali oma liivakastis"
+    },
+    "snippets": {
+      "title": "Käsujupid",
+      "subtitle": "Käsud on terminalis ühe puudutusega saadaval.",
+      "manage": "Halda käsujuppe",
+      "emptyTitle": "Käsujuppe veel pole",
+      "emptyDescription": "Salvesta käsk üks kord, seejärel saada see ükskõik millisest terminalist.",
+      "add": "Lisa käsujupp",
+      "newTitle": "Uus käsujupp",
+      "edit": "Muuda käsujuppi",
+      "name": "Käsujupi nimi",
+      "namePlaceholder": "Juuruta veebirakendus",
+      "command": "Kestakäsk",
+      "commandPlaceholder": "nt. docker compose up -d",
+      "host": "Saadaval",
+      "everyHost": "Kõik hostid",
+      "appendNewline": "Käivita kohe",
+      "appendNewlineHint": "Saadab pärast käsku reavahetuse, nii et käsk käivitub, mitte ei jää käsuviibale ootama.",
+      "send": "{{label}}, saadab selle käsujupi",
+      "rowActions": "{{label}}, muuda käsujuppi",
+      "moveUp": "Liiguta üles",
+      "moveDown": "Liiguta alla",
+      "deleteMessage": "Salvestatud käsk eemaldatakse igast terminalist, mis seda pakkus."
     }
   }
 }

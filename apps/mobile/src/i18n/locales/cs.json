@@ -22,6 +22,7 @@
     "expired": "Platnost vypršela"
   },
   "common": {
+    "deleteTitle": "Smazat {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Zrušit",
@@ -4235,7 +4236,6 @@
       "importConfig": "Importovat z konfigurace SSH",
       "rowActions": "{{label}}, {{target}}. Otevře terminál; dlouhým stiskem upravíte nebo odstraníte.",
       "viaJump": "přes {{label}}",
-      "deleteTitle": "Smazat {{label}}?",
       "deleteMessage": "Smazáním se odstraní i jeho nastavení a přesměrování portů. Tuto akci nelze vrátit.",
       "deleteFailed": "Hostitele se nepodařilo smazat."
     },
@@ -4314,6 +4314,7 @@
       "switcherTitle": "Relace",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Vložit",
+      "hideKeyboard": "Skrýt klávesnici",
       "pasteTitle": "Vložit několik řádků?",
       "pasteMultiLine": "Tento text obsahuje několik řádků a odešle se jako jeden příkaz.",
       "hostKeyTitle": "Neznámý klíč hostitele",
@@ -4375,6 +4376,51 @@
       "createdTitle": "Klíč vytvořen",
       "createdDescription": "Přidejte tento veřejný klíč do souboru authorized_keys na serveru a poté se připojte pomocí tohoto klíče.",
       "copyPublicKey": "Kopírovat klíč"
+    },
+    "sandbox": {
+      "title": "Terminál",
+      "subtitle": "Cloudový sandbox",
+      "connectingTitle": "Otevírání terminálu",
+      "connectingMessage": "Připojování k shellu sandboxu.",
+      "reconnectingMessage": "Spojení s terminálem se přerušilo. Sandbox běží dál.",
+      "stoppedTitle": "Sandbox je zastaven",
+      "stoppedMessage": "Pošlete zprávu v relaci, aby se probudil, a potom to zkuste znovu.",
+      "exitedMessage": "Shell skončil. Nový terminál spustí čistý shell.",
+      "newTerminal": "Nový terminál",
+      "disconnectedTitle": "Terminál se odpojil",
+      "disconnectedMessage": "Relace zavřela terminál. Otevřete ho znovu z relace.",
+      "unavailableTitle": "Terminál není dostupný",
+      "unavailableMessage": "Sandbox nemohl otevřít terminál. Zkuste to znovu z relace.",
+      "forbiddenMessage": "Tato relace neumožňuje interaktivní terminál.",
+      "notFoundMessage": "Tato relace nemá sandbox, který by tento účet mohl otevřít."
+    },
+    "sandboxes": {
+      "title": "Sandboxy Kilo",
+      "unnamed": "Sandbox bez názvu",
+      "open": "{{title}}, otevře terminál v jeho sandboxu"
+    },
+    "snippets": {
+      "title": "Úryvky",
+      "subtitle": "Příkazy na jedno klepnutí v terminálu.",
+      "manage": "Spravovat úryvky",
+      "emptyTitle": "Zatím žádné úryvky",
+      "emptyDescription": "Uložte příkaz jednou a potom jej odešlete z libovolného terminálu.",
+      "add": "Přidat úryvek",
+      "newTitle": "Nový úryvek",
+      "edit": "Upravit úryvek",
+      "name": "Název úryvku",
+      "namePlaceholder": "Nasadit webovou aplikaci",
+      "command": "Příkaz shellu",
+      "commandPlaceholder": "např. docker compose up -d",
+      "host": "Dostupné na",
+      "everyHost": "Každý hostitel",
+      "appendNewline": "Spustit ihned",
+      "appendNewlineHint": "Po příkazu odešle nový řádek, takže se příkaz spustí, místo aby zůstal na příkazovém řádku.",
+      "send": "{{label}}, odešle tento úryvek",
+      "rowActions": "{{label}}, upravit úryvek",
+      "moveUp": "Přesunout nahoru",
+      "moveDown": "Přesunout dolů",
+      "deleteMessage": "Uložený příkaz se odstraní z každého terminálu, který jej nabízel."
     }
   }
 }

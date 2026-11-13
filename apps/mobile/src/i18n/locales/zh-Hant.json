@@ -22,6 +22,7 @@
     "expired": "已過期"
   },
   "common": {
+    "deleteTitle": "刪除 {{label}}？",
     "sentenceJoiner": "。",
     "listJoiner": "、",
     "cancel": "取消",
@@ -4105,7 +4106,6 @@
       "importConfig": "從 SSH 設定匯入",
       "rowActions": "{{label}}，{{target}}。開啟終端機；長按可編輯或刪除。",
       "viaJump": "經由 {{label}}",
-      "deleteTitle": "刪除 {{label}}？",
       "deleteMessage": "其設定與連接埠轉送也會一併移除。此操作無法復原。",
       "deleteFailed": "無法刪除主機。"
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "工作階段",
       "switchTo": "{{label}}，{{state}}",
       "paste": "貼上",
+      "hideKeyboard": "隱藏鍵盤",
       "pasteTitle": "貼上多行內容？",
       "pasteMultiLine": "這段文字包含多行，將以單一命令送出。",
       "hostKeyTitle": "未知的主機金鑰",
@@ -4245,6 +4246,51 @@
       "createdTitle": "金鑰已產生",
       "createdDescription": "將此公開金鑰新增至伺服器的 authorized_keys，然後使用此金鑰連線。",
       "copyPublicKey": "複製金鑰"
+    },
+    "sandbox": {
+      "title": "終端機",
+      "subtitle": "雲端沙箱",
+      "connectingTitle": "正在開啟終端機",
+      "connectingMessage": "正在連線到沙箱的殼層。",
+      "reconnectingMessage": "終端機連線中斷。沙箱仍在執行。",
+      "stoppedTitle": "沙箱已停止",
+      "stoppedMessage": "在工作階段中傳送訊息以喚醒它，然後再試一次。",
+      "exitedMessage": "殼層已結束。新終端機會啟動全新的殼層。",
+      "newTerminal": "新增終端機",
+      "disconnectedTitle": "終端機已中斷連線",
+      "disconnectedMessage": "工作階段已關閉終端機。請從工作階段重新開啟。",
+      "unavailableTitle": "終端機無法使用",
+      "unavailableMessage": "沙箱無法開啟終端機。請從工作階段再試一次。",
+      "forbiddenMessage": "此工作階段不允許互動式終端機。",
+      "notFoundMessage": "此工作階段沒有此帳戶可開啟的沙箱。"
+    },
+    "sandboxes": {
+      "title": "Kilo 沙箱",
+      "unnamed": "未命名沙箱",
+      "open": "{{title}}，在其沙箱中開啟終端機"
+    },
+    "snippets": {
+      "title": "指令片段",
+      "subtitle": "在終端機中輕點一下即可使用指令。",
+      "manage": "管理指令片段",
+      "emptyTitle": "尚無指令片段",
+      "emptyDescription": "儲存指令一次，之後即可從任何終端機傳送。",
+      "add": "新增指令片段",
+      "newTitle": "新增指令片段",
+      "edit": "編輯指令片段",
+      "name": "指令片段名稱",
+      "namePlaceholder": "部署網頁應用程式",
+      "command": "殼層指令",
+      "commandPlaceholder": "例如 docker compose up -d",
+      "host": "適用於",
+      "everyHost": "所有主機",
+      "appendNewline": "立即執行",
+      "appendNewlineHint": "在指令後傳送換行字元，讓它直接執行，而不會停在提示字元。",
+      "send": "{{label}}，傳送此指令片段",
+      "rowActions": "{{label}}，編輯指令片段",
+      "moveUp": "上移",
+      "moveDown": "下移",
+      "deleteMessage": "已儲存的指令會從提供它的每個終端機中移除。"
     }
   }
 }

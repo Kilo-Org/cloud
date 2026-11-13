@@ -22,6 +22,7 @@
     "expired": "Expirée"
   },
   "common": {
+    "deleteTitle": "Supprimer {{label}} ?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Annuler",
@@ -4170,7 +4171,6 @@
       "importConfig": "Importer depuis la configuration SSH",
       "rowActions": "{{label}}, {{target}}. Ouvre un terminal ; appui long pour modifier et supprimer.",
       "viaJump": "via {{label}}",
-      "deleteTitle": "Supprimer {{label}} ?",
       "deleteMessage": "Ses paramètres et ses redirections de port sont supprimés avec lui. Cette action est irréversible.",
       "deleteFailed": "L’hôte n’a pas pu être supprimé."
     },
@@ -4249,6 +4249,7 @@
       "switcherTitle": "Sessions",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Coller",
+      "hideKeyboard": "Masquer le clavier",
       "pasteTitle": "Coller plusieurs lignes ?",
       "pasteMultiLine": "Ce texte s’étend sur plusieurs lignes et est envoyé comme une seule commande.",
       "hostKeyTitle": "Clé d’hôte inconnue",
@@ -4310,6 +4311,51 @@
       "createdTitle": "Clé créée",
       "createdDescription": "Ajoutez cette clé publique au fichier authorized_keys du serveur, puis connectez-vous avec cette clé.",
       "copyPublicKey": "Copier la clé"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Bac à sable cloud",
+      "connectingTitle": "Ouverture d’un terminal",
+      "connectingMessage": "Connexion au shell du bac à sable.",
+      "reconnectingMessage": "La connexion au terminal a été interrompue. Le bac à sable continue de fonctionner.",
+      "stoppedTitle": "Le bac à sable est arrêté",
+      "stoppedMessage": "Envoyez un message dans la session pour le réveiller, puis réessayez.",
+      "exitedMessage": "Le shell s’est terminé. Un nouveau terminal en démarre un nouveau.",
+      "newTerminal": "Nouveau terminal",
+      "disconnectedTitle": "Le terminal s’est déconnecté",
+      "disconnectedMessage": "La session a fermé le terminal. Rouvrez-le depuis la session.",
+      "unavailableTitle": "Terminal indisponible",
+      "unavailableMessage": "Le bac à sable n’a pas pu ouvrir de terminal. Réessayez depuis la session.",
+      "forbiddenMessage": "Cette session n’autorise pas de terminal interactif.",
+      "notFoundMessage": "Cette session n’a pas de bac à sable que ce compte peut ouvrir."
+    },
+    "sandboxes": {
+      "title": "Bacs à sable Kilo",
+      "unnamed": "Bac à sable sans titre",
+      "open": "{{title}}, ouvre un terminal dans son bac à sable"
+    },
+    "snippets": {
+      "title": "Extraits",
+      "subtitle": "Des commandes accessibles en un geste dans un terminal.",
+      "manage": "Gérer les extraits",
+      "emptyTitle": "Aucun extrait pour l’instant",
+      "emptyDescription": "Enregistrez une commande une fois, puis envoyez-la depuis n’importe quel terminal.",
+      "add": "Ajouter un extrait",
+      "newTitle": "Nouvel extrait",
+      "edit": "Modifier l’extrait",
+      "name": "Nom de l’extrait",
+      "namePlaceholder": "Déployer l’application web",
+      "command": "Commande shell",
+      "commandPlaceholder": "p. ex. docker compose up -d",
+      "host": "Disponible sur",
+      "everyHost": "Tous les hôtes",
+      "appendNewline": "Exécuter immédiatement",
+      "appendNewlineHint": "Envoie un saut de ligne après la commande, pour qu’elle s’exécute au lieu de rester à l’invite.",
+      "send": "{{label}}, envoie cet extrait",
+      "rowActions": "{{label}}, modifier l’extrait",
+      "moveUp": "Monter",
+      "moveDown": "Descendre",
+      "deleteMessage": "La commande enregistrée est supprimée de tous les terminaux qui la proposaient."
     }
   }
 }

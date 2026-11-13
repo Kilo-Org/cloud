@@ -22,6 +22,7 @@
     "expired": "期限切れ"
   },
   "common": {
+    "deleteTitle": "{{label}}を削除しますか?",
     "sentenceJoiner": "。",
     "listJoiner": "、",
     "cancel": "キャンセル",
@@ -4105,7 +4106,6 @@
       "importConfig": "SSH configから読み込む",
       "rowActions": "{{label}}、{{target}}。ターミナルを開きます。長押しすると編集と削除ができます。",
       "viaJump": "{{label}}経由",
-      "deleteTitle": "{{label}}を削除しますか?",
       "deleteMessage": "設定とポート転送も一緒に削除されます。この操作は取り消せません。",
       "deleteFailed": "ホストを削除できませんでした。"
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "セッション",
       "switchTo": "{{label}}、{{state}}",
       "paste": "貼り付け",
+      "hideKeyboard": "キーボードを隠す",
       "pasteTitle": "複数行を貼り付けますか?",
       "pasteMultiLine": "このテキストは複数行にまたがっており、1つのコマンドとして送信されます。",
       "hostKeyTitle": "不明なホストキー",
@@ -4245,6 +4246,51 @@
       "createdTitle": "キーを作成しました",
       "createdDescription": "この公開鍵をサーバーのauthorized_keysに追加してから、このキーで接続してください。",
       "copyPublicKey": "キーをコピー"
+    },
+    "sandbox": {
+      "title": "ターミナル",
+      "subtitle": "クラウドサンドボックス",
+      "connectingTitle": "ターミナルを開いています",
+      "connectingMessage": "サンドボックスのシェルに接続しています。",
+      "reconnectingMessage": "ターミナルの接続が切れました。サンドボックスは実行を続けています。",
+      "stoppedTitle": "サンドボックスは停止しています",
+      "stoppedMessage": "セッションでメッセージを送って起動し、再試行してください。",
+      "exitedMessage": "シェルが終了しました。新しいターミナルを開くと、新しいシェルが起動します。",
+      "newTerminal": "新しいターミナル",
+      "disconnectedTitle": "ターミナルが切断されました",
+      "disconnectedMessage": "セッションがターミナルを閉じました。セッションからもう一度開いてください。",
+      "unavailableTitle": "ターミナルを利用できません",
+      "unavailableMessage": "サンドボックスがターミナルを開けませんでした。セッションからもう一度お試しください。",
+      "forbiddenMessage": "このセッションでは対話型ターミナルを使用できません。",
+      "notFoundMessage": "このセッションには、このアカウントで開けるサンドボックスがありません。"
+    },
+    "sandboxes": {
+      "title": "Kiloのサンドボックス",
+      "unnamed": "名称未設定のサンドボックス",
+      "open": "{{title}}、サンドボックスでターミナルを開きます"
+    },
+    "snippets": {
+      "title": "スニペット",
+      "subtitle": "ターミナルでワンタップで使えるコマンド。",
+      "manage": "スニペットを管理",
+      "emptyTitle": "スニペットはまだありません",
+      "emptyDescription": "コマンドを一度保存すれば、どのターミナルからでも送信できます。",
+      "add": "スニペットを追加",
+      "newTitle": "新しいスニペット",
+      "edit": "スニペットを編集",
+      "name": "スニペット名",
+      "namePlaceholder": "Webアプリをデプロイ",
+      "command": "シェルコマンド",
+      "commandPlaceholder": "例: docker compose up -d",
+      "host": "利用可能なホスト",
+      "everyHost": "すべてのホスト",
+      "appendNewline": "すぐに実行",
+      "appendNewlineHint": "コマンドの後に改行を送信するため、プロンプトで止まらずに実行されます。",
+      "send": "{{label}}、このスニペットを送信します",
+      "rowActions": "{{label}}、スニペットを編集",
+      "moveUp": "上に移動",
+      "moveDown": "下に移動",
+      "deleteMessage": "保存されたコマンドは、それを提供していたすべてのターミナルから削除されます。"
     }
   }
 }

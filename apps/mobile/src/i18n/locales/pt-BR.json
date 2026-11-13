@@ -22,6 +22,7 @@
     "expired": "Expirado"
   },
   "common": {
+    "deleteTitle": "Excluir {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancelar",
@@ -4176,7 +4177,6 @@
       "importConfig": "Importar do SSH config",
       "rowActions": "{{label}}, {{target}}. Abre um terminal; pressione e segure para editar e excluir.",
       "viaJump": "via {{label}}",
-      "deleteTitle": "Excluir {{label}}?",
       "deleteMessage": "As configurações e os encaminhamentos de porta são removidos junto com ele. Isso não pode ser desfeito.",
       "deleteFailed": "Não foi possível excluir o host."
     },
@@ -4255,6 +4255,7 @@
       "switcherTitle": "Sessões",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Colar",
+      "hideKeyboard": "Ocultar teclado",
       "pasteTitle": "Colar várias linhas?",
       "pasteMultiLine": "Este texto ocupa várias linhas e é enviado como um único comando.",
       "hostKeyTitle": "Chave do host desconhecida",
@@ -4316,6 +4317,51 @@
       "createdTitle": "Chave criada",
       "createdDescription": "Adicione esta chave pública ao authorized_keys do servidor e conecte-se com esta chave.",
       "copyPublicKey": "Copiar chave"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Sandbox na nuvem",
+      "connectingTitle": "Abrindo um terminal",
+      "connectingMessage": "Conectando ao shell do sandbox.",
+      "reconnectingMessage": "A conexão do terminal caiu. O sandbox continua em execução.",
+      "stoppedTitle": "O sandbox está parado",
+      "stoppedMessage": "Envie uma mensagem na sessão para acordá-lo e tente novamente.",
+      "exitedMessage": "O shell terminou. Um novo terminal inicia um shell novo.",
+      "newTerminal": "Novo terminal",
+      "disconnectedTitle": "O terminal desconectou",
+      "disconnectedMessage": "A sessão fechou o terminal. Abra-o novamente pela sessão.",
+      "unavailableTitle": "Terminal indisponível",
+      "unavailableMessage": "O sandbox não conseguiu abrir um terminal. Tente novamente pela sessão.",
+      "forbiddenMessage": "Esta sessão não permite um terminal interativo.",
+      "notFoundMessage": "Esta sessão não tem um sandbox que esta conta possa abrir."
+    },
+    "sandboxes": {
+      "title": "Sandboxes do Kilo",
+      "unnamed": "Sandbox sem título",
+      "open": "{{title}}, abre um terminal em seu sandbox"
+    },
+    "snippets": {
+      "title": "Snippets",
+      "subtitle": "Comandos a um toque no terminal.",
+      "manage": "Gerenciar snippets",
+      "emptyTitle": "Nenhum snippet ainda",
+      "emptyDescription": "Salve um comando uma vez e envie-o de qualquer terminal.",
+      "add": "Adicionar snippet",
+      "newTitle": "Novo snippet",
+      "edit": "Editar snippet",
+      "name": "Nome do snippet",
+      "namePlaceholder": "Fazer deploy do app web",
+      "command": "Comando de shell",
+      "commandPlaceholder": "ex. docker compose up -d",
+      "host": "Disponível em",
+      "everyHost": "Todos os hosts",
+      "appendNewline": "Executar imediatamente",
+      "appendNewlineHint": "Envia uma quebra de linha após o comando, para que ele seja executado em vez de ficar parado no prompt.",
+      "send": "{{label}}, envia este snippet",
+      "rowActions": "{{label}}, editar snippet",
+      "moveUp": "Mover para cima",
+      "moveDown": "Mover para baixo",
+      "deleteMessage": "O comando armazenado é removido de todos os terminais que o ofereciam."
     }
   }
 }

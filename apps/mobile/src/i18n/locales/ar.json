@@ -22,6 +22,7 @@
     "expired": "انتهت الصلاحية"
   },
   "common": {
+    "deleteTitle": "حذف {{label}}؟",
     "sentenceJoiner": ". ",
     "listJoiner": "، ",
     "cancel": "إلغاء",
@@ -4365,7 +4366,6 @@
       "importConfig": "استيراد من إعدادات SSH",
       "rowActions": "{{label}}، {{target}}. الضغط يفتح طرفية؛ والضغط المطول يتيح التعديل والحذف.",
       "viaJump": "عبر {{label}}",
-      "deleteTitle": "حذف {{label}}؟",
       "deleteMessage": "تُزال معه إعداداته وتحويلات المنافذ. لا يمكن التراجع عن هذا.",
       "deleteFailed": "تعذّر حذف المضيف."
     },
@@ -4444,6 +4444,7 @@
       "switcherTitle": "الجلسات",
       "switchTo": "{{label}}، {{state}}",
       "paste": "لصق",
+      "hideKeyboard": "إخفاء لوحة المفاتيح",
       "pasteTitle": "لصق عدة أسطر؟",
       "pasteMultiLine": "يمتد هذا النص على عدة أسطر ويُرسل كأمر واحد.",
       "hostKeyTitle": "مفتاح مضيف غير معروف",
@@ -4505,6 +4506,51 @@
       "createdTitle": "تم إنشاء المفتاح",
       "createdDescription": "أضف هذا المفتاح العام إلى authorized_keys الخاص بالخادم، ثم اتصل باستخدام هذا المفتاح.",
       "copyPublicKey": "نسخ المفتاح"
+    },
+    "sandbox": {
+      "title": "الطرفية",
+      "subtitle": "بيئة معزولة سحابية",
+      "connectingTitle": "جارٍ فتح طرفية",
+      "connectingMessage": "جارٍ الاتصال بصدفة البيئة المعزولة.",
+      "reconnectingMessage": "انقطع اتصال الطرفية. تظل البيئة المعزولة قيد التشغيل.",
+      "stoppedTitle": "البيئة المعزولة متوقفة",
+      "stoppedMessage": "أرسل رسالة في الجلسة لإيقاظها، ثم أعد المحاولة.",
+      "exitedMessage": "انتهت الصدفة. طرفية جديدة تبدأ صدفة جديدة.",
+      "newTerminal": "طرفية جديدة",
+      "disconnectedTitle": "انقطعت الطرفية",
+      "disconnectedMessage": "أغلقت الجلسة الطرفية. افتحها مجددًا من الجلسة.",
+      "unavailableTitle": "الطرفية غير متاحة",
+      "unavailableMessage": "تعذّر على البيئة المعزولة فتح طرفية. حاول مرة أخرى من الجلسة.",
+      "forbiddenMessage": "لا تسمح هذه الجلسة بطرفية تفاعلية.",
+      "notFoundMessage": "لا تحتوي هذه الجلسة على بيئة معزولة يمكن لهذا الحساب فتحها."
+    },
+    "sandboxes": {
+      "title": "بيئات Kilo المعزولة",
+      "unnamed": "بيئة معزولة بدون عنوان",
+      "open": "{{title}}، يفتح طرفية في بيئته المعزولة"
+    },
+    "snippets": {
+      "title": "المقتطفات",
+      "subtitle": "أوامر على بعد نقرة واحدة في الطرفية.",
+      "manage": "إدارة المقتطفات",
+      "emptyTitle": "لا توجد مقتطفات بعد",
+      "emptyDescription": "احفظ أمرًا مرة واحدة، ثم أرسله من أي طرفية.",
+      "add": "إضافة مقتطف",
+      "newTitle": "مقتطف جديد",
+      "edit": "تعديل المقتطف",
+      "name": "اسم المقتطف",
+      "namePlaceholder": "نشر تطبيق الويب",
+      "command": "أمر الصدفة",
+      "commandPlaceholder": "مثال: docker compose up -d",
+      "host": "متاح على",
+      "everyHost": "كل المضيفات",
+      "appendNewline": "تشغيله فورًا",
+      "appendNewlineHint": "يرسل سطرًا جديدًا بعد الأمر، فيُشغَّل بدلًا من البقاء عند موجه الأوامر.",
+      "send": "{{label}}، يرسل هذا المقتطف",
+      "rowActions": "{{label}}، تعديل المقتطف",
+      "moveUp": "نقل لأعلى",
+      "moveDown": "نقل لأسفل",
+      "deleteMessage": "يُزال الأمر المخزّن من كل طرفية كانت تعرضه."
     }
   }
 }

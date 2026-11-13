@@ -22,6 +22,7 @@
     "expired": "Wygasło"
   },
   "common": {
+    "deleteTitle": "Usunąć {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Anuluj",
@@ -4235,7 +4236,6 @@
       "importConfig": "Importuj z konfiguracji SSH",
       "rowActions": "{{label}}, {{target}}. Otwiera terminal; długie naciśnięcie umożliwia edycję i usunięcie.",
       "viaJump": "przez {{label}}",
-      "deleteTitle": "Usunąć {{label}}?",
       "deleteMessage": "Jego ustawienia i przekierowania portów zostaną usunięte razem z nim. Tej operacji nie można cofnąć.",
       "deleteFailed": "Nie udało się usunąć hosta."
     },
@@ -4314,6 +4314,7 @@
       "switcherTitle": "Sesje",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Wklej",
+      "hideKeyboard": "Ukryj klawiaturę",
       "pasteTitle": "Wkleić kilka wierszy?",
       "pasteMultiLine": "Ten tekst obejmuje kilka wierszy i zostanie wysłany jako jedno polecenie.",
       "hostKeyTitle": "Nieznany klucz hosta",
@@ -4375,6 +4376,51 @@
       "createdTitle": "Klucz utworzony",
       "createdDescription": "Dodaj ten klucz publiczny do authorized_keys na serwerze, a następnie połącz się za pomocą tego klucza.",
       "copyPublicKey": "Kopiuj klucz"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Piaskownica w chmurze",
+      "connectingTitle": "Otwieranie terminala",
+      "connectingMessage": "Łączenie z powłoką piaskownicy.",
+      "reconnectingMessage": "Połączenie terminala zostało przerwane. Piaskownica nadal działa.",
+      "stoppedTitle": "Piaskownica jest zatrzymana",
+      "stoppedMessage": "Wyślij wiadomość w sesji, aby ją obudzić, a następnie spróbuj ponownie.",
+      "exitedMessage": "Powłoka zakończyła działanie. Nowy terminal uruchamia nową powłokę.",
+      "newTerminal": "Nowy terminal",
+      "disconnectedTitle": "Terminal został rozłączony",
+      "disconnectedMessage": "Sesja zamknęła terminal. Otwórz go ponownie z sesji.",
+      "unavailableTitle": "Terminal niedostępny",
+      "unavailableMessage": "Piaskownica nie mogła otworzyć terminala. Spróbuj ponownie z sesji.",
+      "forbiddenMessage": "Ta sesja nie pozwala na interaktywny terminal.",
+      "notFoundMessage": "Ta sesja nie ma piaskownicy, którą to konto może otworzyć."
+    },
+    "sandboxes": {
+      "title": "Piaskownice Kilo",
+      "unnamed": "Piaskownica bez nazwy",
+      "open": "{{title}}, otwiera terminal w swojej piaskownicy"
+    },
+    "snippets": {
+      "title": "Fragmenty",
+      "subtitle": "Polecenia dostępne jednym dotknięciem w terminalu.",
+      "manage": "Zarządzaj fragmentami",
+      "emptyTitle": "Brak fragmentów",
+      "emptyDescription": "Zapisz polecenie raz, a następnie wysyłaj je z dowolnego terminala.",
+      "add": "Dodaj fragment",
+      "newTitle": "Nowy fragment",
+      "edit": "Edytuj fragment",
+      "name": "Nazwa fragmentu",
+      "namePlaceholder": "Wdróż aplikację webową",
+      "command": "Polecenie powłoki",
+      "commandPlaceholder": "np. docker compose up -d",
+      "host": "Dostępny na",
+      "everyHost": "Każdy host",
+      "appendNewline": "Uruchom od razu",
+      "appendNewlineHint": "Wysyła znak nowego wiersza po poleceniu, dzięki czemu jest ono uruchamiane, zamiast czekać na znaku zachęty.",
+      "send": "{{label}}, wysyła ten fragment",
+      "rowActions": "{{label}}, edytuj fragment",
+      "moveUp": "Przenieś w górę",
+      "moveDown": "Przenieś w dół",
+      "deleteMessage": "Zapisane polecenie zostanie usunięte z każdego terminala, który je oferował."
     }
   }
 }

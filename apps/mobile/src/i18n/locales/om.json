@@ -22,6 +22,7 @@
     "expired": "Yeroon isaa darbeera"
   },
   "common": {
+    "deleteTitle": "{{label}} balleessuu?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Dhiisi",
@@ -4105,7 +4106,6 @@
       "importConfig": "SSH config irraa galchi",
       "rowActions": "{{label}}, {{target}}. Terminaalii banuuf tuqi; gulaaluufis haquufis yeroo dheeraa qabi.",
       "viaJump": "{{label}} keessaan",
-      "deleteTitle": "{{label}} balleessuu?",
       "deleteMessage": "Qindaa'inni isaa fi port forwardoonni isaa isa wajjin keessaa ba'u. Kun hin deebi'u.",
       "deleteFailed": "Hostiin hin balleeffamne."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Turtiiwwan",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Maxxansi",
+      "hideKeyboard": "Kiiboodii dhoksi",
       "pasteTitle": "Sararoota hedduu maxxansuu?",
       "pasteMultiLine": "Barreeffamni kun sararoota hedduu qaba; akka ajaja tokkootti ergama.",
       "hostKeyTitle": "Furtuu hostii hin beekamne",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Furtuun uumame",
       "createdDescription": "Furtuu uummataa kana authorized_keys sirbaa keessatti dabali, ergasii furtuu kanaan walqunnami.",
       "copyPublicKey": "Furtuu garagalchi"
+    },
+    "sandbox": {
+      "title": "Terminaalii",
+      "subtitle": "Saandbooxii duumessaa",
+      "connectingTitle": "Terminaalii banuu",
+      "connectingMessage": "Sheelii saandbooxii wajjin walqunnamaa jira.",
+      "reconnectingMessage": "Walqunnamtiin terminaalii addaan cite. Saandbooxiin hojii itti fufaa jira.",
+      "stoppedTitle": "Saandbooxiin dhaabateera",
+      "stoppedMessage": "Isa damqisiisuuf seeshinii keessatti ergaa ergi, sana booda irra deebi'ii yaali.",
+      "exitedMessage": "Sheeliin xumurame. Terminaaliin haaraan sheelii haaraa jalqaba.",
+      "newTerminal": "Terminaalii haaraa",
+      "disconnectedTitle": "Terminaaliin addaan cite",
+      "disconnectedMessage": "Seeshiniin terminaalii cufe. Seeshinii irraa ammas bani.",
+      "unavailableTitle": "Terminaalii hin jiru",
+      "unavailableMessage": "Saandbooxiin terminaalii banuu hin dandeenye. Seeshinii irraa irra deebi'ii yaali.",
+      "forbiddenMessage": "Seeshiniin kun terminaalii interaaktii hin hayyamu.",
+      "notFoundMessage": "Seeshiniin kun saandbooxii herregni kun banuu danda'u hin qabu."
+    },
+    "sandboxes": {
+      "title": "Saandbooxiiwwan Kilo",
+      "unnamed": "Saandbooxii maqaa hin qabne",
+      "open": "{{title}}, saandbooxii isaa keessatti terminaalii bana"
+    },
+    "snippets": {
+      "title": "Snippiiwwan",
+      "subtitle": "Ajajoota terminaalii keessatti tuqaa tokkoon bira ga'aman.",
+      "manage": "Snippiiwwan bulchi",
+      "emptyTitle": "Snippiiwwan amma hin jiran",
+      "emptyDescription": "Ajaja tokko yeroo tokko kuusi, sana booda terminaalii kamiyyuu irraa ergi.",
+      "add": "Snippii dabali",
+      "newTitle": "Snippii haaraa",
+      "edit": "Snippii gulaali",
+      "name": "Maqaa snippii",
+      "namePlaceholder": "Appii weebii hojiirra oolchi",
+      "command": "Ajaja sheelii",
+      "commandPlaceholder": "fakkeenyaaf docker compose up -d",
+      "host": "Kan irratti argamu",
+      "everyHost": "Hostii hunda",
+      "appendNewline": "Battalumatti hojjechi",
+      "appendNewlineHint": "Ajaja booda sarara haaraa erga, kanaaf ajajni prompt irra taa'ee utuu hin taane ni hojjeta.",
+      "send": "{{label}}, snippii kana erga",
+      "rowActions": "{{label}}, snippii gulaali",
+      "moveUp": "Olsochi",
+      "moveDown": "Gadsochi",
+      "deleteMessage": "Ajajni kuufame terminaalii kamiyyuu isa dhiyeesse irraa ni haqama."
     }
   }
 }

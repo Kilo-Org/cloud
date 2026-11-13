@@ -22,6 +22,7 @@
     "expired": "Caducado"
   },
   "common": {
+    "deleteTitle": "¿Eliminar {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancelar",
@@ -4170,7 +4171,6 @@
       "importConfig": "Importar desde la configuración de SSH",
       "rowActions": "{{label}}, {{target}}. Abre una terminal; mantén pulsado para editar y eliminar.",
       "viaJump": "vía {{label}}",
-      "deleteTitle": "¿Eliminar {{label}}?",
       "deleteMessage": "Su configuración y sus reenvíos de puerto se eliminan con él. Esta acción no se puede deshacer.",
       "deleteFailed": "No se pudo eliminar el host."
     },
@@ -4249,6 +4249,7 @@
       "switcherTitle": "Sesiones",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Pegar",
+      "hideKeyboard": "Ocultar teclado",
       "pasteTitle": "¿Pegar varias líneas?",
       "pasteMultiLine": "Este texto ocupa varias líneas y se envía como un solo comando.",
       "hostKeyTitle": "Clave de host desconocida",
@@ -4310,6 +4311,51 @@
       "createdTitle": "Clave creada",
       "createdDescription": "Añade esta clave pública al archivo authorized_keys del servidor y, después, conéctate con esta clave.",
       "copyPublicKey": "Copiar clave"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Entorno aislado en la nube",
+      "connectingTitle": "Abriendo una terminal",
+      "connectingMessage": "Conectando con el shell del entorno aislado.",
+      "reconnectingMessage": "Se perdió la conexión con la terminal. El entorno aislado sigue en ejecución.",
+      "stoppedTitle": "El entorno aislado está detenido",
+      "stoppedMessage": "Envía un mensaje en la sesión para despertarlo y vuelve a intentarlo.",
+      "exitedMessage": "El shell terminó. Una nueva terminal inicia uno nuevo.",
+      "newTerminal": "Nueva terminal",
+      "disconnectedTitle": "La terminal se desconectó",
+      "disconnectedMessage": "La sesión cerró la terminal. Vuelve a abrirla desde la sesión.",
+      "unavailableTitle": "Terminal no disponible",
+      "unavailableMessage": "El entorno aislado no pudo abrir una terminal. Vuelve a intentarlo desde la sesión.",
+      "forbiddenMessage": "Esta sesión no permite una terminal interactiva.",
+      "notFoundMessage": "Esta sesión no tiene ningún entorno aislado que esta cuenta pueda abrir."
+    },
+    "sandboxes": {
+      "title": "Entornos aislados de Kilo",
+      "unnamed": "Entorno aislado sin título",
+      "open": "{{title}}, abre una terminal en su entorno aislado"
+    },
+    "snippets": {
+      "title": "Fragmentos",
+      "subtitle": "Comandos a un toque en la terminal.",
+      "manage": "Gestionar fragmentos",
+      "emptyTitle": "Aún no hay fragmentos",
+      "emptyDescription": "Guarda un comando una vez y envíalo desde cualquier terminal.",
+      "add": "Añadir fragmento",
+      "newTitle": "Nuevo fragmento",
+      "edit": "Editar fragmento",
+      "name": "Nombre del fragmento",
+      "namePlaceholder": "Desplegar la aplicación web",
+      "command": "Comando de shell",
+      "commandPlaceholder": "p. ej. docker compose up -d",
+      "host": "Disponible en",
+      "everyHost": "Todos los hosts",
+      "appendNewline": "Ejecutarlo al instante",
+      "appendNewlineHint": "Envía un salto de línea después del comando, así se ejecuta en lugar de quedarse esperando en el indicador.",
+      "send": "{{label}}, envía este fragmento",
+      "rowActions": "{{label}}, editar fragmento",
+      "moveUp": "Mover hacia arriba",
+      "moveDown": "Mover hacia abajo",
+      "deleteMessage": "El comando guardado se elimina de todas las terminales que lo ofrecían."
     }
   }
 }

@@ -22,6 +22,7 @@
     "expired": "Kua pau te wā"
   },
   "common": {
+    "deleteTitle": "Muku {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Whakakore",
@@ -4105,7 +4106,6 @@
       "importConfig": "Kawemai mai i te whirihoranga SSH",
       "rowActions": "{{label}}, {{target}}. Ka whakatuwheratia te pūtakataka; pēhi roa ki te whakatika, ki te muku rānei.",
       "viaJump": "mā {{label}}",
-      "deleteTitle": "Muku {{label}}?",
       "deleteMessage": "Ka tangohia tahitia ōna tautuhinga me ōna whakawhiti tauranga. Kāore e taea te whakahoki.",
       "deleteFailed": "Kāore i taea te muku i te pou."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Ngā wātū",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Whakapiri",
+      "hideKeyboard": "Huna papapato",
       "pasteTitle": "Whakapiri i ngā rārangi maha?",
       "pasteMultiLine": "Ka horapa tēnei kuputuhi ki ngā rārangi maha, ā, ka tukuna hei whakahau kotahi.",
       "hostKeyTitle": "Kī pou kāore e mōhiotia",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Kua hangaia te kī",
       "createdDescription": "Tāpiritia tēnei kī tūmatanui ki te authorized_keys o te tūmau, kātahi ka hono atu mā tēnei kī.",
       "copyPublicKey": "Kopea te kī"
+    },
+    "sandbox": {
+      "title": "Tāminara",
+      "subtitle": "Pouaka one kapua",
+      "connectingTitle": "Te whakatuwhera i tētahi tāminara",
+      "connectingMessage": "E hono ana ki te anga o te pouaka one.",
+      "reconnectingMessage": "Kua motu te hononga tāminara. Kei te rere tonu te pouaka one.",
+      "stoppedTitle": "Kua tū te pouaka one",
+      "stoppedMessage": "Tukuna he karere i roto i te wātū kia oho ai, kātahi ka whakamātau anō.",
+      "exitedMessage": "Kua mutu te anga. Ka tīmata tētahi tāminara hou i tētahi anga hou.",
+      "newTerminal": "Tāminara hou",
+      "disconnectedTitle": "Kua momotu te tāminara",
+      "disconnectedMessage": "Kua katia e te wātū te tāminara. Whakatuwheratia anō mai i te wātū.",
+      "unavailableTitle": "Kāore te tāminara e wātea",
+      "unavailableMessage": "Kāore i taea e te pouaka one te whakatuwhera i tētahi tāminara. Whakamātau anō mai i te wātū.",
+      "forbiddenMessage": "Kāore tēnei wātū e whakaae ki tētahi tāminara pāhekoheko.",
+      "notFoundMessage": "Kāore he pouaka one i tēnei wātū ka taea e tēnei pūkete te whakatuwhera."
+    },
+    "sandboxes": {
+      "title": "Ngā pouaka one a Kilo",
+      "unnamed": "Pouaka one kore ingoa",
+      "open": "{{title}}, ka whakatuwhera i tētahi tāminara i tōna pouaka one"
+    },
+    "snippets": {
+      "title": "Ngā maramara",
+      "subtitle": "Ngā whakahau e taea ai te tuku mā te pā kotahi i roto i tētahi tāminara.",
+      "manage": "Whakahaere maramara",
+      "emptyTitle": "Kāore anō he maramara",
+      "emptyDescription": "Tiakina he whakahau kotahi, kātahi ka tukuna atu i tētahi tāminara ahakoa tēhea.",
+      "add": "Tāpiri maramara",
+      "newTitle": "Maramara hōu",
+      "edit": "Whakatika maramara",
+      "name": "Ingoa maramara",
+      "namePlaceholder": "Tuku i te taupānga tukutuku",
+      "command": "Whakahau anga",
+      "commandPlaceholder": "hei tauira docker compose up -d",
+      "host": "E wātea ana i",
+      "everyHost": "Ngā pou katoa",
+      "appendNewline": "Whakahaerehia tonutia",
+      "appendNewlineHint": "Ka tukuna he rārangi hōu i muri i te whakahau, kia whakahaere tonu ai, kāore e noho noa i te tohu whakahau.",
+      "send": "{{label}}, ka tuku i tēnei maramara",
+      "rowActions": "{{label}}, whakatika maramara",
+      "moveUp": "Nekehia ki runga",
+      "moveDown": "Nekehia ki raro",
+      "deleteMessage": "Ka tangohia te whakahau kua tiakina mai i ngā tāminara katoa i whakaatu ai i a ia."
     }
   }
 }

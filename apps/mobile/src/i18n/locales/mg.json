@@ -22,6 +22,7 @@
     "expired": "Lany fe-potoana"
   },
   "common": {
+    "deleteTitle": "Fafao {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Foano",
@@ -4105,7 +4106,6 @@
       "importConfig": "Ento avy amin'ny SSH config",
       "rowActions": "{{label}}, {{target}}. Manokatra ny mpanova; tsindrio lava raha hanova sy hamafa.",
       "viaJump": "amin'ny alalan'ny {{label}}",
-      "deleteTitle": "Fafao {{label}}?",
       "deleteMessage": "Esorina miaraka aminy ny fandrindrana sy ny fampitana port. Tsy azo averina izany.",
       "deleteFailed": "Tsy afaka nofafana ny host."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Fotoam-piasana",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Petaho",
+      "hideKeyboard": "Afeno ny klavier",
       "pasteTitle": "Hametaka andalana maromaro?",
       "pasteMultiLine": "Ity lahatsoratra ity dia mandrakotra andalana maromaro ary alefa ho baiko iray.",
       "hostKeyTitle": "Tsy fantatra ny fanalahidin'ny host",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Noforonina ny fanalahidy",
       "createdDescription": "Ampio ao amin'ny authorized_keys an'ny mpizara ity fanalahidy ampahibemaso ity, avy eo mifandraisa amin'ny alalan'ity fanalahidy ity.",
       "copyPublicKey": "Adikao ny fanalahidy ampahibemaso"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Tontolo mitokana ao amin'ny rahona",
+      "connectingTitle": "Manokatra terminal",
+      "connectingMessage": "Mifandray amin'ny shell ao amin'ny tontolo mitokana.",
+      "reconnectingMessage": "Tapaka ny fifandraisana amin'ny terminal. Mbola mandeha ny tontolo mitokana.",
+      "stoppedTitle": "Mijanona ny tontolo mitokana",
+      "stoppedMessage": "Alefaso hafatra ao amin'ny sesiona mba hamoha azy, dia andramo indray.",
+      "exitedMessage": "Tapitra ny shell. Manomboka shell vaovao ny terminal vaovao.",
+      "newTerminal": "Terminal vaovao",
+      "disconnectedTitle": "Tapaka ny fifandraisana amin'ny terminal",
+      "disconnectedMessage": "Nofaranan'ny sesiona ny terminal. Sokafy indray avy ao amin'ny sesiona.",
+      "unavailableTitle": "Tsy misy terminal",
+      "unavailableMessage": "Tsy afaka nanokatra terminal ny tontolo mitokana. Andramo indray avy ao amin'ny sesiona.",
+      "forbiddenMessage": "Tsy mamela terminal interactif ity sesiona ity.",
+      "notFoundMessage": "Tsy misy tontolo mitokana azon'ity kaonty ity sokafana ao amin'ity sesiona ity."
+    },
+    "sandboxes": {
+      "title": "Tontolo mitokana Kilo",
+      "unnamed": "Tontolo mitokana tsy misy anarana",
+      "open": "{{title}}, manokatra terminal ao amin'ny tontolo mitokana misy azy"
+    },
+    "snippets": {
+      "title": "Sombin-baiko",
+      "subtitle": "Baiko azo alefa amin'ny tsindry iray ao amin'ny terminal.",
+      "manage": "Tantano ny sombin-baiko",
+      "emptyTitle": "Mbola tsy misy sombin-baiko",
+      "emptyDescription": "Tehirizo indray mandeha ny baiko iray, dia alefaso avy amin'ny terminal rehetra.",
+      "add": "Ampio sombin-baiko",
+      "newTitle": "Sombin-baiko vaovao",
+      "edit": "Ovay ny sombin-baiko",
+      "name": "Anaran'ny sombin-baiko",
+      "namePlaceholder": "Apetraho ny fampiharana web",
+      "command": "Baiko shell",
+      "commandPlaceholder": "oh. docker compose up -d",
+      "host": "Azo ampiasaina amin'ny",
+      "everyHost": "Ny host rehetra",
+      "appendNewline": "Ampandehano avy hatrany",
+      "appendNewlineHint": "Mandefa andalana vaovao aorian'ny baiko, ka mandeha izy fa tsy mijanona eo amin'ny prompt.",
+      "send": "{{label}}, mandefa ity sombin-baiko ity",
+      "rowActions": "{{label}}, ovay ny sombin-baiko",
+      "moveUp": "Afindro ambony",
+      "moveDown": "Afindro ambany",
+      "deleteMessage": "Esorina amin'ny terminal rehetra nanolotra azy ny baiko voatahiry."
     }
   }
 }

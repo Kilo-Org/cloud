@@ -22,6 +22,7 @@
     "expired": "Àkókò ti kọjá"
   },
   "common": {
+    "deleteTitle": "Parẹ́ {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Fagilé",
@@ -4105,7 +4106,6 @@
       "importConfig": "Gbe wọlé láti inú SSH config",
       "rowActions": "{{label}}, {{target}}. Tẹ̀ ẹ́ láti ṣí olóòtú; tẹ̀ mọ́lẹ̀ pẹ́ fún àtúnṣe àti pípaarẹ́.",
       "viaJump": "nípasẹ̀ {{label}}",
-      "deleteTitle": "Parẹ́ {{label}}?",
       "deleteMessage": "A máa yọ ètò rẹ̀ àti àwọn ìtọ́ka port kúrò pẹ̀lú rẹ̀. A kò lè yí èyí padà.",
       "deleteFailed": "A kò lè parẹ́ sáfà náà."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Àwọn ìgbà iṣẹ́",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Lẹ̀",
+      "hideKeyboard": "Fi kẹ́bọ́ọ̀dù pamọ́",
       "pasteTitle": "Ṣé kí a lẹ̀ ọ̀pọ̀ ìlà?",
       "pasteMultiLine": "Ọ̀rọ̀ yìí gba ọ̀pọ̀ ìlà, a sì fi ránṣẹ́ gẹ́gẹ́ bí àṣẹ kan.",
       "hostKeyTitle": "Kọ́kọ́rọ́ sáfà tí a kò mọ̀",
@@ -4245,6 +4246,51 @@
       "createdTitle": "A ti dá kọ́kọ́rọ́",
       "createdDescription": "Fi kọ́kọ́rọ́ gbogbo ènìyàn yìí kún authorized_keys lórí sáfà náà, lẹ́yìn náà lo kọ́kọ́rọ́ yìí láti sopọ̀ mọ́ sáfà náà.",
       "copyPublicKey": "Ṣe àdàkọ́ kọ́kọ́rọ́"
+    },
+    "sandbox": {
+      "title": "Tẹmínà",
+      "subtitle": "Àpótí ìyàsọ́tọ̀ ojú-ọ̀run",
+      "connectingTitle": "Ń ṣí tẹmínà kan",
+      "connectingMessage": "Ń sopọ̀ mọ́ shell ti àpótí ìyàsọ́tọ̀.",
+      "reconnectingMessage": "Àsopọ̀ tẹmínà ti já. Àpótí ìyàsọ́tọ̀ ṣì ń ṣiṣẹ́.",
+      "stoppedTitle": "Àpótí ìyàsọ́tọ̀ ti dúró",
+      "stoppedMessage": "Rán ìránṣẹ́ nínú ìpàdé láti jí i, lẹ́yìn náà tún gbìyànjú.",
+      "exitedMessage": "Shell ti parí. Tẹmínà tuntun yóò ṣí shell tuntun.",
+      "newTerminal": "Tẹmínà tuntun",
+      "disconnectedTitle": "Tẹmínà ti yà kúrò",
+      "disconnectedMessage": "Ìpàdé ti pa tẹmínà dé. Tún ṣí i láti inú ìpàdé.",
+      "unavailableTitle": "Tẹmínà kò wà",
+      "unavailableMessage": "Àpótí ìyàsọ́tọ̀ kò lè ṣí tẹmínà kan. Tún gbìyànjú láti inú ìpàdé.",
+      "forbiddenMessage": "Ìpàdé yìí kò fàyè gba tẹmínà ìbáraẹnisọ̀rọ̀.",
+      "notFoundMessage": "Ìpàdé yìí kò ní àpótí ìyàsọ́tọ̀ tí àkọsílẹ̀ yìí lè ṣí."
+    },
+    "sandboxes": {
+      "title": "Àwọn àpótí ìyàsọ́tọ̀ Kilo",
+      "unnamed": "Àpótí ìyàsọ́tọ̀ àìlórúkọ",
+      "open": "{{title}}, ṣí tẹmínà kan nínú àpótí ìyàsọ́tọ̀ rẹ̀"
+    },
+    "snippets": {
+      "title": "Àwọn àṣẹ kúkúrú",
+      "subtitle": "Àwọn àṣẹ tí ó wà ní tẹ̀ẹ́ kan nínú tẹmínà.",
+      "manage": "Ṣàkóso àwọn àṣẹ kúkúrú",
+      "emptyTitle": "Kò tíì sí àṣẹ kúkúrú kankan",
+      "emptyDescription": "Fi àṣẹ pamọ́ lẹ́ẹ̀kan, lẹ́yìn náà rán an láti inú tẹmínà èyíkéyìí.",
+      "add": "Fi àṣẹ kúkúrú kún",
+      "newTitle": "Àṣẹ kúkúrú tuntun",
+      "edit": "Ṣàtúnṣe àṣẹ kúkúrú",
+      "name": "Orúkọ àṣẹ kúkúrú",
+      "namePlaceholder": "Gbé áàpù wẹ́ẹ̀bù jáde",
+      "command": "Àṣẹ shell",
+      "commandPlaceholder": "fun apẹẹrẹ docker compose up -d",
+      "host": "Wà lórí",
+      "everyHost": "Gbogbo olùgbàlejò",
+      "appendNewline": "Mú un ṣiṣẹ́ lẹ́sẹ̀kẹsẹ̀",
+      "appendNewlineHint": "Á máa fi ìlà tuntun ránṣẹ́ lẹ́yìn àṣẹ náà, kí ó lè ṣiṣẹ́ dípò kí ó dúró ní àmì ìpè.",
+      "send": "{{label}}, rán àṣẹ kúkúrú yìí",
+      "rowActions": "{{label}}, ṣàtúnṣe àṣẹ kúkúrú",
+      "moveUp": "Gbé sókè",
+      "moveDown": "Gbé sísàlẹ̀",
+      "deleteMessage": "A máa yọ àṣẹ tí a fipamọ́ kúrò láti inú gbogbo tẹmínà tí ó ti ní í."
     }
   }
 }

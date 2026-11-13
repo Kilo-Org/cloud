@@ -22,6 +22,7 @@
     "expired": "Útrunnið"
   },
   "common": {
+    "deleteTitle": "Eyða {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Hætta við",
@@ -4105,7 +4106,6 @@
       "importConfig": "Flytja inn úr SSH-stillingu",
       "rowActions": "{{label}}, {{target}}. Opnar ritilinn; haltu inni til að breyta og eyða.",
       "viaJump": "í gegnum {{label}}",
-      "deleteTitle": "Eyða {{label}}?",
       "deleteMessage": "Stilling hans og gáttarflutningar eru fjarlægðir með honum. Þetta er ekki hægt að afturkalla.",
       "deleteFailed": "Ekki tókst að eyða netþjóninum."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Lotur",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Líma",
+      "hideKeyboard": "Fela lyklaborð",
       "pasteTitle": "Líma nokkrar línur?",
       "pasteMultiLine": "Þessi texti spannar nokkrar línur og er sendur sem ein skipun.",
       "hostKeyTitle": "Óþekktur netþjónslykill",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Lykill búinn til",
       "createdDescription": "Bættu þessum opinbera lykli við authorized_keys á netþjóninum og tengdu þig síðan með þessum lykli.",
       "copyPublicKey": "Afrita lykil"
+    },
+    "sandbox": {
+      "title": "Skjáhermir",
+      "subtitle": "Skýjasandkassi",
+      "connectingTitle": "Opnar skjáhermi",
+      "connectingMessage": "Tengist skel sandkassans.",
+      "reconnectingMessage": "Tengingin við skjáherminn rofnaði. Sandkassinn keyrir áfram.",
+      "stoppedTitle": "Sandkassinn er stöðvaður",
+      "stoppedMessage": "Sendu skilaboð í lotunni til að vekja hann og reyndu svo aftur.",
+      "exitedMessage": "Skelin endaði. Nýr skjáhermir byrjar nýja skel.",
+      "newTerminal": "Nýr skjáhermir",
+      "disconnectedTitle": "Skjáhermirinn aftengdist",
+      "disconnectedMessage": "Lotan lokaði skjáherminum. Opnaðu hann aftur frá lotunni.",
+      "unavailableTitle": "Skjáhermir ekki tiltækur",
+      "unavailableMessage": "Sandkassinn gat ekki opnað skjáhermi. Reyndu aftur frá lotunni.",
+      "forbiddenMessage": "Þessi lota leyfir ekki gagnvirkan skjáhermi.",
+      "notFoundMessage": "Þessi lota hefur engan sandkassa sem þessi reikningur getur opnað."
+    },
+    "sandboxes": {
+      "title": "Kilo-sandkassar",
+      "unnamed": "Ónefndur sandkassi",
+      "open": "{{title}}, opnar skjáhermi í sandkassa sínum"
+    },
+    "snippets": {
+      "title": "Brot",
+      "subtitle": "Skipanir í einni snertingu í skjáhermi.",
+      "manage": "Sýsla með brotum",
+      "emptyTitle": "Engin brot ennþá",
+      "emptyDescription": "Vistaðu skipun einu sinni og sendu hana svo frá hvaða skjáhermi sem er.",
+      "add": "Bæta við broti",
+      "newTitle": "Nýtt brot",
+      "edit": "Breyta broti",
+      "name": "Heiti brots",
+      "namePlaceholder": "Setja vefapp í notkun",
+      "command": "Skeljarskipun",
+      "commandPlaceholder": "t.d. docker compose up -d",
+      "host": "Tiltækt á",
+      "everyHost": "Allir netþjónar",
+      "appendNewline": "Keyra strax",
+      "appendNewlineHint": "Sendir línuskil á eftir skipuninni, svo hún keyri í stað þess að bíða við skipanakvaðninguna.",
+      "send": "{{label}}, sendir þetta brot",
+      "rowActions": "{{label}}, breyta broti",
+      "moveUp": "Færa upp",
+      "moveDown": "Færa niður",
+      "deleteMessage": "Vistaða skipunin er fjarlægð úr hverjum skjáhermi sem bauð hana."
     }
   }
 }

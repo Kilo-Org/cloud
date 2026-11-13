@@ -22,6 +22,7 @@
     "expired": "Müddəti bitib"
   },
   "common": {
+    "deleteTitle": "{{label}} silinsin?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Ləğv et",
@@ -4105,7 +4106,6 @@
       "importConfig": "SSH konfiqurasiyasından idxal et",
       "rowActions": "{{label}}, {{target}}. Terminal açır; redaktə və silmək üçün uzun basın.",
       "viaJump": "{{label}} vasitəsilə",
-      "deleteTitle": "{{label}} silinsin?",
       "deleteMessage": "Onunla birlikdə parametrləri və port yönləndirmələri də silinir. Bu geri qaytarıla bilməz.",
       "deleteFailed": "Host silinə bilmədi."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Sessiyalar",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Yapışdır",
+      "hideKeyboard": "Klaviaturanı gizlət",
       "pasteTitle": "Bir neçə sətir yapışdırılsın?",
       "pasteMultiLine": "Bu mətn bir neçə sətirə yayılır və bir əmr kimi göndərilir.",
       "hostKeyTitle": "Naməlum host açarı",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Açar yaradıldı",
       "createdDescription": "Bu açıq açarı serverin authorized_keys faylına əlavə edin, sonra bu açarla qoşulun.",
       "copyPublicKey": "Açarı kopyala"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Bulud təcrid mühiti",
+      "connectingTitle": "Terminal açılır",
+      "connectingMessage": "Təcrid mühitinin shell-inə qoşulur.",
+      "reconnectingMessage": "Terminal bağlantısı kəsildi. Təcrid mühiti işləməyə davam edir.",
+      "stoppedTitle": "Təcrid mühiti dayandırılıb",
+      "stoppedMessage": "Onu oyatmaq üçün sessiyada mesaj göndərin, sonra yenidən cəhd edin.",
+      "exitedMessage": "Shell bitdi. Yeni terminal təzə bir shell başladır.",
+      "newTerminal": "Yeni terminal",
+      "disconnectedTitle": "Terminal əlaqəsi kəsildi",
+      "disconnectedMessage": "Sessiya terminalı bağladı. Onu sessiyadan yenidən açın.",
+      "unavailableTitle": "Terminal əlçatan deyil",
+      "unavailableMessage": "Təcrid mühiti terminal aça bilmədi. Sessiyadan yenidən cəhd edin.",
+      "forbiddenMessage": "Bu sessiya interaktiv terminala icazə vermir.",
+      "notFoundMessage": "Bu sessiyada bu hesabın aça biləcəyi təcrid mühiti yoxdur."
+    },
+    "sandboxes": {
+      "title": "Kilo təcrid mühitləri",
+      "unnamed": "Adsız təcrid mühiti",
+      "open": "{{title}}, öz təcrid mühitində terminal açır"
+    },
+    "snippets": {
+      "title": "Fraqmentlər",
+      "subtitle": "Terminalda bir toxunuşla əlçatan əmrlər.",
+      "manage": "Fraqmentləri idarə et",
+      "emptyTitle": "Hələ fraqment yoxdur",
+      "emptyDescription": "Bir əmri bir dəfə yadda saxlayın, sonra istənilən terminaldan göndərin.",
+      "add": "Fraqment əlavə et",
+      "newTitle": "Yeni fraqment",
+      "edit": "Fraqmenti redaktə et",
+      "name": "Fraqment adı",
+      "namePlaceholder": "Veb tətbiqini yerləşdir",
+      "command": "Shell əmri",
+      "commandPlaceholder": "məs. docker compose up -d",
+      "host": "Əlçatan olduğu host",
+      "everyHost": "Bütün hostlar",
+      "appendNewline": "Dərhal işə sal",
+      "appendNewlineHint": "Əmrdən sonra yeni sətir göndərir, beləliklə əmr prompt-da dayanmaq əvəzinə işləyir.",
+      "send": "{{label}}, bu fraqmenti göndərir",
+      "rowActions": "{{label}}, fraqmenti redaktə et",
+      "moveUp": "Yuxarı köçür",
+      "moveDown": "Aşağı köçür",
+      "deleteMessage": "Yadda saxlanılan əmr onu təklif edən hər terminaldan silinir."
     }
   }
 }

@@ -22,6 +22,7 @@
     "expired": "Verval"
   },
   "common": {
+    "deleteTitle": "Skrap {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Kanselleer",
@@ -4105,7 +4106,6 @@
       "importConfig": "Voer in vanaf SSH-konfigurasie",
       "rowActions": "{{label}}, {{target}}. Maak 'n terminaal oop; druk lank om te wysig en te verwyder.",
       "viaJump": "via {{label}}",
-      "deleteTitle": "Skrap {{label}}?",
       "deleteMessage": "Sy instellings en poortaansture word saam verwyder. Dit kan nie ongedaan gemaak word nie.",
       "deleteFailed": "Die gasheer kon nie geskrap word nie."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Sessies",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Plak",
+      "hideKeyboard": "Versteek sleutelbord",
       "pasteTitle": "Plak verskeie reëls?",
       "pasteMultiLine": "Hierdie teks strek oor verskeie reëls en word as een opdrag gestuur.",
       "hostKeyTitle": "Onbekende gasheersleutel",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Sleutel geskep",
       "createdDescription": "Voeg hierdie publieke sleutel by die bediener se authorized_keys, en verbind dan met hierdie sleutel.",
       "copyPublicKey": "Kopieer sleutel"
+    },
+    "sandbox": {
+      "title": "Terminaal",
+      "subtitle": "Wolk-sandkassie",
+      "connectingTitle": "Terminaal word oopgemaak",
+      "connectingMessage": "Koppel aan die sandkassie se dop.",
+      "reconnectingMessage": "Die terminaalverbinding het weggeval. Die sandkassie bly aan die gang.",
+      "stoppedTitle": "Die sandkassie is gestop",
+      "stoppedMessage": "Stuur 'n boodskap in die sessie om dit wakker te maak en probeer dan weer.",
+      "exitedMessage": "Die dop het geëindig. 'n Nuwe terminaal begin 'n nuwe dop.",
+      "newTerminal": "Nuwe terminaal",
+      "disconnectedTitle": "Die terminaal het ontkoppel",
+      "disconnectedMessage": "Die sessie het die terminaal gesluit. Maak dit weer vanuit die sessie oop.",
+      "unavailableTitle": "Terminaal nie beskikbaar nie",
+      "unavailableMessage": "Die sandkassie kon nie 'n terminaal oopmaak nie. Probeer weer vanuit die sessie.",
+      "forbiddenMessage": "Hierdie sessie laat nie 'n interaktiewe terminaal toe nie.",
+      "notFoundMessage": "Hierdie sessie het geen sandkassie wat hierdie rekening kan oopmaak nie."
+    },
+    "sandboxes": {
+      "title": "Kilo-sandkassies",
+      "unnamed": "Naamloos sandkassie",
+      "open": "{{title}}, maak 'n terminaal in sy sandkassie oop"
+    },
+    "snippets": {
+      "title": "Brokkies",
+      "subtitle": "Opdragte is net een tik weg in 'n terminaal.",
+      "manage": "Bestuur brokkies",
+      "emptyTitle": "Nog geen brokkies nie",
+      "emptyDescription": "Stoor 'n opdrag een keer en stuur dit dan vanuit enige terminaal.",
+      "add": "Voeg brokkie by",
+      "newTitle": "Nuwe brokkie",
+      "edit": "Wysig brokkie",
+      "name": "Brokkienaam",
+      "namePlaceholder": "Ontplooi die webapp",
+      "command": "Dopopdrag",
+      "commandPlaceholder": "bv. docker compose up -d",
+      "host": "Beskikbaar op",
+      "everyHost": "Elke gasheer",
+      "appendNewline": "Voer dit dadelik uit",
+      "appendNewlineHint": "Stuur 'n nuwe reël ná die opdrag, sodat dit uitgevoer word in plaas daarvan om by die opdragteken te sit.",
+      "send": "{{label}}, stuur hierdie brokkie",
+      "rowActions": "{{label}}, wysig brokkie",
+      "moveUp": "Skuif op",
+      "moveDown": "Skuif af",
+      "deleteMessage": "Die gestoorde opdrag word van elke terminaal verwyder wat dit aangebied het."
     }
   }
 }

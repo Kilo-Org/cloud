@@ -22,6 +22,7 @@
     "expired": "Termiņš beidzies"
   },
   "common": {
+    "deleteTitle": "Dzēst {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Atcelt",
@@ -4170,7 +4171,6 @@
       "importConfig": "Importēt no SSH konfigurācijas",
       "rowActions": "{{label}}, {{target}}. Atver termināli; ilgi nospiediet, lai rediģētu vai dzēstu.",
       "viaJump": "caur {{label}}",
-      "deleteTitle": "Dzēst {{label}}?",
       "deleteMessage": "Līdz ar to tiek noņemti tā iestatījumi un portu pāradresācijas. To nevar atsaukt.",
       "deleteFailed": "Resursdatoru nevarēja dzēst."
     },
@@ -4249,6 +4249,7 @@
       "switcherTitle": "Sesijas",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Ielīmēt",
+      "hideKeyboard": "Paslēpt tastatūru",
       "pasteTitle": "Ielīmēt vairākas rindas?",
       "pasteMultiLine": "Šis teksts aizņem vairākas rindas un tiek nosūtīts kā viena komanda.",
       "hostKeyTitle": "Nezināma resursdatora atslēga",
@@ -4310,6 +4311,51 @@
       "createdTitle": "Atslēga izveidota",
       "createdDescription": "Pievienojiet šo publisko atslēgu servera authorized_keys failam un pēc tam izveidojiet savienojumu ar šo atslēgu.",
       "copyPublicKey": "Kopēt atslēgu"
+    },
+    "sandbox": {
+      "title": "Terminālis",
+      "subtitle": "Mākoņa smilškaste",
+      "connectingTitle": "Atveram termināli",
+      "connectingMessage": "Pieslēdzamies smilškastes čaulai.",
+      "reconnectingMessage": "Termināļa savienojums pārtrūka. Smilškaste turpina darboties.",
+      "stoppedTitle": "Smilškaste ir apturēta",
+      "stoppedMessage": "Nosūtiet ziņojumu sesijā, lai to pamodinātu, pēc tam mēģiniet vēlreiz.",
+      "exitedMessage": "Čaula beidzās. Jauns terminālis atver jaunu čaulu.",
+      "newTerminal": "Jauns terminālis",
+      "disconnectedTitle": "Terminālis atvienojās",
+      "disconnectedMessage": "Sesija aizvēra termināli. Atveriet to vēlreiz no sesijas.",
+      "unavailableTitle": "Terminālis nav pieejams",
+      "unavailableMessage": "Smilškaste nevarēja atvērt termināli. Mēģiniet vēlreiz no sesijas.",
+      "forbiddenMessage": "Šī sesija nepieļauj interaktīvu termināli.",
+      "notFoundMessage": "Šai sesijai nav smilškastes, ko šis konts varētu atvērt."
+    },
+    "sandboxes": {
+      "title": "Kilo smilškastes",
+      "unnamed": "Nenosaukta smilškaste",
+      "open": "{{title}}, atver termināli tā smilškastē"
+    },
+    "snippets": {
+      "title": "Fragmenti",
+      "subtitle": "Komandas vienā pieskārienā terminālī.",
+      "manage": "Pārvaldīt fragmentus",
+      "emptyTitle": "Vēl nav fragmentu",
+      "emptyDescription": "Saglabājiet komandu vienreiz, pēc tam nosūtiet to no jebkura termināļa.",
+      "add": "Pievienot fragmentu",
+      "newTitle": "Jauns fragments",
+      "edit": "Rediģēt fragmentu",
+      "name": "Fragmenta nosaukums",
+      "namePlaceholder": "Izvietot tīmekļa lietotni",
+      "command": "Čaulas komanda",
+      "commandPlaceholder": "piem. docker compose up -d",
+      "host": "Pieejams",
+      "everyHost": "Katrs resursdators",
+      "appendNewline": "Palaist uzreiz",
+      "appendNewlineHint": "Pēc komandas nosūta jaunas rindas rakstzīmi, tāpēc tā tiek izpildīta, nevis gaida uzvednē.",
+      "send": "{{label}}, nosūta šo fragmentu",
+      "rowActions": "{{label}}, rediģēt fragmentu",
+      "moveUp": "Pārvietot uz augšu",
+      "moveDown": "Pārvietot uz leju",
+      "deleteMessage": "Saglabātā komanda tiek noņemta no visiem termināļiem, kuros tā bija pieejama."
     }
   }
 }

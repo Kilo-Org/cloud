@@ -22,6 +22,7 @@
     "expired": "Caducada"
   },
   "common": {
+    "deleteTitle": "Vols eliminar {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancel·la",
@@ -4170,7 +4171,6 @@
       "importConfig": "Importa de la configuració SSH",
       "rowActions": "{{label}}, {{target}}. Obre un terminal; mantén premut per editar i eliminar.",
       "viaJump": "via {{label}}",
-      "deleteTitle": "Vols eliminar {{label}}?",
       "deleteMessage": "Se n'eliminen la configuració i els reenviaments de port. Això no es pot desfer.",
       "deleteFailed": "No s'ha pogut eliminar l'amfitrió."
     },
@@ -4249,6 +4249,7 @@
       "switcherTitle": "Sessions",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Enganxa",
+      "hideKeyboard": "Amaga el teclat",
       "pasteTitle": "Vols enganxar diverses línies?",
       "pasteMultiLine": "Aquest text ocupa diverses línies i s'envia com una sola ordre.",
       "hostKeyTitle": "Clau d'amfitrió desconeguda",
@@ -4310,6 +4311,51 @@
       "createdTitle": "Clau creada",
       "createdDescription": "Afegeix aquesta clau pública a l'authorized_keys del servidor i, després, connecta't amb aquesta clau.",
       "copyPublicKey": "Copia la clau"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Entorn aïllat al núvol",
+      "connectingTitle": "S'està obrint un terminal",
+      "connectingMessage": "S'està connectant al shell de l'entorn aïllat.",
+      "reconnectingMessage": "La connexió del terminal s'ha perdut. L'entorn aïllat continua en marxa.",
+      "stoppedTitle": "L'entorn aïllat està aturat",
+      "stoppedMessage": "Envia un missatge a la sessió per despertar-lo i torna-ho a provar.",
+      "exitedMessage": "El shell ha finalitzat. Un terminal nou n'inicia un de nou.",
+      "newTerminal": "Terminal nou",
+      "disconnectedTitle": "El terminal s'ha desconnectat",
+      "disconnectedMessage": "La sessió ha tancat el terminal. Torna-lo a obrir des de la sessió.",
+      "unavailableTitle": "Terminal no disponible",
+      "unavailableMessage": "L'entorn aïllat no ha pogut obrir un terminal. Torna-ho a provar des de la sessió.",
+      "forbiddenMessage": "Aquesta sessió no permet un terminal interactiu.",
+      "notFoundMessage": "Aquesta sessió no té cap entorn aïllat que aquest compte pugui obrir."
+    },
+    "sandboxes": {
+      "title": "Entorns aïllats de Kilo",
+      "unnamed": "Entorn aïllat sense títol",
+      "open": "{{title}}, obre un terminal al seu entorn aïllat"
+    },
+    "snippets": {
+      "title": "Fragments",
+      "subtitle": "Comandes a un sol toc en un terminal.",
+      "manage": "Gestiona els fragments",
+      "emptyTitle": "Encara no hi ha cap fragment",
+      "emptyDescription": "Desa una comanda una vegada i envia-la des de qualsevol terminal.",
+      "add": "Afegeix fragment",
+      "newTitle": "Fragment nou",
+      "edit": "Edita el fragment",
+      "name": "Nom del fragment",
+      "namePlaceholder": "Desplega l'app web",
+      "command": "Comanda de shell",
+      "commandPlaceholder": "p. ex. docker compose up -d",
+      "host": "Disponible a",
+      "everyHost": "Tots els amfitrions",
+      "appendNewline": "Executa-la de seguida",
+      "appendNewlineHint": "Envia un salt de línia després de la comanda, de manera que s'executa en lloc de quedar-se al prompt.",
+      "send": "{{label}}, envia aquest fragment",
+      "rowActions": "{{label}}, edita el fragment",
+      "moveUp": "Mou cap amunt",
+      "moveDown": "Mou cap avall",
+      "deleteMessage": "La comanda desada s'elimina de tots els terminals que l'oferien."
     }
   }
 }

@@ -22,6 +22,7 @@
     "expired": "Galiojimas baigėsi"
   },
   "common": {
+    "deleteTitle": "Ištrinti {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Atšaukti",
@@ -4235,7 +4236,6 @@
       "importConfig": "Importuoti iš SSH konfigūracijos",
       "rowActions": "{{label}}, {{target}}. Palietus atidaromas terminalas; ilgai palaikius galima redaguoti arba ištrinti.",
       "viaJump": "per {{label}}",
-      "deleteTitle": "Ištrinti {{label}}?",
       "deleteMessage": "Kartu bus pašalinti jo nustatymai ir prievadų peradresavimai. Šio veiksmo atšaukti negalima.",
       "deleteFailed": "Nepavyko ištrinti hosto."
     },
@@ -4314,6 +4314,7 @@
       "switcherTitle": "Sesijos",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Įklijuoti",
+      "hideKeyboard": "Slėpti klaviatūrą",
       "pasteTitle": "Įklijuoti kelias eilutes?",
       "pasteMultiLine": "Šis tekstas apima kelias eilutes ir bus išsiųstas kaip viena komanda.",
       "hostKeyTitle": "Nežinomas hosto raktas",
@@ -4375,6 +4376,51 @@
       "createdTitle": "Raktas sukurtas",
       "createdDescription": "Pridėkite šį viešąjį raktą prie serverio authorized_keys, tada prisijunkite su šiuo raktu.",
       "copyPublicKey": "Kopijuoti raktą"
+    },
+    "sandbox": {
+      "title": "Terminalas",
+      "subtitle": "Debesijos smėliadėžė",
+      "connectingTitle": "Atidaromas terminalas",
+      "connectingMessage": "Jungiamasi prie smėliadėžės apvalkalo.",
+      "reconnectingMessage": "Terminalo ryšys nutrūko. Smėliadėžė veikia toliau.",
+      "stoppedTitle": "Smėliadėžė sustabdyta",
+      "stoppedMessage": "Siųskite žinutę sesijoje, kad ją pažadintumėte, tada bandykite dar kartą.",
+      "exitedMessage": "Apvalkalas baigėsi. Naujas terminalas paleidžia naują apvalkalą.",
+      "newTerminal": "Naujas terminalas",
+      "disconnectedTitle": "Terminalas atsijungė",
+      "disconnectedMessage": "Sesija uždarė terminalą. Atidarykite jį iš naujo sesijoje.",
+      "unavailableTitle": "Terminalas nepasiekiamas",
+      "unavailableMessage": "Smėliadėžė negalėjo atidaryti terminalo. Bandykite dar kartą sesijoje.",
+      "forbiddenMessage": "Ši sesija neleidžia interaktyvaus terminalo.",
+      "notFoundMessage": "Šioje sesijoje nėra smėliadėžės, kurią ši paskyra galėtų atidaryti."
+    },
+    "sandboxes": {
+      "title": "Kilo smėliadėžės",
+      "unnamed": "Bevardė smėliadėžė",
+      "open": "{{title}}, atidaro terminalą savo smėliadėžėje"
+    },
+    "snippets": {
+      "title": "Fragmentai",
+      "subtitle": "Komandos vienu palietimu terminale.",
+      "manage": "Tvarkyti fragmentus",
+      "emptyTitle": "Kol kas nėra fragmentų",
+      "emptyDescription": "Išsaugokite komandą vieną kartą, tada siųskite ją iš bet kurio terminalo.",
+      "add": "Pridėti fragmentą",
+      "newTitle": "Naujas fragmentas",
+      "edit": "Redaguoti fragmentą",
+      "name": "Fragmento pavadinimas",
+      "namePlaceholder": "Įdiegti žiniatinklio programėlę",
+      "command": "Apvalkalo komanda",
+      "commandPlaceholder": "pvz. docker compose up -d",
+      "host": "Pasiekiama",
+      "everyHost": "Visi hostai",
+      "appendNewline": "Paleisti iš karto",
+      "appendNewlineHint": "Po komandos išsiunčiama nauja eilutė, todėl komanda įvykdoma, o ne lieka stovėti komandinėje eilutėje.",
+      "send": "{{label}}, išsiunčia šį fragmentą",
+      "rowActions": "{{label}}, redaguoti fragmentą",
+      "moveUp": "Perkelti aukščiau",
+      "moveDown": "Perkelti žemiau",
+      "deleteMessage": "Išsaugota komanda pašalinama iš kiekvieno terminalo, kuriame ji buvo pasiūlyta."
     }
   }
 }

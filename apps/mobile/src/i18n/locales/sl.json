@@ -22,6 +22,7 @@
     "expired": "Poteklo"
   },
   "common": {
+    "deleteTitle": "Izbrisati {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Prekliči",
@@ -4235,7 +4236,6 @@
       "importConfig": "Uvozi iz konfiguracije SSH",
       "rowActions": "{{label}}, {{target}}. Odpre terminal; dolg pritisk ponudi urejanje in brisanje.",
       "viaJump": "prek {{label}}",
-      "deleteTitle": "Izbrisati {{label}}?",
       "deleteMessage": "Z njim se odstranijo tudi njegove nastavitve in preusmeritve vrat. Tega ni mogoče razveljaviti.",
       "deleteFailed": "Gostitelja ni bilo mogoče izbrisati."
     },
@@ -4314,6 +4314,7 @@
       "switcherTitle": "Seje",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Prilepi",
+      "hideKeyboard": "Skrij tipkovnico",
       "pasteTitle": "Prilepiti več vrstic?",
       "pasteMultiLine": "To besedilo obsega več vrstic in se pošlje kot en ukaz.",
       "hostKeyTitle": "Neznan ključ gostitelja",
@@ -4375,6 +4376,51 @@
       "createdTitle": "Ključ je ustvarjen",
       "createdDescription": "Dodaj ta javni ključ v datoteko authorized_keys na strežniku in se nato poveži s tem ključem.",
       "copyPublicKey": "Kopiraj ključ"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Oblačni peskovnik",
+      "connectingTitle": "Odpiranje terminala",
+      "connectingMessage": "Povezovanje z lupino peskovnika.",
+      "reconnectingMessage": "Povezava terminala je prekinjena. Peskovnik še naprej deluje.",
+      "stoppedTitle": "Peskovnik je ustavljen",
+      "stoppedMessage": "Pošljite sporočilo v seji, da ga prebudite, nato poskusite znova.",
+      "exitedMessage": "Lupina se je končala. Nov terminal zažene novo lupino.",
+      "newTerminal": "Nov terminal",
+      "disconnectedTitle": "Terminal se je odklopil",
+      "disconnectedMessage": "Seja je zaprla terminal. Odprite ga znova iz seje.",
+      "unavailableTitle": "Terminal ni na voljo",
+      "unavailableMessage": "Peskovnik ni mogel odpreti terminala. Poskusite znova iz seje.",
+      "forbiddenMessage": "Ta seja ne dovoljuje interaktivnega terminala.",
+      "notFoundMessage": "Ta seja nima peskovnika, ki bi ga ta račun lahko odprl."
+    },
+    "sandboxes": {
+      "title": "Kilo peskovniki",
+      "unnamed": "Neimenovan peskovnik",
+      "open": "{{title}}, odpre terminal v svojem peskovniku"
+    },
+    "snippets": {
+      "title": "Odrezki",
+      "subtitle": "Ukazi na en dotik v terminalu.",
+      "manage": "Upravljaj odrezke",
+      "emptyTitle": "Ni še nobenega odrezka",
+      "emptyDescription": "Shranite ukaz enkrat, nato pa ga pošljite iz katerega koli terminala.",
+      "add": "Dodaj odrezek",
+      "newTitle": "Nov odrezek",
+      "edit": "Uredi odrezek",
+      "name": "Ime odrezka",
+      "namePlaceholder": "Objavi spletno aplikacijo",
+      "command": "Ukaz lupine",
+      "commandPlaceholder": "npr. docker compose up -d",
+      "host": "Na voljo na",
+      "everyHost": "Vsi gostitelji",
+      "appendNewline": "Zaženi takoj",
+      "appendNewlineHint": "Po ukazu pošlje prelom vrstice, zato se ukaz zažene, namesto da bi ostal na pozivu.",
+      "send": "{{label}}, pošlje ta odrezek",
+      "rowActions": "{{label}}, uredi odrezek",
+      "moveUp": "Premakni navzgor",
+      "moveDown": "Premakni navzdol",
+      "deleteMessage": "Shranjeni ukaz se odstrani iz vsakega terminala, ki ga je ponujal."
     }
   }
 }

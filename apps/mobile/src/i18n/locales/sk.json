@@ -22,6 +22,7 @@
     "expired": "Platnosť vypršala"
   },
   "common": {
+    "deleteTitle": "Odstrániť {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Zrušiť",
@@ -4235,7 +4236,6 @@
       "importConfig": "Importovať z konfigurácie SSH",
       "rowActions": "{{label}}, {{target}}. Otvorí terminál; dlhým stlačením upravíte alebo odstránite.",
       "viaJump": "cez {{label}}",
-      "deleteTitle": "Odstrániť {{label}}?",
       "deleteMessage": "Jeho nastavenie a presmerovania portov sa odstránia spolu s ním. Toto sa nedá vrátiť.",
       "deleteFailed": "Hostiteľa sa nepodarilo odstrániť."
     },
@@ -4314,6 +4314,7 @@
       "switcherTitle": "Relácie",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Vložiť",
+      "hideKeyboard": "Skryť klávesnicu",
       "pasteTitle": "Vložiť niekoľko riadkov?",
       "pasteMultiLine": "Tento text obsahuje niekoľko riadkov a odošle sa ako jeden príkaz.",
       "hostKeyTitle": "Neznámy kľúč hostiteľa",
@@ -4375,6 +4376,51 @@
       "createdTitle": "Kľúč bol vytvorený",
       "createdDescription": "Pridajte tento verejný kľúč do authorized_keys servera a potom sa pripojte pomocou tohto kľúča.",
       "copyPublicKey": "Kopírovať kľúč"
+    },
+    "sandbox": {
+      "title": "Terminál",
+      "subtitle": "Cloudové pieskovisko",
+      "connectingTitle": "Otvára sa terminál",
+      "connectingMessage": "Pripája sa k shellu pieskoviska.",
+      "reconnectingMessage": "Pripojenie terminála sa prerušilo. Pieskovisko ďalej beží.",
+      "stoppedTitle": "Pieskovisko je zastavené",
+      "stoppedMessage": "Pošlite správu v relácii, aby sa prebudilo, a potom to skúste znova.",
+      "exitedMessage": "Shell skončil. Nový terminál spustí nový shell.",
+      "newTerminal": "Nový terminál",
+      "disconnectedTitle": "Terminál sa odpojil",
+      "disconnectedMessage": "Relácia zavrela terminál. Otvorte ho znova z relácie.",
+      "unavailableTitle": "Terminál nie je dostupný",
+      "unavailableMessage": "Pieskovisku sa nepodarilo otvoriť terminál. Skúste to znova z relácie.",
+      "forbiddenMessage": "Táto relácia neumožňuje interaktívny terminál.",
+      "notFoundMessage": "Táto relácia nemá pieskovisko, ktoré by tento účet mohol otvoriť."
+    },
+    "sandboxes": {
+      "title": "Pieskoviská Kilo",
+      "unnamed": "Pieskovisko bez názvu",
+      "open": "{{title}}, otvorí terminál v jeho pieskovisku"
+    },
+    "snippets": {
+      "title": "Úryvky",
+      "subtitle": "Príkazy na jedno klepnutie v termináli.",
+      "manage": "Spravovať úryvky",
+      "emptyTitle": "Zatiaľ žiadne úryvky",
+      "emptyDescription": "Uložte príkaz raz a potom ho odošlite z ľubovoľného terminála.",
+      "add": "Pridať úryvok",
+      "newTitle": "Nový úryvok",
+      "edit": "Upraviť úryvok",
+      "name": "Názov úryvku",
+      "namePlaceholder": "Nasaďte webovú aplikáciu",
+      "command": "Príkaz shellu",
+      "commandPlaceholder": "napr. docker compose up -d",
+      "host": "Dostupné na",
+      "everyHost": "Každý hostiteľ",
+      "appendNewline": "Spustiť hneď",
+      "appendNewlineHint": "Odošle za príkaz nový riadok, takže sa spustí namiesto toho, aby čakal na výzve.",
+      "send": "{{label}}, odošle tento úryvok",
+      "rowActions": "{{label}}, upraviť úryvok",
+      "moveUp": "Presunúť nahor",
+      "moveDown": "Presunúť nadol",
+      "deleteMessage": "Uložený príkaz sa odstráni z každého terminála, ktorý ho ponúkal."
     }
   }
 }

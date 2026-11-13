@@ -22,6 +22,7 @@
     "expired": "Skada"
   },
   "common": {
+    "deleteTitle": "Ħassar {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Ikkanċella",
@@ -4300,7 +4301,6 @@
       "importConfig": "Importa mill-konfigurazzjoni SSH",
       "rowActions": "{{label}}, {{target}}. Agħfas biex tiftaħ terminal; ippremi fit-tul għall-editjar u t-tħassir.",
       "viaJump": "permezz ta' {{label}}",
-      "deleteTitle": "Ħassar {{label}}?",
       "deleteMessage": "L-issettjar u l-port forwards tiegħu jitneħħew miegħu. Dan ma jistax jiġi annullat.",
       "deleteFailed": "Il-host ma setax jiġi mħassar."
     },
@@ -4379,6 +4379,7 @@
       "switcherTitle": "Sessjonijiet",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Ippejstja",
+      "hideKeyboard": "Aħbi t-tastiera",
       "pasteTitle": "Ippejstja diversi linji?",
       "pasteMultiLine": "Dan it-test jinfirex fuq diversi linji u jintbagħat bħala kmand wieħed.",
       "hostKeyTitle": "Ċavetta tal-host mhux magħrufa",
@@ -4440,6 +4441,51 @@
       "createdTitle": "Ċavetta ġiet iġġenerata",
       "createdDescription": "Żid din iċ-ċavetta pubblika mal-authorized_keys tas-server, imbagħad ikkonnettja b'din iċ-ċavetta.",
       "copyPublicKey": "Ikkopja ċ-ċavetta"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Ambjent iżolat fis-sħaba",
+      "connectingTitle": "Qed jinfetaħ terminal",
+      "connectingMessage": "Qed jikkonnettja mal-shell tal-ambjent iżolat.",
+      "reconnectingMessage": "Il-konnessjoni tat-terminal inqatgħet. L-ambjent iżolat jibqa' jaħdem.",
+      "stoppedTitle": "L-ambjent iżolat huwa mwaqqaf",
+      "stoppedMessage": "Ibgħat messaġġ fis-sessjoni biex tqajjem l-ambjent iżolat, imbagħad erġa' pprova.",
+      "exitedMessage": "Is-shell spiċċa. Terminal ġdid jibda shell ġdid.",
+      "newTerminal": "Terminal ġdid",
+      "disconnectedTitle": "It-terminal skonnetta",
+      "disconnectedMessage": "Is-sessjoni għalqet it-terminal. Iftaħh mill-ġdid mis-sessjoni.",
+      "unavailableTitle": "It-terminal mhux disponibbli",
+      "unavailableMessage": "L-ambjent iżolat ma setax jiftaħ terminal. Erġa' pprova mis-sessjoni.",
+      "forbiddenMessage": "Din is-sessjoni ma tippermettix terminal interattiv.",
+      "notFoundMessage": "Din is-sessjoni m'għandhiex ambjent iżolat li dan il-kont jista' jiftaħ."
+    },
+    "sandboxes": {
+      "title": "L-ambjenti iżolati ta' Kilo",
+      "unnamed": "Ambjent iżolat mingħajr titlu",
+      "open": "{{title}}, jiftaħ terminal fl-ambjent iżolat tiegħu"
+    },
+    "snippets": {
+      "title": "Siltiet",
+      "subtitle": "Komandi b'tap wieħed fit-terminal.",
+      "manage": "Immaniġġja s-siltiet",
+      "emptyTitle": "Għad m'hemmx siltiet",
+      "emptyDescription": "Issejvja kmand darba, imbagħad ibgħatu minn kwalunkwe terminal.",
+      "add": "Żid silta",
+      "newTitle": "Silta ġdida",
+      "edit": "Editja s-silta",
+      "name": "Isem is-silta",
+      "namePlaceholder": "Iddeploja l-web app",
+      "command": "Kmand tas-shell",
+      "commandPlaceholder": "eż. docker compose up -d",
+      "host": "Disponibbli fuq",
+      "everyHost": "Kull host",
+      "appendNewline": "Ħaddmu mill-ewwel",
+      "appendNewlineHint": "Jibgħat newline wara l-kmand, biex dan jiġi eżegwit minflok ma jibqa' jistenna fil-prompt.",
+      "send": "{{label}}, jibgħat din is-silta",
+      "rowActions": "{{label}}, editja s-silta",
+      "moveUp": "Ċaqlaq 'il fuq",
+      "moveDown": "Ċaqlaq 'l isfel",
+      "deleteMessage": "Il-kmand maħżun jitneħħa minn kull terminal li kien joffrih."
     }
   }
 }

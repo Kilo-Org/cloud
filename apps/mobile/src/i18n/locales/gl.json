@@ -22,6 +22,7 @@
     "expired": "Caducado"
   },
   "common": {
+    "deleteTitle": "Eliminar {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancelar",
@@ -4105,7 +4106,6 @@
       "importConfig": "Importar da configuración SSH",
       "rowActions": "{{label}}, {{target}}. Abre un terminal; mantén premido para editar e eliminar.",
       "viaJump": "vía {{label}}",
-      "deleteTitle": "Eliminar {{label}}?",
       "deleteMessage": "A súa configuración e os reenvíos de portos elimínanse con el. Isto non se pode desfacer.",
       "deleteFailed": "Non se puido eliminar o host."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Sesións",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Pegar",
+      "hideKeyboard": "Ocultar teclado",
       "pasteTitle": "Pegar varias liñas?",
       "pasteMultiLine": "Este texto ocupa varias liñas e envíase como un único comando.",
       "hostKeyTitle": "Chave do host descoñecida",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Chave creada",
       "createdDescription": "Engade esta chave pública ao authorized_keys do servidor e despois conéctate con esta chave.",
       "copyPublicKey": "Copiar chave"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Contorno illado na nube",
+      "connectingTitle": "Abrindo un terminal",
+      "connectingMessage": "Conectando coa consola do contorno illado.",
+      "reconnectingMessage": "Perdeuse a conexión do terminal. O contorno illado segue en execución.",
+      "stoppedTitle": "O contorno illado está detido",
+      "stoppedMessage": "Envía unha mensaxe na sesión para despertalo e despois téntao de novo.",
+      "exitedMessage": "A consola rematou. Un terminal novo inicia unha consola nova.",
+      "newTerminal": "Novo terminal",
+      "disconnectedTitle": "O terminal desconectouse",
+      "disconnectedMessage": "A sesión pechou o terminal. Ábreo de novo desde a sesión.",
+      "unavailableTitle": "Terminal non dispoñible",
+      "unavailableMessage": "O contorno illado non puido abrir un terminal. Téntao de novo desde a sesión.",
+      "forbiddenMessage": "Esta sesión non permite un terminal interactivo.",
+      "notFoundMessage": "Esta sesión non ten ningún contorno illado que esta conta poida abrir."
+    },
+    "sandboxes": {
+      "title": "Contornos illados de Kilo",
+      "unnamed": "Contorno illado sen título",
+      "open": "{{title}}, abre un terminal no seu contorno illado"
+    },
+    "snippets": {
+      "title": "Fragmentos",
+      "subtitle": "Comandos a un toque nun terminal.",
+      "manage": "Xestionar fragmentos",
+      "emptyTitle": "Aínda non hai fragmentos",
+      "emptyDescription": "Garda un comando unha vez e despois envíao desde calquera terminal.",
+      "add": "Engadir fragmento",
+      "newTitle": "Novo fragmento",
+      "edit": "Editar fragmento",
+      "name": "Nome do fragmento",
+      "namePlaceholder": "Despregar a aplicación web",
+      "command": "Comando de consola",
+      "commandPlaceholder": "p. ex. docker compose up -d",
+      "host": "Dispoñible en",
+      "everyHost": "Todos os hosts",
+      "appendNewline": "Executalo de inmediato",
+      "appendNewlineHint": "Envía un salto de liña despois do comando, para que se execute en vez de quedar no indicador de ordes.",
+      "send": "{{label}}, envía este fragmento",
+      "rowActions": "{{label}}, editar fragmento",
+      "moveUp": "Mover arriba",
+      "moveDown": "Mover abaixo",
+      "deleteMessage": "O comando gardado elimínase de todos os terminais que o ofrecían."
     }
   }
 }

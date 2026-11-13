@@ -22,6 +22,7 @@
     "expired": "만료됨"
   },
   "common": {
+    "deleteTitle": "{{label}}을(를) 삭제할까요?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "취소",
@@ -4105,7 +4106,6 @@
       "importConfig": "SSH config에서 가져오기",
       "rowActions": "{{label}}, {{target}}. 터미널을 엽니다. 길게 누르면 편집하거나 삭제할 수 있습니다.",
       "viaJump": "{{label}} 경유",
-      "deleteTitle": "{{label}}을(를) 삭제할까요?",
       "deleteMessage": "설정과 포트 포워드도 함께 제거됩니다. 이 작업은 되돌릴 수 없습니다.",
       "deleteFailed": "호스트를 삭제할 수 없습니다."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "세션",
       "switchTo": "{{label}}, {{state}}",
       "paste": "붙여넣기",
+      "hideKeyboard": "키보드 숨기기",
       "pasteTitle": "여러 줄을 붙여넣을까요?",
       "pasteMultiLine": "이 텍스트는 여러 줄이며 하나의 명령으로 전송됩니다.",
       "hostKeyTitle": "알 수 없는 호스트 키",
@@ -4245,6 +4246,51 @@
       "createdTitle": "키 생성 완료",
       "createdDescription": "이 공개 키를 서버의 authorized_keys에 추가한 다음, 이 키로 연결하세요.",
       "copyPublicKey": "키 복사"
+    },
+    "sandbox": {
+      "title": "터미널",
+      "subtitle": "클라우드 샌드박스",
+      "connectingTitle": "터미널을 여는 중",
+      "connectingMessage": "샌드박스의 셸에 연결하는 중입니다.",
+      "reconnectingMessage": "터미널 연결이 끊어졌습니다. 샌드박스는 계속 실행됩니다.",
+      "stoppedTitle": "샌드박스가 중지됨",
+      "stoppedMessage": "세션에서 메시지를 보내 깨운 후 다시 시도하세요.",
+      "exitedMessage": "셸이 종료되었습니다. 새 터미널을 열면 새 셸이 시작됩니다.",
+      "newTerminal": "새 터미널",
+      "disconnectedTitle": "터미널 연결 끊김",
+      "disconnectedMessage": "세션에서 터미널을 닫았습니다. 세션에서 다시 여세요.",
+      "unavailableTitle": "터미널을 사용할 수 없음",
+      "unavailableMessage": "샌드박스에서 터미널을 열 수 없습니다. 세션에서 다시 시도하세요.",
+      "forbiddenMessage": "이 세션에서는 대화형 터미널을 허용하지 않습니다.",
+      "notFoundMessage": "이 세션에는 이 계정으로 열 수 있는 샌드박스가 없습니다."
+    },
+    "sandboxes": {
+      "title": "Kilo 샌드박스",
+      "unnamed": "제목 없는 샌드박스",
+      "open": "{{title}}, 해당 샌드박스에서 터미널을 엽니다"
+    },
+    "snippets": {
+      "title": "스니펫",
+      "subtitle": "터미널에서 한 번의 탭으로 사용할 수 있는 명령입니다.",
+      "manage": "스니펫 관리",
+      "emptyTitle": "아직 스니펫 없음",
+      "emptyDescription": "명령을 한 번 저장하면 어느 터미널에서든 보낼 수 있습니다.",
+      "add": "스니펫 추가",
+      "newTitle": "새 스니펫",
+      "edit": "스니펫 편집",
+      "name": "스니펫 이름",
+      "namePlaceholder": "웹 앱 배포",
+      "command": "셸 명령",
+      "commandPlaceholder": "예: docker compose up -d",
+      "host": "사용 가능 호스트",
+      "everyHost": "모든 호스트",
+      "appendNewline": "즉시 실행",
+      "appendNewlineHint": "명령 뒤에 줄바꿈을 보내 프롬프트에 머무르지 않고 바로 실행되도록 합니다.",
+      "send": "{{label}}, 이 스니펫을 보냅니다",
+      "rowActions": "{{label}}, 스니펫 편집",
+      "moveUp": "위로 이동",
+      "moveDown": "아래로 이동",
+      "deleteMessage": "저장된 명령이 이 명령을 제공하던 모든 터미널에서 제거됩니다."
     }
   }
 }

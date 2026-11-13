@@ -22,6 +22,7 @@
     "expired": "Nag-expire"
   },
   "common": {
+    "deleteTitle": "Burahin ang {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Kanselahin",
@@ -4105,7 +4106,6 @@
       "importConfig": "I-import mula sa SSH config",
       "rowActions": "{{label}}, {{target}}. Binubuksan ang terminal; pindutin nang matagal para i-edit o i-delete.",
       "viaJump": "sa pamamagitan ng {{label}}",
-      "deleteTitle": "Burahin ang {{label}}?",
       "deleteMessage": "Aalisin din kasama nito ang setting at port forwards nito. Hindi na ito maibabalik.",
       "deleteFailed": "Hindi nabura ang host."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Mga sesyon",
       "switchTo": "{{label}}, {{state}}",
       "paste": "I-paste",
+      "hideKeyboard": "Itago ang keyboard",
       "pasteTitle": "I-paste ang maraming linya?",
       "pasteMultiLine": "Maraming linya ang tekstong ito at ipapadala ito bilang isang command.",
       "hostKeyTitle": "Hindi kilalang host key",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Nagawa ang key",
       "createdDescription": "Idagdag ang pampublikong key na ito sa authorized_keys ng server, pagkatapos ay kumonekta gamit ang key na ito.",
       "copyPublicKey": "Kopyahin ang key"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Sandbox sa cloud",
+      "connectingTitle": "Pagbubukas ng terminal",
+      "connectingMessage": "Kumokonekta sa shell ng sandbox.",
+      "reconnectingMessage": "Naputol ang koneksyon ng terminal. Patuloy na tumatakbo ang sandbox.",
+      "stoppedTitle": "Nakatigil ang sandbox",
+      "stoppedMessage": "Magpadala ng mensahe sa session para gisingin ito, pagkatapos ay subukan muli.",
+      "exitedMessage": "Natapos ang shell. Ang bagong terminal ay magsisimula ng panibagong shell.",
+      "newTerminal": "Bagong terminal",
+      "disconnectedTitle": "Nadiskonekta ang terminal",
+      "disconnectedMessage": "Isinara ng session ang terminal. Buksan itong muli mula sa session.",
+      "unavailableTitle": "Hindi available ang terminal",
+      "unavailableMessage": "Hindi mabuksan ng sandbox ang terminal. Subukan muli mula sa session.",
+      "forbiddenMessage": "Hindi pinapayagan ng session na ito ang interactive na terminal.",
+      "notFoundMessage": "Walang sandbox ang session na ito na mabubuksan ng account na ito."
+    },
+    "sandboxes": {
+      "title": "Mga sandbox ng Kilo",
+      "unnamed": "Walang pamagat na sandbox",
+      "open": "{{title}}, nagbubukas ng terminal sa sandbox nito"
+    },
+    "snippets": {
+      "title": "Mga snippet",
+      "subtitle": "Mga command na maaabot sa isang tap sa terminal.",
+      "manage": "Pamahalaan ang mga snippet",
+      "emptyTitle": "Wala pang snippet",
+      "emptyDescription": "I-save ang isang command nang isang beses, pagkatapos ay ipadala ito mula sa kahit anong terminal.",
+      "add": "Magdagdag ng snippet",
+      "newTitle": "Bagong snippet",
+      "edit": "I-edit ang snippet",
+      "name": "Pangalan ng snippet",
+      "namePlaceholder": "I-deploy ang web app",
+      "command": "Command sa shell",
+      "commandPlaceholder": "hal. docker compose up -d",
+      "host": "Magagamit sa",
+      "everyHost": "Lahat ng host",
+      "appendNewline": "Patakbuhin agad",
+      "appendNewlineHint": "Nagpapadala ng newline pagkatapos ng command, kaya tumatakbo ito sa halip na manatili lamang sa prompt.",
+      "send": "{{label}}, ipinapadala ang snippet na ito",
+      "rowActions": "{{label}}, i-edit ang snippet",
+      "moveUp": "Ilipat pataas",
+      "moveDown": "Ilipat pababa",
+      "deleteMessage": "Tinatanggal ang naka-save na command mula sa bawat terminal na nag-alok nito."
     }
   }
 }

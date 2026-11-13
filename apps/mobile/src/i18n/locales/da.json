@@ -22,6 +22,7 @@
     "expired": "Udløbet"
   },
   "common": {
+    "deleteTitle": "Slet {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Annuller",
@@ -4105,7 +4106,6 @@
       "importConfig": "Importér fra SSH-konfiguration",
       "rowActions": "{{label}}, {{target}}. Åbner en terminal; langt tryk for at redigere eller slette.",
       "viaJump": "via {{label}}",
-      "deleteTitle": "Slet {{label}}?",
       "deleteMessage": "Dens opsætning og portvideresendelser fjernes sammen med den. Det kan ikke fortrydes.",
       "deleteFailed": "Værten kunne ikke slettes."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Sessioner",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Indsæt",
+      "hideKeyboard": "Skjul tastatur",
       "pasteTitle": "Indsætte flere linjer?",
       "pasteMultiLine": "Denne tekst spænder over flere linjer og sendes som én kommando.",
       "hostKeyTitle": "Ukendt værtsnøgle",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Nøgle oprettet",
       "createdDescription": "Tilføj denne offentlige nøgle til serverens authorized_keys, og opret derefter forbindelse med denne nøgle.",
       "copyPublicKey": "Kopiér nøgle"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Cloud-sandkasse",
+      "connectingTitle": "Åbner en terminal",
+      "connectingMessage": "Opretter forbindelse til sandkassens shell.",
+      "reconnectingMessage": "Terminalforbindelsen blev afbrudt. Sandkassen kører videre.",
+      "stoppedTitle": "Sandkassen er stoppet",
+      "stoppedMessage": "Send en besked i sessionen for at vække den, og prøv derefter igen.",
+      "exitedMessage": "Shellen er afsluttet. En ny terminal starter en ny shell.",
+      "newTerminal": "Ny terminal",
+      "disconnectedTitle": "Terminalen blev afbrudt",
+      "disconnectedMessage": "Sessionen lukkede terminalen. Åbn den igen fra sessionen.",
+      "unavailableTitle": "Terminalen er ikke tilgængelig",
+      "unavailableMessage": "Sandkassen kunne ikke åbne en terminal. Prøv igen fra sessionen.",
+      "forbiddenMessage": "Denne session tillader ikke en interaktiv terminal.",
+      "notFoundMessage": "Denne session har ingen sandkasse, som denne konto kan åbne."
+    },
+    "sandboxes": {
+      "title": "Kilo-sandkasser",
+      "unnamed": "Unavngivet sandkasse",
+      "open": "{{title}}, åbner en terminal i sin sandkasse"
+    },
+    "snippets": {
+      "title": "Snippets",
+      "subtitle": "Kommandoer ét tryk væk i en terminal.",
+      "manage": "Administrer snippets",
+      "emptyTitle": "Ingen snippets endnu",
+      "emptyDescription": "Gem en kommando én gang, og send den derefter fra enhver terminal.",
+      "add": "Tilføj snippet",
+      "newTitle": "Ny snippet",
+      "edit": "Rediger snippet",
+      "name": "Navn på snippet",
+      "namePlaceholder": "Udrul webappen",
+      "command": "Shell-kommando",
+      "commandPlaceholder": "f.eks. docker compose up -d",
+      "host": "Tilgængelig på",
+      "everyHost": "Alle værter",
+      "appendNewline": "Kør den med det samme",
+      "appendNewlineHint": "Sender et linjeskift efter kommandoen, så den kører i stedet for at blive stående ved prompten.",
+      "send": "{{label}}, sender denne snippet",
+      "rowActions": "{{label}}, rediger snippet",
+      "moveUp": "Flyt op",
+      "moveDown": "Flyt ned",
+      "deleteMessage": "Den gemte kommando fjernes fra alle terminaler, der tilbød den."
     }
   }
 }

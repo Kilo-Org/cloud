@@ -22,6 +22,7 @@
     "expired": "Isteklo"
   },
   "common": {
+    "deleteTitle": "Obriši {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Odustani",
@@ -4170,7 +4171,6 @@
       "importConfig": "Uvezi iz SSH konfiguracije",
       "rowActions": "{{label}}, {{target}}. Otvara terminal; dugi pritisak za uređivanje i brisanje.",
       "viaJump": "preko {{label}}",
-      "deleteTitle": "Obriši {{label}}?",
       "deleteMessage": "Njegove postavke i prosljeđivanja portova uklanjaju se zajedno s njim. To se ne može poništiti.",
       "deleteFailed": "Host nije bilo moguće obrisati."
     },
@@ -4249,6 +4249,7 @@
       "switcherTitle": "Sesije",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Zalijepi",
+      "hideKeyboard": "Sakrij tipkovnicu",
       "pasteTitle": "Zalijepiti nekoliko redaka?",
       "pasteMultiLine": "Ovaj tekst sadrži više redaka i šalje se kao jedna naredba.",
       "hostKeyTitle": "Nepoznat ključ hosta",
@@ -4310,6 +4311,51 @@
       "createdTitle": "Ključ je stvoren",
       "createdDescription": "Dodaj ovaj javni ključ u authorized_keys na poslužitelju, zatim se poveži s ovim ključem.",
       "copyPublicKey": "Kopiraj ključ"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Okruženje u oblaku",
+      "connectingTitle": "Otvaranje terminala",
+      "connectingMessage": "Povezivanje s ljuskom okruženja.",
+      "reconnectingMessage": "Veza s terminalom je prekinuta. Okruženje nastavlja raditi.",
+      "stoppedTitle": "Okruženje je zaustavljeno",
+      "stoppedMessage": "Pošaljite poruku u sesiji da ga probudite, zatim pokušajte ponovno.",
+      "exitedMessage": "Ljuska je završila. Novi terminal pokreće novu ljusku.",
+      "newTerminal": "Novi terminal",
+      "disconnectedTitle": "Terminal se odspojio",
+      "disconnectedMessage": "Sesija je zatvorila terminal. Otvorite ga ponovno iz sesije.",
+      "unavailableTitle": "Terminal nije dostupan",
+      "unavailableMessage": "Okruženje nije moglo otvoriti terminal. Pokušajte ponovno iz sesije.",
+      "forbiddenMessage": "Ova sesija ne dopušta interaktivni terminal.",
+      "notFoundMessage": "Ova sesija nema okruženje koje ovaj račun može otvoriti."
+    },
+    "sandboxes": {
+      "title": "Kilo okruženja",
+      "unnamed": "Neimenovano okruženje",
+      "open": "{{title}}, otvara terminal u njegovom okruženju"
+    },
+    "snippets": {
+      "title": "Isječci",
+      "subtitle": "Naredbe na jedan dodir u terminalu.",
+      "manage": "Upravljaj isječcima",
+      "emptyTitle": "Još nema isječaka",
+      "emptyDescription": "Spremite naredbu jednom, a zatim je šaljite iz bilo kojeg terminala.",
+      "add": "Dodaj isječak",
+      "newTitle": "Novi isječak",
+      "edit": "Uredi isječak",
+      "name": "Naziv isječka",
+      "namePlaceholder": "Postavi web-aplikaciju",
+      "command": "Naredba ljuske",
+      "commandPlaceholder": "npr. docker compose up -d",
+      "host": "Dostupno na",
+      "everyHost": "Svaki host",
+      "appendNewline": "Pokreni odmah",
+      "appendNewlineHint": "Šalje novi redak nakon naredbe, pa se ona izvršava umjesto da stoji na naredbenom retku.",
+      "send": "{{label}}, šalje ovaj isječak",
+      "rowActions": "{{label}}, uredi isječak",
+      "moveUp": "Pomakni gore",
+      "moveDown": "Pomakni dolje",
+      "deleteMessage": "Pohranjena naredba uklanja se iz svakog terminala koji ju je nudio."
     }
   }
 }

@@ -22,6 +22,7 @@
     "expired": "ጊዜው አልፏል"
   },
   "common": {
+    "deleteTitle": "{{label}}ን ይሰረዝ?",
     "sentenceJoiner": "። ",
     "listJoiner": "፣ ",
     "cancel": "ተው",
@@ -4105,7 +4106,6 @@
       "importConfig": "ከ SSH ውቅር አስገባ",
       "rowActions": "{{label}}፣ {{target}}። አርታዒውን ይከፍታል፤ ለማርትዕና ለመሰረዝ ረጅም ጊዜ ተጭነው ይያዙ።",
       "viaJump": "በ{{label}} በኩል",
-      "deleteTitle": "{{label}}ን ይሰረዝ?",
       "deleteMessage": "ቅንብሩና የወደብ ማስተላለፊያዎቹ አብረውት ይወገዳሉ። ይህ መመለስ አይቻልም።",
       "deleteFailed": "አስተናጋጁ ሊሰረዝ አልቻለም።"
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "ክፍለ ጊዜዎች",
       "switchTo": "{{label}}፣ {{state}}",
       "paste": "ለጥፍ",
+      "hideKeyboard": "የቁልፍ ሰሌዳን ደብቅ",
       "pasteTitle": "በርካታ መስመሮችን ይለጥፉ?",
       "pasteMultiLine": "ይህ ጽሑፍ በርካታ መስመሮች ይዟል፣ እንደ አንድ ትዕዛዝ ይላካል።",
       "hostKeyTitle": "ያልታወቀ የአስተናጋጅ ቁልፍ",
@@ -4245,6 +4246,51 @@
       "createdTitle": "ቁልፍ ተፈጥሯል",
       "createdDescription": "ይህን ይፋዊ ቁልፍ ወደ አገልጋዩ authorized_keys ያክሉ፣ ከዚያም በዚህ ቁልፍ ይገናኙ።",
       "copyPublicKey": "ቁልፍ ቅዳ"
+    },
+    "sandbox": {
+      "title": "ተርሚናል",
+      "subtitle": "የደመና ሳንድቦክስ",
+      "connectingTitle": "ተርሚናል በመክፈት ላይ",
+      "connectingMessage": "ወደ ሳንድቦክስ ሼል በመገናኘት ላይ።",
+      "reconnectingMessage": "የተርሚናል ግንኙነቱ ተቋርጧል። ሳንድቦክሱ መሥራቱን ይቀጥላል።",
+      "stoppedTitle": "ሳንድቦክሱ ቆሟል",
+      "stoppedMessage": "እንዲነቃ በክፍለ ጊዜው ውስጥ መልእክት ይላኩ፣ ከዚያ እንደገና ይሞክሩ።",
+      "exitedMessage": "ሼሉ አብቅቷል። አዲስ ተርሚናል አዲስ ሼል ይጀምራል።",
+      "newTerminal": "አዲስ ተርሚናል",
+      "disconnectedTitle": "ተርሚናሉ ተቋርጧል",
+      "disconnectedMessage": "ክፍለ ጊዜው ተርሚናሉን ዘግቷል። ከክፍለ ጊዜው እንደገና ይክፈቱት።",
+      "unavailableTitle": "ተርሚናል አይገኝም",
+      "unavailableMessage": "ሳንድቦክሱ ተርሚናል መክፈት አልቻለም። ከክፍለ ጊዜው እንደገና ይሞክሩ።",
+      "forbiddenMessage": "ይህ ክፍለ ጊዜ በይነተግባር ተርሚናል አይፈቅድም።",
+      "notFoundMessage": "ይህ ክፍለ ጊዜ ይህ መለያ ሊከፍተው የሚችል ሳንድቦክስ የለውም።"
+    },
+    "sandboxes": {
+      "title": "የKilo ሳንድቦክሶች",
+      "unnamed": "ርዕስ የለሽ ሳንድቦክስ",
+      "open": "{{title}}፣ በሳንድቦክሱ ውስጥ ተርሚናል ይከፍታል"
+    },
+    "snippets": {
+      "title": "ቅንጥቦች",
+      "subtitle": "ትዕዛዞች በተርሚናል ውስጥ በአንድ ንክኪ ይገኛሉ።",
+      "manage": "ቅንጥቦችን ያስተዳድሩ",
+      "emptyTitle": "እስካሁን ቅንጥብ የለም",
+      "emptyDescription": "ትዕዛዝን አንድ ጊዜ ያስቀምጡ፣ ከዚያ ከማንኛውም ተርሚናል ይላኩት።",
+      "add": "ቅንጥብ ጨምር",
+      "newTitle": "አዲስ ቅንጥብ",
+      "edit": "ቅንጥብ አርትዕ",
+      "name": "የቅንጥብ ስም",
+      "namePlaceholder": "የድር መተግበሪያውን ያሰማሩ",
+      "command": "የሼል ትዕዛዝ",
+      "commandPlaceholder": "ለምሳሌ docker compose up -d",
+      "host": "የሚገኝበት",
+      "everyHost": "ሁሉም አስተናጋጅ",
+      "appendNewline": "ወዲያውኑ ያሂዱት",
+      "appendNewlineHint": "ከትዕዛዙ በኋላ አዲስ መስመር ይልካል፣ ስለዚህ በፕሮምፕቱ ላይ ከመቆየት ይልቅ ይሠራል።",
+      "send": "{{label}}፣ ይህን ቅንጥብ ይልካል",
+      "rowActions": "{{label}}፣ ቅንጥብ አርትዕ",
+      "moveUp": "ወደ ላይ አንቀሳቅስ",
+      "moveDown": "ወደ ታች አንቀሳቅስ",
+      "deleteMessage": "የተቀመጠው ትዕዛዝ ካቀረበው ከማንኛውም ተርሚናል ይወገዳል።"
     }
   }
 }

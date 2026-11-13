@@ -22,6 +22,7 @@
     "expired": "Imithe in éag"
   },
   "common": {
+    "deleteTitle": "Scrios {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cealaigh",
@@ -4300,7 +4301,6 @@
       "importConfig": "Iompórtáil ó chumraíocht SSH",
       "rowActions": "{{label}}, {{target}}. Osclaíonn tapáil teirminéal; coinnigh síos chun eagarthóireacht agus scriosadh a dhéanamh.",
       "viaJump": "trí {{label}}",
-      "deleteTitle": "Scrios {{label}}?",
       "deleteMessage": "Baintear a shocrú agus a chuid aistrithe port leis. Ní féidir é seo a chealú.",
       "deleteFailed": "Níorbh fhéidir an t-óstach a scriosadh."
     },
@@ -4379,6 +4379,7 @@
       "switcherTitle": "Seisiúin",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Greamaigh",
+      "hideKeyboard": "Folaigh an mhéarchlár",
       "pasteTitle": "Greamaigh roinnt línte?",
       "pasteMultiLine": "Síneann an téacs seo thar roinnt línte agus seoltar mar aon ordú amháin é.",
       "hostKeyTitle": "Eochair óstaigh anaithnid",
@@ -4440,6 +4441,51 @@
       "createdTitle": "Eochair chruthaithe",
       "createdDescription": "Cuir an eochair phoiblí seo le authorized_keys an fhreastalaí, ansin ceangail leis an eochair seo.",
       "copyPublicKey": "Cóipeáil eochair"
+    },
+    "sandbox": {
+      "title": "Teirminéal",
+      "subtitle": "Bosca gainimh sa scamall",
+      "connectingTitle": "Teirminéal á oscailt",
+      "connectingMessage": "Ag ceangal le blaosc an bhosca gainimh.",
+      "reconnectingMessage": "Cailleadh nasc an teirminéil. Leanann an bosca gainimh ag rith.",
+      "stoppedTitle": "Tá an bosca gainimh stoptha",
+      "stoppedMessage": "Seol teachtaireacht sa seisiún chun é a dhúiseacht, ansin triail arís.",
+      "exitedMessage": "Tháinig deireadh leis an mblaosc. Cuireann teirminéal nua tús le blaosc úr.",
+      "newTerminal": "Teirminéal nua",
+      "disconnectedTitle": "Dícheanglaíodh an teirminéal",
+      "disconnectedMessage": "Dhún an seisiún an teirminéal. Oscail arís é ón seisiún.",
+      "unavailableTitle": "Níl an teirminéal ar fáil",
+      "unavailableMessage": "Níorbh fhéidir leis an mbosca gainimh teirminéal a oscailt. Triail arís ón seisiún.",
+      "forbiddenMessage": "Ní cheadaíonn an seisiún seo teirminéal idirghníomhach.",
+      "notFoundMessage": "Níl aon bhosca gainimh sa seisiún seo ar féidir leis an gcuntas seo a oscailt."
+    },
+    "sandboxes": {
+      "title": "Boscanna gainimh Kilo",
+      "unnamed": "Bosca gainimh gan teideal",
+      "open": "{{title}}, osclaíonn sé teirminéal ina bhosca gainimh"
+    },
+    "snippets": {
+      "title": "Blúirí",
+      "subtitle": "Orduithe atá ar fáil le tapáil amháin i dteirminéal.",
+      "manage": "Bainistigh blúirí",
+      "emptyTitle": "Níl aon bhlúire fós",
+      "emptyDescription": "Sábháil ordú uair amháin, ansin seol é ó aon teirminéal.",
+      "add": "Cuir blúire leis",
+      "newTitle": "Blúire nua",
+      "edit": "Cuir blúire in eagar",
+      "name": "Ainm an bhlúire",
+      "namePlaceholder": "Imscar an aip ghréasáin",
+      "command": "Ordú blaoisce",
+      "commandPlaceholder": "m.sh. docker compose up -d",
+      "host": "Ar fáil ar",
+      "everyHost": "Gach óstach",
+      "appendNewline": "Rith láithreach é",
+      "appendNewlineHint": "Seolann sé líne nua tar éis an ordaithe, ionas go ritheann sé in ionad fanacht ag an leid.",
+      "send": "{{label}}, seolann sé an blúire seo",
+      "rowActions": "{{label}}, cuir blúire in eagar",
+      "moveUp": "Bog suas",
+      "moveDown": "Bog síos",
+      "deleteMessage": "Baintear an t-ordú stóráilte ó gach teirminéal a thairg é."
     }
   }
 }

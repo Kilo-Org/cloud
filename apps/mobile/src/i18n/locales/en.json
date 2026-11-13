@@ -147,6 +147,7 @@
     "noRepositoriesFound": "No repositories found",
     "critical": "Critical",
     "delete": "Delete",
+    "deleteTitle": "Delete {{label}}?",
     "deleted": "Deleted",
     "details": "Details",
     "draft": "Draft",
@@ -4105,7 +4106,6 @@
       "importConfig": "Import from SSH config",
       "rowActions": "{{label}}, {{target}}. Opens a terminal; long press for edit and delete.",
       "viaJump": "via {{label}}",
-      "deleteTitle": "Delete {{label}}?",
       "deleteMessage": "Its setting and port forwards are removed with it. This cannot be undone.",
       "deleteFailed": "The host could not be deleted."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Sessions",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Paste",
+      "hideKeyboard": "Hide keyboard",
       "pasteTitle": "Paste several lines?",
       "pasteMultiLine": "This text spans several lines and is sent as one command.",
       "hostKeyTitle": "Unknown host key",
@@ -4245,6 +4246,51 @@
       "copied": "Public key copied.",
       "unreadable": "That key could not be read.",
       "unsupported": "This key's algorithm is not supported."
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Cloud sandbox",
+      "connectingTitle": "Opening a terminal",
+      "connectingMessage": "Connecting to the sandbox's shell.",
+      "reconnectingMessage": "The terminal connection dropped. The sandbox keeps running.",
+      "stoppedTitle": "The sandbox is stopped",
+      "stoppedMessage": "Send a message in the session to wake it, then retry.",
+      "exitedMessage": "The shell ended. A new terminal starts a fresh one.",
+      "newTerminal": "New terminal",
+      "disconnectedTitle": "The terminal disconnected",
+      "disconnectedMessage": "The session closed the terminal. Open it again from the session.",
+      "unavailableTitle": "Terminal unavailable",
+      "unavailableMessage": "The sandbox could not open a terminal. Try again from the session.",
+      "forbiddenMessage": "This session does not allow an interactive terminal.",
+      "notFoundMessage": "This session has no sandbox this account can open."
+    },
+    "sandboxes": {
+      "title": "Kilo sandboxes",
+      "unnamed": "Untitled sandbox",
+      "open": "{{title}}, opens a terminal in its sandbox"
+    },
+    "snippets": {
+      "title": "Snippets",
+      "subtitle": "Commands one tap away in a terminal.",
+      "manage": "Manage snippets",
+      "emptyTitle": "No snippets yet",
+      "emptyDescription": "Save a command once, then send it from any terminal.",
+      "add": "Add snippet",
+      "newTitle": "New snippet",
+      "edit": "Edit snippet",
+      "name": "Snippet name",
+      "namePlaceholder": "Deploy the web app",
+      "command": "Shell command",
+      "commandPlaceholder": "docker compose up -d",
+      "host": "Available on",
+      "everyHost": "Every host",
+      "appendNewline": "Run it right away",
+      "appendNewlineHint": "Sends a newline after the command, so it runs instead of sitting at the prompt.",
+      "send": "{{label}}, sends this snippet",
+      "rowActions": "{{label}}, edit snippet",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "deleteMessage": "The stored command is removed from every terminal that offered it."
     }
   }
 }

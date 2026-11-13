@@ -22,6 +22,7 @@
     "expired": "Oge agwụla"
   },
   "common": {
+    "deleteTitle": "Hichapụ {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Kagbuo",
@@ -4105,7 +4106,6 @@
       "importConfig": "Bubata site na nhazi SSH",
       "rowActions": "{{label}}, {{target}}. Na-emepe terminal; pịa ogologo maka ndezi na ihichapụ.",
       "viaJump": "site na {{label}}",
-      "deleteTitle": "Hichapụ {{label}}?",
       "deleteMessage": "A na-ewepụ ntọala ya na port forward ya na ya. Enweghị ike iweghachi ya.",
       "deleteFailed": "Enweghị ike ihichapụ host ahụ."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Nnọkọ",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Tapịa",
+      "hideKeyboard": "Zoo bọọdụ igodo",
       "pasteTitle": "Tapịa ọtụtụ ahịrị?",
       "pasteMultiLine": "Ederede a nwere ọtụtụ ahịrị ma a na-eziga ya dị ka otu iwu.",
       "hostKeyTitle": "Igodo host a na-amaghị",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Emepụtala igodo",
       "createdDescription": "Tinye igodo ọhaneze a na authorized_keys nke sẹva ahụ, wee jikọọ na igodo a.",
       "copyPublicKey": "ṅomi igodo"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Igbe ájá igwe ojii",
+      "connectingTitle": "Imeghe terminal",
+      "connectingMessage": "Na-ejikọ na shei nke igbe ájá ahụ.",
+      "reconnectingMessage": "Njikọ terminal akwụsịrị. Igbe ájá ahụ ka na-aga n'ihu.",
+      "stoppedTitle": "Igbe ájá ahụ akwụsịla",
+      "stoppedMessage": "Ziga ozi na seshọn ahụ iji kpọtee ya, wee nwaa ọzọ.",
+      "exitedMessage": "Shei ahụ gwụrụ. Terminal ọhụrụ na-amalite otu ọhụrụ.",
+      "newTerminal": "Terminal ọhụrụ",
+      "disconnectedTitle": "Terminal ahụ akwụsịrị njikọ",
+      "disconnectedMessage": "Seshọn ahụ mechiri terminal. Meghee ya ọzọ site na seshọn.",
+      "unavailableTitle": "Terminal adịghị adị",
+      "unavailableMessage": "Igbe ájá ahụ enweghị ike imeghe terminal. Nwaa ọzọ site na seshọn.",
+      "forbiddenMessage": "Seshọn a anaghị ekwe terminal mmekọrịta.",
+      "notFoundMessage": "Seshọn a enweghị igbe ájá nke akaụntụ a nwere ike imeghe."
+    },
+    "sandboxes": {
+      "title": "Igbe ájá Kilo",
+      "unnamed": "Igbe ájá enweghị aha",
+      "open": "{{title}}, na-emepe terminal n'ime igbe ájá ya"
+    },
+    "snippets": {
+      "title": "Snippet",
+      "subtitle": "Iwu ndị dị otu mmetụ aka n'ime terminal.",
+      "manage": "Jikwaa snippet",
+      "emptyTitle": "Enwebeghị snippet ọ bụla",
+      "emptyDescription": "Chekwaa otu iwu otu ugboro, wee ziga ya site na terminal ọ bụla.",
+      "add": "Tinye snippet",
+      "newTitle": "Snippet ọhụrụ",
+      "edit": "Dezie snippet",
+      "name": "Aha snippet",
+      "namePlaceholder": "Bipụta web app",
+      "command": "Iwu shei",
+      "commandPlaceholder": "dịka docker compose up -d",
+      "host": "Dị na",
+      "everyHost": "Host ọ bụla",
+      "appendNewline": "Gbaa ya ozugbo",
+      "appendNewlineHint": "Na-eziga ahịrị ọhụrụ mgbe iwu ahụ gasịrị, ka ọ gbaa kama ịnọdụ na prompt.",
+      "send": "{{label}}, na-eziga snippet a",
+      "rowActions": "{{label}}, dezie snippet",
+      "moveUp": "Bugharịa elu",
+      "moveDown": "Bugharịa ala",
+      "deleteMessage": "A na-ewepụ iwu echekwara site na terminal ọ bụla nyere ya."
     }
   }
 }

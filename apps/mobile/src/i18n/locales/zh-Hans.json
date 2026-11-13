@@ -22,6 +22,7 @@
     "expired": "已过期"
   },
   "common": {
+    "deleteTitle": "删除 {{label}}？",
     "sentenceJoiner": "。",
     "listJoiner": "、",
     "cancel": "取消",
@@ -4105,7 +4106,6 @@
       "importConfig": "从 SSH 配置导入",
       "rowActions": "{{label}}，{{target}}。打开终端；长按可编辑或删除。",
       "viaJump": "经由 {{label}}",
-      "deleteTitle": "删除 {{label}}？",
       "deleteMessage": "它的设置和端口转发也会一并移除。此操作无法撤销。",
       "deleteFailed": "无法删除该主机。"
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "会话",
       "switchTo": "{{label}}，{{state}}",
       "paste": "粘贴",
+      "hideKeyboard": "隐藏键盘",
       "pasteTitle": "粘贴多行？",
       "pasteMultiLine": "这段文本包含多行，将作为一条命令发送。",
       "hostKeyTitle": "未知的主机密钥",
@@ -4245,6 +4246,51 @@
       "createdTitle": "密钥已创建",
       "createdDescription": "将此公钥添加到服务器的 authorized_keys，然后使用此密钥连接。",
       "copyPublicKey": "复制公钥"
+    },
+    "sandbox": {
+      "title": "终端",
+      "subtitle": "云端沙盒",
+      "connectingTitle": "正在打开终端",
+      "connectingMessage": "正在连接到沙盒的 shell。",
+      "reconnectingMessage": "终端连接已断开。沙盒仍在运行。",
+      "stoppedTitle": "沙盒已停止",
+      "stoppedMessage": "在会话中发送消息将其唤醒，然后重试。",
+      "exitedMessage": "Shell 已结束。新终端会启动一个全新的 Shell。",
+      "newTerminal": "新建终端",
+      "disconnectedTitle": "终端已断开连接",
+      "disconnectedMessage": "会话关闭了终端。请从会话中重新打开。",
+      "unavailableTitle": "终端不可用",
+      "unavailableMessage": "沙盒无法打开终端。请从会话中重试。",
+      "forbiddenMessage": "此会话不允许交互式终端。",
+      "notFoundMessage": "此会话没有此账号可以打开的沙盒。"
+    },
+    "sandboxes": {
+      "title": "Kilo 沙盒",
+      "unnamed": "未命名沙盒",
+      "open": "{{title}}，在其沙盒中打开终端"
+    },
+    "snippets": {
+      "title": "片段",
+      "subtitle": "在终端中轻点一下即可使用命令。",
+      "manage": "管理片段",
+      "emptyTitle": "还没有片段",
+      "emptyDescription": "保存一次命令，即可从任何终端发送。",
+      "add": "添加片段",
+      "newTitle": "新建片段",
+      "edit": "编辑片段",
+      "name": "片段名称",
+      "namePlaceholder": "部署 Web 应用",
+      "command": "Shell 命令",
+      "commandPlaceholder": "例如 docker compose up -d",
+      "host": "适用于",
+      "everyHost": "所有主机",
+      "appendNewline": "立即运行",
+      "appendNewlineHint": "在命令后发送换行符，使其直接运行，而不是停留在提示符处。",
+      "send": "{{label}}，发送此片段",
+      "rowActions": "{{label}}，编辑片段",
+      "moveUp": "上移",
+      "moveDown": "下移",
+      "deleteMessage": "已保存的命令会从所有提供它的终端中移除。"
     }
   }
 }

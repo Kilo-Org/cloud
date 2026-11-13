@@ -22,6 +22,7 @@
     "expired": "פג התוקף"
   },
   "common": {
+    "deleteTitle": "למחוק את {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "ביטול",
@@ -4170,7 +4171,6 @@
       "importConfig": "ייבוא מהגדרות SSH",
       "rowActions": "{{label}}, {{target}}. הקשה פותחת מסוף; לחיצה ארוכה מציעה עריכה ומחיקה.",
       "viaJump": "דרך {{label}}",
-      "deleteTitle": "למחוק את {{label}}?",
       "deleteMessage": "ההגדרה והעברות הפורטים שלו יוסרו יחד איתו. לא ניתן לבטל פעולה זו.",
       "deleteFailed": "לא ניתן היה למחוק את המארח."
     },
@@ -4249,6 +4249,7 @@
       "switcherTitle": "סשנים",
       "switchTo": "{{label}}, {{state}}",
       "paste": "הדבקה",
+      "hideKeyboard": "הסתר מקלדת",
       "pasteTitle": "להדביק כמה שורות?",
       "pasteMultiLine": "הטקסט הזה משתרע על פני כמה שורות ונשלח כפקודה אחת.",
       "hostKeyTitle": "מפתח מארח לא מוכר",
@@ -4310,6 +4311,51 @@
       "createdTitle": "מפתח נוצר",
       "createdDescription": "הוסף את המפתח הציבורי הזה ל-authorized_keys של השרת, ולאחר מכן התחבר עם מפתח זה.",
       "copyPublicKey": "העתקת מפתח"
+    },
+    "sandbox": {
+      "title": "מסוף",
+      "subtitle": "ארגז חול בענן",
+      "connectingTitle": "פתיחת מסוף",
+      "connectingMessage": "מתחבר למעטפת של ארגז החול.",
+      "reconnectingMessage": "החיבור למסוף נותק. ארגז החול ממשיך לפעול.",
+      "stoppedTitle": "ארגז החול עצור",
+      "stoppedMessage": "שלחו הודעה בשיחה כדי להעיר אותו, ואז נסו שוב.",
+      "exitedMessage": "המעטפת הסתיימה. מסוף חדש מתחיל מעטפת חדשה.",
+      "newTerminal": "מסוף חדש",
+      "disconnectedTitle": "המסוף התנתק",
+      "disconnectedMessage": "השיחה סגרה את המסוף. פתחו אותו שוב מהשיחה.",
+      "unavailableTitle": "המסוף אינו זמין",
+      "unavailableMessage": "ארגז החול לא הצליח לפתוח מסוף. נסו שוב מהשיחה.",
+      "forbiddenMessage": "השיחה הזו אינה מאפשרת מסוף אינטראקטיבי.",
+      "notFoundMessage": "לשיחה הזו אין ארגז חול שהחשבון הזה יכול לפתוח."
+    },
+    "sandboxes": {
+      "title": "ארגזי חול של Kilo",
+      "unnamed": "ארגז חול ללא שם",
+      "open": "{{title}}, פותח מסוף בארגז החול שלו"
+    },
+    "snippets": {
+      "title": "קטעים",
+      "subtitle": "פקודות זמינות בהקשה אחת במסוף.",
+      "manage": "ניהול קטעים",
+      "emptyTitle": "אין עדיין קטעים",
+      "emptyDescription": "שמרו פקודה פעם אחת, ואז שלחו אותה מכל מסוף.",
+      "add": "הוספת קטע",
+      "newTitle": "קטע חדש",
+      "edit": "עריכת קטע",
+      "name": "שם הקטע",
+      "namePlaceholder": "פריסת אפליקציית האינטרנט",
+      "command": "פקודת מעטפת",
+      "commandPlaceholder": "למשל docker compose up -d",
+      "host": "זמין ב",
+      "everyHost": "כל מארח",
+      "appendNewline": "הרצה מיידית",
+      "appendNewlineHint": "שולח שורה חדשה אחרי הפקודה, כך שהיא מופעלת במקום להישאר בהנחיה.",
+      "send": "{{label}}, שולח את הקטע הזה",
+      "rowActions": "{{label}}, עריכת קטע",
+      "moveUp": "העברה למעלה",
+      "moveDown": "העברה למטה",
+      "deleteMessage": "הפקודה השמורה מוסרת מכל מסוף שהציע אותה."
     }
   }
 }

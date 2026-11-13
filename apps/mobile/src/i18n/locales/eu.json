@@ -22,6 +22,7 @@
     "expired": "Iraungita"
   },
   "common": {
+    "deleteTitle": "Ezabatu {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Utzi",
@@ -4105,7 +4106,6 @@
       "importConfig": "Inportatu SSH konfiguraziotik",
       "rowActions": "{{label}}, {{target}}. Ukitzeak terminal bat irekitzen du; sakatze luzeak editatzeko eta ezabatzeko aukera ematen du.",
       "viaJump": "{{label}} bidez",
-      "deleteTitle": "Ezabatu {{label}}?",
       "deleteMessage": "Bere konfigurazioa eta portu-birbidalketak harekin batera kenduko dira. Hau ezin da desegin.",
       "deleteFailed": "Ezin izan da ostalaria ezabatu."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Saioak",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Itsatsi",
+      "hideKeyboard": "Ezkutatu teklatua",
       "pasteTitle": "Hainbat lerro itsatsi?",
       "pasteMultiLine": "Testu honek hainbat lerro ditu eta komando bakar gisa bidaliko da.",
       "hostKeyTitle": "Ostalariaren gako ezezaguna",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Gakoa sortu da",
       "createdDescription": "Gehitu gako publiko hau zerbitzariaren authorized_keys fitxategian, eta, ondoren, konektatu gako honekin.",
       "copyPublicKey": "Kopiatu gakoa"
+    },
+    "sandbox": {
+      "title": "Terminala",
+      "subtitle": "Hodeiko ingurune isolatua",
+      "connectingTitle": "Terminal bat irekitzen",
+      "connectingMessage": "Ingurune isolatuaren shellera konektatzen ari da.",
+      "reconnectingMessage": "Terminalaren konexioa eten da. Ingurune isolatuak martxan jarraitzen du.",
+      "stoppedTitle": "Ingurune isolatua geldituta dago",
+      "stoppedMessage": "Bidali mezu bat saioan hura esnatzeko, eta gero saiatu berriro.",
+      "exitedMessage": "Shell-a amaitu da. Terminal berri batek shell berri bat abiarazten du.",
+      "newTerminal": "Terminal berria",
+      "disconnectedTitle": "Terminala deskonektatu da",
+      "disconnectedMessage": "Saioak terminala itxi du. Ireki berriro saiotik.",
+      "unavailableTitle": "Terminala ez dago erabilgarri",
+      "unavailableMessage": "Ingurune isolatuak ezin izan du terminal bat ireki. Saiatu berriro saiotik.",
+      "forbiddenMessage": "Saio honek ez du terminal interaktiborik onartzen.",
+      "notFoundMessage": "Saio honek ez du kontu honek ireki dezakeen ingurune isolaturik."
+    },
+    "sandboxes": {
+      "title": "Kilo ingurune isolatuak",
+      "unnamed": "Izenik gabeko ingurune isolatua",
+      "open": "{{title}}, terminal bat irekitzen du bere ingurune isolatuan"
+    },
+    "snippets": {
+      "title": "Zatiak",
+      "subtitle": "Komandoak terminalean ukitu bakarrera.",
+      "manage": "Kudeatu zatiak",
+      "emptyTitle": "Oraindik ez dago zatirik",
+      "emptyDescription": "Gorde komando bat behin, eta gero bidali edozein terminaletik.",
+      "add": "Gehitu zatia",
+      "newTitle": "Zati berria",
+      "edit": "Editatu zatia",
+      "name": "Zatiaren izena",
+      "namePlaceholder": "Web aplikazioa inplementatu",
+      "command": "Shell komandoa",
+      "commandPlaceholder": "adib. docker compose up -d",
+      "host": "Erabilgarri",
+      "everyHost": "Ostalari guztiak",
+      "appendNewline": "Exekutatu berehala",
+      "appendNewlineHint": "Komandoaren ondoren lerro-jauzi bat bidaltzen du, beraz, exekutatu egiten da prompt-ean gelditu beharrean.",
+      "send": "{{label}}, zati hau bidaltzen du",
+      "rowActions": "{{label}}, editatu zatia",
+      "moveUp": "Mugitu gora",
+      "moveDown": "Mugitu behera",
+      "deleteMessage": "Gordetako komandoa eskaini zuten terminal guztietatik kentzen da."
     }
   }
 }

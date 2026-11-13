@@ -22,6 +22,7 @@
     "expired": "Utgånget"
   },
   "common": {
+    "deleteTitle": "Ta bort {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Avbryt",
@@ -4105,7 +4106,6 @@
       "importConfig": "Importera från SSH-konfiguration",
       "rowActions": "{{label}}, {{target}}. Öppnar en terminal; håll intryckt för att redigera och ta bort.",
       "viaJump": "via {{label}}",
-      "deleteTitle": "Ta bort {{label}}?",
       "deleteMessage": "Dess inställning och portvidarebefordringar tas bort med den. Detta kan inte ångras.",
       "deleteFailed": "Värden kunde inte tas bort."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Sessioner",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Klistra in",
+      "hideKeyboard": "Dölj tangentbordet",
       "pasteTitle": "Klistra in flera rader?",
       "pasteMultiLine": "Den här texten sträcker sig över flera rader och skickas som ett kommando.",
       "hostKeyTitle": "Okänd värdnyckel",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Nyckel skapad",
       "createdDescription": "Lägg till den här offentliga nyckeln i serverns authorized_keys och anslut sedan med den här nyckeln.",
       "copyPublicKey": "Kopiera nyckel"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Molnsandlåda",
+      "connectingTitle": "Öppnar en terminal",
+      "connectingMessage": "Ansluter till sandlådans shell.",
+      "reconnectingMessage": "Terminalanslutningen bröts. Sandlådan fortsätter att köra.",
+      "stoppedTitle": "Sandlådan är stoppad",
+      "stoppedMessage": "Skicka ett meddelande i sessionen för att väcka den och försök sedan igen.",
+      "exitedMessage": "Shellen avslutades. En ny terminal startar en ny shell.",
+      "newTerminal": "Ny terminal",
+      "disconnectedTitle": "Terminalen kopplades från",
+      "disconnectedMessage": "Sessionen stängde terminalen. Öppna den igen från sessionen.",
+      "unavailableTitle": "Terminal otillgänglig",
+      "unavailableMessage": "Sandlådan kunde inte öppna en terminal. Försök igen från sessionen.",
+      "forbiddenMessage": "Den här sessionen tillåter inte en interaktiv terminal.",
+      "notFoundMessage": "Den här sessionen har ingen sandlåda som det här kontot kan öppna."
+    },
+    "sandboxes": {
+      "title": "Kilo-sandlådor",
+      "unnamed": "Namnlös sandlåda",
+      "open": "{{title}}, öppnar en terminal i dess sandlåda"
+    },
+    "snippets": {
+      "title": "Kommandon",
+      "subtitle": "Kommandon ett tryck bort i en terminal.",
+      "manage": "Hantera kommandon",
+      "emptyTitle": "Inga kommandon än",
+      "emptyDescription": "Spara ett kommando en gång och skicka det sedan från vilken terminal som helst.",
+      "add": "Lägg till kommando",
+      "newTitle": "Nytt kommando",
+      "edit": "Redigera kommando",
+      "name": "Kommandonamn",
+      "namePlaceholder": "Driftsätt webbappen",
+      "command": "Shellkommando",
+      "commandPlaceholder": "t.ex. docker compose up -d",
+      "host": "Tillgängligt på",
+      "everyHost": "Alla värdar",
+      "appendNewline": "Kör det direkt",
+      "appendNewlineHint": "Skickar en radbrytning efter kommandot, så att det körs i stället för att bli stående vid prompten.",
+      "send": "{{label}}, skickar det här kommandot",
+      "rowActions": "{{label}}, redigera kommandot",
+      "moveUp": "Flytta upp",
+      "moveDown": "Flytta ned",
+      "deleteMessage": "Det sparade kommandot tas bort från alla terminaler som erbjöd det."
     }
   }
 }

@@ -22,6 +22,7 @@
     "expired": "Utløpt"
   },
   "common": {
+    "deleteTitle": "Slette {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Avbryt",
@@ -4105,7 +4106,6 @@
       "importConfig": "Importer fra SSH-konfig",
       "rowActions": "{{label}}, {{target}}. Åpner en terminal; langt trykk for å redigere og slette.",
       "viaJump": "via {{label}}",
-      "deleteTitle": "Slette {{label}}?",
       "deleteMessage": "Innstillingene og portvideresendingene fjernes sammen med den. Dette kan ikke angres.",
       "deleteFailed": "Vertet kunne ikke slettes."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Økter",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Lim inn",
+      "hideKeyboard": "Skjul tastatur",
       "pasteTitle": "Lime inn flere linjer?",
       "pasteMultiLine": "Denne teksten går over flere linjer og sendes som én kommando.",
       "hostKeyTitle": "Ukjent vertsnøkkel",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Nøkkel opprettet",
       "createdDescription": "Legg til denne offentlige nøkkelen i serverens authorized_keys, og koble deretter til med denne nøkkelen.",
       "copyPublicKey": "Kopier nøkkel"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Skybasert sandkasse",
+      "connectingTitle": "Åpner en terminal",
+      "connectingMessage": "Kobler til sandkassens skall.",
+      "reconnectingMessage": "Terminaltilkoblingen ble brutt. Sandkassen fortsetter å kjøre.",
+      "stoppedTitle": "Sandkassen er stoppet",
+      "stoppedMessage": "Send en melding i økten for å vekke den, og prøv igjen.",
+      "exitedMessage": "Skallet er avsluttet. En ny terminal starter et nytt skall.",
+      "newTerminal": "Ny terminal",
+      "disconnectedTitle": "Terminalen ble frakoblet",
+      "disconnectedMessage": "Økten lukket terminalen. Åpne den igjen fra økten.",
+      "unavailableTitle": "Terminal utilgjengelig",
+      "unavailableMessage": "Sandkassen kunne ikke åpne en terminal. Prøv igjen fra økten.",
+      "forbiddenMessage": "Denne økten tillater ikke en interaktiv terminal.",
+      "notFoundMessage": "Denne økten har ingen sandkasse som denne kontoen kan åpne."
+    },
+    "sandboxes": {
+      "title": "Kilo-sandkasser",
+      "unnamed": "Sandkasse uten navn",
+      "open": "{{title}}, åpner en terminal i sandkassen"
+    },
+    "snippets": {
+      "title": "Snutter",
+      "subtitle": "Kommandoer ett trykk unna i en terminal.",
+      "manage": "Administrer snutter",
+      "emptyTitle": "Ingen snutter ennå",
+      "emptyDescription": "Lagre en kommando én gang, og send den fra hvilken som helst terminal.",
+      "add": "Legg til snutt",
+      "newTitle": "Ny snutt",
+      "edit": "Rediger snutt",
+      "name": "Navn på snutt",
+      "namePlaceholder": "Distribuer nettappen",
+      "command": "Skallkommando",
+      "commandPlaceholder": "f.eks. docker compose up -d",
+      "host": "Tilgjengelig på",
+      "everyHost": "Alle verter",
+      "appendNewline": "Kjør den med en gang",
+      "appendNewlineHint": "Sender en ny linje etter kommandoen, slik at den kjøres i stedet for å bli stående ved ledeteksten.",
+      "send": "{{label}}, sender denne snutten",
+      "rowActions": "{{label}}, rediger snutt",
+      "moveUp": "Flytt opp",
+      "moveDown": "Flytt ned",
+      "deleteMessage": "Den lagrede kommandoen fjernes fra alle terminaler som tilbød den."
     }
   }
 }

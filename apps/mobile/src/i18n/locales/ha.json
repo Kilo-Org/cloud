@@ -22,6 +22,7 @@
     "expired": "Lokaci ya ƙare"
   },
   "common": {
+    "deleteTitle": "Share {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Soke",
@@ -4105,7 +4106,6 @@
       "importConfig": "Shigo daga config ɗin SSH",
       "rowActions": "{{label}}, {{target}}. Yana buɗe tashar umarni; danna tsawon lokaci don gyara da sharewa.",
       "viaJump": "ta {{label}}",
-      "deleteTitle": "Share {{label}}?",
       "deleteMessage": "Ana cire saitin sa da port forwards tare da shi. Ba za a iya juyar da wannan ba.",
       "deleteFailed": "Ba a iya share host ɗin ba."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Zamanni",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Manna",
+      "hideKeyboard": "Ɓoye madannai",
       "pasteTitle": "Manna layuka da yawa?",
       "pasteMultiLine": "Wannan rubutu ya shafi layuka da yawa kuma ana aika shi a matsayin umarni ɗaya.",
       "hostKeyTitle": "Maɓallin host da ba a sani ba",
@@ -4245,6 +4246,51 @@
       "createdTitle": "An ƙirƙiri maɓalli",
       "createdDescription": "Ƙara wannan maɓallin jama'a zuwa authorized_keys na uwar garke, sannan ka haɗa da wannan maɓalli.",
       "copyPublicKey": "Kwafi maɓalli"
+    },
+    "sandbox": {
+      "title": "Tashar umarni",
+      "subtitle": "Yankin keɓe na girgije",
+      "connectingTitle": "Ana buɗe tashar umarni",
+      "connectingMessage": "Ana haɗawa da harsashin yankin keɓe.",
+      "reconnectingMessage": "Haɗin tashar umarni ya yanke. Yankin keɓe yana ci gaba da aiki.",
+      "stoppedTitle": "An tsayar da yankin keɓe",
+      "stoppedMessage": "Aika saƙo a cikin zaman don tada shi, sannan sake gwadawa.",
+      "exitedMessage": "Harsashin ya ƙare. Sabuwar tashar umarni tana fara sabon harsashi.",
+      "newTerminal": "Sabuwar tashar umarni",
+      "disconnectedTitle": "Tashar umarni ta katse",
+      "disconnectedMessage": "Zaman ya rufe tashar umarni. Sake buɗe ta daga zaman.",
+      "unavailableTitle": "Tashar umarni ba ta samuwa",
+      "unavailableMessage": "Yankin keɓe bai iya buɗe tashar umarni ba. Sake gwadawa daga zaman.",
+      "forbiddenMessage": "Wannan zaman ba ya ba da izinin tashar umarni mai mu'amala.",
+      "notFoundMessage": "Wannan zaman ba shi da yankin keɓe da asusun nan zai iya buɗewa."
+    },
+    "sandboxes": {
+      "title": "Yankunan keɓe na Kilo",
+      "unnamed": "Yankin keɓe maras take",
+      "open": "{{title}}, yana buɗe tashar umarni a cikin yankin keɓensa"
+    },
+    "snippets": {
+      "title": "Gajerun umarni",
+      "subtitle": "Umarni da za a iya aikawa da danna ɗaya a tashar umarni.",
+      "manage": "Sarrafa gajerun umarni",
+      "emptyTitle": "Babu gajerun umarni tukuna",
+      "emptyDescription": "Adana umarni sau ɗaya, sannan aika shi daga kowace tashar umarni.",
+      "add": "Ƙara gajeren umarni",
+      "newTitle": "Sabon gajeren umarni",
+      "edit": "Gyara gajeren umarni",
+      "name": "Sunan gajeren umarni",
+      "namePlaceholder": "Tura manhajar yanar gizo",
+      "command": "Umarnin harsashi",
+      "commandPlaceholder": "misali docker compose up -d",
+      "host": "Ana samuwa a",
+      "everyHost": "Kowace host",
+      "appendNewline": "Aiwatar da shi nan take",
+      "appendNewlineHint": "Yana aika sabon layi bayan umarnin, don haka yana gudana maimakon ya zauna a kan alamar umarni.",
+      "send": "{{label}}, yana aika wannan gajeren umarni",
+      "rowActions": "{{label}}, gyara gajeren umarni",
+      "moveUp": "Matsa sama",
+      "moveDown": "Matsa ƙasa",
+      "deleteMessage": "Ana cire umarnin da aka adana daga kowace tashar umarni da ta ba da shi."
     }
   }
 }

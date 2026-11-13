@@ -22,6 +22,7 @@
     "expired": "Kuphelelwe yisikhathi"
   },
   "common": {
+    "deleteTitle": "Susa {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Khansela",
@@ -4105,7 +4106,6 @@
       "importConfig": "Ngenisa kusuka kukhonfigi ye-SSH",
       "rowActions": "{{label}}, {{target}}. Kuvula itheminali; cindezela isikhathi eside ukuze uhlele noma ususe.",
       "viaJump": "ngokusebenzisa {{label}}",
-      "deleteTitle": "Susa {{label}}?",
       "deleteMessage": "Izilungiselelo zayo nokudluliswa kwamachweba kususwa kanye nayo. Lokhu akukwazi ukuhlehliswa.",
       "deleteFailed": "Ihosthi ayikwazanga ukususwa."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Amaseshini",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Namathisela",
+      "hideKeyboard": "Fihla ikhibhodi",
       "pasteTitle": "Namathisela imigqa eminingi?",
       "pasteMultiLine": "Lo mbhalo unemigqa eminingi futhi uthunyelwa njengomyalo owodwa.",
       "hostKeyTitle": "Ukhiye wehosthi ongaziwa",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Ukhiye udaliwe",
       "createdDescription": "Engeza lo khiye womphakathi ku-authorized_keys yeseva, bese uxhuma ngalo khiye.",
       "copyPublicKey": "Kopisha ukhiye"
+    },
+    "sandbox": {
+      "title": "Ithembinali",
+      "subtitle": "Isiqukathi esizimele samafu",
+      "connectingTitle": "Kuvulwa itheminali",
+      "connectingMessage": "Kuxhunywa neshelu lesiqukathi esizimele.",
+      "reconnectingMessage": "Ukuxhumana kwethebinali kwephukile. Isiqukathi esizimele siyaqhubeka nokusebenza.",
+      "stoppedTitle": "Isiqukathi esizimele simisiwe",
+      "stoppedMessage": "Thumela umyalezo kuseshini ukuze usivuse, bese uzama futhi.",
+      "exitedMessage": "Ishelu liphelile. Ithembinali entsha iqala ishelu elisha.",
+      "newTerminal": "Ithembinali entsha",
+      "disconnectedTitle": "Ithembinali inqanyuliwe",
+      "disconnectedMessage": "Iseshini ivale itheminali. Yivule futhi kuseshini.",
+      "unavailableTitle": "Ithembinali ayitholakali",
+      "unavailableMessage": "Isiqukathi esizimele asikwazanga ukuvula itheminali. Zama futhi kuseshini.",
+      "forbiddenMessage": "Le seshini ayivumeli itheminali esebenzisanayo.",
+      "notFoundMessage": "Akukho siqukathi esizimele esingavulwa yile akhawunti kule seshini."
+    },
+    "sandboxes": {
+      "title": "Iziqukathi ezizimele ze-Kilo",
+      "unnamed": "Isiqukathi esingenasihloko",
+      "open": "{{title}}, kuvula itheminali esiqukathini sayo esizimele"
+    },
+    "snippets": {
+      "title": "Iziqeshana",
+      "subtitle": "Imiyalo etholakala ngokuthepha kube kanye kutheminali.",
+      "manage": "Phatha iziqeshana",
+      "emptyTitle": "Azikho iziqeshana okwamanje",
+      "emptyDescription": "Londoloza umyalo kanye, bese uwuthumela kunoma iyiphi itheminali.",
+      "add": "Engeza isiqeshana",
+      "newTitle": "Isiqeshana esisha",
+      "edit": "Hlela isiqeshana",
+      "name": "Igama lesiqeshana",
+      "namePlaceholder": "Sethumela uhlelo lokusebenza lwewebhu",
+      "command": "Umyalo weshelu",
+      "commandPlaceholder": "isb. docker compose up -d",
+      "host": "Itholakala ku",
+      "everyHost": "Wonke amahosthi",
+      "appendNewline": "Yisebenzise ngokushesha",
+      "appendNewlineHint": "Ithumela umugqa omusha ngemva komyalo, ukuze usebenze esikhundleni sokuhlala ku-prompt.",
+      "send": "{{label}}, ithumela lesi siqeshana",
+      "rowActions": "{{label}}, hlela isiqeshana",
+      "moveUp": "Nyusa",
+      "moveDown": "Hlisa",
+      "deleteMessage": "Umyalo ogciniwe ususwa kuyo yonke itheminali eyawunikeza."
     }
   }
 }

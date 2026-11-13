@@ -22,6 +22,7 @@
     "expired": "Waqtigiisu dhacay"
   },
   "common": {
+    "deleteTitle": "Tirtir {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Jooji",
@@ -4105,7 +4106,6 @@
       "importConfig": "Ka soo qaado SSH config",
       "rowActions": "{{label}}, {{target}}. Waxay furtaa terminal; riix dheer si aad u tifaftirto ama u tirtirto.",
       "viaJump": "loo marayo {{label}}",
-      "deleteTitle": "Tirtir {{label}}?",
       "deleteMessage": "Dejinta iyo port forwards-keeda waa la saarayaa. Tan dib looma noqon karo.",
       "deleteFailed": "Host-ka lama tirtiri karin."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Kalfadhiyada",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Ku dheji",
+      "hideKeyboard": "Qari kiiboodhka",
       "pasteTitle": "Ma ku dhejinayaa dhowr sadar?",
       "pasteMultiLine": "Qoraalkan wuxuu ka kooban yahay dhowr sadar, waxaana loo diraa sidii hal amar.",
       "hostKeyTitle": "Furaha host-ka aan la aqoon",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Fure la abuuray",
       "createdDescription": "Ku dar furaha guudkan authorized_keys-ka server-ka, ka dibna furahan ku xiriir.",
       "copyPublicKey": "Koobi furaha"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Deegaan go'doon oo daruureed",
+      "connectingTitle": "Terminal ayaa la furayaa",
+      "connectingMessage": "Waxaa la xidhiidhayaa shell-ka deegaanka go'doonka.",
+      "reconnectingMessage": "Xidhiidhka terminal-ka wuu go'ay. Deegaanka go'doonka wuu sii shaqaynayaa.",
+      "stoppedTitle": "Deegaanka go'doonka waa joogsan yahay",
+      "stoppedMessage": "Fariin ku dir fadhiga si aad u soo kiciso, ka dibna mar kale isku day.",
+      "exitedMessage": "Shell-ka wuu dhammaaday. Terminal cusub ayaa shell cusub bilaabaya.",
+      "newTerminal": "Terminal cusub",
+      "disconnectedTitle": "Terminal-ka wuu go'ay",
+      "disconnectedMessage": "Fadhiga ayaa terminal-ka xiray. Mar kale fadhiga ka fur.",
+      "unavailableTitle": "Terminal lama heli karo",
+      "unavailableMessage": "Deegaanka go'doonka terminal ma furi karin. Mar kale fadhiga ka isku day.",
+      "forbiddenMessage": "Fadhigan ma ogola terminal isdhexgal ah.",
+      "notFoundMessage": "Fadhigan ma laha deegaan go'doon uu akoonkan furi karo."
+    },
+    "sandboxes": {
+      "title": "Deegaanada go'doon ee Kilo",
+      "unnamed": "Deegaan go'doon aan magac lahayn",
+      "open": "{{title}}, wuxuu furaa terminal ku yaal deegaanka go'doonkiisa"
+    },
+    "snippets": {
+      "title": "Amarro kaydsan",
+      "subtitle": "Amarro hal taabasho kaga jira terminal-ka.",
+      "manage": "Maamul amarraha kaydsan",
+      "emptyTitle": "Weli amarro kaydsan ma jiraan",
+      "emptyDescription": "Kaydi amar hal mar, ka dibna terminal kasta ka dir.",
+      "add": "Ku dar amar kaydsan",
+      "newTitle": "Amar kaydsan oo cusub",
+      "edit": "Tifaftir amarka kaydsan",
+      "name": "Magaca amarka kaydsan",
+      "namePlaceholder": "Geyn app-ka web-ka",
+      "command": "Amarka shell-ka",
+      "commandPlaceholder": "tus. docker compose up -d",
+      "host": "Laga heli karaa",
+      "everyHost": "Host kasta",
+      "appendNewline": "Isla markiiba socodsii",
+      "appendNewlineHint": "Waxay diraa khad cusub amarka ka dib, si uu u socdo halkii uu prompt-ka ku fadhiisan lahaa.",
+      "send": "{{label}}, wuxuu diraa amarkan kaydsan",
+      "rowActions": "{{label}}, tifaftir amarka kaydsan",
+      "moveUp": "Kor u dhaqaaji",
+      "moveDown": "Hoos u dhaqaaji",
+      "deleteMessage": "Amarka la kaydiyay waxaa laga saarayaa terminal kasta oo soo bandhigay."
     }
   }
 }

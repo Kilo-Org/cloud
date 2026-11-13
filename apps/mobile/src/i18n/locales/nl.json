@@ -22,6 +22,7 @@
     "expired": "Verlopen"
   },
   "common": {
+    "deleteTitle": "{{label}} verwijderen?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Annuleren",
@@ -4105,7 +4106,6 @@
       "importConfig": "Importeren uit SSH-configuratie",
       "rowActions": "{{label}}, {{target}}. Opent een terminal; lang indrukken voor bewerken en verwijderen.",
       "viaJump": "via {{label}}",
-      "deleteTitle": "{{label}} verwijderen?",
       "deleteMessage": "De instellingen en port forwards worden mee verwijderd. Dit kan niet ongedaan worden gemaakt.",
       "deleteFailed": "De host kon niet worden verwijderd."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Sessies",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Plakken",
+      "hideKeyboard": "Toetsenbord verbergen",
       "pasteTitle": "Meerdere regels plakken?",
       "pasteMultiLine": "Deze tekst bestaat uit meerdere regels en wordt als één opdracht verstuurd.",
       "hostKeyTitle": "Onbekende hostsleutel",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Sleutel aangemaakt",
       "createdDescription": "Voeg deze publieke sleutel toe aan de authorized_keys van de server en maak daarna verbinding met deze sleutel.",
       "copyPublicKey": "Sleutel kopiëren"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Cloud-sandbox",
+      "connectingTitle": "Terminal wordt geopend",
+      "connectingMessage": "Verbinden met de shell van de sandbox.",
+      "reconnectingMessage": "De terminalverbinding is verbroken. De sandbox blijft draaien.",
+      "stoppedTitle": "De sandbox is gestopt",
+      "stoppedMessage": "Stuur een bericht in de sessie om de sandbox te wekken en probeer het daarna opnieuw.",
+      "exitedMessage": "De shell is beëindigd. Een nieuwe terminal start een nieuwe shell.",
+      "newTerminal": "Nieuwe terminal",
+      "disconnectedTitle": "De terminal is losgekoppeld",
+      "disconnectedMessage": "De sessie heeft de terminal gesloten. Open hem opnieuw vanuit de sessie.",
+      "unavailableTitle": "Terminal niet beschikbaar",
+      "unavailableMessage": "De sandbox kon geen terminal openen. Probeer het opnieuw vanuit de sessie.",
+      "forbiddenMessage": "Deze sessie staat geen interactieve terminal toe.",
+      "notFoundMessage": "Deze sessie heeft geen sandbox die dit account kan openen."
+    },
+    "sandboxes": {
+      "title": "Kilo-sandboxen",
+      "unnamed": "Naamloze sandbox",
+      "open": "{{title}}, opent een terminal in de sandbox"
+    },
+    "snippets": {
+      "title": "Snippets",
+      "subtitle": "Commando's met één tik beschikbaar in een terminal.",
+      "manage": "Snippets beheren",
+      "emptyTitle": "Nog geen snippets",
+      "emptyDescription": "Sla een commando één keer op en verstuur het daarna vanuit elke terminal.",
+      "add": "Snippet toevoegen",
+      "newTitle": "Nieuwe snippet",
+      "edit": "Snippet bewerken",
+      "name": "Snippetnaam",
+      "namePlaceholder": "De webapp uitrollen",
+      "command": "Shellcommando",
+      "commandPlaceholder": "bijv. docker compose up -d",
+      "host": "Beschikbaar op",
+      "everyHost": "Elke host",
+      "appendNewline": "Direct uitvoeren",
+      "appendNewlineHint": "Stuurt een nieuwe regel na het commando, zodat het wordt uitgevoerd in plaats van bij de prompt te blijven staan.",
+      "send": "{{label}}, verstuurt deze snippet",
+      "rowActions": "{{label}}, snippet bewerken",
+      "moveUp": "Omhoog verplaatsen",
+      "moveDown": "Omlaag verplaatsen",
+      "deleteMessage": "Het opgeslagen commando wordt verwijderd uit elke terminal die het aanbood."
     }
   }
 }

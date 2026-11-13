@@ -22,6 +22,7 @@
     "expired": "Muda wake umeisha"
   },
   "common": {
+    "deleteTitle": "Futa {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Ghairi",
@@ -4105,7 +4106,6 @@
       "importConfig": "Leta kutoka SSH config",
       "rowActions": "{{label}}, {{target}}. Hufungua terminal; bonyeza kwa muda mrefu ili kuhariri na kufuta.",
       "viaJump": "kupitia {{label}}",
-      "deleteTitle": "Futa {{label}}?",
       "deleteMessage": "Mipangilio yake na uelekezaji wa bandari huondolewa pamoja nayo. Hili haliwezi kutenduliwa.",
       "deleteFailed": "Mwenyeji hakuweza kufutwa."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Vikao",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Bandika",
+      "hideKeyboard": "Ficha kibodi",
       "pasteTitle": "Bandika mistari kadhaa?",
       "pasteMultiLine": "Maandishi haya yana mistari kadhaa na hutumwa kama amri moja.",
       "hostKeyTitle": "Ufunguo wa mwenyeji usiojulikana",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Ufunguo umetengenezwa",
       "createdDescription": "Ongeza ufunguo huu wa umma kwenye authorized_keys ya seva, kisha unganisha ukitumia ufunguo huu.",
       "copyPublicKey": "Nakili ufunguo"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Sanduku la wingu",
+      "connectingTitle": "Inafungua terminal",
+      "connectingMessage": "Inaunganisha na ganda la sanduku.",
+      "reconnectingMessage": "Muunganisho wa terminal umeanguka. Sanduku linaendelea kufanya kazi.",
+      "stoppedTitle": "Sanduku limesimama",
+      "stoppedMessage": "Tuma ujumbe kwenye kikao ili kuliamsha, kisha ujaribu tena.",
+      "exitedMessage": "Ganda limeisha. Terminal mpya huanzisha ganda jipya.",
+      "newTerminal": "Terminal mpya",
+      "disconnectedTitle": "Terminal imekatika",
+      "disconnectedMessage": "Kikao kilifunga terminal. Ifungue tena kutoka kwenye kikao.",
+      "unavailableTitle": "Terminal haipatikani",
+      "unavailableMessage": "Sanduku halikuweza kufungua terminal. Jaribu tena kutoka kwenye kikao.",
+      "forbiddenMessage": "Kikao hiki hakiruhusu terminal shirikishi.",
+      "notFoundMessage": "Kikao hiki hakina sanduku ambalo akaunti hii inaweza kufungua."
+    },
+    "sandboxes": {
+      "title": "Masanduku ya Kilo",
+      "unnamed": "Sanduku lisilo na jina",
+      "open": "{{title}}, hufungua terminal katika sanduku lake"
+    },
+    "snippets": {
+      "title": "Vipande",
+      "subtitle": "Amri zinazopatikana kwa mguso mmoja kwenye terminal.",
+      "manage": "Dhibiti vipande",
+      "emptyTitle": "Bado hakuna vipande",
+      "emptyDescription": "Hifadhi amri mara moja, kisha uitume kutoka terminal yoyote.",
+      "add": "Ongeza kipande",
+      "newTitle": "Kipande kipya",
+      "edit": "Hariri kipande",
+      "name": "Jina la kipande",
+      "namePlaceholder": "Sambaza programu ya wavuti",
+      "command": "Amri ya ganda",
+      "commandPlaceholder": "kmf. docker compose up -d",
+      "host": "Inapatikana kwenye",
+      "everyHost": "Kila mwenyeji",
+      "appendNewline": "Iendeshe mara moja",
+      "appendNewlineHint": "Hutuma mstari mpya baada ya amri, ili iendeshwe badala ya kukaa kwenye kidokezo.",
+      "send": "{{label}}, hutuma kipande hiki",
+      "rowActions": "{{label}}, hariri kipande",
+      "moveUp": "Hamisha juu",
+      "moveDown": "Hamisha chini",
+      "deleteMessage": "Amri iliyohifadhiwa huondolewa kutoka kila terminal iliyoitoa."
     }
   }
 }

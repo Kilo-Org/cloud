@@ -22,6 +22,7 @@
     "expired": "Kedaluwarsa"
   },
   "common": {
+    "deleteTitle": "Hapus {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Batal",
@@ -4105,7 +4106,6 @@
       "importConfig": "Impor dari konfigurasi SSH",
       "rowActions": "{{label}}, {{target}}. Membuka terminal; tekan lama untuk mengedit dan menghapus.",
       "viaJump": "melalui {{label}}",
-      "deleteTitle": "Hapus {{label}}?",
       "deleteMessage": "Pengaturan dan penerusan portnya akan ikut dihapus. Tindakan ini tidak dapat dibatalkan.",
       "deleteFailed": "Host tidak dapat dihapus."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Sesi",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Tempel",
+      "hideKeyboard": "Sembunyikan keyboard",
       "pasteTitle": "Tempel beberapa baris?",
       "pasteMultiLine": "Teks ini terdiri dari beberapa baris dan dikirim sebagai satu perintah.",
       "hostKeyTitle": "Kunci host tidak dikenal",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Kunci dibuat",
       "createdDescription": "Tambahkan kunci publik ini ke authorized_keys server, lalu hubungkan dengan kunci ini.",
       "copyPublicKey": "Salin kunci"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Sandbox cloud",
+      "connectingTitle": "Membuka terminal",
+      "connectingMessage": "Menghubungkan ke shell sandbox.",
+      "reconnectingMessage": "Koneksi terminal terputus. Sandbox tetap berjalan.",
+      "stoppedTitle": "Sandbox berhenti",
+      "stoppedMessage": "Kirim pesan di sesi untuk membangunkannya, lalu coba lagi.",
+      "exitedMessage": "Shell berakhir. Terminal baru akan memulai shell yang baru.",
+      "newTerminal": "Terminal baru",
+      "disconnectedTitle": "Terminal terputus",
+      "disconnectedMessage": "Sesi menutup terminal. Buka lagi dari sesi.",
+      "unavailableTitle": "Terminal tidak tersedia",
+      "unavailableMessage": "Sandbox tidak dapat membuka terminal. Coba lagi dari sesi.",
+      "forbiddenMessage": "Sesi ini tidak mengizinkan terminal interaktif.",
+      "notFoundMessage": "Sesi ini tidak memiliki sandbox yang dapat dibuka oleh akun ini."
+    },
+    "sandboxes": {
+      "title": "Sandbox Kilo",
+      "unnamed": "Sandbox tanpa judul",
+      "open": "{{title}}, membuka terminal di sandbox-nya"
+    },
+    "snippets": {
+      "title": "Snippet",
+      "subtitle": "Perintah yang cukup sekali ketuk di terminal.",
+      "manage": "Kelola snippet",
+      "emptyTitle": "Belum ada snippet",
+      "emptyDescription": "Simpan perintah sekali, lalu kirim dari terminal mana pun.",
+      "add": "Tambah snippet",
+      "newTitle": "Snippet baru",
+      "edit": "Edit snippet",
+      "name": "Nama snippet",
+      "namePlaceholder": "Deploy aplikasi web",
+      "command": "Perintah shell",
+      "commandPlaceholder": "mis. docker compose up -d",
+      "host": "Tersedia di",
+      "everyHost": "Semua host",
+      "appendNewline": "Langsung jalankan",
+      "appendNewlineHint": "Mengirim baris baru setelah perintah, sehingga perintah dijalankan alih-alih menunggu di prompt.",
+      "send": "{{label}}, mengirim snippet ini",
+      "rowActions": "{{label}}, edit snippet",
+      "moveUp": "Pindahkan ke atas",
+      "moveDown": "Pindahkan ke bawah",
+      "deleteMessage": "Perintah yang tersimpan akan dihapus dari setiap terminal yang menyediakannya."
     }
   }
 }

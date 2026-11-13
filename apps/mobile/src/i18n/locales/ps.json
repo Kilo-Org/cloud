@@ -22,6 +22,7 @@
     "expired": "مهلت یې تېر شو"
   },
   "common": {
+    "deleteTitle": "{{label}} ړنګ کړئ?",
     "sentenceJoiner": ". ",
     "listJoiner": "، ",
     "cancel": "لغوه کړئ",
@@ -4105,7 +4106,6 @@
       "importConfig": "له SSH کانفیګ څخه وارد کړئ",
       "rowActions": "{{label}}، {{target}}. ټرمینل پرانیزي؛ د سمون او ړنګولو لپاره اوږد فشار ورکړئ.",
       "viaJump": "د {{label}} له لارې",
-      "deleteTitle": "{{label}} ړنګ کړئ?",
       "deleteMessage": "د هغه تنظیمات او پورټ فوروارډونه ورسره لرې کېږي. دا بېرته نه شي ګرځول کېدای.",
       "deleteFailed": "هوسټ ړنګ نه شو."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "ناستې",
       "switchTo": "{{label}}، {{state}}",
       "paste": "پیسټ کړئ",
+      "hideKeyboard": "کیبورډ پټ کړئ",
       "pasteTitle": "څو کرښې پیسټ کړو؟",
       "pasteMultiLine": "دا متن څو کرښې لري او د یوې کمانډ په توګه لېږل کېږي.",
       "hostKeyTitle": "د هوسټ ناپیژندل شوې کیلي",
@@ -4245,6 +4246,51 @@
       "createdTitle": "کیلي جوړه شوه",
       "createdDescription": "دا عامه کیلي د سرور authorized_keys ته اضافه کړئ، بیا د دې کیلي سره وصل شئ.",
       "copyPublicKey": "کیلي کاپي کړئ"
+    },
+    "sandbox": {
+      "title": "ټرمینل",
+      "subtitle": "کلاوډ سانډباکس",
+      "connectingTitle": "ټرمینل پرانیستل",
+      "connectingMessage": "د سانډباکس شیل سره نښلېدل روان دي.",
+      "reconnectingMessage": "د ټرمینل اړیکه پرې شوه. سانډباکس خپل کار ته دوام ورکوي.",
+      "stoppedTitle": "سانډباکس ودرول شوی دی",
+      "stoppedMessage": "د سانډباکس له خوبه راویښولو لپاره په سیشن کې پیغام ولېږئ، بیا هڅه وکړئ.",
+      "exitedMessage": "شیل پای ته ورسېد. نوی ټرمینل یو نوی شیل پیلوي.",
+      "newTerminal": "نوی ټرمینل",
+      "disconnectedTitle": "ټرمینل پرې شو",
+      "disconnectedMessage": "سیشن ټرمینل بند کړ. دا بیا له سیشن څخه پرانیزئ.",
+      "unavailableTitle": "ټرمینل نشته",
+      "unavailableMessage": "سانډباکس ونه توانید ټرمینل پرانیزي. له سیشن څخه بیا هڅه وکړئ.",
+      "forbiddenMessage": "دا سیشن تعاملي ټرمینل ته اجازه نه ورکوي.",
+      "notFoundMessage": "دا سیشن هغه سانډباکس نه لري چې دا حساب یې پرانیستلی شي."
+    },
+    "sandboxes": {
+      "title": "د Kilo سانډباکسونه",
+      "unnamed": "بې سرلیکه سانډباکس",
+      "open": "{{title}}، په خپل سانډباکس کې ټرمینل پرانیزي"
+    },
+    "snippets": {
+      "title": "ټوټې",
+      "subtitle": "په ټرمینل کې کمانډونه یوې ټېپ ته نږدې دي.",
+      "manage": "د ټوټو مدیریت",
+      "emptyTitle": "لا ټوټې نشته",
+      "emptyDescription": "یو کمانډ یو ځل خوندي کړئ، بیا یې له هر ټرمینل څخه ولېږئ.",
+      "add": "ټوټه اضافه کړئ",
+      "newTitle": "نوې ټوټه",
+      "edit": "ټوټه سمه کړئ",
+      "name": "د ټوټې نوم",
+      "namePlaceholder": "وېب اپ ځای پرځای کړئ",
+      "command": "شیل کمانډ",
+      "commandPlaceholder": "لکه docker compose up -d",
+      "host": "د لاسرسي وړ",
+      "everyHost": "هر هوسټ",
+      "appendNewline": "سمدلاسه یې چل کړئ",
+      "appendNewlineHint": "له کمانډ وروسته یوه نوې کرښه لېږي، نو دا چلېږي د دې پرځای چې په پرامپټ کې پاتې شي.",
+      "send": "{{label}}، دا ټوټه لېږي",
+      "rowActions": "{{label}}، ټوټه سمه کړئ",
+      "moveUp": "پورته یې کړئ",
+      "moveDown": "ښکته یې کړئ",
+      "deleteMessage": "ذخیره شوی کمانډ له هر هغه ټرمینل څخه چې دا یې وړاندې کاوه، لرې کېږي."
     }
   }
 }

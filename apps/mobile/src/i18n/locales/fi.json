@@ -22,6 +22,7 @@
     "expired": "Vanhentunut"
   },
   "common": {
+    "deleteTitle": "Poistetaanko {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Peruuta",
@@ -4105,7 +4106,6 @@
       "importConfig": "Tuo SSH-asetustiedostosta",
       "rowActions": "{{label}}, {{target}}. Avaa päätteen; pitkä painallus näyttää muokkaus- ja poistovaihtoehdot.",
       "viaJump": "{{label}} kautta",
-      "deleteTitle": "Poistetaanko {{label}}?",
       "deleteMessage": "Sen asetukset ja porttiohjaukset poistetaan sen mukana. Tätä ei voi kumota.",
       "deleteFailed": "Isäntää ei voitu poistaa."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Istunnot",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Liitä",
+      "hideKeyboard": "Piilota näppäimistö",
       "pasteTitle": "Liitetäänkö useita rivejä?",
       "pasteMultiLine": "Tämä teksti kattaa useita rivejä ja lähetetään yhtenä komennona.",
       "hostKeyTitle": "Tuntematon isännän avain",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Avain luotu",
       "createdDescription": "Lisää tämä julkinen avain palvelimen authorized_keys-tiedostoon ja muodosta sitten yhteys tällä avaimella.",
       "copyPublicKey": "Kopioi avain"
+    },
+    "sandbox": {
+      "title": "Pääte",
+      "subtitle": "Pilvihiekkalaatikko",
+      "connectingTitle": "Avataan päätettä",
+      "connectingMessage": "Yhdistetään hiekkalaatikon komentotulkkiin.",
+      "reconnectingMessage": "Päätteen yhteys katkesi. Hiekkalaatikko jatkaa toimintaansa.",
+      "stoppedTitle": "Hiekkalaatikko on pysäytetty",
+      "stoppedMessage": "Lähetä viesti istunnossa herättääksesi sen, ja yritä sitten uudelleen.",
+      "exitedMessage": "Komentotulkki päättyi. Uusi pääte käynnistää uuden.",
+      "newTerminal": "Uusi pääte",
+      "disconnectedTitle": "Pääte irrotettiin",
+      "disconnectedMessage": "Istunto sulki päätteen. Avaa se uudelleen istunnosta.",
+      "unavailableTitle": "Pääte ei ole käytettävissä",
+      "unavailableMessage": "Hiekkalaatikko ei voinut avata päätettä. Yritä uudelleen istunnosta.",
+      "forbiddenMessage": "Tämä istunto ei salli interaktiivista päätettä.",
+      "notFoundMessage": "Tällä istunnolla ei ole hiekkalaatikkoa, jonka tämä tili voi avata."
+    },
+    "sandboxes": {
+      "title": "Kilon hiekkalaatikot",
+      "unnamed": "Nimetön hiekkalaatikko",
+      "open": "{{title}}, avaa päätteen sen hiekkalaatikossa"
+    },
+    "snippets": {
+      "title": "Komennonpätkät",
+      "subtitle": "Komennot yhden napautuksen päässä päätteessä.",
+      "manage": "Hallitse komennonpätkiä",
+      "emptyTitle": "Ei vielä komennonpätkiä",
+      "emptyDescription": "Tallenna komento kerran ja lähetä se mistä tahansa päätteestä.",
+      "add": "Lisää komennonpätkä",
+      "newTitle": "Uusi komennonpätkä",
+      "edit": "Muokkaa komennonpätkää",
+      "name": "Komennonpätkän nimi",
+      "namePlaceholder": "Julkaise verkkosovellus",
+      "command": "Komentotulkin komento",
+      "commandPlaceholder": "esim. docker compose up -d",
+      "host": "Käytettävissä",
+      "everyHost": "Jokainen isäntä",
+      "appendNewline": "Suorita heti",
+      "appendNewlineHint": "Lähettää rivinvaihdon komennon jälkeen, jolloin komento suoritetaan sen sijaan että se jäisi kehotteelle.",
+      "send": "{{label}}, lähettää tämän komennonpätkän",
+      "rowActions": "{{label}}, muokkaa komennonpätkää",
+      "moveUp": "Siirrä ylös",
+      "moveDown": "Siirrä alas",
+      "deleteMessage": "Tallennettu komento poistetaan jokaisesta päätteestä, joka tarjosi sen."
     }
   }
 }

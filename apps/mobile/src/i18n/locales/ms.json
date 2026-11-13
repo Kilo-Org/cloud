@@ -22,6 +22,7 @@
     "expired": "Tamat tempoh"
   },
   "common": {
+    "deleteTitle": "Padam {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Batal",
@@ -4105,7 +4106,6 @@
       "importConfig": "Import daripada konfig SSH",
       "rowActions": "{{label}}, {{target}}. Membuka terminal; tekan lama untuk edit dan padam.",
       "viaJump": "melalui {{label}}",
-      "deleteTitle": "Padam {{label}}?",
       "deleteMessage": "Tetapan dan pemajuan portnya turut dibuang. Tindakan ini tidak boleh dibatalkan.",
       "deleteFailed": "Hos tidak dapat dipadamkan."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Sesi",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Tampal",
+      "hideKeyboard": "Sembunyikan papan kekunci",
       "pasteTitle": "Tampal beberapa baris?",
       "pasteMultiLine": "Teks ini merangkumi beberapa baris dan dihantar sebagai satu arahan.",
       "hostKeyTitle": "Kunci hos tidak dikenali",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Kunci dicipta",
       "createdDescription": "Tambah kunci awam ini ke authorized_keys pelayan, kemudian sambung dengan kunci ini.",
       "copyPublicKey": "Salin kunci"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Kotak pasir awan",
+      "connectingTitle": "Membuka terminal",
+      "connectingMessage": "Menyambung ke shell kotak pasir.",
+      "reconnectingMessage": "Sambungan terminal terputus. Kotak pasir terus berjalan.",
+      "stoppedTitle": "Kotak pasir dihentikan",
+      "stoppedMessage": "Hantar mesej dalam sesi untuk membangunkannya, kemudian cuba lagi.",
+      "exitedMessage": "Shell telah tamat. Terminal baharu akan memulakan shell baharu.",
+      "newTerminal": "Terminal baharu",
+      "disconnectedTitle": "Terminal terputus",
+      "disconnectedMessage": "Sesi menutup terminal. Buka semula daripada sesi.",
+      "unavailableTitle": "Terminal tidak tersedia",
+      "unavailableMessage": "Kotak pasir tidak dapat membuka terminal. Cuba lagi daripada sesi.",
+      "forbiddenMessage": "Sesi ini tidak membenarkan terminal interaktif.",
+      "notFoundMessage": "Sesi ini tidak mempunyai kotak pasir yang boleh dibuka oleh akaun ini."
+    },
+    "sandboxes": {
+      "title": "Kotak pasir Kilo",
+      "unnamed": "Kotak pasir tanpa tajuk",
+      "open": "{{title}}, membuka terminal dalam kotak pasirnya"
+    },
+    "snippets": {
+      "title": "Serpihan",
+      "subtitle": "Arahan hanya satu ketikan dalam terminal.",
+      "manage": "Urus serpihan",
+      "emptyTitle": "Belum ada serpihan",
+      "emptyDescription": "Simpan arahan sekali, kemudian hantarnya daripada mana-mana terminal.",
+      "add": "Tambah serpihan",
+      "newTitle": "Serpihan baharu",
+      "edit": "Edit serpihan",
+      "name": "Nama serpihan",
+      "namePlaceholder": "Terbitkan aplikasi web",
+      "command": "Arahan shell",
+      "commandPlaceholder": "cth. docker compose up -d",
+      "host": "Tersedia pada",
+      "everyHost": "Semua hos",
+      "appendNewline": "Jalankannya serta-merta",
+      "appendNewlineHint": "Menghantar baris baharu selepas arahan, jadi arahan itu berjalan dan bukannya menunggu di prompt.",
+      "send": "{{label}}, menghantar serpihan ini",
+      "rowActions": "{{label}}, edit serpihan",
+      "moveUp": "Alih ke atas",
+      "moveDown": "Alih ke bawah",
+      "deleteMessage": "Arahan yang disimpan dibuang daripada setiap terminal yang menawarkannya."
     }
   }
 }

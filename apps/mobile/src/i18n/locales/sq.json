@@ -22,6 +22,7 @@
     "expired": "Skaduar"
   },
   "common": {
+    "deleteTitle": "Të fshihet {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Anulo",
@@ -4105,7 +4106,6 @@
       "importConfig": "Importo nga konfigurimi SSH",
       "rowActions": "{{label}}, {{target}}. Hap një terminal; shtypje e gjatë për redaktim dhe fshirje.",
       "viaJump": "përmes {{label}}",
-      "deleteTitle": "Të fshihet {{label}}?",
       "deleteMessage": "Cilësimi i tij dhe përcjelljet e portit hiqen bashkë me të. Kjo nuk mund të zhbëhet.",
       "deleteFailed": "Host nuk mund të fshihej."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Seancat",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Ngjit",
+      "hideKeyboard": "Fshih tastierën",
       "pasteTitle": "Të ngjiten disa rreshta?",
       "pasteMultiLine": "Ky tekst shtrihet në disa rreshta dhe dërgohet si një komandë e vetme.",
       "hostKeyTitle": "Çelës hosti i panjohur",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Çelësi u krijua",
       "createdDescription": "Shto këtë çelës publik në authorized_keys të serverit, më pas lidhu me këtë çelës.",
       "copyPublicKey": "Kopjo çelësin"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Mjedis izolues në renë kompjuterike",
+      "connectingTitle": "Po hapet një terminal",
+      "connectingMessage": "Po lidhet me shell-in e mjedisit izolues.",
+      "reconnectingMessage": "Lidhja me terminalin u shkëput. Mjedisi izolues vazhdon të funksionojë.",
+      "stoppedTitle": "Mjedisi izolues është ndalur",
+      "stoppedMessage": "Dërgo një mesazh në sesion për ta zgjuar, pastaj riprovo.",
+      "exitedMessage": "Shell-i përfundoi. Një terminal i ri nis një shell të ri.",
+      "newTerminal": "Terminal i ri",
+      "disconnectedTitle": "Terminali u shkëput",
+      "disconnectedMessage": "Sesioni e mbylli terminalin. Hape përsëri nga sesioni.",
+      "unavailableTitle": "Terminali nuk disponohet",
+      "unavailableMessage": "Mjedisi izolues nuk mundi të hapte një terminal. Provo përsëri nga sesioni.",
+      "forbiddenMessage": "Ky sesion nuk lejon një terminal interaktiv.",
+      "notFoundMessage": "Ky sesion nuk ka asnjë mjedis izolues që kjo llogari mund ta hapë."
+    },
+    "sandboxes": {
+      "title": "Mjediset izoluese të Kilo",
+      "unnamed": "Mjedis izolues pa titull",
+      "open": "{{title}}, hap një terminal në mjedisin izolues të tij"
+    },
+    "snippets": {
+      "title": "Snippet-et",
+      "subtitle": "Komandat janë një prekje larg në një terminal.",
+      "manage": "Menaxho snippet-et",
+      "emptyTitle": "Nuk ka ende snippet-e",
+      "emptyDescription": "Ruaj një komandë një herë, pastaj dërgoje nga çdo terminal.",
+      "add": "Shto snippet",
+      "newTitle": "Snippet i ri",
+      "edit": "Redakto snippet",
+      "name": "Emri i snippet-it",
+      "namePlaceholder": "Deployo aplikacionin web",
+      "command": "Komandë shell",
+      "commandPlaceholder": "p.sh. docker compose up -d",
+      "host": "Disponohet në",
+      "everyHost": "Çdo host",
+      "appendNewline": "Ekzekutoje menjëherë",
+      "appendNewlineHint": "Dërgon një rresht të ri pas komandës, kështu që ajo ekzekutohet në vend që të mbetet në prompt.",
+      "send": "{{label}}, dërgon këtë snippet",
+      "rowActions": "{{label}}, redakto snippet",
+      "moveUp": "Zhvendos lart",
+      "moveDown": "Zhvendos poshtë",
+      "deleteMessage": "Komanda e ruajtur hiqet nga çdo terminal që e ofronte."
     }
   }
 }

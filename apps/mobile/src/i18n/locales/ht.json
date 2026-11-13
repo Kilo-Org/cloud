@@ -22,6 +22,7 @@
     "expired": "Ekspire"
   },
   "common": {
+    "deleteTitle": "Efase {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Anile",
@@ -4105,7 +4106,6 @@
       "importConfig": "Enpòte soti nan konfigirasyon SSH",
       "rowActions": "{{label}}, {{target}}. Louvri yon tèminal; kenbe peze pou modifye ak efase.",
       "viaJump": "atravè {{label}}",
-      "deleteTitle": "Efase {{label}}?",
       "deleteMessage": "Paramèt li ak redireksyon pò li yo ap retire ansanm avè l. Sa pa ka defèt.",
       "deleteFailed": "Nou pa t ka efase ot la."
     },
@@ -4184,6 +4184,7 @@
       "switcherTitle": "Sesyon",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Kole",
+      "hideKeyboard": "Kache klavye",
       "pasteTitle": "Kole plizyè liy?",
       "pasteMultiLine": "Tèks sa a gen plizyè liy epi yo voye l kòm yon sèl kòmand.",
       "hostKeyTitle": "Kle ot enkoni",
@@ -4245,6 +4246,51 @@
       "createdTitle": "Kle kreye",
       "createdDescription": "Ajoute kle piblik sa a nan authorized_keys sèvè a, epi konekte ak kle sa a.",
       "copyPublicKey": "Kopye kle"
+    },
+    "sandbox": {
+      "title": "Tèminal",
+      "subtitle": "Sandbòks nan nwaj",
+      "connectingTitle": "N ap ouvri yon tèminal",
+      "connectingMessage": "N ap konekte ak shell sandbòks la.",
+      "reconnectingMessage": "Koneksyon tèminal la koupe. Sandbòks la kontinye fonksyone.",
+      "stoppedTitle": "Sandbòks la sispann",
+      "stoppedMessage": "Voye yon mesaj nan sesyon an pou reveye l, epi eseye ankò.",
+      "exitedMessage": "Shell la fini. Yon nouvo tèminal kòmanse yon shell tou nèf.",
+      "newTerminal": "Nouvo tèminal",
+      "disconnectedTitle": "Tèminal la dekonekte",
+      "disconnectedMessage": "Sesyon an fèmen tèminal la. Ouvri l ankò depi nan sesyon an.",
+      "unavailableTitle": "Tèminal pa disponib",
+      "unavailableMessage": "Sandbòks la pa t ka ouvri yon tèminal. Eseye ankò depi nan sesyon an.",
+      "forbiddenMessage": "Sesyon sa a pa pèmèt yon tèminal entèaktif.",
+      "notFoundMessage": "Sesyon sa a pa gen okenn sandbòks ke kont sa a ka ouvri."
+    },
+    "sandboxes": {
+      "title": "Sandbòks Kilo",
+      "unnamed": "Sandbòks san tit",
+      "open": "{{title}}, ouvri yon tèminal nan sandbòks li"
+    },
+    "snippets": {
+      "title": "Kòmand anrejistre",
+      "subtitle": "Kòmand ki disponib ak yon sèl tap nan yon tèminal.",
+      "manage": "Jere kòmand anrejistre yo",
+      "emptyTitle": "Poko gen kòmand anrejistre",
+      "emptyDescription": "Anrejistre yon kòmand yon sèl fwa, epi voye l depi nan nenpòt tèminal.",
+      "add": "Ajoute kòmand anrejistre",
+      "newTitle": "Nouvo kòmand anrejistre",
+      "edit": "Modifye kòmand anrejistre",
+      "name": "Non kòmand anrejistre a",
+      "namePlaceholder": "Deplwaye aplikasyon wèb la",
+      "command": "Kòmand shell",
+      "commandPlaceholder": "pa ekzanp docker compose up -d",
+      "host": "Disponib sou",
+      "everyHost": "Tout ot",
+      "appendNewline": "Lanse l touswit",
+      "appendNewlineHint": "Voye yon nouvo liy apre kòmand lan, konsa li egzekite olye li rete sou envit la.",
+      "send": "{{label}}, voye kòmand anrejistre sa a",
+      "rowActions": "{{label}}, modifye kòmand anrejistre a",
+      "moveUp": "Deplase anwo",
+      "moveDown": "Deplase anba",
+      "deleteMessage": "Kòmand ki anrejistre a retire nan tout tèminal ki te ofri l."
     }
   }
 }

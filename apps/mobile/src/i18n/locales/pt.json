@@ -22,6 +22,7 @@
     "expired": "Expirado"
   },
   "common": {
+    "deleteTitle": "Eliminar {{label}}?",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancelar",
@@ -4176,7 +4177,6 @@
       "importConfig": "Importar da configuração SSH",
       "rowActions": "{{label}}, {{target}}. Abre um terminal; pressione e segure para editar e eliminar.",
       "viaJump": "via {{label}}",
-      "deleteTitle": "Eliminar {{label}}?",
       "deleteMessage": "A sua configuração e os reencaminhamentos de portas são removidos com ele. Esta ação não pode ser anulada.",
       "deleteFailed": "Não foi possível eliminar o anfitrião."
     },
@@ -4255,6 +4255,7 @@
       "switcherTitle": "Sessões",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Colar",
+      "hideKeyboard": "Ocultar teclado",
       "pasteTitle": "Colar várias linhas?",
       "pasteMultiLine": "Este texto ocupa várias linhas e é enviado como um único comando.",
       "hostKeyTitle": "Chave do anfitrião desconhecida",
@@ -4316,6 +4317,51 @@
       "createdTitle": "Chave criada",
       "createdDescription": "Adicione esta chave pública ao authorized_keys do servidor e, em seguida, ligue-se com esta chave.",
       "copyPublicKey": "Copiar chave"
+    },
+    "sandbox": {
+      "title": "Terminal",
+      "subtitle": "Ambiente isolado na nuvem",
+      "connectingTitle": "A abrir um terminal",
+      "connectingMessage": "A ligar à shell do ambiente isolado.",
+      "reconnectingMessage": "A ligação ao terminal caiu. O ambiente isolado continua a funcionar.",
+      "stoppedTitle": "O ambiente isolado está parado",
+      "stoppedMessage": "Envie uma mensagem na sessão para o acordar e tente novamente.",
+      "exitedMessage": "A shell terminou. Um novo terminal inicia uma nova shell.",
+      "newTerminal": "Novo terminal",
+      "disconnectedTitle": "O terminal desligou-se",
+      "disconnectedMessage": "A sessão fechou o terminal. Abra-o novamente a partir da sessão.",
+      "unavailableTitle": "Terminal indisponível",
+      "unavailableMessage": "O ambiente isolado não conseguiu abrir um terminal. Tente novamente a partir da sessão.",
+      "forbiddenMessage": "Esta sessão não permite um terminal interativo.",
+      "notFoundMessage": "Esta sessão não tem nenhum ambiente isolado que esta conta possa abrir."
+    },
+    "sandboxes": {
+      "title": "Ambientes isolados do Kilo",
+      "unnamed": "Ambiente isolado sem título",
+      "open": "{{title}}, abre um terminal no seu ambiente isolado"
+    },
+    "snippets": {
+      "title": "Comandos guardados",
+      "subtitle": "Comandos a um toque num terminal.",
+      "manage": "Gerir comandos guardados",
+      "emptyTitle": "Ainda não há comandos guardados",
+      "emptyDescription": "Guarde um comando uma vez e envie-o a partir de qualquer terminal.",
+      "add": "Adicionar comando",
+      "newTitle": "Novo comando",
+      "edit": "Editar comando",
+      "name": "Nome do comando",
+      "namePlaceholder": "Publicar a aplicação web",
+      "command": "Comando de shell",
+      "commandPlaceholder": "p. ex. docker compose up -d",
+      "host": "Disponível em",
+      "everyHost": "Todos os anfitriões",
+      "appendNewline": "Executar de imediato",
+      "appendNewlineHint": "Envia uma nova linha após o comando, para que este seja executado em vez de ficar no prompt.",
+      "send": "{{label}}, envia este comando",
+      "rowActions": "{{label}}, editar comando",
+      "moveUp": "Mover para cima",
+      "moveDown": "Mover para baixo",
+      "deleteMessage": "O comando guardado é removido de todos os terminais que o ofereciam."
     }
   }
 }

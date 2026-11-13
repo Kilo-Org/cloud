@@ -7,14 +7,42 @@ import { LAST_CLOUD_ENVIRONMENT_KEY } from '@/lib/storage-keys';
 /**
  * The last environment chosen for one repository in one scope. The web keeps
  * the same map in localStorage, so switching back to a repository restores the
- * environment picked for it instead of asking again.
+ * environment picked for it instead of asking again. Entries are ordered by
+ * recency: a pick moves its repository to the end of the map, and only the
+ * newest {@link MAX_STORED_ENVIRONMENT_CHOICES} repositories are kept.
  */
 type StoredEnvironmentChoice = Record<string, string>;
+
+/**
+ * One entry per repository a person has picked an environment in. The map is
+ * otherwise never pruned by the person, so the oldest picks fall out instead of
+ * growing the persisted record for every repository ever opened.
+ */
+export const MAX_STORED_ENVIRONMENT_CHOICES = 50;
+
+/** The map with `key` holding `environmentId` as its most recent entry. */
+export function withEnvironmentChoice(
+  stored: StoredEnvironmentChoice,
+  key: string,
+  environmentId: string
+): StoredEnvironmentChoice {
+  const entries = Object.entries(stored).filter(([storedKey]) => storedKey !== key);
+  entries.push([key, environmentId]);
+  return Object.fromEntries(entries.slice(-MAX_STORED_ENVIRONMENT_CHOICES));
+}
+
+/** The map without `key`: a choice whose environment is gone leaves nothing behind. */
+export function withoutEnvironmentChoice(
+  stored: StoredEnvironmentChoice,
+  key: string
+): StoredEnvironmentChoice {
+  return Object.fromEntries(Object.entries(stored).filter(([storedKey]) => storedKey !== key));
+}
 
 const rawStoredEnvironmentChoiceSchema = z.record(z.string(), z.unknown());
 const storedEnvironmentIdSchema = z.string();
 
-function parseStoredEnvironmentChoice(raw: string | null): StoredEnvironmentChoice {
+export function parseStoredEnvironmentChoice(raw: string | null): StoredEnvironmentChoice {
   if (!raw) {
     return {};
   }
@@ -55,7 +83,16 @@ export function clearEnvironmentChoices() {
 }
 
 function saveEnvironmentChoice(key: string, environmentId: string) {
-  store.set({ ...store.getRequested(), [key]: environmentId });
+  store.set(withEnvironmentChoice(store.getRequested(), key, environmentId));
+}
+
+/** Drops one repository's entry, e.g. when its environment is no longer listed. */
+export function forgetEnvironmentChoice(key: string) {
+  const stored = store.getRequested();
+  if (!Object.hasOwn(stored, key)) {
+    return;
+  }
+  store.set(withoutEnvironmentChoice(stored, key));
 }
 
 export function usePersistedEnvironmentChoice() {

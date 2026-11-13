@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { type NewSessionRepository } from '@/components/agents/new-session-repository-state';
@@ -15,7 +15,10 @@ import {
   type EnvironmentBuildStatusRow,
   isBuildActive,
 } from '@/lib/cloud-environments/environment-build-copy';
-import { usePersistedEnvironmentChoice } from '@/lib/hooks/environment-choice';
+import {
+  forgetEnvironmentChoice,
+  usePersistedEnvironmentChoice,
+} from '@/lib/hooks/environment-choice';
 import { useTRPC } from '@/lib/trpc';
 
 /** Never fetched: the list query is disabled until the repository resolves. */
@@ -78,6 +81,21 @@ export function useSessionEnvironment({
   const [madeChoice, setMadeChoice] = useState<{ key: string; environmentId: string } | null>(null);
   const chosenId = chosenEnvironmentId(madeChoice, stored, choiceKey);
   const matches = list.data;
+  // A stored pick whose environment no longer contains this repository can
+  // never be used again, and the map keeps one entry per repository, so drop it
+  // rather than carry a dead key for the life of the install. The list is only
+  // read once it has answered: an environment that is unlisted mid-load is not
+  // evidence it is gone.
+  const storedId = choiceKey === null ? undefined : stored[choiceKey];
+  const storedChoiceGone =
+    matches !== undefined &&
+    storedId !== undefined &&
+    !matches.some(environment => environment.id === storedId);
+  useEffect(() => {
+    if (storedChoiceGone && choiceKey !== null) {
+      forgetEnvironmentChoice(choiceKey);
+    }
+  }, [choiceKey, storedChoiceGone]);
   const selection: EnvironmentSelection =
     wire === null ? { status: 'idle' } : selectEnvironment(matches, chosenId, list.isLoading);
 

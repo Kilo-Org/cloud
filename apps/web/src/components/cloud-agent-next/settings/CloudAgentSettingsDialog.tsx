@@ -27,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProfilesManager } from '@/components/cloud-agent/profile-editor/ProfilesManager';
 import { useCloudAgentSettings } from '@/hooks/useCloudAgentSettings';
 import { useVercelComputeEnrollment } from '@/hooks/useVercelComputeEnrollment';
+import { useVercelComputeStatus } from '@/hooks/useVercelComputeStatus';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { BuiltinAgentsSection } from './BuiltinAgentsSection';
@@ -105,8 +106,16 @@ function CloudAgentSettings({
     organizationId,
     enabled: settings?.canManage === true,
   });
+  const statusQuery = useVercelComputeStatus({
+    organizationId,
+    enabled: settings?.canManage === true,
+  });
   const canManageCompute =
-    settings?.canManage === true && enrollmentQuery.isSuccess && enrollmentQuery.data.enrolled;
+    settings?.canManage === true &&
+    ((enrollmentQuery.isSuccess && enrollmentQuery.data.enrolled) ||
+      statusQuery.data != null ||
+      enrollmentQuery.isError ||
+      statusQuery.isError);
   const activeSection = section === 'compute' && !canManageCompute ? 'general' : section;
 
   return (
@@ -297,7 +306,11 @@ function CloudAgentSettings({
             value="compute"
             className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
           >
-            <VercelComputeSettings organizationId={organizationId} />
+            <VercelComputeSettings
+              organizationId={organizationId}
+              enrollmentQuery={enrollmentQuery}
+              statusQuery={statusQuery}
+            />
           </TabsContent>
         )}
       </Tabs>

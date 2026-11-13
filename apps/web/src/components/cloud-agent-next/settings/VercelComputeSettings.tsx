@@ -1,7 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useVercelComputeData, type VercelComputeRemoveError } from '@/hooks/useVercelComputeData';
+import {
+  useVercelComputeData,
+  type VercelComputeQueries,
+  type VercelComputeRemoveError,
+} from '@/hooks/useVercelComputeData';
 import { useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { AlertTriangle, Check, Circle, ExternalLink, Loader2, MoreHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
@@ -107,7 +111,11 @@ function statusCopy(
   }
 }
 
-export function VercelComputeSettings({ organizationId }: { organizationId?: string }) {
+export function VercelComputeSettings({
+  organizationId,
+  enrollmentQuery,
+  statusQuery,
+}: { organizationId?: string } & VercelComputeQueries) {
   const [token, setToken] = useState('');
   const [teamId, setTeamId] = useState('');
   const [projectId, setProjectId] = useState('');
@@ -134,7 +142,6 @@ export function VercelComputeSettings({ organizationId }: { organizationId?: str
     enrollmentState,
     isEnrolled,
     status,
-    statusQuery,
     isSetupFormVisible,
     discoverTeamsMutation,
     discoverProjectsMutation,
@@ -151,6 +158,8 @@ export function VercelComputeSettings({ organizationId }: { organizationId?: str
     dispatchUpgradeRuntime,
     dispatchRemove,
   } = useVercelComputeData(organizationId, normalizedToken, teamId, {
+    enrollmentQuery,
+    statusQuery,
     onRemoveSuccess: removeMutationSuccess,
     onRemoveError: removeMutationError,
   });
@@ -333,8 +342,16 @@ export function VercelComputeSettings({ organizationId }: { organizationId?: str
             <AlertTriangle />
             <AlertTitle>Vercel compute availability could not be verified</AlertTitle>
             <AlertDescription>
-              Setup is temporarily unavailable. Try again later. Existing credentials can still be
-              removed.
+              <p>Setup is temporarily unavailable. Existing credentials can still be removed.</p>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={enrollmentQuery.isFetching}
+                onClick={() => void enrollmentQuery.refetch()}
+              >
+                {enrollmentQuery.isFetching && <Loader2 className="mr-2 size-4 animate-spin" />}
+                Retry enrollment
+              </Button>
             </AlertDescription>
           </Alert>
         )}

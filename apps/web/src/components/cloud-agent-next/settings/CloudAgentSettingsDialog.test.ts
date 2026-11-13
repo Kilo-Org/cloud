@@ -7,6 +7,11 @@ import type { CloudAgentSettingsDialog as CloudAgentSettingsDialogComponent } fr
 
 const mockUseCloudAgentSettings = jest.fn();
 const mockUseVercelComputeEnrollment = jest.fn();
+const mockUseVercelComputeStatus = jest.fn();
+
+jest.mock('@/hooks/useVercelComputeStatus', () => ({
+  useVercelComputeStatus: (options: unknown) => mockUseVercelComputeStatus(options),
+}));
 
 jest.mock('@/hooks/useVercelComputeEnrollment', () => ({
   useVercelComputeEnrollment: (options: unknown) => mockUseVercelComputeEnrollment(options),
@@ -225,6 +230,8 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
       isSuccess: true,
       data: { enrolled: false },
     });
+    mockUseVercelComputeStatus.mockReset();
+    mockUseVercelComputeStatus.mockReturnValue({ isSuccess: true, data: null });
     const container = domDocument.getElementById('root');
     if (!container) throw new Error('Missing settings dialog test root');
     act(() => {
@@ -273,7 +280,6 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
   it.each([
     ['not enrolled', { isSuccess: true, data: { enrolled: false } }],
     ['loading', { isSuccess: false, data: undefined }],
-    ['failed with cached enrollment', { isSuccess: false, data: { enrolled: true } }],
   ])('hides compute when enrollment is %s, including deep links', (_label, enrollment) => {
     mockUseCloudAgentSettings.mockReturnValue(queryResult({ data: settings(true) }));
     mockUseVercelComputeEnrollment.mockReturnValue(enrollment);
@@ -288,19 +294,78 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     expect(section('session-defaults-heading').textContent).toContain('Default sandbox');
   });
 
-  it('does not check enrollment or show compute for a read-only organization member', () => {
-    mockUseCloudAgentSettings.mockReturnValue(queryResult({ data: settings(false) }));
-    mockUseVercelComputeEnrollment.mockReturnValue({
-      isSuccess: true,
-      data: { enrolled: true },
-    });
+  it.each([undefined, 'org-1'])(
+    'keeps compute reachable for an unenrolled owner with credentials in %s scope',
+    organizationId => {
+      mockUseCloudAgentSettings.mockReturnValue(queryResult({ data: settings(true) }));
+      mockUseVercelComputeStatus.mockReturnValue({
+        isSuccess: true,
+        data: { id: 'credential-1' },
+      });
+      renderDialog(organizationId, 'compute');
+
+      expect(domDocument.querySelector('[data-section="vercel-compute"]')).not.toBeNull();
+      expect(mockUseVercelComputeStatus).toHaveBeenCalledWith({
+        organizationId,
+        enabled: true,
+      });
+    }
+  );
+
+  it.each([
+    ['enrollment', { isError: true, isSuccess: false, data: undefined }, { data: null }],
+    [
+      'cached enrollment',
+      { isError: true, isSuccess: false, data: { enrolled: true } },
+      { data: null },
+    ],
+    ['status', { isSuccess: true, data: { enrolled: false } }, { isError: true }],
+  ])('keeps compute reachable to retry a failed %s check', (_label, enrollment, status) => {
+    mockUseCloudAgentSettings.mockReturnValue(queryResult({ data: settings(true) }));
+    mockUseVercelComputeEnrollment.mockReturnValue(enrollment);
+    mockUseVercelComputeStatus.mockReturnValue(status);
+    renderDialog('org-1', 'compute');
+
+    expect(domDocument.querySelector('[data-section="vercel-compute"]')).not.toBeNull();
+    expect(domDocument.querySelector('[role="tab"][data-state="active"]')?.textContent).toBe(
+      'Compute'
+    );
+  });
+
+  it.each([undefined, 'org-1'])(
+    'does not check compute access or show compute without management permission in %s scope',
+    organizationId => {
+      mockUseCloudAgentSettings.mockReturnValue(queryResult({ data: settings(false) }));
+      mockUseVercelComputeEnrollment.mockReturnValue({
+        isSuccess: true,
+        data: { enrolled: true },
+      });
+      mockUseVercelComputeStatus.mockReturnValue({ data: { id: 'credential-1' }, isError: true });
+      renderDialog(organizationId, 'compute');
+
+      expect(domDocument.querySelector('[data-section="vercel-compute"]')).toBeNull();
+      expect(mockUseVercelComputeEnrollment).toHaveBeenCalledWith({
+        organizationId,
+        enabled: false,
+      });
+      expect(mockUseVercelComputeStatus).toHaveBeenCalledWith({
+        organizationId,
+        enabled: false,
+      });
+      expect(section('session-defaults-heading').textContent).toContain('Default sandbox');
+    }
+  );
+
+  it('hides compute after an unenrolled owner removes the credentials', () => {
+    mockUseCloudAgentSettings.mockReturnValue(queryResult({ data: settings(true) }));
+    mockUseVercelComputeStatus.mockReturnValue({ data: { id: 'credential-1' } });
+    renderDialog('org-1', 'compute');
+    expect(domDocument.querySelector('[data-section="vercel-compute"]')).not.toBeNull();
+
+    mockUseVercelComputeStatus.mockReturnValue({ isSuccess: true, data: null });
     renderDialog('org-1', 'compute');
 
     expect(domDocument.querySelector('[data-section="vercel-compute"]')).toBeNull();
-    expect(mockUseVercelComputeEnrollment).toHaveBeenCalledWith({
-      organizationId: 'org-1',
-      enabled: false,
-    });
     expect(section('session-defaults-heading').textContent).toContain('Default sandbox');
   });
 

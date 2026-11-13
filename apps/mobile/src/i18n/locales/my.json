@@ -63,7 +63,7 @@
     "personal": "ကိုယ်ပိုင်",
     "connectGithub": "GitHub ချိတ်ဆက်ပါ",
     "cost": "ကုန်ကျစရိတ်",
-    "discard": "ပယ်ဖျက်ပါ",
+    "discard": "ဖျက်ပါ",
     "discardChangesMessage": "သင်၏ အပြောင်းအလဲများ ဆုံးရှုံးသွားပါလိမ့်မည်။",
     "discardChangesTitle": "အပြောင်းအလဲများကို ပယ်ဖျက်မလား?",
     "findings": "တွေ့ရှိချက်များ",
@@ -1471,7 +1471,7 @@
       "no": "မဟုတ်ပါ",
       "action": {
         "analyzeCodebase": "ကုဒ်ဘေ့စ်ကို ခွဲခြမ်းစိတ်ဖြာပါ",
-        "dismiss": "ပယ်ဖျက်ပါ",
+        "dismiss": "ဖျက်ပါ",
         "manualReview": "လူအားဖြင့် ပြန်လည်စစ်ဆေးခြင်း",
         "monitor": "စောင့်ကြည့်ပါ",
         "openPr": "PR ဖွင့်ပါ"

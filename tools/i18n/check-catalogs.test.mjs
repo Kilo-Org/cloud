@@ -1391,3 +1391,159 @@ test('reports a broken catalog through the command and exits non-zero', () => {
   assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
   assert.match(result.stderr, /check-catalogs: \d+ problem\(s\)/);
 });
+
+// A confirmation's safe button falls back to the catalog's own Cancel label
+// (`cancelLabel ?? t('common.cancel')`), so a destructive label translated with
+// that same word leaves the reader two buttons that both read Cancel.
+const CONFIRM_ENGLISH = {
+  common: { cancel: 'Cancel', keepEditing: 'Keep editing' },
+  sessionShare: { revoke: 'Revoke link' },
+};
+const CONFIRM_SOURCE = [
+  "t('common.cancel');",
+  "t('common.keepEditing');",
+  "confirm({ message: 'Stop sharing?', confirmLabel: t('sessionShare.revoke') });",
+].join('\n');
+const FRENCH_CANCEL = { cancel: 'Annuler', keepEditing: 'Continuer la modification' };
+
+test('rejects a destructive confirm label that is the catalog’s Cancel word', () => {
+  const found = run({
+    language: 'fr',
+    english: CONFIRM_ENGLISH,
+    translated: {
+      common: FRENCH_CANCEL,
+      sessionShare: { revoke: 'Annuler' },
+    },
+    source: CONFIRM_SOURCE,
+  });
+  assert.deepEqual(found, [
+    'mobile/fr: "sessionShare.revoke" reads "Annuler", which this catalog already uses for Cancel ("Annuler"); the destructive button must use a verb the locale does not use for Cancel',
+  ]);
+});
+
+test('rejects a destructive confirm label that contains the Cancel word', () => {
+  const found = run({
+    language: 'fr',
+    english: CONFIRM_ENGLISH,
+    translated: {
+      common: FRENCH_CANCEL,
+      sessionShare: { revoke: 'Annuler le partage' },
+    },
+    source: CONFIRM_SOURCE,
+  });
+  assert.deepEqual(found, [
+    'mobile/fr: "sessionShare.revoke" reads "Annuler le partage", which this catalog already uses for Cancel ("Annuler"); the destructive button must use a verb the locale does not use for Cancel',
+  ]);
+});
+
+test('accepts a destructive confirm label with a verb of its own', () => {
+  const found = run({
+    language: 'fr',
+    english: CONFIRM_ENGLISH,
+    translated: {
+      common: FRENCH_CANCEL,
+      sessionShare: { revoke: 'Révoquer le lien' },
+    },
+    source: CONFIRM_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('accepts an English confirm label that names the action it cancels', () => {
+  // "Cancel subscription" beside "Cancel" is the shipped English pattern, so
+  // English anchors the class: a locale may translate this label with its
+  // Cancel word, because English already tells the reader which action ends.
+  const found = run({
+    english: {
+      common: { cancel: 'Cancel', keepEditing: 'Keep editing' },
+      kiloPass: { manage: { cancel: 'Cancel subscription' } },
+    },
+    translated: {
+      common: { cancel: 'Отмена', keepEditing: 'Продолжить изменение' },
+      kiloPass: { manage: { cancel: 'Отмена' } },
+    },
+    source: [
+      "t('common.cancel');",
+      "t('common.keepEditing');",
+      "confirm({ message: 'Stop renewing?', confirmLabel: t('kiloPass.manage.cancel') });",
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+test('accepts a destructive label whose every call site names its own cancel label', () => {
+  const found = run({
+    language: 'fr',
+    english: CONFIRM_ENGLISH,
+    translated: {
+      common: FRENCH_CANCEL,
+      sessionShare: { revoke: 'Annuler' },
+    },
+    source: [
+      "t('common.cancel');",
+      "t('common.keepEditing');",
+      "confirm({ message: 'Stop sharing?', confirmLabel: t('sessionShare.revoke'), cancelLabel: t('common.keepEditing') });",
+      "confirm({ message: 'Stop sharing this link?', confirmLabel: t('sessionShare.revoke'), cancelLabel: t('common.keepEditing') });",
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects an Alert destructive button that reads as the Cancel word', () => {
+  const found = run({
+    language: 'fr',
+    english: CONFIRM_ENGLISH,
+    translated: {
+      common: FRENCH_CANCEL,
+      sessionShare: { revoke: 'Annuler' },
+    },
+    source: [
+      "t('common.cancel');",
+      "t('common.keepEditing');",
+      "Alert.alert('Stop sharing?', undefined, [{ text: t('common.keepEditing'), style: 'cancel' }, { text: t('sessionShare.revoke'), style: 'destructive' }]);",
+    ].join('\n'),
+  });
+  assert.deepEqual(found, [
+    'mobile/fr: "sessionShare.revoke" reads "Annuler", which this catalog already uses for Cancel ("Annuler"); the destructive button must use a verb the locale does not use for Cancel',
+  ]);
+});
+
+// `consent-card.tsx` passes `actions.destructiveLabel` into `confirm()` with no
+// `cancelLabel`, so the safe button falls back to Cancel there too; the label
+// itself is resolved from an object literal in `consent-mode.ts`.
+const CONSENT_ENGLISH = {
+  common: { back: 'Back', cancel: 'Cancel' },
+  consent: { revokeConsent: 'Revoke consent' },
+};
+const CONSENT_SOURCE = [
+  "t('common.back');",
+  "t('common.cancel');",
+  "const actions = { primaryLabel: i18n.t('common.back'), destructiveLabel: i18n.t('consent.revokeConsent') };",
+  "confirm({ title: 'Revoke consent?', message: 'You will be signed out.', confirmLabel: actions.destructiveLabel });",
+].join('\n');
+
+test('rejects a consent destructive label that reads as the Cancel word, and accepts a verb of its own', () => {
+  const found = run({
+    language: 'fr',
+    english: CONSENT_ENGLISH,
+    translated: {
+      common: { back: 'Retour', cancel: 'Annuler' },
+      consent: { revokeConsent: 'Annuler' },
+    },
+    source: CONSENT_SOURCE,
+  });
+  assert.deepEqual(found, [
+    'mobile/fr: "consent.revokeConsent" reads "Annuler", which this catalog already uses for Cancel ("Annuler"); the destructive button must use a verb the locale does not use for Cancel',
+  ]);
+
+  const distinct = run({
+    language: 'fr',
+    english: CONSENT_ENGLISH,
+    translated: {
+      common: { back: 'Retour', cancel: 'Annuler' },
+      consent: { revokeConsent: 'Révoquer le consentement' },
+    },
+    source: CONSENT_SOURCE,
+  });
+  assert.deepEqual(distinct, []);
+});

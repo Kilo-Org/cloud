@@ -4186,7 +4186,7 @@
     "existingTitle": "기존 링크",
     "existingDescription": "이 세션에는 이미 공유 링크가 있습니다. 새 링크를 만들면 기존 링크가 대체되며 더 이상 작동하지 않습니다.",
     "rotate": "새 링크 만들기",
-    "revoke": "링크 취소",
+    "revoke": "링크 제거",
     "revokeTitle": "링크를 취소하시겠습니까?",
     "revokeMessage": "현재 링크가 즉시 작동을 멈춥니다.",
     "revokeFailed": "링크를 취소할 수 없습니다.",

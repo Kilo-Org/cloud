@@ -4008,7 +4008,7 @@
       "sessionPullRequest": "PR-ka fadhiga",
       "sessionPullRequestNumber": "PR-ka fadhiga #{{number}}",
       "openSessionHint": "Wuxuu furaa fadhiga.",
-      "unlinkSessionAction": "Jooji xiriirka fadhiga",
+      "unlinkSessionAction": "Ka saar xiriirka fadhiga",
       "unlinkConfirmTitle": "Ma joojinayaa xiriirka {{title}}?",
       "unlinkConfirmMessage": "Fadhiga laftiisu lama tirtiro. Kaliya xiriirka uu la leeyahay hawshan ayaa la saaraa.",
       "startNewSession": "Bilow fadhi cusub",

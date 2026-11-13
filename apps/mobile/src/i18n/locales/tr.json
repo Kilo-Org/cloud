@@ -3136,7 +3136,7 @@
       "manageInvitationA11y": "{{email}} için daveti yönet",
       "removeMember": "Üyeyi çıkar",
       "removeMemberMessage": "{{name}} bu kuruluştan çıkarılsın mı?",
-      "revokeConfirm": "İptal et",
+      "revokeConfirm": "Kaldır",
       "revokeInvitation": "Daveti iptal et",
       "revokeInvitationMessage": "{{email}} adresine gönderilen davet iptal edilsin mi?",
       "setDailyUsageLimit": "Günlük kullanım sınırı belirle",

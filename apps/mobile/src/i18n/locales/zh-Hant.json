@@ -866,7 +866,6 @@
     },
     "analytics": {
       "title": "分析",
-      "period": "時間範圍",
       "trackedReviews": "已追蹤的審查",
       "findingsRaised": "提出的問題",
       "highImpactChanges": "高影響變更",

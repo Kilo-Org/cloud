@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "විශ්ලේෂණ",
-      "period": "කාල පරාසය",
       "trackedReviews": "නිරීක්ෂණය කළ සමාලෝචන",
       "findingsRaised": "ඉදිරිපත් කළ ගැටලු",
       "highImpactChanges": "ඉහළ බලපෑම් වෙනස්කම්",

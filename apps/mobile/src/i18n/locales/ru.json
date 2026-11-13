@@ -868,7 +868,6 @@
     },
     "analytics": {
       "title": "Аналитика",
-      "period": "Диапазон времени",
       "trackedReviews": "Отслеживаемые проверки",
       "findingsRaised": "Выявленные уязвимости",
       "highImpactChanges": "Изменения с высоким влиянием",

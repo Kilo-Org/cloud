@@ -866,7 +866,6 @@
     },
     "analytics": {
       "title": "Analitik",
-      "period": "Rentang waktu",
       "trackedReviews": "Tinjauan dilacak",
       "findingsRaised": "Temuan yang dilaporkan",
       "highImpactChanges": "Perubahan berdampak tinggi",

@@ -834,7 +834,6 @@
     },
     "analytics": {
       "title": "Statistiques",
-      "period": "Période",
       "trackedReviews": "Revues suivies",
       "findingsRaised": "Signalements émis",
       "highImpactChanges": "Modifications à fort impact",

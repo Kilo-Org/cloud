@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "ಅನಾಲಿಟಿಕ್ಸ್",
-      "period": "ಸಮಯದ ವ್ಯಾಪ್ತಿ",
       "trackedReviews": "ಟ್ರ್ಯಾಕ್ ಮಾಡಿದ ಪರಿಶೀಲನೆಗಳು",
       "findingsRaised": "ವರದಿಯಾದ ಸಮಸ್ಯೆಗಳು",
       "highImpactChanges": "ಹೆಚ್ಚಿನ ಪ್ರಭಾವದ ಬದಲಾವಣೆಗಳು",

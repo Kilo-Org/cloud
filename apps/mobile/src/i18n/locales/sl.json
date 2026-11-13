@@ -1456,7 +1456,6 @@
     },
     "analytics": {
       "title": "Analitika",
-      "period": "Časovno obdobje",
       "trackedReviews": "Sledeni pregledi",
       "findingsRaised": "Prijavljene ugotovitve",
       "highImpactChanges": "Spremembe z velikim vplivom",

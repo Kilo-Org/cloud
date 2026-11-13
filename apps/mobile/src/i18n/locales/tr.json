@@ -866,7 +866,6 @@
     },
     "analytics": {
       "title": "İstatistikler",
-      "period": "Zaman aralığı",
       "trackedReviews": "İzlenen incelemeler",
       "findingsRaised": "Tespit edilen bulgular",
       "highImpactChanges": "Yüksek etkili değişiklikler",

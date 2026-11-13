@@ -1475,7 +1475,6 @@
     },
     "analytics": {
       "title": "Analytics",
-      "period": "Time range",
       "trackedReviews": "Reviews tracked",
       "findingsRaised": "Findings raised",
       "highImpactChanges": "High-impact changes",

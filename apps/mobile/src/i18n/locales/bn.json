@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "অ্যানালিটিক্স",
-      "period": "সময়সীমা",
       "trackedReviews": "ট্র্যাক করা রিভিউ",
       "findingsRaised": "শনাক্ত সমস্যা",
       "highImpactChanges": "উচ্চ প্রভাবের পরিবর্তন",

@@ -866,7 +866,6 @@
     },
     "analytics": {
       "title": "分析",
-      "period": "期間",
       "trackedReviews": "追跡中のレビュー",
       "findingsRaised": "指摘された問題",
       "highImpactChanges": "影響の大きい変更",

@@ -868,7 +868,6 @@
     },
     "analytics": {
       "title": "Analityka",
-      "period": "Zakres czasu",
       "trackedReviews": "Śledzone przeglądy",
       "findingsRaised": "Zgłoszone problemy",
       "highImpactChanges": "Zmiany o dużym wpływie",

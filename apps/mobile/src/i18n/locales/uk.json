@@ -868,7 +868,6 @@
     },
     "analytics": {
       "title": "Аналітика",
-      "period": "Часовий діапазон",
       "trackedReviews": "Відстежені перевірки",
       "findingsRaised": "Виявлені проблеми",
       "highImpactChanges": "Зміни з високим впливом",

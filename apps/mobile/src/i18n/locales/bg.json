@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "Анализи",
-      "period": "Период",
       "trackedReviews": "Проследени прегледи",
       "findingsRaised": "Отчетени находки",
       "highImpactChanges": "Промени с голямо въздействие",

@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "Statistika",
-      "period": "Intervali kohor",
       "trackedReviews": "Shqyrtime të ndjekura",
       "findingsRaised": "Gjetje të ngritura",
       "highImpactChanges": "Ndryshime me ndikim të lartë",

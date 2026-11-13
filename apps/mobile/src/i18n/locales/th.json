@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "การวิเคราะห์",
-      "period": "ช่วงเวลา",
       "trackedReviews": "การตรวจสอบที่ติดตาม",
       "findingsRaised": "ข้อค้นพบที่พบ",
       "highImpactChanges": "การเปลี่ยนแปลงที่มีผลกระทบสูง",

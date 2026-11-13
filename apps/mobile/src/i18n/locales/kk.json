@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "Статистика",
-      "period": "Уақыт аралығы",
       "trackedReviews": "Тіркелген тексерулер",
       "findingsRaised": "Анықталған мәселелер",
       "highImpactChanges": "Жоғары әсерлі өзгерістер",

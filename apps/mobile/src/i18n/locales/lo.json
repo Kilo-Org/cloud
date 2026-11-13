@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "ການວິເຄາະ",
-      "period": "ຊ່ວງເວລາ",
       "trackedReviews": "ການກວດສອບທີ່ຕິດຕາມ",
       "findingsRaised": "ບັນຫາທີ່ກວດພົບ",
       "highImpactChanges": "ການປ່ຽນແປງທີ່ມີຜົນກະທົບສູງ",

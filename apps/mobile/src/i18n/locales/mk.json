@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "Аналитика",
-      "period": "Временски опсег",
       "trackedReviews": "Следени прегледи",
       "findingsRaised": "Пријавени наоди",
       "highImpactChanges": "Промени со големо влијание",

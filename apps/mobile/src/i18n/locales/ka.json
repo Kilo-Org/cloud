@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "სტატისტიკა",
-      "period": "დროის დიაპაზონი",
       "trackedReviews": "დაფიქსირებული შემოწმებები",
       "findingsRaised": "გამოვლენილი მიგნებები",
       "highImpactChanges": "მაღალი გავლენის ცვლილებები",

@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "Tölfræði",
-      "period": "Tímabil",
       "trackedReviews": "Yfirferðir sem fylgst er með",
       "findingsRaised": "Tilkynnt frávik",
       "highImpactChanges": "Breytingar með miklum áhrifum",

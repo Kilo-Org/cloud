@@ -866,7 +866,6 @@
     },
     "analytics": {
       "title": "Phân tích",
-      "period": "Khoảng thời gian",
       "trackedReviews": "Các lượt rà soát được theo dõi",
       "findingsRaised": "Vấn đề được nêu",
       "highImpactChanges": "Thay đổi có tác động cao",

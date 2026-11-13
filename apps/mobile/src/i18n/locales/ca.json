@@ -1432,7 +1432,6 @@
     },
     "analytics": {
       "title": "Analítica",
-      "period": "Període",
       "trackedReviews": "Revisions registrades",
       "findingsRaised": "Troballes detectades",
       "highImpactChanges": "Canvis d'alt impacte",

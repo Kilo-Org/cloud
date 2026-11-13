@@ -866,7 +866,6 @@
     },
     "analytics": {
       "title": "Statistieken",
-      "period": "Tijdsbereik",
       "trackedReviews": "Gevolgde reviews",
       "findingsRaised": "Gemelde bevindingen",
       "highImpactChanges": "Wijzigingen met grote impact",

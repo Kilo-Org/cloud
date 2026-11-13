@@ -834,7 +834,6 @@
     },
     "analytics": {
       "title": "Estatísticas",
-      "period": "Intervalo de tempo",
       "trackedReviews": "Revisões acompanhadas",
       "findingsRaised": "Ocorrências levantadas",
       "highImpactChanges": "Mudanças de alto impacto",

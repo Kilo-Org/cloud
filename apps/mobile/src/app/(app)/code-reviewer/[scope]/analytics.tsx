@@ -195,7 +195,7 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
           <SegmentedControl
             options={PERIOD_OPTIONS}
             value={String(period)}
-            accessibilityLabel={t('codeReviewer.analytics.period')}
+            accessibilityLabel={t('usage.rangePicker')}
             onChange={value => {
               const next = Number(value);
               if (next === 7 || next === 30 || next === 90) {

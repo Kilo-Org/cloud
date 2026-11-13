@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "విశ్లేషణలు",
-      "period": "సమయ పరిధి",
       "trackedReviews": "ట్రాక్ చేసిన సమీక్షలు",
       "findingsRaised": "నివేదించిన సమస్యలు",
       "highImpactChanges": "అధిక ప్రభావ మార్పులు",

@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "Statisztika",
-      "period": "Időtartomány",
       "trackedReviews": "Követett kódellenőrzések",
       "findingsRaised": "Felvetett találatok",
       "highImpactChanges": "Nagy hatású változások",

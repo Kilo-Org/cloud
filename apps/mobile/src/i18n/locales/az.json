@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "Analitika",
-      "period": "Zaman aralığı",
       "trackedReviews": "İzlənən yoxlamalar",
       "findingsRaised": "Aşkarlanan tapıntılar",
       "highImpactChanges": "Yüksək təsirli dəyişikliklər",

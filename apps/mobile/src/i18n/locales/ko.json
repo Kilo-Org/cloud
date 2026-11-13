@@ -866,7 +866,6 @@
     },
     "analytics": {
       "title": "분석",
-      "period": "기간",
       "trackedReviews": "추적된 리뷰",
       "findingsRaised": "발견된 문제",
       "highImpactChanges": "영향이 큰 변경",

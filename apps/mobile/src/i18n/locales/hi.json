@@ -866,7 +866,6 @@
     },
     "analytics": {
       "title": "एनालिटिक्स",
-      "period": "समय सीमा",
       "trackedReviews": "ट्रैक किए गए रिव्यू",
       "findingsRaised": "बताए गए निष्कर्ष",
       "highImpactChanges": "ज़्यादा असर वाले बदलाव",

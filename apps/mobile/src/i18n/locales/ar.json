@@ -870,7 +870,6 @@
     },
     "analytics": {
       "title": "التحليلات",
-      "period": "النطاق الزمني",
       "trackedReviews": "المراجعات المتتبَّعة",
       "findingsRaised": "النتائج المرصودة",
       "highImpactChanges": "تغييرات عالية التأثير",

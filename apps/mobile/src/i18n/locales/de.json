@@ -866,7 +866,6 @@
     },
     "analytics": {
       "title": "Analysen",
-      "period": "Zeitraum",
       "trackedReviews": "Erfasste Reviews",
       "findingsRaised": "Gemeldete Befunde",
       "highImpactChanges": "Änderungen mit großer Auswirkung",

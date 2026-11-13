@@ -1456,7 +1456,6 @@
     },
     "analytics": {
       "title": "Analytika",
-      "period": "Časové rozpätie",
       "trackedReviews": "Sledované kontroly",
       "findingsRaised": "Nahlásené nálezy",
       "highImpactChanges": "Zmeny s veľkým vplyvom",

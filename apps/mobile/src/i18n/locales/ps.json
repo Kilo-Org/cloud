@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "احصایې",
-      "period": "د وخت موده",
       "trackedReviews": "ثبت شوې بیاکتنې",
       "findingsRaised": "راپورته شوې موندنې",
       "highImpactChanges": "لوړ اغیز لرونکي بدلونونه",

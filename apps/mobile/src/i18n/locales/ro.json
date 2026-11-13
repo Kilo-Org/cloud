@@ -1432,7 +1432,6 @@
     },
     "analytics": {
       "title": "Statistici",
-      "period": "Interval de timp",
       "trackedReviews": "Revizuiri urmărite",
       "findingsRaised": "Constatări semnalate",
       "highImpactChanges": "Modificări cu impact mare",

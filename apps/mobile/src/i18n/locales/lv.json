@@ -1432,7 +1432,6 @@
     },
     "analytics": {
       "title": "Analītika",
-      "period": "Laika periods",
       "trackedReviews": "Sekotās pārskatīšanas",
       "findingsRaised": "Iesniegtie konstatējumi",
       "highImpactChanges": "Lielas ietekmes izmaiņas",

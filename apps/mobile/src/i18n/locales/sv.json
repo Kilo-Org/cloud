@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "Statistik",
-      "period": "Tidsintervall",
       "trackedReviews": "Granskningar som följs",
       "findingsRaised": "Rapporterade fynd",
       "highImpactChanges": "Ändringar med stor påverkan",

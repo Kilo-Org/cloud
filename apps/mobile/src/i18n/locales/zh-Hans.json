@@ -866,7 +866,6 @@
     },
     "analytics": {
       "title": "分析",
-      "period": "时间范围",
       "trackedReviews": "已跟踪的审查",
       "findingsRaised": "提出的问题",
       "highImpactChanges": "高影响变更",

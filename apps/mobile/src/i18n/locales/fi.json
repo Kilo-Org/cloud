@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "Analytiikka",
-      "period": "Aikaväli",
       "trackedReviews": "Seuratut katselmoinnit",
       "findingsRaised": "Tehdyt havainnot",
       "highImpactChanges": "Suuren vaikutuksen muutokset",

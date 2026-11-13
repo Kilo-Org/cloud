@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "Аналитик",
-      "period": "Хугацааны хүрээ",
       "trackedReviews": "Хянаж буй шалгалтууд",
       "findingsRaised": "Илэрсэн асуудлууд",
       "highImpactChanges": "Өндөр нөлөөтэй өөрчлөлтүүд",

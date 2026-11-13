@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "एनालिटिक्स",
-      "period": "समय अवधि",
       "trackedReviews": "ट्र्याक गरिएका समीक्षा",
       "findingsRaised": "रिपोर्ट गरिएका समस्या",
       "highImpactChanges": "उच्च प्रभावका परिवर्तन",

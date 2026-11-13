@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "ትንታኔ",
-      "period": "የጊዜ ክልል",
       "trackedReviews": "ክትትል የተደረገባቸው ግምገማዎች",
       "findingsRaised": "የተነሱ ግኝቶች",
       "highImpactChanges": "ከፍተኛ ተጽዕኖ ያላቸው ለውጦች",

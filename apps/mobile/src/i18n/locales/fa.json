@@ -1408,7 +1408,6 @@
     },
     "analytics": {
       "title": "تحلیل‌ها",
-      "period": "بازه زمانی",
       "trackedReviews": "بازبینی‌های ثبت‌شده",
       "findingsRaised": "یافته‌های مطرح‌شده",
       "highImpactChanges": "تغییرات پرتأثیر",

@@ -6,12 +6,38 @@ import {
   type ReadCallback,
   type ResourceKey,
 } from 'i18next';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { activateLanguage } from './activate-language';
+import type * as Catalogs from './catalogs';
 import { CATALOG_LOADERS } from './catalogs';
 import { isSupportedLanguage } from './languages';
 import en from './locales/en.json';
+
+const brokenLoaders = vi.hoisted(() => new Set<string>());
+
+/**
+ * `activateLanguage` recovers a failed backend read by parsing the catalog
+ * itself, so the backend can never decide the outcome alone — the parse is the
+ * last source of the copy. This mock is where a test breaks that source: every
+ * real loader stays in place and only a tag in `brokenLoaders` throws, which is
+ * the missing or unparsable catalog of a bad bundle.
+ */
+vi.mock('./catalogs', async importOriginal => {
+  const actual = await importOriginal<typeof Catalogs>();
+  return {
+    CATALOG_LOADERS: new Proxy(actual.CATALOG_LOADERS, {
+      get(target, key) {
+        if (typeof key === 'string' && brokenLoaders.has(key)) {
+          return () => {
+            throw new Error(`broken catalog: ${key}`);
+          };
+        }
+        return Reflect.get(target, key);
+      },
+    }),
+  };
+});
 
 type Harness = {
   readonly instance: I18nInstance;
@@ -27,17 +53,27 @@ type Harness = {
  *
  * A tag in `failingReads` fails its first read and would succeed on a retry,
  * which is exactly the state the app cannot leave: i18next remembers the failed
- * entry as `-1` and never asks again.
+ * entry as `-1` and never asks again. A tag in `permanentlyFailingReads` fails
+ * every read, so the backend can never supply it. Neither state makes the
+ * activation fail on its own: the recovery branch parses the catalog directly
+ * and bypasses the backend, so `failed` needs the loader itself to break.
  */
-function createHarness(failingReads: readonly string[] = []): Harness {
+function createHarness({
+  failingReads = [],
+  permanentlyFailingReads = [],
+}: {
+  readonly failingReads?: readonly string[];
+  readonly permanentlyFailingReads?: readonly string[];
+} = {}): Harness {
   const reads: string[] = [];
   const pendingFailures = new Set(failingReads);
+  const permanentFailures = new Set(permanentlyFailingReads);
   const backend: BackendModule = {
     type: 'backend',
     init: () => undefined,
     read: (language: string, _namespace: string, callback: ReadCallback) => {
       reads.push(language);
-      if (pendingFailures.delete(language)) {
+      if (permanentFailures.has(language) || pendingFailures.delete(language)) {
         callback(new Error(`catalog read failed: ${language}`), false);
         return;
       }
@@ -63,8 +99,12 @@ function createHarness(failingReads: readonly string[] = []): Harness {
 }
 
 describe('activateLanguage', () => {
+  afterEach(() => {
+    brokenLoaders.clear();
+  });
+
   it('recovers a catalog the backend failed once, and the copy is active', async () => {
-    const { instance, reads } = createHarness(['pt-BR', 'pt']);
+    const { instance, reads } = createHarness({ failingReads: ['pt-BR', 'pt'] });
 
     await expect(activateLanguage('pt-BR', instance)).resolves.toBe('recovered');
     expect(instance.hasResourceBundle('pt-BR', 'translation')).toBe(true);
@@ -88,5 +128,19 @@ describe('activateLanguage', () => {
     expect(reads).toEqual(['pt-BR', 'pt']);
 
     await instance.changeLanguage('en');
+  });
+
+  it('reports a catalog that never loads, without throwing', async () => {
+    const { instance, reads } = createHarness({ permanentlyFailingReads: ['pt-BR', 'pt'] });
+    brokenLoaders.add('pt-BR');
+    brokenLoaders.add('pt');
+
+    // The never-throws contract: the caller gets an outcome to fall back on,
+    // and the store is left without the bundle the recovery could not parse.
+    await expect(activateLanguage('pt-BR', instance)).resolves.toBe('failed');
+    expect(instance.hasResourceBundle('pt-BR', 'translation')).toBe(false);
+    // Both sources are broken, and the loader is what decides: the `recovered`
+    // test above shows the same backend failure alone would have succeeded.
+    expect(reads).toEqual(['pt-BR', 'pt']);
   });
 });

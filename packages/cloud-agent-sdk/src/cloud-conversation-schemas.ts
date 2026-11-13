@@ -278,29 +278,31 @@ export const preparationAttemptPageSchema = z.object({
   steps: z.array(preparationPageStepSchema),
 });
 
-export const queuedMessageSnapshotSchema = z
-  .object({
-    messageId: z.string(),
-    content: z.string(),
-    timestamp: z.number(),
-    delivery: z.enum(['queued', 'sent']).optional(),
-    turnType: z.literal('command').optional(),
-    completedAt: z.number().optional(),
-    terminalFailure: z
-      .object({
-        messageId: z.string(),
-        status: z.string().optional(),
-        delivery: z.enum(['queued', 'sent']).optional(),
-        accepted: z.boolean().optional(),
-        error: z.string().optional(),
-        reason: z.string().optional(),
-        billingFailure: customerBillingFailureSchema.optional().catch(undefined),
-        timestamp: z.number(),
-      })
-      .passthrough()
-      .optional(),
-  })
-  .passthrough();
+/**
+ * The page's copy of one queued or failed turn. The shape is closed: the page
+ * type it becomes has no index signature, so a loose object would not be
+ * assignable to it under exact optional property types.
+ */
+export const queuedMessageSnapshotSchema = z.object({
+  messageId: z.string(),
+  content: z.string(),
+  timestamp: z.number(),
+  delivery: z.enum(['queued', 'sent']).optional(),
+  turnType: z.literal('command').optional(),
+  completedAt: z.number().optional(),
+  terminalFailure: z
+    .object({
+      messageId: z.string(),
+      status: z.string().optional(),
+      delivery: z.enum(['queued', 'sent']).optional(),
+      accepted: z.boolean().optional(),
+      error: z.string().optional(),
+      reason: z.string().optional(),
+      billingFailure: customerBillingFailureSchema.optional().catch(undefined),
+      timestamp: z.number(),
+    })
+    .optional(),
+});
 
 const cloudV1MessagesPageWireSchema = z.object({
   source: z.object({ version: z.literal('v1') }).optional(),

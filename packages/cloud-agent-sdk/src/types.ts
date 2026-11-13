@@ -294,19 +294,21 @@ export type QueuedMessageSnapshot = {
   messageId: string;
   content: string;
   timestamp: number;
-  delivery?: 'queued' | 'sent';
-  turnType?: 'command';
-  completedAt?: number;
-  terminalFailure?: {
-    messageId: string;
-    status?: string;
-    delivery?: 'queued' | 'sent';
-    accepted?: boolean;
-    error?: string;
-    reason?: string;
-    billingFailure?: unknown;
-    timestamp: number;
-  };
+  delivery?: 'queued' | 'sent' | undefined;
+  turnType?: 'command' | undefined;
+  completedAt?: number | undefined;
+  terminalFailure?:
+    | {
+        messageId: string;
+        status?: string | undefined;
+        delivery?: 'queued' | 'sent' | undefined;
+        accepted?: boolean | undefined;
+        error?: string | undefined;
+        reason?: string | undefined;
+        billingFailure?: unknown;
+        timestamp: number;
+      }
+    | undefined;
 };
 
 /** Full service state — all non-chat state in one place. */

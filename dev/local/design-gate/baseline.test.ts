@@ -621,9 +621,56 @@ test('a tab route keeps a marker-less target ready when the link leaves the rout
     target: UNMARKED.id,
     rule: 'env-mismatch',
     severity: 'warning',
+    expected: 'the deep link changes the screen',
     message: 'deep link did not open',
   } as never);
   assert.deepEqual(targetReadiness(run.outcome, unmarkedManifest, run.out), []);
+});
+
+test('a marker-less target stays not ready when its cell config did not apply', t => {
+  const run = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({
+      route: UNMARKED.route,
+      screen: UNMARKED.screen,
+      nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800] }],
+    })
+  );
+  run.outcome.findings.push({
+    cell: 'base',
+    target: UNMARKED.id,
+    rule: 'env-mismatch',
+    severity: 'error',
+    expected: 'probe env matches the cell config',
+    message: 'Cell config did not apply (isRTL false, expected true)',
+  } as never);
+  assert.deepEqual(targetReadiness(run.outcome, unmarkedManifest, run.out), [
+    `base/${UNMARKED.id}: target not ready or screen identity differs (${UNMARKED.route}, ${UNMARKED.screen})`,
+  ]);
+});
+
+test('a marker-less target stays not ready when another target landed on its screen', t => {
+  const run = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({
+      route: UNMARKED.route,
+      screen: UNMARKED.screen,
+      nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800] }],
+    })
+  );
+  run.outcome.findings.push({
+    cell: 'base',
+    target: UNMARKED.id,
+    rule: 'env-mismatch',
+    severity: 'warning',
+    expected: 'a distinct screen per target',
+    message: 'showed the same screen as profile',
+  } as never);
+  assert.deepEqual(targetReadiness(run.outcome, unmarkedManifest, run.out), [
+    `base/${UNMARKED.id}: target not ready or screen identity differs (${UNMARKED.route}, ${UNMARKED.screen})`,
+  ]);
 });
 
 test('a marker-less target stays not ready when the capture itself is unusable', t => {

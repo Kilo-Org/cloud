@@ -440,24 +440,24 @@ export function targetReadiness(
                 node.visibleRect[3] > 0
             );
       // A tab route keeps the URL at its group root, so opening it need not change
-      // the route and the runner reports `env-mismatch`. For a marker-less target
-      // the declared screen identity below is what proves the link landed, so that
-      // rule only fails a target that also declares a marker. The rules that mean
-      // the capture itself is unusable always apply.
-      const warning = outcome.findings.some(
+      // the route and the runner reports a landing notice. For a marker-less target
+      // the declared screen identity below is what proves the link landed, so only
+      // that one notice is dropped. Every other env-mismatch still fails the
+      // target: a cell config that did not apply, a language that did not switch,
+      // or two targets that landed on one screen all leave the capture unusable.
+      const LANDING_NOTICE = 'the deep link changes the screen';
+      const failed = outcome.findings.some(
         finding =>
           finding.cell === cell.id &&
           finding.target === target.id &&
-          (target.readyTestID === undefined
-            ? ['unsettled', 'capture-alignment', 'blank-frame'].includes(finding.rule)
-            : ['env-mismatch', 'unsettled', 'capture-alignment', 'blank-frame'].includes(
-                finding.rule
-              ))
+          (['unsettled', 'capture-alignment', 'blank-frame'].includes(finding.rule) ||
+            (finding.rule === 'env-mismatch' &&
+              (target.readyTestID !== undefined || finding.expected !== LANDING_NOTICE)))
       );
       if (
         blocked ||
         !ready ||
-        warning ||
+        failed ||
         dump.env.route !== target.route ||
         dump.env.screen !== target.screen
       ) {

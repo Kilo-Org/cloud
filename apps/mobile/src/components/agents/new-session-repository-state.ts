@@ -216,43 +216,6 @@ export function isStoredRepoSelectionGone(input: {
   );
 }
 
-/**
- * Whether the repository region's final height is known, so the provider cards
- * and every row below them can paint in one commit.
- *
- * A card's height is data-dependent (an expanded connect prompt, a compact row
- * after a selection, nothing while a provider loads), so painting one after the
- * form has settled pushes every row under the section down. The last two
- * clauses cover the selection: the route prefill seeds a repository in the render
- * its lists settle (`seedPending`), and a stored selection the provider no longer
- * lists is dropped after mount (`storedSelectionGone`). Either would turn an
- * expanded connect card into the compact row under rows that had already painted.
- */
-export function isRepositoryRegionSettled(input: {
-  /** Every provider query finished its first load (a paused query counts as resolved). */
-  providerQueriesResolved: boolean;
-  /** The persisted connect-card collapse list has been read. */
-  connectCtasLoaded: boolean;
-  /** The durable repository draft for this account and scope has loaded. */
-  draftSettled: boolean;
-  /**
-   * The route prefill can still replace the selection with a repository. A
-   * prefill that names no repository never seeds one, so a settled list with
-   * rows and no request is already final.
-   */
-  seedPending: boolean;
-  /** A stored selection its provider's list no longer contains, still to be dropped. */
-  storedSelectionGone: boolean;
-}): boolean {
-  return (
-    input.providerQueriesResolved &&
-    input.connectCtasLoaded &&
-    input.draftSettled &&
-    !input.seedPending &&
-    !input.storedSelectionGone
-  );
-}
-
 const repositoryKey = (repository: NewSessionRepository): string =>
   `${repository.platform}/${repository.fullName}`;
 

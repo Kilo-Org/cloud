@@ -10,10 +10,10 @@ import { type KiloSessionId, type RemoteModelOverride } from '@kilocode/cloud-ag
 
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
 import {
-  isRepositoryRegionSettled,
   isStoredRepoSelectionGone,
   resetSelectedBranchOverrides,
 } from '@/components/agents/new-session-repository-state';
+import { isRepositoryRegionSettled } from '@/components/agents/new-session-repository-settle';
 import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
 import {
   type NewSessionPromptSeed,

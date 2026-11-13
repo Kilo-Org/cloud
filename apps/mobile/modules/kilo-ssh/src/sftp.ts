@@ -1,6 +1,6 @@
 import type { SftpEntry, TransferOptions } from './ReactNativeSsh.types';
 import ReactNativeSsh from './ReactNativeSshModule';
-import { guard } from './errors';
+import { guard, SshError } from './errors';
 
 /** Opens the SFTP subsystem on a new channel of the session. */
 export function openSftp(sessionId: string): Promise<string> {
@@ -80,16 +80,24 @@ async function transfer(
   start: (transferId: string) => Promise<number>,
   options: TransferOptions
 ): Promise<number> {
+  const signal = options.signal;
   const transferId = `transfer-${(transfers += 1)}`;
   const subscription = options.onProgress ? listen(transferId, options.onProgress) : undefined;
   const abort = () => ReactNativeSsh.cancelTransfer(transferId);
-  options.signal?.addEventListener('abort', abort);
+  signal?.addEventListener('abort', abort);
 
   try {
+    // A signal aborted before this point never fires `abort`, and the native
+    // cancel token does not exist until the call below runs: starting here
+    // would transfer the whole file and resolve.
+    if (signal?.aborted) {
+      throw new SshError('Cancelled', 'The transfer was cancelled');
+    }
+
     return await guard(() => start(transferId));
   } finally {
     subscription?.remove();
-    options.signal?.removeEventListener('abort', abort);
+    signal?.removeEventListener('abort', abort);
   }
 }
 

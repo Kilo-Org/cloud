@@ -87,6 +87,7 @@ export default defineProject({
       'src/lib/telemetry/**/*.test.ts',
       'src/lib/tour/**/*.test.ts',
       'modules/kilo-surface-geometry/*.test.ts',
+      'modules/kilo-ssh/*.test.ts',
     ],
   },
 });

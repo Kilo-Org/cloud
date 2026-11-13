@@ -284,15 +284,15 @@ describe('ConfigureRow note', () => {
       expect.arrayContaining(['mt-1', 'text-xs', 'text-muted-foreground'])
     );
     // The inset is the start edge (the tile's 30 dp plus the row's gap), so the
-    // note keeps to the title's column when the row mirrors.
+    // note keeps to the title's column when the row mirrors. Compiling the
+    // rendered class is what makes a `pl-` regression fail: it would resolve to
+    // `paddingLeft` and leave the note under the icon in a mirrored row.
     const note = root.find(
       node => Object.is(node.type, 'Text') && Object.is(node.props.children, NOTE)
     );
-    // The inset must compile to the START edge, not the left one: the row's
-    // icon tile and title column move to the physical right under RTL, so a
-    // `pl-` utility would put the note under the tile there.
-    expect(await compiledDeclarations('ps-[40.5px]')).toContainEqual({ paddingInlineStart: 40.5 });
-    expect(await compiledDeclarations('pl-[40.5px]')).toContainEqual({ paddingLeft: 40.5 });
+    expect(await compiledDeclarations(String(note.props.className))).toContainEqual({
+      paddingInlineStart: 40.5,
+    });
     // It is a sentence, so it wraps instead of ellipsizing like a value does.
     expect(note.props.numberOfLines).toBe(3);
     expect(textOf(root, 'Transcribe')).toContain('mt-0.5');
@@ -304,16 +304,16 @@ describe('ConfigureRow note', () => {
     expect(textBlock.findAll(node => Object.is(node.props.children, NOTE))).toHaveLength(0);
   });
 
-  it('drops the inset when the row stacks, where the note takes the full width', () => {
+  it('drops the inset when the row stacks, where the note takes the full width', async () => {
     windowDims.width = 160;
     const root = renderRow({ note: NOTE });
 
-    expect(
-      String(
-        root.find(node => Object.is(node.type, 'Text') && Object.is(node.props.children, NOTE))
-          .props.className
-      )
-    ).not.toContain('ps-[40.5px]');
+    const note = root.find(
+      node => Object.is(node.type, 'Text') && Object.is(node.props.children, NOTE)
+    );
+    expect(await compiledDeclarations(String(note.props.className))).not.toContainEqual({
+      paddingInlineStart: 40.5,
+    });
   });
 
   it('renders only the title and subtitle when a row has no note', () => {

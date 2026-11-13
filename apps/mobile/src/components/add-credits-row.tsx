@@ -3,7 +3,11 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import {
+  LINE_ACTION_BOX_CLASS,
+  LINE_ACTION_HIT_SLOP,
+  STATE_ACTION_CLASS,
+} from '@/lib/a11y/tap-target';
 import { canOpenExternalBilling } from '@/lib/credits/external-billing-link';
 import { openExternalUrl } from '@/lib/external-link';
 import { isNarrowLayout } from '@/lib/narrow-layout';
@@ -21,6 +25,14 @@ type AddCreditsButtonProps = Readonly<{
   onPress: () => void;
   emphasis?: AddCreditsEmphasis;
   className?: string;
+  /**
+   * Paint the line-action box's 28 dp floor instead of growing the line to a
+   * control's touch size, with `hitSlop` carrying the rest of the 44 pt target.
+   * The button carries no vertical margin of its own: `AddCreditsRow` puts the
+   * inline control inside the box that cancels the height, so the caller's line
+   * stays one text line tall (`apps/mobile/AGENTS.md`).
+   */
+  lineAction?: boolean;
 }>;
 
 /**
@@ -42,6 +54,7 @@ export function AddCreditsButton({
   onPress,
   emphasis = 'quiet',
   className,
+  lineAction = false,
 }: AddCreditsButtonProps) {
   const { t } = useTranslation();
   const primary = emphasis === 'primary';
@@ -55,8 +68,14 @@ export function AddCreditsButton({
         // the surface the person's own bubble uses instead.
         primary ? 'bg-accent-soft' : 'dark:bg-secondary-fill',
         className,
-        STATE_ACTION_CLASS
+        // A line action fills the box `AddCreditsRow` wraps around it: the frame
+        // is the box's floor with no vertical margin, so the box alone cancels
+        // the height and the caller's line stays one text line tall.
+        lineAction ? 'min-h-[28px]' : STATE_ACTION_CLASS
       )}
+      // Undefined keeps the shared `Button`'s own `sm` default; a line action
+      // draws a smaller frame, so it carries the flush-to-44pt slop itself.
+      hitSlop={lineAction ? LINE_ACTION_HIT_SLOP : undefined}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={t('addCredits.cta')}
@@ -82,6 +101,8 @@ type AddCreditsRowProps = Readonly<{
    * that caller, so the button sits at its natural size beside the amount.
    */
   inline?: boolean;
+  /** Keep the caller's line one text line tall; see `AddCreditsButton`. */
+  lineAction?: boolean;
 }>;
 
 /**
@@ -97,10 +118,20 @@ type AddCreditsRowProps = Readonly<{
  * In a wide row it keeps its trailing position inside the caller's padding; in
  * a window under `NARROW_LAYOUT_WIDTH` it spans the row, which is the tap
  * target width it had before. With `inline` the caller's row is the row: the
- * button is returned alone, at its natural size, so it can sit on the balance
- * line instead of filling a block of its own.
+ * button is returned at its natural size, so it can sit on the balance line
+ * instead of filling a block of its own. With `lineAction` too, the button
+ * comes wrapped in the line-action box: the box is the 28 dp frame the control
+ * fills and its negative margin cancels that height, so the caller's line stays
+ * one text line tall and the control's frame fits the box it belongs to.
  */
-export function AddCreditsRow({ url, onPress, className, emphasis, inline }: AddCreditsRowProps) {
+export function AddCreditsRow({
+  url,
+  onPress,
+  className,
+  emphasis,
+  inline,
+  lineAction,
+}: AddCreditsRowProps) {
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const narrow = isNarrowLayout(width);
@@ -122,11 +153,17 @@ export function AddCreditsRow({ url, onPress, className, emphasis, inline }: Add
         })
       }
       emphasis={emphasis}
+      lineAction={lineAction}
       className={inline || !narrow ? undefined : 'w-full'}
     />
   );
   if (inline) {
-    return button;
+    // The box is the control's whole frame in this row: it is 28 dp tall and its
+    // negative margin cancels that height, so the caller's line keeps its own
+    // height. The box paints nothing, so the button — not the box — is what the
+    // gate measures against the caller's row, and the row no longer has to grow
+    // its trailing group to hold the control's frame.
+    return lineAction ? <View className={LINE_ACTION_BOX_CLASS}>{button}</View> : button;
   }
   return (
     <View className={cn(narrow ? undefined : 'flex-row items-center justify-end', className)}>

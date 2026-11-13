@@ -323,6 +323,12 @@ describe('Organization hub card', () => {
     // the button once the copy beside it left.
     const trailing: object | null | undefined = balance?.props.trailing;
     expect(isValidElement(trailing) && trailing.type === AddCreditsRow).toBe(true);
+    // `inline` drops the control's own block, and `lineAction` keeps the
+    // amount's line one text line tall instead of growing it to 48 dp.
+    const trailingProps = isValidElement<{ inline?: boolean; lineAction?: boolean }>(trailing)
+      ? trailing.props
+      : undefined;
+    expect(trailingProps).toMatchObject({ inline: true, lineAction: true });
     unmount();
   });
 

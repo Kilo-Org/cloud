@@ -228,6 +228,9 @@ import {
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
 import { useRemoteModelCatalogRetry } from '@/lib/hooks/use-remote-model-catalog-retry';
+import { useAppActiveAndFocused } from '@/lib/hooks/use-app-active-and-focused';
+import { computeChargesMicrodollars, sessionTotalMicrodollars } from '@/lib/session-compute-total';
+import { useSessionComputeCharges } from '@/lib/hooks/use-session-compute';
 import { useSessionRaiseReader } from '@/lib/hooks/use-session-raise-reader';
 import {
   buildContinueHref,
@@ -600,6 +603,27 @@ export function SessionDetailContent({
   // own row is available the scope is unresolved: the org-scoped reads wait for
   // it, and the create, restart, Continue and fork actions stay unavailable.
   const organizationId = sessionDataLoaded ? (fetchedData.organizationId ?? undefined) : undefined;
+
+  // Compute cost is part of the session's total wherever the screen paints one:
+  // the header pill and the context sheet. One read serves both, and a session
+  // with no compute scope answers nothing, so the model cost stands alone.
+  //
+  // A session screen stays mounted on the navigation stack after the user
+  // leaves it, so the poll follows this screen's focus and the app's foreground
+  // state rather than its mount; a blurred screen reads the entry another
+  // surface refreshes on its own turn instead of asking every interval from the
+  // background.
+  const cloudAgentSessionId = sessionDataLoaded ? (fetchedData.cloudAgentSessionId ?? null) : null;
+  const computePolling = useAppActiveAndFocused();
+  const computeCharges = useSessionComputeCharges({
+    cloudAgentSessionId,
+    organizationId,
+    poll: computePolling,
+  });
+  const sessionCostMicrodollars = sessionTotalMicrodollars(
+    totalMicrodollars,
+    computeChargesMicrodollars(computeCharges.data)
+  );
 
   // The session's active-profile chip: the profile this session runs on. It
   // resolves from the session's own recorded `profileId`, so an explicit
@@ -2218,7 +2242,7 @@ export function SessionDetailContent({
     <View className="min-w-0 shrink flex-row items-center gap-2">
       <SessionContextMetrics
         info={contextInfo}
-        totalCostMicrodollars={totalMicrodollars}
+        totalCostMicrodollars={sessionCostMicrodollars}
         // The pill's values read as a settled session. While the body is still
         // a skeleton no reading has arrived, so the pill paints its ring alone.
         hasMessages={messages.length > 0 && !isSessionChromePending}
@@ -2791,6 +2815,8 @@ export function SessionDetailContent({
               modelDisplay={contextModelAndProvider.model}
               providerDisplay={contextModelAndProvider.provider}
               totalCostMicrodollars={totalMicrodollars}
+              cloudAgentSessionId={cloudAgentSessionId}
+              organizationId={organizationId}
               breakdownCostUsd={breakdownCostUsd}
               messages={messages}
               modelOptions={modelOptions}
@@ -2951,8 +2977,15 @@ export function SessionDetailContent({
                  from the last assistant part, and compute-status.ts maps a
                  reasoning part to agentChat.partDetail.thinking, so the spinner
                  reads Thinking during a reasoning stream in both modes. Feeding
-                 it displayedMessages would drop that label. */
-              <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
+                 it displayedMessages would drop that label. A pending ask takes
+                 the label instead: the blocked tool part has not run, and
+                 `blockingInteraction` already excludes an ask the auto-approve
+                 reply answers, so that ask keeps the activity label. */
+              <WorkingIndicator
+                messages={messages}
+                isStreaming={shouldShowFooterWorking}
+                blockingInteraction={hasBlockingInteraction ? blockingInteraction : 'none'}
+              />
             ) : null}
             {sessionFooterItem === 'status' && footerStatusIndicator !== null ? (
               <SessionStatusIndicator indicator={footerStatusIndicator} />

@@ -20,6 +20,8 @@ export type AgentProfileMcpServerRow = RouterOutputs['agentProfiles']['mcpServer
 export type AgentProfileKiloCommandRow = RouterOutputs['agentProfiles']['kiloCommands'][number];
 /** One skill row, as the section read returns it. */
 export type AgentProfileSkillRow = RouterOutputs['agentProfiles']['skills'][number];
+/** One instruction row, as the section read returns it. */
+export type AgentProfileInstructionRow = RouterOutputs['agentProfiles']['instructions'][number];
 /** One profile's metadata and collection counts, as the Overview renders them. */
 export type AgentProfileOverview = RouterOutputs['agentProfiles']['overview'];
 

@@ -2,13 +2,14 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { splitProfilesByOwner } from '@/components/profiles/profile-owner-model';
-import {
-  type AgentProfileDetail,
-  type AgentProfileListItem,
-} from '@/lib/hooks/agent-profile-types';
+import { type AgentProfileListItem } from '@/lib/hooks/agent-profile-types';
 import { useTRPC } from '@/lib/trpc';
 
-export type { AgentProfileDetail, AgentProfileListItem };
+export type {
+  AgentProfileDetail,
+  AgentProfileInstructionRow,
+  AgentProfileListItem,
+} from '@/lib/hooks/agent-profile-types';
 export { useAgentProfileMutations } from '@/lib/hooks/use-agent-profile-mutations';
 export { useAgentProfileSectionMutations } from '@/lib/hooks/use-agent-profile-section-mutations';
 
@@ -189,6 +190,15 @@ export function useAgentProfileKiloCommands(profileId: string, organizationId?: 
   const trpc = useTRPC();
   return useQuery({
     ...trpc.agentProfiles.kiloCommands.queryOptions({ profileId, organizationId }),
+    ...PROFILE_READ_OPTIONS,
+  });
+}
+
+/** A single profile's instruction files. See `vars`. */
+export function useAgentProfileInstructions(profileId: string, organizationId?: string) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.agentProfiles.instructions.queryOptions({ profileId, organizationId }),
     ...PROFILE_READ_OPTIONS,
   });
 }

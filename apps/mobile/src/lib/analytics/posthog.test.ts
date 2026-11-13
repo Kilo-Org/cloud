@@ -20,6 +20,7 @@ const hoisted = vi.hoisted(() => {
   const holder: { options?: Record<string, unknown> } = {};
   const device = { deviceType: null as number | null };
   const controller = {
+    allowsMandatory: vi.fn().mockReturnValue(true),
     allowsOptional: vi.fn().mockReturnValue(true),
     currentGeneration: vi.fn().mockReturnValue(0),
   };
@@ -66,6 +67,7 @@ vi.mock('expo-application', () => ({
 vi.mock('@/lib/config', () => ({ POSTHOG_API_KEY: 'test-key' }));
 
 vi.mock('@/lib/telemetry/controller', () => ({
+  allowsMandatory: hoisted.controller.allowsMandatory,
   allowsOptional: hoisted.controller.allowsOptional,
   currentGeneration: hoisted.controller.currentGeneration,
 }));
@@ -172,10 +174,12 @@ describe('initPostHog gate', () => {
     vi.clearAllMocks();
     hoisted.holder.options = undefined;
     hoisted.controller.currentGeneration.mockReturnValue(0);
+    hoisted.controller.allowsMandatory.mockReturnValue(true);
+    hoisted.controller.allowsOptional.mockReturnValue(true);
   });
 
-  it('returns early when optional consent is not given', async () => {
-    hoisted.controller.allowsOptional.mockReturnValue(false);
+  it('returns early when no account decision exists', async () => {
+    hoisted.controller.allowsMandatory.mockReturnValue(false);
     const initPostHog = await loadInitPostHog();
     initPostHog();
 
@@ -191,6 +195,82 @@ describe('initPostHog gate', () => {
     const posthogModule = await import('posthog-react-native');
     expect(posthogModule.default).toHaveBeenCalledTimes(1);
   });
+
+  it('creates a capture-free client when optional consent is not given', async () => {
+    // Feature-flag evaluation is functional: the client exists for the signed-in
+    // account, but every switch that would send analytics on its own is off and
+    // the SDK starts opted out, so capture is dropped.
+    hoisted.controller.allowsOptional.mockReturnValue(false);
+    const initPostHog = await loadInitPostHog();
+    initPostHog();
+
+    const posthogModule = await import('posthog-react-native');
+    expect(posthogModule.default).toHaveBeenCalledTimes(1);
+    expect(hoisted.holder.options).toMatchObject({
+      defaultOptIn: false,
+      captureAppLifecycleEvents: false,
+      sendFeatureFlagEvent: false,
+      capturePushNotificationSubscriptions: false,
+      capturePushNotificationOpened: false,
+      disableSurveys: true,
+    });
+    expect(hoisted.client.setPersonPropertiesForFlags).not.toHaveBeenCalled();
+  });
+
+  it('keeps capture on when optional consent is given', async () => {
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    const initPostHog = await loadInitPostHog();
+    initPostHog();
+
+    expect(hoisted.holder.options).toMatchObject({
+      defaultOptIn: true,
+      captureAppLifecycleEvents: true,
+      sendFeatureFlagEvent: true,
+      disableSurveys: false,
+    });
+    expect(hoisted.client.setPersonPropertiesForFlags).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts no client in a development build without a dev host', async () => {
+    // A dev build must not contact the production project: without an explicit
+    // dev host every flag falls back to its default.
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    vi.stubGlobal('__DEV__', true);
+    try {
+      const initPostHog = await loadInitPostHog();
+      initPostHog();
+
+      const posthogModule = await import('posthog-react-native');
+      expect(posthogModule.default).not.toHaveBeenCalled();
+    } finally {
+      vi.stubGlobal('__DEV__', false);
+    }
+  });
+
+  it('evaluates flags against a dev host without capturing', async () => {
+    // The explicit dev host is the only way a development build evaluates
+    // flags; capture stays closed because dev builds never capture.
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    vi.stubGlobal('__DEV__', true);
+    process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST = 'http://10.0.2.2:8123';
+    try {
+      const initPostHog = await loadInitPostHog();
+      initPostHog();
+
+      const posthogModule = await import('posthog-react-native');
+      expect(posthogModule.default).toHaveBeenCalledTimes(1);
+      expect(hoisted.holder.options).toMatchObject({
+        host: 'http://10.0.2.2:8123',
+        defaultOptIn: false,
+        captureAppLifecycleEvents: false,
+        sendFeatureFlagEvent: false,
+      });
+      expect(hoisted.client.setPersonPropertiesForFlags).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST;
+      vi.stubGlobal('__DEV__', false);
+    }
+  });
 });
 
 describe('capture gate and generation scoping', () => {
@@ -201,7 +281,7 @@ describe('capture gate and generation scoping', () => {
     hoisted.controller.allowsOptional.mockReturnValue(true);
   });
 
-  it('captureEvent returns early when optional consent is not given', async () => {
+  it('captureEvent is dropped for a flags-only client', async () => {
     hoisted.controller.allowsOptional.mockReturnValue(false);
     const { initPostHog, captureEvent } = await loadModule();
     initPostHog();
@@ -244,10 +324,20 @@ describe('capture gate and generation scoping', () => {
     expect(hoisted.client.screen).not.toHaveBeenCalled();
   });
 
-  it('identifyUser returns early when optional consent is not given', async () => {
+  it('identifyUser sets the identity without person properties when optional consent is not given', async () => {
+    // A flags-only client still needs the web's distinct ID so the same person
+    // resolves the same flag value; it writes no person properties.
     hoisted.controller.allowsOptional.mockReturnValue(false);
     const { initPostHog, identifyUser } = await loadModule();
     initPostHog();
+    identifyUser('test@test.com');
+
+    expect(hoisted.client.identify).toHaveBeenCalledWith('test@test.com', undefined);
+    expect(hoisted.client.reloadFeatureFlags).toHaveBeenCalledTimes(1);
+  });
+
+  it('identifyUser is a no-op when no client exists', async () => {
+    const { identifyUser } = await loadModule();
     identifyUser('test@test.com');
 
     expect(hoisted.client.identify).not.toHaveBeenCalled();
@@ -283,6 +373,8 @@ describe('captureEvent privacy and gates', () => {
   it('warns in development and names every dropped key', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     vi.stubGlobal('__DEV__', true);
+    // A dev client only exists against an explicit dev host.
+    process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST = 'http://127.0.0.1:8123';
     try {
       const { initPostHog, captureEvent } = await loadModule();
       initPostHog();
@@ -296,6 +388,7 @@ describe('captureEvent privacy and gates', () => {
         'Analytics sample-event: redacted prohibited properties repo_name, session_id'
       );
     } finally {
+      delete process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST;
       vi.stubGlobal('__DEV__', false);
       warn.mockRestore();
     }
@@ -527,6 +620,59 @@ describe('initPostHog constructor options', () => {
   });
 });
 
+describe('livePostHogClient', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.controller.allowsMandatory.mockReturnValue(true);
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+  });
+
+  it('reports what the client was built for, null when none runs', async () => {
+    const { initPostHog, identifyUser, discardPostHog, livePostHogClient } = await loadModule();
+    expect(livePostHogClient()).toBeNull();
+
+    initPostHog();
+    expect(livePostHogClient()).toEqual({
+      generation: 0,
+      optionalConsent: true,
+      identifiedEmail: undefined,
+    });
+
+    identifyUser('test@test.com');
+    expect(livePostHogClient()?.identifiedEmail).toBe('test@test.com');
+
+    await discardPostHog();
+    expect(livePostHogClient()).toBeNull();
+  });
+
+  it('reports the optional-consent level the client was built with', async () => {
+    hoisted.controller.allowsOptional.mockReturnValue(false);
+    const { initPostHog, livePostHogClient } = await loadModule();
+    initPostHog();
+
+    expect(livePostHogClient()?.optionalConsent).toBe(false);
+  });
+
+  it('records the consent level a development build cannot capture', async () => {
+    // A dev build captures nothing even with a dev host, so the captured flag
+    // says false either way; the recorded level must still follow consent.
+    vi.stubGlobal('__DEV__', true);
+    process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST = 'http://127.0.0.1:8123';
+    try {
+      const { initPostHog, livePostHogClient } = await loadModule();
+      initPostHog();
+
+      expect(hoisted.holder.options).toMatchObject({ defaultOptIn: false });
+      expect(livePostHogClient()?.optionalConsent).toBe(true);
+    } finally {
+      delete process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST;
+      vi.stubGlobal('__DEV__', false);
+    }
+  });
+});
+
 describe('resumePostHog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -706,6 +852,7 @@ describe('isPostHogReady and subscribeToPostHogReady', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.holder.options = undefined;
+    hoisted.controller.allowsMandatory.mockReturnValue(true);
     hoisted.controller.allowsOptional.mockReturnValue(true);
     hoisted.controller.currentGeneration.mockReturnValue(0);
   });
@@ -746,12 +893,22 @@ describe('isPostHogReady and subscribeToPostHogReady', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
-  it('isPostHogReady returns false when consent is not allowed', async () => {
+  it('isPostHogReady returns false when no account decision exists', async () => {
+    hoisted.controller.allowsMandatory.mockReturnValue(false);
+    const { initPostHog, isPostHogReady } = await loadModule();
+    initPostHog();
+
+    expect(isPostHogReady()).toBe(false);
+  });
+
+  it('isPostHogReady returns true for a flags-only client', async () => {
+    // Flag evaluation does not need optional consent, so a signed-in account
+    // still has a live client; capture stays closed.
     hoisted.controller.allowsOptional.mockReturnValue(false);
     const { initPostHog, isPostHogReady } = await loadModule();
     initPostHog();
-    // initPostHog returns early when consent is not allowed.
-    expect(isPostHogReady()).toBe(false);
+
+    expect(isPostHogReady()).toBe(true);
   });
 
   it('isPostHogReady stays true after a second initPostHog call', async () => {

@@ -22,6 +22,7 @@ import {
   type CloudAgentWorktreeId,
 } from '@kilocode/session-ingest-contracts';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
+import type { CachedSessionSnapshotPage } from '@kilocode/cloud-agent-sdk';
 import { startOfDay, subDays } from 'date-fns';
 import { extractRepoFromGitUrl } from './utils/git-utils';
 import { ChatSidebar } from './ChatSidebar';
@@ -95,6 +96,7 @@ import {
   sendLocalSessionRequest,
 } from './local-sessions/local-session-request';
 import { localSessionsStorageKey } from './local-sessions/local-session-storage';
+import { transcriptCacheKey, transcriptCacheScope } from './session-transcript-cache';
 
 // Context for children to toggle the mobile sidebar sheet
 type WorktreeChatTabs = {
@@ -309,6 +311,7 @@ function CloudSidebarLayoutContent({
   const agentStatus = useAtomValue(manager.atoms.agentStatus);
   const activeSessionType = useAtomValue(manager.atoms.activeSessionType);
   const fetchedSessionData = useAtomValue(manager.atoms.fetchedSessionData);
+  const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
@@ -802,6 +805,15 @@ function CloudSidebarLayoutContent({
         return false;
       }
 
+      const sourceConfig =
+        fetchedSessionData?.kiloSessionId === serverSourceId
+          ? sessionConfig
+          : queryClient.getQueryData<CachedSessionSnapshotPage>(
+              transcriptCacheKey(
+                transcriptCacheScope(currentUserId, organizationId ?? null),
+                serverSourceId
+              )
+            )?.sessionConfig;
       const kiloSessionId = createLocalSession({
         organizationId: organizationId ?? null,
         worktreeId,
@@ -812,7 +824,16 @@ function CloudSidebarLayoutContent({
           knownChats.find(chat => chat.worktreeId === worktreeId && chat.repository)?.repository ||
           '',
         branch: source?.branch ?? getWorktreeBranch(worktreeId, knownChats),
-        composer,
+        composer:
+          composer ??
+          (sourceConfig
+            ? {
+                mode: sourceConfig.mode,
+                model: sourceConfig.model,
+                variant: sourceConfig.variant ?? null,
+                runtimeAgents: sourceConfig.runtimeAgents,
+              }
+            : null),
         firstMessage: null,
       });
       if (placement === 'replace' && worktreeId === selectedWorktreeId) {
@@ -830,12 +851,16 @@ function CloudSidebarLayoutContent({
     [
       cachedSessions,
       createLocalSession,
+      currentUserId,
+      fetchedSessionData,
       focusComposerForSession,
       openSessionInternal,
       openWorktreeChats,
       organizationId,
+      queryClient,
       replaceChatTab,
       selectedWorktreeId,
+      sessionConfig,
       worktreeChats,
     ]
   );

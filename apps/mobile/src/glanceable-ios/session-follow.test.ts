@@ -4,11 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GLANCEABLE_STALE_MS } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { sessionLiveActivityRelevance } from '@kilocode/notifications/schemas';
 
+import { WIDGET_STORE_CLASS_MARKER } from '@/lib/auth/secure-store-gated';
 import {
   _resetLiveActivitySwitchForTests,
   setLiveActivityEnabledValue,
   setNotificationPermissionGrantedValue,
 } from '@/lib/glanceable/live-activity-switch';
+import { SESSION_CARD_SCOPE_KEY } from '@/lib/glanceable/widget-store';
 import { setProtectedDataAvailable } from '@/lib/protected-data';
 
 import {
@@ -178,6 +180,9 @@ beforeEach(() => {
   _resetSessionCardScopeStoreForTests();
   _setSessionCardScopeStoreForTests(scopeStore);
   storedScopes.clear();
+  // A keychain that has been unlocked since boot answers the probe, which is
+  // what lets an absent record read as absent instead of unreadable.
+  storedScopes.set(WIDGET_STORE_CLASS_MARKER.key, WIDGET_STORE_CLASS_MARKER.value);
   scopeReadsFail = false;
 });
 
@@ -281,7 +286,7 @@ describe('the follow scope record', () => {
       setProtectedDataAvailable(true);
     });
 
-    it('reads the records as unavailable instead of calling the keychain', async () => {
+    it('reads a refused record as unavailable', async () => {
       rememberSessionCardScope('session-1', CTX);
       await _settleSessionCardScopeWritesForTests();
       const read = vi.fn(scopeStore.getItemAsync);
@@ -291,15 +296,19 @@ describe('the follow scope record', () => {
       });
 
       setProtectedDataAvailable(false);
+      scopeReadsFail = true;
       const records = await readSessionCardScopes();
 
       // Unavailable, never empty: an empty map would make every followed card
-      // out of scope and end it.
+      // out of scope and end it. The record is written
+      // AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY, so a locked device still tries the
+      // read; the refusal is what makes it unreadable.
       expect(records).toBeNull();
-      expect(read).not.toHaveBeenCalled();
+      expect(read).toHaveBeenCalled();
     });
 
-    it('does not write a follow it could only half record', async () => {
+    it('records a follow while the device is locked', async () => {
+      storedScopes.set(SESSION_CARD_SCOPE_KEY, JSON.stringify({ version: 1, cards: {} }));
       const write = vi.fn(scopeStore.setItemAsync);
       _setSessionCardScopeStoreForTests({
         getItemAsync: scopeStore.getItemAsync,
@@ -310,10 +319,27 @@ describe('the follow scope record', () => {
       rememberSessionCardScope('session-1', CTX);
       await _settleSessionCardScopeWritesForTests();
 
-      // The card stays followed; only the record it cannot write is skipped, and
-      // the next follow or restore writes it.
+      // The record is readable with the screen locked once the device has been
+      // unlocked after boot, so a follow records then.
+      expect(storedScopes.get(SESSION_CARD_SCOPE_KEY)).toContain('"session-1"');
+    });
+
+    it('does not write a follow over a record it cannot read while locked', async () => {
+      // A keychain the device has not unlocked since boot cannot answer the
+      // probe either, so nothing it returns proves the record is empty.
+      storedScopes.delete(WIDGET_STORE_CLASS_MARKER.key);
+      const write = vi.fn(scopeStore.setItemAsync);
+      _setSessionCardScopeStoreForTests({
+        getItemAsync: scopeStore.getItemAsync,
+        setItemAsync: write,
+      });
+
+      setProtectedDataAvailable(false);
+      rememberSessionCardScope('session-1', CTX);
+      await _settleSessionCardScopeWritesForTests();
+
+      // The map this follow built would drop every other card's scope.
       expect(write).not.toHaveBeenCalled();
-      expect(storedScopes.has('session-1')).toBe(false);
     });
   });
 });

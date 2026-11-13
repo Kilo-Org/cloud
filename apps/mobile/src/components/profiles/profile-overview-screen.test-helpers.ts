@@ -128,6 +128,11 @@ export function findRow(root: ReactTestInstance, title: string): ReactTestInstan
   return row;
 }
 
+/** The subtitle each ConfigureRow rendered, in screen order. */
+export function rowSubtitles(root: ReactTestInstance): unknown[] {
+  return findAll(root, 'ConfigureRow').map(node => node.props.subtitle);
+}
+
 function pressButton(root: ReactTestInstance, index: number): void {
   const button = findAll(root, 'Button')[index];
   if (!button) {

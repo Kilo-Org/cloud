@@ -15,11 +15,13 @@ import {
   getLocalScopeKey,
   persistGlanceableSink,
 } from '@/lib/glanceable/persist';
+import { _setScopeStoreForTests } from '@/lib/glanceable/scope';
 import {
   type GlanceableSinkContext,
   registerGlanceableSink,
   unregisterGlanceableSink,
 } from '@/lib/glanceable/sink-registry';
+import { setProtectedDataAvailable } from '@/lib/protected-data';
 import { ACTIVE_USER_ID_KEY, AUTH_TOKEN_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import {
   _setGlanceableSinksLoaderForTests,
@@ -74,6 +76,7 @@ const mocks = vi.hoisted(() => ({
   requireOptionalNativeModule: vi.fn(),
   whenLanguagePreferenceLoaded: vi.fn(),
   languageResolved: 'en' as string,
+  openExternalUrl: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({
@@ -234,6 +237,20 @@ vi.mock('@/lib/analytics/posthog', () => ({
   captureEvent: mocks.captureEvent,
 }));
 
+// This suite needs the web origin a KiloClaw tap opens on. The global setup
+// stubs `@/lib/config` with no values at all.
+vi.mock('@/lib/config', () => {
+  const values: Record<string, unknown> = { WEB_BASE_URL: 'https://app.example.com' };
+  return new Proxy(values, {
+    get: (target, key) => target[String(key)],
+    has: () => true,
+  });
+});
+
+// The in-app browser: a KiloClaw tap opens it, and the suite asserts the URL
+// instead of mounting a browser.
+vi.mock('./external-link', () => ({ openExternalUrl: mocks.openExternalUrl }));
+
 // The headless session push only: the follow store and the row delete are
 // observed here; every other export keeps its real implementation.
 const sessionPush = vi.hoisted(() => ({
@@ -265,6 +282,11 @@ vi.mock('@/lib/glanceable/session-activity-tokens-android', async importOriginal
 // storage is replaced; payload parsing, mapping, and the pending slot are real.
 async function loadNotifications() {
   vi.resetModules();
+  // The hint reads go through the widget store, whose resolver lazy-loads the
+  // native module this pure suite cannot import; the reset above created a new
+  // scope module, so the seam is installed on that instance.
+  const scope = await import('@/lib/glanceable/scope');
+  scope._setScopeStoreForTests({ getItemAsync: mocks.getItemAsync });
   const pending = await import('./deep-link-launch');
   pending._setSecureStoreForTests({
     setItemAsync: vi.fn().mockResolvedValue(undefined),
@@ -319,16 +341,30 @@ beforeEach(() => {
   mocks.clearLastNotificationResponse.mockImplementation(() => {
     mocks.lastResponse = null;
   });
+  // The hint reads go through the widget store, which lazy-loads the native
+  // module the pure suite cannot import; the seam supplies the same mock the
+  // credential path uses.
+  _setScopeStoreForTests({ getItemAsync: mocks.getItemAsync });
 });
 
-describe('retired notification payloads', () => {
-  it.each([
+describe('KiloClaw notification payloads', () => {
+  const clawPayloads = [
     { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
     { type: 'instance-lifecycle', event: 'ready', sandboxId: 's1' },
     { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 's1' },
-  ])('ignores $type without displaying a foreground notification', async data => {
+  ] as const;
+
+  it.each(clawPayloads)('parses $type so a tap can open its web page', async data => {
     const loaded = await loadNotifications();
-    expect(loaded.parseNotificationData(data)).toBeNull();
+
+    expect(loaded.parseNotificationData(data)).toEqual(data);
+  });
+
+  it.each(clawPayloads)('keeps $type out of the foreground banner', async data => {
+    // The push was already delivered: a visible banner is the OS's job, and
+    // this handler only decides what a foregrounded app shows. KiloClaw has no
+    // in-app surface, and the push stays reachable from the history list.
+    const loaded = await loadNotifications();
     loaded.setupNotificationHandler();
     const handler = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
       handleNotification: (notification: {
@@ -822,6 +858,42 @@ describe.each(['cold', 'warm'])('%s notification responses', mode => {
 
     expect(pending.getPendingDeepLinkSnapshot()).toBe(existing);
     expect(mocks.lastResponse).toBe(mode === 'cold' ? null : response);
+    subscription.remove();
+  });
+});
+
+describe.each(['cold', 'warm'])('%s KiloClaw notification responses', mode => {
+  it.each([
+    [
+      { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
+      'https://app.example.com/claw/chat/c1',
+    ],
+    [
+      { type: 'instance-lifecycle', event: 'ready', sandboxId: 's1' },
+      'https://app.example.com/claw',
+    ],
+    [
+      { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 's1' },
+      'https://app.example.com/claw',
+    ],
+  ] as const)('opens $data.type on the web instead of stashing a route', async (data, url) => {
+    const { setupNotificationResponseHandler, checkInitialNotification, pending } =
+      await loadNotifications();
+    const response = { notification: { request: { content: { data } } } };
+    mocks.lastResponse = response;
+    const subscription = setupNotificationResponseHandler();
+
+    if (mode === 'cold') {
+      checkInitialNotification();
+    } else {
+      deliverWarmResponse(response);
+    }
+
+    await vi.waitFor(() => {
+      expect(mocks.openExternalUrl).toHaveBeenCalledWith(url, { retryOnError: true });
+    });
+    expect(pending.getPendingDeepLinkSnapshot()).toBeNull();
+    expect(mocks.clearLastNotificationResponse).toHaveBeenCalled();
     subscription.remove();
   });
 });
@@ -1532,6 +1604,62 @@ describe('applyGlanceablePushData', () => {
       organizationId: 'org-9',
     });
 
+    unregisterGlanceableSink(sink);
+  });
+
+  it('applies a push with the screen locked when the identity hints answer', async () => {
+    _setLastGlanceableSnapshotForTests(
+      glanceableSnapshot({
+        scopeKey: SCOPE_KEY,
+        revision: 3,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      })
+    );
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+    setProtectedDataAvailable(false);
+
+    const result = await applyGlanceablePushData(
+      activeGlanceablePush({
+        scopeKey: SCOPE_KEY,
+        updatedAt: '2026-01-02T00:00:00.000Z',
+        organizationBound: true,
+      })
+    );
+
+    expect(result).toBe(true);
+    expect(sink.publish).toHaveBeenCalledWith(expect.objectContaining({ revision: 4 }));
+
+    setProtectedDataAvailable(true);
+    unregisterGlanceableSink(sink);
+  });
+
+  it('drops a push before the first unlock without reading it as a sign-out', async () => {
+    _setLastGlanceableSnapshotForTests(
+      glanceableSnapshot({
+        scopeKey: SCOPE_KEY,
+        revision: 3,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      })
+    );
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+    setProtectedDataAvailable(false);
+    // The keychain has not been unlocked since boot, so the hints cannot answer.
+    mocks.getItemAsync.mockResolvedValue(null);
+
+    const result = await applyGlanceablePushData(
+      activeGlanceablePush({ scopeKey: SCOPE_KEY, updatedAt: '2026-01-02T00:00:00.000Z' })
+    );
+
+    expect(result).toBe(false);
+    expect(sink.publish).not.toHaveBeenCalled();
+    // The seeded scope is the one this process already acts for; an unanswered
+    // hint must not retire it.
+    expect(getLocalScopeKey()).toBe(SCOPE_KEY);
+    expect(getLastGlanceableSnapshot()?.revision).toBe(3);
+
+    setProtectedDataAvailable(true);
     unregisterGlanceableSink(sink);
   });
 
@@ -2612,6 +2740,10 @@ describe('cold iOS background delivery', () => {
 
   async function loadColdBackground() {
     vi.resetModules();
+    // A static import cannot reach the module instance `resetModules` just
+    // created, and the hint reads must run on that instance.
+    const scope = await import('@/lib/glanceable/scope');
+    scope._setScopeStoreForTests({ getItemAsync: mocks.getItemAsync });
     await import('@/lib/glanceable/delivery-registration');
     const [notifications, registry, persist, sink, cleanup, blank, waitingAsk] = await Promise.all([
       import('./notifications'),

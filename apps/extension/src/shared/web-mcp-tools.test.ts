@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { WebMcpToolDescriptor } from './tab-debugger';
-import { buildWebMcpToolDefinitions } from './web-mcp-tools';
+import { buildWebMcpDefinitionSignature, buildWebMcpToolDefinitions } from './web-mcp-tools';
 
 const objectSchema = {
   additionalProperties: false,
@@ -224,5 +224,22 @@ describe('webMCP tools', () => {
 
     expect(result.tools.map(tool => tool.function.name)).toStrictEqual(['ok_tool']);
     expect(result.warning).toContain('Omitted 3');
+  });
+});
+
+describe('web mcp definition signature', () => {
+  // eslint-disable-next-line typescript/no-unsafe-type-assertion -- page-supplied descriptor fields arrive typed as strings but are untrusted.
+  const untrustedText = (value: unknown): string => value as string;
+
+  it('normalizes non-string descriptor fields before comparing', () => {
+    const signature = buildWebMcpDefinitionSignature({
+      description: untrustedText(42),
+      inputSchema: { type: 'object' },
+      name: 'do_thing',
+      origin: untrustedText(null),
+      title: untrustedText({}),
+    });
+
+    expect(signature).toBe('["do_thing","","","",{"type":"object"}]');
   });
 });

@@ -109,7 +109,13 @@ export const buildWebMcpDefinitionSignature = ({
   readonly title: string;
 }): string =>
   JSON.stringify(
-    canonicalize([name, title, description, origin, normalizeInputSchema(inputSchema)])
+    canonicalize([
+      normalizeString(name),
+      normalizeString(title),
+      normalizeString(description),
+      normalizeString(origin),
+      normalizeInputSchema(inputSchema),
+    ])
   );
 
 export const buildWebMcpToolDefinitions = ({
@@ -148,13 +154,7 @@ export const buildWebMcpToolDefinitions = ({
       const title = normalizeString(tool.title);
       const description = normalizeString(tool.description);
       const origin = normalizeString(tool.origin);
-      const definitionSignature = buildWebMcpDefinitionSignature({
-        description,
-        inputSchema: tool.inputSchema,
-        name,
-        origin,
-        title,
-      });
+      const definitionSignature = buildWebMcpDefinitionSignature(tool);
 
       routes.set(name, {
         definitionSignature,

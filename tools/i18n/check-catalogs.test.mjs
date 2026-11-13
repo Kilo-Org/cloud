@@ -1449,24 +1449,80 @@ test('accepts a destructive confirm label with a verb of its own', () => {
   assert.deepEqual(found, []);
 });
 
+// "Cancel subscription" beside "Cancel" is the shipped English pattern, so
+// English anchors the class: a locale may translate this label with its Cancel
+// word, because English already tells the reader which action ends. The
+// equality test still applies there: a locale that renders the red button with
+// nothing but the Cancel word leaves two buttons reading Cancel.
+const ANCHORED_ENGLISH = {
+  common: { cancel: 'Cancel', keepEditing: 'Keep editing' },
+  kiloPass: { manage: { cancel: 'Cancel subscription' } },
+};
+const ANCHORED_SOURCE = [
+  "t('common.cancel');",
+  "t('common.keepEditing');",
+  "confirm({ message: 'Stop renewing?', confirmLabel: t('kiloPass.manage.cancel') });",
+].join('\n');
+
 test('accepts an English confirm label that names the action it cancels', () => {
-  // "Cancel subscription" beside "Cancel" is the shipped English pattern, so
-  // English anchors the class: a locale may translate this label with its
-  // Cancel word, because English already tells the reader which action ends.
   const found = run({
-    english: {
-      common: { cancel: 'Cancel', keepEditing: 'Keep editing' },
-      kiloPass: { manage: { cancel: 'Cancel subscription' } },
+    english: ANCHORED_ENGLISH,
+    translated: {
+      common: { cancel: 'Отмена', keepEditing: 'Продолжить изменение' },
+      kiloPass: { manage: { cancel: 'Отмена подписки' } },
     },
+    source: ANCHORED_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects an anchored confirm label that is only the catalog’s Cancel word', () => {
+  const found = run({
+    english: ANCHORED_ENGLISH,
     translated: {
       common: { cancel: 'Отмена', keepEditing: 'Продолжить изменение' },
       kiloPass: { manage: { cancel: 'Отмена' } },
     },
-    source: [
-      "t('common.cancel');",
-      "t('common.keepEditing');",
-      "confirm({ message: 'Stop renewing?', confirmLabel: t('kiloPass.manage.cancel') });",
-    ].join('\n'),
+    source: ANCHORED_SOURCE,
+  });
+  assert.deepEqual(found, [
+    'mobile/ru: "kiloPass.manage.cancel" reads "Отмена", which this catalog already uses for Cancel ("Отмена"); the destructive button must use a verb the locale does not use for Cancel',
+  ]);
+});
+
+// Turkish writes the capital of `i` as `İ` (U+0130), which lowercases to `i`
+// plus U+0307; a fold that keeps the mark misses every value spelling the word
+// with a plain `i`.
+const TURKISH_CANCEL = { cancel: 'İptal', keepEditing: 'Düzenlemeye devam et' };
+const TURKISH_ENGLISH = {
+  common: { cancel: 'Cancel', keepEditing: 'Keep editing' },
+  sessionShare: { revoke: 'Revoke link' },
+};
+
+test('rejects a destructive confirm label that spells the dotted Cancel word with a plain i', () => {
+  const found = run({
+    language: 'tr',
+    english: TURKISH_ENGLISH,
+    translated: {
+      common: TURKISH_CANCEL,
+      sessionShare: { revoke: 'Bağlantıyı iptal et' },
+    },
+    source: CONFIRM_SOURCE,
+  });
+  assert.deepEqual(found, [
+    'mobile/tr: "sessionShare.revoke" reads "Bağlantıyı iptal et", which this catalog already uses for Cancel ("İptal"); the destructive button must use a verb the locale does not use for Cancel',
+  ]);
+});
+
+test('accepts a Turkish label that names the action beside an anchored Cancel word', () => {
+  const found = run({
+    language: 'tr',
+    english: ANCHORED_ENGLISH,
+    translated: {
+      common: TURKISH_CANCEL,
+      kiloPass: { manage: { cancel: 'Aboneliği iptal et' } },
+    },
+    source: ANCHORED_SOURCE,
   });
   assert.deepEqual(found, []);
 });

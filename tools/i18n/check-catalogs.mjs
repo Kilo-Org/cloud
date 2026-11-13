@@ -710,62 +710,80 @@ function scanSource(root) {
  * space, no edge space. Diacritics stay, because a locale that writes Cancel
  * with another accent has written a different word; the comparison asks
  * whether the reader sees the same button twice.
+ *
+ * The dotted capital is not a different word. Turkish writes the capital of
+ * `i` as `İ` (U+0130), which `toLowerCase` spells `i` + U+0307, so `İptal`
+ * would fold to `i̇ptal` and never match a value that spells `iptal` with a
+ * plain `i`. The pair becomes that plain `i`.
  */
 function foldDestructiveLabel(value) {
-  return value.normalize('NFC').toLowerCase().replace(/\s+/gu, ' ').trim();
+  return value
+    .normalize('NFC')
+    .toLowerCase()
+    .replace(/\u0069\u0307/g, 'i')
+    .replace(/\s+/gu, ' ')
+    .trim();
 }
 
 /**
- * The destructively painted keys whose label must not read as this catalog's
- * own Cancel word.
+ * The destructively painted keys, each mapped to whether its label may also be
+ * rejected for merely CONTAINING this catalog's Cancel word.
  *
  * `destructive-confirm-dialog.tsx` paints the safe button with
  * `cancelLabel ?? t('common.cancel')`, so a confirmation that leaves the safe
  * button to the fallback shows two buttons reading Cancel when the confirm
  * label was translated with the Cancel word.
  *
- * English anchors the class: "Cancel subscription" beside "Cancel" is the
- * shipped English pattern, so an English label that names the action it ends
- * is legal and every locale may translate it freely. A label whose English is a
- * bare destructive verb — "Revoke", "Discard" — is the one a translator must
- * not fold into the Cancel word. A key missing from English is not checked
- * here; the parity rule reports it.
+ * Exact equality is the defect whatever English says: a red button reading only
+ * Cancel is the second Cancel button. Every key that paints the red choice is
+ * checked for it.
+ *
+ * English anchors only the wider contains test: "Cancel subscription" beside
+ * "Cancel" is the shipped English pattern, so a locale may translate that label
+ * with its own Cancel word as long as the label also names the action. A key
+ * whose English value is the bare Cancel word anchors nothing new — English
+ * paints Cancel twice itself — so it takes the same exemption. A key missing
+ * from English is not checked here; the parity rule reports it.
  */
 function destructiveConfirmKeys(source, english) {
-  const keys = new Set();
+  const checks = new Map();
   if (source === null) {
-    return keys;
+    return checks;
   }
   const englishCancel = foldDestructiveLabel(english.get('common.cancel') ?? '');
-  if (englishCancel === '') {
-    return keys;
-  }
   for (const key of source.destructiveKeys) {
     const englishValue = english.get(key);
     if (englishValue === undefined) {
       continue;
     }
-    if (!foldDestructiveLabel(englishValue).includes(englishCancel)) {
-      keys.add(key);
-    }
+    checks.set(
+      key,
+      englishCancel !== '' && !foldDestructiveLabel(englishValue).includes(englishCancel)
+    );
   }
-  return keys;
+  return checks;
 }
 
 /**
  * Reject a destructive button whose label reads as this catalog's Cancel word.
  *
- * A substring is enough: a reader scanning two buttons, "Cancel subscription"
- * and "Cancel", sees Cancel twice. A label that is genuinely another word
- * containing the Cancel word as letters is rare enough that a reviewed
- * exception should carry it, not a looser comparison.
+ * An exact match is always a defect: the reader sees Cancel on the red button
+ * too. A substring is one only where English anchors the class, because a
+ * reader scanning "Cancel subscription" and "Cancel" sees Cancel twice, and a
+ * label that is genuinely another word containing the Cancel word as letters is
+ * rare enough that a reviewed exception should carry it, not a looser
+ * comparison.
  */
-function checkDestructiveConfirmLabel(label, key, value, cancelValue) {
+function checkDestructiveConfirmLabel(label, key, value, cancelValue, allowContains) {
   if (cancelValue === undefined) {
     return;
   }
   const cancel = foldDestructiveLabel(cancelValue);
-  if (cancel === '' || !foldDestructiveLabel(value).includes(cancel)) {
+  if (cancel === '') {
+    return;
+  }
+  const folded = foldDestructiveLabel(value);
+  if (folded !== cancel && !(allowContains && folded.includes(cancel))) {
     return;
   }
   fail(
@@ -1115,7 +1133,7 @@ export function checkCatalogs(root = ROOT) {
       wordingGroups.get(folded).push(key);
     }
     const sharedWordings = [...wordingGroups].filter(([, keys]) => keys.length > 1);
-    const destructiveKeys = destructiveConfirmKeys(source, english);
+    const destructiveChecks = destructiveConfirmKeys(source, english);
 
     // One key per piece of copy. Two keys holding the same English string cannot
     // be translated apart without the catalogs drifting, so the copy belongs to
@@ -1290,8 +1308,15 @@ export function checkCatalogs(root = ROOT) {
           fail(`${label}: "${key}" is empty`);
         }
         const englishValue = english.get(key);
-        if (destructiveKeys.has(key)) {
-          checkDestructiveConfirmLabel(label, key, value, translated.get('common.cancel'));
+        const allowContains = destructiveChecks.get(key);
+        if (allowContains !== undefined) {
+          checkDestructiveConfirmLabel(
+            label,
+            key,
+            value,
+            translated.get('common.cancel'),
+            allowContains
+          );
         }
         if (catalog.name === 'mobile' && key === 'home.noLiveSessions' && value === englishValue) {
           fail(`${label}: "${key}" must be translated`);

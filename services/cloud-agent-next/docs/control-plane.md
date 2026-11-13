@@ -366,9 +366,10 @@ so a later report changes nothing.
 
 `preparing` → `ready` → `failed`. Each preparation attempt has a deadline that outlasts its
 own steps in sequence (sandbox create, wrapper first connect and hello, snapshot restore with
-the clone fallback, Kilo runtime start, session import), including one create retry and one
-retry each of the last two steps. Environment snapshot builds run separately. An attempt
-starts when a route enters `preparing`: the first `prepare`, a `prepare` after `failed`, or a
+the clone fallback, Kilo runtime start, session import), including one create retry, one
+snapshot launch retry (a confirmed stop and its own launch bound) and one retry each of the last
+two steps. Environment snapshot builds run separately. An attempt starts when a route enters
+`preparing`: the first `prepare`, a `prepare` after `failed`, or a
 re-prepare after a wrapper restart. A repeated `prepare`, a reconnect or a new allocation inside the
 attempt keeps its deadline. Setup commands keep their own per-command limits, and how many run is
 configuration, so the attempt deadline is their aggregate stop: a preparation whose setup work
@@ -642,9 +643,15 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   `launch` returns `startSource` (`repository` or `image`). The progress detail names the snapshot
   capture date and time in UTC, the changed environment settings, an earlier base image and the
   real admission outcome.
-- **No fallback.** A failed snapshot start stops that container and retries the same snapshot once
-  within the original deadline. A permanent reason (expired, missing, image mismatch, provenance, or a
-  provider that started the image instead) fails at once and asks to rebuild the environment.
+- **No fallback.** Each snapshot launch attempt has its own 5-minute bound
+  (`DEADLINE_MS.repositoryStartup`): the first ends at the create deadline, which starts at create.
+  A failed or timed-out snapshot start stops that container and, after a confirmed stop, retries the
+  same snapshot once. The retry moves the allocation's create deadline to a new 5-minute bound,
+  renders a new startup command and artifact grant for that bound, and reports "Retrying the
+  snapshot start" on the snapshot step. A slow first attempt therefore never uses up the retry. A
+  stop that does not confirm fails at once. A permanent reason (expired, missing, image mismatch,
+  provenance, or a provider that started the image instead) fails at once and asks to rebuild the
+  environment.
   A repeated transient failure asks to send the message again, and to rebuild only if the failure
   repeats. Neither failure allows the session to continue from the base image.
   A wrapper that connected during the launch receives no
@@ -1257,6 +1264,7 @@ them through one development-only override.
 | Bootstrap | Install | Until the first-connect deadline, rendered by the Worker | Report `deadline_exceeded` and exit |
 | Sandbox DO | Provider stop | Existing ladder | Log unconfirmed stop; routing state `stopped` |
 | Sandbox DO | Environment snapshot lookup | 15 s, capped by the launch deadline | Start from the image |
+| Sandbox DO | Snapshot launch attempt (workspace or environment) | 5 min per attempt, 2 attempts with a confirmed stop (up to 30 s) between; the retry moves the create deadline | Route `failed` (`workspace_snapshot_start_failed` or `environment_snapshot_required`) |
 | Wrapper | Preparation steps | Section 7 | Route `failed` with the step reason |
 | Wrapper | Adopt an environment snapshot | 2 min | Preserve the workspace and fail preparation |
 | Environment build DO | One build | 30 min including capture | Build `failed` (`deadline`); stop the builder |
@@ -1974,6 +1982,23 @@ terminal outcomes. Duplicate or older updates cannot overwrite newer SQL state;
 deleted sessions are never recreated. Notifications remain best effort, with the
 existing list reconciliation and reconnect fetch repairing missed notifications.
 Deploy session-ingest before cloud-agent-next; no database migration is needed.
+
+The session list also records the session's Kilo runtime in `cli_sessions_v2.version`
+(`CLI_SESSION_VERSION_BY_RUNTIME_HARNESS`: `1` Kilo v1, `2` Kilo v2, `0` unknown).
+After a delivery to a `ready` route, the Session DO sends that route container's
+`runtimeHarness`, which the connected wrapper reported, through
+`SESSION_INGEST.recordCloudAgentSessionHarness`. Ingest writes only the row that
+matches the user and Cloud Agent session, and keeps `updated_at`. Ingest returns
+`true` for a matching row, including an idempotent repeat, or `false` for no match.
+The Session DO persists one pending record before publication. Publication runs
+in the background with a five-second timeout and never waits for another delivery.
+Failures and unmatched rows retry through the shared alarm every 30 seconds, even
+after completion or eviction. After ten attempts, the alarm discards the pending
+record and logs the retry limit; a later delivery can start another attempt batch,
+including during the final retry window. Invalid record identities are logged and
+skipped without failing an already accepted turn.
+Acknowledged records survive eviction and suppress repeated writes for the same
+runtime. Rows created before this record stay `0` until a new delivery records it.
 
 | Reason | Stage / code |
 |---|---|

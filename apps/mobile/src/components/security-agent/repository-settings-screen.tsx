@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/empty-state';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { classifyListBody } from '@/lib/query/list-body-state';
+import { OrphanedFindingsCard } from '@/components/security-agent/orphaned-findings-card';
 import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
@@ -263,6 +264,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
           {t('securityAgent.sla.permissionNote')}
         </Text>
       )}
+      <OrphanedFindingsCard scope={scope} canManage={canManage} />
       <RadioGroup label={t('common.repositories')}>
         {(['all', 'selected'] as const).map(option => (
           <ChoiceRow

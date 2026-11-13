@@ -6,6 +6,7 @@ import {
   cloudSessionMessagesPageSchema,
   parseCustomerBillingFailure,
   type CustomerBillingFailure,
+  type SessionStatus,
 } from './schemas';
 import type {
   CreateRemoteSessionInput,
@@ -402,6 +403,14 @@ type SessionManagerConfig = {
    */
   isStalledTransportError?: (err: unknown) => boolean;
   /**
+   * Opt-in for a consumer that opens a session immediately after creating it
+   * (the extension's CLI target). A just-created session can answer NOT_FOUND
+   * until its row is readable, so inside the window the open keeps loading and
+   * retries instead of latching the terminal not-available state. Absent, a
+   * NOT_FOUND stays terminal, which is what web and mobile expect.
+   */
+  spawnedSessionOpen?: SpawnedSessionOpenOptions;
+  /**
    * The consumer's send path can deliver remote-CLI attachment parts: it
    * materializes the presigned GET parts and passes them as `attachmentParts`.
    * The `supportsAttachments` gate reports a `remote` session supported only
@@ -610,6 +619,7 @@ type SessionManagerAtoms = {
   totalCost: Atom<number>;
   contextUsage: Atom<ContextUsage | undefined>;
   childMessages: Atom<(childSessionId: string) => StoredMessage[]>;
+  childSessionStatus: Atom<(childSessionId: string) => SessionStatus | undefined>;
   childSessionHydrationState: Atom<(childSessionId: string) => ChildSessionHydrationState>;
   childSessionError: Atom<(childSessionId: string) => string | null>;
   /** True when the latest page left a non-null cursor (more history to load). */
@@ -649,6 +659,12 @@ type SessionManagerAtoms = {
 
 type SessionManager = {
   switchSession(kiloSessionId: KiloSessionId): Promise<void>;
+  /**
+   * Record that the consumer just created this session, so an open that races
+   * its row can wait for it instead of latching "no longer available". Only
+   * meaningful with `spawnedSessionOpen` configured.
+   */
+  noteSpawnedSession(kiloSessionId: KiloSessionId): void;
   hydrateChildSession(childSessionId: KiloSessionId): Promise<void>;
   /**
    * Load the next page of older messages for a hydrated child session using
@@ -767,6 +783,18 @@ type SessionManager = {
   destroy(): void;
   atoms: SessionManagerAtoms;
 };
+
+export type SpawnedSessionOpenOptions = {
+  /** How long after `noteSpawnedSession` a NOT_FOUND still counts as "not readable yet". */
+  graceMs: number;
+  /** Delay before re-opening a session that answered NOT_FOUND inside the window. */
+  retryDelayMs?: number;
+  /** Cap on NOT_FOUND retries per spawned session, so a missing row still surfaces. */
+  maxAttempts?: number;
+};
+
+const DEFAULT_SPAWNED_RETRY_DELAY_MS = 1_000;
+const DEFAULT_SPAWNED_MAX_ATTEMPTS = 10;
 
 const GENERIC_ERROR = 'Something went wrong. Please retry in a moment.';
 /** Terminal message for a child session whose first page is a worker 404 (not-found). */
@@ -1208,6 +1236,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const worktreeChangesRefreshAtom = atom<WorktreeChangesRefresh | null>(null);
   const childSessionHydrationStatesAtom = atom<Map<string, ChildSessionHydrationState>>(new Map());
   const childSessionErrorsAtom = atom<Map<string, string>>(new Map());
+  const childSessionStatusesAtom = atom<ReadonlyMap<string, SessionStatus>>(new Map());
   const hasOlderMessagesAtom = atom<boolean>(false);
   const isLoadingOlderMessagesAtom = atom<boolean>(false);
   const olderMessagesErrorAtom = atom<OlderMessagesError | null>(null);
@@ -1477,6 +1506,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const errors = get(childSessionErrorsAtom);
     return (childSessionId: string): string | null => errors.get(childSessionId) ?? null;
   });
+  const childSessionStatusAtom = atom(get => {
+    const statuses = get(childSessionStatusesAtom);
+    return (childSessionId: string): SessionStatus | undefined => statuses.get(childSessionId);
+  });
 
   let activeSessionId: KiloSessionId | null = null;
   let switchGeneration = 0;
@@ -1521,6 +1554,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * eviction order (`rememberDeniedSession`).
    */
   const deniedSessionIds = new Set<KiloSessionId>();
+  const spawnedSessions = new Map<KiloSessionId, { attempts: number; spawnedAt: number }>();
+  const spawnedRetryTimers = new Map<KiloSessionId, ReturnType<typeof setTimeout>>();
   let activeSessionType: ActiveSessionType | null = null;
   /**
    * Latest per-session capabilities reported by the live CLI transport's
@@ -1722,6 +1757,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(fetchedSessionDataAtom, null);
     store.set(childSessionHydrationStatesAtom, new Map());
     store.set(childSessionErrorsAtom, new Map());
+    store.set(childSessionStatusesAtom, new Map());
     store.set(availableCommandsAtom, []);
     store.set(availableCommandsCatalogStatusAtom, null);
     store.set(worktreeChangesRefreshAtom, null);
@@ -1758,6 +1794,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     childSessionHydrationRequests.clear();
     store.set(childSessionHydrationStatesAtom, new Map());
     store.set(childSessionErrorsAtom, new Map());
+    store.set(childSessionStatusesAtom, new Map());
   }
 
   function setChildSessionHydrationState(
@@ -2755,6 +2792,66 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   /**
+   * Whether this NOT_FOUND belongs to a session the consumer just created and
+   * whose row may still be on its way. Consumes one retry of the budget.
+   */
+  function takeSpawnedRetry(kiloSessionId: KiloSessionId): boolean {
+    const options = config.spawnedSessionOpen;
+    const spawned = spawnedSessions.get(kiloSessionId);
+    if (options === undefined || spawned === undefined) return false;
+    if (Date.now() - spawned.spawnedAt > options.graceMs) {
+      spawnedSessions.delete(kiloSessionId);
+      return false;
+    }
+    const maxAttempts = options.maxAttempts ?? DEFAULT_SPAWNED_MAX_ATTEMPTS;
+    if (spawned.attempts >= maxAttempts) {
+      spawnedSessions.delete(kiloSessionId);
+      return false;
+    }
+    spawned.attempts += 1;
+    return true;
+  }
+
+  /**
+   * Cancel a scheduled spawned retry. The handle must not outlive the open it
+   * belongs to: a fired retry re-opens the session by id, which would replace a
+   * session that has since opened or been reported unavailable.
+   */
+  function clearSpawnedRetry(kiloSessionId: KiloSessionId): void {
+    const timer = spawnedRetryTimers.get(kiloSessionId);
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    spawnedRetryTimers.delete(kiloSessionId);
+  }
+
+  /** Cancel every pending spawned retry except the one for the newly opened id. */
+  function clearOtherSpawnedRetries(kiloSessionId: KiloSessionId): void {
+    for (const [id, timer] of spawnedRetryTimers) {
+      if (id === kiloSessionId) continue;
+      clearTimeout(timer);
+      spawnedRetryTimers.delete(id);
+    }
+  }
+
+  /**
+   * Re-open a spawned session that answered NOT_FOUND, unless the caller has
+   * moved on. The session stays in its loading state until the row is readable
+   * or the retry budget runs out.
+   */
+  function scheduleSpawnedRetry(open: SessionOpen): void {
+    const delay = config.spawnedSessionOpen?.retryDelayMs ?? DEFAULT_SPAWNED_RETRY_DELAY_MS;
+    clearSpawnedRetry(open.kiloSessionId);
+    spawnedRetryTimers.set(
+      open.kiloSessionId,
+      scheduleUnrefdTimer(() => {
+        spawnedRetryTimers.delete(open.kiloSessionId);
+        if (open.expectedGeneration !== switchGeneration) return;
+        void switchSession(open.kiloSessionId);
+      }, delay)
+    );
+  }
+
+  /**
    * Record a session the server answered as not available. Recently touched
    * ids survive eviction; the active session is never evicted.
    */
@@ -2881,6 +2978,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   async function switchSession(kiloSessionId: KiloSessionId): Promise<void> {
     cacheActiveSessionPage();
+    clearOtherSpawnedRetries(kiloSessionId);
     const preserveTranscript = preserveTranscriptOnOpen(kiloSessionId);
     const expectedGeneration = beginSessionOpen(kiloSessionId);
     const resolvedFailures = seedResolvedDeliveryFailures(kiloSessionId, expectedGeneration);
@@ -3231,6 +3329,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (open.expectedGeneration !== switchGeneration || open.denied) return null;
     // The server confirmed this id, so its page may be used again.
     deniedSessionIds.delete(open.kiloSessionId);
+    spawnedSessions.delete(open.kiloSessionId);
+    clearSpawnedRetry(open.kiloSessionId);
     return data;
   }
 
@@ -3238,7 +3338,21 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const parsed = errorShapeSchema.safeParse(error);
     const code = parsed.success ? (parsed.data.data?.code ?? parsed.data.shape?.code) : undefined;
     if (code !== 'NOT_FOUND' && code !== 'UNAUTHORIZED' && code !== 'FORBIDDEN') return false;
+    if (code === 'NOT_FOUND' && takeSpawnedRetry(open.kiloSessionId)) {
+      open.denied = true;
+      open.acceptCachedPage = false;
+      stateUnsub?.();
+      stateUnsub = null;
+      currentSession?.destroy();
+      currentSession = null;
+      store.set(isLoadingAtom, true);
+      setIndicator(null);
+      scheduleSpawnedRetry(open);
+      return true;
+    }
     open.denied = true;
+    clearSpawnedRetry(open.kiloSessionId);
+    spawnedSessions.delete(open.kiloSessionId);
     open.acceptCachedPage = false;
     open.surfaceDeferredOpenFailure = null;
     stateUnsub?.();
@@ -3485,6 +3599,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
             if (open.expectedGeneration !== switchGeneration) return;
             settlePendingSendConfirmation(open.kiloSessionId, event.messageId);
           });
+        }
+        if (event.type === 'session.status' && event.sessionId !== store.get(rootSessionIdAtom)) {
+          const statuses = new Map(store.get(childSessionStatusesAtom));
+          statuses.set(event.sessionId, event.status);
+          store.set(childSessionStatusesAtom, statuses);
+          if (event.status.type === 'busy') {
+            const errors = new Map(store.get(childSessionErrorsAtom));
+            errors.delete(event.sessionId);
+            store.set(childSessionErrorsAtom, errors);
+          }
         }
         if (event.type === 'cloud.message.failed' && !open.resolvedFailures.has(event.messageId)) {
           store.set(billingFailureAtom, event.billingFailure ?? null);
@@ -4407,6 +4531,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     metadataRecoveryCleanups = [];
     resetChildSessionHydration();
     switchGeneration += 1;
+    for (const timer of spawnedRetryTimers.values()) clearTimeout(timer);
+    spawnedRetryTimers.clear();
+    spawnedSessions.clear();
     stateUnsub?.();
     stateUnsub = null;
     currentSession?.destroy();
@@ -4434,6 +4561,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   return {
     switchSession,
+    noteSpawnedSession: (kiloSessionId: KiloSessionId) => {
+      const options = config.spawnedSessionOpen;
+      if (options === undefined) return;
+      const now = Date.now();
+      for (const [id, spawned] of spawnedSessions) {
+        if (now - spawned.spawnedAt > options.graceMs) spawnedSessions.delete(id);
+      }
+      spawnedSessions.set(kiloSessionId, { attempts: 0, spawnedAt: now });
+    },
     hydrateChildSession,
     loadOlderChildMessages,
     loadOlderMessages,
@@ -4516,6 +4652,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       totalCost: totalCostAtom,
       contextUsage: contextUsageAtom,
       childMessages: childMessagesAtom,
+      childSessionStatus: childSessionStatusAtom,
       childSessionHydrationState: childSessionHydrationStateAtom,
       childSessionError: childSessionErrorAtom,
       hasOlderMessages: hasOlderMessagesAtom,

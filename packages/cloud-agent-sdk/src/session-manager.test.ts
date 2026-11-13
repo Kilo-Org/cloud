@@ -5271,6 +5271,51 @@ describe('createSessionManager', () => {
   });
 
   describe('message filtering', () => {
+    it('tracks child lifecycle status independently from root activity and clears it on switch', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-root'));
+      const childStatus = () => config.store.get(mgr.atoms.childSessionStatus)('ses-child');
+      const rootStatus = () => config.store.get(mgr.atoms.childSessionStatus)('ses-root');
+      expect(childStatus()).toBeUndefined();
+      mockSessionCallbacks.onEvent?.({
+        type: 'session.status',
+        sessionId: 'ses-child',
+        status: { type: 'busy' },
+      });
+      expect(childStatus()).toEqual({ type: 'busy' });
+      expect(config.store.get(mgr.atoms.isStreaming)).toBe(false);
+      mockSessionCallbacks.onEvent?.({
+        type: 'session.status',
+        sessionId: 'ses-root',
+        status: { type: 'idle' },
+      });
+      expect(rootStatus()).toBeUndefined();
+      expect(childStatus()).toEqual({ type: 'busy' });
+      mockSessionCallbacks.onEvent?.({
+        type: 'session.status',
+        sessionId: 'ses-child',
+        status: { type: 'idle' },
+      });
+      expect(childStatus()).toEqual({ type: 'idle' });
+      await mgr.switchSession(kiloId('ses-other'));
+      expect(childStatus()).toBeUndefined();
+    });
+
+    it('clears a stale child error when that child starts again', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-root'));
+      mockSessionCallbacks.onChildSessionError?.('ses-child', 'Synthetic failure');
+      expect(config.store.get(mgr.atoms.childSessionError)('ses-child')).toBe('Synthetic failure');
+      mockSessionCallbacks.onEvent?.({
+        type: 'session.status',
+        sessionId: 'ses-child',
+        status: { type: 'busy' },
+      });
+      expect(config.store.get(mgr.atoms.childSessionError)('ses-child')).toBeNull();
+    });
+
     it('main chat excludes child messages even if child session.created never arrived', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -11876,5 +11921,159 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
         attachmentParts,
       });
     });
+  });
+});
+
+describe('createSessionManager — spawned session open', () => {
+  const notFound = { data: { code: 'NOT_FOUND' } };
+
+  const settle = async (): Promise<void> => {
+    jest.advanceTimersByTime(10);
+    for (let tick = 0; tick < 5; tick += 1) await Promise.resolve();
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('keeps a just-spawned NOT_FOUND out of the terminal state and retries the open', async () => {
+    const fetchSession = jest
+      .fn()
+      .mockRejectedValueOnce(notFound)
+      .mockRejectedValueOnce(notFound)
+      .mockResolvedValue(defaultFetchedSession);
+    const config = createMockConfig({
+      fetchSession,
+      spawnedSessionOpen: { graceMs: 10_000, maxAttempts: 5, retryDelayMs: 1 },
+    });
+    const mgr = createSessionManager(config);
+    mgr.noteSpawnedSession(kiloId('ses-1'));
+
+    await mgr.switchSession(kiloId('ses-1'));
+
+    expect(atomValue(config.store, mgr.atoms.statusIndicator)).toBeNull();
+    await settle();
+    await settle();
+    expect(fetchSession.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(
+      atomValue<{ code?: string } | null>(config.store, mgr.atoms.statusIndicator)?.code
+    ).not.toBe('child-session-not-found');
+  });
+
+  it('fails immediately when the option is absent', async () => {
+    const fetchSession = jest.fn().mockRejectedValue(notFound);
+    const config = createMockConfig({ fetchSession });
+    const mgr = createSessionManager(config);
+    mgr.noteSpawnedSession(kiloId('ses-1'));
+
+    await mgr.switchSession(kiloId('ses-1'));
+
+    expect(atomValue<{ code?: string } | null>(config.store, mgr.atoms.statusIndicator)?.code).toBe(
+      'child-session-not-found'
+    );
+    expect(fetchSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels a pending retry when the user switches to another session', async () => {
+    const fetchSession = jest.fn((id: KiloSessionId) =>
+      id === kiloId('ses-2') ? Promise.resolve(defaultFetchedSession) : Promise.reject(notFound)
+    );
+    const config = createMockConfig({
+      fetchSession,
+      spawnedSessionOpen: { graceMs: 10_000, maxAttempts: 5, retryDelayMs: 10 },
+    });
+    const mgr = createSessionManager(config);
+    mgr.noteSpawnedSession(kiloId('ses-1'));
+
+    await mgr.switchSession(kiloId('ses-1'));
+    const callsForSpawned = (): number =>
+      fetchSession.mock.calls.filter(([id]) => id === kiloId('ses-1')).length;
+    expect(callsForSpawned()).toBe(1);
+
+    await mgr.switchSession(kiloId('ses-2'));
+    for (let attempt = 0; attempt < 3; attempt += 1) await settle();
+
+    expect(callsForSpawned()).toBe(1);
+  });
+
+  it('cancels a pending retry on dispose', async () => {
+    const fetchSession = jest.fn().mockRejectedValue(notFound);
+    const config = createMockConfig({
+      fetchSession,
+      spawnedSessionOpen: { graceMs: 10_000, maxAttempts: 5, retryDelayMs: 10 },
+    });
+    const mgr = createSessionManager(config);
+    mgr.noteSpawnedSession(kiloId('ses-1'));
+
+    await mgr.switchSession(kiloId('ses-1'));
+    expect(fetchSession).toHaveBeenCalledTimes(1);
+
+    mgr.destroy();
+    for (let attempt = 0; attempt < 3; attempt += 1) await settle();
+
+    expect(fetchSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops scheduling retries once the same session is denied terminally', async () => {
+    const fetchSession = jest.fn().mockRejectedValue(notFound);
+    const config = createMockConfig({
+      fetchSession,
+      spawnedSessionOpen: { graceMs: 10_000, maxAttempts: 1, retryDelayMs: 10 },
+    });
+    const mgr = createSessionManager(config);
+    mgr.noteSpawnedSession(kiloId('ses-1'));
+
+    await mgr.switchSession(kiloId('ses-1'));
+    for (let attempt = 0; attempt < 6; attempt += 1) await settle();
+
+    expect(fetchSession).toHaveBeenCalledTimes(2);
+    expect(atomValue<{ code?: string } | null>(config.store, mgr.atoms.statusIndicator)?.code).toBe(
+      'child-session-not-found'
+    );
+  });
+
+  it('evicts a spawned entry once its grace has passed when a new id is noted', async () => {
+    const fetchSession = jest.fn().mockRejectedValue(notFound);
+    const config = createMockConfig({
+      fetchSession,
+      spawnedSessionOpen: { graceMs: 1_000, maxAttempts: 5, retryDelayMs: 10 },
+    });
+    const mgr = createSessionManager(config);
+
+    mgr.noteSpawnedSession(kiloId('ses-stale'));
+    jest.advanceTimersByTime(5_000);
+    mgr.noteSpawnedSession(kiloId('ses-fresh'));
+
+    await mgr.switchSession(kiloId('ses-stale'));
+    expect(fetchSession.mock.calls.filter(([id]) => id === kiloId('ses-stale'))).toHaveLength(1);
+    expect(atomValue<{ code?: string } | null>(config.store, mgr.atoms.statusIndicator)?.code).toBe(
+      'child-session-not-found'
+    );
+
+    await mgr.switchSession(kiloId('ses-fresh'));
+    await settle();
+    expect(
+      fetchSession.mock.calls.filter(([id]) => id === kiloId('ses-fresh')).length
+    ).toBeGreaterThan(1);
+  });
+
+  it('gives up after maxAttempts so a session that never appears still surfaces', async () => {
+    const config = createMockConfig({
+      fetchSession: jest.fn().mockRejectedValue(notFound),
+      spawnedSessionOpen: { graceMs: 10_000, maxAttempts: 2, retryDelayMs: 1 },
+    });
+    const mgr = createSessionManager(config);
+    mgr.noteSpawnedSession(kiloId('ses-1'));
+
+    await mgr.switchSession(kiloId('ses-1'));
+    for (let attempt = 0; attempt < 6; attempt += 1) await settle();
+
+    expect(atomValue<{ code?: string } | null>(config.store, mgr.atoms.statusIndicator)?.code).toBe(
+      'child-session-not-found'
+    );
   });
 });

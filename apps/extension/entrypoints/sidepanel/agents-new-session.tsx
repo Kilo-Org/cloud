@@ -236,7 +236,7 @@ export const AgentsNewSession = ({
   onCreated: (kiloSessionId: string, initialPrompt?: string) => void;
   onCancel: () => void;
 }): JSX.Element => {
-  const { organizationId, token, trpcClient, userWebConnection } = useExtensionAgents();
+  const { manager, organizationId, token, trpcClient, userWebConnection } = useExtensionAgents();
   const queryClient = useQueryClient();
 
   const { auth, isLoading: isAuthLoading } = useStoredAuth();
@@ -538,6 +538,7 @@ export const AgentsNewSession = ({
         });
         captureEvent(CONVERSATION_CREATED_EVENT, { mode: 'agents' });
         setIsSubmitting(false);
+        manager.noteSpawnedSession(parsed.kiloSessionId);
         onCreated(parsed.kiloSessionId, trimmed);
       } catch (error) {
         setSubmitError(error instanceof Error ? error.message : 'Failed to start the session.');
@@ -610,6 +611,7 @@ export const AgentsNewSession = ({
     trpcClient,
     queryClient,
     onCreated,
+    manager,
   ]);
 
   const creditsUrl = useMemo(() => {

@@ -14,6 +14,7 @@ import {
 import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { getOpenPauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
+import { pickKiloPassSubscriptionForProjection } from '@kilocode/worker-utils/kilo-pass-bonus-projection';
 
 type Db = typeof defaultDb;
 type DbOrTx = Db | DrizzleTransaction;
@@ -30,6 +31,8 @@ export type KiloPassSubscriptionState = {
   currentStreakMonths: number;
   nextYearlyIssueAt: string | null;
   startedAt: string | null;
+  /** Absent on a state a caller assembles rather than reads from a row. */
+  endedAt?: string | null;
   resumesAt: string | null;
 };
 
@@ -45,8 +48,33 @@ type KiloPassSubscriptionRowForState = {
   currentStreakMonths: number;
   nextYearlyIssueAt: string | null;
   startedAt: string | null;
+  endedAt: string | null;
   createdAt: string;
 };
+
+function toKiloPassSubscriptionState(
+  selected: KiloPassSubscriptionRowForState,
+  overrides: Pick<KiloPassSubscriptionState, 'status' | 'cancelAtPeriodEnd' | 'resumesAt'> & {
+    /** A date a caller derives instead of the stored one, such as a store expiry. */
+    endedAt?: string | null;
+  }
+): KiloPassSubscriptionState {
+  return {
+    subscriptionId: selected.subscriptionId,
+    stripeSubscriptionId: selected.stripeSubscriptionId,
+    paymentProvider: selected.paymentProvider,
+    providerSubscriptionId: selected.providerSubscriptionId,
+    tier: selected.tier,
+    cadence: selected.cadence,
+    status: overrides.status,
+    cancelAtPeriodEnd: overrides.cancelAtPeriodEnd,
+    currentStreakMonths: selected.currentStreakMonths,
+    nextYearlyIssueAt: normalizeTimestampToIso(selected.nextYearlyIssueAt),
+    startedAt: normalizeTimestampToIso(selected.startedAt),
+    endedAt: overrides.endedAt ?? normalizeTimestampToIso(selected.endedAt),
+    resumesAt: overrides.resumesAt,
+  };
+}
 
 function isoToMillis(iso: string | null): number | null {
   if (!iso) return null;
@@ -63,14 +91,6 @@ function normalizeTimestampToIso(timestamp: string | null): string | null {
   return dayjs(millis).utc().toISOString();
 }
 
-function getSubscriptionRecencyMillis(subscription: KiloPassSubscriptionRowForState): number {
-  return (
-    isoToMillis(subscription.startedAt) ??
-    isoToMillis(subscription.createdAt) ??
-    Number.NEGATIVE_INFINITY
-  );
-}
-
 function isStoreManagedProvider(paymentProvider: KiloPassPaymentProvider): boolean {
   return paymentProvider !== KiloPassPaymentProviderValue.Stripe;
 }
@@ -79,42 +99,6 @@ function isExpiredAtOrBeforeNow(expiresAt: string | null, nowIso: string): boole
   const expiresAtMillis = isoToMillis(expiresAt);
   const nowMillis = isoToMillis(nowIso);
   return expiresAtMillis !== null && nowMillis !== null && expiresAtMillis <= nowMillis;
-}
-
-/**
- * Determines the priority of a subscription status for selection.
- * Lower number = higher priority.
- * Active subscriptions are preferred, then pending cancellation, then ended.
- */
-function getStatusPriority(row: KiloPassSubscriptionRowForState): number {
-  if (row.status === 'active' && !row.cancelAtPeriodEnd) return 0;
-  if (row.status === 'active' && row.cancelAtPeriodEnd) return 1;
-  // Trialing is also considered active-ish
-  if (row.status === 'trialing') return 2;
-  // Past due - still has access but payment issues
-  if (row.status === 'past_due') return 3;
-  if (row.status === 'paused') return 4;
-  // Incomplete - initial payment pending
-  if (row.status === 'incomplete') return 5;
-  // Ended states
-  if (isStripeSubscriptionEnded(row.status)) return 6;
-  // Fallback for any unknown status
-  return 7;
-}
-
-function pickSubscriptionForState(
-  subscriptions: readonly KiloPassSubscriptionRowForState[]
-): KiloPassSubscriptionRowForState | null {
-  if (subscriptions.length === 0) return null;
-
-  // Sort by priority first, then by recency within same priority
-  const sorted = [...subscriptions].sort((a, b) => {
-    const priorityDiff = getStatusPriority(a) - getStatusPriority(b);
-    if (priorityDiff !== 0) return priorityDiff;
-    return getSubscriptionRecencyMillis(b) - getSubscriptionRecencyMillis(a);
-  });
-
-  return sorted[0] ?? null;
 }
 
 export async function getKiloPassStateForUser(
@@ -135,6 +119,7 @@ export async function getKiloPassStateForUser(
       currentStreakMonths: kilo_pass_subscriptions.current_streak_months,
       nextYearlyIssueAt: kilo_pass_subscriptions.next_yearly_issue_at,
       startedAt: kilo_pass_subscriptions.started_at,
+      endedAt: kilo_pass_subscriptions.ended_at,
       createdAt: kilo_pass_subscriptions.created_at,
     })
     .from(kilo_pass_subscriptions)
@@ -143,7 +128,7 @@ export async function getKiloPassStateForUser(
     ? await subscriptionQuery.for('update')
     : await subscriptionQuery;
 
-  const selected = pickSubscriptionForState(subscriptions);
+  const selected = pickKiloPassSubscriptionForProjection(subscriptions);
   if (!selected) return null;
 
   if (isStoreManagedProvider(selected.paymentProvider)) {
@@ -159,20 +144,14 @@ export async function getKiloPassStateForUser(
     // Store subscriptions are historical: notifications no longer change their
     // rows, so derive canceled from the last recorded expiry without writing.
     if (isExpiredAtOrBeforeNow(latestStorePurchase?.expires_at ?? null, nowIso)) {
-      return {
-        subscriptionId: selected.subscriptionId,
-        stripeSubscriptionId: selected.stripeSubscriptionId,
-        paymentProvider: selected.paymentProvider,
-        providerSubscriptionId: selected.providerSubscriptionId,
-        tier: selected.tier,
-        cadence: selected.cadence,
+      return toKiloPassSubscriptionState(selected, {
         status: 'canceled',
         cancelAtPeriodEnd: false,
-        currentStreakMonths: selected.currentStreakMonths,
-        nextYearlyIssueAt: normalizeTimestampToIso(selected.nextYearlyIssueAt),
-        startedAt: normalizeTimestampToIso(selected.startedAt),
+        // A store pass ends when its last recorded purchase expires, so that
+        // expiry is the date the pass ended.
+        endedAt: normalizeTimestampToIso(latestStorePurchase?.expires_at ?? null),
         resumesAt: null,
-      };
+      });
     }
   }
 
@@ -186,18 +165,9 @@ export async function getKiloPassStateForUser(
   const resumesAt =
     isPaused && openPause.resumes_at ? normalizeTimestampToIso(openPause.resumes_at) : null;
 
-  return {
-    subscriptionId: selected.subscriptionId,
-    stripeSubscriptionId: selected.stripeSubscriptionId,
-    paymentProvider: selected.paymentProvider,
-    providerSubscriptionId: selected.providerSubscriptionId,
-    tier: selected.tier,
-    cadence: selected.cadence,
+  return toKiloPassSubscriptionState(selected, {
     status: isPaused ? 'paused' : selected.status,
     cancelAtPeriodEnd: selected.cancelAtPeriodEnd,
-    currentStreakMonths: selected.currentStreakMonths,
-    nextYearlyIssueAt: normalizeTimestampToIso(selected.nextYearlyIssueAt),
-    startedAt: normalizeTimestampToIso(selected.startedAt),
     resumesAt,
-  };
+  });
 }

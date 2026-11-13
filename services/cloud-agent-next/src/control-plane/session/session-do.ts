@@ -29,6 +29,7 @@ import {
 } from '@kilocode/worker-utils/cloud-agent-authority';
 import { sessionCallbackContext } from './callback-context.js';
 import { createSessionListStatusOutbox, deriveSessionListStatus } from './list-status.js';
+import { createRuntimeHarnessRecorder } from './runtime-harness-record.js';
 import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
@@ -639,6 +640,13 @@ export type NativeSnapshotCursor = {
 
 export const CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES = NATIVE_DELIVERY_LIMITS.eventBytes;
 
+/**
+ * Cap on the stream rows the first history page appends. The page's own budget
+ * is reduced by their measured size, so the whole response stays inside the
+ * history page bound.
+ */
+const MAX_SNAPSHOT_ROWS_BYTES = 256 * 1024;
+
 type SessionMessageRow = typeof controlPlaneMessages.$inferSelect;
 
 type TransportPass = { deadlineAt: number; scheduleRecovery: boolean };
@@ -789,6 +797,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
   private readonly listStatusOutbox: ReturnType<typeof createSessionListStatusOutbox>;
+  private readonly runtimeHarnessRecorder: ReturnType<typeof createRuntimeHarnessRecorder>;
   /** Terminal callback outbox (plan B5); one job per drained batch. */
   private readonly messageCallbacks: MessageCallbacks;
   /** Worktree-changes projection from the shared event log (plan B10). */
@@ -837,6 +846,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.listStatusOutbox = createSessionListStatusOutbox({
       storage: ctx.storage,
       publish: update => this.env.SESSION_INGEST.publishCloudAgentSessionStatus(update),
+    });
+    this.runtimeHarnessRecorder = createRuntimeHarnessRecorder({
+      storage: ctx.storage,
+      record: params => this.env.SESSION_INGEST.recordCloudAgentSessionHarness(params),
     });
     this.messageCallbacks = createMessageCallbacks({
       storage: ctx.storage,
@@ -2728,23 +2741,27 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (!this.messages.some(message => message.state === 'queued')) {
       await this.clearTransportRecovery();
     }
+    const harnessDueAt = this.runtimeHarnessRecorder.nextDueAt();
     const candidates = [
       this.transportRecoveryAt,
       nextBackstopAt(this.messages, this.sessionTimers()),
       this.reportOutbox.nextDueAt() ?? null,
       this.messageCallbacks.nextCallbackDueAt() ?? null,
       statusDueAt,
+      harnessDueAt,
     ].filter((value): value is number => value !== null);
     if (candidates.length === 0) {
       await this.ctx.storage.deleteAlarm();
       return;
     }
     await this.ctx.storage.setAlarm(Math.min(...candidates));
-    if (statusDueAt !== null && statusDueAt <= Date.now()) {
+    if (
+      (statusDueAt !== null && statusDueAt <= Date.now()) ||
+      (harnessDueAt !== null && harnessDueAt <= Date.now())
+    ) {
       // Metadata publication never holds up preparation, answers, or outcomes.
       this.ctx.waitUntil(
-        this.listStatusOutbox
-          .repair()
+        Promise.all([this.listStatusOutbox.repair(), this.runtimeHarnessRecorder.repair()])
           .then(() =>
             this.enqueue(async () => {
               // The serialized finalizer re-arms the alarm after publication.
@@ -2753,7 +2770,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           .catch(() => {
             logger
               .withFields({ sessionId: this.sessionId })
-              .warn('Session list status repair failed');
+              .warn('Session list metadata repair failed');
           })
       );
     }
@@ -2853,7 +2870,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.ensureClientHistory(kiloSessionId);
     if (this.registration !== registration) return null;
     this.partText.flush();
-    return readSessionMessagesPage({
+    // The first page carries the rows the stream replays on connect, so a
+    // client that cannot reach the socket still shows the preparation attempts
+    // and the run's queued or failed turns. Older pages stay bare: the rows are
+    // current state, not history. Their size is reserved from the page budget so
+    // the response stays inside the page bound.
+    const snapshotRows = parsed.cursor === undefined ? this.readSnapshotRows() : undefined;
+    const page = readSessionMessagesPage({
       db: this.db,
       storage: this.ctx.storage,
       queries: this.eventQueries,
@@ -2866,7 +2889,14 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       omittedItemCount:
         readHistoryHydration(this.ctx.storage, isRoot ? undefined : kiloSessionId)
           ?.omittedItemCount ?? 0,
+      reservedBytes: snapshotRows?.bytes,
     });
+    if (snapshotRows === undefined) return page;
+    return {
+      ...page,
+      preparationAttempts: snapshotRows.preparationAttempts,
+      queuedMessages: snapshotRows.queuedMessages,
+    };
   }
 
   /** Returns a descendant's lineage under the registered root; the root has none. */
@@ -3844,6 +3874,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           runtimeHarness: message.container?.runtimeHarness,
         });
       }
+      this.recordDeliveredRuntimeHarness();
       await this.armAlarm();
       return;
     }
@@ -3860,6 +3891,24 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       return;
     }
     await this.applyView(view, pass);
+  }
+
+  private recordDeliveredRuntimeHarness(): void {
+    const runtimeHarness =
+      this.route.state === 'ready' ? this.route.container?.runtimeHarness : undefined;
+    if (
+      runtimeHarness === undefined ||
+      this.registration === null ||
+      this.metadata === null ||
+      this.env.SESSION_INGEST === undefined
+    )
+      return;
+    this.runtimeHarnessRecorder.record({
+      sessionId: this.registration.spec.kiloSessionId,
+      kiloUserId: this.metadata.identity.userId,
+      cloudAgentSessionId: this.sessionId,
+      runtimeHarness,
+    });
   }
 
   private async persistQueuedContainer(
@@ -4580,6 +4629,42 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         }
         return snapshot;
       });
+  }
+
+  /**
+   * The stream rows the first history page appends, trimmed to
+   * `MAX_SNAPSHOT_ROWS_BYTES` newest first, and their measured size. The page's
+   * own budget is reduced by that size so the response stays inside
+   * `MAX_SESSION_PAGE_BYTES`. Queued turns are reserved first, so a failed run
+   * always keeps the question row it is answering; preparation attempts give way.
+   */
+  private readSnapshotRows(): {
+    preparationAttempts: PreparationAttempt[];
+    queuedMessages: QueuedMessageSnapshot[];
+    bytes: number;
+  } {
+    const encoder = new TextEncoder();
+    const budget = { remaining: MAX_SNAPSHOT_ROWS_BYTES };
+    // Both lists run oldest first, so walking back keeps the newest rows.
+    const keepNewest = <T>(rows: T[]): T[] => {
+      const kept: T[] = [];
+      for (let index = rows.length - 1; index >= 0; index -= 1) {
+        const row = rows.at(index);
+        if (row === undefined) break;
+        const rowBytes = encoder.encode(JSON.stringify(row)).byteLength;
+        if (rowBytes > budget.remaining) break;
+        budget.remaining -= rowBytes;
+        kept.push(row);
+      }
+      return kept.reverse();
+    };
+    const queuedMessages = keepNewest(this.deriveQueuedMessages());
+    const preparationAttempts = keepNewest(listPreparationAttempts(this.eventQueries));
+    return {
+      preparationAttempts,
+      queuedMessages,
+      bytes: MAX_SNAPSHOT_ROWS_BYTES - budget.remaining,
+    };
   }
 
   private readPendingInteractions(): { questions: unknown[]; permissions: unknown[] } | undefined {

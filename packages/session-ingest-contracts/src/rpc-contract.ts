@@ -25,6 +25,28 @@ export type PublishCloudAgentSessionStatusParams = z.infer<
   typeof publishCloudAgentSessionStatusSchema
 >;
 
+export const recordCloudAgentSessionHarnessSchema = z
+  .object({
+    sessionId: sessionIdSchema,
+    kiloUserId: z.string().min(1),
+    cloudAgentSessionId: cloudAgentSessionIdSchema,
+    runtimeHarness: z.enum(['kilo', 'kilo2']),
+  })
+  .strict();
+export type RecordCloudAgentSessionHarnessParams = z.infer<
+  typeof recordCloudAgentSessionHarnessSchema
+>;
+
+/**
+ * `cli_sessions_v2.version` of a Cloud Agent session once its runtime is known.
+ * `0` means unknown: rows from before this record, native CLI rows, and Cloud
+ * Agent rows that have not delivered a message to a ready sandbox yet.
+ */
+export const CLI_SESSION_VERSION_BY_RUNTIME_HARNESS = {
+  kilo: 1,
+  kilo2: 2,
+} as const satisfies Record<RecordCloudAgentSessionHarnessParams['runtimeHarness'], number>;
+
 export const cloudAgentWorktreeLocationSchema = z
   .object({
     sandboxId: z.string().regex(/^[A-Za-z0-9._:-]{1,256}$/),
@@ -195,7 +217,10 @@ export const createSessionForCloudAgentSchema = z.object({
    * registration only; later sibling registrations leave it untouched.
    */
   parentWorktreeId: cloudAgentWorktreeIdSchema.optional(),
-  /** The branch the new working branch starts from. Null means the default branch. */
+  /**
+   * The branch the new working branch starts from. Omitted means the default
+   * branch, or the stacked parent's branch when `parentWorktreeId` is set.
+   */
   baseBranch: z.string().min(1).max(256).optional(),
   /** The exact commit the working branch starts from, resolved by the web router. */
   baseSha: z
@@ -1370,6 +1395,9 @@ export type GetSessionMessagesResult = AuthorizedSessionMessages | null;
 
 export type SessionIngestRpcMethods = {
   publishCloudAgentSessionStatus: (params: PublishCloudAgentSessionStatusParams) => Promise<void>;
+  recordCloudAgentSessionHarness: (
+    params: RecordCloudAgentSessionHarnessParams
+  ) => Promise<boolean>;
   beginCloudAgentWorktreeDeletion: (
     params: CloudAgentWorktreeDeletionParams
   ) => Promise<CloudAgentWorktreeDeletionState>;

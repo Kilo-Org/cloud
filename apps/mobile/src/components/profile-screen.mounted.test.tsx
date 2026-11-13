@@ -108,7 +108,6 @@ vi.mock('@/components/ui/icons', () => ({
   Globe: 'Globe',
   KeyRound: 'KeyRound',
   Lock: 'Lock',
-  LogOut: 'LogOut',
   MessageSquare: 'MessageSquare',
   Plug: 'Plug',
   ShieldCheck: 'ShieldCheck',
@@ -128,6 +127,7 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

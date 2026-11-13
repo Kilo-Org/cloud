@@ -49,25 +49,14 @@ function clearSearchIndexBestEffort(): void {
 }
 
 /**
- * Re-run the OS search clear on an app launch that restored no session.
- *
- * The sign-out teardown fires the clear once and cannot await it, and the
- * process can be killed before it lands, so a failure there would leave the
- * previous account's session, pull-request and security titles searchable for
- * the whole signed-out window with nothing to retry it — the index sync is
- * gated off while signed out. This is that retry: on a signed-out launch the
- * sync never runs, so a wiped ledger cannot re-index anything, and the next
- * sign-in re-indexes its own account from its own cache.
+ * Re-runs the clears for a launch with no stored session, so the surfaces that
+ * outlive a session start empty.
  */
 export function clearSystemSearchIndexOnSignedOutLaunch(): void {
   clearSearchIndexBestEffort();
-  // The intent catalog is the same titles in another place, and its clear has
-  // the same one-shot problem: the teardown fired it without awaiting, so a
-  // process killed before it landed would leave the previous account's sessions
-  // named by Siri for the whole signed-out window. The signed-out launch is that
-  // retry, and running it while signed out cannot re-publish anything because
-  // the sync is gated off.
   clearSessionCatalogBestEffort();
+  runClear(clearArtifactMirror);
+  runClear(notifyArtifactsChanged);
 }
 
 /**
@@ -111,7 +100,7 @@ function clearRecentPrsBestEffort(): void {
  * the caller's own sign-in/sign-out state reset. The recents delete and OS
  * search clear are fired without awaiting, so the function stays synchronous;
  * a rejection is reported through telemetry, and the signed-out-launch re-clear
- * retries the index clear.
+ * retries the device-wide members.
  *
  * Both boundaries call this: the sign-out body and the account switch. A clear
  * that only the sign-out path ran would let a direct switch hand the next

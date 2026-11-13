@@ -4,6 +4,7 @@ import {
   getProvider,
   type ProviderRoute,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { FailoverRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/byok-failover';
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 import {
@@ -63,6 +64,16 @@ import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/prov
 import type { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import type { ValidatedGatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-request';
 import type { AdmittedModelResolution } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-model-resolution';
+
+/**
+ * The OpenRouter provider slug each delegated route stands for in the organization provider
+ * policy. A delegated route serves the request from its own upstream, so the policy is compared
+ * with that provider directly.
+ */
+const DELEGATED_ROUTE_POLICY_PROVIDER_ID: Partial<Record<ProviderType, string>> = {
+  'claude-billing': 'anthropic',
+  'openai-chatgpt': 'openai',
+};
 
 type ProviderPolicyInput = {
   request: ValidatedGatewayRequest;
@@ -152,7 +163,8 @@ export async function resolveProviderAndPolicy(
   let accessCheck: ReturnType<typeof resolveAccessCheck> | undefined;
   const getAccessCheck = () => (accessCheck ??= resolveAccessCheck(input));
   const isAnonymous = isAnonymousContext(user);
-  const isDirectByokProviderAllowed = async (policyProviderId: string) => {
+  /** Whether the organization policy admits the model served by this one provider. */
+  const isModelAllowedForPolicyProvider = async (policyProviderId: string) => {
     const groupPolicy = await input.organizationGroupPolicyPromise;
     return (
       !groupPolicy || (await isModelAllowedForProviderKey(groupPolicy, model, policyProviderId))
@@ -181,7 +193,7 @@ export async function resolveProviderAndPolicy(
       request.body.provider,
     getAllowedProviders: async () =>
       isAnonymous ? undefined : (await getAccessCheck()).allowedProviders,
-    isDirectByokProviderAllowed,
+    isDirectByokProviderAllowed: isModelAllowedForPolicyProvider,
     kiloIgnoredProviders: getIgnoredProviders(model, isNonTrialEnterprise),
     onDecision: decision => input.providerMetadataCapture?.captureRoutingDecision(decision),
   });
@@ -225,9 +237,12 @@ export async function resolveProviderAndPolicy(
   const routeRejection = async (
     route: ProviderRoute
   ): Promise<NextResponseType<unknown> | null> => {
-    // A local, so the type guard narrows it rather than `route.provider.type`.
     const providerType = route.provider.type;
-    if (providerType === 'claude-billing' && !(await isDirectByokProviderAllowed('anthropic'))) {
+    const delegatedPolicyProviderId = DELEGATED_ROUTE_POLICY_PROVIDER_ID[providerType];
+    if (
+      delegatedPolicyProviderId &&
+      !(await isModelAllowedForPolicyProvider(delegatedPolicyProviderId))
+    ) {
       return modelNotAllowedResponse();
     }
     if (isManagedGatewayDisabled(organizationGatewaySettings, providerType)) {
@@ -296,7 +311,7 @@ export async function resolveProviderAndPolicy(
       const directByokProvider = findDirectByokProvider(route.userByok?.[0]?.providerId ?? '');
       if (
         !directByokProvider ||
-        !(await isDirectByokProviderAllowed(getDirectByokPolicyProviderId(directByokProvider)))
+        !(await isModelAllowedForPolicyProvider(getDirectByokPolicyProviderId(directByokProvider)))
       ) {
         return poolRouted ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
       }

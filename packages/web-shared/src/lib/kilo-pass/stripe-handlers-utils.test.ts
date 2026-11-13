@@ -1,12 +1,12 @@
 import type Stripe from 'stripe';
 import {
-  addOneMonthToIssueMonth,
   getInvoiceIssueMonth,
   getInvoiceSubscription,
-  getPreviousIssueMonth,
   getStripeEndedAtIso,
+  getStripeReportedEndedAtIso,
   resolveSettledInvoicePayment,
 } from './stripe-handlers-utils';
+import { addOneMonthToIssueMonth, getPreviousIssueMonth } from './issue-month';
 import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
 
 describe('addOneMonthToIssueMonth', () => {
@@ -361,6 +361,55 @@ describe('resolveSettledInvoicePayment', () => {
     });
   });
 
+  it.each([
+    ['card', 'card'],
+    ['sepa_debit', 'sepa_debit'],
+    ['us_bank_account', 'us_bank_account'],
+    ['bacs_debit', 'bacs_debit'],
+    ['au_becs_debit', 'au_becs_debit'],
+  ])('maps %s settlement fingerprints on the payment-method and charge paths', async type => {
+    const fingerprint = `fp_${type}`;
+    const viaPaymentMethod = makeInvoice([
+      makeInvoicePayment({
+        type: 'payment_intent',
+        payment_intent: {
+          id: `pi_${type}`,
+          object: 'payment_intent',
+          payment_method: {
+            id: `pm_${type}`,
+            object: 'payment_method',
+            type,
+            [type]: { fingerprint },
+          },
+        } as unknown as Stripe.PaymentIntent,
+      }),
+    ]);
+    const viaCharge = makeInvoice([
+      makeInvoicePayment({
+        type: 'charge',
+        charge: {
+          id: `ch_${type}`,
+          object: 'charge',
+          payment_method_details: { type, [type]: { fingerprint } },
+        } as unknown as Stripe.Charge,
+      }),
+    ]);
+
+    const stripe = {} as Stripe;
+    await expect(
+      resolveSettledInvoicePayment({ invoice: viaPaymentMethod, stripe })
+    ).resolves.toMatchObject({
+      kind: 'settled',
+      paymentMethod: { kind: 'reusable', paymentMethodType: type, fingerprint },
+    });
+    await expect(
+      resolveSettledInvoicePayment({ invoice: viaCharge, stripe })
+    ).resolves.toMatchObject({
+      kind: 'settled',
+      paymentMethod: { kind: 'reusable', paymentMethodType: type, fingerprint },
+    });
+  });
+
   it('rejects multiple paid settlements instead of choosing one', async () => {
     const invoice = makeInvoice([
       makeInvoicePayment({ type: 'payment_intent', payment_intent: 'pi_first' }),
@@ -524,5 +573,34 @@ describe('getStripeEndedAtIso', () => {
 
     const result = getStripeEndedAtIso(subscription);
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  });
+});
+
+describe('getStripeReportedEndedAtIso', () => {
+  it('uses ended_at when available', () => {
+    const subscription = {
+      ended_at: 1735689600,
+      canceled_at: 1735603200,
+    } as Stripe.Subscription;
+
+    expect(getStripeReportedEndedAtIso(subscription)).toBe('2025-01-01T00:00:00.000Z');
+  });
+
+  it('falls back to canceled_at when ended_at is null', () => {
+    const subscription = {
+      ended_at: null,
+      canceled_at: 1735603200,
+    } as Stripe.Subscription;
+
+    expect(getStripeReportedEndedAtIso(subscription)).toBe('2024-12-31T00:00:00.000Z');
+  });
+
+  it('returns null when both ended_at and canceled_at are null', () => {
+    const subscription = {
+      ended_at: null,
+      canceled_at: null,
+    } as Stripe.Subscription;
+
+    expect(getStripeReportedEndedAtIso(subscription)).toBeNull();
   });
 });

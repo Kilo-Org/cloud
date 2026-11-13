@@ -5360,18 +5360,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const selection = selectStartup(this.env, pin.provider, cohort, harness);
         const createDeadline =
           state.createDeadlineAt ?? Date.now() + this.sandboxTimers().providerCreateMs;
-        const startupCommand = await withTimeout(
-          downloadedStartup({
-            env: this.env,
-            descriptor: selection.descriptor,
-            harness,
-            sandboxId: this.sandboxId,
-            allocationId,
-            deadlineAt: createDeadline + this.sandboxTimers().wrapperFirstConnectMs,
-          }),
-          remainingMs(createDeadline),
-          'Runtime preflight timed out'
-        );
+        const startupCommandFor = (launchDeadline: number) =>
+          withTimeout(
+            downloadedStartup({
+              env: this.env,
+              descriptor: selection.descriptor,
+              harness,
+              sandboxId: this.sandboxId,
+              allocationId,
+              deadlineAt: launchDeadline + this.sandboxTimers().wrapperFirstConnectMs,
+            }),
+            remainingMs(launchDeadline),
+            'Runtime preflight timed out'
+          );
+        const startupCommand = await startupCommandFor(createDeadline);
         const launchEnv = await this.wrapperLaunchEnv(credential, allocationId, pin.provider);
         if (pin.billing) await assertContainerAccountAvailable(this.env, pin.billing);
         selectedLaunch =
@@ -5536,6 +5538,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
             selection: launch.selection,
             launchEnv,
             startupCommand,
+            startupCommandFor,
             launchOptions,
           });
         } finally {
@@ -6069,10 +6072,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
-   * One provider start with a bounded retry of the same snapshot artifact. A
+   * One provider start with one retry of the same snapshot artifact. A
    * permanent reason fails at once; a transient reason is observed twice before
-   * failing. A wrapper that connects while the launch is in flight owns the
-   * allocation, so it is never stopped or relaunched.
+   * failing. Each attempt has its own bound: the first ends at the create
+   * deadline, and the retry gets a full repository startup bound after a
+   * confirmed stop, so a slow first attempt cannot use up the retry. A wrapper
+   * that connects while the launch is in flight owns the allocation, so it is
+   * never stopped or relaunched.
    */
   private async launchWithSnapshotRetry(input: {
     allocationId: string;
@@ -6081,34 +6087,36 @@ export class SandboxControlV2 extends DurableObject<Env> {
     selection: SnapshotStartSelection | null;
     launchEnv: Record<string, string>;
     startupCommand: ProviderStartupCommand;
+    startupCommandFor: (launchDeadline: number) => Promise<ProviderStartupCommand>;
     launchOptions: ProviderLaunchOptions;
   }): Promise<{ result: ProviderLaunchResult; owned: boolean }> {
+    let launchDeadline = input.launchDeadline;
+    let startupCommand = input.startupCommand;
     const requestedSnapshot = input.launchOptions.snapshot !== undefined;
-    const startedAt = Date.now();
     const source = input.selection?.source ?? 'image';
-    const recordFailure = (
-      attempt: number,
-      failure: Omit<SnapshotLaunchFailureDiagnostic, 'source' | 'attempt' | 'elapsedMs'>
-    ): SnapshotLaunchFailureDiagnostic => {
-      const diagnostic: SnapshotLaunchFailureDiagnostic = {
-        ...failure,
-        source,
-        attempt,
-        elapsedMs: Math.max(0, Date.now() - startedAt),
-      };
-      if (failure.failureStage !== 'provider_snapshot' || failure.reason === 'unsupported') {
-        logControlDiagnostic(
-          'snapshot_launch_failed',
-          { sandboxId: this.sandboxId, allocationId: input.allocationId, ...diagnostic },
-          'warn'
-        );
-      }
-      return diagnostic;
-    };
     for (let attempt = 1; ; attempt += 1) {
-      if (Date.now() >= input.launchDeadline) {
+      const attemptStartedAt = Date.now();
+      const recordFailure = (
+        failure: Omit<SnapshotLaunchFailureDiagnostic, 'source' | 'attempt' | 'elapsedMs'>
+      ): SnapshotLaunchFailureDiagnostic => {
+        const diagnostic: SnapshotLaunchFailureDiagnostic = {
+          ...failure,
+          source,
+          attempt,
+          elapsedMs: Math.max(0, Date.now() - attemptStartedAt),
+        };
+        if (failure.failureStage !== 'provider_snapshot' || failure.reason === 'unsupported') {
+          logControlDiagnostic(
+            'snapshot_launch_failed',
+            { sandboxId: this.sandboxId, allocationId: input.allocationId, ...diagnostic },
+            'warn'
+          );
+        }
+        return diagnostic;
+      };
+      if (Date.now() >= launchDeadline) {
         if (!requestedSnapshot) throw new Error('Sandbox launch timed out');
-        const diagnostic = recordFailure(attempt, {
+        const diagnostic = recordFailure({
           failureStage: 'launch_deadline',
           reason: 'launch_deadline',
           errorName: 'Error',
@@ -6125,20 +6133,23 @@ export class SandboxControlV2 extends DurableObject<Env> {
         result = await withTimeout(
           this.provider.launch(
             input.createdRef,
-            { command: input.startupCommand, env: input.launchEnv },
+            { command: startupCommand, env: input.launchEnv },
             requestedSnapshot
               ? {
                   ...input.launchOptions,
+                  ...(input.launchOptions.deadlineAt === undefined
+                    ? {}
+                    : { deadlineAt: launchDeadline }),
                   snapshotDiagnostic: {
                     allocationId: input.allocationId,
                     source,
                     attempt,
-                    startedAt,
+                    startedAt: attemptStartedAt,
                   },
                 }
               : input.launchOptions
           ),
-          remainingMs(input.launchDeadline),
+          remainingMs(launchDeadline),
           'Sandbox launch timed out',
           () => {
             timedOut = true;
@@ -6174,23 +6185,19 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // An owned allocation fails through `failConnectedSnapshotMiss`, which
       // handles a connected wrapper; the creation fail path does not.
       if (await this.allocationOwnedElsewhere(input.allocationId)) {
-        recordFailure(attempt, {
+        recordFailure({
           ...failure,
           failureStage: 'allocation_owned',
           reason: 'allocation_owned',
         });
         return { result, owned: true };
       }
-      if (
-        snapshotStartFailureIsPermanent(reason) ||
-        attempt >= 2 ||
-        Date.now() >= input.launchDeadline
-      ) {
-        throw this.snapshotStartFailure(input.selection, reason, recordFailure(attempt, failure));
+      if (snapshotStartFailureIsPermanent(reason) || attempt >= 2) {
+        throw this.snapshotStartFailure(input.selection, reason, recordFailure(failure));
       }
       const retry = await this.stopForSnapshotRetry(input.createdRef, input.allocationId);
       if (retry.result === 'owned') {
-        recordFailure(attempt, {
+        recordFailure({
           ...failure,
           failureStage: 'allocation_owned',
           reason: 'allocation_owned',
@@ -6198,7 +6205,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         return { result, owned: true };
       }
       if (retry.result === 'failed') {
-        const diagnostic = recordFailure(attempt, {
+        const diagnostic = recordFailure({
           failureStage: 'retry_stop',
           reason: 'stop_failed',
           errorName: retry.errorName,
@@ -6209,8 +6216,60 @@ export class SandboxControlV2 extends DurableObject<Env> {
         });
         throw this.snapshotStartFailure(input.selection, reason, diagnostic);
       }
-      recordFailure(attempt, failure);
+      const previousDeadline = launchDeadline;
+      launchDeadline = Date.now() + DEADLINE_MS.repositoryStartup;
+      if (
+        !(await this.startSnapshotRetry(
+          input.allocationId,
+          launchDeadline,
+          source === 'workspace' ? 'restore' : 'environment_snapshot'
+        ))
+      ) {
+        recordFailure({
+          ...failure,
+          failureStage: 'allocation_owned',
+          reason: 'allocation_owned',
+        });
+        return { result, owned: true };
+      }
+      recordFailure(failure);
+      logControlDiagnostic('snapshot_launch_retry', {
+        sandboxId: this.sandboxId,
+        allocationId: input.allocationId,
+        source,
+        attempt: attempt + 1,
+        previousDeadlineAt: previousDeadline,
+        deadlineAt: launchDeadline,
+      });
+      startupCommand = await input.startupCommandFor(launchDeadline);
     }
+  }
+
+  /**
+   * Gives a snapshot launch retry its own bound by moving the create deadline,
+   * and tells the preparing routes that the start is retried. Returns false
+   * when the allocation is no longer this creating attempt.
+   */
+  private async startSnapshotRetry(
+    allocationId: string,
+    createDeadlineAt: number,
+    step: 'restore' | 'environment_snapshot'
+  ): Promise<boolean> {
+    return this.enqueue(async () => {
+      await this.applyEvent({
+        type: 'snapshot-retry',
+        at: Date.now(),
+        allocationId,
+        createDeadlineAt,
+      });
+      const state = await this.readAllocation();
+      if (state.kind !== 'creating' || state.allocationId !== allocationId) return false;
+      await notifyPreparingRoutes(this.routeContext(state), {
+        step,
+        detail: 'Retrying the snapshot start',
+      });
+      return true;
+    });
   }
 
   private async allocationOwnedElsewhere(allocationId: string): Promise<boolean> {

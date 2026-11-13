@@ -38,6 +38,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/repo-picker-filter.ts': 'repo search folding',
   'lib/todos/todo-model.ts': 'repository full-name comparison',
   'lib/use-new-session-repos.ts': 'repo key normalization',
+  'lib/cloud-environments/environment-selection.ts': 'remembered-choice key normalization',
   'lib/invoice-download.ts': 'filename comparison',
   'lib/agent-attachments/validate.ts': 'file-extension normalization',
   'lib/document-preview.ts': 'document MIME and file-extension normalization',
@@ -82,6 +83,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'components/profiles/kilo-command-form-sheet.tsx': 'slash-command name normalization',
   'components/profiles/repo-bindings-model.ts': 'repository full-name search and comparison',
   'lib/url-authority.ts': 'URL scheme and hostname normalization',
+  'lib/code-reviewer-council.ts': 'council label dedupe comparison',
 };
 
 /** The `.toUpperCase(` / `.toLowerCase(` call the class is about. */

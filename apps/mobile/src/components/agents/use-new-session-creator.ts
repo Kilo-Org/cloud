@@ -49,6 +49,10 @@ type UseNewSessionCreatorInput = {
   autoCommit: boolean;
   /** Effective environment profile id; omitted from the create body when unset. */
   profileId?: string | null;
+  /** The cloud environment the picker chose; omitted lets the server resolve it. */
+  requestedEnvironment?: { id: string };
+  /** The form shows an environment picker, so several matches need a choice. */
+  requireEnvironmentChoice?: true;
   /** Manual env vars from Advanced Configuration; omitted from the body when empty. */
   manualEnvVars?: Record<string, string>;
   /** Manual setup commands from Advanced Configuration; omitted from the body when empty. */
@@ -98,6 +102,8 @@ export function useNewSessionCreator({
   variant,
   autoCommit,
   profileId,
+  requestedEnvironment,
+  requireEnvironmentChoice,
   manualEnvVars,
   setupCommands,
   todoId,
@@ -202,6 +208,8 @@ export function useNewSessionCreator({
           model,
           variant,
           profileId,
+          requestedEnvironment,
+          requireEnvironmentChoice,
           envVars: manualEnvVars,
           setupCommands,
           autoCommit,
@@ -302,6 +310,8 @@ export function useNewSessionCreator({
     autoCommit,
     organizationId,
     profileId,
+    requestedEnvironment,
+    requireEnvironmentChoice,
     manualEnvVars,
     setupCommands,
     todoId,

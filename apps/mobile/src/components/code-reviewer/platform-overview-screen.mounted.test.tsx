@@ -54,6 +54,8 @@ const launchBrowser = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const openExternal = vi.hoisted(() => vi.fn());
 const openPicker = vi.hoisted(() => vi.fn());
 
+const councilUi = vi.hoisted(() => ({ allowed: false }));
+
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
@@ -161,6 +163,10 @@ vi.mock('@/lib/code-reviewer-config', () => ({
 }));
 vi.mock('@/lib/hooks/use-reviewer-models', () => ({
   useReviewerModels: () => ({ models: [], isLoading: false }),
+}));
+vi.mock('@/lib/hooks/use-reviewer-council', () => ({
+  useCouncilGate: () => ({ allowed: councilUi.allowed, pending: false }),
+  useCouncilUiEnabled: () => councilUi.allowed,
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   classifyProviderState: () => provider,

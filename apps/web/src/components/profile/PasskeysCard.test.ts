@@ -409,7 +409,7 @@ describe('PasskeysCard', () => {
     expect(mockRefetch).not.toHaveBeenCalled();
   });
 
-  it('asks an admin to sign in again when enrollment needs reauthentication', async () => {
+  it('asks to sign in again when enrollment needs reauthentication', async () => {
     mockQueryResult.data = { passkeys: [ROW] };
     mockFetch.mockResolvedValue({
       ok: false,

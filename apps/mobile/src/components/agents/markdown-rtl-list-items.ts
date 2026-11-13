@@ -12,8 +12,13 @@
  */
 const RIGHT_TO_LEFT_MARK = '\u200F';
 
-/** Up to three spaces and any blockquote markers in front of a line's content. */
-const BLOCKQUOTE = /^[ \t]{0,3}(?:>[ \t]?)*/;
+/**
+ * Up to three spaces and one or more blockquote markers in front of a line's
+ * content. At least one marker is required: without it the pattern would also
+ * eat the indentation of an unquoted line, and a fence indented deeper than a
+ * closer allows would end the block it is code inside.
+ */
+const BLOCKQUOTE = /^[ \t]{0,3}(?:>[ \t]?)+/;
 
 /** A fence opener: up to three spaces, then three or more marks and an info string. */
 const FENCE_OPEN = /^[ \t]{0,3}(`{3,}|~{3,})/;

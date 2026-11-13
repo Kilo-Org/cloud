@@ -53,6 +53,11 @@ describe('rtlListItems', () => {
     expect(rtlListItems(value)).toBe(`> \`\`\`md\n> - item\n> \`\`\`\n- ${MARK}item`);
   });
 
+  it('keeps a fence open when a fence run in its body is indented too deep to close', () => {
+    const value = '```\n    ```\n    - still code\n```\n- item';
+    expect(rtlListItems(value)).toBe(`\`\`\`\n    \`\`\`\n    - still code\n\`\`\`\n- ${MARK}item`);
+  });
+
   it('keeps an indented code block exactly', () => {
     const value = 'Example:\n\n    - item\n\n- item';
     expect(rtlListItems(value)).toBe(`Example:\n\n    - item\n\n- ${MARK}item`);

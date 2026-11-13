@@ -519,6 +519,20 @@ describe('RepositoryBranchSelector', () => {
     expect(classesOf(rowBody(loaded))).not.toContain('py-2');
   });
 
+  it('keeps a two-line retry message off the frame border without growing the row', () => {
+    // The message is two lines of `text-sm` that scales with the system font,
+    // so at large sizes it outgrows the 48 dp floor. The padding goes on the
+    // message: on the body it would add to the 48 dp retry and make the failed
+    // row taller than every other branch state.
+    const renderer = mountSelector(githubRow, branchesState({ isRetryableError: true }));
+
+    expect(classesOf(rowBody(renderer))).not.toContain('py-2');
+    const message = renderer.root.findAll(
+      node => node.props.numberOfLines === 2 && typeof node.props.className === 'string'
+    )[0];
+    expect(classesOf(message)).toContain('py-2');
+  });
+
   it('draws the retry borderless, on the shared action floor, aligned to the message inset', () => {
     // A box inside the frame drew its own border against the frame's (doubled
     // edges, worst in dark) and sat 10.5 dp in from the trailing border. A

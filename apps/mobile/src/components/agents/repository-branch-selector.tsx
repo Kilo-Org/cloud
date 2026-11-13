@@ -157,7 +157,11 @@ export function RepositoryBranchSelector({
         return (
           <View className={ROW_FRAME_CLASS}>
             <View className={cn(BRANCH_ROW_BODY_CLASS, 'justify-between')}>
-              <Text className="flex-1 text-sm text-muted-foreground" numberOfLines={2}>
+              {/* The padding sits on the message, not the body: the 48 dp
+                  retry already fills the floor, so body padding would make the
+                  failed row taller than the others. On the message it only
+                  takes effect once two large-text lines outgrow the floor. */}
+              <Text className="flex-1 py-2 text-sm text-muted-foreground" numberOfLines={2}>
                 {t('agentChat.newSession.branchLoadError')}
               </Text>
               {/* Borderless, so the 48 dp action fills the body without

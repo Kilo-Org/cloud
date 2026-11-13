@@ -13,6 +13,7 @@
 
 import type * as toolSummaryTranslationClient from './tool-summary-translation-client';
 
+import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { type CachedToolSummaryTranslation } from '@/lib/persist/tool-summary-translation-cache';
 
 import { persistTranslation, readStoredTranslations } from './tool-summary-translation-store';
@@ -71,6 +72,12 @@ type QueueItem = {
 
 /** One request's worth of queued work: one language and model, unique texts. */
 type FlushBatch = {
+  /**
+   * The configuration generation the batch was taken under. A configuration
+   * change or an account reset bumps it, which fences the batch before it
+   * sends: the texts and the opt-in belong to the previous generation.
+   */
+  generation: number;
   language: string;
   modelId: string;
   /** The unique texts this request carries, in queue order. */
@@ -212,6 +219,23 @@ async function loadClient(): Promise<typeof toolSummaryTranslationClient> {
 }
 
 let activeBatches = 0;
+/**
+ * The dispatch fence of every batch that is still running. A batch taken under
+ * an opt-in, a model or an account that `setConfig` or the account reset
+ * replaces must not send its texts, and one already on the wire is cancelled
+ * instead of completing under the next account's credentials, so both reset
+ * paths abort the controllers here.
+ */
+const batchControllers = new Set<AbortController>();
+
+/** Aborts every running batch's request and forgets them; they clear on their own. */
+function abortActiveBatches(): void {
+  for (const controller of batchControllers) {
+    controller.abort();
+  }
+  batchControllers.clear();
+}
+
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let version = 0;
 /**
@@ -478,6 +502,10 @@ export function setConfig(next: ToolSummaryTranslationConfig): void {
   // failures would only make `retryUnresolvedTranslations` re-send work the
   // user just invalidated.
   generation += 1;
+  // Fence the batches taken under the previous opt-in/model: an aborted one
+  // never sends, and one already on the wire is cancelled instead of landing
+  // after the user turned translation off.
+  abortActiveBatches();
   queue.length = 0;
   queued.clear();
   inFlight.clear();
@@ -630,11 +658,26 @@ function takeBatch(): FlushBatch | null {
   if (texts.length === 0) {
     return null;
   }
-  return { language, modelId, texts, items };
+  return { generation, language, modelId, texts, items };
 }
 
 /** Fallback contract: nothing thrown here may reach a transcript row. */
 async function runBatch(batch: FlushBatch): Promise<void> {
+  // The authority this batch was taken under. The controllers are aborted by a
+  // configuration change and by the account reset — the two events that bump
+  // the generation — and the same conditions are re-checked by the client
+  // immediately before it sends, so the texts of one account are never sent
+  // as, or attributed to, another.
+  const controller = new AbortController();
+  const epoch = currentAuthEpoch();
+  const scope: toolSummaryTranslationClient.ToolSummaryTranslationScope = {
+    signal: controller.signal,
+    isCurrent: () =>
+      !controller.signal.aborted &&
+      batch.generation === generation &&
+      isCurrentAuthEpoch(epoch),
+  };
+  batchControllers.add(controller);
   // One token for the whole request: a config change clears the map and a
   // replacement request for a key may already own its slot, so the `finally`
   // below only deletes entries that are still this request's.
@@ -681,6 +724,7 @@ async function runBatch(batch: FlushBatch): Promise<void> {
       texts: batch.texts,
       targetLanguage: batch.language,
       model: batch.modelId,
+      scope,
     });
     const byText = new Map<string, string | null>();
     for (const [index, text] of batch.texts.entries()) {
@@ -713,6 +757,7 @@ async function runBatch(batch: FlushBatch): Promise<void> {
     countFailures(new Set());
   } finally {
     activeBatches -= 1;
+    batchControllers.delete(controller);
     // Delete only this request's entries: a config change clears the map and a
     // replacement request for the same key may already own the slots.
     for (const item of batch.items) {
@@ -900,13 +945,15 @@ export function retryUnresolvedTranslations(): void {
  * `retryUnresolvedTranslations` runs from the retry mount on a deep link or a
  * connection recovery, so without this the signed-out account's summaries
  * would be sent to the gateway under the next account's token. The generation
- * bump discards a batch that is still in flight under the old account, and
- * the emitted version drops every mounted row back to its source text. The
- * reset epoch fences a hydration read that is still in flight too, so the
- * cleared cache stays cleared.
+ * bump and the aborted batches stop a batch that is still in flight under the
+ * old account: one that has not sent yet never does, and one already on the
+ * wire is cancelled. The emitted version drops every mounted row back to its
+ * source text. The reset epoch fences a hydration read that is still in
+ * flight too, so the cleared cache stays cleared.
  */
 export function clearToolSummaryTranslationMemory(): void {
   generation += 1;
+  abortActiveBatches();
   accountResetEpoch += 1;
   queue.length = 0;
   queued.clear();

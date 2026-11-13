@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   authState,
   findConfigureRows,
+  findNode,
   flushIdle,
   idleState,
   keys,
@@ -80,6 +81,66 @@ describe('ProfileScreen Organization section', () => {
     // Choosing stays on Profile; the section renders the chosen organization's
     // row once the context publishes instead of navigating away.
     expect(routerPush).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('keeps the section when a selected organization switches to Personal with memberships listed', async () => {
+    providersQueryFn.mockResolvedValue({ providers: [] });
+    organizationsQueryFn.mockResolvedValue([
+      { organizationId: 'org-1', organizationName: 'Kilo', role: 'admin' },
+    ]);
+
+    const queryClient = createTestQueryClient();
+    const { renderer, unmount } = await mountProfile(queryClient);
+    const root = renderer.root;
+
+    flushIdle();
+    const chooserTitle = i18n.t('organization.boundary.selectOrganization');
+    await waitFor(() => findConfigureRows(root, i18n.t('profile.manageOrganization')).length === 1);
+
+    // The mocked context reads its state at render time, so the cache write is
+    // what re-renders the screen after the context switches to Personal.
+    act(() => {
+      organizationState.organizationId = null;
+      queryClient.setQueryData(keys.organizations, [
+        { organizationId: 'org-1', organizationName: 'Kilo', role: 'admin' },
+      ]);
+    });
+
+    await waitFor(() => findConfigureRows(root, chooserTitle).length === 1);
+
+    expect(nodeCountWithChildren(root, 'Text', i18n.t('common.organization'))).toBe(1);
+    expect(findConfigureRows(root, i18n.t('profile.manageOrganization'))).toHaveLength(0);
+    expect(findConfigureRows(root, chooserTitle)).toHaveLength(1);
+
+    unmount();
+  });
+
+  it('keeps the Organization section and its retry when the memberships read fails', async () => {
+    organizationState.organizationId = null;
+    providersQueryFn.mockResolvedValue({ providers: [] });
+    organizationsQueryFn.mockRejectedValue(new Error('memberships unavailable'));
+
+    const { renderer, unmount } = await mountProfile();
+    const root = renderer.root;
+
+    flushIdle();
+    await waitFor(() => nodeCount(root, 'QueryError') === 1);
+
+    expect(nodeCountWithChildren(root, 'Text', i18n.t('common.organization'))).toBe(1);
+    const error = findNode(root, 'QueryError');
+    expect(error?.props.title).toBe(i18n.t('profile.couldNotLoadOrganization'));
+    expect(
+      findConfigureRows(root, i18n.t('organization.boundary.selectOrganization'))
+    ).toHaveLength(0);
+
+    const callsBeforeRetry = organizationsQueryFn.mock.calls.length;
+    act(() => {
+      (error?.props as { onRetry?: () => void } | undefined)?.onRetry?.();
+    });
+
+    await waitFor(() => organizationsQueryFn.mock.calls.length > callsBeforeRetry);
 
     unmount();
   });

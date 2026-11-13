@@ -111,9 +111,13 @@ export function ProfileScreen() {
   // a Personal context still offers the account picker when the account has
   // memberships, so organization management is not gated behind the credits
   // account control. The restore decides the context first, so the chooser never
-  // paints for a frame before the active organization's row replaces it.
+  // paints for a frame before the active organization's row replaces it. A
+  // memberships read that failed keeps the section too: its error and Retry live
+  // inside this block, so hiding the section while the list is unavailable would
+  // drop the only retry. Only a read that settles with no memberships hides it.
   const showOrganizationSection =
-    organizationId != null || (organizationContextLoaded && (orgs?.length ?? 0) > 0);
+    organizationId != null ||
+    (organizationContextLoaded && ((orgs?.length ?? 0) > 0 || organizationsError));
 
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
   // The prompt's surface is platform-specific (`feedback-prompt-platform.ts`);

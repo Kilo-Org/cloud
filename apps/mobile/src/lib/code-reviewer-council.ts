@@ -129,15 +129,11 @@ export function parseRequiredLabels(value: string): RequiredLabels {
   const labels: string[] = [];
   for (const raw of value.split(',')) {
     const label = raw.trim();
-    if (label.length === 0) {
-      continue;
-    }
     const key = label.toLowerCase();
-    if (seen.has(key)) {
-      continue;
+    if (label.length > 0 && !seen.has(key)) {
+      seen.add(key);
+      labels.push(label);
     }
-    seen.add(key);
-    labels.push(label);
   }
   if (labels.length > COUNCIL_MAX_REQUIRED_LABELS) {
     return { ok: false, problem: 'tooMany' };

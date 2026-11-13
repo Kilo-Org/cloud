@@ -25,6 +25,50 @@ const ROW_CASES = [
     app: '/(app)/(tabs)/(3_profile)/preferences',
   },
   {
+    path: '/credits',
+    app: '/(app)/(tabs)/(3_profile)/credit-history',
+  },
+  {
+    path: '/usage',
+    app: '/(app)/usage',
+  },
+  {
+    path: '/invoices',
+    app: '/(app)/(tabs)/(3_profile)/invoices',
+  },
+  {
+    path: '/data-exports',
+    app: '/(app)/(tabs)/(3_profile)/data-export',
+  },
+  {
+    path: '/byok',
+    app: '/(app)/(tabs)/(3_profile)/provider-keys',
+  },
+  {
+    path: '/integrations',
+    app: '/(app)/(tabs)/(3_profile)/integrations',
+  },
+  {
+    path: '/subscriptions/kilo-pass',
+    app: '/(app)/kilo-pass',
+  },
+  {
+    path: '/security-agent/config',
+    app: '/(app)/security-agent/personal/settings',
+  },
+  {
+    path: '/organizations/org_123/security-agent/config',
+    app: '/(app)/security-agent/org_123/settings',
+  },
+  {
+    path: '/organizations/org_123/integrations',
+    app: '/(app)/(tabs)/(3_profile)/integrations?org=org_123',
+  },
+  {
+    path: '/organizations/org_123/usage-details',
+    app: '/(app)/(tabs)/(3_profile)/organization/usage?org=org_123',
+  },
+  {
     path: '/cloud/sessions',
     app: '/(app)/(tabs)/(2_agents)',
   },
@@ -87,8 +131,8 @@ const ROW_CASES = [
 ] as const;
 
 describe('UNIVERSAL_LINK_ROUTES', () => {
-  it('has exactly 19 rows', () => {
-    expect(UNIVERSAL_LINK_ROUTES).toHaveLength(19);
+  it('has exactly 30 rows', () => {
+    expect(UNIVERSAL_LINK_ROUTES).toHaveLength(30);
   });
 });
 
@@ -315,6 +359,23 @@ describe('deliberately unmapped paths', () => {
     '/share/sh_1',
     '/',
     '/login',
+    // Sub-paths of the account rows above: the app shows the hub page, never a
+    // per-service detail page, so these stay on the web. A literal row matches
+    // exactly, so no exclusion is needed for them.
+    '/integrations/slack',
+    '/integrations/linear',
+    '/integrations/linear/reinstall',
+    '/subscriptions/kilo-pass/refer',
+    '/subscriptions/coding-plans',
+    '/security-agent/audit-report',
+    // Organization pages with no screen in the app. BYOK, members and invoices
+    // are cards or web-only pages (the org's invoices live on the multi-card
+    // `/organizations/<id>/payment-details`), so their links open the web.
+    '/organizations/org_123/byok',
+    '/organizations/org_123/members',
+    '/organizations/org_123/payment-details',
+    '/organizations/org_123/integrations/linear',
+    '/organizations/org_123/security-agent/audit-report',
   ] as const;
 
   it.each(unmapped)('%s → null', path => {
@@ -323,13 +384,20 @@ describe('deliberately unmapped paths', () => {
   });
 });
 
-describe('commerce paths are not universal links', () => {
-  it.each(['/kilo-pass', '/credits', '/subscriptions/kilo-pass'])(
-    'webPathToAppPath(%s) → null',
-    path => {
-      expect(webPathToAppPath(path)).toBeNull();
-    }
-  );
+describe('commerce paths', () => {
+  it('maps the account pages the app owns to their native screens', () => {
+    // These were deliberately unmapped while the app had no screen for them;
+    // the credit history, the Kilo Pass manager and the purchase modal are
+    // native now, so the web pages open them instead of a dead web view.
+    expect(webPathToAppPath('/credits')).toBe('/(app)/(tabs)/(3_profile)/credit-history');
+    expect(webPathToAppPath('/subscriptions/kilo-pass')).toBe('/(app)/kilo-pass');
+  });
+
+  it('keeps /kilo-pass unmapped — the app has no web page for it', () => {
+    // `/kilo-pass` is not a page of the web app; the row above is the
+    // `/subscriptions/kilo-pass` page, which the app answers natively.
+    expect(webPathToAppPath('/kilo-pass')).toBeNull();
+  });
 });
 
 describe('foreign / garbage input', () => {
@@ -384,8 +452,8 @@ describe('parseKiloWebPath', () => {
 });
 
 describe('aasaComponents', () => {
-  it('returns 24 entries (19 rows + 5 exclusions)', () => {
-    expect(aasaComponents()).toHaveLength(24);
+  it('returns 35 entries (30 rows + 5 exclusions)', () => {
+    expect(aasaComponents()).toHaveLength(35);
   });
 
   it('every entry has a "/" key', () => {
@@ -397,27 +465,36 @@ describe('aasaComponents', () => {
 
   it('emits exclusion immediately before /code-reviews/*', () => {
     const components = aasaComponents();
-    expect(components[8]).toEqual({ '/': '/code-reviews/review-md', exclude: true });
-    expect(components[9]).toEqual({ '/': '/code-reviews/*' });
+    const row = components.findIndex(c => c['/'] === '/code-reviews/*');
+    expect(components[row - 1]).toEqual({ '/': '/code-reviews/review-md', exclude: true });
+    expect(components[row]).toEqual({ '/': '/code-reviews/*' });
   });
 
   it('emits exclusion immediately before /organizations/*/code-reviews/*', () => {
     const components = aasaComponents();
-    expect(components[13]).toEqual({
+    const row = components.findIndex(c => c['/'] === '/organizations/*/code-reviews/*');
+    expect(components[row - 1]).toEqual({
       '/': '/organizations/*/code-reviews/review-md',
       exclude: true,
     });
-    expect(components[14]).toEqual({ '/': '/organizations/*/code-reviews/*' });
+    expect(components[row]).toEqual({ '/': '/organizations/*/code-reviews/*' });
   });
 
   it('excludes the organization create paths before the bare organization row', () => {
-    const paths = aasaComponents().map(c => c['/']);
+    const components = aasaComponents();
+    const paths = components.map(c => c['/']);
     const bare = paths.indexOf('/organizations/*');
     expect(bare).toBeGreaterThan(0);
-    expect(paths[bare - 3]).toBe('/organizations/new');
-    expect(paths[bare - 2]).toBe('/organizations/create');
-    expect(aasaComponents()[bare - 3]).toMatchObject({ exclude: true });
-    expect(aasaComponents()[bare - 2]).toMatchObject({ exclude: true });
+    expect(paths.slice(0, bare)).toEqual(
+      expect.arrayContaining(['/organizations/new', '/organizations/create'])
+    );
+    const created = components.filter(
+      c => c['/'] === '/organizations/new' || c['/'] === '/organizations/create'
+    );
+    expect(created).toHaveLength(2);
+    for (const entry of created) {
+      expect(entry).toMatchObject({ exclude: true });
+    }
   });
 
   it('excludes deeper organization paths immediately before the bare row', () => {
@@ -434,9 +511,12 @@ describe('aasaComponents', () => {
     for (const handled of [
       '/organizations/*/security-agent',
       '/organizations/*/security-agent/findings',
+      '/organizations/*/security-agent/config',
       '/organizations/*/code-reviews',
       '/organizations/*/code-reviews/*',
       '/organizations/*/overview',
+      '/organizations/*/integrations',
+      '/organizations/*/usage-details',
     ]) {
       const index = paths.indexOf(handled);
       expect(index).toBeGreaterThan(-1);
@@ -463,17 +543,28 @@ describe('androidPathPatterns', () => {
       '/home',
       '/profile',
       '/profile/preferences',
+      '/credits',
+      '/usage',
+      '/invoices',
+      '/data-exports',
+      '/byok',
+      '/integrations',
+      '/subscriptions/kilo-pass',
       '/cloud/sessions',
       '/cloud/sessions/.*',
       '/security-agent',
       '/security-agent/findings',
+      '/security-agent/config',
       '/code-reviews',
       '/code-reviews/.*',
       '/organizations/.*/security-agent',
       '/organizations/.*/security-agent/findings',
+      '/organizations/.*/security-agent/config',
       '/organizations/.*/code-reviews',
       '/organizations/.*/code-reviews/.*',
       '/organizations/.*/overview',
+      '/organizations/.*/integrations',
+      '/organizations/.*/usage-details',
       // The only row that departs from the `.*` compile: it must match one
       // segment, or the Android filter swallows every web-only org page.
       '/organizations/[^/]+',
@@ -482,6 +573,25 @@ describe('androidPathPatterns', () => {
       '/pr-review/.*/.*/.*',
       '/s/.*',
     ]);
+  });
+
+  it('compiles every literal account row to a literal pattern', () => {
+    // Android matches the whole path, so a literal row claims that page and
+    // nothing below it: `/integrations/slack` stays in the browser although the
+    // app owns `/integrations`.
+    const patterns = androidPathPatterns();
+    for (const literal of [
+      '/credits',
+      '/usage',
+      '/invoices',
+      '/data-exports',
+      '/byok',
+      '/integrations',
+      '/subscriptions/kilo-pass',
+      '/security-agent/config',
+    ]) {
+      expect(patterns).toContain(literal);
+    }
   });
 
   it('departs from the `.*` compile on the bare organization row only', () => {

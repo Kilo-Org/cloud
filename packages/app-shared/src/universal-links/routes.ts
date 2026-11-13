@@ -50,6 +50,20 @@ export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
   { webPath: '/home', appPath: '/(app)/(tabs)/(0_home)' },
   { webPath: '/profile', appPath: '/(app)/(tabs)/(3_profile)' },
   { webPath: '/profile/preferences', appPath: '/(app)/(tabs)/(3_profile)/preferences' },
+  // The app's own account screens. Every one of these is a literal path: the
+  // web pages below them (`/integrations/linear`, `/subscriptions/kilo-pass/
+  // refer`, …) have no screen of their own in the app, and a literal row
+  // matches exactly, so those sub-paths stay in the browser on both platforms
+  // without an exclusion.
+  { webPath: '/credits', appPath: '/(app)/(tabs)/(3_profile)/credit-history' },
+  { webPath: '/usage', appPath: '/(app)/usage' },
+  { webPath: '/invoices', appPath: '/(app)/(tabs)/(3_profile)/invoices' },
+  { webPath: '/data-exports', appPath: '/(app)/(tabs)/(3_profile)/data-export' },
+  { webPath: '/byok', appPath: '/(app)/(tabs)/(3_profile)/provider-keys' },
+  { webPath: '/integrations', appPath: '/(app)/(tabs)/(3_profile)/integrations' },
+  // Kilo Pass management is a modal screen in the app, so it is its own row,
+  // not a tab.
+  { webPath: '/subscriptions/kilo-pass', appPath: '/(app)/kilo-pass' },
   { webPath: '/cloud/sessions', appPath: '/(app)/(tabs)/(2_agents)' },
   { webPath: '/cloud/sessions/*', appPath: '/(app)/agent-chat/<1>' },
   {
@@ -60,6 +74,9 @@ export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
     webPath: '/security-agent/findings',
     appPath: '/(app)/security-agent/personal/findings',
   },
+  // The security agent's settings page. Literal, so its sibling web pages
+  // (`/security-agent/audit-report`) keep opening in the browser.
+  { webPath: '/security-agent/config', appPath: '/(app)/security-agent/personal/settings' },
   {
     webPath: '/code-reviews',
     appPath: '/(app)/code-reviewer/personal',
@@ -78,6 +95,10 @@ export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
     appPath: '/(app)/security-agent/<1>/findings',
   },
   {
+    webPath: '/organizations/*/security-agent/config',
+    appPath: '/(app)/security-agent/<1>/settings',
+  },
+  {
     webPath: '/organizations/*/code-reviews',
     appPath: '/(app)/code-reviewer/<1>',
   },
@@ -90,10 +111,25 @@ export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
     webPath: '/organizations/*/overview',
     appPath: '/(app)/(tabs)/(3_profile)/organization/<1>',
   },
+  // The organization screens that live behind the app's org settings but read a
+  // scope of their own: the integrations hub already takes an `?org=` scope,
+  // and the usage screen takes the same one through its route. The web's org
+  // invoices live on `/organizations/<id>/payment-details`, a page of several
+  // cards (balance, top-up, purchase history, invoices) that no single app
+  // screen shows, so that page stays in the browser.
+  {
+    webPath: '/organizations/*/integrations',
+    appPath: '/(app)/(tabs)/(3_profile)/integrations?org=<1>',
+  },
+  {
+    webPath: '/organizations/*/usage-details',
+    appPath: '/(app)/(tabs)/(3_profile)/organization/usage?org=<1>',
+  },
   // The bare organization route: the web dashboard, and where an accepted
   // invitation lands (`apps/web` redirects to `/organizations/<id>`). Exactly
-  // one segment — every deeper `/organizations/<id>/…` page (SSO, guardrails,
-  // request logs, …) is web-only, so those links stay in the browser. The two
+  // one segment — every deeper `/organizations/<id>/…` page without a row of
+  // its own above (SSO, guardrails, request logs, payment details, …) is
+  // web-only, so those links stay in the browser. The two
   // literal pages under the same shape are not ids either: the create form
   // must open where the account is asked. On iOS `*` crosses `/`, hence
   // `excludeDeeperAasaPaths`; on Android the explicit `[^/]+` override keeps

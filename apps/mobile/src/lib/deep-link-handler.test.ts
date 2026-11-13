@@ -88,6 +88,52 @@ const MAPPED_CASES = [
     href: '/(app)/code-reviewer/org_1/reviews/rev_9',
   },
   {
+    path: 'https://app.kilo.ai/credits',
+    href: '/(app)/(tabs)/(3_profile)/credit-history',
+  },
+  {
+    path: 'https://app.kilo.ai/usage',
+    href: '/(app)/usage',
+  },
+  {
+    path: 'https://app.kilo.ai/invoices',
+    href: '/(app)/(tabs)/(3_profile)/invoices',
+  },
+  {
+    path: 'https://app.kilo.ai/data-exports',
+    href: '/(app)/(tabs)/(3_profile)/data-export',
+  },
+  {
+    path: 'https://app.kilo.ai/byok',
+    href: '/(app)/(tabs)/(3_profile)/provider-keys',
+  },
+  {
+    path: 'https://app.kilo.ai/integrations',
+    href: '/(app)/(tabs)/(3_profile)/integrations',
+  },
+  {
+    path: 'https://app.kilo.ai/subscriptions/kilo-pass',
+    href: '/(app)/kilo-pass',
+  },
+  {
+    path: 'https://app.kilo.ai/security-agent/config',
+    href: '/(app)/security-agent/personal/settings',
+  },
+  {
+    path: 'https://app.kilo.ai/organizations/org_1/security-agent/config',
+    href: '/(app)/security-agent/org_1/settings',
+  },
+  {
+    // The org scope rides the query, the way the credit-activity link carries
+    // it, so the screen shows the organization the link names.
+    path: 'https://app.kilo.ai/organizations/org_1/integrations',
+    href: '/(app)/(tabs)/(3_profile)/integrations?org=org_1',
+  },
+  {
+    path: 'https://app.kilo.ai/organizations/org_1/usage-details',
+    href: '/(app)/(tabs)/(3_profile)/organization/usage?org=org_1',
+  },
+  {
     path: 'https://app.kilo.ai/s/share-token.abc-def',
     href: '/(app)/shared/share-token.abc-def',
   },
@@ -182,6 +228,16 @@ describe('redirectSystemPath', () => {
       // A session-family capture the store cannot address names no session.
       'kiloapp://agent-chat/ses:1',
       'kiloapp:///(app)/agent-chat/ses:1',
+      // Sub-paths of the account pages the app owns at their root: the app has
+      // no per-service detail screen, so these stay on the web.
+      'https://app.kilo.ai/integrations/slack',
+      'https://app.kilo.ai/integrations/linear/reinstall',
+      'https://app.kilo.ai/subscriptions/kilo-pass/refer',
+      'https://app.kilo.ai/security-agent/audit-report',
+      'https://app.kilo.ai/organizations/org_1/byok',
+      'https://app.kilo.ai/organizations/org_1/members',
+      'https://app.kilo.ai/organizations/org_1/payment-details',
+      'https://app.kilo.ai/organizations/org_1/integrations/linear',
     ])('ignores %s without navigate or stash', path => {
       for (const initial of [true, false]) {
         expect(redirectSystemPath({ path, initial })).toBeNull();

@@ -21,6 +21,7 @@ export const PICKER_ROUTE_PATHS = [
   '/agent-chat/instance-picker',
   '/agent-chat/folder-picker',
   '/agent-chat/profile-picker',
+  '/context-picker',
 ] as const satisfies readonly string[];
 
 /** Route names as they appear in the navigation state (no leading slash). */

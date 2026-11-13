@@ -243,6 +243,7 @@ public final class ReactNativeSshModule: Module {
     let sessionId = state.sessionIds.next()
     let handler = JsSessionHandler(
       sessionId: sessionId,
+      requestIds: state.requestIds,
       requestHostKey: { [weak self] request in
         await self?.requestHostKey(request) ?? false
       },
@@ -250,7 +251,7 @@ public final class ReactNativeSshModule: Module {
         await self?.requestPrompts(request) ?? .cancelled
       },
       notifyDisconnect: { [weak self] notice in
-        self?.sendEvent("onDisconnect", notice.toEvent())
+        self?.handleTransportDisconnect(notice)
       }
     )
 
@@ -342,19 +343,39 @@ public final class ReactNativeSshModule: Module {
     try await translateAsync { try await session.disconnect() }
   }
 
+  private func handleTransportDisconnect(_ notice: DisconnectNotice) {
+    state.removeSession(notice.sessionId)
+    state.shellIds(of: notice.sessionId).forEach { closeShell($0) }
+    sendEvent("onDisconnect", notice.toEvent())
+  }
+
+  private func shellDimensions(_ options: ShellOptionsRecord) throws -> (cols: UInt32, rows: UInt32) {
+    guard
+      let cols = UInt32(exactly: options.cols),
+      let rows = UInt32(exactly: options.rows),
+      cols > 0,
+      rows > 0
+    else {
+      throw Exception(name: "SshError", description: "cols and rows must be positive integers", code: "Protocol")
+    }
+
+    return (cols, rows)
+  }
+
   private func openShell(_ sessionId: String, _ options: ShellOptionsRecord) async throws -> String {
     guard let session = state.session(sessionId) else {
       throw channelClosed(sessionId)
     }
 
+    let dimensions = try shellDimensions(options)
     let shellId = state.shellIds.next()
     let source = try await translateAsync {
       try await SshShellSource.open(
         sessionId: sessionId,
         session: session,
         term: options.term,
-        cols: options.cols,
-        rows: options.rows
+        cols: dimensions.cols,
+        rows: dimensions.rows
       )
     }
 
@@ -419,8 +440,19 @@ private extension ConnectConfigRecord {
     guard port >= 1 && port <= 65535 else {
       throw Exception(name: "SshError", description: "port must be between 1 and 65535", code: "Protocol")
     }
-    guard connectTimeoutMs > 0, keepaliveIntervalS >= 0 else {
-      throw Exception(name: "SshError", description: "invalid timeout or keepalive", code: "Protocol")
+    guard connectTimeoutMs > 0, connectTimeoutMs <= Int(UInt32.max) else {
+      throw Exception(
+        name: "SshError",
+        description: "connectTimeoutMs must be between 1 and \(UInt32.max)",
+        code: "Protocol"
+      )
+    }
+    guard keepaliveIntervalS >= 0, keepaliveIntervalS <= Int(UInt32.max) else {
+      throw Exception(
+        name: "SshError",
+        description: "keepaliveIntervalS must be between 0 and \(UInt32.max)",
+        code: "Protocol"
+      )
     }
 
     return ConnectConfig(

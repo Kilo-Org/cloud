@@ -551,6 +551,9 @@ importers:
       '@kilocode/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
+      '@kilocode/react-native-ssh':
+        specifier: file:/home/igor/work/react-native-ssh
+        version: file:../react-native-ssh(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       '@kilocode/session-ingest-contracts':
         specifier: workspace:*
         version: link:../../packages/session-ingest-contracts
@@ -577,7 +580,7 @@ importers:
         version: 1.5.2(@types/react@19.3.0)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       '@sentry/react-native':
         specifier: ~8.31.0
-        version: 8.31.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.8)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1)(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.64.7)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))
+        version: 8.31.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.8)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.64.7)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))
       '@shopify/flash-list':
         specifier: 2.3.3
         version: 2.3.3(patch_hash=4dd296d36c4b56d12d10dd905129118653c63050997a8aa814bd72578ae77714)(@babel/runtime@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
@@ -6624,6 +6627,13 @@ packages:
     engines: {node: '>=10.0'}
     peerDependencies:
       tslib: '2'
+
+  '@kilocode/react-native-ssh@file:../react-native-ssh':
+    resolution: {directory: ../react-native-ssh, type: directory}
+    peerDependencies:
+      expo: '*'
+      react: '*'
+      react-native: '*'
 
   '@kilocode/sdk@7.8.17':
     resolution: {integrity: sha512-l289qtrKYwI1wxTrzmXLcY75Sa354yjw6+7UPUg7RrlIcABwdqoAh8Kyuhv0W485NtotYjZiRwC5LmbdGaqe5g==}
@@ -18728,6 +18738,7 @@ packages:
 
   node-abort-controller@3.1.1:
     resolution: {integrity: sha512-AGK2yQKIjRuqnc6VkX2Xj5d+QW8xZ87pa1UK6yA6ouUyuxfHuMP6umE5QK7UmTeOAymo+Zx1Fxiuw9rVx8taHQ==}
+    deprecated: This package is no longer needed on supported Node.js versions. Node.js 16+ includes AbortController and AbortSignal as built-in globals. All Node.js versions requiring this polyfill are end-of-life. Use the built-in globals instead.
 
   node-addon-api@7.1.1:
     resolution: {integrity: sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ==}
@@ -27227,6 +27238,12 @@ snapshots:
       '@jsonjoy.com/codegen': 17.67.0(tslib@2.8.1)
       tslib: 2.8.1
 
+  '@kilocode/react-native-ssh@file:../react-native-ssh(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)':
+    dependencies:
+      expo: 58.0.10(@babel/core@7.29.7)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.19)(expo-widgets@58.0.17)(react-dom@19.2.6(react@19.3.0))(react-native-webview@14.0.1(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)(utf-8-validate@6.0.6)
+      react: 19.3.0
+      react-native: 0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)
+
   '@kilocode/sdk@7.8.17':
     dependencies:
       cross-spawn: 7.0.6
@@ -31602,7 +31619,7 @@ snapshots:
       '@sentry/conventions': 0.27.0
       '@sentry/core': 11.7.0
 
-  '@sentry/react-native@8.31.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.8)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1)(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.64.7)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))':
+  '@sentry/react-native@8.31.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.8)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.64.7)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))':
     dependencies:
       '@expo/config-plugins': 58.0.9(typescript@7.0.2)
       '@sentry/browser': 10.76.2

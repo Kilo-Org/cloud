@@ -9,12 +9,18 @@ import { Text } from '@/components/ui/text';
 import {
   sandboxDetailText,
   sandboxStatusLabel,
+  sandboxStatusSettled,
 } from '@/lib/cloud-environments/sandbox-status-copy';
 import { workspaceSnapshotRecoveryOffered } from '@/lib/cloud-environments/workspace-snapshot-recovery';
 import { formatDate } from '@/lib/format';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
-/** The worker's own status is a snapshot; a sleeping sandbox changes on its own. */
+/**
+ * The worker's own status is a snapshot, and a sandbox that is running or
+ * changing hands moves between states on its own. Once it settles — asleep
+ * until the next message, or failed — the snapshot stops moving, so the poll
+ * stops with it instead of re-reading a dead session every 15 seconds.
+ */
 const SANDBOX_POLL_MS = 15_000;
 
 type SessionSandboxSectionProps = {
@@ -53,7 +59,8 @@ export function SessionSandboxSection({
           { cloudAgentSessionId: sessionId, organizationId },
           {
             enabled: cloudAgentSessionId !== null,
-            refetchInterval: SANDBOX_POLL_MS,
+            refetchInterval: query =>
+              sandboxStatusSettled(query.state.data?.status) ? false : SANDBOX_POLL_MS,
             retry: false,
           }
         )
@@ -61,7 +68,8 @@ export function SessionSandboxSection({
           { cloudAgentSessionId: sessionId },
           {
             enabled: cloudAgentSessionId !== null,
-            refetchInterval: SANDBOX_POLL_MS,
+            refetchInterval: query =>
+              sandboxStatusSettled(query.state.data?.status) ? false : SANDBOX_POLL_MS,
             retry: false,
           }
         )

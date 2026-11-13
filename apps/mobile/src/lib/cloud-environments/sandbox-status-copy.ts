@@ -17,6 +17,22 @@ const STATUS_LABEL_KEYS = {
   unknown: 'agentChat.environment.sandboxStatusUnknown',
 } satisfies Record<SandboxStatusRow['status'], string>;
 
+/**
+ * The states a sandbox leaves only when a person acts: a sleeping sandbox wakes
+ * on the next message, and a failed one retries on it. Everything else moves on
+ * its own — a running sandbox falls asleep after its idle timeout, a transition
+ * resolves, and an unresolved read is being checked — so only those are worth
+ * polling for.
+ */
+const SETTLED_STATUSES = {
+  sleeping: true,
+  error: true,
+} satisfies Partial<Record<SandboxStatusRow['status'], true>>;
+
+export function sandboxStatusSettled(status: SandboxStatusRow['status'] | undefined): boolean {
+  return status !== undefined && Object.hasOwn(SETTLED_STATUSES, status);
+}
+
 /** The one line naming the sandbox's state. */
 export function sandboxStatusLabel(status: SandboxStatusRow['status'], t: TFunction): string {
   return t(STATUS_LABEL_KEYS[status]);

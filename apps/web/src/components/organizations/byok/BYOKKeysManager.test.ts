@@ -13,6 +13,10 @@ type ReorderInput = ListInput & { keyIds: string[] };
 
 const listKey = (input: ListInput) => ['byok', 'list', input];
 let mockKeys: BYOKApiKeyResponse[] = [];
+/** The options the screen registered for the stored-key test, so a test can run its handlers. */
+let mockTestApiKeyOptions:
+  | { onSuccess?: (result: unknown, variables: { id: string }) => void }
+  | undefined;
 const mockReorder = jest.fn(async ({ keyIds }: ReorderInput) => {
   mockKeys = keyIds.map(id => {
     const key = mockKeys.find(key => key.id === id);
@@ -54,7 +58,12 @@ jest.mock('@/lib/trpc/utils', () => ({
         reorder: {
           mutationOptions: (options: object) => ({ ...options, mutationFn: mockReorder }),
         },
-        testApiKey: mutation,
+        testApiKey: {
+          mutationOptions: (options: object) => {
+            mockTestApiKeyOptions = options as typeof mockTestApiKeyOptions;
+            return { ...options, mutationFn: jest.fn() };
+          },
+        },
       },
     };
   },
@@ -248,5 +257,121 @@ describe('BYOK key priorities', () => {
       previousKeys
     );
     expect(toast.error).toHaveBeenCalledWith('Failed to save key priority: Permission denied');
+  });
+});
+
+describe('BYOK stored-key test toasts', () => {
+  let root: Root | undefined;
+  let queryClient: QueryClient | undefined;
+  let cleanup: (() => void) | undefined;
+
+  afterEach(async () => {
+    await act(async () => root?.unmount());
+    root = undefined;
+    queryClient?.clear();
+    queryClient = undefined;
+    cleanup?.();
+    cleanup = undefined;
+    mockTestApiKeyOptions = undefined;
+    jest.mocked(toast.error).mockClear();
+    jest.mocked(toast.success).mockClear();
+  });
+
+  async function mount() {
+    mockKeys = [
+      {
+        id: 'anthropic-key',
+        provider_id: 'anthropic',
+        provider_name: 'Anthropic',
+        management_source: 'user',
+        is_enabled: true,
+        serve_catalog_models: false,
+        supports_catalog_mode: false,
+        can_change_catalog_mode: false,
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        created_by: 'test-user',
+      },
+    ];
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient = client;
+    client.setQueryData(listKey({}), mockKeys);
+    const dom = installDom();
+    cleanup = dom.cleanup;
+    root = createRoot(dom.container);
+    await act(async () => {
+      root?.render(
+        createElement(QueryClientProvider, { client }, createElement(BYOKKeysManager, {}))
+      );
+    });
+    if (!mockTestApiKeyOptions?.onSuccess) throw new Error('Test mutation was never created');
+    return mockTestApiKeyOptions.onSuccess;
+  }
+
+  it('reports a rejected key without the gateway setup text the payload carries', async () => {
+    const onSuccess = await mount();
+
+    await act(async () => {
+      onSuccess(
+        {
+          outcome: 'rejected',
+          detail: 'To authenticate, set the AI_GATEWAY_API_KEY environment variable.',
+          success: false,
+          message: 'legacy sentence',
+        },
+        { id: 'anthropic-key' }
+      );
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(
+      'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.'
+    );
+  });
+
+  it('keeps the provider sentence for a failure that has no other reason', async () => {
+    const onSuccess = await mount();
+
+    await act(async () => {
+      onSuccess(
+        { outcome: 'failed', detail: 'upstream said 401', success: false, message: 'legacy' },
+        { id: 'anthropic-key' }
+      );
+    });
+
+    expect(toast.error).toHaveBeenCalledWith('API key test failed: upstream said 401');
+  });
+
+  it('names the provider that is still listed when its id is gone from the catalog', async () => {
+    const onSuccess = await mount();
+
+    await act(async () => {
+      onSuccess(
+        { outcome: 'unsupported-provider', success: false, message: 'legacy' },
+        { id: 'anthropic-key' }
+      );
+    });
+
+    expect(toast.error).toHaveBeenCalledWith('Provider anthropic is no longer supported.');
+  });
+
+  it('reports a successful test with the provider and model the server chose', async () => {
+    const onSuccess = await mount();
+
+    await act(async () => {
+      onSuccess(
+        {
+          outcome: 'ok',
+          provider: 'Anthropic',
+          model: 'claude-sonnet-4',
+          success: true,
+          message: 'legacy',
+        },
+        { id: 'anthropic-key' }
+      );
+    });
+
+    expect(toast.success).toHaveBeenCalledWith(
+      'API key test success. Provider: Anthropic. Model: claude-sonnet-4.'
+    );
   });
 });

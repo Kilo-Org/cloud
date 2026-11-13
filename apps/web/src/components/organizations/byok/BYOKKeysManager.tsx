@@ -277,8 +277,9 @@ function updateBYOKDialogState(state: BYOKDialogState, update: Partial<BYOKDialo
 
 /**
  * The stored-key test reports an outcome rather than a message, so this copy
- * lives here. `detail` is the provider's own error text and is appended only
- * where the sentence does not already carry it.
+ * lives here. `rejected` names the credential problem itself and drops the
+ * provider's `detail`, which is SDK setup text for a different audience.
+ * `failed` keeps the provider's own sentence, which is where its reason lives.
  */
 function byokKeyTestMessage(result: BYOKKeyTestResult, providerId: string | undefined): string {
   switch (result.outcome) {
@@ -294,11 +295,8 @@ function byokKeyTestMessage(result: BYOKKeyTestResult, providerId: string | unde
       return 'API key test failed: the stored key could not be read. Try again later.';
     case 'deprecated-provider':
       return 'Codestral is deprecated and its API key can no longer be tested.';
-    case 'rejected': {
-      const message =
-        'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.';
-      return result.detail ? `${message} ${result.detail}` : message;
-    }
+    case 'rejected':
+      return 'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.';
     case 'failed':
       return result.detail
         ? `API key test failed: ${result.detail}`

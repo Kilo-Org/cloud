@@ -114,6 +114,26 @@ describe('buildFailureText', () => {
     );
   });
 
+  it('keeps reasons that only sound alike apart', () => {
+    // Each of these pairs shares a cause only in its first word; the web gives
+    // each its own sentence, and the wrong one sends the reader to fix the wrong
+    // thing (billing capacity as missing credits, a lost actor as a lost
+    // repository authorization).
+    expect(buildFailureText('capture_uncertain', t)).toBe(
+      'agentChat.environment.failureCaptureUncertain'
+    );
+    expect(buildFailureText('builder_start_failed', t)).toBe(
+      'agentChat.environment.failureBuilderStart'
+    );
+    expect(buildFailureText('actor_unauthorized', t)).toBe(
+      'agentChat.environment.failureActorUnauthorized'
+    );
+    expect(buildFailureText('billing_unavailable', t)).toBe(
+      'agentChat.environment.failureBillingUnavailable'
+    );
+    expect(buildFailureText('billing_blocked', t)).toBe('agentChat.environment.failureBilling');
+  });
+
   it('gives every runtime reason one sentence and an unknown one the generic failure', () => {
     expect(buildFailureText('runtime_cli_probe_failed', t)).toBe(
       'agentChat.environment.failureRuntime'
@@ -164,8 +184,16 @@ describe('buildSummaryLabel', () => {
     expect(buildSummaryLabel(status({ published }), t)).toBe(
       'agentChat.environment.buildSucceeded'
     );
+    // Only `revision` says the settings changed; `age` is a snapshot the next
+    // session refreshes and `image` is one built for another sandbox image.
     expect(buildSummaryLabel(status({ published: { ...published, stale: 'revision' } }), t)).toBe(
       'agentChat.environment.buildStale'
+    );
+    expect(buildSummaryLabel(status({ published: { ...published, stale: 'age' } }), t)).toBe(
+      'agentChat.environment.buildStaleAge'
+    );
+    expect(buildSummaryLabel(status({ published: { ...published, stale: 'image' } }), t)).toBe(
+      'agentChat.environment.buildStaleImage'
     );
   });
 

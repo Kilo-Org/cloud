@@ -71,14 +71,14 @@ const FAILURE_KEYS = {
   setup_timeout: 'agentChat.environment.failureTimeout',
   cleanup_failed: 'agentChat.environment.failureCleanup',
   capture_failed: 'agentChat.environment.failureCapture',
-  capture_uncertain: 'agentChat.environment.failureCapture',
+  capture_uncertain: 'agentChat.environment.failureCaptureUncertain',
   deadline: 'agentChat.environment.failureDeadline',
   builder_lost: 'agentChat.environment.failureBuilderLost',
-  builder_start_failed: 'agentChat.environment.failureBuilderLost',
+  builder_start_failed: 'agentChat.environment.failureBuilderStart',
   repository_unauthorized: 'agentChat.environment.failureUnauthorized',
-  actor_unauthorized: 'agentChat.environment.failureUnauthorized',
+  actor_unauthorized: 'agentChat.environment.failureActorUnauthorized',
   billing_blocked: 'agentChat.environment.failureBilling',
-  billing_unavailable: 'agentChat.environment.failureBilling',
+  billing_unavailable: 'agentChat.environment.failureBillingUnavailable',
   configuration_changed: 'agentChat.environment.failureConfiguration',
 } satisfies Record<string, string>;
 
@@ -120,9 +120,19 @@ export function buildSummaryLabel(
     return buildStageLabel(latest, t);
   }
   if (status.published !== null) {
-    return status.published.stale === null
-      ? t('agentChat.environment.buildSucceeded')
-      : t('agentChat.environment.buildStale');
+    // Only `revision` means the settings changed; `age` and `image` each name
+    // their own cause, as the web's staleness copy does.
+    const stale = status.published.stale;
+    if (stale === 'age') {
+      return t('agentChat.environment.buildStaleAge');
+    }
+    if (stale === 'image') {
+      return t('agentChat.environment.buildStaleImage');
+    }
+    if (stale === 'revision') {
+      return t('agentChat.environment.buildStale');
+    }
+    return t('agentChat.environment.buildSucceeded');
   }
   return t('agentChat.environment.buildNotBuilt');
 }

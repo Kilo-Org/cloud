@@ -1244,7 +1244,17 @@
       "changeRequestMissingPermissions": "Kiloren GitHub App-ak ezin ditu pull requestak ireki biltegi honetan. Biltegiko jabe batek eduki eta pull requestetarako idazteko baimena eman behar dio aplikazioari eta saiatu berriro.",
       "changeRequestFailed": "Kilok ezin izan du pull requesta ireki. Saiatu berriro une bat barru.",
       "proposalConflict": "Beste berrikuspen-memoria proposamen bat oraindik aktibo dago biltegi honetarako.",
-      "offAction": "Berrikuspen-memoria desgaituta dago. Gaitu, eta saiatu berriro."
+      "offAction": "Berrikuspen-memoria desgaituta dago. Gaitu, eta saiatu berriro.",
+      "analyze": {
+        "title": "Aztertu iritziak",
+        "description": "Aukeratu mantentzaileen azken erantzunak dituen biltegi bat, eta bilatu errepikatzen den jarraibide-eredu bat.",
+        "chooseRepository": "Aukeratu biltegi bat",
+        "action": "Aztertu orain",
+        "noRepositories": "Oraindik ez dago mantentzaileen azken erantzunak dituen biltegirik.",
+        "proposed": "Berrikuspen-memoriaren proposamena sortu da",
+        "noFeedback": "Ez da azken iritzirik aurkitu biltegi honetan",
+        "noPattern": "Ez da errepikatzen den eredu argirik aurkitu"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Sartu merge-eskaera baten baliozko URL bat.",
@@ -1376,7 +1386,62 @@
       "title": "Kode-berrikusleak zure esku-hartzea behar du.",
       "recoveryLabel": "Jarri harremanetan laguntza-taldearekin"
     },
-    "unknownError": "Errore ezezagun bat gertatu da."
+    "unknownError": "Errore ezezagun bat gertatu da.",
+    "skipBotPullRequests": {
+      "title": "Saltatu boten bateratze-eskaerak",
+      "subtitle": "Ez exekutatu berrikuspen automatikorik Dependabot edo Renovate bezalako botek irekitako bateratze-eskaeretan. Desgaitu aukera hau boten bateratze-eskaerak ere berrikusteko."
+    },
+    "repoModels": {
+      "title": "Biltegi bakoitzeko eredua",
+      "description": "Exekutatu biltegi batzuen berrikuspenak beste eredu batekin, beste pentsatze-ahalegin batekin edo biekin.",
+      "defaultModel": "Eredu lehenetsia erabiltzen du",
+      "resetLabel": "Berrezarri {{repository}} biltegiaren eredua",
+      "changeHint": "Eredu-hautatzailea irekitzen du"
+    },
+    "analytics": {
+      "title": "Analitika",
+      "period": "Denbora-tartea",
+      "trackedReviews": "Jarraitutako berrikuspenak",
+      "findingsRaised": "Sortutako aurkikuntzak",
+      "highImpactChanges": "Eragin handiko aldaketak",
+      "impactPoints": "Eragin-puntuak",
+      "repositoryLine": "Berrikuspenak: {{reviews}} · Aurkikuntzak: {{findings}}",
+      "empty": "Oraindik ez dago analitikadun berrikuspenik",
+      "emptyDescription": "Analitikak amaitutako berrikuspenak erregistratzen ditu erakundean gaituta dagoen bitartean.",
+      "off": "Analitika desgaituta dago erakunde honetan.",
+      "couldNotLoad": "Ezin izan da analitika kargatu"
+    },
+    "council": {
+      "title": "Kontseilu-berrikuspena",
+      "subtitle": "Hainbat espezialistak berrikusten dute bateratze-eskaera bakoitza, eta haien botoak erabaki bakarrean batzen dira.",
+      "unavailable": "Kontseilu-berrikuspena ez dago erabilgarri erakunde honetan.",
+      "noRepositories": "Oraindik ez da biltegirik hautatu. Lehenik, aukeratu biltegiak biltegien ezarpenetan.",
+      "specialists": "Espezialistak",
+      "labels": "Kontseilu-berrikuspena abiarazten duten etiketak",
+      "labelsPlaceholder": "adib. kontseilua, berrikuspen sakona",
+      "labelsDescription": "Bereizi etiketak komekin. Kontseilua gaituta duen biltegi batek etiketa horietako bat gutxienez duten bateratze-eskaeretan soilik exekutatuko du kontseilua. Utzi hutsik bateratze-eskaera egoki guztietarako.",
+      "minSpecialists": "Hautatu gutxienez {{minimum}} espezialista. {{selected}} hautatuta.",
+      "specialistName": {
+        "testCoverage": "Proben estaldura",
+        "correctness": "Zuzentasuna",
+        "custom": "Espezialista"
+      },
+      "specialist": {
+        "security": "Baimen-saihesteak, sekretuen kudeaketa eta sarrera ez-seguruak.",
+        "performance": "Bide beroak, N+1 kontsultak eta memoria-esleipen astunak.",
+        "testing": "Portaera berriaren estaldura falta edo ahula.",
+        "correctness": "Logika-erroreak, muturreko kasuak eta lasterketa-baldintzak.",
+        "custom": "Bere arloko arazoak berrikusten ditu."
+      },
+      "strategy": {
+        "advisory": "Aholku-emailea",
+        "advisoryDescription": "Aurkikuntzak eta botoak jakinarazten ditu bateratzea blokeatu gabe.",
+        "unanimous": "Aho batez",
+        "unanimousDescription": "Bateratzea blokeatzen du edozein espezialistak arazo kritiko bat jakinarazten duenean.",
+        "majority": "Gehiengoa",
+        "majorityDescription": "Bateratzea blokeatzen du espezialista gehienek arazo kritiko bat jakinarazten dutenean soilik."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1879,6 +1944,16 @@
       "auto": "Automatikoa",
       "shallow": "Azalekoa",
       "deep": "Sakona"
+    },
+    "orphanedFindings": {
+      "title": "Kendutako biltegien aurkikuntzak",
+      "description": "Biltegi hauek jada ez daude eskuragarri GitHub integrazioaren bidez. Haien aurkikuntzak oraindik kontuan hartzen dira aginte-paneletan eta txostenetan.",
+      "count": "Aurkikuntzak: {{count}}",
+      "clearLabel": "Garbitu {{repository}} biltegiaren aurkikuntzak",
+      "confirmTitle": "Aurkikuntzak garbitu?",
+      "confirmMessage": "{{repository}} biltegirako erregistratutako aurkikuntza guztiak ezabatuko dira. Ezin da desegin.",
+      "confirmAction": "Ezabatu aurkikuntzak",
+      "cleared": "Garbitutako aurkikuntzak: {{count}}"
     }
   },
   "agents": {

@@ -726,6 +726,16 @@
       "changeRequestFailed": "Kilo n'a pas pu ouvrir la pull request. Réessayez dans un instant.",
       "proposalConflict": "Une autre proposition pour ce dépôt est toujours active.",
       "offAction": "La mémoire de revue est désactivée. Activez-la, puis réessayez.",
+      "analyze": {
+        "title": "Analyser les retours",
+        "description": "Choisissez un dépôt avec des réponses récentes des responsables, puis recherchez une consigne récurrente.",
+        "chooseRepository": "Choisir un dépôt",
+        "action": "Analyser maintenant",
+        "noRepositories": "Aucun dépôt n'a encore de réponses récentes des responsables.",
+        "proposed": "Proposition de mémoire de revue créée",
+        "noFeedback": "Aucun retour récent trouvé pour ce dépôt",
+        "noPattern": "Aucun schéma récurrent clair trouvé"
+      },
       "off": "La mémoire de revue est désactivée",
       "on": "La mémoire de revue est activée",
       "offDescription": "Activez-la pour permettre à Kilo d'apprendre des réponses des responsables du dépôt et de proposer des consignes pour REVIEW.md.",
@@ -802,7 +812,62 @@
       "title": "L'agent de revue de code nécessite votre intervention",
       "recoveryLabel": "Contacter l'assistance"
     },
-    "unknownError": "Erreur inconnue"
+    "unknownError": "Erreur inconnue",
+    "skipBotPullRequests": {
+      "title": "Ignorer les pull requests des bots",
+      "subtitle": "Ne pas lancer de revues automatiques sur les pull requests ouvertes par des bots comme Dependabot ou Renovate. Désactivez cette option pour les examiner aussi."
+    },
+    "repoModels": {
+      "title": "Modèle par dépôt",
+      "description": "Utilisez un autre modèle, un autre niveau de réflexion, ou les deux, pour les revues de certains dépôts.",
+      "defaultModel": "Utilise le modèle par défaut",
+      "resetLabel": "Réinitialiser le modèle pour {{repository}}",
+      "changeHint": "Ouvre le sélecteur de modèle"
+    },
+    "analytics": {
+      "title": "Statistiques",
+      "period": "Période",
+      "trackedReviews": "Revues suivies",
+      "findingsRaised": "Signalements émis",
+      "highImpactChanges": "Modifications à fort impact",
+      "impactPoints": "Points d'impact",
+      "repositoryLine": "Revues : {{reviews}} · Signalements : {{findings}}",
+      "empty": "Aucune revue avec statistiques pour l'instant",
+      "emptyDescription": "Les statistiques enregistrent les revues terminées tant qu'elles sont activées pour l'organisation.",
+      "off": "Les statistiques sont désactivées pour cette organisation.",
+      "couldNotLoad": "Impossible de charger les statistiques"
+    },
+    "council": {
+      "title": "Revue en conseil",
+      "subtitle": "Plusieurs spécialistes examinent chaque pull request, et leurs votes sont combinés en une seule décision.",
+      "unavailable": "La revue en conseil n'est pas disponible pour cette organisation.",
+      "noRepositories": "Aucun dépôt sélectionné pour l'instant. Choisissez d'abord des dépôts dans les paramètres des dépôts.",
+      "specialists": "Spécialistes",
+      "labels": "Étiquettes qui déclenchent la revue en conseil",
+      "labelsPlaceholder": "ex. : conseil, revue approfondie",
+      "labelsDescription": "Séparez les étiquettes par des virgules. Un dépôt avec revue en conseil ne l'exécutera alors que pour les pull requests portant au moins une de ces étiquettes. Laissez vide pour toutes les pull requests éligibles.",
+      "minSpecialists": "Sélectionnez au moins {{minimum}} spécialistes. Sélectionnés : {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Couverture de tests",
+        "correctness": "Exactitude",
+        "custom": "Spécialiste"
+      },
+      "specialist": {
+        "security": "Contournement d'autorisation, gestion des secrets et entrées non sécurisées.",
+        "performance": "Chemins critiques, requêtes N+1 et allocations lourdes.",
+        "testing": "Couverture absente ou insuffisante des nouveaux comportements.",
+        "correctness": "Erreurs de logique, cas limites et conditions de concurrence.",
+        "custom": "Examine les problèmes de son propre domaine."
+      },
+      "strategy": {
+        "advisory": "Consultatif",
+        "advisoryDescription": "Signale les problèmes et vote sans bloquer la fusion.",
+        "unanimous": "Unanime",
+        "unanimousDescription": "Bloque la fusion dès qu'un spécialiste signale un problème critique.",
+        "majority": "Majorité",
+        "majorityDescription": "Bloque la fusion uniquement si la plupart des spécialistes signalent un problème critique."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1320,6 +1385,16 @@
       "auto": "Auto",
       "shallow": "Superficielle",
       "deep": "Approfondie"
+    },
+    "orphanedFindings": {
+      "title": "Signalements des dépôts supprimés",
+      "description": "Ces dépôts ne sont plus accessibles via l'intégration GitHub. Leurs signalements restent comptabilisés dans les tableaux de bord et les rapports.",
+      "count": "Signalements : {{count}}",
+      "clearLabel": "Effacer les signalements de {{repository}}",
+      "confirmTitle": "Effacer les signalements ?",
+      "confirmMessage": "Tous les signalements enregistrés pour {{repository}} seront supprimés. Cette action est irréversible.",
+      "confirmAction": "Supprimer les signalements",
+      "cleared": "Signalements effacés : {{count}}"
     }
   },
   "agentChat": {

@@ -1267,7 +1267,17 @@
       "changeRequestMissingPermissions": "Aplicația GitHub a Kilo nu poate deschide pull request-uri în acest depozit. Un proprietar al depozitului trebuie să acorde aplicației acces de scriere la conținut și la pull request-uri, apoi încearcă din nou.",
       "changeRequestFailed": "Kilo nu a putut deschide pull request-ul. Încearcă din nou în câteva momente.",
       "proposalConflict": "O altă propunere de memorie de revizuire pentru acest depozit este încă activă, așa că aceasta nu poate fi salvată deocamdată.",
-      "offAction": "Memoria de revizuire este dezactivată. Activeaz-o, apoi încearcă din nou."
+      "offAction": "Memoria de revizuire este dezactivată. Activeaz-o, apoi încearcă din nou.",
+      "analyze": {
+        "title": "Analizează reacțiile",
+        "description": "Alege un depozit cu răspunsuri recente de la responsabilii de proiect, apoi caută un singur tipar de îndrumare care se repetă.",
+        "chooseRepository": "Alege un depozit",
+        "action": "Analizează acum",
+        "noRepositories": "Niciun depozit nu are încă răspunsuri recente de la responsabilii de proiect.",
+        "proposed": "Propunere de memorie de revizuire creată",
+        "noFeedback": "Nu s-au găsit reacții recente pentru acest depozit",
+        "noPattern": "Nu s-a găsit niciun tipar repetat clar"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Introdu o adresă URL validă pentru un merge request.",
@@ -1400,7 +1410,62 @@
       "title": "Agentul de revizuire a codului necesită intervenția ta.",
       "recoveryLabel": "Contactează asistența"
     },
-    "unknownError": "Eroare necunoscută"
+    "unknownError": "Eroare necunoscută",
+    "skipBotPullRequests": {
+      "title": "Omite PR-urile create de boți",
+      "subtitle": "Nu rula revizuiri automate pe PR-urile deschise de boți precum Dependabot sau Renovate. Dezactivează această opțiune pentru a revizui și PR-urile boților."
+    },
+    "repoModels": {
+      "title": "Model pe depozit",
+      "description": "Rulează revizuirile unor depozite cu alt model, cu alt efort de raționament sau cu ambele.",
+      "defaultModel": "Folosește modelul implicit",
+      "resetLabel": "Resetează modelul pentru {{repository}}",
+      "changeHint": "Deschide selectorul de modele"
+    },
+    "analytics": {
+      "title": "Statistici",
+      "period": "Interval de timp",
+      "trackedReviews": "Revizuiri urmărite",
+      "findingsRaised": "Constatări semnalate",
+      "highImpactChanges": "Modificări cu impact mare",
+      "impactPoints": "Puncte de impact",
+      "repositoryLine": "Revizuiri: {{reviews}} · Constatări: {{findings}}",
+      "empty": "Nicio revizuire cu statistici deocamdată",
+      "emptyDescription": "Statisticile înregistrează revizuirile finalizate cât timp sunt activate pentru organizație.",
+      "off": "Statisticile sunt dezactivate pentru această organizație.",
+      "couldNotLoad": "Statisticile nu au putut fi încărcate"
+    },
+    "council": {
+      "title": "Revizuire în consiliu",
+      "subtitle": "Mai mulți experți revizuiesc fiecare PR, iar voturile lor se combină într-o singură decizie.",
+      "unavailable": "Revizuirea în consiliu nu este disponibilă pentru această organizație.",
+      "noRepositories": "Niciun depozit selectat deocamdată. Alege mai întâi depozitele din setările depozitelor.",
+      "specialists": "Experți",
+      "labels": "Etichete care declanșează revizuirea în consiliu",
+      "labelsPlaceholder": "de ex. consiliu, revizuire aprofundată",
+      "labelsDescription": "Separă etichetele prin virgule. Un depozit cu consiliul activat rulează apoi revizuirea doar pentru PR-urile care au cel puțin una dintre aceste etichete. Lasă gol pentru toate PR-urile eligibile.",
+      "minSpecialists": "Selectează cel puțin {{minimum}} experți. {{selected}} selectați.",
+      "specialistName": {
+        "testCoverage": "Acoperirea testelor",
+        "correctness": "Corectitudine",
+        "custom": "Expert"
+      },
+      "specialist": {
+        "security": "Ocolirea autorizării, gestionarea secretelor și date de intrare nesigure.",
+        "performance": "Căi critice, interogări N+1 și alocări mari.",
+        "testing": "Acoperire lipsă sau slabă pentru comportamentul nou.",
+        "correctness": "Erori de logică, cazuri limită și condiții de concurență.",
+        "custom": "Revizuiește problemele din aria sa proprie."
+      },
+      "strategy": {
+        "advisory": "Consultativ",
+        "advisoryDescription": "Raportează constatări și votează fără a bloca îmbinarea.",
+        "unanimous": "Unanim",
+        "unanimousDescription": "Blochează îmbinarea când orice expert raportează o problemă critică.",
+        "majority": "Majoritate",
+        "majorityDescription": "Blochează îmbinarea doar când majoritatea experților raportează o problemă critică."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1918,6 +1983,16 @@
       "auto": "Automată",
       "shallow": "Superficială",
       "deep": "Aprofundată"
+    },
+    "orphanedFindings": {
+      "title": "Constatări pentru depozitele eliminate",
+      "description": "Aceste depozite nu mai sunt accesibile prin integrarea GitHub. Constatările lor contează în continuare în panouri și rapoarte.",
+      "count": "Constatări: {{count}}",
+      "clearLabel": "Șterge constatările pentru {{repository}}",
+      "confirmTitle": "Ștergi constatările?",
+      "confirmMessage": "Toate constatările înregistrate pentru {{repository}} vor fi șterse. Această acțiune nu poate fi anulată.",
+      "confirmAction": "Șterge constatările",
+      "cleared": "Constatări șterse: {{count}}"
     }
   },
   "agents": {

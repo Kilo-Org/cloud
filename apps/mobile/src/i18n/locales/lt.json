@@ -1290,7 +1290,17 @@
       "changeRequestMissingPermissions": "Kilo GitHub programėlė negali atidaryti PR šioje saugykloje. Saugyklos savininkas turi suteikti programėlei rašymo prieigą prie turinio ir PR, tada bandyk dar kartą.",
       "changeRequestFailed": "Kilo nepavyko atidaryti PR. Bandyk dar kartą po akimirkos.",
       "proposalConflict": "Kitas šios saugyklos pasiūlymas vis dar aktyvus.",
-      "offAction": "Peržiūros atmintis išjungta. Įjunk ją, tada bandyk dar kartą."
+      "offAction": "Peržiūros atmintis išjungta. Įjunk ją, tada bandyk dar kartą.",
+      "analyze": {
+        "title": "Analizuoti atsiliepimus",
+        "description": "Pasirink saugyklą su naujais prižiūrėtojų atsakymais, tada ieškok vieno pasikartojančio gairių šablono.",
+        "chooseRepository": "Pasirink saugyklą",
+        "action": "Analizuoti dabar",
+        "noRepositories": "Nė viena saugykla dar neturi naujų prižiūrėtojų atsakymų.",
+        "proposed": "Sukurtas peržiūros atminties pasiūlymas",
+        "noFeedback": "Šiai saugyklai neseniai atsiliepimų nerasta",
+        "noPattern": "Nerastas aiškus pasikartojantis šablonas"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Įvesk tinkamą merge request URL.",
@@ -1424,7 +1434,62 @@
       "title": "Kodo peržiūros agentui reikia tavo dėmesio.",
       "recoveryLabel": "Kreiptis į pagalbos tarnybą"
     },
-    "unknownError": "Nežinoma klaida."
+    "unknownError": "Nežinoma klaida.",
+    "skipBotPullRequests": {
+      "title": "Praleisti botų atidarytus PR",
+      "subtitle": "Neatlik automatinės peržiūros PR, kuriuos atidaro botai, pavyzdžiui, Dependabot arba Renovate. Išjunk tai, jei nori peržiūrėti ir botų PR."
+    },
+    "repoModels": {
+      "title": "Modelis pagal saugyklą",
+      "description": "Kai kurių saugyklų peržiūras vykdyk naudodamas kitą modelį, mąstymo intensyvumą arba abu.",
+      "defaultModel": "Naudoja numatytąjį modelį",
+      "resetLabel": "Atkurti modelį saugyklai {{repository}}",
+      "changeHint": "Atidaro modelio pasirinkimą"
+    },
+    "analytics": {
+      "title": "Analitika",
+      "period": "Laikotarpis",
+      "trackedReviews": "Stebimos peržiūros",
+      "findingsRaised": "Pateikti radiniai",
+      "highImpactChanges": "Didelio poveikio pakeitimai",
+      "impactPoints": "Poveikio taškai",
+      "repositoryLine": "Peržiūros: {{reviews}} · Radiniai: {{findings}}",
+      "empty": "Dar nėra peržiūrų su analitika",
+      "emptyDescription": "Analitika fiksuoja užbaigtas peržiūras, kol ji įjungta organizacijai.",
+      "off": "Šiai organizacijai analitika išjungta.",
+      "couldNotLoad": "Nepavyko įkelti analitikos"
+    },
+    "council": {
+      "title": "Tarybos peržiūra",
+      "subtitle": "Kiekvieną PR peržiūri keli specialistai, o jų balsai sujungiami į vieną sprendimą.",
+      "unavailable": "Tarybos peržiūra šiai organizacijai nepasiekiama.",
+      "noRepositories": "Dar nepasirinkta nė viena saugykla. Pirmiausia pasirink saugyklas saugyklų nustatymuose.",
+      "specialists": "Specialistai",
+      "labels": "Žymos, kurios įjungia tarybos peržiūrą",
+      "labelsPlaceholder": "pvz., taryba, išsami peržiūra",
+      "labelsDescription": "Žymas atskirk kableliais. Saugykla su įjungta taryba tada atlieka tarybos peržiūrą tik tiems PR, kurie turi bent vieną iš šių žymų. Palik tuščią visiems tinkamiems PR.",
+      "minSpecialists": "Pasirink bent {{minimum}} specialistus. Pasirinkta: {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Testų aprėptis",
+        "correctness": "Korektiškumas",
+        "custom": "Specialistas"
+      },
+      "specialist": {
+        "security": "Autorizacijos apėjimas, slaptųjų duomenų tvarkymas ir nesaugi įvestis.",
+        "performance": "Karštosios vietos, N+1 užklausos ir didelės alokacijos.",
+        "testing": "Trūkstama arba silpna naujo elgesio aprėptis.",
+        "correctness": "Logikos klaidos, kraštiniai atvejai ir lenktynių sąlygos.",
+        "custom": "Peržiūri problemas savo srityje."
+      },
+      "strategy": {
+        "advisory": "Patariamoji",
+        "advisoryDescription": "Praneša radinius ir balsuoja neblokuodama sujungimo.",
+        "unanimous": "Vienbalsė",
+        "unanimousDescription": "Blokuoja sujungimą, kai bet kuris specialistas praneša kritinę problemą.",
+        "majority": "Dauguma",
+        "majorityDescription": "Blokuoja sujungimą tik tada, kai dauguma specialistų praneša kritinę problemą."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1957,6 +2022,16 @@
       "auto": "Automatinė",
       "shallow": "Paviršinė",
       "deep": "Išsami"
+    },
+    "orphanedFindings": {
+      "title": "Pašalintų saugyklų radiniai",
+      "description": "Šios saugyklos nebepasiekiamos per GitHub integraciją. Jų radiniai vis dar skaičiuojami ataskaitų lentelėse ir ataskaitose.",
+      "count": "Radiniai: {{count}}",
+      "clearLabel": "Išvalyti saugyklos {{repository}} radinius",
+      "confirmTitle": "Išvalyti radinius?",
+      "confirmMessage": "Visi užfiksuoti saugyklos {{repository}} radiniai bus ištrinti. To atšaukti negalima.",
+      "confirmAction": "Ištrinti radinius",
+      "cleared": "Radiniai išvalyti: {{count}}"
     }
   },
   "agents": {

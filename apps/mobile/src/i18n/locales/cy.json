@@ -1336,7 +1336,17 @@
       "changeRequestMissingPermissions": "Ni all ap GitHub Kilo agor ceisiadau tynnu yn y gofrestrfa hon. Rhaid i berchennog y gofrestrfa roi mynediad ysgrifennu i'r ap at gynnwys a cheisiadau tynnu, yna rhowch gynnig arall arni.",
       "changeRequestFailed": "Ni allai Kilo agor y cais tynnu. Rhowch gynnig arall arni mewn munud.",
       "proposalConflict": "Mae cynnig arall ar gyfer cof adolygu'r gofrestrfa hon yn dal yn weithredol, felly ni ellir cadw'r un hwn eto.",
-      "offAction": "Mae'r cof adolygu wedi'i ddiffodd. Trowch ef ymlaen, yna rhowch gynnig arall arni."
+      "offAction": "Mae'r cof adolygu wedi'i ddiffodd. Trowch ef ymlaen, yna rhowch gynnig arall arni.",
+      "analyze": {
+        "title": "Dadansoddi adborth",
+        "description": "Dewiswch ystorfa ag ymatebion diweddar gan gynhalwyr, yna chwiliwch am un patrwm canllaw sy'n cael ei ailadrodd.",
+        "chooseRepository": "Dewiswch ystorfa",
+        "action": "Dadansoddi nawr",
+        "noRepositories": "Nid oes gan unrhyw ystorfa ymatebion diweddar gan gynhalwyr eto.",
+        "proposed": "Crëwyd cynnig cof adolygu",
+        "noFeedback": "Dim adborth diweddar ar gyfer yr ystorfa hon",
+        "noPattern": "Ni chanfuwyd patrwm amlwg sy'n cael ei ailadrodd"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Rhowch URL dilys ar gyfer cais uno.",
@@ -1472,7 +1482,62 @@
       "title": "Mae angen sylw ar yr adolygydd cod.",
       "recoveryLabel": "Cysylltu â'r tîm cymorth"
     },
-    "unknownError": "Digwyddodd gwall anhysbys."
+    "unknownError": "Digwyddodd gwall anhysbys.",
+    "skipBotPullRequests": {
+      "title": "Hepgor ceisiadau tynnu gan fotiau",
+      "subtitle": "Peidiwch â rhedeg adolygiadau awtomataidd ar geisiadau tynnu a agorwyd gan fotiau fel Dependabot neu Renovate. Diffoddwch hyn i adolygu ceisiadau tynnu gan fotiau hefyd."
+    },
+    "repoModels": {
+      "title": "Model fesul ystorfa",
+      "description": "Rhedwch adolygiadau rhai ystorfeydd ar fodel gwahanol, ymdrech feddwl wahanol, neu'r ddau.",
+      "defaultModel": "Yn defnyddio'r model rhagosodedig",
+      "resetLabel": "Ailosod y model ar gyfer {{repository}}",
+      "changeHint": "Yn agor y dewisydd modelau"
+    },
+    "analytics": {
+      "title": "Dadansoddeg",
+      "period": "Cyfnod amser",
+      "trackedReviews": "Adolygiadau a olrheiniwyd",
+      "findingsRaised": "Canfyddiadau a godwyd",
+      "highImpactChanges": "Newidiadau effaith uchel",
+      "impactPoints": "Pwyntiau effaith",
+      "repositoryLine": "Adolygiadau: {{reviews}} · Canfyddiadau: {{findings}}",
+      "empty": "Dim adolygiadau â dadansoddeg eto",
+      "emptyDescription": "Mae dadansoddeg yn cofnodi adolygiadau a gwblhawyd tra bo'r nodwedd wedi'i galluogi ar gyfer y sefydliad.",
+      "off": "Mae dadansoddeg wedi'i diffodd ar gyfer y sefydliad hwn.",
+      "couldNotLoad": "Methwyd llwytho'r dadansoddeg"
+    },
+    "council": {
+      "title": "Adolygiad cyngor",
+      "subtitle": "Mae sawl arbenigwr yn adolygu pob cais tynnu, ac mae eu pleidleisiau'n cyfuno'n un penderfyniad.",
+      "unavailable": "Nid yw adolygiad cyngor ar gael i'r sefydliad hwn.",
+      "noRepositories": "Dim ystorfeydd wedi'u dewis eto. Dewiswch ystorfeydd yng ngosodiadau'r ystorfeydd yn gyntaf.",
+      "specialists": "Arbenigwyr",
+      "labels": "Labeli sy'n sbarduno adolygiad cyngor",
+      "labelsPlaceholder": "e.e. cyngor, adolygiad manwl",
+      "labelsDescription": "Gwahanwch labeli â chomas. Wedyn bydd ystorfa sydd â'r cyngor wedi'i alluogi yn rhedeg y cyngor dim ond ar gyfer ceisiadau tynnu sydd ag o leiaf un o'r labeli hyn. Gadewch yn wag ar gyfer pob cais tynnu cymwys.",
+      "minSpecialists": "Dewiswch o leiaf {{minimum}} arbenigwr. {{selected}} wedi'u dewis.",
+      "specialistName": {
+        "testCoverage": "Cwmpas profion",
+        "correctness": "Cywirdeb",
+        "custom": "Arbenigwr"
+      },
+      "specialist": {
+        "security": "Osgoi awdurdodi, trin cyfrinachau a mewnbwn anniogel.",
+        "performance": "Llwybrau poeth, ymholiadau N+1 a dyraniadau trwm.",
+        "testing": "Cwmpas profion coll neu wan ar gyfer ymddygiad newydd.",
+        "correctness": "Gwallau rhesymeg, achosion ymylol ac amodau ras.",
+        "custom": "Yn adolygu problemau yn ei faes ei hun."
+      },
+      "strategy": {
+        "advisory": "Cynghorol",
+        "advisoryDescription": "Yn adrodd canfyddiadau a phleidleisiau heb rwystro'r cyfuno.",
+        "unanimous": "Unfrydol",
+        "unanimousDescription": "Yn rhwystro'r cyfuno pan fydd unrhyw arbenigwr yn adrodd problem gritigol.",
+        "majority": "Mwyafrif",
+        "majorityDescription": "Yn rhwystro'r cyfuno dim ond pan fydd y rhan fwyaf o'r arbenigwyr yn adrodd problem gritigol."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -2035,6 +2100,16 @@
       "auto": "Awtomatig",
       "shallow": "Bas",
       "deep": "Dwfn"
+    },
+    "orphanedFindings": {
+      "title": "Canfyddiadau ar gyfer ystorfeydd a dynnwyd",
+      "description": "Nid oes modd cyrraedd yr ystorfeydd hyn drwy integreiddiad GitHub mwyach. Mae eu canfyddiadau'n dal i gyfrif mewn dangosfyrddau ac adroddiadau.",
+      "count": "Canfyddiadau: {{count}}",
+      "clearLabel": "Clirio canfyddiadau ar gyfer {{repository}}",
+      "confirmTitle": "Clirio canfyddiadau?",
+      "confirmMessage": "Bydd pob canfyddiad a gofnodwyd ar gyfer {{repository}} yn cael ei ddileu. Nid oes modd dadwneud hyn.",
+      "confirmAction": "Dileu canfyddiadau",
+      "cleared": "Canfyddiadau wedi'u clirio: {{count}}"
     }
   },
   "agents": {

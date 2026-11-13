@@ -759,6 +759,16 @@
       "changeRequestFailed": "Kilo kon de pull request niet openen. Probeer het over een moment opnieuw.",
       "proposalConflict": "Er is nog een ander voorstel voor deze repository actief.",
       "offAction": "Het reviewgeheugen is uitgeschakeld. Schakel het in en probeer het daarna opnieuw.",
+      "analyze": {
+        "title": "Feedback analyseren",
+        "description": "Kies een repository met recente reacties van beheerders en zoek dan naar één terugkerend patroon in de aanwijzingen.",
+        "chooseRepository": "Repository kiezen",
+        "action": "Nu analyseren",
+        "noRepositories": "Nog geen repository met recente reacties van beheerders.",
+        "proposed": "Voorstel voor reviewgeheugen aangemaakt",
+        "noFeedback": "Geen recente feedback gevonden voor deze repository",
+        "noPattern": "Geen duidelijk terugkerend patroon gevonden"
+      },
       "off": "Het reviewgeheugen is uitgeschakeld.",
       "on": "Het reviewgeheugen is ingeschakeld.",
       "offDescription": "Schakel het reviewgeheugen in zodat Kilo leert van antwoorden van beheerders en richtlijnen voor REVIEW.md voorstelt.",
@@ -834,7 +844,62 @@
       "title": "De codebeoordelaar heeft je aandacht nodig.",
       "recoveryLabel": "Contact opnemen met de helpdesk"
     },
-    "unknownError": "Onbekende fout"
+    "unknownError": "Onbekende fout",
+    "skipBotPullRequests": {
+      "title": "PR's van bots overslaan",
+      "subtitle": "Voer geen automatische reviews uit op PR's die door bots zoals Dependabot of Renovate zijn geopend. Zet dit uit om ook PR's van bots te reviewen."
+    },
+    "repoModels": {
+      "title": "Model per repository",
+      "description": "Voer de reviews van sommige repositories uit met een ander model, een andere denkinspanning of beide.",
+      "defaultModel": "Gebruikt het standaardmodel",
+      "resetLabel": "Model voor {{repository}} resetten",
+      "changeHint": "Opent de modelkiezer"
+    },
+    "analytics": {
+      "title": "Statistieken",
+      "period": "Tijdsbereik",
+      "trackedReviews": "Gevolgde reviews",
+      "findingsRaised": "Gemelde bevindingen",
+      "highImpactChanges": "Wijzigingen met grote impact",
+      "impactPoints": "Impactpunten",
+      "repositoryLine": "Reviews: {{reviews}} · Bevindingen: {{findings}}",
+      "empty": "Nog geen reviews met statistieken",
+      "emptyDescription": "Statistieken leggen afgeronde reviews vast zolang ze voor de organisatie zijn ingeschakeld.",
+      "off": "Statistieken staan uit voor deze organisatie.",
+      "couldNotLoad": "Kan statistieken niet laden"
+    },
+    "council": {
+      "title": "Panelbeoordeling",
+      "subtitle": "Meerdere deskundigen beoordelen elke PR en hun stemmen komen samen tot één beslissing.",
+      "unavailable": "Panelbeoordeling is niet beschikbaar voor deze organisatie.",
+      "noRepositories": "Nog geen repositories geselecteerd. Kies eerst repositories in de repository-instellingen.",
+      "specialists": "Deskundigen",
+      "labels": "Tags die panelbeoordeling activeren",
+      "labelsPlaceholder": "bijv. panel, diepgaande review",
+      "labelsDescription": "Scheid tags met komma's. Een repository met panelbeoordeling voert de beoordeling daarna alleen uit voor PR's met minstens één van deze tags. Laat dit leeg voor elke in aanmerking komende PR.",
+      "minSpecialists": "Selecteer minstens {{minimum}} deskundigen. {{selected}} geselecteerd.",
+      "specialistName": {
+        "testCoverage": "Testdekking",
+        "correctness": "Correctheid",
+        "custom": "Deskundige"
+      },
+      "specialist": {
+        "security": "Omzeilen van autorisatie, omgang met geheimen en onveilige invoer.",
+        "performance": "Kritieke paden, N+1-query's en zware toewijzingen.",
+        "testing": "Ontbrekende of zwakke dekking voor nieuw gedrag.",
+        "correctness": "Logische fouten, randgevallen en race-omstandigheden.",
+        "custom": "Beoordeelt problemen binnen het eigen gebied."
+      },
+      "strategy": {
+        "advisory": "Adviserend",
+        "advisoryDescription": "Meldt bevindingen en stemt zonder de samenvoeging te blokkeren.",
+        "unanimous": "Unaniem",
+        "unanimousDescription": "Blokkeert de samenvoeging wanneer een deskundige een kritiek probleem meldt.",
+        "majority": "Meerderheid",
+        "majorityDescription": "Blokkeert de samenvoeging alleen wanneer de meeste deskundigen een kritiek probleem melden."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1337,6 +1402,16 @@
       "auto": "Automatisch",
       "shallow": "Oppervlakkig",
       "deep": "Diepgaand"
+    },
+    "orphanedFindings": {
+      "title": "Bevindingen voor verwijderde repositories",
+      "description": "Deze repositories zijn niet meer bereikbaar via de GitHub-integratie. Hun bevindingen tellen nog mee in dashboards en rapporten.",
+      "count": "Bevindingen: {{count}}",
+      "clearLabel": "Bevindingen voor {{repository}} verwijderen",
+      "confirmTitle": "Bevindingen verwijderen?",
+      "confirmMessage": "Elke vastgelegde bevinding voor {{repository}} wordt verwijderd. Dit kan niet ongedaan worden gemaakt.",
+      "confirmAction": "Bevindingen verwijderen",
+      "cleared": "Bevindingen verwijderd: {{count}}"
     }
   },
   "agents": {

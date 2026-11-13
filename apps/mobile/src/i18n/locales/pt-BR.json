@@ -726,6 +726,16 @@
       "changeRequestFailed": "O Kilo não conseguiu abrir o pull request. Tente novamente em instantes.",
       "proposalConflict": "Outra proposta de memória de revisão para este mesmo repositório ainda está ativa, então esta ainda não pode ser salva.",
       "offAction": "A memória de revisão está desativada. Ative-a e tente novamente.",
+      "analyze": {
+        "title": "Analisar feedback",
+        "description": "Escolha um repositório com respostas recentes dos mantenedores e depois procure um padrão de orientação repetido.",
+        "chooseRepository": "Escolher um repositório",
+        "action": "Analisar agora",
+        "noRepositories": "Nenhum repositório tem respostas recentes dos mantenedores ainda.",
+        "proposed": "Proposta de memória de revisão criada",
+        "noFeedback": "Nenhum feedback recente encontrado para este repositório",
+        "noPattern": "Nenhum padrão repetido claro encontrado"
+      },
       "off": "A memória de revisão está desativada.",
       "on": "A memória de revisão está ativada.",
       "offDescription": "Ative-a para que o Kilo aprenda com as respostas dos mantenedores e proponha orientações para o REVIEW.md.",
@@ -802,7 +812,62 @@
       "title": "O revisor de código precisa de atenção.",
       "recoveryLabel": "Falar com o suporte"
     },
-    "unknownError": "Erro desconhecido"
+    "unknownError": "Erro desconhecido",
+    "skipBotPullRequests": {
+      "title": "Ignorar PRs de bots",
+      "subtitle": "Não execute revisões automáticas em PRs abertas por bots como Dependabot ou Renovate. Desative esta opção para revisar também as PRs de bots."
+    },
+    "repoModels": {
+      "title": "Modelo por repositório",
+      "description": "Execute as revisões de alguns repositórios com outro modelo, outro esforço de raciocínio ou ambos.",
+      "defaultModel": "Usa o modelo padrão",
+      "resetLabel": "Redefinir o modelo de {{repository}}",
+      "changeHint": "Abre o seletor de modelos"
+    },
+    "analytics": {
+      "title": "Estatísticas",
+      "period": "Intervalo de tempo",
+      "trackedReviews": "Revisões acompanhadas",
+      "findingsRaised": "Ocorrências levantadas",
+      "highImpactChanges": "Mudanças de alto impacto",
+      "impactPoints": "Pontos de impacto",
+      "repositoryLine": "Revisões: {{reviews}} · Ocorrências: {{findings}}",
+      "empty": "Nenhuma revisão com estatísticas ainda",
+      "emptyDescription": "As estatísticas registram revisões concluídas enquanto estão ativadas para a organização.",
+      "off": "As estatísticas estão desativadas para esta organização.",
+      "couldNotLoad": "Não foi possível carregar as estatísticas"
+    },
+    "council": {
+      "title": "Revisão do conselho",
+      "subtitle": "Vários especialistas revisam cada PR e os votos deles se combinam em uma única decisão.",
+      "unavailable": "A revisão do conselho não está disponível para esta organização.",
+      "noRepositories": "Nenhum repositório selecionado ainda. Escolha repositórios nas configurações de repositórios primeiro.",
+      "specialists": "Especialistas",
+      "labels": "Etiquetas que acionam a revisão do conselho",
+      "labelsPlaceholder": "ex.: conselho, revisão profunda",
+      "labelsDescription": "Separe as etiquetas com vírgulas. Um repositório com o conselho ativado passa a executar a revisão apenas nas PRs que tiverem pelo menos uma dessas etiquetas. Deixe em branco para todas as PRs elegíveis.",
+      "minSpecialists": "Selecione pelo menos {{minimum}} especialistas. {{selected}} selecionados.",
+      "specialistName": {
+        "testCoverage": "Cobertura de testes",
+        "correctness": "Corretude",
+        "custom": "Especialista"
+      },
+      "specialist": {
+        "security": "Contorno de autorização, tratamento de segredos e entrada não segura.",
+        "performance": "Caminhos críticos, consultas N+1 e alocações pesadas.",
+        "testing": "Cobertura ausente ou fraca para o novo comportamento.",
+        "correctness": "Erros de lógica, casos extremos e condições de corrida.",
+        "custom": "Revisa problemas da própria área."
+      },
+      "strategy": {
+        "advisory": "Consultivo",
+        "advisoryDescription": "Relata ocorrências e vota sem bloquear a mesclagem.",
+        "unanimous": "Unânime",
+        "unanimousDescription": "Bloqueia a mesclagem quando qualquer especialista relata um problema crítico.",
+        "majority": "Maioria",
+        "majorityDescription": "Bloqueia a mesclagem apenas quando a maioria dos especialistas relata um problema crítico."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1326,6 +1391,16 @@
       "auto": "Automática",
       "shallow": "Superficial",
       "deep": "Profunda"
+    },
+    "orphanedFindings": {
+      "title": "Ocorrências de repositórios removidos",
+      "description": "Estes repositórios não são mais acessíveis pela integração com o GitHub. As ocorrências deles ainda contam nos painéis e relatórios.",
+      "count": "Ocorrências: {{count}}",
+      "clearLabel": "Excluir ocorrências de {{repository}}",
+      "confirmTitle": "Excluir ocorrências?",
+      "confirmMessage": "Todas as ocorrências registradas de {{repository}} serão excluídas. Isso não pode ser desfeito.",
+      "confirmAction": "Excluir ocorrências",
+      "cleared": "Ocorrências excluídas: {{count}}"
     }
   },
   "agents": {

@@ -759,6 +759,16 @@
       "changeRequestFailed": "Kiloはプルリクエストを作成できませんでした。しばらくしてからもう一度お試しください。",
       "proposalConflict": "このリポジトリには別のレビューメモリの提案がまだアクティブなため、この提案はまだ保存できません。",
       "offAction": "レビューメモリはオフです。有効にしてから、もう一度お試しください。",
+      "analyze": {
+        "title": "フィードバックを分析",
+        "description": "最近メンテナーからの返信があるリポジトリを選び、繰り返し現れるガイダンスのパターンを1つ探します。",
+        "chooseRepository": "リポジトリを選択",
+        "action": "今すぐ分析",
+        "noRepositories": "最近メンテナーの返信があるリポジトリはまだありません。",
+        "proposed": "レビューメモリの提案を作成しました",
+        "noFeedback": "このリポジトリの最近のフィードバックは見つかりませんでした",
+        "noPattern": "明確な繰り返しパターンは見つかりませんでした"
+      },
       "off": "レビューメモリはオフです。",
       "on": "レビューメモリはオンです。",
       "offDescription": "有効にすると、Kiloがメンテナーの返信から学習し、REVIEW.mdに記載する指針を提案します。",
@@ -834,7 +844,62 @@
       "title": "コードレビュアーで対応が必要です。",
       "recoveryLabel": "サポートに連絡"
     },
-    "unknownError": "不明なエラー"
+    "unknownError": "不明なエラー",
+    "skipBotPullRequests": {
+      "title": "ボットからのプルリクエストをスキップ",
+      "subtitle": "Dependabot や Renovate などのボットが開いたプルリクエストでは自動レビューを実行しません。ボットのプルリクエストもレビューするには、これをオフにします。"
+    },
+    "repoModels": {
+      "title": "リポジトリごとのモデル",
+      "description": "一部のリポジトリのレビューを別のモデル、思考の深さ、またはその両方で実行します。",
+      "defaultModel": "デフォルトのモデルを使用します",
+      "resetLabel": "{{repository}} のモデルをリセット",
+      "changeHint": "モデル選択を開きます"
+    },
+    "analytics": {
+      "title": "分析",
+      "period": "期間",
+      "trackedReviews": "追跡中のレビュー",
+      "findingsRaised": "指摘された問題",
+      "highImpactChanges": "影響の大きい変更",
+      "impactPoints": "インパクトポイント",
+      "repositoryLine": "レビュー: {{reviews}} · 指摘: {{findings}}",
+      "empty": "分析データのあるレビューはまだありません",
+      "emptyDescription": "分析機能は、組織で有効になっている間に完了したレビューを記録します。",
+      "off": "この組織では分析がオフになっています。",
+      "couldNotLoad": "分析を読み込めませんでした"
+    },
+    "council": {
+      "title": "合議レビュー",
+      "subtitle": "複数のスペシャリストが各プルリクエストをレビューし、その投票が1つの判定にまとめられます。",
+      "unavailable": "この組織では合議レビューを利用できません。",
+      "noRepositories": "リポジトリがまだ選択されていません。先にリポジトリ設定で選択してください。",
+      "specialists": "スペシャリスト",
+      "labels": "合議レビューを開始するラベル",
+      "labelsPlaceholder": "例: 合議、詳細レビュー",
+      "labelsDescription": "ラベルはカンマで区切ります。合議が有効なリポジトリは、これらのラベルを1つ以上持つプルリクエストでのみ合議を実行します。空欄にすると、条件を満たすすべてのプルリクエストが対象になります。",
+      "minSpecialists": "スペシャリストを{{minimum}}名以上選択してください。現在{{selected}}名選択中です。",
+      "specialistName": {
+        "testCoverage": "テストカバレッジ",
+        "correctness": "正しさ",
+        "custom": "スペシャリスト"
+      },
+      "specialist": {
+        "security": "認可の回避、シークレットの扱い、安全でない入力。",
+        "performance": "ホットパス、N+1クエリ、過剰なメモリ割り当て。",
+        "testing": "新しい動作に対するカバレッジの不足や弱さ。",
+        "correctness": "論理エラー、エッジケース、競合状態。",
+        "custom": "自身の領域の問題をレビューします。"
+      },
+      "strategy": {
+        "advisory": "助言",
+        "advisoryDescription": "マージをブロックせずに指摘と投票を行います。",
+        "unanimous": "全員一致",
+        "unanimousDescription": "いずれかのスペシャリストが重大な問題を報告した場合にマージをブロックします。",
+        "majority": "多数決",
+        "majorityDescription": "過半数のスペシャリストが重大な問題を報告した場合にのみマージをブロックします。"
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1337,6 +1402,16 @@
       "auto": "自動",
       "shallow": "簡易",
       "deep": "詳細"
+    },
+    "orphanedFindings": {
+      "title": "削除されたリポジトリの検出結果",
+      "description": "これらのリポジトリには GitHub 連携からアクセスできなくなりました。検出結果はダッシュボードとレポートでは引き続き集計されます。",
+      "count": "検出結果: {{count}}",
+      "clearLabel": "{{repository}} の検出結果を消去",
+      "confirmTitle": "検出結果を消去しますか？",
+      "confirmMessage": "{{repository}} の記録済みの検出結果がすべて削除されます。この操作は取り消せません。",
+      "confirmAction": "検出結果を削除",
+      "cleared": "検出結果を消去しました: {{count}}"
     }
   },
   "agents": {

@@ -1244,7 +1244,17 @@
       "changeRequestMissingPermissions": "Aplikasi GitHub Kilo tidak boleh membuka pull request dalam repositori ini. Pemilik repositori mesti memberikan aplikasi akses tulis kepada kandungan dan pull request, kemudian cuba lagi.",
       "changeRequestFailed": "Kilo tidak dapat membuka pull request. Cuba lagi sebentar.",
       "proposalConflict": "Cadangan lain untuk repositori ini masih aktif, jadi cadangan ini belum boleh disimpan.",
-      "offAction": "Memori semakan dinyahdayakan. Dayakannya, kemudian cuba lagi."
+      "offAction": "Memori semakan dinyahdayakan. Dayakannya, kemudian cuba lagi.",
+      "analyze": {
+        "title": "Analisis maklum balas",
+        "description": "Pilih repositori yang mempunyai balasan penyelenggara terkini, kemudian cari satu corak panduan yang berulang.",
+        "chooseRepository": "Pilih repositori",
+        "action": "Analisis sekarang",
+        "noRepositories": "Belum ada repositori dengan balasan penyelenggara terkini.",
+        "proposed": "Cadangan memori semakan dicipta",
+        "noFeedback": "Tiada maklum balas terkini untuk repositori ini",
+        "noPattern": "Tiada corak berulang yang jelas ditemui"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Masukkan URL permintaan gabungan yang sah.",
@@ -1376,7 +1386,62 @@
       "title": "Penyemak kod memerlukan perhatian anda.",
       "recoveryLabel": "Hubungi sokongan"
     },
-    "unknownError": "Ralat yang tidak diketahui."
+    "unknownError": "Ralat yang tidak diketahui.",
+    "skipBotPullRequests": {
+      "title": "Langkau permintaan penarikan daripada bot",
+      "subtitle": "Jangan jalankan semakan automatik pada permintaan penarikan yang dibuka oleh bot seperti Dependabot atau Renovate. Matikan pilihan ini untuk turut menyemak permintaan penarikan daripada bot."
+    },
+    "repoModels": {
+      "title": "Model setiap repositori",
+      "description": "Jalankan semakan sesetengah repositori dengan model, tahap pemikiran atau kedua-duanya yang berbeza.",
+      "defaultModel": "Menggunakan model lalai",
+      "resetLabel": "Set semula model untuk {{repository}}",
+      "changeHint": "Membuka pemilih model"
+    },
+    "analytics": {
+      "title": "Analitik",
+      "period": "Julat masa",
+      "trackedReviews": "Semakan dijejaki",
+      "findingsRaised": "Penemuan dilaporkan",
+      "highImpactChanges": "Perubahan berimpak tinggi",
+      "impactPoints": "Mata impak",
+      "repositoryLine": "Semakan: {{reviews}} · Penemuan: {{findings}}",
+      "empty": "Belum ada semakan dengan analitik",
+      "emptyDescription": "Analitik merekodkan semakan yang selesai selagi ciri ini didayakan untuk organisasi.",
+      "off": "Analitik dimatikan untuk organisasi ini.",
+      "couldNotLoad": "Tidak dapat memuatkan analitik"
+    },
+    "council": {
+      "title": "Semakan panel",
+      "subtitle": "Beberapa pakar menyemak setiap permintaan penarikan, dan undian mereka digabungkan menjadi satu keputusan.",
+      "unavailable": "Semakan panel tidak tersedia untuk organisasi ini.",
+      "noRepositories": "Belum ada repositori dipilih. Pilih repositori dalam tetapan repositori dahulu.",
+      "specialists": "Pakar",
+      "labels": "Label yang mencetuskan semakan panel",
+      "labelsPlaceholder": "cth. panel, semakan mendalam",
+      "labelsDescription": "Pisahkan label dengan koma. Repositori yang mendayakan panel kemudian hanya menjalankan panel untuk permintaan penarikan yang membawa sekurang-kurangnya satu label ini. Biarkan kosong untuk setiap permintaan penarikan yang layak.",
+      "minSpecialists": "Pilih sekurang-kurangnya {{minimum}} pakar. {{selected}} dipilih.",
+      "specialistName": {
+        "testCoverage": "Liputan ujian",
+        "correctness": "Ketepatan",
+        "custom": "Pakar"
+      },
+      "specialist": {
+        "security": "Pintasan kebenaran, pengendalian rahsia dan input tidak selamat.",
+        "performance": "Laluan kritikal, pertanyaan N+1 dan peruntukan memori yang berat.",
+        "testing": "Liputan yang hilang atau lemah untuk tingkah laku baharu.",
+        "correctness": "Ralat logik, kes tepi dan keadaan perlumbaan.",
+        "custom": "Menyemak isu dalam bidangnya sendiri."
+      },
+      "strategy": {
+        "advisory": "Nasihat",
+        "advisoryDescription": "Melaporkan penemuan dan mengundi tanpa menyekat penggabungan.",
+        "unanimous": "Sebulat suara",
+        "unanimousDescription": "Menyekat penggabungan apabila mana-mana pakar melaporkan isu kritikal.",
+        "majority": "Majoriti",
+        "majorityDescription": "Menyekat penggabungan hanya apabila majoriti pakar melaporkan isu kritikal."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1879,6 +1944,16 @@
       "auto": "Automatik",
       "shallow": "Ringkas",
       "deep": "Mendalam"
+    },
+    "orphanedFindings": {
+      "title": "Penemuan untuk repositori yang dibuang",
+      "description": "Repositori ini tidak lagi boleh dicapai melalui integrasi GitHub. Penemuannya masih dikira dalam papan pemuka dan laporan.",
+      "count": "Penemuan: {{count}}",
+      "clearLabel": "Kosongkan penemuan untuk {{repository}}",
+      "confirmTitle": "Kosongkan penemuan?",
+      "confirmMessage": "Setiap penemuan yang direkodkan untuk {{repository}} akan dipadamkan. Tindakan ini tidak boleh dibuat asal.",
+      "confirmAction": "Padam penemuan",
+      "cleared": "Penemuan dikosongkan: {{count}}"
     }
   },
   "agents": {

@@ -759,6 +759,16 @@
       "changeRequestFailed": "Kilo pull request'i açamadı. Bir an sonra tekrar dene.",
       "proposalConflict": "Bu depo için başka bir öneri hâlâ etkin olduğundan bu öneri henüz kaydedilemez.",
       "offAction": "İnceleme belleği kapalı. Aç, sonra tekrar dene.",
+      "analyze": {
+        "title": "Geri bildirimi analiz et",
+        "description": "Son dönemde proje sorumlularından yanıt alan bir depo seç, ardından tekrar eden tek bir yönlendirme örüntüsü ara.",
+        "chooseRepository": "Bir depo seç",
+        "action": "Şimdi analiz et",
+        "noRepositories": "Henüz son dönemde proje sorumlularından yanıt alan bir depo yok.",
+        "proposed": "İnceleme belleği önerisi oluşturuldu",
+        "noFeedback": "Bu depo için son dönemde geri bildirim bulunamadı",
+        "noPattern": "Belirgin, tekrar eden bir örüntü bulunamadı"
+      },
       "off": "İnceleme belleği kapalı.",
       "on": "İnceleme belleği açık.",
       "offDescription": "Kilo'nun proje sorumlularının yanıtlarından öğrenmesi ve REVIEW.md yönergeleri önermesi için inceleme belleğini aç.",
@@ -834,7 +844,62 @@
       "title": "Kod inceleyici için işlem yapman gerekiyor.",
       "recoveryLabel": "Destekle iletişime geç"
     },
-    "unknownError": "Bilinmeyen bir hata oluştu."
+    "unknownError": "Bilinmeyen bir hata oluştu.",
+    "skipBotPullRequests": {
+      "title": "Botların çekme isteklerini atla",
+      "subtitle": "Dependabot veya Renovate gibi botların açtığı çekme isteklerinde otomatik inceleme çalıştırma. Botların çekme isteklerini de incelemek için bunu kapat."
+    },
+    "repoModels": {
+      "title": "Depo bazında model",
+      "description": "Bazı depoların incelemelerini farklı bir modelle, farklı bir düşünme çabasıyla veya ikisiyle birden çalıştır.",
+      "defaultModel": "Varsayılan modeli kullanır",
+      "resetLabel": "{{repository}} için modeli sıfırla",
+      "changeHint": "Model seçiciyi açar"
+    },
+    "analytics": {
+      "title": "İstatistikler",
+      "period": "Zaman aralığı",
+      "trackedReviews": "İzlenen incelemeler",
+      "findingsRaised": "Tespit edilen bulgular",
+      "highImpactChanges": "Yüksek etkili değişiklikler",
+      "impactPoints": "Etki puanı",
+      "repositoryLine": "İncelemeler: {{reviews}} · Bulgular: {{findings}}",
+      "empty": "Henüz istatistiği olan inceleme yok",
+      "emptyDescription": "İstatistikler, kuruluş için etkin olduğu sürece tamamlanan incelemeleri kaydeder.",
+      "off": "Bu kuruluş için istatistikler kapalı.",
+      "couldNotLoad": "İstatistikler yüklenemedi"
+    },
+    "council": {
+      "title": "Konsey incelemesi",
+      "subtitle": "Birkaç uzman her çekme isteğini inceler ve oyları tek bir kararda birleşir.",
+      "unavailable": "Konsey incelemesi bu kuruluş için kullanılamıyor.",
+      "noRepositories": "Henüz depo seçilmedi. Önce depo ayarlarından depo seç.",
+      "specialists": "Uzmanlar",
+      "labels": "Konsey incelemesini tetikleyen etiketler",
+      "labelsPlaceholder": "örn. konsey, derin inceleme",
+      "labelsDescription": "Etiketleri virgülle ayır. Konsey etkin bir depo, konseyi yalnızca bu etiketlerden en az birini taşıyan çekme isteklerinde çalıştırır. Tüm uygun çekme istekleri için boş bırak.",
+      "minSpecialists": "En az {{minimum}} uzman seç. {{selected}} seçildi.",
+      "specialistName": {
+        "testCoverage": "Test kapsamı",
+        "correctness": "Doğruluk",
+        "custom": "Uzman"
+      },
+      "specialist": {
+        "security": "Yetkilendirmeyi atlatma, gizli bilgi işleme ve güvenli olmayan girdi.",
+        "performance": "Sıcak yollar, N+1 sorguları ve ağır bellek ayırmaları.",
+        "testing": "Yeni davranış için eksik veya zayıf kapsam.",
+        "correctness": "Mantık hataları, uç durumlar ve yarış koşulları.",
+        "custom": "Kendi alanındaki sorunları inceler."
+      },
+      "strategy": {
+        "advisory": "Tavsiye",
+        "advisoryDescription": "Bulguları bildirir ve birleştirmeyi engellemeden oy verir.",
+        "unanimous": "Oybirliği",
+        "unanimousDescription": "Herhangi bir uzman kritik bir sorun bildirirse birleştirmeyi engeller.",
+        "majority": "Çoğunluk",
+        "majorityDescription": "Birleştirmeyi yalnızca uzmanların çoğu kritik bir sorun bildirirse engeller."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1337,6 +1402,16 @@
       "auto": "Otomatik",
       "shallow": "Yüzeysel",
       "deep": "Derin"
+    },
+    "orphanedFindings": {
+      "title": "Kaldırılan depoların bulguları",
+      "description": "Bu depolara artık GitHub entegrasyonu üzerinden erişilemiyor. Bulguları panel ve raporlarda sayılmaya devam ediyor.",
+      "count": "Bulgular: {{count}}",
+      "clearLabel": "{{repository}} için bulguları temizle",
+      "confirmTitle": "Bulgular temizlensin mi?",
+      "confirmMessage": "{{repository}} için kaydedilmiş her bulgu silinecek. Bu işlem geri alınamaz.",
+      "confirmAction": "Bulguları sil",
+      "cleared": "Bulgular temizlendi: {{count}}"
     }
   },
   "agents": {

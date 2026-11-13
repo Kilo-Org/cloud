@@ -1267,7 +1267,17 @@
       "changeRequestMissingPermissions": "L'aplicació GitHub de Kilo no pot obrir pull requests en aquest repositori. Un propietari del repositori ha de donar a l'aplicació accés d'escriptura als continguts i a les pull requests, i després tornar-ho a provar.",
       "changeRequestFailed": "Kilo no ha pogut obrir la pull request. Torna-ho a provar d'aquí a un moment.",
       "proposalConflict": "Una altra proposta de memòria de revisió per a aquest repositori encara està activa, de manera que aquesta encara no es pot desar.",
-      "offAction": "La memòria de revisió està desactivada. Activa-la i torna-ho a provar."
+      "offAction": "La memòria de revisió està desactivada. Activa-la i torna-ho a provar.",
+      "analyze": {
+        "title": "Analitza les respostes",
+        "description": "Tria un repositori amb respostes recents dels mantenidors i cerca-hi un patró de pautes que es repeteixi.",
+        "chooseRepository": "Tria un repositori",
+        "action": "Analitza ara",
+        "noRepositories": "Encara cap repositori no té respostes recents dels mantenidors.",
+        "proposed": "S'ha creat una proposta de memòria de revisió",
+        "noFeedback": "No s'han trobat respostes recents per a aquest repositori",
+        "noPattern": "No s'ha trobat cap patró repetit clar"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Introdueix una URL vàlida d'una sol·licitud de fusió.",
@@ -1400,7 +1410,62 @@
       "title": "El revisor de codi necessita la teva atenció.",
       "recoveryLabel": "Contacta amb l'equip de suport"
     },
-    "unknownError": "S'ha produït un error desconegut."
+    "unknownError": "S'ha produït un error desconegut.",
+    "skipBotPullRequests": {
+      "title": "Omet les pull requests de bots",
+      "subtitle": "No executis revisions automàtiques a les pull requests obertes per bots com Dependabot o Renovate. Desactiva-ho per revisar també les pull requests de bots."
+    },
+    "repoModels": {
+      "title": "Model per repositori",
+      "description": "Fes servir un altre model, un altre esforç de raonament o tots dos per a les revisions d'alguns repositoris.",
+      "defaultModel": "Fa servir el model predeterminat",
+      "resetLabel": "Restableix el model de {{repository}}",
+      "changeHint": "Obre el selector de models"
+    },
+    "analytics": {
+      "title": "Analítica",
+      "period": "Període",
+      "trackedReviews": "Revisions registrades",
+      "findingsRaised": "Troballes detectades",
+      "highImpactChanges": "Canvis d'alt impacte",
+      "impactPoints": "Punts d'impacte",
+      "repositoryLine": "Revisions: {{reviews}} · Troballes: {{findings}}",
+      "empty": "Encara no hi ha revisions amb analítica",
+      "emptyDescription": "L'analítica registra les revisions completades mentre està activada per a l'organització.",
+      "off": "L'analítica està desactivada per a aquesta organització.",
+      "couldNotLoad": "No s'ha pogut carregar l'analítica"
+    },
+    "council": {
+      "title": "Revisió en consell",
+      "subtitle": "Diversos especialistes revisen cada pull request i els seus vots es combinen en una sola decisió.",
+      "unavailable": "La revisió en consell no està disponible per a aquesta organització.",
+      "noRepositories": "Encara no hi ha cap repositori seleccionat. Primer tria'n a la configuració de repositoris.",
+      "specialists": "Especialistes",
+      "labels": "Etiquetes que activen la revisió en consell",
+      "labelsPlaceholder": "p. ex. consell, revisió a fons",
+      "labelsDescription": "Separa les etiquetes amb comes. Així, un repositori amb el consell activat només l'executa per a les pull requests que tinguin almenys una d'aquestes etiquetes. Deixa-ho en blanc per aplicar-lo a totes les pull requests aptes.",
+      "minSpecialists": "Selecciona almenys {{minimum}} especialistes. Seleccionats: {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Cobertura de proves",
+        "correctness": "Correcció",
+        "custom": "Especialista"
+      },
+      "specialist": {
+        "security": "Elusió d'autorització, gestió de secrets i entrades insegures.",
+        "performance": "Camins crítics, consultes N+1 i assignacions de memòria pesades.",
+        "testing": "Cobertura absent o insuficient per al comportament nou.",
+        "correctness": "Errors de lògica, casos límit i condicions de carrera.",
+        "custom": "Revisa incidències de la seva pròpia àrea."
+      },
+      "strategy": {
+        "advisory": "Consultiva",
+        "advisoryDescription": "Informa de troballes i vots sense bloquejar la fusió.",
+        "unanimous": "Unànime",
+        "unanimousDescription": "Bloqueja la fusió si qualsevol especialista informa d'una incidència crítica.",
+        "majority": "Per majoria",
+        "majorityDescription": "Bloqueja la fusió només si la majoria d'especialistes informen d'una incidència crítica."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1918,6 +1983,16 @@
       "auto": "Automàtica",
       "shallow": "Superficial",
       "deep": "Profunda"
+    },
+    "orphanedFindings": {
+      "title": "Troballes de repositoris eliminats",
+      "description": "Aquests repositoris ja no són accessibles mitjançant la integració de GitHub. Les seves troballes encara compten als taulers i informes.",
+      "count": "Troballes: {{count}}",
+      "clearLabel": "Esborra les troballes de {{repository}}",
+      "confirmTitle": "Vols esborrar les troballes?",
+      "confirmMessage": "S'eliminaran totes les troballes registrades de {{repository}}. Aquesta acció no es pot desfer.",
+      "confirmAction": "Elimina les troballes",
+      "cleared": "Troballes esborrades: {{count}}"
     }
   },
   "agents": {

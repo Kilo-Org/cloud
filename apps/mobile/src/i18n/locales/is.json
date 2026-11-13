@@ -1244,7 +1244,17 @@
       "changeRequestMissingPermissions": "GitHub-app Kilo getur ekki opnað samrunabeiðnir í þessu hugbúnaðarsafni. Eigandi hugbúnaðarsafnsins verður að veita appinu skrifaðgang að efni og samrunabeiðnum og reyna svo aftur.",
       "changeRequestFailed": "Kilo tókst ekki að opna samrunabeiðnina. Reyndu aftur eftir smástund.",
       "proposalConflict": "Önnur tillaga fyrir þetta hugbúnaðarsafn er enn virk.",
-      "offAction": "Slökkt er á yfirferðarminni. Kveiktu á því og reyndu aftur."
+      "offAction": "Slökkt er á yfirferðarminni. Kveiktu á því og reyndu aftur.",
+      "analyze": {
+        "title": "Greina endurgjöf",
+        "description": "Veldu geymslu með nýlegum svörum viðhaldsaðila og leitaðu svo að einu endurteknu mynstri í leiðbeiningunum.",
+        "chooseRepository": "Veldu geymslu",
+        "action": "Greina núna",
+        "noRepositories": "Engin geymsla er með nýleg svör viðhaldsaðila ennþá.",
+        "proposed": "Tillaga að yfirferðarminni búin til",
+        "noFeedback": "Engin nýleg endurgjöf fannst fyrir þessa geymslu",
+        "noPattern": "Ekkert skýrt endurtekið mynstur fannst"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Sláðu inn gilda URL-slóð á merge request.",
@@ -1376,7 +1386,62 @@
       "title": "Kóðarýnirinn þarfnast athygli.",
       "recoveryLabel": "Hafa samband við þjónustuver"
     },
-    "unknownError": "Óþekkt villa"
+    "unknownError": "Óþekkt villa",
+    "skipBotPullRequests": {
+      "title": "Sleppa samrunabeiðnum frá bótum",
+      "subtitle": "Ekki keyra sjálfvirkar yfirferðir á samrunabeiðnum sem bótur eins og Dependabot eða Renovate opna. Slökktu á þessu til að fara einnig yfir samrunabeiðnir bóta."
+    },
+    "repoModels": {
+      "title": "Líkan fyrir hverja geymslu",
+      "description": "Keyrðu yfirferðir sumra geymslna með öðru líkani, annarri dýpt rökhugsunar eða báðum.",
+      "defaultModel": "Notar sjálfgefna líkanið",
+      "resetLabel": "Endurstilla líkan fyrir {{repository}}",
+      "changeHint": "Opnar líkanavalinn"
+    },
+    "analytics": {
+      "title": "Tölfræði",
+      "period": "Tímabil",
+      "trackedReviews": "Yfirferðir sem fylgst er með",
+      "findingsRaised": "Tilkynnt frávik",
+      "highImpactChanges": "Breytingar með miklum áhrifum",
+      "impactPoints": "Áhrifastig",
+      "repositoryLine": "Yfirferðir: {{reviews}} · Frávik: {{findings}}",
+      "empty": "Engar yfirferðir með tölfræði ennþá",
+      "emptyDescription": "Tölfræðin skráir yfirferðir sem klárast meðan hún er virk fyrir fyrirtækið.",
+      "off": "Tölfræðin er óvirk fyrir þetta fyrirtæki.",
+      "couldNotLoad": "Tókst ekki að sækja tölfræðina"
+    },
+    "council": {
+      "title": "Ráðsyfirferð",
+      "subtitle": "Nokkrir sérfræðingar fara yfir hverja samrunabeiðni og atkvæði þeirra sameinast í eina ákvörðun.",
+      "unavailable": "Ráðsyfirferð er ekki í boði fyrir þetta fyrirtæki.",
+      "noRepositories": "Engar geymslur valdar ennþá. Veldu geymslur í stillingum geymslna fyrst.",
+      "specialists": "Sérfræðingar",
+      "labels": "Merki sem kveikja á ráðsyfirferð",
+      "labelsPlaceholder": "t.d. ráð, djúp yfirferð",
+      "labelsDescription": "Aðgreindu merkin með kommum. Geymsla með ráðsyfirferð keyrir þá yfirferðina aðeins fyrir samrunabeiðnir sem bera að minnsta kosti eitt af þessum merkjum. Skildu eftir autt fyrir allar gjaldgengar samrunabeiðnir.",
+      "minSpecialists": "Veldu að minnsta kosti {{minimum}} sérfræðinga. {{selected}} valdir.",
+      "specialistName": {
+        "testCoverage": "Prófunarþekja",
+        "correctness": "Réttmæti",
+        "custom": "Sérfræðingur"
+      },
+      "specialist": {
+        "security": "Hliðstýring fram hjá heimildum, meðferð leyndarmála og óöruggt inntak.",
+        "performance": "Kritískar leiðir í kóðanum, N+1 fyrirspurnir og þungar úthlutanir.",
+        "testing": "Vöntun á þekju eða veik þekja fyrir nýja hegðun.",
+        "correctness": "Rökvillus, jaðartilvik og kapphlaupsskilyrði.",
+        "custom": "Fer yfir vandamál á eigin sviði."
+      },
+      "strategy": {
+        "advisory": "Ráðgefandi",
+        "advisoryDescription": "Tilkynnir frávik og greiðir atkvæði án þess að hindra sameininguna.",
+        "unanimous": "Einróma",
+        "unanimousDescription": "Hindrar sameininguna þegar einhver sérfræðingur tilkynnir alvarlegt vandamál.",
+        "majority": "Meirihluti",
+        "majorityDescription": "Hindrar sameininguna aðeins þegar meirihluti sérfræðinga tilkynnir alvarlegt vandamál."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1879,6 +1944,16 @@
       "auto": "Sjálfvirkt",
       "shallow": "Grunnt",
       "deep": "Ítarlegt"
+    },
+    "orphanedFindings": {
+      "title": "Frávik fyrir fjarlægðar geymslur",
+      "description": "Þessar geymslur eru ekki lengur aðgengilegar í gegnum GitHub-samþættinguna. Frávik þeirra teljast enn í mælaborðum og skýrslum.",
+      "count": "Frávik: {{count}}",
+      "clearLabel": "Eyða frávikum fyrir {{repository}}",
+      "confirmTitle": "Eyða frávikum?",
+      "confirmMessage": "Öllum skráðum frávikum fyrir {{repository}} verður eytt. Þetta er ekki hægt að afturkalla.",
+      "confirmAction": "Eyða frávikum",
+      "cleared": "Frávikum hefur verið eytt: {{count}}"
     }
   },
   "agents": {

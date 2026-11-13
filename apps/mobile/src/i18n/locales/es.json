@@ -759,6 +759,16 @@
       "changeRequestFailed": "Kilo no pudo abrir la pull request. Inténtalo de nuevo en un momento.",
       "proposalConflict": "Otra propuesta para este repositorio sigue activa, así que esta todavía no se puede guardar.",
       "offAction": "La memoria de revisión está desactivada. Actívala y vuelve a intentarlo.",
+      "analyze": {
+        "title": "Analizar comentarios",
+        "description": "Elige un repositorio con respuestas recientes de los responsables del mantenimiento y busca un patrón de directrices repetido.",
+        "chooseRepository": "Elige un repositorio",
+        "action": "Analizar ahora",
+        "noRepositories": "Ningún repositorio tiene aún respuestas recientes de los responsables del mantenimiento.",
+        "proposed": "Propuesta de memoria de revisión creada",
+        "noFeedback": "No se encontraron comentarios recientes en este repositorio",
+        "noPattern": "No se encontró ningún patrón repetido claro"
+      },
       "off": "La memoria de revisión está desactivada.",
       "on": "La memoria de revisión está activada.",
       "offDescription": "Actívala para que Kilo aprenda de las respuestas de los responsables del mantenimiento y proponga directrices para REVIEW.md.",
@@ -835,7 +845,62 @@
       "title": "El revisor de código requiere tu atención.",
       "recoveryLabel": "Contactar con soporte técnico"
     },
-    "unknownError": "Error desconocido"
+    "unknownError": "Error desconocido",
+    "skipBotPullRequests": {
+      "title": "Omitir pull requests de bots",
+      "subtitle": "No se ejecutan revisiones automáticas en pull requests abiertos por bots como Dependabot o Renovate. Desactívalo para revisar también los pull requests de bots."
+    },
+    "repoModels": {
+      "title": "Modelo por repositorio",
+      "description": "Ejecuta las revisiones de algunos repositorios con otro modelo, otro nivel de razonamiento o ambos.",
+      "defaultModel": "Usa el modelo predeterminado",
+      "resetLabel": "Restablecer modelo de {{repository}}",
+      "changeHint": "Abre el selector de modelos"
+    },
+    "analytics": {
+      "title": "Analíticas",
+      "period": "Periodo",
+      "trackedReviews": "Revisiones registradas",
+      "findingsRaised": "Hallazgos detectados",
+      "highImpactChanges": "Cambios de alto impacto",
+      "impactPoints": "Puntos de impacto",
+      "repositoryLine": "Revisiones: {{reviews}} · Hallazgos: {{findings}}",
+      "empty": "Aún no hay revisiones con analíticas",
+      "emptyDescription": "Las analíticas registran las revisiones completadas mientras estén activadas para la organización.",
+      "off": "Las analíticas están desactivadas para esta organización.",
+      "couldNotLoad": "No se pudieron cargar las analíticas"
+    },
+    "council": {
+      "title": "Revisión por consejo",
+      "subtitle": "Varios especialistas revisan cada pull request y sus votos se combinan en una única decisión.",
+      "unavailable": "La revisión por consejo no está disponible para esta organización.",
+      "noRepositories": "Aún no hay repositorios seleccionados. Primero elige repositorios en la configuración de repositorios.",
+      "specialists": "Especialistas",
+      "labels": "Etiquetas que activan la revisión por consejo",
+      "labelsPlaceholder": "p. ej., consejo, revisión a fondo",
+      "labelsDescription": "Separa las etiquetas con comas. Así, un repositorio con el consejo activado solo lo ejecutará en pull requests que tengan al menos una de estas etiquetas. Déjalo vacío para aplicarlo a todos los pull requests aptos.",
+      "minSpecialists": "Selecciona al menos {{minimum}} especialistas. Seleccionados: {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Cobertura de pruebas",
+        "correctness": "Corrección",
+        "custom": "Especialista"
+      },
+      "specialist": {
+        "security": "Elusión de autorización, gestión de secretos y entradas inseguras.",
+        "performance": "Rutas críticas, consultas N+1 y asignaciones de memoria costosas.",
+        "testing": "Cobertura ausente o insuficiente del nuevo comportamiento.",
+        "correctness": "Errores de lógica, casos límite y condiciones de carrera.",
+        "custom": "Revisa problemas de su propia área."
+      },
+      "strategy": {
+        "advisory": "Consultivo",
+        "advisoryDescription": "Informa de hallazgos y votos sin bloquear la fusión.",
+        "unanimous": "Unánime",
+        "unanimousDescription": "Bloquea la fusión si algún especialista informa de un problema crítico.",
+        "majority": "Mayoría",
+        "majorityDescription": "Bloquea la fusión solo si la mayoría de los especialistas informa de un problema crítico."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1353,6 +1418,16 @@
       "auto": "Automático",
       "shallow": "Superficial",
       "deep": "Profundo"
+    },
+    "orphanedFindings": {
+      "title": "Hallazgos de repositorios eliminados",
+      "description": "Estos repositorios ya no son accesibles a través de la integración con GitHub. Sus hallazgos siguen contando en los paneles y los informes.",
+      "count": "Hallazgos: {{count}}",
+      "clearLabel": "Borrar hallazgos de {{repository}}",
+      "confirmTitle": "¿Borrar hallazgos?",
+      "confirmMessage": "Se eliminarán todos los hallazgos registrados de {{repository}}. Esta acción no se puede deshacer.",
+      "confirmAction": "Eliminar hallazgos",
+      "cleared": "Hallazgos borrados: {{count}}"
     }
   },
   "agents": {

@@ -1244,7 +1244,17 @@
       "changeRequestMissingPermissions": "A aplicación de GitHub de Kilo non pode abrir solicitudes de incorporación neste repositorio. Un propietario do repositorio debe darlle á aplicación permiso de escritura sobre os contidos e as solicitudes de incorporación e, despois, téntao de novo.",
       "changeRequestFailed": "Kilo non puido abrir a solicitude de incorporación. Téntao de novo dentro dun intre.",
       "proposalConflict": "Outra proposta de memoria de revisión para este repositorio aínda está activa.",
-      "offAction": "A memoria de revisión está desactivada. Actívaa e téntao de novo."
+      "offAction": "A memoria de revisión está desactivada. Actívaa e téntao de novo.",
+      "analyze": {
+        "title": "Analizar comentarios",
+        "description": "Escolle un repositorio con respostas recentes dos responsables do mantemento e busca un patrón de pautas repetido.",
+        "chooseRepository": "Escolle un repositorio",
+        "action": "Analizar agora",
+        "noRepositories": "Ningún repositorio ten aínda respostas recentes dos responsables do mantemento.",
+        "proposed": "Creouse a proposta de memoria de revisión",
+        "noFeedback": "Non se atoparon comentarios recentes para este repositorio",
+        "noPattern": "Non se atopou ningún patrón repetido claro"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Introduce un URL válido dunha solicitude de fusión.",
@@ -1376,7 +1386,62 @@
       "title": "O revisor de código precisa a túa atención.",
       "recoveryLabel": "Contactar coa asistencia"
     },
-    "unknownError": "Erro descoñecido"
+    "unknownError": "Erro descoñecido",
+    "skipBotPullRequests": {
+      "title": "Omitir pull requests de bots",
+      "subtitle": "Non executar revisións automáticas en pull requests abertas por bots como Dependabot ou Renovate. Desactívao para revisar tamén as pull requests de bots."
+    },
+    "repoModels": {
+      "title": "Modelo por repositorio",
+      "description": "Usa outro modelo, outro nivel de razoamento ou ambos nas revisións dalgúns repositorios.",
+      "defaultModel": "Usa o modelo predeterminado",
+      "resetLabel": "Restablecer o modelo de {{repository}}",
+      "changeHint": "Abre o selector de modelos"
+    },
+    "analytics": {
+      "title": "Analítica",
+      "period": "Intervalo de tempo",
+      "trackedReviews": "Revisións rexistradas",
+      "findingsRaised": "Achados detectados",
+      "highImpactChanges": "Cambios de alto impacto",
+      "impactPoints": "Puntos de impacto",
+      "repositoryLine": "Revisións: {{reviews}} · Achados: {{findings}}",
+      "empty": "Aínda non hai revisións con analítica",
+      "emptyDescription": "A analítica rexistra as revisións completadas mentres estea activada para a organización.",
+      "off": "A analítica está desactivada para esta organización.",
+      "couldNotLoad": "Non se puido cargar a analítica"
+    },
+    "council": {
+      "title": "Revisión en consello",
+      "subtitle": "Varios especialistas revisan cada pull request e os seus votos combínanse nunha única decisión.",
+      "unavailable": "A revisión en consello non está dispoñible para esta organización.",
+      "noRepositories": "Aínda non hai repositorios seleccionados. Primeiro escolle repositorios na configuración de repositorios.",
+      "specialists": "Especialistas",
+      "labels": "Etiquetas que activan a revisión en consello",
+      "labelsPlaceholder": "p. ex. consello, revisión profunda",
+      "labelsDescription": "Separa as etiquetas con comas. Así, un repositorio co consello activado só o executa nas pull requests que teñan polo menos unha destas etiquetas. Déixao en branco para todas as pull requests aptas.",
+      "minSpecialists": "Selecciona polo menos {{minimum}} especialistas. Seleccionados: {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Cobertura de probas",
+        "correctness": "Corrección",
+        "custom": "Especialista"
+      },
+      "specialist": {
+        "security": "Omisión da autorización, xestión de segredos e entradas non seguras.",
+        "performance": "Rutas críticas, consultas N+1 e asignacións pesadas.",
+        "testing": "Cobertura ausente ou insuficiente para o novo comportamento.",
+        "correctness": "Erros lóxicos, casos límite e condicións de carreira.",
+        "custom": "Revisa problemas da súa propia área."
+      },
+      "strategy": {
+        "advisory": "Consultivo",
+        "advisoryDescription": "Informa de achados e votos sen bloquear a fusión.",
+        "unanimous": "Unánime",
+        "unanimousDescription": "Bloquea a fusión cando calquera especialista informa dun problema crítico.",
+        "majority": "Por maioría",
+        "majorityDescription": "Bloquea a fusión só cando a maioría dos especialistas informa dun problema crítico."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1879,6 +1944,16 @@
       "auto": "Automática",
       "shallow": "Superficial",
       "deep": "Profunda"
+    },
+    "orphanedFindings": {
+      "title": "Achados de repositorios eliminados",
+      "description": "Estes repositorios xa non son accesibles a través da integración con GitHub. Os seus achados seguen contando nos paneis e informes.",
+      "count": "Achados: {{count}}",
+      "clearLabel": "Borrar os achados de {{repository}}",
+      "confirmTitle": "Borrar os achados?",
+      "confirmMessage": "Eliminaranse todos os achados rexistrados de {{repository}}. Non se pode desfacer.",
+      "confirmAction": "Eliminar achados",
+      "cleared": "Achados borrados: {{count}}"
     }
   },
   "agents": {

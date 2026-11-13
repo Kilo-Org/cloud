@@ -1244,7 +1244,17 @@
       "changeRequestMissingPermissions": "Ngwa GitHub nke Kilo enweghị ike imepe arịrịọ ijikọ koodu na ebe nchekwa a. Onye nwe ebe nchekwa ga-enyerịrị ngwa ahụ ikike ide ihe na arịrịọ ijikọ koodu, wee nwaa ọzọ.",
       "changeRequestFailed": "Kilo enweghị ike imepe arịrịọ ijikọ koodu. Nwaa ọzọ n'oge na-adịghị anya.",
       "proposalConflict": "Aro ọzọ maka ebe nchekwa koodu a ka na-aga n'ihu.",
-      "offAction": "A gbanyụrụ ebe nchekwa nyocha. Gbanye ya, wee nwaa ọzọ."
+      "offAction": "A gbanyụrụ ebe nchekwa nyocha. Gbanye ya, wee nwaa ọzọ.",
+      "analyze": {
+        "title": "Nyochaa nzaghachi",
+        "description": "Họrọ ebe nchekwa nwere nzaghachi ndị na-elekọta n'oge na-adịbeghị anya, wee chọọ otu usoro nduzi na-emegharị ugboro ugboro.",
+        "chooseRepository": "Họrọ ebe nchekwa",
+        "action": "Nyochaa ugbu a",
+        "noRepositories": "Ọnweghị ebe nchekwa nwere nzaghachi ndị na-elekọta n'oge na-adịbeghị anya.",
+        "proposed": "Emepụtara aro ncheta nyocha",
+        "noFeedback": "Ahụghị nzaghachi ọhụrụ maka ebe nchekwa a",
+        "noPattern": "Ahụghị usoro a na-emegharị nke ọma"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Tinye URL arịrịọ njikọta dị irè.",
@@ -1376,7 +1386,62 @@
       "title": "Onye nyocha koodu chọrọ nlebara anya.",
       "recoveryLabel": "Kpọtụrụ ndị nkwado"
     },
-    "unknownError": "Njehie a na-amaghị"
+    "unknownError": "Njehie a na-amaghị",
+    "skipBotPullRequests": {
+      "title": "Hapụ PR sitere na bot",
+      "subtitle": "Emela nyocha akpaaka na PR ndị bot dịka Dependabot ma ọ bụ Renovate mepere. Gbanyụọ nke a ka i nyochaa PR nke bot kwa."
+    },
+    "repoModels": {
+      "title": "Ụdị AI maka ebe nchekwa ọ bụla",
+      "description": "Mee nyocha nke ụfọdụ ebe nchekwa na ụdị AI ọzọ, mgbalị echiche ọzọ, ma ọ bụ ha abụọ.",
+      "defaultModel": "Na-eji ụdị AI ndabara",
+      "resetLabel": "Weghachi ụdị AI maka {{repository}}",
+      "changeHint": "Na-emepe ihe nhọrọ ụdị AI"
+    },
+    "analytics": {
+      "title": "Ọnụọgụgụ nyocha",
+      "period": "Oge",
+      "trackedReviews": "Nyocha ndị a na-eso",
+      "findingsRaised": "Ihe achọpụtara e welitere",
+      "highImpactChanges": "Mgbanwe nwere mmetụta dị elu",
+      "impactPoints": "Pọọnti mmetụta",
+      "repositoryLine": "Nyocha: {{reviews}} · Ihe achọpụtara: {{findings}}",
+      "empty": "Enweghị nyocha nwere ọnụọgụgụ nyocha",
+      "emptyDescription": "Ọnụọgụgụ nyocha na-edekọ nyocha ndị gụchara mgbe agbanyere ya maka nzukọ.",
+      "off": "Agbanyụrụ ọnụọgụgụ nyocha maka nzukọ a.",
+      "couldNotLoad": "Enweghị ike ibudata ọnụọgụgụ nyocha"
+    },
+    "council": {
+      "title": "Nyocha otu ndị nyocha",
+      "subtitle": "Ọtụtụ ndị ọkachamara na-enyocha PR ọ bụla, ntuli aka ha na-ejikọta ọnụ wee bụrụ otu mkpebi.",
+      "unavailable": "Nyocha otu ndị nyocha adịghị maka nzukọ a.",
+      "noRepositories": "Ahọrọbeghị ebe nchekwa ọ bụla. Buru ụzọ họrọ ebe nchekwa na ntọala ebe nchekwa.",
+      "specialists": "Ndị ọkachamara",
+      "labels": "Mkpado na-akpalite nyocha otu ndị nyocha",
+      "labelsPlaceholder": "dịka: otu nyocha, nyocha miri emi",
+      "labelsDescription": "Kewaa mkpado site na kọma. Ebe nchekwa nwere otu ndị nyocha na-eme nyocha otu ndị nyocha naanị maka PR nwere opekata mpe otu n'ime mkpado ndị a. Hapụ ya tọgbọ chakoo maka PR ọ bụla tozuru oke.",
+      "minSpecialists": "Họrọ opekata mpe ndị ọkachamara {{minimum}}. Ahọọrọla {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Mkpuchi nnwale",
+        "correctness": "Ịzị ezi",
+        "custom": "Ọkachamara"
+      },
+      "specialist": {
+        "security": "Ịgabiga ikike, ijikwa ihe nzuzo na ntinye na-enweghị nchebe.",
+        "performance": "Akụkụ koodu kacha arụ ọrụ, ajụjụ N+1 na oke ebe nchekwa a na-ekenye.",
+        "testing": "Mkpuchi na-adịghị ma ọ bụ nke na-esighị ike maka omume ọhụrụ.",
+        "correctness": "Njehie mgbagha, okwu dị n'ọnụ ọnụ na ọnọdụ ịgba ọsọ oge.",
+        "custom": "Na-enyocha okwu dị n'akụkụ nke ya."
+      },
+      "strategy": {
+        "advisory": "Ndụmọdụ",
+        "advisoryDescription": "Na-akọ ihe achọpụtara ma na-atụ ntuli aka n'enweghị igbochi njikọta.",
+        "unanimous": "Otu olu",
+        "unanimousDescription": "Na-egbochi njikọta mgbe ọkachamara ọ bụla kọrọ nsogbu dị oké njọ.",
+        "majority": "Ọtụtụ",
+        "majorityDescription": "Na-egbochi njikọta naanị mgbe ọtụtụ ndị ọkachamara kọrọ nsogbu dị oké njọ."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1879,6 +1944,16 @@
       "auto": "Akpaaka",
       "shallow": "Emighị emi",
       "deep": "Miri emi"
+    },
+    "orphanedFindings": {
+      "title": "Ihe achọpụtara maka ebe nchekwa ewepụrụ",
+      "description": "Enweghịzi ike iru ebe nchekwa ndị a site na njikọ GitHub. A ka na-agụta ihe achọpụtara ha na ibe nchịkọta na akụkọ.",
+      "count": "Ihe achọpụtara: {{count}}",
+      "clearLabel": "Kpochapụ ihe achọpụtara maka {{repository}}",
+      "confirmTitle": "Kpochapụ ihe achọpụtara?",
+      "confirmMessage": "A ga-ehichapụ ihe achọpụtara ọ bụla edekọtara maka {{repository}}. Enweghị ike iweghachi ya.",
+      "confirmAction": "Hichapụ ihe achọpụtara",
+      "cleared": "Ekpochapụla ihe achọpụtara: {{count}}"
     }
   },
   "agents": {

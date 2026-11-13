@@ -1244,7 +1244,17 @@
       "changeRequestMissingPermissions": "Kilos GitHub App kan ikke åpne pull requests i dette repositoriet. En eier av repositoriet må gi appen skrivetilgang til innhold og pull requests, og deretter prøve igjen.",
       "changeRequestFailed": "Kilo kunne ikke åpne pull requesten. Prøv igjen om et øyeblikk.",
       "proposalConflict": "Et annet forslag for dette repositoriet er fortsatt aktivt.",
-      "offAction": "Minnet for kodegjennomganger er deaktivert. Aktiver det, og prøv igjen."
+      "offAction": "Minnet for kodegjennomganger er deaktivert. Aktiver det, og prøv igjen.",
+      "analyze": {
+        "title": "Analyser tilbakemeldinger",
+        "description": "Velg et kodelager med nylige svar fra vedlikeholderne, og se deretter etter ett gjentatt mønster i veiledningen.",
+        "chooseRepository": "Velg et kodelager",
+        "action": "Analyser nå",
+        "noRepositories": "Ingen kodelagre har nylige svar fra vedlikeholderne ennå.",
+        "proposed": "Forslag til minne for kodegjennomganger er opprettet",
+        "noFeedback": "Fant ingen nylige tilbakemeldinger for dette kodelageret",
+        "noPattern": "Fant ikke noe tydelig gjentatt mønster"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Skriv inn en gyldig URL til en merge request.",
@@ -1376,7 +1386,62 @@
       "title": "Kodegjennomgangen trenger oppfølging.",
       "recoveryLabel": "Kontakt kundestøtte"
     },
-    "unknownError": "Det oppstod en ukjent feil."
+    "unknownError": "Det oppstod en ukjent feil.",
+    "skipBotPullRequests": {
+      "title": "Hopp over PR-er fra boter",
+      "subtitle": "Ikke kjør automatiske gjennomganger på PR-er som er åpnet av boter som Dependabot eller Renovate. Slå av dette for å gjennomgå PR-er fra boter også."
+    },
+    "repoModels": {
+      "title": "Modell per kodelager",
+      "description": "Kjør gjennomgangene for enkelte kodelagre med en annen modell, en annen resonneringsinnsats eller begge.",
+      "defaultModel": "Bruker standardmodellen",
+      "resetLabel": "Tilbakestill modellen for {{repository}}",
+      "changeHint": "Åpner modellvelgeren"
+    },
+    "analytics": {
+      "title": "Statistikk",
+      "period": "Tidsrom",
+      "trackedReviews": "Gjennomganger som følges",
+      "findingsRaised": "Registrerte funn",
+      "highImpactChanges": "Endringer med stor påvirkning",
+      "impactPoints": "Påvirkningspoeng",
+      "repositoryLine": "Gjennomganger: {{reviews}} · Funn: {{findings}}",
+      "empty": "Ingen gjennomganger med statistikk ennå",
+      "emptyDescription": "Statistikken registrerer fullførte gjennomganger så lenge den er aktivert for organisasjonen.",
+      "off": "Statistikken er slått av for denne organisasjonen.",
+      "couldNotLoad": "Kunne ikke laste statistikken"
+    },
+    "council": {
+      "title": "Panelvurdering",
+      "subtitle": "Flere spesialister vurderer hver PR, og stemmene deres kombineres til én avgjørelse.",
+      "unavailable": "Panelvurdering er ikke tilgjengelig for denne organisasjonen.",
+      "noRepositories": "Ingen kodelagre er valgt ennå. Velg kodelagre i kodelagerinnstillingene først.",
+      "specialists": "Spesialister",
+      "labels": "Etiketter som utløser panelvurdering",
+      "labelsPlaceholder": "f.eks. panel, dyp gjennomgang",
+      "labelsDescription": "Skill etikettene med komma. Et kodelager med panelvurdering kjører da vurderingen bare for PR-er som har minst én av disse etikettene. La feltet stå tomt for alle kvalifiserte PR-er.",
+      "minSpecialists": "Velg minst {{minimum}} spesialister. {{selected}} valgt.",
+      "specialistName": {
+        "testCoverage": "Testdekning",
+        "correctness": "Korrekthet",
+        "custom": "Spesialist"
+      },
+      "specialist": {
+        "security": "Omgåelse av autorisasjon, håndtering av hemmeligheter og utrygg inndata.",
+        "performance": "Kritiske kodeveier, N+1-spørringer og tunge allokeringer.",
+        "testing": "Manglende eller svak dekning for ny oppførsel.",
+        "correctness": "Logikkfeil, kanttilfeller og kappløpssituasjoner.",
+        "custom": "Vurderer problemer innenfor sitt eget område."
+      },
+      "strategy": {
+        "advisory": "Rådgivende",
+        "advisoryDescription": "Rapporterer funn og stemmer uten å blokkere flettingen.",
+        "unanimous": "Enstemmig",
+        "unanimousDescription": "Blokkerer flettingen når en spesialist rapporterer et kritisk problem.",
+        "majority": "Flertall",
+        "majorityDescription": "Blokkerer flettingen bare når de fleste spesialistene rapporterer et kritisk problem."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1879,6 +1944,16 @@
       "auto": "Automatisk",
       "shallow": "Overflatisk",
       "deep": "Grundig"
+    },
+    "orphanedFindings": {
+      "title": "Funn for fjernede kodelagre",
+      "description": "Disse kodelagrene er ikke lenger tilgjengelige via GitHub-integrasjonen. Funnene deres teller fortsatt i dashbord og rapporter.",
+      "count": "Funn: {{count}}",
+      "clearLabel": "Slett funn for {{repository}}",
+      "confirmTitle": "Slette funn?",
+      "confirmMessage": "Hvert registrerte funn for {{repository}} blir slettet. Dette kan ikke angres.",
+      "confirmAction": "Slett funn",
+      "cleared": "Funn slettet: {{count}}"
     }
   },
   "agents": {

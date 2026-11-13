@@ -1244,7 +1244,17 @@
       "changeRequestMissingPermissions": "Kilos GitHub-app kan inte öppna pull requests i det här arkivet. En arkivägare måste ge appen skrivåtkomst till innehåll och pull requests och sedan försöka igen.",
       "changeRequestFailed": "Kilo kunde inte öppna pull requesten. Försök igen om en stund.",
       "proposalConflict": "Ett annat förslag för det här arkivet är fortfarande aktivt, så det här kan inte sparas ännu.",
-      "offAction": "Granskningsminnet är avstängt. Aktivera det och försök igen."
+      "offAction": "Granskningsminnet är avstängt. Aktivera det och försök igen.",
+      "analyze": {
+        "title": "Analysera återkoppling",
+        "description": "Välj ett kodarkiv med nya svar från de projektansvariga och leta sedan efter ett återkommande mönster i vägledningen.",
+        "chooseRepository": "Välj ett kodarkiv",
+        "action": "Analysera nu",
+        "noRepositories": "Inget kodarkiv har nya svar från de projektansvariga än.",
+        "proposed": "Förslag till granskningsminne skapat",
+        "noFeedback": "Ingen ny återkoppling hittades för detta kodarkiv",
+        "noPattern": "Inget tydligt återkommande mönster hittades"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Ange en giltig URL till en merge request",
@@ -1376,7 +1386,62 @@
       "title": "Code Reviewer kräver en åtgärd",
       "recoveryLabel": "Kontakta supporten"
     },
-    "unknownError": "Okänt fel"
+    "unknownError": "Okänt fel",
+    "skipBotPullRequests": {
+      "title": "Hoppa över pull-begäranden från botar",
+      "subtitle": "Kör inga automatiska granskningar på pull-begäranden som öppnats av botar som Dependabot eller Renovate. Stäng av detta för att granska botars pull-begäranden också."
+    },
+    "repoModels": {
+      "title": "Modell per kodarkiv",
+      "description": "Kör vissa kodarkivs granskningar med en annan modell, en annan resonemangsnivå eller båda.",
+      "defaultModel": "Använder standardmodellen",
+      "resetLabel": "Återställ modellen för {{repository}}",
+      "changeHint": "Öppnar modellväljaren"
+    },
+    "analytics": {
+      "title": "Statistik",
+      "period": "Tidsintervall",
+      "trackedReviews": "Granskningar som följs",
+      "findingsRaised": "Rapporterade fynd",
+      "highImpactChanges": "Ändringar med stor påverkan",
+      "impactPoints": "Påverkanspoäng",
+      "repositoryLine": "Granskningar: {{reviews}} · Fynd: {{findings}}",
+      "empty": "Inga granskningar med statistik än",
+      "emptyDescription": "Statistiken registrerar slutförda granskningar så länge den är aktiverad för organisationen.",
+      "off": "Statistiken är avstängd för denna organisation.",
+      "couldNotLoad": "Det gick inte att läsa in statistiken"
+    },
+    "council": {
+      "title": "Rådsgranskning",
+      "subtitle": "Flera experter granskar varje pull-begäran och deras röster kombineras till ett beslut.",
+      "unavailable": "Rådsgranskning är inte tillgänglig för denna organisation.",
+      "noRepositories": "Inga kodarkiv har valts än. Välj kodarkiv i inställningarna för kodarkiv först.",
+      "specialists": "Experter",
+      "labels": "Etiketter som utlöser rådsgranskning",
+      "labelsPlaceholder": "t.ex. råd, djupgranskning",
+      "labelsDescription": "Separera etiketterna med kommatecken. Ett kodarkiv med rådsgranskning kör då granskningen endast för pull-begäranden som har minst en av dessa etiketter. Lämna tomt för alla kvalificerade pull-begäranden.",
+      "minSpecialists": "Välj minst {{minimum}} experter. {{selected}} valda.",
+      "specialistName": {
+        "testCoverage": "Testtäckning",
+        "correctness": "Korrekthet",
+        "custom": "Expert"
+      },
+      "specialist": {
+        "security": "Kringgående av behörighet, hantering av hemligheter och osäker indata.",
+        "performance": "Kritiska kodvägar, N+1-frågor och tunga allokeringar.",
+        "testing": "Saknad eller svag täckning för nytt beteende.",
+        "correctness": "Logiska fel, kantfall och kapplöpningsvillkor.",
+        "custom": "Granskar problem inom sitt eget område."
+      },
+      "strategy": {
+        "advisory": "Rådgivande",
+        "advisoryDescription": "Rapporterar fynd och röstar utan att blockera sammanfogningen.",
+        "unanimous": "Enhälligt",
+        "unanimousDescription": "Blockerar sammanfogningen när någon expert rapporterar ett kritiskt problem.",
+        "majority": "Majoritet",
+        "majorityDescription": "Blockerar sammanfogningen endast när de flesta experter rapporterar ett kritiskt problem."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1879,6 +1944,16 @@
       "auto": "Automatisk",
       "shallow": "Översiktlig",
       "deep": "Fördjupad"
+    },
+    "orphanedFindings": {
+      "title": "Fynd för borttagna kodarkiv",
+      "description": "Dessa kodarkiv går inte längre att nå via GitHub-integrationen. Deras fynd räknas fortfarande i instrumentpaneler och rapporter.",
+      "count": "Fynd: {{count}}",
+      "clearLabel": "Rensa fynd för {{repository}}",
+      "confirmTitle": "Rensa fynd?",
+      "confirmMessage": "Alla registrerade fynd för {{repository}} rensas. Detta kan inte ångras.",
+      "confirmAction": "Rensa fynd",
+      "cleared": "Fynd rensade: {{count}}"
     }
   },
   "agents": {

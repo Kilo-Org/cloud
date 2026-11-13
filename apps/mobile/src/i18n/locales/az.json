@@ -1244,7 +1244,17 @@
       "changeRequestMissingPermissions": "Kilo-nun GitHub Tətbiqi bu repozitoriyada pull sorğusu aça bilmir. Repozitoriya sahibi tətbiqə məzmun və pull sorğuları üçün yazma icazəsi verməlidir, sonra yenidən cəhd et.",
       "changeRequestFailed": "Kilo pull sorğusunu aça bilmədi. Bir azdan yenidən cəhd et.",
       "proposalConflict": "Bu repozitoriya üçün başqa bir təklif hələ də aktivdir.",
-      "offAction": "Kod yoxlaması yaddaşı deaktivdir. Onu aktivləşdir, sonra yenidən cəhd et."
+      "offAction": "Kod yoxlaması yaddaşı deaktivdir. Onu aktivləşdir, sonra yenidən cəhd et.",
+      "analyze": {
+        "title": "Rəyləri təhlil et",
+        "description": "Layihəyə cavabdeh şəxslərin son cavabları olan repozitoriya seç, sonra təkrarlanan bir təlimat nümunəsi axtar.",
+        "chooseRepository": "Repozitoriya seç",
+        "action": "İndi təhlil et",
+        "noRepositories": "Hələ heç bir repozitoriyada layihəyə cavabdeh şəxslərin son cavabları yoxdur.",
+        "proposed": "Yoxlama yaddaşı təklifi yaradıldı",
+        "noFeedback": "Bu repozitoriya üçün son rəy tapılmadı",
+        "noPattern": "Aydın təkrarlanan nümunə tapılmadı"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Etibarlı merge sorğusu URL-i daxil et.",
@@ -1376,7 +1386,62 @@
       "title": "Kod yoxlayıcısında müdaxilə tələb olunur.",
       "recoveryLabel": "Dəstək xidməti ilə əlaqə saxla"
     },
-    "unknownError": "Naməlum xəta"
+    "unknownError": "Naməlum xəta",
+    "skipBotPullRequests": {
+      "title": "Botların pull request-lərini ötür",
+      "subtitle": "Dependabot və ya Renovate kimi botların açdığı pull request-lər üçün avtomatik yoxlama aparma. Bot pull request-lərini də yoxlamaq üçün bunu söndür."
+    },
+    "repoModels": {
+      "title": "Repozitoriya üzrə model",
+      "description": "Bəzi repozitoriyaların yoxlamalarını fərqli model, düşünmə səviyyəsi və ya hər ikisi ilə apar.",
+      "defaultModel": "Standart modeldən istifadə edir",
+      "resetLabel": "{{repository}} üçün modeli sıfırla",
+      "changeHint": "Model seçicisini açır"
+    },
+    "analytics": {
+      "title": "Analitika",
+      "period": "Zaman aralığı",
+      "trackedReviews": "İzlənən yoxlamalar",
+      "findingsRaised": "Aşkarlanan tapıntılar",
+      "highImpactChanges": "Yüksək təsirli dəyişikliklər",
+      "impactPoints": "Təsir xalları",
+      "repositoryLine": "Yoxlamalar: {{reviews}} · Tapıntılar: {{findings}}",
+      "empty": "Analitikası olan yoxlama hələ yoxdur",
+      "emptyDescription": "Analitika təşkilat üçün aktiv olduğu müddətdə tamamlanmış yoxlamaları qeydə alır.",
+      "off": "Bu təşkilat üçün analitika deaktivdir.",
+      "couldNotLoad": "Analitikanı yükləmək mümkün olmadı"
+    },
+    "council": {
+      "title": "Şura yoxlaması",
+      "subtitle": "Hər pull request-i bir neçə mütəxəssis yoxlayır və onların səsləri vahid qərarda birləşir.",
+      "unavailable": "Şura yoxlaması bu təşkilat üçün əlçatan deyil.",
+      "noRepositories": "Hələ heç bir repozitoriya seçilməyib. Əvvəlcə repozitoriya ayarlarında repozitoriyaları seç.",
+      "specialists": "Mütəxəssislər",
+      "labels": "Şura yoxlamasını işə salan etiketlər",
+      "labelsPlaceholder": "məs. şura, dərin yoxlama",
+      "labelsDescription": "Etiketləri vergüllə ayır. Şura aktiv olan repozitoriya yalnız bu etiketlərdən ən azı birini daşıyan pull request-lər üçün şura yoxlaması aparacaq. Bütün uyğun pull request-lər üçün boş saxla.",
+      "minSpecialists": "Ən azı {{minimum}} mütəxəssis seç. Seçilib: {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Test əhatəsi",
+        "correctness": "Düzgünlük",
+        "custom": "Mütəxəssis"
+      },
+      "specialist": {
+        "security": "Avtorizasiyadan yan keçmə, gizli məlumatların idarəsi və təhlükəli daxiletmə.",
+        "performance": "Tez-tez icra olunan kod yolları, N+1 sorğuları və ağır yaddaş ayırmaları.",
+        "testing": "Yeni davranış üçün çatışmayan və ya zəif test əhatəsi.",
+        "correctness": "Məntiq xətaları, sərhəd halları və yarış vəziyyətləri.",
+        "custom": "Öz sahəsindəki problemləri yoxlayır."
+      },
+      "strategy": {
+        "advisory": "Məsləhət",
+        "advisoryDescription": "Birləşdirməni bloklamadan tapıntıları və səsləri bildirir.",
+        "unanimous": "Yekdil",
+        "unanimousDescription": "Hər hansı mütəxəssis kritik problem bildirdikdə birləşdirməni bloklayır.",
+        "majority": "Əksəriyyət",
+        "majorityDescription": "Birləşdirməni yalnız mütəxəssislərin əksəriyyəti kritik problem bildirdikdə bloklayır."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1879,6 +1944,16 @@
       "auto": "Avtomatik",
       "shallow": "Səthi",
       "deep": "Dərin"
+    },
+    "orphanedFindings": {
+      "title": "Silinmiş repozitoriyalar üçün tapıntılar",
+      "description": "Bu repozitoriyalar artıq GitHub inteqrasiyası vasitəsilə əlçatan deyil. Onların tapıntıları hələ də panellərdə və hesabatlarda nəzərə alınır.",
+      "count": "Tapıntılar: {{count}}",
+      "clearLabel": "{{repository}} üçün tapıntıları təmizlə",
+      "confirmTitle": "Tapıntılar təmizlənsin?",
+      "confirmMessage": "{{repository}} üçün qeydə alınmış bütün tapıntılar silinəcək. Bu əməliyyatı geri qaytarmaq mümkün deyil.",
+      "confirmAction": "Tapıntıları sil",
+      "cleared": "Təmizlənən tapıntılar: {{count}}"
     }
   },
   "agents": {

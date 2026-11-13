@@ -1244,7 +1244,17 @@
       "changeRequestMissingPermissions": "Aplikacioni GitHub i Kilo nuk mund të hapë pull request në këtë depo. Një pronar i depos duhet t'i japë aplikacionit akses shkrimi në përmbajtje dhe pull request, më pas provo përsëri.",
       "changeRequestFailed": "Kilo nuk mund të hapte pull request. Provo përsëri pas një çasti.",
       "proposalConflict": "Një propozim tjetër për këtë depo është ende aktiv.",
-      "offAction": "Kujtesa e shqyrtimit është e çaktivizuar. Aktivizoje dhe pastaj provo përsëri."
+      "offAction": "Kujtesa e shqyrtimit është e çaktivizuar. Aktivizoje dhe pastaj provo përsëri.",
+      "analyze": {
+        "title": "Analizo komentet",
+        "description": "Zgjidh një depo me përgjigje të reja nga mirëmbajtësit dhe më pas kërko një model të vetëm udhëzimi që përsëritet.",
+        "chooseRepository": "Zgjidh një depo",
+        "action": "Analizo tani",
+        "noRepositories": "Asnjë depo nuk ka ende përgjigje të reja nga mirëmbajtësit.",
+        "proposed": "Propozimi për kujtesën e shqyrtimit u krijua",
+        "noFeedback": "Nuk u gjetën komente të reja për këtë depo",
+        "noPattern": "Nuk u gjet asnjë model i qartë që përsëritet"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Shkruaj një URL të vlefshme për kërkesën e integrimit.",
@@ -1376,7 +1386,62 @@
       "title": "Shqyrtuesi i kodit kërkon vëmendje.",
       "recoveryLabel": "Kontakto mbështetjen"
     },
-    "unknownError": "Ndodhi një gabim i panjohur."
+    "unknownError": "Ndodhi një gabim i panjohur.",
+    "skipBotPullRequests": {
+      "title": "Anashkalo PR-të e botëve",
+      "subtitle": "Mos ekzekuto shqyrtime automatike në PR-të e hapura nga botë si Dependabot ose Renovate. Çaktivizoje këtë për të shqyrtuar edhe PR-të e botëve."
+    },
+    "repoModels": {
+      "title": "Model për çdo depo",
+      "description": "Ekzekuto shqyrtimet e disa depove me një model tjetër, një nivel tjetër arsyetimi ose me të dyja.",
+      "defaultModel": "Përdor modelin e parazgjedhur",
+      "resetLabel": "Rivendos modelin për {{repository}}",
+      "changeHint": "Hap zgjedhësin e modeleve"
+    },
+    "analytics": {
+      "title": "Statistika",
+      "period": "Intervali kohor",
+      "trackedReviews": "Shqyrtime të ndjekura",
+      "findingsRaised": "Gjetje të ngritura",
+      "highImpactChanges": "Ndryshime me ndikim të lartë",
+      "impactPoints": "Pikë ndikimi",
+      "repositoryLine": "Shqyrtime: {{reviews}} · Gjetje: {{findings}}",
+      "empty": "Ende nuk ka shqyrtime me statistika",
+      "emptyDescription": "Statistikat regjistrojnë shqyrtimet e përfunduara sa kohë që janë aktive për organizatën.",
+      "off": "Statistikat janë çaktivizuar për këtë organizatë.",
+      "couldNotLoad": "Statistikat nuk mund të ngarkoheshin"
+    },
+    "council": {
+      "title": "Shqyrtimi nga këshilli",
+      "subtitle": "Disa ekspertë shqyrtojnë çdo PR dhe votat e tyre bashkohen në një vendim të vetëm.",
+      "unavailable": "Shqyrtimi nga këshilli nuk është i disponueshëm për këtë organizatë.",
+      "noRepositories": "Ende nuk është zgjedhur asnjë depo. Zgjidh fillimisht depot te cilësimet e depove.",
+      "specialists": "Ekspertë",
+      "labels": "Etiketa që aktivizojnë shqyrtimin nga këshilli",
+      "labelsPlaceholder": "p.sh. këshill, shqyrtim i thelluar",
+      "labelsDescription": "Ndaji etiketat me presje. Një depo me këshillin e aktivizuar ekzekuton më pas shqyrtimin vetëm për PR-të që mbajnë të paktën një nga këto etiketa. Lëre bosh për të gjitha PR-të e përshtatshme.",
+      "minSpecialists": "Zgjidh të paktën {{minimum}} ekspertë. {{selected}} të zgjedhur.",
+      "specialistName": {
+        "testCoverage": "Mbulimi me teste",
+        "correctness": "Korrektësia",
+        "custom": "Ekspert"
+      },
+      "specialist": {
+        "security": "Anashkalim i autorizimit, trajtimi i sekreteve dhe hyrje e pasigurt.",
+        "performance": "Rrugë kritike, pyetje N+1 dhe alokime të rënda.",
+        "testing": "Mbulim që mungon ose është i dobët për sjelljen e re.",
+        "correctness": "Gabime logjike, raste kufitare dhe kushte garuese.",
+        "custom": "Shqyrton problemet në fushën e vet."
+      },
+      "strategy": {
+        "advisory": "Këshillues",
+        "advisoryDescription": "Raporton gjetjet dhe voton pa bllokuar bashkimin.",
+        "unanimous": "Unanim",
+        "unanimousDescription": "Bllokon bashkimin kur ndonjë ekspert raporton një problem kritik.",
+        "majority": "Shumicë",
+        "majorityDescription": "Bllokon bashkimin vetëm kur shumica e ekspertëve raporton një problem kritik."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1879,6 +1944,16 @@
       "auto": "Automatike",
       "shallow": "Sipërfaqësore",
       "deep": "E thellë"
+    },
+    "orphanedFindings": {
+      "title": "Gjetjet për depot e hequra",
+      "description": "Këto depo nuk janë më të arritshme përmes integrimit me GitHub. Gjetjet e tyre vazhdojnë të numërohen në panele dhe raporte.",
+      "count": "Gjetje: {{count}}",
+      "clearLabel": "Fshi gjetjet për {{repository}}",
+      "confirmTitle": "Të fshihen gjetjet?",
+      "confirmMessage": "Të gjitha gjetjet e regjistruara për {{repository}} do të fshihen. Ky veprim nuk mund të zhbëhet.",
+      "confirmAction": "Fshi gjetjet",
+      "cleared": "Gjetjet u fshinë: {{count}}"
     }
   },
   "agents": {

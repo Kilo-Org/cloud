@@ -1267,7 +1267,17 @@
       "changeRequestMissingPermissions": "Kilo GitHub aplikacija ne može da otvori pull request-ove u ovom repozitorijumu. Vlasnik repozitorijuma mora dati aplikaciji pravo pisanja nad sadržajem i pull request-ovima, a zatim pokušati ponovo.",
       "changeRequestFailed": "Kilo nije mogao da otvori pull request. Pokušajte ponovo za trenutak.",
       "proposalConflict": "Još jedan predlog memorije pregleda za ovaj repozitorijum je i dalje aktivan, pa ovaj još ne može da se sačuva.",
-      "offAction": "Memorija pregleda je isključena. Uključi je, pa pokušaj ponovo."
+      "offAction": "Memorija pregleda je isključena. Uključi je, pa pokušaj ponovo.",
+      "analyze": {
+        "title": "Analiziraj povratne informacije",
+        "description": "Izaberi repozitorijum sa nedavnim odgovorima osoba koje održavaju repozitorijum, zatim potraži jedan obrazac smernica koji se ponavlja.",
+        "chooseRepository": "Izaberi repozitorijum",
+        "action": "Analiziraj sada",
+        "noRepositories": "Nijedan repozitorijum još uvek nema nedavne odgovore osoba koje održavaju repozitorijum.",
+        "proposed": "Predlog memorije pregleda je napravljen",
+        "noFeedback": "Za ovaj repozitorijum nisu pronađene nedavne povratne informacije",
+        "noPattern": "Nije pronađen jasan obrazac koji se ponavlja"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Unesi važeći URL merge request-a.",
@@ -1400,7 +1410,62 @@
       "title": "Agent za pregled koda zahteva tvoju pažnju.",
       "recoveryLabel": "Kontaktiraj podršku"
     },
-    "unknownError": "Nepoznata greška"
+    "unknownError": "Nepoznata greška",
+    "skipBotPullRequests": {
+      "title": "Preskoči pull request-ove od botova",
+      "subtitle": "Ne pokreći automatske preglede za pull request-ove koje otvaraju botovi kao što su Dependabot ili Renovate. Isključi ovu opciju da bi se pregledali i pull request-ovi botova."
+    },
+    "repoModels": {
+      "title": "Model po repozitorijumu",
+      "description": "Pokreni preglede nekih repozitorijuma sa drugim modelom, nivoom razmišljanja ili oboje.",
+      "defaultModel": "Koristi podrazumevani model",
+      "resetLabel": "Vrati podrazumevani model za {{repository}}",
+      "changeHint": "Otvara birač modela"
+    },
+    "analytics": {
+      "title": "Analitika",
+      "period": "Vremenski opseg",
+      "trackedReviews": "Praćeni pregledi",
+      "findingsRaised": "Prijavljeni nalazi",
+      "highImpactChanges": "Promene sa velikim uticajem",
+      "impactPoints": "Poeni uticaja",
+      "repositoryLine": "Pregledi: {{reviews}} · Nalazi: {{findings}}",
+      "empty": "Još nema pregleda sa analitikom",
+      "emptyDescription": "Analitika beleži završene preglede dok je uključena za organizaciju.",
+      "off": "Analitika je isključena za ovu organizaciju.",
+      "couldNotLoad": "Nije moguće učitati analitiku"
+    },
+    "council": {
+      "title": "Pregled veća",
+      "subtitle": "Nekoliko stručnjaka pregleda svaki pull request, a njihovi glasovi se spajaju u jednu odluku.",
+      "unavailable": "Pregled veća nije dostupan za ovu organizaciju.",
+      "noRepositories": "Još nije izabran nijedan repozitorijum. Najpre izaberi repozitorijume u podešavanjima repozitorijuma.",
+      "specialists": "Stručnjaci",
+      "labels": "Oznake koje pokreću pregled veća",
+      "labelsPlaceholder": "npr. veće, detaljan pregled",
+      "labelsDescription": "Odvoji oznake zarezima. Repozitorijum kojem je veće uključeno tada pokreće veće samo za pull request-ove koji nose bar jednu od tih oznaka. Ostavi prazno za svaki podoban pull request.",
+      "minSpecialists": "Izaberi bar {{minimum}} stručnjaka. Izabrano: {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Pokrivenost testovima",
+        "correctness": "Ispravnost",
+        "custom": "Stručnjak"
+      },
+      "specialist": {
+        "security": "Zaobilaženje autorizacije, rukovanje tajnama i nesiguran unos.",
+        "performance": "Kritične putanje, N+1 upiti i velike alokacije.",
+        "testing": "Nedostajuća ili slaba pokrivenost novog ponašanja.",
+        "correctness": "Greške u logici, rubni slučajevi i uslovi trke.",
+        "custom": "Pregleda probleme u svojoj oblasti."
+      },
+      "strategy": {
+        "advisory": "Savetodavno",
+        "advisoryDescription": "Prijavljuje nalaze i glasa bez blokiranja spajanja.",
+        "unanimous": "Jednoglasno",
+        "unanimousDescription": "Blokira spajanje kada bilo koji stručnjak prijavi kritičan problem.",
+        "majority": "Većina",
+        "majorityDescription": "Blokira spajanje samo kada većina stručnjaka prijavi kritičan problem."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1918,6 +1983,16 @@
       "auto": "Automatski",
       "shallow": "Osnovno",
       "deep": "Detaljno"
+    },
+    "orphanedFindings": {
+      "title": "Nalazi za uklonjene repozitorijume",
+      "description": "Ovi repozitorijumi više nisu dostupni preko GitHub integracije. Njihovi nalazi se i dalje broje na kontrolnim tablama i u izveštajima.",
+      "count": "Nalazi: {{count}}",
+      "clearLabel": "Očisti nalaze za {{repository}}",
+      "confirmTitle": "Očistiti nalaze?",
+      "confirmMessage": "Svi zabeleženi nalazi za {{repository}} biće izbrisani. To ne može da se poništi.",
+      "confirmAction": "Izbriši nalaze",
+      "cleared": "Očišćeni nalazi: {{count}}"
     }
   },
   "agents": {

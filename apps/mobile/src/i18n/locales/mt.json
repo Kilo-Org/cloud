@@ -1313,7 +1313,17 @@
       "changeRequestMissingPermissions": "L-App GitHub ta' Kilo ma tistax tiftaħ pull requests f'dan ir-repożitorju. Sid ir-repożitorju jrid jagħti lill-app aċċess tal-kitba għall-kontenut u l-pull requests, imbagħad erġa' pprova.",
       "changeRequestFailed": "Kilo ma setax jiftaħ il-pull request. Erġa' pprova fi ftit mument.",
       "proposalConflict": "Proposta oħra għal dan ir-repożitorju għadha attiva.",
-      "offAction": "Il-memorja tar-reviżjoni hija diżattivata. Attivaha, mbagħad erġa' pprova."
+      "offAction": "Il-memorja tar-reviżjoni hija diżattivata. Attivaha, mbagħad erġa' pprova.",
+      "analyze": {
+        "title": "Analizza l-kummenti",
+        "description": "Agħżel repożitorju b'tweġibiet reċenti mill-manutenturi, imbagħad fittex mudell wieħed ta' gwida li jirrepeti.",
+        "chooseRepository": "Agħżel repożitorju",
+        "action": "Analizza issa",
+        "noRepositories": "Għad m'hemm l-ebda repożitorju b'tweġibiet reċenti mill-manutenturi.",
+        "proposed": "Proposta tal-memorja tar-reviżjoni nħolqot",
+        "noFeedback": "Ma nstab l-ebda kumment reċenti għal dan ir-repożitorju",
+        "noPattern": "Ma nstab l-ebda mudell ċar li jirrepeti"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Daħħal URL validu għal merge request.",
@@ -1448,7 +1458,62 @@
       "title": "Ir-reviżur tal-kodiċi jeħtieġ l-attenzjoni tiegħek.",
       "recoveryLabel": "Ikkuntattja l-appoġġ"
     },
-    "unknownError": "Żball mhux magħruf"
+    "unknownError": "Żball mhux magħruf",
+    "skipBotPullRequests": {
+      "title": "Aqbeż il-PRs mill-bots",
+      "subtitle": "Tħaddimx reviżjonijiet awtomatiċi fuq PRs miftuħa minn bots bħal Dependabot jew Renovate. Itfi din l-għażla biex tirrevedi wkoll il-PRs tal-bots."
+    },
+    "repoModels": {
+      "title": "Mudell għal kull repożitorju",
+      "description": "Ħaddem ir-reviżjonijiet ta' xi repożitorji b'mudell differenti, b'sforz ta' ħsieb differenti, jew it-tnejn.",
+      "defaultModel": "Juża l-mudell predefinit",
+      "resetLabel": "Irrisettja l-mudell għal {{repository}}",
+      "changeHint": "Jiftaħ l-għażla tal-mudell"
+    },
+    "analytics": {
+      "title": "Statistika",
+      "period": "Firxa tal-ħin",
+      "trackedReviews": "Reviżjonijiet segwiti",
+      "findingsRaised": "Sejbiet imqajma",
+      "highImpactChanges": "Bidliet b'impatt kbir",
+      "impactPoints": "Punti ta' impatt",
+      "repositoryLine": "Reviżjonijiet: {{reviews}} · Sejbiet: {{findings}}",
+      "empty": "Għad m'hemmx reviżjonijiet bi statistika",
+      "emptyDescription": "L-istatistika tirrekordja reviżjonijiet kompluti sakemm tkun attiva għall-organizzazzjoni.",
+      "off": "L-istatistika hija mitfija għal din l-organizzazzjoni.",
+      "couldNotLoad": "L-istatistika ma setgħetx tiġi mgħobbija"
+    },
+    "council": {
+      "title": "Reviżjoni tal-kunsill",
+      "subtitle": "Diversi speċjalisti jirrevedu kull PR, u l-voti tagħhom jingħaqdu f'deċiżjoni waħda.",
+      "unavailable": "Ir-reviżjoni tal-kunsill mhijiex disponibbli għal din l-organizzazzjoni.",
+      "noRepositories": "Għad m'hemm l-ebda repożitorju magħżul. Agħżel repożitorji fl-issettjar tar-repożitorji l-ewwel.",
+      "specialists": "Speċjalisti",
+      "labels": "Tikketti li jattivaw ir-reviżjoni tal-kunsill",
+      "labelsPlaceholder": "eż. kunsill, reviżjoni fil-fond",
+      "labelsDescription": "Issepara t-tikketti bil-virgoli. Repożitorju bil-kunsill attivat imbagħad iħaddem ir-reviżjoni biss għall-PRs li jġorru mill-inqas waħda minn dawn it-tikketti. Ħallih vojt għal kull PR eliġibbli.",
+      "minSpecialists": "Agħżel mill-inqas {{minimum}} speċjalisti. {{selected}} magħżula.",
+      "specialistName": {
+        "testCoverage": "Kopertura tat-testijiet",
+        "correctness": "Korrektezza",
+        "custom": "Speċjalist"
+      },
+      "specialist": {
+        "security": "Evitar tal-awtorizzazzjoni, immaniġġjar tas-sigrieti u input mhux sigur.",
+        "performance": "Mogħdijiet kritiċi, mistoqsijiet N+1 u allokazzjonijiet tqal.",
+        "testing": "Kopertura nieqsa jew dgħajfa għall-imġiba l-ġdida.",
+        "correctness": "Żbalji tal-loġika, każijiet estremi u kundizzjonijiet ta' tlielaq.",
+        "custom": "Jirrevedi problemi fil-qasam tiegħu stess."
+      },
+      "strategy": {
+        "advisory": "Konsultattiv",
+        "advisoryDescription": "Jirrapporta s-sejbiet u jivvota mingħajr ma jibblokka l-għaqda.",
+        "unanimous": "Unanimi",
+        "unanimousDescription": "Jibblokka l-għaqda meta xi speċjalist jirrapporta problema kritika.",
+        "majority": "Maġġoranza",
+        "majorityDescription": "Jibblokka l-għaqda biss meta l-maġġoranza tal-ispeċjalisti tirrapporta problema kritika."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1996,6 +2061,16 @@
       "auto": "Awtomatika",
       "shallow": "Superfiċjali",
       "deep": "Fil-fond"
+    },
+    "orphanedFindings": {
+      "title": "Sejbiet għal repożitorji mneħħija",
+      "description": "Dawn ir-repożitorji m'għadhomx aċċessibbli permezz tal-integrazzjoni mal-GitHub. Is-sejbiet tagħhom għadhom jingħaddu fil-pannelli u fir-rapporti.",
+      "count": "Sejbiet: {{count}}",
+      "clearLabel": "Ħassar is-sejbiet għal {{repository}}",
+      "confirmTitle": "Tħassar is-sejbiet?",
+      "confirmMessage": "Kull sejba rrekordjata għal {{repository}} se titħassar. Dan ma jistax jiġi annullat.",
+      "confirmAction": "Ħassar is-sejbiet",
+      "cleared": "Sejbiet imħassra: {{count}}"
     }
   },
   "agents": {

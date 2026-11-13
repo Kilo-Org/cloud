@@ -1267,7 +1267,17 @@
       "changeRequestMissingPermissions": "A aplicação GitHub do Kilo não consegue abrir pull requests neste repositório. Um proprietário do repositório tem de conceder à aplicação acesso de escrita a conteúdos e pull requests; depois, tenta novamente.",
       "changeRequestFailed": "O Kilo não conseguiu abrir o pull request. Tenta novamente dentro de momentos.",
       "proposalConflict": "Há outra proposta de memória de revisão para este repositório que ainda está ativa, por isso esta ainda não pode ser guardada.",
-      "offAction": "A memória de revisão está desativada. Ativa-a e tenta novamente."
+      "offAction": "A memória de revisão está desativada. Ativa-a e tenta novamente.",
+      "analyze": {
+        "title": "Analisar comentários",
+        "description": "Escolhe um repositório com respostas recentes dos responsáveis pelo projeto e procura depois um padrão de orientação repetido.",
+        "chooseRepository": "Escolher um repositório",
+        "action": "Analisar agora",
+        "noRepositories": "Ainda não há nenhum repositório com respostas recentes dos responsáveis pelo projeto.",
+        "proposed": "Proposta de memória de revisão criada",
+        "noFeedback": "Não foram encontrados comentários recentes para este repositório",
+        "noPattern": "Não foi encontrado nenhum padrão repetido claro"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Introduz um URL válido de um merge request.",
@@ -1400,7 +1410,62 @@
       "title": "O revisor de código precisa da tua atenção.",
       "recoveryLabel": "Contactar o suporte"
     },
-    "unknownError": "Erro desconhecido"
+    "unknownError": "Erro desconhecido",
+    "skipBotPullRequests": {
+      "title": "Ignorar pedidos de integração de bots",
+      "subtitle": "Não executes revisões automáticas em pedidos de integração abertos por bots como o Dependabot ou o Renovate. Desativa esta opção para rever também os pedidos de integração de bots."
+    },
+    "repoModels": {
+      "title": "Modelo por repositório",
+      "description": "Executa as revisões de alguns repositórios com outro modelo, outro esforço de raciocínio ou ambos.",
+      "defaultModel": "Utiliza o modelo predefinido",
+      "resetLabel": "Repor o modelo de {{repository}}",
+      "changeHint": "Abre o seletor de modelos"
+    },
+    "analytics": {
+      "title": "Estatísticas",
+      "period": "Intervalo de tempo",
+      "trackedReviews": "Revisões acompanhadas",
+      "findingsRaised": "Ocorrências levantadas",
+      "highImpactChanges": "Alterações de grande impacto",
+      "impactPoints": "Pontos de impacto",
+      "repositoryLine": "Revisões: {{reviews}} · Ocorrências: {{findings}}",
+      "empty": "Ainda não há revisões com estatísticas",
+      "emptyDescription": "As estatísticas registam revisões concluídas enquanto estão ativadas para a organização.",
+      "off": "As estatísticas estão desativadas para esta organização.",
+      "couldNotLoad": "Não foi possível carregar as estatísticas"
+    },
+    "council": {
+      "title": "Revisão do conselho",
+      "subtitle": "Vários especialistas revêm cada pedido de integração e os votos deles combinam-se numa única decisão.",
+      "unavailable": "A revisão do conselho não está disponível para esta organização.",
+      "noRepositories": "Ainda não há repositórios selecionados. Escolhe primeiro repositórios nas definições de repositórios.",
+      "specialists": "Especialistas",
+      "labels": "Etiquetas que ativam a revisão do conselho",
+      "labelsPlaceholder": "ex.: conselho, revisão profunda",
+      "labelsDescription": "Separa as etiquetas com vírgulas. Um repositório com o conselho ativado passa a executar a revisão apenas nos pedidos de integração que tenham pelo menos uma destas etiquetas. Deixa em branco para todos os pedidos de integração elegíveis.",
+      "minSpecialists": "Seleciona pelo menos {{minimum}} especialistas. {{selected}} selecionados.",
+      "specialistName": {
+        "testCoverage": "Cobertura de testes",
+        "correctness": "Corretude",
+        "custom": "Especialista"
+      },
+      "specialist": {
+        "security": "Contorno de autorização, tratamento de segredos e entrada não segura.",
+        "performance": "Caminhos críticos, consultas N+1 e alocações pesadas.",
+        "testing": "Cobertura ausente ou fraca para o novo comportamento.",
+        "correctness": "Erros de lógica, casos limite e condições de corrida.",
+        "custom": "Revê problemas da sua própria área."
+      },
+      "strategy": {
+        "advisory": "Consultivo",
+        "advisoryDescription": "Comunica ocorrências e vota sem bloquear a fusão.",
+        "unanimous": "Unânime",
+        "unanimousDescription": "Bloqueia a fusão quando qualquer especialista comunica um problema crítico.",
+        "majority": "Maioria",
+        "majorityDescription": "Bloqueia a fusão apenas quando a maioria dos especialistas comunica um problema crítico."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1924,6 +1989,16 @@
       "auto": "Automático",
       "shallow": "Superficial",
       "deep": "Profundo"
+    },
+    "orphanedFindings": {
+      "title": "Ocorrências de repositórios removidos",
+      "description": "Estes repositórios já não estão acessíveis através da integração com o GitHub. As ocorrências deles continuam a contar nos painéis e relatórios.",
+      "count": "Ocorrências: {{count}}",
+      "clearLabel": "Eliminar ocorrências de {{repository}}",
+      "confirmTitle": "Eliminar ocorrências?",
+      "confirmMessage": "Todas as ocorrências registadas de {{repository}} serão eliminadas. Esta ação não pode ser anulada.",
+      "confirmAction": "Eliminar ocorrências",
+      "cleared": "Ocorrências eliminadas: {{count}}"
     }
   },
   "agents": {

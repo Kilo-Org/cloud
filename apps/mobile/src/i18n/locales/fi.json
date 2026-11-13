@@ -1244,7 +1244,17 @@
       "changeRequestMissingPermissions": "Kilon GitHub-sovellus ei voi avata pull requesteja tässä repositoriossa. Repositorion omistajan on myönnettävä sovellukselle kirjoitusoikeus sisältöihin ja pull requesteihin, ja yritä sitten uudelleen.",
       "changeRequestFailed": "Kilo ei voinut avata pull requestia. Yritä uudelleen hetken kuluttua.",
       "proposalConflict": "Toinen ehdotus tälle repositoriolle on vielä aktiivinen.",
-      "offAction": "Katselmointimuisti on pois käytöstä. Ota se käyttöön ja yritä uudelleen."
+      "offAction": "Katselmointimuisti on pois käytöstä. Ota se käyttöön ja yritä uudelleen.",
+      "analyze": {
+        "title": "Analysoi palaute",
+        "description": "Valitse koodivarasto, jossa on tuoreita ylläpitäjien vastauksia, ja etsi yksi toistuva ohjemalli.",
+        "chooseRepository": "Valitse koodivarasto",
+        "action": "Analysoi nyt",
+        "noRepositories": "Missään koodivarastossa ei ole vielä tuoreita ylläpitäjien vastauksia.",
+        "proposed": "Katselmointimuistin ehdotus luotu",
+        "noFeedback": "Tälle koodivarastolle ei löytynyt tuoretta palautetta",
+        "noPattern": "Selkeää toistuvaa mallia ei löytynyt"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Anna kelvollinen yhdistämispyynnön URL-osoite.",
@@ -1376,7 +1386,62 @@
       "title": "Koodikatselmoija vaatii toimenpiteitä",
       "recoveryLabel": "Ota yhteyttä tukeen"
     },
-    "unknownError": "Tapahtui tuntematon virhe."
+    "unknownError": "Tapahtui tuntematon virhe.",
+    "skipBotPullRequests": {
+      "title": "Ohita bottien vetopyynnöt",
+      "subtitle": "Älä suorita automaattisia katselmointeja bottien (esim. Dependabot tai Renovate) avaamille vetopyynnöille. Poista tämä käytöstä, jos haluat katselmoida myös bottien vetopyynnöt."
+    },
+    "repoModels": {
+      "title": "Koodivarastokohtainen malli",
+      "description": "Käytä joidenkin koodivarastojen katselmoinneissa eri mallia, päättelytasoa tai molempia.",
+      "defaultModel": "Käyttää oletusmallia",
+      "resetLabel": "Palauta koodivaraston {{repository}} malli",
+      "changeHint": "Avaa mallin valinnan"
+    },
+    "analytics": {
+      "title": "Analytiikka",
+      "period": "Aikaväli",
+      "trackedReviews": "Seuratut katselmoinnit",
+      "findingsRaised": "Tehdyt havainnot",
+      "highImpactChanges": "Suuren vaikutuksen muutokset",
+      "impactPoints": "Vaikutuspisteet",
+      "repositoryLine": "Katselmoinnit: {{reviews}} · Havainnot: {{findings}}",
+      "empty": "Ei vielä analytiikkaa sisältäviä katselmointeja",
+      "emptyDescription": "Analytiikka tallentaa valmiit katselmoinnit, kun se on käytössä organisaatiossa.",
+      "off": "Analytiikka ei ole käytössä tässä organisaatiossa.",
+      "couldNotLoad": "Analytiikan lataaminen epäonnistui"
+    },
+    "council": {
+      "title": "Neuvostokatselmointi",
+      "subtitle": "Useampi asiantuntija katselmoi jokaisen vetopyynnön, ja heidän äänensä yhdistetään yhdeksi päätökseksi.",
+      "unavailable": "Neuvostokatselmointi ei ole käytettävissä tässä organisaatiossa.",
+      "noRepositories": "Koodivarastoja ei ole vielä valittu. Valitse ensin koodivarastot koodivarastoasetuksista.",
+      "specialists": "Asiantuntijat",
+      "labels": "Neuvostokatselmoinnin käynnistävät tunnisteet",
+      "labelsPlaceholder": "esim. neuvosto, perusteellinen katselmointi",
+      "labelsDescription": "Erota tunnisteet pilkuilla. Tällöin neuvostokatselmointia käyttävä koodivarasto suorittaa sen vain vetopyynnöille, joilla on vähintään yksi näistä tunnisteista. Jätä tyhjäksi, jos haluat sen kaikille kelvollisille vetopyynnöille.",
+      "minSpecialists": "Valitse vähintään {{minimum}} asiantuntijaa. Valittuna {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Testikattavuus",
+        "correctness": "Oikeellisuus",
+        "custom": "Asiantuntija"
+      },
+      "specialist": {
+        "security": "Valtuutuksen ohitukset, salaisuuksien käsittely ja vaarallinen syöte.",
+        "performance": "Kriittiset suorituspolut, N+1-kyselyt ja raskaat muistinvaraukset.",
+        "testing": "Puuttuva tai heikko testikattavuus uudelle toiminnalle.",
+        "correctness": "Logiikkavirheet, reunatapaukset ja kilpatilanteet.",
+        "custom": "Katselmoi oman alueensa ongelmia."
+      },
+      "strategy": {
+        "advisory": "Neuvoa-antava",
+        "advisoryDescription": "Raportoi havainnot ja äänet estämättä yhdistämistä.",
+        "unanimous": "Yksimielinen",
+        "unanimousDescription": "Estää yhdistämisen, jos yksikin asiantuntija raportoi kriittisen ongelman.",
+        "majority": "Enemmistö",
+        "majorityDescription": "Estää yhdistämisen vain, jos useimmat asiantuntijat raportoivat kriittisen ongelman."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1879,6 +1944,16 @@
       "auto": "Automaattinen",
       "shallow": "Kevyt",
       "deep": "Perusteellinen"
+    },
+    "orphanedFindings": {
+      "title": "Poistettujen koodivarastojen havainnot",
+      "description": "Näihin koodivarastoihin ei enää päästä GitHub-integraation kautta. Niiden havainnot lasketaan edelleen mukaan koontinäyttöihin ja raportteihin.",
+      "count": "Havainnot: {{count}}",
+      "clearLabel": "Tyhjennä koodivaraston {{repository}} havainnot",
+      "confirmTitle": "Tyhjennetäänkö havainnot?",
+      "confirmMessage": "Kaikki koodivaraston {{repository}} tallennetut havainnot poistetaan. Tätä ei voi kumota.",
+      "confirmAction": "Poista havainnot",
+      "cleared": "Havaintoja tyhjennetty: {{count}}"
     }
   },
   "agents": {

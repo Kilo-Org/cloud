@@ -1244,7 +1244,17 @@
       "changeRequestMissingPermissions": "I-GitHub App ye-Kilo ayikwazi ukuvula ama-PR kule rejistri. Umnikazi we-rejistri kufanele anikeze i-app ilungelo lokubhala kokuqukethwe nakuma-PR, bese uzama futhi.",
       "changeRequestFailed": "I-Kilo ayikwazanga ukuvula i-PR. Zama futhi emva kwesikhashana.",
       "proposalConflict": "Esinye isiphakamiso sale rejistri sisasebenza.",
-      "offAction": "Inkumbulo yokuhlola ivaliwe. Yivule, bese uzama futhi."
+      "offAction": "Inkumbulo yokuhlola ivaliwe. Yivule, bese uzama futhi.",
+      "analyze": {
+        "title": "Hlaziya impendulo",
+        "description": "Khetha inqolobane yekhodi enezimpendulo zakamuva zabagcini bekhodi, bese ufuna iphethini eyodwa yokuqondisa ephindayo.",
+        "chooseRepository": "Khetha inqolobane yekhodi",
+        "action": "Hlaziya manje",
+        "noRepositories": "Ayikho inqolobane yekhodi enezimpendulo zakamuva zabagcini bekhodi okwamanje.",
+        "proposed": "Isiphakamiso senkumbulo yokuhlola sidalwe",
+        "noFeedback": "Ayikho impendulo yakamuva etholakele kule nqolobane yekhodi",
+        "noPattern": "Ayikho iphethini ephindayo ecacile etholakele"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Faka i-URL evumelekile yesicelo sokuhlanganisa.",
@@ -1376,7 +1386,62 @@
       "title": "Umhloli wekhodi udinga ukunakwa.",
       "recoveryLabel": "Xhumana nethimba losizo"
     },
-    "unknownError": "Iphutha elingaziwa"
+    "unknownError": "Iphutha elingaziwa",
+    "skipBotPullRequests": {
+      "title": "Yeqa ama-PR avela kuma-bot",
+      "subtitle": "Ungaqalisi ukuhlolwa okuzenzakalelayo kuma-PR avulwe ama-bot afana ne-Dependabot noma i-Renovate. Vala lokhu ukuze uhlole nama-PR enziwe ama-bot."
+    },
+    "repoModels": {
+      "title": "Imodeli yenqolobane yekhodi ngayinye",
+      "description": "Sebenzisa ukuhlolwa kweminye iminqolobane yekhodi ngemodeli ehlukile, umzamo wokucabanga ohlukile, noma kokubili.",
+      "defaultModel": "Kusebenzisa imodeli ezenzakalelayo",
+      "resetLabel": "Setha kabusha imodeli ye-{{repository}}",
+      "changeHint": "Kuvula isikhethi semodeli"
+    },
+    "analytics": {
+      "title": "Izibalo",
+      "period": "Ibanga lesikhathi",
+      "trackedReviews": "Ukuhlolwa okulandelelwayo",
+      "findingsRaised": "Okutholakele okuvezwe",
+      "highImpactChanges": "Izinguquko ezinomthelela ophezulu",
+      "impactPoints": "Amaphuzu omthelela",
+      "repositoryLine": "Ukuhlolwa: {{reviews}} · Okutholakele: {{findings}}",
+      "empty": "Akukho kuhlolwa okunezibalo okwamanje",
+      "emptyDescription": "Izibalo ziqopha ukuhlolwa okuqediwe ngenkathi zivuliwe enhlanganweni.",
+      "off": "Izibalo zivaliwe kule nhlangano.",
+      "couldNotLoad": "Ayikwazanga ukulayisha izibalo"
+    },
+    "council": {
+      "title": "Ukuhlola komkhandlu",
+      "subtitle": "Ochwepheshe abaningi bahlola i-PR ngayinye, futhi amavoti abo ahlangana abe yisinqumo esisodwa.",
+      "unavailable": "Ukuhlola komkhandlu akutholakali kule nhlangano.",
+      "noRepositories": "Azikho izinqolobane zekhodi ezikhethiwe okwamanje. Khetha izinqolobane zekhodi kuzilungiselelo zenqolobane yekhodi kuqala.",
+      "specialists": "Ochwepheshe",
+      "labels": "Amalebula avula ukuhlola komkhandlu",
+      "labelsPlaceholder": "isb: umkhandlu, ukuhlola okujulile",
+      "labelsDescription": "Ihlukanise amalebula ngamakhoma. Inqolobane yekhodi evule ukuhlola komkhandlu ibe isisebenza umkhandlu kuphela kuma-PR anenye yalawa malebula okungenani eyodwa. Shiya kungenalutho kuwo wonke ama-PR afanelekile.",
+      "minSpecialists": "Khetha okungenani ochwepheshe abangu-{{minimum}}. {{selected}} bakhethiwe.",
+      "specialistName": {
+        "testCoverage": "Ukumbozwa kwezivivinyo",
+        "correctness": "Ukunemba",
+        "custom": "Uchwepheshe"
+      },
+      "specialist": {
+        "security": "Ukweqa ukugunyazwa, ukuphatha izimfihlo nokufaka okungaphephile.",
+        "performance": "Izindlela ezisebenza kakhulu, imibuzo ye-N+1 nokwabiwa okukhulu.",
+        "testing": "Ukumbozwa okungekho noma okubuthakathaka kokuziphatha okusha.",
+        "correctness": "Amaphutha okucabanga, izimo zomkhawulo nezimo zokuncintisana kwesikhathi.",
+        "custom": "Ihlola izinkinga endaweni yayo."
+      },
+      "strategy": {
+        "advisory": "Izeluleko",
+        "advisoryDescription": "Ibika okutholakele futhi ivote ngaphandle kokuvimba ukuhlanganisa.",
+        "unanimous": "Imvumelwano ephelele",
+        "unanimousDescription": "Ivimba ukuhlanganisa uma noma yimuphi uchwepheshe ebika inkinga ebucayi.",
+        "majority": "Iningi",
+        "majorityDescription": "Ivimba ukuhlanganisa kuphela uma iningi lochwepheshe libika inkinga ebucayi."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1879,6 +1944,16 @@
       "auto": "Okuzenzakalelayo",
       "shallow": "Okungajulile",
       "deep": "Okujulile"
+    },
+    "orphanedFindings": {
+      "title": "Okutholakele ezinqolobaneni zekhodi ezisusiwe",
+      "description": "Lezi zinqolobane zekhodi azisafinyeleleki ngokuxhumana kwe-GitHub. Okutholakele kuzo kusabalwa kumadeshibhodi nasemibikweni.",
+      "count": "Okutholakele: {{count}}",
+      "clearLabel": "Sula okutholakele kwe-{{repository}}",
+      "confirmTitle": "Sula okutholakele?",
+      "confirmMessage": "Konke okutholakele okurekhodiwe kwe-{{repository}} kuzosuswa. Lokhu akukwazi ukuhlehliswa.",
+      "confirmAction": "Susa okutholakele",
+      "cleared": "Okutholakele kusuliwe: {{count}}"
     }
   },
   "agents": {

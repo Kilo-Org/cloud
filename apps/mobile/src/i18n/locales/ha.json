@@ -1244,7 +1244,17 @@
       "changeRequestMissingPermissions": "Aplikashin GitHub na Kilo ba zai iya buɗe pull request a cikin wannan ajiya ba. Dole mai ajiyar ya ba app ɗin damar rubutu ga abubuwan ciki da pull request, sannan sake gwadawa.",
       "changeRequestFailed": "Kilo ya kasa buɗe pull request ɗin. Sake gwadawa nan da ɗan lokaci.",
       "proposalConflict": "Wata shawara don wannan ajiya har yanzu tana aiki.",
-      "offAction": "An kashe ƙwaƙwalwar bita. Kunna ta, sannan sake gwadawa."
+      "offAction": "An kashe ƙwaƙwalwar bita. Kunna ta, sannan sake gwadawa.",
+      "analyze": {
+        "title": "Bincika ra'ayoyi",
+        "description": "Zaɓi ma'ajiya mai amsoshin masu kula na kwanan nan, sannan a nemi tsarin jagora guda ɗaya da ke maimaituwa.",
+        "chooseRepository": "Zaɓi ma'ajiya",
+        "action": "Bincika yanzu",
+        "noRepositories": "Babu ma'ajiyar da ke da amsoshin masu kula na kwanan nan tukuna.",
+        "proposed": "An ƙirƙiri shawarar ƙwaƙwalwar bita",
+        "noFeedback": "Ba a sami ra'ayoyi na kwanan nan ga wannan ma'ajiya ba",
+        "noPattern": "Ba a sami bayyanannen tsari da ke maimaituwa ba"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Shigar da ingantaccen URL na buƙatar haɗawa.",
@@ -1376,7 +1386,62 @@
       "title": "Mai bitar lambar shiri yana buƙatar kulawa.",
       "recoveryLabel": "Tuntuɓi masu tallafi"
     },
-    "unknownError": "Kuskuren da ba a sani ba"
+    "unknownError": "Kuskuren da ba a sani ba",
+    "skipBotPullRequests": {
+      "title": "Tsallake buƙatun haɗawa daga bot",
+      "subtitle": "Kada a yi bita ta atomatik kan buƙatun haɗawa da bot kamar Dependabot ko Renovate suka buɗe. Kashe wannan don a yi bitar buƙatun haɗawa na bot ma."
+    },
+    "repoModels": {
+      "title": "Samfuri na kowace ma'ajiya",
+      "description": "Gudanar da bitar wasu ma'ajiyoyi da samfuri daban, matakin tunani daban, ko duka biyun.",
+      "defaultModel": "Yana amfani da samfurin asali",
+      "resetLabel": "Sake saita samfuri na {{repository}}",
+      "changeHint": "Yana buɗe mai zaɓin samfuri"
+    },
+    "analytics": {
+      "title": "Nazari",
+      "period": "Tsawon lokaci",
+      "trackedReviews": "Bitocin da aka bibiya",
+      "findingsRaised": "Abubuwan da aka gano",
+      "highImpactChanges": "Canje-canje masu babban tasiri",
+      "impactPoints": "Makin tasiri",
+      "repositoryLine": "Bitoci: {{reviews}} · Abubuwan da aka gano: {{findings}}",
+      "empty": "Babu bitoci masu nazari tukuna",
+      "emptyDescription": "Nazari yana adana bitocin da aka kammala yayin da aka kunna shi ga ƙungiyar.",
+      "off": "An kashe nazari ga wannan ƙungiyar.",
+      "couldNotLoad": "An kasa loda nazari"
+    },
+    "council": {
+      "title": "Bitar majalisa",
+      "subtitle": "Ƙwararru da dama suna bitar kowace buƙatar haɗawa, kuma ƙuri'unsu suna haɗuwa su zama shawara ɗaya.",
+      "unavailable": "Bitar majalisa ba ta samuwa ga wannan ƙungiyar.",
+      "noRepositories": "Ba a zaɓi ma'ajiyoyi ba tukuna. Zaɓi ma'ajiyoyi a saitunan ma'ajiya da farko.",
+      "specialists": "Ƙwararru",
+      "labels": "Lakabobin da ke kunna bitar majalisa",
+      "labelsPlaceholder": "misali: majalisa, bita mai zurfi",
+      "labelsDescription": "Raba lakabobi da waƙafi. Ma'ajiyar da aka kunna majalisa a cikinta za ta gudanar da majalisa ne kawai don buƙatun haɗawa da ke ɗauke da aƙalla ɗaya daga cikin waɗannan lakabobin. Bar shi babu komai don kowace buƙatar haɗawa da ta cancanta.",
+      "minSpecialists": "Zaɓi aƙalla ƙwararru {{minimum}}. An zaɓi {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Rufin gwaji",
+        "correctness": "Daidaito",
+        "custom": "Ƙwararre"
+      },
+      "specialist": {
+        "security": "Ƙetare izini, sarrafa sirri da shigarwa marar aminci.",
+        "performance": "Hanyoyi masu yawan aiki, tambayoyin N+1 da manyan rabon ƙwaƙwalwa.",
+        "testing": "Rashin gwaji ko gwaji mai rauni don sabbin halaye.",
+        "correctness": "Kurakuran dabaru, yanayin gefe da yanayin tsere.",
+        "custom": "Yana bitar matsaloli a fannin kansa."
+      },
+      "strategy": {
+        "advisory": "Na shawara",
+        "advisoryDescription": "Yana ba da rahoton abubuwan da aka gano da ƙuri'u ba tare da hana haɗawa ba.",
+        "unanimous": "Baki ɗaya",
+        "unanimousDescription": "Yana hana haɗawa idan kowane ƙwararre ya ba da rahoton babbar matsala.",
+        "majority": "Rinjaye",
+        "majorityDescription": "Yana hana haɗawa ne kawai idan yawancin ƙwararru suka ba da rahoton babbar matsala."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1879,6 +1944,16 @@
       "auto": "Na atomatik",
       "shallow": "Maras zurfi",
       "deep": "Mai zurfi"
+    },
+    "orphanedFindings": {
+      "title": "Abubuwan da aka gano na ma'ajiyoyin da aka cire",
+      "description": "Ba za a iya isa ga waɗannan ma'ajiyoyi ta haɗin GitHub ba kuma. Har yanzu ana ƙirga abubuwan da aka gano nasu a allunan bayanai da rahotanni.",
+      "count": "Abubuwan da aka gano: {{count}}",
+      "clearLabel": "Share abubuwan da aka gano na {{repository}}",
+      "confirmTitle": "Share abubuwan da aka gano?",
+      "confirmMessage": "Za a goge duk abubuwan da aka gano da aka adana na {{repository}}. Ba za a iya mayar da wannan ba.",
+      "confirmAction": "Goge abubuwan da aka gano",
+      "cleared": "An share abubuwan da aka gano: {{count}}"
     }
   },
   "agents": {

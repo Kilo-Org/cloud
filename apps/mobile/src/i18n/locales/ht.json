@@ -1244,7 +1244,17 @@
       "changeRequestMissingPermissions": "Aplikasyon GitHub Kilo a pa ka ouvri pull request nan depo sa a. Yon pwopriyetè depo dwe bay aplikasyon an aksè ekriti sou kontni ak pull request, epi eseye ankò.",
       "changeRequestFailed": "Kilo pa t ka ouvri pull request la. Eseye ankò nan yon ti moman.",
       "proposalConflict": "Yon lòt pwopozisyon memwa revizyon pou menm depo sa a toujou aktif, kidonk sa a pa ka anrejistre pou kounye a.",
-      "offAction": "Memwa revizyon an dezaktive. Aktive li, epi eseye ankò."
+      "offAction": "Memwa revizyon an dezaktive. Aktive li, epi eseye ankò.",
+      "analyze": {
+        "title": "Analize repons yo",
+        "description": "Chwazi yon depo ki gen dènye repons moun ki responsab antretyen kòd la, epi chèche yon sèl modèl direktiv ki repete.",
+        "chooseRepository": "Chwazi yon depo",
+        "action": "Analize kounye a",
+        "noRepositories": "Poko gen depo ki gen dènye repons moun ki responsab antretyen kòd la.",
+        "proposed": "Pwopozisyon memwa revizyon kreye",
+        "noFeedback": "Pa jwenn okenn repons resan pou depo sa a",
+        "noPattern": "Pa jwenn okenn modèl ki repete klè"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Antre yon URL valab pou merge request la.",
@@ -1376,7 +1386,62 @@
       "title": "Revizè kòd la bezwen atansyon ou.",
       "recoveryLabel": "Kontakte ekip sipò a"
     },
-    "unknownError": "Erè enkoni"
+    "unknownError": "Erè enkoni",
+    "skipBotPullRequests": {
+      "title": "Sote demann fizyon ki soti nan bot yo",
+      "subtitle": "Pa kouri revizyon otomatik sou demann fizyon ke bot tankou Dependabot oswa Renovate ouvri. Dezaktive sa pou revize demann fizyon bot yo tou."
+    },
+    "repoModels": {
+      "title": "Modèl pa depo",
+      "description": "Kouri revizyon kèk depo sou yon lòt modèl, yon lòt efò refleksyon, oswa tou de.",
+      "defaultModel": "Itilize modèl pa defo a",
+      "resetLabel": "Reyinisyalize modèl pou {{repository}}",
+      "changeHint": "Ouvri seleksyonè modèl la"
+    },
+    "analytics": {
+      "title": "Estatistik",
+      "period": "Entèval tan",
+      "trackedReviews": "Revizyon ki gen swivi",
+      "findingsRaised": "Konsta ki detekte",
+      "highImpactChanges": "Chanjman ki gen gwo enpak",
+      "impactPoints": "Pwen enpak",
+      "repositoryLine": "Revizyon: {{reviews}} · Konsta: {{findings}}",
+      "empty": "Poko gen revizyon ak estatistik",
+      "emptyDescription": "Estatistik yo anrejistre revizyon ki fini pandan yo aktive pou òganizasyon an.",
+      "off": "Estatistik yo dezaktive pou òganizasyon sa a.",
+      "couldNotLoad": "Nou pa t ka chaje estatistik yo"
+    },
+    "council": {
+      "title": "Revizyon konsèy",
+      "subtitle": "Plizyè espesyalis revize chak demann fizyon, epi vòt yo mete ansanm pou fè yon sèl desizyon.",
+      "unavailable": "Revizyon konsèy pa disponib pou òganizasyon sa a.",
+      "noRepositories": "Poko gen depo ki chwazi. Chwazi depo nan paramèt depo yo anvan.",
+      "specialists": "Espesyalis",
+      "labels": "Etikèt ki deklanche revizyon konsèy",
+      "labelsPlaceholder": "pa egzanp: konsèy, revizyon apwofondi",
+      "labelsDescription": "Separe etikèt yo ak vigil. Yon depo ki aktive revizyon konsèy ap kouri l sèlman pou demann fizyon ki gen omwen youn nan etikèt sa yo. Kite l vid pou chak demann fizyon ki kalifye.",
+      "minSpecialists": "Chwazi omwen {{minimum}} espesyalis. {{selected}} chwazi.",
+      "specialistName": {
+        "testCoverage": "Kouvèti tès",
+        "correctness": "Egzaktitid",
+        "custom": "Espesyalis"
+      },
+      "specialist": {
+        "security": "Kontoune otorizasyon, jesyon sekrè ak antre ki pa an sekirite.",
+        "performance": "Chemen cho, rechèch N+1 ak gwo alokasyon memwa.",
+        "testing": "Kouvèti ki manke oswa ki fèb pou nouvo konpòtman.",
+        "correctness": "Erè lojik, ka limit ak kondisyon kous.",
+        "custom": "Revize pwoblèm nan pwòp domèn li."
+      },
+      "strategy": {
+        "advisory": "Konsiltatif",
+        "advisoryDescription": "Rapòte konsta epi vote san bloke fizyon an.",
+        "unanimous": "Inanim",
+        "unanimousDescription": "Bloke fizyon an lè nenpòt espesyalis rapòte yon pwoblèm kritik.",
+        "majority": "Majorite",
+        "majorityDescription": "Bloke fizyon an sèlman lè pifò espesyalis rapòte yon pwoblèm kritik."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1879,6 +1944,16 @@
       "auto": "Otomatik",
       "shallow": "Supèrfisyèl",
       "deep": "Apwofondi"
+    },
+    "orphanedFindings": {
+      "title": "Konsta pou depo ki retire",
+      "description": "Depo sa yo pa aksesib ankò atravè entegrasyon GitHub la. Konsta yo toujou konte nan tablo bò ak rapò yo.",
+      "count": "Konsta: {{count}}",
+      "clearLabel": "Efase konsta pou {{repository}}",
+      "confirmTitle": "Efase konsta yo?",
+      "confirmMessage": "Tout konsta ki anrejistre pou {{repository}} ap efase. Sa pa ka defèt.",
+      "confirmAction": "Efase konsta yo",
+      "cleared": "Konsta efase: {{count}}"
     }
   },
   "agents": {

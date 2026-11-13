@@ -759,6 +759,16 @@
       "changeRequestFailed": "Kilo nie mogło otworzyć pull requesta. Spróbuj ponownie za chwilę.",
       "proposalConflict": "Inna propozycja pamięci przeglądów dla tego repozytorium jest nadal aktywna, więc tej nie można jeszcze zapisać.",
       "offAction": "Pamięć przeglądów jest wyłączona. Włącz ją, a następnie spróbuj ponownie.",
+      "analyze": {
+        "title": "Analizuj opinie",
+        "description": "Wybierz repozytorium z niedawnymi odpowiedziami opiekunów, a następnie poszukaj jednego powtarzającego się wzorca wskazówek.",
+        "chooseRepository": "Wybierz repozytorium",
+        "action": "Analizuj teraz",
+        "noRepositories": "Żadne repozytorium nie ma jeszcze niedawnych odpowiedzi opiekunów.",
+        "proposed": "Utworzono propozycję pamięci przeglądów",
+        "noFeedback": "Nie znaleziono niedawnych opinii dla tego repozytorium",
+        "noPattern": "Nie znaleziono wyraźnego powtarzającego się wzorca"
+      },
       "off": "Pamięć przeglądów jest wyłączona.",
       "on": "Pamięć przeglądów jest włączona.",
       "offDescription": "Włącz ją, aby Kilo uczyło się na podstawie odpowiedzi opiekunów repozytorium i proponowało wytyczne do pliku REVIEW.md.",
@@ -836,7 +846,62 @@
       "title": "Asystent przeglądu kodu wymaga twojej uwagi.",
       "recoveryLabel": "Skontaktuj się z pomocą techniczną"
     },
-    "unknownError": "Wystąpił nieznany błąd."
+    "unknownError": "Wystąpił nieznany błąd.",
+    "skipBotPullRequests": {
+      "title": "Pomijaj pull requesty od botów",
+      "subtitle": "Nie uruchamiaj automatycznych przeglądów pull requestów otwieranych przez boty, takie jak Dependabot czy Renovate. Wyłącz tę opcję, aby przeglądać także pull requesty botów."
+    },
+    "repoModels": {
+      "title": "Model dla repozytorium",
+      "description": "Przeprowadzaj przeglądy niektórych repozytoriów z innym modelem, poziomem rozumowania lub oboma.",
+      "defaultModel": "Używa modelu domyślnego",
+      "resetLabel": "Przywróć domyślny model dla {{repository}}",
+      "changeHint": "Otwiera wybór modelu"
+    },
+    "analytics": {
+      "title": "Analityka",
+      "period": "Zakres czasu",
+      "trackedReviews": "Śledzone przeglądy",
+      "findingsRaised": "Zgłoszone problemy",
+      "highImpactChanges": "Zmiany o dużym wpływie",
+      "impactPoints": "Punkty wpływu",
+      "repositoryLine": "Przeglądy: {{reviews}} · Problemy: {{findings}}",
+      "empty": "Brak przeglądów z analityką",
+      "emptyDescription": "Analityka rejestruje ukończone przeglądy, dopóki jest włączona dla organizacji.",
+      "off": "Analityka jest wyłączona dla tej organizacji.",
+      "couldNotLoad": "Nie udało się wczytać analityki"
+    },
+    "council": {
+      "title": "Przegląd rady",
+      "subtitle": "Każdy pull request przegląda kilku specjalistów, a ich głosy łączą się w jedną decyzję.",
+      "unavailable": "Przegląd rady nie jest dostępny dla tej organizacji.",
+      "noRepositories": "Nie wybrano jeszcze żadnego repozytorium. Najpierw wybierz repozytoria w ustawieniach repozytoriów.",
+      "specialists": "Specjaliści",
+      "labels": "Etykiety uruchamiające przegląd rady",
+      "labelsPlaceholder": "np. rada, przegląd szczegółowy",
+      "labelsDescription": "Oddziel etykiety przecinkami. Repozytorium z włączoną radą uruchamia przegląd rady tylko dla pull requestów mających co najmniej jedną z tych etykiet. Pozostaw puste, aby objąć każdy kwalifikujący się pull request.",
+      "minSpecialists": "Wybierz co najmniej {{minimum}} specjalistów. Wybrano: {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Pokrycie testami",
+        "correctness": "Poprawność",
+        "custom": "Specjalista"
+      },
+      "specialist": {
+        "security": "Omijanie autoryzacji, obsługa sekretów i niebezpieczne dane wejściowe.",
+        "performance": "Gorące ścieżki, zapytania N+1 i duże alokacje.",
+        "testing": "Brakujące lub słabe pokrycie nowego zachowania.",
+        "correctness": "Błędy logiczne, przypadki brzegowe i warunki wyścigu.",
+        "custom": "Przegląda problemy w swoim obszarze."
+      },
+      "strategy": {
+        "advisory": "Doradczy",
+        "advisoryDescription": "Zgłasza problemy i głosuje bez blokowania scalania.",
+        "unanimous": "Jednomyślny",
+        "unanimousDescription": "Blokuje scalanie, gdy którykolwiek specjalista zgłosi krytyczny problem.",
+        "majority": "Większość",
+        "majorityDescription": "Blokuje scalanie tylko wtedy, gdy większość specjalistów zgłosi krytyczny problem."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1369,6 +1434,16 @@
       "auto": "Automatyczna",
       "shallow": "Podstawowa",
       "deep": "Szczegółowa"
+    },
+    "orphanedFindings": {
+      "title": "Problemy usuniętych repozytoriów",
+      "description": "Te repozytoria nie są już dostępne przez integrację GitHub. Ich problemy nadal są liczone na pulpitach i w raportach.",
+      "count": "Problemy: {{count}}",
+      "clearLabel": "Wyczyść problemy dla {{repository}}",
+      "confirmTitle": "Wyczyścić problemy?",
+      "confirmMessage": "Wszystkie zapisane problemy dla {{repository}} zostaną usunięte. Tej operacji nie można cofnąć.",
+      "confirmAction": "Usuń problemy",
+      "cleared": "Problemy wyczyszczone: {{count}}"
     }
   },
   "agents": {

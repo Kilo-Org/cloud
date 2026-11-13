@@ -26,38 +26,42 @@ export type CodeReviewActionRequiredCopy = {
   recoveryLabel: string;
 };
 
+// One title for every reason: the banner, the check run and the email all say the
+// same thing, so a reword happens here once.
+const CODE_REVIEW_ACTION_REQUIRED_TITLE = 'Code Reviewer needs attention';
+
 const COPY_BY_REASON: Record<CodeReviewActionRequiredReason, CodeReviewActionRequiredCopy> = {
   github_installation_required: {
-    title: 'Code Reviewer needs attention',
+    title: CODE_REVIEW_ACTION_REQUIRED_TITLE,
     description:
       'Code Reviewer was disabled because Kilo cannot access this repository with an active GitHub App installation. Update the GitHub App installation, then enable Code Reviewer again.',
     recoveryLabel: 'Update GitHub App',
   },
   github_ip_allow_list: {
-    title: 'Code Reviewer needs attention',
+    title: CODE_REVIEW_ACTION_REQUIRED_TITLE,
     description: `Code Reviewer was disabled because this GitHub organization uses an IP allow list that blocks Kilo. Contact ${SUPPORT_EMAIL} for help, then enable Code Reviewer again.`,
     recoveryLabel: 'Contact support',
   },
   gitlab_project_access_required: {
-    title: 'Code Reviewer needs attention',
+    title: CODE_REVIEW_ACTION_REQUIRED_TITLE,
     description:
       'Code Reviewer was disabled because Kilo cannot create a GitLab Project Access Token for this project. Grant Maintainer access or enable Project Access Tokens, then enable Code Reviewer again.',
     recoveryLabel: 'Update GitLab integration',
   },
   byok_invalid_key: {
-    title: 'Code Reviewer needs attention',
+    title: CODE_REVIEW_ACTION_REQUIRED_TITLE,
     description:
       'Code Reviewer was disabled because the selected BYOK API key is invalid, revoked, or lacks permission. Update the key or choose another model, then enable Code Reviewer again.',
     recoveryLabel: 'Update BYOK settings',
   },
   selected_model_unavailable: {
-    title: 'Code Reviewer needs attention',
+    title: CODE_REVIEW_ACTION_REQUIRED_TITLE,
     description:
       'Code Reviewer was disabled because the selected model is not available for cloud agent sessions. Choose an available model, then enable Code Reviewer again.',
     recoveryLabel: 'Update Code Reviewer settings',
   },
   repeated_repository_clone_timeout: {
-    title: 'Code Reviewer needs attention',
+    title: CODE_REVIEW_ACTION_REQUIRED_TITLE,
     description: `Code Reviewer was disabled after three repository clone timeouts today. Contact ${SUPPORT_EMAIL} for help, then enable Code Reviewer again.`,
     recoveryLabel: 'Contact support',
   },

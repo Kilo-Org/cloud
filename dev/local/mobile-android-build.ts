@@ -70,7 +70,13 @@ export function buildAndroidFingerprintOptions(): {
     // The generated android/ tree is output, not an input: its bytes differ
     // per worktree. Pin it out of the hash so no fingerprint version can key
     // builds on it.
-    ignorePaths: ['android/**', 'modules/*/src/**', 'modules/**/*.test.ts'],
+    ignorePaths: [
+      'android/**',
+      // Module build output is generated per tree and machine, not an input.
+      'modules/**/build/**',
+      'modules/*/src/**',
+      'modules/**/*.test.ts',
+    ],
     extraSources: [
       {
         type: 'contents',

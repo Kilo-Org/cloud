@@ -24,9 +24,10 @@ class KiloViewTagRangeModule : Module() {
 }
 
 private object ViewTagRanges {
-  // Each instance may allocate this many tags before its range is spent: an instance that
-  // mounts and recycles far more views than this in one life would start aliasing the next
-  // range, which is the state the ranges exist to avoid.
+  // The distance between one instance's first tag and the next instance's: tags advance by
+  // two, so one instance holds half this many before its range is spent. An instance that
+  // mounts and recycles more views than that in one life would start aliasing the next range,
+  // which is the state the ranges exist to avoid.
   private const val RANGE_SIZE = 1 shl 21
 
   private var claimed = 0

@@ -22,6 +22,9 @@
     "expired": "Expirado"
   },
   "common": {
+    "creditHistory": "Histórico de créditos",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancelar",
@@ -118,6 +121,7 @@
     "copyLink": "Copiar link",
     "couldNotLoadOrganizations": "Não foi possível carregar as organizações.",
     "couldNotLoadSessions": "Não foi possível carregar as sessões.",
+    "couldnTLoad": "Não foi possível carregar.",
     "couldnTLoadMore": "Não foi possível carregar mais itens.",
     "deviceSessions": "Sessões nos dispositivos",
     "disabled": "Desativado",
@@ -245,6 +249,10 @@
     "notAdded": "Você entrou. {{provider}} não foi adicionado à sua conta."
   },
   "profile": {
+    "creditHistorySubtitle": "Compras, recibos e movimentação de créditos",
+    "invoicesSubtitle": "Baixe as faturas das suas compras",
+    "manageBilling": "Gerenciar cobrança em kilo.ai",
+    "manageBillingIosNote": "Formas de pagamento, recarga automática e dados de cobrança são gerenciados em kilo.ai.",
     "codeReviewerSubtitle": "Revisões automáticas de PR",
     "securityAgentSubtitle": "Encontrar e corrigir vulnerabilidades",
     "reviews": "Revisões",
@@ -2354,6 +2362,26 @@
     "onlyFirstFilesAttached_many": "Apenas os primeiros {{displayCount}} arquivos serão anexados."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Histórico de cobrança",
+      "billingHistoryEmpty": "Nenhum histórico de cobrança ainda.",
+      "cancel": "Cancelar assinatura",
+      "cancelDescription": "Seu Kilo Pass continua ativo até o fim do período de cobrança e não será renovado.",
+      "cancelScheduled": "Será cancelada em {{date}}",
+      "cancelScheduledChange": "Cancelar alteração agendada",
+      "cancelled": "Assinatura cancelada",
+      "changePlan": "Alterar plano em kilo.ai",
+      "changePlanIosNote": "Alterações de planos pagos estão disponíveis em kilo.ai.",
+      "creditHistoryEmpty": "Nenhum crédito do Kilo Pass ainda.",
+      "manageInStore": "Gerenciar na {{store}}",
+      "resume": "Retomar assinatura",
+      "resumeCancelledDescription": "Seu Kilo Pass voltará a ser renovado automaticamente.",
+      "resumePausedDescription": "Seu Kilo Pass será retomado agora, antes da data de retomada agendada.",
+      "resumed": "Assinatura retomada",
+      "scheduledChange": "Alteração agendada",
+      "scheduledChangeCancelDescription": "Seu Kilo Pass continua no plano atual e será renovado como hoje.",
+      "scheduledChangeSummary": "{{plan}} em {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "O Kilo Pass está indisponível.",
     "couldNotLoad": "Não foi possível carregar o Kilo Pass. Tente novamente.",
@@ -3941,6 +3969,25 @@
     "importConfigApplied": "Config importada"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Não foi possível carregar a atividade de crédito.",
+      "appStoreReceipt": "Recibo na App Store",
+      "deductionFallback": "Dedução de créditos",
+      "emptyDescription": "Compras de créditos, recibos e uso aparecerão aqui.",
+      "emptyTitle": "Nenhum histórico de créditos",
+      "googlePlayReceipt": "Recibo no Google Play",
+      "kind": {
+        "adjustment": "Ajuste",
+        "balanceNeutral": "Sem efeito no saldo",
+        "deduction": "Dedução",
+        "grant": "Créditos concedidos",
+        "purchase": "Compra"
+      },
+      "purchaseFallback": "Compra de créditos",
+      "receipt": "Recibo",
+      "receiptA11y": "Abrir o recibo de {{description}}",
+      "receiptUnavailable": "Não há recibo disponível para esta compra."
+    },
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de codificação com IA no Kilo App. A loja cobra na sua conta e os créditos são adicionados depois que a loja confirma o pagamento.",
     "nextExpiry": "{{amount}} em créditos expiram em {{date}} (UTC). Os créditos com vencimento mais próximo são usados primeiro.",
@@ -4126,6 +4173,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Não foi possível abrir este resultado da pesquisa"
+  },
+  "invoices": {
+    "personalEmptyDescription": "As faturas das suas compras aparecerão aqui assim que você for cobrado."
   },
   "cloudAgent": {
     "compute": {

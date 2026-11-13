@@ -22,6 +22,9 @@
     "expired": "Útrunnið"
   },
   "common": {
+    "creditHistory": "Inneignarferill",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Hætta við",
@@ -118,6 +121,7 @@
     "copyLink": "Afrita tengil",
     "couldNotLoadOrganizations": "Tókst ekki að sækja fyrirtæki.",
     "couldNotLoadSessions": "Tókst ekki að sækja lotur.",
+    "couldnTLoad": "Tókst ekki að sækja.",
     "couldnTLoadMore": "Tókst ekki að sækja meira.",
     "deviceSessions": "Innskráningar í tækjum",
     "disabled": "Óvirkt",
@@ -245,6 +249,10 @@
     "notAdded": "Innskráning tókst. {{provider}} var ekki bætt við reikninginn þinn."
   },
   "profile": {
+    "creditHistorySubtitle": "Kaup, kvittanir og hreyfingar inneignar",
+    "invoicesSubtitle": "Sæktu reikninga fyrir kaupin þín",
+    "manageBilling": "Stjórna greiðslum á kilo.ai",
+    "manageBillingIosNote": "Greiðslumátum, sjálfvirkri áfyllingu og greiðsluupplýsingum er stjórnað á kilo.ai.",
     "codeReviewerSubtitle": "Sjálfvirk yfirferð PR",
     "securityAgentSubtitle": "Finna og laga veikleika",
     "reviews": "Yfirferðir",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "Aðeins fyrstu {{displayCount}} skrárnar verða hengdar við."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Greiðsluferill",
+      "billingHistoryEmpty": "Enginn greiðsluferill enn.",
+      "cancel": "Segja upp áskrift",
+      "cancelDescription": "Kilo Pass verður áfram virkt til loka greiðslutímabilsins og endurnýjast ekki.",
+      "cancelScheduled": "Lýkur {{date}}",
+      "cancelScheduledChange": "Hætta við áætlaða breytingu",
+      "cancelled": "Áskrift sagt upp",
+      "changePlan": "Breyta áskriftarleið á kilo.ai",
+      "changePlanIosNote": "Hægt er að breyta greiddum áskriftarleiðum á kilo.ai.",
+      "creditHistoryEmpty": "Engin Kilo Pass-inneign enn.",
+      "manageInStore": "Stjórna í {{store}}",
+      "resume": "Halda áskrift áfram",
+      "resumeCancelledDescription": "Kilo Pass byrjar aftur að endurnýjast sjálfkrafa.",
+      "resumePausedDescription": "Kilo Pass fer aftur í gang núna, á undan áætluðum degi.",
+      "resumed": "Áskrift virk á ný",
+      "scheduledChange": "Áætluð breyting",
+      "scheduledChangeCancelDescription": "Kilo Pass helst á núverandi áskriftarleið og endurnýjast eins og áður.",
+      "scheduledChangeSummary": "{{plan}} þann {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass er ekki tiltækt.",
     "couldNotLoad": "Ekki tókst að sækja upplýsingar um Kilo Pass. Reyndu aftur.",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Stillingar fluttar inn"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Gat ekki hlaðið inneignarferli.",
+      "appStoreReceipt": "Kvittun frá App Store",
+      "deductionFallback": "Frádráttur inneignar",
+      "emptyDescription": "Kaup á inneign, kvittanir og notkun birtast hér.",
+      "emptyTitle": "Enginn inneignarferill",
+      "googlePlayReceipt": "Kvittun frá Google Play",
+      "kind": {
+        "adjustment": "Leiðrétting",
+        "balanceNeutral": "Hefur ekki áhrif á stöðu",
+        "deduction": "Frádráttur",
+        "grant": "Úthlutuð inneign",
+        "purchase": "Kaup"
+      },
+      "purchaseFallback": "Kaup á inneign",
+      "receipt": "Kvittun",
+      "receiptA11y": "Opna kvittun fyrir {{description}}",
+      "receiptUnavailable": "Engin kvittun er tiltæk fyrir þessi kaup."
+    },
     "title": "Kaupa inneign",
     "description": "Inneign er einstakt kaup sem bætist við Kilo-stöðuna þína til að keyra AI-forritunarlotur í Kilo App. Verslunin rukkar reikninginn þinn og inneign bætist við eftir að verslunin staðfestir greiðsluna.",
     "nextExpiry": "Inneign að upphæð {{amount}} rennur út {{date}} (UTC). Inneign sem rennur fyrst út er notuð fyrst.",
@@ -4055,6 +4102,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ekki tókst að opna þessa leitarniðurstöðu"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Reikningar fyrir þín eigin kaup birtast hér eftir fyrstu greiðslu."
   },
   "cloudAgent": {
     "compute": {

@@ -22,6 +22,9 @@
     "expired": "Termiņš beidzies"
   },
   "common": {
+    "creditHistory": "Kredītu vēsture",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Atcelt",
@@ -118,6 +121,7 @@
     "copyLink": "Kopēt saiti",
     "couldNotLoadOrganizations": "Neizdevās ielādēt organizācijas.",
     "couldNotLoadSessions": "Neizdevās ielādēt sesijas.",
+    "couldnTLoad": "Neizdevās ielādēt.",
     "couldnTLoadMore": "Neizdevās ielādēt vairāk.",
     "deviceSessions": "Ierīču sesijas",
     "disabled": "Atspējots",
@@ -245,6 +249,10 @@
     "notAdded": "Tu esi pierakstījies. {{provider}} netika pievienots tavam kontam."
   },
   "profile": {
+    "creditHistorySubtitle": "Pirkumi, kvītis un kredītu darbības",
+    "invoicesSubtitle": "Lejupielādējiet rēķinus par saviem pirkumiem",
+    "manageBilling": "Pārvaldīt norēķinus vietnē kilo.ai",
+    "manageBillingIosNote": "Maksājumu veidi, automātiskā papildināšana un norēķinu informācija tiek pārvaldīta vietnē kilo.ai.",
     "codeReviewerSubtitle": "Automātiskas PR pārbaudes",
     "securityAgentSubtitle": "Atrast un novērst ievainojamības",
     "reviews": "Koda pārbaudes",
@@ -2913,6 +2921,26 @@
     "onlyFirstFilesAttached_zero": "Tiks pievienoti tikai pirmie {{displayCount}} faili."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Norēķinu vēsture",
+      "billingHistoryEmpty": "Norēķinu vēstures vēl nav.",
+      "cancel": "Atcelt abonementu",
+      "cancelDescription": "Jūsu Kilo Pass paliek aktīvs līdz norēķinu perioda beigām un netiks atjaunots.",
+      "cancelScheduled": "Tiks atcelts {{date}}",
+      "cancelScheduledChange": "Atcelt ieplānotās izmaiņas",
+      "cancelled": "Abonements atcelts",
+      "changePlan": "Mainīt plānu vietnē kilo.ai",
+      "changePlanIosNote": "Maksas plānu maiņa ir pieejama vietnē kilo.ai.",
+      "creditHistoryEmpty": "Kilo Pass kredītu vēl nav.",
+      "manageInStore": "Pārvaldīt veikalā {{store}}",
+      "resume": "Atsākt abonementu",
+      "resumeCancelledDescription": "Jūsu Kilo Pass atkal tiks automātiski atjaunots.",
+      "resumePausedDescription": "Jūsu Kilo Pass darbība atsāksies tūlīt, pirms ieplānotā atsākšanas datuma.",
+      "resumed": "Abonements atsākts",
+      "scheduledChange": "Ieplānotās izmaiņas",
+      "scheduledChangeCancelDescription": "Jūsu Kilo Pass paliks pašreizējā plānā un tiks atjaunots tāpat kā līdz šim.",
+      "scheduledChangeSummary": "{{plan}} no {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass nav pieejams.",
     "couldNotLoad": "Neizdevās ielādēt Kilo Pass. Mēģini vēlreiz.",
@@ -3935,6 +3963,25 @@
     "importConfigApplied": "Konfigurācija importēta"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Neizdevās ielādēt kredīta aktivitāti.",
+      "appStoreReceipt": "Kvīts veikalā App Store",
+      "deductionFallback": "Kredītu norakstīšana",
+      "emptyDescription": "Šeit būs redzami kredītu pirkumi, kvītis un lietojums.",
+      "emptyTitle": "Nav kredītu vēstures",
+      "googlePlayReceipt": "Kvīts pakalpojumā Google Play",
+      "kind": {
+        "adjustment": "Korekcija",
+        "balanceNeutral": "Neietekmē atlikumu",
+        "deduction": "Norakstīšana",
+        "grant": "Kredītu piešķīrums",
+        "purchase": "Pirkums"
+      },
+      "purchaseFallback": "Kredītu pirkums",
+      "receipt": "Kvīts",
+      "receiptA11y": "Atvērt kvīti: {{description}}",
+      "receiptUnavailable": "Šim pirkumam kvīts nav pieejama."
+    },
     "title": "Pirkt kredītus",
     "description": "Kredīti ir vienreizējs pirkums, kas tiek pievienots tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App. Veikals iekasē maksu no tava konta, un kredīti tiek pievienoti pēc tam, kad veikals apstiprina maksājumu.",
     "nextExpiry": "Kredītu {{amount}} apmērā derīguma termiņš beidzas {{date}} (UTC). Vispirms tiek izmantoti kredīti ar agrāko derīguma termiņu.",
@@ -4120,6 +4167,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Neizdevās atvērt šo meklēšanas rezultātu"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Rēķini par jūsu pirkumiem šeit parādīsies, kad jums tiks izrakstīts rēķins."
   },
   "cloudAgent": {
     "compute": {

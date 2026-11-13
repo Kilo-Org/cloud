@@ -22,6 +22,9 @@
     "expired": "Lany fe-potoana"
   },
   "common": {
+    "creditHistory": "Tantaran'ny kredita",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Foano",
@@ -118,6 +121,7 @@
     "copyLink": "Adikao ny rohy",
     "couldNotLoadOrganizations": "Tsy tafiditra ny fikambanana.",
     "couldNotLoadSessions": "Tsy tafiditra ny fotoam-piasana.",
+    "couldnTLoad": "Tsy tafiditra.",
     "couldnTLoadMore": "Tsy tafiditra ny manaraka.",
     "deviceSessions": "Fotoam-piasana amin'ny fitaovana",
     "disabled": "Tsy mandeha",
@@ -245,6 +249,10 @@
     "notAdded": "Tafiditra ianao. Tsy nampiana tao amin'ny kaontinao {{provider}}."
   },
   "profile": {
+    "creditHistorySubtitle": "Fividianana, rosia ary hetsika momba ny kredita",
+    "invoicesSubtitle": "Ampidino ny faktioran'ny fividiananao",
+    "manageBilling": "Tantano ny fandoavam-bola ao amin'ny kilo.ai",
+    "manageBillingIosNote": "Ao amin'ny kilo.ai no itantanana ny fomba fandoavam-bola, ny famenoana ho azy ary ny antsipirian'ny fandoavam-bola.",
     "codeReviewerSubtitle": "Fandinihana PR mandeha ho azy",
     "securityAgentSubtitle": "Tadiavo sy ahitsio ny fahalemena ara-piarovana",
     "reviews": "Fandinihana",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "Ny rakitra {{displayCount}} voalohany ihany no hatambatra amin'ny hafatra."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Tantaran'ny fandoavam-bola",
+      "billingHistoryEmpty": "Mbola tsy misy tantaran'ny fandoavam-bola.",
+      "cancel": "Foano ny famandrihana",
+      "cancelDescription": "Mijanona ho mavitrika hatramin'ny fiafaran'ny vanim-potoana fandoavam-bola ny Kilo Pass anao ary tsy havaozina intsony.",
+      "cancelScheduled": "Hofoanana amin'ny {{date}}",
+      "cancelScheduledChange": "Foano ny fanovana voalahatra",
+      "cancelled": "Voafoana ny famandrihana",
+      "changePlan": "Ovay ny tolotra ao amin'ny kilo.ai",
+      "changePlanIosNote": "Azo atao ao amin'ny kilo.ai ny fanovana tolotra mandoa vola.",
+      "creditHistoryEmpty": "Mbola tsy misy kredita Kilo Pass.",
+      "manageInStore": "Tantano ao amin'ny {{store}}",
+      "resume": "Tohizo ny famandrihana",
+      "resumeCancelledDescription": "Hiverina havaozina ho azy indray ny Kilo Pass anao.",
+      "resumePausedDescription": "Mitohy izao ny Kilo Pass anao, alohan'ny daty voalahatra hitohizany.",
+      "resumed": "Nitohy ny famandrihana",
+      "scheduledChange": "Fanovana voalahatra",
+      "scheduledChangeCancelDescription": "Mijanona amin'ny tolotra misy azy ankehitriny ny Kilo Pass anao ary havaozina toy ny amin'izao.",
+      "scheduledChangeSummary": "{{plan}} amin'ny {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Tsy azo ampiasaina ny Kilo Pass.",
     "couldNotLoad": "Tsy nety nampidirina ny Kilo Pass. Andramo indray.",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Voadika ny config"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Tsy afaka nampidirina ny hetsika momba ny trosa.",
+      "appStoreReceipt": "Rosia avy amin'ny App Store",
+      "deductionFallback": "Fanalana kredita",
+      "emptyDescription": "Hiseho eto ny fividianana kredita, ny rosia ary ny fampiasana.",
+      "emptyTitle": "Tsy misy tantaran'ny kredita",
+      "googlePlayReceipt": "Rosia avy amin'ny Google Play",
+      "kind": {
+        "adjustment": "Fanitsiana",
+        "balanceNeutral": "Tsy manova ny sisa",
+        "deduction": "Fanalana",
+        "grant": "Kredita nomena",
+        "purchase": "Fividianana"
+      },
+      "purchaseFallback": "Fividianana kredita",
+      "receipt": "Rosia",
+      "receiptA11y": "Sokafy ny rosia ho an'ny {{description}}",
+      "receiptUnavailable": "Tsy misy rosia ho an'ity fividianana ity."
+    },
     "title": "Hividy kireditra",
     "description": "Ny kireditra dia fividianana indray mandeha ampiana amin'ny balan Kilo anao hanaovana session coding AI ao amin'ny Kilo App. Ny fivarotana no maka vola amin'ny kaontinao ary ampiana ny kireditra rehefa manamarina ny fandoavam-bola ny fivarotana.",
     "nextExpiry": "Kireditra {{amount}} ho lany daty amin'ny {{date}} (UTC). Ny kireditra ho lany daty voalohany no ampiasaina aloha.",
@@ -4055,6 +4102,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Tsy voasokatra ity valim-pikarohana ity"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Hiseho eto ny faktioran'ny fividiananao manokana rehefa voaloa ianao."
   },
   "cloudAgent": {
     "compute": {

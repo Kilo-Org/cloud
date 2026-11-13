@@ -237,6 +237,12 @@ vi.mock('@/components/add-credits-row', () => ({
 const kiloPassCardProps = vi.hoisted(() => ({
   latest: undefined as { hideLoadingSkeleton?: boolean } | undefined,
 }));
+vi.mock('@/components/credits/credits-links', () => ({
+  // The card's own contract is the balance block; the personal rows have their
+  // own mounted suite.
+  PersonalCreditsLinks: () => null,
+}));
+
 vi.mock('@/components/kilo-pass/kilo-pass-subscription-card', () => ({
   KiloPassSubscriptionCard: (props: { hideLoadingSkeleton?: boolean }) => {
     kiloPassCardProps.latest = props;

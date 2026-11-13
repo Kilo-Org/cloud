@@ -6,7 +6,7 @@ import {
 } from '@/lib/share-remote-file';
 import { firstNonEmpty } from '@/lib/utils';
 
-const INVOICE_CACHE_DIRECTORY = 'org-invoices';
+const INVOICE_CACHE_DIRECTORY = 'invoices';
 
 type InvoiceRowState = 'idle' | 'busy' | 'no-affordance';
 
@@ -21,7 +21,7 @@ type InvoiceRowStateInput = {
 };
 
 /**
- * Visual state for an organization invoice row.
+ * Visual state for an invoice row.
  *
  * Exactly three states: no PDF → no affordance; sharing in flight → busy;
  * otherwise idle. Failures are transient (toast then idle) and are not modeled
@@ -65,7 +65,7 @@ export function getInvoicePdfFilename(invoice: {
   return stem.toLowerCase().endsWith('.pdf') ? stem : `${stem}.pdf`;
 }
 
-export async function shareOrganizationInvoicePdf(invoice: {
+export async function shareInvoicePdf(invoice: {
   readonly id: string;
   readonly number: string | null;
   readonly description?: string | null;

@@ -22,6 +22,9 @@
     "expired": "Термін дії минув"
   },
   "common": {
+    "creditHistory": "Історія кредитів",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Скасувати",
@@ -118,6 +121,7 @@
     "copyLink": "Скопіювати посилання",
     "couldNotLoadOrganizations": "Не вдалося завантажити організації.",
     "couldNotLoadSessions": "Не вдалося завантажити сеанси.",
+    "couldnTLoad": "Не вдалося завантажити.",
     "couldnTLoadMore": "Не вдалося завантажити більше даних.",
     "deviceSessions": "Сеанси на пристроях",
     "disabled": "Вимкнено",
@@ -245,6 +249,10 @@
     "notAdded": "Ви увійшли. {{provider}} не додано до вашого облікового запису."
   },
   "profile": {
+    "creditHistorySubtitle": "Покупки, квитанції та операції з кредитами",
+    "invoicesSubtitle": "Завантажуйте рахунки за свої покупки",
+    "manageBilling": "Керувати оплатою на kilo.ai",
+    "manageBillingIosNote": "Способи оплати, автопоповнення та платіжні дані керуються на kilo.ai.",
     "codeReviewerSubtitle": "Автоматичні перевірки PR",
     "securityAgentSubtitle": "Пошук і усунення вразливостей",
     "reviews": "Перевірки",
@@ -2378,6 +2386,26 @@
     "onlyFirstFilesAttached_many": "Буде вкладено лише перші файли: {{displayCount}}."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Історія платежів",
+      "billingHistoryEmpty": "Історії платежів ще немає.",
+      "cancel": "Скасувати підписку",
+      "cancelDescription": "Ваш Kilo Pass залишиться активним до кінця розрахункового періоду й не буде поновлений.",
+      "cancelScheduled": "Скасовується {{date}}",
+      "cancelScheduledChange": "Скасувати заплановану зміну",
+      "cancelled": "Підписку скасовано",
+      "changePlan": "Змінити план на kilo.ai",
+      "changePlanIosNote": "Змінити платний план можна на kilo.ai.",
+      "creditHistoryEmpty": "Кредитів Kilo Pass ще немає.",
+      "manageInStore": "Керувати в {{store}}",
+      "resume": "Відновити підписку",
+      "resumeCancelledDescription": "Ваш Kilo Pass знову поновлюватиметься автоматично.",
+      "resumePausedDescription": "Ваш Kilo Pass відновиться зараз, раніше запланованої дати відновлення.",
+      "resumed": "Підписку відновлено",
+      "scheduledChange": "Запланована зміна",
+      "scheduledChangeCancelDescription": "Ваш Kilo Pass залишиться на поточному плані й поновлюватиметься, як і зараз.",
+      "scheduledChangeSummary": "{{plan}} з {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass недоступний.",
     "couldNotLoad": "Не вдалося завантажити Kilo Pass. Спробуйте ще раз.",
@@ -3996,6 +4024,25 @@
     "importConfigApplied": "Конфігурацію імпортовано"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Не вдалося завантажити кредитну активність.",
+      "appStoreReceipt": "Квитанція в App Store",
+      "deductionFallback": "Списання кредитів",
+      "emptyDescription": "Тут з’являтимуться покупки кредитів, квитанції та використання.",
+      "emptyTitle": "Історії кредитів немає",
+      "googlePlayReceipt": "Квитанція в Google Play",
+      "kind": {
+        "adjustment": "Коригування",
+        "balanceNeutral": "Без зміни балансу",
+        "deduction": "Списання",
+        "grant": "Нарахування кредитів",
+        "purchase": "Покупка"
+      },
+      "purchaseFallback": "Покупка кредитів",
+      "receipt": "Квитанція",
+      "receiptA11y": "Відкрити квитанцію для {{description}}",
+      "receiptUnavailable": "Квитанція для цієї покупки недоступна."
+    },
     "title": "Купити кредити",
     "description": "Кредити — це разова покупка, яка додається на ваш баланс Kilo для запуску AI-сесій кодування в Kilo App. Магазин списує кошти з вашого акаунта, і кредити нараховуються після підтвердження оплати магазином.",
     "nextExpiry": "Термін дії кредитів на суму {{amount}} спливає {{date}} (UTC). Спершу використовуються кредити з найранішим терміном дії.",
@@ -4185,6 +4232,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Не вдалося відкрити цей результат пошуку"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Рахунки за ваші власні покупки з’являться тут після першого списання оплати."
   },
   "cloudAgent": {
     "compute": {

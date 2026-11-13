@@ -22,6 +22,9 @@
     "expired": "已过期"
   },
   "common": {
+    "creditHistory": "积分记录",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": "。",
     "listJoiner": "、",
     "cancel": "取消",
@@ -118,6 +121,7 @@
     "copyLink": "复制链接",
     "couldNotLoadOrganizations": "无法加载组织",
     "couldNotLoadSessions": "无法加载会话",
+    "couldnTLoad": "无法加载",
     "couldnTLoadMore": "无法加载更多内容",
     "deviceSessions": "登录设备",
     "disabled": "已禁用",
@@ -245,6 +249,10 @@
     "notAdded": "你已登录，但未能将 {{provider}} 添加到你的账户。"
   },
   "profile": {
+    "creditHistorySubtitle": "购买、收据和积分动态",
+    "invoicesSubtitle": "下载购买发票",
+    "manageBilling": "在 kilo.ai 管理账单",
+    "manageBillingIosNote": "付款方式、自动充值和账单详情请在 kilo.ai 上管理。",
     "codeReviewerSubtitle": "自动 PR 审查",
     "securityAgentSubtitle": "查找并修复漏洞",
     "reviews": "审查",
@@ -2318,6 +2326,26 @@
     "onlyFirstFilesAttached_other": "仅附加前 {{displayCount}} 个文件。"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "账单记录",
+      "billingHistoryEmpty": "暂无账单记录。",
+      "cancel": "取消订阅",
+      "cancelDescription": "你的 Kilo Pass 将保持有效至当前计费周期结束，之后不再续订。",
+      "cancelScheduled": "将于 {{date}} 取消",
+      "cancelScheduledChange": "取消计划变更",
+      "cancelled": "已取消订阅",
+      "changePlan": "在 kilo.ai 更改方案",
+      "changePlanIosNote": "付费方案变更请前往 kilo.ai。",
+      "creditHistoryEmpty": "暂无 Kilo Pass 积分。",
+      "manageInStore": "在 {{store}} 中管理",
+      "resume": "恢复订阅",
+      "resumeCancelledDescription": "你的 Kilo Pass 将重新开始自动续订。",
+      "resumePausedDescription": "你的 Kilo Pass 将立即恢复，早于原定的恢复日期。",
+      "resumed": "订阅已恢复",
+      "scheduledChange": "计划变更",
+      "scheduledChangeCancelDescription": "你的 Kilo Pass 将保持当前方案，并照常续订。",
+      "scheduledChangeSummary": "{{date}} 变更为 {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass 暂不可用。",
     "couldNotLoad": "无法加载 Kilo Pass。请重试。",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "配置已导入"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "无法加载积分活动。",
+      "appStoreReceipt": "收据位于 App Store",
+      "deductionFallback": "积分扣除",
+      "emptyDescription": "积分购买、收据和使用情况将显示在这里。",
+      "emptyTitle": "暂无积分记录",
+      "googlePlayReceipt": "收据位于 Google Play",
+      "kind": {
+        "adjustment": "调整",
+        "balanceNeutral": "余额不变",
+        "deduction": "扣除",
+        "grant": "赠送积分",
+        "purchase": "购买"
+      },
+      "purchaseFallback": "积分购买",
+      "receipt": "收据",
+      "receiptA11y": "打开 {{description}} 的收据",
+      "receiptUnavailable": "此购买暂无可用收据。"
+    },
     "title": "购买额度",
     "description": "额度是一次性购买，会添加到你的 Kilo 余额中，用于在 Kilo App 中运行 AI 编程会话。商店会向你的账户收费，商店确认付款后额度才会到账。",
     "nextExpiry": "{{amount}} 的额度将于 {{date}}（UTC）到期。最早到期的额度会优先使用。",
@@ -4055,6 +4102,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "无法打开此搜索结果"
+  },
+  "invoices": {
+    "personalEmptyDescription": "产生扣费后，你个人购买的发票将显示在这里。"
   },
   "cloudAgent": {
     "compute": {

@@ -22,6 +22,9 @@
     "expired": "Мерзімі өтті"
   },
   "common": {
+    "creditHistory": "Кредиттер тарихы",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Болдырмау",
@@ -118,6 +121,7 @@
     "copyLink": "Сілтемені көшіру",
     "couldNotLoadOrganizations": "Ұйымдарды жүктеу мүмкін болмады.",
     "couldNotLoadSessions": "Сессияларды жүктеу мүмкін болмады.",
+    "couldnTLoad": "Жүктеу мүмкін болмады.",
     "couldnTLoadMore": "Қосымша деректерді жүктеу мүмкін болмады.",
     "deviceSessions": "Құрылғылардағы сессиялар",
     "disabled": "Өшірілген",
@@ -245,6 +249,10 @@
     "notAdded": "Сіз кірдіңіз. {{provider}} аккаунтыңызға қосылмады."
   },
   "profile": {
+    "creditHistorySubtitle": "Сатып алулар, түбіртектер және кредит әрекеттері",
+    "invoicesSubtitle": "Сатып алуларыңыздың шот-фактураларын жүктеп алыңыз",
+    "manageBilling": "Төлемдерді kilo.ai сайтында басқару",
+    "manageBillingIosNote": "Төлем әдістері, автоматты толтыру және төлем деректері kilo.ai сайтында басқарылады.",
     "codeReviewerSubtitle": "PR сұрауларын автоматты тексеру",
     "securityAgentSubtitle": "Осалдықтарды табу және жою",
     "reviews": "Тексерулер",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "Тек алғашқы {{displayCount}} файл тіркеледі."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Төлемдер тарихы",
+      "billingHistoryEmpty": "Төлемдер тарихы әзірге жоқ.",
+      "cancel": "Жазылымнан бас тарту",
+      "cancelDescription": "Kilo Pass төлем кезеңінің соңына дейін белсенді болып қалады және ұзартылмайды.",
+      "cancelScheduled": "{{date}} күні тоқтатылады",
+      "cancelScheduledChange": "Жоспарланған өзгерісті болдырмау",
+      "cancelled": "Жазылымнан бас тартылды",
+      "changePlan": "Жоспарды kilo.ai сайтында өзгерту",
+      "changePlanIosNote": "Ақылы жоспарды өзгерту kilo.ai сайтында қолжетімді.",
+      "creditHistoryEmpty": "Kilo Pass кредиттері әзірге жоқ.",
+      "manageInStore": "{{store}} арқылы басқару",
+      "resume": "Жазылымды жалғастыру",
+      "resumeCancelledDescription": "Kilo Pass қайтадан автоматты түрде ұзартыла бастайды.",
+      "resumePausedDescription": "Kilo Pass жоспарланған жалғасу күнін күтпей, қазір жалғасады.",
+      "resumed": "Жазылым жалғастырылды",
+      "scheduledChange": "Жоспарланған өзгеріс",
+      "scheduledChangeCancelDescription": "Kilo Pass ағымдағы жоспарында қалады және қазіргідей ұзартыла береді.",
+      "scheduledChangeSummary": "{{plan}}, {{date}} күні"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass қолжетімсіз.",
     "couldNotLoad": "Kilo Pass деректерін жүктеу мүмкін болмады. Қайталап көріңіз.",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Конфигурация импортталды"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Кредит белсенділігін жүктеу мүмкін болмады.",
+      "appStoreReceipt": "App Store түбіртегі",
+      "deductionFallback": "Кредит шегерімі",
+      "emptyDescription": "Кредит сатып алулары, түбіртектер және пайдалану осында көрсетіледі.",
+      "emptyTitle": "Кредиттер тарихы жоқ",
+      "googlePlayReceipt": "Google Play түбіртегі",
+      "kind": {
+        "adjustment": "Түзету",
+        "balanceNeutral": "Балансқа әсер етпейді",
+        "deduction": "Шегерім",
+        "grant": "Берілген кредит",
+        "purchase": "Сатып алу"
+      },
+      "purchaseFallback": "Кредит сатып алу",
+      "receipt": "Түбіртек",
+      "receiptA11y": "Түбіртекті ашу: {{description}}",
+      "receiptUnavailable": "Бұл сатып алу үшін түбіртек қолжетімді емес."
+    },
     "title": "Кредит сатып алу",
     "description": "Кредиттер — Kilo App-те AI бағдарламалау сессияларын жүргізу үшін Kilo балансына қосылатын бір реттік сатып алу. Дүкен шотыңыздан ақша алады және дүкен төлемді растағаннан кейін кредиттер қосылады.",
     "nextExpiry": "{{amount}} көлеміндегі кредиттердің мерзімі {{date}} (UTC) күні аяқталады. Мерзімі ең ерте аяқталатын кредиттер бірінші жұмсалады.",
@@ -4055,6 +4102,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Бұл іздеу нәтижесі ашылмады"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Сізге төлем есептелгеннен кейін жеке сатып алуларыңыздың шот-фактуралары осында көрсетіледі."
   },
   "cloudAgent": {
     "compute": {

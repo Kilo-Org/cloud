@@ -22,6 +22,9 @@
     "expired": "منقضی شد"
   },
   "common": {
+    "creditHistory": "تاریخچهٔ اعتبار",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": "، ",
     "cancel": "لغو",
@@ -118,6 +121,7 @@
     "copyLink": "کپی پیوند",
     "couldNotLoadOrganizations": "بارگذاری سازمان‌ها ناموفق بود.",
     "couldNotLoadSessions": "بارگذاری نشست‌ها ناموفق بود.",
+    "couldnTLoad": "بارگذاری ناموفق بود.",
     "couldnTLoadMore": "بارگذاری موارد بیشتر ناموفق بود.",
     "deviceSessions": "نشست‌های دستگاه",
     "disabled": "غیرفعال",
@@ -245,6 +249,10 @@
     "notAdded": "وارد شده‌اید. {{provider}} به حساب شما افزوده نشد."
   },
   "profile": {
+    "creditHistorySubtitle": "خریدها، رسیدها و فعالیت اعتبار",
+    "invoicesSubtitle": "فاکتورهای خریدهایتان را دانلود کنید",
+    "manageBilling": "مدیریت صورتحساب در kilo.ai",
+    "manageBillingIosNote": "روش‌های پرداخت، شارژ خودکار و جزئیات صورتحساب در kilo.ai مدیریت می‌شوند.",
     "codeReviewerSubtitle": "بازبینی خودکار PR",
     "securityAgentSubtitle": "یافتن و رفع آسیب‌پذیری‌ها",
     "reviews": "بازبینی‌ها",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "فقط {{displayCount}} فایل اول پیوست می‌شوند."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "تاریخچهٔ صورتحساب",
+      "billingHistoryEmpty": "هنوز تاریخچهٔ صورتحسابی وجود ندارد.",
+      "cancel": "لغو اشتراک",
+      "cancelDescription": "Kilo Pass شما تا پایان دورهٔ صورتحساب فعال می‌ماند و تمدید نخواهد شد.",
+      "cancelScheduled": "در {{date}} لغو می‌شود",
+      "cancelScheduledChange": "لغو تغییر زمان‌بندی‌شده",
+      "cancelled": "اشتراک لغو شد",
+      "changePlan": "تغییر طرح در kilo.ai",
+      "changePlanIosNote": "تغییر طرح‌های پولی در kilo.ai امکان‌پذیر است.",
+      "creditHistoryEmpty": "هنوز اعتباری از Kilo Pass وجود ندارد.",
+      "manageInStore": "مدیریت در {{store}}",
+      "resume": "ازسرگیری اشتراک",
+      "resumeCancelledDescription": "Kilo Pass شما دوباره به‌طور خودکار تمدید می‌شود.",
+      "resumePausedDescription": "Kilo Pass شما هم‌اکنون، پیش از تاریخ ازسرگیری زمان‌بندی‌شده، از سر گرفته می‌شود.",
+      "resumed": "اشتراک از سر گرفته شد",
+      "scheduledChange": "تغییر زمان‌بندی‌شده",
+      "scheduledChangeCancelDescription": "Kilo Pass شما روی طرح فعلی می‌ماند و مانند اکنون تمدید می‌شود.",
+      "scheduledChangeSummary": "{{plan}} در {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass در دسترس نیست.",
     "couldNotLoad": "Kilo Pass بارگذاری نشد. دوباره تلاش کنید.",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Config درون‌ریزی شد"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "فعالیت اعتباری بارگذاری نشد.",
+      "appStoreReceipt": "رسید از App Store",
+      "deductionFallback": "کسر اعتبار",
+      "emptyDescription": "خریدهای اعتبار، رسیدها و مصرف در اینجا نمایش داده می‌شوند.",
+      "emptyTitle": "تاریخچهٔ اعتباری وجود ندارد",
+      "googlePlayReceipt": "رسید از Google Play",
+      "kind": {
+        "adjustment": "اصلاحیه",
+        "balanceNeutral": "بدون تأثیر بر موجودی",
+        "deduction": "کسر",
+        "grant": "اعطای اعتبار",
+        "purchase": "خرید"
+      },
+      "purchaseFallback": "خرید اعتبار",
+      "receipt": "رسید",
+      "receiptA11y": "باز کردن رسید {{description}}",
+      "receiptUnavailable": "رسیدی برای این خرید موجود نیست."
+    },
     "title": "خرید اعتبار",
     "description": "اعتبار یک خرید یکباره است که برای اجرای جلسات کدنویسی هوش مصنوعی در Kilo App به موجودی Kilo شما اضافه می‌شود. فروشگاه مبلغ را از حساب شما دریافت می‌کند و اعتبار پس از تأیید پرداخت توسط فروشگاه اضافه می‌شود.",
     "nextExpiry": "{{amount}} اعتبار در {{date}} (UTC) منقضی می‌شود. اعتبارهایی که زودتر منقضی می‌شوند، اول استفاده می‌شوند.",
@@ -4055,6 +4102,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "باز کردن این نتیجه جست‌وجو ممکن نشد"
+  },
+  "invoices": {
+    "personalEmptyDescription": "فاکتورهای خریدهای شخصی‌تان پس از صدور صورتحساب در اینجا نمایش داده می‌شوند."
   },
   "cloudAgent": {
     "compute": {

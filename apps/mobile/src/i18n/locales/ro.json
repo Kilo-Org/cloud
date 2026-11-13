@@ -22,6 +22,9 @@
     "expired": "Expirat"
   },
   "common": {
+    "creditHistory": "Istoric credite",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Anulează",
@@ -118,6 +121,7 @@
     "copyLink": "Copiază linkul",
     "couldNotLoadOrganizations": "Nu s-au putut încărca organizațiile.",
     "couldNotLoadSessions": "Nu s-au putut încărca sesiunile.",
+    "couldnTLoad": "Nu s-a putut încărca.",
     "couldnTLoadMore": "Nu s-au putut încărca mai multe elemente.",
     "deviceSessions": "Sesiuni pe dispozitive",
     "disabled": "Dezactivat",
@@ -245,6 +249,10 @@
     "notAdded": "Te-ai autentificat. {{provider}} nu a fost adăugat în contul tău."
   },
   "profile": {
+    "creditHistorySubtitle": "Achiziții, chitanțe și activitatea creditelor",
+    "invoicesSubtitle": "Descarcă facturile pentru achizițiile tale",
+    "manageBilling": "Gestionează facturarea pe kilo.ai",
+    "manageBillingIosNote": "Metodele de plată, reîncărcarea automată și detaliile de facturare se gestionează pe kilo.ai.",
     "codeReviewerSubtitle": "Revizuiri automate de PR",
     "securityAgentSubtitle": "Găsește și remediază vulnerabilitățile",
     "reviews": "Revizuiri",
@@ -2913,6 +2921,26 @@
     "onlyFirstFilesAttached_few": "Doar primele {{displayCount}} fișiere vor fi atașate."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Istoric facturare",
+      "billingHistoryEmpty": "Nu există încă un istoric de facturare.",
+      "cancel": "Anulează abonamentul",
+      "cancelDescription": "Kilo Pass rămâne activ până la sfârșitul perioadei de facturare și nu se va reînnoi.",
+      "cancelScheduled": "Se anulează pe {{date}}",
+      "cancelScheduledChange": "Anulează modificarea programată",
+      "cancelled": "Abonament anulat",
+      "changePlan": "Schimbă planul pe kilo.ai",
+      "changePlanIosNote": "Modificările planurilor plătite sunt disponibile pe kilo.ai.",
+      "creditHistoryEmpty": "Nu există încă credite Kilo Pass.",
+      "manageInStore": "Gestionează în {{store}}",
+      "resume": "Reia abonamentul",
+      "resumeCancelledDescription": "Kilo Pass va începe din nou să se reînnoiască automat.",
+      "resumePausedDescription": "Kilo Pass se reia acum, înainte de data programată pentru reluare.",
+      "resumed": "Abonament reluat",
+      "scheduledChange": "Modificare programată",
+      "scheduledChangeCancelDescription": "Kilo Pass rămâne pe planul actual și se reînnoiește ca până acum.",
+      "scheduledChangeSummary": "{{plan}} de la {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass nu este disponibil.",
     "couldNotLoad": "Kilo Pass nu a putut fi încărcat. Încearcă din nou.",
@@ -3935,6 +3963,25 @@
     "importConfigApplied": "Configurație importată"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Nu am putut încărca activitatea de credite.",
+      "appStoreReceipt": "Chitanță din App Store",
+      "deductionFallback": "Deducere de credite",
+      "emptyDescription": "Achizițiile de credite, chitanțele și utilizarea vor apărea aici.",
+      "emptyTitle": "Niciun istoric de credite",
+      "googlePlayReceipt": "Chitanță din Google Play",
+      "kind": {
+        "adjustment": "Ajustare",
+        "balanceNeutral": "Fără impact asupra soldului",
+        "deduction": "Deducere",
+        "grant": "Credite acordate",
+        "purchase": "Achiziție"
+      },
+      "purchaseFallback": "Achiziție de credite",
+      "receipt": "Chitanță",
+      "receiptA11y": "Deschide chitanța pentru {{description}}",
+      "receiptUnavailable": "Nu există o chitanță disponibilă pentru această achiziție."
+    },
     "title": "Cumpără credite",
     "description": "Creditele sunt o achiziție unică adăugată la soldul tău Kilo pentru rularea sesiunilor de codare AI în Kilo App. Magazinul îți debitează contul, iar creditele sunt adăugate după ce magazinul confirmă plata.",
     "nextExpiry": "Creditele în valoare de {{amount}} expiră la {{date}} (UTC). Creditele cu cea mai apropiată dată de expirare sunt folosite primele.",
@@ -4120,6 +4167,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nu s-a putut deschide acest rezultat de căutare"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Facturile pentru achizițiile tale personale vor apărea aici după prima facturare."
   },
   "cloudAgent": {
     "compute": {

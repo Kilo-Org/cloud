@@ -22,6 +22,9 @@
     "expired": "ໝົດອາຍຸແລ້ວ"
   },
   "common": {
+    "creditHistory": "ປະຫວັດເຄຣດິດ",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "ຍົກເລີກ",
@@ -118,6 +121,7 @@
     "copyLink": "ຄັດລອກລິ້ງ",
     "couldNotLoadOrganizations": "ບໍ່ສາມາດໂຫຼດລາຍຊື່ອົງກອນໄດ້.",
     "couldNotLoadSessions": "ບໍ່ສາມາດໂຫຼດເຊສຊັນໄດ້.",
+    "couldnTLoad": "ບໍ່ສາມາດໂຫຼດໄດ້.",
     "couldnTLoadMore": "ບໍ່ສາມາດໂຫຼດເພີ່ມເຕີມໄດ້.",
     "deviceSessions": "ເຊສຊັນຂອງອຸປະກອນ",
     "disabled": "ປິດໃຊ້ແລ້ວ",
@@ -245,6 +249,10 @@
     "notAdded": "ທ່ານເຂົ້າສູ່ລະບົບແລ້ວ. ບໍ່ໄດ້ເພີ່ມ {{provider}} ໃສ່ບັນຊີຂອງທ່ານ."
   },
   "profile": {
+    "creditHistorySubtitle": "ການຊື້, ໃບຮັບເງິນ ແລະ ການເຄື່ອນໄຫວເຄຣດິດ",
+    "invoicesSubtitle": "ດາວໂຫຼດໃບແຈ້ງໜີ້ສຳລັບການຊື້ຂອງທ່ານ",
+    "manageBilling": "ຈັດການການຮຽກເກັບເງິນໃນ kilo.ai",
+    "manageBillingIosNote": "ວິທີຊຳລະເງິນ, ການເຕີມເງິນອັດຕະໂນມັດ ແລະ ລາຍລະອຽດການຮຽກເກັບເງິນແມ່ນຈັດການໃນ kilo.ai.",
     "codeReviewerSubtitle": "ການກວດສອບ PR ອັດຕະໂນມັດ",
     "securityAgentSubtitle": "ຊອກຫາ ແລະ ແກ້ໄຂຈຸດອ່ອນດ້ານຄວາມປອດໄພ",
     "reviews": "ການກວດສອບ",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "ຈະແນບສະເພາະໄຟລ໌ {{displayCount}} ໄຟລ໌ທຳອິດເທົ່ານັ້ນ."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "ປະຫວັດການຮຽກເກັບເງິນ",
+      "billingHistoryEmpty": "ຍັງບໍ່ມີປະຫວັດການຮຽກເກັບເງິນ.",
+      "cancel": "ຍົກເລີກການສະໝັກສະມາຊິກ",
+      "cancelDescription": "Kilo Pass ຂອງທ່ານຈະຍັງໃຊ້ງານໄດ້ຈົນຮອດທ້າຍຮອບການຮຽກເກັບເງິນ ແລະ ຈະບໍ່ຕໍ່ອາຍຸ.",
+      "cancelScheduled": "ຈະຍົກເລີກໃນວັນທີ {{date}}",
+      "cancelScheduledChange": "ຍົກເລີກການປ່ຽນແປງທີ່ກຳນົດໄວ້",
+      "cancelled": "ຍົກເລີກການສະໝັກສະມາຊິກແລ້ວ",
+      "changePlan": "ປ່ຽນແຜນໃນ kilo.ai",
+      "changePlanIosNote": "ການປ່ຽນແຜນແບບເສຍເງິນສາມາດເຮັດໄດ້ໃນ kilo.ai.",
+      "creditHistoryEmpty": "ຍັງບໍ່ມີເຄຣດິດ Kilo Pass.",
+      "manageInStore": "ຈັດການໃນ {{store}}",
+      "resume": "ສືບຕໍ່ການສະໝັກສະມາຊິກ",
+      "resumeCancelledDescription": "Kilo Pass ຂອງທ່ານຈະເລີ່ມຕໍ່ອາຍຸອັດຕະໂນມັດອີກຄັ້ງ.",
+      "resumePausedDescription": "Kilo Pass ຂອງທ່ານຈະສືບຕໍ່ດຽວນີ້ ກ່ອນວັນທີສືບຕໍ່ທີ່ກຳນົດໄວ້.",
+      "resumed": "ສືບຕໍ່ການສະໝັກສະມາຊິກແລ້ວ",
+      "scheduledChange": "ການປ່ຽນແປງທີ່ກຳນົດໄວ້",
+      "scheduledChangeCancelDescription": "Kilo Pass ຂອງທ່ານຈະຢູ່ໃນແຜນປັດຈຸບັນ ແລະ ຕໍ່ອາຍຸຄືເກົ່າ.",
+      "scheduledChangeSummary": "{{plan}} ໃນວັນທີ {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "ບໍ່ສາມາດໃຊ້ Kilo Pass ໄດ້.",
     "couldNotLoad": "ບໍ່ສາມາດໂຫຼດ Kilo Pass ໄດ້. ລອງອີກຄັ້ງ.",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "ນຳເຂົ້າ config ແລ້ວ"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "ບໍ່ສາມາດໂຫລດກິດຈະກຳເຄຣດິດໄດ້.",
+      "appStoreReceipt": "ໃບຮັບເງິນຈາກ App Store",
+      "deductionFallback": "ການຫັກເຄຣດິດ",
+      "emptyDescription": "ການຊື້ເຄຣດິດ, ໃບຮັບເງິນ ແລະ ການນຳໃຊ້ຈະສະແດງຢູ່ບ່ອນນີ້.",
+      "emptyTitle": "ບໍ່ມີປະຫວັດເຄຣດິດ",
+      "googlePlayReceipt": "ໃບຮັບເງິນຈາກ Google Play",
+      "kind": {
+        "adjustment": "ການປັບປຸງ",
+        "balanceNeutral": "ບໍ່ກະທົບຍອດເງິນ",
+        "deduction": "ການຫັກ",
+        "grant": "ເຄຣດິດທີ່ໄດ້ຮັບ",
+        "purchase": "ການຊື້"
+      },
+      "purchaseFallback": "ການຊື້ເຄຣດິດ",
+      "receipt": "ໃບຮັບເງິນ",
+      "receiptA11y": "ເປີດໃບຮັບເງິນສຳລັບ {{description}}",
+      "receiptUnavailable": "ບໍ່ມີໃບຮັບເງິນສຳລັບການຊື້ນີ້."
+    },
     "title": "ຊື້ເຄຣດິດ",
     "description": "ເຄຣດິດເປັນການຊື້ຄັ້ງດຽວທີ່ເພີ່ມໃສ່ຍອດ Kilo ຂອງທ່ານສຳລັບການແລ່ນເຊດຊັນການຂຽນໂຄ້ດ AI ໃນ Kilo App. ຮ້ານຄ້າຄິດຄ່າຈາກບັນຊີຂອງທ່ານ ແລະ ເຄຣດິດຈະຖືກເພີ່ມຫຼັງຈາກຮ້ານຄ້າຢືນຢັນການຊຳລະ.",
     "nextExpiry": "ເຄຣດິດ {{amount}} ຈະໝົດອາຍຸ {{date}} (UTC). ເຄຣດິດທີ່ໝົດອາຍຸກ່ອນຈະຖືກໃຊ້ກ່ອນ.",
@@ -4055,6 +4102,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ບໍ່ສາມາດເປີດຜົນການຄົ້ນຫານີ້ໄດ້"
+  },
+  "invoices": {
+    "personalEmptyDescription": "ໃບແຈ້ງໜີ້ສຳລັບການຊື້ຂອງທ່ານເອງຈະສະແດງຢູ່ບ່ອນນີ້ເມື່ອມີການຮຽກເກັບເງິນ."
   },
   "cloudAgent": {
     "compute": {

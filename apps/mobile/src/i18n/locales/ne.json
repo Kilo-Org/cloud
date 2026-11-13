@@ -22,6 +22,9 @@
     "expired": "म्याद सकियो"
   },
   "common": {
+    "creditHistory": "क्रेडिट इतिहास",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": "। ",
     "listJoiner": ", ",
     "cancel": "रद्द गर्नुहोस्",
@@ -118,6 +121,7 @@
     "copyLink": "लिङ्क प्रतिलिपि गर्नुहोस्",
     "couldNotLoadOrganizations": "संस्थाहरू लोड गर्न सकिएन।",
     "couldNotLoadSessions": "सत्रहरू लोड गर्न सकिएन।",
+    "couldnTLoad": "लोड गर्न सकिएन।",
     "couldnTLoadMore": "थप लोड गर्न सकिएन।",
     "deviceSessions": "यन्त्रका सत्रहरू",
     "disabled": "बन्द",
@@ -245,6 +249,10 @@
     "notAdded": "तपाईं साइन इन हुनुभएको छ। {{provider}} तपाईंको खातामा थपिएन।"
   },
   "profile": {
+    "creditHistorySubtitle": "खरिद, रसिद र क्रेडिट गतिविधि",
+    "invoicesSubtitle": "तपाईंका खरिदहरूका इनभ्वाइस डाउनलोड गर्नुहोस्",
+    "manageBilling": "kilo.ai मा बिलिङ व्यवस्थापन गर्नुहोस्",
+    "manageBillingIosNote": "भुक्तानी विधि, स्वतः टप-अप र बिलिङ विवरणहरू kilo.ai मा व्यवस्थापन गरिन्छन्।",
     "codeReviewerSubtitle": "स्वचालित PR समीक्षाहरू",
     "securityAgentSubtitle": "सुरक्षा कमजोरीहरू पत्ता लगाएर समाधान गर्नुहोस्",
     "reviews": "समीक्षाहरू",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "सुरुका {{displayCount}} फाइल मात्र संलग्न गरिनेछन्।"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "बिलिङ इतिहास",
+      "billingHistoryEmpty": "अहिलेसम्म कुनै बिलिङ इतिहास छैन।",
+      "cancel": "सदस्यता रद्द गर्नुहोस्",
+      "cancelDescription": "तपाईंको Kilo Pass बिलिङ अवधिको अन्त्यसम्म सक्रिय रहन्छ र नवीकरण हुने छैन।",
+      "cancelScheduled": "{{date}} मा रद्द हुन्छ",
+      "cancelScheduledChange": "तय गरिएको परिवर्तन रद्द गर्नुहोस्",
+      "cancelled": "सदस्यता रद्द गरियो",
+      "changePlan": "kilo.ai मा योजना परिवर्तन गर्नुहोस्",
+      "changePlanIosNote": "सशुल्क योजना परिवर्तन kilo.ai मा उपलब्ध छन्।",
+      "creditHistoryEmpty": "अहिलेसम्म कुनै Kilo Pass क्रेडिट छैन।",
+      "manageInStore": "{{store}} मा व्यवस्थापन गर्नुहोस्",
+      "resume": "सदस्यता पुनः सुरु गर्नुहोस्",
+      "resumeCancelledDescription": "तपाईंको Kilo Pass फेरि स्वतः नवीकरण हुन थाल्छ।",
+      "resumePausedDescription": "तपाईंको Kilo Pass तय गरिएको पुनः सुरु मितिभन्दा पहिले, अहिले नै पुनः सुरु हुन्छ।",
+      "resumed": "सदस्यता पुनः सुरु भयो",
+      "scheduledChange": "तय गरिएको परिवर्तन",
+      "scheduledChangeCancelDescription": "तपाईंको Kilo Pass हालकै योजनामा रहन्छ र अहिले जस्तै नवीकरण हुन्छ।",
+      "scheduledChangeSummary": "{{date}} मा {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass उपलब्ध छैन।",
     "couldNotLoad": "Kilo Pass लोड गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Config आयात भयो"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "क्रेडिट गतिविधि लोड गर्न सकिएन।",
+      "appStoreReceipt": "App Store बाट रसिद",
+      "deductionFallback": "क्रेडिट कटौती",
+      "emptyDescription": "क्रेडिट खरिद, रसिद र प्रयोग यहाँ देखिनेछन्।",
+      "emptyTitle": "कुनै क्रेडिट इतिहास छैन",
+      "googlePlayReceipt": "Google Play बाट रसिद",
+      "kind": {
+        "adjustment": "समायोजन",
+        "balanceNeutral": "ब्यालेन्समा असर नगर्ने",
+        "deduction": "कटौती",
+        "grant": "क्रेडिट अनुदान",
+        "purchase": "खरिद"
+      },
+      "purchaseFallback": "क्रेडिट खरिद",
+      "receipt": "रसिद",
+      "receiptA11y": "{{description}} को रसिद खोल्नुहोस्",
+      "receiptUnavailable": "यो खरिदको रसिद उपलब्ध छैन।"
+    },
     "title": "क्रेडिट किन्नुहोस्",
     "description": "क्रेडिट भनेको Kilo App मा AI कोडिङ सत्रहरू चलाउन तपाईंको Kilo ब्यालेन्समा थपिने एक-पटकको खरिद हो। स्टोरले तपाईंको खाताबाट शुल्क लिन्छ र स्टोरले भुक्तानी पुष्टि गरेपछि क्रेडिट थपिन्छ।",
     "nextExpiry": "{{amount}} बराबरको क्रेडिटको म्याद {{date}} (UTC) मा सकिन्छ। सबैभन्दा पहिले म्याद सकिने क्रेडिट पहिले प्रयोग गरिन्छ।",
@@ -4055,6 +4102,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "यो खोज परिणाम खोल्न सकिएन"
+  },
+  "invoices": {
+    "personalEmptyDescription": "तपाईंलाई बिल गरिएपछि तपाईंका आफ्नै खरिदहरूका इनभ्वाइस यहाँ देखिनेछन्।"
   },
   "cloudAgent": {
     "compute": {

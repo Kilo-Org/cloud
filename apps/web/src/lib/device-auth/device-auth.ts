@@ -509,7 +509,6 @@ export async function consumeDeviceAuthByDeviceCode(
     return { status: row.status as 'pending' | 'denied' | 'consumed' };
   }
 
-  // Only reachable after a successful atomic consume.
   let sessionId: string | undefined;
   try {
     if (!consumed.kilo_user_id) {
@@ -624,7 +623,6 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
     .returning();
 
   if (consumed) {
-    // Only reachable after a successful atomic consume.
     try {
       const kiloUserId = consumed.kilo_user_id;
       if (!kiloUserId) {

@@ -19,7 +19,6 @@
 import * as z from 'zod';
 import {
   COUNCIL_MIN_SPECIALISTS,
-  COUNCIL_SPECIALIST_PRESETS,
   type CouncilSpecialistPreset,
 } from '@kilocode/app-shared/code-review';
 import {
@@ -33,7 +32,6 @@ import {
   type CouncilAggregationStrategy,
   type CouncilFinding,
   type CouncilSpecialist,
-  type CouncilSpecialistRole,
   type CouncilVote,
 } from '@kilocode/db/schema-types';
 

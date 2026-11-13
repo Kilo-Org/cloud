@@ -8,11 +8,11 @@
 //    runs, so the toggle that would cross that line must not write.
 
 import { createElement, type ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import '@/i18n';
 import { act } from '@/test/renderer';
-import { renderWithProviders } from '@/test/render-with-providers';
+import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 
 import CouncilRoute from './council';
 
@@ -27,17 +27,21 @@ type SaveMutation = { mutate: Mock; isPending: boolean };
 
 type SavedPatch = { council?: { specialists: { id: string; enabled: boolean }[] } };
 
-const state = vi.hoisted(() => ({
-  scope: 'org-1',
-  platform: 'github' as 'github' | 'gitlab' | 'bitbucket',
-  gate: { allowed: true, pending: false },
-  configEnabled: [] as boolean[],
-  config: { data: null as unknown, isFetching: false, isError: false, refetch: vi.fn() },
-  save: { mutate: vi.fn(), isPending: false } as SaveMutation,
-  toastErrors: [] as string[],
-  toggleProps: [] as ToggleProps[],
-  patches: [] as SavedPatch[],
-}));
+const state = vi.hoisted(() => {
+  const save: SaveMutation = { mutate: vi.fn(), isPending: false };
+
+  return {
+    scope: 'org-1',
+    platform: 'github' as 'github' | 'gitlab' | 'bitbucket',
+    gate: { allowed: true, pending: false },
+    configEnabled: [] as boolean[],
+    config: { data: null as unknown, isFetching: false, isError: false, refetch: vi.fn() },
+    save,
+    toastErrors: [] as string[],
+    toggleProps: [] as ToggleProps[],
+    patches: [] as SavedPatch[],
+  };
+});
 
 const specialists = vi.hoisted(() => [
   { id: 'security', role: 'security', name: 'Security', enabled: true, required: false, lens: '' },
@@ -133,16 +137,16 @@ vi.mock('@/components/tab-screen', () => ({
     createElement('ScrollView', null, props.children),
 }));
 
-let renderer: Awaited<ReturnType<typeof renderWithProviders>>['renderer'];
+type MountedRenderer = RenderWithProvidersResult['renderer'];
 
-const renderedTexts = () =>
+const renderedTexts = (renderer: MountedRenderer) =>
   renderer.root
     .findAll(node => String(node.type) === 'Text')
     .flatMap(node => node.props.children as unknown[])
     .filter((value): value is string => typeof value === 'string');
 
 const specialistToggle = (title: string) =>
-  state.toggleProps.filter(props => props.title === title).at(-1);
+  state.toggleProps.findLast(props => props.title === title);
 
 beforeEach(() => {
   state.scope = 'org-1';
@@ -174,10 +178,12 @@ describe('council route gate', () => {
     state.platform = 'bitbucket';
 
     const mounted = await renderWithProviders(createElement(CouncilRoute));
-    renderer = mounted.renderer;
-    await act(async () => undefined);
+    const { renderer } = mounted;
+    await act(() => undefined);
 
-    expect(renderedTexts()).toContain('Council review is not available for this organization.');
+    expect(renderedTexts(renderer)).toContain(
+      'Council review is not available for this organization.'
+    );
     expect(renderer.root.findAll(node => String(node.type) === 'ToggleRow')).toHaveLength(0);
     // The config read is what the editor needs; a refused platform never asks.
     expect(state.configEnabled).toEqual([false]);
@@ -187,10 +193,12 @@ describe('council route gate', () => {
 
   it('paints the editor for a supported, entitled organisation', async () => {
     const mounted = await renderWithProviders(createElement(CouncilRoute));
-    renderer = mounted.renderer;
-    await act(async () => undefined);
+    const { renderer } = mounted;
+    await act(() => undefined);
 
-    expect(renderedTexts()).not.toContain('Council review is not available for this organization.');
+    expect(renderedTexts(renderer)).not.toContain(
+      'Council review is not available for this organization.'
+    );
     expect(state.configEnabled).toContain(true);
 
     mounted.unmount();
@@ -201,10 +209,12 @@ describe('council route gate', () => {
     state.gate.pending = true;
 
     const mounted = await renderWithProviders(createElement(CouncilRoute));
-    renderer = mounted.renderer;
-    await act(async () => undefined);
+    const { renderer } = mounted;
+    await act(() => undefined);
 
-    expect(renderedTexts()).not.toContain('Council review is not available for this organization.');
+    expect(renderedTexts(renderer)).not.toContain(
+      'Council review is not available for this organization.'
+    );
     expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
       0
     );
@@ -216,10 +226,9 @@ describe('council route gate', () => {
 describe('council specialist minimum', () => {
   it('does not save the toggle that would leave an enabled council below the minimum', async () => {
     const mounted = await renderWithProviders(createElement(CouncilRoute));
-    renderer = mounted.renderer;
-    await act(async () => undefined);
+    await act(() => undefined);
 
-    await act(async () => {
+    await act(() => {
       specialistToggle('Performance')?.onValueChange?.(false);
     });
 
@@ -235,17 +244,23 @@ describe('council specialist minimum', () => {
       council: {
         enabled: true,
         aggregation_strategy: 'advisory',
-        specialists: specialists.map(entry => ({ ...entry, enabled: true })),
+        specialists: specialists.map(({ id, role, name, required, lens }) => ({
+          id,
+          role,
+          name,
+          enabled: true,
+          required,
+          lens,
+        })),
       },
       selectedRepositoryIds: [1],
       councilEnabledRepositoryIds: [],
     };
 
     const mounted = await renderWithProviders(createElement(CouncilRoute));
-    renderer = mounted.renderer;
-    await act(async () => undefined);
+    await act(() => undefined);
 
-    await act(async () => {
+    await act(() => {
       specialistToggle('Performance')?.onValueChange?.(false);
     });
 

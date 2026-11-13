@@ -68,6 +68,10 @@ const TWO_SENSE_COPY = new Map([
   ],
   ['comment', 'the verb on a button, versus the noun on a row label and a badge'],
   [
+    'disconnect',
+    'ending an SSH session and its port forwards, versus unlinking a connected integration',
+  ],
+  [
     'receipt',
     'the confirmation a moderation report produces, versus the proof of payment for a credit purchase',
   ],

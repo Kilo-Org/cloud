@@ -158,7 +158,11 @@ describe('MenuSheet', () => {
     expect(rows).toHaveLength(3);
 
     await act(() => {
-      (rows[1]?.props.onPress as () => void)();
+      const second = rows[1];
+      if (second === undefined) {
+        throw new Error('the second row is missing');
+      }
+      (second.props.onPress as () => void)();
     });
     expect(props.onSelect).toHaveBeenCalledExactlyOnceWith(1);
   });

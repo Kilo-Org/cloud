@@ -1,5 +1,9 @@
 import type * as SshPackage from '../../../../modules/kilo-ssh/src';
-import { type ConnectOptions, type SshAuth, type SshErrorCode } from '../../../../modules/kilo-ssh/src';
+import {
+  type ConnectOptions,
+  type SshAuth,
+  type SshErrorCode,
+} from '../../../../modules/kilo-ssh/src';
 
 import { i18n } from '@/i18n';
 

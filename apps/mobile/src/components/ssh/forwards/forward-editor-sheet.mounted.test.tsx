@@ -3,12 +3,7 @@ import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import {
-  act,
-  type ReactTestInstance,
-  type ReactTestRenderer,
-  TestRenderer,
-} from '@/test/renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 
 import { ForwardEditorSheet } from './forward-editor-sheet';
 

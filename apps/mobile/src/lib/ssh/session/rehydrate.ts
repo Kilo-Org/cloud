@@ -10,11 +10,11 @@ import { forgetIdleNotify } from './idle-notify';
 import { live } from './live';
 import { ensureSshEvents } from './manager';
 import {
+  type ForwardTarget,
   nativeTarget,
   planForwards,
   planSessions,
   planStale,
-  type ForwardTarget,
 } from './rehydrate-plan';
 import { patchSession, writeSession } from './session-store';
 
@@ -27,6 +27,12 @@ export type Rehydration = {
 
 const NOTHING: Rehydration = { adopted: 0, closed: 0, orphans: 0, unmatched: 0 };
 
+/** What the native registry still holds, in the shape a plan reads it. */
+type RegistrySnapshot = Readonly<{
+  sessions: SessionInfo[];
+  forwards: ForwardInfo[];
+}>;
+
 /**
  * Brings the manager back in line with the native registry.
  *
@@ -35,15 +41,8 @@ const NOTHING: Rehydration = { adopted: 0, closed: 0, orphans: 0, unmatched: 0 }
  * something a session may fail on.
  */
 export async function rehydrateSshSessions(): Promise<Rehydration> {
-  let registry: { sessions: SessionInfo[]; forwards: ForwardInfo[] };
-  try {
-    const ssh = await sshPackage();
-    await ensureSshEvents();
-    registry = {
-      sessions: await ssh.listSessions(),
-      forwards: await ssh.listForwards(),
-    };
-  } catch {
+  const registry = await readRegistry();
+  if (registry === null) {
     return NOTHING;
   }
 
@@ -56,9 +55,7 @@ export async function rehydrateSshSessions(): Promise<Rehydration> {
   const db = await sshDatabase();
   const hosts = listHosts(db);
   const tracked = new Set(
-    [...live.values()]
-      .map(entry => entry.nativeSessionId)
-      .filter((id): id is string => id !== null)
+    [...live.values()].map(entry => entry.nativeSessionId).filter((id): id is string => id !== null)
   );
   const plan = planSessions(registry.sessions, hosts, tracked);
   const adoptedTargets = new Map<string, ForwardTarget>();
@@ -100,13 +97,12 @@ export async function rehydrateSshSessions(): Promise<Rehydration> {
   }
 
   for (const entry of live.values()) {
-    if (entry.nativeSessionId === null || adoptedTargets.has(entry.nativeSessionId)) {
-      continue;
+    if (entry.nativeSessionId !== null && !adoptedTargets.has(entry.nativeSessionId)) {
+      adoptedTargets.set(entry.nativeSessionId, {
+        sessionId: entry.id,
+        forwards: listForwardsForHost(db, entry.host.id),
+      });
     }
-    adoptedTargets.set(entry.nativeSessionId, {
-      sessionId: entry.id,
-      forwards: listForwardsForHost(db, entry.host.id),
-    });
   }
 
   const forwards = planForwards(registry.forwards, adoptedTargets);
@@ -121,6 +117,19 @@ export async function rehydrateSshSessions(): Promise<Rehydration> {
     orphans: forwards.orphans.length,
     unmatched: plan.unmatched.length,
   };
+}
+
+async function readRegistry(): Promise<RegistrySnapshot | null> {
+  try {
+    const ssh = await sshPackage();
+    await ensureSshEvents();
+    return {
+      sessions: await ssh.listSessions(),
+      forwards: await ssh.listForwards(),
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**

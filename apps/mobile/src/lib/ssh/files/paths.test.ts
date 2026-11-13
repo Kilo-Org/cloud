@@ -84,9 +84,9 @@ describe('preview choice', () => {
 describe('home directory', () => {
   it('resolves the channel working directory, not a literal tilde', async () => {
     const calls: { channel: string; path: string }[] = [];
-    const resolved = await resolveHomeDirectory('sftp-1', async (channel, path) => {
+    const resolved = await resolveHomeDirectory('sftp-1', (channel, path) => {
       calls.push({ channel, path });
-      return '/home/user';
+      return Promise.resolve('/home/user');
     });
 
     expect(resolved).toBe('/home/user');

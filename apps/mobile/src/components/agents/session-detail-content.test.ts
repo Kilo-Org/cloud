@@ -3833,12 +3833,12 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
           renderedText(node).includes(i18n.t('agentChat.session.backToSessions'))
       );
       const routesBeforeCardBack = [...navigationRoutes];
-      const plantedRoutes: string[] = ['(app)', '/(app)/(tabs)/(2_agents)/', 'agent-chat/x'];
+      const plantedRoutes: string[] = ['(app)', '/(app)/(tabs)/(2_agents)', 'agent-chat/x'];
       navigationRoutes.splice(0, navigationRoutes.length, ...plantedRoutes);
       act(() => {
         (backToSessions.props.onPress as () => void)();
       });
-      expect(navigationRoutes).toEqual(['(app)', '/(app)/(tabs)/(2_agents)/']);
+      expect(navigationRoutes).toEqual(['(app)', '/(app)/(tabs)/(2_agents)']);
       navigationRoutes.splice(0, navigationRoutes.length, ...routesBeforeCardBack);
     }
 

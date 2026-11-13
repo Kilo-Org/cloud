@@ -86,8 +86,8 @@ export function useSftpBrowser(connectionId: string | null): SftpBrowser {
       try {
         const ssh = await sshPackage();
         const channel = await ssh.openSftp(connectionId);
-        const home = await resolveHomeDirectory(channel, (sftp, path) =>
-          ssh.resolvePath(sftp, path)
+        const home = await resolveHomeDirectory(channel, (sftp, entryPath) =>
+          ssh.resolvePath(sftp, entryPath)
         );
         if (opening.cancelled) {
           await closeQuietly(ssh, channel);

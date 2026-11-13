@@ -61,7 +61,9 @@ describe('the ssh_forwards bind index migration', () => {
     expect(database.prepare('select id from ssh_forwards').all()).toEqual([{ id: 'kept' }]);
     expect(
       database
-        .prepare("select name from sqlite_master where type = 'index' and name = 'ssh_forwards_bind'")
+        .prepare(
+          "select name from sqlite_master where type = 'index' and name = 'ssh_forwards_bind'"
+        )
         .all()
     ).toEqual([{ name: 'ssh_forwards_bind' }]);
   });

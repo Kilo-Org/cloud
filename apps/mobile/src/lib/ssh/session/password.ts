@@ -1,4 +1,4 @@
-import type { SshHost } from '../hosts';
+import { type SshHost } from '../hosts';
 
 /**
  * The password an attempt sends for `host`: one typed for this host in the open

@@ -78,13 +78,21 @@ describe('adopting native sessions', () => {
     );
 
     expect(plan.adopt).toEqual([
-      { native: expect.objectContaining({ sessionId: 'session-1' }), host: web, shellId: 'shell-1' },
+      {
+        native: expect.objectContaining({ sessionId: 'session-1' }),
+        host: web,
+        shellId: 'shell-1',
+      },
     ]);
     expect(plan.unmatched).toEqual([]);
   });
 
   it('adopts a connection whose shell is not open as connected without a shell', () => {
-    const plan = planSessions([session({ sessionId: 'session-1' })], [host({ id: 'web' })], new Set());
+    const plan = planSessions(
+      [session({ sessionId: 'session-1' })],
+      [host({ id: 'web' })],
+      new Set()
+    );
 
     expect(plan.adopt[0]?.shellId).toBeNull();
   });
@@ -156,10 +164,7 @@ describe('reconciling listeners', () => {
   });
 
   it('stops a listener whose row no longer matches the bind address', () => {
-    const plan = planForwards(
-      [forward({ forwardId: 'forward-1', bindHost: '0.0.0.0' })],
-      targets
-    );
+    const plan = planForwards([forward({ forwardId: 'forward-1', bindHost: '0.0.0.0' })], targets);
 
     expect(plan.orphans).toEqual(['forward-1']);
   });

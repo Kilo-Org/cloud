@@ -20,7 +20,7 @@ export function nativeTarget(info: Pick<SessionInfo, 'username' | 'host' | 'port
   return `${info.username}@${info.host}:${info.port}`;
 }
 
-export type AdoptedSession = {
+type AdoptedSession = {
   readonly native: SessionInfo;
   readonly host: SshHost;
   /** The shell the terminal reattaches to; `null` when the shell closed first. */
@@ -47,16 +47,15 @@ export function planSessions(
   const unmatched: SessionInfo[] = [];
 
   for (const native of nativeSessions) {
-    if (tracked.has(native.sessionId)) {
-      continue;
+    if (!tracked.has(native.sessionId)) {
+      const target = nativeTarget(native);
+      const host = hosts.find(candidate => hostTarget(candidate) === target);
+      if (host === undefined) {
+        unmatched.push(native);
+      } else {
+        adopt.push({ native, host, shellId: native.shellIds[0] ?? null });
+      }
     }
-    const target = nativeTarget(native);
-    const host = hosts.find(candidate => hostTarget(candidate) === target);
-    if (host === undefined) {
-      unmatched.push(native);
-      continue;
-    }
-    adopt.push({ native, host, shellId: native.shellIds[0] ?? null });
   }
 
   return { adopt, unmatched };
@@ -68,7 +67,7 @@ export type ForwardTarget = {
   readonly forwards: readonly SshForward[];
 };
 
-export type PlannedForwards = {
+type PlannedForwards = {
   readonly sessionId: string;
   readonly nativeSessionId: string;
   readonly forwards: readonly AdoptedForward[];
@@ -105,15 +104,15 @@ export function planForwards(
     );
     if (target === undefined || stored === undefined) {
       orphans.push(native.forwardId);
-      continue;
+    } else {
+      const group = adopt.get(native.sessionId) ?? { targets: target, forwards: [] };
+      group.forwards.push({
+        forwardId: stored.id,
+        nativeForwardId: native.forwardId,
+        port: native.port,
+      });
+      adopt.set(native.sessionId, group);
     }
-    const group = adopt.get(native.sessionId) ?? { targets: target, forwards: [] };
-    group.forwards.push({
-      forwardId: stored.id,
-      nativeForwardId: native.forwardId,
-      port: native.port,
-    });
-    adopt.set(native.sessionId, group);
   }
 
   return {
@@ -135,4 +134,3 @@ export function planStale(
     .filter(entry => entry.nativeSessionId !== null && !alive.has(entry.nativeSessionId))
     .map(entry => entry.id);
 }
-

@@ -161,14 +161,17 @@ export function useSettingsBackGuard({
                   // A caller that asks its own destructive question answers
                   // `declined` when the reader backs out of it there: the
                   // draft stays unsaved and the screen stays, as with Keep
-                  // editing.
+                  // editing. The sheet is already gone by this point, so that
+                  // question is the only one on screen.
                   if ((await onSaveRef.current()) === 'declined') {
                     return;
                   }
                   leave();
                 } catch {
-                  // The screen's own refusal line reports the failure — stay
-                  // on the screen so the user can retry or discard.
+                  // The confirmation is dismissed as this save starts, so the
+                  // reader is already on the screen when the save is refused:
+                  // that screen's own refusal line reports the failure, and the
+                  // leave is dropped so the draft stays for a retry or discard.
                 }
               })();
             },

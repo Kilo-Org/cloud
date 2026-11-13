@@ -7,8 +7,8 @@ import { securityConfigMutationMessage } from '@/lib/security-agent-ledger';
 type SettingsSaveFeedback = {
   /** Await a settings save, keep its refusal for the inline line, and rethrow it. */
   run: (save: () => Promise<void>) => Promise<void>;
-  /** The durable refusal line, or `null` when the last save succeeded. */
-  node: ReactElement | null;
+  /** The line's reserved slot: blank until a save is refused, then the refusal. */
+  node: ReactElement;
 };
 
 /**
@@ -26,6 +26,12 @@ type SettingsSaveFeedback = {
  * one catalog's copy in state. The stored error survives a re-render and a
  * later attempt: a retry in flight keeps the previous line up rather than
  * blinking it off and back.
+ *
+ * The slot is reserved in every state, at one line of the status copy's
+ * height, so the body below it never moves when a refusal arrives or clears
+ * (apps/mobile/AGENTS.md: never shift layout when state changes). The empty
+ * state is that blank slot and nothing else: no line, no live region, and so
+ * nothing announced.
  *
  * `AccessibleStatus` is the single announcement owner here — a live region where
  * the platform has one, an imperative announcement otherwise — so the save hook
@@ -45,18 +51,25 @@ export function useSettingsSaveFeedback(): SettingsSaveFeedback {
     }
   }, []);
 
-  // No wrapper (and no reserved gap) in the empty state: the line appears only
-  // when there is a refusal to show, between the header and the scrolling body.
-  const node =
-    failure === null ? null : (
-      <View className="px-6 pb-2">
+  // `min-h-5` is one line of `text-sm` at the 14pt rem (1.25rem = 17.5dp), the
+  // reserved-status slot the app already uses for a line that comes and goes.
+  // The wrapper carries no bottom padding: 17.5dp plus the scroll view's own
+  // `pt-4` (14dp) is 31.5dp of empty band above the first block in the empty
+  // state, inside the 38dp the design gate allows (scroll padding + one 24dp
+  // section break). A `pb-2` on top would be 38.5dp and trip its leading-gap.
+  const node = (
+    <View className="min-h-5 justify-center px-6">
+      {/* Nothing to report mounts nothing at all: the empty state is the slot's
+          reserved height, with no live region and no announcement to clear. */}
+      {failure === null ? null : (
         <AccessibleStatus
           message={securityConfigMutationMessage(failure)}
           tone="error"
           className="text-sm"
         />
-      </View>
-    );
+      )}
+    </View>
+  );
 
   return { run, node };
 }

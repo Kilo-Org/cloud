@@ -162,6 +162,37 @@ describe('DestructiveConfirmDialog', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
+  // The extra choice is a save-and-stay, not a decision about the removal, so
+  // the sheet goes either way: the reader lands on the screen the save was
+  // about and reads the outcome there, and a second press cannot queue another
+  // save behind a sheet that never left.
+  it('dismisses the sheet before running the extra action', () => {
+    const onExtra = vi.fn<() => void>();
+    const root = mount({ extraAction: { label: 'Save changes', onPress: onExtra } });
+
+    const extra = pressableWith(root, 'bg-secondary-fill');
+    expect(
+      extra.findAll(node => isType(node, 'Text') && node.children.includes('Save changes'))
+    ).toHaveLength(1);
+
+    callProp(extra, 'onPress');
+
+    // Dismissing, not dismissed: the action waits for the sheet to report the
+    // finished dismissal, exactly as Discard and Keep editing do.
+    expect(root.find(node => isType(node, 'BottomSheet')).props.index).toBe(-1);
+    expect(onExtra).not.toHaveBeenCalled();
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(onCancel).not.toHaveBeenCalled();
+
+    callProp(
+      root.find(node => isType(node, 'BottomSheet')),
+      'onDismiss'
+    );
+    expect(onExtra).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
   it('runs the destructive action only when the destructive control is pressed', () => {
     const root = mount();
 

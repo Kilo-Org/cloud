@@ -2,9 +2,10 @@
 // `SettingsSaveButton` swallows the save's rejection, so the toast was the only
 // trace of a refusal: a few seconds of copy, then the unchanged screen with the
 // draft still dirty. This suite drives the shared hook behind that line: it
-// renders nothing before a refusal, keeps the error's sentence (re-translated
-// from the catalog, never the server's English text) until a save succeeds, and
-// hands the rejection back to the caller that decides navigation from it.
+// keeps a one-line slot reserved before anything is refused, fills that slot in
+// place with the error's sentence (re-translated from the catalog, never the
+// server's English text) until a save succeeds, and hands the rejection back to
+// the caller that decides navigation from it.
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -58,16 +59,33 @@ function statusMessage(renderer: TestRenderer.ReactTestRenderer): string | null 
   return String(first.props.children);
 }
 
+/** The line's slot — the one wrapper the hook renders in every state. */
+function slot(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
+  const slots = renderer.root.findAllByType('View');
+  if (slots.length !== 1) {
+    throw new Error(`expected one reserved slot, found ${slots.length}`);
+  }
+  const [only] = slots;
+  if (!only) {
+    throw new Error('the reserved slot is missing');
+  }
+  return only;
+}
+
 describe('useSettingsSaveFeedback', () => {
   beforeEach(async () => {
     probe.run = null;
     await i18n.changeLanguage('en');
   });
 
-  it('renders nothing before a save fails', () => {
+  it('reserves an empty line before a save fails', () => {
     const renderer = mount();
 
-    expect(renderer.toJSON()).toBeNull();
+    // The slot is there from the first commit, at the height of one status
+    // line, so the body the hook sits above never moves when the line fills in.
+    expect(slot(renderer).props.className).toBe('min-h-5 justify-center px-6');
+    // ...and it says nothing: an empty message renders no text and announces
+    // nothing, rather than leaving an empty live region behind.
     expect(renderer.root.findAllByType('Text')).toHaveLength(0);
 
     act(() => {
@@ -75,7 +93,7 @@ describe('useSettingsSaveFeedback', () => {
     });
   });
 
-  it('renders the catalog sentence for a lapsed organization trial', async () => {
+  it('fills the slot with the catalog sentence for a lapsed organization trial', async () => {
     const refusal = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
       data: { code: 'FORBIDDEN' },
     });
@@ -86,6 +104,9 @@ describe('useSettingsSaveFeedback', () => {
     });
 
     expect(statusMessage(renderer)).toBe(i18n.t('common.organizationTrialEnded'));
+    // The same slot holds the sentence: the line swaps in place instead of
+    // pushing the scrolling body down.
+    expect(slot(renderer).findAllByType('Text')).toHaveLength(1);
 
     act(() => {
       renderer.unmount();
@@ -154,7 +175,9 @@ describe('useSettingsSaveFeedback', () => {
       await retry;
     });
 
-    expect(renderer.toJSON()).toBeNull();
+    // The sentence clears; the slot stays, so the body does not move back up.
+    expect(renderer.root.findAllByType('Text')).toHaveLength(0);
+    expect(slot(renderer).props.className).toBe('min-h-5 justify-center px-6');
 
     act(() => {
       renderer.unmount();

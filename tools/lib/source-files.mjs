@@ -83,9 +83,10 @@ export function parseSourceEntry(dir, root, file, text) {
 }
 
 /**
- * Every source file below `dir`, read and parsed once, one file at a time: its
- * absolute path `file`, the normalised path `path` a diagnostic names it by, its
- * `text`, its syntax tree `program`, and one `problems` line per parse error.
+ * Every source file below `dir`, read and parsed once, one file at a time, each
+ * as one `parseSourceEntry`: its absolute path `file`, the normalised path
+ * `path` a diagnostic names it by, its `text`, its syntax tree `program`, the
+ * `lineOf` lookup, and one `problems` line per parse error.
  *
  * The walk is a generator, so a caller's `for … of` holds one file's text and
  * one syntax tree at a time and peak memory does not grow with the tree.

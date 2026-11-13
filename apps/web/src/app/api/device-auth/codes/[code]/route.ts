@@ -69,6 +69,11 @@ function getDenyRateLimitKey(userId: string): string {
   return crypto.createHmac('sha256', NEXTAUTH_SECRET).update(userId).digest('base64url');
 }
 
+/** The device presents the poll secret as the code, so the secret never becomes a rate-limit key in the clear. */
+function getDeviceCancelRateLimitKey(code: string): string {
+  return crypto.createHmac('sha256', NEXTAUTH_SECRET).update(code).digest('base64url');
+}
+
 function deviceAuthFailureResponse(error: unknown, notPendingMessage: string): Response {
   if (error instanceof Error) {
     if (error.message === 'Device authorization request not found') {
@@ -83,7 +88,19 @@ function deviceAuthFailureResponse(error: unknown, notPendingMessage: string): R
   return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
 }
 
-async function cancelFromDevice(code: string): Promise<Response> {
+async function cancelFromDevice(code: string, request: Request): Promise<Response> {
+  const { rateLimited } = await checkRateLimit(DEVICE_AUTH_DENY_RATE_LIMIT_ID, {
+    request,
+    rateLimitKey: getDeviceCancelRateLimitKey(code),
+  });
+
+  if (rateLimited) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded. Please try again later.' },
+      { status: 429 }
+    );
+  }
+
   try {
     await cancelDeviceAuthRequest(code);
   } catch (error) {
@@ -110,7 +127,7 @@ export const DELETE = withRestTiming(
     // Without a viewer token the caller is the device itself, presenting the
     // poll secret that the poll GET accepts as `code`.
     if (viewerToken === null) {
-      return cancelFromDevice(code);
+      return cancelFromDevice(code, request);
     }
 
     // Authenticate the user

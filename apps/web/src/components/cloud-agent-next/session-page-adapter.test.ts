@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { beforeAll, describe, expect, it, jest } from '@jest/globals';
 import {
   type KiloSdkMessageHistory,
   type KiloSdkMessageHistoryPage,
@@ -6,12 +6,19 @@ import {
   type KiloSessionId,
   type CloudAgentSessionId,
 } from '@kilocode/cloud-agent-sdk';
-import {
-  fetchWebCloudSessionSnapshotPage,
-  fetchWebSessionSnapshotPage,
-  type CloudSessionPageTrpcClient,
-  type SessionPageTrpcClient,
-} from './session-page-adapter';
+import type * as SessionPageAdapter from './session-page-adapter';
+import type { CloudSessionPageTrpcClient, SessionPageTrpcClient } from './session-page-adapter';
+
+const mockCaptureException = jest.fn();
+jest.mock('@sentry/nextjs', () => ({ captureException: mockCaptureException }));
+
+let fetchWebCloudSessionSnapshotPage: typeof SessionPageAdapter.fetchWebCloudSessionSnapshotPage;
+let fetchWebSessionSnapshotPage: typeof SessionPageAdapter.fetchWebSessionSnapshotPage;
+
+beforeAll(async () => {
+  ({ fetchWebCloudSessionSnapshotPage, fetchWebSessionSnapshotPage } =
+    await import('./session-page-adapter'));
+});
 
 const unbatched = { context: { skipBatch: true } };
 
@@ -383,10 +390,64 @@ describe('fetchWebCloudSessionSnapshotPage', () => {
   it('keeps a usable partial page and retry cursor when an additional read fails', async () => {
     const fixture = client();
     const first = { ...page, nextCursor: 'retry-here' };
-    fixture.personal.mockResolvedValueOnce(first).mockRejectedValueOnce(new Error('Unavailable'));
+    const failure = new Error('Unavailable');
+    mockCaptureException.mockClear();
+    fixture.personal.mockResolvedValueOnce(first).mockRejectedValueOnce(failure);
     await expect(fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {})).resolves.toEqual(
       first
     );
+    expect(fixture.personal).toHaveBeenCalledTimes(2);
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockCaptureException).toHaveBeenCalledWith(failure, expect.anything());
+  });
+
+  it('keeps the initial page within the SDK retained-message window', async () => {
+    const fixture = client();
+    const messages = (prefix: string, count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        info: { id: `${prefix}_${index}`, role: 'assistant' },
+        parts: [],
+      }));
+    const first = { ...page, messages: messages('newer', 160), nextCursor: 'one' };
+    const second = { ...page, messages: messages('middle', 30), nextCursor: 'two' };
+    fixture.personal
+      .mockResolvedValueOnce(first)
+      .mockResolvedValueOnce(second)
+      .mockResolvedValueOnce({ ...page, messages: messages('older', 11), nextCursor: 'three' });
+    const result = await fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {});
+    expect(result?.messages).toHaveLength(190);
+    expect(result?.nextCursor).toBe('two');
+    expect(fixture.personal).toHaveBeenCalledTimes(3);
+  });
+
+  it('counts v2 synthetic prompts as user turns', async () => {
+    const fixture = client();
+    const source = {
+      version: 'v2',
+      session: {
+        id: page.info.id,
+        location: { directory: '/workspace/fixture' },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    const message = (id: string, type: 'user' | 'synthetic') => ({
+      message: { id, type, time: { created: 1 } },
+    });
+    fixture.personal
+      .mockResolvedValueOnce({
+        ...page,
+        source,
+        messages: [message('msg_synthetic', 'synthetic')],
+        nextCursor: 'one',
+      })
+      .mockResolvedValueOnce({
+        ...page,
+        source,
+        messages: [message('msg_user', 'user')],
+        nextCursor: 'two',
+      });
+    const result = await fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {});
+    expect(result?.nextCursor).toBe('two');
     expect(fixture.personal).toHaveBeenCalledTimes(2);
   });
 

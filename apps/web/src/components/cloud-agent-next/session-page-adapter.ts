@@ -1,5 +1,7 @@
+import * as Sentry from '@sentry/nextjs';
 import type { CloudSessionMessagesWirePage } from '@kilocode/cloud-agent-sdk/schemas';
 import {
+  RETAINED_MESSAGE_WINDOW,
   type KiloSdkMessageHistory,
   type KiloSdkMessageHistoryPage,
   type KiloSessionId,
@@ -23,7 +25,7 @@ const historyUserMessageSchema = z.union([
     .object({ info: z.object({ id: z.string(), role: z.literal('user') }) })
     .transform(m => m.info.id),
   z
-    .object({ message: z.object({ id: z.string(), type: z.literal('user') }) })
+    .object({ message: z.object({ id: z.string(), type: z.enum(['user', 'synthetic']) }) })
     .transform(m => m.message.id),
 ]);
 
@@ -50,10 +52,13 @@ async function loadRecentUserTurns<
     let older: Page | null;
     try {
       older = await load(cursor);
-    } catch {
+    } catch (error) {
+      Sentry.captureException(error, { tags: { source: 'initial-history-continuation' } });
       break;
     }
     if (!older || (older.nextCursor && cursors.has(older.nextCursor))) break;
+    // The SDK never trims the initial page, so it must fit the retained window.
+    if (page.messages.length + older.messages.length > RETAINED_MESSAGE_WINDOW) break;
     const olderBytes = new TextEncoder().encode(JSON.stringify(older)).byteLength;
     if (bytes + olderBytes > MAX_INITIAL_HISTORY_BYTES) break;
     bytes += olderBytes;

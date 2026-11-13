@@ -29,7 +29,7 @@ import {
 } from '@/lib/code-reviews/review-memory/change-request';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-review';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { REVIEW_MEMORY_PROPOSAL_STATUSES } from '@kilocode/db/schema-types';

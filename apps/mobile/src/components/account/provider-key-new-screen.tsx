@@ -1,7 +1,7 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -49,10 +49,19 @@ export function ProviderKeyNewScreen() {
   const keyRef = useRef('');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const providers = useQuery(trpc.byok.listProviders.queryOptions({}));
+  // The value is a plaintext credential; drop the copy this screen holds as soon
+  // as it is stored, and when the screen goes away.
+  useEffect(
+    () => () => {
+      keyRef.current = '';
+    },
+    []
+  );
 
   const create = useMutation(
     trpc.byok.create.mutationOptions({
       onSuccess: () => {
+        keyRef.current = '';
         // The list the reader returns to is stale the moment this lands.
         void queryClient.invalidateQueries({ queryKey: trpc.byok.list.queryKey({}) });
         announcingToast.success(t('profile.providerKeys.added'));

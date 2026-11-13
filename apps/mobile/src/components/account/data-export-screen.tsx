@@ -81,6 +81,10 @@ export function DataExportScreen() {
   const download = useMutation(
     trpc.userExports.createDownload.mutationOptions({
       onSuccess: async (result, variables) => {
+        // The code is spent, so the form closes: nothing may resubmit it.
+        codeRef.current = '';
+        setChallengeId(null);
+        setExportId(null);
         setCodeError(null);
         try {
           await shareDataExport({ downloadUrl: result.downloadUrl, exportId: variables.exportId });

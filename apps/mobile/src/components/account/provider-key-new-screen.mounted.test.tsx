@@ -180,6 +180,21 @@ describe('ProviderKeyNewScreen', () => {
     expect(state.dismissTo).not.toHaveBeenCalled();
   });
 
+  it('drops the saved key so it cannot be sent twice', async () => {
+    const root = await mount();
+    submit(root, 'sk-test-123');
+
+    act(() => {
+      state.mutations[0]?.onSuccess?.();
+    });
+    act(() => {
+      (addButton(root).props.onPress as () => void)();
+    });
+
+    expect(state.mutate).toHaveBeenCalledTimes(1);
+    expect(state.toastError).toHaveBeenCalledWith('Enter the key.');
+  });
+
   it('returns to the list after the key is added', async () => {
     const root = await mount();
     submit(root, 'sk-test-123');

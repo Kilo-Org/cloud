@@ -15,6 +15,7 @@ const state = vi.hoisted(() => ({
   error: false,
   push: vi.fn(),
   clear: vi.fn(),
+  openExternalUrl: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable', TextInput: 'TextInput' }));
@@ -58,6 +59,8 @@ vi.mock('@tanstack/react-query', async importOriginal => {
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({ byok: { listProviders: { queryOptions: () => ({}), queryKey: () => [] } } }),
 }));
+vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.test' }));
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: state.openExternalUrl }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#888888' }),
 }));
@@ -86,9 +89,13 @@ async function mount() {
   return view.renderer.root;
 }
 
+/** The provider rows: the web row is a pressable with its own label. */
 function rowLabels(root: ReactTestRenderer['root']) {
   return root.findAll(
-    node => Object.is(node.type, 'Pressable') && typeof node.props.accessibilityLabel === 'string'
+    node =>
+      Object.is(node.type, 'Pressable') &&
+      typeof node.props.accessibilityLabel === 'string' &&
+      node.props.accessibilityLabel !== 'Open in browser'
   );
 }
 
@@ -183,6 +190,35 @@ describe('ProviderKeyProviderPickerScreen', () => {
     } finally {
       await i18n.changeLanguage('en');
     }
+  });
+
+  it('offers the structured-credential providers on the web instead', async () => {
+    state.providers = [
+      { id: 'anthropic', name: 'Anthropic' },
+      { id: 'azure', name: 'Azure Foundry' },
+      { id: 'bedrock-byok', name: 'AWS Bedrock' },
+      { id: 'vertex-byok', name: 'Google Vertex AI' },
+    ];
+    const root = await mount();
+
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['Anthropic']);
+
+    const webRow = root.findAll(
+      node =>
+        Object.is(node.type, 'Pressable') && node.props.accessibilityLabel === 'Open in browser'
+    );
+    const [onlyWebRow] = webRow;
+    if (!onlyWebRow) {
+      throw new Error('missing the web row');
+    }
+
+    act(() => {
+      (onlyWebRow.props.onPress as () => void)();
+    });
+    expect(state.openExternalUrl).toHaveBeenCalledWith(
+      'https://app.example.test/byok',
+      expect.objectContaining({ label: 'Provider keys' })
+    );
   });
 
   it('keeps a retry when the provider list cannot be read', async () => {

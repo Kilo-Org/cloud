@@ -17,6 +17,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { COMPACT_CONTROL_HIT_SLOP_DP, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
+import { WEB_BASE_URL } from '@/lib/config';
+import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
@@ -25,6 +27,18 @@ type ProviderOption = inferRouterOutputs<MobileRouter>['byok']['listProviders'][
 
 /** Ids are ASCII slugs: folding them here keeps the comparison locale-independent. */
 const ID_FOLD_LOCALE = 'en';
+
+/**
+ * Providers whose credential is a structured JSON document rather than a single
+ * key: the web form collects each field separately (Azure Foundry, Amazon
+ * Bedrock, Google Vertex AI). The app has one masked field, so it points at the
+ * web page instead of failing every paste.
+ */
+const STRUCTURED_CREDENTIAL_PROVIDER_IDS: ReadonlySet<string> = new Set([
+  'azure',
+  'bedrock-byok',
+  'vertex-byok',
+]);
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = {
@@ -78,7 +92,9 @@ export function ProviderKeyProviderPickerScreen() {
   const providers = useQuery(trpc.byok.listProviders.queryOptions({}));
 
   const filtered = useMemo(() => {
-    const rows = providers.data ?? [];
+    const rows = (providers.data ?? []).filter(
+      provider => !STRUCTURED_CREDENTIAL_PROVIDER_IDS.has(provider.id)
+    );
     const trimmed = query.trim();
     if (trimmed === '') {
       return rows;
@@ -95,6 +111,9 @@ export function ProviderKeyProviderPickerScreen() {
         provider.id.toLocaleLowerCase(ID_FOLD_LOCALE).includes(idNeedle)
     );
   }, [providers.data, query, i18n.language]);
+
+  const offersWebOnlyProviders =
+    providers.data?.some(provider => STRUCTURED_CREDENTIAL_PROVIDER_IDS.has(provider.id)) ?? false;
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<ProviderOption>) => <ProviderRow provider={item} />,
@@ -167,6 +186,23 @@ export function ProviderKeyProviderPickerScreen() {
           </Button>
         )}
       </View>
+      {offersWebOnlyProviders ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('common.openInBrowser')}
+          className="mx-4 mb-1 flex-row items-center gap-2 rounded-lg bg-secondary px-3 py-3 active:opacity-70"
+          onPress={() => {
+            void openExternalUrl(`${WEB_BASE_URL}/byok`, {
+              label: t('profile.providerKeys.title'),
+            });
+          }}
+        >
+          <Text className="min-w-0 flex-1 text-sm text-foreground">
+            {t('common.openInBrowser')}
+          </Text>
+          <DirectionalChevronRight size={14} color={colors.mutedForeground} />
+        </Pressable>
+      ) : null}
       {body}
     </View>
   );

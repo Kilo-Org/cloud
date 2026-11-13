@@ -261,6 +261,22 @@ describe('DataExportScreen code entry', () => {
     expect(state.toastError).toHaveBeenCalledWith('Enter the code from the email.');
   });
 
+  it('closes the code form once the code has been spent', async () => {
+    state.exports = [READY_EXPORT];
+    const root = await mount();
+    openCodeStep(root);
+
+    act(() => {
+      handlersFor('download').onSuccess?.(
+        { downloadUrl: 'https://stub.test/artifact' },
+        { exportId: 'export-2', code: '12345678', challengeId: 'challenge-1' }
+      );
+    });
+
+    expect(root.findAll(node => Object.is(node.type, 'FormField'))).toHaveLength(0);
+    expect(root.findAll(node => Object.is(node.type, 'Button'))).toHaveLength(2);
+  });
+
   it('never renders the request schema payload when the server rejects a code', async () => {
     state.exports = [READY_EXPORT];
     const root = await mount();

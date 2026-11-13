@@ -1,4 +1,17 @@
-import { callerAddressFromHeaders } from './caller-address';
+import { callerAddressFromHeaders, callerAddressOrNull } from './caller-address';
+
+describe('callerAddressOrNull', () => {
+  it('returns the first hop of the platform-observed header', () => {
+    expect(
+      callerAddressOrNull(new Headers({ 'x-vercel-forwarded-for': '203.0.113.7, 70.41.3.18' }))
+    ).toBe('203.0.113.7');
+  });
+
+  it('returns null when neither platform header carries a hop', () => {
+    expect(callerAddressOrNull(new Headers({ 'x-forwarded-for': '192.0.2.11' }))).toBeNull();
+    expect(callerAddressOrNull(new Headers({ 'x-vercel-forwarded-for': ' ' }))).toBeNull();
+  });
+});
 
 describe('callerAddressFromHeaders', () => {
   it('returns the first hop of the platform-observed header', () => {

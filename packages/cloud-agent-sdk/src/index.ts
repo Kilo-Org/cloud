@@ -73,6 +73,7 @@ export type {
   PermissionResponse,
 } from './session';
 
+export { cloudMessageInfoSchema, cloudMessagePartSchema } from './cloud-conversation-schemas';
 export { normalize, normalizeCliEvent, isChatEvent, projectSessionGoal } from './normalizer';
 export type { NormalizedEvent, ChatEvent, ChatEventVersion, ServiceEvent } from './normalizer';
 

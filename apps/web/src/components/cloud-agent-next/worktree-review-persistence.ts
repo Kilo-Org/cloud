@@ -12,7 +12,7 @@ import {
   worktreeReviewCommentSchema,
   sameWorktreeReviewScope,
   type WorktreeReviewAnchor,
-} from './worktree-review';
+} from '@kilocode/app-shared/worktree-review';
 import {
   WORKTREE_REVIEW_PERSISTENCE_TIMEOUT_MS,
   type PersistedWorktreeReviewDraft,

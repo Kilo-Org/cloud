@@ -215,6 +215,17 @@ export type ContainerUsageRpcMethods = {
   recordStop: (input: RecordStopInput) => Promise<RecordAck>;
 };
 
+export const containerBillingStatusInputSchema = usageContextBaseSchema.pick({
+  service: true,
+  subject: true,
+});
+
+export type ContainerBillingStatusRpcMethods = {
+  getBillingMode: (
+    input: z.infer<typeof containerBillingStatusInputSchema>
+  ) => Promise<'shadow' | 'paid'>;
+};
+
 export function intervalId(service: string, instanceId: string, startEpochMs: number): string {
   return `${keyPart(service)}:${keyPart(instanceId)}:${startEpochMs}`;
 }

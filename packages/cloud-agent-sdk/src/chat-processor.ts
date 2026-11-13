@@ -16,12 +16,15 @@ type ChatProcessor = {
    * Materialize a synthetic user message from a `cloud.message.queued` server
    * event, unless an authoritative message with the same id already exists.
    * The synthetic message is overwritten when the wrapper later emits the
-   * real `message.updated` payload for the same id.
+   * real `message.updated` payload for the same id. The server queue time is
+   * recorded as `queuedAt`, also on an existing optimistic row, so the row is
+   * ordered by server time until its native row arrives.
    */
   synthesizeQueuedUserMessage(input: {
     messageId: string;
     sessionId: string;
     content: string | undefined;
+    createdAt?: number | undefined;
   }): void;
 };
 
@@ -278,11 +281,23 @@ function createChatProcessor(
       return true;
     },
 
-    synthesizeQueuedUserMessage({ messageId, sessionId, content }) {
+    synthesizeQueuedUserMessage({ messageId, sessionId, content, createdAt }) {
+      const existing = sessionStorage.getMessageInfo(messageId);
+      if (existing) {
+        if (
+          createdAt !== undefined &&
+          existing.role === 'user' &&
+          existing.sessionID === sessionId &&
+          existing.synthetic === true &&
+          existing.queuedAt === undefined
+        ) {
+          sessionStorage.upsertMessage({ ...existing, queuedAt: createdAt });
+        }
+        return;
+      }
       // Empty or missing content can't form a renderable user message; wait for
       // the authoritative `message.updated` payload from the wrapper instead.
       if (!content) return;
-      if (sessionStorage.getMessageInfo(messageId)) return;
 
       // Same unconfirmed marker as the optimistic send-time row: the
       // authoritative `message.updated` for this id replaces the info (role and
@@ -293,10 +308,11 @@ function createChatProcessor(
         id: messageId,
         sessionID: sessionId,
         role: 'user',
-        time: { created: Date.now() },
+        time: { created: createdAt ?? Date.now() },
         agent: '',
         model: { providerID: '', modelID: '' },
         synthetic: true,
+        ...(createdAt === undefined ? {} : { queuedAt: createdAt }),
       };
       sessionStorage.upsertMessage(syntheticMessage);
 

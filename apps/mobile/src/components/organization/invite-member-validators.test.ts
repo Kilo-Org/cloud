@@ -4,6 +4,7 @@ import {
   inviteEmailError,
   inviteErrorCopy,
 } from '@/components/organization/invite-member-validators';
+import { ORGANIZATION_INVITE_SEAT_LIMIT_REACHED } from '@kilocode/app-shared/organizations';
 import { i18n } from '@/i18n';
 
 const invalidCopy = i18n.t('organization.inviteMember.emailError');
@@ -82,6 +83,19 @@ describe('inviteErrorCopy', () => {
     expect(
       inviteErrorCopy(Object.assign(new Error('Invite conflict'), { data: { code: 'CONFLICT' } }))
     ).toEqual({ field: 'form', message: i18n.t('organization.inviteMember.alreadyInvited') });
+  });
+
+  it('names a seat rejection, so a race with another invite still explains itself', () => {
+    const error = Object.assign(new Error(ORGANIZATION_INVITE_SEAT_LIMIT_REACHED), {
+      data: {
+        code: 'PRECONDITION_FAILED',
+        message: ORGANIZATION_INVITE_SEAT_LIMIT_REACHED,
+      },
+    });
+    expect(inviteErrorCopy(error)).toEqual({
+      field: 'form',
+      message: i18n.t('organization.inviteMember.noSeatsAvailable'),
+    });
   });
 
   it('falls back to the generic line for every other failure', () => {

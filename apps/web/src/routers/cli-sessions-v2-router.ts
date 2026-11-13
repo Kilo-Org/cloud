@@ -45,6 +45,7 @@ import {
   fetchSessionMessagesPage,
   fetchSessionDiff,
   deleteSession as deleteSessionIngest,
+  fetchSharedSession,
   shareSession as shareSessionIngest,
   SessionShareTooLargeError,
   sessionIngestTrpcError,
@@ -1047,6 +1048,15 @@ const UnshareSessionInputSchema = z.object({
   session_id: sessionIdField,
 });
 const ShareSessionInputSchema = UnshareSessionInputSchema.extend(sessionShareOptionsSchema.shape);
+
+/**
+ * A public share token is an opaque signed capability. It is only ever an
+ * input to the worker read; the length bound keeps a garbage segment from
+ * reaching the upstream request.
+ */
+const GetSharedSessionInputSchema = z.object({
+  share_token: z.string().min(1).max(4096),
+});
 
 function addCreatedOnPlatformConditions(
   whereConditions: SQL[],
@@ -3406,5 +3416,27 @@ export const cliSessionsV2Router = createTRPCRouter({
         cause: error,
       });
     }
+  }),
+
+  /**
+   * Read a publicly shared session by its share token.
+   *
+   * The token is the capability: every caller holding it may read the
+   * transcript, which is exactly the rule the public `/s/<token>` web page
+   * applies. The read is therefore not owner-scoped — an owned session id is
+   * never accepted here, only the opaque token issued by `share`.
+   *
+   * An expired, revoked, rotated-out, or unknown token is NOT_FOUND. Clients
+   * treat that code as terminal: it is the dead-link state, not a failure to
+   * retry. A token whose snapshot read fails keeps its metadata and reports
+   * `transcriptUnavailable`, so a transient upstream fault never reads as a
+   * revoked link.
+   */
+  getSharedSession: baseProcedure.input(GetSharedSessionInputSchema).query(async ({ input }) => {
+    const shared = await fetchSharedSession(input.share_token);
+    if (!shared) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Shared session not found' });
+    }
+    return shared;
   }),
 });

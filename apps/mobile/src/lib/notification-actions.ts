@@ -32,13 +32,19 @@ import {
 import * as Sentry from '@sentry/react-native';
 
 import { getLanguageSnapshot, i18n } from '@/i18n';
+import { WEB_BASE_URL } from '@/lib/config';
 
+import { openClawNotificationWebUrl } from './claw-notification';
 import { type PendingDeepLinkOptions, setPendingDeepLink } from './deep-link-launch';
 import {
   type NeedsInputAction,
   type NeedsInputActionOutcome,
 } from './notification-action-interaction';
-import { notificationPathForData, prPathForData } from './notification-path';
+import {
+  notificationDestinationForData,
+  notificationPathForData,
+  prPathForData,
+} from './notification-path';
 import {
   clearPostedNeedsInputNotification,
   notificationIdentifierForSession,
@@ -186,51 +192,95 @@ const headlessStringDataSchema = z.string();
  * With the app alive in the background, Expo hands the same response to both
  * the JS response listener and the registered background task
  * (ExpoHandlingDelegate.handleNotificationResponse), so one tap can arrive
- * twice. Concurrent dispatches of one response share the first interaction;
- * once it settles, a later tap — on the replaced result notification — is
- * answered again.
+ * twice. Concurrent dispatches of one response share the first one — an action
+ * answers once, and a body tap opens its destination once; once it settles, a
+ * later tap — on the replaced result notification — is answered again, except
+ * that a KiloClaw page already opened for that response identity is not opened
+ * a second time by a late second delivery of the same tap.
  */
 // eslint-disable-next-line promise-function-async -- passthrough dispatch: one interaction per tap shares an in-flight promise
 export function handleNeedsInputNotificationResponse(
   response: Notifications.NotificationResponse,
   deps: NeedsInputActionDeps = {}
 ): Promise<boolean> {
-  const key = actionDispatchKey(response);
-  if (key === null) {
-    return dispatchNeedsInputResponse(response, deps);
-  }
-  const inFlight = inFlightActionDispatches.get(key);
+  const key = responseDispatchKey(response);
+  const inFlight = inFlightDispatches.get(key);
   if (inFlight) {
     return inFlight;
   }
-  const dispatch = trackActionDispatch(key, dispatchNeedsInputResponse(response, deps));
-  inFlightActionDispatches.set(key, dispatch);
+  const dispatch = trackDispatch(key, dispatchNeedsInputResponse(response, deps));
+  inFlightDispatches.set(key, dispatch);
   return dispatch;
 }
 
-// One interaction per tap: the in-flight dispatch for each OS response, keyed
-// by its notification identifier and action. Entries are removed on settle so
-// a retry tap on the replaced notification runs again.
-const inFlightActionDispatches = new Map<string, Promise<boolean>>();
+// One dispatch per tap: the in-flight dispatch for each OS response, keyed by
+// its notification identifier and action. A body tap is deduped like an action
+// button, because Expo delivers a warm-background tap to both the JS listener
+// and the registered background task — and the tap's side effect is a browser
+// open, which must happen once. Entries are removed on settle so a retry tap on
+// the replaced notification runs again.
+const inFlightDispatches = new Map<string, Promise<boolean>>();
 
-/** The OS identity of a response, or null for identifiers outside our four actions. */
-function actionDispatchKey(response: Notifications.NotificationResponse): string | null {
-  if (!isNeedsInputActionIdentifier(response.actionIdentifier)) {
-    return null;
-  }
+/** The OS identity of a response: its notification identifier and action id. */
+function responseDispatchKey(response: Notifications.NotificationResponse): string {
   return `${response.notification.request.identifier}:${response.actionIdentifier}`;
 }
 
 /** Forget the in-flight dispatch once it settles, without disturbing its result. */
-async function trackActionDispatch(key: string, dispatch: Promise<boolean>): Promise<boolean> {
+async function trackDispatch(key: string, dispatch: Promise<boolean>): Promise<boolean> {
   try {
     const result = await dispatch;
-    inFlightActionDispatches.delete(key);
+    inFlightDispatches.delete(key);
     return result;
   } catch (error) {
-    inFlightActionDispatches.delete(key);
+    inFlightDispatches.delete(key);
     throw error;
   }
+}
+
+// How long a response identity is remembered as having opened its page. Expo
+// can deliver one body tap as two responses that are not concurrent — the JS
+// listener first, then the registered background task once the first dispatch
+// settled — and both deliveries land within seconds of each other. The window
+// covers that race and nothing longer, so a person tapping the same,
+// still-present notification again a while later opens the page again.
+const OPENED_EXTERNAL_TTL_MS = 10 * 1000;
+
+// Oldest-first, so a full memory drops the least recently opened page.
+const OPENED_EXTERNAL_MEMORY_SIZE = 32;
+
+/** When each response identity last opened its external page. */
+const openedExternalPages = new Map<string, number>();
+
+/**
+ * True when this dispatch is the first for the response's identity, false when
+ * the same tap already opened its page. Expired entries are pruned on the way
+ * in, and the memory stays bounded so a long session cannot grow it.
+ */
+function claimExternalOpen(key: string, now: number): boolean {
+  for (const [seen, openedAt] of openedExternalPages) {
+    if (now - openedAt <= OPENED_EXTERNAL_TTL_MS) {
+      // Insertion order runs oldest first: every later entry is newer.
+      break;
+    }
+    openedExternalPages.delete(seen);
+  }
+  if (openedExternalPages.has(key)) {
+    return false;
+  }
+  openedExternalPages.set(key, now);
+  if (openedExternalPages.size > OPENED_EXTERNAL_MEMORY_SIZE) {
+    const oldest = openedExternalPages.keys().next().value;
+    if (oldest !== undefined) {
+      openedExternalPages.delete(oldest);
+    }
+  }
+  return true;
+}
+
+/** Clear the opened-page memory between tests; it is process-wide state. */
+export function _resetOpenedExternalPagesForTests(): void {
+  openedExternalPages.clear();
 }
 
 async function dispatchNeedsInputResponse(
@@ -296,16 +346,26 @@ async function dispatchNeedsInputResponse(
   if (data === null) {
     return false;
   }
-  const path = notificationPathForData(data);
-  if (path === null) {
+  const destination = notificationDestinationForData(data, WEB_BASE_URL);
+  if (destination === null) {
     return false;
   }
   Notifications.clearLastNotificationResponse();
+  if (destination.kind === 'external') {
+    // A KiloClaw push has no mobile screen: its tap opens the web page in the
+    // in-app browser, with the retry affordance a failed open offers. One tap
+    // can arrive twice, and a second delivery lands after the in-flight map
+    // has forgotten the first, so the page is claimed by response identity.
+    if (claimExternalOpen(responseDispatchKey(response), Date.now())) {
+      void openClawNotificationWebUrl(destination.url);
+    }
+    return false;
+  }
   // Always stash: the gated consumer in `_layout.tsx` owns every navigation.
   // `router.navigate` queues rather than throws when the router is unmounted,
   // so a tap while at the consent/force-update/login gate would navigate past
   // the gate and be dropped by the root redirect.
-  setPendingDeepLink(path, 'notification', pendingDeepLinkOptionsForData(data));
+  setPendingDeepLink(destination.href, 'notification', pendingDeepLinkOptionsForData(data));
   return false;
 }
 

@@ -131,8 +131,7 @@ export function useSessionModels(input: UseSessionModelsInput): UseSessionModels
     gatewayOrganization.organizationId,
     usesGateway && gatewayOrganization.resolved && requestCatalog
   );
-  const catalogLoaded =
-    requestCatalog && gatewayOrganization.resolved && !gatewayModels.isLoadingModels;
+  const catalogLoaded = gatewayOrganization.resolved && gatewayModels.hasLoadedModels;
   // A remote session's model comes from its CLI, not from the composer settings.
   const catalog = useMemo(
     () =>

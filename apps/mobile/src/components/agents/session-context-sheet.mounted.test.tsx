@@ -24,8 +24,8 @@ const holder = vi.hoisted(() => ({
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: () => ({ data: { instances: holder.instances }, isPending: holder.isPending }),
-  useMutation: () => ({ mutate: vi.fn(), isPending: false }),
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useQueryClient: () => ({ invalidateQueries: () => Promise.resolve() }),
+  useMutation: () => ({ mutate: () => undefined, isPending: false }),
 }));
 vi.mock('@/lib/trpc', () => {
   const options = { queryOptions: () => ({}), queryKey: () => [] };
@@ -34,18 +34,16 @@ vi.mock('@/lib/trpc', () => {
     trpcClient: { cloudAgentNext: {}, organizations: { cloudAgentNext: {} } },
     useTRPC: () => ({
       activeSessions: { listInstances: { queryOptions: () => ({}) } },
+      cliSessionsV2: {
+        get: { queryOptions: () => ({}), queryKey: () => ['get'] },
+        share: { mutationOptions: () => ({}) },
+        unshare: { mutationOptions: () => ({}) },
+      },
       cloudAgentNext: namespace,
       organizations: { cloudAgentNext: namespace },
     }),
   };
 });
-// The sandbox section's own button and dialog edges reach react-native through
-// modules the mounted transform cannot parse (activity-indicator -> motion ->
-// expo-battery), so both are mocked at their adapter.
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/dialog', () => ({
-  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
-}));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('./session-row-actions', () => ({
   copySessionId: async (id: string) => {
@@ -88,6 +86,13 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+// The sandbox section's own button and dialog edges reach react-native through
+// modules the mounted transform cannot parse (activity-indicator -> motion ->
+// expo-battery), so both are mocked at their adapter.
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
+}));
 vi.mock('@/components/ui/text', async () => {
   const React = await import('react');
   return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };

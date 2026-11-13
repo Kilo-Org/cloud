@@ -39,14 +39,14 @@ const registryItem: McpCatalogItem = {
       label: 'npm',
       identityKey: 'npm:@example/server',
       target: { kind: 'package', ecosystem: 'npm', identifier: '@example/server' },
-      versionHint: '1.2.0',
+      versionSpecHint: '>=1.2.0',
     },
     {
       eligible: true,
       label: 'remote',
       identityKey: 'remote:https://mcp.example.com/mcp',
       target: { kind: 'remote', url: 'https://mcp.example.com/mcp' },
-      versionHint: null,
+      versionSpecHint: null,
     },
     { eligible: false, label: 'oci', reason: 'oci packages aren’t supported yet.' },
   ],
@@ -246,7 +246,7 @@ describe('organization guardrails router', () => {
       );
     });
 
-    it('adds a custom package with a minimum version', async () => {
+    it('adds a custom package with allowed versions', async () => {
       const caller = await createCallerForUser(owner.id);
 
       const added = await caller.organizations.mcpGuardrails.add({
@@ -259,7 +259,7 @@ describe('organization guardrails router', () => {
           ecosystem: 'npm',
           identifier: '@modelcontextprotocol/server-filesystem',
         },
-        minVersion: ' 2025.1.0 ',
+        versionSpec: ' >=2025.1.0 ',
       });
 
       expect(added).toMatchObject({
@@ -269,10 +269,74 @@ describe('organization guardrails router', () => {
           kind: 'package',
           ecosystem: 'npm',
           identifier: '@modelcontextprotocol/server-filesystem',
+          version_spec: '>=2025.1.0',
           min_version: '2025.1.0',
         },
       });
     });
+
+    it('accepts the legacy minVersion input as a minimum range', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      const added = await caller.organizations.mcpGuardrails.add({
+        organizationId,
+        type: 'mcp',
+        source: 'custom',
+        target: { kind: 'package', ecosystem: 'npm', identifier: 'legacy-pkg' },
+        minVersion: '1.2.0',
+      });
+
+      expect(added.config).toMatchObject({
+        version_spec: '>=1.2.0',
+        min_version: '1.2.0',
+      });
+    });
+
+    it('treats a legacy 0.0.0 minimum as any version', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      const added = await caller.organizations.mcpGuardrails.add({
+        organizationId,
+        type: 'mcp',
+        source: 'custom',
+        target: { kind: 'package', ecosystem: 'npm', identifier: 'legacy-any' },
+        minVersion: '0.0.0',
+      });
+
+      expect(added.config).toMatchObject({ version_spec: null, min_version: null });
+    });
+
+    it.each(['latest', '^1.2.3', '>=2.0.0'])(
+      'rejects the invalid legacy minVersion %j instead of storing no restriction',
+      async minVersion => {
+        const caller = await createCallerForUser(owner.id);
+        await expect(
+          caller.organizations.mcpGuardrails.add({
+            organizationId,
+            type: 'mcp',
+            source: 'custom',
+            target: { kind: 'package', ecosystem: 'npm', identifier: 'legacy-pkg' },
+            minVersion,
+          })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      }
+    );
+
+    it.each(['>=5.0.0 ||', '>=1.0.0, <2.0.0'])(
+      'rejects the allowed versions %j, which would widen the policy',
+      async versionSpec => {
+        const caller = await createCallerForUser(owner.id);
+        await expect(
+          caller.organizations.mcpGuardrails.add({
+            organizationId,
+            type: 'mcp',
+            source: 'custom',
+            target: { kind: 'package', ecosystem: 'npm', identifier: 'wide-pkg' },
+            versionSpec,
+          })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      }
+    );
 
     it.each([
       { kind: 'remote', url: 'http://mcp.example.com' },
@@ -331,7 +395,7 @@ describe('organization guardrails router', () => {
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });
 
-    it('rejects an invalid minimum version', async () => {
+    it('rejects a tag as allowed versions', async () => {
       const caller = await createCallerForUser(owner.id);
       await expect(
         caller.organizations.mcpGuardrails.add({
@@ -339,7 +403,7 @@ describe('organization guardrails router', () => {
           type: 'mcp',
           source: 'custom',
           target: { kind: 'package', ecosystem: 'npm', identifier: 'pkg' },
-          minVersion: '^1.0.0',
+          versionSpec: 'latest',
         })
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });
@@ -392,7 +456,7 @@ describe('organization guardrails router', () => {
         source: 'mcp_registry',
         sourceId: 'io.example/server',
         identityKey: 'npm:@example/server',
-        minVersion: '1.2.0',
+        versionSpec: '1.2.0',
       });
 
       expect(mockResolve).toHaveBeenCalledWith({
@@ -403,25 +467,30 @@ describe('organization guardrails router', () => {
         name: 'Example Server',
         description: 'An example server',
         identityKey: 'npm:@example/server',
-        config: { kind: 'package', identifier: '@example/server', min_version: '1.2.0' },
+        config: {
+          kind: 'package',
+          identifier: '@example/server',
+          version_spec: '1.2.0',
+          min_version: '1.2.0',
+        },
         source: { registry: 'mcp_registry', id: 'io.example/server' },
       });
     });
 
-    it('ignores a minimum version for remote servers', async () => {
+    it('rejects allowed versions for remote servers', async () => {
       mockResolve.mockResolvedValue(registryItem);
       const caller = await createCallerForUser(owner.id);
 
-      const added = await caller.organizations.mcpGuardrails.add({
-        organizationId,
-        type: 'mcp',
-        source: 'mcp_registry',
-        sourceId: 'io.example/server',
-        identityKey: 'remote:https://mcp.example.com/mcp',
-        minVersion: '1.0.0',
-      });
-
-      expect(added.config).toEqual({ kind: 'remote', url: 'https://mcp.example.com/mcp' });
+      await expect(
+        caller.organizations.mcpGuardrails.add({
+          organizationId,
+          type: 'mcp',
+          source: 'mcp_registry',
+          sourceId: 'io.example/server',
+          identityKey: 'remote:https://mcp.example.com/mcp',
+          versionSpec: '1.0.0',
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });
 
     it('rejects an identity the registry no longer offers or marks ineligible', async () => {
@@ -498,7 +567,12 @@ describe('organization guardrails router', () => {
       });
       expect(page.nextCursor).toBe('next');
       expect(page.items[0].variants).toEqual([
-        expect.objectContaining({ identityKey: 'npm:@example/server', alreadyAdded: true }),
+        expect.objectContaining({
+          identityKey: 'npm:@example/server',
+          versionSpecHint: '>=1.2.0',
+          versionHint: '1.2.0',
+          alreadyAdded: true,
+        }),
         expect.objectContaining({
           identityKey: 'remote:https://mcp.example.com/mcp',
           alreadyAdded: false,
@@ -529,12 +603,12 @@ describe('organization guardrails router', () => {
         type: 'mcp',
         source: 'custom',
         target: { kind: 'package', ecosystem: 'npm', identifier: 'pkg' },
-        minVersion: '1.0.0',
+        versionSpec: '1.0.0',
       });
       return { caller, added };
     }
 
-    it('updates the name, description and minimum version', async () => {
+    it('updates the name, description and allowed versions', async () => {
       const { caller, added } = await addPackage();
 
       const updated = await caller.organizations.mcpGuardrails.update({
@@ -542,13 +616,18 @@ describe('organization guardrails router', () => {
         guardrailId: added.id,
         name: 'Renamed',
         description: 'Why we allow it',
-        minVersion: '2.0.0',
+        versionSpec: '2.0.0',
       });
 
       expect(updated).toMatchObject({
         name: 'Renamed',
         description: 'Why we allow it',
-        config: { kind: 'package', identifier: 'pkg', min_version: '2.0.0' },
+        config: {
+          kind: 'package',
+          identifier: 'pkg',
+          version_spec: '2.0.0',
+          min_version: '2.0.0',
+        },
         identityKey: 'npm:pkg',
       });
       expect((await latestAuditLog()).action).toBe('organization.guardrail.update');
@@ -565,6 +644,7 @@ describe('organization guardrails router', () => {
       });
 
       expect(updated.name).toBe(identifier);
+      expect(updated.config).toMatchObject({ version_spec: '1.0.0', min_version: '1.0.0' });
     });
 
     it('rejects changing the target to one that is already allowed', async () => {
@@ -585,17 +665,99 @@ describe('organization guardrails router', () => {
       ).rejects.toMatchObject({ code: 'CONFLICT' });
     });
 
-    it('clears the minimum version', async () => {
+    it('clears the allowed versions', async () => {
       const { caller, added } = await addPackage();
       const updated = await caller.organizations.mcpGuardrails.update({
         organizationId,
         guardrailId: added.id,
-        minVersion: '',
+        versionSpec: '',
       });
-      expect(updated.config).toMatchObject({ min_version: null });
+      expect(updated.config).toMatchObject({ version_spec: null, min_version: null });
     });
 
-    it('rejects a minimum version on a remote server', async () => {
+    it('renames a guardrail with an unconvertible legacy minimum without clearing it', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const [row] = await db
+        .insert(organization_guardrails)
+        .values({
+          organization_id: organizationId,
+          type: 'mcp',
+          identity_key: 'npm:legacy-invalid',
+          name: 'Legacy invalid',
+          description: null,
+          config: {
+            kind: 'package',
+            ecosystem: 'npm',
+            identifier: 'legacy-invalid',
+            version_spec: null,
+            min_version: 'latest',
+          },
+          source: { registry: 'custom', id: null },
+          created_by_kilo_user_id: owner.id,
+        })
+        .returning();
+
+      const updated = await caller.organizations.mcpGuardrails.update({
+        organizationId,
+        guardrailId: row.id,
+        name: 'Renamed legacy invalid',
+        target: { kind: 'package', ecosystem: 'npm', identifier: 'legacy-invalid' },
+      });
+
+      expect(updated.name).toBe('Renamed legacy invalid');
+      expect(updated.config).toMatchObject({
+        version_spec: null,
+        version_spec_invalid: true,
+        min_version: 'latest',
+      });
+
+      const [stored] = await db
+        .select()
+        .from(organization_guardrails)
+        .where(eq(organization_guardrails.id, row.id));
+      expect(stored.config).toMatchObject({ version_spec: null, min_version: 'latest' });
+      expect(stored.config).not.toHaveProperty('version_spec_invalid');
+    });
+
+    it('keeps a range when a pre-range admin tab resubmits the floor it was shown', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const added = await caller.organizations.mcpGuardrails.add({
+        organizationId,
+        type: 'mcp',
+        source: 'custom',
+        target: { kind: 'package', ecosystem: 'npm', identifier: 'ranged' },
+        versionSpec: '^2.0.0 || >=3.0.3',
+      });
+      expect(added.config).toMatchObject({ min_version: '2.0.0' });
+
+      const renamed = await caller.organizations.mcpGuardrails.update({
+        organizationId,
+        guardrailId: added.id,
+        name: 'Renamed',
+        target: { kind: 'package', ecosystem: 'npm', identifier: 'ranged' },
+        minVersion: '2.0.0',
+      });
+      expect(renamed.config).toMatchObject({
+        version_spec: '^2.0.0 || >=3.0.3',
+        min_version: '2.0.0',
+      });
+
+      const versionOnly = await caller.organizations.mcpGuardrails.update({
+        organizationId,
+        guardrailId: added.id,
+        minVersion: '2.0.0',
+      });
+      expect(versionOnly.config).toMatchObject({ version_spec: '^2.0.0 || >=3.0.3' });
+
+      const raised = await caller.organizations.mcpGuardrails.update({
+        organizationId,
+        guardrailId: added.id,
+        minVersion: '3.1.0',
+      });
+      expect(raised.config).toMatchObject({ version_spec: '>=3.1.0', min_version: '3.1.0' });
+    });
+
+    it('rejects allowed versions on a remote server', async () => {
       const caller = await createCallerForUser(owner.id);
       const added = await caller.organizations.mcpGuardrails.add({
         organizationId,
@@ -607,7 +769,7 @@ describe('organization guardrails router', () => {
         caller.organizations.mcpGuardrails.update({
           organizationId,
           guardrailId: added.id,
-          minVersion: '1.0.0',
+          versionSpec: '1.0.0',
         })
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });
@@ -833,7 +995,7 @@ describe('organization guardrails router', () => {
 
     it('approves a server as the matching registry entry', async () => {
       await seedEvents();
-      mockFindMatch.mockResolvedValue({ item: registryItem, versionHint: null });
+      mockFindMatch.mockResolvedValue({ item: registryItem, versionSpecHint: null });
       const caller = await createCallerForUser(owner.id);
 
       const result = await caller.organizations.mcpGuardrails.approveConnection({
@@ -879,6 +1041,7 @@ describe('organization guardrails router', () => {
             kind: 'package',
             ecosystem: 'npm',
             identifier: 'left-pad-mcp',
+            version_spec: null,
             min_version: null,
           },
         })

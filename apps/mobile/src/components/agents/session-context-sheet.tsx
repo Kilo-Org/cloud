@@ -47,6 +47,7 @@ import { SessionSandboxSection } from './session-sandbox-section';
 import { copySessionId, copySessionLink } from './session-row-actions';
 import { type SessionConnectionDisplay } from './session-connection-indicator-state';
 import { SessionTodoLinkRow } from '@/components/todos/session-todo-link';
+import { SessionShareSection } from './session-share-section';
 
 type SessionContextSheetProps = {
   visible: boolean;
@@ -382,6 +383,8 @@ export function SessionContextSheet({
             status={linkCopy.status}
             onPress={linkCopy.handlePress}
           />
+
+          <SessionShareSection sessionId={sessionId} visible={visible} />
 
           {runningOn.kind !== 'hidden' ? (
             <Row label={t('agentChat.instancePicker.runOn')}>

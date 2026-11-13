@@ -397,7 +397,6 @@ public final class ReactNativeSshModule: Module {
     let dimensions = try shellDimensions(options)
     let shellId = state.shellIds.next()
     let source = try await translateAsync {
-      // A channel that ends releases itself: nothing holds a shell past its exit.
       try await SshShellSource.open(
         sessionId: sessionId,
         session: session,

@@ -12,8 +12,6 @@ import java.util.concurrent.CopyOnWriteArrayList
  * A shell channel as the terminal view sees it: bytes go straight from Rust to
  * the view, and input comes back the same way. Nothing crosses JavaScript.
  *
- * A channel that ends is done: the module drops the source instead of holding
- * its channel and buffer until JavaScript asks for it.
  */
 internal class SshShellSource private constructor(
   val sessionId: String,
@@ -21,7 +19,7 @@ internal class SshShellSource private constructor(
   private val delivery: SinkDelivery,
   val activity: ShellActivity,
 ) : TerminalByteSource {
-  /** Set once the channel reported its exit; a source never reopens. */
+  /** Set only after a sink received the exit; unbound closed shells remain attachable. */
   val terminated: Boolean
     get() = delivery.terminated
 
@@ -121,9 +119,12 @@ internal class SinkDelivery(
 
     synchronized(lock) {
       sink = next
-      pending = buffered ?: emptyList()
+      pending = if (next == null) emptyList() else buffered ?: emptyList()
       closed = closeEvent
-      buffered = null
+      if (next != null) {
+        buffered = ArrayList()
+        bufferedBytes = 0
+      }
     }
 
     if (next == null) {
@@ -131,7 +132,10 @@ internal class SinkDelivery(
     }
 
     pending.forEach(next::onData)
-    closed?.let { next.onClosed(it.exitStatus, it.error) }
+    closed?.let {
+      next.onClosed(it.exitStatus, it.error)
+      deliveredClose()
+    }
   }
 
   override fun onData(bytes: ByteArray) {
@@ -149,15 +153,25 @@ internal class SinkDelivery(
   }
 
   override fun onClosed(exitStatus: UInt?, error: String?) {
-    var first = false
     val target = synchronized(lock) {
+      if (closeEvent != null) return
       closeEvent = CloseEvent(exitStatus?.toInt(), error)
-      first = !terminated
-      terminated = true
       sink
     }
 
-    target?.onClosed(exitStatus?.toInt(), error)
+    if (target != null) {
+      target.onClosed(exitStatus?.toInt(), error)
+      deliveredClose()
+    }
+  }
+
+  private fun deliveredClose() {
+    val first = synchronized(lock) {
+      if (terminated) false else {
+        terminated = true
+        true
+      }
+    }
     if (first) onTerminated()
   }
 
@@ -166,7 +180,6 @@ internal class SinkDelivery(
     if (bufferedBytes + bytes.size > MAX_BUFFERED_BYTES) {
       return
     }
-
     pending.add(bytes)
     bufferedBytes += bytes.size
   }

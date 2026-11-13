@@ -73,24 +73,27 @@ internal object BackgroundSessions {
   }
 
   fun sync(context: Context) {
-    val action = synchronized(lock) {
+    synchronized(lock) {
       val count = SshRegistry.sessionCount()
       val opened = !serviceRunning && count > 0
       val closed = serviceRunning && count == 0
       serviceRunning = count > 0
       if (closed) startDeferred = false
 
-      when {
+      val action = when {
         opened -> Runnable { start(context) }
         closed -> Runnable { SshSessionService.stop(context) }
         else -> null
       }
+      if (action == null) refresh(context) else mainHandler.post(action)
     }
-
-    if (action == null) refresh(context) else mainHandler.post(action)
   }
 
   private fun start(context: Context) {
+    if (SshRegistry.sessionCount() == 0) {
+      synchronized(lock) { serviceRunning = false }
+      return
+    }
     if (!isAppForeground()) {
       deferStart(context)
       return

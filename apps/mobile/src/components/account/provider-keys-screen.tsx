@@ -18,6 +18,7 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { useTRPC } from '@/lib/trpc';
 import { i18n } from '@/i18n';
 
@@ -203,9 +204,17 @@ export function ProviderKeysScreen() {
             break;
           }
           default: {
-            // Unreachable: `outcome` is the exhaustive discriminated union.
-            const unhandled: never = result;
-            throw new Error(`Unhandled key test outcome: ${String(unhandled)}`);
+            // `result` is `never`: this build knows every outcome the union
+            // declares. The union belongs to the server, and a build installed
+            // before the server adds one still receives it, so the tap answers
+            // with the generic failure copy and the outcome is recorded.
+            captureTelemetry({
+              level: 'warning',
+              message: 'Unhandled BYOK key test outcome',
+              extra: { result },
+            });
+            announcingToast.error(t('profile.providerKeys.testFailed'));
+            break;
           }
         }
       },

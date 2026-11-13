@@ -234,6 +234,17 @@ describe('ProviderKeysScreen', () => {
     expect(announcingToast.error).toHaveBeenCalledWith('The key test failed. Try again.');
   });
 
+  it('answers a tap whose outcome this build does not know', async () => {
+    await mount();
+
+    act(() => {
+      testMutation().onSuccess?.({ outcome: 'rate-limited' });
+    });
+
+    expect(announcingToast.error).toHaveBeenCalledWith('The key test failed. Try again.');
+    expect(announcingToast.success).not.toHaveBeenCalled();
+  });
+
   it('asks before removing a key and then deletes it', async () => {
     const root = await mount();
 

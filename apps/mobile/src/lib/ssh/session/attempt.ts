@@ -14,6 +14,7 @@ import { sshDatabase } from '../store';
 import { MAX_RECONNECT_ATTEMPTS, reconnectDelayMs } from './backoff';
 import { requireKeyAccess } from './biometric';
 import { clearTimer, type LiveSession, setPhase, stillOpen } from './live';
+import { passwordFor } from './password';
 import { patchSession, sessionById } from './session-store';
 import { isRetryableReason, type SshCloseReason } from './types';
 
@@ -228,7 +229,7 @@ async function authFor(
   host: SshHost
 ): Promise<SshAuth | null> {
   if (host.authMethod === 'password') {
-    const password = host.password ?? entry.passwords.get(host.id) ?? null;
+    const password = passwordFor(host, entry.passwords);
     if (password === null) {
       entry.authHostId = host.id;
       setPhase(entry, {

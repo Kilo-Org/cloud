@@ -72,7 +72,7 @@ export function hostFormValuesOf(host: SshHost | null): HostFormValues {
     portText: String(host?.port ?? 22),
     username: host?.username ?? '',
     authMethod: host?.authMethod ?? 'password',
-    password: '',
+    password: host?.password ?? '',
     savePassword: host?.password != null,
     keyId: host?.keyId ?? null,
     jumpHostId: host?.jumpHostId ?? null,

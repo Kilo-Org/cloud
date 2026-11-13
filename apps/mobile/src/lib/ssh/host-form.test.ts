@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { jumpHostCandidates } from './host-form';
+import { hostFormValuesOf, jumpHostCandidates, toHostInput } from './host-form';
 import { type SshHost } from './hosts';
 
 // The stores reach `expo-crypto` for ids; under Node its runtime setup reads
@@ -43,5 +43,20 @@ describe('jumpHostCandidates', () => {
     const hosts = [hostOf('a', null), hostOf('b', 'a')];
 
     expect(jumpHostCandidates(hosts, null).map(host => host.id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('hostFormValuesOf', () => {
+  it('carries a saved password back into the record when nothing is retyped', () => {
+    const stored = { ...hostOf('a', null), password: 'kept' };
+
+    expect(toHostInput(hostFormValuesOf(stored)).password).toBe('kept');
+  });
+
+  it('starts a new host with no password', () => {
+    const values = hostFormValuesOf(null);
+
+    expect(values.password).toBe('');
+    expect(values.savePassword).toBe(false);
   });
 });

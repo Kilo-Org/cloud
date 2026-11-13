@@ -72,7 +72,7 @@ const ViewMetaSchema = z
  */
 const portInRange = (origin: string): boolean => {
   const port = /:(\d{1,5})$/u.exec(origin)?.[1];
-  return port === undefined || Number(port) <= 65_535;
+  return port === undefined || (Number(port) >= 1 && Number(port) <= 65_535);
 };
 
 /**
@@ -142,8 +142,18 @@ export function contentSecurityPolicy(meta: Readonly<Record<string, unknown>> | 
  */
 export function viewDocument(html: string, policy: string): string {
   const meta = `<meta http-equiv="Content-Security-Policy" content="${policy.replaceAll('"', '&quot;')}">`;
-  const doctype = /^\uFEFF?\s*<!doctype[^>]*>/iu.exec(html);
-  const at = doctype === null ? 0 : doctype.index + doctype[0].length;
+  /* The prologue a parser reads before a doctype it honours: a byte-order mark,
+     whitespace, comments and processing instructions. The doctype is sought
+     past all of it, one token at a time, so a large document is scanned once. */
+  const prologue = /(?:\uFEFF|\s+|<!--[\s\S]*?-->|<\?[\s\S]*?\?>)/uy;
+  let afterPrologue = 0;
+  while (prologue.exec(html) !== null) {
+    afterPrologue = prologue.lastIndex;
+  }
+  const doctype = /<!doctype[^>]*>/iuy;
+  doctype.lastIndex = afterPrologue;
+  const found = doctype.exec(html);
+  const at = found === null ? 0 : found.index + found[0].length;
   return `${html.slice(0, at)}${meta}${html.slice(at)}`;
 }
 

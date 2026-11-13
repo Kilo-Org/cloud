@@ -100,9 +100,18 @@ describe('the policy a view runs under', () => {
 
   it('drops a port no origin can have', () => {
     const policy = contentSecurityPolicy({
-      ui: { csp: { connectDomains: ['https://api.example:99999', 'https://api.example:443'] } },
+      ui: {
+        csp: {
+          connectDomains: [
+            'https://api.example:0',
+            'https://api.example:99999',
+            'https://api.example:443',
+          ],
+        },
+      },
     });
     expect(policy).toContain('connect-src https://api.example:443');
+    expect(policy).not.toContain(':0');
     expect(policy).not.toContain('99999');
   });
 });
@@ -159,6 +168,17 @@ describe('the document a view draws', () => {
     expect(document.startsWith('\uFEFF<!doctype html><meta ')).toBe(true);
     expect(document.indexOf('Content-Security-Policy')).toBeLessThan(
       document.indexOf('<!-- <head> -->')
+    );
+  });
+
+  it('keeps a doctype that follows comments and whitespace in front of the policy', () => {
+    const document = viewDocument(
+      '<!-- a note -->\n<!doctype html><html><body><p>a view</p></body></html>',
+      "default-src 'none'"
+    );
+    expect(document.startsWith('<!-- a note -->\n<!doctype html><meta ')).toBe(true);
+    expect(document.indexOf('Content-Security-Policy')).toBeLessThan(
+      document.indexOf('<p>a view</p>')
     );
   });
 });

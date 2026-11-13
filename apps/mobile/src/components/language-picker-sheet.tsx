@@ -42,10 +42,7 @@ import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib
 // themed `contentStyle` paints the surface (see the (auth) layout), and a
 // second opaque layer would cover the sheet's own themed surface.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = {
-  paddingHorizontal: 16,
-  paddingBottom: 16,
-} satisfies ViewStyle;
+const listContentContainerStyle = { paddingHorizontal: 16, paddingBottom: 16 } satisfies ViewStyle;
 // A query that matches nothing leaves the no-match state as the list's only
 // content, and the sheet body is far taller than it. Without this the content
 // box shrinks to the state's own height, so the state's own centring collapses
@@ -152,6 +149,7 @@ export function LanguagePickerSheet({
     () => languagePickerItems(query, appliedLanguage, applied === 'device'),
     [query, appliedLanguage, applied]
   );
+  const listIsEmpty = items.length === 0 && !searchInList;
   // The list's memoized cells compare `renderItem` and `extraData` by identity
   // before re-rendering a row (see the security-agent finding list). `selected`
   // and the in-flight `busy` state therefore have to travel through `extraData`:
@@ -388,9 +386,7 @@ export function LanguagePickerSheet({
         nestedScrollEnabled
         style={listStyle}
         contentContainerStyle={
-          items.length === 0 && !searchInList
-            ? emptyListContentContainerStyle
-            : listContentContainerStyle
+          listIsEmpty ? emptyListContentContainerStyle : listContentContainerStyle
         }
         data={items}
         extraData={rowExtraData}

@@ -1782,15 +1782,18 @@ jobs:
 
       # Port 9000 is published so a remote forward bound inside the container
       # is reachable; 2222-2226 carry password, two-factor, silent and bastion.
+      # Every published port binds to the loopback interface only: the fixtures
+      # accept the repository's test password and 2FA code, so a runner sharing
+      # a network must not be able to reach them.
       - name: Start the SSH test servers
         run: |
           set -euo pipefail
           docker network create ssh-core-net
-          docker run -d --name ssh-core-password --network ssh-core-net -p 2222:2222 -p 9000:9000 ssh-core-test password
-          docker run -d --name ssh-core-twofactor --network ssh-core-net -p 2223:2222 ssh-core-test two-factor
-          docker run -d --name ssh-core-silent --network ssh-core-net -p 2224:2222 ssh-core-test silent
+          docker run -d --name ssh-core-password --network ssh-core-net -p 127.0.0.1:2222:2222 -p 127.0.0.1:9000:9000 ssh-core-test password
+          docker run -d --name ssh-core-twofactor --network ssh-core-net -p 127.0.0.1:2223:2222 ssh-core-test two-factor
+          docker run -d --name ssh-core-silent --network ssh-core-net -p 127.0.0.1:2224:2222 ssh-core-test silent
           docker run -d --name ssh-core-http --network ssh-core-net ssh-core-test http
-          docker run -d --name ssh-core-bastion --network ssh-core-net -p 2226:2222 ssh-core-test password
+          docker run -d --name ssh-core-bastion --network ssh-core-net -p 127.0.0.1:2226:2222 ssh-core-test password
           docker run -d --name ssh-core-target --network ssh-core-net ssh-core-test password
           for port in 2222 2223 2224 2226; do
             for attempt in $(seq 1 30); do

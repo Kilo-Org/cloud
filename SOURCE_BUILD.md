@@ -1,10 +1,8 @@
 # Building the Kilo Code Firefox extension from source
 
-This archive is the source of the Firefox package submitted to AMO for
-`kilo-extension` 1.0.4: commit `2e0871d9e164a9a290dd683c3cc1deb6d8059a84` of
-<https://github.com/Kilo-Org/cloud>.
-
-It is a pnpm workspace subset, not the whole monorepo:
+This archive is the source of the Firefox package for the `kilo-extension`
+release it ships with; the version is the one in `apps/extension/package.json`
+inside the archive. It is a pnpm workspace subset, not the whole monorepo:
 
 - the root workspace files (`package.json`, `pnpm-workspace.yaml`,
   `pnpm-lock.yaml`, `.nvmrc`, `.gitignore`, `patches/`,
@@ -28,9 +26,10 @@ It is a pnpm workspace subset, not the whole monorepo:
 ## Steps
 
 ```sh
-mkdir kilo-extension-1.0.4-amo-sources
-unzip -q kilo-extension-1.0.4-amo-sources.zip -d kilo-extension-1.0.4-amo-sources
-cd kilo-extension-1.0.4-amo-sources
+# The archive ships as kilo-extension-<version>-sources.zip.
+mkdir extension-sources
+unzip -q kilo-extension-*-sources.zip -d extension-sources
+cd extension-sources
 
 # Corepack links pnpm into /usr/bin, so this one step needs root. Without sudo,
 # use `npm install -g pnpm@11.1.2` instead.
@@ -55,12 +54,12 @@ apps/extension/.output/firefox-mv3/
 ```
 
 Its contents — `manifest.json`, `background.js`, `sidepanel.html`, `chunks/`,
-`assets/`, `icon/` — are the files inside the submitted
-`kilo-extension-1.0.4-firefox.zip`. To recreate that zip:
+`assets/`, `icon/` — are the files inside the Firefox package that ships with
+this release (`kilo-extension-<version>-firefox.zip`). To recreate that zip:
 
 ```sh
 cd apps/extension/.output/firefox-mv3
-zip -r -X ../../../../kilo-extension-1.0.4-firefox.zip .
+zip -r -X ../../../../kilo-extension-firefox.zip .
 ```
 
 ## The one build-time input that is not in this archive
@@ -88,3 +87,7 @@ extension changes.
 Playwright artifacts are not in the archive. `pnpm install` recreates
 `node_modules/`, and `wxt build` writes both `.output/` and the `.wxt/`
 directory that `apps/extension/tsconfig.json` extends.
+
+The release workflow rebuilds this archive with the commands above and diffs
+the result against the Firefox package it uploads, so an entry missing from
+`includeSources` fails the release instead of the next store submission.

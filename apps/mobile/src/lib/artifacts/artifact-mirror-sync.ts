@@ -221,9 +221,9 @@ async function runSyncOnce(
 
   const scope = readCacheScope(userId);
   const key = syncStateItemKey(userId);
-  const state = parseSyncState(await deps.readState(scope, key));
+  const stored = reconcileWithDisk(parseSyncState(await deps.readState(scope, key)), deps);
   const now = deps.now();
-  if (!options.force && isWithinMinInterval(state.lastRunAt, now)) {
+  if (!options.force && isWithinMinInterval(stored.lastRunAt, now)) {
     return { status: 'skipped', reason: 'interval' };
   }
   if (!canPublish(epoch)) {
@@ -235,7 +235,7 @@ async function runSyncOnce(
     deps,
     epoch,
     generation,
-    states: nextSessionStates(page.sessions, state.sessions),
+    states: nextSessionStates(page.sessions, stored.sessions),
   };
   const advanced = await advanceSessions(page.sessions, run);
   if (advanced.discarded || !canPublish(epoch)) {
@@ -540,6 +540,33 @@ function applyByteBudget(
 /** The publication fence: no sign-out in progress and the epoch still current. */
 function canPublish(epoch: number): boolean {
   return !isSignOutActive() && isCurrentAuthEpoch(epoch);
+}
+
+/**
+ * Reconcile the stored crawl state with the bytes actually in the mirror.
+ *
+ * The mirror is derived data, and everything on the device can remove it: an
+ * account boundary wipes it, the file browser can delete a folder, and the OS
+ * can sweep the cache. A stored state that still names a file whose byte is
+ * gone would skip re-materializing it and publish it in the index anyway, so
+ * the state is checked against the disk first. One missing byte restarts that
+ * session's crawl from its first page: the artifact may sit behind an earlier
+ * cursor, so keeping the cursor would never reach it again.
+ */
+function reconcileWithDisk(state: MirrorSyncState, deps: ArtifactMirrorSyncDeps): MirrorSyncState {
+  const sessions: Record<string, MirrorSyncSessionState> = {};
+  for (const [sessionId, session] of Object.entries(state.sessions)) {
+    const directory = deps.mirrorSessionDir(sessionId);
+    const missing =
+      directory !== null && session.files.some(file => !new File(directory, file.id).exists);
+    // No browsable container means nothing was ever materialized there, so the
+    // state is kept as it is; with one, a missing byte restarts the crawl.
+    sessions[sessionId] =
+      directory !== null && missing
+        ? { cursor: null, done: false, files: [], updatedAt: session.updatedAt }
+        : session;
+  }
+  return { lastRunAt: state.lastRunAt, sessions };
 }
 
 function isWithinMinInterval(lastRunAt: number | null, now: number): boolean {

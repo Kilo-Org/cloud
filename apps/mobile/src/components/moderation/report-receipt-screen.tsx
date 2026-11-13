@@ -61,10 +61,10 @@ function statusLabel(dictionary: Readonly<Record<string, string>>, status: strin
  * The control takes width from the value, which on a 360 dp screen leaves too
  * little for the whole id. So a copy row gives its value a second line, and the
  * value wraps into it instead of losing characters: the id the description asks
- * the reader to keep stays readable, not only copyable. Two lines bound the
- * growth, and a value still longer than both cuts at its middle rather than its
- * end, so the characters that tell one id from another stay on screen. A row
- * without a control holds none and keeps one line, as the status rows do.
+ * the reader to keep stays readable, not only copyable. Two lines bound the row's
+ * growth, so a value longer than both keeps the end cut that the platform serves
+ * for multi-line text, and the copy control carries the whole value regardless.
+ * A row without a control holds none and keeps one line, as the status rows do.
  */
 function StatusRow({
   label,
@@ -81,7 +81,6 @@ function StatusRow({
         <Text
           className="min-w-0 shrink text-sm font-medium text-foreground"
           numberOfLines={copyLabel === undefined ? 1 : 2}
-          ellipsizeMode={copyLabel === undefined ? 'tail' : 'middle'}
         >
           {value}
         </Text>

@@ -1,0 +1,29 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'ai.kilo.reactnativessh'
+version = new groovy.json.JsonSlurper().parse(file('../package.json')).version
+
+android {
+  namespace "ai.kilo.reactnativessh"
+  defaultConfig {
+    versionCode 1
+    versionName project.version
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  // The uniffi Kotlin bindings call into libssh_core.so through JNA direct mapping.
+  implementation 'net.java.dev.jna:jna:5.17.0@aar'
+  // The bindings expose async functions and callback interfaces as coroutines.
+  implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2'
+  implementation 'androidx.annotation:annotation:1.9.0'
+  implementation 'androidx.core:core-ktx:1.17.0'
+  implementation 'androidx.lifecycle:lifecycle-process:2.9.2'
+  implementation 'com.facebook.react:react-android'
+}

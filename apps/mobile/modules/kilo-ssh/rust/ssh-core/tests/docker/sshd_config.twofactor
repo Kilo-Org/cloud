@@ -1,0 +1,18 @@
+Port 2222
+AddressFamily inet
+ListenAddress 0.0.0.0
+
+HostKey /etc/ssh/ssh_host_ed25519_key
+HostKey /etc/ssh/ssh_host_ecdsa_key
+HostKey /etc/ssh/ssh_host_rsa_key
+
+PidFile /run/sshd.twofactor.pid
+PasswordAuthentication no
+KbdInteractiveAuthentication yes
+PubkeyAuthentication no
+PermitRootLogin no
+UsePAM yes
+AuthenticationMethods keyboard-interactive
+
+PrintMotd no
+AcceptEnv LANG LC_*

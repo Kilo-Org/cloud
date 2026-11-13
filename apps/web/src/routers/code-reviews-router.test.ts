@@ -3628,8 +3628,8 @@ describe('personalReviewAgent.patchReviewConfig', () => {
           },
         ],
         disable_review_md: true,
-        // Web-only setting the patch schema never carries; `false` proves
-        // the patch passes it through instead of resetting to the default.
+        // A setting a patch may carry. `false` here proves a patch that omits
+        // it keeps this value instead of resetting to the default.
         skip_bot_pull_requests: false,
         review_memory_enabled: true,
         review_analytics_enabled: true,
@@ -3682,6 +3682,38 @@ describe('personalReviewAgent.patchReviewConfig', () => {
     expect(stored?.is_enabled).toBe(false);
   });
 
+  it('persists skipBotPullRequests from a patch and keeps the stored value when a patch omits it', async () => {
+    await seedPersonalGithubConfig();
+    const caller = await createCallerForUser(testUser.id);
+
+    // The mobile overview's toggle sends only this field.
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      skipBotPullRequests: true,
+    });
+    expect(
+      (await caller.personalReviewAgent.getReviewConfig({ platform: 'github' })).skipBotPullRequests
+    ).toBe(true);
+
+    // A patch that does not carry it must not reset it to the default.
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      reviewStyle: 'strict',
+    });
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        review_style: 'strict',
+        skip_bot_pull_requests: true,
+      })
+    );
+  });
+
   it('preserves manuallyAddedRepositories and repositoryModelOverrides when the patch omits them', async () => {
     await seedPersonalGithubConfig();
     const caller = await createCallerForUser(testUser.id);
@@ -3721,7 +3753,7 @@ describe('personalReviewAgent.patchReviewConfig', () => {
         repository_selection_mode: 'all',
         gate_threshold: 'off',
         disable_review_md: true,
-        // Web-only setting preserved by the patch pass-through:
+        // A setting the patch did not carry, preserved by the field-merge:
         skip_bot_pull_requests: false,
         // Feature flags preserved by `preserveCodeReviewFeatureSettings`:
         review_memory_enabled: true,

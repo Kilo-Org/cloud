@@ -47,11 +47,13 @@ export function viewArguments(input: Readonly<Record<string, unknown>>) {
 export const MAX_VIEW_BYTES = 1_000_000;
 
 /**
- * One origin a policy may name. Anything else — a wildcard, `'unsafe-inline'`,
- * a bare word — is dropped, because the policy is the resource's own request
- * and a request cannot widen the sandbox beyond what the host allows.
+ * One origin a policy may name: a scheme, an exact host and an optional port.
+ * Anything else — a wildcard host, a path, credentials, `'unsafe-inline'`, a
+ * bare word — is dropped, because the policy is the resource's own request and
+ * a request cannot widen the sandbox beyond what the host allows.
  */
-const ORIGIN = /^(?:https?|wss?):\/\/[^\s;'"<>]+$/u;
+const ORIGIN =
+  /^(?:https?|wss?):\/\/(?:\[[0-9A-Fa-f:.]+\]|[^\s/\\@?#;,'"<>()[\]{}|^`%*:]+)(?::\d{1,5})?$/u;
 
 const ResourceCspSchema = z.object({
   connectDomains: z.array(z.string()).optional(),
@@ -64,8 +66,23 @@ const ViewMetaSchema = z
   .object({ ui: z.object({ csp: ResourceCspSchema.optional() }).optional() })
   .optional();
 
+/**
+ * Whether a port an origin names is one a socket can have. A source with a
+ * larger one names nothing a request can reach, so it is not an origin here.
+ */
+const portInRange = (origin: string): boolean => {
+  const port = /:(\d{1,5})$/u.exec(origin)?.[1];
+  return port === undefined || (Number(port) >= 1 && Number(port) <= 65_535);
+};
+
+/**
+ * The origins a directive names, each exactly an origin. A host spelled with a
+ * trailing slash is the same origin, so the slash is dropped before the test.
+ */
 const originsOf = (domains: readonly string[] | undefined): readonly string[] =>
-  (domains ?? []).filter(domain => ORIGIN.test(domain));
+  (domains ?? [])
+    .map(domain => domain.replace(/\/$/u, ''))
+    .filter(domain => ORIGIN.test(domain) && portInRange(domain));
 
 /** The policy tokens for one directive: the named origins, or nothing. */
 const tokensFor = (origins: readonly string[]): string =>
@@ -106,26 +123,103 @@ export function contentSecurityPolicy(meta: Readonly<Record<string, unknown>> | 
   ].join('; ');
 }
 
+/** A document may start with a byte-order mark, which the parser drops. */
+const BYTE_ORDER_MARK = '\uFEFF';
+
+/** The whitespace the tokenizer skips before content, and only that. */
+const PROLOGUE_SPACE = /[ \t\n\f\r]*/y;
+
+/** A doctype ends at the first `>`, whatever it names. */
+const PROLOGUE_DOCTYPE = /<!doctype[^>]*>/iy;
+
+/** The characters that open a comment, and the rule that reads its body. */
+const COMMENT_OPEN = '<!--';
+
+/**
+ * One comment: `<!-->` and `<!--->` close an empty comment at once, and any
+ * other comment ends at the first `-->` or `--!>`.
+ */
+const PROLOGUE_COMMENT = /<!--(?:>|->|[\s\S]*?--!?>)/y;
+
+/** `<?` and any `<!` that is not a doctype are bogus comments: up to the first `>`. */
+const PROLOGUE_BOGUS = /<[!?][^>]*>/y;
+
+/**
+ * Where the policy goes: after the prologue the tokenizer reads before the
+ * document's own content, which is after a doctype when the prologue reaches
+ * one.
+ *
+ * Each token is consumed by the tokenizer's own rule, so a document cannot talk
+ * the scan past markup. A token that ends without a terminator, or one that is
+ * none of these, ends the prologue: everything from there is content. A
+ * doctype past that content is a doctype the parser ignores, so it never moves
+ * the policy behind the content.
+ *
+ * A comment is read as one token and nothing else is tried where it starts: a
+ * comment with no terminator reads the rest of the document, so no token after
+ * it is part of the prologue, and the scan reads a document once rather than
+ * hunting a terminator again from every `<!--` it passes.
+ *
+ * A document with no doctype keeps its byte-order mark first, because a mark
+ * the policy got in front of would be read as a stray character of the document.
+ */
+function policyIndex(html: string): number {
+  const start = html.startsWith(BYTE_ORDER_MARK) ? BYTE_ORDER_MARK.length : 0;
+  let at = start;
+  let doctype = start;
+  let done = false;
+  while (!done) {
+    PROLOGUE_SPACE.lastIndex = at;
+    PROLOGUE_SPACE.exec(html);
+    at = PROLOGUE_SPACE.lastIndex;
+    if (html.startsWith(COMMENT_OPEN, at)) {
+      PROLOGUE_COMMENT.lastIndex = at;
+      const comment = PROLOGUE_COMMENT.exec(html);
+      if (comment === null) {
+        done = true;
+      } else {
+        at = comment.index + comment[0].length;
+      }
+    } else {
+      PROLOGUE_DOCTYPE.lastIndex = at;
+      PROLOGUE_BOGUS.lastIndex = at;
+      const held = PROLOGUE_DOCTYPE.exec(html);
+      const token = held ?? PROLOGUE_BOGUS.exec(html);
+      if (token === null) {
+        done = true;
+      } else {
+        at = token.index + token[0].length;
+        if (held !== null) {
+          doctype = at;
+        }
+      }
+    }
+  }
+  return doctype;
+}
+
 /**
  * The view's HTML with its policy in front of it.
  *
  * The policy is a meta element, because the document is loaded as `srcdoc`
- * with no headers of its own. It goes first in the head, before the resource's
- * own tags, so nothing in the document can run before it applies.
+ * with no headers of its own. It goes before everything the resource wrote, and
+ * after the resource's doctype when the parser honours one, so:
+ *
+ * - the parser reads the meta while it is still building the head, which puts
+ *   the meta in the head of the document it draws;
+ * - the doctype keeps its place, so a document that declared one is drawn in
+ *   standards mode;
+ * - a document with no head is still a document the parser gives one, with the
+ *   policy already in it.
+ *
+ * The resource's own markup cannot move the policy behind any of it: the
+ * insertion point is the prologue the tokenizer actually reads, so text that
+ * looks like a head or a doctype inside a comment, a script or an attribute is
+ * never mistaken for one.
  */
 export function viewDocument(html: string, policy: string): string {
   const meta = `<meta http-equiv="Content-Security-Policy" content="${policy.replaceAll('"', '&quot;')}">`;
-  const head = /<head[^>]*>/iu.exec(html);
-  if (head !== null) {
-    const at = head.index + head[0].length;
-    return `${html.slice(0, at)}${meta}${html.slice(at)}`;
-  }
-  /* A document without a head still gets its policy before its own content, and
-     after the doctype when it has one: a start tag in front of the doctype is
-     a parse error, and the parser then draws the whole document in quirks
-     mode. The parser hoists the meta into the head it makes. */
-  const doctype = /^\s*<!doctype[^>]*>/iu.exec(html);
-  const at = doctype === null ? 0 : doctype.index + doctype[0].length;
+  const at = policyIndex(html);
   return `${html.slice(0, at)}${meta}${html.slice(at)}`;
 }
 

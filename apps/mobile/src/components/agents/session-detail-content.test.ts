@@ -2651,6 +2651,43 @@ describe('session detail stored-session retry availability', () => {
         renderedText(node).includes(i18n.t('agentChat.session.backToSessions'))
     );
     expect(back.props.variant).toBe('outline');
+    // An outline control paints no fill of its own, so the dark primary fill
+    // never reaches this branch: only the surface's one filled primary carries
+    // it.
+    expect(String(back.props.className)).not.toContain('dark:bg-selection');
+  });
+
+  // A writable session has no read-only footer owning the surface's primary, so
+  // the card's Back is the filled one and it takes the same muted dark tone the
+  // read-only footer's Continue does.
+  it('fills the error card back control with the muted tone in dark mode', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails(null);
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+    });
+    // The transcript read fails before any row arrives, so the terminal card
+    // paints as the whole body.
+    act(() => {
+      view.store.set<string | null, [string | null], unknown>(
+        view.manager.atoms.error,
+        'Session history temporarily unavailable'
+      );
+    });
+
+    expect(view.renderer.root.findAllByType(QueryError)).toHaveLength(1);
+    expect(view.store.get(view.manager.atoms.isReadOnly)).toBe(false);
+
+    const back = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        renderedText(node).includes(i18n.t('agentChat.session.backToSessions'))
+    );
+    expect(String(back.props.className)).toContain('bg-primary');
+    expect(String(back.props.className)).toContain('dark:bg-selection');
+    const label = back.find(node => Object.is(node.type, 'Text'));
+    expect(String(label.props.className)).toContain('text-primary-foreground');
+    expect(String(label.props.className)).toContain('dark:text-selection-foreground');
   });
 
   it('drops Retry while a writable session has no transport that can deliver', async () => {

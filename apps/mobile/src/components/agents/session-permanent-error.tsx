@@ -62,7 +62,10 @@ export function SessionPermanentError({
             isRetrying={isRetrying}
           />
           {/* One primary action per surface (DESIGN.md): Back is the recovery
-              action, so it fills; Copy stays outlined as the utility. */}
+              action, so it fills; Copy stays outlined as the utility. Dark takes
+              the lifted olive `--selection` with its own label tone instead of
+              the glare of #ffdd00, so both themes give the control the light
+              mode's weight. */}
           <View className="flex-row gap-3">
             <Button
               variant="outline"
@@ -76,6 +79,7 @@ export function SessionPermanentError({
             </Button>
             <Button
               size="action"
+              className="bg-primary dark:bg-selection"
               onPress={() => {
                 // POP_TO reuses the `(tabs)` route under this screen and
                 // truncates every `agent-chat` route above it, so a composer
@@ -83,7 +87,9 @@ export function SessionPermanentError({
                 router.dismissTo(AGENTS_SESSIONS_INDEX_HREF);
               }}
             >
-              <Text>{t('agentChat.session.backToSessions')}</Text>
+              <Text className="text-primary-foreground dark:text-selection-foreground">
+                {t('agentChat.session.backToSessions')}
+              </Text>
             </Button>
           </View>
         </View>

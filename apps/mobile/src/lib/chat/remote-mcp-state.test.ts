@@ -56,6 +56,35 @@ describe('the pure helpers', () => {
     ).toEqual(['mcp_alpha_read', 'mcp_beta_read']);
   });
 
+  it('offers a name two servers share once, from the server stored first', () => {
+    const alpha = server({ id: 'alpha' });
+    const beta = server({ id: 'beta' });
+    const fromAlpha = tool('mcp_shared_read', { serverToolName: 'read-alpha' });
+    const fromBeta = tool('mcp_shared_read', { serverToolName: 'read-beta' });
+    const discovered = new Map<string, RemoteMcpDiscovery>([
+      ['alpha', discoveryOf('alpha', [fromAlpha])],
+      ['beta', discoveryOf('beta', [fromBeta])],
+    ]);
+
+    const tools = remoteServerToolsFor([alpha, beta], discovered);
+
+    expect(tools.map(entry => entry.definition.name)).toEqual(['mcp_shared_read']);
+    expect(tools[0]).toBe(fromAlpha);
+  });
+
+  it('keeps the surviving tools in stored order and leaves a server’s other tools alone', () => {
+    const alpha = server({ id: 'alpha' });
+    const beta = server({ id: 'beta' });
+    const discovered = new Map<string, RemoteMcpDiscovery>([
+      ['alpha', discoveryOf('alpha', [tool('mcp_alpha_list'), tool('mcp_shared_read')])],
+      ['beta', discoveryOf('beta', [tool('mcp_shared_read'), tool('mcp_beta_write')])],
+    ]);
+
+    expect(
+      remoteServerToolsFor([alpha, beta], discovered).map(entry => entry.definition.name)
+    ).toEqual(['mcp_alpha_list', 'mcp_shared_read', 'mcp_beta_write']);
+  });
+
   it('leaves a failed discovery failed and offers none of its tools', () => {
     const alpha = server({ id: 'alpha' });
     const discovered = new Map<string, RemoteMcpDiscovery>([
@@ -90,6 +119,46 @@ describe('the pure helpers', () => {
     expect([...remoteServerViewsFor([alpha, beta], discovered).keys()]).toEqual([
       'mcp_alpha_chart',
     ]);
+  });
+
+  it('publishes the view of the server whose tool the model is offered', () => {
+    const alpha = server({ id: 'alpha' });
+    const beta = server({ id: 'beta' });
+    const discovered = new Map<string, RemoteMcpDiscovery>([
+      [
+        'alpha',
+        discoveryOf('alpha', [viewTool('mcp_shared_chart', 'chart', 'ui://alpha/chart.html')]),
+      ],
+      [
+        'beta',
+        discoveryOf('beta', [viewTool('mcp_shared_chart', 'chart', 'ui://beta/chart.html')]),
+      ],
+    ]);
+
+    expect([...remoteServerViewsFor([alpha, beta], discovered)]).toEqual([
+      [
+        'mcp_shared_chart',
+        {
+          serverId: 'alpha',
+          serverToolName: 'chart',
+          resourceUri: 'ui://alpha/chart.html',
+        },
+      ],
+    ]);
+  });
+
+  it('publishes no view for a name whose surviving tool carries none', () => {
+    const alpha = server({ id: 'alpha' });
+    const beta = server({ id: 'beta' });
+    const discovered = new Map<string, RemoteMcpDiscovery>([
+      ['alpha', discoveryOf('alpha', [tool('mcp_shared_chart', { serverToolName: 'chart' })])],
+      [
+        'beta',
+        discoveryOf('beta', [viewTool('mcp_shared_chart', 'chart', 'ui://beta/chart.html')]),
+      ],
+    ]);
+
+    expect(remoteServerViewsFor([alpha, beta], discovered).size).toBe(0);
   });
 
   it('offers a Retry on a server that answered with no tools', () => {

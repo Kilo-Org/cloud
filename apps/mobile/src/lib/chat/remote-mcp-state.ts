@@ -108,20 +108,56 @@ export function connectingOf(state: RemoteMcpServerState): RemoteMcpServerState 
 }
 
 /**
+ * The servers whose discovery answered, in stored order, with what each
+ * answered. A disabled server is left out whatever a cached entry says, because
+ * it is the list that decides and the entry is left for `reconcile` to drop. A
+ * server with no entry has not been asked yet, and a failed discovery is a
+ * server the app cannot currently reach, so neither of them has an answer to
+ * offer.
+ */
+function answeredServers(
+  servers: readonly StoredRemoteMcpServer[],
+  discovered: ReadonlyMap<string, RemoteMcpDiscovery>
+): readonly (readonly [StoredRemoteMcpServer, RemoteMcpDiscovery])[] {
+  const answered: (readonly [StoredRemoteMcpServer, RemoteMcpDiscovery])[] = [];
+  for (const server of servers) {
+    const found = server.enabled ? discovered.get(server.id) : undefined;
+    if (found !== undefined && found.failed !== true) {
+      answered.push([server, found]);
+    }
+  }
+  return answered;
+}
+
+/**
  * The tools of the enabled servers that were discovered, in list order.
  *
  * A disabled server contributes nothing even if it has a cached entry, and a
  * failed discovery contributes nothing even when it answered with tools
  * earlier: the union is only ever a server the app can currently reach.
+ *
+ * A tool name has one owner. Two servers can offer the same name, because the
+ * server names its tools itself and the harness only prefixes them, so the list
+ * keeps the first tool for each name and leaves the later ones out. A call is
+ * resolved against the first tool with its name, so this is the list it answers
+ * from: what the model is offered and what it gets back are one set.
  */
 export function remoteServerToolsFor(
   servers: readonly StoredRemoteMcpServer[],
   discovered: ReadonlyMap<string, RemoteMcpDiscovery>
 ): readonly Tool[] {
-  return servers.flatMap(server => {
-    const found = server.enabled ? discovered.get(server.id) : undefined;
-    return found === undefined || found.failed === true ? [] : found.tools;
-  });
+  const tools: Tool[] = [];
+  const seen = new Set<string>();
+  for (const [, found] of answeredServers(servers, discovered)) {
+    for (const tool of found.tools) {
+      const name = tool.definition.name;
+      if (!seen.has(name)) {
+        seen.add(name);
+        tools.push(tool);
+      }
+    }
+  }
+  return tools;
 }
 
 /**
@@ -151,17 +187,28 @@ export function discoveryOf(
  * The views the enabled servers' discovered tools carry, by the name the model
  * calls each tool by. A disabled or failed server contributes none, which is
  * the same rule its tools follow.
+ *
+ * The name has the one owner the tool list gave it: the first server to offer
+ * it. The seen set covers every tool a server offers, not only the ones that
+ * carry a view, so a shadowed tool leaves no view behind even when the tool
+ * that survives it carries none, and a later server's view never replaces an
+ * earlier server's.
  */
 export function remoteServerViewsFor(
   servers: readonly StoredRemoteMcpServer[],
   discovered: ReadonlyMap<string, RemoteMcpDiscovery>
 ): ReadonlyMap<string, RemoteMcpToolView> {
   const views = new Map<string, RemoteMcpToolView>();
-  for (const server of servers) {
-    const found = server.enabled ? discovered.get(server.id) : undefined;
-    if (found !== undefined && found.failed !== true) {
-      for (const [name, view] of found.views) {
-        views.set(name, view);
+  const seen = new Set<string>();
+  for (const [, found] of answeredServers(servers, discovered)) {
+    for (const tool of found.tools) {
+      const name = tool.definition.name;
+      if (!seen.has(name)) {
+        seen.add(name);
+        const view = found.views.get(name);
+        if (view !== undefined) {
+          views.set(name, view);
+        }
       }
     }
   }

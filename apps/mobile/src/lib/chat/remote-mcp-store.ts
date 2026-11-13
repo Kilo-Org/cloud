@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { createSecureStorePreference } from '@/lib/hooks/secure-store-preference';
 import { REMOTE_MCP_SERVERS_KEY } from '@/lib/storage-keys';
 
+import { isReservedMcpServerId } from './mcp-server-namespace';
 import { clearRemoteMcpOAuth, forgetRemoteMcpOAuth } from './remote-mcp-oauth-store';
 import { normalizeRemoteMcpUrl, sameRemoteMcpEndpoint } from './remote-mcp-url';
 
@@ -89,9 +90,32 @@ function slugFor(name: string): string {
 }
 
 /**
- * A unique id for a new server. A name shared with an existing server gets a
- * numeric suffix, because two servers with one id would map their tools to the
- * same names and silently drop each other.
+ * An id that is free in `taken` and outside the built-in server's namespace.
+ * The name's slug is the id when nothing holds it. Otherwise the first numeric
+ * suffix that is free is used, which is what keeps two servers with one name
+ * from mapping their tools to the same names. A slug never contains `_`, so a
+ * suffixed id cannot enter the built-in namespace, and the reserved check runs
+ * over it anyway so that this one rule covers every id the app writes.
+ */
+function uniqueId(name: string, taken: ReadonlySet<string>): string {
+  const base = slugFor(name);
+  if (!taken.has(base) && !isReservedMcpServerId(base)) {
+    return base;
+  }
+  let suffix = 2;
+  let candidate = `${base}-${suffix}`;
+  while (taken.has(candidate) || isReservedMcpServerId(candidate)) {
+    suffix += 1;
+    candidate = `${base}-${suffix}`;
+  }
+  return candidate;
+}
+
+/**
+ * A unique id for a new server. A requested id is kept when it is callable-name
+ * safe and free of the stored ids and of the built-in server's namespace, and
+ * anything else falls back to the name. Two servers with one id would map their
+ * tools to the same names and silently drop each other.
  */
 function resolveServerId(
   name: string,
@@ -99,18 +123,15 @@ function resolveServerId(
   servers: readonly StoredRemoteMcpServer[]
 ): string {
   const taken = new Set(servers.map(server => server.id));
-  if (requested !== undefined && CALLABLE_ID.test(requested) && !taken.has(requested)) {
+  if (
+    requested !== undefined &&
+    CALLABLE_ID.test(requested) &&
+    !taken.has(requested) &&
+    !isReservedMcpServerId(requested)
+  ) {
     return requested;
   }
-  const base = slugFor(name);
-  if (!taken.has(base)) {
-    return base;
-  }
-  let suffix = 2;
-  while (taken.has(`${base}-${suffix}`)) {
-    suffix += 1;
-  }
-  return `${base}-${suffix}`;
+  return uniqueId(name, taken);
 }
 
 /** A stored URL is normalized on the way in; an unnormalizable one is dropped. */
@@ -124,7 +145,9 @@ function normalizeStoredUrl(url: string): string | undefined {
 
 /**
  * Parse entries independently so one corrupt server cannot erase healthy
- * servers and their bearer tokens on the next write.
+ * servers and their bearer tokens on the next write. An entry whose stored id
+ * is the built-in server's, or extends it, is loaded under a free id rather
+ * than discarded, so the person keeps the server and the value saved for it.
  */
 export function parseRemoteMcpServers(raw: string | null): StoredRemoteMcpServer[] {
   if (raw === null) {
@@ -135,19 +158,45 @@ export function parseRemoteMcpServers(raw: string | null): StoredRemoteMcpServer
     if (!Array.isArray(parsed)) {
       return [];
     }
-    const servers: StoredRemoteMcpServer[] = [];
-    const ids = new Set<string>();
-    const urls = new Set<string>();
+    const readable: { readonly server: StoredRemoteMcpServer; readonly url: string }[] = [];
     for (const entry of parsed) {
       const result = storedRemoteMcpServerSchema.safeParse(entry);
       if (result.success) {
-        const server = result.data;
-        const url = normalizeStoredUrl(server.url);
-        if (url !== undefined && !ids.has(server.id) && !urls.has(url)) {
-          ids.add(server.id);
-          urls.add(url);
-          servers.push({ ...server, url });
+        const url = normalizeStoredUrl(result.data.url);
+        if (url !== undefined) {
+          readable.push({ server: result.data, url });
         }
+      }
+    }
+    // The ids are claimed in two passes. Every entry already carrying an id of
+    // its own keeps it, in stored order, so a row that is free keeps the id the
+    // list was written with. Only then does an entry whose id belongs to the
+    // built-in server take a free one, against every id claimed so far, so it
+    // can never take the id an entry later in the list already holds. The
+    // accepted list is then drawn in the persisted order, whatever pass wrote
+    // each row.
+    const ids = new Set<string>();
+    const urls = new Set<string>();
+    const accepted: (StoredRemoteMcpServer | undefined)[] = readable.map(() => undefined);
+    for (const [index, { server, url }] of readable.entries()) {
+      if (!isReservedMcpServerId(server.id) && !ids.has(server.id) && !urls.has(url)) {
+        ids.add(server.id);
+        urls.add(url);
+        accepted[index] = { ...server, url };
+      }
+    }
+    for (const [index, { server, url }] of readable.entries()) {
+      if (isReservedMcpServerId(server.id) && !urls.has(url)) {
+        const id = uniqueId(server.name, ids);
+        ids.add(id);
+        urls.add(url);
+        accepted[index] = { ...server, id, url };
+      }
+    }
+    const servers: StoredRemoteMcpServer[] = [];
+    for (const server of accepted) {
+      if (server !== undefined) {
+        servers.push(server);
       }
     }
     return servers;

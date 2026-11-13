@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   type OrganizationProfilePermission,
-  useCanManageOrganizationProfiles,
   useOrganizationProfilePermission,
 } from '@/lib/hooks/use-can-manage-profiles';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -21,23 +20,19 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 
 const seen = vi.hoisted(() => ({
   permission: null as OrganizationProfilePermission | null,
-  canManage: null as boolean | null,
 }));
 
 function PermissionProbe({ organizationId }: Readonly<{ organizationId?: string }>) {
   seen.permission = useOrganizationProfilePermission(organizationId);
-  seen.canManage = useCanManageOrganizationProfiles(organizationId);
   return null;
 }
 
 async function readPermission(props: Readonly<{ organizationId?: string }>): Promise<{
   permission: OrganizationProfilePermission | null;
-  canManage: boolean | null;
 }> {
   seen.permission = null;
-  seen.canManage = null;
   const { unmount } = await renderWithProviders(createElement(PermissionProbe, props));
-  const observed = { permission: seen.permission, canManage: seen.canManage };
+  const observed = { permission: seen.permission };
   unmount();
   return observed;
 }
@@ -52,7 +47,7 @@ describe('useOrganizationProfilePermission', () => {
     boundary.isResolving = true;
     boundary.role = 'member';
 
-    expect(await readPermission({})).toEqual({ permission: 'allowed', canManage: true });
+    expect(await readPermission({})).toEqual({ permission: 'allowed' });
   });
 
   it('an unresolved organization reports resolving, not read-only', async () => {
@@ -61,7 +56,6 @@ describe('useOrganizationProfilePermission', () => {
 
     expect(await readPermission({ organizationId: 'org-1' })).toEqual({
       permission: 'resolving',
-      canManage: false,
     });
   });
 
@@ -70,7 +64,6 @@ describe('useOrganizationProfilePermission', () => {
 
     expect(await readPermission({ organizationId: 'org-1' })).toEqual({
       permission: 'allowed',
-      canManage: true,
     });
   });
 
@@ -79,7 +72,6 @@ describe('useOrganizationProfilePermission', () => {
 
     expect(await readPermission({ organizationId: 'org-1' })).toEqual({
       permission: 'read-only',
-      canManage: false,
     });
   });
 
@@ -88,7 +80,6 @@ describe('useOrganizationProfilePermission', () => {
 
     expect(await readPermission({ organizationId: 'org-1' })).toEqual({
       permission: 'read-only',
-      canManage: false,
     });
   });
 });

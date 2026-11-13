@@ -1,4 +1,4 @@
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -10,6 +10,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
+  permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
   query: {
     data: undefined as AgentSource[] | undefined,
     isError: false,
@@ -30,7 +31,7 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileSectionMutations: () => h.mutations,
 }));
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => true,
+  useOrganizationProfilePermission: () => h.permission,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('react-native', () => ({
@@ -44,7 +45,11 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  // The real state renders its action inside its body, so the slot that stands in
+  // for the add action belongs to the tree; the stub keeps only that slot.
+  EmptyState: (props: { action?: ReactNode }) => props.action,
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: h.confirm, dialog: null }),
@@ -86,9 +91,7 @@ describe('ProfileAgentsScreen mode badge', () => {
   it('renders the localized short label for every visibility mode', async () => {
     await i18n.changeLanguage('hi');
     h.query.data = [agent('alpha', 'primary'), agent('beta', 'subagent'), agent('gamma', 'all')];
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
-    );
+    const { renderer, unmount } = await mountScreen();
 
     const labels = renderer.root
       .findAll(node => String(node.type) === 'Text')
@@ -110,9 +113,7 @@ describe('ProfileAgentsScreen mode badge', () => {
   it('falls back to the primary mode label when the config carries none', async () => {
     await i18n.changeLanguage('hi');
     h.query.data = [agent('alpha', undefined)];
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
-    );
+    const { renderer, unmount } = await mountScreen();
 
     const labels = renderer.root
       .findAll(node => String(node.type) === 'Text')
@@ -127,9 +128,7 @@ describe('ProfileAgentsScreen mode badge', () => {
 
   it('announces the agent identity before its controls', async () => {
     h.query.data = [agent('alpha', 'primary')];
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
-    );
+    const { renderer, unmount } = await mountScreen();
 
     const identity = renderer.root.findAll(
       node => String(node.type) === 'View' && node.props.accessibilityRole === 'text'
@@ -143,9 +142,7 @@ describe('ProfileAgentsScreen mode badge', () => {
 
   it('drops the row presses of the burst that closed the sheet', async () => {
     h.query.data = [agent('alpha', 'primary')];
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
-    );
+    const { renderer, unmount } = await mountScreen();
 
     pressRow(renderer.root, 'Edit');
     const sheet = renderer.root.find(node => String(node.type) === 'AgentFormSheet');
@@ -194,9 +191,7 @@ describe('ProfileAgentsScreen form draft', () => {
 
   it('reopens the add sheet after a remount', async () => {
     h.query.data = [agent('alpha', 'primary')];
-    const first = await renderWithProviders(
-      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
-    );
+    const first = await mountScreen();
     const addButton = first.renderer.root.findAll(node => String(node.type) === 'Button')[0];
     if (!addButton) {
       throw new Error('the add button was not rendered');
@@ -207,9 +202,7 @@ describe('ProfileAgentsScreen form draft', () => {
     ).toHaveLength(1);
     first.unmount();
 
-    const second = await renderWithProviders(
-      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
-    );
+    const second = await mountScreen();
     expect(
       second.renderer.root.findAll(node => String(node.type) === 'AgentFormSheet')
     ).toHaveLength(1);
@@ -218,9 +211,7 @@ describe('ProfileAgentsScreen form draft', () => {
 
   it('keeps the add sheet closed after the form was cancelled', async () => {
     h.query.data = [agent('alpha', 'primary')];
-    const first = await renderWithProviders(
-      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
-    );
+    const first = await mountScreen();
     const addButton = first.renderer.root.findAll(node => String(node.type) === 'Button')[0];
     if (!addButton) {
       throw new Error('the add button was not rendered');
@@ -233,9 +224,7 @@ describe('ProfileAgentsScreen form draft', () => {
     pressClose(sheet);
     first.unmount();
 
-    const second = await renderWithProviders(
-      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
-    );
+    const second = await mountScreen();
     expect(
       second.renderer.root.findAll(node => String(node.type) === 'AgentFormSheet')
     ).toHaveLength(0);
@@ -248,6 +237,11 @@ type MountedRenderer = Awaited<ReturnType<typeof renderWithProviders>>['renderer
 /** The nodes of one host type; the stubs keep their props untyped. */
 function nodesOfType(renderer: MountedRenderer, type: string) {
   return renderer.root.findAll(node => String(node.type) === type);
+}
+
+/** Mount the agents screen against this test's query and permission state. */
+function mountScreen() {
+  return renderWithProviders(createElement(ProfileAgentsScreen, { profileId: 'profile-1' }));
 }
 
 /** The open sheet, which the screen wires to its own save pipeline. */
@@ -281,9 +275,7 @@ describe('ProfileAgentsScreen save ownership', () => {
     const pendingSave = Promise.withResolvers<unknown>();
     h.mutations.createAgent.mutateAsync.mockImplementation(() => pendingSave.promise);
 
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
-    );
+    const { renderer, unmount } = await mountScreen();
     pressAdd(renderer);
     const first = openSheet(renderer);
     act(() => {
@@ -317,9 +309,7 @@ describe('ProfileAgentsScreen save ownership', () => {
 describe('ProfileAgentsScreen agent row layout', () => {
   it('keeps the mode label off the name row', async () => {
     h.query.data = [agent('Alpha', 'subagent')];
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
-    );
+    const { renderer, unmount } = await mountScreen();
 
     const texts = renderer.root.findAll(node => String(node.type) === 'Text');
     const nameText = texts.find(node => node.props.children === 'Alpha');
@@ -330,6 +320,51 @@ describe('ProfileAgentsScreen agent row layout', () => {
     // where it sits at the same gap as the model and the description.
     expect(label?.parent).not.toBe(nameText?.parent);
     expect(label?.parent).toBe(nameText?.parent?.parent);
+
+    unmount();
+  });
+});
+
+/** The visible strings of one mounted tree, in render order. */
+function screenTexts(renderer: MountedRenderer): unknown[] {
+  return nodesOfType(renderer, 'Text').map(node => node.props.children);
+}
+
+describe('ProfileAgentsScreen manage slot', () => {
+  beforeEach(() => {
+    resetFormDraftsForTests();
+  });
+
+  it('empty list: a member reads who may change the profile instead of an add action', async () => {
+    h.permission = 'read-only';
+    h.query.data = [];
+    const { renderer, unmount } = await mountScreen();
+
+    expect(screenTexts(renderer)).toContain(i18n.t('profiles.organizationRoleRequired'));
+    expect(nodesOfType(renderer, 'Button')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('populated list: a member gets the sentence and no add action or row control', async () => {
+    h.permission = 'read-only';
+    h.query.data = [agent('alpha', 'primary')];
+    const { renderer, unmount } = await mountScreen();
+
+    expect(screenTexts(renderer)).toContain(i18n.t('profiles.organizationRoleRequired'));
+    expect(nodesOfType(renderer, 'Button')).toHaveLength(0);
+    expect(nodesOfType(renderer, 'Pressable')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('an unresolved role shows neither the action nor the sentence', async () => {
+    h.permission = 'resolving';
+    h.query.data = [];
+    const { renderer, unmount } = await mountScreen();
+
+    expect(screenTexts(renderer)).not.toContain(i18n.t('profiles.organizationRoleRequired'));
+    expect(nodesOfType(renderer, 'Button')).toHaveLength(0);
 
     unmount();
   });

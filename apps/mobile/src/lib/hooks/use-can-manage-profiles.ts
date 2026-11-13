@@ -30,13 +30,3 @@ export function useOrganizationProfilePermission(
   }
   return canManageOrganization(role) ? 'allowed' : 'read-only';
 }
-
-/**
- * Whether the current user holds an organization-manage role (owner/admin) in
- * `organizationId`. Defaults to `false` while the membership list loads so
- * organization screens stay read-only until the role resolves; the server
- * rejects unauthorized writes regardless.
- */
-export function useCanManageOrganizationProfiles(organizationId?: string): boolean {
-  return useOrganizationProfilePermission(organizationId) === 'allowed';
-}

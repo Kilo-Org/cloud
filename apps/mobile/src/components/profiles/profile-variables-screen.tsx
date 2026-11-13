@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
+import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import {
   applyVariableEdit,
@@ -28,7 +29,7 @@ import { useAgentProfileMutations, useAgentProfileVars } from '@/lib/hooks/use-a
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_VARS } from '@/lib/agent-profile-forms';
 import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
-import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
+import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_VARS: readonly ProfileVarSource[] = [];
@@ -64,7 +65,8 @@ export function ProfileVariablesScreen({
   const { confirm, dialog } = useConfirmDialog();
   const varsQuery = useAgentProfileVars(profileId, organizationId);
   const { setVar, deleteVar } = useAgentProfileMutations(organizationId);
-  const canManage = useCanManageOrganizationProfiles(organizationId);
+  const permission = useOrganizationProfilePermission(organizationId);
+  const canManage = permission === 'allowed';
 
   const serverVars: readonly ProfileVarSource[] = varsQuery.data ?? NO_VARS;
   // The screen owns the list so a saved edit shows immediately; the sync below
@@ -204,11 +206,11 @@ export function ProfileVariablesScreen({
         description={null}
         placement="top"
         action={
-          canManage ? (
+          <ProfileManageSlot permission={permission}>
             <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
               <Text>{t('profiles.addVariable')}</Text>
             </Button>
-          ) : null
+          </ProfileManageSlot>
         }
       />
     );
@@ -243,11 +245,13 @@ export function ProfileVariablesScreen({
 
         {isAdding ? renderEditForm(true, initialVariableEdit(undefined)) : null}
 
-        {showAdd && canManage ? (
-          <Button onPress={startAdd}>
-            <Text>{t('profiles.addVariable')}</Text>
-          </Button>
-        ) : null}
+        <ProfileManageSlot permission={permission}>
+          {showAdd ? (
+            <Button onPress={startAdd}>
+              <Text>{t('profiles.addVariable')}</Text>
+            </Button>
+          ) : null}
+        </ProfileManageSlot>
 
         {atVariableCap && canManage ? (
           <AccessibleStatus

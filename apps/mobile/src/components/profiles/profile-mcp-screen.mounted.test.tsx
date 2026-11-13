@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- one mounted case per MCP screen state: loading, error, empty, row toggle, edit, add, validation, failure fallbacks, and delete */
+import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -41,10 +42,12 @@ const h = vi.hoisted(() => ({
   },
 }));
 
-const permissionState = vi.hoisted(() => ({ canManage: true }));
+const permissionState = vi.hoisted(() => ({
+  permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
+}));
 
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => permissionState.canManage,
+  useOrganizationProfilePermission: () => permissionState.permission,
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
@@ -77,7 +80,12 @@ vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  // The screen hands its action to the manage slot, so the stub renders what it
+  // is given: the read-only sentence replaces the button in the same subtree.
+  EmptyState: (props: { title: string; description?: ReactNode; action?: ReactNode }) =>
+    createElement('EmptyState', { title: props.title }, props.description, props.action),
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
@@ -97,6 +105,7 @@ describe('ProfileMcpScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetFormDraftsForTests();
+    permissionState.permission = 'allowed';
     Object.assign(h.query, {
       data: undefined,
       isError: false,
@@ -139,6 +148,54 @@ describe('ProfileMcpScreen', () => {
     expect(findOne(renderer.root, 'EmptyState').props.title).toBe('No MCP servers yet');
     pressEmptyAction(renderer);
     expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+
+    unmount();
+  });
+
+  it('read-only: the empty state names who may act in place of the add control', async () => {
+    permissionState.permission = 'read-only';
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findOne(renderer.root, 'EmptyState').props.title).toBe('No MCP servers yet');
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      i18n.t('profiles.organizationRoleRequired')
+    );
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('read-only: a loaded list keeps its rows, drops its controls and names who may act', async () => {
+    permissionState.permission = 'read-only';
+    h.query.data = testProfile([testServer()]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('docs');
+    expect(findAll(renderer.root, 'Pressable')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      i18n.t('profiles.organizationRoleRequired')
+    );
+
+    unmount();
+  });
+
+  it('resolving: the empty state renders neither the sentence nor an action', async () => {
+    permissionState.permission = 'resolving';
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('profiles.organizationRoleRequired')
+    );
 
     unmount();
   });

@@ -6,6 +6,7 @@ const draftsSchema = z.record(z.string(), z.string());
 
 let storedDrafts: Record<string, string> = {};
 let isHydrated = false;
+let hydrateGeneration = 0;
 const localWrites = new Map<string, string | undefined>();
 
 const getDraftSnapshot = () => {
@@ -26,7 +27,14 @@ const writeDrafts = (): Promise<void> => storage.setItem(draftStorageKey, getDra
 
 export const hydrateStoredDrafts = async (): Promise<Record<string, string>> => {
   if (!isHydrated) {
+    const generation = hydrateGeneration;
     const parsed = draftsSchema.safeParse(await storage.getItem(draftStorageKey));
+
+    // A sign-out cleared the drafts while this read was in flight: its reset wins, so the map it removed must not be restored.
+    if (generation !== hydrateGeneration) {
+      return {};
+    }
+
     storedDrafts = parsed.success ? parsed.data : {};
     isHydrated = true;
   }
@@ -55,6 +63,7 @@ export const persistDraft = (conversationId: string, text: string): void => {
  * unsent message text on its first hydrate.
  */
 export const clearStoredDrafts = async (): Promise<void> => {
+  hydrateGeneration += 1;
   storedDrafts = {};
   localWrites.clear();
   // The empty state is authoritative; a hydrate must not read the old map back.

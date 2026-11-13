@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
 const draftStorage = new Map<string, unknown>();
+const storageRead: { deferred?: (() => unknown) | undefined } = {};
 
 // eslint-disable-next-line vitest/prefer-import-in-mock, jest/no-untyped-mock-factory
 vi.mock('#imports', () => ({
   storage: {
-    getItem: (key: string) => draftStorage.get(key) ?? null,
+    getItem: (key: string) => storageRead.deferred?.() ?? draftStorage.get(key) ?? null,
     removeItem: (key: string) => {
       draftStorage.delete(key);
     },
@@ -84,6 +85,22 @@ describe('agent draft storage', () => {
     await drafts.clearStoredDrafts();
 
     expect(draftStorage.has(draftStorageKey)).toBe(false);
+    await expect(drafts.hydrateStoredDrafts()).resolves.toStrictEqual({});
+    expect(draftStorage.has(draftStorageKey)).toBe(false);
+  });
+
+  it('ignores a read that was in flight when a sign-out cleared the drafts', async () => {
+    draftStorage.clear();
+    const drafts = await loadDraftStorage();
+    const { promise: pendingRead, resolve: releaseRead } = Promise.withResolvers<unknown>();
+    storageRead.deferred = () => pendingRead;
+
+    const hydration = drafts.hydrateStoredDrafts();
+    await drafts.clearStoredDrafts();
+    releaseRead({ 'conversation-1': 'first account draft' });
+
+    await expect(hydration).resolves.toStrictEqual({});
+    storageRead.deferred = undefined;
     await expect(drafts.hydrateStoredDrafts()).resolves.toStrictEqual({});
     expect(draftStorage.has(draftStorageKey)).toBe(false);
   });

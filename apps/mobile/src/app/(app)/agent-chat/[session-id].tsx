@@ -316,13 +316,12 @@ export default function SessionDetailScreen() {
       metadataAccessDenied &&
       sessionRendered.current !== rawSessionId)
   ) {
-    // An identity failure stays retriable. An access denial (UNAUTHORIZED /
-    // FORBIDDEN) and an id the store cannot address can't be recovered by
-    // retrying, so they show a permanent state with no Retry. A NOT_FOUND keeps
-    // Retry: the lookup can be unsettled — the row can lag the read on a resume
-    // or a cold start — so the screen must be able to ask again instead of
-    // holding a dead end for a session the account still lists. All of them get
-    // Back and Copy.
+    // An identity failure stays retriable. An authoritative metadata denial
+    // (NOT_FOUND / UNAUTHORIZED / FORBIDDEN) and an id the store cannot address
+    // can't be recovered by retrying, so they show a permanent state with no
+    // Retry. All of them get Back and Copy. A NOT_FOUND reaches this branch only
+    // after the open spent its whole retry budget, so the read had its chance to
+    // settle before the answer became final.
     displayedProviderKey.current = null;
     // An identity failure owns its own copy. An id the store cannot address
     // never reached a read, so it answers the same denial a missing session
@@ -356,9 +355,6 @@ export default function SessionDetailScreen() {
       variant = 'permission';
     }
     const retry = identityFailed ? confirmation.retry : () => void sessionQuery.refetch();
-    // An id the store cannot address never reached a read: there is nothing to
-    // ask again, so its answer is as final as an access denial's.
-    const terminal = unauthorized || !addressable;
     const copyText = buildTerminalErrorCopyText({ sessionId, title, message });
     return (
       <View className="flex-1 bg-background">
@@ -373,7 +369,7 @@ export default function SessionDetailScreen() {
           variant={variant}
           title={title}
           message={message}
-          retry={terminal ? undefined : retry}
+          retry={notFound || unauthorized ? undefined : retry}
           isRetrying={identityFailed ? confirmation.isPending : sessionQuery.isFetching}
           copyText={copyText}
           restoredRouteOpen={restoredOpen && (notFound || unauthorized)}

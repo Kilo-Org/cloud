@@ -23,8 +23,8 @@
  *   on the identity restored from storage — gets the budget.
  *
  * A stale or deleted session reaches the same terminal "not found" state
- * once the window closes; that state keeps a Retry, because a client cannot
- * tell a deleted row from a read that has not settled.
+ * once the window closes; that state offers no Retry, because the read has
+ * already had its whole chance to settle.
  *
  * Implemented as free functions (not methods on the route component) so
  * they can be unit-tested in a plain Node vitest environment without

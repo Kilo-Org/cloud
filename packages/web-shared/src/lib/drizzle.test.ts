@@ -2,6 +2,7 @@ import {
   cleanupDbForTest,
   pool,
   db,
+  isUSRegion,
   selectReplicaUrl,
   shouldExitOnPoolError,
   sql,
@@ -65,6 +66,18 @@ describe('drizzle', () => {
 
   describe('replica selection', () => {
     const primaryUrl = 'postgres://primary';
+
+    it('treats only documented function regions as US, never an edge region', () => {
+      // AGENTS.md "Vercel Function Regions" is the region list: functions run in
+      // `fra1` and `sfo1`, and any other region is a proxy or edge hop. An edge
+      // region must never route a Frankfurt function to the US replica.
+      expect(isUSRegion('sfo1')).toBe(true);
+      expect(isUSRegion('fra1')).toBe(false);
+      expect(isUSRegion('iad1')).toBe(false);
+      expect(isUSRegion('pdx1')).toBe(false);
+      expect(isUSRegion('cle1')).toBe(false);
+      expect(isUSRegion(undefined)).toBe(false);
+    });
 
     it('uses the primary in local development even when replicas are configured', () => {
       expect(

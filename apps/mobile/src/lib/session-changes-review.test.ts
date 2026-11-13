@@ -11,6 +11,7 @@ import {
   sessionChangesCommentsForFile,
   sessionChangesFileKey,
   sessionChangesFilePatch,
+  sessionChangesReviewSend,
   type SessionChangesSnapshot,
   sessionChangesStaleCommentIds,
   updateSessionChangesComment,
@@ -182,6 +183,20 @@ describe('getSessionChangesReviewBlock', () => {
         model: 'kilo/x',
       })
     ).toBeUndefined();
+  });
+});
+
+describe('sessionChangesReviewSend', () => {
+  it('reuses the message id when an unchanged draft is sent again after a failure', () => {
+    const first = sessionChangesReviewSend(null, 'review one', () => 'msg_first');
+    const retry = sessionChangesReviewSend(first, 'review one', () => 'msg_second');
+    expect(retry.messageId).toBe('msg_first');
+  });
+
+  it('mints a new message id when the draft changed', () => {
+    const first = sessionChangesReviewSend(null, 'review one', () => 'msg_first');
+    const changed = sessionChangesReviewSend(first, 'review two', () => 'msg_second');
+    expect(changed).toEqual({ prompt: 'review two', messageId: 'msg_second' });
   });
 });
 

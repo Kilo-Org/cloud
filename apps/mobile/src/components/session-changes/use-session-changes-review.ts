@@ -3,7 +3,7 @@
 
 import { useMutation } from '@tanstack/react-query';
 import * as Crypto from 'expo-crypto';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -18,6 +18,8 @@ import {
   type SessionChangesDraft,
   type SessionChangesFile,
   type SessionChangesFilePatch,
+  type SessionChangesReviewSend,
+  sessionChangesReviewSend,
 } from '@/lib/session-changes-review';
 import { trpcClient } from '@/lib/trpc';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
@@ -66,6 +68,7 @@ export function useSessionChangesReview({
   const [commentError, setCommentError] = useState<string | undefined>(undefined);
   const [sendError, setSendError] = useState<string | undefined>(undefined);
   const [sent, setSent] = useState(false);
+  const sendRef = useRef<SessionChangesReviewSend | null>(null);
 
   const sendMutation = useMutation({
     mutationFn: (input: {
@@ -77,9 +80,13 @@ export function useSessionChangesReview({
       if (cloudAgentSessionId === null) {
         throw new Error('No Cloud Agent session');
       }
+      // One id per draft content: a retry after an ambiguous failure reuses it
+      // so the worker cannot start a second turn; a changed draft mints a new one.
+      const send = sessionChangesReviewSend(sendRef.current, input.prompt, generateMessageId);
+      sendRef.current = send;
       const body = {
         cloudAgentSessionId,
-        messageId: generateMessageId(),
+        messageId: send.messageId,
         payload: {
           type: 'prompt' as const,
           prompt: input.prompt,
@@ -124,6 +131,7 @@ export function useSessionChangesReview({
       { prompt: built.prompt, mode, model, variant },
       {
         onSuccess: () => {
+          sendRef.current = null;
           setDraft(EMPTY_SESSION_CHANGES_DRAFT);
           setReviewOpen(false);
           setSent(true);

@@ -188,6 +188,24 @@ export function sessionChangesCommentsForFile(
   );
 }
 
+/** A review send: its prompt and the message id the worker dedupes it by. */
+export type SessionChangesReviewSend = { prompt: string; messageId: string };
+
+/**
+ * The send for a prompt, keeping the message id of the previous send while the
+ * prompt is unchanged. A failed send can be retried, and the worker dedupes a
+ * retry by its message id, so an ambiguous failure must not mint a second turn;
+ * a changed draft is a different message and mints a new id.
+ */
+export function sessionChangesReviewSend(
+  previous: SessionChangesReviewSend | null,
+  prompt: string,
+  mintMessageId: () => string
+): SessionChangesReviewSend {
+  const messageId = previous?.prompt === prompt ? previous.messageId : mintMessageId();
+  return { prompt, messageId };
+}
+
 /** The one message a whole draft becomes, formatted by the shared serializer. */
 export function buildSessionChangesReviewPrompt(
   draft: SessionChangesDraft,

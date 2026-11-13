@@ -807,7 +807,6 @@ function requireGraphQlOperation<T>(value: T | null | undefined, operation: stri
   return value;
 }
 
-
 // Shared per-intent ledger for the four PR write procedures. With an
 // `operationKey` the procedure admits a `pr`-domain row and only then runs the
 // GitHub effect; every later same-key call dedupes, replays the canonical

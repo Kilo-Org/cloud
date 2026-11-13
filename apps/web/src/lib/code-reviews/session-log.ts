@@ -17,7 +17,6 @@ export type SessionLogConversionOptions = {
   includeFullAssistantText?: boolean;
 };
 
-
 /**
  * Convert a v2 session snapshot into flat log entries for the terminal view.
  *
@@ -125,7 +124,6 @@ export function v2SnapshotToLogEntries(
 
   return entries;
 }
-
 
 /**
  * Convert v1 blob messages into flat log entries.

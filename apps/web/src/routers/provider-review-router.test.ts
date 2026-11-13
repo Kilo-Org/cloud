@@ -141,7 +141,6 @@ jest.mock('@/lib/provider-review/bitbucket-write', () => ({
   mergePullRequest: (...a: unknown[]) => bitbucketWrite.mergePullRequest(...a),
 }));
 
-
 const gitlabBase = {
   platform: 'gitlab' as const,
   projectPath: 'group/sub/repo',
@@ -230,7 +229,6 @@ beforeEach(() => {
   bitbucketWrite.addComment.mockResolvedValue({ done: true, replayed: false });
 });
 
-
 describe('providerReviewRouter inputs', () => {
   it('rejects host, token, instanceUrl, and userId fields on the GitLab arm', async () => {
     for (const smuggled of [
@@ -302,7 +300,6 @@ describe('providerReviewRouter inputs', () => {
     );
   });
 });
-
 
 describe('providerReviewRouter identity derivation', () => {
   it('runs ensureOrganizationAccess before any provider call when an organizationId is present', async () => {
@@ -394,7 +391,6 @@ describe('providerReviewRouter identity derivation', () => {
   });
 });
 
-
 // A connection that must be re-established is the mobile reconnect state
 // (PRECONDITION_FAILED), never FORBIDDEN: the reader's Kilo access is intact.
 describe('providerReviewRouter connection failures', () => {
@@ -448,7 +444,6 @@ describe('providerReviewRouter inbox connection failures', () => {
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 });
-
 
 describe('providerReviewRouter file line reads', () => {
   const fileLines = { ref: 'abc123', path: 'src/app.ts', startLine: 1, endLine: 5 };
@@ -690,7 +685,6 @@ describe('providerReviewRouter ledger', () => {
   });
 });
 
-
 describe('providerReviewRouter failed-row outcome codes', () => {
   it('records an unclassified write failure as internal_error, never a client rejection', async () => {
     gitlabWrite.addComment.mockRejectedValueOnce(new Error('unexpected provider-layer failure'));
@@ -726,7 +720,6 @@ describe('providerReviewRouter failed-row outcome codes', () => {
     );
   });
 });
-
 
 describe('providerReviewRouter inline anchors', () => {
   const anchor = {
@@ -1003,7 +996,6 @@ describe('providerReviewRouter inline anchors', () => {
   });
 });
 
-
 describe('providerReviewRouter merge head fence', () => {
   it('surfaces the exact stale-head reason as a CONFLICT and settles the row failed head_moved', async () => {
     gitlabWrite.mergePullRequest.mockRejectedValueOnce(
@@ -1102,7 +1094,6 @@ describe('providerReviewRouter merge head fence', () => {
     expect(mockSettleOperation).not.toHaveBeenCalled();
   });
 });
-
 
 describe('providerReviewRouter capabilities', () => {
   it('answers GitLab with the MR capability list (no request-changes event)', async () => {

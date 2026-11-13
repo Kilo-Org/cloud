@@ -4263,7 +4263,8 @@
       "tmuxAttach": "Podłącz tmux",
       "tmuxSession": "Nazwa sesji tmux",
       "saved": "Zapisano hosta.",
-      "saveFailed": "Nie udało się zapisać hosta."
+      "saveFailed": "Nie udało się zapisać hosta.",
+      "fieldRequired": "To pole jest wymagane"
     },
     "errors": {
       "invalidPort": "Użyj portu od 1 do 65535",
@@ -4297,7 +4298,8 @@
       "deleteTitle": "Zapomnieć {{pattern}}?",
       "deleteMessage": "Przy następnym połączeniu znów zostaniesz poproszony o zaufanie jego kluczowi.",
       "deleteFailed": "Nie udało się usunąć klucza hosta.",
-      "deleteLabel": "Zapomnij {{pattern}}"
+      "deleteLabel": "Zapomnij {{pattern}}",
+      "firstTrustedOn": "Zaufany od {{date}}"
     },
     "session": {
       "keyPrompt": "Odblokuj, aby użyć klucza SSH",
@@ -4328,10 +4330,12 @@
       "unlock": "Odblokuj",
       "promptsSubmit": "Wyślij",
       "promptLabel": "Odpowiedź {{index}}",
+      "promptTitle": "Zaloguj się do serwera",
       "state": {
         "connecting": "Łączenie",
         "hostKey": "Sprawdzanie klucza hosta",
-        "reconnecting": "Ponowne łączenie"
+        "reconnecting": "Ponowne łączenie",
+        "prompt": "Oczekiwanie na Twoją odpowiedź"
       },
       "reason": {
         "network": "Nie można było połączyć się z serwerem.",
@@ -4356,6 +4360,7 @@
     },
     "keys": {
       "generate": "Wygeneruj nowy klucz",
+      "name": "Nazwa klucza",
       "import": "Importuj klucz",
       "generateTitle": "Wygeneruj klucz",
       "generateDescription": "Klucz jest tworzony na tym urządzeniu i nigdy go nie opuszcza. Dodaj klucz publiczny do autoryzowanych kluczy serwera.",

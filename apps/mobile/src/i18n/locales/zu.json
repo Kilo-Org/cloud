@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Namathisela i-tmux",
       "tmuxSession": "Igama leseshini ye-tmux",
       "saved": "Ihosthi ilondoloziwe.",
-      "saveFailed": "Ihosthi ayikwazanga ukulondolozwa."
+      "saveFailed": "Ihosthi ayikwazanga ukulondolozwa.",
+      "fieldRequired": "Le nkambu iyadingeka"
     },
     "errors": {
       "invalidPort": "Sebenzisa iphothi esukela ku-1 kuya ku-65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Khohlwa {{pattern}}?",
       "deleteMessage": "Ukuxhumana okulandelayo kuzokucela ukuthi uthembe ukhiye wayo futhi.",
       "deleteFailed": "Ukhiye wehosthi awukwazanga ukususwa.",
-      "deleteLabel": "Khohlwa {{pattern}}"
+      "deleteLabel": "Khohlwa {{pattern}}",
+      "firstTrustedOn": "Kuthenjwa kusukela ngo-{{date}}"
     },
     "session": {
       "keyPrompt": "Vula ukuze usebenzise ukhiye wakho we-SSH",
@@ -4198,10 +4200,12 @@
       "unlock": "Vula",
       "promptsSubmit": "Thumela",
       "promptLabel": "Impendulo {{index}}",
+      "promptTitle": "Ngena eseveni",
       "state": {
         "connecting": "Ixhuma",
         "hostKey": "Ihlola ukhiye wehosthi",
-        "reconnecting": "Ixhuma kabusha"
+        "reconnecting": "Ixhuma kabusha",
+        "prompt": "Kulindwe impendulo yakho"
       },
       "reason": {
         "network": "Iseva ayikwazanga ukufinyeleleka.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Khiqiza ukhiye omusha",
+      "name": "Igama lokhiye",
       "import": "Ngenisa ukhiye",
       "generateTitle": "Khiqiza ukhiye",
       "generateDescription": "Ukhiye wakhiwa kule divayisi futhi awukaze uphume kuyo. Engeza ukhiye womphakathi ohlwini lwamakhiye agunyaziwe eseva.",

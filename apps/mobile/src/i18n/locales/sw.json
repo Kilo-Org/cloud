@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Ambatisha tmux",
       "tmuxSession": "Jina la kipindi cha tmux",
       "saved": "Mwenyeji amehifadhiwa.",
-      "saveFailed": "Mwenyeji hakuweza kuhifadhiwa."
+      "saveFailed": "Mwenyeji hakuweza kuhifadhiwa.",
+      "fieldRequired": "Sehemu hii inahitajika"
     },
     "errors": {
       "invalidPort": "Tumia bandari kuanzia 1 hadi 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Sahau {{pattern}}?",
       "deleteMessage": "Muunganisho ujao utakuomba kuamini ufunguo wake tena.",
       "deleteFailed": "Ufunguo wa mwenyeji haukuweza kuondolewa.",
-      "deleteLabel": "Sahau {{pattern}}"
+      "deleteLabel": "Sahau {{pattern}}",
+      "firstTrustedOn": "Inatumainiwa tangu {{date}}"
     },
     "session": {
       "keyPrompt": "Fungua ili kutumia ufunguo wako wa SSH",
@@ -4198,10 +4200,12 @@
       "unlock": "Fungua",
       "promptsSubmit": "Wasilisha",
       "promptLabel": "Jibu {{index}}",
+      "promptTitle": "Ingia kwenye seva",
       "state": {
         "connecting": "Inaunganisha",
         "hostKey": "Inakagua ufunguo wa mwenyeji",
-        "reconnecting": "Inaunganisha tena"
+        "reconnecting": "Inaunganisha tena",
+        "prompt": "Inasubiri jibu lako"
       },
       "reason": {
         "network": "Seva haikuweza kufikiwa.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Tengeneza ufunguo mpya",
+      "name": "Jina la ufunguo",
       "import": "Leta ufunguo",
       "generateTitle": "Tengeneza ufunguo",
       "generateDescription": "Ufunguo huzalishwa kwenye kifaa hiki na hauondoki kamwe. Ongeza ufunguo wa umma kwenye funguo zilizoruhusiwa za seva.",

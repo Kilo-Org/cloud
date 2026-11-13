@@ -1,7 +1,7 @@
 import { useCallback, useSyncExternalStore } from 'react';
 
 import { sessionById, sessionList, subscribeSessions } from './session-store';
-import  { type SshSession } from './types';
+import { type SshSession } from './types';
 
 /** Every open session, oldest first. */
 export function useSshSessions(): readonly SshSession[] {

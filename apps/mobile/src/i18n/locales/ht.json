@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Atache tmux",
       "tmuxSession": "Non sesyon tmux",
       "saved": "Ot la anrejistre.",
-      "saveFailed": "Nou pa t ka anrejistre ot la."
+      "saveFailed": "Nou pa t ka anrejistre ot la.",
+      "fieldRequired": "Chan sa a obligatwa"
     },
     "errors": {
       "invalidPort": "Itilize yon pò soti 1 rive 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Bliye {{pattern}}?",
       "deleteMessage": "Pwochen koneksyon an ap mande w pou w fè konfyans ak kle li ankò.",
       "deleteFailed": "Nou pa t ka retire kle ot la.",
-      "deleteLabel": "Bliye {{pattern}}"
+      "deleteLabel": "Bliye {{pattern}}",
+      "firstTrustedOn": "Konfyans depi {{date}}"
     },
     "session": {
       "keyPrompt": "Debloke pou w sèvi ak kle SSH ou",
@@ -4198,10 +4200,12 @@
       "unlock": "Debloke",
       "promptsSubmit": "Soumèt",
       "promptLabel": "Repons {{index}}",
+      "promptTitle": "Konekte sou sèvè a",
       "state": {
         "connecting": "Ap konekte",
         "hostKey": "Ap verifye kle ot la",
-        "reconnecting": "Ap rekonekte"
+        "reconnecting": "Ap rekonekte",
+        "prompt": "N ap tann repons ou"
       },
       "reason": {
         "network": "Nou pa t ka atenn sèvè a.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Jenere nouvo kle",
+      "name": "Non kle",
       "import": "Enpòte kle",
       "generateTitle": "Jenere yon kle",
       "generateDescription": "Yo kreye kle a sou aparèy sa a epi li pa janm kite l. Ajoute kle piblik la nan kle otorize sèvè a.",

@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Āpiti tmux",
       "tmuxSession": "Ingoa wātū tmux",
       "saved": "Kua tiakina te pou.",
-      "saveFailed": "Kāore i taea te tiaki i te pou."
+      "saveFailed": "Kāore i taea te tiaki i te pou.",
+      "fieldRequired": "E hiahiatia ana tēnei āpure"
     },
     "errors": {
       "invalidPort": "Whakamahia he tauranga mai i 1 ki 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Wareware ki a {{pattern}}?",
       "deleteMessage": "Ka pātai te hononga e whai ake nei kia whakawhirinaki anō koe ki tōna kī.",
       "deleteFailed": "Kāore i taea te tango i te kī pou.",
-      "deleteLabel": "Wareware ki a {{pattern}}"
+      "deleteLabel": "Wareware ki a {{pattern}}",
+      "firstTrustedOn": "Kua whakawhirinakihia mai i {{date}}"
     },
     "session": {
       "keyPrompt": "Wetewhate kia taea ai te whakamahi i tō kī SSH",
@@ -4198,10 +4200,12 @@
       "unlock": "Wetewhate",
       "promptsSubmit": "Tuku",
       "promptLabel": "Whakautu {{index}}",
+      "promptTitle": "Takiuru ki te tūmau",
       "state": {
         "connecting": "E hono ana",
         "hostKey": "E tirotiro ana i te kī pou",
-        "reconnecting": "E hono anō ana"
+        "reconnecting": "E hono anō ana",
+        "prompt": "E tatari ana mō tō whakautu"
       },
       "reason": {
         "network": "Kāore i taea te whakapā atu ki te tūmau.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Hanga kī hou",
+      "name": "Ingoa kī",
       "import": "Kawemai kī",
       "generateTitle": "Hanga kī",
       "generateDescription": "Ka hangaia te kī ki tēnei pūrere, ā, kāore e puta atu i tēnei pūrere. Tāpirihia te kī tūmatanui ki ngā kī kua whakaaetia o te tūmau.",

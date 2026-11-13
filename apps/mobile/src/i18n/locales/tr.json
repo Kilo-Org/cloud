@@ -4133,7 +4133,8 @@
       "tmuxAttach": "tmux'e bağlan",
       "tmuxSession": "tmux oturum adı",
       "saved": "Host kaydedildi.",
-      "saveFailed": "Host kaydedilemedi."
+      "saveFailed": "Host kaydedilemedi.",
+      "fieldRequired": "Bu alan zorunludur"
     },
     "errors": {
       "invalidPort": "1 ile 65535 arasında bir port kullanın",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "{{pattern}} unutulsun mu?",
       "deleteMessage": "Bir sonraki bağlantıda anahtarına yeniden güvenmeniz istenir.",
       "deleteFailed": "Host anahtarı kaldırılamadı.",
-      "deleteLabel": "{{pattern}} unut"
+      "deleteLabel": "{{pattern}} unut",
+      "firstTrustedOn": "{{date}} tarihinden beri güvenilir"
     },
     "session": {
       "keyPrompt": "SSH anahtarınızı kullanmak için kilidi açın",
@@ -4198,10 +4200,12 @@
       "unlock": "Kilidi aç",
       "promptsSubmit": "Gönder",
       "promptLabel": "Yanıt {{index}}",
+      "promptTitle": "Sunucuya giriş yap",
       "state": {
         "connecting": "Bağlanılıyor",
         "hostKey": "Host anahtarı denetleniyor",
-        "reconnecting": "Yeniden bağlanılıyor"
+        "reconnecting": "Yeniden bağlanılıyor",
+        "prompt": "Yanıtınız bekleniyor"
       },
       "reason": {
         "network": "Sunucuya ulaşılamadı.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Yeni anahtar oluştur",
+      "name": "Anahtar adı",
       "import": "Anahtar içe aktar",
       "generateTitle": "Anahtar oluştur",
       "generateDescription": "Anahtar bu cihazda oluşturulur ve buradan hiç ayrılmaz. Açık anahtarı sunucunun yetkili anahtarlarına ekleyin.",

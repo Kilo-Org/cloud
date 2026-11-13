@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Liitä tmuxiin",
       "tmuxSession": "tmux-istunnon nimi",
       "saved": "Isäntä tallennettu.",
-      "saveFailed": "Isäntää ei voitu tallentaa."
+      "saveFailed": "Isäntää ei voitu tallentaa.",
+      "fieldRequired": "Tämä kenttä on pakollinen"
     },
     "errors": {
       "invalidPort": "Käytä porttia väliltä 1–65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Unohdetaanko {{pattern}}?",
       "deleteMessage": "Seuraavalla yhdistämiskerralla sinulta kysytään uudelleen, luotatko sen avaimeen.",
       "deleteFailed": "Isännän avainta ei voitu poistaa.",
-      "deleteLabel": "Unohda {{pattern}}"
+      "deleteLabel": "Unohda {{pattern}}",
+      "firstTrustedOn": "Luotettu {{date}} alkaen"
     },
     "session": {
       "keyPrompt": "Avaa käyttääksesi SSH-avaintasi",
@@ -4198,10 +4200,12 @@
       "unlock": "Avaa",
       "promptsSubmit": "Lähetä",
       "promptLabel": "Vastaus {{index}}",
+      "promptTitle": "Kirjaudu palvelimelle",
       "state": {
         "connecting": "Yhdistetään",
         "hostKey": "Tarkistetaan isännän avain",
-        "reconnecting": "Yhdistetään uudelleen"
+        "reconnecting": "Yhdistetään uudelleen",
+        "prompt": "Odotetaan vastaustasi"
       },
       "reason": {
         "network": "Palvelimeen ei saatu yhteyttä.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Luo uusi avain",
+      "name": "Avaimen nimi",
       "import": "Tuo avain",
       "generateTitle": "Luo avain",
       "generateDescription": "Avain luodaan tällä laitteella, eikä se koskaan poistu siitä. Lisää julkinen avain palvelimen valtuutettuihin avaimiin.",

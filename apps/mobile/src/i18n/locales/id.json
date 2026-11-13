@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Lampirkan tmux",
       "tmuxSession": "Nama sesi tmux",
       "saved": "Host disimpan.",
-      "saveFailed": "Host tidak dapat disimpan."
+      "saveFailed": "Host tidak dapat disimpan.",
+      "fieldRequired": "Kolom ini wajib diisi"
     },
     "errors": {
       "invalidPort": "Gunakan port 1 hingga 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Lupakan {{pattern}}?",
       "deleteMessage": "Koneksi berikutnya akan meminta Anda mempercayai kuncinya lagi.",
       "deleteFailed": "Kunci host tidak dapat dihapus.",
-      "deleteLabel": "Lupakan {{pattern}}"
+      "deleteLabel": "Lupakan {{pattern}}",
+      "firstTrustedOn": "Dipercaya sejak {{date}}"
     },
     "session": {
       "keyPrompt": "Buka kunci untuk menggunakan kunci SSH Anda",
@@ -4198,10 +4200,12 @@
       "unlock": "Buka kunci",
       "promptsSubmit": "Kirim",
       "promptLabel": "Jawaban {{index}}",
+      "promptTitle": "Masuk ke server",
       "state": {
         "connecting": "Menghubungkan",
         "hostKey": "Memeriksa kunci host",
-        "reconnecting": "Menghubungkan ulang"
+        "reconnecting": "Menghubungkan ulang",
+        "prompt": "Menunggu jawaban Anda"
       },
       "reason": {
         "network": "Server tidak dapat dijangkau.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Buat kunci baru",
+      "name": "Nama kunci",
       "import": "Impor kunci",
       "generateTitle": "Buat kunci",
       "generateDescription": "Kunci dibuat di perangkat ini dan tidak pernah meninggalkannya. Tambahkan kunci publik ke kunci yang diizinkan di server.",

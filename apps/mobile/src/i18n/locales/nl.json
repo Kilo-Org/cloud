@@ -4133,7 +4133,8 @@
       "tmuxAttach": "tmux koppelen",
       "tmuxSession": "Naam tmux-sessie",
       "saved": "Host opgeslagen.",
-      "saveFailed": "De host kon niet worden opgeslagen."
+      "saveFailed": "De host kon niet worden opgeslagen.",
+      "fieldRequired": "Dit veld is verplicht"
     },
     "errors": {
       "invalidPort": "Gebruik een poort van 1 tot 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "{{pattern}} vergeten?",
       "deleteMessage": "Bij de volgende verbinding moet je de sleutel opnieuw vertrouwen.",
       "deleteFailed": "De hostsleutel kon niet worden verwijderd.",
-      "deleteLabel": "{{pattern}} vergeten"
+      "deleteLabel": "{{pattern}} vergeten",
+      "firstTrustedOn": "Vertrouwd sinds {{date}}"
     },
     "session": {
       "keyPrompt": "Ontgrendel om je SSH-sleutel te gebruiken",
@@ -4198,10 +4200,12 @@
       "unlock": "Ontgrendelen",
       "promptsSubmit": "Versturen",
       "promptLabel": "Antwoord {{index}}",
+      "promptTitle": "Aanmelden bij de server",
       "state": {
         "connecting": "Verbinden",
         "hostKey": "Hostsleutel controleren",
-        "reconnecting": "Opnieuw verbinden"
+        "reconnecting": "Opnieuw verbinden",
+        "prompt": "Wachten op je antwoord"
       },
       "reason": {
         "network": "De server was niet bereikbaar.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Nieuwe sleutel genereren",
+      "name": "Sleutelnaam",
       "import": "Sleutel importeren",
       "generateTitle": "Een sleutel genereren",
       "generateDescription": "De sleutel wordt op dit apparaat aangemaakt en verlaat het nooit. Voeg de publieke sleutel toe aan de authorized keys van de server.",

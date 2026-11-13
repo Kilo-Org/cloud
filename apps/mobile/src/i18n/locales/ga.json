@@ -4328,7 +4328,8 @@
       "tmuxAttach": "Ceangail tmux",
       "tmuxSession": "Ainm seisiúin tmux",
       "saved": "Sábhálaíodh an t-óstach.",
-      "saveFailed": "Níorbh fhéidir an t-óstach a shábháil."
+      "saveFailed": "Níorbh fhéidir an t-óstach a shábháil.",
+      "fieldRequired": "Tá an réimse seo riachtanach"
     },
     "errors": {
       "invalidPort": "Úsáid port ó 1 go 65535",
@@ -4362,7 +4363,8 @@
       "deleteTitle": "Déan dearmad ar {{pattern}}?",
       "deleteMessage": "Iarrfaidh an chéad cheangal eile ort muinín a chur ina heochair arís.",
       "deleteFailed": "Níorbh fhéidir eochair an óstaigh a bhaint.",
-      "deleteLabel": "Déan dearmad ar {{pattern}}"
+      "deleteLabel": "Déan dearmad ar {{pattern}}",
+      "firstTrustedOn": "Iontaofa ó {{date}}"
     },
     "session": {
       "keyPrompt": "Díghlasáil chun d'eochair SSH a úsáid",
@@ -4393,10 +4395,12 @@
       "unlock": "Díghlasáil",
       "promptsSubmit": "Seol",
       "promptLabel": "Freagra {{index}}",
+      "promptTitle": "Sínigh isteach chuig an bhfreastalaí",
       "state": {
         "connecting": "Ag ceangal",
         "hostKey": "Ag seiceáil eochair an óstaigh",
-        "reconnecting": "Ag athcheangal"
+        "reconnecting": "Ag athcheangal",
+        "prompt": "Ag fanacht le do fhreagra"
       },
       "reason": {
         "network": "Níorbh fhéidir teacht ar an bhfreastalaí.",
@@ -4421,6 +4425,7 @@
     },
     "keys": {
       "generate": "Gin eochair nua",
+      "name": "Ainm eochrach",
       "import": "Iompórtáil eochair",
       "generateTitle": "Gin eochair",
       "generateDescription": "Cruthaítear an eochair ar an ngléas seo agus ní fhágann sí riamh é. Cuir an eochair phoiblí le heochracha údaraithe an fhreastalaí.",

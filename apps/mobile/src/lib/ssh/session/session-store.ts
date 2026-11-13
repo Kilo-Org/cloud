@@ -1,4 +1,4 @@
-import  { type SshSession } from './types';
+import { type SshSession } from './types';
 
 /**
  * The open sessions, outside React: the native connections outlive any one

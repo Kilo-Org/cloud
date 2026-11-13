@@ -32,7 +32,7 @@ export function SshKeyCreateScreen() {
 
   const busy = state.kind === 'generating' || create.isPending;
 
-  async function leave() {
+  function leave() {
     if (router.canGoBack()) {
       router.back();
       return;
@@ -73,7 +73,7 @@ export function SshKeyCreateScreen() {
           <SshPublicKeyBlock publicKey={state.publicKey} fingerprint={state.fingerprint} />
         ) : (
           <FormField
-            label={t('todos.listSettings.name')}
+            label={t('ssh.keys.name')}
             placeholder={t('ssh.editor.key')}
             defaultValue=""
             disabled={busy}
@@ -87,7 +87,7 @@ export function SshKeyCreateScreen() {
       </DetailScreenScrollView>
       <View className="gap-2 px-4 pb-4 pt-3">
         {state.kind === 'ready' ? (
-          <Button className={STATE_ACTION_CLASS} onPress={() => void leave()}>
+          <Button className={STATE_ACTION_CLASS} onPress={leave}>
             <Text>{t('common.done')}</Text>
           </Button>
         ) : (

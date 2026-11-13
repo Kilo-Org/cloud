@@ -4133,7 +4133,8 @@
       "tmuxAttach": "tmuxitti maxxansi",
       "tmuxSession": "Maqaa sessii tmux",
       "saved": "Hostiin kuufame.",
-      "saveFailed": "Hostiin hin kuufamne."
+      "saveFailed": "Hostiin hin kuufamne.",
+      "fieldRequired": "Dirreen kun barbaachisaa dha"
     },
     "errors": {
       "invalidPort": "Port 1 hanga 65535 fayyadami",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "{{pattern}} dagattaa?",
       "deleteMessage": "Walqunnamtii itti aanu furtuu isaa amanamuu si gaafata.",
       "deleteFailed": "Furtuun hostii hin haqamne.",
-      "deleteLabel": "{{pattern}} dagahi"
+      "deleteLabel": "{{pattern}} dagahi",
+      "firstTrustedOn": "{{date}} kaasee amanamaa"
     },
     "session": {
       "keyPrompt": "Furtuu SSH kee itti fayyadamuuf bani",
@@ -4198,10 +4200,12 @@
       "unlock": "Bani",
       "promptsSubmit": "Galchi",
       "promptLabel": "Deebii {{index}}",
+      "promptTitle": "Serveritti seeni",
       "state": {
         "connecting": "Walqunnamaa jira",
         "hostKey": "Furtuu hostii sakatta'aa jira",
-        "reconnecting": "Irra deebiin walqunnamaa jira"
+        "reconnecting": "Irra deebiin walqunnamaa jira",
+        "prompt": "Deebii kee eegaa jira"
       },
       "reason": {
         "network": "Sarvarii bira ga'uun hin danda'amne.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Furtuu haaraa uumi",
+      "name": "Maqaa furtuu",
       "import": "Furtuu galchi",
       "generateTitle": "Furtuu uumi",
       "generateDescription": "Furtuun kun meeshaa kana irratti uumama, yeroo tokkoillee isa hin dhiisu. Furtuu uummataa kan sarvarii furtuuwwan hayyamaman keessatti dabali.",

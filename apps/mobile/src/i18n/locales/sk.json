@@ -4263,7 +4263,8 @@
       "tmuxAttach": "Pripojiť tmux",
       "tmuxSession": "Názov relácie tmux",
       "saved": "Hostiteľ uložený.",
-      "saveFailed": "Hostiteľa sa nepodarilo uložiť."
+      "saveFailed": "Hostiteľa sa nepodarilo uložiť.",
+      "fieldRequired": "Toto pole je povinné"
     },
     "errors": {
       "invalidPort": "Použite port od 1 do 65535",
@@ -4297,7 +4298,8 @@
       "deleteTitle": "Zabudnúť {{pattern}}?",
       "deleteMessage": "Pri ďalšom pripojení sa znova zobrazí výzva na dôveru v jeho kľúč.",
       "deleteFailed": "Kľúč hostiteľa sa nepodarilo odstrániť.",
-      "deleteLabel": "Zabudnúť {{pattern}}"
+      "deleteLabel": "Zabudnúť {{pattern}}",
+      "firstTrustedOn": "Dôveryhodný od {{date}}"
     },
     "session": {
       "keyPrompt": "Odomknite na použitie SSH kľúča",
@@ -4328,10 +4330,12 @@
       "unlock": "Odomknúť",
       "promptsSubmit": "Odoslať",
       "promptLabel": "Odpoveď {{index}}",
+      "promptTitle": "Prihlásenie na server",
       "state": {
         "connecting": "Pripája sa",
         "hostKey": "Kontrola kľúča hostiteľa",
-        "reconnecting": "Pripája sa znova"
+        "reconnecting": "Pripája sa znova",
+        "prompt": "Čaká sa na vašu odpoveď"
       },
       "reason": {
         "network": "Server sa nepodarilo dosiahnuť.",
@@ -4356,6 +4360,7 @@
     },
     "keys": {
       "generate": "Vygenerovať nový kľúč",
+      "name": "Názov kľúča",
       "import": "Importovať kľúč",
       "generateTitle": "Vygenerovať kľúč",
       "generateDescription": "Kľúč sa vytvorí na tomto zariadení a nikdy ho neopustí. Pridajte verejný kľúč do zoznamu autorizovaných kľúčov na serveri.",

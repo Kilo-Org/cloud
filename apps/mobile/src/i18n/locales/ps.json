@@ -4133,7 +4133,8 @@
       "tmuxAttach": "tmux ونښلوئ",
       "tmuxSession": "د tmux سیشن نوم",
       "saved": "هوسټ خوندي شو.",
-      "saveFailed": "هوسټ خوندي نه شو."
+      "saveFailed": "هوسټ خوندي نه شو.",
+      "fieldRequired": "دا ساحه اړینه ده"
     },
     "errors": {
       "invalidPort": "له 1 څخه تر 65535 پورې پورټ وکاروئ",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "{{pattern}} هېر کړئ?",
       "deleteMessage": "راتلونکی وصل به بیا ستاسو څخه د هغه کیلي باور وغواړي.",
       "deleteFailed": "د هوسټ کیلي لرې نه شوه.",
-      "deleteLabel": "{{pattern}} هېر کړئ"
+      "deleteLabel": "{{pattern}} هېر کړئ",
+      "firstTrustedOn": "له {{date}} راهیسې باوري"
     },
     "session": {
       "keyPrompt": "د SSH کیلي کارولو لپاره خلاص کړئ",
@@ -4198,10 +4200,12 @@
       "unlock": "خلاص کړئ",
       "promptsSubmit": "وسپارئ",
       "promptLabel": "ځواب {{index}}",
+      "promptTitle": "سرور ته ننوتل",
       "state": {
         "connecting": "وصل کېږي",
         "hostKey": "د هوسټ کیلي څېړل کېږي",
-        "reconnecting": "بیا وصل کېږي"
+        "reconnecting": "بیا وصل کېږي",
+        "prompt": "ستاسو د ځواب په تمه"
       },
       "reason": {
         "network": "سرور ته د رسېدو امکان نه و.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "نوې کیلي جوړه کړئ",
+      "name": "د کیلي نوم",
       "import": "کیلي وارد کړئ",
       "generateTitle": "یوه کیلي جوړه کړئ",
       "generateDescription": "کیلي په دې وسیله جوړېږي او هېڅکله ترې نه وځي. عامه کیلي د سرور مجازو کیليو ته اضافه کړئ.",

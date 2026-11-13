@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Tengjast tmux",
       "tmuxSession": "Heiti tmux-lotu",
       "saved": "Netþjónn vistaður.",
-      "saveFailed": "Ekki tókst að vista netþjóninn."
+      "saveFailed": "Ekki tókst að vista netþjóninn.",
+      "fieldRequired": "Þetta svæði er nauðsynlegt"
     },
     "errors": {
       "invalidPort": "Notaðu gátt frá 1 til 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Gleyma {{pattern}}?",
       "deleteMessage": "Næsta tenging biður þig að treysta lyklinum hans aftur.",
       "deleteFailed": "Ekki tókst að fjarlægja netþjónslykilinn.",
-      "deleteLabel": "Gleyma {{pattern}}"
+      "deleteLabel": "Gleyma {{pattern}}",
+      "firstTrustedOn": "Treyst síðan {{date}}"
     },
     "session": {
       "keyPrompt": "Opnaðu til að nota SSH-lykilinn þinn",
@@ -4198,10 +4200,12 @@
       "unlock": "Opna",
       "promptsSubmit": "Senda inn",
       "promptLabel": "Svar {{index}}",
+      "promptTitle": "Innskráning á þjóninn",
       "state": {
         "connecting": "Tengist",
         "hostKey": "Athuga netþjónslykil",
-        "reconnecting": "Tengist aftur"
+        "reconnecting": "Tengist aftur",
+        "prompt": "Bíður eftir svari þínu"
       },
       "reason": {
         "network": "Ekki tókst að ná sambandi við netþjóninn.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Búa til nýjan lykil",
+      "name": "Nafn lykils",
       "import": "Flytja inn lykil",
       "generateTitle": "Búa til lykil",
       "generateDescription": "Lykillinn er búinn til á þessu tæki og fer aldrei héðan. Bættu opinbera lyklinum við heimilaða lykla netþjónsins.",

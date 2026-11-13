@@ -4133,7 +4133,8 @@
       "tmuxAttach": "ເຂົ້າຮ່ວມ tmux",
       "tmuxSession": "ຊື່ເຊສຊັນ tmux",
       "saved": "ບັນທຶກໂຮສແລ້ວ.",
-      "saveFailed": "ບໍ່ສາມາດບັນທຶກໂຮສໄດ້."
+      "saveFailed": "ບໍ່ສາມາດບັນທຶກໂຮສໄດ້.",
+      "fieldRequired": "ຕ້ອງປ້ອນຊ່ອງນີ້"
     },
     "errors": {
       "invalidPort": "ໃຊ້ພອດຕັ້ງແຕ່ 1 ຫາ 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "ລືມ {{pattern}}?",
       "deleteMessage": "ການເຊື່ອມຕໍ່ຄັ້ງຕໍ່ໄປຈະຖາມໃຫ້ທ່ານໄວ້ວາງໃຈກະແຈຂອງມັນອີກຄັ້ງ.",
       "deleteFailed": "ບໍ່ສາມາດເອົາກະແຈຂອງໂຮສອອກໄດ້.",
-      "deleteLabel": "ລືມ {{pattern}}"
+      "deleteLabel": "ລືມ {{pattern}}",
+      "firstTrustedOn": "ໄວ້ວາງໃຈຕັ້ງແຕ່ {{date}}"
     },
     "session": {
       "keyPrompt": "ປົດລັອກເພື່ອໃຊ້ກະແຈ SSH ຂອງທ່ານ",
@@ -4198,10 +4200,12 @@
       "unlock": "ປົດລັອກ",
       "promptsSubmit": "ສົ່ງ",
       "promptLabel": "ຄຳຕອບ {{index}}",
+      "promptTitle": "ເຂົ້າສູ່ລະບົບເຊີບເວີ",
       "state": {
         "connecting": "ກຳລັງເຊື່ອມຕໍ່",
         "hostKey": "ກຳລັງກວດສອບກະແຈໂຮສ",
-        "reconnecting": "ກຳລັງເຊື່ອມຕໍ່ຄືນ"
+        "reconnecting": "ກຳລັງເຊື່ອມຕໍ່ຄືນ",
+        "prompt": "ລໍຖ້າຄຳຕອບຂອງທ່ານ"
       },
       "reason": {
         "network": "ບໍ່ສາມາດເຂົ້າເຖິງເຊີບເວີໄດ້.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "ສ້າງກະແຈໃໝ່",
+      "name": "ຊື່ກະແຈ",
       "import": "ນຳເຂົ້າກະແຈ",
       "generateTitle": "ສ້າງກະແຈ",
       "generateDescription": "ກະແຈຖືກສ້າງຢູ່ເທິງອຸປະກອນນີ້ ແລະ ຈະບໍ່ອອກໄປຈາກອຸປະກອນນີ້ເລີຍ. ເພີ່ມກະແຈສາທາລະນະໃສ່ກະແຈທີ່ໄດ້ຮັບອະນຸຍາດຂອງເຊີບເວີ.",

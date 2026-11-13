@@ -35,10 +35,7 @@ export const TERMINAL_KEYS: readonly TerminalKey[] = [
 ];
 
 /** The bytes a bar key sends as they are, before any sticky modifier. */
-const KEY_SEQUENCES: Record<
-  Exclude<TerminalKeyId, 'ctrl' | 'alt'>,
-  string
-> = {
+const KEY_SEQUENCES = {
   esc: '\u001B',
   tab: '\t',
   left: '\u001B[D',
@@ -49,7 +46,7 @@ const KEY_SEQUENCES: Record<
   tilde: '~',
   slash: '/',
   dash: '-',
-};
+} satisfies Record<Exclude<TerminalKeyId, 'ctrl' | 'alt'>, string>;
 
 export function keySequence(id: Exclude<TerminalKeyId, 'ctrl' | 'alt'>): string {
   return KEY_SEQUENCES[id];
@@ -57,7 +54,8 @@ export function keySequence(id: Exclude<TerminalKeyId, 'ctrl' | 'alt'>): string 
 
 /** `c` with Control held: the byte the shell reads as an interrupt. */
 export function controlSequence(letter: string): string {
-  return String.fromCharCode(letter.toLowerCase().charCodeAt(0) - 96);
+  const code = letter.toLowerCase().codePointAt(0) ?? 0;
+  return String.fromCodePoint(code - 96);
 }
 
 /** `c` with Alt held: the escape prefix every terminal sends. */

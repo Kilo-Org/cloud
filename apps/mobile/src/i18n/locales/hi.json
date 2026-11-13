@@ -4133,7 +4133,8 @@
       "tmuxAttach": "tmux अटैच करें",
       "tmuxSession": "tmux सत्र नाम",
       "saved": "होस्ट सहेजा गया।",
-      "saveFailed": "होस्ट सहेजा नहीं जा सका।"
+      "saveFailed": "होस्ट सहेजा नहीं जा सका।",
+      "fieldRequired": "यह फ़ील्ड आवश्यक है"
     },
     "errors": {
       "invalidPort": "1 से 65535 तक का पोर्ट उपयोग करें",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "{{pattern}} भुलाएँ?",
       "deleteMessage": "अगली बार कनेक्ट करने पर आपसे फिर से इसकी कुंजी पर भरोसा करने को कहा जाएगा।",
       "deleteFailed": "होस्ट कुंजी हटाई नहीं जा सकी।",
-      "deleteLabel": "{{pattern}} भुलाएँ"
+      "deleteLabel": "{{pattern}} भुलाएँ",
+      "firstTrustedOn": "{{date}} से विश्वसनीय"
     },
     "session": {
       "keyPrompt": "अपनी SSH कुंजी का उपयोग करने के लिए अनलॉक करें",
@@ -4198,10 +4200,12 @@
       "unlock": "अनलॉक करें",
       "promptsSubmit": "सबमिट करें",
       "promptLabel": "उत्तर {{index}}",
+      "promptTitle": "सर्वर में साइन इन करें",
       "state": {
         "connecting": "कनेक्ट हो रहा है",
         "hostKey": "होस्ट कुंजी जाँची जा रही है",
-        "reconnecting": "फिर से कनेक्ट हो रहा है"
+        "reconnecting": "फिर से कनेक्ट हो रहा है",
+        "prompt": "आपके उत्तर की प्रतीक्षा है"
       },
       "reason": {
         "network": "सर्वर तक नहीं पहुँचा जा सका।",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "नई कुंजी बनाएँ",
+      "name": "कुंजी का नाम",
       "import": "कुंजी आयात करें",
       "generateTitle": "कुंजी बनाएँ",
       "generateDescription": "कुंजी इस डिवाइस पर बनाई जाती है और कभी इससे बाहर नहीं जाती। पब्लिक की को सर्वर की अधिकृत कुंजियों में जोड़ें।",

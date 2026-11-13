@@ -4328,7 +4328,8 @@
       "tmuxAttach": "Ittakka tmux",
       "tmuxSession": "Isem is-sessjoni tmux",
       "saved": "Host issejvjat.",
-      "saveFailed": "Il-host ma setax jiġi ssejvjat."
+      "saveFailed": "Il-host ma setax jiġi ssejvjat.",
+      "fieldRequired": "Dan il-qasam huwa meħtieġ"
     },
     "errors": {
       "invalidPort": "Uża port minn 1 sa 65535",
@@ -4362,7 +4363,8 @@
       "deleteTitle": "Tinsa {{pattern}}?",
       "deleteMessage": "Il-konnessjoni li jmiss titolbok tafda ċ-ċavetta tiegħu mill-ġdid.",
       "deleteFailed": "Iċ-ċavetta tal-host ma setgħetx titneħħa.",
-      "deleteLabel": "Tinsa {{pattern}}"
+      "deleteLabel": "Tinsa {{pattern}}",
+      "firstTrustedOn": "Fdata minn {{date}}"
     },
     "session": {
       "keyPrompt": "Iftaħ biex tuża ċ-ċavetta SSH tiegħek",
@@ -4393,10 +4395,12 @@
       "unlock": "Iftaħ",
       "promptsSubmit": "Ibgħat",
       "promptLabel": "Tweġiba {{index}}",
+      "promptTitle": "Idħol fis-server",
       "state": {
         "connecting": "Qed jikkonnettja",
         "hostKey": "Qed jiċċekkja ċ-ċavetta tal-host",
-        "reconnecting": "Qed jerġa' jikkonnettja"
+        "reconnecting": "Qed jerġa' jikkonnettja",
+        "prompt": "Qed nistenna tweġibtek"
       },
       "reason": {
         "network": "Is-server ma setax jintlaħaq.",
@@ -4421,6 +4425,7 @@
     },
     "keys": {
       "generate": "Iġġenera ċavetta ġdida",
+      "name": "Isem iċ-ċavetta",
       "import": "Importa ċavetta",
       "generateTitle": "Iġġenera ċavetta",
       "generateDescription": "Iċ-ċavetta tinħoloq fuq dan it-tagħmir u qatt ma toħroġ minnu. Żid iċ-ċavetta pubblika maċ-ċwievet awtorizzati tas-server.",

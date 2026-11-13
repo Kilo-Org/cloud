@@ -4133,7 +4133,8 @@
       "tmuxAttach": "附加 tmux",
       "tmuxSession": "tmux 工作階段名稱",
       "saved": "已儲存主機。",
-      "saveFailed": "無法儲存主機。"
+      "saveFailed": "無法儲存主機。",
+      "fieldRequired": "此欄位為必填"
     },
     "errors": {
       "invalidPort": "請使用 1 到 65535 的連接埠",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "忘記 {{pattern}}？",
       "deleteMessage": "下次連線時會再次要求你信任其金鑰。",
       "deleteFailed": "無法移除主機金鑰。",
-      "deleteLabel": "忘記 {{pattern}}"
+      "deleteLabel": "忘記 {{pattern}}",
+      "firstTrustedOn": "自 {{date}} 起信任"
     },
     "session": {
       "keyPrompt": "解鎖以使用你的 SSH 金鑰",
@@ -4198,10 +4200,12 @@
       "unlock": "解鎖",
       "promptsSubmit": "送出",
       "promptLabel": "回答 {{index}}",
+      "promptTitle": "登入伺服器",
       "state": {
         "connecting": "連線中",
         "hostKey": "檢查主機金鑰中",
-        "reconnecting": "重新連線中"
+        "reconnecting": "重新連線中",
+        "prompt": "等待您的回答"
       },
       "reason": {
         "network": "無法連線至伺服器。",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "產生新金鑰",
+      "name": "金鑰名稱",
       "import": "匯入金鑰",
       "generateTitle": "產生金鑰",
       "generateDescription": "金鑰會在此裝置上建立，永遠不會離開此裝置。請將公開金鑰加入伺服器的授權金鑰。",

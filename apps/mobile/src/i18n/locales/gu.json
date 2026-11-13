@@ -4133,7 +4133,8 @@
       "tmuxAttach": "tmux એટેચ કરો",
       "tmuxSession": "tmux સેશનનું નામ",
       "saved": "હોસ્ટ સાચવ્યું.",
-      "saveFailed": "હોસ્ટ સાચવી શકાઈ નહીં."
+      "saveFailed": "હોસ્ટ સાચવી શકાઈ નહીં.",
+      "fieldRequired": "આ ફીલ્ડ જરૂરી છે"
     },
     "errors": {
       "invalidPort": "1 થી 65535 સુધીનો પોર્ટ વાપરો",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "{{pattern}} ભૂલી જવું?",
       "deleteMessage": "આગલી વાર કનેક્ટ કરતી વખતે ફરી તેની કી પર ભરોસો કરવાનું કહેવામાં આવશે.",
       "deleteFailed": "હોસ્ટ કી દૂર કરી શકાઈ નહીં.",
-      "deleteLabel": "{{pattern}} ભૂલી જાઓ"
+      "deleteLabel": "{{pattern}} ભૂલી જાઓ",
+      "firstTrustedOn": "{{date}} થી વિશ્વસનીય"
     },
     "session": {
       "keyPrompt": "તમારી SSH કી વાપરવા માટે અનલૉક કરો",
@@ -4198,10 +4200,12 @@
       "unlock": "અનલૉક કરો",
       "promptsSubmit": "સબમિટ કરો",
       "promptLabel": "જવાબ {{index}}",
+      "promptTitle": "સર્વરમાં સાઇન ઇન કરો",
       "state": {
         "connecting": "કનેક્ટ થઈ રહ્યું છે",
         "hostKey": "હોસ્ટ કી તપાસી રહ્યું છે",
-        "reconnecting": "ફરીથી કનેક્ટ થઈ રહ્યું છે"
+        "reconnecting": "ફરીથી કનેક્ટ થઈ રહ્યું છે",
+        "prompt": "તમારા જવાબની રાહ જોઈ રહ્યું છે"
       },
       "reason": {
         "network": "સર્વર સુધી પહોંચી શકાયું નહીં.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "નવી કી બનાવો",
+      "name": "કીનું નામ",
       "import": "કી આયાત કરો",
       "generateTitle": "કી બનાવો",
       "generateDescription": "કી આ ડિવાઇસ પર જ બનાવવામાં આવે છે અને ક્યારેય આ ડિવાઇસ છોડતી નથી. જાહેર કી સર્વરની અધિકૃત કીઓમાં ઉમેરો.",

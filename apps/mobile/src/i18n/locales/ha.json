@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Haɗa tmux",
       "tmuxSession": "Sunan zaman tmux",
       "saved": "An adana host ɗin.",
-      "saveFailed": "Ba a iya adana host ɗin ba."
+      "saveFailed": "Ba a iya adana host ɗin ba.",
+      "fieldRequired": "Ana buƙatar wannan filin"
     },
     "errors": {
       "invalidPort": "Yi amfani da port daga 1 zuwa 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Manta {{pattern}}?",
       "deleteMessage": "Haɗin na gaba zai sake neman ka amince da maɓallinsa.",
       "deleteFailed": "Ba a iya cire maɓallin host ɗin ba.",
-      "deleteLabel": "Manta {{pattern}}"
+      "deleteLabel": "Manta {{pattern}}",
+      "firstTrustedOn": "Amintacce tun {{date}}"
     },
     "session": {
       "keyPrompt": "Buɗe don amfani da maɓallin SSH ɗinka",
@@ -4198,10 +4200,12 @@
       "unlock": "Buɗe",
       "promptsSubmit": "Aika",
       "promptLabel": "Amsa {{index}}",
+      "promptTitle": "Shiga uwar garke",
       "state": {
         "connecting": "Ana haɗawa",
         "hostKey": "Ana duba maɓallin host",
-        "reconnecting": "Ana sake haɗawa"
+        "reconnecting": "Ana sake haɗawa",
+        "prompt": "Ana jiran amsarka"
       },
       "reason": {
         "network": "Ba a iya isa ga uwar garken ba.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Ƙirƙiri sabon maɓalli",
+      "name": "Sunan maɓalli",
       "import": "Shigo da maɓalli",
       "generateTitle": "Ƙirƙiri maɓalli",
       "generateDescription": "Ana ƙirƙirar maɓallin a wannan na'urar kuma ba ya barin ta. Ƙara maɓallin jama'a zuwa maɓallan da aka ba da izini a uwar garken.",

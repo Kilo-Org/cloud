@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Ku xidh tmux",
       "tmuxSession": "Magaca session-ka tmux",
       "saved": "Host-ka waa la kaydiyay.",
-      "saveFailed": "Host-ka lama kaydin karin."
+      "saveFailed": "Host-ka lama kaydin karin.",
+      "fieldRequired": "Goobtan waa loo baahan yahay"
     },
     "errors": {
       "invalidPort": "Isticmaal port u dhexeeya 1 iyo 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Ma iloowdo {{pattern}}?",
       "deleteMessage": "Xidhiidhka xiga wuxuu kaa codsanayaa inaad mar kale aaminto furahiisa.",
       "deleteFailed": "Furaha host-ka lama saari karin.",
-      "deleteLabel": "Iloobi {{pattern}}"
+      "deleteLabel": "Iloobi {{pattern}}",
+      "firstTrustedOn": "La aaminay ilaa {{date}}"
     },
     "session": {
       "keyPrompt": "Fur si aad u isticmaasho furahaaga SSH",
@@ -4198,10 +4200,12 @@
       "unlock": "Fur",
       "promptsSubmit": "Gudbi",
       "promptLabel": "Jawaab {{index}}",
+      "promptTitle": "Soo gal serverka",
       "state": {
         "connecting": "Xidhiidhinaya",
         "hostKey": "La hubinaya furaha host-ka",
-        "reconnecting": "Dib u xidhiidhinaya"
+        "reconnecting": "Dib u xidhiidhinaya",
+        "prompt": "Sugaya jawaabtaada"
       },
       "reason": {
         "network": "Serverka lama gaari karin.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Soo saar fure cusub",
+      "name": "Magaca furaha",
       "import": "Soo qaado fure",
       "generateTitle": "Soo saar fure",
       "generateDescription": "Furaha waxaa lagu abuuraa qalabkan, marnaba kama tago. Ku dar furaha guud furaayaasha la oggolaaday ee serverka.",

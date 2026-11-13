@@ -4198,7 +4198,8 @@
       "tmuxAttach": "הצטרפות ל-tmux",
       "tmuxSession": "שם הפעלת tmux",
       "saved": "המארח נשמר.",
-      "saveFailed": "לא ניתן היה לשמור את המארח."
+      "saveFailed": "לא ניתן היה לשמור את המארח.",
+      "fieldRequired": "שדה חובה"
     },
     "errors": {
       "invalidPort": "יש להשתמש בפורט בין 1 ל-65535",
@@ -4232,7 +4233,8 @@
       "deleteTitle": "לשכוח את {{pattern}}?",
       "deleteMessage": "בחיבור הבא תתבקשו שוב לתת אמון במפתח שלו.",
       "deleteFailed": "לא ניתן היה להסיר את מפתח המארח.",
-      "deleteLabel": "שכחת {{pattern}}"
+      "deleteLabel": "שכחת {{pattern}}",
+      "firstTrustedOn": "מהימן מאז {{date}}"
     },
     "session": {
       "keyPrompt": "פתחו כדי להשתמש במפתח ה-SSH שלכם",
@@ -4263,10 +4265,12 @@
       "unlock": "פתיחה",
       "promptsSubmit": "שליחה",
       "promptLabel": "תשובה {{index}}",
+      "promptTitle": "התחברות לשרת",
       "state": {
         "connecting": "מתחבר",
         "hostKey": "בודק מפתח מארח",
-        "reconnecting": "מתחבר מחדש"
+        "reconnecting": "מתחבר מחדש",
+        "prompt": "ממתין לתשובתך"
       },
       "reason": {
         "network": "לא ניתן היה להגיע לשרת.",
@@ -4291,6 +4295,7 @@
     },
     "keys": {
       "generate": "יצירת מפתח חדש",
+      "name": "שם מפתח",
       "import": "ייבוא מפתח",
       "generateTitle": "יצירת מפתח",
       "generateDescription": "המפתח נוצר במכשיר הזה ולעולם לא יוצא ממנו. הוסיפו את המפתח הציבורי לרשימת המפתחות המורשים בשרת.",

@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Erantsi tmux",
       "tmuxSession": "tmux saioaren izena",
       "saved": "Ostalaria gordeta.",
-      "saveFailed": "Ezin izan da ostalaria gorde."
+      "saveFailed": "Ezin izan da ostalaria gorde.",
+      "fieldRequired": "Eremu hau derrigorrezkoa da"
     },
     "errors": {
       "invalidPort": "Erabili 1etik 65535era bitarteko ataka bat",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Ahaztu {{pattern}}?",
       "deleteMessage": "Hurrengo konexioan berriro eskatuko zaizu gakoa fidagarritzat jotzeko.",
       "deleteFailed": "Ezin izan da ostalariaren gakoa kendu.",
-      "deleteLabel": "Ahaztu {{pattern}}"
+      "deleteLabel": "Ahaztu {{pattern}}",
+      "firstTrustedOn": "Fidagarria {{date}}tik aurrera"
     },
     "session": {
       "keyPrompt": "Desblokeatu zure SSH gakoa erabiltzeko",
@@ -4198,10 +4200,12 @@
       "unlock": "Desblokeatu",
       "promptsSubmit": "Bidali",
       "promptLabel": "{{index}}. erantzuna",
+      "promptTitle": "Hasi saioa zerbitzarian",
       "state": {
         "connecting": "Konektatzen",
         "hostKey": "Ostalariaren gakoa egiaztatzen",
-        "reconnecting": "Berriz konektatzen"
+        "reconnecting": "Berriz konektatzen",
+        "prompt": "Zure erantzunaren zain"
       },
       "reason": {
         "network": "Ezin izan da zerbitzarira iritsi.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Sortu gako berria",
+      "name": "Gakoaren izena",
       "import": "Inportatu gakoa",
       "generateTitle": "Sortu gako bat",
       "generateDescription": "Gakoa gailu honetan sortzen da eta ez da inoiz hemendik ateratzen. Gehitu gako publikoa zerbitzariaren baimendutako gakoen zerrendara.",

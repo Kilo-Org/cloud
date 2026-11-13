@@ -4133,7 +4133,8 @@
       "tmuxAttach": "اتصال به tmux",
       "tmuxSession": "نام نشست tmux",
       "saved": "میزبان ذخیره شد.",
-      "saveFailed": "میزبان ذخیره نشد."
+      "saveFailed": "میزبان ذخیره نشد.",
+      "fieldRequired": "این فیلد الزامی است"
     },
     "errors": {
       "invalidPort": "پورتی از 1 تا 65535 استفاده کنید",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "{{pattern}} فراموش شود؟",
       "deleteMessage": "اتصال بعدی دوباره از شما می‌خواهد به کلید آن اعتماد کنید.",
       "deleteFailed": "کلید میزبان حذف نشد.",
-      "deleteLabel": "فراموش کردن {{pattern}}"
+      "deleteLabel": "فراموش کردن {{pattern}}",
+      "firstTrustedOn": "مورد اعتماد از {{date}}"
     },
     "session": {
       "keyPrompt": "برای استفاده از کلید SSH خود، قفل را باز کنید",
@@ -4198,10 +4200,12 @@
       "unlock": "باز کردن قفل",
       "promptsSubmit": "ارسال",
       "promptLabel": "پاسخ {{index}}",
+      "promptTitle": "ورود به سرور",
       "state": {
         "connecting": "در حال اتصال",
         "hostKey": "بررسی کلید میزبان",
-        "reconnecting": "در حال اتصال دوباره"
+        "reconnecting": "در حال اتصال دوباره",
+        "prompt": "در انتظار پاسخ شما"
       },
       "reason": {
         "network": "دسترسی به سرور ممکن نشد.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "ساخت کلید جدید",
+      "name": "نام کلید",
       "import": "وارد کردن کلید",
       "generateTitle": "ساخت کلید",
       "generateDescription": "کلید روی همین دستگاه ساخته می‌شود و هرگز از آن خارج نمی‌شود. کلید عمومی را به کلیدهای مجاز سرور اضافه کنید.",

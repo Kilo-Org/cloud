@@ -1,4 +1,4 @@
-import  { type TerminalTheme } from '@kilocode/react-native-ssh';
+import { type TerminalTheme } from '@kilocode/react-native-ssh';
 
 /**
  * The two terminal palettes.

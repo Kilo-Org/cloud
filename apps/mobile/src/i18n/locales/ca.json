@@ -4198,7 +4198,8 @@
       "tmuxAttach": "Adjunta tmux",
       "tmuxSession": "Nom de la sessió tmux",
       "saved": "Amfitrió desat.",
-      "saveFailed": "No s'ha pogut desar l'amfitrió."
+      "saveFailed": "No s'ha pogut desar l'amfitrió.",
+      "fieldRequired": "Aquest camp és obligatori"
     },
     "errors": {
       "invalidPort": "Fes servir un port de l'1 al 65535",
@@ -4232,7 +4233,8 @@
       "deleteTitle": "Vols oblidar {{pattern}}?",
       "deleteMessage": "La propera connexió et tornarà a demanar que confiïs en la seva clau.",
       "deleteFailed": "No s'ha pogut eliminar la clau de l'amfitrió.",
-      "deleteLabel": "Oblida {{pattern}}"
+      "deleteLabel": "Oblida {{pattern}}",
+      "firstTrustedOn": "De confiança des de {{date}}"
     },
     "session": {
       "keyPrompt": "Desbloqueja per utilitzar la teva clau SSH",
@@ -4263,10 +4265,12 @@
       "unlock": "Desbloqueja",
       "promptsSubmit": "Envia",
       "promptLabel": "Resposta {{index}}",
+      "promptTitle": "Inicia la sessió al servidor",
       "state": {
         "connecting": "Connectant",
         "hostKey": "Comprovant la clau de l'amfitrió",
-        "reconnecting": "Tornant a connectar"
+        "reconnecting": "Tornant a connectar",
+        "prompt": "Esperant la teva resposta"
       },
       "reason": {
         "network": "No s'ha pogut contactar amb el servidor.",
@@ -4291,6 +4295,7 @@
     },
     "keys": {
       "generate": "Genera una clau nova",
+      "name": "Nom de la clau",
       "import": "Importa una clau",
       "generateTitle": "Genera una clau",
       "generateDescription": "La clau es crea en aquest dispositiu i no en surt mai. Afegeix la clau pública a les claus autoritzades del servidor.",

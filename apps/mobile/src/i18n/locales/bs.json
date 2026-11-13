@@ -4198,7 +4198,8 @@
       "tmuxAttach": "Priključi tmux",
       "tmuxSession": "Naziv tmux sesije",
       "saved": "Host je sačuvan.",
-      "saveFailed": "Nije bilo moguće sačuvati host."
+      "saveFailed": "Nije bilo moguće sačuvati host.",
+      "fieldRequired": "Ovo polje je obavezno"
     },
     "errors": {
       "invalidPort": "Koristite port od 1 do 65535",
@@ -4232,7 +4233,8 @@
       "deleteTitle": "Zaboraviti {{pattern}}?",
       "deleteMessage": "Pri sljedećem povezivanju ponovo ćete morati potvrditi da vjerujete njegovom ključu.",
       "deleteFailed": "Nije bilo moguće ukloniti ključ hosta.",
-      "deleteLabel": "Zaboravi {{pattern}}"
+      "deleteLabel": "Zaboravi {{pattern}}",
+      "firstTrustedOn": "Pouzdan od {{date}}"
     },
     "session": {
       "keyPrompt": "Otključajte da biste koristili SSH ključ",
@@ -4263,10 +4265,12 @@
       "unlock": "Otključaj",
       "promptsSubmit": "Pošalji",
       "promptLabel": "Odgovor {{index}}",
+      "promptTitle": "Prijava na server",
       "state": {
         "connecting": "Povezivanje",
         "hostKey": "Provjera ključa hosta",
-        "reconnecting": "Ponovno povezivanje"
+        "reconnecting": "Ponovno povezivanje",
+        "prompt": "Čeka se vaš odgovor"
       },
       "reason": {
         "network": "Server nije dostupan.",
@@ -4291,6 +4295,7 @@
     },
     "keys": {
       "generate": "Generiši novi ključ",
+      "name": "Naziv ključa",
       "import": "Uvezi ključ",
       "generateTitle": "Generisanje ključa",
       "generateDescription": "Ključ se stvara na ovom uređaju i nikada ga ne napušta. Dodajte javni ključ u ovlaštene ključeve servera.",

@@ -55,8 +55,3 @@ export async function requireKeyAccess(promptMessage: string): Promise<boolean> 
     return false;
   }
 }
-
-/** Forgets the current unlock: the next key use asks again. */
-export function clearKeyAccess(): void {
-  unlocked = false;
-}

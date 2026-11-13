@@ -50,7 +50,7 @@ export function SshPromptSheet({ sessionId }: Readonly<{ sessionId: string }>) {
     }
     case 'awaiting-password':
     case 'awaiting-passphrase': {
-      return <SecretForm sessionId={sessionId} phase={phase} />;
+      return <SecretForm sessionId={sessionId} phase={phase} hostLabel={session?.label ?? ''} />;
     }
     case 'awaiting-prompts': {
       return <PromptsForm sessionId={sessionId} phase={phase} />;
@@ -59,6 +59,9 @@ export function SshPromptSheet({ sessionId }: Readonly<{ sessionId: string }>) {
     case 'connected':
     case 'reconnecting':
     case 'closed': {
+      return null;
+    }
+    default: {
       return null;
     }
   }
@@ -112,8 +115,11 @@ function HostKeyForm({
 function SecretForm({
   sessionId,
   phase,
+  hostLabel,
 }: Readonly<{
   sessionId: string;
+  /** The host the session is for: the sheet names it in its body copy. */
+  hostLabel: string;
   phase: Extract<SshSessionPhase, { kind: 'awaiting-password' | 'awaiting-passphrase' }>;
 }>) {
   const { t } = useTranslation();
@@ -148,7 +154,7 @@ function SecretForm({
       <View className="gap-4 px-4 pt-2">
         <Text className="text-sm text-muted-foreground">
           {password
-            ? t('ssh.session.passwordBody')
+            ? t('ssh.session.passwordBody', { label: hostLabel })
             : t('ssh.session.passphraseBody', { label: t('ssh.editor.privateKey') })}
         </Text>
         {phase.failed ? (
@@ -192,7 +198,7 @@ function PromptsForm({
 
   return (
     <PickerSheet
-      title={phase.prompts.name.trim() || t('modelChat.mcpOAuth.signIn')}
+      title={phase.prompts.name.trim() || t('ssh.session.promptTitle')}
       doneLabel={t('ssh.session.promptsSubmit')}
       onDone={submit}
       onCancel={cancel}

@@ -1,4 +1,4 @@
-import  { type TerminalViewHandle } from '@kilocode/react-native-ssh';
+import { type TerminalViewHandle } from '@kilocode/react-native-ssh';
 import * as Clipboard from 'expo-clipboard';
 import { usePathname, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -81,16 +81,11 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
     if (pendingCommand === null || shellId === null || terminal === null) {
       return;
     }
-    void terminal
-      .sendInput(encodeTerminalInput(pendingCommand))
-      .then(() => {
-        consumePendingCommand(sessionId, pendingCommand);
-      })
-      .catch(() => undefined);
+    void typeOnce(terminal, sessionId, pendingCommand);
   }, [pendingCommand, shellId, sessionId]);
 
   const send = useCallback((text: string) => {
-    void terminalRef.current?.sendInput(encodeTerminalInput(text)).catch(() => undefined);
+    void sendToShell(terminalRef.current, text);
   }, []);
 
   async function pasteFromClipboard() {
@@ -271,7 +266,7 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
                 const text = pasteText;
                 setPasteText(null);
                 if (text !== null) {
-                  void terminalRef.current?.paste(text).catch(() => undefined);
+                  void pasteToShell(terminalRef.current, text);
                 }
               }}
             >
@@ -282,4 +277,40 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
       </Sheet>
     </View>
   );
+}
+
+/**
+ * Types the pending command — the tmux attach — and then records that it was
+ * sent. The shell can end between the mount and the keystroke, which is not a
+ * failure this screen can act on.
+ */
+async function typeOnce(
+  terminal: TerminalViewHandle,
+  sessionId: string,
+  command: string
+): Promise<void> {
+  try {
+    await terminal.sendInput(encodeTerminalInput(command));
+    consumePendingCommand(sessionId, command);
+  } catch {
+    // The shell closed before the command reached it.
+  }
+}
+
+/** Sends one key sequence to the shell, ignoring a shell that already closed. */
+async function sendToShell(terminal: TerminalViewHandle | null, text: string): Promise<void> {
+  try {
+    await terminal?.sendInput(encodeTerminalInput(text));
+  } catch {
+    // The shell closed under this key.
+  }
+}
+
+/** Sends pasted text through the view's own paste, ignoring a closed shell. */
+async function pasteToShell(terminal: TerminalViewHandle | null, text: string): Promise<void> {
+  try {
+    await terminal?.paste(text);
+  } catch {
+    // The shell closed before the paste.
+  }
 }

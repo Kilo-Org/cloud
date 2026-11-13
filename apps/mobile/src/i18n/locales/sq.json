@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Lidhu me tmux",
       "tmuxSession": "Emri i sesionit tmux",
       "saved": "Host u ruajt.",
-      "saveFailed": "Host nuk mund të ruhej."
+      "saveFailed": "Host nuk mund të ruhej.",
+      "fieldRequired": "Kjo fushë është e detyrueshme"
     },
     "errors": {
       "invalidPort": "Përdor një portë nga 1 deri në 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Harro {{pattern}}?",
       "deleteMessage": "Lidhja tjetër do të të kërkojë të besosh përsëri çelësin e tij.",
       "deleteFailed": "Çelësi i hostit nuk mund të hiqej.",
-      "deleteLabel": "Harro {{pattern}}"
+      "deleteLabel": "Harro {{pattern}}",
+      "firstTrustedOn": "I besuar që prej {{date}}"
     },
     "session": {
       "keyPrompt": "Zhblloko për të përdorur çelësin tënd SSH",
@@ -4198,10 +4200,12 @@
       "unlock": "Zhblloko",
       "promptsSubmit": "Dërgo",
       "promptLabel": "Përgjigja {{index}}",
+      "promptTitle": "Hyr në server",
       "state": {
         "connecting": "Po lidhet",
         "hostKey": "Po kontrollon çelësin e hostit",
-        "reconnecting": "Po rilidhet"
+        "reconnecting": "Po rilidhet",
+        "prompt": "Në pritje të përgjigjes tënde"
       },
       "reason": {
         "network": "Serveri nuk mund të arrihej.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Gjenero çelës të ri",
+      "name": "Emri i çelësit",
       "import": "Importo çelësin",
       "generateTitle": "Gjenero një çelës",
       "generateDescription": "Çelësi krijohet në këtë pajisje dhe nuk largohet kurrë prej saj. Shto çelësin publik te çelësat e autorizuar të serverit.",

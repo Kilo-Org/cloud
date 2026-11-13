@@ -4133,7 +4133,8 @@
       "tmuxAttach": "tmux 연결",
       "tmuxSession": "tmux 세션 이름",
       "saved": "호스트가 저장되었습니다.",
-      "saveFailed": "호스트를 저장할 수 없습니다."
+      "saveFailed": "호스트를 저장할 수 없습니다.",
+      "fieldRequired": "필수 입력 항목입니다"
     },
     "errors": {
       "invalidPort": "1~65535 사이의 포트를 사용하세요",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "{{pattern}}을(를) 잊을까요?",
       "deleteMessage": "다음 연결 시 해당 키를 다시 신뢰하라는 메시지가 표시됩니다.",
       "deleteFailed": "호스트 키를 제거할 수 없습니다.",
-      "deleteLabel": "{{pattern}} 잊기"
+      "deleteLabel": "{{pattern}} 잊기",
+      "firstTrustedOn": "{{date}}부터 신뢰함"
     },
     "session": {
       "keyPrompt": "SSH 키를 사용하려면 잠금을 해제하세요",
@@ -4198,10 +4200,12 @@
       "unlock": "잠금 해제",
       "promptsSubmit": "제출",
       "promptLabel": "답변 {{index}}",
+      "promptTitle": "서버에 로그인",
       "state": {
         "connecting": "연결 중",
         "hostKey": "호스트 키 확인 중",
-        "reconnecting": "다시 연결 중"
+        "reconnecting": "다시 연결 중",
+        "prompt": "응답 대기 중"
       },
       "reason": {
         "network": "서버에 연결할 수 없습니다.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "새 키 생성",
+      "name": "키 이름",
       "import": "키 가져오기",
       "generateTitle": "키 생성",
       "generateDescription": "키는 이 기기에서 생성되며 절대 기기를 떠나지 않습니다. 공개 키를 서버의 authorized keys에 추가하세요.",

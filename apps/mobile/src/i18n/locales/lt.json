@@ -4263,7 +4263,8 @@
       "tmuxAttach": "Prijungti tmux",
       "tmuxSession": "tmux sesijos pavadinimas",
       "saved": "Hostas išsaugotas.",
-      "saveFailed": "Nepavyko išsaugoti hosto."
+      "saveFailed": "Nepavyko išsaugoti hosto.",
+      "fieldRequired": "Šis laukas privalomas"
     },
     "errors": {
       "invalidPort": "Naudokite prievadą nuo 1 iki 65535",
@@ -4297,7 +4298,8 @@
       "deleteTitle": "Pamiršti {{pattern}}?",
       "deleteMessage": "Kito prisijungimo metu vėl būsite paprašyti patvirtinti jo raktą.",
       "deleteFailed": "Nepavyko pašalinti hosto rakto.",
-      "deleteLabel": "Pamiršti {{pattern}}"
+      "deleteLabel": "Pamiršti {{pattern}}",
+      "firstTrustedOn": "Patikimas nuo {{date}}"
     },
     "session": {
       "keyPrompt": "Atrakinkite, kad galėtumėte naudoti SSH raktą",
@@ -4328,10 +4330,12 @@
       "unlock": "Atrakinti",
       "promptsSubmit": "Pateikti",
       "promptLabel": "Atsakymas {{index}}",
+      "promptTitle": "Prisijungti prie serverio",
       "state": {
         "connecting": "Jungiamasi",
         "hostKey": "Tikrinamas hosto raktas",
-        "reconnecting": "Jungiamasi iš naujo"
+        "reconnecting": "Jungiamasi iš naujo",
+        "prompt": "Laukiama jūsų atsakymo"
       },
       "reason": {
         "network": "Nepavyko pasiekti serverio.",
@@ -4356,6 +4360,7 @@
     },
     "keys": {
       "generate": "Sugeneruoti naują raktą",
+      "name": "Rakto pavadinimas",
       "import": "Importuoti raktą",
       "generateTitle": "Sugeneruoti raktą",
       "generateDescription": "Raktas sugeneruojamas šiame įrenginyje ir niekada jo nepalieka. Pridėkite viešąjį raktą prie serverio leidžiamų raktų.",

@@ -4133,7 +4133,8 @@
       "tmuxAttach": "tmux’ga ulanish",
       "tmuxSession": "tmux sessiya nomi",
       "saved": "Host saqlandi.",
-      "saveFailed": "Hostni saqlab bo‘lmadi."
+      "saveFailed": "Hostni saqlab bo‘lmadi.",
+      "fieldRequired": "Bu maydon to'ldirilishi shart"
     },
     "errors": {
       "invalidPort": "1 dan 65535 gacha portdan foydalaning",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "{{pattern}} unutilsinmi?",
       "deleteMessage": "Keyingi ulanishda uning kalitiga yana ishonish so‘raladi.",
       "deleteFailed": "Host kalitini olib tashlab bo‘lmadi.",
-      "deleteLabel": "{{pattern}}ni unutish"
+      "deleteLabel": "{{pattern}}ni unutish",
+      "firstTrustedOn": "{{date}}dan beri ishonchli"
     },
     "session": {
       "keyPrompt": "SSH kalitingizdan foydalanish uchun qulfni oching",
@@ -4198,10 +4200,12 @@
       "unlock": "Qulfni ochish",
       "promptsSubmit": "Yuborish",
       "promptLabel": "{{index}}-javob",
+      "promptTitle": "Serverga kirish",
       "state": {
         "connecting": "Ulanmoqda",
         "hostKey": "Host kaliti tekshirilmoqda",
-        "reconnecting": "Qayta ulanmoqda"
+        "reconnecting": "Qayta ulanmoqda",
+        "prompt": "Javobingiz kutilmoqda"
       },
       "reason": {
         "network": "Serverga ulanib bo‘lmadi.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Yangi kalit yaratish",
+      "name": "Kalit nomi",
       "import": "Kalitni import qilish",
       "generateTitle": "Kalit yaratish",
       "generateDescription": "Kalit shu qurilmada yaratiladi va undan hech qachon chiqmaydi. Ochiq kalitni serverning ruxsat etilgan kalitlariga qo‘shing.",

@@ -4133,7 +4133,8 @@
       "tmuxAttach": "tmux منسلک کریں",
       "tmuxSession": "tmux سیشن کا نام",
       "saved": "ہوسٹ محفوظ ہو گیا۔",
-      "saveFailed": "ہوسٹ محفوظ نہیں ہو سکا۔"
+      "saveFailed": "ہوسٹ محفوظ نہیں ہو سکا۔",
+      "fieldRequired": "یہ خانہ لازمی ہے"
     },
     "errors": {
       "invalidPort": "1 سے 65535 تک کا پورٹ استعمال کریں",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "{{pattern}} بھلا دیں؟",
       "deleteMessage": "اگلی بار جڑنے پر آپ سے دوبارہ اس کی کلید پر اعتماد کرنے کو کہا جائے گا۔",
       "deleteFailed": "ہوسٹ کلید ہٹ نہیں سکی۔",
-      "deleteLabel": "{{pattern}} بھلا دیں"
+      "deleteLabel": "{{pattern}} بھلا دیں",
+      "firstTrustedOn": "{{date}} سے قابلِ اعتماد"
     },
     "session": {
       "keyPrompt": "اپنی SSH کلید استعمال کرنے کے لیے ان لاک کریں",
@@ -4198,10 +4200,12 @@
       "unlock": "ان لاک کریں",
       "promptsSubmit": "جمع کرائیں",
       "promptLabel": "جواب {{index}}",
+      "promptTitle": "سرور میں سائن ان کریں",
       "state": {
         "connecting": "جڑ رہا ہے",
         "hostKey": "ہوسٹ کلید کی جانچ",
-        "reconnecting": "دوبارہ جڑ رہا ہے"
+        "reconnecting": "دوبارہ جڑ رہا ہے",
+        "prompt": "آپ کے جواب کا انتظار"
       },
       "reason": {
         "network": "سرور تک رسائی نہیں ہو سکی۔",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "نئی کلید بنائیں",
+      "name": "کلید کا نام",
       "import": "کلید درآمد کریں",
       "generateTitle": "ایک کلید بنائیں",
       "generateDescription": "کلید اسی ڈیوائس پر بنتی ہے اور کبھی اس سے باہر نہیں جاتی۔ عوامی کلید کو سرور کی مجاز کلیدوں میں شامل کریں۔",

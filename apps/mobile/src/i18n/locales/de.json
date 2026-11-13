@@ -4133,7 +4133,8 @@
       "tmuxAttach": "tmux anhängen",
       "tmuxSession": "Name der tmux-Sitzung",
       "saved": "Host gespeichert.",
-      "saveFailed": "Der Host konnte nicht gespeichert werden."
+      "saveFailed": "Der Host konnte nicht gespeichert werden.",
+      "fieldRequired": "Dieses Feld ist erforderlich"
     },
     "errors": {
       "invalidPort": "Verwende einen Port von 1 bis 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "{{pattern}} vergessen?",
       "deleteMessage": "Bei der nächsten Verbindung wirst du erneut gefragt, ob du dem Schlüssel vertraust.",
       "deleteFailed": "Der Hostschlüssel konnte nicht entfernt werden.",
-      "deleteLabel": "{{pattern}} vergessen"
+      "deleteLabel": "{{pattern}} vergessen",
+      "firstTrustedOn": "Vertrauenswürdig seit {{date}}"
     },
     "session": {
       "keyPrompt": "Entsperren, um deinen SSH-Schlüssel zu verwenden",
@@ -4198,10 +4200,12 @@
       "unlock": "Entsperren",
       "promptsSubmit": "Absenden",
       "promptLabel": "Antwort {{index}}",
+      "promptTitle": "Beim Server anmelden",
       "state": {
         "connecting": "Verbindung wird hergestellt",
         "hostKey": "Hostschlüssel wird geprüft",
-        "reconnecting": "Erneute Verbindung"
+        "reconnecting": "Erneute Verbindung",
+        "prompt": "Wartet auf deine Antwort"
       },
       "reason": {
         "network": "Der Server konnte nicht erreicht werden.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Neuen Schlüssel erzeugen",
+      "name": "Schlüsselname",
       "import": "Schlüssel importieren",
       "generateTitle": "Schlüssel erzeugen",
       "generateDescription": "Der Schlüssel wird auf diesem Gerät erzeugt und verlässt es nie. Füge den öffentlichen Schlüssel zu den autorisierten Schlüsseln des Servers hinzu.",

@@ -4133,7 +4133,8 @@
       "tmuxAttach": "So tmux mọ́",
       "tmuxSession": "Orúkọ ìpàdé tmux",
       "saved": "A ti fipamọ́ sáfà.",
-      "saveFailed": "A kò lè fipamọ́ sáfà náà."
+      "saveFailed": "A kò lè fipamọ́ sáfà náà.",
+      "fieldRequired": "Pápá yìí pọn dandan"
     },
     "errors": {
       "invalidPort": "Lo port láti 1 sí 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Gbàgbé {{pattern}}?",
       "deleteMessage": "Ìsopọ̀ tó kàn yóò tún béèrè kí o gbẹ́kẹ̀lé kọ́kọ́rọ́ rẹ̀.",
       "deleteFailed": "A kò lè yọ kọ́kọ́rọ́ sáfà kúrò.",
-      "deleteLabel": "Gbàgbé {{pattern}}"
+      "deleteLabel": "Gbàgbé {{pattern}}",
+      "firstTrustedOn": "Tí a gbẹ́kẹ̀lé láti {{date}}"
     },
     "session": {
       "keyPrompt": "Ṣí i kí o lè lo kọ́kọ́rọ́ SSH rẹ",
@@ -4198,10 +4200,12 @@
       "unlock": "Ṣí",
       "promptsSubmit": "Fi ránṣẹ́",
       "promptLabel": "Ìdáhùn {{index}}",
+      "promptTitle": "Wọlé sí sáfà",
       "state": {
         "connecting": "Ń sopọ̀",
         "hostKey": "Ń yẹ kọ́kọ́rọ́ sáfà wò",
-        "reconnecting": "Ń tún sopọ̀"
+        "reconnecting": "Ń tún sopọ̀",
+        "prompt": "Ń dúró fún ìdáhùn rẹ"
       },
       "reason": {
         "network": "A kò lè dé ọ̀dọ̀ sáfà náà.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Dá kọ́kọ́rọ́ tuntun",
+      "name": "Orúkọ kọ́kọ́rọ́",
       "import": "Gbe kọ́kọ́rọ́ wọlé",
       "generateTitle": "Dá kọ́kọ́rọ́ kan",
       "generateDescription": "A máa dá kọ́kọ́rọ́ náà lórí ẹ̀rọ yìí, kò sì ní jáde kúrò níbẹ̀. Fi kọ́kọ́rọ́ gbogbo ènìyàn kún àwọn kọ́kọ́rọ́ tí a fọwọ́ sí lórí sáfà náà.",

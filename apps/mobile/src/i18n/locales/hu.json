@@ -4133,7 +4133,8 @@
       "tmuxAttach": "tmux csatolása",
       "tmuxSession": "tmux-munkamenet neve",
       "saved": "Gazdagép mentve.",
-      "saveFailed": "A gazdagépet nem sikerült menteni."
+      "saveFailed": "A gazdagépet nem sikerült menteni.",
+      "fieldRequired": "A mező kitöltése kötelező"
     },
     "errors": {
       "invalidPort": "1 és 65535 közötti portot használj",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "{{pattern}} elfelejtése?",
       "deleteMessage": "A következő kapcsolódáskor újra meg kell bíznod a kulcsában.",
       "deleteFailed": "A gazdagépkulcsot nem sikerült eltávolítani.",
-      "deleteLabel": "{{pattern}} elfelejtése"
+      "deleteLabel": "{{pattern}} elfelejtése",
+      "firstTrustedOn": "Megbízható {{date}} óta"
     },
     "session": {
       "keyPrompt": "Az SSH-kulcs használatához oldd fel.",
@@ -4198,10 +4200,12 @@
       "unlock": "Feloldás",
       "promptsSubmit": "Küldés",
       "promptLabel": "{{index}}. válasz",
+      "promptTitle": "Bejelentkezés a szerverre",
       "state": {
         "connecting": "Csatlakozás",
         "hostKey": "Gazdagépkulcs ellenőrzése",
-        "reconnecting": "Újracsatlakozás"
+        "reconnecting": "Újracsatlakozás",
+        "prompt": "Válaszra vár"
       },
       "reason": {
         "network": "A szerver nem érhető el.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Új kulcs létrehozása",
+      "name": "Kulcs neve",
       "import": "Kulcs importálása",
       "generateTitle": "Kulcs létrehozása",
       "generateDescription": "A kulcs ezen az eszközön jön létre, és soha nem hagyja el. A nyilvános kulcsot tedd be a szerver engedélyezett kulcsai közé.",

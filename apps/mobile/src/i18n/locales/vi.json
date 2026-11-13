@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Gắn tmux",
       "tmuxSession": "Tên phiên tmux",
       "saved": "Đã lưu máy chủ.",
-      "saveFailed": "Không thể lưu máy chủ."
+      "saveFailed": "Không thể lưu máy chủ.",
+      "fieldRequired": "Trường này là bắt buộc"
     },
     "errors": {
       "invalidPort": "Dùng cổng từ 1 đến 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Quên {{pattern}}?",
       "deleteMessage": "Lần kết nối tiếp theo sẽ yêu cầu bạn tin cậy khóa của nó lần nữa.",
       "deleteFailed": "Không thể xóa khóa máy chủ.",
-      "deleteLabel": "Quên {{pattern}}"
+      "deleteLabel": "Quên {{pattern}}",
+      "firstTrustedOn": "Đã tin cậy từ {{date}}"
     },
     "session": {
       "keyPrompt": "Mở khóa để dùng khóa SSH của bạn",
@@ -4198,10 +4200,12 @@
       "unlock": "Mở khóa",
       "promptsSubmit": "Gửi",
       "promptLabel": "Câu trả lời {{index}}",
+      "promptTitle": "Đăng nhập vào máy chủ",
       "state": {
         "connecting": "Đang kết nối",
         "hostKey": "Đang kiểm tra khóa máy chủ",
-        "reconnecting": "Đang kết nối lại"
+        "reconnecting": "Đang kết nối lại",
+        "prompt": "Đang chờ bạn trả lời"
       },
       "reason": {
         "network": "Không thể kết nối tới máy chủ.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Tạo khóa mới",
+      "name": "Tên khóa",
       "import": "Nhập khóa",
       "generateTitle": "Tạo khóa",
       "generateDescription": "Khóa được tạo trên thiết bị này và không bao giờ rời khỏi thiết bị. Hãy thêm khóa công khai vào authorized keys của máy chủ.",

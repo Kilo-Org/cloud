@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Anexar tmux",
       "tmuxSession": "Nome da sesión tmux",
       "saved": "Host gardado.",
-      "saveFailed": "Non se puido gardar o host."
+      "saveFailed": "Non se puido gardar o host.",
+      "fieldRequired": "Este campo é obrigatorio"
     },
     "errors": {
       "invalidPort": "Usa un porto do 1 ao 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Esquecer {{pattern}}?",
       "deleteMessage": "A próxima conexión pedirache que confíes na súa chave de novo.",
       "deleteFailed": "Non se puido eliminar a chave do host.",
-      "deleteLabel": "Esquecer {{pattern}}"
+      "deleteLabel": "Esquecer {{pattern}}",
+      "firstTrustedOn": "De confianza desde {{date}}"
     },
     "session": {
       "keyPrompt": "Desbloquea para usar a túa chave SSH",
@@ -4198,10 +4200,12 @@
       "unlock": "Desbloquear",
       "promptsSubmit": "Enviar",
       "promptLabel": "Resposta {{index}}",
+      "promptTitle": "Iniciar sesión no servidor",
       "state": {
         "connecting": "Conectando",
         "hostKey": "Comprobando a chave do host",
-        "reconnecting": "Reconectando"
+        "reconnecting": "Reconectando",
+        "prompt": "Agardando a túa resposta"
       },
       "reason": {
         "network": "Non se puido chegar ao servidor.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Xerar nova chave",
+      "name": "Nome da chave",
       "import": "Importar chave",
       "generateTitle": "Xerar unha chave",
       "generateDescription": "A chave créase neste dispositivo e nunca sae del. Engade a chave pública ás chaves autorizadas do servidor.",

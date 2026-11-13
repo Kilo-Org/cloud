@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Attach tmux",
       "tmuxSession": "tmux session name",
       "saved": "Host saved.",
-      "saveFailed": "The host could not be saved."
+      "saveFailed": "The host could not be saved.",
+      "fieldRequired": "This field is required."
     },
     "errors": {
       "invalidPort": "Use a port from 1 to 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Forget {{pattern}}?",
       "deleteMessage": "The next connection asks you to trust its key again.",
       "deleteFailed": "The host key could not be removed.",
-      "deleteLabel": "Forget {{pattern}}"
+      "deleteLabel": "Forget {{pattern}}",
+      "firstTrustedOn": "Trusted since {{date}}"
     },
     "session": {
       "keyPrompt": "Unlock to use your SSH key",
@@ -4198,10 +4200,12 @@
       "unlock": "Unlock",
       "promptsSubmit": "Submit",
       "promptLabel": "Answer {{index}}",
+      "promptTitle": "Sign in to the server",
       "state": {
         "connecting": "Connecting",
         "hostKey": "Checking host key",
-        "reconnecting": "Reconnecting"
+        "reconnecting": "Reconnecting",
+        "prompt": "Waiting for your answer"
       },
       "reason": {
         "network": "The server could not be reached.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Generate new key",
+      "name": "Key name",
       "import": "Import key",
       "generateTitle": "Generate a key",
       "generateDescription": "The key is created on this device and never leaves it. Add the public key to the server's authorized keys.",

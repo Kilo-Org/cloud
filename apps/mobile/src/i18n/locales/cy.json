@@ -4393,7 +4393,8 @@
       "tmuxAttach": "Atodi tmux",
       "tmuxSession": "Enw sesiwn tmux",
       "saved": "Gwesteiwr wedi'i gadw.",
-      "saveFailed": "Nid oedd modd cadw'r gwesteiwr."
+      "saveFailed": "Nid oedd modd cadw'r gwesteiwr.",
+      "fieldRequired": "Mae'r maes hwn yn ofynnol"
     },
     "errors": {
       "invalidPort": "Defnyddiwch borth rhwng 1 a 65535",
@@ -4427,7 +4428,8 @@
       "deleteTitle": "Anghofio {{pattern}}?",
       "deleteMessage": "Bydd y cysylltiad nesaf yn gofyn i chi ymddiried yn ei hallwedd eto.",
       "deleteFailed": "Nid oedd modd tynnu allwedd y gwesteiwr.",
-      "deleteLabel": "Anghofio {{pattern}}"
+      "deleteLabel": "Anghofio {{pattern}}",
+      "firstTrustedOn": "Ymddiriedir ynddi ers {{date}}"
     },
     "session": {
       "keyPrompt": "Datglowch i ddefnyddio'ch allwedd SSH",
@@ -4458,10 +4460,12 @@
       "unlock": "Datgloi",
       "promptsSubmit": "Cyflwyno",
       "promptLabel": "Ateb {{index}}",
+      "promptTitle": "Mewngofnodi i'r gweinydd",
       "state": {
         "connecting": "Yn cysylltu",
         "hostKey": "Yn gwirio allwedd y gwesteiwr",
-        "reconnecting": "Yn ailgysylltu"
+        "reconnecting": "Yn ailgysylltu",
+        "prompt": "Yn aros am eich ateb"
       },
       "reason": {
         "network": "Nid oedd modd cyrraedd y gweinydd.",
@@ -4486,6 +4490,7 @@
     },
     "keys": {
       "generate": "Cynhyrchu allwedd newydd",
+      "name": "Enw allwedd",
       "import": "Mewnforio allwedd",
       "generateTitle": "Cynhyrchu allwedd",
       "generateDescription": "Caiff yr allwedd ei chreu ar y ddyfais hon ac nid yw byth yn ei gadael. Ychwanegwch yr allwedd gyhoeddus at allweddi awdurdodedig y gweinydd.",

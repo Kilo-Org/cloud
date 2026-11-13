@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Ampifandraiso tmux",
       "tmuxSession": "Anaran'ny session tmux",
       "saved": "Voatahiry ny host.",
-      "saveFailed": "Tsy afaka notahirizina ny host."
+      "saveFailed": "Tsy afaka notahirizina ny host.",
+      "fieldRequired": "Ilaina ity saha ity"
     },
     "errors": {
       "invalidPort": "Ampiasao ny port 1 ka hatramin'ny 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Adinoo {{pattern}}?",
       "deleteMessage": "Hangataka anao hitoky ny fanalahidiny indray ny fifandraisana manaraka.",
       "deleteFailed": "Tsy afaka noesorina ny fanalahidin'ny host.",
-      "deleteLabel": "Adinoo {{pattern}}"
+      "deleteLabel": "Adinoo {{pattern}}",
+      "firstTrustedOn": "Tokisana hatramin'ny {{date}}"
     },
     "session": {
       "keyPrompt": "Sokafy mba hampiasanao ny fanalahidin'ny SSH",
@@ -4198,10 +4200,12 @@
       "unlock": "Sokafy",
       "promptsSubmit": "Alefa",
       "promptLabel": "Valiny {{index}}",
+      "promptTitle": "Hiditra ao amin'ny serveur",
       "state": {
         "connecting": "Mifandray",
         "hostKey": "Manamarina ny fanalahidin'ny host",
-        "reconnecting": "Mifandray indray"
+        "reconnecting": "Mifandray indray",
+        "prompt": "Miandry ny valinao"
       },
       "reason": {
         "network": "Tsy tratra ny serveur.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Mamorona fanalahidy vaovao",
+      "name": "Anaran'ny fanalahidy",
       "import": "Ento ny fanalahidy",
       "generateTitle": "Mamorona fanalahidy",
       "generateDescription": "Foronina ao amin'ity fitaovana ity ny fanalahidy ary tsy mivoaka mihitsy. Ampio ao amin'ny authorized_keys an'ny serveur ny fanalahidy ampahibemaso.",

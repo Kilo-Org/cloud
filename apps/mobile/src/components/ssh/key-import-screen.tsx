@@ -3,8 +3,7 @@ import { File } from 'expo-file-system';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { TextInput} from 'react-native';
-import { View } from 'react-native';
+import { type TextInput, View } from 'react-native';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { ScreenHeader } from '@/components/screen-header';
@@ -19,7 +18,7 @@ import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { setCreatedKeyId } from '@/lib/ssh/created-key';
 import { importedKeyInput } from '@/lib/ssh/key-input';
-import { sshPackage } from '@/lib/ssh/native';
+import { nativeErrorCode, sshPackage } from '@/lib/ssh/native';
 import { SSH_HOSTS_ROUTE } from '@/lib/ssh/routes';
 import { useSshKeyMutations } from '@/lib/ssh/use-ssh';
 
@@ -101,13 +100,17 @@ export function SshKeyImportScreen() {
         fingerprint: created.fingerprintSha256,
       });
     } catch (error) {
-      if (errorCode(error) === 'WrongPassphrase') {
+      if (nativeErrorCode(error) === 'WrongPassphrase') {
         setState({ kind: 'needsPassphrase' });
         return;
       }
       setState({
         kind: 'failed',
-        message: t(errorCode(error) === 'UnsupportedAlgorithm' ? 'ssh.keys.unsupported' : 'ssh.keys.unreadable'),
+        message: t(
+          nativeErrorCode(error) === 'UnsupportedAlgorithm'
+            ? 'ssh.keys.unsupported'
+            : 'ssh.keys.unreadable'
+        ),
       });
     }
   }
@@ -128,7 +131,7 @@ export function SshKeyImportScreen() {
         ) : (
           <>
             <FormField
-              label={t('todos.listSettings.name')}
+              label={t('ssh.keys.name')}
               placeholder={t('ssh.editor.key')}
               defaultValue=""
               disabled={busy}
@@ -209,12 +212,4 @@ export function SshKeyImportScreen() {
       </View>
     </View>
   );
-}
-
-function errorCode(cause: unknown): string | null {
-  if (typeof cause === 'object' && cause !== null && 'code' in cause) {
-    const { code } = cause;
-    return typeof code === 'string' ? code : null;
-  }
-  return null;
 }

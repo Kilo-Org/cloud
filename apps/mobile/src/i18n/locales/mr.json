@@ -4133,7 +4133,8 @@
       "tmuxAttach": "tmux संलग्न करा",
       "tmuxSession": "tmux सत्राचे नाव",
       "saved": "होस्ट जतन केला.",
-      "saveFailed": "होस्ट जतन करता आला नाही."
+      "saveFailed": "होस्ट जतन करता आला नाही.",
+      "fieldRequired": "हे फील्ड आवश्यक आहे"
     },
     "errors": {
       "invalidPort": "1 ते 65535 मधील पोर्ट वापरा",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "{{pattern}} विसरायचे?",
       "deleteMessage": "पुढील कनेक्शनवेळी त्याची की पुन्हा विश्वासार्ह मानण्यास सांगितले जाईल.",
       "deleteFailed": "होस्ट की काढता आली नाही.",
-      "deleteLabel": "{{pattern}} विसरा"
+      "deleteLabel": "{{pattern}} विसरा",
+      "firstTrustedOn": "{{date}} पासून विश्वासार्ह"
     },
     "session": {
       "keyPrompt": "तुमची SSH की वापरण्यासाठी अनलॉक करा",
@@ -4198,10 +4200,12 @@
       "unlock": "अनलॉक करा",
       "promptsSubmit": "सबमिट करा",
       "promptLabel": "उत्तर {{index}}",
+      "promptTitle": "सर्व्हरवर साइन इन करा",
       "state": {
         "connecting": "कनेक्ट होत आहे",
         "hostKey": "होस्ट की तपासत आहे",
-        "reconnecting": "पुन्हा कनेक्ट होत आहे"
+        "reconnecting": "पुन्हा कनेक्ट होत आहे",
+        "prompt": "तुमच्या उत्तराची प्रतीक्षा आहे"
       },
       "reason": {
         "network": "सर्व्हरशी संपर्क होऊ शकला नाही.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "नवीन की तयार करा",
+      "name": "कीचे नाव",
       "import": "की आयात करा",
       "generateTitle": "की तयार करा",
       "generateDescription": "ही की या डिव्हाइसवर तयार केली जाते आणि कधीही हे डिव्हाइस सोडत नाही. सार्वजनिक की सर्व्हरच्या अधिकृत कींमध्ये जोडा.",

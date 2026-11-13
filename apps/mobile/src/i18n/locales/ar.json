@@ -4393,7 +4393,8 @@
       "tmuxAttach": "إرفاق tmux",
       "tmuxSession": "اسم جلسة tmux",
       "saved": "تم حفظ المضيف.",
-      "saveFailed": "تعذّر حفظ المضيف."
+      "saveFailed": "تعذّر حفظ المضيف.",
+      "fieldRequired": "هذا الحقل مطلوب"
     },
     "errors": {
       "invalidPort": "استخدم منفذًا من 1 إلى 65535",
@@ -4427,7 +4428,8 @@
       "deleteTitle": "نسيان {{pattern}}؟",
       "deleteMessage": "سيطلب منك الاتصال التالي الوثوق بمفتاحه من جديد.",
       "deleteFailed": "تعذّرت إزالة مفتاح المضيف.",
-      "deleteLabel": "نسيان {{pattern}}"
+      "deleteLabel": "نسيان {{pattern}}",
+      "firstTrustedOn": "موثوق منذ {{date}}"
     },
     "session": {
       "keyPrompt": "افتح القفل لاستخدام مفتاح SSH",
@@ -4458,10 +4460,12 @@
       "unlock": "فتح القفل",
       "promptsSubmit": "إرسال",
       "promptLabel": "الإجابة {{index}}",
+      "promptTitle": "تسجيل الدخول إلى الخادم",
       "state": {
         "connecting": "جارٍ الاتصال",
         "hostKey": "التحقق من مفتاح المضيف",
-        "reconnecting": "جارٍ إعادة الاتصال"
+        "reconnecting": "جارٍ إعادة الاتصال",
+        "prompt": "بانتظار إجابتك"
       },
       "reason": {
         "network": "تعذّر الوصول إلى الخادم.",
@@ -4486,6 +4490,7 @@
     },
     "keys": {
       "generate": "توليد مفتاح جديد",
+      "name": "اسم المفتاح",
       "import": "استيراد مفتاح",
       "generateTitle": "توليد مفتاح",
       "generateDescription": "يُنشأ المفتاح على هذا الجهاز ولا يغادره أبدًا. أضف المفتاح العام إلى ملف authorized_keys على الخادم.",

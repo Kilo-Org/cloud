@@ -4198,7 +4198,8 @@
       "tmuxAttach": "Atașează tmux",
       "tmuxSession": "Numele sesiunii tmux",
       "saved": "Gazda a fost salvată.",
-      "saveFailed": "Gazda nu a putut fi salvată."
+      "saveFailed": "Gazda nu a putut fi salvată.",
+      "fieldRequired": "Acest câmp este obligatoriu"
     },
     "errors": {
       "invalidPort": "Folosește un port de la 1 la 65535",
@@ -4232,7 +4233,8 @@
       "deleteTitle": "Uită {{pattern}}?",
       "deleteMessage": "La următoarea conectare ți se va cere din nou să ai încredere în cheia sa.",
       "deleteFailed": "Cheia gazdei nu a putut fi eliminată.",
-      "deleteLabel": "Uită {{pattern}}"
+      "deleteLabel": "Uită {{pattern}}",
+      "firstTrustedOn": "De încredere din {{date}}"
     },
     "session": {
       "keyPrompt": "Deblochează pentru a folosi cheia SSH",
@@ -4263,10 +4265,12 @@
       "unlock": "Deblochează",
       "promptsSubmit": "Trimite",
       "promptLabel": "Răspuns {{index}}",
+      "promptTitle": "Autentificare pe server",
       "state": {
         "connecting": "Se conectează",
         "hostKey": "Verifică cheia gazdei",
-        "reconnecting": "Se reconectează"
+        "reconnecting": "Se reconectează",
+        "prompt": "Se așteaptă răspunsul tău"
       },
       "reason": {
         "network": "Serverul nu a putut fi contactat.",
@@ -4291,6 +4295,7 @@
     },
     "keys": {
       "generate": "Generează cheie nouă",
+      "name": "Nume cheie",
       "import": "Importă cheia",
       "generateTitle": "Generează o cheie",
       "generateDescription": "Cheia este creată pe acest dispozitiv și nu îl părăsește niciodată. Adaugă cheia publică la cheile autorizate ale serverului.",

@@ -4133,7 +4133,8 @@
       "tmuxAttach": "เชื่อมต่อ tmux",
       "tmuxSession": "ชื่อเซสชัน tmux",
       "saved": "บันทึกโฮสต์แล้ว.",
-      "saveFailed": "ไม่สามารถบันทึกโฮสต์ได้."
+      "saveFailed": "ไม่สามารถบันทึกโฮสต์ได้.",
+      "fieldRequired": "จำเป็นต้องกรอกช่องนี้"
     },
     "errors": {
       "invalidPort": "ใช้พอร์ตตั้งแต่ 1 ถึง 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "ลืม {{pattern}}?",
       "deleteMessage": "การเชื่อมต่อครั้งถัดไปจะถามให้คุณเชื่อถือคีย์อีกครั้ง.",
       "deleteFailed": "ไม่สามารถลบคีย์โฮสต์ได้.",
-      "deleteLabel": "ลืม {{pattern}}"
+      "deleteLabel": "ลืม {{pattern}}",
+      "firstTrustedOn": "เชื่อถือตั้งแต่ {{date}}"
     },
     "session": {
       "keyPrompt": "ปลดล็อกเพื่อใช้คีย์ SSH ของคุณ",
@@ -4198,10 +4200,12 @@
       "unlock": "ปลดล็อก",
       "promptsSubmit": "ส่ง",
       "promptLabel": "คำตอบ {{index}}",
+      "promptTitle": "ลงชื่อเข้าใช้เซิร์ฟเวอร์",
       "state": {
         "connecting": "กำลังเชื่อมต่อ",
         "hostKey": "กำลังตรวจสอบคีย์โฮสต์",
-        "reconnecting": "กำลังเชื่อมต่อใหม่"
+        "reconnecting": "กำลังเชื่อมต่อใหม่",
+        "prompt": "รอคำตอบจากคุณ"
       },
       "reason": {
         "network": "ไม่สามารถเชื่อมต่อถึงเซิร์ฟเวอร์ได้",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "สร้างคีย์ใหม่",
+      "name": "ชื่อคีย์",
       "import": "นำเข้าคีย์",
       "generateTitle": "สร้างคีย์",
       "generateDescription": "คีย์ถูกสร้างบนอุปกรณ์นี้และไม่เคยออกจากเครื่อง เพิ่มคีย์สาธารณะลงใน authorized keys ของเซิร์ฟเวอร์",

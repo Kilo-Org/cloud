@@ -4133,7 +4133,8 @@
       "tmuxAttach": "tmux-a qoşul",
       "tmuxSession": "tmux sessiyasının adı",
       "saved": "Host yadda saxlanıldı.",
-      "saveFailed": "Host yadda saxlanıla bilmədi."
+      "saveFailed": "Host yadda saxlanıla bilmədi.",
+      "fieldRequired": "Bu sahə mütləqdir"
     },
     "errors": {
       "invalidPort": "1–65535 aralığında port istifadə edin",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "{{pattern}} unudulsun?",
       "deleteMessage": "Növbəti qoşulmada onun açarına yenidən etibar etməyiniz istəniləcək.",
       "deleteFailed": "Host açarı silinə bilmədi.",
-      "deleteLabel": "{{pattern}} unut"
+      "deleteLabel": "{{pattern}} unut",
+      "firstTrustedOn": "{{date}} tarixindən etibarlı"
     },
     "session": {
       "keyPrompt": "SSH açarınızdan istifadə etmək üçün kilidi açın",
@@ -4198,10 +4200,12 @@
       "unlock": "Kilidi aç",
       "promptsSubmit": "Göndər",
       "promptLabel": "Cavab {{index}}",
+      "promptTitle": "Serverə daxil ol",
       "state": {
         "connecting": "Qoşulur",
         "hostKey": "Host açarı yoxlanılır",
-        "reconnecting": "Yenidən qoşulur"
+        "reconnecting": "Yenidən qoşulur",
+        "prompt": "Cavabını gözləyir"
       },
       "reason": {
         "network": "Serverə çatmaq mümkün olmadı.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Yeni açar yarat",
+      "name": "Açar adı",
       "import": "Açar idxal et",
       "generateTitle": "Açar yarat",
       "generateDescription": "Açar bu cihazda yaradılır və heç vaxt ondan çıxmır. Açıq açarı serverin icazəli açarlarına əlavə edin.",

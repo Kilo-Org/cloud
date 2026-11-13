@@ -1,9 +1,9 @@
-import  { type TFunction } from 'i18next';
+import { type TFunction } from 'i18next';
 
-import  { type SshCloseReason, type SshSessionPhase } from './types';
+import { type SshCloseReason, type SshSessionPhase } from './types';
 
 /** What ended a session, in the person's words. */
-const REASON_KEY: Record<SshCloseReason, string> = {
+const REASON_KEY = {
   Network: 'ssh.session.reason.network',
   Timeout: 'ssh.session.reason.timeout',
   ChannelClosed: 'ssh.session.reason.channelClosed',
@@ -20,34 +20,24 @@ const REASON_KEY: Record<SshCloseReason, string> = {
   'host-missing': 'ssh.session.reason.hostMissing',
   unavailable: 'ssh.session.reason.unavailable',
   user: 'ssh.session.reason.closed',
-};
+} satisfies Record<SshCloseReason, string>;
 
 export function closeReasonMessage(t: TFunction, reason: SshCloseReason): string {
   return t(REASON_KEY[reason]);
 }
 
 /** The one-line state the session switcher shows beside a session. */
+const STATE_KEY = {
+  connecting: 'ssh.session.state.connecting',
+  'awaiting-host-key': 'ssh.session.state.hostKey',
+  'awaiting-password': 'ssh.session.state.prompt',
+  'awaiting-passphrase': 'ssh.session.state.prompt',
+  'awaiting-prompts': 'ssh.session.state.prompt',
+  connected: 'common.connected',
+  reconnecting: 'ssh.session.state.reconnecting',
+  closed: 'common.closed',
+} satisfies Record<SshSessionPhase['kind'], string>;
+
 export function sessionStateLabel(t: TFunction, phase: SshSessionPhase): string {
-  switch (phase.kind) {
-    case 'connecting': {
-      return t('ssh.session.state.connecting');
-    }
-    case 'awaiting-host-key': {
-      return t('ssh.session.state.hostKey');
-    }
-    case 'awaiting-password':
-    case 'awaiting-passphrase':
-    case 'awaiting-prompts': {
-      return t('glanceable.waitingForYou');
-    }
-    case 'connected': {
-      return t('common.connected');
-    }
-    case 'reconnecting': {
-      return t('ssh.session.state.reconnecting');
-    }
-    case 'closed': {
-      return t('common.closed');
-    }
-  }
+  return t(STATE_KEY[phase.kind]);
 }

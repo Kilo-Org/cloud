@@ -4133,7 +4133,8 @@
       "tmuxAttach": "tmux አያዝ",
       "tmuxSession": "የ tmux ክፍለ ጊዜ ስም",
       "saved": "አስተናጋጁ ተቀምጧል።",
-      "saveFailed": "አስተናጋጁ ሊቀመጥ አልቻለም።"
+      "saveFailed": "አስተናጋጁ ሊቀመጥ አልቻለም።",
+      "fieldRequired": "ይህ መስክ ያስፈልጋል"
     },
     "errors": {
       "invalidPort": "ከ 1 እስከ 65535 ያለ ወደብ ይጠቀሙ",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "{{pattern}}ን ይረሳ?",
       "deleteMessage": "በሚቀጥለው ግንኙነት ቁልፉን እንደገና እንዲያምኑ ይጠየቃሉ።",
       "deleteFailed": "የአስተናጋጅ ቁልፉ ሊወገድ አልቻለም።",
-      "deleteLabel": "{{pattern}}ን ረሳ"
+      "deleteLabel": "{{pattern}}ን ረሳ",
+      "firstTrustedOn": "ከ{{date}} ጀምሮ የታመነ"
     },
     "session": {
       "keyPrompt": "SSH ቁልፍዎን ለመጠቀም ይክፈቱ",
@@ -4198,10 +4200,12 @@
       "unlock": "ክፈት",
       "promptsSubmit": "ላክ",
       "promptLabel": "መልስ {{index}}",
+      "promptTitle": "ወደ አገልጋዩ ይግቡ",
       "state": {
         "connecting": "በመገናኘት ላይ",
         "hostKey": "የአስተናጋጅ ቁልፍ በመፈተሽ ላይ",
-        "reconnecting": "እንደገና በመገናኘት ላይ"
+        "reconnecting": "እንደገና በመገናኘት ላይ",
+        "prompt": "መልስዎን በመጠበቅ ላይ"
       },
       "reason": {
         "network": "አገልጋዩ ሊደረስበት አልቻለም።",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "አዲስ ቁልፍ ፍጠር",
+      "name": "የቁልፍ ስም",
       "import": "ቁልፍ አስገባ",
       "generateTitle": "ቁልፍ ፍጠር",
       "generateDescription": "ቁልፉ በዚህ መሣሪያ ላይ ይፈጠራል፣ ከመሣሪያውም አይወጣም። ይፋዊውን ቁልፍ ወደ አገልጋዩ የተፈቀዱ ቁልፎች ያክሉት።",

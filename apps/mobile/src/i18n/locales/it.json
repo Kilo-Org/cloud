@@ -4198,7 +4198,8 @@
       "tmuxAttach": "Collega tmux",
       "tmuxSession": "Nome della sessione tmux",
       "saved": "Host salvato.",
-      "saveFailed": "Impossibile salvare l'host."
+      "saveFailed": "Impossibile salvare l'host.",
+      "fieldRequired": "Questo campo è obbligatorio"
     },
     "errors": {
       "invalidPort": "Usa una porta da 1 a 65535",
@@ -4232,7 +4233,8 @@
       "deleteTitle": "Dimenticare {{pattern}}?",
       "deleteMessage": "Alla prossima connessione ti verrà chiesto di considerare attendibile di nuovo la sua chiave.",
       "deleteFailed": "Impossibile rimuovere la chiave dell'host.",
-      "deleteLabel": "Dimentica {{pattern}}"
+      "deleteLabel": "Dimentica {{pattern}}",
+      "firstTrustedOn": "Attendibile da {{date}}"
     },
     "session": {
       "keyPrompt": "Sblocca per usare la tua chiave SSH",
@@ -4263,10 +4265,12 @@
       "unlock": "Sblocca",
       "promptsSubmit": "Invia",
       "promptLabel": "Risposta {{index}}",
+      "promptTitle": "Accedi al server",
       "state": {
         "connecting": "Connessione",
         "hostKey": "Verifica della chiave dell'host",
-        "reconnecting": "Riconnessione"
+        "reconnecting": "Riconnessione",
+        "prompt": "In attesa della tua risposta"
       },
       "reason": {
         "network": "Impossibile raggiungere il server.",
@@ -4291,6 +4295,7 @@
     },
     "keys": {
       "generate": "Genera nuova chiave",
+      "name": "Nome chiave",
       "import": "Importa chiave",
       "generateTitle": "Genera una chiave",
       "generateDescription": "La chiave viene creata su questo dispositivo e non lo lascia mai. Aggiungi la chiave pubblica alle chiavi autorizzate del server.",

@@ -1,4 +1,4 @@
-import  { type SshErrorCode } from '@kilocode/react-native-ssh';
+import { type SshErrorCode } from '@kilocode/react-native-ssh';
 
 /**
  * Why a session stopped. `SshErrorCode` names what the Rust core reports; the
@@ -16,15 +16,15 @@ export type SshCloseReason =
  * The endings a new attempt can clear without changing anything the person
  * entered: the transport failed, not the credentials or the host key.
  */
-const RETRYABLE_REASONS: Partial<Record<SshCloseReason, true>> = {
-  Network: true,
-  Timeout: true,
-  ChannelClosed: true,
-  disconnected: true,
-};
+const RETRYABLE_REASONS = [
+  'Network',
+  'Timeout',
+  'ChannelClosed',
+  'disconnected',
+] as const satisfies readonly SshCloseReason[];
 
 export function isRetryableReason(reason: SshCloseReason): boolean {
-  return RETRYABLE_REASONS[reason] === true;
+  return RETRYABLE_REASONS.some(candidate => candidate === reason);
 }
 
 /** A host key the connection is waiting on the person to decide about. */
@@ -94,6 +94,12 @@ export function needsPrompt(phase: SshSessionPhase): boolean {
     case 'awaiting-passphrase':
     case 'awaiting-prompts': {
       return true;
+    }
+    case 'connected':
+    case 'connecting':
+    case 'reconnecting':
+    case 'closed': {
+      return false;
     }
     default: {
       return false;

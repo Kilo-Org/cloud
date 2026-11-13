@@ -45,7 +45,7 @@ function KnownHostRow({ entry, disabled, onDelete }: KnownHostRowProps) {
           <Text className="text-xs text-muted-foreground">{entry.keyAlgorithm}</Text>
           <Text className="text-xs text-muted-foreground">·</Text>
           <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-            {t('profile.passkeyAddedOn', { date: added })}
+            {t('ssh.knownHosts.firstTrustedOn', { date: added })}
           </Text>
         </View>
       </View>

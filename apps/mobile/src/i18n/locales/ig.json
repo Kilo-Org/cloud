@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Jikọta tmux",
       "tmuxSession": "Aha nnọkọ tmux",
       "saved": "Echekwara host.",
-      "saveFailed": "Enweghị ike ichekwa host ahụ."
+      "saveFailed": "Enweghị ike ichekwa host ahụ.",
+      "fieldRequired": "Achọrọ ubi a"
     },
     "errors": {
       "invalidPort": "Jiri port site na 1 ruo 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Chefuo {{pattern}}?",
       "deleteMessage": "Njikọ na-esote ga-ajụ gị ka i tụkwasị igodo ya obi ọzọ.",
       "deleteFailed": "Enweghị ike iwepụ igodo host ahụ.",
-      "deleteLabel": "Chefuo {{pattern}}"
+      "deleteLabel": "Chefuo {{pattern}}",
+      "firstTrustedOn": "Atụkwasịrị obi kemgbe {{date}}"
     },
     "session": {
       "keyPrompt": "Kpọghee igodo SSH gị ka i jiri ya",
@@ -4198,10 +4200,12 @@
       "unlock": "Kpọghee",
       "promptsSubmit": "Nyefee",
       "promptLabel": "Azịza {{index}}",
+      "promptTitle": "Banye na sava",
       "state": {
         "connecting": "Na-ejikọ",
         "hostKey": "Na-enyocha igodo host",
-        "reconnecting": "Na-ejikọ ọzọ"
+        "reconnecting": "Na-ejikọ ọzọ",
+        "prompt": "Na-eche azịza gị"
       },
       "reason": {
         "network": "Enweghị ike iru sava ahụ.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Mepụta igodo ọhụrụ",
+      "name": "Aha igodo",
       "import": "Bubata igodo",
       "generateTitle": "Mepụta igodo",
       "generateDescription": "A na-emepụta igodo a na ngwaọrụ a, ọ dịghịkwa apụ na ya. Tinye igodo ọhaneze na ndepụta igodo ndị sava ahụ kwadoro.",

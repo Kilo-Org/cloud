@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Heg tmux aan",
       "tmuxSession": "tmux-sessienaam",
       "saved": "Gasheer gestoor.",
-      "saveFailed": "Die gasheer kon nie gestoor word nie."
+      "saveFailed": "Die gasheer kon nie gestoor word nie.",
+      "fieldRequired": "Hierdie veld is verpligtend"
     },
     "errors": {
       "invalidPort": "Gebruik 'n poort van 1 tot 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Vergeet {{pattern}}?",
       "deleteMessage": "Die volgende verbinding vra jou weer om sy sleutel te vertrou.",
       "deleteFailed": "Die gasheersleutel kon nie verwyder word nie.",
-      "deleteLabel": "Vergeet {{pattern}}"
+      "deleteLabel": "Vergeet {{pattern}}",
+      "firstTrustedOn": "Vertrou sedert {{date}}"
     },
     "session": {
       "keyPrompt": "Ontsluit om jou SSH-sleutel te gebruik",
@@ -4198,10 +4200,12 @@
       "unlock": "Ontsluit",
       "promptsSubmit": "Dien in",
       "promptLabel": "Antwoord {{index}}",
+      "promptTitle": "Meld aan by die bediener",
       "state": {
         "connecting": "Koppel",
         "hostKey": "Kontroleer gasheersleutel",
-        "reconnecting": "Koppel weer"
+        "reconnecting": "Koppel weer",
+        "prompt": "Wag vir jou antwoord"
       },
       "reason": {
         "network": "Die bediener kon nie bereik word nie.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Genereer nuwe sleutel",
+      "name": "Sleutelnaam",
       "import": "Voer sleutel in",
       "generateTitle": "Genereer 'n sleutel",
       "generateDescription": "Die sleutel word op hierdie toestel geskep en verlaat dit nooit nie. Voeg die publieke sleutel by die bediener se gemagtigde sleutels.",

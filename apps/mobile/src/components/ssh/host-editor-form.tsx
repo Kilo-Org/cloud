@@ -1,10 +1,11 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
+import { HostKeyFields, HostPasswordFields } from '@/components/ssh/host-credential-fields';
 import { PickerField } from '@/components/ssh/picker-field';
 import { SwitchField } from '@/components/ssh/switch-field';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -28,8 +29,6 @@ import {
 } from '@/lib/ssh/host-form';
 import { type SshHost, type SshHostInput, SshJumpHostCycleError } from '@/lib/ssh/hosts';
 import { type SshKey } from '@/lib/ssh/keys';
-import { SSH_KEY_IMPORT_ROUTE, SSH_KEY_NEW_ROUTE } from '@/lib/ssh/routes';
-import { cn } from '@/lib/utils';
 
 type HostEditorFormProps = Readonly<{
   host: SshHost | null;
@@ -72,7 +71,6 @@ export function HostEditorForm({
   const [tmuxAttach, setTmuxAttach] = useState(initial.tmuxAttach);
   const [issues, setIssues] = useState<readonly HostFormIssue[]>([]);
   const [picker, setPicker] = useState<OpenPicker>(null);
-  const router = useRouter();
 
   // The key screens push over this one, so returning focus is where their
   // result arrives: the key they created becomes this host's key.
@@ -94,7 +92,7 @@ export function HostEditorForm({
     if (kind === undefined) {
       return undefined;
     }
-    return kind === 'invalidPort' ? t('ssh.errors.invalidPort') : t('profiles.valueRequired');
+    return kind === 'invalidPort' ? t('ssh.errors.invalidPort') : t('ssh.editor.fieldRequired');
   }
 
   const authOptions: { value: SshAuthMethod; label: string }[] = [
@@ -204,64 +202,26 @@ export function HostEditorForm({
         </View>
 
         {authMethod === 'password' ? (
-          <>
-            <FormField
-              label={t('ssh.editor.password')}
-              placeholder={t('ssh.editor.passwordPlaceholder')}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="off"
-              textContentType="password"
-              defaultValue={initial.password}
-              disabled={saving}
-              onChangeText={value => {
-                passwordRef.current = value;
-              }}
-            />
-            <SwitchField
-              label={t('ssh.editor.savePassword')}
-              hint={t('ssh.editor.savePasswordHint')}
-              value={savePassword}
-              onValueChange={setSavePassword}
-            />
-          </>
+          <HostPasswordFields
+            password={initial.password}
+            savePassword={savePassword}
+            disabled={saving}
+            onPasswordChange={value => {
+              passwordRef.current = value;
+            }}
+            onSavePasswordChange={setSavePassword}
+          />
         ) : null}
 
         {authMethod === 'key' ? (
-          <>
-            <PickerField
-              label={t('ssh.editor.privateKey')}
-              value={keys.length === 0 ? t('ssh.editor.noKeys') : (selectedKey?.label ?? null)}
-              placeholder={t('ssh.editor.chooseKey')}
-              disabled={keys.length === 0 || saving}
-              onPress={() => {
-                setPicker('key');
-              }}
-            />
-            <View className="flex-row gap-2">
-              <Button
-                variant="outline"
-                className={cn(STATE_ACTION_CLASS, 'flex-1')}
-                disabled={saving}
-                onPress={() => {
-                  router.push(SSH_KEY_NEW_ROUTE);
-                }}
-              >
-                <Text>{t('ssh.keys.generate')}</Text>
-              </Button>
-              <Button
-                variant="outline"
-                className={cn(STATE_ACTION_CLASS, 'flex-1')}
-                disabled={saving}
-                onPress={() => {
-                  router.push(SSH_KEY_IMPORT_ROUTE);
-                }}
-              >
-                <Text>{t('ssh.keys.import')}</Text>
-              </Button>
-            </View>
-          </>
+          <HostKeyFields
+            keys={keys}
+            selectedKey={selectedKey}
+            disabled={saving}
+            onChoose={() => {
+              setPicker('key');
+            }}
+          />
         ) : null}
 
         <PickerField

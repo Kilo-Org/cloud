@@ -4204,7 +4204,8 @@
       "tmuxAttach": "Anexar tmux",
       "tmuxSession": "Nome da sessão tmux",
       "saved": "Host salvo.",
-      "saveFailed": "Não foi possível salvar o host."
+      "saveFailed": "Não foi possível salvar o host.",
+      "fieldRequired": "Este campo é obrigatório"
     },
     "errors": {
       "invalidPort": "Use uma porta de 1 a 65535",
@@ -4238,7 +4239,8 @@
       "deleteTitle": "Esquecer {{pattern}}?",
       "deleteMessage": "A próxima conexão pede que você confie na chave novamente.",
       "deleteFailed": "Não foi possível remover a chave do host.",
-      "deleteLabel": "Esquecer {{pattern}}"
+      "deleteLabel": "Esquecer {{pattern}}",
+      "firstTrustedOn": "Confiável desde {{date}}"
     },
     "session": {
       "keyPrompt": "Desbloqueie para usar sua chave SSH",
@@ -4269,10 +4271,12 @@
       "unlock": "Desbloquear",
       "promptsSubmit": "Enviar",
       "promptLabel": "Resposta {{index}}",
+      "promptTitle": "Entrar no servidor",
       "state": {
         "connecting": "Conectando",
         "hostKey": "Verificando a chave do host",
-        "reconnecting": "Reconectando"
+        "reconnecting": "Reconectando",
+        "prompt": "Aguardando sua resposta"
       },
       "reason": {
         "network": "Não foi possível acessar o servidor.",
@@ -4297,6 +4301,7 @@
     },
     "keys": {
       "generate": "Gerar nova chave",
+      "name": "Nome da chave",
       "import": "Importar chave",
       "generateTitle": "Gerar uma chave",
       "generateDescription": "A chave é criada neste dispositivo e nunca sai dele. Adicione a chave pública às chaves autorizadas do servidor.",

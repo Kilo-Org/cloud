@@ -65,30 +65,27 @@ export function TerminalKeyBar({ disabled, onSend, onPaste }: TerminalKeyBarProp
           keyboardShouldPersistTaps="always"
           contentContainerClassName="flex-row items-center gap-1 px-2 py-1"
         >
-          {TERMINAL_KEYS.map(key => {
-            const armed = key.id === 'ctrl' || key.id === 'alt';
-            return (
-              <Pressable
-                key={key.id}
-                onPress={() => {
-                  press(key.id);
-                }}
-                disabled={disabled}
-                accessibilityRole="button"
-                accessibilityLabel={key.label}
-                accessibilityState={{ disabled }}
-                className={cn(
-                  KEY_BOX_CLASS,
-                  'bg-secondary active:opacity-70',
-                  disabled && 'opacity-50'
-                )}
-              >
-                <Text variant="mono" className="text-sm text-foreground">
-                  {key.label}
-                </Text>
-              </Pressable>
-            );
-          })}
+          {TERMINAL_KEYS.map(key => (
+            <Pressable
+              key={key.id}
+              onPress={() => {
+                press(key.id);
+              }}
+              disabled={disabled}
+              accessibilityRole="button"
+              accessibilityLabel={key.label}
+              accessibilityState={{ disabled }}
+              className={cn(
+                KEY_BOX_CLASS,
+                'bg-secondary active:opacity-70',
+                disabled && 'opacity-50'
+              )}
+            >
+              <Text variant="mono" className="text-sm text-foreground">
+                {key.label}
+              </Text>
+            </Pressable>
+          ))}
           <Pressable
             onPress={onPaste}
             disabled={disabled}

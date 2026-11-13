@@ -4133,7 +4133,8 @@
       "tmuxAttach": "tmux সংযুক্ত করুন",
       "tmuxSession": "tmux সেশন নাম",
       "saved": "হোস্ট সংরক্ষিত হয়েছে।",
-      "saveFailed": "হোস্টটি সংরক্ষণ করা যায়নি।"
+      "saveFailed": "হোস্টটি সংরক্ষণ করা যায়নি।",
+      "fieldRequired": "এই ক্ষেত্রটি আবশ্যক"
     },
     "errors": {
       "invalidPort": "1 থেকে 65535 এর মধ্যে পোর্ট ব্যবহার করুন",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "{{pattern}} ভুলে যাবেন?",
       "deleteMessage": "পরের সংযোগে আবার এর কী বিশ্বস্ত করতে বলা হবে।",
       "deleteFailed": "হোস্ট কী সরানো যায়নি।",
-      "deleteLabel": "{{pattern}} ভুলে যান"
+      "deleteLabel": "{{pattern}} ভুলে যান",
+      "firstTrustedOn": "{{date}} থেকে বিশ্বস্ত"
     },
     "session": {
       "keyPrompt": "আপনার SSH কী ব্যবহার করতে আনলক করুন",
@@ -4198,10 +4200,12 @@
       "unlock": "আনলক করুন",
       "promptsSubmit": "জমা দিন",
       "promptLabel": "উত্তর {{index}}",
+      "promptTitle": "সার্ভারে সাইন ইন করুন",
       "state": {
         "connecting": "সংযোগ করা হচ্ছে",
         "hostKey": "হোস্ট কী যাচাই করা হচ্ছে",
-        "reconnecting": "পুনরায় সংযোগ হচ্ছে"
+        "reconnecting": "পুনরায় সংযোগ হচ্ছে",
+        "prompt": "আপনার উত্তরের জন্য অপেক্ষা করা হচ্ছে"
       },
       "reason": {
         "network": "সার্ভারে পৌঁছানো যায়নি।",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "নতুন কী তৈরি করুন",
+      "name": "কী-এর নাম",
       "import": "কী আমদানি করুন",
       "generateTitle": "একটি কী তৈরি করুন",
       "generateDescription": "কীটি এই ডিভাইসেই তৈরি হয় এবং কখনও এটি ছেড়ে যায় না। সার্ভারের অনুমোদিত কী-তে পাবলিক কী যোগ করুন।",

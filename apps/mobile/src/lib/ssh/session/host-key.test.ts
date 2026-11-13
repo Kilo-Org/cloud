@@ -1,8 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createSshTestDatabase } from '../database.test-helpers';
 import { trustHostKey } from '../known-hosts';
 import { judgeHostKey } from './host-key';
+
+// `known-hosts` mints ids through `expo-crypto`, whose module load pulls the
+// expo runtime into this project; the store's own suites mock it the same way.
+vi.mock('expo-crypto', () => ({ randomUUID: () => 'host-key-test-id' }));
 
 const OFFERED = {
   hostPattern: '[web-1.kilo.test]:2222',

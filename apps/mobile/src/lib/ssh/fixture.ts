@@ -11,7 +11,7 @@ import { trustHostKey } from './known-hosts';
 import { sshPackage } from './native';
 import { SSH_HOSTS_ROUTE, SSH_KNOWN_HOSTS_ROUTE, sshHostPath, sshSessionPath } from './routes';
 import { writeSession } from './session/session-store';
-import  { type SshSessionPhase } from './session/types';
+import { type SshSessionPhase } from './session/types';
 import { sshDatabase } from './store';
 import { SSH_KEY } from './use-ssh';
 
@@ -283,9 +283,15 @@ async function seedSession(name: string): Promise<string> {
 async function openSampleShell(label: string): Promise<string> {
   const ssh = await sshPackage();
   const source = ssh.createFeedSource();
-  // The sample is ASCII, so one byte per character is its UTF-8 encoding.
-  const text = `Welcome to ${label}\r\n${SAMPLE_OUTPUT}`;
-  source.feed(Uint8Array.from(text, character => character.charCodeAt(0)));
+  const sample = new TextEncoder().encode(`Welcome to ${label}\r\n${SAMPLE_OUTPUT}`);
+  // The view takes the source's sink when it attaches, and bytes written before
+  // that have nowhere to go, so the sample waits for the first resize the
+  // attached view reports.
+  const feedOnce = () => {
+    stopListening();
+    source.feed(sample);
+  };
+  const stopListening = source.onResize(feedOnce);
   // A second session beside it, so the switcher has more than one row.
   writeSession({
     id: 'fixture-session-second',

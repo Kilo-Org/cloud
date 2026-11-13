@@ -1,4 +1,4 @@
-import NetInfo from '@react-native-community/netinfo';
+import { addEventListener } from '@react-native-community/netinfo';
 import { AppState } from 'react-native';
 
 import { resumeSshSessions } from './manager';
@@ -18,7 +18,7 @@ export function startSshReconnectTriggers(): () => void {
     }
     wasActive = active;
   });
-  const unsubscribeNetwork = NetInfo.addEventListener(state => {
+  const unsubscribeNetwork = addEventListener(state => {
     if (state.isConnected === true) {
       resumeSshSessions();
     }

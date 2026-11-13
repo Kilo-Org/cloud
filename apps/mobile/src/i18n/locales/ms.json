@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Lampir tmux",
       "tmuxSession": "Nama sesi tmux",
       "saved": "Hos disimpan.",
-      "saveFailed": "Hos tidak dapat disimpan."
+      "saveFailed": "Hos tidak dapat disimpan.",
+      "fieldRequired": "Medan ini diperlukan"
     },
     "errors": {
       "invalidPort": "Gunakan port 1 hingga 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Lupakan {{pattern}}?",
       "deleteMessage": "Sambungan seterusnya meminta anda mempercayai kuncinya sekali lagi.",
       "deleteFailed": "Kunci hos tidak dapat dibuang.",
-      "deleteLabel": "Lupakan {{pattern}}"
+      "deleteLabel": "Lupakan {{pattern}}",
+      "firstTrustedOn": "Dipercayai sejak {{date}}"
     },
     "session": {
       "keyPrompt": "Buka kunci untuk menggunakan kunci SSH anda",
@@ -4198,10 +4200,12 @@
       "unlock": "Buka kunci",
       "promptsSubmit": "Hantar",
       "promptLabel": "Jawapan {{index}}",
+      "promptTitle": "Log masuk ke pelayan",
       "state": {
         "connecting": "Menyambung",
         "hostKey": "Menyemak kunci hos",
-        "reconnecting": "Menyambung semula"
+        "reconnecting": "Menyambung semula",
+        "prompt": "Menunggu jawapan anda"
       },
       "reason": {
         "network": "Pelayan tidak dapat dihubungi.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Jana kunci baharu",
+      "name": "Nama kunci",
       "import": "Import kunci",
       "generateTitle": "Jana kunci",
       "generateDescription": "Kunci dijana pada peranti ini dan tidak pernah meninggalkannya. Tambahkan kunci awam ke kunci yang dibenarkan pelayan.",

@@ -4198,7 +4198,8 @@
       "tmuxAttach": "Attacher tmux",
       "tmuxSession": "Nom de la session tmux",
       "saved": "Hôte enregistré.",
-      "saveFailed": "L’hôte n’a pas pu être enregistré."
+      "saveFailed": "L’hôte n’a pas pu être enregistré.",
+      "fieldRequired": "Ce champ est obligatoire"
     },
     "errors": {
       "invalidPort": "Utilisez un port entre 1 et 65535",
@@ -4232,7 +4233,8 @@
       "deleteTitle": "Oublier {{pattern}} ?",
       "deleteMessage": "La prochaine connexion vous demandera à nouveau de faire confiance à sa clé.",
       "deleteFailed": "La clé de l’hôte n’a pas pu être supprimée.",
-      "deleteLabel": "Oublier {{pattern}}"
+      "deleteLabel": "Oublier {{pattern}}",
+      "firstTrustedOn": "Approuvée depuis le {{date}}"
     },
     "session": {
       "keyPrompt": "Déverrouiller pour utiliser votre clé SSH",
@@ -4263,10 +4265,12 @@
       "unlock": "Déverrouiller",
       "promptsSubmit": "Valider",
       "promptLabel": "Réponse {{index}}",
+      "promptTitle": "Connexion au serveur",
       "state": {
         "connecting": "Connexion",
         "hostKey": "Vérification de la clé d’hôte",
-        "reconnecting": "Reconnexion"
+        "reconnecting": "Reconnexion",
+        "prompt": "En attente de votre réponse"
       },
       "reason": {
         "network": "Le serveur n’a pas pu être joint.",
@@ -4291,6 +4295,7 @@
     },
     "keys": {
       "generate": "Générer une nouvelle clé",
+      "name": "Nom de la clé",
       "import": "Importer une clé",
       "generateTitle": "Générer une clé",
       "generateDescription": "La clé est créée sur cet appareil et ne le quitte jamais. Ajoutez la clé publique aux clés autorisées du serveur.",

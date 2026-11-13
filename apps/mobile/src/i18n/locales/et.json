@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Ühenda tmux",
       "tmuxSession": "tmuxi sessiooni nimi",
       "saved": "Host salvestatud.",
-      "saveFailed": "Hosti ei õnnestunud salvestada."
+      "saveFailed": "Hosti ei õnnestunud salvestada.",
+      "fieldRequired": "See väli on kohustuslik"
     },
     "errors": {
       "invalidPort": "Kasuta porti vahemikus 1–65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Unusta {{pattern}}?",
       "deleteMessage": "Järgmisel ühendamisel palutakse selle võtit uuesti usaldada.",
       "deleteFailed": "Hosti võtit ei õnnestunud eemaldada.",
-      "deleteLabel": "Unusta {{pattern}}"
+      "deleteLabel": "Unusta {{pattern}}",
+      "firstTrustedOn": "Usaldatud alates {{date}}"
     },
     "session": {
       "keyPrompt": "Lukusta lahti, et kasutada SSH-võtit",
@@ -4198,10 +4200,12 @@
       "unlock": "Lukusta lahti",
       "promptsSubmit": "Esita",
       "promptLabel": "Vastus {{index}}",
+      "promptTitle": "Logi serverisse sisse",
       "state": {
         "connecting": "Ühendamine",
         "hostKey": "Hosti võtme kontrollimine",
-        "reconnecting": "Uuesti ühendamine"
+        "reconnecting": "Uuesti ühendamine",
+        "prompt": "Ootab sinu vastust"
       },
       "reason": {
         "network": "Serveriga ei õnnestunud ühendust saada.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Genereeri uus võti",
+      "name": "Võtme nimi",
       "import": "Impordi võti",
       "generateTitle": "Genereeri võti",
       "generateDescription": "Võti luuakse selles seadmes ega lahku sellest kunagi. Lisa avalik võti serveri autoriseeritud võtmete hulka.",

@@ -4263,7 +4263,8 @@
       "tmuxAttach": "Priklopi tmux",
       "tmuxSession": "Ime seje tmux",
       "saved": "Gostitelj je shranjen.",
-      "saveFailed": "Gostitelja ni bilo mogoče shraniti."
+      "saveFailed": "Gostitelja ni bilo mogoče shraniti.",
+      "fieldRequired": "To polje je obvezno"
     },
     "errors": {
       "invalidPort": "Uporabite vrata od 1 do 65535",
@@ -4297,7 +4298,8 @@
       "deleteTitle": "Pozabiti {{pattern}}?",
       "deleteMessage": "Ob naslednji povezavi boste morali znova zaupati njegovemu ključu.",
       "deleteFailed": "Ključa gostitelja ni bilo mogoče odstraniti.",
-      "deleteLabel": "Pozabi {{pattern}}"
+      "deleteLabel": "Pozabi {{pattern}}",
+      "firstTrustedOn": "Zaupan od {{date}}"
     },
     "session": {
       "keyPrompt": "Odklenite za uporabo ključa SSH",
@@ -4328,10 +4330,12 @@
       "unlock": "Odkleni",
       "promptsSubmit": "Pošlji",
       "promptLabel": "Odgovor {{index}}",
+      "promptTitle": "Prijava v strežnik",
       "state": {
         "connecting": "Povezovanje",
         "hostKey": "Preverjanje ključa gostitelja",
-        "reconnecting": "Ponovno povezovanje"
+        "reconnecting": "Ponovno povezovanje",
+        "prompt": "Čakanje na vaš odgovor"
       },
       "reason": {
         "network": "Strežnika ni bilo mogoče doseči.",
@@ -4356,6 +4360,7 @@
     },
     "keys": {
       "generate": "Ustvari nov ključ",
+      "name": "Ime ključa",
       "import": "Uvozi ključ",
       "generateTitle": "Ustvari ključ",
       "generateDescription": "Ključ nastane na tej napravi in je nikoli ne zapusti. Dodajte javni ključ med dovoljene ključe strežnika.",

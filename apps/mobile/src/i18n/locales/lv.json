@@ -4198,7 +4198,8 @@
       "tmuxAttach": "Pievienoties tmux",
       "tmuxSession": "tmux sesijas nosaukums",
       "saved": "Resursdators saglabāts.",
-      "saveFailed": "Resursdatoru nevarēja saglabāt."
+      "saveFailed": "Resursdatoru nevarēja saglabāt.",
+      "fieldRequired": "Šis lauks ir obligāts"
     },
     "errors": {
       "invalidPort": "Izmantojiet portu no 1 līdz 65535",
@@ -4232,7 +4233,8 @@
       "deleteTitle": "Aizmirst {{pattern}}?",
       "deleteMessage": "Nākamajā savienojumā jums atkal prasīs uzticēties tās atslēgai.",
       "deleteFailed": "Resursdatora atslēgu nevarēja noņemt.",
-      "deleteLabel": "Aizmirst {{pattern}}"
+      "deleteLabel": "Aizmirst {{pattern}}",
+      "firstTrustedOn": "Uzticamā kopš {{date}}"
     },
     "session": {
       "keyPrompt": "Atbloķējiet, lai izmantotu savu SSH atslēgu",
@@ -4263,10 +4265,12 @@
       "unlock": "Atbloķēt",
       "promptsSubmit": "Iesniegt",
       "promptLabel": "Atbilde {{index}}",
+      "promptTitle": "Pieteikšanās serverim",
       "state": {
         "connecting": "Savienojas",
         "hostKey": "Pārbauda resursdatora atslēgu",
-        "reconnecting": "Atkārtoti savienojas"
+        "reconnecting": "Atkārtoti savienojas",
+        "prompt": "Gaida jūsu atbildi"
       },
       "reason": {
         "network": "Serveri nevarēja sasniegt.",
@@ -4291,6 +4295,7 @@
     },
     "keys": {
       "generate": "Ģenerēt jaunu atslēgu",
+      "name": "Atslēgas nosaukums",
       "import": "Importēt atslēgu",
       "generateTitle": "Ģenerēt atslēgu",
       "generateDescription": "Atslēga tiek izveidota šajā ierīcē un nekad to neatstāj. Pievienojiet publisko atslēgu servera atļauto atslēgu sarakstam.",

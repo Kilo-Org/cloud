@@ -1,8 +1,8 @@
-import  { type GeneratedKey, type ParsedKey } from '@kilocode/react-native-ssh';
+import { type GeneratedKey, type ParsedKey } from '@kilocode/react-native-ssh';
 
-import type { SSH_KEY_ALGORITHMS } from '@/lib/persist/schema';
+import { type SSH_KEY_ALGORITHMS } from '@/lib/persist/schema';
 
-import  { type SshKeyInput } from './keys';
+import { type SshKeyInput } from './keys';
 
 export type SshKeyAlgorithm = (typeof SSH_KEY_ALGORITHMS)[number];
 

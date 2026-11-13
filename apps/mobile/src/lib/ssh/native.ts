@@ -1,4 +1,5 @@
 import type * as SshPackage from '@kilocode/react-native-ssh';
+import { z } from 'zod';
 
 /**
  * The SSH package, loaded once on first use.
@@ -15,4 +16,13 @@ let loading: Promise<typeof SshPackage> | null = null;
 export function sshPackage(): Promise<typeof SshPackage> {
   loading ??= import('@kilocode/react-native-ssh');
   return loading;
+}
+
+/** A rejected native call carries its `SshErrorCode` as `code`. */
+const rejectedCallSchema = z.object({ code: z.string() });
+
+/** The code a rejected native call carries, or `null` when it carries none. */
+export function nativeErrorCode(cause: unknown): string | null {
+  const parsed = rejectedCallSchema.safeParse(cause);
+  return parsed.success ? parsed.data.code : null;
 }

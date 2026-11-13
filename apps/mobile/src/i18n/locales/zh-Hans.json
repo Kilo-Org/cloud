@@ -4133,7 +4133,8 @@
       "tmuxAttach": "附加 tmux",
       "tmuxSession": "tmux 会话名",
       "saved": "主机已保存。",
-      "saveFailed": "无法保存该主机。"
+      "saveFailed": "无法保存该主机。",
+      "fieldRequired": "此字段为必填项"
     },
     "errors": {
       "invalidPort": "请使用 1 到 65535 之间的端口",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "忘记 {{pattern}}？",
       "deleteMessage": "下次连接时会再次要求你信任它的密钥。",
       "deleteFailed": "无法移除该主机密钥。",
-      "deleteLabel": "忘记 {{pattern}}"
+      "deleteLabel": "忘记 {{pattern}}",
+      "firstTrustedOn": "自 {{date}} 起信任"
     },
     "session": {
       "keyPrompt": "解锁以使用你的 SSH 密钥",
@@ -4198,10 +4200,12 @@
       "unlock": "解锁",
       "promptsSubmit": "提交",
       "promptLabel": "回答 {{index}}",
+      "promptTitle": "登录到服务器",
       "state": {
         "connecting": "正在连接",
         "hostKey": "正在检查主机密钥",
-        "reconnecting": "正在重新连接"
+        "reconnecting": "正在重新连接",
+        "prompt": "等待你的回答"
       },
       "reason": {
         "network": "无法连接到服务器。",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "生成新密钥",
+      "name": "密钥名称",
       "import": "导入密钥",
       "generateTitle": "生成密钥",
       "generateDescription": "密钥在此设备上生成，绝不会离开此设备。将公钥添加到服务器的授权密钥中。",

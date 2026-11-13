@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Vedhæft tmux",
       "tmuxSession": "Navn på tmux-session",
       "saved": "Værten er gemt.",
-      "saveFailed": "Værten kunne ikke gemmes."
+      "saveFailed": "Værten kunne ikke gemmes.",
+      "fieldRequired": "Dette felt er påkrævet"
     },
     "errors": {
       "invalidPort": "Brug en port fra 1 til 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Glem {{pattern}}?",
       "deleteMessage": "Ved næste forbindelse bliver du bedt om at betro dens nøgle igen.",
       "deleteFailed": "Værtsnøglen kunne ikke fjernes.",
-      "deleteLabel": "Glem {{pattern}}"
+      "deleteLabel": "Glem {{pattern}}",
+      "firstTrustedOn": "Betroet siden {{date}}"
     },
     "session": {
       "keyPrompt": "Lås op for at bruge din SSH-nøgle",
@@ -4198,10 +4200,12 @@
       "unlock": "Lås op",
       "promptsSubmit": "Send",
       "promptLabel": "Svar {{index}}",
+      "promptTitle": "Log ind på serveren",
       "state": {
         "connecting": "Forbinder",
         "hostKey": "Kontrollerer værtsnøgle",
-        "reconnecting": "Genopretter forbindelsen"
+        "reconnecting": "Genopretter forbindelsen",
+        "prompt": "Venter på dit svar"
       },
       "reason": {
         "network": "Serveren kunne ikke nås.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Generér ny nøgle",
+      "name": "Nøglenavn",
       "import": "Importér nøgle",
       "generateTitle": "Generér en nøgle",
       "generateDescription": "Nøglen oprettes på denne enhed og forlader den aldrig. Føj den offentlige nøgle til serverens autoriserede nøgler.",

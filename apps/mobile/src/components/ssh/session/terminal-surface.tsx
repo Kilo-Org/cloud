@@ -1,5 +1,6 @@
 import { TerminalView, type TerminalViewHandle } from '@kilocode/react-native-ssh';
 import { type RefObject, useMemo } from 'react';
+import { StyleSheet } from 'react-native';
 
 import { terminalThemeFor } from '@/lib/ssh/terminal-theme';
 
@@ -8,6 +9,13 @@ import { terminalThemeFor } from '@/lib/ssh/terminal-theme';
  * and it carries the block glyphs a terminal draws.
  */
 const FONT_FAMILY = 'JetBrainsMono_500Medium';
+
+const styles = StyleSheet.create({
+  // The package's view is a plain native view, not a NativeWind component, so
+  // its height comes from this style rather than a class: without it the view
+  // lays out at zero height and draws nothing.
+  surface: { flex: 1 },
+});
 
 type TerminalSurfaceProps = Readonly<{
   /** The native byte source the shell writes to. */
@@ -44,7 +52,7 @@ export function TerminalSurface({
 
   return (
     <TerminalView
-      className="flex-1"
+      style={styles.surface}
       ref={instance => {
         handleRef.current = instance;
       }}

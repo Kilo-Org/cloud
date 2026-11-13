@@ -4133,7 +4133,8 @@
       "tmuxAttach": "tmuxにアタッチ",
       "tmuxSession": "tmuxセッション名",
       "saved": "ホストを保存しました。",
-      "saveFailed": "ホストを保存できませんでした。"
+      "saveFailed": "ホストを保存できませんでした。",
+      "fieldRequired": "この項目は必須です"
     },
     "errors": {
       "invalidPort": "1〜65535のポートを指定してください",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "{{pattern}}を忘れますか?",
       "deleteMessage": "次回接続時に、再度キーの信頼を求められます。",
       "deleteFailed": "ホストキーを削除できませんでした。",
-      "deleteLabel": "{{pattern}}を忘れる"
+      "deleteLabel": "{{pattern}}を忘れる",
+      "firstTrustedOn": "{{date}}から信頼済み"
     },
     "session": {
       "keyPrompt": "SSHキーを使うためにロックを解除",
@@ -4198,10 +4200,12 @@
       "unlock": "ロック解除",
       "promptsSubmit": "送信",
       "promptLabel": "回答 {{index}}",
+      "promptTitle": "サーバーにサインイン",
       "state": {
         "connecting": "接続中",
         "hostKey": "ホストキーを確認中",
-        "reconnecting": "再接続中"
+        "reconnecting": "再接続中",
+        "prompt": "回答を待っています"
       },
       "reason": {
         "network": "サーバーに接続できませんでした。",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "新しいキーを生成",
+      "name": "キー名",
       "import": "キーを読み込む",
       "generateTitle": "キーを生成",
       "generateDescription": "キーはこのデバイス上で作成され、デバイスの外に出ることはありません。公開鍵をサーバーのauthorized_keysに追加してください。",

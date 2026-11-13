@@ -4133,7 +4133,8 @@
       "tmuxAttach": "Koppla till tmux",
       "tmuxSession": "Namn på tmux-session",
       "saved": "Värden har sparats.",
-      "saveFailed": "Värden kunde inte sparas."
+      "saveFailed": "Värden kunde inte sparas.",
+      "fieldRequired": "Det här fältet är obligatoriskt"
     },
     "errors": {
       "invalidPort": "Använd en port från 1 till 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Glöm {{pattern}}?",
       "deleteMessage": "Nästa anslutning ber dig betro dess nyckel igen.",
       "deleteFailed": "Värdnyckeln kunde inte tas bort.",
-      "deleteLabel": "Glöm {{pattern}}"
+      "deleteLabel": "Glöm {{pattern}}",
+      "firstTrustedOn": "Betrodd sedan {{date}}"
     },
     "session": {
       "keyPrompt": "Lås upp för att använda din SSH-nyckel",
@@ -4198,10 +4200,12 @@
       "unlock": "Lås upp",
       "promptsSubmit": "Skicka",
       "promptLabel": "Svar {{index}}",
+      "promptTitle": "Logga in på servern",
       "state": {
         "connecting": "Ansluter",
         "hostKey": "Kontrollerar värdnyckel",
-        "reconnecting": "Återansluter"
+        "reconnecting": "Återansluter",
+        "prompt": "Väntar på ditt svar"
       },
       "reason": {
         "network": "Servern kunde inte nås.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Skapa ny nyckel",
+      "name": "Nyckelnamn",
       "import": "Importera nyckel",
       "generateTitle": "Skapa en nyckel",
       "generateDescription": "Nyckeln skapas på den här enheten och lämnar den aldrig. Lägg till den offentliga nyckeln i serverns auktoriserade nycklar.",

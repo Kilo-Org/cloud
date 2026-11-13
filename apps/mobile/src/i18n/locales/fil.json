@@ -4133,7 +4133,8 @@
       "tmuxAttach": "I-attach ang tmux",
       "tmuxSession": "Pangalan ng tmux session",
       "saved": "Na-save ang host.",
-      "saveFailed": "Hindi na-save ang host."
+      "saveFailed": "Hindi na-save ang host.",
+      "fieldRequired": "Kinakailangan ang field na ito"
     },
     "errors": {
       "invalidPort": "Gumamit ng port mula 1 hanggang 65535",
@@ -4167,7 +4168,8 @@
       "deleteTitle": "Kalimutan ang {{pattern}}?",
       "deleteMessage": "Hihilingin muli sa susunod na koneksyon na pagkatiwalaan ang key nito.",
       "deleteFailed": "Hindi naalis ang host key.",
-      "deleteLabel": "Kalimutan ang {{pattern}}"
+      "deleteLabel": "Kalimutan ang {{pattern}}",
+      "firstTrustedOn": "Pinagkakatiwalaan mula noong {{date}}"
     },
     "session": {
       "keyPrompt": "I-unlock para magamit ang SSH key mo",
@@ -4198,10 +4200,12 @@
       "unlock": "I-unlock",
       "promptsSubmit": "Isumite",
       "promptLabel": "Sagot {{index}}",
+      "promptTitle": "Mag-sign in sa server",
       "state": {
         "connecting": "Kumokonekta",
         "hostKey": "Sinusuri ang host key",
-        "reconnecting": "Muling kumokonekta"
+        "reconnecting": "Muling kumokonekta",
+        "prompt": "Naghihintay sa iyong sagot"
       },
       "reason": {
         "network": "Hindi maabot ang server.",
@@ -4226,6 +4230,7 @@
     },
     "keys": {
       "generate": "Gumawa ng bagong key",
+      "name": "Pangalan ng key",
       "import": "I-import ang key",
       "generateTitle": "Gumawa ng key",
       "generateDescription": "Nagawa ang key sa device na ito at hindi ito kailanman umaalis dito. Idagdag ang pampublikong key sa authorized keys ng server.",

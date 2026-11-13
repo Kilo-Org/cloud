@@ -2,7 +2,9 @@
 import { expect, test } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
+import { z } from 'zod';
 import { launchExtensionContext, startFixtureServer } from './extension-context-fixture';
+import { getExtensionStorage } from './tab-selection-e2e-helpers';
 
 const runLive = process.env['EXTENSION_LOCAL_BACKEND_E2E'] === '1';
 test.skip(!runLive, 'local backend only');
@@ -456,36 +458,32 @@ const decideCloudForm = async (sidePanel: Page): Promise<string | null> => {
   return null;
 };
 
+const extensionAuthStorageSchema = z.object({
+  kiloAuth: z.object({ token: z.string().min(1) }),
+});
+
 /** The extension's own API bearer token, read from its storage. */
-const readExtensionToken = (sidePanel: Page): Promise<string> =>
-  sidePanel.evaluate(
-    () =>
-      new Promise<string>(resolve => {
-        const storage = (
-          globalThis as {
-            chrome?: {
-              storage?: {
-                local?: {
-                  get: (
-                    keys: string[],
-                    callback: (items: Record<string, { token?: string } | undefined>) => void
-                  ) => void;
-                };
-              };
-            };
-          }
-        ).chrome?.storage?.local;
-        storage?.get(['kiloAuth'], items => {
-          resolve(items['kiloAuth']?.token ?? '');
-        });
-      })
+const readExtensionToken = async (sidePanel: Page): Promise<string> => {
+  const stored = extensionAuthStorageSchema.safeParse(
+    await getExtensionStorage(sidePanel, ['kiloAuth'])
   );
+
+  if (!stored.success) {
+    throw new Error('the extension stored no kiloAuth token the session lists can use');
+  }
+
+  return stored.data.token;
+};
 
 /** Session ids the user already has, from both lists the Agents view reads. */
 const listSessionIds = async (
   context: BrowserContext,
   token: string
 ): Promise<ReadonlySet<string>> => {
+  if (token === '') {
+    throw new Error('no API token was available to list sessions with');
+  }
+
   const ids = new Set<string>();
   const paths = [
     'activeSessions.list?input=%7B%22includeCloudAgentSessions%22%3Atrue%2C%22organizationId%22%3Anull%7D',
@@ -495,6 +493,11 @@ const listSessionIds = async (
     const response = await context.request.get(`${localBackendUrl}/api/trpc/${path}`, {
       headers: { authorization: `Bearer ${token}` },
     });
+
+    if (!response.ok()) {
+      throw new Error(`listing sessions failed with ${response.status()} for ${path}`);
+    }
+
     const body = await response.text();
     for (const [, id] of body.matchAll(/"(?:id|session_id)":"(ses_[A-Za-z0-9]+)"/gu)) {
       if (id !== undefined) {

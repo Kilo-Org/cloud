@@ -107,8 +107,6 @@ internal object SshRegistry {
     return sessions.remove(sessionId)
   }
 
-  fun sessions(): Map<String, SshSession> = sessions
-
   fun shell(shellId: String): SshShellSource? = shells[shellId]
 
   fun putShell(shellId: String, source: SshShellSource) {
@@ -230,10 +228,20 @@ internal object SshRegistry {
     return session
   }
 
-  private fun closeShell(shellId: String) {
+  /** Drops a shell and its channel, whether it ended or the user closed it. */
+  fun closeShell(shellId: String) {
     IdleNotifications.release(shellId)
 
     removeShell(shellId)?.close()
+  }
+
+  /** Drops a session the transport ended, on the callback thread that saw it. */
+  fun releaseDisconnected(sessionId: String) {
+    if (releaseSession(sessionId) == null) {
+      return
+    }
+
+    sync()
   }
 
   /**

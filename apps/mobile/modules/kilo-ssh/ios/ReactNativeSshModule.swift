@@ -70,7 +70,7 @@ public final class ReactNativeSshModule: Module {
     }
 
     Function("closeShell") { (shellId: String) in
-      self.closeShell(shellId)
+      releaseShell(shellId)
     }
 
     Function("listSessions") { () -> [SessionInfoRecord] in
@@ -118,7 +118,7 @@ public final class ReactNativeSshModule: Module {
       // by session only sees entries that exist, so check after storing.
       guard self.state.session(sessionId) != nil else {
         _ = self.state.removeSftp(sftpId)
-        try await translateAsync { try await client.shutdown() }
+        try? await client.shutdown()
         throw channelClosed(sessionId)
       }
 
@@ -262,7 +262,8 @@ public final class ReactNativeSshModule: Module {
         await self?.requestPrompts(request) ?? .cancelled
       },
       notifyDisconnect: { [weak self] notice in
-        self?.handleTransportDisconnect(notice)
+        releaseDisconnectedSession(notice)
+        self?.sendEvent("onDisconnect", notice.toEvent())
       }
     )
 
@@ -341,7 +342,7 @@ public final class ReactNativeSshModule: Module {
     // sweep already ran; a forward nobody owns would listen forever.
     guard state.session(sessionId) != nil else {
       _ = state.removeForward(forwardId)
-      try await translateAsync { try await handle.stop() }
+      try? await handle.stop()
       throw channelClosed(sessionId)
     }
 
@@ -373,15 +374,6 @@ public final class ReactNativeSshModule: Module {
     release.shells.forEach { closeShell($0.id, $0.source) }
     await release.shutDown()
     try await translateAsync { try await release.session.disconnect() }
-  }
-
-  private func handleTransportDisconnect(_ notice: DisconnectNotice) {
-    if let release = state.releaseSession(notice.sessionId) {
-      release.shells.forEach { closeShell($0.id, $0.source) }
-      Task { await release.shutDown() }
-    }
-
-    sendEvent("onDisconnect", notice.toEvent())
   }
 
   private func shellDimensions(_ options: ShellOptionsRecord) throws -> (cols: UInt32, rows: UInt32) {
@@ -428,10 +420,6 @@ public final class ReactNativeSshModule: Module {
     return shellId
   }
 
-  private func closeShell(_ shellId: String) {
-    releaseShell(shellId)
-  }
-
   private func requestHostKey(_ request: HostKeyRequest) async -> Bool {
     let pending = PendingRequest<Bool>()
     state.store(hostKeyRequest: pending, id: request.requestId)
@@ -455,6 +443,17 @@ public final class ReactNativeSshModule: Module {
 
 private func channelClosed(_ sessionId: String) -> Exception {
   Exception(name: "SshError", description: "session \(sessionId) is not connected", code: "ChannelClosed")
+}
+
+/// Drops a session the transport ended. It touches only the shared registry, so
+/// a socket that dies after a reload still releases what it held.
+private func releaseDisconnectedSession(_ notice: DisconnectNotice) {
+  guard let release = SshModuleState.shared.releaseSession(notice.sessionId) else {
+    return
+  }
+
+  release.shells.forEach { closeShell($0.id, $0.source) }
+  Task { await release.shutDown() }
 }
 
 /// Unhooks a shell the registry still holds, whichever way its channel ended.

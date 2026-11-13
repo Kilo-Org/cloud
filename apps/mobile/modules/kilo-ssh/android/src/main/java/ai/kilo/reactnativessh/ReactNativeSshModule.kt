@@ -117,7 +117,7 @@ class ReactNativeSshModule : Module() {
     }
 
     Function("closeShell") { shellId: String ->
-      closeShell(shellId)
+      sshRegistry.closeShell(shellId)
     }
 
     Function("configureBackgroundSessions") { channelName: String, title: String, disconnectAllLabel: String ->
@@ -269,16 +269,17 @@ class ReactNativeSshModule : Module() {
     connect: suspend (SessionHandler) -> SshSession,
   ): String {
     val sessionId = sshRegistry.sessionIds.next()
+    val registry = sshRegistry
     val handler = JsSessionHandler(
       sessionId = sessionId,
-      requestIds = sshRegistry.requestIds,
+      requestIds = registry.requestIds,
       requestHostKey = ::requestHostKey,
       requestPrompts = ::requestPrompts,
-      // The socket can die while no runtime is attached, so the notice goes
-      // through the registry's channel and the release is registry state.
+      // The socket can die while no runtime is attached, so the notice and the
+      // release go through the registry rather than this instance.
       notifyDisconnect = { record ->
-        sshRegistry.emit(EVENT_DISCONNECT, record.toEvent())
-        removeSession(record.sessionId)
+        registry.emit(EVENT_DISCONNECT, record.toEvent())
+        registry.releaseDisconnected(record.sessionId)
       },
     )
 
@@ -318,7 +319,7 @@ class ReactNativeSshModule : Module() {
     val source = translateSuspendFailures {
       // A channel that ends releases itself: nothing holds a shell past its exit.
       SshShellSource.open(sessionId, session, options.term, options.cols, options.rows) {
-        closeShell(shellId)
+        sshRegistry.closeShell(shellId)
       }
     }
 
@@ -326,25 +327,9 @@ class ReactNativeSshModule : Module() {
 
     // The channel can end before it is registered, in which case the callback
     // above had nothing to remove yet.
-    if (source.terminated) closeShell(shellId)
+    if (source.terminated) sshRegistry.closeShell(shellId)
 
     return shellId
-  }
-
-  private fun closeShell(shellId: String) {
-    val source = sshRegistry.removeShell(shellId) ?: return
-
-    IdleNotifications.release(shellId)
-    source.close()
-  }
-
-  /** Runs on the core's disconnect callback thread, so the teardown is queued. */
-  private fun removeSession(sessionId: String) {
-    if (sshRegistry.releaseSession(sessionId) == null) {
-      return
-    }
-
-    sshRegistry.sync()
   }
 
   private suspend fun closeSftp(sftpId: String) {

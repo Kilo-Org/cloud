@@ -332,6 +332,8 @@
       "unlinkTitle": "Koble fra {{provider}}?",
       "unlinkMessage": "Du kan ikke lenger logge inn med {{provider}}. De andre metodene dine forblir uendret.",
       "unlinked": "{{provider}} er koblet fra",
+      "lastMethod": "Du kan ikke koble fra din eneste påloggingsmetode. Koble til en annen metode først.",
+      "notLinked": "{{provider}} er ikke lenger koblet til kontoen din.",
       "linkAnother": "Koble til en annen leverandør",
       "linkAnotherSubtitle": "Åpner siden for tilkoblede kontoer på kilo.ai",
       "emptyTitle": "Ingen påloggingsmetoder",

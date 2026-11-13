@@ -332,6 +332,8 @@
       "unlinkTitle": "Já ìsopọ̀ {{provider}}?",
       "unlinkMessage": "O kò ní lè wọlé pẹ̀lú {{provider}} mọ́. Àwọn ọ̀nà mìíràn rẹ yóò wà bí wọ́n ṣe wà.",
       "unlinked": "A ti já ìsopọ̀ {{provider}}",
+      "lastMethod": "O kò lè já ìsopọ̀ ọ̀nà ìwọlé rẹ kan ṣoṣo. So ọ̀nà mìíràn pọ̀ lákọ̀ọ́kọ́.",
+      "notLinked": "A ti já ìsopọ̀ {{provider}} kúrò nínú àkọsílẹ̀ rẹ.",
       "linkAnother": "So olùpèsè mìíràn pọ̀",
       "linkAnotherSubtitle": "Ó ń ṣí ojú-ìwé àwọn àkọọ́lẹ̀ tí a sopọ̀ lórí kilo.ai",
       "emptyTitle": "Kò sí ọ̀nà ìwọlé",

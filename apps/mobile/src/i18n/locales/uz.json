@@ -332,6 +332,8 @@
       "unlinkTitle": "{{provider}} aloqasi uzilsinmi?",
       "unlinkMessage": "Endi {{provider}} orqali tizimga kira olmaysiz. Boshqa usullaringiz o'zgarishsiz qoladi.",
       "unlinked": "{{provider}} aloqasi uzildi",
+      "lastMethod": "Yagona kirish usulingizning aloqasini uza olmaysiz. Avval boshqa usulni bog'lang.",
+      "notLinked": "{{provider}} endi hisobingizga bog'lanmagan.",
       "linkAnother": "Boshqa provayderni bog'lash",
       "linkAnotherSubtitle": "kilo.ai saytidagi bog'langan hisoblar sahifasini ochadi",
       "emptyTitle": "Kirish usullari yo'q",

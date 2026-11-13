@@ -21,6 +21,7 @@ import { Text } from '@/components/ui/text';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_INSTRUCTIONS } from '@/lib/agent-profile-forms';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import {
   type AgentProfileInstructionRow,
   useAgentProfileInstructions,
@@ -211,9 +212,11 @@ export function ProfileInstructionsScreen({
 
   const confirmDelete = (instruction: InstructionTarget) => {
     confirm({
-      title: t('common.delete'),
-      message: instruction.name,
-      confirmLabel: t('common.delete'),
+      // A file name is read position by position, so it keeps its own
+      // left-to-right direction inside a right-to-left sentence.
+      title: t('profiles.instructionDeleteTitle', { name: isolateLtrBidiText(instruction.name) }),
+      message: t('profiles.instructionDeleteMessage'),
+      confirmLabel: t('profiles.instructionDeleteConfirm'),
       onConfirm: () => {
         void runDelete(instruction.id);
       },

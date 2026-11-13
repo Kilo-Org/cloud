@@ -631,11 +631,18 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     await waitFor(() => !picker(ui).props.disabled);
     const trigger = picker(ui).props.className as string;
     // The same bordered, full-width box `InstanceSelector` and `RepoSelector`
-    // render, so one label-value row on the form keeps one shape. The inline
-    // default is a bare row with no box.
+    // render, so one label-value column on the form keeps one shape. The frame
+    // carries the chrome and the body inside it the 48 dp height, so a value,
+    // a skeleton or a retry fills one box. The inline default is a bare row
+    // with no box.
     expect(trigger).toContain('border');
     expect(trigger).toContain('bg-secondary');
-    expect(trigger).toContain('justify-between');
+    expect(trigger).not.toContain('min-h-');
+    const body = picker(ui).find(
+      node =>
+        typeof node.props.className === 'string' && node.props.className.includes('min-h-[48px]')
+    );
+    expect(body.props.className).toContain('flex-1');
     const label = picker(ui).findByType(Text);
     expect(label.props.className).toContain('flex-1');
     expect(label.props.className).toContain('text-foreground');

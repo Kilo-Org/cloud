@@ -12,7 +12,11 @@ import {
   setSelectedBranchOverride,
 } from './new-session-repository-state';
 import { type RepositoryBranchesState, useRepositoryBranches } from '@/lib/use-new-session-repos';
-import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import {
+  FIELD_TRIGGER_BODY_CLASS,
+  FIELD_TRIGGER_FRAME_CLASS,
+  STATE_ACTION_CLASS,
+} from '@/lib/a11y/tap-target';
 import { branchPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 
 const router = vi.hoisted(() => ({ push: vi.fn() }));
@@ -131,6 +135,9 @@ function rowBody(renderer: TestRenderer.ReactTestRenderer) {
   return rowFrame(renderer)?.children[0] as TestRenderer.ReactTestInstance | undefined;
 }
 
+/** The class names of the shared trigger body, for a body that must render it. */
+const TRIGGER_BODY_CLASSES = FIELD_TRIGGER_BODY_CLASS.split(' ');
+
 /** Classes that pin a node's own height — none may sit on a row frame. */
 function heightClasses(node: TestRenderer.ReactTestInstance | undefined): string[] {
   return classesOf(node).filter(name => /^-?(min-)?h-/.test(name));
@@ -243,7 +250,7 @@ describe('RepositoryBranchSelector', () => {
     const loading = mountSelector(githubRow, branchesState({ isLoading: true }));
 
     expect(heightClasses(rowFrame(loading))).toHaveLength(0);
-    expect(classesOf(rowBody(loading))).toContain(ROW_TARGET_CLASS);
+    expect(classesOf(rowBody(loading))).toContain('min-h-[48px]');
     expect(
       loading.root.findAll(
         node => node.props.accessibilityLabel === i18n.t('agentChat.newSession.branchLoading')
@@ -253,7 +260,7 @@ describe('RepositoryBranchSelector', () => {
     const loaded = mountSelector(githubRow);
     expect(rowFrame(loaded)?.props.accessibilityLabel).toBe(branchLabel('main'));
     expect(heightClasses(rowFrame(loaded))).toHaveLength(0);
-    expect(classesOf(rowBody(loaded))).toContain(ROW_TARGET_CLASS);
+    expect(classesOf(rowBody(loaded))).toContain('min-h-[48px]');
   });
 
   // Spot check e4-branch-03/04: the screenshots showed a blue "refreshing"
@@ -295,7 +302,7 @@ describe('RepositoryBranchSelector', () => {
       // The frame never pins a height: a floor read against a border box makes
       // the states whose content is already 48 dp tall taller than the rest.
       expect(heightClasses(rowFrame(renderer))).toHaveLength(0);
-      expect(classesOf(rowBody(renderer))).toContain(ROW_TARGET_CLASS);
+      expect(classesOf(rowBody(renderer))).toContain('min-h-[48px]');
       expect(rowsWithClass(renderer, 'h-12')).toHaveLength(0);
     }
   });
@@ -319,7 +326,7 @@ describe('RepositoryBranchSelector', () => {
     const renderer = mountSelector(githubRow, branchesState({ isRetryableError: true }));
     const body = rowBody(renderer);
 
-    expect(classesOf(body)).toContain(ROW_TARGET_CLASS);
+    expect(classesOf(body)).toContain('min-h-[48px]');
     expect(body?.findAllByType('Button' as never)).toHaveLength(1);
 
     const [retryAction] = renderer.root.findAllByType('Button' as never);
@@ -386,7 +393,7 @@ describe('RepositoryBranchSelector', () => {
       throw new Error('the permanent-failure note rendered without a row');
     }
     const classes = (row.props.className as string).split(' ');
-    expect(classes).toContain(ROW_TARGET_CLASS);
+    expect(classesOf(row)).toContain('min-h-[48px]');
     expect(classes).not.toContain('h-12');
   });
 
@@ -441,6 +448,60 @@ describe('RepositoryBranchSelector', () => {
     press(trigger);
     expect(router.push).not.toHaveBeenCalled();
     expect(branchPickerSlot.get(UNFENCED_ROUTE_KEY)).toBeUndefined();
+  });
+
+  it('renders every state in the same trigger frame as the pickers above it', () => {
+    // The finding this pins: the branch row measured ~50.3 dp while the
+    // Account, Run on and Repository triggers above it measured ~44.2 dp, so
+    // the last control in the column read as a differently sized field, and
+    // the failed and note states swapped the frame's fill for a card.
+    const states: RepositoryBranchesState[] = [
+      branchesState({ isLoading: true }),
+      branchesState(),
+      branchesState({ isRetryableError: true }),
+      branchesState({ isPermanentError: true }),
+      branchesState({ branches: [], defaultBranch: null }),
+      branchesState({ isEnabled: false }),
+    ];
+    const triggerFrame = FIELD_TRIGGER_FRAME_CLASS.split(' ').sort();
+    for (const state of states) {
+      const renderer = mountSelector(githubRow, state);
+      expect(classesOf(rowFrame(renderer)).sort()).toEqual(triggerFrame);
+      expect(classesOf(rowBody(renderer))).toEqual(expect.arrayContaining(TRIGGER_BODY_CLASSES));
+      // One fill for every state, and it is the shared trigger's own.
+      expect(classesOf(rowFrame(renderer)).filter(name => name.startsWith('bg-'))).toEqual([
+        'bg-secondary',
+      ]);
+    }
+  });
+
+  it("starts a note row at the frame's leading inset, like the failed message", () => {
+    // A note is a line of copy inside a field, so it reads from the leading
+    // edge: the shared body lays its row out at the start, and only the
+    // loading line fills the width (its skeleton does).
+    const renderer = mountSelector(githubRow, branchesState({ isPermanentError: true }));
+
+    expect(classesOf(rowBody(renderer))).toEqual(TRIGGER_BODY_CLASSES);
+    expect(classesOf(rowBody(renderer))).not.toContain('justify-center');
+    expect(classesOf(rowBody(renderer))).not.toContain('justify-between');
+  });
+
+  it('draws the retry borderless, on the shared action floor, aligned to the message inset', () => {
+    // A box inside the frame drew its own border against the frame's (doubled
+    // edges, worst in dark) and sat 10.5 dp in from the trailing border. A
+    // borderless action fills the body instead, and its negative trailing
+    // margin cancels its own horizontal padding, so the label keeps the same
+    // 10.5 dp from the trailing border that the message keeps from the leading
+    // one in either direction.
+    const renderer = mountSelector(githubRow, branchesState({ isRetryableError: true }));
+    const retryAction = renderer.root.findAllByType('Button' as never)[0];
+    if (retryAction === undefined) {
+      throw new Error('the retry action did not render');
+    }
+
+    expect(retryAction.props.variant).toBe('ghost');
+    expect(classesOf(retryAction)).toContain(STATE_ACTION_CLASS);
+    expect(classesOf(retryAction)).toContain('-me-3');
   });
 });
 

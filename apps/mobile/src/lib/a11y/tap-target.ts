@@ -61,6 +61,31 @@ export const STATE_ACTION_CLASS = 'min-h-[48px]';
 export const ROW_TARGET_CLASS = 'min-h-[48px]';
 
 /**
+ * The frame a stacked form gives its pickers — Account, Run on, Repository and
+ * the branch row under them. One field shape for the whole column, so a form
+ * never shows two trigger heights side by side.
+ *
+ * It carries no vertical padding of its own on purpose: a floor placed on the
+ * frame is measured against its border box, so a state whose content is
+ * already {@link ROW_TARGET_CLASS} tall renders one border taller than a state
+ * whose content is a line of text, and the column moves as that state arrives.
+ * The body inside it owns the height instead (see
+ * {@link FIELD_TRIGGER_BODY_CLASS}).
+ */
+export const FIELD_TRIGGER_FRAME_CLASS =
+  'flex-row items-center rounded-lg border border-border bg-secondary px-3';
+
+/**
+ * The content box inside {@link FIELD_TRIGGER_FRAME_CLASS}. Every trigger and
+ * every state of one renders in this box, so all of them measure
+ * `48 dp + the frame's two borders` (50 dp) — above `DESIGN.md:364`'s 44pt
+ * floor, and the height the 48 dp form buttons below them already use. A
+ * value line, a skeleton, a note or a 48 dp action all fit inside it without
+ * growing the frame.
+ */
+export const FIELD_TRIGGER_BODY_CLASS = 'min-h-[48px] flex-1 flex-row items-center gap-2';
+
+/**
  * The frame a screen header's titled control renders on its own pressable
  * node — the pressable title and a header title composed of its own content.
  * A title sized by its text reports that line's height (`text-lg` is 24.8dp),

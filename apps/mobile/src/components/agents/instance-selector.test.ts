@@ -20,6 +20,7 @@ vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('react-native', () => ({
   Keyboard: { dismiss: vi.fn() },
   Pressable: 'Pressable',
+  View: 'View',
 }));
 
 vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
@@ -29,7 +30,13 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000', mutedForeground: '#666' }),
 }));
 
-type Node = { props?: Record<string, unknown> } | null | undefined | string | number | boolean;
+type Node =
+  | { type?: unknown; props?: Record<string, unknown> }
+  | null
+  | undefined
+  | string
+  | number
+  | boolean;
 
 function textValues(node: Node): string[] {
   if (typeof node === 'string') {
@@ -44,13 +51,21 @@ function textValues(node: Node): string[] {
   );
 }
 
-/** The props of the closed selector's value line, the only `flex-1` text. */
+/**
+ * The props of the closed selector's value line: the only `flex-1` text. The
+ * trigger's content box is also `flex-1`, so the element type has to name the
+ * text itself.
+ */
 function valueProps(node: Node): Record<string, unknown> | undefined {
   if (node === null || typeof node !== 'object') {
     return undefined;
   }
   const props = node.props;
-  if (typeof props?.className === 'string' && props.className.includes('flex-1')) {
+  if (
+    node.type === 'Text' &&
+    typeof props?.className === 'string' &&
+    props.className.includes('flex-1')
+  ) {
     return props;
   }
   const children = props?.children;

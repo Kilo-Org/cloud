@@ -42,18 +42,15 @@ export default defineConfig({
     plugins: [tailwindcss()],
   }),
   zip: {
-    // WXT globs every file under `sourcesRoot` and keeps one when it matches
-    // `includeSources` OR misses `excludeSources`, so this list only acts as
-    // the allowlist it reads like while `excludeSources` covers everything: a
-    // sources zip of the whole monorepo is about 490 MB uncompressed and AMO
-    // rejects the upload. What follows is the whole of
-    // `pnpm install --filter kilo-extension...` plus `build:firefox`; see
-    // SOURCE_BUILD.md, which ships in the zip as the reviewer instructions.
-    // Add a package here when the build starts reading its source.
+    /*
+     * WXT keeps a file that matches includeSources OR misses excludeSources, so
+     * excludeSources covers everything to make this list the allowlist it reads
+     * like. Without it the sources zip is the whole monorepo and AMO rejects it.
+     * The list is exactly what a filtered install plus build:firefox reads; see
+     * SOURCE_BUILD.md. Add a package here when the build starts reading it.
+     */
     includeSources: [
-      // Tailwind v4 scans the tree for class candidates and skips the paths
-      // these files ignore, so a build without them emits utilities the release
-      // build never had.
+      // Tailwind v4 skips gitignored paths when it scans for class names.
       '.gitignore',
       '.nvmrc',
       'SOURCE_BUILD.md',
@@ -62,9 +59,7 @@ export default defineConfig({
       'pnpm-lock.yaml',
       'pnpm-workspace.yaml',
       'scripts/check-pnpm.mjs',
-      // pnpm resolves the workspace graph from the lockfile and every project
-      // manifest, even for a filtered install, so each project contributes its
-      // package.json and nothing else.
+      // A filtered pnpm install still reads every workspace manifest.
       'apps/*/package.json',
       'packages/*/package.json',
       'services/**/package.json',

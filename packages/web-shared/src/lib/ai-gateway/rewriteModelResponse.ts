@@ -9,10 +9,12 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { getDynamicRequestLoggingMode } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
+import { stripNulBytesInPlace } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   apiRequestLogBlobKey,
+  deleteApiRequestLogBlob,
   uploadApiRequestLogBlob,
   type EnkryptRequestLog,
 } from '@kilocode/web-shared/lib/r2/api-request-log';
@@ -141,31 +143,44 @@ async function createRequestLogCapture(
         await logging.enkrypt?.(false);
         return;
       }
-      const created_at = new Date().toISOString();
-      const uploadError = await uploadApiRequestLogBlob(
-        apiRequestLogBlobKey({ id: usage_id, created_at }),
-        {
-          request: redactApiRequestLogRequest(request),
-          response: responseText ?? null,
-          error: detectedError,
-          enkrypt: await logging.enkrypt?.(),
-        }
-      );
+      const row = {
+        id: usage_id,
+        created_at: new Date().toISOString(),
+        generation_id: generationId,
+        kilo_user_id: user.id,
+        organization_id,
+        session_id,
+        requested_model: model,
+      };
+      // The session ID comes from client headers and the generation ID from the upstream
+      // response; Postgres text rejects NUL bytes. Stripping them, as microdollar_usage_metadata
+      // does, keeps the session ID equal to the one stored there.
+      stripNulBytesInPlace(row, []);
+      const key = apiRequestLogBlobKey(row);
+      const uploadError = await uploadApiRequestLogBlob(key, {
+        request: redactApiRequestLogRequest(request),
+        response: responseText ?? null,
+        error: detectedError,
+        enkrypt: await logging.enkrypt?.(),
+      });
       if (uploadError !== null) {
         logExceptInTest(
           `[rewriteModelResponse] failed to upload api_request_log_2 blob to R2 (user=${user.id}, status=${status}, model=${model}): ${uploadError.substring(0, 4000)}`
         );
         return;
       }
-      await db.insert(api_request_log_2).values({
-        id: usage_id,
-        created_at,
-        generation_id: generationId,
-        kilo_user_id: user.id,
-        organization_id,
-        session_id,
-        requested_model: model,
-      });
+      try {
+        await db.insert(api_request_log_2).values(row);
+      } catch (insertError) {
+        // Without its row the blob can no longer be found, and retention only deletes rows.
+        const deleteError = await deleteApiRequestLogBlob(key);
+        if (deleteError !== null) {
+          logExceptInTest(
+            `[rewriteModelResponse] failed to delete orphaned api_request_log_2 blob ${key} from R2: ${deleteError.substring(0, 4000)}`
+          );
+        }
+        throw insertError;
+      }
       logExceptInTest('[rewriteModelResponse] Inserted into api_request_log_2', usage_id);
     } catch (e) {
       const cause = e instanceof Error ? e.cause : undefined;

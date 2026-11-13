@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Palveluntarjoajien avaimet",
       "rowSubtitle": "Käytä palveluntarjoajasi omaa laskutusta",
+      "manageOnWeb": "Hallinnoi verkossa",
+      "manageOnWebReason": "Nämä palveluntarjoajat tarvitsevat jäsennellyt tunnistetiedot.",
       "description": "Näiden avainten kautta tehdyt pyynnöt laskutetaan palveluntarjoajasi tililtä Kilo-saldon sijaan.",
       "enabled": "Käytössä",
       "disabled": "Pois käytöstä",

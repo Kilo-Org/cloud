@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Furtuuwwan dhiyeessaa",
       "rowSubtitle": "Kaffaltii dhiyeessaa kee fayyadami",
+      "manageOnWeb": "Weebii irratti bulchi",
+      "manageOnWebReason": "Dhiyeessitoonni kunneen ragaalee eenyummaa caaseffamoo barbaadu.",
       "description": "Gaaffiiwwan furtuuwwan kanaan ergaman haftee Kilo kee irraa osoo hin taane herrega dhiyeessaa keetti kaffalamu.",
       "enabled": "Hojiirra jira",
       "disabled": "Dhaameera",

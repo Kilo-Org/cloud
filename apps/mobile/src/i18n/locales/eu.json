@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Hornitzaileen gakoak",
       "rowSubtitle": "Erabili zure hornitzailearen fakturazioa",
+      "manageOnWeb": "Kudeatu webean",
+      "manageOnWebReason": "Hornitzaile hauek egiturazko kredentzialak behar dituzte.",
       "description": "Gako hauen bidezko eskaerak zure hornitzaile-kontuan fakturatzen dira, ez zure Kilo saldoan.",
       "enabled": "Erabiltzen",
       "disabled": "Desaktibatuta",

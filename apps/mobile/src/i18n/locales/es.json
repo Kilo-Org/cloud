@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Claves de proveedor",
       "rowSubtitle": "Usa la facturación de tu propio proveedor",
+      "manageOnWeb": "Gestionar en la web",
+      "manageOnWebReason": "Estos proveedores necesitan credenciales estructuradas.",
       "description": "Las solicitudes realizadas con estas claves se facturan a tu cuenta del proveedor en lugar de a tu saldo de Kilo.",
       "enabled": "En uso",
       "disabled": "Desactivada",

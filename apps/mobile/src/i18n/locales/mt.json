@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Ċwievet tal-fornitur",
       "rowSubtitle": "Uża l-fatturazzjoni tal-fornitur tiegħek",
+      "manageOnWeb": "Immaniġġja fuq il-web",
+      "manageOnWebReason": "Dawn il-fornituri jeħtieġu kredenzjali strutturati.",
       "description": "It-talbiet magħmula b'dawn iċ-ċwievet jiġu ffatturati lill-kont tal-fornitur tiegħek minflok jitnaqqsu mill-bilanċ ta' Kilo tiegħek.",
       "enabled": "Qed tintuża",
       "disabled": "Mitfija",

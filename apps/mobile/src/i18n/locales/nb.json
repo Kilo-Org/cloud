@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Leverandørnøkler",
       "rowSubtitle": "Bruk din egen leverandørfakturering",
+      "manageOnWeb": "Administrer på nettet",
+      "manageOnWebReason": "Disse leverandørene trenger strukturert legitimasjon.",
       "description": "Forespørsler via disse nøklene faktureres leverandørkontoen din i stedet for Kilo-saldoen din.",
       "enabled": "I bruk",
       "disabled": "Slått av",

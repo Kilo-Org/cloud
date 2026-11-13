@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Ključi ponudnikov",
       "rowSubtitle": "Uporabi lastno obračunavanje pri ponudniku",
+      "manageOnWeb": "Upravljaj v spletu",
+      "manageOnWebReason": "Ti ponudniki potrebujejo strukturirane poverilnice.",
       "description": "Zahteve prek teh ključev se zaračunajo tvojemu računu pri ponudniku namesto stanju v Kilo.",
       "enabled": "V uporabi",
       "disabled": "Izklopljeno",

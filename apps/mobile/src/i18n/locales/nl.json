@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Providersleutels",
       "rowSubtitle": "Facturering via je eigen provider",
+      "manageOnWeb": "Beheren op het web",
+      "manageOnWebReason": "Deze providers hebben gestructureerde inloggegevens nodig.",
       "description": "Verzoeken via deze sleutels worden gefactureerd aan je provideraccount in plaats van afgeschreven van je Kilo-saldo.",
       "enabled": "In gebruik",
       "disabled": "Uitgeschakeld",

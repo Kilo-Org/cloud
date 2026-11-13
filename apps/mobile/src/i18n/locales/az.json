@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Provayder açarları",
       "rowSubtitle": "Öz provayder ödənişindən istifadə et",
+      "manageOnWeb": "Vebdə idarə et",
+      "manageOnWebReason": "Bu provayderlər strukturlaşdırılmış etimadnamələr tələb edir.",
       "description": "Bu açarlarla göndərilən sorğuların haqqı Kilo balansından deyil, provayder hesabından tutulur.",
       "enabled": "İstifadədədir",
       "disabled": "Söndürülüb",

@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Kľúče poskytovateľov",
       "rowSubtitle": "Používať vlastnú fakturáciu u poskytovateľa",
+      "manageOnWeb": "Spravovať na webe",
+      "manageOnWebReason": "Títo poskytovatelia vyžadujú štruktúrované prihlasovacie údaje.",
       "description": "Požiadavky cez tieto kľúče sa účtujú na tvoj účet u poskytovateľa namiesto tvojho zostatku v Kilo.",
       "enabled": "Používa sa",
       "disabled": "Vypnuté",

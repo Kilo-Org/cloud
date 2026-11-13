@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Chei de furnizor",
       "rowSubtitle": "Folosește facturarea propriului furnizor",
+      "manageOnWeb": "Gestionează pe web",
+      "manageOnWebReason": "Acești furnizori necesită date de autentificare structurate.",
       "description": "Solicitările făcute cu aceste chei sunt facturate în contul tău de furnizor, nu din soldul Kilo.",
       "enabled": "În uz",
       "disabled": "Dezactivată",

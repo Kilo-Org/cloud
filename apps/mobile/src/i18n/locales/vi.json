@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Khóa nhà cung cấp",
       "rowSubtitle": "Dùng thanh toán của nhà cung cấp riêng",
+      "manageOnWeb": "Quản lý trên web",
+      "manageOnWebReason": "Các nhà cung cấp này cần thông tin xác thực có cấu trúc.",
       "description": "Các yêu cầu qua những khóa này sẽ được tính phí vào tài khoản nhà cung cấp của bạn thay vì số dư Kilo.",
       "enabled": "Đang dùng",
       "disabled": "Đã tắt",

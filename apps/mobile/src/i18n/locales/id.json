@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Kunci penyedia",
       "rowSubtitle": "Gunakan penagihan penyedia milikmu sendiri",
+      "manageOnWeb": "Kelola di web",
+      "manageOnWebReason": "Penyedia ini memerlukan kredensial terstruktur.",
       "description": "Permintaan melalui kunci ini ditagihkan ke akun penyediamu, bukan ke saldo Kilo-mu.",
       "enabled": "Digunakan",
       "disabled": "Dinonaktifkan",

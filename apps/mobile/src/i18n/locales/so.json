@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Furayaasha bixiyaha",
       "rowSubtitle": "Isticmaal biilasha bixiyahaaga",
+      "manageOnWeb": "Ku maamul shabakadda",
+      "manageOnWebReason": "Bixiyeyaashan waxay u baahan yihiin aqoonsiyo habaysan.",
       "description": "Codsiyada maraya furayaashan waxaa lagu dallacayaa akoonka bixiyahaaga halkii laga jari lahaa hadhaagaaga Kilo.",
       "enabled": "La isticmaalayo",
       "disabled": "Waa la damiyay",

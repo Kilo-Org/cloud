@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "供應商金鑰",
       "rowSubtitle": "使用你自己的供應商計費",
+      "manageOnWeb": "在網頁上管理",
+      "manageOnWebReason": "這些供應商需要結構化憑證",
       "description": "透過這些金鑰發出的請求會向你的供應商帳戶計費，而不會從你的 Kilo 餘額扣除。",
       "enabled": "使用中",
       "disabled": "已關閉",

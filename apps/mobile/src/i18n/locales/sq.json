@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Çelësat e ofruesve",
       "rowSubtitle": "Përdor faturimin e ofruesit tënd",
+      "manageOnWeb": "Menaxho në ueb",
+      "manageOnWebReason": "Këta ofrues kërkojnë kredenciale të strukturuara.",
       "description": "Kërkesat përmes këtyre çelësave faturohen në llogarinë tënde te ofruesi, në vend të gjendjes tënde në Kilo.",
       "enabled": "Në përdorim",
       "disabled": "I çaktivizuar",

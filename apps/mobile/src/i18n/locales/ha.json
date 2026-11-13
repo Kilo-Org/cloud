@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Maɓallan masu samarwa",
       "rowSubtitle": "Yi amfani da biyan kuɗin mai samarwarka",
+      "manageOnWeb": "Sarrafa a yanar gizo",
+      "manageOnWebReason": "Waɗannan masu samarwa suna buƙatar takardun shaida masu tsari.",
       "description": "Ana cajin buƙatun da ke bi ta waɗannan maɓallan zuwa asusun mai samarwarka maimakon ragowar kuɗinka na Kilo.",
       "enabled": "Ana amfani",
       "disabled": "A kashe",

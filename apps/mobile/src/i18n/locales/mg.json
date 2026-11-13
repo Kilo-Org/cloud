@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Lakilen'ny mpamatsy",
       "rowSubtitle": "Ampiasao ny fandoavam-bola amin'ny mpamatsinao",
+      "manageOnWeb": "Tantano amin'ny tranonkala",
+      "manageOnWebReason": "Mila mari-panamarinana voarafitra ireo mpamatsy ireo.",
       "description": "Ny fangatahana mampiasa ireo lakile ireo dia aloa amin'ny kaontinao ao amin'ny mpamatsy fa tsy amin'ny ambim-bola Kilo anananao.",
       "enabled": "Ampiasaina",
       "disabled": "Najanona",

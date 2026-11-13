@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Provayder kalitlari",
       "rowSubtitle": "O'z provayderingiz orqali to'lash",
+      "manageOnWeb": "Vebda boshqarish",
+      "manageOnWebReason": "Bu provayderlar tuzilgan hisob ma'lumotlarini talab qiladi.",
       "description": "Bu kalitlar orqali yuborilgan so'rovlar uchun to'lov Kilo balansingizdan emas, provayder hisobingizdan olinadi.",
       "enabled": "Foydalanilmoqda",
       "disabled": "O'chirilgan",

@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Eochracha soláthraí",
       "rowSubtitle": "Úsáid billeáil do sholáthraí féin",
+      "manageOnWeb": "Bainistigh ar an ngréasán",
+      "manageOnWebReason": "Teastaíonn dintiúir struchtúrtha ó na soláthraithe seo.",
       "description": "Gearrtar iarratais a dhéantar trí na heochracha seo ar do chuntas soláthraí in ionad d'iarmhéid Kilo.",
       "enabled": "In úsáid",
       "disabled": "Múchta",

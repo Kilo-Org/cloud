@@ -95,7 +95,7 @@ function rowLabels(root: ReactTestRenderer['root']) {
     node =>
       Object.is(node.type, 'Pressable') &&
       typeof node.props.accessibilityLabel === 'string' &&
-      node.props.accessibilityLabel !== 'Open in browser'
+      node.props.accessibilityLabel !== 'Manage on the web'
   );
 }
 
@@ -205,7 +205,7 @@ describe('ProviderKeyProviderPickerScreen', () => {
 
     const webRow = root.findAll(
       node =>
-        Object.is(node.type, 'Pressable') && node.props.accessibilityLabel === 'Open in browser'
+        Object.is(node.type, 'Pressable') && node.props.accessibilityLabel === 'Manage on the web'
     );
     const [onlyWebRow] = webRow;
     if (!onlyWebRow) {

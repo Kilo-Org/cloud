@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Chiavi dei provider",
       "rowSubtitle": "Usa la fatturazione del tuo provider",
+      "manageOnWeb": "Gestisci sul web",
+      "manageOnWebReason": "Questi provider richiedono credenziali strutturate.",
       "description": "Le richieste effettuate con queste chiavi vengono addebitate sul tuo account del provider anziché sul saldo Kilo.",
       "enabled": "In uso",
       "disabled": "Disattivata",

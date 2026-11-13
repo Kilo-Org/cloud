@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Clés de fournisseur",
       "rowSubtitle": "Utiliser votre propre facturation fournisseur",
+      "manageOnWeb": "Gérer sur le web",
+      "manageOnWebReason": "Ces fournisseurs nécessitent des identifiants structurés.",
       "description": "Les requêtes effectuées avec ces clés sont facturées sur votre compte fournisseur au lieu de votre solde Kilo.",
       "enabled": "Utilisée",
       "disabled": "Désactivée",

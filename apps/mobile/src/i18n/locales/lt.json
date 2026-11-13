@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Teikėjų raktai",
       "rowSubtitle": "Naudoti savo teikėjo atsiskaitymą",
+      "manageOnWeb": "Tvarkyti žiniatinklyje",
+      "manageOnWebReason": "Šiems teikėjams reikalingi struktūrizuoti prisijungimo duomenys.",
       "description": "Užklausos, atliekamos su šiais raktais, apmokestinamos jūsų teikėjo paskyroje, o ne iš jūsų Kilo likučio.",
       "enabled": "Naudojamas",
       "disabled": "Išjungtas",

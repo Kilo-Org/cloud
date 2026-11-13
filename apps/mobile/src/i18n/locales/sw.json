@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Funguo za watoa huduma",
       "rowSubtitle": "Tumia malipo ya mtoa huduma wako",
+      "manageOnWeb": "Dhibiti kwenye wavuti",
+      "manageOnWebReason": "Watoa huduma hawa wanahitaji vitambulisho vilivyopangwa.",
       "description": "Maombi yanayopitia funguo hizi yanatozwa kwenye akaunti yako ya mtoa huduma badala ya salio lako la Kilo.",
       "enabled": "Inatumika",
       "disabled": "Imezimwa",

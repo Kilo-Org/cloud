@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Nodrošinātāju atslēgas",
       "rowSubtitle": "Izmanto sava nodrošinātāja norēķinus",
+      "manageOnWeb": "Pārvaldi tīmeklī",
+      "manageOnWebReason": "Šiem nodrošinātājiem nepieciešami strukturēti akreditācijas dati.",
       "description": "Pieprasījumi, kas veikti ar šīm atslēgām, tiek iekasēti no tava nodrošinātāja konta, nevis no tava Kilo atlikuma.",
       "enabled": "Tiek izmantota",
       "disabled": "Izslēgta",

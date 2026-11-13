@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Claves de provedor",
       "rowSubtitle": "Usa a facturación do teu propio provedor",
+      "manageOnWeb": "Xestionar na web",
+      "manageOnWebReason": "Estes provedores necesitan credenciais estruturadas.",
       "description": "As solicitudes feitas con estas claves facúranse na túa conta do provedor en lugar de descontarse do teu saldo de Kilo.",
       "enabled": "En uso",
       "disabled": "Desactivada",

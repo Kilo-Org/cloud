@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Klucze dostawców",
       "rowSubtitle": "Korzystaj z własnych rozliczeń u dostawcy",
+      "manageOnWeb": "Zarządzaj w przeglądarce",
+      "manageOnWebReason": "Ci dostawcy wymagają danych uwierzytelniających w określonym formacie.",
       "description": "Żądania wysyłane z użyciem tych kluczy są rozliczane na twoim koncie u dostawcy zamiast z salda Kilo.",
       "enabled": "W użyciu",
       "disabled": "Wyłączony",

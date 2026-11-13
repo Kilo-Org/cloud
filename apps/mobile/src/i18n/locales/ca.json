@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Claus de proveïdor",
       "rowSubtitle": "Utilitza la facturació del teu proveïdor",
+      "manageOnWeb": "Gestiona-ho al web",
+      "manageOnWebReason": "Aquests proveïdors necessiten credencials estructurades.",
       "description": "Les sol·licituds fetes amb aquestes claus es facturen al teu compte del proveïdor en lloc del saldo de Kilo.",
       "enabled": "En ús",
       "disabled": "Desactivada",

@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Teenusepakkuja võtmed",
       "rowSubtitle": "Kasuta oma teenusepakkuja arveldust",
+      "manageOnWeb": "Halda veebis",
+      "manageOnWebReason": "Need teenusepakkujad vajavad struktureeritud mandaate.",
       "description": "Nende võtmetega tehtud päringud arveldatakse sinu teenusepakkuja kontolt, mitte Kilo saldolt.",
       "enabled": "Kasutusel",
       "disabled": "Välja lülitatud",

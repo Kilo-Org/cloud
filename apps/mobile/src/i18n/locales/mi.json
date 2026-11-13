@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Ngā kī kaiwhakarato",
       "rowSubtitle": "Whakamahia te pire o tō ake kaiwhakarato",
+      "manageOnWeb": "Whakahaerehia i te ipurangi",
+      "manageOnWebReason": "E hiahia ana ēnei kaiwhakarato ki ngā tohu tuakiri whai hanganga.",
       "description": "Ko ngā tono mā ēnei kī ka pirehia ki tō pūkete kaiwhakarato, kaua ki tō toenga Kilo.",
       "enabled": "E whakamahia ana",
       "disabled": "Kua whakawetohia",

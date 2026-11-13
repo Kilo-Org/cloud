@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Mga key ng provider",
       "rowSubtitle": "Gamitin ang sarili mong billing sa provider",
+      "manageOnWeb": "Pamahalaan sa web",
+      "manageOnWebReason": "Kailangan ng mga provider na ito ng mga structured na credential.",
       "description": "Ang mga request na dumadaan sa mga key na ito ay sisingilin sa akawnt mo sa provider sa halip na sa balanse mo sa Kilo.",
       "enabled": "Ginagamit",
       "disabled": "Naka-off",

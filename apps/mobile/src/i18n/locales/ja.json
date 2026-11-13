@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "プロバイダーキー",
       "rowSubtitle": "自分のプロバイダーアカウントで課金",
+      "manageOnWeb": "Webで管理",
+      "manageOnWebReason": "これらのプロバイダーには構造化された認証情報が必要です",
       "description": "これらのキーを使ったリクエストは、Kiloの残高ではなくプロバイダーのアカウントに請求されます。",
       "enabled": "使用中",
       "disabled": "オフ",

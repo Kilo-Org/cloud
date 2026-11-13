@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Lyklar þjónustuveitna",
       "rowSubtitle": "Nota eigin greiðslur hjá þjónustuveitu",
+      "manageOnWeb": "Stjórna á vefnum",
+      "manageOnWebReason": "Þessar þjónustuveitur þurfa skipulagðar innskráningarupplýsingar.",
       "description": "Beiðnir með þessum lyklum eru gjaldfærðar á reikninginn þinn hjá þjónustuveitunni í stað Kilo-inneignarinnar þinnar.",
       "enabled": "Í notkun",
       "disabled": "Slökkt",

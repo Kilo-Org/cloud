@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Chaves de provedor",
       "rowSubtitle": "Use o faturamento do seu próprio provedor",
+      "manageOnWeb": "Gerenciar na web",
+      "manageOnWebReason": "Esses provedores precisam de credenciais estruturadas.",
       "description": "As solicitações feitas com essas chaves são cobradas na sua conta do provedor, e não no seu saldo Kilo.",
       "enabled": "Em uso",
       "disabled": "Desativada",

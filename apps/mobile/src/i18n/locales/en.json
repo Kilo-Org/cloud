@@ -397,6 +397,8 @@
     "providerKeys": {
       "title": "Provider keys",
       "rowSubtitle": "Use your own provider billing",
+      "manageOnWeb": "Manage on the web",
+      "manageOnWebReason": "These providers need structured credentials.",
       "description": "Requests through these keys are billed to your provider account instead of your Kilo balance.",
       "enabled": "In use",
       "disabled": "Turned off",

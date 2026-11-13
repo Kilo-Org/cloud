@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Ključevi pružatelja usluga",
       "rowSubtitle": "Koristi vlastitu naplatu kod pružatelja usluga",
+      "manageOnWeb": "Upravljaj na webu",
+      "manageOnWebReason": "Ovi pružatelji usluga trebaju strukturirane vjerodajnice.",
       "description": "Zahtjevi putem ovih ključeva naplaćuju se na tvoj račun kod pružatelja usluga umjesto s tvog Kilo salda.",
       "enabled": "U upotrebi",
       "disabled": "Isključeno",

@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "提供商密钥",
       "rowSubtitle": "使用你自己的提供商计费",
+      "manageOnWeb": "在网页上管理",
+      "manageOnWebReason": "这些提供商需要结构化凭据。",
       "description": "通过这些密钥发出的请求将计入你的提供商账户，而不是从 Kilo 余额中扣除。",
       "enabled": "使用中",
       "disabled": "已关闭",

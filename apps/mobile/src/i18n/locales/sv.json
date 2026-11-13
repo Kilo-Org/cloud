@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Leverantörsnycklar",
       "rowSubtitle": "Använd din egen leverantörsfakturering",
+      "manageOnWeb": "Hantera på webben",
+      "manageOnWebReason": "Dessa leverantörer kräver strukturerade autentiseringsuppgifter.",
       "description": "Förfrågningar via dessa nycklar faktureras ditt leverantörskonto i stället för ditt Kilo-saldo.",
       "enabled": "Används",
       "disabled": "Avstängd",

@@ -189,17 +189,22 @@ export function ProviderKeyProviderPickerScreen() {
       {offersWebOnlyProviders ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t('common.openInBrowser')}
-          className="mx-4 mb-1 flex-row items-center gap-2 rounded-lg bg-secondary px-3 py-3 active:opacity-70"
+          accessibilityLabel={t('profile.providerKeys.manageOnWeb')}
+          className="mx-4 mb-1 flex-row items-center gap-3 rounded-lg bg-secondary px-3 py-3 active:opacity-70"
           onPress={() => {
             void openExternalUrl(`${WEB_BASE_URL}/byok`, {
               label: t('profile.providerKeys.title'),
             });
           }}
         >
-          <Text className="min-w-0 flex-1 text-sm text-foreground">
-            {t('common.openInBrowser')}
-          </Text>
+          <View className="min-w-0 flex-1 gap-1">
+            <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+              {t('profile.providerKeys.manageOnWeb')}
+            </Text>
+            <Text className="text-xs text-muted-foreground" numberOfLines={2}>
+              {t('profile.providerKeys.manageOnWebReason')}
+            </Text>
+          </View>
           <DirectionalChevronRight size={14} color={colors.mutedForeground} />
         </Pressable>
       ) : null}

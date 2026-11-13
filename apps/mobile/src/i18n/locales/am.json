@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "የአቅራቢ ቁልፎች",
       "rowSubtitle": "የራስዎን የአቅራቢ ክፍያ ይጠቀሙ",
+      "manageOnWeb": "በድር ላይ ያስተዳድሩ",
+      "manageOnWebReason": "እነዚህ አቅራቢዎች የተዋቀሩ የማረጋገጫ መረጃዎችን ይፈልጋሉ።",
       "description": "በእነዚህ ቁልፎች የሚላኩ ጥያቄዎች ከKilo ቀሪ ሂሳብዎ ይልቅ በአቅራቢ መለያዎ ይከፈላሉ።",
       "enabled": "በጥቅም ላይ",
       "disabled": "ጠፍቷል",

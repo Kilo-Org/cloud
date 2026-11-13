@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Sağlayıcı anahtarları",
       "rowSubtitle": "Kendi sağlayıcı faturalandırmanı kullan",
+      "manageOnWeb": "Web'de yönet",
+      "manageOnWebReason": "Bu sağlayıcılar yapılandırılmış kimlik bilgileri gerektirir.",
       "description": "Bu anahtarlar üzerinden yapılan istekler Kilo bakiyen yerine sağlayıcı hesabına faturalandırılır.",
       "enabled": "Kullanımda",
       "disabled": "Kapalı",

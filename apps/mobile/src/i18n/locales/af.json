@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Verskaffersleutels",
       "rowSubtitle": "Gebruik jou eie verskaffer se fakturering",
+      "manageOnWeb": "Bestuur op die web",
+      "manageOnWebReason": "Hierdie verskaffers benodig gestruktureerde geloofsbriewe.",
       "description": "Versoeke via hierdie sleutels word aan jou verskafferrekening gefaktureer in plaas van van jou Kilo-saldo afgetrek.",
       "enabled": "In gebruik",
       "disabled": "Afgeskakel",

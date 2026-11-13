@@ -330,6 +330,8 @@
     "providerKeys": {
       "title": "Anbieterschlüssel",
       "rowSubtitle": "Eigene Anbieterabrechnung nutzen",
+      "manageOnWeb": "Im Web verwalten",
+      "manageOnWebReason": "Diese Anbieter benötigen strukturierte Anmeldedaten.",
       "description": "Anfragen über diese Schlüssel werden über dein Anbieterkonto statt über dein Kilo-Guthaben abgerechnet.",
       "enabled": "Aktiv",
       "disabled": "Deaktiviert",

@@ -32,6 +32,7 @@
     "./approval-key": "./src/approval-key.ts",
     "./byok-credentials": "./src/byok-credentials.ts",
     "./home-widget": "./src/home-widget.ts",
+    "./display-text": "./src/display-text.ts",
     "./tool-detail": "./src/tool-detail/index.ts",
     "./worktree-review": "./src/worktree-review/index.ts"
   },

@@ -108,6 +108,11 @@ vi.mock('@/lib/persist/resolved-delivery-failures', () => ({
   readResolvedDeliveryFailures: vi.fn(async () => []),
   persistResolvedDeliveryFailure: vi.fn(async () => undefined),
 }));
+vi.mock('@/lib/persist/pending-send-confirmations', () => ({
+  readPendingSendConfirmations: vi.fn(async () => []),
+  persistPendingSendConfirmation: vi.fn(async () => undefined),
+  clearPendingSendConfirmation: vi.fn(async () => undefined),
+}));
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.test',
   CLOUD_AGENT_WS_URL: 'wss://ws.test',
@@ -195,9 +200,18 @@ vi.mock('@/components/todos/session-todo-link', () => ({
 vi.mock('@/components/agents/message-text-select-sheet', () => ({
   MessageTextSelectSheet: 'MessageTextSelectSheet',
 }));
+// The root container ref `session-detail-content` reads for navigation
+// readiness. expo-router exposes it as one module-level singleton, so the mock
+// hands back the same object on every render; these screens render with the
+// container up, so no debounced publish is dropped.
+const navigationContainer = vi.hoisted(() => ({
+  addListener: () => () => undefined,
+  isReady: () => true,
+}));
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   useIsFocused: () => true,
+  useNavigationContainerRef: () => navigationContainer,
   usePreventRemove: vi.fn(),
   useNavigation: () => ({
     getState: () => ({
@@ -342,6 +356,17 @@ vi.mock('@/lib/hooks/use-remote-model-catalog-retry', () => ({
 }));
 vi.mock('@/lib/hooks/use-session-raise-reader', () => ({
   useSessionRaiseReader: () => () => null,
+}));
+// The header pill adds the session's compute charges to its total; this screen
+// test supplies the model cost only, so the read is pinned to "nothing recorded".
+vi.mock('@/lib/hooks/use-session-compute', () => ({
+  useSessionComputeCharges: () => ({ data: undefined, isError: false, refetch: vi.fn() }),
+  useComputeRates: () => ({ data: undefined }),
+}));
+// The compute poll follows the screen's focus and the app's foreground state;
+// this suite is about delivery order, so it stands in as on screen.
+vi.mock('@/lib/hooks/use-app-active-and-focused', () => ({
+  useAppActiveAndFocused: () => true,
 }));
 vi.mock('@/lib/use-github-repos-refresh', () => ({
   useGitHubReposRefresh: () => ({ openGitHubIntegration: vi.fn() }),
@@ -648,6 +673,7 @@ function makeManager() {
       olderMessagesOmittedItemCount: { value: 0 },
       resolvedDeliveryFailures: { value: new Set<string>() },
       supersededInFlightMessageIds: { value: new Set<string>() },
+      deliveredFailedPrompt: { value: null },
     },
     switchSession: vi.fn(),
     send: vi.fn(),

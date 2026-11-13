@@ -130,8 +130,23 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/transcript-execution-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/transcript-execution-failure-fixture';
     }
+    if (/(?:^|\/)dev\/transcript-preparation-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/transcript-preparation-failure-fixture';
+    }
     if (/(?:^|\/)dev\/transcript-undelivered-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/transcript-undelivered-fixture';
+    }
+    // Dev-only agent chat screen with its composer, for the design gate: a live
+    // session never holds still long enough for a cell to bracket it. The
+    // optional query selects the fixture's still state, so it is forwarded.
+    const agentChatFixture = /(?:^|\/)dev\/agent-chat-fixture\/?(\?.*)?$/.exec(path);
+    if (agentChatFixture) {
+      return `/(app)/agent-chat-fixture${agentChatFixture[1] ?? ''}`;
+    }
+    // Dev-only auth transition: the real sign-in screen, mounted inside the
+    // signed-in app, so sign-in can be exercised while an account is active.
+    if (/(?:^|\/)dev\/auth-switch-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/auth-switch-fixture';
     }
     // Dev-only render-recovery faults: `kiloapp:///dev/render-recovery-fixture/<name>`
     // arms one and opens the fixture route, or clears it without navigating.

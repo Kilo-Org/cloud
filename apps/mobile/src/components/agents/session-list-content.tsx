@@ -11,7 +11,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NewSessionButton } from '@/components/agents/new-session-button';
 import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { BodyEmpty } from '@/components/agents/session-list-body-empty';
-import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
+import {
+  selectSessionListBodyModel,
+  type SessionListClearAction,
+} from '@/components/agents/session-list-body-model';
 import { selectSessionListContentSurface } from '@/components/agents/session-list-content-surface';
 import { type SessionSection } from '@/components/agents/session-list-helpers';
 import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
@@ -80,12 +83,15 @@ type AgentSessionListContentProps = {
    */
   nonPullRefreshes: number;
   hasActiveQuery: boolean;
+  /** A platform or project filter narrows the list, so it can cause an empty body. */
+  hasActiveFilters: boolean;
   isSearching: boolean;
   /** True while the driving query fetches — the error body's retry in flight. */
   isRetrying: boolean;
   /** Committed (debounced) search query — scroll-to-top fires when this value changes. */
   searchQuery: string;
-  onClearQuery: () => void;
+  /** Retires exactly the narrowing input the pressed clear control names. */
+  onClearAction: (action: SessionListClearAction) => void;
   /** The no-history body's next step: open the new-session composer. */
   onCreateSession: () => void;
 };
@@ -107,10 +113,11 @@ export function AgentSessionListContent({
   onSessionPress,
   nonPullRefreshes,
   hasActiveQuery,
+  hasActiveFilters,
   isSearching,
   isRetrying,
   searchQuery,
-  onClearQuery,
+  onClearAction,
   onCreateSession,
 }: Readonly<AgentSessionListContentProps>) {
   const listRef = useRef<FlashListRef<SessionListRow>>(null);
@@ -187,8 +194,8 @@ export function AgentSessionListContent({
   // Pure body decision — see `session-list-body-model.ts`.
   const bodyModel = selectSessionListBodyModel({
     hasHistoryContent: sections.length > 0,
-    hasActiveQuery,
     isSearching,
+    hasActiveFilters,
     isError,
   });
 
@@ -202,14 +209,37 @@ export function AgentSessionListContent({
     hasFreshHistory,
   });
 
-  const clearQueryAction = useMemo(
-    () => (
-      <Button variant="outline" onPress={onClearQuery} className={STATE_ACTION_CLASS}>
-        <Text>{isSearching ? t('common.clearSearch') : t('common.clearFilters')}</Text>
-      </Button>
-    ),
-    [isSearching, onClearQuery, t]
-  );
+  // One control per active narrowing input, each naming exactly what it clears.
+  // A search and a filter can both hide the session, so the body would otherwise
+  // leave the hidden cause in place behind a label naming the other one.
+  const clearActions = useMemo(() => {
+    const actions =
+      bodyModel.kind === 'filtered-empty' || bodyModel.kind === 'query-error-empty'
+        ? bodyModel.clearActions
+        : [];
+    if (actions.length === 0) {
+      return null;
+    }
+    return (
+      <View className="flex-row flex-wrap items-center justify-center gap-2">
+        {actions.map(action => (
+          <Button
+            key={action}
+            variant="outline"
+            testID={action === 'clear-search' ? 'session-clear-search' : 'session-clear-filters'}
+            onPress={() => {
+              onClearAction(action);
+            }}
+            className={STATE_ACTION_CLASS}
+          >
+            <Text>
+              {action === 'clear-search' ? t('common.clearSearch') : t('common.clearFilters')}
+            </Text>
+          </Button>
+        ))}
+      </View>
+    );
+  }, [bodyModel, onClearAction, t]);
 
   // The no-history body's next step. It opens the same composer the Agents
   // tab's "New session" action does, so an empty history never dead-ends at a
@@ -431,7 +461,7 @@ export function AgentSessionListContent({
         <BodyEmpty
           kind="no-past-sessions"
           isSearching={isSearching}
-          clearQueryAction={clearQueryAction}
+          hasActiveFilters={hasActiveFilters}
           createSessionAction={createSessionAction}
           onRetry={onRetry}
           refreshControl={refreshControl}
@@ -451,10 +481,8 @@ export function AgentSessionListContent({
         <BodyEmpty
           kind={bodyModel.kind}
           isSearching={isSearching}
-          secondaryAction={
-            bodyModel.kind === 'query-error-empty' ? bodyModel.secondaryAction : undefined
-          }
-          clearQueryAction={clearQueryAction}
+          hasActiveFilters={hasActiveFilters}
+          clearActions={clearActions}
           isRetrying={isRetrying}
           onRetry={onRetry}
           refreshControl={refreshControl}

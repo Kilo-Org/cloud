@@ -346,6 +346,75 @@ describe('EventServiceClient', () => {
     }
   });
 
+  it('stops after a refused connection ticket when no unauthorized handler is configured', async () => {
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const statuses = [401, 403];
+      let attempt = 0;
+      const refusedFetch = vi.fn(async () => {
+        const status = statuses[attempt % statuses.length];
+        attempt += 1;
+        return new Response(null, { status });
+      });
+      vi.stubGlobal('fetch', refusedFetch);
+
+      const client = makeClient();
+      await client.connect();
+
+      expect(refusedFetch).toHaveBeenCalledTimes(1);
+      expect(allMockWs).toHaveLength(0);
+      expect(client.isConnected()).toBe(false);
+      expect(warn).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(refusedFetch).toHaveBeenCalledTimes(1);
+      expect(allMockWs).toHaveLength(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops when a reconnect ticket is refused and no unauthorized handler is configured', async () => {
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      let attempt = 0;
+      const refusedAfterFirst = vi.fn(async () => {
+        attempt += 1;
+        if (attempt === 1) {
+          return new Response(JSON.stringify({ ticket: 'ticket-1' }), {
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        return new Response(null, { status: 403 });
+      });
+      vi.stubGlobal('fetch', refusedAfterFirst);
+
+      const client = makeClient();
+      await client.connect();
+      expect(client.isConnected()).toBe(true);
+      expect(allMockWs).toHaveLength(1);
+
+      lastMockWs.triggerClose();
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(refusedAfterFirst).toHaveBeenCalledTimes(2);
+      expect(allMockWs).toHaveLength(1);
+      expect(warn).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(refusedAfterFirst).toHaveBeenCalledTimes(2);
+      expect(allMockWs).toHaveLength(1);
+      expect(client.isConnected()).toBe(false);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps reconnecting after repeated pre-open failures', async () => {
     vi.useFakeTimers();
     const reconnectDelay = vi.spyOn(Math, 'random').mockReturnValue(1);

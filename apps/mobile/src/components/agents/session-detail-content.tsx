@@ -5,14 +5,19 @@ import {
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
+import {
+  type Href,
+  useFocusEffect,
+  useIsFocused,
+  useNavigationContainerRef,
+  useRouter,
+} from 'expo-router';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { Platform, type TextInstance, View } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -38,6 +43,7 @@ import {
 import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
 import { restartAgentSession } from '@/components/agents/restart-agent-session';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
+import { addCreditsDestinationFor } from '@/lib/credits/add-credits-destination';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { MessageErrorBoundary } from '@/components/agents/message-error-boundary';
@@ -140,6 +146,7 @@ import {
   SessionSkeletonMessages,
 } from '@/components/agents/session-detail-skeleton';
 import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
+import { PULL_FEEDBACK_MIN_BEAT_MS } from '@/components/agents/use-pull-refresh';
 import {
   SESSION_SLOW_LOAD_MS,
   useSessionSlowLoadPhase,
@@ -177,12 +184,14 @@ import { ToolRunSheetHost } from '@/components/agents/tool-run-sheet-host';
 import {
   buildTerminalErrorCopyText,
   resolveSessionTerminalError,
+  type SessionTerminalError,
   statusIndicatorDuplicatesMessageFailure,
 } from '@/components/agents/session-terminal-error';
 import { performCopy } from '@/components/agents/use-message-copy';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
 import { type ContextDisplayScope } from '@/components/context-control';
+import { KeyboardFollowPane } from '@/components/keyboard-follow-pane';
 import { ScreenHeader } from '@/components/screen-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { BlurBar } from '@/components/ui/blur-bar';
@@ -219,6 +228,9 @@ import {
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
 import { useRemoteModelCatalogRetry } from '@/lib/hooks/use-remote-model-catalog-retry';
+import { useAppActiveAndFocused } from '@/lib/hooks/use-app-active-and-focused';
+import { computeChargesMicrodollars, sessionTotalMicrodollars } from '@/lib/session-compute-total';
+import { useSessionComputeCharges } from '@/lib/hooks/use-session-compute';
 import { useSessionRaiseReader } from '@/lib/hooks/use-session-raise-reader';
 import {
   buildContinueHref,
@@ -292,6 +304,12 @@ export function SessionDetailContent({
   const manager = useSessionManager();
   const { t } = useTranslation();
   const router = useRouter();
+  // The root container this screen's `setParams` lands on, read at the moment
+  // of the call rather than through state: `setParams` asserts the container is
+  // mounted and throws "Attempted to navigate before mounting the Root Layout
+  // component" otherwise (KILO-APP-6VA). The debounced publish below is the one
+  // call that can outlive the container.
+  const navigationRef = useNavigationContainerRef();
   const { openNewSessionHref } = useNewSessionNavigator();
   const { confirm, dialog } = useConfirmDialog();
   // The router behind the failure row's one navigation. Read through a ref so a
@@ -470,13 +488,20 @@ export function SessionDetailContent({
       return undefined;
     }
     const timer = setTimeout(() => {
+      // The container can go away between this effect and its timer: an
+      // activity recreate, or the bootstrap-error surface that renders no
+      // `Slot`. Dropping the publish costs one resume position; writing it
+      // would throw out of the timer and take the app to the fatal screen.
+      if (!navigationRef.isReady()) {
+        return;
+      }
       publishedAnchorRef.current = anchor;
       router.setParams({ at: anchor });
     }, ANCHOR_PUBLISH_DEBOUNCE_MS);
     return () => {
       clearTimeout(timer);
     };
-  }, [anchor, router]);
+  }, [anchor, navigationRef, router]);
 
   // A send takes the transcript position over: the sent message and its reply
   // must be on screen, even when a `?at=` resume left the transcript parked on
@@ -570,7 +595,35 @@ export function SessionDetailContent({
     },
   });
 
-  const organizationId = fetchedData?.organizationId ?? undefined;
+  // `fetchSession` is the only source of the session's own row, so the recorded
+  // profile id, the title, the cost and the loading flag all apply only once the
+  // row names the session on screen.
+  const sessionDataLoaded = fetchedData?.kiloSessionId === sessionId;
+  // The organization scope follows the session on screen. Until that session's
+  // own row is available the scope is unresolved: the org-scoped reads wait for
+  // it, and the create, restart, Continue and fork actions stay unavailable.
+  const organizationId = sessionDataLoaded ? (fetchedData.organizationId ?? undefined) : undefined;
+
+  // Compute cost is part of the session's total wherever the screen paints one:
+  // the header pill and the context sheet. One read serves both, and a session
+  // with no compute scope answers nothing, so the model cost stands alone.
+  //
+  // A session screen stays mounted on the navigation stack after the user
+  // leaves it, so the poll follows this screen's focus and the app's foreground
+  // state rather than its mount; a blurred screen reads the entry another
+  // surface refreshes on its own turn instead of asking every interval from the
+  // background.
+  const cloudAgentSessionId = sessionDataLoaded ? (fetchedData.cloudAgentSessionId ?? null) : null;
+  const computePolling = useAppActiveAndFocused();
+  const computeCharges = useSessionComputeCharges({
+    cloudAgentSessionId,
+    organizationId,
+    poll: computePolling,
+  });
+  const sessionCostMicrodollars = sessionTotalMicrodollars(
+    totalMicrodollars,
+    computeChargesMicrodollars(computeCharges.data)
+  );
 
   // The session's active-profile chip: the profile this session runs on. It
   // resolves from the session's own recorded `profileId`, so an explicit
@@ -585,12 +638,10 @@ export function SessionDetailContent({
     effectiveDefaultId,
     isLoading: isSessionProfileLoading,
     isError: isSessionProfileError,
-  } = useEffectiveAgentProfile(organizationId);
-  // `fetchSession` is the only source of the session's own profile id, and the
-  // atom can still hold the previous session's row. Until the CURRENT session's
-  // read resolves, the chip stays hidden rather than briefly naming the context
-  // default for a session that recorded a different profile.
-  const sessionDataLoaded = fetchedData?.kiloSessionId === sessionId;
+  } = useEffectiveAgentProfile(organizationId, null, { enabled: sessionDataLoaded });
+  // Until the current session's read resolves, the chip stays hidden rather than
+  // briefly naming the context default for a session that recorded a different
+  // profile.
   const recordedSessionProfileId = sessionDataLoaded ? (fetchedData.profileId ?? null) : null;
   const activeSessionProfileId = sessionDataLoaded
     ? (recordedSessionProfileId ?? effectiveDefaultId)
@@ -632,13 +683,26 @@ export function SessionDetailContent({
   useCliSessionPresence(presenceSessionId);
 
   const { saveModel: savePersistedModel } = usePersistedAgentModel();
-  const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
+  const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId, {
+    enabled: sessionDataLoaded,
+  });
   const { defaultExpanded: reasoningDefaultExpanded } = useReasoningPreference();
   const { hideThinking, hasLoaded: hideThinkingLoaded } = useHideThinkingPreference();
   const { keepScreenOn, hasLoaded: keepScreenOnLoaded } = useKeepScreenOnPreference();
   const { condenseToolCalls } = useCondenseToolCallsPreference();
-  const { models: gatewayModels, isLoading: gatewayModelsLoading } =
-    useAvailableModels(organizationId);
+  const { models: catalogModels, isLoading: gatewayCatalogLoading } = useAvailableModels(
+    organizationId,
+    'member',
+    { enabled: sessionDataLoaded }
+  );
+  // The picker lists models only once the session's scope is resolved. Until
+  // then it holds its loading state, so it never presents a model list for a
+  // scope the screen has not settled.
+  const gatewayModels = useMemo(
+    () => (sessionDataLoaded ? catalogModels : []),
+    [catalogModels, sessionDataLoaded]
+  );
+  const gatewayModelsLoading = gatewayCatalogLoading || !sessionDataLoaded;
   const sessionModels = useSessionModelOptions({
     activeSessionType,
     remoteModelState,
@@ -720,7 +784,8 @@ export function SessionDetailContent({
   );
   const { profileAgents: effectiveProfileAgents } = useEffectiveProfileCustomModes(
     organizationId,
-    activeSessionProfileId
+    activeSessionProfileId,
+    { enabled: sessionDataLoaded }
   );
   const roleView = useMemo(
     () =>
@@ -1172,7 +1237,7 @@ export function SessionDetailContent({
   // transport, the next build restores the normal streaming behavior.
   const dropUnrenderableUserRows = activeSessionType === 'read-only';
 
-  const baseTranscript = useMemo(() => {
+  const { transcript: baseTranscript, preparationFailureTriggers } = useMemo(() => {
     // A superseded submission's preparation goes with its row: dropping only
     // the row would leave `mergeSessionTranscript` re-emitting the attempt at
     // the end (its trigger id is no longer in the message list).
@@ -1182,10 +1247,22 @@ export function SessionDetailContent({
         : preparationAttempts.filter(
             attempt => !supersededMessageIds.has(attempt.triggerMessageId)
           );
-    return mergeSessionTranscript(displayedMessages, attempts, {
-      deliveryStates: pendingMessages,
-      dropUnrenderableUserRows,
-    });
+    // A failed attempt states its own failure in the group it renders, with the
+    // stage and the reason. The question that triggered it must not repeat the
+    // generic response failure on top of that statement.
+    const failed = new Set<string>();
+    for (const attempt of attempts) {
+      if (attempt.status === 'failed') {
+        failed.add(attempt.triggerMessageId);
+      }
+    }
+    return {
+      transcript: mergeSessionTranscript(displayedMessages, attempts, {
+        deliveryStates: pendingMessages,
+        dropUnrenderableUserRows,
+      }),
+      preparationFailureTriggers: failed,
+    };
   }, [
     displayedMessages,
     preparationAttempts,
@@ -1373,6 +1450,38 @@ export function SessionDetailContent({
     composerControlRef.current?.setText(text);
   }, []);
 
+  // A failed send the server accepted after all: its response was lost, so the
+  // composer put the text back, and the confirmed message then reached the
+  // transcript. The transcript owns the message now, so the restored draft is
+  // withdrawn — otherwise the same text sits in two places and the next Send
+  // posts it twice. The composer keeps a draft the reader has since edited, and
+  // the record's `sequence` makes this effect run once per delivery.
+  const deliveredFailedPrompt = useAtomValue(manager.atoms.deliveredFailedPrompt);
+  const appliedDeliveredFailedPromptSequence = useRef(0);
+  // The load each record was published for. The draft suppression lasts only
+  // until the composer consumes that one load, so a draft the reader stores
+  // afterwards with the same words is never taken for the delivered message.
+  const [consumedDeliveredSequence, setConsumedDeliveredSequence] = useState(0);
+  useEffect(() => {
+    if (deliveredFailedPrompt === null) {
+      return;
+    }
+    if (deliveredFailedPrompt.sequence <= appliedDeliveredFailedPromptSequence.current) {
+      return;
+    }
+    appliedDeliveredFailedPromptSequence.current = deliveredFailedPrompt.sequence;
+    composerControlRef.current?.withdrawRestoredSend(deliveredFailedPrompt.text);
+  }, [deliveredFailedPrompt, setConsumedDeliveredSequence]);
+  const consumableDeliveredDraft =
+    deliveredFailedPrompt !== null && deliveredFailedPrompt.sequence > consumedDeliveredSequence
+      ? deliveredFailedPrompt.text
+      : null;
+  const consumeDeliveredDraft = useCallback(() => {
+    if (deliveredFailedPrompt !== null) {
+      setConsumedDeliveredSequence(deliveredFailedPrompt.sequence);
+    }
+  }, [deliveredFailedPrompt]);
+
   // Where the account settles a turn its balance refused. The action reads no
   // session state, so it stays wired for a read-only transcript too. It reads
   // the router through the ref `renderItem` already holds its identity across a
@@ -1381,6 +1490,19 @@ export function SessionDetailContent({
   const handleAddCredits = useCallback(() => {
     routerRef.current.push('/(app)/credits' as Href);
   }, []);
+
+  // One destination object for every row: a fresh one per render would
+  // re-create each memoized row's props. The session records the balance that
+  // pays for it, so an organization's session is settled on that organization's
+  // billing page and a personal one on the in-app purchase screen. Until the
+  // CURRENT session's metadata is the loaded one, that record is unknown, so the
+  // row offers no action rather than reading "no organization" from a load that
+  // has not answered yet — the fallback would be the personal balance.
+  const addCredits = useMemo(
+    () =>
+      sessionDataLoaded ? addCreditsDestinationFor(organizationId, handleAddCredits) : undefined,
+    [handleAddCredits, organizationId, sessionDataLoaded]
+  );
 
   const handleRetryMessage = useCallback(
     (message: StoredMessage) => {
@@ -1641,9 +1763,10 @@ export function SessionDetailContent({
           onLongPressDetails={handleOpenDetails}
           holdQueuedSlot={isStreaming && heldQueuedIds.has(item.message.info.id)}
           onRetryMessage={retryPrompt !== null ? handleRetryMessage : undefined}
-          onAddCredits={handleAddCredits}
+          addCredits={addCredits}
           retryAvailable={retryAvailable}
           onCopyToComposer={handleCopyToComposer}
+          failureStatedByPreparation={preparationFailureTriggers.has(item.message.info.id)}
           onRestoreQueued={
             canceledQueuedMessages.has(item.message.info.id) ? handleRestoreQueued : undefined
           }
@@ -1676,8 +1799,9 @@ export function SessionDetailContent({
       pendingMessages,
       heldQueuedIds,
       retryAvailable,
+      preparationFailureTriggers,
       handleRetryMessage,
-      handleAddCredits,
+      addCredits,
       handleCopyToComposer,
       handleOpenDetails,
       handleRestoreQueued,
@@ -1852,6 +1976,99 @@ export function SessionDetailContent({
       }),
     [error, statusIndicator, messages.length, connectionLost]
   );
+  // Acknowledging a terminal error's Retry. The reopen clears `errorAtom` and
+  // sets the loading flag before its first await, so the card that carries the
+  // action is unmounted by the same tap: without this, a failure that answers
+  // as fast as the transport can ask leaves the screen as it was and the tap
+  // reads as lost. The card keeps the failure it states, with its action busy,
+  // until the reopen's outcome owns the body again — content landed, the
+  // reopened failure is on screen, or the shared transport leg came back.
+  //
+  // The acknowledgment is also bounded by the slow-load threshold, the same
+  // window the slow card's Retry uses: a reopen that never reports an outcome
+  // must not leave the action disabled behind a spinner.
+  const [terminalRetry, setTerminalRetry] = useState<{
+    sessionId: string;
+    error: SessionTerminalError;
+    tappedAt: number;
+  } | null>(null);
+  const terminalRetryPending = terminalRetry?.sessionId === sessionId;
+  useEffect(() => {
+    if (!terminalRetryPending) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setTerminalRetry(null);
+    }, SESSION_SLOW_LOAD_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [terminalRetryPending]);
+  useEffect(() => {
+    if (!terminalRetryPending) {
+      return undefined;
+    }
+    // The reopen's outcome owns the body again once content landed, the
+    // reopened failure is on screen, or — on the session branch — the open
+    // finished without a failure to show, which is a session that really is
+    // empty. That last case has to release: without it a successful retry on an
+    // empty session would keep the stale failure card up for the whole window.
+    const settled =
+      messages.length > 0 ||
+      (terminalRetry.error.retryWith === 'connection'
+        ? terminalError === null
+        : !isLoading && (terminalError !== null || fetchedData?.kiloSessionId === sessionId));
+    if (!settled) {
+      return undefined;
+    }
+    // The outcome is already on screen, but a refused reopen settles in well
+    // under a second: releasing at once makes the busy state a flash the reader
+    // misses, and the tap reads as lost again — the same device-defect
+    // reasoning the list's pull feedback uses. Hold the acknowledged state
+    // through that beat, then swap.
+    const beat = Math.max(0, PULL_FEEDBACK_MIN_BEAT_MS - (Date.now() - terminalRetry.tappedAt));
+    if (beat === 0) {
+      setTerminalRetry(null);
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setTerminalRetry(null);
+    }, beat);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [
+    terminalRetryPending,
+    terminalRetry,
+    terminalError,
+    isLoading,
+    messages.length,
+    fetchedData,
+    sessionId,
+  ]);
+  const shownTerminalError =
+    terminalRetryPending && messages.length === 0
+      ? (terminalError ?? terminalRetry.error)
+      : terminalError;
+  const handleTerminalRetry = (failure: SessionTerminalError): void => {
+    if (terminalRetryPending) {
+      return;
+    }
+    setTerminalRetry({ sessionId, error: failure, tappedAt: Date.now() });
+    if (failure.retryWith === 'connection') {
+      retrySessionConnection();
+      return;
+    }
+    void (async () => {
+      try {
+        await manager.switchSession(sessionId);
+      } catch {
+        // A reopen that rejects without clearing the failure never settles on
+        // its own: hand the action back instead of leaving it busy.
+        setTerminalRetry(current => (current?.sessionId === sessionId ? null : current));
+      }
+    })();
+  };
   // A failed last row states its own failure and carries the action. The fixed
   // footer's error line must not state the same failure a second time (explorer
   // finding: the same failure stated three times), so a status error the row
@@ -2006,9 +2223,9 @@ export function SessionDetailContent({
   // header pill to show and nothing for its sheet to do: it reports no usage,
   // and a session opened read-only cannot auto-approve, so the pill would only
   // paint its two dash placeholders beside the finished empty state (design
-  // gate, empty read-only fixture). The pill keeps its reserved box instead,
-  // exactly like the unresolved placeholder; a failed open keeps the live
-  // control, whose sheet still offers the connection reading and its Retry.
+  // gate, empty read-only fixture). The pill hides instead, exactly like the
+  // unresolved placeholder; a failed open keeps the live control, whose sheet
+  // still offers the connection reading and its Retry.
   const contextPillHasNothingToReport =
     isReadOnly &&
     messages.length === 0 &&
@@ -2016,14 +2233,18 @@ export function SessionDetailContent({
     terminalError === null &&
     !isSessionChromePending;
   const headerRight = (
+    // The pill leads and the Follow control takes the trailing edge. The pill
+    // grows by one reading when the session starts reporting usage, and a
+    // control after it would move by that width; at the end of the row it keeps
+    // one position instead. The growth comes out of the heading beside it, which
+    // keeps its own line cap and tail ellipsis — the trade this row makes to
+    // leave the title the width up to the pill's painted size.
     <View className="min-w-0 shrink flex-row items-center gap-2">
-      <SessionFollowButton sessionId={sessionId} />
       <SessionContextMetrics
         info={contextInfo}
-        totalCostMicrodollars={totalMicrodollars}
-        // The pill's value slots read as a settled session. While the body is
-        // still a skeleton they belong to the loading shape instead, so the
-        // pill keeps the bars that hold the row the values will take.
+        totalCostMicrodollars={sessionCostMicrodollars}
+        // The pill's values read as a settled session. While the body is still
+        // a skeleton no reading has arrived, so the pill paints its ring alone.
         hasMessages={messages.length > 0 && !isSessionChromePending}
         autoApproveAvailable={autoApproveAvailable}
         loading={isSessionChromePending}
@@ -2045,6 +2266,7 @@ export function SessionDetailContent({
               }
         }
       />
+      <SessionFollowButton sessionId={sessionId} />
     </View>
   );
   const associatedPr = fetchedData?.associatedPr ?? null;
@@ -2124,10 +2346,15 @@ export function SessionDetailContent({
   // the transcript is painted, not merely once the open resolves: a read-only
   // footer above rows that are still skeletons is the same two states at once,
   // so the reserve holds for that window too (see `isSessionChromePending`).
+  // Continue opens a new session in this session's organization, so its control
+  // waits for the session's own row the same way the scoped reads do. Until that
+  // row names this open, the read-only slot keeps the reserve it already holds
+  // rather than painting a control that cannot act.
+  const isReadOnlyFooterPending = isSessionChromePending || !sessionDataLoaded;
   const isComposerVisible =
     !hasBlockingInteraction && !isReadOnlySession && !isSessionChromePending;
   const isReadOnlyContinueVisible =
-    isReadOnlySession && !hasBlockingInteraction && !isSessionChromePending;
+    isReadOnlySession && !hasBlockingInteraction && !isReadOnlyFooterPending;
   // The pending slot holds the shape its session will end in. The kind is only
   // set once the transport answers, but the metadata read lands before that and
   // names a cloud-agent session, which is writable by construction; the id
@@ -2139,8 +2366,10 @@ export function SessionDetailContent({
   const isPendingComposer =
     isWritableResolved ||
     (fetchedData?.kiloSessionId === sessionId && fetchedData.cloudAgentSessionId !== null);
+  // The reserve never shares the slot with a live control: a settled composer
+  // already holds it, and the hold only owns the slot when nothing else does.
   const isReadOnlyFooterPlaceholderVisible =
-    isSessionChromePending && !hasBlockingInteraction && !isPendingComposer;
+    isReadOnlyFooterPending && !hasBlockingInteraction && !isPendingComposer && !isComposerVisible;
   const isComposerSkeletonVisible =
     isSessionChromePending && !hasBlockingInteraction && isPendingComposer;
   // Structural locks only. The live send capability is passed separately so a
@@ -2310,6 +2539,11 @@ export function SessionDetailContent({
   );
 
   const handleCreateSession = useCallback(async () => {
+    // Start creates a session in the displayed session's organization, so it
+    // requires that session's own row to supply the scope first.
+    if (!sessionDataLoaded) {
+      return false;
+    }
     // The orchestrator surfaces exactly one actionable toast on failure and
     // calls `router.replace` to the new session route on success — the
     // route-keyed `AgentSessionProvider` creates a fresh manager for the new
@@ -2329,9 +2563,14 @@ export function SessionDetailContent({
       },
     });
     return result.success;
-  }, [manager, sessionRouter, organizationId]);
+  }, [manager, sessionRouter, organizationId, sessionDataLoaded]);
 
   const handleRestartSession = useCallback(async () => {
+    // Restart opens a replacement session in the same organization, so it waits
+    // for the same resolved scope Start does.
+    if (!sessionDataLoaded) {
+      return false;
+    }
     const result = await restartAgentSession({
       create: manager.createRemoteSession.bind(manager),
       exit: manager.exitRemoteSession.bind(manager),
@@ -2342,7 +2581,7 @@ export function SessionDetailContent({
       },
     });
     return result.success;
-  }, [manager, sessionRouter, organizationId]);
+  }, [manager, sessionRouter, organizationId, sessionDataLoaded]);
 
   const handleExitSession = useCallback(
     async (
@@ -2389,6 +2628,11 @@ export function SessionDetailContent({
 
   const pushContinue = useCallback(
     (cut: ForkCut | null) => {
+      // Continue and fork open a new session in this session's organization, so
+      // both need the scope resolved before they open a destination.
+      if (!sessionDataLoaded) {
+        return;
+      }
       openNewSessionHref(
         buildContinueHref({
           organizationId,
@@ -2396,9 +2640,9 @@ export function SessionDetailContent({
           cloneSourceTitle: rename.title,
           cloneUpToMessageId: cut?.cloneUpToMessageId,
           forkPrefillText: cut?.forkPrefillText,
-          forkSourceIsCloudAgent: Boolean(fetchedData?.cloudAgentSessionId),
+          forkSourceIsCloudAgent: Boolean(fetchedData.cloudAgentSessionId),
           prefill: buildContinuePrefillParams({
-            gitUrl: fetchedData?.gitUrl,
+            gitUrl: fetchedData.gitUrl,
             mode: currentMode,
             model: currentModel,
             variant: currentVariant,
@@ -2416,6 +2660,7 @@ export function SessionDetailContent({
       currentMode,
       currentModel,
       currentVariant,
+      sessionDataLoaded,
     ]
   );
 
@@ -2536,13 +2781,12 @@ export function SessionDetailContent({
           {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
           <VisibleSessionPublisher sessionId={sessionId} />
 
-          {/* The trailing bottom-chrome spacer below reserves the navigation-bar
-              inset outside this view. The native lift measures the keyboard
-              against this view's own bottom edge, so that inset is never
-              counted twice — the correction the app-aware padding needed. */}
-          <KeyboardAvoidingView className="flex-1" behavior="padding">
-            {renderKeyboardBody()}
-          </KeyboardAvoidingView>
+          {/* The transcript and composer keep their layout while the keyboard
+              moves: the pane translates them with the keyboard on the UI
+              thread, so the list is not resized frame by frame and does not
+              re-pin its tail from those layout events. The trailing spacer
+              below still reserves the navigation-bar inset. */}
+          <KeyboardFollowPane>{renderKeyboardBody()}</KeyboardFollowPane>
 
           {isComposerVisible ? (
             <BlurBar className="border-t-0">
@@ -2571,6 +2815,8 @@ export function SessionDetailContent({
               modelDisplay={contextModelAndProvider.model}
               providerDisplay={contextModelAndProvider.provider}
               totalCostMicrodollars={totalMicrodollars}
+              cloudAgentSessionId={cloudAgentSessionId}
+              organizationId={organizationId}
               breakdownCostUsd={breakdownCostUsd}
               messages={messages}
               modelOptions={modelOptions}
@@ -2610,7 +2856,9 @@ export function SessionDetailContent({
                 ? t('agentChat.session.cancelQueuedUpgradeRequired')
                 : null
             }
-            onForkFromHere={detailsForkCut ? handleForkFromHere : undefined}
+            onForkFromHere={
+              detailsForkCut !== null && sessionDataLoaded ? handleForkFromHere : undefined
+            }
           />
 
           {childSessionSheet.sheet ? (
@@ -2729,8 +2977,15 @@ export function SessionDetailContent({
                  from the last assistant part, and compute-status.ts maps a
                  reasoning part to agentChat.partDetail.thinking, so the spinner
                  reads Thinking during a reasoning stream in both modes. Feeding
-                 it displayedMessages would drop that label. */
-              <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
+                 it displayedMessages would drop that label. A pending ask takes
+                 the label instead: the blocked tool part has not run, and
+                 `blockingInteraction` already excludes an ask the auto-approve
+                 reply answers, so that ask keeps the activity label. */
+              <WorkingIndicator
+                messages={messages}
+                isStreaming={shouldShowFooterWorking}
+                blockingInteraction={hasBlockingInteraction ? blockingInteraction : 'none'}
+              />
             ) : null}
             {sessionFooterItem === 'status' && footerStatusIndicator !== null ? (
               <SessionStatusIndicator indicator={footerStatusIndicator} />
@@ -2874,6 +3129,8 @@ export function SessionDetailContent({
                 autoSend={autoSend}
                 draftKey={userId ? sessionComposerDraftKey : undefined}
                 initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
+                deliveredDraft={consumableDeliveredDraft}
+                onDeliveredDraftConsumed={consumeDeliveredDraft}
                 sessionId={sessionId}
                 suggestion={activeSuggestion}
                 onAcceptSuggestion={async (requestId, index) => {
@@ -2892,37 +3149,30 @@ export function SessionDetailContent({
   }
 
   function renderContent() {
-    if (terminalError) {
+    if (shownTerminalError) {
       const copyText = buildTerminalErrorCopyText({
         sessionId,
-        title: terminalError.title,
-        message: terminalError.message,
-        detail: terminalError.detail,
+        title: shownTerminalError.title,
+        message: shownTerminalError.message,
+        detail: shownTerminalError.detail,
       });
       return (
         <CenteredState>
           <View className="items-center gap-3 px-6">
             <QueryError
-              variant={terminalError.variant}
+              variant={shownTerminalError.variant}
               placement="top"
               className="px-0 pt-0"
-              title={terminalError.title}
-              message={terminalError.message}
+              title={shownTerminalError.title}
+              message={shownTerminalError.message}
               onRetry={
-                terminalError.retryable
+                shownTerminalError.retryable
                   ? () => {
-                      // A spent reconnect budget on the shared transport leg is
-                      // only cleared by resetting that leg; reopening the
-                      // session over the same dead socket would return here.
-                      if (terminalError.retryWith === 'connection') {
-                        retrySessionConnection();
-                        return;
-                      }
-                      void manager.switchSession(sessionId);
+                      handleTerminalRetry(shownTerminalError);
                     }
                   : undefined
               }
-              isRetrying={isLoading}
+              isRetrying={terminalRetryPending}
             />
             <View className="flex-row gap-3">
               <Button

@@ -10,6 +10,7 @@ import { refreshGlanceableSessions } from '../remote-session-notifications';
 import { prUrlMatchesGitUrl } from '../ingest/metadata';
 import {
   CLIOutboundMessageSchema,
+  heartbeatSessionCount,
   type CLIInboundMessage,
   type Instance,
   type SessionEventPayload,
@@ -710,10 +711,14 @@ export class UserConnectionDO extends DurableObject<Env> {
   ): void {
     const result = CLIOutboundMessageSchema.safeParse(parsed);
     if (!result.success) {
+      // Report the frame's size beside the byte count so a frame outside the
+      // contract is diagnosable from its shape, never from its contents.
+      const sessionCount = heartbeatSessionCount(parsed);
       console.warn('CLI message parse failed', {
         role: 'cli',
         connectionId: attachment.connectionId,
         byteCount: binaryByteCount ?? new TextEncoder().encode(raw).byteLength,
+        ...(sessionCount === undefined ? {} : { sessionCount }),
         issues: result.error.issues.map(issue => ({
           path: issue.path,
           code: issue.code,
@@ -1499,6 +1504,17 @@ export class UserConnectionDO extends DurableObject<Env> {
     attachment: WSAttachment & { role: 'web' },
     sessionId: string
   ): Promise<void> {
+    // A socket that already holds this subscription keeps it: the stored entry
+    // is the answer, and the access recheck, session-list send and CLI forward
+    // below run once per subscription. An unsubscribe clears both entries, so
+    // the next subscribe resolves access.
+    if (
+      this.webSubscriptions.get(sessionId)?.has(ws) &&
+      attachment.subscribedSessions.includes(sessionId)
+    ) {
+      return;
+    }
+
     // Recheck current membership before subscribing: a removed member must not
     // receive events from an org session they no longer have access to.
     const kiloUserId = attachment.kiloUserId;

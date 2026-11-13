@@ -56,7 +56,11 @@ import {
   MAX_DURABLE_RESULT_BYTES,
   UserConnectionDO,
 } from './UserConnectionDO';
-import type { Instance } from '../types/user-connection-protocol';
+import {
+  MAX_HEARTBEAT_SESSIONS,
+  MAX_HEARTBEAT_TITLE_LENGTH,
+  type Instance,
+} from '../types/user-connection-protocol';
 
 type MockWS = {
   send: ReturnType<typeof vi.fn>;
@@ -1855,6 +1859,44 @@ describe('UserConnectionDO', () => {
         subscribedSessions: string[];
       };
       expect(att.subscribedSessions).toEqual(['s1']);
+    });
+
+    it('answers a subscribe for a session the socket already holds from that subscription', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      await sendSubscribe(doInstance, webWs, 's1');
+
+      sessionAccessMocks.resolveAccessibleKiloSession.mockClear();
+      webWs.send.mockClear();
+      cliWs.send.mockClear();
+
+      await sendSubscribe(doInstance, webWs, 's1');
+
+      expect(sessionAccessMocks.resolveAccessibleKiloSession).not.toHaveBeenCalled();
+      expect(webWs.send).not.toHaveBeenCalled();
+      expect(cliWs.send).not.toHaveBeenCalled();
+      expect(webWs.deserializeAttachment()).toMatchObject({ subscribedSessions: ['s1'] });
+    });
+
+    it('rechecks access for a subscribe that follows an unsubscribe', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      await sendSubscribe(doInstance, webWs, 's1');
+      sendUnsubscribe(doInstance, webWs, 's1');
+      await flushAsync();
+
+      sessionAccessMocks.resolveAccessibleKiloSession.mockClear();
+      webWs.send.mockClear();
+      await sendSubscribe(doInstance, webWs, 's1');
+
+      expect(sessionAccessMocks.resolveAccessibleKiloSession).toHaveBeenCalledTimes(1);
+      expect(allSent(webWs).filter(m => m.event === 'sessions.list')).toHaveLength(1);
     });
 
     it('unsubscribe sends to CLI when last subscriber leaves', async () => {
@@ -6034,6 +6076,86 @@ describe('UserConnectionDO', () => {
         issues: [{ path: ['id'], code: 'invalid_type' }],
       });
       expect(JSON.stringify(warn.mock.calls)).not.toContain(secret);
+    });
+
+    it('acknowledges and relays a heartbeat at the session count limit', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+      const sessions = Array.from({ length: MAX_HEARTBEAT_SESSIONS }, (_, index) =>
+        makeSession(`ses-at-limit-${index}`)
+      );
+
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', sessions })
+      );
+      await flushAsync();
+
+      expect(allSent(cliWs)).toEqual([{ type: 'heartbeat_ack' }]);
+      const heartbeatEvent = allSent(webWs).find(message => message.event === 'sessions.heartbeat');
+      const data: unknown = heartbeatEvent?.data;
+      if (!isRecord(data) || !Array.isArray(data.sessions)) {
+        throw new Error('sessions.heartbeat must carry a session list');
+      }
+      expect(data.sessions).toHaveLength(MAX_HEARTBEAT_SESSIONS);
+    });
+
+    it('refuses a heartbeat over the session limit before any per-session work', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const sessions = Array.from({ length: MAX_HEARTBEAT_SESSIONS + 1 }, (_, index) =>
+        makeSession(`ses-over-limit-${index}`)
+      );
+      const frame = JSON.stringify({ type: 'heartbeat', sessions });
+
+      await doInstance.webSocketMessage(cliWs as never, frame);
+      await flushAsync();
+
+      expect(warn).toHaveBeenCalledWith('CLI message parse failed', {
+        role: 'cli',
+        connectionId: 'cli-1',
+        byteCount: new TextEncoder().encode(frame).byteLength,
+        sessionCount: MAX_HEARTBEAT_SESSIONS + 1,
+        issues: [{ path: ['sessions'], code: 'too_big' }],
+      });
+      // No acknowledgement, no broadcast, no ready-push entry, no ownership.
+      expect(allSent(cliWs)).toEqual([]);
+      expect(allSent(webWs)).toEqual([]);
+      expect(ctx.storage.store.size).toBe(0);
+      expect(ctx.storage.put).not.toHaveBeenCalled();
+      expect(doInstance.getActiveSessions()).toEqual([]);
+      expect(cliWs.deserializeAttachment()).toMatchObject({ sessions: [] });
+    });
+
+    it('shortens an over-limit title and relays the shortened value', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const sessions = [
+        makeSession('ses_title_too_long', 'busy', 't'.repeat(MAX_HEARTBEAT_TITLE_LENGTH + 1)),
+      ];
+
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', sessions })
+      );
+      await flushAsync();
+
+      expect(warn).not.toHaveBeenCalledWith('CLI message parse failed', expect.anything());
+      expect(allSent(cliWs)).toEqual([{ type: 'heartbeat_ack' }]);
+      const active = doInstance.getActiveSessions();
+      expect(active).toHaveLength(1);
+      expect(active[0]?.title).toHaveLength(MAX_HEARTBEAT_TITLE_LENGTH);
+      const heartbeatEvent = allSent(webWs).find(message => message.event === 'sessions.heartbeat');
+      expect(JSON.stringify(heartbeatEvent)).toContain('t'.repeat(MAX_HEARTBEAT_TITLE_LENGTH));
+      expect(JSON.stringify(heartbeatEvent)).not.toContain(
+        't'.repeat(MAX_HEARTBEAT_TITLE_LENGTH + 1)
+      );
+      expect(ctx.storage.store.size).toBeGreaterThan(0);
     });
 
     it('webSocketError triggers webSocketClose', async () => {

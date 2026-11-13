@@ -10,6 +10,7 @@ import { renderWithProviders, type RenderWithProvidersResult } from '@/test/rend
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type StoredChatBackend } from '@/lib/chat/backend-store';
 import { backendTargetId, CREDITS_FAILURE_KEY, localTargetId } from '@/lib/chat/backend-target';
+import { type AddCreditsDestination } from '@/lib/credits/add-credits-destination';
 
 /**
  * What the chat screen draws while it is opening.
@@ -103,8 +104,28 @@ const mcpModel = vi.hoisted(() => ({
   saving: false,
 }));
 
+/** The chat's place: which account and balance its sends draw on. */
+type TestPlace = {
+  chatScope: string;
+  org: { kind: 'personal' } | { kind: 'organization'; id: string };
+};
+
+/** A chat the person pays for, and the organization's own that a test switches to. */
+const PERSONAL_PLACE: TestPlace = { chatScope: 'u1:personal', org: { kind: 'personal' } };
+const chatPlace = vi.hoisted(() => ({ value: null as TestPlace | null }));
+
+/** The platform the screen reads; the App Store gate hides an external page on iOS. */
+const platform = vi.hoisted(() => ({ OS: 'ios' as 'ios' | 'android' }));
+/** The external link helper, so a press that opens a page is asserted, not launched. */
+const externalLink = vi.hoisted(() => ({
+  open: vi.fn<(url: string, options?: { label?: string }) => Promise<void>>(),
+}));
+
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: externalLink.open }));
+vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.com' }));
+
 vi.mock('@/lib/chat/use-chat', () => ({
-  useChatPlace: () => ({ chatScope: 'u1:personal', org: { kind: 'personal' } }),
+  useChatPlace: () => chatPlace.value,
   useChat: () => ({
     state: {
       sessionId: 's1',
@@ -175,6 +196,7 @@ vi.mock('@/components/agents/session-message-list', () => ({
   SessionMessageList: 'SessionMessageList',
 }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/icons', () => ({
@@ -232,9 +254,10 @@ vi.mock('react-native-reanimated', () => ({
 vi.mock('react-native', () => ({
   Alert: { alert: backendUi.alert },
   ActivityIndicator: 'ActivityIndicator',
-  Platform: { OS: 'ios' },
+  Platform: platform,
   Pressable: 'Pressable',
   View: 'View',
+  useWindowDimensions: () => ({ width: 1080, height: 2400, scale: 2, fontScale: 1 }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 24, left: 0, right: 0 }),
@@ -261,6 +284,9 @@ beforeEach(() => {
   state.images = false;
   keyboard.progress = 0;
   state.send.mockClear();
+  chatPlace.value = PERSONAL_PLACE;
+  platform.OS = 'ios';
+  externalLink.open.mockReset();
 });
 afterEach(() => {
   view?.unmount();
@@ -354,6 +380,13 @@ describe('the chat transcript while it opens', () => {
     expect(messagesOf(tree)).toEqual([]);
     /* Nothing failed, so the chat takes a first message. */
     expect(count(tree, 'ChatComposer')).toBe(1);
+    /* The state centers in the transcript area its own scroller shows, so the
+       pending paint and the measured placement agree from the first frame and
+       the state does not move when a measurement lands. The state centers
+       through its own scroller, so no second one wraps it. */
+    const [empty] = emptyStatesOf(tree);
+    expect(empty?.description).toBeDefined();
+    expect(count(tree, 'CenteredState')).toBe(0);
   });
 
   it.each([
@@ -704,7 +737,7 @@ describe('a retained chat failure', () => {
     expect(refused.onRetryMessage).toBeUndefined();
     expect(refused.onCopyToComposer).toBeInstanceOf(Function);
     act(() => {
-      refused.onAddCredits?.();
+      pressInAppCredits(refused);
     });
     expect(router.push).toHaveBeenCalledWith('/(app)/credits');
     expect(state.retry).not.toHaveBeenCalled();
@@ -734,6 +767,67 @@ describe('a retained chat failure', () => {
     /* Nothing on screen could be asked again, and a re-send meets the same
        refusal, so no Retry joins it. */
     expect(state.retry).not.toHaveBeenCalled();
+  });
+
+  /* The balance that refused the send decides where the credit is bought. An
+     organization's chat spends that organization's balance, so its own billing
+     page settles it; the in-app purchase screen would sell the person's packs
+     against a balance that never paid for the send. */
+  it('opens the organization billing page for a refused send the organization pays for', async () => {
+    chatPlace.value = { chatScope: 'u1:org-1', org: { kind: 'organization', id: 'org-1' } };
+    platform.OS = 'android';
+    state.status = 'idle';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.messages = [
+      { info: { id: 't1', role: 'user' } },
+      { info: { id: 't2', role: 'assistant' } },
+    ];
+    const tree = await mount();
+
+    expect(messagesOf(tree)).toEqual(['Not enough credits to send this message.']);
+    press(tree, i18n.t('addCredits.cta'));
+    expect(router.push).not.toHaveBeenCalled();
+    expect(externalLink.open).toHaveBeenCalledWith(
+      'https://example.com/organizations/org-1/payment-details',
+      { label: i18n.t('addCredits.billingPage') }
+    );
+    expect(state.retry).not.toHaveBeenCalled();
+  });
+
+  /* App Store review forbids an in-app link to an external purchase, so the
+     organization's page is offered only where the platform may open it. The
+     refusal still states its cause; the action it cannot take is not drawn. */
+  it('offers no organization top-up where the platform may not open it', async () => {
+    chatPlace.value = { chatScope: 'u1:org-1', org: { kind: 'organization', id: 'org-1' } };
+    platform.OS = 'ios';
+    state.status = 'idle';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.messages = [
+      { info: { id: 't1', role: 'user' } },
+      { info: { id: 't2', role: 'assistant' } },
+    ];
+    const tree = await mount();
+
+    expect(messagesOf(tree)).toEqual(['Not enough credits to send this message.']);
+    expect(buttonLabels(tree)).toEqual([]);
+    expect(externalLink.open).not.toHaveBeenCalled();
+  });
+
+  /* The chat's payer is read from its place. Until that resolves, the screen
+     offers no destination rather than guessing the person's own balance. */
+  it('offers no Add credits until the chat’s payer is known', async () => {
+    chatPlace.value = null;
+    state.status = 'idle';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.messages = [
+      { info: { id: 't1', role: 'user' } },
+      { info: { id: 't2', role: 'assistant' } },
+    ];
+    const tree = await mount();
+
+    expect(messagesOf(tree)).toEqual(['Not enough credits to send this message.']);
+    expect(buttonLabels(tree)).toEqual([]);
+    expect(router.push).not.toHaveBeenCalled();
   });
 });
 
@@ -809,7 +903,7 @@ type BubbleProps = {
   onLongPressDetails?: (message: unknown) => void;
   deliveryState?: { status: string; error?: string; reason?: string };
   onRetryMessage?: (message: unknown) => void;
-  onAddCredits?: () => void;
+  addCredits?: AddCreditsDestination;
   onCopyToComposer?: (text: string) => void;
 };
 
@@ -833,6 +927,15 @@ const sheetOf = (tree: ReactTestRenderer) =>
     deliveryState?: unknown;
     onClose: () => void;
   };
+
+/** Presses the in-app Add credits action a bubble was handed. */
+function pressInAppCredits(bubble: BubbleProps): void {
+  const credits = bubble.addCredits;
+  if (credits?.kind !== 'inApp') {
+    throw new TypeError('The bubble has no in-app Add credits action');
+  }
+  credits.onPress();
+}
 
 describe('message actions', () => {
   it('opens the details of a question and of an answer on long-press', async () => {
@@ -971,7 +1074,7 @@ describe('message actions', () => {
     // and the Retry does not.
     expect(kept.onRetryMessage).toBeUndefined();
     act(() => {
-      kept.onAddCredits?.();
+      pressInAppCredits(kept);
     });
     expect(router.push).toHaveBeenCalledWith('/(app)/credits');
     expect(state.retry).not.toHaveBeenCalled();
@@ -1031,7 +1134,7 @@ describe('message actions', () => {
     expect(bubble.deliveryState).toEqual({ status: 'failed', error: '', reason: 'credits' });
     expect(bubble.onRetryMessage).toBeUndefined();
     act(() => {
-      bubble.onAddCredits?.();
+      pressInAppCredits(bubble);
     });
     expect(router.push).toHaveBeenCalledWith('/(app)/credits');
     expect(state.retry).not.toHaveBeenCalled();

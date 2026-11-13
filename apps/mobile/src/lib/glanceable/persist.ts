@@ -4,6 +4,12 @@ import {
   glanceableAgentsSnapshotSchema,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import {
+  type GatedSecureStore,
+  readGatedValueForUpdate,
+  widgetSecureStore,
+  writeGatedValue,
+} from '@/lib/auth/secure-store-gated';
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 import {
   _resetHomeWidgetDataForTests,
@@ -13,6 +19,7 @@ import {
 import { readSignedInScope, type SignedInScope } from './scope';
 
 import { type GlanceableSink } from './sink-registry';
+import { GLANCEABLE_LEGACY_SCOPE_KEY, GLANCEABLE_SNAPSHOT_KEY } from './widget-store';
 
 /**
  * Durable mirror of the last glanceable snapshot, which carries its own scope
@@ -24,33 +31,16 @@ import { type GlanceableSink } from './sink-registry';
  * iOS widgets read the snapshot through expo-widgets `updateSnapshot` /
  * `updateTimeline`; Android widgets read through `react-native-android-widget`
  * storage. This store exists so the background push handler can compare an
- * incoming scope key without React context.
+ * incoming scope key without React context, which is why its item lives in the
+ * widget store (`./widget-store`) rather than under the default keychain class.
  */
-
-// SecureStore keys are defined here (not storage-keys.ts) so this module stays
-// self-contained; nothing else owns them.
-const GLANCEABLE_SNAPSHOT_KEY = 'glanceable-snapshot';
-// The previous release wrote the scope key beside the snapshot. One record now
-// carries both, so this key is only read: a record it wrote before the upgrade
-// still restores, and a scope key it left without a snapshot still fills the
-// scope the way it does today.
-const GLANCEABLE_LEGACY_SCOPE_KEY = 'glanceable-scope-key';
-
-type SecureStoreLike = {
-  setItemAsync: (key: string, value: string) => Promise<void>;
-  getItemAsync: (key: string) => Promise<string | null>;
-};
 
 // Test-only override so pure suites do not load expo-secure-store
 // (→ expo-modules-core → RN). Mirrors the deep-link-launch pattern.
-let secureStoreForTests: SecureStoreLike | null = null;
+let secureStoreForTests: GatedSecureStore | null = null;
 
-function getSecureStore(): SecureStoreLike {
-  if (secureStoreForTests) {
-    return secureStoreForTests;
-  }
-  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
-  return require('expo-secure-store') as SecureStoreLike;
+function getSecureStore(): GatedSecureStore {
+  return secureStoreForTests ?? widgetSecureStore();
 }
 
 let lastSnapshot: GlanceableAgentsSnapshot | null = null;
@@ -200,17 +190,16 @@ export function adoptGlanceableScopeKey(scopeKey: string): void {
  * in-memory snapshot is authoritative, so a failed write is reported at warning
  * level with the stable write fingerprint and never rejects: a `void`-ed native
  * rejection here would surface as an unhandled error with no caller able to
- * recover it.
+ * recover it. The widget store's `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` class
+ * keeps the mirror readable while the phone is locked, so a background publish
+ * lands there; only a device that has not been unlocked since boot refuses it,
+ * and the next publish mirrors the frame again.
  */
 async function mirrorSnapshotAfter(previous: Promise<void> | null, raw: string): Promise<void> {
   if (previous !== null) {
     await previous;
   }
-  try {
-    await getSecureStore().setItemAsync(GLANCEABLE_SNAPSHOT_KEY, raw);
-  } catch (error) {
-    reportSecureStoreFailure('write', error);
-  }
+  await writeGatedValue(getSecureStore, GLANCEABLE_SNAPSHOT_KEY, raw);
 }
 
 /** In-memory write plus a fire-and-forget SecureStore mirror. */
@@ -276,12 +265,19 @@ export async function restorePersistedGlanceable(): Promise<void> {
   // "not read yet" until this read lands too.
   restoresInFlight += 1;
   try {
-    const rawSnapshot = await getSecureStore().getItemAsync(GLANCEABLE_SNAPSHOT_KEY);
+    const snapshot = await readGatedValueForUpdate(getSecureStore, GLANCEABLE_SNAPSHOT_KEY);
+    // A mirror the keychain would not hand over — a locked device, or a read
+    // that failed — may still name an owner, so the uncertainty is recorded
+    // instead of the null snapshot reading as an empty mirror.
+    if (snapshot.status === 'unreadable') {
+      restoreUnavailable = true;
+      return;
+    }
     // A live write landed during the read: it owns the state; skip the fill.
     if (persistEpoch !== startEpoch) {
       return;
     }
-    const stored = rawSnapshot === null ? null : parseStoredSnapshot(rawSnapshot);
+    const stored = snapshot.value === null ? null : parseStoredSnapshot(snapshot.value);
     const authenticatedScope = await readSignedInScope(getSecureStore());
     // A live write that landed during the identity read owns the state, the
     // same as one that landed during the record read: skip the fill rather than
@@ -296,14 +292,20 @@ export async function restorePersistedGlanceable(): Promise<void> {
       // still names the scope it published for. It is adopted only when the
       // identity read names that same scope, so a key left behind by another
       // account never becomes this process's scope.
-      const legacyScopeKey = await getSecureStore().getItemAsync(GLANCEABLE_LEGACY_SCOPE_KEY);
+      const legacy = await readGatedValueForUpdate(getSecureStore, GLANCEABLE_LEGACY_SCOPE_KEY);
+      // An unreadable legacy entry leaves the scope unconfirmed, the same as an
+      // unreadable mirror above: it may name this account's scope.
+      if (legacy.status === 'unreadable') {
+        restoreUnavailable = true;
+        return;
+      }
       // A live publish that landed during this read owns the scope, the same as
       // one that landed during either read above.
       if (persistEpoch !== startEpoch) {
         return;
       }
-      if (legacyScopeKey !== null && legacyScopeKey === authenticatedScopeKey) {
-        localScopeKey = legacyScopeKey;
+      if (legacy.value !== null && legacy.value === authenticatedScopeKey) {
+        localScopeKey = legacy.value;
       }
       restoredScope = 'none';
     } else {
@@ -320,11 +322,10 @@ export async function restorePersistedGlanceable(): Promise<void> {
     }
     await restoreHomeWidgetData(authenticatedScopeKey);
   } catch (error) {
-    // A malformed mirror is treated as absent; the publisher repopulates it.
-    // A read failure is different: the record may be there and own a card, so
-    // record the uncertainty for callers that act on a null snapshot. Reported
-    // at warning level so a keychain/keystore failure is visible instead of
-    // looking like an empty mirror.
+    // The reads above no longer reject on a keychain failure — the gate reads
+    // it as unreadable. This stays for the unexpected, so a throw still records
+    // the uncertainty for callers that act on a null snapshot instead of
+    // escaping a restore that callers run fire-and-forget.
     restoreUnavailable = true;
     reportSecureStoreFailure('read', error);
   } finally {
@@ -357,7 +358,7 @@ export const persistGlanceableSink: GlanceableSink = {
 
 // ── Test-only helpers ──────────────────────────────────────────────────────
 
-export function _setSecureStoreForTests(store: SecureStoreLike | null): void {
+export function _setSecureStoreForTests(store: GatedSecureStore | null): void {
   secureStoreForTests = store;
   _setHomeWidgetStoreForTests(store);
 }

@@ -2,7 +2,7 @@
 // oxlint-disable max-lines — gate teardown proof adds one mounted-hook test alongside existing module-level tests
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => {
   const client = {
@@ -261,7 +261,7 @@ describe('discard closes capture', () => {
     const { initPostHog, captureEvent } = await loadPostHogModule();
     const ctrl = await import('@/lib/telemetry/controller');
     ctrl.setTelemetryDecision('test', false);
-    // initPostHog returns early — optional is false.
+    // The client exists for flag evaluation; capture is what stays closed.
     initPostHog();
 
     captureEvent('test-event');
@@ -330,6 +330,7 @@ describe('optional telemetry lifecycle', () => {
   });
 
   it('purges when the epoch remains unchanged after discard', async () => {
+    vi.useFakeTimers();
     const mod = await loadPostHogWithGate();
     mod.ctrl.setTelemetryDecision('test', true);
     mod.initPostHog();
@@ -360,7 +361,12 @@ describe('optional telemetry lifecycle', () => {
 
     expect(hoisted.storage.purgePostHogPersistence).toHaveBeenCalledTimes(1);
 
+    // Finish the 110 ms resume this path now starts, so no continuation
+    // outlives the test.
+    await vi.advanceTimersByTimeAsync(120);
+
     renderer.unmount();
+    vi.useRealTimers();
   });
 
   it('does not initialize SDKs when resume is superseded', async () => {
@@ -414,7 +420,8 @@ describe('needsConsent gate teardown', () => {
     hoisted.appsFlyer.create.mockResolvedValue(undefined);
   });
 
-  it('gate hook tears down AppsFlyer and PostHog when needsConsent becomes true', async () => {
+  it('gate hook tears down AppsFlyer and capture when needsConsent becomes true', async () => {
+    vi.useFakeTimers();
     const gate = await loadPostHogWithGate();
 
     // Arm telemetry first so the PostHog client exists when teardown runs.
@@ -463,7 +470,189 @@ describe('needsConsent gate teardown', () => {
     expect(hoisted.client.optOut).toHaveBeenCalled();
     expect(hoisted.storage.purgePostHogPersistence).toHaveBeenCalledTimes(1);
 
+    // No SDK start is scheduled: the user has not answered, so even the
+    // flags-only client stays unbuilt until `needsConsent` clears.
+    await vi.advanceTimersByTimeAsync(120);
+    expect(gate.isPostHogReady()).toBe(false);
+
     rendererRef.current?.unmount();
+    vi.useRealTimers();
+  });
+
+  it('starts the flags-only client once the user answers with analytics off', async () => {
+    vi.useFakeTimers();
+    const gate = await loadPostHogWithGate();
+
+    type GateState = Parameters<typeof gate.useAnalyticsConsentGate>[0];
+    function GateWrapper(props: GateState): null {
+      gate.useAnalyticsConsentGate(props);
+      return null;
+    }
+
+    const renderer = TestRenderer.create(
+      createElement(GateWrapper, {
+        hasToken: true,
+        ...SETTLED,
+        consentChecked: true,
+        needsConsent: true,
+        email: 'test@test.com',
+        accountId: 'test-account',
+        optionalConsent: false,
+      })
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await vi.advanceTimersByTimeAsync(120);
+    expect(hoisted.holder.options).toBeUndefined();
+
+    // The user accepts with optional analytics off.
+    renderer.update(
+      createElement(GateWrapper, {
+        hasToken: true,
+        ...SETTLED,
+        consentChecked: true,
+        needsConsent: false,
+        email: 'test@test.com',
+        accountId: 'test-account',
+        optionalConsent: false,
+      })
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await vi.advanceTimersByTimeAsync(120);
+
+    expect(hoisted.holder.options).toMatchObject({ defaultOptIn: false });
+    expect(hoisted.client.capture).not.toHaveBeenCalled();
+
+    renderer.unmount();
+    vi.useRealTimers();
+  });
+});
+
+describe('client reuse across gate re-runs', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.device.deviceType = 1;
+    hoisted.appsFlyer.create.mockResolvedValue(undefined);
+  });
+
+  it('identifies the running client when the email arrives later instead of rebuilding it', async () => {
+    vi.useFakeTimers();
+    const gate = await loadPostHogWithGate();
+    const PostHogModule = await import('posthog-react-native');
+
+    type GateState = Parameters<typeof gate.useAnalyticsConsentGate>[0];
+    function GateWrapper(props: GateState): null {
+      gate.useAnalyticsConsentGate(props);
+      return null;
+    }
+
+    const state: GateState = {
+      hasToken: true,
+      ...SETTLED,
+      consentChecked: true,
+      needsConsent: false,
+      email: undefined,
+      accountId: 'test-account',
+      optionalConsent: false,
+    };
+
+    const renderer = TestRenderer.create(createElement(GateWrapper, state));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await vi.advanceTimersByTimeAsync(120);
+
+    expect(PostHogModule.default).toHaveBeenCalledTimes(1);
+    expect(hoisted.client.identify).not.toHaveBeenCalled();
+    expect(hoisted.storage.sealPostHogStorage).not.toHaveBeenCalled();
+
+    // The same account and consent, only the email resolved a moment later.
+    renderer.update(createElement(GateWrapper, { ...state, email: 'test@test.com' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await vi.advanceTimersByTimeAsync(120);
+
+    // The running client is identified: no teardown, no second client, and the
+    // queue it already holds survives.
+    expect(PostHogModule.default).toHaveBeenCalledTimes(1);
+    expect(hoisted.storage.sealPostHogStorage).not.toHaveBeenCalled();
+    expect(hoisted.client.optOut).not.toHaveBeenCalled();
+    expect(hoisted.client.identify).toHaveBeenCalledTimes(1);
+    expect(hoisted.client.identify).toHaveBeenCalledWith('test@test.com', undefined);
+
+    renderer.unmount();
+    vi.useRealTimers();
+  });
+});
+
+describe('consent level reaches Appsflyer in a development build', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.device.deviceType = 1;
+    hoisted.appsFlyer.create.mockResolvedValue(undefined);
+    vi.useFakeTimers();
+    // A dev build evaluates flags only against an explicit dev host and never
+    // captures, so the capture flag cannot carry a consent change to Appsflyer.
+    vi.stubGlobal('__DEV__', true);
+    process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST = 'http://127.0.0.1:8123';
+  });
+
+  afterEach(() => {
+    delete process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST;
+    vi.stubGlobal('__DEV__', false);
+    vi.useRealTimers();
+  });
+
+  it('starts Appsflyer when optional analytics is turned on for a dev flags client', async () => {
+    const gate = await loadPostHogWithGate();
+
+    type GateState = Parameters<typeof gate.useAnalyticsConsentGate>[0];
+    function GateWrapper(props: GateState): null {
+      gate.useAnalyticsConsentGate(props);
+      return null;
+    }
+
+    const state: GateState = {
+      hasToken: true,
+      ...SETTLED,
+      consentChecked: true,
+      needsConsent: false,
+      email: 'test@test.com',
+      accountId: 'test-account',
+      optionalConsent: false,
+    };
+
+    const renderer = TestRenderer.create(createElement(GateWrapper, state));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await vi.advanceTimersByTimeAsync(120);
+
+    expect(hoisted.holder.options).toMatchObject({ defaultOptIn: false });
+    expect(hoisted.appsFlyer.create).not.toHaveBeenCalled();
+
+    // The user turns optional analytics on for the same account.
+    renderer.update(createElement(GateWrapper, { ...state, optionalConsent: true }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await vi.advanceTimersByTimeAsync(120);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(hoisted.appsFlyer.create).toHaveBeenCalledTimes(1);
+    expect(hoisted.appsFlyer.setConsentData).toHaveBeenCalledWith(
+      expect.objectContaining({ hasConsentForDataUsage: true })
+    );
+
+    renderer.unmount();
   });
 });
 
@@ -748,7 +937,10 @@ describe('unsettled consent teardown', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(hoisted.client.optOut).toHaveBeenCalledTimes(0);
+    // The flags-only client is torn down on the way up, so the shared optOut
+    // mock records that teardown. Recovery is proven by the NEW client: it
+    // starts opted in and its captures reach the SDK.
+    expect(hoisted.holder.options).toMatchObject({ defaultOptIn: true });
 
     hoisted.client.capture.mockClear();
     mod.captureEvent('after-recovery');

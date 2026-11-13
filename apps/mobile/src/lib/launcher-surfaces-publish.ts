@@ -39,6 +39,19 @@ export type LauncherSurfacesPublisher = {
 };
 
 /**
+ * The revision of the native surface: it moves whenever a clear runs outside a
+ * publisher, so every publisher knows the surface it last wrote is no longer
+ * the surface the OS holds. `apply` compares it beside the payload, and the
+ * derivation that follows a boundary clear therefore writes the list again.
+ */
+let clearedRevision = 0;
+
+/** Record a clear that ran outside a publisher. */
+export function noteLauncherSurfacesCleared(): void {
+  clearedRevision += 1;
+}
+
+/**
  * Memoized writer for the launcher surfaces. The serialized payload — not the
  * target object identity — is the memo key, because the session list is
  * re-derived on every refetch and the OS surface must only be rewritten when
@@ -51,19 +64,23 @@ export function createLauncherSurfacesPublisher(
   clear: () => void
 ): LauncherSurfacesPublisher {
   let lastPublished: string | null = null;
+  let publishedRevision = 0;
 
   return {
     apply(targets, translate) {
       const payload = buildLauncherSurfacesPayload(targets, translate);
       const serialized = JSON.stringify(payload);
-      if (serialized === lastPublished) {
+      if (serialized === lastPublished && clearedRevision === publishedRevision) {
         return;
       }
       lastPublished = serialized;
+      publishedRevision = clearedRevision;
       publish(payload);
     },
     clear() {
       lastPublished = null;
+      clearedRevision += 1;
+      publishedRevision = clearedRevision;
       clear();
     },
   };

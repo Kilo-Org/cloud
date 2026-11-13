@@ -1,6 +1,7 @@
 import {
   CODE_REVIEW_ACTION_REQUIRED_REASONS,
   getCodeReviewActionRequiredCopy as getSharedCodeReviewActionRequiredCopy,
+  type CodeReviewActionRequiredCopy as SharedCodeReviewActionRequiredCopy,
   type CodeReviewActionRequiredReason,
   type CodeReviewActionRequiredState,
 } from '@kilocode/app-shared/code-reviews';
@@ -14,20 +15,17 @@ export {
 
 export const CODE_REVIEW_ACTION_REQUIRED_RUNTIME_STATE_KEY = 'code_review_action_required';
 
-export type CodeReviewActionRequiredCopy = {
-  title: string;
-  description: string;
-  recoveryLabel: string;
+// The shared type owns the three user-facing strings. The web app adds the
+// fields it derives from them (`emailReason` and `checkSummary` come from the
+// shared description, so the description text has exactly one source) and the
+// provider-specific titles.
+export type CodeReviewActionRequiredCopy = SharedCodeReviewActionRequiredCopy & {
   emailReason: string;
   checkTitle: string;
   checkSummary: string;
   gitlabDescription: string;
 };
 
-// Web-only copy fields. The three user-facing strings (title, description,
-// recovery label) live in @kilocode/app-shared/code-reviews; `emailReason` and
-// `checkSummary` are derived from the shared description below, so the
-// description text has exactly one source.
 const WEB_COPY_BY_REASON: Record<
   CodeReviewActionRequiredReason,
   { checkTitle: string; gitlabDescription: string }

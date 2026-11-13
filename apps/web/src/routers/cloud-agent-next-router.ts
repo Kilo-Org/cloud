@@ -12,8 +12,7 @@ import { releaseRefusedSend } from '@/lib/cloud-agent-next/release-refused-send'
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-access';
-import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
-import type { User } from '@kilocode/db/schema';
+import { createCloudAgentControlToken } from '@/lib/cloud-agent-next/request-control-token';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import { resolveGitHubIntegrationIdForRepository } from '@/lib/cloud-agent/github-integration-resolution';
 import {
@@ -54,6 +53,8 @@ import {
   baseGetEgressAuditNextOutputSchema,
   baseGetSessionMessagesPageNextSchema,
   baseGetSessionMessagesPageNextOutputSchema,
+  baseGetSessionToolPartDetailNextSchema,
+  baseGetSessionToolPartDetailNextOutputSchema,
   baseGetSandboxStatusNextSchema,
   baseGetSandboxStatusNextOutputSchema,
   baseGetPendingInteractionsNextSchema,
@@ -173,15 +174,6 @@ async function assertUserOwnsSession(
       expectedWorktreeId,
     });
   }
-}
-
-async function createCloudAgentControlToken(user: User, headersList?: Headers): Promise<string> {
-  return (
-    await createControlTokenForRequest(user, 'cloud-agent-next', {
-      headers: headersList,
-      tokenSource: 'cloud-agent',
-    })
-  ).token;
 }
 
 /**
@@ -939,8 +931,10 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseGetSessionNextSchema)
     .output(baseGetSessionNextOutputSchema)
     .query(async ({ ctx, input }) => {
-      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
-      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      const [, authToken] = await Promise.all([
+        assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId),
+        createCloudAgentControlToken(ctx.user, ctx.headersList),
+      ]);
       const client = createCloudAgentNextClient(authToken);
 
       return await client.getSession(input.cloudAgentSessionId);
@@ -963,6 +957,16 @@ export const cloudAgentNextRouter = createTRPCRouter({
       await assertUserOwnsSession(ctx.user.id, input.sessionId);
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
       return createCloudAgentNextClient(authToken).getSessionMessagesPage(input);
+    }),
+
+  /** Complete stored details for an expanded tool preview; authorized on every read. */
+  getSessionToolPartDetail: baseProcedure
+    .input(baseGetSessionToolPartDetailNextSchema)
+    .output(baseGetSessionToolPartDetailNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.sessionId);
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      return createCloudAgentNextClient(authToken).getSessionToolPartDetail(input);
     }),
 
   getSandboxStatus: baseProcedure

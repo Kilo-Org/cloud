@@ -10,16 +10,7 @@
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   "preview_urls": false,
-  "rules": [
-    { "type": "Text", "globs": ["**/*.sql"], "fallthrough": true },
-    {
-      "type": "Data",
-      "globs": [
-        "**/wrapper/dist/control-plane-wrapper.js?binary",
-        "**/wrapper/control-plane-supervisor.sh?binary",
-      ],
-    },
-  ],
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "workers_dev": true,
   "dev": {
     "port": 8794,
@@ -115,6 +106,7 @@
    * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
    */
   "services": [
+    { "binding": "SESSION_SYNC", "service": "session-sync" },
     {
       "binding": "SESSION_INGEST",
       "service": "session-ingest",
@@ -384,6 +376,7 @@
         "VERCEL_SANDBOX_EXTEND_DURATION_MS": "600000",
       },
       "services": [
+        { "binding": "SESSION_SYNC", "service": "session-sync-local" },
         {
           "binding": "SESSION_INGEST",
           "service": "session-ingest",

@@ -1962,6 +1962,37 @@
     ],
     "searchBlob": "agentProfiles.get Fetch a single agent profile's full details by ID, scoped to the current user or an organization. agentprofiles get profileid organizationid profileId organizationId"
   },
+  "agentProfiles.instructions": {
+    "path": "agentProfiles.instructions",
+    "kind": "query",
+    "summary": "Returns the profile's instruction (rules) files: name, content, and enabled flag, ordered by name, optionally scoped to an organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "profileId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "instructions",
+      "profileid",
+      "organizationid"
+    ],
+    "searchBlob": "agentProfiles.instructions Returns the profile's instruction (rules) files: name, content, and enabled flag, ordered by name, optionally scoped to an organization. agentprofiles instructions profileid organizationid profileId organizationId"
+  },
   "agentProfiles.kiloCommands": {
     "path": "agentProfiles.kiloCommands",
     "kind": "query",
@@ -3967,6 +3998,28 @@
     ],
     "searchBlob": "byok.listCatalogModeSupportedModels List which AI models each direct BYOK provider supports when running in catalog mode, grouped by provider and returned as model names with catalog ids. Use to discover available catalog-mode models per provider. byok listcatalogmodesupportedmodels"
   },
+  "byok.listProviders": {
+    "path": "byok.listProviders",
+    "kind": "query",
+    "summary": "List the AI model providers you can connect with your own API key (bring your own key), optionally scoped to an organization. Includes experimental providers only when experimental BYOK is enabled.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "byok",
+      "listproviders",
+      "organizationid"
+    ],
+    "searchBlob": "byok.listProviders List the AI model providers you can connect with your own API key (bring your own key), optionally scoped to an organization. Includes experimental providers only when experimental BYOK is enabled. byok listproviders organizationid organizationId"
+  },
   "byok.listSupportedModels": {
     "path": "byok.listSupportedModels",
     "kind": "query",
@@ -5324,6 +5377,31 @@
       "cursor"
     ],
     "searchBlob": "cliSessionsV2.getSessionMessagesPage Fetch a paginated page of a session's message history for incremental loading, including an event watermark when starting a fresh read. clisessionsv2 getsessionmessagespage session_id limit cursor session_id limit cursor"
+  },
+  "cliSessionsV2.getSharedSession": {
+    "path": "cliSessionsV2.getSharedSession",
+    "kind": "query",
+    "summary": "Retrieve a shared CLI session using its share link token, returning the session details for viewing or resuming.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "share_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "share_token"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "getsharedsession",
+      "share_token"
+    ],
+    "searchBlob": "cliSessionsV2.getSharedSession Retrieve a shared CLI session using its share link token, returning the session details for viewing or resuming. clisessionsv2 getsharedsession share_token share_token"
   },
   "cliSessionsV2.getWatchPr": {
     "path": "cliSessionsV2.getWatchPr",
@@ -6772,6 +6850,13 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 100
+        },
+        "toolDisplay": {
+          "type": "string",
+          "enum": [
+            "full",
+            "preview"
+          ]
         }
       },
       "required": [
@@ -6784,9 +6869,61 @@
       "sessionid",
       "kilosessionid",
       "cursor",
-      "limit"
+      "limit",
+      "tooldisplay"
     ],
-    "searchBlob": "cloudAgentNext.getSessionMessagesPage Retrieve a paginated page of messages and conversation history for one of your Cloud Agent sessions, with an optional cursor for older messages. Use it to load or scroll through session history. cloudagentnext getsessionmessagespage sessionid kilosessionid cursor limit sessionId kiloSessionId cursor limit"
+    "searchBlob": "cloudAgentNext.getSessionMessagesPage Retrieve a paginated page of messages and conversation history for one of your Cloud Agent sessions, with an optional cursor for older messages. Use it to load or scroll through session history. cloudagentnext getsessionmessagespage sessionid kilosessionid cursor limit tooldisplay sessionId kiloSessionId cursor limit toolDisplay"
+  },
+  "cloudAgentNext.getSessionToolPartDetail": {
+    "path": "cloudAgentNext.getSessionToolPartDetail",
+    "kind": "query",
+    "summary": "Get the full detail of a single tool call part within a Cloud Agent session, including its input, output, and status. Use to inspect exactly what a specific tool invocation did during an agent run.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "kiloSessionId": {
+          "type": "string",
+          "minLength": 30,
+          "maxLength": 30,
+          "format": "starts_with",
+          "pattern": "^ses_.*"
+        },
+        "messageId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "partId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "callId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "sessionId",
+        "messageId",
+        "partId"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "getsessiontoolpartdetail",
+      "sessionid",
+      "kilosessionid",
+      "messageid",
+      "partid",
+      "callid"
+    ],
+    "searchBlob": "cloudAgentNext.getSessionToolPartDetail Get the full detail of a single tool call part within a Cloud Agent session, including its input, output, and status. Use to inspect exactly what a specific tool invocation did during an agent run. cloudagentnext getsessiontoolpartdetail sessionid kilosessionid messageid partid callid sessionId kiloSessionId messageId partId callId"
   },
   "cloudAgentNext.getStackedWorkspaceSource": {
     "path": "cloudAgentNext.getStackedWorkspaceSource",
@@ -11126,6 +11263,28 @@
     ],
     "searchBlob": "computeBilling.charges List compute usage charges for your personal account or an organization, optionally filtered to your own usage or specific date ranges. computebilling charges organizationid view startdate enddate groupby page organizationId view startDate endDate groupBy page"
   },
+  "computeBilling.codeReviewRate": {
+    "path": "computeBilling.codeReviewRate",
+    "kind": "query",
+    "summary": "Check whether code review compute billing is enabled for a user or organization, and get the hourly USD rate charged for code review sandbox containers if it is.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "computebilling",
+      "codereviewrate",
+      "organizationid"
+    ],
+    "searchBlob": "computeBilling.codeReviewRate Check whether code review compute billing is enabled for a user or organization, and get the hourly USD rate charged for code review sandbox containers if it is. computebilling codereviewrate organizationid organizationId"
+  },
   "computeBilling.rates": {
     "path": "computeBilling.rates",
     "kind": "query",
@@ -13519,134 +13678,6 @@
     ],
     "searchBlob": "kiloPass.cancelSubscription Cancel a user's Kilo Pass subscription at the end of the current billing period so it does not renew. kilopass cancelsubscription"
   },
-  "kiloPass.completeAppStorePurchase": {
-    "path": "kiloPass.completeAppStorePurchase",
-    "kind": "mutation",
-    "summary": "Finish an Apple App Store Kilo Pass purchase by validating the App Store receipt and activating the subscription on the user's account.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "signedTransactionJws": {
-          "type": "string",
-          "minLength": 1
-        },
-        "platform": {
-          "type": "string",
-          "enum": [
-            "ios",
-            "android"
-          ]
-        },
-        "storefront": {
-          "type": "string",
-          "enum": [
-            "app_store",
-            "play",
-            "web"
-          ]
-        },
-        "product": {
-          "type": "string",
-          "enum": [
-            "kilo_pass",
-            "credits"
-          ]
-        },
-        "program": {
-          "anyOf": [
-            {
-              "type": "string",
-              "maxLength": 64
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "signedTransactionJws",
-        "platform",
-        "storefront",
-        "product"
-      ]
-    },
-    "tags": [
-      "kilopass",
-      "completeappstorepurchase",
-      "signedtransactionjws",
-      "platform",
-      "storefront",
-      "product",
-      "program"
-    ],
-    "searchBlob": "kiloPass.completeAppStorePurchase Finish an Apple App Store Kilo Pass purchase by validating the App Store receipt and activating the subscription on the user's account. kilopass completeappstorepurchase signedtransactionjws platform storefront product program signedTransactionJws platform storefront product program"
-  },
-  "kiloPass.completePlayPurchase": {
-    "path": "kiloPass.completePlayPurchase",
-    "kind": "mutation",
-    "summary": "Finish a Google Play Kilo Pass purchase by validating the Play purchase token and activating the subscription on the user's account.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "purchaseToken": {
-          "type": "string",
-          "minLength": 1
-        },
-        "platform": {
-          "type": "string",
-          "enum": [
-            "ios",
-            "android"
-          ]
-        },
-        "storefront": {
-          "type": "string",
-          "enum": [
-            "app_store",
-            "play",
-            "web"
-          ]
-        },
-        "product": {
-          "type": "string",
-          "enum": [
-            "kilo_pass",
-            "credits"
-          ]
-        },
-        "program": {
-          "anyOf": [
-            {
-              "type": "string",
-              "maxLength": 64
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "purchaseToken",
-        "platform",
-        "storefront",
-        "product"
-      ]
-    },
-    "tags": [
-      "kilopass",
-      "completeplaypurchase",
-      "purchasetoken",
-      "platform",
-      "storefront",
-      "product",
-      "program"
-    ],
-    "searchBlob": "kiloPass.completePlayPurchase Finish a Google Play Kilo Pass purchase by validating the Play purchase token and activating the subscription on the user's account. kilopass completeplaypurchase purchasetoken platform storefront product program purchaseToken platform storefront product program"
-  },
   "kiloPass.createCheckoutSession": {
     "path": "kiloPass.createCheckoutSession",
     "kind": "mutation",
@@ -13866,17 +13897,6 @@
       "returnurl"
     ],
     "searchBlob": "kiloPass.getCustomerPortalUrl Get a Stripe billing portal link where a user can view and manage their Kilo Pass subscription and payment details. kilopass getcustomerportalurl returnurl returnUrl"
-  },
-  "kiloPass.getMobileStoreProducts": {
-    "path": "kiloPass.getMobileStoreProducts",
-    "kind": "query",
-    "summary": "Get the available Kilo Pass products and app store account token for in-app / mobile store purchases.",
-    "inputSchema": {},
-    "tags": [
-      "kilopass",
-      "getmobilestoreproducts"
-    ],
-    "searchBlob": "kiloPass.getMobileStoreProducts Get the available Kilo Pass products and app store account token for in-app / mobile store purchases. kilopass getmobilestoreproducts"
   },
   "kiloPass.getPurchasePresentation": {
     "path": "kiloPass.getPurchasePresentation",
@@ -18618,6 +18638,13 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 100
+        },
+        "toolDisplay": {
+          "type": "string",
+          "enum": [
+            "full",
+            "preview"
+          ]
         }
       },
       "required": [
@@ -18633,9 +18660,69 @@
       "sessionid",
       "kilosessionid",
       "cursor",
-      "limit"
+      "limit",
+      "tooldisplay"
     ],
-    "searchBlob": "organizations.cloudAgentNext.getSessionMessagesPage Get a paginated page of chat messages from a cloud agent session, using a cursor and limit to page through the conversation history. Use to load earlier or later messages in a session transcript for an organization. organizations cloudagentnext getsessionmessagespage organizationid sessionid kilosessionid cursor limit organizationId sessionId kiloSessionId cursor limit"
+    "searchBlob": "organizations.cloudAgentNext.getSessionMessagesPage Get a paginated page of chat messages from a cloud agent session, using a cursor and limit to page through the conversation history. Use to load earlier or later messages in a session transcript for an organization. organizations cloudagentnext getsessionmessagespage organizationid sessionid kilosessionid cursor limit tooldisplay organizationId sessionId kiloSessionId cursor limit toolDisplay"
+  },
+  "organizations.cloudAgentNext.getSessionToolPartDetail": {
+    "path": "organizations.cloudAgentNext.getSessionToolPartDetail",
+    "kind": "query",
+    "summary": "Fetch the full stored details of a single tool call inside an organization's Cloud Agent session chat, such as the tool's input, output, status, and error, identified by message, part, and call ID. Use it to expand a tool-call preview in session history or inspect what a specific tool actually did.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "kiloSessionId": {
+          "type": "string",
+          "minLength": 30,
+          "maxLength": 30,
+          "format": "starts_with",
+          "pattern": "^ses_.*"
+        },
+        "messageId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "partId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "callId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "organizationId",
+        "sessionId",
+        "messageId",
+        "partId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getsessiontoolpartdetail",
+      "organizationid",
+      "sessionid",
+      "kilosessionid",
+      "messageid",
+      "partid",
+      "callid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getSessionToolPartDetail Fetch the full stored details of a single tool call inside an organization's Cloud Agent session chat, such as the tool's input, output, status, and error, identified by message, part, and call ID. Use it to expand a tool-call preview in session history or inspect what a specific tool actually did. organizations cloudagentnext getsessiontoolpartdetail organizationid sessionid kilosessionid messageid partid callid organizationId sessionId kiloSessionId messageId partId callId"
   },
   "organizations.cloudAgentNext.getStackedWorkspaceSource": {
     "path": "organizations.cloudAgentNext.getStackedWorkspaceSource",
@@ -37093,6 +37180,17 @@
     ],
     "searchBlob": "user.getPasskeys List all passkeys (WebAuthn security keys, Face ID, Touch ID) registered to the signed-in user's account, including device type and last used time. user getpasskeys"
   },
+  "user.getProfileLinks": {
+    "path": "user.getProfileLinks",
+    "kind": "query",
+    "summary": "Get the signed-in user's saved LinkedIn and GitHub profile URLs from their account settings.",
+    "inputSchema": {},
+    "tags": [
+      "user",
+      "getprofilelinks"
+    ],
+    "searchBlob": "user.getProfileLinks Get the signed-in user's saved LinkedIn and GitHub profile URLs from their account settings. user getprofilelinks"
+  },
   "user.hasGatewayUsage": {
     "path": "user.hasGatewayUsage",
     "kind": "query",
@@ -38856,6 +38954,55 @@
       "folderids"
     ],
     "searchBlob": "workspaceFolders.reorder Change the display order of workspace folders. workspacefolders reorder organizationid folderids organizationId folderIds"
+  },
+  "workspaceFolders.reorderWorktrees": {
+    "path": "workspaceFolders.reorderWorktrees",
+    "kind": "mutation",
+    "summary": "Set the custom worktree order inside a smart workspace folder in the cloud agent sidebar, so you can manually arrange worktrees within the folder. Use to save a drag-and-drop reordering of worktrees.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "folderId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "worktreeIds": {
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        }
+      },
+      "required": [
+        "organizationId",
+        "folderId",
+        "worktreeIds"
+      ]
+    },
+    "tags": [
+      "workspacefolders",
+      "reorderworktrees",
+      "organizationid",
+      "folderid",
+      "worktreeids"
+    ],
+    "searchBlob": "workspaceFolders.reorderWorktrees Set the custom worktree order inside a smart workspace folder in the cloud agent sidebar, so you can manually arrange worktrees within the folder. Use to save a drag-and-drop reordering of worktrees. workspacefolders reorderworktrees organizationid folderid worktreeids organizationId folderId worktreeIds"
   },
   "workspaceFolders.update": {
     "path": "workspaceFolders.update",

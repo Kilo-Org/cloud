@@ -8,6 +8,10 @@ import {
   SESSION_INGEST_WORKER_URL,
 } from '@kilocode/web-shared/lib/config.server';
 import { ServiceFetchTimeoutError, fetchWithinBudget } from '@/lib/bounded-service-fetch';
+import {
+  toSharedTranscriptMessages,
+  type SharedTranscriptMessage,
+} from '@/lib/shared-session-transcript';
 import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import type { User } from '@kilocode/db/schema';
@@ -117,10 +121,10 @@ function redactedRouteForLog(requestUrl: string): string {
  * `CONTROL_PLANE_UPSTREAM_BUDGET_MS` (strictly under the mobile app's 15s
  * `CONTROL_PLANE_DEADLINE_MS`) instead of holding the calling control-plane
  * procedure open until the client deadline fires or the gateway answers 504.
- * The timeout keeps the module's existing failure shape: every call site
- * already propagates a transport failure to its router, which maps it to an
- * `INTERNAL_SERVER_ERROR` the mobile client renders as its existing retryable
- * state — never a new non-retryable one.
+ * Call sites propagate the timeout to their router, and
+ * `sessionIngestTrpcError` maps it to `SERVICE_UNAVAILABLE`: a stalled
+ * upstream is retryable on the client, never reported as a defect here. Other
+ * transport failures keep `INTERNAL_SERVER_ERROR`.
  *
  * On a budget expiry exactly one allow-listed line is emitted. It carries the
  * redacted route, the elapsed time and a fixed outcome — never the
@@ -144,6 +148,28 @@ async function fetchSessionIngest(requestUrl: string, init: RequestInit = {}): P
     }
     throw error;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Failure mapping
+// ---------------------------------------------------------------------------
+
+/**
+ * The tRPC error one session-ingest call failure becomes.
+ *
+ * A budget expiry is an upstream that did not answer in time, not a fault in
+ * this control plane, so it must stay retryable: `SERVICE_UNAVAILABLE`. Every
+ * other failure keeps the `INTERNAL_SERVER_ERROR` contract the routers already
+ * publish for an unexpected worker answer. `cause` is preserved so the
+ * original timeout stays attributable in logs and Sentry.
+ */
+export function sessionIngestTrpcError(message: string, cause: unknown): TRPCError {
+  return new TRPCError({
+    code:
+      cause instanceof ServiceFetchTimeoutError ? 'SERVICE_UNAVAILABLE' : 'INTERNAL_SERVER_ERROR',
+    message,
+    cause,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -594,6 +620,60 @@ export async function fetchSharedSessionSnapshot(
   }
 
   return parsed.data;
+}
+
+/** A public share as the read-only viewer needs it: who shared it, and what it says. */
+export type SharedSessionRead = {
+  metadata: SharedSessionMetadata;
+  messages: SharedTranscriptMessage[];
+  /**
+   * The link is valid but the snapshot behind it could not be read. The viewer
+   * still shows the session's identity and says the transcript is unavailable,
+   * exactly like the public web page does.
+   */
+  transcriptUnavailable: boolean;
+};
+
+/**
+ * Read a publicly shared session by its share token.
+ *
+ * Returns null when the token names no live share — expired, revoked, rotated
+ * out by a newer link, or never valid. That is the one answer the viewer treats
+ * as terminal, because retrying it cannot succeed.
+ *
+ * The snapshot is validated into renderable messages here, so every client of
+ * this capability receives the same transcript the public web page shows. The
+ * token is intentionally never included in errors or Sentry context.
+ */
+export async function fetchSharedSession(shareToken: string): Promise<SharedSessionRead | null> {
+  // Both reads are capped by the same upstream budget, and the control-plane
+  // procedure budget is only slightly larger, so issuing them in sequence can
+  // fail a link that is valid. The public page reads them together too. A
+  // snapshot rejection is folded into a settled result so a dead link still
+  // answers null below rather than surfacing the snapshot's error.
+  const [metadata, snapshotRead] = await Promise.all([
+    fetchSharedSessionMetadata(shareToken),
+    fetchSharedSessionSnapshot(shareToken).then(
+      snapshot => ({ ok: true as const, snapshot }),
+      () => ({ ok: false as const, snapshot: null })
+    ),
+  ]);
+  if (!metadata) {
+    return null;
+  }
+
+  if (!snapshotRead.ok || snapshotRead.snapshot === null) {
+    // A valid capability whose snapshot read failed is not a dead link: the
+    // metadata above resolved, so the viewer keeps the session and reports the
+    // transcript as unavailable rather than claiming the link expired.
+    return { metadata, messages: [], transcriptUnavailable: true };
+  }
+
+  return {
+    metadata,
+    messages: toSharedTranscriptMessages(snapshotRead.snapshot.messages),
+    transcriptUnavailable: false,
+  };
 }
 
 // ---------------------------------------------------------------------------

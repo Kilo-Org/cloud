@@ -1382,4 +1382,133 @@ describe('microdollars_used tracking', () => {
       .where(eq(organizations.id, nonExistentOrgId));
     expect(nonExistentOrg.length).toBe(0);
   });
+
+  describe('bouncer organization payer', () => {
+    const PARENT_CREATED_AT = '2025-08-01T00:00:00.000Z';
+
+    // A parent with one child: the child holds 5000 microdollars and has spent 1500 of its own,
+    // the parent holds 100000 and has spent 30000 across the family. The child has no seats, so a
+    // member allowance applies.
+    async function familyChild() {
+      const owner = await insertTestUser();
+      const member = await insertTestUser();
+      const parent = await createTestOrganization('Parent Org', owner.id, 100_000);
+      const child = await createTestOrganization('Child Org', owner.id, 5_000, undefined, false);
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      await db
+        .update(organizations)
+        .set({ created_at: PARENT_CREATED_AT, microdollars_used: 30_000 })
+        .where(eq(organizations.id, parent.id));
+      await db
+        .update(organizations)
+        .set({ microdollars_used: 1_500 })
+        .where(eq(organizations.id, child.id));
+      await addUserToOrganization(child.id, member.id, 'member');
+      return { member, parent, child };
+    }
+
+    test('reports a child organization as its parent with the family totals', async () => {
+      const { member, parent, child } = await familyChild();
+
+      const result = await getBalanceForOrganizationUser(child.id, member.id);
+
+      expect(result.payer?.bouncer).toMatchObject({
+        rootOrganizationId: parent.id,
+        microdollarsUsed: 31_500,
+        totalMicrodollarsAcquired: 105_000,
+      });
+      expect(new Date(result.payer?.bouncer?.createdAt ?? 0).toISOString()).toBe(PARENT_CREATED_AT);
+      // The top-level facts stay the child's own.
+      expect(result.payer).toMatchObject({
+        microdollarsUsed: 1_500,
+        totalMicrodollarsAcquired: 5_000,
+      });
+    });
+
+    test('keeps a child member on the child organization balance', async () => {
+      const { member, child } = await familyChild();
+
+      const result = await getBalanceForOrganizationUser(child.id, member.id);
+
+      expect(result.balance).toBe(0.0035);
+      expect(result.payer?.bouncer?.microdollarsUsed).toBe(31_500);
+    });
+
+    test('keeps the child organization own balance when the parent is funded', async () => {
+      const { member, child } = await familyChild();
+      await db
+        .update(organizations)
+        .set({ microdollars_used: 0, total_microdollars_acquired: 0 })
+        .where(eq(organizations.id, child.id));
+
+      const result = await getBalanceForOrganizationUser(child.id, member.id);
+      const payer = result.payer;
+      const ownBalance = payer ? payer.totalMicrodollarsAcquired - payer.microdollarsUsed : null;
+
+      expect(ownBalance).toBe(0);
+      expect(payer?.bouncer?.totalMicrodollarsAcquired).toBe(100_000);
+    });
+
+    test('keeps the child member allowance as the admission limit', async () => {
+      const { member, child } = await familyChild();
+      await updateOrganizationUserLimit(child.id, member.id, 0.002);
+
+      const result = await getBalanceForOrganizationUser(child.id, member.id);
+
+      expect(result.balance).toBe(0.002);
+      expect(result.balanceLimitedByUserAllowance).toBe(false);
+    });
+
+    test('reports a standalone organization as its own payer', async () => {
+      const owner = await insertTestUser();
+      const organization = await createTestOrganization('Standalone Org', owner.id, 40_000);
+      await db
+        .update(organizations)
+        .set({ created_at: PARENT_CREATED_AT })
+        .where(eq(organizations.id, organization.id));
+
+      const result = await getBalanceForOrganizationUser(organization.id, owner.id);
+
+      expect(result.payer?.bouncer).toMatchObject({
+        rootOrganizationId: organization.id,
+        microdollarsUsed: 0,
+        totalMicrodollarsAcquired: 40_000,
+      });
+      expect(result.payer).toMatchObject({
+        microdollarsUsed: 0,
+        totalMicrodollarsAcquired: 40_000,
+      });
+    });
+
+    test('sums every child organization into the parent payer', async () => {
+      const owner = await insertTestUser();
+      const parent = await createTestOrganization('Parent Org', owner.id, 10_000);
+      const childOne = await createTestOrganization('Child One', owner.id, 2_000);
+      const childTwo = await createTestOrganization('Child Two', owner.id, 3_000);
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id, microdollars_used: 4_000 })
+        .where(eq(organizations.id, childOne.id));
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id, microdollars_used: 500 })
+        .where(eq(organizations.id, childTwo.id));
+      await db
+        .update(organizations)
+        .set({ created_at: PARENT_CREATED_AT, microdollars_used: 1_000 })
+        .where(eq(organizations.id, parent.id));
+
+      const result = await getBalanceForOrganizationUser(parent.id, owner.id);
+
+      expect(result.payer?.bouncer).toMatchObject({
+        rootOrganizationId: parent.id,
+        microdollarsUsed: 5_500,
+        totalMicrodollarsAcquired: 15_000,
+      });
+      expect(result.balance).toBe(0.009);
+    });
+  });
 });

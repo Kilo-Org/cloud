@@ -32,7 +32,7 @@ import type {
   EnkryptUsageWrite,
   EnkryptUsageWriteInput,
   EnkryptUsageWriteResponse,
-} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
+} from '@kilocode/usage-contracts';
 
 /**
  * PLACEHOLDER: Enkrypt documents Guardrails credits only as a monthly plan allowance, with no price

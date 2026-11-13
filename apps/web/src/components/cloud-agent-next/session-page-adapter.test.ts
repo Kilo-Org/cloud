@@ -13,6 +13,8 @@ import {
   type SessionPageTrpcClient,
 } from './session-page-adapter';
 
+const unbatched = { context: { skipBatch: true } };
+
 function kiloSessionId(id: string): KiloSessionId {
   return id as KiloSessionId;
 }
@@ -110,12 +112,75 @@ describe('fetchWebCloudSessionSnapshotPage', () => {
     await expect(fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {})).resolves.toEqual(
       page
     );
-    await fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, { cursor: 'older', limit: 20 });
-    expect(fixture.personal).toHaveBeenNthCalledWith(1, { sessionId });
-    expect(fixture.personal).toHaveBeenNthCalledWith(2, { sessionId, cursor: 'older', limit: 20 });
+    await fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, { cursor: 'older' });
+    expect(fixture.personal).toHaveBeenNthCalledWith(
+      1,
+      { sessionId, toolDisplay: 'preview', limit: 20 },
+      unbatched
+    );
+    expect(fixture.personal).toHaveBeenNthCalledWith(
+      2,
+      { sessionId, toolDisplay: 'preview', cursor: 'older' },
+      unbatched
+    );
     expect(fixture.organization).not.toHaveBeenCalled();
     expect(fixture.ingest).not.toHaveBeenCalled();
   });
+
+  it.each([undefined, 'org-1'])(
+    'requests 20 initial messages for scope %s',
+    async organizationId => {
+      const fixture = client();
+      await fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, { organizationId });
+      const query = organizationId ? fixture.organization : fixture.personal;
+      expect(query.mock.calls).toEqual([
+        [
+          {
+            sessionId,
+            toolDisplay: 'preview',
+            limit: 20,
+            ...(organizationId ? { organizationId } : {}),
+          },
+          unbatched,
+        ],
+      ]);
+    }
+  );
+
+  it.each([undefined, 'org-1'])(
+    'preserves explicit initial and older-page limits for scope %s',
+    async organizationId => {
+      const fixture = client();
+      await fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, { organizationId, limit: 7 });
+      await fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {
+        organizationId,
+        cursor: 'older',
+        limit: 12,
+      });
+      const query = organizationId ? fixture.organization : fixture.personal;
+      expect(query.mock.calls).toEqual([
+        [
+          {
+            sessionId,
+            toolDisplay: 'preview',
+            limit: 7,
+            ...(organizationId ? { organizationId } : {}),
+          },
+          unbatched,
+        ],
+        [
+          {
+            sessionId,
+            toolDisplay: 'preview',
+            cursor: 'older',
+            limit: 12,
+            ...(organizationId ? { organizationId } : {}),
+          },
+          unbatched,
+        ],
+      ]);
+    }
+  );
 
   it('keeps organization scope on the DO proxy without calling the ingest router', async () => {
     const fixture = client();
@@ -123,14 +188,48 @@ describe('fetchWebCloudSessionSnapshotPage', () => {
       organizationId: 'org-1',
       cursor: 'older',
     });
-    expect(fixture.organization).toHaveBeenCalledWith({
-      sessionId,
-      cursor: 'older',
-      organizationId: 'org-1',
-    });
+    expect(fixture.organization).toHaveBeenCalledWith(
+      {
+        sessionId,
+        toolDisplay: 'preview',
+        cursor: 'older',
+        organizationId: 'org-1',
+      },
+      unbatched
+    );
     expect(fixture.personal).not.toHaveBeenCalled();
     expect(fixture.ingest).not.toHaveBeenCalled();
   });
+
+  it.each([undefined, 'org-1'])(
+    'requests 20 initial child messages without changing scope %s',
+    async organizationId => {
+      const fixture = client();
+      const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+      const childPage = { ...page, info: { id: childId, parentID: page.info.id } };
+      fixture.personal.mockResolvedValue(childPage);
+      fixture.organization.mockResolvedValue(childPage);
+      await expect(
+        fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {
+          organizationId,
+          kiloSessionId: childId,
+        })
+      ).resolves.toEqual(childPage);
+      const query = organizationId ? fixture.organization : fixture.personal;
+      expect(query.mock.calls).toEqual([
+        [
+          {
+            sessionId,
+            toolDisplay: 'preview',
+            kiloSessionId: childId,
+            limit: 20,
+            ...(organizationId ? { organizationId } : {}),
+          },
+          unbatched,
+        ],
+      ]);
+    }
+  );
 
   it.each([undefined, 'org-1'])(
     'forwards a native child selector through the root DO for scope %s',
@@ -149,13 +248,14 @@ describe('fetchWebCloudSessionSnapshotPage', () => {
       ).resolves.toEqual(childPage);
       const input = {
         sessionId,
+        toolDisplay: 'preview' as const,
         kiloSessionId: childId,
         cursor: 'child-older',
       };
       if (organizationId) {
-        expect(fixture.organization).toHaveBeenCalledWith({ ...input, organizationId });
+        expect(fixture.organization).toHaveBeenCalledWith({ ...input, organizationId }, unbatched);
       } else {
-        expect(fixture.personal).toHaveBeenCalledWith(input);
+        expect(fixture.personal).toHaveBeenCalledWith(input, unbatched);
       }
       expect(fixture.ingest).not.toHaveBeenCalled();
     }
@@ -202,7 +302,7 @@ describe('fetchWebSessionSnapshotPage', () => {
       omittedItemCount: 2,
       watermarkEventId: 42,
     });
-    expect(query).toHaveBeenCalledWith({ session_id: 'ses_123' });
+    expect(query).toHaveBeenCalledWith({ session_id: 'ses_123', limit: 20 }, unbatched);
   });
 
   it('forwards the continuation cursor to the tRPC layer as `cursor`', async () => {
@@ -217,10 +317,13 @@ describe('fetchWebSessionSnapshotPage', () => {
       cursor: 'opaque-cursor',
     });
 
-    expect(query).toHaveBeenCalledWith({
-      session_id: 'ses_123',
-      cursor: 'opaque-cursor',
-    });
+    expect(query).toHaveBeenCalledWith(
+      {
+        session_id: 'ses_123',
+        cursor: 'opaque-cursor',
+      },
+      unbatched
+    );
   });
 
   it('omits the cursor from the tRPC request when the manager has no continuation', async () => {
@@ -235,7 +338,7 @@ describe('fetchWebSessionSnapshotPage', () => {
       cursor: '',
     });
 
-    expect(query).toHaveBeenCalledWith({ session_id: 'ses_123' });
+    expect(query).toHaveBeenCalledWith({ session_id: 'ses_123', limit: 20 }, unbatched);
   });
 
   it('maps a session with no messages (history:null) to an empty success page', async () => {
@@ -304,7 +407,7 @@ describe('fetchWebSessionSnapshotPage', () => {
     expect(results).toEqual(histories);
   });
 
-  it('lets the tRPC input schema default the limit to 50 on the initial read', async () => {
+  it('uses 20 messages for the initial read, including the server-prefetch adapter', async () => {
     const query = jest.fn<
       SessionPageTrpcClient['cliSessionsV2']['getSessionMessagesPage']['query']
     >(async () => ({
@@ -314,9 +417,7 @@ describe('fetchWebSessionSnapshotPage', () => {
 
     await fetchWebSessionSnapshotPage(createClient(query), kiloSessionId('ses_123'), {});
 
-    const call = query.mock.calls[0]?.[0] as Record<string, unknown> | undefined;
-    expect(call).toBeDefined();
-    expect(call?.limit).toBeUndefined();
+    expect(query).toHaveBeenCalledWith({ session_id: 'ses_123', limit: 20 }, unbatched);
   });
 
   it('carries watermarkEventId through when the web router includes it', async () => {

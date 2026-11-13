@@ -214,6 +214,51 @@ describe('resolveSessionTerminalError', () => {
     ).toMatchObject({ retryable: true });
   });
 
+  it.each([
+    {
+      message: 'You are not authorized to use the Cloud Agent.',
+      variant: 'permission',
+      title: 'Access denied',
+      copy: "You don't have permission to view this.",
+    },
+    {
+      message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      variant: 'server',
+      title: "Couldn't load this session",
+      copy: 'Not enough credits for this request. Add credits and try again.',
+    },
+    {
+      message: 'Selected model is unavailable for Cloud Agent. Choose another available model.',
+      variant: 'server',
+      title: "Couldn't load this session",
+      copy: "This model isn't available for Cloud Agent. Choose another model and try again.",
+    },
+    {
+      message: 'This session is no longer available.',
+      variant: 'not-found',
+      title: 'Not found',
+      copy: 'This item may have been removed or is no longer available.',
+    },
+  ] as const)(
+    'offers no Retry for a permanent transport failure: $message',
+    ({ message, variant, title, copy }) => {
+      // The transport forwards the server's own failure text onto the error atom.
+      // A denial, an empty wallet, an unusable model and a session the server no
+      // longer has all answer a second open the same way, so the reader gets the
+      // class copy that names what to change instead of a Retry.
+      expect(
+        resolveSessionTerminalError({ error: message, statusIndicator: null, messageCount: 0 })
+      ).toEqual({
+        variant,
+        title,
+        message: copy,
+        retryable: false,
+        retryWith: 'session',
+        detail: message,
+      });
+    }
+  );
+
   it('never shows the English transport message to the reader', () => {
     const resolved = resolveSessionTerminalError(
       indicatorFor('Connection failed. Please retry in a moment.')

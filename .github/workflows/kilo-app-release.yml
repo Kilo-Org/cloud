@@ -95,7 +95,35 @@ jobs:
           # the version-bump branch re-triggers this workflow, and the tag marks the
           # pre-changelog commit, so without the exclusion every release starts the
           # next one. The same exclusion retires the bump-PR merge from the range.
-          CHANGES=$(git diff --name-only "$LAST_TAG"..HEAD -- apps/mobile/ packages/trpc/ packages/app-shared/ packages/event-service/ packages/notifications/ packages/cloud-agent-sdk/ ':(exclude)apps/mobile/CHANGELOG.md')
+          #
+          # The other exclusions are app-local files that cannot reach the shipped
+          # bundle: lint and test configuration, test files, markdown, and the
+          # repo-side scripts under apps/mobile/scripts and apps/mobile/e2e. Metro
+          # adds only `sql` to sourceExts and `txt` to assetExts, so none of these
+          # is resolvable into the bundle, and no app module imports one of them.
+          # A merge that touches only them changes no byte of the app, and must not
+          # spend one of the ten App Store Connect uploads. A script's generated
+          # output is committed under apps/mobile/src, which stays in the range, so
+          # a change of the generated app bytes still releases.
+          # The push `paths` filter above stays unfiltered: such a merge still
+          # starts this run and records the decision here, while the upload-cap
+          # gate and the suite lookup stay behind should_build. Add a path here
+          # only when the bundle cannot reach it.
+          CHANGES=$(git diff --name-only "$LAST_TAG"..HEAD -- \
+            apps/mobile/ \
+            packages/trpc/ \
+            packages/app-shared/ \
+            packages/event-service/ \
+            packages/notifications/ \
+            packages/cloud-agent-sdk/ \
+            ':(exclude)apps/mobile/CHANGELOG.md' \
+            ':(exclude,glob)apps/mobile/**/*.md' \
+            ':(exclude,glob)apps/mobile/**/*.test.ts' \
+            ':(exclude,glob)apps/mobile/**/*.test.tsx' \
+            ':(exclude,glob)apps/mobile/scripts/**' \
+            ':(exclude,glob)apps/mobile/e2e/**' \
+            ':(exclude)apps/mobile/.oxlintrc*.json' \
+            ':(exclude)apps/mobile/vitest*.ts')
 
           # The bump-version job edits the version line after every submission. Its
           # merged PR must not release the same code again, or every release starts
@@ -370,8 +398,15 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
+      # The preflight only reads the EAS CLI and the evaluated Expo config, and
+      # both come from the app's own closure: `eas-cli` is the app's development
+      # dependency, and `app.config.ts` with scripts/assert-expo-config.mjs
+      # resolves app-local modules. Only that closure and the root project are
+      # installed, so the smaller runner stops linking the workspaces the
+      # preflight never reads. Widen the filter when a step here imports a
+      # workspace outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo
 
       - name: Check EXPO_TOKEN
         run: |

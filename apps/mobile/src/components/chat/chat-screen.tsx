@@ -13,9 +13,8 @@ import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { PartDetailSheetHost } from '@/components/agents/part-detail-sheet-host';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SessionMessageList } from '@/components/agents/session-message-list';
-import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
-import { MessageCircle, Wrench } from '@/components/ui/icons';
+import { Wrench } from '@/components/ui/icons';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useSessionModelOptions } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -39,10 +38,12 @@ import { ChatTitle } from './chat-title';
 import { ChatComposerArea } from './chat-composer-area';
 import { ChatTranscriptFailure } from './chat-transcript-failure';
 import { ChatDetailsSheet } from './chat-details-sheet';
+import { ChatEmptyState } from './chat-empty-state';
 import { useChatDetails } from './chat-details-state';
 import { McpSettingsSheet, useMcpSettings } from './mcp-settings-sheet';
 import { BackendSettingsControl } from './backend-settings-sheet';
 import { useChatMessageActions } from './use-chat-message-actions';
+import { useChatAddCredits } from './use-chat-add-credits';
 import { useWebSearchSetting } from './web-search-row';
 
 /**
@@ -184,12 +185,10 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
 
   // Where the account buys the credit a refused send needs. Both the failed
   // question and the row above the composer reach it through this one action.
-  const openCredits = useCallback(() => {
-    router.push('/(app)/credits' as Href);
-  }, [router]);
+  const addCredits = useChatAddCredits(place);
 
   const messages = asMessages(state);
-  const actions = useChatMessageActions(state, messages, { retry, addCredits: openCredits });
+  const actions = useChatMessageActions(state, messages, { retry, addCredits });
   const { actionsFor } = actions;
   const details = useChatDetails({
     model: state.model === '' ? model : state.model,
@@ -281,17 +280,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       );
     }
     if (messages.length === 0) {
-      return (
-        <EmptyState
-          icon={MessageCircle}
-          // i18n-dup-ok: 'modelChat.empty.title' was renamed from the base catalog's
-          // quickChat.empty.title in the harness-chat rebuild; no other live key carries it.
-          title={t('modelChat.empty.title')}
-          // i18n-dup-ok: 'modelChat.empty.description' was renamed from the base catalog's
-          // quickChat.empty.description in the harness-chat rebuild; no other live key carries it.
-          description={t('modelChat.empty.description')}
-        />
-      );
+      return <ChatEmptyState />;
     }
     // The host lets a folded thinking row open its text in the part sheet.
     return (
@@ -327,7 +316,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
             failureKey={rowFailureKey}
             retryable={retryable}
             onRetry={() => void retry()}
-            onAddCredits={openCredits}
+            addCredits={addCredits}
             onSend={handleSend}
             composerControlRef={actions.composerControlRef}
             onStop={handleStop}

@@ -1,6 +1,10 @@
 import { GET as getPersonalEnrollment } from '@/app/api/internal/byoc/vercel-credentials/user/[userId]/route';
 import { GET as getOrganizationEnrollment } from '@/app/api/internal/byoc/vercel-credentials/organization/[organizationId]/route';
-import { decodeVercelConnection, vercelConnectionUpdate } from '@/lib/byoc/vercel-connection';
+import {
+  decodeVercelConnection,
+  vercelConnectionUpdate,
+  vercelSetupStepSchema,
+} from '@/lib/byoc/vercel-connection';
 import { NextRequest } from 'next/server';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
@@ -1056,6 +1060,69 @@ describe('Shared BYOC connections', () => {
       ).rejects.toMatchObject({ cause: { constraint: 'byoc_connections_owner_check' } });
     } finally {
       await db.delete(byoc_connections).where(eq(byoc_connections.id, inserted.id));
+    }
+  });
+
+  it('accepts current split setup steps and normalizes retired baked-runtime steps', () => {
+    const currentSteps = [
+      'validating_access',
+      'create_builder',
+      'install_system_dependencies',
+      'install_node_dependencies',
+      'snapshot_builder',
+      'create_validator',
+      'launch_validator_wrapper',
+      'verify_validator_call_home',
+      'stop_validator',
+      'confirm_terminal',
+    ] as const;
+
+    for (const step of currentSteps) {
+      expect(vercelSetupStepSchema.parse(step)).toBe(step);
+    }
+    for (const step of ['upload_runtime_artifacts', 'verify_runtime_artifacts'] as const) {
+      expect(vercelSetupStepSchema.parse(step)).toBe('install_node_dependencies');
+    }
+  });
+
+  it('decodes a stored retired setup step at the current install step', async () => {
+    const [row] = await db
+      .insert(byoc_connections)
+      .values({
+        user_id: personalUser.id,
+        provider: 'vercel',
+        credentials_encrypted: {
+          ...credentials,
+          scheme: 'byoc-vercel-credential-rsa-aes-256-gcm',
+        },
+        config: {
+          token_scope: 'team',
+          team_id: 'team-1',
+          project_id: 'project-1',
+          team_slug: null,
+          project_slug: null,
+        },
+        runtime: {
+          runtime_build_id: null,
+          runtime_snapshot_id: null,
+          runtime_wrapper_version: null,
+          runtime_released_at: null,
+          runtime_digest: null,
+        },
+        setup_status: 'building',
+        setup_step: 'verify_runtime_artifacts',
+        upgrade_status: 'building',
+        upgrade_step: 'upload_runtime_artifacts',
+      })
+      .returning();
+
+    try {
+      expect(decodeVercelConnection(row)).toMatchObject({
+        setup_step: 'install_node_dependencies',
+        upgrade_step: 'install_node_dependencies',
+      });
+    } finally {
+      await db.delete(byoc_connections).where(eq(byoc_connections.id, row.id));
     }
   });
 

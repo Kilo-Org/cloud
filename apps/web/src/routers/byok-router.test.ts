@@ -138,6 +138,30 @@ describe('BYOK Router', () => {
     await db.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, ownerUser.id));
   });
 
+  describe('listProviders', () => {
+    test('offers every addable provider and not the deprecated codestral key', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      const providers = await caller.byok.listProviders({});
+      const ids = providers.map(provider => provider.id);
+
+      expect(ids).toContain('anthropic');
+      expect(ids).toContain('openrouter');
+      expect(ids).not.toContain('codestral');
+      expect(providers.every(provider => provider.name.length > 0)).toBe(true);
+    });
+
+    test('hides the experimental direct providers until the feature is enabled', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      const providers = await caller.byok.listProviders({});
+      const ids = providers.map(provider => provider.id);
+
+      expect(ids).not.toContain('bedrock-byok');
+      expect(ids).not.toContain('vertex-byok');
+    });
+  });
+
   describe('list', () => {
     test('should return empty array when organization has no keys', async () => {
       const caller = await createCallerForUser(ownerUser.id);
@@ -162,7 +186,9 @@ describe('BYOK Router', () => {
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe(created.id);
       expect(result[0].provider_id).toBe('anthropic');
-      expect(result[0].provider_name).toBe('anthropic');
+      // The response carries the name every client shows, so a picker and a key
+      // list do not each resolve the same id through their own table.
+      expect(result[0].provider_name).toBe('Anthropic');
       expect(result[0].created_by).toBe(ownerUser.id);
     });
 
@@ -656,7 +682,7 @@ describe('BYOK Router', () => {
 
       expect(result.id).toBeDefined();
       expect(result.provider_id).toBe('anthropic');
-      expect(result.provider_name).toBe('anthropic');
+      expect(result.provider_name).toBe('Anthropic');
       expect(result.created_by).toBe(ownerUser.id);
       expect(result.created_at).toBeDefined();
       expect(result.updated_at).toBeDefined();
@@ -1216,7 +1242,7 @@ describe('BYOK Router', () => {
         expect(created).toEqual({
           id: expect.any(String),
           provider_id: 'bedrock',
-          provider_name: 'bedrock',
+          provider_name: 'AWS Bedrock',
           management_source: 'user',
           is_enabled: true,
           serve_catalog_models: false,
@@ -1821,9 +1847,21 @@ describe('BYOK Router', () => {
           data: {
             data: [
               { id: 'anthropic/claude-fixture', name: 'Claude Fixture', type: 'language' },
+              {
+                id: 'acme/vercel-only-fixture',
+                name: 'Vercel Only Fixture',
+                type: 'language',
+                context_window: 128_000,
+                modalities: { input: ['text'], output: ['text'] },
+                pricing: { input: '0.000001', output: '0.000002' },
+              },
               ...fillerModels,
             ],
           },
+        },
+        {
+          url: gatewayModelEndpointsUrl(VERCEL_AI_GATEWAY, 'acme/vercel-only-fixture'),
+          data: { data: { endpoints: [{ provider_name: 'bedrock' }] } },
         },
         {
           url: gatewayModelEndpointsUrl(VERCEL_AI_GATEWAY, 'anthropic/claude-fixture'),
@@ -1840,7 +1878,13 @@ describe('BYOK Router', () => {
         const result = await caller.byok.listSupportedModels();
 
         expect(result.anthropic).toEqual(['Claude Fixture (anthropic/claude-fixture)']);
-        expect(result.bedrock).toEqual(['Claude Fixture (anthropic/claude-fixture)']);
+        expect(result.bedrock).toEqual([
+          'Claude Fixture (anthropic/claude-fixture)',
+          'Vercel Only Fixture (acme/vercel-only-fixture)',
+        ]);
+        expect(result['vercel-ai-gateway']).toContain(
+          'Vercel Only Fixture (acme/vercel-only-fixture)'
+        );
         expect(result['byteplus-coding']).toContain(
           'ByteDance-Seed-Code (byteplus-coding/bytedance-seed-code)'
         );

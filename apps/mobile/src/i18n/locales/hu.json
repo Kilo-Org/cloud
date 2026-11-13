@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Nem sikerült megnyitni ezt a keresési találatot"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Még nincs használat",
+      "sharedWorkspace": "A munkaterület összes csevegésére közös",
+      "currentRates": "Aktuális díjak",
+      "perHour": "{{rate}}/óra",
+      "mediumSandbox": "Közepes homokozó",
+      "largeSandbox": "Nagy homokozó",
+      "earlierActivity": "Korábbi tevékenység",
+      "now": "most",
+      "loadFailed": "A Compute-díjakat nem sikerült betölteni."
+    },
+    "preview": {
+      "title": "Előnézet megnyitása",
+      "listeningServices": "Figyelő szolgáltatások",
+      "empty": "Nem található figyelő szolgáltatás. Az ügynöknek el kell indítania egy webszervert, ezután frissíteni kell a listát.",
+      "notRunning": "Ez a homokozó le van állítva. Az újraindításhoz üzenetet kell küldeni az ügynöknek.",
+      "notReady": "A homokozó még nem áll készen. A frissítés a csatlakozás után lehetséges.",
+      "unsupported": "Ehhez a homokozóhoz nem érhető el a szolgáltatásfelderítés.",
+      "failed": "Nem sikerült felderíteni a szolgáltatásokat.",
+      "openService": "{{name}} megnyitása, port: {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Triggerek és webhookok",
+      "subtitle": "Webhook- és ütemezett triggerek kezelése a weben."
+    }
+  },
   "sessionShare": {
     "title": "Munkamenet megosztása",
     "subtitle": "A linkkel bárki elolvashatja ezt a munkamenetet.",

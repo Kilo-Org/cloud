@@ -4311,6 +4311,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Ni lwyddwyd i agor canlyniad chwilio hwn"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Cyfrifiadura",
+      "noUsage": "Dim defnydd eto",
+      "sharedWorkspace": "Wedi'i rannu gan bob sgwrs yn y gweithle hwn",
+      "currentRates": "Cyfraddau cyfredol",
+      "perHour": "{{rate}}/awr",
+      "mediumSandbox": "Blwch tywod canolig",
+      "largeSandbox": "Blwch tywod mawr",
+      "earlierActivity": "Gweithgarwch cynharach",
+      "now": "nawr",
+      "loadFailed": "Nid oedd modd llwytho'r taliadau cyfrifiadura."
+    },
+    "preview": {
+      "title": "Agor rhagolwg",
+      "listeningServices": "Gwasanaethau sy'n gwrando",
+      "empty": "Heb ddod o hyd i unrhyw wasanaethau sy'n gwrando. Gofynnwch i'r asiant gychwyn gweinydd gwe, yna adnewyddwch.",
+      "notRunning": "Mae'r blwch tywod hwn wedi stopio. Anfonwch neges at yr asiant i'w gychwyn eto.",
+      "notReady": "Nid yw'r blwch tywod yn barod eto. Adnewyddwch unwaith y bydd wedi cysylltu.",
+      "unsupported": "Nid yw darganfod gwasanaethau ar gael ar gyfer y blwch tywod hwn.",
+      "failed": "Nid oedd modd darganfod gwasanaethau.",
+      "openService": "Agor {{name}} ar borth {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Sbardunau a bachau gwe",
+      "subtitle": "Rheolwch sbardunau bachyn gwe a sbardunau wedi'u hamserlennu ar y we."
+    }
+  },
   "sessionShare": {
     "title": "Rhannu sesiwn",
     "subtitle": "Gall unrhyw un sydd â'r ddolen ddarllen y sesiwn hon.",

@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Natiijadan raadinta lama furi karin"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Weli isticmaal ma jiro",
+      "sharedWorkspace": "Waxaa wadaaga dhammaan wadahadallada goobtan shaqada",
+      "currentRates": "Qiimaha hadda",
+      "perHour": "{{rate}}/saacaddii",
+      "mediumSandbox": "Sandbox dhexdhexaad ah",
+      "largeSandbox": "Sandbox weyn",
+      "earlierActivity": "Hawlihii hore",
+      "now": "hadda",
+      "loadFailed": "Kharashyada Compute-ka lama soo rari karin."
+    },
+    "preview": {
+      "title": "Fur horudhaca",
+      "listeningServices": "Adeegyada dhegeysanaya",
+      "empty": "Lama helin adeegyo dhegeysanaya. Wakiilka ka codso inuu bilaabo server web, kadibna cusboonaysii.",
+      "notRunning": "Sandbox-kan waa la joojiyay. U dir wakiilka fariin si uu mar kale u bilaabmo.",
+      "notReady": "Sandbox-ka weli diyaar ma aha. Cusboonaysii marka uu ku xirmo.",
+      "unsupported": "Raadinta adeegyada looma heli karo sandbox-kan.",
+      "failed": "Adeegyada lama heli karin.",
+      "openService": "Fur {{name}} ee ku jira dekedda {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Kiciyeyaasha & webhook-yada",
+      "subtitle": "Ku maamul kiciyeyaasha webhook-ga iyo kuwa jadwaleysan shabakadda."
+    }
+  },
   "sessionShare": {
     "title": "Wadaag fadhiga",
     "subtitle": "Qof kasta oo haysta xiriirka wuu akhrin karaa fadhigan.",

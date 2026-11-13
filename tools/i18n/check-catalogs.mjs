@@ -190,6 +190,7 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'agentChat.toolCard.toolGlob',
   'agentChat.toolCard.toolGrep',
   'agentChat.modelCost.perMillion',
+  'cloudAgent.preview.portLabel',
   'agentChat.tasks.progress',
   'agentChat.questionCard.option',
   'agentChat.sessionFilter.platformCli',

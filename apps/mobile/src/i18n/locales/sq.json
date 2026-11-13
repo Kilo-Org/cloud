@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Nuk u hap dot ky rezultat kërkimi"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Ende pa përdorim",
+      "sharedWorkspace": "E përbashkët për të gjitha bisedat në këtë hapësirë pune",
+      "currentRates": "Tarifat aktuale",
+      "perHour": "{{rate}}/orë",
+      "mediumSandbox": "Sandbox mesatar",
+      "largeSandbox": "Sandbox i madh",
+      "earlierActivity": "Aktiviteti i mëparshëm",
+      "now": "tani",
+      "loadFailed": "Kostot e Compute nuk mund të ngarkoheshin."
+    },
+    "preview": {
+      "title": "Hap pamjen paraprake",
+      "listeningServices": "Shërbimet në dëgjim",
+      "empty": "Nuk u gjet asnjë shërbim në dëgjim. Kërkoji agjentit të nisë një server web, pastaj rifresko.",
+      "notRunning": "Ky sandbox është ndalur. Dërgoji agjentit një mesazh për ta nisur përsëri.",
+      "notReady": "Sandbox-i nuk është ende gati. Rifresko sapo të lidhet.",
+      "unsupported": "Zbulimi i shërbimeve nuk është i disponueshëm për këtë sandbox.",
+      "failed": "Shërbimet nuk mund të zbuloheshin.",
+      "openService": "Hap {{name}} në portën {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Aktivizuesit dhe webhook-et",
+      "subtitle": "Menaxho në ueb aktivizuesit me webhook dhe ata të planifikuar."
+    }
+  },
   "sessionShare": {
     "title": "Ndaj seancën",
     "subtitle": "Kushdo që ka lidhjen mund ta lexojë këtë seancë.",

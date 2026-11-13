@@ -4181,6 +4181,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Ni bilo mogoče odpreti tega rezultata iskanja"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Računski viri",
+      "noUsage": "Še ni porabe",
+      "sharedWorkspace": "Skupno vsem klepetom v tem delovnem prostoru",
+      "currentRates": "Trenutne cene",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Srednji peskovnik",
+      "largeSandbox": "Velik peskovnik",
+      "earlierActivity": "Prejšnja dejavnost",
+      "now": "zdaj",
+      "loadFailed": "Stroškov računskih virov ni bilo mogoče naložiti."
+    },
+    "preview": {
+      "title": "Odpri predogled",
+      "listeningServices": "Storitve, ki poslušajo",
+      "empty": "Ni najdenih storitev, ki poslušajo. Prosi agenta, naj zažene spletni strežnik, nato osveži.",
+      "notRunning": "Ta peskovnik je ustavljen. Pošlji agentu sporočilo, da ga znova zažene.",
+      "notReady": "Peskovnik še ni pripravljen. Osveži, ko bo povezan.",
+      "unsupported": "Odkrivanje storitev za ta peskovnik ni na voljo.",
+      "failed": "Storitev ni bilo mogoče odkriti.",
+      "openService": "Odpri {{name}} na vratih {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Sprožilci in webhooki",
+      "subtitle": "Na spletu upravljaj sprožilce webhook in časovno načrtovane sprožilce."
+    }
+  },
   "sessionShare": {
     "title": "Deli sejo",
     "subtitle": "Vsakdo s povezavo lahko bere to sejo.",

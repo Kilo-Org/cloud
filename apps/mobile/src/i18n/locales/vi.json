@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Không thể mở kết quả tìm kiếm này"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Chưa có mức sử dụng",
+      "sharedWorkspace": "Dùng chung cho mọi cuộc trò chuyện trong không gian làm việc này",
+      "currentRates": "Mức giá hiện tại",
+      "perHour": "{{rate}}/giờ",
+      "mediumSandbox": "Sandbox cỡ vừa",
+      "largeSandbox": "Sandbox cỡ lớn",
+      "earlierActivity": "Hoạt động trước đó",
+      "now": "hiện tại",
+      "loadFailed": "Không thể tải phí Compute."
+    },
+    "preview": {
+      "title": "Mở bản xem trước",
+      "listeningServices": "Dịch vụ đang lắng nghe",
+      "empty": "Không tìm thấy dịch vụ nào đang lắng nghe. Hãy yêu cầu tác nhân khởi động một máy chủ web, sau đó làm mới.",
+      "notRunning": "Sandbox này đã dừng. Hãy gửi tin nhắn cho tác nhân để khởi động lại.",
+      "notReady": "Sandbox chưa sẵn sàng. Hãy làm mới sau khi đã kết nối.",
+      "unsupported": "Tính năng dò tìm dịch vụ không khả dụng cho sandbox này.",
+      "failed": "Không thể dò tìm dịch vụ.",
+      "openService": "Mở {{name}} trên cổng {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Trình kích hoạt & webhook",
+      "subtitle": "Quản lý trình kích hoạt webhook và trình kích hoạt theo lịch trên web."
+    }
+  },
   "sessionShare": {
     "title": "Chia sẻ phiên",
     "subtitle": "Bất kỳ ai có liên kết đều có thể đọc phiên này.",

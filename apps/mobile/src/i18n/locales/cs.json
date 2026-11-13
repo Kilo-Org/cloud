@@ -4181,6 +4181,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Nepodařilo se otevřít tento výsledek hledání"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Zatím žádné využití",
+      "sharedWorkspace": "Sdíleno všemi chaty v tomto pracovním prostoru",
+      "currentRates": "Aktuální sazby",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Střední sandbox",
+      "largeSandbox": "Velký sandbox",
+      "earlierActivity": "Dřívější aktivita",
+      "now": "nyní",
+      "loadFailed": "Poplatky za Compute se nepodařilo načíst."
+    },
+    "preview": {
+      "title": "Otevřít náhled",
+      "listeningServices": "Naslouchající služby",
+      "empty": "Nebyly nalezeny žádné naslouchající služby. Stačí požádat agenta o spuštění webového serveru a pak obnovit.",
+      "notRunning": "Tento sandbox je zastavený. Pro opětovné spuštění stačí poslat agentovi zprávu.",
+      "notReady": "Sandbox ještě není připravený. Po připojení stačí obnovit.",
+      "unsupported": "Zjišťování služeb není pro tento sandbox dostupné.",
+      "failed": "Služby se nepodařilo zjistit.",
+      "openService": "Otevřít {{name}} na portu {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Spouštěče a webhooky",
+      "subtitle": "Správa webhookových a plánovaných spouštěčů na webu."
+    }
+  },
   "sessionShare": {
     "title": "Sdílet relaci",
     "subtitle": "Kdokoli s odkazem si může tuto relaci přečíst.",

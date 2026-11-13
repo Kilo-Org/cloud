@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Kon nie hierdie soektogresultaat oopmaak nie"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Nog geen gebruik nie",
+      "sharedWorkspace": "Gedeel deur alle kletse in hierdie werkruimte",
+      "currentRates": "Huidige tariewe",
+      "perHour": "{{rate}}/u",
+      "mediumSandbox": "Medium sandbox",
+      "largeSandbox": "Groot sandbox",
+      "earlierActivity": "Vroeëre aktiwiteit",
+      "now": "nou",
+      "loadFailed": "Compute-koste kon nie laai nie."
+    },
+    "preview": {
+      "title": "Maak voorskou oop",
+      "listeningServices": "Luisterende dienste",
+      "empty": "Geen luisterende dienste gevind nie. Vra die agent om 'n webbediener te begin en verfris dan.",
+      "notRunning": "Hierdie sandbox is gestop. Stuur vir die agent 'n boodskap om dit weer te begin.",
+      "notReady": "Die sandbox is nog nie gereed nie. Verfris sodra dit gekoppel is.",
+      "unsupported": "Diensopsporing is nie vir hierdie sandbox beskikbaar nie.",
+      "failed": "Kon nie dienste opspoor nie.",
+      "openService": "Maak {{name}} op poort {{port}} oop",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Snellers en webhooks",
+      "subtitle": "Bestuur webhook- en geskeduleerde snellers op die web."
+    }
+  },
   "sessionShare": {
     "title": "Deel sessie",
     "subtitle": "Enigiemand met die skakel kan hierdie sessie lees.",

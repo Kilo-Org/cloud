@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Pa t ka louvri rezilta rechèch sa a"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Poko gen itilizasyon",
+      "sharedWorkspace": "Pataje ant tout chat nan espas travay sa a",
+      "currentRates": "Pri aktyèl",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Sandbox mwayen",
+      "largeSandbox": "Gwo sandbox",
+      "earlierActivity": "Aktivite pi bonè",
+      "now": "kounye a",
+      "loadFailed": "Frè Compute yo pa t ka chaje."
+    },
+    "preview": {
+      "title": "Louvri apèsi",
+      "listeningServices": "Sèvis k ap koute",
+      "empty": "Pa jwenn okenn sèvis k ap koute. Mande ajan an pou l demare yon sèvè web, epi rafrechi.",
+      "notRunning": "Sandbox sa a kanpe. Voye yon mesaj bay ajan an pou l demare l ankò.",
+      "notReady": "Sandbox la poko pare. Rafrechi lè li konekte.",
+      "unsupported": "Dekouvèt sèvis pa disponib pou sandbox sa a.",
+      "failed": "Pa t ka dekouvri sèvis yo.",
+      "openService": "Louvri {{name}} sou pò {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Deklanchè ak webhook",
+      "subtitle": "Jere deklanchè webhook ak deklanchè pwograme yo sou web la."
+    }
+  },
   "sessionShare": {
     "title": "Pataje sesyon",
     "subtitle": "Nenpòt moun ki gen lyen an ka li sesyon sa a.",

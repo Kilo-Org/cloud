@@ -4116,6 +4116,35 @@
   "systemSearch": {
     "couldNotOpenResult": "No se pudo abrir este resultado de búsqueda"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Aún no hay uso",
+      "sharedWorkspace": "Compartido por todos los chats de este espacio de trabajo",
+      "currentRates": "Tarifas actuales",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Sandbox mediano",
+      "largeSandbox": "Sandbox grande",
+      "earlierActivity": "Actividad anterior",
+      "now": "ahora",
+      "loadFailed": "No se pudieron cargar los cargos de compute."
+    },
+    "preview": {
+      "title": "Abrir vista previa",
+      "listeningServices": "Servicios en escucha",
+      "empty": "No se encontraron servicios en escucha. Pide al agente que inicie un servidor web y luego actualiza.",
+      "notRunning": "Este sandbox está detenido. Envía un mensaje al agente para iniciarlo de nuevo.",
+      "notReady": "El sandbox aún no está listo. Actualiza cuando esté conectado.",
+      "unsupported": "La detección de servicios no está disponible para este sandbox.",
+      "failed": "No se pudieron detectar los servicios.",
+      "openService": "Abrir {{name}} en el puerto {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Activadores y webhooks",
+      "subtitle": "Gestiona los activadores de webhook y programados en la web."
+    }
+  },
   "sessionShare": {
     "title": "Compartir sesión",
     "subtitle": "Cualquier persona con el enlace puede leer esta sesión.",

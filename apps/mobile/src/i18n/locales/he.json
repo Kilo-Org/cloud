@@ -4116,6 +4116,35 @@
   "systemSearch": {
     "couldNotOpenResult": "לא ניתן היה לפתוח את תוצאת החיפוש הזו"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "מחשוב",
+      "noUsage": "אין שימוש עדיין",
+      "sharedWorkspace": "משותף לכל הצ'אטים בסביבת העבודה הזו",
+      "currentRates": "תעריפים נוכחיים",
+      "perHour": "{{rate}}/שעה",
+      "mediumSandbox": "ארגז חול בינוני",
+      "largeSandbox": "ארגז חול גדול",
+      "earlierActivity": "פעילות קודמת",
+      "now": "עכשיו",
+      "loadFailed": "לא ניתן היה לטעון את חיובי המחשוב."
+    },
+    "preview": {
+      "title": "פתיחת תצוגה מקדימה",
+      "listeningServices": "שירותים מאזינים",
+      "empty": "לא נמצאו שירותים מאזינים. אפשר לבקש מהסוכן להפעיל שרת אינטרנט ואז לרענן.",
+      "notRunning": "ארגז החול הזה הופסק. כדי להפעיל אותו מחדש, יש לשלוח הודעה לסוכן.",
+      "notReady": "ארגז החול עדיין לא מוכן. יש לרענן לאחר שהוא יתחבר.",
+      "unsupported": "איתור שירותים אינו זמין עבור ארגז החול הזה.",
+      "failed": "לא ניתן היה לאתר שירותים.",
+      "openService": "פתיחת {{name}} ביציאה {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "טריגרים ו-webhooks",
+      "subtitle": "ניהול טריגרים של webhook וטריגרים מתוזמנים באתר."
+    }
+  },
   "sessionShare": {
     "title": "שיתוף סשן",
     "subtitle": "כל מי שיש לו את הקישור יכול לקרוא את הסשן הזה.",

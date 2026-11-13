@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Tidak dapat membuka hasil carian ini"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Pengkomputeran",
+      "noUsage": "Belum ada penggunaan",
+      "sharedWorkspace": "Dikongsi oleh semua sembang dalam ruang kerja ini",
+      "currentRates": "Kadar semasa",
+      "perHour": "{{rate}}/jam",
+      "mediumSandbox": "Kotak pasir sederhana",
+      "largeSandbox": "Kotak pasir besar",
+      "earlierActivity": "Aktiviti terdahulu",
+      "now": "sekarang",
+      "loadFailed": "Caj pengkomputeran tidak dapat dimuatkan."
+    },
+    "preview": {
+      "title": "Buka pratonton",
+      "listeningServices": "Perkhidmatan yang mendengar",
+      "empty": "Tiada perkhidmatan yang mendengar ditemui. Minta ejen memulakan pelayan web, kemudian muat semula.",
+      "notRunning": "Kotak pasir ini telah dihentikan. Hantar mesej kepada ejen untuk memulakannya semula.",
+      "notReady": "Kotak pasir belum sedia. Muat semula setelah ia disambungkan.",
+      "unsupported": "Penemuan perkhidmatan tidak tersedia untuk kotak pasir ini.",
+      "failed": "Tidak dapat menemui perkhidmatan.",
+      "openService": "Buka {{name}} pada port {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Pencetus & webhook",
+      "subtitle": "Urus pencetus webhook dan berjadual di web."
+    }
+  },
   "sessionShare": {
     "title": "Kongsi sesi",
     "subtitle": "Sesiapa yang mempunyai pautan ini boleh membaca sesi ini.",

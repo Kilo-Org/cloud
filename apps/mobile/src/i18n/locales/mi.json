@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Kāore i taea te whakatuwhera i tēnei hua kimi"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Kāore anō kia whakamahia",
+      "sharedWorkspace": "Ka tiritiria e ngā kōrerorero katoa o tēnei mokowā mahi",
+      "currentRates": "Ngā utu o nāianei",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Sandbox waenga",
+      "largeSandbox": "Sandbox nui",
+      "earlierActivity": "Ngā mahi o mua",
+      "now": "ināianei",
+      "loadFailed": "Kāore i taea te uta i ngā utu Compute."
+    },
+    "preview": {
+      "title": "Whakatuwhera arokite",
+      "listeningServices": "Ngā ratonga e whakarongo ana",
+      "empty": "Kāore i kitea he ratonga e whakarongo ana. Tonoa te māngai ki te tīmata i tētahi tūmau tukutuku, kātahi ka whakahou.",
+      "notRunning": "Kua mutu tēnei sandbox. Tukuna he karere ki te māngai kia tīmata anō ai.",
+      "notReady": "Kāore anō te sandbox kia rite. Whakahoutia ina kua hono.",
+      "unsupported": "Kāore te kimi ratonga e wātea ana mō tēnei sandbox.",
+      "failed": "Kāore i taea te kimi ratonga.",
+      "openService": "Whakatuwhera i a {{name}} i te tauranga {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Ngā keu me ngā webhook",
+      "subtitle": "Whakahaerehia ngā keu webhook me ngā keu kua whakaritea i te tukutuku."
+    }
+  },
   "sessionShare": {
     "title": "Tiri wātū",
     "subtitle": "Ka taea e te hunga katoa kei a rātou te hono te pānui i tēnei wātū.",

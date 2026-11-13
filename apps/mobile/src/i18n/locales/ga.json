@@ -4246,6 +4246,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Níorbh fhéidir an toradh cuardaigh seo a oscailt"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Ríomhaireacht",
+      "noUsage": "Gan úsáid fós",
+      "sharedWorkspace": "Roinnte ag gach comhrá sa spás oibre seo",
+      "currentRates": "Rátaí reatha",
+      "perHour": "{{rate}}/uair",
+      "mediumSandbox": "Bosca gainimh meánmhéide",
+      "largeSandbox": "Bosca gainimh mór",
+      "earlierActivity": "Gníomhaíocht níos luaithe",
+      "now": "anois",
+      "loadFailed": "Níorbh fhéidir na táillí ríomhaireachta a lódáil."
+    },
+    "preview": {
+      "title": "Oscail réamhamharc",
+      "listeningServices": "Seirbhísí ag éisteacht",
+      "empty": "Níor aimsíodh aon seirbhísí ag éisteacht. Iarr ar an ngníomhaire freastalaí gréasáin a thosú, ansin athnuaigh.",
+      "notRunning": "Tá an bosca gainimh seo stoptha. Seol teachtaireacht chuig an ngníomhaire chun é a thosú arís.",
+      "notReady": "Níl an bosca gainimh réidh fós. Athnuaigh nuair a bheidh sé ceangailte.",
+      "unsupported": "Níl aimsiú seirbhísí ar fáil don bhosca gainimh seo.",
+      "failed": "Níorbh fhéidir seirbhísí a aimsiú.",
+      "openService": "Oscail {{name}} ar phort {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Truicir & crúcaí gréasáin",
+      "subtitle": "Bainistigh truicir chrúca gréasáin agus truicir sceidealaithe ar an ngréasán."
+    }
+  },
   "sessionShare": {
     "title": "Comhroinn seisiún",
     "subtitle": "Is féidir le duine ar bith a bhfuil an nasc aige an seisiún seo a léamh.",

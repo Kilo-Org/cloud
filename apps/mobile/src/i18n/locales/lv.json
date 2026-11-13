@@ -4116,6 +4116,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Neizdevās atvērt šo meklēšanas rezultātu"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Skaitļošanas resursi",
+      "noUsage": "Vēl nav lietojuma",
+      "sharedWorkspace": "Kopīgi visām šīs darbvietas tērzēšanām",
+      "currentRates": "Pašreizējie tarifi",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Vidēja smilškaste",
+      "largeSandbox": "Liela smilškaste",
+      "earlierActivity": "Iepriekšējās darbības",
+      "now": "tagad",
+      "loadFailed": "Neizdevās ielādēt maksu par skaitļošanas resursiem."
+    },
+    "preview": {
+      "title": "Atvērt priekšskatījumu",
+      "listeningServices": "Klausošie pakalpojumi",
+      "empty": "Netika atrasts neviens klausošs pakalpojums. Lūdziet aģentam palaist tīmekļa serveri un pēc tam atsvaidziniet.",
+      "notRunning": "Šī smilškaste ir apturēta. Nosūtiet aģentam ziņojumu, lai to atkal palaistu.",
+      "notReady": "Smilškaste vēl nav gatava. Atsvaidziniet, tiklīdz tā ir pievienota.",
+      "unsupported": "Pakalpojumu noteikšana šai smilškastei nav pieejama.",
+      "failed": "Neizdevās atrast pakalpojumus.",
+      "openService": "Atvērt {{name}} portā {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Trigeri un tīmekļa āķi",
+      "subtitle": "Pārvaldiet tīmekļa āķu un plānotos trigerus tīmeklī."
+    }
+  },
   "sessionShare": {
     "title": "Kopīgot sesiju",
     "subtitle": "Ikviens, kam ir saite, var lasīt šo sesiju.",

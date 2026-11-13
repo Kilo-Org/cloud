@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Tsy voasokatra ity valim-pikarohana ity"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Mbola tsy misy fampiasana",
+      "sharedWorkspace": "Iombonan'ny resaka rehetra ato amin'ity toeram-piasana ity",
+      "currentRates": "Sarany ankehitriny",
+      "perHour": "{{rate}}/ora",
+      "mediumSandbox": "Sandbox antonony",
+      "largeSandbox": "Sandbox lehibe",
+      "earlierActivity": "Hetsika teo aloha",
+      "now": "izao",
+      "loadFailed": "Tsy nety nampidirina ny saran'ny Compute."
+    },
+    "preview": {
+      "title": "Sokafy ny topi-maso",
+      "listeningServices": "Serivisy mihaino",
+      "empty": "Tsy nisy serivisy mihaino hita. Angataho amin'ny mpanampy ny hanombohana mpizara tranonkala, dia havaozy avy eo.",
+      "notRunning": "Najanona ity sandbox ity. Mandefasa hafatra amin'ny mpanampy mba hanombohana azy indray.",
+      "notReady": "Mbola tsy vonona ny sandbox. Havaozy rehefa tafiditra ny fifandraisana.",
+      "unsupported": "Tsy azo atao amin'ity sandbox ity ny fitadiavana serivisy.",
+      "failed": "Tsy nahomby ny fitadiavana serivisy.",
+      "openService": "Sokafy {{name}} amin'ny port {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Trigger sy webhook",
+      "subtitle": "Tantano amin'ny tranonkala ny trigger webhook sy ny trigger voalahatra."
+    }
+  },
   "sessionShare": {
     "title": "Hizara ny fotoam-piasana",
     "subtitle": "Afaka mamaky ity fotoam-piasana ity izay rehetra manana ny rohy.",

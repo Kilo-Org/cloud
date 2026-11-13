@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Kunne ikke åbne dette søgeresultat"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Intet forbrug endnu",
+      "sharedWorkspace": "Deles af alle chats i dette arbejdsområde",
+      "currentRates": "Aktuelle priser",
+      "perHour": "{{rate}}/t",
+      "mediumSandbox": "Mellemstor sandbox",
+      "largeSandbox": "Stor sandbox",
+      "earlierActivity": "Tidligere aktivitet",
+      "now": "nu",
+      "loadFailed": "Compute-omkostninger kunne ikke indlæses."
+    },
+    "preview": {
+      "title": "Åbn forhåndsvisning",
+      "listeningServices": "Lyttende tjenester",
+      "empty": "Ingen lyttende tjenester fundet. Bed agenten om at starte en webserver, og opdater derefter.",
+      "notRunning": "Denne sandbox er stoppet. Send agenten en besked for at starte den igen.",
+      "notReady": "Sandboxen er ikke klar endnu. Opdater, når den er forbundet.",
+      "unsupported": "Tjenestesøgning er ikke tilgængelig for denne sandbox.",
+      "failed": "Kunne ikke finde tjenester.",
+      "openService": "Åbn {{name}} på port {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Triggere og webhooks",
+      "subtitle": "Administrer webhook- og planlagte triggere på nettet."
+    }
+  },
   "sessionShare": {
     "title": "Del session",
     "subtitle": "Alle med linket kan læse denne session.",

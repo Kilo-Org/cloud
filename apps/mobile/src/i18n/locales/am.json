@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "ይህን የፍለጋ ውጤት መክፈት አልተቻለም"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "እስካሁን ምንም አጠቃቀም የለም",
+      "sharedWorkspace": "በዚህ የሥራ ቦታ ውስጥ ባሉ ሁሉም ውይይቶች የሚጋራ",
+      "currentRates": "የአሁኑ ዋጋዎች",
+      "perHour": "{{rate}}/ሰዓት",
+      "mediumSandbox": "መካከለኛ sandbox",
+      "largeSandbox": "ትልቅ sandbox",
+      "earlierActivity": "ቀደም ያለ እንቅስቃሴ",
+      "now": "አሁን",
+      "loadFailed": "የCompute ክፍያዎችን መጫን አልተቻለም።"
+    },
+    "preview": {
+      "title": "ቅድመ እይታ ክፈት",
+      "listeningServices": "የሚያዳምጡ አገልግሎቶች",
+      "empty": "ምንም የሚያዳምጡ አገልግሎቶች አልተገኙም። ወኪሉን የድር አገልጋይ እንዲያስጀምር ጠይቅ፣ ከዚያ አድስ።",
+      "notRunning": "ይህ sandbox ቆሟል። እንደገና ለማስጀመር ለወኪሉ መልዕክት ላክ።",
+      "notReady": "Sandbox ገና ዝግጁ አይደለም። ከተገናኘ በኋላ አድስ።",
+      "unsupported": "ለዚህ sandbox የአገልግሎት ፍለጋ አይገኝም።",
+      "failed": "አገልግሎቶችን ማግኘት አልተቻለም።",
+      "openService": "{{name}}ን በፖርት {{port}} ላይ ክፈት",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "ቀስቅሴዎች እና webhooks",
+      "subtitle": "የwebhook እና የታቀዱ ቀስቅሴዎችን በድር ላይ አስተዳድር።"
+    }
+  },
   "sessionShare": {
     "title": "ክፍለ ጊዜውን አጋራ",
     "subtitle": "ሊንኩ ያለው ማንኛውም ሰው ይህን ክፍለ ጊዜ ማንበብ ይችላል።",

@@ -4116,6 +4116,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Nije moguće otvoriti ovaj rezultat pretrage"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Još nema potrošnje",
+      "sharedWorkspace": "Zajedničko svim razgovorima u ovom radnom prostoru",
+      "currentRates": "Trenutačne cijene",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Srednji sandbox",
+      "largeSandbox": "Veliki sandbox",
+      "earlierActivity": "Ranija aktivnost",
+      "now": "sada",
+      "loadFailed": "Troškovi za Compute nisu se mogli učitati."
+    },
+    "preview": {
+      "title": "Otvori pregled",
+      "listeningServices": "Servisi koji slušaju",
+      "empty": "Nije pronađen nijedan servis koji sluša. Zamoli agenta da pokrene web-poslužitelj, zatim osvježi.",
+      "notRunning": "Ovaj sandbox je zaustavljen. Pošalji agentu poruku da ga ponovno pokreneš.",
+      "notReady": "Sandbox još nije spreman. Osvježi kad se poveže.",
+      "unsupported": "Otkrivanje servisa nije dostupno za ovaj sandbox.",
+      "failed": "Nije moguće otkriti servise.",
+      "openService": "Otvori {{name}} na portu {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Okidači i webhookovi",
+      "subtitle": "Upravljaj webhook i zakazanim okidačima na webu."
+    }
+  },
   "sessionShare": {
     "title": "Podijeli sesiju",
     "subtitle": "Svatko s poveznicom može čitati ovu sesiju.",

@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Не успеа отворањето на овој резултат од пребарувањето"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Сè уште нема користење",
+      "sharedWorkspace": "Заеднички за сите разговори во овој работен простор",
+      "currentRates": "Тековни цени",
+      "perHour": "{{rate}}/ч",
+      "mediumSandbox": "Среден sandbox",
+      "largeSandbox": "Голем sandbox",
+      "earlierActivity": "Претходна активност",
+      "now": "сега",
+      "loadFailed": "Трошоците за Compute не можеа да се вчитаат."
+    },
+    "preview": {
+      "title": "Отвори преглед",
+      "listeningServices": "Сервиси што слушаат",
+      "empty": "Не се пронајдени сервиси што слушаат. Побарај од агентот да стартува веб-сервер, па освежи.",
+      "notRunning": "Овој sandbox е запрен. Испрати порака до агентот за повторно да го стартуваш.",
+      "notReady": "Sandbox-от сè уште не е подготвен. Освежи откако ќе се поврзе.",
+      "unsupported": "Откривањето сервиси не е достапно за овој sandbox.",
+      "failed": "Сервисите не можеа да се откријат.",
+      "openService": "Отвори {{name}} на порта {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Тригери и webhooks",
+      "subtitle": "Управувај со webhook тригери и закажани тригери на веб."
+    }
+  },
   "sessionShare": {
     "title": "Сподели сесија",
     "subtitle": "Секој што ја има врската може да ја чита оваа сесија.",

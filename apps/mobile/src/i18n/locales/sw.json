@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Imeshindikana kufungua matokeo haya ya utafutaji"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Bado hakuna matumizi",
+      "sharedWorkspace": "Inashirikiwa na gumzo zote katika eneo hili la kazi",
+      "currentRates": "Viwango vya sasa",
+      "perHour": "{{rate}}/saa",
+      "mediumSandbox": "Sandbox ya wastani",
+      "largeSandbox": "Sandbox kubwa",
+      "earlierActivity": "Shughuli za awali",
+      "now": "sasa",
+      "loadFailed": "Gharama za Compute hazikuweza kupakiwa."
+    },
+    "preview": {
+      "title": "Fungua onyesho la kukagua",
+      "listeningServices": "Huduma zinazosikiliza",
+      "empty": "Hakuna huduma zinazosikiliza zilizopatikana. Mwombe wakala aanzishe seva ya wavuti, kisha onyesha upya.",
+      "notRunning": "Sandbox hii imesimamishwa. Mtumie wakala ujumbe ili aianzishe tena.",
+      "notReady": "Sandbox bado haiko tayari. Onyesha upya ikishaunganishwa.",
+      "unsupported": "Ugunduzi wa huduma haupatikani kwa sandbox hii.",
+      "failed": "Imeshindwa kugundua huduma.",
+      "openService": "Fungua {{name}} kwenye mlango {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Vichochezi na webhook",
+      "subtitle": "Dhibiti vichochezi vya webhook na vilivyoratibiwa kwenye wavuti."
+    }
+  },
   "sessionShare": {
     "title": "Shiriki kipindi",
     "subtitle": "Yeyote mwenye kiungo anaweza kusoma kipindi hiki.",

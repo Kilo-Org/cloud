@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Otsingutulemust ei õnnestunud avada"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Arvutusressursid",
+      "noUsage": "Kasutust veel pole",
+      "sharedWorkspace": "Jagatud kõigi selle tööruumi vestluste vahel",
+      "currentRates": "Praegused hinnad",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Keskmine liivakast",
+      "largeSandbox": "Suur liivakast",
+      "earlierActivity": "Varasem tegevus",
+      "now": "praegu",
+      "loadFailed": "Arvutusressursside tasusid ei õnnestunud laadida."
+    },
+    "preview": {
+      "title": "Ava eelvaade",
+      "listeningServices": "Kuulavad teenused",
+      "empty": "Kuulavaid teenuseid ei leitud. Palu agendil veebiserver käivitada ja seejärel värskenda.",
+      "notRunning": "See liivakast on peatatud. Selle uuesti käivitamiseks saada agendile sõnum.",
+      "notReady": "Liivakast pole veel valmis. Värskenda, kui see on ühendatud.",
+      "unsupported": "Teenuste tuvastamine pole selle liivakasti puhul saadaval.",
+      "failed": "Teenuseid ei õnnestunud tuvastada.",
+      "openService": "Ava {{name}} pordil {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Päästikud ja veebihaagid",
+      "subtitle": "Halda veebihaagi- ja ajastatud päästikuid veebis."
+    }
+  },
   "sessionShare": {
     "title": "Jaga seanssi",
     "subtitle": "Kõik, kellel on link, saavad seda seanssi lugeda.",

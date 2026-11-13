@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Bu qidiruv natijasini ochib bo'lmadi"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Hali foydalanilmagan",
+      "sharedWorkspace": "Ushbu ish maydonidagi barcha chatlar uchun umumiy",
+      "currentRates": "Joriy tariflar",
+      "perHour": "{{rate}}/soat",
+      "mediumSandbox": "O‘rta sandbox",
+      "largeSandbox": "Katta sandbox",
+      "earlierActivity": "Avvalgi faollik",
+      "now": "hozir",
+      "loadFailed": "Compute to‘lovlarini yuklab bo‘lmadi."
+    },
+    "preview": {
+      "title": "Oldindan ko‘rishni ochish",
+      "listeningServices": "Tinglayotgan xizmatlar",
+      "empty": "Tinglayotgan xizmatlar topilmadi. Agentdan veb-serverni ishga tushirishni so‘rang, so‘ng yangilang.",
+      "notRunning": "Bu sandbox to‘xtatilgan. Uni qayta ishga tushirish uchun agentga xabar yuboring.",
+      "notReady": "Sandbox hali tayyor emas. Ulangandan so‘ng yangilang.",
+      "unsupported": "Bu sandbox uchun xizmatlarni aniqlash mavjud emas.",
+      "failed": "Xizmatlarni aniqlab bo‘lmadi.",
+      "openService": "{{name}} xizmatini {{port}}-portda ochish",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Triggerlar va webhooklar",
+      "subtitle": "Webhook va rejalashtirilgan triggerlarni vebda boshqaring."
+    }
+  },
   "sessionShare": {
     "title": "Seansni ulashish",
     "subtitle": "Havolaga ega har kim bu seansni oʻqiy oladi.",

@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "無法開啟此搜尋結果"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "運算",
+      "noUsage": "尚無使用量",
+      "sharedWorkspace": "由此工作區中的所有對話共用",
+      "currentRates": "目前費率",
+      "perHour": "{{rate}}/小時",
+      "mediumSandbox": "中型沙箱",
+      "largeSandbox": "大型沙箱",
+      "earlierActivity": "較早的活動",
+      "now": "現在",
+      "loadFailed": "無法載入運算費用。"
+    },
+    "preview": {
+      "title": "開啟預覽",
+      "listeningServices": "監聽中的服務",
+      "empty": "找不到監聽中的服務。請要求代理啟動網頁伺服器，然後重新整理。",
+      "notRunning": "此沙箱已停止。傳送訊息給代理即可重新啟動。",
+      "notReady": "沙箱尚未就緒。連線後請重新整理。",
+      "unsupported": "此沙箱無法使用服務探索。",
+      "failed": "無法探索服務。",
+      "openService": "開啟連接埠 {{port}} 上的 {{name}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "觸發條件與 Webhook",
+      "subtitle": "在網頁上管理 Webhook 與排程觸發條件。"
+    }
+  },
   "sessionShare": {
     "title": "分享工作階段",
     "subtitle": "任何擁有此連結的人都能檢視這個工作階段。",

@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Could not open this search result"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "No usage yet",
+      "sharedWorkspace": "Shared by all chats in this workspace",
+      "currentRates": "Current rates",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Medium sandbox",
+      "largeSandbox": "Large sandbox",
+      "earlierActivity": "Earlier activity",
+      "now": "now",
+      "loadFailed": "Compute charges could not load."
+    },
+    "preview": {
+      "title": "Open preview",
+      "listeningServices": "Listening services",
+      "empty": "No listening services found. Ask the agent to start a web server, then refresh.",
+      "notRunning": "This sandbox is stopped. Send the agent a message to start it again.",
+      "notReady": "The sandbox is not ready yet. Refresh once it is connected.",
+      "unsupported": "Service discovery is not available for this sandbox.",
+      "failed": "Could not discover services.",
+      "openService": "Open {{name}} on port {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Triggers & webhooks",
+      "subtitle": "Manage webhook and scheduled triggers on the web."
+    }
+  },
   "sessionShare": {
     "title": "Share session",
     "subtitle": "Anyone with the link can read this session.",

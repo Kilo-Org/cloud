@@ -4246,6 +4246,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Ma stajniex niftħu dan ir-riżultat tat-tfittxija"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Għad m'hemm l-ebda użu",
+      "sharedWorkspace": "Maqsum bejn iċ-chats kollha f'dan il-workspace",
+      "currentRates": "Rati attwali",
+      "perHour": "{{rate}}/siegħa",
+      "mediumSandbox": "Sandbox medju",
+      "largeSandbox": "Sandbox kbir",
+      "earlierActivity": "Attività preċedenti",
+      "now": "issa",
+      "loadFailed": "L-ispejjeż tal-Compute ma setgħux jitgħabbew."
+    },
+    "preview": {
+      "title": "Iftaħ il-preview",
+      "listeningServices": "Servizzi li qed jisimgħu",
+      "empty": "Ma nstab l-ebda servizz li qed jisma'. Staqsi lill-aġent biex jibda web server, imbagħad aġġorna.",
+      "notRunning": "Dan is-sandbox huwa mwaqqaf. Ibgħat messaġġ lill-aġent biex terġa' tibdih.",
+      "notReady": "Is-sandbox għadu mhux lest. Aġġorna ladarba jkun konness.",
+      "unsupported": "L-iskoperta tas-servizzi mhix disponibbli għal dan is-sandbox.",
+      "failed": "Ma kienx possibbli li jinstabu s-servizzi.",
+      "openService": "Iftaħ {{name}} fuq il-port {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Triggers u webhooks",
+      "subtitle": "Immaniġġja t-triggers tal-webhook u dawk skedati fuq il-web."
+    }
+  },
   "sessionShare": {
     "title": "Aqsam is-sessjoni",
     "subtitle": "Kull min għandu l-link jista' jaqra din is-sessjoni.",

@@ -4181,6 +4181,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Nepodarilo sa otvoriť tento výsledok vyhľadávania"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Zatiaľ bez využitia",
+      "sharedWorkspace": "Zdieľané všetkými chatmi v tomto pracovnom priestore",
+      "currentRates": "Aktuálne sadzby",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Stredný sandbox",
+      "largeSandbox": "Veľký sandbox",
+      "earlierActivity": "Staršia aktivita",
+      "now": "teraz",
+      "loadFailed": "Poplatky za Compute sa nepodarilo načítať."
+    },
+    "preview": {
+      "title": "Otvoriť náhľad",
+      "listeningServices": "Načúvajúce služby",
+      "empty": "Nenašli sa žiadne načúvajúce služby. Požiadajte agenta, aby spustil webový server, a potom obnovte.",
+      "notRunning": "Tento sandbox je zastavený. Ak ho chcete znova spustiť, pošlite agentovi správu.",
+      "notReady": "Sandbox ešte nie je pripravený. Obnovte, keď bude pripojený.",
+      "unsupported": "Vyhľadávanie služieb nie je pre tento sandbox dostupné.",
+      "failed": "Služby sa nepodarilo vyhľadať.",
+      "openService": "Otvoriť {{name}} na porte {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Spúšťače a webhooky",
+      "subtitle": "Spravujte webhookové a plánované spúšťače na webe."
+    }
+  },
   "sessionShare": {
     "title": "Zdieľať reláciu",
     "subtitle": "Túto reláciu si môže prečítať ktokoľvek s odkazom.",

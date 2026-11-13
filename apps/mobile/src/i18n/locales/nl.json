@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "Dit zoekresultaat kon niet worden geopend"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Nog geen gebruik",
+      "sharedWorkspace": "Gedeeld door alle chats in deze workspace",
+      "currentRates": "Huidige tarieven",
+      "perHour": "{{rate}}/u",
+      "mediumSandbox": "Middelgrote sandbox",
+      "largeSandbox": "Grote sandbox",
+      "earlierActivity": "Eerdere activiteit",
+      "now": "nu",
+      "loadFailed": "Compute-kosten konden niet worden geladen."
+    },
+    "preview": {
+      "title": "Preview openen",
+      "listeningServices": "Luisterende services",
+      "empty": "Geen luisterende services gevonden. Vraag de agent een webserver te starten en vernieuw daarna.",
+      "notRunning": "Deze sandbox is gestopt. Stuur de agent een bericht om hem opnieuw te starten.",
+      "notReady": "De sandbox is nog niet klaar. Vernieuw zodra hij verbonden is.",
+      "unsupported": "Servicedetectie is niet beschikbaar voor deze sandbox.",
+      "failed": "Services konden niet worden gedetecteerd.",
+      "openService": "{{name}} openen op poort {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Triggers en webhooks",
+      "subtitle": "Beheer webhook- en geplande triggers op het web."
+    }
+  },
   "sessionShare": {
     "title": "Sessie delen",
     "subtitle": "Iedereen met de link kan deze sessie lezen.",

@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "无法打开此搜索结果"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "计算资源",
+      "noUsage": "暂无用量",
+      "sharedWorkspace": "由此工作区中的所有聊天共享",
+      "currentRates": "当前费率",
+      "perHour": "{{rate}}/小时",
+      "mediumSandbox": "中型沙盒",
+      "largeSandbox": "大型沙盒",
+      "earlierActivity": "更早的活动",
+      "now": "现在",
+      "loadFailed": "无法加载计算资源费用。"
+    },
+    "preview": {
+      "title": "打开预览",
+      "listeningServices": "监听中的服务",
+      "empty": "未找到监听中的服务。请让智能体启动一个 Web 服务器，然后刷新。",
+      "notRunning": "此沙盒已停止。向智能体发送一条消息即可重新启动。",
+      "notReady": "沙盒尚未就绪。连接后请刷新。",
+      "unsupported": "此沙盒不支持服务发现。",
+      "failed": "无法发现服务。",
+      "openService": "打开端口 {{port}} 上的 {{name}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "触发器和 Webhook",
+      "subtitle": "在网页上管理 Webhook 和定时触发器。"
+    }
+  },
   "sessionShare": {
     "title": "分享会话",
     "subtitle": "任何拥有此链接的人都可以查看此会话。",

@@ -23,6 +23,15 @@ import { useTRPC } from '@/lib/trpc';
 
 import { type SessionAutoApproveState } from './session-auto-approve';
 import { SessionAutoApproveRow } from './session-auto-approve-row';
+import { SessionComputeSection } from './session-compute-section';
+import { formatSessionTotalCost } from './session-list-helpers';
+import { isPermissionDeniedError } from '@/lib/trpc-error';
+import {
+  computeChargesMicrodollars,
+  isCloudAgentSessionId,
+  sessionTotalMicrodollars,
+} from '@/lib/session-compute-total';
+import { useSessionComputeCharges } from '@/lib/hooks/use-session-compute';
 import { ContextUsageRing } from './context-usage-ring';
 import { useOptionalSessionManager } from './session-manager-context';
 import {
@@ -60,6 +69,10 @@ type SessionContextSheetProps = {
   modelDisplay: string;
   providerDisplay: string;
   totalCostMicrodollars: number | null;
+  /** The viewed session's Cloud Agent id: the compute charges and preview address it. */
+  cloudAgentSessionId?: string | null;
+  /** The session's organization, when it is billed to one. */
+  organizationId?: string;
   breakdownCostUsd: number;
   messages: StoredMessage[];
   modelOptions: SessionModelOption[];
@@ -81,6 +94,15 @@ const SHEET_RING_STROKE = 8;
 const LazySessionContextPrRow = lazy(async () => {
   const { SessionContextPrRow } = await import('./session-context-pr-row');
   return { default: SessionContextPrRow };
+});
+
+// The preview row owns the sandbox's service scan, the preview-ticket mutation
+// and the in-app browser hand-off. Lazy-loading it keeps those modules out of
+// this sheet's graph until a session that can actually preview renders it, the
+// same reason the PR row above is lazy.
+const LazySessionPreviewRow = lazy(async () => {
+  const { SessionPreviewRow } = await import('./session-preview-row');
+  return { default: SessionPreviewRow };
 });
 
 const TONE_TEXT_CLASS = {
@@ -164,6 +186,8 @@ export function SessionContextSheet({
   modelDisplay,
   providerDisplay,
   totalCostMicrodollars,
+  cloudAgentSessionId,
+  organizationId,
   breakdownCostUsd,
   messages,
   modelOptions,
@@ -222,6 +246,23 @@ export function SessionContextSheet({
     breakdown.subagentCostUsd,
     olderActivityCostUsd
   );
+  // The session total is the model cost plus what the sandbox cost. The read is
+  // shared with the session page's pill, which owns its poll timer and stays
+  // mounted behind the sheet, so the sheet only reads the cache entry it keeps
+  // fresh. A session with no compute scope (or another payer) answers nothing
+  // and the model cost stands alone.
+  const computeCharges = useSessionComputeCharges({
+    cloudAgentSessionId,
+    organizationId,
+    poll: false,
+  });
+  const totalCostText =
+    formatSessionTotalCost(
+      sessionTotalMicrodollars(
+        totalCostMicrodollars,
+        computeChargesMicrodollars(computeCharges.data)
+      )
+    ) ?? content.cost;
 
   return (
     <SessionPageSheet visible={visible} onClose={onClose} dismissible>
@@ -385,11 +426,28 @@ export function SessionContextSheet({
             </Row>
           ) : null}
 
-          {content.cost !== null || autoApproveState !== 'unavailable' ? (
+          {/* The row paints the combined total, so its gate is that total, not
+              the model-only figure: a read-only session with no model cost can
+              still owe a workspace's positive sandbox compute, and hiding the
+              row would hide its figure and its sharing note together. */}
+          {totalCostText !== null || autoApproveState !== 'unavailable' ? (
             <Row label={t('agentChat.contextUsage.totalCost')}>
               <Text className="text-base font-medium text-foreground tabular-nums">
-                {content.cost ?? '-'}
+                {totalCostText ?? '-'}
               </Text>
+              {/* The web session information dialog adds the whole workspace's
+                  recorded compute to its total and names that sharing under the
+                  Compute figure. This total is the same one the header pill
+                  paints, so it carries the same note rather than reading as
+                  this chat's own sandbox spend. */}
+              {computeCharges.data?.scope === 'workspace' ? (
+                <Text
+                  className="text-xs text-muted-foreground"
+                  testID="session-context-sheet-shared-compute"
+                >
+                  {t('cloudAgent.compute.sharedWorkspace')}
+                </Text>
+              ) : null}
             </Row>
           ) : null}
 
@@ -460,6 +518,17 @@ export function SessionContextSheet({
             </Text>
           </View>
         ) : null}
+
+        <SessionComputeSection
+          charges={computeCharges.data}
+          isError={computeCharges.isError && !isPermissionDeniedError(computeCharges.error)}
+          onRetry={() => void computeCharges.refetch()}
+        />
+
+        <SessionPreviewRowSlot
+          cloudAgentSessionId={cloudAgentSessionId}
+          organizationId={organizationId}
+        />
       </ScrollView>
 
       <View style={{ height: insets.bottom }} className="bg-background" />
@@ -492,6 +561,31 @@ function useRunningOnLabel(
   // row's space while that first lookup is in flight so the rows below it do
   // not jump when the label arrives.
   return isRemote && isPending ? { kind: 'pending' } : { kind: 'hidden' };
+}
+
+/**
+ * The preview entry, for a session the control plane can serve a preview for
+ * (`workspace_` ids). An older session would only get a 404 back, so its row is
+ * absent rather than disabled, and the lazy module is never loaded for it.
+ */
+function SessionPreviewRowSlot({
+  cloudAgentSessionId,
+  organizationId,
+}: Readonly<{
+  cloudAgentSessionId: string | null | undefined;
+  organizationId: string | undefined;
+}>) {
+  if (!isCloudAgentSessionId(cloudAgentSessionId)) {
+    return null;
+  }
+  return (
+    <Suspense fallback={null}>
+      <LazySessionPreviewRow
+        cloudAgentSessionId={cloudAgentSessionId}
+        organizationId={organizationId}
+      />
+    </Suspense>
+  );
 }
 
 function CopyRow({

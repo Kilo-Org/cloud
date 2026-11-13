@@ -4051,6 +4051,35 @@
   "systemSearch": {
     "couldNotOpenResult": "A kò lè ṣí àbájọ́ ìwádìí yìí"
   },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Kò sí lílò síbẹ̀",
+      "sharedWorkspace": "Gbogbo ìjíròrò nínú workspace yìí ló jọ ń lò ó",
+      "currentRates": "Iye owó lọ́wọ́lọ́wọ́",
+      "perHour": "{{rate}}/wákàtí",
+      "mediumSandbox": "Sandbox alábọ́dé",
+      "largeSandbox": "Sandbox ńlá",
+      "earlierActivity": "Ìṣe ìṣáájú",
+      "now": "báyìí",
+      "loadFailed": "Kò ṣeé ṣe láti gbé iye owó Compute wọlé."
+    },
+    "preview": {
+      "title": "Ṣí ìwòṣáájú",
+      "listeningServices": "Àwọn iṣẹ́ tó ń tẹ́tí sílẹ̀",
+      "empty": "A kò rí iṣẹ́ kankan tó ń tẹ́tí sílẹ̀. Ní kí aṣojú bẹ̀rẹ̀ web server kan, lẹ́yìn náà sọ ọ́ di tuntun.",
+      "notRunning": "Sandbox yìí ti dúró. Fi ìfiránṣẹ́ ránṣẹ́ sí aṣojú láti tún un bẹ̀rẹ̀.",
+      "notReady": "Sandbox kò tíì ṣetán. Sọ ọ́ di tuntun nígbà tí ó bá ti sopọ̀.",
+      "unsupported": "Ìwárí iṣẹ́ kò sí fún sandbox yìí.",
+      "failed": "Kò ṣeé ṣe láti wá àwọn iṣẹ́ rí.",
+      "openService": "Ṣí {{name}} lórí port {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Àwọn trigger àti webhook",
+      "subtitle": "Ṣàkóso àwọn trigger webhook àti àwọn tí a ṣètò àkókò fún lórí wẹ́ẹ̀bù."
+    }
+  },
   "sessionShare": {
     "title": "Pín ìgbà iṣẹ́",
     "subtitle": "Ẹnikẹ́ni tó bá ní ìjápọ̀ náà lè ka ìgbà iṣẹ́ yìí.",

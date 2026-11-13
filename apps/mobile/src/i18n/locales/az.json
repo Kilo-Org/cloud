@@ -22,6 +22,7 @@
     "expired": "Müddəti bitib"
   },
   "common": {
+    "manageOnWeb": "Vebdə idarə et",
     "creditHistory": "Kredit tarixçəsi",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Provayder açarları",
       "rowSubtitle": "Öz provayder ödənişindən istifadə et",
-      "manageOnWeb": "Vebdə idarə et",
       "manageOnWebReason": "Bu provayderlər strukturlaşdırılmış etimadnamələr tələb edir.",
       "description": "Bu açarlarla göndərilən sorğuların haqqı Kilo balansından deyil, provayder hesabından tutulur.",
       "enabled": "İstifadədədir",
@@ -2550,7 +2550,8 @@
       "cancelQueued": "Mesajı ləğv et",
       "cancelQueuedAccessibility": "Növbədəki mesajı ləğv et",
       "restoreQueued": "Bərpa et",
-      "restoreQueuedAccessibility": "Ləğv edilmiş mesajı mesaj sahəsinə qaytar"
+      "restoreQueuedAccessibility": "Ləğv edilmiş mesajı mesaj sahəsinə qaytar",
+      "noReplyRecorded": "Bu mesaj üçün cavab qeydə alınmadı."
     },
     "olderMessages": {
       "arrived": "Əvvəlki mesajlar yükləndi",
@@ -4177,6 +4178,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu axtarış nəticəsi açılmadı"
+  },
+  "usage": {
+    "title": "İstifadə",
+    "orgTitle": "Təşkilatın istifadəsi",
+    "entrySubtitle": "Xərc, sorğular və tokenlər",
+    "rangePicker": "Zaman aralığı",
+    "range90d": "90 gün",
+    "metricPicker": "Qrafik göstəricisi",
+    "chartA11y": "Gün üzrə {{metric}}",
+    "avgCostPerRequest": "Orta xərc / sorğu",
+    "topModels": "Əsas modellər",
+    "topFeatures": "Əsas funksiyalar",
+    "emptyTitle": "Bu dövrdə istifadə yoxdur",
+    "orgSelfNotice": "Bu təşkilatda öz istifadənizi görürsünüz.",
+    "viewDetails": "İstifadə təfərrüatlarına baxın"
+  },
+  "integrations": {
+    "title": "İnteqrasiyalar",
+    "sectionTitle": "Qoşulmuş xidmətlər",
+    "entrySubtitle": "GitHub, Slack, Linear və digərləri",
+    "subtitle": "Proqram tərtibatı alətlərinizi və iş proseslərinizi Kilo ilə əlaqələndirin",
+    "emptyHint": "Hələ heç bir inteqrasiya qoşulmayıb.",
+    "disconnect": "Bağlantını kəs",
+    "disconnectTitle": "{{provider}} bağlantısı kəsilsin?",
+    "disconnectMessage": "Kilo {{provider}} daxilində cavab verməyi dayandıracaq. İstənilən vaxt yenidən qoşula bilərsiniz.",
+    "connectedTo": "{{account}} hesabına qoşulub",
+    "disconnected": "{{provider}} bağlantısı kəsildi",
+    "disconnectFailed": "{{provider}} bağlantısını kəsmək mümkün olmadı",
+    "couldNotLoad": "İnteqrasiyaları yükləmək mümkün olmadı",
+    "permissionDenied": "Bu inteqrasiyaları idarə etmək üçün icazəniz yoxdur.",
+    "memberHint": "Bu bağlantıları dəyişmək üçün təşkilatın sahibinə və ya administratoruna müraciət edin.",
+    "connectFailed": "Qoşulma səhifəsini açmaq mümkün olmadı"
   },
   "invoices": {
     "personalEmptyDescription": "Ödəniş tutulduqdan sonra şəxsi alışlarınızın fakturaları burada görünəcək."

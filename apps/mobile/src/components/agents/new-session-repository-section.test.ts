@@ -60,13 +60,12 @@ vi.mock('react-native-reanimated', () => ({
 
 const collapseState = vi.hoisted(() => ({
   collapsedCtas: [] as string[],
-  hasLoaded: true,
   setConnectCtaCollapsed: vi.fn(),
 }));
 vi.mock('@/lib/hooks/use-collapsed-connect-ctas-preference', () => ({
   useCollapsedConnectCtas: () => ({
     collapsedCtas: collapseState.collapsedCtas,
-    hasLoaded: collapseState.hasLoaded,
+    hasLoaded: true,
   }),
   setConnectCtaCollapsed: collapseState.setConnectCtaCollapsed,
 }));
@@ -106,7 +105,6 @@ function pressHeader(renderer: TestRenderer.ReactTestRenderer, title: string): v
 beforeEach(() => {
   resetSelectedBranchOverrides();
   collapseState.collapsedCtas = [];
-  collapseState.hasLoaded = true;
   collapseState.setConnectCtaCollapsed.mockClear();
 });
 
@@ -324,14 +322,30 @@ describe('NewSessionRepositorySection connect card collapse', () => {
     expect(collapseState.setConnectCtaCollapsed).toHaveBeenCalledWith('github', !collapsed);
   });
 
-  it('renders no connect card until the persisted state has loaded', () => {
-    collapseState.hasLoaded = false;
-    const renderer = mountSection({ groups: [group('github', 'connect')] });
+  it('renders no card or branch row until the region is settled', () => {
+    // The form paints the rows below the section on this same signal, so an
+    // unsettled region must contribute no height at all.
+    const unsettled = mountSection({
+      settled: false,
+      value: 'github:owner/repo',
+      groups: [group('github', 'connect')],
+    });
 
-    const text = renderedText(renderer);
+    const text = renderedText(unsettled);
     expect(text).not.toContain(i18n.t('common.connectGithub'));
     expect(text).not.toContain(i18n.t('agentChat.newSession.connectGithubDescription'));
-    expect(pressables(renderer)).toHaveLength(0);
+    expect(pressables(unsettled)).toHaveLength(0);
+    expect(branchSelectorProps(unsettled)).toBeUndefined();
+
+    // The same groups paint the card and the branch row once the region has
+    // settled.
+    const settled = mountSection({
+      groups: [group('github', 'connect')],
+      value: 'github:owner/repo',
+    });
+
+    expect(renderedText(settled)).toContain(i18n.t('common.connectGithub'));
+    expect(branchSelectorProps(settled)?.repository).toEqual(githubRow);
   });
 
   it.each([
@@ -408,7 +422,6 @@ describe('NewSessionRepositorySection connect cards after selection', () => {
     const onConnect = vi.fn(() => undefined);
     const onRefreshRepos = vi.fn(() => undefined);
     collapseState.collapsedCtas = [platform];
-    collapseState.hasLoaded = false;
     setSelectedBranchOverride(row, 'release/2.0');
     const renderer = mountSection({
       value: `${row.platform}:${row.fullName}`,

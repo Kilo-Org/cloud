@@ -38,9 +38,11 @@ jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   generateBoundedInternalServiceToken: () => 'test-token',
 }));
 
-jest.mock('@/routers/cli-sessions-v2-router', () => {
+jest.mock('@/lib/session-associated-pr', () => {
   const { z } = jest.requireActual('zod');
+  const actual = jest.requireActual('@/lib/session-associated-pr');
   return {
+    sessionAssociatedPr: actual.sessionAssociatedPr,
     associatedPrSchema: z.object({}).passthrough(),
     // Mirror the real gate: only a session whose own stored link GitHub has
     // verified renders an associatedPr; no link or an unverified link renders

@@ -22,6 +22,7 @@
     "expired": "Nag-expire"
   },
   "common": {
+    "manageOnWeb": "Pamahalaan sa web",
     "creditHistory": "Kasaysayan ng credit",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Mga key ng provider",
       "rowSubtitle": "Gamitin ang sarili mong billing sa provider",
-      "manageOnWeb": "Pamahalaan sa web",
       "manageOnWebReason": "Kailangan ng mga provider na ito ng mga structured na credential.",
       "description": "Ang mga request na dumadaan sa mga key na ito ay sisingilin sa akawnt mo sa provider sa halip na sa balanse mo sa Kilo.",
       "enabled": "Ginagamit",
@@ -2550,7 +2550,8 @@
       "cancelQueued": "Kanselahin ang mensahe",
       "cancelQueuedAccessibility": "Kanselahin ang nakapilang mensahe",
       "restoreQueued": "Ibalik",
-      "restoreQueuedAccessibility": "Ibalik ang kinanselang mensahe sa sulatan ng mensahe"
+      "restoreQueuedAccessibility": "Ibalik ang kinanselang mensahe sa sulatan ng mensahe",
+      "noReplyRecorded": "Walang naitalang tugon para sa mensaheng ito."
     },
     "olderMessages": {
       "arrived": "Na-load ang mga naunang mensahe",
@@ -4177,6 +4178,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Hindi mabuksan ang resulta ng paghahanap na ito"
+  },
+  "usage": {
+    "title": "Paggamit",
+    "orgTitle": "Paggamit ng organisasyon",
+    "entrySubtitle": "Gastos, mga kahilingan, at mga token",
+    "rangePicker": "Saklaw ng panahon",
+    "range90d": "90 araw",
+    "metricPicker": "Sukatan ng chart",
+    "chartA11y": "{{metric}} bawat araw",
+    "avgCostPerRequest": "Avg na gastos / kahilingan",
+    "topModels": "Nangungunang mga model",
+    "topFeatures": "Nangungunang mga feature",
+    "emptyTitle": "Walang paggamit sa panahong ito",
+    "orgSelfNotice": "Nakikita mo ang sarili mong paggamit sa organisasyong ito.",
+    "viewDetails": "Tingnan ang detalye ng paggamit"
+  },
+  "integrations": {
+    "title": "Mga Integration",
+    "sectionTitle": "Mga nakakonektang serbisyo",
+    "entrySubtitle": "GitHub, Slack, Linear at iba pa",
+    "subtitle": "Ikonekta ang iyong mga development tool at workflow sa Kilo",
+    "emptyHint": "Wala pang nakakonektang integration.",
+    "disconnect": "Idiskonekta",
+    "disconnectTitle": "Idiskonekta ang {{provider}}?",
+    "disconnectMessage": "Hihinto na ang Kilo sa pagtugon sa {{provider}}. Maaari kang kumonekta muli anumang oras.",
+    "connectedTo": "Nakakonekta sa {{account}}",
+    "disconnected": "Nadiskonekta ang {{provider}}",
+    "disconnectFailed": "Hindi ma-diskonekta ang {{provider}}",
+    "couldNotLoad": "Hindi ma-load ang mga integration",
+    "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga integration na ito.",
+    "memberHint": "Hilingin sa isang may-ari o admin ng organisasyon na baguhin ang mga koneksyong ito.",
+    "connectFailed": "Hindi mabuksan ang pahina ng koneksyon"
   },
   "invoices": {
     "personalEmptyDescription": "Lalabas dito ang mga invoice ng sarili mong mga binili kapag nasingil ka na."

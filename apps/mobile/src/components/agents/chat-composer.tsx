@@ -290,6 +290,15 @@ type ChatComposerProps = {
   onDismissSuggestion?: (requestId: string) => Promise<void>;
   /** Imperative handle the host binds to call `setText`. */
   controlRef?: Ref<ChatComposerControl>;
+  /**
+   * How far the input has grown past its one-line floor, in dp. The host reads
+   * it to hold the transcript's bottom edge while this composer takes that
+   * space: a scroll correction issued from the list's later `onLayout` is a
+   * visible late jump of the whole transcript, so the space is reserved in the
+   * same commit the input grows instead. Reported once per rendered line, not
+   * per keystroke, and never for the chrome around the input.
+   */
+  onInputBottomInsetChange?: (insetDp: number) => void;
 };
 
 /**
@@ -347,6 +356,7 @@ export function ChatComposer({
   onAcceptSuggestion,
   onDismissSuggestion,
   controlRef,
+  onInputBottomInsetChange,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
   const themedSheet = useThemedActionSheetOptions();
@@ -509,11 +519,50 @@ export function ChatComposer({
   // leaf's first measurement lands.
   const [measureHeight, setMeasureHeight] = useState(inputMinHeight);
   const [inputMaxHeight, setInputMaxHeight] = useState(rawInputMaxHeight);
-  const handleMeasureChange = useCallback((height: number, maxHeight: number) => {
-    setMeasureHeight(height);
-    setInputMaxHeight(maxHeight);
-  }, []);
+  // The last reservation this composer published, so a repeated measurement
+  // publishes nothing and the mount can publish the floor once.
+  const reportedInputBottomInsetRef = useRef<number | null>(null);
+  const handleMeasureChange = useCallback(
+    (height: number, maxHeight: number) => {
+      setMeasureHeight(height);
+      setInputMaxHeight(maxHeight);
+      // The transcript's reservation has to land in the same commit as the
+      // height it reserves, so it is published here, beside that height, rather
+      // than from an effect that would need a second commit.
+      const nextInset = Math.max(0, height - inputMinHeight);
+      if (reportedInputBottomInsetRef.current !== nextInset) {
+        reportedInputBottomInsetRef.current = nextInset;
+        onInputBottomInsetChange?.(nextInset);
+      }
+    },
+    [inputMinHeight, onInputBottomInsetChange]
+  );
   const measureHandleRef = useRef<ChatComposerMeasureHandle | null>(null);
+  // The host reserves this in the transcript's layout. The measurement path
+  // publishes it beside the height it reserves, so both land in one commit;
+  // this effect covers the two cases that carry no measurement: the mount, and
+  // a window or font-scale change that moves the one-line floor under a
+  // standing height. The floor is the input's own one-line height, so a taller
+  // window never reads as growth, and a cleared draft reports zero again.
+  //
+  // The mount reports the floor as well. A composer remounted under another
+  // key starts on that floor and would otherwise publish nothing, leaving the
+  // reservation of the instance it replaced in the transcript.
+  //
+  // This is a passive effect, not a layout one: the host state lives in the
+  // screen that mounts this composer, so publishing from a layout effect
+  // updated a component whose own mount commit was still running, and React
+  // reported it as a state update on a component that has not mounted yet. The
+  // mount carries no growth to anchor, one commit later is early enough, and
+  // the growth path beside the height keeps the same-frame anchor.
+  const inputBottomInset = Math.max(0, measureHeight - inputMinHeight);
+  useEffect(() => {
+    const previous = reportedInputBottomInsetRef.current;
+    reportedInputBottomInsetRef.current = inputBottomInset;
+    if (previous !== inputBottomInset) {
+      onInputBottomInsetChange?.(inputBottomInset);
+    }
+  }, [inputBottomInset, onInputBottomInsetChange]);
   // The row reports the real input's content height (dp, padding included) on
   // every content change, and `useTextHeight` reads the line pitch that input
   // lays out at from it, so the capped height it publishes lands on a whole

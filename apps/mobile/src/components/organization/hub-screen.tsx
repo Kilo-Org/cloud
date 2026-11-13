@@ -4,7 +4,7 @@ import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
-import { Bell, FileText, Pencil, Receipt, Users, Wallet } from '@/components/ui/icons';
+import { Bell, FileText, Pencil, Plug, Receipt, Users, Wallet } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -256,10 +256,11 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               // direction, so the run carries its own left-to-right order.
               valueDirection="ltr"
               // An empty balance offers the top-up on the amount's own line: a
-              // row of its own would hold nothing but this control.
+              // row of its own would hold nothing but this control, and
+              // `lineAction` keeps that line one text line tall.
               trailing={
                 org.balance === 0 ? (
-                  <AddCreditsRow inline url={organizationBillingUrl(organizationId)} />
+                  <AddCreditsRow inline lineAction url={organizationBillingUrl(organizationId)} />
                 ) : undefined
               }
               // Always pass the label: a node React Native stops handing a
@@ -303,15 +304,29 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           />
         </Animated.View>
 
-        <OrgUsageStats organizationId={organizationId} />
+        <OrgUsageStats
+          organizationId={organizationId}
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/organization/usage' as Href);
+          }}
+        />
 
         <View className="rounded-lg bg-secondary px-3">
           <ConfigureRow
             icon={Users}
             title={t('organization.members.title')}
-            last={!showMoney}
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/organization/members' as Href);
+            }}
+          />
+          {/* Every member may view the organization's connections; the hub
+              itself hides the actions their role cannot take. */}
+          <ConfigureRow
+            icon={Plug}
+            title={t('integrations.title')}
+            last={!showMoney}
+            onPress={() => {
+              router.push(`/(app)/(tabs)/(3_profile)/integrations?org=${organizationId}` as Href);
             }}
           />
           {showMoney && (

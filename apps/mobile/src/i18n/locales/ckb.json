@@ -22,6 +22,7 @@
     "expired": "بەسەرچوو"
   },
   "common": {
+    "manageOnWeb": "لەسەر وێب بەڕێوەی ببە",
     "creditHistory": "مێژووی کرێدیت",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "کلیلەکانی دابینکەر",
       "rowSubtitle": "پارەدانی دابینکەری خۆت بەکاربهێنە",
-      "manageOnWeb": "لەسەر وێب بەڕێوەی ببە",
       "manageOnWebReason": "ئەم دابینکەرانە پێویستیان بە زانیاریی چوونەژوورەوەی پێکهاتەدار هەیە.",
       "description": "تێچووی ئەو داواکارییانەی بەم کلیلانە دەکرێن لەسەر هەژماری دابینکەرەکەت حیساب دەکرێت، نەک لە باڵانسی Kilo.",
       "enabled": "لە بەکارهێناندایە",
@@ -2550,7 +2550,8 @@
       "cancelQueued": "هەڵوەشاندنەوەی پەیام",
       "cancelQueuedAccessibility": "هەڵوەشاندنەوەی پەیامی ناو ڕیز",
       "restoreQueued": "گەڕاندنەوە",
-      "restoreQueuedAccessibility": "گەڕاندنەوەی پەیامی هەڵوەشاوە بۆ خانەی نووسینی پەیام"
+      "restoreQueuedAccessibility": "گەڕاندنەوەی پەیامی هەڵوەشاوە بۆ خانەی نووسینی پەیام",
+      "noReplyRecorded": "هیچ وەڵامێک بۆ ئەم پەیامە تۆمار نەکراوە."
     },
     "olderMessages": {
       "arrived": "پەیامە پێشووەکان بار کران",
@@ -4177,6 +4178,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "نەتوانرا ئەم ئەنجامی گەڕانە بکرێتەوە"
+  },
+  "usage": {
+    "title": "بەکارهێنان",
+    "orgTitle": "بەکارهێنانی ڕێکخراو",
+    "entrySubtitle": "خەرجی، داواکارییەکان و تۆکنەکان",
+    "rangePicker": "ماوەی کات",
+    "range90d": "90 ڕۆژ",
+    "metricPicker": "پێوەری چارت",
+    "chartA11y": "{{metric}} بۆ هەر ڕۆژێک",
+    "avgCostPerRequest": "تێکڕای تێچوون / داواکاری",
+    "topModels": "مۆدێلە سەرەکییەکان",
+    "topFeatures": "تایبەتمەندییە سەرەکییەکان",
+    "emptyTitle": "لەم ماوەیەدا هیچ بەکارهێنانێک نییە",
+    "orgSelfNotice": "تۆ بەکارهێنانی خۆت لەم ڕێکخراوەدا دەبینیت.",
+    "viewDetails": "بینینی وردەکاریی بەکارهێنان"
+  },
+  "integrations": {
+    "title": "یەکخستنەکان",
+    "sectionTitle": "خزمەتگوزارییە پەیوەستکراوەکان",
+    "entrySubtitle": "GitHub، Slack، Linear و زیاتر",
+    "subtitle": "ئامراز و ڕەوتی کارەکانی گەشەپێدانت بە Kilo ببەستەوە",
+    "emptyHint": "هێشتا هیچ یەکخستنێک پەیوەست نەکراوە.",
+    "disconnect": "پچڕاندن",
+    "disconnectTitle": "پەیوەندی {{provider}} بپچڕێنرێت؟",
+    "disconnectMessage": "Kilo چیتر لە {{provider}} وەڵام ناداتەوە. هەر کاتێک بتەوێت دەتوانیت دووبارە پەیوەستی بکەیتەوە.",
+    "connectedTo": "پەیوەستکراوە بە {{account}}",
+    "disconnected": "پەیوەندی {{provider}} پچڕێنرا",
+    "disconnectFailed": "نەتوانرا پەیوەندی {{provider}} بپچڕێنرێت",
+    "couldNotLoad": "نەتوانرا یەکخستنەکان باربکرێن",
+    "permissionDenied": "مۆڵەتی بەڕێوەبردنی ئەم یەکخستنانەت نییە.",
+    "memberHint": "بۆ گۆڕینی ئەم پەیوەندییانە داوا لە خاوەن یان بەڕێوەبەری ڕێکخراوەکە بکە.",
+    "connectFailed": "نەتوانرا پەڕەی پەیوەستکردن بکرێتەوە"
   },
   "invoices": {
     "personalEmptyDescription": "فاکتۆرەکانی کڕینەکانی خۆت دوای ئەوەی پارەت لێ وەردەگیرێت لێرە دەردەکەون."

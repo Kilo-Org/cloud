@@ -22,6 +22,7 @@
     "expired": "Waqtigiisu dhacay"
   },
   "common": {
+    "manageOnWeb": "Ku maamul shabakadda",
     "creditHistory": "Taariikhda kiredit-ka",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Furayaasha bixiyaha",
       "rowSubtitle": "Isticmaal biilasha bixiyahaaga",
-      "manageOnWeb": "Ku maamul shabakadda",
       "manageOnWebReason": "Bixiyeyaashan waxay u baahan yihiin aqoonsiyo habaysan.",
       "description": "Codsiyada maraya furayaashan waxaa lagu dallacayaa akoonka bixiyahaaga halkii laga jari lahaa hadhaagaaga Kilo.",
       "enabled": "La isticmaalayo",
@@ -2550,7 +2550,8 @@
       "cancelQueued": "Jooji farriinta",
       "cancelQueuedAccessibility": "Jooji farriinta safka ku jirta",
       "restoreQueued": "Soo celi",
-      "restoreQueuedAccessibility": "Farriinta la joojiyay ku soo celi goobta farriinta lagu qoro"
+      "restoreQueuedAccessibility": "Farriinta la joojiyay ku soo celi goobta farriinta lagu qoro",
+      "noReplyRecorded": "Jawaab lama diiwaangelin farriintan."
     },
     "olderMessages": {
       "arrived": "Farriimihii hore waa la soo shubay",
@@ -4177,6 +4178,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Natiijadan raadinta lama furi karin"
+  },
+  "usage": {
+    "title": "Isticmaalka",
+    "orgTitle": "Isticmaalka ururka",
+    "entrySubtitle": "Kharashka, codsiyada iyo halbeegyada",
+    "rangePicker": "Muddada waqtiga",
+    "range90d": "90 maalmood",
+    "metricPicker": "Cabbirka shaxda",
+    "chartA11y": "{{metric}} maalintii",
+    "avgCostPerRequest": "Celceliska kharashka / codsi",
+    "topModels": "Moodeellada ugu badan",
+    "topFeatures": "Astaamaha ugu badan",
+    "emptyTitle": "Isticmaal kuma jiro muddadan",
+    "orgSelfNotice": "Waxaad arkaysaa isticmaalkaaga gaarka ah ee ururkan.",
+    "viewDetails": "Eeg faahfaahinta isticmaalka"
+  },
+  "integrations": {
+    "title": "Isku-xidhka",
+    "sectionTitle": "Adeegyada ku xidhan",
+    "entrySubtitle": "GitHub, Slack, Linear iyo kuwo kale",
+    "subtitle": "Ku xidh qalabkaaga horumarinta iyo hababka shaqadaada Kilo",
+    "emptyHint": "Weli wax isku-xidh ah lama samayn.",
+    "disconnect": "Ka goo",
+    "disconnectTitle": "Ka goo {{provider}}?",
+    "disconnectMessage": "Kilo way joojin doontaa ka jawaabista {{provider}}. Waad dib u xidhi kartaa wakhti kasta.",
+    "connectedTo": "Ku xidhan {{account}}",
+    "disconnected": "{{provider}} waa la gooyay",
+    "disconnectFailed": "Lama goyn karo {{provider}}",
+    "couldNotLoad": "Lama soo gelin karo isku-xidhka",
+    "permissionDenied": "Ma haysatid ogolaansho aad ku maamusho isku-xidhkan.",
+    "memberHint": "Weydii milkiilaha ama maamulaha ururka si uu u beddelo isku-xidhkan.",
+    "connectFailed": "Bogga isku-xidhka lama furi karo"
   },
   "invoices": {
     "personalEmptyDescription": "Qaansheegyada iibsiyadaada gaarka ah halkan ayay ka muuqan doonaan marka lacag lagaa qaado."

@@ -30,6 +30,7 @@ import { parseParam } from '@/lib/route-params';
 import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 import { isAddressableStoredSessionId } from '@/lib/session-id-shape';
 import { useRestoredRouteOpen } from '@/lib/hooks/use-restored-route-open';
+import { useSessionRouteBack } from '@/lib/navigation/session-route-back';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { parseResumeAnchor } from '@/lib/session-resume';
 import { useRestoredAccountId } from '@/lib/hooks/use-restored-account-id';
@@ -101,6 +102,10 @@ export default function SessionDetailScreen() {
   );
   const trpc = useTRPC();
   const { t } = useTranslation();
+  // System Back answers the way the header's back control does: it pops the
+  // route the person came from, and it never leaves the app while this screen
+  // is open.
+  useSessionRouteBack();
   // The open's clock starts at route mount — before the metadata query and
   // the transcript screen — so the slow-load threshold measures from when
   // the user tapped, not from when SessionDetailContent happens to mount.

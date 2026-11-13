@@ -22,6 +22,7 @@
     "expired": "مهلت یې تېر شو"
   },
   "common": {
+    "manageOnWeb": "په ویب کې یې اداره کړئ",
     "creditHistory": "د کریډیټ تاریخچه",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "د چمتو کوونکي کیلي",
       "rowSubtitle": "د خپل چمتو کوونکي بیلینګ وکاروئ",
-      "manageOnWeb": "په ویب کې یې اداره کړئ",
       "manageOnWebReason": "دا چمتو کوونکي جوړښت لرونکو اعتبارنامو ته اړتیا لري.",
       "description": "د دې کیلیو له لارې د غوښتنو لګښت ستاسو د Kilo بیلانس پر ځای ستاسو د چمتو کوونکي په حساب بیل کېږي.",
       "enabled": "کارول کېږي",
@@ -2550,7 +2550,8 @@
       "cancelQueued": "پیغام لغوه کړئ",
       "cancelQueuedAccessibility": "په کتار کې پروت پیغام لغوه کړئ",
       "restoreQueued": "بېرته راوړئ",
-      "restoreQueuedAccessibility": "لغوه شوی پیغام د پیغام لیکلو ځای ته بېرته راوړئ"
+      "restoreQueuedAccessibility": "لغوه شوی پیغام د پیغام لیکلو ځای ته بېرته راوړئ",
+      "noReplyRecorded": "د دې پیغام لپاره ځواب نه دی ثبت شوی."
     },
     "olderMessages": {
       "arrived": "پخواني پیغامونه بار شول",
@@ -4177,6 +4178,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "دا د لټون پایله پرانیستل نه شو"
+  },
+  "usage": {
+    "title": "کارونه",
+    "orgTitle": "د سازمان کارونه",
+    "entrySubtitle": "لګښت، غوښتنې او ټوکنونه",
+    "rangePicker": "د وخت موده",
+    "range90d": "90 ورځې",
+    "metricPicker": "د چارټ شاخص",
+    "chartA11y": "{{metric}} په ورځ",
+    "avgCostPerRequest": "اوسط لګښت / غوښتنه",
+    "topModels": "مخکښ ماډلونه",
+    "topFeatures": "مخکښې ځانګړنې",
+    "emptyTitle": "په دې موده کې کارونه نشته",
+    "orgSelfNotice": "تاسو په دې سازمان کې خپله کارونه وینئ.",
+    "viewDetails": "د کارونې جزئیات وګورئ"
+  },
+  "integrations": {
+    "title": "ادغامونه",
+    "sectionTitle": "نښلول شوي خدمتونه",
+    "entrySubtitle": "GitHub، Slack، Linear او نور",
+    "subtitle": "خپل پراختیايي وسایل او کاري بهیرونه له Kilo سره ونښلوئ",
+    "emptyHint": "تر اوسه هیڅ ادغام نه دی نښلول شوی.",
+    "disconnect": "اړیکه پرې کړئ",
+    "disconnectTitle": "له {{provider}} سره اړیکه پرې کړئ؟",
+    "disconnectMessage": "Kilo به نور په {{provider}} کې ځواب نه ورکوي. تاسو هر وخت بیا نښلولی شئ.",
+    "connectedTo": "له {{account}} سره نښلول شوی",
+    "disconnected": "له {{provider}} سره اړیکه پرې شوه",
+    "disconnectFailed": "له {{provider}} سره اړیکه پرې نه شوه",
+    "couldNotLoad": "ادغامونه راوړل نه شول",
+    "permissionDenied": "تاسو د دې ادغامونو د مدیریت اجازه نه لرئ.",
+    "memberHint": "د دې اړیکو د بدلولو لپاره د سازمان له مالک یا مدیر څخه وغواړئ.",
+    "connectFailed": "د نښلولو پاڼه پرانیستل نه شوه"
   },
   "invoices": {
     "personalEmptyDescription": "کله چې درڅخه پیسې واخیستل شي، ستاسو د شخصي پېرودنو بلونه به دلته ښکاره شي."

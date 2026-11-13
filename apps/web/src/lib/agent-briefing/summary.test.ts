@@ -15,6 +15,7 @@ import {
   KILO_AUTO_SMALL_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { briefingPriceBound, briefingPrompt } from './summary';
+import { briefingFactsSchema } from './evidence';
 import type { BriefingReportRow } from './store';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
@@ -382,40 +383,38 @@ function reportRow(excerpt: string, title = 'Captured session'): BriefingReportR
   } as unknown as BriefingReportRow;
 }
 
+function promptFor(row: BriefingReportRow): string {
+  return briefingPrompt(row, briefingFactsSchema.parse(row.facts), row.language);
+}
+
 describe('briefing prompt evidence', () => {
   const secretKey = 'wJalrXUtnFEMI/' + 'K7MDENG/bPxRfiCYEXAMPLEKEY';
 
   it('sends no credential material from stored facts to the model', () => {
-    const prompt = briefingPrompt(
-      reportRow('Deploy used AWS_SECRET_' + `ACCESS_KEY=${secretKey} from the shell.`),
-      'English'
+    const prompt = promptFor(
+      reportRow('Deploy used AWS_SECRET_' + `ACCESS_KEY=${secretKey} from the shell.`)
     );
     expect(prompt).not.toContain(secretKey);
     expect(prompt).toContain('[redacted credential]');
   });
 
   it('sends only excerpts that screening clears', () => {
-    const prompt = briefingPrompt(
-      reportRow('Stopped at client_' + 'secret: "' + secretKey),
-      'English'
-    );
+    const prompt = promptFor(reportRow('Stopped at client_' + 'secret: "' + secretKey));
     expect(prompt).not.toContain(secretKey);
     expect(prompt).not.toContain('Stopped at');
   });
 
   it('sends only screened excerpts to the model', () => {
-    const prompt = briefingPrompt(
-      reportRow('Set MYSQL_' + 'PWD=' + 'hunter' + '2 then ran the migration.'),
-      'English'
+    const prompt = promptFor(
+      reportRow('Set MYSQL_' + 'PWD=' + 'hunter' + '2 then ran the migration.')
     );
     expect(prompt).not.toContain('hunter' + '2');
     expect(prompt).toContain('[redacted credential]');
   });
 
   it('sends only titles that screening clears', () => {
-    const prompt = briefingPrompt(
-      reportRow('Nothing to report.', 'Plan for client_' + 'secret: "' + secretKey),
-      'English'
+    const prompt = promptFor(
+      reportRow('Nothing to report.', 'Plan for client_' + 'secret: "' + secretKey)
     );
     expect(prompt).not.toContain(secretKey);
     expect(prompt).toContain('Agent session');

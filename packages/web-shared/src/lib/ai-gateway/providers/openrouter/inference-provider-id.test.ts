@@ -133,6 +133,12 @@ describe('inference provider ids', () => {
     expect(openRouterToVercelInferenceProviderId('claude-on-aws')).toBe('claudeaws');
   });
 
+  test('maps the OpenRouter Particle AI provider to its Vercel provider id', () => {
+    expect(OpenRouterInferenceProviderIdSchema.parse('particle-ai')).toBe('particle-ai');
+    expect(VercelNonUserByokInferenceProviderIdSchema.parse('particle')).toBe('particle');
+    expect(openRouterToVercelInferenceProviderId('particle-ai')).toBe('particle');
+  });
+
   test('preserves provider ids that are not in the known provider registry', () => {
     expect(openRouterToVercelInferenceProviderId('future-provider')).toBe('future-provider');
     expect(normalizeVercelInferenceProviderIdForRouting('future-provider')).toBe('future-provider');

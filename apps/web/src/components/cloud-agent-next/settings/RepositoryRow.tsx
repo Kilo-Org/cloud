@@ -17,6 +17,7 @@ type RepositoryRowProps = {
   row: CloudAgentSettingsRepositoryRow;
   profiles: ProfileOption[];
   choices: SandboxAllocationChoice[];
+  sandboxOptionsUnavailable: boolean;
   /** Set only where the sandbox cannot be chosen, so the row shows where sessions run. */
   fixedSandbox?: DefaultSandboxDescription;
   disabled: boolean;
@@ -30,6 +31,7 @@ export function RepositoryRow({
   row,
   profiles,
   choices,
+  sandboxOptionsUnavailable,
   fixedSandbox,
   disabled,
   action,
@@ -82,19 +84,25 @@ export function RepositoryRow({
           <span id={sandboxLabelId} className="text-muted-foreground text-xs font-medium">
             Sandbox
           </span>
-          <SandboxSelect
-            layout="compact"
-            value={toSelectableAllocation(row.allocation)}
-            choices={choices}
-            unavailableReason={
-              row.allocationRepositoryUnavailableReason ?? row.allocationUnavailableReason
-            }
-            noneLabel="Default"
-            noneDescription={fixedSandbox}
-            labelledBy={`${sandboxLabelId} ${nameId}`}
-            disabled={disabled}
-            onChange={onAllocationChange}
-          />
+          {sandboxOptionsUnavailable ? (
+            <p className="text-muted-foreground text-sm">
+              {row.allocation ?? 'Default'} · Options unavailable
+            </p>
+          ) : (
+            <SandboxSelect
+              layout="compact"
+              value={toSelectableAllocation(row.allocation)}
+              choices={choices}
+              unavailableReason={
+                row.allocationRepositoryUnavailableReason ?? row.allocationUnavailableReason
+              }
+              noneLabel="Default"
+              noneDescription={fixedSandbox}
+              labelledBy={`${sandboxLabelId} ${nameId}`}
+              disabled={disabled}
+              onChange={onAllocationChange}
+            />
+          )}
         </div>
       </div>
     </li>

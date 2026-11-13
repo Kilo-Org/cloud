@@ -22,6 +22,7 @@
     "expired": "ಅವಧಿ ಮುಗಿದಿದೆ"
   },
   "common": {
+    "manageOnWeb": "ವೆಬ್‌ನಲ್ಲಿ ನಿರ್ವಹಿಸಿ",
     "creditHistory": "ಕ್ರೆಡಿಟ್ ಇತಿಹಾಸ",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "ಪೂರೈಕೆದಾರ ಕೀಗಳು",
       "rowSubtitle": "ನಿಮ್ಮ ಸ್ವಂತ ಪೂರೈಕೆದಾರ ಬಿಲ್ಲಿಂಗ್ ಬಳಸಿ",
-      "manageOnWeb": "ವೆಬ್‌ನಲ್ಲಿ ನಿರ್ವಹಿಸಿ",
       "manageOnWebReason": "ಈ ಪೂರೈಕೆದಾರರಿಗೆ ರಚನಾತ್ಮಕ ರುಜುವಾತುಗಳು ಬೇಕಾಗುತ್ತವೆ.",
       "description": "ಈ ಕೀಗಳ ಮೂಲಕ ಬರುವ ವಿನಂತಿಗಳಿಗೆ ನಿಮ್ಮ Kilo ಉಳಿಕೆಯ ಬದಲು ನಿಮ್ಮ ಪೂರೈಕೆದಾರ ಖಾತೆಗೆ ಬಿಲ್ ಮಾಡಲಾಗುತ್ತದೆ.",
       "enabled": "ಬಳಕೆಯಲ್ಲಿದೆ",
@@ -2550,7 +2550,8 @@
       "cancelQueued": "ಸಂದೇಶವನ್ನು ರದ್ದುಮಾಡಿ",
       "cancelQueuedAccessibility": "ಸರದಿಯಲ್ಲಿರುವ ಸಂದೇಶವನ್ನು ರದ್ದುಮಾಡಿ",
       "restoreQueued": "ಮರುಸ್ಥಾಪಿಸಿ",
-      "restoreQueuedAccessibility": "ರದ್ದುಮಾಡಿದ ಸಂದೇಶವನ್ನು ಸಂದೇಶ ಪೆಟ್ಟಿಗೆಗೆ ಮರುಸ್ಥಾಪಿಸಿ"
+      "restoreQueuedAccessibility": "ರದ್ದುಮಾಡಿದ ಸಂದೇಶವನ್ನು ಸಂದೇಶ ಪೆಟ್ಟಿಗೆಗೆ ಮರುಸ್ಥಾಪಿಸಿ",
+      "noReplyRecorded": "ಈ ಸಂದೇಶಕ್ಕೆ ಯಾವುದೇ ಪ್ರತಿಕ್ರಿಯೆಯನ್ನು ದಾಖಲಿಸಲಾಗಿಲ್ಲ."
     },
     "olderMessages": {
       "arrived": "ಹಿಂದಿನ ಸಂದೇಶಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
@@ -4177,6 +4178,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ಈ ಹುಡುಕು ಫಲಿತಾಂಶವನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ"
+  },
+  "usage": {
+    "title": "ಬಳಕೆ",
+    "orgTitle": "ಸಂಸ್ಥೆಯ ಬಳಕೆ",
+    "entrySubtitle": "ವೆಚ್ಚ, ವಿನಂತಿಗಳು ಮತ್ತು ಟೋಕನ್‌ಗಳು",
+    "rangePicker": "ಸಮಯದ ಅವಧಿ",
+    "range90d": "90 ದಿನಗಳು",
+    "metricPicker": "ಚಾರ್ಟ್ ಮಾಪಕ",
+    "chartA11y": "ದಿನಕ್ಕೆ {{metric}}",
+    "avgCostPerRequest": "ಸರಾಸರಿ ವೆಚ್ಚ / ವಿನಂತಿ",
+    "topModels": "ಪ್ರಮುಖ ಮಾಡೆಲ್‌ಗಳು",
+    "topFeatures": "ಪ್ರಮುಖ ವೈಶಿಷ್ಟ್ಯಗಳು",
+    "emptyTitle": "ಈ ಅವಧಿಯಲ್ಲಿ ಯಾವುದೇ ಬಳಕೆ ಇಲ್ಲ",
+    "orgSelfNotice": "ನೀವು ಈ ಸಂಸ್ಥೆಯಲ್ಲಿನ ನಿಮ್ಮ ಸ್ವಂತ ಬಳಕೆಯನ್ನು ನೋಡುತ್ತಿದ್ದೀರಿ.",
+    "viewDetails": "ಬಳಕೆಯ ವಿವರಗಳನ್ನು ನೋಡಿ"
+  },
+  "integrations": {
+    "title": "ಏಕೀಕರಣಗಳು",
+    "sectionTitle": "ಸಂಪರ್ಕಿತ ಸೇವೆಗಳು",
+    "entrySubtitle": "GitHub, Slack, Linear ಮತ್ತು ಇನ್ನಷ್ಟು",
+    "subtitle": "ನಿಮ್ಮ ಡೆವಲಪ್‌ಮೆಂಟ್ ಪರಿಕರಗಳು ಮತ್ತು ವರ್ಕ್‌ಫ್ಲೋಗಳನ್ನು Kilo ಗೆ ಸಂಪರ್ಕಿಸಿ",
+    "emptyHint": "ಇನ್ನೂ ಯಾವುದೇ ಏಕೀಕರಣಗಳನ್ನು ಸಂಪರ್ಕಿಸಲಾಗಿಲ್ಲ.",
+    "disconnect": "ಸಂಪರ್ಕ ಕಡಿತಗೊಳಿಸಿ",
+    "disconnectTitle": "{{provider}} ಸಂಪರ್ಕ ಕಡಿತಗೊಳಿಸಬೇಕೇ?",
+    "disconnectMessage": "Kilo {{provider}} ನಲ್ಲಿ ಪ್ರತಿಕ್ರಿಯಿಸುವುದನ್ನು ನಿಲ್ಲಿಸುತ್ತದೆ. ನೀವು ಯಾವಾಗ ಬೇಕಾದರೂ ಮರುಸಂಪರ್ಕಿಸಬಹುದು.",
+    "connectedTo": "{{account}} ಗೆ ಸಂಪರ್ಕಿಸಲಾಗಿದೆ",
+    "disconnected": "{{provider}} ಸಂಪರ್ಕ ಕಡಿತಗೊಂಡಿದೆ",
+    "disconnectFailed": "{{provider}} ಸಂಪರ್ಕ ಕಡಿತಗೊಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+    "couldNotLoad": "ಏಕೀಕರಣಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+    "permissionDenied": "ಈ ಏಕೀಕರಣಗಳನ್ನು ನಿರ್ವಹಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
+    "memberHint": "ಈ ಸಂಪರ್ಕಗಳನ್ನು ಬದಲಾಯಿಸಲು ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು ಅಥವಾ ನಿರ್ವಾಹಕರನ್ನು ಕೇಳಿ.",
+    "connectFailed": "ಸಂಪರ್ಕ ಪುಟವನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ"
   },
   "invoices": {
     "personalEmptyDescription": "ನಿಮಗೆ ಬಿಲ್ ಮಾಡಿದ ನಂತರ ನಿಮ್ಮ ಸ್ವಂತ ಖರೀದಿಗಳ ಇನ್‌ವಾಯ್ಸ್‌ಗಳು ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ."

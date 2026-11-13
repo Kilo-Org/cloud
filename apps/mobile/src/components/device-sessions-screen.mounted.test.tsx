@@ -34,7 +34,6 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'DetailScreenScrollView' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
@@ -51,11 +50,11 @@ vi.mock('@/components/ui/dialog', () => ({
   }),
 }));
 vi.mock('@/components/ui/icons', () => ({
-  LogOut: 'LogOut',
   Smartphone: 'Smartphone',
   Shield: 'Shield',
   X: 'X',
 }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));
 vi.mock('@/lib/auth/auth-context', () => ({
   useAuth: () => ({ token: 'test-token', signOut: vi.fn() }),
 }));
@@ -109,7 +108,7 @@ describe('account surface states', () => {
       query.isError = state === 'error';
       const { renderer, unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
       expect(
-        renderer.root.findAll(node => String(node.type) === 'DetailScreenScrollView')
+        renderer.root.findAll(node => String(node.type) === 'TabScreenScrollView')
       ).toHaveLength(0);
       const body = renderer.root.find(
         node => String(node.type) === (state === 'error' ? 'QueryError' : 'EmptyState')

@@ -22,6 +22,7 @@
     "expired": "Abgelaufen"
   },
   "common": {
+    "manageOnWeb": "Im Web verwalten",
     "creditHistory": "Credit-Verlauf",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Anbieterschlüssel",
       "rowSubtitle": "Eigene Anbieterabrechnung nutzen",
-      "manageOnWeb": "Im Web verwalten",
       "manageOnWebReason": "Diese Anbieter benötigen strukturierte Anmeldedaten.",
       "description": "Anfragen über diese Schlüssel werden über dein Anbieterkonto statt über dein Kilo-Guthaben abgerechnet.",
       "enabled": "Aktiv",
@@ -2008,7 +2008,8 @@
       "cancelQueued": "Nachricht abbrechen",
       "cancelQueuedAccessibility": "Nachricht in der Warteschlange abbrechen",
       "restoreQueued": "Wiederherstellen",
-      "restoreQueuedAccessibility": "Abgebrochene Nachricht im Eingabefeld wiederherstellen"
+      "restoreQueuedAccessibility": "Abgebrochene Nachricht im Eingabefeld wiederherstellen",
+      "noReplyRecorded": "Für diese Nachricht wurde keine Antwort aufgezeichnet."
     },
     "olderMessages": {
       "arrived": "Frühere Nachrichten geladen",
@@ -4177,6 +4178,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Dieses Suchergebnis konnte nicht geöffnet werden"
+  },
+  "usage": {
+    "title": "Nutzung",
+    "orgTitle": "Organisationsnutzung",
+    "entrySubtitle": "Kosten, Anfragen und Tokens",
+    "rangePicker": "Zeitraum",
+    "range90d": "90 Tage",
+    "metricPicker": "Diagramm-Kennzahl",
+    "chartA11y": "{{metric}} pro Tag",
+    "avgCostPerRequest": "Ø Kosten/Anfrage",
+    "topModels": "Top-Modelle",
+    "topFeatures": "Top-Funktionen",
+    "emptyTitle": "Keine Nutzung in diesem Zeitraum",
+    "orgSelfNotice": "Du siehst deine eigene Nutzung in dieser Organisation.",
+    "viewDetails": "Nutzungsdetails anzeigen"
+  },
+  "integrations": {
+    "title": "Integrationen",
+    "sectionTitle": "Verbundene Dienste",
+    "entrySubtitle": "GitHub, Slack, Linear und mehr",
+    "subtitle": "Verbinde deine Entwicklungstools und Workflows mit Kilo",
+    "emptyHint": "Noch keine Integrationen verbunden.",
+    "disconnect": "Trennen",
+    "disconnectTitle": "{{provider}} trennen?",
+    "disconnectMessage": "Kilo reagiert dann nicht mehr in {{provider}}. Du kannst die Verbindung jederzeit wiederherstellen.",
+    "connectedTo": "Verbunden mit {{account}}",
+    "disconnected": "{{provider}} getrennt",
+    "disconnectFailed": "{{provider}} konnte nicht getrennt werden",
+    "couldNotLoad": "Integrationen konnten nicht geladen werden",
+    "permissionDenied": "Du hast keine Berechtigung, diese Integrationen zu verwalten.",
+    "memberHint": "Bitte eine Person mit Inhaber- oder Admin-Rechten in der Organisation, diese Verbindungen zu ändern.",
+    "connectFailed": "Die Verbindungsseite konnte nicht geöffnet werden"
   },
   "invoices": {
     "personalEmptyDescription": "Rechnungen für deine eigenen Käufe werden hier angezeigt, sobald dir etwas in Rechnung gestellt wurde."

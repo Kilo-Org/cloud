@@ -22,6 +22,7 @@
     "expired": "মেয়াদ শেষ"
   },
   "common": {
+    "manageOnWeb": "ওয়েবে পরিচালনা করুন",
     "creditHistory": "ক্রেডিট ইতিহাস",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "প্রোভাইডার কী",
       "rowSubtitle": "নিজের প্রোভাইডার বিলিং ব্যবহার করুন",
-      "manageOnWeb": "ওয়েবে পরিচালনা করুন",
       "manageOnWebReason": "এই প্রোভাইডারগুলোর জন্য কাঠামোবদ্ধ ক্রেডেনশিয়াল প্রয়োজন।",
       "description": "এই কী দিয়ে করা রিকোয়েস্টের বিল আপনার Kilo ব্যালেন্সের বদলে আপনার প্রোভাইডার অ্যাকাউন্টে যাবে।",
       "enabled": "ব্যবহার হচ্ছে",
@@ -2550,7 +2550,8 @@
       "cancelQueued": "বার্তা বাতিল করুন",
       "cancelQueuedAccessibility": "অপেক্ষমাণ বার্তা বাতিল করুন",
       "restoreQueued": "ফিরিয়ে আনুন",
-      "restoreQueuedAccessibility": "বাতিল করা বার্তাটি বার্তা লেখার ঘরে ফিরিয়ে আনুন"
+      "restoreQueuedAccessibility": "বাতিল করা বার্তাটি বার্তা লেখার ঘরে ফিরিয়ে আনুন",
+      "noReplyRecorded": "এই বার্তার জন্য কোনো উত্তর রেকর্ড করা হয়নি।"
     },
     "olderMessages": {
       "arrived": "আগের বার্তাগুলি লোড হয়েছে",
@@ -4177,6 +4178,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "এই অনুসন্ধানের ফলাফল খোলা যায়নি"
+  },
+  "usage": {
+    "title": "ব্যবহার",
+    "orgTitle": "সংস্থার ব্যবহার",
+    "entrySubtitle": "খরচ, অনুরোধ ও টোকেন",
+    "rangePicker": "সময়সীমা",
+    "range90d": "৯০ দিন",
+    "metricPicker": "চার্টের মেট্রিক",
+    "chartA11y": "প্রতিদিন {{metric}}",
+    "avgCostPerRequest": "গড় খরচ / অনুরোধ",
+    "topModels": "শীর্ষ মডেল",
+    "topFeatures": "শীর্ষ ফিচার",
+    "emptyTitle": "এই সময়ে কোনো ব্যবহার নেই",
+    "orgSelfNotice": "আপনি এই সংস্থায় আপনার নিজের ব্যবহার দেখছেন।",
+    "viewDetails": "ব্যবহারের বিস্তারিত দেখুন"
+  },
+  "integrations": {
+    "title": "ইন্টিগ্রেশন",
+    "sectionTitle": "সংযুক্ত পরিষেবা",
+    "entrySubtitle": "GitHub, Slack, Linear ও আরও অনেক কিছু",
+    "subtitle": "আপনার ডেভেলপমেন্ট টুল ও ওয়ার্কফ্লো Kilo-র সাথে সংযুক্ত করুন",
+    "emptyHint": "এখনও কোনো ইন্টিগ্রেশন সংযুক্ত করা হয়নি।",
+    "disconnect": "সংযোগ বিচ্ছিন্ন করুন",
+    "disconnectTitle": "{{provider}}-এর সংযোগ বিচ্ছিন্ন করবেন?",
+    "disconnectMessage": "Kilo আর {{provider}}-এ সাড়া দেবে না। আপনি যেকোনো সময় আবার সংযোগ করতে পারবেন।",
+    "connectedTo": "{{account}}-এর সাথে সংযুক্ত",
+    "disconnected": "{{provider}}-এর সংযোগ বিচ্ছিন্ন হয়েছে",
+    "disconnectFailed": "{{provider}}-এর সংযোগ বিচ্ছিন্ন করা যায়নি",
+    "couldNotLoad": "ইন্টিগ্রেশন লোড করা যায়নি",
+    "permissionDenied": "এই ইন্টিগ্রেশনগুলো পরিচালনা করার অনুমতি আপনার নেই।",
+    "memberHint": "এই সংযোগগুলো পরিবর্তন করতে আপনার প্রতিষ্ঠানের মালিক বা অ্যাডমিনকে বলুন।",
+    "connectFailed": "সংযোগের পেজটি খোলা যায়নি"
   },
   "invoices": {
     "personalEmptyDescription": "আপনার কাছ থেকে বিল নেওয়া হলে আপনার নিজের কেনাকাটার ইনভয়েস এখানে দেখা যাবে।"

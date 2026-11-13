@@ -177,7 +177,10 @@ export { splitByContiguousPrefix } from './array-utils';
 export { calculateContextUsagePercentage } from './context-usage';
 export type { ContextUsage } from './context-usage';
 
-export { isNoOpCompletedPreparationAttempt } from './preparation-attempts';
+export {
+  isNoOpCompletedPreparationAttempt,
+  isPreparationCancellation,
+} from './preparation-attempts';
 
 export type {
   KiloSdkMessageHistory,

@@ -251,6 +251,15 @@ test('still rejects a template-literal key', () => {
   );
 });
 
+test('reports an unparsed file by its path below the tree it was read from', () => {
+  const found = run({ source: "t('agents.title'\n" });
+  assert.match(
+    found.join('\n'),
+    /^apps\/mobile\/src\/example\.ts:2: cannot parse: /m,
+    found.join('\n')
+  );
+});
+
 test('ignores a mounted-harness helper while a source file still reports its keys', () => {
   const source = "t('agents.missing');\n";
   const inSource = run({ source });

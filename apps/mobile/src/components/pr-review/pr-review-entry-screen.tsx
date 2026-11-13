@@ -1,5 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { Clipboard as ClipboardIcon, SearchX, X } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { type ReactNode, useCallback, useState } from 'react';
@@ -21,6 +21,7 @@ import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { providerPrRefLabel, providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import {
@@ -39,7 +40,7 @@ import {
 import { usePrLinkField } from '@/lib/pr-review/use-pr-link-field';
 
 export function PrReviewEntryScreen() {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
@@ -87,7 +88,7 @@ export function PrReviewEntryScreen() {
     // self-managed GitLab host parses to a ref whose instanceHint rides as
     // the route's `instance` param — the server re-derives the authoritative
     // instance, so a mismatched host lands on the clear not-authorized state.
-    router.push(providerPrRoutePath(decision.ref));
+    pushOnce(providerPrRoutePath(decision.ref));
   };
 
   const handlePaste = async () => {
@@ -117,7 +118,7 @@ export function PrReviewEntryScreen() {
     // `lastOpenedAt` (and `lastResult`) once an authorized payload loads.
     // The entry's platform (legacy entries: GitHub) decides the route, so a
     // GitLab row opens the GitLab surface, never a same-named GitHub PR.
-    router.push(providerPrRoutePath(providerRefFromRecentPr(entry)));
+    pushOnce(providerPrRoutePath(providerRefFromRecentPr(entry)));
   };
 
   const handleRemoveRecent = (entry: RecentPr) => {

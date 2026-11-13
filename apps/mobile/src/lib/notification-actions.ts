@@ -119,6 +119,7 @@ function needsInputActionFor(actionId: NeedsInputActionId): Notifications.Notifi
 type NeedsInputInteractionRunner = (input: {
   kiloSessionId: string;
   action: NeedsInputAction;
+  raiseId?: string;
   text?: string;
 }) => Promise<NeedsInputActionOutcome>;
 
@@ -534,6 +535,10 @@ async function runAnswerAction(args: {
     outcome = await (deps.runInteraction ?? defaultRunInteraction)({
       kiloSessionId: data.cliSessionId,
       action,
+      // The raise this notification presented. The interaction answers only
+      // that raise; a payload posted before the field existed omits it and
+      // keeps the earlier behaviour.
+      ...(data.raiseId === undefined ? {} : { raiseId: data.raiseId }),
       ...(action === 'reply' ? { text: response.userText } : {}),
     });
   } catch (error) {

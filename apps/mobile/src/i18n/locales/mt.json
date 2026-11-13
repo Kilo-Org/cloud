@@ -22,6 +22,7 @@
     "expired": "Skada"
   },
   "common": {
+    "manageOnWeb": "Immaniġġja fuq il-web",
     "creditHistory": "Storja tal-krediti",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Ċwievet tal-fornitur",
       "rowSubtitle": "Uża l-fatturazzjoni tal-fornitur tiegħek",
-      "manageOnWeb": "Immaniġġja fuq il-web",
       "manageOnWebReason": "Dawn il-fornituri jeħtieġu kredenzjali strutturati.",
       "description": "It-talbiet magħmula b'dawn iċ-ċwievet jiġu ffatturati lill-kont tal-fornitur tiegħek minflok jitnaqqsu mill-bilanċ ta' Kilo tiegħek.",
       "enabled": "Qed tintuża",
@@ -2685,7 +2685,8 @@
       "cancelQueued": "Ikkanċella l-messaġġ",
       "cancelQueuedAccessibility": "Ikkanċella l-messaġġ fil-kju",
       "restoreQueued": "Irrestawra",
-      "restoreQueuedAccessibility": "Irrestawra l-messaġġ ikkanċellat fil-qasam tal-messaġġ"
+      "restoreQueuedAccessibility": "Irrestawra l-messaġġ ikkanċellat fil-qasam tal-messaġġ",
+      "noReplyRecorded": "Ma ġiet irreġistrata l-ebda tweġiba għal dan il-messaġġ."
     },
     "olderMessages": {
       "arrived": "Il-messaġġi ta' qabel tgħabbew",
@@ -4372,6 +4373,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ma stajniex niftħu dan ir-riżultat tat-tfittxija"
+  },
+  "usage": {
+    "title": "Użu",
+    "orgTitle": "Użu tal-organizzazzjoni",
+    "entrySubtitle": "Spiża, talbiet u unitajiet tat-test",
+    "rangePicker": "Medda ta' żmien",
+    "range90d": "90 jum",
+    "metricPicker": "Metrika tal-grafika",
+    "chartA11y": "{{metric}} kuljum",
+    "avgCostPerRequest": "Spiża medja / talba",
+    "topModels": "Il-mudelli l-aktar użati",
+    "topFeatures": "Il-funzjonijiet l-aktar użati",
+    "emptyTitle": "L-ebda użu f'dan il-perjodu",
+    "orgSelfNotice": "Qed tara l-użu tiegħek stess f'din l-organizzazzjoni.",
+    "viewDetails": "Ara d-dettalji tal-użu"
+  },
+  "integrations": {
+    "title": "Integrazzjonijiet",
+    "sectionTitle": "Servizzi konnessi",
+    "entrySubtitle": "GitHub, Slack, Linear u aktar",
+    "subtitle": "Qabbad l-għodod u l-proċessi tax-xogħol tal-iżvilupp tiegħek ma' Kilo",
+    "emptyHint": "Għad m'hemm l-ebda integrazzjoni konnessa.",
+    "disconnect": "Skonnettja",
+    "disconnectTitle": "Tiskonnettja {{provider}}?",
+    "disconnectMessage": "Kilo se jieqaf jirrispondi f'{{provider}}. Tista' terġa' tikkonnettja fi kwalunkwe ħin.",
+    "connectedTo": "Konness ma' {{account}}",
+    "disconnected": "{{provider}} ġie skonnettjat",
+    "disconnectFailed": "L-iskonnettjar ta' {{provider}} ma rnexxiex",
+    "couldNotLoad": "L-integrazzjonijiet ma setgħux jitgħabbew",
+    "permissionDenied": "M'għandekx permess timmaniġġja dawn l-integrazzjonijiet.",
+    "memberHint": "Itlob lil sid jew amministratur tal-organizzazzjoni biex ibiddel dawn il-konnessjonijiet.",
+    "connectFailed": "Il-paġna tal-konnessjoni ma setgħetx tinfetaħ"
   },
   "invoices": {
     "personalEmptyDescription": "Il-fatturi għax-xiri tiegħek stess se jidhru hawn ladarba tiġi ddebitat."

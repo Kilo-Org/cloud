@@ -21,6 +21,17 @@ export const briefingFactsSchema = briefingReportSchema.pick({
   coverage: true,
   truncated: true,
 });
+export type BriefingFacts = z.infer<typeof briefingFactsSchema>;
+
+function scorecardFor(facts: BriefingFacts) {
+  return {
+    sessions: facts.sessions.length,
+    pullRequests: new Set(
+      facts.sources.filter(source => source.kind === 'pull_request').map(source => source.url)
+    ).size,
+    blockers: facts.sources.filter(source => source.kind === 'blocker').length,
+  };
+}
 const completedExcerptSchema = z.object({
   messageId: z.string(),
   completedAt: z.string().datetime(),
@@ -127,23 +138,11 @@ export function buildBriefingSnapshot(rows: SnapshotSession[]) {
     const session = { sessionId: row.session_id, title, url, status: row.status, sources };
     facts.sessions.push(session);
     facts.sources.push(...sources);
-    facts.scorecard = {
-      sessions: facts.sessions.length,
-      pullRequests: new Set(
-        facts.sources.filter(source => source.kind === 'pull_request').map(source => source.url)
-      ).size,
-      blockers: facts.sources.filter(source => source.kind === 'blocker').length,
-    };
+    facts.scorecard = scorecardFor(facts);
     if (Buffer.byteLength(JSON.stringify(facts), 'utf8') > BRIEFING_MAX_SNAPSHOT_BYTES) {
       facts.sessions.pop();
       facts.sources.splice(facts.sources.length - sources.length, sources.length);
-      facts.scorecard = {
-        sessions: facts.sessions.length,
-        pullRequests: new Set(
-          facts.sources.filter(source => source.kind === 'pull_request').map(source => source.url)
-        ).size,
-        blockers: facts.sources.filter(source => source.kind === 'blocker').length,
-      };
+      facts.scorecard = scorecardFor(facts);
       facts.truncated = true;
       break;
     }

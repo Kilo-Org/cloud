@@ -21,6 +21,7 @@ import {
 
 import {
   DEFAULT_USER_NOTIFICATION_PREFERENCES,
+  raiseIdForWaitingRow,
   sanitizeTitle,
   type UserNotificationPreferences,
 } from './cloud-agent-session-push';
@@ -30,6 +31,12 @@ export type { SendAgentSessionNotificationParams } from '@kilocode/notifications
 type AgentNotificationSession = {
   title: string | null;
   organizationId: string | null;
+  /**
+   * The stored status and its own time, so this push can name the raise it
+   * presents. Absent on a row that never carried a status.
+   */
+  status?: string | null;
+  statusUpdatedAt?: string | Date | null;
 };
 
 export type AgentNotificationSessionPushContent = {
@@ -43,18 +50,26 @@ export type AgentNotificationSessionPushContent = {
    * organization_id), which leaves the app on Personal.
    */
   organizationId?: string;
+  /**
+   * The raise this push presents, when the session row names one. Absent for a
+   * row that is not waiting or carries no status time; the app then keeps its
+   * previous behaviour.
+   */
+  raiseId?: string;
 };
 
 export function buildAgentSessionNotificationContent(
   params: SendAgentSessionNotificationParams,
   session: AgentNotificationSession
 ): AgentNotificationSessionPushContent {
+  const raiseId = raiseIdForWaitingRow(session);
   return {
     presenceContext: presenceContextForCliSession(params.cliSessionId),
     idempotencyKey: `agent-notification:${params.cliSessionId}:${params.notificationId}`,
     title: sanitizeTitle(session.title) ?? 'Agent session',
     body: params.message,
     ...(session.organizationId != null && { organizationId: session.organizationId }),
+    ...(raiseId !== null && { raiseId }),
   };
 }
 
@@ -108,6 +123,9 @@ export function buildAgentSessionNotificationDispatchInput(
         // The session's organization rides on the push so a tap can switch the
         // app before it opens the session. Absent for a Personal session.
         ...(content.organizationId != null && { organizationId: content.organizationId }),
+        // The raise the session row names, so a tap answers it and not a
+        // raise that replaced it while this notification stood.
+        ...(content.raiseId !== undefined && { raiseId: content.raiseId }),
       },
       sound: 'default',
       priority: 'high',

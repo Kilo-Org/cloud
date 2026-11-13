@@ -37,19 +37,12 @@
  * Usage: node tools/i18n/check-plurals.mjs [--source-only]
  */
 import { readFileSync, readdirSync } from 'node:fs';
-import { join, relative as relativePath, sep } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import {
-  isTranslateCallee,
-  lineIndex,
-  parseProblems,
-  parseSourceFile,
-  unwrap,
-  walk,
-} from '../lib/ast.mjs';
+import { isTranslateCallee, unwrap, walk } from '../lib/ast.mjs';
 import { countPlaceholderBases, flattenCatalog, pluralParts } from '../lib/catalogs.mjs';
-import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
+import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SOURCE_DIR = join(ROOT, 'apps/mobile/src');
@@ -234,16 +227,14 @@ function countedCall(node, text) {
 function auditTree(rootDir) {
   const calls = [];
   const problems = [];
-  for (const file of sourceFiles(rootDir, isTestArtifact)) {
-    const text = readFileSync(file, 'utf8');
-    const { program, errors } = parseSourceFile(file, text);
-    // The app's sources read the way every other diagnostic names them; a
-    // fixture tree outside the repository reads from its own root.
-    const fromRepo = relativePath(ROOT, file);
-    const path = (fromRepo.startsWith('..') ? relativePath(rootDir, file) : fromRepo)
-      .split(sep)
-      .join('/');
-    problems.push(...parseProblems(path, errors, lineIndex(text)));
+  // The app's sources read the way every other diagnostic names them; a
+  // fixture tree outside the repository reads from its own root.
+  for (const { text, program, problems: unparsed } of parseSourceTree(
+    rootDir,
+    ROOT,
+    isTestArtifact
+  )) {
+    problems.push(...unparsed);
     walk(program, node => {
       const call = countedCall(node, text);
       if (call !== null) {

@@ -68,7 +68,8 @@
     "./organization-membership": "./src/organization-membership.ts",
     "./webhook-body-validation": "./src/webhook-body-validation.ts",
     "./organization-usage": "./src/organization-usage.ts",
-    "./organization-consumption": "./src/organization-consumption.ts"
+    "./organization-consumption": "./src/organization-consumption.ts",
+    "./runtime-model-diagnostics": "./src/runtime-model-diagnostics.ts"
   },
   "scripts": {
     "test": "vitest run",

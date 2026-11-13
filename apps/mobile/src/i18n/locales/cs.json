@@ -22,6 +22,7 @@
     "expired": "Platnost vypršela"
   },
   "common": {
+    "manageOnWeb": "Spravovat na webu",
     "creditHistory": "Historie kreditů",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Klíče poskytovatelů",
       "rowSubtitle": "Používat vlastní fakturaci u poskytovatele",
-      "manageOnWeb": "Spravovat na webu",
       "manageOnWebReason": "Tito poskytovatelé vyžadují strukturované přihlašovací údaje.",
       "description": "Požadavky přes tyto klíče se účtují na váš účet u poskytovatele, ne z vašeho zůstatku v Kilo.",
       "enabled": "Používá se",
@@ -2640,7 +2640,8 @@
       "cancelQueued": "Zrušit zprávu",
       "cancelQueuedAccessibility": "Zrušit zprávu ve frontě",
       "restoreQueued": "Obnovit",
-      "restoreQueuedAccessibility": "Vrátit zrušenou zprávu do pole pro zprávu"
+      "restoreQueuedAccessibility": "Vrátit zrušenou zprávu do pole pro zprávu",
+      "noReplyRecorded": "U této zprávy nebyla zaznamenána žádná odpověď."
     },
     "olderMessages": {
       "arrived": "Starší zprávy načteny",
@@ -4307,6 +4308,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nepodařilo se otevřít tento výsledek hledání"
+  },
+  "usage": {
+    "title": "Využití",
+    "orgTitle": "Využití organizace",
+    "entrySubtitle": "Náklady, požadavky a tokeny",
+    "rangePicker": "Časové období",
+    "range90d": "90 dní",
+    "metricPicker": "Metrika grafu",
+    "chartA11y": "{{metric}} za den",
+    "avgCostPerRequest": "Prům. náklady / pož.",
+    "topModels": "Nejpoužívanější modely",
+    "topFeatures": "Nejpoužívanější funkce",
+    "emptyTitle": "V tomto období žádné využití",
+    "orgSelfNotice": "Vidíte své vlastní využití v této organizaci.",
+    "viewDetails": "Zobrazit podrobnosti o využití"
+  },
+  "integrations": {
+    "title": "Integrace",
+    "sectionTitle": "Připojené služby",
+    "entrySubtitle": "GitHub, Slack, Linear a další",
+    "subtitle": "Propojte své vývojářské nástroje a pracovní postupy s Kilo",
+    "emptyHint": "Zatím nejsou připojeny žádné integrace.",
+    "disconnect": "Odpojit",
+    "disconnectTitle": "Odpojit {{provider}}?",
+    "disconnectMessage": "Kilo přestane odpovídat v {{provider}}. Kdykoli se můžete znovu připojit.",
+    "connectedTo": "Připojeno k účtu {{account}}",
+    "disconnected": "{{provider}} byl odpojen",
+    "disconnectFailed": "{{provider}} se nepodařilo odpojit",
+    "couldNotLoad": "Integrace se nepodařilo načíst",
+    "permissionDenied": "Nemáte oprávnění spravovat tyto integrace.",
+    "memberHint": "Požádejte vlastníka nebo správce organizace o změnu těchto připojení.",
+    "connectFailed": "Stránku pro připojení se nepodařilo otevřít"
   },
   "invoices": {
     "personalEmptyDescription": "Faktury za vaše vlastní nákupy se zde zobrazí po vyúčtování."

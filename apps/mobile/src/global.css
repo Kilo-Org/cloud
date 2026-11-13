@@ -134,7 +134,7 @@
   --agent-sky-tile-border: #2c7fb033;
 
   /* Curated row-hue palette — the logo yellow's own family.
-   * Six steps walk one warm band (50deg -> 105deg, an 11deg step) at one fixed
+   * Seven steps walk one warm band (50deg -> 116deg, an 11deg step) at one fixed
    * chroma/value per theme, around the light primary olive (#4f5a10, h~71).
    * Status hues sit outside the band (danger
    * 8deg, warn 37deg, good 150deg, info 220deg), so no step reads as a status
@@ -160,6 +160,9 @@
   --row-fern: #357c1d;
   --row-fern-tile-bg: #357c1d1a;
   --row-fern-tile-border: #357c1d33;
+  --row-pine: #237c1d;
+  --row-pine-tile-bg: #237c1d1a;
+  --row-pine-tile-border: #237c1d33;
 }
 
 /* Focus design tokens — DARK (FD palette) */
@@ -300,6 +303,9 @@
     --row-fern: #9eeb84;
     --row-fern-tile-bg: #9eeb841a;
     --row-fern-tile-border: #9eeb8433;
+    --row-pine: #8beb84;
+    --row-pine-tile-bg: #8beb841a;
+    --row-pine-tile-border: #8beb8433;
   }
 }
 
@@ -397,6 +403,9 @@
   --color-row-fern: var(--row-fern);
   --color-row-fern-tile-bg: var(--row-fern-tile-bg);
   --color-row-fern-tile-border: var(--row-fern-tile-border);
+  --color-row-pine: var(--row-pine);
+  --color-row-pine-tile-bg: var(--row-pine-tile-bg);
+  --color-row-pine-tile-border: var(--row-pine-tile-border);
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);

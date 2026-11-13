@@ -270,7 +270,7 @@ pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standar
 - After a link opens, the gate keeps measuring for 2.5 s, so content that arrives late and moves the screen is a `layout-shift` error.
 - A scrolling screen must start with what it shows. Empty space above the first painted content, beyond the scroll content's top padding and one section break (24 dp), is a `leading-gap` error: a first block pushed down by a margin, or a box that holds its content at its bottom.
 - Shift measurements use transform-free layout frames. Navigation transforms remain visible in screenshots and motion recordings without hiding real content shifts.
-- The sampler retains the newest 400 distinct layouts. A truncation flag in the timeline and motion artifacts marks incomplete capture.
+- The sampler retains the newest layouts that fit its weight budget, up to a maximum count. A truncation flag in the timeline and motion artifacts marks incomplete capture.
 - Fix every `error` finding, then run the gate again until it exits 0. Fix each `warning`, or give a one-line reason in the pull request.
 - Exit code 2 is an environment failure (no device, no Metro page, no probe), not a pass.
 - Attach `contact-sheet.png` from the output directory to the pull request with `gh pr comment --attach`. Never commit it.

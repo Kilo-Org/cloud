@@ -34,6 +34,7 @@ import { parseSessionMetadata } from '../../src/persistence/session-metadata.js'
 import { sessionDoName } from '../../src/session-identity.js';
 import type { SessionIngestBinding } from '../../src/session-ingest-binding.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
+import { seedRegistration } from './helpers/seed-registration.js';
 
 const USER_ID = 'history-user';
 const sessions = (env as unknown as { SANDBOX_SESSION: DurableObjectNamespace<SandboxSessionV2> })
@@ -57,7 +58,7 @@ async function fixture() {
     }),
     sandboxSelection: { provider: 'cloudflare' },
   });
-  await stub.registerSession({
+  await seedRegistration(stub, {
     sandboxId,
     spec: {
       sessionId,

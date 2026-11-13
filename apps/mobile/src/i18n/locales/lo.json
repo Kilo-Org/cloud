@@ -22,6 +22,7 @@
     "expired": "ໝົດອາຍຸແລ້ວ"
   },
   "common": {
+    "manageOnWeb": "ຈັດການໃນເວັບ",
     "creditHistory": "ປະຫວັດເຄຣດິດ",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "ຄີຂອງຜູ້ໃຫ້ບໍລິການ",
       "rowSubtitle": "ໃຊ້ການຮຽກເກັບເງິນຂອງຜູ້ໃຫ້ບໍລິການຂອງທ່ານເອງ",
-      "manageOnWeb": "ຈັດການໃນເວັບ",
       "manageOnWebReason": "ຜູ້ໃຫ້ບໍລິການເຫຼົ່ານີ້ຕ້ອງການຂໍ້ມູນຮັບຮອງແບບມີໂຄງສ້າງ",
       "description": "ຄຳຂໍທີ່ສົ່ງຜ່ານຄີເຫຼົ່ານີ້ຈະຖືກຮຽກເກັບເງິນຈາກບັນຊີຜູ້ໃຫ້ບໍລິການຂອງທ່ານ ແທນຍອດເງິນ Kilo ຂອງທ່ານ.",
       "enabled": "ກຳລັງໃຊ້ງານ",
@@ -2550,7 +2550,8 @@
       "cancelQueued": "ຍົກເລີກຂໍ້ຄວາມ",
       "cancelQueuedAccessibility": "ຍົກເລີກຂໍ້ຄວາມທີ່ລໍຖ້າສົ່ງ",
       "restoreQueued": "ກູ້ຄືນ",
-      "restoreQueuedAccessibility": "ນຳຂໍ້ຄວາມທີ່ຍົກເລີກກັບຄືນສູ່ຊ່ອງປ້ອນຂໍ້ຄວາມ"
+      "restoreQueuedAccessibility": "ນຳຂໍ້ຄວາມທີ່ຍົກເລີກກັບຄືນສູ່ຊ່ອງປ້ອນຂໍ້ຄວາມ",
+      "noReplyRecorded": "ບໍ່ມີການບັນທຶກຄຳຕອບສຳລັບຂໍ້ຄວາມນີ້."
     },
     "olderMessages": {
       "arrived": "ໂຫຼດຂໍ້ຄວາມກ່ອນໜ້າແລ້ວ",
@@ -4177,6 +4178,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ບໍ່ສາມາດເປີດຜົນການຄົ້ນຫານີ້ໄດ້"
+  },
+  "usage": {
+    "title": "ການນຳໃຊ້",
+    "orgTitle": "ການນຳໃຊ້ຂອງອົງກອນ",
+    "entrySubtitle": "ຄ່າໃຊ້ຈ່າຍ, ຄຳຂໍ ແລະ ໂທເຄັນ",
+    "rangePicker": "ຊ່ວງເວລາ",
+    "range90d": "90 ວັນ",
+    "metricPicker": "ຕົວຊີ້ວັດແຜນພູມ",
+    "chartA11y": "{{metric}} ຕໍ່ວັນ",
+    "avgCostPerRequest": "ຄ່າໃຊ້ຈ່າຍສະເລ່ຍ / ຄຳຂໍ",
+    "topModels": "ໂມເດວທີ່ໃຊ້ຫຼາຍສຸດ",
+    "topFeatures": "ຄຸນສົມບັດທີ່ໃຊ້ຫຼາຍສຸດ",
+    "emptyTitle": "ບໍ່ມີການນຳໃຊ້ໃນຊ່ວງເວລານີ້",
+    "orgSelfNotice": "ທ່ານກຳລັງເບິ່ງການນຳໃຊ້ຂອງທ່ານເອງໃນອົງກອນນີ້.",
+    "viewDetails": "ເບິ່ງລາຍລະອຽດການນຳໃຊ້"
+  },
+  "integrations": {
+    "title": "ການເຊື່ອມໂຍງ",
+    "sectionTitle": "ບໍລິການທີ່ເຊື່ອມຕໍ່ແລ້ວ",
+    "entrySubtitle": "GitHub, Slack, Linear ແລະ ອື່ນໆ",
+    "subtitle": "ເຊື່ອມຕໍ່ເຄື່ອງມືພັດທະນາ ແລະ ຂັ້ນຕອນການເຮັດວຽກຂອງທ່ານກັບ Kilo",
+    "emptyHint": "ຍັງບໍ່ມີການເຊື່ອມໂຍງໃດໆເທື່ອ.",
+    "disconnect": "ຕັດການເຊື່ອມຕໍ່",
+    "disconnectTitle": "ຕັດການເຊື່ອມຕໍ່ {{provider}} ບໍ?",
+    "disconnectMessage": "Kilo ຈະຢຸດຕອບກັບໃນ {{provider}}. ທ່ານສາມາດເຊື່ອມຕໍ່ຄືນໄດ້ທຸກເວລາ.",
+    "connectedTo": "ເຊື່ອມຕໍ່ກັບ {{account}} ແລ້ວ",
+    "disconnected": "ຕັດການເຊື່ອມຕໍ່ {{provider}} ແລ້ວ",
+    "disconnectFailed": "ບໍ່ສາມາດຕັດການເຊື່ອມຕໍ່ {{provider}} ໄດ້",
+    "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການເຊື່ອມໂຍງໄດ້",
+    "permissionDenied": "ທ່ານບໍ່ມີສິດຈັດການການເຊື່ອມໂຍງເຫຼົ່ານີ້.",
+    "memberHint": "ກະລຸນາຂໍໃຫ້ເຈົ້າຂອງ ຫຼື ຜູ້ດູແລອົງກອນປ່ຽນແປງການເຊື່ອມຕໍ່ເຫຼົ່ານີ້.",
+    "connectFailed": "ບໍ່ສາມາດເປີດໜ້າການເຊື່ອມຕໍ່ໄດ້"
   },
   "invoices": {
     "personalEmptyDescription": "ໃບແຈ້ງໜີ້ສຳລັບການຊື້ຂອງທ່ານເອງຈະສະແດງຢູ່ບ່ອນນີ້ເມື່ອມີການຮຽກເກັບເງິນ."

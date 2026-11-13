@@ -22,6 +22,7 @@
     "expired": "หมดอายุแล้ว"
   },
   "common": {
+    "manageOnWeb": "จัดการบนเว็บ",
     "creditHistory": "ประวัติเครดิต",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "คีย์ผู้ให้บริการ",
       "rowSubtitle": "ใช้การเรียกเก็บเงินจากผู้ให้บริการของคุณเอง",
-      "manageOnWeb": "จัดการบนเว็บ",
       "manageOnWebReason": "ผู้ให้บริการเหล่านี้ต้องใช้ข้อมูลรับรองแบบมีโครงสร้าง",
       "description": "คำขอที่ส่งผ่านคีย์เหล่านี้จะเรียกเก็บเงินจากบัญชีผู้ให้บริการของคุณแทนยอดคงเหลือ Kilo.",
       "enabled": "กำลังใช้งาน",
@@ -2550,7 +2550,8 @@
       "cancelQueued": "ยกเลิกข้อความ",
       "cancelQueuedAccessibility": "ยกเลิกข้อความที่อยู่ในคิว",
       "restoreQueued": "กู้คืน",
-      "restoreQueuedAccessibility": "กู้คืนข้อความที่ยกเลิกไปยังช่องป้อนข้อความ"
+      "restoreQueuedAccessibility": "กู้คืนข้อความที่ยกเลิกไปยังช่องป้อนข้อความ",
+      "noReplyRecorded": "ไม่มีบันทึกคำตอบสำหรับข้อความนี้"
     },
     "olderMessages": {
       "arrived": "โหลดข้อความก่อนหน้าแล้ว",
@@ -4177,6 +4178,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ไม่สามารถเปิดผลการค้นหานี้ได้"
+  },
+  "usage": {
+    "title": "การใช้งาน",
+    "orgTitle": "การใช้งานขององค์กร",
+    "entrySubtitle": "ค่าใช้จ่าย คำขอ และโทเคน",
+    "rangePicker": "ช่วงเวลา",
+    "range90d": "90 วัน",
+    "metricPicker": "ตัวชี้วัดของแผนภูมิ",
+    "chartA11y": "{{metric}} ต่อวัน",
+    "avgCostPerRequest": "ค่าใช้จ่ายเฉลี่ย/คำขอ",
+    "topModels": "โมเดลที่ใช้มากที่สุด",
+    "topFeatures": "ฟีเจอร์ที่ใช้มากที่สุด",
+    "emptyTitle": "ไม่มีการใช้งานในช่วงนี้",
+    "orgSelfNotice": "คุณกำลังดูการใช้งานของคุณเองในองค์กรนี้",
+    "viewDetails": "ดูรายละเอียดการใช้งาน"
+  },
+  "integrations": {
+    "title": "การเชื่อมต่อ",
+    "sectionTitle": "บริการที่เชื่อมต่อแล้ว",
+    "entrySubtitle": "GitHub, Slack, Linear และอื่นๆ",
+    "subtitle": "เชื่อมต่อเครื่องมือและเวิร์กโฟลว์การพัฒนาของคุณกับ Kilo",
+    "emptyHint": "ยังไม่มีการเชื่อมต่อ",
+    "disconnect": "ยกเลิกการเชื่อมต่อ",
+    "disconnectTitle": "ยกเลิกการเชื่อมต่อ {{provider}} ใช่ไหม",
+    "disconnectMessage": "Kilo จะหยุดตอบกลับใน {{provider}} คุณสามารถเชื่อมต่อใหม่ได้ทุกเมื่อ",
+    "connectedTo": "เชื่อมต่อกับ {{account}} แล้ว",
+    "disconnected": "ยกเลิกการเชื่อมต่อ {{provider}} แล้ว",
+    "disconnectFailed": "ไม่สามารถยกเลิกการเชื่อมต่อ {{provider}} ได้",
+    "couldNotLoad": "ไม่สามารถโหลดการเชื่อมต่อได้",
+    "permissionDenied": "คุณไม่มีสิทธิ์จัดการการเชื่อมต่อเหล่านี้",
+    "memberHint": "โปรดขอให้เจ้าของหรือผู้ดูแลองค์กรเปลี่ยนแปลงการเชื่อมต่อเหล่านี้",
+    "connectFailed": "ไม่สามารถเปิดหน้าการเชื่อมต่อได้"
   },
   "invoices": {
     "personalEmptyDescription": "ใบแจ้งหนี้สำหรับการซื้อของคุณเองจะแสดงที่นี่เมื่อมีการเรียกเก็บเงิน"

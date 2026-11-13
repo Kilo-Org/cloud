@@ -89,6 +89,7 @@
     "expired": "Expired"
   },
   "common": {
+    "manageOnWeb": "Manage on the web",
     "creditHistory": "Credit history",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -405,7 +406,6 @@
     "providerKeys": {
       "title": "Provider keys",
       "rowSubtitle": "Use your own provider billing",
-      "manageOnWeb": "Manage on the web",
       "manageOnWebReason": "These providers need structured credentials.",
       "description": "Requests through these keys are billed to your provider account instead of your Kilo balance.",
       "enabled": "In use",
@@ -2634,6 +2634,7 @@
       "cancelQueuedAccessibility": "Cancel queued message",
       "restoreQueued": "Restore",
       "restoreQueuedAccessibility": "Restore canceled message to the composer",
+      "noReplyRecorded": "No response was recorded for this message.",
       "userMessage": "User message",
       "assistantMessage": "Assistant message",
       "longPressHint": "Long press for message details"
@@ -4177,6 +4178,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Could not open this search result"
+  },
+  "usage": {
+    "title": "Usage",
+    "orgTitle": "Organization usage",
+    "entrySubtitle": "Spend, requests, and tokens",
+    "rangePicker": "Time range",
+    "range90d": "90 days",
+    "metricPicker": "Chart metric",
+    "chartA11y": "{{metric}} per day",
+    "avgCostPerRequest": "Avg cost / req",
+    "topModels": "Top models",
+    "topFeatures": "Top features",
+    "emptyTitle": "No usage in this period",
+    "orgSelfNotice": "You're seeing your own usage in this organization.",
+    "viewDetails": "View usage details"
+  },
+  "integrations": {
+    "title": "Integrations",
+    "sectionTitle": "Connected services",
+    "entrySubtitle": "GitHub, Slack, Linear and more",
+    "subtitle": "Connect your development tools and workflows to Kilo",
+    "emptyHint": "No integrations connected yet.",
+    "disconnect": "Disconnect",
+    "disconnectTitle": "Disconnect {{provider}}?",
+    "disconnectMessage": "Kilo will stop responding in {{provider}}. You can reconnect at any time.",
+    "connectedTo": "Connected to {{account}}",
+    "disconnected": "{{provider}} disconnected",
+    "disconnectFailed": "Could not disconnect {{provider}}",
+    "couldNotLoad": "Could not load integrations",
+    "permissionDenied": "You do not have permission to manage these integrations.",
+    "memberHint": "Ask an organization owner or admin to change these connections.",
+    "connectFailed": "Could not open the connection page"
   },
   "invoices": {
     "personalEmptyDescription": "Invoices for your own purchases will appear here once you are billed."

@@ -1,5 +1,6 @@
 export * from './terminal';
 export { default } from './ReactNativeSshModule';
+export { BACKGROUND_SESSION_COUNT_TOKEN } from './ReactNativeSsh.types';
 export type { GeneratedKey } from './ReactNativeSsh.types';
 export { SshError, isRetryableError } from './errors';
 export {
@@ -17,6 +18,7 @@ export {
   parsePrivateKey,
 } from './ssh';
 export { decryptExport, encryptExport } from './export';
+export { listForwards, listSessions, stopForwardById } from './registry';
 export { startLocalForward, startRemoteForward } from './forward';
 export {
   closeSftp,
@@ -32,6 +34,7 @@ export {
   upload,
 } from './sftp';
 export type { Forward, ForwardConfig } from './forward';
+export type { ForwardInfo, SessionInfo } from './ReactNativeSsh.types';
 export type {
   BackgroundSessionTexts,
   CommandFinishedNotice,

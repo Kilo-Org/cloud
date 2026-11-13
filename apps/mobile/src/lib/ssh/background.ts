@@ -1,3 +1,4 @@
+import { BACKGROUND_SESSION_COUNT_TOKEN } from '../../../modules/kilo-ssh/src';
 import { i18n } from '@/i18n';
 
 import { type Cancellation } from './cancellation';
@@ -24,7 +25,11 @@ export function startSshBackgroundSessions(): () => void {
       ssh.configureBackgroundSessions({
         channelName: i18n.t('ssh.notification.sessions'),
         title: i18n.t('ssh.notification.sessions'),
-        body: count => i18n.t('ssh.notification.body', { sessions: count }),
+        // The count is a token, not a number: the native side substitutes its
+        // own registry count, so a reload cannot leave a stale number behind.
+        bodyTemplate: i18n.t('ssh.notification.body', {
+          sessions: BACKGROUND_SESSION_COUNT_TOKEN,
+        }),
         disconnectAllLabel: i18n.t('ssh.notification.disconnectAll'),
       });
       const subscription = ssh.addSshListener('onDisconnectAll', () => {

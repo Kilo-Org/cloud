@@ -180,6 +180,15 @@ async function begin(entry: LiveSession): Promise<void> {
   await attempt(entry);
 }
 
+/**
+ * Registers the core's listeners for this runtime. Adoption runs it first: a
+ * session taken over from the native registry needs somewhere for its later
+ * disconnects, host keys and forward failures to land.
+ */
+export function ensureSshEvents(): Promise<void> {
+  return ensureListening();
+}
+
 let listening: Promise<void> | null = null;
 
 /**

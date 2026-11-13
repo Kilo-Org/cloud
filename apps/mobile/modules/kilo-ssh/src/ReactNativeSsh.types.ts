@@ -113,13 +113,45 @@ export type DisconnectNotice = {
 };
 
 /**
- * The texts the background session notification renders. `body` receives the
- * number of open sessions so each plural form stays in the app's translations.
+ * A live session as the native registry holds it. A JavaScript runtime that
+ * starts while the sockets are already open reads these to rebuild its view.
  */
+export type SessionInfo = {
+  sessionId: string;
+  host: string;
+  port: number;
+  username: string;
+  /** Shell ids whose byte sources are still registered with the terminal. */
+  shellIds: string[];
+  sftpIds: string[];
+  forwardIds: string[];
+};
+
+/** A forward that is still listening on a live session. */
+export type ForwardInfo = {
+  forwardId: string;
+  sessionId: string;
+  direction: 'local' | 'remote';
+  bindHost: string;
+  bindPort: number;
+  /** The port the listener actually bound. */
+  port: number;
+};
+
+/**
+ * Where a localized notification body puts the session count. The sentence is
+ * translated once with this token in place of the number and the native side
+ * substitutes its own registry count, so the text never depends on a number a
+ * destroyed JavaScript runtime once reported.
+ */
+export const BACKGROUND_SESSION_COUNT_TOKEN = '{count}';
+
+/** The texts the background session notification renders. */
 export type BackgroundSessionTexts = {
   channelName: string;
   title: string;
-  body: (count: number) => string;
+  /** The translated body with {@link BACKGROUND_SESSION_COUNT_TOKEN} where the count goes. */
+  bodyTemplate: string;
   disconnectAllLabel: string;
 };
 

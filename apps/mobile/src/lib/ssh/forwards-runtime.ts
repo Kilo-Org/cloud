@@ -1,4 +1,4 @@
-import { type Forward } from '@kilocode/react-native-ssh';
+import { type Forward } from '../../../modules/kilo-ssh/src';
 
 import { type SshForward } from './forwards';
 import { nativeErrorCode, sshPackage } from './native';
@@ -152,6 +152,47 @@ export function handleForwardError(nativeSessionId: string): void {
     }
   }
   publish();
+}
+
+/** A listener that survived a JavaScript reload, already paired with its row. */
+export type AdoptedForward = {
+  readonly forwardId: string;
+  readonly nativeForwardId: string;
+  readonly port: number;
+};
+
+/**
+ * Adopts listeners the native registry kept across a reload.
+ *
+ * Nothing here starts anything: the ports are already bound by the previous
+ * runtime, and the only thing missing is the state the sheet renders. Stopping
+ * one goes straight to the native id, because no wrapper object exists for a
+ * listener this runtime did not open.
+ */
+export function adoptForwards(
+  sessionId: string,
+  nativeSessionId: string,
+  forwards: readonly AdoptedForward[]
+): void {
+  const entry = entryFor(sessionId);
+  entry.nativeSessionId = nativeSessionId;
+  for (const forward of forwards) {
+    entry.handles.set(forward.forwardId, {
+      port: forward.port,
+      stop: () => stopById(forward.nativeForwardId),
+    });
+    entry.statuses.set(forward.forwardId, { kind: 'listening', port: forward.port });
+  }
+  publish();
+}
+
+async function stopById(nativeForwardId: string): Promise<void> {
+  try {
+    const ssh = await sshPackage();
+    await ssh.stopForwardById(nativeForwardId);
+  } catch {
+    // The connection the listener ran on is already gone.
+  }
 }
 
 /** Ends every listener of the session and forgets its state. */

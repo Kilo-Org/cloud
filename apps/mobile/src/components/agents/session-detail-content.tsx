@@ -3039,8 +3039,6 @@ export function SessionDetailContent({
               modelDisplay={contextModelAndProvider.model}
               providerDisplay={contextModelAndProvider.provider}
               totalCostMicrodollars={totalMicrodollars}
-              cloudAgentSessionId={cloudAgentSessionId}
-              organizationId={organizationId}
               breakdownCostUsd={breakdownCostUsd}
               messages={messages}
               modelOptions={modelOptions}

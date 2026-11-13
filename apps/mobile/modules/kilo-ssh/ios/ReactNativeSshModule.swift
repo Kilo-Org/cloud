@@ -1,7 +1,7 @@
 import ExpoModulesCore
 
 public final class ReactNativeSshModule: Module {
-  private let state = SshModuleState()
+  private let state = SshModuleState.shared
 
   public func definition() -> ModuleDefinition {
     Name("ReactNativeSsh")
@@ -73,8 +73,16 @@ public final class ReactNativeSshModule: Module {
       self.closeShell(shellId)
     }
 
+    Function("listSessions") { () -> [SessionInfoRecord] in
+      self.state.sessionRecords()
+    }
+
+    Function("listForwards") { () -> [ForwardInfoRecord] in
+      self.state.forwardRecords()
+    }
+
     Function("configureBackgroundSessions") { (_: String, _: String, _: String) -> Int in
-      0
+      self.state.sessionRecords().count
     }
 
     Function("updateSessionsBody") { (_: String) -> Void in }
@@ -104,7 +112,7 @@ public final class ReactNativeSshModule: Module {
 
       let sftpId = self.state.sftpIds.next()
       let client = try await translateAsync { try await session.openSftp() }
-      self.state.store(sftp: client, id: sftpId)
+      self.state.store(sftp: client, id: sftpId, sessionId: sessionId)
 
       return sftpId
     }
@@ -195,41 +203,30 @@ public final class ReactNativeSshModule: Module {
 
     AsyncFunction("startLocalForward")
     { (sessionId: String, config: ForwardConfigRecord) async throws -> ForwardStartRecord in
-      try await self.startForward(sessionId, config) { session, native, sink in
+      try await self.startForward(sessionId, config, direction: "local") { session, native, sink in
         try await session.startLocalForward(config: native, events: sink)
       }
     }
 
     AsyncFunction("startRemoteForward")
     { (sessionId: String, config: ForwardConfigRecord) async throws -> ForwardStartRecord in
-      try await self.startForward(sessionId, config) { session, native, sink in
+      try await self.startForward(sessionId, config, direction: "remote") { session, native, sink in
         try await session.startRemoteForward(config: native, events: sink)
       }
     }
 
     AsyncFunction("stopForward") { (forwardId: String) async throws in
-      guard let handle = self.state.removeForward(forwardId) else {
+      guard let entry = self.state.removeForward(forwardId) else {
         return
       }
 
-      try await translateAsync { try await handle.stop() }
+      try await translateAsync { try await entry.handle.stop() }
     }
 
-    OnDestroy {
-      self.state.allShellIds().forEach { self.closeShell($0) }
-      self.state.allCancels().forEach { $0.cancel() }
-      Task {
-        for client in self.state.allSftps() {
-          try? await client.shutdown()
-        }
-        for forward in self.state.allForwards() {
-          try? await forward.stop()
-        }
-        for session in self.state.allSessions() {
-          try? await session.disconnect()
-        }
-      }
-    }
+    /// A reload builds a new module while the sockets it opened stay live, so
+    /// teardown leaves the shared state — and every session in it — intact. The
+    /// process ending is what closes them.
+    OnDestroy {}
   }
 
   private func isRetryable(_ code: String) -> Bool {
@@ -241,6 +238,7 @@ public final class ReactNativeSshModule: Module {
     via jumpSessionId: String? = nil
   ) async throws -> String {
     let sessionId = state.sessionIds.next()
+    let target = SessionTarget(host: config.host, port: config.port, username: config.username)
     let handler = JsSessionHandler(
       sessionId: sessionId,
       requestHostKey: { [weak self] request in
@@ -268,7 +266,7 @@ public final class ReactNativeSshModule: Module {
       }
     }
 
-    state.store(session: session, id: sessionId)
+    state.store(session: session, id: sessionId, target: target)
 
     return sessionId
   }
@@ -298,6 +296,7 @@ public final class ReactNativeSshModule: Module {
   private func startForward(
     _ sessionId: String,
     _ config: ForwardConfigRecord,
+    direction: String,
     start: (SshSession, ForwardConfig, ForwardSink) async throws -> ForwardHandle
   ) async throws -> ForwardStartRecord {
     guard let session = state.session(sessionId) else {
@@ -311,11 +310,22 @@ public final class ReactNativeSshModule: Module {
     let handle = try await translateAsync {
       try await start(session, config.toNative(), sink)
     }
-    state.store(forward: handle, id: forwardId)
+    let port = Int(handle.actualPort())
+    state.store(
+      forward: ForwardEntry(
+        sessionId: sessionId,
+        direction: direction,
+        bindHost: config.bindHost,
+        bindPort: config.bindPort,
+        port: port,
+        handle: handle
+      ),
+      id: forwardId
+    )
 
     var record = ForwardStartRecord()
     record.forwardId = forwardId
-    record.port = Int(handle.actualPort())
+    record.port = port
     return record
   }
 

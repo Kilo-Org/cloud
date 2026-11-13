@@ -82,11 +82,8 @@ type SessionContextSheetProps = {
   onAutoApproveChange: (enabled: boolean) => void;
   connectionDisplay: SessionConnectionDisplay;
   onRetryConnection: () => void;
-  /** The control-plane session id; null when this session has no sandbox. */
-  cloudAgentSessionId: string | null;
   /** See `SessionSandboxSection`: only a failed start offers a fresh start. */
   cloudStatusType: string | null;
-  organizationId: string | undefined;
 };
 
 const SHEET_RING_SIZE = 96;
@@ -202,9 +199,7 @@ export function SessionContextSheet({
   onAutoApproveChange,
   connectionDisplay,
   onRetryConnection,
-  cloudAgentSessionId,
   cloudStatusType,
-  organizationId,
 }: Readonly<SessionContextSheetProps>) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();

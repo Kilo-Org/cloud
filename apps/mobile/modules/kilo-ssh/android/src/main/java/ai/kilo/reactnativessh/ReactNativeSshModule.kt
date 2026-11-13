@@ -2,17 +2,14 @@ package ai.kilo.reactnativessh
 
 import ai.kilo.reactnativessh.background.BackgroundSessions
 import ai.kilo.reactnativessh.background.IdleNotifications
-import ai.kilo.reactnativessh.terminal.TerminalSourceRegistry
 import ai.kilo.reactnativessh.uniffi.AuthMethod
 import ai.kilo.reactnativessh.uniffi.CancelToken
 import ai.kilo.reactnativessh.uniffi.ConnectConfig
 import ai.kilo.reactnativessh.uniffi.Entry
 import ai.kilo.reactnativessh.uniffi.EntryKind
 import ai.kilo.reactnativessh.uniffi.ForwardConfig
-import ai.kilo.reactnativessh.uniffi.ForwardHandle
 import ai.kilo.reactnativessh.uniffi.ForwardSink
 import ai.kilo.reactnativessh.uniffi.SessionHandler
-import ai.kilo.reactnativessh.uniffi.SftpClient
 import ai.kilo.reactnativessh.uniffi.SshException
 import ai.kilo.reactnativessh.uniffi.SshSession
 import ai.kilo.reactnativessh.uniffi.TransferProgress
@@ -27,11 +24,6 @@ import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
-import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 internal const val EVENT_HOST_KEY = "onHostKey"
 internal const val EVENT_KEYBOARD_INTERACTIVE = "onKeyboardInteractive"
@@ -42,19 +34,15 @@ internal const val EVENT_DISCONNECT_ALL = "onDisconnectAll"
 internal const val EVENT_TRANSFER_PROGRESS = "onTransferProgress"
 internal const val EVENT_FORWARD_ERROR = "onForwardError"
 
+/**
+ * The JavaScript surface. Every resource lives in [SshRegistry], which outlives
+ * a reload; this class only translates calls in both directions and is free to
+ * be thrown away.
+ */
 class ReactNativeSshModule : Module() {
-  private val sessions = ConcurrentHashMap<String, SshSession>()
-  private val shells = ConcurrentHashMap<String, SshShellSource>()
-  private val sftps = ConcurrentHashMap<String, SftpClient>()
-  private val forwards = ConcurrentHashMap<String, ForwardHandle>()
-  private val cancels = ConcurrentHashMap<String, CancelToken>()
-  private val hostKeyRequests = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
-  private val promptRequests = ConcurrentHashMap<String, CompletableDeferred<List<String>?>>()
-  private val sessionIds = IdSequence("session-")
-  private val shellIds = IdSequence("shell-")
-  private var reportedSessionCount = 0
-  private val sftpIds = IdSequence("sftp-")
-  private val forwardIds = IdSequence("forward-")
+  private val registry = SshRegistry
+
+  private val sink = SshEventSink { name, payload -> runCatching { sendEvent(name, payload) } }
 
   override fun definition() = ModuleDefinition {
     Name("ReactNativeSsh")
@@ -70,7 +58,8 @@ class ReactNativeSshModule : Module() {
     )
 
     OnCreate {
-      BackgroundSessions.disconnectAll = ::disconnectAll
+      registry.attach(androidContext, sink)
+      BackgroundSessions.disconnectAll = registry::disconnectAll
     }
 
     Function("coreVersion") {
@@ -136,8 +125,16 @@ class ReactNativeSshModule : Module() {
       BackgroundSessions.setBody(androidContext, body)
     }
 
+    Function("listSessions") {
+      registry.sessionRecords()
+    }
+
+    Function("listForwards") {
+      registry.forwardRecords()
+    }
+
     Function("notifyWhenIdle") { shellId: String, quietMs: Double, title: String, body: String? ->
-      val source = shells[shellId]
+      val source = registry.shell(shellId)
 
       if (source == null) {
         false
@@ -157,11 +154,11 @@ class ReactNativeSshModule : Module() {
     }
 
     Function("answerHostKey") { requestId: String, accept: Boolean ->
-      hostKeyRequests[requestId]?.complete(accept) == true
+      registry.hostKeyRequest(requestId)?.complete(accept) == true
     }
 
     Function("answerPrompts") { requestId: String, answers: List<String>? ->
-      promptRequests[requestId]?.complete(answers) == true
+      registry.promptRequest(requestId)?.complete(answers) == true
     }
 
     Function("isRetryableCode") { code: String ->
@@ -169,14 +166,15 @@ class ReactNativeSshModule : Module() {
     }
 
     AsyncFunction("openSftp").SuspendBody { sessionId: String ->
-      val sftpId = sftpIds.next()
-      sftps[sftpId] = translateSuspendFailures { session(sessionId).openSftp() }
+      val sftpId = registry.sftpIds.next()
+      val client = translateSuspendFailures { session(sessionId).openSftp() }
+      registry.putSftp(sftpId, sessionId, client)
 
       sftpId
     }
 
     AsyncFunction("closeSftp").SuspendBody { sftpId: String ->
-      sftps.remove(sftpId)?.let { client -> translateSuspendFailures { client.shutdown() } }
+      registry.removeSftp(sftpId)?.let { client -> translateSuspendFailures { client.shutdown() } }
     }
 
     AsyncFunction("sftpList").SuspendBody { sftpId: String, path: String ->
@@ -222,36 +220,33 @@ class ReactNativeSshModule : Module() {
       }
 
     Function("cancelTransfer") { transferId: String ->
-      cancels[transferId]?.cancel()
+      registry.cancel(transferId)?.cancel()
     }
 
     AsyncFunction("startLocalForward").SuspendBody { sessionId: String, config: ForwardConfigRecord ->
-      registerForward {
+      registerForward(sessionId, "local", config) {
         session(sessionId).startLocalForward(config.toNative(), forwardSink(sessionId))
       }
     }
 
     AsyncFunction("startRemoteForward").SuspendBody { sessionId: String, config: ForwardConfigRecord ->
-      registerForward {
+      registerForward(sessionId, "remote", config) {
         session(sessionId).startRemoteForward(config.toNative(), forwardSink(sessionId))
       }
     }
 
     AsyncFunction("stopForward").SuspendBody { forwardId: String ->
-      forwards.remove(forwardId)?.let { handle -> translateSuspendFailures { handle.stop() } }
+      registry.removeForward(forwardId)?.let { entry -> translateSuspendFailures { entry.handle.stop() } }
     }
 
+    /**
+     * A reload destroys the module while the foreground service keeps the
+     * process, and with it every socket. The sessions stay in the registry for
+     * the next runtime to reattach to, so teardown only drops this instance's
+     * event channel.
+     */
     OnDestroy {
-      val scope = CoroutineScope(Dispatchers.IO)
-
-      shells.keys.forEach(::closeShell)
-      sftps.values.forEach { client -> scope.launch { runCatching { client.shutdown() } } }
-      forwards.values.forEach { handle -> scope.launch { runCatching { handle.stop() } } }
-      cancels.values.forEach { token -> token.cancel() }
-      sessions.forEach { (_, session) -> scope.launch { runCatching { session.disconnect() } } }
-      sessions.clear()
-      stopBackgroundSessions()
-      BackgroundSessions.disconnectAll = null
+      registry.detach(sink)
     }
   }
 
@@ -262,20 +257,22 @@ class ReactNativeSshModule : Module() {
     config: ConnectConfigRecord,
     connect: suspend (SessionHandler) -> SshSession,
   ): String {
-    val sessionId = sessionIds.next()
+    val sessionId = registry.sessionIds.next()
     val handler = JsSessionHandler(
       sessionId = sessionId,
       requestHostKey = ::requestHostKey,
       requestPrompts = ::requestPrompts,
+      // The socket can die while no runtime is attached, so the notice goes
+      // through the registry's channel and the removal is registry state.
       notifyDisconnect = { record ->
-        // The module can be gone already when a socket dies during teardown.
-        runCatching { sendEvent(EVENT_DISCONNECT, record.toEvent()) }
+        registry.emit(EVENT_DISCONNECT, record.toEvent())
         removeSession(record.sessionId)
       },
     )
 
-    sessions[sessionId] = translateSuspendFailures { connect(handler) }
-    syncSessions()
+    val target = SessionTarget(host = config.host, port = config.port, username = config.username)
+    registry.putSession(sessionId, translateSuspendFailures { connect(handler) }, target)
+    registry.sync()
 
     return sessionId
   }
@@ -292,80 +289,43 @@ class ReactNativeSshModule : Module() {
   }
 
   private suspend fun disconnectSession(sessionId: String) {
-    val session = sessions.remove(sessionId) ?: return
+    val session = registry.removeSession(sessionId) ?: return
 
     closeShells(sessionId)
-    syncSessions()
+    registry.sync()
     translateSuspendFailures { session.disconnect() }
   }
 
   private suspend fun openShell(sessionId: String, options: ShellOptionsRecord): String {
     val session = session(sessionId)
-    val shellId = shellIds.next()
+    val shellId = registry.shellIds.next()
     val source = translateSuspendFailures {
       SshShellSource.open(sessionId, session, options.term, options.cols, options.rows)
     }
 
-    shells[shellId] = source
-    TerminalSourceRegistry.register(shellId, source)
+    registry.putShell(shellId, source)
 
     return shellId
   }
 
   private fun closeShell(shellId: String) {
-    val source = shells.remove(shellId) ?: return
+    val source = registry.removeShell(shellId) ?: return
 
     IdleNotifications.release(shellId)
-    TerminalSourceRegistry.unregister(shellId)
     source.close()
   }
 
   private fun closeShells(sessionId: String) {
-    shells.filterValues { it.sessionId == sessionId }.keys.forEach(::closeShell)
+    registry.shellIdsOf(sessionId).forEach(::closeShell)
   }
 
   private fun removeSession(sessionId: String) {
-    if (sessions.remove(sessionId) == null) {
+    if (registry.removeSession(sessionId) == null) {
       return
     }
 
     closeShells(sessionId)
-    syncSessions()
-  }
-
-  /** SFTP clients and forwards belong to an open session, so sessions alone bound the service. */
-  private fun syncSessions() {
-    val count = sessions.size
-
-    if (count == reportedSessionCount) {
-      return
-    }
-
-    reportedSessionCount = count
-    val context = appContext.reactContext?.applicationContext ?: return
-
-    BackgroundSessions.update(context, count)
-    sendEvent(EVENT_SESSIONS_CHANGED, mapOf("count" to count))
-  }
-
-  private fun stopBackgroundSessions() {
-    val context = appContext.reactContext?.applicationContext ?: return
-
-    BackgroundSessions.update(context, 0)
-  }
-
-  private fun disconnectAll() {
-    shells.keys.toList().forEach(::closeShell)
-
-    val scope = CoroutineScope(Dispatchers.IO)
-    sessions.keys.toList().forEach { sessionId ->
-      val session = sessions.remove(sessionId) ?: return@forEach
-
-      scope.launch { runCatching { session.disconnect() } }
-    }
-
-    syncSessions()
-    sendEvent(EVENT_DISCONNECT_ALL)
+    registry.sync()
   }
 
   private suspend fun transfer(
@@ -373,22 +333,38 @@ class ReactNativeSshModule : Module() {
     run: suspend (TransferProgress, CancelToken) -> ULong,
   ): Double {
     val cancel = CancelToken()
-    cancels[transferId] = cancel
+    registry.putCancel(transferId, cancel)
 
     return try {
       translateSuspendFailures { run(progressSink(transferId), cancel) }.toDouble()
     } finally {
-      cancels.remove(transferId)
+      registry.removeCancel(transferId)
     }
   }
 
-  private suspend fun registerForward(start: suspend () -> ForwardHandle): ForwardStartRecord {
-    val forwardId = forwardIds.next()
+  private suspend fun registerForward(
+    sessionId: String,
+    direction: String,
+    config: ForwardConfigRecord,
+    start: suspend () -> ForwardHandle,
+  ): ForwardStartRecord {
+    val forwardId = registry.forwardIds.next()
     val handle = translateSuspendFailures(start)
+    val port = handle.actualPort().toInt()
 
-    forwards[forwardId] = handle
+    registry.putForward(
+      forwardId,
+      ForwardEntry(
+        sessionId = sessionId,
+        direction = direction,
+        bindHost = config.bindHost,
+        bindPort = config.bindPort,
+        port = port,
+        handle = handle,
+      ),
+    )
 
-    return ForwardStartRecord(forwardId, handle.actualPort().toInt())
+    return ForwardStartRecord(forwardId, port)
   }
 
   private fun progressSink(transferId: String) = object : TransferProgress {
@@ -416,34 +392,34 @@ class ReactNativeSshModule : Module() {
 
   private suspend fun requestHostKey(request: HostKeyRequestRecord): Boolean {
     val decision = CompletableDeferred<Boolean>()
-    hostKeyRequests[request.requestId] = decision
+    registry.putHostKeyRequest(request.requestId, decision)
 
     return try {
       sendEvent(EVENT_HOST_KEY, request.toEvent())
       decision.await()
     } finally {
-      hostKeyRequests.remove(request.requestId)
+      registry.removeHostKeyRequest(request.requestId)
     }
   }
 
   private suspend fun requestPrompts(request: KeyboardInteractiveRequestRecord): List<String>? {
     val answers = CompletableDeferred<List<String>?>()
-    promptRequests[request.requestId] = answers
+    registry.putPromptRequest(request.requestId, answers)
 
     return try {
       sendEvent(EVENT_KEYBOARD_INTERACTIVE, request.toEvent())
       answers.await()
     } finally {
-      promptRequests.remove(request.requestId)
+      registry.removePromptRequest(request.requestId)
     }
   }
 
   private fun session(sessionId: String): SshSession =
-    sessions[sessionId]
+    registry.session(sessionId)
       ?: throw SshException.ChannelClosed("session $sessionId is not connected").toCodedException()
 
   private fun sftp(sftpId: String): SftpClient =
-    sftps[sftpId]
+    registry.sftp(sftpId)
       ?: throw SshException.ChannelClosed("sftp $sftpId is not open").toCodedException()
 }
 

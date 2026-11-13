@@ -66,6 +66,27 @@ class ForwardStartRecord(
   @Field val port: Int,
 ) : Record
 
+/** A live session as the registry holds it, for a runtime that just started. */
+class SessionInfoRecord(
+  @Field val sessionId: String,
+  @Field val host: String,
+  @Field val port: Int,
+  @Field val username: String,
+  @Field val shellIds: List<String>,
+  @Field val sftpIds: List<String>,
+  @Field val forwardIds: List<String>,
+) : Record
+
+/** A live forward as the registry holds it. */
+class ForwardInfoRecord(
+  @Field val forwardId: String,
+  @Field val sessionId: String,
+  @Field val direction: String,
+  @Field val bindHost: String,
+  @Field val bindPort: Int,
+  @Field val port: Int,
+) : Record
+
 internal class HostKeyRequestRecord(
   val sessionId: String,
   val requestId: String,

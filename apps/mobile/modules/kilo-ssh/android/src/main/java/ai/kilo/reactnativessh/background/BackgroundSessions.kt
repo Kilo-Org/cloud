@@ -1,50 +1,75 @@
 package ai.kilo.reactnativessh.background
 
+import ai.kilo.reactnativessh.SshRegistry
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
 
+/**
+ * Where a localized body puts the session count. JavaScript renders the
+ * translated sentence once with this token in place of the number, and the
+ * native side substitutes the registry's own count, so the text never depends
+ * on a number the destroyed runtime once reported.
+ */
+internal const val COUNT_TOKEN = "{count}"
+
 internal data class SessionTexts(
   val channelName: String,
   val title: String,
+  val bodyTemplate: String,
   val disconnectAllLabel: String,
 )
 
 /**
- * The open-session state the background notification renders, and the only
- * owner of the service lifecycle: it starts on the first session and stops with
- * the last one.
+ * The background notification and the service lifecycle, driven by the native
+ * registry rather than by a count JavaScript reports.
+ *
+ * The registry is the only owner of the open sessions, so the number in the
+ * notification is read from it on every sync: a JavaScript reload can neither
+ * inflate nor zero the count, a session that dies while no runtime is attached
+ * still drops out of the text, and the foreground service stops exactly when
+ * the last native session goes away.
  */
 internal object BackgroundSessions {
   private val mainHandler = Handler(Looper.getMainLooper())
 
-  @Volatile var texts = SessionTexts("SSH sessions", "SSH session active", "Disconnect all")
+  @Volatile var texts = SessionTexts("SSH sessions", "SSH session active", "", "Disconnect all")
     private set
 
-  @Volatile var body = ""
-    private set
+  private var serviceRunning = false
 
-  @Volatile private var count = 0
-
-  /** Invoked from the notification action; set by the module that owns the sessions. */
+  /** Invoked from the notification action; set once the registry is up. */
   var disconnectAll: (() -> Unit)? = null
 
-  fun configure(context: Context, channelName: String, title: String, disconnectAllLabel: String): Int {
-    texts = SessionTexts(channelName, title, disconnectAllLabel)
-    refresh(context)
+  /** The localized body with the live session count in it. */
+  fun body(): String = texts.bodyTemplate.replace(COUNT_TOKEN, SshRegistry.sessionCount().toString())
 
-    return count
+  fun configure(
+    context: Context,
+    channelName: String,
+    title: String,
+    disconnectAllLabel: String,
+  ): Int {
+    texts = texts.copy(
+      channelName = channelName,
+      title = title,
+      disconnectAllLabel = disconnectAllLabel,
+    )
+    sync(context)
+
+    return SshRegistry.sessionCount()
   }
 
-  fun setBody(context: Context, next: String) {
-    body = next
+  fun setBody(context: Context, template: String) {
+    texts = texts.copy(bodyTemplate = template)
     refresh(context)
   }
 
-  fun update(context: Context, next: Int) {
-    val opened = count == 0 && next > 0
-    val closed = count > 0 && next == 0
-    count = next
+  fun sync(context: Context) {
+    val count = SshRegistry.sessionCount()
+    val opened = !serviceRunning && count > 0
+    val closed = serviceRunning && count == 0
+    serviceRunning = count > 0
 
     when {
       opened -> mainHandler.post { SshSessionService.start(context) }
@@ -54,6 +79,6 @@ internal object BackgroundSessions {
   }
 
   private fun refresh(context: Context) {
-    mainHandler.post { if (count > 0) SessionNotifications.postOngoing(context) }
+    mainHandler.post { if (serviceRunning) SessionNotifications.postOngoing(context) }
   }
 }

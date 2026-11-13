@@ -92,6 +92,27 @@ struct ForwardStartRecord: Record, @unchecked Sendable {
   @Field var port: Int = 0
 }
 
+/// A live session as the registry holds it, for a runtime that just started.
+struct SessionInfoRecord: Record, @unchecked Sendable {
+  @Field var sessionId: String = ""
+  @Field var host: String = ""
+  @Field var port: Int = 22
+  @Field var username: String = ""
+  @Field var shellIds: [String] = []
+  @Field var sftpIds: [String] = []
+  @Field var forwardIds: [String] = []
+}
+
+/// A live forward as the registry holds it.
+struct ForwardInfoRecord: Record, @unchecked Sendable {
+  @Field var forwardId: String = ""
+  @Field var sessionId: String = ""
+  @Field var direction: String = ""
+  @Field var bindHost: String = ""
+  @Field var bindPort: Int = 0
+  @Field var port: Int = 0
+}
+
 struct HostKeyRequest: Sendable {
   let sessionId: String
   let requestId: String

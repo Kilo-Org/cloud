@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Could not open this search result"
   },
+  "usage": {
+    "title": "Usage",
+    "orgTitle": "Organization usage",
+    "entrySubtitle": "Spend, requests, and tokens",
+    "rangePicker": "Time range",
+    "range90d": "90 days",
+    "metricPicker": "Chart metric",
+    "chartA11y": "{{metric}} per day",
+    "avgCostPerRequest": "Avg cost / req",
+    "topModels": "Top models",
+    "topFeatures": "Top features",
+    "emptyTitle": "No usage in this period",
+    "orgSelfNotice": "You're seeing your own usage in this organization.",
+    "viewDetails": "View usage details"
+  },
   "integrations": {
     "title": "Integrations",
     "sectionTitle": "Connected services",

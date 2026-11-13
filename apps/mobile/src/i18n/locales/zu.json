@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Asikwazanga ukuvula leli phumela lokusesha"
   },
+  "usage": {
+    "title": "Ukusetshenziswa",
+    "orgTitle": "Ukusetshenziswa kwenhlangano",
+    "entrySubtitle": "Izindleko, izicelo, namathokheni",
+    "rangePicker": "Isikhawu sesikhathi",
+    "range90d": "Izinsuku ezingu-90",
+    "metricPicker": "Isilinganiso seshadi",
+    "chartA11y": "{{metric}} ngosuku",
+    "avgCostPerRequest": "Izindleko ezimaphakathi / isicelo",
+    "topModels": "Amamodeli aphezulu",
+    "topFeatures": "Izici eziphezulu",
+    "emptyTitle": "Akukho ukusetshenziswa kulesi sikhathi",
+    "orgSelfNotice": "Ubona ukusetshenziswa kwakho kule nhlangano.",
+    "viewDetails": "Buka imininingwane yokusetshenziswa"
+  },
   "integrations": {
     "title": "Ukuhlanganiswa",
     "sectionTitle": "Amasevisi axhunyiwe",

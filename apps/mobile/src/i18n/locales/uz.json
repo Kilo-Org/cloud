@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Bu qidiruv natijasini ochib bo'lmadi"
   },
+  "usage": {
+    "title": "Foydalanish",
+    "orgTitle": "Tashkilot foydalanishi",
+    "entrySubtitle": "Xarajat, so'rovlar va tokenlar",
+    "rangePicker": "Vaqt oralig'i",
+    "range90d": "90 kun",
+    "metricPicker": "Grafik ko'rsatkichi",
+    "chartA11y": "Kunlik {{metric}}",
+    "avgCostPerRequest": "O'rt. xarajat / so'rov",
+    "topModels": "Yetakchi modellar",
+    "topFeatures": "Yetakchi funksiyalar",
+    "emptyTitle": "Bu davrda foydalanish yo'q",
+    "orgSelfNotice": "Siz ushbu tashkilotdagi o'z foydalanishingizni ko'ryapsiz.",
+    "viewDetails": "Foydalanish tafsilotlarini ko'rish"
+  },
   "integrations": {
     "title": "Integratsiyalar",
     "sectionTitle": "Ulangan xizmatlar",

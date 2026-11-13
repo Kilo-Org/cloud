@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Dieses Suchergebnis konnte nicht geöffnet werden"
   },
+  "usage": {
+    "title": "Nutzung",
+    "orgTitle": "Organisationsnutzung",
+    "entrySubtitle": "Kosten, Anfragen und Tokens",
+    "rangePicker": "Zeitraum",
+    "range90d": "90 Tage",
+    "metricPicker": "Diagramm-Kennzahl",
+    "chartA11y": "{{metric}} pro Tag",
+    "avgCostPerRequest": "Ø Kosten/Anfrage",
+    "topModels": "Top-Modelle",
+    "topFeatures": "Top-Funktionen",
+    "emptyTitle": "Keine Nutzung in diesem Zeitraum",
+    "orgSelfNotice": "Du siehst deine eigene Nutzung in dieser Organisation.",
+    "viewDetails": "Nutzungsdetails anzeigen"
+  },
   "integrations": {
     "title": "Integrationen",
     "sectionTitle": "Verbundene Dienste",

@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Tämän hakutuloksen avaaminen epäonnistui"
   },
+  "usage": {
+    "title": "Käyttö",
+    "orgTitle": "Organisaation käyttö",
+    "entrySubtitle": "Kulut, pyynnöt ja tokenit",
+    "rangePicker": "Aikaväli",
+    "range90d": "90 päivää",
+    "metricPicker": "Kaavion mittari",
+    "chartA11y": "{{metric}} päivittäin",
+    "avgCostPerRequest": "Keskikustannus / pyyntö",
+    "topModels": "Käytetyimmät mallit",
+    "topFeatures": "Käytetyimmät ominaisuudet",
+    "emptyTitle": "Ei käyttöä tällä aikavälillä",
+    "orgSelfNotice": "Näet oman käyttösi tässä organisaatiossa.",
+    "viewDetails": "Näytä käytön tiedot"
+  },
   "integrations": {
     "title": "Integraatiot",
     "sectionTitle": "Yhdistetyt palvelut",

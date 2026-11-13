@@ -4363,6 +4363,21 @@
   "systemSearch": {
     "couldNotOpenResult": "تعذّر فتح نتيجة البحث هذه"
   },
+  "usage": {
+    "title": "الاستخدام",
+    "orgTitle": "استخدام المؤسسة",
+    "entrySubtitle": "الإنفاق والطلبات والرموز",
+    "rangePicker": "النطاق الزمني",
+    "range90d": "90 يومًا",
+    "metricPicker": "مقياس المخطط",
+    "chartA11y": "{{metric}} يوميًا",
+    "avgCostPerRequest": "متوسط تكلفة الطلب",
+    "topModels": "أكثر النماذج استخدامًا",
+    "topFeatures": "أكثر الميزات استخدامًا",
+    "emptyTitle": "لا يوجد استخدام في هذه الفترة",
+    "orgSelfNotice": "أنت تشاهد استخدامك الخاص في هذه المؤسسة.",
+    "viewDetails": "عرض تفاصيل الاستخدام"
+  },
   "integrations": {
     "title": "التكاملات",
     "sectionTitle": "الخدمات المتصلة",

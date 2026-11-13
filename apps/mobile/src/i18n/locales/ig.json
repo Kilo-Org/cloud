@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Enweghị ike imepe nsonaazụ ọchụchọ a"
   },
+  "usage": {
+    "title": "Ojiji",
+    "orgTitle": "Ojiji nzukọ",
+    "entrySubtitle": "Mmefu, arịrịọ, na tokin",
+    "rangePicker": "Oke oge",
+    "range90d": "Ụbọchị 90",
+    "metricPicker": "Ihe eserese na-egosi",
+    "chartA11y": "{{metric}} kwa ụbọchị",
+    "avgCostPerRequest": "Ọnụ ahịa nkezi / arịrịọ",
+    "topModels": "Ụdị a kacha eji",
+    "topFeatures": "Njirimara a kacha eji",
+    "emptyTitle": "Enweghị ojiji n'oge a",
+    "orgSelfNotice": "Ị na-ahụ ojiji nke gị n'ime nzukọ a.",
+    "viewDetails": "Lee nkọwa ojiji"
+  },
   "integrations": {
     "title": "Njikọ",
     "sectionTitle": "Ọrụ ejikọrọ",

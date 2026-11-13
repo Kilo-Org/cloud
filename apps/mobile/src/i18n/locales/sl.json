@@ -4233,6 +4233,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Ni bilo mogoče odpreti tega rezultata iskanja"
   },
+  "usage": {
+    "title": "Poraba",
+    "orgTitle": "Poraba organizacije",
+    "entrySubtitle": "Stroški, zahteve in žetoni",
+    "rangePicker": "Časovno obdobje",
+    "range90d": "90 dni",
+    "metricPicker": "Metrika grafa",
+    "chartA11y": "{{metric}} na dan",
+    "avgCostPerRequest": "Povp. strošek / zahtevo",
+    "topModels": "Najpogostejši modeli",
+    "topFeatures": "Najpogostejše funkcije",
+    "emptyTitle": "V tem obdobju ni porabe",
+    "orgSelfNotice": "Prikazana je vaša lastna poraba v tej organizaciji.",
+    "viewDetails": "Ogled podrobnosti porabe"
+  },
   "integrations": {
     "title": "Integracije",
     "sectionTitle": "Povezane storitve",

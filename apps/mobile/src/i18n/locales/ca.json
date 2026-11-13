@@ -4168,6 +4168,21 @@
   "systemSearch": {
     "couldNotOpenResult": "No s'ha pogut obrir aquest resultat de la cerca"
   },
+  "usage": {
+    "title": "Ús",
+    "orgTitle": "Ús de l'organització",
+    "entrySubtitle": "Despesa, sol·licituds i tòkens",
+    "rangePicker": "Període",
+    "range90d": "90 dies",
+    "metricPicker": "Mètrica del gràfic",
+    "chartA11y": "{{metric}} per dia",
+    "avgCostPerRequest": "Import mitjà / sol·l.",
+    "topModels": "Models més usats",
+    "topFeatures": "Funcions més usades",
+    "emptyTitle": "Cap ús en aquest període",
+    "orgSelfNotice": "Estàs veient el teu propi ús en aquesta organització.",
+    "viewDetails": "Mostra els detalls d'ús"
+  },
   "integrations": {
     "title": "Integracions",
     "sectionTitle": "Serveis connectats",

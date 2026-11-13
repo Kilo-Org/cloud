@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "この検索結果を開けませんでした"
   },
+  "usage": {
+    "title": "使用状況",
+    "orgTitle": "組織の使用状況",
+    "entrySubtitle": "コスト、リクエスト、トークン",
+    "rangePicker": "期間",
+    "range90d": "90日間",
+    "metricPicker": "グラフの指標",
+    "chartA11y": "1日あたりの{{metric}}",
+    "avgCostPerRequest": "平均コスト/リクエスト",
+    "topModels": "上位のモデル",
+    "topFeatures": "上位の機能",
+    "emptyTitle": "この期間の使用はありません",
+    "orgSelfNotice": "この組織でのあなた自身の使用状況を表示しています。",
+    "viewDetails": "使用状況の詳細を表示"
+  },
   "integrations": {
     "title": "連携",
     "sectionTitle": "接続済みのサービス",

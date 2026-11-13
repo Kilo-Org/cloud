@@ -4168,6 +4168,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Nu s-a putut deschide acest rezultat de căutare"
   },
+  "usage": {
+    "title": "Utilizare",
+    "orgTitle": "Utilizarea organizației",
+    "entrySubtitle": "Cheltuieli, cereri și tokenuri",
+    "rangePicker": "Interval de timp",
+    "range90d": "90 de zile",
+    "metricPicker": "Metrica graficului",
+    "chartA11y": "{{metric}} pe zi",
+    "avgCostPerRequest": "Cost mediu / cerere",
+    "topModels": "Modele principale",
+    "topFeatures": "Funcții principale",
+    "emptyTitle": "Nicio utilizare în această perioadă",
+    "orgSelfNotice": "Vezi propria utilizare în această organizație.",
+    "viewDetails": "Vezi detaliile utilizării"
+  },
   "integrations": {
     "title": "Integrări",
     "sectionTitle": "Servicii conectate",

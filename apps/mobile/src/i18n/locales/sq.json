@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Nuk u hap dot ky rezultat kërkimi"
   },
+  "usage": {
+    "title": "Përdorimi",
+    "orgTitle": "Përdorimi i organizatës",
+    "entrySubtitle": "Shpenzimet, kërkesat dhe tokenët",
+    "rangePicker": "Periudha kohore",
+    "range90d": "90 ditë",
+    "metricPicker": "Metrika e grafikut",
+    "chartA11y": "{{metric}} në ditë",
+    "avgCostPerRequest": "Kosto mesatare / kërkesë",
+    "topModels": "Modelet kryesore",
+    "topFeatures": "Veçoritë kryesore",
+    "emptyTitle": "Asnjë përdorim në këtë periudhë",
+    "orgSelfNotice": "Po shihni përdorimin tuaj në këtë organizatë.",
+    "viewDetails": "Shiko detajet e përdorimit"
+  },
   "integrations": {
     "title": "Integrimet",
     "sectionTitle": "Shërbimet e lidhura",

@@ -4168,6 +4168,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Nije moguće otvoriti ovaj rezultat pretrage"
   },
+  "usage": {
+    "title": "Potrošnja",
+    "orgTitle": "Potrošnja organizacije",
+    "entrySubtitle": "Troškovi, zahtjevi i tokeni",
+    "rangePicker": "Vremenski raspon",
+    "range90d": "90 dana",
+    "metricPicker": "Metrika grafikona",
+    "chartA11y": "{{metric}} po danu",
+    "avgCostPerRequest": "Prosj. trošak / zahtjev",
+    "topModels": "Najkorišteniji modeli",
+    "topFeatures": "Najkorištenije značajke",
+    "emptyTitle": "Nema potrošnje u ovom razdoblju",
+    "orgSelfNotice": "Prikazuje se vaša vlastita potrošnja u ovoj organizaciji.",
+    "viewDetails": "Prikaži detalje potrošnje"
+  },
   "integrations": {
     "title": "Integracije",
     "sectionTitle": "Povezane usluge",

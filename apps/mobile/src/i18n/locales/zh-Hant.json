@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "無法開啟此搜尋結果"
   },
+  "usage": {
+    "title": "用量",
+    "orgTitle": "組織用量",
+    "entrySubtitle": "費用、請求與詞元",
+    "rangePicker": "時間範圍",
+    "range90d": "90 天",
+    "metricPicker": "圖表指標",
+    "chartA11y": "每日{{metric}}",
+    "avgCostPerRequest": "每次請求平均費用",
+    "topModels": "最常用模型",
+    "topFeatures": "最常用功能",
+    "emptyTitle": "此期間沒有用量",
+    "orgSelfNotice": "你看到的是你自己在此組織中的用量。",
+    "viewDetails": "查看用量詳情"
+  },
   "integrations": {
     "title": "整合",
     "sectionTitle": "已連結的服務",

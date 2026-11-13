@@ -143,6 +143,7 @@ vi.mock('@/components/ui/icons', () => ({
   GitPullRequest: 'GitPullRequest',
   Globe: 'Globe',
   KeyRound: 'KeyRound',
+  LineChart: 'LineChart',
   Lock: 'Lock',
   LogOut: 'LogOut',
   MessageSquare: 'MessageSquare',

@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "ไม่สามารถเปิดผลการค้นหานี้ได้"
   },
+  "usage": {
+    "title": "การใช้งาน",
+    "orgTitle": "การใช้งานขององค์กร",
+    "entrySubtitle": "ค่าใช้จ่าย คำขอ และโทเคน",
+    "rangePicker": "ช่วงเวลา",
+    "range90d": "90 วัน",
+    "metricPicker": "ตัวชี้วัดของแผนภูมิ",
+    "chartA11y": "{{metric}} ต่อวัน",
+    "avgCostPerRequest": "ค่าใช้จ่ายเฉลี่ย/คำขอ",
+    "topModels": "โมเดลที่ใช้มากที่สุด",
+    "topFeatures": "ฟีเจอร์ที่ใช้มากที่สุด",
+    "emptyTitle": "ไม่มีการใช้งานในช่วงนี้",
+    "orgSelfNotice": "คุณกำลังดูการใช้งานของคุณเองในองค์กรนี้",
+    "viewDetails": "ดูรายละเอียดการใช้งาน"
+  },
   "integrations": {
     "title": "การเชื่อมต่อ",
     "sectionTitle": "บริการที่เชื่อมต่อแล้ว",

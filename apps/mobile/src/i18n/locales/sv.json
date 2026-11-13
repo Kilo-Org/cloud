@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Kunde inte öppna det här sökresultatet"
   },
+  "usage": {
+    "title": "Användning",
+    "orgTitle": "Organisationens användning",
+    "entrySubtitle": "Utgifter, begäranden och token",
+    "rangePicker": "Tidsperiod",
+    "range90d": "90 dagar",
+    "metricPicker": "Mätvärde i diagram",
+    "chartA11y": "{{metric}} per dag",
+    "avgCostPerRequest": "Snittkostnad / begäran",
+    "topModels": "Mest använda modeller",
+    "topFeatures": "Mest använda funktioner",
+    "emptyTitle": "Ingen användning under perioden",
+    "orgSelfNotice": "Du ser din egen användning i den här organisationen.",
+    "viewDetails": "Visa användningsdetaljer"
+  },
   "integrations": {
     "title": "Integrationer",
     "sectionTitle": "Anslutna tjänster",

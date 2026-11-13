@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Ba a iya buɗe wannan sakamakon binciken ba"
   },
+  "usage": {
+    "title": "Amfani",
+    "orgTitle": "Amfanin ƙungiya",
+    "entrySubtitle": "Kuɗin da aka kashe, buƙatu da guntayen rubutu",
+    "rangePicker": "Tsawon lokaci",
+    "range90d": "Kwanaki 90",
+    "metricPicker": "Ma'aunin jadawali",
+    "chartA11y": "{{metric}} a kowace rana",
+    "avgCostPerRequest": "Matsakaicin farashi / buƙata",
+    "topModels": "Manyan samfura",
+    "topFeatures": "Manyan fasaloli",
+    "emptyTitle": "Babu amfani a wannan lokaci",
+    "orgSelfNotice": "Kuna ganin amfaninku na kanku a wannan ƙungiyar.",
+    "viewDetails": "Duba bayanan amfani"
+  },
   "integrations": {
     "title": "Haɗe-haɗe",
     "sectionTitle": "Ayyukan da aka haɗa",

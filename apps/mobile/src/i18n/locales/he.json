@@ -4168,6 +4168,21 @@
   "systemSearch": {
     "couldNotOpenResult": "לא ניתן היה לפתוח את תוצאת החיפוש הזו"
   },
+  "usage": {
+    "title": "שימוש",
+    "orgTitle": "שימוש בארגון",
+    "entrySubtitle": "הוצאות, בקשות וטוקנים",
+    "rangePicker": "טווח זמן",
+    "range90d": "90 ימים",
+    "metricPicker": "מדד התרשים",
+    "chartA11y": "{{metric}} ליום",
+    "avgCostPerRequest": "עלות ממוצעת לבקשה",
+    "topModels": "מודלים מובילים",
+    "topFeatures": "תכונות מובילות",
+    "emptyTitle": "אין שימוש בתקופה זו",
+    "orgSelfNotice": "מוצג השימוש שלך בארגון זה.",
+    "viewDetails": "הצגת פרטי השימוש"
+  },
   "integrations": {
     "title": "אינטגרציות",
     "sectionTitle": "שירותים מחוברים",

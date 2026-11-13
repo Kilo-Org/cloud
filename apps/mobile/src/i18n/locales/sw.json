@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Imeshindikana kufungua matokeo haya ya utafutaji"
   },
+  "usage": {
+    "title": "Matumizi",
+    "orgTitle": "Matumizi ya shirika",
+    "entrySubtitle": "Gharama, maombi na tokeni",
+    "rangePicker": "Kipindi cha muda",
+    "range90d": "Siku 90",
+    "metricPicker": "Kipimo cha chati",
+    "chartA11y": "{{metric}} kwa siku",
+    "avgCostPerRequest": "Wastani wa gharama / ombi",
+    "topModels": "Modeli zinazoongoza",
+    "topFeatures": "Vipengele vinavyoongoza",
+    "emptyTitle": "Hakuna matumizi katika kipindi hiki",
+    "orgSelfNotice": "Unaona matumizi yako mwenyewe katika shirika hili.",
+    "viewDetails": "Angalia maelezo ya matumizi"
+  },
   "integrations": {
     "title": "Miunganisho",
     "sectionTitle": "Huduma zilizounganishwa",

@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Non se puido abrir este resultado da busca"
   },
+  "usage": {
+    "title": "Uso",
+    "orgTitle": "Uso da organización",
+    "entrySubtitle": "Gasto, solicitudes e tokens",
+    "rangePicker": "Intervalo de tempo",
+    "range90d": "90 días",
+    "metricPicker": "Métrica do gráfico",
+    "chartA11y": "{{metric}} por día",
+    "avgCostPerRequest": "Custo medio / solic.",
+    "topModels": "Modelos principais",
+    "topFeatures": "Funcións principais",
+    "emptyTitle": "Sen uso neste período",
+    "orgSelfNotice": "Estás a ver o teu propio uso nesta organización.",
+    "viewDetails": "Ver detalles do uso"
+  },
   "integrations": {
     "title": "Integracións",
     "sectionTitle": "Servizos conectados",

@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "دا د لټون پایله پرانیستل نه شو"
   },
+  "usage": {
+    "title": "کارونه",
+    "orgTitle": "د سازمان کارونه",
+    "entrySubtitle": "لګښت، غوښتنې او ټوکنونه",
+    "rangePicker": "د وخت موده",
+    "range90d": "90 ورځې",
+    "metricPicker": "د چارټ شاخص",
+    "chartA11y": "{{metric}} په ورځ",
+    "avgCostPerRequest": "اوسط لګښت / غوښتنه",
+    "topModels": "مخکښ ماډلونه",
+    "topFeatures": "مخکښې ځانګړنې",
+    "emptyTitle": "په دې موده کې کارونه نشته",
+    "orgSelfNotice": "تاسو په دې سازمان کې خپله کارونه وینئ.",
+    "viewDetails": "د کارونې جزئیات وګورئ"
+  },
   "integrations": {
     "title": "ادغامونه",
     "sectionTitle": "نښلول شوي خدمتونه",

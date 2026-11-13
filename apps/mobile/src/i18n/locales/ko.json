@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "이 검색 결과를 열지 못했습니다"
   },
+  "usage": {
+    "title": "사용량",
+    "orgTitle": "조직 사용량",
+    "entrySubtitle": "비용, 요청, 토큰",
+    "rangePicker": "기간",
+    "range90d": "90일",
+    "metricPicker": "차트 지표",
+    "chartA11y": "일별 {{metric}}",
+    "avgCostPerRequest": "요청당 평균 비용",
+    "topModels": "상위 모델",
+    "topFeatures": "상위 기능",
+    "emptyTitle": "이 기간에 사용량이 없습니다",
+    "orgSelfNotice": "이 조직에서 내 사용량을 보고 있습니다.",
+    "viewDetails": "사용량 세부 정보 보기"
+  },
   "integrations": {
     "title": "연동",
     "sectionTitle": "연결된 서비스",

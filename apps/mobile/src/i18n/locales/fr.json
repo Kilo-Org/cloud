@@ -4168,6 +4168,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Impossible d'ouvrir ce résultat de recherche"
   },
+  "usage": {
+    "title": "Utilisation",
+    "orgTitle": "Utilisation de l'organisation",
+    "entrySubtitle": "Dépenses, requêtes et jetons",
+    "rangePicker": "Période",
+    "range90d": "90 jours",
+    "metricPicker": "Métrique du graphique",
+    "chartA11y": "{{metric}} par jour",
+    "avgCostPerRequest": "Coût moy. / requête",
+    "topModels": "Principaux modèles",
+    "topFeatures": "Principales fonctionnalités",
+    "emptyTitle": "Aucune utilisation sur cette période",
+    "orgSelfNotice": "Vous voyez votre propre utilisation dans cette organisation.",
+    "viewDetails": "Voir les détails d'utilisation"
+  },
   "integrations": {
     "title": "Intégrations",
     "sectionTitle": "Services connectés",

@@ -1,6 +1,6 @@
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -34,6 +34,11 @@ function StatTile({ label, value }: Readonly<{ label: string; value: string | nu
 
 type OrgUsageStatsProps = {
   organizationId: string;
+  /**
+   * Turns the section into the entry point for the full usage screen. Absent
+   * leaves the numbers informational.
+   */
+  onPress?: () => void;
 };
 
 /**
@@ -42,8 +47,12 @@ type OrgUsageStatsProps = {
  * The grid carries no entrance animation: it is the section's entire body, so a
  * fade that does not run leaves four cards unpainted while their frames and
  * accessibility nodes are already in place.
+ *
+ * With `onPress` the whole grid opens the usage screen. The section cannot load
+ * keeps its own retry row instead of the wrapper: a pressable around a retry
+ * button leaves the reader guessing which control a tap reaches.
  */
-export function OrgUsageStats({ organizationId }: Readonly<OrgUsageStatsProps>) {
+export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStatsProps>) {
   const { t } = useTranslation();
   const { data, isError, isPaused, isFetching, refetch } = useOrgUsageStats(organizationId);
   const unavailable = data == null && (isError || isPaused);
@@ -52,7 +61,7 @@ export function OrgUsageStats({ organizationId }: Readonly<OrgUsageStatsProps>) 
   // totals through a refetch error.
   const missingValue = unavailable ? '—' : null;
 
-  return (
+  const body = (
     <View className="gap-3">
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
         {t('organization.usageStats.last30Days')}
@@ -98,5 +107,20 @@ export function OrgUsageStats({ organizationId }: Readonly<OrgUsageStatsProps>) 
         </View>
       )}
     </View>
+  );
+
+  if (onPress === undefined || unavailable) {
+    return body;
+  }
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityHint={t('usage.viewDetails')}
+      className="active:opacity-70"
+    >
+      {body}
+    </Pressable>
   );
 }

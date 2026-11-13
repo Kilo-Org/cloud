@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Kunne ikke åbne dette søgeresultat"
   },
+  "usage": {
+    "title": "Forbrug",
+    "orgTitle": "Organisationens forbrug",
+    "entrySubtitle": "Udgifter, anmodninger og tokens",
+    "rangePicker": "Tidsperiode",
+    "range90d": "90 dage",
+    "metricPicker": "Diagrammets nøgletal",
+    "chartA11y": "{{metric}} pr. dag",
+    "avgCostPerRequest": "Gns. pris pr. anmodning",
+    "topModels": "Mest brugte modeller",
+    "topFeatures": "Mest brugte funktioner",
+    "emptyTitle": "Intet forbrug i denne periode",
+    "orgSelfNotice": "Du ser dit eget forbrug i denne organisation.",
+    "viewDetails": "Se forbrugsdetaljer"
+  },
   "integrations": {
     "title": "Integrationer",
     "sectionTitle": "Forbundne tjenester",

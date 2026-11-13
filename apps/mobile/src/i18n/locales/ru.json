@@ -4233,6 +4233,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Не удалось открыть результат поиска"
   },
+  "usage": {
+    "title": "Использование",
+    "orgTitle": "Использование организации",
+    "entrySubtitle": "Расходы, запросы и токены",
+    "rangePicker": "Период",
+    "range90d": "90 дней",
+    "metricPicker": "Показатель графика",
+    "chartA11y": "{{metric}} по дням",
+    "avgCostPerRequest": "Ср. стоимость запроса",
+    "topModels": "Топ моделей",
+    "topFeatures": "Топ функций",
+    "emptyTitle": "Нет использования за этот период",
+    "orgSelfNotice": "Показано ваше собственное использование в этой организации.",
+    "viewDetails": "Подробнее об использовании"
+  },
   "integrations": {
     "title": "Интеграции",
     "sectionTitle": "Подключённые сервисы",

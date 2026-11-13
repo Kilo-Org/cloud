@@ -4298,6 +4298,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Ma stajniex niftħu dan ir-riżultat tat-tfittxija"
   },
+  "usage": {
+    "title": "Użu",
+    "orgTitle": "Użu tal-organizzazzjoni",
+    "entrySubtitle": "Spiża, talbiet u unitajiet tat-test",
+    "rangePicker": "Medda ta' żmien",
+    "range90d": "90 jum",
+    "metricPicker": "Metrika tal-grafika",
+    "chartA11y": "{{metric}} kuljum",
+    "avgCostPerRequest": "Spiża medja / talba",
+    "topModels": "Il-mudelli l-aktar użati",
+    "topFeatures": "Il-funzjonijiet l-aktar użati",
+    "emptyTitle": "L-ebda użu f'dan il-perjodu",
+    "orgSelfNotice": "Qed tara l-użu tiegħek stess f'din l-organizzazzjoni.",
+    "viewDetails": "Ara d-dettalji tal-użu"
+  },
   "integrations": {
     "title": "Integrazzjonijiet",
     "sectionTitle": "Servizzi konnessi",

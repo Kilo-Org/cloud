@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "ਇਹ ਖੋਜ ਨਤੀਜਾ ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ"
   },
+  "usage": {
+    "title": "ਵਰਤੋਂ",
+    "orgTitle": "ਸੰਗਠਨ ਦੀ ਵਰਤੋਂ",
+    "entrySubtitle": "ਖਰਚਾ, ਬੇਨਤੀਆਂ ਅਤੇ ਟੋਕਨ",
+    "rangePicker": "ਸਮਾਂ ਸੀਮਾ",
+    "range90d": "90 ਦਿਨ",
+    "metricPicker": "ਚਾਰਟ ਮਾਪਦੰਡ",
+    "chartA11y": "ਪ੍ਰਤੀ ਦਿਨ {{metric}}",
+    "avgCostPerRequest": "ਔਸਤ ਲਾਗਤ / ਬੇਨਤੀ",
+    "topModels": "ਪ੍ਰਮੁੱਖ ਮਾਡਲ",
+    "topFeatures": "ਪ੍ਰਮੁੱਖ ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ",
+    "emptyTitle": "ਇਸ ਮਿਆਦ ਵਿੱਚ ਕੋਈ ਵਰਤੋਂ ਨਹੀਂ",
+    "orgSelfNotice": "ਤੁਸੀਂ ਇਸ ਸੰਗਠਨ ਵਿੱਚ ਆਪਣੀ ਵਰਤੋਂ ਦੇਖ ਰਹੇ ਹੋ।",
+    "viewDetails": "ਵਰਤੋਂ ਦੇ ਵੇਰਵੇ ਦੇਖੋ"
+  },
   "integrations": {
     "title": "ਇੰਟੀਗ੍ਰੇਸ਼ਨ",
     "sectionTitle": "ਕਨੈਕਟ ਕੀਤੀਆਂ ਸੇਵਾਵਾਂ",

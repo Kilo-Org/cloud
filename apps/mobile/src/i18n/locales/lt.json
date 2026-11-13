@@ -4233,6 +4233,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Nepavyko atidaryti šio paieškos rezultato"
   },
+  "usage": {
+    "title": "Naudojimas",
+    "orgTitle": "Organizacijos naudojimas",
+    "entrySubtitle": "Išlaidos, užklausos ir žetonai",
+    "rangePicker": "Laikotarpis",
+    "range90d": "90 dienų",
+    "metricPicker": "Diagramos metrika",
+    "chartA11y": "{{metric}} per dieną",
+    "avgCostPerRequest": "Vid. kaina / užkl.",
+    "topModels": "Populiariausi modeliai",
+    "topFeatures": "Populiariausios funkcijos",
+    "emptyTitle": "Šiuo laikotarpiu naudojimo nėra",
+    "orgSelfNotice": "Matote savo naudojimą šioje organizacijoje.",
+    "viewDetails": "Peržiūrėti naudojimo informaciją"
+  },
   "integrations": {
     "title": "Integracijos",
     "sectionTitle": "Prijungtos paslaugos",

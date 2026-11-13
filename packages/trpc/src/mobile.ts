@@ -28,6 +28,7 @@ import { spendAlertRouter } from '@/routers/spend-alert-router';
 import { agentBriefingRouter } from '@/routers/agent-briefing-router';
 import { computeBillingRouter } from '@/routers/compute-billing-router';
 import { agentProfilesMobileRouter } from './agent-profiles-mobile';
+import { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
 import { byokRouter } from '@/routers/byok-router';
 import { userExportsRouter } from '@/routers/user-exports-router';
 
@@ -67,6 +68,7 @@ const mobileRouter = createTRPCRouter({
   agentBriefing: agentBriefingRouter,
   computeBilling: computeBillingRouter,
   agentProfiles: agentProfilesMobileRouter,
+  usageAnalytics: usageAnalyticsRouter,
   byok: byokRouter,
   userExports: userExportsRouter,
 });

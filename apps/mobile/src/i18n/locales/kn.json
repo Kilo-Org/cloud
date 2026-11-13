@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "ಈ ಹುಡುಕು ಫಲಿತಾಂಶವನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ"
   },
+  "usage": {
+    "title": "ಬಳಕೆ",
+    "orgTitle": "ಸಂಸ್ಥೆಯ ಬಳಕೆ",
+    "entrySubtitle": "ವೆಚ್ಚ, ವಿನಂತಿಗಳು ಮತ್ತು ಟೋಕನ್‌ಗಳು",
+    "rangePicker": "ಸಮಯದ ಅವಧಿ",
+    "range90d": "90 ದಿನಗಳು",
+    "metricPicker": "ಚಾರ್ಟ್ ಮಾಪಕ",
+    "chartA11y": "ದಿನಕ್ಕೆ {{metric}}",
+    "avgCostPerRequest": "ಸರಾಸರಿ ವೆಚ್ಚ / ವಿನಂತಿ",
+    "topModels": "ಪ್ರಮುಖ ಮಾಡೆಲ್‌ಗಳು",
+    "topFeatures": "ಪ್ರಮುಖ ವೈಶಿಷ್ಟ್ಯಗಳು",
+    "emptyTitle": "ಈ ಅವಧಿಯಲ್ಲಿ ಯಾವುದೇ ಬಳಕೆ ಇಲ್ಲ",
+    "orgSelfNotice": "ನೀವು ಈ ಸಂಸ್ಥೆಯಲ್ಲಿನ ನಿಮ್ಮ ಸ್ವಂತ ಬಳಕೆಯನ್ನು ನೋಡುತ್ತಿದ್ದೀರಿ.",
+    "viewDetails": "ಬಳಕೆಯ ವಿವರಗಳನ್ನು ನೋಡಿ"
+  },
   "integrations": {
     "title": "ಏಕೀಕರಣಗಳು",
     "sectionTitle": "ಸಂಪರ್ಕಿತ ಸೇವೆಗಳು",

@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "A kò lè ṣí àbájọ́ ìwádìí yìí"
   },
+  "usage": {
+    "title": "Ìlò",
+    "orgTitle": "Ìlò àjọ",
+    "entrySubtitle": "Ìnáwó, àwọn ìbéèrè, àti àwọn ìpín ọ̀rọ̀",
+    "rangePicker": "Sáà àkókò",
+    "range90d": "Ọjọ́ 90",
+    "metricPicker": "Ìwọ̀n àtẹ àwòrán",
+    "chartA11y": "{{metric}} lójoojúmọ́",
+    "avgCostPerRequest": "Iye owó àpapọ̀ / ìbéèrè",
+    "topModels": "Àwọn àwòṣe tó ga jù",
+    "topFeatures": "Àwọn ẹ̀yà tó ga jù",
+    "emptyTitle": "Kò sí ìlò ní sáà yìí",
+    "orgSelfNotice": "Ìlò tìrẹ nínú àjọ yìí ni ò ń rí.",
+    "viewDetails": "Wo àlàyé ìlò"
+  },
   "integrations": {
     "title": "Àwọn Ìsopọ̀",
     "sectionTitle": "Àwọn iṣẹ́ tí a so pọ̀",

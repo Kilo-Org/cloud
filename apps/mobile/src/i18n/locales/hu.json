@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Nem sikerült megnyitni ezt a keresési találatot"
   },
+  "usage": {
+    "title": "Használat",
+    "orgTitle": "Szervezeti használat",
+    "entrySubtitle": "Költség, kérések és tokenek",
+    "rangePicker": "Időtartomány",
+    "range90d": "90 nap",
+    "metricPicker": "Diagram mutatója",
+    "chartA11y": "{{metric}} naponta",
+    "avgCostPerRequest": "Átl. költség / kérés",
+    "topModels": "Leggyakoribb modellek",
+    "topFeatures": "Leggyakoribb funkciók",
+    "emptyTitle": "Nincs használat ebben az időszakban",
+    "orgSelfNotice": "A saját használatodat látod ebben a szervezetben.",
+    "viewDetails": "Használati részletek megtekintése"
+  },
   "integrations": {
     "title": "Integrációk",
     "sectionTitle": "Csatlakoztatott szolgáltatások",

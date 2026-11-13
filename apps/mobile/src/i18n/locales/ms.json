@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Tidak dapat membuka hasil carian ini"
   },
+  "usage": {
+    "title": "Penggunaan",
+    "orgTitle": "Penggunaan organisasi",
+    "entrySubtitle": "Perbelanjaan, permintaan dan token",
+    "rangePicker": "Julat masa",
+    "range90d": "90 hari",
+    "metricPicker": "Metrik carta",
+    "chartA11y": "{{metric}} sehari",
+    "avgCostPerRequest": "Purata kos / permintaan",
+    "topModels": "Model teratas",
+    "topFeatures": "Ciri teratas",
+    "emptyTitle": "Tiada penggunaan dalam tempoh ini",
+    "orgSelfNotice": "Anda sedang melihat penggunaan anda sendiri dalam organisasi ini.",
+    "viewDetails": "Lihat butiran penggunaan"
+  },
   "integrations": {
     "title": "Integrasi",
     "sectionTitle": "Perkhidmatan yang disambungkan",

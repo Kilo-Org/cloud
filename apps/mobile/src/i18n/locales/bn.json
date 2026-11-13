@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "এই অনুসন্ধানের ফলাফল খোলা যায়নি"
   },
+  "usage": {
+    "title": "ব্যবহার",
+    "orgTitle": "সংস্থার ব্যবহার",
+    "entrySubtitle": "খরচ, অনুরোধ ও টোকেন",
+    "rangePicker": "সময়সীমা",
+    "range90d": "৯০ দিন",
+    "metricPicker": "চার্টের মেট্রিক",
+    "chartA11y": "প্রতিদিন {{metric}}",
+    "avgCostPerRequest": "গড় খরচ / অনুরোধ",
+    "topModels": "শীর্ষ মডেল",
+    "topFeatures": "শীর্ষ ফিচার",
+    "emptyTitle": "এই সময়ে কোনো ব্যবহার নেই",
+    "orgSelfNotice": "আপনি এই সংস্থায় আপনার নিজের ব্যবহার দেখছেন।",
+    "viewDetails": "ব্যবহারের বিস্তারিত দেখুন"
+  },
   "integrations": {
     "title": "ইন্টিগ্রেশন",
     "sectionTitle": "সংযুক্ত পরিষেবা",

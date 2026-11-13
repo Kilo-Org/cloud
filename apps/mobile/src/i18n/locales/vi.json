@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Không thể mở kết quả tìm kiếm này"
   },
+  "usage": {
+    "title": "Mức sử dụng",
+    "orgTitle": "Mức sử dụng của tổ chức",
+    "entrySubtitle": "Chi tiêu, yêu cầu và token",
+    "rangePicker": "Khoảng thời gian",
+    "range90d": "90 ngày",
+    "metricPicker": "Chỉ số biểu đồ",
+    "chartA11y": "{{metric}} mỗi ngày",
+    "avgCostPerRequest": "Chi phí TB / yêu cầu",
+    "topModels": "Mô hình hàng đầu",
+    "topFeatures": "Tính năng hàng đầu",
+    "emptyTitle": "Không có mức sử dụng trong kỳ này",
+    "orgSelfNotice": "Bạn đang xem mức sử dụng của chính mình trong tổ chức này.",
+    "viewDetails": "Xem chi tiết mức sử dụng"
+  },
   "integrations": {
     "title": "Tích hợp",
     "sectionTitle": "Dịch vụ đã kết nối",

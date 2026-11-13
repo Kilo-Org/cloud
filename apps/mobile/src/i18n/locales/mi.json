@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Kāore i taea te whakatuwhera i tēnei hua kimi"
   },
+  "usage": {
+    "title": "Whakamahinga",
+    "orgTitle": "Whakamahinga o te whakahaere",
+    "entrySubtitle": "Ngā whakapaunga, ngā tono, me ngā tōkena",
+    "rangePicker": "Awhe wā",
+    "range90d": "90 rā",
+    "metricPicker": "Ine o te kauwhata",
+    "chartA11y": "{{metric}} ia rā",
+    "avgCostPerRequest": "Utu toharite / tono",
+    "topModels": "Ngā tauira matua",
+    "topFeatures": "Ngā āhuatanga matua",
+    "emptyTitle": "Kāore he whakamahinga i tēnei wā",
+    "orgSelfNotice": "Ko tāu ake whakamahinga i tēnei whakahaere e kitea ana e koe.",
+    "viewDetails": "Tirohia ngā taipitopito whakamahinga"
+  },
   "integrations": {
     "title": "Ngā Tūhononga",
     "sectionTitle": "Ngā ratonga kua honoa",

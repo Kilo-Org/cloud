@@ -4233,6 +4233,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Не вдалося відкрити цей результат пошуку"
   },
+  "usage": {
+    "title": "Використання",
+    "orgTitle": "Використання організації",
+    "entrySubtitle": "Витрати, запити й токени",
+    "rangePicker": "Період",
+    "range90d": "90 днів",
+    "metricPicker": "Показник графіка",
+    "chartA11y": "{{metric}} за днями",
+    "avgCostPerRequest": "Сер. вартість / запит",
+    "topModels": "Популярні моделі",
+    "topFeatures": "Популярні функції",
+    "emptyTitle": "За цей період використання немає",
+    "orgSelfNotice": "Ви бачите власне використання в цій організації.",
+    "viewDetails": "Докладніше про використання"
+  },
   "integrations": {
     "title": "Інтеграції",
     "sectionTitle": "Підключені сервіси",

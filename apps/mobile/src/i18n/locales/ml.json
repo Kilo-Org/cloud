@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "ഈ തിരച്ചിൽ ഫലം തുറക്കാനായില്ല"
   },
+  "usage": {
+    "title": "ഉപയോഗം",
+    "orgTitle": "ഓർഗനൈസേഷൻ ഉപയോഗം",
+    "entrySubtitle": "ചെലവ്, അഭ്യർത്ഥനകൾ, ടോക്കണുകൾ",
+    "rangePicker": "സമയപരിധി",
+    "range90d": "90 ദിവസം",
+    "metricPicker": "ചാർട്ട് മെട്രിക്",
+    "chartA11y": "പ്രതിദിന {{metric}}",
+    "avgCostPerRequest": "ശരാശരി ചെലവ് / അഭ്യർത്ഥന",
+    "topModels": "മുൻനിര മോഡലുകൾ",
+    "topFeatures": "മുൻനിര ഫീച്ചറുകൾ",
+    "emptyTitle": "ഈ കാലയളവിൽ ഉപയോഗമില്ല",
+    "orgSelfNotice": "ഈ ഓർഗനൈസേഷനിലെ നിങ്ങളുടെ സ്വന്തം ഉപയോഗമാണ് നിങ്ങൾ കാണുന്നത്.",
+    "viewDetails": "ഉപയോഗ വിശദാംശങ്ങൾ കാണുക"
+  },
   "integrations": {
     "title": "ഇന്റഗ്രേഷനുകൾ",
     "sectionTitle": "കണക്റ്റ് ചെയ്‌ത സേവനങ്ങൾ",

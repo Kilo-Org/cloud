@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "ບໍ່ສາມາດເປີດຜົນການຄົ້ນຫານີ້ໄດ້"
   },
+  "usage": {
+    "title": "ການນຳໃຊ້",
+    "orgTitle": "ການນຳໃຊ້ຂອງອົງກອນ",
+    "entrySubtitle": "ຄ່າໃຊ້ຈ່າຍ, ຄຳຂໍ ແລະ ໂທເຄັນ",
+    "rangePicker": "ຊ່ວງເວລາ",
+    "range90d": "90 ວັນ",
+    "metricPicker": "ຕົວຊີ້ວັດແຜນພູມ",
+    "chartA11y": "{{metric}} ຕໍ່ວັນ",
+    "avgCostPerRequest": "ຄ່າໃຊ້ຈ່າຍສະເລ່ຍ / ຄຳຂໍ",
+    "topModels": "ໂມເດວທີ່ໃຊ້ຫຼາຍສຸດ",
+    "topFeatures": "ຄຸນສົມບັດທີ່ໃຊ້ຫຼາຍສຸດ",
+    "emptyTitle": "ບໍ່ມີການນຳໃຊ້ໃນຊ່ວງເວລານີ້",
+    "orgSelfNotice": "ທ່ານກຳລັງເບິ່ງການນຳໃຊ້ຂອງທ່ານເອງໃນອົງກອນນີ້.",
+    "viewDetails": "ເບິ່ງລາຍລະອຽດການນຳໃຊ້"
+  },
   "integrations": {
     "title": "ການເຊື່ອມໂຍງ",
     "sectionTitle": "ບໍລິການທີ່ເຊື່ອມຕໍ່ແລ້ວ",

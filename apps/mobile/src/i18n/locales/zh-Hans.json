@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "无法打开此搜索结果"
   },
+  "usage": {
+    "title": "用量",
+    "orgTitle": "组织用量",
+    "entrySubtitle": "费用、请求和词元",
+    "rangePicker": "时间范围",
+    "range90d": "90 天",
+    "metricPicker": "图表指标",
+    "chartA11y": "每日{{metric}}",
+    "avgCostPerRequest": "平均每次请求费用",
+    "topModels": "常用模型",
+    "topFeatures": "常用功能",
+    "emptyTitle": "此期间无用量",
+    "orgSelfNotice": "你看到的是你自己在此组织中的用量。",
+    "viewDetails": "查看用量详情"
+  },
   "integrations": {
     "title": "集成",
     "sectionTitle": "已连接的服务",

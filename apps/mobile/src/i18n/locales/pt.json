@@ -4174,6 +4174,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Não foi possível abrir este resultado de pesquisa"
   },
+  "usage": {
+    "title": "Utilização",
+    "orgTitle": "Utilização da organização",
+    "entrySubtitle": "Gastos, pedidos e tokens",
+    "rangePicker": "Período",
+    "range90d": "90 dias",
+    "metricPicker": "Métrica do gráfico",
+    "chartA11y": "{{metric}} por dia",
+    "avgCostPerRequest": "Custo médio / pedido",
+    "topModels": "Modelos mais usados",
+    "topFeatures": "Funcionalidades mais usadas",
+    "emptyTitle": "Sem utilização neste período",
+    "orgSelfNotice": "Está a ver a sua própria utilização nesta organização.",
+    "viewDetails": "Ver detalhes de utilização"
+  },
   "integrations": {
     "title": "Integrações",
     "sectionTitle": "Serviços conectados",

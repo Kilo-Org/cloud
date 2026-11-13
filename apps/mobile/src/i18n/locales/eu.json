@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "Ezin izan da bilaketa-emaitza hau ireki"
   },
+  "usage": {
+    "title": "Erabilera",
+    "orgTitle": "Erakundearen erabilera",
+    "entrySubtitle": "Gastua, eskaerak eta tokenak",
+    "rangePicker": "Denbora-tartea",
+    "range90d": "90 egun",
+    "metricPicker": "Grafikoaren metrika",
+    "chartA11y": "{{metric}} eguneko",
+    "avgCostPerRequest": "Kostu ertaina / eskaera",
+    "topModels": "Eredu erabilienak",
+    "topFeatures": "Funtzio erabilienak",
+    "emptyTitle": "Ez dago erabilerarik aldi honetan",
+    "orgSelfNotice": "Erakunde honetan zure erabilera ikusten ari zara.",
+    "viewDetails": "Ikusi erabileraren xehetasunak"
+  },
   "integrations": {
     "title": "Integrazioak",
     "sectionTitle": "Konektatutako zerbitzuak",

@@ -4103,6 +4103,21 @@
   "systemSearch": {
     "couldNotOpenResult": "ይህን የፍለጋ ውጤት መክፈት አልተቻለም"
   },
+  "usage": {
+    "title": "አጠቃቀም",
+    "orgTitle": "የድርጅት አጠቃቀም",
+    "entrySubtitle": "ወጪ፣ ጥያቄዎች እና ቶከኖች",
+    "rangePicker": "የጊዜ ክልል",
+    "range90d": "90 ቀናት",
+    "metricPicker": "የገበታ መለኪያ",
+    "chartA11y": "{{metric}} በቀን",
+    "avgCostPerRequest": "አማካይ ወጪ / ጥያቄ",
+    "topModels": "ዋና ሞዴሎች",
+    "topFeatures": "ዋና ባህሪያት",
+    "emptyTitle": "በዚህ ጊዜ ውስጥ ምንም አጠቃቀም የለም",
+    "orgSelfNotice": "በዚህ ድርጅት ውስጥ የራስዎን አጠቃቀም እያዩ ነው።",
+    "viewDetails": "የአጠቃቀም ዝርዝሮችን ይመልከቱ"
+  },
   "integrations": {
     "title": "ውህደቶች",
     "sectionTitle": "የተገናኙ አገልግሎቶች",

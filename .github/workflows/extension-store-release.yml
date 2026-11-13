@@ -88,6 +88,26 @@ jobs:
                 "apps/extension/.output/kilo-extension-$V-firefox.zip" \
                 "apps/extension/.output/kilo-extension-$V-sources.zip"
 
+      # The sources zip is the only thing a reviewer can rebuild, and its
+      # allowlist lives in wxt.config.ts: a workspace dependency the list misses
+      # still builds here, where the whole monorepo is checked out, and would
+      # only surface when AMO rejects the archive. Rebuild it the way
+      # SOURCE_BUILD.md describes and diff the result against the package being
+      # uploaded. The key comes from the job env and is never echoed.
+      - name: Verify the sources zip rebuilds the Firefox package
+        run: |
+          set -euo pipefail
+          V="${{ steps.version.outputs.version }}"
+          WORK="$(mktemp -d)"
+          mkdir -p "$WORK/sources" "$WORK/package"
+          unzip -q "apps/extension/.output/kilo-extension-$V-sources.zip" -d "$WORK/sources"
+          unzip -q "apps/extension/.output/kilo-extension-$V-firefox.zip" -d "$WORK/package"
+          cd "$WORK/sources"
+          pnpm install --frozen-lockfile --filter kilo-extension... --ignore-scripts
+          pnpm --filter kilo-extension --config.verify-deps-before-run=false build:firefox
+          diff -r "$WORK/package" "$WORK/sources/apps/extension/.output/firefox-mv3"
+          echo "The sources zip rebuilds kilo-extension-$V-firefox.zip file for file."
+
       - name: Upload store artifacts
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:

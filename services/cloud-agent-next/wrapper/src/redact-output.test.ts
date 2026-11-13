@@ -47,6 +47,13 @@ describe('redactSecrets', () => {
       'Authorization: [REDACTED]'
     );
     expect(redactSecrets('apiKey=synthetic-api-key')).toBe('apiKey=[REDACTED]');
+    expect(
+      redactSecrets(
+        'x-api-key: synthetic-a\napikey: synthetic-b\n  Password: synthetic-c\nx-auth-token:synthetic-d\nstatus: ok'
+      )
+    ).toBe(
+      'x-api-key: [REDACTED]\napikey: [REDACTED]\n  Password: [REDACTED]\nx-auth-token:[REDACTED]\nstatus: ok'
+    );
     const escaped = JSON.stringify({
       error: JSON.stringify({ headers: { authorization: 'synthetic-secret' } }),
     });

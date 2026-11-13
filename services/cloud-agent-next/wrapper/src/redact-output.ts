@@ -26,6 +26,11 @@ const SECRET_PATTERNS: { pattern: RegExp; replacement: string }[] = [
   },
   {
     pattern:
+      /^(\s*[A-Za-z0-9_-]*(?:secret|token|password|passphrase|credential|api[_-]?key|private[_-]?key|access[_-]?key)[A-Za-z0-9_-]*\s*:[ \t]*)\S[^\r\n]*/gim,
+    replacement: `$1${REDACTED}`,
+  },
+  {
+    pattern:
       /(("|')[A-Za-z0-9_.-]*(?:secret|token|password|passphrase|credential|api[_-]?key|private[_-]?key|access[_-]?key|authorization|cookie)[A-Za-z0-9_.-]*\2\s*:\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/gi,
     replacement: `$1"${REDACTED}"`,
   },

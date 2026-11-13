@@ -307,6 +307,7 @@
     "passkeyAdded": "Nampiana ny fanalahidin'ny fidirana.",
     "passkeyAddFailed": "Tsy afaka nanampy fanalahidin'ny fidirana. Andramo indray.",
     "passkeyAddUnsupported": "Tsy afaka mamorona fanalahidin'ny fidirana ity fitaovana ity.",
+    "passkeyAddUnavailable": "Ny fanalahidin'ny fidirana dia tsy azo ampiana raha tsy ao amin'ny mpitety tranonkala.",
     "passkeyAddCancelled": "Nofoanana ny famoronana ny fanalahidin'ny fidirana.",
     "passkeyRemoved": "Voafafa ny fanalahidin'ny fidirana.",
     "passkeyRemoveFailed": "Tsy afaka namafa io fanalahidin'ny fidirana io. Andramo indray.",

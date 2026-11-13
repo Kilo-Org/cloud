@@ -307,6 +307,7 @@
     "passkeyAdded": "Adgangsnøgle tilføjet.",
     "passkeyAddFailed": "Kunne ikke tilføje en adgangsnøgle. Prøv igen.",
     "passkeyAddUnsupported": "Denne enhed kan ikke oprette adgangsnøgler.",
+    "passkeyAddUnavailable": "Adgangsnøgler kan kun tilføjes i en webbrowser.",
     "passkeyAddCancelled": "Oprettelsen af adgangsnøglen blev annulleret.",
     "passkeyRemoved": "Adgangsnøgle fjernet.",
     "passkeyRemoveFailed": "Kunne ikke fjerne den adgangsnøgle. Prøv igen.",

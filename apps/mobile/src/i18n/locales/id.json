@@ -307,6 +307,7 @@
     "passkeyAdded": "Kunci sandi ditambahkan.",
     "passkeyAddFailed": "Tidak dapat menambahkan kunci sandi. Coba lagi.",
     "passkeyAddUnsupported": "Perangkat ini tidak dapat membuat kunci sandi.",
+    "passkeyAddUnavailable": "Kunci sandi hanya dapat ditambahkan di browser web.",
     "passkeyAddCancelled": "Pembuatan kunci sandi dibatalkan.",
     "passkeyRemoved": "Kunci sandi dihapus.",
     "passkeyRemoveFailed": "Tidak dapat menghapus kunci sandi itu. Coba lagi.",

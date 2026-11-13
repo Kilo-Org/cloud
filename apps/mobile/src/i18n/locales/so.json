@@ -307,6 +307,7 @@
     "passkeyAdded": "Furaha gelitaanka waa la daray.",
     "passkeyAddFailed": "Lama dari karin furaha gelitaanka. Isku day mar kale.",
     "passkeyAddUnsupported": "Qalabkan ma abuuri karo furahayaasha gelitaanka.",
+    "passkeyAddUnavailable": "Furahayaasha gelitaanka waxaa lagu dari karaa oo kaliya browser-ka web.",
     "passkeyAddCancelled": "Abuurista furaha gelitaanka waa la joojiyay.",
     "passkeyRemoved": "Furaha gelitaanka waa la tirtiray.",
     "passkeyRemoveFailed": "Furaha gelitaankaas lama tirtiri karin. Isku day mar kale.",

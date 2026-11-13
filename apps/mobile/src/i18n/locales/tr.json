@@ -307,6 +307,7 @@
     "passkeyAdded": "Geçiş anahtarı eklendi.",
     "passkeyAddFailed": "Geçiş anahtarı eklenemedi. Tekrar deneyin.",
     "passkeyAddUnsupported": "Bu cihaz geçiş anahtarı oluşturamaz.",
+    "passkeyAddUnavailable": "Geçiş anahtarları yalnızca bir web tarayıcısında eklenebilir.",
     "passkeyAddCancelled": "Geçiş anahtarı oluşturma iptal edildi.",
     "passkeyRemoved": "Geçiş anahtarı kaldırıldı.",
     "passkeyRemoveFailed": "O geçiş anahtarı kaldırılamadı. Tekrar deneyin.",

@@ -307,6 +307,7 @@
     "passkeyAdded": "પાસકી ઉમેરાઈ.",
     "passkeyAddFailed": "પાસકી ઉમેરી શકાઈ નથી. ફરી પ્રયાસ કરો.",
     "passkeyAddUnsupported": "આ ઉપકરણ પાસકી બનાવી શકતું નથી.",
+    "passkeyAddUnavailable": "પાસકી ફક્ત વેબ બ્રાઉઝરમાં જ ઉમેરી શકાય છે.",
     "passkeyAddCancelled": "પાસકી બનાવવી રદ થઈ.",
     "passkeyRemoved": "પાસકી દૂર કરી.",
     "passkeyRemoveFailed": "તે પાસકી દૂર કરી શકાઈ નથી. ફરી પ્રયાસ કરો.",

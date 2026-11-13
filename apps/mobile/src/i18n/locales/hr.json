@@ -307,6 +307,7 @@
     "passkeyAdded": "Pristupni ključ dodan.",
     "passkeyAddFailed": "Pristupni ključ nije moguće dodati. Pokušaj ponovno.",
     "passkeyAddUnsupported": "Ovaj uređaj ne može stvarati pristupne ključeve.",
+    "passkeyAddUnavailable": "Pristupni ključevi mogu se dodati samo u web-pregledniku.",
     "passkeyAddCancelled": "Stvaranje pristupnog ključa je otkazano.",
     "passkeyRemoved": "Pristupni ključ uklonjen.",
     "passkeyRemoveFailed": "Taj pristupni ključ nije moguće ukloniti. Pokušaj ponovno.",

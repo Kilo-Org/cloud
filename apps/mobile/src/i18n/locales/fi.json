@@ -307,6 +307,7 @@
     "passkeyAdded": "Pääsyavain lisätty.",
     "passkeyAddFailed": "Pääsyavainta ei voitu lisätä. Yritä uudelleen.",
     "passkeyAddUnsupported": "Tämä laite ei voi luoda pääsyavaimia.",
+    "passkeyAddUnavailable": "Pääsyavaimia voi lisätä vain verkkoselaimessa.",
     "passkeyAddCancelled": "Pääsyavaimen luonti peruutettiin.",
     "passkeyRemoved": "Pääsyavain poistettu.",
     "passkeyRemoveFailed": "Kyseistä pääsyavainta ei voitu poistaa. Yritä uudelleen.",

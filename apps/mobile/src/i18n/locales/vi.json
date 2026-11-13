@@ -307,6 +307,7 @@
     "passkeyAdded": "Đã thêm khóa truy cập.",
     "passkeyAddFailed": "Không thể thêm khóa truy cập. Hãy thử lại.",
     "passkeyAddUnsupported": "Thiết bị này không thể tạo khóa truy cập.",
+    "passkeyAddUnavailable": "Chỉ có thể thêm khóa truy cập trong trình duyệt web.",
     "passkeyAddCancelled": "Việc tạo khóa truy cập đã bị hủy.",
     "passkeyRemoved": "Đã xóa khóa truy cập.",
     "passkeyRemoveFailed": "Không thể xóa khóa truy cập đó. Hãy thử lại.",

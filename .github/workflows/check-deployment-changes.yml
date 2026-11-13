@@ -154,11 +154,17 @@ jobs:
           # build inputs stay deploy-triggering. A skipped commit stays in the
           # next real release: base_sha is the last recorded deployment, so the
           # next deployment's diff absorbs it.
+          # Markdown is excluded at the repository root only: the web app
+          # compiles page.md and page.mdx under its app directory into routes
+          # (pageExtensions in apps/web/next.config.mjs), so markdown inside
+          # apps/web stays deploy-triggering. The docs directory exclusion
+          # covers the docs tree; markdown in other package directories is
+          # documentation by convention and the next real release absorbs a
+          # skipped docs-only commit.
           if git diff --quiet "$base_sha" "$target_sha" -- . \
             ':(exclude)apps/mobile' \
             ':(exclude)apps/extension' \
             ':(exclude)apps/storybook' \
-            ':(exclude)*.md' \
             ':(exclude).github' \
             ':(exclude)dev' \
             ':(exclude)tools' \
@@ -172,7 +178,8 @@ jobs:
             ':(exclude).vscode' \
             ':(exclude).cursor' \
             ':(exclude).husky' \
-            ':(exclude).plans'; then
+            ':(exclude).plans' \
+            ':(exclude,glob)*.md'; then
             echo "No deployment needed: only files outside the deploy inputs changed." >> "$GITHUB_STEP_SUMMARY"
             echo "should_deploy=false" >> "$GITHUB_OUTPUT"
             exit 0

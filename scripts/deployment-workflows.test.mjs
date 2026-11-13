@@ -474,13 +474,12 @@ test('successful main CI selects the tested deployment SHA', () => {
   const predicate = check.run.replace(/\\\n\s*/g, ' ');
   assert.match(
     predicate,
-    /git diff --quiet "\$base_sha" "\$target_sha" -- \.( +':\(exclude\)[\w.*\/-]+')+; then/
+    /git diff --quiet "\$base_sha" "\$target_sha" -- \.( +':\(exclude\)[\w.*\/,-]+')+; then/
   );
   for (const excluded of [
     'apps/mobile',
     'apps/extension',
     'apps/storybook',
-    '*.md',
     '.github',
     'dev',
     'tools',
@@ -495,6 +494,7 @@ test('successful main CI selects the tested deployment SHA', () => {
     '.cursor',
     '.husky',
     '.plans',
+    '(glob)*.md',
   ]) {
     assert.match(
       predicate,
@@ -1035,6 +1035,15 @@ test('deployment gate only deploys changes since the last complete run', () => {
     writeFileSync(join(directory, 'docs', 'note.md'), 'docs');
     commit('docs');
     assert.equal(runGate(deployedSha).should_deploy, 'false');
+
+    // A markdown file inside apps/web is a deploy input: the web app compiles
+    // page.md and page.mdx under its app directory into routes
+    // (pageExtensions in apps/web/next.config.mjs), so only root-level
+    // markdown is excluded.
+    mkdirSync(join(directory, 'apps/web/src/app'), { recursive: true });
+    writeFileSync(join(directory, 'apps/web/src/app', 'page.md'), 'route');
+    commit('web route');
+    assert.equal(runGate(deployedSha).should_deploy, 'true');
 
     mkdirSync(join(directory, '.github'), { recursive: true });
     writeFileSync(join(directory, '.github', 'workflows-ci.yml'), 'ci');

@@ -31,6 +31,7 @@ internal object BackgroundSessions {
     private set
 
   @Volatile private var count = 0
+  private var startDeferred = false
 
   /** Invoked from the notification action; set by the module that owns the sessions. */
   var disconnectAll: (() -> Unit)? = null
@@ -52,15 +53,48 @@ internal object BackgroundSessions {
       val opened = count == 0 && next > 0
       val closed = count > 0 && next == 0
       count = next
+      if (closed) startDeferred = false
 
       when {
-        opened -> Runnable { SshSessionService.start(context) }
+        opened -> Runnable { start(context) }
         closed -> Runnable { SshSessionService.stop(context) }
         else -> Runnable { refresh(context) }
       }
     }
 
     mainHandler.post(action)
+  }
+
+  private fun start(context: Context) {
+    if (!isAppForeground()) {
+      deferStart(context)
+      return
+    }
+
+    synchronized(lock) { startDeferred = false }
+    SshSessionService.start(context)
+  }
+
+  /**
+   * Android 12+ refuses a foreground-service start from the background, so a
+   * session opened there waits for the next time the app is on screen instead
+   * of crashing the process. `start` degrades silently if it is still refused.
+   */
+  private fun deferStart(context: Context) {
+    val schedule = synchronized(lock) {
+      if (startDeferred) {
+        false
+      } else {
+        startDeferred = true
+        true
+      }
+    }
+
+    if (!schedule) {
+      return
+    }
+
+    runWhenForeground { if (count > 0) start(context) }
   }
 
   private fun refresh(context: Context) {

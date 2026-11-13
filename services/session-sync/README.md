@@ -541,6 +541,83 @@ Never replay an ambiguous external tool effect automatically.
 
 ## Live delivery, commands, and presence
 
+### User session notifications
+
+Session notifications report committed storage changes independently of remote
+control, runner sockets, and per-session subscriptions. The later Cloud Agent web
+integration can use these notifications to invalidate session lists and status.
+No web UI consumer is added here.
+
+| Method | Path | Input / result |
+|---|---|---|
+| POST | `/v1/notifications/ticket` | A human/device sync grant → `{ticket,expiresAt}` |
+| GET | `/v1/notifications` | WebSocket upgrade with a `session-notifications` viewer ticket |
+| PUT | `/v1/sessions/:id/status` | `{version:1,sourceID,after,status}` → `{value,version,updatedAt}` |
+
+Use the same `kilo-session-ticket.<ticket>` WebSocket subprotocol as live sockets.
+Bearer tickets also work for server clients. Query credentials are rejected.
+The service checks tickets again inside `SessionNotificationsDO`, which is keyed
+by authenticated user. Each socket receives only that user's sessions in its
+ticket's tenant. Organization membership never grants another creator's events.
+Open separate connections for separate tenant scopes.
+
+The service immediately sends `{version:1,type:"hello",body:{expiresAt,reauthAt,
+reconnectAfterMs,resetRequired:true}}`. It then broadcasts:
+
+```json
+{
+  "version": 1,
+  "type": "session.updated",
+  "session": {
+    "sessionID": "ses_synthetic",
+    "tenant": {"type": "user", "id": "synthetic-user"},
+    "revision": 1,
+    "position": 7,
+    "title": "Updated title",
+    "status": {"value": "question", "version": 2, "updatedAt": 1794500000000},
+    "createdAt": 1794400000000,
+    "updatedAt": 1794500000000,
+    "deletedAt": null
+  },
+  "changedAt": 1794500000000
+}
+```
+
+Event types are `session.created`, `session.updated`, `session.status.updated`,
+and `session.deleted`. Creation follows successful registration. Each newly
+committed batch emits `session.updated`, including title changes. Batch retries
+do not emit again. Rejected or rolled-back writes never emit. Deletion includes
+explicit deletion, account erasure, and idle retention; repeated deletion does
+not emit again. Events contain bounded metadata, never transcript or question
+contents. `title` is omitted when the native session entity is absent or stored
+as a blob; consumers fetch the canonical snapshot in that case. Inline titles
+are limited to 1,024 characters in notifications.
+
+Native sync does not infer execution status from transcript entities or the
+remote-control relay. Producers must explicitly write status using the new
+endpoint; existing producers do not yet do this automatically. The write checks
+the session creator, tenant, source binding, and live Cloud Agent upload authority
+where applicable. `after` is the last observed **status version**, starting at
+zero, not a transcript source position. A changed status increments that version;
+same-status writes and exact last-transition retries are no-ops. A stale version
+returns `position_conflict` with the current status version. Status accepts bounded
+lowercase tokens such as `busy`, `question`, `permission`, `retry`, and `idle`.
+`GET /v1/sessions/:id` exposes the last committed status, or null before the first
+status write. Status writes do not change transcript revision or position.
+
+Notifications are best-effort invalidation hints, not a durable event log.
+Delivery failure cannot reject a committed upload. Delivery can be missing,
+duplicated, or reordered; consumers refetch authoritative data and use transcript
+revision/status version to reject stale results. Refresh the creator index and
+canonical session state on every connection and periodically while connected.
+The stream has no replay cursor and retains no offline events. Each session
+bounds pending notification delivery to 64 tasks. Each user has at most 100
+notification sockets, with 120 client frames per minute per socket and an 8 KiB
+input-frame limit. Socket attachments survive hibernation; alarms close expired
+tickets. Send `{type:"reauth",ticket}` before expiry; user, tenant, and audience
+cannot change. `{type:"ping"}` receives a `pong` control frame. Clients cannot
+publish notifications or execute commands through this stream.
+
 The cloud is a thin relay: it authenticates, stamps sender/time/sequence, applies
 limits, keeps a short event replay ring, and stores opaque command payloads. It
 does not interpret approvals, aborts, slash commands, run IDs, or sync positions.

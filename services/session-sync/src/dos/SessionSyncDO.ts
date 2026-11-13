@@ -24,6 +24,7 @@ import {
   principalSchema,
   registerRequestSchema,
   sessionIDSchema,
+  statusRequestSchema,
   utf8Bytes,
   type BlobAck,
   type ErrorCode,
@@ -32,6 +33,7 @@ import {
   type SessionState,
   type SyncError,
   type Tenant,
+  type SessionStatus,
 } from '../protocol';
 import * as batches from './session-sync/batch';
 import { getTenantStub } from './SessionSyncTenantDO';
@@ -42,6 +44,9 @@ import * as page from './session-sync/page';
 import * as session from './session-sync/session';
 import { leaseBytes } from './session-sync/lease';
 import { diagnostic, metricsEnabled, phase, syncPhase, type DiagnosticOperation } from '../metrics';
+import * as notifications from './session-sync/notifications';
+import { publishNotification } from '../notifications/publish';
+import type { SessionNotification } from '../notifications/protocol';
 
 const PURGE_RETRY_MS = 60_000;
 export const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
@@ -54,6 +59,7 @@ class LeaseRequired extends Error {
 const target = { principal: principalSchema, sessionID: sessionIDSchema };
 const stateInput = z.strictObject(target);
 const registerInput = z.strictObject({ ...target, request: registerRequestSchema });
+const statusInput = z.strictObject({ ...target, request: statusRequestSchema });
 const batchInput = z.strictObject({ ...target, body: z.string() });
 const pageInput = z.strictObject({
   ...target,
@@ -138,6 +144,7 @@ export class SessionSyncDO extends DurableObject<Env> {
   private dataRateLimit = new DataRateLimit();
   private initialized: Promise<void> | undefined;
   private schemaReady = false;
+  private pendingNotifications = 0;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -199,6 +206,22 @@ export class SessionSyncDO extends DurableObject<Env> {
       if (error instanceof session.SyncFailure) return { ok: false, error: error.error };
       throw error;
     }
+  }
+
+  private notify(event: SessionNotification | undefined): void {
+    if (!event) return;
+    const meta = session.load(this.db);
+    if (!meta) return;
+    if (this.pendingNotifications >= 64) {
+      console.error('Session sync notification queue is full');
+      return;
+    }
+    this.pendingNotifications++;
+    this.ctx.waitUntil(
+      publishNotification(this.env, meta.creator_id, event).finally(() => {
+        this.pendingNotifications--;
+      })
+    );
   }
 
   /** Serializes admission changes without blocking reads during tenant RPCs. */
@@ -471,6 +494,8 @@ export class SessionSyncDO extends DurableObject<Env> {
         session.register(this.db, principal, sessionID, request.sourceID, Date.now())
       );
       if (registered.ok) {
+        if (registered.value.created)
+          this.notify(notifications.snapshot(this.db, 'session.created', Date.now()));
         await this.ctx.storage.delete('pendingRegistration');
         this.pendingRegistration = undefined;
         await this.scheduleSweep();
@@ -521,6 +546,23 @@ export class SessionSyncDO extends DurableObject<Env> {
       () => this.tx(() => session.toState(this.db, session.visible(this.db, principal, sessionID))),
       principal.tenant.type
     );
+  }
+
+  async setStatus(input: unknown): Promise<Result<SessionStatus>> {
+    const parsed = parse(statusInput, input);
+    if (!parsed.ok) return parsed;
+    const { principal, sessionID, request } = parsed.value;
+    const missing = this.missingSession();
+    if (missing) return missing;
+    return this.serial(async () => {
+      const result = this.tx(() =>
+        notifications.setStatus(this.db, principal, sessionID, request, Date.now())
+      );
+      if (!result.ok) return result;
+      this.notify(result.value.notification);
+      await this.scheduleSweep();
+      return ok(result.value.status);
+    });
   }
 
   /** Applies the batch in `body`, the exact UTF-8 request text. */
@@ -592,17 +634,34 @@ export class SessionSyncDO extends DurableObject<Env> {
           if (!batch.ok) work.validationCode = batch.error.code;
         }
         if (!batch.ok) throw new session.SyncFailure(batch.error);
-        return batches.apply(this.db, principal, sessionID, batch.value, digest, Date.now(), work);
-      });
-      if (applied.ok)
-        await phase(
-          this.env,
-          'applyBatch',
-          'schedule',
-          () => this.scheduleSweep(),
-          principal.tenant.type
+        const revision = session.load(this.db)?.revision ?? 0;
+        const receipt = batches.apply(
+          this.db,
+          principal,
+          sessionID,
+          batch.value,
+          digest,
+          Date.now(),
+          work
         );
-      return applied;
+        return {
+          receipt,
+          notification:
+            receipt.revision > revision
+              ? notifications.snapshot(this.db, 'session.updated', receipt.committedAt)
+              : undefined,
+        };
+      });
+      if (!applied.ok) return applied;
+      this.notify(applied.value.notification);
+      await phase(
+        this.env,
+        'applyBatch',
+        'schedule',
+        () => this.scheduleSweep(),
+        principal.tenant.type
+      );
+      return ok(applied.value.receipt);
     } finally {
       if (work) {
         if (work.validationAttempts > 0)
@@ -769,6 +828,7 @@ export class SessionSyncDO extends DurableObject<Env> {
       this.tx(() => erase.tombstone(this.db, principal, sessionID, Date.now()))
     );
     if (!erased.ok) return erased;
+    this.notify(erased.value.notification);
     let r2Ms = 0;
     try {
       await this.scheduleSweep();
@@ -802,6 +862,7 @@ export class SessionSyncDO extends DurableObject<Env> {
       }
       if (meta.creator_id !== principal.userID) return ok(null);
       const result = this.tx(() => erase.tombstone(this.db, principal, sessionID, Date.now()));
+      if (result.ok) this.notify(result.value.notification);
       return result.ok ? ok(null) : result;
     });
     if (!erased.ok) return erased;
@@ -833,6 +894,7 @@ export class SessionSyncDO extends DurableObject<Env> {
             )
           );
           if (!erased.ok) throw new Error(erased.error.message);
+          this.notify(erased.value.notification);
         }
       });
       const purged = await this.purgeRelay();

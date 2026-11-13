@@ -31,7 +31,9 @@ export function isCloudAgentSyncHandle(token: string): boolean {
 /** Receipt inspection is required by the uploader; transcript reads, deletion and control are excluded. */
 export function cloudAgentSyncUploadSession(method: string, pathname: string): string | null {
   const match =
-    /^\/v1\/sessions\/(ses_[A-Za-z0-9_-]{1,252})(\/batches|\/blobs\/[a-f0-9]{64})?$/.exec(pathname);
+    /^\/v1\/sessions\/(ses_[A-Za-z0-9_-]{1,252})(\/batches|\/status|\/blobs\/[a-f0-9]{64})?$/.exec(
+      pathname
+    );
   if (!match) return null;
   const suffix = match[2];
   if (suffix === undefined) return method === 'GET' || method === 'PUT' ? match[1] : null;

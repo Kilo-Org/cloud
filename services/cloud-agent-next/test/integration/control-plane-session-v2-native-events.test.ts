@@ -7,6 +7,7 @@ import { readNativeEventPayload } from '../../src/control-plane/session/native-e
 import { PART_TEXT_FLUSH_MS } from '../../src/control-plane/session/part-text-buffer.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
+import { seedRegistration } from './helpers/seed-registration.js';
 import type {
   ControlPlaneEvent,
   ControlPlaneEventsNotification,
@@ -33,7 +34,7 @@ async function fixture() {
     }),
     sandboxSelection: { provider: 'cloudflare' },
   });
-  await stub.registerSession({
+  await seedRegistration(stub, {
     sandboxId,
     spec: {
       sessionId,

@@ -56,6 +56,7 @@ import { createFakeCredentialBroker, installFakeSandboxEnv } from './helpers/fak
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
+import { seedRegistration } from './helpers/seed-registration.js';
 import { waitFor } from './wait-for.js';
 
 const NATIVE_KILO_TOKEN =
@@ -74,7 +75,7 @@ describe('retired control-plane runtime recovery', () => {
       const sandboxId = `istd-${'a'.repeat(48)}`;
       const stub = sessions.getByName(sessionDoName(SESSION_OWNER_ID, sessionId));
       const peer = new FakeSandboxPeer();
-      await stub.registerSession(registration(sandboxId, sessionId));
+      await seedRegistration(stub, registration(sandboxId, sessionId));
       await installPeer(stub, peer);
       await runInDurableObject(stub, async (instance, state) => {
         const metadata = parseSessionMetadata({
@@ -108,7 +109,7 @@ describe('retired control-plane runtime recovery', () => {
     const sandboxId = isolatedSandboxId();
     const stub = sessions.getByName(sessionDoName(SESSION_OWNER_ID, sessionId));
     const peer = new FakeSandboxPeer();
-    await stub.registerSession(registration(sandboxId, sessionId));
+    await seedRegistration(stub, registration(sandboxId, sessionId));
     await installPeer(stub, peer);
     await runInDurableObject(stub, async (instance, state) => {
       const metadata = parseSessionMetadata({
@@ -138,7 +139,7 @@ describe('retired control-plane runtime recovery', () => {
       const sandboxId = isolatedSandboxId();
       const stub = sessions.getByName(sessionDoName(SESSION_OWNER_ID, sessionId));
       const peer = new FakeSandboxPeer();
-      await stub.registerSession(registration(sandboxId, sessionId));
+      await seedRegistration(stub, registration(sandboxId, sessionId));
       const now = Date.now();
       const rows = (['accepted', 'completed', 'failed', 'cancelled'] as const).map(state => ({
         message_id: state,
@@ -559,7 +560,7 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     const sandboxId = unique('sbx__session_v2');
     const stub = sessions.getByName(sessionId);
     const peer = new FakeSandboxPeer();
-    await stub.registerSession(registration(sandboxId, sessionId));
+    await seedRegistration(stub, registration(sandboxId, sessionId));
     await installPeer(stub, peer);
     return { sessionId, stub, peer };
   }
@@ -2035,7 +2036,7 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     let stub = sessions.getByName(sessionId);
     // Register first so the wipe is what removes the session, not the absence
     // of any data.
-    await stub.registerSession(registration(sandboxId, sessionId));
+    await seedRegistration(stub, registration(sandboxId, sessionId));
 
     await runInDurableObject(stub, async (_instance, state) => {
       await state.storage.delete('control_plane_generation');
@@ -2090,7 +2091,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         });
       });
       const sessionStub = sessions.getByName(sessionDoName(SESSION_OWNER_ID, sessionId));
-      await sessionStub.registerSession({
+      await seedRegistration(sessionStub, {
         ...registration(sandboxId, sessionId),
         sandboxSelection: { provider: 'cloudflare-containers' },
       });
@@ -2217,7 +2218,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
       });
     });
     const sessionStub = sessions.getByName(sessionDoName(SESSION_OWNER_ID, sessionId));
-    await sessionStub.registerSession({
+    await seedRegistration(sessionStub, {
       ...registration(sandboxId, sessionId),
       sandboxSelection: { provider: 'cloudflare-containers' },
     });
@@ -2930,7 +2931,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
       });
     });
     const sessionStub = sessions.getByName(sessionDoName(SESSION_OWNER_ID, sessionId));
-    await sessionStub.registerSession(registration(sandboxId, sessionId));
+    await seedRegistration(sessionStub, registration(sandboxId, sessionId));
     const sentAt = Date.now();
     await sessionStub.send(promptPayload('m1'));
     const retryBy = Date.now() + CONTROL_PLANE_TIMERS.sandbox.providerCreateRetryMs;
@@ -3002,7 +3003,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     });
     const sessionName = sessionDoName(SESSION_OWNER_ID, sessionId);
     const sessionStub = sessions.getByName(sessionName);
-    await sessionStub.registerSession(registration(sandboxId, sessionId));
+    await seedRegistration(sessionStub, registration(sandboxId, sessionId));
     const reports: CloudAgentQueueReport[] = [];
     const callbacks: CallbackJob[] = [];
     await runInDurableObject(sessionStub, instance => {
@@ -3109,7 +3110,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     // `ownerId:sessionId` (spec §3); stream routing here uses the same name.
     const sessionName = sessionDoName(SESSION_OWNER_ID, sessionId);
     const sessionStub = sessions.getByName(sessionName);
-    await sessionStub.registerSession(registration(sandboxId, sessionId));
+    await seedRegistration(sessionStub, registration(sandboxId, sessionId));
 
     const stream = await connectStream(sessionName);
     await sessionStub.send(promptPayload('m1'));
@@ -3275,7 +3276,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     }));
     const base = registration(sandboxId, sessionId);
     const sessionStub = sessions.getByName(sessionDoName(SESSION_OWNER_ID, sessionId));
-    await sessionStub.registerSession({
+    await seedRegistration(sessionStub, {
       ...base,
       spec: { ...base.spec, directory: '/workspace', roots },
       environment: {
@@ -3336,7 +3337,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
 
     const sessionName = sessionDoName(SESSION_OWNER_ID, sessionId);
     const sessionStub = sessions.getByName(sessionName);
-    await sessionStub.registerSession(registration(sandboxId, sessionId));
+    await seedRegistration(sessionStub, registration(sandboxId, sessionId));
 
     await sessionStub.send(promptPayload('m1'));
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
@@ -3411,7 +3412,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
 
     const sessionName = sessionDoName(SESSION_OWNER_ID, sessionId);
     const sessionStub = sessions.getByName(sessionName);
-    await sessionStub.registerSession(registration(sandboxId, sessionId));
+    await seedRegistration(sessionStub, registration(sandboxId, sessionId));
 
     await sessionStub.send(promptPayload('m1'));
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
@@ -3463,7 +3464,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
 
     const sessionName = sessionDoName(SESSION_OWNER_ID, sessionId);
     const sessionStub = sessions.getByName(sessionName);
-    await sessionStub.registerSession(registration(sandboxId, sessionId));
+    await seedRegistration(sessionStub, registration(sandboxId, sessionId));
 
     await sessionStub.send(promptPayload('m1'));
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));

@@ -252,7 +252,6 @@ function makeDb(limitResults: (unknown[] | Error)[]): WorkerDb {
 }
 
 type DoStubOverrides = {
-  registerSession?: ReturnType<typeof vi.fn>;
   registerSessionFromMetadata?: ReturnType<typeof vi.fn>;
   createSessionWithInitialAdmission?: ReturnType<typeof vi.fn>;
   getMetadata?: ReturnType<typeof vi.fn>;
@@ -263,7 +262,6 @@ type DoStubOverrides = {
 
 function makeDoStub(overrides: DoStubOverrides = {}) {
   return {
-    registerSession: overrides.registerSession ?? vi.fn().mockResolvedValue({ success: true }),
     registerSessionFromMetadata:
       overrides.registerSessionFromMetadata ?? vi.fn().mockResolvedValue({ success: true }),
     createSessionWithInitialAdmission:
@@ -310,7 +308,6 @@ function createdRpcInput(doStub: ReturnType<typeof makeDoStub>): {
 } & SessionMetadata {
   const arg =
     doStub.createSessionWithInitialAdmission.mock.calls[0]?.[0] ??
-    doStub.registerSession.mock.calls[0]?.[0] ??
     doStub.registerSessionFromMetadata.mock.calls[0]?.[0];
   if (arg && typeof arg === 'object' && 'metadata' in arg) {
     return arg as {
@@ -496,7 +493,6 @@ describe('explicit sandbox session creation', () => {
     expect(recordSandboxIdentityMock).not.toHaveBeenCalled();
     expect(createCliSessionMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    expect(doStub.registerSession).not.toHaveBeenCalled();
   }
 
   beforeEach(() => {
@@ -2163,7 +2159,6 @@ describe('explicit sandbox session creation', () => {
       expect(settleOptions(0)?.outboxEvent).toMatchObject({
         properties: { outcome: 'failed' },
       });
-      expect(doStub.registerSession).not.toHaveBeenCalled();
       expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
     });
 
@@ -2195,7 +2190,6 @@ describe('explicit sandbox session creation', () => {
         });
         expect(recordSandboxIdentityMock).not.toHaveBeenCalled();
         expect(createCliSessionMock).not.toHaveBeenCalled();
-        expect(doStub.registerSession).not.toHaveBeenCalled();
         expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
       }
     );
@@ -5832,7 +5826,6 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       }
       await expect(runCreate(ctx, input)).rejects.toThrow();
       expect(stub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-      expect(stub.registerSession).not.toHaveBeenCalled();
       expect(createCliSessionMock).not.toHaveBeenCalled();
       expect(deleteCliSessionMock).not.toHaveBeenCalled();
       expect(settleOperationMock).not.toHaveBeenCalled();
@@ -6152,7 +6145,6 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
     expect(metadata.finalization.autoCommit).toBe(false);
     expect(doStub.getMessageResult).toHaveBeenCalledExactlyOnceWith(INITIAL_MESSAGE_ID);
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    expect(doStub.registerSession).not.toHaveBeenCalled();
     expect(recordOperationProgressMock).not.toHaveBeenCalled();
     expect(createCliSessionMock).not.toHaveBeenCalled();
   });
@@ -6438,7 +6430,6 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       message: expect.stringContaining('has been retired'),
     });
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    expect(doStub.registerSession).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -7189,10 +7180,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
         cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID,
       })
     );
-    expect(
-      doStub.registerSession.mock.calls.length +
-        doStub.registerSessionFromMetadata.mock.calls.length
-    ).toBe(1);
+    expect(doStub.registerSessionFromMetadata.mock.calls.length).toBe(1);
     expect(settleOperationMock).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({ rowId: ROW_ID, status: 'completed', outcomeCode: 'ok' })
@@ -7257,10 +7245,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
 
     expect(sandboxSessionIdFromName).toHaveBeenCalledWith(`${USER_ID}:${WORKSPACE_SESSION_ID}`);
     expect(sandboxSessionGet).toHaveBeenCalledTimes(1);
-    expect(
-      doStub.registerSession.mock.calls.length +
-        doStub.registerSessionFromMetadata.mock.calls.length
-    ).toBe(1);
+    expect(doStub.registerSessionFromMetadata.mock.calls.length).toBe(1);
     expect(createdMetadata(doStub)?.clone).toEqual({
       cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID,
     });
@@ -7584,7 +7569,6 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       })
     );
     expect(markReconcilePendingMock).not.toHaveBeenCalled();
-    expect(doStub.registerSession).not.toHaveBeenCalled();
     expect(deleteCliSessionMock).not.toHaveBeenCalled();
   });
 
@@ -7600,7 +7584,6 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
 
     expect(markReconcilePendingMock).toHaveBeenCalledWith(expect.any(Object), { rowId: ROW_ID });
     expect(settleOperationMock).not.toHaveBeenCalled();
-    expect(doStub.registerSession).not.toHaveBeenCalled();
     expect(deleteCliSessionMock).toHaveBeenCalledWith(
       expect.objectContaining({
         sessionId: KILO_SESSION_ID,
@@ -7622,7 +7605,6 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
 
     expect(markReconcilePendingMock).toHaveBeenCalledWith(expect.any(Object), { rowId: ROW_ID });
     expect(settleOperationMock).not.toHaveBeenCalled();
-    expect(doStub.registerSession).not.toHaveBeenCalled();
   });
 
   it('routes a thrown clone ingest outcome through reconcile-pending and rethrows the raw error', async () => {
@@ -7634,7 +7616,6 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
 
     expect(markReconcilePendingMock).toHaveBeenCalledWith(expect.any(Object), { rowId: ROW_ID });
     expect(settleOperationMock).not.toHaveBeenCalled();
-    expect(doStub.registerSession).not.toHaveBeenCalled();
   });
 
   it('keeps onlyIfEmpty rollback and no clone forwarding for a non-clone create', async () => {
@@ -7696,16 +7677,15 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
   });
 
   it('treats a clone-only "Session already registered" DO result as idempotent success', async () => {
-    // A lost first-attempt response makes the retry hit the non-idempotent DO
-    // method, which returns this rejection when metadata already exists. The
-    // caller must settle success without rolling back the live clone or
-    // tombstoning its IDs.
+    // A lost first-attempt response can make the retry see this rejection from
+    // the registration RPC. The caller must settle success without rolling back
+    // the live clone or tombstoning its IDs.
     createCliSessionMock.mockResolvedValue({
       status: 'ready',
       clone: { sessionId: KILO_SESSION_ID, copiedItemCount: 1 },
     });
     const doStub = makeDoStub({
-      registerSession: vi.fn().mockResolvedValue({
+      registerSessionFromMetadata: vi.fn().mockResolvedValue({
         success: false,
         error: 'Session already registered',
       }),
@@ -7714,10 +7694,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
 
     const result = await runCreate(ctx, cloneRequest());
 
-    expect(
-      doStub.registerSession.mock.calls.length +
-        doStub.registerSessionFromMetadata.mock.calls.length
-    ).toBe(1);
+    expect(doStub.registerSessionFromMetadata.mock.calls.length).toBe(1);
     expect(deleteCliSessionMock).not.toHaveBeenCalled();
     expect(recordSessionFailureMock).not.toHaveBeenCalled();
     expect(recordOperationProgressMock).not.toHaveBeenCalledWith(
@@ -7951,10 +7928,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
         cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID,
       })
     );
-    expect(
-      doStub.registerSession.mock.calls.length +
-        doStub.registerSessionFromMetadata.mock.calls.length
-    ).toBe(1);
+    expect(doStub.registerSessionFromMetadata.mock.calls.length).toBe(1);
     expect(settleOperationMock).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({
@@ -8059,8 +8033,6 @@ describe('createSessionWithLedger clone reconciliation', () => {
       code: 'CONFLICT',
       message: 'creation_in_progress',
     });
-
-    expect(doStub.registerSession).not.toHaveBeenCalled();
   });
 
   it('settles a clone-only create completed when ownership and metadata are both present', async () => {
@@ -8084,7 +8056,6 @@ describe('createSessionWithLedger clone reconciliation', () => {
 
     expect(doStub.getMetadata).toHaveBeenCalledTimes(1);
     expect(doStub.getMessageResult).not.toHaveBeenCalled();
-    expect(doStub.registerSession).not.toHaveBeenCalled();
     expect(createCliSessionMock).not.toHaveBeenCalled();
     expect(settleOperationMock).toHaveBeenCalledWith(
       expect.any(Object),
@@ -8175,10 +8146,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
         cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID,
       })
     );
-    expect(
-      doStub.registerSession.mock.calls.length +
-        doStub.registerSessionFromMetadata.mock.calls.length
-    ).toBe(1);
+    expect(doStub.registerSessionFromMetadata.mock.calls.length).toBe(1);
     expect(settleOperationMock).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({
@@ -8228,7 +8196,6 @@ describe('createSessionWithLedger clone reconciliation', () => {
       })
     );
     expect(markReconcilePendingMock).toHaveBeenCalledWith(expect.any(Object), { rowId: ROW_ID });
-    expect(doStub.registerSession).not.toHaveBeenCalled();
   });
 
   it('tombstones a rejected clone so the next same-key retry allocates fresh IDs', async () => {
@@ -8293,10 +8260,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
         cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID,
       })
     );
-    expect(
-      doStub.registerSession.mock.calls.length +
-        doStub.registerSessionFromMetadata.mock.calls.length
-    ).toBe(1);
+    expect(doStub.registerSessionFromMetadata.mock.calls.length).toBe(1);
     expect(settleOperationMock).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({
@@ -8354,7 +8318,6 @@ describe('createSessionWithLedger clone reconciliation', () => {
         kiloSessionId: KILO_SESSION_ID,
       },
     });
-    expect(doStub.registerSession).not.toHaveBeenCalled();
 
     // Attempt 2: same-key retry sees the tombstone and allocates fresh IDs.
     const FRESH_CLOUD_ID = 'workspace_fresh_11111111-1111-1111-1111-111111111111';
@@ -8388,10 +8351,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
         cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID,
       })
     );
-    expect(
-      doStub.registerSession.mock.calls.length +
-        doStub.registerSessionFromMetadata.mock.calls.length
-    ).toBe(1);
+    expect(doStub.registerSessionFromMetadata.mock.calls.length).toBe(1);
     expect(result).toEqual({
       cloudAgentSessionId: FRESH_CLOUD_ID,
       kiloSessionId: FRESH_KILO_ID,
@@ -8479,7 +8439,6 @@ describe('createSessionWithLedger non-clone rejection', () => {
       },
     });
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    expect(doStub.registerSession).not.toHaveBeenCalled();
 
     // Attempt 2: the same-key retry sees the tombstone and allocates fresh IDs.
     const FRESH_CLOUD_ID = 'workspace_fresh_11111111-1111-1111-1111-111111111111';

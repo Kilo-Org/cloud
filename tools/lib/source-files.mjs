@@ -53,9 +53,12 @@ function collect(dir, skip, files) {
 }
 
 /**
- * Every source file below `dir`, read and parsed once: its absolute path `file`,
- * the normalised path `path` a diagnostic names it by, its `text`, its syntax
- * tree `program`, and one `problems` line per parse error.
+ * Every source file below `dir`, read and parsed once, one file at a time: its
+ * absolute path `file`, the normalised path `path` a diagnostic names it by, its
+ * `text`, its syntax tree `program`, and one `problems` line per parse error.
+ *
+ * The walk is a generator, so a caller's `for … of` holds one file's text and
+ * one syntax tree at a time and peak memory does not grow with the tree.
  *
  * A file the parser refused has an empty tree, so the keys or calls it holds
  * would leave an audit without a word. `problems` says what the parser stopped
@@ -66,8 +69,7 @@ function collect(dir, skip, files) {
  * temporary directory — is named from `dir`, so it still reads from its own
  * root.
  */
-export function parseSourceTree(dir, root, skip) {
-  const entries = [];
+export function* parseSourceTree(dir, root, skip) {
   for (const file of sourceFiles(dir, skip)) {
     const text = readFileSync(file, 'utf8');
     const { program, errors } = parseSourceFile(file, text);
@@ -75,13 +77,12 @@ export function parseSourceTree(dir, root, skip) {
     const path = (fromRoot.startsWith('..') ? relativePath(dir, file) : fromRoot)
       .split(sep)
       .join('/');
-    entries.push({
+    yield {
       file,
       path,
       text,
       program,
       problems: parseProblems(path, errors, lineIndex(text)),
-    });
+    };
   }
-  return entries;
 }

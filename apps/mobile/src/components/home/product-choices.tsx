@@ -10,6 +10,7 @@ import { useFeatureFlag } from '@/lib/analytics/posthog';
 import { FEATURE_FLAG_SSH_CLIENT } from '@/lib/feature-flags';
 import { getCodeReviewerProfilePath, getPrReviewEntryPath } from '@/lib/profile-agent-navigation';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { useSshFixtureFlag } from '@/lib/ssh/fixture';
 import { SSH_HOSTS_ROUTE } from '@/lib/ssh/routes';
 
 type ProductChoicesProps = {
@@ -21,7 +22,9 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
   const router = useRouter();
   const { t } = useTranslation();
   const scope = organizationId ?? PERSONAL_SECURITY_SCOPE;
-  const sshEnabled = useFeatureFlag(FEATURE_FLAG_SSH_CLIENT, false);
+  const remoteFlag = useFeatureFlag(FEATURE_FLAG_SSH_CLIENT, false);
+  const fixtureFlag = useSshFixtureFlag();
+  const sshEnabled = remoteFlag || fixtureFlag;
 
   return (
     <View>

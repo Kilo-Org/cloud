@@ -264,6 +264,22 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
 ]);
 
 /**
+ * Keys a locale must translate, per catalog, even where a catalog would
+ * otherwise be allowed to keep the English copy.
+ *
+ * The Home screen's empty state says that nothing of the reader's own work is
+ * running. A catalog that leaves that sentence in English renders an
+ * untranslated screen for a reader who chose another language, so no locale may
+ * copy English here — unlike the format-only and proper-noun keys above, which
+ * are identical in every language on purpose.
+ *
+ * The map lists, per catalog, the keys no locale may leave in English. Removing
+ * a key from a catalog's set promises its copy may now be identical to English
+ * in that catalog.
+ */
+const MUST_TRANSLATE_KEYS = new Map([['mobile', new Set(['home.noLiveSessions'])]]);
+
+/**
  * Push copy that is English on purpose, per catalog. A value listed for a tag
  * is not reported as untranslated for that tag.
  *
@@ -1190,6 +1206,7 @@ export function checkCatalogs(root = ROOT) {
     // The base each catalog's consumers append their own part to: a plural stem
     // in the app, a `.title`/`.body` part in the push runtime.
     const baseKeyOf = catalog.name === 'mobile' ? pluralBaseKey : pushBaseKey;
+    const mustTranslateKeys = MUST_TRANSLATE_KEYS.get(catalog.name) ?? new Set();
     const englishFamilies = pluralFamilyBases(english);
     // English copy that interpolates {{count}} but whose words inflect none or
     // only by count, so English ships a flat key (or a family). A language whose
@@ -1400,7 +1417,9 @@ export function checkCatalogs(root = ROOT) {
             allowContains
           );
         }
-        if (catalog.name === 'mobile' && key === 'home.noLiveSessions' && value === englishValue) {
+        // A catalog may not leave a listed key in English; MUST_TRANSLATE_KEYS
+        // records which keys, per catalog, and why.
+        if (mustTranslateKeys.has(key) && value === englishValue) {
           fail(`${label}: "${key}" must be translated`);
         }
         const expected = placeholders(englishValue);

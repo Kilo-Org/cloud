@@ -13,14 +13,13 @@ const {
   NODE_ENV,
 } = process.env;
 
-const POSTGRES_URL = getEnvVariable('POSTGRES_URL');
-
 // Environment validation
-if (!POSTGRES_URL) throw new Error('POSTGRES_URL not configured');
 if (!POSTGRES_CONNECT_TIMEOUT) throw new Error('POSTGRES_CONNECT_TIMEOUT not configured');
 if (!POSTGRES_MAX_QUERY_TIME) throw new Error('POSTGRES_MAX_QUERY_TIME not configured');
 
-// Base url + test worker suffix (shared) - includes env validation internally
+// Base url + test worker suffix (shared). It selects POSTGRES_URL_PRODUCTION or
+// POSTGRES_URL for the current mode and throws when that variable is unset, so
+// it owns the connection-URL contract; no pool below is built before it runs.
 let postgresUrl = computeDatabaseUrl();
 
 const IS_SCRIPT = process.env.IS_SCRIPT === 'true';

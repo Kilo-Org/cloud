@@ -22,6 +22,9 @@
     "expired": "Срок истёк"
   },
   "common": {
+    "creditHistory": "История кредитов",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Отмена",
@@ -118,6 +121,7 @@
     "copyLink": "Скопировать ссылку",
     "couldNotLoadOrganizations": "Не удалось загрузить организации.",
     "couldNotLoadSessions": "Не удалось загрузить сеансы.",
+    "couldnTLoad": "Не удалось загрузить.",
     "couldnTLoadMore": "Не удалось загрузить следующие записи.",
     "deviceSessions": "Сеансы на устройствах",
     "disabled": "Отключено",
@@ -245,6 +249,10 @@
     "notAdded": "Вход выполнен. {{provider}} не добавлен в ваш аккаунт."
   },
   "profile": {
+    "creditHistorySubtitle": "Покупки, чеки и операции с кредитами",
+    "invoicesSubtitle": "Скачивайте счета за покупки",
+    "manageBilling": "Управление оплатой на kilo.ai",
+    "manageBillingIosNote": "Способы оплаты, автопополнение и платёжные данные настраиваются на kilo.ai.",
     "codeReviewerSubtitle": "Автоматические проверки PR",
     "securityAgentSubtitle": "Поиск и устранение уязвимостей",
     "reviews": "Проверки",
@@ -2453,6 +2461,26 @@
     "onlyFirstFilesAttached_many": "Будут прикреплены только файлы в начале списка: {{displayCount}}."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "История платежей",
+      "billingHistoryEmpty": "Платежей пока нет.",
+      "cancel": "Отменить подписку",
+      "cancelDescription": "Kilo Pass останется активным до конца расчётного периода и не будет продлён.",
+      "cancelScheduled": "Отменяется {{date}}",
+      "cancelScheduledChange": "Отменить запланированное изменение",
+      "cancelled": "Подписка отменена",
+      "changePlan": "Сменить тариф на kilo.ai",
+      "changePlanIosNote": "Сменить платный тариф можно на kilo.ai.",
+      "creditHistoryEmpty": "Кредитов Kilo Pass пока нет.",
+      "manageInStore": "Управлять в {{store}}",
+      "resume": "Возобновить подписку",
+      "resumeCancelledDescription": "Kilo Pass снова будет продлеваться автоматически.",
+      "resumePausedDescription": "Kilo Pass возобновится сейчас, не дожидаясь запланированной даты.",
+      "resumed": "Подписка возобновлена",
+      "scheduledChange": "Запланированное изменение",
+      "scheduledChangeCancelDescription": "Kilo Pass останется на текущем тарифе и будет продлеваться как сейчас.",
+      "scheduledChangeSummary": "{{plan}} с {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass недоступен.",
     "couldNotLoad": "Не удалось загрузить Kilo Pass. Попробуйте снова.",
@@ -4071,6 +4099,25 @@
     "importConfigApplied": "Конфигурация импортирована"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Не удалось загрузить кредитную активность.",
+      "appStoreReceipt": "Чек в App Store",
+      "deductionFallback": "Списание кредитов",
+      "emptyDescription": "Здесь появятся покупки кредитов, чеки и расход.",
+      "emptyTitle": "Истории кредитов нет",
+      "googlePlayReceipt": "Чек в Google Play",
+      "kind": {
+        "adjustment": "Корректировка",
+        "balanceNeutral": "Без изменения баланса",
+        "deduction": "Списание",
+        "grant": "Начисление кредитов",
+        "purchase": "Покупка"
+      },
+      "purchaseFallback": "Покупка кредитов",
+      "receipt": "Чек",
+      "receiptA11y": "Открыть чек: {{description}}",
+      "receiptUnavailable": "Чек для этой покупки недоступен."
+    },
     "title": "Купить кредиты",
     "description": "Кредиты — это разовая покупка, которая добавляется на ваш баланс Kilo для проведения ИИ-сессий кодинга в Kilo App. Магазин списывает средства с вашего аккаунта, и кредиты начисляются после подтверждения оплаты магазином.",
     "nextExpiry": "Срок действия кредитов на сумму {{amount}} истекает {{date}} (UTC). Сначала расходуются кредиты с самым ранним сроком действия.",
@@ -4260,6 +4307,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Не удалось открыть результат поиска"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Счета за ваши личные покупки появятся здесь после первого списания."
   },
   "cloudAgent": {
     "compute": {

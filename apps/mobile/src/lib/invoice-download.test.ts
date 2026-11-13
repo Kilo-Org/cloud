@@ -7,7 +7,7 @@ import {
   invoiceSharingUnavailableMessage,
   selectInvoiceDownloadErrorMessage,
   selectInvoiceRowState,
-} from '@/lib/organization-invoice-download';
+} from '@/lib/invoice-download';
 import { ShareRemoteFileError } from '@/lib/share-remote-file';
 
 vi.mock('expo-file-system', () => ({

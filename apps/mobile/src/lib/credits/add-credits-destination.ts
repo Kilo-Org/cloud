@@ -25,6 +25,15 @@ export function organizationBillingUrl(organizationId: string): string {
 }
 
 /**
+ * The page where a person manages their own billing: payment methods, auto
+ * top-up, and the purchase history the app keeps out of reach behind the App
+ * Store's purchase-link rule.
+ */
+export function personalBillingUrl(): string {
+  return `${WEB_BASE_URL}/credits`;
+}
+
+/**
  * The Add credits destination of the balance a session or chat spends.
  *
  * A surface that records the organization paying for it settles a refusal on

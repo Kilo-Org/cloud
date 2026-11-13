@@ -22,6 +22,9 @@
     "expired": "Oge agwụla"
   },
   "common": {
+    "creditHistory": "Akụkọ kredit",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Kagbuo",
@@ -118,6 +121,7 @@
     "copyLink": "Detuo njikọ",
     "couldNotLoadOrganizations": "Enweghị ike ibudata òtù.",
     "couldNotLoadSessions": "Enweghị ike ibudata nnọkọ.",
+    "couldnTLoad": "Enweghị ike ibudata.",
     "couldnTLoadMore": "Enweghị ike ibudata ọzọ.",
     "deviceSessions": "Nnọkọ ngwaọrụ",
     "disabled": "Agbanyụrụ",
@@ -245,6 +249,10 @@
     "notAdded": "Ị banyela. Etinyeghị {{provider}} na akaụntụ gị."
   },
   "profile": {
+    "creditHistorySubtitle": "Ịzụ ahịa, rịsịt, na ihe omume kredit",
+    "invoicesSubtitle": "Budata akwụkwọ ụgwọ maka ihe ị zụrụ",
+    "manageBilling": "Jikwaa ịkwụ ụgwọ na kilo.ai",
+    "manageBillingIosNote": "A na-ejikwa ụzọ ịkwụ ụgwọ, itinye kredit na-akpaghị aka, na nkọwa ịkwụ ụgwọ na kilo.ai.",
     "codeReviewerSubtitle": "Nyocha PR akpaghị aka",
     "securityAgentSubtitle": "Chọta ma dozie adịghị ike nchebe",
     "reviews": "Nyocha",
@@ -2935,6 +2943,26 @@
     "onlyFirstFilesAttached_other": "Naanị faịlụ {{displayCount}} mbụ ka a ga-etinye."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Akụkọ ịkwụ ụgwọ",
+      "billingHistoryEmpty": "Enweghị akụkọ ịkwụ ụgwọ ka ugbu a.",
+      "cancel": "Kagbuo ndenye aha",
+      "cancelDescription": "Kilo Pass gị ga-anọgide na-arụ ọrụ ruo ngwụcha oge ịkwụ ụgwọ, a gaghịkwa emeghari ya ọhụrụ.",
+      "cancelScheduled": "Ọ ga-akagbu na {{date}}",
+      "cancelScheduledChange": "Kagbuo mgbanwe a haziri",
+      "cancelled": "Akagburu ndenye aha",
+      "changePlan": "Gbanwee atụmatụ na kilo.ai",
+      "changePlanIosNote": "Mgbanwe atụmatụ a na-akwụ ụgwọ dị na kilo.ai.",
+      "creditHistoryEmpty": "Enweghị kredit Kilo Pass ka ugbu a.",
+      "manageInStore": "Jikwaa na {{store}}",
+      "resume": "Maliteghachi ndenye aha",
+      "resumeCancelledDescription": "Kilo Pass gị ga-amaliteghachi imeghari ọhụrụ na-akpaghị aka.",
+      "resumePausedDescription": "Kilo Pass gị ga-amaliteghachi ugbu a, tupu ụbọchị a haziri maka ịmaliteghachi ya.",
+      "resumed": "Amaliteghachiri ndenye aha",
+      "scheduledChange": "Mgbanwe a haziri",
+      "scheduledChangeCancelDescription": "Kilo Pass gị ga-anọgide na atụmatụ ya ugbu a ma meghari ọhụrụ dịka o si eme taa.",
+      "scheduledChangeSummary": "{{plan}} na {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "A budataghị Kilo Pass.",
     "couldNotLoad": "Enweghị ike ibudata Kilo Pass. Nwaa ọzọ.",
@@ -3949,6 +3977,25 @@
     "importConfigApplied": "Ebubere nhazi"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Enweghị ike ibudata mmemme kredit.",
+      "appStoreReceipt": "Rịsịt sitere na App Store",
+      "deductionFallback": "Mwepụ kredit",
+      "emptyDescription": "Ịzụ kredit, rịsịt, na ojiji ga-apụta ebe a.",
+      "emptyTitle": "Enweghị akụkọ kredit",
+      "googlePlayReceipt": "Rịsịt sitere na Google Play",
+      "kind": {
+        "adjustment": "Mmezi",
+        "balanceNeutral": "Enweghị mmetụta n'ego fọdụrụ",
+        "deduction": "Mwepụ",
+        "grant": "Onyinye kredit",
+        "purchase": "Ịzụ ahịa"
+      },
+      "purchaseFallback": "Ịzụ kredit",
+      "receipt": "Rịsịt",
+      "receiptA11y": "Mepee rịsịt maka {{description}}",
+      "receiptUnavailable": "Enweghị rịsịt maka ihe a zụrụ a."
+    },
     "title": "Zụta ego ojiji",
     "description": "Ego ojiji bụ azụmahịa otu oge nke a na-agbakwunye na nguzozi Kilo gị maka ịgba nnọkọ ịde koodu AI na Kilo App. Ụlọ ahịa na-akwụ ụgwọ na akaụntụ gị, a na-agbakwunye ego ojiji mgbe ụlọ ahịa kwadoro ịkwụ ụgwọ ahụ.",
     "nextExpiry": "Ego ojiji ruru {{amount}} ga-agwụ na {{date}} (UTC). A na-ebu ụzọ jiri ego ojiji nke ga-akacha agwụ ngwa ngwa.",
@@ -4130,6 +4177,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Enweghị ike imepe nsonaazụ ọchụchọ a"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Akwụkwọ ụgwọ maka ihe gị onwe gị zụrụ ga-apụta ebe a ozugbo a nara gị ụgwọ."
   },
   "cloudAgent": {
     "compute": {

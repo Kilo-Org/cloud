@@ -22,6 +22,9 @@
     "expired": "ਮਿਆਦ ਪੁੱਗ ਗਈ"
   },
   "common": {
+    "creditHistory": "ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": "। ",
     "listJoiner": ", ",
     "cancel": "ਰੱਦ ਕਰੋ",
@@ -118,6 +121,7 @@
     "copyLink": "ਲਿੰਕ ਕਾਪੀ ਕਰੋ",
     "couldNotLoadOrganizations": "ਸੰਸਥਾਵਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
     "couldNotLoadSessions": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
+    "couldnTLoad": "ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
     "couldnTLoadMore": "ਹੋਰ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
     "deviceSessions": "ਡਿਵਾਈਸਾਂ ਦੇ ਸੈਸ਼ਨ",
     "disabled": "ਬੰਦ",
@@ -245,6 +249,10 @@
     "notAdded": "ਤੁਸੀਂ ਸਾਈਨ ਇਨ ਕਰ ਲਿਆ ਹੈ। {{provider}} ਤੁਹਾਡੇ ਖਾਤੇ ਵਿੱਚ ਨਹੀਂ ਜੋੜਿਆ ਗਿਆ।"
   },
   "profile": {
+    "creditHistorySubtitle": "ਖਰੀਦਾਂ, ਰਸੀਦਾਂ ਅਤੇ ਕ੍ਰੈਡਿਟ ਗਤੀਵਿਧੀ",
+    "invoicesSubtitle": "ਆਪਣੀਆਂ ਖਰੀਦਾਂ ਦੇ ਇਨਵੌਇਸ ਡਾਊਨਲੋਡ ਕਰੋ",
+    "manageBilling": "kilo.ai 'ਤੇ ਬਿਲਿੰਗ ਦਾ ਪ੍ਰਬੰਧ ਕਰੋ",
+    "manageBillingIosNote": "ਭੁਗਤਾਨ ਦੇ ਤਰੀਕਿਆਂ, ਆਟੋ ਟੌਪ-ਅੱਪ ਅਤੇ ਬਿਲਿੰਗ ਵੇਰਵਿਆਂ ਦਾ ਪ੍ਰਬੰਧ kilo.ai 'ਤੇ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
     "codeReviewerSubtitle": "ਆਪਣੇ ਆਪ ਹੋਣ ਵਾਲੀਆਂ PR ਸਮੀਖਿਆਵਾਂ",
     "securityAgentSubtitle": "ਸੁਰੱਖਿਆ ਕਮਜ਼ੋਰੀਆਂ ਲੱਭੋ ਅਤੇ ਠੀਕ ਕਰੋ",
     "reviews": "ਸਮੀਖਿਆਵਾਂ",
@@ -2935,6 +2943,26 @@
     "onlyFirstFilesAttached_other": "ਸਿਰਫ਼ ਪਹਿਲੀਆਂ {{displayCount}} ਫਾਈਲਾਂ ਨੱਥੀ ਕੀਤੀਆਂ ਜਾਣਗੀਆਂ।"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "ਬਿਲਿੰਗ ਇਤਿਹਾਸ",
+      "billingHistoryEmpty": "ਅਜੇ ਕੋਈ ਬਿਲਿੰਗ ਇਤਿਹਾਸ ਨਹੀਂ ਹੈ।",
+      "cancel": "ਸਬਸਕ੍ਰਿਪਸ਼ਨ ਰੱਦ ਕਰੋ",
+      "cancelDescription": "ਤੁਹਾਡਾ Kilo Pass ਬਿਲਿੰਗ ਮਿਆਦ ਦੇ ਅੰਤ ਤੱਕ ਕਿਰਿਆਸ਼ੀਲ ਰਹੇਗਾ ਅਤੇ ਰੀਨਿਊ ਨਹੀਂ ਹੋਵੇਗਾ।",
+      "cancelScheduled": "{{date}} ਨੂੰ ਰੱਦ ਹੋਵੇਗਾ",
+      "cancelScheduledChange": "ਨਿਰਧਾਰਿਤ ਬਦਲਾਅ ਰੱਦ ਕਰੋ",
+      "cancelled": "ਸਬਸਕ੍ਰਿਪਸ਼ਨ ਰੱਦ ਕੀਤੀ ਗਈ",
+      "changePlan": "kilo.ai 'ਤੇ ਪਲਾਨ ਬਦਲੋ",
+      "changePlanIosNote": "ਭੁਗਤਾਨ ਵਾਲੇ ਪਲਾਨ ਵਿੱਚ ਬਦਲਾਅ kilo.ai 'ਤੇ ਉਪਲਬਧ ਹਨ।",
+      "creditHistoryEmpty": "ਅਜੇ ਕੋਈ Kilo Pass ਕ੍ਰੈਡਿਟ ਨਹੀਂ ਹੈ।",
+      "manageInStore": "{{store}} ਵਿੱਚ ਪ੍ਰਬੰਧ ਕਰੋ",
+      "resume": "ਸਬਸਕ੍ਰਿਪਸ਼ਨ ਮੁੜ ਸ਼ੁਰੂ ਕਰੋ",
+      "resumeCancelledDescription": "ਤੁਹਾਡਾ Kilo Pass ਦੁਬਾਰਾ ਆਪਣੇ-ਆਪ ਰੀਨਿਊ ਹੋਣਾ ਸ਼ੁਰੂ ਹੋ ਜਾਵੇਗਾ।",
+      "resumePausedDescription": "ਤੁਹਾਡਾ Kilo Pass ਆਪਣੀ ਨਿਰਧਾਰਿਤ ਮੁੜ-ਸ਼ੁਰੂਆਤ ਮਿਤੀ ਤੋਂ ਪਹਿਲਾਂ, ਹੁਣੇ ਮੁੜ ਸ਼ੁਰੂ ਹੋ ਜਾਵੇਗਾ।",
+      "resumed": "ਸਬਸਕ੍ਰਿਪਸ਼ਨ ਮੁੜ ਸ਼ੁਰੂ ਹੋ ਗਈ",
+      "scheduledChange": "ਨਿਰਧਾਰਿਤ ਬਦਲਾਅ",
+      "scheduledChangeCancelDescription": "ਤੁਹਾਡਾ Kilo Pass ਆਪਣੇ ਮੌਜੂਦਾ ਪਲਾਨ 'ਤੇ ਹੀ ਰਹੇਗਾ ਅਤੇ ਹੁਣ ਵਾਂਗ ਹੀ ਰੀਨਿਊ ਹੋਵੇਗਾ।",
+      "scheduledChangeSummary": "{{date}} ਨੂੰ {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
     "couldNotLoad": "Kilo Pass ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
@@ -3949,6 +3977,25 @@
     "importConfigApplied": "Config ਆਯਾਤ ਹੋਇਆ"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "ਕ੍ਰੈਡਿਟ ਗਤੀਵਿਧੀ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ।",
+      "appStoreReceipt": "App Store ਤੋਂ ਰਸੀਦ",
+      "deductionFallback": "ਕ੍ਰੈਡਿਟ ਕਟੌਤੀ",
+      "emptyDescription": "ਕ੍ਰੈਡਿਟ ਖਰੀਦਾਂ, ਰਸੀਦਾਂ ਅਤੇ ਵਰਤੋਂ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",
+      "emptyTitle": "ਕੋਈ ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ ਨਹੀਂ",
+      "googlePlayReceipt": "Google Play ਤੋਂ ਰਸੀਦ",
+      "kind": {
+        "adjustment": "ਸਮਾਯੋਜਨ",
+        "balanceNeutral": "ਬਕਾਇਆ ਅਪਰਿਵਰਤਿਤ",
+        "deduction": "ਕਟੌਤੀ",
+        "grant": "ਕ੍ਰੈਡਿਟ ਗ੍ਰਾਂਟ",
+        "purchase": "ਖਰੀਦ"
+      },
+      "purchaseFallback": "ਕ੍ਰੈਡਿਟ ਖਰੀਦ",
+      "receipt": "ਰਸੀਦ",
+      "receiptA11y": "{{description}} ਲਈ ਰਸੀਦ ਖੋਲ੍ਹੋ",
+      "receiptUnavailable": "ਇਸ ਖਰੀਦ ਲਈ ਕੋਈ ਰਸੀਦ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।"
+    },
     "title": "ਕ੍ਰੈਡਿਟ ਖਰੀਦੋ",
     "description": "ਕ੍ਰੈਡਿਟ ਇੱਕ-ਵਾਰ ਦੀ ਖਰੀਦ ਹੈ ਜੋ Kilo ਐਪ ਵਿੱਚ AI ਕੋਡਿੰਗ ਸੈਸ਼ਨ ਚਲਾਉਣ ਲਈ ਤੁਹਾਡੇ Kilo ਬੈਲੰਸ ਵਿੱਚ ਜੋੜੀ ਜਾਂਦੀ ਹੈ। ਸਟੋਰ ਤੁਹਾਡੇ ਖਾਤੇ ਤੋਂ ਚਾਰਜ ਲੈਂਦਾ ਹੈ ਅਤੇ ਸਟੋਰ ਵੱਲੋਂ ਭੁਗਤਾਨ ਦੀ ਪੁਸ਼ਟੀ ਕਰਨ ਤੋਂ ਬਾਅਦ ਕ੍ਰੈਡਿਟ ਜੋੜੇ ਜਾਂਦੇ ਹਨ।",
     "nextExpiry": "{{amount}} ਦੇ ਕ੍ਰੈਡਿਟਾਂ ਦੀ ਮਿਆਦ {{date}} (UTC) ਨੂੰ ਪੁੱਗ ਰਹੀ ਹੈ। ਸਭ ਤੋਂ ਪਹਿਲਾਂ ਮਿਆਦ ਪੁੱਗਣ ਵਾਲੇ ਕ੍ਰੈਡਿਟ ਪਹਿਲਾਂ ਵਰਤੇ ਜਾਂਦੇ ਹਨ।",
@@ -4130,6 +4177,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ਇਹ ਖੋਜ ਨਤੀਜਾ ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ"
+  },
+  "invoices": {
+    "personalEmptyDescription": "ਤੁਹਾਡੇ ਤੋਂ ਬਿੱਲ ਲਏ ਜਾਣ ਤੋਂ ਬਾਅਦ ਤੁਹਾਡੀਆਂ ਆਪਣੀਆਂ ਖਰੀਦਾਂ ਦੇ ਇਨਵੌਇਸ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।"
   },
   "cloudAgent": {
     "compute": {

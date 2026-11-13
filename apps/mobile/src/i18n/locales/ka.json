@@ -22,6 +22,9 @@
     "expired": "ვადაგასულია"
   },
   "common": {
+    "creditHistory": "კრედიტების ისტორია",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "გაუქმება",
@@ -118,6 +121,7 @@
     "copyLink": "ბმულის კოპირება",
     "couldNotLoadOrganizations": "ორგანიზაციების ჩატვირთვა ვერ მოხერხდა.",
     "couldNotLoadSessions": "სესიების ჩატვირთვა ვერ მოხერხდა.",
+    "couldnTLoad": "ჩატვირთვა ვერ მოხერხდა.",
     "couldnTLoadMore": "მეტის ჩატვირთვა ვერ მოხერხდა.",
     "deviceSessions": "მოწყობილობების სესიები",
     "disabled": "გამორთულია",
@@ -245,6 +249,10 @@
     "notAdded": "შესული ხარ. {{provider}} არ დაემატა შენს ანგარიშს."
   },
   "profile": {
+    "creditHistorySubtitle": "შენაძენები, ქვითრები და კრედიტების აქტივობა",
+    "invoicesSubtitle": "ჩამოტვირთეთ თქვენი შენაძენების ინვოისები",
+    "manageBilling": "გადახდების მართვა kilo.ai-ზე",
+    "manageBillingIosNote": "გადახდის მეთოდები, ავტომატური შევსება და ანგარიშსწორების დეტალები იმართება kilo.ai-ზე.",
     "codeReviewerSubtitle": "PR-ების ავტომატური შემოწმება",
     "securityAgentSubtitle": "მოწყვლადობების პოვნა და აღმოფხვრა",
     "reviews": "კოდის შემოწმება",
@@ -2935,6 +2943,26 @@
     "onlyFirstFilesAttached_other": "მხოლოდ პირველი {{displayCount}} ფაილი მიემაგრება."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "გადახდების ისტორია",
+      "billingHistoryEmpty": "გადახდების ისტორია ჯერ არ არის.",
+      "cancel": "გამოწერის გაუქმება",
+      "cancelDescription": "თქვენი Kilo Pass აქტიური დარჩება ანგარიშსწორების პერიოდის ბოლომდე და აღარ განახლდება.",
+      "cancelScheduled": "გაუქმდება {{date}}",
+      "cancelScheduledChange": "დაგეგმილი ცვლილების გაუქმება",
+      "cancelled": "გამოწერა გაუქმდა",
+      "changePlan": "გეგმის შეცვლა kilo.ai-ზე",
+      "changePlanIosNote": "ფასიანი გეგმის შეცვლა ხელმისაწვდომია kilo.ai-ზე.",
+      "creditHistoryEmpty": "Kilo Pass-ის კრედიტები ჯერ არ არის.",
+      "manageInStore": "მართვა {{store}}-ში",
+      "resume": "გამოწერის აღდგენა",
+      "resumeCancelledDescription": "თქვენი Kilo Pass კვლავ ავტომატურად განახლდება.",
+      "resumePausedDescription": "თქვენი Kilo Pass ახლავე აღდგება, დაგეგმილ თარიღამდე.",
+      "resumed": "გამოწერა აღდგა",
+      "scheduledChange": "დაგეგმილი ცვლილება",
+      "scheduledChangeCancelDescription": "თქვენი Kilo Pass დარჩება მიმდინარე გეგმაზე და განახლდება ისე, როგორც ახლა.",
+      "scheduledChangeSummary": "{{plan}} {{date}}-დან"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass მიუწვდომელია.",
     "couldNotLoad": "Kilo Pass-ის ჩატვირთვა ვერ მოხერხდა. სცადე ხელახლა.",
@@ -3949,6 +3977,25 @@
     "importConfigApplied": "კონფიგი იმპორტირებულია"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "კრედიტების აქტივობის ჩატვირთვა ვერ მოხერხდა.",
+      "appStoreReceipt": "ქვითარი App Store-იდან",
+      "deductionFallback": "კრედიტების ჩამოჭრა",
+      "emptyDescription": "კრედიტების შენაძენები, ქვითრები და გამოყენება აქ გამოჩნდება.",
+      "emptyTitle": "კრედიტების ისტორია ცარიელია",
+      "googlePlayReceipt": "ქვითარი Google Play-დან",
+      "kind": {
+        "adjustment": "კორექტირება",
+        "balanceNeutral": "ბალანსზე გავლენის გარეშე",
+        "deduction": "ჩამოჭრა",
+        "grant": "კრედიტების მინიჭება",
+        "purchase": "შენაძენი"
+      },
+      "purchaseFallback": "კრედიტების შეძენა",
+      "receipt": "ქვითარი",
+      "receiptA11y": "ქვითრის გახსნა: {{description}}",
+      "receiptUnavailable": "ამ შენაძენისთვის ქვითარი ხელმისაწვდომი არ არის."
+    },
     "title": "კრედიტების ყიდვა",
     "description": "კრედიტები ერთჯერადი შენაძენია, რომელიც ემატება თქვენს Kilo ბალანსს Kilo აპში AI კოდირების სესიების გასაშვებად. მაღაზია თქვენს ანგარიშს არიცხავს თანხას და კრედიტები ემატება მას შემდეგ, რაც მაღაზია გადახდას დაადასტურებს.",
     "nextExpiry": "კრედიტების ({{amount}}) ვადა იწურება: {{date}} (UTC). ჯერ გამოიყენება კრედიტები, რომელთა ვადაც ყველაზე ადრე იწურება.",
@@ -4130,6 +4177,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ამ ძიების შედეგის გახსნა ვერ მოხერხდა"
+  },
+  "invoices": {
+    "personalEmptyDescription": "თქვენი პირადი შენაძენების ინვოისები აქ გამოჩნდება, როგორც კი თანხა ჩამოგეჭრებათ."
   },
   "cloudAgent": {
     "compute": {

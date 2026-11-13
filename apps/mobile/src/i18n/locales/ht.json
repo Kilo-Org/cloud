@@ -22,6 +22,9 @@
     "expired": "Ekspire"
   },
   "common": {
+    "creditHistory": "Istorik kredi",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Anile",
@@ -118,6 +121,7 @@
     "copyLink": "Kopye lyen an",
     "couldNotLoadOrganizations": "Nou pa t kapab chaje òganizasyon yo.",
     "couldNotLoadSessions": "Nou pa t kapab chaje sesyon yo.",
+    "couldnTLoad": "Nou pa t kapab chaje.",
     "couldnTLoadMore": "Nou pa t kapab chaje plis.",
     "deviceSessions": "Sesyon aparèy",
     "disabled": "Dezaktive",
@@ -245,6 +249,10 @@
     "notAdded": "Ou konekte. Yo pa t ajoute {{provider}} nan kont ou."
   },
   "profile": {
+    "creditHistorySubtitle": "Acha, resi, ak aktivite kredi",
+    "invoicesSubtitle": "Telechaje fakti pou acha ou yo",
+    "manageBilling": "Jere faktirasyon sou kilo.ai",
+    "manageBillingIosNote": "Mwayen peman, rechaj otomatik, ak detay faktirasyon yo jere sou kilo.ai.",
     "codeReviewerSubtitle": "Revizyon otomatik PR yo",
     "securityAgentSubtitle": "Jwenn epi korije vilnerabilite",
     "reviews": "Revizyon",
@@ -2935,6 +2943,26 @@
     "onlyFirstFilesAttached_other": "Se sèlman premye {{displayCount}} fichye yo k ap tache."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Istorik faktirasyon",
+      "billingHistoryEmpty": "Poko gen istorik faktirasyon.",
+      "cancel": "Anile abònman",
+      "cancelDescription": "Kilo Pass ou a rete aktif jiska fen peryòd faktirasyon an epi li p ap renouvle.",
+      "cancelScheduled": "Ap anile {{date}}",
+      "cancelScheduledChange": "Anile chanjman ki pwograme a",
+      "cancelled": "Abònman anile",
+      "changePlan": "Chanje plan sou kilo.ai",
+      "changePlanIosNote": "Chanjman plan peye yo disponib sou kilo.ai.",
+      "creditHistoryEmpty": "Poko gen kredi Kilo Pass.",
+      "manageInStore": "Jere nan {{store}}",
+      "resume": "Rekòmanse abònman",
+      "resumeCancelledDescription": "Kilo Pass ou a ap kòmanse renouvle otomatikman ankò.",
+      "resumePausedDescription": "Kilo Pass ou a rekòmanse kounye a, anvan dat li te pwograme pou l rekòmanse a.",
+      "resumed": "Abònman rekòmanse",
+      "scheduledChange": "Chanjman pwograme",
+      "scheduledChangeCancelDescription": "Kilo Pass ou a rete sou plan aktyèl li epi l ap renouvle menm jan li fè jodi a.",
+      "scheduledChangeSummary": "{{plan}} nan dat {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass pa disponib.",
     "couldNotLoad": "Nou pa t ka chaje Kilo Pass. Eseye ankò.",
@@ -3949,6 +3977,25 @@
     "importConfigApplied": "Config enpòte"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Pa t ka chaje aktivite kredi.",
+      "appStoreReceipt": "Resi ki nan App Store",
+      "deductionFallback": "Dediksyon kredi",
+      "emptyDescription": "Acha kredi, resi, ak itilizasyon ap parèt isit la.",
+      "emptyTitle": "Pa gen istorik kredi",
+      "googlePlayReceipt": "Resi ki nan Google Play",
+      "kind": {
+        "adjustment": "Ajisteman",
+        "balanceNeutral": "San efè sou balans",
+        "deduction": "Dediksyon",
+        "grant": "Kredi gratis",
+        "purchase": "Acha"
+      },
+      "purchaseFallback": "Acha kredi",
+      "receipt": "Resi",
+      "receiptA11y": "Louvri resi pou {{description}}",
+      "receiptUnavailable": "Pa gen resi disponib pou acha sa a."
+    },
     "title": "Achte kredi",
     "description": "Kredi se yon acha yon sèl fwa ki ajoute nan balans Kilo ou pou kouri sesyon kodaj AI nan Kilo App. Magazen an chaje kont ou epi kredi yo ajoute apre magazen an konfime peman an.",
     "nextExpiry": "{{amount}} nan kredi ap ekspire {{date}} (UTC). Kredi ki ekspire pi bonè yo itilize an premye.",
@@ -4130,6 +4177,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Pa t ka louvri rezilta rechèch sa a"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Fakti pou pwòp acha ou yo ap parèt isit la yon fwa yo faktire w."
   },
   "cloudAgent": {
     "compute": {

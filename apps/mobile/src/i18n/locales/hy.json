@@ -22,6 +22,9 @@
     "expired": "Ժամկետանց"
   },
   "common": {
+    "creditHistory": "Կրեդիտների պատմություն",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": "։ ",
     "listJoiner": ", ",
     "cancel": "Չեղարկել",
@@ -118,6 +121,7 @@
     "copyLink": "Պատճենել հղումը",
     "couldNotLoadOrganizations": "Չհաջողվեց բեռնել կազմակերպությունները։",
     "couldNotLoadSessions": "Չհաջողվեց բեռնել նստաշրջանները։",
+    "couldnTLoad": "Չհաջողվեց բեռնել։",
     "couldnTLoadMore": "Չհաջողվեց բեռնել ավելին։",
     "deviceSessions": "Սարքերի նստաշրջաններ",
     "disabled": "Անջատված",
@@ -245,6 +249,10 @@
     "notAdded": "Դու մուտք ես գործել։ {{provider}}-ն չավելացվեց քո հաշվին։"
   },
   "profile": {
+    "creditHistorySubtitle": "Գնումներ, անդորրագրեր և կրեդիտների շարժ",
+    "invoicesSubtitle": "Ներբեռնեք ձեր գնումների հաշիվ-ապրանքագրերը",
+    "manageBilling": "Կառավարել վճարումները kilo.ai-ում",
+    "manageBillingIosNote": "Վճարման եղանակները, ավտոմատ համալրումը և վճարային տվյալները կառավարվում են kilo.ai-ում։",
     "codeReviewerSubtitle": "PR-ների ավտոմատ ստուգումներ",
     "securityAgentSubtitle": "Գտնել և վերացնել խոցելիությունները",
     "reviews": "Վերանայումներ",
@@ -2935,6 +2943,26 @@
     "onlyFirstFilesAttached_other": "Կկցվեն միայն առաջին {{displayCount}} ֆայլերը։"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Վճարումների պատմություն",
+      "billingHistoryEmpty": "Վճարումների պատմություն դեռ չկա։",
+      "cancel": "Չեղարկել բաժանորդագրությունը",
+      "cancelDescription": "Ձեր Kilo Pass-ը ակտիվ կմնա մինչև վճարային ժամանակաշրջանի ավարտը և չի երկարաձգվի։",
+      "cancelScheduled": "Կչեղարկվի՝ {{date}}",
+      "cancelScheduledChange": "Չեղարկել պլանավորված փոփոխությունը",
+      "cancelled": "Բաժանորդագրությունը չեղարկվեց",
+      "changePlan": "Փոխել պլանը kilo.ai-ում",
+      "changePlanIosNote": "Վճարովի պլանի փոփոխությունները հասանելի են kilo.ai-ում։",
+      "creditHistoryEmpty": "Kilo Pass-ի կրեդիտներ դեռ չկան։",
+      "manageInStore": "Կառավարել {{store}}-ում",
+      "resume": "Վերսկսել բաժանորդագրությունը",
+      "resumeCancelledDescription": "Ձեր Kilo Pass-ը կրկին ավտոմատ կերպով կերկարաձգվի։",
+      "resumePausedDescription": "Ձեր Kilo Pass-ը կվերսկսվի հիմա՝ նախքան վերսկսման պլանավորված ամսաթիվը։",
+      "resumed": "Բաժանորդագրությունը վերսկսվեց",
+      "scheduledChange": "Պլանավորված փոփոխություն",
+      "scheduledChangeCancelDescription": "Ձեր Kilo Pass-ը կմնա ընթացիկ պլանում և կերկարաձգվի այնպես, ինչպես հիմա։",
+      "scheduledChangeSummary": "{{plan}}՝ {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass-ը չհաջողվեց բեռնել։",
     "couldNotLoad": "Չհաջողվեց բեռնել Kilo Pass-ը։ Կրկին փորձիր։",
@@ -3949,6 +3977,25 @@
     "importConfigApplied": "Կոնֆիգը ներմուծվեց"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Կրեդիտների ակտիվությունը չհաջողվեց բեռնել։",
+      "appStoreReceipt": "Անդորրագիր App Store-ից",
+      "deductionFallback": "Կրեդիտների դուրսգրում",
+      "emptyDescription": "Կրեդիտների գնումները, անդորրագրերը և օգտագործումը կհայտնվեն այստեղ։",
+      "emptyTitle": "Կրեդիտների պատմություն չկա",
+      "googlePlayReceipt": "Անդորրագիր Google Play-ից",
+      "purchaseFallback": "Կրեդիտների գնում",
+      "receipt": "Անդորրագիր",
+      "receiptA11y": "Բացել անդորրագիրը՝ {{description}}",
+      "receiptUnavailable": "Այս գնման համար անդորրագիր հասանելի չէ։",
+      "kind": {
+        "adjustment": "Ճշգրտում",
+        "balanceNeutral": "Առանց հաշվեկշռի փոփոխության",
+        "deduction": "Դուրսգրում",
+        "grant": "Կրեդիտների տրամադրում",
+        "purchase": "Գնում"
+      }
+    },
     "title": "Գնել կրեդիտներ",
     "description": "Կրեդիտները միանվագ գնում են, որը ավելացվում է ձեր Kilo մնացորդին՝ Kilo App-ում AI ծրագրավորման նստաշրջաններ վարելու համար։ Խանութը գանձում է ձեր հաշվից, և կրեդիտները ավելացվում են այն բանից հետո, երբ խանութը հաստատում է վճարումը։",
     "nextExpiry": "{{amount}} կրեդիտի ժամկետը լրանում է՝ {{date}} (UTC)։ Առաջինը օգտագործվում են ամենավաղ ժամկետ ունեցող կրեդիտները։",
@@ -4130,6 +4177,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Չհաջողվեց բացել այս որոնման արդյունքը"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Ձեր անձնական գնումների հաշիվ-ապրանքագրերը կհայտնվեն այստեղ, երբ ձեզնից գումար գանձվի։"
   },
   "cloudAgent": {
     "compute": {

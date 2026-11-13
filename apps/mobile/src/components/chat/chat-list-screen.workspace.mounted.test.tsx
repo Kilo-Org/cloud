@@ -1,11 +1,12 @@
 /* eslint-disable max-lines -- the account row is proven against the real account provider and picker, which needs the app's whole provider-mock surface in one file. */
-import { createElement, type ReactNode, useEffect } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { ChatListScreen } from '@/components/chat/chat-list-screen';
 import { OrganizationProvider } from '@/lib/organization-context';
+import { contextPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import {
   renderWithProviders,
@@ -116,12 +117,7 @@ vi.mock('sonner-native', () => ({
   toast: { error: state.toastError, dismiss: state.toastDismiss },
 }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: state.push }),
-  // The account picker closes itself on the owning screen's focus loss; this
-  // suite keeps the screen focused, so the effect lives as long as the tree.
-  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
-    useEffect(effect, [effect]);
-  },
+  useRouter: () => ({ push: state.push, back: vi.fn() }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -199,21 +195,6 @@ function accountControl(ui: RenderWithProvidersResult) {
   return ui.renderer.root.findByProps({ accessibilityHint: 'Select account' });
 }
 
-/** The open picker's account rows, in option order. */
-function optionRows(ui: RenderWithProvidersResult) {
-  return ui.renderer.root.findAll(node => {
-    const selectionState: unknown = node.props.accessibilityState;
-    return (
-      (node.type as string) === 'Pressable' &&
-      node.props.accessibilityRole === 'button' &&
-      typeof selectionState === 'object' &&
-      selectionState !== null &&
-      'selected' in selectionState &&
-      typeof selectionState.selected === 'boolean'
-    );
-  });
-}
-
 async function press(node: ReactTestInstance): Promise<void> {
   const onPress = node.props.onPress as (() => void) | undefined;
   await act(() => {
@@ -221,13 +202,22 @@ async function press(node: ReactTestInstance): Promise<void> {
   });
 }
 
+/**
+ * Presses the account control, then applies the row the picker route reports
+ * for that account: the row press and the route's pick are the same call.
+ */
 async function chooseAccount(ui: RenderWithProvidersResult, name: string): Promise<void> {
   await press(accountControl(ui));
-  const row = optionRows(ui).find(node => node.props.accessibilityLabel === name);
-  expect(row).toBeDefined();
-  if (row !== undefined) {
-    await press(row);
+  expect(state.push).toHaveBeenCalledWith('/(app)/context-picker');
+  const bridge = contextPickerSlot.get(UNFENCED_ROUTE_KEY);
+  if (bridge === undefined) {
+    throw new Error('the account picker route was not handed a bridge');
   }
+  const index = bridge.options.indexOf(name);
+  expect(index).toBeGreaterThan(-1);
+  await act(() => {
+    bridge.onSelect(index);
+  });
 }
 
 describe('the workspace the Chat tab names', () => {

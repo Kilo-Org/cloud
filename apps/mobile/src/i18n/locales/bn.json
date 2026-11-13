@@ -22,6 +22,9 @@
     "expired": "মেয়াদ শেষ"
   },
   "common": {
+    "creditHistory": "ক্রেডিট ইতিহাস",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": "। ",
     "listJoiner": ", ",
     "cancel": "বাতিল করুন",
@@ -118,6 +121,7 @@
     "copyLink": "লিঙ্ক কপি করুন",
     "couldNotLoadOrganizations": "সংস্থাগুলো লোড করা যায়নি।",
     "couldNotLoadSessions": "সেশন লোড করা যায়নি।",
+    "couldnTLoad": "লোড করা যায়নি।",
     "couldnTLoadMore": "আরও লোড করা যায়নি।",
     "deviceSessions": "ডিভাইসের সেশন",
     "disabled": "বন্ধ",
@@ -245,6 +249,10 @@
     "notAdded": "আপনি সাইন ইন করেছেন। {{provider}} আপনার অ্যাকাউন্টে যোগ করা হয়নি।"
   },
   "profile": {
+    "creditHistorySubtitle": "কেনাকাটা, রসিদ এবং ক্রেডিট কার্যকলাপ",
+    "invoicesSubtitle": "আপনার কেনাকাটার ইনভয়েস ডাউনলোড করুন",
+    "manageBilling": "kilo.ai-এ বিলিং পরিচালনা করুন",
+    "manageBillingIosNote": "পেমেন্ট পদ্ধতি, অটো টপ-আপ এবং বিলিংয়ের বিবরণ kilo.ai-এ পরিচালনা করা হয়।",
     "codeReviewerSubtitle": "স্বয়ংক্রিয় PR রিভিউ",
     "securityAgentSubtitle": "নিরাপত্তার দুর্বলতা খুঁজে ঠিক করুন",
     "reviews": "রিভিউ",
@@ -2935,6 +2943,26 @@
     "onlyFirstFilesAttached_other": "শুধুমাত্র প্রথম {{displayCount}}টি ফাইল সংযুক্ত হবে।"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "বিলিং ইতিহাস",
+      "billingHistoryEmpty": "এখনও কোনো বিলিং ইতিহাস নেই।",
+      "cancel": "সাবস্ক্রিপশন বাতিল করুন",
+      "cancelDescription": "আপনার Kilo Pass বিলিং পর্বের শেষ পর্যন্ত সক্রিয় থাকবে এবং আর নবায়ন হবে না।",
+      "cancelScheduled": "{{date}} তারিখে বাতিল হবে",
+      "cancelScheduledChange": "নির্ধারিত পরিবর্তন বাতিল করুন",
+      "cancelled": "সাবস্ক্রিপশন বাতিল হয়েছে",
+      "changePlan": "kilo.ai-এ প্ল্যান পরিবর্তন করুন",
+      "changePlanIosNote": "পেইড প্ল্যান পরিবর্তন kilo.ai-এ করা যায়।",
+      "creditHistoryEmpty": "এখনও কোনো Kilo Pass ক্রেডিট নেই।",
+      "manageInStore": "{{store}}-এ পরিচালনা করুন",
+      "resume": "সাবস্ক্রিপশন আবার চালু করুন",
+      "resumeCancelledDescription": "আপনার Kilo Pass আবার স্বয়ংক্রিয়ভাবে নবায়ন হতে শুরু করবে।",
+      "resumePausedDescription": "আপনার Kilo Pass নির্ধারিত পুনরায় চালুর তারিখের আগেই এখন আবার চালু হবে।",
+      "resumed": "সাবস্ক্রিপশন আবার চালু হয়েছে",
+      "scheduledChange": "নির্ধারিত পরিবর্তন",
+      "scheduledChangeCancelDescription": "আপনার Kilo Pass বর্তমান প্ল্যানেই থাকবে এবং এখনকার মতোই নবায়ন হবে।",
+      "scheduledChangeSummary": "{{date}} তারিখে {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass এখন পাওয়া যাচ্ছে না।",
     "couldNotLoad": "Kilo Pass লোড করা যায়নি। আবার চেষ্টা করুন।",
@@ -3949,6 +3977,25 @@
     "importConfigApplied": "কনফিগ আমদানি হয়েছে"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "ক্রেডিট কার্যকলাপ লোড করা যায়নি।",
+      "appStoreReceipt": "App Store-এর রসিদ",
+      "deductionFallback": "ক্রেডিট কর্তন",
+      "emptyDescription": "ক্রেডিট কেনাকাটা, রসিদ এবং ব্যবহার এখানে দেখা যাবে।",
+      "emptyTitle": "কোনো ক্রেডিট ইতিহাস নেই",
+      "googlePlayReceipt": "Google Play-এর রসিদ",
+      "kind": {
+        "adjustment": "সমন্বয়",
+        "balanceNeutral": "ব্যালেন্স অপরিবর্তিত",
+        "deduction": "কর্তন",
+        "grant": "ক্রেডিট অনুদান",
+        "purchase": "কেনাকাটা"
+      },
+      "purchaseFallback": "ক্রেডিট কেনাকাটা",
+      "receipt": "রসিদ",
+      "receiptA11y": "{{description}}-এর রসিদ খুলুন",
+      "receiptUnavailable": "এই কেনাকাটার জন্য কোনো রসিদ পাওয়া যাচ্ছে না।"
+    },
     "title": "ক্রেডিট কিনুন",
     "description": "ক্রেডিট হলো Kilo App-এ AI কোডিং সেশন চালানোর জন্য আপনার Kilo ব্যালেন্সে যোগ করা এককালীন কেনাকাটা। স্টোর আপনার অ্যাকাউন্ট থেকে চার্জ নেয় এবং স্টোর পেমেন্ট নিশ্চিত করার পর ক্রেডিট যোগ করা হয়।",
     "nextExpiry": "{{amount}} ক্রেডিটের মেয়াদ শেষ হবে {{date}} (UTC) তারিখে। যে ক্রেডিটের মেয়াদ সবার আগে শেষ হয়, সেগুলো আগে ব্যবহার করা হয়।",
@@ -4130,6 +4177,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "এই অনুসন্ধানের ফলাফল খোলা যায়নি"
+  },
+  "invoices": {
+    "personalEmptyDescription": "আপনার কাছ থেকে বিল নেওয়া হলে আপনার নিজের কেনাকাটার ইনভয়েস এখানে দেখা যাবে।"
   },
   "cloudAgent": {
     "compute": {

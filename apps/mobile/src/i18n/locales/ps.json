@@ -22,6 +22,9 @@
     "expired": "مهلت یې تېر شو"
   },
   "common": {
+    "creditHistory": "د کریډیټ تاریخچه",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": "، ",
     "cancel": "لغوه کړئ",
@@ -118,6 +121,7 @@
     "copyLink": "لینک کاپي کړئ",
     "couldNotLoadOrganizations": "سازمانونه بار نه شول.",
     "couldNotLoadSessions": "ناستې بار نه شوې.",
+    "couldnTLoad": "بار نه شول.",
     "couldnTLoadMore": "نور توکي بار نه شول.",
     "deviceSessions": "د وسیلو ناستې",
     "disabled": "غیرفعال",
@@ -245,6 +249,10 @@
     "notAdded": "تاسو ننوتلي یاست. {{provider}} ستاسو حساب ته زیات نه شو."
   },
   "profile": {
+    "creditHistorySubtitle": "پېرودنې، رسیدونه، او د کریډیټ فعالیت",
+    "invoicesSubtitle": "د خپلو پېرودنو بلونه ډاونلوډ کړئ",
+    "manageBilling": "په kilo.ai کې تادیات اداره کړئ",
+    "manageBillingIosNote": "د تادیې طریقې، اتومات چارج، او د تادیاتو جزئیات په kilo.ai کې اداره کېږي.",
     "codeReviewerSubtitle": "د PR اوتومات بیاکتنې",
     "securityAgentSubtitle": "زیانمنتیاوې ومومئ او حل کړئ",
     "reviews": "بیاکتنې",
@@ -2935,6 +2943,26 @@
     "onlyFirstFilesAttached_other": "یوازې لومړني {{displayCount}} فایلونه به ضمیمه شي."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "د تادیاتو تاریخچه",
+      "billingHistoryEmpty": "تر اوسه د تادیاتو تاریخچه نشته.",
+      "cancel": "ګډون لغوه کړئ",
+      "cancelDescription": "ستاسو Kilo Pass د تادیې دورې تر پایه فعال پاتې کېږي او بیا به نه نوي کېږي.",
+      "cancelScheduled": "په {{date}} لغوه کېږي",
+      "cancelScheduledChange": "ټاکل شوی بدلون لغوه کړئ",
+      "cancelled": "ګډون لغوه شو",
+      "changePlan": "په kilo.ai کې پلان بدل کړئ",
+      "changePlanIosNote": "د پیسو لرونکو پلانونو بدلونونه په kilo.ai کې شته.",
+      "creditHistoryEmpty": "تر اوسه د Kilo Pass کریډیټونه نشته.",
+      "manageInStore": "په {{store}} کې اداره کړئ",
+      "resume": "ګډون بیا پیل کړئ",
+      "resumeCancelledDescription": "ستاسو Kilo Pass بیا په اتومات ډول نوي کېدل پیلوي.",
+      "resumePausedDescription": "ستاسو Kilo Pass د بیا پیل له ټاکل شوې نېټې مخکې همدا اوس بیا پیلېږي.",
+      "resumed": "ګډون بیا پیل شو",
+      "scheduledChange": "ټاکل شوی بدلون",
+      "scheduledChangeCancelDescription": "ستاسو Kilo Pass په خپل اوسني پلان پاتې کېږي او د اوس په څېر نوی کېږي.",
+      "scheduledChangeSummary": "{{plan}} په {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass بار نه شو.",
     "couldNotLoad": "Kilo Pass بار نه شو. بیا هڅه وکړئ.",
@@ -3949,6 +3977,25 @@
     "importConfigApplied": "ترتیبات راوړل شول"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "د کریډیټ فعالیت پورته نه شو.",
+      "appStoreReceipt": "له App Store څخه رسید",
+      "deductionFallback": "د کریډیټ کسر",
+      "emptyDescription": "د کریډیټ پېرودنې، رسیدونه، او کارونه به دلته ښکاره شي.",
+      "emptyTitle": "د کریډیټ تاریخچه نشته",
+      "googlePlayReceipt": "له Google Play څخه رسید",
+      "kind": {
+        "adjustment": "سمون",
+        "balanceNeutral": "په بیلانس بې اغېزې",
+        "deduction": "کسر",
+        "grant": "د کریډیټ ورکړه",
+        "purchase": "پېرود"
+      },
+      "purchaseFallback": "د کریډیټ پېرود",
+      "receipt": "رسید",
+      "receiptA11y": "د {{description}} رسید پرانیزئ",
+      "receiptUnavailable": "د دې پېرود لپاره رسید نشته."
+    },
     "title": "کریډیټ وپېرئ",
     "description": "کریډیټ یو ځل پېرود دی چې ستاسو Kilo توازن ته په Kilo App کې د AI کوډ کولو ناستو چلولو لپاره زیاتېږي. پلورنځی ستاسو له حساب څخه پیسې اخلي او کریډیټ وروسته له هغه زیاتېږي چې پلورنځی تادیه تایید کړي.",
     "nextExpiry": "د {{amount}} کریډیټ موده په {{date}} (UTC) پای ته رسېږي. هغه کریډیټونه چې موده یې تر ټولو وړاندې پای ته رسېږي، لومړی کارول کېږي.",
@@ -4130,6 +4177,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "دا د لټون پایله پرانیستل نه شو"
+  },
+  "invoices": {
+    "personalEmptyDescription": "کله چې درڅخه پیسې واخیستل شي، ستاسو د شخصي پېرودنو بلونه به دلته ښکاره شي."
   },
   "cloudAgent": {
     "compute": {

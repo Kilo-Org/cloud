@@ -22,6 +22,9 @@
     "expired": "פג התוקף"
   },
   "common": {
+    "creditHistory": "היסטוריית קרדיטים",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "ביטול",
@@ -118,6 +121,7 @@
     "copyLink": "העתקת קישור",
     "couldNotLoadOrganizations": "לא הצלחנו לטעון את הארגונים.",
     "couldNotLoadSessions": "לא הצלחנו לטעון את הסשנים.",
+    "couldnTLoad": "לא הצלחנו לטעון.",
     "couldnTLoadMore": "לא הצלחנו לטעון פריטים נוספים.",
     "deviceSessions": "סשנים במכשירים",
     "disabled": "מושבת",
@@ -245,6 +249,10 @@
     "notAdded": "נכנסת לחשבון. {{provider}} לא נוסף לחשבון שלך."
   },
   "profile": {
+    "creditHistorySubtitle": "רכישות, קבלות ופעילות קרדיטים",
+    "invoicesSubtitle": "הורדת חשבוניות עבור הרכישות שלך",
+    "manageBilling": "ניהול החיוב ב-kilo.ai",
+    "manageBillingIosNote": "אמצעי תשלום, טעינה אוטומטית ופרטי חיוב מנוהלים ב-kilo.ai.",
     "codeReviewerSubtitle": "סקירות PR אוטומטיות",
     "securityAgentSubtitle": "איתור ותיקון של חולשות אבטחה",
     "reviews": "סקירות",
@@ -2423,6 +2431,26 @@
     "onlyFirstFilesAttached_two": "רק {{displayCount}} הקבצים הראשונים יצורפו."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "היסטוריית חיובים",
+      "billingHistoryEmpty": "אין עדיין היסטוריית חיובים.",
+      "cancel": "ביטול המינוי",
+      "cancelDescription": "ה-Kilo Pass שלך יישאר פעיל עד סוף תקופת החיוב ולא יתחדש.",
+      "cancelScheduled": "יבוטל בתאריך {{date}}",
+      "cancelScheduledChange": "ביטול השינוי המתוזמן",
+      "cancelled": "המינוי בוטל",
+      "changePlan": "שינוי תוכנית ב-kilo.ai",
+      "changePlanIosNote": "שינויים בתוכניות בתשלום זמינים ב-kilo.ai.",
+      "creditHistoryEmpty": "עדיין אין קרדיטים מ-Kilo Pass.",
+      "manageInStore": "ניהול ב-{{store}}",
+      "resume": "חידוש המינוי",
+      "resumeCancelledDescription": "ה-Kilo Pass שלך יתחיל שוב להתחדש אוטומטית.",
+      "resumePausedDescription": "ה-Kilo Pass שלך יחודש עכשיו, לפני מועד החידוש המתוזמן.",
+      "resumed": "המינוי חודש",
+      "scheduledChange": "שינוי מתוזמן",
+      "scheduledChangeCancelDescription": "ה-Kilo Pass שלך יישאר בתוכנית הנוכחית ויתחדש כמו היום.",
+      "scheduledChangeSummary": "{{plan}} בתאריך {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass אינו זמין.",
     "couldNotLoad": "לא ניתן לטעון את Kilo Pass. נסה שוב.",
@@ -4010,6 +4038,25 @@
     "importConfigApplied": "ההגדרות יובאו"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "לא ניתן לטעון פעילות קרדיט.",
+      "appStoreReceipt": "קבלה מ-App Store",
+      "deductionFallback": "ניכוי קרדיטים",
+      "emptyDescription": "רכישות קרדיטים, קבלות ושימוש יופיעו כאן.",
+      "emptyTitle": "אין היסטוריית קרדיטים",
+      "googlePlayReceipt": "קבלה מ-Google Play",
+      "kind": {
+        "adjustment": "התאמה",
+        "balanceNeutral": "ללא השפעה על היתרה",
+        "deduction": "ניכוי",
+        "grant": "הענקת קרדיטים",
+        "purchase": "רכישה"
+      },
+      "purchaseFallback": "רכישת קרדיטים",
+      "receipt": "קבלה",
+      "receiptA11y": "פתיחת הקבלה עבור {{description}}",
+      "receiptUnavailable": "אין קבלה זמינה עבור רכישה זו."
+    },
     "title": "קניית קרדיטים",
     "description": "קרדיטים הם רכישה חד-פעמית שמתווספת ליתרת ה-Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App. החנות מחייבת את החשבון שלך והקרדיטים מתווספים לאחר שהחנות מאשרת את התשלום.",
     "nextExpiry": "תוקפם של קרדיטים בסך {{amount}} יפוג ב-{{date}} (UTC). קרדיטים שתוקפם יפוג ראשון מנוצלים קודם.",
@@ -4195,6 +4242,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "לא ניתן היה לפתוח את תוצאת החיפוש הזו"
+  },
+  "invoices": {
+    "personalEmptyDescription": "חשבוניות על הרכישות האישיות שלך יופיעו כאן לאחר החיוב."
   },
   "cloudAgent": {
     "compute": {

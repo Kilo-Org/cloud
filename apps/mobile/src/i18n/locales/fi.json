@@ -22,6 +22,9 @@
     "expired": "Vanhentunut"
   },
   "common": {
+    "creditHistory": "Krediittihistoria",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Peruuta",
@@ -118,6 +121,7 @@
     "copyLink": "Kopioi linkki",
     "couldNotLoadOrganizations": "Organisaatioiden lataaminen epäonnistui.",
     "couldNotLoadSessions": "Istuntojen lataaminen epäonnistui.",
+    "couldnTLoad": "Ei voitu ladata.",
     "couldnTLoadMore": "Lisää ei voitu ladata.",
     "deviceSessions": "Laiteistunnot",
     "disabled": "Ei käytössä",
@@ -245,6 +249,10 @@
     "notAdded": "Olet kirjautunut sisään. {{provider}}-palvelua ei lisätty tiliisi."
   },
   "profile": {
+    "creditHistorySubtitle": "Ostot, kuitit ja krediittitapahtumat",
+    "invoicesSubtitle": "Lataa ostojesi laskut",
+    "manageBilling": "Hallinnoi laskutusta osoitteessa kilo.ai",
+    "manageBillingIosNote": "Maksutapoja, automaattista saldon täydennystä ja laskutustietoja hallinnoidaan osoitteessa kilo.ai.",
     "codeReviewerSubtitle": "Automaattiset PR-katselmoinnit",
     "securityAgentSubtitle": "Etsi ja korjaa haavoittuvuuksia",
     "reviews": "Katselmoinnit",
@@ -2935,6 +2943,26 @@
     "onlyFirstFilesAttached_other": "Vain ensimmäiset {{displayCount}} tiedostoa liitetään."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Laskutushistoria",
+      "billingHistoryEmpty": "Ei vielä laskutushistoriaa.",
+      "cancel": "Peru tilaus",
+      "cancelDescription": "Kilo Pass pysyy voimassa laskutuskauden loppuun asti, eikä sitä uusita.",
+      "cancelScheduled": "Päättyy {{date}}",
+      "cancelScheduledChange": "Peru ajoitettu muutos",
+      "cancelled": "Tilaus peruttu",
+      "changePlan": "Vaihda pakettia osoitteessa kilo.ai",
+      "changePlanIosNote": "Maksullisia pakettimuutoksia voi tehdä osoitteessa kilo.ai.",
+      "creditHistoryEmpty": "Ei vielä Kilo Pass -krediittejä.",
+      "manageInStore": "Hallinnoi palvelussa {{store}}",
+      "resume": "Jatka tilausta",
+      "resumeCancelledDescription": "Kilo Pass alkaa taas uusiutua automaattisesti.",
+      "resumePausedDescription": "Kilo Pass jatkuu nyt, ennen ajoitettua jatkamispäivää.",
+      "resumed": "Tilausta jatkettu",
+      "scheduledChange": "Ajoitettu muutos",
+      "scheduledChangeCancelDescription": "Kilo Pass pysyy nykyisessä paketissaan ja uusiutuu kuten nytkin.",
+      "scheduledChangeSummary": "{{plan}} {{date}} alkaen"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Passin lataaminen epäonnistui.",
     "couldNotLoad": "Kilo Passia ei voitu ladata. Yritä uudelleen.",
@@ -3949,6 +3977,25 @@
     "importConfigApplied": "Config tuotu"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Krediittitapahtumia ei voitu ladata.",
+      "appStoreReceipt": "Kuitti App Storessa",
+      "deductionFallback": "Krediittien veloitus",
+      "emptyDescription": "Krediittien ostot, kuitit ja käyttö näkyvät täällä.",
+      "emptyTitle": "Ei krediittihistoriaa",
+      "googlePlayReceipt": "Kuitti Google Playssa",
+      "kind": {
+        "adjustment": "Oikaisu",
+        "balanceNeutral": "Ei vaikuta saldoon",
+        "deduction": "Veloitus",
+        "grant": "Myönnetyt krediitit",
+        "purchase": "Osto"
+      },
+      "purchaseFallback": "Krediittiosto",
+      "receipt": "Kuitti",
+      "receiptA11y": "Avaa kuitti: {{description}}",
+      "receiptUnavailable": "Tälle ostolle ei ole saatavilla kuittia."
+    },
     "title": "Osta krediittejä",
     "description": "Krediitit ovat kertaostos, joka lisätään Kilo-saldoosi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa. Kauppa veloittaa tiliäsi ja krediitit lisätään, kun kauppa vahvistaa maksun.",
     "nextExpiry": "Krediittejä vanhenee {{date}} (UTC): {{amount}}. Aikaisimmin vanhenevat krediitit käytetään ensin.",
@@ -4130,6 +4177,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Tämän hakutuloksen avaaminen epäonnistui"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Omien ostojesi laskut näkyvät täällä, kun sinua on laskutettu."
   },
   "cloudAgent": {
     "compute": {

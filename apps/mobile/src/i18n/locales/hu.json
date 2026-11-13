@@ -22,6 +22,9 @@
     "expired": "Lejárt"
   },
   "common": {
+    "creditHistory": "Kreditelőzmények",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Mégse",
@@ -118,6 +121,7 @@
     "copyLink": "Hivatkozás másolása",
     "couldNotLoadOrganizations": "Nem sikerült betölteni a szervezeteket.",
     "couldNotLoadSessions": "Nem sikerült betölteni a munkameneteket.",
+    "couldnTLoad": "Nem sikerült betölteni.",
     "couldnTLoadMore": "Nem sikerült betölteni a további elemeket.",
     "deviceSessions": "Eszközök munkamenetei",
     "disabled": "Letiltva",
@@ -245,6 +249,10 @@
     "notAdded": "Bejelentkeztél. A(z) {{provider}} nem lett hozzáadva a fiókodhoz."
   },
   "profile": {
+    "creditHistorySubtitle": "Vásárlások, nyugták és kreditmozgások",
+    "invoicesSubtitle": "Töltsd le a vásárlásaid számláit",
+    "manageBilling": "Számlázás kezelése a kilo.ai oldalon",
+    "manageBillingIosNote": "A fizetési módok, az automatikus feltöltés és a számlázási adatok a kilo.ai oldalon kezelhetők.",
     "codeReviewerSubtitle": "Automatikus PR-ellenőrzések",
     "securityAgentSubtitle": "Sérülékenységek keresése és javítása",
     "reviews": "Ellenőrzések",
@@ -2935,6 +2943,26 @@
     "onlyFirstFilesAttached_other": "Csak az első {{displayCount}} fájl lesz csatolva."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Számlázási előzmények",
+      "billingHistoryEmpty": "Még nincsenek számlázási előzmények.",
+      "cancel": "Előfizetés lemondása",
+      "cancelDescription": "A Kilo Pass a számlázási időszak végéig aktív marad, és nem újul meg.",
+      "cancelScheduled": "Megszűnik: {{date}}",
+      "cancelScheduledChange": "Ütemezett módosítás visszavonása",
+      "cancelled": "Előfizetés lemondva",
+      "changePlan": "Csomagváltás a kilo.ai oldalon",
+      "changePlanIosNote": "A fizetős csomagok módosítása a kilo.ai oldalon érhető el.",
+      "creditHistoryEmpty": "Még nincsenek Kilo Pass-kreditek.",
+      "manageInStore": "Kezelés itt: {{store}}",
+      "resume": "Előfizetés folytatása",
+      "resumeCancelledDescription": "A Kilo Pass ismét automatikusan megújul.",
+      "resumePausedDescription": "A Kilo Pass most folytatódik, még az ütemezett folytatási dátum előtt.",
+      "resumed": "Előfizetés folytatva",
+      "scheduledChange": "Ütemezett módosítás",
+      "scheduledChangeCancelDescription": "A Kilo Pass a jelenlegi csomagon marad, és ugyanúgy újul meg, mint eddig.",
+      "scheduledChangeSummary": "{{plan}}, kezdés: {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Nem sikerült betölteni a Kilo Pass-t.",
     "couldNotLoad": "Nem sikerült betölteni a Kilo Pass szolgáltatást. Próbáld újra.",
@@ -3949,6 +3977,25 @@
     "importConfigApplied": "Konfiguráció importálva"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Nem sikerült betölteni a kreditaktivitást.",
+      "appStoreReceipt": "A nyugta az App Store-ban érhető el",
+      "deductionFallback": "Kreditlevonás",
+      "emptyDescription": "A kreditvásárlások, a nyugták és a felhasználás itt jelennek meg.",
+      "emptyTitle": "Nincsenek kreditelőzmények",
+      "googlePlayReceipt": "A nyugta a Google Playen érhető el",
+      "kind": {
+        "adjustment": "Korrekció",
+        "balanceNeutral": "Egyenlegsemleges",
+        "deduction": "Levonás",
+        "grant": "Kreditjuttatás",
+        "purchase": "Vásárlás"
+      },
+      "purchaseFallback": "Kreditvásárlás",
+      "receipt": "Nyugta",
+      "receiptA11y": "Nyugta megnyitása: {{description}}",
+      "receiptUnavailable": "Ehhez a vásárláshoz nem érhető el nyugta."
+    },
     "title": "Kreditek vásárlása",
     "description": "A kreditek egyszeri vásárlás, amely a Kilo egyenlegedhez adódik AI kódolási munkamenetek futtatásához a Kilo alkalmazásban. Az áruház terheli a fiókodat, és a kreditek az áruház fizetésigazolása után kerülnek jóváírásra.",
     "nextExpiry": "{{amount}} értékű kredit lejárati ideje: {{date}} (UTC). A legkorábban lejáró kreditek használódnak fel először.",
@@ -4130,6 +4177,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nem sikerült megnyitni ezt a keresési találatot"
+  },
+  "invoices": {
+    "personalEmptyDescription": "A saját vásárlásaid számlái itt jelennek meg, amint kiállítjuk őket."
   },
   "cloudAgent": {
     "compute": {

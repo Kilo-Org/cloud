@@ -22,6 +22,9 @@
     "expired": "காலாவதியானது"
   },
   "common": {
+    "creditHistory": "கிரெடிட் வரலாறு",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "ரத்து செய்யவும்",
@@ -118,6 +121,7 @@
     "copyLink": "இணைப்பை நகலெடுக்கவும்",
     "couldNotLoadOrganizations": "நிறுவனங்களை ஏற்ற முடியவில்லை.",
     "couldNotLoadSessions": "அமர்வுகளை ஏற்ற முடியவில்லை.",
+    "couldnTLoad": "ஏற்ற முடியவில்லை.",
     "couldnTLoadMore": "மேலும் ஏற்ற முடியவில்லை.",
     "deviceSessions": "சாதன அமர்வுகள்",
     "disabled": "முடக்கப்பட்டது",
@@ -245,6 +249,10 @@
     "notAdded": "நீங்கள் உள்நுழைந்துவிட்டீர்கள். {{provider}} உங்கள் கணக்கில் சேர்க்கப்படவில்லை."
   },
   "profile": {
+    "creditHistorySubtitle": "வாங்குதல்கள், ரசீதுகள் மற்றும் கிரெடிட் செயல்பாடு",
+    "invoicesSubtitle": "உங்கள் வாங்குதல்களுக்கான இன்வாய்ஸ்களைப் பதிவிறக்கவும்",
+    "manageBilling": "kilo.ai-இல் பில்லிங்கை நிர்வகிக்கவும்",
+    "manageBillingIosNote": "பணம் செலுத்தும் முறைகள், தானியங்கு டாப்-அப் மற்றும் பில்லிங் விவரங்கள் kilo.ai-இல் நிர்வகிக்கப்படுகின்றன.",
     "codeReviewerSubtitle": "தானியங்கி PR மதிப்பாய்வுகள்",
     "securityAgentSubtitle": "பாதுகாப்புக் குறைபாடுகளைக் கண்டறிந்து சரிசெய்யவும்",
     "reviews": "மதிப்பாய்வுகள்",
@@ -2935,6 +2943,26 @@
     "onlyFirstFilesAttached_other": "முதல் {{displayCount}} கோப்புகள் மட்டுமே இணைக்கப்படும்."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "பில்லிங் வரலாறு",
+      "billingHistoryEmpty": "இதுவரை பில்லிங் வரலாறு இல்லை.",
+      "cancel": "சந்தாவை ரத்துசெய்",
+      "cancelDescription": "உங்கள் Kilo Pass பில்லிங் காலம் முடியும் வரை செயலில் இருக்கும், அதன் பிறகு புதுப்பிக்கப்படாது.",
+      "cancelScheduled": "{{date}} அன்று ரத்தாகும்",
+      "cancelScheduledChange": "திட்டமிட்ட மாற்றத்தை ரத்துசெய்",
+      "cancelled": "சந்தா ரத்துசெய்யப்பட்டது",
+      "changePlan": "kilo.ai-இல் திட்டத்தை மாற்றவும்",
+      "changePlanIosNote": "கட்டணத் திட்ட மாற்றங்கள் kilo.ai-இல் கிடைக்கின்றன.",
+      "creditHistoryEmpty": "இதுவரை Kilo Pass கிரெடிட்கள் இல்லை.",
+      "manageInStore": "{{store}}-இல் நிர்வகிக்கவும்",
+      "resume": "சந்தாவை மீண்டும் தொடங்கு",
+      "resumeCancelledDescription": "உங்கள் Kilo Pass மீண்டும் தானாகப் புதுப்பிக்கத் தொடங்கும்.",
+      "resumePausedDescription": "உங்கள் Kilo Pass திட்டமிட்ட மீண்டும் தொடங்கும் தேதிக்கு முன்பே இப்போது மீண்டும் தொடங்கும்.",
+      "resumed": "சந்தா மீண்டும் தொடங்கப்பட்டது",
+      "scheduledChange": "திட்டமிட்ட மாற்றம்",
+      "scheduledChangeCancelDescription": "உங்கள் Kilo Pass தற்போதைய திட்டத்திலேயே தொடர்ந்து, இப்போது போலவே புதுப்பிக்கப்படும்.",
+      "scheduledChangeSummary": "{{date}} அன்று {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass கிடைக்கவில்லை.",
     "couldNotLoad": "Kilo Pass-ஐ ஏற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
@@ -3949,6 +3977,25 @@
     "importConfigApplied": "Config இறக்குமதி செய்யப்பட்டது"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "கிரெடிட் செயல்பாட்டை ஏற்ற முடியவில்லை.",
+      "appStoreReceipt": "App Store-இலிருந்து ரசீது",
+      "deductionFallback": "கிரெடிட் கழிவு",
+      "emptyDescription": "கிரெடிட் வாங்குதல்கள், ரசீதுகள் மற்றும் பயன்பாடு இங்கே தோன்றும்.",
+      "emptyTitle": "கிரெடிட் வரலாறு இல்லை",
+      "googlePlayReceipt": "Google Play-இலிருந்து ரசீது",
+      "kind": {
+        "adjustment": "சரிசெய்தல்",
+        "balanceNeutral": "இருப்பு மாறாதது",
+        "deduction": "கழிவு",
+        "grant": "கிரெடிட் வழங்கல்",
+        "purchase": "வாங்குதல்"
+      },
+      "purchaseFallback": "கிரெடிட் வாங்குதல்",
+      "receipt": "ரசீது",
+      "receiptA11y": "{{description}}-க்கான ரசீதைத் திற",
+      "receiptUnavailable": "இந்த வாங்குதலுக்கு ரசீது கிடைக்கவில்லை."
+    },
     "title": "கிரெடிட்களை வாங்கவும்",
     "description": "கிரெடிட்கள் என்பது Kilo App இல் AI குறியீட்டு அமர்வுகளை இயக்க உங்கள் Kilo இருப்புக்கு சேர்க்கப்படும் ஒரு முறை வாங்குதல் ஆகும். ஸ்டோர் உங்கள் கணக்கிலிருந்து கட்டணம் வசூலிக்கும், ஸ்டோர் பணம் செலுத்தியதை உறுதிப்படுத்திய பிறகு கிரெடிட்கள் சேர்க்கப்படும்.",
     "nextExpiry": "{{amount}} மதிப்புள்ள கிரெடிட்கள் {{date}} (UTC) அன்று காலாவதியாகும். முதலில் காலாவதியாகும் கிரெடிட்கள் முதலில் பயன்படுத்தப்படும்.",
@@ -4130,6 +4177,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "இந்தத் தேடல் முடிவைத் திறக்க முடியவில்லை"
+  },
+  "invoices": {
+    "personalEmptyDescription": "உங்களுக்குக் கட்டணம் விதிக்கப்பட்டதும், உங்கள் சொந்த வாங்குதல்களுக்கான இன்வாய்ஸ்கள் இங்கே தோன்றும்."
   },
   "cloudAgent": {
     "compute": {

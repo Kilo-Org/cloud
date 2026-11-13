@@ -22,6 +22,9 @@
     "expired": "Caducada"
   },
   "common": {
+    "creditHistory": "Historial de crèdits",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancel·la",
@@ -118,6 +121,7 @@
     "copyLink": "Copia l'enllaç",
     "couldNotLoadOrganizations": "No s'han pogut carregar les organitzacions.",
     "couldNotLoadSessions": "No s'han pogut carregar les sessions.",
+    "couldnTLoad": "No s'ha pogut carregar.",
     "couldnTLoadMore": "No se n'han pogut carregar més.",
     "deviceSessions": "Sessions als dispositius",
     "disabled": "Desactivat",
@@ -245,6 +249,10 @@
     "notAdded": "Has iniciat la sessió. No s'ha afegit {{provider}} al teu compte."
   },
   "profile": {
+    "creditHistorySubtitle": "Compres, rebuts i activitat de crèdits",
+    "invoicesSubtitle": "Baixa les factures de les teves compres",
+    "manageBilling": "Gestiona la facturació a kilo.ai",
+    "manageBillingIosNote": "Els mètodes de pagament, la recàrrega automàtica i les dades de facturació es gestionen a kilo.ai.",
     "codeReviewerSubtitle": "Revisions automàtiques de PR",
     "securityAgentSubtitle": "Troba i corregeix vulnerabilitats",
     "reviews": "Revisions",
@@ -2988,6 +2996,26 @@
     "onlyFirstFilesAttached_many": "Només s'adjuntaran els primers {{displayCount}} fitxers."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Historial de facturació",
+      "billingHistoryEmpty": "Encara no hi ha historial de facturació.",
+      "cancel": "Cancel·la la subscripció",
+      "cancelDescription": "El teu Kilo Pass continuarà actiu fins al final del període de facturació i no es renovarà.",
+      "cancelScheduled": "Es cancel·la el {{date}}",
+      "cancelScheduledChange": "Cancel·la el canvi programat",
+      "cancelled": "Subscripció cancel·lada",
+      "changePlan": "Canvia de pla a kilo.ai",
+      "changePlanIosNote": "Els canvis de pla de pagament estan disponibles a kilo.ai.",
+      "creditHistoryEmpty": "Encara no hi ha crèdits del Kilo Pass.",
+      "manageInStore": "Gestiona a {{store}}",
+      "resume": "Reprèn la subscripció",
+      "resumeCancelledDescription": "El teu Kilo Pass tornarà a renovar-se automàticament.",
+      "resumePausedDescription": "El teu Kilo Pass es reprèn ara, abans de la data de represa programada.",
+      "resumed": "Subscripció represa",
+      "scheduledChange": "Canvi programat",
+      "scheduledChangeCancelDescription": "El teu Kilo Pass es manté en el pla actual i es renova com fins ara.",
+      "scheduledChangeSummary": "{{plan}} el {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass no està disponible.",
     "couldNotLoad": "No s'ha pogut carregar Kilo Pass. Torna-ho a provar.",
@@ -4010,6 +4038,25 @@
     "importConfigApplied": "Configuració importada"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "No s'ha pogut carregar l'activitat de crèdit.",
+      "appStoreReceipt": "Rebut de l'App Store",
+      "deductionFallback": "Deducció de crèdits",
+      "emptyDescription": "Les compres de crèdits, els rebuts i l'ús apareixeran aquí.",
+      "emptyTitle": "No hi ha historial de crèdits",
+      "googlePlayReceipt": "Rebut de Google Play",
+      "kind": {
+        "adjustment": "Ajust",
+        "balanceNeutral": "Sense efecte en el saldo",
+        "deduction": "Deducció",
+        "grant": "Concessió de crèdits",
+        "purchase": "Compra"
+      },
+      "purchaseFallback": "Compra de crèdits",
+      "receipt": "Rebut",
+      "receiptA11y": "Obre el rebut de {{description}}",
+      "receiptUnavailable": "No hi ha cap rebut disponible per a aquesta compra."
+    },
     "title": "Compra crèdits",
     "description": "Els crèdits són una compra única que s'afegeix al teu saldo de Kilo per executar sessions de programació amb IA a l'aplicació Kilo. La botiga cobra al teu compte i els crèdits s'afegeixen quan la botiga confirma el pagament.",
     "nextExpiry": "{{amount}} en crèdits caduquen el {{date}} (UTC). Els crèdits amb la caducitat més propera s'utilitzen primer.",
@@ -4195,6 +4242,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "No s'ha pogut obrir aquest resultat de la cerca"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Les factures de les teves compres apareixeran aquí quan se't facturi."
   },
   "cloudAgent": {
     "compute": {

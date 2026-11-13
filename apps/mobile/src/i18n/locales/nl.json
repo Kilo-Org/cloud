@@ -22,6 +22,9 @@
     "expired": "Verlopen"
   },
   "common": {
+    "creditHistory": "Tegoedgeschiedenis",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Annuleren",
@@ -118,6 +121,7 @@
     "copyLink": "Link kopiëren",
     "couldNotLoadOrganizations": "De organisaties konden niet worden geladen.",
     "couldNotLoadSessions": "De sessies konden niet worden geladen.",
+    "couldnTLoad": "Laden is mislukt.",
     "couldnTLoadMore": "Meer laden is mislukt.",
     "deviceSessions": "Apparaatsessies",
     "disabled": "Uitgeschakeld",
@@ -245,6 +249,10 @@
     "notAdded": "Je bent aangemeld. {{provider}} is niet aan je account toegevoegd."
   },
   "profile": {
+    "creditHistorySubtitle": "Aankopen, bonnen en tegoedactiviteit",
+    "invoicesSubtitle": "Download facturen voor je aankopen",
+    "manageBilling": "Facturering beheren op kilo.ai",
+    "manageBillingIosNote": "Betaalmethoden, automatisch opwaarderen en factuurgegevens worden beheerd op kilo.ai.",
     "codeReviewerSubtitle": "Automatische PR-beoordelingen",
     "securityAgentSubtitle": "Kwetsbaarheden vinden en verhelpen",
     "reviews": "Beoordelingen",
@@ -2393,6 +2401,26 @@
     "onlyFirstFilesAttached_other": "Alleen de eerste {{displayCount}} bestanden worden bijgevoegd."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Factuurgeschiedenis",
+      "billingHistoryEmpty": "Nog geen factuurgeschiedenis.",
+      "cancel": "Abonnement opzeggen",
+      "cancelDescription": "Je Kilo Pass blijft actief tot het einde van de factuurperiode en wordt niet verlengd.",
+      "cancelScheduled": "Eindigt op {{date}}",
+      "cancelScheduledChange": "Geplande wijziging annuleren",
+      "cancelled": "Abonnement opgezegd",
+      "changePlan": "Abonnement wijzigen op kilo.ai",
+      "changePlanIosNote": "Betaalde abonnementswijzigingen zijn beschikbaar op kilo.ai.",
+      "creditHistoryEmpty": "Nog geen Kilo Pass-tegoed.",
+      "manageInStore": "Beheren in {{store}}",
+      "resume": "Abonnement hervatten",
+      "resumeCancelledDescription": "Je Kilo Pass wordt weer automatisch verlengd.",
+      "resumePausedDescription": "Je Kilo Pass wordt nu hervat, vóór de geplande hervattingsdatum.",
+      "resumed": "Abonnement hervat",
+      "scheduledChange": "Geplande wijziging",
+      "scheduledChangeCancelDescription": "Je Kilo Pass blijft op het huidige abonnement en wordt verlengd zoals nu.",
+      "scheduledChangeSummary": "{{plan}} op {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass is niet beschikbaar.",
     "couldNotLoad": "Kilo Pass kon niet worden geladen. Probeer het opnieuw.",
@@ -3949,6 +3977,25 @@
     "importConfigApplied": "Config geïmporteerd"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Kan tegoedactiviteit niet laden.",
+      "appStoreReceipt": "Bon in de App Store",
+      "deductionFallback": "Tegoedafschrijving",
+      "emptyDescription": "Tegoedaankopen, bonnen en verbruik verschijnen hier.",
+      "emptyTitle": "Geen tegoedgeschiedenis",
+      "googlePlayReceipt": "Bon in Google Play",
+      "kind": {
+        "adjustment": "Correctie",
+        "balanceNeutral": "Saldoneutraal",
+        "deduction": "Afschrijving",
+        "grant": "Tegoedtoekenning",
+        "purchase": "Aankoop"
+      },
+      "purchaseFallback": "Tegoedaankoop",
+      "receipt": "Bon",
+      "receiptA11y": "Open de bon voor {{description}}",
+      "receiptUnavailable": "Er is geen bon beschikbaar voor deze aankoop."
+    },
     "title": "Credits kopen",
     "description": "Credits zijn een eenmalige aankoop die aan je Kilo-saldo wordt toegevoegd voor AI-coderingssessies in Kilo App. De store belast je account en de credits worden toegevoegd nadat de store de betaling bevestigt.",
     "nextExpiry": "{{amount}} aan credits verloopt op {{date}} (UTC). Credits die het eerst verlopen, worden eerst gebruikt.",
@@ -4130,6 +4177,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Dit zoekresultaat kon niet worden geopend"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Facturen voor je eigen aankopen verschijnen hier zodra je wordt gefactureerd."
   },
   "cloudAgent": {
     "compute": {

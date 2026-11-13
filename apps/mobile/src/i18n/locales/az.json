@@ -22,6 +22,9 @@
     "expired": "Müddəti bitib"
   },
   "common": {
+    "creditHistory": "Kredit tarixçəsi",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Ləğv et",
@@ -118,6 +121,7 @@
     "copyLink": "Keçidi kopyala",
     "couldNotLoadOrganizations": "Təşkilatları yükləmək mümkün olmadı.",
     "couldNotLoadSessions": "Sessiyaları yükləmək mümkün olmadı.",
+    "couldnTLoad": "Yükləmək mümkün olmadı.",
     "couldnTLoadMore": "Daha çox məlumat yükləmək mümkün olmadı.",
     "deviceSessions": "Cihaz sessiyaları",
     "disabled": "Deaktiv",
@@ -245,6 +249,10 @@
     "notAdded": "Daxil olmusan. {{provider}} hesabına əlavə edilmədi."
   },
   "profile": {
+    "creditHistorySubtitle": "Alışlar, qəbzlər və kredit fəaliyyəti",
+    "invoicesSubtitle": "Alışlarınız üçün fakturaları endirin",
+    "manageBilling": "Ödənişləri kilo.ai saytında idarə edin",
+    "manageBillingIosNote": "Ödəniş üsulları, avtomatik balans artırma və ödəniş məlumatları kilo.ai saytında idarə olunur.",
     "codeReviewerSubtitle": "Avtomatik PR yoxlamaları",
     "securityAgentSubtitle": "Təhlükəsizlik boşluqlarını tap və aradan qaldır",
     "reviews": "Yoxlamalar",
@@ -2935,6 +2943,26 @@
     "onlyFirstFilesAttached_other": "Yalnız ilk {{displayCount}} fayl əlavə ediləcək."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Ödəniş tarixçəsi",
+      "billingHistoryEmpty": "Hələ ödəniş tarixçəsi yoxdur.",
+      "cancel": "Abunəliyi ləğv et",
+      "cancelDescription": "Kilo Pass ödəniş dövrünün sonunadək aktiv qalacaq və yenilənməyəcək.",
+      "cancelScheduled": "{{date}} tarixində ləğv olunur",
+      "cancelScheduledChange": "Planlaşdırılmış dəyişikliyi ləğv et",
+      "cancelled": "Abunəlik ləğv edildi",
+      "changePlan": "Planı kilo.ai saytında dəyişin",
+      "changePlanIosNote": "Ödənişli plan dəyişiklikləri kilo.ai saytında mövcuddur.",
+      "creditHistoryEmpty": "Hələ Kilo Pass krediti yoxdur.",
+      "manageInStore": "{{store}} daxilində idarə et",
+      "resume": "Abunəliyi bərpa et",
+      "resumeCancelledDescription": "Kilo Pass yenidən avtomatik yenilənməyə başlayacaq.",
+      "resumePausedDescription": "Kilo Pass planlaşdırılmış bərpa tarixindən əvvəl, indi bərpa olunacaq.",
+      "resumed": "Abunəlik bərpa edildi",
+      "scheduledChange": "Planlaşdırılmış dəyişiklik",
+      "scheduledChangeCancelDescription": "Kilo Pass cari planında qalacaq və indiki kimi yenilənəcək.",
+      "scheduledChangeSummary": "{{plan}}, {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass əlçatan deyil.",
     "couldNotLoad": "Kilo Pass-ı yükləmək mümkün olmadı. Yenidən cəhd et.",
@@ -3949,6 +3977,25 @@
     "importConfigApplied": "Config idxal edildi"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Kredit fəaliyyəti yüklənmədi.",
+      "appStoreReceipt": "App Store qəbzi",
+      "deductionFallback": "Kredit çıxılması",
+      "emptyDescription": "Kredit alışları, qəbzlər və istifadə burada görünəcək.",
+      "emptyTitle": "Kredit tarixçəsi yoxdur",
+      "googlePlayReceipt": "Google Play qəbzi",
+      "kind": {
+        "adjustment": "Düzəliş",
+        "balanceNeutral": "Balansa təsirsiz",
+        "deduction": "Çıxılma",
+        "grant": "Kredit hədiyyəsi",
+        "purchase": "Alış"
+      },
+      "purchaseFallback": "Kredit alışı",
+      "receipt": "Qəbz",
+      "receiptA11y": "{{description}} üçün qəbzi açın",
+      "receiptUnavailable": "Bu alış üçün qəbz mövcud deyil."
+    },
     "title": "Kredit al",
     "description": "Kredit Kilo App-də AI kodlaşdırma sessiyalarını işə salmaq üçün Kilo balansına əlavə olunan birdəfəlik alışdır. Mağaza hesabından ödəniş alır və mağaza ödənişi təsdiqlədikdən sonra kredit əlavə olunur.",
     "nextExpiry": "{{amount}} məbləğində kreditin müddəti {{date}} (UTC) tarixində bitir. Müddəti ən tez bitən kreditlər ilk istifadə olunur.",
@@ -4130,6 +4177,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu axtarış nəticəsi açılmadı"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Ödəniş tutulduqdan sonra şəxsi alışlarınızın fakturaları burada görünəcək."
   },
   "cloudAgent": {
     "compute": {

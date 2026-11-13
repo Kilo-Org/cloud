@@ -22,6 +22,9 @@
     "expired": "Expirée"
   },
   "common": {
+    "creditHistory": "Historique des crédits",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Annuler",
@@ -118,6 +121,7 @@
     "copyLink": "Copier le lien",
     "couldNotLoadOrganizations": "Impossible de charger les organisations",
     "couldNotLoadSessions": "Impossible de charger les sessions",
+    "couldnTLoad": "Le chargement a échoué",
     "couldnTLoadMore": "Impossible de charger la suite",
     "deviceSessions": "Sessions sur les appareils",
     "disabled": "Désactivé",
@@ -245,6 +249,10 @@
     "notAdded": "Vous êtes connecté. {{provider}} n'a pas été ajouté à votre compte."
   },
   "profile": {
+    "creditHistorySubtitle": "Achats, reçus et activité des crédits",
+    "invoicesSubtitle": "Téléchargez les factures de vos achats",
+    "manageBilling": "Gérer la facturation sur kilo.ai",
+    "manageBillingIosNote": "Les moyens de paiement, la recharge automatique et les informations de facturation se gèrent sur kilo.ai.",
     "codeReviewerSubtitle": "Revues automatiques de PR",
     "securityAgentSubtitle": "Trouver et corriger les vulnérabilités",
     "reviews": "Revues",
@@ -2351,6 +2359,26 @@
     "onlyFirstFilesAttached_many": "Seuls les {{displayCount}} premiers fichiers seront joints."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Historique de facturation",
+      "billingHistoryEmpty": "Aucun historique de facturation pour le moment.",
+      "cancel": "Résilier l'abonnement",
+      "cancelDescription": "Votre Kilo Pass reste actif jusqu'à la fin de la période de facturation et ne sera pas renouvelé.",
+      "cancelScheduled": "Prend fin le {{date}}",
+      "cancelScheduledChange": "Annuler le changement prévu",
+      "cancelled": "Abonnement résilié",
+      "changePlan": "Changer de forfait sur kilo.ai",
+      "changePlanIosNote": "Les changements de forfait payant sont disponibles sur kilo.ai.",
+      "creditHistoryEmpty": "Aucun crédit Kilo Pass pour le moment.",
+      "manageInStore": "Gérer dans {{store}}",
+      "resume": "Réactiver l'abonnement",
+      "resumeCancelledDescription": "Votre Kilo Pass sera de nouveau renouvelé automatiquement.",
+      "resumePausedDescription": "Votre Kilo Pass reprend dès maintenant, avant la date de reprise prévue.",
+      "resumed": "Abonnement réactivé",
+      "scheduledChange": "Changement prévu",
+      "scheduledChangeCancelDescription": "Votre Kilo Pass conserve son forfait actuel et se renouvelle comme aujourd'hui.",
+      "scheduledChangeSummary": "{{plan}} le {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass n'a pas pu être chargé.",
     "couldNotLoad": "Impossible de charger Kilo Pass. Réessayez.",
@@ -4010,6 +4038,25 @@
     "importConfigApplied": "Config importée"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Impossible de charger l'activité de crédits.",
+      "appStoreReceipt": "Reçu disponible sur l'App Store",
+      "deductionFallback": "Déduction de crédits",
+      "emptyDescription": "Vos achats de crédits, reçus et consommations apparaîtront ici.",
+      "emptyTitle": "Aucun historique de crédits",
+      "googlePlayReceipt": "Reçu disponible sur Google Play",
+      "kind": {
+        "adjustment": "Ajustement",
+        "balanceNeutral": "Sans effet sur le solde",
+        "deduction": "Déduction",
+        "grant": "Crédits offerts",
+        "purchase": "Achat"
+      },
+      "purchaseFallback": "Achat de crédits",
+      "receipt": "Reçu",
+      "receiptA11y": "Ouvrir le reçu pour {{description}}",
+      "receiptUnavailable": "Aucun reçu n'est disponible pour cet achat."
+    },
     "title": "Acheter des crédits",
     "description": "Les crédits sont un achat unique ajouté à votre solde Kilo pour lancer des sessions de codage IA dans Kilo App. La boutique débite votre compte et les crédits sont ajoutés après confirmation du paiement par la boutique.",
     "nextExpiry": "{{amount}} de crédits expirent le {{date}} (UTC). Les crédits dont l'expiration est la plus proche sont utilisés en premier.",
@@ -4195,6 +4242,9 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Impossible d'ouvrir ce résultat de recherche"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Les factures de vos achats personnels apparaîtront ici dès votre première facturation."
   },
   "cloudAgent": {
     "compute": {

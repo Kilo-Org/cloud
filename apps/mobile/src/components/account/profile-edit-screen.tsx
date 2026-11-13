@@ -50,6 +50,8 @@ function submittedUrl(value: string, initial: string | null): string | null | un
 type FieldsProps = {
   readonly linkedinUrl: string | null;
   readonly githubUrl: string | null;
+  /** The screen's one exit: the save completing, or a Save that changed nothing. */
+  readonly onDone: () => void;
 };
 
 /**
@@ -57,9 +59,8 @@ type FieldsProps = {
  * uncontrolled (a ref per field, `defaultValue` for the initial text), so they
  * cannot be filled in by a query that settles after their first render.
  */
-function ProfileLinkForm({ linkedinUrl, githubUrl }: FieldsProps) {
+function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
   const { t } = useTranslation();
-  const popOnce = usePopOnce();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const linkedinRef = useRef(linkedinUrl ?? '');
@@ -75,9 +76,9 @@ function ProfileLinkForm({ linkedinUrl, githubUrl }: FieldsProps) {
         // would show the links as they were before this save.
         void queryClient.invalidateQueries({ queryKey: trpc.user.getProfileLinks.queryKey() });
         announcingToast.success(t('profile.editProfile.saved'));
-        // A Back the reader took during the save already popped this screen, so
-        // the completion must not pop the screen beneath it as well.
-        popOnce();
+        // Same rule as the header's Back: if the reader already left during the
+        // save, this completion is dropped instead of popping the screen beneath.
+        onDone();
       },
       // The server's message is the account of what it refused, so it is shown
       // as written rather than replaced with a generic failure.
@@ -96,7 +97,7 @@ function ProfileLinkForm({ linkedinUrl, githubUrl }: FieldsProps) {
       return;
     }
     if (linkedin === undefined && github === undefined) {
-      popOnce();
+      onDone();
       return;
     }
     update.mutate({
@@ -160,6 +161,13 @@ function ProfileLinkForm({ linkedinUrl, githubUrl }: FieldsProps) {
  */
 export function ProfileEditScreen() {
   const { t } = useTranslation();
+  // This route has one exit, whoever asks for it: the header's Back, the save's
+  // completion, and a Save that changed nothing all leave through `popOnce`. The
+  // route leaves once, and a press or completion that arrives while it is
+  // already leaving is dropped — the reader's Back can still land on this
+  // screen's header during the pop the completion started, and a second pop
+  // would close Account settings beneath it.
+  const popOnce = usePopOnce();
   const trpc = useTRPC();
   const links = useQuery(trpc.user.getProfileLinks.queryOptions());
 
@@ -176,13 +184,17 @@ export function ProfileEditScreen() {
     body = <QueryError onRetry={() => void links.refetch()} isRetrying={links.isFetching} />;
   } else {
     body = (
-      <ProfileLinkForm linkedinUrl={links.data.linkedinUrl} githubUrl={links.data.githubUrl} />
+      <ProfileLinkForm
+        linkedinUrl={links.data.linkedinUrl}
+        githubUrl={links.data.githubUrl}
+        onDone={popOnce}
+      />
     );
   }
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profile.editProfile.title')} />
+      <ScreenHeader title={t('profile.editProfile.title')} onBack={popOnce} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-6 px-4 pt-4"

@@ -24,6 +24,7 @@ type ScreenState = {
   mutate: Mock;
   back: Mock;
   focused: boolean;
+  headerBack: (() => void) | undefined;
   toastError: Mock;
   toastSuccess: Mock;
 };
@@ -36,6 +37,7 @@ const state = vi.hoisted((): ScreenState => ({
   invalidate: vi.fn(),
   back: vi.fn(),
   focused: true,
+  headerBack: undefined,
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
 }));
@@ -96,7 +98,14 @@ vi.mock('@/lib/trpc', () => ({
     },
   }),
 }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/screen-header', () => ({
+  // The real header runs its `onBack` for a Back press; keep that callback so a
+  // test can deliver the press.
+  ScreenHeader: (props: { onBack?: () => void }) => {
+    state.headerBack = props.onBack;
+    return 'ScreenHeader';
+  },
+}));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -124,6 +133,13 @@ function field(root: ReactTestRenderer['root'], label: string) {
   return only;
 }
 
+/** Type into the GitHub field, as a reader editing the link would. */
+function typeGithub(root: ReactTestRenderer['root'], value: string): void {
+  act(() => {
+    (field(root, 'GitHub URL').props.onChangeText as (value: string) => void)(value);
+  });
+}
+
 function saveButton(root: ReactTestRenderer['root']) {
   const found = root.findAll(
     node => Object.is(node.type, BUTTON) && node.props.className !== undefined
@@ -141,6 +157,17 @@ function press(root: ReactTestRenderer['root']): void {
   });
 }
 
+/** The reader's Back, as the header delivers it: through the screen's own exit. */
+function pressHeaderBack(): void {
+  const onBack = state.headerBack;
+  if (!onBack) {
+    throw new Error('missing header Back');
+  }
+  act(() => {
+    onBack();
+  });
+}
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   resetLeaveSettle();
@@ -148,6 +175,7 @@ beforeEach(() => {
   state.error = false;
   state.mutations = [];
   state.focused = true;
+  state.headerBack = undefined;
   state.mutate.mockClear();
   state.invalidate.mockClear();
   state.back.mockClear();
@@ -194,11 +222,7 @@ describe('ProfileEditScreen', () => {
   it('does not pop the screen beneath when the reader left before the save settled', async () => {
     const root = await mount();
 
-    act(() => {
-      (field(root, 'GitHub URL').props.onChangeText as (value: string) => void)(
-        'https://github.com/ada'
-      );
-    });
+    typeGithub(root, 'https://github.com/ada');
     press(root);
     expect(state.mutate).toHaveBeenCalledWith({ github_url: 'https://github.com/ada' });
     expect(state.back).not.toHaveBeenCalled();
@@ -217,11 +241,7 @@ describe('ProfileEditScreen', () => {
   it('pops once for a save, and never for a repeated settle or a no-change Save', async () => {
     const root = await mount();
 
-    act(() => {
-      (field(root, 'GitHub URL').props.onChangeText as (value: string) => void)(
-        'https://github.com/ada'
-      );
-    });
+    typeGithub(root, 'https://github.com/ada');
     press(root);
     act(() => {
       state.mutations.at(-1)?.onSuccess?.();
@@ -240,6 +260,49 @@ describe('ProfileEditScreen', () => {
     press(root);
 
     expect(state.mutate).toHaveBeenCalledTimes(1);
+    expect(state.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves once when the save completes before the reader presses Back', async () => {
+    const root = await mount();
+
+    typeGithub(root, 'https://github.com/ada');
+    press(root);
+
+    // The mutation settles first: the completion pops the editor and opens the
+    // leave window.
+    act(() => {
+      state.mutations.at(-1)?.onSuccess?.();
+    });
+    expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [] });
+    expect(state.back).toHaveBeenCalledTimes(1);
+
+    // The reader's Back still reaches this header during that pop, because the
+    // header stays the touch owner until the transition ends.
+    pressHeaderBack();
+
+    expect(state.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves once when the header Back precedes the save completion', async () => {
+    const root = await mount();
+
+    typeGithub(root, 'https://github.com/ada');
+    press(root);
+
+    // The reader leaves through the header while the save is in flight.
+    pressHeaderBack();
+    expect(state.back).toHaveBeenCalledTimes(1);
+
+    // The navigator applied that Back, so this route is no longer focused when
+    // the save settles.
+    state.focused = false;
+    act(() => {
+      state.mutations.at(-1)?.onSuccess?.();
+    });
+
+    expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [] });
+    expect(state.toastSuccess).toHaveBeenCalledWith('Profile updated');
     expect(state.back).toHaveBeenCalledTimes(1);
   });
 

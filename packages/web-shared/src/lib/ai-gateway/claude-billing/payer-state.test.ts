@@ -7,6 +7,7 @@ jest.mock('./store', () => ({ getGrantedClaudeBillingConnection: jest.fn() }));
 import { afterEach, describe, expect, it } from '@jest/globals';
 import { getGrantedClaudeBillingConnection } from './store';
 import { getAuthoritativeClaudeBillingState } from './payer-state';
+import { readJsonBody } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 
 const owner = { kind: 'personal', kiloUserId: 'owner' } as const;
 afterEach(() => {
@@ -73,7 +74,7 @@ describe('Cross-region Claude payer state', () => {
       kiloUserId: 'owner',
       organizationId,
     });
-    expect(fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init?.body)))).toEqual([
+    expect(fetchMock.mock.calls.map(([, init]) => readJsonBody(init?.body))).toEqual([
       { kind: 'organization', organizationId },
       { kind: 'organization', organizationId, kiloUserId: 'owner' },
     ]);

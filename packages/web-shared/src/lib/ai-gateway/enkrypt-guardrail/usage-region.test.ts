@@ -21,6 +21,7 @@ import {
 } from '@kilocode/web-shared/tests/helpers/enkrypt-usage.helper';
 import { MICRODOLLARS_PER_ENKRYPT_CREDIT, recordEnkryptUsage } from './usage';
 import { EnkryptUsageWriteSchema } from '@kilocode/usage-contracts';
+import { readJsonBody, requestUrlOf } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 
 const mockedIsUSRegion = jest.mocked(isUSRegion);
 const nativeFetch = globalThis.fetch;
@@ -61,14 +62,14 @@ describe('recordEnkryptUsage region routing', () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url, init] = mockFetch.mock.calls[0];
-    expect(String(url)).toBe('https://app.example.com/api/internal/enkrypt-usage/record');
+    expect(requestUrlOf(url)).toBe('https://app.example.com/api/internal/enkrypt-usage/record');
     expect(init?.method).toBe('POST');
     expect(init?.headers).toEqual({
       'content-type': 'application/json',
       'x-internal-api-key': 'test-internal-secret',
     });
-    expect(JSON.parse(String(init?.body))).not.toHaveProperty('guardrail');
-    const body = EnkryptUsageWriteSchema.parse(JSON.parse(String(init?.body)));
+    expect(readJsonBody(init?.body)).not.toHaveProperty('guardrail');
+    const body = EnkryptUsageWriteSchema.parse(readJsonBody(init?.body));
     expect(body).toEqual({
       ...usageRecord,
       guardrail: 'input',
@@ -86,7 +87,7 @@ describe('recordEnkryptUsage region routing', () => {
       mockFetch.mockImplementation(async (_url, init) =>
         Response.json({
           status,
-          usageId: EnkryptUsageWriteSchema.parse(JSON.parse(String(init?.body))).id,
+          usageId: EnkryptUsageWriteSchema.parse(readJsonBody(init?.body)).id,
         })
       );
       const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -154,9 +155,7 @@ describe('recordEnkryptUsage region routing', () => {
     );
     expect(JSON.stringify(consoleError.mock.calls)).not.toContain('test-internal-secret');
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    const handedOff = EnkryptUsageWriteSchema.parse(
-      JSON.parse(String(mockFetch.mock.calls[0][1]?.body))
-    );
+    const handedOff = EnkryptUsageWriteSchema.parse(readJsonBody(mockFetch.mock.calls[0][1]?.body));
     const rows = await enkryptLedgerRows(usageRecord.organizationId);
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(handedOff.id);
@@ -219,7 +218,7 @@ describe('recordEnkryptUsage region routing', () => {
       await expect(recordEnkryptUsage(usageRecord)).resolves.toBeUndefined();
 
       const handedOff = EnkryptUsageWriteSchema.parse(
-        JSON.parse(String(mockFetch.mock.calls[0][1]?.body))
+        readJsonBody(mockFetch.mock.calls[0][1]?.body)
       );
       expect(consoleWarn).toHaveBeenCalledTimes(1);
       expect(consoleWarn).toHaveBeenCalledWith(warning, {

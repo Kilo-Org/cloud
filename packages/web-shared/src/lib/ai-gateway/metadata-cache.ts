@@ -1,7 +1,7 @@
 import { ai_gateway_metadata_cache } from '@kilocode/db';
 import { eq } from 'drizzle-orm';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
-import type { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleDatabase } from '@kilocode/web-shared/lib/drizzle';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
@@ -18,7 +18,8 @@ export type MetadataSource<T> = {
   rawWhenNotFound?: unknown;
 };
 
-export type MetadataDb = typeof db | typeof readDb;
+/** A stored-metadata reader: the primary connection, or the read replica when one is configured. */
+export type MetadataDb = DrizzleDatabase;
 
 export async function fetchMetadata<T>(
   source: MetadataSource<T>,

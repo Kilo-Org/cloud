@@ -6093,31 +6093,30 @@ export class SandboxControlV2 extends DurableObject<Env> {
     let launchDeadline = input.launchDeadline;
     let startupCommand = input.startupCommand;
     const requestedSnapshot = input.launchOptions.snapshot !== undefined;
-    const startedAt = Date.now();
     const source = input.selection?.source ?? 'image';
-    const recordFailure = (
-      attempt: number,
-      failure: Omit<SnapshotLaunchFailureDiagnostic, 'source' | 'attempt' | 'elapsedMs'>
-    ): SnapshotLaunchFailureDiagnostic => {
-      const diagnostic: SnapshotLaunchFailureDiagnostic = {
-        ...failure,
-        source,
-        attempt,
-        elapsedMs: Math.max(0, Date.now() - startedAt),
-      };
-      if (failure.failureStage !== 'provider_snapshot' || failure.reason === 'unsupported') {
-        logControlDiagnostic(
-          'snapshot_launch_failed',
-          { sandboxId: this.sandboxId, allocationId: input.allocationId, ...diagnostic },
-          'warn'
-        );
-      }
-      return diagnostic;
-    };
     for (let attempt = 1; ; attempt += 1) {
+      const attemptStartedAt = Date.now();
+      const recordFailure = (
+        failure: Omit<SnapshotLaunchFailureDiagnostic, 'source' | 'attempt' | 'elapsedMs'>
+      ): SnapshotLaunchFailureDiagnostic => {
+        const diagnostic: SnapshotLaunchFailureDiagnostic = {
+          ...failure,
+          source,
+          attempt,
+          elapsedMs: Math.max(0, Date.now() - attemptStartedAt),
+        };
+        if (failure.failureStage !== 'provider_snapshot' || failure.reason === 'unsupported') {
+          logControlDiagnostic(
+            'snapshot_launch_failed',
+            { sandboxId: this.sandboxId, allocationId: input.allocationId, ...diagnostic },
+            'warn'
+          );
+        }
+        return diagnostic;
+      };
       if (Date.now() >= launchDeadline) {
         if (!requestedSnapshot) throw new Error('Sandbox launch timed out');
-        const diagnostic = recordFailure(attempt, {
+        const diagnostic = recordFailure({
           failureStage: 'launch_deadline',
           reason: 'launch_deadline',
           errorName: 'Error',
@@ -6145,7 +6144,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
                     allocationId: input.allocationId,
                     source,
                     attempt,
-                    startedAt,
+                    startedAt: attemptStartedAt,
                   },
                 }
               : input.launchOptions
@@ -6186,7 +6185,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // An owned allocation fails through `failConnectedSnapshotMiss`, which
       // handles a connected wrapper; the creation fail path does not.
       if (await this.allocationOwnedElsewhere(input.allocationId)) {
-        recordFailure(attempt, {
+        recordFailure({
           ...failure,
           failureStage: 'allocation_owned',
           reason: 'allocation_owned',
@@ -6194,11 +6193,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
         return { result, owned: true };
       }
       if (snapshotStartFailureIsPermanent(reason) || attempt >= 2) {
-        throw this.snapshotStartFailure(input.selection, reason, recordFailure(attempt, failure));
+        throw this.snapshotStartFailure(input.selection, reason, recordFailure(failure));
       }
       const retry = await this.stopForSnapshotRetry(input.createdRef, input.allocationId);
       if (retry.result === 'owned') {
-        recordFailure(attempt, {
+        recordFailure({
           ...failure,
           failureStage: 'allocation_owned',
           reason: 'allocation_owned',
@@ -6206,7 +6205,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         return { result, owned: true };
       }
       if (retry.result === 'failed') {
-        const diagnostic = recordFailure(attempt, {
+        const diagnostic = recordFailure({
           failureStage: 'retry_stop',
           reason: 'stop_failed',
           errorName: retry.errorName,
@@ -6226,14 +6225,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
           source === 'workspace' ? 'restore' : 'environment_snapshot'
         ))
       ) {
-        recordFailure(attempt, {
+        recordFailure({
           ...failure,
           failureStage: 'allocation_owned',
           reason: 'allocation_owned',
         });
         return { result, owned: true };
       }
-      recordFailure(attempt, failure);
+      recordFailure(failure);
       logControlDiagnostic('snapshot_launch_retry', {
         sandboxId: this.sandboxId,
         allocationId: input.allocationId,

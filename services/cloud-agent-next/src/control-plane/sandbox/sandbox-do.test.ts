@@ -220,10 +220,50 @@ describe('SandboxControlV2 snapshot start diagnostics', () => {
     expect(
       records
         .filter(record => record.diagnosticEvent === 'snapshot_launch_failed')
-        .map(record => [record.attempt, record.failureStage])
+        .map(record => [record.attempt, record.failureStage, record.elapsedMs])
     ).toEqual([
-      [1, 'launch_deadline'],
-      [2, 'launch_deadline'],
+      [1, 'launch_deadline', 1_000],
+      [2, 'launch_deadline', DEADLINE_MS.repositoryStartup],
+    ]);
+  });
+
+  it('measures a short retry separately from a timed-out first attempt and its stop', async () => {
+    const fields = vi.spyOn(logger, 'withFields');
+    const options: Array<ProviderLaunchOptions | undefined> = [];
+    const launch = vi.fn<ProviderAdapter['launch']>(async (_ref, _startup, launchOptions) => {
+      options.push(launchOptions);
+      if (options.length === 1) return new Promise<never>(() => {});
+      vi.setSystemTime(Date.now() + 1_000);
+      throw new TypeError('provider rejected retry');
+    });
+    const sandbox = unit(launch);
+    sandbox.stopRef = vi.fn(async () => {
+      vi.setSystemTime(Date.now() + 10_000);
+      return { confirmed: true, errorName: 'none', cause: 'stop_confirmed' };
+    });
+    const failed = sandbox
+      .launchWithSnapshotRetry({
+        ...input,
+        launchDeadline: 10_000 + DEADLINE_MS.repositoryStartup,
+      })
+      .catch(error => error);
+    await vi.advanceTimersByTimeAsync(DEADLINE_MS.repositoryStartup);
+    expect(await failed).toMatchObject({ reason: 'transient' });
+    expect(options.map(option => option?.snapshotDiagnostic)).toEqual([
+      { allocationId: ALLOCATION_ID, source: 'environment', attempt: 1, startedAt: 10_000 },
+      { allocationId: ALLOCATION_ID, source: 'environment', attempt: 2, startedAt: 320_000 },
+    ]);
+    expect(
+      fields.mock.calls
+        .map(([record]) => record)
+        .filter(
+          record => record.diagnosticEvent === 'snapshot_launch_failed' && record.attempt === 2
+        )
+    ).toEqual([
+      expect.objectContaining({
+        failureStage: 'provider_rejection',
+        elapsedMs: 1_000,
+      }),
     ]);
   });
 

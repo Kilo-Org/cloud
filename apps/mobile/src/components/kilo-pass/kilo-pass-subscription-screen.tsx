@@ -182,19 +182,14 @@ function KiloPassMessageBody({ message }: { message: string }) {
 }
 
 /**
- * A lapsed pass keeps the plan line and the day it stopped, in the same frame
- * the active details use, so the reader sees where their pass stands instead
- * of a bare "ended" message.
+ * A lapsed pass is one of the screen's centered states — crown, the plan it
+ * was, the day it stopped — so the reader sees where their pass stands instead
+ * of a bare line floating in an otherwise empty body.
  */
 function KiloPassEndedBody({ detail }: { detail: Extract<KiloPassDetail, { kind: 'ended' }> }) {
   return (
     <KiloPassFrame>
-      <DetailScreenScrollView contentContainerClassName="grow justify-center gap-4 px-5">
-        <View className="gap-1">
-          <Text className="text-base font-semibold text-foreground">{detail.planLabel}</Text>
-          <Text className="text-sm text-muted-foreground">{detail.endedLabel}</Text>
-        </View>
-      </DetailScreenScrollView>
+      <EmptyState icon={Crown} title={detail.planLabel} description={detail.endedLabel} />
     </KiloPassFrame>
   );
 }

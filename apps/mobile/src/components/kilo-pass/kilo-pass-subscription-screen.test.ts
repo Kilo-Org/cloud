@@ -203,10 +203,17 @@ describe('KiloPassSubscriptionScreen', () => {
       isEligibleForFirstMonthPromo: false,
     };
     const renderer = await renderScreen();
-    const text = allText(renderer);
-    expect(text).toContain('Pro · Monthly');
-    expect(text).toContain('Ended Nov 8, 2026');
+    // The screen's centered state, so a lapsed pass reads as a finished surface
+    // rather than a line floating in an empty body.
+    const emptyState = nodesOfType(renderer, 'EmptyState');
+    expect(emptyState).toHaveLength(1);
+    expect(emptyState[0]?.props).toMatchObject({
+      icon: 'Crown',
+      title: 'Pro · Monthly',
+      description: 'Ended Nov 8, 2026',
+    });
     // The ended surface reports state only: no manage, cancel, or buy action.
+    expect(emptyState[0]?.props.action).toBeUndefined();
     expect(nodesOfType(renderer, 'Button')).toHaveLength(0);
     expect(nodesOfType(renderer, 'KvRow')).toHaveLength(0);
     renderer.unmount();

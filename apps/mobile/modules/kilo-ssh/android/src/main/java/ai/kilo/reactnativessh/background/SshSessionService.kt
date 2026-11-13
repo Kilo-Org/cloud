@@ -46,8 +46,14 @@ class SshSessionService : Service() {
   companion object {
     const val ACTION_DISCONNECT_ALL = "ai.kilo.reactnativessh.DISCONNECT_ALL"
 
-    fun start(context: Context) {
+    fun start(context: Context): Boolean = try {
       ContextCompat.startForegroundService(context, Intent(context, SshSessionService::class.java))
+      true
+    } catch (_: IllegalStateException) {
+      // Android 8+ refuses a background service start and 12+ throws
+      // ForegroundServiceStartNotAllowedException here: the caller waits for
+      // the app to come back instead of taking the process down.
+      false
     }
 
     fun stop(context: Context) {

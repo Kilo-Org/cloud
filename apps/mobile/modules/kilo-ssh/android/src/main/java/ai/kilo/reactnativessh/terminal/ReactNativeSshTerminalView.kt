@@ -256,10 +256,12 @@ class ReactNativeSshTerminalView(context: Context, appContext: AppContext) : Exp
   }
 
   internal fun pasteFromClipboard() {
-    val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return
-    val text = clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString().orEmpty()
-    if (text.isEmpty()) return
-    session.write(text)
+    onMain {
+      val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return@onMain
+      val text = clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString().orEmpty()
+      if (text.isEmpty()) return@onMain
+      session.write(text)
+    }
   }
 
   private fun rebindSource() {
@@ -304,18 +306,22 @@ class ReactNativeSshTerminalView(context: Context, appContext: AppContext) : Exp
   private fun canAcceptInput(): Boolean = source != null && !transportClosed
 
   internal fun requestTerminalFocus() {
-    if (!canAcceptInput() || !isAttachedToWindow) return
-    terminal.requestFocus()
-    terminal.post {
-      if (!canAcceptInput() || !terminal.isFocused) return@post
-      context.getSystemService(InputMethodManager::class.java)?.showSoftInput(terminal, 0)
+    onMain {
+      if (!canAcceptInput() || !isAttachedToWindow) return@onMain
+      terminal.requestFocus()
+      terminal.post {
+        if (!canAcceptInput() || !terminal.isFocused) return@post
+        context.getSystemService(InputMethodManager::class.java)?.showSoftInput(terminal, 0)
+      }
     }
   }
 
   internal fun clearTerminalFocus() {
-    terminal.clearFocus()
-    context.getSystemService(InputMethodManager::class.java)
-      ?.hideSoftInputFromWindow(terminal.windowToken, 0)
+    onMain {
+      terminal.clearFocus()
+      context.getSystemService(InputMethodManager::class.java)
+        ?.hideSoftInputFromWindow(terminal.windowToken, 0)
+    }
   }
 
   private fun resolveTypeface(fontFamily: String?): Typeface {

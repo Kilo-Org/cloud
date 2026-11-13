@@ -31,6 +31,8 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 internal const val EVENT_HOST_KEY = "onHostKey"
@@ -45,13 +47,17 @@ internal const val EVENT_FORWARD_ERROR = "onForwardError"
 class ReactNativeSshModule : Module() {
   private val sessions = ConcurrentHashMap<String, SshSession>()
   private val shells = ConcurrentHashMap<String, SshShellSource>()
-  private val sftps = ConcurrentHashMap<String, SftpClient>()
-  private val forwards = ConcurrentHashMap<String, ForwardHandle>()
+  private val sftps = ConcurrentHashMap<String, SessionSftp>()
+  private val forwards = ConcurrentHashMap<String, SessionForward>()
   private val cancels = ConcurrentHashMap<String, CancelToken>()
   private val hostKeyRequests = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
   private val promptRequests = ConcurrentHashMap<String, CompletableDeferred<List<String>?>>()
   private val sessionIds = IdSequence("session-")
   private val shellIds = IdSequence("shell-")
+  // One sequence for every session: the pending host-key and prompt maps are
+  // keyed by request id alone, so a per-session counter would collide.
+  private val requestIds = IdSequence("request-")
+  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private var reportedSessionCount = 0
   private val sftpIds = IdSequence("sftp-")
   private val forwardIds = IdSequence("forward-")
@@ -170,13 +176,22 @@ class ReactNativeSshModule : Module() {
 
     AsyncFunction("openSftp").SuspendBody { sessionId: String ->
       val sftpId = sftpIds.next()
-      sftps[sftpId] = translateSuspendFailures { session(sessionId).openSftp() }
+      val client = translateSuspendFailures { session(sessionId).openSftp() }
+
+      sftps[sftpId] = SessionSftp(sessionId, client)
+
+      // The session can be disconnected while the client is opening; sweeping
+      // by session only sees entries that exist, so check after storing.
+      if (!sessions.containsKey(sessionId)) {
+        closeSftp(sftpId)
+        throw SshException.ChannelClosed("session $sessionId is not connected").toCodedException()
+      }
 
       sftpId
     }
 
     AsyncFunction("closeSftp").SuspendBody { sftpId: String ->
-      sftps.remove(sftpId)?.let { client -> translateSuspendFailures { client.shutdown() } }
+      closeSftp(sftpId)
     }
 
     AsyncFunction("sftpList").SuspendBody { sftpId: String, path: String ->
@@ -226,29 +241,32 @@ class ReactNativeSshModule : Module() {
     }
 
     AsyncFunction("startLocalForward").SuspendBody { sessionId: String, config: ForwardConfigRecord ->
-      registerForward {
+      registerForward(sessionId) {
         session(sessionId).startLocalForward(config.toNative(), forwardSink(sessionId))
       }
     }
 
     AsyncFunction("startRemoteForward").SuspendBody { sessionId: String, config: ForwardConfigRecord ->
-      registerForward {
+      registerForward(sessionId) {
         session(sessionId).startRemoteForward(config.toNative(), forwardSink(sessionId))
       }
     }
 
     AsyncFunction("stopForward").SuspendBody { forwardId: String ->
-      forwards.remove(forwardId)?.let { handle -> translateSuspendFailures { handle.stop() } }
+      stopForward(forwardId)
     }
 
     OnDestroy {
-      val scope = CoroutineScope(Dispatchers.IO)
+      scope.cancel()
+
+      // The teardown outlives the module, so it gets its own scope.
+      val teardown = CoroutineScope(Dispatchers.IO)
 
       shells.keys.forEach(::closeShell)
-      sftps.values.forEach { client -> scope.launch { runCatching { client.shutdown() } } }
-      forwards.values.forEach { handle -> scope.launch { runCatching { handle.stop() } } }
+      sftps.values.forEach { entry -> teardown.launch { runCatching { entry.client.shutdown() } } }
+      forwards.values.forEach { entry -> teardown.launch { runCatching { entry.handle.stop() } } }
       cancels.values.forEach { token -> token.cancel() }
-      sessions.forEach { (_, session) -> scope.launch { runCatching { session.disconnect() } } }
+      sessions.forEach { (_, session) -> teardown.launch { runCatching { session.disconnect() } } }
       sessions.clear()
       stopBackgroundSessions()
       BackgroundSessions.disconnectAll = null
@@ -265,6 +283,7 @@ class ReactNativeSshModule : Module() {
     val sessionId = sessionIds.next()
     val handler = JsSessionHandler(
       sessionId = sessionId,
+      requestIds = requestIds,
       requestHostKey = ::requestHostKey,
       requestPrompts = ::requestPrompts,
       notifyDisconnect = { record ->
@@ -295,6 +314,8 @@ class ReactNativeSshModule : Module() {
     val session = sessions.remove(sessionId) ?: return
 
     closeShells(sessionId)
+    closeSftps(sessionId)
+    stopForwards(sessionId)
     syncSessions()
     translateSuspendFailures { session.disconnect() }
   }
@@ -303,37 +324,68 @@ class ReactNativeSshModule : Module() {
     val session = session(sessionId)
     val shellId = shellIds.next()
     val source = translateSuspendFailures {
-      SshShellSource.open(sessionId, session, options.term, options.cols, options.rows)
+      // A channel that ends releases itself: the module holds no shell past its exit.
+      SshShellSource.open(sessionId, session, options.term, options.cols, options.rows) {
+        closeShell(shellId)
+      }
     }
 
     shells[shellId] = source
     TerminalSourceRegistry.register(shellId, source)
 
+    // The channel can end before it is registered, in which case the callback
+    // above had nothing to remove yet.
+    if (source.terminated) closeShell(shellId)
+
     return shellId
   }
 
   private fun closeShell(shellId: String) {
-    val source = shells.remove(shellId) ?: return
-
     IdleNotifications.release(shellId)
     TerminalSourceRegistry.unregister(shellId)
-    source.close()
+    shells.remove(shellId)?.close()
   }
 
   private fun closeShells(sessionId: String) {
     shells.filterValues { it.sessionId == sessionId }.keys.forEach(::closeShell)
   }
 
+  /** Every SFTP client the session opened follows it out, whatever the caller did. */
+  private suspend fun closeSftps(sessionId: String) {
+    sftps.filterValues { it.sessionId == sessionId }.keys.forEach { sftpId ->
+      runCatching { closeSftp(sftpId) }
+    }
+  }
+
+  private suspend fun stopForwards(sessionId: String) {
+    forwards.filterValues { it.sessionId == sessionId }.keys.forEach { forwardId ->
+      runCatching { stopForward(forwardId) }
+    }
+  }
+
+  private suspend fun closeSftp(sftpId: String) {
+    sftps.remove(sftpId)?.let { entry -> translateSuspendFailures { entry.client.shutdown() } }
+  }
+
+  private suspend fun stopForward(forwardId: String) {
+    forwards.remove(forwardId)?.let { entry -> translateSuspendFailures { entry.handle.stop() } }
+  }
+
+  /** Runs on the core's disconnect callback thread, so the shutdowns are queued. */
   private fun removeSession(sessionId: String) {
     if (sessions.remove(sessionId) == null) {
       return
     }
 
     closeShells(sessionId)
+    scope.launch {
+      closeSftps(sessionId)
+      stopForwards(sessionId)
+    }
     syncSessions()
   }
 
-  /** SFTP clients and forwards belong to an open session, so sessions alone bound the service. */
+  /** Every open session, and nothing else, keeps the foreground service alive. */
   private fun syncSessions() {
     val count = sessions.size
 
@@ -357,10 +409,13 @@ class ReactNativeSshModule : Module() {
   private fun disconnectAll() {
     shells.keys.toList().forEach(::closeShell)
 
-    val scope = CoroutineScope(Dispatchers.IO)
     sessions.keys.toList().forEach { sessionId ->
       val session = sessions.remove(sessionId) ?: return@forEach
 
+      scope.launch {
+        closeSftps(sessionId)
+        stopForwards(sessionId)
+      }
       scope.launch { runCatching { session.disconnect() } }
     }
 
@@ -382,11 +437,18 @@ class ReactNativeSshModule : Module() {
     }
   }
 
-  private suspend fun registerForward(start: suspend () -> ForwardHandle): ForwardStartRecord {
+  private suspend fun registerForward(sessionId: String, start: suspend () -> ForwardHandle): ForwardStartRecord {
     val forwardId = forwardIds.next()
     val handle = translateSuspendFailures(start)
 
-    forwards[forwardId] = handle
+    forwards[forwardId] = SessionForward(sessionId, handle)
+
+    // The session can be disconnected while the forward is starting, and the
+    // sweep already ran; a forward nobody owns would listen forever.
+    if (!sessions.containsKey(sessionId)) {
+      stopForward(forwardId)
+      throw SshException.ChannelClosed("session $sessionId is not connected").toCodedException()
+    }
 
     return ForwardStartRecord(forwardId, handle.actualPort().toInt())
   }
@@ -443,9 +505,15 @@ class ReactNativeSshModule : Module() {
       ?: throw SshException.ChannelClosed("session $sessionId is not connected").toCodedException()
 
   private fun sftp(sftpId: String): SftpClient =
-    sftps[sftpId]
+    sftps[sftpId]?.client
       ?: throw SshException.ChannelClosed("sftp $sftpId is not open").toCodedException()
 }
+
+/** An SFTP client and the session whose shutdown it shares. */
+private class SessionSftp(val sessionId: String, val client: SftpClient)
+
+/** A port forward and the session whose shutdown it shares. */
+private class SessionForward(val sessionId: String, val handle: ForwardHandle)
 
 /** Runs a core call, translating its failure into a coded JavaScript error. */
 private inline fun <T> translateFailures(call: () -> T): T = try {

@@ -157,14 +157,20 @@ function press(root: ReactTestRenderer['root']): void {
   });
 }
 
-/** The reader's Back, as the header delivers it: through the screen's own exit. */
+/**
+ * The reader's Back on this screen's header. The real header dispatches through
+ * `useHeaderBack`: a declared `onBack` is the handler, and without one it pops
+ * with `router.back()` of its own. Both arms are reproduced here, so a screen
+ * that leaves the header to pop by itself is measured, not excused.
+ */
 function pressHeaderBack(): void {
   const onBack = state.headerBack;
-  if (!onBack) {
-    throw new Error('missing header Back');
-  }
   act(() => {
-    onBack();
+    if (onBack) {
+      onBack();
+      return;
+    }
+    state.back();
   });
 }
 

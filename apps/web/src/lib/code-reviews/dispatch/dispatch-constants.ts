@@ -14,9 +14,11 @@ const RUNNING_CODE_REVIEW_STATUS = 'running' as const;
  * Statuses a review can hold while it still has work outstanding.
  *
  * A review in one of these states can still move; the states it can move to are
- * {@link TERMINAL_CODE_REVIEW_STATUSES}. Callers that select or guard on "still
- * in flight" reference this rather than repeating the literals, so adding or
- * renaming a status is a single edit.
+ * {@link TERMINAL_CODE_REVIEW_STATUSES}. In-flight predicates reference the
+ * per-status members above instead of repeating their literals, so renaming a
+ * status is a single edit. A new in-flight status still needs its own predicate
+ * in the dispatch conditions, because each status is compared on a different
+ * timestamp.
  */
 export const NON_TERMINAL_CODE_REVIEW_STATUSES = [
   PENDING_CODE_REVIEW_STATUS,

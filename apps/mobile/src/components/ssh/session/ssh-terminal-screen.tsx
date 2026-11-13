@@ -123,6 +123,7 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
       <TerminalSurface
         handleRef={terminalRef}
         sourceId={shellId}
+        autoFocus
         fontSize={fontSize}
         onLinkPress={url => {
           void openExternalUrl(url);

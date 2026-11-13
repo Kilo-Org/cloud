@@ -35,6 +35,12 @@ type TerminalSurfaceProps = Readonly<{
   onTitleChange?: (title: string | null) => void;
   /** A closed shell: `error` is null for a clean remote exit. */
   onClosed?: (error: string | null) => void;
+  /**
+   * Open the keyboard as soon as the shell is behind this view. The native view
+   * waits for its source to bind, so a shell that arrives after the mount still
+   * takes focus instead of leaving the terminal idle with no input.
+   */
+  autoFocus?: boolean;
 }>;
 
 /**
@@ -46,6 +52,7 @@ export function TerminalSurface({
   sourceId,
   fontSize,
   handleRef,
+  autoFocus,
   onResize,
   onFontSizeChange,
   onLinkPress,
@@ -61,6 +68,7 @@ export function TerminalSurface({
         handleRef.current = instance;
       }}
       sourceId={sourceId}
+      autoFocus={autoFocus}
       fontFamily={FONT_FAMILY}
       fontSize={fontSize}
       theme={theme}

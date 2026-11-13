@@ -75,6 +75,7 @@ export function SandboxTerminalScreen({
       <TerminalSurface
         handleRef={terminalRef}
         sourceId={sourceId}
+        autoFocus
         fontSize={fontSize}
         onLinkPress={url => {
           void openExternalUrl(url);

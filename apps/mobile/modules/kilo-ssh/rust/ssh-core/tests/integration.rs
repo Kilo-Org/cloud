@@ -10,10 +10,10 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-use ssh_core::{AuthMethod, Prompt, SessionHandler, SshError, SshSession};
+use ssh_core::{AuthMethod, ConnectConfig, Prompt, SessionHandler, SshError, SshSession};
 use support::{
-    TestHandler, expect_failure, open_shell, password_session, server, wait_for_close,
-    wait_for_text,
+    TestHandler, expect_failure, open_shell, password_session, server, stalled_auth_server,
+    wait_for_close, wait_for_text,
 };
 
 #[tokio::test]
@@ -362,5 +362,68 @@ async fn connect_timeout_bounds_a_silent_listener() {
     assert!(
         waited < Duration::from_secs(10),
         "the timeout fired after {waited:?}"
+    );
+}
+
+#[tokio::test]
+async fn connect_timeout_bounds_an_unanswered_authentication() {
+    let (port, server) = stalled_auth_server().await;
+    let config = ConnectConfig {
+        host: "127.0.0.1".to_string(),
+        port,
+        username: "user".to_string(),
+        auth: AuthMethod::Password {
+            password: "ssh-core-password".to_string(),
+        },
+        connect_timeout_ms: 1_500,
+        keepalive_interval_s: 0,
+    };
+    let handler = Arc::new(TestHandler::accepting());
+
+    let started = tokio::time::Instant::now();
+    let error = expect_failure(
+        SshSession::connect(config, handler as Arc<dyn SessionHandler>).await,
+        "a server that completes key exchange and never answers authentication must time out",
+    );
+    let waited = started.elapsed();
+    server.abort();
+
+    assert!(
+        matches!(error, SshError::Timeout { .. }),
+        "unexpected error: {error:?}"
+    );
+    assert!(
+        waited < Duration::from_secs(10),
+        "the timeout fired after {waited:?}"
+    );
+}
+
+#[tokio::test]
+async fn connect_budget_pauses_while_a_prompt_is_open() {
+    let server = server!();
+    let delay = Duration::from_millis(1_500);
+    let handler = Arc::new(
+        TestHandler::answering_by_prompt(
+            server.keyboard_interactive_code.clone(),
+            server.password.clone(),
+        )
+        .delayed(delay),
+    );
+    let mut config = server.config(
+        server.keyboard_interactive_port,
+        AuthMethod::KeyboardInteractive,
+    );
+    config.connect_timeout_ms = 1_000;
+
+    let started = tokio::time::Instant::now();
+    let session = SshSession::connect(config, handler as Arc<dyn SessionHandler>)
+        .await
+        .expect("a user slower than the budget is still a user");
+    let waited = started.elapsed();
+    session.disconnect().await.expect("disconnect");
+
+    assert!(
+        waited >= delay,
+        "the answers were not delayed, so the budget was never exercised: {waited:?}"
     );
 }

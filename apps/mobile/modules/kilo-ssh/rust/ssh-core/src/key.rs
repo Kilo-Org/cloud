@@ -3,6 +3,7 @@
 use russh::keys::ssh_key::LineEnding;
 use russh::keys::ssh_key::private::{Ed25519Keypair, KeypairData};
 use russh::keys::{HashAlg, PrivateKey, decode_secret_key};
+use zeroize::Zeroize;
 
 use crate::error::{SshError, key_error};
 
@@ -44,6 +45,8 @@ pub fn generate_ed25519_key(comment: String) -> Result<GeneratedKey, SshError> {
     })?;
 
     let pair = Ed25519Keypair::from_seed(&seed);
+    seed.zeroize();
+
     let key = PrivateKey::new(KeypairData::Ed25519(pair), comment).map_err(key_error)?;
 
     let private_key_openssh = key

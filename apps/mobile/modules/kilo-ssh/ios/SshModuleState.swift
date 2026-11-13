@@ -20,6 +20,29 @@ struct ForwardEntry: @unchecked Sendable {
 }
 
 /**
+ * What a session held, handed back when the session ends.
+ *
+ * The shells close on the caller's thread because the terminal view reads them;
+ * the clients and listeners need the socket, so `shutDown` runs before it goes.
+ */
+struct ReleasedSession: @unchecked Sendable {
+  let session: SshSession
+  let shells: [(id: String, source: SshShellSource)]
+  let sftps: [SftpClient]
+  let forwards: [ForwardEntry]
+
+  func shutDown() async {
+    for client in sftps {
+      try? await client.shutdown()
+    }
+
+    for entry in forwards {
+      try? await entry.handle.stop()
+    }
+  }
+}
+
+/**
  * Every live SSH resource, shared by the JavaScript thread and the Rust callback
  * threads.
  *
@@ -35,6 +58,7 @@ final class SshModuleState: @unchecked Sendable {
   let shellIds = IdSequence(prefix: "shell-")
   let sftpIds = IdSequence(prefix: "sftp-")
   let forwardIds = IdSequence(prefix: "forward-")
+  let requestIds = IdSequence(prefix: "request-")
 
   private let lock = NSLock()
   private var sessions: [String: SshSession] = [:]
@@ -60,17 +84,35 @@ final class SshModuleState: @unchecked Sendable {
     return sessions[id]
   }
 
-  func removeSession(_ id: String) -> SshSession? {
+  func releaseSession(_ id: String) -> ReleasedSession? {
     lock.lock()
-    defer { lock.unlock() }
-    targets.removeValue(forKey: id)
-    return sessions.removeValue(forKey: id)
-  }
 
-  func allSessions() -> [SshSession] {
-    lock.lock()
-    defer { lock.unlock() }
-    return Array(sessions.values)
+    guard let session = sessions.removeValue(forKey: id) else {
+      lock.unlock()
+
+      return nil
+    }
+
+    targets.removeValue(forKey: id)
+    let ownedShells = shells.filter { $0.value.sessionId == id }.map { (id: $0.key, source: $0.value) }
+    ownedShells.forEach { shells.removeValue(forKey: $0.id) }
+    let ownedSftpIds = sftpSessions.filter { $0.value == id }.map(\.key)
+    let ownedSftps = ownedSftpIds.compactMap { sftpId -> SftpClient? in
+      sftpSessions.removeValue(forKey: sftpId)
+
+      return sftps.removeValue(forKey: sftpId)
+    }
+    let ownedForwardIds = forwards.filter { $0.value.sessionId == id }.map(\.key)
+    let ownedForwards = ownedForwardIds.compactMap { forwards.removeValue(forKey: $0) }
+
+    lock.unlock()
+
+    return ReleasedSession(
+      session: session,
+      shells: ownedShells,
+      sftps: ownedSftps,
+      forwards: ownedForwards
+    )
   }
 
   func sessionRecords() -> [SessionInfoRecord] {
@@ -105,18 +147,6 @@ final class SshModuleState: @unchecked Sendable {
     return shells.removeValue(forKey: id)
   }
 
-  func shellIds(of sessionId: String) -> [String] {
-    lock.lock()
-    defer { lock.unlock() }
-    return shells.filter { $0.value.sessionId == sessionId }.map { $0.key }
-  }
-
-  func allShellIds() -> [String] {
-    lock.lock()
-    defer { lock.unlock() }
-    return Array(shells.keys)
-  }
-
   func store(sftp: SftpClient, id: String, sessionId: String) {
     lock.lock()
     sftpSessions[id] = sessionId
@@ -137,12 +167,6 @@ final class SshModuleState: @unchecked Sendable {
     return sftps.removeValue(forKey: id)
   }
 
-  func allSftps() -> [SftpClient] {
-    lock.lock()
-    defer { lock.unlock() }
-    return Array(sftps.values)
-  }
-
   func store(forward: ForwardEntry, id: String) {
     lock.lock()
     forwards[id] = forward
@@ -153,12 +177,6 @@ final class SshModuleState: @unchecked Sendable {
     lock.lock()
     defer { lock.unlock() }
     return forwards.removeValue(forKey: id)
-  }
-
-  func allForwards() -> [ForwardHandle] {
-    lock.lock()
-    defer { lock.unlock() }
-    return forwards.values.map(\.handle)
   }
 
   func forwardRecords() -> [ForwardInfoRecord] {
@@ -192,12 +210,6 @@ final class SshModuleState: @unchecked Sendable {
     lock.lock()
     defer { lock.unlock() }
     return cancels.removeValue(forKey: id)
-  }
-
-  func allCancels() -> [CancelToken] {
-    lock.lock()
-    defer { lock.unlock() }
-    return Array(cancels.values)
   }
 
   func store(hostKeyRequest: PendingRequest<Bool>, id: String) {

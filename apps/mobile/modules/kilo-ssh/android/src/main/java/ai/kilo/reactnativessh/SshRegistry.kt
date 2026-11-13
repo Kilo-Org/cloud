@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /** What a session was opened against, kept so a later runtime can name it. */
@@ -51,6 +52,9 @@ internal fun interface SshEventSink {
 internal object SshRegistry {
   val sessionIds = IdSequence("session-")
   val shellIds = IdSequence("shell-")
+  // One sequence for every session: the pending host-key and prompt maps are
+  // keyed by request id alone, so a per-session counter would collide.
+  val requestIds = IdSequence("request-")
   val sftpIds = IdSequence("sftp-")
   val forwardIds = IdSequence("forward-")
 
@@ -65,6 +69,9 @@ internal object SshRegistry {
   private val promptRequests = ConcurrentHashMap<String, CompletableDeferred<List<String>?>>()
 
   @Volatile private var appContext: Context? = null
+
+  /** Shutdowns the transport's own disconnect callback cannot wait on. */
+  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
   /** The module instance currently attached to JavaScript, if one is alive. */
   @Volatile private var events: SshEventSink? = null
@@ -202,21 +209,41 @@ internal object SshRegistry {
     }
 
   /**
+   * Drops a session and everything it owns, whichever way it ends: JavaScript
+   * asked, the transport died, or the notification's disconnect-all fired.
+   *
+   * The shells close here, on the calling thread, because the terminal view
+   * reads them; the SFTP clients and forwards are shut down on this object's
+   * scope, because the transport's disconnect callback cannot wait on them.
+   */
+  fun releaseSession(sessionId: String): SshSession? {
+    val session = removeSession(sessionId) ?: return null
+
+    shellIdsOf(sessionId).forEach(::closeShell)
+    sftpIdsOf(sessionId).forEach { sftpId ->
+      removeSftp(sftpId)?.let { client -> scope.launch { runCatching { client.shutdown() } } }
+    }
+    forwardIdsOf(sessionId).forEach { forwardId ->
+      removeForward(forwardId)?.let { entry -> scope.launch { runCatching { entry.handle.stop() } } }
+    }
+
+    return session
+  }
+
+  private fun closeShell(shellId: String) {
+    IdleNotifications.release(shellId)
+
+    removeShell(shellId)?.close()
+  }
+
+  /**
    * Ends every session from the notification action. The teardown runs here
    * rather than in the module so it still works when no JavaScript runtime is
    * attached, which is the state a reload leaves behind.
    */
   fun disconnectAll() {
-    shells.keys.toList().forEach { shellId ->
-      IdleNotifications.release(shellId)
-      removeShell(shellId)?.close()
-    }
-
-    val scope = CoroutineScope(Dispatchers.IO)
     sessions.keys.toList().forEach { sessionId ->
-      val session = removeSession(sessionId) ?: return@forEach
-
-      scope.launch { runCatching { session.disconnect() } }
+      releaseSession(sessionId)?.let { session -> scope.launch { runCatching { session.disconnect() } } }
     }
 
     sync()

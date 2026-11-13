@@ -114,6 +114,14 @@ public final class ReactNativeSshModule: Module {
       let client = try await translateAsync { try await session.openSftp() }
       self.state.store(sftp: client, id: sftpId, sessionId: sessionId)
 
+      // The session can be disconnected while the client is opening; sweeping
+      // by session only sees entries that exist, so check after storing.
+      guard self.state.session(sessionId) != nil else {
+        _ = self.state.removeSftp(sftpId)
+        try await translateAsync { try await client.shutdown() }
+        throw channelClosed(sessionId)
+      }
+
       return sftpId
     }
 
@@ -246,6 +254,7 @@ public final class ReactNativeSshModule: Module {
     )
     let handler = JsSessionHandler(
       sessionId: sessionId,
+      requestIds: state.requestIds,
       requestHostKey: { [weak self] request in
         await self?.requestHostKey(request) ?? false
       },
@@ -253,7 +262,7 @@ public final class ReactNativeSshModule: Module {
         await self?.requestPrompts(request) ?? .cancelled
       },
       notifyDisconnect: { [weak self] notice in
-        self?.sendEvent("onDisconnect", notice.toEvent())
+        self?.handleTransportDisconnect(notice)
       }
     )
 
@@ -328,6 +337,14 @@ public final class ReactNativeSshModule: Module {
       id: forwardId
     )
 
+    // The session can be disconnected while the forward is starting, and the
+    // sweep already ran; a forward nobody owns would listen forever.
+    guard state.session(sessionId) != nil else {
+      _ = state.removeForward(forwardId)
+      try await translateAsync { try await handle.stop() }
+      throw channelClosed(sessionId)
+    }
+
     var record = ForwardStartRecord()
     record.forwardId = forwardId
     record.port = port
@@ -349,12 +366,35 @@ public final class ReactNativeSshModule: Module {
   }
 
   private func disconnectSession(_ sessionId: String) async throws {
-    guard let session = state.removeSession(sessionId) else {
+    guard let release = state.releaseSession(sessionId) else {
       return
     }
 
-    state.shellIds(of: sessionId).forEach { closeShell($0) }
-    try await translateAsync { try await session.disconnect() }
+    release.shells.forEach { closeShell($0.id, $0.source) }
+    await release.shutDown()
+    try await translateAsync { try await release.session.disconnect() }
+  }
+
+  private func handleTransportDisconnect(_ notice: DisconnectNotice) {
+    if let release = state.releaseSession(notice.sessionId) {
+      release.shells.forEach { closeShell($0.id, $0.source) }
+      Task { await release.shutDown() }
+    }
+
+    sendEvent("onDisconnect", notice.toEvent())
+  }
+
+  private func shellDimensions(_ options: ShellOptionsRecord) throws -> (cols: UInt32, rows: UInt32) {
+    guard
+      let cols = UInt32(exactly: options.cols),
+      let rows = UInt32(exactly: options.rows),
+      cols > 0,
+      rows > 0
+    else {
+      throw Exception(name: "SshError", description: "cols and rows must be positive integers", code: "Protocol")
+    }
+
+    return (cols, rows)
   }
 
   private func openShell(_ sessionId: String, _ options: ShellOptionsRecord) async throws -> String {
@@ -362,30 +402,34 @@ public final class ReactNativeSshModule: Module {
       throw channelClosed(sessionId)
     }
 
+    let dimensions = try shellDimensions(options)
     let shellId = state.shellIds.next()
     let source = try await translateAsync {
+      // A channel that ends releases itself: nothing holds a shell past its exit.
       try await SshShellSource.open(
         sessionId: sessionId,
         session: session,
         term: options.term,
-        cols: options.cols,
-        rows: options.rows
+        cols: dimensions.cols,
+        rows: dimensions.rows,
+        onTerminated: { releaseShell(shellId) }
       )
     }
 
     state.store(shell: source, id: shellId)
     TerminalSourceRegistry.shared.register(shellId, source)
 
+    // The channel can end before it is registered, in which case the callback
+    // above had nothing to remove yet.
+    if source.terminated {
+      releaseShell(shellId)
+    }
+
     return shellId
   }
 
   private func closeShell(_ shellId: String) {
-    guard let source = state.removeShell(shellId) else {
-      return
-    }
-
-    TerminalSourceRegistry.shared.unregister(shellId)
-    source.close()
+    releaseShell(shellId)
   }
 
   private func requestHostKey(_ request: HostKeyRequest) async -> Bool {
@@ -413,6 +457,20 @@ private func channelClosed(_ sessionId: String) -> Exception {
   Exception(name: "SshError", description: "session \(sessionId) is not connected", code: "ChannelClosed")
 }
 
+/// Unhooks a shell the registry still holds, whichever way its channel ended.
+private func releaseShell(_ shellId: String) {
+  guard let source = SshModuleState.shared.removeShell(shellId) else {
+    return
+  }
+
+  closeShell(shellId, source)
+}
+
+private func closeShell(_ shellId: String, _ source: SshShellSource) {
+  TerminalSourceRegistry.shared.unregister(shellId)
+  source.close()
+}
+
 private func translate<Value>(_ call: () throws -> Value) throws -> Value {
   do {
     return try call()
@@ -434,8 +492,19 @@ private extension ConnectConfigRecord {
     guard port >= 1 && port <= 65535 else {
       throw Exception(name: "SshError", description: "port must be between 1 and 65535", code: "Protocol")
     }
-    guard connectTimeoutMs > 0, keepaliveIntervalS >= 0 else {
-      throw Exception(name: "SshError", description: "invalid timeout or keepalive", code: "Protocol")
+    guard connectTimeoutMs > 0, connectTimeoutMs <= Int(UInt32.max) else {
+      throw Exception(
+        name: "SshError",
+        description: "connectTimeoutMs must be between 1 and \(UInt32.max)",
+        code: "Protocol"
+      )
+    }
+    guard keepaliveIntervalS >= 0, keepaliveIntervalS <= Int(UInt32.max) else {
+      throw Exception(
+        name: "SshError",
+        description: "keepaliveIntervalS must be between 0 and \(UInt32.max)",
+        code: "Protocol"
+      )
     }
 
     return ConnectConfig(

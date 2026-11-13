@@ -2476,6 +2476,7 @@ dependencies = [
  "getrandom 0.4.3",
  "russh",
  "russh-sftp",
+ "serde_json",
  "sha2 0.10.9",
  "tokio",
  "uniffi",

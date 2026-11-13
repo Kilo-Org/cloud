@@ -45,3 +45,9 @@ apps/web/src/app/api/organizations/\[id\]/guardrails/mcp-connections/route\.test
 # credential-free value; the earlier commit stays in branch history. Exclude the
 # fixture path so the synthetic URI does not fail the scan.
 dev/seed/lib/db\.test\.ts
+
+# SSH test-key fixtures. The kilo-ssh Rust tests parse and authenticate with
+# throwaway private keys made for the OpenSSH test containers only; no server
+# outside those containers trusts them. Exclude the fixture directory so the
+# synthetic keys do not fail the scan.
+apps/mobile/modules/kilo-ssh/rust/ssh-core/tests/fixtures/.*

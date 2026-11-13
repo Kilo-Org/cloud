@@ -171,13 +171,21 @@ class ReactNativeSshModule : Module() {
     AsyncFunction("openSftp").SuspendBody { sessionId: String ->
       val sftpId = sshRegistry.sftpIds.next()
       val client = translateSuspendFailures { session(sessionId).openSftp() }
+
       sshRegistry.putSftp(sftpId, sessionId, client)
+
+      // The session can be disconnected while the client is opening; sweeping
+      // by session only sees entries that exist, so check after storing.
+      if (sshRegistry.session(sessionId) == null) {
+        closeSftp(sftpId)
+        throw SshException.ChannelClosed("session $sessionId is not connected").toCodedException()
+      }
 
       sftpId
     }
 
     AsyncFunction("closeSftp").SuspendBody { sftpId: String ->
-      sshRegistry.removeSftp(sftpId)?.let { client -> translateSuspendFailures { client.shutdown() } }
+      closeSftp(sftpId)
     }
 
     AsyncFunction("sftpList").SuspendBody { sftpId: String, path: String ->
@@ -239,7 +247,7 @@ class ReactNativeSshModule : Module() {
     }
 
     AsyncFunction("stopForward").SuspendBody { forwardId: String ->
-      sshRegistry.removeForward(forwardId)?.let { entry -> translateSuspendFailures { entry.handle.stop() } }
+      stopForward(forwardId)
     }
 
     /**
@@ -263,10 +271,11 @@ class ReactNativeSshModule : Module() {
     val sessionId = sshRegistry.sessionIds.next()
     val handler = JsSessionHandler(
       sessionId = sessionId,
+      requestIds = sshRegistry.requestIds,
       requestHostKey = ::requestHostKey,
       requestPrompts = ::requestPrompts,
       // The socket can die while no runtime is attached, so the notice goes
-      // through the registry's channel and the removal is registry state.
+      // through the registry's channel and the release is registry state.
       notifyDisconnect = { record ->
         sshRegistry.emit(EVENT_DISCONNECT, record.toEvent())
         removeSession(record.sessionId)
@@ -297,9 +306,8 @@ class ReactNativeSshModule : Module() {
   }
 
   private suspend fun disconnectSession(sessionId: String) {
-    val session = sshRegistry.removeSession(sessionId) ?: return
+    val session = sshRegistry.releaseSession(sessionId) ?: return
 
-    closeShells(sessionId)
     sshRegistry.sync()
     translateSuspendFailures { session.disconnect() }
   }
@@ -308,10 +316,17 @@ class ReactNativeSshModule : Module() {
     val session = session(sessionId)
     val shellId = sshRegistry.shellIds.next()
     val source = translateSuspendFailures {
-      SshShellSource.open(sessionId, session, options.term, options.cols, options.rows)
+      // A channel that ends releases itself: nothing holds a shell past its exit.
+      SshShellSource.open(sessionId, session, options.term, options.cols, options.rows) {
+        closeShell(shellId)
+      }
     }
 
     sshRegistry.putShell(shellId, source)
+
+    // The channel can end before it is registered, in which case the callback
+    // above had nothing to remove yet.
+    if (source.terminated) closeShell(shellId)
 
     return shellId
   }
@@ -323,17 +338,21 @@ class ReactNativeSshModule : Module() {
     source.close()
   }
 
-  private fun closeShells(sessionId: String) {
-    sshRegistry.shellIdsOf(sessionId).forEach(::closeShell)
-  }
-
+  /** Runs on the core's disconnect callback thread, so the teardown is queued. */
   private fun removeSession(sessionId: String) {
-    if (sshRegistry.removeSession(sessionId) == null) {
+    if (sshRegistry.releaseSession(sessionId) == null) {
       return
     }
 
-    closeShells(sessionId)
     sshRegistry.sync()
+  }
+
+  private suspend fun closeSftp(sftpId: String) {
+    sshRegistry.removeSftp(sftpId)?.let { client -> translateSuspendFailures { client.shutdown() } }
+  }
+
+  private suspend fun stopForward(forwardId: String) {
+    sshRegistry.removeForward(forwardId)?.let { entry -> translateSuspendFailures { entry.handle.stop() } }
   }
 
   private suspend fun transfer(
@@ -371,6 +390,13 @@ class ReactNativeSshModule : Module() {
         handle = handle,
       ),
     )
+
+    // The session can be disconnected while the forward is starting, and the
+    // sweep already ran; a forward nobody owns would listen forever.
+    if (sshRegistry.session(sessionId) == null) {
+      stopForward(forwardId)
+      throw SshException.ChannelClosed("session $sessionId is not connected").toCodedException()
+    }
 
     return ForwardStartRecord(forwardId, port)
   }

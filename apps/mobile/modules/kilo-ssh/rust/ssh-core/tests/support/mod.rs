@@ -6,12 +6,15 @@
 #![allow(dead_code, unused_imports, unused_macros)]
 
 use std::io::Write;
+use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
+use russh::server::Auth;
+use russh::server::Server as RusshServer;
 use sha2::{Digest, Sha256};
 use ssh_core::{
     AuthMethod, ByteSink, CancelToken, ConnectConfig, ForwardSink, Prompt, SessionHandler,
@@ -21,7 +24,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 
-pub const TIMEOUT: Duration = Duration::from_secs(4_000);
+pub const CONNECT_TIMEOUT: Duration = Duration::from_millis(4_000);
 pub const OUTPUT_WAIT: Duration = Duration::from_secs(20);
 pub const POLL: Duration = Duration::from_millis(25);
 pub const KEEPALIVE_INTERVAL_S: u32 = 5;
@@ -65,7 +68,7 @@ impl Server {
             port,
             username: self.user.clone(),
             auth,
-            connect_timeout_ms: TIMEOUT.as_millis() as u32,
+            connect_timeout_ms: CONNECT_TIMEOUT.as_millis() as u32,
             keepalive_interval_s: KEEPALIVE_INTERVAL_S,
         }
     }
@@ -139,6 +142,7 @@ pub struct TestHandler {
     accept_host_key: bool,
     answers: Vec<Vec<String>>,
     answer_by_prompt: Option<(String, String)>,
+    answer_delay: Duration,
     rounds: Mutex<Vec<Vec<Prompt>>>,
     pub host_keys: Mutex<Vec<SeenHostKey>>,
     pub disconnects: AtomicUsize,
@@ -150,9 +154,19 @@ impl TestHandler {
             accept_host_key: true,
             answers: Vec::new(),
             answer_by_prompt: None,
+            answer_delay: Duration::ZERO,
             rounds: Mutex::new(Vec::new()),
             host_keys: Mutex::new(Vec::new()),
             disconnects: AtomicUsize::new(0),
+        }
+    }
+
+    /// Waits `delay` before every answer, standing in for a user who takes
+    /// their time at a prompt.
+    pub fn delayed(self, delay: Duration) -> Self {
+        Self {
+            answer_delay: delay,
+            ..self
         }
     }
 
@@ -210,6 +224,9 @@ impl SessionHandler for TestHandler {
         prompts: Vec<Prompt>,
     ) -> Option<Vec<String>> {
         assert!(name.len() < 256, "the server name is a short identifier");
+        if !self.answer_delay.is_zero() {
+            tokio::time::sleep(self.answer_delay).await;
+        }
         let answers = self.answer_by_prompt.as_ref().map(|(code, password)| {
             prompts
                 .iter()
@@ -236,6 +253,54 @@ impl SessionHandler for TestHandler {
     fn on_disconnect(&self, _reason: String) {
         self.disconnects.fetch_add(1, Ordering::SeqCst);
     }
+}
+
+struct StalledAuthServer;
+
+struct StalledAuthSession;
+
+impl RusshServer for StalledAuthServer {
+    type Handler = StalledAuthSession;
+
+    fn new_client(&mut self, _peer: Option<SocketAddr>) -> Self::Handler {
+        StalledAuthSession
+    }
+}
+
+impl russh::server::Handler for StalledAuthSession {
+    type Error = russh::Error;
+
+    async fn auth_password(&mut self, _user: &str, _password: &str) -> Result<Auth, Self::Error> {
+        std::future::pending().await
+    }
+}
+
+/// Serves SSH on a device port, completes key exchange, and never answers
+/// authentication: the connect budget is the only way out.
+pub async fn stalled_auth_server() -> (u16, JoinHandle<()>) {
+    let listener = TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .expect("bind a stalled auth server");
+    let port = listener.local_addr().expect("local address").port();
+    let key_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/id_ed25519");
+    let key = russh::keys::PrivateKey::from_openssh(
+        std::fs::read_to_string(&key_path)
+            .unwrap_or_else(|error| panic!("reading {}: {error}", key_path.display())),
+    )
+    .expect("parse the fixture host key");
+    let config = Arc::new(russh::server::Config {
+        keys: vec![key],
+        auth_rejection_time: Duration::from_millis(10),
+        auth_rejection_time_initial: Some(Duration::ZERO),
+        ..Default::default()
+    });
+
+    let task = tokio::spawn(async move {
+        let mut server = StalledAuthServer;
+        let _ = server.run_on_socket(config, &listener).await;
+    });
+
+    (port, task)
 }
 
 #[derive(Default)]

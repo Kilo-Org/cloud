@@ -8,10 +8,13 @@ import ai.kilo.reactnativessh.uniffi.SessionHandler
  *
  * Each request is registered before the event is emitted and removed as soon
  * as the decision arrives, so `answerHostKey`/`answerPrompts` never see a stale
- * id and a dropped connection releases the pending wait.
+ * id and a dropped connection releases the pending wait. Ids come from the
+ * module's one sequence: the pending-request maps are keyed by id alone, so
+ * per-session counters would collide as soon as a second connection opens.
  */
 internal class JsSessionHandler(
   private val sessionId: String,
+  private val requestIds: IdSequence,
   private val requestHostKey: suspend (HostKeyRequestRecord) -> Boolean,
   private val requestPrompts: suspend (KeyboardInteractiveRequestRecord) -> List<String>?,
   private val notifyDisconnect: (DisconnectRecord) -> Unit,
@@ -51,6 +54,4 @@ internal class JsSessionHandler(
   override fun onDisconnect(reason: String) {
     notifyDisconnect(DisconnectRecord(sessionId, reason))
   }
-
-  private val requestIds = IdSequence("request-")
 }

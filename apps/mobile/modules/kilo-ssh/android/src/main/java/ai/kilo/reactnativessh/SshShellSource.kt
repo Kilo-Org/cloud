@@ -11,6 +11,9 @@ import java.util.concurrent.CopyOnWriteArrayList
 /**
  * A shell channel as the terminal view sees it: bytes go straight from Rust to
  * the view, and input comes back the same way. Nothing crosses JavaScript.
+ *
+ * A channel that ends is done: the module drops the source instead of holding
+ * its channel and buffer until JavaScript asks for it.
  */
 internal class SshShellSource private constructor(
   val sessionId: String,
@@ -18,6 +21,10 @@ internal class SshShellSource private constructor(
   private val delivery: SinkDelivery,
   val activity: ShellActivity,
 ) : TerminalByteSource {
+  /** Set once the channel reported its exit; a source never reopens. */
+  val terminated: Boolean
+    get() = delivery.terminated
+
   override fun write(bytes: ByteArray) {
     try {
       channel.write(bytes)
@@ -47,15 +54,20 @@ internal class SshShellSource private constructor(
   }
 
   companion object {
+    /**
+     * [onTerminated] runs once, on the thread that delivers the channel's exit,
+     * after the bound sink has seen the close. It must not block.
+     */
     suspend fun open(
       sessionId: String,
       session: SshSession,
       term: String,
       cols: Int,
       rows: Int,
+      onTerminated: () -> Unit,
     ): SshShellSource {
       val activity = ShellActivity()
-      val delivery = SinkDelivery(activity)
+      val delivery = SinkDelivery(activity, onTerminated)
       val channel = session.openShell(term, cols.toUInt(), rows.toUInt(), delivery)
 
       return SshShellSource(sessionId, channel, delivery, activity)
@@ -89,12 +101,19 @@ internal class ShellActivity {
  * The view attaches after the shell is opened, so bytes that arrive first are
  * buffered up to [MAX_BUFFERED_BYTES] and delivered on `bind`.
  */
-internal class SinkDelivery(private val activity: ShellActivity) : ByteSink {
+internal class SinkDelivery(
+  private val activity: ShellActivity,
+  private val onTerminated: () -> Unit,
+) : ByteSink {
   private val lock = Any()
   private var sink: TerminalSink? = null
   private var buffered: MutableList<ByteArray>? = ArrayList()
   private var bufferedBytes = 0
   private var closeEvent: CloseEvent? = null
+
+  /** Written under [lock] and read from the module, which owns the source. */
+  @Volatile var terminated = false
+    private set
 
   fun bind(next: TerminalSink?) {
     val pending: List<ByteArray>
@@ -130,12 +149,16 @@ internal class SinkDelivery(private val activity: ShellActivity) : ByteSink {
   }
 
   override fun onClosed(exitStatus: UInt?, error: String?) {
+    var first = false
     val target = synchronized(lock) {
       closeEvent = CloseEvent(exitStatus?.toInt(), error)
+      first = !terminated
+      terminated = true
       sink
     }
 
     target?.onClosed(exitStatus?.toInt(), error)
+    if (first) onTerminated()
   }
 
   private fun buffer(bytes: ByteArray) {

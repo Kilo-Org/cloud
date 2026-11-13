@@ -1,11 +1,19 @@
 import Foundation
 
-/// A shell channel as the terminal view sees it: bytes go straight from Rust
-/// to the view, and input comes back the same way. Nothing crosses JavaScript.
+/// A shell channel as the terminal view sees it: bytes go straight from Rust to
+/// the view, and input comes back the same way. Nothing crosses JavaScript.
+///
+/// A channel that ends is done: the module drops the source instead of holding
+/// its channel and buffer until JavaScript asks for it.
 final class SshShellSource: TerminalByteSource, @unchecked Sendable {
   let sessionId: String
   private let channel: ShellChannel
   private let delivery: SinkDelivery
+
+  /// Set once the channel reported its exit; a source never reopens.
+  var terminated: Bool {
+    delivery.terminated
+  }
 
   init(sessionId: String, channel: ShellChannel, delivery: SinkDelivery) {
     self.sessionId = sessionId
@@ -13,18 +21,21 @@ final class SshShellSource: TerminalByteSource, @unchecked Sendable {
     self.delivery = delivery
   }
 
+  /// `onTerminated` runs once, on the thread that delivers the channel's exit,
+  /// after the bound sink has seen the close. It must not block.
   static func open(
     sessionId: String,
     session: SshSession,
     term: String,
-    cols: Int,
-    rows: Int
+    cols: UInt32,
+    rows: UInt32,
+    onTerminated: @escaping @Sendable () -> Void
   ) async throws -> SshShellSource {
-    let delivery = SinkDelivery()
+    let delivery = SinkDelivery(onTerminated: onTerminated)
     let channel = try await session.openShell(
       term: term,
-      cols: UInt32(cols),
-      rows: UInt32(rows),
+      cols: cols,
+      rows: rows,
       sink: delivery
     )
 
@@ -40,8 +51,17 @@ final class SshShellSource: TerminalByteSource, @unchecked Sendable {
   }
 
   func resize(cols: Int, rows: Int) {
+    guard
+      let cols = UInt32(exactly: cols),
+      let rows = UInt32(exactly: rows),
+      cols > 0,
+      rows > 0
+    else {
+      return
+    }
+
     do {
-      try channel.resize(cols: UInt32(cols), rows: UInt32(rows))
+      try channel.resize(cols: cols, rows: rows)
     } catch {
       delivery.onClosed(exitStatus: nil, error: message(for: error))
     }
@@ -68,11 +88,23 @@ final class SinkDelivery: ByteSink, @unchecked Sendable {
   private static let maxBufferedBytes = 64 * 1024
 
   private let lock = NSLock()
+  private let onTerminated: @Sendable () -> Void
   private var sink: TerminalSink?
   private var buffering = true
   private var buffered: [Data] = []
   private var bufferedBytes = 0
   private var closeEvent: (exitStatus: Int?, error: String?)?
+
+  init(onTerminated: @escaping @Sendable () -> Void) {
+    self.onTerminated = onTerminated
+  }
+
+  /// Written under `lock` and read from the module, which owns the source.
+  var terminated: Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    return closeEvent != nil
+  }
 
   func bind(_ next: TerminalSink?) {
     lock.lock()
@@ -110,10 +142,14 @@ final class SinkDelivery: ByteSink, @unchecked Sendable {
     let status = exitStatus.map { Int($0) }
 
     lock.lock()
+    let first = closeEvent == nil
     let target = sink
     closeEvent = (status, error)
     lock.unlock()
 
     target?.onClosed(exitStatus: status, error: error)
+    if first {
+      onTerminated()
+    }
   }
 }

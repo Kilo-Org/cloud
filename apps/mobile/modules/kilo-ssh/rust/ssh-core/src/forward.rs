@@ -94,7 +94,6 @@ impl Stopper {
                 port,
             } => {
                 forwards.remove(port);
-                let session = session.lock().await;
 
                 session
                     .cancel_tcpip_forward(address, port)
@@ -189,19 +188,15 @@ pub(crate) async fn start_remote(
     config: ForwardConfig,
     events: Arc<dyn ForwardSink>,
 ) -> Result<Arc<ForwardHandle>, SshError> {
-    let reported = {
-        let handle = session.lock().await;
-
-        handle
-            .tcpip_forward(config.bind_host.clone(), u32::from(config.bind_port))
-            .await
-            .map_err(|error| SshError::Forwarding {
-                message: format!(
-                    "requesting {}:{} failed: {error}",
-                    config.bind_host, config.bind_port
-                ),
-            })?
-    };
+    let reported = session
+        .tcpip_forward(config.bind_host.clone(), u32::from(config.bind_port))
+        .await
+        .map_err(|error| SshError::Forwarding {
+            message: format!(
+                "requesting {}:{} failed: {error}",
+                config.bind_host, config.bind_port
+            ),
+        })?;
     let bound = port_bound(reported, config.bind_port)?;
 
     forwards.insert(
@@ -271,18 +266,14 @@ async fn accept_connections(
 }
 
 async fn forward(transport: TcpStream, session: SessionHandle, destination: Destination) {
-    let channel = {
-        let handle = session.lock().await;
-
-        handle
-            .channel_open_direct_tcpip(
-                destination.host.clone(),
-                u32::from(destination.port),
-                ORIGINATOR_ADDRESS,
-                0,
-            )
-            .await
-    };
+    let channel = session
+        .channel_open_direct_tcpip(
+            destination.host.clone(),
+            u32::from(destination.port),
+            ORIGINATOR_ADDRESS,
+            0,
+        )
+        .await;
 
     match channel {
         Ok(channel) => bridge(transport, channel, &destination).await,

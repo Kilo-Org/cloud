@@ -11,7 +11,6 @@ use russh::client::{
 use russh::keys::ssh_key;
 use russh::keys::{HashAlg, PrivateKeyWithHashAlg, PublicKeyBase64, PublicKeyOrCertificate};
 use russh::{Channel, ChannelMsg, ChannelOpenFailure, Disconnect};
-use tokio::sync::Mutex;
 use tokio::time::Instant;
 
 use crate::error::SshError;
@@ -98,7 +97,11 @@ pub trait SessionHandler: Send + Sync {
 }
 
 /// The session's channel handle, shared with the forwards it owns.
-pub(crate) type SessionHandle = Arc<Mutex<Handle<ClientHandler>>>;
+///
+/// Every operation the app asks for after connecting takes `&Handle`, so the
+/// handle is shared rather than locked: a slow channel open, forward or SFTP
+/// request cannot block the others or the disconnect that would end it.
+pub(crate) type SessionHandle = Arc<Handle<ClientHandler>>;
 
 #[derive(uniffi::Object)]
 pub struct SshSession {
@@ -126,6 +129,15 @@ impl Handshake {
             host_key_rejected: AtomicBool::new(false),
             closed_by_app: AtomicBool::new(false),
         }
+    }
+
+    /// Asks the session handler a question, marking the wait so the connect
+    /// budget pauses while the user decides.
+    async fn ask_user<T>(&self, question: impl Future<Output = T>) -> T {
+        self.awaiting_user.store(true, Ordering::SeqCst);
+        let answer = question.await;
+        self.awaiting_user.store(false, Ordering::SeqCst);
+        answer
     }
 }
 
@@ -161,8 +173,7 @@ impl SshSession {
         rows: u32,
         sink: Arc<dyn ByteSink>,
     ) -> Result<Arc<ShellChannel>, SshError> {
-        let handle = self.handle.lock().await;
-        let mut channel = handle.channel_open_session().await?;
+        let mut channel = self.handle.channel_open_session().await?;
 
         channel
             .request_pty(true, &term, cols, rows, 0, 0, &[])
@@ -176,8 +187,7 @@ impl SshSession {
 
     /// Runs one command against a fresh session channel.
     pub async fn exec(&self, command: String) -> Result<ExecResult, SshError> {
-        let handle = self.handle.lock().await;
-        let mut channel = handle.channel_open_session().await?;
+        let mut channel = self.handle.channel_open_session().await?;
         channel.exec(true, command.into_bytes()).await?;
 
         let mut result = ExecResult {
@@ -186,24 +196,7 @@ impl SshSession {
             exit_status: None,
         };
 
-        loop {
-            match channel.wait().await {
-                Some(ChannelMsg::Data { data }) => result.stdout.extend_from_slice(&data),
-                Some(ChannelMsg::ExtendedData { data, ext }) => {
-                    if ext == STDERR_EXTENDED_DATA {
-                        result.stderr.extend_from_slice(&data);
-                    } else {
-                        result.stdout.extend_from_slice(&data);
-                    }
-                }
-                Some(ChannelMsg::ExitStatus { exit_status }) => {
-                    result.exit_status = Some(exit_status);
-                }
-                Some(ChannelMsg::Eof) => {}
-                Some(ChannelMsg::Close) | None => break,
-                Some(_) => {}
-            }
-        }
+        while !exec_message(&mut result, channel.wait().await)? {}
 
         Ok(result)
     }
@@ -213,7 +206,7 @@ impl SshSession {
         let handle = Arc::clone(&self.handle);
 
         runtime::run(async move {
-            let mut channel = handle.lock().await.channel_open_session().await?;
+            let mut channel = handle.channel_open_session().await?;
             channel.request_subsystem(true, "sftp").await?;
             await_success(&mut channel).await?;
 
@@ -259,8 +252,7 @@ impl SshSession {
             return Ok(());
         }
 
-        let handle = self.handle.lock().await;
-        handle
+        self.handle
             .disconnect(Disconnect::ByApplication, "", "")
             .await
             .map_err(SshError::from)
@@ -274,9 +266,12 @@ impl SshSession {
         port: u16,
         budget: Duration,
     ) -> Result<Channel<Msg>, SshError> {
-        let handle = self.handle.lock().await;
-        let connecting =
-            handle.channel_open_direct_tcpip(host.to_string(), u32::from(port), "127.0.0.1", 0);
+        let connecting = self.handle.channel_open_direct_tcpip(
+            host.to_string(),
+            u32::from(port),
+            "127.0.0.1",
+            0,
+        );
 
         tokio::time::timeout(budget, connecting)
             .await
@@ -353,17 +348,22 @@ async fn finish(
     forwards: Arc<RemoteForwards>,
     mut handle: Handle<ClientHandler>,
 ) -> Result<Arc<SshSession>, SshError> {
-    authenticate(&mut handle, &config, handler.as_ref()).await?;
+    let authenticating = authenticate(&mut handle, &config, handler.as_ref(), &handshake);
+    bound_by(
+        authenticating,
+        &handshake,
+        &format!("authenticating to {}:{}", handshake.host, handshake.port),
+    )
+    .await?;
 
     Ok(Arc::new(SshSession {
-        handle: Arc::new(Mutex::new(handle)),
+        handle: Arc::new(handle),
         handshake,
         forwards,
     }))
 }
 
-/// Waits for the handshake, extending the budget while the session handler has
-/// a question open with the user.
+/// Waits for the handshake within the connection budget.
 async fn await_handshake<C>(
     connecting: C,
     handshake: &Handshake,
@@ -371,27 +371,43 @@ async fn await_handshake<C>(
 where
     C: Future<Output = Result<Handle<ClientHandler>, SshError>>,
 {
+    let reporting_host_key = async {
+        match connecting.await {
+            Ok(handle) => Ok(handle),
+            Err(_) if handshake.host_key_rejected.load(Ordering::SeqCst) => {
+                Err(SshError::HostKeyRejected)
+            }
+            Err(error) => Err(error),
+        }
+    };
+
+    bound_by(
+        reporting_host_key,
+        handshake,
+        &format!("connecting to {}:{}", handshake.host, handshake.port),
+    )
+    .await
+}
+
+/// Runs one step of connecting within the connection budget, extending the
+/// budget while the session handler has a question open with the user.
+async fn bound_by<T, C>(work: C, handshake: &Handshake, description: &str) -> Result<T, SshError>
+where
+    C: Future<Output = Result<T, SshError>>,
+{
     let timeout = Duration::from_millis(u64::from(handshake.timeout_ms));
-    let mut connecting = Box::pin(connecting);
+    let mut work = std::pin::pin!(work);
     let mut deadline = Instant::now() + timeout;
 
     loop {
         tokio::select! {
-            connected = &mut connecting => {
-                return match connected {
-                    Ok(handle) => Ok(handle),
-                    Err(_) if handshake.host_key_rejected.load(Ordering::SeqCst) => {
-                        Err(SshError::HostKeyRejected)
-                    }
-                    Err(error) => Err(error),
-                };
-            }
+            outcome = &mut work => return outcome,
             () = tokio::time::sleep_until(deadline) => {
                 if handshake.awaiting_user.load(Ordering::SeqCst) {
                     deadline = Instant::now() + timeout;
                 } else {
                     return Err(SshError::Timeout {
-                        message: format!("connecting to {}:{}", handshake.host, handshake.port),
+                        message: description.to_string(),
                     });
                 }
             }
@@ -414,6 +430,7 @@ async fn authenticate(
     handle: &mut Handle<ClientHandler>,
     config: &ConnectConfig,
     handler: &dyn SessionHandler,
+    handshake: &Handshake,
 ) -> Result<(), SshError> {
     match &config.auth {
         AuthMethod::Password { password } => {
@@ -467,8 +484,8 @@ async fn authenticate(
                             .collect::<Vec<_>>();
                         let expected = asked.len();
 
-                        let answers = handler
-                            .keyboard_interactive(name, instructions, asked)
+                        let answers = handshake
+                            .ask_user(handler.keyboard_interactive(name, instructions, asked))
                             .await
                             .ok_or(SshError::AuthCancelled)?;
                         if answers.len() != expected {
@@ -521,6 +538,31 @@ async fn await_success(channel: &mut Channel<russh::client::Msg>) -> Result<(), 
     }
 }
 
+/// Folds one channel message from an exec request into `result`, returning
+/// whether the channel finished.
+fn exec_message(result: &mut ExecResult, message: Option<ChannelMsg>) -> Result<bool, SshError> {
+    match message {
+        Some(ChannelMsg::Data { data }) => result.stdout.extend_from_slice(&data),
+        Some(ChannelMsg::ExtendedData { data, ext }) => {
+            if ext == STDERR_EXTENDED_DATA {
+                result.stderr.extend_from_slice(&data);
+            } else {
+                result.stdout.extend_from_slice(&data);
+            }
+        }
+        Some(ChannelMsg::ExitStatus { exit_status }) => result.exit_status = Some(exit_status),
+        Some(ChannelMsg::Failure) => {
+            return Err(SshError::Protocol {
+                message: "the server refused the exec request".to_string(),
+            });
+        }
+        Some(ChannelMsg::Close) | None => return Ok(true),
+        Some(_) => {}
+    }
+
+    Ok(false)
+}
+
 pub(crate) struct ClientHandler {
     host: String,
     port: u16,
@@ -569,18 +611,16 @@ impl russh::client::Handler for ClientHandler {
             }
         };
 
-        self.handshake.awaiting_user.store(true, Ordering::SeqCst);
         let accepted = self
-            .app
-            .verify_host_key(
+            .handshake
+            .ask_user(self.app.verify_host_key(
                 self.host.clone(),
                 self.port,
                 algorithm,
                 public_key_base64,
                 fingerprint,
-            )
+            ))
             .await;
-        self.handshake.awaiting_user.store(false, Ordering::SeqCst);
 
         if !accepted {
             self.handshake
@@ -666,5 +706,121 @@ mod tests {
         assert!(client.nodelay);
         assert!(client.inactivity_timeout.is_none());
         assert_eq!(client.keepalive_max, KEEPALIVE_MAX);
+    }
+
+    fn empty_result() -> ExecResult {
+        ExecResult {
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+            exit_status: None,
+        }
+    }
+
+    #[test]
+    fn exec_folds_output_and_exit_status() {
+        let mut result = empty_result();
+
+        assert!(
+            !exec_message(
+                &mut result,
+                Some(ChannelMsg::Data {
+                    data: b"out".as_slice().into(),
+                })
+            )
+            .expect("stdout")
+        );
+        assert!(
+            !exec_message(
+                &mut result,
+                Some(ChannelMsg::ExtendedData {
+                    data: b"err".as_slice().into(),
+                    ext: STDERR_EXTENDED_DATA,
+                })
+            )
+            .expect("stderr")
+        );
+        assert!(
+            !exec_message(
+                &mut result,
+                Some(ChannelMsg::ExtendedData {
+                    data: b"note".as_slice().into(),
+                    ext: 2,
+                })
+            )
+            .expect("other extended data")
+        );
+        assert!(
+            !exec_message(&mut result, Some(ChannelMsg::ExitStatus { exit_status: 7 }))
+                .expect("exit status")
+        );
+        assert!(!exec_message(&mut result, Some(ChannelMsg::Eof)).expect("eof"));
+        assert!(exec_message(&mut result, Some(ChannelMsg::Close)).expect("close"));
+        assert!(exec_message(&mut result, None).expect("stream end"));
+
+        assert_eq!(result.stdout, b"outnote");
+        assert_eq!(result.stderr, b"err");
+        assert_eq!(result.exit_status, Some(7));
+    }
+
+    #[test]
+    fn exec_reports_a_refused_request() {
+        let mut result = empty_result();
+
+        let error = exec_message(&mut result, Some(ChannelMsg::Failure))
+            .expect_err("a refused exec request must fail");
+
+        assert!(
+            matches!(error, SshError::Protocol { .. }),
+            "unexpected error: {error:?}"
+        );
+    }
+
+    #[test]
+    fn the_session_handle_is_shared_between_tasks() {
+        fn assert_shared<T: Send + Sync + Clone>() {}
+
+        assert_shared::<SessionHandle>();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_connect_budget_expires() {
+        let handshake = Handshake::new(&config(0, 1_000));
+
+        let error = bound_by(
+            std::future::pending::<Result<(), SshError>>(),
+            &handshake,
+            "connecting",
+        )
+        .await
+        .expect_err("a step the server never answers must time out");
+
+        assert!(
+            matches!(error, SshError::Timeout { .. }),
+            "unexpected error: {error:?}"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_connect_budget_pauses_while_the_user_answers() {
+        let handshake = Handshake::new(&config(0, 1_000));
+        let started = Instant::now();
+
+        let answer = bound_by(
+            async {
+                handshake
+                    .ask_user(tokio::time::sleep(Duration::from_secs(30)))
+                    .await;
+                Ok(())
+            },
+            &handshake,
+            "authenticating",
+        )
+        .await;
+
+        assert!(answer.is_ok(), "a question may stay open past the budget");
+        assert!(
+            started.elapsed() >= Duration::from_secs(30),
+            "the budget expired while the user was answering"
+        );
     }
 }

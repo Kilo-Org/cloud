@@ -368,8 +368,8 @@ export async function toInsertableDbUsageRecord(
   // (error 22021) and crash the microdollar_usage CTE insert, leaving the
   // request un-billed. See KILOCODE-WEB-1G3Z.
   const dirtyFields: string[] = [];
-  stripNulBytesInPlace(core as unknown as Record<string, unknown>, dirtyFields);
-  stripNulBytesInPlace(metadata as unknown as Record<string, unknown>, dirtyFields);
+  stripNulBytesInPlace(core, dirtyFields);
+  stripNulBytesInPlace(metadata, dirtyFields);
   if (dirtyFields.length > 0) {
     // Log to Axiom (not Sentry) — this is a one-off source-attribution probe,
     // not an issue to triage. Once the dominant field is identified via

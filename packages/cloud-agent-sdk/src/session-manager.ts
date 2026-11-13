@@ -186,7 +186,7 @@ const PENDING_CONFIRMATION_MAX_SESSIONS = 20;
  * Maximum number of retained messages. Once the loaded transcript exceeds this,
  * `trimRetainedHistory` drops the oldest loaded older-page from local storage.
  */
-const RETAINED_MESSAGE_WINDOW = 200;
+export const RETAINED_MESSAGE_WINDOW = 200;
 
 /**
  * How long a matching `Aborted` error stays suppressed after an interrupt RPC

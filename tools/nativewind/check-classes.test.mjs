@@ -14,7 +14,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 
-import { checkSourceFile } from './check-classes.mjs';
+import { checkParsedFile } from './check-classes.mjs';
+import { parseSourceEntry } from '../lib/source-files.mjs';
 
 // The rule cases read the repository's own files: the checker resolves the app's
 // global.css token list from its own location, so nothing has to be copied. The
@@ -25,13 +26,14 @@ const MOBILE_ROOT = join(REPO, 'apps/mobile');
 const SHARED_SCANNERS = ['ast.mjs', 'source-files.mjs'];
 
 /**
- * The diagnostics of one file, straight from the checker's own export. The
- * absolute path names the repository's app tree because the Intl rule decides
- * by it whether the formatter rule applies; `checkSourceFile` reads nothing
- * from that path but the text it is given.
+ * The diagnostics of one file, straight from the checker's own export. A
+ * fixture's text is passed directly, and the absolute path names the
+ * repository's app tree because the Intl rule decides by it whether the
+ * formatter rule applies; the shared parse entry reads nothing from that path
+ * but the text it is given.
  */
 function check(relative, text) {
-  return checkSourceFile(relative, join(REPO, relative), text);
+  return checkParsedFile(parseSourceEntry(MOBILE_ROOT, REPO, join(REPO, relative), text));
 }
 
 /** The diagnostics of several files, in the order they are listed. */
@@ -374,7 +376,7 @@ test('flags a runtime Text import under any name and allows the type-only forms'
 
 test('runs the whole audit over a clean tree through the CLI and ignores test scaffolding', context => {
   // The scaffolding filter lives in the audit's file walk, not in
-  // checkSourceFile, so this case runs the entry point that walks the tree.
+  // checkParsedFile, so this case runs the entry point that walks the tree.
   const root = makeFixture(context, {
     'apps/mobile/src/screen.tsx': screen('<ScrollView contentContainerClassName="px-4" />'),
     'apps/mobile/src/components/screen.mounted.test.tsx': "import { Text } from 'react-native';\n",
@@ -413,22 +415,27 @@ test('importing the module neither scans nor runs the compiler probes', context 
   assert.equal(result.stderr, '');
 });
 
-test('checkSourceFile reports one file and keeps no state between calls', context => {
+test('checkParsedFile reports one file and keeps no state between calls', context => {
   const root = makeFixture(context, {
     'apps/mobile/src/screen.tsx': screen('<ScrollView className="px-4" />'),
   });
   const source = '<ScrollView className="px-4" />';
   const absolute = join(root, 'apps/mobile/src/screen.tsx');
+  const dir = join(root, 'apps/mobile/src');
   writeFileSync(
     join(root, 'probe.mjs'),
     [
-      "import { checkSourceFile } from './tools/nativewind/check-classes.mjs';",
+      "import { checkParsedFile } from './tools/nativewind/check-classes.mjs';",
+      "import { parseSourceEntry } from './tools/lib/source-files.mjs';",
       `const source = ${JSON.stringify(source)};`,
       `const absolute = ${JSON.stringify(absolute)};`,
-      'const first = checkSourceFile("screen.tsx", absolute, source);',
-      'const second = checkSourceFile("screen.tsx", absolute, source);',
-      'const clean = checkSourceFile("other.ts", absolute, "export const a = 1;");',
-      'console.log(JSON.stringify({ first, second, clean }));',
+      `const dir = ${JSON.stringify(dir)};`,
+      `const root = ${JSON.stringify(root)};`,
+      'const entry = parseSourceEntry(dir, root, absolute, source);',
+      'const first = checkParsedFile(entry);',
+      'const firstAgain = checkParsedFile(entry);',
+      'const clean = checkParsedFile(parseSourceEntry(dir, root, absolute, "export const a = 1;"));',
+      'console.log(JSON.stringify({ first, firstAgain, clean }));',
     ].join('\n')
   );
   const result = spawnSync(process.execPath, [join(root, 'probe.mjs')], {
@@ -438,11 +445,12 @@ test('checkSourceFile reports one file and keeps no state between calls', contex
   });
   assert.ifError(result.error);
   assert.equal(result.status, 0, result.stderr);
-  const { first, second, clean } = JSON.parse(result.stdout);
+  const { first, firstAgain, clean } = JSON.parse(result.stdout);
   assert.equal(first.length, 1);
   assert.match(first[0], /<ScrollView> carries "px-4" on its own className/);
-  // A second call sees this call's problems only, and a clean file sees none.
-  assert.deepEqual(second, first);
+  // A second call on the same entry sees this call's problems only, and a clean
+  // file sees none.
+  assert.deepEqual(firstAgain, first);
   assert.deepEqual(clean, []);
 });
 
@@ -550,22 +558,36 @@ test('reports a constructor whose new ends the previous line', () => {
   ]);
 });
 
-test('reads one relative path the same however it is spelled', () => {
+test('names every file from its root, inside the repository or a temporary tree', context => {
   const widget = 'apps/mobile/src/glanceable-ios/active-agents-widget.tsx';
   const source =
     "import { Text } from 'react-native';\n" + "export const a = Intl.DateTimeFormat('en-US');\n";
-  const plain = [
-    check('apps/mobile/src/panel.tsx', source),
-    check('./apps/mobile/src/panel.tsx', source),
-    check('/apps/mobile/src/panel.tsx', source),
-  ];
-  // Every diagnostic names the normalised path, so the finding is the same file.
-  assert.equal(plain[0].length, 2);
-  assert.deepEqual(plain[1], plain[0], 'a ./ prefix must not change the verdict');
-  assert.deepEqual(plain[2], plain[0], 'a leading slash must not change the verdict');
+  // A file below the root is named from it, whatever spelling arrives up front.
+  for (const relative of [
+    'apps/mobile/src/panel.tsx',
+    './apps/mobile/src/panel.tsx',
+    '/apps/mobile/src/panel.tsx',
+  ]) {
+    const entry = parseSourceEntry(MOBILE_ROOT, REPO, join(REPO, relative), source);
+    assert.equal(entry.path, 'apps/mobile/src/panel.tsx', 'POSIX separators, no leading separator');
+    // Every diagnostic names that path, so the finding is the same file.
+    assert.deepEqual(
+      check(relative, source).map(problem => problem.split(':')[0]),
+      ['apps/mobile/src/panel.tsx', 'apps/mobile/src/panel.tsx']
+    );
+  }
+  // A file outside the root is named from the `dir` argument: the `..` segments go.
+  const temp = mkdtempSync(join(tmpdir(), 'check-classes-path-'));
+  context.after(() => rmSync(temp, { recursive: true, force: true }));
+  const dir = join(temp, 'apps/mobile/src');
+  const nested = join(dir, 'components');
+  mkdirSync(nested, { recursive: true });
+  const outside = join(nested, 'panel.tsx');
+  writeFileSync(outside, source);
+  const entry = parseSourceEntry(dir, REPO, outside, source);
+  assert.equal(entry.path, 'components/panel.tsx');
+  assert.equal(entry.file, outside);
   // The widget-process exemption reads the same normalised path as every check.
   const widgetSource = "export const a = Intl.DateTimeFormat('en-US');\n";
-  for (const path of [widget, `/${widget}`, `./${widget}`]) {
-    assert.deepEqual(check(path, widgetSource), [], 'the widget layout keeps its exemption');
-  }
+  assert.deepEqual(check(widget, widgetSource), [], 'the widget layout keeps its exemption');
 });

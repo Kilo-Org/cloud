@@ -82,21 +82,15 @@ import {
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { normalizeGitUrl } from '@/lib/integrations/platforms/github/normalize-git-url';
-import {
-  isGitHubOwnerName,
-  isGitHubRepositoryName,
-  parseGitHubOwnerRepo,
-} from '@/lib/integrations/platforms/github/repository-coordinates';
+import { parseGitHubOwnerRepo } from '@/lib/integrations/platforms/github/repository-coordinates';
 import {
   pullRequestUrlMatchesRepo,
   verifySessionPullRequestLink,
 } from '@/lib/integrations/platforms/github/pr-link-identity';
 import { triggerBatchReviewDecisionFetchIfNeeded } from '@/lib/integrations/platforms/github/batch-review-decisions';
 import {
-  getPrObservationSummary,
   createEmptyPrObservations,
   prObservationsSchema,
-  prObservationSummarySchema,
 } from '@/lib/integrations/platforms/github/pr-observations';
 import { fetchPullRequestObservations } from '@/lib/integrations/platforms/github/pr-status';
 import {
@@ -111,7 +105,15 @@ import {
   type WorkspaceOrder,
 } from '@/lib/cloud-agent/workspace-folders';
 import { after } from 'next/server';
-import { sessionAssociatedPr } from '@/lib/session-associated-pr';
+import {
+  sessionAssociatedPr,
+  associatedPrSchema,
+  formatAssociatedPr,
+  parseGitHubPrUrl,
+  samePullRequest,
+  type AssociatedPrRow,
+  type SessionPrFields,
+} from '@/lib/session-associated-pr';
 
 import {
   changeWatchPr,
@@ -284,50 +286,18 @@ export const REFRESH_THROTTLE_MS = 60_000;
  */
 export { parseGitHubOwnerRepo };
 
-export const associatedPrSchema = z.object({
-  url: z.string(),
-  number: z.number(),
-  state: z.string(),
-  title: z.string().nullable(),
-  headSha: z.string().nullable(),
-  observations: prObservationSummarySchema.nullable(),
-  lastSyncedAt: z.string(),
-  reviewDecision: z.enum(['approved', 'changes_requested', 'review_required']).nullable(),
-  // True when the server has flagged this PR for an async review-decision
-  // fetch (see batch-review-decisions.ts) and the result has not landed yet.
-  // Clients can poll the list endpoint while any row reports pending=true to
-  // surface review-decision badges shortly after they become available.
-  reviewDecisionPending: z.boolean(),
-  // Host platform of the linked PR (e.g. 'github'). Always present when an
-  // associatedPr is returned.
-  platform: z.string(),
-  baseRef: z.string().nullable(),
-  stackNumber: z.number().nullable(),
-  stackPosition: z.number().nullable(),
-  stackSize: z.number().nullable(),
-});
-
-type AssociatedPrRow = {
-  pr_url: string | null;
-  pr_number: number | null;
-  pr_state: string | null;
-  pr_title: string | null;
-  pr_head_sha: string | null;
-  pr_observations?: unknown;
-  pr_last_synced_at: string | null;
-  pr_review_decision: string | null;
-  review_decision_pending: boolean | null;
-  pr_base_ref?: string | null;
-  stack_number?: number | null;
-  stack_position?: number | null;
-  stack_size?: number | null;
-  /**
-   * True when the row is the PR of the session's Cloud Agent workspace (a PR
-   * on the workspace's repository and branch) rather than the session's own
-   * reported link. See `sessionAssociatedPr`.
-   */
-  pr_from_workspace?: boolean | null;
-};
+/**
+ * The associated-PR wire schema and formatters live in
+ * `@/lib/session-associated-pr` (which owns the associated-PR query);
+ * re-exported here for the router's callers.
+ */
+export {
+  associatedPrSchema,
+  formatAssociatedPr,
+  parseGitHubPrUrl,
+  type AssociatedPrRow,
+  type SessionPrFields,
+} from '@/lib/session-associated-pr';
 
 /**
  * Flat aliases for the session's own stored PR link, produced by
@@ -347,225 +317,6 @@ type SessionPrRow = {
    */
   session_pr_verified_at: string | null;
 };
-
-/**
- * The session's stored PR link (cli_sessions_v2.platform / pr_url / pr_number)
- * plus its updated_at and verified-at, used for the pending-partial
- * lastSyncedAt and to gate the live cache fields.
- */
-type SessionPrFields = {
-  platform: string | null;
-  pr_url: string | null;
-  pr_number: number | null;
-  updated_at: string | null;
-  /**
-   * `cli_sessions_v2.git_url`. A pending link is only surfaced when it names
-   * this repository; an unparseable or mismatched link is no evidence.
-   */
-  git_url: string | null;
-  /**
-   * `cli_sessions_v2.pr_link_verified_at`. Non-null lets the read path serve
-   * the matching cache row's live fields; null means the link has not been
-   * verified against GitHub and must not be shown.
-   */
-  pr_link_verified_at: string | null;
-};
-
-/**
- * Parse a GitHub pull-request URL into `{ owner, repo, number }`. Returns
- * `null` for non-GitHub hosts, URLs that do not resolve to
- * `owner/repo/pull/N`, and owner or repo values outside GitHub's name charset.
- * Accepts a trailing subpath (e.g. `/files`), query
- * string, and fragment, matching the mobile parser so a pasted PR URL is
- * never skipped during refresh. A PR URL has more than two path segments,
- * so `parseGitHubOwnerRepo` cannot parse it.
- */
-export function parseGitHubPrUrl(
-  url: string
-): { owner: string; repo: string; number: number } | null {
-  const sshMatch = url.match(/^git@([^:]+):(.+)$/);
-  let host: string;
-  let path: string;
-  if (sshMatch) {
-    host = sshMatch[1].toLowerCase();
-    path = sshMatch[2];
-  } else {
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      return null;
-    }
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:' && parsed.protocol !== 'ssh:') {
-      return null;
-    }
-    host = parsed.hostname.toLowerCase();
-    path = parsed.pathname.replace(/^\/+/, '');
-  }
-
-  if (host !== 'github.com' && host !== 'www.github.com') {
-    return null;
-  }
-
-  const segments = path.replace(/\/+$/, '').split('/').filter(Boolean);
-  if (segments.length < 4 || segments[2] !== 'pull') {
-    return null;
-  }
-  const [owner, repo, , numberStr] = segments;
-  const number = Number(numberStr);
-  if (!isGitHubOwnerName(owner) || !isGitHubRepositoryName(repo)) {
-    return null;
-  }
-  if (!Number.isInteger(number) || number <= 0) {
-    return null;
-  }
-  return { owner, repo, number };
-}
-
-/**
- * Format a cache row into the associatedPr shape. Returns null when the cache
- * row has no PR. `platform` is supplied by the caller.
- */
-function formatCacheRow(
-  cache: AssociatedPrRow,
-  platform: string
-): z.infer<typeof associatedPrSchema> | null {
-  if (
-    cache.pr_url === null ||
-    cache.pr_number === null ||
-    cache.pr_state === null ||
-    cache.pr_last_synced_at === null
-  ) {
-    return null;
-  }
-  const rd = cache.pr_review_decision;
-  const reviewDecision =
-    rd === 'approved' || rd === 'changes_requested' || rd === 'review_required' ? rd : null;
-  return {
-    url: cache.pr_url,
-    number: cache.pr_number,
-    state: cache.pr_state,
-    title: cache.pr_title,
-    headSha: cache.pr_head_sha,
-    observations: getPrObservationSummary(cache.pr_observations, cache.pr_head_sha),
-    lastSyncedAt: cache.pr_last_synced_at,
-    reviewDecision,
-    reviewDecisionPending: cache.review_decision_pending === true,
-    platform,
-    baseRef: cache.pr_base_ref ?? null,
-    stackNumber: cache.stack_number ?? null,
-    stackPosition: cache.stack_position ?? null,
-    stackSize: cache.stack_size ?? null,
-  };
-}
-
-/**
- * Build the pending partial for a session whose own stored link is verified but
- * whose per-PR cache row is missing or names a different PR. Carries only the
- * session's own link fields; never another PR's cache fields.
- *
- * `formatAssociatedPr` only calls this for a verified link, but the guard below
- * keeps an unverified link from ever rendering even if called directly: an
- * unverified link must name the session's repository and be a GitHub link.
- */
-function pendingPartialFromSession(
-  session: SessionPrFields,
-  reviewDecisionPending: boolean
-): z.infer<typeof associatedPrSchema> | null {
-  if (session.pr_url === null) {
-    return null;
-  }
-  if (session.pr_link_verified_at === null) {
-    // An unverified link must name the session's repository; a stored link to
-    // another repo is no evidence and is never surfaced. A verified link has
-    // already passed that check against GitHub, so it needs no re-check here.
-    if (!pullRequestUrlMatchesRepo(session.pr_url, session.git_url)) {
-      return null;
-    }
-    // Only a GitHub link has a verification path here. Another platform's
-    // unverified link would stay pending forever, so it is not shown as a PR.
-    if (session.platform != null && session.platform !== 'github') {
-      return null;
-    }
-  }
-  const url = session.pr_url;
-  const parsed = parseGitHubPrUrl(url);
-  return {
-    url,
-    number: session.pr_number ?? parsed?.number ?? 0,
-    state: 'unknown',
-    title: null,
-    headSha: null,
-    observations: null,
-    lastSyncedAt: session.updated_at
-      ? new Date(session.updated_at).toISOString()
-      : new Date().toISOString(),
-    reviewDecision: null,
-    reviewDecisionPending,
-    platform: session.platform ?? 'github',
-    baseRef: null,
-    stackNumber: null,
-    stackPosition: null,
-    stackSize: null,
-  };
-}
-
-/**
- * Compare two PR URLs as the same pull request, ignoring trailing subpath,
- * query, fragment, and trailing slash. A stored link like
- * `.../pull/7/files` names the same PR as the canonical cache URL
- * `.../pull/7`. Returns `false` when either URL is not a parseable GitHub PR
- * URL.
- */
-function samePullRequest(sessionUrl: string, cacheUrl: string): boolean {
-  if (sessionUrl === cacheUrl) return true;
-  const s = parseGitHubPrUrl(sessionUrl);
-  const c = parseGitHubPrUrl(cacheUrl);
-  return (
-    s !== null &&
-    c !== null &&
-    s.owner.toLowerCase() === c.owner.toLowerCase() &&
-    s.repo.toLowerCase() === c.repo.toLowerCase() &&
-    s.number === c.number
-  );
-}
-
-/**
- * Format the associated PR for a session. The link must be the session's own
- * stored link and it must have passed GitHub verification; otherwise no PR is
- * shown.
- *
- *   1. Verified session link matches the cache PR → live cache fields.
- *   2. Verified session link, cache missing or for a different PR → pending
- *      partial (the session's own URL/number, state `unknown`, never the other
- *      PR's cache fields).
- *   3. No stored link, or a stored link GitHub has not verified
- *      (`pr_link_verified_at` NULL) → `null`. An unverified link is a guess, so
- *      it is never surfaced as a badge or an Open-on-GitHub link; a wrong link
- *      is worse than no link.
- *
- * The one exception is a Cloud Agent workspace's PR (`pr_from_workspace`): a
- * PR on the branch the workspace has checked out belongs to every chat in it,
- * so it is shown without a link of the chat's own. Outside workspaces there is
- * no branch-name fallback: a session with no stored link shows no PR, however
- * fresh the cache row for its branch happens to be.
- */
-export function formatAssociatedPr(
-  session: SessionPrFields,
-  cache: AssociatedPrRow,
-  opts?: { partialReviewDecisionPending?: boolean }
-): z.infer<typeof associatedPrSchema> | null {
-  if (cache.pr_from_workspace === true) {
-    return formatCacheRow(cache, 'github');
-  }
-  if (session.pr_url === null || session.pr_link_verified_at === null) {
-    return null;
-  }
-  if (cache.pr_url !== null && samePullRequest(session.pr_url, cache.pr_url)) {
-    return formatCacheRow(cache, session.platform ?? 'github');
-  }
-  return pendingPartialFromSession(session, opts?.partialReviewDecisionPending ?? true);
-}
 
 export function getPrLinkVerificationKey(
   session: Pick<

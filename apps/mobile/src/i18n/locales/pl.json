@@ -22,6 +22,7 @@
     "expired": "Wygasło"
   },
   "common": {
+    "manageOnWeb": "Zarządzaj w przeglądarce",
     "creditHistory": "Historia kredytów",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Klucze dostawców",
       "rowSubtitle": "Korzystaj z własnych rozliczeń u dostawcy",
-      "manageOnWeb": "Zarządzaj w przeglądarce",
       "manageOnWebReason": "Ci dostawcy wymagają danych uwierzytelniających w określonym formacie.",
       "description": "Żądania wysyłane z użyciem tych kluczy są rozliczane na twoim koncie u dostawcy zamiast z salda Kilo.",
       "enabled": "W użyciu",
@@ -1977,7 +1977,8 @@
       "cancelQueued": "Anuluj wiadomość",
       "cancelQueuedAccessibility": "Anuluj wiadomość w kolejce",
       "restoreQueued": "Przywróć",
-      "restoreQueuedAccessibility": "Przywróć anulowaną wiadomość do pola wiadomości"
+      "restoreQueuedAccessibility": "Przywróć anulowaną wiadomość do pola wiadomości",
+      "noReplyRecorded": "Dla tej wiadomości nie zapisano odpowiedzi."
     },
     "olderMessages": {
       "arrived": "Wczytano wcześniejsze wiadomości",
@@ -4232,6 +4233,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nie udało się otworzyć tego wyniku wyszukiwania"
+  },
+  "usage": {
+    "title": "Użycie",
+    "orgTitle": "Użycie organizacji",
+    "entrySubtitle": "Wydatki, żądania i tokeny",
+    "rangePicker": "Zakres czasu",
+    "range90d": "90 dni",
+    "metricPicker": "Metryka wykresu",
+    "chartA11y": "{{metric}} na dzień",
+    "avgCostPerRequest": "Śr. koszt / żądanie",
+    "topModels": "Najczęściej używane modele",
+    "topFeatures": "Najczęściej używane funkcje",
+    "emptyTitle": "Brak użycia w tym okresie",
+    "orgSelfNotice": "Widzisz własne użycie w tej organizacji.",
+    "viewDetails": "Wyświetl szczegóły użycia"
+  },
+  "integrations": {
+    "title": "Integracje",
+    "sectionTitle": "Połączone usługi",
+    "entrySubtitle": "GitHub, Slack, Linear i inne",
+    "subtitle": "Połącz swoje narzędzia programistyczne i procesy pracy z Kilo",
+    "emptyHint": "Brak połączonych integracji.",
+    "disconnect": "Odłącz",
+    "disconnectTitle": "Odłączyć usługę {{provider}}?",
+    "disconnectMessage": "Kilo przestanie odpowiadać w usłudze {{provider}}. W każdej chwili możesz połączyć ją ponownie.",
+    "connectedTo": "Połączono z kontem {{account}}",
+    "disconnected": "Odłączono usługę {{provider}}",
+    "disconnectFailed": "Nie udało się odłączyć usługi {{provider}}",
+    "couldNotLoad": "Nie udało się wczytać integracji",
+    "permissionDenied": "Nie masz uprawnień do zarządzania tymi integracjami.",
+    "memberHint": "Poproś właściciela lub administratora organizacji o zmianę tych połączeń.",
+    "connectFailed": "Nie udało się otworzyć strony połączenia"
   },
   "invoices": {
     "personalEmptyDescription": "Faktury za Twoje zakupy pojawią się tutaj po pierwszym obciążeniu."

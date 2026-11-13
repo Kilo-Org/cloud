@@ -32,6 +32,7 @@ import {
 } from './helpers/fake-credentials.js';
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
+import { seedRegistration } from './helpers/seed-registration.js';
 import { readRoute, writeRoute } from '../../src/control-plane/sandbox/routes.js';
 import { workspaceDiskSnapshots } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import { DEADLINE_MS } from '../../src/sandbox-control/deadlines.js';
@@ -157,7 +158,7 @@ async function setup(
       sandboxKind: options.shared ? ('shared' as const) : ('isolated-standard' as const),
     },
   };
-  await session.registerSession(registration);
+  await seedRegistration(session, registration);
   const wrappers: FakeWrapper[] = [];
   async function connect(index = 0) {
     await waitFor(() => expect(launchEnvs.length).toBeGreaterThan(index));
@@ -268,7 +269,7 @@ async function setup(
       spec: { ...registration.spec, sessionId: id, kiloSessionId },
       credentials: { ...registration.credentials, kiloSessionId },
     };
-    await sibling.registerSession(siblingRegistration);
+    await seedRegistration(sibling, siblingRegistration);
     return { id, session: sibling, registration: siblingRegistration };
   }
   async function attachSibling(wrapper: FakeWrapper) {
@@ -374,7 +375,7 @@ describe('idle workspace disk checkpoint', () => {
     const first = await test.statusStream();
     const second = await test.statusStream(sibling.session, sibling.id);
     const unrelated = await test.registerSibling();
-    await unrelated.session.registerSession({
+    await seedRegistration(unrelated.session, {
       ...unrelated.registration,
       credentials: { ...unrelated.registration.credentials, orgId: 'other-org' },
     });

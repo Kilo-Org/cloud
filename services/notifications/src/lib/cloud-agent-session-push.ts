@@ -21,7 +21,43 @@ type CloudAgentNotificationSession = {
    * for a session with no PR (and for every status push).
    */
   prUrl: string | null;
+  /**
+   * The stored status and its own time. A waiting row names the raise its
+   * attention push presents (see `raiseIdForWaitingRow`), so the app can
+   * refuse an answer meant for a raise that already moved on. Absent on a row
+   * that never carried a status.
+   */
+  status?: string | null;
+  statusUpdatedAt?: string | Date | null;
 };
+
+/** The statuses that mean the agent waits for the user's answer. */
+const WAITING_STATUS: Record<string, true> = { question: true, permission: true };
+
+/**
+ * The raise a waiting session row presents, in the payload's ISO form, or null
+ * when the row is not waiting or carries no status time.
+ *
+ * The payload crosses to the device as JSON, so a stored `Date` is serialized
+ * explicitly; a row written by a server path that reused a stored time keeps
+ * that instant. A raise cannot be named from a status alone, so a row without
+ * its time yields null and the payload keeps the older shape.
+ */
+export function raiseIdForWaitingRow(row: {
+  status?: string | null;
+  statusUpdatedAt?: string | Date | null;
+}): string | null {
+  const status = row.status ?? null;
+  if (status === null || WAITING_STATUS[status] !== true) {
+    return null;
+  }
+  const at = row.statusUpdatedAt ?? null;
+  if (at === null) {
+    return null;
+  }
+  const time = at instanceof Date ? at.getTime() : Date.parse(at);
+  return Number.isFinite(time) ? new Date(time).toISOString() : null;
+}
 
 /** Per-category preference columns, shared with the rest of the notification pipeline. */
 export type UserNotificationPreferences = {
@@ -126,6 +162,10 @@ async function dispatchSessionPush(
   }
 
   const content = buildContent(session);
+  // The raise this attention push presents, named by the session row's own
+  // status time so the app answers that raise and never one that replaced it.
+  // Status pushes carry none, and a non-waiting row names nothing.
+  const raiseId = content.category === 'attention' ? raiseIdForWaitingRow(session) : null;
   const outcome = await deps.dispatchPush({
     userId,
     presenceContext: content.presenceContext,
@@ -157,6 +197,9 @@ async function dispatchSessionPush(
         // read site defaults the kind to `unknown`.
         ...(content.category === 'attention' && {
           ...(content.attentionKind !== undefined && { attentionKind: content.attentionKind }),
+          // The raise this push presents (see above), so the app answers it
+          // and not a raise that replaced it before the tap.
+          ...(raiseId !== null && { raiseId }),
           // The payload's `prUrl` is a usable URL or absent: an empty value
           // would fail the payload schema on the device and cost the whole
           // notification its route and actions, not just the Open PR action.

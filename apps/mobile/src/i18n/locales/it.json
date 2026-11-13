@@ -22,6 +22,7 @@
     "expired": "Scaduto"
   },
   "common": {
+    "manageOnWeb": "Gestisci sul web",
     "creditHistory": "Cronologia crediti",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Chiavi dei provider",
       "rowSubtitle": "Usa la fatturazione del tuo provider",
-      "manageOnWeb": "Gestisci sul web",
       "manageOnWebReason": "Questi provider richiedono credenziali strutturate.",
       "description": "Le richieste effettuate con queste chiavi vengono addebitate sul tuo account del provider anziché sul saldo Kilo.",
       "enabled": "In uso",
@@ -1922,7 +1922,8 @@
       "cancelQueued": "Annulla il messaggio",
       "cancelQueuedAccessibility": "Annulla il messaggio in coda",
       "restoreQueued": "Ripristina",
-      "restoreQueuedAccessibility": "Ripristina il messaggio annullato nel campo del messaggio"
+      "restoreQueuedAccessibility": "Ripristina il messaggio annullato nel campo del messaggio",
+      "noReplyRecorded": "Nessuna risposta è stata registrata per questo messaggio."
     },
     "olderMessages": {
       "arrived": "Messaggi precedenti caricati",
@@ -4167,6 +4168,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Impossibile aprire questo risultato di ricerca"
+  },
+  "usage": {
+    "title": "Utilizzo",
+    "orgTitle": "Utilizzo dell'organizzazione",
+    "entrySubtitle": "Spesa, richieste e token",
+    "rangePicker": "Intervallo di tempo",
+    "range90d": "90 giorni",
+    "metricPicker": "Metrica del grafico",
+    "chartA11y": "{{metric}} al giorno",
+    "avgCostPerRequest": "Costo medio / rich.",
+    "topModels": "Modelli più usati",
+    "topFeatures": "Funzionalità più usate",
+    "emptyTitle": "Nessun utilizzo in questo periodo",
+    "orgSelfNotice": "Stai visualizzando il tuo utilizzo in questa organizzazione.",
+    "viewDetails": "Visualizza dettagli utilizzo"
+  },
+  "integrations": {
+    "title": "Integrazioni",
+    "sectionTitle": "Servizi collegati",
+    "entrySubtitle": "GitHub, Slack, Linear e altro",
+    "subtitle": "Collega a Kilo i tuoi strumenti e flussi di lavoro di sviluppo",
+    "emptyHint": "Nessuna integrazione collegata.",
+    "disconnect": "Scollega",
+    "disconnectTitle": "Scollegare {{provider}}?",
+    "disconnectMessage": "Kilo smetterà di rispondere in {{provider}}. Puoi ricollegarlo in qualsiasi momento.",
+    "connectedTo": "Collegato a {{account}}",
+    "disconnected": "{{provider}} scollegato",
+    "disconnectFailed": "Impossibile scollegare {{provider}}",
+    "couldNotLoad": "Impossibile caricare le integrazioni",
+    "permissionDenied": "Non hai l'autorizzazione per gestire queste integrazioni.",
+    "memberHint": "Chiedi a un proprietario o a un amministratore dell'organizzazione di modificare questi collegamenti.",
+    "connectFailed": "Impossibile aprire la pagina di collegamento"
   },
   "invoices": {
     "personalEmptyDescription": "Le fatture dei tuoi acquisti personali appariranno qui dopo il primo addebito."

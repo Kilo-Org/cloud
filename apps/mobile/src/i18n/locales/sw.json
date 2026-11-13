@@ -22,6 +22,7 @@
     "expired": "Muda wake umeisha"
   },
   "common": {
+    "manageOnWeb": "Dhibiti kwenye wavuti",
     "creditHistory": "Historia ya salio",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Funguo za watoa huduma",
       "rowSubtitle": "Tumia malipo ya mtoa huduma wako",
-      "manageOnWeb": "Dhibiti kwenye wavuti",
       "manageOnWebReason": "Watoa huduma hawa wanahitaji vitambulisho vilivyopangwa.",
       "description": "Maombi yanayopitia funguo hizi yanatozwa kwenye akaunti yako ya mtoa huduma badala ya salio lako la Kilo.",
       "enabled": "Inatumika",
@@ -2475,7 +2475,8 @@
       "cancelQueued": "Ghairi ujumbe",
       "cancelQueuedAccessibility": "Ghairi ujumbe ulio kwenye foleni",
       "restoreQueued": "Rejesha",
-      "restoreQueuedAccessibility": "Rejesha ujumbe ulioghairiwa kwenye sehemu ya kuandika ujumbe"
+      "restoreQueuedAccessibility": "Rejesha ujumbe ulioghairiwa kwenye sehemu ya kuandika ujumbe",
+      "noReplyRecorded": "Hakuna jibu lililorekodiwa kwa ujumbe huu."
     },
     "olderMessages": {
       "arrived": "Ujumbe wa awali umepakiwa",
@@ -4102,6 +4103,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Imeshindikana kufungua matokeo haya ya utafutaji"
+  },
+  "usage": {
+    "title": "Matumizi",
+    "orgTitle": "Matumizi ya shirika",
+    "entrySubtitle": "Gharama, maombi na tokeni",
+    "rangePicker": "Kipindi cha muda",
+    "range90d": "Siku 90",
+    "metricPicker": "Kipimo cha chati",
+    "chartA11y": "{{metric}} kwa siku",
+    "avgCostPerRequest": "Wastani wa gharama / ombi",
+    "topModels": "Modeli zinazoongoza",
+    "topFeatures": "Vipengele vinavyoongoza",
+    "emptyTitle": "Hakuna matumizi katika kipindi hiki",
+    "orgSelfNotice": "Unaona matumizi yako mwenyewe katika shirika hili.",
+    "viewDetails": "Angalia maelezo ya matumizi"
+  },
+  "integrations": {
+    "title": "Miunganisho",
+    "sectionTitle": "Huduma zilizounganishwa",
+    "entrySubtitle": "GitHub, Slack, Linear na zaidi",
+    "subtitle": "Unganisha zana zako za usanidi na mitiririko yako ya kazi na Kilo",
+    "emptyHint": "Bado hakuna miunganisho iliyounganishwa.",
+    "disconnect": "Tenganisha",
+    "disconnectTitle": "Ungependa kutenganisha {{provider}}?",
+    "disconnectMessage": "Kilo itaacha kujibu kwenye {{provider}}. Unaweza kuunganisha tena wakati wowote.",
+    "connectedTo": "Imeunganishwa na {{account}}",
+    "disconnected": "{{provider}} imetenganishwa",
+    "disconnectFailed": "Imeshindwa kutenganisha {{provider}}",
+    "couldNotLoad": "Imeshindwa kupakia miunganisho",
+    "permissionDenied": "Huna ruhusa ya kudhibiti miunganisho hii.",
+    "memberHint": "Mwombe mmiliki au msimamizi wa shirika abadilishe miunganisho hii.",
+    "connectFailed": "Imeshindwa kufungua ukurasa wa kuunganisha"
   },
   "invoices": {
     "personalEmptyDescription": "Ankara za ununuzi wako binafsi zitaonekana hapa baada ya kutozwa."

@@ -22,6 +22,7 @@
     "expired": "Expirat"
   },
   "common": {
+    "manageOnWeb": "Gestionează pe web",
     "creditHistory": "Istoric credite",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Chei de furnizor",
       "rowSubtitle": "Folosește facturarea propriului furnizor",
-      "manageOnWeb": "Gestionează pe web",
       "manageOnWebReason": "Acești furnizori necesită date de autentificare structurate.",
       "description": "Solicitările făcute cu aceste chei sunt facturate în contul tău de furnizor, nu din soldul Kilo.",
       "enabled": "În uz",
@@ -2520,7 +2520,8 @@
       "cancelQueued": "Anulează mesajul",
       "cancelQueuedAccessibility": "Anulează mesajul în așteptare",
       "restoreQueued": "Restabilește",
-      "restoreQueuedAccessibility": "Restabilește mesajul anulat în câmpul de mesaj"
+      "restoreQueuedAccessibility": "Restabilește mesajul anulat în câmpul de mesaj",
+      "noReplyRecorded": "Nu a fost înregistrat niciun răspuns pentru acest mesaj."
     },
     "olderMessages": {
       "arrived": "Mesajele anterioare au fost încărcate",
@@ -4167,6 +4168,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nu s-a putut deschide acest rezultat de căutare"
+  },
+  "usage": {
+    "title": "Utilizare",
+    "orgTitle": "Utilizarea organizației",
+    "entrySubtitle": "Cheltuieli, cereri și tokenuri",
+    "rangePicker": "Interval de timp",
+    "range90d": "90 de zile",
+    "metricPicker": "Metrica graficului",
+    "chartA11y": "{{metric}} pe zi",
+    "avgCostPerRequest": "Cost mediu / cerere",
+    "topModels": "Modele principale",
+    "topFeatures": "Funcții principale",
+    "emptyTitle": "Nicio utilizare în această perioadă",
+    "orgSelfNotice": "Vezi propria utilizare în această organizație.",
+    "viewDetails": "Vezi detaliile utilizării"
+  },
+  "integrations": {
+    "title": "Integrări",
+    "sectionTitle": "Servicii conectate",
+    "entrySubtitle": "GitHub, Slack, Linear și altele",
+    "subtitle": "Conectează-ți instrumentele și fluxurile de lucru pentru dezvoltare la Kilo",
+    "emptyHint": "Nicio integrare conectată încă.",
+    "disconnect": "Deconectează",
+    "disconnectTitle": "Deconectezi {{provider}}?",
+    "disconnectMessage": "Kilo nu va mai răspunde în {{provider}}. Te poți reconecta oricând.",
+    "connectedTo": "Conectat la {{account}}",
+    "disconnected": "{{provider}} a fost deconectat",
+    "disconnectFailed": "{{provider}} nu a putut fi deconectat",
+    "couldNotLoad": "Integrările nu au putut fi încărcate",
+    "permissionDenied": "Nu ai permisiunea de a gestiona aceste integrări.",
+    "memberHint": "Cere unui proprietar sau administrator al organizației să modifice aceste conexiuni.",
+    "connectFailed": "Pagina de conectare nu a putut fi deschisă"
   },
   "invoices": {
     "personalEmptyDescription": "Facturile pentru achizițiile tale personale vor apărea aici după prima facturare."

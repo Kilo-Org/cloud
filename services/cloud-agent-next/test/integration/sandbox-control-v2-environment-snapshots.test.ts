@@ -34,6 +34,7 @@ import {
   installFakeRuntimeProxyPeer,
 } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
+import { seedRegistration } from './helpers/seed-registration.js';
 import { waitFor } from './wait-for.js';
 
 const SESSION = 'workspace_11111111-1111-1111-1111-111111111111';
@@ -909,7 +910,7 @@ describe('environment snapshot session preparation', () => {
       }
     ).SANDBOX_SESSION;
     const session = sessionNamespace.getByName(sessionDoName('user_123', SESSION));
-    await session.registerSession({
+    await seedRegistration(session, {
       sandboxId,
       ...prepareInput({ ...BUILD, startCommands: ['serve'] }),
     });

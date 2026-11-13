@@ -22,6 +22,7 @@
     "expired": "කල් ඉකුත් වී ඇත"
   },
   "common": {
+    "manageOnWeb": "වෙබයේ කළමනාකරණය කරන්න",
     "creditHistory": "ක්‍රෙඩිට් ඉතිහාසය",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "සපයන්නාගේ යතුරු",
       "rowSubtitle": "ඔබේම සපයන්නාගේ බිල්පත් ක්‍රමය භාවිත කරන්න",
-      "manageOnWeb": "වෙබයේ කළමනාකරණය කරන්න",
       "manageOnWebReason": "මෙම සපයන්නන්ට ව්‍යුහගත අක්තපත්‍ර අවශ්‍ය වේ.",
       "description": "මෙම යතුරු හරහා යන ඉල්ලීම් ඔබේ Kilo ශේෂය වෙනුවට ඔබේ සපයන්නාගේ ගිණුමට බිල් කෙරේ.",
       "enabled": "භාවිතයේ ඇත",
@@ -2475,7 +2475,8 @@
       "cancelQueued": "පණිවිඩය අවලංගු කරන්න",
       "cancelQueuedAccessibility": "පෝලිමේ ඇති පණිවිඩය අවලංගු කරන්න",
       "restoreQueued": "යළි ගෙන එන්න",
-      "restoreQueuedAccessibility": "අවලංගු කළ පණිවිඩය පණිවිඩ කොටුවට යළි ගෙන එන්න"
+      "restoreQueuedAccessibility": "අවලංගු කළ පණිවිඩය පණිවිඩ කොටුවට යළි ගෙන එන්න",
+      "noReplyRecorded": "මෙම පණිවිඩය සඳහා ප්‍රතිචාරයක් සටහන් වී නොමැත."
     },
     "olderMessages": {
       "arrived": "පෙර පණිවිඩ පූරණය විය",
@@ -4102,6 +4103,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "මෙම සෙවුම් ප්‍රතිඵලය විවෘත කිරීමට නොහැකි විය"
+  },
+  "usage": {
+    "title": "භාවිතය",
+    "orgTitle": "සංවිධාන භාවිතය",
+    "entrySubtitle": "වියදම, ඉල්ලීම් සහ ටෝකන",
+    "rangePicker": "කාල පරාසය",
+    "range90d": "දින 90",
+    "metricPicker": "ප්‍රස්ථාර මිනුම",
+    "chartA11y": "දිනකට {{metric}}",
+    "avgCostPerRequest": "සාමාන්‍ය පිරිවැය / ඉල්ලීම",
+    "topModels": "ප්‍රමුඛ ආකෘති",
+    "topFeatures": "ප්‍රමුඛ විශේෂාංග",
+    "emptyTitle": "මෙම කාලය තුළ භාවිතයක් නැත",
+    "orgSelfNotice": "ඔබ දකින්නේ මෙම සංවිධානයේ ඔබගේම භාවිතයයි.",
+    "viewDetails": "භාවිත විස්තර බලන්න"
+  },
+  "integrations": {
+    "title": "ඒකාබද්ධ කිරීම්",
+    "sectionTitle": "සම්බන්ධිත සේවා",
+    "entrySubtitle": "GitHub, Slack, Linear සහ තවත් බොහෝ දේ",
+    "subtitle": "ඔබේ සංවර්ධන මෙවලම් සහ කාර්ය ප්‍රවාහ Kilo වෙත සම්බන්ධ කරන්න",
+    "emptyHint": "තවම කිසිදු ඒකාබද්ධ කිරීමක් සම්බන්ධ කර නැත.",
+    "disconnect": "විසන්ධි කරන්න",
+    "disconnectTitle": "{{provider}} විසන්ධි කරන්නද?",
+    "disconnectMessage": "Kilo {{provider}} තුළ ප්‍රතිචාර දැක්වීම නවත්වනු ඇත. ඔබට ඕනෑම වේලාවක නැවත සම්බන්ධ විය හැක.",
+    "connectedTo": "{{account}} වෙත සම්බන්ධිතයි",
+    "disconnected": "{{provider}} විසන්ධි කරන ලදී",
+    "disconnectFailed": "{{provider}} විසන්ධි කළ නොහැකි විය",
+    "couldNotLoad": "ඒකාබද්ධ කිරීම් පූරණය කළ නොහැකි විය",
+    "permissionDenied": "මෙම ඒකාබද්ධ කිරීම් කළමනාකරණය කිරීමට ඔබට අවසර නැත.",
+    "memberHint": "මෙම සම්බන්ධතා වෙනස් කිරීමට සංවිධානයේ හිමිකරුවෙකුගෙන් හෝ පරිපාලකවරයෙකුගෙන් ඉල්ලා සිටින්න.",
+    "connectFailed": "සම්බන්ධතා පිටුව විවෘත කළ නොහැකි විය"
   },
   "invoices": {
     "personalEmptyDescription": "ඔබෙන් බිල්පත් අය කළ පසු, ඔබේම මිලදී ගැනීම් සඳහා ඉන්වොයිස් මෙහි දිස් වේ."

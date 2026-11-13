@@ -22,6 +22,7 @@
     "expired": "已過期"
   },
   "common": {
+    "manageOnWeb": "在網頁上管理",
     "creditHistory": "點數紀錄",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "供應商金鑰",
       "rowSubtitle": "使用你自己的供應商計費",
-      "manageOnWeb": "在網頁上管理",
       "manageOnWebReason": "這些供應商需要結構化憑證",
       "description": "透過這些金鑰發出的請求會向你的供應商帳戶計費，而不會從你的 Kilo 餘額扣除。",
       "enabled": "使用中",
@@ -1933,7 +1933,8 @@
       "cancelQueued": "取消訊息",
       "cancelQueuedAccessibility": "取消已排入佇列的訊息",
       "restoreQueued": "還原",
-      "restoreQueuedAccessibility": "將已取消的訊息還原至訊息輸入框"
+      "restoreQueuedAccessibility": "將已取消的訊息還原至訊息輸入框",
+      "noReplyRecorded": "沒有為此訊息記錄任何回覆。"
     },
     "olderMessages": {
       "arrived": "已載入較早的訊息",
@@ -4102,6 +4103,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "無法開啟此搜尋結果"
+  },
+  "usage": {
+    "title": "用量",
+    "orgTitle": "組織用量",
+    "entrySubtitle": "費用、請求與詞元",
+    "rangePicker": "時間範圍",
+    "range90d": "90 天",
+    "metricPicker": "圖表指標",
+    "chartA11y": "每日{{metric}}",
+    "avgCostPerRequest": "每次請求平均費用",
+    "topModels": "最常用模型",
+    "topFeatures": "最常用功能",
+    "emptyTitle": "此期間沒有用量",
+    "orgSelfNotice": "你看到的是你自己在此組織中的用量。",
+    "viewDetails": "查看用量詳情"
+  },
+  "integrations": {
+    "title": "整合",
+    "sectionTitle": "已連結的服務",
+    "entrySubtitle": "GitHub、Slack、Linear 等",
+    "subtitle": "將您的開發工具與工作流程連結至 Kilo",
+    "emptyHint": "尚未連結任何整合。",
+    "disconnect": "中斷連結",
+    "disconnectTitle": "要中斷與 {{provider}} 的連結嗎？",
+    "disconnectMessage": "Kilo 將停止在 {{provider}} 中回應。您可以隨時重新連結。",
+    "connectedTo": "已連結至 {{account}}",
+    "disconnected": "已中斷與 {{provider}} 的連結",
+    "disconnectFailed": "無法中斷與 {{provider}} 的連結",
+    "couldNotLoad": "無法載入整合",
+    "permissionDenied": "您沒有管理這些整合的權限。",
+    "memberHint": "請洽詢組織擁有者或管理員來變更這些連結。",
+    "connectFailed": "無法開啟連結頁面"
   },
   "invoices": {
     "personalEmptyDescription": "你個人購買的發票會在計費後顯示在這裡。"

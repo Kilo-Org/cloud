@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The new-session screen reads these repository helpers together: provider status, grouping, stored-selection validity, the region-settle signal, and branch state all describe one section, and splitting them would scatter the rules that must agree on `platform:fullName`. */
 import { type RepoPlatform } from '@/lib/picker-bridge';
 import { dedupeBy } from '@/lib/query/dedupe-by-id';
 

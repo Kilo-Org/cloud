@@ -22,6 +22,7 @@
     "expired": "Isteklo"
   },
   "common": {
+    "manageOnWeb": "Upravljaj na webu",
     "creditHistory": "Historija kredita",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Ključevi pružalaca",
       "rowSubtitle": "Koristi naplatu vlastitog pružaoca",
-      "manageOnWeb": "Upravljaj na webu",
       "manageOnWebReason": "Ovi pružaoci zahtijevaju strukturirane akreditive.",
       "description": "Zahtjevi putem ovih ključeva naplaćuju se na tvoj nalog kod pružaoca umjesto s tvog Kilo salda.",
       "enabled": "U upotrebi",
@@ -2520,7 +2520,8 @@
       "cancelQueued": "Otkaži poruku",
       "cancelQueuedAccessibility": "Otkaži poruku na čekanju",
       "restoreQueued": "Vrati",
-      "restoreQueuedAccessibility": "Vrati otkazanu poruku u polje za unos poruke"
+      "restoreQueuedAccessibility": "Vrati otkazanu poruku u polje za unos poruke",
+      "noReplyRecorded": "Za ovu poruku nije zabilježen odgovor."
     },
     "olderMessages": {
       "arrived": "Ranije poruke su učitane",
@@ -4167,6 +4168,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nije moguće otvoriti ovaj rezultat pretrage"
+  },
+  "usage": {
+    "title": "Potrošnja",
+    "orgTitle": "Potrošnja organizacije",
+    "entrySubtitle": "Troškovi, zahtjevi i tokeni",
+    "rangePicker": "Vremenski period",
+    "range90d": "90 dana",
+    "metricPicker": "Metrika grafikona",
+    "chartA11y": "{{metric}} po danu",
+    "avgCostPerRequest": "Prosj. trošak / zahtjev",
+    "topModels": "Najčešći modeli",
+    "topFeatures": "Najčešće funkcije",
+    "emptyTitle": "Nema potrošnje u ovom periodu",
+    "orgSelfNotice": "Vidite vlastitu potrošnju u ovoj organizaciji.",
+    "viewDetails": "Prikaži detalje potrošnje"
+  },
+  "integrations": {
+    "title": "Integracije",
+    "sectionTitle": "Povezane usluge",
+    "entrySubtitle": "GitHub, Slack, Linear i drugo",
+    "subtitle": "Povežite svoje razvojne alate i tokove rada s Kilo",
+    "emptyHint": "Još nema povezanih integracija.",
+    "disconnect": "Prekini vezu",
+    "disconnectTitle": "Prekinuti vezu s {{provider}}?",
+    "disconnectMessage": "Kilo će prestati odgovarati u {{provider}}. Možete se ponovo povezati u bilo kojem trenutku.",
+    "connectedTo": "Povezano s {{account}}",
+    "disconnected": "Veza s {{provider}} je prekinuta",
+    "disconnectFailed": "Nije moguće prekinuti vezu s {{provider}}",
+    "couldNotLoad": "Nije moguće učitati integracije",
+    "permissionDenied": "Nemate dozvolu za upravljanje ovim integracijama.",
+    "memberHint": "Zamolite vlasnika ili administratora organizacije da promijeni ove veze.",
+    "connectFailed": "Nije moguće otvoriti stranicu za povezivanje"
   },
   "invoices": {
     "personalEmptyDescription": "Fakture za vaše lične kupovine pojavit će se ovdje nakon što vam se izvrši naplata."

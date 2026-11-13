@@ -22,6 +22,7 @@
     "expired": "Tamat tempoh"
   },
   "common": {
+    "manageOnWeb": "Urus di web",
     "creditHistory": "Sejarah kredit",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Kunci pembekal",
       "rowSubtitle": "Gunakan pengebilan pembekal anda sendiri",
-      "manageOnWeb": "Urus di web",
       "manageOnWebReason": "Pembekal ini memerlukan kelayakan berstruktur.",
       "description": "Permintaan melalui kunci ini dibilkan kepada akaun pembekal anda dan bukannya baki Kilo anda.",
       "enabled": "Sedang digunakan",
@@ -2475,7 +2475,8 @@
       "cancelQueued": "Batalkan mesej",
       "cancelQueuedAccessibility": "Batalkan mesej dalam baris gilir",
       "restoreQueued": "Pulihkan",
-      "restoreQueuedAccessibility": "Pulihkan mesej yang dibatalkan ke ruang mesej"
+      "restoreQueuedAccessibility": "Pulihkan mesej yang dibatalkan ke ruang mesej",
+      "noReplyRecorded": "Tiada respons direkodkan untuk mesej ini."
     },
     "olderMessages": {
       "arrived": "Mesej terdahulu dimuatkan",
@@ -4102,6 +4103,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Tidak dapat membuka hasil carian ini"
+  },
+  "usage": {
+    "title": "Penggunaan",
+    "orgTitle": "Penggunaan organisasi",
+    "entrySubtitle": "Perbelanjaan, permintaan dan token",
+    "rangePicker": "Julat masa",
+    "range90d": "90 hari",
+    "metricPicker": "Metrik carta",
+    "chartA11y": "{{metric}} sehari",
+    "avgCostPerRequest": "Purata kos / permintaan",
+    "topModels": "Model teratas",
+    "topFeatures": "Ciri teratas",
+    "emptyTitle": "Tiada penggunaan dalam tempoh ini",
+    "orgSelfNotice": "Anda sedang melihat penggunaan anda sendiri dalam organisasi ini.",
+    "viewDetails": "Lihat butiran penggunaan"
+  },
+  "integrations": {
+    "title": "Integrasi",
+    "sectionTitle": "Perkhidmatan yang disambungkan",
+    "entrySubtitle": "GitHub, Slack, Linear dan banyak lagi",
+    "subtitle": "Sambungkan alat dan aliran kerja pembangunan anda kepada Kilo",
+    "emptyHint": "Belum ada integrasi yang disambungkan.",
+    "disconnect": "Putuskan sambungan",
+    "disconnectTitle": "Putuskan sambungan {{provider}}?",
+    "disconnectMessage": "Kilo akan berhenti memberikan respons dalam {{provider}}. Anda boleh menyambung semula pada bila-bila masa.",
+    "connectedTo": "Disambungkan kepada {{account}}",
+    "disconnected": "Sambungan {{provider}} telah diputuskan",
+    "disconnectFailed": "Tidak dapat memutuskan sambungan {{provider}}",
+    "couldNotLoad": "Tidak dapat memuatkan integrasi",
+    "permissionDenied": "Anda tidak mempunyai kebenaran untuk mengurus integrasi ini.",
+    "memberHint": "Minta pemilik atau pentadbir organisasi untuk menukar sambungan ini.",
+    "connectFailed": "Tidak dapat membuka halaman sambungan"
   },
   "invoices": {
     "personalEmptyDescription": "Invois untuk pembelian anda sendiri akan dipaparkan di sini setelah anda dibilkan."

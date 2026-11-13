@@ -22,6 +22,7 @@
     "expired": "Истечено"
   },
   "common": {
+    "manageOnWeb": "Управувај на веб",
     "creditHistory": "Историја на кредити",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Клучеви на провајдери",
       "rowSubtitle": "Користи наплата преку сопствениот провајдер",
-      "manageOnWeb": "Управувај на веб",
       "manageOnWebReason": "Овие провајдери бараат структурирани акредитиви.",
       "description": "Барањата преку овие клучеви се наплаќаат на твојата сметка кај провајдерот наместо од твојата состојба во Kilo.",
       "enabled": "Во употреба",
@@ -2475,7 +2475,8 @@
       "cancelQueued": "Откажи ја пораката",
       "cancelQueuedAccessibility": "Откажи ја пораката што чека",
       "restoreQueued": "Врати",
-      "restoreQueuedAccessibility": "Врати ја откажаната порака во полето за порака"
+      "restoreQueuedAccessibility": "Врати ја откажаната порака во полето за порака",
+      "noReplyRecorded": "Не е забележан одговор за оваа порака."
     },
     "olderMessages": {
       "arrived": "Постарите пораки се вчитани",
@@ -4102,6 +4103,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Не успеа отворањето на овој резултат од пребарувањето"
+  },
+  "usage": {
+    "title": "Користење",
+    "orgTitle": "Користење на организацијата",
+    "entrySubtitle": "Трошоци, барања и токени",
+    "rangePicker": "Временски опсег",
+    "range90d": "90 дена",
+    "metricPicker": "Метрика на графиконот",
+    "chartA11y": "{{metric}} по ден",
+    "avgCostPerRequest": "Прос. трошок / барање",
+    "topModels": "Најкористени модели",
+    "topFeatures": "Најкористени функции",
+    "emptyTitle": "Нема користење во овој период",
+    "orgSelfNotice": "Го гледате вашето користење во оваа организација.",
+    "viewDetails": "Прикажи детали за користењето"
+  },
+  "integrations": {
+    "title": "Интеграции",
+    "sectionTitle": "Поврзани услуги",
+    "entrySubtitle": "GitHub, Slack, Linear и друго",
+    "subtitle": "Поврзете ги вашите развојни алатки и работни процеси со Kilo",
+    "emptyHint": "Сè уште нема поврзани интеграции.",
+    "disconnect": "Прекини врска",
+    "disconnectTitle": "Да се прекине врската со {{provider}}?",
+    "disconnectMessage": "Kilo ќе престане да одговара во {{provider}}. Можете повторно да се поврзете во секое време.",
+    "connectedTo": "Поврзано со {{account}}",
+    "disconnected": "Врската со {{provider}} е прекината",
+    "disconnectFailed": "Не може да се прекине врската со {{provider}}",
+    "couldNotLoad": "Не може да се вчитаат интеграциите",
+    "permissionDenied": "Немате дозвола за управување со овие интеграции.",
+    "memberHint": "Побарајте од сопственик или администратор на организацијата да ги промени овие врски.",
+    "connectFailed": "Не може да се отвори страницата за поврзување"
   },
   "invoices": {
     "personalEmptyDescription": "Фактурите за вашите лични купувања ќе се појават тука откако ќе ви биде наплатено."

@@ -22,6 +22,7 @@
     "expired": "Oge agwụla"
   },
   "common": {
+    "manageOnWeb": "Jikwaa na weebụ",
     "creditHistory": "Akụkọ kredit",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Igodo ndị na-enye ọrụ",
       "rowSubtitle": "Jiri ịkwụ ụgwọ nke onye na-enye ọrụ gị",
-      "manageOnWeb": "Jikwaa na weebụ",
       "manageOnWebReason": "Ndị na-enye ọrụ ndị a chọrọ ozi nbanye ahaziri ahazi",
       "description": "A na-akwụ ụgwọ arịrịọ site n'igodo ndị a n'akaụntụ onye na-enye ọrụ gị kama n'ego fọdụrụ gị na Kilo.",
       "enabled": "Na-eji ya",
@@ -2475,7 +2475,8 @@
       "cancelQueued": "Kagbuo ozi",
       "cancelQueuedAccessibility": "Kagbuo ozi na-echere",
       "restoreQueued": "Weghachite",
-      "restoreQueuedAccessibility": "Weghachite ozi a kagburu n'ebe ide ozi"
+      "restoreQueuedAccessibility": "Weghachite ozi a kagburu n'ebe ide ozi",
+      "noReplyRecorded": "Edekọghị nzaghachi ọ bụla maka ozi a."
     },
     "olderMessages": {
       "arrived": "Ebudatala ozi ndị gara aga",
@@ -4102,6 +4103,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Enweghị ike imepe nsonaazụ ọchụchọ a"
+  },
+  "usage": {
+    "title": "Ojiji",
+    "orgTitle": "Ojiji nzukọ",
+    "entrySubtitle": "Mmefu, arịrịọ, na tokin",
+    "rangePicker": "Oke oge",
+    "range90d": "Ụbọchị 90",
+    "metricPicker": "Ihe eserese na-egosi",
+    "chartA11y": "{{metric}} kwa ụbọchị",
+    "avgCostPerRequest": "Ọnụ ahịa nkezi / arịrịọ",
+    "topModels": "Ụdị a kacha eji",
+    "topFeatures": "Njirimara a kacha eji",
+    "emptyTitle": "Enweghị ojiji n'oge a",
+    "orgSelfNotice": "Ị na-ahụ ojiji nke gị n'ime nzukọ a.",
+    "viewDetails": "Lee nkọwa ojiji"
+  },
+  "integrations": {
+    "title": "Njikọ",
+    "sectionTitle": "Ọrụ ejikọrọ",
+    "entrySubtitle": "GitHub, Slack, Linear na ndị ọzọ",
+    "subtitle": "Jikọọ ngwaọrụ mmepe gị na usoro ọrụ gị na Kilo",
+    "emptyHint": "Enwebeghị njikọ ọ bụla.",
+    "disconnect": "Kwụsị njikọ",
+    "disconnectTitle": "Kwụsị njikọ {{provider}}?",
+    "disconnectMessage": "Kilo agaghị azaghachi ọzọ na {{provider}}. Ị nwere ike ijikọ ọzọ mgbe ọ bụla.",
+    "connectedTo": "Ejikọrọ na {{account}}",
+    "disconnected": "Akwụsịla njikọ {{provider}}",
+    "disconnectFailed": "Enweghị ike ịkwụsị njikọ {{provider}}",
+    "couldNotLoad": "Enweghị ike ibudata njikọ",
+    "permissionDenied": "Ị nweghị ikike ijikwa njikọ ndị a.",
+    "memberHint": "Gwa onye nwe nzukọ ma ọ bụ onye nchịkwa ka ọ gbanwee njikọ ndị a.",
+    "connectFailed": "Enweghị ike imepe ibe njikọ"
   },
   "invoices": {
     "personalEmptyDescription": "Akwụkwọ ụgwọ maka ihe gị onwe gị zụrụ ga-apụta ebe a ozugbo a nara gị ụgwọ."

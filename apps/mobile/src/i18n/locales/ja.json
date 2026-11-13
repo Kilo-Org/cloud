@@ -22,6 +22,7 @@
     "expired": "期限切れ"
   },
   "common": {
+    "manageOnWeb": "Webで管理",
     "creditHistory": "クレジット履歴",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "プロバイダーキー",
       "rowSubtitle": "自分のプロバイダーアカウントで課金",
-      "manageOnWeb": "Webで管理",
       "manageOnWebReason": "これらのプロバイダーには構造化された認証情報が必要です",
       "description": "これらのキーを使ったリクエストは、Kiloの残高ではなくプロバイダーのアカウントに請求されます。",
       "enabled": "使用中",
@@ -1933,7 +1933,8 @@
       "cancelQueued": "メッセージをキャンセル",
       "cancelQueuedAccessibility": "送信待ちのメッセージをキャンセル",
       "restoreQueued": "復元",
-      "restoreQueuedAccessibility": "キャンセルしたメッセージをメッセージ入力欄に復元"
+      "restoreQueuedAccessibility": "キャンセルしたメッセージをメッセージ入力欄に復元",
+      "noReplyRecorded": "このメッセージには応答が記録されていません。"
     },
     "olderMessages": {
       "arrived": "以前のメッセージを読み込みました",
@@ -4102,6 +4103,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "この検索結果を開けませんでした"
+  },
+  "usage": {
+    "title": "使用状況",
+    "orgTitle": "組織の使用状況",
+    "entrySubtitle": "コスト、リクエスト、トークン",
+    "rangePicker": "期間",
+    "range90d": "90日間",
+    "metricPicker": "グラフの指標",
+    "chartA11y": "1日あたりの{{metric}}",
+    "avgCostPerRequest": "平均コスト/リクエスト",
+    "topModels": "上位のモデル",
+    "topFeatures": "上位の機能",
+    "emptyTitle": "この期間の使用はありません",
+    "orgSelfNotice": "この組織でのあなた自身の使用状況を表示しています。",
+    "viewDetails": "使用状況の詳細を表示"
+  },
+  "integrations": {
+    "title": "連携",
+    "sectionTitle": "接続済みのサービス",
+    "entrySubtitle": "GitHub、Slack、Linear など",
+    "subtitle": "開発ツールやワークフローを Kilo に接続します",
+    "emptyHint": "接続済みの連携はまだありません。",
+    "disconnect": "接続を解除",
+    "disconnectTitle": "{{provider}} の接続を解除しますか？",
+    "disconnectMessage": "Kilo は {{provider}} で応答しなくなります。いつでも再接続できます。",
+    "connectedTo": "{{account}} に接続済み",
+    "disconnected": "{{provider}} の接続を解除しました",
+    "disconnectFailed": "{{provider}} の接続を解除できませんでした",
+    "couldNotLoad": "連携を読み込めませんでした",
+    "permissionDenied": "これらの連携を管理する権限がありません。",
+    "memberHint": "これらの接続を変更するには、組織のオーナーまたは管理者に依頼してください。",
+    "connectFailed": "接続ページを開けませんでした"
   },
   "invoices": {
     "personalEmptyDescription": "ご自身の購入に対する請求書は、請求が発生するとここに表示されます。"

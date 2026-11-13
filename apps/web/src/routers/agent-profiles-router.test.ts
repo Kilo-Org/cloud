@@ -3,7 +3,7 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, pool } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_environment_profiles,
   agent_environment_profile_vars,
@@ -17,10 +17,55 @@ import { eq } from 'drizzle-orm';
 import {
   bindProfileToRepo,
   MASKED_SECRET_VALUE,
+  MAX_OWNER_PROFILES,
   MAX_PROFILE_KILO_COMMANDS,
   MAX_PROFILE_VARS,
 } from '@kilocode/cloud-agent-profile';
 import type { User, Organization } from '@kilocode/db/schema';
+import type { PoolClient } from 'pg';
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Poll `pg_locks` until `expected` other backends of this test connection are
+ * blocked on a lock. Observing the lock waits proves the operations actually
+ * overlapped instead of assuming it from a fixed sleep.
+ */
+async function waitForBlockedLockWaiters(client: PoolClient, expected: number): Promise<void> {
+  const deadline = Date.now() + 10_000;
+  for (;;) {
+    const { rows } = await client.query<{ n: number }>(
+      `SELECT count(DISTINCT locked.pid)::int AS n
+         FROM pg_locks locked
+         JOIN pg_stat_activity activity ON activity.pid = locked.pid
+        WHERE NOT locked.granted
+          AND activity.datname = current_database()
+          AND activity.application_name = current_setting('application_name')
+          AND locked.pid <> pg_backend_pid()`
+    );
+    if (rows[0].n >= expected) return;
+    if (Date.now() > deadline) {
+      const diagnostics = await client.query<{ wait: string | null; query: string }>(
+        `SELECT wait_event_type || ':' || coalesce(wait_event, '') AS wait, query
+           FROM pg_stat_activity
+          WHERE datname = current_database() AND pid <> pg_backend_pid()`
+      );
+      throw new Error(
+        `timed out waiting for ${expected} lock waiters; activity: ${JSON.stringify(diagnostics.rows)}`
+      );
+    }
+    await sleep(20);
+  }
+}
+
+/** Release a held test transaction even when an assertion failed mid-test. */
+async function rollbackQuietly(client: PoolClient): Promise<void> {
+  try {
+    await client.query('ROLLBACK');
+  } catch {
+    // Already committed or rolled back; nothing left to release.
+  }
+}
 
 describe('Agent Profiles Router', () => {
   let ownerUser: User;
@@ -2220,5 +2265,178 @@ describe('Agent Profiles Router', () => {
         .where(eq(agent_environment_profiles.id, profileId));
       expect(profile).toHaveLength(0);
     });
+  });
+
+  /**
+   * Profile creation is bounded per owner. Rows are seeded directly so each
+   * test starts at the count it needs, and two callers run on their own pool
+   * connections so the owner lock is exercised for real.
+   */
+  describe('profile creation limit', () => {
+    const LIMIT_MESSAGE = `Profiles are limited to ${MAX_OWNER_PROFILES} per user or organization`;
+
+    async function seedProfiles(
+      owner: { userId: string } | { organizationId: string },
+      count: number
+    ): Promise<string[]> {
+      if (count === 0) return [];
+      const rows = await db
+        .insert(agent_environment_profiles)
+        .values(
+          Array.from({ length: count }, (_, index) => ({
+            owned_by_user_id: 'userId' in owner ? owner.userId : null,
+            owned_by_organization_id: 'organizationId' in owner ? owner.organizationId : null,
+            name: `Seeded Profile ${index}`,
+          }))
+        )
+        .returning({ id: agent_environment_profiles.id });
+      return rows.map(row => row.id);
+    }
+
+    async function countProfiles(
+      owner: { userId: string } | { organizationId: string }
+    ): Promise<number> {
+      const rows = await db
+        .select({ id: agent_environment_profiles.id })
+        .from(agent_environment_profiles)
+        .where(
+          'userId' in owner
+            ? eq(agent_environment_profiles.owned_by_user_id, owner.userId)
+            : eq(agent_environment_profiles.owned_by_organization_id, owner.organizationId)
+        );
+      return rows.length;
+    }
+
+    test('rejects a create at the cap without storing a row', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      await seedProfiles({ userId: ownerUser.id }, MAX_OWNER_PROFILES);
+
+      await expect(caller.agentProfiles.create({ name: 'One Too Many' })).rejects.toMatchObject({
+        code: 'PRECONDITION_FAILED',
+        message: LIMIT_MESSAGE,
+      });
+
+      expect(await countProfiles({ userId: ownerUser.id })).toBe(MAX_OWNER_PROFILES);
+    }, 30000);
+
+    test('stores a create one below the cap', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      await seedProfiles({ userId: ownerUser.id }, MAX_OWNER_PROFILES - 1);
+
+      const created = await caller.agentProfiles.create({ name: 'Last Free Slot' });
+
+      const stored = await db
+        .select({ name: agent_environment_profiles.name })
+        .from(agent_environment_profiles)
+        .where(eq(agent_environment_profiles.id, created.id));
+      expect(stored).toEqual([{ name: 'Last Free Slot' }]);
+      expect(await countProfiles({ userId: ownerUser.id })).toBe(MAX_OWNER_PROFILES);
+    }, 30000);
+
+    test('lets exactly one of two parallel creates fill the last slot', async () => {
+      await seedProfiles({ userId: ownerUser.id }, MAX_OWNER_PROFILES - 1);
+      const firstCaller = await createCallerForUser(ownerUser.id);
+      const secondCaller = await createCallerForUser(ownerUser.id);
+
+      const holder = await pool.connect();
+      let results: PromiseSettledResult<{ id: string }>[];
+      try {
+        // Hold the owner's creation lock from a separate connection, so both
+        // creates must queue behind it before either counts. Observing the
+        // queue proves the two creates overlap inside the owner lock instead
+        // of relying on a fixed sleep to catch a race.
+        await holder.query('BEGIN');
+        await holder.query(
+          `SELECT pg_catalog.pg_advisory_xact_lock(
+             pg_catalog.hashtextextended('agent-environment-profile-creation:user:' || $1, 0)
+           )`,
+          [ownerUser.id]
+        );
+
+        const both = Promise.allSettled([
+          firstCaller.agentProfiles.create({ name: 'Parallel First' }),
+          secondCaller.agentProfiles.create({ name: 'Parallel Second' }),
+        ]);
+
+        await waitForBlockedLockWaiters(holder, 2);
+        await holder.query('COMMIT');
+        results = await both;
+      } finally {
+        await rollbackQuietly(holder);
+        holder.release();
+      }
+
+      const fulfilled = results.filter(result => result.status === 'fulfilled');
+      const rejected = results.filter(result => result.status === 'rejected');
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0]).toMatchObject({ reason: { code: 'PRECONDITION_FAILED' } });
+      expect(String(rejected[0]?.reason)).toContain(LIMIT_MESSAGE);
+
+      // The loser stored nothing, so the owner holds exactly the cap.
+      expect(await countProfiles({ userId: ownerUser.id })).toBe(MAX_OWNER_PROFILES);
+      const stored = await db
+        .select({ name: agent_environment_profiles.name })
+        .from(agent_environment_profiles)
+        .where(eq(agent_environment_profiles.owned_by_user_id, ownerUser.id));
+      const winners = stored.filter(row => row.name.startsWith('Parallel'));
+      expect(winners).toHaveLength(1);
+    }, 30000);
+
+    test('counts the cap per owner, so a full owner does not block another', async () => {
+      const fullOwnerCaller = await createCallerForUser(ownerUser.id);
+      const otherCaller = await createCallerForUser(otherUser.id);
+      await seedProfiles({ userId: ownerUser.id }, MAX_OWNER_PROFILES);
+
+      await expect(
+        fullOwnerCaller.agentProfiles.create({ name: 'Blocked Profile' })
+      ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+
+      await expect(
+        otherCaller.agentProfiles.create({ name: 'Unaffected Profile' })
+      ).resolves.toMatchObject({ id: expect.any(String) });
+      expect(await countProfiles({ userId: otherUser.id })).toBe(1);
+    }, 30000);
+
+    test('bounds organization profiles at the same cap', async () => {
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      await seedProfiles({ organizationId: organizationA.id }, MAX_OWNER_PROFILES - 1);
+
+      await expect(
+        ownerCaller.agentProfiles.create({
+          organizationId: organizationA.id,
+          name: 'Org Last Free Slot',
+        })
+      ).resolves.toMatchObject({ id: expect.any(String) });
+      expect(await countProfiles({ organizationId: organizationA.id })).toBe(MAX_OWNER_PROFILES);
+
+      await expect(
+        ownerCaller.agentProfiles.create({
+          organizationId: organizationA.id,
+          name: 'Org One Too Many',
+        })
+      ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', message: LIMIT_MESSAGE });
+      expect(await countProfiles({ organizationId: organizationA.id })).toBe(MAX_OWNER_PROFILES);
+    }, 30000);
+
+    test('keeps an owner at the cap able to read and update its profiles', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const [profileId] = await seedProfiles({ userId: ownerUser.id }, MAX_OWNER_PROFILES);
+
+      const overview = await caller.agentProfiles.overview({ profileId: profileId! });
+      expect(overview.id).toBe(profileId);
+
+      const listed = await caller.agentProfiles.list({});
+      expect(listed).toHaveLength(MAX_OWNER_PROFILES);
+
+      await expect(
+        caller.agentProfiles.update({ profileId: profileId!, name: 'Renamed At The Cap' })
+      ).resolves.toEqual({ success: true });
+      const stored = await db
+        .select({ name: agent_environment_profiles.name })
+        .from(agent_environment_profiles)
+        .where(eq(agent_environment_profiles.id, profileId!));
+      expect(stored).toEqual([{ name: 'Renamed At The Cap' }]);
+    }, 30000);
   });
 });

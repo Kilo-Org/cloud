@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
-import React, { act, createElement } from 'react';
+import React, { act, createElement, startTransition } from 'react';
+import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { atom, createStore, Provider } from 'jotai';
 import type {
@@ -511,6 +512,7 @@ describe('ChildSessionDrawer header', () => {
   let cleanup: () => void;
   const readDrawerMessages = jest.fn((messages: StoredMessage[]) => [...messages]);
   const drawerSource = atom<StoredMessage[]>([]);
+  const hasOlderMessages = atom(false);
   const drawerStore = createStore();
   const manager = {
     atoms: {
@@ -520,14 +522,17 @@ describe('ChildSessionDrawer header', () => {
         const messages = get(drawerSource);
         return (_sessionId: string): StoredMessage[] => readDrawerMessages(messages);
       }),
-      childSessionHydrationState: atom(() => (_sessionId: string): ChildSessionHydrationState => ({
-        status: 'ready',
-        cursor: null,
-        hasOlder: false,
-        isLoadingOlder: false,
-        olderError: null,
-        omittedItemCount: 0,
-      })),
+      childSessionHydrationState: atom(get => {
+        const hasOlder = get(hasOlderMessages);
+        return (_sessionId: string): ChildSessionHydrationState => ({
+          status: 'ready',
+          cursor: null,
+          hasOlder,
+          isLoadingOlder: false,
+          olderError: null,
+          omittedItemCount: 0,
+        });
+      }),
     },
     hydrateChildSession: jest.fn(),
     loadOlderChildMessages: jest.fn(),
@@ -545,6 +550,7 @@ describe('ChildSessionDrawer header', () => {
   afterEach(() => {
     act(() => root?.unmount());
     root = undefined;
+    drawerStore.set(hasOlderMessages, false);
   });
 
   afterAll(() => {
@@ -578,6 +584,44 @@ describe('ChildSessionDrawer header', () => {
     act(() => drawerStore.set(drawerSource, [childMessageWithTools(2)]));
     expect(readDrawerMessages).toHaveBeenCalledTimes(1);
     expect(container.querySelectorAll('[data-message-id="child-1"]')).toHaveLength(1);
+  });
+
+  it('keeps a reader above the bottom when a message commits before the scroll state', () => {
+    drawerStore.set(drawerSource, [childMessageWithTools(1)]);
+    renderDrawer({ sessionId: childSessionId, description: 'Reading child history' });
+    const scroller = container.querySelector<HTMLElement>('.overflow-y-auto');
+    if (!scroller) throw new Error('Child drawer scroller missing');
+    Object.defineProperties(scroller, {
+      clientHeight: { value: 100 },
+      scrollHeight: { value: 1000 },
+    });
+    act(() => drawerStore.set(drawerSource, [childMessageWithTools(2)]));
+    expect(scroller.scrollTop).toBe(1000);
+    const propsKey = Object.keys(scroller).find(key => key.startsWith('__reactProps$'));
+    if (!propsKey) throw new Error('Child drawer scroll handler missing');
+    const props = (scroller as unknown as Record<string, { onScroll: () => void }>)[propsKey];
+
+    act(() => {
+      scroller.scrollTop = 500;
+      startTransition(() => props.onScroll());
+      flushSync(() => drawerStore.set(drawerSource, [childMessageWithTools(3)]));
+      expect(readDrawerMessages).toHaveBeenLastCalledWith([childMessageWithTools(3)]);
+      expect(scroller.scrollTop).toBe(500);
+    });
+    expect(scroller.scrollTop).toBe(500);
+  });
+
+  it('keeps earlier child history available through an explicit load button', () => {
+    drawerStore.set(hasOlderMessages, true);
+    manager.loadOlderChildMessages.mockClear();
+    renderDrawer({ sessionId: childSessionId, description: 'Earlier child history' });
+    const loadButton = [...container.querySelectorAll('button')].find(
+      button => button.textContent === 'Load earlier messages'
+    );
+    if (!loadButton) throw new Error('Earlier child history button missing');
+    expect(manager.loadOlderChildMessages).not.toHaveBeenCalled();
+    click(loadButton);
+    expect(manager.loadOlderChildMessages).toHaveBeenCalledWith(childSessionId);
   });
 
   it('shows the routed model next to the agent', () => {

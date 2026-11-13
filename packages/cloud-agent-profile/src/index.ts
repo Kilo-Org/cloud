@@ -51,6 +51,7 @@ export {
 export { buildOwnershipCondition, verifyProfileOwnership } from './profile-utils';
 
 // Profile CRUD + lookups
+export { MAX_OWNER_PROFILES } from './contracts/profiles';
 export {
   createProfile,
   updateProfile,

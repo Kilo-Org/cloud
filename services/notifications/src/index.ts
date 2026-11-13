@@ -487,6 +487,8 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
           .select({
             title: cli_sessions_v2.title,
             organizationId: cli_sessions_v2.organization_id,
+            status: cli_sessions_v2.status,
+            statusUpdatedAt: cli_sessions_v2.status_updated_at,
           })
           .from(cli_sessions_v2)
           .where(
@@ -538,6 +540,8 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
             title: cli_sessions_v2.title,
             organizationId: cli_sessions_v2.organization_id,
             prUrl: cli_sessions_v2.pr_url,
+            status: cli_sessions_v2.status,
+            statusUpdatedAt: cli_sessions_v2.status_updated_at,
           })
           .from(cli_sessions_v2)
           .where(

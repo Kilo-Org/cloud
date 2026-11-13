@@ -22,6 +22,7 @@
     "expired": "Kedaluwarsa"
   },
   "common": {
+    "manageOnWeb": "Kelola di web",
     "creditHistory": "Riwayat kredit",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Kunci penyedia",
       "rowSubtitle": "Gunakan penagihan penyedia milikmu sendiri",
-      "manageOnWeb": "Kelola di web",
       "manageOnWebReason": "Penyedia ini memerlukan kredensial terstruktur.",
       "description": "Permintaan melalui kunci ini ditagihkan ke akun penyediamu, bukan ke saldo Kilo-mu.",
       "enabled": "Digunakan",
@@ -1933,7 +1933,8 @@
       "cancelQueued": "Batalkan pesan",
       "cancelQueuedAccessibility": "Batalkan pesan dalam antrean",
       "restoreQueued": "Pulihkan",
-      "restoreQueuedAccessibility": "Pulihkan pesan yang dibatalkan ke kolom pesan"
+      "restoreQueuedAccessibility": "Pulihkan pesan yang dibatalkan ke kolom pesan",
+      "noReplyRecorded": "Tidak ada respons yang tercatat untuk pesan ini."
     },
     "olderMessages": {
       "arrived": "Pesan sebelumnya dimuat",
@@ -4102,6 +4103,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Tidak dapat membuka hasil pencarian ini"
+  },
+  "usage": {
+    "title": "Penggunaan",
+    "orgTitle": "Penggunaan organisasi",
+    "entrySubtitle": "Pengeluaran, permintaan, dan token",
+    "rangePicker": "Rentang waktu",
+    "range90d": "90 hari",
+    "metricPicker": "Metrik grafik",
+    "chartA11y": "{{metric}} per hari",
+    "avgCostPerRequest": "Biaya rata-rata / permintaan",
+    "topModels": "Model teratas",
+    "topFeatures": "Fitur teratas",
+    "emptyTitle": "Tidak ada penggunaan pada periode ini",
+    "orgSelfNotice": "Anda melihat penggunaan Anda sendiri di organisasi ini.",
+    "viewDetails": "Lihat detail penggunaan"
+  },
+  "integrations": {
+    "title": "Integrasi",
+    "sectionTitle": "Layanan terhubung",
+    "entrySubtitle": "GitHub, Slack, Linear, dan lainnya",
+    "subtitle": "Hubungkan alat dan alur kerja pengembangan Anda ke Kilo",
+    "emptyHint": "Belum ada integrasi yang terhubung.",
+    "disconnect": "Putuskan",
+    "disconnectTitle": "Putuskan {{provider}}?",
+    "disconnectMessage": "Kilo tidak akan merespons lagi di {{provider}}. Anda dapat menghubungkannya kembali kapan saja.",
+    "connectedTo": "Terhubung ke {{account}}",
+    "disconnected": "{{provider}} telah diputuskan",
+    "disconnectFailed": "Tidak dapat memutuskan {{provider}}",
+    "couldNotLoad": "Tidak dapat memuat integrasi",
+    "permissionDenied": "Anda tidak memiliki izin untuk mengelola integrasi ini.",
+    "memberHint": "Minta pemilik atau admin organisasi untuk mengubah koneksi ini.",
+    "connectFailed": "Tidak dapat membuka halaman koneksi"
   },
   "invoices": {
     "personalEmptyDescription": "Faktur untuk pembelian pribadi Anda akan muncul di sini setelah Anda ditagih."

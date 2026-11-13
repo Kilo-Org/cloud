@@ -22,6 +22,7 @@
     "expired": "Lejárt"
   },
   "common": {
+    "manageOnWeb": "Kezelés a weben",
     "creditHistory": "Kreditelőzmények",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Szolgáltatói kulcsok",
       "rowSubtitle": "Saját szolgáltatói számlázás használata",
-      "manageOnWeb": "Kezelés a weben",
       "manageOnWebReason": "Ezekhez a szolgáltatókhoz strukturált hitelesítő adatok szükségesek.",
       "description": "Az ezekkel a kulcsokkal küldött kérések a szolgáltatói fiókodat terhelik a Kilo-egyenleged helyett.",
       "enabled": "Használatban",
@@ -2475,7 +2475,8 @@
       "cancelQueued": "Üzenet visszavonása",
       "cancelQueuedAccessibility": "Várakozó üzenet visszavonása",
       "restoreQueued": "Visszaállítás",
-      "restoreQueuedAccessibility": "Visszavont üzenet visszaállítása az üzenetbeviteli mezőbe"
+      "restoreQueuedAccessibility": "Visszavont üzenet visszaállítása az üzenetbeviteli mezőbe",
+      "noReplyRecorded": "Ehhez az üzenethez nem lett válasz rögzítve."
     },
     "olderMessages": {
       "arrived": "Korábbi üzenetek betöltve",
@@ -4102,6 +4103,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nem sikerült megnyitni ezt a keresési találatot"
+  },
+  "usage": {
+    "title": "Használat",
+    "orgTitle": "Szervezeti használat",
+    "entrySubtitle": "Költség, kérések és tokenek",
+    "rangePicker": "Időtartomány",
+    "range90d": "90 nap",
+    "metricPicker": "Diagram mutatója",
+    "chartA11y": "{{metric}} naponta",
+    "avgCostPerRequest": "Átl. költség / kérés",
+    "topModels": "Leggyakoribb modellek",
+    "topFeatures": "Leggyakoribb funkciók",
+    "emptyTitle": "Nincs használat ebben az időszakban",
+    "orgSelfNotice": "A saját használatodat látod ebben a szervezetben.",
+    "viewDetails": "Használati részletek megtekintése"
+  },
+  "integrations": {
+    "title": "Integrációk",
+    "sectionTitle": "Csatlakoztatott szolgáltatások",
+    "entrySubtitle": "GitHub, Slack, Linear és még sok más",
+    "subtitle": "Csatlakoztasd a fejlesztői eszközeidet és munkafolyamataidat a Kilo-fiókodhoz",
+    "emptyHint": "Még nincs csatlakoztatott integráció.",
+    "disconnect": "Leválasztás",
+    "disconnectTitle": "{{provider}} leválasztása?",
+    "disconnectMessage": "A Kilo többé nem fog válaszolni itt: {{provider}}. Bármikor újra csatlakoztathatod.",
+    "connectedTo": "Csatlakoztatva: {{account}}",
+    "disconnected": "{{provider}} leválasztva",
+    "disconnectFailed": "Nem sikerült leválasztani: {{provider}}",
+    "couldNotLoad": "Nem sikerült betölteni az integrációkat",
+    "permissionDenied": "Nincs jogosultságod ezeknek az integrációknak a kezeléséhez.",
+    "memberHint": "Kérd meg a szervezet egyik tulajdonosát vagy adminisztrátorát, hogy módosítsa ezeket a kapcsolatokat.",
+    "connectFailed": "Nem sikerült megnyitni a csatlakozási oldalt"
   },
   "invoices": {
     "personalEmptyDescription": "A saját vásárlásaid számlái itt jelennek meg, amint kiállítjuk őket."

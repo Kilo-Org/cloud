@@ -1,9 +1,10 @@
 import { FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN } from './helpers/fake-credentials.js';
 import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
-import { controlPlaneMessages } from '../../src/control-plane/session/sqlite-schema.js';
+import { controlPlaneMessages, events } from '../../src/control-plane/session/sqlite-schema.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import {
@@ -119,6 +120,114 @@ afterEach(async () => {
 });
 
 describe('SandboxSessionV2 queued transport recovery', () => {
+  it('keeps command text in queued and failed snapshots before acceptance', async () => {
+    const { stub, peer } = await setup();
+    await stub.send({
+      ...prompt('command'),
+      turn: { type: 'command', command: 'review', arguments: 'main' },
+    });
+    expect(await runInDurableObject(stub, instance => instance['deriveQueuedMessages']())).toEqual([
+      expect.objectContaining({ messageId: 'command', content: '/review main' }),
+    ]);
+    peer.prepareView = {
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'preparation_timeout',
+    };
+    await stub.onRoute(peer.prepareView);
+    await evictAllDurableObjects();
+    await installPeer(stub, peer);
+    expect(await runInDurableObject(stub, instance => instance['deriveQueuedMessages']())).toEqual([
+      expect.objectContaining({
+        messageId: 'command',
+        content: '/review main',
+        terminalFailure: expect.objectContaining({
+          accepted: false,
+          delivery: 'queued',
+          reason: 'preparation_timeout',
+        }),
+      }),
+    ]);
+  });
+
+  it('omits accepted command text, including after a runtime failure', async () => {
+    const { stub, peer, sessionId } = await setup();
+    peer.prepareView = peer.view('ready');
+    await stub.send({
+      ...prompt('command'),
+      turn: { type: 'command', command: 'review', arguments: 'main' },
+    });
+    expect(await runInDurableObject(stub, instance => instance['deriveQueuedMessages']())).toEqual([
+      expect.objectContaining({
+        messageId: 'command',
+        content: '',
+        delivery: 'sent',
+        turnType: 'command',
+      }),
+    ]);
+    const sent = await runInDurableObject(stub, (_instance, state) =>
+      drizzle(state.storage)
+        .select()
+        .from(events)
+        .where(eq(events.stream_event_type, 'cloud.message.sent'))
+    );
+    expect(sent).toHaveLength(1);
+    expect(JSON.parse(sent[0]!.payload)).toMatchObject({
+      messageId: 'command',
+      turnType: 'command',
+    });
+    await stub.onOutcome({
+      sessionId,
+      status: 'failed',
+      reason: 'wrapper_failed',
+      lastMessageId: 'command',
+    });
+    expect(await runInDurableObject(stub, instance => instance['deriveQueuedMessages']())).toEqual([
+      expect.objectContaining({
+        messageId: 'command',
+        content: '',
+        terminalFailure: expect.objectContaining({ accepted: true }),
+      }),
+    ]);
+  });
+
+  it.each(['completed', 'cancelled'] as const)(
+    'retains an accepted %s command receipt after reconstruction without retaining completed prompts',
+    async status => {
+      const { stub, peer, sessionId } = await setup();
+      peer.prepareView = peer.view('ready');
+      await stub.send(prompt('ordinary'));
+      await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: 'ordinary' });
+      await stub.send({
+        ...prompt('command'),
+        turn: { type: 'command', command: 'review', arguments: 'main' },
+      });
+      await stub.onOutcome({
+        sessionId,
+        status,
+        ...(status === 'cancelled' ? { reason: 'interrupted' as const } : {}),
+        lastMessageId: 'command',
+      });
+      await evictAllDurableObjects();
+      await installPeer(stub, peer);
+      const snapshots = await runInDurableObject(stub, instance =>
+        instance['deriveQueuedMessages']()
+      );
+      expect(snapshots).toEqual([
+        expect.objectContaining({
+          messageId: 'command',
+          content: '',
+          ...(status === 'completed'
+            ? { completedAt: expect.any(Number) }
+            : {
+                terminalFailure: expect.objectContaining({ accepted: true, reason: 'interrupted' }),
+              }),
+        }),
+      ]);
+      expect(snapshots[0]).not.toHaveProperty('delivery', 'sent');
+    }
+  );
+
   it('keeps RPC deadlines real and scales only the recovery delay through the existing development override', () => {
     expect(CONTROL_PLANE_TIMERS.session.sandboxRpcDeadlineMs).toBe(2_000);
     expect(CONTROL_PLANE_TIMERS.session.transportRecoveryMs).toBe(15_000);
@@ -220,6 +329,87 @@ describe('SandboxSessionV2 queued transport recovery', () => {
     }
   });
 
+  it('still cancels preparation after the status check exhausts its transport deadline', async () => {
+    const { stub, peer, sessionId } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(prompt('m1'));
+    const status = held<Awaited<ReturnType<FakeSandboxPeer['status']>>>();
+    const snapshot = await peer.status({ sessionId });
+    peer.status = async () => status.promise;
+    try {
+      await bounded(stub.stop());
+      expect(peer.cancelWorkspaceCalls).toHaveLength(1);
+      expect((await rows(stub))[0]?.state).toBe('cancelled');
+    } finally {
+      status.resolve(snapshot);
+    }
+  });
+
+  it.each(['preparing', 'ready'] as const)(
+    'rejects an unconfirmed workspace Stop from a %s chat and permits retry',
+    async routeState => {
+      const { stub, peer } = await setup();
+      peer.prepareView = peer.view(routeState);
+      await stub.send(prompt('m1'));
+      peer.workspacePreparing = true;
+      peer.cancelWorkspaceError = new Error('sandbox unavailable');
+      const before = await rows(stub);
+
+      await expect(bounded(stub.stop())).rejects.toThrow(
+        'Could not stop workspace preparation. Try Stop again.'
+      );
+
+      expect(await rows(stub)).toEqual(before);
+      await expect(stub.getSession()).resolves.toMatchObject({
+        type: 'found',
+        route: { state: routeState, attemptId: peer.attemptId },
+      });
+      expect(await alarmAt(stub)).not.toBeNull();
+
+      peer.cancelWorkspaceError = null;
+      await expect(stub.stop()).resolves.toEqual({ interrupted: true });
+      expect((await rows(stub))[0]?.state).toBe('cancelled');
+      await expect(stub.getSession()).resolves.toMatchObject({
+        type: 'found',
+        route: { state: 'unknown' },
+      });
+    }
+  );
+
+  it('rejects a workspace Stop without a sandbox peer instead of reporting cancellation', async () => {
+    const { stub } = await setup();
+    await stub.send(prompt('m1'));
+    const before = await rows(stub);
+    await runInDurableObject(stub, async instance => {
+      instance.sandboxPeerFor = () => null;
+      await expect(instance.stop()).rejects.toThrow(
+        'Could not stop workspace preparation. Try Stop again.'
+      );
+    });
+
+    expect(await rows(stub)).toEqual(before);
+    await expect(stub.getSession()).resolves.toMatchObject({
+      type: 'found',
+      route: { state: 'preparing' },
+    });
+  });
+
+  it('bounds a hung workspace Stop without settling unconfirmed cancellation', async () => {
+    const { stub, peer } = await setup();
+    await stub.send(prompt('m1'));
+    const pending = held<Awaited<ReturnType<FakeSandboxPeer['cancelWorkspace']>>>();
+    peer.cancelWorkspace = async () => pending.promise;
+    const before = await rows(stub);
+    try {
+      await expect(bounded(stub.stop())).rejects.toThrow(
+        'Could not stop workspace preparation. Try Stop again.'
+      );
+      expect(await rows(stub)).toEqual(before);
+    } finally {
+      pending.resolve({ stopEpoch: 1, stopAt: Date.now() });
+    }
+  });
+
   it('bounds hung deliver, its recovery pass and abort; Stop is durable and late callbacks cannot revive it', async () => {
     const { stub, peer, sessionId } = await setup();
     peer.prepareView = peer.view('ready');
@@ -288,7 +478,13 @@ describe('SandboxSessionV2 queued transport recovery', () => {
       await stub.send(prompt('m1'));
       const pending = held<ReturnType<FakeSandboxPeer['view']>>();
       if (operation === 'status') {
-        peer.status = async input => ({ sessionId: input.sessionId, view: await pending.promise });
+        peer.status = async input => ({
+          sessionId: input.sessionId,
+          view: await pending.promise,
+          workspacePreparing: false,
+          workspaceStopEpoch: 0,
+          workspaceStopAt: 0,
+        });
       } else {
         peer.prepareView = { state: 'unknown' };
         peer.prepare = async () => pending.promise;
@@ -313,7 +509,13 @@ describe('SandboxSessionV2 queued transport recovery', () => {
     const pending = held<ControlPlaneDeliverResult>();
     peer.status = async input => {
       await new Promise(resolve => setTimeout(resolve, 1_200));
-      return { sessionId: input.sessionId, view: peer.view('ready') };
+      return {
+        sessionId: input.sessionId,
+        view: peer.view('ready'),
+        workspacePreparing: false,
+        workspaceStopEpoch: 0,
+        workspaceStopAt: 0,
+      };
     };
     peer.deliver = async payload => {
       peer.deliverCalls.push(payload);
@@ -603,7 +805,9 @@ describe('SandboxSessionV2 queued transport recovery', () => {
       await runInDurableObject(stub, instance => instance.alarm());
       expect(peer.prepareCalls).toHaveLength(prepares);
       expect(peer.deliverCalls).toHaveLength(0);
-      expect(peer.statusCalls).toHaveLength(0);
+      // Stop asks the sandbox for the authoritative workspace phase; the other
+      // settle paths do not need it.
+      expect(peer.statusCalls).toHaveLength(action === 'stop' ? 1 : 0);
       expect([reports.length, callbacks.length]).toEqual(counts);
     }
   );

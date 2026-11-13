@@ -22,6 +22,7 @@
     "expired": "Kuphelelwe yisikhathi"
   },
   "common": {
+    "manageOnWeb": "Phatha kuwebhu",
     "creditHistory": "Umlando wamakhredithi",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Okhiye babahlinzeki",
       "rowSubtitle": "Sebenzisa ukukhokhisa komhlinzeki wakho",
-      "manageOnWeb": "Phatha kuwebhu",
       "manageOnWebReason": "Laba bahlinzeki badinga imininingwane yokungena ehlelekile.",
       "description": "Izicelo ezenziwa ngalaba khiye zikhokhiswa ku-akhawunti yakho yomhlinzeki esikhundleni sebhalansi yakho ye-Kilo.",
       "enabled": "Uyasetshenziswa",
@@ -2475,7 +2475,8 @@
       "cancelQueued": "Khansela umlayezo",
       "cancelQueuedAccessibility": "Khansela umlayezo olinde ukuthunyelwa",
       "restoreQueued": "Buyisela",
-      "restoreQueuedAccessibility": "Buyisela umlayezo okhanseliwe endaweni yokubhala"
+      "restoreQueuedAccessibility": "Buyisela umlayezo okhanseliwe endaweni yokubhala",
+      "noReplyRecorded": "Ayikho impendulo erekhodiwe yale mlayezo."
     },
     "olderMessages": {
       "arrived": "Imilayezo yangaphambili ilayishiwe",
@@ -4102,6 +4103,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Asikwazanga ukuvula leli phumela lokusesha"
+  },
+  "usage": {
+    "title": "Ukusetshenziswa",
+    "orgTitle": "Ukusetshenziswa kwenhlangano",
+    "entrySubtitle": "Izindleko, izicelo, namathokheni",
+    "rangePicker": "Isikhawu sesikhathi",
+    "range90d": "Izinsuku ezingu-90",
+    "metricPicker": "Isilinganiso seshadi",
+    "chartA11y": "{{metric}} ngosuku",
+    "avgCostPerRequest": "Izindleko ezimaphakathi / isicelo",
+    "topModels": "Amamodeli aphezulu",
+    "topFeatures": "Izici eziphezulu",
+    "emptyTitle": "Akukho ukusetshenziswa kulesi sikhathi",
+    "orgSelfNotice": "Ubona ukusetshenziswa kwakho kule nhlangano.",
+    "viewDetails": "Buka imininingwane yokusetshenziswa"
+  },
+  "integrations": {
+    "title": "Ukuhlanganiswa",
+    "sectionTitle": "Amasevisi axhunyiwe",
+    "entrySubtitle": "GitHub, Slack, Linear nokunye",
+    "subtitle": "Xhuma amathuluzi akho okuthuthukisa nezinqubo zokusebenza ku-Kilo",
+    "emptyHint": "Akukabi khona ukuhlanganiswa okuxhunyiwe.",
+    "disconnect": "Nqamula",
+    "disconnectTitle": "Nqamula i-{{provider}}?",
+    "disconnectMessage": "I-Kilo izoyeka ukuphendula ku-{{provider}}. Ungaphinda uxhume noma nini.",
+    "connectedTo": "Ixhunywe ku-{{account}}",
+    "disconnected": "I-{{provider}} inqanyuliwe",
+    "disconnectFailed": "Akukwazekanga ukunqamula i-{{provider}}",
+    "couldNotLoad": "Akukwazekanga ukulayisha ukuhlanganiswa",
+    "permissionDenied": "Awunayo imvume yokuphatha lokhu kuhlanganiswa.",
+    "memberHint": "Cela umnikazi wenhlangano noma umphathi ukuthi ashintshe lokhu kuxhumana.",
+    "connectFailed": "Akukwazekanga ukuvula ikhasi lokuxhuma"
   },
   "invoices": {
     "personalEmptyDescription": "Ama-invoyisi okuthenga kwakho azovela lapha uma usukhokhisiwe."

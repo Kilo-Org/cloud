@@ -57,6 +57,11 @@ vi.mock('react', async () => {
     useEffect: vi.fn((fn: React.EffectCallback) => {
       fn();
     }),
+    // The composer publishes its input growth from a layout effect, which must
+    // run before the frame is painted; the mock runs it like `useEffect`.
+    useLayoutEffect: vi.fn((fn: React.EffectCallback) => {
+      fn();
+    }),
     useMemo: vi.fn(<T>(factory: () => T) => factory()),
     useRef: vi.fn(<T>(initial: T) => {
       const index = refSlots.cursor;

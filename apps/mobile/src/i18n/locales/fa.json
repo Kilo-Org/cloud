@@ -22,6 +22,7 @@
     "expired": "منقضی شد"
   },
   "common": {
+    "manageOnWeb": "مدیریت در وب",
     "creditHistory": "تاریخچهٔ اعتبار",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "کلیدهای ارائه‌دهنده",
       "rowSubtitle": "استفاده از صورت‌حساب ارائه‌دهنده خودتان",
-      "manageOnWeb": "مدیریت در وب",
       "manageOnWebReason": "این ارائه‌دهندگان به اطلاعات اعتبارسنجی ساختاریافته نیاز دارند.",
       "description": "هزینه درخواست‌هایی که با این کلیدها ارسال می‌شوند به جای موجودی Kilo، از حساب ارائه‌دهنده شما کسر می‌شود.",
       "enabled": "در حال استفاده",
@@ -2475,7 +2475,8 @@
       "cancelQueued": "لغو پیام",
       "cancelQueuedAccessibility": "لغو پیام در صف",
       "restoreQueued": "بازیابی",
-      "restoreQueuedAccessibility": "بازیابی پیام لغوشده در کادر پیام"
+      "restoreQueuedAccessibility": "بازیابی پیام لغوشده در کادر پیام",
+      "noReplyRecorded": "برای این پیام پاسخی ثبت نشد."
     },
     "olderMessages": {
       "arrived": "پیام‌های قبلی بارگذاری شدند",
@@ -4102,6 +4103,38 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "باز کردن این نتیجه جست‌وجو ممکن نشد"
+  },
+  "usage": {
+    "title": "مصرف",
+    "orgTitle": "مصرف سازمان",
+    "entrySubtitle": "هزینه، درخواست‌ها و توکن‌ها",
+    "rangePicker": "بازه زمانی",
+    "range90d": "۹۰ روز",
+    "metricPicker": "معیار نمودار",
+    "chartA11y": "{{metric}} در روز",
+    "avgCostPerRequest": "میانگین هزینه / درخواست",
+    "topModels": "مدل‌های پرکاربرد",
+    "topFeatures": "قابلیت‌های پرکاربرد",
+    "emptyTitle": "مصرفی در این بازه ثبت نشده است",
+    "orgSelfNotice": "شما مصرف خودتان در این سازمان را می‌بینید.",
+    "viewDetails": "مشاهده جزئیات مصرف"
+  },
+  "integrations": {
+    "title": "یکپارچه‌سازی‌ها",
+    "sectionTitle": "سرویس‌های متصل",
+    "entrySubtitle": "GitHub، Slack، Linear و موارد دیگر",
+    "subtitle": "ابزارها و گردش‌کارهای توسعهٔ خود را به Kilo متصل کنید",
+    "emptyHint": "هنوز هیچ یکپارچه‌سازی متصل نشده است.",
+    "disconnect": "قطع اتصال",
+    "disconnectTitle": "اتصال {{provider}} قطع شود؟",
+    "disconnectMessage": "Kilo دیگر در {{provider}} پاسخ نمی‌دهد. هر زمان بخواهید می‌توانید دوباره متصل شوید.",
+    "connectedTo": "متصل به {{account}}",
+    "disconnected": "اتصال {{provider}} قطع شد",
+    "disconnectFailed": "قطع اتصال {{provider}} ممکن نشد",
+    "couldNotLoad": "بارگیری یکپارچه‌سازی‌ها ممکن نشد",
+    "permissionDenied": "شما اجازهٔ مدیریت این یکپارچه‌سازی‌ها را ندارید.",
+    "memberHint": "برای تغییر این اتصال‌ها از مالک یا مدیر سازمان درخواست کنید.",
+    "connectFailed": "باز کردن صفحهٔ اتصال ممکن نشد"
   },
   "invoices": {
     "personalEmptyDescription": "فاکتورهای خریدهای شخصی‌تان پس از صدور صورتحساب در اینجا نمایش داده می‌شوند."

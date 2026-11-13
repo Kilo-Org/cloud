@@ -90,6 +90,7 @@ import { resolveTranscriptPhase, transcriptReadyForEffects } from './transcript-
 import { billingPayerPresentation } from './billing-payer-presentation';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
+import { AutoFixHistory } from './AutoFixHistory';
 import { PreviewPortDialog } from './PreviewPortDialog';
 import { WorktreeChangesView } from './WorktreeChanges';
 import { commitsByMessageAnchor, isCommitSummaryRepresented } from './message-presentation';
@@ -1737,6 +1738,12 @@ export default function CloudChatPage({
                               : 'hidden'
                           }
                         >
+                          <AutoFixHistory
+                            sessions={worktreeChats}
+                            currentSessionId={sessionIdFromParams}
+                            deletingSessionIds={deletingSessionIds}
+                            onSelectSession={openSession}
+                          />
                           <div className="relative min-h-0 flex-1">
                             {!sessionIdFromParams &&
                               selectedWorktreeId &&

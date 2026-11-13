@@ -80,6 +80,7 @@ import {
   requestChatNavigation,
   type PendingChatNavigation,
 } from './worktree-chat-tabs';
+import { getVisibleMaintenanceChatSessions } from './maintenance-chat-presentation';
 import type { ComposerFocusRequest } from './useSessionComposerFocus';
 import {
   LocalSessionsProvider,
@@ -562,11 +563,14 @@ function CloudSidebarLayoutContent({
       closedSessionIds,
       selectedWorktreeId ? sessionOrderByWorktree[selectedWorktreeId] : undefined
     );
-    return openSessionIds.flatMap(sessionId => {
-      const session = sessionsById.get(sessionId);
-      return session ? [session] : [];
-    });
-  }, [closedSessionIds, selectedWorktreeId, sessionOrderByWorktree, worktreeChats]);
+    return getVisibleMaintenanceChatSessions(worktreeChats, openSessionIds, currentSessionId);
+  }, [
+    closedSessionIds,
+    currentSessionId,
+    selectedWorktreeId,
+    sessionOrderByWorktree,
+    worktreeChats,
+  ]);
   const closedWorktreeChats = useMemo(() => {
     const sessionsById = new Map(worktreeChats.map(session => [session.sessionId, session]));
     return getClosedWorktreeChatSessionIds([...sessionsById.keys()], closedSessionIds).flatMap(

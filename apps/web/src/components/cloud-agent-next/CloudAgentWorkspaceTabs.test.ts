@@ -327,6 +327,48 @@ describe('CloudAgentWorkspaceTabs', () => {
     expect(html.indexOf(tab)).toBeLessThan(html.indexOf(findButtonMarkup(html, user.prompt)));
   });
 
+  it('keeps history in one selected auto-fix tab and retains the live-run attention indicator', () => {
+    const user = makeSession('ses_user', 'Review the changes');
+    const earlier = makeSession('ses_earlier', 'Earlier repair', { chatKind: 'maintenance' });
+    const latest = makeSession('ses_latest', 'Current repair', {
+      chatKind: 'maintenance',
+      isMaintenancePinned: true,
+      sessionStatus: 'question',
+      createdAt: '2026-11-13T12:00:00.000Z',
+    });
+    const html = renderWorkspaceTabs({
+      chatSessions: [user, earlier, latest],
+      currentSessionId: earlier.sessionId,
+      openChatSessionIds: [user.sessionId, earlier.sessionId, latest.sessionId],
+    });
+    expect((html.match(/role="tab"/g) ?? []).length).toBe(2);
+    const tab = findButtonMarkup(html, 'Auto fix');
+    expect(tab).toContain('aria-selected="true"');
+    expect(tab).toContain('aria-label="Waiting for answer"');
+    expect(html).not.toContain('aria-label="Close Earlier repair"');
+    expect(html).not.toContain('aria-label="Close Current repair"');
+  });
+
+  it('does not list historical auto-fix runs as closed sessions in tab options', () => {
+    const user = makeSession('ses_user', 'Review the changes');
+    const earlier = makeSession('ses_earlier', 'Earlier repair', { chatKind: 'maintenance' });
+    const latest = makeSession('ses_latest', 'Latest repair', {
+      chatKind: 'maintenance',
+      createdAt: '2026-11-13T12:00:00.000Z',
+    });
+    const html = renderWorkspaceTabs(
+      {
+        chatSessions: [user, earlier, latest],
+        currentSessionId: user.sessionId,
+        openChatSessionIds: [user.sessionId],
+        closedChatSessionIds: [earlier.sessionId, latest.sessionId],
+      },
+      true
+    );
+    expect(html).toContain('No closed sessions');
+    expect((html.match(/role="tab"/g) ?? []).length).toBe(2);
+  });
+
   it('renders existing shared busy and attention indicators for different chats', () => {
     const busy = makeSession('ses_busy', 'Running investigation', { sessionStatus: 'busy' });
     const attention = makeSession('ses_attention', 'Waiting on an answer', {

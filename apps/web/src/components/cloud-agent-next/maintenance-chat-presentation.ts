@@ -11,15 +11,30 @@ export function isMaintenanceChatPinned(
   return session.chatKind === 'maintenance' && session.isMaintenancePinned === true;
 }
 
+export function getMaintenanceChatSessions(sessions: readonly StoredSession[]): StoredSession[] {
+  return sessions
+    .filter(session => session.chatKind === 'maintenance')
+    .sort(
+      (first, second) =>
+        Number(isMaintenanceChatPinned(second)) - Number(isMaintenanceChatPinned(first)) ||
+        new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime() ||
+        second.sessionId.localeCompare(first.sessionId)
+    );
+}
+
 export function getVisibleMaintenanceChatSessions(
   sessions: readonly StoredSession[],
-  openSessionIds: readonly string[] = sessions.map(session => session.sessionId)
+  openSessionIds: readonly string[] = sessions.map(session => session.sessionId),
+  currentSessionId?: string | null
 ): StoredSession[] {
-  const pinned = sessions.filter(isMaintenanceChatPinned);
+  const maintenanceSessions = getMaintenanceChatSessions(sessions);
+  const maintenance =
+    maintenanceSessions.find(session => session.sessionId === currentSessionId) ??
+    maintenanceSessions[0];
   const sessionsById = new Map(sessions.map(session => [session.sessionId, session]));
   const visible = openSessionIds.flatMap(sessionId => {
     const session = sessionsById.get(sessionId);
-    return session && !isMaintenanceChatPinned(session) ? [session] : [];
+    return session && session.chatKind !== 'maintenance' ? [session] : [];
   });
-  return [...pinned, ...visible];
+  return maintenance ? [maintenance, ...visible] : visible;
 }

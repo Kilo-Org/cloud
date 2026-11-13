@@ -36,7 +36,6 @@ import { CHAT_TAB_ID, fileTabId, terminalTabId } from './workspace-tabs';
 import type { FileWorkspaceTab, TerminalWorkspaceTab, WorkspaceTabId } from './workspace-tabs';
 import type { StoredSession } from './types';
 import type { TerminalStatus } from './useCloudAgentTerminal';
-import { MaintenanceBadge } from './MaintenanceBadge';
 import {
   getVisibleMaintenanceChatSessions,
   isMaintenanceChatPinned,
@@ -154,14 +153,18 @@ export function CloudAgentWorkspaceTabs({
   );
   const visibleChatSessions = getVisibleMaintenanceChatSessions(
     groupedChatSessions,
-    openChatSessionIds
+    openChatSessionIds,
+    currentSessionId
   );
+  const liveMaintenanceSession = groupedChatSessions.find(isMaintenanceChatPinned);
   const openSessionIds = new Set(visibleChatSessions.map(session => session.sessionId));
   const closedChatSessions = (
     closedChatSessionIds ?? groupedChatSessions.map(session => session.sessionId)
   ).flatMap(sessionId => {
     const session = groupedSessionsById.get(sessionId);
-    return session && !openSessionIds.has(sessionId) ? [session] : [];
+    return session && session.chatKind !== 'maintenance' && !openSessionIds.has(sessionId)
+      ? [session]
+      : [];
   });
   const selectedValue =
     activeTabId === CHAT_TAB_ID && selectedWorktreeId && currentSessionId
@@ -279,19 +282,22 @@ export function CloudAgentWorkspaceTabs({
             const isDeleting = deletingSessionIds.includes(session.sessionId);
             const isEditing = editingSessionId === session.sessionId;
             const isAutoFix = session.chatKind === 'maintenance';
+            const activitySession = (isAutoFix && liveMaintenanceSession) || session;
             const canRename = Boolean(onRenameChat) && !isDeleting && !isAutoFix;
             const progress =
-              currentChatProgress?.sessionId === session.sessionId ? currentChatProgress : null;
+              currentChatProgress?.sessionId === activitySession.sessionId
+                ? currentChatProgress
+                : null;
             const activityKind = isEditing
               ? null
               : getSessionActivityIndicatorKind(
-                  session.sessionStatus ?? null,
-                  session.sessionStatusUpdatedAt ?? null
+                  activitySession.sessionStatus ?? null,
+                  activitySession.sessionStatusUpdatedAt ?? null
                 );
 
             return (
               <div
-                key={session.sessionId}
+                key={isAutoFix ? 'auto-fix' : session.sessionId}
                 ref={active ? activeTabWrapperRef : undefined}
                 className={cn(
                   tabClassName,
@@ -312,7 +318,7 @@ export function CloudAgentWorkspaceTabs({
                       tabTriggerClassName,
                       'max-w-52',
                       canRename && 'touch-manipulation select-none',
-                      (onCloseChat || isEditing || isDeleting) && 'rounded-r-none'
+                      ((!isAutoFix && onCloseChat) || isEditing || isDeleting) && 'rounded-r-none'
                     )}
                     onDoubleClick={event => {
                       if (!canRename || lastPointerTypeRef.current === 'touch') return;
@@ -398,8 +404,8 @@ export function CloudAgentWorkspaceTabs({
                           loadingIndicator
                         ) : activityKind ? (
                           <SessionStatusIndicator
-                            status={session.sessionStatus ?? null}
-                            statusUpdatedAt={session.sessionStatusUpdatedAt ?? null}
+                            status={activitySession.sessionStatus ?? null}
+                            statusUpdatedAt={activitySession.sessionStatusUpdatedAt ?? null}
                           />
                         ) : progress && !isEditing ? (
                           <StatusSpinner
@@ -459,7 +465,7 @@ export function CloudAgentWorkspaceTabs({
                   />
                 ) : null}
 
-                {onCloseChat && !isMaintenanceChatPinned(session) && (
+                {onCloseChat && !isAutoFix && (
                   <Button
                     type="button"
                     size="sm"
@@ -687,7 +693,6 @@ export function CloudAgentWorkspaceTabs({
                           </span>
                           <span className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
                             <span>Closed tab</span>
-                            {session.chatKind === 'maintenance' && <MaintenanceBadge />}
                             <TimeAgo timestamp={session.updatedAt} />
                             {isDeleting ? (
                               <LoaderCircle

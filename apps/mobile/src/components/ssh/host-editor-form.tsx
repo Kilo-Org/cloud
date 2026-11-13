@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { PickerField } from '@/components/ssh/picker-field';
@@ -48,6 +49,7 @@ export function HostEditorForm({
   onSubmit,
 }: HostEditorFormProps) {
   const { t } = useTranslation();
+  const { bottom } = useSafeAreaInsets();
   const initial = hostFormValuesOf(host);
 
   // iOS: the text lives in the ref its field writes to; state only holds what
@@ -252,6 +254,9 @@ export function HostEditorForm({
           />
         ) : null}
 
+      </DetailScreenScrollView>
+
+      <View className="gap-2 px-4 pt-3" style={{ paddingBottom: bottom + 16 }}>
         <AccessibleStatus
           message={saveError === undefined || jumpCycle ? null : t('ssh.editor.saveFailed')}
           className="text-sm"
@@ -259,7 +264,7 @@ export function HostEditorForm({
         <Button className={STATE_ACTION_CLASS} loading={saving} disabled={saving} onPress={save}>
           <Text>{t('common.save')}</Text>
         </Button>
-      </DetailScreenScrollView>
+      </View>
 
       <MenuSheet
         visible={picker === 'key'}

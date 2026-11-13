@@ -45,7 +45,7 @@ export function PickerField({
         accessibilityLabel={t('ssh.field.value', { label, value: value ?? placeholder })}
         accessibilityState={{ disabled: Boolean(disabled) }}
         className={cn(
-          'min-h-[44px] flex-row items-center gap-2 rounded-md border border-input bg-background pl-3 pr-2 active:opacity-70 dark:bg-[#FFFFFF0A]',
+          'min-h-[44px] flex-row items-center gap-2 rounded-md border border-input bg-background px-3 active:opacity-70 dark:bg-[#FFFFFF0A]',
           error && 'border-destructive',
           disabled && 'opacity-50'
         )}
@@ -56,7 +56,9 @@ export function PickerField({
         >
           {value ?? placeholder}
         </Text>
-        <ChevronDown size={16} color={colors.mutedForeground} />
+        <View className="size-[18px] shrink-0 items-center justify-center">
+          <ChevronDown size={16} color={colors.mutedForeground} />
+        </View>
       </Pressable>
       <AccessibleStatus message={error ?? null} className="text-sm" />
     </View>

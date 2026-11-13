@@ -12,10 +12,15 @@ import { renderWithProviders } from '@/test/render-with-providers';
 const boundary = vi.hoisted(() => ({
   role: undefined as string | undefined,
   isResolving: false,
+  isError: false,
 }));
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
-  useOrgBoundary: () => ({ role: boundary.role, isResolving: boundary.isResolving }),
+  useOrgBoundary: () => ({
+    role: boundary.role,
+    isResolving: boundary.isResolving,
+    isError: boundary.isError,
+  }),
 }));
 
 const seen = vi.hoisted(() => ({
@@ -41,6 +46,7 @@ describe('useOrganizationProfilePermission', () => {
   beforeEach(() => {
     boundary.role = undefined;
     boundary.isResolving = false;
+    boundary.isError = false;
   });
 
   it('personal scope may create without waiting for a membership', async () => {
@@ -64,6 +70,15 @@ describe('useOrganizationProfilePermission', () => {
 
     expect(await readPermission({ organizationId: 'org-1' })).toEqual({
       permission: 'allowed',
+    });
+  });
+
+  it('a membership list that failed reports resolving, not read-only', async () => {
+    boundary.isError = true;
+    boundary.role = 'owner';
+
+    expect(await readPermission({ organizationId: 'org-1' })).toEqual({
+      permission: 'resolving',
     });
   });
 

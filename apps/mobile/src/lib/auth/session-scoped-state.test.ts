@@ -50,8 +50,8 @@ import {
 import { createLauncherSurfacesPublisher } from '@/lib/launcher-surfaces-publish';
 import { type ConversationComment } from '@/lib/pr-review/discussion/review-discussion-types';
 import {
-  clearSessionScopedState,
   clearSystemSearchIndexOnSignedOutLaunch,
+  clearSessionScopedState,
 } from './session-scoped-state';
 /* eslint-enable import/first */
 
@@ -372,6 +372,33 @@ describe('clearSystemSearchIndexOnSignedOutLaunch', () => {
     // Siri for the whole signed-out window.
     clearSystemSearchIndexOnSignedOutLaunch();
     expect(sessionCatalogMock.clearNativeSessionCatalog).toHaveBeenCalledTimes(1);
+  });
+
+  it('deletes the mirror root once, then signals the provider', () => {
+    let mirrorWasGone: boolean | null = null;
+    mocks.notifyArtifactsChanged.mockImplementationOnce(() => {
+      mirrorWasGone = !fakeFs.state.rootExists;
+    });
+
+    clearSystemSearchIndexOnSignedOutLaunch();
+
+    expect(fakeFs.deleted).toEqual([MIRROR_ROOT_URI]);
+    expect(fakeFs.state.rootExists).toBe(false);
+    expect(mirrorWasGone).toBe(true);
+    expect(mocks.notifyArtifactsChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays idempotent and never throws when the mirror is already gone', () => {
+    clearSystemSearchIndexOnSignedOutLaunch();
+    fakeFs.deleted.length = 0;
+
+    expect(() => {
+      clearSystemSearchIndexOnSignedOutLaunch();
+    }).not.toThrow();
+
+    expect(fakeFs.deleted).toEqual([]);
+    expect(mocks.notifyArtifactsChanged).toHaveBeenCalledTimes(2);
+    expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(2);
   });
 
   it('reports a failed re-clear through telemetry and never throws', async () => {

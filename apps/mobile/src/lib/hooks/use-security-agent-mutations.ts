@@ -39,7 +39,20 @@ function useSecurityAgentConfigQueryKey(scope: string) {
 
 export function useSaveSecurityAgentConfig(
   scope: string,
-  { announceSaved = true }: Readonly<{ announceSaved?: boolean }> = {}
+  {
+    /**
+     * The success toast. A screen with a more specific saved outcome of its own
+     * (Automation's queued count) turns it off and announces in its place.
+     */
+    announceSaved = true,
+    /**
+     * The failure toast. On by default, where it is a save's only failure
+     * surface. `SettingsSaveButton` screens that render their refusal inline
+     * turn it off: the inline line announces the refusal there, and a toast
+     * would add a second copy of the same sentence. The rollback runs either way.
+     */
+    announceFailed = true,
+  }: Readonly<{ announceSaved?: boolean; announceFailed?: boolean }> = {}
 ) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -49,6 +62,12 @@ export function useSaveSecurityAgentConfig(
   // and toast the localized config-write copy. The server's own sentence is
   // English and stays untranslated on the device, so a marked refusal reads
   // catalog copy and anything else reads the generic sentence.
+  //
+  // The toast owns the refusal for a caller that has no surface of its own
+  // (the default). A settings screen that renders the refusal inline passes
+  // `announceFailed: false`: its inline status line is the single announcement
+  // owner there, and a toast would announce the same sentence a second time and
+  // draw a second copy of it. The rollback runs either way.
   return useMutation({
     // Reachability is the save's outcome, not a precondition: the default
     // `networkMode: 'online'` pauses the mutation while the connectivity
@@ -94,7 +113,11 @@ export function useSaveSecurityAgentConfig(
           old ? { ...old, ...restoredFields } : old
         );
       }
-      announcingToast.error(securityConfigMutationMessage(error));
+      // The rollback above runs on every failure; the announcement follows the
+      // caller's contract (inline status line vs. toast).
+      if (announceFailed) {
+        announcingToast.error(securityConfigMutationMessage(error));
+      }
     },
     onSuccess: result => {
       // Saving pops the settings screen, and the screen it returns to can fail

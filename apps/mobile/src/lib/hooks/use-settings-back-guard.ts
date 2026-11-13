@@ -167,8 +167,8 @@ export function useSettingsBackGuard({
                   }
                   leave();
                 } catch {
-                  // The save mutation's centralized onError already toasted —
-                  // stay on the screen so the user can retry or discard.
+                  // The screen's own refusal line reports the failure — stay
+                  // on the screen so the user can retry or discard.
                 }
               })();
             },

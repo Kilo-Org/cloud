@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
+import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
 import { EmptyState } from '@/components/empty-state';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
@@ -77,7 +78,8 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
-  const save = useSaveSecurityAgentConfig(scope);
+  const save = useSaveSecurityAgentConfig(scope, { announceFailed: false });
+  const feedback = useSettingsSaveFeedback();
   const connectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
 
   const [mode, setMode] = useState<RepositorySelectionMode>('all');
@@ -109,10 +111,11 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const patch = { repositorySelectionMode: mode, selectedRepositoryIds: selectedIds };
   const dirty = baseline !== null && getSettingsDirtyState(baseline, patch, valid) !== 'clean';
 
-  const handleSave = async () => {
-    await save.mutateAsync(patch);
-    setBaseline(previous => ({ ...previous, ...patch }));
-  };
+  const handleSave = () =>
+    feedback.run(async () => {
+      await save.mutateAsync(patch);
+      setBaseline(previous => ({ ...previous, ...patch }));
+    });
 
   const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
     dirty,
@@ -179,10 +182,6 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   if (config.isLoading || !config.data) {
     return <RepositorySettingsSkeleton />;
   }
-
-  const setModeOption = (option: RepositorySelectionMode) => {
-    setMode(option);
-  };
 
   const showRepositoryStates = mode === 'selected';
   const hasRepositories = (repositories.data?.length ?? 0) > 0;
@@ -276,7 +275,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
             disabled={!canManage}
             className="border-b-[0.5px] border-hair-soft"
             onPress={() => {
-              setModeOption(option);
+              setMode(option);
             }}
           />
         ))}
@@ -378,6 +377,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
           ) : undefined
         }
       />
+      {feedback.node}
       <FlashList
         style={listStyle}
         data={listData}

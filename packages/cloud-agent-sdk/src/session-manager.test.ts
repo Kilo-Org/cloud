@@ -11978,6 +11978,64 @@ describe('createSessionManager — spawned session open', () => {
     expect(fetchSession).toHaveBeenCalledTimes(1);
   });
 
+  it('cancels a pending retry when the user switches to another session', async () => {
+    const fetchSession = jest.fn((id: KiloSessionId) =>
+      id === kiloId('ses-2') ? Promise.resolve(defaultFetchedSession) : Promise.reject(notFound)
+    );
+    const config = createMockConfig({
+      fetchSession,
+      spawnedSessionOpen: { graceMs: 10_000, maxAttempts: 5, retryDelayMs: 10 },
+    });
+    const mgr = createSessionManager(config);
+    mgr.noteSpawnedSession(kiloId('ses-1'));
+
+    await mgr.switchSession(kiloId('ses-1'));
+    const callsForSpawned = (): number =>
+      fetchSession.mock.calls.filter(([id]) => id === kiloId('ses-1')).length;
+    expect(callsForSpawned()).toBe(1);
+
+    await mgr.switchSession(kiloId('ses-2'));
+    for (let attempt = 0; attempt < 3; attempt += 1) await settle();
+
+    expect(callsForSpawned()).toBe(1);
+  });
+
+  it('cancels a pending retry on dispose', async () => {
+    const fetchSession = jest.fn().mockRejectedValue(notFound);
+    const config = createMockConfig({
+      fetchSession,
+      spawnedSessionOpen: { graceMs: 10_000, maxAttempts: 5, retryDelayMs: 10 },
+    });
+    const mgr = createSessionManager(config);
+    mgr.noteSpawnedSession(kiloId('ses-1'));
+
+    await mgr.switchSession(kiloId('ses-1'));
+    expect(fetchSession).toHaveBeenCalledTimes(1);
+
+    mgr.destroy();
+    for (let attempt = 0; attempt < 3; attempt += 1) await settle();
+
+    expect(fetchSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops scheduling retries once the same session is denied terminally', async () => {
+    const fetchSession = jest.fn().mockRejectedValue(notFound);
+    const config = createMockConfig({
+      fetchSession,
+      spawnedSessionOpen: { graceMs: 10_000, maxAttempts: 1, retryDelayMs: 10 },
+    });
+    const mgr = createSessionManager(config);
+    mgr.noteSpawnedSession(kiloId('ses-1'));
+
+    await mgr.switchSession(kiloId('ses-1'));
+    for (let attempt = 0; attempt < 6; attempt += 1) await settle();
+
+    expect(fetchSession).toHaveBeenCalledTimes(2);
+    expect(atomValue<{ code?: string } | null>(config.store, mgr.atoms.statusIndicator)?.code).toBe(
+      'child-session-not-found'
+    );
+  });
+
   it('gives up after maxAttempts so a session that never appears still surfaces', async () => {
     const config = createMockConfig({
       fetchSession: jest.fn().mockRejectedValue(notFound),

@@ -1555,6 +1555,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    */
   const deniedSessionIds = new Set<KiloSessionId>();
   const spawnedSessions = new Map<KiloSessionId, { attempts: number; spawnedAt: number }>();
+  const spawnedRetryTimers = new Map<KiloSessionId, ReturnType<typeof setTimeout>>();
   let activeSessionType: ActiveSessionType | null = null;
   /**
    * Latest per-session capabilities reported by the live CLI transport's
@@ -2812,16 +2813,42 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   /**
+   * Cancel a scheduled spawned retry. The handle must not outlive the open it
+   * belongs to: a fired retry re-opens the session by id, which would replace a
+   * session that has since opened or been reported unavailable.
+   */
+  function clearSpawnedRetry(kiloSessionId: KiloSessionId): void {
+    const timer = spawnedRetryTimers.get(kiloSessionId);
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    spawnedRetryTimers.delete(kiloSessionId);
+  }
+
+  /** Cancel every pending spawned retry except the one for the newly opened id. */
+  function clearOtherSpawnedRetries(kiloSessionId: KiloSessionId): void {
+    for (const [id, timer] of spawnedRetryTimers) {
+      if (id === kiloSessionId) continue;
+      clearTimeout(timer);
+      spawnedRetryTimers.delete(id);
+    }
+  }
+
+  /**
    * Re-open a spawned session that answered NOT_FOUND, unless the caller has
    * moved on. The session stays in its loading state until the row is readable
    * or the retry budget runs out.
    */
   function scheduleSpawnedRetry(open: SessionOpen): void {
     const delay = config.spawnedSessionOpen?.retryDelayMs ?? DEFAULT_SPAWNED_RETRY_DELAY_MS;
-    setTimeout(() => {
-      if (open.expectedGeneration !== switchGeneration) return;
-      void switchSession(open.kiloSessionId);
-    }, delay);
+    clearSpawnedRetry(open.kiloSessionId);
+    spawnedRetryTimers.set(
+      open.kiloSessionId,
+      scheduleUnrefdTimer(() => {
+        spawnedRetryTimers.delete(open.kiloSessionId);
+        if (open.expectedGeneration !== switchGeneration) return;
+        void switchSession(open.kiloSessionId);
+      }, delay)
+    );
   }
 
   /**
@@ -2951,6 +2978,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   async function switchSession(kiloSessionId: KiloSessionId): Promise<void> {
     cacheActiveSessionPage();
+    clearOtherSpawnedRetries(kiloSessionId);
     const preserveTranscript = preserveTranscriptOnOpen(kiloSessionId);
     const expectedGeneration = beginSessionOpen(kiloSessionId);
     const resolvedFailures = seedResolvedDeliveryFailures(kiloSessionId, expectedGeneration);
@@ -3302,6 +3330,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // The server confirmed this id, so its page may be used again.
     deniedSessionIds.delete(open.kiloSessionId);
     spawnedSessions.delete(open.kiloSessionId);
+    clearSpawnedRetry(open.kiloSessionId);
     return data;
   }
 
@@ -3310,6 +3339,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const code = parsed.success ? (parsed.data.data?.code ?? parsed.data.shape?.code) : undefined;
     if (code !== 'NOT_FOUND' && code !== 'UNAUTHORIZED' && code !== 'FORBIDDEN') return false;
     if (code === 'NOT_FOUND' && takeSpawnedRetry(open.kiloSessionId)) {
+      open.denied = true;
       open.acceptCachedPage = false;
       stateUnsub?.();
       stateUnsub = null;
@@ -3321,6 +3351,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       return true;
     }
     open.denied = true;
+    clearSpawnedRetry(open.kiloSessionId);
     open.acceptCachedPage = false;
     open.surfaceDeferredOpenFailure = null;
     stateUnsub?.();
@@ -4499,6 +4530,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     metadataRecoveryCleanups = [];
     resetChildSessionHydration();
     switchGeneration += 1;
+    for (const timer of spawnedRetryTimers.values()) clearTimeout(timer);
+    spawnedRetryTimers.clear();
     stateUnsub?.();
     stateUnsub = null;
     currentSession?.destroy();

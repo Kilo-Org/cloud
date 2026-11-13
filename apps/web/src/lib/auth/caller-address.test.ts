@@ -7,7 +7,7 @@ describe('callerAddressFromHeaders', () => {
     ).toBe('203.0.113.7');
   });
 
-  it('prefers the platform header when the generic header disagrees', () => {
+  it('prefers the platform-observed header when another forwarding header is present', () => {
     expect(
       callerAddressFromHeaders(
         new Headers({
@@ -25,7 +25,7 @@ describe('callerAddressFromHeaders', () => {
     );
   });
 
-  it('ignores the generic forwarding header on its own', () => {
+  it('returns unknown when only the generic forwarding header is present', () => {
     expect(callerAddressFromHeaders(new Headers({ 'x-forwarded-for': '192.0.2.11' }))).toBe(
       'unknown'
     );

@@ -1,12 +1,9 @@
 /**
- * The caller address a Vercel Firewall rule counts against.
- *
- * `x-vercel-forwarded-for` holds the address the platform observed, so it is
- * read first: the generic forwarding header can be written by a proxy in front
- * of the platform, and a caller that chooses it also chooses its own bucket.
- * `x-real-ip` covers a request the platform labelled with that header alone,
- * and `'unknown'` keeps the rule key non-empty when neither header has a usable
- * hop.
+ * The caller address a Vercel Firewall rule counts against: the address the
+ * platform observed (`x-vercel-forwarded-for`), then `x-real-ip`, then
+ * `'unknown'`, which keeps the rule key non-empty when neither header has a
+ * usable hop. Every caller-keyed sign-in budget reads the address here, so one
+ * caller lands in one bucket and the answers cannot disagree.
  */
 export function callerAddressFromHeaders(headers: Headers): string {
   return (

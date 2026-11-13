@@ -589,6 +589,7 @@ describe('CloudChatPage terminal ownership across navigation', () => {
         worktreeId: 'worktree_shared',
       },
       activity: { type: 'idle' },
+      backgroundActivity: { status: 'inactive' },
       activeSessionType: 'cloud-agent',
       staticMessages: [],
       dynamicMessages: [],

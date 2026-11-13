@@ -13,6 +13,7 @@ import {
   shouldRenderReasoningPart,
 } from '@/components/cloud-agent-next/types';
 import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-ordering';
+import { readBackgroundResult } from '@kilocode/cloud-agent-sdk/background-result';
 
 type SnapshotMessage = {
   info: { id: string; role?: unknown; time?: unknown };
@@ -194,7 +195,10 @@ export function groupAssistantParts(
     const standaloneTool =
       mode === 'live' &&
       isToolPart(part) &&
-      (part.tool === 'question' || part.tool === 'task' || part.tool === 'suggest');
+      (part.tool === 'question' ||
+        part.tool === 'task' ||
+        part.tool === 'suggest' ||
+        readBackgroundResult(part) !== undefined);
     const toolId = producingToolPartId(part);
     // A tool's returned files stay beside that tool instead of ending its group.
     const type =

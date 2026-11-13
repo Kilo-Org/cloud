@@ -4,6 +4,70 @@ import { classifyAssistantFailure } from '../../../src/shared/assistant-failure.
 import type { KiloFeedEvent } from './kilo-event-feed.js';
 import type { HarnessActivityEvent } from './harness-activity.js';
 
+it('persists a native background notice before another model turn starts', async () => {
+  const events: KiloFeedEvent[] = [];
+  const received = Promise.withResolvers<void>();
+  const message = {
+    id: 'msg_notice',
+    type: 'synthetic',
+    time: { created: 3 },
+    description: 'Run tests',
+    metadata: { source: 'shell', shellID: 'sh_test', state: 'completed', exit: 7 },
+    text: '<shell id="sh_test" state="completed" command="pnpm test">\nTests failed\n</shell>',
+  };
+  const native = Bun.serve({
+    port: 0,
+    fetch(request) {
+      const path = new URL(request.url).pathname;
+      if (path === '/api/event')
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(
+                new TextEncoder().encode(
+                  `data: ${JSON.stringify({ id: 'evt_notice', type: 'session.synthetic', created: 3, data: { sessionID: 'ses_root', text: message.text, description: message.description, metadata: message.metadata }, location: { directory: '/workspace' } })}\n\n`
+                )
+              );
+            },
+          }),
+          { headers: { 'content-type': 'text/event-stream' } }
+        );
+      if (path === '/api/session/ses_root/message/msg_notice')
+        return Response.json({ data: message });
+      return Response.json({
+        data: {
+          id: 'ses_root',
+          location: { directory: '/workspace' },
+          time: { created: 1, updated: 3 },
+        },
+      });
+    },
+  });
+  const feed = createKilo2EventFeed({
+    source: {
+      server: { url: native.url.origin },
+      directory: '/workspace',
+      nativeRuntimeId: 'rt_local',
+    },
+    signal: AbortSignal.timeout(5000),
+    onEvent(event) {
+      events.push(event);
+      if (event.type === 'conversation.message.updated') received.resolve();
+    },
+    onFailure() {},
+  });
+  try {
+    await feed.open();
+    await received.promise;
+    expect(
+      events.find(event => event.type === 'conversation.message.updated')?.properties
+    ).toMatchObject({ sessionID: 'ses_root', message });
+  } finally {
+    feed.close();
+    await native.stop(true);
+  }
+});
+
 it('translates native drain proof without session reads or conversation history', async () => {
   const events: KiloFeedEvent[] = [];
   let reads = 0;

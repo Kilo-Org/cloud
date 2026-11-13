@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 
 import { isAdminAuthorized } from './fake-llm-admin.js';
 import { supervisionScenario } from './fake-llm-supervision.js';
+import { backgroundActivityScenario } from './fake-llm-background-activity.js';
 import { fakeCompactionSummary } from './fake-llm-compaction.js';
 
 /** Runtime-neutral view of one inbound request. `url` is path + query. */
@@ -1794,6 +1795,7 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
   'background-task'(args, ctx) {
     runChildTask(args, ctx, true);
   },
+  'background-activity': backgroundActivityScenario,
 
   cron(args, ctx) {
     runSchedule(

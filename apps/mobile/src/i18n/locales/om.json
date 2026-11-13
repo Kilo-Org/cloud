@@ -363,15 +363,16 @@
       "apiKeyLabel": "Furtuu API",
       "apiKeyPlaceholder": "Furtuu maxxansi",
       "apiKeyRequired": "Furtuu galchi.",
-      "keyAlreadyExists": "Furtuu {{provider}} duraan qabda. Osoo kan biraa hin dabaliin kana haqi.",
+      "keyAlreadyExists": "Furtuu dhiyeessii kanaa duraan qabda. Osoo kan biraa hin dabaliin kana haqi.",
       "keyStoreFailed": "Furtuun kuufamuu hin dandeenye. Irra deebi'ii yaali.",
-      "invalidCredentials": "Furtuun kun bifti {{provider}} eeggatu miti. Isaa mirkaneessii irra deebi'ii yaali.",
+      "invalidCredentials": "Furtuun kun bifti dhiyeessii kanaa eeggatu miti. Isaa mirkaneessii irra deebi'ii yaali.",
       "testSucceeded": "Furtuun ni hojjeta. Dhiyeessaa: {{provider}}. Moodeela: {{model}}.",
       "testRejected": "Dhiyeessaan furtuu kana didde. Furtuun kun sirrii ta'uu fi hin haqamne mirkaneessi.",
       "testIncomplete": "Dhiyeessaan qorannoo osoo hin xumuramiin dhaabe. Irra deebi'ii yaali.",
       "testUnsupportedProvider": "Dhiyeessaan kun amma hin deeggaramu. Furtuu haqi.",
       "testUnreadableKey": "Furtuun kuufame dubbifamuu hin dandeenye. Booda irra deebi'ii yaali.",
       "testDeprecatedProvider": "Dhiyeessaan kun fayyadama irraa baheera, kanaaf furtuun isaa qoramuu hin danda'u.",
+      "keyManagedByCodingPlan": "Furtuun dhiyeessii kanaa karoora koodiin bulfama. Furtuun kun dubbisuu qofa waan ta'eef, furtuu kee dabaluuf karoora koodii haqi.",
       "testFailed": "Qorannoon furtuu hin milkaa'ne. Irra deebi'ii yaali."
     },
     "dataExport": {

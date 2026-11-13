@@ -363,15 +363,16 @@
       "apiKeyLabel": "Chiave API",
       "apiKeyPlaceholder": "Incolla la chiave",
       "apiKeyRequired": "Inserisci la chiave.",
-      "keyAlreadyExists": "Hai già una chiave per {{provider}}. Rimuovila prima di aggiungerne un'altra.",
+      "keyAlreadyExists": "Hai già una chiave per questo provider. Rimuovila prima di aggiungerne un'altra.",
       "keyStoreFailed": "Non è stato possibile salvare la chiave. Riprova.",
-      "invalidCredentials": "Questa chiave non è nel formato previsto da {{provider}}. Controllala e riprova.",
+      "invalidCredentials": "Questa chiave non è nel formato previsto da questo provider. Controllala e riprova.",
       "testSucceeded": "La chiave funziona. Provider: {{provider}}. Modello: {{model}}.",
       "testRejected": "Il provider ha rifiutato questa chiave. Verifica che sia corretta e che non sia stata revocata.",
       "testIncomplete": "Il provider ha terminato il test prima che fosse completato. Riprova.",
       "testUnsupportedProvider": "Questo provider non è più supportato. Rimuovi la chiave.",
       "testUnreadableKey": "Non è stato possibile leggere la chiave salvata. Riprova più tardi.",
       "testDeprecatedProvider": "Questo provider è deprecato, quindi la sua chiave non può essere verificata.",
+      "keyManagedByCodingPlan": "Il tuo piano di coding gestisce la chiave di questo provider, che è di sola lettura. Annulla il piano di coding per aggiungere la tua.",
       "testFailed": "La verifica della chiave non è riuscita. Riprova."
     },
     "dataExport": {

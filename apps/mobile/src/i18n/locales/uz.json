@@ -363,15 +363,16 @@
       "apiKeyLabel": "API kaliti",
       "apiKeyPlaceholder": "Kalitni joylang",
       "apiKeyRequired": "Kalitni kiriting.",
-      "keyAlreadyExists": "Sizda {{provider}} uchun allaqachon kalit bor. Boshqasini qo'shishdan oldin uni olib tashlang.",
+      "keyAlreadyExists": "Sizda bu provayder uchun allaqachon kalit bor. Boshqasini qo'shishdan oldin uni olib tashlang.",
       "keyStoreFailed": "Kalitni saqlab bo'lmadi. Qayta urinib ko'ring.",
-      "invalidCredentials": "Bu kalit {{provider}} kutgan formatda emas. Uni tekshirib, qayta urinib ko'ring.",
+      "invalidCredentials": "Bu kalit ushbu provayder kutgan formatda emas. Uni tekshirib, qayta urinib ko'ring.",
       "testSucceeded": "Kalit ishlaydi. Provayder: {{provider}}. Model: {{model}}.",
       "testRejected": "Provayder bu kalitni rad etdi. Uning to'g'riligini va bekor qilinmaganini tekshiring.",
       "testIncomplete": "Provayder sinovni yakunlanishidan oldin to'xtatdi. Qayta urinib ko'ring.",
       "testUnsupportedProvider": "Bu provayder endi qo'llab-quvvatlanmaydi. Kalitni olib tashlang.",
       "testUnreadableKey": "Saqlangan kalitni o'qib bo'lmadi. Keyinroq qayta urinib ko'ring.",
       "testDeprecatedProvider": "Bu provayder eskirgan, shuning uchun uning kalitini sinab bo'lmaydi.",
+      "keyManagedByCodingPlan": "Kodlash tarifi ushbu provayderning kalitini boshqaradi va kalit faqat o'qish uchun. O'z kalitingizni qo'shish uchun kodlash tarifini bekor qiling.",
       "testFailed": "Kalit sinovi muvaffaqiyatsiz tugadi. Qayta urinib ko'ring."
     },
     "dataExport": {

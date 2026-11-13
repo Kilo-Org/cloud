@@ -363,15 +363,16 @@
       "apiKeyLabel": "Klíč API",
       "apiKeyPlaceholder": "Vložte klíč",
       "apiKeyRequired": "Zadejte klíč.",
-      "keyAlreadyExists": "Klíč pro {{provider}} už máte. Před přidáním dalšího ho odeberte.",
+      "keyAlreadyExists": "Klíč pro tohoto poskytovatele už máte. Před přidáním dalšího ho odeberte.",
       "keyStoreFailed": "Klíč se nepodařilo uložit. Zkuste to znovu.",
-      "invalidCredentials": "Tento klíč nemá formát, který {{provider}} očekává. Zkontrolujte ho a zkuste to znovu.",
+      "invalidCredentials": "Tento klíč nemá formát, který tento poskytovatel očekává. Zkontrolujte ho a zkuste to znovu.",
       "testSucceeded": "Klíč funguje. Poskytovatel: {{provider}}. Model: {{model}}.",
       "testRejected": "Poskytovatel tento klíč odmítl. Zkontrolujte, že je správný a že nebyl odvolán.",
       "testIncomplete": "Poskytovatel ukončil test před jeho dokončením. Zkuste to znovu.",
       "testUnsupportedProvider": "Tento poskytovatel už není podporován. Odeberte klíč.",
       "testUnreadableKey": "Uložený klíč se nepodařilo přečíst. Zkuste to znovu později.",
       "testDeprecatedProvider": "Tento poskytovatel je zastaralý, takže jeho klíč nelze otestovat.",
+      "keyManagedByCodingPlan": "Klíč tohoto poskytovatele spravuje programovací tarif a je jen pro čtení. Chcete-li přidat vlastní klíč, zrušte programovací tarif.",
       "testFailed": "Test klíče selhal. Zkuste to znovu."
     },
     "dataExport": {

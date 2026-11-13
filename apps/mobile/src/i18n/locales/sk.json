@@ -363,15 +363,16 @@
       "apiKeyLabel": "Kľúč API",
       "apiKeyPlaceholder": "Vlož kľúč",
       "apiKeyRequired": "Zadaj kľúč.",
-      "keyAlreadyExists": "Pre {{provider}} už máš kľúč. Pred pridaním ďalšieho ho odstráň.",
+      "keyAlreadyExists": "Pre tohto poskytovateľa už máš kľúč. Pred pridaním ďalšieho ho odstráň.",
       "keyStoreFailed": "Kľúč sa nepodarilo uložiť. Skús to znova.",
-      "invalidCredentials": "Tento kľúč nie je vo formáte, ktorý {{provider}} očakáva. Skontroluj ho a skús to znova.",
+      "invalidCredentials": "Tento kľúč nie je vo formáte, ktorý tento poskytovateľ očakáva. Skontroluj ho a skús to znova.",
       "testSucceeded": "Kľúč funguje. Poskytovateľ: {{provider}}. Model: {{model}}.",
       "testRejected": "Poskytovateľ tento kľúč odmietol. Skontroluj, či je správny a či nebol zrušený.",
       "testIncomplete": "Poskytovateľ ukončil test skôr, než sa dokončil. Skús to znova.",
       "testUnsupportedProvider": "Tento poskytovateľ už nie je podporovaný. Odstráň kľúč.",
       "testUnreadableKey": "Uložený kľúč sa nepodarilo prečítať. Skús to znova neskôr.",
       "testDeprecatedProvider": "Tento poskytovateľ je zastaraný, preto jeho kľúč nemožno otestovať.",
+      "keyManagedByCodingPlan": "Kľúč tohto poskytovateľa spravuje plán pre kódovanie a tento kľúč je iba na čítanie. Ak chceš pridať vlastný kľúč, zruš plán pre kódovanie.",
       "testFailed": "Test kľúča zlyhal. Skús to znova."
     },
     "dataExport": {

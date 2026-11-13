@@ -363,15 +363,16 @@
       "apiKeyLabel": "API-lykill",
       "apiKeyPlaceholder": "Límdu lykilinn",
       "apiKeyRequired": "Sláðu inn lykilinn.",
-      "keyAlreadyExists": "Þú ert þegar með lykil fyrir {{provider}}. Fjarlægðu hann áður en þú bætir við öðrum.",
+      "keyAlreadyExists": "Þú ert þegar með lykil fyrir þessa þjónustuveitu. Fjarlægðu hann áður en þú bætir við öðrum.",
       "keyStoreFailed": "Ekki tókst að vista lykilinn. Reyndu aftur.",
-      "invalidCredentials": "Þessi lykill er ekki á því sniði sem {{provider}} gerir ráð fyrir. Athugaðu hann og reyndu aftur.",
+      "invalidCredentials": "Þessi lykill er ekki á því sniði sem þessi þjónustuveita gerir ráð fyrir. Athugaðu hann og reyndu aftur.",
       "testSucceeded": "Lykillinn virkar. Þjónustuveita: {{provider}}. Líkan: {{model}}.",
       "testRejected": "Þjónustuveitan hafnaði þessum lykli. Athugaðu að hann sé réttur og að hann hafi ekki verið afturkallaður.",
       "testIncomplete": "Þjónustuveitan endaði prófið áður en því var lokið. Reyndu aftur.",
       "testUnsupportedProvider": "Þessi þjónustuveita er ekki lengur studd. Fjarlægðu lykilinn.",
       "testUnreadableKey": "Ekki tókst að lesa geymda lykilinn. Reyndu aftur síðar.",
       "testDeprecatedProvider": "Þessi þjónustuveita er úrelt, svo ekki er hægt að prófa lykilinn hennar.",
+      "keyManagedByCodingPlan": "Forritunaráskriftin þín stýrir lyklinum fyrir þessa þjónustuveitu og hann er aðeins til lesturs. Segðu forritunaráskriftinni upp til að bæta við þínum eigin lykli.",
       "testFailed": "Prófun lykilsins mistókst. Reyndu aftur."
     },
     "dataExport": {

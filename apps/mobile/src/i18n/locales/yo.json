@@ -363,15 +363,16 @@
       "apiKeyLabel": "Kọ́kọ́rọ́ API",
       "apiKeyPlaceholder": "Lẹ kọ́kọ́rọ́ náà síbí",
       "apiKeyRequired": "Tẹ kọ́kọ́rọ́ náà.",
-      "keyAlreadyExists": "O ti ní kọ́kọ́rọ́ fún {{provider}} tẹ́lẹ̀. Yọ ọ́ kúrò kí o tó fi òmíràn kún.",
+      "keyAlreadyExists": "O ti ní kọ́kọ́rọ́ fún olùpèsè yìí tẹ́lẹ̀. Yọ ọ́ kúrò kí o tó fi òmíràn kún.",
       "keyStoreFailed": "A kò lè fi kọ́kọ́rọ́ náà pamọ́. Tún gbìyànjú.",
-      "invalidCredentials": "Kọ́kọ́rọ́ yìí kò sí ní ọ̀nà tí {{provider}} ń retí. Ṣàyẹ̀wò rẹ̀ kí o sì tún gbìyànjú.",
+      "invalidCredentials": "Kọ́kọ́rọ́ yìí kò sí ní ọ̀nà tí olùpèsè yìí ń retí. Ṣàyẹ̀wò rẹ̀ kí o sì tún gbìyànjú.",
       "testSucceeded": "Kọ́kọ́rọ́ ń ṣiṣẹ́. Olùpèsè: {{provider}}. Àwòṣe: {{model}}.",
       "testRejected": "Olùpèsè kọ̀ kọ́kọ́rọ́ yìí. Ṣàyẹ̀wò pé ó tọ̀nà àti pé a kò tíì fagi lé e.",
       "testIncomplete": "Olùpèsè dá ìdánwò náà dúró kí ó tó parí. Tún gbìyànjú.",
       "testUnsupportedProvider": "Olùpèsè yìí kò ní àtìlẹ́yìn mọ́. Yọ kọ́kọ́rọ́ náà kúrò.",
       "testUnreadableKey": "A kò lè ka kọ́kọ́rọ́ tí a fipamọ́. Tún gbìyànjú nígbà mìíràn.",
       "testDeprecatedProvider": "Olùpèsè yìí ti di àtijọ́, nítorí náà a kò lè dán kọ́kọ́rọ́ rẹ̀ wò.",
+      "keyManagedByCodingPlan": "Ètò kóòdù ló ń ṣàkóso kọ́kọ́rọ́ olùpèsè yìí, kọ́kọ́rọ́ náà sì kò ṣe é yí padà. Fagilé ètò kóòdù náà kí o tó fi tìrẹ kún.",
       "testFailed": "Ìdánwò kọ́kọ́rọ́ kùnà. Tún gbìyànjú."
     },
     "dataExport": {

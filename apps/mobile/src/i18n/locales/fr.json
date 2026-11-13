@@ -363,15 +363,16 @@
       "apiKeyLabel": "Clé API",
       "apiKeyPlaceholder": "Collez la clé",
       "apiKeyRequired": "Saisissez la clé.",
-      "keyAlreadyExists": "Vous avez déjà une clé pour {{provider}}. Supprimez-la avant d'en ajouter une autre.",
+      "keyAlreadyExists": "Vous avez déjà une clé pour ce fournisseur. Supprimez-la avant d'en ajouter une autre.",
       "keyStoreFailed": "La clé n'a pas pu être enregistrée. Réessayez.",
-      "invalidCredentials": "Cette clé n'est pas dans le format attendu par {{provider}}. Vérifiez-la et réessayez.",
+      "invalidCredentials": "Cette clé n'est pas dans le format attendu par ce fournisseur. Vérifiez-la et réessayez.",
       "testSucceeded": "La clé fonctionne. Fournisseur : {{provider}}. Modèle : {{model}}.",
       "testRejected": "Le fournisseur a rejeté cette clé. Vérifiez qu'elle est correcte et qu'elle n'a pas été révoquée.",
       "testIncomplete": "Le fournisseur a mis fin au test avant qu'il ne soit terminé. Réessayez.",
       "testUnsupportedProvider": "Ce fournisseur n'est plus pris en charge. Supprimez la clé.",
       "testUnreadableKey": "La clé stockée n'a pas pu être lue. Réessayez plus tard.",
       "testDeprecatedProvider": "Ce fournisseur est obsolète, sa clé ne peut donc pas être testée.",
+      "keyManagedByCodingPlan": "Un forfait de code gère la clé de ce fournisseur, et cette clé est en lecture seule. Annulez le forfait de code pour ajouter votre propre clé.",
       "testFailed": "Le test de la clé a échoué. Réessayez."
     },
     "dataExport": {

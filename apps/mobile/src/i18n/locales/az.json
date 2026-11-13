@@ -363,15 +363,16 @@
       "apiKeyLabel": "API açarı",
       "apiKeyPlaceholder": "Açarı yapışdır",
       "apiKeyRequired": "Açarı daxil et.",
-      "keyAlreadyExists": "{{provider}} üçün artıq açarın var. Başqa bir açar əlavə etməzdən əvvəl onu sil.",
+      "keyAlreadyExists": "Bu provayder üçün artıq açarın var. Başqa bir açar əlavə etməzdən əvvəl onu sil.",
       "keyStoreFailed": "Açar yadda saxlanıla bilmədi. Yenidən cəhd et.",
-      "invalidCredentials": "Bu açar {{provider}} gözlədiyi formatda deyil. Onu yoxla və yenidən cəhd et.",
+      "invalidCredentials": "Bu açar bu provayderin gözlədiyi formatda deyil. Onu yoxla və yenidən cəhd et.",
       "testSucceeded": "Açar işləyir. Provayder: {{provider}}. Model: {{model}}.",
       "testRejected": "Provayder bu açarı rədd etdi. Açarın düzgün olduğunu və ləğv edilmədiyini yoxla.",
       "testIncomplete": "Provayder yoxlamanı bitməzdən əvvəl dayandırdı. Yenidən cəhd et.",
       "testUnsupportedProvider": "Bu provayder artıq dəstəklənmir. Açarı sil.",
       "testUnreadableKey": "Saxlanılan açar deşifrə edilib oxuna bilmədi. Sonra yenidən cəhd et.",
       "testDeprecatedProvider": "Bu provayder köhnəlmişdir, buna görə də onun açarı yoxlana bilməz.",
+      "keyManagedByCodingPlan": "Bu provayderin açarı kodlaşdırma planı tərəfindən idarə olunur və açar yalnız oxumaq üçündür. Öz açarını əlavə etmək üçün kodlaşdırma planını ləğv et.",
       "testFailed": "Açar yoxlaması uğursuz oldu. Yenidən cəhd et."
     },
     "dataExport": {

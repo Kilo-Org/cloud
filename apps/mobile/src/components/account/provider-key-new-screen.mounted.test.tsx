@@ -188,7 +188,39 @@ describe('ProviderKeyNewScreen', () => {
     });
 
     expect(statusMessages(root)).toEqual([
-      'You already have a key for Anthropic. Remove it before you add another.',
+      'You already have a key for this provider. Remove it before you add another.',
+    ]);
+    expect(state.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it('reports a key the provider format rejects', async () => {
+    const root = await mount();
+    submit(root, 'sk-test-123');
+
+    act(() => {
+      state.mutations[0]?.onError?.(
+        serverRefusal('UNPROCESSABLE_CONTENT', 'The key does not match the provider format')
+      );
+    });
+
+    expect(statusMessages(root)).toEqual([
+      'This key is not in the format this provider expects. Check it and try again.',
+    ]);
+    expect(state.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it('reports a provider key the coding plan manages as read-only', async () => {
+    const root = await mount();
+    submit(root, 'sk-test-123');
+
+    act(() => {
+      state.mutations[0]?.onError?.(
+        serverRefusal('PRECONDITION_FAILED', "Your coding plan manages this provider's key")
+      );
+    });
+
+    expect(statusMessages(root)).toEqual([
+      "A coding plan manages this provider's key, and the key is read-only. Cancel the coding plan to add your own.",
     ]);
     expect(state.dismissTo).not.toHaveBeenCalled();
   });

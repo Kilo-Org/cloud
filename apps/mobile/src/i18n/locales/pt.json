@@ -363,15 +363,16 @@
       "apiKeyLabel": "Chave de API",
       "apiKeyPlaceholder": "Cola a chave",
       "apiKeyRequired": "Introduz a chave.",
-      "keyAlreadyExists": "Já tens uma chave para {{provider}}. Remove-a antes de adicionares outra.",
+      "keyAlreadyExists": "Já tens uma chave para este fornecedor. Remove-a antes de adicionares outra.",
       "keyStoreFailed": "Não foi possível guardar a chave. Tenta novamente.",
-      "invalidCredentials": "Esta chave não está no formato que {{provider}} espera. Verifica-a e tenta novamente.",
+      "invalidCredentials": "Esta chave não está no formato que este fornecedor espera. Verifica-a e tenta novamente.",
       "testSucceeded": "A chave funciona. Fornecedor: {{provider}}. Modelo: {{model}}.",
       "testRejected": "O fornecedor rejeitou esta chave. Verifica se está correta e se não foi revogada.",
       "testIncomplete": "O fornecedor terminou o teste antes de este estar concluído. Tenta novamente.",
       "testUnsupportedProvider": "Este fornecedor já não é suportado. Remove a chave.",
       "testUnreadableKey": "Não foi possível ler a chave guardada. Tenta novamente mais tarde.",
       "testDeprecatedProvider": "Este fornecedor está obsoleto, pelo que a chave não pode ser testada.",
+      "keyManagedByCodingPlan": "O plano de programação gere a chave deste fornecedor e a chave é só de leitura. Cancela o plano de programação para adicionares a tua própria chave.",
       "testFailed": "O teste da chave falhou. Tenta novamente."
     },
     "dataExport": {

@@ -921,6 +921,87 @@ describe('BYOK Router', () => {
         .orderBy(organization_audit_logs.id);
       expect(logsAfter).toEqual(logsBefore);
     });
+
+    test('create refuses a provider whose key the coding plan manages', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      // The installed key is a coding-plan row, so the owner cannot remove it to
+      // make room: the refusal must name the plan, not ask for a removal.
+      const [managed] = await db
+        .insert(byok_api_keys)
+        .values({
+          kilo_user_id: ownerUser.id,
+          provider_id: 'anthropic',
+          encrypted_api_key_envelope: testByokEnvelope('coding-plan-anthropic-key'),
+          management_source: 'coding_plan',
+          created_by: ownerUser.id,
+        })
+        .returning();
+
+      await expect(
+        caller.byok.create({ provider_id: 'anthropic', api_key: 'personal-anthropic-key' })
+      ).rejects.toMatchObject({
+        code: 'PRECONDITION_FAILED',
+        message:
+          "Your coding plan manages this provider's key and it is read-only. Cancel the coding plan to add your own.",
+      });
+
+      const personalRows = await db
+        .select()
+        .from(byok_api_keys)
+        .where(
+          and(
+            eq(byok_api_keys.kilo_user_id, ownerUser.id),
+            eq(byok_api_keys.provider_id, 'anthropic')
+          )
+        );
+      expect(personalRows).toEqual([managed]);
+
+      const [managedOrganization] = await db
+        .insert(byok_api_keys)
+        .values({
+          organization_id: organizationA.id,
+          provider_id: 'anthropic',
+          encrypted_api_key_envelope: testByokEnvelope('coding-plan-organization-key'),
+          management_source: 'coding_plan',
+          created_by: ownerUser.id,
+        })
+        .returning();
+      const logsBefore = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationA.id))
+        .orderBy(organization_audit_logs.id);
+
+      await expect(
+        caller.byok.create({
+          organizationId: organizationA.id,
+          provider_id: 'anthropic',
+          api_key: 'organization-anthropic-key',
+        })
+      ).rejects.toMatchObject({
+        code: 'PRECONDITION_FAILED',
+        message:
+          "Your coding plan manages this provider's key and it is read-only. Cancel the coding plan to add your own.",
+      });
+
+      const organizationRows = await db
+        .select()
+        .from(byok_api_keys)
+        .where(
+          and(
+            eq(byok_api_keys.organization_id, organizationA.id),
+            eq(byok_api_keys.provider_id, 'anthropic')
+          )
+        );
+      expect(organizationRows).toEqual([managedOrganization]);
+      const logsAfter = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationA.id))
+        .orderBy(organization_audit_logs.id);
+      expect(logsAfter).toEqual(logsBefore);
+    });
   });
 
   describe('KMS envelope encryption', () => {
@@ -1042,7 +1123,11 @@ describe('BYOK Router', () => {
 
       await expect(
         caller.byok.testApiKey({ organizationId: organizationA.id, id: created.id })
-      ).resolves.toEqual({ outcome: 'unreadable-key' });
+      ).resolves.toEqual({
+        outcome: 'unreadable-key',
+        success: false,
+        message: 'API key test failed: the stored key could not be read. Try again later.',
+      });
     });
 
     test('fails create and update without writing when the KMS call fails', async () => {
@@ -1867,6 +1952,8 @@ describe('BYOK Router', () => {
           outcome: 'ok',
           provider: 'openrouter',
           model: 'openai/gpt-5-nano',
+          success: true,
+          message: 'API key test success. Provider: openrouter. Model: openai/gpt-5-nano.',
         });
 
         const upstreamCalls = fetchSpy.mock.calls.filter(([input]) =>
@@ -1904,12 +1991,46 @@ describe('BYOK Router', () => {
         await expect(caller.byok.testApiKey({ id: key.id })).resolves.toEqual({
           outcome: 'rejected',
           detail: 'Invalid API key',
+          success: false,
+          message:
+            'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.',
         });
         const [url, init] = fetchSpy.mock.calls.find(([input]) =>
           String(input).startsWith('https://')
         )!;
         expect(String(url)).toMatch(/^https:\/\/ai-gateway\.vercel\.sh\//);
         expect(new Headers(init?.headers).get('authorization')).toBe('Bearer revoked-vercel-key');
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    test('a client that reads only the legacy pair still gets the old sentence', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const key = await caller.byok.create({
+        provider_id: 'vercel-ai-gateway',
+        api_key: 'revoked-legacy-vercel-key',
+      });
+      const fakeKms = globalThis.fetch;
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) =>
+        isFakeByokKmsRequest(input)
+          ? fakeKms(input, init)
+          : new Response(
+              JSON.stringify({
+                error: { message: 'Invalid API key', type: 'authentication_error' },
+              }),
+              { status: 401, headers: { 'content-type': 'application/json' } }
+            )
+      );
+
+      try {
+        const result = await caller.byok.testApiKey({ id: key.id });
+
+        expect(result.outcome).toBe('rejected');
+        expect(result.success).toBe(false);
+        expect(result.message).toBe(
+          'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.'
+        );
       } finally {
         fetchSpy.mockRestore();
       }
@@ -2093,6 +2214,8 @@ describe('BYOK Router', () => {
 
       await expect(caller.byok.testApiKey({ id: key.id })).resolves.toEqual({
         outcome: 'deprecated-provider',
+        success: false,
+        message: 'Codestral is deprecated and its API key can no longer be tested.',
       });
     });
   });

@@ -363,15 +363,16 @@
       "apiKeyLabel": "Khóa API",
       "apiKeyPlaceholder": "Dán khóa",
       "apiKeyRequired": "Nhập khóa.",
-      "keyAlreadyExists": "Bạn đã có khóa cho {{provider}}. Hãy xóa nó trước khi thêm khóa khác.",
+      "keyAlreadyExists": "Bạn đã có khóa cho nhà cung cấp này. Hãy xóa nó trước khi thêm khóa khác.",
       "keyStoreFailed": "Không thể lưu khóa. Hãy thử lại.",
-      "invalidCredentials": "Khóa này không đúng định dạng mà {{provider}} yêu cầu. Hãy kiểm tra và thử lại.",
+      "invalidCredentials": "Khóa này không đúng định dạng mà nhà cung cấp này yêu cầu. Hãy kiểm tra và thử lại.",
       "testSucceeded": "Khóa hoạt động. Nhà cung cấp: {{provider}}. Mô hình: {{model}}.",
       "testRejected": "Nhà cung cấp đã từ chối khóa này. Hãy kiểm tra rằng khóa đúng và chưa bị thu hồi.",
       "testIncomplete": "Nhà cung cấp đã kết thúc quá trình kiểm tra trước khi hoàn tất. Hãy thử lại.",
       "testUnsupportedProvider": "Nhà cung cấp này không còn được hỗ trợ. Hãy xóa khóa.",
       "testUnreadableKey": "Không thể đọc khóa đã lưu. Hãy thử lại sau.",
       "testDeprecatedProvider": "Nhà cung cấp này đã ngừng hỗ trợ, vì vậy không thể kiểm tra khóa của nó.",
+      "keyManagedByCodingPlan": "Gói lập trình của bạn quản lý khóa của nhà cung cấp này và khóa này ở chế độ chỉ đọc. Bạn cần hủy gói lập trình để thêm khóa của riêng mình.",
       "testFailed": "Kiểm tra khóa thất bại. Hãy thử lại."
     },
     "dataExport": {

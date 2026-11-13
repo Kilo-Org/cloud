@@ -363,15 +363,16 @@
       "apiKeyLabel": "Igodo API",
       "apiKeyPlaceholder": "Mado igodo ahụ",
       "apiKeyRequired": "Tinye igodo ahụ.",
-      "keyAlreadyExists": "Ị nweelarị igodo maka {{provider}}. Wepụ ya tupu i tinye nke ọzọ.",
+      "keyAlreadyExists": "Ị nweelarị igodo maka onye na-enye ọrụ a. Wepụ ya tupu i tinye nke ọzọ.",
       "keyStoreFailed": "A pụghị ichekwa igodo ahụ. Nwaa ọzọ.",
-      "invalidCredentials": "Igodo a adịghị n'ụdị nke {{provider}} na-atụ anya ya. Lelee ya ma nwaa ọzọ.",
+      "invalidCredentials": "Igodo a adịghị n'ụdị nke onye na-enye ọrụ a na-atụ anya ya. Lelee ya ma nwaa ọzọ.",
       "testSucceeded": "Igodo na-arụ ọrụ. Onye na-enye ọrụ: {{provider}}. Ụdị: {{model}}.",
       "testRejected": "Onye na-enye ọrụ jụrụ igodo a. Lelee ma ọ ziri ezi na a kagbuoghị ya.",
       "testIncomplete": "Onye na-enye ọrụ kwụsịrị nnwale ahụ tupu ya agwụcha. Nwaa ọzọ.",
       "testUnsupportedProvider": "A naghị akwado onye na-enye ọrụ a ọzọ. Wepụ igodo ahụ.",
       "testUnreadableKey": "Enweghị ike ịgụ igodo echekwara. Nwaa ọzọ ma emechara.",
       "testDeprecatedProvider": "Onye na-enye ọrụ a adịlarị ochie, ya mere a pụghị ịnwale igodo ya.",
+      "keyManagedByCodingPlan": "Atụmatụ koodu na-ahazi igodo onye na-enye ọrụ a, igodo ahụ bụkwa naanị ịgụ. Kagbuo atụmatụ koodu ahụ iji tinye nke gị.",
       "testFailed": "Nnwale igodo ahụ daara. Nwaa ọzọ."
     },
     "dataExport": {

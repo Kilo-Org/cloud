@@ -363,15 +363,16 @@
       "apiKeyLabel": "APIキー",
       "apiKeyPlaceholder": "キーを貼り付け",
       "apiKeyRequired": "キーを入力してください。",
-      "keyAlreadyExists": "{{provider}}のキーはすでにあります。追加する前に削除してください。",
+      "keyAlreadyExists": "このプロバイダーのキーはすでにあります。追加する前に削除してください。",
       "keyStoreFailed": "キーを保存できませんでした。もう一度お試しください。",
-      "invalidCredentials": "このキーは{{provider}}が期待する形式ではありません。確認してもう一度お試しください。",
+      "invalidCredentials": "このキーはこのプロバイダーが期待する形式ではありません。確認してもう一度お試しください。",
       "testSucceeded": "キーは正常に動作します。プロバイダー：{{provider}}。モデル：{{model}}。",
       "testRejected": "プロバイダーがこのキーを拒否しました。キーが正しく、取り消されていないことを確認してください。",
       "testIncomplete": "プロバイダーがテストを完了する前に終了しました。もう一度お試しください。",
       "testUnsupportedProvider": "このプロバイダーは今後サポートされません。キーを削除してください。",
       "testUnreadableKey": "保存されたキーを読み取れませんでした。後でもう一度お試しください。",
       "testDeprecatedProvider": "このプロバイダーは非推奨のため、そのキーはテストできません。",
+      "keyManagedByCodingPlan": "このプロバイダーのキーはコーディングプランで管理されているため、読み取り専用です。独自のキーを追加するには、コーディングプランをキャンセルしてください。",
       "testFailed": "キーテストに失敗しました。もう一度お試しください。"
     },
     "dataExport": {

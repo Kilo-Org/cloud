@@ -363,15 +363,16 @@
       "apiKeyLabel": "Clave de API",
       "apiKeyPlaceholder": "Pega a clave",
       "apiKeyRequired": "Introduce a clave.",
-      "keyAlreadyExists": "Xa tes unha clave para {{provider}}. Elimina esa clave antes de engadir outra.",
+      "keyAlreadyExists": "Xa tes unha clave para este provedor. Elimínaa antes de engadir outra.",
       "keyStoreFailed": "Non se puido gardar a clave. Téntao de novo.",
-      "invalidCredentials": "Esta clave non ten o formato que espera {{provider}}. Verifica a clave e téntao de novo.",
+      "invalidCredentials": "Esta clave non ten o formato que espera este provedor. Comproba a clave e téntao de novo.",
       "testSucceeded": "A clave funciona. Provedor: {{provider}}. Modelo: {{model}}.",
       "testRejected": "O provedor rexeitou esta clave. Comproba que é correcta e que non foi revogada.",
       "testIncomplete": "O provedor rematou a proba antes de que esta finalizase. Téntao de novo.",
       "testUnsupportedProvider": "Este provedor xa non é compatible. Elimina a clave.",
       "testUnreadableKey": "A clave gardada non se puido ler. Téntao de novo máis tarde.",
       "testDeprecatedProvider": "Este provedor está obsoleto, polo que a súa clave non se pode probar.",
+      "keyManagedByCodingPlan": "O plan de programación xestiona a clave deste provedor, que é de só lectura. Cancela o plan de programación para engadir a túa propia clave.",
       "testFailed": "A proba da clave fallou. Téntao de novo."
     },
     "dataExport": {

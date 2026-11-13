@@ -363,15 +363,16 @@
       "apiKeyLabel": "Ufunguo wa API",
       "apiKeyPlaceholder": "Bandika ufunguo",
       "apiKeyRequired": "Weka ufunguo.",
-      "keyAlreadyExists": "Tayari unayo ufunguo wa {{provider}}. Ondoa ufunguo huo kabla ya kuongeza mwingine.",
+      "keyAlreadyExists": "Tayari unayo ufunguo wa mtoa huduma huyu. Ondoa ufunguo huo kabla ya kuongeza mwingine.",
       "keyStoreFailed": "Ufunguo haukuweza kuhifadhiwa. Jaribu tena.",
-      "invalidCredentials": "Ufunguo huu haupo katika umbizo linalotarajiwa na {{provider}}. Angalia na ujaribu tena.",
+      "invalidCredentials": "Ufunguo huu haupo katika umbizo linalotarajiwa na mtoa huduma huyu. Angalia na ujaribu tena.",
       "testSucceeded": "Ufunguo unafanya kazi. Mtoa huduma: {{provider}}. Modeli: {{model}}.",
       "testRejected": "Mtoa huduma amekataa ufunguo huu. Angalia kwamba ufunguo ni sahihi na haujabatilishwa.",
       "testIncomplete": "Mtoa huduma amemaliza jaribio kabla ya kukamilika. Jaribu tena.",
       "testUnsupportedProvider": "Mtoa huduma huyu hauungwi mkono tena. Ondoa ufunguo.",
       "testUnreadableKey": "Ufunguo uliohifadhiwa haukuweza kusomwa. Jaribu tena baadaye.",
       "testDeprecatedProvider": "Mtoa huduma huyu amepitwa na wakati, kwa hivyo ufunguo wake hauwezi kujaribiwa.",
+      "keyManagedByCodingPlan": "Mpango wa uandishi wa msimbo unasimamia ufunguo wa mtoa huduma huyu, na ufunguo huo ni wa kusoma pekee. Ghairi mpango wa uandishi wa msimbo ili kuongeza ufunguo wako mwenyewe.",
       "testFailed": "Jaribio la ufunguo limeshindwa. Jaribu tena."
     },
     "dataExport": {

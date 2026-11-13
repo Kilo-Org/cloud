@@ -363,15 +363,16 @@
       "apiKeyLabel": "API-kulcs",
       "apiKeyPlaceholder": "Illeszd be a kulcsot",
       "apiKeyRequired": "Add meg a kulcsot.",
-      "keyAlreadyExists": "Már van kulcsod a(z) {{provider}} szolgáltatóhoz. Távolítsd el, mielőtt újat adnál hozzá.",
+      "keyAlreadyExists": "Már van kulcsod ehhez a szolgáltatóhoz. Távolítsd el, mielőtt újat adnál hozzá.",
       "keyStoreFailed": "A kulcsot nem sikerült menteni. Próbáld újra.",
-      "invalidCredentials": "Ez a kulcs nem olyan formátumú, amilyet a(z) {{provider}} elvár. Ellenőrizd, és próbáld újra.",
+      "invalidCredentials": "Ez a kulcs nem olyan formátumú, amilyet ez a szolgáltató elvár. Ellenőrizd, és próbáld újra.",
       "testSucceeded": "A kulcs működik. Szolgáltató: {{provider}}. Modell: {{model}}.",
       "testRejected": "A szolgáltató elutasította ezt a kulcsot. Ellenőrizd, hogy helyes-e, és hogy nem vonták-e vissza.",
       "testIncomplete": "A szolgáltató a teszt befejeződése előtt megszakította azt. Próbáld újra.",
       "testUnsupportedProvider": "Ez a szolgáltató már nem támogatott. Távolítsd el a kulcsot.",
       "testUnreadableKey": "A tárolt kulcsot nem sikerült beolvasni. Próbáld újra később.",
       "testDeprecatedProvider": "Ez a szolgáltató elavult, ezért a kulcsa nem tesztelhető.",
+      "keyManagedByCodingPlan": "A kódolási csomagod kezeli ennek a szolgáltatónak a kulcsát, és a kulcs csak olvasható. Saját kulcs hozzáadásához mondd le a kódolási csomagot.",
       "testFailed": "A kulcs tesztelése nem sikerült. Próbáld újra."
     },
     "dataExport": {

@@ -363,15 +363,16 @@
       "apiKeyLabel": "Ključ API",
       "apiKeyPlaceholder": "Prilepi ključ",
       "apiKeyRequired": "Vnesi ključ.",
-      "keyAlreadyExists": "Za {{provider}} že imaš ključ. Odstrani ga, preden dodaš novega.",
+      "keyAlreadyExists": "Za tega ponudnika že imaš ključ. Odstrani ga, preden dodaš novega.",
       "keyStoreFailed": "Ključa ni bilo mogoče shraniti. Poskusi znova.",
-      "invalidCredentials": "Ta ključ ni v obliki, ki jo pričakuje {{provider}}. Preveri ga in poskusi znova.",
+      "invalidCredentials": "Ta ključ ni v obliki, ki jo pričakuje ta ponudnik. Preveri ga in poskusi znova.",
       "testSucceeded": "Ključ deluje. Ponudnik: {{provider}}. Model: {{model}}.",
       "testRejected": "Ponudnik je ta ključ zavrnil. Preveri, da je pravilen in ni preklican.",
       "testIncomplete": "Ponudnik je preizkus prekinil, preden se je končal. Poskusi znova.",
       "testUnsupportedProvider": "Ta ponudnik ni več podprt. Odstrani ključ.",
       "testUnreadableKey": "Shranjenega ključa ni bilo mogoče prebrati. Poskusi znova pozneje.",
       "testDeprecatedProvider": "Ta ponudnik je opuščen, zato njegovega ključa ni mogoče preizkusiti.",
+      "keyManagedByCodingPlan": "Tvoj paket za kodiranje upravlja ključ za tega ponudnika, ki je samo za branje. Če želiš dodati svojega, prekliči paket za kodiranje.",
       "testFailed": "Preizkus ključa ni uspel. Poskusi znova."
     },
     "dataExport": {

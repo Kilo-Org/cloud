@@ -363,15 +363,16 @@
       "apiKeyLabel": "Çelësi API",
       "apiKeyPlaceholder": "Ngjit çelësin",
       "apiKeyRequired": "Fut çelësin.",
-      "keyAlreadyExists": "Ke tashmë një çelës për {{provider}}. Hiqe përpara se të shtosh një tjetër.",
+      "keyAlreadyExists": "Ke tashmë një çelës për këtë ofrues. Hiqe përpara se të shtosh një tjetër.",
       "keyStoreFailed": "Çelësi nuk u ruajt dot. Provo përsëri.",
-      "invalidCredentials": "Ky çelës nuk është në formatin që pret {{provider}}. Kontrolloje dhe provo përsëri.",
+      "invalidCredentials": "Ky çelës nuk është në formatin që pret ky ofrues. Kontrolloje dhe provo përsëri.",
       "testSucceeded": "Çelësi funksionon. Ofruesi: {{provider}}. Modeli: {{model}}.",
       "testRejected": "Ofruesi e refuzoi këtë çelës. Kontrollo që është i saktë dhe nuk është revokuar.",
       "testIncomplete": "Ofruesi e mbylli testin përpara se të përfundonte. Provo përsëri.",
       "testUnsupportedProvider": "Ky ofrues nuk mbështetet më. Hiq çelësin.",
       "testUnreadableKey": "Çelësi i ruajtur nuk u lexua dot. Provo përsëri më vonë.",
       "testDeprecatedProvider": "Ky ofrues është i vjetëruar, kështu që çelësi i tij nuk mund të testohet.",
+      "keyManagedByCodingPlan": "Plani yt i kodimit menaxhon çelësin e këtij ofruesi dhe çelësi është vetëm për lexim. Anulo planin e kodimit për të shtuar çelësin tënd.",
       "testFailed": "Testimi i çelësit dështoi. Provo përsëri."
     },
     "dataExport": {

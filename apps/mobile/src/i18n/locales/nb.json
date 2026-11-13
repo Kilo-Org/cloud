@@ -363,15 +363,16 @@
       "apiKeyLabel": "API-nøkkel",
       "apiKeyPlaceholder": "Lim inn nøkkelen",
       "apiKeyRequired": "Skriv inn nøkkelen.",
-      "keyAlreadyExists": "Du har allerede en nøkkel for {{provider}}. Fjern den før du legger til en ny.",
+      "keyAlreadyExists": "Du har allerede en nøkkel for denne leverandøren. Fjern den før du legger til en ny.",
       "keyStoreFailed": "Nøkkelen kunne ikke lagres. Prøv igjen.",
-      "invalidCredentials": "Denne nøkkelen er ikke i det formatet {{provider}} forventer. Kontroller den og prøv igjen.",
+      "invalidCredentials": "Denne nøkkelen er ikke i det formatet denne leverandøren forventer. Kontroller den og prøv igjen.",
       "testSucceeded": "Nøkkelen fungerer. Leverandør: {{provider}}. Modell: {{model}}.",
       "testRejected": "Leverandøren avviste denne nøkkelen. Kontroller at den er riktig og ikke er tilbakekalt.",
       "testIncomplete": "Leverandøren avsluttet testen før den var ferdig. Prøv igjen.",
       "testUnsupportedProvider": "Denne leverandøren støttes ikke lenger. Fjern nøkkelen.",
       "testUnreadableKey": "Den lagrede nøkkelen kunne ikke leses. Prøv igjen senere.",
       "testDeprecatedProvider": "Denne leverandøren er utdatert, så nøkkelen kan ikke testes.",
+      "keyManagedByCodingPlan": "Et kodeabonnement administrerer denne leverandørens nøkkel, og nøkkelen er skrivebeskyttet. Avbryt kodeabonnementet for å legge til din egen nøkkel.",
       "testFailed": "Nøkkeltesten mislyktes. Prøv igjen."
     },
     "dataExport": {

@@ -34,13 +34,16 @@ const ProviderParamSchema = z.object({ provider: z.string().min(1) });
  * the provider's response, which names things this form does not show and does
  * not translate, so only the code decides the copy.
  */
-function refusedKeyMessage(error: unknown, provider: ProviderOption | undefined): string {
+function refusedKeyMessage(error: unknown): string {
   const code = readTrpcErrorField(error, 'code');
-  if (code === 'CONFLICT' && provider) {
-    return i18n.t('profile.providerKeys.keyAlreadyExists', { provider: provider.name });
+  if (code === 'CONFLICT') {
+    return i18n.t('profile.providerKeys.keyAlreadyExists');
   }
-  if (code === 'UNPROCESSABLE_CONTENT' && provider) {
-    return i18n.t('profile.providerKeys.invalidCredentials', { provider: provider.name });
+  if (code === 'PRECONDITION_FAILED') {
+    return i18n.t('profile.providerKeys.keyManagedByCodingPlan');
+  }
+  if (code === 'UNPROCESSABLE_CONTENT') {
+    return i18n.t('profile.providerKeys.invalidCredentials');
   }
   return i18n.t('profile.providerKeys.keyStoreFailed');
 }
@@ -76,9 +79,8 @@ export function ProviderKeyNewScreen() {
     []
   );
 
-  // The provider the form is for, resolved before the mutation so the refusal
-  // handler knows whose key it reports on. The route parameter is untrusted
-  // text: an id the server does not offer resolves to nothing.
+  // The provider the form is for. The route parameter is untrusted text: an id
+  // the server does not offer resolves to nothing.
   const provider: ProviderOption | undefined = parsedParam.success
     ? providers.data?.find(row => row.id === parsedParam.data.provider)
     : undefined;
@@ -95,7 +97,7 @@ export function ProviderKeyNewScreen() {
       // The server applies the same credential rules it applies to every stored
       // key; the form reports which one refused this key.
       onError: error => {
-        setSubmitError(refusedKeyMessage(error, provider));
+        setSubmitError(refusedKeyMessage(error));
       },
     })
   );

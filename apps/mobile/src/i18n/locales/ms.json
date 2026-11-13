@@ -363,15 +363,16 @@
       "apiKeyLabel": "Kunci API",
       "apiKeyPlaceholder": "Tampal kunci",
       "apiKeyRequired": "Masukkan kunci.",
-      "keyAlreadyExists": "Anda sudah mempunyai kunci untuk {{provider}}. Alih keluar sebelum anda menambah yang lain.",
+      "keyAlreadyExists": "Anda sudah mempunyai kunci untuk pembekal ini. Alih keluar sebelum anda menambah yang lain.",
       "keyStoreFailed": "Kunci tidak dapat disimpan. Cuba lagi.",
-      "invalidCredentials": "Kunci ini tidak dalam format yang dijangka oleh {{provider}}. Semak dan cuba lagi.",
+      "invalidCredentials": "Kunci ini tidak dalam format yang dijangka oleh pembekal ini. Semak dan cuba lagi.",
       "testSucceeded": "Kunci berfungsi. Pembekal: {{provider}}. Model: {{model}}.",
       "testRejected": "Pembekal menolak kunci ini. Semak bahawa ia betul dan belum dibatalkan.",
       "testIncomplete": "Pembekal menamatkan ujian sebelum ia selesai. Cuba lagi.",
       "testUnsupportedProvider": "Pembekal ini tidak lagi disokong. Alih keluar kunci.",
       "testUnreadableKey": "Kunci yang disimpan tidak dapat dibaca. Cuba lagi nanti.",
       "testDeprecatedProvider": "Pembekal ini usang, jadi kuncinya tidak boleh diuji.",
+      "keyManagedByCodingPlan": "Pelan pengekodan mengurus kunci pembekal ini, dan kunci ini baca sahaja. Batalkan pelan pengekodan untuk menambah kunci anda sendiri.",
       "testFailed": "Ujian kunci gagal. Cuba lagi."
     },
     "dataExport": {

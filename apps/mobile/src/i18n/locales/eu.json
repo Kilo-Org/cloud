@@ -363,15 +363,16 @@
       "apiKeyLabel": "API gakoa",
       "apiKeyPlaceholder": "Itsatsi gakoa",
       "apiKeyRequired": "Idatzi gakoa.",
-      "keyAlreadyExists": "Dagoeneko badaukazu {{provider}} hornitzailearen gako bat. Kendu ezazu beste bat gehitu aurretik.",
+      "keyAlreadyExists": "Dagoeneko badaukazu hornitzaile honen gako bat. Kendu ezazu beste bat gehitu aurretik.",
       "keyStoreFailed": "Ezin izan da gakoa gorde. Saiatu berriro.",
-      "invalidCredentials": "Gako hau ez dago {{provider}} hornitzaileak espero duen formatuan. Egiaztatu eta saiatu berriro.",
+      "invalidCredentials": "Gako hau ez dago hornitzaile honek espero duen formatuan. Egiaztatu eta saiatu berriro.",
       "testSucceeded": "Gakoak funtzionatzen du. Hornitzailea: {{provider}}. Modeloa: {{model}}.",
       "testRejected": "Hornitzaileak gako hau baztertu du. Egiaztatu zuzena dela eta ez dela baliogabetu.",
       "testIncomplete": "Hornitzaileak proba amaitu aurretik eten zuen. Saiatu berriro.",
       "testUnsupportedProvider": "Hornitzaile hau jada ez da onartzen. Kendu gakoa.",
       "testUnreadableKey": "Ezin izan da gordetako gakoa irakurri. Saiatu geroago.",
       "testDeprecatedProvider": "Hornitzaile hau zaharkituta dago, beraz ezin da haren gakoa probatu.",
+      "keyManagedByCodingPlan": "Kodetze-plan batek hornitzaile honen gakoa kudeatzen du, eta gakoa irakurtzeko soilik da. Zure gakoa gehitzeko, kodetze-plana bertan behera utzi behar duzu.",
       "testFailed": "Gakoaren proba huts egin du. Saiatu berriro."
     },
     "dataExport": {

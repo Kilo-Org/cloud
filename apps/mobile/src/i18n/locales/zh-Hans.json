@@ -363,15 +363,16 @@
       "apiKeyLabel": "API 密钥",
       "apiKeyPlaceholder": "粘贴密钥",
       "apiKeyRequired": "请输入密钥。",
-      "keyAlreadyExists": "你已有 {{provider}} 的密钥。请先移除它，再添加另一个。",
+      "keyAlreadyExists": "你已有此提供商的密钥。请先移除它，再添加另一个。",
       "keyStoreFailed": "密钥无法保存。请重试。",
-      "invalidCredentials": "此密钥的格式与 {{provider}} 要求的不符。请检查后重试。",
+      "invalidCredentials": "此密钥的格式与此提供商要求的不符。请检查后重试。",
       "testSucceeded": "密钥可用。提供商：{{provider}}。模型：{{model}}。",
       "testRejected": "提供商拒绝了此密钥。请检查其是否正确且未被撤销。",
       "testIncomplete": "提供商在测试完成前结束了测试。请重试。",
       "testUnsupportedProvider": "此提供商已不再受支持。请移除该密钥。",
       "testUnreadableKey": "无法读取已存储的密钥。请稍后重试。",
       "testDeprecatedProvider": "此提供商已弃用，因此其密钥无法测试。",
+      "keyManagedByCodingPlan": "编程套餐管理着此提供商的密钥，该密钥为只读。要添加你自己的密钥，请先取消编程套餐。",
       "testFailed": "密钥测试失败。请重试。"
     },
     "dataExport": {

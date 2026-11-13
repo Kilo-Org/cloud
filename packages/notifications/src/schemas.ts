@@ -8,6 +8,7 @@ export * from './badge-buckets';
 export * from './needs-input-actions';
 export * from './notification-events';
 export * from './notification-history';
+export * from './primitives';
 export * from './push-data';
 export * from './push-presentation';
 export * from './rpc-schemas';

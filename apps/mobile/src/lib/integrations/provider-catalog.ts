@@ -145,17 +145,6 @@ const MANAGER_NOTE_KEYS: readonly {
 const HUB_HINT_ROLES = ORGANIZATION_MANAGE_ROLES;
 
 /**
- * The roles this action requires, or `null` when any member may take it.
- */
-export function providerManagerRoles(input: {
-  provider: IntegrationProvider;
-  action: IntegrationAction;
-  installed?: boolean;
-}): readonly OrganizationRole[] | null {
-  return rolesFor(PROVIDERS[input.provider], input.action, input.installed);
-}
-
-/**
  * The key of the sentence a row shows when the viewer can take no action on it
  * and the hub hint would misdirect. The hint is true only where every role it
  * names can act — Bitbucket's `owner` is such a role and its `admin` is not, so
@@ -167,7 +156,7 @@ export function providerBlockedNoteKey(input: {
   action: IntegrationAction;
   installed?: boolean;
 }): string | undefined {
-  const roles = providerManagerRoles(input);
+  const roles = rolesFor(PROVIDERS[input.provider], input.action, input.installed);
   if (roles === null) {
     return undefined;
   }

@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +15,7 @@ import { MenuSheet, type MenuSheetOption } from '@/components/ui/menu-sheet';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { takeCreatedKeyId } from '@/lib/ssh/created-key';
 import {
   type HostFormErrorKind,
   type HostFormIssue,
@@ -26,6 +28,8 @@ import {
 } from '@/lib/ssh/host-form';
 import { type SshHost, type SshHostInput, SshJumpHostCycleError } from '@/lib/ssh/hosts';
 import { type SshKey } from '@/lib/ssh/keys';
+import { SSH_KEY_IMPORT_ROUTE, SSH_KEY_NEW_ROUTE } from '@/lib/ssh/routes';
+import { cn } from '@/lib/utils';
 
 type HostEditorFormProps = Readonly<{
   host: SshHost | null;
@@ -68,6 +72,18 @@ export function HostEditorForm({
   const [tmuxAttach, setTmuxAttach] = useState(initial.tmuxAttach);
   const [issues, setIssues] = useState<readonly HostFormIssue[]>([]);
   const [picker, setPicker] = useState<OpenPicker>(null);
+  const router = useRouter();
+
+  // The key screens push over this one, so returning focus is where their
+  // result arrives: the key they created becomes this host's key.
+  useFocusEffect(
+    useCallback(() => {
+      const created = takeCreatedKeyId();
+      if (created !== null) {
+        setKeyId(created);
+      }
+    }, [])
+  );
 
   const jumpCycle = saveError instanceof SshJumpHostCycleError;
   const otherHosts = jumpHostCandidates(hosts, host?.id ?? null);
@@ -213,15 +229,39 @@ export function HostEditorForm({
         ) : null}
 
         {authMethod === 'key' ? (
-          <PickerField
-            label={t('ssh.editor.privateKey')}
-            value={keys.length === 0 ? t('ssh.editor.noKeys') : (selectedKey?.label ?? null)}
-            placeholder={t('ssh.editor.chooseKey')}
-            disabled={keys.length === 0 || saving}
-            onPress={() => {
-              setPicker('key');
-            }}
-          />
+          <>
+            <PickerField
+              label={t('ssh.editor.privateKey')}
+              value={keys.length === 0 ? t('ssh.editor.noKeys') : (selectedKey?.label ?? null)}
+              placeholder={t('ssh.editor.chooseKey')}
+              disabled={keys.length === 0 || saving}
+              onPress={() => {
+                setPicker('key');
+              }}
+            />
+            <View className="flex-row gap-2">
+              <Button
+                variant="outline"
+                className={cn(STATE_ACTION_CLASS, 'flex-1')}
+                disabled={saving}
+                onPress={() => {
+                  router.push(SSH_KEY_NEW_ROUTE);
+                }}
+              >
+                <Text>{t('ssh.keys.generate')}</Text>
+              </Button>
+              <Button
+                variant="outline"
+                className={cn(STATE_ACTION_CLASS, 'flex-1')}
+                disabled={saving}
+                onPress={() => {
+                  router.push(SSH_KEY_IMPORT_ROUTE);
+                }}
+              >
+                <Text>{t('ssh.keys.import')}</Text>
+              </Button>
+            </View>
+          </>
         ) : null}
 
         <PickerField

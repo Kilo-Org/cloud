@@ -24,7 +24,9 @@ import {
   SSH_HOST_NEW_ROUTE,
   SSH_KNOWN_HOSTS_ROUTE,
   sshHostPath,
+  sshSessionPath,
 } from '@/lib/ssh/routes';
+import { openSession } from '@/lib/ssh/session/manager';
 import { useSshHostMutations, useSshHosts } from '@/lib/ssh/use-ssh';
 
 const SKELETON_ROWS = [0, 1, 2];
@@ -156,7 +158,7 @@ export function SshHostsScreen() {
             host={host}
             jumpHost={host.jumpHostId === null ? null : (hostsById.get(host.jumpHostId) ?? null)}
             onPress={() => {
-              router.push(sshHostPath(host.id));
+              router.push(sshSessionPath(openSession(host)));
             }}
             onLongPress={() => {
               setMenuHost(host);

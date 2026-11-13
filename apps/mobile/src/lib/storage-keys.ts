@@ -76,6 +76,8 @@ export const TRUSTED_IMAGE_HOSTS_KEY = 'trusted-image-hosts';
 export const PR_REVIEW_FOOTER_KEY = 'pr-review-footer-enabled';
 /** Group consecutive tool calls on the session page into one condensed row. */
 export const CONDENSE_TOOL_CALLS_KEY = 'condense-tool-calls';
+/** Point size the SSH terminal renders at, last set by a pinch. */
+export const SSH_TERMINAL_FONT_SIZE_KEY = 'ssh-terminal-font-size';
 /** Master switch for the agent-callable settings tools (the profile settings a Quick Chat agent may change). */
 export const SETTINGS_TOOLS_ENABLED_KEY = 'settings-tools-enabled';
 /** Persisted remote MCP servers: a JSON array of `StoredRemoteMcpServer`. */

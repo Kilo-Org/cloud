@@ -1,3 +1,8 @@
+/** The OpenSSH host pattern the store keys a trusted key under. */
+export function hostPattern(hostname: string, port: number): string {
+  return port === 22 ? hostname : `[${hostname}]:${port}`;
+}
+
 /**
  * The OpenSSH host pattern as a reader reads it. A non-default port makes
  * OpenSSH write the host in brackets (`[web-1.kilo.test]:2222`), which is the

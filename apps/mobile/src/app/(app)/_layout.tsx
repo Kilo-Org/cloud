@@ -10,6 +10,7 @@ import { BriefingSyncMount } from '@/components/agent-briefing/briefing-sync-mou
 import { LauncherSurfacesMount } from '@/components/launcher-surfaces-mount';
 import { ScreenErrorBoundary } from '@/components/screen-error-boundary';
 import { SharePayloadNavigator } from '@/components/share/share-payload-navigator';
+import { SshSessionRuntime } from '@/components/ssh/session/ssh-session-runtime';
 import { TourAutoOpen } from '@/components/tour/tour-auto-open';
 import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mount';
 import { StorePurchaseRecoveryMount } from '@/lib/iap/store-purchase-recovery-mount';
@@ -162,6 +163,7 @@ export default function AppLayout() {
       <ToolSummaryTranslationRetryMount />
       <StorePurchaseRecoveryMount />
       <ForegroundReconciliationMount />
+      <SshSessionRuntime />
       <AppWideFreshnessMount />
       <SharePayloadNavigator />
       <PickerLaunchRestoreMount />
@@ -210,7 +212,21 @@ export default function AppLayout() {
             <Stack.Screen name="ssh/host/new" />
             <Stack.Screen name="ssh/host/[host-id]" />
             <Stack.Screen name="ssh/import" />
+            <Stack.Screen name="ssh/key/new" />
+            <Stack.Screen name="ssh/key/import" />
             <Stack.Screen name="ssh/known-hosts" />
+            {/* A session screen is a live shell: a swipe back would hide it,
+                not end it, and the switcher is how a person leaves one. */}
+            <Stack.Screen
+              name="ssh/session/[session-id]"
+              options={{ gestureEnabled: false, headerShown: false }}
+            />
+            {/* A prompt is a question the connection cannot proceed without, so
+                it presents as a sheet that cannot be swiped away. */}
+            <Stack.Screen
+              name="ssh/prompt/[session-id]"
+              options={{ ...sheetOptions, gestureEnabled: false }}
+            />
             <Stack.Screen name="session-changes/[session-id]" options={{ headerShown: false }} />
             <Stack.Screen name="shared/[token]" options={{ headerShown: false }} />
             <Stack.Screen name="agent-chat/model-picker" options={searchSheetOptions} />

@@ -1,11 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
-import { hostTarget } from '@/components/ssh/host-target';
 import { IconTile } from '@/components/ui/icon-tile';
 import { Server } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { NEUTRAL_TINT } from '@/lib/agent-color';
+import { hostTarget } from '@/lib/ssh/host-target';
 import { type SshHost } from '@/lib/ssh/hosts';
 
 type HostListRowProps = Readonly<{

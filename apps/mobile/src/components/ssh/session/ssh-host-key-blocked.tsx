@@ -1,0 +1,72 @@
+import { useTranslation } from 'react-i18next';
+import { View } from 'react-native';
+
+import { Button } from '@/components/ui/button';
+import { KeyRound, ShieldAlert } from '@/components/ui/icons';
+import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { type SshHostKeyAwaiting } from '@/lib/ssh/session/types';
+
+type SshHostKeyBlockedProps = Readonly<{
+  hostKey: SshHostKeyAwaiting & { readonly knownFingerprintSha256: string };
+  onOpenKnownHosts: () => void;
+  onClose: () => void;
+}>;
+
+/**
+ * A host that presented a different key than the one the store trusts.
+ *
+ * There is no Accept here on purpose: the whole value of a trusted key is that
+ * a change is a warning, not a dialog to dismiss. The two fingerprints are
+ * shown side by side so the person can see whether the server was rebuilt, and
+ * the way forward is the known-hosts screen, where the old entry is removed
+ * deliberately.
+ */
+export function SshHostKeyBlocked({ hostKey, onOpenKnownHosts, onClose }: SshHostKeyBlockedProps) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+
+  return (
+    <View className="flex-1 gap-4 px-4 py-6">
+      <View className="flex-row items-center gap-2">
+        <ShieldAlert size={20} color={colors.destructive} />
+        <Text className="text-base font-semibold text-foreground">
+          {t('ssh.session.hostKeyChangedTitle')}
+        </Text>
+      </View>
+      <Text className="text-sm text-muted-foreground">
+        {t('ssh.session.hostKeyChangedBody', {
+          pattern: hostKey.hostPattern,
+          algorithm: hostKey.algorithm,
+        })}
+      </Text>
+
+      <View className="gap-3 rounded-lg border border-danger-tile-border bg-danger-tile-bg p-3">
+        <Fingerprint label={t('ssh.session.hostKeyTrusted')} value={hostKey.knownFingerprintSha256} />
+        <Fingerprint label={t('ssh.session.hostKeyOffered')} value={hostKey.fingerprintSha256} />
+      </View>
+
+      <View className="mt-auto gap-2">
+        <Button className={STATE_ACTION_CLASS} onPress={onOpenKnownHosts}>
+          <KeyRound size={16} color={colors.primaryForeground} />
+          <Text>{t('ssh.session.openKnownHosts')}</Text>
+        </Button>
+        <Button variant="outline" className={STATE_ACTION_CLASS} onPress={onClose}>
+          <Text>{t('ssh.session.disconnect')}</Text>
+        </Button>
+      </View>
+    </View>
+  );
+}
+
+function Fingerprint({ label, value }: Readonly<{ label: string; value: string }>) {
+  return (
+    <View className="gap-1">
+      <Text className="text-xs text-muted-foreground">{label}</Text>
+      <Text variant="mono" className="text-xs text-foreground">
+        {value}
+      </Text>
+    </View>
+  );
+}

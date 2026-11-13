@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
+import { toast } from 'sonner-native';
 
 import { importSshConfig, type SshConfigPlan } from './config-import';
 import { createHost, deleteHost, getHost, listHosts, type SshHostInput, updateHost } from './hosts';
-import { listKeys } from './keys';
+import { createKey, listKeys, type SshKeyInput } from './keys';
 import { listKnownHosts, removeKnownHost } from './known-hosts';
 import { sshDatabase } from './store';
 
@@ -88,6 +89,16 @@ export function useSshKnownHostMutations() {
     onSuccess: () => void invalidate(),
   });
   return { remove };
+}
+
+export function useSshKeyMutations() {
+  const invalidate = useSshInvalidation();
+  const create = useMutation({
+    mutationFn: async (input: SshKeyInput) => createKey(await sshDatabase(), input),
+    onSuccess: () => void invalidate(),
+    onError: error => toast.error(error.message),
+  });
+  return { create };
 }
 
 export function useSshConfigImport() {

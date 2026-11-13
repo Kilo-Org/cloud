@@ -2,10 +2,10 @@ import { type TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { hostTarget } from '@/components/ssh/host-target';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Text } from '@/components/ui/text';
 import { type SshConfigHostDraft, type SshConfigWarning } from '@/lib/ssh/config-import';
+import { hostTarget } from '@/lib/ssh/host-target';
 
 /** What the preview says about one warning it found in a host's block. */
 function warningMessage(t: TFunction, warning: SshConfigWarning): string {

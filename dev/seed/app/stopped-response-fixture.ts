@@ -1,12 +1,14 @@
 import { execFileSync } from 'node:child_process';
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { cli_sessions_v2, kilocode_users } from '@kilocode/db/schema';
 import { signKiloToken } from '@kilocode/worker-utils';
 
+import type { SeedResult } from '../index';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
+import { normalizeSeedEmail } from '../lib/email';
 import {
   buildAssistantMessageItem,
   buildSessionItem,
@@ -15,35 +17,163 @@ import {
   type SessionIngestItem,
 } from '../lib/mobile-sheet-fixtures';
 import { seedTokenSigningParams } from '../lib/token-signing';
+import { isValidEmail } from '../lib/users';
+
+export const usage = '<email>';
 
 const SESSION_ID = 'ses_wcznvhxjre0wq479o73fthedp3';
-const EMAIL = 'drain-gate@example.com';
 const TITLE = 'Stopped response fixture';
+const USER_MESSAGE_ID = 'msgStopFictureUser0001';
+const ASSISTANT_MESSAGE_ID = 'msgStopFictureAsst0001';
+const TEXT_PART_ID = 'prtStopFictureText0001';
+const TOKEN_EXPIRES_SECONDS = 3600;
+const POLL_TIMEOUT_MS = 30_000;
+const POLL_INTERVAL_MS = 500;
 
-const HistoryResponseSchema = z.object({
-  history: z
-    .object({ messages: z.array(z.unknown()) })
-    .partial()
-    .optional(),
+function printUsage(): void {
+  console.log(`Usage: pnpm dev:seed app:stopped-response-fixture ${usage}`);
+  console.log('');
+  console.log('Seeds one agent session whose assistant message carries a');
+  console.log('MessageAbortedError and ends with a stopped text response, through');
+  console.log('the local cloudflare-session-ingest worker. Resets only its own session.');
+  console.log('');
+  console.log('Examples:');
+  console.log('  pnpm dev:seed app:stopped-response-fixture ada@example.com');
+  console.log('  pnpm -s dev:seed app:stopped-response-fixture ada@example.com --json');
+}
+
+function sleep(ms: number): Promise<void> {
+  const { promise, resolve } = Promise.withResolvers<void>();
+  setTimeout(resolve, ms);
+  return promise;
+}
+
+const StoredMessageSchema = z.object({
+  info: z.object({ id: z.string() }),
+  parts: z.array(z.object({ id: z.string(), type: z.string() })),
 });
 
-export async function run(): Promise<unknown> {
+const MessagesResponseSchema = z.object({
+  success: z.boolean(),
+  history: z
+    .object({
+      kind: z.string().optional(),
+      messages: z.array(StoredMessageSchema).optional(),
+    })
+    .nullable(),
+});
+
+type MessagesResponse = z.infer<typeof MessagesResponseSchema>;
+
+function parseArgs(args: string[]): { email: string } {
+  const positionals: string[] = [];
+  for (const arg of args) {
+    if (arg.startsWith('--')) {
+      throw new Error(`Unknown argument: ${arg}`);
+    }
+    positionals.push(arg.trim());
+  }
+  const [email, ...rest] = positionals;
+  if (!email) {
+    printUsage();
+    throw new Error('email is required');
+  }
+  if (rest.length > 0) {
+    throw new Error(`Unexpected extra arguments: ${rest.join(' ')}`);
+  }
+  if (!isValidEmail(email)) {
+    throw new Error(`email is not a valid address: ${email}`);
+  }
+  return { email };
+}
+
+function hasAssistantTextPart(page: MessagesResponse): boolean {
+  const assistant = page.history?.messages?.find(
+    message => message.info.id === ASSISTANT_MESSAGE_ID
+  );
+  if (!assistant) return false;
+  return assistant.parts.some(part => part.id === TEXT_PART_ID && part.type === 'text');
+}
+
+function describeHistory(page: MessagesResponse | null): string {
+  if (!page) return 'a body that does not match the messages response schema';
+  if (!page.success) return 'success=false';
+  const history = page.history;
+  if (history === null) return 'history=null';
+  if (history.kind !== undefined) return `history.kind=${history.kind}`;
+  if (!history.messages) return 'a history without messages';
+  return `${history.messages.length} message(s) without the assistant text part`;
+}
+
+async function pollForMessages(baseUrl: string, sessionId: string, token: string): Promise<number> {
+  const deadline = Date.now() + POLL_TIMEOUT_MS;
+  for (;;) {
+    const response = await fetch(`${baseUrl}/api/session/${sessionId}/messages?limit=100`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      throw new Error(`Messages read of ${sessionId} failed (${response.status})`);
+    }
+    const parsed = MessagesResponseSchema.safeParse(await response.json());
+    const page: MessagesResponse | null = parsed.success ? parsed.data : null;
+    if (page?.success) {
+      if (page.history?.kind === 'too_large') {
+        throw new Error(`session-ingest reported too_large for ${sessionId}`);
+      }
+      if (hasAssistantTextPart(page)) {
+        return page.history?.messages?.length ?? 0;
+      }
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `Timed out waiting for the transcript of ${sessionId}; saw ${describeHistory(page)}`
+      );
+    }
+    await sleep(POLL_INTERVAL_MS);
+  }
+}
+
+export async function run(...args: string[]): Promise<SeedResult | void> {
+  if (args.includes('--help') || args.includes('-h')) {
+    printUsage();
+    return;
+  }
+  const { email } = parseArgs(args);
+
   const secret = process.env.NEXTAUTH_SECRET;
   if (!secret) {
     throw new Error('NEXTAUTH_SECRET is not set for this worktree.');
   }
+
+  const normalizedEmail = normalizeSeedEmail(email);
   assertLocalSeedDatabase('app:stopped-response-fixture');
   const db = getSeedDb();
-  const [user] = await db
+  const matches = await db
     .select({
-      id: kilocode_users.id,
+      userId: kilocode_users.id,
+      email: kilocode_users.google_user_email,
       apiTokenPepper: kilocode_users.api_token_pepper,
     })
     .from(kilocode_users)
-    .where(eq(kilocode_users.google_user_email, EMAIL))
-    .limit(1);
+    .where(
+      or(
+        eq(kilocode_users.google_user_email, email),
+        eq(kilocode_users.normalized_email, normalizedEmail)
+      )
+    );
+
+  if (matches.length === 0) {
+    throw new Error(`No user found for email ${email}.`);
+  }
+  const exactMatches = matches.filter(match => match.email === email);
+  const resolvedMatches = exactMatches.length > 0 ? exactMatches : matches;
+  if (resolvedMatches.length > 1) {
+    const matchList = resolvedMatches.map(match => `${match.email} (${match.userId})`).join(', ');
+    throw new Error(`Multiple users matched ${email}: ${matchList}`);
+  }
+  const [user] = resolvedMatches;
   if (!user) {
-    throw new Error(`No user for ${EMAIL}.`);
+    throw new Error(`No user found for email ${email}.`);
   }
 
   const status = parseSessionIngestServiceStatus(
@@ -57,35 +187,37 @@ export async function run(): Promise<unknown> {
   await db
     .delete(cli_sessions_v2)
     .where(
-      and(eq(cli_sessions_v2.kilo_user_id, user.id), eq(cli_sessions_v2.session_id, SESSION_ID))
+      and(eq(cli_sessions_v2.kilo_user_id, user.userId), eq(cli_sessions_v2.session_id, SESSION_ID))
     );
   await db.insert(cli_sessions_v2).values({
     session_id: SESSION_ID,
-    kilo_user_id: user.id,
+    kilo_user_id: user.userId,
     title: TITLE,
     created_on_platform: 'cli',
   });
 
   const { token } = await signKiloToken({
-    userId: user.id,
+    userId: user.userId,
     pepper: user.apiTokenPepper,
     secret,
-    ...seedTokenSigningParams(3600),
+    ...seedTokenSigningParams(TOKEN_EXPIRES_SECONDS),
   });
 
   const startedAt = Date.now();
-  const userId = 'msgStopFictureUser0001';
-  const assistantId = 'msgStopFictureAsst0001';
   const items: SessionIngestItem[] = [
     buildSessionItem({ sessionId: SESSION_ID, slug: 'stopped-response-fixture', title: TITLE }),
-    buildUserMessageItem({ messageId: userId, sessionId: SESSION_ID, createdAt: startedAt }),
+    buildUserMessageItem({
+      messageId: USER_MESSAGE_ID,
+      sessionId: SESSION_ID,
+      createdAt: startedAt,
+    }),
     {
       type: 'message',
       data: {
         ...buildAssistantMessageItem({
-          messageId: assistantId,
+          messageId: ASSISTANT_MESSAGE_ID,
           sessionId: SESSION_ID,
-          parentId: userId,
+          parentId: USER_MESSAGE_ID,
           createdAt: startedAt + 500,
           completedAt: startedAt + 4000,
           cost: 0,
@@ -102,9 +234,9 @@ export async function run(): Promise<unknown> {
   items.push({
     type: 'part',
     data: {
-      id: 'prtStopFictureText0001',
+      id: TEXT_PART_ID,
       sessionID: SESSION_ID,
-      messageID: assistantId,
+      messageID: ASSISTANT_MESSAGE_ID,
       type: 'text',
       text: [
         'Checking the failing test before I stop.',
@@ -131,13 +263,19 @@ export async function run(): Promise<unknown> {
     throw new Error(`ingest failed (${ingest.status}): ${await ingest.text()}`);
   }
 
-  const check = await fetch(`${baseUrl}/api/session/${SESSION_ID}/messages?limit=10`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!check.ok) {
-    throw new Error(`history read failed (${check.status}): ${await check.text()}`);
-  }
-  const history = HistoryResponseSchema.parse(await check.json());
-  const messages = history.history?.messages ?? [];
-  return { sessionId: SESSION_ID, messageCount: messages.length };
+  const messageCount = await pollForMessages(baseUrl, SESSION_ID, token);
+
+  console.log(
+    'This fixture represents: one agent session whose stopped assistant turn carries MessageAbortedError and a neutral text response.'
+  );
+  console.log(
+    'Suggested next step: open the session on a signed-in dev build and check the stopped status line.'
+  );
+  return {
+    userId: user.userId,
+    email: user.email,
+    sessionId: SESSION_ID,
+    messageCount,
+    deepLink: `kiloapp:///(app)/agent-chat/${SESSION_ID}`,
+  };
 }

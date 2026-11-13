@@ -273,7 +273,7 @@ export function NewSessionConfigureForm({
     <ScrollView
       ref={scrollRef}
       className="flex-1"
-      contentContainerClassName="flex-grow px-4 pt-4"
+      contentContainerClassName="flex-grow px-4 pt-4 pb-4"
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
     >
@@ -429,11 +429,6 @@ export function NewSessionConfigureForm({
           onRequestReveal={revealAdvancedConfig}
         />
       ) : null}
-      {/* The footer is pinned over the scroll viewport, so without this the
-          last rows end underneath it: a row at the bottom of the scroll painted
-          but could no longer be reached or pressed. The spacer reserves exactly
-          the footer's measured height, so every row scrolls clear of Start. */}
-      <View style={{ height: footerHeight }} />
     </ScrollView>
   );
 

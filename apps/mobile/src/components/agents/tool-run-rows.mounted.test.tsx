@@ -172,11 +172,13 @@ describe('CondensedToolRunRow label', () => {
     await settleTranslation();
 
     expect(textWithContent(renderer.root, '3 items; Nouveau fichier')).toHaveLength(1);
-    expect(requestMock).toHaveBeenCalledWith({
-      texts: ['resolved.ts'],
-      targetLanguage: 'en',
-      model: MODEL.id,
-    });
+    expect(requestMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        texts: ['resolved.ts'],
+        targetLanguage: 'en',
+        model: MODEL.id,
+      })
+    );
     renderer.unmount();
   });
 

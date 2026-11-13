@@ -41,10 +41,26 @@ const TranslationArraySchema = z.array(z.unknown());
 /** One entry of the reply: only a string is a translation. */
 const TranslationEntrySchema = z.string();
 
+/**
+ * The authority a batch was queued under. The runtime captures it when it takes
+ * a batch: `signal` aborts when the opt-in, the model or the authenticated
+ * account changes, and `isCurrent` re-checks the same three. The request is
+ * only sent while both still hold, so a batch is authenticated as, and
+ * attributed to, the account that queued it.
+ */
+export type ToolSummaryTranslationScope = {
+  /** Aborted when the batch's opt-in, model or account stops being current. */
+  signal: AbortSignal;
+  /** Re-checks the captured account epoch, generation and opt-in. */
+  isCurrent: () => boolean;
+};
+
 export type RequestToolSummaryTranslationsInput = {
   texts: readonly string[];
   targetLanguage: string;
   model: string;
+  /** The dispatch fence of the batch that carries these texts. */
+  scope: ToolSummaryTranslationScope;
 };
 
 /** Wire headers for the translation request; the organization header is scoped. */
@@ -99,15 +115,21 @@ function parseTranslations(content: string, count: number): (string | null)[] {
  * request. Returns one entry per text in the same order — the trimmed
  * translation, or null at a position whose entry was unusable. Every whole-batch
  * failure (no token, non-2xx, malformed body, timeout/abort, throw) returns one
- * null per text.
+ * null per text, and so does a batch whose account or configuration stopped
+ * being current before the send: it is fenced, never sent under new credentials.
  */
 export async function requestToolSummaryTranslations({
   texts,
   targetLanguage,
   model,
+  scope,
 }: RequestToolSummaryTranslationsInput): Promise<(string | null)[]> {
   if (texts.length === 0) {
     return [];
+  }
+  // The batch is already fenced: no credential read, nothing sent.
+  if (!scope.isCurrent()) {
+    return nullResults(texts.length);
   }
   const token = await getAuthTokenForRequest();
   if (!token) {
@@ -115,6 +137,15 @@ export async function requestToolSummaryTranslations({
   }
   // The organization scope the translation is attributed to; null is personal.
   const organizationId = await readStoredValue(ORGANIZATION_STORAGE_KEY);
+  // Both reads await a secure store, long enough for a sign-out, a profile
+  // switch or an opt-out to land. The fence was captured when the batch was
+  // taken, so a moved epoch or generation means the token and the organization
+  // that were just read describe a different account than the one that queued
+  // these texts. The runtime's fence re-reads its abort signal too. Nothing
+  // awaits between this check and the send.
+  if (!scope.isCurrent()) {
+    return nullResults(texts.length);
+  }
 
   const headers: TranslationRequestHeaders = {
     Authorization: `Bearer ${token}`,
@@ -131,6 +162,12 @@ export async function requestToolSummaryTranslations({
   const prompt = `Translate each string of the user's JSON array into ${targetName}. The array holds ${texts.length} strings; return a JSON array of the same length and order, each string translated. Keep file paths, commands, code, and identifiers unchanged. Return only the JSON array, with no prose and no code fences.`;
 
   const controller = new AbortController();
+  // A reset that aborts the batch aborts its request too: a batch the account
+  // changed under must not finish under the new account.
+  const abortRequest = (): void => {
+    controller.abort();
+  };
+  scope.signal.addEventListener('abort', abortRequest, { once: true });
   // A big batch needs longer than a single text; the scale stays bounded.
   const timeoutMs = Math.min(
     TOOL_SUMMARY_TRANSLATION_TIMEOUT_MS + PER_TEXT_TIMEOUT_MS * (texts.length - 1),
@@ -169,6 +206,7 @@ export async function requestToolSummaryTranslations({
   } catch {
     return nullResults(texts.length);
   } finally {
+    scope.signal.removeEventListener('abort', abortRequest);
     clearTimeout(timeoutId);
   }
 }

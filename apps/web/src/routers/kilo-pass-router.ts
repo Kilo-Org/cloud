@@ -792,6 +792,7 @@ async function buildActiveKiloPassSubscriptionState(params: {
 
   return {
     ...params.subscription,
+    endedAt: params.subscription.endedAt ?? null,
     nextBonusCreditsUsd: getNextKiloPassBonusCreditsUsd({
       subscription: params.subscription,
       isFirstTimeSubscriberEver,
@@ -1545,7 +1546,9 @@ export const kiloPassRouter = createTRPCRouter({
       });
 
       return {
-        subscription: settledSubscription ? subscription : null,
+        subscription: settledSubscription
+          ? { ...subscription, endedAt: subscription.endedAt ?? null }
+          : null,
         creditsAwarded: settledSubscription?.creditsAwarded ?? false,
         hostingIntent,
         welcomePromoIneligibleDueToReusedFingerprint:

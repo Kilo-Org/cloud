@@ -155,7 +155,6 @@ export default function SessionDetailScreen() {
               (error as { data?: { code?: string } } | null)?.data?.code ??
               (error as { code?: string } | null)?.code;
             return shouldRetrySessionNotFound({
-              spawned,
               attempt: failureCount,
               errorCode,
             });

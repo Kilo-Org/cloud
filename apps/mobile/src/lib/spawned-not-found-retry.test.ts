@@ -1,193 +1,51 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  shouldRetryNotFoundOnSpawnedRoute,
-  shouldRetryNotFoundOnYoungRoute,
   shouldRetrySessionNotFound,
   SPAWNED_NOT_FOUND_MAX_ATTEMPTS,
 } from './spawned-not-found-retry';
 
-describe('shouldRetryNotFoundOnSpawnedRoute', () => {
-  describe('spawned param absent (regression: byte-identical to pre-C3b behavior)', () => {
-    it('never retries on NOT_FOUND when spawned is undefined', () => {
-      expect(
-        shouldRetryNotFoundOnSpawnedRoute({
-          spawned: undefined,
-          attempt: 0,
-          errorCode: 'NOT_FOUND',
-        })
-      ).toBe(false);
-    });
-
-    it('never retries on a non-NOT_FOUND error when spawned is undefined', () => {
-      expect(
-        shouldRetryNotFoundOnSpawnedRoute({
-          spawned: undefined,
-          attempt: 0,
-          errorCode: 'INTERNAL_SERVER_ERROR',
-        })
-      ).toBe(false);
-    });
-
-    it('never retries even after multiple attempts when spawned is undefined', () => {
-      // Belt-and-braces: a deeply-attempted absent-spawned retry must
-      // still be false, so the route's existing `retry: false` contract
-      // holds byte-for-byte.
-      expect(
-        shouldRetryNotFoundOnSpawnedRoute({
-          spawned: undefined,
-          attempt: 99,
-          errorCode: 'NOT_FOUND',
-        })
-      ).toBe(false);
-    });
-  });
-
-  describe('spawned param present', () => {
-    it('retries NOT_FOUND on the first attempt', () => {
-      expect(
-        shouldRetryNotFoundOnSpawnedRoute({ spawned: '1', attempt: 0, errorCode: 'NOT_FOUND' })
-      ).toBe(true);
-    });
-
-    it('retries NOT_FOUND while attempt is below the ceiling', () => {
-      // 0-indexed: attempt N is the (N+1)-th failure. We retry attempts
-      // 0..(MAX-1) inclusive; MAX is the first attempt that does NOT
-      // retry (8 tries have already happened by then).
-      for (let attempt = 0; attempt < SPAWNED_NOT_FOUND_MAX_ATTEMPTS; attempt += 1) {
-        expect(
-          shouldRetryNotFoundOnSpawnedRoute({ spawned: '1', attempt, errorCode: 'NOT_FOUND' })
-        ).toBe(true);
-      }
-    });
-
-    it('stops retrying once the attempt count reaches the ceiling', () => {
-      expect(
-        shouldRetryNotFoundOnSpawnedRoute({
-          spawned: '1',
-          attempt: SPAWNED_NOT_FOUND_MAX_ATTEMPTS,
-          errorCode: 'NOT_FOUND',
-        })
-      ).toBe(false);
-      expect(
-        shouldRetryNotFoundOnSpawnedRoute({
-          spawned: '1',
-          attempt: SPAWNED_NOT_FOUND_MAX_ATTEMPTS + 5,
-          errorCode: 'NOT_FOUND',
-        })
-      ).toBe(false);
-    });
-
-    it('does not apply spawned-retry logic to a non-NOT_FOUND error', () => {
-      // The route's QueryError UI handles non-NOT_FOUND errors with
-      // its own Retry CTA. Our retry must not ALSO retry those — that
-      // would either double-fire or change today's behavior.
-      expect(
-        shouldRetryNotFoundOnSpawnedRoute({
-          spawned: '1',
-          attempt: 0,
-          errorCode: 'INTERNAL_SERVER_ERROR',
-        })
-      ).toBe(false);
-      expect(
-        shouldRetryNotFoundOnSpawnedRoute({ spawned: '1', attempt: 0, errorCode: undefined })
-      ).toBe(false);
-    });
-
-    it('treats any non-undefined spawned value (e.g. "0", "true") the same as "1"', () => {
-      // The route only appends the literal "1" today, but the predicate
-      // is presence-based: we only care that the spawn-path navigation
-      // produced SOME value here, not its specific shape.
-      expect(
-        shouldRetryNotFoundOnSpawnedRoute({ spawned: '0', attempt: 0, errorCode: 'NOT_FOUND' })
-      ).toBe(true);
-      expect(
-        shouldRetryNotFoundOnSpawnedRoute({ spawned: 'true', attempt: 0, errorCode: 'NOT_FOUND' })
-      ).toBe(true);
-    });
-  });
-});
-
-describe('shouldRetryNotFoundOnYoungRoute', () => {
-  it('retries NOT_FOUND on the first attempt without any route param', () => {
-    expect(shouldRetryNotFoundOnYoungRoute({ attempt: 0, errorCode: 'NOT_FOUND' })).toBe(true);
+describe('shouldRetrySessionNotFound', () => {
+  it('retries NOT_FOUND on the first attempt', () => {
+    expect(shouldRetrySessionNotFound({ attempt: 0, errorCode: 'NOT_FOUND' })).toBe(true);
   });
 
   it('retries NOT_FOUND while attempt is below the ceiling', () => {
     for (let attempt = 0; attempt < SPAWNED_NOT_FOUND_MAX_ATTEMPTS; attempt += 1) {
-      expect(shouldRetryNotFoundOnYoungRoute({ attempt, errorCode: 'NOT_FOUND' })).toBe(true);
+      expect(shouldRetrySessionNotFound({ attempt, errorCode: 'NOT_FOUND' })).toBe(true);
     }
   });
 
   it('stops retrying once the attempt count reaches the ceiling', () => {
     expect(
-      shouldRetryNotFoundOnYoungRoute({
+      shouldRetrySessionNotFound({
         attempt: SPAWNED_NOT_FOUND_MAX_ATTEMPTS,
         errorCode: 'NOT_FOUND',
       })
     ).toBe(false);
     expect(
-      shouldRetryNotFoundOnYoungRoute({
+      shouldRetrySessionNotFound({
         attempt: SPAWNED_NOT_FOUND_MAX_ATTEMPTS + 5,
         errorCode: 'NOT_FOUND',
       })
     ).toBe(false);
   });
 
-  it('does not retry a non-NOT_FOUND error', () => {
-    expect(
-      shouldRetryNotFoundOnYoungRoute({ attempt: 0, errorCode: 'INTERNAL_SERVER_ERROR' })
-    ).toBe(false);
-    expect(shouldRetryNotFoundOnYoungRoute({ attempt: 0, errorCode: undefined })).toBe(false);
-  });
-});
-
-describe('shouldRetrySessionNotFound', () => {
-  it('retries an ordinary open on NOT_FOUND within the shared budget', () => {
-    expect(
-      shouldRetrySessionNotFound({ spawned: undefined, attempt: 0, errorCode: 'NOT_FOUND' })
-    ).toBe(true);
-    expect(
-      shouldRetrySessionNotFound({
-        spawned: undefined,
-        attempt: SPAWNED_NOT_FOUND_MAX_ATTEMPTS - 1,
-        errorCode: 'NOT_FOUND',
-      })
-    ).toBe(true);
-  });
-
-  it('gives the same budget to an open that began on the restored identity', () => {
-    // The cold-start open has no persisted metadata and a fresh rendered guard,
-    // so its first read is the one that needs the window most.
-    expect(
-      shouldRetrySessionNotFound({ spawned: undefined, attempt: 0, errorCode: 'NOT_FOUND' })
-    ).toBe(true);
-    expect(
-      shouldRetrySessionNotFound({
-        spawned: undefined,
-        attempt: SPAWNED_NOT_FOUND_MAX_ATTEMPTS,
-        errorCode: 'NOT_FOUND',
-      })
-    ).toBe(false);
-  });
-
   it('never retries an access denial, so the account boundary stays immediate', () => {
-    for (const errorCode of ['UNAUTHORIZED', 'FORBIDDEN', 'INTERNAL_SERVER_ERROR', undefined]) {
-      expect(shouldRetrySessionNotFound({ spawned: undefined, attempt: 0, errorCode })).toBe(false);
-      expect(shouldRetrySessionNotFound({ spawned: '1', attempt: 0, errorCode })).toBe(false);
+    // The restored-identity open used to be denied the budget to keep this
+    // boundary quick; the boundary is these codes, and they are never repeated
+    // for any open.
+    for (const errorCode of ['UNAUTHORIZED', 'FORBIDDEN']) {
+      for (let attempt = 0; attempt <= SPAWNED_NOT_FOUND_MAX_ATTEMPTS; attempt += 1) {
+        expect(shouldRetrySessionNotFound({ attempt, errorCode })).toBe(false);
+      }
     }
   });
 
-  it('keeps the spawned open on its own budget', () => {
-    expect(shouldRetrySessionNotFound({ spawned: '1', attempt: 0, errorCode: 'NOT_FOUND' })).toBe(
-      true
+  it('does not retry another failure code or a missing one', () => {
+    expect(shouldRetrySessionNotFound({ attempt: 0, errorCode: 'INTERNAL_SERVER_ERROR' })).toBe(
+      false
     );
-    expect(
-      shouldRetrySessionNotFound({
-        spawned: '1',
-        attempt: SPAWNED_NOT_FOUND_MAX_ATTEMPTS,
-        errorCode: 'NOT_FOUND',
-      })
-    ).toBe(false);
+    expect(shouldRetrySessionNotFound({ attempt: 0, errorCode: undefined })).toBe(false);
   });
 });

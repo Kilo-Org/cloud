@@ -227,7 +227,8 @@ export const createSessionForCloudAgentSchema = z.object({
     .string()
     .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/)
     .optional(),
-  organizationId: z.string().optional(),
+  /** Must be an organization the acting user is a live member of. */
+  organizationId: z.uuid().optional(),
   createdOnPlatform: z.string().min(1),
   title: z.string().optional(),
   // Compatibility: old Cloud Agent workers omit gitUrl; remove after all deployed workers send it.
@@ -255,6 +256,7 @@ export type CreateSessionForCloudAgentParams = z.input<typeof createSessionForCl
  */
 export type SessionCloneRejectionCode =
   | 'source_access_denied'
+  | 'organization_access_denied'
   | 'organization_mismatch'
   | 'malformed_source_data'
   | 'missing_source_body'

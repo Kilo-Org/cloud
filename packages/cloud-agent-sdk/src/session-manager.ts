@@ -31,6 +31,7 @@ import {
   REMOTE_SESSION_EXIT_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED,
+  REMOTE_SESSION_ORGANIZATION_MISMATCH,
 } from './session';
 import type { CloudAgentSession, CloudAgentSessionConfig } from './session';
 import { createChatProcessor } from './chat-processor';
@@ -4456,18 +4457,21 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     currentSession?.retryRemoteCommands();
   }
 
+  /**
+   * Create a session beside the active one. The organization and the other
+   * inheritance fields come from the active session's own row; a caller may
+   * repeat that organization but not change it.
+   */
   async function createRemoteSession(input?: CreateRemoteSessionInput): Promise<KiloSessionId> {
     if (!currentSession || activeSessionType !== 'remote') {
       throw new Error(REMOTE_SESSION_CREATION_NOT_SUPPORTED);
     }
-    // Inheritance from the active session (Decision 6). Explicit caller fields
-    // win when provided (e.g. tests); otherwise store-derived values apply. Only
-    // the active session's own row supplies an organization, and a caller that
-    // names its own organization needs no row.
     const fetched = store.get(fetchedSessionDataAtom);
-    const scopeSupplied = input?.orgId !== undefined;
-    if (!scopeSupplied && fetched?.kiloSessionId !== activeSessionId) {
+    if (fetched?.kiloSessionId !== activeSessionId) {
       throw new Error(REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED);
+    }
+    if (input?.orgId !== undefined && input.orgId !== fetched?.organizationId) {
+      throw new Error(REMOTE_SESSION_ORGANIZATION_MISMATCH);
     }
     const selection = store.get(remoteModelOverrideAtom)?.selection ?? store.get(observedModelAtom);
     const inherited = computeCreateRemoteSessionInheritance({

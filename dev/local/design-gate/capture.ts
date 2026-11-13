@@ -9,7 +9,7 @@ import {
   type TimedTree,
 } from './capture-evidence';
 import type { ProbeClient, ProbeSample } from './cdp';
-import type { ElementRef, Finding } from './findings';
+import type { ElementRef, Finding, RuleId } from './findings';
 import { enterTouchMode } from './input-mode';
 import { envMismatches, isRtlLanguage, mirrorReference, type CellConfig } from './matrix';
 import type { Rgba } from './pixels';
@@ -676,10 +676,11 @@ function warningFinding(
   target: string,
   dump: ProbeDump,
   expected: string,
-  message: string
+  message: string,
+  rule: RuleId = 'env-mismatch'
 ): Finding {
   return {
-    rule: 'env-mismatch',
+    rule,
     severity: 'warning',
     cell,
     target,
@@ -806,7 +807,11 @@ export async function runMatrix(
                 target.id,
                 dump,
                 'the deep link changes the screen',
-                `${target.id} left the screen unchanged (route ${dump.env.route}); the deep link did not open: ${unopened}`
+                `${target.id} left the screen unchanged (route ${dump.env.route}); the deep link did not open: ${unopened}`,
+                // A tab route keeps the URL at its group root, so an unchanged
+                // route is not by itself a failed open; the screen identity is
+                // what decides that, so this notice has its own rule.
+                'link-unopened'
               )
             );
           } else if (other !== undefined) {

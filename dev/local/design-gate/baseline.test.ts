@@ -619,12 +619,27 @@ test('a tab route keeps a marker-less target ready when the link leaves the rout
   run.outcome.findings.push({
     cell: 'base',
     target: UNMARKED.id,
-    rule: 'env-mismatch',
+    rule: 'link-unopened',
     severity: 'warning',
     expected: 'the deep link changes the screen',
     message: 'deep link did not open',
   } as never);
   assert.deepEqual(targetReadiness(run.outcome, unmarkedManifest, run.out), []);
+});
+
+test('a target that declares a marker keeps failing on the landing notice', t => {
+  const run = readinessRun(t, TARGET, probeDump({ ready: true }));
+  run.outcome.findings.push({
+    cell: 'base',
+    target: TARGET.id,
+    rule: 'link-unopened',
+    severity: 'warning',
+    expected: 'the deep link changes the screen',
+    message: 'deep link did not open',
+  } as never);
+  assert.deepEqual(targetReadiness(run.outcome, manifest, run.out), [
+    `base/${TARGET.id}: target not ready or screen identity differs (${TARGET.route}, ${TARGET.screen})`,
+  ]);
 });
 
 test('a marker-less target stays not ready when its cell config did not apply', t => {

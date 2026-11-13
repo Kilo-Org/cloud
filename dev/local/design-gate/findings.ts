@@ -19,7 +19,8 @@ export type RuleId =
   | 'loading-placeholder'
   | 'capture-alignment'
   | 'blank-frame'
-  | 'env-mismatch';
+  | 'env-mismatch'
+  | 'link-unopened';
 
 export type ElementRef = {
   index: number;

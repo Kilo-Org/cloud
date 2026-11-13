@@ -439,25 +439,33 @@ export function targetReadiness(
                 node.visibleRect[2] > 0 &&
                 node.visibleRect[3] > 0
             );
-      // A tab route keeps the URL at its group root, so opening it need not change
-      // the route and the runner reports a landing notice. For a marker-less target
-      // the declared screen identity below is what proves the link landed, so only
-      // that one notice is dropped. Every other env-mismatch still fails the
-      // target: a cell config that did not apply, a language that did not switch,
-      // or two targets that landed on one screen all leave the capture unusable.
-      const LANDING_NOTICE = 'the deep link changes the screen';
+      // A tab route keeps the URL at its group root, so opening it can leave the
+      // route unchanged and the runner reports `link-unopened`. For a marker-less
+      // target the declared screen identity below is what proves the link landed,
+      // so only that rule is dropped. Every other finding still fails the target:
+      // a cell config that did not apply, a language that did not switch, two
+      // targets on one screen, an unsettled or misaligned or blank capture.
       const failed = outcome.findings.some(
         finding =>
           finding.cell === cell.id &&
           finding.target === target.id &&
-          (['unsettled', 'capture-alignment', 'blank-frame'].includes(finding.rule) ||
-            (finding.rule === 'env-mismatch' &&
-              (target.readyTestID !== undefined || finding.expected !== LANDING_NOTICE)))
+          ['unsettled', 'capture-alignment', 'blank-frame', 'env-mismatch'].includes(finding.rule)
       );
+      // A target that declares a marker keeps the original rule, where a link
+      // that did not open is a failure too.
+      const landingFailed =
+        target.readyTestID !== undefined &&
+        outcome.findings.some(
+          finding =>
+            finding.cell === cell.id &&
+            finding.target === target.id &&
+            finding.rule === 'link-unopened'
+        );
       if (
         blocked ||
         !ready ||
         failed ||
+        landingFailed ||
         dump.env.route !== target.route ||
         dump.env.screen !== target.screen
       ) {

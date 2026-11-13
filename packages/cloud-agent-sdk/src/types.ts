@@ -376,12 +376,12 @@ export type SessionSnapshotPage = {
   updateCursor?: number;
   totalCostMicrodollars?: number | null | undefined;
   /** The preparation rows the stream replays first, so the first page can show them. */
-  preparationAttempts?: readonly PreparationAttempt[];
+  preparationAttempts?: readonly PreparationAttempt[] | undefined;
   /**
    * The run's queued and failed turns the socket replays on connect, so a page
    * opened without a socket still shows the question row and its failure.
    */
-  queuedMessages?: readonly QueuedMessageSnapshot[];
+  queuedMessages?: readonly QueuedMessageSnapshot[] | undefined;
 };
 
 export type CloudSessionMetadata = z.infer<typeof cloudSessionMetadataSchema>;

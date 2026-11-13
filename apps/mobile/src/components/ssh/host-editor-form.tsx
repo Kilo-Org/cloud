@@ -84,7 +84,7 @@ export function HostEditorForm({
   const authOptions: { value: SshAuthMethod; label: string }[] = [
     { value: 'password', label: t('ssh.editor.password') },
     { value: 'key', label: t('ssh.editor.key') },
-    { value: 'keyboard_interactive', label: t('ssh.editor.keyboardInteractive') },
+    { value: 'keyboard_interactive', label: t('ssh.editor.interactive') },
   ];
 
   const jumpOptions: MenuSheetOption[] = [
@@ -214,7 +214,7 @@ export function HostEditorForm({
 
         {authMethod === 'key' ? (
           <PickerField
-            label={t('ssh.editor.key')}
+            label={t('profiles.keyLabel')}
             value={keys.length === 0 ? t('ssh.editor.noKeys') : (selectedKey?.label ?? null)}
             placeholder={t('ssh.editor.chooseKey')}
             disabled={keys.length === 0 || saving}
@@ -253,7 +253,6 @@ export function HostEditorForm({
             }}
           />
         ) : null}
-
       </DetailScreenScrollView>
 
       <View className="gap-2 px-4 pt-3" style={{ paddingBottom: bottom + 16 }}>

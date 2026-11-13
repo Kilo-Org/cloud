@@ -9,12 +9,14 @@ import { ScreenHeader } from '@/components/screen-header';
 import { SshStorageError } from '@/components/ssh/ssh-storage-error';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { IconButton } from '@/components/ui/icon-button';
-import { ShieldCheck, Trash2 } from '@/components/ui/icons';
+import { KeyRound, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { formatDate } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { hostPatternDisplay } from '@/lib/ssh/known-host-pattern';
 import { type SshKnownHost } from '@/lib/ssh/known-hosts';
+import { SSH_HOSTS_ROUTE } from '@/lib/ssh/routes';
 import { useSshKnownHostMutations, useSshKnownHosts } from '@/lib/ssh/use-ssh';
 
 const SKELETON_ROWS = [0, 1, 2];
@@ -34,7 +36,7 @@ function KnownHostRow({ entry, disabled, onDelete }: KnownHostRowProps) {
     <View className="flex-row items-center gap-3 rounded-lg bg-secondary px-4 py-3">
       <View className="min-w-0 flex-1">
         <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
-          {entry.hostPattern}
+          {hostPatternDisplay(entry.hostPattern)}
         </Text>
         <Text variant="mono" className="mt-0.5 text-xs text-muted-foreground" numberOfLines={1}>
           {entry.fingerprintSha256}
@@ -52,7 +54,7 @@ function KnownHostRow({ entry, disabled, onDelete }: KnownHostRowProps) {
         disabled={disabled}
         onPress={onDelete}
       >
-        <Trash2 size={16} color={colors.destructive} />
+        <Trash2 size={16} color={colors.mutedForeground} />
       </IconButton>
     </View>
   );
@@ -100,7 +102,7 @@ export function SshKnownHostsScreen() {
   } else if (knownHosts.data.length === 0) {
     body = (
       <EmptyState
-        icon={ShieldCheck}
+        icon={KeyRound}
         title={t('ssh.knownHosts.emptyTitle')}
         description={t('ssh.knownHosts.emptyDescription')}
       />
@@ -128,7 +130,7 @@ export function SshKnownHostsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('ssh.knownHosts.title')} />
+      <ScreenHeader title={t('ssh.knownHosts.title')} backFallback={SSH_HOSTS_ROUTE} />
       {body}
       {dialog}
     </View>

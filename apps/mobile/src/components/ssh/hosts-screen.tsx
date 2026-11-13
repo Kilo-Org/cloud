@@ -12,7 +12,7 @@ import { SshStorageError } from '@/components/ssh/ssh-storage-error';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { IconButton } from '@/components/ui/icon-button';
-import { Plus, Server, ShieldCheck } from '@/components/ui/icons';
+import { KeyRound, Plus, Server } from '@/components/ui/icons';
 import { MenuSheet, type MenuSheetOption } from '@/components/ui/menu-sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -156,7 +156,7 @@ export function SshHostsScreen() {
             host={host}
             jumpHost={host.jumpHostId === null ? null : (hostsById.get(host.jumpHostId) ?? null)}
             onPress={() => {
-              setMenuHost(host);
+              router.push(sshHostPath(host.id));
             }}
             onLongPress={() => {
               setMenuHost(host);
@@ -184,7 +184,7 @@ export function SshHostsScreen() {
                 router.push(SSH_KNOWN_HOSTS_ROUTE);
               }}
             >
-              <ShieldCheck size={20} color={colors.foreground} />
+              <KeyRound size={20} color={colors.foreground} />
             </IconButton>
             {showAdd ? (
               <IconButton

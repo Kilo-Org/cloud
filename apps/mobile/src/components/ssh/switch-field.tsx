@@ -14,15 +14,9 @@ type SwitchFieldProps = Readonly<{
 }>;
 
 /** A labelled switch row: the label and its hint, with the control at the end. */
-export function SwitchField({
-  label,
-  hint,
-  value,
-  disabled,
-  onValueChange,
-}: SwitchFieldProps) {
+export function SwitchField({ label, hint, value, disabled, onValueChange }: SwitchFieldProps) {
   return (
-    <View className="min-h-[44px] flex-row items-center gap-3">
+    <View className="flex-row items-center gap-3">
       <View className="min-w-0 flex-1">
         <Text
           className={cn(
@@ -40,6 +34,7 @@ export function SwitchField({
         value={value}
         disabled={disabled}
         onValueChange={onValueChange}
+        hitSlop={8}
         accessibilityLabel={label}
       />
     </View>

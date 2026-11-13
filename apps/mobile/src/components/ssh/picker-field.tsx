@@ -51,7 +51,10 @@ export function PickerField({
         )}
       >
         <Text
-          className={cn('min-w-0 flex-1 text-sm', empty ? 'text-muted-foreground' : 'text-foreground')}
+          className={cn(
+            'min-w-0 flex-1 text-sm font-normal',
+            empty ? 'text-muted-foreground' : 'text-foreground'
+          )}
           numberOfLines={1}
         >
           {value ?? placeholder}

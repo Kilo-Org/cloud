@@ -1,12 +1,15 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 
+import { queryClient } from '@/lib/query-client';
+
 import { createForward } from './forwards';
 import { createHost, type SshHost } from './hosts';
 import { createKey } from './keys';
 import { trustHostKey } from './known-hosts';
 import { SSH_HOSTS_ROUTE, SSH_KNOWN_HOSTS_ROUTE, sshHostPath } from './routes';
 import { sshDatabase } from './store';
+import { SSH_KEY } from './use-ssh';
 
 /**
  * Dev-only SSH fixtures, reached as `kiloapp:///dev/ssh-fixture/<name>`.
@@ -80,7 +83,8 @@ const FIXTURE_KEY = {
   label: 'laptop',
   algorithm: 'ed25519',
   source: 'generated',
-  privateKeyOpenssh: '-----BEGIN OPENSSH PRIVATE KEY-----\nfixture\n-----END OPENSSH PRIVATE KEY-----',
+  privateKeyOpenssh:
+    '-----BEGIN OPENSSH PRIVATE KEY-----\nfixture\n-----END OPENSSH PRIVATE KEY-----',
   publicKeyOpenssh: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFixtureLaptopKey laptop',
   fingerprintSha256: 'SHA256:laptopFixtureFingerprint',
 } as const;
@@ -88,6 +92,15 @@ const FIXTURE_KEY = {
 function log(message: string): void {
   // eslint-disable-next-line no-console -- dev-only harness feedback in the Metro log
   console.info(`[ssh-fixture] ${message}`);
+}
+
+/**
+ * The store writes rows behind React Query's back, so a screen seeded after it
+ * mounted would keep the list it read before. Resetting the ssh key drops every
+ * cached read and refetches the mounted ones.
+ */
+async function resetSshQueries(): Promise<void> {
+  await queryClient.resetQueries({ queryKey: SSH_KEY });
 }
 
 async function clearSshRows(): Promise<void> {
@@ -183,16 +196,21 @@ export function handleSshFixturePath(path: string): boolean {
     await clearSshRows();
     if (name === 'hosts') {
       await seedHostList();
+      await resetSshQueries();
       router.replace(SSH_HOSTS_ROUTE);
     } else if (name === 'empty') {
+      await resetSshQueries();
       router.replace(SSH_HOSTS_ROUTE);
     } else if (name === 'known-hosts') {
       await seedKnownHosts();
+      await resetSshQueries();
       router.replace(SSH_KNOWN_HOSTS_ROUTE);
     } else if (name === 'known-hosts-empty') {
+      await resetSshQueries();
       router.replace(SSH_KNOWN_HOSTS_ROUTE);
     } else if (name === 'editor-password' || name === 'editor-key') {
       const host = await seedEditor(name === 'editor-key');
+      await resetSshQueries();
       router.replace(sshHostPath(host.id));
     } else {
       log(`unknown fixture ${name}`);

@@ -59,7 +59,7 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
             icon={Terminal}
             title={t('ssh.title')}
             subtitle={t('ssh.subtitle')}
-            hue="fern"
+            hue="sage"
             className="rounded-lg bg-secondary px-3"
             onPress={() => {
               router.push(SSH_HOSTS_ROUTE);

@@ -8,7 +8,7 @@ import { listKnownHosts, removeKnownHost } from './known-hosts';
 import { sshDatabase } from './store';
 
 /** Every ssh query lives under this key, so one invalidation refreshes a screen. */
-const SSH_KEY = ['ssh'] as const;
+export const SSH_KEY = ['ssh'] as const;
 const HOSTS_KEY = [...SSH_KEY, 'hosts'] as const;
 const KNOWN_HOSTS_KEY = [...SSH_KEY, 'known-hosts'] as const;
 

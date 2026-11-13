@@ -1,11 +1,3 @@
-/**
- * Code Review Prompt Generation
- *
- * Prompt generation with per-style overrides. Immutable prompt content lives in the checked-in JSON
- * templates. This file selects the platform template, replaces placeholders, adds dynamic review
- * context, and applies checked-in style and summary format overrides.
- */
-
 import { z } from 'zod';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import {
@@ -39,14 +31,8 @@ export type InlineComment = {
   authoredByKilo: boolean;
 };
 
-/**
- * Previous review status for state machine
- */
 export type PreviousReviewStatus = 'no-review' | 'no-issues' | 'issues-found';
 
-/**
- * Complete review state for intelligent update/create decisions
- */
 export type ExistingReviewState = {
   summaryComment: { commentId: number; body: string } | null;
   inlineComments: InlineComment[];
@@ -129,18 +115,12 @@ they do not replace them:
 - Do not recompute diff line numbers repeatedly; if a line number is uncertain, re-read the diff
   and apply the existing diff-line rules.`;
 
-/**
- * GitLab-specific context for inline comments
- */
 export type GitLabDiffContext = {
   baseSha: string;
   startSha: string;
   headSha: string;
 };
 
-/**
- * Optional parameters for prompt generation
- */
 export type GenerateReviewPromptOptions = {
   /** Code review ID for generating fix link */
   reviewId?: string;
@@ -170,14 +150,6 @@ export type GenerateReviewPromptOptions = {
   omitSubAgentGuidance?: boolean;
 };
 
-/**
- * Generates a code review prompt based on configuration
- * @param config Agent configuration with review settings
- * @param repository Repository in format "owner/repo" (GitHub) or "namespace/project" (GitLab)
- * @param prNumber Pull request number (GitHub) or merge request IID (GitLab)
- * @param options Optional parameters for review context, platform, and incremental mode
- * @returns Generated prompt and checked-in template version
- */
 export async function generateReviewPrompt(
   config: CodeReviewAgentConfig,
   repository: string,
@@ -225,7 +197,6 @@ export async function generateReviewPrompt(
   const freeModel = isFreeModel(effectiveModel);
   const applyFreeModelBudget = freeModel && !omitSubAgentGuidance;
 
-  // Helper to replace common placeholders
   const replacePlaceholders = (text: string, commentId?: number): string => {
     let result = text
       .replace(/{PR_NUMBER}/g, String(pr))
@@ -238,7 +209,6 @@ export async function generateReviewPrompt(
       .replace(/{NOTE_ID}/g, commentId ? String(commentId) : '{NOTE_ID}')
       .replace(/{EXPECTED_HEAD_SHA}/g, expectedHeadSha ?? '{EXPECTED_HEAD_SHA}');
 
-    // GitLab-specific SHA placeholders
     if (gitlabContext) {
       result = result
         .replace(/{BASE_SHA}/g, gitlabContext.baseSha)
@@ -251,16 +221,13 @@ export async function generateReviewPrompt(
 
   let prompt = '';
 
-  // 1. System role
   prompt += template.systemRole + '\n\n';
 
-  // 2. Style guidance (persona/tone override for non-default styles like roast)
   const styleGuide = template.styleGuidance?.[reviewStyle];
   if (styleGuide) {
     prompt += styleGuide + '\n\n';
   }
 
-  // 3. Custom instructions (user-provided, sanitized to prevent injection)
   if (config.custom_instructions) {
     prompt += '# CUSTOM INSTRUCTIONS\n\n' + sanitizeUserInput(config.custom_instructions) + '\n\n';
   }
@@ -269,7 +236,6 @@ export async function generateReviewPrompt(
     prompt += '# PER-REVIEW INSTRUCTIONS\n\n' + sanitizeUserInput(manualInstructions) + '\n\n';
   }
 
-  // 4. Hard constraints (MOST IMPORTANT - always included)
   prompt += template.hardConstraints + '\n\n';
 
   if (template.diffLineGuidance) {
@@ -280,8 +246,6 @@ export async function generateReviewPrompt(
     prompt += template.subAgentGuidance + '\n\n';
   }
 
-  // 5. Workflow with placeholders replaced
-  // Use incremental workflow when we have a previous completed review SHA and a summary comment
   if (
     previousHeadSha &&
     template.incrementalReviewWorkflow &&
@@ -320,23 +284,19 @@ export async function generateReviewPrompt(
     prompt += FREE_MODEL_OUTPUT_BUDGET + '\n\n';
   }
 
-  // 6. What to review
   prompt +=
     (repositoryReviewInstructions
       ? formatRepositoryReviewInstructions(repositoryReviewInstructions)
       : template.whatToReview) + '\n\n';
 
-  // 7. Focus areas (if any selected)
   if (config.focus_areas.length > 0) {
     prompt +=
       '# FOCUS AREAS\n\nPay special attention to: ' + config.focus_areas.join(', ') + '\n\n';
   }
 
-  // 8. Comment format (use style override if available, otherwise default)
   const commentFormat = template.commentFormatOverrides?.[reviewStyle] ?? template.commentFormat;
   prompt += commentFormat + '\n\n';
 
-  // 9. Dynamic context section (separator)
   prompt += '---\n\n# CONTEXT FOR THIS ' + platformConfig.prTerm + '\n\n';
   prompt += `**${platform === PLATFORM.GITLAB ? 'Project' : 'Repository'}:** ${repository}\n`;
   prompt += `**${platformConfig.prTerm} Number:** ${pr}\n\n`;
@@ -345,7 +305,6 @@ export async function generateReviewPrompt(
     prompt += `**Expected Head SHA:** \`${expectedHeadSha}\`\n\n`;
   }
 
-  // Add GitLab-specific SHA context if available
   if (platform === PLATFORM.GITLAB && gitlabContext) {
     prompt += `**Diff Context (for inline comments):**\n`;
     prompt += `- Base SHA: \`${gitlabContext.baseSha}\`\n`;
@@ -353,8 +312,6 @@ export async function generateReviewPrompt(
     prompt += `- Head SHA: \`${gitlabContext.headSha}\`\n\n`;
   }
 
-  // 10. Existing inline comments table (dynamic - built at runtime).
-  // The table lists prior findings made by the review identity that are still active.
   const activeInlineComments = (existingReviewState?.inlineComments ?? []).filter(
     c => c.authoredByKilo && !c.isOutdated
   );
@@ -380,12 +337,10 @@ export async function generateReviewPrompt(
     prompt += '<<<END EXISTING REVIEW COMMENTS>>>\n\n';
   }
 
-  // 11. Summary format templates (use style override if available, otherwise default)
   const summaryOverride = template.summaryFormatOverrides?.[reviewStyle];
   prompt += (summaryOverride?.issuesFound ?? template.summaryFormatIssuesFound) + '\n\n';
   prompt += (summaryOverride?.noIssues ?? template.summaryFormatNoIssues) + '\n\n';
 
-  // 12. Summary marker note and command (CREATE or UPDATE)
   prompt += template.summaryMarkerNote + '\n\n';
   if (existingReviewState?.summaryComment) {
     prompt +=
@@ -397,14 +352,12 @@ export async function generateReviewPrompt(
     prompt += replacePlaceholders(template.summaryCommandCreate) + '\n\n';
   }
 
-  // 13. Fix link (dynamic - only if reviewId provided)
   if (reviewId) {
     const baseUrl = process.env.NEXTAUTH_URL || 'https://kilo.ai';
     const fixLink = `${baseUrl}/cloud-agent-fork/review/${reviewId}`;
     prompt += template.fixLinkTemplate.replace(/{FIX_LINK}/g, fixLink) + '\n\n';
   }
 
-  // 14. Inline comments API call template (from JSON)
   prompt += replacePlaceholders(template.inlineCommentsApi) + '\n';
 
   return {

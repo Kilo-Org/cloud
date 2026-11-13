@@ -47,3 +47,22 @@ export const persistDraft = (conversationId: string, text: string): void => {
     void writeDrafts();
   }
 };
+
+/*
+ * Drop every draft, in memory and on disk. Sign-out calls this because
+ * conversation ids are deterministic (conversation-1, ...): leaving the module
+ * state in place would hand the next account's panel the previous user's
+ * unsent message text on its first hydrate.
+ */
+export const clearStoredDrafts = async (): Promise<void> => {
+  storedDrafts = {};
+  localWrites.clear();
+  // The empty state is authoritative; a hydrate must not read the old map back.
+  isHydrated = true;
+
+  try {
+    await storage.removeItem(draftStorageKey);
+  } catch {
+    // The in-memory reset above already keeps the drafts from crossing accounts.
+  }
+};

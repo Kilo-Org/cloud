@@ -17,6 +17,7 @@ vi.mock('#imports', () => ({
 
 const draftStorageKey = 'local:kiloAgentDrafts';
 interface DraftStorage {
+  clearStoredDrafts: () => Promise<void>;
   hydrateStoredDrafts: () => Promise<Record<string, string>>;
   persistDraft: (conversationId: string, text: string) => void;
 }
@@ -72,5 +73,18 @@ describe('agent draft storage', () => {
     const drafts = await loadDraftStorage();
 
     await expect(drafts.hydrateStoredDrafts()).resolves.toStrictEqual({});
+  });
+
+  it('leaves nothing for the next account after a sign-out clears the drafts', async () => {
+    draftStorage.clear();
+    const drafts = await loadDraftStorage();
+    await drafts.hydrateStoredDrafts();
+    drafts.persistDraft('conversation-1', 'first account draft');
+
+    await drafts.clearStoredDrafts();
+
+    expect(draftStorage.has(draftStorageKey)).toBe(false);
+    await expect(drafts.hydrateStoredDrafts()).resolves.toStrictEqual({});
+    expect(draftStorage.has(draftStorageKey)).toBe(false);
   });
 });

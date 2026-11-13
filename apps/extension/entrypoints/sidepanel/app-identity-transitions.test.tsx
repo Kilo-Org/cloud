@@ -27,6 +27,10 @@ const authMocks = vi.hoisted(() => ({
   validateAuthToken: vi.fn<() => Promise<unknown>>(),
 }));
 
+const draftMocks = vi.hoisted(() => ({
+  clearStoredDrafts: vi.fn<() => Promise<void>>(),
+}));
+
 vi.mock('#imports', () => ({
   browser: { tabs: { create: vi.fn(async () => {}) } },
   storage: { getItem: vi.fn(), removeItem: vi.fn(), setItem: vi.fn() },
@@ -57,6 +61,10 @@ vi.mock('./use-analytics-identity', () => ({
 
 vi.mock('./agent-chat-atoms', () => ({
   clearPerConversationAtoms: () => {},
+}));
+
+vi.mock('./agent-draft-storage', () => ({
+  clearStoredDrafts: () => draftMocks.clearStoredDrafts(),
 }));
 
 vi.mock('./auth-views', () => ({
@@ -122,6 +130,7 @@ describe('side panel identity transitions clear the agents cache', () => {
     authMocks.resetAnalyticsUser.mockResolvedValue();
     authMocks.saveStoredAuth.mockResolvedValue();
     authMocks.validateAuthToken.mockResolvedValue({ auth: ALPHA_AUTH, status: 'valid' });
+    draftMocks.clearStoredDrafts.mockResolvedValue();
   });
 
   it('clears the agents cache on explicit sign out', async () => {
@@ -145,6 +154,8 @@ describe('side panel identity transitions clear the agents cache', () => {
       undefined,
     ]);
     expect(queryClient.getQueryData(['side-panel', 'tabs'])).toStrictEqual([{ title: 'kept' }]);
+    // eslint-disable-next-line vitest/prefer-called-times -- vitest/prefer-called-once is also enabled and prefers the singular matcher.
+    expect(draftMocks.clearStoredDrafts).toHaveBeenCalledOnce();
   });
 
   it('clears the agents cache when the stored session is rejected', async () => {
@@ -162,6 +173,8 @@ describe('side panel identity transitions clear the agents cache', () => {
       undefined,
       undefined,
     ]);
+    // eslint-disable-next-line vitest/prefer-called-times -- vitest/prefer-called-once is also enabled and prefers the singular matcher.
+    expect(draftMocks.clearStoredDrafts).toHaveBeenCalledOnce();
   });
 
   it('clears the agents cache on device-auth sign-in', async () => {

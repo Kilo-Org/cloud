@@ -22,7 +22,7 @@ import {
   SignedOutView,
   ValidationErrorView,
 } from './auth-views';
-import { clearPerConversationAtoms } from './agent-chat-atoms';
+import { clearAccountScopedState } from './account-state';
 import { useAnalyticsIdentity } from './use-analytics-identity';
 import type { SignInSource } from './use-analytics-identity';
 import { useDeviceSignIn } from './use-device-sign-in';
@@ -94,10 +94,9 @@ export const App = (): JSX.Element => {
       }
 
       if (result.status === 'invalid') {
-        // Clear all account-scoped state (conversations and cached agents data included) like sign-out. Message returned below.
+        // Clear all account-scoped state (conversations, drafts, and cached agents data) like sign-out. Message returned below.
         await clearStoredSession(storage);
-        clearPerConversationAtoms();
-        removeAccountScopedAgentsQueries(queryClient);
+        await clearAccountScopedState(queryClient);
         return { message: 'Your session expired. Sign in again.', status: 'signedOut' };
       }
 
@@ -167,8 +166,7 @@ export const App = (): JSX.Element => {
       try {
         await clearStoredSession(storage);
       } finally {
-        clearPerConversationAtoms();
-        removeAccountScopedAgentsQueries(queryClient);
+        await clearAccountScopedState(queryClient);
         queryClient.setQueryData(storedAuthQueryKey, undefined);
         if (storedAuth !== undefined) {
           queryClient.setQueryData(getAuthValidationQueryKey(storedAuth.token), {

@@ -826,7 +826,8 @@ async function buildEndedKiloPassSubscriptionState(params: {
   status: Stripe.Subscription.Status;
   /**
    * The provider's end date, when the status came from a provider read. The
-   * stored date wins when the provider has none.
+   * stored date wins when the row carries one; this value fills the gap for a
+   * row whose date was never stored.
    */
   providerEndedAt?: string | null;
 }): Promise<KiloPassSubscriptionStateResponse> {

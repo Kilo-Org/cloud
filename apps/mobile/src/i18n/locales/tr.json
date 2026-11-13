@@ -333,6 +333,8 @@
       "unlinkTitle": "{{provider}} bağlantısı kaldırılsın mı?",
       "unlinkMessage": "Artık {{provider}} ile oturum açamayacaksın. Diğer yöntemlerin olduğu gibi kalır.",
       "unlinked": "{{provider}} bağlantısı kaldırıldı",
+      "lastMethod": "Tek oturum açma yönteminin bağlantısını kaldıramazsın. Önce başka bir yöntem bağla.",
+      "notLinked": "{{provider}} artık hesabına bağlı değil.",
       "linkAnother": "Başka bir sağlayıcı bağla",
       "linkAnotherSubtitle": "kilo.ai üzerindeki bağlı hesaplar sayfasını açar",
       "emptyTitle": "Oturum açma yöntemi yok",

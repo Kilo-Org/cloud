@@ -102,7 +102,7 @@ function purchase(overrides: Partial<CreditPurchaseEntry> = {}): CreditPurchaseE
   return {
     id: 'purchase-1',
     date: '2026-11-12T10:00:00.000Z',
-    description: 'Credit purchase',
+    kind: 'purchase',
     amount_mUsd: 10_000_000,
     expiryDate: '2027-11-12T00:00:00.000Z',
     creditSource: 'stripe',

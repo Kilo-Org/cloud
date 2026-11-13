@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "လုပ်ဆောင်နေသော agent များတွင် အသစ်အဆန်း ရှိသည်"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "လုပ်ငန်းစဉ် ပြီးစီးပါပြီ"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "မအောင်မြင်ပါ: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "ကြားဖြတ်ခံရသည်: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

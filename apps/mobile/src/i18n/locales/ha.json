@@ -333,6 +333,8 @@
       "unlinkTitle": "Cire haɗin {{provider}}?",
       "unlinkMessage": "Ba za ka iya shiga da {{provider}} kuma ba. Sauran hanyoyinka za su kasance yadda suke.",
       "unlinked": "An cire haɗin {{provider}}",
+      "lastMethod": "Ba za ka iya cire haɗin hanyar shigarka tilo ba. Haɗa wata hanyar shiga da farko.",
+      "notLinked": "An cire haɗin {{provider}} daga asusunka.",
       "linkAnother": "Haɗa wani mai samarwa",
       "linkAnotherSubtitle": "Yana buɗe shafin asusun da aka haɗa a kilo.ai",
       "emptyTitle": "Babu hanyoyin shiga",

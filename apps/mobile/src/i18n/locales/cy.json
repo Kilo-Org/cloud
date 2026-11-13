@@ -333,6 +333,8 @@
       "unlinkTitle": "Datgysylltu {{provider}}?",
       "unlinkMessage": "Ni fyddwch yn gallu mewngofnodi gyda {{provider}} mwyach. Bydd eich dulliau eraill yn aros fel y maen nhw.",
       "unlinked": "{{provider}} wedi'i ddatgysylltu",
+      "lastMethod": "Ni allwch ddatgysylltu eich unig ddull mewngofnodi. Cysylltwch ddull arall yn gyntaf.",
+      "notLinked": "Nid yw {{provider}} yn gysylltiedig â'ch cyfrif mwyach.",
       "linkAnother": "Cysylltu darparwr arall",
       "linkAnotherSubtitle": "Yn agor y dudalen cyfrifon cysylltiedig ar kilo.ai",
       "emptyTitle": "Dim dulliau mewngofnodi",

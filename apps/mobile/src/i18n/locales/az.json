@@ -333,6 +333,8 @@
       "unlinkTitle": "{{provider}} ilə əlaqə kəsilsin?",
       "unlinkMessage": "Artıq {{provider}} ilə daxil ola bilməyəcəksən. Digər üsulların olduğu kimi qalır.",
       "unlinked": "{{provider}} ilə əlaqə kəsildi",
+      "lastMethod": "Yeganə giriş üsulunun əlaqəsini kəsə bilməzsən. Əvvəlcə başqa bir üsul əlaqələndir.",
+      "notLinked": "{{provider}} artıq hesabınla əlaqəli deyil.",
       "linkAnother": "Başqa provayder əlaqələndir",
       "linkAnotherSubtitle": "kilo.ai saytında qoşulmuş hesablar səhifəsini açır",
       "emptyTitle": "Giriş üsulu yoxdur",

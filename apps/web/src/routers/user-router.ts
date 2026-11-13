@@ -83,7 +83,9 @@ import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-w
 
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const CREDIT_PURCHASE_HISTORY_PAGE_SIZE = 25;
-const PERSONAL_TOP_UP_DESCRIPTIONS = ['Top-up via stripe', 'Auto top-up via stripe'];
+/** The description a Stripe automatic top-up writes on its own grant row. */
+const AUTO_TOP_UP_DESCRIPTION = 'Auto top-up via stripe';
+const PERSONAL_TOP_UP_DESCRIPTIONS = ['Top-up via stripe', AUTO_TOP_UP_DESCRIPTION];
 
 /**
  * Resolve one of the user's passkey credential ids from the opaque row id the
@@ -245,12 +247,21 @@ const CreditPurchaseHistoryInputSchema = z.object({
   organizationId: z.uuid().optional(),
 });
 
+/** How one purchase row earned its credits. */
+const CreditPurchaseKindSchema = z.enum(['purchase', 'auto_top_up']);
+type CreditPurchaseKind = z.infer<typeof CreditPurchaseKindSchema>;
+
 const CreditPurchaseHistoryOutputSchema = z.object({
   entries: z.array(
     z.object({
       id: z.uuid(),
       date: z.iso.datetime(),
-      description: z.string(),
+      /**
+       * A one-off purchase, or the automatic top-up the account ran when its
+       * balance fell below the threshold. The client localizes the row title
+       * from it, so the row reads in the reader's language.
+       */
+      kind: CreditPurchaseKindSchema,
       amount_mUsd: z.number().positive(),
       expiryDate: z.iso.datetime().nullable(),
       /**
@@ -918,17 +929,20 @@ export const userRouter = createTRPCRouter({
         .offset(input.cursor);
 
       const hasMore = transactions.length > CREDIT_PURCHASE_HISTORY_PAGE_SIZE;
-      const entries = transactions.slice(0, CREDIT_PURCHASE_HISTORY_PAGE_SIZE).map(transaction => ({
-        id: transaction.id,
-        date: new Date(transaction.date).toISOString(),
-        description:
-          transaction.description === 'Auto top-up via stripe'
-            ? 'Automatic top-up'
-            : 'Credit purchase',
-        amount_mUsd: transaction.amount_mUsd,
-        expiryDate: transaction.expiryDate ? new Date(transaction.expiryDate).toISOString() : null,
-        creditSource: transaction.creditSource,
-      }));
+      const entries = transactions.slice(0, CREDIT_PURCHASE_HISTORY_PAGE_SIZE).map(transaction => {
+        const kind: CreditPurchaseKind =
+          transaction.description === AUTO_TOP_UP_DESCRIPTION ? 'auto_top_up' : 'purchase';
+        return {
+          id: transaction.id,
+          date: new Date(transaction.date).toISOString(),
+          kind,
+          amount_mUsd: transaction.amount_mUsd,
+          expiryDate: transaction.expiryDate
+            ? new Date(transaction.expiryDate).toISOString()
+            : null,
+          creditSource: transaction.creditSource,
+        };
+      });
 
       return {
         entries,

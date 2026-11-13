@@ -333,6 +333,8 @@
       "unlinkTitle": "Prekinuti vezu s računom {{provider}}?",
       "unlinkMessage": "Više se nećeš moći prijaviti putem usluge {{provider}}. Ostali načini prijave ostaju nepromijenjeni.",
       "unlinked": "Veza s računom {{provider}} je prekinuta",
+      "lastMethod": "Ne možeš prekinuti vezu sa svojim jedinim načinom prijave. Prvo poveži drugi način prijave.",
+      "notLinked": "{{provider}} više nije povezan s tvojim računom.",
       "linkAnother": "Poveži drugog pružatelja usluga",
       "linkAnotherSubtitle": "Otvara stranicu povezanih računa na kilo.ai",
       "emptyTitle": "Nema načina prijave",

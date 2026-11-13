@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Agjentët aktivë kanë një përditësim"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Detyra u përfundua"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Dështoi: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "U ndërpre: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

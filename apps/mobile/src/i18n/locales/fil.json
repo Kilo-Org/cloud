@@ -333,6 +333,8 @@
       "unlinkTitle": "I-unlink ang {{provider}}?",
       "unlinkMessage": "Hindi ka na makakapag-sign in gamit ang {{provider}}. Hindi magbabago ang iba mong paraan ng pag-sign in.",
       "unlinked": "Na-unlink ang {{provider}}",
+      "lastMethod": "Hindi mo maaaring i-unlink ang tanging paraan mo ng pag-sign in. Mag-link muna ng ibang paraan.",
+      "notLinked": "Hindi na naka-link ang {{provider}} sa account mo.",
       "linkAnother": "Mag-link ng ibang provider",
       "linkAnotherSubtitle": "Bubuksan ang page ng mga nakakonektang akawnt sa kilo.ai",
       "emptyTitle": "Walang paraan ng pag-sign in",

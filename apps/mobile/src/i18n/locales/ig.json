@@ -333,6 +333,8 @@
       "unlinkTitle": "Wepụ njikọ {{provider}}?",
       "unlinkMessage": "Ị gaghịzi enwe ike iji {{provider}} banye. Ụzọ ndị ọzọ gị ga-anọgide otú ha dị.",
       "unlinked": "Ewepụrụ njikọ {{provider}}",
+      "lastMethod": "Ị nweghị ike iwepụ njikọ naanị ụzọ ịbanye gị. Buru ụzọ jikọọ ụzọ ọzọ.",
+      "notLinked": "{{provider}} enweghịzi njikọ na akaụntụ gị.",
       "linkAnother": "Jikọọ onye na-enye ọrụ ọzọ",
       "linkAnotherSubtitle": "Na-emepe ibe akaụntụ ejikọrọ na kilo.ai",
       "emptyTitle": "Enweghị ụzọ ịbanye",

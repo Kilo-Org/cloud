@@ -333,6 +333,8 @@
       "unlinkTitle": "Ungependa kutenganisha {{provider}}?",
       "unlinkMessage": "Hutaweza tena kuingia kwa kutumia {{provider}}. Njia zako nyingine zitabaki kama zilivyo.",
       "unlinked": "{{provider}} imetenganishwa",
+      "lastMethod": "Huwezi kutenganisha njia yako ya kuingia pekee. Unganisha njia nyingine kwanza.",
+      "notLinked": "{{provider}} haijaunganishwa tena na akaunti yako.",
       "linkAnother": "Unganisha mtoa huduma mwingine",
       "linkAnotherSubtitle": "Hufungua ukurasa wa akaunti zilizounganishwa kwenye kilo.ai",
       "emptyTitle": "Hakuna njia za kuingia",

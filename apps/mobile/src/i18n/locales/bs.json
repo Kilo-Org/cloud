@@ -333,6 +333,8 @@
       "unlinkTitle": "Prekinuti vezu s nalogom {{provider}}?",
       "unlinkMessage": "Više se nećeš moći prijaviti putem naloga {{provider}}. Ostali načini prijave ostaju nepromijenjeni.",
       "unlinked": "Veza s nalogom {{provider}} je prekinuta",
+      "lastMethod": "Ne možeš prekinuti vezu sa svojim jedinim načinom prijave. Prvo poveži drugi način prijave.",
+      "notLinked": "Veza s nalogom {{provider}} više nije aktivna.",
       "linkAnother": "Poveži drugog pružaoca",
       "linkAnotherSubtitle": "Otvara stranicu povezanih naloga na kilo.ai",
       "emptyTitle": "Nema načina prijave",

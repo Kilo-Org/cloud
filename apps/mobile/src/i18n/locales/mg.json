@@ -333,6 +333,8 @@
       "unlinkTitle": "Hotapahina ve ny fifandraisana amin'ny {{provider}}?",
       "unlinkMessage": "Tsy ho afaka hiditra amin'ny alalan'ny {{provider}} intsony ianao. Tsy miova ny fomba fidirana hafa anananao.",
       "unlinked": "Tapaka ny fifandraisana amin'ny {{provider}}",
+      "lastMethod": "Tsy afaka manapaka ny fifandraisana amin'ny hany fomba fidirana anananao ianao. Ampifandraiso aloha ny fomba fidirana hafa.",
+      "notLinked": "Tsy mifandray amin'ny kaontinao intsony ny {{provider}}.",
       "linkAnother": "Ampifandraiso mpamatsy hafa",
       "linkAnotherSubtitle": "Manokatra ny pejin'ny kaonty mifandray ao amin'ny kilo.ai",
       "emptyTitle": "Tsy misy fomba fidirana",

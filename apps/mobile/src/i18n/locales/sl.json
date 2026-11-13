@@ -333,6 +333,8 @@
       "unlinkTitle": "Želiš prekiniti povezavo s storitvijo {{provider}}?",
       "unlinkMessage": "Prijava s storitvijo {{provider}} ne bo več mogoča. Drugi načini prijave ostanejo nespremenjeni.",
       "unlinked": "Povezava s storitvijo {{provider}} je prekinjena",
+      "lastMethod": "Ne moreš prekiniti povezave s svojim edinim načinom prijave. Najprej poveži drug način prijave.",
+      "notLinked": "Storitev {{provider}} ni več povezana s tvojim računom.",
       "linkAnother": "Poveži drugega ponudnika",
       "linkAnotherSubtitle": "Odpre stran povezanih računov na kilo.ai",
       "emptyTitle": "Ni načinov prijave",

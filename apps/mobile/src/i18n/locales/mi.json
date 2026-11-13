@@ -333,6 +333,8 @@
       "unlinkTitle": "Wetewete i {{provider}}?",
       "unlinkMessage": "Kāore e taea e koe te takiuru mā {{provider}} ā muri ake nei. Ka noho tonu ō tikanga kē atu.",
       "unlinked": "Kua wetewetehia {{provider}}",
+      "lastMethod": "Kāore e taea e koe te wetewete i tō tikanga takiuru anake. Honoa tētahi atu tikanga i mua.",
+      "notLinked": "Kua kore a {{provider}} e hono ana ki tō pūkete.",
       "linkAnother": "Honoa tētahi atu kaiwhakarato",
       "linkAnotherSubtitle": "Ka whakatuwhera i te whārangi pūkete hono i kilo.ai",
       "emptyTitle": "Kāore he tikanga takiuru",

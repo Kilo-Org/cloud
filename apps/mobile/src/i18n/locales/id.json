@@ -333,6 +333,8 @@
       "unlinkTitle": "Putuskan tautan {{provider}}?",
       "unlinkMessage": "Kamu tidak akan bisa lagi masuk dengan {{provider}}. Metode lainnya tetap seperti semula.",
       "unlinked": "Tautan {{provider}} diputuskan",
+      "lastMethod": "Kamu tidak bisa memutuskan tautan satu-satunya metode masukmu. Tautkan metode lain terlebih dahulu.",
+      "notLinked": "{{provider}} tidak lagi tertaut ke akunmu.",
       "linkAnother": "Tautkan penyedia lain",
       "linkAnotherSubtitle": "Membuka halaman akun terhubung di kilo.ai",
       "emptyTitle": "Tidak ada metode masuk",

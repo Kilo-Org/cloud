@@ -333,6 +333,8 @@
       "unlinkTitle": "የ{{provider}} ግንኙነት ይቋረጥ?",
       "unlinkMessage": "ከእንግዲህ በ{{provider}} መግባት አይችሉም። ሌሎች ዘዴዎችዎ እንዳሉ ይቆያሉ።",
       "unlinked": "የ{{provider}} ግንኙነት ተቋርጧል",
+      "lastMethod": "ብቸኛውን የመግቢያ ዘዴዎን ማቋረጥ አይችሉም። በመጀመሪያ ሌላ ዘዴ ያገናኙ።",
+      "notLinked": "{{provider}} ከእንግዲህ ከመለያዎ ጋር አልተገናኘም።",
       "linkAnother": "ሌላ አቅራቢ ያገናኙ",
       "linkAnotherSubtitle": "በkilo.ai ላይ የተገናኙ መለያዎች ገጽን ይከፍታል",
       "emptyTitle": "ምንም የመግቢያ ዘዴ የለም",

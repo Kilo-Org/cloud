@@ -333,6 +333,8 @@
       "unlinkTitle": "{{provider}}の連携を解除しますか？",
       "unlinkMessage": "{{provider}}でサインインできなくなります。他のサインイン方法はそのまま残ります。",
       "unlinked": "{{provider}}の連携を解除しました",
+      "lastMethod": "唯一のサインイン方法の連携を解除することはできません。先に別のサインイン方法を連携してください。",
+      "notLinked": "{{provider}}はアカウントに連携されなくなりました。",
       "linkAnother": "別のプロバイダーを連携",
       "linkAnotherSubtitle": "kilo.aiの連携済みアカウントページを開きます",
       "emptyTitle": "サインイン方法がありません",

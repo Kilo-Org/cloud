@@ -333,6 +333,8 @@
       "unlinkTitle": "{{provider}} addaan kuttaa?",
       "unlinkMessage": "Kana booda {{provider}}-n seenuu hin dandeessu. Malawwan kee biroon akkuma jiranitti turu.",
       "unlinked": "{{provider}} addaan citeera",
+      "lastMethod": "Mala seensaa kee qofa addaan kuttuu hin dandeessu. Dursee mala biraa walqabsiisi.",
+      "notLinked": "{{provider}} herrega kee irraa addaan citeera.",
       "linkAnother": "Dhiyeessaa biraa walqabsiisi",
       "linkAnotherSubtitle": "Fuula herregoota walqabatanii kilo.ai irratti bana",
       "emptyTitle": "Malli seensaa hin jiru",

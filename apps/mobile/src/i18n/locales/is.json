@@ -333,6 +333,8 @@
       "unlinkTitle": "Aftengja {{provider}}?",
       "unlinkMessage": "Þú getur ekki lengur skráð þig inn með {{provider}}. Aðrar innskráningarleiðir haldast óbreyttar.",
       "unlinked": "{{provider}} aftengt",
+      "lastMethod": "Þú getur ekki aftengt eina innskráningarleiðina þína. Tengdu aðra innskráningarleið fyrst.",
+      "notLinked": "{{provider}} er ekki lengur tengt við aðganginn þinn.",
       "linkAnother": "Tengja aðra þjónustuveitu",
       "linkAnotherSubtitle": "Opnar síðu tengdra reikninga á kilo.ai",
       "emptyTitle": "Engar innskráningarleiðir",

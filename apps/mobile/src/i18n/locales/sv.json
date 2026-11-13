@@ -333,6 +333,8 @@
       "unlinkTitle": "Koppla från {{provider}}?",
       "unlinkMessage": "Du kommer inte längre att kunna logga in med {{provider}}. Dina andra metoder påverkas inte.",
       "unlinked": "{{provider}} har kopplats från",
+      "lastMethod": "Du kan inte koppla från din enda inloggningsmetod. Länka en annan metod först.",
+      "notLinked": "{{provider}} är inte längre kopplad till ditt konto.",
       "linkAnother": "Länka en annan leverantör",
       "linkAnotherSubtitle": "Öppnar sidan för anslutna konton på kilo.ai",
       "emptyTitle": "Inga inloggningsmetoder",

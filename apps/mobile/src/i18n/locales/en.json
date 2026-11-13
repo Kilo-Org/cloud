@@ -400,6 +400,8 @@
       "unlinkTitle": "Unlink {{provider}}?",
       "unlinkMessage": "You will no longer be able to sign in with {{provider}}. Your other methods stay as they are.",
       "unlinked": "{{provider}} unlinked",
+      "lastMethod": "You can't unlink your only sign-in method. Link another method first.",
+      "notLinked": "{{provider}} is no longer linked to your account.",
       "linkAnother": "Link another provider",
       "linkAnotherSubtitle": "Opens the connected accounts page on kilo.ai",
       "emptyTitle": "No sign-in methods",

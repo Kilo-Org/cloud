@@ -14,6 +14,7 @@ import {
 import { resolveEnkryptOutputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import { recordEnkryptUsage } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { readJsonBody, requestUrlOf } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 import {
   guardEnkryptOutput,
   MAX_HELD_OUTPUT_BYTES,
@@ -240,15 +241,15 @@ function mockEnkrypt(
   respond: (request: DetectRequest, init: RequestInit) => Promise<Response> | Response
 ) {
   return jest.spyOn(global, 'fetch').mockImplementation(async (input, init = {}) => {
-    if (input !== ENKRYPT_DETECT_URL) throw new Error(`unexpected fetch to ${String(input)}`);
-    const body: unknown = JSON.parse(String(init.body));
+    if (input !== ENKRYPT_DETECT_URL) throw new Error(`unexpected fetch to ${requestUrlOf(input)}`);
+    const body: unknown = readJsonBody(init.body);
     return respond(body as DetectRequest, init);
   });
 }
 
 function detectRequests(fetchSpy: ReturnType<typeof mockEnkrypt>): DetectRequest[] {
   return fetchSpy.mock.calls.map(([, init]) => {
-    const body: unknown = JSON.parse(String(init?.body));
+    const body: unknown = readJsonBody(init?.body);
     return body as DetectRequest;
   });
 }

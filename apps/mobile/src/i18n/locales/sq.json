@@ -333,6 +333,8 @@
       "unlinkTitle": "Të shkëputet {{provider}}?",
       "unlinkMessage": "Nuk do të mund të hysh më me {{provider}}. Metodat e tjera mbeten siç janë.",
       "unlinked": "{{provider}} u shkëput",
+      "lastMethod": "Nuk mund të shkëputësh metodën e vetme të hyrjes. Lidh fillimisht një metodë tjetër.",
+      "notLinked": "{{provider}} nuk është më i lidhur me llogarinë tënde.",
       "linkAnother": "Lidh një ofrues tjetër",
       "linkAnotherSubtitle": "Hap faqen e llogarive të lidhura në kilo.ai",
       "emptyTitle": "Asnjë metodë hyrjeje",

@@ -53,6 +53,12 @@ const REMOTE_SESSION_EXIT_NOT_SUPPORTED =
  */
 const REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED =
   'This session is still loading. Try again in a moment.';
+/**
+ * A create must stay in the active session's organization. The message reaches
+ * a client's toast verbatim, so it names the reader's situation and next step.
+ */
+const REMOTE_SESSION_ORGANIZATION_MISMATCH =
+  "A new session stays in this session's organization. Switch organization first.";
 
 type CloudAgentSessionConfig = {
   kiloSessionId: KiloSessionId;
@@ -662,6 +668,7 @@ export {
   REMOTE_SESSION_EXIT_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED,
+  REMOTE_SESSION_ORGANIZATION_MISMATCH,
 };
 export type {
   CloudAgentSession,

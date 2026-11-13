@@ -333,6 +333,8 @@
       "unlinkTitle": "Atsieti {{provider}}?",
       "unlinkMessage": "Nebegalėsite prisijungti per {{provider}}. Kiti jūsų prisijungimo būdai liks nepakeisti.",
       "unlinked": "Atsieta: {{provider}}",
+      "lastMethod": "Negalite atsieti savo vienintelio prisijungimo būdo. Pirmiausia susiekite kitą būdą.",
+      "notLinked": "{{provider}} nebėra susietas su jūsų paskyra.",
       "linkAnother": "Susieti kitą teikėją",
       "linkAnotherSubtitle": "Atidaro susietų paskyrų puslapį svetainėje kilo.ai",
       "emptyTitle": "Prisijungimo būdų nėra",

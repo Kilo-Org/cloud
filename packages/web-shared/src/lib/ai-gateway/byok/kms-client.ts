@@ -87,7 +87,11 @@ async function attemptKmsRequest(
   }
 }
 
-async function sendToKms(config: ByokKmsClientConfig, url: string, init: RequestInit) {
+async function sendToKms(
+  config: ByokKmsClientConfig,
+  url: string,
+  init: RequestInit
+): Promise<unknown> {
   const deadline = Date.now() + KMS_TOTAL_BUDGET_MS;
   let failure: unknown;
   for (let attempt = 1; ; attempt++) {
@@ -102,7 +106,10 @@ async function sendToKms(config: ByokKmsClientConfig, url: string, init: Request
     let retryable: boolean;
     let retryAfter: number | null = null;
     if (outcome.kind === 'response') {
-      if (outcome.response.ok) return outcome.response.json();
+      if (outcome.response.ok) {
+        const body: unknown = await outcome.response.json();
+        return body;
+      }
       const { status } = outcome.response;
       // Release the unused body so the retry reuses the connection.
       void outcome.response.body?.cancel().catch(() => {});

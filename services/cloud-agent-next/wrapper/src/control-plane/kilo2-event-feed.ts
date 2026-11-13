@@ -199,6 +199,12 @@ export function createKilo2EventFeed(options: KiloEventFeedOptions): KiloEventFe
       return;
     }
     if (typeof id !== 'string') return;
+    // The next step start clears retry status. Emit before native reads so a failed
+    // read cannot preserve it.
+    if (event.type === 'session.execution.started')
+      emit('session.turn.open', { sessionID: id }, directory);
+    if (event.type === 'session.execution.started' || event.type === 'session.step.started')
+      emit('session.status', { sessionID: id, status: { type: 'busy' } }, directory);
     const textKind = event.type.startsWith('session.text.')
       ? 'text'
       : event.type.startsWith('session.reasoning.')
@@ -263,10 +269,6 @@ export function createKilo2EventFeed(options: KiloEventFeedOptions): KiloEventFe
           { info: { ...info, directory: nativeDirectory } },
           nativeDirectory
         );
-      }
-      if (event.type === 'session.execution.started') {
-        emit('session.turn.open', { sessionID: id }, nativeDirectory);
-        emit('session.status', { sessionID: id, status: { type: 'busy' } }, nativeDirectory);
       }
       // Read the native database. This preserves content ordinals, tool state,
       // and user-message identity without maintaining a second execution state machine.

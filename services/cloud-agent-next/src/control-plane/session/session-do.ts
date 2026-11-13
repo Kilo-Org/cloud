@@ -197,6 +197,7 @@ import {
   createControlPlaneWorktreeChanges,
   type ControlPlaneWorktreeChanges,
   type SharedWorktreeChangesPeer,
+  type WorktreeChangeStates,
 } from './worktree-changes.js';
 import {
   worktreeChangesReadySchema,
@@ -2650,6 +2651,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   async getWorktreeFile(input: unknown): Promise<GetWorktreeFileOutput> {
     await this.initialized;
     return this.worktreeChanges.getFile(input);
+  }
+
+  async getWorktreeChangeStates(): Promise<WorktreeChangeStates> {
+    await this.initialized;
+    return this.worktreeChanges.changeStates();
   }
 
   async refreshWorktreeChanges(): Promise<RefreshWorktreeChangesOutput> {

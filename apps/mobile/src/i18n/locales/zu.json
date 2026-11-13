@@ -333,6 +333,8 @@
       "unlinkTitle": "Nqamula i-{{provider}}?",
       "unlinkMessage": "Ngeke usakwazi ukungena nge-{{provider}}. Ezinye izindlela zakho zizohlala zinjalo.",
       "unlinked": "I-{{provider}} inqamuliwe",
+      "lastMethod": "Awukwazi ukunqamula indlela yakho yokungena kuphela. Xhuma enye indlela kuqala.",
+      "notLinked": "I-{{provider}} ayisaxhunyiwe kwi-akhawunti yakho.",
       "linkAnother": "Xhuma omunye umhlinzeki",
       "linkAnotherSubtitle": "Ivula ikhasi lama-akhawunti axhunyiwe ku-kilo.ai",
       "emptyTitle": "Azikho izindlela zokungena",

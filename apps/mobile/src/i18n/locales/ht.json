@@ -333,6 +333,8 @@
       "unlinkTitle": "Retire lyen {{provider}}?",
       "unlinkMessage": "Ou p ap ka konekte ak {{provider}} ankò. Lòt metòd ou yo ap rete jan yo ye a.",
       "unlinked": "Lyen {{provider}} retire",
+      "lastMethod": "Ou pa ka retire lyen sèl metòd koneksyon ou a. Lye yon lòt metòd anvan.",
+      "notLinked": "{{provider}} pa gen lyen ak kont ou ankò.",
       "linkAnother": "Lye yon lòt founisè",
       "linkAnotherSubtitle": "Ouvri paj kont ki konekte yo sou kilo.ai",
       "emptyTitle": "Pa gen metòd koneksyon",

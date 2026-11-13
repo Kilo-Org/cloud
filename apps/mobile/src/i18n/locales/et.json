@@ -333,6 +333,8 @@
       "unlinkTitle": "Kas tühistada sidumine teenusega {{provider}}?",
       "unlinkMessage": "Sa ei saa enam teenusega {{provider}} sisse logida. Sinu teised sisselogimisviisid jäävad alles.",
       "unlinked": "Sidumine teenusega {{provider}} on tühistatud",
+      "lastMethod": "Sa ei saa tühistada oma ainsa sisselogimisviisi sidumist. Seo esmalt veel üks sisselogimisviis.",
+      "notLinked": "{{provider}} ei ole enam sinu kontoga seotud.",
       "linkAnother": "Seo veel üks teenusepakkuja",
       "linkAnotherSubtitle": "Avab kilo.ai-s ühendatud kontode lehe",
       "emptyTitle": "Sisselogimisviise pole",

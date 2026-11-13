@@ -333,6 +333,8 @@
       "unlinkTitle": "解除关联 {{provider}}？",
       "unlinkMessage": "你将无法再使用 {{provider}} 登录。其他登录方式不受影响。",
       "unlinked": "已解除关联 {{provider}}",
+      "lastMethod": "无法解除关联你唯一的登录方式。请先关联其他登录方式。",
+      "notLinked": "{{provider}} 已不再与你的账号关联。",
       "linkAnother": "关联其他登录方式",
       "linkAnotherSubtitle": "打开 kilo.ai 上的已关联账户页面",
       "emptyTitle": "暂无登录方式",

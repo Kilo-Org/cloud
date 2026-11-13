@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Agenții activi au o actualizare"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Sarcină finalizată"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Eșuat: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Întrerupt: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

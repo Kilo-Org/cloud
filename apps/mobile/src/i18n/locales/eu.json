@@ -333,6 +333,8 @@
       "unlinkTitle": "Desestekatu {{provider}}?",
       "unlinkMessage": "Aurrerantzean ezingo duzu saioa hasi {{provider}} bidez. Beste metodoak bere horretan geratuko dira.",
       "unlinked": "{{provider}} desestekatu da",
+      "lastMethod": "Ezingo duzu zure saioa hasteko metodo bakarra desestekatu. Estekatu beste metodo bat lehenengo.",
+      "notLinked": "{{provider}} jada ez dago zure kontuarekin estekatuta.",
       "linkAnother": "Estekatu beste hornitzaile bat",
       "linkAnotherSubtitle": "kilo.ai-ko konektatutako kontuen orria irekitzen du",
       "emptyTitle": "Ez dago saioa hasteko metodorik",

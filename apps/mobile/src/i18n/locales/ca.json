@@ -333,6 +333,8 @@
       "unlinkTitle": "Vols desvincular {{provider}}?",
       "unlinkMessage": "Ja no podràs iniciar la sessió amb {{provider}}. Els altres mètodes es mantindran igual.",
       "unlinked": "S'ha desvinculat {{provider}}",
+      "lastMethod": "No pots desvincular el teu únic mètode d'inici de sessió. Vincula primer un altre mètode.",
+      "notLinked": "{{provider}} ja no està vinculat al teu compte.",
       "linkAnother": "Vincula un altre proveïdor",
       "linkAnotherSubtitle": "Obre la pàgina de comptes connectats a kilo.ai",
       "emptyTitle": "No hi ha mètodes d'inici de sessió",

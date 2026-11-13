@@ -358,6 +358,7 @@ export async function runControlPlaneWrapper(
     uploadUrl,
     uploadGrant,
     wrapperLogPath: env.WRAPPER_LOG_PATH,
+    environment: env,
     onDiagnostic: diagnostics.onDiagnostic,
     projector,
   });

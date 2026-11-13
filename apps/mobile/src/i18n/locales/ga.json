@@ -333,6 +333,8 @@
       "unlinkTitle": "Ar mhaith leat {{provider}} a dhínascadh?",
       "unlinkMessage": "Ní bheidh tú in ann síniú isteach le {{provider}} a thuilleadh. Fanfaidh do mhodhanna eile mar atá siad.",
       "unlinked": "Dínascadh {{provider}}",
+      "lastMethod": "Ní féidir leat do mhodh sínithe isteach amháin a dhínascadh. Nasc modh eile ar dtús.",
+      "notLinked": "Níl {{provider}} nasctha le do chuntas a thuilleadh.",
       "linkAnother": "Nasc soláthraí eile",
       "linkAnotherSubtitle": "Osclaíonn sé leathanach na gcuntas nasctha ar kilo.ai",
       "emptyTitle": "Níl aon mhodh sínithe isteach ann",

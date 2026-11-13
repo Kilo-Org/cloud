@@ -333,6 +333,8 @@
       "unlinkTitle": "Poistetaanko palvelun {{provider}} linkitys?",
       "unlinkMessage": "Et voi enää kirjautua palvelulla {{provider}}. Muut kirjautumistapasi säilyvät ennallaan.",
       "unlinked": "Palvelun {{provider}} linkitys poistettu",
+      "lastMethod": "Et voi poistaa linkitystä ainoasta kirjautumistavastasi. Linkitä ensin toinen kirjautumistapa.",
+      "notLinked": "Palvelua {{provider}} ei ole enää linkitetty tiliisi.",
       "linkAnother": "Linkitä toinen palveluntarjoaja",
       "linkAnotherSubtitle": "Avaa linkitettyjen tilien sivun osoitteessa kilo.ai",
       "emptyTitle": "Ei kirjautumistapoja",

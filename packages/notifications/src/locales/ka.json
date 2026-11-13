@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "აქტიურ აგენტებს განახლება აქვთ"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "ამოცანა დასრულდა"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "ჩავარდა: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "შეწყდა: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

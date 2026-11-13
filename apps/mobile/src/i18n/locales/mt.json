@@ -333,6 +333,8 @@
       "unlinkTitle": "Tneħħi r-rabta ma' {{provider}}?",
       "unlinkMessage": "Ma tkunx tista' tidħol aktar permezz ta' {{provider}}. Il-metodi l-oħra tiegħek jibqgħu kif inhuma.",
       "unlinked": "Ir-rabta ma' {{provider}} tneħħiet",
+      "lastMethod": "Ma tistax tneħħi r-rabta mal-uniku metodu ta' dħul tiegħek. Qabbad metodu ieħor l-ewwel.",
+      "notLinked": "{{provider}} m'għadux marbut mal-kont tiegħek.",
       "linkAnother": "Qabbad fornitur ieħor",
       "linkAnotherSubtitle": "Tiftaħ il-paġna tal-kontijiet imqabbdin fuq kilo.ai",
       "emptyTitle": "L-ebda metodu ta' dħul",

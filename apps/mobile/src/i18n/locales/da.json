@@ -333,6 +333,8 @@
       "unlinkTitle": "Fjern tilknytning af {{provider}}?",
       "unlinkMessage": "Du kan ikke længere logge ind med {{provider}}. Dine andre metoder forbliver uændrede.",
       "unlinked": "{{provider}} er ikke længere tilknyttet",
+      "lastMethod": "Du kan ikke fjerne tilknytningen af din eneste loginmetode. Tilknyt en anden metode først.",
+      "notLinked": "{{provider}} er ikke længere tilknyttet din konto.",
       "linkAnother": "Tilknyt en anden udbyder",
       "linkAnotherSubtitle": "Åbner siden med tilknyttede konti på kilo.ai",
       "emptyTitle": "Ingen loginmetoder",

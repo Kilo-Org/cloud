@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Các tác nhân đang hoạt động có bản cập nhật"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Tác vụ đã hoàn tất"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Thất bại: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Bị gián đoạn: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

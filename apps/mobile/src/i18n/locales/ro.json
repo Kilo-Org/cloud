@@ -333,6 +333,8 @@
       "unlinkTitle": "Dezasociezi {{provider}}?",
       "unlinkMessage": "Nu te vei mai putea autentifica cu {{provider}}. Celelalte metode rămân neschimbate.",
       "unlinked": "{{provider}} a fost dezasociat",
+      "lastMethod": "Nu poți dezasocia singura metodă de autentificare. Asociază mai întâi o altă metodă.",
+      "notLinked": "{{provider}} nu mai este asociat contului tău.",
       "linkAnother": "Asociază alt furnizor",
       "linkAnotherSubtitle": "Deschide pagina conturilor conectate pe kilo.ai",
       "emptyTitle": "Nicio metodă de autentificare",

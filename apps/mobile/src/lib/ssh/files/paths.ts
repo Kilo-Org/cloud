@@ -112,6 +112,21 @@ const TEXT_EXTENSIONS = new Set([
   'makefile',
 ]);
 
+/**
+ * The directory an SFTP channel opens in.
+ *
+ * `.` is the channel's working directory, which the server sets to the login
+ * directory. `~` is not expanded by OpenSSH's sftp-server: the client joins it
+ * onto the working directory, so the screen asks for a `/home/user/~` that does
+ * not exist and every listing fails as not found.
+ */
+export function resolveHomeDirectory(
+  channel: string,
+  resolvePath: (channel: string, path: string) => Promise<string>
+): Promise<string> {
+  return resolvePath(channel, '.');
+}
+
 export type PreviewKind = 'text' | 'image';
 
 /** How the app can show this entry in place, or null when it has to be shared. */

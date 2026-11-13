@@ -8,6 +8,7 @@ import {
   MAX_PREVIEW_BYTES,
   parentRemotePath,
   previewKindOf,
+  resolveHomeDirectory,
   sortEntries,
 } from './paths';
 
@@ -77,5 +78,18 @@ describe('preview choice', () => {
   it('refuses directories and unknown extensions', () => {
     expect(previewKindOf(entry('app', 'directory'))).toBeNull();
     expect(previewKindOf(entry('archive.bin', 'file', 10))).toBeNull();
+  });
+});
+
+describe('home directory', () => {
+  it('resolves the channel working directory, not a literal tilde', async () => {
+    const calls: { channel: string; path: string }[] = [];
+    const resolved = await resolveHomeDirectory('sftp-1', async (channel, path) => {
+      calls.push({ channel, path });
+      return '/home/user';
+    });
+
+    expect(resolved).toBe('/home/user');
+    expect(calls).toEqual([{ channel: 'sftp-1', path: '.' }]);
   });
 });

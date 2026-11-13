@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { type Cancellation } from '../cancellation';
 import { nativeErrorCode, sshPackage } from '../native';
+import { resolveHomeDirectory } from './paths';
 
 export type SftpBrowserPhase =
   | { readonly kind: 'waiting' }
@@ -85,7 +86,9 @@ export function useSftpBrowser(connectionId: string | null): SftpBrowser {
       try {
         const ssh = await sshPackage();
         const channel = await ssh.openSftp(connectionId);
-        const home = await ssh.resolvePath(channel, '~');
+        const home = await resolveHomeDirectory(channel, (sftp, path) =>
+          ssh.resolvePath(sftp, path)
+        );
         if (opening.cancelled) {
           await closeQuietly(ssh, channel);
           return;

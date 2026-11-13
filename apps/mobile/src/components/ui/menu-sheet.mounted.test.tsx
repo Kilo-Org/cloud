@@ -150,6 +150,19 @@ describe('MenuSheet', () => {
     expect(props.onSelect).not.toHaveBeenCalled();
   });
 
+  it('renders one row per option when two options share a label', async () => {
+    const { renderer, props } = await renderMenu({
+      options: [{ label: 'bastion' }, { label: 'bastion' }],
+    });
+    const rows = pressables(renderer);
+    expect(rows).toHaveLength(3);
+
+    await act(() => {
+      (rows[1]?.props.onPress as () => void)();
+    });
+    expect(props.onSelect).toHaveBeenCalledExactlyOnceWith(1);
+  });
+
   it('closes without a selection when the sheet dismisses itself', async () => {
     const { props } = await renderMenu();
     expect(sheet.onClose).toBeTypeOf('function');

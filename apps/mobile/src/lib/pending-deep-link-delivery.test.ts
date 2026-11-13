@@ -6,12 +6,15 @@ import {
 } from './pending-deep-link-delivery';
 
 const SESSION_HREF = '/(app)/agent-chat/ses_1';
-// The pathname the router reports for that thread: every layout group dropped,
-// no query (the same form `profileScreenPath` produces).
-const SESSION_PATHNAME = '/agent-chat/ses_1';
-// The pathname the router reports with the account settings screen focused:
-// the tab group is a layout group too, so it does not survive either.
-const ACCOUNT_PATHNAME = '/account';
+// The segments `useSegments` reports for that thread.
+const SESSION_SEGMENTS = ['(app)', 'agent-chat', 'ses_1'];
+// The segments it reports with the account settings screen focused: the app
+// group, the tabs navigator, the tab the screen lives in, then the screen.
+const ACCOUNT_SEGMENTS = ['(app)', '(tabs)', '(3_profile)', 'account'];
+// Two different tab roots: their pathname is `/? for both, so only the tab
+// segment keeps them apart.
+const PROFILE_TAB_SEGMENTS = ['(app)', '(tabs)', '(3_profile)'];
+const HOME_TAB_SEGMENTS = ['(app)', '(tabs)', '(0_home)'];
 const ACCOUNT_HREF = '/(app)/(tabs)/(3_profile)/account';
 
 describe('shouldDeliverPendingDeepLink', () => {
@@ -23,7 +26,7 @@ describe('shouldDeliverPendingDeepLink', () => {
         arrival: 'live',
         href: SESSION_HREF,
         atLandingRoute: false,
-        pathname: ACCOUNT_PATHNAME,
+        segments: ACCOUNT_SEGMENTS,
       })
     ).toBe(true);
     expect(
@@ -31,7 +34,7 @@ describe('shouldDeliverPendingDeepLink', () => {
         arrival: 'live',
         href: SESSION_HREF,
         atLandingRoute: true,
-        pathname: '/',
+        segments: HOME_TAB_SEGMENTS,
       })
     ).toBe(true);
   });
@@ -42,31 +45,30 @@ describe('shouldDeliverPendingDeepLink', () => {
         arrival: 'restored',
         href: SESSION_HREF,
         atLandingRoute: true,
-        pathname: '/',
+        segments: HOME_TAB_SEGMENTS,
       })
     ).toBe(true);
   });
 
   it('delivers a recovered destination the app is already showing', () => {
-    // A cold launch restores its own base Intent: the resume anchor and the
-    // group segments do not make the same destination look like a different
-    // one.
+    // A cold launch restores its own base Intent: the resume anchor, the layout
+    // groups and the query do not make the same destination look different.
     expect(
       shouldDeliverPendingDeepLink({
         arrival: 'restored',
         href: '/(app)/agent-chat/ses_1?at=msg_2',
         atLandingRoute: false,
-        pathname: SESSION_PATHNAME,
+        segments: SESSION_SEGMENTS,
       })
     ).toBe(true);
-    // A tab-grouped destination: the router reports `/account` while the href
-    // carries both the app group and the tab group.
+    // A destination inside a tab: the href carries both the app group and the
+    // tab group, and the focused route carries the same tab segment.
     expect(
       shouldDeliverPendingDeepLink({
         arrival: 'restored',
         href: ACCOUNT_HREF,
         atLandingRoute: false,
-        pathname: ACCOUNT_PATHNAME,
+        segments: ACCOUNT_SEGMENTS,
       })
     ).toBe(true);
   });
@@ -77,7 +79,7 @@ describe('shouldDeliverPendingDeepLink', () => {
         arrival: 'restored',
         href: SESSION_HREF,
         atLandingRoute: false,
-        pathname: ACCOUNT_PATHNAME,
+        segments: ACCOUNT_SEGMENTS,
       })
     ).toBe(false);
     expect(
@@ -85,9 +87,30 @@ describe('shouldDeliverPendingDeepLink', () => {
         arrival: 'restored',
         href: '/(app)/agent-chat/ses_2',
         atLandingRoute: false,
-        pathname: SESSION_PATHNAME,
+        segments: SESSION_SEGMENTS,
       })
     ).toBe(false);
+  });
+
+  it('keeps two different tabs apart', () => {
+    // The pathname of both tab roots is `/`, so a comparison on it would treat
+    // the Profile tab as the screen already showing.
+    expect(
+      shouldDeliverPendingDeepLink({
+        arrival: 'restored',
+        href: '/(app)/(tabs)/(3_profile)',
+        atLandingRoute: false,
+        segments: HOME_TAB_SEGMENTS,
+      })
+    ).toBe(false);
+    expect(
+      shouldDeliverPendingDeepLink({
+        arrival: 'restored',
+        href: '/(app)/(tabs)/(3_profile)',
+        atLandingRoute: false,
+        segments: PROFILE_TAB_SEGMENTS,
+      })
+    ).toBe(true);
   });
 });
 

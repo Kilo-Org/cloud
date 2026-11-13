@@ -1084,7 +1084,7 @@ function RootLayoutNav({
         arrival: pendingArrival,
         href: pending.href,
         atLandingRoute: isAppLandingSegments(segments),
-        pathname,
+        segments,
       })
     ) {
       return;

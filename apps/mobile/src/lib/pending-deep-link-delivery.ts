@@ -1,6 +1,6 @@
 import { type PendingDeepLinkArrival } from './deep-link-launch';
 import { SESSION_ROUTE_SIBLINGS } from './deep-link-destination';
-import { profileScreenPath } from './profile-route-stack';
+import { normalizedRoutePath } from './last-route-repair';
 import { SESSION_HREF_PREFIX } from './system-search-families';
 
 /**
@@ -18,25 +18,34 @@ import { SESSION_HREF_PREFIX } from './system-search-families';
  *
  * Two cases still deliver a recovered destination. One is the app's landing
  * route, where nobody has chosen anything yet. The other is the destination
- * already being the current path: a cold launch that restored its own base
+ * already being the current route: a cold launch that restored its own base
  * Intent has the app there before the slot is consumed, and that navigation is
  * the one `withAnchor` exists for — it inserts each Stack's layout anchor
  * beneath the target so Back returns to the tab's own root (see
- * `deep-link-destination.ts`). Both sides are compared in the form the router
- * reports a pathname — `profileScreenPath` drops every group segment and the
- * query — so a tab-grouped href, a layout group and a `?at=` resume anchor do
- * not make the same destination look like a different one.
+ * `deep-link-destination.ts`).
+ *
+ * The comparison runs on the route's own segments, from `useSegments`, not on
+ * the pathname: a parenthesised segment names a destination — which tab is
+ * focused — and the pathname drops every group, so all four tab roots would
+ * read as `/`. `normalizedRoutePath` keeps a tab segment on both sides while it
+ * drops the layout groups (`(app)`, `(auth)`, `(tabs)`) and the query, so two
+ * different tabs stay different and a `?at=` resume anchor does not make the
+ * same session look like another one.
  */
 export function shouldDeliverPendingDeepLink(input: {
   readonly arrival: PendingDeepLinkArrival;
   readonly href: string;
   readonly atLandingRoute: boolean;
-  readonly pathname: string;
+  readonly segments: readonly string[];
 }): boolean {
   if (input.arrival === 'live') {
     return true;
   }
-  return input.atLandingRoute || profileScreenPath(input.href) === input.pathname;
+  if (input.atLandingRoute) {
+    return true;
+  }
+  const currentRoute = normalizedRoutePath(`/${input.segments.join('/')}`);
+  return normalizedRoutePath(input.href) === currentRoute;
 }
 
 /**

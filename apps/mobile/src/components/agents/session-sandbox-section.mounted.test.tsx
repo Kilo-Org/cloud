@@ -39,15 +39,15 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('@/lib/trpc', () => {
   const queries = {
     getSandboxStatus: {
-      queryOptions: (input: unknown, options: CapturedQueryOptions) => ({
-        queryKey: ['getSandboxStatus', input],
+      queryOptions: (input: unknown, options: CapturedQueryOptions): CapturedQueryOptions => ({
         ...options,
+        queryKey: ['getSandboxStatus', input],
       }),
     },
     getWorkspaceSnapshotRecovery: {
-      queryOptions: (input: unknown, options: CapturedQueryOptions) => ({
-        queryKey: ['getWorkspaceSnapshotRecovery', input],
+      queryOptions: (input: unknown, options: CapturedQueryOptions): CapturedQueryOptions => ({
         ...options,
+        queryKey: ['getWorkspaceSnapshotRecovery', input],
       }),
       queryKey: () => ['getWorkspaceSnapshotRecovery'],
     },

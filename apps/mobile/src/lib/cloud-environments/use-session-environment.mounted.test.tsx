@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { TestRenderer } from '@/test/renderer';
 import { createTestQueryClient } from '@/test/render-with-providers';
@@ -29,12 +29,12 @@ const REPOSITORY = {
   isPrivate: true,
 } as const;
 
-const state = vi.hoisted(() => ({
-  stored: {} as Record<string, string>,
-  forget: vi.fn<(key: string) => void>(),
+const state = vi.hoisted<{
+  stored: Record<string, string>;
+  forget: Mock<(key: string) => void>;
   /** The environments the list answers with; `null` keeps the answer pending. */
-  environments: null as EnvironmentSummaryRow[] | null,
-}));
+  environments: EnvironmentSummaryRow[] | null;
+}>(() => ({ stored: {}, forget: vi.fn<(key: string) => void>(), environments: null }));
 
 vi.mock('@/lib/hooks/environment-choice', () => ({
   usePersistedEnvironmentChoice: () => ({ stored: state.stored, saveEnvironmentChoice: vi.fn() }),
@@ -51,7 +51,11 @@ vi.mock('@/lib/trpc', () => ({
           if (listed === null) {
             return {
               queryKey,
-              queryFn: () => new Promise<EnvironmentSummaryRow[]>(() => {}),
+              // Never resolves: this case is about a list that has not answered.
+              queryFn: () =>
+                new Promise<EnvironmentSummaryRow[]>(() => {
+                  // The answer arrives only in tests that resolve the list.
+                }),
               enabled: options.enabled,
             };
           }

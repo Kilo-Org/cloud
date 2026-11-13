@@ -138,10 +138,12 @@ describe('EnvironmentSheet', () => {
     pressBuildDetails(root, OTHER_ENVIRONMENT.id);
 
     const detail = buildDetail(root);
-    expect(detail).not.toBeNull();
+    if (detail === null) {
+      throw new Error('The build view did not open');
+    }
 
     TestRenderer.act(() => {
-      (detail?.props.onClose as () => void)();
+      (detail.props.onClose as () => void)();
     });
 
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -154,8 +156,13 @@ describe('EnvironmentSheet', () => {
     const { root, onChoose, onClose } = renderSheet();
     pressBuildDetails(root, OTHER_ENVIRONMENT.id);
 
+    const detail = buildDetail(root);
+    if (detail === null) {
+      throw new Error('The build view did not open');
+    }
+
     TestRenderer.act(() => {
-      (buildDetail(root)?.props.onBack as () => void)();
+      (detail.props.onBack as () => void)();
     });
 
     expect(buildDetail(root)).toBeNull();

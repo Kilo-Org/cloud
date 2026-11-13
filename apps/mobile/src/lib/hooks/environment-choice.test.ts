@@ -1,24 +1,24 @@
 import { describe, expect, it, vi } from 'vitest';
 
-// The map persists through the account metadata store; this suite covers the
-// map's own rules, so the store is a stub that never touches the disk.
-vi.mock('@/lib/hooks/secure-store-preference', () => ({
-  createSecureStorePreference: () => ({
-    preload: () => {},
-    get: () => ({}),
-    getRequested: () => ({}),
-    set: () => {},
-    subscribe: () => () => {},
-    clear: () => {},
-  }),
-}));
-
 import {
   MAX_STORED_ENVIRONMENT_CHOICES,
   parseStoredEnvironmentChoice,
   withEnvironmentChoice,
   withoutEnvironmentChoice,
 } from './environment-choice';
+
+// The map persists through the account metadata store; this suite covers the
+// map's own rules, so the store is a stub that never touches the disk.
+vi.mock('@/lib/hooks/secure-store-preference', () => ({
+  createSecureStorePreference: () => ({
+    preload: vi.fn<() => void>(),
+    get: vi.fn<() => Record<string, string>>(() => ({})),
+    getRequested: vi.fn<() => Record<string, string>>(() => ({})),
+    set: vi.fn<() => void>(),
+    subscribe: vi.fn<() => () => void>(() => vi.fn<() => void>()),
+    clear: vi.fn<() => void>(),
+  }),
+}));
 
 function choices(count: number): Record<string, string> {
   return Object.fromEntries(

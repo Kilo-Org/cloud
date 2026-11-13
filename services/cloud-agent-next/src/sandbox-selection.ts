@@ -10,6 +10,7 @@ import {
   CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
   SELECTABLE_SANDBOX_ALLOCATIONS,
   getSandboxAllocation,
+  getSandboxAllocationInstance,
   getSandboxAllocationProvider,
   getSandboxAllocationRequest,
   isSandboxAllocationAvailable,
@@ -17,6 +18,7 @@ import {
   type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { getDefaultSandboxDestination, isOrgInList } from './sandbox-id.js';
+import { containersBillingIdentity } from './container-usage-context.js';
 import type { Env } from './types.js';
 
 export { isSandboxAllocationAvailable } from '@kilocode/worker-utils/sandbox-allocation';
@@ -100,49 +102,56 @@ export async function getSandboxSelectionCapabilities(
   const selectionAllowed =
     isOrgInList(env.SANDBOX_SELECTION_IDS, owner.userId) ||
     isOrgInList(env.SANDBOX_SELECTION_IDS, owner.orgId) ||
-    enrolledByocVercelOwner(env, owner) !== undefined ||
-    (await billingModeForOwner(env, owner)) === 'paid';
-  if (!selectionAllowed) {
-    // Owners without selection still run somewhere; report where so the UI can
-    // show it without offering a choice.
-    return {
-      enabled: false,
-      defaultDestination: getDefaultSandboxDestination(env, owner),
-      options: [],
-    };
-  }
+    enrolledByocVercelOwner(env, owner) !== undefined;
 
   const capability = options?.capability;
   // Report every selectable allocation with its unavailability reasons so the
   // picker can show disabled entries; a reason-bearing option is unavailable.
-  const candidates = SELECTABLE_SANDBOX_ALLOCATIONS.map(allocation => {
-    const unavailableReason = sandboxAllocationUnavailableReason(
-      env,
-      owner,
-      allocation,
-      capability,
-      options?.vercelUnavailableReason
-    );
-    return {
-      allocation: getSandboxAllocationRequest(allocation),
-      ...(unavailableReason ? { unavailableReason } : {}),
-    };
-  });
+  const candidates = await Promise.all(
+    SELECTABLE_SANDBOX_ALLOCATIONS.map(async allocation => {
+      let unavailableReason = sandboxAllocationUnavailableReason(
+        env,
+        owner,
+        allocation,
+        capability,
+        options?.vercelUnavailableReason
+      );
+      const instance = getSandboxAllocationInstance(allocation);
+      // Billing enrollment is service-scoped; use the same identity as usage recording.
+      if (
+        !selectionAllowed &&
+        instance !== undefined &&
+        (await billingModeForOwner(env, owner, containersBillingIdentity(instance).service)) !==
+          'paid'
+      ) {
+        unavailableReason = 'Paid compute billing is not enabled for this sandbox size';
+      }
+      return {
+        allocation: getSandboxAllocationRequest(allocation),
+        ...(unavailableReason ? { unavailableReason } : {}),
+      };
+    })
+  );
+  const enabled = selectionAllowed || candidates.some(candidate => !candidate.unavailableReason);
   return {
-    enabled: true,
+    enabled,
     defaultDestination: getDefaultSandboxDestination(env, owner),
-    options: candidates,
+    options: enabled ? candidates : [],
   };
 }
 
-async function billingModeForOwner(env: Env, owner: SelectionOwner): Promise<BillingMode> {
+async function billingModeForOwner(
+  env: Env,
+  owner: SelectionOwner,
+  service: string
+): Promise<BillingMode> {
   let cause: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       return billingModeSchema.parse(
         await withTimeout(
           env.CONTAINER_USAGE_METER.getBillingMode({
-            service: 'cloud-agent-next-sandbox-containers-standard3',
+            service,
             subject: owner.orgId
               ? { type: 'org', id: owner.orgId }
               : { type: 'user', id: owner.userId },

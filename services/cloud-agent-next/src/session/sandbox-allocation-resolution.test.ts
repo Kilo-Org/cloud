@@ -192,9 +192,23 @@ describe('resolveSavedSandboxAllocation', () => {
       })
     ).resolves.toBe('cloudflare-containers-standard-4');
     expect(getBillingMode).toHaveBeenCalledWith({
-      service: 'cloud-agent-next-sandbox-containers-standard3',
+      service: 'cloud-agent-next-sandbox-containers-standard4',
       subject: { type: 'org', id: owner.orgId },
     });
+  });
+
+  it('skips an unpaid saved size and keeps the paid context default', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      repositoryAllocation: 'cloudflare-containers-standard-3',
+      contextAllocation: 'cloudflare-containers-standard-4',
+    });
+    const getBillingMode = vi.fn(async ({ service }: { service: string }) =>
+      service === 'cloud-agent-next-sandbox-containers-standard4' ? 'paid' : 'shadow'
+    );
+
+    await expect(
+      resolve({ env: { CONTAINER_USAGE_METER: { getBillingMode } } as unknown as Env })
+    ).resolves.toBe('cloudflare-containers-standard-4');
   });
 
   it.each(['github', 'gitlab', 'bitbucket'] as const)(
@@ -354,7 +368,7 @@ describe('resolveSavedSandboxAllocation', () => {
     });
 
     await expect(resolve({ env: disabledEnv })).resolves.toBeUndefined();
-    expect(disabledEnv.CONTAINER_USAGE_METER.getBillingMode).toHaveBeenCalledOnce();
+    expect(disabledEnv.CONTAINER_USAGE_METER.getBillingMode).toHaveBeenCalledTimes(2);
   });
 
   it('reports a billing failure instead of dropping a selectable saved size', async () => {
@@ -366,7 +380,7 @@ describe('resolveSavedSandboxAllocation', () => {
     await expect(
       resolve({ env: { CONTAINER_USAGE_METER: { getBillingMode } } as unknown as Env })
     ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
-    expect(getBillingMode).toHaveBeenCalledTimes(2);
+    expect(getBillingMode).toHaveBeenCalledTimes(4);
   });
 
   it('reads only the context setting for a Bitbucket repository', async () => {

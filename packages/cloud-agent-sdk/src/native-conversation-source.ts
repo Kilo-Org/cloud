@@ -113,9 +113,9 @@ export function reduceNativePendingRequests(
       ...pending,
       permissions: pending.permissions.filter(item => item.id !== identity.data.id),
       // In place, so a replayed request keeps its place in the oldest-first list.
-      unreadablePermissions: upsertByRequestId(pending.unreadablePermissions, {
-        requestId: identity.data.id,
-      }),
+      unreadablePermissions: [
+        ...upsertByRequestId(pending.unreadablePermissions, { requestId: identity.data.id }),
+      ],
     };
   }
   if (event.type === 'permission.replied')

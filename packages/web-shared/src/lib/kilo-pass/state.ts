@@ -31,6 +31,8 @@ export type KiloPassSubscriptionState = {
   currentStreakMonths: number;
   nextYearlyIssueAt: string | null;
   startedAt: string | null;
+  /** Absent on a state a caller assembles rather than reads from a row. */
+  endedAt?: string | null;
   resumesAt: string | null;
 };
 
@@ -46,12 +48,16 @@ type KiloPassSubscriptionRowForState = {
   currentStreakMonths: number;
   nextYearlyIssueAt: string | null;
   startedAt: string | null;
+  endedAt: string | null;
   createdAt: string;
 };
 
 function toKiloPassSubscriptionState(
   selected: KiloPassSubscriptionRowForState,
-  overrides: Pick<KiloPassSubscriptionState, 'status' | 'cancelAtPeriodEnd' | 'resumesAt'>
+  overrides: Pick<KiloPassSubscriptionState, 'status' | 'cancelAtPeriodEnd' | 'resumesAt'> & {
+    /** A date a caller derives instead of the stored one, such as a store expiry. */
+    endedAt?: string | null;
+  }
 ): KiloPassSubscriptionState {
   return {
     subscriptionId: selected.subscriptionId,
@@ -65,6 +71,7 @@ function toKiloPassSubscriptionState(
     currentStreakMonths: selected.currentStreakMonths,
     nextYearlyIssueAt: normalizeTimestampToIso(selected.nextYearlyIssueAt),
     startedAt: normalizeTimestampToIso(selected.startedAt),
+    endedAt: overrides.endedAt ?? normalizeTimestampToIso(selected.endedAt),
     resumesAt: overrides.resumesAt,
   };
 }
@@ -112,6 +119,7 @@ export async function getKiloPassStateForUser(
       currentStreakMonths: kilo_pass_subscriptions.current_streak_months,
       nextYearlyIssueAt: kilo_pass_subscriptions.next_yearly_issue_at,
       startedAt: kilo_pass_subscriptions.started_at,
+      endedAt: kilo_pass_subscriptions.ended_at,
       createdAt: kilo_pass_subscriptions.created_at,
     })
     .from(kilo_pass_subscriptions)
@@ -139,6 +147,9 @@ export async function getKiloPassStateForUser(
       return toKiloPassSubscriptionState(selected, {
         status: 'canceled',
         cancelAtPeriodEnd: false,
+        // A store pass ends when its last recorded purchase expires, so that
+        // expiry is the date the pass ended.
+        endedAt: normalizeTimestampToIso(latestStorePurchase?.expires_at ?? null),
         resumesAt: null,
       });
     }

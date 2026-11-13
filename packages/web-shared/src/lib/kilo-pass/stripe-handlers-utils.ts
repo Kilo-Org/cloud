@@ -339,13 +339,28 @@ export async function resolveSettledInvoicePayment(params: {
 }
 
 /**
+ * Gets the end date Stripe reports for a subscription as an ISO string, or null
+ * when Stripe reports neither `ended_at` nor `canceled_at`.
+ *
+ * For read paths: a pass whose provider date is unknown must not claim a date,
+ * so the caller can render "ended" without a day.
+ */
+export function getStripeReportedEndedAtIso(subscription: Stripe.Subscription): string | null {
+  const seconds = subscription.ended_at ?? subscription.canceled_at ?? null;
+  if (seconds === null) {
+    return null;
+  }
+  return dayjs.unix(seconds).utc().toISOString();
+}
+
+/**
  * Gets the ended_at timestamp from a Stripe subscription as an ISO string.
  * Falls back to current time if no ended_at or canceled_at is available.
+ *
+ * For write paths: a terminal subscription row that is stored needs a date, so
+ * the fallback applies here. A read path that would rather report no date uses
+ * `getStripeReportedEndedAtIso`.
  */
 export function getStripeEndedAtIso(subscription: Stripe.Subscription): string {
-  const seconds = subscription.ended_at ?? subscription.canceled_at ?? null;
-  if (seconds != null) {
-    return dayjs.unix(seconds).utc().toISOString();
-  }
-  return dayjs().utc().toISOString();
+  return getStripeReportedEndedAtIso(subscription) ?? dayjs().utc().toISOString();
 }

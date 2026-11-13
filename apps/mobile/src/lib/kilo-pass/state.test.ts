@@ -14,6 +14,7 @@ function subscription(overrides: Partial<KiloPassSubscription> = {}): KiloPassSu
     status: 'active',
     cancelAtPeriodEnd: false,
     resumesAt: null,
+    endedAt: null,
     nextBillingAt: '2026-12-05T12:00:00.000Z',
     refillAt: '2026-12-05T12:00:00.000Z',
     currentPeriodBaseCreditsUsd: 49,
@@ -72,8 +73,28 @@ describe('getKiloPassDetailState', () => {
           isError: false,
           isPending: false,
         })
-      ).toEqual({ kind: 'ended' });
+      ).toEqual({
+        kind: 'ended',
+        tierLabel: 'Pro',
+        planLabel: 'Pro · Monthly',
+        endedLabel: 'Ended',
+      });
     }
+  });
+
+  it('names the plan and the day a lapsed pass ended', () => {
+    const detail = getKiloPassDetailState({
+      subscription: subscription({ status: 'canceled', endedAt: '2026-11-08T04:05:06.000Z' }),
+      isError: false,
+      isPending: false,
+    });
+
+    expect(detail).toEqual({
+      kind: 'ended',
+      tierLabel: 'Pro',
+      planLabel: 'Pro · Monthly',
+      endedLabel: 'Ended Nov 8, 2026',
+    });
   });
 
   it('describes an active pass with its plan, status, renewal, usage, and bonus', () => {
@@ -247,7 +268,7 @@ describe('getKiloPassCardContentState', () => {
     ).toEqual({
       kind: 'error',
       title: "Couldn't load Kilo Pass.",
-      description: 'Try again from Profile.',
+      description: 'Check your connection, then try again.',
       actionLabel: 'Retry',
     });
   });
@@ -275,6 +296,21 @@ describe('getKiloPassCardContentState', () => {
       title: 'Kilo Pass',
       description: 'Active',
       accessibilityLabel: 'Kilo Pass. Active',
+    });
+  });
+
+  it('summarizes a lapsed pass with its tier and end date', () => {
+    expect(
+      getKiloPassCardContentState({
+        subscription: subscription({ status: 'canceled', endedAt: '2026-11-08T04:05:06.000Z' }),
+        isError: false,
+        isPending: false,
+      })
+    ).toEqual({
+      kind: 'card',
+      title: 'Kilo Pass',
+      description: 'Pro · Ended Nov 8, 2026',
+      accessibilityLabel: 'Kilo Pass. Pro · Ended Nov 8, 2026',
     });
   });
 });

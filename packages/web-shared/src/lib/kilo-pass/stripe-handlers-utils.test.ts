@@ -3,6 +3,7 @@ import {
   getInvoiceIssueMonth,
   getInvoiceSubscription,
   getStripeEndedAtIso,
+  getStripeReportedEndedAtIso,
   resolveSettledInvoicePayment,
 } from './stripe-handlers-utils';
 import { addOneMonthToIssueMonth, getPreviousIssueMonth } from './issue-month';
@@ -572,5 +573,34 @@ describe('getStripeEndedAtIso', () => {
 
     const result = getStripeEndedAtIso(subscription);
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  });
+});
+
+describe('getStripeReportedEndedAtIso', () => {
+  it('uses ended_at when available', () => {
+    const subscription = {
+      ended_at: 1735689600,
+      canceled_at: 1735603200,
+    } as Stripe.Subscription;
+
+    expect(getStripeReportedEndedAtIso(subscription)).toBe('2025-01-01T00:00:00.000Z');
+  });
+
+  it('falls back to canceled_at when ended_at is null', () => {
+    const subscription = {
+      ended_at: null,
+      canceled_at: 1735603200,
+    } as Stripe.Subscription;
+
+    expect(getStripeReportedEndedAtIso(subscription)).toBe('2024-12-31T00:00:00.000Z');
+  });
+
+  it('returns null when both ended_at and canceled_at are null', () => {
+    const subscription = {
+      ended_at: null,
+      canceled_at: null,
+    } as Stripe.Subscription;
+
+    expect(getStripeReportedEndedAtIso(subscription)).toBeNull();
   });
 });

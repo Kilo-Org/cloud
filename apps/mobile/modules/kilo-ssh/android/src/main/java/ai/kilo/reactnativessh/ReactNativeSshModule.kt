@@ -307,21 +307,26 @@ class ReactNativeSshModule : Module() {
     val session = session(sessionId)
     val shellId = shellIds.next()
     val source = translateSuspendFailures {
-      SshShellSource.open(sessionId, session, options.term, options.cols, options.rows)
+      // A channel that ends releases itself: the module holds no shell past its exit.
+      SshShellSource.open(sessionId, session, options.term, options.cols, options.rows) {
+        closeShell(shellId)
+      }
     }
 
     shells[shellId] = source
     TerminalSourceRegistry.register(shellId, source)
 
+    // The channel can end before it is registered, in which case the callback
+    // above had nothing to remove yet.
+    if (source.terminated) closeShell(shellId)
+
     return shellId
   }
 
   private fun closeShell(shellId: String) {
-    val source = shells.remove(shellId) ?: return
-
     IdleNotifications.release(shellId)
     TerminalSourceRegistry.unregister(shellId)
-    source.close()
+    shells.remove(shellId)?.close()
   }
 
   private fun closeShells(sessionId: String) {

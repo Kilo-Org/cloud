@@ -109,7 +109,7 @@ export const STRATEGY_DESCRIPTION_KEYS = {
 } satisfies Record<CouncilAggregationStrategy, string>;
 
 /** The server caps a label draft can exceed, in the order the form checks them. */
-export type RequiredLabelsProblem = 'tooMany' | 'tooLong';
+type RequiredLabelsProblem = 'tooMany' | 'tooLong';
 
 export type RequiredLabels =
   | { ok: true; labels: string[] }

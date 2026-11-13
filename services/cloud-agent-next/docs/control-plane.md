@@ -1360,6 +1360,49 @@ identity failures remain hard failures and are never downgraded to pending clean
 workspace from one IDE's Agent Manager is a client-local action: it performs no Cloud mutation, and
 only `deleteWorktree` destroys Cloud state.
 
+### Hosted workspace changes and linked pull request
+
+Workspace-keyed `getHostedWorkspaceChanges`, `refreshHostedWorkspaceChanges`,
+`getHostedWorkspaceChangeFile`, `getHostedWorkspacePullRequest` and
+`getHostedWorkspacePullRequestFile` serve the Cloud change and published-PR
+diffs an IDE renders without opening a local checkout. They authorize through
+the owner-scoped workspace catalog plus the ordinary organization
+membership/scope checks; a guessed or another owner's workspace identity is
+`NOT_FOUND`, and a workspace whose organization the caller has left is
+`FORBIDDEN`.
+
+A hosted workspace's committed/uncommitted snapshot is stored once per
+`worktreeId` under the Sandbox DO and read through any root session, so the
+response is independent of the session the caller happens to name and sibling
+sessions share exactly one snapshot. The reads are passive: they only touch DO
+storage, never call `prepare`, `deliver`, a sandbox wake or billing. A
+multi-repository workspace returns one comparison per repository — attributed by
+the longest repository `path` prefix — and never a union of files from different
+repositories; an unattributable saved file fails closed as `inconsistent`. Every
+listed file reports diff/content availability with the saved omission reason, so
+an omitted payload never renders as an empty successful diff. The per-file read
+is revision-fenced and keeps the session contract's `available`, `omitted`,
+`stale`, `no_longer_listed` and `not_captured` outcomes. Refresh preserves the
+existing `refreshed` / `offline` / `failed` semantics and the previous durable
+snapshot; an offline refresh does not discard saved changes.
+
+The linked-PR leg is addressed only by workspace identity. Cloud resolves the
+workspace's cached branch PR from `github_branch_pull_requests` and re-verifies
+the live PR with the workspace owner's GitHub App installation credential: the
+base and head repositories must be the workspace repository and the head ref
+must be the workspace branch. A missing or never-cached PR is `not_linked`; a
+repo or head-ref mismatch is `unverified` and exposes no PR data. When the
+installation cannot read the PR but a connected-user credential would, the
+result is the distinct `credential_required`; the connected-user credential is
+never spent on these reads. A moved PR head is normal publication progress and
+is served as the current head with `cacheStale` set when it differs from the
+cached head. GitHub authorization, rate-limit, not-found and availability
+failures stay distinct (`github_access_denied`, `github_rate_limited`,
+`pull_request_not_found`, `github_unavailable`) and never look like an empty
+PR. The PR file list is bounded and the per-file patch is fenced by
+`expectedHeadSha`, returning `stale`, `not_listed` or `provider_omitted` rather
+than synthesizing a patch.
+
 Bootstrap → Worker (HTTPS on the `WORKER_URL` host, `downloaded` mode only): `GET` one payload with
 the artifact grant, and `POST` one startup-failure report with the wrapper launch credential. The
 Worker forwards an admitted report to the Sandbox DO as `startup-failed`.

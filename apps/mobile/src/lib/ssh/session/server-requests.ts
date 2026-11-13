@@ -8,7 +8,7 @@ import { hostPattern } from '../known-host-pattern';
 import { findKnownHost, trustHostKey } from '../known-hosts';
 import { sshPackage } from '../native';
 import { sshDatabase } from '../store';
-import { fail } from './attempt';
+import { fail, forgetSession } from './attempt';
 import { type HostKeyVerdict, judgeHostKey } from './host-key';
 import { live, type LiveSession, setPhase, stillOpen } from './live';
 import { type SshHostKeyAwaiting, type SshHostKeyDecision } from './types';
@@ -42,6 +42,11 @@ export function handleDisconnect(notice: DisconnectNotice): void {
   for (const entry of live.values()) {
     if (entry.nativeSessionId === notice.sessionId) {
       entry.nativeSessionId = null;
+      // The core reports a disconnect before it has released the session, and
+      // a session left in its registry keeps the connection state the next
+      // attempt to the same host waits on. Closing it is what lets a retry
+      // reach the network again.
+      void forgetSession(notice.sessionId);
       fail(entry, 'disconnected');
       return;
     }

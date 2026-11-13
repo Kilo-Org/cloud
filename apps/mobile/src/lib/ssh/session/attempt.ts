@@ -70,7 +70,7 @@ export async function attempt(entry: LiveSession): Promise<void> {
     };
     const nativeSessionId = await ssh.connect(options);
     if (!stillOpen(entry)) {
-      await abandon(nativeSessionId);
+      await forgetSession(nativeSessionId);
       return;
     }
     entry.nativeSessionId = nativeSessionId;
@@ -200,7 +200,11 @@ async function closeShellQuietly(shellId: string): Promise<void> {
   }
 }
 
-async function abandon(nativeSessionId: string): Promise<void> {
+/**
+ * Releases a native session the app no longer renders. A session left in the
+ * core's registry keeps the connection state its host's next attempt waits on.
+ */
+export async function forgetSession(nativeSessionId: string): Promise<void> {
   try {
     const ssh = await sshPackage();
     await ssh.disconnect(nativeSessionId);

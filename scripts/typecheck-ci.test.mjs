@@ -1488,14 +1488,16 @@ test('the web-test shards install the closure their Jest suite reads', () => {
 });
 
 // The four cloud-agent-next parts run one service suite, and the suite reaches
-// three workspaces outside this service by relative path:
+// workspaces outside this service by relative path:
 // src/telemetry/report-consumer.glanceable.test.ts reads services/notifications
 // and apps/web, and test/integration/scm-broker-parity.test.ts reads
 // services/git-token-service. A project outside the install scope gets no
 // node_modules to resolve its own imports from, so the install names those
 // closures beside the service and wrapper closures the deploy job already
-// installs. A part that starts reading another workspace widens the filter; it
-// does not restore the recursive workspace install.
+// installs. The suites that read packages/cloud-agent-sdk resolve their own
+// imports without that package's node_modules, so it needs no filter. A part
+// that starts reading another workspace widens the filter; it does not restore
+// the recursive workspace install.
 const cloudAgentNextInstall = [
   'pnpm install --frozen-lockfile',
   "--filter 'cloud-agent-next...'",

@@ -1459,15 +1459,16 @@ jobs:
       # Only the closures these parts run plus the root project, as the deploy
       # job for this Worker already installs them: a recursive workspace install
       # links every unrelated package and runs its lifecycle scripts once per
-      # part. Three suites reach another workspace's source by relative path,
-      # and two of them need that workspace's own links:
-      # src/telemetry/report-consumer.glanceable.test.ts reads
-      # services/notifications and apps/web, and
+      # part. A few suites reach another workspace's source by relative path,
+      # and the two whose sources resolve workspace packages need that
+      # workspace's own links: src/telemetry/report-consumer.glanceable.test.ts
+      # reads services/notifications and apps/web, and
       # test/integration/scm-broker-parity.test.ts reads
-      # services/git-token-service. src/websocket/stream.test.ts reads
-      # packages/cloud-agent-sdk, whose source resolves its own imports without
-      # that package's node_modules. Widen the filter when a step here imports a
-      # workspace outside these closures.
+      # services/git-token-service. The suites that read
+      # packages/cloud-agent-sdk, src/websocket/stream.test.ts and
+      # test/integration/control-plane-session-v2-history.test.ts, resolve
+      # without that package's node_modules. Widen the filter when a step here
+      # imports a workspace outside these closures.
       - name: Install dependencies
         run: >-
           pnpm install --frozen-lockfile

@@ -134,7 +134,7 @@ describe('organization usage route deep-linked organization', () => {
     ui.unmount();
   });
 
-  it.each([undefined, '', ['', 'org-b']] as const)(
+  it.each<string | string[] | undefined>([undefined, '', ['', 'org-b']])(
     'leaves the selection alone for %j',
     async org => {
       route.org = org;

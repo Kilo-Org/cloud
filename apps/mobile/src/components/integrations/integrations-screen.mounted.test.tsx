@@ -435,10 +435,13 @@ describe('integrations route deep-linked organization', () => {
     expect(findOne(renderer.root, 'RowMock')).toHaveLength(0);
   });
 
-  it.each([undefined, '', ['', 'org-b']] as const)('leaves the selection alone for %j', org => {
-    routeParams.org = org;
-    mountRoute();
+  it.each<string | string[] | undefined>([undefined, '', ['', 'org-b']])(
+    'leaves the selection alone for %j',
+    org => {
+      routeParams.org = org;
+      mountRoute();
 
-    expect(account.written).toEqual([]);
-  });
+      expect(account.written).toEqual([]);
+    }
+  );
 });

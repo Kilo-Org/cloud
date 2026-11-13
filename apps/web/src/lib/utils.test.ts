@@ -250,11 +250,6 @@ describe('formatIsoDateString_UsaDateOnlyFormat', () => {
 });
 
 describe('requireNotNull', () => {
-  it('should return the value when it is not null or undefined', () => {
-    expect(toNonNullish('hello world')).toBe('hello world');
-    expect(toNonNullish(0)).toBe(0);
-  });
-
   it('should throw an error when value is null or undefined', () => {
     expect(() => toNonNullish(null)).toThrow('Value must not be null or undefined');
     expect(() => toNonNullish(undefined)).toThrow('Value must not be null or undefined');

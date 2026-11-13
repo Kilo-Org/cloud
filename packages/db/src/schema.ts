@@ -2958,11 +2958,13 @@ export const api_request_log_2 = pgTable(
     generation_id: text(),
     kilo_user_id: text().notNull(),
     organization_id: text(),
+    session_id: text(),
     requested_model: text().notNull(),
   },
   table => [
     index('idx_api_request_log_2_created_at').on(table.created_at),
     index('idx_api_request_log_2_generation_id').on(table.generation_id),
+    index('idx_api_request_log_2_session_id').on(table.session_id),
     index('idx_api_request_log_2_kilo_user_id_created_at').on(table.kilo_user_id, table.created_at),
     index('idx_api_request_log_2_organization_id_created_at').on(
       table.organization_id,

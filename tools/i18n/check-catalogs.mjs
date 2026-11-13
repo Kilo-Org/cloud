@@ -768,11 +768,13 @@ function destructiveConfirmKeys(source, english) {
  * Reject a destructive button whose label reads as this catalog's Cancel word.
  *
  * An exact match is always a defect: the reader sees Cancel on the red button
- * too. A substring is one only where English anchors the class, because a
- * reader scanning "Cancel subscription" and "Cancel" sees Cancel twice, and a
- * label that is genuinely another word containing the Cancel word as letters is
- * rare enough that a reviewed exception should carry it, not a looser
- * comparison.
+ * too, so it is rejected for every key. The substring test applies only to a
+ * key whose English copy is a bare destructive verb such as "Revoke": a red
+ * button reading "Revoke link" when Cancel sits beneath it is ambiguous, while
+ * "Cancel subscription" beside "Cancel" is deliberate English and its
+ * translation may keep the locale's Cancel word. `allowContains` carries that
+ * per-key decision, so a key whose English names Cancel never reaches the
+ * substring test.
  */
 function checkDestructiveConfirmLabel(label, key, value, cancelValue, allowContains) {
   if (cancelValue === undefined) {

@@ -134,7 +134,7 @@ describe('AccountSettingsScreen', () => {
     act(() => {
       (findConfigureRow(renderer, 'Device sessions').props.onPress as () => void)();
     });
-    expect(push).toHaveBeenCalledWith('/(app)/device-sessions');
+    expect(push).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/device-sessions');
   });
 
   it('opens the account surfaces the web already had', async () => {

@@ -17,6 +17,7 @@ vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
   Check: 'Check',
   ChevronDown: 'ChevronDown',
+  Square: 'Square',
   Terminal: 'Terminal',
 }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -246,6 +247,22 @@ describe('PreparationGroup incomplete restore', () => {
     expect(mounted.group().props.accessibilityLabel).toBe('Preparation complete');
     expect(mounted.group().props.accessibilityState).toEqual({ expanded: false });
     expect(mounted.renderer.root.findAllByType('Check')).toHaveLength(1);
+    mounted.unmount();
+  });
+
+  it('reads a preparation cancellation as a stopped session at every level', async () => {
+    const mounted = await mount(
+      restoreAttempt({
+        status: 'failed',
+        safeError: 'preparation_cancelled',
+        steps: [incompleteStep({ status: 'failed', safeError: 'preparation_cancelled' })],
+      })
+    );
+    expect(mounted.group().props.accessibilityLabel).toBe('Session stopped');
+    expect(mounted.renderedTextValues()).toContain('Session stopped');
+    expect(mounted.renderedTextValues()).not.toContain('preparation_cancelled');
+    expect(mounted.renderer.root.findAllByType('AlertCircle')).toHaveLength(0);
+    expect(mounted.renderer.root.findAllByType('Square')).toHaveLength(2);
     mounted.unmount();
   });
 

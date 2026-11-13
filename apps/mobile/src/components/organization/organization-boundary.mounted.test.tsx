@@ -56,10 +56,7 @@ vi.mock('@/components/ui/icons', () => ({
 
 const openPickerMock = vi.hoisted(() => vi.fn());
 vi.mock('@/components/context-control', () => ({
-  useContextPicker: () => ({
-    openPicker: openPickerMock,
-    picker: createElement('ContextPickerSheetMock'),
-  }),
+  useContextPicker: () => ({ openPicker: openPickerMock }),
 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -284,8 +281,6 @@ describe('OrganizationBoundary settled states', () => {
     );
     expect(texts).toContain('Choose an account');
     expect(texts).toContain('Back to profile');
-    // The picker sheet element stays mounted in the caller's tree.
-    expect(findByType(renderer.root, 'ContextPickerSheetMock')).toHaveLength(1);
     expect(texts).not.toContain('No organization');
 
     const chooseButton = renderer.root.find(
@@ -316,7 +311,6 @@ describe('OrganizationBoundary settled states', () => {
 
     expect(texts).toContain('Select an organization');
     expect(texts).toContain('Choose an account');
-    expect(findByType(renderer.root, 'ContextPickerSheetMock')).toHaveLength(1);
     expect(texts).not.toContain('Organization unavailable');
     expect(texts).not.toContain('Access denied');
 

@@ -165,6 +165,11 @@ describe('preparationErrorText', () => {
   it('falls back to the attempt failure title for an unknown value', () => {
     expect(preparationErrorText('clone failed', t)).toBe('Preparation failed');
   });
+
+  it('reads a user-cancelled preparation as a stopped session, not a failure', () => {
+    expect(preparationErrorText('preparation_cancelled', t)).toBe('Session stopped');
+    expect(preparationErrorText('Environment preparation was stopped', t)).toBe('Session stopped');
+  });
 });
 
 describe('splitFailureSentence', () => {

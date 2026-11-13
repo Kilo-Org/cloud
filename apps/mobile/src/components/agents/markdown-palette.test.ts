@@ -48,6 +48,7 @@ const colors = {
   rowSage: '#587C1D',
   rowMoss: '#467C1D',
   rowFern: '#357C1D',
+  rowPine: '#237C1D',
 } satisfies ThemeColors;
 
 describe('markdown palette', () => {

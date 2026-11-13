@@ -140,6 +140,7 @@ vi.mock('@/lib/voice-input/gateway/gateway-transcription-preference', () => ({
 type SectionProps = {
   title?: string;
   what?: string;
+  why?: string;
   who?: string;
   footer?: React.ReactElement;
 };
@@ -227,6 +228,18 @@ describe('ConsentDetails copy', () => {
     expect(titles).toContain('Performance profiling');
     expect(titles).toContain('Install attribution');
     expect(titles).toContain('Voice transcription');
+    expect(titles).toContain('Feature rollout');
+  });
+
+  it('feature rollout section discloses the email, its purpose, and PostHog', () => {
+    const renderer = mount();
+    const section = findAllSectionProps(renderer.root).find(s => s.title === 'Feature rollout');
+    expect(section).toBeDefined();
+    expect(section?.what).toBe('Your account email.');
+    expect(section?.why).toBe(
+      'To decide which features you see, including ones we are still rolling out.'
+    );
+    expect(section?.who).toBe('PostHog, the feature-flag service.');
   });
 
   it('onboarding heading states the default-on behavior', () => {

@@ -268,54 +268,73 @@ export function countGlanceableApprovals(sessions: readonly GlanceableSessionRow
 }
 
 /**
+ * The row whose chosen timestamp is the earliest or the latest among the rows
+ * that `qualifies` admits, or null when no admitted row carries a parseable
+ * time.
+ *
+ * A row with a missing or unparseable timestamp is skipped rather than read as
+ * now, which would understate a wait or overstate how new a change is. Only a
+ * strictly earlier or strictly later value replaces the winner, so the first
+ * row of a tie stays the winner.
+ */
+function extremeTimestampRow(
+  sessions: readonly GlanceableSessionRow[],
+  qualifies: (session: GlanceableSessionRow) => boolean,
+  readTimestamp: (session: GlanceableSessionRow) => string | undefined,
+  extreme: 'earliest' | 'latest'
+): { at: number; session: GlanceableSessionRow } | null {
+  let winner: { at: number; session: GlanceableSessionRow } | null = null;
+  for (const session of sessions) {
+    if (!qualifies(session)) {
+      continue;
+    }
+    const at = timestampMs(readTimestamp(session));
+    if (at === null) {
+      continue;
+    }
+    if (winner !== null) {
+      const loses = extreme === 'earliest' ? at >= winner.at : at <= winner.at;
+      if (loses) {
+        continue;
+      }
+    }
+    winner = { at, session };
+  }
+  return winner;
+}
+
+/**
  * The earliest `statusUpdatedAt` among the needs-input sessions as an ISO 8601
  * timestamp, or null when none waits or none carried a usable timestamp.
  *
  * The counts are aggregates, so a single duration can only honestly describe
  * the oldest wait: it is a floor on how long the user has kept an agent
- * blocked. A row with a missing or unparseable timestamp is skipped rather
- * than treated as waiting since now, which would understate the wait.
+ * blocked.
  */
 export function oldestNeedsInputSince(sessions: readonly GlanceableSessionRow[]): string | null {
-  let oldest: number | null = null;
-  for (const session of sessions) {
-    if (
-      glanceableNeedsInputKind(session.status) === null ||
-      session.statusUpdatedAt === undefined
-    ) {
-      continue;
-    }
-    const at = timestampMs(session.statusUpdatedAt);
-    if (at === null || (oldest !== null && at >= oldest)) {
-      continue;
-    }
-    oldest = at;
-  }
-  return oldest === null ? null : new Date(oldest).toISOString();
+  const oldest = extremeTimestampRow(
+    sessions,
+    session => glanceableNeedsInputKind(session.status) !== null,
+    session => session.statusUpdatedAt,
+    'earliest'
+  );
+  return oldest === null ? null : new Date(oldest.at).toISOString();
 }
 
 /**
  * The earliest parseable `scheduledAt` among scheduled sessions as an ISO 8601
  * timestamp, or null when none is scheduled or none carried a usable wake time.
- *
- * A row with a missing or unparseable timestamp is skipped rather than treated
- * as waking now, which would understate how soon the soonest wake is. A
- * scheduled row with no wake time still counts as scheduled — only the
+ * A scheduled row with no wake time still counts as scheduled — only the
  * timestamp is absent.
  */
 export function soonestScheduledAt(sessions: readonly GlanceableSessionRow[]): string | null {
-  let soonest: number | null = null;
-  for (const session of sessions) {
-    if (session.status !== 'scheduled' || session.scheduledAt === undefined) {
-      continue;
-    }
-    const at = timestampMs(session.scheduledAt);
-    if (at === null || (soonest !== null && at >= soonest)) {
-      continue;
-    }
-    soonest = at;
-  }
-  return soonest === null ? null : new Date(soonest).toISOString();
+  const soonest = extremeTimestampRow(
+    sessions,
+    session => session.status === 'scheduled',
+    session => session.scheduledAt,
+    'earliest'
+  );
+  return soonest === null ? null : new Date(soonest.at).toISOString();
 }
 
 /**
@@ -324,29 +343,20 @@ export function soonestScheduledAt(sessions: readonly GlanceableSessionRow[]): s
  *
  * The counts and the newest-result line must agree, so the kind maps through
  * `glanceableStatusKind`: a completed or unknown status reads as `running`
- * exactly as it counts. A row with a missing or unparseable timestamp is
- * skipped rather than treated as changing now, which would overstate how new
- * the newest change is.
+ * exactly as it counts.
  */
 export function newestGlanceableResult(
   sessions: readonly GlanceableSessionRow[]
 ): { kind: GlanceableStatusKind; at: string } | null {
-  let newest: number | null = null;
-  let newestKind: GlanceableStatusKind | null = null;
-  for (const session of sessions) {
-    if (session.statusUpdatedAt === undefined) {
-      continue;
-    }
-    const at = timestampMs(session.statusUpdatedAt);
-    if (at === null || (newest !== null && at <= newest)) {
-      continue;
-    }
-    newest = at;
-    newestKind = glanceableStatusKind(session.status);
-  }
-  return newest === null || newestKind === null
+  const newest = extremeTimestampRow(
+    sessions,
+    () => true,
+    session => session.statusUpdatedAt,
+    'latest'
+  );
+  return newest === null
     ? null
-    : { kind: newestKind, at: new Date(newest).toISOString() };
+    : { kind: glanceableStatusKind(newest.session.status), at: new Date(newest.at).toISOString() };
 }
 
 // FNV-1a 32-bit over UTF-16 code units (two bytes each). Deterministic across

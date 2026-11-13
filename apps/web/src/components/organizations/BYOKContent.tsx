@@ -16,7 +16,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
-import { CHATGPT_ACCESS_FLAG } from '@/lib/auth/openai/access';
+import { CHATGPT_ACCESS_FLAG } from '@kilocode/app-shared/feature-flags';
 import { ClaudeBillingCard } from './byok/ClaudeBillingCard';
 
 /**

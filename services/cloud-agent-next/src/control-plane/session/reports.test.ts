@@ -22,6 +22,32 @@ function message(
 }
 
 describe('projectSettledMessageFailure', () => {
+  it.each(['completion_unconfirmed', 'no_outcome'])(
+    'keeps %s classified in reports and terminal callbacks',
+    reason => {
+      const settled = message({ state: 'failed', acceptedAt: 1, reason });
+      const report = buildControlPlaneMessageReport({
+        cloudAgentSessionId: 'workspace_11111111-1111-1111-1111-111111111111',
+        message: settled,
+      });
+
+      expect(report?.run).toMatchObject({
+        status: 'failed',
+        failureStage: 'post_dispatch_no_activity',
+        failureCode: 'wrapper_no_output',
+        failureResponsibility: 'platform',
+        failureReason: 'wrapper_liveness',
+        diagnostic: {
+          errorMessageRedacted: 'Wrapper made no execution progress during the watchdog window',
+        },
+      });
+      expect(projectSettledMessageFailure(settled, {})).toMatchObject({
+        stage: 'post_dispatch_no_activity',
+        code: 'wrapper_no_output',
+      });
+    }
+  );
+
   it.each([400, 402, 403])(
     'preserves classified BYOK APIError %s facts in the callback projection',
     statusCode => {

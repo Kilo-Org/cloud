@@ -97,6 +97,13 @@ type MessageBubbleProps = {
   /** Restores a canceled queued message's prompt back into the composer. */
   onRestoreQueued?: (message: StoredMessage) => void;
   /**
+   * Whether this row is the prompt a stored transcript ends on with no reply
+   * recorded after it. Set only by a read-only session, whose stored rows carry
+   * no delivery state: the record cannot say the send failed, so the row states
+   * only that nothing answers it. Defaults to false.
+   */
+  noReplyRecorded?: boolean;
+  /**
    * When true, consecutive tool parts of an assistant message render as one
    * condensed run row. Off (or omitted) keeps the per-part rendering exactly as
    * it was.
@@ -122,6 +129,7 @@ function MessageBubbleImpl({
   onCopyToComposer,
   failureStatedByPreparation,
   onRestoreQueued,
+  noReplyRecorded,
   condenseToolCalls,
 }: Readonly<MessageBubbleProps>) {
   const isUser = message.info.role === 'user';
@@ -319,6 +327,21 @@ function MessageBubbleImpl({
       </View>
     ) : null;
 
+  // A stored transcript can end on a prompt with nothing recorded under it.
+  // The record holds no delivery state, so this row says only what it knows —
+  // that no reply follows the prompt — in the neutral status tone: no marker,
+  // no action, and no claim that the send failed. It sits in the prompt's own
+  // column like the failure footer, and outside the Pressable, so a screen
+  // reader announces it after the row instead of folding it into the bubble.
+  const noReplyNote =
+    isUser && noReplyRecorded === true ? (
+      <View className="px-4 pt-1 pb-[24px]">
+        <Text className="text-right text-sm text-muted-foreground">
+          {t('agentChat.messageBubble.noReplyRecorded')}
+        </Text>
+      </View>
+    ) : null;
+
   if (isUser) {
     // Composer, queued-message synthesis, and slash commands emit exactly one
     // human-authored text part, so the separator separates it from synthesized
@@ -413,6 +436,7 @@ function MessageBubbleImpl({
           </Pressable>
         ) : null}
         {failureFooter}
+        {noReplyNote}
       </View>
     );
   }

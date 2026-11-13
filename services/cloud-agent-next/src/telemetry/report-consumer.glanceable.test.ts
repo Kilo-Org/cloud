@@ -29,18 +29,11 @@ vi.mock('@kilocode/web-shared/lib/drizzle', () => ({
     return database.current;
   },
 }));
-vi.mock('@/routers/cli-sessions-v2-router', async () => {
-  const { z } = await import('zod');
-  return {
-    associatedPrSchema: z.unknown(),
-    formatAssociatedPr: () => null,
-  };
-});
-// SQLite has no LATERAL: stand in an uncorrelated subquery that never matches.
 vi.mock('@/lib/session-associated-pr', async () => {
   const { sql } = await import('drizzle-orm');
   const { QueryBuilder } = await import('drizzle-orm/pg-core');
   const { github_branch_pull_requests: pr } = await import('@kilocode/db/schema');
+  const { z } = await import('zod');
   return {
     sessionAssociatedPr: new QueryBuilder()
       .select({
@@ -58,6 +51,8 @@ vi.mock('@/lib/session-associated-pr', async () => {
       .from(pr)
       .where(sql`false`)
       .as('session_pr'),
+    associatedPrSchema: z.unknown(),
+    formatAssociatedPr: () => null,
   };
 });
 

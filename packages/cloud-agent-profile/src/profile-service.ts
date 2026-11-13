@@ -14,7 +14,9 @@ import {
 import { eq, and, sql, count, inArray } from 'drizzle-orm';
 import type { ProfileDatabase, ProfileOwner, ProfileSummary, ProfileResponse } from './types';
 import {
+  assertOwnerProfileLimit,
   buildOwnershipCondition,
+  lockProfileCreation,
   lockProfileOwnership,
   verifyProfileOwnership,
 } from './profile-utils';
@@ -31,6 +33,11 @@ import { listInstructionsForProfile } from './profile-instructions-service';
  * `createdByUserId` records the user who initiated the creation. For
  * user-owned profiles this matches `owner.id`; for org-owned profiles it
  * identifies the member who authored the shared profile.
+ *
+ * The owner's profile count and the insert are one unit under the owner's
+ * creation lock, so parallel creates cannot take an owner past
+ * `MAX_OWNER_PROFILES`. The limit guards creation alone: profiles an owner
+ * already holds stay readable and editable.
  */
 export async function createProfile(
   db: WorkerDb,
@@ -39,18 +46,23 @@ export async function createProfile(
   name: string,
   description?: string
 ): Promise<{ id: string }> {
-  const [profile] = await db
-    .insert(agent_environment_profiles)
-    .values({
-      owned_by_organization_id: owner.type === 'organization' ? owner.id : null,
-      owned_by_user_id: owner.type === 'user' ? owner.id : null,
-      created_by_user_id: createdByUserId,
-      name,
-      description: description ?? null,
-    })
-    .returning({ id: agent_environment_profiles.id });
+  return await db.transaction(async tx => {
+    await lockProfileCreation(tx, owner);
+    await assertOwnerProfileLimit(tx, owner);
 
-  return { id: profile.id };
+    const [profile] = await tx
+      .insert(agent_environment_profiles)
+      .values({
+        owned_by_organization_id: owner.type === 'organization' ? owner.id : null,
+        owned_by_user_id: owner.type === 'user' ? owner.id : null,
+        created_by_user_id: createdByUserId,
+        name,
+        description: description ?? null,
+      })
+      .returning({ id: agent_environment_profiles.id });
+
+    return { id: profile.id };
+  });
 }
 
 /**

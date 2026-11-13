@@ -82,10 +82,10 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: 'gray' }),
 }));
 
-vi.mock('@/lib/organization-invoice-download', () => ({
+vi.mock('@/lib/invoice-download', () => ({
   selectInvoiceRowState: () => 'no-affordance',
   getInvoiceDownloadErrorMessage: String,
-  shareOrganizationInvoicePdf: vi.fn(),
+  shareInvoicePdf: vi.fn(),
 }));
 
 vi.mock('sonner-native', () => ({

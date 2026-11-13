@@ -45,6 +45,7 @@ export const lightColors = {
   rowSage: '#587C1D',
   rowMoss: '#467C1D',
   rowFern: '#357C1D',
+  rowPine: '#237C1D',
 } as const;
 
 export const darkColors = {
@@ -92,4 +93,5 @@ export const darkColors = {
   rowSage: '#C4EB84',
   rowMoss: '#B1EB84',
   rowFern: '#9EEB84',
+  rowPine: '#8BEB84',
 } as const;

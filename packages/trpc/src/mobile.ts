@@ -6,6 +6,11 @@ import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
 import { todosRouter } from '@/routers/todos-router';
 import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
+import { platformIntegrationsRouter } from '@/routers/platform-integrations-router';
+import { slackRouter } from '@/routers/slack-router';
+import { linearRouter } from '@/routers/linear-router';
+import { discordRouter } from '@/routers/discord-router';
+import { gitlabRouter } from '@/routers/gitlab-router';
 import { codeReviewRouter } from '@/routers/code-reviews/code-reviews-router';
 import { reviewMemoryRouter } from '@/routers/code-reviews/review-memory-router';
 import { personalReviewAgentRouter } from '@/routers/code-reviews-router';
@@ -21,7 +26,11 @@ import { moderationRouter } from '@/routers/moderation-router';
 import { kiloChatRouter } from '@/routers/kilo-chat-router';
 import { spendAlertRouter } from '@/routers/spend-alert-router';
 import { agentBriefingRouter } from '@/routers/agent-briefing-router';
+import { computeBillingRouter } from '@/routers/compute-billing-router';
 import { agentProfilesMobileRouter } from './agent-profiles-mobile';
+import { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
+import { byokRouter } from '@/routers/byok-router';
+import { userExportsRouter } from '@/routers/user-exports-router';
 
 /**
  * Mobile-scoped tRPC router. Composes only the namespaces the mobile app
@@ -37,6 +46,11 @@ const mobileRouter = createTRPCRouter({
   todos: todosRouter,
   cloudAgentNext: cloudAgentNextRouter,
   githubApps: githubAppsRouter,
+  platformIntegrations: platformIntegrationsRouter,
+  slack: slackRouter,
+  linear: linearRouter,
+  discord: discordRouter,
+  gitlab: gitlabRouter,
   codeReviews: codeReviewRouter,
   reviewMemory: reviewMemoryRouter,
   personalReviewAgent: personalReviewAgentRouter,
@@ -52,7 +66,11 @@ const mobileRouter = createTRPCRouter({
   kiloChat: kiloChatRouter,
   spendAlerts: spendAlertRouter,
   agentBriefing: agentBriefingRouter,
+  computeBilling: computeBillingRouter,
   agentProfiles: agentProfilesMobileRouter,
+  usageAnalytics: usageAnalyticsRouter,
+  byok: byokRouter,
+  userExports: userExportsRouter,
 });
 
 export type MobileRouter = typeof mobileRouter;

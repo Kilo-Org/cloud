@@ -29,7 +29,6 @@ import { EnkryptPublishedBenchmarkSchema, OpenCodeSettingsSchema } from '@kiloco
 
 export const OrganizationRoleSchema = z.enum(ORGANIZATION_ROLES);
 
-// API-facing billing cycle values: 'monthly' | 'annual'
 // The DB stores 'yearly' instead of 'annual'; Stripe uses 'year'/'month'.
 export const BillingCycleSchema = z.enum(['monthly', 'annual']);
 export type BillingCycle = z.infer<typeof BillingCycleSchema>;

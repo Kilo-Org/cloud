@@ -56,8 +56,9 @@ type InstructionFormSheetProps = Readonly<{
  *
  * The name is reduced to the server's slug rule on save and the preview under
  * the field says so first, so a typed `Release Notes` is never silently stored
- * as another file name. Save validates everything else through
- * `validateInstructionInput`; a refused input shows the matching
+ * as another file name. Save validates the name as typed through
+ * `validateInstructionInput`; a name with nothing left in ASCII after the fold
+ * is refused as invalid, not as empty. A refused input shows the matching
  * `profiles.instruction*` message under the field at fault.
  */
 export function InstructionFormSheet({
@@ -96,7 +97,7 @@ export function InstructionFormSheet({
 
   const submit = () => {
     const result = validateInstructionInput({
-      name: cleanInstructionName(nameRef.current),
+      name: nameRef.current,
       content: contentRef.current,
     });
     if (result !== null) {

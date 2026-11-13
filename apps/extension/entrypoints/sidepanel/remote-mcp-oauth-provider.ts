@@ -19,6 +19,9 @@ import {
 
 const REDIRECT_PATH = 'remote-mcp';
 
+/* Shown when the interactive sign-in ends without an authorization code (closed, blocked, or failed). */
+export const AUTH_INCOMPLETE_MESSAGE = 'Sign-in did not complete. Start it again with Connect.';
+
 /**
  * SDK `OAuthClientProvider` backed by a single server's persisted OAuth state.
  *
@@ -107,12 +110,18 @@ export const createRemoteMcpOAuthProvider = ({
     },
 
     async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
-      const redirect = await browser.identity.launchWebAuthFlow({
-        interactive: true,
-        url: authorizationUrl.toString(),
-      });
+      let redirect: string | undefined = undefined;
+      try {
+        redirect = await browser.identity.launchWebAuthFlow({
+          interactive: true,
+          url: authorizationUrl.toString(),
+        });
+      } catch (error) {
+        // Closing or blocking the browser flow rejects; the user needs the outcome, not the platform error.
+        throw new Error(AUTH_INCOMPLETE_MESSAGE, { cause: error });
+      }
       if (redirect === undefined) {
-        throw new Error('Authorization flow returned no redirect URL.');
+        throw new Error(AUTH_INCOMPLETE_MESSAGE);
       }
       authorizationCode = parseAuthorizationRedirect(redirect);
     },

@@ -823,10 +823,6 @@ export function isEmailOnBlockedTld(email: string, blockedTlds: readonly string[
 export const isBlockedTLD = async (email: string): Promise<boolean> =>
   isEmailOnBlockedTld(email, await getBlockedSignupTlds());
 
-export function report_blocked_user(kiloUserId: string) {
-  return authError(403, 'Access denied (R1)', kiloUserId);
-}
-
 export const uuidSchema = z.uuid();
 const uuid = uuidSchema;
 // Namespace UUID for generating UUIDs from legacy user IDs

@@ -215,7 +215,11 @@ function CloudAgentSettings({
                 </h3>
                 <Badge variant="secondary">{organizationId ? 'All members' : 'New sessions'}</Badge>
               </div>
-              <DefaultSandboxSection organizationId={organizationId} settings={settings} />
+              <DefaultSandboxSection
+                organizationId={organizationId}
+                settings={settings}
+                onRetry={() => void settingsQuery.refetch()}
+              />
               <RepositoryOverridesSection
                 organizationId={organizationId}
                 settings={settings}

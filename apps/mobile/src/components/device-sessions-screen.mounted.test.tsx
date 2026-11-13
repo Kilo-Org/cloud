@@ -34,7 +34,6 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'DetailScreenScrollView' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
@@ -51,11 +50,11 @@ vi.mock('@/components/ui/dialog', () => ({
   }),
 }));
 vi.mock('@/components/ui/icons', () => ({
-  LogOut: 'LogOut',
   Smartphone: 'Smartphone',
   Shield: 'Shield',
   X: 'X',
 }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));
 vi.mock('@/lib/auth/auth-context', () => ({
   useAuth: () => ({ token: 'test-token', signOut: vi.fn() }),
 }));
@@ -109,7 +108,7 @@ describe('account surface states', () => {
       query.isError = state === 'error';
       const { renderer, unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
       expect(
-        renderer.root.findAll(node => String(node.type) === 'DetailScreenScrollView')
+        renderer.root.findAll(node => String(node.type) === 'TabScreenScrollView')
       ).toHaveLength(0);
       const body = renderer.root.find(
         node => String(node.type) === (state === 'error' ? 'QueryError' : 'EmptyState')
@@ -224,6 +223,7 @@ type SessionFixture = {
   userAgent: string;
   isCurrent?: boolean;
   signedIn?: string;
+  lastSeen?: string;
 };
 
 function session({
@@ -231,18 +231,19 @@ function session({
   userAgent,
   isCurrent = false,
   signedIn = '2026-01-01T00:00:00Z',
+  lastSeen = signedIn,
 }: SessionFixture): DeviceSession {
   return {
     id,
     user_agent: userAgent,
     isCurrent,
     created_at: signedIn,
-    last_seen_at: signedIn,
+    last_seen_at: lastSeen,
   };
 }
 
 describe('device session sign-out controls', () => {
-  it('names the device in each non-current label and isolates it in the confirmation', async () => {
+  it('names the device and both dates in each non-current label and isolates the device in the confirmation', async () => {
     query.data = [
       session({
         id: 'current',
@@ -250,15 +251,20 @@ describe('device session sign-out controls', () => {
         isCurrent: true,
         signedIn: '2026-01-03T00:00:00Z',
       }),
-      session({ id: 'phone', userAgent: 'هاتف-قديم', signedIn: '2026-02-28T09:15:00Z' }),
+      session({
+        id: 'phone',
+        userAgent: 'هاتف-قديم',
+        signedIn: '2026-02-28T09:15:00Z',
+        lastSeen: '2026-03-11T18:40:00Z',
+      }),
       session({ id: 'cli', userAgent: 'axios/1.7.0', signedIn: '2026-03-04T11:00:00Z' }),
     ];
     const { renderer, unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
     const buttons = renderer.root.findAll(node => String(node.type) === 'Pressable');
     expect(buttons.map(button => button.props.accessibilityLabel)).toStrictEqual([
       'Sign out this device',
-      `Sign out ${FIRST_STRONG_ISOLATE}هاتف-قديم${POP_DIRECTIONAL_ISOLATE}, signed in 2026-02-28`,
-      `Sign out ${FIRST_STRONG_ISOLATE}axios${POP_DIRECTIONAL_ISOLATE}, signed in 2026-03-04`,
+      `Sign out ${FIRST_STRONG_ISOLATE}هاتف-قديم${POP_DIRECTIONAL_ISOLATE}, signed in 2026-02-28, last seen 2026-03-11`,
+      `Sign out ${FIRST_STRONG_ISOLATE}axios${POP_DIRECTIONAL_ISOLATE}, signed in 2026-03-04, last seen 2026-03-04`,
     ]);
 
     (buttons[1]?.props.onPress as (() => void) | undefined)?.();
@@ -287,11 +293,13 @@ describe('device session sign-out controls', () => {
         id: 'browser-1',
         userAgent: 'Mozilla/5.0 (Macintosh) Safari/605.1.15',
         signedIn: '2026-03-10T08:00:00Z',
+        lastSeen: '2026-03-14T06:00:00Z',
       }),
       session({
         id: 'browser-2',
         userAgent: 'Mozilla/5.0 (Windows NT 10.0) Chrome/130.0',
         signedIn: '2026-03-12T09:30:00Z',
+        lastSeen: '2026-03-14T06:00:00Z',
       }),
     ];
     const { renderer, unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
@@ -299,8 +307,8 @@ describe('device session sign-out controls', () => {
       .findAll(node => String(node.type) === 'Pressable')
       .map(button => button.props.accessibilityLabel as string);
     expect(labels).toStrictEqual([
-      `Sign out ${FIRST_STRONG_ISOLATE}Web browser${POP_DIRECTIONAL_ISOLATE}, signed in 2026-03-10`,
-      `Sign out ${FIRST_STRONG_ISOLATE}Web browser${POP_DIRECTIONAL_ISOLATE}, signed in 2026-03-12`,
+      `Sign out ${FIRST_STRONG_ISOLATE}Web browser${POP_DIRECTIONAL_ISOLATE}, signed in 2026-03-10, last seen 2026-03-14`,
+      `Sign out ${FIRST_STRONG_ISOLATE}Web browser${POP_DIRECTIONAL_ISOLATE}, signed in 2026-03-12, last seen 2026-03-14`,
     ]);
     expect(new Set(labels).size).toBe(2);
     unmount();

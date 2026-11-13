@@ -1,8 +1,9 @@
-import { useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { formatContextSummary, getContextRatio, getContextTone } from '@/src/shared/context-usage';
 import { formatSessionCost } from '@/src/shared/session-cost';
 import { DESIGN_TOKENS } from './design-tokens';
+import { dismissLayer, useDismissOnOutsideClick, useEscapeKey } from './use-dismiss';
 
 const toneStroke = {
   danger: DESIGN_TOKENS.statusRed500,
@@ -32,6 +33,11 @@ export const ContextDonut = ({
   sessionCostUsd: number;
 }): JSX.Element => {
   const detailsRef = useRef<HTMLDetailsElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const closePopover = useCallback(() => {
+    detailsRef.current?.removeAttribute('open');
+    setIsOpen(false);
+  }, []);
   const ratio = getContextRatio(promptTokens, contextLength);
   const stroke =
     ratio === undefined ? DESIGN_TOKENS.statusGray500 : toneStroke[getContextTone(ratio)];
@@ -40,8 +46,22 @@ export const ContextDonut = ({
   const label = `Context usage: ${summary}`;
   const sessionCostLabel = formatSessionCost(sessionCostUsd);
 
+  useDismissOnOutsideClick({
+    enabled: isOpen,
+    onDismiss: closePopover,
+    rank: dismissLayer.popover,
+    targetRef: detailsRef,
+  });
+  useEscapeKey(isOpen, closePopover, dismissLayer.popover);
+
   return (
-    <details className="relative shrink-0" ref={detailsRef}>
+    <details
+      className="relative shrink-0"
+      onToggle={event => {
+        setIsOpen(event.currentTarget.open);
+      }}
+      ref={detailsRef}
+    >
       <summary
         aria-label={label}
         className="flex size-8 cursor-pointer list-none items-center justify-center rounded-md border border-border bg-surface-overlay text-foreground-on-secondary outline-none transition hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
@@ -80,7 +100,7 @@ export const ContextDonut = ({
             className="type-label mt-3 h-8 w-full rounded-md border border-border bg-surface-overlay px-2 text-foreground-on-secondary outline-none transition hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background disabled:cursor-not-allowed disabled:bg-surface-selected disabled:text-foreground-subtle"
             disabled={!canCompact}
             onClick={() => {
-              detailsRef.current?.removeAttribute('open');
+              closePopover();
               onCompact();
             }}
             type="button"

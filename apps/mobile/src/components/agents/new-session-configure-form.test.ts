@@ -327,6 +327,7 @@ function defaultProps() {
     onChangeFolderPath: vi.fn(),
     groups: [] as RepositoryGroup[],
     isRetrying: false,
+    repositoryRegionSettled: true,
     onChangeRepo: vi.fn(),
     onConnectProvider: vi.fn(),
     onRefreshRepos: vi.fn(),
@@ -1043,6 +1044,32 @@ describe('NewSessionConfigureForm', () => {
 
     expect(findElementByType(element, 'SegmentedControl')).toBeNull();
     expect(findTextContent(element, t => t === 'Changes')).toBe(false);
+  });
+
+  it('holds the rows below the repository section until its final height is known', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const unsettled = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      repositoryRegionSettled: false,
+    }) as Node;
+
+    expect(findTextContent(unsettled, t => t === 'Changes')).toBe(false);
+    expect(containsComponent(unsettled, NewSessionProfileRow)).toBe(false);
+    expect(findElementByType(unsettled, 'AdvancedConfigPanel')).toBeNull();
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const settled = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      repositoryRegionSettled: true,
+    }) as Node;
+
+    expect(findTextContent(settled, t => t === 'Changes')).toBe(true);
+    expect(containsComponent(settled, NewSessionProfileRow)).toBe(true);
+    expect(findElementByType(settled, 'AdvancedConfigPanel')).not.toBeNull();
   });
 
   // ── Case 12: the Run on helper sentence stays in plain language, on a remote target only ──

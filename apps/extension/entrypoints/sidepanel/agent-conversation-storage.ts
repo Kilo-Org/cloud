@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the persisted-event migration table is one cohesive unit; splitting it would scatter the union's cases. */
 import { storage } from '#imports';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -198,6 +199,17 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
             : { reasoningDetails: event.reasoningDetails }),
           ...(event.snapshotId === undefined ? {} : { snapshotId: event.snapshotId }),
           tabId: event.tabId,
+          type: event.type,
+        });
+        break;
+      }
+      case 'error': {
+        events.push({
+          ...(event.action === undefined ? {} : { action: event.action }),
+          ...(event.detail === undefined ? {} : { detail: event.detail }),
+          id: event.id,
+          ...(event.retry === undefined ? {} : { retry: event.retry }),
+          title: event.title,
           type: event.type,
         });
         break;

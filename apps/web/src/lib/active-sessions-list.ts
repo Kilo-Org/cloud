@@ -1,6 +1,7 @@
 import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
+import { timestampToIso } from '@kilocode/app-shared/utils';
 import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
 import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
 import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
@@ -10,7 +11,7 @@ import { cli_sessions_v2, cloud_agent_session_runs } from '@kilocode/db/schema';
 import { sessionAssociatedPr } from '@/lib/session-associated-pr';
 import { and, desc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { activeOrganizationAccessSql } from '@kilocode/worker-utils/organization-membership';
-import { associatedPrSchema, formatAssociatedPr } from '@/routers/cli-sessions-v2-router';
+import { associatedPrSchema, formatAssociatedPr } from '@/lib/session-associated-pr';
 
 export const activeSessionSchema = z.object({
   id: z.string(),
@@ -251,18 +252,6 @@ export function resolveCloudCandidateStatus(
   return storedStatus ?? '';
 }
 
-/**
- * Normalize a raw `timestamptz` text to ISO 8601, or null when it will not
- * parse. Hermes rejects the Postgres form (`2026-09-02 17:28:02.242039+00`),
- * so a field a React Native client passes to `Date` must be converted here.
- * The older timestamp fields stay raw: their consumers already handle the
- * Postgres form and changing them would be a wire change with no reader.
- */
-function toIsoTimestamp(value: string): string | null {
-  const at = Date.parse(value);
-  return Number.isNaN(at) ? null : new Date(at).toISOString();
-}
-
 function mapEnrichedHeartbeatSession(
   session: ActiveSession,
   row: EnrichmentRow | undefined
@@ -294,7 +283,7 @@ function mapEnrichedHeartbeatSession(
   const statusUpdatedAt =
     mapped.status !== row.status || row.status_updated_at == null
       ? null
-      : toIsoTimestamp(row.status_updated_at);
+      : timestampToIso(row.status_updated_at);
   if (statusUpdatedAt !== null) {
     mapped.statusUpdatedAt = statusUpdatedAt;
   }
@@ -333,7 +322,7 @@ function mapCloudCandidateRow(row: CloudCandidateRow): ActiveSession {
   const statusUpdatedAt =
     mapped.status !== row.status || row.status_updated_at == null
       ? null
-      : toIsoTimestamp(row.status_updated_at);
+      : timestampToIso(row.status_updated_at);
   if (statusUpdatedAt !== null) {
     mapped.statusUpdatedAt = statusUpdatedAt;
   }

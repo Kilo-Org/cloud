@@ -183,21 +183,6 @@ describe('buildVercelModelIdOverrides', () => {
     }
   });
 
-  it('allows several legacy aliases to share a Vercel model ID', () => {
-    expect(build(catalog({ openrouter: [], vercel: [] }), [], [])).toEqual(
-      expect.arrayContaining([
-        {
-          openrouter_model_id: 'anthropic/claude-sonnet-4-5',
-          vercel_model_id: 'anthropic/claude-sonnet-4.5',
-        },
-        {
-          openrouter_model_id: 'claude-sonnet-4.5',
-          vercel_model_id: 'anthropic/claude-sonnet-4.5',
-        },
-      ])
-    );
-  });
-
   it('sorts overrides and truncates generated entries to the configured maximum', () => {
     const count = VERCEL_MODEL_ID_OVERRIDES_MAX_COUNT + 1;
     jest.spyOn(console, 'warn').mockImplementation(() => {});

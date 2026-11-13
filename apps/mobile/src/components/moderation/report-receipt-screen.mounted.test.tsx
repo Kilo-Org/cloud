@@ -163,10 +163,14 @@ describe('ReportReceiptScreen', () => {
       throw new Error('missing copy control');
     }
 
-    // A middle cut keeps the first and last characters of the id on screen in
-    // the compact cell; the status rows cut at their end instead.
+    // The copy control takes width from the value, so the id wraps into a
+    // second line on a narrow screen and stays readable; a value still longer
+    // cuts at its middle. The status rows keep one line and cut at their end.
+    expect(textNode(root, RECEIPT_ID).props.numberOfLines).toBe(2);
     expect(textNode(root, RECEIPT_ID).props.ellipsizeMode).toBe('middle');
+    expect(textNode(root, 'Received').props.numberOfLines).toBe(1);
     expect(textNode(root, 'Received').props.ellipsizeMode).toBe('tail');
+    expect(textNode(root, 'None submitted').props.numberOfLines).toBe(1);
     expect(textNode(root, 'None submitted').props.ellipsizeMode).toBe('tail');
 
     act(() => {

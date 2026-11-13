@@ -56,10 +56,15 @@ function statusLabel(dictionary: Readonly<Record<string, string>>, status: strin
 /**
  * One label/value line. `copyLabel` turns the row into one whose value the
  * reader can carry away: the control copies the whole value it was given, so an
- * id the row truncates still reaches the clipboard in one piece. A copied value
- * cuts at its middle rather than its end, so the characters that tell one id
- * from another stay on screen. A row without it holds no control, as the status
- * rows keep none.
+ * id the row truncates still reaches the clipboard in one piece.
+ *
+ * The control takes width from the value, which on a 360 dp screen leaves too
+ * little for the whole id. So a copy row gives its value a second line, and the
+ * value wraps into it instead of losing characters: the id the description asks
+ * the reader to keep stays readable, not only copyable. Two lines bound the
+ * growth, and a value still longer than both cuts at its middle rather than its
+ * end, so the characters that tell one id from another stay on screen. A row
+ * without a control holds none and keeps one line, as the status rows do.
  */
 function StatusRow({
   label,
@@ -75,7 +80,7 @@ function StatusRow({
       <View className="min-w-0 flex-1 flex-row items-center justify-end gap-2">
         <Text
           className="min-w-0 shrink text-sm font-medium text-foreground"
-          numberOfLines={1}
+          numberOfLines={copyLabel === undefined ? 1 : 2}
           ellipsizeMode={copyLabel === undefined ? 'tail' : 'middle'}
         >
           {value}
@@ -83,8 +88,8 @@ function StatusRow({
         {copyLabel === undefined ? null : (
           <Pressable
             // The compact box carries the whole tap target, and its negative
-            // margin cancels back to one text line so this row keeps the height
-            // of the rows beside it.
+            // margin cancels back to one text line, so the row is as high as
+            // its wrapped value and no higher.
             className={cn(COMPACT_CONTROL_BOX_CLASS, '-my-[7px]', 'active:opacity-70')}
             hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
             accessibilityRole="button"

@@ -269,11 +269,11 @@ export async function handleAudioTranscriptionsRequest(
       )
     : NO_ORGANIZATION_GATEWAY_SETTINGS;
   if (isManagedGatewayDisabled(organizationGatewaySettings, provider.type)) {
-    return managedGatewayDisabledResponse(provider.type);
+    return managedGatewayDisabledResponse(provider.type, { switchModel: false });
   }
   const gatewayByDomain = getManagedGatewayFromUrl(provider.apiUrl);
   if (gatewayByDomain && isManagedGatewayDisabled(organizationGatewaySettings, gatewayByDomain)) {
-    return managedGatewayDisabledResponse(gatewayByDomain);
+    return managedGatewayDisabledResponse(gatewayByDomain, { switchModel: false });
   }
 
   // The usage row reports the payer the balance check resolved: the root organization for an

@@ -81,6 +81,7 @@ import {
   getOutputHeaders,
   lastUserPromptText,
   makeErrorReadable,
+  managedGatewayDisabledResponse,
   parseEmbeddingUsageFromResponse,
   parseEditUsageFromResponse,
   parseTranscriptionUsageFromResponse,
@@ -107,6 +108,38 @@ describe('claudeBillingReconnectResponse', () => {
     expect(body.message).toContain('An organization owner must reconnect Claude billing');
     expect(body.message).toContain(`/organizations/${organizationId}/byok`);
     expect(body.error).toBe(body.message);
+  });
+});
+
+describe('managedGatewayDisabledResponse', () => {
+  type Body = { error: string; error_type: string; message: string };
+
+  const error =
+    'This request would be routed through OpenRouter, which your organization has disabled.';
+
+  it('offers switching the model by default', async () => {
+    const response = managedGatewayDisabledResponse('openrouter');
+
+    expect(response.status).toBe(403);
+    const body = (await response.json()) as Body;
+    expect(body.error).toBe(error);
+    expect(body.error_type).toBe(ProxyErrorType.provider_not_allowed);
+    expect(body.message).toBe(
+      `${error} Select another model or ask an organization admin to update the gateway settings on the Providers & Models page.`
+    );
+  });
+
+  it('names only the admin action when the route has a single upstream', async () => {
+    const response = managedGatewayDisabledResponse('openrouter', { switchModel: false });
+
+    expect(response.status).toBe(403);
+    const body = (await response.json()) as Body;
+    expect(body.error).toBe(error);
+    expect(body.error_type).toBe(ProxyErrorType.provider_not_allowed);
+    expect(body.message).toBe(
+      `${error} Ask an organization admin to update the gateway settings on the Providers & Models page.`
+    );
+    expect(body.message).not.toContain('Select another model');
   });
 });
 

@@ -275,13 +275,24 @@ const MANAGED_GATEWAY_NAMES = {
   vercel: 'the Vercel AI Gateway',
 } as const satisfies Record<ManagedGatewayId, string>;
 
-export function managedGatewayDisabledResponse(gateway: ManagedGatewayId) {
+/**
+ * `switchModel: false` drops the model suggestion for routes whose only upstream is the disabled
+ * gateway, where choosing another model cannot avoid the refusal.
+ */
+export function managedGatewayDisabledResponse(
+  gateway: ManagedGatewayId,
+  options: { switchModel?: boolean } = {}
+) {
   const error = `This request would be routed through ${MANAGED_GATEWAY_NAMES[gateway]}, which your organization has disabled.`;
+  const guidance =
+    options.switchModel === false
+      ? 'Ask an organization admin to update the gateway settings on the Providers & Models page.'
+      : 'Select another model or ask an organization admin to update the gateway settings on the Providers & Models page.';
   return NextResponse.json(
     {
       error,
       error_type: ProxyErrorType.provider_not_allowed,
-      message: `${error} Select another model or ask an organization admin to update the gateway settings on the Providers & Models page.`,
+      message: `${error} ${guidance}`,
     },
     { status: 403 }
   );

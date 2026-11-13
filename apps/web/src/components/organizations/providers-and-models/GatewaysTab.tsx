@@ -55,10 +55,10 @@ export function GatewaysTab({ organizationId, canEdit, settings }: Props) {
       <CardHeader>
         <CardTitle>Gateways</CardTitle>
         <CardDescription>
-          Kilo routes chat requests through the Vercel AI Gateway or OpenRouter, and audio
-          transcription requests through OpenRouter. When the Vercel AI Gateway is off, chat
-          requests Kilo would send there go through OpenRouter instead. Requests that still end up
-          on a disabled gateway fail with an error. These settings do not apply to embeddings yet.
+          Kilo routes organization-funded inference requests through the Vercel AI Gateway or
+          OpenRouter. When the Vercel AI Gateway is off, chat requests Kilo would send there go
+          through OpenRouter instead. Requests that still end up on a disabled gateway fail with an
+          error. These settings do not apply to embeddings yet.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

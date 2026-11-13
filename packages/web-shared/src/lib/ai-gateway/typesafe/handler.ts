@@ -158,11 +158,11 @@ export async function handleSystemOneRequest(request: NextRequest) {
       )
     : NO_ORGANIZATION_GATEWAY_SETTINGS;
   if (isManagedGatewayDisabled(organizationGatewaySettings, OPENROUTER.type)) {
-    return managedGatewayDisabledResponse(OPENROUTER.type);
+    return managedGatewayDisabledResponse(OPENROUTER.type, { switchModel: false });
   }
   const gatewayByDomain = getManagedGatewayFromUrl(OPENROUTER.apiUrl);
   if (gatewayByDomain && isManagedGatewayDisabled(organizationGatewaySettings, gatewayByDomain)) {
-    return managedGatewayDisabledResponse(gatewayByDomain);
+    return managedGatewayDisabledResponse(gatewayByDomain, { switchModel: false });
   }
 
   const creditsBlocked = paidUsageRejection({ user, organizationId, account, exempt: false });

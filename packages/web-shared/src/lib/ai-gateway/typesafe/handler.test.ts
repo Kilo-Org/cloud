@@ -1468,9 +1468,11 @@ describe('handleSystemOneRequest', () => {
       const response = await handleSystemOneRequest(makeRequest());
 
       expect(response.status).toBe(403);
-      await expect(response.json()).resolves.toMatchObject({
+      const body = (await response.json()) as { error_type: string; message: string };
+      expect(body).toMatchObject({
         error_type: 'provider_not_allowed',
       });
+      expect(body.message).not.toContain('Select another model');
       expect(mockedFetch).not.toHaveBeenCalled();
       expect(deferredUsageCallbacks()).toHaveLength(0);
     });

@@ -254,18 +254,19 @@ describe('ConfigureRow disabled cue', () => {
 describe('ConfigureRow note', () => {
   const NOTE = 'Only organization owners and billing managers can change this connection.';
 
-  it('renders the note below the icon-aligned line, indented to the title column', () => {
+  it('renders the note below the icon-aligned line, inset to the title column', () => {
     const root = renderRow({ note: NOTE });
 
     expect(textOf(root, NOTE)).toEqual(
-      expect.arrayContaining(['mt-1', 'text-xs', 'text-muted-foreground', 'ps-[42px]'])
+      expect.arrayContaining(['mt-1', 'text-xs', 'text-muted-foreground'])
     );
-    // The indent is the start edge, so the note keeps to the title's column
-    // when the row mirrors.
-    // It is a sentence, so it wraps instead of ellipsizing like a value does.
+    // The start inset is the tile's 30 dp plus the row's gap, not a physical
+    // left padding: under RTL the tile sits on the physical right.
     const note = root.find(
       node => Object.is(node.type, 'Text') && Object.is(node.props.children, NOTE)
     );
+    expect(note.props.style).toEqual({ paddingStart: 40.5 });
+    // It is a sentence, so it wraps instead of ellipsizing like a value does.
     expect(note.props.numberOfLines).toBe(3);
     expect(textOf(root, 'Transcribe')).toContain('mt-0.5');
     // A third line inside the title column would centre the tile on
@@ -276,10 +277,14 @@ describe('ConfigureRow note', () => {
     expect(textBlock.findAll(node => Object.is(node.props.children, NOTE))).toHaveLength(0);
   });
 
-  it('gives the stacked row its note without the tile indent', () => {
+  it('drops the inset when the row stacks, where the note takes the full width', () => {
     windowDims.width = 160;
+    const root = renderRow({ note: NOTE });
 
-    expect(textOf(renderRow({ note: NOTE }), NOTE)).not.toContain('ps-[42px]');
+    expect(
+      root.find(node => Object.is(node.type, 'Text') && Object.is(node.props.children, NOTE)).props
+        .style
+    ).toBeUndefined();
   });
 
   it('renders only the title and subtitle when a row has no note', () => {

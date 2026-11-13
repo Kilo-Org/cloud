@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the URL-field suite and the single-push burst case share one harness, so the field's states are asserted against one wiring */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -102,6 +103,55 @@ describe('provider-neutral URL field', () => {
       ).onPress as () => void
     )();
     expect(mocks.push).toHaveBeenCalledWith('/(app)/pr-review/bitbucket/acme/api/7');
+  });
+
+  // The defect this pins: a fast double tap on Open used to push the review
+  // route twice, which left the field holding a link while the placeholder
+  // drew over it and Open was disabled. The shared single-push guard keeps one
+  // gesture to one route, so the field stays consistent afterwards.
+  it('opens one review route for two Open presses in one burst and keeps the field consistent', async () => {
+    const tree = await renderLoaded();
+    const input = find(tree, 'Input', () => true);
+    (propsOf(input).onChangeText as (value: string) => void)(
+      'https://github.com/octocat/hello-world/pull/42'
+    );
+    const after = render();
+    const open = find(
+      after,
+      'Button',
+      p => p.accessibilityLabel === 'Open pull request or merge request'
+    );
+    const press = propsOf(open).onPress as () => void;
+    // Both presses belong to one burst: the same tick, no render between them.
+    press();
+    press();
+    expect(mocks.push).toHaveBeenCalledTimes(1);
+    expect(mocks.push).toHaveBeenCalledWith('/(app)/pr-review/octocat/hello-world/42');
+
+    const settled = render();
+    expect(findAll(settled, 'PrLinkPlaceholder')).toHaveLength(0);
+    expect(
+      propsOf(
+        find(settled, 'Button', p => p.accessibilityLabel === 'Open pull request or merge request')
+      ).disabled
+    ).toBe(false);
+    expect(
+      findAll(settled, 'Pressable').filter(p => p.props?.accessibilityLabel === 'Clear link')
+    ).toHaveLength(1);
+
+    // This harness runs the focus effect on every render, so this render is the
+    // screen regaining focus: the guard window is gone and Open navigates again.
+    const refocused = render();
+    (
+      propsOf(
+        find(
+          refocused,
+          'Button',
+          p => p.accessibilityLabel === 'Open pull request or merge request'
+        )
+      ).onPress as () => void
+    )();
+    expect(mocks.push).toHaveBeenCalledTimes(2);
   });
 
   it('enables Open only for valid links and clears inline feedback after correction or clear', async () => {

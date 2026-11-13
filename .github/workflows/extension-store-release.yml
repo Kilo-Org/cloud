@@ -99,13 +99,14 @@ jobs:
           set -euo pipefail
           V="${{ steps.version.outputs.version }}"
           WORK="$(mktemp -d)"
+          trap 'rm -rf "$WORK"' EXIT
           mkdir -p "$WORK/sources" "$WORK/package"
           unzip -q "apps/extension/.output/kilo-extension-$V-sources.zip" -d "$WORK/sources"
           unzip -q "apps/extension/.output/kilo-extension-$V-firefox.zip" -d "$WORK/package"
           cd "$WORK/sources"
           pnpm install --frozen-lockfile --filter kilo-extension... --ignore-scripts
           pnpm --filter kilo-extension --config.verify-deps-before-run=false build:firefox
-          diff -r "$WORK/package" "$WORK/sources/apps/extension/.output/firefox-mv3"
+          diff -rq "$WORK/package" "$WORK/sources/apps/extension/.output/firefox-mv3"
           echo "The sources zip rebuilds kilo-extension-$V-firefox.zip file for file."
 
       - name: Upload store artifacts

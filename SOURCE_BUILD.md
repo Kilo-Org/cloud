@@ -34,7 +34,7 @@ cd extension-sources
 # Corepack links pnpm into /usr/bin, so this one step needs root. Without sudo,
 # use `npm install -g pnpm@11.1.2` instead.
 sudo corepack enable
-corepack prepare pnpm@11.1.2 --activate
+corepack install --global pnpm@11.1.2
 
 # --ignore-scripts skips install hooks. The repository's root `prepare` hook
 # builds packages that are not part of this extension, and it cannot run here.

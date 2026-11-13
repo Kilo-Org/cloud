@@ -1,13 +1,21 @@
 #!/usr/bin/env bash
 #
-# Builds libssh_core.so for the Android ABIs the example app ships and generates
-# the Kotlin bindings that the module compiles against.
+# Builds libssh_core.so for the given Android ABIs and generates the Kotlin
+# bindings that the module compiles against.
 #
-# Requires: rustup, cargo, a JDK-free Android SDK with the NDK installed
-# (ANDROID_HOME or ANDROID_SDK_ROOT, or ANDROID_NDK_HOME set explicitly).
+# Usage: build-android.sh [abi...]
+#   The ABIs are Gradle ABI names (armeabi-v7a, arm64-v8a, x86, x86_64); the
+#   module task passes the app's reactNativeArchitectures. With no argument the
+#   four the React Native template packages are built.
+#
+# Requires: rustup, cargo, an Android SDK with the NDK installed (ANDROID_HOME
+# or ANDROID_SDK_ROOT, or ANDROID_NDK_HOME set explicitly).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./ensure-rust.sh
+source "$SCRIPT_DIR/ensure-rust.sh"
+
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 RUST_DIR="$ROOT/rust"
 MANIFEST="$RUST_DIR/Cargo.toml"
@@ -17,6 +25,19 @@ JNI_DIR="$ROOT/android/src/main/jniLibs"
 KOTLIN_SRC_DIR="$ROOT/android/src/main/java"
 KOTLIN_PACKAGE_DIR="$KOTLIN_SRC_DIR/ai/kilo/reactnativessh/uniffi"
 ANDROID_API=24
+
+rust_target() {
+  case "$1" in
+    armeabi-v7a) echo "armv7-linux-androideabi" ;;
+    arm64-v8a) echo "aarch64-linux-android" ;;
+    x86) echo "i686-linux-android" ;;
+    x86_64) echo "x86_64-linux-android" ;;
+    *)
+      echo "Unknown Android ABI: $1" >&2
+      exit 1
+      ;;
+  esac
+}
 
 resolve_ndk() {
   if [[ -n "${ANDROID_NDK_HOME:-}" ]]; then
@@ -43,8 +64,21 @@ host_library() {
   echo "$RUST_DIR/target/release/libssh_core.$ext"
 }
 
-echo "==> Installing Rust targets for Android"
-rustup target add aarch64-linux-android x86_64-linux-android
+if [[ "$#" -gt 0 ]]; then
+  ABIS=("$@")
+else
+  ABIS=(armeabi-v7a arm64-v8a x86 x86_64)
+fi
+
+TARGETS=()
+NDK_FLAGS=()
+for abi in "${ABIS[@]}"; do
+  TARGETS+=("$(rust_target "$abi")")
+  NDK_FLAGS+=(--target "$abi")
+done
+
+echo "==> Installing Rust targets for Android: ${TARGETS[*]}"
+rustup target add "${TARGETS[@]}"
 
 if ! command -v cargo-ndk >/dev/null 2>&1; then
   echo "==> Installing cargo-ndk"
@@ -54,14 +88,13 @@ fi
 export ANDROID_NDK_HOME="$(resolve_ndk)"
 echo "==> Using NDK $ANDROID_NDK_HOME"
 
-echo "==> Building libssh_core.so for arm64-v8a and x86_64"
+echo "==> Building libssh_core.so for ${ABIS[*]}"
 rm -rf "$JNI_DIR"
 # cargo-ndk reads Cargo.toml from the working directory before it applies flags.
 (
   cd "$RUST_DIR"
   cargo ndk \
-    --target arm64-v8a \
-    --target x86_64 \
+    "${NDK_FLAGS[@]}" \
     --platform "$ANDROID_API" \
     --output-dir "$JNI_DIR" \
     build --package ssh-core --release

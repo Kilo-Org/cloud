@@ -41,17 +41,15 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       fontSize={fontSize}
       cursorStyle={cursorStyle}
       theme={nativeTheme}
-      onResize={onResize && ((event) => onResize(event.nativeEvent))}
-      onLinkPress={onLinkPress && ((event) => onLinkPress(event.nativeEvent.url))}
+      onResize={onResize && (event => onResize(event.nativeEvent))}
+      onLinkPress={onLinkPress && (event => onLinkPress(event.nativeEvent.url))}
       onBell={onBell}
-      onTitleChange={onTitleChange && ((event) => onTitleChange(event.nativeEvent.title))}
+      onTitleChange={onTitleChange && (event => onTitleChange(event.nativeEvent.title))}
       onSelectionChange={
-        onSelectionChange && ((event) => onSelectionChange(event.nativeEvent.selecting))
+        onSelectionChange && (event => onSelectionChange(event.nativeEvent.selecting))
       }
-      onFontSizeChange={
-        onFontSizeChange && ((event) => onFontSizeChange(event.nativeEvent.fontSize))
-      }
-      onClosed={onClosed && ((event) => onClosed(event.nativeEvent))}
+      onFontSizeChange={onFontSizeChange && (event => onFontSizeChange(event.nativeEvent.fontSize))}
+      onClosed={onClosed && (event => onClosed(event.nativeEvent))}
     />
   );
 });

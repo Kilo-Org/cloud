@@ -33,7 +33,7 @@ export function parseColor(value: string): number {
   }
 
   const hex = value.slice(1);
-  const expanded = hex.length === 3 ? [...hex].map((digit) => digit + digit).join('') : hex;
+  const expanded = hex.length === 3 ? [...hex].map(digit => digit + digit).join('') : hex;
   const argb = expanded.length === 6 ? `ff${expanded}` : expanded;
   return parseInt(argb, 16) | 0;
 }

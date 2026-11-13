@@ -1,0 +1,6 @@
+# Built by scripts/build-android.sh and scripts/build-ios.sh, never committed.
+/rust/target/
+/android/src/main/jniLibs/
+/android/src/main/java/ai/kilo/reactnativessh/uniffi/
+/ios/Generated/
+/ios/Frameworks/

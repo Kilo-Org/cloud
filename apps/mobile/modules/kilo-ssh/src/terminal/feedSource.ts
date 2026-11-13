@@ -14,12 +14,12 @@ export function createFeedSource(): FeedSource {
 
   return {
     sourceId: native.sourceId,
-    feed: (bytes) => native.feed(bytes),
-    onInput: (listener) => {
+    feed: bytes => native.feed(bytes),
+    onInput: listener => {
       const subscription = native.addListener('onInput', listener);
       return () => subscription.remove();
     },
-    onResize: (listener) => {
+    onResize: listener => {
       const subscription = native.addListener('onResize', listener);
       return () => subscription.remove();
     },

@@ -39,7 +39,7 @@ export function translate(cause: unknown): SshError {
 
 function codeOf(cause: unknown): SshErrorCode {
   const candidate = hasCode(cause) ? cause.code : undefined;
-  const match = SSH_ERROR_CODES.find((code) => code === candidate);
+  const match = SSH_ERROR_CODES.find(code => code === candidate);
 
   return match ?? 'Protocol';
 }

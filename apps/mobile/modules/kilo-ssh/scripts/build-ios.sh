@@ -8,6 +8,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "build-ios.sh needs macOS: the SDK, lipo and xcodebuild are Xcode-only" >&2
+  exit 1
+fi
+# shellcheck source=./ensure-rust.sh
+source "$SCRIPT_DIR/ensure-rust.sh"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 RUST_DIR="$ROOT/rust"
 MANIFEST="$RUST_DIR/Cargo.toml"
@@ -19,11 +25,6 @@ FRAMEWORKS_DIR="$IOS_DIR/Frameworks"
 LIPO_DIR="$RUST_DIR/target/ios-lipo"
 DEVICE_TARGET="aarch64-apple-ios"
 SIM_TARGETS=("aarch64-apple-ios-sim" "x86_64-apple-ios")
-
-if [[ "$(uname -s)" != "Darwin" ]]; then
-  echo "build-ios.sh needs macOS: the SDK, lipo and xcodebuild are Xcode-only" >&2
-  exit 1
-fi
 
 echo "==> Installing Rust targets for iOS"
 rustup target add "$DEVICE_TARGET" "${SIM_TARGETS[@]}"

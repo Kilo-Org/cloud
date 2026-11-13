@@ -4,16 +4,13 @@ plugins {
 }
 
 group = 'ai.kilo.reactnativessh'
-version = new groovy.json.JsonSlurper().parse(file('../package.json')).version
+version = '1.0.0'
 
 android {
   namespace "ai.kilo.reactnativessh"
   defaultConfig {
     versionCode 1
     versionName project.version
-  }
-  lintOptions {
-    abortOnError false
   }
 }
 
@@ -26,4 +23,30 @@ dependencies {
   implementation 'androidx.core:core-ktx:1.17.0'
   implementation 'androidx.lifecycle:lifecycle-process:2.9.2'
   implementation 'com.facebook.react:react-android'
+}
+
+// The Rust core compiles for the ABIs the app packages. The list is the app's
+// own `reactNativeArchitectures`, so no slice is packaged without its library;
+// a build that does not set the property packs all four the template ships.
+def rustAbis = (findProperty('reactNativeArchitectures') ?: 'armeabi-v7a,arm64-v8a,x86,x86_64')
+    .split(',')
+    .collect { it.trim() }
+    .findAll { !it.isEmpty() }
+
+def rustCore = tasks.register('buildRustCore', Exec) {
+  group = 'rust'
+  description = 'Builds libssh_core.so and its Kotlin bindings when a Rust source is newer than them.'
+  workingDir = file('..')
+  commandLine(['bash', 'scripts/build-android.sh'] + rustAbis)
+  inputs.files(fileTree('../rust') { exclude 'target/**' })
+  inputs.file('../rust-toolchain.toml')
+  outputs.files(
+      fileTree('../android/src/main/jniLibs'),
+      fileTree('../android/src/main/java/ai/kilo/reactnativessh/uniffi'))
+  standardOutput = System.out
+  errorOutput = System.err
+}
+
+tasks.matching { it.name == 'preBuild' }.configureEach {
+  dependsOn rustCore
 }

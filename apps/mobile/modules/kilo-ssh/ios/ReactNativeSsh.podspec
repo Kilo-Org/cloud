@@ -1,20 +1,16 @@
-require 'json'
-
-package = JSON.parse(File.read(File.join(__dir__, '..', 'package.json')))
-
 Pod::Spec.new do |s|
   s.name           = 'ReactNativeSsh'
-  s.version        = package['version']
-  s.summary        = package['description']
-  s.description    = package['description']
-  s.license        = package['license']
-  s.author         = package['author']
-  s.homepage       = package['homepage']
+  s.version        = '1.0.0'
+  s.summary        = 'SSH client with a Rust core, uniffi bindings and a terminal view'
+  s.description    = 'Connects, authenticates and runs shells, commands, SFTP transfers and port forwards through a Rust core reached over uniffi.'
+  s.license        = { :type => 'Proprietary' }
+  s.author         = 'Kilo'
+  s.homepage       = 'https://github.com/Kilo-Org/cloud'
   s.platforms      = {
     :ios => '16.4'
   }
   s.swift_version  = '5.9'
-  s.source         = { git: '' }
+  s.source         = { :git => 'https://github.com/Kilo-Org/cloud.git' }
   s.static_framework = true
 
   s.dependency 'ExpoModulesCore'
@@ -32,8 +28,11 @@ Pod::Spec.new do |s|
     'SWIFT_INCLUDE_PATHS' => '"$(PODS_TARGET_SRCROOT)/Generated"',
   }
 
-  # The Rust core ships as a static-library xcframework. CocoaPods copies the
-  # slice matching the build platform and architectures and links its archive.
+  # The Rust core ships as a static-library xcframework. CocoaPods reads this
+  # path at pod install and silently drops the bundle when it is absent, so
+  # scripts/build-native.sh must run before pod install: `pnpm ios` and the
+  # eas-build-post-install hook both do. The iOS job of mobile-native-build.yml
+  # runs it before its prebuild too.
   #
   # No file pattern may reach into Frameworks/: an exclude_files entry that
   # matches the bundle (e.g. "Frameworks/**/*") removes it from the file

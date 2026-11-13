@@ -53,7 +53,7 @@ export function download(
   options: TransferOptions = {}
 ): Promise<number> {
   return transfer(
-    (transferId) => ReactNativeSsh.sftpDownload(sftpId, remotePath, localFileUrl, transferId),
+    transferId => ReactNativeSsh.sftpDownload(sftpId, remotePath, localFileUrl, transferId),
     options
   );
 }
@@ -69,7 +69,7 @@ export function upload(
   options: TransferOptions = {}
 ): Promise<number> {
   return transfer(
-    (transferId) => ReactNativeSsh.sftpUpload(sftpId, localFileUrl, remotePath, transferId),
+    transferId => ReactNativeSsh.sftpUpload(sftpId, localFileUrl, remotePath, transferId),
     options
   );
 }
@@ -94,7 +94,7 @@ async function transfer(
 }
 
 function listen(transferId: string, onProgress: NonNullable<TransferOptions['onProgress']>) {
-  return ReactNativeSsh.addListener('onTransferProgress', (event) => {
+  return ReactNativeSsh.addListener('onTransferProgress', event => {
     if (event.transferId === transferId) {
       onProgress({ transferred: event.transferred, total: event.total });
     }

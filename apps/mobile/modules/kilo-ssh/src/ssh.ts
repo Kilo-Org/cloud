@@ -92,7 +92,7 @@ export function configureBackgroundSessions(texts: BackgroundSessionTexts): void
 
   ReactNativeSsh.updateSessionsBody(texts.body(count));
 
-  sessionsListener ??= ReactNativeSsh.addListener('onSessionsChanged', (notice) => {
+  sessionsListener ??= ReactNativeSsh.addListener('onSessionsChanged', notice => {
     if (sessionTexts) {
       ReactNativeSsh.updateSessionsBody(sessionTexts.body(notice.count));
     }

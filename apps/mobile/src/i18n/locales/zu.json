@@ -4133,8 +4133,7 @@
     "disconnectFailed": "Akukwazekanga ukunqamula i-{{provider}}",
     "couldNotLoad": "Akukwazekanga ukulayisha ukuhlanganiswa",
     "permissionDenied": "Awunayo imvume yokuphatha lokhu kuhlanganiswa.",
-    "rowManagedByOwnerOrAdmin": "Cela umnikazi wenhlangano noma umphathi ukuthi ashintshe lokhu kuxhumana.",
-    "rowManagedByOwnersAndBilling": "Abanikazi benhlangano nabaphathi bokukhokha kuphela abangashintsha lokhu kuxhumana.",
+    "managedByOwner": "Cela umnikazi wenhlangano ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",
     "connectFailed": "Akukwazekanga ukuvula ikhasi lokuxhuma"
   },
   "invoices": {

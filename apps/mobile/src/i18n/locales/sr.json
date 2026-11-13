@@ -4198,8 +4198,7 @@
     "disconnectFailed": "Prekidanje veze sa uslugom {{provider}} nije uspelo",
     "couldNotLoad": "Učitavanje integracija nije uspelo",
     "permissionDenied": "Nemate dozvolu da upravljate ovim integracijama.",
-    "rowManagedByOwnerOrAdmin": "Zamolite vlasnika ili administratora organizacije da promeni ovu vezu.",
-    "rowManagedByOwnersAndBilling": "Samo vlasnici organizacije i menadžeri za naplatu mogu da promene ovu vezu.",
+    "managedByOwner": "Zamolite vlasnika organizacije da promeni vezu koju ne možete da promenite.",
     "connectFailed": "Otvaranje stranice za povezivanje nije uspelo"
   },
   "invoices": {

@@ -4393,8 +4393,7 @@
     "disconnectFailed": "Methu datgysylltu {{provider}}",
     "couldNotLoad": "Methu llwytho'r integreiddiadau",
     "permissionDenied": "Does gennych chi ddim caniatâd i reoli'r integreiddiadau hyn.",
-    "rowManagedByOwnerOrAdmin": "Gofynnwch i berchennog neu weinyddwr y sefydliad newid y cysylltiad hwn.",
-    "rowManagedByOwnersAndBilling": "Dim ond perchnogion sefydliad a rheolwyr bilio all newid y cysylltiad hwn.",
+    "managedByOwner": "Gofynnwch i berchennog y sefydliad newid cysylltiad na allwch ei newid.",
     "connectFailed": "Methu agor y dudalen gysylltu"
   },
   "invoices": {

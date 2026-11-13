@@ -4133,8 +4133,7 @@
     "disconnectFailed": "{{provider}} nuk mund të shkëputej",
     "couldNotLoad": "Integrimet nuk mund të ngarkoheshin",
     "permissionDenied": "Nuk ke leje për të menaxhuar këto integrime.",
-    "rowManagedByOwnerOrAdmin": "Kërkoji një pronari ose administratori të organizatës t'i ndryshojë këtë lidhje.",
-    "rowManagedByOwnersAndBilling": "Vetëm pronarët e organizatës dhe menaxherët e faturimit mund ta ndryshojnë këtë lidhje.",
+    "managedByOwner": "Kërkoji një pronari të organizatës të ndryshojë një lidhje që nuk mund ta ndryshosh.",
     "connectFailed": "Faqja e lidhjes nuk mund të hapej"
   },
   "invoices": {

@@ -4133,8 +4133,7 @@
     "disconnectFailed": "{{provider}} xizmatini uzib boʻlmadi",
     "couldNotLoad": "Integratsiyalarni yuklab boʻlmadi",
     "permissionDenied": "Sizda bu integratsiyalarni boshqarish uchun ruxsat yoʻq.",
-    "rowManagedByOwnerOrAdmin": "Bu ulanishni oʻzgartirish uchun tashkilot egasi yoki administratoriga murojaat qiling.",
-    "rowManagedByOwnersAndBilling": "Faqat tashkilot egalari va to'lov menejerlari bu ulanishni oʻzgartirishi mumkin.",
+    "managedByOwner": "Siz oʻzgartira olmaydigan ulanishni oʻzgartirish uchun tashkilot egasiga murojaat qiling.",
     "connectFailed": "Ulanish sahifasini ochib boʻlmadi"
   },
   "invoices": {

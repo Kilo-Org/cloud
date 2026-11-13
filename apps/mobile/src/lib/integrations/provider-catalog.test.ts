@@ -5,8 +5,8 @@ import {
   INTEGRATION_PROVIDERS,
   type IntegrationProvider,
   integrationScope,
-  providerBlockedNoteKey,
   providerLabelKey,
+  providerRowBlocked,
   visibleIntegrationProviders,
 } from './provider-catalog';
 
@@ -135,39 +135,78 @@ describe('canManageProvider', () => {
   });
 });
 
-describe('providerBlockedNoteKey', () => {
-  it('asks for an owner or admin on the rows the manage set can change', () => {
-    for (const provider of ['github', 'slack'] as const) {
-      for (const action of ['connect', 'disconnect'] as const) {
-        expect(providerBlockedNoteKey({ provider, action, installed: true })).toBe(
-          'integrations.rowManagedByOwnerOrAdmin'
-        );
+describe('providerRowBlocked', () => {
+  // A member's row offers nothing wherever the action's rule needs an owner:
+  // the manage set and the billing set both name one, and so does Bitbucket's
+  // page. `installed` only picks which action the row would show.
+  it('blocks a member on every organization provider whose rule needs an owner', () => {
+    for (const provider of ['github', 'slack', 'discord', 'linear', 'bitbucket'] as const) {
+      for (const installed of [false, true]) {
+        expect(
+          providerRowBlocked({ provider, scope: 'organization', role: 'member', installed })
+        ).toBe(true);
       }
     }
   });
 
-  it('asks for an owner or admin on the rows gated on billing roles, which include an admin', () => {
-    for (const provider of ['gitlab', 'discord', 'linear'] as const) {
-      for (const action of ['connect', 'disconnect'] as const) {
-        expect(providerBlockedNoteKey({ provider, action, installed: true })).toBe(
-          'integrations.rowManagedByOwnerOrAdmin'
-        );
-      }
-    }
-  });
-
-  it('names the owners-and-billing set for the Bitbucket row, whose page admits no admin', () => {
-    for (const action of ['connect', 'disconnect'] as const) {
-      expect(providerBlockedNoteKey({ provider: 'bitbucket', action, installed: true })).toBe(
-        'integrations.rowManagedByOwnersAndBilling'
-      );
-    }
-  });
-
-  it('has no note for a connect any member may take', () => {
+  it('leaves the first GitLab connect to any member, and blocks the replace', () => {
+    // `resolveGitLabOAuthOwner` asks for billing roles only when the connect
+    // would replace an existing integration, so a member's first connect is
+    // accepted and that row offers its button.
     expect(
-      providerBlockedNoteKey({ provider: 'gitlab', action: 'connect', installed: false })
-    ).toBeUndefined();
+      providerRowBlocked({
+        provider: 'gitlab',
+        scope: 'organization',
+        role: 'member',
+        installed: false,
+      })
+    ).toBe(false);
+    expect(
+      providerRowBlocked({
+        provider: 'gitlab',
+        scope: 'organization',
+        role: 'member',
+        installed: true,
+      })
+    ).toBe(true);
+  });
+
+  it('blocks an admin on Bitbucket only, whose page turns an admin away', () => {
+    for (const provider of ['github', 'slack', 'gitlab', 'discord', 'linear'] as const) {
+      for (const installed of [false, true]) {
+        expect(
+          providerRowBlocked({ provider, scope: 'organization', role: 'admin', installed })
+        ).toBe(false);
+      }
+    }
+    expect(
+      providerRowBlocked({
+        provider: 'bitbucket',
+        scope: 'organization',
+        role: 'admin',
+        installed: true,
+      })
+    ).toBe(true);
+  });
+
+  it('blocks nothing for an owner, because every rule that gates a row names one', () => {
+    for (const provider of INTEGRATION_PROVIDERS) {
+      for (const installed of [false, true]) {
+        expect(
+          providerRowBlocked({ provider, scope: 'organization', role: 'owner', installed })
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('blocks every organization row while the viewer role is unresolved', () => {
+    for (const provider of INTEGRATION_PROVIDERS) {
+      for (const installed of [false, true]) {
+        expect(
+          providerRowBlocked({ provider, scope: 'organization', role: undefined, installed })
+        ).toBe(true);
+      }
+    }
   });
 });
 

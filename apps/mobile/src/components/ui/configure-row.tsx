@@ -27,13 +27,6 @@ import { cn } from '@/lib/utils';
  */
 const CONFIGURE_ROW_STACK_FONT_SCALE = 1.8;
 
-/**
- * The note's inset: the icon tile's 30 dp plus the icon-aligned line's `gap-3`,
- * which is 10.5 dp at this app's 14 pt rem. It is the start edge, so the note
- * keeps to the title's column when the row mirrors.
- */
-const NOTE_INDENT_CLASS = 'ps-[40.5px]';
-
 type ConfigureRowProps = {
   icon: LucideIcon;
   title: string;
@@ -52,14 +45,6 @@ type ConfigureRowProps = {
    * that stands in for the settled text is the caller's.
    */
   subtitlePlaceholder?: ReactNode;
-  /**
-   * One more muted line under the row's icon-aligned line, for a row that must
-   * say why it offers nothing to change (an integration the viewer's role
-   * cannot manage). It sits outside the title column so it never shifts the
-   * icon and the trailing control. Wraps: it is a sentence, not a value, so it
-   * takes the row's full width.
-   */
-  note?: string;
   /**
    * Semantic tone override (good / warn / danger). When omitted the row uses
    * the shared neutral tile, so every row in a settings list carries the same
@@ -96,7 +81,6 @@ export function ConfigureRow({
   subtitle,
   subtitleNumberOfLines,
   subtitlePlaceholder,
-  note,
   tone,
   hue,
   onPress,
@@ -170,25 +154,10 @@ export function ConfigureRow({
     </View>
   );
 
-  // The note is a sentence about the whole row, not a value of the title
-  // column: inside `textBlock` it made the side-by-side row centre the icon
-  // tile and the trailing control on title+subtitle+note, so a row with a note
-  // sat its icon lower than a row without one. It renders below the
-  // icon-aligned line instead, inset to the title's column by
-  // NOTE_INDENT_CLASS.
-  const noteNode = note ? (
-    <Text
-      className={cn('mt-1 text-xs text-muted-foreground', stack ? undefined : NOTE_INDENT_CLASS)}
-      numberOfLines={3}
-    >
-      {note}
-    </Text>
-  ) : null;
-
   const inner = (
     <View
       className={cn(
-        stack ? 'gap-2 py-3' : 'py-3',
+        stack ? 'gap-2 py-3' : 'flex-row items-center gap-3 py-3',
         !last && 'border-b-[0.5px] border-hair-soft',
         className
       )}
@@ -200,16 +169,12 @@ export function ConfigureRow({
             {trailingNode ? <View className="shrink-0">{trailingNode}</View> : null}
           </View>
           {textBlock}
-          {noteNode}
         </>
       ) : (
         <>
-          <View className="flex-row items-center gap-3">
-            {iconTile}
-            {textBlock}
-            {trailingNode}
-          </View>
-          {noteNode}
+          {iconTile}
+          {textBlock}
+          {trailingNode}
         </>
       )}
     </View>

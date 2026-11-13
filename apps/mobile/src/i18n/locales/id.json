@@ -4133,8 +4133,7 @@
     "disconnectFailed": "Tidak dapat memutuskan {{provider}}",
     "couldNotLoad": "Tidak dapat memuat integrasi",
     "permissionDenied": "Anda tidak memiliki izin untuk mengelola integrasi ini.",
-    "rowManagedByOwnerOrAdmin": "Minta pemilik atau admin organisasi untuk mengubah koneksi ini.",
-    "rowManagedByOwnersAndBilling": "Hanya pemilik organisasi dan manajer penagihan yang dapat mengubah koneksi ini.",
+    "managedByOwner": "Minta pemilik organisasi untuk mengubah koneksi yang tidak dapat Anda ubah.",
     "connectFailed": "Tidak dapat membuka halaman koneksi"
   },
   "invoices": {

@@ -4198,8 +4198,7 @@
     "disconnectFailed": "No se pudo desconectar {{provider}}",
     "couldNotLoad": "No se pudieron cargar las integraciones",
     "permissionDenied": "No tienes permiso para gestionar estas integraciones.",
-    "rowManagedByOwnerOrAdmin": "Pide a un propietario o administrador de la organización que cambie esta conexión.",
-    "rowManagedByOwnersAndBilling": "Solo los propietarios de la organización y los gestores de facturación pueden cambiar esta conexión.",
+    "managedByOwner": "Pide a un propietario de la organización que cambie una conexión que no puedas cambiar.",
     "connectFailed": "No se pudo abrir la página de conexión"
   },
   "invoices": {

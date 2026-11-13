@@ -4133,8 +4133,7 @@
     "disconnectFailed": "Lama goyn karo {{provider}}",
     "couldNotLoad": "Lama soo gelin karo isku-xidhka",
     "permissionDenied": "Ma haysatid ogolaansho aad ku maamusho isku-xidhkan.",
-    "rowManagedByOwnerOrAdmin": "Weydii milkiilaha ama maamulaha ururka si uu u beddelo isku-xidhkan.",
-    "rowManagedByOwnersAndBilling": "Kaliya mulkiilayaasha ururka iyo maareeyayaasha biilasha ayaa beddeli kara isku-xidhkan.",
+    "managedByOwner": "Weydii milkiilaha ururka si uu u beddelo isku-xidhka aadan beddeli karin.",
     "connectFailed": "Bogga isku-xidhka lama furi karo"
   },
   "invoices": {

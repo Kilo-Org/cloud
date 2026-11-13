@@ -4133,8 +4133,7 @@
     "disconnectFailed": "Không thể ngắt kết nối {{provider}}",
     "couldNotLoad": "Không thể tải các tích hợp",
     "permissionDenied": "Bạn không có quyền quản lý các tích hợp này.",
-    "rowManagedByOwnerOrAdmin": "Hãy yêu cầu chủ sở hữu hoặc quản trị viên của tổ chức thay đổi kết nối này.",
-    "rowManagedByOwnersAndBilling": "Chỉ chủ sở hữu và người quản lý thanh toán của tổ chức mới có thể thay đổi kết nối này.",
+    "managedByOwner": "Hãy yêu cầu chủ sở hữu của tổ chức thay đổi kết nối mà bạn không thể thay đổi.",
     "connectFailed": "Không thể mở trang kết nối"
   },
   "invoices": {

@@ -19,7 +19,6 @@ import {
   canManageProvider,
   type IntegrationProvider,
   type IntegrationScope,
-  providerBlockedNoteKey,
   providerLabelKey,
 } from '@/lib/integrations/provider-catalog';
 
@@ -134,25 +133,12 @@ export function IntegrationProviderRow({
     ) : null;
   }
 
-  // A row that offers the viewer nothing names the roles that can change it;
-  // the note key follows the action's own role set, so the sentence stays true
-  // where the page behind the action admits no admin.
-  const blockedNoteKey =
-    action == null && !row.actionPending
-      ? providerBlockedNoteKey({
-          provider: row.provider,
-          action: row.installed ? 'disconnect' : 'connect',
-          installed: row.installed,
-        })
-      : undefined;
-
   return (
     <ConfigureRow
       icon={PROVIDER_ICONS[row.provider]}
       title={label}
       subtitle={subtitle}
       subtitleNumberOfLines={1}
-      note={blockedNoteKey ? t(blockedNoteKey) : undefined}
       trailing={action}
       last={last}
     />

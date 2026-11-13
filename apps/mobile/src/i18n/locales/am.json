@@ -4133,8 +4133,7 @@
     "disconnectFailed": "የ{{provider}} ግንኙነትን ማቋረጥ አልተቻለም",
     "couldNotLoad": "ውህደቶችን መጫን አልተቻለም",
     "permissionDenied": "እነዚህን ውህደቶች የማስተዳደር ፈቃድ የለዎትም።",
-    "rowManagedByOwnerOrAdmin": "ይህን ግንኙነት ለመቀየር የድርጅቱን ባለቤት ወይም አስተዳዳሪ ይጠይቁ።",
-    "rowManagedByOwnersAndBilling": "ይህን ግንኙነት መቀየር የሚችሉት የድርጅቱ ባለቤቶች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
+    "managedByOwner": "መቀየር የማይችሉትን ግንኙነት ለመቀየር የድርጅቱን ባለቤት ይጠይቁ።",
     "connectFailed": "የግንኙነት ገጹን መክፈት አልተቻለም"
   },
   "invoices": {

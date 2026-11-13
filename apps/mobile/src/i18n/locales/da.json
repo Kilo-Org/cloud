@@ -4133,8 +4133,7 @@
     "disconnectFailed": "Forbindelsen til {{provider}} kunne ikke afbrydes",
     "couldNotLoad": "Integrationerne kunne ikke indlæses",
     "permissionDenied": "Du har ikke tilladelse til at administrere disse integrationer.",
-    "rowManagedByOwnerOrAdmin": "Bed en ejer eller administrator i organisationen om at ændre denne forbindelse.",
-    "rowManagedByOwnersAndBilling": "Kun ejere og faktureringsansvarlige i organisationen kan ændre denne forbindelse.",
+    "managedByOwner": "Bed en ejer i organisationen om at ændre en forbindelse, du ikke kan.",
     "connectFailed": "Siden til oprettelse af forbindelse kunne ikke åbnes"
   },
   "invoices": {

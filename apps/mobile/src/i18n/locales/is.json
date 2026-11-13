@@ -4133,8 +4133,7 @@
     "disconnectFailed": "Ekki tókst að aftengja {{provider}}",
     "couldNotLoad": "Ekki tókst að hlaða inn samþættingum",
     "permissionDenied": "Þú hefur ekki heimild til að stjórna þessum samþættingum.",
-    "rowManagedByOwnerOrAdmin": "Biddu eiganda eða stjórnanda stofnunarinnar um að breyta þessari tengingu.",
-    "rowManagedByOwnersAndBilling": "Aðeins eigendur og innheimtustjórar stofnunarinnar geta breytt þessari tengingu.",
+    "managedByOwner": "Biddu eiganda stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",
     "connectFailed": "Ekki tókst að opna tengingarsíðuna"
   },
   "invoices": {

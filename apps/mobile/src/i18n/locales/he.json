@@ -4198,8 +4198,7 @@
     "disconnectFailed": "לא ניתן לנתק את {{provider}}",
     "couldNotLoad": "לא ניתן לטעון את האינטגרציות",
     "permissionDenied": "אין לך הרשאה לנהל את האינטגרציות האלה.",
-    "rowManagedByOwnerOrAdmin": "כדי לשנות את החיבור הזה, יש לפנות לבעלים או למנהל של הארגון.",
-    "rowManagedByOwnersAndBilling": "רק בעלים של הארגון ומנהלי חיובים יכולים לשנות את החיבור הזה.",
+    "managedByOwner": "כדי לשנות חיבור שאין באפשרותך לשנות, יש לפנות לבעלים של הארגון.",
     "connectFailed": "לא ניתן לפתוח את דף החיבור"
   },
   "invoices": {

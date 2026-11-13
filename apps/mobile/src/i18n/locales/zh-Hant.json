@@ -4133,8 +4133,7 @@
     "disconnectFailed": "無法中斷與 {{provider}} 的連結",
     "couldNotLoad": "無法載入整合",
     "permissionDenied": "您沒有管理這些整合的權限。",
-    "rowManagedByOwnerOrAdmin": "請洽詢組織擁有者或管理員來變更此連結。",
-    "rowManagedByOwnersAndBilling": "只有組織擁有者和帳單管理員可以變更此連結。",
+    "managedByOwner": "請洽詢組織擁有者來變更您無法變更的連結。",
     "connectFailed": "無法開啟連結頁面"
   },
   "invoices": {

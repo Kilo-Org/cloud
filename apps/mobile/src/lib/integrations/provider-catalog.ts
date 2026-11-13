@@ -129,45 +129,6 @@ function rolesFor(
 }
 
 /**
- * The row note each organization role set names. A blocked row says which roles
- * can change it, so the sentence follows the action's server procedure. It is
- * written for one row's connection, because it renders under that row. The
- * ask-form holds wherever an owner or an admin can act: it names a role that
- * can change the row and does not claim to list them all. Only a page that
- * turns an admin away gets a note naming the narrower set, so a member is never
- * sent to a role that cannot change the connection.
- */
-const NOTE_KEYS_BY_ROLE_SET: readonly {
-  roles: readonly OrganizationRole[];
-  key: string;
-}[] = [
-  { roles: ORGANIZATION_MANAGE_ROLES, key: 'integrations.rowManagedByOwnerOrAdmin' },
-  { roles: ORGANIZATION_BILLING_ROLES, key: 'integrations.rowManagedByOwnerOrAdmin' },
-  { roles: BITBUCKET_ROLES, key: 'integrations.rowManagedByOwnersAndBilling' },
-];
-
-/**
- * The key of the sentence a row shows when the viewer can take no action on it:
- * the ask-form where an owner or an admin can change it, and the narrower
- * owners-and-billing sentence where the page behind the row turns an admin
- * away. Undefined for a connect any member may take, and for a role set the
- * table does not cover — such a row shows no note.
- */
-export function providerBlockedNoteKey(input: {
-  provider: IntegrationProvider;
-  action: IntegrationAction;
-  installed?: boolean;
-}): string | undefined {
-  const roles = rolesFor(PROVIDERS[input.provider], input.action, input.installed);
-  if (roles === null) {
-    return undefined;
-  }
-  return NOTE_KEYS_BY_ROLE_SET.find(
-    entry => entry.roles.length === roles.length && entry.roles.every(role => roles.includes(role))
-  )?.key;
-}
-
-/**
  * Whether the viewer may take this action on this provider's connection. The
  * personal scope belongs to the viewer, so every action is theirs. In an
  * organization the answer follows the server procedure that would run, action
@@ -191,6 +152,24 @@ export function canManageProvider(input: {
     return input.role != null;
   }
   return allowedRoles.some(allowedRole => allowedRole === input.role);
+}
+
+/**
+ * Whether the row offers the viewer no action at all. It asks the same question
+ * the trailing button asks, with the action that row would show, so the answer
+ * can never disagree with the control beside it. The hub names the roles that
+ * can change such a row once, above the list, instead of under every row.
+ */
+export function providerRowBlocked(input: {
+  provider: IntegrationProvider;
+  scope: IntegrationScope;
+  role: string | undefined;
+  installed?: boolean;
+}): boolean {
+  return !canManageProvider({
+    ...input,
+    action: input.installed ? 'disconnect' : 'connect',
+  });
 }
 
 /**

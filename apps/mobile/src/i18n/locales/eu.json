@@ -4133,8 +4133,7 @@
     "disconnectFailed": "Ezin izan da {{provider}} deskonektatu",
     "couldNotLoad": "Ezin izan dira integrazioak kargatu",
     "permissionDenied": "Ez duzu integrazio hauek kudeatzeko baimenik.",
-    "rowManagedByOwnerOrAdmin": "Eskatu erakundearen jabe edo administratzaile bati konexio hau aldatzeko.",
-    "rowManagedByOwnersAndBilling": "Erakundearen jabeek eta fakturazio-kudeatzaileek soilik alda dezakete konexio hau.",
+    "managedByOwner": "Eskatu erakundearen jabe bati aldatu ezin duzun konexio bat alda dezan.",
     "connectFailed": "Ezin izan da konexio-orria ireki"
   },
   "invoices": {

@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- one mounted suite covers both scopes: the role-gated row actions, the role notes, and the header subtitle */
+/* eslint-disable max-lines -- one mounted suite covers both scopes: the role-gated row actions, the shared owner note, and the header subtitle */
 // The integrations hub serves both scopes: the personal one shows every
 // connection the account owns, and the organization one hides the actions the
 // viewer's role cannot take. The states below are the ones the screen owns —
@@ -13,10 +13,7 @@ import { IntegrationsScreen } from './integrations-screen';
 
 type SetupStatusRow = { platform: string; installed: boolean; installation?: unknown };
 
-const ROW_NOTE = 'Ask an organization owner or admin to change this connection.';
-// Bitbucket's page admits owners and billing managers, so its row cannot use
-// the ask-form: the note names the set that can change it.
-const BITBUCKET_NOTE = 'Only organization owners and billing managers can change this connection.';
+const SHARED_NOTE = 'Ask an organization owner to change a connection you cannot.';
 
 const GITHUB_CONNECTION = {
   id: 'gh-1',
@@ -125,15 +122,10 @@ vi.mock('@/components/ui/text', () => ({
 // Each row carries its action as a child, so a test can ask one row for its
 // button instead of inspecting the trailing element it was handed.
 vi.mock('@/components/ui/configure-row', () => ({
-  ConfigureRow: (props: {
-    title?: string;
-    subtitle?: string;
-    note?: string;
-    trailing?: ReactNode;
-  }) =>
+  ConfigureRow: (props: { title?: string; subtitle?: string; trailing?: ReactNode }) =>
     createElement(
       'RowMock',
-      { title: props.title, subtitle: props.subtitle, note: props.note },
+      { title: props.title, subtitle: props.subtitle },
       props.trailing ?? null
     ),
 }));
@@ -288,93 +280,54 @@ describe('IntegrationsScreen', () => {
     expect(calls.disconnect).toHaveBeenCalledWith({ provider: 'slack', githubIntegrationId: null });
   });
 
-  it('gives every blocked row the ask-form note, and Bitbucket its own set', () => {
+  it('shows one shared note to a member whose organization rows offer nothing', () => {
     state.role = 'member';
     state.statuses.data = [
       { platform: 'github', installed: true, installation: { accountLogin: 'acme' } },
       { platform: 'slack', installed: true, installation: { teamName: 'Acme Slack' } },
-      { platform: 'gitlab', installed: true, installation: { accountLogin: 'acme' } },
       { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
     ];
-    const renderer = mount('org-1');
-    const root = renderer.root;
+    const root = mount('org-1').root;
 
-    // The manage and billing sets both admit an owner or an admin, so their
-    // rows ask for one; Bitbucket's page turns an admin away, so that row names
-    // the narrower set. No sentence above the rows contradicts either.
-    for (const title of ['GitHub', 'Slack', 'GitLab', 'Linear']) {
+    // Every action a member's role cannot take leaves its row without a
+    // control, and the hub names the one role that can change them once, above
+    // the list, instead of under each row.
+    for (const title of ['GitHub', 'Slack', 'Bitbucket']) {
       expect(actionOf(rowTitled(root, title))).toBeNull();
-      expect(rowTitled(root, title).props.note).toBe(ROW_NOTE);
     }
-    expect(actionOf(rowTitled(root, 'Bitbucket'))).toBeNull();
-    expect(rowTitled(root, 'Bitbucket').props.note).toBe(BITBUCKET_NOTE);
-    expect(texts(root)).not.toContain(ROW_NOTE);
-  });
-
-  it('lets a member make the first GitLab connect without a note on that row', () => {
-    state.role = 'member';
-    state.statuses.data = [
-      { platform: 'github', installed: true, installation: { accountLogin: 'acme' } },
-      { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
-    ];
-    const renderer = mount('org-1');
-    const root = renderer.root;
-
-    // `resolveGitLabOAuthOwner` only needs billing roles to replace an existing
-    // integration, so a member's first connect is accepted and its row says
-    // nothing: a note there would contradict the action it offers.
+    expect(texts(root).filter(text => text === SHARED_NOTE)).toHaveLength(1);
+    // A row the server would accept keeps its button: `resolveGitLabOAuthOwner`
+    // asks for billing roles only when a connect replaces an existing
+    // integration, so a member's first connect is offered.
     expect(actionOf(rowTitled(root, 'GitLab'))?.props.accessibilityLabel).toBe('Connect. GitLab');
-    expect(rowTitled(root, 'GitLab').props.note).toBeUndefined();
-    expect(texts(root)).not.toContain(ROW_NOTE);
   });
 
-  it('offers every row to an owner and leaves each row quiet', () => {
+  it('shows no shared note to an owner, who is offered every row', () => {
     state.role = 'owner';
     state.statuses.data = [
       { platform: 'slack', installed: true, installation: { teamName: 'Acme' } },
+      { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
     ];
     const root = mount('org-1').root;
 
     expect(findOne(root, 'RowMock').every(row => actionOf(row) != null)).toBe(true);
-    expect(findOne(root, 'RowMock').every(row => row.props.note === undefined)).toBe(true);
-    expect(texts(root)).not.toContain(ROW_NOTE);
+    expect(texts(root)).not.toContain(SHARED_NOTE);
   });
 
-  it('names the owners-and-billing set on the Bitbucket row an admin cannot change', () => {
-    state.role = 'admin';
-    state.statuses.data = [
-      { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
-    ];
-    const root = mount('org-1').root;
-
-    // Bitbucket's page admits no admin, so the manage set's "owner or admin"
-    // sentence would send one to a role that cannot change it.
-    expect(actionOf(rowTitled(root, 'Bitbucket'))).toBeNull();
-    expect(rowTitled(root, 'Bitbucket').props.note).toBe(BITBUCKET_NOTE);
-  });
-
-  it('leaves the Bitbucket row quiet for an owner, who is offered its action', () => {
-    state.role = 'owner';
-    state.statuses.data = [
-      { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
-    ];
-    const root = mount('org-1').root;
-
-    expect(actionOf(rowTitled(root, 'Bitbucket'))).not.toBeNull();
-    expect(rowTitled(root, 'Bitbucket').props.note).toBeUndefined();
-  });
-
-  it('never explains the rows in the personal scope', () => {
+  it('shows no shared note and no organization name in the personal scope', () => {
     state.role = 'member';
     state.statuses.data = [
       { platform: 'slack', installed: true, installation: { teamName: 'Acme' } },
     ];
     const root = mount().root;
 
+    // The personal scope belongs to the viewer, so every row offers its action
+    // and nothing needs explaining.
     expect(findOne(root, 'RowMock').every(row => actionOf(row) != null)).toBe(true);
-    expect(texts(root)).not.toContain(ROW_NOTE);
-    // The personal scope belongs to the viewer, so no row is blocked.
-    expect(findOne(root, 'RowMock').every(row => row.props.note === undefined)).toBe(true);
+    expect(texts(root)).not.toContain(SHARED_NOTE);
+    const header = findOne(root, 'ScreenHeaderMock')[0];
+    expect(header?.props.title).toBe('Integrations');
+    expect(header?.props.subtitle).toBeUndefined();
   });
 
   it('names the organization in the header of the organization scope', () => {
@@ -383,13 +336,6 @@ describe('IntegrationsScreen', () => {
 
     expect(header?.props.title).toBe('Integrations');
     expect(header?.props.subtitle).toBe('Acme');
-  });
-
-  it('leaves the header subtitle empty in the personal scope', () => {
-    const header = findOne(mount().root, 'ScreenHeaderMock')[0];
-
-    expect(header?.props.title).toBe('Integrations');
-    expect(header?.props.subtitle).toBeUndefined();
   });
 
   it('retries a failed read from the error state', () => {

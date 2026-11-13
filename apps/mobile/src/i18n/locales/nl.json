@@ -4133,8 +4133,7 @@
     "disconnectFailed": "Kan {{provider}} niet ontkoppelen",
     "couldNotLoad": "Kan integraties niet laden",
     "permissionDenied": "Je hebt geen toestemming om deze integraties te beheren.",
-    "rowManagedByOwnerOrAdmin": "Vraag een eigenaar of beheerder van de organisatie om deze koppeling te wijzigen.",
-    "rowManagedByOwnersAndBilling": "Alleen eigenaren en factuurbeheerders van de organisatie kunnen deze koppeling wijzigen.",
+    "managedByOwner": "Vraag een eigenaar van de organisatie om een koppeling te wijzigen die je zelf niet kunt wijzigen.",
     "connectFailed": "Kan de koppelingspagina niet openen"
   },
   "invoices": {

@@ -27,6 +27,7 @@ import {
   type IntegrationProvider,
   integrationScope,
   providerLabelKey,
+  providerRowBlocked,
 } from '@/lib/integrations/provider-catalog';
 import { isPermissionDeniedError, trpcErrorVariant } from '@/lib/trpc-error';
 
@@ -105,6 +106,21 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
     githubConnectionsPending: githubConnections.isPending,
   });
   const role = boundary.role ?? undefined;
+  // One row that offers the viewer no action is enough to need the sentence,
+  // and `owner` can change a connection in every role set these rows follow, so
+  // the hub names that role once here instead of under each blocked row.
+  const namesOwner =
+    scope === 'organization' &&
+    rows.some(
+      row =>
+        !row.actionPending &&
+        providerRowBlocked({
+          provider: row.provider,
+          scope,
+          role,
+          installed: row.installed,
+        })
+    );
 
   const openProviderPage = (provider: IntegrationProvider) => {
     void openExternalUrl(getIntegrationPageUrl(WEB_BASE_URL, provider, organizationId), {
@@ -137,6 +153,11 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
       >
         <View className="gap-4">
           <Text className="text-sm text-muted-foreground">{t('integrations.subtitle')}</Text>
+          {namesOwner ? (
+            <Text className="text-xs text-muted-foreground">
+              {t('integrations.managedByOwner')}
+            </Text>
+          ) : null}
           {rows.some(row => row.installed) ? null : (
             <Text className="text-xs text-muted-foreground">{t('integrations.emptyHint')}</Text>
           )}

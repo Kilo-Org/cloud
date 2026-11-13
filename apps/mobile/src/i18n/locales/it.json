@@ -4198,8 +4198,7 @@
     "disconnectFailed": "Impossibile scollegare {{provider}}",
     "couldNotLoad": "Impossibile caricare le integrazioni",
     "permissionDenied": "Non hai l'autorizzazione per gestire queste integrazioni.",
-    "rowManagedByOwnerOrAdmin": "Chiedi a un proprietario o a un amministratore dell'organizzazione di modificare questo collegamento.",
-    "rowManagedByOwnersAndBilling": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono modificare questo collegamento.",
+    "managedByOwner": "Chiedi a un proprietario dell'organizzazione di modificare un collegamento che non puoi modificare.",
     "connectFailed": "Impossibile aprire la pagina di collegamento"
   },
   "invoices": {

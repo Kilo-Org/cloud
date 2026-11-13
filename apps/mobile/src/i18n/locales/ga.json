@@ -4328,8 +4328,7 @@
     "disconnectFailed": "Níorbh fhéidir {{provider}} a dhícheangal",
     "couldNotLoad": "Níorbh fhéidir na comhtháthuithe a lódáil",
     "permissionDenied": "Níl cead agat na comhtháthuithe seo a bhainistiú.",
-    "rowManagedByOwnerOrAdmin": "Iarr ar úinéir nó ar riarthóir na heagraíochta an ceangal seo a athrú.",
-    "rowManagedByOwnersAndBilling": "Ní féidir ach le húinéirí eagraíochta agus le bainisteoirí billeála an ceangal seo a athrú.",
+    "managedByOwner": "Iarr ar úinéir eagraíochta ceangal nach féidir leat a athrú.",
     "connectFailed": "Níorbh fhéidir an leathanach ceangail a oscailt"
   },
   "invoices": {

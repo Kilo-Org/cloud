@@ -4393,8 +4393,7 @@
     "disconnectFailed": "تعذّر قطع الاتصال بـ {{provider}}",
     "couldNotLoad": "تعذّر تحميل التكاملات",
     "permissionDenied": "ليس لديك إذن لإدارة هذه التكاملات.",
-    "rowManagedByOwnerOrAdmin": "اطلب من مالك المؤسسة أو أحد مسؤوليها تغيير هذا الاتصال.",
-    "rowManagedByOwnersAndBilling": "يمكن لمالكي المؤسسة ومديري الفوترة فقط تغيير هذا الاتصال.",
+    "managedByOwner": "اطلب من مالك المؤسسة تغيير اتصال لا يمكنك تغييره.",
     "connectFailed": "تعذّر فتح صفحة الاتصال"
   },
   "invoices": {

@@ -4198,8 +4198,7 @@
     "disconnectFailed": "Neizdevās atvienot {{provider}}",
     "couldNotLoad": "Neizdevās ielādēt integrācijas",
     "permissionDenied": "Jums nav atļaujas pārvaldīt šīs integrācijas.",
-    "rowManagedByOwnerOrAdmin": "Lūdziet organizācijas īpašniekam vai administratoram mainīt šo savienojumu.",
-    "rowManagedByOwnersAndBilling": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var mainīt šo savienojumu.",
+    "managedByOwner": "Lūdziet organizācijas īpašniekam mainīt savienojumu, kuru nevarat mainīt.",
     "connectFailed": "Neizdevās atvērt savienojuma lapu"
   },
   "invoices": {

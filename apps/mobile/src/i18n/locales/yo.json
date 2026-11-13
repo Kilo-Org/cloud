@@ -4133,8 +4133,7 @@
     "disconnectFailed": "Kò ṣeé ṣe láti já ìsopọ̀ {{provider}}",
     "couldNotLoad": "Kò ṣeé ṣe láti gbé àwọn ìsopọ̀ wá",
     "permissionDenied": "O kò ní àṣẹ láti ṣàkóso àwọn ìsopọ̀ wọ̀nyí.",
-    "rowManagedByOwnerOrAdmin": "Bèèrè lọ́wọ́ ẹni tó ni àjọ náà tàbí alákòóso láti yí ìsopọ̀ yìí padà.",
-    "rowManagedByOwnersAndBilling": "Àwọn ẹni tó ni àjọ àti àwọn olùṣàkóso ìsanwó nìkan ló lè yí ìsopọ̀ yìí padà.",
+    "managedByOwner": "Bèèrè lọ́wọ́ ẹni tó ni àjọ náà láti yí ìsopọ̀ kan tí o kò lè yí padà.",
     "connectFailed": "Kò ṣeé ṣe láti ṣí ojú-ìwé ìsopọ̀"
   },
   "invoices": {

@@ -4198,8 +4198,7 @@
     "disconnectFailed": "{{provider}} nu a putut fi deconectat",
     "couldNotLoad": "Integrările nu au putut fi încărcate",
     "permissionDenied": "Nu ai permisiunea de a gestiona aceste integrări.",
-    "rowManagedByOwnerOrAdmin": "Cere unui proprietar sau administrator al organizației să modifice această conexiune.",
-    "rowManagedByOwnersAndBilling": "Doar proprietarii organizației și managerii de facturare pot modifica această conexiune.",
+    "managedByOwner": "Cere unui proprietar al organizației să modifice o conexiune pe care nu o poți modifica.",
     "connectFailed": "Pagina de conectare nu a putut fi deschisă"
   },
   "invoices": {

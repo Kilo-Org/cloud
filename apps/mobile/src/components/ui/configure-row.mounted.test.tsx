@@ -1,34 +1,11 @@
 /* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted React Native layout regression tests. */
-// eslint-disable-next-line import/no-nodejs-modules -- The compiler's CommonJS export is the only way to load it under vitest.
-import { createRequire } from 'node:module';
-import tailwindcss from '@tailwindcss/postcss';
-import postcss from 'postcss';
 import { createElement } from 'react';
-import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Globe } from '@/components/ui/icons';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { ConfigureRow } from './configure-row';
-
-const { compile } = createRequire(import.meta.url)(
-  'react-native-css/compiler'
-) as typeof NativeCSSCompiler;
-
-/** The compiled declarations of one className, through the app's own pipeline. */
-async function compiledDeclarations(classes: string): Promise<unknown[]> {
-  const { css } = await postcss([tailwindcss()]).process(
-    `@reference "../../global.css"; .target { @apply ${classes}; }`,
-    { from: import.meta.filename }
-  );
-  return (
-    compile(css, { inlineVariables: false })
-      .stylesheet()
-      .s?.find(([name]) => name === 'target')?.[1]
-      .flatMap(rule => rule.d ?? []) ?? []
-  );
-}
 
 const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, scale: 2 }));
 
@@ -78,7 +55,6 @@ function renderRow(
     disabled?: boolean;
     /** `false` renders the inert row a display-only row is: no Pressable at all. */
     pressable?: boolean;
-    note?: string;
   } = {}
 ) {
   act(() => {
@@ -89,7 +65,6 @@ function renderRow(
       ...(props.pressable === false ? {} : { onPress: () => undefined }),
       ...(props.tone === undefined ? {} : { tone: props.tone }),
       ...(props.disabled === undefined ? {} : { disabled: props.disabled }),
-      ...(props.note === undefined ? {} : { note: props.note }),
     });
     if (renderer) {
       renderer.update(element);
@@ -149,20 +124,10 @@ describe('ConfigureRow mounted layout', () => {
     expect(classes).not.toContain('flex-row');
   });
 
-  it('keeps the icon and trailing control on one line at phone widths', () => {
-    const root = renderRow();
-    const classes = rowClasses(root);
-    // The note renders below the icon-aligned line, so the padded row body is a
-    // column and that inner line carries the side-by-side geometry.
-    expect(classes).toEqual(expect.arrayContaining(['py-3']));
+  it('keeps the side-by-side row at phone widths', () => {
+    const classes = rowClasses(renderRow());
+    expect(classes).toEqual(expect.arrayContaining(['flex-row', 'items-center', 'gap-3']));
     expect(classes).not.toContain('gap-2');
-    expect(classes).not.toContain('flex-row');
-    const line = root.find(
-      node => Object.is(node.type, 'View') && String(node.props.className).includes('flex-row')
-    );
-    expect(String(line.props.className).split(' ')).toEqual(
-      expect.arrayContaining(['flex-row', 'items-center', 'gap-3'])
-    );
   });
 
   it('still stacks at the large-font-scale threshold', () => {
@@ -271,52 +236,5 @@ describe('ConfigureRow disabled cue', () => {
     // no state of its own to announce from a node a reader never reaches.
     expect(root.findAllByType('Pressable' as never)).toHaveLength(0);
     expect(root.findAll(node => node.props.accessibilityState !== undefined)).toHaveLength(0);
-  });
-});
-
-describe('ConfigureRow note', () => {
-  const NOTE = 'Only organization owners and billing managers can change this connection.';
-
-  it('renders the note below the icon-aligned line, inset to the title column', async () => {
-    const root = renderRow({ note: NOTE });
-
-    expect(textOf(root, NOTE)).toEqual(
-      expect.arrayContaining(['mt-1', 'text-xs', 'text-muted-foreground'])
-    );
-    // The inset is the start edge (the tile's 30 dp plus the row's gap), so the
-    // note keeps to the title's column when the row mirrors. Compiling the
-    // rendered class is what makes a `pl-` regression fail: it would resolve to
-    // `paddingLeft` and leave the note under the icon in a mirrored row.
-    const note = root.find(
-      node => Object.is(node.type, 'Text') && Object.is(node.props.children, NOTE)
-    );
-    expect(await compiledDeclarations(String(note.props.className))).toContainEqual({
-      paddingInlineStart: 40.5,
-    });
-    // It is a sentence, so it wraps instead of ellipsizing like a value does.
-    expect(note.props.numberOfLines).toBe(3);
-    expect(textOf(root, 'Transcribe')).toContain('mt-0.5');
-    // A third line inside the title column would centre the tile on
-    // title+subtitle+note and drop the icon of a row that carries one.
-    const textBlock = root.find(
-      node => Object.is(node.type, 'View') && String(node.props.className).includes('min-w-0')
-    );
-    expect(textBlock.findAll(node => Object.is(node.props.children, NOTE))).toHaveLength(0);
-  });
-
-  it('drops the inset when the row stacks, where the note takes the full width', async () => {
-    windowDims.width = 160;
-    const root = renderRow({ note: NOTE });
-
-    const note = root.find(
-      node => Object.is(node.type, 'Text') && Object.is(node.props.children, NOTE)
-    );
-    expect(await compiledDeclarations(String(note.props.className))).not.toContainEqual({
-      paddingInlineStart: 40.5,
-    });
-  });
-
-  it('renders only the title and subtitle when a row has no note', () => {
-    expect(renderRow().findAll(node => Object.is(node.type, 'Text'))).toHaveLength(2);
   });
 });

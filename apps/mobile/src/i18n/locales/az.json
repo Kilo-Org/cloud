@@ -4133,8 +4133,7 @@
     "disconnectFailed": "{{provider}} bağlantısını kəsmək mümkün olmadı",
     "couldNotLoad": "İnteqrasiyaları yükləmək mümkün olmadı",
     "permissionDenied": "Bu inteqrasiyaları idarə etmək üçün icazəniz yoxdur.",
-    "rowManagedByOwnerOrAdmin": "Bu bağlantını dəyişmək üçün təşkilatın sahibinə və ya administratoruna müraciət edin.",
-    "rowManagedByOwnersAndBilling": "Yalnız təşkilatın sahibləri və ödəniş menecerləri bu bağlantını dəyişə bilər.",
+    "managedByOwner": "Dəyişə bilmədiyiniz bir bağlantını dəyişmək üçün təşkilatın sahibinə müraciət edin.",
     "connectFailed": "Qoşulma səhifəsini açmaq mümkün olmadı"
   },
   "invoices": {

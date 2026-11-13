@@ -1933,7 +1933,8 @@
       "cancelQueued": "Bericht annuleren",
       "cancelQueuedAccessibility": "Bericht in de wachtrij annuleren",
       "restoreQueued": "Herstellen",
-      "restoreQueuedAccessibility": "Geannuleerd bericht terugzetten in het berichtveld"
+      "restoreQueuedAccessibility": "Geannuleerd bericht terugzetten in het berichtveld",
+      "noReplyRecorded": "Er is geen antwoord geregistreerd voor dit bericht."
     },
     "olderMessages": {
       "arrived": "Eerdere berichten geladen",

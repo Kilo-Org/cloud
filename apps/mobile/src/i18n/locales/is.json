@@ -2475,7 +2475,8 @@
       "cancelQueued": "Hætta við skilaboð",
       "cancelQueuedAccessibility": "Hætta við skilaboð í biðröð",
       "restoreQueued": "Endurheimta",
-      "restoreQueuedAccessibility": "Endurheimta afturkölluð skilaboð í ritilinn"
+      "restoreQueuedAccessibility": "Endurheimta afturkölluð skilaboð í ritilinn",
+      "noReplyRecorded": "Ekkert svar var skráð fyrir þessi skilaboð."
     },
     "olderMessages": {
       "arrived": "Eldri skilaboð hlaðin",

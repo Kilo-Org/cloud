@@ -2475,7 +2475,8 @@
       "cancelQueued": "Mesajı ləğv et",
       "cancelQueuedAccessibility": "Növbədəki mesajı ləğv et",
       "restoreQueued": "Bərpa et",
-      "restoreQueuedAccessibility": "Ləğv edilmiş mesajı mesaj sahəsinə qaytar"
+      "restoreQueuedAccessibility": "Ləğv edilmiş mesajı mesaj sahəsinə qaytar",
+      "noReplyRecorded": "Bu mesaj üçün cavab qeydə alınmadı."
     },
     "olderMessages": {
       "arrived": "Əvvəlki mesajlar yükləndi",

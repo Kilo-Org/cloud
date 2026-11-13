@@ -2475,7 +2475,8 @@
       "cancelQueued": "Peruuta viesti",
       "cancelQueuedAccessibility": "Peruuta jonossa oleva viesti",
       "restoreQueued": "Palauta",
-      "restoreQueuedAccessibility": "Palauta peruutettu viesti viestikenttään"
+      "restoreQueuedAccessibility": "Palauta peruutettu viesti viestikenttään",
+      "noReplyRecorded": "Tälle viestille ei tallennettu vastausta."
     },
     "olderMessages": {
       "arrived": "Aiemmat viestit ladattu",

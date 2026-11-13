@@ -1933,7 +1933,8 @@
       "cancelQueued": "메시지 취소",
       "cancelQueuedAccessibility": "대기 중인 메시지 취소",
       "restoreQueued": "복원",
-      "restoreQueuedAccessibility": "취소된 메시지를 메시지 입력란으로 복원"
+      "restoreQueuedAccessibility": "취소된 메시지를 메시지 입력란으로 복원",
+      "noReplyRecorded": "이 메시지에 대한 응답이 기록되지 않았습니다."
     },
     "olderMessages": {
       "arrived": "이전 메시지를 불러왔습니다",

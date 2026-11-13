@@ -2655,7 +2655,8 @@
       "cancelQueued": "Canslo neges",
       "cancelQueuedAccessibility": "Canslo neges yn y ciw",
       "restoreQueued": "Adfer",
-      "restoreQueuedAccessibility": "Adfer y neges a ganslwyd i'r blwch neges"
+      "restoreQueuedAccessibility": "Adfer y neges a ganslwyd i'r blwch neges",
+      "noReplyRecorded": "Ni chofnodwyd ymateb ar gyfer y neges hon."
     },
     "olderMessages": {
       "arrived": "Llwythwyd negeseuon cynharach",

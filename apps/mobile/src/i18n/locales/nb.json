@@ -2475,7 +2475,8 @@
       "cancelQueued": "Avbryt melding",
       "cancelQueuedAccessibility": "Avbryt melding i kø",
       "restoreQueued": "Gjenopprett",
-      "restoreQueuedAccessibility": "Gjenopprett avbrutt melding i meldingsfeltet"
+      "restoreQueuedAccessibility": "Gjenopprett avbrutt melding i meldingsfeltet",
+      "noReplyRecorded": "Det ble ikke registrert noe svar for denne meldingen."
     },
     "olderMessages": {
       "arrived": "Tidligere meldinger lastet inn",

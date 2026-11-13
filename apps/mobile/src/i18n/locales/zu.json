@@ -2475,7 +2475,8 @@
       "cancelQueued": "Khansela umlayezo",
       "cancelQueuedAccessibility": "Khansela umlayezo olinde ukuthunyelwa",
       "restoreQueued": "Buyisela",
-      "restoreQueuedAccessibility": "Buyisela umlayezo okhanseliwe endaweni yokubhala"
+      "restoreQueuedAccessibility": "Buyisela umlayezo okhanseliwe endaweni yokubhala",
+      "noReplyRecorded": "Ayikho impendulo erekhodiwe yale mlayezo."
     },
     "olderMessages": {
       "arrived": "Imilayezo yangaphambili ilayishiwe",

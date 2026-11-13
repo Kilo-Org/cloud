@@ -2565,7 +2565,8 @@
       "cancelQueued": "Адмяніць паведамленне",
       "cancelQueuedAccessibility": "Адмяніць паведамленне ў чарзе",
       "restoreQueued": "Аднавіць",
-      "restoreQueuedAccessibility": "Вярнуць адмененае паведамленне ў поле ўводу"
+      "restoreQueuedAccessibility": "Вярнуць адмененае паведамленне ў поле ўводу",
+      "noReplyRecorded": "Для гэтага паведамлення адказ не запісаны."
     },
     "olderMessages": {
       "arrived": "Ранейшыя паведамленні загружаныя",

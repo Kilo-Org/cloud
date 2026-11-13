@@ -2520,7 +2520,8 @@
       "cancelQueued": "Cancel·la el missatge",
       "cancelQueuedAccessibility": "Cancel·la el missatge en cua",
       "restoreQueued": "Restaura",
-      "restoreQueuedAccessibility": "Restaura el missatge cancel·lat al camp de missatge"
+      "restoreQueuedAccessibility": "Restaura el missatge cancel·lat al camp de missatge",
+      "noReplyRecorded": "No s'ha registrat cap resposta per a aquest missatge."
     },
     "olderMessages": {
       "arrived": "S'han carregat els missatges anteriors",

@@ -2475,7 +2475,8 @@
       "cancelQueued": "Ακύρωση μηνύματος",
       "cancelQueuedAccessibility": "Ακύρωση μηνύματος σε αναμονή",
       "restoreQueued": "Επαναφορά",
-      "restoreQueuedAccessibility": "Επαναφορά ακυρωμένου μηνύματος στο πεδίο μηνύματος"
+      "restoreQueuedAccessibility": "Επαναφορά ακυρωμένου μηνύματος στο πεδίο μηνύματος",
+      "noReplyRecorded": "Δεν καταγράφηκε απάντηση για αυτό το μήνυμα."
     },
     "olderMessages": {
       "arrived": "Φορτώθηκαν προηγούμενα μηνύματα",

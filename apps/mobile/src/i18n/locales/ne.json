@@ -2475,7 +2475,8 @@
       "cancelQueued": "सन्देश रद्द गर्नुहोस्",
       "cancelQueuedAccessibility": "लाममा रहेको सन्देश रद्द गर्नुहोस्",
       "restoreQueued": "फिर्ता ल्याउनुहोस्",
-      "restoreQueuedAccessibility": "रद्द गरिएको सन्देश सन्देश लेख्ने ठाउँमा फिर्ता ल्याउनुहोस्"
+      "restoreQueuedAccessibility": "रद्द गरिएको सन्देश सन्देश लेख्ने ठाउँमा फिर्ता ल्याउनुहोस्",
+      "noReplyRecorded": "यो सन्देशको लागि कुनै उत्तर रेकर्ड गरिएको छैन।"
     },
     "olderMessages": {
       "arrived": "पहिलेका सन्देशहरू लोड भए",

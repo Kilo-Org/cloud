@@ -122,6 +122,7 @@ import {
   resolveRetryTarget,
   restoreCanceledQueuedMessages,
   retryFailedMessage,
+  unansweredPromptMessageId,
 } from '@/components/agents/session-detail-content-helpers';
 import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
 import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch';
@@ -1726,6 +1727,17 @@ export function SessionDetailContent({
     [canceledQueuedMessages, t]
   );
 
+  // A stored transcript that ends on a prompt says so: the record holds no
+  // delivery state for that turn and nothing follows it. Only a read-only
+  // session draws it — a live prompt at the end is in flight, and its own
+  // delivery states say what happened to it. The note is bound to the same
+  // resolved kind as the read-only footer, so it withdraws with that footer when
+  // the kind turns out to be live after all.
+  const unansweredPromptId =
+    activeSessionType === 'read-only' && !isStreaming
+      ? unansweredPromptMessageId(displayedMessages, baseTranscript, pendingMessages)
+      : null;
+
   const renderItem = useCallback(
     ({ item }: { item: SessionTranscriptItem }) => {
       if (item.type === 'preparation') {
@@ -1793,6 +1805,7 @@ export function SessionDetailContent({
           onRestoreQueued={
             canceledQueuedMessages.has(item.message.info.id) ? handleRestoreQueued : undefined
           }
+          noReplyRecorded={item.message.info.id === unansweredPromptId}
           condenseToolCalls={condenseToolCalls}
         />
       );
@@ -1829,6 +1842,7 @@ export function SessionDetailContent({
       handleOpenDetails,
       handleRestoreQueued,
       canceledQueuedMessages,
+      unansweredPromptId,
       condenseToolCalls,
     ]
   );

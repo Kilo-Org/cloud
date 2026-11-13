@@ -1933,7 +1933,8 @@
       "cancelQueued": "Hủy tin nhắn",
       "cancelQueuedAccessibility": "Hủy tin nhắn đang chờ",
       "restoreQueued": "Khôi phục",
-      "restoreQueuedAccessibility": "Khôi phục tin nhắn đã hủy vào ô nhập tin nhắn"
+      "restoreQueuedAccessibility": "Khôi phục tin nhắn đã hủy vào ô nhập tin nhắn",
+      "noReplyRecorded": "Không có phản hồi nào được ghi lại cho tin nhắn này."
     },
     "olderMessages": {
       "arrived": "Đã tải các tin nhắn trước đó",

@@ -1933,7 +1933,8 @@
       "cancelQueued": "取消消息",
       "cancelQueuedAccessibility": "取消已排队的消息",
       "restoreQueued": "恢复",
-      "restoreQueuedAccessibility": "将已取消的消息恢复到输入框"
+      "restoreQueuedAccessibility": "将已取消的消息恢复到输入框",
+      "noReplyRecorded": "未记录到对此消息的回复。"
     },
     "olderMessages": {
       "arrived": "已加载较早的消息",

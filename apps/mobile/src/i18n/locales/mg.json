@@ -2475,7 +2475,8 @@
       "cancelQueued": "Foano ny hafatra",
       "cancelQueuedAccessibility": "Foano ny hafatra miandry",
       "restoreQueued": "Avereno",
-      "restoreQueuedAccessibility": "Avereno ao amin'ny faritra fanoratana hafatra ny hafatra nofoanana"
+      "restoreQueuedAccessibility": "Avereno ao amin'ny faritra fanoratana hafatra ny hafatra nofoanana",
+      "noReplyRecorded": "Tsy nisy famaliana voarakitra ho an'ity hafatra ity."
     },
     "olderMessages": {
       "arrived": "Voaray ny hafatra taloha",

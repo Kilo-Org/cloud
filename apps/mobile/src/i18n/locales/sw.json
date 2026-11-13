@@ -2475,7 +2475,8 @@
       "cancelQueued": "Ghairi ujumbe",
       "cancelQueuedAccessibility": "Ghairi ujumbe ulio kwenye foleni",
       "restoreQueued": "Rejesha",
-      "restoreQueuedAccessibility": "Rejesha ujumbe ulioghairiwa kwenye sehemu ya kuandika ujumbe"
+      "restoreQueuedAccessibility": "Rejesha ujumbe ulioghairiwa kwenye sehemu ya kuandika ujumbe",
+      "noReplyRecorded": "Hakuna jibu lililorekodiwa kwa ujumbe huu."
     },
     "olderMessages": {
       "arrived": "Ujumbe wa awali umepakiwa",

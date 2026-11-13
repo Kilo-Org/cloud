@@ -1933,7 +1933,8 @@
       "cancelQueued": "取消訊息",
       "cancelQueuedAccessibility": "取消已排入佇列的訊息",
       "restoreQueued": "還原",
-      "restoreQueuedAccessibility": "將已取消的訊息還原至訊息輸入框"
+      "restoreQueuedAccessibility": "將已取消的訊息還原至訊息輸入框",
+      "noReplyRecorded": "沒有為此訊息記錄任何回覆。"
     },
     "olderMessages": {
       "arrived": "已載入較早的訊息",

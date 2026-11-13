@@ -2475,7 +2475,8 @@
       "cancelQueued": "Avbryt meddelande",
       "cancelQueuedAccessibility": "Avbryt köat meddelande",
       "restoreQueued": "Återställ",
-      "restoreQueuedAccessibility": "Återställ avbrutet meddelande till meddelandefältet"
+      "restoreQueuedAccessibility": "Återställ avbrutet meddelande till meddelandefältet",
+      "noReplyRecorded": "Inget svar registrerades för det här meddelandet."
     },
     "olderMessages": {
       "arrived": "Tidigare meddelanden lästes in",

@@ -2475,7 +2475,8 @@
       "cancelQueued": "Whakakorea te karere",
       "cancelQueuedAccessibility": "Whakakorea te karere e tatari ana",
       "restoreQueued": "Whakahokia",
-      "restoreQueuedAccessibility": "Whakahokia te karere kua whakakorea ki te pouaka karere"
+      "restoreQueuedAccessibility": "Whakahokia te karere kua whakakorea ki te pouaka karere",
+      "noReplyRecorded": "Kāore i tuhia he whakautu mō tēnei karere."
     },
     "olderMessages": {
       "arrived": "Kua utaina ngā karere o mua",

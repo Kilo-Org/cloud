@@ -2475,7 +2475,8 @@
       "cancelQueued": "መልእክቱን ይሰርዙ",
       "cancelQueuedAccessibility": "ወረፋ ላይ ያለውን መልእክት ይሰርዙ",
       "restoreQueued": "ይመልሱ",
-      "restoreQueuedAccessibility": "የተሰረዘውን መልእክት ወደ መልእክት ማስገቢያው ይመልሱ"
+      "restoreQueuedAccessibility": "የተሰረዘውን መልእክት ወደ መልእክት ማስገቢያው ይመልሱ",
+      "noReplyRecorded": "ለዚህ መልእክት ምንም ምላሽ አልተመዘገበም።"
     },
     "olderMessages": {
       "arrived": "የቀደሙ መልእክቶች ተጭነዋል",

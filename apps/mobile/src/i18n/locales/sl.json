@@ -2565,7 +2565,8 @@
       "cancelQueued": "Prekliči sporočilo",
       "cancelQueuedAccessibility": "Prekliči sporočilo v čakalni vrsti",
       "restoreQueued": "Obnovi",
-      "restoreQueuedAccessibility": "Vrni preklicano sporočilo v polje za vnos sporočila"
+      "restoreQueuedAccessibility": "Vrni preklicano sporočilo v polje za vnos sporočila",
+      "noReplyRecorded": "Za to sporočilo ni bilo zabeleženega odgovora."
     },
     "olderMessages": {
       "arrived": "Naložena so bila prejšnja sporočila",

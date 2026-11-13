@@ -2475,7 +2475,8 @@
       "cancelQueued": "ବାର୍ତ୍ତା ବାତିଲ କରନ୍ତୁ",
       "cancelQueuedAccessibility": "ଅପେକ୍ଷାରେ ଥିବା ବାର୍ତ୍ତା ବାତିଲ କରନ୍ତୁ",
       "restoreQueued": "ଫେରାନ୍ତୁ",
-      "restoreQueuedAccessibility": "ବାତିଲ ହୋଇଥିବା ବାର୍ତ୍ତାକୁ ବାର୍ତ୍ତା ଲେଖିବା ସ୍ଥାନକୁ ଫେରାନ୍ତୁ"
+      "restoreQueuedAccessibility": "ବାତିଲ ହୋଇଥିବା ବାର୍ତ୍ତାକୁ ବାର୍ତ୍ତା ଲେଖିବା ସ୍ଥାନକୁ ଫେରାନ୍ତୁ",
+      "noReplyRecorded": "ଏହି ବାର୍ତ୍ତା ପାଇଁ କୌଣସି ଉତ୍ତର ରେକର୍ଡ କରାଯାଇ ନାହିଁ।"
     },
     "olderMessages": {
       "arrived": "ପୂର୍ବ ବାର୍ତ୍ତାଗୁଡ଼ିକ ଲୋଡ୍ ହେଲା",

@@ -2475,7 +2475,8 @@
       "cancelQueued": "පණිවිඩය අවලංගු කරන්න",
       "cancelQueuedAccessibility": "පෝලිමේ ඇති පණිවිඩය අවලංගු කරන්න",
       "restoreQueued": "යළි ගෙන එන්න",
-      "restoreQueuedAccessibility": "අවලංගු කළ පණිවිඩය පණිවිඩ කොටුවට යළි ගෙන එන්න"
+      "restoreQueuedAccessibility": "අවලංගු කළ පණිවිඩය පණිවිඩ කොටුවට යළි ගෙන එන්න",
+      "noReplyRecorded": "මෙම පණිවිඩය සඳහා ප්‍රතිචාරයක් සටහන් වී නොමැත."
     },
     "olderMessages": {
       "arrived": "පෙර පණිවිඩ පූරණය විය",

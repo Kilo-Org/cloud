@@ -1933,7 +1933,8 @@
       "cancelQueued": "Nachricht abbrechen",
       "cancelQueuedAccessibility": "Nachricht in der Warteschlange abbrechen",
       "restoreQueued": "Wiederherstellen",
-      "restoreQueuedAccessibility": "Abgebrochene Nachricht im Eingabefeld wiederherstellen"
+      "restoreQueuedAccessibility": "Abgebrochene Nachricht im Eingabefeld wiederherstellen",
+      "noReplyRecorded": "Für diese Nachricht wurde keine Antwort aufgezeichnet."
     },
     "olderMessages": {
       "arrived": "Frühere Nachrichten geladen",

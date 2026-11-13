@@ -428,6 +428,33 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     ).toBe(true);
   });
 
+  it('accepts delivery when the runtime record has an invalid ingest session identity', async () => {
+    const { stub, peer, sessionMetadata, sandboxSelection } = await setupGeneratedTitleSession();
+    peer.prepareView = {
+      ...peer.view('ready'),
+      container: {
+        provider: 'cloudflare-containers',
+        sandboxId: 'sandbox-invalid-harness-id',
+        runtimeHarness: 'kilo2',
+      },
+    };
+    sessionMetadata.auth.kiloSessionId = 'legacy-session-id';
+    await expect(
+      stub.createSessionWithInitialAdmission({
+        metadata: sessionMetadata,
+        sandboxSelection,
+        message: promptPayload(messageId()),
+      })
+    ).resolves.toMatchObject({ success: true });
+    expect(peer.deliverCalls).toHaveLength(1);
+    expect(await stub.getSession()).toMatchObject({ messages: [{ state: 'accepted' }] });
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        state.storage.get('session_runtime_harness')
+      )
+    ).toBeUndefined();
+  });
+
   it.each(['unavailable', 'unmatched'] as const)(
     'retries an %s harness record from the alarm after completion and eviction',
     async failure => {
@@ -492,6 +519,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       await evictAllDurableObjects();
       await installGeneratedTitleFakes(stub);
       await runInDurableObject(stub, async (instance, state) => {
+        instance.sandboxPeerFor = () => peer;
         Object.assign(instance.env.SESSION_INGEST, {
           async recordCloudAgentSessionHarness(params: RecordCloudAgentSessionHarnessParams) {
             const records =

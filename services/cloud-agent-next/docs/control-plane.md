@@ -1946,7 +1946,9 @@ The Session DO persists one pending record before publication. Publication runs
 in the background with a five-second timeout and never waits for another delivery.
 Failures and unmatched rows retry through the shared alarm every 30 seconds, even
 after completion or eviction. After ten attempts, the alarm discards the pending
-record and logs the retry limit; a later delivery can start another attempt batch.
+record and logs the retry limit; a later delivery can start another attempt batch,
+including during the final retry window. Invalid record identities are logged and
+skipped without failing an already accepted turn.
 Acknowledged records survive eviction and suppress repeated writes for the same
 runtime. Rows created before this record stay `0` until a new delivery records it.
 

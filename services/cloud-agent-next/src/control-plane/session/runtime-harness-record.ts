@@ -33,8 +33,20 @@ export function createRuntimeHarnessRecorder(input: {
   };
 
   function record(update: RecordCloudAgentSessionHarnessParams, now = Date.now()): void {
-    if (current()?.update.runtimeHarness === update.runtimeHarness) return;
-    input.storage.kv.put(RECORD_KEY, storedRecordSchema.parse({ update, attempts: 0, dueAt: now }));
+    const snapshot = storedRecordSchema.safeParse({ update, attempts: 0, dueAt: now });
+    if (!snapshot.success) {
+      logger
+        .withFields({ sessionId: update.cloudAgentSessionId })
+        .warn('Skipped invalid session runtime record; the turn is unaffected');
+      return;
+    }
+    const previous = current();
+    if (
+      previous?.update.runtimeHarness === update.runtimeHarness &&
+      (previous.dueAt === null || previous.attempts < RUNTIME_HARNESS_MAX_ATTEMPTS)
+    )
+      return;
+    input.storage.kv.put(RECORD_KEY, snapshot.data);
   }
 
   async function deliver(now: number): Promise<void> {

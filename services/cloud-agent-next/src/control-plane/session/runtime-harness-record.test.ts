@@ -35,6 +35,16 @@ function fixture() {
 afterEach(() => vi.useRealTimers());
 
 describe('runtime harness recorder', () => {
+  it('skips an invalid session identity without failing delivery or storing a record', async () => {
+    const { values, record, recorder } = fixture();
+    expect(() =>
+      recorder.record({ ...update, sessionId: 'legacy-session-id' }, 1000)
+    ).not.toThrow();
+    expect(values.size).toBe(0);
+    await recorder.repair(1000);
+    expect(record).not.toHaveBeenCalled();
+  });
+
   it.each(['unavailable', 'unmatched'] as const)(
     'retains an %s record across eviction and acknowledges only a matching write',
     async failure => {
@@ -100,6 +110,22 @@ describe('runtime harness recorder', () => {
     record.mockResolvedValue(true);
     await recorder.repair(now);
     expect(record).toHaveBeenCalledTimes(RUNTIME_HARNESS_MAX_ATTEMPTS + 1);
+  });
+
+  it('starts a fresh batch when delivery arrives in the final retry window', async () => {
+    const { record, recorder } = fixture();
+    record.mockResolvedValue(false);
+    recorder.record(update, 1000);
+    for (let attempt = 0; attempt < RUNTIME_HARNESS_MAX_ATTEMPTS; attempt++) {
+      await recorder.repair(1000 + attempt * RUNTIME_HARNESS_RETRY_MS);
+    }
+    const now = 1001 + (RUNTIME_HARNESS_MAX_ATTEMPTS - 1) * RUNTIME_HARNESS_RETRY_MS;
+    expect(recorder.nextDueAt()).toBeGreaterThan(now);
+    recorder.record(update, now);
+    record.mockResolvedValue(true);
+    await recorder.repair(now);
+    expect(record).toHaveBeenCalledTimes(RUNTIME_HARNESS_MAX_ATTEMPTS + 1);
+    expect(recorder.nextDueAt()).toBeNull();
   });
 
   it('does not recreate storage after deletion during publication', async () => {

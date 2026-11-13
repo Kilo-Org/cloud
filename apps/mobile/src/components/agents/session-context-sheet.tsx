@@ -672,7 +672,10 @@ function SessionChangesRow({
       }}
       accessibilityRole="button"
       accessibilityLabel={label}
-      className="min-h-[44px] flex-row items-center justify-between gap-3 active:opacity-70"
+      className={cn(
+        ROW_TARGET_CLASS,
+        'flex-row items-center justify-between gap-3 active:opacity-70'
+      )}
       testID="session-context-sheet-view-changes"
     >
       <Text className="text-base font-medium text-foreground">{label}</Text>

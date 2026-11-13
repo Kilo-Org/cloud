@@ -1,5 +1,5 @@
 import type { Part, SessionSnapshot, TextPart } from './types';
-import { projectKilo2ShellNotification } from './kilo2-shell-notification';
+import { projectKilo2Notification } from './kilo2-notification';
 import {
   kilo2FileContentSchema,
   kilo2PartId,
@@ -124,7 +124,7 @@ export function readKilo2Messages(
   };
   let parentID = '';
   for (const nativeMessage of messages) {
-    const message = projectKilo2ShellNotification(nativeMessage);
+    const message = projectKilo2Notification(nativeMessage);
     const base = { id: message.id, sessionID: session.id };
     const model = message.model ?? session.model;
     const agent = message.agent ?? session.agent ?? 'build';

@@ -16,6 +16,7 @@ import {
 import { createKilo2Reads, kilo2LocationQuery as locationQuery } from './kilo2-reads.js';
 import { restoreKilo2History } from './kilo2-history.js';
 import type { Kilo2Lifecycle } from './kilo2-lifecycle.js';
+import { readKilo2BackgroundActivity } from './kilo2-background.js';
 
 const ptySchema = z.object({
   id: z.string(),
@@ -427,7 +428,11 @@ export function createKilo2Harness(options: {
     },
     isUnavailableError: isKiloServerUnreachableError,
     updateCloudAgentMcp,
-    reads,
+    reads: {
+      ...reads,
+      getBackgroundActivity: (id, directory, signal) =>
+        readKilo2BackgroundActivity(api, id, directory, signal),
+    },
     terminals,
     worktree: {
       async listSessionIds(directory) {

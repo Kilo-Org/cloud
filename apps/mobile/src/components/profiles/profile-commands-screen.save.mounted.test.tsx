@@ -39,7 +39,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => true,
+  useOrganizationProfilePermission: () => 'allowed',
 }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileCommands: () => h.query,

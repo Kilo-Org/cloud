@@ -45,6 +45,7 @@ import { and, eq } from 'drizzle-orm';
 import type { SandboxLifecycleStatus } from '../../shared/sandbox-status.js';
 import type { PreparationAttempt } from '../../shared/protocol.js';
 import { getSessionAuxiliaryMetadata } from '../../session/session-auxiliary-metadata.js';
+import { getBackgroundActivity } from './session-background.js';
 
 function publicRepositoryFields(metadata: CloudAgentSessionState): {
   githubRepo?: string;
@@ -216,6 +217,7 @@ async function deleteSessionResources(
  */
 export function createSessionManagementHandlers() {
   return {
+    getBackgroundActivity,
     /**
      * Delete a session and clean up all associated resources.
      *

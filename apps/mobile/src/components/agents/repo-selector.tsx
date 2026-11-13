@@ -1,9 +1,10 @@
 import { type Href, useRouter } from 'expo-router';
 import { ChevronDown } from '@/components/ui/icons';
-import { Keyboard, Pressable } from 'react-native';
+import { Keyboard, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
+import { FIELD_TRIGGER_BODY_CLASS, FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   type RepoOption as BridgeRepoOption,
@@ -165,18 +166,20 @@ export function RepoSelector({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: effectivelyDisabled }}
-      className={cn(
-        'flex-row items-center justify-between rounded-lg border border-border bg-secondary px-3 py-3',
-        effectivelyDisabled && 'opacity-50'
-      )}
+      className={cn(FIELD_TRIGGER_FRAME_CLASS, effectivelyDisabled && 'opacity-50')}
     >
-      <Text
-        className={cn('flex-1 text-base', value ? 'text-foreground' : 'text-muted-foreground')}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
-      <ChevronDown size={14} color={colors.mutedForeground} />
+      <View className={cn(FIELD_TRIGGER_BODY_CLASS, 'justify-between')}>
+        <Text
+          className={cn(
+            'min-w-0 flex-1 text-base',
+            value ? 'text-foreground' : 'text-muted-foreground'
+          )}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+        <ChevronDown size={14} color={colors.mutedForeground} />
+      </View>
     </Pressable>
   );
 }

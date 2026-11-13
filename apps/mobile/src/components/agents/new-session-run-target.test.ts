@@ -168,6 +168,25 @@ describe('NewSessionRunTarget', () => {
     expect(findElementByType(element, 'Button')?.disabled).toBe(true);
   });
 
+  it('stretches the refresh square to the trigger edges beside it', async () => {
+    const { NewSessionRunTarget } = await import('./new-session-run-target');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionRunTarget(baseProps()) as Node;
+
+    const classes = String(findElementByType(element, 'Button')?.className).split(' ');
+    // The trigger beside it owns the row height (48 dp of content plus its two
+    // borders, ~50 dp), so the square gives up its own fixed box and stretches
+    // to those same edges; its radius matches the trigger frame too. Before
+    // this, its top and bottom missed the trigger's by ~1 dp and its corners by
+    // 2 dp.
+    expect(classes).toContain('self-stretch');
+    expect(classes).toContain('aspect-square');
+    expect(classes).toContain('rounded-lg');
+    expect(classes).toContain('h-auto');
+    expect(classes).toContain('w-auto');
+  });
+
   it('names the clone target when the selector is hidden', async () => {
     const { NewSessionRunTarget } = await import('./new-session-run-target');
     const props = { ...baseProps(), showRunOnSelector: false, runOnInstance: INSTANCE };

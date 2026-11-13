@@ -355,7 +355,7 @@
       "add": "Sleutel toevoegen",
       "added": "Sleutel toegevoegd",
       "emptyTitle": "Geen providersleutels",
-      "emptyDescription": "Voeg een sleutel toe om verzoeken aan je eigen provideraccount te laten factureren.",
+      "emptyDescription": "Voeg een sleutel toe om te beginnen.",
       "chooseProvider": "Kies een provider",
       "searchProviders": "Providers zoeken",
       "noProvidersTitle": "Geen overeenkomende providers",

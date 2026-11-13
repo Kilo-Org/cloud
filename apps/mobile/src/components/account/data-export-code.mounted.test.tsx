@@ -52,7 +52,7 @@ function record(kind: string) {
   };
 }
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({ View: 'View', useColorScheme: () => 'light' }));
 vi.mock('@tanstack/react-query', async importOriginal => {
   // The provider and client stay real so renderWithProviders works; only the
   // hooks the screen calls are replaced.

@@ -3,7 +3,7 @@ import type { ReviewMemoryProposalStatus } from '@kilocode/db/schema-types';
 import {
   REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY,
   type ReviewMemoryChangeRequestErrorReason,
-} from '@kilocode/app-shared/code-reviews';
+} from '@kilocode/app-shared/code-review';
 
 import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';

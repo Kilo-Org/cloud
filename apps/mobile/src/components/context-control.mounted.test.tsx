@@ -631,16 +631,34 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     await waitFor(() => !picker(ui).props.disabled);
     const trigger = picker(ui).props.className as string;
     // The same bordered, full-width box `InstanceSelector` and `RepoSelector`
-    // render, so one label-value row on the form keeps one shape. The inline
-    // default is a bare row with no box.
+    // render, so one label-value column on the form keeps one shape. The frame
+    // carries the chrome and the body inside it the 48 dp height, so a value,
+    // a skeleton or a retry fills one box. The inline default is a bare row
+    // with no box.
     expect(trigger).toContain('border');
     expect(trigger).toContain('bg-secondary');
-    expect(trigger).toContain('justify-between');
+    expect(trigger).not.toContain('min-h-');
+    const body = picker(ui).find(
+      node =>
+        typeof node.props.className === 'string' && node.props.className.includes('min-h-[48px]')
+    );
+    expect(body.props.className).toContain('flex-1');
     const label = picker(ui).findByType(Text);
     expect(label.props.className).toContain('flex-1');
     expect(label.props.className).toContain('text-foreground');
+    // The column's chevrons all end on the body's trailing edge — the
+    // Repository and Branch triggers draw a bare 14 dp glyph — so this one must
+    // not sit in a fixed `size-5` box (17.52 dp at this app's 14 pt rem), which
+    // left the top chevron ~1.9 dp short of the ones below it.
+    const glyphBox = picker(ui).findByType('ChevronDown' as never).parent?.props
+      .className as string;
+    expect(glyphBox).not.toContain('size-5');
     const inline = await mount();
     const inlineTrigger = picker(inline).props.className as string;
     expect(inlineTrigger).not.toContain('bg-secondary');
+    // The inline row keeps its fixed glyph box, which holds the line height.
+    const inlineGlyphBox = picker(inline).findByType('ChevronDown' as never).parent?.props
+      .className as string;
+    expect(inlineGlyphBox).toContain('size-5');
   });
 });

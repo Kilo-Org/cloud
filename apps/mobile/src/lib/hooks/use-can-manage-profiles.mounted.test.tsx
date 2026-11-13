@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   type OrganizationProfilePermission,
-  useCanManageOrganizationProfiles,
   useOrganizationProfilePermission,
 } from '@/lib/hooks/use-can-manage-profiles';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -13,31 +12,32 @@ import { renderWithProviders } from '@/test/render-with-providers';
 const boundary = vi.hoisted(() => ({
   role: undefined as string | undefined,
   isResolving: false,
+  isError: false,
 }));
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
-  useOrgBoundary: () => ({ role: boundary.role, isResolving: boundary.isResolving }),
+  useOrgBoundary: () => ({
+    role: boundary.role,
+    isResolving: boundary.isResolving,
+    isError: boundary.isError,
+  }),
 }));
 
 const seen = vi.hoisted(() => ({
   permission: null as OrganizationProfilePermission | null,
-  canManage: null as boolean | null,
 }));
 
 function PermissionProbe({ organizationId }: Readonly<{ organizationId?: string }>) {
   seen.permission = useOrganizationProfilePermission(organizationId);
-  seen.canManage = useCanManageOrganizationProfiles(organizationId);
   return null;
 }
 
 async function readPermission(props: Readonly<{ organizationId?: string }>): Promise<{
   permission: OrganizationProfilePermission | null;
-  canManage: boolean | null;
 }> {
   seen.permission = null;
-  seen.canManage = null;
   const { unmount } = await renderWithProviders(createElement(PermissionProbe, props));
-  const observed = { permission: seen.permission, canManage: seen.canManage };
+  const observed = { permission: seen.permission };
   unmount();
   return observed;
 }
@@ -46,13 +46,14 @@ describe('useOrganizationProfilePermission', () => {
   beforeEach(() => {
     boundary.role = undefined;
     boundary.isResolving = false;
+    boundary.isError = false;
   });
 
   it('personal scope may create without waiting for a membership', async () => {
     boundary.isResolving = true;
     boundary.role = 'member';
 
-    expect(await readPermission({})).toEqual({ permission: 'allowed', canManage: true });
+    expect(await readPermission({})).toEqual({ permission: 'allowed' });
   });
 
   it('an unresolved organization reports resolving, not read-only', async () => {
@@ -61,7 +62,6 @@ describe('useOrganizationProfilePermission', () => {
 
     expect(await readPermission({ organizationId: 'org-1' })).toEqual({
       permission: 'resolving',
-      canManage: false,
     });
   });
 
@@ -70,7 +70,15 @@ describe('useOrganizationProfilePermission', () => {
 
     expect(await readPermission({ organizationId: 'org-1' })).toEqual({
       permission: 'allowed',
-      canManage: true,
+    });
+  });
+
+  it('a membership list that failed reports resolving, not read-only', async () => {
+    boundary.isError = true;
+    boundary.role = 'owner';
+
+    expect(await readPermission({ organizationId: 'org-1' })).toEqual({
+      permission: 'resolving',
     });
   });
 
@@ -79,7 +87,6 @@ describe('useOrganizationProfilePermission', () => {
 
     expect(await readPermission({ organizationId: 'org-1' })).toEqual({
       permission: 'read-only',
-      canManage: false,
     });
   });
 
@@ -88,7 +95,6 @@ describe('useOrganizationProfilePermission', () => {
 
     expect(await readPermission({ organizationId: 'org-1' })).toEqual({
       permission: 'read-only',
-      canManage: false,
     });
   });
 });

@@ -16,7 +16,7 @@ import {
   resolveExternalToken,
 } from './index';
 import { searchCatalogDetailed } from './search';
-import type { Catalog, ForwardedAuth, GrantProps } from './types';
+import { JsonRpcFailure, type Catalog, type ForwardedAuth, type GrantProps } from './types';
 
 const scope: CloudAgentAuthority = {
   version: 1,
@@ -225,6 +225,164 @@ describe('Cloud Agent MCP authority', () => {
       });
     }
   );
+
+  it('decodes a JSON-encoded scoped input before the authority and schema checks', async () => {
+    // A scoped call reaches the generic `call` tool too, and a client may send
+    // its object as a JSON string. The authority must judge the decoded value,
+    // not the encoding.
+    const fetchImpl = upstream();
+    await callCatalogEndpoint({
+      catalog,
+      path: 'cloudAgentNext.prepareSession',
+      input: JSON.stringify(launch),
+      auth,
+      webBaseUrl: 'https://fixture.invalid',
+      fetchImpl,
+    });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(fetchImpl.mock.calls[0][1]).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify(launch),
+    });
+  });
+
+  it('decodes a JSON-encoded scoped query input and sends the object', async () => {
+    const fetchImpl = upstream();
+    const input = { cloudAgentSessionId: childSessionId };
+    await callCatalogEndpoint({
+      catalog,
+      path: 'cloudAgentNext.getSession',
+      input: JSON.stringify(input),
+      auth,
+      webBaseUrl: 'https://fixture.invalid',
+      fetchImpl,
+    });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    const [url] = fetchImpl.mock.calls[0] as unknown as [string];
+    expect(new URL(url).searchParams.get('input')).toBe(JSON.stringify(input));
+  });
+
+  it('decodes against the scoped authority schema, not the base catalog row', async () => {
+    // The models.list catalog row takes no input, while a scoped grant accepts
+    // an empty object; decoding against the base row would keep the string and
+    // the authority would refuse it.
+    const fetchImpl = upstream();
+    await callCatalogEndpoint({
+      catalog,
+      path: 'models.list',
+      input: '{}',
+      auth,
+      webBaseUrl: 'https://fixture.invalid',
+      fetchImpl,
+    });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    const [url] = fetchImpl.mock.calls[0] as unknown as [string];
+    expect(new URL(url).searchParams.get('input')).toBe('{}');
+  });
+
+  it('decodes a JSON-encoded environment listing for each authority scope', async () => {
+    for (const scopeOrganizationId of [null, organizationId]) {
+      const fetchImpl = upstream();
+      const repository = { platform: 'github', fullName: 'acme/widgets' };
+      const input = scopeOrganizationId === null ? { repository } : { repository, organizationId };
+      await callCatalogEndpoint({
+        catalog,
+        path: 'cloudEnvironments.list',
+        input: JSON.stringify(input),
+        auth: scopeOrganizationId === null ? auth : organizationAuth,
+        webBaseUrl: 'https://fixture.invalid',
+        fetchImpl,
+      });
+      expect(fetchImpl).toHaveBeenCalledOnce();
+      const [url] = fetchImpl.mock.calls[0] as unknown as [string];
+      expect(new URL(url).searchParams.get('input')).toBe(JSON.stringify(input));
+    }
+  });
+
+  it('decodes a JSON-encoded organization procedure input and pins its organization', async () => {
+    const fetchImpl = upstream();
+    const input = { ...launch, organizationId };
+    await callCatalogEndpoint({
+      catalog,
+      path: 'organizations.cloudAgentNext.prepareSession',
+      input: JSON.stringify(input),
+      auth: organizationAuth,
+      webBaseUrl: 'https://fixture.invalid',
+      fetchImpl,
+    });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(fetchImpl.mock.calls[0][1]).toMatchObject({ body: JSON.stringify(input) });
+  });
+
+  it.each([
+    // Outside the grant: the canned authority answer, never the schema
+    // builder's own error, for an unknown and a guarded path alike.
+    { path: 'user.getMe', input: '{}', auth },
+    { path: 'debug.getState', input: '{"verbose":true}', auth },
+    // The decoded payload widens the organization scope.
+    {
+      path: 'cloudAgentNext.prepareSession',
+      input: JSON.stringify({ ...launch, organizationId }),
+      auth,
+    },
+    {
+      path: 'organizations.cloudAgentNext.prepareSession',
+      input: JSON.stringify({
+        ...launch,
+        organizationId: '22222222-2222-4222-8222-222222222222',
+      }),
+      auth: organizationAuth,
+    },
+    // The decoded payload misses the pinned organization.
+    {
+      path: 'organizations.cloudAgentNext.prepareSession',
+      input: JSON.stringify(launch),
+      auth: organizationAuth,
+    },
+    // The decoded payload fails the scoped operation schema.
+    {
+      path: 'cloudAgentNext.prepareSession',
+      input: JSON.stringify({ ...launch, model: '' }),
+      auth,
+    },
+    // The scoped schema is strict: a decoded value it does not describe is
+    // refused, so decoding never widens the grant.
+    {
+      path: 'models.list',
+      input: JSON.stringify({ limit: 5 }),
+      auth,
+    },
+  ])(
+    'denies a JSON-encoded scoped input outside its grant: $path',
+    async ({ path: deniedPath, input: deniedInput, auth: deniedAuth }) => {
+      const fetchImpl = upstream();
+      const error = await callCatalogEndpoint({
+        catalog,
+        path: deniedPath,
+        input: deniedInput,
+        auth: deniedAuth,
+        webBaseUrl: 'https://fixture.invalid',
+        fetchImpl,
+      }).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(JsonRpcFailure);
+      expect((error as Error).message).toBe('Cloud Agent authority does not permit this request');
+      expect(fetchImpl).not.toHaveBeenCalled();
+    }
+  );
+
+  it('denies an expired grant even when the encoded input decodes to an allowed value', async () => {
+    const fetchImpl = upstream();
+    const error = await callCatalogEndpoint({
+      catalog,
+      path: 'cloudAgentNext.prepareSession',
+      input: JSON.stringify(launch),
+      auth: { ...auth, cloudAgentAuthority: { ...scope, expiresAt: 1 } },
+      webBaseUrl: 'https://fixture.invalid',
+      fetchImpl,
+    }).catch((e: unknown) => e);
+    expect((error as Error).message).toBe('Cloud Agent authority does not permit this request');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
 
   it.each(personalLifecycle)(
     'forwards the personal lifecycle procedure $path with $method',

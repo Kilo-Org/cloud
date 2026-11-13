@@ -355,7 +355,7 @@
       "add": "Lisää avain",
       "added": "Avain lisätty",
       "emptyTitle": "Ei palveluntarjoajien avaimia",
-      "emptyDescription": "Lisää avain, niin pyynnöt laskutetaan omalta palveluntarjoajatililtäsi.",
+      "emptyDescription": "Aloita lisäämällä avain.",
       "chooseProvider": "Valitse palveluntarjoaja",
       "searchProviders": "Hae palveluntarjoajia",
       "noProvidersTitle": "Ei vastaavia palveluntarjoajia",

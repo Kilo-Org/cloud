@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { backgroundActivityInventorySchema } from '@kilocode/session-ingest-contracts';
 import type {
   ControlPlaneControlResult,
   ControlPlaneNativeOperation,
@@ -153,6 +154,12 @@ function parseNativeResult(
   kiloSessionId: string
 ): NativeReadOutcome {
   switch (operation.name) {
+    case 'session.background': {
+      const parsed = backgroundActivityInventorySchema.safeParse(value);
+      return parsed.success && parsed.data.sessionID === kiloSessionId
+        ? bounded(parsed.data)
+        : invalidNativeResult();
+    }
     case 'session.get':
       return sessionPublicShape(value, kiloSessionId);
     case 'session.messages':

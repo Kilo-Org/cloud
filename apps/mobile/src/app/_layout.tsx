@@ -84,6 +84,7 @@ import {
   useThemePreference,
 } from '@/lib/hooks/use-theme-preference';
 import { i18n } from '@/i18n';
+import { activateLanguage } from '@/i18n/activate-language';
 import {
   clearDirectionAttemptAsync,
   readDirectionAttemptAsync,
@@ -101,7 +102,6 @@ import {
   useLanguagePreference,
 } from '@/lib/hooks/use-language-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
-import { prewarmIntl } from '@/lib/intl-cache';
 import {
   captureLaunchDeepLink,
   clearPendingDeepLink,
@@ -534,14 +534,19 @@ function RootLayoutNav({
           runLanguageReturnNavigation();
         }
       }
-      try {
-        // The plural-rules polyfill must be in place before the first render in the new language.
-        prewarmIntl(resolved);
-        await i18n.changeLanguage(resolved);
-      } catch {
-        // The plural-rules polyfill must be in place before the first render in the new language.
-        prewarmIntl('en');
-        await i18n.changeLanguage('en');
+      // Applies the language in place: `activateLanguage` warms the
+      // plural-rules polyfill before the change (so the first render in the new
+      // language already has its formatters), and the returned outcome is the
+      // store, not the promise — a catalog the lazy backend failed to read is
+      // recovered once inside it. Only an unrecoverable failure falls back to
+      // English, and it is reported: `changeLanguage` never rejects, so without
+      // this report a failed catalog would mean a silently English process.
+      const activation = await activateLanguage(resolved);
+      if (activation === 'failed') {
+        await activateLanguage('en');
+        Sentry.captureException(new Error(`Language catalog failed: ${resolved}`), {
+          tags: { 'error.subsystem': 'startup', 'error.operation': 'language_catalog' },
+        });
       }
       void renameAndroidNotificationChannels();
       // The module-scope category registration ran under the English default

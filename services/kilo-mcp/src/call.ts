@@ -18,6 +18,14 @@ import {
 const INVALID_PARAMS = -32602;
 const INTERNAL_ERROR = -32000;
 
+/**
+ * The one refusal a scoped grant gets for a denied call: a bad authority
+ * binding, an expired grant, a procedure or payload outside the grant, and a
+ * procedure whose schema this worker cannot build all look the same to the
+ * caller.
+ */
+const AUTHORITY_REFUSAL = 'Cloud Agent authority does not permit this request';
+
 function assertScopedCall(
   auth: ForwardedAuth,
   path: string,
@@ -37,7 +45,7 @@ function assertScopedCall(
       throw new Error('Cloud Agent authority kind does not match the catalog');
     }
   } catch {
-    throw new JsonRpcFailure(INVALID_PARAMS, 'Cloud Agent authority does not permit this request');
+    throw new JsonRpcFailure(INVALID_PARAMS, AUTHORITY_REFUSAL);
   }
 }
 
@@ -83,6 +91,33 @@ function describeViolations(errors: OutputUnit[]): string[] {
     const where = error.instanceLocation !== '#' ? error.instanceLocation : '(root)';
     return `${where} (${error.keyword}): ${error.error}`;
   });
+}
+
+/**
+ * Decode a JSON-encoded `input` when the endpoint's schema does not accept it as
+ * a string. `call` and `call_protected` publish `input` with a description and
+ * no JSON Schema `type` (the catalog row decides the shape), so some MCP clients
+ * send a structured value as a JSON string; the schema then rejects it with a
+ * `type` violation.
+ *
+ * The schema still decides everything: a string it accepts is a legitimate
+ * scalar (`debug.badInputError`) and is returned untouched. Only a string that
+ * parses to an object or array is decoded — a parsed scalar would replace the
+ * value the string itself is, and a parsed `null` reads as "no input". The
+ * decoded value still goes through `assertInputMatchesSchema`, so an invalid
+ * object is refused with its own violations instead of a bare `type` mismatch.
+ */
+function decodeStringifiedInput(inputSchema: Record<string, unknown>, input: unknown): unknown {
+  if (typeof input !== 'string') return input;
+  if (validatorFor(inputSchema).validate(input).valid) return input;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(input);
+  } catch {
+    return input;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return input;
+  return parsed;
 }
 
 /**
@@ -432,12 +467,17 @@ export async function fetchCatalogCall(options: {
 
 /**
  * The `call` tool: validate `input` against the endpoint's published schema and
- * forward a non-guarded endpoint to apps/web over its public tRPC GET transport.
+ * forward a non-guarded endpoint to apps/web over its public tRPC transport.
  *
  * A guarded row (admin or debug) is refused locally before any upstream
  * request: `call` never runs one. Without the opt-in the refusal names the
  * checkbox to tick; with it, the refusal points at the OTP-protected tools.
  * apps/web enforces the admin rule again via `adminProcedure`.
+ *
+ * A scoped authority grant decides the input shape itself (see
+ * `cloudAgentAuthorityInputSchema`), so its schema is built before the value is
+ * read: the authority and the schema then judge the decoded value, which is the
+ * value forwarded.
  */
 export async function callCatalogEndpoint(options: {
   catalog: Catalog;
@@ -447,32 +487,60 @@ export async function callCatalogEndpoint(options: {
   webBaseUrl: string;
   fetchImpl?: typeof fetch;
 }): Promise<{ text: string; truncated: boolean }> {
-  const { catalog, path, input } = options;
-  assertScopedCall(options.auth, path, input);
+  const { catalog, path, input, auth } = options;
   const row = catalogRowFor(catalog, path);
+
+  // A scoped grant's schema covers procedures whose catalog row differs —
+  // models.list takes no input there, and cloudEnvironments.list is narrower —
+  // and it carries the organization constraint. Building it refuses a procedure
+  // outside the grant, and that refusal is the canned authority answer: the
+  // builder's own error never reaches the caller.
+  let scopedSchema: Record<string, unknown> | undefined;
+  if (auth.cloudAgentAuthority !== undefined) {
+    try {
+      scopedSchema = cloudAgentAuthorityInputSchema(auth.cloudAgentAuthority, path);
+    } catch {
+      throw new JsonRpcFailure(INVALID_PARAMS, AUTHORITY_REFUSAL);
+    }
+  }
+
+  let inputSchema: Record<string, unknown>;
+  if (scopedSchema !== undefined) {
+    inputSchema = scopedSchema;
+  } else {
+    if (!row) {
+      throw unknownPath(path);
+    }
+    inputSchema = row.inputSchema;
+  }
+
+  // Decode before any payload check: the authority and the schema must judge the
+  // value that is forwarded, not the client's JSON encoding of it.
+  const decodedInput = decodeStringifiedInput(inputSchema, input);
+  assertScopedCall(auth, path, decodedInput);
   if (!row) {
+    // A granted procedure missing from the catalog is drift; the authority
+    // checks above still decided whether this caller may ask at all.
     throw unknownPath(path);
   }
   if (isGuardedRow(row)) {
     throw new JsonRpcFailure(
       INVALID_PARAMS,
-      options.auth.adminEnabled === true
+      auth.adminEnabled === true
         ? `"${path}" is an admin or debug endpoint. Use the call_protected tool, then submit_otp with the code from your authenticator app, to run it.`
         : `"${path}" is an admin or debug endpoint. Reconnect the Kilo MCP server and tick "Enable admin and debug actions" at sign-in to allow admin and debug actions.`,
       { path }
     );
   }
-  const inputRow = options.auth.cloudAgentAuthority
-    ? {
-        ...row,
-        inputSchema: cloudAgentAuthorityInputSchema(options.auth.cloudAgentAuthority, path),
-      }
-    : row;
-  assertInputMatchesSchema(inputRow, path, input);
+  assertInputMatchesSchema(
+    inputSchema === row.inputSchema ? row : { ...row, inputSchema },
+    path,
+    decodedInput
+  );
   return forwardCatalogCall({
     row,
-    input,
-    auth: options.auth,
+    input: decodedInput,
+    auth,
     webBaseUrl: options.webBaseUrl,
     ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
   });
@@ -507,8 +575,10 @@ export async function requestProtectedCall(options: {
     );
   }
   // Validate before recording anything: the payload the user approves is
-  // exactly the payload the schema describes.
-  const sendInput = assertInputMatchesSchema(row, path, input);
+  // exactly the payload the schema describes. A JSON-encoded structured input
+  // is decoded first, so the recorded payload is the value, not its encoding.
+  const recordedInput = decodeStringifiedInput(row.inputSchema, input);
+  const sendInput = assertInputMatchesSchema(row, path, recordedInput);
 
   const sessionId = auth.sessionId;
   if (!requests || typeof sessionId !== 'string' || sessionId.length === 0) {
@@ -526,7 +596,7 @@ export async function requestProtectedCall(options: {
       clientId: auth.clientId,
       path,
       kind: row.debug === true ? 'debug' : 'admin',
-      inputJson: sendInput ? JSON.stringify(input) : null,
+      inputJson: sendInput ? JSON.stringify(recordedInput) : null,
       nowIso: new Date().toISOString(),
     });
   } catch {

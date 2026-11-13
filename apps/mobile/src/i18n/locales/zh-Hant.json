@@ -355,7 +355,7 @@
       "add": "新增金鑰",
       "added": "金鑰已新增",
       "emptyTitle": "沒有供應商金鑰",
-      "emptyDescription": "新增金鑰，即可將請求費用計入你自己的供應商帳戶。",
+      "emptyDescription": "新增金鑰即可開始使用。",
       "chooseProvider": "選擇供應商",
       "searchProviders": "搜尋供應商",
       "noProvidersTitle": "沒有相符的供應商",

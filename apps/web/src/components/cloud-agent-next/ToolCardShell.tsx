@@ -14,6 +14,8 @@ type ToolCardShellProps = {
   badge?: ReactNode;
   status: 'pending' | 'running' | 'completed' | 'error';
   defaultExpanded?: boolean;
+  expansion?: { open: boolean; onOpenChange: (open: boolean) => void };
+  triggerClassName?: string;
   children?: ReactNode;
 };
 
@@ -24,9 +26,13 @@ export function ToolCardShell({
   badge,
   status,
   defaultExpanded,
+  expansion,
+  triggerClassName,
   children,
 }: ToolCardShellProps) {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded ?? false);
+  const [localExpanded, setLocalExpanded] = useState(defaultExpanded ?? false);
+  const isExpanded = expansion?.open ?? localExpanded;
+  const setIsExpanded = expansion?.onOpenChange ?? setLocalExpanded;
   const pointerDown = useRef<{ x: number; y: number } | null>(null);
   const detail = useToolDetail();
   const requestDetail = detail?.request;
@@ -62,7 +68,8 @@ export function ToolCardShell({
         }}
         className={cn(
           'text-muted-foreground hover:bg-muted/40 hover:text-foreground focus-visible:ring-ring flex min-h-6 w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs select-text focus-visible:ring-2 focus-visible:outline-none pointer-coarse:min-h-11',
-          status === 'error' && 'text-destructive'
+          status === 'error' && 'text-destructive',
+          triggerClassName
         )}
       >
         {status === 'pending' || status === 'running' ? (

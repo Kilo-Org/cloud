@@ -264,6 +264,109 @@ test('reports an unparsed file by its path below the tree it was read from', () 
   );
 });
 
+test('accepts values that read as a brace or a key-shaped run', () => {
+  // A message may quote a brace, or a `"key": 1` fragment, without the scan
+  // mistaking either for the catalog's own structure.
+  const english = {
+    agents: {
+      title: 'Agents',
+      open: 'Keep the lone { in place',
+      close: 'Keep the lone } in place',
+      total: 'Read {{"total": 1, "title": 2}} as text',
+      headline: 'Also read {{"total": 1, "title": 2}} as text',
+    },
+  };
+  const found = run({
+    extraFiles: { 'apps/mobile/src/i18n/locales/en.json': JSON.stringify(english) },
+    translated: {
+      agents: {
+        title: 'Агенты',
+        open: 'Оставьте одиночную { на месте',
+        close: 'Оставьте одиночную } на месте',
+        total: 'Читайте {{"total": 1, "title": 2}} как текст',
+        headline: 'Читайте ещё {{"total": 1, "title": 2}} как текст',
+      },
+    },
+    source: [
+      "t('agents.title');",
+      "t('agents.open');",
+      "t('agents.close');",
+      "t('agents.total');",
+      "t('agents.headline');",
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+test('still reports a repeated key after a value closes a brace', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/en.json': [
+        '{',
+        '  "agents": {',
+        '    "summary": "Read as text",',
+        '    "title": "Agents }",',
+        '    "summary": "Read as text"',
+        '  }',
+        '}',
+      ].join('\n'),
+    },
+    translated: { agents: { summary: 'Читается как текст', title: 'Агенты }' } },
+    source: "t('agents.title');\nt('agents.summary');",
+  });
+  assert.deepEqual(found, ['mobile/en: duplicate key "summary"']);
+});
+
+test('reports unbalanced English catalog braces once, without a missing-key cascade', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/en.json': [
+        '{',
+        '  "agents": {',
+        '    "title": "Agents }",',
+        '    "summary": "Read as text"',
+        '}',
+      ].join('\n'),
+    },
+    source: "t('agents.title');\nt('agents.summary');",
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(found[0], /cannot audit catalog: its strings and braces do not balance/);
+});
+
+test('reports a balanced catalog JSON rejects in the same one problem line', () => {
+  // The braces match, so only JSON.parse can reject the file; a stack trace here
+  // would hide which catalog is broken.
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/en.json': '{\n  "agents": {\n    "title" "Agents"\n  }\n}\n',
+    },
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(found[0], /^mobile\/en: cannot audit catalog: /);
+});
+
+test('reports an unreadable locale catalog without inventing missing keys', () => {
+  // The skipped locale carries no values, so it can say neither that a key is
+  // missing nor that a key was left in English.
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/ru.json': [
+        '{',
+        '  "agents": {',
+        '    "title": "Агенты }",',
+        '    "liveCount_one": "{{count}} сеанс"',
+        '}',
+      ].join('\n'),
+    },
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(
+    found[0],
+    /^mobile\/ru: cannot audit catalog: its strings and braces do not balance/
+  );
+});
+
 test('ignores a mounted-harness helper while a source file still reports its keys', () => {
   const source = "t('agents.missing');\n";
   const inSource = run({ source });
@@ -315,6 +418,16 @@ test('rejects the English live-session empty state in a translated catalog', () 
   });
   assert.ok(found.length > 0, 'expected a problem');
   assert.match(found.join('\n'), /mobile\/ru: "home\.noLiveSessions" must be translated/);
+});
+
+test('accepts a translated live-session empty state', () => {
+  const english = { home: { noLiveSessions: 'Nothing running right now' } };
+  const found = run({
+    english,
+    translated: { home: { noLiveSessions: 'Сейчас ничего не запущено' } },
+    source: "t('home.noLiveSessions');",
+  });
+  assert.deepEqual(found, []);
 });
 
 test('rejects an empty translated value', () => {

@@ -4,7 +4,7 @@ import {
   type CodeReviewActionRequiredCopy as SharedCodeReviewActionRequiredCopy,
   type CodeReviewActionRequiredReason,
   type CodeReviewActionRequiredState,
-} from '@kilocode/app-shared/code-reviews';
+} from '@kilocode/app-shared/code-review';
 import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 
 export {

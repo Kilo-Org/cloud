@@ -14,12 +14,13 @@ import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
 import {
   instanceLifecycleEventSchema,
   scheduledActionEventSchema,
-  securityLifecycleEventSchema,
+  securityLifecyclePayloadShape,
 } from './notification-events';
 import { SESSION_CARD_STATUS_KINDS, sessionLiveOutcomeSchema } from './session-live-content';
-import { refineSpendAlertScope } from './spend-alert-scope';
+import { nonEmptyStringSchema } from './non-empty-string';
+import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope';
 
-export const nonEmptyStringSchema = z.string().min(1);
+export { nonEmptyStringSchema };
 
 // Discriminates between attention-requiring and status-only cloud agent
 // session notifications. Optional everywhere it appears so old producers
@@ -135,8 +136,7 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('spend_alert'),
-      scope: z.enum(['personal', 'organization']),
-      organizationId: nonEmptyStringSchema.optional(),
+      ...spendAlertScopeShape,
     })
     .superRefine(refineSpendAlertScope),
   z.object({
@@ -149,11 +149,7 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   // for the event-to-action mapping and the FindingCreated rationale.
   z.object({
     type: z.literal('security_lifecycle'),
-    event: securityLifecycleEventSchema,
-    findingId: nonEmptyStringSchema,
-    scope: nonEmptyStringSchema,
-    remediationId: nonEmptyStringSchema.optional(),
-    prUrl: nonEmptyStringSchema.optional(),
+    ...securityLifecyclePayloadShape,
   }),
   // Aggregate snapshot remains privacy-minimal. Optional Home-only details
   // travel beside it for background Home widget updates and are never copied

@@ -14,7 +14,7 @@ import type {
   ReviewMemoryPlatform,
   ReviewMemoryProposalStatus,
 } from '@kilocode/db/schema-types';
-import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-review';
 import { reviewMemoryRetentionCutoff } from './retention';
 
 export type ReviewMemoryOwner = { type: 'org'; id: string } | { type: 'user'; id: string };

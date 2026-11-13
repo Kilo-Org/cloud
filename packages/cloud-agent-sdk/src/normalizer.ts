@@ -4,6 +4,7 @@
  * boundary `as` casts so downstream code receives properly typed NormalizedEvents.
  */
 import { z } from 'zod';
+import type { BackgroundActivityState } from './background-activity';
 import type { Part, QuestionInfo, Message } from '@kilocode/app-shared/opencode';
 import type {
   SessionInfo,
@@ -95,6 +96,8 @@ export type ChatEvent = (
 
 /** Service events — lifecycle, status, questions, autocommit, preparation. */
 export type ServiceEvent =
+  | { type: 'background.activity'; state: BackgroundActivityState }
+  | { type: 'background.invalidated' }
   | { type: 'session.status'; sessionId: string; status: SessionStatus }
   | { type: 'session.created'; info: SessionInfo }
   | { type: 'session.updated'; info: SessionInfo }

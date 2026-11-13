@@ -9,7 +9,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-reviews';
+import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-review';
 import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 
 import '@/i18n';

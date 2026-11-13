@@ -18,6 +18,7 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
 import { i18n } from '@/i18n';
 
@@ -132,6 +133,7 @@ export function ProviderKeysScreen() {
   const trpc = useTRPC();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const colors = useThemeColors();
   const { confirm, dialog } = useConfirmDialog();
   const [testingId, setTestingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -269,7 +271,7 @@ export function ProviderKeysScreen() {
               router.push(ADD_KEY_ROUTE);
             }}
           >
-            <Plus size={16} />
+            <Plus size={16} color={colors.foreground} />
             <Text>{t('profile.providerKeys.add')}</Text>
           </Button>
         </View>

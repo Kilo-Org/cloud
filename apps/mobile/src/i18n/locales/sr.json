@@ -355,7 +355,7 @@
       "add": "Dodaj ključ",
       "added": "Ključ je dodat",
       "emptyTitle": "Nema ključeva provajdera",
-      "emptyDescription": "Dodaj ključ da bi se zahtevi naplaćivali na tvom nalogu kod provajdera.",
+      "emptyDescription": "Dodaj ključ za početak.",
       "chooseProvider": "Izaberi provajdera",
       "searchProviders": "Pretraži provajdere",
       "noProvidersTitle": "Nema odgovarajućih provajdera",

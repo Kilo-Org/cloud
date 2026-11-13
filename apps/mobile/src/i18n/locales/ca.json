@@ -355,7 +355,7 @@
       "add": "Afegeix una clau",
       "added": "S'ha afegit la clau",
       "emptyTitle": "No hi ha claus de proveïdor",
-      "emptyDescription": "Afegeix una clau per facturar les sol·licituds al teu compte del proveïdor.",
+      "emptyDescription": "Afegeix una clau per començar.",
       "chooseProvider": "Tria un proveïdor",
       "searchProviders": "Cerca proveïdors",
       "noProvidersTitle": "No hi ha proveïdors coincidents",

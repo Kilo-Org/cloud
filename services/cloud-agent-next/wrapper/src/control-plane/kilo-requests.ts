@@ -101,6 +101,9 @@ export function createControlPlaneKiloRequests(deps: ControlPlaneKiloRequestsDep
       }
       case 'session.todo':
         return client.getSessionTodos(kiloSessionId, directory, signal);
+      case 'session.background':
+        if (!client.getBackgroundActivity) throw new UnsupportedOperationError();
+        return client.getBackgroundActivity(kiloSessionId, directory, signal);
       case 'session.diff': {
         const nativeDiff = await client.getSessionDiff(kiloSessionId, directory, signal);
         if (!Array.isArray(nativeDiff))

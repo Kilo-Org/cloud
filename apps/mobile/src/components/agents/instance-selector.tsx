@@ -1,9 +1,10 @@
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
-import { Keyboard, Pressable } from 'react-native';
+import { Keyboard, Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { FIELD_TRIGGER_BODY_CLASS, FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
 import { i18n } from '@/i18n';
 import {
   cloudAgentTargetLabel,
@@ -111,26 +112,25 @@ export function InstanceSelector({
         label: accessibleTarget,
       })}
       accessibilityState={{ disabled: !canOpenPicker }}
-      className={cn(
-        'flex-row items-center justify-between rounded-lg border border-border bg-secondary px-3 py-3',
-        !canOpenPicker && 'opacity-50'
-      )}
+      className={cn(FIELD_TRIGGER_FRAME_CLASS, !canOpenPicker && 'opacity-50')}
     >
-      <Text
-        className={cn(
-          'min-w-0 flex-1 text-base',
-          isPlaceholder ? 'text-muted-foreground' : 'text-foreground'
-        )}
-        numberOfLines={1}
-        // The value is a computer name, read from the start, so it takes the
-        // ordinary tail cut. The project it runs in is the Folder field's job
-        // below the row, and repeating it here cut the name itself on a
-        // compact screen.
-        ellipsizeMode="tail"
-      >
-        {label}
-      </Text>
-      <ChevronDown size={14} color={colors.mutedForeground} />
+      <View className={cn(FIELD_TRIGGER_BODY_CLASS, 'justify-between')}>
+        <Text
+          className={cn(
+            'min-w-0 flex-1 text-base',
+            isPlaceholder ? 'text-muted-foreground' : 'text-foreground'
+          )}
+          numberOfLines={1}
+          // The value is a computer name, read from the start, so it takes the
+          // ordinary tail cut. The project it runs in is the Folder field's job
+          // below the row, and repeating it cut the name itself on a compact
+          // screen.
+          ellipsizeMode="tail"
+        >
+          {label}
+        </Text>
+        <ChevronDown size={14} color={colors.mutedForeground} />
+      </View>
     </Pressable>
   );
 }

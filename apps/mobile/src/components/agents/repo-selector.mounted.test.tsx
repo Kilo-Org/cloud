@@ -10,6 +10,7 @@ vi.mock('expo-router', () => ({ useRouter: () => ({ push }) }));
 vi.mock('react-native', () => ({
   Keyboard: { dismiss: vi.fn() },
   Pressable: 'Pressable',
+  View: 'View',
 }));
 vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

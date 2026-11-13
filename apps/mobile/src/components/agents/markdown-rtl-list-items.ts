@@ -5,12 +5,24 @@
  * reply in the interface's script aligns to the start edge while its bullets
  * stay on the left. Naming the start edge inside each item's own text moves the
  * marker, the indent and the wrapped lines to the same edge as the heading and
- * every other paragraph of the turn; the item's words still read left to right.
+ * every other paragraph of the turn.
  *
  * The mark is a right-to-left mark (U+200F), a strong character with no width,
- * so it changes the paragraph's direction without drawing or speaking anything.
+ * so it names the interface start edge for the paragraph without drawing or
+ * speaking anything. The item's own words then sit inside a first-strong
+ * isolate, which keeps them in their own direction: a run of Latin words still
+ * ends its sentence with the full stop at the end, and Arabic or Hebrew words
+ * still read right to left. The mark stays outside the isolate because the bidi
+ * algorithm skips text inside an isolate while it resolves the paragraph's
+ * direction.
  */
 const RIGHT_TO_LEFT_MARK = '\u200F';
+
+/** Opens the isolate that lets the item's own text keep its own direction. */
+const FIRST_STRONG_ISOLATE = '\u2068';
+
+/** Closes that isolate at the end of the item's own text. */
+const POP_DIRECTIONAL_ISOLATE = '\u2069';
 
 /**
  * Up to three spaces and one or more blockquote markers in front of a line's
@@ -56,60 +68,125 @@ function closingFence(open: Fence, content: string): Fence | null {
   return run.startsWith(open.mark) ? { mark: open.mark, length: run.length } : null;
 }
 
-function withStartEdge(line: string): string {
+/**
+ * The item with the start edge named and its text opened as an isolate, or
+ * `null` for a line that is not an item with content. The closer is set by the
+ * caller, at the end of the item's text.
+ */
+function withStartEdge(line: string): string | null {
   if (THEMATIC_BREAK.test(line.replace(BLOCKQUOTE, ''))) {
-    return line;
+    return null;
   }
   const item = LIST_ITEM.exec(line);
   if (item === null) {
-    return line;
+    return null;
   }
   const prefix = item[0];
   const content = line.slice(prefix.length);
   // A marker on its own line opens nothing to align.
-  return content.trim() === '' ? line : `${prefix}${RIGHT_TO_LEFT_MARK}${content}`;
+  if (content.trim() === '') {
+    return null;
+  }
+  return `${prefix}${RIGHT_TO_LEFT_MARK}${FIRST_STRONG_ISOLATE}${content}`;
 }
 
 /**
- * The same markdown with the interface start edge named inside every list item.
+ * Whether `line` carries text that belongs to the item above it: not blank, not
+ * a blockquote, fence or rule, and not another item's marker.
+ */
+function continuesItem(line: string): boolean {
+  if (line.trim() === '') {
+    return false;
+  }
+  if (BLOCKQUOTE.test(line) || FENCE_OPEN.test(line) || THEMATIC_BREAK.test(line)) {
+    return false;
+  }
+  return LIST_ITEM.exec(line) === null;
+}
+
+/**
+ * The same markdown with the interface start edge named inside every list item
+ * and the item's own text isolated so it keeps its own direction. The closer
+ * sits at the end of the item's text, across its lazy continuation lines.
  * Fenced and indented code keep their text exactly: a list-shaped line there is
  * code, not a list.
  */
 export function rtlListItems(markdown: string): string {
+  const lines: string[] = [];
   let open: Fence | null = null;
   let indentedCode = false;
   let afterBlankLine = true;
-  return markdown
-    .split('\n')
-    .map(line => {
-      const content = line.replace(BLOCKQUOTE, '');
-      if (open !== null) {
-        const close = closingFence(open, content);
-        if (close !== null && close.length >= open.length) {
-          open = null;
-        }
+  // The line whose isolate is still open; a closer lands at the end of it.
+  let pending: number | null = null;
+
+  const closeIsolate = (): void => {
+    if (pending === null) {
+      return;
+    }
+    const last = lines[pending];
+    if (last !== undefined) {
+      lines[pending] = `${last}${POP_DIRECTIONAL_ISOLATE}`;
+    }
+    pending = null;
+  };
+
+  /**
+   * Adds one source line: an item line opens an isolate, a continuation line
+   * keeps it open, and any other line closes it. Code lines pass through.
+   */
+  const emit = (line: string): void => {
+    if (pending !== null) {
+      if (continuesItem(line)) {
         afterBlankLine = false;
-        return line;
+        pending = lines.length;
+        lines.push(line);
+        return;
       }
-      if (indentedCode) {
-        if (line.trim() === '' || INDENTED_CODE.test(line)) {
-          return line;
-        }
-        indentedCode = false;
+      closeIsolate();
+    }
+    const content = line.replace(BLOCKQUOTE, '');
+    if (open !== null) {
+      const close = closingFence(open, content);
+      if (close !== null && close.length >= open.length) {
+        open = null;
       }
-      const fence = FENCE_OPEN.exec(content)?.[1];
-      if (fence !== undefined) {
-        open = { mark: fence, length: fence.length };
-        afterBlankLine = false;
-        return line;
+      afterBlankLine = false;
+      lines.push(line);
+      return;
+    }
+    if (indentedCode) {
+      if (line.trim() === '' || INDENTED_CODE.test(line)) {
+        lines.push(line);
+        return;
       }
-      if (afterBlankLine && INDENTED_CODE.test(line)) {
-        indentedCode = true;
-        afterBlankLine = false;
-        return line;
-      }
-      afterBlankLine = line.trim() === '';
-      return withStartEdge(line);
-    })
-    .join('\n');
+      indentedCode = false;
+    }
+    const fence = FENCE_OPEN.exec(content)?.[1];
+    if (fence !== undefined) {
+      open = { mark: fence, length: fence.length };
+      afterBlankLine = false;
+      lines.push(line);
+      return;
+    }
+    if (afterBlankLine && INDENTED_CODE.test(line)) {
+      indentedCode = true;
+      afterBlankLine = false;
+      lines.push(line);
+      return;
+    }
+    afterBlankLine = line.trim() === '';
+    const rewritten = withStartEdge(line);
+    if (rewritten === null) {
+      lines.push(line);
+      return;
+    }
+    pending = lines.length;
+    lines.push(rewritten);
+  };
+
+  for (const line of markdown.split('\n')) {
+    emit(line);
+  }
+  closeIsolate();
+  return lines.join('\n');
 }

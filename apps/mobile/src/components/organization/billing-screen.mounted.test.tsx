@@ -43,6 +43,12 @@ const queries = vi.hoisted(() => ({
   },
 }));
 
+/** The boundary's own seat numbers, which the seats read corrects once it lands. */
+const boundary = vi.hoisted(() => ({
+  requireSeats: true,
+  seatCount: { used: 3, total: 3 },
+}));
+
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   isMoneyRole: () => true,
   useOrgBoundary: () => ({
@@ -52,8 +58,8 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
       id: 'org-1',
       name: 'Acme',
       plan: 'enterprise',
-      seatCount: { used: 3, total: 3 },
-      requireSeats: true,
+      seatCount: boundary.seatCount,
+      requireSeats: boundary.requireSeats,
       isTrialExpiredForEnforcement: false,
       parentOrganizationId: null,
     },
@@ -173,6 +179,14 @@ function subscriptionReadout() {
   };
 }
 
+/** The seats row's rendered value, as the screen hands it to `KvRow`. */
+function seatsReadout(renderer: ReactTestRenderer): unknown {
+  const row = renderer.root
+    .findAllByType('KvRow')
+    .find(node => node.props.label === 'Organization seats');
+  return row?.props.value;
+}
+
 beforeEach(() => {
   for (const query of Object.values(queries)) {
     query.isPending = false;
@@ -181,6 +195,8 @@ beforeEach(() => {
     query.data = undefined;
     query.refetch.mockClear();
   }
+  boundary.requireSeats = true;
+  boundary.seatCount = { used: 3, total: 3 };
   queries.seats.data = { usedSeats: 3, totalSeats: 3 };
   queries.autoTopUp.data = { enabled: true, amountCents: 5000, thresholdCents: 1000 };
 });
@@ -222,6 +238,37 @@ describe('OrganizationBillingScreen failure states', () => {
     expect(queries.autoTopUp.refetch).toHaveBeenCalledTimes(1);
     expect(queries.subscription.refetch).not.toHaveBeenCalled();
     expect(queries.seats.refetch).not.toHaveBeenCalled();
+    unmount();
+  });
+});
+
+describe('OrganizationBillingScreen seats row', () => {
+  it('holds an unenforced organization at seats used-only, before and after the read', async () => {
+    boundary.requireSeats = false;
+    // A legacy organization has never bought seats, and the seats read answers
+    // `seat_count || 0` — so `3 / 0` is exactly the row it must not paint.
+    boundary.seatCount = { used: 3, total: 0 };
+    queries.subscription.data = subscriptionReadout();
+
+    queries.seats.data = undefined;
+    const firstFrame = await mount();
+    expect(seatsReadout(firstFrame.renderer)).toBe('3');
+    firstFrame.unmount();
+
+    queries.seats.data = { usedSeats: 3, totalSeats: 0 };
+    const settled = await mount();
+    expect(seatsReadout(settled.renderer)).toBe('3');
+    settled.unmount();
+  });
+
+  it('appends the total once a seat-enforcing organization has a positive one', async () => {
+    boundary.requireSeats = true;
+    boundary.seatCount = { used: 3, total: 0 };
+    queries.subscription.data = subscriptionReadout();
+    queries.seats.data = { usedSeats: 3, totalSeats: 4 };
+
+    const { renderer, unmount } = await mount();
+    expect(seatsReadout(renderer)).toBe('3 / 4');
     unmount();
   });
 });

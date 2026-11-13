@@ -137,13 +137,16 @@ export function OrganizationBillingScreen() {
   const scheduledSeatChange = subscription.data ? getScheduledSeatChange(subscription.data) : null;
   // The list entry already carries the same seat numbers, so the row paints
   // settled on the first frame and the query only corrects it if they moved.
-  let seatCountValue = formatNumber(org.seatCount.used, i18n.language);
-  if (org.requireSeats) {
-    seatCountValue = formatSeatCount(org.seatCount.used, org.seatCount.total);
-  }
-  if (seats.data) {
-    seatCountValue = formatSeatCount(seats.data.usedSeats, seats.data.totalSeats);
-  }
+  // A total is printed only when the organization enforces seats and actually
+  // bought some: `getOrganizationSeatUsage` answers `seat_count || 0`, so a
+  // legacy organization would read `3 / 0`, and the row would also change
+  // shape on the frame the seats read lands.
+  const seatsInUse = seats.data?.usedSeats ?? org.seatCount.used;
+  const seatsPurchased = seats.data?.totalSeats ?? org.seatCount.total;
+  const seatCountValue =
+    org.requireSeats && seatsPurchased > 0
+      ? formatSeatCount(seatsInUse, seatsPurchased)
+      : formatNumber(seatsInUse, i18n.language);
 
   const autoTopUpReadout = autoTopUp.data ? getAutoTopUpReadout(autoTopUp.data) : null;
 
@@ -189,7 +192,7 @@ export function OrganizationBillingScreen() {
         />
         {scheduledSeatChange == null ? null : (
           <KvRow
-            label={t('organization.billing.scheduledChange')}
+            label={t('kiloPass.manage.scheduledChange')}
             value={scheduledSeatChange}
             valueFace="text"
             last

@@ -100,7 +100,6 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     return state.config;
   },
   useSaveReviewConfig: () => state.save,
-  useReviewerPermission: () => ({ status: 'ready', canEdit: true }),
   useGitHubRepositories: () => ({
     data: { repositories: [{ id: 1, fullName: 'kilo/app' }] },
     isLoading: false,

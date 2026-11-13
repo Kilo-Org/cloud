@@ -39,7 +39,6 @@ import {
   useGitHubRepositories,
   useGitLabRepositories,
   useReviewConfig,
-  useReviewerPermission,
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
 import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
@@ -77,7 +76,6 @@ function CouncilScreen({
   const config = useReviewConfig(scope, platform, { enabled: councilUiEnabled });
   const configBody = useReviewConfigBody(config, { restartable: councilUiEnabled });
   const save = useSaveReviewConfig(scope, platform);
-  const permission = useReviewerPermission(scope);
   const githubRepos = useGitHubRepositories(scope, councilUiEnabled && platform === 'github');
   const gitlabRepos = useGitLabRepositories(scope, councilUiEnabled && platform === 'gitlab');
   // Both scopes' repository reads carry the same `repositories` list; only the
@@ -88,8 +86,6 @@ function CouncilScreen({
     id: repository.id,
     fullName: repository.fullName,
   }));
-  const canEdit = permission.status === 'ready' && permission.canEdit;
-
   const stored = config.data?.council ?? null;
   // The switch reads the stored state: an organization that never saved a
   // council has none switched on, so a first visit starts from the default
@@ -154,7 +150,7 @@ function CouncilScreen({
     );
   }
 
-  const disabled = !canEdit || save.isPending || configBody.body.status !== 'ready';
+  const disabled = save.isPending || configBody.body.status !== 'ready';
   const councilOn = council.enabled && !belowMinimum;
   const selectedRepositories = repositories.filter(repository =>
     selectedIds.includes(repository.id)
@@ -298,12 +294,6 @@ function CouncilScreen({
             {t('codeReviewer.council.labelsDescription')}
           </Text>
         </View>
-
-        {!canEdit ? (
-          <Text variant="muted" className="text-center text-xs">
-            {t('securityAgent.sla.permissionNote')}
-          </Text>
-        ) : null}
       </TabScreenScrollView>
     </View>
   );

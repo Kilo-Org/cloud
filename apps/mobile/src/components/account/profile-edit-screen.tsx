@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
 import { type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -14,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { usePopOnce } from '@/lib/navigation/pop-once';
 import { useTRPC } from '@/lib/trpc';
 
 type ProfileUrlError = (value: string) => string | null;
@@ -59,7 +59,7 @@ type FieldsProps = {
  */
 function ProfileLinkForm({ linkedinUrl, githubUrl }: FieldsProps) {
   const { t } = useTranslation();
-  const router = useRouter();
+  const popOnce = usePopOnce();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const linkedinRef = useRef(linkedinUrl ?? '');
@@ -75,7 +75,9 @@ function ProfileLinkForm({ linkedinUrl, githubUrl }: FieldsProps) {
         // would show the links as they were before this save.
         void queryClient.invalidateQueries({ queryKey: trpc.user.getProfileLinks.queryKey() });
         announcingToast.success(t('profile.editProfile.saved'));
-        router.back();
+        // A Back the reader took during the save already popped this screen, so
+        // the completion must not pop the screen beneath it as well.
+        popOnce();
       },
       // The server's message is the account of what it refused, so it is shown
       // as written rather than replaced with a generic failure.
@@ -94,7 +96,7 @@ function ProfileLinkForm({ linkedinUrl, githubUrl }: FieldsProps) {
       return;
     }
     if (linkedin === undefined && github === undefined) {
-      router.back();
+      popOnce();
       return;
     }
     update.mutate({

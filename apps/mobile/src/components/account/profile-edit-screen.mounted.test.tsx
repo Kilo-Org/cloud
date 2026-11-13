@@ -2,6 +2,7 @@ import { createElement, type ElementType } from 'react';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import '@/i18n';
+import { resetLeaveSettle } from '@/lib/navigation/leave-settle';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -22,7 +23,9 @@ type ScreenState = {
   mutations: MutationOptions[];
   mutate: Mock;
   back: Mock;
+  focused: boolean;
   toastError: Mock;
+  toastSuccess: Mock;
 };
 
 const state = vi.hoisted((): ScreenState => ({
@@ -32,11 +35,35 @@ const state = vi.hoisted((): ScreenState => ({
   mutate: vi.fn(),
   invalidate: vi.fn(),
   back: vi.fn(),
+  focused: true,
   toastError: vi.fn(),
+  toastSuccess: vi.fn(),
 }));
 
-vi.mock('react-native', () => ({ View: 'View' }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ back: state.back }) }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  // Nothing dispatches a hardware Back in this harness, so the subscription only
+  // has to answer the hook's cleanup.
+  BackHandler: {
+    addEventListener: () => ({
+      remove: () => {
+        // no listener was registered
+      },
+    }),
+  },
+}));
+vi.mock('expo-router', () => {
+  // Stable objects, like the real hooks: a new identity per render would re-run
+  // the effects `usePopOnce` registers on them.
+  const router = { back: state.back };
+  const navigation = {
+    isFocused: () => state.focused,
+    addListener: () => () => {
+      // the mocked navigator never emits `blur`
+    },
+  };
+  return { useRouter: () => router, useNavigation: () => navigation };
+});
 vi.mock('@tanstack/react-query', async importOriginal => {
   // The provider and client stay real so renderWithProviders works; only the
   // hooks the screen calls are replaced.
@@ -59,7 +86,7 @@ vi.mock('@tanstack/react-query', async importOriginal => {
 });
 vi.mock('sonner-native', () => ({ toast: { error: state.toastError, success: vi.fn() } }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
-  announcingToast: { success: vi.fn(), error: vi.fn() },
+  announcingToast: { success: state.toastSuccess, error: vi.fn() },
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -116,13 +143,16 @@ function press(root: ReactTestRenderer['root']): void {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  resetLeaveSettle();
   state.links = { linkedinUrl: null, githubUrl: null };
   state.error = false;
   state.mutations = [];
+  state.focused = true;
   state.mutate.mockClear();
   state.invalidate.mockClear();
   state.back.mockClear();
   state.toastError.mockClear();
+  state.toastSuccess.mockClear();
 });
 
 afterEach(() => {
@@ -158,6 +188,58 @@ describe('ProfileEditScreen', () => {
       state.mutations[0]?.onSuccess?.();
     });
     expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [] });
+    expect(state.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not pop the screen beneath when the reader left before the save settled', async () => {
+    const root = await mount();
+
+    act(() => {
+      (field(root, 'GitHub URL').props.onChangeText as (value: string) => void)(
+        'https://github.com/ada'
+      );
+    });
+    press(root);
+    expect(state.mutate).toHaveBeenCalledWith({ github_url: 'https://github.com/ada' });
+    expect(state.back).not.toHaveBeenCalled();
+
+    // The reader's Back reached the navigator, so this screen is already leaving.
+    state.focused = false;
+    act(() => {
+      state.mutations.at(-1)?.onSuccess?.();
+    });
+
+    expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [] });
+    expect(state.toastSuccess).toHaveBeenCalledWith('Profile updated');
+    expect(state.back).not.toHaveBeenCalled();
+  });
+
+  it('pops once for a save, and never for a repeated settle or a no-change Save', async () => {
+    const root = await mount();
+
+    act(() => {
+      (field(root, 'GitHub URL').props.onChangeText as (value: string) => void)(
+        'https://github.com/ada'
+      );
+    });
+    press(root);
+    act(() => {
+      state.mutations.at(-1)?.onSuccess?.();
+    });
+    expect(state.back).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      state.mutations.at(-1)?.onSuccess?.();
+    });
+    expect(state.back).toHaveBeenCalledTimes(1);
+
+    // Back to the saved value: Save submits nothing, and must not pop either.
+    act(() => {
+      (field(root, 'GitHub URL').props.onChangeText as (value: string) => void)('');
+    });
+    press(root);
+
+    expect(state.mutate).toHaveBeenCalledTimes(1);
     expect(state.back).toHaveBeenCalledTimes(1);
   });
 

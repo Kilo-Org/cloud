@@ -11,8 +11,8 @@ final class SshModuleState: @unchecked Sendable {
   private let lock = NSLock()
   private var sessions: [String: SshSession] = [:]
   private var shells: [String: SshShellSource] = [:]
-  private var sftps: [String: SftpClient] = [:]
-  private var forwards: [String: ForwardHandle] = [:]
+  private var sftps: [String: SftpEntry] = [:]
+  private var forwards: [String: ForwardEntry] = [:]
   private var cancels: [String: CancelToken] = [:]
   private var hostKeyRequests: [String: PendingRequest<Bool>] = [:]
   private var promptRequests: [String: PendingRequest<PromptReply>] = [:]
@@ -65,46 +65,58 @@ final class SshModuleState: @unchecked Sendable {
     return Array(shells.keys)
   }
 
-  func store(sftp: SftpClient, id: String) {
+  func store(sftp: SftpClient, sessionId: String, id: String) {
     lock.lock()
-    sftps[id] = sftp
+    sftps[id] = SftpEntry(sessionId: sessionId, client: sftp)
     lock.unlock()
   }
 
   func sftp(_ id: String) -> SftpClient? {
     lock.lock()
     defer { lock.unlock() }
-    return sftps[id]
+    return sftps[id]?.client
   }
 
   func removeSftp(_ id: String) -> SftpClient? {
     lock.lock()
     defer { lock.unlock() }
-    return sftps.removeValue(forKey: id)
+    return sftps.removeValue(forKey: id)?.client
+  }
+
+  func sftpIds(of sessionId: String) -> [String] {
+    lock.lock()
+    defer { lock.unlock() }
+    return sftps.filter { $0.value.sessionId == sessionId }.map { $0.key }
   }
 
   func allSftps() -> [SftpClient] {
     lock.lock()
     defer { lock.unlock() }
-    return Array(sftps.values)
+    return sftps.values.map { $0.client }
   }
 
-  func store(forward: ForwardHandle, id: String) {
+  func store(forward: ForwardHandle, sessionId: String, id: String) {
     lock.lock()
-    forwards[id] = forward
+    forwards[id] = ForwardEntry(sessionId: sessionId, handle: forward)
     lock.unlock()
   }
 
   func removeForward(_ id: String) -> ForwardHandle? {
     lock.lock()
     defer { lock.unlock() }
-    return forwards.removeValue(forKey: id)
+    return forwards.removeValue(forKey: id)?.handle
+  }
+
+  func forwardIds(of sessionId: String) -> [String] {
+    lock.lock()
+    defer { lock.unlock() }
+    return forwards.filter { $0.value.sessionId == sessionId }.map { $0.key }
   }
 
   func allForwards() -> [ForwardHandle] {
     lock.lock()
     defer { lock.unlock() }
-    return Array(forwards.values)
+    return forwards.values.map { $0.handle }
   }
 
   func store(cancel: CancelToken, id: String) {
@@ -154,4 +166,16 @@ final class SshModuleState: @unchecked Sendable {
     defer { lock.unlock() }
     return promptRequests.removeValue(forKey: id)
   }
+}
+
+/// An SFTP client and the session whose disconnect it shares.
+private struct SftpEntry {
+  let sessionId: String
+  let client: SftpClient
+}
+
+/// A port forward and the session whose disconnect it shares.
+private struct ForwardEntry {
+  let sessionId: String
+  let handle: ForwardHandle
 }

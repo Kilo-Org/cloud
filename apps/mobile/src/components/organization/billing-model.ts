@@ -164,3 +164,10 @@ export function getAutoTopUpReadout(config: OrgAutoTopUpConfig) {
     threshold: formatMoneyFromCents(config.thresholdCents, i18n.language),
   };
 }
+
+/** The manage-on-web link's wording, which follows the auto top-up config above it. */
+export function getAutoTopUpLinkLabel(enabled: boolean | undefined): string {
+  return enabled === true
+    ? i18n.t('organization.billing.manageAutoTopUp')
+    : i18n.t('organization.billing.setupAutoTopUp');
+}

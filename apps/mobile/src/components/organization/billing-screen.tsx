@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import {
   formatSeatCount,
+  getAutoTopUpLinkLabel,
   getAutoTopUpReadout,
   getOrgSubscriptionState,
   getScheduledSeatChange,
@@ -330,15 +331,9 @@ export function OrganizationBillingScreen() {
               url={`${subscriptionsUrl}/seats`}
               label={t('organization.billing.buySeats')}
             />
-            {/* The read above is the only source of the wording: a pending or
-                failed read has no state to manage, so it keeps the set-up one. */}
             <ExternalBillingLink
               url={organizationBillingUrl(organizationId)}
-              label={
-                autoTopUpReadout?.enabled === true
-                  ? t('organization.billing.manageAutoTopUp')
-                  : t('organization.billing.setupAutoTopUp')
-              }
+              label={getAutoTopUpLinkLabel(autoTopUp.data?.enabled)}
             />
           </View>
         </View>

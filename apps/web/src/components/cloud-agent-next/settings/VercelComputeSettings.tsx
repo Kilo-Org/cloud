@@ -650,7 +650,7 @@ export function VercelComputeSettings({ organizationId }: { organizationId?: str
         ) : status ? (
           <>
             <Card>
-              <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <CardHeader className="flex flex-col gap-4 only:pb-6 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0 space-y-1">
                   <CardTitle className="text-base break-all">
                     {projectLink ? (

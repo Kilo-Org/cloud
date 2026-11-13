@@ -1,3 +1,4 @@
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
@@ -49,6 +50,9 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
   // A deep link can name an organization the viewer is not a member of: the
   // boundary owns that case, so no read fires until membership is confirmed.
   const scopeResolved = scope === 'personal' || (!boundary.isResolving && boundary.org != null);
+  // Every render past the gate below has the organization when the scope is an
+  // organization, so the header names it without a second lookup.
+  const organizationName = scope === 'organization' ? boundary.org?.organizationName : undefined;
 
   useRouteForegroundRefresh([[['platformIntegrations']], [['githubApps', 'listIntegrations']]]);
 
@@ -73,7 +77,7 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
   }
 
   if (statuses.isPending) {
-    return <IntegrationsSkeleton />;
+    return <IntegrationsSkeleton organizationName={organizationName} />;
   }
 
   // `data` survives a failed background refetch, so the loaded rows stay put
@@ -84,7 +88,7 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
     }
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('integrations.title')} />
+        <ScreenHeader title={t('integrations.title')} subtitle={organizationName} />
         <QueryError
           className="bg-background"
           variant={trpcErrorVariant(statuses.error)}
@@ -111,10 +115,18 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
       action: 'connect',
       installed: row.installed,
     }) || canManageProvider({ provider: row.provider, scope, role, action: 'disconnect' });
-  // The hint names the role that can change the connections, so it only shows
-  // when no row offers the viewer any action at all.
+  /**
+   * A member may still get one action (GitLab's first connect admits any member),
+   * so the hint cannot wait for a screen with no action at all. It names the role
+   * that can change the rows the viewer cannot; a viewer who already holds that
+   * role gets no hint, because the sentence would point them at themselves and
+   * Bitbucket's manager set leaves an admin out.
+   */
   const showMemberHint =
-    scope === 'organization' && rows.length > 0 && !rows.some(row => canActOnRow(row));
+    scope === 'organization' &&
+    rows.length > 0 &&
+    !canManageOrganization(role) &&
+    rows.some(row => !canActOnRow(row));
 
   const openProviderPage = (provider: IntegrationProvider) => {
     void openExternalUrl(getIntegrationPageUrl(WEB_BASE_URL, provider, organizationId), {
@@ -139,7 +151,7 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('integrations.title')} />
+      <ScreenHeader title={t('integrations.title')} subtitle={organizationName} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-4 pt-4"
@@ -187,11 +199,11 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
 }
 
 /** Loading placeholder at the loaded rows' size, so the swap moves nothing. */
-function IntegrationsSkeleton() {
+function IntegrationsSkeleton({ organizationName }: Readonly<{ organizationName?: string }>) {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('integrations.title')} />
+      <ScreenHeader title={t('integrations.title')} subtitle={organizationName} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-4 pt-4"

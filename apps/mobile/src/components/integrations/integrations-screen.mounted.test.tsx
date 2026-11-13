@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted suite covers both scopes: the role-gated row actions, the member hint, and the header subtitle */
 // The integrations hub serves both scopes: the personal one shows every
 // connection the account owns, and the organization one hides the actions the
 // viewer's role cannot take. The states below are the ones the screen owns —
@@ -108,7 +109,8 @@ vi.mock('@/components/query-error', () => ({
 }));
 
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { title?: string }) => createElement('ScreenHeaderMock', props),
+  ScreenHeader: (props: { title?: string; subtitle?: string }) =>
+    createElement('ScreenHeaderMock', props),
 }));
 
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
@@ -278,7 +280,7 @@ describe('IntegrationsScreen', () => {
     expect(calls.disconnect).toHaveBeenCalledWith({ provider: 'slack', githubIntegrationId: null });
   });
 
-  it('lets a member make the first GitLab connect and hides the manager actions', () => {
+  it('lets a member make the first GitLab connect and explains the rows it cannot change', () => {
     state.role = 'member';
     state.statuses.data = [
       { platform: 'slack', installed: true, installation: { teamName: 'Acme' } },
@@ -292,7 +294,55 @@ describe('IntegrationsScreen', () => {
     // `resolveGitLabOAuthOwner` only needs billing roles to replace an existing
     // integration, so a member's first connect is accepted.
     expect(actionOf(rowTitled(root, 'GitLab'))?.props.accessibilityLabel).toBe('Connect. GitLab');
+    expect(texts(root)).toContain(MEMBER_HINT);
+  });
+
+  it('keeps the hint off for an owner, who can change every row', () => {
+    state.role = 'owner';
+    state.statuses.data = [
+      { platform: 'slack', installed: true, installation: { teamName: 'Acme' } },
+    ];
+    const root = mount('org-1').root;
+
+    expect(findOne(root, 'RowMock').every(row => actionOf(row) != null)).toBe(true);
     expect(texts(root)).not.toContain(MEMBER_HINT);
+  });
+
+  it('keeps the hint off for an admin, whose Bitbucket row offers no action', () => {
+    state.role = 'admin';
+    state.statuses.data = [
+      { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
+    ];
+    const root = mount('org-1').root;
+
+    expect(actionOf(rowTitled(root, 'Bitbucket'))).toBeNull();
+    expect(texts(root)).not.toContain(MEMBER_HINT);
+  });
+
+  it('never explains the rows in the personal scope', () => {
+    state.role = 'member';
+    state.statuses.data = [
+      { platform: 'slack', installed: true, installation: { teamName: 'Acme' } },
+    ];
+    const root = mount().root;
+
+    expect(findOne(root, 'RowMock').every(row => actionOf(row) != null)).toBe(true);
+    expect(texts(root)).not.toContain(MEMBER_HINT);
+  });
+
+  it('names the organization in the header of the organization scope', () => {
+    state.role = 'member';
+    const header = findOne(mount('org-1').root, 'ScreenHeaderMock')[0];
+
+    expect(header?.props.title).toBe('Integrations');
+    expect(header?.props.subtitle).toBe('Acme');
+  });
+
+  it('leaves the header subtitle empty in the personal scope', () => {
+    const header = findOne(mount().root, 'ScreenHeaderMock')[0];
+
+    expect(header?.props.title).toBe('Integrations');
+    expect(header?.props.subtitle).toBeUndefined();
   });
 
   it('retries a failed read from the error state', () => {

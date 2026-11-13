@@ -341,9 +341,14 @@ describe('resolvePrefillRepoSelection', () => {
 });
 
 describe('isRepoSeedPending', () => {
-  const base = { prefillRepo: 'owner/repo', applied: false, selectedRepo: '', reposSettled: false };
+  const base = {
+    prefillRepo: 'owner/repo',
+    applied: false,
+    selectedRepo: '',
+    providerQueriesResolved: false,
+  };
 
-  it('reports a seed pending while the lists are still loading', () => {
+  it('reports a seed pending while a provider query is still in flight', () => {
     expect(isRepoSeedPending(base)).toBe(true);
   });
 
@@ -351,8 +356,14 @@ describe('isRepoSeedPending', () => {
     expect(isRepoSeedPending({ ...base, applied: true })).toBe(false);
   });
 
-  it('settles once the lists have settled, because the seed ran in that render', () => {
-    expect(isRepoSeedPending({ ...base, reposSettled: true })).toBe(false);
+  it('settles a prefill the resolved lists cannot satisfy instead of holding the region', () => {
+    // The regression this clause exists for: the provider queries resolved and
+    // no seed ran (`applied` false, no selection) because the lists have no
+    // match — an error, a disconnected provider, an empty account. No seed can
+    // arrive now, so reporting pending here would keep the region unsettled
+    // forever: the screen would lose the rows below the section and the
+    // section's own retry and reconnect controls.
+    expect(isRepoSeedPending({ ...base, providerQueriesResolved: true })).toBe(false);
   });
 
   it('settles when the form already holds a selection', () => {
@@ -363,7 +374,9 @@ describe('isRepoSeedPending', () => {
     // The regression this rule exists for: without a request in the route no
     // seed is coming, so the form must not wait for one before it paints the
     // rows below the repository section.
-    expect(isRepoSeedPending({ ...base, prefillRepo: undefined, reposSettled: true })).toBe(false);
+    expect(
+      isRepoSeedPending({ ...base, prefillRepo: undefined, providerQueriesResolved: true })
+    ).toBe(false);
   });
 });
 

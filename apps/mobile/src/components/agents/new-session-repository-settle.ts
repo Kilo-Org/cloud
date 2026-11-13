@@ -26,9 +26,11 @@ export function isRepositoryRegionSettled(input: {
   draftSettled: boolean;
   /**
    * The route prefill can still replace the selection with a repository, which
-   * would turn an expanded connect card into the compact row. A prefill that
-   * names no repository never seeds one, so a settled list with rows and no
-   * request is already final.
+   * would turn an expanded connect card into the compact row. A seed only
+   * arrives while a provider query is still in flight, so this is false once
+   * the queries resolve even when the lists came back empty or failed. A
+   * prefill that names no repository never seeds one, so a form with no request
+   * is already final.
    */
   seedPending: boolean;
   /** A stored selection its provider's list no longer contains, still to be dropped. */

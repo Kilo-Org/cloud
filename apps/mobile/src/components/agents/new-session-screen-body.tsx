@@ -471,6 +471,7 @@ export function NewSessionScreenBody() {
   const { selectedRepo, setSelectedRepo, repoSeedPending } = useNewSessionPrefillTargets({
     repositories,
     reposSettled,
+    providerQueriesResolved,
     models,
     modelsSettled: !isLoadingModels && !isModelsError && models.length > 0,
     storedRepo: repositoryDraft.settled ? repositoryDraft.value : null,

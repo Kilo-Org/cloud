@@ -125,6 +125,8 @@ describe('AddCreditsRow inline placement', () => {
 
   it('hands the button over with no block of its own', () => {
     const root = renderInline();
+    // `inline` on its own returns the button. The line-action box is the one
+    // wrapper an inline call can get, and that suite pins it below.
     expect(root.findAllByType('View')).toHaveLength(0);
     expect(root.findByType(BUTTON)).toBeDefined();
   });
@@ -162,12 +164,31 @@ describe('AddCreditsRow line action', () => {
     return renderer.root;
   }
 
-  it('draws the shared line-action box instead of the state surface', () => {
-    const classes = String(renderLineAction().findByType(BUTTON).props.className).split(' ');
-    // Every token, so the negative margin that cancels the box's overflow
+  // The box has to be the control's parent, not the control: the caller's row
+  // gives a trailing control one text line (17.9dp on the balance row), and a
+  // button that carried the box's 28dp frame itself overhung that group by 5dp
+  // (SPOT-DEFECT: the hub balance row's "Add credits" clipped finding).
+  it('wraps the button in the line-action box', () => {
+    const root = renderLineAction();
+    const wrappers = root.findAllByType('View');
+    expect(wrappers).toHaveLength(1);
+    const wrapper = wrappers[0];
+    // Every token, so the negative margin that cancels the box's extra height
     // cannot be dropped while the height alone still matches.
-    expect(classes).toEqual(expect.arrayContaining(LINE_ACTION_BOX_CLASS.split(' ')));
+    expect(String(wrapper?.props.className).split(' ')).toEqual(
+      expect.arrayContaining(LINE_ACTION_BOX_CLASS.split(' '))
+    );
+    // The box is what the caller lays out; the control fills it.
+    expect(wrapper?.findByType(BUTTON)).toBeDefined();
+  });
+
+  it('fills the box without carrying a frame or margin of its own', () => {
+    const classes = String(renderLineAction().findByType(BUTTON).props.className).split(' ');
+    expect(classes).toContain(`min-h-[${MIN_TAP_TARGET_DP}px]`);
     expect(classes).not.toContain('min-h-[48px]');
+    // A vertical margin here would move the control inside the box instead of
+    // leaving the box to cancel the height.
+    expect(classes.filter(token => token.startsWith('-my-'))).toEqual([]);
   });
 
   it('carries the line-action slop the box needs', () => {

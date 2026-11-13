@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 const draftStorage = new Map<string, unknown>();
+const storageWrites: { rejectNext: boolean; values: unknown[] } = { rejectNext: false, values: [] };
 const storageRead: { deferred?: (() => unknown) | undefined } = {};
 
 // eslint-disable-next-line vitest/prefer-import-in-mock, jest/no-untyped-mock-factory
@@ -11,7 +12,14 @@ vi.mock('#imports', () => ({
       draftStorage.delete(key);
     },
     setItem: (key: string, value: unknown) => {
+      if (storageWrites.rejectNext) {
+        storageWrites.rejectNext = false;
+        return Promise.reject(new Error('quota exceeded'));
+      }
+
+      storageWrites.values.push(value);
       draftStorage.set(key, value);
+      return Promise.resolve();
     },
   },
 }));
@@ -49,7 +57,9 @@ describe('agent draft storage', () => {
     drafts.persistDraft('conversation-1', 'sent text');
     drafts.persistDraft('conversation-1', '');
 
-    expect(draftStorage.get(draftStorageKey)).toStrictEqual({});
+    await vi.waitFor(() => {
+      expect(draftStorage.get(draftStorageKey)).toStrictEqual({});
+    });
   });
 
   it('keeps stored drafts when an edit lands before hydration finishes', async () => {
@@ -87,6 +97,40 @@ describe('agent draft storage', () => {
     expect(draftStorage.has(draftStorageKey)).toBe(false);
     await expect(drafts.hydrateStoredDrafts()).resolves.toStrictEqual({});
     expect(draftStorage.has(draftStorageKey)).toBe(false);
+  });
+
+  it('serializes a burst of edits and ends on the latest draft', async () => {
+    draftStorage.clear();
+    const drafts = await loadDraftStorage();
+    await drafts.hydrateStoredDrafts();
+    storageWrites.values.length = 0;
+
+    drafts.persistDraft('conversation-1', 'a');
+    drafts.persistDraft('conversation-1', 'ab');
+    drafts.persistDraft('conversation-1', 'abc');
+
+    await vi.waitFor(() => {
+      expect(storageWrites.values).toStrictEqual([
+        { 'conversation-1': 'a' },
+        { 'conversation-1': 'abc' },
+      ]);
+    });
+  });
+
+  it('keeps the in-memory draft when the write rejects', async () => {
+    draftStorage.clear();
+    const drafts = await loadDraftStorage();
+    await drafts.hydrateStoredDrafts();
+
+    storageWrites.rejectNext = true;
+    drafts.persistDraft('conversation-1', 'typed');
+
+    await vi.waitFor(() => {
+      expect(storageWrites.rejectNext).toBe(false);
+    });
+    await expect(drafts.hydrateStoredDrafts()).resolves.toStrictEqual({
+      'conversation-1': 'typed',
+    });
   });
 
   it('ignores a read that was in flight when a sign-out cleared the drafts', async () => {

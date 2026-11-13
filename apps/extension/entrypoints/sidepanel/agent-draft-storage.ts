@@ -25,6 +25,38 @@ const getDraftSnapshot = () => {
 
 const writeDrafts = (): Promise<void> => storage.setItem(draftStorageKey, getDraftSnapshot());
 
+let isWriteInFlight = false;
+let hasPendingWrite = false;
+
+/*
+ * At most one write is in flight; an edit that lands while it runs marks the
+ * snapshot dirty and the loop writes the latest one afterwards, so a burst of
+ * keystrokes cannot queue a write per key or finish out of order.
+ */
+const flushDrafts = async (): Promise<void> => {
+  if (isWriteInFlight) {
+    hasPendingWrite = true;
+    return;
+  }
+
+  isWriteInFlight = true;
+
+  try {
+    do {
+      hasPendingWrite = false;
+
+      try {
+        // eslint-disable-next-line no-await-in-loop -- one write at a time is the point; the loop only re-runs when an edit landed mid-write.
+        await writeDrafts();
+      } catch {
+        // A rejected write must not escape as an unhandled rejection: the in-memory draft stays authoritative and the next write retries the latest snapshot.
+      }
+    } while (hasPendingWrite);
+  } finally {
+    isWriteInFlight = false;
+  }
+};
+
 export const hydrateStoredDrafts = async (): Promise<Record<string, string>> => {
   if (!isHydrated) {
     const generation = hydrateGeneration;
@@ -42,7 +74,7 @@ export const hydrateStoredDrafts = async (): Promise<Record<string, string>> => 
   const snapshot = getDraftSnapshot();
 
   if (localWrites.size > 0) {
-    await writeDrafts();
+    await flushDrafts();
   }
 
   return snapshot;
@@ -52,7 +84,7 @@ export const persistDraft = (conversationId: string, text: string): void => {
   localWrites.set(conversationId, text === '' ? undefined : text);
 
   if (isHydrated) {
-    void writeDrafts();
+    void flushDrafts();
   }
 };
 
@@ -64,6 +96,7 @@ export const persistDraft = (conversationId: string, text: string): void => {
  */
 export const clearStoredDrafts = async (): Promise<void> => {
   hydrateGeneration += 1;
+  hasPendingWrite = false;
   storedDrafts = {};
   localWrites.clear();
   // The empty state is authoritative; a hydrate must not read the old map back.

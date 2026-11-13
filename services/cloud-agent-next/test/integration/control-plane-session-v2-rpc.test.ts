@@ -1191,9 +1191,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     expect(siblingStored?.sandboxId).toBe(siblingSandboxId);
 
     await expect(
-      siblingStub.registerSessionFromMetadata(
-        registerInput({ sandboxId: siblingOtherSandboxId })
-      )
+      siblingStub.registerSessionFromMetadata(registerInput({ sandboxId: siblingOtherSandboxId }))
     ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
     await expect(
       siblingStub.registerSessionFromMetadata(

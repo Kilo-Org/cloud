@@ -57,6 +57,7 @@ import { RuntimeErrorScreen } from '@/components/runtime-error-screen';
 import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { MotionProvider } from '@/lib/a11y/motion';
+import { isAppLandingSegments } from '@/lib/agent-attachments/picker-launch-restore';
 import { useAuth } from '@/lib/auth/auth-context';
 import { resolveBootstrapDecision, shouldShowBootstrapLoading } from '@/lib/bootstrap-decision';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
@@ -106,6 +107,7 @@ import {
   captureLaunchDeepLink,
   clearPendingDeepLink,
   consumePendingDeepLink,
+  getPendingDeepLinkArrival,
   getPendingDeepLinkSnapshot,
   subscribeToPendingDeepLink,
   wasLaunchAppRouteCaptured,
@@ -127,6 +129,10 @@ import { restorePersistedCacheOnColdStart } from '@/lib/persist/read-cache';
 import { queryClient } from '@/lib/query-client';
 import { useTRPC } from '@/lib/trpc';
 import { readNotificationPreviewsIfLoaded } from '@/lib/hooks/agent-push-preference';
+import {
+  isSessionDestinationHref,
+  shouldDeliverPendingDeepLink,
+} from '@/lib/pending-deep-link-delivery';
 import { resolvePendingNavigation } from '@/lib/pending-navigation';
 import {
   isShellReadyForShare,
@@ -1061,8 +1067,26 @@ function RootLayoutNav({
     if (pendingDeepLink === null || !isShellReady || !navigationReady) {
       return;
     }
+    // The arrival rides in the slot the consume below clears, so it is read
+    // first.
+    const pendingArrival = getPendingDeepLinkArrival();
     const pending = consumePendingDeepLink();
     if (!pending) {
+      return;
+    }
+    // A destination the app recovered for itself (a replayed launch Intent, or
+    // a record an earlier process persisted) is stale by construction and must
+    // not open over a screen the person has since reached. The consume above
+    // already cleared the slot and its persisted mirror, so a dropped
+    // destination cannot come back on a later launch.
+    if (
+      !shouldDeliverPendingDeepLink({
+        arrival: pendingArrival,
+        href: pending.href,
+        atLandingRoute: isAppLandingSegments(segments),
+        pathname,
+      })
+    ) {
       return;
     }
     // Switch to the destination's organization before navigating, in the same
@@ -1075,9 +1099,23 @@ function RootLayoutNav({
     }
     const navigation = resolvePendingNavigation(pending.href);
     if (navigation) {
+      // An automatically recovered session the server no longer has must leave
+      // instead of holding a dead end, the same mark the relaunch repair sets
+      // for its restore. Only the session route takes that mark.
+      if (pendingArrival === 'restored' && isSessionDestinationHref(pending.href)) {
+        noteRestoredRouteOpen(pending.href);
+      }
       router.navigate(navigation.href as Href, { withAnchor: navigation.withAnchor });
     }
-  }, [pendingDeepLink, isShellReady, navigationReady, router, setOrganizationId]);
+  }, [
+    pendingDeepLink,
+    isShellReady,
+    navigationReady,
+    router,
+    setOrganizationId,
+    segments,
+    pathname,
+  ]);
 
   useEffect(() => {
     if (pendingShareId === null || !isShellReady || !navigationReady) {

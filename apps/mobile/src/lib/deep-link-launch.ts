@@ -18,6 +18,16 @@ type DeepLinkSource = PendingDeepLinkRecord['source'];
 
 type GetLinkingURL = () => string | null;
 
+/**
+ * How a pending destination arrived. `'live'` is a choice the person made while
+ * this process ran: a link tap, a notification tap, a launcher shortcut, an
+ * action URL. `'restored'` is a destination the app recovered for itself — the
+ * OS replaying the launch Intent, or a record an earlier process persisted — so
+ * nobody asked for it in this process. The layout reads it back through
+ * `getPendingDeepLinkArrival` before navigating.
+ */
+export type PendingDeepLinkArrival = 'live' | 'restored';
+
 /** Per-capture flags the precedence and account rules read back. */
 export type PendingDeepLinkOptions = {
   /** Only the cold-launch capture sets this; see the module flag below. */
@@ -35,6 +45,12 @@ export type PendingDeepLinkOptions = {
    * destination carries no organization: Personal, or a source that has none.
    */
   organizationId?: string | null;
+  /**
+   * How the destination arrived. Omitted means `'live'`: every source that does
+   * not set it fires only for a gesture someone just made. The cold-launch
+   * capture and the durable restore set `'restored'`.
+   */
+  arrival?: PendingDeepLinkArrival;
 };
 
 /** Minimal SecureStore surface used by the durable mirror. */
@@ -94,6 +110,12 @@ let pendingDeepLinkUserId: string | null = null;
 // `pendingDeepLinkUserId`: it rides with the pending slot and never switches
 // anything on its own.
 let pendingDeepLinkOrganizationId: string | null = null;
+
+// How the CURRENT in-memory slot's destination arrived. A restored destination
+// was not chosen in this process — the OS replayed the launch Intent, or the
+// durable record was written by an earlier process — so the layout checks where
+// the person is before opening it. A live one is always delivered.
+let pendingArrival: PendingDeepLinkArrival = 'live';
 
 // Whether an account identity is known yet. A cold launch captures a
 // system-search tap at module scope, before auth restores, so `currentDeepLinkUserId`
@@ -282,6 +304,7 @@ function applyPendingDeepLink(
   pendingUniversalLinkFromLaunch = options?.fromLaunchAppScheme === true;
   pendingDeepLinkSessionBound = source === 'system-search' || options?.sessionBound === true;
   pendingDeepLinkOrganizationId = options?.organizationId ?? null;
+  pendingArrival = options?.arrival ?? 'live';
   pendingDeepLinkEpoch += 1;
   persistPendingDeepLink(href, source);
   notifyPendingDeepLinkListeners();
@@ -333,6 +356,7 @@ export function clearPendingDeepLink(): void {
   pendingUniversalLinkFromLaunch = false;
   pendingDeepLinkSessionBound = false;
   pendingDeepLinkOrganizationId = null;
+  pendingArrival = 'live';
   deferredSystemSearchHref = null;
   pendingDeepLinkEpoch += 1;
   deletePersistedPendingDeepLink();
@@ -362,6 +386,14 @@ export function clearAccountBoundPendingDeepLink(): void {
 /** Current pending href without clearing. For `useSyncExternalStore`. */
 export function getPendingDeepLinkSnapshot(): string | null {
   return pendingDeepLink;
+}
+
+/**
+ * How the pending destination arrived. Read before `consumePendingDeepLink`,
+ * which clears the slot the arrival rides in.
+ */
+export function getPendingDeepLinkArrival(): PendingDeepLinkArrival {
+  return pendingArrival;
 }
 
 /** Subscribe to pending-slot changes. Returns an unsubscribe function. */
@@ -428,7 +460,13 @@ export async function restorePersistedPendingDeepLink(): Promise<void> {
   }
 
   const { href, source, sessionBound, organizationId } = record;
-  setPendingDeepLink(currentRouteHref(href), source, { sessionBound, organizationId });
+  setPendingDeepLink(currentRouteHref(href), source, {
+    sessionBound,
+    organizationId,
+    // The record was written by an earlier process: a recovery, not a choice
+    // someone made in this one.
+    arrival: 'restored',
+  });
 }
 
 async function readPersistedPendingDeepLink(): Promise<string | null> {
@@ -508,6 +546,9 @@ export function captureLaunchDeepLink(): void {
     setPendingDeepLink(launchCapturedHref, 'universal-link', {
       fromLaunchAppScheme: url.startsWith(APP_SCHEME),
       sessionBound: isSystemSearchFamilyLink(url),
+      // The OS launched this process with the URL: a replayed Intent, not a
+      // gesture someone made in this process.
+      arrival: 'restored',
     });
     return;
   }
@@ -519,6 +560,9 @@ export function captureLaunchDeepLink(): void {
     launchCapturedAppRoute = true;
     setPendingDeepLink(appRoute, 'universal-link', {
       fromLaunchAppScheme: url.startsWith(APP_SCHEME),
+      // Same as the resume capture: a launch URL is the OS replaying the
+      // Intent, not a screen chosen in this process.
+      arrival: 'restored',
     });
   }
 }
@@ -546,6 +590,7 @@ export function _resetDeepLinkLaunchForTests(): void {
   pendingUniversalLinkFromLaunch = false;
   pendingDeepLinkSessionBound = false;
   pendingDeepLinkOrganizationId = null;
+  pendingArrival = 'live';
   launchCapturedHref = null;
   launchCapturedAppRoute = false;
   getLinkingURLForTests = null;

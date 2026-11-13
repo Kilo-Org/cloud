@@ -60,9 +60,13 @@ export const ClaudeBillingPayerStateSchema = z.object({
   status: z.enum(ClaudeBillingConnectionStatus),
   user_profile_id: z.string().min(1),
   connected_at: z.iso.datetime().nullable(),
-  /** The person the row belongs to; absent from the previous web app release. */
+  /**
+   * The person the row belongs to, null for a row that belongs to an
+   * organization. Every web app release since #10300 answers with it, and the
+   * cross-region read binds a personal or member row by it.
+   */
   kilo_user_id: z.string().nullable().optional(),
-  /** The person who linked it last; absent from the previous web app release. */
+  /** The person who linked it last; every release since #10300 answers with it. */
   created_by: z.string().min(1).optional(),
 });
 export type ClaudeBillingPayerState = z.infer<typeof ClaudeBillingPayerStateSchema>;

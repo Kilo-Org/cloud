@@ -381,11 +381,21 @@ describe('SessionContextMetrics', () => {
     };
 
     // Settled empty chat, and a transcript that reported nothing yet.
-    expectBare(render({ info: undefined, totalCostMicrodollars: null, hasMessages: false, onPress }));
-    expectBare(render({ info: undefined, totalCostMicrodollars: null, hasMessages: true, onPress }));
+    expectBare(
+      render({ info: undefined, totalCostMicrodollars: null, hasMessages: false, onPress })
+    );
+    expectBare(
+      render({ info: undefined, totalCostMicrodollars: null, hasMessages: true, onPress })
+    );
     // The resolving open paints its bar, so it keeps the capsule.
     expectCapsule(
-      render({ info: undefined, totalCostMicrodollars: null, hasMessages: false, loading: true, onPress })
+      render({
+        info: undefined,
+        totalCostMicrodollars: null,
+        hasMessages: false,
+        loading: true,
+        onPress,
+      })
     );
     // Any reading wears the capsule.
     expectCapsule(

@@ -317,6 +317,16 @@ test('rejects the English live-session empty state in a translated catalog', () 
   assert.match(found.join('\n'), /mobile\/ru: "home\.noLiveSessions" must be translated/);
 });
 
+test('accepts a translated live-session empty state', () => {
+  const english = { home: { noLiveSessions: 'Nothing running right now' } };
+  const found = run({
+    english,
+    translated: { home: { noLiveSessions: 'Сейчас ничего не запущено' } },
+    source: "t('home.noLiveSessions');",
+  });
+  assert.deepEqual(found, []);
+});
+
 test('rejects an empty translated value', () => {
   const found = run({
     translated: { agents: { ...TRANSLATED.agents, title: '' } },

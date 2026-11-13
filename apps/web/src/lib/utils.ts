@@ -159,7 +159,6 @@ export async function parseResultJsonWithZodSchema<T>(
         errorMessage = errorData.error;
       }
     } catch (_jsonError) {
-      //console.log('Failed to parse error response as JSON:', jsonError);
       // Keep the default error message if JSON parsing fails
     }
 
@@ -214,7 +213,7 @@ export function formatPaymentMethodDescription(info: PaymentMethodInfo): string 
     return 'Stripe Link';
   }
   if (info.type === 'card' && info.last4) {
-    const brand = info.brand ? info.brand.charAt(0).toUpperCase() + info.brand.slice(1) : 'Card';
+    const brand = info.brand ? capitalize(info.brand) : 'Card';
     return `${brand} ending in ${info.last4}`;
   }
   return '';

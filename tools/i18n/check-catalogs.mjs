@@ -14,7 +14,7 @@
  * Usage: node tools/i18n/check-catalogs.mjs
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join, relative as relativePath, sep } from 'node:path';
+import { join, relative as relativePath } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
@@ -26,7 +26,7 @@ import {
   walk,
 } from '../lib/ast.mjs';
 import { countPlaceholderBases, flattenCatalog, pluralParts } from '../lib/catalogs.mjs';
-import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
+import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -577,14 +577,15 @@ function holdsLabel(values, run) {
 function scanSource(root) {
   const called = new Set();
   const referenced = new Set();
-  for (const file of sourceFiles(join(root, 'apps/mobile/src'), isTestArtifact)) {
-    const text = readFileSync(file, 'utf8');
-    const { program, errors } = parseSourceFile(file, text);
+  for (const { file, program, problems: unparsed } of parseSourceTree(
+    join(root, 'apps/mobile/src'),
+    root,
+    isTestArtifact
+  )) {
     // A file the parser refused has an empty tree, so its keys would leave
     // both sets without a word. `check:i18n` runs oxlint first, so this
     // normally reports nothing.
-    const path = relativePath(root, file).split(sep).join('/');
-    for (const problem of parseProblems(path, errors, lineIndex(text))) {
+    for (const problem of unparsed) {
       fail(problem);
     }
     walk(program, node => {

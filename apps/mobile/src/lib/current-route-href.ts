@@ -1,8 +1,10 @@
-// Persisted navigation survives app upgrades; these retired route groups must still resolve.
+// Persisted navigation survives app upgrades; these retired route groups must still resolve, each
+// pair naming the retired path first and the path the screen has now second.
 const MOVED_ROUTE_PREFIXES: readonly (readonly [string, string])[] = [
   ['/(app)/(tabs)/(3_profile)/code-reviewer', '/(app)/code-reviewer'],
   ['/(app)/(tabs)/(3_profile)/security-agent', '/(app)/security-agent'],
   ['/(app)/(tabs)/(3_profile)/notifications', '/(app)/notifications'],
+  ['/(app)/device-sessions', '/(app)/(tabs)/(3_profile)/device-sessions'],
 ];
 
 export function currentRouteHref(href: string): string {

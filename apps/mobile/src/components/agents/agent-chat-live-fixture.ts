@@ -33,6 +33,7 @@ import {
   type WorktreeChangesRefresh,
 } from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
+import { type SessionStatus } from '@kilocode/cloud-agent-sdk/schemas';
 import { cloudAgentId } from '@kilocode/cloud-agent-sdk/test-helpers';
 
 import { AGENT_CHAT_FIXTURE_SESSION_ID } from './agent-chat-fixture-session';
@@ -311,6 +312,9 @@ export function createAgentChatFixtureManager(
       totalCost: atom(0.0012),
       contextUsage: atom<ContextUsage | undefined>(undefined),
       childMessages: fixed<(childSessionId: string) => StoredMessage[]>(() => []),
+      childSessionStatus: fixed<(childSessionId: string) => SessionStatus | undefined>(
+        () => undefined
+      ),
       childSessionHydrationState: fixed<(childSessionId: string) => ChildSessionHydrationState>(
         () => ({ status: 'idle' })
       ),

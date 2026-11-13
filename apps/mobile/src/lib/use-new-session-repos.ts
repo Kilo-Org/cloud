@@ -43,6 +43,16 @@ type UseNewSessionReposResult = {
   isRetrying: boolean;
   /** True once every provider query has settled without error and at least one repo is visible. */
   reposSettled: boolean;
+  /**
+   * True once every provider query has finished its first load.
+   *
+   * `isLoading` is false for a query that is paused or disabled, so a screen
+   * that is offline (or a personal scope, where the Bitbucket query is
+   * disabled) still settles and never withholds the form's rows. This
+   * deliberately does not read `resolveProviderStatus`, which reports
+   * `'loading'` whenever a paused query has no data.
+   */
+  providerQueriesResolved: boolean;
   openIntegration: (platform: RepositoryPlatform) => void;
   /**
    * The provider whose connect flow is running, or null. A control that opens
@@ -415,6 +425,9 @@ export function useNewSessionRepos({
     isRefreshingGitHub ||
     isRefreshingProviders;
 
+  const providerQueriesResolved =
+    !githubQuery.isLoading && !gitlabQuery.isLoading && !bitbucketQuery.isLoading;
+
   const reposSettled =
     !githubQuery.isLoading &&
     !gitlabQuery.isLoading &&
@@ -430,6 +443,7 @@ export function useNewSessionRepos({
     groups,
     isRetrying,
     reposSettled,
+    providerQueriesResolved,
     openIntegration,
     connectingProvider,
     refreshReposForceFresh,

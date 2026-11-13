@@ -31,7 +31,6 @@ vi.mock('@/components/ui/icons', () => ({
   Globe: 'Globe',
   KeyRound: 'KeyRound',
   Lock: 'Lock',
-  LogOut: 'LogOut',
   Shield: 'Shield',
   Smartphone: 'Smartphone',
   UserRound: 'UserRound',
@@ -41,6 +40,7 @@ vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' })
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));
 vi.mock('@/lib/auth/push-registration-reconciliation', () => ({
   attemptPushRegistrationReconciliation: vi.fn(),
 }));
@@ -155,7 +155,7 @@ describe('AccountSettingsScreen', () => {
     act(() => {
       (findConfigureRow(renderer, 'Device sessions').props.onPress as () => void)();
     });
-    expect(push).toHaveBeenCalledWith('/(app)/device-sessions');
+    expect(push).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/device-sessions');
   });
 
   it('opens the account surfaces the web already had', async () => {

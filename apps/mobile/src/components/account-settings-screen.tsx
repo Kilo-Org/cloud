@@ -7,7 +7,6 @@ import {
   Globe,
   KeyRound,
   Lock,
-  LogOut,
   Shield,
   Smartphone,
   UserRound,
@@ -21,6 +20,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { DirectionalLogOut } from '@/components/ui/directional-icons';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { attemptPushRegistrationReconciliation } from '@/lib/auth/push-registration-reconciliation';
@@ -171,11 +171,11 @@ export function AccountSettingsScreen() {
           subtitle={t('profile.deviceSessionsSubtitle')}
           className={rowClassName}
           onPress={() => {
-            router.push('/(app)/device-sessions' as Href);
+            router.push('/(app)/(tabs)/(3_profile)/device-sessions' as Href);
           }}
         />
         <ConfigureRow
-          icon={LogOut}
+          icon={DirectionalLogOut}
           title={t('profile.signOutWeb.title')}
           subtitle={t('profile.signOutWeb.rowSubtitle')}
           tone="danger"

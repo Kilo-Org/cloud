@@ -450,32 +450,21 @@
       }
     },
     {
-      // The one exemption list for `no-restricted-imports`: every sanctioned
-      // home of a banned import, plus every test location, in one override.
-      // Add a new single-home module here rather than in another entry.
+      // The sanctioned single-home modules for `no-restricted-imports`.
+      // Add a new single-home module to this list rather than to another entry.
       //   sheet.tsx  — the single home of `@expo/ui` BottomSheet
       //   dialog.tsx — the single home of `@rn-primitives/dialog`
       //   keep-awake.ts — the single home of `expo-keep-awake`
       //   switch.tsx — the single home of `react-native` Switch
       //   image.tsx — the single home of `react-native` Image and `expo-image`
       //   icons.ts — the single home of `lucide-react-native`
-      // Test files mock `react-native` and the native libraries directly, so
-      // they are exempt permanently, in every test location the test override
-      // below covers. No file imports `Modal` from `react-native` any more, and
-      // no exception exists for it: see apps/mobile/AGENTS.md.
       "files": [
         "src/components/ui/sheet.tsx",
         "src/components/ui/dialog.tsx",
         "src/lib/keep-awake.ts",
         "src/components/ui/switch.tsx",
         "src/components/ui/image.tsx",
-        "src/components/ui/icons.ts",
-        "**/*.test.ts",
-        "**/*.test.tsx",
-        "**/__tests__/**",
-        "**/*test-utils*",
-        "**/*test-helpers*",
-        "src/test/**"
+        "src/components/ui/icons.ts"
       ],
       "rules": {
         "no-restricted-imports": "off"
@@ -500,6 +489,16 @@
       }
     },
     {
+      // The one place that lists every test location, and the one override
+      // that holds every test-only rule exemption: add a new test location
+      // here only. A test file mocks `react-native` and the native libraries
+      // directly, so it is permanently exempt from the import bans.
+      // `check:i18n` lints this tree too, with .oxlintrc.i18n.json, whose own
+      // narrower test-location list still reports `no-literal-copy` in
+      // `**/*test-helpers*`, `**/*test-utils*` and `src/test/**`. A literal
+      // copy string in one of those files needs a directive for that run.
+      // No file imports `Modal` from `react-native` any more, and no exception
+      // exists for it: see apps/mobile/AGENTS.md.
       "files": [
         "**/*.test.ts",
         "**/*.test.tsx",
@@ -516,7 +515,9 @@
         "anti-slop/no-reflect-get": "off",
         "anti-slop/no-runtime-typeof": "off",
         "anti-slop/no-unknown-returns": "off",
+        "no-literal-copy/no-literal-copy": "off",
         "no-restricted-globals": "off",
+        "no-restricted-imports": "off",
         "zod-utils/no-inline-zod-schema": "off"
       }
     },
@@ -541,12 +542,6 @@
       "files": ["src/i18n/index.ts"],
       "rules": {
         "promise/prefer-await-to-callbacks": "off"
-      }
-    },
-    {
-      "files": ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**"],
-      "rules": {
-        "no-literal-copy/no-literal-copy": "off"
       }
     }
   ]

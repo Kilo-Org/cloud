@@ -19,6 +19,8 @@ type SessionRecord = {
   title: string | null;
   organizationId: string | null;
   prUrl: string | null;
+  status?: string | null;
+  statusUpdatedAt?: string | Date | null;
 };
 
 const ALL_ON: UserNotificationPreferences = {
@@ -910,6 +912,109 @@ describe('attention raise detail on push data', () => {
       cliSessionId: 'ses_1',
       category: 'status',
     });
+  });
+});
+
+describe('raise identity on push data', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockDispatchPush.mockResolvedValue({ kind: 'delivered', tokenCount: 1 });
+  });
+
+  it('names the waiting raise on an attention push so the app answers that raise', async () => {
+    const deps = createDeps({
+      session: { status: 'permission', statusUpdatedAt: '2026-09-18 21:00:00+00' },
+    });
+
+    await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'attention:raise',
+        status: 'completed',
+        body: 'Kilo needs your input.',
+        category: 'attention',
+        attentionKind: 'permission',
+      },
+      deps
+    );
+
+    const call = mockDispatchPush.mock.calls[0]?.[0] as DispatchPushInput;
+    expect(call.push.data).toEqual({
+      type: 'cloud_agent_session',
+      cliSessionId: 'ses_1',
+      category: 'attention',
+      attentionKind: 'permission',
+      raiseId: '2026-09-18T21:00:00.000Z',
+    });
+    expect(pushDataSchema.safeParse(call.push.data).success).toBe(true);
+  });
+
+  it('omits the raise identity on a status push and on a session that is not waiting', async () => {
+    const waitingDeps = createDeps({
+      session: { status: 'permission', statusUpdatedAt: '2026-09-18 21:00:00+00' },
+    });
+    await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'exec_status_raise',
+        status: 'completed',
+        body: 'Done',
+        category: 'status',
+      },
+      waitingDeps
+    );
+    const statusCall = mockDispatchPush.mock.calls[0]?.[0] as DispatchPushInput;
+    expect(statusCall.push.data).toEqual({
+      type: 'cloud_agent_session',
+      cliSessionId: 'ses_1',
+      category: 'status',
+    });
+
+    mockDispatchPush.mockClear();
+    const idleDeps = createDeps({
+      session: { status: 'idle', statusUpdatedAt: '2026-09-18 21:00:00+00' },
+    });
+    await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'attention:idle',
+        status: 'completed',
+        body: 'Kilo needs your input.',
+        category: 'attention',
+        attentionKind: 'question',
+      },
+      idleDeps
+    );
+    const idleCall = mockDispatchPush.mock.calls[0]?.[0] as DispatchPushInput;
+    expect(idleCall.push.data).toEqual({
+      type: 'cloud_agent_session',
+      cliSessionId: 'ses_1',
+      category: 'attention',
+      attentionKind: 'question',
+    });
+  });
+
+  it('omits the raise identity when a waiting row carries no status time', async () => {
+    const deps = createDeps({ session: { status: 'question', statusUpdatedAt: null } });
+
+    await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'attention:no_time',
+        status: 'completed',
+        body: 'Kilo needs your input.',
+        category: 'attention',
+        attentionKind: 'question',
+      },
+      deps
+    );
+
+    const call = mockDispatchPush.mock.calls[0]?.[0] as DispatchPushInput;
+    expect(Object.keys(call.push.data)).not.toContain('raiseId');
   });
 });
 

@@ -132,6 +132,7 @@ export function NewSessionConfigureForm({
   autoFocusPrompt = true,
   groups,
   isRetrying,
+  repositoryRegionSettled,
   onChangeRepo,
   onConnectProvider,
   connectingProvider = null,
@@ -358,6 +359,7 @@ export function NewSessionConfigureForm({
           disabled={isCreating}
           groups={groups}
           isRetrying={isRetrying}
+          settled={repositoryRegionSettled}
           onChange={onChangeRepo}
           onConnect={onConnectProvider}
           connectingProvider={connectingProvider}
@@ -370,7 +372,13 @@ export function NewSessionConfigureForm({
         />
       ) : null}
 
-      {!isRemote && !isCloneEntry ? (
+      {/*
+        Everything below the repository section waits for that section's final
+        height. A connect card's height is data-dependent, so painting these
+        rows first and letting the cards arrive above them would push the rows
+        (and the rest of the form) down after it has settled.
+      */}
+      {!isRemote && !isCloneEntry && repositoryRegionSettled ? (
         <View className="mt-5">
           <Text className="mb-2 text-sm font-medium text-muted-foreground">
             {t('common.changes')}
@@ -389,7 +397,7 @@ export function NewSessionConfigureForm({
         </View>
       ) : null}
 
-      {!isRemote && !isCloneEntry ? (
+      {!isRemote && !isCloneEntry && repositoryRegionSettled ? (
         <NewSessionProfileRow
           profile={profile}
           isProfileLoading={isProfileLoading}
@@ -406,7 +414,7 @@ export function NewSessionConfigureForm({
         // both the profile pick and the manual env/command draft are the
         // session's own state, so one submitted create carries them all.
       }
-      {!isRemote && !isCloneEntry ? (
+      {!isRemote && !isCloneEntry && repositoryRegionSettled ? (
         <AdvancedConfigPanel
           organizationId={organizationId}
           selectedProfileId={selectedProfileId}

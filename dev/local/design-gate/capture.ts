@@ -158,6 +158,14 @@ export function loadingPlaceholder(tree: LayoutTree): boolean {
   });
 }
 
+/** One sampling window, sized for the settle it spans. */
+function startSampling(ctx: { probe: Pick<ProbeClient, 'startSampling'>; observeMs: number }) {
+  return ctx.probe.startSampling(
+    IN_APP_SAMPLE_INTERVAL_MS,
+    ctx.observeMs + IN_APP_SAMPLING_SLACK_MS + 2 * LOADING_SETTLE_TIMEOUT_MS
+  );
+}
+
 export async function sampleUntilSettled(
   probe: Pick<ProbeClient, 'dump'>,
   clock: Clock,
@@ -451,7 +459,6 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     screenTexts(dump) !== beforeTexts ||
     (dump.env.screen !== undefined && dump.env.screen !== beforeScreen) ||
     (beforeRoute === linkRoute && dump.env.route.split('?')[0] === linkRoute);
-
   await ctx.probe.openLink(target.link);
   // A cold screen paints its own loading placeholder and holds it still, so a
   // settle loop would measure the placeholder. Wait for it to clear first, and
@@ -482,9 +489,12 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
   let unopened: string | undefined;
   if (!opened(settled.dump)) {
     ctx.log(`design-gate: ${target.id} did not change the screen; opening the link again`);
+    // The retry opens the same cold screen, so it gets the same wait, and the
+    // timeline is restarted after it for the same reason as above.
+    await ctx.probe.stopSampling();
     await ctx.probe.openLink(target.link);
-    // The retry opens the same cold screen, so it gets the same wait.
     await waitForPlaceholder();
+    await startSampling(ctx);
     settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
     if (!opened(settled.dump)) unopened = await ctx.probe.lastOutcome();
   }

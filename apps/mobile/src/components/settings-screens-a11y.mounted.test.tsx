@@ -77,7 +77,6 @@ vi.mock('@/components/ui/icons', () => ({
   History: 'History',
   KeyRound: 'KeyRound',
   Lock: 'Lock',
-  LogOut: 'LogOut',
   Mic: 'Mic',
   Shield: 'Shield',
   SlidersHorizontal: 'SlidersHorizontal',
@@ -89,6 +88,7 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronLeft: 'DirectionalChevronLeft',
   DirectionalChevronRight: 'DirectionalChevronRight',
+  DirectionalLogOut: 'DirectionalLogOut',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 // The appearance control is mounted for real below, so its selection haptic is

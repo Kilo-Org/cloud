@@ -116,17 +116,18 @@ describe('modal dialog focus and dismissal', () => {
     expect(document.activeElement).toBe(opener);
   });
 
-  it('leaves Escape to an open native select inside the dialog', () => {
+  it('closes from a focused closed select inside the dialog', () => {
     const onClose = vi.fn();
     render(<DialogHarness onClose={onClose} withSelect />);
     fireEvent.click(screen.getByRole('button', { name: 'Open settings' }));
 
-    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Credit account' }), {
-      key: 'Escape',
-    });
+    const select = screen.getByRole('combobox', { name: 'Credit account' });
+    select.focus();
+    fireEvent.keyDown(select, { key: 'Escape' });
 
-    expect(onClose).not.toHaveBeenCalled();
-    expect(screen.queryByRole('dialog')).not.toBeNull();
+    // eslint-disable-next-line vitest/prefer-called-times -- vitest/prefer-called-once is also enabled and prefers the singular matcher.
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('leaves Escape to a control that already handled it', () => {
@@ -168,14 +169,14 @@ describe('escape dismissal', () => {
     expect(screen.getByRole('button', { name: 'Dismissed 1' })).toBeDefined();
   });
 
-  it('leaves Escape to an open native select', () => {
+  it('dismisses from a focused closed select', () => {
     render(<EscapeHarness enabled />);
 
-    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Native picker' }), {
-      key: 'Escape',
-    });
+    const select = screen.getByRole('combobox', { name: 'Native picker' });
+    select.focus();
+    fireEvent.keyDown(select, { key: 'Escape' });
 
-    expect(screen.getByRole('button', { name: 'Dismissed 0' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Dismissed 1' })).toBeDefined();
   });
 });
 

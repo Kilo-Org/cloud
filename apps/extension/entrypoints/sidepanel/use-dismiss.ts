@@ -25,9 +25,10 @@ const useLatestRef = <TValue>(value: TValue): RefObject<TValue> => {
 };
 
 /*
- * Escape belongs to an open native `<select>` popup and to any control that
- * already handled the key itself; treating it as a dismissal of the surface
- * behind that control would discard what the user was editing.
+ * A control that already handled Escape has called `preventDefault`, and the
+ * surface behind it must not dismiss as well. A native `<select>` needs no
+ * guard of its own: the browser keeps keys for an open popup, so a focused
+ * select still lets Escape reach the dialog.
  */
 export const useEscapeKey = (enabled: boolean, onEscape: () => void): void => {
   const onEscapeRef = useLatestRef(onEscape);
@@ -38,11 +39,7 @@ export const useEscapeKey = (enabled: boolean, onEscape: () => void): void => {
     }
 
     const handleKeyDown = (event: KeyboardEvent): void => {
-      if (
-        event.key !== 'Escape' ||
-        event.defaultPrevented ||
-        event.target instanceof HTMLSelectElement
-      ) {
+      if (event.key !== 'Escape' || event.defaultPrevented) {
         return;
       }
 
@@ -130,8 +127,7 @@ export const useModalDialog = ({
 
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
-        // Same key ownership as useEscapeKey: a select popup or an inner handler keeps it.
-        if (!event.defaultPrevented && !(event.target instanceof HTMLSelectElement)) {
+        if (!event.defaultPrevented) {
           event.preventDefault();
           onCloseRef.current();
         }

@@ -287,6 +287,44 @@ test('leading-gap: a body inside this scroller still reports its own pushed-down
   assert.match(finding?.message ?? '', /top margin/);
 });
 
+test('leading-gap: a nested list the rule does not measure never takes the ink', () => {
+  // A platform dump reports both axes for a list class it cannot classify (a
+  // FlashList's RecyclerView), so the rule never measures it. The wrapper must
+  // keep reporting the gap instead of handing the ink to a scroller that is
+  // skipped.
+  const nodes = nestedScrollerScreen({ text: [39.62, 528.38, 332.19, 17.52] });
+  nodes[3] = {
+    parent: 3,
+    tag: 'RecyclerView',
+    rect: [0, 136.76, 411.43, 777.52],
+    scrollAxes: { x: true, y: true },
+  } as ProbeNode;
+  const findings = checkScreen(tree(nodes, MEASURED_WINDOW)).filter(
+    found => found.rule === 'leading-gap'
+  );
+  assert.equal(findings.length, 1);
+  assert.match(findings[0]?.message ?? '', /ScrollView/);
+});
+
+test('leading-gap: a first block that is itself a scroller keeps its own margin measured', () => {
+  // The handoff covers ink a block holds below itself, not a block that is the
+  // scroller: the inner scroller's own content starts at its top, so nothing
+  // would report a body that pushed the whole scroller down.
+  const nodes: ProbeNode[] = [
+    { parent: 0, tag: 'ScrollView', rect: [0, 0, 411.43, 914.29] },
+    { parent: 1, tag: 'ViewGroup', rect: [0, 0, 411.43, 1200] },
+    { parent: 2, tag: 'ScrollView', rect: [0, 100, 411.43, 700] },
+    { parent: 3, tag: 'ViewGroup', rect: [0, 100, 411.43, 700] },
+    { parent: 4, tag: 'Paragraph', rect: [14, 100, 200, 20], text: 'Pinned body' },
+  ];
+  const findings = checkScreen(tree(nodes, MEASURED_WINDOW)).filter(
+    found => found.rule === 'leading-gap'
+  );
+  assert.equal(findings.length, 1);
+  assert.equal(Math.round((findings[0]?.measured ?? 0) * 10) / 10, 100);
+  assert.match(findings[0]?.message ?? '', /top margin/);
+});
+
 test('leading-gap: a tab body inside the tab scroller is not the wrapper gap', () => {
   // The reported Home tab shape at 472 dp: the wrapper's first ink is the live
   // section's paragraph, placed by the tab scroller's centred body. The measured

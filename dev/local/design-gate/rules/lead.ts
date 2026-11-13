@@ -61,10 +61,20 @@ function oneSidedBox(ink: LayoutNode, block: LayoutNode): LayoutNode | undefined
  * padding has nothing to do with how far down that ink sits, and a gap it reads
  * is the inner body's placement. The inner scroller is measured on its own, so
  * this rule leaves the ink to it.
+ *
+ * Only a scroller this rule measures receives the handoff: the axis test is the
+ * one `checkLeadingGap` makes, so a horizontal or unclassified list (a platform
+ * dump reports both axes for a class it cannot classify) never takes the ink
+ * away from a scroller that would have reported it.
+ *
+ * The walk stops at the first block, so a body whose own first block is a
+ * scroller keeps its margin measured here; the handoff covers ink the block
+ * holds below itself.
  */
-function placedByNestedScroller(ink: LayoutNode, scroll: LayoutNode): boolean {
+function placedByNestedScroller(ink: LayoutNode, block: LayoutNode, scroll: LayoutNode): boolean {
   for (let box = ink.parent; box && box !== scroll; box = box.parent) {
-    if (box.scroll.y) return true;
+    if (box === block) return false;
+    if (box.scroll.y && !box.scroll.x) return true;
   }
   return false;
 }
@@ -178,7 +188,7 @@ export function checkLeadingGap(tree: LayoutTree): Finding[] {
     if (!block) continue;
     const ink = topInk(block);
     if (!ink) continue;
-    if (placedByNestedScroller(ink, scroll)) continue;
+    if (placedByNestedScroller(ink, block, scroll)) continue;
     const start = contentBox(content, tree.env.isRTL, layoutRect(content))[1];
     const margin = layoutRect(block)[1] - start;
     const holder = margin > LEADING_GAP_MAX_DP ? undefined : oneSidedBox(ink, block);

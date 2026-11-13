@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- one mounted suite covers both scopes: the role-gated row actions, the member hint, and the header subtitle */
+/* eslint-disable max-lines -- one mounted suite covers both scopes: the role-gated row actions, the role notes, and the header subtitle */
 // The integrations hub serves both scopes: the personal one shows every
 // connection the account owns, and the organization one hides the actions the
 // viewer's role cannot take. The states below are the ones the screen owns —
@@ -14,8 +14,8 @@ import { IntegrationsScreen } from './integrations-screen';
 type SetupStatusRow = { platform: string; installed: boolean; installation?: unknown };
 
 const MEMBER_HINT = 'Ask an organization owner or admin to change these connections.';
-// Bitbucket's page admits owners and billing managers, so the hub hint's
-// "owner or admin" would send a member to a role that cannot change it.
+// Bitbucket's page admits owners and billing managers, so its row cannot use
+// the ask-form: the note names the set that can change it.
 const BITBUCKET_NOTE = 'Only organization owners and billing managers can change this connection.';
 
 const GITHUB_CONNECTION = {
@@ -288,24 +288,47 @@ describe('IntegrationsScreen', () => {
     expect(calls.disconnect).toHaveBeenCalledWith({ provider: 'slack', githubIntegrationId: null });
   });
 
-  it('lets a member make the first GitLab connect and explains the rows it cannot change', () => {
+  it('gives every blocked row the ask-form note, and Bitbucket its own set', () => {
     state.role = 'member';
     state.statuses.data = [
-      { platform: 'slack', installed: true, installation: { teamName: 'Acme' } },
+      { platform: 'github', installed: true, installation: { accountLogin: 'acme' } },
+      { platform: 'slack', installed: true, installation: { teamName: 'Acme Slack' } },
+      { platform: 'gitlab', installed: true, installation: { accountLogin: 'acme' } },
       { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
     ];
     const renderer = mount('org-1');
     const root = renderer.root;
 
-    expect(actionOf(rowTitled(root, 'GitHub'))).toBeNull();
+    // The manage and billing sets both admit an owner or an admin, so their
+    // rows ask for one; Bitbucket's page turns an admin away, so that row names
+    // the narrower set. No sentence above the rows contradicts either.
+    for (const title of ['GitHub', 'Slack', 'GitLab', 'Linear']) {
+      expect(actionOf(rowTitled(root, title))).toBeNull();
+      expect(rowTitled(root, title).props.note).toBe(MEMBER_HINT);
+    }
     expect(actionOf(rowTitled(root, 'Bitbucket'))).toBeNull();
-    // `resolveGitLabOAuthOwner` only needs billing roles to replace an existing
-    // integration, so a member's first connect is accepted.
-    expect(actionOf(rowTitled(root, 'GitLab'))?.props.accessibilityLabel).toBe('Connect. GitLab');
-    expect(texts(root)).toContain(MEMBER_HINT);
+    expect(rowTitled(root, 'Bitbucket').props.note).toBe(BITBUCKET_NOTE);
+    expect(texts(root)).not.toContain(MEMBER_HINT);
   });
 
-  it('keeps the hint off for an owner, who can change every row', () => {
+  it('lets a member make the first GitLab connect without a note on that row', () => {
+    state.role = 'member';
+    state.statuses.data = [
+      { platform: 'github', installed: true, installation: { accountLogin: 'acme' } },
+      { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
+    ];
+    const renderer = mount('org-1');
+    const root = renderer.root;
+
+    // `resolveGitLabOAuthOwner` only needs billing roles to replace an existing
+    // integration, so a member's first connect is accepted and its row says
+    // nothing: a note there would contradict the action it offers.
+    expect(actionOf(rowTitled(root, 'GitLab'))?.props.accessibilityLabel).toBe('Connect. GitLab');
+    expect(rowTitled(root, 'GitLab').props.note).toBeUndefined();
+    expect(texts(root)).not.toContain(MEMBER_HINT);
+  });
+
+  it('offers every row to an owner and leaves each row quiet', () => {
     state.role = 'owner';
     state.statuses.data = [
       { platform: 'slack', installed: true, installation: { teamName: 'Acme' } },
@@ -313,45 +336,20 @@ describe('IntegrationsScreen', () => {
     const root = mount('org-1').root;
 
     expect(findOne(root, 'RowMock').every(row => actionOf(row) != null)).toBe(true);
+    expect(findOne(root, 'RowMock').every(row => row.props.note === undefined)).toBe(true);
     expect(texts(root)).not.toContain(MEMBER_HINT);
   });
 
-  it('keeps the hint off for an admin, whose Bitbucket row offers no action', () => {
+  it('names the owners-and-billing set on the Bitbucket row an admin cannot change', () => {
     state.role = 'admin';
     state.statuses.data = [
       { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
     ];
     const root = mount('org-1').root;
 
+    // Bitbucket's page admits no admin, so the manage set's "owner or admin"
+    // sentence would send one to a role that cannot change it.
     expect(actionOf(rowTitled(root, 'Bitbucket'))).toBeNull();
-    expect(texts(root)).not.toContain(MEMBER_HINT);
-  });
-
-  it('names the roles that can change a blocked Bitbucket row for a member', () => {
-    state.role = 'member';
-    state.statuses.data = [
-      { platform: 'github', installed: true, installation: { accountLogin: 'acme' } },
-      { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
-    ];
-    const root = mount('org-1').root;
-
-    // The hub hint sends a member to an owner or an admin; Bitbucket's page
-    // only lets an owner change the connection, so the row says so itself.
-    expect(texts(root)).toContain(MEMBER_HINT);
-    expect(rowTitled(root, 'Bitbucket').props.note).toBe(BITBUCKET_NOTE);
-    // GitHub's manager set is the one the hint names, so its row stays quiet.
-    expect(rowTitled(root, 'GitHub').props.note).toBeUndefined();
-  });
-
-  it('names the roles that can change a blocked Bitbucket row for an admin', () => {
-    state.role = 'admin';
-    state.statuses.data = [
-      { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
-    ];
-    const root = mount('org-1').root;
-
-    // No hub hint for an admin, and the hint would be wrong for this row anyway.
-    expect(texts(root)).not.toContain(MEMBER_HINT);
     expect(rowTitled(root, 'Bitbucket').props.note).toBe(BITBUCKET_NOTE);
   });
 

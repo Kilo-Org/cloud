@@ -1,4 +1,3 @@
-import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
@@ -25,7 +24,6 @@ import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refr
 import { getIntegrationPageUrl } from '@/lib/integration-urls';
 import { buildIntegrationRows, type IntegrationRow } from '@/lib/integrations/integration-rows';
 import {
-  canManageProvider,
   type IntegrationProvider,
   integrationScope,
   providerLabelKey,
@@ -107,26 +105,6 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
     githubConnectionsPending: githubConnections.isPending,
   });
   const role = boundary.role ?? undefined;
-  const canActOnRow = (row: IntegrationRow) =>
-    canManageProvider({
-      provider: row.provider,
-      scope,
-      role,
-      action: 'connect',
-      installed: row.installed,
-    }) || canManageProvider({ provider: row.provider, scope, role, action: 'disconnect' });
-  /**
-   * A member may still get one action (GitLab's first connect admits any member),
-   * so the hint cannot wait for a screen with no action at all. It names the role
-   * that can change the rows the viewer cannot; a viewer who already holds that
-   * role gets no hint, because the sentence would point them at themselves and
-   * Bitbucket's manager set leaves an admin out.
-   */
-  const showMemberHint =
-    scope === 'organization' &&
-    rows.length > 0 &&
-    !canManageOrganization(role) &&
-    rows.some(row => !canActOnRow(row));
 
   const openProviderPage = (provider: IntegrationProvider) => {
     void openExternalUrl(getIntegrationPageUrl(WEB_BASE_URL, provider, organizationId), {
@@ -162,9 +140,6 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
           {rows.some(row => row.installed) ? null : (
             <Text className="text-xs text-muted-foreground">{t('integrations.emptyHint')}</Text>
           )}
-          {showMemberHint ? (
-            <Text className="text-xs text-muted-foreground">{t('integrations.memberHint')}</Text>
-          ) : null}
           {rows.length > 0 ? (
             <View className="rounded-lg bg-secondary px-3">
               {rows.map((row, index) => (

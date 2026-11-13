@@ -126,10 +126,20 @@ describe('ConfigureRow mounted layout', () => {
     expect(classes).not.toContain('flex-row');
   });
 
-  it('keeps the side-by-side row at phone widths', () => {
-    const classes = rowClasses(renderRow());
-    expect(classes).toEqual(expect.arrayContaining(['flex-row', 'items-center', 'gap-3']));
+  it('keeps the icon and trailing control on one line at phone widths', () => {
+    const root = renderRow();
+    const classes = rowClasses(root);
+    // The note renders below the icon-aligned line, so the padded row body is a
+    // column and that inner line carries the side-by-side geometry.
+    expect(classes).toEqual(expect.arrayContaining(['py-3']));
     expect(classes).not.toContain('gap-2');
+    expect(classes).not.toContain('flex-row');
+    const line = root.find(
+      node => Object.is(node.type, 'View') && String(node.props.className).includes('flex-row')
+    );
+    expect(String(line.props.className).split(' ')).toEqual(
+      expect.arrayContaining(['flex-row', 'items-center', 'gap-3'])
+    );
   });
 
   it('still stacks at the large-font-scale threshold', () => {
@@ -244,11 +254,11 @@ describe('ConfigureRow disabled cue', () => {
 describe('ConfigureRow note', () => {
   const NOTE = 'Only organization owners and billing managers can change this connection.';
 
-  it('renders the note as one more muted line under the subtitle', () => {
+  it('renders the note below the icon-aligned line, indented to the title column', () => {
     const root = renderRow({ note: NOTE });
 
     expect(textOf(root, NOTE)).toEqual(
-      expect.arrayContaining(['mt-1', 'text-xs', 'text-muted-foreground'])
+      expect.arrayContaining(['mt-1', 'text-xs', 'text-muted-foreground', 'pl-[42px]'])
     );
     // It is a sentence, so it wraps instead of ellipsizing like a value does.
     const note = root.find(
@@ -256,6 +266,18 @@ describe('ConfigureRow note', () => {
     );
     expect(note.props.numberOfLines).toBe(3);
     expect(textOf(root, 'Transcribe')).toContain('mt-0.5');
+    // A third line inside the title column would centre the tile on
+    // title+subtitle+note and drop the icon of a row that carries one.
+    const textBlock = root.find(
+      node => Object.is(node.type, 'View') && String(node.props.className).includes('min-w-0')
+    );
+    expect(textBlock.findAll(node => Object.is(node.props.children, NOTE))).toHaveLength(0);
+  });
+
+  it('gives the stacked row its note without the tile indent', () => {
+    windowDims.width = 160;
+
+    expect(textOf(renderRow({ note: NOTE }), NOTE)).not.toContain('pl-[42px]');
   });
 
   it('renders only the title and subtitle when a row has no note', () => {

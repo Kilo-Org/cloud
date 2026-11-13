@@ -136,20 +136,31 @@ describe('canManageProvider', () => {
 });
 
 describe('providerBlockedNoteKey', () => {
-  it('names the roles for the Bitbucket row, whose set omits an admin', () => {
+  it('asks for an owner or admin on the rows the manage set can change', () => {
+    for (const provider of ['github', 'slack'] as const) {
+      for (const action of ['connect', 'disconnect'] as const) {
+        expect(providerBlockedNoteKey({ provider, action, installed: true })).toBe(
+          'integrations.memberHint'
+        );
+      }
+    }
+  });
+
+  it('asks for an owner or admin on the rows gated on billing roles, which include an admin', () => {
+    for (const provider of ['gitlab', 'discord', 'linear'] as const) {
+      for (const action of ['connect', 'disconnect'] as const) {
+        expect(providerBlockedNoteKey({ provider, action, installed: true })).toBe(
+          'integrations.memberHint'
+        );
+      }
+    }
+  });
+
+  it('names the owners-and-billing set for the Bitbucket row, whose page admits no admin', () => {
     for (const action of ['connect', 'disconnect'] as const) {
       expect(providerBlockedNoteKey({ provider: 'bitbucket', action, installed: true })).toBe(
         'integrations.rowManagedByOwnersAndBilling'
       );
-    }
-  });
-
-  it('stays quiet where the hub hint names only roles that can act', () => {
-    const providers = ['github', 'slack', 'gitlab', 'discord', 'linear'] as const;
-    for (const provider of providers) {
-      for (const action of ['connect', 'disconnect'] as const) {
-        expect(providerBlockedNoteKey({ provider, action, installed: true })).toBeUndefined();
-      }
     }
   });
 

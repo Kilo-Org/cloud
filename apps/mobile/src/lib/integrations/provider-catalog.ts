@@ -129,27 +129,28 @@ function rolesFor(
 }
 
 /**
- * Roles a provider's hub row names when it offers the viewer no action. The hub
- * hint names {@link ORGANIZATION_MANAGE_ROLES}, so a provider whose manager set
- * names no such role would be misdescribed by it: the Bitbucket page admits
- * owners and billing managers only, and an admin cannot change it. A note keyed
- * by the exact set keeps the sentence true for each provider instead of
- * widening the set or narrowing the hint.
+ * The row note each organization role set names. A blocked row says which roles
+ * can change it, so the sentence follows the action's server procedure instead
+ * of one screen-wide hint. The ask-form holds wherever an owner or an admin can
+ * act: it names a role that can change the row and does not claim to list them
+ * all. Only a page that turns an admin away gets a note naming the narrower
+ * set, so a member is never sent to a role that cannot change the connection.
  */
-const MANAGER_NOTE_KEYS: readonly {
+const NOTE_KEYS_BY_ROLE_SET: readonly {
   roles: readonly OrganizationRole[];
   key: string;
-}[] = [{ roles: BITBUCKET_ROLES, key: 'integrations.rowManagedByOwnersAndBilling' }];
-
-/** The hub hint's own role set; a note is needed only where this set cannot act. */
-const HUB_HINT_ROLES = ORGANIZATION_MANAGE_ROLES;
+}[] = [
+  { roles: ORGANIZATION_MANAGE_ROLES, key: 'integrations.memberHint' },
+  { roles: ORGANIZATION_BILLING_ROLES, key: 'integrations.memberHint' },
+  { roles: BITBUCKET_ROLES, key: 'integrations.rowManagedByOwnersAndBilling' },
+];
 
 /**
- * The key of the sentence a row shows when the viewer can take no action on it
- * and the hub hint would misdirect. The hint is true only where every role it
- * names can act — Bitbucket's `owner` is such a role and its `admin` is not, so
- * the hint would send a member to a role the page turns away. Undefined when
- * the hint's roles all act, and for a provider set the table does not cover.
+ * The key of the sentence a row shows when the viewer can take no action on it:
+ * the ask-form where an owner or an admin can change it, and the narrower
+ * owners-and-billing sentence where the page behind the row turns an admin
+ * away. Undefined for a connect any member may take, and for a role set the
+ * table does not cover — such a row shows no note.
  */
 export function providerBlockedNoteKey(input: {
   provider: IntegrationProvider;
@@ -160,10 +161,7 @@ export function providerBlockedNoteKey(input: {
   if (roles === null) {
     return undefined;
   }
-  if (HUB_HINT_ROLES.every(hintRole => roles.includes(hintRole))) {
-    return undefined;
-  }
-  return MANAGER_NOTE_KEYS.find(
+  return NOTE_KEYS_BY_ROLE_SET.find(
     entry => entry.roles.length === roles.length && entry.roles.every(role => roles.includes(role))
   )?.key;
 }

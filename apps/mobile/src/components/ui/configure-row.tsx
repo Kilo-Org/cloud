@@ -46,9 +46,11 @@ type ConfigureRowProps = {
    */
   subtitlePlaceholder?: ReactNode;
   /**
-   * One more muted line under the subtitle, for a row that must say why it
-   * offers nothing to change (an integration the viewer's role cannot manage).
-   * Wraps: it is a sentence, not a value, so it takes the row's full width.
+   * One more muted line under the row's icon-aligned line, for a row that must
+   * say why it offers nothing to change (an integration the viewer's role
+   * cannot manage). It sits outside the title column so it never shifts the
+   * icon and the trailing control. Wraps: it is a sentence, not a value, so it
+   * takes the row's full width.
    */
   note?: string;
   /**
@@ -158,18 +160,32 @@ export function ConfigureRow({
         {title}
       </Text>
       {subtitleNode}
-      {note ? (
-        <Text className="mt-1 text-xs text-muted-foreground" numberOfLines={3}>
-          {note}
-        </Text>
-      ) : null}
     </View>
   );
+
+  // The note is a sentence about the whole row, not a value of the title
+  // column: inside `textBlock` it made the side-by-side row centre the icon
+  // tile and the trailing control on title+subtitle+note, so a row with a note
+  // sat its icon lower than a row without one. It renders below the
+  // icon-aligned line instead, indented by the tile's 30 dp plus the row's
+  // 12 dp gap so its first word still lands on the title's column.
+  const noteNode = note ? (
+    <Text
+      className={
+        stack
+          ? 'mt-1 text-xs text-muted-foreground'
+          : 'mt-1 pl-[42px] text-xs text-muted-foreground'
+      }
+      numberOfLines={3}
+    >
+      {note}
+    </Text>
+  ) : null;
 
   const inner = (
     <View
       className={cn(
-        stack ? 'gap-2 py-3' : 'flex-row items-center gap-3 py-3',
+        stack ? 'gap-2 py-3' : 'py-3',
         !last && 'border-b-[0.5px] border-hair-soft',
         className
       )}
@@ -181,12 +197,16 @@ export function ConfigureRow({
             {trailingNode ? <View className="shrink-0">{trailingNode}</View> : null}
           </View>
           {textBlock}
+          {noteNode}
         </>
       ) : (
         <>
-          {iconTile}
-          {textBlock}
-          {trailingNode}
+          <View className="flex-row items-center gap-3">
+            {iconTile}
+            {textBlock}
+            {trailingNode}
+          </View>
+          {noteNode}
         </>
       )}
     </View>

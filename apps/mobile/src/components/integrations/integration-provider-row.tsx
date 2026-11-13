@@ -134,8 +134,9 @@ export function IntegrationProviderRow({
     ) : null;
   }
 
-  // A row that offers the viewer nothing names the roles that can change it,
-  // but only where the hub hint's own roles cannot all act on that row.
+  // A row that offers the viewer nothing names the roles that can change it;
+  // the note key follows the action's own role set, so the sentence stays true
+  // where the page behind the action admits no admin.
   const blockedNoteKey =
     action == null && !row.actionPending
       ? providerBlockedNoteKey({

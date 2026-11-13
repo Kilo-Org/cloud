@@ -11288,7 +11288,7 @@
   "computeBilling.personalBillingMode": {
     "path": "computeBilling.personalBillingMode",
     "kind": "query",
-    "summary": "Look up whether a personal Cloudflare container instance is set to pay-as-you-go or subscription-based billing. Use to check the current billing mode for a user's own compute instance.",
+    "summary": "Look up the signed-in user's billing mode for a Kilo-hosted container instance: shadow (usage is metered but not charged yet) or paid (usage is charged).",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -11310,7 +11310,7 @@
       "personalbillingmode",
       "instance"
     ],
-    "searchBlob": "computeBilling.personalBillingMode Look up whether a personal Cloudflare container instance is set to pay-as-you-go or subscription-based billing. Use to check the current billing mode for a user's own compute instance. computebilling personalbillingmode instance instance"
+    "searchBlob": "computeBilling.personalBillingMode Look up the signed-in user's billing mode for a Kilo-hosted container instance: shadow (usage is metered but not charged yet) or paid (usage is charged). computebilling personalbillingmode instance instance"
   },
   "computeBilling.rates": {
     "path": "computeBilling.rates",

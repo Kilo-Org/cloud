@@ -29,10 +29,12 @@ const h = vi.hoisted(() => ({
   colorScheme: { current: 'light' as 'light' | 'dark' },
 }));
 
-const permissionState = vi.hoisted(() => ({ canManage: true }));
+const permissionState = vi.hoisted(() => ({
+  permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
+}));
 
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => permissionState.canManage,
+  useOrganizationProfilePermission: () => permissionState.permission,
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
@@ -86,7 +88,17 @@ vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', async () => {
+  // vi.mock factories are hoisted above the module's imports, so the React
+  // helpers must be loaded inside the factory.
+  const { createElement: createMockElement } = await import('react');
+  return {
+    // The real state renders its `action` below the title, so the manage slot's
+    // sentence or the manager's CTA reaches the tree the way the screen hands it over.
+    EmptyState: (props: { action?: ReactNode }) =>
+      createMockElement('EmptyState', props, props.action),
+  };
+});
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -232,7 +244,7 @@ describe('ProfileKiloCommandsScreen save refusals', () => {
     for (const mutation of Object.values(h.mutations)) {
       Object.assign(mutation, { isPending: false });
     }
-    permissionState.canManage = true;
+    permissionState.permission = 'allowed';
   });
 
   it('refuses a name a loaded command already uses, without calling the server', async () => {
@@ -364,7 +376,7 @@ describe('ProfileKiloCommandsScreen row controls', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Object.assign(h.query, { data: [testCommand()], isPending: false, isError: false });
-    permissionState.canManage = true;
+    permissionState.permission = 'allowed';
     h.colorScheme.current = 'light';
   });
 
@@ -458,7 +470,7 @@ describe('ProfileKiloCommandsScreen after the form sheet closes', () => {
     h.query.data = [testCommand(), testCommand({ id: 'cmd-2', name: 'deploy' })];
     h.query.isPending = false;
     h.query.isError = false;
-    permissionState.canManage = true;
+    permissionState.permission = 'allowed';
   });
 
   // The sheet dismisses natively and the list sits underneath it, so the rest
@@ -498,6 +510,38 @@ describe('ProfileKiloCommandsScreen after the form sheet closes', () => {
       profileId: 'profile-1',
       orderedIds: ['cmd-2', 'cmd-1'],
     });
+
+    unmount();
+  });
+});
+
+describe('ProfileKiloCommandsScreen without the manage role', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    permissionState.permission = 'read-only';
+    Object.assign(h.query, { data: [testCommand()], isPending: false, isError: false });
+  });
+
+  it('names the required role where a manager would find the add control', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      i18n.t('profiles.organizationRoleRequired')
+    );
+
+    unmount();
+  });
+
+  it('names the required role in place of the add CTA when the list is empty', async () => {
+    h.query.data = [];
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      i18n.t('profiles.organizationRoleRequired')
+    );
 
     unmount();
   });

@@ -11,6 +11,7 @@ import {
   type AgentSource,
   type AgentVisibility,
 } from '@/components/profiles/profile-agents-model';
+import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { ProfileRowIdentity, profileRowLabel } from '@/components/profiles/profile-row-identity';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
@@ -25,7 +26,7 @@ import {
   useAgentProfileAgents,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
-import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
+import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -141,7 +142,8 @@ export function ProfileAgentsScreen({
   const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfileAgents(profileId, organizationId);
   const { createAgent, updateAgent, deleteAgent } = useAgentProfileSectionMutations(organizationId);
-  const canManage = useCanManageOrganizationProfiles(organizationId);
+  const permission = useOrganizationProfilePermission(organizationId);
+  const canManage = permission === 'allowed';
 
   const agents = profileQuery.data ?? NO_AGENTS;
   const rows = agentRows(agents);
@@ -235,11 +237,11 @@ export function ProfileAgentsScreen({
         description={null}
         placement="top"
         action={
-          canManage ? (
+          <ProfileManageSlot permission={permission}>
             <Button className={STATE_ACTION_CLASS} onPress={handleStartAdd}>
               <Text>{t('profiles.agents.add')}</Text>
             </Button>
-          ) : null
+          </ProfileManageSlot>
         }
       />
     );
@@ -275,11 +277,11 @@ export function ProfileAgentsScreen({
             />
           );
         })}
-        {canManage ? (
+        <ProfileManageSlot permission={permission}>
           <Button onPress={handleStartAdd}>
             <Text>{t('profiles.agents.add')}</Text>
           </Button>
-        ) : null}
+        </ProfileManageSlot>
       </>
     );
   }

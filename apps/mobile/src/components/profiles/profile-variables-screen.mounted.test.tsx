@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- one mounted harness pins the form, secret-masking, delete flows, and the inline refusals for the variables screen */
+import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -28,7 +29,7 @@ import { resetFormDraftsForTests } from '@/lib/form-draft';
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
   error: vi.fn(),
-  canManage: true,
+  permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
   query: {
     data: undefined as TestVars | undefined,
     isError: false,
@@ -43,7 +44,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => h.canManage,
+  useOrganizationProfilePermission: () => h.permission,
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
@@ -73,7 +74,12 @@ vi.mock('@/components/ui/dialog', () => ({
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  // The screen hands its action to the manage slot, so the stub renders what it
+  // is given: the read-only sentence replaces the button in the same subtree.
+  EmptyState: (props: { title: string; description?: ReactNode; action?: ReactNode }) =>
+    createElement('EmptyState', { title: props.title }, props.description, props.action),
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -86,21 +92,11 @@ vi.mock('@/components/ui/icons', () => ({
   Trash2: 'Trash2',
 }));
 
-/** Press the add CTA the empty state renders through its `action` prop. */
-function pressEmptyAction(renderer: Awaited<ReturnType<typeof mountScreen>>['renderer']): void {
-  const action = findOne(renderer.root, 'EmptyState').props.action as {
-    props: { onPress: () => void };
-  };
-  act(() => {
-    action.props.onPress();
-  });
-}
-
 describe('ProfileVariablesScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetFormDraftsForTests();
-    h.canManage = true;
+    h.permission = 'allowed';
     Object.assign(h.query, {
       data: undefined,
       isError: false,
@@ -141,7 +137,7 @@ describe('ProfileVariablesScreen', () => {
     const { renderer, unmount } = await mountScreen();
 
     expect(findOne(renderer.root, 'EmptyState').props.title).toBe('No variables yet');
-    pressEmptyAction(renderer);
+    pressButton(renderer.root, 'Add variable');
     expect(findField(renderer.root, 'Key')).toBeTruthy();
 
     unmount();
@@ -153,7 +149,7 @@ describe('ProfileVariablesScreen', () => {
     h.mutations.setVar.mutateAsync.mockResolvedValue({ success: true });
 
     const { renderer, unmount } = await mountScreen();
-    pressEmptyAction(renderer);
+    pressButton(renderer.root, 'Add variable');
     changeText(renderer.root, 'Key', 'api key');
     changeText(renderer.root, 'Value', 'shh');
     pressButton(renderer.root, 'Save');
@@ -234,7 +230,7 @@ describe('ProfileVariablesScreen', () => {
   it('states the limit only for a reader who can add variables', async () => {
     h.query.data = atVariableLimit();
     h.query.isPending = false;
-    h.canManage = false;
+    h.permission = 'read-only';
 
     const { renderer, unmount } = await mountScreen();
     const limitCopy = i18n.t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS });
@@ -252,7 +248,7 @@ describe('ProfileVariablesScreen', () => {
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
-    pressEmptyAction(renderer);
+    pressButton(renderer.root, 'Add variable');
 
     const label = i18n.t('profiles.secrets.markSecret');
     const labels = findAll(renderer.root, 'Text').filter(node => node.props.children === label);
@@ -274,7 +270,7 @@ describe('ProfileVariablesScreen', () => {
     h.mutations.setVar.mutateAsync.mockResolvedValue({ success: true });
 
     const { renderer, unmount } = await mountScreen();
-    pressEmptyAction(renderer);
+    pressButton(renderer.root, 'Add variable');
     changeText(renderer.root, 'Key', 'API_की');
     changeText(renderer.root, 'Value', 'https://api.example.com/v1');
 
@@ -303,7 +299,7 @@ describe('ProfileVariablesScreen', () => {
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
-    pressEmptyAction(renderer);
+    pressButton(renderer.root, 'Add variable');
     changeText(renderer.root, 'Key', 'API_KEY');
 
     const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
@@ -317,7 +313,7 @@ describe('ProfileVariablesScreen', () => {
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
-    pressEmptyAction(renderer);
+    pressButton(renderer.root, 'Add variable');
     changeText(renderer.root, 'Key', 'api_key');
 
     expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
@@ -332,7 +328,7 @@ describe('ProfileVariablesScreen', () => {
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
-    pressEmptyAction(renderer);
+    pressButton(renderer.root, 'Add variable');
     pressButton(renderer.root, 'Save');
 
     expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
@@ -391,7 +387,7 @@ describe('ProfileVariablesScreen', () => {
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
-    pressEmptyAction(renderer);
+    pressButton(renderer.root, 'Add variable');
     changeText(renderer.root, 'Key', 'API_KEY');
     pressButton(renderer.root, 'Save');
 
@@ -410,7 +406,7 @@ describe('ProfileVariablesScreen', () => {
     h.mutations.setVar.mutateAsync.mockRejectedValue(error);
 
     const { renderer, unmount } = await mountScreen();
-    pressEmptyAction(renderer);
+    pressButton(renderer.root, 'Add variable');
     changeText(renderer.root, 'Key', 'API_KEY');
     changeText(renderer.root, 'Value', 'shh');
     pressButton(renderer.root, 'Save');
@@ -516,8 +512,8 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
-  it('read-only: rows render without edit or delete controls', async () => {
-    h.canManage = false;
+  it('read-only: rows render without edit or delete controls, under the sentence naming who may act', async () => {
+    h.permission = 'read-only';
     h.query.data = testVars([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;
     const { renderer, unmount } = await mountScreen();
@@ -525,6 +521,41 @@ describe('ProfileVariablesScreen', () => {
       String(node.props.accessibilityLabel).startsWith('Delete variable')
     );
     expect(rowActions).toHaveLength(0);
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      i18n.t('profiles.organizationRoleRequired')
+    );
+    unmount();
+  });
+
+  it('read-only: the empty state names who may act in place of the add control', async () => {
+    h.permission = 'read-only';
+    h.query.data = testVars();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findOne(renderer.root, 'EmptyState').props.title).toBe('No variables yet');
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      i18n.t('profiles.organizationRoleRequired')
+    );
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('resolving: the empty state renders neither the sentence nor an action', async () => {
+    h.permission = 'resolving';
+    h.query.data = testVars();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('profiles.organizationRoleRequired')
+    );
+
     unmount();
   });
 

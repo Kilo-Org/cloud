@@ -4,7 +4,6 @@ import '@/i18n';
 import {
   findAll,
   findFields,
-  findOne,
   mountScreen,
   testCommands,
   type TestCommands,
@@ -26,10 +25,12 @@ const h = vi.hoisted(() => ({
   back: vi.fn(),
 }));
 
-const permissionState = vi.hoisted(() => ({ canManage: false }));
+const permissionState = vi.hoisted(() => ({
+  permission: 'read-only' as 'resolving' | 'allowed' | 'read-only',
+}));
 
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => permissionState.canManage,
+  useOrganizationProfilePermission: () => permissionState.permission,
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
@@ -54,7 +55,17 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', async () => {
+  // vi.mock factories are hoisted above the module's imports, so the React
+  // helpers must be loaded inside the factory.
+  const { createElement } = await import('react');
+  return {
+    // The real state renders its `action` below the title, so the manage slot's
+    // sentence reaches the tree the way the screen hands it over.
+    EmptyState: (props: { action?: unknown }) =>
+      createElement('EmptyState', props, props.action as never),
+  };
+});
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', async () => {
   const { createElement, useRef } = await import('react');
@@ -93,11 +104,14 @@ vi.mock('@/components/ui/icons', () => ({
   Trash2: 'Trash2',
 }));
 
+/** The role sentence a member reads in the action's place. */
+const ROLE_SENTENCE = 'Only organization owners and admins can change organization profiles.';
+
 describe('ProfileCommandsScreen without the manage role', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetFormDraftsForTests();
-    permissionState.canManage = false;
+    permissionState.permission = 'read-only';
     Object.assign(h.query, {
       data: undefined,
       isError: false,
@@ -126,13 +140,30 @@ describe('ProfileCommandsScreen without the manage role', () => {
     unmount();
   });
 
-  it('shows no add CTA to a member when the list is empty', async () => {
+  it('names the required role in place of the add CTA when the list is empty', async () => {
     h.query.data = testCommands();
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen('org-1');
 
-    expect(findOne(renderer.root, 'EmptyState').props.action).toBeNull();
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      ROLE_SENTENCE
+    );
+
+    unmount();
+  });
+
+  it('names the required role in place of the add control a manager would get', async () => {
+    h.query.data = testCommands(['pnpm install']);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen('org-1');
+
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      ROLE_SENTENCE
+    );
 
     unmount();
   });

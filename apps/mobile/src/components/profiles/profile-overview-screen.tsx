@@ -13,6 +13,7 @@ import {
   type OverviewSectionKey,
   overviewSectionRows,
 } from '@/components/profiles/profile-overview-model';
+import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { ProfileMetadataForm } from '@/components/profiles/profile-metadata-form';
 import { ProfileOverviewSkeleton } from '@/components/profiles/profile-overview-skeleton';
 import { ProfileRepoPinsSection } from '@/components/profiles/profile-repo-pins-section';
@@ -40,7 +41,7 @@ import { PreferenceRow } from '@/components/ui/preference-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileMutations, useAgentProfileOverview } from '@/lib/hooks/use-agent-profiles';
-import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
+import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { usePopOnce } from '@/lib/navigation/pop-once';
@@ -124,7 +125,11 @@ export function ProfileOverviewScreen({
   const profileQuery = useAgentProfileOverview(profileId, organizationId);
   const { update, deleteProfile, setAsDefault, clearDefault } =
     useAgentProfileMutations(organizationId);
-  const canManage = useCanManageOrganizationProfiles(organizationId);
+  // Three states: a member reads who may change the profile instead of a
+  // control that would be refused, and a role that has not resolved shows
+  // neither.
+  const permission = useOrganizationProfilePermission(organizationId);
+  const canManage = permission === 'allowed';
   // Unsaved name or description edits ask before the route goes, the way the
   // profile form sheets do. A read-only viewer cannot edit the form, so the
   // guard stays off for them.
@@ -258,6 +263,11 @@ export function ProfileOverviewScreen({
 
         {showContent ? (
           <>
+            {/* A member sees the metadata form, the default switch, Import and
+                Delete disabled or absent, so the statement naming who may
+                change the profile sits above them, where the manager's action
+                would be. A manager's slot renders nothing. */}
+            <ProfileManageSlot permission={permission} />
             <ProfileMetadataForm
               key={metadataFormKey(profile)}
               profile={profile}

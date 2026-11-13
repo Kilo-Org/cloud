@@ -13,6 +13,7 @@ import {
   type KiloCommandSource,
   type KiloCommandUpdatePayload,
 } from '@/components/profiles/profile-kilo-commands-model';
+import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -28,7 +29,7 @@ import {
 } from '@/lib/hooks/use-agent-profiles';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
-import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
+import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
@@ -65,7 +66,8 @@ export function ProfileKiloCommandsScreen({
     reorderKiloCommands,
   } = useAgentProfileSectionMutations(organizationId);
 
-  const canManage = useCanManageOrganizationProfiles(organizationId);
+  const permission = useOrganizationProfilePermission(organizationId);
+  const canManage = permission === 'allowed';
 
   const commands = profileQuery.data ?? NO_COMMANDS;
   const rows = kiloCommandRows(commands);
@@ -189,11 +191,11 @@ export function ProfileKiloCommandsScreen({
         description={null}
         placement="top"
         action={
-          canManage ? (
+          <ProfileManageSlot permission={permission}>
             <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
               <Text>{t('profiles.slashCommands.add')}</Text>
             </Button>
-          ) : null
+          </ProfileManageSlot>
         }
       />
     );
@@ -264,11 +266,11 @@ export function ProfileKiloCommandsScreen({
             />
           );
         })}
-        {canManage ? (
+        <ProfileManageSlot permission={permission}>
           <Button onPress={startAdd}>
             <Text>{t('profiles.slashCommands.add')}</Text>
           </Button>
-        ) : null}
+        </ProfileManageSlot>
       </>
     );
   }

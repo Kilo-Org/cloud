@@ -26,6 +26,7 @@ const h = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
   confirm: vi.fn(),
+  permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
   connectivity: 'online' as string,
   query: {
     data: undefined as TestProfileDetail | undefined,
@@ -43,7 +44,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => true,
+  useOrganizationProfilePermission: () => h.permission,
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
@@ -129,6 +130,7 @@ describe('ProfileOverviewScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     h.connectivity = 'online';
+    h.permission = 'allowed';
     resetOverviewState(h);
   });
 

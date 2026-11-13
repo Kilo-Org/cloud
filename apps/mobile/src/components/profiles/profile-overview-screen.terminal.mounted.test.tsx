@@ -36,7 +36,7 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => true,
+  useOrganizationProfilePermission: () => 'allowed',
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   getCommittedConnectivityStatus: () => 'online',

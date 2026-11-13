@@ -272,6 +272,84 @@ test('probe client raises InfraError after three retries', async () => {
   assert.deepEqual(delays, [2_000, 2_000, 2_000]);
 });
 
+test('a failing readiness probe in the reload window closes its session', async () => {
+  const opened: { closed: boolean }[] = [];
+  const realNow = Date.now;
+  let now = 0;
+  const answers = (index: number, expression: string) => {
+    // The first session dies with the reload.
+    if (index === 0) return 'close';
+    // Inside the reload window the re-opened target is listed but its runtime
+    // has not attached yet, so the readiness probe times out.
+    if (index === 1 && expression.includes('ready')) return 'silent';
+    return expression.includes('ready');
+  };
+  try {
+    Date.now = () => now;
+    const client = createProbeClient({
+      metro: 'http://127.0.0.1:8081',
+      names: ['Pixel'],
+      timeoutMs: 5,
+      sleep: async ms => {
+        now += ms;
+      },
+      fetch: (async () => Response.json([page('p-1', 'Pixel')])) as typeof fetch,
+      createSocket: () => {
+        const index = opened.length;
+        const entry = { closed: false };
+        opened.push(entry);
+        const fake = fakeSocket(message => {
+          const answer = answers(index, String(message.params.expression));
+          if (answer === 'close') queueMicrotask(() => fake.socket.close());
+          if (answer === 'silent') return undefined;
+          return { result: { result: { value: answer } } };
+        });
+        return {
+          send: fake.socket.send,
+          addEventListener: fake.socket.addEventListener,
+          close: () => {
+            entry.closed = true;
+            fake.socket.close();
+          },
+        };
+      },
+    });
+    assert.equal(await client.ready(), true);
+  } finally {
+    Date.now = realNow;
+  }
+  // One session per reload-window iteration: a readiness probe that fails must
+  // not leave the socket open while the loop opens the next one.
+  assert.deepEqual(
+    opened.map(entry => entry.closed),
+    [true, true, true, false]
+  );
+});
+
+test('a caller budget bounds the reload wait too', async () => {
+  let clockMs = 0;
+  const client = createProbeClient({
+    metro: 'http://127.0.0.1:8081',
+    names: ['Pixel'],
+    now: () => clockMs,
+    sleep: async ms => {
+      clockMs += ms;
+    },
+    fetch: (async () => Response.json([page('p-1', 'Pixel')])) as typeof fetch,
+    createSocket: () => {
+      const fake = fakeSocket(() => {
+        queueMicrotask(() => fake.socket.close());
+        return undefined;
+      });
+      return fake.socket;
+    },
+  });
+  // A caller that declares 700 ms waits that long, not the 20 s reload window,
+  // so an app that is gone still fails inside the caller's own deadline.
+  await assert.rejects(client.dump(700), (error: unknown) => error instanceof InfraError);
+  assert.ok(clockMs < 10_000, `the call spent ${clockMs} ms on a 700 ms budget`);
+});
+
 test('parseSamples validates in-app samples and expandSamples repeats them', () => {
   const dump = {
     version: 1,

@@ -6,6 +6,10 @@ import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { queryAccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 import { cloudAgentSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import { TRPCError } from '@trpc/server';
+import { cloud_billing_sku } from '@kilocode/db/schema';
+import { and, eq } from 'drizzle-orm';
+import { SANDBOX_USAGE_SKUS } from '@kilocode/worker-utils/cloud-agent-compute';
+import { isCodeReviewComputeBillingEnabled } from '@/lib/code-reviews/compute-billing';
 import {
   COMPUTE_CHARGE_MAX_PAGE,
   readComputeCharges,
@@ -28,6 +32,29 @@ export const computeChargesInputSchema = z
   }, 'Choose a date range of at most one year.');
 
 export const computeBillingRouter = createTRPCRouter({
+  codeReviewRate: baseProcedure
+    .input(z.object({ organizationId: z.uuid().optional() }))
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) await ensureOrganizationAccess(ctx, input.organizationId);
+      const enabled = await isCodeReviewComputeBillingEnabled(
+        input.organizationId
+          ? { type: 'org', id: input.organizationId }
+          : { type: 'user', id: ctx.user.id }
+      );
+      if (!enabled) return { enabled: false, hourlyUsd: null };
+      const [rate] = await db
+        .select({ rate: cloud_billing_sku.rate_cents_per_unit })
+        .from(cloud_billing_sku)
+        .where(
+          and(
+            eq(cloud_billing_sku.id, SANDBOX_USAGE_SKUS.SandboxContainersCodeReview),
+            eq(cloud_billing_sku.unit, 'second'),
+            eq(cloud_billing_sku.accepts_new_usage, true)
+          )
+        )
+        .limit(1);
+      return { enabled: true, hourlyUsd: rate ? Number(rate.rate) * 36 : null };
+    }),
   rates: baseProcedure.query(() => readComputeRates(db)),
   sessionCharges: baseProcedure
     .input(

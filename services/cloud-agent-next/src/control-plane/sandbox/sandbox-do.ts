@@ -237,6 +237,7 @@ import {
   CONTROL_PLANE_REQUEST_TIMEOUT_MS,
   CONTROL_PLANE_WORKTREE_GIT_TIMEOUT_MS,
   controlPlaneAnswerPayloadSchema,
+  controlPlaneCancelWorkspacePayloadSchema,
   controlPlaneDeliverPayloadSchema,
   controlPlaneKiloRequestInputSchema,
   controlPlanePrepareInputSchema,
@@ -246,9 +247,12 @@ import {
   controlPlaneTerminalInputSchema,
   controlPlaneWorktreeCaptureInputSchema,
   controlPlaneWorktreeDeletionPayloadSchema,
+  controlPlaneWorkspaceStoppedPayloadSchema,
   controlPlaneWrapperFrameSchema,
   type AttachmentSpec,
   type ControlPlaneAnswerPayload,
+  type ControlPlaneCancelWorkspacePayload,
+  type ControlPlaneCancelWorkspaceResult,
   type ControlPlaneCommandFailure,
   type ControlPlaneControlResult,
   type ControlPlaneCredentialSource,
@@ -269,6 +273,7 @@ import {
   type ControlPlaneTerminalInput,
   type ControlPlaneWorktreeCaptureInput,
   type ControlPlaneWrapperFrame,
+  type ControlPlaneWorkspaceStoppedPayload,
   type ControlPlaneWorkspaceFailureSubtype,
   type WorkspaceConfig,
 } from '../../shared/control-plane-protocol.js';
@@ -442,6 +447,23 @@ const GENERATION = 2;
 const CREDENTIAL_HASH_KEY = 'wrapper_credential_hash';
 const RUNTIME_HARNESS_KEY = 'runtime_harness';
 const OWNER_KEY = 'control_plane_owner';
+/** Durable workspace Stop epoch/at, shared by every route on this sandbox. */
+const WORKSPACE_STOP_KEY = 'control_plane_workspace_stop';
+const PENDING_WORKSPACE_STOP_PREFIX = 'control_plane_pending_workspace_stop/';
+
+const pendingWorkspaceStopRecordSchema = z.object({
+  payload: controlPlaneWorkspaceStoppedPayloadSchema,
+  dueAt: z.number().int().nonnegative(),
+});
+
+type PendingWorkspaceStopRecord = z.infer<typeof pendingWorkspaceStopRecordSchema>;
+
+const workspaceStopSchema = z.object({
+  epoch: z.number().int().nonnegative(),
+  at: z.number().int().nonnegative(),
+});
+
+type WorkspaceStop = z.infer<typeof workspaceStopSchema>;
 const COMMAND_FAILURE_NOTE_KEY_PREFIX = 'command_failure_note:';
 
 type PendingCommandFailureNote = { attemptId: string; note: string };
@@ -656,6 +678,8 @@ export type ControlPlaneSessionPeer = HistoryPageSession & {
     workspace?: WorkspaceMcpBinding
   ): Promise<{ url: string; token: string; expiresAt: number } | undefined>;
   onRoute(update: ControlPlaneRouteUpdate): Promise<void>;
+  /** The whole workspace stopped during preparation; settle this chat. */
+  onWorkspaceStopped(payload: ControlPlaneWorkspaceStoppedPayload): Promise<void>;
   onEvents(notification: ControlPlaneEventsNotification): Promise<void>;
   onOutcome(outcome: ControlPlaneOutcome): Promise<void>;
   /** False when the session no longer reads the worktree, so it is not notified again. */
@@ -979,8 +1003,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private readonly notifications = createSandboxNotificationDispatcher({
     budgetMs: () => CONTROL_PLANE_TIMERS.sandbox.sessionNotifyDeadlineMs,
-    send: (sessionId, notification, deadlineAt, signal) =>
-      this.notifySession(sessionId, notification, deadlineAt, signal),
+    send: async (sessionId, notification, deadlineAt, signal) => {
+      await this.notifySession(sessionId, notification, deadlineAt, signal);
+      if (notification.kind === 'workspace_stopped') {
+        this.ackPendingWorkspaceStop(sessionId, notification.payload);
+      }
+    },
     waitUntil: work => this.ctx.waitUntil(work),
     diagnostic: loss =>
       logger.withFields({ sandboxId: this.sandboxId, ...loss }).warn('Sandbox notification loss'),
@@ -1236,8 +1264,19 @@ export class SandboxControlV2 extends DurableObject<Env> {
       input.environment === undefined
         ? undefined
         : environmentReferenceSchema.parse(input.environment);
+    const stopEpoch =
+      input.stopEpoch === undefined
+        ? undefined
+        : z.number().int().nonnegative().parse(input.stopEpoch);
+    const intentAt =
+      input.intentAt === undefined
+        ? undefined
+        : z.number().int().nonnegative().parse(input.intentAt);
     return this.enqueue(() =>
-      this.runPrepare(parsed.spec, parsed.credentials, sandboxSelection, environment)
+      this.runPrepare(parsed.spec, parsed.credentials, sandboxSelection, environment, {
+        ...(stopEpoch === undefined ? {} : { stopEpoch }),
+        ...(intentAt === undefined ? {} : { intentAt }),
+      })
     );
   }
 
@@ -1337,6 +1376,159 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.fenceWorkspaceSnapshot('abort', parsed.sessionId);
       return this.dispatchToWrapper({ type: 'session.abort', sessionId: parsed.sessionId });
     });
+  }
+
+  /** Retire the workspace's routes and stop the physical sandbox. */
+  async cancelWorkspace(
+    payload: ControlPlaneCancelWorkspacePayload
+  ): Promise<ControlPlaneCancelWorkspaceResult> {
+    await this.initialized;
+    const parsed = controlPlaneCancelWorkspacePayloadSchema.parse(payload);
+    return this.enqueue(async () => {
+      const previous = await this.readWorkspaceStop();
+      // A retried Stop reuses its epoch; it must not cancel newer work.
+      const alreadyStopped = previous.epoch > 0 && parsed.requestedAt <= previous.at;
+      const stop: WorkspaceStop = alreadyStopped
+        ? previous
+        : {
+            epoch: previous.epoch + 1,
+            at: Math.max(previous.at, parsed.requestedAt, Date.now()),
+          };
+      if (!alreadyStopped) await this.writeWorkspaceStop(stop);
+      const startedBeforeStop = (route: RouteRecord) =>
+        route.state === 'failed' ||
+        (route.attemptDeadlineAt > 0 &&
+          route.attemptDeadlineAt - this.sandboxTimers().routePreparationMs <= stop.at);
+      // A fresh Stop retires everything that exists now; a replay keeps newer routes.
+      const allRoutes = await listRoutes(this.db);
+      const routes = alreadyStopped ? allRoutes.filter(startedBeforeStop) : allRoutes;
+      for (const route of routes) {
+        const payload: ControlPlaneWorkspaceStoppedPayload = {
+          requestedAt: stop.at,
+          stopEpoch: stop.epoch,
+          attemptId: route.attemptId,
+        };
+        // Persist before the route disappears; the alarm replays until the
+        // Session DO acknowledges this exact epoch/attempt.
+        this.rememberPendingWorkspaceStop(route.sessionId, payload);
+        this.notifications.retire(route.sessionId);
+        await deleteRoute(this.db, this.ctx.storage.kv, route.sessionId);
+        this.notifications.enqueue(route.sessionId, {
+          kind: 'workspace_stopped',
+          payload,
+        });
+      }
+      this.fenceWorkspaceSnapshot('abort');
+      const remaining = await listRoutes(this.db);
+      if (remaining.some(route => route.state === 'preparing' || route.state === 'ready')) {
+        // A newer chat already started new work on this sandbox; do not stop it.
+        await this.armAlarm(await this.readAllocation());
+        return { stopEpoch: stop.epoch, stopAt: stop.at };
+      }
+      if (alreadyStopped && routes.length === 0) return { stopEpoch: stop.epoch, stopAt: stop.at };
+      // Rebuild the Vercel policy before entering stopping; refresh is a no-op once stopping.
+      const policyApplied = await this.refreshVercelNetworkPolicy();
+      await this.applyEvent({
+        type: 'stop-requested',
+        at: Date.now(),
+        reason: policyApplied ? 'preparation_cancelled' : 'sandbox_lost',
+      });
+      return { stopEpoch: stop.epoch, stopAt: stop.at };
+    });
+  }
+
+  private async readWorkspaceStop(): Promise<WorkspaceStop> {
+    const stored = await this.ctx.storage.get<unknown>(WORKSPACE_STOP_KEY);
+    const parsed = workspaceStopSchema.safeParse(stored);
+    return parsed.success ? parsed.data : { epoch: 0, at: 0 };
+  }
+
+  private async writeWorkspaceStop(stop: WorkspaceStop): Promise<void> {
+    await this.ctx.storage.put(WORKSPACE_STOP_KEY, stop);
+  }
+
+  private pendingWorkspaceStopKey(sessionId: string): string {
+    return `${PENDING_WORKSPACE_STOP_PREFIX}${sessionId}`;
+  }
+
+  private workspaceStopRetryMs(): number {
+    return Math.max(1, this.sandboxTimers().sessionNotifyDeadlineMs);
+  }
+
+  private rememberPendingWorkspaceStop(
+    sessionId: string,
+    payload: ControlPlaneWorkspaceStoppedPayload
+  ): void {
+    this.ctx.storage.kv.put(this.pendingWorkspaceStopKey(sessionId), {
+      payload,
+      dueAt: Date.now() + this.workspaceStopRetryMs(),
+    } satisfies PendingWorkspaceStopRecord);
+  }
+
+  private ackPendingWorkspaceStop(
+    sessionId: string,
+    payload: ControlPlaneWorkspaceStoppedPayload
+  ): void {
+    const key = this.pendingWorkspaceStopKey(sessionId);
+    const stored = pendingWorkspaceStopRecordSchema.safeParse(
+      this.ctx.storage.kv.get<unknown>(key)
+    );
+    if (!stored.success) return;
+    if (
+      stored.data.payload.stopEpoch !== payload.stopEpoch ||
+      stored.data.payload.attemptId !== payload.attemptId
+    ) {
+      return;
+    }
+    this.ctx.storage.kv.delete(key);
+  }
+
+  private pendingWorkspaceStops(): Array<{
+    key: string;
+    sessionId: string;
+    record: PendingWorkspaceStopRecord;
+  }> {
+    const entries: Array<{ key: string; sessionId: string; record: PendingWorkspaceStopRecord }> =
+      [];
+    const invalidKeys: string[] = [];
+    for (const [key, value] of this.ctx.storage.kv.list<unknown>({
+      prefix: PENDING_WORKSPACE_STOP_PREFIX,
+    })) {
+      const stored = pendingWorkspaceStopRecordSchema.safeParse(value);
+      if (!stored.success) {
+        invalidKeys.push(key);
+        continue;
+      }
+      entries.push({
+        key,
+        sessionId: key.slice(PENDING_WORKSPACE_STOP_PREFIX.length),
+        record: stored.data,
+      });
+    }
+    for (const key of invalidKeys) this.ctx.storage.kv.delete(key);
+    return entries;
+  }
+
+  private redispatchPendingWorkspaceStops(now = Date.now()): void {
+    for (const entry of this.pendingWorkspaceStops()) {
+      if (entry.record.dueAt > now) continue;
+      this.notifications.enqueue(entry.sessionId, {
+        kind: 'workspace_stopped',
+        payload: entry.record.payload,
+      });
+      this.ctx.storage.kv.put(entry.key, {
+        payload: entry.record.payload,
+        dueAt: now + this.workspaceStopRetryMs(),
+      } satisfies PendingWorkspaceStopRecord);
+    }
+  }
+
+  private earliestPendingWorkspaceStopAt(): number | null {
+    let earliest: number | null = null;
+    for (const entry of this.pendingWorkspaceStops()) {
+      if (earliest === null || entry.record.dueAt < earliest) earliest = entry.record.dueAt;
+    }
+    return earliest;
   }
 
   async answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneDispatchResult> {
@@ -1487,12 +1679,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return this.enqueue(async () => {
       const state = await this.readAllocation();
       const route = await readRoute(this.db, parsed.sessionId);
+      const routes = await listRoutes(this.db);
+      const stop = await this.readWorkspaceStop();
       return {
         sessionId: parsed.sessionId,
         view: await this.withContainer(
           routeView(route, state.kind === 'connected', sandboxPreparationProgress(state)),
           state
         ),
+        workspacePreparing: routes.some(candidate => candidate.state === 'preparing'),
+        workspaceStopEpoch: stop.epoch,
+        workspaceStopAt: stop.at,
       };
     });
   }
@@ -2621,6 +2818,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await this.initialized;
     await this.enqueue(async () => {
       this.expireUnboundSockets(Date.now());
+      this.redispatchPendingWorkspaceStops();
       let state = await this.readAllocation();
       const admissionDeadline =
         state.kind === 'creating' && this.currentProvider() === 'cloudflare-containers'
@@ -2660,6 +2858,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
             Date.now() + this.sandboxTimers().providerCreateMs,
             (await earliestRouteDeadlineAt(this.db)) ?? Infinity,
             this.earliestHelloDeadlineAt() ?? Infinity,
+            this.earliestPendingWorkspaceStopAt() ?? Infinity,
             admissionDeadline ?? Infinity
           )
         );
@@ -3084,8 +3283,24 @@ export class SandboxControlV2 extends DurableObject<Env> {
     spec: ControlPlaneRouteSpec,
     source: ControlPlaneCredentialSource,
     sandboxSelection?: ControlPlaneSandboxSelection,
-    environment?: SessionEnvironmentReference
+    environment?: SessionEnvironmentReference,
+    intent?: { stopEpoch?: number; intentAt?: number }
   ): Promise<ControlPlaneRouteView> {
+    // Stale preparation (work created before the Stop) must not revive the sandbox.
+    const stop = await this.readWorkspaceStop();
+    if (
+      stop.epoch > 0 &&
+      (intent?.stopEpoch ?? 0) < stop.epoch &&
+      (intent?.intentAt ?? 0) <= stop.at
+    ) {
+      logControlDiagnostic('route_prepare_refused', {
+        sessionId: spec.sessionId,
+        attemptId: spec.attemptId,
+        reason: 'workspace_stopped',
+        stopEpoch: stop.epoch,
+      });
+      return { state: 'unknown', stopEpoch: stop.epoch, stopAt: stop.at };
+    }
     // Sandbox owner admission (B3 review 5): the first prepare names the owner;
     // a later prepare for a different owner is rejected, not silently accepted.
     await this.initializeOwner(source.userId);
@@ -5023,6 +5238,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
             return target.onRoute(notification.payload);
           case 'outcome':
             return target.onOutcome(notification.payload);
+          case 'workspace_stopped':
+            return target.onWorkspaceStopped(notification.payload);
           case 'worktree_changes':
             return target.onWorktreeChangesReady(notification.payload).then(subscribed => {
               // A deleted or moved session leaves; a later read subscribes it again.
@@ -7219,6 +7436,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       retryAt,
       snapshotAt,
       this.earliestHelloDeadlineAt(),
+      this.earliestPendingWorkspaceStopAt(),
     ].filter((at): at is number => at !== null);
     if (candidates.length === 0) {
       await this.ctx.storage.deleteAlarm();

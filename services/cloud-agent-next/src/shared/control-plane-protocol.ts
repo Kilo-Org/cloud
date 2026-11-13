@@ -179,6 +179,7 @@ export type ControlPlaneCommandFailure = z.infer<typeof controlPlaneCommandFailu
 
 export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'preparation_timeout',
+  'preparation_cancelled',
   'workspace_setup_failed',
   'credential_upgrade_required',
   'repository_access_failed',
@@ -847,7 +848,18 @@ export const controlPlanePromptPayloadSchema = z.union([
   }),
 ]);
 
-const controlPlaneRouteUnknownSchema = z.object({ state: z.literal('unknown') }).strict();
+/**
+ * `stopEpoch` is present when the Sandbox refused a stale prepare because a
+ * workspace Stop happened after that work was created. The Session DO records
+ * it and settles the work instead of reviving the sandbox.
+ */
+const controlPlaneRouteUnknownSchema = z
+  .object({
+    state: z.literal('unknown'),
+    stopEpoch: z.number().int().positive().optional(),
+    stopAt: z.number().int().nonnegative().optional(),
+  })
+  .strict();
 const controlPlaneRoutePreparingSchema = z
   .object({
     state: z.literal('preparing'),
@@ -961,6 +973,37 @@ export const controlPlaneSessionRefPayloadSchema = z
   .object({ sessionId: z.string().min(1) })
   .strict();
 
+/**
+ * Workspace Stop during environment preparation. One sandbox serves one
+ * workspace, so the Sandbox DO retires every route on it. `requestedAt` is when
+ * the Session DO accepted Stop; a preparation for work created before it is
+ * stale, while a message created after it is new intent.
+ */
+export const controlPlaneCancelWorkspacePayloadSchema = z
+  .object({
+    sessionId: z.string().min(1),
+    requestedAt: z.number().int().nonnegative(),
+  })
+  .strict();
+
+/** Sandbox DO -> Session DO: the whole workspace stopped during preparation. */
+export const controlPlaneWorkspaceStoppedPayloadSchema = z
+  .object({
+    requestedAt: z.number().int().nonnegative(),
+    stopEpoch: z.number().int().positive(),
+    /** The route attempt this Stop retired; fence only that attempt. */
+    attemptId: z.string().min(1).max(128),
+  })
+  .strict();
+
+/** The durable workspace Stop, returned so a delayed retry stays idempotent. */
+export const controlPlaneCancelWorkspaceResultSchema = z
+  .object({
+    stopEpoch: z.number().int().positive(),
+    stopAt: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export const controlPlaneAnswerReplySchema = z.discriminatedUnion('action', [
   z
     .object({
@@ -998,6 +1041,11 @@ export const controlPlaneStatusResultSchema = z
   .object({
     sessionId: z.string().min(1),
     view: controlPlaneRouteViewSchema,
+    /** Authoritative workspace phase: preparation is shared by every chat. */
+    workspacePreparing: z.boolean(),
+    /** Newest durable workspace Stop, so a dropped notification reconciles. */
+    workspaceStopEpoch: z.number().int().nonnegative(),
+    workspaceStopAt: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -1695,6 +1743,15 @@ export type ControlPlaneSessionCredentialsFrame = z.infer<
 >;
 export type ControlPlaneSessionPromptFrame = z.infer<typeof controlPlaneSessionPromptFrameSchema>;
 export type ControlPlaneSessionAbortFrame = z.infer<typeof controlPlaneSessionAbortFrameSchema>;
+export type ControlPlaneCancelWorkspacePayload = z.infer<
+  typeof controlPlaneCancelWorkspacePayloadSchema
+>;
+export type ControlPlaneWorkspaceStoppedPayload = z.infer<
+  typeof controlPlaneWorkspaceStoppedPayloadSchema
+>;
+export type ControlPlaneCancelWorkspaceResult = z.infer<
+  typeof controlPlaneCancelWorkspaceResultSchema
+>;
 export type ControlPlaneSessionAnswerFrame = z.infer<typeof controlPlaneSessionAnswerFrameSchema>;
 export type ControlPlaneSessionReleaseFrame = z.infer<typeof controlPlaneSessionReleaseFrameSchema>;
 export type ControlPlaneSessionEventsFrame = z.infer<typeof controlPlaneSessionEventsFrameSchema>;

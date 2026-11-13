@@ -135,6 +135,7 @@ export function classifyControlPlaneFailure(
       return POST_DISPATCH_WRAPPER_ERROR_BEFORE_ACTIVITY;
     case 'sandbox_stopped':
     case 'execution_limit':
+    case 'preparation_cancelled':
       // Spec §10 maps both to interruption/system_interrupt. The report schema
       // permits an interruption classification only on an interrupted run, so
       // the report writer reports a run carrying this classification as

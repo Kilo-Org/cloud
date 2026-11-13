@@ -111,8 +111,11 @@ import {
   controlPlaneRouteUpdateSchema,
   controlPlaneRouteViewSchema,
   controlPlaneSetupEventSchema,
+  controlPlaneWorkspaceStoppedPayloadSchema,
   type ControlPlaneAnswerPayload,
   type ControlPlaneAnswerReply,
+  type ControlPlaneCancelWorkspacePayload,
+  type ControlPlaneCancelWorkspaceResult,
   type ControlPlaneControlResult,
   type ControlPlaneDeliverPayload,
   type ControlPlaneDeliverResult,
@@ -131,6 +134,7 @@ import {
   type ControlPlaneStatusResult,
   type ControlPlaneTerminalInput,
   type ControlPlaneWorktreeCaptureInput,
+  type ControlPlaneWorkspaceStoppedPayload,
 } from '../../shared/control-plane-protocol.js';
 import {
   worktreeBranchOperationResultSchema,
@@ -288,6 +292,17 @@ const TRANSPORT_RECOVERY_KEY = 'control_plane_transport_recovery_at';
 const PENDING_INTERACTIONS_KEY = 'session_pending_interactions';
 const AVAILABLE_COMMANDS_KEY = 'available_commands';
 const ROOT_STATUS_KEY = 'session_root_status';
+/** Workspace Stop authority: newest epoch/at and the attempts it retired. */
+const WORKSPACE_STOP_STATE_KEY = 'control_plane_workspace_stop_state';
+const WORKSPACE_STOPPED_ATTEMPTS_MAX = 8;
+const workspaceStopStateSchema = z
+  .object({
+    epoch: z.number().int().nonnegative(),
+    at: z.number().int().nonnegative(),
+    attempts: z.array(z.string().min(1)).max(WORKSPACE_STOPPED_ATTEMPTS_MAX),
+  })
+  .strict();
+type WorkspaceStopState = z.infer<typeof workspaceStopStateSchema>;
 const EVENT_RECEIPT_PREFIX = 'native_event_receipt/';
 /**
  * A delivery is retried only until `expiresAt`, but an attempt can wait in this DO's queue past it.
@@ -539,6 +554,10 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   prepare(input: ControlPlanePrepareInputWithSelection): Promise<ControlPlaneRouteView>;
   deliver(payload: ControlPlaneDeliverPayload): Promise<ControlPlaneDeliverResult>;
   abort(payload: ControlPlaneSessionRefPayload): Promise<ControlPlaneDispatchResult>;
+  /** Workspace Stop during preparation; returns the durable stop epoch. */
+  cancelWorkspace(
+    payload: ControlPlaneCancelWorkspacePayload
+  ): Promise<ControlPlaneCancelWorkspaceResult>;
   answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneDispatchResult>;
   release(payload: ControlPlaneSessionRefPayload): Promise<void>;
   /** H4: the Sandbox DO returns the connected allocation fence for a bound handle. */
@@ -761,6 +780,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private runtimeAuthorization: RuntimeAuthorization | undefined;
   private messages: SessionMessage[] = [];
   private route: ControlPlaneRouteView = { state: 'unknown' };
+  private workspaceStop: WorkspaceStopState = { epoch: 0, at: 0, attempts: [] };
   private transportRecoveryAt: number | null = null;
   private pendingInteractions: PendingInteractions | undefined;
   private availableCommands: CommandsAvailableData = { commands: [] };
@@ -1222,6 +1242,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.availableCommands = commands?.commands ? commands : { commands: [] };
     const rootStatus = rootStatusSchema.safeParse(await this.ctx.storage.get(ROOT_STATUS_KEY));
     this.rootStatus = rootStatus.success ? rootStatus.data : undefined;
+    const stop = workspaceStopStateSchema.safeParse(
+      await this.ctx.storage.get<unknown>(WORKSPACE_STOP_STATE_KEY)
+    );
+    this.workspaceStop = stop.success ? stop.data : { epoch: 0, at: 0, attempts: [] };
     this.messages = await this.loadMessages();
     this.route = await this.loadRoute();
     const recoveryAt = z
@@ -2001,8 +2025,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       const view = await this.readSandboxView(pass);
       if (view?.state === 'failed' && view.attemptId === this.currentAttemptId()) {
         await this.applyView(view, pass);
-        reduction = queueMessage(this.messages, parsed, now);
       }
+      // Reconciliation can cancel queued work; rebuild against the current set.
+      reduction = queueMessage(this.messages, parsed, now);
+      if (reduction.rejected === 'queue-full') return 'queue-full';
     }
     if (reduction.changed.length > 0) {
       this.messages = reduction.messages;
@@ -2034,8 +2060,50 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       // A user cancel: mark the interruption so the next idle schedules a
       // capture that shows the cancelled worktree state.
       this.worktreeChanges.markInterrupted();
-      await this.settleMessages(open, 'cancelled', 'interrupted');
       const peer = this.sandboxPeer();
+      const pass = this.transportPass();
+      const status = await this.readSandboxStatus(peer, pass);
+      if (status !== null && status.workspaceStopEpoch > this.workspaceStop.epoch) {
+        const localAttempt = this.route.state === 'unknown' ? undefined : this.route.attemptId;
+        const authoritativeRetired =
+          localAttempt !== undefined &&
+          (status.view.state === 'unknown' || status.view.attemptId !== localAttempt);
+        await this.settleWorkspaceStop(
+          status.workspaceStopEpoch,
+          status.workspaceStopAt,
+          authoritativeRetired ? localAttempt : undefined
+        );
+        const newerWork =
+          this.route.state === 'preparing' ||
+          status.workspacePreparing ||
+          openMessages(this.messages).some(message => message.createdAt > status.workspaceStopAt);
+        if (!newerWork) return { interrupted: open.length > 0 };
+      }
+      const workspacePreparing =
+        this.route.state === 'preparing' || status?.workspacePreparing === true;
+      if (workspacePreparing) {
+        const requestedAt = Math.max(Date.now(), this.workspaceStop.at + 1);
+        const current = openMessages(this.messages).map(message => message.messageId);
+        let result: ControlPlaneCancelWorkspaceResult;
+        try {
+          if (peer === null) throw new Error('Sandbox unavailable');
+          result = await withDORetry(
+            () => this.sandboxPeer() ?? peer,
+            current => current.cancelWorkspace({ sessionId: this.sessionId, requestedAt }),
+            'session.cancel_workspace',
+            this.sandboxRpcConfig(this.transportPass())
+          );
+        } catch {
+          throw new Error('Could not stop workspace preparation. Try Stop again.');
+        }
+        await this.settleWorkspaceStop(
+          result.stopEpoch,
+          result.stopAt,
+          this.route.state === 'unknown' ? undefined : this.route.attemptId
+        );
+        return { interrupted: open.length > 0 || current.length > 0 };
+      }
+      await this.settleMessages(open, 'cancelled', 'interrupted');
       if (peer !== null) {
         try {
           await withDORetry(
@@ -2049,6 +2117,88 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         }
       }
       return { interrupted: open.length > 0 };
+    });
+  }
+
+  private async readSandboxStatus(
+    peer: ControlPlaneSandboxPeer | null,
+    pass: TransportPass
+  ): Promise<ControlPlaneStatusResult | null> {
+    if (peer === null) return null;
+    try {
+      return await withDORetry(
+        () => this.sandboxPeer() ?? peer,
+        current => current.status({ sessionId: this.sessionId }),
+        'session.status',
+        this.sandboxRpcConfig(pass)
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Cancel work created before the Stop; work created after it is new intent.
+   * Duplicate or older notification epochs are ignored.
+   */
+  private async settleWorkspaceStop(
+    stopEpoch: number,
+    stopAt: number,
+    retiredAttemptId?: string
+  ): Promise<boolean> {
+    if (stopEpoch <= this.workspaceStop.epoch) return false;
+    const newerIntent = openMessages(this.messages).some(message => message.createdAt > stopAt);
+    this.workspaceStop = {
+      epoch: stopEpoch,
+      at: Math.max(this.workspaceStop.at, stopAt),
+      attempts: this.workspaceStop.attempts,
+    };
+    await this.ctx.storage.put(WORKSPACE_STOP_STATE_KEY, this.workspaceStop);
+    const cancel = openMessages(this.messages)
+      .filter(message => message.createdAt <= stopAt)
+      .map(message => message.messageId);
+    if (cancel.length > 0) await this.settleMessages(cancel, 'cancelled', 'interrupted');
+    if (newerIntent) {
+      await this.armAlarm();
+      return true;
+    }
+    await this.settleCancelledRoute(retiredAttemptId);
+    return true;
+  }
+
+  private async rememberStoppedAttempt(attemptId: string): Promise<void> {
+    if (this.workspaceStop.attempts.includes(attemptId)) return;
+    this.workspaceStop = {
+      ...this.workspaceStop,
+      attempts: [...this.workspaceStop.attempts, attemptId].slice(-WORKSPACE_STOPPED_ATTEMPTS_MAX),
+    };
+    await this.ctx.storage.put(WORKSPACE_STOP_STATE_KEY, this.workspaceStop);
+  }
+
+  private async settleCancelledRoute(retiredAttemptId?: string): Promise<void> {
+    if (retiredAttemptId !== undefined) await this.rememberStoppedAttempt(retiredAttemptId);
+    if (this.route.state === 'preparing') {
+      this.finalizeAttempt(this.route.attemptId, {
+        status: 'failed',
+        safeError: 'preparation_cancelled',
+      });
+    }
+    this.finishWorktreePreparation();
+    this.route = { state: 'unknown' };
+    await this.ctx.storage.put(ROUTE_KEY, this.route);
+    await this.clearPendingInteractions();
+    await this.clearTransportRecovery();
+    this.emitCloudStatus({ type: 'error', message: 'preparation_cancelled' });
+    await this.armAlarm();
+  }
+
+  async onWorkspaceStopped(payload: ControlPlaneWorkspaceStoppedPayload): Promise<void> {
+    await this.initialized;
+    if (this.registration === null) return;
+    const parsed = controlPlaneWorkspaceStoppedPayloadSchema.parse(payload);
+    await this.enqueue(async () => {
+      if (this.registration === null) return;
+      await this.settleWorkspaceStop(parsed.stopEpoch, parsed.requestedAt, parsed.attemptId);
     });
   }
 
@@ -2283,6 +2433,25 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.enqueue(async () => {
       // A delete queued ahead of this notification wiped the session.
       if (this.registration === null) return;
+      // Retired attempts must not revive a route that is now `unknown`.
+      if (parsed.state !== 'unknown' && this.workspaceStop.attempts.includes(parsed.attemptId)) {
+        return;
+      }
+      if (parsed.state !== 'unknown' && this.route.state === 'unknown') {
+        const pass = this.transportPass();
+        const authoritative = await this.readSandboxView(pass);
+        if (authoritative === null) {
+          await this.armAlarm();
+          return;
+        }
+        if (authoritative.state !== 'unknown') {
+          await this.applyView(authoritative, pass);
+        } else if (this.messages.some(message => message.state === 'queued')) {
+          await this.recoverQueued(pass);
+        }
+        await this.armAlarm();
+        return;
+      }
       if (parsed.state === 'lost' && parsed.attemptId === this.currentAttemptId()) {
         await this.captureQueuedRouteContainer(parsed);
       }
@@ -2484,7 +2653,15 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       // Retry any report/callback obligation a previous attempt could not send.
       await this.repairOutboxes();
       const now = Date.now();
-      const due = dueBackstopMessages(this.messages, now, this.sessionTimers());
+      let due = dueBackstopMessages(this.messages, now, this.sessionTimers());
+      let reconciled = false;
+      if (due.length > 0) {
+        // Reconcile a dropped workspace_stopped before applying backstop failure.
+        const epochBefore = this.workspaceStop.epoch;
+        await this.readSandboxView(this.transportPass(false));
+        reconciled = this.workspaceStop.epoch > epochBefore;
+        due = dueBackstopMessages(this.messages, now, this.sessionTimers());
+      }
       if (due.length > 0) {
         if (due.some(entry => entry.message.state === 'queued')) {
           await this.captureQueuedRouteContainer(this.route);
@@ -2501,6 +2678,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       }
       if (this.transportRecoveryAt !== null && this.transportRecoveryAt <= now) {
         await this.clearTransportRecovery();
+        await this.recoverQueued(this.transportPass(false));
+      } else if (reconciled && this.messages.some(message => message.state === 'queued')) {
         await this.recoverQueued(this.transportPass(false));
       }
       await this.armAlarm();
@@ -3301,6 +3480,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.pendingInteractions = undefined;
     this.availableCommands = { commands: [] };
     this.rootStatus = undefined;
+    this.workspaceStop = { epoch: 0, at: 0, attempts: [] };
     this.historyHydrations.clear();
     this.worktreePreparationGeneration = undefined;
     this.preparationRecorders.clear();
@@ -3472,11 +3652,24 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
-  private async applyView(view: ControlPlaneRouteView, pass = this.transportPass()): Promise<void> {
-    // The route view is the source of the preparation row: the previous
-    // persisted view names the attempt that is open, so a transition closes it
-    // even if this process lost its in-memory recorder map to eviction.
+  private async applyView(
+    view: ControlPlaneRouteView,
+    pass = this.transportPass(),
+    allowStopRetry = true
+  ): Promise<void> {
     const previous = this.route;
+    if (view.state === 'unknown' && view.stopEpoch !== undefined) {
+      const retiredAttemptId = previous.state === 'unknown' ? undefined : previous.attemptId;
+      if (view.stopEpoch > this.workspaceStop.epoch) {
+        await this.settleWorkspaceStop(view.stopEpoch, view.stopAt ?? Date.now(), retiredAttemptId);
+      }
+      if (allowStopRetry && this.messages.some(message => message.state === 'queued')) {
+        const prepared = await this.prepareSandbox(pass);
+        if (prepared !== null) await this.applyView(prepared, pass, false);
+        return;
+      }
+      if (view.stopEpoch > this.workspaceStop.epoch) return;
+    }
     if (view.state === 'failed') await this.captureQueuedRouteContainer(view);
     const previousAttemptId = previous.state === 'unknown' ? undefined : previous.attemptId;
     const nextAttemptId = view.state === 'unknown' ? undefined : view.attemptId;
@@ -3717,6 +3910,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       await this.scheduleTransportRecovery(pass);
       return null;
     }
+    // A Stop refuses work created before its wall clock; a later message is new intent.
+    const intent = oldestOpenMessage(this.messages, 'queued');
     try {
       return await withDORetry(
         () => this.sandboxPeer() ?? peer,
@@ -3728,6 +3923,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               ? { sandboxSelection: registration.sandboxSelection }
               : {}),
             ...(registration.environment ? { environment: registration.environment } : {}),
+            stopEpoch: this.workspaceStop.epoch,
+            ...(intent === undefined ? {} : { intentAt: intent.createdAt }),
           }),
         'session.prepare',
         this.sandboxRpcConfig(pass)
@@ -3815,6 +4012,20 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         'session.status',
         this.sandboxRpcConfig(pass)
       );
+      if (status.workspaceStopEpoch > this.workspaceStop.epoch) {
+        const localAttempt = this.route.state === 'unknown' ? undefined : this.route.attemptId;
+        const authoritativeRetired =
+          localAttempt !== undefined &&
+          (status.view.state === 'unknown' || status.view.attemptId !== localAttempt);
+        await this.settleWorkspaceStop(
+          status.workspaceStopEpoch,
+          status.workspaceStopAt,
+          authoritativeRetired ? localAttempt : undefined
+        );
+        return this.messages.some(message => message.state === 'queued')
+          ? { state: 'unknown' }
+          : null;
+      }
       return controlPlaneRouteViewSchema.parse(status.view);
     } catch {
       await this.scheduleTransportRecovery(pass);

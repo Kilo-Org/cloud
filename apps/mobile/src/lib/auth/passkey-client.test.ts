@@ -588,6 +588,54 @@ describe('registerPasskey', () => {
     expect(api.create).not.toHaveBeenCalled();
   });
 
+  it('reports an options refusal the route never accepts as unavailable', async () => {
+    const api = fakeApi();
+    mockPostAuth.mockResolvedValueOnce({
+      ok: false,
+      errorCode: undefined,
+      ssoOrganizationId: undefined,
+      httpStatus: 401,
+    });
+
+    const result = await registerPasskey(api);
+
+    // The options step answers 401 only for a session it will not accept, so
+    // the status alone decides it even when the body carries no known code.
+    expect(result).toEqual({ status: 'error', failure: 'unavailable' });
+    expect(api.create).not.toHaveBeenCalled();
+  });
+
+  it('keeps an attestation 401 from the challenge retryable', async () => {
+    const api = fakeApi();
+    api.create.mockResolvedValue(attestation);
+    mockPostAuth.mockResolvedValueOnce(optionsResponse).mockResolvedValueOnce({
+      ok: false,
+      errorCode: 'CHALLENGE_EXPIRED',
+      ssoOrganizationId: undefined,
+      httpStatus: 401,
+    });
+
+    const result = await registerPasskey(api);
+
+    // Verify also answers 401 for the challenge itself; a fresh ceremony mints
+    // a new one, so this refusal must stay retryable.
+    expect(result).toEqual({ status: 'error', failure: 'failed' });
+  });
+
+  it('keeps a rate-limited refusal retryable', async () => {
+    const api = fakeApi();
+    mockPostAuth.mockResolvedValueOnce({
+      ok: false,
+      errorCode: 'RATE_LIMITED',
+      ssoOrganizationId: undefined,
+      httpStatus: 429,
+    });
+
+    const result = await registerPasskey(api);
+
+    expect(result).toEqual({ status: 'error', failure: 'failed' });
+  });
+
   it('reports a refused attestation as the generic failure', async () => {
     const api = fakeApi();
     api.create.mockResolvedValue(attestation);

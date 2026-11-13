@@ -29,4 +29,17 @@ describe('workspace branch registration contract', () => {
       );
     }
   });
+
+  it('accepts an organization id that is a UUID', () => {
+    const organizationId = '11111111-1111-4111-8111-111111111111';
+    expect(
+      createSessionForCloudAgentSchema.parse({ ...params, organizationId }).organizationId
+    ).toBe(organizationId);
+  });
+
+  it('rejects an organization id that is not a UUID', () => {
+    expect(
+      createSessionForCloudAgentSchema.safeParse({ ...params, organizationId: 'acme' }).success
+    ).toBe(false);
+  });
 });

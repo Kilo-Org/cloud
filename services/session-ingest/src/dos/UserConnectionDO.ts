@@ -1,4 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
+import { getWorkerDb } from '@kilocode/db/client';
+import { hasOrganizationAccess } from '@kilocode/worker-utils';
 import { z } from 'zod';
 
 import type { Env } from '../env';
@@ -259,6 +261,12 @@ const SESSION_ACCESS_DENIED_ERROR = {
   message: 'You no longer have access to this session',
 };
 
+const ORGANIZATION_ACCESS_DENIED_ERROR = {
+  source: 'relay',
+  code: 'ORGANIZATION_ACCESS_DENIED',
+  message: 'You do not have access to this organization',
+};
+
 const CATALOG_TOO_LARGE_ERROR = {
   source: 'relay',
   code: 'CATALOG_TOO_LARGE',
@@ -324,6 +332,32 @@ const MUTATION_ID_TOO_LONG_ERROR = {
   code: 'MUTATION_ID_TOO_LONG',
   message: 'Mutation ID is too long',
 };
+
+/** UUID v1–v5 shape used to gate the `create_session` organization claim. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * The organization a `create_session` command claims the new session belongs
+ * to. `none` is a personal create; `invalid` is a claim that cannot be read, so
+ * the command is refused instead of forwarded with an unreadable claim.
+ */
+type CreateSessionOrgClaim =
+  | { kind: 'none' }
+  | { kind: 'invalid' }
+  | { kind: 'organization'; organizationId: string };
+
+function readCreateSessionOrgClaim(msg: {
+  command: string;
+  data?: unknown;
+}): CreateSessionOrgClaim {
+  if (msg.command !== 'create_session') return { kind: 'none' };
+  const data = msg.data;
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return { kind: 'none' };
+  if (!Object.hasOwn(data, 'orgId')) return { kind: 'none' };
+  const orgId: unknown = Reflect.get(data, 'orgId');
+  if (typeof orgId !== 'string') return { kind: 'invalid' };
+  return { kind: 'organization', organizationId: orgId };
+}
 
 type ReadyPushEntry = {
   kiloUserId: string;
@@ -1628,6 +1662,38 @@ export class UserConnectionDO extends DurableObject<Env> {
         error: INVALID_COMMAND_ERROR,
       });
       return;
+    }
+
+    // A create may name an organization, and that claim reaches the CLI.
+    // Confirm the acting user can act for it here, so the create cannot be
+    // attributed to an organization they are not a member of.
+    const orgClaim = readCreateSessionOrgClaim(msg);
+    if (orgClaim.kind === 'invalid') {
+      this.sendToWeb(ws, {
+        type: 'response',
+        id: msg.id,
+        error: INVALID_COMMAND_ERROR,
+      });
+      return;
+    }
+    if (orgClaim.kind === 'organization') {
+      const kiloUserId = attachment.kiloUserId;
+      const organizationId = orgClaim.organizationId;
+      if (
+        !kiloUserId ||
+        !UUID_RE.test(organizationId) ||
+        !(await hasOrganizationAccess(getWorkerDb(this.env.HYPERDRIVE.connectionString), {
+          kiloUserId,
+          organizationId,
+        }))
+      ) {
+        this.sendToWeb(ws, {
+          type: 'response',
+          id: msg.id,
+          error: ORGANIZATION_ACCESS_DENIED_ERROR,
+        });
+        return;
+      }
     }
 
     // Command-time access recheck: a removed member must not forward a command

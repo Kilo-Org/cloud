@@ -161,6 +161,13 @@ const reopenRunningSession = async ({
     kiloSessionId === undefined
       ? undefined
       : sidePanel.locator(`[data-session-id="${kiloSessionId}"]`);
+  if (idRow !== undefined) {
+    // The list refetches when it mounts again, so the own row can arrive late.
+    await expect
+      .poll(() => idRow.count(), { timeout: 30_000 })
+      .toBeGreaterThan(0)
+      .catch(() => undefined);
+  }
   const idRowCount = idRow === undefined ? 0 : await idRow.count().catch(() => 0);
 
   // 'Session' is the view's placeholder before the session metadata loads; it
@@ -449,6 +456,73 @@ const decideCloudForm = async (sidePanel: Page): Promise<string | null> => {
   return null;
 };
 
+/** The extension's own API bearer token, read from its storage. */
+const readExtensionToken = async (sidePanel: Page): Promise<string> =>
+  sidePanel.evaluate(
+    () =>
+      new Promise<string>(resolve => {
+        const storage = (
+          globalThis as {
+            chrome?: {
+              storage?: {
+                local?: {
+                  get: (
+                    keys: string[],
+                    callback: (items: Record<string, { token?: string } | undefined>) => void
+                  ) => void;
+                };
+              };
+            };
+          }
+        ).chrome?.storage?.local;
+        storage?.get(['kiloAuth'], items => {
+          resolve(items['kiloAuth']?.token ?? '');
+        });
+      })
+  );
+
+/** Session ids the user already has, from both lists the Agents view reads. */
+const listSessionIds = async (
+  context: BrowserContext,
+  token: string
+): Promise<ReadonlySet<string>> => {
+  const ids = new Set<string>();
+  const paths = [
+    'activeSessions.list?input=%7B%22includeCloudAgentSessions%22%3Atrue%2C%22organizationId%22%3Anull%7D',
+    'cliSessionsV2.list?input=%7B%22includeChildren%22%3Afalse%2C%22limit%22%3A10%2C%22orderBy%22%3A%22updated_at%22%2C%22organizationId%22%3Anull%7D',
+  ];
+  for (const path of paths) {
+    const response = await context.request.get(`${localBackendUrl}/api/trpc/${path}`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    for (const match of (await response.text()).matchAll(
+      /"(?:id|session_id)":"(ses_[A-Za-z0-9]+)"/gu
+    )) {
+      const id = match[1];
+      if (id !== undefined) ids.add(id);
+    }
+  }
+  return ids;
+};
+
+/** Wait for the id a CLI create added to the user's lists. */
+const waitForCreatedSessionId = async (
+  context: BrowserContext,
+  token: string,
+  before: ReadonlySet<string>
+): Promise<string> => {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop -- polling the create's server-side row
+    const current = await listSessionIds(context, token);
+    for (const id of current) if (!before.has(id)) return id;
+    // eslint-disable-next-line no-await-in-loop -- polls between list reads
+    await new Promise<void>(resolve => {
+      setTimeout(resolve, 1_000);
+    });
+  }
+  throw new Error('the CLI create added no session row the list reads can see');
+};
+
 test('live local backend: remote CLI agent covers start, reopen, queue, and stop', async () => {
   const fixture = await startFixtureServer({ title: 'Kilo live agents session target' });
   const { context, extensionId, userDataDir } = await launchExtensionContext();
@@ -467,6 +541,8 @@ test('live local backend: remote CLI agent covers start, reopen, queue, and stop
     });
 
     const nonce = `p${process.pid}-${Date.now().toString(36)}`;
+    const token = await readExtensionToken(sidePanel);
+    const idsBeforeCreate = await listSessionIds(context, token);
 
     // Start: spawn onto the connected CLI instance.
     await sidePanel.getByRole('button', { exact: true, name: 'New session' }).click();
@@ -490,7 +566,13 @@ test('live local backend: remote CLI agent covers start, reopen, queue, and stop
     await sidePanel.getByRole('button', { name: 'Start session' }).click();
     await expect(sidePanel.getByLabel('Back to sessions')).toBeVisible({ timeout: 30_000 });
 
-    await runOpenSessionPhases({ kiloSessionId: undefined, nonce, platformLabel: 'CLI', sidePanel });
+    const createdKiloSessionId = await waitForCreatedSessionId(context, token, idsBeforeCreate);
+    await runOpenSessionPhases({
+      kiloSessionId: createdKiloSessionId,
+      nonce,
+      platformLabel: 'CLI',
+      sidePanel,
+    });
   } finally {
     await context.close();
     await fixture.close();

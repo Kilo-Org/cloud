@@ -251,7 +251,7 @@ public final class ReactNativeSshModule: Module {
         await self?.requestPrompts(request) ?? .cancelled
       },
       notifyDisconnect: { [weak self] notice in
-        self?.sendEvent("onDisconnect", notice.toEvent())
+        self?.handleTransportDisconnect(notice)
       }
     )
 
@@ -341,6 +341,12 @@ public final class ReactNativeSshModule: Module {
 
     state.shellIds(of: sessionId).forEach { closeShell($0) }
     try await translateAsync { try await session.disconnect() }
+  }
+
+  private func handleTransportDisconnect(_ notice: DisconnectNotice) {
+    state.removeSession(notice.sessionId)
+    state.shellIds(of: notice.sessionId).forEach { closeShell($0) }
+    sendEvent("onDisconnect", notice.toEvent())
   }
 
   private func openShell(_ sessionId: String, _ options: ShellOptionsRecord) async throws -> String {

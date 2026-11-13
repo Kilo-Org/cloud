@@ -14,7 +14,7 @@ import {
 // wrapper picks its icon from `I18nManager.isRTL` on every render.
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 
-vi.mock('react-native', () => ({ I18nManager: i18nManager }));
+vi.mock('react-native', () => ({ I18nManager: i18nManager, View: 'View' }));
 
 vi.mock('@/components/ui/icons', () => ({
   ArrowLeft: 'ArrowLeft',
@@ -96,9 +96,10 @@ describe.each(WRAPPERS)('$name', ({ Component, ltr, rtl }) => {
   });
 });
 
-const CALLER_STYLE = { marginTop: 7 };
+/** A caller style that carries more than one property, including its own transform step. */
+const CALLER_STYLE = { marginTop: 7, transform: [{ rotate: '15deg' }] };
 
-/** Count of horizontal-flip steps the rendered style carries, at any nesting depth. */
+/** Count of horizontal-flip steps the rendered tree carries, at any nesting depth. */
 function mirrorStepCount(style: unknown): number {
   if (Array.isArray(style)) {
     return style.reduce((total, entry) => total + mirrorStepCount(entry), 0);
@@ -116,16 +117,14 @@ function mirrorStepCount(style: unknown): number {
   ).length;
 }
 
-function carriesCallerStyle(style: unknown): boolean {
-  if (Array.isArray(style)) {
-    return style.some(entry => carriesCallerStyle(entry));
+/** Flip steps anywhere in the rendered tree: the wrapper may carry the flip itself. */
+function treeMirrorStepCount(renderer: TestRenderer.ReactTestRenderer): number {
+  let total = 0;
+  for (const node of renderer.root.findAll(() => true)) {
+    const style: unknown = node.props.style;
+    total += mirrorStepCount(style);
   }
-  return (
-    style !== null &&
-    typeof style === 'object' &&
-    'marginTop' in style &&
-    style.marginTop === CALLER_STYLE.marginTop
-  );
+  return total;
 }
 
 function renderLogOut(props: { style?: typeof CALLER_STYLE } = {}): TestRenderer.ReactTestRenderer {
@@ -140,14 +139,15 @@ function renderLogOut(props: { style?: typeof CALLER_STYLE } = {}): TestRenderer
   return renderer;
 }
 
-function logOutStyle(renderer: TestRenderer.ReactTestRenderer): unknown {
+/** The single log-out glyph the wrapper draws, so its own props can be asserted. */
+function logOutIcon(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
   const icons = renderer.root.findAllByType('LogOut');
   expect(icons).toHaveLength(1);
   const icon = icons.at(0);
   if (!icon) {
     throw new Error('Expected one log-out icon');
   }
-  return icon.props.style;
+  return icon;
 }
 
 /**
@@ -159,7 +159,7 @@ describe('DirectionalLogOut', () => {
   it('draws one log-out glyph, unflipped, in an LTR interface', () => {
     const renderer = renderLogOut();
 
-    expect(mirrorStepCount(logOutStyle(renderer))).toBe(0);
+    expect(treeMirrorStepCount(renderer)).toBe(0);
 
     renderer.unmount();
   });
@@ -168,26 +168,27 @@ describe('DirectionalLogOut', () => {
     i18nManager.isRTL = true;
     const renderer = renderLogOut();
 
-    expect(mirrorStepCount(logOutStyle(renderer))).toBe(1);
+    expect(treeMirrorStepCount(renderer)).toBe(1);
 
     renderer.unmount();
   });
 
-  it('keeps a caller-supplied style in an LTR interface', () => {
+  it('hands the caller style to the glyph untouched in an LTR interface', () => {
     const renderer = renderLogOut({ style: CALLER_STYLE });
 
-    expect(carriesCallerStyle(logOutStyle(renderer))).toBe(true);
+    expect(logOutIcon(renderer).props.style).toEqual(CALLER_STYLE);
 
     renderer.unmount();
   });
 
-  it('keeps a caller-supplied style alongside the flip in an RTL interface', () => {
+  it('hands the caller style to the glyph untouched in an RTL interface, so no caller property is replaced', () => {
     i18nManager.isRTL = true;
     const renderer = renderLogOut({ style: CALLER_STYLE });
 
-    const style = logOutStyle(renderer);
-    expect(carriesCallerStyle(style)).toBe(true);
-    expect(mirrorStepCount(style)).toBe(1);
+    const icon = logOutIcon(renderer);
+    expect(icon.props.style).toEqual(CALLER_STYLE);
+    expect(mirrorStepCount(icon.props.style)).toBe(0);
+    expect(treeMirrorStepCount(renderer)).toBe(1);
 
     renderer.unmount();
   });

@@ -431,7 +431,7 @@ describe('syncArtifactMirror crawling', () => {
       failed: 0,
       files: 1,
     });
-    expect(sessionFiles(h.lastManifest(), 's1')).toEqual(['f1', 'f2']);
+    expect(sessionFiles(h.lastManifest(), 's1').toSorted()).toEqual(['f1', 'f2']);
     expect(h.getSessionMessagesPage).toHaveBeenCalledTimes(3);
   });
 
@@ -448,25 +448,30 @@ describe('syncArtifactMirror crawling', () => {
     expect(sessionFiles(h.lastManifest(), 's1')).toEqual(['f1']);
   });
 
-  it('re-reads a session whose mirrored bytes are gone', async () => {
-    // The mirror is derived data: an account boundary, the file browser or the
-    // OS can remove it. Stored crawl state that still names the file would skip
-    // re-materializing it and publish it in the index anyway, so the run checks
-    // the disk before it trusts that state.
+  it('re-reads a session whose mirrored bytes are gone and keeps the ones left', async () => {
+    // The mirror is derived data: the file browser or the OS can remove it.
+    // Stored crawl state that still names the file would skip re-materializing
+    // it and publish it in the index anyway, so the run checks the disk first.
+    // The session's surviving files stay indexed and are not fetched again.
     const h = harness();
     h.sessions.push({ id: 's1', updatedAt: T1 });
-    setFiles(h, 's1', [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
+    setFiles(h, 's1', [
+      { id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` },
+      { id: 'f2', size: 20, url: `${STORAGE_ORIGIN}/f2` },
+    ]);
 
     await syncArtifactMirror({ deps: h.deps });
-    expect(h.downloadFile).toHaveBeenCalledTimes(1);
+    expect(h.downloadFile).toHaveBeenCalledTimes(2);
     fakeFs.remove('file:///mirror/sessions/f1');
 
     h.setNow(NOW + MIRROR_SYNC_MIN_INTERVAL_MS);
     await syncArtifactMirror({ deps: h.deps });
 
     expect(h.getSessionMessagesPage).toHaveBeenCalledTimes(2);
-    expect(h.downloadFile).toHaveBeenCalledTimes(2);
-    expect(sessionFiles(h.lastManifest(), 's1')).toEqual(['f1']);
+    expect(
+      h.downloadFile.mock.calls.filter(([url]) => url === `${STORAGE_ORIGIN}/f2`)
+    ).toHaveLength(1);
+    expect(sessionFiles(h.lastManifest(), 's1').toSorted()).toEqual(['f1', 'f2']);
   });
 
   it('restarts a session whose head changed while its crawl was in progress', async () => {

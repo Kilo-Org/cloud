@@ -258,9 +258,9 @@ export async function handleAudioTranscriptionsRequest(
   const account = await readGatewayBalance(user, organizationId, requestedModelLowerCased);
   const { balance, settings, plan, payer } = account;
 
-  // The organization's disabled-gateway settings cover every organization-funded
-  // inference route, so this route applies them to the provider the transcription
-  // catalog resolves, before any upstream call or charge.
+  // The organization's disabled-gateway settings govern which gateways its funded
+  // requests may use. Apply them to the provider the transcription catalog resolves,
+  // before any upstream call or charge.
   const organizationGatewaySettings = organizationId
     ? getOrganizationGatewaySettings(
         await getRuntimeOrganizationFeatures(),

@@ -30,6 +30,8 @@ import {
   readKilo2MessagesPage,
   type Kilo2MessagesPage,
 } from './conversation-history.js';
+import type { PreparationAttempt } from '../../shared/protocol.js';
+import type { QueuedMessageSnapshot } from '../../websocket/stream.js';
 
 export const MAX_SESSION_PAGE_BYTES = 4 * 1024 * 1024;
 /**
@@ -106,6 +108,17 @@ function parseItem<T>(raw: string | null | undefined, schema: z.ZodType<T>): T |
   }
 }
 
+/**
+ * Rows the WebSocket `connected` event replays on connect. The first history
+ * page carries them so a client that opens without a socket still shows the
+ * run's preparation rows and its queued or failed turns. Older pages must not
+ * repeat them.
+ */
+export type SessionSnapshotRows = {
+  preparationAttempts?: PreparationAttempt[];
+  queuedMessages?: QueuedMessageSnapshot[];
+};
+
 type V1SessionMessagesPage = {
   kind: 'success';
   source: { version: 'v1' };
@@ -115,7 +128,7 @@ type V1SessionMessagesPage = {
   omittedItemCount: number;
   updateCursor: number;
   totalCostMicrodollars: number;
-};
+} & SessionSnapshotRows;
 
 export type SessionMessagesPage = V1SessionMessagesPage | Kilo2MessagesPage;
 

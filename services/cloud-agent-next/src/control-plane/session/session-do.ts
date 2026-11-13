@@ -2853,7 +2853,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.ensureClientHistory(kiloSessionId);
     if (this.registration !== registration) return null;
     this.partText.flush();
-    return readSessionMessagesPage({
+    const page = readSessionMessagesPage({
       db: this.db,
       storage: this.ctx.storage,
       queries: this.eventQueries,
@@ -2867,6 +2867,16 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         readHistoryHydration(this.ctx.storage, isRoot ? undefined : kiloSessionId)
           ?.omittedItemCount ?? 0,
     });
+    // The first page carries the rows the stream replays on connect, so a
+    // client that cannot reach the socket still shows the preparation attempts
+    // and the run's queued or failed turns. Older pages stay bare: the rows are
+    // current state, not history.
+    if (parsed.cursor !== undefined) return page;
+    return {
+      ...page,
+      preparationAttempts: listPreparationAttempts(this.eventQueries),
+      queuedMessages: this.deriveQueuedMessages(),
+    };
   }
 
   /** Returns a descendant's lineage under the registered root; the root has none. */

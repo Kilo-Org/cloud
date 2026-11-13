@@ -6,7 +6,9 @@ import {
   sessionIdSchema,
   kilo2ConversationSourceSchema,
   kilo2MessageSchema,
+  customerBillingFailureSchema,
 } from '@kilocode/session-ingest-contracts';
+import { PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
 import { readKilo2Messages } from './kilo2-source-messages';
 import type {
   CloudAgentSessionId,
@@ -238,6 +240,68 @@ export const cloudSessionMessagesPageInputSchema = z.object({
   toolDisplay: z.enum(['full', 'preview']).optional(),
 });
 
+/**
+ * A preparation step snapshot as the page carries it. `schemas.ts` validates
+ * the same shape for a live `preparing` event; this copy keeps the page's
+ * attempts complete, including their steps, through the page transform.
+ */
+const preparationPageStepSchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  kind: z.enum(['phase', 'setup_command']),
+  label: z.string(),
+  status: z.enum(['running', 'completed', 'failed']),
+  startedAt: z.number(),
+  startedRevision: z.number().optional(),
+  parentStepId: z.string().optional(),
+  completedAt: z.number().optional(),
+  revision: z.number(),
+  latestDetail: z.string().optional(),
+  snapshotCapturedAt: z.number().optional(),
+  safeError: z.string().optional(),
+  command: z.string().optional(),
+  commandIndex: z.number().optional(),
+  commandCount: z.number().optional(),
+  outputTail: z.string().max(PREPARATION_OUTPUT_TAIL_MAX_BYTES).optional(),
+  outputTruncated: z.boolean().optional(),
+  exitCode: z.number().optional(),
+});
+
+export const preparationAttemptPageSchema = z.object({
+  id: z.string(),
+  triggerMessageId: z.string(),
+  status: z.enum(['running', 'completed', 'failed']),
+  startedAt: z.number(),
+  completedAt: z.number().optional(),
+  safeError: z.string().optional(),
+  revision: z.number(),
+  steps: z.array(preparationPageStepSchema),
+});
+
+export const queuedMessageSnapshotSchema = z
+  .object({
+    messageId: z.string(),
+    content: z.string(),
+    timestamp: z.number(),
+    delivery: z.enum(['queued', 'sent']).optional(),
+    turnType: z.literal('command').optional(),
+    completedAt: z.number().optional(),
+    terminalFailure: z
+      .object({
+        messageId: z.string(),
+        status: z.string().optional(),
+        delivery: z.enum(['queued', 'sent']).optional(),
+        accepted: z.boolean().optional(),
+        error: z.string().optional(),
+        reason: z.string().optional(),
+        billingFailure: customerBillingFailureSchema.optional().catch(undefined),
+        timestamp: z.number(),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
+
 const cloudV1MessagesPageWireSchema = z.object({
   source: z.object({ version: z.literal('v1') }).optional(),
   kind: z.literal('success'),
@@ -247,6 +311,9 @@ const cloudV1MessagesPageWireSchema = z.object({
   omittedItemCount: z.number().int().nonnegative(),
   updateCursor: mutationCursorSchema,
   totalCostMicrodollars: cloudSessionMetadataSchema.shape.totalCostMicrodollars,
+  /** The rows the stream replays on connect; only the first page carries them. */
+  preparationAttempts: z.array(preparationAttemptPageSchema).optional(),
+  queuedMessages: z.array(queuedMessageSnapshotSchema).optional(),
 });
 
 export const cloudSessionMessagesPageWireSchema = z

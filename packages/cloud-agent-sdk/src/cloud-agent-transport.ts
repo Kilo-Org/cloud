@@ -22,10 +22,12 @@ import {
   cloudMessageInfoSchema,
   cloudMessagePartSchema,
   cloudSessionMessagesPageSchema,
+  customerBillingFailureSchema,
 } from './schemas';
 import type {
   CloudAgentSessionId,
   KiloSessionId,
+  QueuedMessageSnapshot,
   SessionSnapshot,
   SessionSnapshotPage,
   SessionSnapshotPageOutcome,
@@ -332,6 +334,50 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       connection = null;
     }
 
+    /**
+     * Emit the page's queued and failed turns through the service sink exactly
+     * as the `connected` snapshot does, so a client that never reaches the
+     * socket builds the same pending entries and synthetic rows. A page
+     * snapshot carries no retry attempt count, so a failure that is not an
+     * interrupt replays as a terminal execution failure.
+     */
+    function replayQueuedSnapshots(
+      queuedMessages: readonly QueuedMessageSnapshot[] | undefined
+    ): void {
+      for (const queued of queuedMessages ?? []) {
+        if (queued.completedAt !== undefined) {
+          sink.onServiceEvent({ type: 'cloud.message.completed', messageId: queued.messageId });
+          continue;
+        }
+        const failure = queued.terminalFailure;
+        // A turn that is merely queued or already accepted carries no event of
+        // its own: the stream reports it only as the active message.
+        if (failure === undefined) continue;
+        sink.onServiceEvent({
+          type: 'cloud.message.queued',
+          messageId: queued.messageId,
+          content: queued.content,
+          createdAt: queued.timestamp,
+        });
+        const billingFailure =
+          failure.billingFailure === undefined
+            ? undefined
+            : customerBillingFailureSchema.safeParse(failure.billingFailure);
+        sink.onServiceEvent({
+          type: 'cloud.message.failed',
+          messageId: queued.messageId,
+          ...(failure.delivery === undefined ? {} : { delivery: failure.delivery }),
+          ...(failure.accepted === undefined ? {} : { accepted: failure.accepted }),
+          error: failure.error ?? 'Message delivery failed',
+          reason:
+            failure.status === 'interrupted' || failure.reason === 'interrupted'
+              ? 'interrupted'
+              : 'execution',
+          ...(billingFailure?.success === true ? { billingFailure: billingFailure.data } : {}),
+        });
+      }
+    }
+
     function replayInitialPage(page: SessionSnapshotPage): void {
       // Seed lastEventId from the page's event-log watermark. A present
       // watermark sets the cursor to 0 so the WebSocket connect uses
@@ -345,10 +391,12 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       }
       // Exactly one page per connect may seed the manager: a reconnect
       // catch-up that lands first wins, and a slower initial retry must not
-      // reset the older-pages cursor back to the newest page afterwards.
+      // reset the older-pages cursor back to the newest page afterwards. The
+      // replayed queued turns are current state, so only that page emits them.
       if (!initialPageRecorded) {
         initialPageRecorded = true;
         config.onInitialPageLoaded?.(page);
+        replayQueuedSnapshots(page.queuedMessages);
       }
       sources.observeProjected(page.messages);
       const version =

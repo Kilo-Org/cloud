@@ -284,6 +284,31 @@ export type PreparationAttempt = {
   steps: PreparationStepSnapshot[];
 };
 
+/**
+ * One of the run's queued or failed turns, as the `connected` event replays it.
+ * `terminalFailure` is the settled failure a client shows in place of the
+ * message: the page's copy lets an opened session paint the question row and
+ * its failure without a socket.
+ */
+export type QueuedMessageSnapshot = {
+  messageId: string;
+  content: string;
+  timestamp: number;
+  delivery?: 'queued' | 'sent';
+  turnType?: 'command';
+  completedAt?: number;
+  terminalFailure?: {
+    messageId: string;
+    status?: string;
+    delivery?: 'queued' | 'sent';
+    accepted?: boolean;
+    error?: string;
+    reason?: string;
+    billingFailure?: unknown;
+    timestamp: number;
+  };
+};
+
 /** Full service state — all non-chat state in one place. */
 export type ServiceStateSnapshot = {
   activity: SessionActivity;
@@ -352,6 +377,11 @@ export type SessionSnapshotPage = {
   totalCostMicrodollars?: number | null | undefined;
   /** The preparation rows the stream replays first, so the first page can show them. */
   preparationAttempts?: readonly PreparationAttempt[];
+  /**
+   * The run's queued and failed turns the socket replays on connect, so a page
+   * opened without a socket still shows the question row and its failure.
+   */
+  queuedMessages?: readonly QueuedMessageSnapshot[];
 };
 
 export type CloudSessionMetadata = z.infer<typeof cloudSessionMetadataSchema>;

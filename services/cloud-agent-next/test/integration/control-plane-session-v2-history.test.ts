@@ -1,4 +1,4 @@
-import { env, reset, runInDurableObject } from 'cloudflare:test';
+import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
 import { asc, eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -12,6 +12,7 @@ import {
 import {
   MAX_SESSION_PAGE_BYTES,
   MAX_SESSION_PREVIEW_PAGE_BYTES,
+  encodeCursor,
   readSessionMessagesPage,
 } from '../../src/control-plane/session/history.js';
 import {
@@ -25,6 +26,7 @@ import {
   readNativeEventPayload,
 } from '../../src/control-plane/session/native-events.js';
 import {
+  controlPlaneMessages,
   eventMutationCursor,
   events,
   historyImport,
@@ -210,6 +212,64 @@ describe('workspace DO history and mutation cursors', () => {
       part: part(kiloSessionId, 'msg_plan', 'prt_plan'),
     });
     await expectIndexedEventReads(stub);
+  });
+
+  it('carries the stream rows on the first history page only', async () => {
+    const { stub, sessionId, kiloSessionId } = await fixture();
+    const now = Date.now();
+    await runInDurableObject(stub, async (instance, state) => {
+      drizzle(state.storage)
+        .insert(controlPlaneMessages)
+        .values({
+          message_id: 'msg_failed',
+          intent: JSON.stringify({
+            messageId: 'msg_failed',
+            turn: { type: 'prompt', prompt: 'Fix the build' },
+            agent: { mode: 'code', model: 'test/model' },
+          }),
+          state: 'failed',
+          created_at: now,
+          accepted_at: null,
+          settled_at: now,
+          reason: 'workspace_setup_failed',
+        })
+        .run();
+      const recorder = instance['preparationRecorder']('attempt_failed', 'msg_failed');
+      recorder.onProgress('workspace_setup', 'Preparing environment');
+      recorder.finalize({ status: 'failed', safeError: 'Workspace setup failed' });
+    });
+    // Messages are read once per instance, so the seed needs a fresh read.
+    await evictAllDurableObjects();
+
+    const first = await stub.getSessionMessagesPage();
+    expect(first).toMatchObject({
+      preparationAttempts: [expect.objectContaining({ id: 'attempt_failed', status: 'failed' })],
+      queuedMessages: [
+        expect.objectContaining({
+          messageId: 'msg_failed',
+          content: 'Fix the build',
+          terminalFailure: expect.objectContaining({
+            status: 'failed',
+            delivery: 'queued',
+            reason: 'workspace_setup_failed',
+          }),
+        }),
+      ],
+    });
+
+    const older = await stub.getSessionMessagesPage({
+      cursor: encodeCursor({
+        version: 1,
+        sessionId,
+        rootKiloSessionId: kiloSessionId,
+        kiloSessionId,
+        createdAt: 0,
+        messageId: 'msg_oldest',
+        rowId: 1,
+      }),
+    });
+    expect(older).not.toHaveProperty('preparationAttempts');
+    expect(older).not.toHaveProperty('queuedMessages');
   });
 
   it('keeps native v2 history pages on indexed entity ranges', async () => {

@@ -12,6 +12,7 @@ import {
   MAX_SESSION_PREVIEW_PAGE_BYTES,
   type readSessionMessagesPage,
   type HistoryCursor,
+  type SessionSnapshotRows,
 } from './history.js';
 import { isKilocodeRow } from './event-queries.js';
 import { events } from './sqlite-schema.js';
@@ -31,7 +32,7 @@ export type Kilo2MessagesPage = {
   omittedItemCount: number;
   updateCursor: number;
   totalCostMicrodollars: number;
-};
+} & SessionSnapshotRows;
 
 type Input = Parameters<typeof readSessionMessagesPage>[0];
 

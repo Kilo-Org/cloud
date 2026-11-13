@@ -317,7 +317,7 @@ export function ProfileScreen() {
             ) : (
               organizationRow
             )}
-                </View>
+          </View>
         )}
 
         {/* App */}

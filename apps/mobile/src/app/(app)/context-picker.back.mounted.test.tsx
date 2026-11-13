@@ -9,7 +9,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ContextPickerScreen from './context-picker';
 import { NavigationContext } from '@/lib/navigation/navigation-context';
 
-const bridge = vi.hoisted(() => ({ options: ['Personal', 'Acme'], currentIndex: 1, onSelect: vi.fn() }));
+const bridge = vi.hoisted(() => ({
+  options: ['Personal', 'Acme'],
+  currentIndex: 1,
+  onSelect: vi.fn(),
+}));
 const slotClear = vi.hoisted(() => vi.fn());
 const router = vi.hoisted(() => ({ back: vi.fn() }));
 const backHandlers = vi.hoisted(() => {

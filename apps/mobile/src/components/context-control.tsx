@@ -77,7 +77,11 @@ export function useContextPicker(
       // The route reads its rows and its pick from the registry, so the
       // memberships and the selection identity the control shows are the ones
       // the sheet renders.
-      contextPickerSlot.set(UNFENCED_ROUTE_KEY, { options: labels, currentIndex, onSelect: select });
+      contextPickerSlot.set(UNFENCED_ROUTE_KEY, {
+        options: labels,
+        currentIndex,
+        onSelect: select,
+      });
       router.push('/(app)/context-picker' as Href);
     },
   };

@@ -18,12 +18,13 @@ import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { UpstreamTimeoutError } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { api_request_log } from '@kilocode/db/schema';
+import { api_request_log_2 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
 import { eq } from 'drizzle-orm';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import {
+  apiRequestLogBlobKey,
   apiRequestLogBlobSchema,
   type EnkryptRequestLog,
 } from '@kilocode/web-shared/lib/r2/api-request-log';
@@ -419,9 +420,9 @@ describe.each(timeoutEffortRequests)('$name timeout effort guidance', ({ request
       userByok: false,
       customLlmPricing: null,
       logging: {
+        usage_id: crypto.randomUUID(),
         user: null,
         organization_id: null,
-        session_id: null,
         vercel_request_id: 'fra1::request-id',
         request,
       },
@@ -2693,11 +2694,13 @@ describe.each([
   }
 );
 
+const LOG_USER_ID = 'rewrite-model-response-log-user';
+
 function makeLogging(overrides?: Partial<RequestLoggingParams>): RequestLoggingParams {
   return {
-    user: null,
+    usage_id: crypto.randomUUID(),
+    user: { id: LOG_USER_ID } as RequestLoggingParams['user'],
     organization_id: null,
-    session_id: null,
     vercel_request_id: null,
     request: { body: {} } as unknown as RequestLoggingParams['request'],
     ...overrides,
@@ -2988,7 +2991,7 @@ describe('rewriteModelResponse', () => {
     });
 
     expect(mockedAfter).not.toHaveBeenCalled();
-    expect(mockedOptIn).toHaveBeenCalledWith({ accountId: null, organizationId: null });
+    expect(mockedOptIn).toHaveBeenCalledWith({ accountId: LOG_USER_ID, organizationId: null });
   });
 
   test('logs custom models with opt-in', async () => {
@@ -3012,22 +3015,23 @@ describe('rewriteModelResponse', () => {
     await logUnrewrittenResponse({
       response: jsonResponse({ error: 'upstream error' }, 400),
       model: 'kilo-internal/my-model',
-      providerId: 'custom',
       logging: makeLogging(),
       error: null,
     });
 
     expect(mockedAfter).not.toHaveBeenCalled();
-    expect(mockedOptIn).toHaveBeenCalledWith({ accountId: null, organizationId: null });
+    expect(mockedOptIn).toHaveBeenCalledWith({ accountId: LOG_USER_ID, organizationId: null });
   });
 });
 
-describe('api_request_log storage', () => {
+describe('api_request_log_2 storage', () => {
   const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
     '@kilocode/web-shared/lib/r2/create-client'
   );
-  const vercelRequestId = 'api-request-log-r2-storage-test';
+  const storageUserId = 'api-request-log-r2-storage-test';
+  const organizationId = '5a0e7d36-3c0b-4cf2-9a3e-2c7a1d9b6f41';
   const bucket = 'test-api-request-log';
+  const storageUser = { id: storageUserId } as RequestLoggingParams['user'];
 
   async function runScheduledLogInsert() {
     expect(mockedAfter).toHaveBeenCalledTimes(1);
@@ -3035,50 +3039,54 @@ describe('api_request_log storage', () => {
     await (typeof task === 'function' ? task() : task);
   }
 
-  async function selectLoggedRow() {
-    const rows = await db
+  async function selectLoggedRows() {
+    return db
       .select()
-      .from(api_request_log)
-      .where(eq(api_request_log.vercel_request_id, vercelRequestId));
+      .from(api_request_log_2)
+      .where(eq(api_request_log_2.kilo_user_id, storageUserId));
+  }
+
+  async function selectLoggedRow() {
+    const rows = await selectLoggedRows();
     expect(rows).toHaveLength(1);
     return rows[0];
+  }
+
+  function storedBlob(row: { id: string; created_at: string }) {
+    return apiRequestLogBlobSchema.parse(
+      JSON.parse(fakeR2.objects.get(`${bucket}/${apiRequestLogBlobKey(row)}`) ?? '')
+    );
+  }
+
+  function storageLogging(overrides?: Partial<RequestLoggingParams>) {
+    return makeLogging({ user: storageUser, ...overrides });
   }
 
   async function logUpstreamResponse(
     response: Response,
     mode: RequestLoggingMode,
-    error: Record<string, string> | null
+    error: Record<string, string> | null,
+    logging = storageLogging({
+      organization_id: organizationId,
+      request: {
+        kind: 'chat_completions',
+        body: {
+          model: 'kilo-internal/my-model',
+          messages: [{ role: 'user', content: 'hello' }],
+          providerOptions: { gateway: { byok: { friendli: [{ apiKey: 'secret-key' }] } } },
+        },
+      },
+    })
   ) {
     mockedOptIn.mockResolvedValueOnce(mode);
     await logUnrewrittenResponse({
       response,
       model: 'kilo-internal/my-model',
-      providerId: 'custom',
       error,
-      logging: makeLogging({
-        vercel_request_id: vercelRequestId,
-        request: {
-          kind: 'chat_completions',
-          body: {
-            model: 'kilo-internal/my-model',
-            messages: [{ role: 'user', content: 'hello' }],
-            providerOptions: { gateway: { byok: { friendli: [{ apiKey: 'secret-key' }] } } },
-          },
-        },
-      }),
+      logging,
     });
     await runScheduledLogInsert();
-  }
-
-  async function logUpstreamError() {
-    await logUpstreamResponse(jsonResponse({ error: 'upstream error' }, 400), 'all', null);
-  }
-
-  async function selectLoggedRows() {
-    return db
-      .select()
-      .from(api_request_log)
-      .where(eq(api_request_log.vercel_request_id, vercelRequestId));
+    return logging;
   }
 
   beforeEach(() => {
@@ -3087,12 +3095,16 @@ describe('api_request_log storage', () => {
 
   afterEach(async () => {
     jest.restoreAllMocks();
-    await db.delete(api_request_log).where(eq(api_request_log.vercel_request_id, vercelRequestId));
+    await db.delete(api_request_log_2).where(eq(api_request_log_2.kilo_user_id, storageUserId));
   });
 
-  test('stores the redacted request and raw response with one R2 upload', async () => {
+  test('stores the row under the usage ID and the redacted request and raw response at the derived key', async () => {
     const send = jest.spyOn(fakeR2, 'send');
-    await logUpstreamError();
+    const logging = await logUpstreamResponse(
+      jsonResponse({ error: 'upstream error' }, 400),
+      'all',
+      null
+    );
 
     expect(send).toHaveBeenCalledTimes(1);
     expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
@@ -3102,24 +3114,90 @@ describe('api_request_log storage', () => {
       secretAccessKey: 'mock-test-api-request-log-secret-key',
     });
     const row = await selectLoggedRow();
-    expect(row).toMatchObject({
-      status_code: 400,
-      provider: 'custom',
-      request: null,
-      response: null,
-      error: null,
+    expect(row).toEqual({
+      id: logging.usage_id,
+      created_at: expect.any(String),
+      generation_id: null,
+      kilo_user_id: storageUserId,
+      organization_id: organizationId,
+      requested_model: 'kilo-internal/my-model',
     });
-    expect(row.request_r2_key).toMatch(/^\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}\/record\.v1\.json$/);
-    expect(row.response_r2_key).toBe(row.request_r2_key);
-    expect(JSON.parse(fakeR2.objects.get(`${bucket}/${row.request_r2_key}`) ?? '')).toEqual({
-      version: 1,
+    const date = new Date(row.created_at).toISOString().slice(0, 10).replaceAll('-', '/');
+    expect([...fakeR2.objects.keys()]).toEqual([`${bucket}/${date}/${logging.usage_id}.json`]);
+    expect(storedBlob(row)).toEqual({
+      version: 2,
       request: {
         model: 'kilo-internal/my-model',
         messages: [{ role: 'user', content: 'hello' }],
         providerOptions: { gateway: { byok: { friendli: [{ apiKey: '[redacted]' }] } } },
       },
       response: JSON.stringify({ error: 'upstream error' }),
+      error: null,
     });
+  });
+
+  test.each([
+    {
+      kind: 'chat_completions',
+      json: { id: 'gen-chat', model: 'upstream-model', choices: [] },
+      sse: 'data: {"id":"gen-chat","model":"upstream-model","choices":[]}\n\ndata: {"id":"gen-chat-2","choices":[]}\n\ndata: [DONE]\n\n',
+      expected: 'gen-chat',
+    },
+    {
+      kind: 'messages',
+      json: { id: 'msg-1', type: 'message', model: 'upstream-model', content: [] },
+      sse: 'data: {"type":"message_start","message":{"id":"msg-1","model":"upstream-model"}}\n\ndata: {"type":"message_stop"}\n\n',
+      expected: 'msg-1',
+    },
+    {
+      kind: 'responses',
+      json: { id: 'resp-1', object: 'response', model: 'upstream-model', output: [] },
+      sse: 'data: {"type":"response.created","response":{"id":"resp-1","model":"upstream-model"}}\n\ndata: {"type":"response.completed","response":{"id":"resp-1","model":"upstream-model"}}\n\n',
+      expected: 'resp-1',
+    },
+  ] as const)('stores the $kind generation ID', async ({ kind, json, sse, expected }) => {
+    for (const response of [jsonResponse(json), sseResponse(sse)]) {
+      mockedAfter.mockClear();
+      mockedOptIn.mockResolvedValueOnce('all');
+      const logging = storageLogging({
+        request: { kind, body: { model: 'kilo-internal/my-model' } } as GatewayRequest,
+      });
+      const result = await rewriteModelResponse({
+        response,
+        model: 'kilo-internal/my-model',
+        providerId: 'custom',
+        kind,
+        isFree: true,
+        userByok: false,
+        customLlmPricing: null,
+        logging,
+        responseTransforms: null,
+      });
+      await readOutputStream(result);
+      await runScheduledLogInsert();
+
+      const [row] = await db
+        .select({ generation_id: api_request_log_2.generation_id })
+        .from(api_request_log_2)
+        .where(eq(api_request_log_2.id, logging.usage_id));
+      expect(row).toEqual({ generation_id: expected });
+    }
+  });
+
+  test('does not log anonymous requests, even when an opt-in matches', async () => {
+    const enkrypt = jest.fn(async (_captureResponse?: boolean): Promise<EnkryptRequestLog[]> => []);
+    mockedOptIn.mockResolvedValueOnce('all');
+
+    await logUnrewrittenResponse({
+      response: jsonResponse({ error: 'upstream error' }, 400),
+      model: 'kilo-internal/my-model',
+      error: null,
+      logging: makeLogging({ user: null, enkrypt }),
+    });
+    await runScheduledLogInsert();
+
+    expect(enkrypt).toHaveBeenCalledWith(false);
+    expect(fakeR2.objects.size).toBe(0);
   });
 
   test('awaits Enkrypt calls only in after() and stores them with the request and response in one PUT', async () => {
@@ -3176,7 +3254,7 @@ describe('api_request_log storage', () => {
       isFree: true,
       userByok: false,
       customLlmPricing: null,
-      logging: makeLogging({ vercel_request_id: vercelRequestId, request, enkrypt }),
+      logging: storageLogging({ request, enkrypt }),
       responseTransforms: null,
     });
     await response.text();
@@ -3197,16 +3275,12 @@ describe('api_request_log storage', () => {
     expect(enkrypt).toHaveBeenCalledTimes(1);
     expect(send).toHaveBeenCalledTimes(1);
     expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
-    expect(row.response_r2_key).toBe(row.request_r2_key);
     expect(fakeR2.objects.size).toBe(1);
-    expect(
-      apiRequestLogBlobSchema.parse(
-        JSON.parse(fakeR2.objects.get(`${bucket}/${row.request_r2_key}`) ?? '')
-      )
-    ).toEqual({
-      version: 1,
+    expect(storedBlob(row)).toEqual({
+      version: 2,
       request: request.body,
       response: JSON.stringify(upstream),
+      error: null,
       enkrypt: calls,
     });
   });
@@ -3227,7 +3301,7 @@ describe('api_request_log storage', () => {
         isFree: true,
         userByok: false,
         customLlmPricing: null,
-        logging: makeLogging({ vercel_request_id: vercelRequestId, enkrypt }),
+        logging: storageLogging({ enkrypt }),
         responseTransforms: null,
       });
       await response.text();
@@ -3243,30 +3317,25 @@ describe('api_request_log storage', () => {
     }
   );
 
-  test('keeps the log row and records the failure when the R2 upload fails', async () => {
+  test('skips the row when the R2 upload fails', async () => {
     jest.spyOn(fakeR2, 'send').mockRejectedValue(new Error('R2 unavailable'));
 
-    await logUpstreamError();
+    await logUpstreamResponse(jsonResponse({ error: 'upstream error' }, 400), 'all', null);
 
-    const row = await selectLoggedRow();
-    expect(row).toMatchObject({
-      status_code: 400,
-      request_r2_key: null,
-      response_r2_key: null,
-      error: {
-        r2_upload_error: 'Error: R2 unavailable',
-      },
-    });
+    expect(await selectLoggedRows()).toEqual([]);
+    expect(mockedLog).toHaveBeenCalledWith(
+      expect.stringContaining('failed to upload api_request_log_2 blob to R2')
+    );
   });
 
   test('logs upstream error statuses for errors-only opt-ins', async () => {
     await logUpstreamResponse(jsonResponse({ error: 'upstream error' }, 400), 'errors_only', null);
 
     const row = await selectLoggedRow();
-    expect(row).toMatchObject({ status_code: 400, error: null });
-    expect(JSON.parse(fakeR2.objects.get(`${bucket}/${row.response_r2_key}`) ?? '').response).toBe(
-      JSON.stringify({ error: 'upstream error' })
-    );
+    expect(storedBlob(row)).toMatchObject({
+      response: JSON.stringify({ error: 'upstream error' }),
+      error: null,
+    });
   });
 
   test('skips successful responses for errors-only opt-ins', async () => {
@@ -3288,16 +3357,10 @@ describe('api_request_log storage', () => {
     );
 
     const row = await selectLoggedRow();
-    expect(row).toMatchObject({
-      status_code: 200,
-      error: { response_body_read_error: expect.stringContaining('upstream disconnected') },
-    });
-    expect(row.request_r2_key).not.toBeNull();
-    expect(row.response_r2_key).toBe(row.request_r2_key);
-    expect(JSON.parse(fakeR2.objects.get(`${bucket}/${row.request_r2_key}`) ?? '')).toMatchObject({
-      version: 1,
+    expect(storedBlob(row)).toMatchObject({
       request: expect.any(Object),
       response: null,
+      error: { response_body_read_error: expect.stringContaining('upstream disconnected') },
     });
     expect(fakeR2.objects.size).toBe(1);
   });
@@ -3305,7 +3368,7 @@ describe('api_request_log storage', () => {
   test('logs successful responses for opt-ins that log all requests', async () => {
     await logUpstreamResponse(jsonResponse({ model: 'kilo-internal/my-model' }), 'all', null);
 
-    expect(await selectLoggedRow()).toMatchObject({ status_code: 200, error: null });
+    expect(storedBlob(await selectLoggedRow())).toMatchObject({ error: null });
   });
 
   test.each<RequestLoggingMode>(['all', 'errors_only'])(
@@ -3315,32 +3378,15 @@ describe('api_request_log storage', () => {
         guardrail_rejection: 'block',
       });
 
-      expect(await selectLoggedRow()).toMatchObject({
-        status_code: 400,
+      expect(storedBlob(await selectLoggedRow())).toMatchObject({
         error: { guardrail_rejection: 'block' },
       });
     }
   );
-
-  test('merges the caller error marker with the R2 upload failure', async () => {
-    jest.spyOn(fakeR2, 'send').mockRejectedValue(new Error('R2 unavailable'));
-
-    await logUpstreamResponse(jsonResponse({ error: 'unavailable' }, 503), 'all', {
-      guardrail_rejection: 'unavailable',
-    });
-
-    expect(await selectLoggedRow()).toMatchObject({
-      status_code: 503,
-      error: {
-        guardrail_rejection: 'unavailable',
-        r2_upload_error: 'Error: R2 unavailable',
-      },
-    });
-  });
 });
 
 function makeCapture() {
-  return { setBody: jest.fn(), setReadError: jest.fn() };
+  return { setGenerationId: jest.fn(), setBody: jest.fn(), setReadError: jest.fn() };
 }
 
 describe('request log capture', () => {

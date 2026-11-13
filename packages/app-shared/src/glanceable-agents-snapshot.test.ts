@@ -612,6 +612,30 @@ describe('newestGlanceableResult', () => {
   });
 });
 
+describe('extreme timestamp ties', () => {
+  // Two rows that share the newest instant carry different kinds, and the
+  // glanceable surfaces name the winner's kind, so the tie must break on the
+  // first row: only a strictly later value replaces the winner. The two
+  // ISO-returning aggregates cannot show a tie, because every tied row would
+  // serialise to the same instant.
+  const instant = new Date(NOW).toISOString();
+
+  it('takes the newest-result kind from the first row of a tie', () => {
+    expect(
+      newestGlanceableResult([
+        { status: 'permission', statusUpdatedAt: instant },
+        { status: 'busy', statusUpdatedAt: instant },
+      ])
+    ).toEqual({ kind: 'needsInput', at: instant });
+    expect(
+      oldestNeedsInputSince([
+        { status: 'permission', statusUpdatedAt: instant },
+        { status: 'question', statusUpdatedAt: instant },
+      ])
+    ).toBe(instant);
+  });
+});
+
 describe('session timestamp parsing', () => {
   // A producer can hand the rows a PostgreSQL timestamp rather than ISO 8601,
   // and Hermes cannot parse that form, so every helper reads the instant

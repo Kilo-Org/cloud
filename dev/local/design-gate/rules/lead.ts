@@ -70,6 +70,11 @@ function oneSidedBox(ink: LayoutNode, block: LayoutNode): LayoutNode | undefined
  * The walk stops at the first block, so a body whose own first block is a
  * scroller keeps its margin measured here; the handoff covers ink the block
  * holds below itself.
+ *
+ * The handoff applies only when this scroller's own first block starts at its
+ * content top. A block the screen pushed down by a margin is that screen's own
+ * hole, and the inner scroller, which starts at the block's top, is not the
+ * cause of it.
  */
 function placedByNestedScroller(ink: LayoutNode, block: LayoutNode, scroll: LayoutNode): boolean {
   for (let box = ink.parent; box && box !== scroll; box = box.parent) {
@@ -188,9 +193,11 @@ export function checkLeadingGap(tree: LayoutTree): Finding[] {
     if (!block) continue;
     const ink = topInk(block);
     if (!ink) continue;
-    if (placedByNestedScroller(ink, block, scroll)) continue;
     const start = contentBox(content, tree.env.isRTL, layoutRect(content))[1];
     const margin = layoutRect(block)[1] - start;
+    // A block pushed down by a margin is this scroller's own hole; only ink a
+    // block at the content top holds below itself belongs to a nested scroller.
+    if (margin <= LEADING_GAP_MAX_DP && placedByNestedScroller(ink, block, scroll)) continue;
     const holder = margin > LEADING_GAP_MAX_DP ? undefined : oneSidedBox(ink, block);
     if (margin <= LEADING_GAP_MAX_DP && !holder) continue;
     if (!holder) {

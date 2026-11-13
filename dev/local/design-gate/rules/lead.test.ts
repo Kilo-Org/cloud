@@ -325,6 +325,28 @@ test('leading-gap: a first block that is itself a scroller keeps its own margin 
   assert.match(findings[0]?.message ?? '', /top margin/);
 });
 
+test('leading-gap: a container pushed down over a nested scroller still reports its margin', () => {
+  // A platform dump of a screen whose first block is pushed 350 dp down and
+  // holds a scroller starting at the block's own top. The handoff must not fire
+  // on a displaced block: the inner scroller's first block sits at its content
+  // top, so the 350 dp hole belongs to the outer scroller, not to the inner one.
+  const nodes: ProbeNode[] = [
+    { parent: 0, tag: 'ScrollView', rect: [0, 0, 411.43, 914.29] },
+    { parent: 1, tag: 'ViewGroup', rect: [0, 0, 411.43, 914.29] },
+    { parent: 2, tag: 'ViewGroup', rect: [0, 350, 411.43, 500] },
+    { parent: 3, tag: 'ScrollView', rect: [0, 350, 411.43, 500] },
+    { parent: 4, tag: 'ViewGroup', rect: [0, 350, 411.43, 500] },
+    { parent: 5, tag: 'ViewGroup', rect: [0, 350, 411.43, 120] },
+    { parent: 6, tag: 'Paragraph', rect: [14, 350, 100, 20], text: 'LIVE NOW' },
+  ];
+  const findings = checkScreen(tree(nodes, MEASURED_WINDOW)).filter(
+    found => found.rule === 'leading-gap'
+  );
+  assert.equal(findings.length, 1);
+  assert.equal(Math.round((findings[0]?.measured ?? 0) * 10) / 10, 350);
+  assert.match(findings[0]?.message ?? '', /top margin/);
+});
+
 test('leading-gap: a tab body inside the tab scroller is not the wrapper gap', () => {
   // The reported Home tab shape at 472 dp: the wrapper's first ink is the live
   // section's paragraph, placed by the tab scroller's centred body. The measured

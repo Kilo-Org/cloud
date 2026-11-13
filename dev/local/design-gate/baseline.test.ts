@@ -20,7 +20,7 @@ import {
   type Preparation,
   type Revision,
 } from './baseline';
-import type { RunOutcome } from './capture';
+import type { RunOutcome, SkippedTarget } from './capture';
 import type { Finding } from './findings';
 import type { ProbeDump } from './tree';
 
@@ -221,6 +221,9 @@ function capture(
     findings?: (Finding & { count?: number })[];
     width?: number;
     nodes?: ProbeDump['nodes'];
+    skipped?: SkippedTarget[];
+    /** Model a cell the runner applied but never started: no CellRun at all. */
+    omitCell?: boolean;
   } = {}
 ) {
   fs.mkdirSync(dir);
@@ -254,33 +257,40 @@ function capture(
   // Deliberately synthetic bytes: these tests exercise receipt binding, not visual claims.
   fs.writeFileSync(path.join(dir, 'screen.png'), 'synthetic-image');
   const outcome: RunOutcome = {
-    cells: [
-      {
-        id: 'base',
-        config: { id: 'base', dark: false, rtl: false, compact: false, landscape: false },
-        screens: [
-          {
-            target: TARGET.id,
-            link: TARGET.link,
-            dump: 'screen.json',
-            screenshot: 'screen.png',
-            annotated: 'annotated.png',
-            env: dump.env,
-          },
-        ],
-      },
-    ],
+    cells:
+      options.omitCell === true
+        ? []
+        : [
+            {
+              id: 'base',
+              config: { id: 'base', dark: false, rtl: false, compact: false, landscape: false },
+              screens: [
+                {
+                  target: TARGET.id,
+                  link: TARGET.link,
+                  dump: 'screen.json',
+                  screenshot: 'screen.png',
+                  annotated: 'annotated.png',
+                  env: dump.env,
+                },
+              ],
+            },
+          ],
     findings: options.findings ?? [],
+    skipped: options.skipped ?? [],
   };
-  // Same omission of per-screen env as writeArtifacts.
+  // The artifact shape `writeArtifacts` writes: skips under `run`, and the same
+  // omission of per-screen env.
   fs.writeFileSync(
     path.join(dir, 'findings.json'),
     JSON.stringify({
-      ...outcome,
+      version: 1,
+      run: { skipped: outcome.skipped },
       cells: outcome.cells.map(cell => ({
         ...cell,
         screens: cell.screens.map(({ env: _env, ...screen }) => screen),
       })),
+      findings: outcome.findings,
     })
   );
   writeCaptureReceipt(preparation, revision, outcome, dir);
@@ -315,6 +325,33 @@ test('actual compare operation attributes only ready same-screen exact-source ca
   assert.equal(result.status, 'comparable');
   assert.equal(result.introduced.length, 1);
   assert.deepEqual(result.reasons, []);
+});
+
+test('a comparison whose base run never started a cell names that cell as inconclusive', async t => {
+  const fixture = syntheticRepo(t);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'base-run');
+  const headRun = path.join(fixture.root, 'head-run');
+  // The runner applied the cell and could not switch the app's language, so the
+  // artifact has no CellRun for it and names the target under `run.skipped`.
+  capture(preparation, 'base', baseRun, {
+    omitCell: true,
+    skipped: [{ cell: 'base', target: TARGET.id, reason: 'InfraError: no debugger page' }],
+  });
+  capture(preparation, 'head', headRun);
+  const result = await compareProof(
+    preparation,
+    baseRun,
+    headRun,
+    path.join(fixture.root, 'comparison')
+  );
+  assert.equal(result.status, 'inconclusive');
+  assert.match(
+    result.reasons.join(' '),
+    new RegExp(
+      `base: base/${TARGET.id}: target could not be read \\(InfraError: no debugger page\\)`
+    )
+  );
 });
 
 test('pre-existing findings are not attributed to head', async t => {
@@ -421,6 +458,25 @@ test('empty/missing screen coverage and escaped dump paths fail closed', async t
   const outcome = capture(preparation, 'base', baseRun);
   outcome.cells[0].screens[0].dump = '../targets.json';
   assert.throws(() => targetReadiness(outcome, manifest, baseRun), /escapes/);
+});
+
+test('a target the probe could not read makes readiness inconclusive and names the cause', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-skip-'));
+  const readiness = targetReadiness(
+    {
+      cells: [{ id: 'base', screens: [] }],
+      findings: [],
+      skipped: [{ cell: 'base', target: TARGET.id, reason: 'InfraError: no debugger page' }],
+    },
+    manifest,
+    dir
+  );
+  // The skip replaces the anonymous "missing screen" reason: a comparison that
+  // sees it must say which target was never read and why.
+  assert.deepEqual(readiness, [
+    'base: target coverage differs from manifest',
+    `base/${TARGET.id}: target could not be read (InfraError: no debugger page)`,
+  ]);
 });
 
 test('manifest screen identity uses the raw segments.join producer key, not a route path', () => {

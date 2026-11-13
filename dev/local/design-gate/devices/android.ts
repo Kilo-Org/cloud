@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { InfraError, type Device, type Exec, type Spawn } from '../capture';
+import { APP_ID } from '../report';
 import { compactSize, type CellConfig } from '../matrix';
 
 const REMOTE_UI_XML = '/sdcard/design-gate-ui.xml';
@@ -49,8 +50,13 @@ export function resolveSerial(exec: Exec, requested: string | undefined): string
   );
 }
 
-export function createAndroidDevice(options: { exec: Exec; spawn: Spawn; serial: string }): Device {
-  const { exec, spawn, serial } = options;
+export function createAndroidDevice(options: {
+  exec: Exec;
+  spawn: Spawn;
+  serial: string;
+  metroPort: number;
+}): Device {
+  const { exec, spawn, serial, metroPort } = options;
   const adb = (args: readonly string[]) => exec('adb', ['-s', serial, ...args]);
   const shell = (...args: string[]) =>
     adb(['shell', ...args])
@@ -108,6 +114,26 @@ export function createAndroidDevice(options: { exec: Exec; spawn: Spawn; serial:
       setSize(config.compact ? compactSize(densityDpi) : initial.sizeOverride);
       if (config.landscape) setRotation('0', '1');
       else setRotation(initial.accelerometerRotation, initial.userRotation);
+    },
+    // The dev client's inspector does not survive a runtime reload on every
+    // emulator: after a language switch the app keeps painting while the page
+    // list stays empty until the process restarts, and the device's reverse
+    // tunnel to Metro goes with it. Relaunch through the dev client's own deep
+    // link (a launcher relaunch opens the launcher, not the app) after
+    // re-establishing that tunnel; the runner waits for readiness afterwards.
+    relaunch: () => {
+      adb(['reverse', `tcp:${metroPort}`, `tcp:${metroPort}`]);
+      shell('am', 'force-stop', APP_ID);
+      adb([
+        'shell',
+        'am',
+        'start',
+        '-a',
+        'android.intent.action.VIEW',
+        '-d',
+        `kiloapp://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A${metroPort}`,
+        APP_ID,
+      ]);
     },
     restore: () => {
       const errors: unknown[] = [];

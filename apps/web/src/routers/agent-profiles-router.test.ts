@@ -512,7 +512,14 @@ describe('Agent Profiles Router', () => {
         expect(vars.find(variable => variable.key === 'SECRET')?.value).toBe('***');
       });
 
-      test.each(['vars', 'commands', 'mcpServers', 'skills', 'kiloCommands'] as const)(
+      test.each([
+        'vars',
+        'commands',
+        'mcpServers',
+        'skills',
+        'kiloCommands',
+        'instructions',
+      ] as const)(
         '%s keeps answering when another collection holds a row the whole-profile read refuses',
         async procedure => {
           const caller = await createCallerForUser(ownerUser.id);
@@ -571,18 +578,48 @@ describe('Agent Profiles Router', () => {
         ]);
       });
 
-      test.each(['vars', 'commands', 'mcpServers', 'skills', 'kiloCommands'] as const)(
-        '%s refuses another user profile',
-        async procedure => {
-          const callerA = await createCallerForUser(ownerUser.id);
-          const callerB = await createCallerForUser(otherUser.id);
-          const { id: profileId } = await callerA.agentProfiles.create({ name: 'Private' });
+      test('instructions lists the rules files ordered by name', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Rules Profile' });
+        await caller.agentProfiles.createInstruction({
+          profileId,
+          name: 'zeta-rules',
+          content: 'Last alphabetically.',
+        });
+        await caller.agentProfiles.createInstruction({
+          profileId,
+          name: 'alpha-rules',
+          content: 'First alphabetically.',
+        });
 
-          await expect(callerB.agentProfiles[procedure]({ profileId })).rejects.toThrow(
-            'Profile not found'
-          );
-        }
-      );
+        const instructions = await caller.agentProfiles.instructions({ profileId });
+
+        expect(instructions.map(instruction => instruction.name)).toEqual([
+          'alpha-rules',
+          'zeta-rules',
+        ]);
+        expect(instructions.map(instruction => instruction.content)).toEqual([
+          'First alphabetically.',
+          'Last alphabetically.',
+        ]);
+      });
+
+      test.each([
+        'vars',
+        'commands',
+        'mcpServers',
+        'skills',
+        'kiloCommands',
+        'instructions',
+      ] as const)('%s refuses another user profile', async procedure => {
+        const callerA = await createCallerForUser(ownerUser.id);
+        const callerB = await createCallerForUser(otherUser.id);
+        const { id: profileId } = await callerA.agentProfiles.create({ name: 'Private' });
+
+        await expect(callerB.agentProfiles[procedure]({ profileId })).rejects.toThrow(
+          'Profile not found'
+        );
+      });
     });
 
     describe('update', () => {

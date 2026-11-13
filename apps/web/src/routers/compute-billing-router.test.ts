@@ -11,11 +11,24 @@ import {
   container_usage_segment,
   organization_memberships,
 } from '@kilocode/db/schema';
-import { and, eq } from 'drizzle-orm';
-import { CLOUD_AGENT_CONTAINER_SKUS } from '@kilocode/worker-utils/cloud-agent-compute';
+import { and, eq, sql } from 'drizzle-orm';
+import {
+  CLOUD_AGENT_CONTAINER_SKUS,
+  SANDBOX_USAGE_SKUS,
+} from '@kilocode/worker-utils/cloud-agent-compute';
 import { computeBillingRouter, computeChargesInputSchema } from './compute-billing-router';
 import { formatComputePrice } from '@/lib/cloud-agent/compute-price';
 import { containerInstanceForSku } from '@/lib/cloud-agent/compute-billing';
+import type * as CodeReviewComputeBilling from '@/lib/code-reviews/compute-billing';
+import {
+  isCodeReviewComputeBillingEnabled,
+  readCodeReviewContainerCost,
+} from '@/lib/code-reviews/compute-billing';
+
+jest.mock('@/lib/code-reviews/compute-billing', () => ({
+  ...jest.requireActual<typeof CodeReviewComputeBilling>('@/lib/code-reviews/compute-billing'),
+  isCodeReviewComputeBillingEnabled: jest.fn(),
+}));
 
 const createCaller = createCallerFactory(computeBillingRouter);
 const range = { startDate: '2026-10-01T00:00:00.000Z', endDate: '2026-11-01T00:00:00.000Z' };
@@ -328,6 +341,132 @@ describe('session compute charges', () => {
 });
 
 describe('customer compute billing PostgreSQL queries', () => {
+  it('prices paid code reviews from their dedicated SKU, not a chat container SKU', async () => {
+    const user = await insertTestUser();
+    jest.mocked(isCodeReviewComputeBillingEnabled).mockResolvedValueOnce(true);
+    await db.insert(cloud_billing_sku).values({
+      id: SANDBOX_USAGE_SKUS.SandboxContainersCodeReview,
+      name: 'Code review compute',
+      unit: 'second',
+      rate_cents_per_unit: '0.005',
+    });
+    await expect(createCaller({ user }).codeReviewRate({})).resolves.toEqual({
+      enabled: true,
+      hourlyUsd: 0.18,
+    });
+    expect(isCodeReviewComputeBillingEnabled).toHaveBeenLastCalledWith({
+      type: 'user',
+      id: user.id,
+    });
+    await db
+      .delete(cloud_billing_sku)
+      .where(eq(cloud_billing_sku.id, SANDBOX_USAGE_SKUS.SandboxContainersCodeReview));
+  });
+
+  it('does not show paid pricing for shadow-mode accounts', async () => {
+    const user = await insertTestUser();
+    jest.mocked(isCodeReviewComputeBillingEnabled).mockResolvedValueOnce(false);
+    await expect(createCaller({ user }).codeReviewRate({})).resolves.toEqual({
+      enabled: false,
+      hourlyUsd: null,
+    });
+  });
+
+  it('does not invent a missing code review price', async () => {
+    const user = await insertTestUser();
+    jest.mocked(isCodeReviewComputeBillingEnabled).mockResolvedValueOnce(true);
+    await expect(createCaller({ user }).codeReviewRate({})).resolves.toEqual({
+      enabled: true,
+      hourlyUsd: null,
+    });
+  });
+
+  it.each([
+    { unit: 'second', accepts_new_usage: false },
+    { unit: 'hour', accepts_new_usage: true },
+  ] as const)('does not advertise an unusable code review SKU: %o', async sku => {
+    const user = await insertTestUser();
+    jest.mocked(isCodeReviewComputeBillingEnabled).mockResolvedValueOnce(true);
+    await db.insert(cloud_billing_sku).values({
+      id: SANDBOX_USAGE_SKUS.SandboxContainersCodeReview,
+      name: 'Unavailable code review compute',
+      rate_cents_per_unit: '0.005',
+      ...sku,
+      unit: sql`${sku.unit}`,
+    });
+    try {
+      await expect(createCaller({ user }).codeReviewRate({})).resolves.toEqual({
+        enabled: true,
+        hourlyUsd: null,
+      });
+    } finally {
+      await db
+        .delete(cloud_billing_sku)
+        .where(eq(cloud_billing_sku.id, SANDBOX_USAGE_SKUS.SandboxContainersCodeReview));
+    }
+  });
+
+  it('authorizes organization pricing and uses the organization payer', async () => {
+    const { owner, outsider, org } = await fixture();
+    jest.mocked(isCodeReviewComputeBillingEnabled).mockResolvedValueOnce(false);
+    await createCaller({ user: owner }).codeReviewRate({ organizationId: org.id });
+    expect(isCodeReviewComputeBillingEnabled).toHaveBeenLastCalledWith({ type: 'org', id: org.id });
+    await expect(
+      createCaller({ user: outsider }).codeReviewRate({ organizationId: org.id })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+  });
+
+  it('sums review container charges across attempts without duplicate sessions or other payers', async () => {
+    const { owner, outsider, org, skuId } = await fixture();
+    await charge({ skuId, userId: owner.id, sessionId: 'workspace_review_a', seconds: 120 });
+    await charge({
+      skuId,
+      userId: owner.id,
+      sessionId: 'workspace_review_b',
+      seconds: 60,
+      day: '2026-11-01T12:00:00.000Z',
+    });
+    await charge({ skuId, userId: outsider.id, sessionId: 'workspace_review_a', seconds: 999 });
+    await charge({
+      skuId,
+      orgId: org.id,
+      actorId: owner.id,
+      bot: true,
+      sessionId: 'workspace_review_a',
+      seconds: 30,
+    });
+    await expect(
+      readCodeReviewContainerCost(
+        db,
+        { type: 'user', id: owner.id },
+        ['workspace_review_a', 'workspace_review_a', 'workspace_review_b'],
+        range.startDate
+      )
+    ).resolves.toBe(18_000);
+    await expect(
+      readCodeReviewContainerCost(
+        db,
+        { type: 'org', id: org.id },
+        ['workspace_review_a'],
+        range.startDate
+      )
+    ).resolves.toBe(3_000);
+    await expect(
+      readCodeReviewContainerCost(db, { type: 'user', id: owner.id }, [], range.startDate)
+    ).resolves.toBeNull();
+    await expect(
+      readCodeReviewContainerCost(db, { type: 'user', id: owner.id }, ['missing'], range.startDate)
+    ).resolves.toBeNull();
+    await expect(
+      readCodeReviewContainerCost(
+        db,
+        { type: 'user', id: owner.id },
+        ['workspace_review_a', 'workspace_review_b'],
+        '2026-11-01 12:00:00+00'
+      )
+    ).resolves.toBe(6_000);
+  });
+
   it('returns runtime SKU rates and keeps missing prices unavailable', async () => {
     const user = await insertTestUser();
     await db.insert(cloud_billing_sku).values({

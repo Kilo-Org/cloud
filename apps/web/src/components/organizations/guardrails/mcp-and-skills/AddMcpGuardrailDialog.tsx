@@ -64,7 +64,7 @@ export function AddMcpGuardrailDialog({
           source: entry.source,
           sourceId: entry.sourceId,
           identityKey: entry.identityKey,
-          ...(entry.isPackage ? { minVersion: entry.minVersion } : {}),
+          ...(entry.isPackage ? { versionSpec: entry.versionSpec } : {}),
         });
         added += 1;
       } catch (error) {
@@ -130,14 +130,14 @@ export function AddMcpGuardrailDialog({
                         identityKey: variant.identityKey,
                         name: item.name,
                         isPackage: variant.target.kind === 'package',
-                        minVersion: variant.versionHint ?? '',
+                        versionSpec: variant.versionSpecHint ?? '',
                       },
                     };
                   });
                 }}
-                onMinVersionChange={(key, minVersion) =>
+                onVersionSpecChange={(key, versionSpec) =>
                   setSelection(current =>
-                    current[key] ? { ...current, [key]: { ...current[key], minVersion } } : current
+                    current[key] ? { ...current, [key]: { ...current[key], versionSpec } } : current
                   )
                 }
               />

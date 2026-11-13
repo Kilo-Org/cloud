@@ -80,7 +80,9 @@ vi.mock('@/lib/config', () => ({
 }));
 
 vi.mock('@/lib/storage-keys', () => ({
+  ACTIVE_USER_ID_KEY: 'active-user-id',
   AUTH_TOKEN_KEY: 'auth-token',
+  ORGANIZATION_STORAGE_KEY: 'organization',
   TOKEN_EXPIRES_AT_KEY: 'token-expires-at',
 }));
 

@@ -61,6 +61,8 @@ import { readWaitingAsk } from '@/lib/glanceable/waiting-ask';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { getDndAccessGranted } from '@/glanceable-android/live-update';
 import { i18n } from '@/i18n';
+import { WEB_BASE_URL } from '@/lib/config';
+import { openClawNotificationWebUrl } from './claw-notification';
 import { setPendingDeepLink } from './deep-link-launch';
 import { BACKGROUND_NOTIFICATION_TASK } from './notification-background-task';
 import {
@@ -70,7 +72,7 @@ import {
   pendingDeepLinkOptionsForData,
 } from './notification-actions';
 import { isAgentProgressAllowedInActiveFocus } from './notification-focus-filter';
-import { notificationPathForData } from './notification-path';
+import { notificationDestinationForData } from './notification-path';
 import {
   isAppOwnedNeedsInputNotification,
   isNeedsInputNotificationPosted,
@@ -140,19 +142,12 @@ const appBadgeSink: GlanceableSink = {
 // Runtime-validates that an arbitrary notification `data` payload matches the
 // shape we care about. Push producers can evolve independently of the app, so
 // always parse before reading fields from the OS-provided notification content.
+// Every push kind parses here, KiloClaw included: a KiloClaw tap now opens its
+// web page (see `notificationDestinationForData`), so it is no longer dropped
+// at the parse boundary.
 export function parseNotificationData(data: unknown): PushData | null {
   const parsed = pushDataSchema.safeParse(data);
-  if (!parsed.success) {
-    return null;
-  }
-  if (
-    parsed.data.type === 'chat.message' ||
-    parsed.data.type === 'instance-lifecycle' ||
-    parsed.data.type === 'scheduled-action'
-  ) {
-    return null;
-  }
-  return parsed.data;
+  return parsed.success ? parsed.data : null;
 }
 
 // Fallback terminal end for sinks without a native terminal contract.
@@ -644,12 +639,16 @@ export function checkInitialNotification(): void {
     return;
   }
   const data = parseNotificationData(response.notification.request.content.data);
-  const path = data && notificationPathForData(data);
-  if (data && path) {
-    // Stash the session's destination the same way the warm tap paths do
-    // (notification-actions.ts), so a session push that launches the app lands
-    // in the session's organization instead of the previously selected one.
-    setPendingDeepLink(path, 'notification', pendingDeepLinkOptionsForData(data));
+  if (data) {
+    const destination = notificationDestinationForData(data, WEB_BASE_URL);
+    if (destination?.kind === 'external') {
+      void openClawNotificationWebUrl(destination.url);
+    } else if (destination !== null) {
+      // Stash the session's destination the same way the warm tap paths do
+      // (notification-actions.ts), so a session push that launches the app lands
+      // in the session's organization instead of the previously selected one.
+      setPendingDeepLink(destination.href, 'notification', pendingDeepLinkOptionsForData(data));
+    }
   }
   Notifications.clearLastNotificationResponse();
 }

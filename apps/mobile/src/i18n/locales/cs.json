@@ -332,6 +332,8 @@
       "unlinkTitle": "Odpojit {{provider}}?",
       "unlinkMessage": "Přes {{provider}} se už nebudete moct přihlásit. Ostatní způsoby přihlášení zůstanou beze změny.",
       "unlinked": "Odpojeno: {{provider}}",
+      "lastMethod": "Svůj jediný způsob přihlášení nemůžete odpojit. Nejdřív propojte další způsob přihlášení.",
+      "notLinked": "{{provider}} už není propojen s vaším účtem.",
       "linkAnother": "Propojit dalšího poskytovatele",
       "linkAnotherSubtitle": "Otevře stránku propojených účtů na kilo.ai",
       "emptyTitle": "Žádné způsoby přihlášení",

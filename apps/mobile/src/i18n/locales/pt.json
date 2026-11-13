@@ -332,6 +332,8 @@
       "unlinkTitle": "Desassociar {{provider}}?",
       "unlinkMessage": "Deixarás de poder iniciar sessão com {{provider}}. Os teus outros métodos mantêm-se inalterados.",
       "unlinked": "{{provider}} desassociado",
+      "lastMethod": "Não podes desassociar o teu único método de início de sessão. Associa outro método primeiro.",
+      "notLinked": "{{provider}} já não está associado à tua conta.",
       "linkAnother": "Associar outro fornecedor",
       "linkAnotherSubtitle": "Abre a página de contas ligadas em kilo.ai",
       "emptyTitle": "Sem métodos de início de sessão",

@@ -332,6 +332,8 @@
       "unlinkTitle": "Ontkoppel {{provider}}?",
       "unlinkMessage": "Jy sal nie meer met {{provider}} kan aanmeld nie. Jou ander metodes bly soos hulle is.",
       "unlinked": "{{provider}} ontkoppel",
+      "lastMethod": "Jy kan nie jou enigste aanmeldmetode ontkoppel nie. Koppel eers nog 'n metode.",
+      "notLinked": "{{provider}} is nie meer aan jou rekening gekoppel nie.",
       "linkAnother": "Koppel nog 'n verskaffer",
       "linkAnotherSubtitle": "Maak die bladsy met gekoppelde rekeninge op kilo.ai oop",
       "emptyTitle": "Geen aanmeldmetodes nie",

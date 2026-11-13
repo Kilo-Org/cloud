@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildCreditHistoryItems,
@@ -105,5 +105,81 @@ describe('buildCreditHistoryItems', () => {
 
   it('returns nothing for an account with no history', () => {
     expect(buildCreditHistoryItems([], [])).toEqual([]);
+  });
+
+  it('ranks the ledger by the PostgreSQL time the device cannot parse', () => {
+    // Hermes rejects the server's `created_at` form, so the order cannot come
+    // from `Date.parse`; every such row used to rank at epoch 0.
+    const parseSpy = vi.spyOn(Date, 'parse').mockReturnValue(Number.NaN);
+    try {
+      const items = buildCreditHistoryItems(
+        [purchase({ id: 'p1', date: '2026-03-16T15:40:00.000Z' })],
+        [deduction({ id: 'd1', date: '2026-03-16 15:21:40.957+00' })]
+      );
+
+      expect(items.map(item => item.key)).toEqual(['purchase:p1', 'ledger:d1']);
+    } finally {
+      parseSpy.mockRestore();
+    }
+  });
+
+  it('sorts a row whose time does not parse below every dated row', () => {
+    const items = buildCreditHistoryItems(
+      [],
+      [
+        deduction({ id: 'broken', date: 'not a time' }),
+        deduction({ id: 'dated', date: '2026-02-02 00:00:00+00' }),
+      ]
+    );
+
+    expect(items.map(item => item.key)).toEqual(['ledger:dated', 'ledger:broken']);
+  });
+
+  it('marks a ledger row whose grant already has its purchase row', () => {
+    const items = buildCreditHistoryItems(
+      [purchase({ id: 'p1', date: '2026-01-01T00:00:00.000Z' })],
+      [
+        deduction({
+          id: 'expiry',
+          date: '2026-04-01T00:00:00.000Z',
+          kind: 'adjustment',
+          purchase: {
+            id: 'p1',
+            date: '2026-01-01T00:00:00.000Z',
+            description: 'Top-up via stripe',
+            amount_mUsd: 20_000_000,
+            is_free: false,
+            credit_source: 'stripe',
+          },
+        }),
+      ]
+    );
+
+    const ledger = items.find(item => item.key === 'ledger:expiry');
+    expect(ledger).toMatchObject({ kind: 'ledger', grantListed: true });
+  });
+
+  it('keeps the grant line while its purchase page is not loaded', () => {
+    const items = buildCreditHistoryItems(
+      [],
+      [
+        deduction({
+          id: 'expiry',
+          date: '2026-04-01T00:00:00.000Z',
+          kind: 'adjustment',
+          purchase: {
+            id: 'p1',
+            date: '2026-01-01T00:00:00.000Z',
+            description: 'Top-up via stripe',
+            amount_mUsd: 20_000_000,
+            is_free: false,
+            credit_source: 'stripe',
+          },
+        }),
+      ]
+    );
+
+    const ledger = items.find(item => item.key === 'ledger:expiry');
+    expect(ledger).toMatchObject({ kind: 'ledger', grantListed: false });
   });
 });

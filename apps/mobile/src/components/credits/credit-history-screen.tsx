@@ -103,7 +103,7 @@ export function PersonalCreditHistoryScreen() {
           onOpenReceipt={openReceipt}
         />
       ) : (
-        <LedgerHistoryRow deduction={item.deduction} />
+        <LedgerHistoryRow deduction={item.deduction} grantListed={item.grantListed} />
       ),
     [openReceipt, openingReceiptId]
   );

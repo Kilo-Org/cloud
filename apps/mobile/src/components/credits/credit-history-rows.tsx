@@ -204,13 +204,18 @@ function LedgerLine({
 /**
  * One ledger event: a grant (a purchase, a bonus, a Kilo Pass month), a
  * deduction, an adjustment, or a balance-neutral settlement. A grant whose
- * expiry closed it reads as one event, with the expiry as its second line.
+ * expiry closed it reads as one event, with the expiry as its second line —
+ * unless the grant already has its own purchase row above, in which case this
+ * row reads as the expiry alone.
  */
 export const LedgerHistoryRow = memo(function LedgerHistoryRow({
   deduction,
-}: Readonly<{ deduction: CreditDeduction }>) {
+  grantListed,
+}: Readonly<{ deduction: CreditDeduction; grantListed: boolean }>) {
   const { t } = useTranslation();
-  const purchase = deduction.purchase;
+  // The purchase row carries the grant, its receipt, and its expiry date, so a
+  // grant printed again here would read as a second purchase.
+  const purchase = grantListed ? null : deduction.purchase;
 
   return (
     <View className="gap-2 rounded-lg bg-secondary p-3">

@@ -1,5 +1,7 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
+import { parseTimestamp } from '@/lib/utils';
+
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
 /** One completed paid credit purchase, as the purchase history lists it. */
@@ -88,11 +90,26 @@ export type CreditHistoryItem =
       readonly key: string;
       readonly deduction: CreditDeduction;
       readonly sortDate: string;
+      /**
+       * True when the paid grant this row belongs to is already on screen as
+       * its own purchase row. The row then prints only the event it records
+       * (an expiry) instead of that grant a second time.
+       */
+      readonly grantListed: boolean;
     };
 
-function timestampOf(value: string): number {
-  const parsed = Date.parse(value);
-  return Number.isNaN(parsed) ? 0 : parsed;
+/**
+ * Rank of one row's date, newest first.
+ *
+ * The ledger hands back the raw `credit_transactions.created_at` column
+ * (`2026-03-16 15:21:40.957+00`), which Hermes' `Date.parse` rejects and the
+ * shared parser normalizes; a purchase arrives as ISO already. A row whose time
+ * still does not parse sorts below every dated row rather than claiming a real
+ * instant, so one broken record cannot reorder the rest.
+ */
+function sortTimeOf(value: string): number {
+  const at = parseTimestamp(value).getTime();
+  return Number.isFinite(at) ? at : Number.NEGATIVE_INFINITY;
 }
 
 /**
@@ -101,12 +118,18 @@ function timestampOf(value: string): number {
  *
  * Purchases arrive paged and the ledger does not, so a ledger row that is newer
  * than the oldest loaded purchase still sorts above it; the two sources cannot
- * disagree on a timestamp because both are stored on the same credit row.
+ * disagree on a timestamp because both are stored on the same credit row. A
+ * ledger row whose grant already has its purchase row is flagged so the row
+ * prints the expiry alone, and the purchase stays one row.
  */
 export function buildCreditHistoryItems(
   purchases: readonly CreditPurchaseEntry[],
   deductions: readonly CreditDeduction[]
 ): CreditHistoryItem[] {
+  // The two reads overlap: an expiry row names the grant it closed, and a paid
+  // grant is also a purchase row with its receipt. Only the purchase pages the
+  // screen holds can be duplicated, so the loaded ids decide.
+  const listedPurchaseIds = new Set(purchases.map(entry => entry.id));
   const items: CreditHistoryItem[] = [
     ...purchases.map((entry): CreditHistoryItem => ({
       kind: 'purchase',
@@ -114,21 +137,26 @@ export function buildCreditHistoryItems(
       entry,
       sortDate: entry.date,
     })),
-    ...deductions.map((deduction): CreditHistoryItem => ({
-      kind: 'ledger',
-      key: `ledger:${deduction.id}`,
-      deduction,
-      sortDate: deduction.purchase?.date ?? deduction.date,
-    })),
+    ...deductions.map((deduction): CreditHistoryItem => {
+      const grant = deduction.purchase;
+      return {
+        kind: 'ledger',
+        key: `ledger:${deduction.id}`,
+        deduction,
+        sortDate: grant?.date ?? deduction.date,
+        grantListed: grant != null && listedPurchaseIds.has(grant.id),
+      };
+    }),
   ];
 
   return items.sort((a, b) => {
-    const byDate = timestampOf(b.sortDate) - timestampOf(a.sortDate);
-    if (byDate !== 0) {
-      return byDate;
+    const atA = sortTimeOf(a.sortDate);
+    const atB = sortTimeOf(b.sortDate);
+    if (atA !== atB) {
+      return atB - atA;
     }
-    // A deterministic order for two rows that share a timestamp, so a refetch
-    // cannot reshuffle them under the reader.
+    // A deterministic order for two rows that share a timestamp (or whose time
+    // does not parse), so a refetch cannot reshuffle them under the reader.
     return a.key.localeCompare(b.key);
   });
 }

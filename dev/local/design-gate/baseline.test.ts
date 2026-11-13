@@ -518,11 +518,7 @@ test('manifest screen identity uses the raw segments.join producer key, not a ro
 });
 
 /** A readiness run for one captured dump, without a full preparation. */
-function readinessRun(
-  t: TestContext,
-  target: { id: string; link: string },
-  dump: ProbeDump
-) {
+function readinessRun(t: TestContext, target: { id: string; link: string }, dump: ProbeDump) {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-ready-'));
   t.after(() => fs.rmSync(out, { recursive: true, force: true }));
   fs.writeFileSync(path.join(out, 'screen.json'), JSON.stringify(dump));

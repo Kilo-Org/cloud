@@ -3,12 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
 import { strFromU8, unzipSync } from 'fflate';
-import {
-  api_request_log_2,
-  kilocode_users,
-  microdollar_usage_metadata,
-  type User,
-} from '@kilocode/db/schema';
+import { api_request_log_2, kilocode_users, type User } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
@@ -190,6 +185,7 @@ describe('GET /admin/api/api-request-log/download', () => {
         organization_id: ORGANIZATION_ID,
         requested_model: sensitiveText,
         generation_id: sensitiveText,
+        session_id: sensitiveText,
       },
       JSON.stringify({
         version: 2,
@@ -198,9 +194,6 @@ describe('GET /admin/api/api-request-log/download', () => {
         error: null,
       })
     );
-    await db
-      .insert(microdollar_usage_metadata)
-      .values({ id: row.id, message_id: 'message', session_id: sensitiveText });
     const request = createRequest({
       id: row.id,
       generationId: sensitiveText,
@@ -214,44 +207,40 @@ describe('GET /admin/api/api-request-log/download', () => {
     request.headers.set('authorization', 'Bearer secret');
     request.headers.set('x-forwarded-for', '192.0.2.1');
 
-    try {
-      const response = await GET(request);
+    const response = await GET(request);
 
-      expect(response.status).toBe(200);
-      expect(mockedRecordAdminAction).toHaveBeenCalledTimes(1);
-      expect(mockedRecordAdminAction).toHaveBeenCalledWith(
-        expect.objectContaining({
-          user: exporter,
-          authViaToken: true,
-          ip: '192.0.2.1',
-          trpcPath: '/admin/api/api-request-log/download',
-        }),
-        {
-          action: 'api_request_log.download',
-          target: { type: 'user', id: TEST_USER_ID },
-          message: 'Started API request log ZIP export',
-          metadata: {
-            logId: row.id,
-            hasGenerationIdFilter: true,
-            userId: TEST_USER_ID,
-            organizationId: ORGANIZATION_ID,
-            startAt: '2026-08-01T12:00:00.000Z',
-            endAt: '2026-08-01T12:30:59.999Z',
-            hasUserFilter: true,
-            hasOrganizationFilter: true,
-            hasModelPrefixFilter: true,
-            hasSessionFilter: true,
-            matchingRows: 1,
-          },
-        }
-      );
-      expect(JSON.stringify(mockedRecordAdminAction.mock.calls)).not.toContain(sensitiveText);
-      expect(JSON.stringify(mockedRecordAdminAction.mock.calls)).not.toContain('secret');
-      await response.arrayBuffer();
-      expect(mockedRecordAdminAction).toHaveBeenCalledTimes(1);
-    } finally {
-      await db.delete(microdollar_usage_metadata).where(eq(microdollar_usage_metadata.id, row.id));
-    }
+    expect(response.status).toBe(200);
+    expect(mockedRecordAdminAction).toHaveBeenCalledTimes(1);
+    expect(mockedRecordAdminAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user: exporter,
+        authViaToken: true,
+        ip: '192.0.2.1',
+        trpcPath: '/admin/api/api-request-log/download',
+      }),
+      {
+        action: 'api_request_log.download',
+        target: { type: 'user', id: TEST_USER_ID },
+        message: 'Started API request log ZIP export',
+        metadata: {
+          logId: row.id,
+          hasGenerationIdFilter: true,
+          userId: TEST_USER_ID,
+          organizationId: ORGANIZATION_ID,
+          startAt: '2026-08-01T12:00:00.000Z',
+          endAt: '2026-08-01T12:30:59.999Z',
+          hasUserFilter: true,
+          hasOrganizationFilter: true,
+          hasModelPrefixFilter: true,
+          hasSessionFilter: true,
+          matchingRows: 1,
+        },
+      }
+    );
+    expect(JSON.stringify(mockedRecordAdminAction.mock.calls)).not.toContain(sensitiveText);
+    expect(JSON.stringify(mockedRecordAdminAction.mock.calls)).not.toContain('secret');
+    await response.arrayBuffer();
+    expect(mockedRecordAdminAction).toHaveBeenCalledTimes(1);
   });
 
   it('targets the organization for an export without a user filter', async () => {
@@ -636,27 +625,17 @@ describe('GET /admin/api/api-request-log/download', () => {
     );
   });
 
-  it('filters by session ID through microdollar_usage_metadata', async () => {
-    const inSession = await insertLog();
-    const otherSession = await insertLog();
+  it('filters by session ID', async () => {
+    const inSession = await insertLog({ session_id: 'session-1' });
+    await insertLog({ session_id: 'session-2' });
     await insertLog();
-    await db.insert(microdollar_usage_metadata).values([
-      { id: inSession.id, message_id: 'message-1', session_id: 'session-1' },
-      { id: otherSession.id, message_id: 'message-2', session_id: 'session-2' },
-    ]);
 
-    try {
-      const response = await GET(createRequest({ sessionId: 'session-1' }));
+    const response = await GET(createRequest({ sessionId: 'session-1' }));
 
-      expect(response.status).toBe(200);
-      expect(response.headers.get('Content-Disposition')).toContain('_session-1.zip');
-      const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
-      expect(exportedIds(entries)).toEqual([inSession.id]);
-    } finally {
-      await db
-        .delete(microdollar_usage_metadata)
-        .where(inArray(microdollar_usage_metadata.id, [inSession.id, otherSession.id]));
-    }
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Disposition')).toContain('_session-1.zip');
+    const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
+    expect(exportedIds(entries)).toEqual([inSession.id]);
   });
 
   it.each<Record<string, string>>([
@@ -668,7 +647,11 @@ describe('GET /admin/api/api-request-log/download', () => {
     { startTime: '13:00' },
     { endTime: '11:00' },
   ])('combines the log ID with the other filters %j', async overrides => {
-    const row = await insertLog({ generation_id: 'gen-1', organization_id: ORGANIZATION_ID });
+    const row = await insertLog({
+      generation_id: 'gen-1',
+      organization_id: ORGANIZATION_ID,
+      session_id: 'session-1',
+    });
 
     const response = await GET(createRequest({ id: row.id, ...overrides }));
 

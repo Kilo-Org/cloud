@@ -7241,7 +7241,10 @@ describe('Enkrypt input guardrail', () => {
 
     async function handleLoggedRequest() {
       const response = await handleLlmProxyRequest(
-        makeRequest(makeBody(), { 'x-vercel-id': vercelRequestId })
+        makeRequest(makeBody(), {
+          'x-vercel-id': vercelRequestId,
+          'x-kilocode-taskid': 'ses_logged',
+        })
       );
       await Promise.all(
         jest.mocked(after).mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
@@ -7455,6 +7458,7 @@ describe('Enkrypt input guardrail', () => {
             generation_id: null,
             kilo_user_id: 'user-123',
             organization_id: 'org-1',
+            session_id: 'ses_logged',
             requested_model: 'openai/gpt-4o',
           },
         ]);

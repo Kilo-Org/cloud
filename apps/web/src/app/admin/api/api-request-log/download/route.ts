@@ -2,8 +2,8 @@ import { connection, type NextRequest } from 'next/server';
 import * as z from 'zod';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { api_request_log_2, microdollar_usage_metadata } from '@kilocode/db/schema';
-import { and, gte, lte, eq, asc, gt, count, inArray, like, or, type SQL } from 'drizzle-orm';
+import { api_request_log_2 } from '@kilocode/db/schema';
+import { and, gte, lte, eq, asc, gt, count, like, or, type SQL } from 'drizzle-orm';
 import {
   apiRequestLogBlobKey,
   apiRequestLogBlobSchema,
@@ -90,17 +90,8 @@ function buildFilter(
   if (modelPrefix) {
     conditions.push(like(api_request_log_2.requested_model, `${escapeLikePattern(modelPrefix)}%`));
   }
-  // The log id is the usage id, and the session ID is stored only with the usage metadata.
   if (sessionId) {
-    conditions.push(
-      inArray(
-        api_request_log_2.id,
-        db
-          .select({ id: microdollar_usage_metadata.id })
-          .from(microdollar_usage_metadata)
-          .where(eq(microdollar_usage_metadata.session_id, sessionId))
-      )
-    );
+    conditions.push(eq(api_request_log_2.session_id, sessionId));
   }
   return and(...conditions);
 }

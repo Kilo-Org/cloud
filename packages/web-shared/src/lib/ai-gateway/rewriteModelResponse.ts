@@ -30,6 +30,7 @@ export type RequestLoggingParams = {
   usage_id: string;
   user: User | null;
   organization_id: string | null;
+  session_id: string | null;
   vercel_request_id: string | null;
   request: GatewayRequest;
   enkrypt?: (captureResponse?: boolean) => Promise<EnkryptRequestLog[]>;
@@ -87,7 +88,7 @@ async function createRequestLogCapture(
   logging: RequestLoggingParams,
   extraError: Record<string, string> | null
 ): Promise<RequestLogCapture | null> {
-  const { usage_id, user, organization_id, request } = logging;
+  const { usage_id, user, organization_id, session_id, request } = logging;
   const loggingMode = await getDynamicRequestLoggingMode({
     accountId: user?.id ?? null,
     organizationId: organization_id,
@@ -162,6 +163,7 @@ async function createRequestLogCapture(
         generation_id: generationId,
         kilo_user_id: user.id,
         organization_id,
+        session_id,
         requested_model: model,
       });
       logExceptInTest('[rewriteModelResponse] Inserted into api_request_log_2', usage_id);

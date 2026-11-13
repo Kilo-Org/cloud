@@ -423,6 +423,7 @@ describe.each(timeoutEffortRequests)('$name timeout effort guidance', ({ request
         usage_id: crypto.randomUUID(),
         user: null,
         organization_id: null,
+        session_id: null,
         vercel_request_id: 'fra1::request-id',
         request,
       },
@@ -2701,6 +2702,7 @@ function makeLogging(overrides?: Partial<RequestLoggingParams>): RequestLoggingP
     usage_id: crypto.randomUUID(),
     user: { id: LOG_USER_ID } as RequestLoggingParams['user'],
     organization_id: null,
+    session_id: null,
     vercel_request_id: null,
     request: { body: {} } as unknown as RequestLoggingParams['request'],
     ...overrides,
@@ -3068,6 +3070,7 @@ describe('api_request_log_2 storage', () => {
     error: Record<string, string> | null,
     logging = storageLogging({
       organization_id: organizationId,
+      session_id: 'ses_storage',
       request: {
         kind: 'chat_completions',
         body: {
@@ -3120,6 +3123,7 @@ describe('api_request_log_2 storage', () => {
       generation_id: null,
       kilo_user_id: storageUserId,
       organization_id: organizationId,
+      session_id: 'ses_storage',
       requested_model: 'kilo-internal/my-model',
     });
     const date = new Date(row.created_at).toISOString().slice(0, 10).replaceAll('-', '/');

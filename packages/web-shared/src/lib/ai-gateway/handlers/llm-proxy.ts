@@ -457,6 +457,7 @@ export async function handleLlmProxyRequest(
     usage_id: usageId,
     user: caller.kind === 'signed-in' ? caller.user : null,
     organization_id: organizationId || null,
+    session_id: usageContext.session_id,
     vercel_request_id: headers.vercelRequestId,
     request: requestBodyParsed,
     enkrypt: enkryptGuardrail.requestLogs,

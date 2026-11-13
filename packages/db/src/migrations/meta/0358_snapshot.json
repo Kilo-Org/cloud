@@ -1,5 +1,5 @@
 {
-  "id": "2a848c13-ec7b-42f0-b79f-e3506fa2550f",
+  "id": "3b3e5cdd-3d1a-4622-a4c6-e536cfbf6f88",
   "prevId": "fedf4df4-b771-47ea-bee4-4a1e65353537",
   "version": "7",
   "dialect": "postgresql",
@@ -2556,6 +2556,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "session_id": {
+          "name": "session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "requested_model": {
           "name": "requested_model",
           "type": "text",
@@ -2584,6 +2590,21 @@
           "columns": [
             {
               "expression": "generation_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_api_request_log_2_session_id": {
+          "name": "idx_api_request_log_2_session_id",
+          "columns": [
+            {
+              "expression": "session_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

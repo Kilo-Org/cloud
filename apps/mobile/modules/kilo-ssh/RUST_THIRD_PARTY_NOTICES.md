@@ -14,7 +14,7 @@ MPL-2.0 code here and are used unmodified from crates.io, which is where their s
 published.
 
 | crate | version | licence | source |
-| --- | --- | --- | --- |
+|---|---|---|---|
 | `aead` | `0.5.2` | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
 | `aead` | `0.6.1` | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
 | `aes` | `0.9.4` | MIT OR Apache-2.0 | https://github.com/RustCrypto/block-ciphers |

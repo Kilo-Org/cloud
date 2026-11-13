@@ -103,6 +103,21 @@ const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =
   fetch(input, init);
 const emptyDefaultConversationEvents = (): AgentConversationEvent[] => [];
 
+/*
+ * A retry re-sends the last user message, so everything the failed turn added
+ * after it goes too: a stale assistant message, thinking block or tool call
+ * would otherwise be replayed into the fresh request.
+ */
+export const truncateToLastUserMessage = (
+  events: readonly AgentConversationEvent[]
+): AgentConversationEvent[] => {
+  const lastUserIndex = events.findLastIndex(
+    event => event.type === 'message' && event.role === 'user'
+  );
+
+  return lastUserIndex === -1 ? [...events] : events.slice(0, lastUserIndex + 1);
+};
+
 interface ConversationRunState {
   readonly abort: AbortController;
   readonly selectedTabId: number;
@@ -942,18 +957,14 @@ export const AgentChatPanel = ({
       return;
     }
 
-    const remainingEvents = conversation.events.filter(
-      event => !(event.type === 'error' && event.id === errorEventId)
+    const retryEvents = truncateToLastUserMessage(
+      conversation.events.filter(event => !(event.type === 'error' && event.id === errorEventId))
     );
 
     setConversationStore(currentStore =>
-      updateStoredConversationEvents(currentStore, conversationId, () => remainingEvents)
+      updateStoredConversationEvents(currentStore, conversationId, () => retryEvents)
     );
-    void startTurn(
-      conversationId,
-      remainingEvents,
-      createRunState(conversationId, runSelectedTabId)
-    );
+    void startTurn(conversationId, retryEvents, createRunState(conversationId, runSelectedTabId));
   };
 
   const retryError = (event: ConversationErrorEvent): void => {

@@ -20,6 +20,7 @@ import {
   useIntegrationStatuses,
 } from '@/lib/hooks/use-integrations';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { useOrgDeepLinkSelection } from '@/lib/hooks/use-org-deep-link-selection';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { getIntegrationPageUrl } from '@/lib/integration-urls';
 import { buildIntegrationRows, type IntegrationRow } from '@/lib/integrations/integration-rows';
@@ -46,6 +47,14 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
   const { t } = useTranslation();
   const scope = integrationScope(organizationId);
   const boundary = useOrgBoundary(organizationId);
+  // The link's organization becomes the selection once it resolves to a
+  // membership; a foreign id writes nothing and stays on the boundary's state.
+  useOrgDeepLinkSelection({
+    orgParam: organizationId,
+    contextOrganizationId: boundary.contextOrganizationId,
+    orgs: boundary.orgs,
+    isOrgListLoading: boundary.isLoading,
+  });
   // A deep link can name an organization the viewer is not a member of: the
   // boundary owns that case, so no read fires until membership is confirmed.
   const scopeResolved = scope === 'personal' || (!boundary.isResolving && boundary.org != null);

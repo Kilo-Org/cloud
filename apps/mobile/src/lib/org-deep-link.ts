@@ -1,5 +1,5 @@
-/** Every route that takes an `?org=` scope (credit activity, usage) uses the
- * first value of a repeated org query parameter.
+/** Every route that takes an `?org=` scope (credit activity, usage,
+ * integrations) uses the first value of a repeated org query parameter.
  * Empty first values mean no explicit scope; later values are never a fallback.
  * Both the route guard and screen use this normalization before membership checks.
  */

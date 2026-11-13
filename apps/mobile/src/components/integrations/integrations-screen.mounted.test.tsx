@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- cohesive mounted suite for the integrations hub state and deep-link scope contract */
+
 // The integrations hub serves both scopes: the personal one shows every
 // connection the account owns, and the organization one hides the actions the
 // viewer's role cannot take. The states below are the ones the screen owns —
@@ -8,6 +10,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
+import IntegrationsRoute from '@/app/(app)/(tabs)/(3_profile)/integrations';
 import { IntegrationsScreen } from './integrations-screen';
 
 type SetupStatusRow = { platform: string; installed: boolean; installation?: unknown };
@@ -32,6 +35,7 @@ const state = vi.hoisted(() => ({
   githubConnections: { data: [] as unknown[] | undefined, isPending: false },
   role: undefined as string | undefined,
   orgResolved: true,
+  orgs: [] as { organizationId: string; role?: string }[],
   permissionDenied: false,
 }));
 const calls = vi.hoisted(() => ({
@@ -66,10 +70,40 @@ vi.mock('@/lib/hooks/use-integrations', () => ({
 }));
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
-  useOrgBoundary: () => ({
-    role: state.role,
-    org: state.orgResolved ? { organizationId: 'org-1', organizationName: 'Acme' } : undefined,
-    isResolving: false,
+  useOrgBoundary: (override?: string) => {
+    const id = override ?? account.organizationId;
+    const org = state.orgs.find(entry => entry.organizationId === id);
+    return {
+      contextOrganizationId: account.organizationId,
+      organizationId: id,
+      role: state.role,
+      org: state.orgResolved ? org : undefined,
+      orgs: state.orgs,
+      isLoading: false,
+      isResolving: false,
+      isError: false,
+    };
+  },
+}));
+
+// The account provider as the screen sees it: the persisted selection and the
+// writer the deep-link scope uses.
+const account = vi.hoisted(() => ({
+  organizationId: 'org-1' as string | null,
+  written: [] as (string | null)[],
+  setOrganizationId: vi.fn(),
+  reset() {
+    account.organizationId = 'org-1';
+    account.written = [];
+    account.setOrganizationId.mockClear();
+  },
+}));
+
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({
+    organizationId: account.organizationId,
+    isLoaded: true,
+    setOrganizationId: account.setOrganizationId,
   }),
 }));
 
@@ -160,8 +194,10 @@ function mount(organizationId?: string): TestRenderer.ReactTestRenderer {
 afterEach(() => {
   act(() => {
     mounted?.unmount();
+    mountedRoute?.unmount();
   });
   mounted = undefined;
+  mountedRoute = undefined;
 });
 
 function findOne(root: TestRenderer.ReactTestInstance, type: string) {
@@ -196,6 +232,12 @@ function press(node: TestRenderer.ReactTestInstance | null) {
 }
 
 beforeEach(() => {
+  account.reset();
+  account.setOrganizationId.mockImplementation((next: string | null) => {
+    account.written.push(next);
+  });
+  state.orgs = [{ organizationId: 'org-1' }, { organizationId: 'org-b' }];
+  routeParams.org = undefined;
   state.statuses = statusState();
   state.githubConnections = { data: [], isPending: false };
   state.role = undefined;
@@ -349,5 +391,54 @@ describe('IntegrationsScreen', () => {
     const renderer = mount('org-unresolved');
     expect(findOne(renderer.root, 'OrganizationBoundaryMock')[0]?.props.title).toBe('Integrations');
     expect(findOne(renderer.root, 'RowMock')).toHaveLength(0);
+  });
+});
+
+const routeParams = vi.hoisted(() => ({ org: undefined as string | string[] | undefined }));
+vi.mock('expo-router', () => ({
+  useLocalSearchParams: () => ({ org: routeParams.org }),
+}));
+
+let mountedRoute: TestRenderer.ReactTestRenderer | undefined = undefined;
+
+function mountRoute(): TestRenderer.ReactTestRenderer {
+  act(() => {
+    mountedRoute = TestRenderer.create(createElement(IntegrationsRoute));
+  });
+  if (!mountedRoute) {
+    throw new Error('integrations route did not render');
+  }
+  return mountedRoute;
+}
+
+describe('integrations route deep-linked organization', () => {
+  it('writes the linked member organization as the selection', () => {
+    routeParams.org = 'org-b';
+    mountRoute();
+
+    expect(account.written).toEqual(['org-b']);
+  });
+
+  it('takes the first of a repeated org parameter', () => {
+    routeParams.org = ['org-b', 'org-c'];
+    mountRoute();
+
+    expect(account.written).toEqual(['org-b']);
+  });
+
+  it('writes nothing for an organization the viewer is not a member of', () => {
+    routeParams.org = 'org-foreign';
+    const renderer = mountRoute();
+
+    expect(account.written).toEqual([]);
+    expect(findOne(renderer.root, 'OrganizationBoundaryMock')).toHaveLength(1);
+    expect(findOne(renderer.root, 'RowMock')).toHaveLength(0);
+  });
+
+  it.each([undefined, '', ['', 'org-b']] as const)('leaves the selection alone for %j', org => {
+    routeParams.org = org;
+    mountRoute();
+
+    expect(account.written).toEqual([]);
   });
 });

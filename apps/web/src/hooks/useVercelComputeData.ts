@@ -1,17 +1,24 @@
 'use client';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { inferRouterOutputs } from '@trpc/server';
 import { toast } from 'sonner';
 import type { RootRouter } from '@/routers/root-router';
 import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
 import type { VercelProject, VercelTeam } from '@/lib/vercel-client';
+import type { useVercelComputeEnrollment } from '@/hooks/useVercelComputeEnrollment';
+import type { useVercelComputeStatus } from '@/hooks/useVercelComputeStatus';
 
 export type VercelComputeRemoveError = {
   data?: { code?: string } | null;
   message: string;
 };
 
-type VercelComputeDataCallbacks = {
+export type VercelComputeQueries = {
+  enrollmentQuery: ReturnType<typeof useVercelComputeEnrollment>;
+  statusQuery: ReturnType<typeof useVercelComputeStatus>;
+};
+
+type VercelComputeDataOptions = VercelComputeQueries & {
   onRemoveSuccess: () => void;
   onRemoveError: (error: VercelComputeRemoveError) => void;
 };
@@ -68,18 +75,13 @@ export function useVercelComputeData(
   organizationId: string | undefined,
   normalizedToken: string,
   teamId: string,
-  { onRemoveSuccess, onRemoveError }: VercelComputeDataCallbacks
+  { enrollmentQuery, statusQuery, onRemoveSuccess, onRemoveError }: VercelComputeDataOptions
 ) {
   const trpc = useTRPC();
   const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
   const organizationOwner = organizationId !== undefined;
 
-  const enrollmentQuery = useQuery(
-    organizationOwner
-      ? trpc.organizations.vercelCompute.getEnrollment.queryOptions({ organizationId })
-      : trpc.vercelCompute.getEnrollment.queryOptions()
-  );
   const enrollmentState: 'checking' | 'unavailable' | 'enrolled' | 'not-enrolled' =
     enrollmentQuery.isPending
       ? 'checking'
@@ -90,18 +92,6 @@ export function useVercelComputeData(
           : 'not-enrolled';
   const isEnrolled = enrollmentState === 'enrolled';
 
-  const statusQuery = useQuery({
-    ...(organizationOwner
-      ? trpc.organizations.vercelCompute.getStatus.queryOptions({ organizationId })
-      : trpc.vercelCompute.getStatus.queryOptions()),
-    refetchInterval: query =>
-      query.state.data?.setupStatus === 'pending' ||
-      query.state.data?.setupStatus === 'building' ||
-      query.state.data?.upgradeStatus === 'pending' ||
-      query.state.data?.upgradeStatus === 'building'
-        ? 2_000
-        : false,
-  });
   const status = statusQuery.data;
   const isSetupFormVisible = !status && statusQuery.isSuccess && isEnrolled;
 
@@ -269,7 +259,6 @@ export function useVercelComputeData(
     enrollmentState,
     isEnrolled,
     status,
-    statusQuery,
     isSetupFormVisible,
     discoverTeamsMutation,
     discoverProjectsMutation,

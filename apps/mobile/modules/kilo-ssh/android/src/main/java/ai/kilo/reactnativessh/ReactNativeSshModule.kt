@@ -139,7 +139,7 @@ class ReactNativeSshModule : Module() {
     Function("notifyWhenIdle") { shellId: String, quietMs: Double, title: String, body: String? ->
       val source = sshRegistry.shell(shellId)
 
-      if (source == null) {
+      if (source == null || source.terminated) {
         false
       } else {
         IdleNotifications.watch(
@@ -317,17 +317,12 @@ class ReactNativeSshModule : Module() {
     val session = session(sessionId)
     val shellId = sshRegistry.shellIds.next()
     val source = translateSuspendFailures {
-      // A channel that ends releases itself: nothing holds a shell past its exit.
       SshShellSource.open(sessionId, session, options.term, options.cols, options.rows) {
         sshRegistry.closeShell(shellId)
       }
     }
 
     sshRegistry.putShell(shellId, source)
-
-    // The channel can end before it is registered, in which case the callback
-    // above had nothing to remove yet.
-    if (source.terminated) sshRegistry.closeShell(shellId)
 
     return shellId
   }

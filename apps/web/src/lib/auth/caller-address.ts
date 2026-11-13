@@ -2,8 +2,7 @@
  * The caller address a Vercel Firewall rule counts against: the address the
  * platform observed (`x-vercel-forwarded-for`), then `x-real-ip`, then
  * `'unknown'`, which keeps the rule key non-empty when neither header has a
- * usable hop. Every caller-keyed sign-in budget reads the address here, so one
- * caller lands in one bucket and the answers cannot disagree.
+ * usable hop.
  */
 export function callerAddressFromHeaders(headers: Headers): string {
   return (

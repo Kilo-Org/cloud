@@ -25,6 +25,7 @@ import {
 import { sessionGitSummaryPayloadSchema, worktreeRecoverySchema } from './worktree-changes-wire.js';
 import { PreviewServicesScanSchema } from './preview-services.js';
 import { controlPlaneWorktreeGitFrameSchema } from './worktree-git-operations.js';
+import { maintenanceChatSchema, maintenanceOutcomeSchema } from './pr-maintenance.js';
 
 const cloudAgentWorktreeIdSchema = z.templateLiteral(['worktree_', z.uuid()]);
 
@@ -406,6 +407,7 @@ const routeSpecObjectSchema = z
     kiloSessionId: z.string().min(1),
     directory: z.string().min(1).max(1024),
     createdOnPlatform: z.string().max(256).optional(),
+    maintenance: maintenanceChatSchema.optional(),
     githubReviewTarget: z
       .object({
         repo: z.string().min(1).max(256),
@@ -947,6 +949,7 @@ export const controlPlaneOutcomeSchema = z
     assistantReason: controlPlaneAssistantFailureReasonSchema.optional(),
     providerOwnership: controlPlaneProviderOwnershipSchema.optional(),
     gateResult: z.enum(['pass', 'fail']).optional(),
+    maintenance: maintenanceOutcomeSchema.optional(),
     lastMessageId: z.string().min(1).max(128),
   })
   .strict()

@@ -4,6 +4,12 @@ const mockPullsGet = jest.fn();
 const mockListForRef = jest.fn();
 const mockGetCombinedStatusForRef = jest.fn();
 const mockGraphQlRequest = jest.fn();
+const mockRedisEval = jest.fn();
+import { executeGitHubGraphQl, validateGitHubGraphQl } from '@/tests/helpers/github-graphql-schema';
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({ logExceptInTest: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: { eval: (...args: unknown[]) => mockRedisEval(...args) },
+}));
 
 jest.mock('./adapter', () => {
   class MockGitHubRateLimitError extends Error {
@@ -184,7 +190,83 @@ function existingWith(overrides: Partial<PrObservations>): unknown {
   return { ...createEmptyPrObservations(), headSha: HEAD_SHA, ...overrides };
 }
 
+const reviewer = { __typename: 'User', login: 'reviewer', databaseId: 8 };
+const kiloBot = { __typename: 'Bot', login: 'kiloconnect', databaseId: 5 };
+
+function schemaComment(id: string, body: string, author = reviewer) {
+  return {
+    fullDatabaseId: id,
+    body,
+    authorAssociation: author.__typename === 'Bot' ? 'NONE' : 'MEMBER',
+    author,
+    updatedAt: AT,
+    url: `https://github.com/acme/widgets/pull/7#comment-${id}`,
+    commit: { oid: HEAD_SHA },
+  };
+}
+
+function schemaThread(id: string, rootId: string) {
+  const comments = [
+    schemaComment(rootId, `Root ${rootId}.`),
+    schemaComment(`${rootId}1`, `Reply ${rootId}.`),
+  ];
+  return {
+    id,
+    isResolved: false,
+    comments: ({ first }: { first: number }) => ({
+      nodes: comments.slice(0, first),
+      pageInfo: { hasNextPage: comments.length > first },
+    }),
+  };
+}
+
+const schemaPullRequest = {
+  reviewDecision: 'CHANGES_REQUESTED',
+  comments: {
+    nodes: [schemaComment('20', 'Document the list contract.', kiloBot)],
+    pageInfo: { hasPreviousPage: false },
+  },
+  reviews: {
+    nodes: [{ ...schemaComment('30', 'Needs tests.'), state: 'CHANGES_REQUESTED' }],
+    pageInfo: { hasPreviousPage: false },
+  },
+  files: {
+    nodes: [{ path: 'src/list.ts', changeType: 'MODIFIED' }],
+    pageInfo: { hasNextPage: false },
+  },
+  reviewThreads: ({ after }: { after: string | null }) =>
+    after === null
+      ? {
+          nodes: [schemaThread('PRRT_1', '9')],
+          pageInfo: { hasNextPage: true, endCursor: 'cursor-1' },
+        }
+      : {
+          nodes: [schemaThread('PRRT_2', '11')],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+};
+
+type SchemaResponse = { data: { repository: { pullRequest: Record<string, unknown> } } };
+
+function answerFromGitHubSchema() {
+  const responses: SchemaResponse[] = [];
+  mockGraphQlRequest.mockImplementation(
+    async (_route: string, request: { query: string; variables: Record<string, unknown> }) => {
+      const result = await executeGitHubGraphQl(request.query, request.variables, {
+        rateLimit: { cost: 1, limit: 5000, remaining: 4999, resetAt: LATER },
+        repository: { pullRequest: schemaPullRequest },
+      });
+      expect(result.errors).toBeUndefined();
+      const body = JSON.parse(JSON.stringify(result)) as SchemaResponse;
+      responses.push(body);
+      return { headers: {}, data: body };
+    }
+  );
+  return responses;
+}
+
 beforeEach(() => {
+  mockRedisEval.mockReset().mockResolvedValue([1, 0, 0]);
   mockGenerateToken.mockReset().mockResolvedValue({
     token: 'installation-token',
     expires_at: null,
@@ -201,6 +283,51 @@ afterEach(() => {
 });
 
 describe('fetchPullRequestObservations', () => {
+  it('includes existing inline follow-up requests with their root and thread identity', async () => {
+    const root = {
+      fullDatabaseId: '9',
+      body: 'Handle an empty list.',
+      authorAssociation: 'MEMBER',
+      author: { login: 'reviewer', __typename: 'User', databaseId: 8 },
+      updatedAt: AT,
+      url: 'https://github.com/acme/widgets/pull/7#discussion_r9',
+      commit: { oid: OLD_SHA },
+    };
+    const reply = {
+      ...root,
+      fullDatabaseId: '10',
+      body: 'Also handle a missing list.',
+      updatedAt: LATER,
+    };
+    const node = {
+      id: 'thread-1',
+      isResolved: false,
+      comments: { nodes: [root, reply], pageInfo: { hasNextPage: false } },
+    };
+    const page = {
+      ...graphQlPage({ nodes: [node] }),
+      comments: { nodes: [], pageInfo: { hasPreviousPage: false } },
+      reviews: { nodes: [], pageInfo: { hasPreviousPage: false } },
+      files: { nodes: [], pageInfo: { hasNextPage: false } },
+    };
+    mockGraphQlRequest.mockResolvedValue(graphQlResponse(page));
+    const result = await fetchPullRequestObservations({ ...input, maintenanceReason: 'recheck' });
+    expect(result.maintenance).toMatchObject({
+      complete: true,
+      feedback: [
+        { fullDatabaseId: '9', rootId: '9', threadId: 'thread-1', body: root.body },
+        { fullDatabaseId: '10', rootId: '9', threadId: 'thread-1', body: reply.body },
+      ],
+    });
+    const partialNode = {
+      ...node,
+      comments: { ...node.comments, pageInfo: { hasNextPage: true } },
+    };
+    const partialPage = { ...page, reviewThreads: { ...page.reviewThreads, nodes: [partialNode] } };
+    mockGraphQlRequest.mockResolvedValue(graphQlResponse(partialPage));
+    const partial = await fetchPullRequestObservations({ ...input, maintenanceReason: 'recheck' });
+    expect(partial.maintenance).toMatchObject({ complete: false, feedback: [] });
+  });
   it('generates the agent installation token with the exact app and integration association', async () => {
     await fetchPullRequestObservations({ ...input, appType: 'lite' });
 
@@ -314,10 +441,96 @@ describe('fetchPullRequestObservations', () => {
     ];
     expect(method).toBe('POST /graphql');
     expect(request.query).toContain('isResolved');
-    expect(request.query).toContain('comments(first: 1)');
     expect(request.query).toContain('fullDatabaseId');
-    expect(request.query).not.toContain('databaseId');
-    expect(request.variables).toMatchObject({ owner: 'acme', name: 'widgets', number: 7 });
+    expect(validateGitHubGraphQl(request.query)).toEqual([]);
+    expect(request.variables).toEqual({
+      owner: 'acme',
+      name: 'widgets',
+      number: 7,
+      after: null,
+      includePrFeedback: false,
+      includeThreadFeedback: false,
+      threadCommentLimit: 1,
+    });
+  });
+
+  it('reads only the review decision and thread roots for a normal refresh', async () => {
+    const responses = answerFromGitHubSchema();
+
+    const result = await fetchPullRequestObservations(input);
+
+    expect(responses.map(response => response.data.repository.pullRequest)).toEqual([
+      {
+        reviewDecision: 'CHANGES_REQUESTED',
+        reviewThreads: {
+          nodes: [
+            { id: 'PRRT_1', isResolved: false, comments: { nodes: [{ fullDatabaseId: '9' }] } },
+          ],
+          pageInfo: { hasNextPage: true, endCursor: 'cursor-1' },
+        },
+      },
+      {
+        reviewDecision: 'CHANGES_REQUESTED',
+        reviewThreads: {
+          nodes: [
+            { id: 'PRRT_2', isResolved: false, comments: { nodes: [{ fullDatabaseId: '11' }] } },
+          ],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      },
+    ]);
+    expect(result.observations.threads).toEqual([
+      { rootId: '9', threadId: 'PRRT_1', state: 'unresolved' },
+      { rootId: '11', threadId: 'PRRT_2', state: 'unresolved' },
+    ]);
+    expect(result.observations.threadsComplete).toBe(true);
+    expect(mockRedisEval).not.toHaveBeenCalled();
+  });
+
+  it('reads PR feedback and files on the first maintenance page and thread feedback on every page', async () => {
+    const responses = answerFromGitHubSchema();
+
+    const result = await fetchPullRequestObservations({ ...input, maintenanceReason: 'recheck' });
+
+    const [first, second] = responses.map(response => response.data.repository.pullRequest);
+    expect(Object.keys(first ?? {}).sort()).toEqual([
+      'comments',
+      'files',
+      'reviewDecision',
+      'reviewThreads',
+      'reviews',
+    ]);
+    expect(Object.keys(second ?? {}).sort()).toEqual(['reviewDecision', 'reviewThreads']);
+    expect(result.maintenance).toMatchObject({
+      complete: true,
+      files: ['src/list.ts'],
+      filesComplete: true,
+    });
+    expect(
+      result.maintenance?.feedback.map(item => [item.source, item.fullDatabaseId, item.threadId])
+    ).toEqual([
+      ['conversation_comment', '20', null],
+      ['review', '30', null],
+      ['review_comment', '9', 'PRRT_1'],
+      ['review_comment', '91', 'PRRT_1'],
+      ['review_comment', '11', 'PRRT_2'],
+      ['review_comment', '111', 'PRRT_2'],
+    ]);
+  });
+
+  it('normalizes GraphQL bot authors to the REST login used by trust policies', async () => {
+    answerFromGitHubSchema();
+
+    const result = await fetchPullRequestObservations({ ...input, maintenanceReason: 'enable' });
+
+    expect(result.maintenance?.feedback.map(item => item.author)).toEqual([
+      { login: 'kiloconnect[bot]', __typename: 'Bot', databaseId: '5' },
+      { login: 'reviewer', __typename: 'User', databaseId: '8' },
+      { login: 'reviewer', __typename: 'User', databaseId: '8' },
+      { login: 'reviewer', __typename: 'User', databaseId: '8' },
+      { login: 'reviewer', __typename: 'User', databaseId: '8' },
+      { login: 'reviewer', __typename: 'User', databaseId: '8' },
+    ]);
   });
 
   it('summarizes a successful empty inventory as observed and complete', async () => {
@@ -921,6 +1134,7 @@ describe('fetchPullRequestObservations', () => {
   it.each([
     ['type', { message: 'slow down', type: 'RATE_LIMITED' }],
     ['extension code', { message: 'slow down', extensions: { code: 'SECONDARY_RATE_LIMIT' } }],
+    ['lowercase extension code', { message: 'slow down', extensions: { code: 'abuse_detection' } }],
   ])('detects a GraphQL rate limit from a %s in a later error entry', async (_label, rateEntry) => {
     const now = Date.parse('2026-01-01T00:00:00.000Z');
     jest.spyOn(Date, 'now').mockReturnValue(now);

@@ -26,6 +26,15 @@ import {
 import { isNotNull, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import type { SessionLiveSummary } from '@kilocode/session-ingest-contracts';
+import type {
+  CloudAgentChatKind,
+  WatchPrAttemptStatus,
+  WatchPrEvidence,
+  WatchPrExecutionStatus,
+  WatchPrFeedbackDisposition,
+  WatchPrMaintenanceInput,
+  WatchPrMaintenanceResult,
+} from './cloud-agent-pr-maintenance';
 import {
   KiloPassTier,
   KiloPassCadence,
@@ -6733,6 +6742,9 @@ export const cli_sessions_v2 = pgTable(
     cloud_agent_session_scope_id: text(),
     cloud_agent_worktree_id: text(),
     created_on_platform: text().notNull().default('unknown'),
+    chat_kind: text().$type<CloudAgentChatKind>().notNull().default('user'),
+    maintenance_watch_id: uuid(),
+    maintenance_attempt_id: uuid(),
     git_url: text(),
     git_branch: text(),
     platform: text(), // PR host (e.g. github), NOT the OS.
@@ -6786,6 +6798,14 @@ export const cli_sessions_v2 = pgTable(
       .on(table.cloud_agent_session_id)
       .where(isNotNull(table.cloud_agent_session_id)),
     index('IDX_cli_sessions_v2_organization_id').on(table.organization_id),
+    index('IDX_cli_sessions_v2_maintenance_watch')
+      .on(table.maintenance_watch_id)
+      .where(isNotNull(table.maintenance_watch_id))
+      .concurrently(),
+    index('IDX_cli_sessions_v2_maintenance_attempt')
+      .on(table.maintenance_attempt_id)
+      .where(isNotNull(table.maintenance_attempt_id))
+      .concurrently(),
     index('IDX_cli_sessions_v2_user_updated').on(table.kilo_user_id, table.updated_at),
     index('IDX_cli_sessions_v2_user_activity')
       .on(table.kilo_user_id, sql`coalesce(${table.last_activity_at}, ${table.created_at})`)
@@ -6851,13 +6871,22 @@ export const cloud_agent_pr_watches = pgTable(
     head_sha: text().notNull(),
     base_sha: text().notNull(),
     status: text().$type<WatchPrStatus>().notNull().default('watching'),
+    execution_status: text().$type<WatchPrExecutionStatus>().notNull().default('watching'),
     generation: integer().notNull().default(1),
     pending_revision: integer().notNull().default(0),
+    pending_since: timestamp({ withTimezone: true, mode: 'string' }),
+    next_run_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_assessed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    total_attempts: integer().notNull().default(0),
+    last_attempt_id: uuid().references((): AnyPgColumn => cloud_agent_pr_maintenance_attempts.id, {
+      onDelete: 'set null',
+    }),
     policy: jsonb().$type<WatchPrPolicy>().notNull(),
     projection: jsonb().$type<unknown>().notNull(),
     lifecycle_reason: text(),
-    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }),
     last_event_at: timestamp({ withTimezone: true, mode: 'string' }),
+    finished_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
@@ -6874,9 +6903,17 @@ export const cloud_agent_pr_watches = pgTable(
       table.pr_number
     ),
     index('IDX_cloud_agent_pr_watches_head').on(table.repository_id, table.head_sha),
+    index('IDX_cloud_agent_pr_watches_due')
+      .on(table.next_run_at)
+      .where(sql`${table.status} = 'watching' AND ${table.next_run_at} IS NOT NULL`)
+      .concurrently(),
     check(
       'cloud_agent_pr_watches_status_check',
       sql`${table.status} IN ('watching', 'paused', 'finished')`
+    ),
+    check(
+      'cloud_agent_pr_watches_execution_status_check',
+      sql`${table.execution_status} IN ('watching', 'waiting_for_session', 'fixing', 'waiting_for_checks', 'needs_input')`
     ),
     check(
       'cloud_agent_pr_watches_app_type_check',
@@ -6884,7 +6921,7 @@ export const cloud_agent_pr_watches = pgTable(
     ),
     check(
       'cloud_agent_pr_watches_version_check',
-      sql`${table.generation} > 0 AND ${table.pending_revision} >= 0 AND ${table.pr_number} > 0`
+      sql`${table.generation} > 0 AND ${table.pending_revision} >= 0 AND ${table.pr_number} > 0 AND ${table.total_attempts} >= 0`
     ),
     check(
       'cloud_agent_pr_watches_repo_url_check',
@@ -6894,6 +6931,144 @@ export const cloud_agent_pr_watches = pgTable(
 );
 
 export type CloudAgentPrWatch = typeof cloud_agent_pr_watches.$inferSelect;
+
+export const cloud_agent_pr_maintenance_attempts = pgTable(
+  'cloud_agent_pr_maintenance_attempts',
+  {
+    id: idPrimaryKeyColumn,
+    watch_id: uuid()
+      .notNull()
+      .references(() => cloud_agent_pr_watches.id, { onDelete: 'cascade' }),
+    worktree_id: text().notNull(),
+    generation: integer().notNull(),
+    pending_revision: integer().notNull(),
+    ordinal: integer().notNull(),
+    session_id: text(),
+    cloud_agent_session_id: text(),
+    creation_operation_key: uuid().notNull(),
+    message_id: text().notNull(),
+    status: text().$type<WatchPrAttemptStatus>().notNull().default('creating'),
+    input: jsonb().$type<WatchPrMaintenanceInput>().notNull(),
+    result: jsonb().$type<WatchPrMaintenanceResult>(),
+    delivery_attempts: integer().notNull().default(0),
+    next_run_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_delivery_at: timestamp({ withTimezone: true, mode: 'string' }),
+    started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    needs_input_at: timestamp({ withTimezone: true, mode: 'string' }),
+    finished_at: timestamp({ withTimezone: true, mode: 'string' }),
+    reason: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_cloud_agent_pr_maintenance_attempts_live_workspace')
+      .on(table.worktree_id)
+      .where(sql`${table.status} IN ('creating', 'running', 'needs_input')`),
+    uniqueIndex('UQ_cloud_agent_pr_maintenance_attempts_operation').on(
+      table.creation_operation_key
+    ),
+    uniqueIndex('UQ_cloud_agent_pr_maintenance_attempts_message').on(table.message_id),
+    uniqueIndex('UQ_cloud_agent_pr_maintenance_attempts_session')
+      .on(table.session_id)
+      .where(isNotNull(table.session_id)),
+    uniqueIndex('UQ_cloud_agent_pr_maintenance_attempts_cloud_session')
+      .on(table.cloud_agent_session_id)
+      .where(isNotNull(table.cloud_agent_session_id)),
+    uniqueIndex('UQ_cloud_agent_pr_maintenance_attempts_ordinal').on(table.watch_id, table.ordinal),
+    uniqueIndex('UQ_cloud_agent_pr_maintenance_attempts_revision').on(
+      table.watch_id,
+      table.generation,
+      table.pending_revision
+    ),
+    index('IDX_cloud_agent_pr_maintenance_attempts_watch').on(table.watch_id, table.created_at),
+    index('IDX_cloud_agent_pr_maintenance_attempts_due')
+      .on(table.next_run_at)
+      .where(
+        sql`${table.status} IN ('creating', 'running', 'needs_input') AND ${table.next_run_at} IS NOT NULL`
+      ),
+    check(
+      'cloud_agent_pr_maintenance_attempts_status_check',
+      sql`${table.status} IN ('creating', 'running', 'needs_input', 'completed', 'failed', 'stopped')`
+    ),
+    check(
+      'cloud_agent_pr_maintenance_attempts_version_check',
+      sql`${table.generation} > 0 AND ${table.pending_revision} >= 0 AND ${table.ordinal} BETWEEN 1 AND 10 AND ${table.delivery_attempts} BETWEEN 0 AND 5`
+    ),
+    check(
+      'cloud_agent_pr_maintenance_attempts_finished_check',
+      sql`(${table.status} IN ('creating', 'running', 'needs_input') AND ${table.finished_at} IS NULL) OR (${table.status} IN ('completed', 'failed', 'stopped') AND ${table.finished_at} IS NOT NULL)`
+    ),
+    check(
+      'cloud_agent_pr_maintenance_attempts_payload_check',
+      sql`jsonb_typeof(${table.input}) = 'object' AND length(${table.input}::text) <= 524288 AND (${table.result} IS NULL OR (jsonb_typeof(${table.result}) = 'object' AND length(${table.result}::text) <= 262144))`
+    ),
+  ]
+);
+
+export type CloudAgentPrMaintenanceAttempt =
+  typeof cloud_agent_pr_maintenance_attempts.$inferSelect;
+export type NewCloudAgentPrMaintenanceAttempt =
+  typeof cloud_agent_pr_maintenance_attempts.$inferInsert;
+
+export const cloud_agent_pr_feedback_dispositions = pgTable(
+  'cloud_agent_pr_feedback_dispositions',
+  {
+    id: idPrimaryKeyColumn,
+    watch_id: uuid()
+      .notNull()
+      .references(() => cloud_agent_pr_watches.id, { onDelete: 'cascade' }),
+    attempt_id: uuid().references(() => cloud_agent_pr_maintenance_attempts.id, {
+      onDelete: 'set null',
+    }),
+    problem_key: text().notNull(),
+    content_fingerprint: text().notNull(),
+    disposition: text().$type<WatchPrFeedbackDisposition>().notNull(),
+    reason: text().notNull(),
+    evidence: jsonb()
+      .$type<WatchPrEvidence[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    thread_id: text(),
+    reply_comment_id: text(),
+    reply_body: text(),
+    replied_at: timestamp({ withTimezone: true, mode: 'string' }),
+    resolution_status: text()
+      .$type<'not_applicable' | 'open' | 'resolved'>()
+      .notNull()
+      .default('not_applicable'),
+    resolved_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_cloud_agent_pr_feedback_dispositions_problem').on(
+      table.watch_id,
+      table.problem_key,
+      table.content_fingerprint
+    ),
+    index('IDX_cloud_agent_pr_feedback_dispositions_attempt').on(table.attempt_id),
+    index('IDX_cloud_agent_pr_feedback_dispositions_reply')
+      .on(table.reply_comment_id)
+      .where(isNotNull(table.reply_comment_id)),
+    check(
+      'cloud_agent_pr_feedback_dispositions_disposition_check',
+      sql`${table.disposition} IN ('addressed', 'already_addressed', 'disagreed', 'deferred', 'needs_input', 'not_actionable')`
+    ),
+    check(
+      'cloud_agent_pr_feedback_dispositions_resolution_check',
+      sql`(${table.resolution_status} = 'not_applicable' AND ${table.thread_id} IS NULL AND ${table.resolved_at} IS NULL) OR (${table.resolution_status} = 'open' AND ${table.thread_id} IS NOT NULL AND ${table.resolved_at} IS NULL) OR (${table.resolution_status} = 'resolved' AND ${table.thread_id} IS NOT NULL AND ${table.resolved_at} IS NOT NULL AND ${table.disposition} IN ('addressed', 'already_addressed'))`
+    ),
+    check(
+      'cloud_agent_pr_feedback_dispositions_bounds_check',
+      sql`length(${table.problem_key}) BETWEEN 1 AND 200 AND length(${table.content_fingerprint}) BETWEEN 1 AND 128 AND length(${table.reason}) BETWEEN 1 AND 2000 AND length(${table.reply_body}) <= 4000 AND jsonb_typeof(${table.evidence}) = 'array' AND jsonb_array_length(${table.evidence}) <= 10 AND length(${table.evidence}::text) <= 65536`
+    ),
+  ]
+);
+
+export type CloudAgentPrFeedbackDisposition =
+  typeof cloud_agent_pr_feedback_dispositions.$inferSelect;
+export type NewCloudAgentPrFeedbackDisposition =
+  typeof cloud_agent_pr_feedback_dispositions.$inferInsert;
 
 export const cloud_agent_pr_watch_activity = pgTable(
   'cloud_agent_pr_watch_activity',

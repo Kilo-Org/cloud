@@ -602,6 +602,9 @@ async function defaultAdmitPrompt(params: {
   if (result.type === 'session-not-found') {
     return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
   }
+  if (result.type === 'maintenance-stopped') {
+    return { success: false, code: 'BAD_REQUEST', error: 'maintenance_attempt_stopped' };
+  }
   if (result.type === 'queue-full') {
     return pendingQueueFullAdmissionFailure();
   }

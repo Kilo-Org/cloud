@@ -1,9 +1,12 @@
 import { type SessionMessageCompletionSource } from './session-message-state.js';
 import { type SafeFailureProjection } from './safe-failure-projection.js';
+import type { MaintenanceOutcome } from '../shared/pr-maintenance.js';
 
 export type SafeMessageResult = {
   messageId: string;
   status: 'queued' | 'running' | 'completed' | 'failed' | 'interrupted';
+  failureCode?: string;
+  maintenance?: MaintenanceOutcome;
   createdAt: number;
   queuedAt?: number;
   acceptedAt?: number;

@@ -25,6 +25,7 @@ import { useStackedWorkspaceSource } from './hooks/useStackedWorkspaceSource';
 import { resolveStackedWorkspaceAvailability } from './workspace-stacks';
 import type { WorktreeBranchOperationTarget } from './useWorktreeBranchOperations';
 import { Badge } from '@/components/ui/badge';
+import { MaintenanceBadge } from './MaintenanceBadge';
 
 export type ChatStackBreadcrumbItem = {
   worktreeId: string;
@@ -78,6 +79,7 @@ type ChatHeaderProps = {
   changesOpen?: boolean;
   onToggleChanges?: (event: MouseEvent<HTMLButtonElement>) => void;
   sessionTitle?: string;
+  chatKind?: 'user' | 'maintenance';
   sessionActive: boolean;
   sandboxStatusEligible?: boolean;
   /** Whether the source session is a Cloud Agent session that can be forked. */
@@ -111,6 +113,7 @@ export function ChatHeader({
   kiloSessionId,
   organizationId,
   sessionTitle,
+  chatKind,
   sessionActive,
   sandboxStatusEligible = false,
   canForkToCloud = false,
@@ -201,6 +204,7 @@ export function ChatHeader({
         />
       )}
       <div className="flex min-w-0 items-center gap-1">
+        {chatKind === 'maintenance' && <MaintenanceBadge />}
         {stack && (
           <div className="hidden min-w-0 items-center gap-0.5 overflow-x-auto md:flex">
             {stack.behindParent && (

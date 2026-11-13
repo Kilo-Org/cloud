@@ -2039,6 +2039,61 @@ describe('runSiblingCreate clone registration rollback', () => {
     });
   });
 
+  it('creates a fresh maintenance sibling with fresh authorization, explicit metadata, and no auto-commit', async () => {
+    const { context, db, destinationStub } = fixture();
+    const run = cloneRun(context, db);
+    const options = { ...run.options };
+    delete options.clone;
+    delete options.continuation;
+    const chat = {
+      kind: 'maintenance' as const,
+      watchId: '11111111-1111-4111-8111-111111111111',
+      attemptId: '22222222-2222-4222-8222-222222222222',
+      publication: {
+        repoUrl: 'https://github.com/acme/repo',
+        headRef: 'feature/shared',
+        baseRef: 'main',
+        observedHeadSha: 'a'.repeat(40),
+        baseSha: 'b'.repeat(40),
+      },
+    };
+    run.source.metadata.lifecycle.timestamp = Date.now() - 2 * 86_400_000;
+    await runSiblingCreate({
+      ...run,
+      intent: 'create_workspace_session',
+      options: {
+        ...options,
+        chat,
+        requestedKiloSessionId: DESTINATION_KILO_SESSION_ID,
+        requestedCloudAgentSessionId: DESTINATION_WORKSPACE_ID,
+      },
+      preissuedRuntimeAuthorization: {
+        token: 'fresh-automation-token',
+        seal: 'fresh-automation-seal',
+      },
+    });
+    expect(createRuntimeAuthorizationMock).not.toHaveBeenCalled();
+    expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          chat,
+          finalization: { autoCommit: false },
+          auth: expect.objectContaining({ kilocodeToken: 'fresh-automation-token' }),
+          identity: expect.objectContaining({ createdOnPlatform: 'cloud-agent-web' }),
+        }),
+        runtimeAuthorizationSeal: 'fresh-automation-seal',
+      })
+    );
+    expect(createSessionForCloudAgentMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chat: { kind: 'maintenance', watchId: chat.watchId, attemptId: chat.attemptId },
+      })
+    );
+    expect(createSessionForCloudAgentMock.mock.calls.at(-1)?.[0]).not.toHaveProperty(
+      'cloneFromKiloSessionId'
+    );
+  });
+
   it('keeps onlyIfEmpty cleanup for a non-clone sibling rejection', async () => {
     const { context, db, destinationStub } = fixture();
     destinationStub.registerSessionFromMetadata.mockResolvedValueOnce({ success: false });

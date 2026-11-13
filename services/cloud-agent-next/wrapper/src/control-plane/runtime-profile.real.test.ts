@@ -197,7 +197,7 @@ suite('pinned Kilo profile discovery', () => {
       expect(manager.activeTurnCount()).toBe(0);
       expect(fixture.requests).toBe(0);
     } finally {
-      manager?.shutdown();
+      await manager?.shutdown();
       await fixture.dispose();
     }
   }, 30_000);

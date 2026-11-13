@@ -5091,95 +5091,241 @@
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         },
         "policy": {
-          "type": "object",
-          "properties": {
-            "version": {
-              "type": "number",
-              "const": 1
-            },
-            "model": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 200
-            },
-            "profileId": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "categories": {
+          "oneOf": [
+            {
               "type": "object",
               "properties": {
-                "reviews": {
+                "version": {
+                  "type": "number",
+                  "const": 1
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "profileId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "categories": {
+                  "type": "object",
+                  "properties": {
+                    "reviews": {
+                      "type": "boolean"
+                    },
+                    "failedChecks": {
+                      "type": "boolean"
+                    },
+                    "baseUpdates": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "reviews",
+                    "failedChecks",
+                    "baseUpdates"
+                  ]
+                },
+                "branchStrategy": {
+                  "type": "string",
+                  "enum": [
+                    "merge",
+                    "rebase"
+                  ]
+                },
+                "historyRewriteConsent": {
                   "type": "boolean"
                 },
-                "failedChecks": {
-                  "type": "boolean"
+                "maxAttemptsPerProblem": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2
                 },
-                "baseUpdates": {
-                  "type": "boolean"
+                "maxTotalAttempts": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10
+                },
+                "observationOnlyConsent": {
+                  "type": "boolean",
+                  "const": true
+                },
+                "futureEventsOnlyConsent": {
+                  "type": "boolean",
+                  "const": true
+                },
+                "noHardSpendCapConsent": {
+                  "type": "boolean",
+                  "const": true
                 }
               },
               "required": [
-                "reviews",
-                "failedChecks",
-                "baseUpdates"
-              ]
+                "version",
+                "model",
+                "profileId",
+                "categories",
+                "branchStrategy",
+                "historyRewriteConsent",
+                "maxAttemptsPerProblem",
+                "maxTotalAttempts",
+                "observationOnlyConsent",
+                "futureEventsOnlyConsent",
+                "noHardSpendCapConsent"
+              ],
+              "additionalProperties": false
             },
-            "branchStrategy": {
-              "type": "string",
-              "enum": [
-                "merge",
-                "rebase"
-              ]
-            },
-            "historyRewriteConsent": {
-              "type": "boolean"
-            },
-            "maxAttemptsPerProblem": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 2
-            },
-            "maxTotalAttempts": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 10
-            },
-            "observationOnlyConsent": {
-              "type": "boolean",
-              "const": true
-            },
-            "futureEventsOnlyConsent": {
-              "type": "boolean",
-              "const": true
-            },
-            "noHardSpendCapConsent": {
-              "type": "boolean",
-              "const": true
+            {
+              "type": "object",
+              "properties": {
+                "version": {
+                  "type": "number",
+                  "const": 2
+                },
+                "automaticWritesConsent": {
+                  "type": "boolean",
+                  "const": true
+                },
+                "historyRewriteConsent": {
+                  "type": "boolean",
+                  "const": true
+                },
+                "noHardSpendCapConsent": {
+                  "type": "boolean",
+                  "const": true
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "variant": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "profileId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "environmentId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "trustedBotLogins": {
+                  "default": [
+                    "kiloconnect[bot]",
+                    "kiloconnect-development[bot]",
+                    "kiloconnect-lite[bot]"
+                  ],
+                  "maxItems": 25,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,38}(?:\\[bot\\])?$"
+                  }
+                },
+                "categories": {
+                  "type": "object",
+                  "properties": {
+                    "reviews": {
+                      "type": "boolean"
+                    },
+                    "failedChecks": {
+                      "type": "boolean"
+                    },
+                    "conflicts": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "reviews",
+                    "failedChecks",
+                    "conflicts"
+                  ],
+                  "additionalProperties": false
+                },
+                "branchStrategy": {
+                  "default": "rebase",
+                  "type": "string",
+                  "const": "rebase"
+                },
+                "maxAttemptsPerProblem": {
+                  "default": 2,
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2
+                },
+                "maxTotalAttempts": {
+                  "default": 10,
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10
+                },
+                "batchDelaySeconds": {
+                  "default": 30,
+                  "type": "integer",
+                  "minimum": 5,
+                  "maximum": 120
+                },
+                "maxBatchWaitSeconds": {
+                  "default": 120,
+                  "type": "integer",
+                  "minimum": 10,
+                  "maximum": 300
+                },
+                "quietPeriodSeconds": {
+                  "default": 180,
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 600
+                }
+              },
+              "required": [
+                "version",
+                "automaticWritesConsent",
+                "historyRewriteConsent",
+                "noHardSpendCapConsent",
+                "model",
+                "profileId",
+                "environmentId",
+                "categories"
+              ],
+              "additionalProperties": false
             }
-          },
-          "required": [
-            "version",
-            "model",
-            "profileId",
-            "categories",
-            "branchStrategy",
-            "historyRewriteConsent",
-            "maxAttemptsPerProblem",
-            "maxTotalAttempts",
-            "observationOnlyConsent",
-            "futureEventsOnlyConsent",
-            "noHardSpendCapConsent"
-          ],
-          "additionalProperties": false
+          ]
         },
         "expiresAt": {
           "type": "string",
@@ -5192,8 +5338,7 @@
         "expectedRepoUrl",
         "expectedPrNumber",
         "integrationId",
-        "policy",
-        "expiresAt"
+        "policy"
       ]
     },
     "tags": [

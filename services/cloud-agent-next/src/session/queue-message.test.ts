@@ -200,6 +200,17 @@ describe('preflightAndQueuePromptMessage', () => {
       )
     ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Session not found' });
   });
+  it('maps a stopped maintenance admission to a conflict without retrying', async () => {
+    const send = makeSend({ type: 'maintenance-stopped' });
+    await expect(
+      preflightAndQueuePromptMessage(
+        promptInput,
+        { env: makeEnv({ send }) as Env, userId: 'u' },
+        'send'
+      )
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'maintenance_attempt_stopped' });
+    expect(send).toHaveBeenCalledOnce();
+  });
 
   it('maps a V2 queue-full send to the retryable 429 PENDING_QUEUE_FULL', async () => {
     const send = makeSend({ type: 'queue-full' });

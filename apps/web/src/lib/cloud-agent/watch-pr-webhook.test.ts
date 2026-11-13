@@ -9,6 +9,11 @@ const mockTransaction = jest.fn();
 const mockAuthorize = jest.fn();
 const mockRetainCi = jest.fn();
 const mockReadCi = jest.fn();
+const mockSchedule = jest.fn();
+
+jest.mock('./watch-pr-maintenance-client', () => ({
+  scheduleWatchPr: (...args: unknown[]) => mockSchedule(...args),
+}));
 
 jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: {
@@ -35,6 +40,7 @@ jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
 import { observeWatchPrWebhook } from './watch-pr-webhook';
 import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 import { PgDialect } from 'drizzle-orm/pg-core';
+import { watchPrMaintenancePolicySchema } from '@kilocode/db/cloud-agent-pr-maintenance';
 
 const head = 'a'.repeat(40);
 const input = {
@@ -111,6 +117,7 @@ describe('awaited watch PR durable observation', () => {
     mockAuthorize.mockResolvedValue(undefined);
     mockRetainCi.mockResolvedValue(1);
     mockReadCi.mockResolvedValue([]);
+    mockSchedule.mockResolvedValue({ scheduled: true });
     mockTransaction.mockImplementation(async callback =>
       callback({
         select: () => ({
@@ -365,6 +372,33 @@ describe('awaited watch PR durable observation', () => {
       fetch.mockRestore();
     }
   });
+  it('clears waiting_for_checks on a terminal success without waiting for another dispatch', async () => {
+    mockLockedWatch.mockResolvedValue([{ ...watch, execution_status: 'waiting_for_checks' }]);
+    await observeWatchPrWebhook({
+      ...input,
+      payload: {
+        ...input.payload,
+        check_run: { ...input.payload.check_run, conclusion: 'success' },
+      },
+    });
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ execution_status: 'watching', next_run_at: null })
+    );
+  });
+  it('never changes the execution state of a live attempt from a check webhook', async () => {
+    mockLockedWatch.mockResolvedValue([{ ...watch, execution_status: 'fixing' }]);
+    mockReceipt.mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: 'live-attempt' }]);
+    await observeWatchPrWebhook({
+      ...input,
+      payload: {
+        ...input.payload,
+        check_run: { ...input.payload.check_run, conclusion: 'success' },
+      },
+    });
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ execution_status: 'fixing' })
+    );
+  });
 
   it('does not resolve until the projection transaction has persisted', async () => {
     let release: (() => void) | undefined;
@@ -450,7 +484,7 @@ describe('awaited watch PR durable observation', () => {
     expect(mockTransaction).not.toHaveBeenCalled();
   });
 
-  it('finishes expired watches with a generation fence without manufacturing actionable work', async () => {
+  it('finishes legacy observation consent at expiry without retaining the new event body', async () => {
     mockLockedWatch.mockResolvedValue([{ ...watch, expires_at: '2026-01-01 12:00:00+00' }]);
     await observeWatchPrWebhook(input);
     expect(mockUpdate).toHaveBeenCalledWith(
@@ -462,7 +496,96 @@ describe('awaited watch PR durable observation', () => {
       })
     );
     expect(mockInsert).toHaveBeenCalledWith(
-      expect.objectContaining({ generation: 2, reason: 'expired' })
+      expect.objectContaining({ generation: 2, reason: 'expired', kind: 'finished', data: null })
     );
+  });
+  it('never expires a v2 maintenance watch from the compatibility column', async () => {
+    const policy = watchPrMaintenancePolicySchema.parse({
+      version: 2,
+      automaticWritesConsent: true,
+      historyRewriteConsent: true,
+      noHardSpendCapConsent: true,
+      model: 'test/model',
+      profileId: null,
+      environmentId: null,
+      categories: { reviews: true, failedChecks: true, conflicts: true },
+    });
+    mockLockedWatch.mockResolvedValue([{ ...watch, policy, expires_at: '2026-01-01 12:00:00+00' }]);
+    await observeWatchPrWebhook(input);
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'watching', generation: 1, pending_revision: 1 })
+    );
+  });
+
+  describe('maintenance timers', () => {
+    const maintenanceWatch = {
+      ...watch,
+      next_run_at: null,
+      pending_since: null,
+      policy: watchPrMaintenancePolicySchema.parse({
+        version: 2,
+        automaticWritesConsent: true,
+        historyRewriteConsent: true,
+        noHardSpendCapConsent: true,
+        model: 'test/model',
+        profileId: null,
+        environmentId: null,
+        categories: { reviews: true, failedChecks: true, conflicts: true },
+      }),
+    };
+    beforeEach(() => mockLockedWatch.mockResolvedValue([maintenanceWatch]));
+
+    it('schedules the new batch due time only after the observation transaction commits', async () => {
+      let committed = false;
+      mockTransaction.mockImplementation(async callback => {
+        const result = await callback({
+          select: () => ({
+            from: () => ({
+              where: () => ({
+                for: mockLockedWatch,
+                limit: mockReceipt,
+                then: (resolve: (rows: unknown) => unknown) => mockReceipt().then(resolve),
+              }),
+            }),
+          }),
+          insert: () => ({ values: mockInsert }),
+          update: () => ({ set: (values: unknown) => ({ where: () => mockUpdate(values) }) }),
+        });
+        committed = true;
+        return result;
+      });
+      const committedWhenScheduled: boolean[] = [];
+      mockSchedule.mockImplementation(async () => {
+        committedWhenScheduled.push(committed);
+        return { scheduled: true };
+      });
+      await observeWatchPrWebhook(input);
+      const dueAt = mockUpdate.mock.calls[0][0].next_run_at;
+      expect(dueAt).toEqual(expect.any(String));
+      expect(mockSchedule).toHaveBeenCalledWith(watch.id, dueAt);
+      expect(committedWhenScheduled).toEqual([true]);
+    });
+
+    it('does not schedule again when a repeated observation keeps the same due time', async () => {
+      await observeWatchPrWebhook(input);
+      mockLockedWatch.mockResolvedValue([{ ...maintenanceWatch, ...mockUpdate.mock.calls[0][0] }]);
+      await observeWatchPrWebhook({ ...input, deliveryId: 'delivery-2' });
+      expect(mockUpdate).toHaveBeenCalledTimes(2);
+      expect(mockSchedule).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves a live attempt to its own poll timer', async () => {
+      mockReceipt.mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: 'live-attempt' }]);
+      await observeWatchPrWebhook(input);
+      expect(mockUpdate.mock.calls[0][0].next_run_at).toEqual(expect.any(String));
+      expect(mockSchedule).not.toHaveBeenCalled();
+    });
+
+    it('acknowledges a persisted observation when the runtime cannot schedule it', async () => {
+      mockSchedule.mockRejectedValue(new Error('runtime unavailable'));
+      await expect(observeWatchPrWebhook(input)).resolves.toBeUndefined();
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
+      expect(mockSchedule).toHaveBeenCalledTimes(1);
+    });
   });
 });

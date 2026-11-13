@@ -234,6 +234,84 @@ function makeStoredSession(
   return { ...dbSessionToStoredSession(makeDbSession(sessionId, updatedAt)), ...overrides };
 }
 
+describe('maintenance session metadata', () => {
+  it('maps explicit metadata without changing the session platform', () => {
+    const row = {
+      ...makeDbSession('ses_maintenance', '2026-11-12T12:00:00.000Z'),
+      chat_kind: 'maintenance' as const,
+      maintenance_watch_id: 'watch-example',
+      maintenance_attempt_id: 'attempt-example',
+      is_maintenance_pinned: true,
+    };
+    const stored = dbSessionToStoredSession(row);
+    expect(stored.chatKind).toBe('maintenance');
+    expect(stored.maintenanceWatchId).toBe('watch-example');
+    expect(stored.maintenanceAttemptId).toBe('attempt-example');
+    expect(stored.isMaintenancePinned).toBe(true);
+    expect(stored.createdOnPlatform).toBe('web');
+  });
+
+  it('invalidates the session display key when the attempt pin changes without chat activity', () => {
+    const row = {
+      session_id: 'ses_maintenance',
+      updated_at: '2026-11-12T12:00:00.000Z',
+      status: 'idle',
+      status_updated_at: null,
+      chat_kind: 'maintenance',
+    };
+    expect(sessionCacheKey({ ...row, is_maintenance_pinned: true })).not.toBe(
+      sessionCacheKey({ ...row, is_maintenance_pinned: false })
+    );
+  });
+
+  it('uses authoritative attempt pinning even when cached chat updates are newer', () => {
+    const authoritative = makeStoredSession('ses_maintenance', '2026-11-12T12:00:00.000Z', {
+      worktreeId: 'worktree-example',
+      chatKind: 'maintenance',
+      isMaintenancePinned: false,
+    });
+    const cached = {
+      ...authoritative,
+      updatedAt: '2026-11-12T12:00:01.000Z',
+      isMaintenancePinned: true,
+    };
+    expect(
+      mergeWorktreeChatSessions('worktree-example', [authoritative], [cached])[0]
+        .isMaintenancePinned
+    ).toBe(false);
+  });
+
+  it('preserves maintenance metadata when a sparse session event arrives', () => {
+    const row = {
+      ...makeDbSession('ses_maintenance', '2026-11-12T12:00:00.000Z'),
+      chat_kind: 'maintenance' as const,
+      maintenance_watch_id: 'watch-example',
+      maintenance_attempt_id: 'attempt-example',
+      is_maintenance_pinned: true,
+    };
+    const updated = upsertSidebarDbSession(
+      [row],
+      makeDbSession(row.session_id, '2026-11-12T12:00:01.000Z')
+    );
+    expect(updated[0].chat_kind).toBe('maintenance');
+    expect(updated[0].is_maintenance_pinned).toBe(true);
+  });
+
+  it('maps event chat identity but never derives a live attempt pin from the event', () => {
+    const row = eventRowToDbSession(
+      makeEventRow({
+        chatKind: 'maintenance',
+        maintenanceWatchId: 'watch-example',
+        maintenanceAttemptId: 'attempt-example',
+      })
+    );
+    expect(row.chat_kind).toBe('maintenance');
+    expect(row.maintenance_watch_id).toBe('watch-example');
+    expect(row.maintenance_attempt_id).toBe('attempt-example');
+    expect(row.is_maintenance_pinned).toBeUndefined();
+  });
+});
+
 describe('mergeSidebarFolderSessions', () => {
   it('includes all-time folder workspaces beyond the recent 200-session cap', () => {
     const recent = Array.from({ length: 200 }, (_, i) =>
@@ -1764,6 +1842,10 @@ describe('useSidebarSessions live update helpers', () => {
           sessions: [
             {
               sessionId: 'ses_hidden',
+              chat_kind: 'user',
+              maintenance_watch_id: null,
+              maintenance_attempt_id: null,
+              is_maintenance_pinned: false,
               sessionStatus: 'busy',
               sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
               updatedAt: '2026-01-03T12:00:00.000Z',

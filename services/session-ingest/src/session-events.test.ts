@@ -16,6 +16,9 @@ describe('mapSessionEventRow', () => {
         updated_at: '2026-04-29 02:17:13.123+00',
         title: 'Fix issue',
         created_on_platform: 'cloud-agent',
+        chat_kind: 'maintenance',
+        maintenance_watch_id: '11111111-1111-4111-8111-111111111111',
+        maintenance_attempt_id: '22222222-2222-4222-8222-222222222222',
         organization_id: null,
         git_url: null,
         git_branch: null,
@@ -29,6 +32,9 @@ describe('mapSessionEventRow', () => {
       expect(session.updatedAt).toBe('2026-04-29T02:17:13.123Z');
       expect(session.statusUpdatedAt).toBe('2026-04-29T03:18:14.456Z');
       expect(session.worktreeId).toBe(cloudAgentWorktreeId);
+      expect(session.chatKind).toBe('maintenance');
+      expect(session.maintenanceWatchId).toBe('11111111-1111-4111-8111-111111111111');
+      expect(session.maintenanceAttemptId).toBe('22222222-2222-4222-8222-222222222222');
     }
   );
 });

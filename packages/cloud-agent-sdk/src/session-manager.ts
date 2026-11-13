@@ -298,6 +298,10 @@ type FetchedSessionData = {
   gitUrl: string | null;
   gitBranch: string | null;
   worktreeId?: string | null;
+  chatKind?: 'user' | 'maintenance';
+  maintenanceWatchId?: string | null;
+  maintenanceAttemptId?: string | null;
+  isMaintenancePinned?: boolean;
   mode: string | null;
   environmentId?: string | null;
   model: string | null;

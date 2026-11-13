@@ -578,47 +578,147 @@ repository.
     reported result or failure, and links to that session. It MUST NOT render
     the serialized callback envelope as the user's message.
 
-### Watch PR (Observation-Only Pilot)
+### Automatic PR Maintenance
 
-Implementation status: lifecycle controls and activity are backend/API and MCP
-capabilities. Client watch controls and confirmation described below remain
-planned; the current client only shows passive PR hover-card observation counts.
-Watch PR admission is best-effort: observer errors do not fail the enclosing
-webhook. Only successfully persisted state survives; bounded Redis CI receipts
-are not a complete recovery mechanism. Exact recovery limits are documented in
-`docs/plans/cloud-agent-watch-pr.md`.
+Implementation status: the observation-only pilot is the previous foundation.
+Versioned maintenance contracts and storage do not alone enable automatic repairs.
+Release requires the runtime, observation, web controls, and local verification in
+`docs/plans/cloud-agent-watch-pr.md`. These rules define the accepted MVP behavior.
 
-1. An eligible verified GitHub PR MUST offer an accessible watch control without
-   requiring hover. Enabling a watch MUST require a writable grouped Cloud Agent
-   worktree, current repository access, an open same-repository PR, and pilot
-   enablement. Arbitrary PR URLs, fork PRs, and legacy ungrouped sessions MUST NOT
-   be eligible.
-2. The confirmation MUST state that this pilot observes future delivered webhook
-   events only. Pre-existing reviews and checks MAY be missing. It MUST clearly
-   state that no automatic repair, agent run, edit, or push occurs. Saved repair
-   preferences MUST NOT authorize present or future automatic writes, and MUST
-   NOT hide observed problems.
-3. Watch state and observations MUST survive closing the browser and sleeping
-   compute. Waiting MUST NOT start or keep an environment awake or incur agent
-   usage charges. Watching MUST NOT promise complete GitHub delivery coverage or
-   merge readiness.
-4. Details MUST distinguish Watching, Paused, Finished, observed problems, and
-   observations needing attention. Empty evidence MAY say **No observed problems**
-   only alongside future-event coverage and last-received timing. Pending,
-   ambiguous, and truncated evidence MUST NOT be presented as merge readiness.
-5. The user MUST be able to Pause, Resume when pilot enablement permits it, Stop
-   watching, and inspect recent activity. Pause MUST preserve observations and
-   MUST NOT cause automated execution. Stop, confirmed PR closure/merge, expiry,
-   and source worktree deletion MUST fence further watch work. A finished watch
-   MUST NOT restart from a delayed webhook or PR reopen event.
-6. **Recheck PR lifecycle** MUST be an explicit user action. This pilot's recheck
-   MUST state that it verifies PR identity and open/closed/merged lifecycle only,
-   not review or check completeness. Refreshing the watch display MUST NOT fetch
-   GitHub state. Existing watches MUST remain manageable when new enablement is
-   disabled.
-7. One PR's control MUST NOT display or mutate a different PR's watch, including
-   sibling chats and worktrees reused for another PR. Stale controls MUST fail
-   visibly and allow refreshing rather than silently overwriting newer state.
+1. A verified eligible PR MUST offer **Automatically maintain this PR** without
+   requiring hover. Enablement MUST verify a writable grouped workspace, current
+   access, and an open PR with head and base in the same repository. Fork PRs,
+   arbitrary external PR URLs, and legacy ungrouped sessions are outside the MVP.
+2. Confirmation MUST explain automatic edits, commits, rebases, pushes, and normal
+   credit use. Version 2 policy MUST require fresh explicit automatic-write,
+   history-rewrite, and no-hard-spend-cap consent. Version 1 observation preferences
+   MUST remain readable and MUST NOT authorize automatic writes. Attempt limits
+   and balance checks MUST NOT be called a hard monetary cap.
+3. Policy MUST record model, optional variant, profile, environment, trusted review
+   bots, repair categories, and bounded limits. Enablement MUST assess existing
+   feedback, checks, and conflicts immediately through the shared PR refresh.
+4. Maintenance MUST have no expiry. It MUST survive browser closure, sleeping
+   compute, and more than 24 hours without browser activity. Each new maintenance
+   chat MUST revalidate access and receive fresh automation authorization. It MUST
+   NOT rely on authorization copied from an expired user chat.
+5. Waiting MUST NOT start an agent, keep a sandbox awake, or incur agent usage.
+   Observations MUST use webhooks, not recurring GitHub polling. Missing deliveries,
+   pending checks, unknown evidence, or truncated evidence MUST NOT imply success
+   or merge readiness. Show last event/assessment time and an explicit Recheck.
+6. Each repair batch MUST use a fresh dedicated maintenance chat. Ordinary user
+   chats MUST NOT receive automatic repair tasks. A batch MAY contain feedback,
+   current-head failures, and a merge conflict. Later events MUST remain pending
+   outside the active attempt's immutable input snapshot.
+7. Maintenance MUST start only when no user chat is `busy`, `retry`, `question`,
+   or `permission`, no user chat changed status during the quiet period, and no
+   maintenance attempt is active. Coordination is best effort and start-only; it
+   MUST NOT introduce a workspace execution lock. A delayed server check MAY read
+   Kilo state while waiting. It MUST NOT call GitHub or start an empty waiting chat.
+8. After maintenance starts, user chats MUST remain free to start or continue.
+   User chats and maintenance MUST NOT stop, pause, or delay each other. The
+   product accepts concurrent edits in one checkout and possible untidy state.
+9. Maintenance messages MUST disable per-message auto-commit and instruct the
+   agent to commit only its changed files. User auto-commit MUST skip an active
+   maintenance rebase. Maintenance MUST NOT stash or commit unrelated edits. A
+   dirty checkout that prevents rebase MUST end the attempt for a later idle retry.
+10. Any maintenance termination MUST abort an unfinished rebase and restore the
+    checkout's branch. Other partial edits MAY remain. Recovery MUST NOT assume
+    uncommitted files survived or disappeared when the sandbox stopped.
+11. A question MUST show **Needs your input** and keep the maintenance chat pinned.
+    It MUST NOT block user chats or keep compute awake. A waiting message ending
+    with `sandbox_stopped` MUST remain waiting for input, not fail the attempt.
+    The user's answer MUST continue the same chat without waiting for other chats.
+    A normal user message in a maintenance chat also continues that chat.
+12. Chat metadata MUST explicitly distinguish `user` and `maintenance`, with
+    watch/attempt links. It MUST NOT reuse `created_on_platform`. Web chats MUST
+    show **Maintenance**, without a PR number. Automatic pinning MUST derive from
+    the live attempt, include input waits, and end on completion or Stop. Pin the
+    chat, not the workspace. Finished chats MUST remain accessible in PR history.
+13. A fresh chat MUST receive a bounded brief with purpose, user constraints,
+    branches and SHAs, exact rebase command, full bounded feedback/thread IDs,
+    failing-job diagnostics, relevant previous results/dispositions, verification,
+    references, and persisted attempt limits. It MUST NOT automatically inherit
+    the full original chat or every prior repair transcript. The agent MUST NOT
+    list PR comments/checks/runs with `gh`; the brief supplies that data.
+14. Trust MUST use payload `OWNER`, `MEMBER`, or `COLLABORATOR` associations and
+    configured review bot logins. Kilo Code Reviewer MUST be trusted by default.
+    Other bots MUST be ignored unless configured. Edited bot summaries MUST create
+    work only when actionable content changes. Older unresolved feedback MUST
+    remain assessable against current code after a push.
+15. The agent MUST verify feedback before changing code. It MUST fix valid requests,
+    verify already-addressed work, explain disagreement once, defer optional work
+    outside the PR's purpose, and ask a specific question for unclear conflicts.
+    Missing approval or non-actionable changes-requested reviews MUST NOT loop.
+16. Feedback dispositions and compact attempt results MUST persist outside chat
+    context. Reply once per handled review thread and once per batch for conversation
+    comments. Prefer platform-posted replies with recorded IDs and a hidden marker.
+    Suppress marked replies only from recognized Kilo bot accounts. Account-only
+    filtering MUST NOT suppress Code Reviewer comments, including the lite App.
+17. Verified published fixes MAY resolve addressed review threads automatically.
+    Batch resolutions in GraphQL. Disputed threads MUST remain open. Conversation
+    comments MUST NOT receive a thread-resolution action. Changed actionable
+    comment content MUST remain new evidence despite a previous disposition.
+18. Diagnose only terminal failures on the current PR head. Read each failing job's
+    trimmed logs once, for at most three jobs per attempt. Fix code failures and
+    verify locally. Retry confirmed transient infrastructure failures within a
+    small limit. Surface missing secrets, permissions, approvals, or unavailable
+    diagnostics specifically. Old-head failures MUST NOT start repair work.
+19. Rebase MUST occur only for a merge conflict, after a fresh fetch, onto the
+    actual target branch's current tip. Normal PRs use `git rebase origin/<target>`.
+    Stacked PRs use `git rebase --onto origin/<target> <parent-commit>` with recorded
+    `cloud_agent_worktrees.base_sha`. Maintenance MUST NOT call Restack or rebase
+    child workspaces automatically. A conflict-free base update causes no attempt.
+20. Publication instructions MUST target only the existing PR branch with
+    `--force-with-lease=refs/heads/<pr-branch>:<observed-head-sha>`. Fetch and reassess
+    on lease failure. Never relax the lease, use plain force, or rewrite a parent
+    branch. Update the stacked parent SHA only after confirmed publication.
+21. Publication restrictions are agent instructions, not enforced limits. Maintenance
+    has user-chat Git/GitHub access. This accepted risk MUST NOT become a release
+    gate for non-bypassable publication enforcement. Stop and access changes MUST
+    invalidate queued work; they cannot undo a push already in flight.
+22. Stable attempt, creation-operation, session, and message identities MUST survive
+    delivery retries. Track the exact message result. A completed turn or final
+    summary MUST NOT prove a push. Git evidence MUST identify repository, branch,
+    exact lease, observed/pushed/verified heads, base, exit code, and normalized time.
+    Failed or unknown publication MUST remain separate from a successful repair.
+23. Lifecycle MUST remain `watching | paused | finished`. Independent execution
+    state MUST distinguish `watching | waiting_for_session | fixing |
+    waiting_for_checks | needs_input`. Details MUST show Watching, Waiting for your
+    session to finish, Fixing, Waiting for checks, Needs your input, Paused, or
+    Finished. Explanatory text MAY show Waiting for GitHub rate limit.
+24. The user MUST be able to enable, stop, pause, resume, Recheck, and open current
+    or previous maintenance chats. Stop on maintenance MUST pause the watch and
+    prevent event-driven restart. Attempt exhaustion, unavailable access, and user
+    decisions MUST show a reason and recovery action. PR merge/close or workspace
+    deletion MUST finish maintenance. Stale generations MUST NOT restart it.
+25. Admission MUST durably save signed, authorized events before acknowledging
+    success. Deduplicate deliveries and object revisions, handle reordered events,
+    and bound retries. Batching, delayed execution, and retry scheduling MUST live
+    outside Vercel request lifetimes. Do not use agent polling or sleep loops.
+26. GitHub API use MUST share installation cooldowns and prioritize other features.
+    Enable/Recheck MUST reuse the shared refresh and per-PR throttle. Base pushes
+    without file overlap MUST cause no API call. Debounce overlapping pushes and
+    batch conflict queries per installation, initially 25–50 PRs. Check a PR at
+    most about every 15 minutes and retry `UNKNOWN` mergeability only once.
+27. Send API writes serially at least one second apart. On rate limits, stop all
+    maintenance calls for that installation until reset/cooldown. Do not pause the
+    watch or retry immediately. Preserve pending work and postpone low-priority
+    checks/Recheck when budget is low. Measure calls by endpoint/reason, including
+    sandbox broker calls. Both GitHub Apps require the new event subscriptions.
+28. Persist attempt counts across chats. Pilot defaults are two attempts per problem,
+    ten total attempts, 30-second batching, two-minute maximum wait, three-minute
+    quiet period, and bounded delivery/log/context limits. A successful push MUST
+    end the attempt; observing subsequent checks MUST NOT keep an agent running.
+29. Activity MUST distinguish trigger, changes, verification, publication, and chat
+    link. Show actual usage when available. Notify on needed decisions or meaningful
+    completion. Check/review status and merge readiness MUST remain independent.
+    One PR's controls MUST NOT display or mutate another PR or a newer generation.
+30. Retention MUST delete only finished watches after 30 days. Live and paused
+    watches MUST survive inactivity. Watch deletion MUST cascade private briefs,
+    results, dispositions, and activity. User soft deletion MUST remove owned
+    maintenance data without touching another owner. Retained chat links become
+    null, while their explicit Maintenance kind remains. Strict transport timestamp
+    validation MUST receive UTC ISO values normalized from PostgreSQL strings.
 
 ### Sandbox Status
 

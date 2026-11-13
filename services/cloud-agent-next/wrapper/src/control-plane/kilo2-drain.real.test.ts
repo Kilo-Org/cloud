@@ -208,7 +208,7 @@ suite('real Kilo v2 drain completion', () => {
       } finally {
         childGate.resolve();
         parentGate.resolve();
-        manager.shutdown();
+        await manager.shutdown();
         await runtime.shutdown();
         await fake.stop(true);
         await fs.rm(root, { recursive: true, force: true });

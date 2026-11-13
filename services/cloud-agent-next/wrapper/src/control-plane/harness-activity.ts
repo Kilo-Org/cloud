@@ -7,6 +7,7 @@ export type ActivityMessage = {
   sessionId: string;
   id: string;
   role: 'user' | 'assistant';
+  parentMessageId?: string;
   time?: { created: number; completed?: number };
   /** Present when the native message reports a model or provider error. */
   error?: unknown;

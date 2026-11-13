@@ -26,6 +26,7 @@ import { TRPCClientError } from '@trpc/client';
 import {
   cli_sessions_v2,
   cloud_agent_session_runs,
+  cloud_agent_pr_maintenance_attempts,
   cloud_agent_user_settings,
   cloud_agent_workspace_folders,
   cloud_agent_worktrees,
@@ -409,6 +410,14 @@ const commonSessionFields = {
   parent_session_id: cli_sessions_v2.parent_session_id,
   organization_id: cli_sessions_v2.organization_id,
   created_on_platform: cli_sessions_v2.created_on_platform,
+  chat_kind: cli_sessions_v2.chat_kind,
+  maintenance_watch_id: cli_sessions_v2.maintenance_watch_id,
+  maintenance_attempt_id: cli_sessions_v2.maintenance_attempt_id,
+  is_maintenance_pinned: sql<boolean>`${cli_sessions_v2.chat_kind} = 'maintenance' AND EXISTS (
+    SELECT 1 FROM ${cloud_agent_pr_maintenance_attempts}
+    WHERE ${cloud_agent_pr_maintenance_attempts.id} = ${cli_sessions_v2.maintenance_attempt_id}
+      AND ${cloud_agent_pr_maintenance_attempts.status} IN ('creating', 'running', 'needs_input')
+  )`,
   git_url: cli_sessions_v2.git_url,
   git_branch: cli_sessions_v2.git_branch,
   status: cli_sessions_v2.status,
@@ -547,14 +556,22 @@ type WorktreeDetail = {
     sessionStatus: string | null;
     sessionStatusUpdatedAt: string | null;
     updatedAt: string;
+    chat_kind: CliSessionV2['chat_kind'];
+    maintenance_watch_id: string | null;
+    maintenance_attempt_id: string | null;
+    is_maintenance_pinned: boolean;
   })[];
   prSession:
     | (Pick<
         CliSessionV2,
-        | Exclude<keyof typeof commonSessionFields, keyof LatestRunOutcome>
+        | Exclude<
+            keyof typeof commonSessionFields,
+            keyof LatestRunOutcome | 'is_maintenance_pinned'
+          >
         | 'total_cost_microdollars'
       > &
         LatestRunOutcome & {
+          is_maintenance_pinned: boolean;
           associatedPr: z.infer<typeof associatedPrSchema> | null;
         })
     | null;
@@ -1044,6 +1061,10 @@ export const cliSessionsV2Router = createTRPCRouter({
             'sessionId', ${cli_sessions_v2.session_id},
             'sessionStatus', ${cli_sessions_v2.status},
             'sessionStatusUpdatedAt', ${cli_sessions_v2.status_updated_at},
+            'chat_kind', ${cli_sessions_v2.chat_kind},
+            'maintenance_watch_id', ${cli_sessions_v2.maintenance_watch_id},
+            'maintenance_attempt_id', ${cli_sessions_v2.maintenance_attempt_id},
+            'is_maintenance_pinned', ${commonSessionFields.is_maintenance_pinned},
             'latest_run_status', ${latestRunFields.latest_run_status},
             'latest_run_failure_kind', ${latestRunFields.latest_run_failure_kind},
             'latest_run_terminal_at', ${latestRunFields.latest_run_terminal_at},
@@ -1290,6 +1311,9 @@ export const cliSessionsV2Router = createTRPCRouter({
           cachePrHeadSha: sql<string | null>`${sessionAssociatedPr.pr_head_sha}`.as(
             'cache_pr_head_sha'
           ),
+          cachePrObservations: sql<unknown>`${sessionAssociatedPr.pr_observations}`.as(
+            'cache_pr_observations'
+          ),
           cachePrLastSyncedAt: sql<string | null>`${sessionAssociatedPr.pr_last_synced_at}`.as(
             'cache_pr_last_synced_at'
           ),
@@ -1434,6 +1458,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_state: sql<string | null>`${scoped.cachePrState}`.as('pr_state'),
           pr_title: sql<string | null>`${scoped.cachePrTitle}`.as('pr_title'),
           pr_head_sha: sql<string | null>`${scoped.cachePrHeadSha}`.as('pr_head_sha'),
+          pr_observations: sql<unknown>`${scoped.cachePrObservations}`.as('pr_observations'),
           pr_last_synced_at: sql<string | null>`${scoped.cachePrLastSyncedAt}`.as(
             'pr_last_synced_at'
           ),
@@ -1506,6 +1531,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_state: sql<string | null>`${prSessions.pr_state}`.as('pr_state'),
           pr_title: sql<string | null>`${prSessions.pr_title}`.as('pr_title'),
           pr_head_sha: sql<string | null>`${prSessions.pr_head_sha}`.as('pr_head_sha'),
+          pr_observations: sql<unknown>`${prSessions.pr_observations}`.as('pr_observations'),
           pr_last_synced_at: sql<string | null>`${prSessions.pr_last_synced_at}`.as(
             'pr_last_synced_at'
           ),
@@ -1583,6 +1609,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         pr_state: base.pr_state,
         pr_title: base.pr_title,
         pr_head_sha: base.pr_head_sha,
+        pr_observations: base.pr_observations,
         pr_last_synced_at: base.pr_last_synced_at,
         pr_review_decision: base.pr_review_decision,
         review_decision_pending: base.review_decision_pending,
@@ -1624,6 +1651,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_state: row.pr_state,
           pr_title: row.pr_title,
           pr_head_sha: row.pr_head_sha,
+          pr_observations: row.pr_observations,
           pr_last_synced_at: row.pr_last_synced_at,
           pr_review_decision: row.pr_review_decision,
           review_decision_pending: row.review_decision_pending,
@@ -2042,7 +2070,11 @@ export const cliSessionsV2Router = createTRPCRouter({
     // that could pick another account's row for the same id and deny the owner
     // their own session. Read the rows for the id and prefer the caller's.
     const sessions = await db
-      .select({ ...getTableColumns(cli_sessions_v2), ...latestRunFields })
+      .select({
+        ...getTableColumns(cli_sessions_v2),
+        ...latestRunFields,
+        is_maintenance_pinned: commonSessionFields.is_maintenance_pinned,
+      })
       .from(cli_sessions_v2)
       .where(eq(cli_sessions_v2.session_id, session_id));
 
@@ -2284,6 +2316,10 @@ export const cliSessionsV2Router = createTRPCRouter({
         git_url: z.string().nullable(),
         git_branch: z.string().nullable(),
         created_on_platform: z.string(),
+        chat_kind: z.enum(['user', 'maintenance']),
+        maintenance_watch_id: z.string().nullable(),
+        maintenance_attempt_id: z.string().nullable(),
+        is_maintenance_pinned: z.boolean(),
         created_at: z.coerce.date(),
         updated_at: z.coerce.date(),
         version: z.number(),
@@ -2311,6 +2347,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         .select({
           session: cli_sessions_v2,
           ...latestRunFields,
+          is_maintenance_pinned: commonSessionFields.is_maintenance_pinned,
           pr_url: sessionAssociatedPr.pr_url,
           pr_number: sessionAssociatedPr.pr_number,
           pr_state: sessionAssociatedPr.pr_state,
@@ -2409,6 +2446,10 @@ export const cliSessionsV2Router = createTRPCRouter({
         git_url: session.git_url ?? null,
         git_branch: session.git_branch ?? runtimeState?.branchName ?? null,
         created_on_platform: session.created_on_platform,
+        chat_kind: session.chat_kind,
+        maintenance_watch_id: session.maintenance_watch_id,
+        maintenance_attempt_id: session.maintenance_attempt_id,
+        is_maintenance_pinned: row.is_maintenance_pinned,
         created_at: session.created_at,
         updated_at: session.updated_at,
         version: session.version,

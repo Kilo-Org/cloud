@@ -1,4 +1,5 @@
 import { readBoundedRequestBodyBytes } from '../bounded-request-body.js';
+import { logGitHubAgentApiRequest } from './github-agent-api-telemetry.js';
 import {
   GITHUB_RATE_LIMIT_MAX_RETRY_ATTEMPTS,
   GITHUB_RATE_LIMIT_MAX_RETRY_TOTAL_WAIT_MS,
@@ -223,6 +224,7 @@ async function handleManagedGitHubOutbound(
     return new Response('GitHub authorization unavailable', { status: 502 });
   }
 
+  logGitHubAgentApiRequest(request, result, response);
   logDiagnostic(
     'info',
     { ...logFields, upstreamStatus: response.status },

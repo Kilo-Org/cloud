@@ -2,14 +2,14 @@ import { getWorkerDb, kilocode_users, organization_memberships, organizations } 
 import { and, eq } from 'drizzle-orm';
 import { jwtVerify, SignJWT } from 'jose';
 import { z } from 'zod';
-import { signModernKiloToken, verifyKiloTokenForPolicy } from './kilo-token-policy.js';
-import { sha256Hex } from './sha256.js';
-import type { RuntimeAuthorization } from './runtime-authorization-contract.js';
+import { signModernKiloToken, verifyKiloTokenForPolicy } from './kilo-token-policy';
+import { sha256Hex } from './sha256';
+import type { RuntimeAuthorization } from './runtime-authorization-contract';
 import {
   RuntimeAuthorizationSchema,
   runtimeAuthorizationMaximumLifetimeMs,
   RuntimeResourceKindSchema,
-} from './runtime-authorization-contract.js';
+} from './runtime-authorization-contract';
 export { RuntimeAuthorizationSchema };
 export type { RuntimeAuthorization };
 

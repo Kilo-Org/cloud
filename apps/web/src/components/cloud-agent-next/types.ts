@@ -9,6 +9,7 @@
  */
 
 import * as z from 'zod';
+import type { CloudAgentChatKind } from '@kilocode/db/cloud-agent-pr-maintenance';
 
 import type { AssociatedPr } from './utils/github-pr-link';
 
@@ -401,6 +402,10 @@ export type StoredSession = {
   cloudAgentSessionId?: string | null;
   /** Platform where session was created: 'cli', 'cloud-agent', 'agent-manager', or extension identifier */
   createdOnPlatform?: string | null;
+  chatKind?: CloudAgentChatKind;
+  maintenanceWatchId?: string | null;
+  maintenanceAttemptId?: string | null;
+  isMaintenancePinned?: boolean;
   /** Git branch name, shown separately from repository in the sidebar */
   branch?: string | null;
   worktreeId?: string | null;

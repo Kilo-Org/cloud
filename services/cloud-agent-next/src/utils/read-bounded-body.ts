@@ -1,5 +1,5 @@
 export async function readBoundedBody(
-  request: Request,
+  request: Pick<Request, 'body'>,
   maximumBytes: number
 ): Promise<string | null> {
   if (!request.body) return null;

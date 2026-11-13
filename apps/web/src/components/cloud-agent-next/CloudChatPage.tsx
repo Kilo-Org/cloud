@@ -1487,6 +1487,7 @@ export default function CloudChatPage({
   const sessionActions = (
     <ChatHeader
       currentUserId={currentUserId}
+      chatKind={storedChat?.chatKind ?? fetchedSessionData?.chatKind}
       parentSessionHref={parentSessionHref}
       cloudAgentSessionId={workspaceCloudSessionId ?? 'Starting session…'}
       changesCloudAgentSessionId={changesCloudSessionId ?? undefined}

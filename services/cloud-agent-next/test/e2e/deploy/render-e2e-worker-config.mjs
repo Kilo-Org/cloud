@@ -29,6 +29,12 @@ const E2E_INTERNAL_SECRET_PATTERN = /^[A-Za-z0-9._~-]+$/;
 const CALLBACK_QUEUE = 'cloud-agent-next-callback-queue';
 const CALLBACK_QUEUE_E2E = 'cloud-agent-next-callback-queue-e2e-test';
 const REPORT_QUEUE = 'cloud-agent-next-report-queue';
+const PR_MAINTENANCE_QUEUE_BINDING = 'PR_MAINTENANCE_QUEUE';
+const PR_MAINTENANCE_QUEUES = new Set([
+  'cloud-agent-next-pr-maintenance',
+  'cloud-agent-next-pr-maintenance-dev',
+]);
+const PR_MAINTENANCE_RECOVERY_CRON = '* * * * *';
 
 // Native Cloudflare Containers is the only runtime, so the E2E Worker boots the
 // same `SandboxContainers` class as production.
@@ -206,16 +212,29 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
   config.queues = {
     ...config.queues,
     producers: (config.queues?.producers ?? [])
-      .filter(producer => producer.binding !== 'CLOUD_AGENT_REPORT_QUEUE')
+      .filter(
+        producer =>
+          producer.binding !== 'CLOUD_AGENT_REPORT_QUEUE' &&
+          producer.binding !== PR_MAINTENANCE_QUEUE_BINDING
+      )
       .map(producer =>
         producer.queue === CALLBACK_QUEUE ? { ...producer, queue: CALLBACK_QUEUE_E2E } : producer
       ),
     consumers: (config.queues?.consumers ?? [])
-      .filter(consumer => consumer.queue !== REPORT_QUEUE)
+      .filter(
+        consumer => consumer.queue !== REPORT_QUEUE && !PR_MAINTENANCE_QUEUES.has(consumer.queue)
+      )
       .map(consumer =>
         consumer.queue === CALLBACK_QUEUE ? { ...consumer, queue: CALLBACK_QUEUE_E2E } : consumer
       ),
   };
+
+  if (config.triggers?.crons) {
+    config.triggers = {
+      ...config.triggers,
+      crons: config.triggers.crons.filter(cron => cron !== PR_MAINTENANCE_RECOVERY_CRON),
+    };
+  }
 
   return config;
 }

@@ -5,10 +5,17 @@ import { Bot, Clock, Cloud, GitBranch, Monitor, Puzzle, Terminal } from 'lucide-
 import type { StoredSession } from './types';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import Link from 'next/link';
+import { MaintenanceBadge } from './MaintenanceBadge';
 
 export type SessionsListItem = Pick<
   StoredSession,
-  'sessionId' | 'createdAt' | 'createdOnPlatform' | 'prompt' | 'mode'
+  | 'sessionId'
+  | 'createdAt'
+  | 'createdOnPlatform'
+  | 'prompt'
+  | 'mode'
+  | 'chatKind'
+  | 'isMaintenancePinned'
 > & { repository: string | null };
 
 export type SessionsListProps = {
@@ -104,6 +111,9 @@ export function SessionsList({ sessions, organizationId, onSessionClick }: Sessi
                       {session.prompt}
                     </CardTitle>
                     {badge}
+                    {session.chatKind === 'maintenance' && (
+                      <MaintenanceBadge pinned={session.isMaintenancePinned} />
+                    )}
                   </div>
                   {session.repository && (
                     <CardDescription className="mt-1 flex items-center gap-2">

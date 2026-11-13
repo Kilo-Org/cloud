@@ -374,7 +374,12 @@ async function prepareWarmRoute(
   const credential = launchEnv.SANDBOX_CONTROL_CREDENTIAL;
   const allocationId = launchEnv.CONTROL_PLANE_ALLOCATION_ID;
   if (!credential || !allocationId) throw new Error('launch environment is missing identity');
-  const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential, runtimeContract });
+  const wrapper = await FakeWrapper.connect({
+    sandboxId: SANDBOX_ID,
+    credential,
+    runtimeContract,
+    prMaintenance: true,
+  });
   expect(await wrapper.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
     type: 'welcome',
     protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
@@ -2006,6 +2011,53 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(credentialsFrame.kilo.token).toBe(refreshed.kilo.alias);
     expect(credentialsFrame.sessionId).toBe(SESSION);
   });
+
+  it.each(['legacy', 'worktree'] as const)(
+    'preserves maintenance identity through actual %s credential issuance and refresh',
+    async runtimeContract => {
+      const provider = createFakeProvider();
+      const broker = createFakeCredentialBroker();
+      const stub = await setup(provider, broker);
+      const input = prepareInput(SESSION, credentialsSource(SESSION));
+      const maintenance: NonNullable<ControlPlaneRouteSpec['maintenance']> = {
+        kind: 'maintenance',
+        watchId: '33333333-3333-4333-8333-333333333333',
+        attemptId: '44444444-4444-4444-8444-444444444444',
+        publication: {
+          repoUrl: 'https://github.com/acme/widgets',
+          headRef: 'feature/repair',
+          baseRef: 'main',
+          observedHeadSha: 'a'.repeat(40),
+          baseSha: 'b'.repeat(40),
+        },
+        allowRebase: true,
+        parentCommitSha: 'c'.repeat(40),
+        recoverableAttemptIds: ['55555555-5555-4555-8555-555555555555'],
+      };
+      input.spec.maintenance = maintenance;
+      input.spec.branch = maintenance.publication.headRef;
+      const { prepareFrame, wrapper } = await prepareWarmRoute(
+        stub,
+        provider,
+        input,
+        runtimeContract
+      );
+      if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+      expect(prepareFrame.spec.maintenance).toEqual(maintenance);
+      expect(JSON.parse((await readRouteRow(stub, SESSION))?.spec ?? '{}').maintenance).toEqual(
+        maintenance
+      );
+      await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+      expect(
+        await stub.deliver({ sessionId: SESSION, messages: [promptPayload('maintenance-message')] })
+      ).toBe('sent');
+      expect((await wrapper.next())?.type).toBe('session.credentials');
+      expect((await wrapper.next())?.type).toBe('session.prompt');
+      expect(JSON.parse((await readRouteRow(stub, SESSION))?.spec ?? '{}').maintenance).toEqual(
+        maintenance
+      );
+    }
+  );
 
   it('renews a due grant from the alarm without a message and keeps the sandbox-visible values', async () => {
     const provider = createFakeProvider();

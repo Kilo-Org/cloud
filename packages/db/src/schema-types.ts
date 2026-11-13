@@ -10,36 +10,11 @@ import {
 } from '@kilocode/app-shared/code-review';
 import * as z from 'zod';
 
-export const watchPrPolicySchema = z
-  .object({
-    version: z.literal(1),
-    model: z.string().trim().min(1).max(200),
-    profileId: z.string().uuid().nullable(),
-    categories: z.object({
-      reviews: z.boolean(),
-      failedChecks: z.boolean(),
-      baseUpdates: z.boolean(),
-    }),
-    branchStrategy: z.enum(['merge', 'rebase']),
-    historyRewriteConsent: z.boolean(),
-    maxAttemptsPerProblem: z.number().int().min(1).max(2),
-    maxTotalAttempts: z.number().int().min(1).max(10),
-    observationOnlyConsent: z.literal(true),
-    futureEventsOnlyConsent: z.literal(true),
-    noHardSpendCapConsent: z.literal(true),
-  })
-  .strict()
-  .refine(value => value.branchStrategy !== 'rebase' || value.historyRewriteConsent, {
-    message: 'Rebase requires explicit history-rewrite consent',
-    path: ['historyRewriteConsent'],
-  })
-  .refine(value => value.maxAttemptsPerProblem <= value.maxTotalAttempts, {
-    message: 'Per-problem attempts cannot exceed total attempts',
-    path: ['maxAttemptsPerProblem'],
-  });
-
-export type WatchPrPolicy = z.infer<typeof watchPrPolicySchema>;
-export type WatchPrStatus = 'watching' | 'paused' | 'finished';
+export {
+  watchPrPolicySchema,
+  type WatchPrPolicy,
+  type WatchPrStatus,
+} from './cloud-agent-pr-maintenance';
 
 // =============================================================================
 // A. Runtime Values (used in enumCheck() or .default())

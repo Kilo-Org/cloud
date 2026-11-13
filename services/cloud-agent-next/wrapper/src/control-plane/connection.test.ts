@@ -8,6 +8,8 @@ import {
   WORKSPACE_CONFIGURATION_VERSION,
   RUNTIME_INSTRUCTIONS_HEADER,
   RUNTIME_INSTRUCTIONS_VERSION,
+  PR_MAINTENANCE_HEADER,
+  PR_MAINTENANCE_VERSION,
 } from '../../../src/shared/control-plane-runtime-contract.js';
 import { describe, expect, it } from 'bun:test';
 import { z } from 'zod';
@@ -194,6 +196,7 @@ it('advertises worktree support without changing the strict legacy hello', () =>
     expect(socket.options?.headers?.[RUNTIME_INSTRUCTIONS_HEADER]).toBe(
       RUNTIME_INSTRUCTIONS_VERSION
     );
+    expect(socket.options?.headers?.[PR_MAINTENANCE_HEADER]).toBe(PR_MAINTENANCE_VERSION);
     socket.onopen?.();
     expect(socket.frames[0]).toEqual({
       type: 'hello',

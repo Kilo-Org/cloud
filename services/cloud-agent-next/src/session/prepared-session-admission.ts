@@ -1,3 +1,4 @@
+import { TRPCError } from '@trpc/server';
 import type { QueueAckResponse } from '../router/schemas.js';
 import type { Env } from '../types.js';
 import type { SessionId } from '../types/ids.js';
@@ -109,6 +110,9 @@ export async function admitPreparedInitialMessage(
   );
   if (sendResult.type === 'session-not-found') {
     throwAdmissionError({ success: false, code: 'NOT_FOUND', error: 'Session not found' });
+  }
+  if (sendResult.type === 'maintenance-stopped') {
+    throw new TRPCError({ code: 'CONFLICT', message: 'maintenance_attempt_stopped' });
   }
   if (sendResult.type === 'queue-full') {
     throwAdmissionError(pendingQueueFullAdmissionFailure());

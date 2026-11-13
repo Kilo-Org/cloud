@@ -676,4 +676,68 @@ describe('cliSessionsV2 listWorkspaces Cloud Agent workspace PR', () => {
     });
     expect(searched.workspaces.map(workspace => workspace.worktreeId)).toEqual([worktree]);
   });
+
+  it('keeps cached check and thread evidence in the workspace PR summary', async () => {
+    const worktree = worktreeId();
+    const headSha = 'ab'.repeat(20);
+    await insertWorktree(worktree, { git_url: GIT_URL, git_branch: 'kilo/workspace-evidence' });
+    await db.insert(cli_sessions_v2).values(
+      makeSession('ses_300000000000000000000002', worktree, {
+        git_branch: 'kilo/workspace-evidence',
+      })
+    );
+    await db.insert(github_branch_pull_requests).values({
+      git_url: GIT_URL,
+      git_branch: 'kilo/workspace-evidence',
+      owned_by_user_id: USER_ID,
+      pr_url: `${GIT_URL}/pull/78`,
+      pr_number: 78,
+      pr_state: 'open',
+      pr_title: 'Workspace evidence',
+      pr_head_sha: headSha,
+      pr_last_synced_at: '2026-08-02T00:00:00.000Z',
+      pr_observations: {
+        version: 1,
+        headSha,
+        checks: [
+          {
+            key: 'test / unit',
+            id: '1',
+            attempt: 1,
+            at: '2026-08-02T00:00:00.000Z',
+            phase: 2,
+            failed: true,
+            outcome: 'failed',
+          },
+          {
+            key: 'lint',
+            id: '2',
+            attempt: 1,
+            at: '2026-08-02T00:00:00.000Z',
+            phase: 2,
+            failed: false,
+            outcome: 'passed',
+          },
+        ],
+        threads: [{ rootId: '10', threadId: 'PRRT_1', state: 'unresolved' }],
+        threadsObserved: true,
+        threadsUnknown: false,
+        checksTruncated: false,
+        threadsTruncated: false,
+        checksObserved: true,
+        checksComplete: true,
+        threadsComplete: true,
+      },
+    });
+
+    const workspace = (
+      await sessionCaller().listWorkspaces({ organizationId: null })
+    ).workspaces.find(row => row.worktreeId === worktree);
+
+    expect(workspace?.pr?.observations).toMatchObject({
+      checks: { total: 2, failed: 1, passed: 1, complete: true },
+      unresolvedThreads: 1,
+      truncated: false,
+    });
+  });
 });

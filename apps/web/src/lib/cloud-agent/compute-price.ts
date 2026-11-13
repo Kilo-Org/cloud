@@ -1,3 +1,24 @@
+import {
+  CLOUDFLARE_CONTAINERS_INSTANCES,
+  type CloudflareContainersInstance,
+  type SandboxAllocationRequest,
+  type SandboxDestination,
+} from '@kilocode/worker-utils/sandbox-allocation';
+
+/** The instance of a Kilo-hosted container. Other providers bill compute themselves, so they get no price. */
+export function kiloContainersInstance(
+  destination: SandboxAllocationRequest | SandboxDestination | undefined
+): CloudflareContainersInstance | null {
+  if (
+    destination?.provider.id !== 'cloudflare-containers' ||
+    destination.provider.account !== 'kilo'
+  )
+    return null;
+  return (
+    CLOUDFLARE_CONTAINERS_INSTANCES.find(instance => instance === destination.instanceType) ?? null
+  );
+}
+
 function isKnownHourlyRate(hourlyUsd: number | null | undefined): hourlyUsd is number {
   return hourlyUsd != null && Number.isFinite(hourlyUsd) && hourlyUsd > 0;
 }

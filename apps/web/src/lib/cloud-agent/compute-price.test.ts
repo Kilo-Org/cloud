@@ -1,5 +1,16 @@
 import { describe, expect, it } from '@jest/globals';
-import { computePriceNote } from './compute-price';
+import { getSandboxAllocationRequest } from '@kilocode/worker-utils/sandbox-allocation';
+import { computePriceNote, kiloContainersInstance } from './compute-price';
+
+describe('kiloContainersInstance', () => {
+  it('returns the instance of a Kilo-hosted container only', () => {
+    expect(
+      kiloContainersInstance(getSandboxAllocationRequest('cloudflare-containers-standard-4'))
+    ).toBe('standard-4');
+    expect(kiloContainersInstance(getSandboxAllocationRequest('vercel-small'))).toBeNull();
+    expect(kiloContainersInstance(undefined)).toBeNull();
+  });
+});
 
 const rate = { hourlyUsd: 0.18, available: true };
 

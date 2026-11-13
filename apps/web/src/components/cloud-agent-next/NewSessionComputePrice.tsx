@@ -3,12 +3,12 @@
 import { Box } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { computePriceNote } from '@/lib/cloud-agent/compute-price';
+import { computePriceNote, kiloContainersInstance } from '@/lib/cloud-agent/compute-price';
 import { usePersonalComputeBillingMode } from '@/hooks/usePersonalComputeBillingMode';
 import type { EnvironmentRepository, EnvironmentSummary } from '@/hooks/useCloudAgentEnvironments';
 import { repositoryName } from './environment-repositories';
 import { formatSandboxCapacity } from './sandbox-selection';
-import { kiloContainersInstance, newSessionSandboxDestination } from './new-session-sandbox';
+import { newSessionSandboxDestination } from './new-session-sandbox';
 
 /** The compute price of a personal session's sandbox. Hidden until the price and billing mode are known. */
 export function NewSessionComputePrice({

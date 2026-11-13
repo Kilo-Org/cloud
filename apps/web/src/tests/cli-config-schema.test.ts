@@ -161,6 +161,14 @@ describe('kilo config.json schema merge', () => {
     expect(agent.properties.build).toBeDefined(); // upstream key preserved
   });
 
+  test('exposes code as the primary agent and marks build as a deprecated alias', () => {
+    const agent = props.agent as {
+      properties: { code: unknown; build: { description?: string } };
+    };
+    expect(agent.properties.code).toBeDefined();
+    expect(agent.properties.build.description).toContain('deprecated');
+  });
+
   test('adds notebook permission keys without dropping upstream', () => {
     const defs = out.$defs as Record<string, unknown>;
     const permissionConfig = defs.PermissionConfig as {

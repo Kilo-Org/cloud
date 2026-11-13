@@ -52,8 +52,12 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
             {device}
           </Text>
           {session.isCurrent && (
-            <View className="rounded-full bg-primary px-2 py-0.5">
-              <Text className="text-[10px] font-semibold uppercase leading-[normal] text-primary-foreground">
+            /* The badge keeps the light olive in dark mode: the dark accent
+                (#ffdd00) as a full pill glares and pulls focus, so dark swaps
+                in `--selection`, the same hue lifted to stand off the page,
+                with its own label tone. */
+            <View className="rounded-full bg-primary px-2 py-0.5 dark:bg-selection">
+              <Text className="text-[10px] font-semibold uppercase leading-[normal] text-primary-foreground dark:text-selection-foreground">
                 {t('deviceSessions.thisDevice')}
               </Text>
             </View>

@@ -317,6 +317,7 @@ const ActiveSessionsSection = ({
             return (
               <button
                 className="w-full rounded-md px-2 py-1.5 text-left type-body transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
+                data-session-id={session.id}
                 key={session.id}
                 onClick={() => {
                   onOpenSession(session.id);
@@ -537,6 +538,7 @@ const HistorySessionsSection = ({
           {rows.map(session => (
             <button
               className={`w-full rounded-md text-left type-body transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring ${rowTextColumnClass}`}
+              data-session-id={session.id}
               key={session.id}
               onClick={() => {
                 onOpenSession(session.id);

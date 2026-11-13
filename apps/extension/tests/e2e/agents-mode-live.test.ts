@@ -129,11 +129,14 @@ const failIfReadOnly = async (sidePanel: Page): Promise<void> => {
  */
 const reopenRunningSession = async ({
   sidePanel,
+  kiloSessionId,
   nonce,
   sessionTitle,
   platformLabel,
 }: {
   sidePanel: Page;
+  /** The session this run created, when the flow could capture it. */
+  kiloSessionId: string | undefined;
   nonce: string;
   sessionTitle: string;
   platformLabel: 'Cloud agent' | 'CLI';
@@ -148,7 +151,24 @@ const reopenRunningSession = async ({
     .filter({ has: sidePanel.locator(`svg[aria-label="${platformLabel}"]`) });
   await expect.poll(() => platformRows.count(), { timeout: 30_000 }).toBeGreaterThan(0);
 
-  const titleRow = sessionTitle === '' ? undefined : platformRows.filter({ hasText: sessionTitle });
+  /*
+   * The list row and the session view carry different titles: the row holds the
+   * title the row was created with, the view the agent's own title, seconds
+   * apart. Selecting by title therefore opened an unrelated session, so a run
+   * that knows its id selects the row that owns it.
+   */
+  const idRow =
+    kiloSessionId === undefined
+      ? undefined
+      : sidePanel.locator(`[data-session-id="${kiloSessionId}"]`);
+  const idRowCount = idRow === undefined ? 0 : await idRow.count().catch(() => 0);
+
+  // 'Session' is the view's placeholder before the session metadata loads; it
+  // matches unrelated rows, so treat it as unknown and take the newest row.
+  const titleRow =
+    sessionTitle === '' || sessionTitle === 'Session'
+      ? undefined
+      : platformRows.filter({ hasText: sessionTitle });
   const titleRowCount = titleRow === undefined ? 0 : await titleRow.count().catch(() => 0);
   // A stale title falls back to the newest running row, then the newest row.
   const runningRows = platformRows.filter({
@@ -156,7 +176,9 @@ const reopenRunningSession = async ({
   });
   const runningRowCount = await runningRows.count().catch(() => 0);
   let rowToOpen = platformRows.first();
-  if (titleRow !== undefined && titleRowCount > 0) {
+  if (idRow !== undefined && idRowCount > 0) {
+    rowToOpen = idRow.first();
+  } else if (titleRow !== undefined && titleRowCount > 0) {
     rowToOpen = titleRow.first();
   } else if (runningRowCount > 0) {
     rowToOpen = runningRows.first();
@@ -278,10 +300,12 @@ const queueFollowUp = async ({
  */
 const runOpenSessionPhases = async ({
   sidePanel,
+  kiloSessionId,
   nonce,
   platformLabel,
 }: {
   sidePanel: Page;
+  kiloSessionId: string | undefined;
   nonce: string;
   platformLabel: 'Cloud agent' | 'CLI';
 }): Promise<void> => {
@@ -291,7 +315,7 @@ const runOpenSessionPhases = async ({
   await expect(stopButton).toBeVisible({ timeout: 90_000 });
 
   const sessionTitle = await readSessionTitle(sidePanel);
-  await reopenRunningSession({ nonce, platformLabel, sessionTitle, sidePanel });
+  await reopenRunningSession({ kiloSessionId, nonce, platformLabel, sessionTitle, sidePanel });
 
   const reopenedStop = sidePanel.getByRole('button', { name: 'Stop' });
   await expect(reopenedStop).toBeVisible({ timeout: 90_000 });
@@ -354,7 +378,13 @@ const runExistingCloudSessionFallback = async ({
   await queueFollowUp({ nonce, sidePanel });
 
   const sessionTitle = await readSessionTitle(sidePanel);
-  await reopenRunningSession({ nonce, platformLabel: 'Cloud agent', sessionTitle, sidePanel });
+  await reopenRunningSession({
+    kiloSessionId: undefined,
+    nonce,
+    platformLabel: 'Cloud agent',
+    sessionTitle,
+    sidePanel,
+  });
 
   await proveSessionRunning({ phase: 'reopened', sidePanel, unavailableReason });
 
@@ -460,7 +490,7 @@ test('live local backend: remote CLI agent covers start, reopen, queue, and stop
     await sidePanel.getByRole('button', { name: 'Start session' }).click();
     await expect(sidePanel.getByLabel('Back to sessions')).toBeVisible({ timeout: 30_000 });
 
-    await runOpenSessionPhases({ nonce, platformLabel: 'CLI', sidePanel });
+    await runOpenSessionPhases({ kiloSessionId: undefined, nonce, platformLabel: 'CLI', sidePanel });
   } finally {
     await context.close();
     await fixture.close();
@@ -487,6 +517,20 @@ test('live local backend: cloud agent covers start, reopen, queue, and stop', as
 
     const nonce = `p${process.pid}-${Date.now().toString(36)}`;
 
+    // The form returns the session id from prepareSession; capture it so the
+    // reopen selects the row that owns this run instead of a title match.
+    let createdKiloSessionId: string | undefined;
+    sidePanel.on('response', response => {
+      if (!response.url().includes('cloudAgentNext.prepareSession')) return;
+      void response
+        .text()
+        .then(text => {
+          const id = /"kiloSessionId":"(ses_[A-Za-z0-9]+)"/u.exec(text)?.[1];
+          if (id !== undefined) createdKiloSessionId = id;
+        })
+        .catch(() => undefined);
+    });
+
     // Start: prepare a cloud session through the form.
     await sidePanel.getByRole('button', { exact: true, name: 'New session' }).click();
     await sidePanel.getByLabel('What would you like to do?').fill(longPrompt(nonce));
@@ -502,7 +546,13 @@ test('live local backend: cloud agent covers start, reopen, queue, and stop', as
         .then(() => true)
         .catch(() => false);
       if (started) {
-        await runOpenSessionPhases({ nonce, platformLabel: 'Cloud agent', sidePanel });
+        await expect.poll(() => createdKiloSessionId !== undefined, { timeout: 10_000 }).toBe(true);
+        await runOpenSessionPhases({
+          kiloSessionId: createdKiloSessionId,
+          nonce,
+          platformLabel: 'Cloud agent',
+          sidePanel,
+        });
         return;
       }
     }

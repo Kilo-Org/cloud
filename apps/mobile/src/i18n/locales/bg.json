@@ -3964,7 +3964,7 @@
     "instructionEdit": "Редактиране на инструкция {{name}}",
     "instructionDelete": "Изтриване на инструкция {{name}}",
     "instructionDeleteTitle": "Да се изтрие ли инструкция {{name}}?",
-    "instructionDeleteMessage": "Сесиите, които използват този профил, престават да прилагат този файл. Това не може да бъде отменено.",
+    "instructionDeleteMessage": "Новите сесии, които използват този профил, престават да прилагат този файл. Това не може да бъде отменено.",
     "instructionDeleteConfirm": "Изтрий инструкция",
     "instructionSaveFailed": "Инструкцията не можа да се запази",
     "instructionDeleteFailed": "Инструкцията не можа да се изтрие",

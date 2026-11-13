@@ -3964,7 +3964,7 @@
     "instructionEdit": "指示{{name}}を編集",
     "instructionDelete": "指示{{name}}を削除",
     "instructionDeleteTitle": "指示{{name}}を削除しますか？",
-    "instructionDeleteMessage": "このプロフィールを使用しているセッションでは、このファイルが適用されなくなります。これを元に戻すことはできません。",
+    "instructionDeleteMessage": "このプロフィールを使用する新しいセッションでは、このファイルが適用されなくなります。これを元に戻すことはできません。",
     "instructionDeleteConfirm": "指示を削除",
     "instructionSaveFailed": "指示を保存できませんでした",
     "instructionDeleteFailed": "指示を削除できませんでした",

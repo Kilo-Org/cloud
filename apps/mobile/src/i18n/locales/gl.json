@@ -3964,7 +3964,7 @@
     "instructionEdit": "Editar a instrución {{name}}",
     "instructionDelete": "Eliminar a instrución {{name}}",
     "instructionDeleteTitle": "¿Eliminar a instrución {{name}}?",
-    "instructionDeleteMessage": "As sesións que usan este perfil deixan de aplicar este ficheiro. Isto non se pode desfacer.",
+    "instructionDeleteMessage": "As novas sesións que usan este perfil deixan de aplicar este ficheiro. Isto non se pode desfacer.",
     "instructionDeleteConfirm": "Eliminar a instrución",
     "instructionSaveFailed": "Non se puido gardar a instrución",
     "instructionDeleteFailed": "Non se puido eliminar a instrución",

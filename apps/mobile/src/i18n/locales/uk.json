@@ -4084,7 +4084,7 @@
     "instructionEdit": "Редагувати інструкцію {{name}}",
     "instructionDelete": "Видалити інструкцію {{name}}",
     "instructionDeleteTitle": "Видалити інструкцію {{name}}?",
-    "instructionDeleteMessage": "Сеанси, які використовують цей профіль, перестають застосовувати цей файл. Це неможливо скасувати.",
+    "instructionDeleteMessage": "Нові сеанси, які використовують цей профіль, перестають застосовувати цей файл. Це неможливо скасувати.",
     "instructionDeleteConfirm": "Видалити інструкцію",
     "instructionSaveFailed": "Не вдалося зберегти інструкцію",
     "instructionDeleteFailed": "Не вдалося видалити інструкцію",

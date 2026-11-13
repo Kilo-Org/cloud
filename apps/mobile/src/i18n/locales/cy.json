@@ -4204,7 +4204,7 @@
     "instructionEdit": "Golygu cyfarwyddyd {{name}}",
     "instructionDelete": "Dileu cyfarwyddyd {{name}}",
     "instructionDeleteTitle": "Dileu cyfarwyddyd {{name}}?",
-    "instructionDeleteMessage": "Mae sesiynau sy'n defnyddio'r proffil hwn yn peidio â chymhwyso'r ffeil hon. Ni ellir dadwneud hyn.",
+    "instructionDeleteMessage": "Mae sesiynau newydd sy'n defnyddio'r proffil hwn yn peidio â chymhwyso'r ffeil hon. Ni ellir dadwneud hyn.",
     "instructionDeleteConfirm": "Dileu cyfarwyddyd",
     "instructionSaveFailed": "Methu cadw'r cyfarwyddyd",
     "instructionDeleteFailed": "Methu dileu'r cyfarwyddyd",

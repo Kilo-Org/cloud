@@ -3964,7 +3964,7 @@
     "instructionEdit": "Whakatika tohutohu {{name}}",
     "instructionDelete": "Mukua tohutohu {{name}}",
     "instructionDeleteTitle": "Mukua tohutohu {{name}}?",
-    "instructionDeleteMessage": "Ka mutu te whakamahi a ngā wātū e whakamahi ana i tēnei kōtaha i tēnei kōnae. Kāore e taea te whakakore i tēnei.",
+    "instructionDeleteMessage": "Ka mutu te whakamahi a ngā wātū hōu e whakamahi ana i tēnei kōtaha i tēnei kōnae. Kāore e taea te whakakore i tēnei.",
     "instructionDeleteConfirm": "Mukua tohutohu",
     "instructionSaveFailed": "Kāore i taea te tiaki i te tohutohu",
     "instructionDeleteFailed": "Kāore i taea te muku i te tohutohu",

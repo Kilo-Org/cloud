@@ -3964,7 +3964,7 @@
     "instructionEdit": "Breyta leiðbeiningu {{name}}",
     "instructionDelete": "Eyða leiðbeiningu {{name}}",
     "instructionDeleteTitle": "Eyða leiðbeiningu {{name}}?",
-    "instructionDeleteMessage": "Lotur sem nota þennan prófíl hætta að beita þessari skrá. Þetta er ekki hægt að afturkalla.",
+    "instructionDeleteMessage": "Nýjar lotur sem nota þennan prófíl hætta að beita þessari skrá. Þetta er ekki hægt að afturkalla.",
     "instructionDeleteConfirm": "Eyða leiðbeiningu",
     "instructionSaveFailed": "Gat ekki vistað leiðbeininguna",
     "instructionDeleteFailed": "Gat ekki eytt leiðbeiningunni",

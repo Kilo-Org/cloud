@@ -3964,7 +3964,7 @@
     "instructionEdit": "Editatu {{name}} jarraibidea",
     "instructionDelete": "Ezabatu {{name}} jarraibidea",
     "instructionDeleteTitle": "Ezabatu {{name}} jarraibidea?",
-    "instructionDeleteMessage": "Profil hau erabiltzen duten saioek fitxategi hau aplikatzeari uzten diote. Hau ezin da desegin.",
+    "instructionDeleteMessage": "Profil hau erabiltzen duten saio berriek fitxategi hau aplikatzeari uzten diote. Hau ezin da desegin.",
     "instructionDeleteConfirm": "Ezabatu jarraibidea",
     "instructionSaveFailed": "Ezin izan da jarraibidea gorde",
     "instructionDeleteFailed": "Ezin izan da jarraibidea ezabatu",

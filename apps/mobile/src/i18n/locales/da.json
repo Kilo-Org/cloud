@@ -3964,7 +3964,7 @@
     "instructionEdit": "Rediger instruktionen {{name}}",
     "instructionDelete": "Slet instruktionen {{name}}",
     "instructionDeleteTitle": "Slet instruktionen {{name}}?",
-    "instructionDeleteMessage": "Sessioner, der bruger denne profil, holder op med at anvende denne fil. Dette kan ikke fortrydes.",
+    "instructionDeleteMessage": "Nye sessioner, der bruger denne profil, holder op med at anvende denne fil. Dette kan ikke fortrydes.",
     "instructionDeleteConfirm": "Slet instruktionen",
     "instructionSaveFailed": "Instruktionen kunne ikke gemmes",
     "instructionDeleteFailed": "Instruktionen kunne ikke slettes",

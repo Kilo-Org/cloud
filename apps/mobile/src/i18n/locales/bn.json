@@ -3964,7 +3964,7 @@
     "instructionEdit": "{{name}} নির্দেশনা সম্পাদনা করুন",
     "instructionDelete": "{{name}} নির্দেশনা মুছুন",
     "instructionDeleteTitle": "{{name}} নির্দেশনা মুছবেন?",
-    "instructionDeleteMessage": "এই প্রোফাইল ব্যবহার করা সেশনগুলো আর এই ফাইলটি প্রয়োগ করা বন্ধ করে দেবে। এটি পূর্বাবস্থায় ফেরানো যাবে না।",
+    "instructionDeleteMessage": "এই প্রোফাইল ব্যবহার করা নতুন সেশনগুলো আর এই ফাইলটি প্রয়োগ করা বন্ধ করে দেবে। এটি পূর্বাবস্থায় ফেরানো যাবে না।",
     "instructionDeleteConfirm": "নির্দেশনা মুছুন",
     "instructionSaveFailed": "নির্দেশনা সংরক্ষণ করা যায়নি",
     "instructionDeleteFailed": "নির্দেশনা মোছা যায়নি",

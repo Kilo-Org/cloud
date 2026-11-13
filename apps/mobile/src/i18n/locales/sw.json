@@ -3964,7 +3964,7 @@
     "instructionEdit": "Hariri elekezo {{name}}",
     "instructionDelete": "Futa elekezo {{name}}",
     "instructionDeleteTitle": "Futa elekezo {{name}}?",
-    "instructionDeleteMessage": "Vikao vinavyotumia wasifu huu huacha kutumia faili hii. Hili haliwezi kutenduliwa.",
+    "instructionDeleteMessage": "Vikao vipya vinavyotumia wasifu huu huacha kutumia faili hii. Hili haliwezi kutenduliwa.",
     "instructionDeleteConfirm": "Futa elekezo",
     "instructionSaveFailed": "Imeshindwa kuhifadhi elekezo",
     "instructionDeleteFailed": "Imeshindwa kufuta elekezo",

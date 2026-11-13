@@ -3964,7 +3964,7 @@
     "instructionEdit": "Modifiko udhëzimin {{name}}",
     "instructionDelete": "Fshi udhëzimin {{name}}",
     "instructionDeleteTitle": "Fshi udhëzimin {{name}}?",
-    "instructionDeleteMessage": "Seancat që përdorin këtë profil nuk e aplikojnë më këtë skedar. Kjo nuk mund të zhbëhet.",
+    "instructionDeleteMessage": "Seancat e reja që përdorin këtë profil nuk e aplikojnë më këtë skedar. Kjo nuk mund të zhbëhet.",
     "instructionDeleteConfirm": "Fshi udhëzimin",
     "instructionSaveFailed": "Udhëzimi nuk u ruajt",
     "instructionDeleteFailed": "Udhëzimi nuk u fshi",

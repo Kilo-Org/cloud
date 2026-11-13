@@ -3964,7 +3964,7 @@
     "instructionEdit": "Redigera instruktionen {{name}}",
     "instructionDelete": "Ta bort instruktionen {{name}}",
     "instructionDeleteTitle": "Ta bort instruktionen {{name}}?",
-    "instructionDeleteMessage": "Sessioner som använder den här profilen slutar att tillämpa den här filen. Detta kan inte ångras.",
+    "instructionDeleteMessage": "Nya sessioner som använder den här profilen slutar att tillämpa den här filen. Detta kan inte ångras.",
     "instructionDeleteConfirm": "Ta bort instruktion",
     "instructionSaveFailed": "Det gick inte att spara instruktionen",
     "instructionDeleteFailed": "Det gick inte att ta bort instruktionen",

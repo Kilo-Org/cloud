@@ -3964,7 +3964,7 @@
     "instructionEdit": "Instructie {{name}} bewerken",
     "instructionDelete": "Instructie {{name}} verwijderen",
     "instructionDeleteTitle": "Instructie {{name}} verwijderen?",
-    "instructionDeleteMessage": "Sessies die dit profiel gebruiken, passen dit bestand niet meer toe. Dit kan niet ongedaan worden gemaakt.",
+    "instructionDeleteMessage": "Nieuwe sessies die dit profiel gebruiken, passen dit bestand niet meer toe. Dit kan niet ongedaan worden gemaakt.",
     "instructionDeleteConfirm": "Instructie verwijderen",
     "instructionSaveFailed": "Kon de instructie niet opslaan",
     "instructionDeleteFailed": "Kon de instructie niet verwijderen",

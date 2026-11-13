@@ -3964,7 +3964,7 @@
     "instructionEdit": "Anweisung {{name}} bearbeiten",
     "instructionDelete": "Anweisung {{name}} löschen",
     "instructionDeleteTitle": "Anweisung {{name}} löschen?",
-    "instructionDeleteMessage": "Sitzungen, die dieses Profil verwenden, wenden diese Datei nicht mehr an. Dies kann nicht rückgängig gemacht werden.",
+    "instructionDeleteMessage": "Neue Sitzungen, die dieses Profil verwenden, wenden diese Datei nicht mehr an. Dies kann nicht rückgängig gemacht werden.",
     "instructionDeleteConfirm": "Anweisung löschen",
     "instructionSaveFailed": "Anweisung konnte nicht gespeichert werden",
     "instructionDeleteFailed": "Anweisung konnte nicht gelöscht werden",

@@ -3964,7 +3964,7 @@
     "instructionEdit": "ಸೂಚನೆ {{name}} ಸಂಪಾದಿಸಿ",
     "instructionDelete": "ಸೂಚನೆ {{name}} ಅಳಿಸಿ",
     "instructionDeleteTitle": "ಸೂಚನೆ {{name}} ಅಳಿಸಬೇಕೇ?",
-    "instructionDeleteMessage": "ಈ ಪ್ರೊಫೈಲ್ ಬಳಸುವ ಸೆಷನ್‌ಗಳು ಇನ್ನು ಮುಂದೆ ಈ ಫೈಲ್ ಅನ್ನು ಅನ್ವಯಿಸುವುದಿಲ್ಲ. ಇದನ್ನು ರದ್ದುಗೊಳಿಸಲಾಗುವುದಿಲ್ಲ.",
+    "instructionDeleteMessage": "ಈ ಪ್ರೊಫೈಲ್ ಬಳಸುವ ಹೊಸ ಸೆಷನ್‌ಗಳು ಇನ್ನು ಮುಂದೆ ಈ ಫೈಲ್ ಅನ್ನು ಅನ್ವಯಿಸುವುದಿಲ್ಲ. ಇದನ್ನು ರದ್ದುಗೊಳಿಸಲಾಗುವುದಿಲ್ಲ.",
     "instructionDeleteConfirm": "ಸೂಚನೆ ಅಳಿಸಿ",
     "instructionSaveFailed": "ಸೂಚನೆ ಉಳಿಸಲಾಗಲಿಲ್ಲ",
     "instructionDeleteFailed": "ಸೂಚನೆ ಅಳಿಸಲಾಗಲಿಲ್ಲ",

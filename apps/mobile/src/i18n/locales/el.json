@@ -3964,7 +3964,7 @@
     "instructionEdit": "Επεξεργασία οδηγίας {{name}}",
     "instructionDelete": "Διαγραφή οδηγίας {{name}}",
     "instructionDeleteTitle": "Διαγραφή οδηγίας {{name}};",
-    "instructionDeleteMessage": "Οι συνεδρίες που χρησιμοποιούν αυτό το προφίλ σταματούν να εφαρμόζουν αυτό το αρχείο. Αυτό δεν μπορεί να αναιρεθεί.",
+    "instructionDeleteMessage": "Οι νέες συνεδρίες που χρησιμοποιούν αυτό το προφίλ σταματούν να εφαρμόζουν αυτό το αρχείο. Αυτό δεν μπορεί να αναιρεθεί.",
     "instructionDeleteConfirm": "Διαγραφή οδηγίας",
     "instructionSaveFailed": "Δεν ήταν δυνατή η αποθήκευση της οδηγίας",
     "instructionDeleteFailed": "Δεν ήταν δυνατή η διαγραφή της οδηγίας",

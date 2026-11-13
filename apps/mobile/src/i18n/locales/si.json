@@ -3964,7 +3964,7 @@
     "instructionEdit": "උපදෙස {{name}} සංස්කරණය කරන්න",
     "instructionDelete": "උපදෙස {{name}} මකන්න",
     "instructionDeleteTitle": "උපදෙස {{name}} මකන්නද?",
-    "instructionDeleteMessage": "මෙම පැතිකඩ භාවිතා කරන සැසි මෙම ගොනුව යෙදීම නවතා දමයි. මෙය ආපසු හැරවිය නොහැක.",
+    "instructionDeleteMessage": "මෙම පැතිකඩ භාවිතා කරන නව සැසි මෙම ගොනුව යෙදීම නවතා දමයි. මෙය ආපසු හැරවිය නොහැක.",
     "instructionDeleteConfirm": "උපදෙස මකන්න",
     "instructionSaveFailed": "උපදෙස සුරැකීමට නොහැකි විය",
     "instructionDeleteFailed": "උපදෙස මැකීමට නොහැකි විය",

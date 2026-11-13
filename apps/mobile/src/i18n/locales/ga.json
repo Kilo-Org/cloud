@@ -4144,7 +4144,7 @@
     "instructionEdit": "Cuir an treoir {{name}} in eagar",
     "instructionDelete": "Scrios an treoir {{name}}",
     "instructionDeleteTitle": "Scrios an treoir {{name}}?",
-    "instructionDeleteMessage": "Ní chuirfidh na seisiúin a úsáideann an phróifíl seo an comhad seo i bhfeidhm a thuilleadh. Ní féidir é seo a chealú.",
+    "instructionDeleteMessage": "Ní chuirfidh na seisiúin nua a úsáideann an phróifíl seo an comhad seo i bhfeidhm a thuilleadh. Ní féidir é seo a chealú.",
     "instructionDeleteConfirm": "Scrios an treoir",
     "instructionSaveFailed": "Níorbh fhéidir an treoir a shábháil",
     "instructionDeleteFailed": "Níorbh fhéidir an treoir a scriosadh",

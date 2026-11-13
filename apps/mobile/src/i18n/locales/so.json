@@ -3964,7 +3964,7 @@
     "instructionEdit": "Wax ka beddel tilmaanta {{name}}",
     "instructionDelete": "Tirtir tilmaanta {{name}}",
     "instructionDeleteTitle": "Ma tirtirtaa tilmaanta {{name}}?",
-    "instructionDeleteMessage": "Fadhiyada isticmaala borofaylkan waxay joojinayaan inay faylkan ku dabaqaan. Tan lama celin karo.",
+    "instructionDeleteMessage": "Fadhiyada cusub ee isticmaala borofilkan waxay joojinayaan inay faylkan ku dabaqaan. Tan lama celin karo.",
     "instructionDeleteConfirm": "Tirtir tilmaanta",
     "instructionSaveFailed": "Lama kaydin karin tilmaanta",
     "instructionDeleteFailed": "Lama tirtiri karin tilmaanta",

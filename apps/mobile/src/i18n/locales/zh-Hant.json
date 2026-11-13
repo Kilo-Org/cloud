@@ -3964,7 +3964,7 @@
     "instructionEdit": "編輯指示 {{name}}",
     "instructionDelete": "刪除指示 {{name}}",
     "instructionDeleteTitle": "刪除指示 {{name}}？",
-    "instructionDeleteMessage": "使用此設定檔的工作階段將停止套用此檔案。此操作無法撤銷。",
+    "instructionDeleteMessage": "使用此設定檔的新工作階段將停止套用此檔案。此操作無法撤銷。",
     "instructionDeleteConfirm": "刪除指示",
     "instructionSaveFailed": "無法儲存指示",
     "instructionDeleteFailed": "無法刪除指示",

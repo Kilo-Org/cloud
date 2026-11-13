@@ -4030,7 +4030,7 @@
     "instructionEdit": "Editar instrução {{name}}",
     "instructionDelete": "Excluir instrução {{name}}",
     "instructionDeleteTitle": "Excluir instrução {{name}}?",
-    "instructionDeleteMessage": "As sessões que usam este perfil param de aplicar este arquivo. Isto não pode ser desfeito.",
+    "instructionDeleteMessage": "As novas sessões que usam este perfil param de aplicar este arquivo. Isto não pode ser desfeito.",
     "instructionDeleteConfirm": "Excluir instrução",
     "instructionSaveFailed": "Não foi possível salvar a instrução",
     "instructionDeleteFailed": "Não foi possível excluir a instrução",

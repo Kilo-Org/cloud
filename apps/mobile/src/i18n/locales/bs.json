@@ -4024,7 +4024,7 @@
     "instructionEdit": "Uredi uputstvo {{name}}",
     "instructionDelete": "Izbriši uputstvo {{name}}",
     "instructionDeleteTitle": "Izbrisati uputstvo {{name}}?",
-    "instructionDeleteMessage": "Sesije koje koriste ovaj profil prestaju primjenjivati ovu datoteku. Ovo se ne može poništiti.",
+    "instructionDeleteMessage": "Nove sesije koje koriste ovaj profil prestaju primjenjivati ovu datoteku. Ovo se ne može poništiti.",
     "instructionDeleteConfirm": "Izbriši uputstvo",
     "instructionSaveFailed": "Uputstvo nije moguće sačuvati",
     "instructionDeleteFailed": "Uputstvo nije moguće izbrisati",

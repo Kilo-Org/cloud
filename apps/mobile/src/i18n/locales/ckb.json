@@ -3964,7 +3964,7 @@
     "instructionEdit": "دەستکاریکردنی ڕێنمایی {{name}}",
     "instructionDelete": "سڕینەوەی ڕێنمایی {{name}}",
     "instructionDeleteTitle": "ڕێنمایی {{name}} بسڕدرێتەوە؟",
-    "instructionDeleteMessage": "ئەو دانیشتنانەی کە ئەم پرۆفایلە بەکاردەهێنن ئیتر ئەم پەڕگەیە جێبەجێ ناکەن. ئەمەش ناتوانرێت هەڵبوەشێتەوە.",
+    "instructionDeleteMessage": "ئەو دانیشتنە نوێیانەی کە ئەم پرۆفایلە بەکاردەهێنن ئیتر ئەم پەڕگەیە جێبەجێ ناکەن. ئەمەش ناتوانرێت هەڵبوەشێتەوە.",
     "instructionDeleteConfirm": "سڕینەوەی ڕێنمایی",
     "instructionSaveFailed": "نەتوانرا ڕێنماییەکە پاشەکەوت بکرێت",
     "instructionDeleteFailed": "نەتوانرا ڕێنماییەکە بسڕدرێتەوە",

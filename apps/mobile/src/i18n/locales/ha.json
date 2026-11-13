@@ -3964,7 +3964,7 @@
     "instructionEdit": "Gyara umarni {{name}}",
     "instructionDelete": "Share umarni {{name}}",
     "instructionDeleteTitle": "A share umarni {{name}}?",
-    "instructionDeleteMessage": "Zaman da ke amfani da wannan bayanan martaba za su daina amfani da wannan fayil. Ba za a iya soke wannan ba.",
+    "instructionDeleteMessage": "Sabbin zaman da ke amfani da wannan bayanan martaba za su daina amfani da wannan fayil. Ba za a iya soke wannan ba.",
     "instructionDeleteConfirm": "Share umarni",
     "instructionSaveFailed": "An kasa adana umarnin",
     "instructionDeleteFailed": "An kasa share umarnin",

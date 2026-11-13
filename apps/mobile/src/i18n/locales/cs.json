@@ -4084,7 +4084,7 @@
     "instructionEdit": "Upravit pokyn {{name}}",
     "instructionDelete": "Smazat pokyn {{name}}",
     "instructionDeleteTitle": "Smazat pokyn {{name}}?",
-    "instructionDeleteMessage": "Relace, které používají tento profil, přestanou tento soubor používat. Toto nelze vrátit zpět.",
+    "instructionDeleteMessage": "Nové relace, které používají tento profil, přestanou tento soubor používat. Toto nelze vrátit zpět.",
     "instructionDeleteConfirm": "Smazat pokyn",
     "instructionSaveFailed": "Pokyn se nepodařilo uložit",
     "instructionDeleteFailed": "Pokyn se nepodařilo smazat",

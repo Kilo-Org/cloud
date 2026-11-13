@@ -3964,7 +3964,7 @@
     "instructionEdit": "Utasítás szerkesztése: {{name}}",
     "instructionDelete": "Utasítás törlése: {{name}}",
     "instructionDeleteTitle": "Törli az utasítást: {{name}}?",
-    "instructionDeleteMessage": "A profilt használó munkamenetek ezután nem alkalmazzák ezt a fájlt. Ezt nem lehet visszavonni.",
+    "instructionDeleteMessage": "A profilt használó új munkamenetek ezután nem alkalmazzák ezt a fájlt. Ezt nem lehet visszavonni.",
     "instructionDeleteConfirm": "Utasítás törlése",
     "instructionSaveFailed": "Nem sikerült menteni az utasítást",
     "instructionDeleteFailed": "Nem sikerült törölni az utasítást",

@@ -3964,7 +3964,7 @@
     "instructionEdit": "సూచన {{name}} సవరించండి",
     "instructionDelete": "సూచన {{name}} తొలగించండి",
     "instructionDeleteTitle": "సూచన {{name}} తొలగించాలా?",
-    "instructionDeleteMessage": "ఈ ప్రొఫైల్‌ను ఉపయోగించే సెషన్‌లకు ఇకపై ఈ ఫైల్ వర్తించదు. ఇది రద్దు చేయబడదు.",
+    "instructionDeleteMessage": "ఈ ప్రొఫైల్‌ను ఉపయోగించే కొత్త సెషన్‌లకు ఇకపై ఈ ఫైల్ వర్తించదు. ఇది రద్దు చేయబడదు.",
     "instructionDeleteConfirm": "సూచన తొలగించండి",
     "instructionSaveFailed": "సూచనను సేవ్ చేయలేకపోయాం",
     "instructionDeleteFailed": "సూచనను తొలగించలేకపోయాం",

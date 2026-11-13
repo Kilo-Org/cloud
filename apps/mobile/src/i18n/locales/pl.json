@@ -4084,7 +4084,7 @@
     "instructionEdit": "Edytuj instrukcję {{name}}",
     "instructionDelete": "Usuń instrukcję {{name}}",
     "instructionDeleteTitle": "Usunąć instrukcję {{name}}?",
-    "instructionDeleteMessage": "Sesje korzystające z tego profilu przestaną stosować ten plik. Tego nie można cofnąć.",
+    "instructionDeleteMessage": "Nowe sesje korzystające z tego profilu przestaną stosować ten plik. Tego nie można cofnąć.",
     "instructionDeleteConfirm": "Usuń instrukcję",
     "instructionSaveFailed": "Nie udało się zapisać instrukcji",
     "instructionDeleteFailed": "Nie udało się usunąć instrukcji",

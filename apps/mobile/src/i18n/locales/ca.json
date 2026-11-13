@@ -4024,7 +4024,7 @@
     "instructionEdit": "Edita la instrucció {{name}}",
     "instructionDelete": "Elimina la instrucció {{name}}",
     "instructionDeleteTitle": "Eliminar la instrucció {{name}}?",
-    "instructionDeleteMessage": "Les sessions que utilitzen aquest perfil deixen d'aplicar aquest fitxer. Això no es pot desfer.",
+    "instructionDeleteMessage": "Les noves sessions que utilitzen aquest perfil deixen d'aplicar aquest fitxer. Això no es pot desfer.",
     "instructionDeleteConfirm": "Elimina la instrucció",
     "instructionSaveFailed": "No s'ha pogut desar la instrucció",
     "instructionDeleteFailed": "No s'ha pogut eliminar la instrucció",

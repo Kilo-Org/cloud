@@ -3964,7 +3964,7 @@
     "instructionEdit": "แก้ไขคำแนะนำ {{name}}",
     "instructionDelete": "ลบคำแนะนำ {{name}}",
     "instructionDeleteTitle": "ลบคำแนะนำ {{name}} หรือไม่",
-    "instructionDeleteMessage": "เซสชันที่ใช้โปรไฟล์นี้จะหยุดใช้ไฟล์นี้ การดำเนินการนี้ไม่สามารถยกเลิกได้",
+    "instructionDeleteMessage": "เซสชันใหม่ที่ใช้โปรไฟล์นี้จะหยุดใช้ไฟล์นี้ การดำเนินการนี้ไม่สามารถยกเลิกได้",
     "instructionDeleteConfirm": "ลบคำแนะนำ",
     "instructionSaveFailed": "ไม่สามารถบันทึกคำแนะนำได้",
     "instructionDeleteFailed": "ไม่สามารถลบคำแนะนำได้",

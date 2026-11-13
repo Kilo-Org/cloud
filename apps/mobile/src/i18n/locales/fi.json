@@ -3964,7 +3964,7 @@
     "instructionEdit": "Muokkaa ohjetta {{name}}",
     "instructionDelete": "Poista ohje {{name}}",
     "instructionDeleteTitle": "Poistetaanko ohje {{name}}?",
-    "instructionDeleteMessage": "Istunnot, jotka käyttävät tätä profiilia, lakkaavat soveltamasta tätä tiedostoa. Tätä ei voi kumota.",
+    "instructionDeleteMessage": "Uudet istunnot, jotka käyttävät tätä profiilia, lakkaavat soveltamasta tätä tiedostoa. Tätä ei voi kumota.",
     "instructionDeleteConfirm": "Poista ohje",
     "instructionSaveFailed": "Ohjeen tallennus epäonnistui",
     "instructionDeleteFailed": "Ohjeen poisto epäonnistui",

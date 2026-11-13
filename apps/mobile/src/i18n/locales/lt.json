@@ -4084,7 +4084,7 @@
     "instructionEdit": "Redaguoti instrukciją {{name}}",
     "instructionDelete": "Ištrinti instrukciją {{name}}",
     "instructionDeleteTitle": "Ištrinti instrukciją {{name}}?",
-    "instructionDeleteMessage": "Sesijos, kurios naudoja šį profilį, nustos taikyti šį failą. To negalima anuliuoti.",
+    "instructionDeleteMessage": "Naujos sesijos, kurios naudoja šį profilį, nustos taikyti šį failą. To negalima anuliuoti.",
     "instructionDeleteConfirm": "Ištrinti instrukciją",
     "instructionSaveFailed": "Nepavyko išsaugoti instrukcijos",
     "instructionDeleteFailed": "Nepavyko ištrinti instrukcijos",

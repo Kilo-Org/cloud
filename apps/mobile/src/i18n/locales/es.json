@@ -4024,7 +4024,7 @@
     "instructionEdit": "Editar instrucción {{name}}",
     "instructionDelete": "Eliminar instrucción {{name}}",
     "instructionDeleteTitle": "¿Eliminar instrucción {{name}}?",
-    "instructionDeleteMessage": "Las sesiones que usan este perfil dejan de aplicar este archivo. Esto no se puede deshacer.",
+    "instructionDeleteMessage": "Las nuevas sesiones que usan este perfil dejan de aplicar este archivo. Esto no se puede deshacer.",
     "instructionDeleteConfirm": "Eliminar instrucción",
     "instructionSaveFailed": "No se pudo guardar la instrucción",
     "instructionDeleteFailed": "No se pudo eliminar la instrucción",

@@ -4024,7 +4024,7 @@
     "instructionEdit": "Editează instrucțiunea {{name}}",
     "instructionDelete": "Șterge instrucțiunea {{name}}",
     "instructionDeleteTitle": "Șterge instrucțiunea {{name}}?",
-    "instructionDeleteMessage": "Sesiunile care utilizează acest profil nu mai aplică acest fișier. Acest lucru nu poate fi anulat.",
+    "instructionDeleteMessage": "Sesiunile noi care utilizează acest profil nu mai aplică acest fișier. Acest lucru nu poate fi anulat.",
     "instructionDeleteConfirm": "Șterge instrucțiunea",
     "instructionSaveFailed": "Instrucțiunea nu a putut fi salvată",
     "instructionDeleteFailed": "Instrucțiunea nu a putut fi ștearsă",

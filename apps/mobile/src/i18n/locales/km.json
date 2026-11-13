@@ -3964,7 +3964,7 @@
     "instructionEdit": "កែសម្រួលការណែនាំ {{name}}",
     "instructionDelete": "លុបការណែនាំ {{name}}",
     "instructionDeleteTitle": "លុបការណែនាំ {{name}}?",
-    "instructionDeleteMessage": "សេសសិនដែលប្រើកម្រងព័ត៌មាននេះឈប់អនុវត្តឯកសារនេះ។ នេះមិនអាចត្រឡប់វិញបានទេ។",
+    "instructionDeleteMessage": "សេសសិនថ្មីដែលប្រើកម្រងព័ត៌មាននេះឈប់អនុវត្តឯកសារនេះ។ នេះមិនអាចត្រឡប់វិញបានទេ។",
     "instructionDeleteConfirm": "លុបការណែនាំ",
     "instructionSaveFailed": "មិនអាចរក្សាទុកការណែនាំបានទេ",
     "instructionDeleteFailed": "មិនអាចលុបការណែនាំបានទេ",

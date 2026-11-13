@@ -4024,7 +4024,7 @@
     "instructionEdit": "Rediģēt instrukciju {{name}}",
     "instructionDelete": "Dzēst instrukciju {{name}}",
     "instructionDeleteTitle": "Vai dzēst instrukciju {{name}}?",
-    "instructionDeleteMessage": "Sesijas, kas izmanto šo profilu, pārstāj piemērot šo failu. Šo darbību nevar atsaukt.",
+    "instructionDeleteMessage": "Jaunās sesijas, kas izmanto šo profilu, pārstāj piemērot šo failu. Šo darbību nevar atsaukt.",
     "instructionDeleteConfirm": "Dzēst instrukciju",
     "instructionSaveFailed": "Instrukciju neizdevās saglabāt",
     "instructionDeleteFailed": "Instrukciju neizdevās dzēst",

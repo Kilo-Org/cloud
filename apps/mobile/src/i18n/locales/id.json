@@ -3964,7 +3964,7 @@
     "instructionEdit": "Ubah instruksi {{name}}",
     "instructionDelete": "Hapus instruksi {{name}}",
     "instructionDeleteTitle": "Hapus instruksi {{name}}?",
-    "instructionDeleteMessage": "Sesi yang menggunakan profil ini berhenti menerapkan file ini. Hal ini tidak dapat dibatalkan.",
+    "instructionDeleteMessage": "Sesi baru yang menggunakan profil ini berhenti menerapkan file ini. Hal ini tidak dapat dibatalkan.",
     "instructionDeleteConfirm": "Hapus instruksi",
     "instructionSaveFailed": "Gagal menyimpan instruksi",
     "instructionDeleteFailed": "Gagal menghapus instruksi",

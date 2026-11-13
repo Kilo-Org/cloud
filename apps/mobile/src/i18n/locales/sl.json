@@ -4084,7 +4084,7 @@
     "instructionEdit": "Uredi navodilo {{name}}",
     "instructionDelete": "Izbriši navodilo {{name}}",
     "instructionDeleteTitle": "Izbriši navodilo {{name}}?",
-    "instructionDeleteMessage": "Seje, ki uporabljajo ta profil, prenehajo uporabljati to datoteko. Tega ni mogoče razveljaviti.",
+    "instructionDeleteMessage": "Nove seje, ki uporabljajo ta profil, prenehajo uporabljati to datoteko. Tega ni mogoče razveljaviti.",
     "instructionDeleteConfirm": "Izbriši navodilo",
     "instructionSaveFailed": "Navodila ni bilo mogoče shraniti",
     "instructionDeleteFailed": "Navodila ni bilo mogoče izbrisati",

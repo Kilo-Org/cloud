@@ -3964,7 +3964,7 @@
     "instructionEdit": "መመሪያ {{name}} አርትዕ",
     "instructionDelete": "መመሪያ {{name}} ሰርዝ",
     "instructionDeleteTitle": "መመሪያ {{name}} ሰርዝ፧",
-    "instructionDeleteMessage": "ይህን መገለጫ የሚጠቀሙ ክፍለ ጊዜዎች ይህን ፋይል መተግበር ያቆማሉ። ይህ ሊቀለበስ አይችልም።",
+    "instructionDeleteMessage": "ይህን መገለጫ የሚጠቀሙ አዲስ ክፍለ ጊዜዎች ይህን ፋይል መተግበር ያቆማሉ። ይህ ሊቀለበስ አይችልም።",
     "instructionDeleteConfirm": "መመሪያ ሰርዝ",
     "instructionSaveFailed": "መመሪያውን ማስቀመጥ አልተቻለም",
     "instructionDeleteFailed": "መመሪያውን መሰረዝ አልተቻለም",

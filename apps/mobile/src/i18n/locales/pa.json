@@ -3964,7 +3964,7 @@
     "instructionEdit": "ਹਦਾਇਤ {{name}} ਸੰਪਾਦਿਤ ਕਰੋ",
     "instructionDelete": "ਹਦਾਇਤ {{name}} ਮਿਟਾਓ",
     "instructionDeleteTitle": "ਕੀ ਹਦਾਇਤ {{name}} ਮਿਟਾਉਣੀ ਹੈ?",
-    "instructionDeleteMessage": "ਇਸ ਪ੍ਰੋਫਾਈਲ ਦੀ ਵਰਤੋਂ ਕਰਨ ਵਾਲੇ ਸੈਸ਼ਨ ਇਸ ਫਾਈਲ ਨੂੰ ਲਾਗੂ ਕਰਨਾ ਬੰਦ ਕਰ ਦਿੰਦੇ ਹਨ। ਇਸ ਨੂੰ ਅਣਕੀਤਾ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।",
+    "instructionDeleteMessage": "ਇਸ ਪ੍ਰੋਫਾਈਲ ਦੀ ਵਰਤੋਂ ਕਰਨ ਵਾਲੇ ਨਵੇਂ ਸੈਸ਼ਨ ਇਸ ਫਾਈਲ ਨੂੰ ਲਾਗੂ ਕਰਨਾ ਬੰਦ ਕਰ ਦਿੰਦੇ ਹਨ। ਇਸ ਨੂੰ ਅਣਕੀਤਾ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।",
     "instructionDeleteConfirm": "ਹਦਾਇਤ ਮਿਟਾਓ",
     "instructionSaveFailed": "ਹਦਾਇਤ ਸੰਭਾਲੀ ਨਹੀਂ ਜਾ ਸਕੀ",
     "instructionDeleteFailed": "ਹਦਾਇਤ ਮਿਟਾਈ ਨਹੀਂ ਜਾ ਸਕੀ",

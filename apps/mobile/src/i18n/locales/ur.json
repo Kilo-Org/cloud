@@ -3964,7 +3964,7 @@
     "instructionEdit": "ہدایت {{name}} میں ترمیم کریں",
     "instructionDelete": "ہدایت {{name}} حذف کریں",
     "instructionDeleteTitle": "ہدایت {{name}} حذف کریں؟",
-    "instructionDeleteMessage": "وہ سیشنز جو یہ پروفائل استعمال کرتے ہیں اس فائل کو لاگو کرنا بند کر دیتے ہیں۔ اسے کالعدم نہیں کیا جا سکتا۔",
+    "instructionDeleteMessage": "نئے سیشنز جو یہ پروفائل استعمال کرتے ہیں اس فائل کو لاگو کرنا بند کر دیتے ہیں۔ اسے کالعدم نہیں کیا جا سکتا۔",
     "instructionDeleteConfirm": "ہدایت حذف کریں",
     "instructionSaveFailed": "ہدایت محفوظ نہیں ہو سکی",
     "instructionDeleteFailed": "ہدایت حذف نہیں ہو سکی",

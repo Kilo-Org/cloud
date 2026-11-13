@@ -3964,7 +3964,7 @@
     "instructionEdit": "ინსტრუქციის რედაქტირება {{name}}",
     "instructionDelete": "ინსტრუქციის წაშლა {{name}}",
     "instructionDeleteTitle": "ინსტრუქციის წაშლა {{name}}?",
-    "instructionDeleteMessage": "სესიები, რომლებიც იყენებენ ამ პროფილს, წყვეტენ ამ ფაილის გამოყენებას. ამის გაუქმება შეუძლებელია.",
+    "instructionDeleteMessage": "ახალი სესიები, რომლებიც იყენებენ ამ პროფილს, წყვეტენ ამ ფაილის გამოყენებას. ამის გაუქმება შეუძლებელია.",
     "instructionDeleteConfirm": "ინსტრუქციის წაშლა",
     "instructionSaveFailed": "ინსტრუქციის შენახვა ვერ მოხერხდა",
     "instructionDeleteFailed": "ინსტრუქციის წაშლა ვერ მოხერხდა",

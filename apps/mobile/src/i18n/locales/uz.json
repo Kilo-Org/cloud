@@ -3964,7 +3964,7 @@
     "instructionEdit": "{{name}} ko'rsatmasini tahrirlash",
     "instructionDelete": "{{name}} ko'rsatmasini o'chirish",
     "instructionDeleteTitle": "{{name}} ko'rsatmasini o'chirasizmi?",
-    "instructionDeleteMessage": "Bu profildan foydalanadigan sessiyalar bu faylni qo'llashni to'xtatadi. Buni ortga qaytarib bo‘lmaydi.",
+    "instructionDeleteMessage": "Bu profildan foydalanadigan yangi sessiyalar bu faylni qo'llashni to'xtatadi. Buni ortga qaytarib bo‘lmaydi.",
     "instructionDeleteConfirm": "Ko'rsatmani o'chirish",
     "instructionSaveFailed": "Ko'rsatmani saqlab bo'lmadi",
     "instructionDeleteFailed": "Ko'rsatmani o'chirib bo'lmadi",

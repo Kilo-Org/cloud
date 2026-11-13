@@ -3964,7 +3964,7 @@
     "instructionEdit": "Sửa hướng dẫn {{name}}",
     "instructionDelete": "Xóa hướng dẫn {{name}}",
     "instructionDeleteTitle": "Xóa hướng dẫn {{name}}?",
-    "instructionDeleteMessage": "Các phiên sử dụng hồ sơ này sẽ ngừng áp dụng tệp này. Điều này không thể hoàn tác được.",
+    "instructionDeleteMessage": "Các phiên mới sử dụng hồ sơ này sẽ ngừng áp dụng tệp này. Điều này không thể hoàn tác được.",
     "instructionDeleteConfirm": "Xóa hướng dẫn",
     "instructionSaveFailed": "Không thể lưu hướng dẫn",
     "instructionDeleteFailed": "Không thể xóa hướng dẫn",

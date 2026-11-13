@@ -3964,7 +3964,7 @@
     "instructionEdit": "لارښوونه {{name}} سمول",
     "instructionDelete": "لارښوونه {{name}} ړنګول",
     "instructionDeleteTitle": "لارښوونه {{name}} ړنګول؟",
-    "instructionDeleteMessage": "هغه ناستې چې دا پروفایل کاروي، د دې فایل پلي کول بندوي. دا بېرته نه شي راګرځول کېدای.",
+    "instructionDeleteMessage": "هغه نوې ناستې چې دا پروفایل کاروي، د دې فایل پلي کول بندوي. دا بېرته نه شي راګرځول کېدای.",
     "instructionDeleteConfirm": "لارښوونه ړنګول",
     "instructionSaveFailed": "لارښوونه ونه ساتل شوه",
     "instructionDeleteFailed": "لارښوونه ونه ړنګېده",

@@ -3964,7 +3964,7 @@
     "instructionEdit": "Muuda juhist {{name}}",
     "instructionDelete": "Kustuta juhis {{name}}",
     "instructionDeleteTitle": "Kustuta juhis {{name}}?",
-    "instructionDeleteMessage": "Sessioonid, mis kasutavad seda profiili, ei rakenda enam seda faili. Seda ei saa tagasi võtta.",
+    "instructionDeleteMessage": "Uued sessioonid, mis seda profiili kasutavad, ei rakenda enam seda faili. Seda ei saa tagasi võtta.",
     "instructionDeleteConfirm": "Kustuta juhis",
     "instructionSaveFailed": "Juhise salvestamine ebaõnnestus",
     "instructionDeleteFailed": "Juhise kustutamine ebaõnnestus",

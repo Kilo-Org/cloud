@@ -4024,7 +4024,7 @@
     "instructionEdit": "Modifica istruzione {{name}}",
     "instructionDelete": "Elimina istruzione {{name}}",
     "instructionDeleteTitle": "Eliminare l'istruzione {{name}}?",
-    "instructionDeleteMessage": "Le sessioni che usano questo profilo non applicano più questo file. Questa operazione non può essere annullata.",
+    "instructionDeleteMessage": "Le nuove sessioni che usano questo profilo non applicano più questo file. Questa operazione non può essere annullata.",
     "instructionDeleteConfirm": "Elimina istruzione",
     "instructionSaveFailed": "Impossibile salvare l'istruzione",
     "instructionDeleteFailed": "Impossibile eliminare l'istruzione",

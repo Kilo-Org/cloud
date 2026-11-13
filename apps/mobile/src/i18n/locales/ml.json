@@ -3964,7 +3964,7 @@
     "instructionEdit": "{{name}} നിർദ്ദേശം എഡിറ്റ് ചെയ്യുക",
     "instructionDelete": "{{name}} നിർദ്ദേശം ഇല്ലാതാക്കുക",
     "instructionDeleteTitle": "{{name}} നിർദ്ദേശം ഇല്ലാതാക്കണോ?",
-    "instructionDeleteMessage": "ഈ പ്രൊഫൈൽ ഉപയോഗിക്കുന്ന സെഷനുകൾ ഈ ഫയൽ പ്രയോഗിക്കുന്നത് നിർത്തുന്നു. ഇത് പഴയപടിയാക്കാനാകില്ല.",
+    "instructionDeleteMessage": "ഈ പ്രൊഫൈൽ ഉപയോഗിക്കുന്ന പുതിയ സെഷനുകൾ ഈ ഫയൽ പ്രയോഗിക്കുന്നത് നിർത്തുന്നു. ഇത് പഴയപടിയാക്കാനാകില്ല.",
     "instructionDeleteConfirm": "നിർദ്ദേശം ഇല്ലാതാക്കുക",
     "instructionSaveFailed": "നിർദ്ദേശം സേവ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
     "instructionDeleteFailed": "നിർദ്ദേശം ഇല്ലാതാക്കാൻ കഴിഞ്ഞില്ല",

@@ -3964,7 +3964,7 @@
     "instructionEdit": "{{name}} зааврыг засах",
     "instructionDelete": "{{name}} зааврыг устгах",
     "instructionDeleteTitle": "{{name}} зааврыг устгах уу?",
-    "instructionDeleteMessage": "Энэ профайлыг ашигладаг сессүүд энэ файлыг хэрэглэхээ болино. Үүнийг буцаах боломжгүй.",
+    "instructionDeleteMessage": "Энэ профайлыг ашигладаг шинэ сессүүд энэ файлыг хэрэглэхээ болино. Үүнийг буцаах боломжгүй.",
     "instructionDeleteConfirm": "Зааврыг устгах",
     "instructionSaveFailed": "Зааврыг хадгалж чадсангүй",
     "instructionDeleteFailed": "Зааврыг устгаж чадсангүй",

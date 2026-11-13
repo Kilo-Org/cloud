@@ -3964,7 +3964,7 @@
     "instructionEdit": "સૂચના {{name}} સંપાદિત કરો",
     "instructionDelete": "સૂચના {{name}} કાઢી નાખો",
     "instructionDeleteTitle": "સૂચના {{name}} કાઢી નાખવી છે?",
-    "instructionDeleteMessage": "આ પ્રોફાઇલનો ઉપયોગ કરતા સેશન આ ફાઇલ લાગુ કરવાનું બંધ કરી દે છે. આ પૂર્વવત્ કરી શકાતું નથી.",
+    "instructionDeleteMessage": "આ પ્રોફાઇલનો ઉપયોગ કરતા નવા સેશન આ ફાઇલ લાગુ કરવાનું બંધ કરી દે છે. આ પૂર્વવત્ કરી શકાતું નથી.",
     "instructionDeleteConfirm": "સૂચના કાઢી નાખો",
     "instructionSaveFailed": "સૂચના સેવ કરી શકાઈ નહીં",
     "instructionDeleteFailed": "સૂચના કાઢી શકાઈ નહીં",

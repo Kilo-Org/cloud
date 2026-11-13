@@ -4024,7 +4024,7 @@
     "instructionEdit": "עריכת ההוראה {{name}}",
     "instructionDelete": "מחיקת ההוראה {{name}}",
     "instructionDeleteTitle": "למחוק את ההוראה {{name}}?",
-    "instructionDeleteMessage": "הפעלות שמשתמשות בפרופיל הזה מפסיקות להחיל את הקובץ הזה. לא ניתן לבטל זאת.",
+    "instructionDeleteMessage": "הפעלות חדשות שמשתמשות בפרופיל הזה מפסיקות להחיל את הקובץ הזה. לא ניתן לבטל זאת.",
     "instructionDeleteConfirm": "מחיקת הוראה",
     "instructionSaveFailed": "לא ניתן היה לשמור את ההוראה",
     "instructionDeleteFailed": "לא ניתן היה למחוק את ההוראה",

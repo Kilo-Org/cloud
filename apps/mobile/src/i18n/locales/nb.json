@@ -3964,7 +3964,7 @@
     "instructionEdit": "Rediger instruksjonen {{name}}",
     "instructionDelete": "Slett instruksjonen {{name}}",
     "instructionDeleteTitle": "Slette instruksjonen {{name}}?",
-    "instructionDeleteMessage": "Økter som bruker denne profilen, slutter å bruke denne filen. Dette kan ikke angres.",
+    "instructionDeleteMessage": "Nye økter som bruker denne profilen, slutter å bruke denne filen. Dette kan ikke angres.",
     "instructionDeleteConfirm": "Slett instruksjon",
     "instructionSaveFailed": "Kunne ikke lagre instruksjonen",
     "instructionDeleteFailed": "Kunne ikke slette instruksjonen",

@@ -3964,7 +3964,7 @@
     "instructionEdit": "Qajeelfama {{name}} gulaali",
     "instructionDelete": "Qajeelfama {{name}} haqi",
     "instructionDeleteTitle": "Qajeelfama {{name}} haquu barbaadda?",
-    "instructionDeleteMessage": "Seeshiniiwwan piroofaayilii kana fayyadaman faayilii kana hojiirra oolchuu dhiisu. Kun duubatti deebi’uu hin danda’u.",
+    "instructionDeleteMessage": "Seeshiniiwwan haaraan piroofaayilii kana fayyadaman faayilii kana hojiirra oolchuu dhiisu. Kun duubatti deebi’uu hin danda’u.",
     "instructionDeleteConfirm": "Qajeelfama haqi",
     "instructionSaveFailed": "Qajeelfama olkaa'uu hin dandeenye",
     "instructionDeleteFailed": "Qajeelfama haquu hin dandeenye",

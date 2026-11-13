@@ -3964,7 +3964,7 @@
     "instructionEdit": "Modifye enstriksyon {{name}}",
     "instructionDelete": "Efase enstriksyon {{name}}",
     "instructionDeleteTitle": "Efase enstriksyon {{name}}?",
-    "instructionDeleteMessage": "Sesyon ki itilize pwofil sa a sispann aplike fichye sa a. Sa a pa ka defèt.",
+    "instructionDeleteMessage": "Nouvo sesyon ki itilize pwofil sa a sispann aplike fichye sa a. Sa a pa ka defèt.",
     "instructionDeleteConfirm": "Efase enstriksyon",
     "instructionSaveFailed": "Pa t kapab sovgade enstriksyon an",
     "instructionDeleteFailed": "Pa t kapab efase enstriksyon an",

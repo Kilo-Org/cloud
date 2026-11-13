@@ -4031,7 +4031,7 @@
     "instructionEdit": "Edit instruction {{name}}",
     "instructionDelete": "Delete instruction {{name}}",
     "instructionDeleteTitle": "Delete instruction {{name}}?",
-    "instructionDeleteMessage": "Sessions that use this profile stop applying this file. This cannot be undone.",
+    "instructionDeleteMessage": "New sessions that use this profile stop applying this file. This cannot be undone.",
     "instructionDeleteConfirm": "Delete instruction",
     "instructionSaveFailed": "Couldn't save the instruction",
     "instructionDeleteFailed": "Couldn't delete the instruction",

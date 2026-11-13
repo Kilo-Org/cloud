@@ -3964,7 +3964,7 @@
     "instructionEdit": "सूचना {{name}} संपादित करा",
     "instructionDelete": "सूचना {{name}} हटवा",
     "instructionDeleteTitle": "सूचना {{name}} हटवायची?",
-    "instructionDeleteMessage": "हे प्रोफाइल वापरणारी सत्रे ही फाईल लागू करणे थांबवतात. हे पूर्ववत केले जाऊ शकत नाही.",
+    "instructionDeleteMessage": "हे प्रोफाइल वापरणारी नवीन सेशन ही फाईल लागू करणे थांबवतात. हे पूर्ववत केले जाऊ शकत नाही.",
     "instructionDeleteConfirm": "सूचना हटवा",
     "instructionSaveFailed": "सूचना सेव्ह करता आली नाही",
     "instructionDeleteFailed": "सूचना हटवता आली नाही",

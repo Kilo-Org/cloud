@@ -3964,7 +3964,7 @@
     "instructionEdit": "Խմբագրել {{name}} հրահանգը",
     "instructionDelete": "Ջնջել {{name}} հրահանգը",
     "instructionDeleteTitle": "Ջնջե՞լ {{name}} հրահանգը։",
-    "instructionDeleteMessage": "Այս պրոֆիլն օգտագործող նստաշրջանները դադարում են կիրառել այս ֆայլը։ Սա հնարավոր չէ հետարկել։",
+    "instructionDeleteMessage": "Այս պրոֆիլն օգտագործող նոր նստաշրջանները դադարում են կիրառել այս ֆայլը։ Սա հնարավոր չէ հետարկել։",
     "instructionDeleteConfirm": "Ջնջել հրահանգը",
     "instructionSaveFailed": "Չհաջողվեց պահել հրահանգը",
     "instructionDeleteFailed": "Չհաջողվեց ջնջել հրահանգը",

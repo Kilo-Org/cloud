@@ -3964,7 +3964,7 @@
     "instructionEdit": "ନିର୍ଦ୍ଦେଶ {{name}} ସମ୍ପାଦନ କରନ୍ତୁ",
     "instructionDelete": "ନିର୍ଦ୍ଦେଶ {{name}} ଡିଲିଟ କରନ୍ତୁ",
     "instructionDeleteTitle": "ନିର୍ଦ୍ଦେଶ {{name}} ଡିଲିଟ କରନ୍ତୁ?",
-    "instructionDeleteMessage": "ଏହି ପ୍ରୋଫାଇଲ୍ ବ୍ୟବହାର କରୁଥିବା ସେସନ୍ଗୁଡ଼ିକ ଏହି ଫାଇଲ୍ ପ୍ରୟୋଗ କରିବା ବନ୍ଦ କରନ୍ତି। ଏହାକୁ ପୂର୍ବବତ୍ କରାଯାଇପାରିବ ନାହିଁ।",
+    "instructionDeleteMessage": "ଏହି ପ୍ରୋଫାଇଲ୍ ବ୍ୟବହାର କରୁଥିବା ନୂଆ ସେସନ୍ଗୁଡ଼ିକ ଏହି ଫାଇଲ୍ ପ୍ରୟୋଗ କରିବା ବନ୍ଦ କରନ୍ତି। ଏହାକୁ ପୂର୍ବବତ୍ କରାଯାଇପାରିବ ନାହିଁ।",
     "instructionDeleteConfirm": "ନିର୍ଦ୍ଦେଶ ଡିଲିଟ କରନ୍ତୁ",
     "instructionSaveFailed": "ନିର୍ଦ୍ଦେଶ ସେଭ ହୋଇପାରିଲା ନାହିଁ",
     "instructionDeleteFailed": "ନିର୍ଦ୍ଦେଶ ଡିଲିଟ ହୋଇପାରିଲା ନାହିଁ",

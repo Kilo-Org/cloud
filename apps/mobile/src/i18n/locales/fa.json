@@ -3964,7 +3964,7 @@
     "instructionEdit": "ویرایش دستورالعمل {{name}}",
     "instructionDelete": "حذف دستورالعمل {{name}}",
     "instructionDeleteTitle": "دستورالعمل {{name}} حذف شود؟",
-    "instructionDeleteMessage": "نشست‌هایی که از این نمایه استفاده می‌کنند دیگر این فایل را اعمال نمی‌کنند. این قابل واگرد نیست.",
+    "instructionDeleteMessage": "نشست‌های جدیدی که از این نمایه استفاده می‌کنند دیگر این فایل را اعمال نمی‌کنند. این قابل واگرد نیست.",
     "instructionDeleteConfirm": "حذف دستورالعمل",
     "instructionSaveFailed": "دستورالعمل ذخیره نشد",
     "instructionDeleteFailed": "دستورالعمل حذف نشد",

@@ -3964,7 +3964,7 @@
     "instructionEdit": "ແກ້ໄຂຄຳແນະນຳ {{name}}",
     "instructionDelete": "ລຶບຄຳແນະນຳ {{name}}",
     "instructionDeleteTitle": "ລຶບຄຳແນະນຳ {{name}} ບໍ?",
-    "instructionDeleteMessage": "ເຊສຊັນທີ່ໃຊ້ໂປຣໄຟລ໌ນີ້ຈະຢຸດການນຳໃຊ້ໄຟລ໌ນີ້. ອັນນີ້ບໍ່ສາມາດຍົກເລີກໄດ້.",
+    "instructionDeleteMessage": "ເຊສຊັນໃໝ່ທີ່ໃຊ້ໂປຣໄຟລ໌ນີ້ຈະຢຸດການນຳໃຊ້ໄຟລ໌ນີ້. ອັນນີ້ບໍ່ສາມາດຍົກເລີກໄດ້.",
     "instructionDeleteConfirm": "ລຶບຄຳແນະນຳ",
     "instructionSaveFailed": "ບໍ່ສາມາດບັນທຶກຄຳແນະນຳໄດ້",
     "instructionDeleteFailed": "ບໍ່ສາມາດລຶບຄຳແນະນຳໄດ້",

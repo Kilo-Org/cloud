@@ -3964,7 +3964,7 @@
     "instructionEdit": "Hlela umyalo {{name}}",
     "instructionDelete": "Susa umyalo {{name}}",
     "instructionDeleteTitle": "Susa umyalo {{name}}?",
-    "instructionDeleteMessage": "Amaseshini asebenzisa le phrofayela ayeka ukusebenzisa le fayela. Lokhu akukwazi ukuhlehliswa.",
+    "instructionDeleteMessage": "Amaseshini amasha asebenzisa le phrofayela ayeka ukusebenzisa le fayela. Lokhu akukwazi ukuhlehliswa.",
     "instructionDeleteConfirm": "Susa umyalo",
     "instructionSaveFailed": "Ayikwazekanga ukugcina umyalo",
     "instructionDeleteFailed": "Ayikwazekanga ukususa umyalo",

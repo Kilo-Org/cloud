@@ -3964,7 +3964,7 @@
     "instructionEdit": "Edit arahan {{name}}",
     "instructionDelete": "Padam arahan {{name}}",
     "instructionDeleteTitle": "Padam arahan {{name}}?",
-    "instructionDeleteMessage": "Sesi yang menggunakan profil ini tidak lagi menggunakan fail ini. Ini tidak boleh dibuat asal.",
+    "instructionDeleteMessage": "Sesi baharu yang menggunakan profil ini tidak lagi menggunakan fail ini. Ini tidak boleh dibuat asal.",
     "instructionDeleteConfirm": "Padam arahan",
     "instructionSaveFailed": "Tidak dapat menyimpan arahan",
     "instructionDeleteFailed": "Tidak dapat memadam arahan",

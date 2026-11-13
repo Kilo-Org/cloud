@@ -4084,7 +4084,7 @@
     "instructionEdit": "Изменить инструкцию {{name}}",
     "instructionDelete": "Удалить инструкцию {{name}}",
     "instructionDeleteTitle": "Удалить инструкцию {{name}}?",
-    "instructionDeleteMessage": "Сеансы, которые используют этот профиль, больше не применяют этот файл. Это невозможно отменить.",
+    "instructionDeleteMessage": "Новые сеансы, которые используют этот профиль, больше не применяют этот файл. Это невозможно отменить.",
     "instructionDeleteConfirm": "Удалить инструкцию",
     "instructionSaveFailed": "Не удалось сохранить инструкцию",
     "instructionDeleteFailed": "Не удалось удалить инструкцию",

@@ -3964,7 +3964,7 @@
     "instructionEdit": "{{name}} talimatını düzenle",
     "instructionDelete": "{{name}} talimatını sil",
     "instructionDeleteTitle": "{{name}} talimatı silinsin mi?",
-    "instructionDeleteMessage": "Bu profili kullanan oturumlar bu dosyayı artık uygulamaz. Bu geri alınamaz.",
+    "instructionDeleteMessage": "Bu profili kullanan yeni oturumlar bu dosyayı artık uygulamaz. Bu geri alınamaz.",
     "instructionDeleteConfirm": "Talimatı sil",
     "instructionSaveFailed": "Talimat kaydedilemedi",
     "instructionDeleteFailed": "Talimat silinemedi",

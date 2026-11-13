@@ -3964,7 +3964,7 @@
     "instructionEdit": "{{name}} нұсқаулығын өңдеу",
     "instructionDelete": "{{name}} нұсқаулығын жою",
     "instructionDeleteTitle": "{{name}} нұсқаулығын жою керек пе?",
-    "instructionDeleteMessage": "Бұл профильді пайдаланатын сессиялар бұл файлды қолдануды тоқтатады. Бұл әрекетті қайтару мүмкін емес.",
+    "instructionDeleteMessage": "Бұл профильді пайдаланатын жаңа сессиялар бұл файлды қолдануды тоқтатады. Бұл әрекетті қайтару мүмкін емес.",
     "instructionDeleteConfirm": "Нұсқаулықты жою",
     "instructionSaveFailed": "Нұсқаулықты сақтау мүмкін болмады",
     "instructionDeleteFailed": "Нұсқаулықты жою мүмкін болмады",

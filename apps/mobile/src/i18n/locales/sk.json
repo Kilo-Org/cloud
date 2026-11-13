@@ -4084,7 +4084,7 @@
     "instructionEdit": "Upraviť pokyn {{name}}",
     "instructionDelete": "Odstrániť pokyn {{name}}",
     "instructionDeleteTitle": "Odstrániť pokyn {{name}}?",
-    "instructionDeleteMessage": "Relácie, ktoré používajú tento profil, prestanú uplatňovať tento súbor. Toto sa nedá vrátiť späť.",
+    "instructionDeleteMessage": "Nové relácie, ktoré používajú tento profil, prestanú uplatňovať tento súbor. Toto sa nedá vrátiť späť.",
     "instructionDeleteConfirm": "Odstrániť pokyn",
     "instructionSaveFailed": "Pokyn sa nepodarilo uložiť",
     "instructionDeleteFailed": "Pokyn sa nepodarilo odstrániť",

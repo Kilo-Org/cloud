@@ -264,10 +264,13 @@ export function PasskeysScreen() {
   ) : null;
 
   // The notice and the control it explains share the footer. The one exception
-  // is the empty state on a device that cannot create passkeys: there the
-  // notice replaces the hint that would name the withdrawn control, so the
-  // footer must not repeat it.
-  const footerNotice = passkeys.length === 0 && !canCreatePasskeys ? null : addFailureNotice;
+  // is the empty state on a device or account that cannot create passkeys: there
+  // the notice replaces the hint that would name the withdrawn control, so the
+  // footer must not repeat it. Every other body — the skeleton and a failed
+  // first load included — keeps the notice in the footer, where it is the only
+  // explanation for the control that is no longer offered.
+  const emptyBodyRendered = !isPending && !(isError && data === undefined) && passkeys.length === 0;
+  const footerNotice = emptyBodyRendered && !canCreatePasskeys ? null : addFailureNotice;
 
   let failureNotice: ReactNode = null;
   if (removeFailureId !== null) {

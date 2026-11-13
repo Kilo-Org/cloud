@@ -155,4 +155,21 @@ describe('PasskeysScreen inline failures', () => {
     expect(emptyDescription(view)).toBe('Passkeys can only be added in a web browser.');
     view.unmount();
   });
+
+  it('names the reason the control went away when a press lands during the first load', async () => {
+    // The footer keeps its coordinates whatever the body renders, so the Add
+    // control is pressable while the first load is still skeletons. Its refusal
+    // then has no empty state to sit in, and the footer must still say why the
+    // control is gone.
+    list.queryFn.mockImplementation(() => new Promise<void>(() => undefined));
+    list.register.mockResolvedValue({ status: 'error', failure: 'unavailable' });
+    const view = await mount();
+    await waitFor(() => nodes(view, 'Skeleton').length > 0);
+
+    await press(buttonByLabel(view, 'Add a passkey'));
+    await waitFor(() => !hasButtonLabel(view, 'Add a passkey'));
+
+    expect(texts(view)).toContain('Passkeys can only be added in a web browser.');
+    view.unmount();
+  });
 });

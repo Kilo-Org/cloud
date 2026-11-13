@@ -52,9 +52,11 @@ const requestSchema = z.discriminatedUnion('action', [
 ]);
 
 /**
- * Enrollment requires a fresh session for every account: a live step-up proof
- * is sufficient, and a first passkey (which cannot have a proof yet) requires a
- * primary sign-in from the last ten minutes.
+ * Enrollment requires a fresh session. A primary sign-in from the last ten
+ * minutes is enough for every account. A live step-up proof for this browser
+ * session is accepted as well, which is how an account that can mint one — the
+ * MFA ceremony, which is a platform-admin surface — enrolls without signing in
+ * again; every other account satisfies the rule by signing in.
  *
  * The rule applies to every account and is not behind a release toggle.
  */

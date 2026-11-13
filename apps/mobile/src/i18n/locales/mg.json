@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Mbola tsy misy host",
-      "emptyDescription": "Ampio host, na ento ao ny host avy amin'ny SSH config-nao.",
+      "emptyDescription": "Ny mpampiantrano voatahiry dia manokatra terminal ao amin'ny serveuranao.",
       "addHost": "Ampio host",
       "importConfig": "Ento avy amin'ny SSH config",
       "rowActions": "{{label}}, {{target}}. Manokatra ny mpanova; tsindrio lava raha hanova sy hamafa.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Tehirizo ny tenimiafina",
       "savePasswordHint": "Tehirizina ao amin'ny fitahirizana voaaro amin'ity fitaovana ity.",
       "chooseKey": "Safidio ny fanalahidy",
+      "privateKey": "Lakile manokana",
       "noKeys": "Mbola tsy misy fanalahidy",
       "jumpHost": "Host fiampitana",
       "directConnection": "Fifandraisana mivantana",

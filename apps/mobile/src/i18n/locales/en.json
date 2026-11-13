@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "No hosts yet",
-      "emptyDescription": "Add a host, or bring in the hosts from your SSH config.",
+      "emptyDescription": "Saved hosts open a terminal on your server.",
       "addHost": "Add host",
       "importConfig": "Import from SSH config",
       "rowActions": "{{label}}, {{target}}. Opens the editor; long press for edit and delete.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Save password",
       "savePasswordHint": "Kept in the encrypted store on this device.",
       "chooseKey": "Choose a key",
+      "privateKey": "Private key",
       "noKeys": "No keys yet",
       "jumpHost": "Jump host",
       "directConnection": "Direct connection",

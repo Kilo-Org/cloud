@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Nog geen gashere nie",
-      "emptyDescription": "Voeg 'n gasheer by, of bring die gashere uit jou SSH-konfigurasie in.",
+      "emptyDescription": "Gestoorde gashere maak 'n terminaal op jou bediener oop.",
       "addHost": "Voeg gasheer by",
       "importConfig": "Voer in vanaf SSH-konfigurasie",
       "rowActions": "{{label}}, {{target}}. Open die redigeerder; druk lank om te wysig en te verwyder.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Stoor wagwoord",
       "savePasswordHint": "Word in die geënkripteerde berging op hierdie toestel gehou.",
       "chooseKey": "Kies 'n sleutel",
+      "privateKey": "Privaatsleutel",
       "noKeys": "Nog geen sleutels nie",
       "jumpHost": "Spronggasheer",
       "directConnection": "Direkte verbinding",

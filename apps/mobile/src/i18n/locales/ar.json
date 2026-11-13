@@ -4360,7 +4360,7 @@
     },
     "hosts": {
       "emptyTitle": "لا توجد مضيفات بعد",
-      "emptyDescription": "أضف مضيفًا، أو استورد المضيفات من إعدادات SSH.",
+      "emptyDescription": "تفتح المضيفات المحفوظة طرفية على خادمك.",
       "addHost": "إضافة مضيف",
       "importConfig": "استيراد من إعدادات SSH",
       "rowActions": "{{label}}، {{target}}. الضغط يفتح المحرر؛ والضغط المطول يتيح التعديل والحذف.",
@@ -4386,6 +4386,7 @@
       "savePassword": "حفظ كلمة المرور",
       "savePasswordHint": "تُحفظ في المخزن المشفّر على هذا الجهاز.",
       "chooseKey": "اختيار مفتاح",
+      "privateKey": "مفتاح خاص",
       "noKeys": "لا توجد مفاتيح بعد",
       "jumpHost": "مضيف العبور",
       "directConnection": "اتصال مباشر",

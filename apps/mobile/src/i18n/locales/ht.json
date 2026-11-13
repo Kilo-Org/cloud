@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Poko gen ot",
-      "emptyDescription": "Ajoute yon ot, oswa enpòte ot yo soti nan konfigirasyon SSH ou.",
+      "emptyDescription": "Òt ki anrejistre yo ouvri yon tèminal sou sèvè w.",
       "addHost": "Ajoute ot",
       "importConfig": "Enpòte soti nan konfigirasyon SSH",
       "rowActions": "{{label}}, {{target}}. Louvri editè a; kenbe peze pou modifye ak efase.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Anrejistre modpas",
       "savePasswordHint": "Li kenbe nan depo chifre sou aparèy sa a.",
       "chooseKey": "Chwazi yon kle",
+      "privateKey": "Kle prive",
       "noKeys": "Poko gen kle",
       "jumpHost": "Ot pon",
       "directConnection": "Koneksyon dirèk",

@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Wala pang host",
-      "emptyDescription": "Magdagdag ng host, o mag-import ng mga host mula sa iyong SSH config.",
+      "emptyDescription": "Ang mga naka-save na host ay nagbubukas ng terminal sa iyong server.",
       "addHost": "Magdagdag ng host",
       "importConfig": "I-import mula sa SSH config",
       "rowActions": "{{label}}, {{target}}. Binubuksan ang editor kapag pinindot; pindutin nang matagal para i-edit o i-delete.",
@@ -4126,6 +4126,7 @@
       "savePassword": "I-save ang password",
       "savePasswordHint": "Itinatago sa naka-encrypt na imbakan sa device na ito.",
       "chooseKey": "Pumili ng key",
+      "privateKey": "Pribadong key",
       "noKeys": "Wala pang key",
       "jumpHost": "Jump host",
       "directConnection": "Direktang koneksyon",

@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Bado hakuna wenyeji",
-      "emptyDescription": "Ongeza mwenyeji, au leta wenyeji kutoka kwenye SSH config yako.",
+      "emptyDescription": "Wenyeji waliohifadhiwa hufungua terminal kwenye seva yako.",
       "addHost": "Ongeza mwenyeji",
       "importConfig": "Leta kutoka SSH config",
       "rowActions": "{{label}}, {{target}}. Hufungua kihariri; bonyeza kwa muda mrefu ili kuhariri na kufuta.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Hifadhi nenosiri",
       "savePasswordHint": "Huhifadhiwa katika hazina iliyosimbwa kwa siri kwenye kifaa hiki.",
       "chooseKey": "Chagua ufunguo",
+      "privateKey": "Ufunguo wa faragha",
       "noKeys": "Bado hakuna funguo",
       "jumpHost": "Mwenyeji wa kuruka",
       "directConnection": "Muunganisho wa moja kwa moja",

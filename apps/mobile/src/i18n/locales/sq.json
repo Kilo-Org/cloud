@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Nuk ka ende hoste",
-      "emptyDescription": "Shto një host ose importo hostet nga konfigurimi yt SSH.",
+      "emptyDescription": "Pritësit e ruajtur hapin një terminal në serverin tuaj.",
       "addHost": "Shto host",
       "importConfig": "Importo nga konfigurimi SSH",
       "rowActions": "{{label}}, {{target}}. Hap redaktuesin; shtypje e gjatë për redaktim dhe fshirje.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Ruaj fjalëkalimin",
       "savePasswordHint": "Mbahet në ruajtësen e kriptuar të kësaj pajisjeje.",
       "chooseKey": "Zgjidh një çelës",
+      "privateKey": "Çelësi privat",
       "noKeys": "Nuk ka çelësa ende",
       "jumpHost": "Host kapërcimi",
       "directConnection": "Lidhje e drejtpërdrejtë",

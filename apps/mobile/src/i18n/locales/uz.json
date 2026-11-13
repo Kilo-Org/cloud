@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Hozircha host yo‘q",
-      "emptyDescription": "Host qo‘shing yoki SSH konfiguratsiyangizdagi hostlarni olib keling.",
+      "emptyDescription": "Saqlangan hostlar serveringizda terminal ochadi.",
       "addHost": "Host qo‘shish",
       "importConfig": "SSH konfiguratsiyasidan import qilish",
       "rowActions": "{{label}}, {{target}}. Tahrirlagichni ochadi; tahrirlash va oʻchirish uchun uzoq bosing.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Parolni saqlash",
       "savePasswordHint": "Shu qurilmadagi shifrlangan xotirada saqlanadi.",
       "chooseKey": "Kalitni tanlash",
+      "privateKey": "Maxfiy kalit",
       "noKeys": "Hozircha kalit yo‘q",
       "jumpHost": "Oraliq host",
       "directConnection": "To‘g‘ridan-to‘g‘ri ulanish",

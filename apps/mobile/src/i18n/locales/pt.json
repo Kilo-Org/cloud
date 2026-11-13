@@ -4171,7 +4171,7 @@
     },
     "hosts": {
       "emptyTitle": "Ainda não há anfitriões",
-      "emptyDescription": "Adicione um anfitrião ou importe os anfitriões da sua configuração SSH.",
+      "emptyDescription": "Hosts salvos abrem um terminal no seu servidor.",
       "addHost": "Adicionar anfitrião",
       "importConfig": "Importar da configuração SSH",
       "rowActions": "{{label}}, {{target}}. Abre o editor; pressione e segure para editar e excluir.",
@@ -4197,6 +4197,7 @@
       "savePassword": "Guardar palavra-passe",
       "savePasswordHint": "Guardada no armazenamento encriptado deste dispositivo.",
       "chooseKey": "Escolher uma chave",
+      "privateKey": "Chave privada",
       "noKeys": "Ainda não há chaves",
       "jumpHost": "Anfitrião de salto",
       "directConnection": "Ligação direta",

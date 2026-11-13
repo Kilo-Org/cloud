@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Weli host-yo ma jiraan",
-      "emptyDescription": "Ku dar host, ama ka soo qaado host-yada SSH config-kaaga.",
+      "emptyDescription": "Martigeliyayaasha la kaydiyay waxay terminal ka furaan serverkaaga.",
       "addHost": "Ku dar host",
       "importConfig": "Ka soo qaado SSH config",
       "rowActions": "{{label}}, {{target}}. Waxay furtaa tifaftiraha; riix dheer si aad u tifaftirto ama u tirtirto.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Kaydi furaha sirta",
       "savePasswordHint": "Waxaa lagu hayaa kaydka lagu sireeyay ee qalabkan.",
       "chooseKey": "Dooro fure",
+      "privateKey": "Fure gaar ah",
       "noKeys": "Weli furayaal ma jiraan",
       "jumpHost": "Host-ka boodidda",
       "directConnection": "Xidhiidh toos ah",

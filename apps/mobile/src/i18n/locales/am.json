@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "እስካሁን አስተናጋጅ የለም",
-      "emptyDescription": "አስተናጋጅ ይጨምሩ፣ ወይም ከ SSH ውቅርዎ አስተናጋጆችን ያስገቡ።",
+      "emptyDescription": "የተቀመጡ አስተናጋጆች በአገልጋይዎ ላይ ተርሚናል ይከፍታሉ።",
       "addHost": "አስተናጋጅ ጨምር",
       "importConfig": "ከ SSH ውቅር አስገባ",
       "rowActions": "{{label}}፣ {{target}}። አርታዒውን ይከፍታል፤ ለማርትዕና ለመሰረዝ ረጅም ጊዜ ተጭነው ይያዙ።",
@@ -4126,6 +4126,7 @@
       "savePassword": "የይለፍ ቃል አስቀምጥ",
       "savePasswordHint": "በዚህ መሣሪያ ላይ ባለው የተመሰጠረ ማከማቻ ውስጥ ይቀመጣል።",
       "chooseKey": "ቁልፍ ይምረጡ",
+      "privateKey": "የግል ቁልፍ",
       "noKeys": "እስካሁን ቁልፍ የለም",
       "jumpHost": "የመዝለል አስተናጋጅ",
       "directConnection": "ቀጥታ ግንኙነት",

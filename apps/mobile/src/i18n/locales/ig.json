@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Enwebeghị host ọ bụla",
-      "emptyDescription": "Tinye host, ma ọ bụ bubata host ndị dị na nhazi SSH gị.",
+      "emptyDescription": "Ndị ọbịa echekwara na-emepe terminal na sava gị.",
       "addHost": "Tinye host",
       "importConfig": "Bubata site na nhazi SSH",
       "rowActions": "{{label}}, {{target}}. Na-emepe ndezi; pịa ogologo maka ndezi na ihichapụ.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Chekwaa paswọọdụ",
       "savePasswordHint": "A na-edebe ya n'ebe nchekwa ezoro ezo dị na ngwaọrụ a.",
       "chooseKey": "Họrọ igodo",
+      "privateKey": "Igodo nzuzo",
       "noKeys": "Enwebeghị igodo ọ bụla",
       "jumpHost": "Jump host",
       "directConnection": "Njikọ kpọmkwem",

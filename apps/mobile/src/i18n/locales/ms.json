@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Belum ada hos",
-      "emptyDescription": "Tambah hos, atau import hos daripada konfig SSH anda.",
+      "emptyDescription": "Hos yang disimpan membuka terminal pada pelayan anda.",
       "addHost": "Tambah hos",
       "importConfig": "Import daripada konfig SSH",
       "rowActions": "{{label}}, {{target}}. Ketik untuk membuka editor; tekan lama untuk edit dan padam.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Simpan kata laluan",
       "savePasswordHint": "Disimpan dalam storan tersulit pada peranti ini.",
       "chooseKey": "Pilih kunci",
+      "privateKey": "Kunci peribadi",
       "noKeys": "Belum ada kunci",
       "jumpHost": "Hos lompat",
       "directConnection": "Sambungan terus",

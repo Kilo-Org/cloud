@@ -4165,7 +4165,7 @@
     },
     "hosts": {
       "emptyTitle": "Nessun host",
-      "emptyDescription": "Aggiungi un host oppure importa gli host dalla tua configurazione SSH.",
+      "emptyDescription": "Gli host salvati aprono un terminale sul tuo server.",
       "addHost": "Aggiungi host",
       "importConfig": "Importa dalla configurazione SSH",
       "rowActions": "{{label}}, {{target}}. Apre l'editor; tieni premuto per modificare ed eliminare.",
@@ -4191,6 +4191,7 @@
       "savePassword": "Salva password",
       "savePasswordHint": "Conservata nell'archivio crittografato di questo dispositivo.",
       "chooseKey": "Scegli una chiave",
+      "privateKey": "Chiave privata",
       "noKeys": "Nessuna chiave",
       "jumpHost": "Jump host",
       "directConnection": "Connessione diretta",

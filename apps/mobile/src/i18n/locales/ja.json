@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "ホストがまだありません",
-      "emptyDescription": "ホストを追加するか、SSH configからホストを読み込んでください。",
+      "emptyDescription": "保存したホストは、お使いのサーバーでターミナルを開きます。",
       "addHost": "ホストを追加",
       "importConfig": "SSH configから読み込む",
       "rowActions": "{{label}}、{{target}}。タップするとエディターが開きます。長押しすると編集と削除ができます。",
@@ -4126,6 +4126,7 @@
       "savePassword": "パスワードを保存",
       "savePasswordHint": "このデバイスの暗号化ストアに保存されます。",
       "chooseKey": "キーを選択",
+      "privateKey": "秘密鍵",
       "noKeys": "キーがまだありません",
       "jumpHost": "踏み台ホスト",
       "directConnection": "直接接続",

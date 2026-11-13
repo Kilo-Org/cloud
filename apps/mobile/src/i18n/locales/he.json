@@ -4165,7 +4165,7 @@
     },
     "hosts": {
       "emptyTitle": "אין עדיין מארחים",
-      "emptyDescription": "הוסיפו מארח, או ייבאו מארחים מקובץ ההגדרות של SSH.",
+      "emptyDescription": "מארחים שמורים פותחים מסוף על השרת שלך.",
       "addHost": "הוספת מארח",
       "importConfig": "ייבוא מהגדרות SSH",
       "rowActions": "{{label}}, {{target}}. הקשה פותחת את העורך; לחיצה ארוכה מציעה עריכה ומחיקה.",
@@ -4191,6 +4191,7 @@
       "savePassword": "שמירת סיסמה",
       "savePasswordHint": "נשמרת במאגר המוצפן במכשיר זה.",
       "chooseKey": "בחירת מפתח",
+      "privateKey": "מפתח פרטי",
       "noKeys": "אין עדיין מפתחות",
       "jumpHost": "מארח קפיצה",
       "directConnection": "חיבור ישיר",

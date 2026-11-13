@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Henüz host yok",
-      "emptyDescription": "Bir host ekleyin veya hostları SSH yapılandırmanızdan içe aktarın.",
+      "emptyDescription": "Kayıtlı makineler sunucunuzda bir terminal açar.",
       "addHost": "Host ekle",
       "importConfig": "SSH yapılandırmasından içe aktar",
       "rowActions": "{{label}}, {{target}}. Düzenleyiciyi açar; düzenleme ve silme için uzun basın.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Parolayı kaydet",
       "savePasswordHint": "Bu cihazdaki şifreli depolama alanında saklanır.",
       "chooseKey": "Anahtar seç",
+      "privateKey": "Özel anahtar",
       "noKeys": "Henüz anahtar yok",
       "jumpHost": "Atlama hostu",
       "directConnection": "Doğrudan bağlantı",

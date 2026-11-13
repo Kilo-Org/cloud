@@ -4165,7 +4165,7 @@
     },
     "hosts": {
       "emptyTitle": "Vēl nav resursdatoru",
-      "emptyDescription": "Pievienojiet resursdatoru vai importējiet resursdatorus no SSH konfigurācijas.",
+      "emptyDescription": "Saglabātie resursdatori atver termināli jūsu serverī.",
       "addHost": "Pievienot resursdatoru",
       "importConfig": "Importēt no SSH konfigurācijas",
       "rowActions": "{{label}}, {{target}}. Atver redaktoru; ilgi nospiediet, lai rediģētu vai dzēstu.",
@@ -4191,6 +4191,7 @@
       "savePassword": "Saglabāt paroli",
       "savePasswordHint": "Glabāta šīs ierīces šifrētajā krātuvē.",
       "chooseKey": "Izvēlēties atslēgu",
+      "privateKey": "Privātā atslēga",
       "noKeys": "Vēl nav atslēgu",
       "jumpHost": "Starpposma resursdators",
       "directConnection": "Tiešs savienojums",

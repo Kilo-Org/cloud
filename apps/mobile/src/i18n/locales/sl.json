@@ -4230,7 +4230,7 @@
     },
     "hosts": {
       "emptyTitle": "Ni še nobenega gostitelja",
-      "emptyDescription": "Dodajte gostitelja ali uvozite gostitelje iz svoje konfiguracije SSH.",
+      "emptyDescription": "Shranjeni gostitelji odprejo terminal na vašem strežniku.",
       "addHost": "Dodaj gostitelja",
       "importConfig": "Uvozi iz konfiguracije SSH",
       "rowActions": "{{label}}, {{target}}. Odpre urejevalnik; dolg pritisk ponudi urejanje in brisanje.",
@@ -4256,6 +4256,7 @@
       "savePassword": "Shrani geslo",
       "savePasswordHint": "Shranjeno v šifrirani shrambi na tej napravi.",
       "chooseKey": "Izberi ključ",
+      "privateKey": "Zasebni ključ",
       "noKeys": "Ni še nobenega ključa",
       "jumpHost": "Skakalni gostitelj",
       "directConnection": "Neposredna povezava",

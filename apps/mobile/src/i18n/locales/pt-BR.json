@@ -4171,7 +4171,7 @@
     },
     "hosts": {
       "emptyTitle": "Nenhum host ainda",
-      "emptyDescription": "Adicione um host ou traga os hosts do seu SSH config.",
+      "emptyDescription": "Hosts salvos abrem um terminal no seu servidor.",
       "addHost": "Adicionar host",
       "importConfig": "Importar do SSH config",
       "rowActions": "{{label}}, {{target}}. Abre o editor; pressione e segure para editar e excluir.",
@@ -4197,6 +4197,7 @@
       "savePassword": "Salvar senha",
       "savePasswordHint": "Mantida no armazenamento criptografado deste dispositivo.",
       "chooseKey": "Escolher uma chave",
+      "privateKey": "Chave privada",
       "noKeys": "Nenhuma chave ainda",
       "jumpHost": "Host de salto",
       "directConnection": "Conexão direta",

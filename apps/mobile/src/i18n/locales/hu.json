@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Még nincs gazdagép",
-      "emptyDescription": "Adj hozzá egy gazdagépet, vagy hozd be a gazdagépeket az SSH-konfigurációdból.",
+      "emptyDescription": "A mentett gazdagépek terminált nyitnak a szerverén.",
       "addHost": "Gazdagép hozzáadása",
       "importConfig": "Importálás SSH-konfigurációból",
       "rowActions": "{{label}}, {{target}}. Megnyitja a szerkesztőt; hosszú nyomás esetén szerkesztés és törlés.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Jelszó mentése",
       "savePasswordHint": "Az eszközön lévő titkosított tárhelyen tároljuk.",
       "chooseKey": "Kulcs kiválasztása",
+      "privateKey": "Titkos kulcs",
       "noKeys": "Még nincs kulcs",
       "jumpHost": "Ugrógazdagép",
       "directConnection": "Közvetlen kapcsolat",

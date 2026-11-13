@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Kāore anō he pou",
-      "emptyDescription": "Tāpiri he pou, kawe mai rānei i ngā pou mai i tō whirihoranga SSH.",
+      "emptyDescription": "Ka whakatuwheratia e ngā pou kua tiakina he tāminara ki tō tūmau.",
       "addHost": "Tāpiri pou",
       "importConfig": "Kawemai mai i te whirihoranga SSH",
       "rowActions": "{{label}}, {{target}}. Ka whakatuwheratia te pūtakataka; pēhi roa ki te whakatika, ki te muku rānei.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Tiaki kupuhipa",
       "savePasswordHint": "Ka tiakina ki te rokiroki whakamunatia o tēnei pūrere.",
       "chooseKey": "Kōwhiri kī",
+      "privateKey": "Kī tūmataiti",
       "noKeys": "Kāore anō he kī",
       "jumpHost": "Pou peke",
       "directConnection": "Hononga tōtika",

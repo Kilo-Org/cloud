@@ -4295,7 +4295,7 @@
     },
     "hosts": {
       "emptyTitle": "Níl aon óstach fós",
-      "emptyDescription": "Cuir óstach leis, nó tabhair isteach na hóstaigh ó do chumraíocht SSH.",
+      "emptyDescription": "Osclaíonn óstaigh shábháilte teirminéal ar do fhreastalaí.",
       "addHost": "Cuir óstach leis",
       "importConfig": "Iompórtáil ó chumraíocht SSH",
       "rowActions": "{{label}}, {{target}}. Osclaíonn tapáil an t-eagarthóir; coinnigh síos chun eagarthóireacht agus scriosadh a dhéanamh.",
@@ -4321,6 +4321,7 @@
       "savePassword": "Sábháil pasfhocal",
       "savePasswordHint": "Coinnítear sa stóras criptithe ar an ngléas seo é.",
       "chooseKey": "Roghnaigh eochair",
+      "privateKey": "Eochair phríobháideach",
       "noKeys": "Níl aon eochracha fós",
       "jumpHost": "Óstach léim",
       "directConnection": "Ceangal díreach",

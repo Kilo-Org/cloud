@@ -4165,7 +4165,7 @@
     },
     "hosts": {
       "emptyTitle": "Još nema hostova",
-      "emptyDescription": "Dodaj host ili uvezi hostove iz svoje SSH konfiguracije.",
+      "emptyDescription": "Sačuvani hostovi otvaraju terminal na vašem serveru.",
       "addHost": "Dodaj host",
       "importConfig": "Uvezi iz SSH konfiguracije",
       "rowActions": "{{label}}, {{target}}. Otvara uređivač; dugi pritisak za izmenu i brisanje.",
@@ -4191,6 +4191,7 @@
       "savePassword": "Sačuvaj lozinku",
       "savePasswordHint": "Čuva se u šifrovanom skladištu na ovom uređaju.",
       "chooseKey": "Izaberi ključ",
+      "privateKey": "Privatni ključ",
       "noKeys": "Još nema ključeva",
       "jumpHost": "Jump host",
       "directConnection": "Direktna veza",

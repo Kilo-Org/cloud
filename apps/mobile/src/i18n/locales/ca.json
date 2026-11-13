@@ -4165,7 +4165,7 @@
     },
     "hosts": {
       "emptyTitle": "Encara no hi ha cap amfitrió",
-      "emptyDescription": "Afegeix un amfitrió o importa els amfitrions de la teva configuració SSH.",
+      "emptyDescription": "Els amfitrions desats obren un terminal al teu servidor.",
       "addHost": "Afegeix amfitrió",
       "importConfig": "Importa de la configuració SSH",
       "rowActions": "{{label}}, {{target}}. Obre l'editor; mantén premut per editar i eliminar.",
@@ -4191,6 +4191,7 @@
       "savePassword": "Desa la contrasenya",
       "savePasswordHint": "Es guarda a l'emmagatzematge xifrat d'aquest dispositiu.",
       "chooseKey": "Tria una clau",
+      "privateKey": "Clau privada",
       "noKeys": "Encara no hi ha cap clau",
       "jumpHost": "Amfitrió de salt",
       "directConnection": "Connexió directa",

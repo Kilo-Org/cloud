@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Oraindik ez dago ostalaririk",
-      "emptyDescription": "Gehitu ostalari bat edo inportatu zure SSH konfigurazioko ostalariak.",
+      "emptyDescription": "Gordetako ostalariek terminal bat irekitzen dute zure zerbitzarian.",
       "addHost": "Gehitu ostalaria",
       "importConfig": "Inportatu SSH konfiguraziotik",
       "rowActions": "{{label}}, {{target}}. Ukitzeak editorea irekitzen du; sakatze luzeak editatzeko eta ezabatzeko aukera ematen du.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Gorde pasahitza",
       "savePasswordHint": "Gailuko biltegi zifratuan gordetzen da.",
       "chooseKey": "Aukeratu gako bat",
+      "privateKey": "Gako pribatua",
       "noKeys": "Oraindik ez dago gakorik",
       "jumpHost": "Jauzi-ostalaria",
       "directConnection": "Konexio zuzena",

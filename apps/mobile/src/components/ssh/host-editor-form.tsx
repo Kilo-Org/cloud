@@ -214,7 +214,7 @@ export function HostEditorForm({
 
         {authMethod === 'key' ? (
           <PickerField
-            label={t('profiles.keyLabel')}
+            label={t('ssh.editor.privateKey')}
             value={keys.length === 0 ? t('ssh.editor.noKeys') : (selectedKey?.label ?? null)}
             placeholder={t('ssh.editor.chooseKey')}
             disabled={keys.length === 0 || saving}

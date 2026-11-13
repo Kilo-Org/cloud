@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Ingen værter endnu",
-      "emptyDescription": "Tilføj en vært, eller importér værterne fra din SSH-konfiguration.",
+      "emptyDescription": "Gemte værter åbner en terminal på din server.",
       "addHost": "Tilføj vært",
       "importConfig": "Importér fra SSH-konfiguration",
       "rowActions": "{{label}}, {{target}}. Åbner editoren; langt tryk for at redigere eller slette.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Gem adgangskode",
       "savePasswordHint": "Gemmes i det krypterede lager på denne enhed.",
       "chooseKey": "Vælg en nøgle",
+      "privateKey": "Privat nøgle",
       "noKeys": "Ingen nøgler endnu",
       "jumpHost": "Jump-vært",
       "directConnection": "Direkte forbindelse",

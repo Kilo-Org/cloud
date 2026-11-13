@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Engir netþjónar ennþá",
-      "emptyDescription": "Bættu við netþjóni eða flyttu inn netþjóna úr SSH-stillingunni þinni.",
+      "emptyDescription": "Vistaðir hýslar opna flugstöð á netþjóni þínum.",
       "addHost": "Bæta við netþjóni",
       "importConfig": "Flytja inn úr SSH-stillingu",
       "rowActions": "{{label}}, {{target}}. Opnar ritilinn; haltu inni til að breyta og eyða.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Vista lykilorð",
       "savePasswordHint": "Geymt í dulkóðaðri geymslu á þessu tæki.",
       "chooseKey": "Velja lykil",
+      "privateKey": "Einkalykill",
       "noKeys": "Engir lyklar ennþá",
       "jumpHost": "Milliþjónn",
       "directConnection": "Bein tenging",

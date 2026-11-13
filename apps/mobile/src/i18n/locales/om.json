@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Hostiin hin jiru",
-      "emptyDescription": "Hostii dabali, yookaan hostoota SSH config kee keessaa fidi.",
+      "emptyDescription": "Hostiiwwan kuufaman terminaalii sarvara kee irratti banu.",
       "addHost": "Hostii dabali",
       "importConfig": "SSH config irraa galchi",
       "rowActions": "{{label}}, {{target}}. Gulaali banuuf tuqi; gulaaluufis haquufis yeroo dheeraa qabi.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Jecha darbii kuusi",
       "savePasswordHint": "Kuusaa icciitii meeshaa kana irratti kuufama.",
       "chooseKey": "Furtuu filadhu",
+      "privateKey": "Bantuu dhuunfaa",
       "noKeys": "Ammaaf furtuun hin jiru",
       "jumpHost": "Hostii ce'umsaa",
       "directConnection": "Walqunnamtii kallattii",

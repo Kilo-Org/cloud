@@ -4165,7 +4165,7 @@
     },
     "hosts": {
       "emptyTitle": "Încă nu există gazde",
-      "emptyDescription": "Adaugă o gazdă sau importă gazdele din configurația SSH.",
+      "emptyDescription": "Gazdele salvate deschid un terminal pe serverul tău.",
       "addHost": "Adaugă gazdă",
       "importConfig": "Importă din configurația SSH",
       "rowActions": "{{label}}, {{target}}. Deschide editorul; apăsare lungă pentru editare și ștergere.",
@@ -4191,6 +4191,7 @@
       "savePassword": "Salvează parola",
       "savePasswordHint": "Păstrată în spațiul de stocare criptat de pe acest dispozitiv.",
       "chooseKey": "Alege o cheie",
+      "privateKey": "Cheie privată",
       "noKeys": "Încă nu există chei",
       "jumpHost": "Gazdă intermediară",
       "directConnection": "Conexiune directă",

@@ -4230,7 +4230,7 @@
     },
     "hosts": {
       "emptyTitle": "Kol kas nėra hostų",
-      "emptyDescription": "Pridėkite hostą arba importuokite hostus iš savo SSH konfigūracijos.",
+      "emptyDescription": "Išsaugoti serveriai atidaro terminalą jūsų serveryje.",
       "addHost": "Pridėti hostą",
       "importConfig": "Importuoti iš SSH konfigūracijos",
       "rowActions": "{{label}}, {{target}}. Palietus atidaromas redaktorius; ilgai palaikius galima redaguoti arba ištrinti.",
@@ -4256,6 +4256,7 @@
       "savePassword": "Išsaugoti slaptažodį",
       "savePasswordHint": "Saugomas šifruotoje šio įrenginio saugykloje.",
       "chooseKey": "Pasirinkti raktą",
+      "privateKey": "Privatusis raktas",
       "noKeys": "Kol kas nėra raktų",
       "jumpHost": "Tarpinis hostas",
       "directConnection": "Tiesioginis ryšys",

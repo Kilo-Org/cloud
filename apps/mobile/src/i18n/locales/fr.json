@@ -4165,7 +4165,7 @@
     },
     "hosts": {
       "emptyTitle": "Aucun hôte pour l’instant",
-      "emptyDescription": "Ajoutez un hôte ou importez les hôtes de votre configuration SSH.",
+      "emptyDescription": "Les hôtes enregistrés ouvrent un terminal sur votre serveur.",
       "addHost": "Ajouter un hôte",
       "importConfig": "Importer depuis la configuration SSH",
       "rowActions": "{{label}}, {{target}}. Ouvre l'éditeur ; appui long pour modifier et supprimer.",
@@ -4191,6 +4191,7 @@
       "savePassword": "Enregistrer le mot de passe",
       "savePasswordHint": "Conservé dans le stockage chiffré de cet appareil.",
       "chooseKey": "Choisir une clé",
+      "privateKey": "Clé privée",
       "noKeys": "Aucune clé pour l’instant",
       "jumpHost": "Hôte de rebond",
       "directConnection": "Connexion directe",

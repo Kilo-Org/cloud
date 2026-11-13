@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Hələ host yoxdur",
-      "emptyDescription": "Host əlavə edin və ya SSH konfiqurasiyanızdakı hostları gətirin.",
+      "emptyDescription": "Yadda saxlanılan hostlar serverinizdə terminal açır.",
       "addHost": "Host əlavə et",
       "importConfig": "SSH konfiqurasiyasından idxal et",
       "rowActions": "{{label}}, {{target}}. Redaktoru açır; redaktə və silmək üçün uzun basın.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Şifrəni yadda saxla",
       "savePasswordHint": "Bu cihazdakı şifrələnmiş yaddaşda saxlanılır.",
       "chooseKey": "Açar seç",
+      "privateKey": "Şəxsi açar",
       "noKeys": "Hələ açar yoxdur",
       "jumpHost": "Keçid hostu",
       "directConnection": "Birbaşa qoşulma",

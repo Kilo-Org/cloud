@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "ยังไม่มีโฮสต์",
-      "emptyDescription": "เพิ่มโฮสต์ หรือนำเข้าโฮสต์จาก SSH config ของคุณ.",
+      "emptyDescription": "โฮสต์ที่บันทึกไว้จะเปิดเทอร์มินัลบนเซิร์ฟเวอร์ของคุณ",
       "addHost": "เพิ่มโฮสต์",
       "importConfig": "นำเข้าจาก SSH config",
       "rowActions": "{{label}}, {{target}} แตะเพื่อเปิดตัวแก้ไข กดค้างเพื่อแก้ไขหรือลบ",
@@ -4126,6 +4126,7 @@
       "savePassword": "บันทึกรหัสผ่าน",
       "savePasswordHint": "เก็บไว้ในที่จัดเก็บที่เข้ารหัสบนอุปกรณ์นี้.",
       "chooseKey": "เลือกคีย์",
+      "privateKey": "กุญแจส่วนตัว",
       "noKeys": "ยังไม่มีคีย์",
       "jumpHost": "Jump host",
       "directConnection": "เชื่อมต่อโดยตรง",

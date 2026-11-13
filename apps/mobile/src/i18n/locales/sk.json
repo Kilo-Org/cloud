@@ -4230,7 +4230,7 @@
     },
     "hosts": {
       "emptyTitle": "Zatiaľ žiadni hostitelia",
-      "emptyDescription": "Pridajte hostiteľa alebo importujte hostiteľov z konfigurácie SSH.",
+      "emptyDescription": "Uložení hostitelia otvoria terminál na vašom serveri.",
       "addHost": "Pridať hostiteľa",
       "importConfig": "Importovať z konfigurácie SSH",
       "rowActions": "{{label}}, {{target}}. Otvorí editor; dlhým stlačením upravíte alebo odstránite.",
@@ -4256,6 +4256,7 @@
       "savePassword": "Uložiť heslo",
       "savePasswordHint": "Ukladá sa v šifrovanom úložisku na tomto zariadení.",
       "chooseKey": "Vybrať kľúč",
+      "privateKey": "Súkromný kľúč",
       "noKeys": "Zatiaľ žiadne kľúče",
       "jumpHost": "Prestupný hostiteľ",
       "directConnection": "Priame pripojenie",

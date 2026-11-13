@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Babu host tukuna",
-      "emptyDescription": "Ƙara host, ko shigo da hosts daga config ɗin SSH ɗinka.",
+      "emptyDescription": "Wuraren da aka adana suna buɗe tashar umarni a uwar garkenka.",
       "addHost": "Ƙara host",
       "importConfig": "Shigo daga config ɗin SSH",
       "rowActions": "{{label}}, {{target}}. Yana buɗe edita; danna tsawon lokaci don gyara da sharewa.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Adana kalmar sirri",
       "savePasswordHint": "Ana ajiye shi a ma'ajiyar sirri a wannan na'urar.",
       "chooseKey": "Zaɓi maɓalli",
+      "privateKey": "Maɓallin sirri",
       "noKeys": "Babu maɓallai tukuna",
       "jumpHost": "Host ɗin tsalle",
       "directConnection": "Haɗi kai tsaye",

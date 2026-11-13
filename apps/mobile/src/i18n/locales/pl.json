@@ -4230,7 +4230,7 @@
     },
     "hosts": {
       "emptyTitle": "Brak hostów",
-      "emptyDescription": "Dodaj hosta lub zaimportuj hosty z konfiguracji SSH.",
+      "emptyDescription": "Zapisane hosty otwierają terminal na twoim serwerze.",
       "addHost": "Dodaj hosta",
       "importConfig": "Importuj z konfiguracji SSH",
       "rowActions": "{{label}}, {{target}}. Otwiera edytor; długie naciśnięcie umożliwia edycję i usunięcie.",
@@ -4256,6 +4256,7 @@
       "savePassword": "Zapisz hasło",
       "savePasswordHint": "Przechowywane w zaszyfrowanej pamięci na tym urządzeniu.",
       "chooseKey": "Wybierz klucz",
+      "privateKey": "Klucz prywatny",
       "noKeys": "Brak kluczy",
       "jumpHost": "Host pośredniczący",
       "directConnection": "Połączenie bezpośrednie",

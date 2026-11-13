@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "尚無主機",
-      "emptyDescription": "新增主機，或從 SSH 設定匯入主機。",
+      "emptyDescription": "已儲存的主機會在你的伺服器上開啟終端機。",
       "addHost": "新增主機",
       "importConfig": "從 SSH 設定匯入",
       "rowActions": "{{label}}，{{target}}。點一下開啟編輯器；長按可編輯或刪除。",
@@ -4126,6 +4126,7 @@
       "savePassword": "儲存密碼",
       "savePasswordHint": "儲存在此裝置的加密儲存區中。",
       "chooseKey": "選擇金鑰",
+      "privateKey": "私密金鑰",
       "noKeys": "尚無金鑰",
       "jumpHost": "跳板主機",
       "directConnection": "直接連線",

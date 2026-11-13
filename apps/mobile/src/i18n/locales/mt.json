@@ -4295,7 +4295,7 @@
     },
     "hosts": {
       "emptyTitle": "Għad m'hemmx hosts",
-      "emptyDescription": "Żid host, jew ġib il-hosts mill-konfigurazzjoni SSH tiegħek.",
+      "emptyDescription": "Il-hosts salvati jiftħu terminal fuq is-server tiegħek.",
       "addHost": "Żid host",
       "importConfig": "Importa mill-konfigurazzjoni SSH",
       "rowActions": "{{label}}, {{target}}. Agħfas biex tiftaħ l-editur; ippremi fit-tul għall-editjar u t-tħassir.",
@@ -4321,6 +4321,7 @@
       "savePassword": "Issejvja l-password",
       "savePasswordHint": "Jinżamm fil-maħżen ikkriptat fuq dan it-tagħmir.",
       "chooseKey": "Agħżel ċavetta",
+      "privateKey": "Ċavetta privata",
       "noKeys": "Għad m'hemmx ċwievet",
       "jumpHost": "Jump host",
       "directConnection": "Konnessjoni diretta",

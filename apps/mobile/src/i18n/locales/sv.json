@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Inga värdar än",
-      "emptyDescription": "Lägg till en värd, eller hämta värdarna från din SSH-konfiguration.",
+      "emptyDescription": "Sparade värdar öppnar en terminal på din server.",
       "addHost": "Lägg till värd",
       "importConfig": "Importera från SSH-konfiguration",
       "rowActions": "{{label}}, {{target}}. Öppnar redigeraren; håll intryckt för att redigera och ta bort.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Spara lösenord",
       "savePasswordHint": "Sparas i det krypterade lagringsutrymmet på den här enheten.",
       "chooseKey": "Välj en nyckel",
+      "privateKey": "Privat nyckel",
       "noKeys": "Inga nycklar än",
       "jumpHost": "Hoppvärd",
       "directConnection": "Direkt anslutning",

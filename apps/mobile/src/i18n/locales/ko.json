@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "아직 호스트 없음",
-      "emptyDescription": "호스트를 추가하거나 SSH config의 호스트를 가져오세요.",
+      "emptyDescription": "저장된 호스트는 서버에서 터미널을 엽니다.",
       "addHost": "호스트 추가",
       "importConfig": "SSH config에서 가져오기",
       "rowActions": "{{label}}, {{target}}. 편집기를 엽니다. 길게 누르면 편집하거나 삭제할 수 있습니다.",
@@ -4126,6 +4126,7 @@
       "savePassword": "비밀번호 저장",
       "savePasswordHint": "이 기기의 암호화된 저장소에 보관됩니다.",
       "chooseKey": "키 선택",
+      "privateKey": "개인 키",
       "noKeys": "아직 키 없음",
       "jumpHost": "점프 호스트",
       "directConnection": "직접 연결",

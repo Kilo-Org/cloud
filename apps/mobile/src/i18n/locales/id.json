@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Belum ada host",
-      "emptyDescription": "Tambahkan host, atau impor host dari konfigurasi SSH Anda.",
+      "emptyDescription": "Host yang disimpan membuka terminal di server Anda.",
       "addHost": "Tambah host",
       "importConfig": "Impor dari konfigurasi SSH",
       "rowActions": "{{label}}, {{target}}. Ketuk untuk membuka editor; tekan lama untuk mengedit dan menghapus.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Simpan kata sandi",
       "savePasswordHint": "Disimpan di penyimpanan terenkripsi pada perangkat ini.",
       "chooseKey": "Pilih kunci",
+      "privateKey": "Kunci privat",
       "noKeys": "Belum ada kunci",
       "jumpHost": "Host perantara",
       "directConnection": "Koneksi langsung",

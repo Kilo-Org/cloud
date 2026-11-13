@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "还没有主机",
-      "emptyDescription": "添加一台主机，或从 SSH 配置中导入主机。",
+      "emptyDescription": "已保存的主机会在你的服务器上打开终端。",
       "addHost": "添加主机",
       "importConfig": "从 SSH 配置导入",
       "rowActions": "{{label}}，{{target}}。点击打开编辑器；长按可编辑或删除。",
@@ -4126,6 +4126,7 @@
       "savePassword": "保存密码",
       "savePasswordHint": "保存在本机的加密存储中。",
       "chooseKey": "选择密钥",
+      "privateKey": "私钥",
       "noKeys": "还没有密钥",
       "jumpHost": "跳板主机",
       "directConnection": "直接连接",

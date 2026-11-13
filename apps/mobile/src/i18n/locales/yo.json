@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Kò tíì sí sáfà kankan",
-      "emptyDescription": "Fi sáfà kún, tàbí gbe àwọn sáfà wọlé láti inú SSH config rẹ.",
+      "emptyDescription": "Àwọn olùgbàlejò tí a ti fipamọ́ máa ń ṣí tẹmínà kan lórí sáfà rẹ.",
       "addHost": "Fi sáfà kún",
       "importConfig": "Gbe wọlé láti inú SSH config",
       "rowActions": "{{label}}, {{target}}. Tẹ̀ ẹ́ láti ṣí olóòtú; tẹ̀ mọ́lẹ̀ pẹ́ fún àtúnṣe àti pípaarẹ́.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Fipamọ́ ọ̀rọ̀ ìpamọ́",
       "savePasswordHint": "A máa pa á mọ́ ní ibi ìpamọ́ tí a fi àṣírí bo lórí ẹ̀rọ yìí.",
       "chooseKey": "Yan kọ́kọ́rọ́ kan",
+      "privateKey": "Kọ́kọ́rọ́ àdáni",
       "noKeys": "Kò tíì sí kọ́kọ́rọ́ kankan",
       "jumpHost": "Sáfà ìfò",
       "directConnection": "Ìsopọ̀ tààrà",

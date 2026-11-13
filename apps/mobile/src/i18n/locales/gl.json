@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Aínda non hai hosts",
-      "emptyDescription": "Engade un host ou importa os hosts do teu ficheiro de configuración SSH.",
+      "emptyDescription": "Os servidores gardados abren un terminal no teu servidor.",
       "addHost": "Engadir host",
       "importConfig": "Importar da configuración SSH",
       "rowActions": "{{label}}, {{target}}. Abre o editor; mantén premido para editar e eliminar.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Gardar contrasinal",
       "savePasswordHint": "Gárdase no almacenamento cifrado deste dispositivo.",
       "chooseKey": "Escoller unha chave",
+      "privateKey": "Chave privada",
       "noKeys": "Aínda non hai chaves",
       "jumpHost": "Host de salto",
       "directConnection": "Conexión directa",

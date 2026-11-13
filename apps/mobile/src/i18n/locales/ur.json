@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "ابھی کوئی ہوسٹ نہیں",
-      "emptyDescription": "ایک ہوسٹ شامل کریں، یا اپنے SSH config سے ہوسٹس لے آئیں۔",
+      "emptyDescription": "محفوظ شدہ ہوسٹس آپ کے سرور پر ٹرمینل کھولتے ہیں۔",
       "addHost": "ہوسٹ شامل کریں",
       "importConfig": "SSH config سے درآمد کریں",
       "rowActions": "{{label}}، {{target}}۔ ایڈیٹر کھولتا ہے؛ ترمیم اور حذف کے لیے دیر تک دبائیں۔",
@@ -4126,6 +4126,7 @@
       "savePassword": "پاس ورڈ محفوظ کریں",
       "savePasswordHint": "اس ڈیوائس کے خفیہ کردہ اسٹور میں رکھا جاتا ہے۔",
       "chooseKey": "کلید منتخب کریں",
+      "privateKey": "نجی کلید",
       "noKeys": "ابھی کوئی کلید نہیں",
       "jumpHost": "جمپ ہوسٹ",
       "directConnection": "براہ راست کنکشن",

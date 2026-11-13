@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Ingen verter ennå",
-      "emptyDescription": "Legg til en vert, eller hent inn vertene fra SSH-konfigurasjonen din.",
+      "emptyDescription": "Lagrede verter åpner en terminal på serveren din.",
       "addHost": "Legg til vert",
       "importConfig": "Importer fra SSH-konfig",
       "rowActions": "{{label}}, {{target}}. Åpner redigeringen; langt trykk for å redigere og slette.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Lagre passord",
       "savePasswordHint": "Oppbevares i det krypterte lageret på denne enheten.",
       "chooseKey": "Velg en nøkkel",
+      "privateKey": "Privat nøkkel",
       "noKeys": "Ingen nøkler ennå",
       "jumpHost": "Hoppvert",
       "directConnection": "Direkte tilkobling",

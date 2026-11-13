@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Noch keine Hosts",
-      "emptyDescription": "Füge einen Host hinzu oder übernimm die Hosts aus deiner SSH-Konfiguration.",
+      "emptyDescription": "Gespeicherte Hosts öffnen ein Terminal auf Ihrem Server.",
       "addHost": "Host hinzufügen",
       "importConfig": "Aus SSH-Konfiguration importieren",
       "rowActions": "{{label}}, {{target}}. Öffnet den Editor; langes Drücken für Bearbeiten und Löschen.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Passwort speichern",
       "savePasswordHint": "Wird im verschlüsselten Speicher dieses Geräts aufbewahrt.",
       "chooseKey": "Schlüssel auswählen",
+      "privateKey": "Privater Schlüssel",
       "noKeys": "Noch keine Schlüssel",
       "jumpHost": "Jump-Host",
       "directConnection": "Direkte Verbindung",

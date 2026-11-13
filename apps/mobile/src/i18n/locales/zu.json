@@ -4100,7 +4100,7 @@
     },
     "hosts": {
       "emptyTitle": "Awekho amahosthi okwamanje",
-      "emptyDescription": "Engeza ihosthi, noma ngenisa amahosthi asuka kukhonfigi yakho ye-SSH.",
+      "emptyDescription": "Amahosthi agciniwe avula itheminali kuseva lakho.",
       "addHost": "Engeza ihosthi",
       "importConfig": "Ngenisa kusuka kukhonfigi ye-SSH",
       "rowActions": "{{label}}, {{target}}. Kuvula umhleli; cindezela isikhathi eside ukuze uhlele noma ususe.",
@@ -4126,6 +4126,7 @@
       "savePassword": "Londoloza iphasiwedi",
       "savePasswordHint": "Igcinwa esitolo esivikelekile kule divayisi.",
       "chooseKey": "Khetha ukhiye",
+      "privateKey": "Isihluthulelo esiyimfihlo",
       "noKeys": "Awekho okhiye okwamanje",
       "jumpHost": "Ihosthi yokugxuma",
       "directConnection": "Ukuxhumana okuqondile",

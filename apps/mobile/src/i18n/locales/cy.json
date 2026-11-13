@@ -4360,7 +4360,7 @@
     },
     "hosts": {
       "emptyTitle": "Dim gwesteiwyr eto",
-      "emptyDescription": "Ychwanegwch westeiwr, neu mewnforiwch y gwesteiwyr o'ch cyfluniad SSH.",
+      "emptyDescription": "Mae gwesteiwyr a gadwyd yn agor terfynell ar eich gweinydd.",
       "addHost": "Ychwanegu gwesteiwr",
       "importConfig": "Mewnforio o gyfluniad SSH",
       "rowActions": "{{label}}, {{target}}. Yn agor y golygydd; pwyswch a dal i olygu a dileu.",
@@ -4386,6 +4386,7 @@
       "savePassword": "Cadw cyfrinair",
       "savePasswordHint": "Cedwir yn y storfa wedi'i hamgryptio ar y ddyfais hon.",
       "chooseKey": "Dewis allwedd",
+      "privateKey": "Allwedd breifat",
       "noKeys": "Dim allweddi eto",
       "jumpHost": "Gwesteiwr naid",
       "directConnection": "Cysylltiad uniongyrchol",

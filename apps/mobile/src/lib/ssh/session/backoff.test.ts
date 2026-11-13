@@ -5,7 +5,9 @@ import { isRetryableReason, needsPrompt, type SshSessionPhase } from './types';
 
 describe('reconnectDelayMs', () => {
   it('starts at one second and doubles', () => {
-    expect([1, 2, 3, 4].map(attempt => reconnectDelayMs(attempt))).toEqual([1000, 2000, 4000, 8000]);
+    expect([1, 2, 3, 4].map(attempt => reconnectDelayMs(attempt))).toEqual([
+      1000, 2000, 4000, 8000,
+    ]);
   });
 
   it('caps the wait so a long outage does not sleep forever', () => {

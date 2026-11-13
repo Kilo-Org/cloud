@@ -124,7 +124,26 @@ const TWO_SENSE_COPY = new Map([
   ['files', 'the files in a pull request, versus the iOS Files app in the attachment picker'],
   ['plan', 'a billing plan, versus the agent plan mode'],
   ['copied', 'a file copied in a diff, versus the toast after a copy to the clipboard'],
-  ['sessions', 'a segment of an agent transcript, versus the shell sessions a terminal client holds'],
+  [
+    'sessions',
+    'a segment of an agent transcript, versus the shell sessions a terminal client holds',
+  ],
+  [
+    'session actions',
+    'the menu an agent session row opens, versus the menu an open SSH session opens',
+  ],
+  [
+    'local',
+    'an MCP server that runs on this device, versus the direction of a port forward that listens on this device',
+  ],
+  [
+    'remote',
+    'an MCP server that runs on another host, versus the direction of a port forward that listens on the server',
+  ],
+  [
+    'delete {{name}}?',
+    'the confirm that deletes a saved todo list, versus the confirm that deletes a file or folder on the server',
+  ],
   [
     '{{displaycount}} critical',
     "the repository row's bucket phrase, which agrees with the wording that row already uses, versus the deadline breakdown line's bucket phrase, which agrees with its own",

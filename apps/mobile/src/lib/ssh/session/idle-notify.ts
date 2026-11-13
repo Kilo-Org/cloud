@@ -9,14 +9,14 @@ const enabled = new Map<string, boolean>();
 const listeners = new Set<() => void>();
 let snapshot: ReadonlyMap<string, boolean> = new Map();
 
-export function subscribeIdleNotify(listener: () => void): () => void {
+function subscribeIdleNotify(listener: () => void): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
   };
 }
 
-export function idleNotifySnapshot(): ReadonlyMap<string, boolean> {
+function idleNotifySnapshot(): ReadonlyMap<string, boolean> {
   return snapshot;
 }
 

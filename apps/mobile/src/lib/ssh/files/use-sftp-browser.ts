@@ -1,4 +1,4 @@
-import { type SshEntry } from '@kilocode/react-native-ssh';
+import { type SftpEntry } from '@kilocode/react-native-ssh';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { nativeErrorCode, sshPackage } from '../native';
@@ -13,7 +13,7 @@ export type SftpBrowser = Readonly<{
   phase: SftpBrowserPhase;
   /** The directory on screen; null until the home directory resolved. */
   path: string | null;
-  entries: readonly SshEntry[];
+  entries: readonly SftpEntry[];
   /** A pull-to-refresh or a navigation is waiting on the server. */
   loading: boolean;
   refreshing: boolean;
@@ -33,7 +33,7 @@ export type SftpBrowser = Readonly<{
 export function useSftpBrowser(connectionId: string | null): SftpBrowser {
   const [phase, setPhase] = useState<SftpBrowserPhase>({ kind: 'waiting' });
   const [path, setPath] = useState<string | null>(null);
-  const [entries, setEntries] = useState<readonly SshEntry[]>([]);
+  const [entries, setEntries] = useState<readonly SftpEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const sftpRef = useRef<string | null>(null);

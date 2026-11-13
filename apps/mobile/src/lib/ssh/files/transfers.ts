@@ -5,14 +5,14 @@ import { getSafeCacheFilename } from '@/lib/share-remote-file';
 
 import { nativeErrorCode, sshPackage } from '../native';
 
-export type TransferKind = 'upload' | 'download';
+type TransferKind = 'upload' | 'download';
 
 /**
  * A transfer ends in `done`, `failed` or `cancelled`; `active` is the only
  * state that still moves bytes. A failed transfer keeps the call that failed,
  * so Retry repeats exactly that call.
  */
-export type TransferStatus = 'active' | 'done' | 'failed' | 'cancelled';
+type TransferStatus = 'active' | 'done' | 'failed' | 'cancelled';
 
 export type SshTransfer = {
   readonly id: string;
@@ -52,7 +52,7 @@ let snapshot: readonly SshTransfer[] = [];
 let counter = 0;
 
 function publish(): void {
-  snapshot = [...transfers.values()].reverse();
+  snapshot = [...transfers.values()].toReversed();
   for (const listener of listeners) {
     listener();
   }
@@ -139,7 +139,10 @@ async function perform(id: string, call: TransferCall, controller: AbortControll
       await ssh.download(call.sftpId, call.remotePath, localUri, options);
     }
     jobs.delete(id);
-    update(id, { status: 'done', bytes: transfers.get(id)?.total ?? transfers.get(id)?.bytes ?? 0 });
+    update(id, {
+      status: 'done',
+      bytes: transfers.get(id)?.total ?? transfers.get(id)?.bytes ?? 0,
+    });
   } catch (error) {
     jobs.delete(id);
     if (controller.signal.aborted) {
@@ -226,11 +229,32 @@ export function transfersForSession(
  */
 export function insertFixtureTransfers(sessionId: string): void {
   const fixture = [
-    { name: 'backup.tar.gz', kind: 'download' as const, status: 'active' as const, bytes: 42_000_000, total: 120_000_000, code: null },
-    { name: 'deploy.log', kind: 'upload' as const, status: 'failed' as const, bytes: 0, total: null, code: 'PermissionDenied' },
-    { name: 'notes.txt', kind: 'download' as const, status: 'done' as const, bytes: 918, total: 918, code: null },
+    {
+      name: 'backup.tar.gz',
+      kind: 'download' as const,
+      status: 'active' as const,
+      bytes: 42_000_000,
+      total: 120_000_000,
+      code: null,
+    },
+    {
+      name: 'deploy.log',
+      kind: 'upload' as const,
+      status: 'failed' as const,
+      bytes: 0,
+      total: null,
+      code: 'PermissionDenied' as const,
+    },
+    {
+      name: 'notes.txt',
+      kind: 'download' as const,
+      status: 'done' as const,
+      bytes: 918,
+      total: 918,
+      code: null,
+    },
   ];
-  fixture.forEach((row, index) => {
+  for (const [index, row] of fixture.entries()) {
     const id = `fixture-transfer-${index}`;
     transfers.set(id, {
       id,
@@ -243,7 +267,7 @@ export function insertFixtureTransfers(sessionId: string): void {
       status: row.status,
       code: row.code,
     });
-  });
+  }
   publish();
 }
 

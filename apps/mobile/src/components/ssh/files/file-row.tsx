@@ -1,4 +1,5 @@
 import { type SftpEntry } from '@kilocode/react-native-ssh';
+import { type TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -6,7 +7,7 @@ import { ChevronRight, FileIcon, FolderOpen, ImageIcon } from '@/components/ui/i
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { formatDate, formatFileSize } from '@/lib/format';
-import { previewKindOf } from '@/lib/ssh/files/paths';
+import { type PreviewKind, previewKindOf } from '@/lib/ssh/files/paths';
 
 type FileRowProps = Readonly<{
   entry: SftpEntry;
@@ -20,16 +21,13 @@ export function FileRow({ entry, onPress, onLongPress }: FileRowProps) {
   const colors = useThemeColors();
   const directory = entry.kind === 'directory';
   const preview = previewKindOf(entry);
-  const Icon = directory ? FolderOpen : preview === 'image' ? ImageIcon : FileIcon;
-  const details = entry.modifiedUnix === null ? [] : [modifiedLabel(entry.modifiedUnix, i18n.language)];
+  const Icon = iconOf(directory, preview);
+  const details =
+    entry.modifiedUnix === null ? [] : [modifiedLabel(entry.modifiedUnix, i18n.language)];
   if (!directory && entry.kind !== 'other') {
     details.unshift(formatFileSize(entry.size, i18n.language));
   }
-  const meaning = directory
-    ? t('ssh.files.kindFolder')
-    : preview === 'image'
-      ? t('ssh.files.kindImage')
-      : t('common.file');
+  const meaning = meaningOf(t, directory, preview);
 
   return (
     <Pressable
@@ -54,6 +52,23 @@ export function FileRow({ entry, onPress, onLongPress }: FileRowProps) {
       {directory ? <ChevronRight size={16} color={colors.mutedForeground} /> : null}
     </Pressable>
   );
+}
+
+function iconOf(directory: boolean, preview: PreviewKind | null) {
+  if (directory) {
+    return FolderOpen;
+  }
+  return preview === 'image' ? ImageIcon : FileIcon;
+}
+
+function meaningOf(t: TFunction, directory: boolean, preview: PreviewKind | null): string {
+  if (directory) {
+    return t('ssh.files.kindFolder');
+  }
+  if (preview === 'image') {
+    return t('ssh.files.kindImage');
+  }
+  return t('common.file');
 }
 
 function modifiedLabel(unixSeconds: number, language: string): string {

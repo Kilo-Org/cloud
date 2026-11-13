@@ -12,13 +12,13 @@ import { nativeErrorCode, sshPackage } from '../native';
 import { joinRemotePath, previewKindOf } from './paths';
 import {
   downloadedFileUri,
+  type SshTransfer,
   startDownload,
   startUpload,
+  subscribeTransfers,
   transferLocalUri,
   transfersForSession,
   transfersSnapshot,
-  subscribeTransfers,
-  type SshTransfer,
 } from './transfers';
 import { pickDocuments, pickPhotos } from './uploads';
 
@@ -74,9 +74,13 @@ export function useFileActions({
     if (transfer.status !== 'done' || uri === null) {
       return;
     }
-    void shareLocalFile(uri).catch(() => {
-      toast.error(t('ssh.files.shareFailed'));
-    });
+    void (async () => {
+      try {
+        await shareLocalFile(uri);
+      } catch {
+        toast.error(t('ssh.files.shareFailed'));
+      }
+    })();
   }, [pendingShare, transfers, sessionId, t]);
 
   function openEntry(entry: SftpEntry) {
@@ -210,11 +214,10 @@ export function useFileActions({
       onConfirm: () => {
         void apply(async () => {
           const ssh = await sshPackage();
-          if (directory) {
-            await ssh.removeDirectory(sftpId, remotePathOf(entry));
-          } else {
-            await ssh.removeFile(sftpId, remotePathOf(entry));
-          }
+          const removed = directory
+            ? ssh.removeDirectory(sftpId, remotePathOf(entry))
+            : ssh.removeFile(sftpId, remotePathOf(entry));
+          await removed;
         }, t('ssh.files.deleteFailed'));
       },
     });

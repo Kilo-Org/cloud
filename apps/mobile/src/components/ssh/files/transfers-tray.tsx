@@ -1,6 +1,8 @@
 import { type TFunction } from 'i18next';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
 import { ArrowUp, CheckCircle2, Download, RotateCcw, Share2, X } from '@/components/ui/icons';
 import { IconButton } from '@/components/ui/icon-button';
@@ -9,6 +11,9 @@ import { formatFileSize } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { transferErrorMessage } from '@/lib/ssh/files/error-copy';
 import { type SshTransfer } from '@/lib/ssh/files/transfers';
+
+/** The bar a transfer with no reported total shows while it runs. */
+const UNKNOWN_PROGRESS = 30;
 
 type TransfersTrayProps = Readonly<{
   transfers: readonly SshTransfer[];
@@ -154,7 +159,7 @@ function transferStatusLabel(transfer: SshTransfer, t: TFunction, language: stri
     return transferErrorMessage(t, transfer.code);
   }
   if (transfer.status === 'cancelled') {
-    return t('ssh.files.transfers.cancelled');
+    return t('common.cancelled');
   }
   if (transfer.status === 'done') {
     return t('ssh.files.transfers.done', { size: formatFileSize(transfer.bytes, language) });
@@ -175,7 +180,15 @@ function transferStatusLabel(transfer: SshTransfer, t: TFunction, language: stri
 function TransferBar({ transfer }: Readonly<{ transfer: SshTransfer }>) {
   const total = transfer.total;
   const percent =
-    total === null || total === 0 ? null : Math.min(100, Math.floor((transfer.bytes / total) * 100));
+    total === null || total === 0
+      ? null
+      : Math.min(100, Math.floor((transfer.bytes / total) * 100));
+  const filled = useSharedValue(percent ?? UNKNOWN_PROGRESS);
+  const fill = useAnimatedStyle(() => ({ width: `${filled.value}%` }));
+
+  useEffect(() => {
+    filled.value = percent ?? UNKNOWN_PROGRESS;
+  }, [filled, percent]);
 
   return (
     <View
@@ -183,10 +196,7 @@ function TransferBar({ transfer }: Readonly<{ transfer: SshTransfer }>) {
       accessibilityValue={percent === null ? undefined : { min: 0, max: 100, now: percent }}
       className="mt-0.5 h-1 overflow-hidden rounded-full bg-secondary"
     >
-      <View
-        className="h-full rounded-full bg-primary"
-        style={{ width: percent === null ? '30%' : `${percent}%` }}
-      />
+      <Animated.View className="h-full rounded-full bg-primary" style={fill} />
     </View>
   );
 }

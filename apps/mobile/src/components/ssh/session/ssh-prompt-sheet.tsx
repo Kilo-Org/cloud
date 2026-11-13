@@ -187,7 +187,9 @@ function SecretForm({
         </Text>
         {phase.failed ? (
           <Text className="text-sm text-destructive">
-            {password ? t('ssh.session.reason.authFailed') : t('ssh.session.reason.wrongPassphrase')}
+            {password
+              ? t('ssh.session.reason.authFailed')
+              : t('ssh.session.reason.wrongPassphrase')}
           </Text>
         ) : null}
         <FormField
@@ -217,7 +219,10 @@ function PromptsForm({
   const answers = useRef<string[]>(phase.prompts.prompts.map(() => ''));
 
   function submit() {
-    submitPrompts(sessionId, phase.prompts.prompts.map((_, index) => answers.current[index] ?? ''));
+    submitPrompts(
+      sessionId,
+      phase.prompts.prompts.map((_, index) => answers.current[index] ?? '')
+    );
   }
 
   function cancel() {

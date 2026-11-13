@@ -1,10 +1,6 @@
 import { type SshHost } from '../hosts';
 import { patchSession } from './session-store';
-import {
-  type SshHostKeyAwaiting,
-  type SshPromptsAwaiting,
-  type SshSessionPhase,
-} from './types';
+import { type SshHostKeyAwaiting, type SshPromptsAwaiting, type SshSessionPhase } from './types';
 
 /**
  * What the manager holds for a session beyond what the screen renders: the

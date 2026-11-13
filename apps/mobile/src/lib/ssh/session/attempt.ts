@@ -1,3 +1,4 @@
+import type * as SshPackage from '@kilocode/react-native-ssh';
 import { type ConnectOptions, type SshAuth, type SshErrorCode } from '@kilocode/react-native-ssh';
 
 import { i18n } from '@/i18n';
@@ -18,6 +19,50 @@ import { isRetryableReason, type SshCloseReason } from './types';
 
 const TERMINAL_TYPE = 'xterm-256color';
 const DEFAULT_TMUX_SESSION = 'kilo';
+
+/**
+ * Opens the hop chain outermost-first, each hop reaching the next through the
+ * one before it. Returns false when the chain stopped short.
+ */
+async function openChain(
+  entry: LiveSession,
+  db: SshDatabase,
+  ssh: typeof SshPackage,
+  hops: readonly SshHost[],
+  opened: string[],
+  via: string | null
+): Promise<boolean> {
+  const hop = hops[0];
+  if (hop === undefined) {
+    return true;
+  }
+  const auth = await authFor(entry, db, hop);
+  if (auth === null) {
+    await disconnectAll(opened);
+    return false;
+  }
+  const options: ConnectOptions = {
+    host: hop.hostname,
+    port: hop.port,
+    username: hop.username,
+    auth,
+  };
+  entry.promptsHostId = auth.type === 'keyboardInteractive' ? hop.id : null;
+  try {
+    const nativeSessionId =
+      via === null ? await ssh.connect(options) : await ssh.connectVia(via, options);
+    opened.push(nativeSessionId);
+    if (!stillOpen(entry)) {
+      await disconnectAll(opened);
+      return false;
+    }
+    return openChain(entry, db, ssh, hops.slice(1), opened, nativeSessionId);
+  } catch (error) {
+    await disconnectAll(opened);
+    fail(entry, reasonOf(error), hop);
+    return false;
+  }
+}
 
 /**
  * The core's failure codes, restated so a rejected promise can be classified
@@ -74,35 +119,8 @@ export async function attempt(entry: LiveSession): Promise<void> {
     entry.connectTargets = chain.map(hop => ({ host: hop.hostname, port: hop.port }));
 
     const ssh = await sshPackage();
-    let via: string | null = null;
-    for (const hop of chain) {
-      const auth = await authFor(entry, db, hop);
-      if (auth === null) {
-        await disconnectAll(opened);
-        return;
-      }
-      const options: ConnectOptions = {
-        host: hop.hostname,
-        port: hop.port,
-        username: hop.username,
-        auth,
-      };
-      entry.promptsHostId = auth.type === 'keyboardInteractive' ? hop.id : null;
-      let nativeSessionId: string;
-      try {
-        nativeSessionId =
-          via === null ? await ssh.connect(options) : await ssh.connectVia(via, options);
-      } catch (error) {
-        await disconnectAll(opened);
-        fail(entry, reasonOf(error), hop);
-        return;
-      }
-      opened.push(nativeSessionId);
-      via = nativeSessionId;
-      if (!stillOpen(entry)) {
-        await disconnectAll(opened);
-        return;
-      }
+    if (!(await openChain(entry, db, ssh, chain, opened, null))) {
+      return;
     }
 
     const targetSessionId = opened.at(-1) ?? null;
@@ -284,9 +302,7 @@ async function closeShellQuietly(shellId: string): Promise<void> {
 
 /** Closes the hop sessions an abandoned attempt opened, outermost last. */
 async function disconnectAll(sessionIds: readonly string[]): Promise<void> {
-  for (const sessionId of [...sessionIds].reverse()) {
-    await forgetSession(sessionId);
-  }
+  await Promise.all(sessionIds.toReversed().map(sessionId => forgetSession(sessionId)));
 }
 
 /**

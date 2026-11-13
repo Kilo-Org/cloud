@@ -32,10 +32,6 @@ export function forwardsSnapshot(): ReadonlyMap<string, ReadonlyMap<string, Forw
   return snapshot;
 }
 
-export function forwardStatusOf(sessionId: string, forwardId: string): ForwardStatus {
-  return sessions.get(sessionId)?.statuses.get(forwardId) ?? STOPPED;
-}
-
 const STOPPED: ForwardStatus = { kind: 'stopped' };
 
 function publish(): void {
@@ -145,7 +141,7 @@ export async function autoStartForwards(
  * session-level failure is what took them down.
  */
 export function handleForwardError(nativeSessionId: string): void {
-  for (const [sessionId, entry] of sessions) {
+  for (const entry of sessions.values()) {
     if (entry.nativeSessionId !== nativeSessionId) {
       continue;
     }

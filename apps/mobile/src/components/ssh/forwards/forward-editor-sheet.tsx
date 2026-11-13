@@ -36,9 +36,7 @@ export function ForwardEditorSheet({ visible, hostId, forward, onClose }: Forwar
   const bindHostRef = useRef(forward?.bindHost ?? DEFAULT_BIND_HOST);
   const bindPortRef = useRef(forward === null ? '' : String(forward.bindPort));
   const destinationHostRef = useRef(forward?.destinationHost ?? 'localhost');
-  const destinationPortRef = useRef(
-    forward === null ? '' : String(forward.destinationPort)
-  );
+  const destinationPortRef = useRef(forward === null ? '' : String(forward.destinationPort));
   const labelRef = useRef(forward?.label ?? '');
 
   function submit() {
@@ -171,7 +169,7 @@ export function ForwardEditorSheet({ visible, hostId, forward, onClose }: Forwar
             }}
           />
           <FormField
-            label={t('ssh.forwards.label')}
+            label={t('ssh.editor.label')}
             placeholder={t('ssh.forwards.labelPlaceholder')}
             defaultValue={labelRef.current}
             onChangeText={value => {

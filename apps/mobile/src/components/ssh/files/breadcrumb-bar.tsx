@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView } from 'react-native';
+import { Pressable, ScrollView, type ScrollViewInstance } from 'react-native';
 
 import { ChevronRight } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -20,7 +20,7 @@ type BreadcrumbBarProps = Readonly<{
 export function BreadcrumbBar({ trail, onOpen }: BreadcrumbBarProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const scroller = useRef<ScrollView>(null);
+  const scroller = useRef<ScrollViewInstance | null>(null);
 
   useEffect(() => {
     scroller.current?.scrollToEnd({ animated: false });

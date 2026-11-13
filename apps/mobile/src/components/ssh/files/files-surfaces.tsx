@@ -2,7 +2,7 @@ import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { FileNameDialog } from '@/components/ssh/files/file-name-dialog';
-import { FilePreviewSheet, type FilePreview } from '@/components/ssh/files/file-preview-sheet';
+import { type FilePreview, FilePreviewSheet } from '@/components/ssh/files/file-preview-sheet';
 import { SessionForwardsSheet } from '@/components/ssh/forwards/session-forwards-sheet';
 import { MenuSheet, type MenuSheetOption } from '@/components/ui/menu-sheet';
 
@@ -86,10 +86,10 @@ export function FilesSurfaces({
           title={
             nameDialog.mode === 'rename'
               ? t('ssh.files.renameTitle', { name: nameDialog.entryName })
-              : t('ssh.files.newFolderTitle')
+              : t('ssh.files.newFolder')
           }
           initialValue={nameDialog.mode === 'rename' ? nameDialog.entryName : ''}
-          confirmLabel={nameDialog.mode === 'rename' ? t('ssh.files.rename') : t('ssh.files.create')}
+          confirmLabel={nameDialog.mode === 'rename' ? t('common.rename') : t('ssh.files.create')}
           busy={busy}
           onCancel={onNameCancel}
           onSubmit={onNameSubmit}

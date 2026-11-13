@@ -1,16 +1,17 @@
-import { useTranslation } from 'react-i18next';
+import { type TFunction } from 'i18next';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { ForwardEditorSheet } from '@/components/ssh/forwards/forward-editor-sheet';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, Plus, Plug } from '@/components/ui/icons';
+import { ChevronRight, Plug, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { forwardLabel, type SshForward } from '@/lib/ssh/forwards';
-import { useSshForwards } from '@/lib/ssh/use-forwards';
+import { type SshForwardsQuery, useSshForwards } from '@/lib/ssh/use-forwards';
 
 type HostForwardsSectionProps = Readonly<{
   /** The host being edited; null until a new host is saved. */
@@ -33,44 +34,14 @@ export function HostForwardsSection({ hostId, disabled }: HostForwardsSectionPro
         </Text>
       </View>
 
-      {hostId === null ? (
-        <Text className="text-xs text-muted-foreground">{t('ssh.forwards.saveHostFirst')}</Text>
-      ) : forwards.isPending ? (
-        <Skeleton className="h-14 rounded-xl" />
-      ) : forwards.isError ? (
-        <Text className="text-xs text-destructive">{t('ssh.forwards.loadFailed')}</Text>
-      ) : forwards.data.length === 0 ? (
-        <Text className="text-xs text-muted-foreground">{t('ssh.forwards.emptyDescription')}</Text>
-      ) : (
-        <View className="gap-2">
-          {forwards.data.map(forward => (
-            <Pressable
-              key={forward.id}
-              accessibilityRole="button"
-              accessibilityLabel={t('ssh.forwards.editAction', { name: forwardLabel(forward) })}
-              disabled={disabled}
-              className="flex-row items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5 active:opacity-70"
-              onPress={() => {
-                setEditing({ forward });
-              }}
-            >
-              <Plug size={16} color={colors.mutedForeground} />
-              <View className="min-w-0 flex-1">
-                <Text className="text-sm text-foreground" numberOfLines={1}>
-                  {forwardLabel(forward)}
-                </Text>
-                <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-                  {forward.direction === 'local'
-                    ? t('ssh.forwards.localLine')
-                    : t('ssh.forwards.remoteLine')}
-                  {forward.autoStart ? ` · ${t('ssh.forwards.autoStartShort')}` : ''}
-                </Text>
-              </View>
-              <ChevronRight size={16} color={colors.mutedForeground} />
-            </Pressable>
-          ))}
-        </View>
-      )}
+      <ForwardsBody
+        hostId={hostId}
+        forwards={forwards}
+        disabled={disabled}
+        onEdit={forward => {
+          setEditing({ forward });
+        }}
+      />
 
       {hostId === null ? null : (
         <Button
@@ -98,4 +69,64 @@ export function HostForwardsSection({ hostId, disabled }: HostForwardsSectionPro
       )}
     </View>
   );
+}
+
+type ForwardsBodyProps = Readonly<{
+  hostId: string | null;
+  forwards: SshForwardsQuery;
+  disabled: boolean;
+  onEdit: (forward: SshForward) => void;
+}>;
+
+function ForwardsBody({ hostId, forwards, disabled, onEdit }: ForwardsBodyProps) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  if (hostId === null) {
+    return <Text className="text-xs text-muted-foreground">{t('ssh.forwards.saveHostFirst')}</Text>;
+  }
+  if (forwards.isPending) {
+    return <Skeleton className="h-14 rounded-xl" />;
+  }
+  if (forwards.isError) {
+    return <Text className="text-xs text-destructive">{t('ssh.forwards.loadFailed')}</Text>;
+  }
+  if (forwards.data.length === 0) {
+    return (
+      <Text className="text-xs text-muted-foreground">{t('ssh.forwards.emptyDescription')}</Text>
+    );
+  }
+  return (
+    <View className="gap-2">
+      {forwards.data.map(forward => (
+        <Pressable
+          key={forward.id}
+          accessibilityRole="button"
+          accessibilityLabel={t('ssh.forwards.editAction', { name: forwardLabel(forward) })}
+          disabled={disabled}
+          className="flex-row items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5 active:opacity-70"
+          onPress={() => {
+            onEdit(forward);
+          }}
+        >
+          <Plug size={16} color={colors.mutedForeground} />
+          <View className="min-w-0 flex-1">
+            <Text className="text-sm text-foreground" numberOfLines={1}>
+              {forwardLabel(forward)}
+            </Text>
+            <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+              {directionLine(t, forward)}
+            </Text>
+          </View>
+          <ChevronRight size={16} color={colors.mutedForeground} />
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+function directionLine(t: TFunction, forward: SshForward): string {
+  const direction = t(
+    forward.direction === 'local' ? 'ssh.forwards.localLine' : 'ssh.forwards.remoteLine'
+  );
+  return forward.autoStart ? `${direction} · ${t('ssh.forwards.autoStartShort')}` : direction;
 }

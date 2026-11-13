@@ -74,9 +74,7 @@ export async function closeSession(id: string): Promise<void> {
     if (nativeSessionId !== null) {
       await ssh.disconnect(nativeSessionId);
     }
-    for (const jump of jumps) {
-      await ssh.disconnect(jump);
-    }
+    await Promise.all(jumps.map(jump => ssh.disconnect(jump)));
   } catch {
     // The connection already went away, or this build carries no module: no
     // native resource is left to release.

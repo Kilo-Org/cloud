@@ -68,7 +68,11 @@ export function SessionForwardsSheet({
     body = (
       <View className="items-center gap-3 px-6 pb-4">
         <AccessibleStatus message={t('ssh.forwards.loadFailed')} className="text-sm" />
-        <Button variant="outline" className={STATE_ACTION_CLASS} onPress={() => void forwards.refetch()}>
+        <Button
+          variant="outline"
+          className={STATE_ACTION_CLASS}
+          onPress={() => void forwards.refetch()}
+        >
           <Text>{t('common.retry')}</Text>
         </Button>
       </View>
@@ -109,7 +113,7 @@ export function SessionForwardsSheet({
               }
             }}
             onStop={() => void stopForward(sessionId, forward.id)}
-            onOpen={(port) => {
+            onOpen={port => {
               void openExternalUrl(localForwardUrl(port));
             }}
           />
@@ -177,17 +181,18 @@ function ForwardRow({
           }
           numberOfLines={2}
         >
-          {forward.direction === 'local' ? t('ssh.forwards.localLine') : t('ssh.forwards.remoteLine')}
+          {forward.direction === 'local'
+            ? t('ssh.forwards.localLine')
+            : t('ssh.forwards.remoteLine')}
           {' · '}
           {forwardStatusLine(status, t)}
         </Text>
       </View>
-      {openable && status.kind === 'listening' ? (
-        <Globe size={16} color={colors.mutedForeground} />
-      ) : null}
+      {openable && listening ? <Globe size={16} color={colors.mutedForeground} /> : null}
       {status.kind === 'starting' ? (
         <ActivityIndicator size="small" />
-      ) : listening ? (
+      ) : null}
+      {status.kind !== 'starting' && listening ? (
         <IconButton
           accessibilityLabel={t('ssh.forwards.stopAction', { name })}
           onPress={() => {
@@ -216,7 +221,7 @@ function forwardStatusLine(status: ForwardStatus, t: TFunction): string {
     return t('ssh.forwards.listening', { port: status.port });
   }
   if (status.kind === 'starting') {
-    return t('ssh.forwards.starting');
+    return t('common.starting');
   }
   if (status.kind === 'failed') {
     return forwardErrorMessage(t, status.code);

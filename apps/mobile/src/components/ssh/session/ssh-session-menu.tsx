@@ -1,4 +1,11 @@
-import { type LucideIcon, Bell, BellOff, ChevronRight, FolderOpen, Plug } from '@/components/ui/icons';
+import {
+  Bell,
+  BellOff,
+  ChevronRight,
+  FolderOpen,
+  type LucideIcon,
+  Plug,
+} from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -36,7 +43,10 @@ export function SshSessionMenu({
   return (
     <Sheet visible={visible} onClose={onClose}>
       <View className="gap-1 pb-4">
-        <Text accessibilityRole="header" className="px-4 py-2 text-sm font-semibold text-muted-foreground">
+        <Text
+          accessibilityRole="header"
+          className="px-4 py-2 text-sm font-semibold text-muted-foreground"
+        >
           {t('ssh.session.menuTitle')}
         </Text>
         <MenuRow

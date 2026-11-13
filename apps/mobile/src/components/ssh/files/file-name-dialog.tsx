@@ -66,12 +66,7 @@ export function FileNameDialog({
           <Button variant="outline" className={STATE_ACTION_CLASS} onPress={onCancel}>
             <Text>{t('common.cancel')}</Text>
           </Button>
-          <Button
-            className={STATE_ACTION_CLASS}
-            loading={busy}
-            disabled={busy}
-            onPress={submit}
-          >
+          <Button className={STATE_ACTION_CLASS} loading={busy} disabled={busy} onPress={submit}>
             <Text>{confirmLabel}</Text>
           </Button>
         </View>

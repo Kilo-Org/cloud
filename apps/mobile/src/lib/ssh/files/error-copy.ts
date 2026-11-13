@@ -11,19 +11,19 @@ type FileErrorKey =
  * A transfer failure, in the person's words. The core names the category; the
  * copy says what that category means for this file rather than quoting it.
  */
-const ERROR_KEY: Readonly<Record<string, FileErrorKey>> = {
-  Network: 'ssh.files.errors.network',
-  Timeout: 'ssh.files.errors.network',
-  ChannelClosed: 'ssh.files.errors.network',
-  Protocol: 'ssh.files.errors.network',
-  PermissionDenied: 'ssh.files.errors.permission',
-  NotFound: 'ssh.files.errors.notFound',
-  LocalIo: 'ssh.files.errors.local',
-  Cancelled: 'ssh.files.errors.cancelled',
-};
+const ERROR_KEY = new Map<string, FileErrorKey>([
+  ['Network', 'ssh.files.errors.network'],
+  ['Timeout', 'ssh.files.errors.network'],
+  ['ChannelClosed', 'ssh.files.errors.network'],
+  ['Protocol', 'ssh.files.errors.network'],
+  ['PermissionDenied', 'ssh.files.errors.permission'],
+  ['NotFound', 'ssh.files.errors.notFound'],
+  ['LocalIo', 'ssh.files.errors.local'],
+  ['Cancelled', 'ssh.files.errors.cancelled'],
+]);
 
 export function transferErrorMessage(t: TFunction, code: string | null): string {
-  const key = code === null ? undefined : ERROR_KEY[code];
+  const key = code === null ? undefined : ERROR_KEY.get(code);
   return t(key ?? 'ssh.files.errors.other');
 }
 
@@ -33,7 +33,7 @@ export function forwardErrorMessage(t: TFunction, code: string | null): string {
     return t('ssh.forwards.errors.portUnavailable');
   }
   if (code === 'Network' || code === 'Timeout' || code === 'ChannelClosed') {
-    return t('ssh.forwards.errors.connection');
+    return t('ssh.session.reason.disconnected');
   }
   return t('ssh.forwards.errors.other');
 }

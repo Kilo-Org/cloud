@@ -1,20 +1,16 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { useSyncExternalStore } from 'react';
 import { toast } from 'sonner-native';
 
 import {
   createForward,
   deleteForward,
+  listForwardsForHost,
   type SshForward,
   type SshForwardInput,
-  listForwardsForHost,
   updateForward,
 } from './forwards';
-import {
-  type ForwardStatus,
-  forwardsSnapshot,
-  subscribeForwards,
-} from './forwards-runtime';
+import { forwardsSnapshot, type ForwardStatus, subscribeForwards } from './forwards-runtime';
 import { sshDatabase } from './store';
 import { SSH_KEY, useSshInvalidation } from './use-ssh';
 
@@ -27,7 +23,9 @@ export function useForwardStatuses(sessionId: string): ReadonlyMap<string, Forwa
 }
 
 /** The forwards stored for one host. A null host reads nothing. */
-export function useSshForwards(hostId: string | null) {
+export type SshForwardsQuery = UseQueryResult<SshForward[], Error>;
+
+export function useSshForwards(hostId: string | null): SshForwardsQuery {
   return useQuery({
     queryKey: [...SSH_KEY, 'forwards', hostId],
     networkMode: 'always',

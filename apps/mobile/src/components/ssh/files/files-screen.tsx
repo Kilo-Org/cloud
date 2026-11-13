@@ -15,6 +15,7 @@ import { ArrowUp, FilePlus, Plug } from '@/components/ui/icons';
 import { IconButton } from '@/components/ui/icon-button';
 import { type MenuSheetOption } from '@/components/ui/menu-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { collator } from '@/lib/intl-cache';
 import { shareLocalFile } from '@/lib/share-remote-file';
 import {
   cancelTransfer,
@@ -82,13 +83,10 @@ export function SshFilesScreen({ sessionId, initialPath = null, dev = null }: Ss
   const openedInitial = useRef(false);
   const previewFixtureShown = useRef(false);
 
-  const collator = useMemo(
-    () => new Intl.Collator(i18n.language, { numeric: true, sensitivity: 'base' }),
-    [i18n.language]
-  );
   const entries = useMemo(
-    () => sortEntries(browser.entries, collator),
-    [browser.entries, collator]
+    () =>
+      sortEntries(browser.entries, collator(i18n.language, { numeric: true, sensitivity: 'base' })),
+    [browser.entries, i18n.language]
   );
   const currentPath = browser.path;
   const actions = useFileActions({
@@ -135,7 +133,7 @@ export function SshFilesScreen({ sessionId, initialPath = null, dev = null }: Ss
     const options: MenuSheetOption[] = [];
     const run: (() => void)[] = [];
     if (entry.kind === 'directory') {
-      options.push({ label: t('ssh.files.open') });
+      options.push({ label: t('ssh.files.openFolder') });
       run.push(() => {
         browser.open(joinRemotePath(currentPath ?? '/', entry.name));
       });
@@ -151,7 +149,7 @@ export function SshFilesScreen({ sessionId, initialPath = null, dev = null }: Ss
         actions.shareFile(entry.name);
       });
     }
-    options.push({ label: t('ssh.files.rename') });
+    options.push({ label: t('common.rename') });
     run.push(() => {
       setNameDialog({ mode: 'rename', entry });
     });
@@ -163,12 +161,7 @@ export function SshFilesScreen({ sessionId, initialPath = null, dev = null }: Ss
   }
 
   const menu = menuEntry === null ? null : entryActions(menuEntry);
-  const nameTarget: FileNameTarget | null =
-    nameDialog === null
-      ? null
-      : nameDialog.mode === 'rename'
-        ? { mode: 'rename', entryName: nameDialog.entry.name }
-        : { mode: 'create' };
+  const nameTarget = nameTargetOf(nameDialog);
 
   return (
     <View className="flex-1 bg-background">
@@ -236,12 +229,18 @@ export function SshFilesScreen({ sessionId, initialPath = null, dev = null }: Ss
           entries={entries}
           loading={browser.loading}
           refreshing={browser.refreshing}
-          onRefresh={browser.refresh}
-          onRetry={browser.refresh}
+          onRefresh={() => {
+            browser.refresh();
+          }}
+          onRetry={() => {
+            browser.refresh();
+          }}
           onUpload={() => {
             setUploadSource(true);
           }}
-          onOpen={actions.openEntry}
+          onOpen={entry => {
+            actions.openEntry(entry);
+          }}
           onLongPress={setMenuEntry}
           onBackToHosts={() => {
             router.replace(SSH_HOSTS_ROUTE);
@@ -256,9 +255,13 @@ export function SshFilesScreen({ sessionId, initialPath = null, dev = null }: Ss
         onShare={transfer => {
           const uri = downloadedFileUri(transfer);
           if (uri !== null) {
-            void shareLocalFile(uri).catch(() => {
-              toast.error(t('ssh.files.shareFailed'));
-            });
+            void (async () => {
+              try {
+                await shareLocalFile(uri);
+              } catch {
+                toast.error(t('ssh.files.shareFailed'));
+              }
+            })();
           }
         }}
         onClear={clearFinishedTransfers}
@@ -302,13 +305,17 @@ export function SshFilesScreen({ sessionId, initialPath = null, dev = null }: Ss
           }
         }}
         preview={actions.preview}
-        onPreviewClose={actions.closePreview}
+        onPreviewClose={() => {
+          actions.closePreview();
+        }}
         onPreviewShare={() => {
           if (actions.preview !== null) {
             actions.shareFile(actions.preview.name);
           }
         }}
-        onPreviewRetry={actions.retryPreview}
+        onPreviewRetry={() => {
+          actions.retryPreview();
+        }}
         forwards={
           session === null
             ? null
@@ -326,4 +333,13 @@ export function SshFilesScreen({ sessionId, initialPath = null, dev = null }: Ss
       />
     </View>
   );
+}
+
+function nameTargetOf(dialog: DialogState | null): FileNameTarget | null {
+  if (dialog === null) {
+    return null;
+  }
+  return dialog.mode === 'rename'
+    ? { mode: 'rename', entryName: dialog.entry.name }
+    : { mode: 'create' };
 }

@@ -30,11 +30,10 @@ export function breadcrumbTrail(path: string): Breadcrumb[] {
   const trail: Breadcrumb[] = [{ label: '/', path: '/' }];
   let current = '';
   for (const segment of path.split('/')) {
-    if (segment === '') {
-      continue;
+    if (segment !== '') {
+      current = `${current}/${segment}`;
+      trail.push({ label: segment, path: current });
     }
-    current = `${current}/${segment}`;
-    trail.push({ label: segment, path: current });
   }
   return trail;
 }
@@ -50,81 +49,83 @@ export function sortEntries(entries: readonly SftpEntry[], collator: Intl.Collat
   });
 }
 
-const IMAGE_EXTENSIONS: Readonly<Record<string, true>> = {
-  png: true,
-  jpg: true,
-  jpeg: true,
-  gif: true,
-  webp: true,
-  bmp: true,
-  heic: true,
-  heif: true,
-  avif: true,
-};
+const IMAGE_EXTENSIONS = new Set([
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'bmp',
+  'heic',
+  'heif',
+  'avif',
+]);
 
 /** Extensions the text preview opens as UTF-8. */
-const TEXT_EXTENSIONS: Readonly<Record<string, true>> = {
-  txt: true,
-  md: true,
-  markdown: true,
-  json: true,
-  jsonl: true,
-  yml: true,
-  yaml: true,
-  toml: true,
-  ini: true,
-  conf: true,
-  cfg: true,
-  env: true,
-  log: true,
-  csv: true,
-  tsv: true,
-  xml: true,
-  html: true,
-  htm: true,
-  css: true,
-  scss: true,
-  js: true,
-  mjs: true,
-  cjs: true,
-  jsx: true,
-  ts: true,
-  tsx: true,
-  sh: true,
-  bash: true,
-  zsh: true,
-  fish: true,
-  py: true,
-  rb: true,
-  go: true,
-  rs: true,
-  c: true,
-  h: true,
-  cc: true,
-  cpp: true,
-  hpp: true,
-  java: true,
-  kt: true,
-  swift: true,
-  php: true,
-  sql: true,
-  service: true,
-  dockerfile: true,
-  makefile: true,
-};
+const TEXT_EXTENSIONS = new Set([
+  'txt',
+  'md',
+  'markdown',
+  'json',
+  'jsonl',
+  'yml',
+  'yaml',
+  'toml',
+  'ini',
+  'conf',
+  'cfg',
+  'env',
+  'log',
+  'csv',
+  'tsv',
+  'xml',
+  'html',
+  'htm',
+  'css',
+  'scss',
+  'js',
+  'mjs',
+  'cjs',
+  'jsx',
+  'ts',
+  'tsx',
+  'sh',
+  'bash',
+  'zsh',
+  'fish',
+  'py',
+  'rb',
+  'go',
+  'rs',
+  'c',
+  'h',
+  'cc',
+  'cpp',
+  'hpp',
+  'java',
+  'kt',
+  'swift',
+  'php',
+  'sql',
+  'service',
+  'dockerfile',
+  'makefile',
+]);
 
 export type PreviewKind = 'text' | 'image';
 
 /** How the app can show this entry in place, or null when it has to be shared. */
-export function previewKindOf(entry: Pick<SftpEntry, 'name' | 'kind' | 'size'>): PreviewKind | null {
+export function previewKindOf(
+  entry: Pick<SftpEntry, 'name' | 'kind' | 'size'>
+): PreviewKind | null {
   if (entry.kind !== 'file') {
     return null;
   }
   const extension = extensionOf(entry.name);
-  if (IMAGE_EXTENSIONS[extension] === true) {
+  if (IMAGE_EXTENSIONS.has(extension)) {
     return 'image';
   }
-  if (TEXT_EXTENSIONS[extension] === true && entry.size <= MAX_PREVIEW_BYTES) {
+  if (TEXT_EXTENSIONS.has(extension) && entry.size <= MAX_PREVIEW_BYTES) {
     return 'text';
   }
   return null;
@@ -143,5 +144,5 @@ function extensionOf(name: string): string {
 export function fileNameOf(path: string): string {
   const trimmed = path.replace(/\/+$/, '');
   const cut = trimmed.lastIndexOf('/');
-  return cut < 0 ? trimmed : trimmed.slice(cut + 1);
+  return cut === -1 ? trimmed : trimmed.slice(cut + 1);
 }

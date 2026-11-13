@@ -53,7 +53,7 @@ export function handleDisconnect(notice: DisconnectNotice): void {
       return;
     }
     const hop = entry.jumpSessionIds.indexOf(notice.sessionId);
-    if (hop >= 0) {
+    if (hop !== -1) {
       // A hop that dropped takes the target's path with it, so the whole chain
       // is retried from the outermost surviving session.
       entry.jumpSessionIds.splice(hop, 1);

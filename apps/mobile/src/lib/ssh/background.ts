@@ -1,5 +1,3 @@
-import { Platform } from 'react-native';
-
 import { i18n } from '@/i18n';
 
 import { sshPackage } from './native';
@@ -7,20 +5,12 @@ import { closeSession } from './session/manager';
 import { live } from './session/live';
 
 /**
- * Android keeps the sockets and the JS runtime alive with the foreground
- * service the package declares, so its notification needs the app's copy. iOS
- * has no such keepalive, where both calls only resolve.
- */
-const BACKGROUND_SESSIONS = Platform.OS === 'android';
-
-/**
  * Hands the background session notification its localized texts and answers its
- * `Disconnect all` action. Returns the teardown that stops listening.
+ * `Disconnect all` action. Android keeps the sockets and the JS runtime alive
+ * with the foreground service the package declares; on iOS both calls only
+ * resolve. Returns the teardown that stops listening.
  */
 export function startSshBackgroundSessions(): () => void {
-  if (!BACKGROUND_SESSIONS) {
-    return () => undefined;
-  }
   let cancelled = false;
   let removeListener: (() => void) | null = null;
 
@@ -31,8 +21,8 @@ export function startSshBackgroundSessions(): () => void {
         return;
       }
       ssh.configureBackgroundSessions({
-        channelName: i18n.t('ssh.notification.channel'),
-        title: i18n.t('ssh.notification.title'),
+        channelName: i18n.t('ssh.notification.sessions'),
+        title: i18n.t('ssh.notification.sessions'),
         body: count => i18n.t('ssh.notification.body', { sessions: count }),
         disconnectAllLabel: i18n.t('ssh.notification.disconnectAll'),
       });
@@ -55,7 +45,5 @@ export function startSshBackgroundSessions(): () => void {
 }
 
 async function closeEverySession(): Promise<void> {
-  for (const id of [...live.keys()]) {
-    await closeSession(id);
-  }
+  await Promise.all([...live.keys()].map(id => closeSession(id)));
 }

@@ -51,7 +51,12 @@ describe('directory order', () => {
   it('puts directories first, then names case-insensitively', () => {
     const collator = new Intl.Collator('en', { sensitivity: 'base', numeric: true });
     const sorted = sortEntries(
-      [entry('b.txt', 'file'), entry('Zeta', 'directory'), entry('a.txt', 'file'), entry('Alpha', 'directory')],
+      [
+        entry('b.txt', 'file'),
+        entry('Zeta', 'directory'),
+        entry('a.txt', 'file'),
+        entry('Alpha', 'directory'),
+      ],
       collator
     );
 

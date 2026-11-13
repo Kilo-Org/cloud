@@ -270,8 +270,7 @@ async function seedSession(name: string): Promise<string> {
   const host = createHost(db, { ...SESSION_HOST, authMethod: 'password' });
   const sessionId = `fixture-session-${name}`;
   const phase = fixturePhase(name) ?? { kind: 'connected' as const };
-  const shellId =
-    phase.kind === 'connected' ? await openSampleShell(host.label) : null;
+  const shellId = phase.kind === 'connected' ? await openSampleShell(host.label) : null;
 
   writeSession({
     id: sessionId,
@@ -414,8 +413,7 @@ export function handleSshFixturePath(path: string): boolean {
     } else if (name === 'files-transfers' || name === 'files-preview' || name === 'forwards') {
       const seeded = await seedFilesSurfaces();
       await resetSshQueries();
-      const dev = name === 'forwards' ? 'forwards' : name === 'files-preview' ? 'preview' : 'transfers';
-      router.replace(sshFilesPath(seeded.sessionId, { dev }));
+      router.replace(sshFilesPath(seeded.sessionId, { dev: filesDevSurface(name) }));
     } else if (name === 'forwards-editor') {
       const seeded = await seedFilesSurfaces();
       await resetSshQueries();
@@ -430,4 +428,11 @@ export function handleSshFixturePath(path: string): boolean {
     }
   })();
   return true;
+}
+
+function filesDevSurface(name: string): 'transfers' | 'preview' | 'forwards' {
+  if (name === 'forwards') {
+    return 'forwards';
+  }
+  return name === 'files-preview' ? 'preview' : 'transfers';
 }

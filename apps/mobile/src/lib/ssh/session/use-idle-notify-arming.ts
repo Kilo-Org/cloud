@@ -26,13 +26,16 @@ export function useIdleNotifyArming(
       return undefined;
     }
     let cancelled = false;
-    void sshPackage()
-      .then(ssh => {
+    void (async () => {
+      try {
+        const ssh = await sshPackage();
         if (!cancelled) {
           ssh.notifyWhenIdle(shellId, QUIET_MS, { title: t('ssh.session.commandFinished') });
         }
-      })
-      .catch(() => undefined);
+      } catch {
+        // A build without the module has no shell to watch.
+      }
+    })();
     return () => {
       cancelled = true;
     };

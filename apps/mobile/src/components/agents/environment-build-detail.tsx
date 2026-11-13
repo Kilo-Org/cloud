@@ -7,12 +7,12 @@ import { toast } from 'sonner-native';
 
 import { SheetHeader } from '@/components/sheet-header';
 import { Text } from '@/components/ui/text';
+import { createBuildRequestIds } from '@/lib/cloud-environments/build-request-id';
 import {
   buildFailureText,
   buildSummaryLabel,
   environmentBuildAction,
   type EnvironmentBuildStatusRow,
-  isBuildActive,
 } from '@/lib/cloud-environments/environment-build-copy';
 import { type EnvironmentSummaryRow } from '@/lib/cloud-environments/environment-selection';
 import { formatDate } from '@/lib/format';
@@ -62,6 +62,9 @@ export function EnvironmentBuildDetail({
   const queryClient = useQueryClient();
   const scope = organizationId ? { organizationId } : {};
   const [logsOpen, setLogsOpen] = useState(false);
+  // The attempt's request id survives a lost answer, so a retried Build cannot
+  // start a second build (see `createBuildRequestIds`).
+  const [requestIds] = useState(() => createBuildRequestIds(randomUUID));
   const canManageQuery = useQuery(trpc.cloudAgentSettings.canManage.queryOptions(scope));
   const canManage = canManageQuery.data?.canManage ?? false;
   const buildId = status?.activeBuild?.buildId ?? status?.latestBuild?.buildId ?? null;
@@ -79,6 +82,9 @@ export function EnvironmentBuildDetail({
       },
       onError: error => {
         toast.error(failureToast(error.message, t('agentChat.environment.couldNotStartBuild')));
+      },
+      onSettled: (_result, _error, variables) => {
+        requestIds.answered(variables.environmentId, variables.expectedRevision);
       },
     })
   );
@@ -105,19 +111,25 @@ export function EnvironmentBuildDetail({
         // A build log is manager-only on both sides: this sheet never asks for a
         // log its reader could not be shown.
         enabled: logsOpen && buildId !== null && canManage,
-        refetchInterval: query =>
-          isBuildActive(status?.activeBuild) && query.state.data?.complete !== true
-            ? BUILD_POLL_MS
-            : false,
+        // The log, not the build status, decides when to stop: a build that
+        // finishes between two status polls would otherwise freeze the sheet at
+        // the lines fetched before it ended, and the tail — the part that says
+        // how it failed — is exactly what the person opened the log for. A
+        // terminal build answers `complete` on the first read.
+        refetchInterval: query => (query.state.data?.complete === true ? false : BUILD_POLL_MS),
       }
     )
   );
   const isSubmitting = requestBuild.isPending || cancelBuild.isPending;
   const action = environmentBuildAction(status, { canManage }, t);
-  const failure = buildFailureText(
-    status?.activeBuild?.failureReason ?? status?.latestBuild?.failureReason ?? null,
-    t
-  );
+  // The sentence explains a failure, so it appears only where a build ended in
+  // one: a canceled build reads "Cancelled" and is not a failure, which is the
+  // same place the web shows it.
+  const endedBuild = status?.activeBuild === null ? status.latestBuild : null;
+  const failure =
+    endedBuild !== null && (endedBuild.state === 'failed' || endedBuild.state === 'obsolete')
+      ? buildFailureText(endedBuild.failureReason, t)
+      : null;
 
   return (
     <>
@@ -154,6 +166,7 @@ export function EnvironmentBuildDetail({
                   setLogsOpen(current => !current);
                 }}
                 lines={logsQuery.data?.lines ?? []}
+                truncated={logsQuery.data?.truncated === true}
                 isLoading={logsQuery.isLoading}
                 isError={logsQuery.isError}
                 onRetry={() => {
@@ -168,7 +181,7 @@ export function EnvironmentBuildDetail({
                 requestBuild.mutate({
                   environmentId: environment.id,
                   expectedRevision: status.configurationRevision,
-                  requestId: randomUUID(),
+                  requestId: requestIds.forAttempt(environment.id, status.configurationRevision),
                   ...scope,
                 });
               }}

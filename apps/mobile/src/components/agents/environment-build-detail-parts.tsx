@@ -42,6 +42,7 @@ export function BuildLogSection({
   open,
   onToggle,
   lines,
+  truncated,
   isLoading,
   isError,
   onRetry,
@@ -49,6 +50,8 @@ export function BuildLogSection({
   open: boolean;
   onToggle: () => void;
   lines: readonly { seq: number; text: string }[];
+  /** The build kept only its first lines; later output was dropped. */
+  truncated: boolean;
   isLoading: boolean;
   isError: boolean;
   onRetry: () => void;
@@ -98,15 +101,31 @@ export function BuildLogSection({
             </Text>
           ) : null}
           {lines.length > 0 ? (
-            <View className="overflow-hidden rounded-md border border-border bg-card">
-              <ScrollView
-                style={{ maxHeight: Math.round(windowHeight * LOGS_MAX_WINDOW_FRACTION) }}
-                contentContainerClassName="p-2"
-              >
-                <Text selectable className="font-mono text-xs text-foreground">
-                  {lines.map(line => line.text).join('\n')}
+            <View className="gap-1">
+              {/* The read returns the latest retained lines, so a log that starts
+                  past its first line is shown without its beginning, and a
+                  truncated one lost its tail; saying so keeps a partial log from
+                  reading as the whole build. */}
+              {(lines[0]?.seq ?? 0) > 1 ? (
+                <Text className="text-xs text-muted-foreground">
+                  {t('agentChat.environment.buildLogsLatestOnly')}
                 </Text>
-              </ScrollView>
+              ) : null}
+              {truncated ? (
+                <Text className="text-xs text-muted-foreground">
+                  {t('agentChat.environment.buildLogsTruncated')}
+                </Text>
+              ) : null}
+              <View className="overflow-hidden rounded-md border border-border bg-card">
+                <ScrollView
+                  style={{ maxHeight: Math.round(windowHeight * LOGS_MAX_WINDOW_FRACTION) }}
+                  contentContainerClassName="p-2"
+                >
+                  <Text selectable className="font-mono text-xs text-foreground">
+                    {lines.map(line => line.text).join('\n')}
+                  </Text>
+                </ScrollView>
+              </View>
             </View>
           ) : null}
         </View>

@@ -4134,6 +4134,7 @@
     "couldNotLoad": "Tidak dapat memuat integrasi",
     "permissionDenied": "Anda tidak memiliki izin untuk mengelola integrasi ini.",
     "memberHint": "Minta pemilik atau admin organisasi untuk mengubah koneksi ini.",
+    "rowManagedByOwnersAndBilling": "Hanya pemilik organisasi dan manajer penagihan yang dapat mengubah koneksi ini.",
     "connectFailed": "Tidak dapat membuka halaman koneksi"
   },
   "invoices": {

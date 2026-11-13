@@ -4134,6 +4134,7 @@
     "couldNotLoad": "Ekki tókst að hlaða inn samþættingum",
     "permissionDenied": "Þú hefur ekki heimild til að stjórna þessum samþættingum.",
     "memberHint": "Biddu eiganda eða stjórnanda stofnunarinnar um að breyta þessum tengingum.",
+    "rowManagedByOwnersAndBilling": "Aðeins eigendur og innheimtustjórar stofnunarinnar geta breytt þessari tengingu.",
     "connectFailed": "Ekki tókst að opna tengingarsíðuna"
   },
   "invoices": {

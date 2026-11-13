@@ -4134,6 +4134,7 @@
     "couldNotLoad": "İnteqrasiyaları yükləmək mümkün olmadı",
     "permissionDenied": "Bu inteqrasiyaları idarə etmək üçün icazəniz yoxdur.",
     "memberHint": "Bu bağlantıları dəyişmək üçün təşkilatın sahibinə və ya administratoruna müraciət edin.",
+    "rowManagedByOwnersAndBilling": "Yalnız təşkilatın sahibləri və ödəniş menecerləri bu bağlantını dəyişə bilər.",
     "connectFailed": "Qoşulma səhifəsini açmaq mümkün olmadı"
   },
   "invoices": {

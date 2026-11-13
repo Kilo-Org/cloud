@@ -4199,6 +4199,7 @@
     "couldNotLoad": "Integrările nu au putut fi încărcate",
     "permissionDenied": "Nu ai permisiunea de a gestiona aceste integrări.",
     "memberHint": "Cere unui proprietar sau administrator al organizației să modifice aceste conexiuni.",
+    "rowManagedByOwnersAndBilling": "Doar proprietarii organizației și managerii de facturare pot modifica această conexiune.",
     "connectFailed": "Pagina de conectare nu a putut fi deschisă"
   },
   "invoices": {

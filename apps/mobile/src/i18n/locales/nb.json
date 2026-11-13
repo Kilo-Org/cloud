@@ -4134,6 +4134,7 @@
     "couldNotLoad": "Kunne ikke laste inn integrasjoner",
     "permissionDenied": "Du har ikke tillatelse til å administrere disse integrasjonene.",
     "memberHint": "Be en eier eller administrator i organisasjonen om å endre disse tilkoblingene.",
+    "rowManagedByOwnersAndBilling": "Bare eiere og faktureringsansvarlige i organisasjonen kan endre denne tilkoblingen.",
     "connectFailed": "Kunne ikke åpne tilkoblingssiden"
   },
   "invoices": {

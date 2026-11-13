@@ -4134,6 +4134,7 @@
     "couldNotLoad": "Pa t ka chaje entegrasyon yo",
     "permissionDenied": "Ou pa gen pèmisyon pou jere entegrasyon sa yo.",
     "memberHint": "Mande yon pwopriyetè oswa yon administratè òganizasyon an pou chanje koneksyon sa yo.",
+    "rowManagedByOwnersAndBilling": "Se sèlman pwopriyetè òganizasyon yo ak responsab faktirasyon yo ki ka chanje koneksyon sa a.",
     "connectFailed": "Pa t ka louvri paj koneksyon an"
   },
   "invoices": {

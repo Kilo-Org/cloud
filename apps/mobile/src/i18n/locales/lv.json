@@ -4199,6 +4199,7 @@
     "couldNotLoad": "Neizdevās ielādēt integrācijas",
     "permissionDenied": "Jums nav atļaujas pārvaldīt šīs integrācijas.",
     "memberHint": "Lūdziet organizācijas īpašniekam vai administratoram mainīt šos savienojumus.",
+    "rowManagedByOwnersAndBilling": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var mainīt šo savienojumu.",
     "connectFailed": "Neizdevās atvērt savienojuma lapu"
   },
   "invoices": {

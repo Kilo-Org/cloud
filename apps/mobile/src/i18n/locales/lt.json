@@ -4264,6 +4264,7 @@
     "couldNotLoad": "Nepavyko įkelti integracijų",
     "permissionDenied": "Neturite teisių tvarkyti šių integracijų.",
     "memberHint": "Paprašykite organizacijos savininko arba administratoriaus pakeisti šias jungtis.",
+    "rowManagedByOwnersAndBilling": "Tik organizacijos savininkai ir atsiskaitymų administratoriai gali pakeisti šią jungtį.",
     "connectFailed": "Nepavyko atidaryti prijungimo puslapio"
   },
   "invoices": {

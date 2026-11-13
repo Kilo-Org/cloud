@@ -4134,6 +4134,7 @@
     "couldNotLoad": "无法加载集成",
     "permissionDenied": "你没有管理这些集成的权限。",
     "memberHint": "请联系组织所有者或管理员更改这些连接。",
+    "rowManagedByOwnersAndBilling": "只有组织所有者和账单管理员才能更改此连接。",
     "connectFailed": "无法打开连接页面"
   },
   "invoices": {

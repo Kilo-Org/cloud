@@ -4134,6 +4134,7 @@
     "couldNotLoad": "ውህደቶችን መጫን አልተቻለም",
     "permissionDenied": "እነዚህን ውህደቶች የማስተዳደር ፈቃድ የለዎትም።",
     "memberHint": "እነዚህን ግንኙነቶች ለመቀየር የድርጅቱን ባለቤት ወይም አስተዳዳሪ ይጠይቁ።",
+    "rowManagedByOwnersAndBilling": "ይህን ግንኙነት መቀየር የሚችሉት የድርጅቱ ባለቤቶች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
     "connectFailed": "የግንኙነት ገጹን መክፈት አልተቻለም"
   },
   "invoices": {

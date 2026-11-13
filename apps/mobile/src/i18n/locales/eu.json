@@ -4134,6 +4134,7 @@
     "couldNotLoad": "Ezin izan dira integrazioak kargatu",
     "permissionDenied": "Ez duzu integrazio hauek kudeatzeko baimenik.",
     "memberHint": "Eskatu erakundearen jabe edo administratzaile bati konexio hauek aldatzeko.",
+    "rowManagedByOwnersAndBilling": "Erakundearen jabeek eta fakturazio-kudeatzaileek soilik alda dezakete konexio hau.",
     "connectFailed": "Ezin izan da konexio-orria ireki"
   },
   "invoices": {

@@ -4134,6 +4134,7 @@
     "couldNotLoad": "Kan integraties niet laden",
     "permissionDenied": "Je hebt geen toestemming om deze integraties te beheren.",
     "memberHint": "Vraag een eigenaar of beheerder van de organisatie om deze koppelingen te wijzigen.",
+    "rowManagedByOwnersAndBilling": "Alleen eigenaren en factuurbeheerders van de organisatie kunnen deze koppeling wijzigen.",
     "connectFailed": "Kan de koppelingspagina niet openen"
   },
   "invoices": {

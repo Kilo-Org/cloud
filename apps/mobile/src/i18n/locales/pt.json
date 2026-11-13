@@ -4205,6 +4205,7 @@
     "couldNotLoad": "Não foi possível carregar as integrações",
     "permissionDenied": "Você não tem permissão para gerenciar estas integrações.",
     "memberHint": "Peça a um proprietário ou administrador da organização para alterar estas conexões.",
+    "rowManagedByOwnersAndBilling": "Apenas os proprietários e os gestores de faturação da organização podem alterar esta conexão.",
     "connectFailed": "Não foi possível abrir a página de conexão"
   },
   "invoices": {

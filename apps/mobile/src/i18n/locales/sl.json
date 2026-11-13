@@ -4264,6 +4264,7 @@
     "couldNotLoad": "Integracij ni bilo mogoče naložiti",
     "permissionDenied": "Nimate dovoljenja za upravljanje teh integracij.",
     "memberHint": "Za spremembo teh povezav prosite lastnika ali skrbnika organizacije.",
+    "rowManagedByOwnersAndBilling": "Samo lastniki organizacije in skrbniki obračunavanja lahko spremenijo to povezavo.",
     "connectFailed": "Strani za povezavo ni bilo mogoče odpreti"
   },
   "invoices": {

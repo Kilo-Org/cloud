@@ -4134,6 +4134,7 @@
     "couldNotLoad": "Ba a iya loda haɗe-haɗe ba",
     "permissionDenied": "Ba ka da izinin sarrafa waɗannan haɗe-haɗe.",
     "memberHint": "Ka roƙi mamallakin ƙungiya ko mai gudanarwa ya canza waɗannan haɗe-haɗe.",
+    "rowManagedByOwnersAndBilling": "Masu ƙungiya da manajojin biyan kuɗi ne kawai za su iya canza wannan haɗin.",
     "connectFailed": "Ba a iya buɗe shafin haɗi ba"
   },
   "invoices": {

@@ -4134,6 +4134,7 @@
     "couldNotLoad": "연동 목록을 불러오지 못했습니다",
     "permissionDenied": "이 연동을 관리할 권한이 없습니다.",
     "memberHint": "이 연결을 변경하려면 조직 소유자 또는 관리자에게 요청하세요.",
+    "rowManagedByOwnersAndBilling": "조직 소유자와 결제 관리자만 이 연결을 변경할 수 있습니다.",
     "connectFailed": "연결 페이지를 열지 못했습니다"
   },
   "invoices": {

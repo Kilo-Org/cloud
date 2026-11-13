@@ -4264,6 +4264,7 @@
     "couldNotLoad": "Integrácie sa nepodarilo načítať",
     "permissionDenied": "Nemáte oprávnenie spravovať tieto integrácie.",
     "memberHint": "Požiadajte vlastníka alebo správcu organizácie, aby tieto pripojenia zmenil.",
+    "rowManagedByOwnersAndBilling": "Toto pripojenie môžu zmeniť iba vlastníci organizácie a správcovia fakturácie.",
     "connectFailed": "Stránku pripojenia sa nepodarilo otvoriť"
   },
   "invoices": {

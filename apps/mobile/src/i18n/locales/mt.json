@@ -4329,6 +4329,7 @@
     "couldNotLoad": "L-integrazzjonijiet ma setgħux jitgħabbew",
     "permissionDenied": "M'għandekx permess timmaniġġja dawn l-integrazzjonijiet.",
     "memberHint": "Itlob lil sid jew amministratur tal-organizzazzjoni biex ibiddel dawn il-konnessjonijiet.",
+    "rowManagedByOwnersAndBilling": "Biss is-sidien tal-organizzazzjoni u l-maniġers tal-ħlasijiet jistgħu jbiddlu din il-konnessjoni.",
     "connectFailed": "Il-paġna tal-konnessjoni ma setgħetx tinfetaħ"
   },
   "invoices": {

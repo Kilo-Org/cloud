@@ -4134,6 +4134,7 @@
     "couldNotLoad": "Akukwazekanga ukulayisha ukuhlanganiswa",
     "permissionDenied": "Awunayo imvume yokuphatha lokhu kuhlanganiswa.",
     "memberHint": "Cela umnikazi wenhlangano noma umphathi ukuthi ashintshe lokhu kuxhumana.",
+    "rowManagedByOwnersAndBilling": "Abanikazi benhlangano nabaphathi bokukhokha kuphela abangashintsha lokhu kuxhumana.",
     "connectFailed": "Akukwazekanga ukuvula ikhasi lokuxhuma"
   },
   "invoices": {

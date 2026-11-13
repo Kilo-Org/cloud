@@ -4134,6 +4134,7 @@
     "couldNotLoad": "Kāore i taea te uta i ngā tūhononga",
     "permissionDenied": "Kāore ōu whakaaetanga ki te whakahaere i ēnei tūhononga.",
     "memberHint": "Tonoa tētahi kaipupuri, kaiwhakahaere rānei o te rōpū kia whakarerekē i ēnei hononga.",
+    "rowManagedByOwnersAndBilling": "Ko ngā rangatira me ngā kaiwhakahaere utu o te whakahaere anake ka taea te whakarerekē i tēnei hononga.",
     "connectFailed": "Kāore i taea te huaki i te whārangi hononga"
   },
   "invoices": {

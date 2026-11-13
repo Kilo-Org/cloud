@@ -4134,6 +4134,7 @@
     "couldNotLoad": "Integrimet nuk mund të ngarkoheshin",
     "permissionDenied": "Nuk ke leje për të menaxhuar këto integrime.",
     "memberHint": "Kërkoji një pronari ose administratori të organizatës t'i ndryshojë këto lidhje.",
+    "rowManagedByOwnersAndBilling": "Vetëm pronarët e organizatës dhe menaxherët e faturimit mund ta ndryshojnë këtë lidhje.",
     "connectFailed": "Faqja e lidhjes nuk mund të hapej"
   },
   "invoices": {

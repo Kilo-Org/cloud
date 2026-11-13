@@ -4134,6 +4134,7 @@
     "couldNotLoad": "Det gick inte att läsa in integrationerna",
     "permissionDenied": "Du har inte behörighet att hantera de här integrationerna.",
     "memberHint": "Be en ägare eller administratör i organisationen att ändra de här anslutningarna.",
+    "rowManagedByOwnersAndBilling": "Endast organisationens ägare och faktureringsansvariga kan ändra den här anslutningen.",
     "connectFailed": "Det gick inte att öppna anslutningssidan"
   },
   "invoices": {

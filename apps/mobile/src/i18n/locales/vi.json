@@ -4134,6 +4134,7 @@
     "couldNotLoad": "Không thể tải các tích hợp",
     "permissionDenied": "Bạn không có quyền quản lý các tích hợp này.",
     "memberHint": "Hãy yêu cầu chủ sở hữu hoặc quản trị viên của tổ chức thay đổi các kết nối này.",
+    "rowManagedByOwnersAndBilling": "Chỉ chủ sở hữu và người quản lý thanh toán của tổ chức mới có thể thay đổi kết nối này.",
     "connectFailed": "Không thể mở trang kết nối"
   },
   "invoices": {

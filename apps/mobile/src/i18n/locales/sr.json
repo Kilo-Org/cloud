@@ -4199,6 +4199,7 @@
     "couldNotLoad": "Učitavanje integracija nije uspelo",
     "permissionDenied": "Nemate dozvolu da upravljate ovim integracijama.",
     "memberHint": "Zamolite vlasnika ili administratora organizacije da promeni ove veze.",
+    "rowManagedByOwnersAndBilling": "Samo vlasnici organizacije i menadžeri za naplatu mogu da promene ovu vezu.",
     "connectFailed": "Otvaranje stranice za povezivanje nije uspelo"
   },
   "invoices": {

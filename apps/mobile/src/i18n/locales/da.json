@@ -4134,6 +4134,7 @@
     "couldNotLoad": "Integrationerne kunne ikke indlæses",
     "permissionDenied": "Du har ikke tilladelse til at administrere disse integrationer.",
     "memberHint": "Bed en ejer eller administrator i organisationen om at ændre disse forbindelser.",
+    "rowManagedByOwnersAndBilling": "Kun ejere og faktureringsansvarlige i organisationen kan ændre denne forbindelse.",
     "connectFailed": "Siden til oprettelse af forbindelse kunne ikke åbnes"
   },
   "invoices": {

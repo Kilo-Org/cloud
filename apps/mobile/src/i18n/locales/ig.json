@@ -4134,6 +4134,7 @@
     "couldNotLoad": "Enweghị ike ibudata njikọ",
     "permissionDenied": "Ị nweghị ikike ijikwa njikọ ndị a.",
     "memberHint": "Gwa onye nwe nzukọ ma ọ bụ onye nchịkwa ka ọ gbanwee njikọ ndị a.",
+    "rowManagedByOwnersAndBilling": "Naanị ndị nwe nzukọ na ndị njikwa ịgba ụgwọ nwere ike ịgbanwe njikọ a.",
     "connectFailed": "Enweghị ike imepe ibe njikọ"
   },
   "invoices": {

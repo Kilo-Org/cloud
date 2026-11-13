@@ -4199,6 +4199,7 @@
     "couldNotLoad": "No s'han pogut carregar les integracions",
     "permissionDenied": "No tens permís per gestionar aquestes integracions.",
     "memberHint": "Demana a un propietari o administrador de l'organització que canviï aquestes connexions.",
+    "rowManagedByOwnersAndBilling": "Només els propietaris i els gestors de facturació de l'organització poden canviar aquesta connexió.",
     "connectFailed": "No s'ha pogut obrir la pàgina de connexió"
   },
   "invoices": {

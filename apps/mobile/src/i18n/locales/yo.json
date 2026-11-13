@@ -4134,6 +4134,7 @@
     "couldNotLoad": "Kò ṣeé ṣe láti gbé àwọn ìsopọ̀ wá",
     "permissionDenied": "O kò ní àṣẹ láti ṣàkóso àwọn ìsopọ̀ wọ̀nyí.",
     "memberHint": "Bèèrè lọ́wọ́ ẹni tó ni àjọ náà tàbí alákòóso láti yí àwọn ìsopọ̀ wọ̀nyí padà.",
+    "rowManagedByOwnersAndBilling": "Àwọn ẹni tó ni àjọ àti àwọn olùṣàkóso ìsanwó nìkan ló lè yí ìsopọ̀ yìí padà.",
     "connectFailed": "Kò ṣeé ṣe láti ṣí ojú-ìwé ìsopọ̀"
   },
   "invoices": {

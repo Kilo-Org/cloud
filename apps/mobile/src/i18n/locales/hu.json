@@ -4134,6 +4134,7 @@
     "couldNotLoad": "Nem sikerült betölteni az integrációkat",
     "permissionDenied": "Nincs jogosultságod ezeknek az integrációknak a kezeléséhez.",
     "memberHint": "Kérd meg a szervezet egyik tulajdonosát vagy adminisztrátorát, hogy módosítsa ezeket a kapcsolatokat.",
+    "rowManagedByOwnersAndBilling": "Csak a szervezet tulajdonosai és számlázási felelősei módosíthatják ezt a kapcsolatot.",
     "connectFailed": "Nem sikerült megnyitni a csatlakozási oldalt"
   },
   "invoices": {

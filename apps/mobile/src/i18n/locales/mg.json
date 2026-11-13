@@ -4134,6 +4134,7 @@
     "couldNotLoad": "Tsy afaka nampiditra ireo fampifandraisana",
     "permissionDenied": "Tsy manana alalana hitantana ireo fampifandraisana ireo ianao.",
     "memberHint": "Angataho amin'ny tompon'ny fikambanana na mpitantana ny fanovana ireo fifandraisana ireo.",
+    "rowManagedByOwnersAndBilling": "Ny tompony sy ny mpitantana faktiora ao amin'ny fikambanana ihany no afaka manova ity fifandraisana ity.",
     "connectFailed": "Tsy afaka nanokatra ny pejy fampifandraisana"
   },
   "invoices": {

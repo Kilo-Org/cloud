@@ -21,6 +21,8 @@ const mocks = vi.hoisted(() => ({
     isPending: false,
     refetch: vi.fn(),
   },
+  /** Every options object the screen hands the scheduled-change read. */
+  scheduledOptions: [] as Record<string, unknown>[],
   ledgers: {
     credit: {
       query: {
@@ -52,8 +54,13 @@ const mocks = vi.hoisted(() => ({
 vi.mock('expo-router', () => ({ useRouter: () => mockRouter }));
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, View: 'View' }));
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: (options?: { key?: string }) =>
-    options?.key === 'scheduled' ? mocks.scheduled : mocks.state,
+  useQuery: (options?: { key?: string }) => {
+    if (options?.key === 'scheduled') {
+      mocks.scheduledOptions.push(options);
+      return mocks.scheduled;
+    }
+    return mocks.state;
+  },
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'DetailScreenScrollView' }));
@@ -161,6 +168,7 @@ describe('KiloPassSubscriptionScreen', () => {
     mocks.state.refetch.mockClear();
     mocks.scheduled.isPending = false;
     mocks.scheduled.data = { scheduledChange: null };
+    mocks.scheduledOptions.length = 0;
     mocks.ledgers.credit.query.isPending = false;
     mocks.ledgers.billing.query.isPending = false;
     mockRouter.replace.mockClear();
@@ -247,6 +255,19 @@ describe('KiloPassSubscriptionScreen', () => {
     const renderer = await renderScreen();
     expect(nodesOfType(renderer, 'Skeleton').length).toBeGreaterThan(0);
     expect(nodesOfType(renderer, 'KvRow')).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('settles the scheduled change even while the device reports offline', async () => {
+    mocks.state.data = { subscription: stripeSubscription(), isEligibleForFirstMonthPromo: false };
+    const renderer = await renderScreen();
+    // The page waits on this read, so it must not pause in `pending` on the
+    // default online mode: that neither errors nor answers, and the screen
+    // would hold its loading state with no retry.
+    expect(mocks.scheduledOptions.at(-1)).toMatchObject({
+      networkMode: 'always',
+      refetchOnReconnect: true,
+    });
     renderer.unmount();
   });
 

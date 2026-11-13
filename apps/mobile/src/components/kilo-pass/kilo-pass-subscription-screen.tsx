@@ -29,6 +29,7 @@ import {
 } from '@/lib/hooks/use-kilo-pass-history';
 import { isStoreManagedPass, type KiloPassSubscriptionState } from '@/lib/kilo-pass/management';
 import { getKiloPassDetailState, type KiloPassDetail } from '@/lib/kilo-pass/state';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -199,9 +200,13 @@ export function KiloPassSubscriptionScreen() {
   const storeManaged = subscription != null && isStoreManagedPass(subscription);
   const creditHistory = useKiloPassCreditHistory(isDetail);
   const billingHistory = useKiloPassBillingHistory(isDetail && !storeManaged);
+  // The page waits on this read before it prints, so it must settle even while
+  // the online manager reports offline: a paused query never errors and never
+  // answers, and the screen would hold its loading state with no retry.
   const scheduledChangeQuery = useQuery({
     ...trpc.kiloPass.getScheduledChange.queryOptions(),
     enabled: isDetail && !storeManaged,
+    ...SETTLE_WHILE_OFFLINE,
   });
   // A store-managed pass has neither a Stripe schedule nor invoices, so those
   // two stay disabled and their pending status says nothing.

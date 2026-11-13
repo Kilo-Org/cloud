@@ -192,6 +192,12 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   };
 
   setTag('ui.ai_model', requestBody.model);
+  // This one call is the route's whole access decision. It answers the paid-usage gate, then
+  // the caller's organization model-access policy: the member grant, the enterprise
+  // organization's model deny list, and its provider allow-list, matched against the provider
+  // this route selected for the model. A denial returns `modelNotAllowedResponse` before any
+  // upstream request. Do not resolve that policy again here; `direct-provider-access.ts` is the
+  // single source, so a second resolution can only disagree with it.
   const accessResult = await checkDirectProviderAccess({
     user,
     organizationId,

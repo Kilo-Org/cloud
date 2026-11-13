@@ -54,18 +54,6 @@ describe('getWorkerDb', () => {
     expect(drizzleMock.mock.calls[0]?.[0]).not.toBe(drizzleMock.mock.calls[1]?.[0]);
     expect(firstDb).not.toBe(secondDb);
   });
-
-  it('lets a caller replace the int8 parsers for its own pool', () => {
-    const customTypes = { getTypeParser: jest.fn() };
-
-    getWorkerDb(workerConnectionString, { types: customTypes });
-
-    expect(pg.Pool).toHaveBeenLastCalledWith({
-      connectionString: workerConnectionString,
-      max: 1,
-      types: customTypes,
-    });
-  });
 });
 
 describe('createDrizzleClient', () => {
@@ -76,18 +64,28 @@ describe('createDrizzleClient', () => {
       expect.objectContaining({ types: databaseTypeParsers })
     );
   });
-
-  it('lets a caller replace the int8 parsers for its own pool', () => {
-    const customTypes = { getTypeParser: jest.fn() };
-
-    createDrizzleClient({
-      connectionString: 'postgres://primary.example/db',
-      poolConfig: { types: customTypes },
-    });
-
-    expect(pg.Pool).toHaveBeenLastCalledWith(expect.objectContaining({ types: customTypes }));
-  });
 });
+
+// Compile-time guards: the helpers own the int8 parser, so their option types must reject
+// `types`. `tsgo --noEmit` compiles this file, so a re-widened type makes these
+// `@ts-expect-error` directives unused and the typecheck fails.
+type WorkerOptions = Parameters<typeof getWorkerDb>[1];
+type PoolConfigOption = NonNullable<Parameters<typeof createDrizzleClient>[0]['poolConfig']>;
+
+const acceptsWorkerSetting: WorkerOptions = { application_name: 'worker', statement_timeout: 1000 };
+// @ts-expect-error getWorkerDb installs databaseTypeParsers on its pool.
+const workerTypes: WorkerOptions = { types: databaseTypeParsers };
+const acceptsPoolSetting: PoolConfigOption = {
+  application_name: 'local-kilo-script',
+  max: 10,
+};
+// @ts-expect-error createDrizzleClient installs databaseTypeParsers on its pool.
+const poolTypes: PoolConfigOption = { types: databaseTypeParsers };
+
+void acceptsWorkerSetting;
+void acceptsPoolSetting;
+void workerTypes;
+void poolTypes;
 
 describe('databaseTypeParsers', () => {
   it('reads int8 as BigInt', () => {

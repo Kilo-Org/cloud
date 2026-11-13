@@ -208,12 +208,16 @@ export function RepositoryBranchSelector({
   }
 
   function renderNote(message: string) {
-    // Note rows carry full sentences, so their body takes the shared row floor
+    // Note rows carry full sentences, so their body keeps the shared row floor
     // and grows with its text instead of clipping it — the same guidance must
-    // fit in every language, not just English.
+    // fit in every language, not just English. The `py-2` is what keeps the
+    // inset when it does grow: a one-line note is centred in the 48 dp floor
+    // and has slack above and below, but a three-line translation is taller
+    // than that floor, and without the padding its line boxes would sit on the
+    // frame's own border.
     return (
       <View className={ROW_FRAME_CLASS}>
-        <View className={BRANCH_ROW_BODY_CLASS}>
+        <View className={cn(BRANCH_ROW_BODY_CLASS, 'py-2')}>
           <Text className="text-sm text-muted-foreground">{message}</Text>
         </View>
       </View>

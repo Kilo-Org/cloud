@@ -496,9 +496,27 @@ describe('RepositoryBranchSelector', () => {
     // loading line fills the width (its skeleton does).
     const renderer = mountSelector(githubRow, branchesState({ isPermanentError: true }));
 
-    expect(classesOf(rowBody(renderer))).toEqual(TRIGGER_BODY_CLASSES);
+    expect(classesOf(rowBody(renderer))).toEqual(expect.arrayContaining(TRIGGER_BODY_CLASSES));
     expect(classesOf(rowBody(renderer))).not.toContain('justify-center');
     expect(classesOf(rowBody(renderer))).not.toContain('justify-between');
+  });
+
+  it('keeps a multi-line note off the frame border', () => {
+    // A note keeps the 48 dp floor, but its copy can outgrow it: the
+    // permanent-refusal message runs past two lines at phone width, and longer
+    // translations of the truncated-list note do too. At three `text-sm` lines
+    // `items-center` has no slack left, so without the body's own vertical
+    // padding the first and last line boxes would sit on the frame's 1 dp
+    // border — the inset would collapse exactly for the long copy the row
+    // exists to show.
+    const renderer = mountSelector(githubRow, branchesState({ isPermanentError: true }));
+
+    expect(classesOf(rowBody(renderer))).toContain('py-2');
+    // The floor stays, so a one-line note is still exactly one trigger tall.
+    expect(classesOf(rowBody(renderer))).toContain('min-h-[48px]');
+    // The trigger's body never carries it: the value line is centred in slack.
+    const loaded = mountSelector(githubRow);
+    expect(classesOf(rowBody(loaded))).not.toContain('py-2');
   });
 
   it('draws the retry borderless, on the shared action floor, aligned to the message inset', () => {

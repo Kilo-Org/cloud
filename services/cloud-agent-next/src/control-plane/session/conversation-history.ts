@@ -123,6 +123,9 @@ export function readKilo2MessagesPage(
     .limit(limit + 1)
     .all();
   let consumed: HistoryCursor | undefined;
+  let turnBoundary:
+    | { messageCount: number; cursor: HistoryCursor; omittedItemCount: number }
+    | undefined;
   let more = rows.length > limit;
   for (const row of rows.slice(0, limit)) {
     const key: HistoryCursor = {
@@ -162,6 +165,18 @@ export function readKilo2MessagesPage(
     const item = displayItem(parsed.data.properties);
     page.messages.push(item);
     bytes += size(item) + 1;
+    if (preview && (item.message.type === 'user' || item.message.type === 'synthetic')) {
+      turnBoundary = {
+        messageCount: page.messages.length,
+        cursor: key,
+        omittedItemCount: page.omittedItemCount,
+      };
+    }
+  }
+  if (more && turnBoundary) {
+    page.messages.length = turnBoundary.messageCount;
+    consumed = turnBoundary.cursor;
+    page.omittedItemCount = turnBoundary.omittedItemCount;
   }
   if (more && consumed) page.nextCursor = encodeCursor(consumed);
   page.messages.reverse();

@@ -122,7 +122,7 @@ describe('fetchWebCloudSessionSnapshotPage', () => {
     await fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, { cursor: 'older' });
     expect(fixture.personal).toHaveBeenNthCalledWith(
       1,
-      { sessionId, toolDisplay: 'preview', limit: 20 },
+      { sessionId, toolDisplay: 'preview', limit: 100 },
       unbatched
     );
     expect(fixture.personal).toHaveBeenNthCalledWith(
@@ -135,7 +135,7 @@ describe('fetchWebCloudSessionSnapshotPage', () => {
   });
 
   it.each([undefined, 'org-1'])(
-    'requests 20 initial messages for scope %s',
+    'requests 100 initial preview messages for scope %s',
     async organizationId => {
       const fixture = client();
       await fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, { organizationId });
@@ -145,7 +145,7 @@ describe('fetchWebCloudSessionSnapshotPage', () => {
           {
             sessionId,
             toolDisplay: 'preview',
-            limit: 20,
+            limit: 100,
             ...(organizationId ? { organizationId } : {}),
           },
           unbatched,
@@ -209,7 +209,7 @@ describe('fetchWebCloudSessionSnapshotPage', () => {
   });
 
   it.each([undefined, 'org-1'])(
-    'requests 20 initial child messages without changing scope %s',
+    'requests 100 initial child preview messages without changing scope %s',
     async organizationId => {
       const fixture = client();
       const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
@@ -229,7 +229,7 @@ describe('fetchWebCloudSessionSnapshotPage', () => {
             sessionId,
             toolDisplay: 'preview',
             kiloSessionId: childId,
-            limit: 20,
+            limit: 100,
             ...(organizationId ? { organizationId } : {}),
           },
           unbatched,

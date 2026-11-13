@@ -11351,7 +11351,48 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(250);
     });
 
-    it('restores the OLDEST popped cursor when two pages drop in one pass', async () => {
+    it('keeps a contiguous recent window when only one of several older pages is trimmed', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async (_id, options) => {
+        const pages: Record<string, { prefix: string; count: number; nextCursor: string | null }> =
+          {
+            start: { prefix: 'init', count: 100, nextCursor: 'cursor-A' },
+            'cursor-A': { prefix: 'olderA', count: 50, nextCursor: 'cursor-B' },
+            'cursor-B': { prefix: 'olderB', count: 50, nextCursor: 'cursor-C' },
+            'cursor-C': { prefix: 'olderC', count: 50, nextCursor: null },
+          };
+        const page = pages[options.cursor ?? 'start'];
+        if (!page) throw new Error('Unexpected history cursor');
+        return makePage({
+          kiloSessionId: 'ses-1',
+          messages: makeMessages(page.prefix, page.count),
+          nextCursor: page.nextCursor,
+        });
+      });
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.loadOlderMessages();
+      await mgr.loadOlderMessages();
+      await mgr.loadOlderMessages();
+
+      mgr.trimRetainedHistory();
+
+      const retained = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(
+        message => message.info.id
+      );
+      expect(retained).toHaveLength(200);
+      expect(retained).toContain('olderA-0');
+      expect(retained).toContain('olderB-0');
+      expect(retained).not.toContain('olderC-0');
+      await mgr.loadOlderMessages();
+      expect(fetchSnapshotPage).toHaveBeenLastCalledWith(
+        kiloId('ses-1'),
+        expect.objectContaining({ cursor: 'cursor-C' })
+      );
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(250);
+    });
+
+    it('restores the continuation immediately before all trimmed pages', async () => {
       const calls: Array<{ cursor?: string }> = [];
       const fetchSnapshotPage = createPageFetchMock(async (_id, options) => {
         calls.push({ ...options });
@@ -11394,8 +11435,6 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
 
       calls.length = 0;
       await mgr.loadOlderMessages();
-      // Re-fetch starts from the OLDEST dropped page's cursor, so the oldest
-      // page (oldA) comes back, not the newer dropped page (oldB).
       expect(calls[calls.length - 1]).toEqual({ cursor: 'cursor-A' });
       const ids = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(
         m => m.info.id

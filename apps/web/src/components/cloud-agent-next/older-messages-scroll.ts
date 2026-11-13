@@ -198,7 +198,9 @@ export function useOlderMessagesPagination({
   const inFlightRef = useRef(false);
   const pendingPositionRef = useRef<PrependScrollPosition | null>(null);
   const requestedContentHeightRef = useRef(0);
+  const requestedOverflowCheckKeyRef = useRef(overflowCheckKey);
   const stalledContentHeightRef = useRef<number | null>(null);
+  const stalledOverflowCheckKeyRef = useRef(overflowCheckKey);
   const wasLoadingRef = useRef(isLoadingOlderMessages);
   const restoreFrameRef = useRef(0);
   const captureFrameRef = useRef<number | null>(null);
@@ -232,6 +234,7 @@ export function useOlderMessagesPagination({
     if (el) {
       pendingPositionRef.current = capturePrependScrollPosition(el);
       requestedContentHeightRef.current = (scrollContentRef?.current ?? el).scrollHeight;
+      requestedOverflowCheckKeyRef.current = overflowCheckKey;
     }
     inFlightRef.current = true;
     void Promise.resolve(onLoad()).finally(() => {
@@ -244,6 +247,7 @@ export function useOlderMessagesPagination({
     isLoadingOlderMessages,
     olderMessagesError,
     onLoad,
+    overflowCheckKey,
     ready,
     scrollContentRef,
     scrollElementRef,
@@ -258,7 +262,8 @@ export function useOlderMessagesPagination({
       el &&
       canAutoloadOlderMessages(el) &&
       el.scrollTop < OLDER_MESSAGES_NEAR_TOP_PX &&
-      (scrollContentRef?.current ?? el).scrollHeight !== stalledContentHeightRef.current
+      ((scrollContentRef?.current ?? el).scrollHeight !== stalledContentHeightRef.current ||
+        !Object.is(overflowCheckKey, stalledOverflowCheckKeyRef.current))
     ) {
       requestOlderMessages();
     }
@@ -267,6 +272,7 @@ export function useOlderMessagesPagination({
     initialPositionedRef,
     isProgrammaticScrollRef,
     olderMessagesError,
+    overflowCheckKey,
     ready,
     requestOlderMessages,
     scrollContentRef,
@@ -297,6 +303,7 @@ export function useOlderMessagesPagination({
       const completedContentHeight = (scrollContentRef?.current ?? el).scrollHeight;
       stalledContentHeightRef.current =
         completedContentHeight <= requestedContentHeight ? completedContentHeight : null;
+      stalledOverflowCheckKeyRef.current = requestedOverflowCheckKeyRef.current;
       isProgrammaticScrollRef.current = false;
       tryAutoloadOlderMessages();
     });

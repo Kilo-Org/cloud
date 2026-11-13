@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, matchesGlob } from 'node:path';
+import { dirname, join, matchesGlob } from 'node:path';
 import test from 'node:test';
 
 import { load } from 'js-yaml';
@@ -228,6 +228,16 @@ test('mobile change detection pins the root workflow path family', () => {
 const lintOnlyCondition =
   "needs.mobile-changes.outputs.mobile == 'true' && needs.mobile-changes.outputs.lint_only != 'true'";
 
+// Reads the `key=value` lines GitHub collects from a step's `$GITHUB_OUTPUT`.
+function readDetectOutput(output) {
+  return Object.fromEntries(
+    readFileSync(output, 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map(line => line.split('='))
+  );
+}
+
 // Runs the detector's own shell against fixture change sets. `git` answers the
 // diffs and `node` answers the workspace selection, so the assertions read the
 // outputs GitHub receives instead of a paraphrase of the step.
@@ -280,12 +290,59 @@ function runDetect(files, { base = 'resolved' } = {}) {
         },
       }
     );
-    return Object.fromEntries(
-      readFileSync(output, 'utf8')
-        .split('\n')
-        .filter(Boolean)
-        .map(line => line.split('='))
+    return readDetectOutput(output);
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+// A stub `git` answers a fixed file list, so it cannot show how git reports a
+// rename. This harness commits `baseFiles` in a real repository, tags that
+// commit `fixture` (the literal every `${{ ... }}` is replaced with), applies
+// the `change` callback as a second commit, and runs the same detector shell
+// with the real git on PATH.
+function runDetectInRepo(baseFiles, change) {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-app-detect-repo-'));
+  try {
+    const repo = join(work, 'repo');
+    mkdirSync(repo);
+    const git = args => execFileSync('git', args, { cwd: repo, encoding: 'utf8' });
+    const write = path => {
+      mkdirSync(join(repo, dirname(path)), { recursive: true });
+      writeFileSync(join(repo, path), '// fixture\n');
+    };
+    git(['init', '--quiet', '--initial-branch=main']);
+    git(['config', 'user.email', 'fixture@example.invalid']);
+    git(['config', 'user.name', 'fixture']);
+    for (const path of baseFiles) write(path);
+    git(['add', '--all']);
+    git(['commit', '--quiet', '--message', 'base']);
+    git(['tag', 'fixture']);
+    change({ git, write });
+    git(['add', '--all']);
+    git(['commit', '--quiet', '--message', 'change']);
+    const bin = join(work, 'bin');
+    mkdirSync(bin);
+    writeFileSync(
+      join(bin, 'node'),
+      '#!/bin/sh\necho \'{"full":false,"packages":[],"test_only_packages":[]}\'\n',
+      { mode: 0o755 }
     );
+    const output = join(work, 'output');
+    writeFileSync(output, '');
+    const detect = readWorkflows()[1].jobs['mobile-changes'].steps.find(
+      step => step.id === 'detect'
+    );
+    execFileSync(
+      'bash',
+      ['-e', '-o', 'pipefail', '-c', detect.run.replace(/\$\{\{[^}]*\}\}/g, 'fixture')],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, GITHUB_OUTPUT: output },
+      }
+    );
+    return readDetectOutput(output);
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
@@ -329,6 +386,28 @@ test('mobile change detection runs the suite when the base commit is unknown', (
     mobile: 'true',
     lint_only: 'false',
   });
+});
+
+// Rename detection reports only the destination, so a move out of an app path
+// into tools/oxlint would list one path, read as lint-only, and stand the
+// shards and the typecheck down after an app source file was removed. The step
+// diffs with `--no-renames`, which lists the deleted path as well.
+test('mobile change detection keeps a move out of an app path out of lint-only', () => {
+  assert.deepEqual(
+    runDetectInRepo(['apps/mobile/src/gone.ts', 'tools/oxlint/plugin/index.ts'], ({ git }) => {
+      git(['mv', 'apps/mobile/src/gone.ts', 'tools/oxlint/plugin/moved.ts']);
+    }),
+    { mobile: 'true', lint_only: 'false' }
+  );
+});
+
+test('mobile change detection stays lint-only for a rename inside tools/oxlint', () => {
+  assert.deepEqual(
+    runDetectInRepo(['tools/oxlint/plugin/index.ts'], ({ git }) => {
+      git(['mv', 'tools/oxlint/plugin/index.ts', 'tools/oxlint/plugin/entry.ts']);
+    }),
+    { mobile: 'true', lint_only: 'true' }
+  );
 });
 
 test('only the shards and the typecheck skip a lint-only change', () => {

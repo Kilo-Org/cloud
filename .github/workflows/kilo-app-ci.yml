@@ -107,7 +107,13 @@ jobs:
             echo "lint_only=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          changed=$(git diff --name-only "$base" HEAD)
+          # Rename detection reports only the destination of a rename, so a
+          # move out of an app path into tools/oxlint would list only the
+          # destination and read as lint-only, skipping the suite after app
+          # code was removed. `--no-renames` lists both sides, so such a move
+          # keeps `lint_only=false`, while a rename between two tools/oxlint
+          # paths stays lint-only.
+          changed=$(git diff --name-only --no-renames "$base" HEAD)
           # Lint-only: the whole changed-path set is under tools/oxlint, so no
           # type program or test reads this commit. Derived from the complete
           # list, never from a second any-match grep: a change that also carries

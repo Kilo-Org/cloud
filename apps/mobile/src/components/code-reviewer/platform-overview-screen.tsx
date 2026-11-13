@@ -335,6 +335,21 @@ export function PlatformOverviewScreen({
                 />
               )}
 
+              {/* Bot detection relies on GitHub's authoritative user type, which
+                  GitLab and Bitbucket webhooks do not provide, so this setting
+                  exists on GitHub only (same gate as the web form). */}
+              {capabilities.skipBotPullRequests && (
+                <ToggleRow
+                  title={t('codeReviewer.skipBotPullRequests.title')}
+                  subtitle={t('codeReviewer.skipBotPullRequests.subtitle')}
+                  value={data.skipBotPullRequests}
+                  disabled={!canEdit || save.isPending}
+                  onValueChange={value => {
+                    save.mutate({ skipBotPullRequests: value });
+                  }}
+                />
+              )}
+
               {!canEdit && (
                 <Text className="text-center text-xs text-muted-foreground">
                   {t('securityAgent.sla.permissionNote')}

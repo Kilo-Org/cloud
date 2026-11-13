@@ -26,6 +26,7 @@ export const PLATFORM_CAPABILITIES = {
     gateRow: true,
     reviewMd: true,
     manualReview: true,
+    skipBotPullRequests: true,
     label: 'GitHub',
   },
   gitlab: {
@@ -34,6 +35,7 @@ export const PLATFORM_CAPABILITIES = {
     gateRow: true,
     reviewMd: true,
     manualReview: true,
+    skipBotPullRequests: false,
     label: 'GitLab',
   },
   bitbucket: {
@@ -42,6 +44,7 @@ export const PLATFORM_CAPABILITIES = {
     gateRow: false,
     reviewMd: false,
     manualReview: false,
+    skipBotPullRequests: false,
     label: 'Bitbucket',
   },
 } satisfies Record<
@@ -52,6 +55,7 @@ export const PLATFORM_CAPABILITIES = {
     gateRow: boolean;
     reviewMd: boolean;
     manualReview: boolean;
+    skipBotPullRequests: boolean;
     label: string;
   }
 >;

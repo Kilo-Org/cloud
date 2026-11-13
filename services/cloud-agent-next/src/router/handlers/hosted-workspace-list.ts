@@ -7,12 +7,17 @@ import {
 import { z } from 'zod';
 import { protectedProcedure } from '../auth.js';
 import { hostedSessionSummarySchema } from './hosted-session-list.js';
+import {
+  readWorkspacePullRequestSummaries,
+  workspacePullRequestSummarySchema,
+  type WorkspacePullRequestSummary,
+} from '../../session/workspace-pull-request.js';
 
 const hostedWorkspaceSessionSummarySchema = hostedSessionSummarySchema.extend({
   workspaceId: cloudAgentWorktreeIdSchema,
 });
 
-const hostedWorkspaceSummarySchema = z
+export const hostedWorkspaceSummarySchema = z
   .object({
     workspaceId: cloudAgentWorktreeIdSchema,
     userId: z.string().min(1),
@@ -22,6 +27,7 @@ const hostedWorkspaceSummarySchema = z
     gitUrl: z.string().max(2048).nullable(),
     gitBranch: z.string().max(512).nullable(),
     profileId: z.string().nullable(),
+    pullRequest: workspacePullRequestSummarySchema.nullable(),
     deletionState: z.enum(['active', 'deleting', 'deleted']),
     created: z.number().int().nonnegative(),
     updated: z.number().int().nonnegative(),
@@ -80,8 +86,17 @@ export const listHostedWorkspaces = protectedProcedure
       kiloUserId: ctx.userId,
       ...input,
     });
+    const pullRequests = await readWorkspacePullRequestSummaries(ctx.env, {
+      userId: ctx.userId,
+      workspaces: page.items.map(workspace => ({
+        workspaceId: workspace.workspaceId,
+        organizationId: workspace.organizationId,
+      })),
+    });
     return {
-      items: page.items.map(workspace => projectWorkspace(workspace, ctx.userId)),
+      items: page.items.map(workspace =>
+        projectWorkspace(workspace, ctx.userId, pullRequests.get(workspace.workspaceId) ?? null)
+      ),
       nextCursor: page.nextCursor,
     };
   });
@@ -95,13 +110,24 @@ export const getHostedWorkspace = protectedProcedure
       ...input,
     });
     if (!workspace) return null;
-    return projectWorkspace(workspace, ctx.userId);
+    const pullRequests = await readWorkspacePullRequestSummaries(ctx.env, {
+      userId: ctx.userId,
+      workspaces: [
+        { workspaceId: workspace.workspaceId, organizationId: workspace.organizationId },
+      ],
+    });
+    return projectWorkspace(workspace, ctx.userId, pullRequests.get(workspace.workspaceId) ?? null);
   });
 
-function projectWorkspace(workspace: CloudAgentWorkspaceSummary, userId: string) {
+function projectWorkspace(
+  workspace: CloudAgentWorkspaceSummary,
+  userId: string,
+  pullRequest: WorkspacePullRequestSummary | null
+) {
   return {
     ...workspace,
     userId,
+    pullRequest,
     sessions: workspace.sessions.map(session => ({
       ...session,
       workspaceId: cloudAgentWorktreeIdSchema.parse(session.workspaceId),

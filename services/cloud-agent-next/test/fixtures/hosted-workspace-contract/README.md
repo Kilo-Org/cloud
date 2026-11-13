@@ -1,4 +1,4 @@
-# Hosted workspace contract fixture (v2)
+# Hosted workspace contract fixture (v3)
 
 Versioned request/response examples, procedure list, status enums and stable
 error codes for the Cloud workspace-first surface an Agent Manager Session Host
@@ -7,7 +7,7 @@ consumes.
 | Procedure | Kind | Purpose |
 |---|---|---|
 | `listHostedWorkspaces` | query | Owner-scoped workspace catalog |
-| `getHostedWorkspace` | query | One workspace with its root sessions |
+| `getHostedWorkspace` | query | One workspace with its root sessions and passive PR summary |
 | `getHostedWorkspaceStatus` | query | Passive compute/activity/wake/billing/deletion projection |
 | `createHostedWorkspace` | mutation | Create a workspace and its first root |
 | `createHostedWorkspaceSession` | mutation | Add a root session to an existing workspace |
@@ -15,6 +15,7 @@ consumes.
 | `setHostedWorkspacePersonalDefaultProfile` | mutation | Set the caller's personal default profile |
 | `clearHostedWorkspacePersonalDefaultProfile` | mutation | Clear the caller's personal default profile |
 | `deleteHostedWorkspaceSession` | mutation | Delete one non-final root session |
+| `refreshHostedWorkspacePullRequest` | mutation | Explicit workspace-scoped PR refresh through the verified-link/throttle path |
 | `deleteWorktree` | mutation | Destructively delete the workspace and every remaining root |
 
 ## Versioning
@@ -22,9 +23,13 @@ consumes.
 - `v1.json` is the released contract. It is **append-only**: never change an
   example, field list, enum or error code in place, because a provider pinned to
   v1 would silently change behavior.
-- `v2.json` is the current contract. It adds the hosted workspace profile
-  listing and personal-default mutations while retaining every v1 procedure and
-  shape.
+- `v2.json` added the hosted workspace profile listing and personal-default
+  mutations while retaining every v1 procedure and shape. It remains frozen.
+- `v3.json` is the current contract. It adds the nullable workspace-level
+  `pullRequest` projection to list/get and the explicit
+  `refreshHostedWorkspacePullRequest` mutation. The PR summary carries its own
+  availability/partial flags; `null` means no verified PR, and a failed refresh
+  is reported separately so it is not confused with `no_pr`.
 - Further breaking or additive contract changes create a new fixture plus a new
   `contractVersion`, and the README documents the difference.
 - `test/unit/hosted-workspace-contract-fixture.test.ts` fails when a fixture

@@ -586,7 +586,10 @@ describe('cliSessionsV2.refreshAssociatedPullRequest', () => {
       retryAt: RETRY_AT,
     });
 
-    await expect(refresh()).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
+    await expect(refresh()).rejects.toMatchObject({
+      code: 'TOO_MANY_REQUESTS',
+      cause: { reason: 'throttled', retryAt: RETRY_AT.toISOString() },
+    });
 
     expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
       expect.objectContaining({ user }),
@@ -616,12 +619,27 @@ describe('cliSessionsV2.refreshAssociatedPullRequest', () => {
       retryAt: RETRY_AT,
     });
 
-    await expect(refresh()).rejects.toMatchObject({ code });
+    await expect(refresh()).rejects.toMatchObject({
+      code,
+      cause: { reason, retryAt: RETRY_AT.toISOString() },
+    });
 
     expect(mockFetchPullRequestByNumber).not.toHaveBeenCalled();
     expect(mockFetchPullRequestObservations).not.toHaveBeenCalled();
     expect(mockInsert).not.toHaveBeenCalled();
     expect(mockDeferPrRefresh).not.toHaveBeenCalled();
+  });
+
+  it('tags a missing GitHub integration with a structured reason', async () => {
+    mockLimit.mockResolvedValueOnce([
+      makeCachedRow({ session: { pr_link_verified_at: VERIFIED_AT } }),
+    ]);
+    mockGetIntegrationForOwner.mockResolvedValueOnce(null);
+
+    await expect(refresh()).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      cause: { reason: 'no_integration' },
+    });
   });
 
   it('does not claim the budget when the session has no usable PR link', async () => {

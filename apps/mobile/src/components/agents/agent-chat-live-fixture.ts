@@ -223,6 +223,7 @@ export function createAgentChatFixtureManager(
     switchSession: async () => undefined,
     hydrateChildSession: async () => undefined,
     loadOlderChildMessages: async () => undefined,
+    noteSpawnedSession: () => undefined,
     loadOlderMessages: async () => undefined,
     trimRetainedHistory: () => undefined,
     updateFetchedAssociatedPr: () => undefined,

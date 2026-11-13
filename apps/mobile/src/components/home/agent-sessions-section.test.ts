@@ -301,11 +301,11 @@ describe('Home live section', () => {
     (node('SectionHeader').props.onActionPress as () => void)();
     // An empty params object is what clears a lingering status filter.
     expect(navigateSpy).toHaveBeenCalledWith({
-      pathname: '/(app)/(tabs)/(2_agents)/',
+      pathname: '/(app)/(tabs)/(2_agents)',
       params: {},
     });
     expect(dismissToSpy).toHaveBeenCalledWith({
-      pathname: '/(app)/(tabs)/(2_agents)/',
+      pathname: '/(app)/(tabs)/(2_agents)',
       params: {},
     });
     expect(navigateSpy.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
@@ -327,11 +327,11 @@ describe('Home live section', () => {
     (row.props.onPress as () => void)();
 
     expect(navigateSpy).toHaveBeenCalledWith({
-      pathname: '/(app)/(tabs)/(2_agents)/',
+      pathname: '/(app)/(tabs)/(2_agents)',
       params: { status: 'idle' },
     });
     expect(dismissToSpy).toHaveBeenCalledWith({
-      pathname: '/(app)/(tabs)/(2_agents)/',
+      pathname: '/(app)/(tabs)/(2_agents)',
       params: { status: 'idle' },
     });
   });

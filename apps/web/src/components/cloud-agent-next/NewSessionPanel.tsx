@@ -208,18 +208,23 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
 
   const allModels = modelsData?.data || [];
 
+  const allModelOptions = useMemo<ModelOption[]>(
+    () =>
+      allModels.map(model => ({
+        id: model.id,
+        name: model.name,
+        isFree: model.isFree,
+        mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
+        hasUserByokAvailable: model.hasUserByokAvailable,
+        variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
+      })),
+    [allModels]
+  );
+
   const modelOptions = useMemo<ModelOption[]>(() => {
-    const options = allModels.map(model => ({
-      id: model.id,
-      name: model.name,
-      isFree: model.isFree,
-      mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
-      hasUserByokAvailable: model.hasUserByokAvailable,
-      variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
-    }));
-    if (!hasLimitedAccess) return options;
-    return options.filter(option => option.isFree || option.hasUserByokAvailable);
-  }, [allModels, hasLimitedAccess]);
+    if (!hasLimitedAccess) return allModelOptions;
+    return allModelOptions.filter(option => option.isFree || option.hasUserByokAvailable);
+  }, [allModelOptions, hasLimitedAccess]);
 
   const [prompt, setPrompt] = useState(() => discardedPrompt ?? '');
   useEffect(() => {
@@ -616,7 +621,9 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     ? selectedCustomAgent?.config.variant?.trim() || undefined
     : undefined;
   const displayModel = agentModelOverride ?? model;
-  const displayModelOption = modelOptions.find(m => m.id === displayModel);
+  // The submitted model drives the label and the start-readiness check, so it
+  // resolves in the full catalog.
+  const displayModelOption = allModelOptions.find(m => m.id === displayModel);
   const displayModelLabel = displayModelOption
     ? formatShortModelDisplayName(displayModelOption.name)
     : displayModel;
@@ -1107,14 +1114,14 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
 
   const isPromptTooLong = prompt.length > CLOUD_AGENT_PROMPT_MAX_LENGTH;
 
-  const selectedModelOption = modelOptions.find(m => m.id === model);
-  // Limited-access users can submit when they've picked a free or BYOK-capable
-  // model from the filtered picker; the server still gates paid models behind
-  // the minimum balance, but the submit button shouldn't pretend otherwise.
+  // Submit readiness follows the submitted model and the composer's catalog
+  // rules, matching what the session creation request sends.
   const limitedAccessModelIsAllowed =
     hasLimitedAccess &&
-    !!selectedModelOption &&
-    (selectedModelOption.isFree || selectedModelOption.hasUserByokAvailable);
+    !!displayModelOption &&
+    (displayModelOption.isFree || displayModelOption.hasUserByokAvailable);
+  const submittedModelNeedsCredits =
+    hasLimitedAccess && displayModel.length > 0 && !limitedAccessModelIsAllowed;
 
   const creationInput = useMemo(() => {
     const trimmed = prompt.trim();
@@ -1163,7 +1170,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     sessionEnvironment.selection.status !== 'loading' &&
     !isPromptTooLong &&
     !publicRepoUrlError &&
-    model.length > 0 &&
+    displayModel.length > 0 &&
     (!stackedTarget ||
       (Boolean(stackedSource) &&
         (stackedSource?.platform === 'git' ? hasPublicRepo : selectedRepo.length > 0))) &&
@@ -1690,6 +1697,14 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
             </Popover>
           </div>
         </div>
+
+        {submittedModelNeedsCredits && (
+          <p className="text-muted-foreground px-1 text-xs" role="status">
+            {hasAgentModelOverride
+              ? `Agent "${selectedCustomAgent?.name}" uses a model that needs credits. Pick another agent or add credits.`
+              : 'This model needs credits. Pick a free model or add credits.'}
+          </p>
+        )}
 
         {/* Session context (outside prompt box): code source left, sandbox setup right */}
         <div className="@container/context flex flex-col gap-1.5">

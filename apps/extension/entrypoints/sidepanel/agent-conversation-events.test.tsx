@@ -5,7 +5,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/react';
 import {
   AgentConversationItemView,
-  canRetryError,
   retryStartEvents,
   withRetryOnlyOnLatestError,
 } from './agent-conversation-events';
@@ -540,18 +539,16 @@ describe('error retry scope', () => {
     const error = createConversationErrorEvent({ retry: 'turn', title: 'The server is busy.' });
     const events = [earlierUser, earlierAnswer, user, partial, error];
 
-    expect(canRetryError(events, error.id)).toBe(true);
     expect(retryStartEvents(events, error.id)).toStrictEqual([earlierUser, earlierAnswer, user]);
   });
 
-  it('stops retrying an error a later user message superseded', () => {
+  it('refuses to retry an error a later user message superseded', () => {
     const error = createConversationErrorEvent({ retry: 'turn', title: 'The server is busy.' });
     const first = createUserMessage('first question');
     const second = createUserMessage('second question');
     const events = [first, error, second];
 
-    expect(canRetryError(events, error.id)).toBe(false);
-    expect(retryStartEvents(events, error.id)).toStrictEqual([first]);
+    expect(retryStartEvents(events, error.id)).toBeUndefined();
   });
 
   it('drops the retry affordance only from an error the transcript moved past', () => {

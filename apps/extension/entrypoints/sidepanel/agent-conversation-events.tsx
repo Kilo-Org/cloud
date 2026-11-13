@@ -399,33 +399,21 @@ const StandaloneToolEvent = ({
 };
 
 /**
- * The user message a retry re-sends: the last one before the error being
- * retried. A newer user message means a later turn started, so that error is
- * no longer the transcript's outcome.
+ * The events a retry re-sends: everything up to the last user message before
+ * the error. Returns undefined when the error is gone or a later user message
+ * started a newer turn, so a retry can never drop that turn.
  */
-export const canRetryError = (
-  events: readonly AgentConversationEvent[],
-  errorEventId: string
-): boolean => {
-  const errorIndex = events.findIndex(event => event.type === 'error' && event.id === errorEventId);
-
-  if (errorIndex === -1) {
-    return false;
-  }
-
-  return !events
-    .slice(errorIndex + 1)
-    .some(event => event.type === 'message' && event.role === 'user');
-};
-
 export const retryStartEvents = (
   events: readonly AgentConversationEvent[],
   errorEventId: string
-): AgentConversationEvent[] => {
+): AgentConversationEvent[] | undefined => {
   const errorIndex = events.findIndex(event => event.type === 'error' && event.id === errorEventId);
 
-  if (errorIndex === -1) {
-    return [...events];
+  if (
+    errorIndex === -1 ||
+    events.slice(errorIndex + 1).some(event => event.type === 'message' && event.role === 'user')
+  ) {
+    return undefined;
   }
 
   const userIndex = events

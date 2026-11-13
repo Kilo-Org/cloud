@@ -75,11 +75,7 @@ import { evalInTab, getTabUrl, navigateTab } from './agent-workflow-runtime';
 import { AUTO_COMPACT_RATIO, getContextRatio } from '@/src/shared/context-usage';
 import { addSessionCost } from '@/src/shared/session-cost';
 import { getActiveTabId, useTabDebugger } from './use-tab-debugger';
-import {
-  canRetryError,
-  retryStartEvents,
-  withRetryOnlyOnLatestError,
-} from './agent-conversation-events';
+import { retryStartEvents, withRetryOnlyOnLatestError } from './agent-conversation-events';
 import { ConversationList } from './conversation-list';
 import { ConversationTabs } from './conversation-tabs';
 import { MessageComposer } from './message-composer';
@@ -950,11 +946,11 @@ export const AgentChatPanel = ({
       return;
     }
 
-    if (!canRetryError(conversation.events, errorEventId)) {
+    const retryEvents = retryStartEvents(conversation.events, errorEventId);
+
+    if (retryEvents === undefined) {
       return;
     }
-
-    const retryEvents = retryStartEvents(conversation.events, errorEventId);
 
     setConversationStore(currentStore =>
       updateStoredConversationEvents(currentStore, conversationId, () => retryEvents)

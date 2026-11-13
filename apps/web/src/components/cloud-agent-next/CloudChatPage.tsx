@@ -65,6 +65,7 @@ import { useLocalComposer } from './local-sessions/use-local-composer';
 import { TranscriptStatusSlot } from './TranscriptStatusSlot';
 import { ComposerContextLine } from './ComposerContextLine';
 import { CurrentTaskList } from './CurrentTaskList';
+import { SessionBackgroundActivityStrip } from './BackgroundActivityStrip';
 import { getCurrentTodos } from './current-todos';
 import { useCloudThreadScroll } from './assistant-ui/use-cloud-thread-scroll';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
@@ -1853,6 +1854,13 @@ export default function CloudChatPage({
                           </div>
 
                           <div hidden={!chatTabActive} className={chatTabActive ? '' : 'hidden'}>
+                            {transcriptPhase !== 'opening' && (
+                              <div className="px-[max(1rem,calc(50%_-_27rem))]">
+                                <SessionBackgroundActivityStrip
+                                  onOpenChildSession={handleOpenTopLevelChildSession}
+                                />
+                              </div>
+                            )}
                             {isReadOnly &&
                               (!isLoading &&
                               sessionIdFromParams &&

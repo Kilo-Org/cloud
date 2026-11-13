@@ -115,6 +115,8 @@ export function createConversationSourceReader() {
     const parsed = kilo2ConversationEventSchema.safeParse(properties);
     if (!parsed.success) return [];
     const event = parsed.data.event;
+    if (/^session\.(shell\.|synthetic$|tool\.|execution\.)|^(form\.|permission\.)/.test(event.type))
+      return [{ type: 'background.invalidated' }];
     const kind = event.type.startsWith('session.text.')
       ? 'text'
       : event.type.startsWith('session.reasoning.')

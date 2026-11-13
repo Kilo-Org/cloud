@@ -284,7 +284,7 @@ export const cloudSessionMessagesPageSchema = cloudSessionMessagesPageWireSchema
         if (!display) {
           // A compaction still in progress is shown once it completes; any
           // other message the projection cannot show is an omitted item.
-          if (parsed.data.type !== 'compaction') omittedItemCount++;
+          if (parsed.data.type !== 'compaction' && parsed.data.type !== 'shell') omittedItemCount++;
           continue;
         }
         if (display.info.role === 'assistant' && item.parentID !== undefined)

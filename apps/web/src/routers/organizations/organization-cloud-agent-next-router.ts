@@ -1340,6 +1340,30 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       });
     }),
 
+  getBackgroundActivity: organizationMemberProcedure
+    .input(
+      z
+        .object({
+          cloudAgentSessionId: z.string().regex(/^workspace_[\w-]+$/),
+          organizationId: z.string().uuid(),
+        })
+        .strict()
+    )
+    .output(backgroundActivityInventorySchema)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      const token = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      return createCloudAgentNextClient(token).getBackgroundActivity(input.cloudAgentSessionId);
+    }),
+
   /** Complete stored details for an expanded tool preview; authorized on every read. */
   getSessionToolPartDetail: organizationMemberProcedure
     .input(GetSessionToolPartDetailInput)
@@ -1574,3 +1598,4 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       })
     ),
 });
+import { backgroundActivityInventorySchema } from '@kilocode/session-ingest-contracts';

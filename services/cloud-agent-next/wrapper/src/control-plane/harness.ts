@@ -8,6 +8,7 @@ import type { CondenseResult } from '../condense-on-complete.js';
 import type { SessionObservation } from './session-supervisor.js';
 import type { RestoreRoots } from '../restore-roots.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
+import type { BackgroundActivityInventory } from '@kilocode/session-ingest-contracts';
 
 export type HarnessSession = { sessionId: string; directory: string; signal?: AbortSignal };
 export type HarnessPrompt = HarnessSession & {
@@ -62,6 +63,11 @@ export type HarnessReads = Pick<
   | 'getQuestions'
   | 'getPermissions'
 > & {
+  getBackgroundActivity?: (
+    sessionId: string,
+    directory: string,
+    signal: AbortSignal
+  ) => Promise<BackgroundActivityInventory>;
   /** Kilo v1 message rows. Other harnesses keep native messages in Cloud history. */
   getRecentSessionMessages?: WrapperKiloClient['getRecentSessionMessages'];
 };

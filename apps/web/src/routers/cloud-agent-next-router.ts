@@ -959,6 +959,15 @@ export const cloudAgentNextRouter = createTRPCRouter({
       return createCloudAgentNextClient(authToken).getSessionMessagesPage(input);
     }),
 
+  getBackgroundActivity: baseProcedure
+    .input(z.object({ cloudAgentSessionId: z.string().regex(/^workspace_[\w-]+$/) }).strict())
+    .output(backgroundActivityInventorySchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      const token = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      return createCloudAgentNextClient(token).getBackgroundActivity(input.cloudAgentSessionId);
+    }),
+
   /** Complete stored details for an expanded tool preview; authorized on every read. */
   getSessionToolPartDetail: baseProcedure
     .input(baseGetSessionToolPartDetailNextSchema)
@@ -1118,3 +1127,4 @@ export const cloudAgentNextRouter = createTRPCRouter({
       })
     ),
 });
+import { backgroundActivityInventorySchema } from '@kilocode/session-ingest-contracts';

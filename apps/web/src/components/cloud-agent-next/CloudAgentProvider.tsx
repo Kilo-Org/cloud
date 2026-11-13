@@ -32,6 +32,7 @@ import { MarkdownParseCacheProvider } from './markdown-parse-cache';
 import { createWebSessionTranscriptCache, transcriptCacheScope } from './session-transcript-cache';
 import { createWebSessionResolver } from './session-resolver';
 import { dbSessionsAtom } from './store/db-session-atoms';
+import { serializeBackgroundActivityReads } from '@kilocode/cloud-agent-sdk/background-activity';
 
 const ManagerContext = createContext<SessionManager | null>(null);
 const UserWebConnectionContext = createContext<UserWebConnection | null>(null);
@@ -259,6 +260,26 @@ export function CloudAgentProvider({ children, userId, organizationId }: CloudAg
       lifecycleHooks: createBrowserLifecycleHooks(),
 
       api: {
+        getBackgroundActivity: serializeBackgroundActivityReads(({ sessionId }) =>
+          queryClient.fetchQuery({
+            queryKey: ['cloud-background-activity', userId, organizationId ?? null, sessionId],
+            queryFn: ({ signal }) => {
+              const deadline = AbortSignal.any([signal, AbortSignal.timeout(30_000)]);
+              return organizationId
+                ? trpcClient.organizations.cloudAgentNext.getBackgroundActivity.query(
+                    { cloudAgentSessionId: sessionId, organizationId },
+                    { signal: deadline }
+                  )
+                : trpcClient.cloudAgentNext.getBackgroundActivity.query(
+                    { cloudAgentSessionId: sessionId },
+                    { signal: deadline }
+                  );
+            },
+            staleTime: 0,
+            gcTime: 0,
+            retry: false,
+          })
+        ),
         send,
 
         interrupt: async payload => {

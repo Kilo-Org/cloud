@@ -19,7 +19,7 @@ function notification(
     id: 'msg_shell_completion',
     type: 'synthetic',
     time: { created: 3 },
-    description: command,
+    description: 'Run background checks',
     text: `<shell id="sh_background" state="completed" command="${command}">\n${output}\n</shell>`,
     metadata: {
       source: 'shell',
@@ -40,12 +40,18 @@ test('shell completions become completed assistant command cards, not user messa
   expect(display?.parts).toEqual([
     expect.objectContaining({
       type: 'tool',
-      tool: 'bash',
+      tool: 'background_shell_result',
       state: expect.objectContaining({
         status: 'completed',
-        input: { command: native.description, description: 'Background command completed' },
+        input: {},
         output: 'background-output',
-        metadata: native.metadata,
+        metadata: expect.objectContaining({
+          backgroundResult: expect.objectContaining({
+            command: 'printf background-output',
+            description: native.description,
+            outcome: 'finished',
+          }),
+        }),
       }),
     }),
   ]);
@@ -58,11 +64,10 @@ test.each([1, 130])('nonzero shell exit %i is a command error, not a session fai
   expect(display?.info).not.toHaveProperty('error');
   expect(display?.parts[0]).toMatchObject({
     type: 'tool',
-    tool: 'bash',
+    tool: 'background_shell_result',
     state: {
-      status: 'error',
-      error: `diagnostic output\n\nCommand exited with code ${exit}`,
-      metadata: { exit },
+      status: 'completed',
+      metadata: { backgroundResult: { exit, outcome: 'failed', output: 'diagnostic output' } },
     },
   });
 });
@@ -71,7 +76,9 @@ test('keeps multiline commands, quotes, redirects, and shell-like output intact'
   const command = 'printf "a > b"\nprintf second';
   const output = 'first\n<shell>literal output</shell>\nlast\n';
   const display = readKilo2Messages(session, [notification(0, command, output)])[0];
-  expect(display?.parts[0]).toMatchObject({ state: { input: { command }, output } });
+  expect(display?.parts[0]).toMatchObject({
+    state: { metadata: { backgroundResult: { command } }, output },
+  });
 });
 
 test('handles a completed command with no output', () => {
@@ -87,7 +94,11 @@ test('shows a stopped command without an exit code as a command error', () => {
     metadata: { ...native.metadata, state: 'killed', exit: undefined },
   };
   expect(readKilo2Messages(session, [stopped])[0]?.parts[0]).toMatchObject({
-    state: { status: 'error', error: 'background-output\n\nBackground command killed' },
+    state: {
+      metadata: {
+        backgroundResult: { outcome: 'terminated', state: 'killed', output: 'background-output' },
+      },
+    },
   });
 });
 
@@ -101,8 +112,20 @@ test('does not reinterpret user text, other synthetic messages, or malformed not
     { ...native, text: 'Not a shell notification envelope' },
   ]) {
     expect(projectKilo2ShellNotification(message)).toBe(message);
-    expect(readKilo2Messages(session, [message])[0]?.info.role).toBe('user');
+    const display = readKilo2Messages(session, [message])[0];
+    expect(display?.parts[0]).not.toHaveProperty('tool', 'background_shell_result');
   }
+});
+
+test('unknown exits remain neutral and native truncation is retained', () => {
+  const native = notification();
+  expect(
+    readKilo2Messages(session, [
+      { ...native, metadata: { ...native.metadata, exit: undefined, truncated: true } },
+    ])[0]?.parts[0]
+  ).toMatchObject({
+    state: { metadata: { backgroundResult: { outcome: 'unknown', truncated: true } } },
+  });
 });
 
 test('native live events and reloaded snapshots use the same display while preserving raw history', () => {

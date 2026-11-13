@@ -210,6 +210,7 @@ type CloudAgentSession = {
   ) => unknown | Promise<unknown>;
   retryRemoteModels: () => void;
   retryRemoteCommands: () => void;
+  retryBackgroundActivity?: () => void;
   observeProjected: (messages: SessionSnapshot['messages']) => void;
   createRemoteSession: (input?: CreateRemoteSessionInput) => Promise<KiloSessionId>;
   exitRemoteSession: () => Promise<void>;
@@ -609,6 +610,9 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     },
     retryRemoteCommands() {
       transport?.retryRemoteCommands?.();
+    },
+    retryBackgroundActivity() {
+      transport?.retryBackgroundActivity?.();
     },
     observeProjected(messages) {
       transport?.observeProjected?.(messages);

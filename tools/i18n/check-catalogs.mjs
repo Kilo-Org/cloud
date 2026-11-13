@@ -376,21 +376,32 @@ function scanCatalogKeys(text) {
 
 /**
  * Parse a catalog and report a key that appears twice in one object. JSON.parse
- * keeps the last duplicate silently, so the raw text is the only witness. A
- * catalog the scan cannot follow is reported once and skipped, so one broken file
- * reads as one problem instead of a stack trace and a cascade of missing keys.
+ * keeps the last duplicate silently, so the raw text is the only witness.
+ *
+ * A catalog this cannot read is reported once and skipped, the way
+ * `check-plurals.mjs` treats a locale it cannot audit: an unbalanced scan or a
+ * file JSON.parse rejects leaves one problem line instead of a stack trace and a
+ * cascade of missing-key findings.
  */
 function parseCatalog(file, label) {
   const text = readFileSync(file, 'utf8');
   const { duplicates, readable } = scanCatalogKeys(text);
   if (!readable) {
-    fail(`${label}: the catalog's strings and braces do not balance, so no key in it can be read`);
+    fail(`${label}: cannot audit catalog: its strings and braces do not balance`);
+    return null;
+  }
+  let catalog;
+  try {
+    catalog = flattenCatalog(JSON.parse(text));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    fail(`${label}: cannot audit catalog: ${message}`);
     return null;
   }
   for (const key of duplicates) {
     fail(`${label}: duplicate key "${key}"`);
   }
-  return JSON.parse(text);
+  return catalog;
 }
 
 /**
@@ -1237,11 +1248,10 @@ export function checkCatalogs(root = ROOT) {
       }
     }
 
-    const englishCatalog = parseCatalog(join(catalog.dir, 'en.json'), `${catalog.name}/en`);
-    if (englishCatalog === null) {
+    const english = parseCatalog(join(catalog.dir, 'en.json'), `${catalog.name}/en`);
+    if (english === null) {
       continue;
     }
-    const english = flattenCatalog(englishCatalog);
     // One scan of this catalog's own source roots serves the usage check, and
     // its destructive-confirm rule for the mobile catalog.
     const source = scanSource(catalog, root);
@@ -1334,11 +1344,10 @@ export function checkCatalogs(root = ROOT) {
         continue;
       }
       const label = `${catalog.name}/${tag}`;
-      const localeCatalog = parseCatalog(join(catalog.dir, `${tag}.json`), label);
-      if (localeCatalog === null) {
+      const translated = parseCatalog(join(catalog.dir, `${tag}.json`), label);
+      if (translated === null) {
         continue;
       }
-      const translated = flattenCatalog(localeCatalog);
       localeValues.set(tag, translated);
       checkAgentEditorCopy(translated, english, label);
       checkPullRequestTerm(translated, label);

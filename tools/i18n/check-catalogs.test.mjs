@@ -331,7 +331,19 @@ test('reports unbalanced English catalog braces once, without a missing-key casc
     source: "t('agents.title');\nt('agents.summary');",
   });
   assert.equal(found.length, 1, found.join('\n'));
-  assert.match(found[0], /strings and braces do not balance/);
+  assert.match(found[0], /cannot audit catalog: its strings and braces do not balance/);
+});
+
+test('reports a balanced catalog JSON rejects in the same one problem line', () => {
+  // The braces match, so only JSON.parse can reject the file; a stack trace here
+  // would hide which catalog is broken.
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/en.json': '{\n  "agents": {\n    "title" "Agents"\n  }\n}\n',
+    },
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(found[0], /^mobile\/en: cannot audit catalog: /);
 });
 
 test('reports an unreadable locale catalog without inventing missing keys', () => {
@@ -349,7 +361,10 @@ test('reports an unreadable locale catalog without inventing missing keys', () =
     },
   });
   assert.equal(found.length, 1, found.join('\n'));
-  assert.match(found[0], /^mobile\/ru: the catalog's strings and braces do not balance/);
+  assert.match(
+    found[0],
+    /^mobile\/ru: cannot audit catalog: its strings and braces do not balance/
+  );
 });
 
 test('ignores a mounted-harness helper while a source file still reports its keys', () => {

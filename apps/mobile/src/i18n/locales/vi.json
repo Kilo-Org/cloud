@@ -885,6 +885,8 @@
       "labels": "Nhãn kích hoạt rà soát hội đồng",
       "labelsPlaceholder": "ví dụ: hội đồng, rà soát chuyên sâu",
       "labelsDescription": "Phân tách các nhãn bằng dấu phẩy. Kho lưu trữ đã bật hội đồng sau đó chỉ chạy hội đồng cho các yêu cầu hợp nhất có ít nhất một trong các nhãn này. Để trống để áp dụng cho mọi yêu cầu hợp nhất đủ điều kiện.",
+      "tooManyLabels": "Có quá nhiều nhãn kích hoạt rà soát hội đồng. Sử dụng tối đa {{maximum}} nhãn.",
+      "labelTooLong": "Nhãn kích hoạt rà soát hội đồng quá dài. Mỗi nhãn không được vượt quá {{maximum}} ký tự.",
       "minSpecialists": "Chọn ít nhất {{minimum}} chuyên gia. Đã chọn {{selected}}.",
       "specialistName": {
         "testCoverage": "Độ bao phủ kiểm thử",

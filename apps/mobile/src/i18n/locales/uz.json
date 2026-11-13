@@ -1427,6 +1427,8 @@
       "labels": "Kengash koʻrib chiqishini ishga tushiruvchi yorliqlar",
       "labelsPlaceholder": "masalan, kengash, chuqur koʻrib chiqish",
       "labelsDescription": "Yorliqlarni vergul bilan ajrating. Kengash yoqilgan repozitoriya kengashni faqat shu yorliqlardan kamida bittasi bor PRlarda ishga tushiradi. Barcha mos keladigan PRlar uchun boʻsh qoldiring.",
+      "tooManyLabels": "Kengash yorliqlari juda koʻp. Koʻpi bilan {{maximum}} ta yorliqdan foydalaning.",
+      "labelTooLong": "Kengash yorligʻi juda uzun. Har bir yorliq {{maximum}} ta belgidan oshmasligi kerak.",
       "minSpecialists": "Kamida {{minimum}} mutaxassis tanlang. {{selected}} tanlandi.",
       "specialistName": {
         "testCoverage": "Test qamrovi",

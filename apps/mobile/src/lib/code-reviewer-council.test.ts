@@ -8,36 +8,48 @@ import {
 
 describe('parseRequiredLabels', () => {
   it('splits on commas, trims each label and drops the empty ones', () => {
-    expect(parseRequiredLabels(' council , deep review ,, ')).toEqual(['council', 'deep review']);
+    expect(parseRequiredLabels(' council , deep review ,, ')).toEqual({
+      ok: true,
+      labels: ['council', 'deep review'],
+    });
   });
 
   it('keeps one label per case-insensitive match, in the casing first written', () => {
-    expect(parseRequiredLabels('Council, council, COUNCIL, release')).toEqual([
-      'Council',
-      'release',
-    ]);
+    expect(parseRequiredLabels('Council, council, COUNCIL, release')).toEqual({
+      ok: true,
+      labels: ['Council', 'release'],
+    });
   });
 
-  it('drops a label longer than the server maximum', () => {
+  it('refuses a draft past the server label count instead of cutting it down', () => {
+    const labels = Array.from({ length: 21 }, (_, index) => `label-${index}`);
+    expect(parseRequiredLabels(labels.join(','))).toEqual({ ok: false, problem: 'tooMany' });
+  });
+
+  it('counts case-insensitive duplicates once against the label count', () => {
+    const labels = Array.from({ length: 20 }, (_, index) => `label-${index}`);
+    const draft = [...labels, ...labels.map(label => label.toUpperCase())];
+    expect(parseRequiredLabels(draft.join(',')).ok).toBe(true);
+  });
+
+  it('keeps a draft at exactly the server label count', () => {
+    const labels = Array.from({ length: 20 }, (_, index) => `label-${index}`);
+    expect(parseRequiredLabels(labels.join(',')).ok).toBe(true);
+  });
+
+  it('refuses a label longer than the server maximum instead of dropping it', () => {
     const tooLong = 'a'.repeat(101);
-    expect(parseRequiredLabels(`ok, ${tooLong}`)).toEqual(['ok']);
+    expect(parseRequiredLabels(`ok, ${tooLong}`)).toEqual({ ok: false, problem: 'tooLong' });
   });
 
   it('keeps a label at exactly the server maximum', () => {
     const atLimit = 'a'.repeat(100);
-    expect(parseRequiredLabels(atLimit)).toEqual([atLimit]);
-  });
-
-  it('stops at the server maximum number of labels', () => {
-    const labels = Array.from({ length: 25 }, (_, index) => `label-${index}`);
-    const parsed = parseRequiredLabels(labels.join(','));
-    expect(parsed).toHaveLength(20);
-    expect(parsed.at(-1)).toBe('label-19');
+    expect(parseRequiredLabels(atLimit)).toEqual({ ok: true, labels: [atLimit] });
   });
 
   it('returns nothing for an empty field', () => {
-    expect(parseRequiredLabels('')).toEqual([]);
-    expect(parseRequiredLabels('   ,  ')).toEqual([]);
+    expect(parseRequiredLabels('')).toEqual({ ok: true, labels: [] });
+    expect(parseRequiredLabels('   ,  ')).toEqual({ ok: true, labels: [] });
   });
 });
 

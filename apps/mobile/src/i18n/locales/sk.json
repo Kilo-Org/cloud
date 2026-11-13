@@ -1475,6 +1475,8 @@
       "labels": "Štítky, ktoré spúšťajú kontrolu rady",
       "labelsPlaceholder": "napr. rada, hĺbková kontrola",
       "labelsDescription": "Štítky oddeľte čiarkami. Repozitár s povolenou radou potom spúšťa radu len pre pull requesty s aspoň jedným z týchto štítkov. Nechajte prázdne pre každý vhodný pull request.",
+      "tooManyLabels": "Príliš veľa štítkov rady. Použite najviac {{maximum}} štítkov.",
+      "labelTooLong": "Štítok rady je príliš dlhý. Každý štítok môže mať najviac {{maximum}} znakov.",
       "minSpecialists": "Vyberte aspoň {{minimum}} špecialistov. Vybraných: {{selected}}.",
       "specialistName": {
         "testCoverage": "Pokrytie testami",

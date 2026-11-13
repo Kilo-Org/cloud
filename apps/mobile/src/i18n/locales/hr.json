@@ -1451,6 +1451,8 @@
       "labels": "Oznake koje pokreću pregled vijeća",
       "labelsPlaceholder": "npr. vijeće, detaljni pregled",
       "labelsDescription": "Odvoji oznake zarezima. Repozitorij s uključenim vijećem tada pokreće vijeće samo za zahtjeve za povlačenje koji nose barem jednu od tih oznaka. Ostavi prazno za svaki podoban zahtjev za povlačenje.",
+      "tooManyLabels": "Previše oznaka za pregled vijeća. Upotrijebi najviše {{maximum}} oznaka.",
+      "labelTooLong": "Oznaka za pregled vijeća je preduga. Svaka oznaka smije imati najviše {{maximum}} znakova.",
       "minSpecialists": "Odaberi barem {{minimum}} stručnjaka. Odabrano: {{selected}}.",
       "specialistName": {
         "testCoverage": "Pokrivenost testovima",

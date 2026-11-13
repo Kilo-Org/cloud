@@ -1427,6 +1427,8 @@
       "labels": "Etikèt ki deklanche revizyon konsèy",
       "labelsPlaceholder": "pa egzanp: konsèy, revizyon apwofondi",
       "labelsDescription": "Separe etikèt yo ak vigil. Yon depo ki aktive revizyon konsèy ap kouri l sèlman pou demann fizyon ki gen omwen youn nan etikèt sa yo. Kite l vid pou chak demann fizyon ki kalifye.",
+      "tooManyLabels": "Gen twòp etikèt pou revizyon konsèy. Pa sèvi ak plis pase {{maximum}} etikèt.",
+      "labelTooLong": "Yon etikèt pou revizyon konsèy twò long. Chak etikèt dwe gen {{maximum}} karaktè oswa mwens.",
       "minSpecialists": "Chwazi omwen {{minimum}} espesyalis. {{selected}} chwazi.",
       "specialistName": {
         "testCoverage": "Kouvèti tès",

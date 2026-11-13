@@ -853,6 +853,8 @@
       "labels": "Etichette che attivano la revisione del gruppo di revisori",
       "labelsPlaceholder": "ad es. consiglio, revisione approfondita",
       "labelsDescription": "Separa le etichette con virgole. Un repository con il gruppo di revisori attivo esegue la revisione solo per le pull request che riportano almeno una di queste etichette. Lascia vuoto per tutte le pull request idonee.",
+      "tooManyLabels": "Troppe etichette per la revisione del gruppo di revisori. Usa al massimo {{maximum}} etichette.",
+      "labelTooLong": "Etichetta per la revisione del gruppo di revisori troppo lunga. Ogni etichetta deve contenere al massimo {{maximum}} caratteri.",
       "minSpecialists": "Seleziona almeno {{minimum}} specialisti. Selezionati: {{selected}}.",
       "specialistName": {
         "testCoverage": "Copertura dei test",

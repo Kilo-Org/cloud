@@ -1427,6 +1427,8 @@
       "labels": "Neuvostokatselmoinnin käynnistävät tunnisteet",
       "labelsPlaceholder": "esim. neuvosto, perusteellinen katselmointi",
       "labelsDescription": "Erota tunnisteet pilkuilla. Tällöin neuvostokatselmointia käyttävä koodivarasto suorittaa sen vain vetopyynnöille, joilla on vähintään yksi näistä tunnisteista. Jätä tyhjäksi, jos haluat sen kaikille kelvollisille vetopyynnöille.",
+      "tooManyLabels": "Neuvostokatselmoinnin tunnisteita on liikaa. Käytä enintään {{maximum}} tunnistetta.",
+      "labelTooLong": "Neuvostokatselmoinnin tunniste on liian pitkä. Kunkin tunnisteen pituus saa olla enintään {{maximum}} merkkiä.",
       "minSpecialists": "Valitse vähintään {{minimum}} asiantuntijaa. Valittuna {{selected}}.",
       "specialistName": {
         "testCoverage": "Testikattavuus",

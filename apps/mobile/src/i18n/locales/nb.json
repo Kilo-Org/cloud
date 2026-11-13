@@ -1427,6 +1427,8 @@
       "labels": "Etiketter som utløser panelvurdering",
       "labelsPlaceholder": "f.eks. panel, dyp gjennomgang",
       "labelsDescription": "Skill etikettene med komma. Et kodelager med panelvurdering kjører da vurderingen bare for PR-er som har minst én av disse etikettene. La feltet stå tomt for alle kvalifiserte PR-er.",
+      "tooManyLabels": "For mange etiketter for panelvurdering. Bruk maksimalt {{maximum}} etiketter.",
+      "labelTooLong": "En etikett for panelvurdering er for lang. Hver etikett kan ha maksimalt {{maximum}} tegn.",
       "minSpecialists": "Velg minst {{minimum}} spesialister. {{selected}} valgt.",
       "specialistName": {
         "testCoverage": "Testdekning",

@@ -1523,6 +1523,8 @@
       "labels": "Labeli sy'n sbarduno adolygiad cyngor",
       "labelsPlaceholder": "e.e. cyngor, adolygiad manwl",
       "labelsDescription": "Gwahanwch labeli â chomas. Wedyn bydd ystorfa sydd â'r cyngor wedi'i alluogi yn rhedeg y cyngor dim ond ar gyfer ceisiadau tynnu sydd ag o leiaf un o'r labeli hyn. Gadewch yn wag ar gyfer pob cais tynnu cymwys.",
+      "tooManyLabels": "Gormod o labeli cyngor. Defnyddiwch hyd at {{maximum}} label.",
+      "labelTooLong": "Mae label cyngor yn rhy hir. Rhaid i bob label gynnwys {{maximum}} nod neu lai.",
       "minSpecialists": "Dewiswch o leiaf {{minimum}} arbenigwr. {{selected}} wedi'u dewis.",
       "specialistName": {
         "testCoverage": "Cwmpas profion",

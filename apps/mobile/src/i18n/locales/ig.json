@@ -1427,6 +1427,8 @@
       "labels": "Mkpado na-akpalite nyocha otu ndị nyocha",
       "labelsPlaceholder": "dịka: otu nyocha, nyocha miri emi",
       "labelsDescription": "Kewaa mkpado site na kọma. Ebe nchekwa nwere otu ndị nyocha na-eme nyocha otu ndị nyocha naanị maka PR nwere opekata mpe otu n'ime mkpado ndị a. Hapụ ya tọgbọ chakoo maka PR ọ bụla tozuru oke.",
+      "tooManyLabels": "Mkpado otu ndị nyocha karịrị akarị. Ejila ihe karịrị mkpado {{maximum}}.",
+      "labelTooLong": "Mkpado otu ndị nyocha dị ogologo karịa ka o kwesịrị. Mkpado ọ bụla ekwesịghị inwe ihe karịrị mkpụrụedemede {{maximum}}.",
       "minSpecialists": "Họrọ opekata mpe ndị ọkachamara {{minimum}}. Ahọọrọla {{selected}}.",
       "specialistName": {
         "testCoverage": "Mkpuchi nnwale",

@@ -885,6 +885,8 @@
       "labels": "Konsey incelemesini tetikleyen etiketler",
       "labelsPlaceholder": "örn. konsey, derin inceleme",
       "labelsDescription": "Etiketleri virgülle ayır. Konsey etkin bir depo, konseyi yalnızca bu etiketlerden en az birini taşıyan çekme isteklerinde çalıştırır. Tüm uygun çekme istekleri için boş bırak.",
+      "tooManyLabels": "Çok fazla konsey etiketi var. En fazla {{maximum}} etiket kullan.",
+      "labelTooLong": "Konsey etiketi çok uzun. Her etiket en fazla {{maximum}} karakter olmalı.",
       "minSpecialists": "En az {{minimum}} uzman seç. {{selected}} seçildi.",
       "specialistName": {
         "testCoverage": "Test kapsamı",

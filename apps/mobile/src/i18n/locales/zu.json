@@ -1427,6 +1427,8 @@
       "labels": "Amalebula avula ukuhlola komkhandlu",
       "labelsPlaceholder": "isb: umkhandlu, ukuhlola okujulile",
       "labelsDescription": "Ihlukanise amalebula ngamakhoma. Inqolobane yekhodi evule ukuhlola komkhandlu ibe isisebenza umkhandlu kuphela kuma-PR anenye yalawa malebula okungenani eyodwa. Shiya kungenalutho kuwo wonke ama-PR afanelekile.",
+      "tooManyLabels": "Amalebula omkhandlu maningi kakhulu. Sebenzisa amalebula angama {{maximum}} noma ambalwa kunalokho.",
+      "labelTooLong": "Ilebula lomkhandlu lide kakhulu. Ilebula ngalinye kufanele libe nezinhlamvu eziyi {{maximum}} noma ezimbalwa kunalokho.",
       "minSpecialists": "Khetha okungenani ochwepheshe abangu-{{minimum}}. {{selected}} bakhethiwe.",
       "specialistName": {
         "testCoverage": "Ukumbozwa kwezivivinyo",

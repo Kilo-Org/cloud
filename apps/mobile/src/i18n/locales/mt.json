@@ -1499,6 +1499,8 @@
       "labels": "Tikketti li jattivaw ir-reviżjoni tal-kunsill",
       "labelsPlaceholder": "eż. kunsill, reviżjoni fil-fond",
       "labelsDescription": "Issepara t-tikketti bil-virgoli. Repożitorju bil-kunsill attivat imbagħad iħaddem ir-reviżjoni biss għall-PRs li jġorru mill-inqas waħda minn dawn it-tikketti. Ħallih vojt għal kull PR eliġibbli.",
+      "tooManyLabels": "Wisq tikketti tal-kunsill. Uża mhux aktar minn {{maximum}} tikketta.",
+      "labelTooLong": "Tikketta tal-kunsill twila wisq. Kull tikketta għandha tkun twila {{maximum}} karattru jew inqas.",
       "minSpecialists": "Agħżel mill-inqas {{minimum}} speċjalisti. {{selected}} magħżula.",
       "specialistName": {
         "testCoverage": "Kopertura tat-testijiet",

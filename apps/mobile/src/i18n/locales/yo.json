@@ -1427,6 +1427,8 @@
       "labels": "Àwọn àmì tó ń mú àtúnyẹ̀wò ìgbìmọ̀ ṣiṣẹ́",
       "labelsPlaceholder": "àpẹẹrẹ: ìgbìmọ̀, àtúnyẹ̀wò jìn",
       "labelsDescription": "Ya àwọn àmì pẹ̀lú kọ́mà. Ibi ìpamọ́ tó ní ìgbìmọ̀ yóò wá ṣe àtúnyẹ̀wò ìgbìmọ̀ kìkì fún PR tó ní ó kéré tán ọ̀kan nínú àwọn àmì wọ̀nyí. Fi sílẹ̀ ṣòfó fún gbogbo PR tó tọ́.",
+      "tooManyLabels": "Àwọn àmì ìgbìmọ̀ pọ̀ jù. Má ṣe lo ju àmì {{maximum}} lọ.",
+      "labelTooLong": "Àmì ìgbìmọ̀ gùn jù. Iye ohun kikọ nínú àmì kọ̀ọ̀kan kò gbọ́dọ̀ ju {{maximum}} lọ.",
       "minSpecialists": "Yan ó kéré tán àwọn akọ́ṣẹ́mọṣọ́ {{minimum}}. A ti yan {{selected}}.",
       "specialistName": {
         "testCoverage": "Ìbòmọ́lẹ̀ ìdánwò",

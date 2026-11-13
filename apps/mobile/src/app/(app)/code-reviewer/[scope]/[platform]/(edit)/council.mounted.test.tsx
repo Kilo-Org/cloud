@@ -30,7 +30,11 @@ type ToggleProps = {
 type SaveMutation = { mutate: Mock; isPending: boolean };
 
 type SavedPatch = {
-  council?: { enabled?: boolean; specialists: { id: string; enabled: boolean }[] } | null;
+  council?: {
+    enabled?: boolean;
+    specialists: { id: string; enabled: boolean }[];
+    required_labels?: string[];
+  } | null;
   councilEnabledRepositoryIds?: (number | string)[];
 };
 
@@ -158,6 +162,17 @@ const renderedTexts = (renderer: MountedRenderer) =>
 
 const specialistToggle = (title: string) =>
   state.toggleProps.findLast(props => props.title === title);
+
+type LabelFieldProps = {
+  value: string;
+  onChangeText: (value: string) => void;
+  onEndEditing: () => void;
+};
+
+const labelField = (renderer: MountedRenderer) =>
+  renderer.root.findAll(node => String(node.type) === 'TextInput')[0]?.props as
+    | LabelFieldProps
+    | undefined;
 
 beforeEach(() => {
   state.scope = 'org-1';
@@ -346,6 +361,63 @@ describe('council unit of write', () => {
     expect(state.save.mutate).toHaveBeenCalledTimes(1);
     expect(state.patches[0]?.council?.enabled).toBe(false);
     expect(state.patches[0]?.councilEnabledRepositoryIds).toEqual([]);
+
+    mounted.unmount();
+  });
+});
+
+describe('council label gate', () => {
+  const commitLabels = async (mounted: RenderWithProvidersResult, text: string): Promise<void> => {
+    const { renderer } = mounted;
+    await act(() => {
+      labelField(renderer)?.onChangeText(text);
+    });
+    await act(() => {
+      labelField(renderer)?.onEndEditing();
+    });
+  };
+
+  it('saves a pasted list within the server caps', async () => {
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    await act(() => undefined);
+
+    await commitLabels(mounted, ' council , deep review ');
+
+    expect(state.save.mutate).toHaveBeenCalledTimes(1);
+    expect(state.patches[0]?.council?.required_labels).toEqual(['council', 'deep review']);
+    expect(state.toastErrors).toHaveLength(0);
+
+    mounted.unmount();
+  });
+
+  it('refuses a list past the label count, keeps the draft and saves nothing', async () => {
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    const { renderer } = mounted;
+    await act(() => undefined);
+
+    const pasted = Array.from({ length: 21 }, (_, index) => `label-${index}`).join(', ');
+    await commitLabels(mounted, pasted);
+
+    expect(state.save.mutate).not.toHaveBeenCalled();
+    expect(state.toastErrors).toEqual(['Too many council labels. Use at most 20 labels.']);
+    expect(labelField(renderer)?.value).toBe(pasted);
+
+    mounted.unmount();
+  });
+
+  it('refuses a label past the length cap, keeps the draft and saves nothing', async () => {
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    const { renderer } = mounted;
+    await act(() => undefined);
+
+    const pasted = `ok, ${'a'.repeat(101)}`;
+    await commitLabels(mounted, pasted);
+
+    expect(state.save.mutate).not.toHaveBeenCalled();
+    expect(state.toastErrors).toEqual([
+      'Council label too long. Each label must be 100 characters or fewer.',
+    ]);
+    expect(labelField(renderer)?.value).toBe(pasted);
 
     mounted.unmount();
   });

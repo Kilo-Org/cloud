@@ -108,27 +108,42 @@ export const STRATEGY_DESCRIPTION_KEYS = {
   majority: 'codeReviewer.council.strategy.majorityDescription',
 } satisfies Record<CouncilAggregationStrategy, string>;
 
+/** The server caps a label draft can exceed, in the order the form checks them. */
+export type RequiredLabelsProblem = 'tooMany' | 'tooLong';
+
+export type RequiredLabels =
+  | { ok: true; labels: string[] }
+  | { ok: false; problem: RequiredLabelsProblem };
+
 /**
- * Parses the comma-separated label field into the persisted list: trimmed,
- * length-capped, deduped case-insensitively (the server matches labels
- * regardless of case, so two casings would be one gate twice) and bounded to
- * the server's own maximum.
+ * Parses the comma-separated label field into the persisted list: trimmed and
+ * deduped case-insensitively (the server matches labels regardless of case, so
+ * two casings would be one gate twice).
+ *
+ * A draft past either server cap is refused rather than cut down: a silently
+ * shorter list would save a gate the user did not write, so the screen keeps
+ * the draft and shows why the save did not happen — what the web form does.
  */
-export function parseRequiredLabels(value: string): string[] {
+export function parseRequiredLabels(value: string): RequiredLabels {
   const seen = new Set<string>();
   const labels: string[] = [];
   for (const raw of value.split(',')) {
     const label = raw.trim();
-    const key = label.toLowerCase();
-    const usable =
-      label.length > 0 &&
-      label.length <= COUNCIL_REQUIRED_LABEL_MAX_LENGTH &&
-      !seen.has(key) &&
-      labels.length < COUNCIL_MAX_REQUIRED_LABELS;
-    if (usable) {
-      seen.add(key);
-      labels.push(label);
+    if (label.length === 0) {
+      continue;
     }
+    const key = label.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    labels.push(label);
   }
-  return labels;
+  if (labels.length > COUNCIL_MAX_REQUIRED_LABELS) {
+    return { ok: false, problem: 'tooMany' };
+  }
+  if (labels.some(label => label.length > COUNCIL_REQUIRED_LABEL_MAX_LENGTH)) {
+    return { ok: false, problem: 'tooLong' };
+  }
+  return { ok: true, labels };
 }

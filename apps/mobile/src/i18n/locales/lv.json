@@ -1451,6 +1451,8 @@
       "labels": "Etiķetes, kas aktivizē padomes pārskatīšanu",
       "labelsPlaceholder": "piem., padome, padziļināta pārskatīšana",
       "labelsDescription": "Atdala etiķetes ar komatiem. Repozitorijs ar iespējotu padomi tad veic padomes pārskatīšanu tikai tiem izmaiņu pieprasījumiem, kuriem ir vismaz viena no šīm etiķetēm. Atstāj tukšu visiem atbilstošajiem izmaiņu pieprasījumiem.",
+      "tooManyLabels": "Pārāk daudz padomes etiķešu. Izmanto ne vairāk kā {{maximum}} etiķešu.",
+      "labelTooLong": "Padomes etiķete ir pārāk gara. Katrā etiķetē drīkst būt ne vairāk kā {{maximum}} rakstzīmju.",
       "minSpecialists": "Izvēlies vismaz {{minimum}} speciālistus. Izvēlēti: {{selected}}.",
       "specialistName": {
         "testCoverage": "Testu pārklājums",

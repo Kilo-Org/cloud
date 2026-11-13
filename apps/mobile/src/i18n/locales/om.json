@@ -1427,6 +1427,8 @@
       "labels": "Mallattoowwan sakatta'a gumii kakaasan",
       "labelsPlaceholder": "fkn: gumii, sakatta'a gadi fagoo",
       "labelsDescription": "Mallattoowwan komaan addan baasi. Kuusaan koodii gumii banu sana booda PR mallattoowwan kana keessaa yoo xiqqaate tokko qabatan qofaaf gumii raawwata. PR ulaagaa guutuuf hundaan duwwaa dhiisi.",
+      "tooManyLabels": "Mallattoowwan gumii garmalee baay'ataniiru. Yoo baay'ate mallattoo {{maximum}} fayyadami.",
+      "labelTooLong": "Mallattoon gumii garmalee dheeraadha. Mallattoon hundi arfii {{maximum}} yookaan isaa gadi qabaachuu qaba.",
       "minSpecialists": "Yoo xiqqaate ogeessota {{minimum}} filadhu. {{selected}} filatamaniiru.",
       "specialistName": {
         "testCoverage": "Hammanga qorannoo",

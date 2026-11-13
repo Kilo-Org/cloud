@@ -1427,6 +1427,8 @@
       "labels": "Kontseilu-berrikuspena abiarazten duten etiketak",
       "labelsPlaceholder": "adib. kontseilua, berrikuspen sakona",
       "labelsDescription": "Bereizi etiketak komekin. Kontseilua gaituta duen biltegi batek etiketa horietako bat gutxienez duten bateratze-eskaeretan soilik exekutatuko du kontseilua. Utzi hutsik bateratze-eskaera egoki guztietarako.",
+      "tooManyLabels": "Kontseilu-berrikuspenerako etiketa gehiegi daude. Erabili gehienez {{maximum}} etiketa.",
+      "labelTooLong": "Kontseilu-berrikuspenerako etiketa luzeegia da. Etiketa bakoitzak gehienez {{maximum}} karaktere izan behar ditu.",
       "minSpecialists": "Hautatu gutxienez {{minimum}} espezialista. {{selected}} hautatuta.",
       "specialistName": {
         "testCoverage": "Proben estaldura",

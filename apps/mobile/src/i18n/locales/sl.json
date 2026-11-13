@@ -1475,6 +1475,8 @@
       "labels": "Oznake, ki sprožijo kolegijski pregled",
       "labelsPlaceholder": "npr. kolegij, poglobljen pregled",
       "labelsDescription": "Oznake loči z vejicami. Skladišče z omogočenim kolegijem nato izvaja kolegijski pregled samo za zahtevke za združitev, ki imajo vsaj eno od teh oznak. Pusti prazno za vsak ustrezen zahtevek za združitev.",
+      "tooManyLabels": "Preveč oznak za kolegijski pregled. Uporabi največ {{maximum}} oznak.",
+      "labelTooLong": "Oznaka za kolegijski pregled je predolga. Vsaka oznaka ima lahko največ {{maximum}} znakov.",
       "minSpecialists": "Izberi vsaj {{minimum}} strokovnjakov. Izbranih: {{selected}}.",
       "specialistName": {
         "testCoverage": "Pokritost s testi",

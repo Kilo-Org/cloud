@@ -1427,6 +1427,8 @@
       "labels": "Ngā tapanga e whakaoho ana i te arotake kaunihera",
       "labelsPlaceholder": "hei tauira, kaunihera, arotake hōhonu",
       "labelsDescription": "Wehea ngā tapanga ki ngā pīhono. Kātahi ka whakahaere te pūranga waehere kua whakahohea mō te kaunihera i te kaunihera anake mō ngā tono kume e mau ana i tētahi o ēnei tapanga, neke atu rānei. Waiho kia wātea mō ia tono kume e tika ana.",
+      "tooManyLabels": "He nui rawa ngā tapanga kaunihera. Kia {{maximum}} ngā tapanga, iti iho rānei.",
+      "labelTooLong": "He roa rawa te tapanga kaunihera. Kia {{maximum}} ngā pūāhua o ia tapanga, iti iho rānei.",
       "minSpecialists": "Kōwhiria kia {{minimum}} mātanga neke atu. Kua kōwhiria {{selected}}.",
       "specialistName": {
         "testCoverage": "Te kapinga whakamātautau",

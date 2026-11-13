@@ -1427,6 +1427,8 @@
       "labels": "Etiketa që aktivizojnë shqyrtimin nga këshilli",
       "labelsPlaceholder": "p.sh. këshill, shqyrtim i thelluar",
       "labelsDescription": "Ndaji etiketat me presje. Një depo me këshillin e aktivizuar ekzekuton më pas shqyrtimin vetëm për PR-të që mbajnë të paktën një nga këto etiketa. Lëre bosh për të gjitha PR-të e përshtatshme.",
+      "tooManyLabels": "Ka tepër etiketa për shqyrtimin nga këshilli. Përdor jo më shumë se {{maximum}} etiketa.",
+      "labelTooLong": "Etiketa për shqyrtimin nga këshilli është tepër e gjatë. Çdo etiketë duhet të ketë jo më shumë se {{maximum}} karaktere.",
       "minSpecialists": "Zgjidh të paktën {{minimum}} ekspertë. {{selected}} të zgjedhur.",
       "specialistName": {
         "testCoverage": "Mbulimi me teste",

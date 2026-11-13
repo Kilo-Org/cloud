@@ -1427,6 +1427,8 @@
       "labels": "Etiketter som utlöser rådsgranskning",
       "labelsPlaceholder": "t.ex. råd, djupgranskning",
       "labelsDescription": "Separera etiketterna med kommatecken. Ett kodarkiv med rådsgranskning kör då granskningen endast för pull-begäranden som har minst en av dessa etiketter. Lämna tomt för alla kvalificerade pull-begäranden.",
+      "tooManyLabels": "För många etiketter för rådsgranskning. Använd högst {{maximum}} etiketter.",
+      "labelTooLong": "En etikett för rådsgranskning är för lång. Varje etikett får innehålla högst {{maximum}} tecken.",
       "minSpecialists": "Välj minst {{minimum}} experter. {{selected}} valda.",
       "specialistName": {
         "testCoverage": "Testtäckning",

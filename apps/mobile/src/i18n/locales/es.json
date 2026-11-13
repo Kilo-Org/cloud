@@ -886,6 +886,8 @@
       "labels": "Etiquetas que activan la revisión por consejo",
       "labelsPlaceholder": "p. ej., consejo, revisión a fondo",
       "labelsDescription": "Separa las etiquetas con comas. Así, un repositorio con el consejo activado solo lo ejecutará en pull requests que tengan al menos una de estas etiquetas. Déjalo vacío para aplicarlo a todos los pull requests aptos.",
+      "tooManyLabels": "Hay demasiadas etiquetas para la revisión por consejo. Usa como máximo {{maximum}} etiquetas.",
+      "labelTooLong": "Una etiqueta para la revisión por consejo es demasiado larga. Cada etiqueta debe tener como máximo {{maximum}} caracteres.",
       "minSpecialists": "Selecciona al menos {{minimum}} especialistas. Seleccionados: {{selected}}.",
       "specialistName": {
         "testCoverage": "Cobertura de pruebas",

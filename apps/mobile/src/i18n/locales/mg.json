@@ -1427,6 +1427,8 @@
       "labels": "Marika mampandeha ny fandinihan'ny filankevitra",
       "labelsPlaceholder": "ohatra: filankevitra, fandinihana lalina",
       "labelsDescription": "Saraho amin'ny faingo ny marika. Ny tahirin-kaody misy filankevitra dia manao filankevitra ihany ho an'ny PR mitondra farafahakeliny iray amin'ireo marika ireo. Avelao foana ho an'ny PR rehetra mendrika.",
+      "tooManyLabels": "Be loatra ny mariky ny filankevitra. Mampiasà marika {{maximum}} raha be indrindra.",
+      "labelTooLong": "Lava loatra ny mariky ny filankevitra. Tsy mahazo mihoatra ny tarehintsoratra {{maximum}} ny marika tsirairay.",
       "minSpecialists": "Misafidiana manam-pahaizana {{minimum}} farafahakeliny. {{selected}} no voafidy.",
       "specialistName": {
         "testCoverage": "Faritra voarakotra amin'ny fitsapana",

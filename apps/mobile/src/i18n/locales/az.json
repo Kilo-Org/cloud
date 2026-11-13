@@ -1427,6 +1427,8 @@
       "labels": "Şura yoxlamasını işə salan etiketlər",
       "labelsPlaceholder": "məs. şura, dərin yoxlama",
       "labelsDescription": "Etiketləri vergüllə ayır. Şura aktiv olan repozitoriya yalnız bu etiketlərdən ən azı birini daşıyan pull request-lər üçün şura yoxlaması aparacaq. Bütün uyğun pull request-lər üçün boş saxla.",
+      "tooManyLabels": "Şura yoxlaması etiketlərinin sayı həddindən çoxdur. Ən çox {{maximum}} etiketdən istifadə et.",
+      "labelTooLong": "Şura yoxlaması etiketi çox uzundur. Hər etiket ən çox {{maximum}} simvoldan ibarət olmalıdır.",
       "minSpecialists": "Ən azı {{minimum}} mütəxəssis seç. Seçilib: {{selected}}.",
       "specialistName": {
         "testCoverage": "Test əhatəsi",

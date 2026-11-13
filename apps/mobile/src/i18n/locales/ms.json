@@ -1427,6 +1427,8 @@
       "labels": "Label yang mencetuskan semakan panel",
       "labelsPlaceholder": "cth. panel, semakan mendalam",
       "labelsDescription": "Pisahkan label dengan koma. Repositori yang mendayakan panel kemudian hanya menjalankan panel untuk permintaan penarikan yang membawa sekurang-kurangnya satu label ini. Biarkan kosong untuk setiap permintaan penarikan yang layak.",
+      "tooManyLabels": "Terlalu banyak label panel. Gunakan tidak lebih daripada {{maximum}} label.",
+      "labelTooLong": "Label panel terlalu panjang. Setiap label mestilah tidak melebihi {{maximum}} aksara.",
       "minSpecialists": "Pilih sekurang-kurangnya {{minimum}} pakar. {{selected}} dipilih.",
       "specialistName": {
         "testCoverage": "Liputan ujian",

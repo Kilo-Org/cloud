@@ -885,6 +885,8 @@
       "labels": "Labels, die ein Gremium-Review auslösen",
       "labelsPlaceholder": "z. B. gremium, tiefenreview",
       "labelsDescription": "Trenne Labels mit Kommas. Ein Code-Repository mit aktiviertem Gremium führt das Gremium-Review dann nur für Pull-Requests mit mindestens einem dieser Labels aus. Leer lassen für alle infrage kommenden Pull-Requests.",
+      "tooManyLabels": "Zu viele Labels für das Gremium-Review. Verwende höchstens {{maximum}} Labels.",
+      "labelTooLong": "Label für das Gremium-Review zu lang. Jedes Label darf höchstens {{maximum}} Zeichen enthalten.",
       "minSpecialists": "Wähle mindestens {{minimum}} Spezialisten aus. {{selected}} ausgewählt.",
       "specialistName": {
         "testCoverage": "Testabdeckung",

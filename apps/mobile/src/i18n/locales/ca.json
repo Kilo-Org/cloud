@@ -1451,6 +1451,8 @@
       "labels": "Etiquetes que activen la revisió en consell",
       "labelsPlaceholder": "p. ex. consell, revisió a fons",
       "labelsDescription": "Separa les etiquetes amb comes. Així, un repositori amb el consell activat només l'executa per a les pull requests que tinguin almenys una d'aquestes etiquetes. Deixa-ho en blanc per aplicar-lo a totes les pull requests aptes.",
+      "tooManyLabels": "Hi ha massa etiquetes per a la revisió en consell. Fes servir com a màxim {{maximum}} etiquetes.",
+      "labelTooLong": "Una etiqueta per a la revisió en consell és massa llarga. Cada etiqueta ha de tenir com a màxim {{maximum}} caràcters.",
       "minSpecialists": "Selecciona almenys {{minimum}} especialistes. Seleccionats: {{selected}}.",
       "specialistName": {
         "testCoverage": "Cobertura de proves",

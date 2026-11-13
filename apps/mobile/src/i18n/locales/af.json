@@ -1427,6 +1427,8 @@
       "labels": "Etikette wat raadhersiening aktiveer",
       "labelsPlaceholder": "bv. raad, diep hersiening",
       "labelsDescription": "Skei etikette met kommas. 'n Bewaarplek met raadhersiening aan voer dit dan net uit vir trekversoeke met minstens een van hierdie etikette. Laat leeg vir elke geskikte trekversoek.",
+      "tooManyLabels": "Te veel etikette vir raadhersiening. Gebruik hoogstens {{maximum}} etikette.",
+      "labelTooLong": "Die etiket vir raadhersiening is te lank. Elke etiket mag hoogstens {{maximum}} karakters bevat.",
       "minSpecialists": "Kies minstens {{minimum}} spesialiste. {{selected}} gekies.",
       "specialistName": {
         "testCoverage": "Toetsdekking",

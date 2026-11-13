@@ -885,6 +885,8 @@
       "labels": "合議レビューを開始するラベル",
       "labelsPlaceholder": "例: 合議、詳細レビュー",
       "labelsDescription": "ラベルはカンマで区切ります。合議が有効なリポジトリは、これらのラベルを1つ以上持つプルリクエストでのみ合議を実行します。空欄にすると、条件を満たすすべてのプルリクエストが対象になります。",
+      "tooManyLabels": "合議レビューを開始するラベルが多すぎます。ラベルは {{maximum}} 個以内にしてください。",
+      "labelTooLong": "合議レビューを開始するラベルが長すぎます。各ラベルは {{maximum}} 文字以内にしてください。",
       "minSpecialists": "スペシャリストを{{minimum}}名以上選択してください。現在{{selected}}名選択中です。",
       "specialistName": {
         "testCoverage": "テストカバレッジ",

@@ -1475,6 +1475,8 @@
       "labels": "Žymos, kurios įjungia tarybos peržiūrą",
       "labelsPlaceholder": "pvz., taryba, išsami peržiūra",
       "labelsDescription": "Žymas atskirk kableliais. Saugykla su įjungta taryba tada atlieka tarybos peržiūrą tik tiems PR, kurie turi bent vieną iš šių žymų. Palik tuščią visiems tinkamiems PR.",
+      "tooManyLabels": "Per daug tarybos žymų. Naudok ne daugiau kaip {{maximum}} žymų.",
+      "labelTooLong": "Tarybos žyma per ilga. Kiekvieną žymą turi sudaryti ne daugiau kaip {{maximum}} simbolių.",
       "minSpecialists": "Pasirink bent {{minimum}} specialistus. Pasirinkta: {{selected}}.",
       "specialistName": {
         "testCoverage": "Testų aprėptis",

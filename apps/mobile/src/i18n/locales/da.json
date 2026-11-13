@@ -1427,6 +1427,8 @@
       "labels": "Etiketter, der udløser rådsgennemgang",
       "labelsPlaceholder": "f.eks. råd, grundig gennemgang",
       "labelsDescription": "Adskil etiketter med kommaer. Et kodelager med rådsgennemgang kører så kun rådet for pull requests, der har mindst én af disse etiketter. Lad feltet stå tomt for at gælde alle relevante pull requests.",
+      "tooManyLabels": "For mange etiketter til rådsgennemgang. Brug højst {{maximum}} etiketter.",
+      "labelTooLong": "En etiket til rådsgennemgang er for lang. Hver etiket må højst være på {{maximum}} tegn.",
       "minSpecialists": "Vælg mindst {{minimum}} specialister. {{selected}} valgt.",
       "specialistName": {
         "testCoverage": "Testdækning",

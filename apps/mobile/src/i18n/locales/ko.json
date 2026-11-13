@@ -885,6 +885,8 @@
       "labels": "협의체 리뷰를 실행하는 레이블",
       "labelsPlaceholder": "예: 협의체, 심층 리뷰",
       "labelsDescription": "레이블은 쉼표로 구분합니다. 협의체가 켜진 저장소는 이 레이블을 하나 이상 가진 풀 리퀘스트에만 협의체를 실행합니다. 비워 두면 조건을 충족하는 모든 풀 리퀘스트에 적용됩니다.",
+      "tooManyLabels": "협의체 리뷰 레이블이 너무 많습니다. 레이블은 최대 {{maximum}} 개까지 사용할 수 있습니다.",
+      "labelTooLong": "협의체 리뷰 레이블이 너무 깁니다. 각 레이블은 {{maximum}} 자 이하여야 합니다.",
       "minSpecialists": "전문가를 {{minimum}}명 이상 선택하세요. {{selected}}명 선택됨.",
       "specialistName": {
         "testCoverage": "테스트 커버리지",

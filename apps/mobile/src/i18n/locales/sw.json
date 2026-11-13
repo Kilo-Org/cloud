@@ -1427,6 +1427,8 @@
       "labels": "Lebo zinazowasha ukaguzi wa baraza",
       "labelsPlaceholder": "k.m. baraza, ukaguzi wa kina",
       "labelsDescription": "Tenganisha lebo kwa koma. Hazina iliyowashwa baraza hufanya baraza tu kwa PR zenye angalau moja ya lebo hizi. Acha wazi kwa kila PR inayostahili.",
+      "tooManyLabels": "Lebo za baraza ni nyingi mno. Tumia lebo {{maximum}} au chache zaidi.",
+      "labelTooLong": "Lebo ya baraza ni ndefu mno. Kila lebo lazima iwe na vibambo {{maximum}} au vichache zaidi.",
       "minSpecialists": "Chagua angalau wataalamu {{minimum}}. {{selected}} wamechaguliwa.",
       "specialistName": {
         "testCoverage": "Ufuniko wa upimaji",

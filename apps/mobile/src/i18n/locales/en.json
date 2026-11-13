@@ -1494,6 +1494,8 @@
       "labels": "Labels that trigger council review",
       "labelsPlaceholder": "e.g. council, deep review",
       "labelsDescription": "Separate labels with commas. A council-enabled repository then runs council only for pull requests carrying at least one of these labels. Leave blank for every eligible pull request.",
+      "tooManyLabels": "Too many council labels. Use at most {{maximum}} labels.",
+      "labelTooLong": "Council label too long. Each label must be {{maximum}} characters or fewer.",
       "minSpecialists": "Select at least {{minimum}} specialists. {{selected}} selected.",
       "specialistName": {
         "testCoverage": "Test coverage",

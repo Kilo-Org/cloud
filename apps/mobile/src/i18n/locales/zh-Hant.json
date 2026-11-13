@@ -885,6 +885,8 @@
       "labels": "觸發審查小組審查的標籤",
       "labelsPlaceholder": "例如：審查小組、深入審查",
       "labelsDescription": "以逗號分隔標籤。啟用審查小組的存放庫接著只會對帶有至少一個這些標籤的提取要求執行審查小組。留空則適用於所有符合條件的提取要求。",
+      "tooManyLabels": "審查小組標籤過多。最多可使用 {{maximum}} 個標籤。",
+      "labelTooLong": "審查小組標籤過長。每個標籤不得超過 {{maximum}} 個字元。",
       "minSpecialists": "請至少選取 {{minimum}} 位專家。已選取 {{selected}} 位。",
       "specialistName": {
         "testCoverage": "測試涵蓋範圍",

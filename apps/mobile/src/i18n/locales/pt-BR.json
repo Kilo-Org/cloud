@@ -853,6 +853,8 @@
       "labels": "Etiquetas que acionam a revisão do conselho",
       "labelsPlaceholder": "ex.: conselho, revisão profunda",
       "labelsDescription": "Separe as etiquetas com vírgulas. Um repositório com o conselho ativado passa a executar a revisão apenas nas PRs que tiverem pelo menos uma dessas etiquetas. Deixe em branco para todas as PRs elegíveis.",
+      "tooManyLabels": "Há etiquetas demais para a revisão do conselho. Use no máximo {{maximum}} etiquetas.",
+      "labelTooLong": "Etiqueta da revisão do conselho muito longa. Cada etiqueta deve ter no máximo {{maximum}} caracteres.",
       "minSpecialists": "Selecione pelo menos {{minimum}} especialistas. {{selected}} selecionados.",
       "specialistName": {
         "testCoverage": "Cobertura de testes",

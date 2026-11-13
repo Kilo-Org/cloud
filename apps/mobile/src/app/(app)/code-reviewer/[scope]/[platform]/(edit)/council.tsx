@@ -1,6 +1,8 @@
 import {
   COUNCIL_AGGREGATION_STRATEGIES,
+  COUNCIL_MAX_REQUIRED_LABELS,
   COUNCIL_MIN_SPECIALISTS,
+  COUNCIL_REQUIRED_LABEL_MAX_LENGTH,
 } from '@kilocode/app-shared/code-review';
 import { type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -20,6 +22,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { formatNumber } from '@/lib/format';
 import {
   type CouncilConfig,
@@ -163,10 +166,24 @@ function CouncilScreen({
 
   const commitLabels = () => {
     const parsed = parseRequiredLabels(labelsText);
-    if (parsed.join(', ') === (config.data?.council?.required_labels ?? []).join(', ')) {
+    if (!parsed.ok) {
+      // The draft stays as typed: a partial save would gate on a list the user
+      // never wrote. Both messages carry the server's own cap.
+      announcingToast.error(
+        parsed.problem === 'tooMany'
+          ? t('codeReviewer.council.tooManyLabels', {
+              maximum: formatNumber(COUNCIL_MAX_REQUIRED_LABELS, i18n.language),
+            })
+          : t('codeReviewer.council.labelTooLong', {
+              maximum: formatNumber(COUNCIL_REQUIRED_LABEL_MAX_LENGTH, i18n.language),
+            })
+      );
       return;
     }
-    writeCouncil({ ...council, required_labels: parsed });
+    if (parsed.labels.join(', ') === (config.data?.council?.required_labels ?? []).join(', ')) {
+      return;
+    }
+    writeCouncil({ ...council, required_labels: parsed.labels });
   };
 
   const setRepositoryEnabled = (repositoryId: number | string, value: boolean) => {

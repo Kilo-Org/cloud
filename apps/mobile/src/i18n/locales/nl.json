@@ -885,6 +885,8 @@
       "labels": "Tags die panelbeoordeling activeren",
       "labelsPlaceholder": "bijv. panel, diepgaande review",
       "labelsDescription": "Scheid tags met komma's. Een repository met panelbeoordeling voert de beoordeling daarna alleen uit voor PR's met minstens één van deze tags. Laat dit leeg voor elke in aanmerking komende PR.",
+      "tooManyLabels": "Te veel tags voor panelbeoordeling. Gebruik maximaal {{maximum}} tags.",
+      "labelTooLong": "Een tag voor panelbeoordeling is te lang. Elke tag mag maximaal {{maximum}} tekens bevatten.",
       "minSpecialists": "Selecteer minstens {{minimum}} deskundigen. {{selected}} geselecteerd.",
       "specialistName": {
         "testCoverage": "Testdekking",

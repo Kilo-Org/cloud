@@ -1427,6 +1427,8 @@
       "labels": "A tanácsellenőrzést kiváltó címkék",
       "labelsPlaceholder": "pl. tanács, mély ellenőrzés",
       "labelsDescription": "A címkéket vesszővel válaszd el. A tanácsellenőrzést engedélyező adattár ezután csak azoknál a PR-eknél futtat tanácsellenőrzést, amelyek legalább egy ilyen címkét viselnek. Hagyd üresen minden jogosult PR esetén.",
+      "tooManyLabels": "Túl sok a tanácsellenőrzést kiváltó címke. Legfeljebb {{maximum}} címkét adj meg.",
+      "labelTooLong": "Túl hosszú a tanácsellenőrzést kiváltó címke. Egy címke legfeljebb {{maximum}} karakterből állhat.",
       "minSpecialists": "Válassz legalább {{minimum}} szakértőt. Kiválasztva: {{selected}}.",
       "specialistName": {
         "testCoverage": "Tesztlefedettség",

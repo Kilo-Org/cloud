@@ -1427,6 +1427,8 @@
       "labels": "Calaamadaha kiciya dib-u-eegista golaha",
       "labelsPlaceholder": "tusaale: gola, dib-u-eegis qoto dheer",
       "labelsDescription": "Kala sooc calaamadaha comma. Kaydka golaha shidan wuxuu markaas gola ku socodsiiyaa oo kaliya PR-yada sita ugu yaraan mid ka mid ah calaamadahan. Ka tag madhan PR kasta oo u qalma.",
+      "tooManyLabels": "Calaamadaha golaha ayaa aad u badan. Isticmaal ugu badnaan {{maximum}} calaamadood.",
+      "labelTooLong": "Calaamadda golaha ayaa aad u dheer. Calaamad kasta waa inay ka koobnaataa {{maximum}} xaraf ama ka yar.",
       "minSpecialists": "Dooro ugu yaraan takhasusleyaal {{minimum}}. {{selected}} ayaa la doortay.",
       "specialistName": {
         "testCoverage": "Daboolka tijaabada",

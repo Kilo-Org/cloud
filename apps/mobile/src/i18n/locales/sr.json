@@ -1451,6 +1451,8 @@
       "labels": "Oznake koje pokreću pregled veća",
       "labelsPlaceholder": "npr. veće, detaljan pregled",
       "labelsDescription": "Odvoji oznake zarezima. Repozitorijum kojem je veće uključeno tada pokreće veće samo za pull request-ove koji nose bar jednu od tih oznaka. Ostavi prazno za svaki podoban pull request.",
+      "tooManyLabels": "Previše oznaka za pregled veća. Koristi najviše {{maximum}} oznaka.",
+      "labelTooLong": "Oznaka za pregled veća je predugačka. Svaka oznaka mora da ima najviše {{maximum}} znakova.",
       "minSpecialists": "Izaberi bar {{minimum}} stručnjaka. Izabrano: {{selected}}.",
       "specialistName": {
         "testCoverage": "Pokrivenost testovima",

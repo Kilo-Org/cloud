@@ -885,6 +885,8 @@
       "labels": "触发评审团审查的标签",
       "labelsPlaceholder": "例如：评审团、深度审查",
       "labelsDescription": "用逗号分隔标签。启用评审团的仓库随后只对带有至少一个上述标签的拉取请求运行评审团。留空则适用于所有符合条件的拉取请求。",
+      "tooManyLabels": "触发评审团审查的标签过多。最多可使用 {{maximum}} 个标签。",
+      "labelTooLong": "触发评审团审查的标签过长。每个标签不得超过 {{maximum}} 个字符。",
       "minSpecialists": "请至少选择 {{minimum}} 位专家。已选择 {{selected}} 位。",
       "specialistName": {
         "testCoverage": "测试覆盖率",

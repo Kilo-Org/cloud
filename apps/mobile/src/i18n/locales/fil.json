@@ -1427,6 +1427,8 @@
       "labels": "Mga label na nagpapasimula ng pagsusuri ng konseho",
       "labelsPlaceholder": "hal. konseho, malalim na pagsusuri",
       "labelsDescription": "Paghiwalayin ang mga label gamit ang kuwit. Sa repositoryong may pinaganang konseho, tatakbo lang ang konseho para sa mga pull request na may kahit isa sa mga label na ito. Iwanang blangko para sa lahat ng kwalipikadong pull request.",
+      "tooManyLabels": "Masyadong maraming label ng konseho. Gumamit ng hindi hihigit sa {{maximum}} label.",
+      "labelTooLong": "Masyadong mahaba ang label ng konseho. Hindi dapat lumampas sa {{maximum}} karakter ang bawat label.",
       "minSpecialists": "Pumili ng hindi bababa sa {{minimum}} espesyalista. {{selected}} ang napili.",
       "specialistName": {
         "testCoverage": "Saklaw ng pagsubok",

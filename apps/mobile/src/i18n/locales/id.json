@@ -885,6 +885,8 @@
       "labels": "Label yang memicu tinjauan dewan",
       "labelsPlaceholder": "mis. dewan, tinjauan mendalam",
       "labelsDescription": "Pisahkan label dengan koma. Repositori yang mengaktifkan dewan kemudian hanya menjalankan dewan untuk PR yang membawa setidaknya satu dari label ini. Biarkan kosong untuk setiap PR yang memenuhi syarat.",
+      "tooManyLabels": "Terlalu banyak label dewan. Gunakan maksimal {{maximum}} label.",
+      "labelTooLong": "Label dewan terlalu panjang. Setiap label harus terdiri dari maksimal {{maximum}} karakter.",
       "minSpecialists": "Pilih setidaknya {{minimum}} spesialis. {{selected}} dipilih.",
       "specialistName": {
         "testCoverage": "Cakupan pengujian",

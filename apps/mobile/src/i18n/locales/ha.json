@@ -1427,6 +1427,8 @@
       "labels": "Lakabobin da ke kunna bitar majalisa",
       "labelsPlaceholder": "misali: majalisa, bita mai zurfi",
       "labelsDescription": "Raba lakabobi da waƙafi. Ma'ajiyar da aka kunna majalisa a cikinta za ta gudanar da majalisa ne kawai don buƙatun haɗawa da ke ɗauke da aƙalla ɗaya daga cikin waɗannan lakabobin. Bar shi babu komai don kowace buƙatar haɗawa da ta cancanta.",
+      "tooManyLabels": "Lakabobin majalisa sun yi yawa. Yi amfani da lakabobi {{maximum}} ko ƙasa da haka.",
+      "labelTooLong": "Lakabin majalisa ya yi tsawo sosai. Dole ne kowane lakabi ya kasance da haruffa {{maximum}} ko ƙasa da haka.",
       "minSpecialists": "Zaɓi aƙalla ƙwararru {{minimum}}. An zaɓi {{selected}}.",
       "specialistName": {
         "testCoverage": "Rufin gwaji",

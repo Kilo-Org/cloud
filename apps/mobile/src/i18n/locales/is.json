@@ -1427,6 +1427,8 @@
       "labels": "Merki sem kveikja á ráðsyfirferð",
       "labelsPlaceholder": "t.d. ráð, djúp yfirferð",
       "labelsDescription": "Aðgreindu merkin með kommum. Geymsla með ráðsyfirferð keyrir þá yfirferðina aðeins fyrir samrunabeiðnir sem bera að minnsta kosti eitt af þessum merkjum. Skildu eftir autt fyrir allar gjaldgengar samrunabeiðnir.",
+      "tooManyLabels": "Of mörg merki fyrir ráðsyfirferð. Notaðu að hámarki {{maximum}} merki.",
+      "labelTooLong": "Merki fyrir ráðsyfirferð er of langt. Hvert merki má innihalda að hámarki {{maximum}} stafi.",
       "minSpecialists": "Veldu að minnsta kosti {{minimum}} sérfræðinga. {{selected}} valdir.",
       "specialistName": {
         "testCoverage": "Prófunarþekja",

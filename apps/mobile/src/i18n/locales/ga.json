@@ -1499,6 +1499,8 @@
       "labels": "Lipéid a spreagann athbhreithniú comhairle",
       "labelsPlaceholder": "m.sh. comhairle, athbhreithniú domhain",
       "labelsDescription": "Scar lipéid le camóga. Ansin ní ritheann stór a bhfuil an chomhairle cumasaithe ann an chomhairle ach d'iarratais tarraingthe a bhfuil ceann amháin ar a laghad de na lipéid seo orthu. Fág bán é do gach iarratas tarraingthe incháilithe.",
+      "tooManyLabels": "Tá an iomarca lipéad comhairle ann. Úsáid {{maximum}} lipéad ar a mhéad.",
+      "labelTooLong": "Tá lipéad comhairle rófhada. Ní cheadaítear níos mó ná {{maximum}} carachtar in aon lipéad.",
       "minSpecialists": "Roghnaigh ar a laghad {{minimum}} speisialtóir. Roghnaithe: {{selected}}.",
       "specialistName": {
         "testCoverage": "Clúdach tástála",

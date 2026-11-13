@@ -853,6 +853,8 @@
       "labels": "Étiquettes qui déclenchent la revue en conseil",
       "labelsPlaceholder": "ex. : conseil, revue approfondie",
       "labelsDescription": "Séparez les étiquettes par des virgules. Un dépôt avec revue en conseil ne l'exécutera alors que pour les pull requests portant au moins une de ces étiquettes. Laissez vide pour toutes les pull requests éligibles.",
+      "tooManyLabels": "Trop d’étiquettes pour la revue en conseil. Utilisez au maximum {{maximum}} étiquettes.",
+      "labelTooLong": "Une étiquette pour la revue en conseil est trop longue. Chaque étiquette doit comporter au maximum {{maximum}} caractères.",
       "minSpecialists": "Sélectionnez au moins {{minimum}} spécialistes. Sélectionnés : {{selected}}.",
       "specialistName": {
         "testCoverage": "Couverture de tests",

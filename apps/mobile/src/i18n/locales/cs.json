@@ -1475,6 +1475,8 @@
       "labels": "Štítky spouštějící kontrolu radou",
       "labelsPlaceholder": "např. rada, hloubková kontrola",
       "labelsDescription": "Štítky oddělte čárkami. Repozitář se zapnutou radou ji pak spustí jen u pull requestů s alespoň jedním z těchto štítků. Ponechte prázdné pro všechny způsobilé pull requesty.",
+      "tooManyLabels": "Příliš mnoho štítků spouštějících kontrolu radou. Použijte nejvýše {{maximum}} štítků.",
+      "labelTooLong": "Štítek spouštějící kontrolu radou je příliš dlouhý. Každý štítek smí mít nejvýše {{maximum}} znaků.",
       "minSpecialists": "Minimální počet specialistů: {{minimum}}. Vybráno: {{selected}}.",
       "specialistName": {
         "testCoverage": "Pokrytí testy",

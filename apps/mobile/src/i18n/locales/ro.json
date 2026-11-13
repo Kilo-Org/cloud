@@ -1451,6 +1451,8 @@
       "labels": "Etichete care declanșează revizuirea în consiliu",
       "labelsPlaceholder": "de ex. consiliu, revizuire aprofundată",
       "labelsDescription": "Separă etichetele prin virgule. Un depozit cu consiliul activat rulează apoi revizuirea doar pentru PR-urile care au cel puțin una dintre aceste etichete. Lasă gol pentru toate PR-urile eligibile.",
+      "tooManyLabels": "Prea multe etichete pentru revizuirea în consiliu. Folosește cel mult {{maximum}} de etichete.",
+      "labelTooLong": "Eticheta pentru revizuirea în consiliu este prea lungă. Fiecare etichetă trebuie să aibă cel mult {{maximum}} de caractere.",
       "minSpecialists": "Selectează cel puțin {{minimum}} experți. {{selected}} selectați.",
       "specialistName": {
         "testCoverage": "Acoperirea testelor",

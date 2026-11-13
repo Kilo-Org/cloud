@@ -613,11 +613,11 @@ describe('newestGlanceableResult', () => {
 });
 
 describe('extreme timestamp ties', () => {
-  // Two rows that share the newest instant carry different kinds, and the
-  // glanceable surfaces name the winner's kind, so the tie must break on the
-  // first row: only a strictly later value replaces the winner. The two
-  // ISO-returning aggregates cannot show a tie, because every tied row would
-  // serialise to the same instant.
+  // A tie can only change an aggregate whose result carries more than the
+  // instant. The newest-result kind is read from the winning row, so the first
+  // row of a tie must win: only a strictly later value replaces the winner.
+  // The two ISO-returning aggregates serialise whichever tied row wins to the
+  // same string, so no assertion on them can distinguish the tie-break.
   const instant = new Date(NOW).toISOString();
 
   it('takes the newest-result kind from the first row of a tie', () => {
@@ -627,12 +627,6 @@ describe('extreme timestamp ties', () => {
         { status: 'busy', statusUpdatedAt: instant },
       ])
     ).toEqual({ kind: 'needsInput', at: instant });
-    expect(
-      oldestNeedsInputSince([
-        { status: 'permission', statusUpdatedAt: instant },
-        { status: 'question', statusUpdatedAt: instant },
-      ])
-    ).toBe(instant);
   });
 });
 

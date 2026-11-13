@@ -244,10 +244,11 @@ vi.mock('expo-router', () => ({
     // The POP_TO end state "Back to sessions" relies on: find the destination
     // at or below the current index, truncate everything above it; with no
     // match, drop the current route and land on the destination.
-    dismissTo: (href: string) => {
-      const index = navigationRoutes.lastIndexOf(href.split('?')[0] ?? href);
+    dismissTo: (href: string | { pathname: string }) => {
+      const path = typeof href === 'string' ? (href.split('?')[0] ?? href) : href.pathname;
+      const index = navigationRoutes.lastIndexOf(path);
       if (index === -1) {
-        navigationRoutes.splice(0, navigationRoutes.length, href);
+        navigationRoutes.splice(0, navigationRoutes.length, path);
       } else {
         navigationRoutes.splice(index + 1);
       }
@@ -3575,6 +3576,21 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
       expect(Boolean(error.onRetry)).toBe(code !== 'UNAUTHORIZED');
       expect(renderedText(view.renderer.root)).toContain('Back to sessions');
       expect(renderedText(view.renderer.root)).toContain('Copy');
+      // The card's Back returns to the sessions list through the same POP_TO
+      // the session route's not-found card uses, so the two cards cannot drift.
+      const backToSessions = view.renderer.root.find(
+        node =>
+          Object.is(node.type, 'Button') &&
+          renderedText(node).includes(i18n.t('agentChat.session.backToSessions'))
+      );
+      const routesBeforeCardBack = [...navigationRoutes];
+      const plantedRoutes: string[] = ['(app)', '/(app)/(tabs)/(2_agents)/', 'agent-chat/x'];
+      navigationRoutes.splice(0, navigationRoutes.length, ...plantedRoutes);
+      act(() => {
+        (backToSessions.props.onPress as () => void)();
+      });
+      expect(navigationRoutes).toEqual(['(app)', '/(app)/(tabs)/(2_agents)/']);
+      navigationRoutes.splice(0, navigationRoutes.length, ...routesBeforeCardBack);
     }
 
     const header = view.renderer.root.findByType(ScreenHeader);

@@ -357,6 +357,17 @@ vi.mock('@/lib/hooks/use-remote-model-catalog-retry', () => ({
 vi.mock('@/lib/hooks/use-session-raise-reader', () => ({
   useSessionRaiseReader: () => () => null,
 }));
+// The header pill adds the session's compute charges to its total; this screen
+// test supplies the model cost only, so the read is pinned to "nothing recorded".
+vi.mock('@/lib/hooks/use-session-compute', () => ({
+  useSessionComputeCharges: () => ({ data: undefined, isError: false, refetch: vi.fn() }),
+  useComputeRates: () => ({ data: undefined }),
+}));
+// The compute poll follows the screen's focus and the app's foreground state;
+// this suite is about delivery order, so it stands in as on screen.
+vi.mock('@/lib/hooks/use-app-active-and-focused', () => ({
+  useAppActiveAndFocused: () => true,
+}));
 vi.mock('@/lib/use-github-repos-refresh', () => ({
   useGitHubReposRefresh: () => ({ openGitHubIntegration: vi.fn() }),
 }));

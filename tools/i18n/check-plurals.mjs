@@ -83,6 +83,10 @@ export const NO_AGREEMENT = new Map([
     'ordinal position: "Setup command {{index}} of {{displayCount}}" names no inflected word',
   ],
   [
+    'agentChat.sessionChanges.reviewTitle',
+    'bare count in parentheses: "Review ({{count}})" names no inflected word',
+  ],
+  [
     'chat.reactions.accessibility',
     'bare count after a label: "{{emoji}} reaction, {{displayCount}}"',
   ],

@@ -13,6 +13,7 @@ import { createStore, Provider } from 'jotai';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { type Pressable } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
   type AssociatedPrData,
@@ -57,7 +58,10 @@ import {
   isSessionGoalCollapsed,
   setSessionGoalCollapsed,
 } from '@/components/agents/session-goal-collapse';
-import { SessionDetailContent } from '@/components/agents/session-detail-content';
+import {
+  CONTINUE_SCOPE_WAIT_MS,
+  SessionDetailContent,
+} from '@/components/agents/session-detail-content';
 import { AGENT_SESSION_NAV_GUARD_MS } from '@/components/agents/agent-session-nav-guard';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SESSION_TITLE_MAX_LENGTH } from '@/components/agents/session-detail-rename-state';
@@ -138,6 +142,9 @@ vi.mock('@/components/agents/user-web-connection-provider', () => ({
 // Keep the actual detail/card/sheet/header callbacks and SDK. Replace native
 // rendering and unrelated composer, account, model-picker, and router dependencies.
 const navigationRoutes = vi.hoisted(() => ['session-detail']);
+// A navigator that drops one kind of push, the way it drops an action issued
+// while the calling route is still settling: the call returns and nothing lands.
+const routerDropsPush = vi.hoisted(() => ({ value: false }));
 // The personal `agentProfiles.list` rows the header's active-profile chip
 // reads; tests set it before mounting to drive the chip's presence.
 const profileRowsState = vi.hoisted(() => {
@@ -230,9 +237,11 @@ vi.mock('expo-router', () => ({
   useNavigationContainerRef: () => navigationContainer,
   usePreventRemove: vi.fn(),
   useNavigation: () => ({
+    // The state the navigator would hold after the router calls above: the
+    // composer's push is only "opened" once it is the route on top.
     getState: () => ({
-      index: 1,
-      routes: [{ name: '(tabs)' }, { name: 'agent-chat/[session-id]' }],
+      index: navigationRoutes.length - 1,
+      routes: navigationRoutes.map(name => ({ name })),
     }),
     addListener: () => () => undefined,
   }),
@@ -247,15 +256,19 @@ vi.mock('expo-router', () => ({
     // The POP_TO end state "Back to sessions" relies on: find the destination
     // at or below the current index, truncate everything above it; with no
     // match, drop the current route and land on the destination.
-    dismissTo: (href: string) => {
-      const index = navigationRoutes.lastIndexOf(href.split('?')[0] ?? href);
+    dismissTo: (href: string | { pathname: string }) => {
+      const path = typeof href === 'string' ? (href.split('?')[0] ?? href) : href.pathname;
+      const index = navigationRoutes.lastIndexOf(path);
       if (index === -1) {
-        navigationRoutes.splice(0, navigationRoutes.length, href);
+        navigationRoutes.splice(0, navigationRoutes.length, path);
       } else {
         navigationRoutes.splice(index + 1);
       }
     },
     push: (href: string) => {
+      if (routerDropsPush.value) {
+        return;
+      }
       navigationRoutes.push(href);
     },
     setParams: routerSetParams,
@@ -656,6 +669,23 @@ vi.mock('@/lib/hooks/use-remote-model-catalog-retry', () => ({
 vi.mock('@/lib/hooks/use-session-raise-reader', () => ({
   useSessionRaiseReader: () => () => null,
 }));
+// The header pill adds the session's compute charges to its total; this screen
+// test supplies the model cost only, so the read is pinned to "nothing recorded"
+// while its arguments are recorded for the polling test.
+const computeReadArgs = vi.hoisted(() => ({ calls: [] as { poll?: boolean }[] }));
+vi.mock('@/lib/hooks/use-session-compute', () => ({
+  useSessionComputeCharges: (args: { poll?: boolean } = {}) => {
+    computeReadArgs.calls.push(args);
+    return { data: undefined, isError: false, refetch: vi.fn() };
+  },
+  useComputeRates: () => ({ data: undefined }),
+}));
+// The poll follows the screen's focus and the app's foreground state; that hook
+// has its own mounted suite, so this screen test supplies the reading.
+const computePolling = vi.hoisted(() => ({ focusedAndActive: true }));
+vi.mock('@/lib/hooks/use-app-active-and-focused', () => ({
+  useAppActiveAndFocused: () => computePolling.focusedAndActive,
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/lib/persist/drafts', () => ({ agentComposerDraftKey: (id: string) => id }));
 vi.mock('@/lib/persist/use-draft-load', () => ({
@@ -909,6 +939,15 @@ function composerProps(view: { renderer: ReactTestRenderer }) {
   };
 }
 
+/** The read-only footer's only control, found by the label a person reads. */
+function continueControlOf(renderer: ReactTestRenderer): ReactTestInstance {
+  return renderer.root.find(
+    node =>
+      Object.is(node.type, 'Button') &&
+      node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+  );
+}
+
 /**
  * The FlashList keys the first message list would mount rows under. The list is
  * stubbed, so read the props the stub was handed: the same `keyExtractor` the
@@ -928,6 +967,7 @@ function transcriptKeys(renderer: ReactTestRenderer): string[] {
 
 beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
+  routerDropsPush.value = false;
   routerSetParams.mockClear();
   navigationContainer.ready = true;
   profileRowsState.personal = [];
@@ -1640,23 +1680,31 @@ describe('session detail organization scope', () => {
     expect(createAndNavigateAgentSession).not.toHaveBeenCalled();
     expect(restartAgentSession).not.toHaveBeenCalled();
 
-    // The read-only footer's Continue is the same class of action: the same
-    // window paints that footer, so it keeps its reserve instead of offering a
-    // Continue that cannot open a destination.
+    // The read-only footer's Continue is the same class of action: it needs the
+    // session's own row for the destination's organization. The window before
+    // that row arrives paints the live control, not the inert reserve, and a
+    // press in that window is held rather than dropped: the reserve swallowed
+    // the press the footer exists for.
     await act(async () => {
       view.store.set(view.manager.atoms.activeSessionType, 'read-only');
       await Promise.resolve();
     });
     expect(
       view.renderer.root.findAll(node => Object.is(node.type, 'SessionReadOnlyFooterPlaceholder'))
-    ).toHaveLength(1);
-    expect(
-      view.renderer.root.findAll(
-        node =>
-          Object.is(node.type, 'Button') &&
-          node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
-      )
     ).toHaveLength(0);
+    const heldContinue = continueControlOf(view.renderer);
+    expect(heldContinue.props.loading).toBe(false);
+    await act(async () => {
+      (heldContinue.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    // The press is answered in place, so a second tap cannot open a second
+    // composer, and nothing is opened before the row lands.
+    expect(continueControlOf(view.renderer).props.loading).toBe(true);
+    await act(async () => {
+      (continueControlOf(view.renderer).props.onPress as () => void)();
+      await Promise.resolve();
+    });
     expect(
       navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
     ).toHaveLength(0);
@@ -1669,6 +1717,17 @@ describe('session detail organization scope', () => {
     const detailsSheet = detailsSheetNode(view.renderer);
     expect(detailsSheet.props.visible).toBe(true);
     expect(detailsSheet.props.onForkFromHere).toBeUndefined();
+
+    // The row lands: the held press opens the composer seeded from this
+    // session, and only once.
+    await act(async () => {
+      metadata.resolve(undefined);
+      await Promise.resolve();
+    });
+    await waitFor(
+      () => navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new')).length === 1
+    );
+    expect(navigationRoutes.at(-1)).toContain(`cloneFromKiloSessionId=${ROOT_ID}`);
   });
 
   it('offers the fork entry once the session row resolves', async () => {
@@ -1692,6 +1751,58 @@ describe('session detail organization scope', () => {
     const destination = navigationRoutes.at(-1) ?? '';
     expect(destination.startsWith('/(app)/agent-chat/new?organizationId=org-a')).toBe(true);
     expect(destination).toContain(`cloneUpToMessageId=${row.info.id}`);
+  });
+
+  it('retries a failed fork as the same fork, not as a plain continue', async () => {
+    // The footer reports one failure with one Retry, so Retry must repeat the
+    // press that failed. A fork retried as a plain Continue would open a
+    // composer that is not cut at the message the person chose.
+    //
+    // Real timers on purpose: the read-back that decides the press failed runs
+    // on the clock, and the held-press release waits for the session row through
+    // this suite's own settled waits.
+    goalMountOptions = { resolvedType: 'remote' };
+    const row = childMessage(ROOT_ID, 'forked row');
+    const view = await mountDetails([row], { sessionOrganizationId: 'org-a' });
+    await waitFor(() => view.store.get(view.manager.atoms.fetchedSessionData) !== null);
+    // The footer that reports the failure belongs to a stored session.
+    await act(async () => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      await Promise.resolve();
+    });
+
+    act(() => {
+      messageBubbleProps(view.renderer, row.info.id).onLongPressDetails(row);
+    });
+    const fork = detailsSheetNode(view.renderer).props.onForkFromHere;
+    expect(typeof fork).toBe('function');
+
+    routerDropsPush.value = true;
+    await act(async () => {
+      (fork as () => void)();
+      await new Promise(resolve => {
+        setTimeout(resolve, 1500);
+      });
+    });
+    expect(renderedTextOutsideSheet(view.renderer.root)).toContain(
+      i18n.t('common.somethingWentWrong')
+    );
+
+    routerDropsPush.value = false;
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await new Promise(resolve => {
+        setTimeout(resolve, 1500);
+      });
+    });
+
+    const destination = navigationRoutes.at(-1) ?? '';
+    expect(destination).toContain(`cloneUpToMessageId=${row.info.id}`);
+    expect(destination).toContain('organizationId=org-a');
   });
 });
 
@@ -2632,15 +2743,17 @@ describe('session detail slow load', () => {
   });
 
   it('holds the read-only footer area, not a composer, while a read-only open has nothing to show', async () => {
+    // The kind is not known yet, so the area is still the reserve. The reserve
+    // exists to keep the slot out of a composer the session may never get.
     const view = await mountDetails(null);
-    // The session resolves to a kind with no writer while its transcript is
-    // still stalled, so its bottom slot is the footer's.
     act(() => {
-      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
-      view.store.set(view.manager.atoms.isReadOnly, true);
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, null);
+      view.store.set(view.manager.atoms.isReadOnly, false);
     });
-    // The skeleton owns the body and the session's transport has not answered:
-    // no composer, and the footer's area is held instead.
     expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
     expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(1);
     expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(0);
@@ -2648,8 +2761,28 @@ describe('session detail slow load', () => {
       0
     );
 
-    // The read-only footer takes the held area, so the transcript never moves
-    // under it when the transport turns out to have no writer.
+    // The kind resolves to read-only while the transport is still stalled: the
+    // footer goes live instead of keeping the reserve — it is the one control
+    // on this screen, and an inert one is what the explorer measured.
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      view.store.set(view.manager.atoms.isReadOnly, true);
+    });
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+    expect(
+      view.renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'Button') &&
+          node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+      )
+    ).toHaveLength(1);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+
+    // The transcript lands, and the footer is the same control in the same
+    // slot: the transcript never moves under it.
     await view.respond(ROOT_ID, [childMessage(ROOT_ID, 'read-only row')]);
     expect(renderedText(view.renderer.root)).toContain('read-only row');
     expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
@@ -3579,6 +3712,21 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
       expect(Boolean(error.onRetry)).toBe(code !== 'UNAUTHORIZED');
       expect(renderedText(view.renderer.root)).toContain('Back to sessions');
       expect(renderedText(view.renderer.root)).toContain('Copy');
+      // The card's Back returns to the sessions list through the same POP_TO
+      // the session route's not-found card uses, so the two cards cannot drift.
+      const backToSessions = view.renderer.root.find(
+        node =>
+          Object.is(node.type, 'Button') &&
+          renderedText(node).includes(i18n.t('agentChat.session.backToSessions'))
+      );
+      const routesBeforeCardBack = [...navigationRoutes];
+      const plantedRoutes: string[] = ['(app)', '/(app)/(tabs)/(2_agents)/', 'agent-chat/x'];
+      navigationRoutes.splice(0, navigationRoutes.length, ...plantedRoutes);
+      act(() => {
+        (backToSessions.props.onPress as () => void)();
+      });
+      expect(navigationRoutes).toEqual(['(app)', '/(app)/(tabs)/(2_agents)/']);
+      navigationRoutes.splice(0, navigationRoutes.length, ...routesBeforeCardBack);
     }
 
     const header = view.renderer.root.findByType(ScreenHeader);
@@ -5525,29 +5673,33 @@ describe('session detail read-only composer', () => {
     expect(controlLabels).toContain(i18n.t('agentChat.session.continueInNewSession'));
   });
 
-  // The transcript paints a skeleton until its rows stop measuring. The chrome
-  // around it reads the same fact: a live continue footer beside a loading body
-  // is the screen showing two states at once.
-  it('keeps the footer and the pill in their loading shapes until the rows are painted', async () => {
+  // The transcript paints a skeleton until its rows stop measuring. The footer
+  // does not wait for that verdict: it holds the session's one control from the
+  // moment the kind resolves, and the pill's box holds its own row. Both stay
+  // where they are while the body fills in.
+  it('keeps the continue control on screen while the rows are still measuring', async () => {
+    // The transcript paints in two steps and the list reports its settle from
+    // its own measurement, which lands after the rows it just rendered. The
+    // footer used to follow that report: the live control was replaced by the
+    // inert placeholder that reserves its shape, and a press in the window
+    // landed on nothing. The control is the screen's one action, so it stays —
+    // busy while the body is still measuring, live once the rows have settled.
     openSettledReport.value = false;
     const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
-
-    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(1);
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    // The pill paints its ring alone in every unresolved state, and the box
+    // around it holds the row its values will take, so nothing shrinks when the
+    // values arrive.
+    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(0);
     expect(
       view.renderer.root.findAll(
         node =>
           Object.is(node.type, 'Button') &&
           node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
       )
-    ).toHaveLength(0);
-    // The pill paints its ring alone in every unresolved state, and the box
-    // around it holds the row its values will take, so nothing shrinks when the
-    // values arrive.
-    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
-    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(0);
+    ).toHaveLength(1);
 
-    // The list then reports its rows painted, and the footer takes the
-    // placeholder's place in the same slot.
+    // The rows settle, and the footer is the same slot with the live control.
     const list = view.renderer.root.findByType(SessionMessageList);
     act(() => {
       (list.props as ComponentProps<typeof SessionMessageList>).onOpenSettledChange?.(
@@ -5627,21 +5779,188 @@ describe('session detail read-only composer', () => {
       nowSpy.mockRestore();
     });
 
-    act(() => {
+    await act(async () => {
       (continueControl.props.onPress as () => void)();
       (continueControl.props.onPress as () => void)();
+      // Flush the verification the press started before asserting on it.
+      await Promise.resolve();
     });
     expect(
       navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
     ).toHaveLength(1);
 
     nowSpy.mockReturnValue(now + AGENT_SESSION_NAV_GUARD_MS);
-    act(() => {
+    await act(async () => {
       (continueControl.props.onPress as () => void)();
+      await Promise.resolve();
     });
     expect(
       navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
     ).toHaveLength(2);
+  });
+
+  it('states a failed open and retries it from the same footer', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+      routerDropsPush.value = true;
+
+      await act(async () => {
+        (continueControlOf(view.renderer).props.onPress as () => void)();
+        await Promise.resolve();
+      });
+      // The press is acknowledged in place while the open is read back: the
+      // footer is busy, not unchanged.
+      expect(continueControlOf(view.renderer).props.loading).toBe(true);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+
+      // The push never landed, so the screen says so beside the control that
+      // can retry it.
+      expect(renderedText(view.renderer.root)).toContain(i18n.t('common.somethingWentWrong'));
+      const retry = view.renderer.root.find(
+        node =>
+          Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+      );
+      expect(continueControlOf(view.renderer).props.loading).toBe(false);
+
+      routerDropsPush.value = false;
+      await act(async () => {
+        (retry.props.onPress as () => void)();
+        await Promise.resolve();
+      });
+      expect(
+        navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+      ).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('offers a fresh press instead of the old failure once the screen is focused again', async () => {
+    // The wait for the composer is bounded, so a push the navigator applies
+    // later still leaves the failure behind. The person then sees the composer,
+    // and returning here must offer one press: a stale error would carry a Retry
+    // that opens a second composer.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+      routerDropsPush.value = true;
+      const focusEffectsBefore = vi.mocked(useFocusEffect).mock.calls.length;
+
+      await act(async () => {
+        (continueControlOf(view.renderer).props.onPress as () => void)();
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(renderedText(view.renderer.root)).toContain(i18n.t('common.somethingWentWrong'));
+
+      // The navigator applies the push after the wait gave up on it, and the
+      // person comes back: this is the focus event the screen receives.
+      const focusEffects = vi
+        .mocked(useFocusEffect)
+        .mock.calls.slice(0, focusEffectsBefore)
+        .map(([effect]) => effect);
+      await act(async () => {
+        for (const effect of focusEffects) {
+          effect();
+        }
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(renderedText(view.renderer.root)).not.toContain(i18n.t('common.somethingWentWrong'));
+      expect(continueControlOf(view.renderer).props.loading).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('paints no failure for a press the focus reset already answered', async () => {
+    // The read-back is bounded but the navigator can answer later. A person who
+    // saw the composer and came back must not find an error about a press that
+    // actually worked.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+      const focusEffectsBefore = vi.mocked(useFocusEffect).mock.calls.length;
+      routerDropsPush.value = true;
+
+      await act(async () => {
+        (continueControlOf(view.renderer).props.onPress as () => void)();
+        await Promise.resolve();
+      });
+
+      // The composer was the destination and the person is back: the screen's
+      // focus effect runs before the read-back's answer.
+      const focusEffects = vi
+        .mocked(useFocusEffect)
+        .mock.calls.slice(0, focusEffectsBefore)
+        .map(([effect]) => effect);
+      await act(async () => {
+        for (const effect of focusEffects) {
+          effect();
+        }
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+
+      expect(renderedText(view.renderer.root)).not.toContain(i18n.t('common.somethingWentWrong'));
+      expect(continueControlOf(view.renderer).props.loading).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('states the failure when the row a held press waits for never arrives', async () => {
+    // A press before the session's own row resolves is held, not dropped. The
+    // wait is bounded: a row that never lands must end in the stated failure
+    // with a Retry, never in a footer that stays busy for good.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const metadata = Promise.withResolvers<undefined>();
+      const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], {
+        metadataReady: metadata.promise,
+        cachedRows: [childMessage(ROOT_ID, 'shown row')],
+      });
+      await act(async () => {
+        view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+        await Promise.resolve();
+      });
+
+      await act(async () => {
+        (continueControlOf(view.renderer).props.onPress as () => void)();
+        await Promise.resolve();
+      });
+      expect(continueControlOf(view.renderer).props.loading).toBe(true);
+      expect(renderedText(view.renderer.root)).not.toContain(i18n.t('common.somethingWentWrong'));
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CONTINUE_SCOPE_WAIT_MS);
+      });
+      expect(renderedText(view.renderer.root)).toContain(i18n.t('common.somethingWentWrong'));
+      expect(continueControlOf(view.renderer).props.loading).toBe(false);
+      expect(
+        navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+      ).toHaveLength(0);
+
+      // The row finally lands and the same footer retries: the press opens the
+      // composer it was always meant to open. (No `waitFor` here: it polls on
+      // the timers this test fakes.)
+      await act(async () => {
+        metadata.resolve(undefined);
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(view.store.get(view.manager.atoms.fetchedSessionData)?.kiloSessionId).toBe(ROOT_ID);
+      await act(async () => {
+        (continueControlOf(view.renderer).props.onPress as () => void)();
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(
+        navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+      ).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -6062,3 +6381,18 @@ function composerPropsWithInset(view: { renderer: ReactTestRenderer }) {
     onInputBottomInsetChange?: (dp: number) => void;
   };
 }
+describe('session detail compute polling', () => {
+  it('polls the compute read only while the screen is focused and the app is active', async () => {
+    computeReadArgs.calls.length = 0;
+    computePolling.focusedAndActive = true;
+    await mountDetails();
+    expect(computeReadArgs.calls.at(-1)?.poll).toBe(true);
+
+    // A screen left on the navigation stack keeps mounting its reads; a blurred
+    // one must leave the shared timer to whichever surface is on screen.
+    computeReadArgs.calls.length = 0;
+    computePolling.focusedAndActive = false;
+    await mountDetails();
+    expect(computeReadArgs.calls.at(-1)?.poll).toBe(false);
+  });
+});

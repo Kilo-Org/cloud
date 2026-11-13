@@ -43,30 +43,35 @@ const assertLayoutAtWidth = async (
 
   const modeBox = await modeButton.boundingBox();
   const modelBox = await modelButton.boundingBox();
-  const effortBox = await effortSelect.boundingBox();
+  // Below 380px the footer hides the thinking control so the remaining controls keep their room.
+  const showsEffortControl = width >= 380;
+  const effortBox = showsEffortControl ? await effortSelect.boundingBox() : null;
   const donutBox = await donut.boundingBox();
   const wrapperBox = await wrapper.boundingBox();
   const rowBox = await row.boundingBox();
 
   expect(modeBox).not.toBeNull();
   expect(modelBox).not.toBeNull();
-  expect(effortBox).not.toBeNull();
   expect(donutBox).not.toBeNull();
   expect(wrapperBox).not.toBeNull();
   expect(rowBox).not.toBeNull();
+  expect(effortBox === null).toBe(!showsEffortControl);
 
-  if (!modeBox || !modelBox || !effortBox || !donutBox || !wrapperBox || !rowBox) {
+  if (!modeBox || !modelBox || !donutBox || !wrapperBox || !rowBox) {
     return;
   }
 
   const modeRight = modeBox.x + modeBox.width;
   const modelRight = modelBox.x + modelBox.width;
-  const effortRight = effortBox.x + effortBox.width;
+  const nextControlLeft = effortBox === null ? donutBox.x : Math.min(effortBox.x, donutBox.x);
 
-  // No overlap between consecutive controls (mode → model → effort → donut)
+  // No overlap between consecutive controls (mode → model → [effort] → donut)
   expect(modeRight).toBeLessThanOrEqual(modelBox.x + 0.5);
-  expect(modelRight).toBeLessThanOrEqual(effortBox.x + 0.5);
-  expect(effortRight).toBeLessThanOrEqual(donutBox.x + 0.5);
+  expect(modelRight).toBeLessThanOrEqual(nextControlLeft + 0.5);
+
+  if (effortBox !== null) {
+    expect(effortBox.x + effortBox.width).toBeLessThanOrEqual(donutBox.x + 0.5);
+  }
 
   // Model trigger button does not overflow its wrapper
   expect(modelRight).toBeLessThanOrEqual(wrapperBox.x + wrapperBox.width + 0.5);
@@ -77,7 +82,10 @@ const assertLayoutAtWidth = async (
 
   // Single row at 560px: all four controls' tops within 1px
   if (width === 560) {
-    const tops = [modeBox.y, modelBox.y, effortBox.y, donutBox.y];
+    const tops =
+      effortBox === null
+        ? [modeBox.y, modelBox.y, donutBox.y]
+        : [modeBox.y, modelBox.y, effortBox.y, donutBox.y];
     const maxTop = Math.max(...tops);
     const minTop = Math.min(...tops);
     expect(maxTop - minTop).toBeLessThanOrEqual(1);
@@ -88,31 +96,11 @@ const assertLayoutAtWidth = async (
     const isTruncated = await modelButton
       .locator('span.truncate')
       .evaluate(element => element.scrollWidth > element.clientWidth);
-    expect(isTruncated).toBe(true);
+    // Hiding the thinking control below 380px leaves the model label its full width.
+    expect(isTruncated).toBe(false);
 
-    const readableAreaFits = await effortSelect.evaluate(async select => {
-      if (!(select instanceof HTMLSelectElement)) {
-        return false;
-      }
-
-      const label = select.selectedOptions[0]?.textContent ?? '';
-      await document.fonts.ready;
-      const style = getComputedStyle(select);
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-
-      if (!context) {
-        return false;
-      }
-
-      context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-
-      return (
-        context.measureText(label).width <=
-        select.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
-      );
-    });
-    expect(readableAreaFits).toBe(true);
+    // The narrow footer drops the thinking control instead of squeezing its label.
+    await expect(effortSelect).toBeHidden();
   }
 
   // Donut opens its popover and closes on a second summary click
@@ -140,7 +128,9 @@ test('footer controls never overlap from 320px through 560px', async () => {
     await assertLayoutAtWidth(sidePanel, 400, false);
     await assertLayoutAtWidth(sidePanel, 560, false);
 
-    // Repeat 320px assertions with "instant" (the longest emitted label: "Instant", 7 chars)
+    // Repeat the 320px assertions with "instant" (the longest emitted label: "Instant", 7 chars).
+    // The control is hidden at 320px, so widen the panel before selecting it.
+    await sidePanel.setViewportSize({ height: 800, width: 560 });
     await sidePanel.getByLabel('Thinking effort').selectOption('instant');
     await assertLayoutAtWidth(sidePanel, 320, true);
   } finally {

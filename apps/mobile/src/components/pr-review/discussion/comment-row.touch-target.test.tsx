@@ -23,6 +23,10 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0 }),
 }));

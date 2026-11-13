@@ -33,7 +33,7 @@ export type KiloPassSubscription = {
  * provider's value unchanged, so the set is written here instead of trusting
  * a fixed count.
  */
-const ENDED_STATUSES = new Set(['canceled', 'incomplete_expired', 'unpaid']);
+export const ENDED_STATUSES = new Set(['canceled', 'incomplete_expired', 'unpaid']);
 
 /** The plan's tier name, keyed by the tier the server stores. */
 const TIER_LABEL_KEYS = {
@@ -87,13 +87,26 @@ function formatIsoDate(iso: string | null | undefined): string | null {
       });
 }
 
+/** A plan as a reader names it: the tier and the cadence it bills on. */
+export function kiloPassPlanLabel(
+  tier: KiloPassSubscription['tier'],
+  cadence: KiloPassSubscription['cadence']
+): string {
+  return `${i18n.t(TIER_LABEL_KEYS[tier])} · ${i18n.t(CADENCE_LABEL_KEYS[cadence])}`;
+}
+
 function planLabel(subscription: KiloPassSubscription): string {
-  return `${i18n.t(TIER_LABEL_KEYS[subscription.tier])} · ${i18n.t(CADENCE_LABEL_KEYS[subscription.cadence])}`;
+  return kiloPassPlanLabel(subscription.tier, subscription.cadence);
 }
 
 function statusLabel(subscription: KiloPassSubscription): string {
   if (subscription.cancelAtPeriodEnd) {
-    return i18n.t('organization.kiloPass.canceling');
+    // The cancellation date is the pass's own paid-through date, so the status
+    // line says when access ends instead of only that it will.
+    const cancelsOn = formatIsoDate(subscription.nextBillingAt);
+    return cancelsOn
+      ? i18n.t('kiloPass.manage.cancelScheduled', { date: cancelsOn })
+      : i18n.t('organization.kiloPass.canceling');
   }
   switch (subscription.status) {
     case 'trialing': {

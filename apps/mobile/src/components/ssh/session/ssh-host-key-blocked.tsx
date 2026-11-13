@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
 import { ShieldAlert } from '@/components/ui/icons';
@@ -34,9 +35,10 @@ export function SshHostKeyBlocked({
 }: SshHostKeyBlockedProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const { bottom } = useSafeAreaInsets();
 
   return (
-    <View className="flex-1 gap-4 px-4 py-6">
+    <View className="flex-1 gap-4 px-4 pt-6" style={{ paddingBottom: bottom + 24 }}>
       <View className="flex-row items-center gap-2">
         <ShieldAlert size={20} color={colors.destructive} />
         <Text className="text-base font-semibold text-foreground">

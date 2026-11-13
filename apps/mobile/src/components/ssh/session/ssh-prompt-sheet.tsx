@@ -83,6 +83,7 @@ function HostKeyForm({
 
   return (
     <PickerSheet
+      topInset="android-window-top"
       title={t('ssh.session.hostKeyTitle')}
       // The header carries no decision here: both answers are body buttons, so
       // a header submit, if one is ever rendered, refuses the key.
@@ -161,6 +162,7 @@ function SecretForm({
 
   return (
     <PickerSheet
+      topInset="android-window-top"
       title={title}
       doneLabel={password ? t('common.connect') : t('ssh.session.unlock')}
       onDone={submit}
@@ -217,6 +219,7 @@ function PromptsForm({
 
   return (
     <PickerSheet
+      topInset="android-window-top"
       title={phase.prompts.name.trim() || t('ssh.session.promptTitle')}
       doneLabel={t('ssh.session.promptsSubmit')}
       onDone={submit}

@@ -7,10 +7,18 @@ const originalEnv = {
   NODE_ENV: process.env.NODE_ENV,
   JEST_WORKER_ID: process.env.JEST_WORKER_ID,
   POSTGRES_URL: process.env.POSTGRES_URL,
+  POSTGRES_URL_PRODUCTION: process.env.POSTGRES_URL_PRODUCTION,
+  USE_PRODUCTION_DB: process.env.USE_PRODUCTION_DB,
 };
 
 function withEnv(name: string, value: string | undefined): void {
-  Object.defineProperty(process.env, name, { value, configurable: true });
+  // Next augments several process.env keys as readonly, so assignment through
+  // Reflect keeps the restore path type-safe.
+  if (value === undefined) {
+    Reflect.deleteProperty(process.env, name);
+  } else {
+    Reflect.set(process.env, name, value);
+  }
 }
 
 afterEach(() => {
@@ -22,9 +30,17 @@ afterEach(() => {
   withEnv('NODE_ENV', originalEnv.NODE_ENV);
   withEnv('JEST_WORKER_ID', originalEnv.JEST_WORKER_ID);
   withEnv('POSTGRES_URL', originalEnv.POSTGRES_URL);
+  withEnv('POSTGRES_URL_PRODUCTION', originalEnv.POSTGRES_URL_PRODUCTION);
+  withEnv('USE_PRODUCTION_DB', originalEnv.USE_PRODUCTION_DB);
 });
 
 describe('computeDatabaseUrl', () => {
+  beforeEach(() => {
+    withEnv('NODE_ENV', 'development');
+    withEnv('USE_PRODUCTION_DB', undefined);
+    withEnv('POSTGRES_URL_PRODUCTION', undefined);
+  });
+
   it('appends the jest worker id to the database name, not the query string', () => {
     withEnv('NODE_ENV', 'test');
     withEnv('JEST_WORKER_ID', '3');
@@ -42,6 +58,28 @@ describe('computeDatabaseUrl', () => {
     expect(computeDatabaseUrl()).toBe(
       'postgres://user:secret@db.example.com:5432/mydb?sslmode=require'
     );
+  });
+
+  it('uses POSTGRES_URL_PRODUCTION and ignores POSTGRES_URL in production mode', () => {
+    withEnv('USE_PRODUCTION_DB', 'true');
+    withEnv('POSTGRES_URL', 'postgres://dev:secret@db.example.com:5432/dev');
+    withEnv('POSTGRES_URL_PRODUCTION', 'postgres://prod:secret@prod.example.com:5432/prod');
+
+    expect(computeDatabaseUrl()).toBe('postgres://prod:secret@prod.example.com:5432/prod');
+  });
+
+  it('names POSTGRES_URL when the default mode has no URL', () => {
+    withEnv('POSTGRES_URL', undefined);
+
+    expect(() => computeDatabaseUrl()).toThrow('POSTGRES_URL not configured');
+  });
+
+  it('names POSTGRES_URL_PRODUCTION when production mode has no URL', () => {
+    withEnv('USE_PRODUCTION_DB', 'true');
+    withEnv('POSTGRES_URL', 'postgres://dev:secret@db.example.com:5432/dev');
+    withEnv('POSTGRES_URL_PRODUCTION', undefined);
+
+    expect(() => computeDatabaseUrl()).toThrow('POSTGRES_URL_PRODUCTION not configured');
   });
 });
 

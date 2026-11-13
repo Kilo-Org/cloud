@@ -18,20 +18,7 @@ export const USER_DELETION_RESOURCE_BATCH_SIZE = 10;
 export const USER_DELETION_USAGE_PREFIX_BATCH_SIZE = 1_000;
 export const USER_DELETION_USAGE_PREFIX_STATEMENT_TIMEOUT_MS = 8_000;
 export const USER_DELETION_CONTINUE_DELAY_MS = 1_000;
-/**
- * Waits before the next PostHog erasure verification. PostHog deletes persons in
- * the background and clears event data in non-peak batches, so the common case is
- * minutes and the slow case is hours. After the last entry the step escalates.
- */
-export const USER_DELETION_POSTHOG_VERIFY_BACKOFF_MS = [
-  60_000,
-  5 * 60_000,
-  15 * 60_000,
-  60 * 60_000,
-  3 * 60 * 60_000,
-  6 * 60 * 60_000,
-  12 * 60 * 60_000,
-] as const;
+export const USER_DELETION_POSTHOG_MAX_VERIFY_ATTEMPTS = 3;
 export const USER_DELETION_SUBSTACK_TIMEOUT_MS = 15_000;
 export const USER_DELETION_SUBSTACK_USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';

@@ -594,9 +594,12 @@ function CloudSidebarLayoutContent({
     worktreeSessionsData?.cliSessions,
   ]);
 
+  // The project filter offers the repositories of the sessions this view lists,
+  // so it reads the same scope those sessions are listed under: `null` is the
+  // personal scope, and an id is that organization's scope.
   const { data: recentReposData } = useQuery({
     ...trpc.cliSessionsV2.recentRepositories.queryOptions({
-      organizationId,
+      organizationId: organizationId ?? null,
       updatedSince: repoUpdatedSince,
     }),
     staleTime: 60_000,

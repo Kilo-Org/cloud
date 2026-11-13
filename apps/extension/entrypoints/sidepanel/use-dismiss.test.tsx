@@ -1,12 +1,21 @@
+/* eslint-disable vitest/no-hooks, vitest/require-top-level-describe -- every test here mounts a surface with a document-level listener, so the DOM must be cleaned between tests */
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi, afterEach } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { useDismissOnOutsideClick, useEscapeKey, useModalDialog } from './use-dismiss';
 
-const DialogHarness = ({ onClose }: { onClose: () => void }): JSX.Element => {
+afterEach(cleanup);
+
+const DialogHarness = ({
+  onClose,
+  withSelect = false,
+}: {
+  onClose: () => void;
+  withSelect?: boolean;
+}): JSX.Element => {
   const [open, setOpen] = useState(false);
   const dialogRef = useModalDialog({
     onClose: () => {
@@ -29,6 +38,21 @@ const DialogHarness = ({ onClose }: { onClose: () => void }): JSX.Element => {
       {open ? (
         <div ref={dialogRef} role="dialog" tabIndex={-1}>
           <button type="button">First control</button>
+          <button
+            onKeyDown={event => {
+              if (event.key === 'Escape') {
+                event.preventDefault();
+              }
+            }}
+            type="button"
+          >
+            Escape owner
+          </button>
+          {withSelect ? (
+            <select aria-label="Credit account">
+              <option value="one">One</option>
+            </select>
+          ) : null}
           <button type="button">Last control</button>
         </div>
       ) : null}
@@ -42,7 +66,14 @@ const EscapeHarness = ({ enabled }: { enabled: boolean }): JSX.Element => {
     setCount(current => current + 1);
   });
 
-  return <button type="button">{`Dismissed ${count}`}</button>;
+  return (
+    <div>
+      <button type="button">{`Dismissed ${count}`}</button>
+      <select aria-label="Native picker">
+        <option value="one">One</option>
+      </select>
+    </div>
+  );
 };
 
 const OutsideClickHarness = ({ enabled }: { enabled: boolean }): JSX.Element => {
@@ -85,6 +116,30 @@ describe('modal dialog focus and dismissal', () => {
     expect(document.activeElement).toBe(opener);
   });
 
+  it('leaves Escape to an open native select inside the dialog', () => {
+    const onClose = vi.fn();
+    render(<DialogHarness onClose={onClose} withSelect />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open settings' }));
+
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Credit account' }), {
+      key: 'Escape',
+    });
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeNull();
+  });
+
+  it('leaves Escape to a control that already handled it', () => {
+    const onClose = vi.fn();
+    render(<DialogHarness onClose={onClose} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open settings' }));
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Escape owner' }), { key: 'Escape' });
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeNull();
+  });
+
   it('wraps Tab and Shift+Tab inside the dialog', () => {
     render(<DialogHarness onClose={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Open settings' }));
@@ -111,6 +166,16 @@ describe('escape dismissal', () => {
     rerender(<EscapeHarness enabled />);
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.getByRole('button', { name: 'Dismissed 1' })).toBeDefined();
+  });
+
+  it('leaves Escape to an open native select', () => {
+    render(<EscapeHarness enabled />);
+
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Native picker' }), {
+      key: 'Escape',
+    });
+
+    expect(screen.getByRole('button', { name: 'Dismissed 0' })).toBeDefined();
   });
 });
 

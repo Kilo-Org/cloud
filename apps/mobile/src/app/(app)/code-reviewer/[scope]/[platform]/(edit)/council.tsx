@@ -1,7 +1,6 @@
 import {
   COUNCIL_AGGREGATION_STRATEGIES,
   COUNCIL_MIN_SPECIALISTS,
-  COUNCIL_SPECIALIST_PRESETS,
 } from '@kilocode/app-shared/code-review';
 import { type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -9,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { CenteredState } from '@/components/centered-state';
+import { CouncilSpecialistsSection } from '@/components/code-reviewer/council-specialists-section';
 import { ReviewerErrorScreen } from '@/components/code-reviewer/reviewer-error-screen';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { InvalidRouteState } from '@/components/invalid-route-state';
@@ -20,7 +20,6 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { formatNumber } from '@/lib/format';
 import {
   type CouncilConfig,
@@ -30,10 +29,8 @@ import {
 import {
   councilSurface,
   parseRequiredLabels,
-  specialistCopy,
   STRATEGY_DESCRIPTION_KEYS,
   STRATEGY_LABEL_KEYS,
-  wouldStarveCouncil,
 } from '@/lib/code-reviewer-council';
 import {
   useGitHubRepositories,
@@ -161,48 +158,6 @@ function CouncilScreen({
     save.mutate({ council: next });
   };
 
-  const setSpecialistEnabled = (id: string, value: boolean) => {
-    if (wouldStarveCouncil(council, id, value)) {
-      // The web form refuses the equivalent save; a per-toggle screen has to
-      // refuse the toggle itself, or it stores a council that is switched on
-      // and below the voting minimum, which never runs.
-      announcingToast.error(
-        t('codeReviewer.council.minSpecialists', {
-          minimum: formatNumber(COUNCIL_MIN_SPECIALISTS, i18n.language),
-          selected: formatNumber(enabledSpecialistCount(council) - 1, i18n.language),
-        })
-      );
-      return;
-    }
-    if (council.specialists.some(specialist => specialist.id === id)) {
-      writeCouncil({
-        ...council,
-        specialists: council.specialists.map(specialist =>
-          specialist.id === id ? { ...specialist, enabled: value } : specialist
-        ),
-      });
-      return;
-    }
-    const preset = COUNCIL_SPECIALIST_PRESETS.find(candidate => candidate.id === id);
-    if (!preset) {
-      return;
-    }
-    writeCouncil({
-      ...council,
-      specialists: [
-        ...council.specialists,
-        {
-          id: preset.id,
-          role: preset.role,
-          name: preset.name,
-          enabled: value,
-          required: false,
-          lens: preset.lens,
-        },
-      ],
-    });
-  };
-
   const commitLabels = () => {
     const parsed = parseRequiredLabels(labelsText);
     if (parsed.join(', ') === (config.data?.council?.required_labels ?? []).join(', ')) {
@@ -266,28 +221,7 @@ function CouncilScreen({
           )}
         </View>
 
-        <View className="gap-2">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('codeReviewer.council.specialists')}
-          </Text>
-          {COUNCIL_SPECIALIST_PRESETS.map(preset => {
-            const copy = specialistCopy(preset.id);
-            return (
-              <ToggleRow
-                key={preset.id}
-                title={t(copy.nameKey)}
-                subtitle={t(copy.descriptionKey)}
-                value={council.specialists.some(
-                  specialist => specialist.id === preset.id && specialist.enabled
-                )}
-                disabled={disabled}
-                onValueChange={value => {
-                  setSpecialistEnabled(preset.id, value);
-                }}
-              />
-            );
-          })}
-        </View>
+        <CouncilSpecialistsSection council={council} disabled={disabled} onWrite={writeCouncil} />
 
         <View className="gap-2">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">

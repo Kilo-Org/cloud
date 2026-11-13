@@ -21,7 +21,9 @@ import type {
 } from '../../src/sandbox-control/provider.js';
 import { ProviderSnapshotCreationError } from '../../src/sandbox-control/provider.js';
 import { RUNTIME_BASE_ABI } from '../../src/sandbox-control/runtime-release.js';
+import { DEADLINE_MS } from '../../src/sandbox-control/deadlines.js';
 import type { ControlPlaneRouteSpec } from '../../src/shared/control-plane-protocol.js';
+import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import {
   createFakeCredentialBroker,
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
@@ -485,7 +487,7 @@ describe('environment snapshot launch', () => {
     await releaseHeld(stub, () => provider.releaseLaunch());
   });
 
-  it('retries the same snapshot on the same allocation and deadline after a transient start failure', async () => {
+  it('retries the same snapshot on the same allocation with its own deadline after a transient start failure', async () => {
     const sandboxId = 'sbx__repo_launch_retry';
     const provider = createFakeProvider({
       launches: [
@@ -497,12 +499,13 @@ describe('environment snapshot launch', () => {
       ...WITH_SNAPSHOT,
       SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
     });
+    const before = Date.now();
     await stub.prepare({
       ...prepareInput(BUILD),
       sandboxSelection: { provider: 'cloudflare-containers' },
     });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
-    const launchDeadline = (await stub.getAllocationState()).createDeadlineAt;
+    const retryDeadline = (await stub.getAllocationState()).createDeadlineAt;
     const { wrapper, allocationId } = await connect(sandboxId, provider, 2);
 
     expect(provider.launchOptions).toEqual([
@@ -511,8 +514,16 @@ describe('environment snapshot launch', () => {
     ]);
     expect(provider.launchRefs[1]).toBe(provider.launchRefs[0]);
     expect(provider.stopRefs).toEqual([provider.launchRefs[0]]);
-    expect(provider.launchDeadlines[0]).toBe(launchDeadline);
-    expect(provider.launchDeadlines[1]).toBe(launchDeadline);
+    const [firstDeadline, launchedRetryDeadline] = provider.launchDeadlines;
+    if (firstDeadline === undefined || retryDeadline === null)
+      throw new Error('Missing launch deadlines');
+    expect(firstDeadline).toBeGreaterThanOrEqual(before + DEADLINE_MS.repositoryStartup);
+    expect(launchedRetryDeadline).toBe(retryDeadline);
+    expect(retryDeadline).toBeGreaterThan(firstDeadline);
+    expect(provider.launchCommands[1]?.argv.join('\n')).toContain(
+      String(retryDeadline + CONTROL_PLANE_TIMERS.sandbox.wrapperFirstConnectMs)
+    );
+    expect(environmentSnapshotDetails(peer)).toContain('Retrying the snapshot start');
     await prepareFrameOf(wrapper);
     expect(await readLaunchRecord(stub)).toEqual({
       allocationId,

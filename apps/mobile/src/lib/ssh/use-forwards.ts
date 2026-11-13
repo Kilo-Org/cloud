@@ -23,7 +23,7 @@ export function useForwardStatuses(sessionId: string): ReadonlyMap<string, Forwa
 }
 
 /** The forwards stored for one host. A null host reads nothing. */
-export type SshForwardsQuery = UseQueryResult<SshForward[], Error>;
+export type SshForwardsQuery = UseQueryResult<SshForward[]>;
 
 export function useSshForwards(hostId: string | null): SshForwardsQuery {
   return useQuery({

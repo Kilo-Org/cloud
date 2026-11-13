@@ -24,7 +24,13 @@ type SshSessionNoticeProps = Readonly<{
  * sits under the header rather than over the terminal, so the last lines the
  * shell printed stay readable while the connection is retried.
  */
-export function SshSessionNotice({ tone, icon: Icon, title, message, action }: SshSessionNoticeProps) {
+export function SshSessionNotice({
+  tone,
+  icon: Icon,
+  title,
+  message,
+  action,
+}: SshSessionNoticeProps) {
   const colors = useThemeColors();
   const tint = tone === 'danger' ? colors.destructive : colors.warn;
 

@@ -278,12 +278,12 @@ describe('TerminalConnection', () => {
     harness.connection.start();
     await flush();
 
-    harness.connection.send(new Uint8Array([0x6C, 0x73]));
+    harness.connection.send(new Uint8Array([0x6c, 0x73]));
     expect(harness.sockets.at(-1)?.sent).toEqual([]);
 
     harness.sockets.at(-1)?.open();
-    harness.connection.send(new Uint8Array([0x6C, 0x73]));
-    expect(harness.sockets.at(-1)?.sent).toEqual([new Uint8Array([0x6C, 0x73])]);
+    harness.connection.send(new Uint8Array([0x6c, 0x73]));
+    expect(harness.sockets.at(-1)?.sent).toEqual([new Uint8Array([0x6c, 0x73])]);
   });
 
   it('tears the socket and the pty down without reporting another state', async () => {

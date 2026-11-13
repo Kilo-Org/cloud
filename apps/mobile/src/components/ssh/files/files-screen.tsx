@@ -3,34 +3,15 @@ import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { toast } from 'sonner-native';
 
-import { ScreenHeader } from '@/components/screen-header';
-import { BreadcrumbBar } from '@/components/ssh/files/breadcrumb-bar';
-import { FilesBody } from '@/components/ssh/files/files-body';
+import { FilesContentView } from '@/components/ssh/files/files-content';
+import { FilesHeader } from '@/components/ssh/files/files-header';
 import { type FileNameTarget, FilesSurfaces } from '@/components/ssh/files/files-surfaces';
-import { TransfersTray } from '@/components/ssh/files/transfers-tray';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { ArrowUp, FilePlus, Plug } from '@/components/ui/icons';
-import { IconButton } from '@/components/ui/icon-button';
 import { type MenuSheetOption } from '@/components/ui/menu-sheet';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { collator } from '@/lib/intl-cache';
-import { shareLocalFile } from '@/lib/share-remote-file';
-import {
-  cancelTransfer,
-  clearFinishedTransfers,
-  downloadedFileUri,
-  insertFixtureTransfers,
-  retryTransfer,
-} from '@/lib/ssh/files/transfers';
-import {
-  breadcrumbTrail,
-  joinRemotePath,
-  parentRemotePath,
-  previewKindOf,
-  sortEntries,
-} from '@/lib/ssh/files/paths';
+import { joinRemotePath, previewKindOf, sortEntries } from '@/lib/ssh/files/paths';
+import { insertFixtureTransfers } from '@/lib/ssh/files/transfers';
 import { useFileActions, useSessionTransfers } from '@/lib/ssh/files/use-file-actions';
 import { useSftpBrowser } from '@/lib/ssh/files/use-sftp-browser';
 import { SSH_HOSTS_ROUTE, sshSessionPath } from '@/lib/ssh/routes';
@@ -69,7 +50,6 @@ const FIXTURE_PREVIEW = {
 export function SshFilesScreen({ sessionId, initialPath = null, dev = null }: SshFilesScreenProps) {
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const colors = useThemeColors();
   const session = useSshSession(sessionId);
   const connectionId = session?.nativeSessionId ?? null;
   const browser = useSftpBrowser(connectionId);
@@ -161,110 +141,51 @@ export function SshFilesScreen({ sessionId, initialPath = null, dev = null }: Ss
   }
 
   const menu = menuEntry === null ? null : entryActions(menuEntry);
-  const nameTarget = nameTargetOf(nameDialog);
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
+      <FilesHeader
         title={session?.label ?? t('ssh.files.title')}
         subtitle={currentPath ?? session?.target}
         backFallback={sshSessionPath(sessionId)}
-        headerRight={
-          <View className="flex-row items-center">
-            <IconButton
-              accessibilityLabel={t('ssh.forwards.title')}
-              disabled={session === null}
-              onPress={() => {
-                setForwardsOpen(true);
-              }}
-            >
-              <Plug size={20} color={colors.foreground} />
-            </IconButton>
-            <IconButton
-              accessibilityLabel={t('ssh.files.newFolder')}
-              disabled={currentPath === null}
-              onPress={() => {
-                setNameDialog({ mode: 'create' });
-              }}
-            >
-              <FilePlus size={20} color={colors.foreground} />
-            </IconButton>
-            <IconButton
-              accessibilityLabel={t('ssh.files.upload')}
-              disabled={currentPath === null}
-              onPress={() => {
-                setUploadSource(true);
-              }}
-            >
-              <ArrowUp size={20} color={colors.foreground} />
-            </IconButton>
-          </View>
-        }
-        headerRightWidth={144}
+        sessionReady={session !== null}
+        folderReady={currentPath !== null}
+        onForwards={() => {
+          setForwardsOpen(true);
+        }}
+        onNewFolder={() => {
+          setNameDialog({ mode: 'create' });
+        }}
+        onUpload={() => {
+          setUploadSource(true);
+        }}
       />
 
-      {currentPath === null ? null : (
-        <View className="flex-row items-center">
-          {currentPath === '/' ? null : (
-            <IconButton
-              accessibilityLabel={t('ssh.files.goUp')}
-              onPress={() => {
-                browser.open(parentRemotePath(currentPath));
-              }}
-            >
-              <ArrowUp size={18} color={colors.mutedForeground} />
-            </IconButton>
-          )}
-          <View className="min-w-0 flex-1">
-            <BreadcrumbBar trail={breadcrumbTrail(currentPath)} onOpen={browser.open} />
-          </View>
-        </View>
-      )}
-
-      <View className="flex-1">
-        <FilesBody
-          session={session}
-          connectionId={connectionId}
-          phase={browser.phase}
-          entries={entries}
-          loading={browser.loading}
-          refreshing={browser.refreshing}
-          onRefresh={() => {
-            browser.refresh();
-          }}
-          onRetry={() => {
-            browser.refresh();
-          }}
-          onUpload={() => {
-            setUploadSource(true);
-          }}
-          onOpen={entry => {
-            actions.openEntry(entry);
-          }}
-          onLongPress={setMenuEntry}
-          onBackToHosts={() => {
-            router.replace(SSH_HOSTS_ROUTE);
-          }}
-        />
-      </View>
-
-      <TransfersTray
+      <FilesContentView
+        session={session}
+        connectionId={connectionId}
+        path={currentPath}
+        phase={browser.phase}
+        entries={entries}
+        loading={browser.loading}
+        refreshing={browser.refreshing}
         transfers={sessionTransfers}
-        onCancel={cancelTransfer}
-        onRetry={retryTransfer}
-        onShare={transfer => {
-          const uri = downloadedFileUri(transfer);
-          if (uri !== null) {
-            void (async () => {
-              try {
-                await shareLocalFile(uri);
-              } catch {
-                toast.error(t('ssh.files.shareFailed'));
-              }
-            })();
-          }
+        onRefresh={() => {
+          browser.refresh();
         }}
-        onClear={clearFinishedTransfers}
+        onUpload={() => {
+          setUploadSource(true);
+        }}
+        onOpen={entry => {
+          actions.openEntry(entry);
+        }}
+        onLongPress={setMenuEntry}
+        onBackToHosts={() => {
+          router.replace(SSH_HOSTS_ROUTE);
+        }}
+        onOpenPath={path => {
+          browser.open(path);
+        }}
       />
 
       <FilesSurfaces
@@ -287,7 +208,7 @@ export function SshFilesScreen({ sessionId, initialPath = null, dev = null }: Ss
           setUploadSource(false);
           void actions.pick(source);
         }}
-        nameDialog={nameTarget}
+        nameDialog={nameTargetOf(nameDialog)}
         busy={actions.busy}
         onNameCancel={() => {
           setNameDialog(null);

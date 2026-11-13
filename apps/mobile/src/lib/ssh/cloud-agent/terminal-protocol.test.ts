@@ -48,7 +48,7 @@ describe('resolveTerminalWsUrl', () => {
 describe('isPtyControlFrame', () => {
   it('treats a NUL-prefixed binary frame as control', () => {
     expect(isPtyControlFrame(binary([0x00, 0x31]))).toBe(true);
-    expect(isPtyControlFrame(binary([0x1B, 0x5B]))).toBe(false);
+    expect(isPtyControlFrame(binary([0x1b, 0x5b]))).toBe(false);
   });
 
   it('treats a NUL-prefixed or cursor text frame as control', () => {

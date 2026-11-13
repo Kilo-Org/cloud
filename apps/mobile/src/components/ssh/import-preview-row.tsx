@@ -62,7 +62,10 @@ export function ImportPreviewRow({ draft, checked, onToggle }: ImportPreviewRowP
             {target}
           </Text>
           {draft.warnings.map((warning, index) => (
-            <Text key={`${warning.kind}-${String(index)}`} className="text-xs text-muted-foreground">
+            <Text
+              key={`${warning.kind}-${String(index)}`}
+              className="text-xs text-muted-foreground"
+            >
               {warningMessage(t, warning)}
             </Text>
           ))}

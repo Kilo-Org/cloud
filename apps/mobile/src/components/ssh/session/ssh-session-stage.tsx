@@ -35,10 +35,7 @@ export function SshSessionStage({ phase, target, onRetry, onClose }: SshSessionS
         action={
           <View className="gap-2 self-stretch px-6">
             {phase.retryable ? (
-              <Button
-                className={STATE_ACTION_CLASS}
-                onPress={onRetry}
-              >
+              <Button className={STATE_ACTION_CLASS} onPress={onRetry}>
                 <RefreshCw size={16} color="#FFFFFF" />
                 <Text>{t('common.retry')}</Text>
               </Button>

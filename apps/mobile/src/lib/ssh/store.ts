@@ -14,7 +14,8 @@ import { type SqlValue, type SshDatabase } from './database';
 export async function sshDatabase(): Promise<SshDatabase> {
   const client = await encryptedDatabase();
   return {
-    getAllSync: <T>(source: string, params: SqlValue[]): T[] => client.getAllSync<T>(source, ...params),
+    getAllSync: <T>(source: string, params: SqlValue[]): T[] =>
+      client.getAllSync<T>(source, ...params),
     runSync: (source: string, params: SqlValue[]) => {
       client.runSync(source, ...params);
     },

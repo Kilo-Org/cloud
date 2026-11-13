@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { type Cancellation } from '../cancellation';
 import { sshPackage } from '../native';
 import { useIdleNotify } from './idle-notify';
 import { type SshSessionPhase } from './types';
@@ -25,11 +26,11 @@ export function useIdleNotifyArming(
     if (!enabled || shellId === null || phase !== 'connected') {
       return undefined;
     }
-    let cancelled = false;
+    const arming: Cancellation = { cancelled: false };
     void (async () => {
       try {
         const ssh = await sshPackage();
-        if (!cancelled) {
+        if (!arming.cancelled) {
           ssh.notifyWhenIdle(shellId, QUIET_MS, { title: t('ssh.session.commandFinished') });
         }
       } catch {
@@ -37,7 +38,7 @@ export function useIdleNotifyArming(
       }
     })();
     return () => {
-      cancelled = true;
+      arming.cancelled = true;
     };
   }, [enabled, shellId, phase, t]);
 }

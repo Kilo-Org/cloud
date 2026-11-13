@@ -42,12 +42,18 @@ function slot(index: number): string {
 describe('terminal theme', () => {
   it('draws the default text and every colour at AA on the terminal background', () => {
     expect(ansi).toHaveLength(16);
-    expect(contrast(required(TERMINAL_THEME.background, 'background'), TERMINAL_BACKGROUND)).toBe(1);
-    expect(contrast(required(TERMINAL_THEME.foreground, 'foreground'), TERMINAL_BACKGROUND)).toBeGreaterThanOrEqual(AA);
+    expect(contrast(required(TERMINAL_THEME.background, 'background'), TERMINAL_BACKGROUND)).toBe(
+      1
+    );
+    expect(
+      contrast(required(TERMINAL_THEME.foreground, 'foreground'), TERMINAL_BACKGROUND)
+    ).toBeGreaterThanOrEqual(AA);
     // Slot 0 is the background family and slot 15 the light end; every slot a
     // tool paints as text, including the dim neutral, clears AA.
     for (const index of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]) {
-      expect(contrast(slot(index), TERMINAL_BACKGROUND), `ansi[${index}]`).toBeGreaterThanOrEqual(AA);
+      expect(contrast(slot(index), TERMINAL_BACKGROUND), `ansi[${index}]`).toBeGreaterThanOrEqual(
+        AA
+      );
     }
   });
 
@@ -60,7 +66,9 @@ describe('terminal theme', () => {
     // tmux's status bar, htop's key column and a diff badge all draw the dark
     // slot as text over a colour, so that pair is the one that has to hold.
     for (const index of [1, 2, 3, 4, 5, 6]) {
-      expect(contrast(slot(0), slot(index)), `ansi[0] on ansi[${index}]`).toBeGreaterThanOrEqual(AA);
+      expect(contrast(slot(0), slot(index)), `ansi[0] on ansi[${index}]`).toBeGreaterThanOrEqual(
+        AA
+      );
     }
   });
 
@@ -78,7 +86,9 @@ describe('terminal theme', () => {
     // on that colour at AA needs <= 0.183, so no palette can satisfy both. The
     // light end is measured only for the contrast it does reach.
     for (const index of [1, 2, 3, 4, 5, 6]) {
-      expect(contrast(slot(15), slot(index)), `ansi[15] on ansi[${index}]`).toBeGreaterThanOrEqual(1.8);
+      expect(contrast(slot(15), slot(index)), `ansi[15] on ansi[${index}]`).toBeGreaterThanOrEqual(
+        1.8
+      );
     }
   });
 });

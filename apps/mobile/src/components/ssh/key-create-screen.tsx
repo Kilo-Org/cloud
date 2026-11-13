@@ -88,7 +88,9 @@ export function SshKeyCreateScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-sm text-muted-foreground">
-          {state.kind === 'ready' ? t('ssh.keys.createdDescription') : t('ssh.keys.generateDescription')}
+          {state.kind === 'ready'
+            ? t('ssh.keys.createdDescription')
+            : t('ssh.keys.generateDescription')}
         </Text>
         {state.kind === 'ready' ? (
           <SshPublicKeyBlock

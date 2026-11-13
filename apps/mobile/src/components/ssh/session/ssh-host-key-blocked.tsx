@@ -53,7 +53,10 @@ export function SshHostKeyBlocked({
       </Text>
 
       <View className="gap-3 rounded-lg border border-danger-tile-border bg-danger-tile-bg p-3">
-        <Fingerprint label={t('ssh.session.hostKeyTrusted')} value={hostKey.knownFingerprintSha256} />
+        <Fingerprint
+          label={t('ssh.session.hostKeyTrusted')}
+          value={hostKey.knownFingerprintSha256}
+        />
         <Fingerprint label={t('ssh.session.hostKeyOffered')} value={hostKey.fingerprintSha256} />
       </View>
 

@@ -137,6 +137,49 @@ export function SessionForwardsSheet({
   );
 }
 
+function ForwardAction({
+  status,
+  name,
+  connected,
+  onStart,
+  onStop,
+}: Readonly<{
+  status: ForwardStatus;
+  name: string;
+  connected: boolean;
+  onStart: () => void;
+  onStop: () => void;
+}>) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  if (status.kind === 'starting') {
+    return <ActivityIndicator size="small" />;
+  }
+  if (status.kind === 'listening') {
+    return (
+      <IconButton
+        accessibilityLabel={t('ssh.forwards.stopAction', { name })}
+        onPress={() => {
+          onStop();
+        }}
+      >
+        <Square size={16} color={colors.mutedForeground} />
+      </IconButton>
+    );
+  }
+  return (
+    <IconButton
+      accessibilityLabel={t('ssh.forwards.startAction', { name })}
+      disabled={!connected}
+      onPress={() => {
+        onStart();
+      }}
+    >
+      <Plug size={16} color={colors.mutedForeground} />
+    </IconButton>
+  );
+}
+
 function ForwardRow({
   forward,
   status,
@@ -188,30 +231,14 @@ function ForwardRow({
           {forwardStatusLine(status, t)}
         </Text>
       </View>
-      {openable && listening ? <Globe size={16} color={colors.mutedForeground} /> : null}
-      {status.kind === 'starting' ? (
-        <ActivityIndicator size="small" />
-      ) : null}
-      {status.kind !== 'starting' && listening ? (
-        <IconButton
-          accessibilityLabel={t('ssh.forwards.stopAction', { name })}
-          onPress={() => {
-            onStop();
-          }}
-        >
-          <Square size={16} color={colors.mutedForeground} />
-        </IconButton>
-      ) : (
-        <IconButton
-          accessibilityLabel={t('ssh.forwards.startAction', { name })}
-          disabled={!connected}
-          onPress={() => {
-            onStart();
-          }}
-        >
-          <Plug size={16} color={colors.mutedForeground} />
-        </IconButton>
-      )}
+      {openable ? <Globe size={16} color={colors.mutedForeground} /> : null}
+      <ForwardAction
+        status={status}
+        name={name}
+        connected={connected}
+        onStart={onStart}
+        onStop={onStop}
+      />
     </Pressable>
   );
 }

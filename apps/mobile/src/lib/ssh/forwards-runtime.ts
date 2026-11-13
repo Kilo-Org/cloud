@@ -128,11 +128,11 @@ export async function autoStartForwards(
 ): Promise<void> {
   await resetSessionForwards(sessionId);
   entryFor(sessionId).nativeSessionId = nativeSessionId;
-  for (const forward of forwards) {
-    if (forward.autoStart) {
-      await startForward(sessionId, nativeSessionId, forward);
-    }
-  }
+  await Promise.all(
+    forwards
+      .filter(forward => forward.autoStart)
+      .map(forward => startForward(sessionId, nativeSessionId, forward))
+  );
 }
 
 /**
@@ -141,19 +141,17 @@ export async function autoStartForwards(
  * session-level failure is what took them down.
  */
 export function handleForwardError(nativeSessionId: string): void {
-  for (const entry of sessions.values()) {
-    if (entry.nativeSessionId !== nativeSessionId) {
-      continue;
-    }
-    entry.handles.clear();
-    for (const [forwardId, status] of entry.statuses) {
-      if (status.kind === 'listening' || status.kind === 'starting') {
-        entry.statuses.set(forwardId, { kind: 'failed', code: 'Forwarding' });
-      }
-    }
-    publish();
+  const entry = [...sessions.values()].find(item => item.nativeSessionId === nativeSessionId);
+  if (entry === undefined) {
     return;
   }
+  entry.handles.clear();
+  for (const [forwardId, status] of entry.statuses) {
+    if (status.kind === 'listening' || status.kind === 'starting') {
+      entry.statuses.set(forwardId, { kind: 'failed', code: 'Forwarding' });
+    }
+  }
+  publish();
 }
 
 /** Ends every listener of the session and forgets its state. */
@@ -164,9 +162,7 @@ export async function resetSessionForwards(sessionId: string): Promise<void> {
   }
   sessions.delete(sessionId);
   publish();
-  for (const handle of entry.handles.values()) {
-    await stopQuietly(handle);
-  }
+  await Promise.all([...entry.handles.values()].map(handle => stopQuietly(handle)));
 }
 
 async function stopQuietly(handle: Forward): Promise<void> {
@@ -181,20 +177,11 @@ async function stopQuietly(handle: Forward): Promise<void> {
  * The destination ports a local forward would serve over HTTP. A forward to one
  * of them is reachable from the device's browser at its own bind port.
  */
-const HTTP_PORTS: Readonly<Record<number, true>> = {
-  80: true,
-  3000: true,
-  5000: true,
-  8000: true,
-  8001: true,
-  8080: true,
-  8081: true,
-  8888: true,
-};
+const HTTP_PORTS: ReadonlySet<number> = new Set([80, 3000, 5000, 8000, 8001, 8080, 8081, 8888]);
 
 /** Whether a listening local forward serves a page the in-app browser can open. */
 export function isHttpForward(forward: Pick<SshForward, 'direction' | 'destinationPort'>): boolean {
-  return forward.direction === 'local' && HTTP_PORTS[forward.destinationPort] === true;
+  return forward.direction === 'local' && HTTP_PORTS.has(forward.destinationPort);
 }
 
 export function localForwardUrl(port: number): string {

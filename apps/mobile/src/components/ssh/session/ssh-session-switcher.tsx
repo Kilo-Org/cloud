@@ -54,7 +54,10 @@ export function SshSessionSwitcher({
               accessibilityRole="button"
               accessibilityLabel={t('ssh.session.switchTo', { label: session.label, state })}
               accessibilityState={{ selected: active }}
-              className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 rounded-md px-2 active:opacity-70')}
+              className={cn(
+                ROW_TARGET_CLASS,
+                'flex-row items-center gap-3 rounded-md px-2 active:opacity-70'
+              )}
             >
               <View className="min-w-0 flex-1 justify-center">
                 <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
@@ -76,7 +79,10 @@ export function SshSessionSwitcher({
           onPress={onNewSession}
           accessibilityRole="button"
           accessibilityLabel={t('common.newSession')}
-          className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-2 rounded-md px-2 active:opacity-70')}
+          className={cn(
+            ROW_TARGET_CLASS,
+            'flex-row items-center gap-2 rounded-md px-2 active:opacity-70'
+          )}
         >
           <Plus size={16} color={colors.foreground} />
           <Text className="text-sm text-foreground">{t('common.newSession')}</Text>

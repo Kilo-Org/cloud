@@ -1,5 +1,6 @@
 import { i18n } from '@/i18n';
 
+import { type Cancellation } from './cancellation';
 import { sshPackage } from './native';
 import { closeSession } from './session/manager';
 import { live } from './session/live';
@@ -11,13 +12,13 @@ import { live } from './session/live';
  * resolve. Returns the teardown that stops listening.
  */
 export function startSshBackgroundSessions(): () => void {
-  let cancelled = false;
+  const registration: Cancellation = { cancelled: false };
   let removeListener: (() => void) | null = null;
 
   void (async () => {
     try {
       const ssh = await sshPackage();
-      if (cancelled) {
+      if (registration.cancelled) {
         return;
       }
       ssh.configureBackgroundSessions({
@@ -38,7 +39,7 @@ export function startSshBackgroundSessions(): () => void {
   })();
 
   return () => {
-    cancelled = true;
+    registration.cancelled = true;
     removeListener?.();
     removeListener = null;
   };

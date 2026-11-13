@@ -20,18 +20,24 @@ import { isRetryableReason, type SshCloseReason } from './types';
 const TERMINAL_TYPE = 'xterm-256color';
 const DEFAULT_TMUX_SESSION = 'kilo';
 
+type ChainOpening = Readonly<{
+  entry: LiveSession;
+  db: SshDatabase;
+  ssh: typeof SshPackage;
+  /** The hop sessions this attempt already opened, outermost first. */
+  opened: string[];
+}>;
+
 /**
  * Opens the hop chain outermost-first, each hop reaching the next through the
  * one before it. Returns false when the chain stopped short.
  */
 async function openChain(
-  entry: LiveSession,
-  db: SshDatabase,
-  ssh: typeof SshPackage,
+  opening: ChainOpening,
   hops: readonly SshHost[],
-  opened: string[],
   via: string | null
 ): Promise<boolean> {
+  const { entry, db, ssh, opened } = opening;
   const hop = hops[0];
   if (hop === undefined) {
     return true;
@@ -56,7 +62,7 @@ async function openChain(
       await disconnectAll(opened);
       return false;
     }
-    return openChain(entry, db, ssh, hops.slice(1), opened, nativeSessionId);
+    return await openChain(opening, hops.slice(1), nativeSessionId);
   } catch (error) {
     await disconnectAll(opened);
     fail(entry, reasonOf(error), hop);
@@ -119,7 +125,7 @@ export async function attempt(entry: LiveSession): Promise<void> {
     entry.connectTargets = chain.map(hop => ({ host: hop.hostname, port: hop.port }));
 
     const ssh = await sshPackage();
-    if (!(await openChain(entry, db, ssh, chain, opened, null))) {
+    if (!(await openChain({ entry, db, ssh, opened }, chain, null))) {
       return;
     }
 

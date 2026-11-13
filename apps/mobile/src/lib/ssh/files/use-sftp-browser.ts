@@ -1,6 +1,7 @@
 import { type SftpEntry } from '@kilocode/react-native-ssh';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { type Cancellation } from '../cancellation';
 import { nativeErrorCode, sshPackage } from '../native';
 
 export type SftpBrowserPhase =
@@ -76,7 +77,7 @@ export function useSftpBrowser(connectionId: string | null): SftpBrowser {
     if (connectionId === null) {
       return undefined;
     }
-    let cancelled = false;
+    const opening: Cancellation = { cancelled: false };
     setPhase({ kind: 'opening' });
     setEntries([]);
     setPath(null);
@@ -84,33 +85,34 @@ export function useSftpBrowser(connectionId: string | null): SftpBrowser {
       try {
         const ssh = await sshPackage();
         const channel = await ssh.openSftp(connectionId);
-        if (cancelled) {
-          await ssh.closeSftp(channel).catch(() => undefined);
+        const home = await ssh.resolvePath(channel, '~');
+        if (opening.cancelled) {
+          await closeQuietly(ssh, channel);
           return;
         }
         sftpRef.current = channel;
         setSftpId(channel);
-        const home = await ssh.resolvePath(channel, '~');
-        if (cancelled) {
-          return;
-        }
         await list(channel, home, 'open');
       } catch (error) {
-        if (!cancelled) {
+        if (!opening.cancelled) {
           setPhase({ kind: 'error', code: nativeErrorCode(error) ?? 'unavailable' });
         }
       }
     })();
     return () => {
-      cancelled = true;
+      opening.cancelled = true;
       requestRef.current += 1;
       const channel = sftpRef.current;
       sftpRef.current = null;
       setSftpId(null);
       if (channel !== null) {
-        void sshPackage()
-          .then(ssh => ssh.closeSftp(channel))
-          .catch(() => undefined);
+        void (async () => {
+          try {
+            await closeQuietly(await sshPackage(), channel);
+          } catch {
+            // A build without the module has no channel to close.
+          }
+        })();
       }
     };
   }, [connectionId, list]);
@@ -133,4 +135,16 @@ export function useSftpBrowser(connectionId: string | null): SftpBrowser {
   }, [list, path]);
 
   return { phase, path, entries, loading, refreshing, sftpId, open, refresh };
+}
+
+/** Closes a channel whose connection may already be gone. */
+async function closeQuietly(
+  ssh: Awaited<ReturnType<typeof sshPackage>>,
+  channel: string
+): Promise<void> {
+  try {
+    await ssh.closeSftp(channel);
+  } catch {
+    // The connection the channel ran on is already gone.
+  }
 }

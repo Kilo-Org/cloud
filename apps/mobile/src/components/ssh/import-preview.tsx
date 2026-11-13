@@ -6,10 +6,7 @@ import { ImportPreviewRow } from '@/components/ssh/import-preview-row';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import {
-  type SshConfigPlan,
-  type SshConfigSkippedHost,
-} from '@/lib/ssh/config-import';
+import { type SshConfigPlan, type SshConfigSkippedHost } from '@/lib/ssh/config-import';
 
 function skipMessage(t: TFunction, skipped: SshConfigSkippedHost): string {
   return skipped.reason === 'noUsername'
@@ -52,7 +49,9 @@ export function SshConfigImportPreview({
           />
         ))}
         {plan.hosts.length === 0 ? (
-          <Text className="text-sm text-muted-foreground">{t('ssh.import.nothingDescription')}</Text>
+          <Text className="text-sm text-muted-foreground">
+            {t('ssh.import.nothingDescription')}
+          </Text>
         ) : null}
       </View>
 

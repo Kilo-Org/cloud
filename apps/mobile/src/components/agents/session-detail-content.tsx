@@ -2822,9 +2822,7 @@ export function SessionDetailContent({
               modelOptions={modelOptions}
               connectionDisplay={connectionDisplay}
               onRetryConnection={retrySessionConnection}
-              cloudAgentSessionId={fetchedData?.cloudAgentSessionId ?? null}
               cloudStatusType={cloudStatus?.type ?? null}
-              organizationId={organizationId}
               autoApproveState={autoApproveState}
               onAutoApproveChange={enabled => {
                 // Selection haptic for the commit: a capability iOS and Android

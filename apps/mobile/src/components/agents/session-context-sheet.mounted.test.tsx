@@ -344,8 +344,6 @@ function sheetElement(
     modelDisplay: 'Claude',
     providerDisplay: 'Kilo',
     totalCostMicrodollars: null,
-    cloudAgentSessionId: null,
-    organizationId: undefined,
     breakdownCostUsd: 0,
     messages: [],
     modelOptions: [],

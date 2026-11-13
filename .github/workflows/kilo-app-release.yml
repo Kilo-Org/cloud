@@ -856,7 +856,9 @@ jobs:
           2. Review and merge. Only the version line and the changelog section
              changed; no product code.
           EOF
-          PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          # Only a PR opened from this repository is the version-bump PR.
+          PR=$(gh pr list --head "$BRANCH" --state open --json number,isCrossRepository \
+            --jq '[.[] | select(.isCrossRepository | not)][0].number // empty')
           if [ -n "$PR" ]; then
             gh pr edit "$PR" --body-file "$RUNNER_TEMP/kilo-app-bump-pr.md"
             echo "Refreshed the version-bump PR #$PR for $BRANCH"

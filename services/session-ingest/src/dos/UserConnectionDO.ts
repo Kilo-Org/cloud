@@ -1,13 +1,16 @@
 import { DurableObject } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
-import { hasOrganizationAccess } from '@kilocode/worker-utils';
+import { hasInheritedOrganizationAccess } from '@kilocode/worker-utils';
 import { z } from 'zod';
 
 import type { Env } from '../env';
 import { getSessionIngestDO } from './SessionIngestDO';
 import { hoistedAttentionChanges, hoistedChildAttention } from './child-attention';
 import { isNeedsInputStatus } from './session-ingest-attention';
-import { resolveAccessibleKiloSession } from '../services/session-access';
+import {
+  resolveAccessibleKiloSession,
+  type AccessibleKiloSession,
+} from '../services/session-access';
 import { refreshGlanceableSessions } from '../remote-session-notifications';
 import { prUrlMatchesGitUrl } from '../ingest/metadata';
 import {
@@ -1664,9 +1667,11 @@ export class UserConnectionDO extends DurableObject<Env> {
       return;
     }
 
-    // A create may name an organization, and that claim reaches the CLI.
-    // Confirm the acting user can act for it here, so the create cannot be
-    // attributed to an organization they are not a member of.
+    // A create may name an organization, and that claim reaches the CLI. Accept
+    // it only when the acting user can act for that organization: for a
+    // session-scoped create that is the resolved session's own organization,
+    // and for a connection-scoped create it is any organization the read paths
+    // grant, which includes a child organization reached through a parent role.
     const orgClaim = readCreateSessionOrgClaim(msg);
     if (orgClaim.kind === 'invalid') {
       this.sendToWeb(ws, {
@@ -1676,29 +1681,11 @@ export class UserConnectionDO extends DurableObject<Env> {
       });
       return;
     }
-    if (orgClaim.kind === 'organization') {
-      const kiloUserId = attachment.kiloUserId;
-      const organizationId = orgClaim.organizationId;
-      if (
-        !kiloUserId ||
-        !UUID_RE.test(organizationId) ||
-        !(await hasOrganizationAccess(getWorkerDb(this.env.HYPERDRIVE.connectionString), {
-          kiloUserId,
-          organizationId,
-        }))
-      ) {
-        this.sendToWeb(ws, {
-          type: 'response',
-          id: msg.id,
-          error: ORGANIZATION_ACCESS_DENIED_ERROR,
-        });
-        return;
-      }
-    }
 
     // Command-time access recheck: a removed member must not forward a command
     // to a session they no longer have access to. Catalog commands without a
     // sessionId skip this check.
+    let accessibleSession: AccessibleKiloSession | null = null;
     if (msg.sessionId) {
       const kiloUserId = attachment.kiloUserId;
       if (!kiloUserId) {
@@ -1709,15 +1696,40 @@ export class UserConnectionDO extends DurableObject<Env> {
         });
         return;
       }
-      const accessible = await resolveAccessibleKiloSession(this.env, {
+      accessibleSession = await resolveAccessibleKiloSession(this.env, {
         kiloUserId,
         kiloSessionId: msg.sessionId,
       });
-      if (!accessible) {
+      if (!accessibleSession) {
         this.sendToWeb(ws, {
           type: 'response',
           id: msg.id,
           error: SESSION_ACCESS_DENIED_ERROR,
+        });
+        return;
+      }
+    }
+
+    if (orgClaim.kind === 'organization') {
+      const kiloUserId = attachment.kiloUserId;
+      const organizationId = orgClaim.organizationId;
+      const allowed =
+        kiloUserId !== undefined &&
+        UUID_RE.test(organizationId) &&
+        (accessibleSession !== null
+          ? accessibleSession.organizationId === organizationId
+          : await hasInheritedOrganizationAccess(
+              getWorkerDb(this.env.HYPERDRIVE.connectionString),
+              {
+                kiloUserId,
+                organizationId,
+              }
+            ));
+      if (!allowed) {
+        this.sendToWeb(ws, {
+          type: 'response',
+          id: msg.id,
+          error: ORGANIZATION_ACCESS_DENIED_ERROR,
         });
         return;
       }

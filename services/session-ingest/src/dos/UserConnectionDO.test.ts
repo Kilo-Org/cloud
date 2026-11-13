@@ -4043,6 +4043,7 @@ describe('UserConnectionDO', () => {
 
   describe('create_session organization scope', () => {
     const ORG_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+    const OTHER_ORG_ID = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff';
 
     it('forwards a create_session for an organization the user belongs to', async () => {
       setupOrganizationMembership(true);
@@ -4149,6 +4150,111 @@ describe('UserConnectionDO', () => {
         type: 'command',
         command: 'create_session',
         data: { title: 'Personal session' },
+      });
+      expect(webWs.send).not.toHaveBeenCalled();
+      expect(vi.mocked(getWorkerDb)).not.toHaveBeenCalled();
+    });
+
+    it('forwards a session-scoped create whose organization matches the session', async () => {
+      const { doInstance, mockCtx } = setup(databaseEnv());
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      vi.mocked(getWorkerDb).mockClear();
+      sessionAccessMocks.resolveAccessibleKiloSession.mockResolvedValueOnce({
+        kiloSessionId: 's1',
+        organizationId: ORG_ID,
+        cloudAgentSessionScopeId: null,
+      });
+
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'create_session',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1, orgId: ORG_ID },
+      });
+
+      const cliCommands = allSent(cliWs).filter(message => message.type === 'command');
+      expect(cliCommands).toHaveLength(1);
+      expect(cliCommands[0]).toMatchObject({
+        type: 'command',
+        command: 'create_session',
+        sessionId: 's1',
+        data: { protocolVersion: 1, orgId: ORG_ID },
+      });
+      expect(webWs.send).not.toHaveBeenCalled();
+      expect(vi.mocked(getWorkerDb)).not.toHaveBeenCalled();
+    });
+
+    it('refuses a session-scoped create for a different organization', async () => {
+      const { doInstance, mockCtx } = setup(databaseEnv());
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      sessionAccessMocks.resolveAccessibleKiloSession.mockResolvedValueOnce({
+        kiloSessionId: 's1',
+        organizationId: ORG_ID,
+        cloudAgentSessionScopeId: null,
+      });
+
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'create_session',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1, orgId: OTHER_ORG_ID },
+      });
+
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'ORGANIZATION_ACCESS_DENIED',
+          message: 'You do not have access to this organization',
+        },
+      });
+      expect(allSent(cliWs).filter(message => message.type === 'command')).toHaveLength(0);
+    });
+
+    it('forwards a session-scoped create for a session reached through a parent organization', async () => {
+      setupOrganizationMembership(false);
+      const { doInstance, mockCtx } = setup(databaseEnv());
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      vi.mocked(getWorkerDb).mockClear();
+      sessionAccessMocks.resolveAccessibleKiloSession.mockResolvedValueOnce({
+        kiloSessionId: 's1',
+        organizationId: ORG_ID,
+        cloudAgentSessionScopeId: null,
+      });
+
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'create_session',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1, orgId: ORG_ID },
+      });
+
+      const cliCommands = allSent(cliWs).filter(message => message.type === 'command');
+      expect(cliCommands).toHaveLength(1);
+      expect(cliCommands[0]).toMatchObject({
+        type: 'command',
+        command: 'create_session',
+        sessionId: 's1',
+        data: { protocolVersion: 1, orgId: ORG_ID },
       });
       expect(webWs.send).not.toHaveBeenCalled();
       expect(vi.mocked(getWorkerDb)).not.toHaveBeenCalled();

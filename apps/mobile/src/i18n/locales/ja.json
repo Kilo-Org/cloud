@@ -414,6 +414,7 @@
       "title": "通報の受付確認",
       "description": "送信した通報の受付確認です。後で参照できるよう、このIDを保管してください。",
       "receiptLabel": "受付",
+      "copyReceiptId": "受付IDをコピー",
       "appealLabel": "異議申し立て",
       "triageReceived": "受付済み",
       "triageOpen": "審査中",

@@ -414,6 +414,7 @@
       "title": "ใบรับรายงาน",
       "description": "ใบรับของรายงานที่คุณส่ง เก็บ ID นี้ไว้เพื่ออ้างอิงในภายหลัง.",
       "receiptLabel": "ใบรับ",
+      "copyReceiptId": "คัดลอก ID ใบรับ",
       "appealLabel": "การอุทธรณ์",
       "triageReceived": "ได้รับแล้ว",
       "triageOpen": "กำลังตรวจสอบ",

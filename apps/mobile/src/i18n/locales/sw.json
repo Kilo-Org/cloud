@@ -414,6 +414,7 @@
       "title": "Risiti ya ripoti",
       "description": "Risiti ya ripoti uliyowasilisha. Hifadhi kitambulisho hiki ili ukirejelee baadaye.",
       "receiptLabel": "Risiti",
+      "copyReceiptId": "Nakili kitambulisho cha risiti",
       "appealLabel": "Rufaa",
       "triageReceived": "Imepokelewa",
       "triageOpen": "Inakaguliwa",

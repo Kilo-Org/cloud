@@ -414,6 +414,7 @@
       "title": "Şikayət qəbzi",
       "description": "Göndərdiyin şikayətin qəbzi. Sonradan ona istinad etmək üçün bu ID-ni saxla.",
       "receiptLabel": "Qəbz",
+      "copyReceiptId": "Qəbz ID-ni kopyala",
       "appealLabel": "Apellyasiya",
       "triageReceived": "Qəbul edildi",
       "triageOpen": "Nəzərdən keçirilir",

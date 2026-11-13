@@ -414,6 +414,7 @@
       "title": "Rasiidka warbixinta",
       "description": "Rasiidka warbixinta aad gudbisay. Kaydso aqoonsigan si aad mar dambe ugu tixraacdo.",
       "receiptLabel": "Rasiid",
+      "copyReceiptId": "Koobi aqoonsiga rasiidka",
       "appealLabel": "Rafcaan",
       "triageReceived": "La helay",
       "triageOpen": "Dib-u-eegis ku jira",

@@ -414,6 +414,7 @@
       "title": "Resit laporan",
       "description": "Resit untuk laporan yang anda serahkan. Simpan ID ini untuk merujuknya kemudian.",
       "receiptLabel": "Resit",
+      "copyReceiptId": "Salin ID resit",
       "appealLabel": "Rayuan",
       "triageReceived": "Diterima",
       "triageOpen": "Dalam semakan",

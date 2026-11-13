@@ -414,6 +414,7 @@
       "title": "Shikoyat kvitansiyasi",
       "description": "Siz yuborgan shikoyat kvitansiyasi. Keyinchalik unga murojaat qilish uchun ushbu ID ni saqlab qo'ying.",
       "receiptLabel": "Kvitansiya",
+      "copyReceiptId": "Kvitansiya identifikatorini nusxalash",
       "appealLabel": "Apellyatsiya",
       "triageReceived": "Qabul qilindi",
       "triageOpen": "Ko'rib chiqilmoqda",

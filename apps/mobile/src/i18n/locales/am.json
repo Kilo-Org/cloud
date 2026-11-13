@@ -414,6 +414,7 @@
       "title": "የሪፖርት ደረሰኝ",
       "description": "ላስገቡት ሪፖርት የተሰጠ ደረሰኝ። በኋላ ለመጥቀስ ይህን መለያ ቁጥር ያስቀምጡ።",
       "receiptLabel": "ደረሰኝ",
+      "copyReceiptId": "የደረሰኙን መለያ ቁጥር ይቅዱ",
       "appealLabel": "ይግባኝ",
       "triageReceived": "ደርሷል",
       "triageOpen": "በግምገማ ላይ",

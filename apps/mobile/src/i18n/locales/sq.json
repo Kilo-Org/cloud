@@ -414,6 +414,7 @@
       "title": "Dëftesa e raportimit",
       "description": "Dëftesa për raportimin që dërgove. Ruaje këtë ID për t'iu referuar më vonë.",
       "receiptLabel": "Dëftesa",
+      "copyReceiptId": "Kopjo ID-në e dëftesës",
       "appealLabel": "Apelimi",
       "triageReceived": "U mor",
       "triageOpen": "Në shqyrtim",

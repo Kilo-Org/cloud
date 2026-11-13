@@ -414,6 +414,7 @@
       "title": "Potwierdzenie zgłoszenia",
       "description": "Potwierdzenie przesłanego przez ciebie zgłoszenia. Zachowaj ten identyfikator, aby móc się do niego później odwołać.",
       "receiptLabel": "Potwierdzenie",
+      "copyReceiptId": "Skopiuj identyfikator potwierdzenia",
       "appealLabel": "Odwołanie",
       "triageReceived": "Otrzymano",
       "triageOpen": "W trakcie rozpatrywania",

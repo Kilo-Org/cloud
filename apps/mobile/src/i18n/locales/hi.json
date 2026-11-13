@@ -414,6 +414,7 @@
       "title": "रिपोर्ट की रसीद",
       "description": "आपकी सबमिट की गई रिपोर्ट की रसीद। बाद में इसका हवाला देने के लिए यह ID संभालकर रखें।",
       "receiptLabel": "रसीद",
+      "copyReceiptId": "रसीद ID कॉपी करें",
       "appealLabel": "अपील",
       "triageReceived": "प्राप्त हुई",
       "triageOpen": "समीक्षा जारी है",

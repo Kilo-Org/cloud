@@ -414,6 +414,7 @@
       "title": "Ragaa gabaasaa",
       "description": "Ragaa gabaasa ati ergiteef. Booda itti wabeeffachuuf ID kana qabadhu.",
       "receiptLabel": "Ragaa",
+      "copyReceiptId": "Ragaa ID waraabi",
       "appealLabel": "Ol'iyyannoo",
       "triageReceived": "Fudhatameera",
       "triageOpen": "Sakatta'amaa jira",

@@ -414,6 +414,7 @@
       "title": "Tanda terima laporan",
       "description": "Tanda terima untuk laporan yang kamu kirim. Simpan ID ini untuk merujuknya nanti.",
       "receiptLabel": "Tanda terima",
+      "copyReceiptId": "Salin ID tanda terima",
       "appealLabel": "Banding",
       "triageReceived": "Diterima",
       "triageOpen": "Sedang ditinjau",

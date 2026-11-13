@@ -414,6 +414,7 @@
       "title": "Xustificante da denuncia",
       "description": "O xustificante da denuncia que enviaches. Garda este ID para consultala máis adiante.",
       "receiptLabel": "Xustificante",
+      "copyReceiptId": "Copiar ID do xustificante",
       "appealLabel": "Recurso",
       "triageReceived": "Recibida",
       "triageOpen": "En revisión",

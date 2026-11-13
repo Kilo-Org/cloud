@@ -414,6 +414,7 @@
       "title": "ਰਿਪੋਰਟ ਦੀ ਰਸੀਦ",
       "description": "ਤੁਹਾਡੇ ਵੱਲੋਂ ਦਰਜ ਕੀਤੀ ਰਿਪੋਰਟ ਦੀ ਰਸੀਦ। ਬਾਅਦ ਵਿੱਚ ਇਸ ਦਾ ਹਵਾਲਾ ਦੇਣ ਲਈ ਇਹ ID ਸੰਭਾਲ ਕੇ ਰੱਖੋ।",
       "receiptLabel": "ਰਸੀਦ",
+      "copyReceiptId": "ਰਸੀਦ ਦੀ ID ਕਾਪੀ ਕਰੋ",
       "appealLabel": "ਅਪੀਲ",
       "triageReceived": "ਪ੍ਰਾਪਤ ਹੋਈ",
       "triageOpen": "ਸਮੀਖਿਆ ਅਧੀਨ",

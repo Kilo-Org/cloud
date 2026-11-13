@@ -414,6 +414,7 @@
       "title": "Bildirim alındısı",
       "description": "Gönderdiğin bildirimin alındısı. Daha sonra başvurmak için bu kimliği sakla.",
       "receiptLabel": "Alındı",
+      "copyReceiptId": "Alındı kimliğini kopyala",
       "appealLabel": "İtiraz",
       "triageReceived": "Alındı",
       "triageOpen": "İnceleniyor",

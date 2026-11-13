@@ -414,6 +414,7 @@
       "title": "Ilmoituksen kuitti",
       "description": "Lähettämäsi ilmoituksen kuitti. Säilytä tämä tunnus, jotta voit viitata siihen myöhemmin.",
       "receiptLabel": "Kuitti",
+      "copyReceiptId": "Kopioi kuitin tunnus",
       "appealLabel": "Valitus",
       "triageReceived": "Vastaanotettu",
       "triageOpen": "Käsittelyssä",

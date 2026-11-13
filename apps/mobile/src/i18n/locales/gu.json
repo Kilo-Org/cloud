@@ -414,6 +414,7 @@
       "title": "રિપોર્ટની રસીદ",
       "description": "તમે સબમિટ કરેલા રિપોર્ટની રસીદ. પછીથી તેનો સંદર્ભ આપવા માટે આ ID સાચવી રાખો.",
       "receiptLabel": "રસીદ",
+      "copyReceiptId": "રસીદ ID કૉપી કરો",
       "appealLabel": "અપીલ",
       "triageReceived": "પ્રાપ્ત થયો",
       "triageOpen": "સમીક્ષા હેઠળ",

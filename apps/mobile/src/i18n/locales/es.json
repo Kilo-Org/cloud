@@ -414,6 +414,7 @@
       "title": "Comprobante de denuncia",
       "description": "El comprobante de la denuncia que enviaste. Guarda este ID para consultarla más adelante.",
       "receiptLabel": "Comprobante",
+      "copyReceiptId": "Copiar ID del comprobante",
       "appealLabel": "Apelación",
       "triageReceived": "Recibida",
       "triageOpen": "En revisión",

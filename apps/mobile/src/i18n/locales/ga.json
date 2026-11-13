@@ -414,6 +414,7 @@
       "title": "Admháil tuairisce",
       "description": "An admháil don tuairisc a chuir tú isteach. Coinnigh an t-aitheantas seo chun tagairt di níos déanaí.",
       "receiptLabel": "Admháil",
+      "copyReceiptId": "Cóipeáil aitheantas na hadmhála",
       "appealLabel": "Achomharc",
       "triageReceived": "Faighte",
       "triageOpen": "Á athbhreithniú",

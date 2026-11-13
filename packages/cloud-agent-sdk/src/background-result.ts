@@ -28,7 +28,9 @@ export const backgroundResultSchema = z.discriminatedUnion('kind', [
 export type BackgroundResult = z.infer<typeof backgroundResultSchema>;
 
 export function backgroundOutcome(
-  input: { kind: 'shell'; state: string; exit?: number } | { kind: 'subagent'; state: string }
+  input:
+    | { kind: 'shell'; state: string; exit?: number | undefined }
+    | { kind: 'subagent'; state: string }
 ): BackgroundResult['outcome'] {
   const { state } = input;
   const exit = input.kind === 'shell' ? input.exit : undefined;

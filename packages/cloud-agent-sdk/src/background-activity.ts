@@ -9,13 +9,14 @@ export function serializeBackgroundActivityReads(
   read: NonNullable<CloudAgentApi['getBackgroundActivity']>
 ): NonNullable<CloudAgentApi['getBackgroundActivity']> {
   const pending = new Map<string, Promise<unknown>>();
-  return async ({ sessionId, signal }) => {
+  return async payload => {
+    const { sessionId, signal } = payload;
     while (pending.has(sessionId)) {
       signal?.throwIfAborted();
       await pending.get(sessionId)?.catch(() => undefined);
     }
     signal?.throwIfAborted();
-    const request = read({ sessionId, signal });
+    const request = read(payload);
     pending.set(sessionId, request);
     try {
       const result = await request;

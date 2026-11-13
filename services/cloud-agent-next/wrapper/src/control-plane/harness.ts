@@ -8,7 +8,7 @@ import type { CondenseResult } from '../condense-on-complete.js';
 import type { SessionObservation } from './session-supervisor.js';
 import type { RestoreRoots } from '../restore-roots.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
-import type { BackgroundActivityInventory } from '@kilocode/session-ingest-contracts';
+import type { BackgroundActivityInventory } from '../../../src/shared/background-activity.js';
 
 export type HarnessSession = { sessionId: string; directory: string; signal?: AbortSignal };
 export type HarnessPrompt = HarnessSession & {

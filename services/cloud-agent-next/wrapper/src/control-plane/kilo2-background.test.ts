@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { readKilo2BackgroundActivity } from './kilo2-background.js';
 import type { Kilo2Api } from './kilo2-api.js';
-import type { BackgroundJob } from '@kilocode/session-ingest-contracts';
+import type { BackgroundJob } from '../../../src/shared/background-activity.js';
 
 const shell = {
   kind: 'shell',

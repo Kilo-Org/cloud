@@ -2,7 +2,7 @@ import { z } from 'zod';
 import {
   backgroundJobSchema,
   backgroundActivityInventorySchema,
-} from '@kilocode/session-ingest-contracts';
+} from '../../../src/shared/background-activity.js';
 import type { Kilo2Api } from './kilo2-api.js';
 import { createKilo2Reads } from './kilo2-reads.js';
 

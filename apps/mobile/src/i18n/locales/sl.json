@@ -22,6 +22,7 @@
     "expired": "Poteklo"
   },
   "common": {
+    "manageOnWeb": "Upravljaj v spletu",
     "creditHistory": "Zgodovina kreditov",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Ključi ponudnikov",
       "rowSubtitle": "Uporabi lastno obračunavanje pri ponudniku",
-      "manageOnWeb": "Upravljaj v spletu",
       "manageOnWebReason": "Ti ponudniki potrebujejo strukturirane poverilnice.",
       "description": "Zahteve prek teh ključev se zaračunajo tvojemu računu pri ponudniku namesto stanju v Kilo.",
       "enabled": "V uporabi",
@@ -4232,6 +4232,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ni bilo mogoče odpreti tega rezultata iskanja"
+  },
+  "integrations": {
+    "title": "Integracije",
+    "sectionTitle": "Povezane storitve",
+    "entrySubtitle": "GitHub, Slack, Linear in drugo",
+    "subtitle": "Povežite svoja razvojna orodja in delovne tokove s Kilo",
+    "emptyHint": "Povezana ni še nobena integracija.",
+    "disconnect": "Prekini povezavo",
+    "disconnectTitle": "Želite prekiniti povezavo s storitvijo {{provider}}?",
+    "disconnectMessage": "Kilo se v storitvi {{provider}} ne bo več odzival. Znova se lahko povežete kadar koli.",
+    "connectedTo": "Povezano z računom {{account}}",
+    "disconnected": "Povezava s storitvijo {{provider}} je prekinjena",
+    "disconnectFailed": "Povezave s storitvijo {{provider}} ni bilo mogoče prekiniti",
+    "couldNotLoad": "Integracij ni bilo mogoče naložiti",
+    "permissionDenied": "Nimate dovoljenja za upravljanje teh integracij.",
+    "memberHint": "Za spremembo teh povezav prosite lastnika ali skrbnika organizacije.",
+    "connectFailed": "Strani za povezavo ni bilo mogoče odpreti"
   },
   "invoices": {
     "personalEmptyDescription": "Računi za vaše lastne nakupe bodo prikazani tukaj, ko vam bo izstavljen račun."

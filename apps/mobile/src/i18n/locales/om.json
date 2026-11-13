@@ -22,6 +22,7 @@
     "expired": "Yeroon isaa darbeera"
   },
   "common": {
+    "manageOnWeb": "Weebii irratti bulchi",
     "creditHistory": "Seenaa kireeditii",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Furtuuwwan dhiyeessaa",
       "rowSubtitle": "Kaffaltii dhiyeessaa kee fayyadami",
-      "manageOnWeb": "Weebii irratti bulchi",
       "manageOnWebReason": "Dhiyeessitoonni kunneen ragaalee eenyummaa caaseffamoo barbaadu.",
       "description": "Gaaffiiwwan furtuuwwan kanaan ergaman haftee Kilo kee irraa osoo hin taane herrega dhiyeessaa keetti kaffalamu.",
       "enabled": "Hojiirra jira",
@@ -4102,6 +4102,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu'aa barbaachuu kana banuun hin danda'amne"
+  },
+  "integrations": {
+    "title": "Walitti hidhamiinsota",
+    "sectionTitle": "Tajaajilawwan walitti hidhaman",
+    "entrySubtitle": "GitHub, Slack, Linear fi kan biroo",
+    "subtitle": "Meeshaalee misoomaa fi adeemsa hojii kee Kilo waliin walitti hidhi",
+    "emptyHint": "Hanga ammaatti walitti hidhamiinsi tokkollee hin jiru.",
+    "disconnect": "Addaan kuti",
+    "disconnectTitle": "{{provider}} addaan kutuu?",
+    "disconnectMessage": "Kilo {{provider}} keessatti deebii kennuu ni dhaabata. Yeroo kamiyyuu irra deebitee walitti hidhuu dandeessa.",
+    "connectedTo": "{{account}} waliin walitti hidhameera",
+    "disconnected": "{{provider}} addaan cite",
+    "disconnectFailed": "{{provider}} addaan kutuun hin danda'amne",
+    "couldNotLoad": "Walitti hidhamiinsota fe'uun hin danda'amne",
+    "permissionDenied": "Walitti hidhamiinsota kana bulchuuf hayyama hin qabdu.",
+    "memberHint": "Walitti hidhamiinsota kana jijjiiruuf abbaa dhaabbataa ykn bulchaa gaafadhu.",
+    "connectFailed": "Fuula walitti hidhamiinsaa banuun hin danda'amne"
   },
   "invoices": {
     "personalEmptyDescription": "Beeksisni kaffaltii bittaa mataa keetii erga kaffaltiin siif herregamee booda asitti mul'ata."

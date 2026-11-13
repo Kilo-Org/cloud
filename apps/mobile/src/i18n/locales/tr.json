@@ -22,6 +22,7 @@
     "expired": "Süresi doldu"
   },
   "common": {
+    "manageOnWeb": "Web'de yönet",
     "creditHistory": "Kredi geçmişi",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Sağlayıcı anahtarları",
       "rowSubtitle": "Kendi sağlayıcı faturalandırmanı kullan",
-      "manageOnWeb": "Web'de yönet",
       "manageOnWebReason": "Bu sağlayıcılar yapılandırılmış kimlik bilgileri gerektirir.",
       "description": "Bu anahtarlar üzerinden yapılan istekler Kilo bakiyen yerine sağlayıcı hesabına faturalandırılır.",
       "enabled": "Kullanımda",
@@ -4102,6 +4102,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu arama sonucu açılamadı"
+  },
+  "integrations": {
+    "title": "Entegrasyonlar",
+    "sectionTitle": "Bağlı hizmetler",
+    "entrySubtitle": "GitHub, Slack, Linear ve daha fazlası",
+    "subtitle": "Geliştirme araçlarınızı ve iş akışlarınızı Kilo'ya bağlayın",
+    "emptyHint": "Henüz bağlı entegrasyon yok.",
+    "disconnect": "Bağlantıyı kes",
+    "disconnectTitle": "{{provider}} bağlantısı kesilsin mi?",
+    "disconnectMessage": "Kilo, {{provider}} üzerinde yanıt vermeyi bırakacak. İstediğiniz zaman yeniden bağlanabilirsiniz.",
+    "connectedTo": "Bağlı hesap: {{account}}",
+    "disconnected": "{{provider}} bağlantısı kesildi",
+    "disconnectFailed": "{{provider}} bağlantısı kesilemedi",
+    "couldNotLoad": "Entegrasyonlar yüklenemedi",
+    "permissionDenied": "Bu entegrasyonları yönetme izniniz yok.",
+    "memberHint": "Bu bağlantıları değiştirmek için bir kuruluş sahibine veya yöneticisine başvurun.",
+    "connectFailed": "Bağlantı sayfası açılamadı"
   },
   "invoices": {
     "personalEmptyDescription": "Kendi satın alımlarınıza ait faturalar, faturalandırıldığınızda burada görünecek."

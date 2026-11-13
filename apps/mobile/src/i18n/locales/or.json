@@ -22,6 +22,7 @@
     "expired": "ମିଆଦ ସମାପ୍ତ"
   },
   "common": {
+    "manageOnWeb": "ୱେବରେ ପରିଚାଳନା କରନ୍ତୁ",
     "creditHistory": "କ୍ରେଡିଟ୍ ଇତିହାସ",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "ପ୍ରଦାନକାରୀ କୀ",
       "rowSubtitle": "ନିଜ ପ୍ରଦାନକାରୀ ବିଲିଂ ବ୍ୟବହାର କରନ୍ତୁ",
-      "manageOnWeb": "ୱେବରେ ପରିଚାଳନା କରନ୍ତୁ",
       "manageOnWebReason": "ଏହି ପ୍ରଦାନକାରୀମାନଙ୍କ ପାଇଁ ସଂରଚିତ କ୍ରେଡେନସିଆଲ୍ ଆବଶ୍ୟକ।",
       "description": "ଏହି କୀ ମାଧ୍ୟମରେ ହେଉଥିବା ଅନୁରୋଧର ବିଲ୍ ଆପଣଙ୍କ Kilo ବ୍ୟାଲାନ୍ସ ବଦଳରେ ଆପଣଙ୍କ ପ୍ରଦାନକାରୀ ଆକାଉଣ୍ଟରେ ହେବ।",
       "enabled": "ବ୍ୟବହାରରେ ଅଛି",
@@ -4102,6 +4102,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ଏହି ଖୋଜା ଫଳାଫଳ ଖୋଲିହେଲା ନାହିଁ"
+  },
+  "integrations": {
+    "title": "ଇଣ୍ଟିଗ୍ରେସନ୍",
+    "sectionTitle": "ସଂଯୁକ୍ତ ସେବାଗୁଡ଼ିକ",
+    "entrySubtitle": "GitHub, Slack, Linear ଏବଂ ଅଧିକ",
+    "subtitle": "ଆପଣଙ୍କ ଡେଭେଲପମେଣ୍ଟ ଟୁଲ୍ ଏବଂ ୱାର୍କଫ୍ଲୋକୁ Kilo ସହ ସଂଯୋଗ କରନ୍ତୁ",
+    "emptyHint": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ଇଣ୍ଟିଗ୍ରେସନ୍ ସଂଯୁକ୍ତ ହୋଇନାହିଁ।",
+    "disconnect": "ବିଚ୍ଛିନ୍ନ କରନ୍ତୁ",
+    "disconnectTitle": "{{provider}} ସହ ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ କରିବେ?",
+    "disconnectMessage": "Kilo ଆଉ {{provider}}ରେ ଉତ୍ତର ଦେବ ନାହିଁ। ଆପଣ ଯେକୌଣସି ସମୟରେ ପୁଣି ସଂଯୋଗ କରିପାରିବେ।",
+    "connectedTo": "{{account}} ସହ ସଂଯୁକ୍ତ",
+    "disconnected": "{{provider}} ସହ ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ ହେଲା",
+    "disconnectFailed": "{{provider}} ସହ ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ କରିହେଲା ନାହିଁ",
+    "couldNotLoad": "ଇଣ୍ଟିଗ୍ରେସନ୍‌ଗୁଡ଼ିକ ଲୋଡ୍ କରିହେଲା ନାହିଁ",
+    "permissionDenied": "ଏହି ଇଣ୍ଟିଗ୍ରେସନ୍‌ଗୁଡ଼ିକ ପରିଚାଳନା କରିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
+    "memberHint": "ଏହି ସଂଯୋଗଗୁଡ଼ିକ ପରିବର୍ତ୍ତନ କରିବାକୁ ଜଣେ ସଂସ୍ଥା ମାଲିକ କିମ୍ବା ଆଡମିନଙ୍କୁ କୁହନ୍ତୁ।",
+    "connectFailed": "ସଂଯୋଗ ପୃଷ୍ଠା ଖୋଲିହେଲା ନାହିଁ"
   },
   "invoices": {
     "personalEmptyDescription": "ଆପଣଙ୍କୁ ବିଲ୍ କରାଗଲା ପରେ ଆପଣଙ୍କ ନିଜ କ୍ରୟର ଇନଭଏସ୍ ଏଠାରେ ଦେଖାଯିବ।"

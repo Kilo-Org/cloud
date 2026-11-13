@@ -22,6 +22,7 @@
     "expired": "Мерзімі өтті"
   },
   "common": {
+    "manageOnWeb": "Вебте басқару",
     "creditHistory": "Кредиттер тарихы",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Провайдер кілттері",
       "rowSubtitle": "Провайдердегі өз шотыңыз арқылы төлеу",
-      "manageOnWeb": "Вебте басқару",
       "manageOnWebReason": "Бұл провайдерлерге құрылымдалған тіркелгі деректері қажет.",
       "description": "Осы кілттер арқылы жіберілген сұраулардың төлемі Kilo теңгеріміңізден емес, провайдердегі тіркелгіңізден алынады.",
       "enabled": "Қолданыста",
@@ -4102,6 +4102,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Бұл іздеу нәтижесі ашылмады"
+  },
+  "integrations": {
+    "title": "Интеграциялар",
+    "sectionTitle": "Қосылған қызметтер",
+    "entrySubtitle": "GitHub, Slack, Linear және басқалары",
+    "subtitle": "Әзірлеу құралдары мен жұмыс процестеріңізді Kilo қызметіне қосыңыз",
+    "emptyHint": "Әзірге ешбір интеграция қосылмаған.",
+    "disconnect": "Ажырату",
+    "disconnectTitle": "{{provider}} қызметін ажырату керек пе?",
+    "disconnectMessage": "Kilo {{provider}} ішінде жауап беруді тоқтатады. Кез келген уақытта қайта қоса аласыз.",
+    "connectedTo": "Қосылған тіркелгі: {{account}}",
+    "disconnected": "{{provider}} ажыратылды",
+    "disconnectFailed": "{{provider}} қызметін ажырату мүмкін болмады",
+    "couldNotLoad": "Интеграцияларды жүктеу мүмкін болмады",
+    "permissionDenied": "Бұл интеграцияларды басқаруға рұқсатыңыз жоқ.",
+    "memberHint": "Бұл қосылымдарды өзгертуді ұйым иесінен немесе әкімшісінен сұраңыз.",
+    "connectFailed": "Қосылу бетін ашу мүмкін болмады"
   },
   "invoices": {
     "personalEmptyDescription": "Сізге төлем есептелгеннен кейін жеке сатып алуларыңыздың шот-фактуралары осында көрсетіледі."

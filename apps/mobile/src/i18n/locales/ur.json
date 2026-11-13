@@ -22,6 +22,7 @@
     "expired": "میعاد ختم ہو گئی"
   },
   "common": {
+    "manageOnWeb": "ویب پر منظم کریں",
     "creditHistory": "کریڈٹ کی تاریخچہ",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "فراہم کنندہ کی کلیدیں",
       "rowSubtitle": "اپنے فراہم کنندہ کی بلنگ استعمال کریں",
-      "manageOnWeb": "ویب پر منظم کریں",
       "manageOnWebReason": "ان فراہم کنندگان کو منظم اسناد درکار ہیں۔",
       "description": "ان کلیدوں کے ذریعے کی گئی درخواستوں کا بل آپ کے Kilo بیلنس کے بجائے آپ کے فراہم کنندہ اکاؤنٹ پر آتا ہے۔",
       "enabled": "زیر استعمال",
@@ -4102,6 +4102,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "یہ تلاش کا نتیجہ کھولا نہیں جا سکا"
+  },
+  "integrations": {
+    "title": "انٹیگریشنز",
+    "sectionTitle": "منسلک سروسز",
+    "entrySubtitle": "GitHub، Slack، Linear اور مزید",
+    "subtitle": "اپنے ڈیولپمنٹ ٹولز اور ورک فلوز کو Kilo سے منسلک کریں",
+    "emptyHint": "ابھی تک کوئی انٹیگریشن منسلک نہیں ہے۔",
+    "disconnect": "منقطع کریں",
+    "disconnectTitle": "{{provider}} کو منقطع کریں؟",
+    "disconnectMessage": "Kilo اب {{provider}} میں جواب نہیں دے گا۔ آپ کسی بھی وقت دوبارہ منسلک کر سکتے ہیں۔",
+    "connectedTo": "{{account}} سے منسلک",
+    "disconnected": "{{provider}} منقطع ہو گیا",
+    "disconnectFailed": "{{provider}} کو منقطع نہیں کیا جا سکا",
+    "couldNotLoad": "انٹیگریشنز لوڈ نہیں ہو سکیں",
+    "permissionDenied": "آپ کو ان انٹیگریشنز کا انتظام کرنے کی اجازت نہیں ہے۔",
+    "memberHint": "ان کنکشنز کو تبدیل کرنے کے لیے تنظیم کے کسی مالک یا ایڈمن سے کہیں۔",
+    "connectFailed": "کنکشن کا صفحہ نہیں کھل سکا"
   },
   "invoices": {
     "personalEmptyDescription": "بل بننے کے بعد آپ کی اپنی خریداریوں کے انوائسز یہاں نظر آئیں گے۔"

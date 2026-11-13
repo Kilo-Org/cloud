@@ -22,6 +22,7 @@
     "expired": "గడువు ముగిసింది"
   },
   "common": {
+    "manageOnWeb": "వెబ్‌లో నిర్వహించండి",
     "creditHistory": "క్రెడిట్ చరిత్ర",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "ప్రొవైడర్ కీలు",
       "rowSubtitle": "మీ సొంత ప్రొవైడర్ బిల్లింగ్‌ను ఉపయోగించండి",
-      "manageOnWeb": "వెబ్‌లో నిర్వహించండి",
       "manageOnWebReason": "ఈ ప్రొవైడర్‌లకు నిర్మాణాత్మక ఆధారాలు అవసరం.",
       "description": "ఈ కీల ద్వారా వెళ్లే అభ్యర్థనలకు మీ Kilo బ్యాలెన్స్‌కు బదులుగా మీ ప్రొవైడర్ ఖాతాకు బిల్ చేయబడుతుంది.",
       "enabled": "వాడుకలో ఉంది",
@@ -4102,6 +4102,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ఈ శోధన ఫలితాన్ని తెరవలేకపోయాము"
+  },
+  "integrations": {
+    "title": "ఇంటిగ్రేషన్‌లు",
+    "sectionTitle": "కనెక్ట్ చేసిన సేవలు",
+    "entrySubtitle": "GitHub, Slack, Linear మరియు మరిన్ని",
+    "subtitle": "మీ డెవలప్‌మెంట్ టూల్స్‌ను, వర్క్‌ఫ్లోలను Kiloకి కనెక్ట్ చేయండి",
+    "emptyHint": "ఇంకా ఏ ఇంటిగ్రేషన్‌లూ కనెక్ట్ చేయలేదు.",
+    "disconnect": "డిస్‌కనెక్ట్ చేయండి",
+    "disconnectTitle": "{{provider}}ని డిస్‌కనెక్ట్ చేయాలా?",
+    "disconnectMessage": "{{provider}}లో Kilo ఇకపై స్పందించదు. మీరు ఎప్పుడైనా మళ్లీ కనెక్ట్ చేయవచ్చు.",
+    "connectedTo": "{{account}}కి కనెక్ట్ అయింది",
+    "disconnected": "{{provider}} డిస్‌కనెక్ట్ అయింది",
+    "disconnectFailed": "{{provider}}ని డిస్‌కనెక్ట్ చేయడం సాధ్యపడలేదు",
+    "couldNotLoad": "ఇంటిగ్రేషన్‌లను లోడ్ చేయడం సాధ్యపడలేదు",
+    "permissionDenied": "ఈ ఇంటిగ్రేషన్‌లను నిర్వహించడానికి మీకు అనుమతి లేదు.",
+    "memberHint": "ఈ కనెక్షన్‌లను మార్చడానికి సంస్థ యజమానిని లేదా అడ్మిన్‌ను అడగండి.",
+    "connectFailed": "కనెక్షన్ పేజీని తెరవడం సాధ్యపడలేదు"
   },
   "invoices": {
     "personalEmptyDescription": "మీకు బిల్ చేయబడిన తర్వాత, మీ స్వంత కొనుగోళ్ల ఇన్‌వాయిస్‌లు ఇక్కడ కనిపిస్తాయి."

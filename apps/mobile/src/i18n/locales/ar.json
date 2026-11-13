@@ -22,6 +22,7 @@
     "expired": "انتهت الصلاحية"
   },
   "common": {
+    "manageOnWeb": "الإدارة عبر الويب",
     "creditHistory": "سجل الرصيد",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "مفاتيح المزوّدين",
       "rowSubtitle": "استخدم الفوترة الخاصة بمزوّدك",
-      "manageOnWeb": "الإدارة عبر الويب",
       "manageOnWebReason": "تتطلب هؤلاء المزوّدون بيانات اعتماد منظّمة.",
       "description": "تُحتسب تكلفة الطلبات المُرسلة عبر هذه المفاتيح على حسابك لدى المزوّد بدلًا من رصيدك في Kilo.",
       "enabled": "قيد الاستخدام",
@@ -4362,6 +4362,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "تعذّر فتح نتيجة البحث هذه"
+  },
+  "integrations": {
+    "title": "التكاملات",
+    "sectionTitle": "الخدمات المتصلة",
+    "entrySubtitle": "GitHub وSlack وLinear والمزيد",
+    "subtitle": "اربط أدوات التطوير ومسارات العمل لديك بـ Kilo",
+    "emptyHint": "لا توجد تكاملات متصلة بعد.",
+    "disconnect": "قطع الاتصال",
+    "disconnectTitle": "هل تريد قطع الاتصال بـ {{provider}}؟",
+    "disconnectMessage": "سيتوقف Kilo عن الرد في {{provider}}. يمكنك إعادة الاتصال في أي وقت.",
+    "connectedTo": "متصل بـ {{account}}",
+    "disconnected": "تم قطع الاتصال بـ {{provider}}",
+    "disconnectFailed": "تعذّر قطع الاتصال بـ {{provider}}",
+    "couldNotLoad": "تعذّر تحميل التكاملات",
+    "permissionDenied": "ليس لديك إذن لإدارة هذه التكاملات.",
+    "memberHint": "اطلب من مالك المؤسسة أو أحد مسؤوليها تغيير هذه الاتصالات.",
+    "connectFailed": "تعذّر فتح صفحة الاتصال"
   },
   "invoices": {
     "personalEmptyDescription": "ستظهر هنا فواتير مشترياتك الشخصية بعد إصدار أول فاتورة لك."

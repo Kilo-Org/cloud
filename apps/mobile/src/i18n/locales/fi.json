@@ -22,6 +22,7 @@
     "expired": "Vanhentunut"
   },
   "common": {
+    "manageOnWeb": "Hallinnoi verkossa",
     "creditHistory": "Krediittihistoria",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Palveluntarjoajien avaimet",
       "rowSubtitle": "Käytä palveluntarjoajasi omaa laskutusta",
-      "manageOnWeb": "Hallinnoi verkossa",
       "manageOnWebReason": "Nämä palveluntarjoajat tarvitsevat jäsennellyt tunnistetiedot.",
       "description": "Näiden avainten kautta tehdyt pyynnöt laskutetaan palveluntarjoajasi tililtä Kilo-saldon sijaan.",
       "enabled": "Käytössä",
@@ -4102,6 +4102,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Tämän hakutuloksen avaaminen epäonnistui"
+  },
+  "integrations": {
+    "title": "Integraatiot",
+    "sectionTitle": "Yhdistetyt palvelut",
+    "entrySubtitle": "GitHub, Slack, Linear ja muita",
+    "subtitle": "Yhdistä kehitystyökalusi ja työnkulkusi Kiloon",
+    "emptyHint": "Integraatioita ei ole vielä yhdistetty.",
+    "disconnect": "Katkaise yhteys",
+    "disconnectTitle": "Katkaistaanko yhteys palveluun {{provider}}?",
+    "disconnectMessage": "Kilo lakkaa vastaamasta palvelussa {{provider}}. Voit yhdistää uudelleen milloin tahansa.",
+    "connectedTo": "Yhdistetty: {{account}}",
+    "disconnected": "Yhteys palveluun {{provider}} katkaistu",
+    "disconnectFailed": "Yhteyttä palveluun {{provider}} ei voitu katkaista",
+    "couldNotLoad": "Integraatioita ei voitu ladata",
+    "permissionDenied": "Sinulla ei ole oikeutta hallita näitä integraatioita.",
+    "memberHint": "Pyydä organisaation omistajaa tai järjestelmänvalvojaa muuttamaan näitä yhteyksiä.",
+    "connectFailed": "Yhdistämissivua ei voitu avata"
   },
   "invoices": {
     "personalEmptyDescription": "Omien ostojesi laskut näkyvät täällä, kun sinua on laskutettu."

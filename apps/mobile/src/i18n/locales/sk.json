@@ -22,6 +22,7 @@
     "expired": "Platnosť vypršala"
   },
   "common": {
+    "manageOnWeb": "Spravovať na webe",
     "creditHistory": "História kreditov",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Kľúče poskytovateľov",
       "rowSubtitle": "Používať vlastnú fakturáciu u poskytovateľa",
-      "manageOnWeb": "Spravovať na webe",
       "manageOnWebReason": "Títo poskytovatelia vyžadujú štruktúrované prihlasovacie údaje.",
       "description": "Požiadavky cez tieto kľúče sa účtujú na tvoj účet u poskytovateľa namiesto tvojho zostatku v Kilo.",
       "enabled": "Používa sa",
@@ -4232,6 +4232,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nepodarilo sa otvoriť tento výsledok vyhľadávania"
+  },
+  "integrations": {
+    "title": "Integrácie",
+    "sectionTitle": "Pripojené služby",
+    "entrySubtitle": "GitHub, Slack, Linear a ďalšie",
+    "subtitle": "Prepojte svoje vývojárske nástroje a pracovné postupy s Kilo",
+    "emptyHint": "Zatiaľ nie sú pripojené žiadne integrácie.",
+    "disconnect": "Odpojiť",
+    "disconnectTitle": "Odpojiť {{provider}}?",
+    "disconnectMessage": "Kilo prestane reagovať v službe {{provider}}. Kedykoľvek ju môžete znova pripojiť.",
+    "connectedTo": "Pripojené k účtu {{account}}",
+    "disconnected": "Služba {{provider}} bola odpojená",
+    "disconnectFailed": "Službu {{provider}} sa nepodarilo odpojiť",
+    "couldNotLoad": "Integrácie sa nepodarilo načítať",
+    "permissionDenied": "Nemáte oprávnenie spravovať tieto integrácie.",
+    "memberHint": "Požiadajte vlastníka alebo správcu organizácie, aby tieto pripojenia zmenil.",
+    "connectFailed": "Stránku pripojenia sa nepodarilo otvoriť"
   },
   "invoices": {
     "personalEmptyDescription": "Faktúry za vaše vlastné nákupy sa tu zobrazia po vyúčtovaní."

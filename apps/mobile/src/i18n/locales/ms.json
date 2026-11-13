@@ -22,6 +22,7 @@
     "expired": "Tamat tempoh"
   },
   "common": {
+    "manageOnWeb": "Urus di web",
     "creditHistory": "Sejarah kredit",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Kunci pembekal",
       "rowSubtitle": "Gunakan pengebilan pembekal anda sendiri",
-      "manageOnWeb": "Urus di web",
       "manageOnWebReason": "Pembekal ini memerlukan kelayakan berstruktur.",
       "description": "Permintaan melalui kunci ini dibilkan kepada akaun pembekal anda dan bukannya baki Kilo anda.",
       "enabled": "Sedang digunakan",
@@ -4102,6 +4102,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Tidak dapat membuka hasil carian ini"
+  },
+  "integrations": {
+    "title": "Integrasi",
+    "sectionTitle": "Perkhidmatan yang disambungkan",
+    "entrySubtitle": "GitHub, Slack, Linear dan banyak lagi",
+    "subtitle": "Sambungkan alat dan aliran kerja pembangunan anda kepada Kilo",
+    "emptyHint": "Belum ada integrasi yang disambungkan.",
+    "disconnect": "Putuskan sambungan",
+    "disconnectTitle": "Putuskan sambungan {{provider}}?",
+    "disconnectMessage": "Kilo akan berhenti memberikan respons dalam {{provider}}. Anda boleh menyambung semula pada bila-bila masa.",
+    "connectedTo": "Disambungkan kepada {{account}}",
+    "disconnected": "Sambungan {{provider}} telah diputuskan",
+    "disconnectFailed": "Tidak dapat memutuskan sambungan {{provider}}",
+    "couldNotLoad": "Tidak dapat memuatkan integrasi",
+    "permissionDenied": "Anda tidak mempunyai kebenaran untuk mengurus integrasi ini.",
+    "memberHint": "Minta pemilik atau pentadbir organisasi untuk menukar sambungan ini.",
+    "connectFailed": "Tidak dapat membuka halaman sambungan"
   },
   "invoices": {
     "personalEmptyDescription": "Invois untuk pembelian anda sendiri akan dipaparkan di sini setelah anda dibilkan."

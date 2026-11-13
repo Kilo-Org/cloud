@@ -22,6 +22,7 @@
     "expired": "Lokaci ya ƙare"
   },
   "common": {
+    "manageOnWeb": "Sarrafa a yanar gizo",
     "creditHistory": "Tarihin kiredit",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Maɓallan masu samarwa",
       "rowSubtitle": "Yi amfani da biyan kuɗin mai samarwarka",
-      "manageOnWeb": "Sarrafa a yanar gizo",
       "manageOnWebReason": "Waɗannan masu samarwa suna buƙatar takardun shaida masu tsari.",
       "description": "Ana cajin buƙatun da ke bi ta waɗannan maɓallan zuwa asusun mai samarwarka maimakon ragowar kuɗinka na Kilo.",
       "enabled": "Ana amfani",
@@ -4102,6 +4102,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ba a iya buɗe wannan sakamakon binciken ba"
+  },
+  "integrations": {
+    "title": "Haɗe-haɗe",
+    "sectionTitle": "Ayyukan da aka haɗa",
+    "entrySubtitle": "GitHub, Slack, Linear da sauransu",
+    "subtitle": "Haɗa kayan aikin haɓaka manhaja da tsarin aikinka da Kilo",
+    "emptyHint": "Babu wani haɗi tukuna.",
+    "disconnect": "Cire haɗi",
+    "disconnectTitle": "A cire haɗin {{provider}}?",
+    "disconnectMessage": "Kilo zai daina amsawa a {{provider}}. Kana iya sake haɗawa a kowane lokaci.",
+    "connectedTo": "An haɗa da {{account}}",
+    "disconnected": "An cire haɗin {{provider}}",
+    "disconnectFailed": "Ba a iya cire haɗin {{provider}} ba",
+    "couldNotLoad": "Ba a iya loda haɗe-haɗe ba",
+    "permissionDenied": "Ba ka da izinin sarrafa waɗannan haɗe-haɗe.",
+    "memberHint": "Ka roƙi mamallakin ƙungiya ko mai gudanarwa ya canza waɗannan haɗe-haɗe.",
+    "connectFailed": "Ba a iya buɗe shafin haɗi ba"
   },
   "invoices": {
     "personalEmptyDescription": "Takardun kuɗi na sayayyarka za su bayyana a nan da zarar an caje ka."

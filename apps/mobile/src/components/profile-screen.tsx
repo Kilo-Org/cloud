@@ -13,6 +13,7 @@ import {
   Lock,
   LogOut,
   MessageSquare,
+  Plug,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -466,6 +467,26 @@ export function ProfileScreen() {
             ))}
           </View>
         )}
+
+        {/* Connected services — the integrations hub. Its own section rather
+            than a row in App: the hub manages external accounts, and its row
+            takes the next curated hue step in reading order. */}
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            {t('integrations.sectionTitle')}
+          </Text>
+          <ConfigureRow
+            icon={Plug}
+            title={t('integrations.title')}
+            subtitle={t('integrations.entrySubtitle')}
+            hue="pine"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/integrations' as Href);
+            }}
+          />
+        </View>
 
         {/* Actions — stacked full-width tiles so labels never clip side-by-side at max Dynamic Type */}
         <View className="mt-6 gap-3">

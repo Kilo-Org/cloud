@@ -22,6 +22,7 @@
     "expired": "Galiojimas baigėsi"
   },
   "common": {
+    "manageOnWeb": "Tvarkyti žiniatinklyje",
     "creditHistory": "Kreditų istorija",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Teikėjų raktai",
       "rowSubtitle": "Naudoti savo teikėjo atsiskaitymą",
-      "manageOnWeb": "Tvarkyti žiniatinklyje",
       "manageOnWebReason": "Šiems teikėjams reikalingi struktūrizuoti prisijungimo duomenys.",
       "description": "Užklausos, atliekamos su šiais raktais, apmokestinamos jūsų teikėjo paskyroje, o ne iš jūsų Kilo likučio.",
       "enabled": "Naudojamas",
@@ -4232,6 +4232,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nepavyko atidaryti šio paieškos rezultato"
+  },
+  "integrations": {
+    "title": "Integracijos",
+    "sectionTitle": "Prijungtos paslaugos",
+    "entrySubtitle": "GitHub, Slack, Linear ir kitos",
+    "subtitle": "Prijunkite savo kūrimo įrankius ir darbo eigas prie Kilo",
+    "emptyHint": "Dar nėra prijungtų integracijų.",
+    "disconnect": "Atjungti",
+    "disconnectTitle": "Atjungti {{provider}}?",
+    "disconnectMessage": "Kilo nebeatsakys {{provider}} platformoje. Bet kada galėsite vėl prijungti.",
+    "connectedTo": "Prijungta: {{account}}",
+    "disconnected": "Atjungta: {{provider}}",
+    "disconnectFailed": "Nepavyko atjungti {{provider}}",
+    "couldNotLoad": "Nepavyko įkelti integracijų",
+    "permissionDenied": "Neturite teisių tvarkyti šių integracijų.",
+    "memberHint": "Paprašykite organizacijos savininko arba administratoriaus pakeisti šias jungtis.",
+    "connectFailed": "Nepavyko atidaryti prijungimo puslapio"
   },
   "invoices": {
     "personalEmptyDescription": "Jūsų asmeninių pirkimų sąskaitos faktūros bus rodomos čia, kai jums bus išrašyta sąskaita."

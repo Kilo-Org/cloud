@@ -22,6 +22,7 @@
     "expired": "Тэрмін дзеяння скончыўся"
   },
   "common": {
+    "manageOnWeb": "Кіраваць у вэб-версіі",
     "creditHistory": "Гісторыя крэдытаў",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Ключы пастаўшчыкоў",
       "rowSubtitle": "Аплата праз уласны ўліковы запіс пастаўшчыка",
-      "manageOnWeb": "Кіраваць у вэб-версіі",
       "manageOnWebReason": "Гэтым пастаўшчыкам патрэбныя структураваныя ўліковыя даныя.",
       "description": "Запыты з гэтымі ключамі аплачваюцца праз ваш уліковы запіс пастаўшчыка, а не з балансу Kilo.",
       "enabled": "Выкарыстоўваецца",
@@ -4232,6 +4232,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Не атрымалася адкрыць гэты вынік пошуку"
+  },
+  "integrations": {
+    "title": "Інтэграцыі",
+    "sectionTitle": "Падключаныя сэрвісы",
+    "entrySubtitle": "GitHub, Slack, Linear і іншыя",
+    "subtitle": "Падключыце свае інструменты распрацоўкі і працоўныя працэсы да Kilo",
+    "emptyHint": "Пакуль няма падключаных інтэграцый.",
+    "disconnect": "Адключыць",
+    "disconnectTitle": "Адключыць {{provider}}?",
+    "disconnectMessage": "Kilo перастане адказваць у {{provider}}. Падключыцца зноў можна ў любы час.",
+    "connectedTo": "Падключана да {{account}}",
+    "disconnected": "Адключана: {{provider}}",
+    "disconnectFailed": "Не ўдалося адключыць {{provider}}",
+    "couldNotLoad": "Не ўдалося загрузіць інтэграцыі",
+    "permissionDenied": "У вас няма правоў на кіраванне гэтымі інтэграцыямі.",
+    "memberHint": "Папрасіце ўладальніка або адміністратара арганізацыі змяніць гэтыя падключэнні.",
+    "connectFailed": "Не ўдалося адкрыць старонку падключэння"
   },
   "invoices": {
     "personalEmptyDescription": "Рахункі за вашы асабістыя пакупкі з'явяцца тут пасля першага спісання аплаты."

@@ -2,7 +2,7 @@ import 'server-only';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, asc, desc, isNull } from 'drizzle-orm';
+import { eq, and, asc, desc, isNull, inArray } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import {
   requireNumericPlatformRepositories,
@@ -42,6 +42,65 @@ export async function listIntegrations(owner: Owner) {
     .orderBy(asc(platform_integrations.created_at), asc(platform_integrations.id));
 
   return integrations;
+}
+
+/**
+ * Which of these connections `uninstallApp` can remove upstream, judged by the
+ * same rule `uninstallExclusiveGitHubInstallation` applies: a `workflow`-role
+ * association whose installation has no other locally connected association.
+ * The hub reads this instead of guessing from the list alone, so it never
+ * offers a native Disconnect the server would refuse.
+ */
+export async function listNativelyUninstallableIds(
+  integrations: readonly PlatformIntegration[]
+): Promise<Set<string>> {
+  const candidates = integrations.filter(
+    integration =>
+      integration.github_connection_role === 'workflow' &&
+      integration.platform_installation_id != null
+  );
+  const installationIds = [
+    ...new Set(candidates.map(integration => integration.platform_installation_id as string)),
+  ];
+  if (installationIds.length === 0) {
+    return new Set();
+  }
+
+  // Every owner's association can share one installation, so the sibling count
+  // is read across the table, exactly as the uninstall transaction does.
+  const connected = await db
+    .select({
+      installationId: platform_integrations.platform_installation_id,
+      appType: platform_integrations.github_app_type,
+    })
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.GITHUB),
+        inArray(platform_integrations.platform_installation_id, installationIds),
+        isNull(platform_integrations.github_disconnected_at)
+      )
+    );
+
+  const countKey = (installationId: string, appType: string | null) =>
+    `${installationId}:${appType ?? 'standard'}`;
+  const counts = new Map<string, number>();
+  for (const row of connected) {
+    if (!row.installationId) continue;
+    const key = countKey(row.installationId, row.appType);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  return new Set(
+    candidates
+      .filter(
+        integration =>
+          counts.get(
+            countKey(integration.platform_installation_id as string, integration.github_app_type)
+          ) === 1
+      )
+      .map(integration => integration.id)
+  );
 }
 
 /**

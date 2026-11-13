@@ -42,6 +42,7 @@ export default defineConfig({
     plugins: [tailwindcss()],
   }),
   zip: {
+    excludeSources: ['*', '**/*'],
     /*
      * WXT keeps a file that matches includeSources OR misses excludeSources, so
      * excludeSources covers everything to make this list the allowlist it reads
@@ -81,7 +82,6 @@ export default defineConfig({
       'packages/cloud-agent-sdk/src/**',
       'packages/session-ingest-contracts/src/**',
     ],
-    excludeSources: ['*', '**/*'],
     sourcesRoot: '../..',
   },
 });

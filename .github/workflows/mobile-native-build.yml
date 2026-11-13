@@ -300,8 +300,15 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-ssh-core-ios-${{ hashFiles('apps/mobile/modules/kilo-ssh/rust/**/*.rs', 'apps/mobile/modules/kilo-ssh/rust/**/Cargo.toml', 'apps/mobile/modules/kilo-ssh/rust/Cargo.lock', 'apps/mobile/modules/kilo-ssh/rust-toolchain.toml', 'apps/mobile/modules/kilo-ssh/rust/**/uniffi*.toml', 'apps/mobile/modules/kilo-ssh/scripts/*.sh') }}
 
       - name: Build the SSH Rust core
-        if: steps.published.outputs.published != 'true' && steps.ssh-core.outputs.cache-hit != 'true'
-        run: bash apps/mobile/modules/kilo-ssh/scripts/build-native.sh
+        if: steps.published.outputs.published != 'true'
+        env:
+          SSH_CORE_RESTORED: ${{ steps.ssh-core.outputs.cache-hit }}
+        run: |
+          if [ "$SSH_CORE_RESTORED" = 'true' ]; then
+            echo 'The SSH core matches the cached build'
+            exit 0
+          fi
+          bash apps/mobile/modules/kilo-ssh/scripts/build-native.sh
 
       - name: Expo prebuild
         if: steps.published.outputs.published != 'true'

@@ -2467,7 +2467,8 @@
       "cancelQueued": "સંદેશ રદ કરો",
       "cancelQueuedAccessibility": "કતારમાં રહેલો સંદેશ રદ કરો",
       "restoreQueued": "પુનઃસ્થાપિત કરો",
-      "restoreQueuedAccessibility": "રદ કરેલો સંદેશ સંદેશના ખાનામાં પાછો મૂકો"
+      "restoreQueuedAccessibility": "રદ કરેલો સંદેશ સંદેશના ખાનામાં પાછો મૂકો",
+      "noReplyRecorded": "આ સંદેશ માટે કોઈ જવાબ નોંધાયો નહીં."
     },
     "olderMessages": {
       "arrived": "અગાઉના સંદેશાઓ લોડ થયા",

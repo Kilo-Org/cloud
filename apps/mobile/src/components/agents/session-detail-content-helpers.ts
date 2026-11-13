@@ -2,7 +2,7 @@ import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-a
 
 import { type MessageFailure, selectMessageFailure } from './message-failure-state';
 import { firstHumanText } from './part-types';
-import { transcriptRendersMessage } from './session-transcript';
+import { type SessionTranscriptItem, transcriptRendersMessage } from './session-transcript';
 
 export function restoreCanceledQueuedMessages(
   messages: StoredMessage[],
@@ -219,6 +219,32 @@ export function lastVisibleMessageFailure({
   // refusal carries its own (Add credits), so it states the failure even where
   // a re-send has no prompt to retry.
   return failure.canAddCredits || resolveRetryPrompt(last, messages) !== null ? failure : null;
+}
+
+/**
+ * The prompt a stored transcript ends on with nothing answering it, or `null`
+ * when the transcript ends on anything else.
+ *
+ * Only a read-only session's record can be read this way: a stored user row
+ * carries no delivery state, so the record cannot say whether the turn failed
+ * to send or the agent answered and the answer was never stored. It can say
+ * that no reply follows the prompt. A live session's prompt at the end is
+ * simply in flight, and its own delivery states say what happened to it.
+ *
+ * The merged transcript decides, so an assistant row, a preparation group or a
+ * condensed tool run that follows the prompt suppresses the note. A row that
+ * carries a delivery state already states itself through the queued badge or
+ * the failure footer.
+ */
+export function unansweredPromptMessageId(
+  transcript: readonly SessionTranscriptItem[],
+  deliveryStates: ReadonlyMap<string, MessageDeliveryState>
+): string | null {
+  const last = transcript.at(-1);
+  if (last?.type !== 'message' || last.message.info.role !== 'user') {
+    return null;
+  }
+  return deliveryStates.has(last.message.info.id) ? null : last.message.info.id;
 }
 
 /**

@@ -2467,7 +2467,8 @@
       "cancelQueued": "Откажи ја пораката",
       "cancelQueuedAccessibility": "Откажи ја пораката што чека",
       "restoreQueued": "Врати",
-      "restoreQueuedAccessibility": "Врати ја откажаната порака во полето за порака"
+      "restoreQueuedAccessibility": "Врати ја откажаната порака во полето за порака",
+      "noReplyRecorded": "Не е забележан одговор за оваа порака."
     },
     "olderMessages": {
       "arrived": "Постарите пораки се вчитани",

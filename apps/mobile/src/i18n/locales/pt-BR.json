@@ -1920,7 +1920,8 @@
       "cancelQueued": "Cancelar mensagem",
       "cancelQueuedAccessibility": "Cancelar mensagem na fila",
       "restoreQueued": "Restaurar",
-      "restoreQueuedAccessibility": "Restaurar mensagem cancelada no campo de mensagem"
+      "restoreQueuedAccessibility": "Restaurar mensagem cancelada no campo de mensagem",
+      "noReplyRecorded": "Nenhuma resposta foi registrada para esta mensagem."
     },
     "olderMessages": {
       "arrived": "Mensagens anteriores carregadas",

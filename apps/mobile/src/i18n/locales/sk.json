@@ -2557,7 +2557,8 @@
       "cancelQueued": "Zrušiť správu",
       "cancelQueuedAccessibility": "Zrušiť správu vo fronte",
       "restoreQueued": "Obnoviť",
-      "restoreQueuedAccessibility": "Vrátiť zrušenú správu do poľa na správu"
+      "restoreQueuedAccessibility": "Vrátiť zrušenú správu do poľa na správu",
+      "noReplyRecorded": "Pre túto správu nebola zaznamenaná žiadna odpoveď."
     },
     "olderMessages": {
       "arrived": "Staršie správy sa načítali",

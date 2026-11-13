@@ -2467,7 +2467,8 @@
       "cancelQueued": "هەڵوەشاندنەوەی پەیام",
       "cancelQueuedAccessibility": "هەڵوەشاندنەوەی پەیامی ناو ڕیز",
       "restoreQueued": "گەڕاندنەوە",
-      "restoreQueuedAccessibility": "گەڕاندنەوەی پەیامی هەڵوەشاوە بۆ خانەی نووسینی پەیام"
+      "restoreQueuedAccessibility": "گەڕاندنەوەی پەیامی هەڵوەشاوە بۆ خانەی نووسینی پەیام",
+      "noReplyRecorded": "هیچ وەڵامێک بۆ ئەم پەیامە تۆمار نەکراوە."
     },
     "olderMessages": {
       "arrived": "پەیامە پێشووەکان بار کران",

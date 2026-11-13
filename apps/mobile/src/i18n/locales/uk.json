@@ -1969,7 +1969,8 @@
       "cancelQueued": "Скасувати повідомлення",
       "cancelQueuedAccessibility": "Скасувати повідомлення в черзі",
       "restoreQueued": "Відновити",
-      "restoreQueuedAccessibility": "Відновити скасоване повідомлення в полі введення повідомлення"
+      "restoreQueuedAccessibility": "Відновити скасоване повідомлення в полі введення повідомлення",
+      "noReplyRecorded": "Для цього повідомлення відповідь не зафіксовано."
     },
     "olderMessages": {
       "arrived": "Попередні повідомлення завантажено",

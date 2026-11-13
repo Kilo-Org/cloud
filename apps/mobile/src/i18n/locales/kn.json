@@ -2467,7 +2467,8 @@
       "cancelQueued": "ಸಂದೇಶವನ್ನು ರದ್ದುಮಾಡಿ",
       "cancelQueuedAccessibility": "ಸರದಿಯಲ್ಲಿರುವ ಸಂದೇಶವನ್ನು ರದ್ದುಮಾಡಿ",
       "restoreQueued": "ಮರುಸ್ಥಾಪಿಸಿ",
-      "restoreQueuedAccessibility": "ರದ್ದುಮಾಡಿದ ಸಂದೇಶವನ್ನು ಸಂದೇಶ ಪೆಟ್ಟಿಗೆಗೆ ಮರುಸ್ಥಾಪಿಸಿ"
+      "restoreQueuedAccessibility": "ರದ್ದುಮಾಡಿದ ಸಂದೇಶವನ್ನು ಸಂದೇಶ ಪೆಟ್ಟಿಗೆಗೆ ಮರುಸ್ಥಾಪಿಸಿ",
+      "noReplyRecorded": "ಈ ಸಂದೇಶಕ್ಕೆ ಯಾವುದೇ ಪ್ರತಿಕ್ರಿಯೆಯನ್ನು ದಾಖಲಿಸಲಾಗಿಲ್ಲ."
     },
     "olderMessages": {
       "arrived": "ಹಿಂದಿನ ಸಂದೇಶಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",

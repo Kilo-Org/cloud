@@ -121,6 +121,7 @@ import {
   resolveRetryTarget,
   restoreCanceledQueuedMessages,
   retryFailedMessage,
+  unansweredPromptMessageId,
 } from '@/components/agents/session-detail-content-helpers';
 import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
 import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch';
@@ -348,6 +349,7 @@ export function SessionDetailContent({
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
   const isLoading = useAtomValue(manager.atoms.isLoading);
+  const isRefreshingCachedTranscript = useAtomValue(manager.atoms.isRefreshingCachedTranscript);
   const error = useAtomValue(manager.atoms.error);
   const fetchedData = useAtomValue(manager.atoms.fetchedSessionData);
   const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
@@ -1703,6 +1705,16 @@ export function SessionDetailContent({
     [canceledQueuedMessages, t]
   );
 
+  // A stored transcript that ends on a prompt says so: the record holds no
+  // delivery state for that turn and nothing follows it. Only a read-only
+  // session can draw that (a live prompt at the end is in flight), and only
+  // once the live page has replaced a cached one, so the note cannot appear on
+  // stale rows and vanish when the answer lands.
+  const unansweredPromptId =
+    activeSessionType === 'read-only' && !isRefreshingCachedTranscript && !isStreaming
+      ? unansweredPromptMessageId(baseTranscript, pendingMessages)
+      : null;
+
   const renderItem = useCallback(
     ({ item }: { item: SessionTranscriptItem }) => {
       if (item.type === 'preparation') {
@@ -1770,6 +1782,7 @@ export function SessionDetailContent({
           onRestoreQueued={
             canceledQueuedMessages.has(item.message.info.id) ? handleRestoreQueued : undefined
           }
+          noReplyRecorded={item.message.info.id === unansweredPromptId}
           condenseToolCalls={condenseToolCalls}
         />
       );
@@ -1806,6 +1819,7 @@ export function SessionDetailContent({
       handleOpenDetails,
       handleRestoreQueued,
       canceledQueuedMessages,
+      unansweredPromptId,
       condenseToolCalls,
     ]
   );

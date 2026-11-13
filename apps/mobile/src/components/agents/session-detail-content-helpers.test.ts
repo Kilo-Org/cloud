@@ -1,11 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import {
+  type MessageDeliveryState,
+  type PreparationAttempt,
+  type StoredMessage,
+} from '@kilocode/cloud-agent-sdk';
 import {
   countInFlightMessages,
   resolveRetryPrompt,
   resolveRetryTarget,
   retryFailedMessage,
+  unansweredPromptMessageId,
 } from './session-detail-content-helpers';
 import { getSessionTranscriptItemKey, mergeSessionTranscript } from './session-transcript';
 import { assistantMessage, userMessage } from './message-bubble-test-utils';
@@ -136,6 +141,62 @@ describe('retryFailedMessage', () => {
       error: 'boom',
       reason: 'execution',
     });
+  });
+});
+
+describe('unansweredPromptMessageId', () => {
+  /** No live transport: a stored transcript's rows carry no delivery state. */
+  const noDeliveryStates = new Map<string, MessageDeliveryState>();
+
+  function attemptAfter(triggerMessageId: string): PreparationAttempt {
+    return {
+      id: 'prep-1',
+      triggerMessageId,
+      status: 'failed',
+      startedAt: 1_761_000_000_000,
+      revision: 1,
+      steps: [],
+    };
+  }
+
+  it('names the prompt a stored transcript ends on with nothing answering it', () => {
+    const prompt = userMessage('m-prompt');
+    expect(unansweredPromptMessageId(mergeSessionTranscript([prompt], []), noDeliveryStates)).toBe(
+      'm-prompt'
+    );
+  });
+
+  it('names nothing once an assistant row follows the prompt', () => {
+    const prompt = userMessage('m-prompt');
+    const answer = withParent(assistantMessage('m-answer'), 'm-prompt');
+    answer.parts = [
+      { id: 'm-answer-text', sessionID: 'ses_1', messageID: 'm-answer', type: 'text', text: 'ok' },
+    ];
+    expect(
+      unansweredPromptMessageId(mergeSessionTranscript([prompt, answer], []), noDeliveryStates)
+    ).toBeNull();
+  });
+
+  it('names nothing when the turn ended in a preparation group', () => {
+    const prompt = userMessage('m-prompt');
+    const transcript = mergeSessionTranscript([prompt], [attemptAfter('m-prompt')]);
+    expect(unansweredPromptMessageId(transcript, noDeliveryStates)).toBeNull();
+  });
+
+  it('names nothing for a prompt that carries a delivery state', () => {
+    // A queued or failed row already states itself through the badge or the
+    // failure footer, so a second statement would describe the same turn twice.
+    const prompt = userMessage('m-prompt');
+    const queued = new Map<string, MessageDeliveryState>([['m-prompt', { status: 'queued' }]]);
+    expect(unansweredPromptMessageId(mergeSessionTranscript([prompt], []), queued)).toBeNull();
+  });
+
+  it('names nothing for a transcript that ends on an assistant row or holds no rows', () => {
+    const answer = assistantMessage('m-answer');
+    expect(
+      unansweredPromptMessageId(mergeSessionTranscript([answer], []), noDeliveryStates)
+    ).toBeNull();
+    expect(unansweredPromptMessageId([], noDeliveryStates)).toBeNull();
   });
 });
 

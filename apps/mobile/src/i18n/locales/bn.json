@@ -2467,7 +2467,8 @@
       "cancelQueued": "বার্তা বাতিল করুন",
       "cancelQueuedAccessibility": "অপেক্ষমাণ বার্তা বাতিল করুন",
       "restoreQueued": "ফিরিয়ে আনুন",
-      "restoreQueuedAccessibility": "বাতিল করা বার্তাটি বার্তা লেখার ঘরে ফিরিয়ে আনুন"
+      "restoreQueuedAccessibility": "বাতিল করা বার্তাটি বার্তা লেখার ঘরে ফিরিয়ে আনুন",
+      "noReplyRecorded": "এই বার্তার জন্য কোনো উত্তর রেকর্ড করা হয়নি।"
     },
     "olderMessages": {
       "arrived": "আগের বার্তাগুলি লোড হয়েছে",

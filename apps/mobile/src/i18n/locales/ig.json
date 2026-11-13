@@ -2467,7 +2467,8 @@
       "cancelQueued": "Kagbuo ozi",
       "cancelQueuedAccessibility": "Kagbuo ozi na-echere",
       "restoreQueued": "Weghachite",
-      "restoreQueuedAccessibility": "Weghachite ozi a kagburu n'ebe ide ozi"
+      "restoreQueuedAccessibility": "Weghachite ozi a kagburu n'ebe ide ozi",
+      "noReplyRecorded": "Edekọghị nzaghachi ọ bụla maka ozi a."
     },
     "olderMessages": {
       "arrived": "Ebudatala ozi ndị gara aga",

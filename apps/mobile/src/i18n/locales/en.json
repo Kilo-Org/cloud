@@ -2551,6 +2551,7 @@
       "cancelQueuedAccessibility": "Cancel queued message",
       "restoreQueued": "Restore",
       "restoreQueuedAccessibility": "Restore canceled message to the composer",
+      "noReplyRecorded": "No response was recorded for this message.",
       "userMessage": "User message",
       "assistantMessage": "Assistant message",
       "longPressHint": "Long press for message details"

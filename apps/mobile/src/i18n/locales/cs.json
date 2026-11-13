@@ -2557,7 +2557,8 @@
       "cancelQueued": "Zrušit zprávu",
       "cancelQueuedAccessibility": "Zrušit zprávu ve frontě",
       "restoreQueued": "Obnovit",
-      "restoreQueuedAccessibility": "Vrátit zrušenou zprávu do pole pro zprávu"
+      "restoreQueuedAccessibility": "Vrátit zrušenou zprávu do pole pro zprávu",
+      "noReplyRecorded": "U této zprávy nebyla zaznamenána žádná odpověď."
     },
     "olderMessages": {
       "arrived": "Starší zprávy načteny",

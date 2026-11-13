@@ -2467,7 +2467,8 @@
       "cancelQueued": "Fagilé ìfiránṣẹ́",
       "cancelQueuedAccessibility": "Fagilé ìfiránṣẹ́ tó wà ní ìlà",
       "restoreQueued": "Mú padà",
-      "restoreQueuedAccessibility": "Dá ìfiránṣẹ́ tí a fagilé padà sí ààyè ìkọ̀wé"
+      "restoreQueuedAccessibility": "Dá ìfiránṣẹ́ tí a fagilé padà sí ààyè ìkọ̀wé",
+      "noReplyRecorded": "A kò gba ìdáhùn kankan sílẹ̀ fún ìfiránṣẹ́ yìí."
     },
     "olderMessages": {
       "arrived": "A ti gbé àwọn ìfiránṣẹ́ tó ṣáájú wọlé",

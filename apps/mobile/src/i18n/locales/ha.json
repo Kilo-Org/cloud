@@ -2467,7 +2467,8 @@
       "cancelQueued": "Soke saƙo",
       "cancelQueuedAccessibility": "Soke saƙon da ke jira",
       "restoreQueued": "Maido",
-      "restoreQueuedAccessibility": "Maido da saƙon da aka soke zuwa wurin rubuta saƙo"
+      "restoreQueuedAccessibility": "Maido da saƙon da aka soke zuwa wurin rubuta saƙo",
+      "noReplyRecorded": "Ba a rubuta wani amsa ba don wannan saƙon."
     },
     "olderMessages": {
       "arrived": "An loda saƙonnin da suka gabata",

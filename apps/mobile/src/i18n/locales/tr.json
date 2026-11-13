@@ -1925,7 +1925,8 @@
       "cancelQueued": "Mesajı iptal et",
       "cancelQueuedAccessibility": "Kuyruktaki mesajı iptal et",
       "restoreQueued": "Geri yükle",
-      "restoreQueuedAccessibility": "İptal edilen mesajı mesaj alanına geri yükle"
+      "restoreQueuedAccessibility": "İptal edilen mesajı mesaj alanına geri yükle",
+      "noReplyRecorded": "Bu mesaj için yanıt kaydedilmedi."
     },
     "olderMessages": {
       "arrived": "Önceki mesajlar yüklendi",

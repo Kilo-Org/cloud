@@ -336,6 +336,35 @@ describe('MessageBubble failed delivery state', () => {
   });
 });
 
+describe('MessageBubble stored prompt with no reply', () => {
+  const NOTE = i18n.t('agentChat.messageBubble.noReplyRecorded');
+
+  it('states that no reply was recorded under the prompt a stored transcript ends on', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-unanswered'), {
+      noReplyRecorded: true,
+      retryAvailable: false,
+    });
+    expect(findText(tree, text => text === NOTE)).toBe(true);
+    // The record cannot say the send failed, so the note carries no failure
+    // marker and no action; the read-only footer owns the one recovery.
+    expect(findElementByType(tree, 'Button')).toBeNull();
+  });
+
+  it('draws no note for a row that is not the unanswered prompt', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-answered'), {
+      retryAvailable: false,
+    });
+    expect(findText(tree, text => text === NOTE)).toBe(false);
+  });
+
+  it('never marks an assistant row, even when a caller sets the prop', async () => {
+    const tree = await renderBubbleWithHandlers(assistantMessageWithText('m-asst'), {
+      noReplyRecorded: true,
+    });
+    expect(findText(tree, text => text === NOTE)).toBe(false);
+  });
+});
+
 async function renderBubbleWithHandlers(
   message: StoredMessage,
   props: {
@@ -349,6 +378,7 @@ async function renderBubbleWithHandlers(
     onLongPressDetails?: (m: StoredMessage) => void;
     condenseToolCalls?: boolean;
     partsOverride?: readonly StoredMessage['parts'][number][];
+    noReplyRecorded?: boolean;
   }
 ): Promise<unknown> {
   const { MessageBubble } = await import('./message-bubble');

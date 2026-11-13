@@ -2467,7 +2467,8 @@
       "cancelQueued": "შეტყობინების გაუქმება",
       "cancelQueuedAccessibility": "რიგში მდგომი შეტყობინების გაუქმება",
       "restoreQueued": "აღდგენა",
-      "restoreQueuedAccessibility": "გაუქმებული შეტყობინების აღდგენა შეტყობინების შეყვანის ველში"
+      "restoreQueuedAccessibility": "გაუქმებული შეტყობინების აღდგენა შეტყობინების შეყვანის ველში",
+      "noReplyRecorded": "ამ შეტყობინებისთვის პასუხი არ დაფიქსირდა."
     },
     "olderMessages": {
       "arrived": "ადრინდელი შეტყობინებები ჩაიტვირთა",

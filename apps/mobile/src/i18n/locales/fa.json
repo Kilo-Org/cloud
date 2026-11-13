@@ -2467,7 +2467,8 @@
       "cancelQueued": "لغو پیام",
       "cancelQueuedAccessibility": "لغو پیام در صف",
       "restoreQueued": "بازیابی",
-      "restoreQueuedAccessibility": "بازیابی پیام لغوشده در کادر پیام"
+      "restoreQueuedAccessibility": "بازیابی پیام لغوشده در کادر پیام",
+      "noReplyRecorded": "برای این پیام پاسخی ثبت نشد."
     },
     "olderMessages": {
       "arrived": "پیام‌های قبلی بارگذاری شدند",

@@ -2467,7 +2467,8 @@
       "cancelQueued": "Отмени съобщението",
       "cancelQueuedAccessibility": "Отмени съобщението в опашката",
       "restoreQueued": "Възстанови",
-      "restoreQueuedAccessibility": "Възстанови отмененото съобщение в полето за съобщения"
+      "restoreQueuedAccessibility": "Възстанови отмененото съобщение в полето за съобщения",
+      "noReplyRecorded": "За това съобщение не беше записан отговор."
     },
     "olderMessages": {
       "arrived": "По-ранните съобщения са заредени",

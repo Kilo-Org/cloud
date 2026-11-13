@@ -2467,7 +2467,8 @@
       "cancelQueued": "Anulo mesazhin",
       "cancelQueuedAccessibility": "Anulo mesazhin në pritje",
       "restoreQueued": "Rikthe",
-      "restoreQueuedAccessibility": "Rikthe mesazhin e anuluar në fushën e mesazhit"
+      "restoreQueuedAccessibility": "Rikthe mesazhin e anuluar në fushën e mesazhit",
+      "noReplyRecorded": "Nuk u regjistrua asnjë përgjigje për këtë mesazh."
     },
     "olderMessages": {
       "arrived": "U ngarkuan mesazhet e mëparshme",

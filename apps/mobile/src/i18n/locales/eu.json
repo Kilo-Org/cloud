@@ -2467,7 +2467,8 @@
       "cancelQueued": "Utzi mezua bertan behera",
       "cancelQueuedAccessibility": "Utzi ilaran dagoen mezua bertan behera",
       "restoreQueued": "Berreskuratu",
-      "restoreQueuedAccessibility": "Berreskuratu bertan behera utzitako mezua mezu-eremuan"
+      "restoreQueuedAccessibility": "Berreskuratu bertan behera utzitako mezua mezu-eremuan",
+      "noReplyRecorded": "Mezu honetarako ez da erantzunik erregistratu."
     },
     "olderMessages": {
       "arrived": "Aurreko mezuak kargatu dira",

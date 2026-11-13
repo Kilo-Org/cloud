@@ -1947,7 +1947,8 @@
       "cancelQueued": "ביטול ההודעה",
       "cancelQueuedAccessibility": "ביטול ההודעה שבתור",
       "restoreQueued": "שחזור",
-      "restoreQueuedAccessibility": "שחזור ההודעה שבוטלה לשדה ההודעה"
+      "restoreQueuedAccessibility": "שחזור ההודעה שבוטלה לשדה ההודעה",
+      "noReplyRecorded": "לא נרשמה תשובה להודעה הזו."
     },
     "olderMessages": {
       "arrived": "הודעות קודמות נטענו",

@@ -2512,7 +2512,8 @@
       "cancelQueued": "Atcelt ziņojumu",
       "cancelQueuedAccessibility": "Atcelt rindā esošu ziņojumu",
       "restoreQueued": "Atjaunot",
-      "restoreQueuedAccessibility": "Atjaunot atcelto ziņojumu ziņojuma ievades laukā"
+      "restoreQueuedAccessibility": "Atjaunot atcelto ziņojumu ziņojuma ievades laukā",
+      "noReplyRecorded": "Šim ziņojumam atbilde nav reģistrēta."
     },
     "olderMessages": {
       "arrived": "Ielādēti iepriekšējie ziņojumi",

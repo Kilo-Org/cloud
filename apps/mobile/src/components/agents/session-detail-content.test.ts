@@ -2546,6 +2546,90 @@ describe('session detail stored-session retry availability', () => {
   });
 });
 
+describe('session detail stored transcript with no reply recorded', () => {
+  const PROMPT = 'Deploy the fix to staging';
+  const PROMPT_ID = 'msg-stored-unanswered';
+  const NOTE = i18n.t('agentChat.messageBubble.noReplyRecorded');
+
+  function storedPrompt(): StoredMessage {
+    const base = userMessage(PROMPT_ID);
+    return {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: `text-${PROMPT_ID}`,
+          sessionID: ROOT_ID,
+          messageID: PROMPT_ID,
+          text: PROMPT,
+        }),
+      ],
+    };
+  }
+
+  function storedAnswer(parentID: string): StoredMessage {
+    const base = assistantMessage('msg-stored-answer');
+    // The fixture builder returns the stored union, so the assistant shape has
+    // to be named before the row can link itself to the prompt it answers.
+    const info: Extract<StoredMessage['info'], { role: 'assistant' }> = {
+      ...(base.info as Extract<StoredMessage['info'], { role: 'assistant' }>),
+      sessionID: ROOT_ID,
+      parentID,
+    };
+    return {
+      info,
+      parts: [
+        stubTextPart({
+          id: 'text-msg-stored-answer',
+          sessionID: ROOT_ID,
+          messageID: base.info.id,
+          text: 'Deployed.',
+        }),
+      ],
+    };
+  }
+
+  it('states under the prompt that the stored record holds no reply for it', async () => {
+    const view = await mountDetails([storedPrompt()]);
+
+    expect(view.store.get(view.manager.atoms.isReadOnly)).toBe(true);
+    // The record carries no delivery state, so the row must not claim the send
+    // failed; it states only that nothing follows the prompt.
+    expect(renderedText(view.renderer.root)).toContain(NOTE);
+    expect(renderedText(view.renderer.root)).not.toContain('Message not sent');
+    expect(renderedText(view.renderer.root)).not.toContain('Response failed');
+    // Continue in a new session stays the read-only transcript's one action.
+    expect(
+      view.renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+      )
+    ).toHaveLength(0);
+  });
+
+  it('draws no note once an answer follows the prompt', async () => {
+    const view = await mountDetails([storedPrompt(), storedAnswer(PROMPT_ID)]);
+    expect(renderedText(view.renderer.root)).not.toContain(NOTE);
+  });
+
+  it('draws no note for a live session whose prompt is still in flight', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([storedPrompt()]);
+    expect(view.store.get(view.manager.atoms.isReadOnly)).toBe(false);
+    expect(renderedText(view.renderer.root)).not.toContain(NOTE);
+  });
+
+  it('holds the note back until a cached transcript is replaced by the live page', async () => {
+    const view = await mountDetails([storedPrompt()]);
+    expect(renderedText(view.renderer.root)).toContain(NOTE);
+    // Rows read from the cache can still gain their answer, so the note waits
+    // for the stored page instead of appearing and then leaving.
+    act(() => {
+      view.store.set(view.manager.atoms.isRefreshingCachedTranscript, true);
+    });
+    expect(renderedText(view.renderer.root)).not.toContain(NOTE);
+  });
+});
+
 describe('session detail slow load', () => {
   it('swaps the endless skeleton for taking-longer copy and a working Retry', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });

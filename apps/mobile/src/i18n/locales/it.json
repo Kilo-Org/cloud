@@ -1914,7 +1914,8 @@
       "cancelQueued": "Annulla il messaggio",
       "cancelQueuedAccessibility": "Annulla il messaggio in coda",
       "restoreQueued": "Ripristina",
-      "restoreQueuedAccessibility": "Ripristina il messaggio annullato nel campo del messaggio"
+      "restoreQueuedAccessibility": "Ripristina il messaggio annullato nel campo del messaggio",
+      "noReplyRecorded": "Nessuna risposta è stata registrata per questo messaggio."
     },
     "olderMessages": {
       "arrived": "Messaggi precedenti caricati",

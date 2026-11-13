@@ -2467,7 +2467,8 @@
       "cancelQueued": "Anile mesaj la",
       "cancelQueuedAccessibility": "Anile mesaj annatant lan",
       "restoreQueued": "Retabli",
-      "restoreQueuedAccessibility": "Retabli mesaj anile a nan chan mesaj la"
+      "restoreQueuedAccessibility": "Retabli mesaj anile a nan chan mesaj la",
+      "noReplyRecorded": "Pa gen okenn repons ki anrejistre pou mesaj sa a."
     },
     "olderMessages": {
       "arrived": "Mesaj anvan yo chaje",

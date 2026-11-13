@@ -2602,7 +2602,8 @@
       "cancelQueued": "Cealaigh teachtaireacht",
       "cancelQueuedAccessibility": "Cealaigh teachtaireacht sa scuaine",
       "restoreQueued": "Athchóirigh",
-      "restoreQueuedAccessibility": "Athchóirigh an teachtaireacht chealaithe sa bhosca teachtaireachta"
+      "restoreQueuedAccessibility": "Athchóirigh an teachtaireacht chealaithe sa bhosca teachtaireachta",
+      "noReplyRecorded": "Níor taifeadadh aon fhreagra don teachtaireacht seo."
     },
     "olderMessages": {
       "arrived": "Lódáladh teachtaireachtaí níos luaithe",

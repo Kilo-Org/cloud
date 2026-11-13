@@ -2467,7 +2467,8 @@
       "cancelQueued": "Kanselahin ang mensahe",
       "cancelQueuedAccessibility": "Kanselahin ang nakapilang mensahe",
       "restoreQueued": "Ibalik",
-      "restoreQueuedAccessibility": "Ibalik ang kinanselang mensahe sa sulatan ng mensahe"
+      "restoreQueuedAccessibility": "Ibalik ang kinanselang mensahe sa sulatan ng mensahe",
+      "noReplyRecorded": "Walang naitalang tugon para sa mensaheng ito."
     },
     "olderMessages": {
       "arrived": "Na-load ang mga naunang mensahe",

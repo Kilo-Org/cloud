@@ -375,7 +375,7 @@ export function PasskeysScreen() {
   }
 
   return (
-    <View className="flex-1 bg-background">
+    <View testID="passkeys-screen" className="flex-1 bg-background">
       <ScreenHeader title={t('profile.passkeysTitle')} />
       <ScrollView
         className="flex-1"

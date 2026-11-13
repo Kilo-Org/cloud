@@ -14,9 +14,17 @@ import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/up
 import {
   countAndStoreTranscriptionUsage,
   invalidRequestResponse,
+  managedGatewayDisabledResponse,
   modelDoesNotExistResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import {
+  getManagedGatewayFromUrl,
+  getOrganizationGatewaySettings,
+  isManagedGatewayDisabled,
+  NO_ORGANIZATION_GATEWAY_SETTINGS,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { providerPreferencesSchema } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
@@ -249,6 +257,24 @@ export async function handleAudioTranscriptionsRequest(
 
   const account = await readGatewayBalance(user, organizationId, requestedModelLowerCased);
   const { balance, settings, plan, payer } = account;
+
+  // The organization's disabled-gateway settings cover every organization-funded
+  // inference route, so this route applies them to the provider the transcription
+  // catalog resolves, before any upstream call or charge.
+  const organizationGatewaySettings = organizationId
+    ? getOrganizationGatewaySettings(
+        await getRuntimeOrganizationFeatures(),
+        organizationId,
+        settings
+      )
+    : NO_ORGANIZATION_GATEWAY_SETTINGS;
+  if (isManagedGatewayDisabled(organizationGatewaySettings, provider.type)) {
+    return managedGatewayDisabledResponse(provider.type);
+  }
+  const gatewayByDomain = getManagedGatewayFromUrl(provider.apiUrl);
+  if (gatewayByDomain && isManagedGatewayDisabled(organizationGatewaySettings, gatewayByDomain)) {
+    return managedGatewayDisabledResponse(gatewayByDomain);
+  }
 
   // The usage row reports the payer the balance check resolved: the root organization for an
   // organization member.

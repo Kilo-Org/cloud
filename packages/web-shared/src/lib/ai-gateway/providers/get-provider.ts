@@ -852,6 +852,10 @@ async function getGatewayRoutedByokKeys(
   );
 }
 
+/**
+ * Embedding requests stay outside the organization disabled-gateway settings for now, matching the
+ * Providers & Models settings copy that says those settings do not apply to embeddings.
+ */
 export async function getEmbeddingProvider(
   requestedModel: string,
   user: User | AnonymousUserContext,

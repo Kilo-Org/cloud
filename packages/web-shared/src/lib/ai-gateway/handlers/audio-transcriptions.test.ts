@@ -21,6 +21,8 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 
 import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 jest.mock('next/server', () => {
@@ -61,6 +63,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => {
     countAndStoreTranscriptionUsage: jest.fn(),
   };
 });
+jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
+  ...(jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/organization-features'
+  ) as Record<string, unknown>),
+  getRuntimeOrganizationFeatures: jest.fn(),
+}));
 
 const mockedCaptureException = jest.mocked(captureException);
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
@@ -69,6 +77,7 @@ const mockedIsFreeModel = jest.mocked(isFreeModel);
 const mockedIsAutoTopUpInFlight = jest.mocked(isAutoTopUpInFlight);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedResolveModelDecision = jest.mocked(resolveOrganizationMemberModelDecision);
+const mockedGetRuntimeOrganizationFeatures = jest.mocked(getRuntimeOrganizationFeatures);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 
@@ -151,6 +160,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     globalThis.fetch = mockedFetch;
     mockedIsFreeModel.mockReturnValue(false);
     mockedIsAutoTopUpInFlight.mockResolvedValue(false);
+    mockedGetRuntimeOrganizationFeatures.mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     jest.mocked(countAndStoreTranscriptionUsage).mockReturnValue({
       // Metrics are mocked, so the parsed stats never need to settle.
       statsPromise: new Promise<MicrodollarUsageStats>(() => {}),
@@ -776,5 +786,112 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: 'model not found' });
+  });
+
+  describe('organization gateway settings', () => {
+    const openRouterDisabledSettings = {
+      data_collection: 'deny',
+      disable_openrouter: true,
+    } satisfies OrganizationSettings;
+    const gatewaySettingsEnabledFeatures = {
+      ...DEFAULT_ORGANIZATION_FEATURES,
+      gateway_settings: ['org-123'],
+    };
+
+    function transcriptionRequest() {
+      return makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never;
+    }
+
+    it('refuses a transcription request when the organization disabled OpenRouter', async () => {
+      setOrganizationMemberAuth(new Set(['openai']));
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: openRouterDisabledSettings,
+        plan: 'enterprise',
+      });
+      mockedGetRuntimeOrganizationFeatures.mockResolvedValue(gatewaySettingsEnabledFeatures);
+      mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
+
+      const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+      const response = await handleAudioTranscriptionsRequest(transcriptionRequest());
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error_type: 'provider_not_allowed',
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(countAndStoreTranscriptionUsage).not.toHaveBeenCalled();
+    });
+
+    it('serves a transcription request when the organization allows OpenRouter', async () => {
+      setOrganizationMemberAuth(new Set(['openai']));
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: { data_collection: 'deny', disable_openrouter: false },
+        plan: 'enterprise',
+      });
+      mockedGetRuntimeOrganizationFeatures.mockResolvedValue(gatewaySettingsEnabledFeatures);
+      mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
+
+      const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+      const response = await handleAudioTranscriptionsRequest(transcriptionRequest());
+
+      expect(response.status).toBe(200);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores the disabled setting while the feature does not list the organization', async () => {
+      setOrganizationMemberAuth(new Set(['openai']));
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: openRouterDisabledSettings,
+        plan: 'enterprise',
+      });
+      mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
+
+      const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+      const response = await handleAudioTranscriptionsRequest(transcriptionRequest());
+
+      expect(response.status).toBe(200);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves a personal transcription request outside the organization settings', async () => {
+      setUserAuth();
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: { disable_openrouter: true },
+        plan: undefined,
+      });
+      mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
+
+      const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+      const response = await handleAudioTranscriptionsRequest(transcriptionRequest());
+
+      expect(response.status).toBe(200);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses the disabled gateway before the credits check', async () => {
+      setOrganizationMemberAuth(new Set(['openai']));
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 0,
+        settings: openRouterDisabledSettings,
+        plan: 'enterprise',
+      });
+      mockedGetRuntimeOrganizationFeatures.mockResolvedValue(gatewaySettingsEnabledFeatures);
+
+      const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+      const response = await handleAudioTranscriptionsRequest(transcriptionRequest());
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error_type: 'provider_not_allowed',
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
   });
 });

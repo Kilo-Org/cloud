@@ -52,6 +52,8 @@ export type CodeReviewCouncilConfigInput = {
     model_slug?: string;
     thinking_effort?: string | null;
   }>;
+  /** Label gate for automated reviews; absent/empty means every eligible PR runs council. */
+  required_labels?: string[];
 };
 
 // Mobile/personal-org save patch. All keys are optional; omission preserves the

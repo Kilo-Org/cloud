@@ -1459,12 +1459,14 @@ jobs:
       # Only the closures these parts run plus the root project, as the deploy
       # job for this Worker already installs them: a recursive workspace install
       # links every unrelated package and runs its lifecycle scripts once per
-      # part. Two suites reach another workspace's source by relative path, so
-      # these parts need that workspace's own links as well:
+      # part. Three suites reach another workspace's source by relative path,
+      # and two of them need that workspace's own links:
       # src/telemetry/report-consumer.glanceable.test.ts reads
       # services/notifications and apps/web, and
       # test/integration/scm-broker-parity.test.ts reads
-      # services/git-token-service. Widen the filter when a step here imports a
+      # services/git-token-service. src/websocket/stream.test.ts reads
+      # packages/cloud-agent-sdk, whose source resolves its own imports without
+      # that package's node_modules. Widen the filter when a step here imports a
       # workspace outside these closures.
       - name: Install dependencies
         run: >-

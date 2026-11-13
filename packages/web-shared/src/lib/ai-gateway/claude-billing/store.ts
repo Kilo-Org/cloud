@@ -10,7 +10,11 @@ import {
   type ClaudeBillingConnectionRow,
 } from '@kilocode/db/schema';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
-import { db, type DrizzleTransaction, type readDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  db,
+  type DrizzleDatabase,
+  type DrizzleTransaction,
+} from '@kilocode/web-shared/lib/drizzle';
 
 /**
  * Who a Claude billing connection belongs to: the person's personal account,
@@ -42,8 +46,8 @@ export type UnreferencedClaudeBillingPayer = {
   id: string;
   userProfileId: string;
 };
-type Database = typeof db | typeof readDb | DrizzleTransaction;
-type WriteDatabase = typeof db | DrizzleTransaction;
+type Database = DrizzleDatabase | DrizzleTransaction;
+type WriteDatabase = DrizzleDatabase | DrizzleTransaction;
 
 export function claudeBillingOwnerWhere(owner: ClaudeBillingOwner) {
   switch (owner.kind) {

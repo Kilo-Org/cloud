@@ -54,7 +54,8 @@ vi.mock('./remote-mcp-oauth-provider', () => ({ remoteMcpOAuthProvider: () => ({
 
 /** The discovery and the resource read, each answering from a mutable function. */
 const answers = vi.hoisted(() => ({
-  tools: () => Effect.succeed<readonly Tool[]>([]),
+  /** What one server answers its discovery with, so two servers can differ. */
+  tools: (_held: RemoteMcpServer) => Effect.succeed<readonly Tool[]>([]),
   resource: (): Effect.Effect<RemoteMcpResource, RemoteMcpError> =>
     Effect.succeed({
       uri: '',
@@ -76,7 +77,7 @@ vi.mock('@kilocode/harness-sdk/plugins/remote-mcp', () => ({
   },
   remoteMcpTools: (held: RemoteMcpServer, deps: RemoteMcpClientDeps) => {
     world.calls.push({ server: held, deps });
-    return answers.tools();
+    return answers.tools(held);
   },
   remoteMcpClient: (held: RemoteMcpServer, deps: RemoteMcpClientDeps) => {
     world.clients.push({ server: held, deps });
@@ -100,6 +101,13 @@ const { mcpCallResultOf } = await import('./remote-mcp-call-results');
 const { remoteServerView } = await import('./remote-mcp-surface');
 
 const chart = viewTool('mcp_alpha_chart', 'chart', 'ui://alpha/chart.html');
+
+/** The same model tool name from another server, reading that server's document. */
+const betaChart = viewTool('mcp_alpha_chart', 'chart', 'ui://beta/chart.html');
+
+/** Each server answers with the tool that carries its own document. */
+const chartFrom = (held: RemoteMcpServer) =>
+  Effect.succeed([held.id === 'alpha' ? chart : betaChart]);
 
 /** One enabled server whose tool carries the chart view. */
 async function discoveredWithChart() {
@@ -160,6 +168,37 @@ describe('the view a tool carries', () => {
     }
 
     expect(remoteServerView('mcp_alpha_chart')).toBeUndefined();
+  });
+
+  it('is the first server’s when two servers offer the same tool', async () => {
+    world.servers = [server({ id: 'alpha' }), server({ id: 'beta' })];
+    answers.tools = chartFrom;
+    await ensureRemoteMcp(place);
+
+    expect(remoteServerView('mcp_alpha_chart')).toEqual({
+      serverId: 'alpha',
+      serverToolName: 'chart',
+      resourceUri: 'ui://alpha/chart.html',
+    });
+  });
+
+  it('is the second server’s once the server that owns the name is disabled', async () => {
+    const alpha = server({ id: 'alpha' });
+    const beta = server({ id: 'beta' });
+    world.servers = [alpha, beta];
+    answers.tools = chartFrom;
+    await ensureRemoteMcp(place);
+
+    world.servers = [{ ...alpha, enabled: false }, beta];
+    for (const listener of world.listeners) {
+      listener();
+    }
+
+    expect(remoteServerView('mcp_alpha_chart')).toEqual({
+      serverId: 'beta',
+      serverToolName: 'chart',
+      resourceUri: 'ui://beta/chart.html',
+    });
   });
 });
 

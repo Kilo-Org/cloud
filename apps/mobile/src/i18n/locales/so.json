@@ -332,6 +332,8 @@
       "unlinkTitle": "Ma jaraysaa xiriirka {{provider}}?",
       "unlinkMessage": "Mar dambe kuma soo geli kartid {{provider}}. Hababkaaga kale sidooda ayay ku ahaanayaan.",
       "unlinked": "Xiriirka {{provider}} waa la jaray",
+      "lastMethod": "Ma jari kartid xiriirka habkaaga soo gelidda ee kaliya. Marka hore ku xir hab kale.",
+      "notLinked": "{{provider}} mar dambe kuma xiran yahay akoonkaaga.",
       "linkAnother": "Ku xir bixiye kale",
       "linkAnotherSubtitle": "Wuxuu furayaa bogga akoonnada ku xiran ee kilo.ai",
       "emptyTitle": "Ma jiraan habab soo gelid",

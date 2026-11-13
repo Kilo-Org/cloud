@@ -332,6 +332,8 @@
       "unlinkTitle": "Dissocier {{provider}} ?",
       "unlinkMessage": "Vous ne pourrez plus vous connecter avec {{provider}}. Vos autres méthodes restent inchangées.",
       "unlinked": "{{provider}} dissocié",
+      "lastMethod": "Vous ne pouvez pas dissocier votre seule méthode de connexion. Associez d'abord une autre méthode.",
+      "notLinked": "{{provider}} n'est plus associé à votre compte.",
       "linkAnother": "Associer un autre fournisseur",
       "linkAnotherSubtitle": "Ouvre la page des comptes connectés sur kilo.ai",
       "emptyTitle": "Aucune méthode de connexion",

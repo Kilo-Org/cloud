@@ -3,6 +3,8 @@ import type { PreparationAttempt, SessionCommit } from '@kilocode/cloud-agent-sd
 import { isAssistantInterruptError } from '../message-error';
 import { getVisibleAssistantParts, groupConversationMessages } from '../message-presentation';
 import { isMessageStreaming, isPartStreaming, type Part, type StoredMessage } from '../types';
+import { groupAssistantParts } from '../shared-transcript-presentation';
+import { reconcileGroupIdentities } from './group-identity';
 import type {
   CloudMessagePresentation,
   CloudProjectedMessage,
@@ -80,8 +82,12 @@ export function createCloudMessageProjector() {
       input.messageGroups ?? groupConversationMessages([...input.messages], preparations, commits);
     const next = new Map<string, CloudProjectedMessage>();
     const rows: CloudProjectedMessage[] = [];
+    const identities = reconcileGroupIdentities(
+      groups.map(sources => sources.map(source => source.info.id)),
+      [...previous].map(([id, row]) => ({ id, itemIds: row.presentation.messageIds }))
+    );
 
-    for (const sources of groups) {
+    for (const [index, sources] of groups.entries()) {
       const first = sources[0];
       const last = sources.at(-1);
       if (!first || !last) continue;
@@ -90,7 +96,8 @@ export function createCloudMessageProjector() {
       const isSending = input.sendingMessageIds?.has(first.info.id) ?? false;
       const anchoredPreparations = preparations.get(first.info.id) ?? emptyPreparations;
       const anchoredCommits = commits.get(last.info.id) ?? emptyCommits;
-      const cached = previous.get(first.info.id);
+      const id = identities[index]?.id ?? first.info.id;
+      const cached = previous.get(id);
       const old = cached?.presentation;
       if (
         cached &&
@@ -103,7 +110,7 @@ export function createCloudMessageProjector() {
         old.commits === anchoredCommits
       ) {
         rows.push(cached);
-        next.set(first.info.id, cached);
+        next.set(id, cached);
         continue;
       }
 
@@ -115,11 +122,26 @@ export function createCloudMessageProjector() {
           ...(part.type === 'tool' ? { toolCallId: part.callID } : {}),
         }))
       );
+      const sourceParts = parts.map(part => part.source);
+      const visible =
+        first.info.role === 'assistant' ? getVisibleAssistantParts(sourceParts) : sourceParts;
+      const segments = groupAssistantParts(visible, 'live');
+      const segmentIds = reconcileGroupIdentities(
+        segments.map(segment => segment.parts.map(part => part.id)),
+        old?.segments.map(segment => ({
+          id: segment.id,
+          itemIds: segment.parts.map(part => part.id),
+        })) ?? []
+      );
       const presentation: CloudMessagePresentation = {
         id: first.info.id,
         messageIds: sources.map(source => source.info.id),
         sources,
         parts,
+        segments: segments.map((segment, index) => ({
+          ...segment,
+          id: segmentIds[index]?.id ?? '',
+        })),
         displayTimestamp: last.info.time.created,
         isStreaming: streaming,
         deliveryState,
@@ -127,9 +149,6 @@ export function createCloudMessageProjector() {
         preparations: anchoredPreparations,
         commits: anchoredCommits,
       };
-      const sourceParts = parts.map(part => part.source);
-      const visible =
-        first.info.role === 'assistant' ? getVisibleAssistantParts(sourceParts) : sourceParts;
       const content = visible.map(part => {
         const partStreaming = streaming && isPartStreaming(part);
         const cachedPart = partsCache.get(part);
@@ -141,7 +160,7 @@ export function createCloudMessageProjector() {
       const row: CloudProjectedMessage = {
         presentation,
         message: {
-          id: first.info.id,
+          id,
           role: first.info.role,
           createdAt: new Date(last.info.time.created),
           content,
@@ -150,7 +169,7 @@ export function createCloudMessageProjector() {
         },
       };
       rows.push(row);
-      next.set(first.info.id, row);
+      next.set(id, row);
     }
     previous = next;
     return rows;

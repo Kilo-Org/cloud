@@ -332,6 +332,8 @@
       "unlinkTitle": "{{provider}} trennen?",
       "unlinkMessage": "Du kannst dich dann nicht mehr mit {{provider}} anmelden. Deine anderen Methoden bleiben unverändert.",
       "unlinked": "{{provider}} getrennt",
+      "lastMethod": "Du kannst deine einzige Anmeldemethode nicht trennen. Verknüpfe zuerst eine weitere.",
+      "notLinked": "{{provider}} ist nicht mehr mit deinem Konto verknüpft.",
       "linkAnother": "Weiteren Anbieter verknüpfen",
       "linkAnotherSubtitle": "Öffnet die Seite mit verknüpften Konten auf kilo.ai",
       "emptyTitle": "Keine Anmeldemethoden",

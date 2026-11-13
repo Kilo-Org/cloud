@@ -332,6 +332,8 @@
       "unlinkTitle": "Desvincular {{provider}}?",
       "unlinkMessage": "Você não poderá mais entrar com {{provider}}. Seus outros métodos continuam como estão.",
       "unlinked": "{{provider}} desvinculado",
+      "lastMethod": "Você não pode desvincular seu único método de login. Vincule outro método primeiro.",
+      "notLinked": "{{provider}} não está mais vinculado à sua conta.",
       "linkAnother": "Vincular outro provedor",
       "linkAnotherSubtitle": "Abre a página de contas conectadas em kilo.ai",
       "emptyTitle": "Nenhum método de login",

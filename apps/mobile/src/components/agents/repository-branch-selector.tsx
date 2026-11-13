@@ -15,11 +15,34 @@ import {
   setSelectedBranchOverride,
   subscribeNewSessionBranchState,
 } from '@/components/agents/new-session-repository-state';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRepositoryBranches } from '@/lib/use-new-session-repos';
 import { branchPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { cn } from '@/lib/utils';
+
+/**
+ * The chrome every branch-row state draws. It carries no height of its own, on
+ * purpose. A floor here is measured against the frame's border box, and the
+ * frame draws 1 dp of border on each side: a state whose content is already
+ * 48 dp tall — the failed row's retry surface — came out one border taller
+ * than the states whose content is a line of text, and everything below the
+ * branch section moved by that border the moment the branches arrived. The
+ * floor belongs on the row's content box instead (see `BRANCH_ROW_BODY_CLASS`),
+ * so every state renders `48 dp + the frame's border` and no state is taller
+ * than the state it replaces.
+ */
+const ROW_FRAME_CLASS = 'flex-row items-center gap-2 rounded-lg border border-border px-3';
+
+/**
+ * The 48 dp content box inside {@link ROW_FRAME_CLASS}. Loading, loaded, failed
+ * and note rows all put their content here, so the row's height does not depend
+ * on which state rendered it: the box is borderless, which makes the floor its
+ * exact height at every screen density, and the frame's border is the same on
+ * every state. The failed row's 48 dp retry surface sits inside this box rather
+ * than beside it, so it is never clipped.
+ */
+const BRANCH_ROW_BODY_CLASS = ROW_TARGET_CLASS;
 
 type RepositoryBranchSelectorProps = {
   /** The resolved selected repository row; `null` renders nothing. */
@@ -28,16 +51,6 @@ type RepositoryBranchSelectorProps = {
   organizationId: string | undefined;
   disabled: boolean;
 };
-
-/** One height for every state, so the row never moves as branches arrive. */
-const ROW_HEIGHT = 'h-12';
-
-/**
- * Note rows carry full sentences, so they start at the trigger height and
- * grow with their text instead of clipping it — the same guidance must fit
- * in every language, not just English.
- */
-const NOTE_MIN_HEIGHT = 'min-h-12';
 
 /**
  * Branch row under the repository selector. The provider's default branch is
@@ -51,9 +64,12 @@ const NOTE_MIN_HEIGHT = 'min-h-12';
  * the picker slot and dismisses the keyboard, so the sheet never floats over
  * the form translucently or under the keyboard.
  *
- * The interactive states render at the same height as the trigger row, so the
- * section below never jumps between loading, branches, and a retryable error.
- * A note row is at least that tall and grows to show its whole message.
+ * Every state renders its content in one 48 px body inside the same bordered
+ * frame (see `ROW_FRAME_CLASS`), so the section below does not jump as branches
+ * arrive: the loading, loaded and failed rows are all `48 px + one border`
+ * tall. The failed row's 48 dp retry action sits inside that body instead of
+ * being clipped by the row's border. A note row grows past the floor to show
+ * its whole message.
  */
 export function RepositoryBranchSelector({
   repository,
@@ -112,8 +128,16 @@ export function RepositoryBranchSelector({
       }
       case 'loading': {
         return (
-          <View accessible accessibilityLabel={t('agentChat.newSession.branchLoading')}>
-            <Skeleton className={cn(ROW_HEIGHT, 'w-full')} />
+          <View
+            accessible
+            accessibilityLabel={t('agentChat.newSession.branchLoading')}
+            className={cn(ROW_FRAME_CLASS, 'bg-secondary')}
+          >
+            <View className={cn(BRANCH_ROW_BODY_CLASS, 'flex-1 justify-center')}>
+              {/* A branch-name line, so the placeholder reads as the row it
+                  becomes instead of a block that resizes into one. */}
+              <Skeleton className="h-4 w-full" />
+            </View>
           </View>
         );
       }
@@ -124,25 +148,27 @@ export function RepositoryBranchSelector({
       }
       case 'retryable': {
         return (
-          <View
-            className={cn(
-              ROW_HEIGHT,
-              'flex-row items-center justify-between gap-2 rounded-lg border border-border bg-card px-3'
-            )}
-          >
-            <Text className="flex-1 text-sm text-muted-foreground" numberOfLines={2}>
-              {t('agentChat.newSession.branchLoadError')}
-            </Text>
-            <Button
-              variant="outline"
-              size="sm"
-              className={STATE_ACTION_CLASS}
-              onPress={handleRetry}
-              disabled={section.isRetrying}
-              loading={section.isRetrying}
+          <View className={cn(ROW_FRAME_CLASS, 'bg-card')}>
+            <View
+              className={cn(
+                BRANCH_ROW_BODY_CLASS,
+                'flex-1 flex-row items-center justify-between gap-2'
+              )}
             >
-              <Text>{t('common.retry')}</Text>
-            </Button>
+              <Text className="flex-1 text-sm text-muted-foreground" numberOfLines={2}>
+                {t('agentChat.newSession.branchLoadError')}
+              </Text>
+              <Button
+                variant="outline"
+                size="sm"
+                className={STATE_ACTION_CLASS}
+                onPress={handleRetry}
+                disabled={section.isRetrying}
+                loading={section.isRetrying}
+              >
+                <Text>{t('common.retry')}</Text>
+              </Button>
+            </View>
           </View>
         );
       }
@@ -173,14 +199,14 @@ export function RepositoryBranchSelector({
   }
 
   function renderNote(message: string) {
+    // Note rows carry full sentences, so their body takes the shared row floor
+    // and grows with its text instead of clipping it — the same guidance must
+    // fit in every language, not just English.
     return (
-      <View
-        className={cn(
-          NOTE_MIN_HEIGHT,
-          'justify-center rounded-lg border border-border bg-card px-3 py-2'
-        )}
-      >
-        <Text className="text-sm text-muted-foreground">{message}</Text>
+      <View className={cn(ROW_FRAME_CLASS, 'bg-card')}>
+        <View className={cn(BRANCH_ROW_BODY_CLASS, 'flex-1 justify-center py-2')}>
+          <Text className="text-sm text-muted-foreground">{message}</Text>
+        </View>
       </View>
     );
   }
@@ -199,21 +225,24 @@ export function RepositoryBranchSelector({
         accessibilityRole="button"
         accessibilityLabel={t('agentChat.newSession.branchAccessibility', { label })}
         accessibilityState={{ disabled }}
-        className={cn(
-          ROW_HEIGHT,
-          'flex-row items-center justify-between gap-2 rounded-lg border border-border bg-secondary px-3',
-          disabled && 'opacity-50'
-        )}
+        className={cn(ROW_FRAME_CLASS, 'bg-secondary', disabled && 'opacity-50')}
       >
-        <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
-          {label}
-        </Text>
-        {isDefault ? (
-          <Text className="text-xs text-muted-foreground">
-            {t('agentChat.newSession.branchDefault')}
+        <View
+          className={cn(
+            BRANCH_ROW_BODY_CLASS,
+            'flex-1 flex-row items-center justify-between gap-2'
+          )}
+        >
+          <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
+            {label}
           </Text>
-        ) : null}
-        <ChevronDown size={14} color={colors.mutedForeground} />
+          {isDefault ? (
+            <Text className="text-xs text-muted-foreground">
+              {t('agentChat.newSession.branchDefault')}
+            </Text>
+          ) : null}
+          <ChevronDown size={14} color={colors.mutedForeground} />
+        </View>
       </Pressable>
     );
   }

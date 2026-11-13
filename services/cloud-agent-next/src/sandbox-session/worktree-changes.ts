@@ -20,6 +20,7 @@ import {
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { getSandboxProvider } from '../persistence/session-metadata.js';
 import type { AgentSandboxProvider } from '../types.js';
+import type { HostedWorkspaceChangeState } from '../shared/hosted-workspace-changes.js';
 import { sameRepositoryIdentity } from '@kilocode/cloud-agent-profile';
 import { launchRepositoryIdentity } from '../session/environment-launch.js';
 import {
@@ -191,6 +192,35 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
       return null;
     }
     return { listed, record: parsed.data };
+  }
+
+  function readStates(snapshot: WorktreeChangesSnapshot): HostedWorkspaceChangeState[] {
+    return snapshot.files.map(listed => {
+      const selected = readRecordAgainstManifest(snapshot, listed);
+      if (!selected) {
+        return {
+          path: listed.path,
+          ...(listed.scope === undefined ? {} : { scope: listed.scope }),
+          revision: listed.revision,
+          diff: { status: 'omitted', reason: 'inconsistent' },
+          content: { status: 'unavailable', reason: 'inconsistent' },
+        };
+      }
+      const { record } = selected;
+      return {
+        path: record.path,
+        ...(record.scope === undefined ? {} : { scope: record.scope }),
+        revision: record.revision,
+        diff:
+          record.diff.status === 'available'
+            ? { status: 'available' }
+            : { status: 'omitted', reason: record.diff.reason },
+        content:
+          record.content.status === 'available'
+            ? { status: 'available', source: record.content.source }
+            : { status: 'unavailable', reason: record.content.reason },
+      };
+    });
   }
 
   function readRecovery(): WorktreeRecovery | undefined {
@@ -427,6 +457,13 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
     recovery(): WorktreeRecovery | undefined {
       if (suppressed) return undefined;
       return readRecovery();
+    },
+    savedStates(): {
+      snapshot: WorktreeChangesSnapshot | null;
+      states: HostedWorkspaceChangeState[];
+    } {
+      const snapshot = readSnapshot();
+      return { snapshot, states: snapshot === null ? [] : readStates(snapshot) };
     },
     async get(): Promise<GetWorktreeChangesOutput> {
       return { snapshot: readSnapshot() };

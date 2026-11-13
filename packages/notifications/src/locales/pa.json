@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "ਸਰਗਰਮ ਏਜੰਟਾਂ ਵਿੱਚ ਇੱਕ ਅੱਪਡੇਟ ਹੈ"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "ਕੰਮ ਪੂਰਾ ਹੋ ਗਿਆ"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "ਅਸਫਲ: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "ਰੁਕਾਵਟ: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

@@ -32,6 +32,7 @@ import type {
   EnkryptToolScanReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import type { EnkryptDetectRequestDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
+import { readJsonBody } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 import { recordEnkryptUsageRecords, startEnkryptInputGuardrail } from './input-guardrail';
 
 jest.mock('next/server', () => ({
@@ -943,7 +944,7 @@ describe('startEnkryptInputGuardrail with many tool definitions', () => {
       maxInFlight: 0,
     };
     jest.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
-      const body = JSON.parse(String(init?.body)) as {
+      const body = readJsonBody(init?.body) as {
         text: string;
         detectors: Record<string, unknown>;
       };
@@ -1174,7 +1175,7 @@ describe('startEnkryptInputGuardrail with many tool definitions', () => {
     /** Answers every Enkrypt call at once by the text it scans. */
     function respondingFetch(respond: (text: string) => Response) {
       return jest.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
-        const body = JSON.parse(String(init?.body)) as { text: string };
+        const body = readJsonBody(init?.body) as { text: string };
         return respond(body.text);
       });
     }

@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "使用中的代理有更新"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "工作已完成"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "失敗：{{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "已中斷：{{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

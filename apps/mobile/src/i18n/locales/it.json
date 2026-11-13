@@ -332,6 +332,8 @@
       "unlinkTitle": "Scollegare {{provider}}?",
       "unlinkMessage": "Non potrai più accedere con {{provider}}. Gli altri metodi resteranno invariati.",
       "unlinked": "{{provider}} scollegato",
+      "lastMethod": "Non puoi scollegare il tuo unico metodo di accesso. Collega prima un altro metodo.",
+      "notLinked": "{{provider}} non è più collegato al tuo account.",
       "linkAnother": "Collega un altro provider",
       "linkAnotherSubtitle": "Apre la pagina degli account collegati su kilo.ai",
       "emptyTitle": "Nessun metodo di accesso",

@@ -332,6 +332,8 @@
       "unlinkTitle": "Nyahpaut {{provider}}?",
       "unlinkMessage": "Anda tidak lagi boleh log masuk dengan {{provider}}. Kaedah anda yang lain kekal seperti sedia ada.",
       "unlinked": "{{provider}} dinyahpaut",
+      "lastMethod": "Anda tidak boleh menyahpaut satu-satunya kaedah log masuk anda. Pautkan kaedah lain terlebih dahulu.",
+      "notLinked": "{{provider}} tidak lagi dipautkan ke akaun anda.",
       "linkAnother": "Pautkan pembekal lain",
       "linkAnotherSubtitle": "Membuka halaman akaun yang disambungkan di kilo.ai",
       "emptyTitle": "Tiada kaedah log masuk",

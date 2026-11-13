@@ -332,6 +332,8 @@
       "unlinkTitle": "Odłączyć {{provider}}?",
       "unlinkMessage": "Nie będzie już można logować się przez {{provider}}. Pozostałe metody pozostaną bez zmian.",
       "unlinked": "Odłączono {{provider}}",
+      "lastMethod": "Nie można odłączyć jedynej metody logowania. Najpierw połącz inną metodę.",
+      "notLinked": "{{provider}} nie jest już połączony z Twoim kontem.",
       "linkAnother": "Połącz innego dostawcę",
       "linkAnotherSubtitle": "Otwiera stronę połączonych kont w kilo.ai",
       "emptyTitle": "Brak metod logowania",

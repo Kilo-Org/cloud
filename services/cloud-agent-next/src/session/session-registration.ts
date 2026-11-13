@@ -51,6 +51,7 @@ import {
   type CloudAgentWorktreeId,
   type CreateSessionForCloudAgentParams,
   type CreateSessionForCloudAgentResult,
+  type SessionCloneRejectionCode,
 } from '@kilocode/session-ingest-contracts';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
 import { generateBranchSlugFromSeed } from '@kilocode/worker-utils/deployment-slug';
@@ -542,6 +543,22 @@ async function createIngestOwnershipRow(
       .error('session-ingest RPC createSessionForCloudAgent failed');
     throw error;
   }
+}
+
+/**
+ * Turn an ingest rejection into the error the caller's surface shows. A refused
+ * organization is a permanent authorization answer, so it keeps the same
+ * forbidden message as the preflight membership check; every other rejection
+ * carries its stable code.
+ */
+function ingestRejectionError(code: SessionCloneRejectionCode): TRPCError {
+  if (code === 'organization_access_denied') {
+    return new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'You do not have access to this organization',
+    });
+  }
+  return new TRPCError({ code: 'BAD_REQUEST', message: code });
 }
 
 async function recordPostSetupFailure(record: () => Promise<void>): Promise<void> {
@@ -1228,7 +1245,7 @@ async function allocateNewSession(
         await recordCloneTombstone(ledger, { cloudAgentSessionId, kiloSessionId });
         await ledger.onFailure('ownership_row', 'session_clone_failed');
       }
-      throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
+      throw ingestRejectionError(ingestResult.code);
     }
     if (ingestResult.status === 'in_progress') {
       if (ledger) {
@@ -1246,7 +1263,7 @@ async function allocateNewSession(
       await recordCloneTombstone(ledger, { cloudAgentSessionId, kiloSessionId });
       await ledger.onFailure('ownership_row', ingestResult.code);
     }
-    throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
+    throw ingestRejectionError(ingestResult.code);
   }
 
   return {
@@ -2657,7 +2674,7 @@ async function resumeCloneCreate(
   if (ingestResult.status === 'rejected') {
     await recordCloneTombstone(hooks, ids);
     await hooks.onFailure('ownership_row', 'session_clone_failed');
-    throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
+    throw ingestRejectionError(ingestResult.code);
   }
   if (ingestResult.status === 'in_progress') {
     await hooks.onTransportFailure();
@@ -2712,7 +2729,7 @@ async function resumeFirstWorktreeCreate(
         });
       }
       await hooks.onFailure('ownership_row', ingestResult.code);
-      throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
+      throw ingestRejectionError(ingestResult.code);
     }
     if (ingestResult?.status === 'in_progress') {
       await hooks.onTransportFailure();

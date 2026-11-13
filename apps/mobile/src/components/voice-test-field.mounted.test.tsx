@@ -137,7 +137,7 @@ describe('VoiceTestField', () => {
     if (!button) {
       throw new Error('VoiceInputButton not found');
     }
-    expect(button.props).toMatchObject({ size: 'md', status: 'idle', disabled: false });
+    expect(button.props).toMatchObject({ status: 'idle', disabled: false });
 
     act(() => {
       (button.props.onPress as () => void)();

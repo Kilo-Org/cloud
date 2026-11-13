@@ -3422,7 +3422,10 @@ export function SessionDetailContent({
               isRetrying={terminalRetryPending}
             />
             {/* One primary action per surface (DESIGN.md): Back is the recovery
-                action, so it fills; Copy stays outlined as the utility. */}
+                action, so it fills; Copy stays outlined as the utility. A
+                read-only transcript keeps its footer beside this card, and that
+                footer's Continue in a new session is the surface's filled
+                primary, so Back steps back to the outline there instead. */}
             <View className="flex-row gap-3">
               <Button
                 variant="outline"
@@ -3434,7 +3437,11 @@ export function SessionDetailContent({
               >
                 <Text>{t('common.copy')}</Text>
               </Button>
-              <Button size="action" onPress={handleBackToSessions}>
+              <Button
+                variant={isReadOnlyContinueVisible ? 'outline' : undefined}
+                size="action"
+                onPress={handleBackToSessions}
+              >
                 <Text>{t('agentChat.session.backToSessions')}</Text>
               </Button>
             </View>

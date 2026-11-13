@@ -2617,6 +2617,42 @@ describe('session detail stored-session retry availability', () => {
     expect(typeof continueButton.props.onPress).toBe('function');
   });
 
+  // The surface states one filled primary at most: while the read-only footer
+  // is on screen its Continue in a new session is that primary, so the card's
+  // Back beside it keeps the outline instead of competing for the fill.
+  it('keeps the fill on the read-only footer while the error card offers Back', async () => {
+    const view = await mountDetails(null);
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+    });
+    // The transcript read fails before any row arrives, so the terminal card
+    // and the read-only footer paint on the same screen.
+    act(() => {
+      view.store.set<string | null, [string | null], unknown>(
+        view.manager.atoms.error,
+        'Session history temporarily unavailable'
+      );
+    });
+
+    expect(view.renderer.root.findAllByType(QueryError)).toHaveLength(1);
+    expect(renderedText(view.renderer.root)).toContain(i18n.t('agentChat.session.readOnly'));
+
+    const filled = view.renderer.root
+      .findAll(node => Object.is(node.type, 'Button'))
+      .filter(node => node.props.variant === undefined || node.props.variant === 'default');
+    expect(filled).toHaveLength(1);
+    expect(filled[0]?.props.accessibilityLabel).toBe(
+      i18n.t('agentChat.session.continueInNewSession')
+    );
+
+    const back = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        renderedText(node).includes(i18n.t('agentChat.session.backToSessions'))
+    );
+    expect(back.props.variant).toBe('outline');
+  });
+
   it('drops Retry while a writable session has no transport that can deliver', async () => {
     goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([promptRow(), failedResponse()]);

@@ -68,6 +68,7 @@ export default defineProject({
       'src/lib/navigation/**/*.test.ts',
       'src/lib/onboarding/**/*.test.ts',
       'src/lib/persist/**/*.test.ts',
+      'src/lib/ssh/**/*.test.ts',
       'src/lib/pr-review/**/*.test.ts',
       'src/lib/app-actions/**/*.test.ts',
       'src/lib/app-actions/**/!(*.mounted).test.tsx',

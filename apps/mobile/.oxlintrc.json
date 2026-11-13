@@ -442,6 +442,7 @@
       "files": [
         "src/components/ui/icons.test.ts",
         "src/lib/chat/store.test.ts",
+        "src/lib/ssh/store.test.ts",
         "src/lib/expo-router-linking.mounted.test.tsx",
         "src/test/renderer.mounted.test.tsx"
       ],

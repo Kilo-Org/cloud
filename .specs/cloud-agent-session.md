@@ -300,11 +300,12 @@ repository.
    show the snapshot revision, the session's revision, and the actual
    replacement build status, including a skipped build or backoff.
 5. If a snapshot start fails transiently, the session MUST retry the same
-   snapshot within the preparation deadline. A permanent failure MUST fail with
-   a specific reason that asks to rebuild the environment. A repeated transient
-   failure MUST ask the user to send the message again and rebuild only if the
-   failure repeats. In both cases, the session MUST NOT continue from the base
-   image.
+   snapshot within the preparation deadline. Each attempt MUST have its own
+   bound, so a slow or timed-out first attempt MUST NOT prevent the retry. A
+   permanent failure MUST fail with a specific reason that asks to rebuild the
+   environment. A repeated transient failure MUST ask the user to send the
+   message again and rebuild only if the failure repeats. In both cases, the
+   session MUST NOT continue from the base image.
 6. A snapshot MUST NOT contain git or build credentials, reflogs, or a Kilo
    home.
 7. Organization managers and personal owners MAY build, refresh, or cancel a
@@ -357,8 +358,10 @@ repository.
     Missing sessions use history recovery without replacing workspace files.
     New chats MUST attach without resetting files.
 12. A transient provider failure MUST retry the same snapshot within the preparation deadline.
-    An expired, missing or incompatible snapshot, an incompatible peer, a permanent or repeated
-    provider failure, or a failed restore step MUST fail with a specific reason, keep the
+    Each attempt MUST have its own bound, so a slow or timed-out first attempt MUST NOT
+    prevent the retry. An expired, missing or incompatible snapshot, an incompatible peer,
+    a permanent or repeated provider failure, or a failed restore step MUST fail with a
+    specific reason, keep the
     snapshot and queued message identity, and MUST NOT fall back to another source. That
     failure MUST offer "Start fresh", which names the changes since the capture time that it
     discards. A failure that may be transient MUST also say that a new message retries. Diagnostics MUST identify workspace, requesting session, allocation, capture

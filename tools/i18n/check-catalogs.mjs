@@ -23,15 +23,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative as relativePath } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import {
-  isTranslateCallee,
-  lineIndex,
-  parseProblems,
-  parseSourceFile,
-  propertyName,
-  unwrap,
-  walk,
-} from '../lib/ast.mjs';
+import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
 import {
   countPlaceholderBases,
   familiesOwedByEveryLocale,
@@ -39,7 +31,7 @@ import {
   pluralFamilyBases,
   pluralParts,
 } from '../lib/catalogs.mjs';
-import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
+import { isTestArtifact, parseSourceEntry, parseSourceTree } from '../lib/source-files.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -1058,16 +1050,15 @@ function checkPushLocaleRegistry(root) {
       .map(name => name.replace(/\.json$/, ''))
   );
   const text = readFileSync(localeModule, 'utf8');
-  const { program, errors } = parseSourceFile(relativeModule, text);
-  const lineOf = lineIndex(text);
-  for (const problem of parseProblems(relativeModule, errors, lineOf)) {
+  const entry = parseSourceEntry(root, root, localeModule, text);
+  for (const problem of entry.problems) {
     fail(problem);
   }
 
   const imported = new Map();
   const registered = new Map();
   let registryFound = false;
-  walk(program, node => {
+  walk(entry.program, node => {
     if (node.type === 'ImportDeclaration') {
       const source = node.source.value;
       const prefix = './locales/';

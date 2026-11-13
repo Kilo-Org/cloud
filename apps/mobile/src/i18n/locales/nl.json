@@ -4181,7 +4181,7 @@
       "closedTitle": "Sessie beëindigd",
       "closedDescription": "Deze shell is niet meer open. Start een nieuwe vanuit de hostslijst.",
       "disconnect": "Verbreken",
-      "switcherTitle": "Open sessies",
+      "switcherTitle": "Sessies",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Plakken",
       "pasteTitle": "Meerdere regels plakken?",
@@ -4241,7 +4241,10 @@
       "share": "Sleutel delen",
       "copied": "Publieke sleutel gekopieerd.",
       "unreadable": "Die sleutel kon niet worden gelezen.",
-      "unsupported": "Het algoritme van deze sleutel wordt niet ondersteund."
+      "unsupported": "Het algoritme van deze sleutel wordt niet ondersteund.",
+      "createdTitle": "Sleutel aangemaakt",
+      "createdDescription": "Voeg deze publieke sleutel toe aan de authorized_keys van de server en maak daarna verbinding met deze sleutel.",
+      "copyPublicKey": "Sleutel kopiëren"
     }
   }
 }

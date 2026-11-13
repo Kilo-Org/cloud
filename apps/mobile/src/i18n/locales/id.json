@@ -4181,7 +4181,7 @@
       "closedTitle": "Sesi berakhir",
       "closedDescription": "Shell ini sudah tidak terbuka. Mulai yang baru dari daftar host.",
       "disconnect": "Putuskan",
-      "switcherTitle": "Sesi yang terbuka",
+      "switcherTitle": "Sesi",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Tempel",
       "pasteTitle": "Tempel beberapa baris?",
@@ -4241,7 +4241,10 @@
       "share": "Bagikan kunci",
       "copied": "Kunci publik disalin.",
       "unreadable": "Kunci itu tidak dapat dibaca.",
-      "unsupported": "Algoritma kunci ini tidak didukung."
+      "unsupported": "Algoritma kunci ini tidak didukung.",
+      "createdTitle": "Kunci dibuat",
+      "createdDescription": "Tambahkan kunci publik ini ke authorized_keys server, lalu hubungkan dengan kunci ini.",
+      "copyPublicKey": "Salin kunci"
     }
   }
 }

@@ -4181,7 +4181,7 @@
       "closedTitle": "Sessiya tugadi",
       "closedDescription": "Bu terminal endi ochiq emas. Yangisini hostlar ro‘yxatidan boshlang.",
       "disconnect": "Ulanishni uzish",
-      "switcherTitle": "Ochiq sessiyalar",
+      "switcherTitle": "Sessiyalar",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Joylashtirish",
       "pasteTitle": "Bir nechta qatorni joylashtirasizmi?",
@@ -4241,7 +4241,10 @@
       "share": "Kalitni ulashish",
       "copied": "Ochiq kalit nusxalandi.",
       "unreadable": "Bu kalitni o‘qib bo‘lmadi.",
-      "unsupported": "Bu kalitning algoritmi qo‘llab-quvvatlanmaydi."
+      "unsupported": "Bu kalitning algoritmi qo‘llab-quvvatlanmaydi.",
+      "createdTitle": "Kalit yaratildi",
+      "createdDescription": "Ushbu ochiq kalitni serverning authorized_keys fayliga qo'shing, so'ngra ushbu kalit bilan ulaning.",
+      "copyPublicKey": "Kalitni nusxalash"
     }
   }
 }

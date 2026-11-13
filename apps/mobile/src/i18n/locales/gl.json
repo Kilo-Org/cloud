@@ -4181,7 +4181,7 @@
       "closedTitle": "Sesión finalizada",
       "closedDescription": "Esta shell xa non está aberta. Inicia unha nova desde a lista de hosts.",
       "disconnect": "Desconectar",
-      "switcherTitle": "Sesións abertas",
+      "switcherTitle": "Sesións",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Pegar",
       "pasteTitle": "Pegar varias liñas?",
@@ -4241,7 +4241,10 @@
       "share": "Compartir chave",
       "copied": "Chave pública copiada.",
       "unreadable": "Non se puido ler esa chave.",
-      "unsupported": "O algoritmo desta chave non é compatible."
+      "unsupported": "O algoritmo desta chave non é compatible.",
+      "createdTitle": "Chave creada",
+      "createdDescription": "Engade esta chave pública ao authorized_keys do servidor e despois conéctate con esta chave.",
+      "copyPublicKey": "Copiar chave"
     }
   }
 }

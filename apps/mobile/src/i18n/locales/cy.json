@@ -4441,7 +4441,7 @@
       "closedTitle": "Sesiwn wedi dod i ben",
       "closedDescription": "Nid yw'r plisgyn hwn ar agor mwyach. Dechreuwch un newydd o restr y gwesteiwyr.",
       "disconnect": "Datgysylltu",
-      "switcherTitle": "Sesiynau agored",
+      "switcherTitle": "Sesiynau",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Gludo",
       "pasteTitle": "Gludo sawl llinell?",
@@ -4501,7 +4501,10 @@
       "share": "Rhannu allwedd",
       "copied": "Copïwyd yr allwedd gyhoeddus.",
       "unreadable": "Nid oedd modd darllen yr allwedd honno.",
-      "unsupported": "Nid yw algorithm yr allwedd hon yn cael ei gefnogi."
+      "unsupported": "Nid yw algorithm yr allwedd hon yn cael ei gefnogi.",
+      "createdTitle": "Allwedd wedi'i chreu",
+      "createdDescription": "Ychwanegwch yr allwedd gyhoeddus hon at authorized_keys y gweinydd, yna cysylltwch â'r allwedd hon.",
+      "copyPublicKey": "Copïo allwedd"
     }
   }
 }

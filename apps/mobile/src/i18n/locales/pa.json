@@ -4181,7 +4181,7 @@
       "closedTitle": "ਸੈਸ਼ਨ ਖ਼ਤਮ ਹੋਇਆ",
       "closedDescription": "ਇਹ ਸ਼ੈੱਲ ਹੁਣ ਖੁੱਲ੍ਹਾ ਨਹੀਂ ਹੈ। ਹੋਸਟ ਸੂਚੀ ਤੋਂ ਨਵਾਂ ਸ਼ੁਰੂ ਕਰੋ।",
       "disconnect": "ਡਿਸਕਨੈਕਟ ਕਰੋ",
-      "switcherTitle": "ਖੁੱਲ੍ਹੇ ਸੈਸ਼ਨ",
+      "switcherTitle": "ਸੈਸ਼ਨ",
       "switchTo": "{{label}}, {{state}}",
       "paste": "ਪੇਸਟ ਕਰੋ",
       "pasteTitle": "ਕਈ ਲਾਈਨਾਂ ਪੇਸਟ ਕਰਨੀਆਂ ਹਨ?",
@@ -4241,7 +4241,10 @@
       "share": "ਕੁੰਜੀ ਸਾਂਝੀ ਕਰੋ",
       "copied": "ਜਨਤਕ ਕੁੰਜੀ ਕਾਪੀ ਕੀਤੀ ਗਈ।",
       "unreadable": "ਉਹ ਕੁੰਜੀ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕੀ।",
-      "unsupported": "ਇਸ ਕੁੰਜੀ ਦਾ ਐਲਗੋਰਿਦਮ ਸਮਰਥਿਤ ਨਹੀਂ ਹੈ।"
+      "unsupported": "ਇਸ ਕੁੰਜੀ ਦਾ ਐਲਗੋਰਿਦਮ ਸਮਰਥਿਤ ਨਹੀਂ ਹੈ।",
+      "createdTitle": "ਕੁੰਜੀ ਬਣਾਈ ਗਈ",
+      "createdDescription": "ਇਹ ਜਨਤਕ ਕੁੰਜੀ ਸਰਵਰ ਦੇ authorized_keys ਵਿੱਚ ਸ਼ਾਮਲ ਕਰੋ, ਫਿਰ ਇਸ ਕੁੰਜੀ ਨਾਲ ਕਨੈਕਟ ਕਰੋ।",
+      "copyPublicKey": "ਕੁੰਜੀ ਕਾਪੀ ਕਰੋ"
     }
   }
 }

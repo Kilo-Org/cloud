@@ -4311,7 +4311,7 @@
       "closedTitle": "Sesja zakończona",
       "closedDescription": "Ta powłoka nie jest już otwarta. Uruchom nową z listy hostów.",
       "disconnect": "Rozłącz",
-      "switcherTitle": "Otwarte sesje",
+      "switcherTitle": "Sesje",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Wklej",
       "pasteTitle": "Wkleić kilka wierszy?",
@@ -4371,7 +4371,10 @@
       "share": "Udostępnij klucz",
       "copied": "Skopiowano klucz publiczny.",
       "unreadable": "Nie udało się odczytać tego klucza.",
-      "unsupported": "Algorytm tego klucza nie jest obsługiwany."
+      "unsupported": "Algorytm tego klucza nie jest obsługiwany.",
+      "createdTitle": "Klucz utworzony",
+      "createdDescription": "Dodaj ten klucz publiczny do authorized_keys na serwerze, a następnie połącz się za pomocą tego klucza.",
+      "copyPublicKey": "Kopiuj klucz"
     }
   }
 }

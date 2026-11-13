@@ -3,7 +3,7 @@ import * as Clipboard from 'expo-clipboard';
 import { usePathname, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useColorScheme, View } from 'react-native';
+import { Keyboard, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
 import { EmptyState } from '@/components/empty-state';
@@ -53,7 +53,6 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
   const router = useRouter();
   const pathname = usePathname();
   const colors = useThemeColors();
-  const dark = useColorScheme() === 'dark';
   const session = useSshSession(sessionId);
   const sessions = useSshSessions();
   const { fontSize, setFontSize } = useTerminalFontSize();
@@ -67,6 +66,14 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
   const promptOnTop = pathname.includes('/ssh/prompt/');
   const shellId = session?.shellId ?? null;
   const pendingCommand = session?.pendingCommand ?? null;
+
+  // A reconnect leaves the last output on screen and the strip above it as the
+  // status; the keyboard would only cover that shell, so it closes.
+  useEffect(() => {
+    if (phase?.kind === 'reconnecting') {
+      Keyboard.dismiss();
+    }
+  }, [phase?.kind]);
 
   useEffect(() => {
     if (promptWaiting && !promptOnTop) {
@@ -123,6 +130,39 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
     );
   }
 
+  // A shell that exists keeps its view — and its buffer — through a reconnect,
+  // so the strip above is the only status then. The wait and the endings own
+  // the area only when there is no shell at all.
+  const showStage = phase.kind === 'connecting' || phase.kind === 'closed';
+  const terminalArea =
+    shellId === null ? null : (
+      <TerminalSurface
+        handleRef={terminalRef}
+        sourceId={shellId}
+        fontSize={fontSize}
+        onLinkPress={url => {
+          void openExternalUrl(url);
+        }}
+        onTitleChange={setShellTitle}
+        onFontSizeChange={setFontSize}
+        onClosed={error => {
+          endShell(sessionId, error);
+        }}
+      />
+    );
+  const stageArea = showStage ? (
+    <SshSessionStage
+      phase={phase}
+      target={session.target}
+      onRetry={() => {
+        retrySession(sessionId);
+      }}
+      onClose={() => {
+        void closeSession(sessionId);
+      }}
+    />
+  ) : null;
+
   const blockedHostKey =
     phase.kind === 'awaiting-host-key' && phase.hostKey.knownFingerprintSha256 !== null
       ? { ...phase.hostKey, knownFingerprintSha256: phase.hostKey.knownFingerprintSha256 }
@@ -171,37 +211,13 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
       {blockedHostKey === null ? (
         <KeyboardAvoidingView className="flex-1" behavior="padding">
           <View className="flex-1 bg-background">
-            {shellId === null ? (
-              <SshSessionStage
-                phase={phase}
-                target={session.target}
-                onRetry={() => {
-                  retrySession(sessionId);
-                }}
-                onClose={() => {
-                  void closeSession(sessionId);
-                }}
-              />
-            ) : (
-              <TerminalSurface
-                handleRef={terminalRef}
-                sourceId={shellId}
-                fontSize={fontSize}
-                dark={dark}
-                onLinkPress={url => {
-                  void openExternalUrl(url);
-                }}
-                onTitleChange={setShellTitle}
-                onFontSizeChange={setFontSize}
-                onClosed={error => {
-                  endShell(sessionId, error);
-                }}
-              />
-            )}
+            {/* A shell that exists stays mounted through a reconnect, with its
+                buffer, so the strip above is the only status on the screen. */}
+            {terminalArea ?? stageArea}
           </View>
           {shellId === null ? null : (
             <TerminalKeyBar
-              disabled={false}
+              disabled={phase.kind !== 'connected'}
               onSend={send}
               onPaste={() => {
                 void pasteFromClipboard();
@@ -212,6 +228,7 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
       ) : (
         <SshHostKeyBlocked
           hostKey={blockedHostKey}
+          label={session.label}
           onOpenKnownHosts={() => {
             decideHostKey(sessionId, 'cancel');
             router.push(SSH_KNOWN_HOSTS_ROUTE);

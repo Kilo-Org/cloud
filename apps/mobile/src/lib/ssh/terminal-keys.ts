@@ -4,8 +4,8 @@ export type TerminalKeyId =
   | 'ctrl'
   | 'alt'
   | 'left'
-  | 'down'
   | 'up'
+  | 'down'
   | 'right'
   | 'pipe'
   | 'tilde'
@@ -18,15 +18,15 @@ export type TerminalKey = Readonly<{
   label: string;
 }>;
 
-/** The key bar, in the order it shows them. */
+/** The key bar, in the order it shows them: the arrows read left to right. */
 export const TERMINAL_KEYS: readonly TerminalKey[] = [
   { id: 'esc', label: 'Esc' },
   { id: 'ctrl', label: 'Ctrl' },
   { id: 'alt', label: 'Alt' },
   { id: 'tab', label: 'Tab' },
   { id: 'left', label: '←' },
-  { id: 'down', label: '↓' },
   { id: 'up', label: '↑' },
+  { id: 'down', label: '↓' },
   { id: 'right', label: '→' },
   { id: 'pipe', label: '|' },
   { id: 'tilde', label: '~' },
@@ -63,5 +63,13 @@ export function altSequence(letter: string): string {
   return `\u001B${letter}`;
 }
 
-/** The letters the sticky-modifier row offers, in keyboard order. */
-export const MODIFIER_LETTERS: readonly string[] = 'abcdefghijklmnopqrstuvwxyz'.split('');
+/**
+ * The letters the sticky-modifier row offers, most used first: interrupt,
+ * end-of-input, suspend, reverse-search, clear, start-of-line, then the rest of
+ * the alphabet, so the pairs a shell is driven with need no scrolling.
+ */
+export const MODIFIER_LETTERS: readonly string[] = [
+  'c', 'd', 'z', 'r', 'l', 'a', 'e', 'u', 'w', 'k',
+  'b', 'f', 'g', 'h', 'i', 'j', 'm', 'n', 'o', 'p',
+  'q', 's', 't', 'v', 'x', 'y',
+];

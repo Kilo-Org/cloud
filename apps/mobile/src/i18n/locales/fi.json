@@ -4181,7 +4181,7 @@
       "closedTitle": "Istunto päättyi",
       "closedDescription": "Tämä komentotulkki ei ole enää auki. Käynnistä uusi istunto isäntäluettelosta.",
       "disconnect": "Katkaise yhteys",
-      "switcherTitle": "Avoimet istunnot",
+      "switcherTitle": "Istunnot",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Liitä",
       "pasteTitle": "Liitetäänkö useita rivejä?",
@@ -4241,7 +4241,10 @@
       "share": "Jaa avain",
       "copied": "Julkinen avain kopioitu.",
       "unreadable": "Kyseistä avainta ei voitu lukea.",
-      "unsupported": "Tämän avaimen algoritmia ei tueta."
+      "unsupported": "Tämän avaimen algoritmia ei tueta.",
+      "createdTitle": "Avain luotu",
+      "createdDescription": "Lisää tämä julkinen avain palvelimen authorized_keys-tiedostoon ja muodosta sitten yhteys tällä avaimella.",
+      "copyPublicKey": "Kopioi avain"
     }
   }
 }

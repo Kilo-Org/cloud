@@ -4181,7 +4181,7 @@
       "closedTitle": "نشست پایان یافت",
       "closedDescription": "این شل دیگر باز نیست. یک شل تازه را از فهرست میزبان‌ها شروع کنید.",
       "disconnect": "قطع اتصال",
-      "switcherTitle": "نشست‌های باز",
+      "switcherTitle": "نشست‌ها",
       "switchTo": "{{label}}، {{state}}",
       "paste": "جای‌گذاری",
       "pasteTitle": "چند خط جای‌گذاری شود؟",
@@ -4241,7 +4241,10 @@
       "share": "اشتراک‌گذاری کلید",
       "copied": "کلید عمومی کپی شد.",
       "unreadable": "آن کلید خوانده نشد.",
-      "unsupported": "الگوریتم این کلید پشتیبانی نمی‌شود."
+      "unsupported": "الگوریتم این کلید پشتیبانی نمی‌شود.",
+      "createdTitle": "کلید ساخته شد",
+      "createdDescription": "این کلید عمومی را به authorized_keys سرور اضافه کنید، سپس با این کلید متصل شوید.",
+      "copyPublicKey": "کپی کلید"
     }
   }
 }

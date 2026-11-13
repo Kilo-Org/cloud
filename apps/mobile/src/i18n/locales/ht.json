@@ -4181,7 +4181,7 @@
       "closedTitle": "Sesyon an fini",
       "closedDescription": "Shell sa a pa ouvè ankò. Kòmanse yon nouvo soti nan lis ot yo.",
       "disconnect": "Dekonekte",
-      "switcherTitle": "Sesyon ouvè yo",
+      "switcherTitle": "Sesyon",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Kole",
       "pasteTitle": "Kole plizyè liy?",
@@ -4241,7 +4241,10 @@
       "share": "Pataje kle",
       "copied": "Kle piblik la kopye.",
       "unreadable": "Nou pa t ka li kle sa a.",
-      "unsupported": "Algoritm kle sa a pa sipòte."
+      "unsupported": "Algoritm kle sa a pa sipòte.",
+      "createdTitle": "Kle kreye",
+      "createdDescription": "Ajoute kle piblik sa a nan authorized_keys sèvè a, epi konekte ak kle sa a.",
+      "copyPublicKey": "Kopye kle"
     }
   }
 }

@@ -4246,7 +4246,7 @@
       "closedTitle": "ההפעלה הסתיימה",
       "closedDescription": "המעטפת הזו כבר לא פתוחה. התחילו הפעלה חדשה מרשימת המארחים.",
       "disconnect": "התנתקות",
-      "switcherTitle": "הפעלות פתוחות",
+      "switcherTitle": "סשנים",
       "switchTo": "{{label}}, {{state}}",
       "paste": "הדבקה",
       "pasteTitle": "להדביק כמה שורות?",
@@ -4306,7 +4306,10 @@
       "share": "שיתוף מפתח",
       "copied": "המפתח הציבורי הועתק.",
       "unreadable": "לא ניתן היה לקרוא את המפתח הזה.",
-      "unsupported": "האלגוריתם של המפתח הזה אינו נתמך."
+      "unsupported": "האלגוריתם של המפתח הזה אינו נתמך.",
+      "createdTitle": "מפתח נוצר",
+      "createdDescription": "הוסף את המפתח הציבורי הזה ל-authorized_keys של השרת, ולאחר מכן התחבר עם מפתח זה.",
+      "copyPublicKey": "העתקת מפתח"
     }
   }
 }

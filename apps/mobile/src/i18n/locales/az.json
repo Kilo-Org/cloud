@@ -4181,7 +4181,7 @@
       "closedTitle": "Sessiya bitdi",
       "closedDescription": "Bu shell artıq açıq deyil. Hostlar siyahısından yenisini başlayın.",
       "disconnect": "Bağlantını kəs",
-      "switcherTitle": "Açıq sessiyalar",
+      "switcherTitle": "Sessiyalar",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Yapışdır",
       "pasteTitle": "Bir neçə sətir yapışdırılsın?",
@@ -4241,7 +4241,10 @@
       "share": "Açarı paylaş",
       "copied": "Açıq açar kopyalandı.",
       "unreadable": "Həmin açar oxuna bilmədi.",
-      "unsupported": "Bu açarın alqoritmi dəstəklənmir."
+      "unsupported": "Bu açarın alqoritmi dəstəklənmir.",
+      "createdTitle": "Açar yaradıldı",
+      "createdDescription": "Bu açıq açarı serverin authorized_keys faylına əlavə edin, sonra bu açarla qoşulun.",
+      "copyPublicKey": "Açarı kopyala"
     }
   }
 }

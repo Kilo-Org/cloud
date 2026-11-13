@@ -4181,7 +4181,7 @@
       "closedTitle": "ክፍለ ጊዜው ተጠናቅቋል",
       "closedDescription": "ይህ ሼል ከእንግዲህ ክፍት አይደለም። ከአስተናጋጆች ዝርዝር አዲስ ይጀምሩ።",
       "disconnect": "ግንኙነት አቋርጥ",
-      "switcherTitle": "ክፍት ክፍለ ጊዜዎች",
+      "switcherTitle": "ክፍለ ጊዜዎች",
       "switchTo": "{{label}}፣ {{state}}",
       "paste": "ለጥፍ",
       "pasteTitle": "በርካታ መስመሮችን ይለጥፉ?",
@@ -4241,7 +4241,10 @@
       "share": "ቁልፍ አጋራ",
       "copied": "ይፋዊው ቁልፍ ተቀድቷል።",
       "unreadable": "ያ ቁልፍ ሊነበብ አልቻለም።",
-      "unsupported": "የዚህ ቁልፍ አልጎሪዝም አይደገፍም።"
+      "unsupported": "የዚህ ቁልፍ አልጎሪዝም አይደገፍም።",
+      "createdTitle": "ቁልፍ ተፈጥሯል",
+      "createdDescription": "ይህን ይፋዊ ቁልፍ ወደ አገልጋዩ authorized_keys ያክሉ፣ ከዚያም በዚህ ቁልፍ ይገናኙ።",
+      "copyPublicKey": "ቁልፍ ቅዳ"
     }
   }
 }

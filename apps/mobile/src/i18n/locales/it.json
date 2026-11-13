@@ -4246,7 +4246,7 @@
       "closedTitle": "Sessione terminata",
       "closedDescription": "Questa shell non è più aperta. Avviane una nuova dall'elenco degli host.",
       "disconnect": "Disconnetti",
-      "switcherTitle": "Sessioni aperte",
+      "switcherTitle": "Sessioni",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Incolla",
       "pasteTitle": "Incollare più righe?",
@@ -4306,7 +4306,10 @@
       "share": "Condividi chiave",
       "copied": "Chiave pubblica copiata.",
       "unreadable": "Impossibile leggere quella chiave.",
-      "unsupported": "L'algoritmo di questa chiave non è supportato."
+      "unsupported": "L'algoritmo di questa chiave non è supportato.",
+      "createdTitle": "Chiave creata",
+      "createdDescription": "Aggiungi questa chiave pubblica agli authorized_keys del server, quindi connettiti con questa chiave.",
+      "copyPublicKey": "Copia chiave"
     }
   }
 }

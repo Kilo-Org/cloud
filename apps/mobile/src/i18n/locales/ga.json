@@ -4376,7 +4376,7 @@
       "closedTitle": "Seisiún críochnaithe",
       "closedDescription": "Níl an sceall seo oscailte a thuilleadh. Tosaigh ceann nua ón liosta óstach.",
       "disconnect": "Dícheangail",
-      "switcherTitle": "Seisiúin oscailte",
+      "switcherTitle": "Seisiúin",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Greamaigh",
       "pasteTitle": "Greamaigh roinnt línte?",
@@ -4436,7 +4436,10 @@
       "share": "Comhroinn eochair",
       "copied": "Cóipeáladh an eochair phoiblí.",
       "unreadable": "Níorbh fhéidir an eochair sin a léamh.",
-      "unsupported": "Ní thacaítear le halgartam na heochrach seo."
+      "unsupported": "Ní thacaítear le halgartam na heochrach seo.",
+      "createdTitle": "Eochair chruthaithe",
+      "createdDescription": "Cuir an eochair phoiblí seo le authorized_keys an fhreastalaí, ansin ceangail leis an eochair seo.",
+      "copyPublicKey": "Cóipeáil eochair"
     }
   }
 }

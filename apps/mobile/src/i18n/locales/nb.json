@@ -4181,7 +4181,7 @@
       "closedTitle": "Økten er avsluttet",
       "closedDescription": "Dette skallet er ikke lenger åpent. Start et nytt fra vertslisten.",
       "disconnect": "Koble fra",
-      "switcherTitle": "Åpne økter",
+      "switcherTitle": "Økter",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Lim inn",
       "pasteTitle": "Lime inn flere linjer?",
@@ -4241,7 +4241,10 @@
       "share": "Del nøkkel",
       "copied": "Offentlig nøkkel kopiert.",
       "unreadable": "Den nøkkelen kunne ikke leses.",
-      "unsupported": "Denne nøkkelens algoritme støttes ikke."
+      "unsupported": "Denne nøkkelens algoritme støttes ikke.",
+      "createdTitle": "Nøkkel opprettet",
+      "createdDescription": "Legg til denne offentlige nøkkelen i serverens authorized_keys, og koble deretter til med denne nøkkelen.",
+      "copyPublicKey": "Kopier nøkkel"
     }
   }
 }

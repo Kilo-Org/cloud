@@ -4181,7 +4181,7 @@
       "closedTitle": "Kua mutu te wātū",
       "closedDescription": "Kua kati tēnei pūtakataka. Tīmatahia tētahi hou mai i te rārangi pou.",
       "disconnect": "Wetekina",
-      "switcherTitle": "Ngā wātū tuwhera",
+      "switcherTitle": "Ngā wātū",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Whakapiri",
       "pasteTitle": "Whakapiri i ngā rārangi maha?",
@@ -4241,7 +4241,10 @@
       "share": "Tohatoha kī",
       "copied": "Kua kopea te kī tūmatanui.",
       "unreadable": "Kāore i taea tērā kī te pānui.",
-      "unsupported": "Kāore te hātepe o tēnei kī e tautokona ana."
+      "unsupported": "Kāore te hātepe o tēnei kī e tautokona ana.",
+      "createdTitle": "Kua hangaia te kī",
+      "createdDescription": "Tāpiritia tēnei kī tūmatanui ki te authorized_keys o te tūmau, kātahi ka hono atu mā tēnei kī.",
+      "copyPublicKey": "Kopea te kī"
     }
   }
 }

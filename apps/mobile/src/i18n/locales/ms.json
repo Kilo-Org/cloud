@@ -4181,7 +4181,7 @@
       "closedTitle": "Sesi tamat",
       "closedDescription": "Shell ini tidak lagi terbuka. Mulakan yang baharu daripada senarai hos.",
       "disconnect": "Putuskan sambungan",
-      "switcherTitle": "Sesi terbuka",
+      "switcherTitle": "Sesi",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Tampal",
       "pasteTitle": "Tampal beberapa baris?",
@@ -4241,7 +4241,10 @@
       "share": "Kongsi kunci",
       "copied": "Kunci awam disalin.",
       "unreadable": "Kunci itu tidak dapat dibaca.",
-      "unsupported": "Algoritma kunci ini tidak disokong."
+      "unsupported": "Algoritma kunci ini tidak disokong.",
+      "createdTitle": "Kunci dicipta",
+      "createdDescription": "Tambah kunci awam ini ke authorized_keys pelayan, kemudian sambung dengan kunci ini.",
+      "copyPublicKey": "Salin kunci"
     }
   }
 }

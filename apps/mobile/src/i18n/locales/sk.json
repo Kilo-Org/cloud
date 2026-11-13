@@ -4311,7 +4311,7 @@
       "closedTitle": "Relácia ukončená",
       "closedDescription": "Tento shell už nie je otvorený. Spustite nový zo zoznamu hostiteľov.",
       "disconnect": "Odpojiť",
-      "switcherTitle": "Otvorené relácie",
+      "switcherTitle": "Relácie",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Vložiť",
       "pasteTitle": "Vložiť niekoľko riadkov?",
@@ -4371,7 +4371,10 @@
       "share": "Zdieľať kľúč",
       "copied": "Verejný kľúč bol skopírovaný.",
       "unreadable": "Tento kľúč sa nepodarilo prečítať.",
-      "unsupported": "Algoritmus tohto kľúča nie je podporovaný."
+      "unsupported": "Algoritmus tohto kľúča nie je podporovaný.",
+      "createdTitle": "Kľúč bol vytvorený",
+      "createdDescription": "Pridajte tento verejný kľúč do authorized_keys servera a potom sa pripojte pomocou tohto kľúča.",
+      "copyPublicKey": "Kopírovať kľúč"
     }
   }
 }

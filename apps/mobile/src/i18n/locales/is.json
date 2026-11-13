@@ -4181,7 +4181,7 @@
       "closedTitle": "Lotu lokið",
       "closedDescription": "Þessi skel er ekki lengur opin. Byrjaðu nýja úr netþjónalistanum.",
       "disconnect": "Aftengja",
-      "switcherTitle": "Opnar lotur",
+      "switcherTitle": "Lotur",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Líma",
       "pasteTitle": "Líma nokkrar línur?",
@@ -4241,7 +4241,10 @@
       "share": "Deila lykli",
       "copied": "Opinber lykill afritaður.",
       "unreadable": "Ekki tókst að lesa þann lykil.",
-      "unsupported": "Reiknirit þessa lykils er ekki stutt."
+      "unsupported": "Reiknirit þessa lykils er ekki stutt.",
+      "createdTitle": "Lykill búinn til",
+      "createdDescription": "Bættu þessum opinbera lykli við authorized_keys á netþjóninum og tengdu þig síðan með þessum lykli.",
+      "copyPublicKey": "Afrita lykil"
     }
   }
 }

@@ -4181,7 +4181,7 @@
       "closedTitle": "Zaman ya ƙare",
       "closedDescription": "Wannan harsashi ba ya buɗe kuma. Fara wani sabo daga jerin hosts.",
       "disconnect": "Katse haɗin",
-      "switcherTitle": "Buɗaɗɗun zama",
+      "switcherTitle": "Zamanni",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Manna",
       "pasteTitle": "Manna layuka da yawa?",
@@ -4241,7 +4241,10 @@
       "share": "Raba maɓalli",
       "copied": "An kwafa maɓallin jama'a.",
       "unreadable": "Ba a iya karanta wannan maɓallin ba.",
-      "unsupported": "Ba a goyi bayan algorithm ɗin wannan maɓallin ba."
+      "unsupported": "Ba a goyi bayan algorithm ɗin wannan maɓallin ba.",
+      "createdTitle": "An ƙirƙiri maɓalli",
+      "createdDescription": "Ƙara wannan maɓallin jama'a zuwa authorized_keys na uwar garke, sannan ka haɗa da wannan maɓalli.",
+      "copyPublicKey": "Kwafi maɓalli"
     }
   }
 }

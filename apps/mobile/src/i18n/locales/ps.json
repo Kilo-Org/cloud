@@ -4181,7 +4181,7 @@
       "closedTitle": "سیشن پای ته ورسېد",
       "closedDescription": "دا شل نور خلاص نه دی. د هوسټونو له لیست څخه نوی شل پیل کړئ.",
       "disconnect": "وصل پرې کړئ",
-      "switcherTitle": "خلاص سیشنونه",
+      "switcherTitle": "ناستې",
       "switchTo": "{{label}}، {{state}}",
       "paste": "پیسټ کړئ",
       "pasteTitle": "څو کرښې پیسټ کړو؟",
@@ -4241,7 +4241,10 @@
       "share": "کیلي شریکه کړئ",
       "copied": "عامه کیلي کاپي شوه.",
       "unreadable": "هغه کیلي ونه لوستل شوه.",
-      "unsupported": "د دې کیلي الګوریتم ملاتړ نه کېږي."
+      "unsupported": "د دې کیلي الګوریتم ملاتړ نه کېږي.",
+      "createdTitle": "کیلي جوړه شوه",
+      "createdDescription": "دا عامه کیلي د سرور authorized_keys ته اضافه کړئ، بیا د دې کیلي سره وصل شئ.",
+      "copyPublicKey": "کیلي کاپي کړئ"
     }
   }
 }

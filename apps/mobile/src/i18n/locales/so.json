@@ -4181,7 +4181,7 @@
       "closedTitle": "Session-ka wuu dhamaaday",
       "closedDescription": "Shell-kan hadda furan maaha. Mid cusub ka bilaab liiska host-yada.",
       "disconnect": "Xidhiidhka gooy",
-      "switcherTitle": "Sessions-ka furan",
+      "switcherTitle": "Kalfadhiyada",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Ku dheji",
       "pasteTitle": "Ma ku dhejinayaa dhowr sadar?",
@@ -4241,7 +4241,10 @@
       "share": "La wadaag furaha",
       "copied": "Furaha guud waa la koobiyeeyay.",
       "unreadable": "Furahaas lama akhrin karin.",
-      "unsupported": "Algorithm-ka furahan lama taageerayo."
+      "unsupported": "Algorithm-ka furahan lama taageerayo.",
+      "createdTitle": "Fure la abuuray",
+      "createdDescription": "Ku dar furaha guudkan authorized_keys-ka server-ka, ka dibna furahan ku xiriir.",
+      "copyPublicKey": "Koobi furaha"
     }
   }
 }

@@ -4181,7 +4181,7 @@
       "closedTitle": "सत्र समाप्त हुआ",
       "closedDescription": "यह शेल अब खुला नहीं है। होस्ट सूची से नया शेल शुरू करें।",
       "disconnect": "डिस्कनेक्ट करें",
-      "switcherTitle": "खुले सत्र",
+      "switcherTitle": "सत्र",
       "switchTo": "{{label}}, {{state}}",
       "paste": "पेस्ट करें",
       "pasteTitle": "कई पंक्तियाँ पेस्ट करें?",
@@ -4241,7 +4241,10 @@
       "share": "कुंजी साझा करें",
       "copied": "पब्लिक की कॉपी हो गई।",
       "unreadable": "वह कुंजी पढ़ी नहीं जा सकी।",
-      "unsupported": "इस कुंजी का एल्गोरिदम समर्थित नहीं है।"
+      "unsupported": "इस कुंजी का एल्गोरिदम समर्थित नहीं है।",
+      "createdTitle": "कुंजी बन गई",
+      "createdDescription": "इस पब्लिक की को सर्वर के authorized_keys में जोड़ें, फिर इस कुंजी से कनेक्ट करें।",
+      "copyPublicKey": "कुंजी कॉपी करें"
     }
   }
 }

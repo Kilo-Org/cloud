@@ -4181,7 +4181,7 @@
       "closedTitle": "સેશન સમાપ્ત થયું",
       "closedDescription": "આ શેલ હવે ખુલ્લું નથી. હોસ્ટ્સ સૂચિમાંથી નવું શેલ શરૂ કરો.",
       "disconnect": "ડિસ્કનેક્ટ કરો",
-      "switcherTitle": "ખુલ્લાં સેશન",
+      "switcherTitle": "સત્રો",
       "switchTo": "{{label}}, {{state}}",
       "paste": "પેસ્ટ કરો",
       "pasteTitle": "ઘણી લાઇન પેસ્ટ કરવી?",
@@ -4241,7 +4241,10 @@
       "share": "કી શેર કરો",
       "copied": "જાહેર કી કૉપી થઈ ગઈ.",
       "unreadable": "તે કી વાંચી શકાઈ નહીં.",
-      "unsupported": "આ કીનું એલ્ગોરિધમ સમર્થિત નથી."
+      "unsupported": "આ કીનું એલ્ગોરિધમ સમર્થિત નથી.",
+      "createdTitle": "કી બનાવાઈ",
+      "createdDescription": "આ જાહેર કીને સર્વરના authorized_keys માં ઉમેરો, પછી આ કી સાથે કનેક્ટ કરો.",
+      "copyPublicKey": "કી કૉપી કરો"
     }
   }
 }

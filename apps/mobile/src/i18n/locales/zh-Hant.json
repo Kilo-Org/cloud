@@ -4181,7 +4181,7 @@
       "closedTitle": "工作階段已結束",
       "closedDescription": "此終端機已關閉。請從主機清單開啟新的工作階段。",
       "disconnect": "中斷連線",
-      "switcherTitle": "開啟的工作階段",
+      "switcherTitle": "工作階段",
       "switchTo": "{{label}}，{{state}}",
       "paste": "貼上",
       "pasteTitle": "貼上多行內容？",
@@ -4241,7 +4241,10 @@
       "share": "分享金鑰",
       "copied": "已複製公開金鑰。",
       "unreadable": "無法讀取該金鑰。",
-      "unsupported": "不支援此金鑰的演算法。"
+      "unsupported": "不支援此金鑰的演算法。",
+      "createdTitle": "金鑰已產生",
+      "createdDescription": "將此公開金鑰新增至伺服器的 authorized_keys，然後使用此金鑰連線。",
+      "copyPublicKey": "複製金鑰"
     }
   }
 }

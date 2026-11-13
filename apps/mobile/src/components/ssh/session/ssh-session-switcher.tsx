@@ -19,7 +19,12 @@ type SshSessionSwitcherProps = Readonly<{
   onClose: () => void;
 }>;
 
-/** The open sessions, with the state each one is in, and the way to start another. */
+/**
+ * Every session the app is holding, with the state each one is in, and the way
+ * to start another. The list includes closed sessions, so the heading names
+ * sessions rather than open ones, and the state keeps its own line end: a long
+ * hostname truncates first.
+ */
 export function SshSessionSwitcher({
   visible,
   sessions,
@@ -34,11 +39,12 @@ export function SshSessionSwitcher({
   return (
     <Sheet visible={visible} onClose={onClose}>
       <View className="gap-1 px-3 pb-4">
-        <Text className="px-2 pb-2 text-sm font-medium text-foreground">
+        <Text className="px-2 pb-3 text-center text-base font-semibold text-foreground">
           {t('ssh.session.switcherTitle')}
         </Text>
         {sessions.map(session => {
           const active = session.id === activeId;
+          const state = sessionStateLabel(t, session.phase);
           return (
             <Pressable
               key={session.id}
@@ -46,10 +52,7 @@ export function SshSessionSwitcher({
                 onSelect(session.id);
               }}
               accessibilityRole="button"
-              accessibilityLabel={t('ssh.session.switchTo', {
-                label: session.label,
-                state: sessionStateLabel(t, session.phase),
-              })}
+              accessibilityLabel={t('ssh.session.switchTo', { label: session.label, state })}
               accessibilityState={{ selected: active }}
               className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 rounded-md px-2 active:opacity-70')}
             >
@@ -57,9 +60,13 @@ export function SshSessionSwitcher({
                 <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
                   {session.label}
                 </Text>
-                <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-                  {session.target} · {sessionStateLabel(t, session.phase)}
-                </Text>
+                <View className="flex-row items-center gap-1.5">
+                  <Text className="shrink text-xs text-muted-foreground" numberOfLines={1}>
+                    {session.target}
+                  </Text>
+                  <Text className="text-xs text-muted-foreground">·</Text>
+                  <Text className="shrink-0 text-xs text-muted-foreground">{state}</Text>
+                </View>
               </View>
               {active ? <Check size={16} color={colors.primary} /> : null}
             </Pressable>

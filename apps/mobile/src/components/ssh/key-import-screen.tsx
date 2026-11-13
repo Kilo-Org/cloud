@@ -127,7 +127,11 @@ export function SshKeyImportScreen() {
       >
         <Text className="text-sm text-muted-foreground">{t('ssh.keys.importDescription')}</Text>
         {state.kind === 'ready' ? (
-          <SshPublicKeyBlock publicKey={state.publicKey} fingerprint={state.fingerprint} />
+          <SshPublicKeyBlock
+            name={labelRef.current.trim()}
+            publicKey={state.publicKey}
+            fingerprint={state.fingerprint}
+          />
         ) : (
           <>
             <FormField

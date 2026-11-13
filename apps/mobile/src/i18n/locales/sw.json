@@ -4181,7 +4181,7 @@
       "closedTitle": "Kipindi kimeisha",
       "closedDescription": "Terminal hii haiko wazi tena. Anzisha mpya kutoka kwenye orodha ya wenyeji.",
       "disconnect": "Tenganisha",
-      "switcherTitle": "Vipindi vilivyo wazi",
+      "switcherTitle": "Vikao",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Bandika",
       "pasteTitle": "Bandika mistari kadhaa?",
@@ -4241,7 +4241,10 @@
       "share": "Shiriki ufunguo",
       "copied": "Ufunguo wa umma umenakiliwa.",
       "unreadable": "Ufunguo huo haukuweza kusomwa.",
-      "unsupported": "Algoriti ya ufunguo huu haiauniwi."
+      "unsupported": "Algoriti ya ufunguo huu haiauniwi.",
+      "createdTitle": "Ufunguo umetengenezwa",
+      "createdDescription": "Ongeza ufunguo huu wa umma kwenye authorized_keys ya seva, kisha unganisha ukitumia ufunguo huu.",
+      "copyPublicKey": "Nakili ufunguo"
     }
   }
 }

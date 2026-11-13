@@ -4181,7 +4181,7 @@
       "closedTitle": "会话已结束",
       "closedDescription": "此终端已不再打开。请从主机列表启动一个新的。",
       "disconnect": "断开连接",
-      "switcherTitle": "打开的会话",
+      "switcherTitle": "会话",
       "switchTo": "{{label}}，{{state}}",
       "paste": "粘贴",
       "pasteTitle": "粘贴多行？",
@@ -4241,7 +4241,10 @@
       "share": "分享密钥",
       "copied": "已复制公钥。",
       "unreadable": "无法读取该密钥。",
-      "unsupported": "不支持此密钥的算法。"
+      "unsupported": "不支持此密钥的算法。",
+      "createdTitle": "密钥已创建",
+      "createdDescription": "将此公钥添加到服务器的 authorized_keys，然后使用此密钥连接。",
+      "copyPublicKey": "复制公钥"
     }
   }
 }

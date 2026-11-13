@@ -4181,7 +4181,7 @@
       "closedTitle": "세션 종료됨",
       "closedDescription": "이 셸은 더 이상 열려 있지 않습니다. 호스트 목록에서 새로 시작하세요.",
       "disconnect": "연결 끊기",
-      "switcherTitle": "열린 세션",
+      "switcherTitle": "세션",
       "switchTo": "{{label}}, {{state}}",
       "paste": "붙여넣기",
       "pasteTitle": "여러 줄을 붙여넣을까요?",
@@ -4241,7 +4241,10 @@
       "share": "키 공유",
       "copied": "공개 키가 복사되었습니다.",
       "unreadable": "해당 키를 읽을 수 없습니다.",
-      "unsupported": "이 키의 알고리즘은 지원되지 않습니다."
+      "unsupported": "이 키의 알고리즘은 지원되지 않습니다.",
+      "createdTitle": "키 생성 완료",
+      "createdDescription": "이 공개 키를 서버의 authorized_keys에 추가한 다음, 이 키로 연결하세요.",
+      "copyPublicKey": "키 복사"
     }
   }
 }

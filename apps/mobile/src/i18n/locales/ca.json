@@ -4246,7 +4246,7 @@
       "closedTitle": "Sessió finalitzada",
       "closedDescription": "Aquest terminal ja no està obert. Inicia'n un de nou des de la llista d'amfitrions.",
       "disconnect": "Desconnecta",
-      "switcherTitle": "Sessions obertes",
+      "switcherTitle": "Sessions",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Enganxa",
       "pasteTitle": "Vols enganxar diverses línies?",
@@ -4306,7 +4306,10 @@
       "share": "Comparteix la clau",
       "copied": "S'ha copiat la clau pública.",
       "unreadable": "No s'ha pogut llegir aquesta clau.",
-      "unsupported": "L'algorisme d'aquesta clau no és compatible."
+      "unsupported": "L'algorisme d'aquesta clau no és compatible.",
+      "createdTitle": "Clau creada",
+      "createdDescription": "Afegeix aquesta clau pública a l'authorized_keys del servidor i, després, connecta't amb aquesta clau.",
+      "copyPublicKey": "Copia la clau"
     }
   }
 }

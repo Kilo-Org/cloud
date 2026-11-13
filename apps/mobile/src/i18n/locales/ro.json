@@ -4246,7 +4246,7 @@
       "closedTitle": "Sesiune încheiată",
       "closedDescription": "Acest shell nu mai este deschis. Începe unul nou din lista de gazde.",
       "disconnect": "Deconectează",
-      "switcherTitle": "Sesiuni deschise",
+      "switcherTitle": "Sesiuni",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Lipește",
       "pasteTitle": "Lipești mai multe linii?",
@@ -4306,7 +4306,10 @@
       "share": "Partajează cheia",
       "copied": "Cheia publică a fost copiată.",
       "unreadable": "Cheia respectivă nu a putut fi citită.",
-      "unsupported": "Algoritmul acestei chei nu este acceptat."
+      "unsupported": "Algoritmul acestei chei nu este acceptat.",
+      "createdTitle": "Cheie creată",
+      "createdDescription": "Adaugă această cheie publică la authorized_keys ale serverului, apoi conectează-te folosind această cheie.",
+      "copyPublicKey": "Copiază cheia"
     }
   }
 }

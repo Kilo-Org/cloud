@@ -4181,7 +4181,7 @@
       "closedTitle": "Phiên đã kết thúc",
       "closedDescription": "Shell này không còn mở nữa. Hãy bắt đầu một phiên mới từ danh sách máy chủ.",
       "disconnect": "Ngắt kết nối",
-      "switcherTitle": "Các phiên đang mở",
+      "switcherTitle": "Phiên",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Dán",
       "pasteTitle": "Dán nhiều dòng?",
@@ -4241,7 +4241,10 @@
       "share": "Chia sẻ khóa",
       "copied": "Đã sao chép khóa công khai.",
       "unreadable": "Không thể đọc khóa đó.",
-      "unsupported": "Thuật toán của khóa này không được hỗ trợ."
+      "unsupported": "Thuật toán của khóa này không được hỗ trợ.",
+      "createdTitle": "Đã tạo khóa",
+      "createdDescription": "Thêm khóa công khai này vào authorized_keys của máy chủ, rồi kết nối bằng khóa này.",
+      "copyPublicKey": "Sao chép khóa"
     }
   }
 }

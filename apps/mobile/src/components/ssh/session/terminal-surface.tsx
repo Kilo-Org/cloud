@@ -2,26 +2,33 @@ import { TerminalView, type TerminalViewHandle } from '@kilocode/react-native-ss
 import { type RefObject, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 
-import { terminalThemeFor } from '@/lib/ssh/terminal-theme';
+import { TERMINAL_BACKGROUND, TERMINAL_THEME } from '@/lib/ssh/terminal-theme';
 
 /**
  * JetBrains Mono is the app's loaded monospace face (the PR diff renders it),
- * and it carries the block glyphs a terminal draws.
+ * and it carries the block glyphs a terminal draws. DESIGN.md names Roboto Mono
+ * for terminal text; that family is not installed in this app
+ * (`@expo-google-fonts/roboto-mono` is not a dependency), so the loaded face is
+ * the one available.
  */
 const FONT_FAMILY = 'JetBrainsMono_500Medium';
+
+/** The inset the shell's glyphs stay clear of, matched by the key bar's padding. */
+const HORIZONTAL_INSET = 8;
 
 const styles = StyleSheet.create({
   // The package's view is a plain native view, not a NativeWind component, so
   // its height comes from this style rather than a class: without it the view
-  // lays out at zero height and draws nothing.
-  surface: { flex: 1 },
+  // lays out at zero height and draws nothing. The background is painted here
+  // as well, so a view that remounts after a reconnect never shows the parent
+  // surface through it.
+  frame: { flex: 1, backgroundColor: TERMINAL_BACKGROUND, paddingHorizontal: HORIZONTAL_INSET },
 });
 
 type TerminalSurfaceProps = Readonly<{
   /** The native byte source the shell writes to. */
   sourceId: string;
   fontSize: number;
-  dark: boolean;
   /** Receives the view's handle, which is how input reaches the pty. */
   handleRef: RefObject<TerminalViewHandle | null>;
   onResize?: (cols: number, rows: number) => void;
@@ -33,14 +40,13 @@ type TerminalSurfaceProps = Readonly<{
 }>;
 
 /**
- * The native terminal, themed for the app's current scheme. This file is the
- * one place that renders the package's view, so its colour contract and the
- * font family have a single owner.
+ * The native terminal. This file is the one place that renders the package's
+ * view, so its colour contract, its inset and the font family have a single
+ * owner.
  */
 export function TerminalSurface({
   sourceId,
   fontSize,
-  dark,
   handleRef,
   onResize,
   onFontSizeChange,
@@ -48,11 +54,11 @@ export function TerminalSurface({
   onTitleChange,
   onClosed,
 }: TerminalSurfaceProps) {
-  const theme = useMemo(() => terminalThemeFor(dark), [dark]);
+  const theme = useMemo(() => TERMINAL_THEME, []);
 
   return (
     <TerminalView
-      style={styles.surface}
+      style={styles.frame}
       ref={instance => {
         handleRef.current = instance;
       }}

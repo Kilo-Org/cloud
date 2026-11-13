@@ -4181,7 +4181,7 @@
       "closedTitle": "सत्र संपले",
       "closedDescription": "हे शेल आता उघडे नाही. होस्ट यादीतून नवीन शेल सुरू करा.",
       "disconnect": "डिस्कनेक्ट करा",
-      "switcherTitle": "सुरू असलेली सत्रे",
+      "switcherTitle": "सत्रे",
       "switchTo": "{{label}}, {{state}}",
       "paste": "पेस्ट करा",
       "pasteTitle": "अनेक ओळी पेस्ट करायच्या?",
@@ -4241,7 +4241,10 @@
       "share": "की शेअर करा",
       "copied": "सार्वजनिक की कॉपी झाली.",
       "unreadable": "ती की वाचता आली नाही.",
-      "unsupported": "या कीचा अल्गोरिदम समर्थित नाही."
+      "unsupported": "या कीचा अल्गोरिदम समर्थित नाही.",
+      "createdTitle": "की तयार झाली",
+      "createdDescription": "ही सार्वजनिक की सर्व्हरच्या authorized_keys मध्ये जोडा, नंतर या कीने कनेक्ट करा.",
+      "copyPublicKey": "की कॉपी करा"
     }
   }
 }

@@ -4181,7 +4181,7 @@
       "closedTitle": "Ìpàdé ti parí",
       "closedDescription": "Ṣẹ́ẹ̀lì yìí kò ṣí mọ́. Bẹ̀rẹ̀ èyí tuntun láti orí àkọsílẹ̀ àwọn sáfà.",
       "disconnect": "Ge ìsopọ̀",
-      "switcherTitle": "Àwọn ìpàdé tó ṣí",
+      "switcherTitle": "Àwọn ìgbà iṣẹ́",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Lẹ̀",
       "pasteTitle": "Ṣé kí a lẹ̀ ọ̀pọ̀ ìlà?",
@@ -4241,7 +4241,10 @@
       "share": "Pín kọ́kọ́rọ́",
       "copied": "A ti ṣe àdàkọ́ kọ́kọ́rọ́ gbogbo ènìyàn.",
       "unreadable": "A kò lè kà kọ́kọ́rọ́ yẹn.",
-      "unsupported": "A kò ṣe àtìlẹ́yìn fún ìlànà ìṣirò kọ́kọ́rọ́ yìí."
+      "unsupported": "A kò ṣe àtìlẹ́yìn fún ìlànà ìṣirò kọ́kọ́rọ́ yìí.",
+      "createdTitle": "A ti dá kọ́kọ́rọ́",
+      "createdDescription": "Fi kọ́kọ́rọ́ gbogbo ènìyàn yìí kún authorized_keys lórí sáfà náà, lẹ́yìn náà lo kọ́kọ́rọ́ yìí láti sopọ̀ mọ́ sáfà náà.",
+      "copyPublicKey": "Ṣe àdàkọ́ kọ́kọ́rọ́"
     }
   }
 }

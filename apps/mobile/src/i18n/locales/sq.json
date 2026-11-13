@@ -4181,7 +4181,7 @@
       "closedTitle": "Sesioni përfundoi",
       "closedDescription": "Ky terminal nuk është më i hapur. Nis një të ri nga lista e hosteve.",
       "disconnect": "Shkëputu",
-      "switcherTitle": "Sesionet e hapura",
+      "switcherTitle": "Seancat",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Ngjit",
       "pasteTitle": "Të ngjiten disa rreshta?",
@@ -4241,7 +4241,10 @@
       "share": "Ndaj çelësin",
       "copied": "Çelësi publik u kopjua.",
       "unreadable": "Ai çelës nuk mund të lexohej.",
-      "unsupported": "Algoritmi i këtij çelësi nuk mbështetet."
+      "unsupported": "Algoritmi i këtij çelësi nuk mbështetet.",
+      "createdTitle": "Çelësi u krijua",
+      "createdDescription": "Shto këtë çelës publik në authorized_keys të serverit, më pas lidhu me këtë çelës.",
+      "copyPublicKey": "Kopjo çelësin"
     }
   }
 }

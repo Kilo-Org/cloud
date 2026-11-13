@@ -4181,7 +4181,7 @@
       "closedTitle": "Sitzung beendet",
       "closedDescription": "Diese Shell ist nicht mehr geöffnet. Starte eine neue aus der Hosts-Liste.",
       "disconnect": "Trennen",
-      "switcherTitle": "Offene Sitzungen",
+      "switcherTitle": "Sitzungen",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Einfügen",
       "pasteTitle": "Mehrere Zeilen einfügen?",
@@ -4241,7 +4241,10 @@
       "share": "Schlüssel teilen",
       "copied": "Öffentlicher Schlüssel kopiert.",
       "unreadable": "Der Schlüssel konnte nicht gelesen werden.",
-      "unsupported": "Der Algorithmus dieses Schlüssels wird nicht unterstützt."
+      "unsupported": "Der Algorithmus dieses Schlüssels wird nicht unterstützt.",
+      "createdTitle": "Schlüssel erzeugt",
+      "createdDescription": "Fügen Sie diesen öffentlichen Schlüssel zur authorized_keys-Datei des Servers hinzu und verbinden Sie sich dann mit diesem Schlüssel.",
+      "copyPublicKey": "Schlüssel kopieren"
     }
   }
 }

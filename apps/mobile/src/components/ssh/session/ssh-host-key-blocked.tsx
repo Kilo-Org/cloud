@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
-import { KeyRound, ShieldAlert } from '@/components/ui/icons';
+import { ShieldAlert } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -10,6 +10,8 @@ import { type SshHostKeyAwaiting } from '@/lib/ssh/session/types';
 
 type SshHostKeyBlockedProps = Readonly<{
   hostKey: SshHostKeyAwaiting & { readonly knownFingerprintSha256: string };
+  /** The host's own name, which the prose names instead of its stored pattern. */
+  label: string;
   onOpenKnownHosts: () => void;
   onClose: () => void;
 }>;
@@ -21,9 +23,15 @@ type SshHostKeyBlockedProps = Readonly<{
  * a change is a warning, not a dialog to dismiss. The two fingerprints are
  * shown side by side so the person can see whether the server was rebuilt, and
  * the way forward is the known-hosts screen, where the old entry is removed
- * deliberately.
+ * deliberately. Disconnect is the primary action, because the safe answer is
+ * the one that leaves: opening the override path is the secondary one.
  */
-export function SshHostKeyBlocked({ hostKey, onOpenKnownHosts, onClose }: SshHostKeyBlockedProps) {
+export function SshHostKeyBlocked({
+  hostKey,
+  label,
+  onOpenKnownHosts,
+  onClose,
+}: SshHostKeyBlockedProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
 
@@ -37,7 +45,7 @@ export function SshHostKeyBlocked({ hostKey, onOpenKnownHosts, onClose }: SshHos
       </View>
       <Text className="text-sm text-muted-foreground">
         {t('ssh.session.hostKeyChangedBody', {
-          pattern: hostKey.hostPattern,
+          pattern: label,
           algorithm: hostKey.algorithm,
         })}
       </Text>
@@ -48,12 +56,11 @@ export function SshHostKeyBlocked({ hostKey, onOpenKnownHosts, onClose }: SshHos
       </View>
 
       <View className="mt-auto gap-2">
-        <Button className={STATE_ACTION_CLASS} onPress={onOpenKnownHosts}>
-          <KeyRound size={16} color={colors.primaryForeground} />
-          <Text>{t('ssh.session.openKnownHosts')}</Text>
-        </Button>
-        <Button variant="outline" className={STATE_ACTION_CLASS} onPress={onClose}>
+        <Button className={STATE_ACTION_CLASS} onPress={onClose}>
           <Text>{t('ssh.session.disconnect')}</Text>
+        </Button>
+        <Button variant="outline" className={STATE_ACTION_CLASS} onPress={onOpenKnownHosts}>
+          <Text>{t('ssh.session.openKnownHosts')}</Text>
         </Button>
       </View>
     </View>

@@ -4181,7 +4181,7 @@
       "closedTitle": "سیشن ختم ہو گیا",
       "closedDescription": "یہ شیل اب کھلا نہیں ہے۔ ہوسٹس فہرست سے نیا شروع کریں۔",
       "disconnect": "منقطع کریں",
-      "switcherTitle": "کھلے سیشنز",
+      "switcherTitle": "سیشنز",
       "switchTo": "{{label}}، {{state}}",
       "paste": "چسپاں کریں",
       "pasteTitle": "کئی سطریں چسپاں کریں؟",
@@ -4241,7 +4241,10 @@
       "share": "کلید شیئر کریں",
       "copied": "عوامی کلید کاپی ہو گئی۔",
       "unreadable": "وہ کلید پڑھی نہیں جا سکی۔",
-      "unsupported": "اس کلید کا الگورتھم معاون نہیں ہے۔"
+      "unsupported": "اس کلید کا الگورتھم معاون نہیں ہے۔",
+      "createdTitle": "کلید بن گئی",
+      "createdDescription": "اس عوامی کلید کو سرور کے authorized_keys میں شامل کریں، پھر اس کلید سے جڑیں۔",
+      "copyPublicKey": "کلید کاپی کریں"
     }
   }
 }

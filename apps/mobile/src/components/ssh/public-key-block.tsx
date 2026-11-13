@@ -9,12 +9,14 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type SshPublicKeyBlockProps = Readonly<{
+  /** The name the key was stored under, so the block says which key it is. */
+  name: string;
   publicKey: string;
   fingerprint: string;
 }>;
 
 /** The key a person installs on their server, with the fingerprint they check it by. */
-export function SshPublicKeyBlock({ publicKey, fingerprint }: SshPublicKeyBlockProps) {
+export function SshPublicKeyBlock({ name, publicKey, fingerprint }: SshPublicKeyBlockProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
 
@@ -25,7 +27,9 @@ export function SshPublicKeyBlock({ publicKey, fingerprint }: SshPublicKeyBlockP
 
   return (
     <View className="gap-2 rounded-md border border-border bg-secondary p-3">
-      <Text className="text-xs text-muted-foreground">{t('ssh.keys.fingerprint')}</Text>
+      <Text className="text-xs text-muted-foreground">{t('ssh.keys.name')}</Text>
+      <Text className="text-xs text-foreground">{name}</Text>
+      <Text className="mt-1 text-xs text-muted-foreground">{t('ssh.keys.fingerprint')}</Text>
       <Text variant="mono" className="text-xs text-foreground">
         {fingerprint}
       </Text>
@@ -36,7 +40,7 @@ export function SshPublicKeyBlock({ publicKey, fingerprint }: SshPublicKeyBlockP
       <View className="flex-row gap-2 pt-1">
         <Button variant="outline" size="sm" onPress={() => void copy()}>
           <Copy size={14} color={colors.foreground} />
-          <Text>{t('common.copy')}</Text>
+          <Text>{t('ssh.keys.copyPublicKey')}</Text>
         </Button>
         <Button
           variant="outline"

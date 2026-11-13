@@ -4181,7 +4181,7 @@
       "closedTitle": "Saioa amaitu da",
       "closedDescription": "Terminal hau itxita dago jada. Ireki saio berri bat ostalarien zerrendatik.",
       "disconnect": "Deskonektatu",
-      "switcherTitle": "Irekitako saioak",
+      "switcherTitle": "Saioak",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Itsatsi",
       "pasteTitle": "Hainbat lerro itsatsi?",
@@ -4241,7 +4241,10 @@
       "share": "Partekatu gakoa",
       "copied": "Gako publikoa kopiatu da.",
       "unreadable": "Ezin izan da gako hori irakurri.",
-      "unsupported": "Gako honen algoritmoa ez da onartzen."
+      "unsupported": "Gako honen algoritmoa ez da onartzen.",
+      "createdTitle": "Gakoa sortu da",
+      "createdDescription": "Gehitu gako publiko hau zerbitzariaren authorized_keys fitxategian, eta, ondoren, konektatu gako honekin.",
+      "copyPublicKey": "Kopiatu gakoa"
     }
   }
 }

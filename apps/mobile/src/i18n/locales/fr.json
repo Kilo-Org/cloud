@@ -4246,7 +4246,7 @@
       "closedTitle": "Session terminée",
       "closedDescription": "Ce terminal n’est plus ouvert. Démarrez-en un nouveau depuis la liste des hôtes.",
       "disconnect": "Déconnecter",
-      "switcherTitle": "Sessions ouvertes",
+      "switcherTitle": "Sessions",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Coller",
       "pasteTitle": "Coller plusieurs lignes ?",
@@ -4306,7 +4306,10 @@
       "share": "Partager la clé",
       "copied": "Clé publique copiée.",
       "unreadable": "Cette clé n’a pas pu être lue.",
-      "unsupported": "L’algorithme de cette clé n’est pas pris en charge."
+      "unsupported": "L’algorithme de cette clé n’est pas pris en charge.",
+      "createdTitle": "Clé créée",
+      "createdDescription": "Ajoutez cette clé publique au fichier authorized_keys du serveur, puis connectez-vous avec cette clé.",
+      "copyPublicKey": "Copier la clé"
     }
   }
 }

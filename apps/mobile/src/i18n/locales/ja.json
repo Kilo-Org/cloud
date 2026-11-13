@@ -4181,7 +4181,7 @@
       "closedTitle": "セッションが終了しました",
       "closedDescription": "このシェルはすでに閉じています。ホスト一覧から新しいシェルを開始してください。",
       "disconnect": "切断",
-      "switcherTitle": "開いているセッション",
+      "switcherTitle": "セッション",
       "switchTo": "{{label}}、{{state}}",
       "paste": "貼り付け",
       "pasteTitle": "複数行を貼り付けますか?",
@@ -4241,7 +4241,10 @@
       "share": "キーを共有",
       "copied": "公開鍵をコピーしました。",
       "unreadable": "そのキーを読み取れませんでした。",
-      "unsupported": "このキーのアルゴリズムはサポートされていません。"
+      "unsupported": "このキーのアルゴリズムはサポートされていません。",
+      "createdTitle": "キーを作成しました",
+      "createdDescription": "この公開鍵をサーバーのauthorized_keysに追加してから、このキーで接続してください。",
+      "copyPublicKey": "キーをコピー"
     }
   }
 }

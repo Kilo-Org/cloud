@@ -4441,7 +4441,7 @@
       "closedTitle": "انتهت الجلسة",
       "closedDescription": "لم تعد هذه الصدفة مفتوحة. ابدأ صدفة جديدة من قائمة المضيفات.",
       "disconnect": "قطع الاتصال",
-      "switcherTitle": "الجلسات المفتوحة",
+      "switcherTitle": "الجلسات",
       "switchTo": "{{label}}، {{state}}",
       "paste": "لصق",
       "pasteTitle": "لصق عدة أسطر؟",
@@ -4501,7 +4501,10 @@
       "share": "مشاركة المفتاح",
       "copied": "تم نسخ المفتاح العام.",
       "unreadable": "تعذّرت قراءة ذلك المفتاح.",
-      "unsupported": "خوارزمية هذا المفتاح غير مدعومة."
+      "unsupported": "خوارزمية هذا المفتاح غير مدعومة.",
+      "createdTitle": "تم إنشاء المفتاح",
+      "createdDescription": "أضف هذا المفتاح العام إلى authorized_keys الخاص بالخادم، ثم اتصل باستخدام هذا المفتاح.",
+      "copyPublicKey": "نسخ المفتاح"
     }
   }
 }

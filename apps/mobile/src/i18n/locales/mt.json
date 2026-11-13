@@ -4376,7 +4376,7 @@
       "closedTitle": "Is-sessjoni ntemmet",
       "closedDescription": "Dan ix-shell m'għadux miftuħ. Ibda wieħed ġdid mil-lista tal-hosts.",
       "disconnect": "Skonnettja",
-      "switcherTitle": "Sessjonijiet miftuħa",
+      "switcherTitle": "Sessjonijiet",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Ippejstja",
       "pasteTitle": "Ippejstja diversi linji?",
@@ -4436,7 +4436,10 @@
       "share": "Aqsam iċ-ċavetta",
       "copied": "Iċ-ċavetta pubblika ġiet ikkupjata.",
       "unreadable": "Dik iċ-ċavetta ma setgħetx tinqara.",
-      "unsupported": "L-algoritmu ta' din iċ-ċavetta mhuwiex appoġġjat."
+      "unsupported": "L-algoritmu ta' din iċ-ċavetta mhuwiex appoġġjat.",
+      "createdTitle": "Ċavetta ġiet iġġenerata",
+      "createdDescription": "Żid din iċ-ċavetta pubblika mal-authorized_keys tas-server, imbagħad ikkonnettja b'din iċ-ċavetta.",
+      "copyPublicKey": "Ikkopja ċ-ċavetta"
     }
   }
 }

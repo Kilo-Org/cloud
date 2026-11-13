@@ -4181,7 +4181,7 @@
       "closedTitle": "Iseshini iphelile",
       "closedDescription": "Le sheli ayisavulekile. Qala entsha kuhlu lwamahosthi.",
       "disconnect": "Nqamula",
-      "switcherTitle": "Amaseshini avuliwe",
+      "switcherTitle": "Amaseshini",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Namathisela",
       "pasteTitle": "Namathisela imigqa eminingi?",
@@ -4241,7 +4241,10 @@
       "share": "Yabelana ngokhiye",
       "copied": "Ukhiye womphakathi ukopishiwe.",
       "unreadable": "Lowo khiye awukwazanga ukufundwa.",
-      "unsupported": "I-algorithm esetshenziswa yilo khiye ayisekelwe."
+      "unsupported": "I-algorithm esetshenziswa yilo khiye ayisekelwe.",
+      "createdTitle": "Ukhiye udaliwe",
+      "createdDescription": "Engeza lo khiye womphakathi ku-authorized_keys yeseva, bese uxhuma ngalo khiye.",
+      "copyPublicKey": "Kopisha ukhiye"
     }
   }
 }

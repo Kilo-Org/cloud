@@ -18,6 +18,8 @@ import { cn } from '@/lib/utils';
 /** The size a bar key paints; its own node carries Android's 48dp floor. */
 const KEY_BOX_CLASS = 'h-[48px] min-w-[48px] items-center justify-center rounded-md px-3';
 
+const ROW_CLASS = 'flex-row items-center border-border bg-card border-t';
+
 type Modifier = 'ctrl' | 'alt';
 
 type TerminalKeyBarProps = Readonly<{
@@ -33,6 +35,10 @@ type TerminalKeyBarProps = Readonly<{
  * next letter is sent with the modifier held (the terminal has no way to hold a
  * key across the soft keyboard, so the modifier and the letter are one
  * gesture). Pressing the modifier again cancels it.
+ *
+ * Paste keeps its own slot past the scrolling keys, because it is the key a
+ * phone needs most and the row is wider than the screen; the scroller is sized
+ * so the next key is always partly visible, which is what says there is more.
  */
 export function TerminalKeyBar({ disabled, onSend, onPaste }: TerminalKeyBarProps) {
   const { t } = useTranslation();
@@ -57,23 +63,45 @@ export function TerminalKeyBar({ disabled, onSend, onPaste }: TerminalKeyBarProp
   }
 
   return (
-    <View className="border-border bg-card border-t">
+    <View className={ROW_CLASS}>
       {modifier === null ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyboardShouldPersistTaps="always"
-          contentContainerClassName="flex-row items-center gap-1 px-2 py-1"
-        >
-          {TERMINAL_KEYS.map(key => (
+        <>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="always"
+            className="flex-1"
+            contentContainerClassName="flex-row items-center gap-1 py-1 pl-2"
+          >
+            {TERMINAL_KEYS.map(key => (
+              <Pressable
+                key={key.id}
+                onPress={() => {
+                  press(key.id);
+                }}
+                disabled={disabled}
+                accessibilityRole="button"
+                accessibilityLabel={key.label}
+                accessibilityState={{ disabled }}
+                className={cn(
+                  KEY_BOX_CLASS,
+                  'bg-secondary active:opacity-70',
+                  disabled && 'opacity-50'
+                )}
+              >
+                <Text variant="mono" className="text-sm text-foreground">
+                  {key.label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+          <View className="my-2 w-px self-stretch bg-border" />
+          <View className="px-2 py-1">
             <Pressable
-              key={key.id}
-              onPress={() => {
-                press(key.id);
-              }}
+              onPress={onPaste}
               disabled={disabled}
               accessibilityRole="button"
-              accessibilityLabel={key.label}
+              accessibilityLabel={t('ssh.session.paste')}
               accessibilityState={{ disabled }}
               className={cn(
                 KEY_BOX_CLASS,
@@ -81,57 +109,48 @@ export function TerminalKeyBar({ disabled, onSend, onPaste }: TerminalKeyBarProp
                 disabled && 'opacity-50'
               )}
             >
-              <Text variant="mono" className="text-sm text-foreground">
-                {key.label}
-              </Text>
+              <ClipboardPaste size={18} color={colors.foreground} />
             </Pressable>
-          ))}
-          <Pressable
-            onPress={onPaste}
-            disabled={disabled}
-            accessibilityRole="button"
-            accessibilityLabel={t('ssh.session.paste')}
-            accessibilityState={{ disabled }}
-            className={cn(KEY_BOX_CLASS, 'bg-secondary active:opacity-70', disabled && 'opacity-50')}
-          >
-            <ClipboardPaste size={18} color={colors.foreground} />
-          </Pressable>
-        </ScrollView>
+          </View>
+        </>
       ) : (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyboardShouldPersistTaps="always"
-          contentContainerClassName="flex-row items-center gap-1 px-2 py-1"
-        >
-          <Pressable
-            onPress={() => {
-              setModifier(null);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={t('common.cancel')}
-            className={cn(KEY_BOX_CLASS, 'bg-primary active:opacity-70')}
+        <>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="always"
+            className="flex-1"
+            contentContainerClassName="flex-row items-center gap-1 py-1 pl-2"
           >
-            <Text variant="mono" className="text-sm text-primary-foreground">
-              {modifier === 'ctrl' ? 'Ctrl' : 'Alt'}
-            </Text>
-          </Pressable>
-          {MODIFIER_LETTERS.map(letter => (
             <Pressable
-              key={letter}
               onPress={() => {
-                pressLetter(letter);
+                setModifier(null);
               }}
               accessibilityRole="button"
-              accessibilityLabel={letter}
-              className={cn(KEY_BOX_CLASS, 'bg-secondary active:opacity-70')}
+              accessibilityLabel={t('common.cancel')}
+              className={cn(KEY_BOX_CLASS, 'bg-primary active:opacity-70')}
             >
-              <Text variant="mono" className="text-sm text-foreground">
-                {letter}
+              <Text variant="mono" className="text-sm text-primary-foreground">
+                {modifier === 'ctrl' ? 'Ctrl' : 'Alt'}
               </Text>
             </Pressable>
-          ))}
-        </ScrollView>
+            {MODIFIER_LETTERS.map(letter => (
+              <Pressable
+                key={letter}
+                onPress={() => {
+                  pressLetter(letter);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={letter}
+                className={cn(KEY_BOX_CLASS, 'bg-secondary active:opacity-70')}
+              >
+                <Text variant="mono" className="text-sm text-foreground">
+                  {letter}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </>
       )}
     </View>
   );

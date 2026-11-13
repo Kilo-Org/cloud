@@ -4181,7 +4181,7 @@
       "closedTitle": "Sessionen er afsluttet",
       "closedDescription": "Denne shell er ikke længere åben. Start en ny fra værtslisten.",
       "disconnect": "Afbryd forbindelsen",
-      "switcherTitle": "Åbne sessioner",
+      "switcherTitle": "Sessioner",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Indsæt",
       "pasteTitle": "Indsætte flere linjer?",
@@ -4241,7 +4241,10 @@
       "share": "Del nøgle",
       "copied": "Offentlig nøgle kopieret.",
       "unreadable": "Nøglen kunne ikke læses.",
-      "unsupported": "Denne nøgles algoritme understøttes ikke."
+      "unsupported": "Denne nøgles algoritme understøttes ikke.",
+      "createdTitle": "Nøgle oprettet",
+      "createdDescription": "Tilføj denne offentlige nøgle til serverens authorized_keys, og opret derefter forbindelse med denne nøgle.",
+      "copyPublicKey": "Kopiér nøgle"
     }
   }
 }

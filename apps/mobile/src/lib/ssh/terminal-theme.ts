@@ -1,64 +1,43 @@
 import { type TerminalTheme } from '@kilocode/react-native-ssh';
 
 /**
- * The two terminal palettes.
+ * The terminal is dark in both app schemes, which is DESIGN.md's terminal
+ * component: a shell is a dark surface wherever it is embedded, and one palette
+ * is one place to keep readable. `surface.inset` is the background and
+ * `syntax.plain` the default text.
  *
- * They are designed against the terminal's own background rather than copied
- * from the app's surfaces: each of the sixteen ANSI colours clears WCAG AA
- * (4.5:1) against the background it is painted on, so the coloured output of a
- * tool — a diff, a linter, a shell prompt — stays readable in both schemes.
- * `terminal-theme.test.ts` holds that measurement.
+ * The sixteen ANSI slots keep their conventional roles: 0 is near the
+ * background, 7 and 15 are the light neutrals text falls back to, 8 is the dim
+ * neutral that still has to read, and each bright is at least 15 L* from its
+ * normal so bold output stays distinguishable from plain.
+ *
+ * `terminal-theme.test.ts` holds the measurements: every colour that is drawn as
+ * text clears WCAG AA (4.5:1) on the background, and ANSI 0 clears it on the six
+ * colour slots it is used over (tmux's status bar, htop's keys, a diff badge).
  */
-export const LIGHT_TERMINAL_THEME: TerminalTheme = {
-  foreground: '#14130F',
-  background: '#FFFFFF',
-  cursor: '#4F5A10',
-  selection: '#4F5A1033',
-  ansi: [
-    '#1F1F1F',
-    '#B3261E',
-    '#1D6B32',
-    '#8A5A00',
-    '#1D4ED8',
-    '#8B2C86',
-    '#0E6E7A',
-    '#3A3A3A',
-    '#565656',
-    '#D1342B',
-    '#2A8043',
-    '#A06A00',
-    '#2A62F0',
-    '#A03E9B',
-    '#147C8A',
-    '#14130F',
-  ],
-};
+export const TERMINAL_BACKGROUND = '#101010';
 
-export const DARK_TERMINAL_THEME: TerminalTheme = {
-  foreground: '#F2F0EB',
-  background: '#0E0E10',
+export const TERMINAL_THEME: TerminalTheme = {
+  foreground: '#E6E4E0',
+  background: TERMINAL_BACKGROUND,
   cursor: '#FFDD00',
   selection: '#FFDD0033',
   ansi: [
-    '#7C7C86',
-    '#FF8C80',
-    '#7FD08B',
-    '#EFC46B',
-    '#8FB6FF',
-    '#E39BE0',
-    '#6FD3D8',
-    '#C9C6CF',
-    '#8C8A94',
-    '#FFA79C',
-    '#95E39E',
-    '#F7D488',
-    '#A9C7FF',
-    '#EFB6EC',
-    '#8FE4E8',
-    '#F2F0EB',
+    '#1C1C1C',
+    '#E5544B',
+    '#4FBF6A',
+    '#D8A94A',
+    '#6C9BF2',
+    '#C77ADF',
+    '#4FC4CE',
+    '#C9C7C2',
+    '#8A8A8F',
+    '#FF9C8C',
+    '#67F98A',
+    '#FFE363',
+    '#95D7FF',
+    '#FFAEFF',
+    '#67FFFF',
+    '#F4F2EF',
   ],
 };
-
-export function terminalThemeFor(dark: boolean): TerminalTheme {
-  return dark ? DARK_TERMINAL_THEME : LIGHT_TERMINAL_THEME;
-}

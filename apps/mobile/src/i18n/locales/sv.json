@@ -4181,7 +4181,7 @@
       "closedTitle": "Sessionen avslutades",
       "closedDescription": "Det här skalet är inte längre öppet. Starta ett nytt från värdlistan.",
       "disconnect": "Koppla från",
-      "switcherTitle": "Öppna sessioner",
+      "switcherTitle": "Sessioner",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Klistra in",
       "pasteTitle": "Klistra in flera rader?",
@@ -4241,7 +4241,10 @@
       "share": "Dela nyckel",
       "copied": "Den offentliga nyckeln har kopierats.",
       "unreadable": "Nyckeln kunde inte läsas.",
-      "unsupported": "Den här nyckelns algoritm stöds inte."
+      "unsupported": "Den här nyckelns algoritm stöds inte.",
+      "createdTitle": "Nyckel skapad",
+      "createdDescription": "Lägg till den här offentliga nyckeln i serverns authorized_keys och anslut sedan med den här nyckeln.",
+      "copyPublicKey": "Kopiera nyckel"
     }
   }
 }

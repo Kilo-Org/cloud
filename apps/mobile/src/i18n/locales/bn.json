@@ -4181,7 +4181,7 @@
       "closedTitle": "সেশন শেষ হয়েছে",
       "closedDescription": "এই শেল আর খোলা নেই। হোস্ট তালিকা থেকে নতুন একটি শুরু করুন।",
       "disconnect": "সংযোগ বিচ্ছিন্ন করুন",
-      "switcherTitle": "খোলা সেশন",
+      "switcherTitle": "সেশন",
       "switchTo": "{{label}}, {{state}}",
       "paste": "পেস্ট করুন",
       "pasteTitle": "কয়েকটি লাইন পেস্ট করবেন?",
@@ -4241,7 +4241,10 @@
       "share": "কী শেয়ার করুন",
       "copied": "পাবলিক কী কপি করা হয়েছে।",
       "unreadable": "ওই কী পড়া যায়নি।",
-      "unsupported": "এই কী-এর অ্যালগরিদম সমর্থিত নয়।"
+      "unsupported": "এই কী-এর অ্যালগরিদম সমর্থিত নয়।",
+      "createdTitle": "কী তৈরি হয়েছে",
+      "createdDescription": "এই পাবলিক কীটি সার্ভারের authorized_keys-এ যোগ করুন, তারপর এই কী দিয়ে সংযোগ করুন।",
+      "copyPublicKey": "কী কপি করুন"
     }
   }
 }

@@ -4181,7 +4181,7 @@
       "closedTitle": "Nnọkọ agwụla",
       "closedDescription": "Shell a adịkwaghị emepe. Malite nke ọhụrụ site na ndepụta host.",
       "disconnect": "Kwụpụ njikọ",
-      "switcherTitle": "Nnọkọ ndị mepere",
+      "switcherTitle": "Nnọkọ",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Tapịa",
       "pasteTitle": "Tapịa ọtụtụ ahịrị?",
@@ -4241,7 +4241,10 @@
       "share": "Kekọrịta igodo",
       "copied": "Eṅomiela igodo ọhaneze.",
       "unreadable": "Enweghị ike ịgụ igodo ahụ.",
-      "unsupported": "A naghị akwado algọridim nke igodo a."
+      "unsupported": "A naghị akwado algọridim nke igodo a.",
+      "createdTitle": "Emepụtala igodo",
+      "createdDescription": "Tinye igodo ọhaneze a na authorized_keys nke sẹva ahụ, wee jikọọ na igodo a.",
+      "copyPublicKey": "ṅomi igodo"
     }
   }
 }

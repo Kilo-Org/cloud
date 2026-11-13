@@ -4311,7 +4311,7 @@
       "closedTitle": "Sesija baigta",
       "closedDescription": "Šis apvalkalas nebėra atidarytas. Paleiskite naują iš hostų sąrašo.",
       "disconnect": "Atsijungti",
-      "switcherTitle": "Atidarytos sesijos",
+      "switcherTitle": "Sesijos",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Įklijuoti",
       "pasteTitle": "Įklijuoti kelias eilutes?",
@@ -4371,7 +4371,10 @@
       "share": "Bendrinti raktą",
       "copied": "Viešasis raktas nukopijuotas.",
       "unreadable": "Nepavyko perskaityti to rakto.",
-      "unsupported": "Šio rakto algoritmas nepalaikomas."
+      "unsupported": "Šio rakto algoritmas nepalaikomas.",
+      "createdTitle": "Raktas sukurtas",
+      "createdDescription": "Pridėkite šį viešąjį raktą prie serverio authorized_keys, tada prisijunkite su šiuo raktu.",
+      "copyPublicKey": "Kopijuoti raktą"
     }
   }
 }

@@ -4311,7 +4311,7 @@
       "closedTitle": "Seja se je končala",
       "closedDescription": "Ta lupina ni več odprta. Novo zaženite s seznama gostiteljev.",
       "disconnect": "Prekini povezavo",
-      "switcherTitle": "Odprte seje",
+      "switcherTitle": "Seje",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Prilepi",
       "pasteTitle": "Prilepiti več vrstic?",
@@ -4371,7 +4371,10 @@
       "share": "Deli ključ",
       "copied": "Javni ključ je kopiran.",
       "unreadable": "Tega ključa ni bilo mogoče prebrati.",
-      "unsupported": "Algoritem tega ključa ni podprt."
+      "unsupported": "Algoritem tega ključa ni podprt.",
+      "createdTitle": "Ključ je ustvarjen",
+      "createdDescription": "Dodaj ta javni ključ v datoteko authorized_keys na strežniku in se nato poveži s tem ključem.",
+      "copyPublicKey": "Kopiraj ključ"
     }
   }
 }

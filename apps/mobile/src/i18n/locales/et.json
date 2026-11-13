@@ -4181,7 +4181,7 @@
       "closedTitle": "Sessioon lõppes",
       "closedDescription": "See kest pole enam avatud. Alusta uut hostide loendist.",
       "disconnect": "Katkesta ühendus",
-      "switcherTitle": "Avatud sessioonid",
+      "switcherTitle": "Seansid",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Kleebi",
       "pasteTitle": "Kleebi mitu rida?",
@@ -4241,7 +4241,10 @@
       "share": "Jaga võtit",
       "copied": "Avalik võti kopeeritud.",
       "unreadable": "Seda võtit ei õnnestunud lugeda.",
-      "unsupported": "Selle võtme algoritmi ei toetata."
+      "unsupported": "Selle võtme algoritmi ei toetata.",
+      "createdTitle": "Võti loodud",
+      "createdDescription": "Lisa see avalik võti serveri authorized_keys-faili ja ühendu seejärel selle võtmega.",
+      "copyPublicKey": "Kopeeri võti"
     }
   }
 }

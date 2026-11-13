@@ -4246,7 +4246,7 @@
       "closedTitle": "Sesija beigusies",
       "closedDescription": "Šī čaula vairs nav atvērta. Sāciet jaunu no resursdatoru saraksta.",
       "disconnect": "Atvienot",
-      "switcherTitle": "Atvērtās sesijas",
+      "switcherTitle": "Sesijas",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Ielīmēt",
       "pasteTitle": "Ielīmēt vairākas rindas?",
@@ -4306,7 +4306,10 @@
       "share": "Kopīgot atslēgu",
       "copied": "Publiskā atslēga nokopēta.",
       "unreadable": "Šo atslēgu nevarēja nolasīt.",
-      "unsupported": "Šīs atslēgas algoritms netiek atbalstīts."
+      "unsupported": "Šīs atslēgas algoritms netiek atbalstīts.",
+      "createdTitle": "Atslēga izveidota",
+      "createdDescription": "Pievienojiet šo publisko atslēgu servera authorized_keys failam un pēc tam izveidojiet savienojumu ar šo atslēgu.",
+      "copyPublicKey": "Kopēt atslēgu"
     }
   }
 }

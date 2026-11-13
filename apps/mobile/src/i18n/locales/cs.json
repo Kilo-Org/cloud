@@ -4311,7 +4311,7 @@
       "closedTitle": "Relace ukončena",
       "closedDescription": "Tento terminál už není otevřený. Nový spusťte ze seznamu hostitelů.",
       "disconnect": "Odpojit",
-      "switcherTitle": "Otevřené relace",
+      "switcherTitle": "Relace",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Vložit",
       "pasteTitle": "Vložit několik řádků?",
@@ -4371,7 +4371,10 @@
       "share": "Sdílet klíč",
       "copied": "Veřejný klíč zkopírován.",
       "unreadable": "Tento klíč se nepodařilo přečíst.",
-      "unsupported": "Algoritmus tohoto klíče není podporován."
+      "unsupported": "Algoritmus tohoto klíče není podporován.",
+      "createdTitle": "Klíč vytvořen",
+      "createdDescription": "Přidejte tento veřejný klíč do souboru authorized_keys na serveru a poté se připojte pomocí tohoto klíče.",
+      "copyPublicKey": "Kopírovat klíč"
     }
   }
 }

@@ -4181,7 +4181,7 @@
       "closedTitle": "Sessiin xumurame",
       "closedDescription": "Sheelliin kun amma banaa hin jiru. Tarree hostootaa irraa haaraa jalqabi.",
       "disconnect": "Walqunnamtii addaan kuti",
-      "switcherTitle": "Sessiiwwan banaa",
+      "switcherTitle": "Turtiiwwan",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Maxxansi",
       "pasteTitle": "Sararoota hedduu maxxansuu?",
@@ -4241,7 +4241,10 @@
       "share": "Furtuu qoodi",
       "copied": "Furtuun uummataa garagalfame.",
       "unreadable": "Furtuun sun hin dubbifamne.",
-      "unsupported": "Algooritmiin furtuu kanaa hin deeggaramne."
+      "unsupported": "Algooritmiin furtuu kanaa hin deeggaramne.",
+      "createdTitle": "Furtuun uumame",
+      "createdDescription": "Furtuu uummataa kana authorized_keys sirbaa keessatti dabali, ergasii furtuu kanaan walqunnami.",
+      "copyPublicKey": "Furtuu garagalchi"
     }
   }
 }

@@ -4246,7 +4246,7 @@
       "closedTitle": "Sesión finalizada",
       "closedDescription": "Esta terminal ya no está abierta. Inicia una nueva desde la lista de hosts.",
       "disconnect": "Desconectar",
-      "switcherTitle": "Sesiones abiertas",
+      "switcherTitle": "Sesiones",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Pegar",
       "pasteTitle": "¿Pegar varias líneas?",
@@ -4306,7 +4306,10 @@
       "share": "Compartir clave",
       "copied": "Clave pública copiada.",
       "unreadable": "No se pudo leer esa clave.",
-      "unsupported": "El algoritmo de esta clave no es compatible."
+      "unsupported": "El algoritmo de esta clave no es compatible.",
+      "createdTitle": "Clave creada",
+      "createdDescription": "Añade esta clave pública al archivo authorized_keys del servidor y, después, conéctate con esta clave.",
+      "copyPublicKey": "Copiar clave"
     }
   }
 }

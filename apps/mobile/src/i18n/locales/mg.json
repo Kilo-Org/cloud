@@ -4181,7 +4181,7 @@
       "closedTitle": "Tapitra ny session",
       "closedDescription": "Tsy misokatra intsony ity shell ity. Atombohy ny vaovao avy amin'ny lisitry ny host.",
       "disconnect": "Tapaho ny fifandraisana",
-      "switcherTitle": "Session misokatra",
+      "switcherTitle": "Fotoam-piasana",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Petaho",
       "pasteTitle": "Hametaka andalana maromaro?",
@@ -4241,7 +4241,10 @@
       "share": "Zarao ny fanalahidy",
       "copied": "Voadika ny fanalahidy ampahibemaso.",
       "unreadable": "Tsy afaka novakiana io fanalahidy io.",
-      "unsupported": "Tsy tohanana ny algorithm an'ity fanalahidy ity."
+      "unsupported": "Tsy tohanana ny algorithm an'ity fanalahidy ity.",
+      "createdTitle": "Noforonina ny fanalahidy",
+      "createdDescription": "Ampio ao amin'ny authorized_keys an'ny mpizara ity fanalahidy ampahibemaso ity, avy eo mifandraisa amin'ny alalan'ity fanalahidy ity.",
+      "copyPublicKey": "Adikao ny fanalahidy ampahibemaso"
     }
   }
 }

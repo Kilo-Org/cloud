@@ -4181,7 +4181,7 @@
       "closedTitle": "A munkamenet véget ért",
       "closedDescription": "Ez a terminál már nincs megnyitva. Indíts újat a gazdagépek listájáról.",
       "disconnect": "Lecsatlakozás",
-      "switcherTitle": "Nyitott munkamenetek",
+      "switcherTitle": "Munkamenetek",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Beillesztés",
       "pasteTitle": "Több sort illesztesz be?",
@@ -4241,7 +4241,10 @@
       "share": "Kulcs megosztása",
       "copied": "A nyilvános kulcs kimásolva.",
       "unreadable": "A kulcsot nem sikerült beolvasni.",
-      "unsupported": "A kulcs algoritmusa nem támogatott."
+      "unsupported": "A kulcs algoritmusa nem támogatott.",
+      "createdTitle": "Kulcs létrehozva",
+      "createdDescription": "Adja hozzá ezt a nyilvános kulcsot a szerver authorized_keys fájljához, majd csatlakozzon ezzel a kulccsal.",
+      "copyPublicKey": "Kulcs másolása"
     }
   }
 }

@@ -4181,7 +4181,7 @@
       "closedTitle": "Oturum sona erdi",
       "closedDescription": "Bu kabuk artık açık değil. Hostlar listesinden yeni bir tane başlatın.",
       "disconnect": "Bağlantıyı kes",
-      "switcherTitle": "Açık oturumlar",
+      "switcherTitle": "Oturumlar",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Yapıştır",
       "pasteTitle": "Birkaç satır yapıştırılsın mı?",
@@ -4241,7 +4241,10 @@
       "share": "Anahtarı paylaş",
       "copied": "Açık anahtar kopyalandı.",
       "unreadable": "Bu anahtar okunamadı.",
-      "unsupported": "Bu anahtarın algoritması desteklenmiyor."
+      "unsupported": "Bu anahtarın algoritması desteklenmiyor.",
+      "createdTitle": "Anahtar oluşturuldu",
+      "createdDescription": "Bu açık anahtarı sunucunun authorized_keys dosyasına ekleyin, ardından bu anahtarla bağlanın.",
+      "copyPublicKey": "Anahtarı kopyala"
     }
   }
 }

@@ -4246,7 +4246,7 @@
       "closedTitle": "Sesija je završena",
       "closedDescription": "Ovaj terminal više nije otvoren. Pokrenite novi s liste hostova.",
       "disconnect": "Prekini vezu",
-      "switcherTitle": "Otvorene sesije",
+      "switcherTitle": "Sesije",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Zalijepi",
       "pasteTitle": "Zalijepiti više redova?",
@@ -4306,7 +4306,10 @@
       "share": "Podijeli ključ",
       "copied": "Javni ključ je kopiran.",
       "unreadable": "Taj ključ nije bilo moguće pročitati.",
-      "unsupported": "Algoritam ovog ključa nije podržan."
+      "unsupported": "Algoritam ovog ključa nije podržan.",
+      "createdTitle": "Ključ je generisan",
+      "createdDescription": "Dodaj ovaj javni ključ u authorized_keys na serveru, a zatim se poveži pomoću ovog ključa.",
+      "copyPublicKey": "Kopiraj ključ"
     }
   }
 }

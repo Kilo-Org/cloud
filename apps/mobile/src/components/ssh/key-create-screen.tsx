@@ -60,7 +60,10 @@ export function SshKeyCreateScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('ssh.keys.generateTitle')} backFallback={SSH_HOSTS_ROUTE} />
+      <ScreenHeader
+        title={state.kind === 'ready' ? t('ssh.keys.createdTitle') : t('ssh.keys.generateTitle')}
+        backFallback={SSH_HOSTS_ROUTE}
+      />
       <DetailScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-5 px-4 pt-4"
@@ -68,9 +71,15 @@ export function SshKeyCreateScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text className="text-sm text-muted-foreground">{t('ssh.keys.generateDescription')}</Text>
+        <Text className="text-sm text-muted-foreground">
+          {state.kind === 'ready' ? t('ssh.keys.createdDescription') : t('ssh.keys.generateDescription')}
+        </Text>
         {state.kind === 'ready' ? (
-          <SshPublicKeyBlock publicKey={state.publicKey} fingerprint={state.fingerprint} />
+          <SshPublicKeyBlock
+            name={label.current}
+            publicKey={state.publicKey}
+            fingerprint={state.fingerprint}
+          />
         ) : (
           <FormField
             label={t('ssh.keys.name')}

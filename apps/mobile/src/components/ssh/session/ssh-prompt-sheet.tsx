@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { PickerSheet } from '@/components/picker-sheet';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
@@ -46,7 +47,7 @@ export function SshPromptSheet({ sessionId }: Readonly<{ sessionId: string }>) {
   }
   switch (phase.kind) {
     case 'awaiting-host-key': {
-      return <HostKeyForm sessionId={sessionId} phase={phase} />;
+      return <HostKeyForm sessionId={sessionId} phase={phase} hostLabel={session?.label ?? ''} />;
     }
     case 'awaiting-password':
     case 'awaiting-passphrase': {
@@ -70,16 +71,23 @@ export function SshPromptSheet({ sessionId }: Readonly<{ sessionId: string }>) {
 function HostKeyForm({
   sessionId,
   phase,
-}: Readonly<{ sessionId: string; phase: Extract<SshSessionPhase, { kind: 'awaiting-host-key' }> }>) {
+  hostLabel,
+}: Readonly<{
+  sessionId: string;
+  phase: Extract<SshSessionPhase, { kind: 'awaiting-host-key' }>;
+  /** The host's own name, which the prose uses instead of its stored pattern. */
+  hostLabel: string;
+}>) {
   const { t } = useTranslation();
   const { hostKey } = phase;
 
   return (
     <PickerSheet
       title={t('ssh.session.hostKeyTitle')}
-      doneLabel={t('ssh.session.trustAndSave')}
+      // The header carries no decision here: both answers are body buttons, so
+      // a header submit, if one is ever rendered, refuses the key.
       onDone={() => {
-        decideHostKey(sessionId, 'save');
+        decideHostKey(sessionId, 'cancel');
       }}
       onCancel={() => {
         decideHostKey(sessionId, 'cancel');
@@ -91,7 +99,7 @@ function HostKeyForm({
     >
       <View className="gap-4 px-4 pt-2">
         <Text className="text-sm text-muted-foreground">
-          {t('ssh.session.hostKeyBody', { pattern: hostKey.hostPattern })}
+          {t('ssh.session.hostKeyBody', { pattern: hostLabel })}
         </Text>
         <View className="gap-1 rounded-md border border-border bg-secondary p-3">
           <Text className="text-xs text-muted-foreground">{hostKey.algorithm}</Text>
@@ -99,8 +107,19 @@ function HostKeyForm({
             {hostKey.fingerprintSha256}
           </Text>
         </View>
+        {/* The permanent choice is the primary one; trusting this key once is
+            the smaller commitment and reads as the alternative. */}
+        <Button
+          className={STATE_ACTION_CLASS}
+          onPress={() => {
+            decideHostKey(sessionId, 'save');
+          }}
+        >
+          <Text>{t('ssh.session.trustAndSave')}</Text>
+        </Button>
         <Button
           variant="outline"
+          className={STATE_ACTION_CLASS}
           onPress={() => {
             decideHostKey(sessionId, 'once');
           }}
@@ -164,7 +183,7 @@ function SecretForm({
         ) : null}
         <FormField
           label={label}
-          placeholder={label}
+          autoFocus
           secureTextEntry
           autoCapitalize="none"
           autoCorrect={false}
@@ -212,13 +231,18 @@ function PromptsForm({
           <Text className="text-sm text-muted-foreground">{phase.prompts.instructions}</Text>
         )}
         {phase.prompts.prompts.map((prompt, index) => {
-          const label = prompt.text.trim() || t('ssh.session.promptLabel', { index: index + 1 });
+          const label =
+            prompt.text.trim().replace(/:$/, '') ||
+            t('ssh.session.promptLabel', { index: index + 1 });
           return (
             <FormField
               key={`${prompt.text}-${index}`}
               label={label}
-              placeholder={label}
+              autoFocus={index === 0}
               secureTextEntry={!prompt.echo}
+              {...(prompt.echo
+                ? { textContentType: 'oneTimeCode' as const, autoComplete: 'sms-otp' as const }
+                : {})}
               autoCapitalize="none"
               autoCorrect={false}
               autoComplete="off"

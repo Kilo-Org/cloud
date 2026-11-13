@@ -4181,7 +4181,7 @@
       "closedTitle": "Natapos ang session",
       "closedDescription": "Hindi na bukas ang shell na ito. Magsimula ng bago mula sa listahan ng mga host.",
       "disconnect": "Idiskonekta",
-      "switcherTitle": "Mga nakabukas na session",
+      "switcherTitle": "Mga sesyon",
       "switchTo": "{{label}}, {{state}}",
       "paste": "I-paste",
       "pasteTitle": "I-paste ang maraming linya?",
@@ -4241,7 +4241,10 @@
       "share": "Ibahagi ang key",
       "copied": "Nakopya ang pampublikong key.",
       "unreadable": "Hindi mabasa ang key na iyon.",
-      "unsupported": "Hindi sinusuportahan ang algorithm ng key na ito."
+      "unsupported": "Hindi sinusuportahan ang algorithm ng key na ito.",
+      "createdTitle": "Nagawa ang key",
+      "createdDescription": "Idagdag ang pampublikong key na ito sa authorized_keys ng server, pagkatapos ay kumonekta gamit ang key na ito.",
+      "copyPublicKey": "Kopyahin ang key"
     }
   }
 }

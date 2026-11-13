@@ -4181,7 +4181,7 @@
       "closedTitle": "Sessie het geëindig",
       "closedDescription": "Hierdie skulp is nie meer oop nie. Begin 'n nuwe een vanaf die lys gashere.",
       "disconnect": "Ontkoppel",
-      "switcherTitle": "Oop sessies",
+      "switcherTitle": "Sessies",
       "switchTo": "{{label}}, {{state}}",
       "paste": "Plak",
       "pasteTitle": "Plak verskeie reëls?",
@@ -4241,7 +4241,10 @@
       "share": "Deel sleutel",
       "copied": "Publieke sleutel gekopieer.",
       "unreadable": "Daardie sleutel kon nie gelees word nie.",
-      "unsupported": "Hierdie sleutel se algoritme word nie ondersteun nie."
+      "unsupported": "Hierdie sleutel se algoritme word nie ondersteun nie.",
+      "createdTitle": "Sleutel geskep",
+      "createdDescription": "Voeg hierdie publieke sleutel by die bediener se authorized_keys, en verbind dan met hierdie sleutel.",
+      "copyPublicKey": "Kopieer sleutel"
     }
   }
 }

@@ -60,9 +60,8 @@ describe('stagePictureForNewSession', () => {
     expect(resolved).toContain('shareId=');
     expect(resolved).not.toContain('organizationId');
     expect(takeSharePayload(shareIdFrom(resolved))).toEqual({
-      text: '',
-      files: [candidate],
-      failedFiles: [],
+      payload: { text: '', files: [candidate], failedFiles: [] },
+      stagedUserId: null,
     });
   });
 

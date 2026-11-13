@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the in-memory store, its durable draft snapshot, the account boundary, and the cache-file hygiene share one module so their scope rules stay in one place */
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import * as Crypto from 'expo-crypto';
 import { File, Paths } from 'expo-file-system';
@@ -46,7 +47,7 @@ type DeleteCachedFile = (uri: string) => void | Promise<void>;
  * account data, and outlives the account boundary so a same-process sign-in
  * can still open the gate for it.
  */
-type StagedSharePayload = { payload: SharePayload; stagedUserId: string | null };
+export type StagedSharePayload = { payload: SharePayload; stagedUserId: string | null };
 
 const payloads = new Map<ShareId, StagedSharePayload>();
 const insertionOrder: ShareId[] = [];
@@ -203,11 +204,15 @@ export function putSharePayload(payload: SharePayload): ShareId {
 }
 
 /**
- * Read-and-delete map entry only. Never deletes cache files here — the
+ * Read-and-delete of the staged entry. Never deletes cache files here — the
  * composer's uploads still read those uris after take. Consuming the payload
  * also clears the durable pending-share-id hint so the gate never re-opens.
+ * Returns the entry rather than its payload: a delivery that fails returns the
+ * payload with `restoreSharePayload`, and that restore needs the stamp the
+ * entry carried, because the signed-in account can change while the upload is
+ * in flight.
  */
-export function takeSharePayload(id: ShareId): SharePayload | null {
+export function takeSharePayload(id: ShareId): StagedSharePayload | null {
   const entry = payloads.get(id);
   if (entry === undefined) {
     return null;
@@ -219,7 +224,7 @@ export function takeSharePayload(id: ShareId): SharePayload | null {
   }
   void persistSharePayloadsNow();
   void clearPendingShareIdDraft(id);
-  return entry.payload;
+  return entry;
 }
 
 /**
@@ -229,12 +234,26 @@ export function takeSharePayload(id: ShareId): SharePayload | null {
  * empty composer. Re-insertion re-files the id at the newest position and
  * evicts the oldest past the cap, so a restored payload lives exactly as long
  * as a freshly staged one.
+ *
+ * `stagedUserId` is the account that staged the entry when it was taken. The
+ * entry returns to the store only while that account is still the signed-in
+ * one, so a staged share stays inside its own account session. A null stamp is
+ * a share captured while signed out: memory-only by design, and still restores.
  */
-export function restoreSharePayload(id: ShareId, payload: SharePayload): void {
+export function restoreSharePayload(
+  id: ShareId,
+  payload: SharePayload,
+  stagedUserId: string | null
+): void {
+  if (stagedUserId !== null && stagedUserId !== sharePersistUserId) {
+    // Nothing delivers this payload now, so its cache copies go with it.
+    discardPayloadCacheFiles(payload);
+    return;
+  }
   if (payloads.has(id)) {
     return;
   }
-  payloads.set(id, { payload, stagedUserId: sharePersistUserId });
+  payloads.set(id, { payload, stagedUserId });
   insertionOrder.push(id);
   evictOldestIfNeeded();
 }

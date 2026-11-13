@@ -5,6 +5,7 @@ import {
   __resetSharePayloadStoreForTests,
   peekSharePayload,
   putSharePayload,
+  setSharePersistUserId,
   takeSharePayload,
 } from '@/lib/share-payload';
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
@@ -282,6 +283,54 @@ describe('applySharePrefill', () => {
     expect(nativeCalls).toEqual([]);
     expect(deliveredCalls).toEqual([1]);
     expect(clearCalls).toEqual([1]);
+  });
+
+  it('returns the payload only for the account that staged it', async () => {
+    setSharePersistUserId('userA');
+    const id = putSharePayload({
+      text: 'staged by a',
+      files: [{ name: 'a.png', uri: 'file:///cache/a.png' }],
+      failedFiles: [],
+    });
+
+    const delivered = await applySharePrefill({
+      shareId: id,
+      input: null,
+      maxLength: 4000,
+      onChangeText: noopChange,
+      addCandidates: async () => {
+        await Promise.resolve();
+        // The account boundary lands between the take and the rejection.
+        setSharePersistUserId('userB');
+        throw new Error('upload failed');
+      },
+      clearShareIdParam: noopClear,
+    });
+
+    expect(delivered).toBe(false);
+    // The payload leaves with the account session that staged it.
+    expect(peekSharePayload(id)).toBeNull();
+  });
+
+  it('restores the payload when the upload fails inside the same account session', async () => {
+    setSharePersistUserId('userA');
+    const id = putSharePayload({
+      text: 'staged by a',
+      files: [{ name: 'a.png', uri: 'file:///cache/a.png' }],
+      failedFiles: [],
+    });
+
+    const delivered = await applySharePrefill({
+      shareId: id,
+      input: null,
+      maxLength: 4000,
+      onChangeText: noopChange,
+      addCandidates: rejectAfterTick,
+      clearShareIdParam: noopClear,
+    });
+
+    expect(delivered).toBe(false);
+    expect(peekSharePayload(id)?.text).toBe('staged by a');
   });
 
   it('delivers nothing for a share whose composer moved on', async () => {

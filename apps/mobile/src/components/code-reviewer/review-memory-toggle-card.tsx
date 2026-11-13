@@ -3,6 +3,8 @@ import { Pressable, View } from 'react-native';
 
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 /**
  * The review-memory switch card. One named control with a 44pt target: the
@@ -29,7 +31,7 @@ export function ReviewMemoryToggleCard({
     <View className="rounded-lg bg-secondary p-4">
       <View className="flex-row items-center justify-between gap-3">
         <Pressable
-          className="min-h-11 min-w-0 flex-1 justify-center active:opacity-70"
+          className={cn(ROW_TARGET_CLASS, 'min-w-0 flex-1 justify-center active:opacity-70')}
           disabled={disabled}
           onPress={() => {
             onChange(!enabled);

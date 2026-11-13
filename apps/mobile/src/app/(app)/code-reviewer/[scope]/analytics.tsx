@@ -40,10 +40,10 @@ function MetricCard({
   value,
 }: Readonly<{ icon: LucideIcon; label: string; value: string }>) {
   return (
-    <View className="min-w-0 flex-1 gap-1 rounded-lg bg-secondary p-4">
+    <View className="min-w-0 flex-1 justify-center gap-1 rounded-lg bg-secondary p-4">
       <View className="flex-row items-center gap-2">
         <Icon size={14} className="text-muted-foreground" />
-        <Text variant="muted" className="text-xs" numberOfLines={2}>
+        <Text variant="muted" className="min-w-0 flex-1 text-xs" numberOfLines={2}>
           {label}
         </Text>
       </View>

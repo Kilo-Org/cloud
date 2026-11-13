@@ -1672,6 +1672,10 @@ export class UserConnectionDO extends DurableObject<Env> {
     // session-scoped create that is the resolved session's own organization,
     // and for a connection-scoped create it is any organization the read paths
     // grant, which includes a child organization reached through a parent role.
+    //
+    // This decides whether the create runs, not what the session records. The
+    // recorded organization is set by the ingest metadata write, which keeps its
+    // own rule, so accepting a scope here never widens the attribution.
     const orgClaim = readCreateSessionOrgClaim(msg);
     if (orgClaim.kind === 'invalid') {
       this.sendToWeb(ws, {

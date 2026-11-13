@@ -1175,6 +1175,15 @@ jobs:
         # step above.
         run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter cloudflare-session-ingest test:postgres
 
+      - name: Run worker-utils membership Postgres tests
+        # The detector names a workspace in the dependency closure of
+        # `@kilocode/worker-utils`, so this step runs whenever the membership
+        # rule or one of its readers changes.
+        if: needs.changes.outputs.test_scripts_db == 'true' || needs.changes.outputs.data_session_ingest == 'true' || needs.changes.outputs.data_meter == 'true'
+        # The suite reads the organizations and memberships tables directly, so
+        # it applies the migrations when it is the only step that runs.
+        run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter @kilocode/worker-utils test:postgres
+
   # In its own job, madge runs beside the script tests instead of before them.
   dependency-cycle-check:
     needs: changes

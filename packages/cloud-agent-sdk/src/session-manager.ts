@@ -2586,30 +2586,22 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   function trimRetainedHistory(): void {
     const storage = store.get(sessionStorageAtom);
     if (!storage) return;
-    // The cursor must be the OLDEST popped entry's `cursorBefore`, not the
-    // last one popped. When two or more pages drop in one pass, overwriting
-    // on every pop leaves the cursor pointing at the newest dropped page, so
-    // `loadOlderMessages` could not re-fetch the oldest dropped page.
-    // Count only root-transcript rows. Child pages share this storage and
-    // must not push the window over the limit.
     let trimmedAny = false;
-    let oldestCursorBefore: string | null = null;
+    let resumeCursor: string | null = null;
     while (
       countRootTranscriptMessages(storage) > RETAINED_MESSAGE_WINDOW &&
       retainedHistoryStack.length > 0
     ) {
-      const entry = retainedHistoryStack.shift();
+      const entry = retainedHistoryStack.pop();
       if (!entry) break;
-      if (!trimmedAny) {
-        trimmedAny = true;
-        oldestCursorBefore = entry.cursorBefore;
-      }
+      trimmedAny = true;
+      resumeCursor = entry.cursorBefore;
       for (const id of entry.messageIds) {
         storage.deleteMessage(id);
       }
     }
     if (trimmedAny) {
-      olderMessagesCursor = oldestCursorBefore;
+      olderMessagesCursor = resumeCursor;
       // The rewind restores a page boundary the backend already served — only
       // a successful page is ever pushed onto the stack — so a terminal latch
       // recorded by a later page no longer describes this cursor. Clear the

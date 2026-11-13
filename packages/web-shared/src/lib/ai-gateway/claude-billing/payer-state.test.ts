@@ -10,6 +10,7 @@ import { getAuthoritativeClaudeBillingState } from './payer-state';
 import { readJsonBody } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 
 const owner = { kind: 'personal', kiloUserId: 'owner' } as const;
+const ORGANIZATION_ID = '00000000-0000-4000-8000-000000000002';
 afterEach(() => {
   jest.restoreAllMocks();
 });
@@ -69,7 +70,7 @@ describe('Cross-region Claude payer state', () => {
     const fetchMock = jest
       .spyOn(globalThis, 'fetch')
       .mockImplementation(async () => Response.json({ connection: null }));
-    const organizationId = '00000000-0000-4000-8000-000000000002';
+    const organizationId = ORGANIZATION_ID;
     await getAuthoritativeClaudeBillingState({ kind: 'shared_services', organizationId });
     await getAuthoritativeClaudeBillingState({
       kind: 'member',
@@ -92,7 +93,7 @@ describe('Cross-region Claude payer state', () => {
       getAuthoritativeClaudeBillingState({
         kind: 'member',
         kiloUserId: 'owner',
-        organizationId: '00000000-0000-4000-8000-000000000002',
+        organizationId: ORGANIZATION_ID,
       })
     ).resolves.toBeNull();
   });
@@ -131,7 +132,45 @@ describe('Cross-region Claude payer state', () => {
     await expect(getAuthoritativeClaudeBillingState(owner)).resolves.toBeNull();
   });
 
-  it('returns a shared-services row, which names an organization rather than a person', async () => {
+  it('returns a shared-services row that names the requested organization', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        connection: {
+          status: 'connected',
+          user_profile_id: 'uprof_org',
+          connected_at: null,
+          organization_id: ORGANIZATION_ID,
+        },
+      })
+    );
+    await expect(
+      getAuthoritativeClaudeBillingState({
+        kind: 'shared_services',
+        organizationId: ORGANIZATION_ID,
+      })
+    ).resolves.toMatchObject({ user_profile_id: 'uprof_org' });
+  });
+
+  it('refuses a shared-services row that names another organization', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        connection: {
+          status: 'connected',
+          user_profile_id: 'uprof_org',
+          connected_at: null,
+          organization_id: '00000000-0000-4000-8000-000000000003',
+        },
+      })
+    );
+    await expect(
+      getAuthoritativeClaudeBillingState({
+        kind: 'shared_services',
+        organizationId: ORGANIZATION_ID,
+      })
+    ).resolves.toBeNull();
+  });
+
+  it('returns a shared-services row from a web app release that sends no organization', async () => {
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       Response.json({
         connection: {
@@ -144,8 +183,25 @@ describe('Cross-region Claude payer state', () => {
     await expect(
       getAuthoritativeClaudeBillingState({
         kind: 'shared_services',
-        organizationId: '00000000-0000-4000-8000-000000000002',
+        organizationId: ORGANIZATION_ID,
       })
     ).resolves.toMatchObject({ user_profile_id: 'uprof_org' });
+  });
+
+  it('returns a personal row that names its owner and no organization', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        connection: {
+          status: 'connected',
+          user_profile_id: 'uprof_owner',
+          connected_at: null,
+          kilo_user_id: 'owner',
+          organization_id: null,
+        },
+      })
+    );
+    await expect(getAuthoritativeClaudeBillingState(owner)).resolves.toMatchObject({
+      user_profile_id: 'uprof_owner',
+    });
   });
 });

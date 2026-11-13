@@ -66,6 +66,12 @@ export const ClaudeBillingPayerStateSchema = z.object({
    * cross-region read binds a personal or member row by it.
    */
   kilo_user_id: z.string().nullable().optional(),
+  /**
+   * The organization an organization-owned connection belongs to; null for a
+   * personal row. The gateway tolerates its absence, because a web app release
+   * that does not send it still answers the shared-services read.
+   */
+  organization_id: z.uuid().nullable().optional(),
   /** The person who linked it last; every release since #10300 answers with it. */
   created_by: z.string().min(1).optional(),
 });
@@ -81,6 +87,7 @@ export function claudeBillingPayerState(
         user_profile_id: row.user_profile_id,
         connected_at: row.connected_at ? new Date(row.connected_at).toISOString() : null,
         kilo_user_id: row.kilo_user_id,
+        organization_id: row.organization_id,
         created_by: row.created_by,
       }
     : null;
@@ -108,9 +115,18 @@ export async function getAuthoritativeClaudeBillingState(
   if (!response.ok) throw new Error(`Claude payer-state read failed with HTTP ${response.status}`);
   const { connection } = responseSchema.parse(await response.json());
   // A personal or member row belongs to the person it names, so the read
-  // returns it only for that person. A shared-services row belongs to the
-  // organization and names no person.
+  // returns it only for that person. A shared-services row belongs to an
+  // organization, so it must name the organization the caller asked about when
+  // the answer carries one; an older web app release sends no organization and
+  // is accepted.
   if (owner.kind !== 'shared_services' && connection?.kilo_user_id !== owner.kiloUserId) {
+    return null;
+  }
+  if (
+    owner.kind === 'shared_services' &&
+    connection?.organization_id &&
+    connection.organization_id !== owner.organizationId
+  ) {
     return null;
   }
   return connection;

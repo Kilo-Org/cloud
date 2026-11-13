@@ -48,6 +48,13 @@ describe('rtlListItems', () => {
     expect(rtlListItems(value)).toBe(`Example:\n\n    - item\n\n- ${MARK}item`);
   });
 
+  it('leaves a thematic break alone', () => {
+    expect(rtlListItems('- - -')).toBe('- - -');
+    expect(rtlListItems('* * *')).toBe('* * *');
+    expect(rtlListItems('---')).toBe('---');
+    expect(rtlListItems('_ _ _')).toBe('_ _ _');
+  });
+
   it('returns markdown without a list unchanged', () => {
     const value = 'A reply with no list.\n\n> quoted\n';
     expect(rtlListItems(value)).toBe(value);

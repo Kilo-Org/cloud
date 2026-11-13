@@ -26,6 +26,13 @@ const LIST_ITEM = /^([ \t]{0,3}(?:>[ \t]?)*)([-*+]|\d{1,9}[.)])([ \t]+)(\[[ xX]\
 /** Four spaces or a tab after a blank line opens an indented code block. */
 const INDENTED_CODE = /^([ \t]{4}|[ \t]*\t)/;
 
+/**
+ * A thematic break: three or more of one bullet character, spaced or not. Its
+ * first three characters match a list item, so it must be recognized before the
+ * marker, or the mark turns the rule into a bullet.
+ */
+const THEMATIC_BREAK = /^[ \t]{0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$/;
+
 type Fence = { readonly mark: string; readonly length: number };
 
 /** The fence line that closes `open`, or `null` for any other line. */
@@ -39,6 +46,9 @@ function closingFence(open: Fence, line: string): Fence | null {
 }
 
 function withStartEdge(line: string): string {
+  if (THEMATIC_BREAK.test(line)) {
+    return line;
+  }
   const item = LIST_ITEM.exec(line);
   if (item === null) {
     return line;

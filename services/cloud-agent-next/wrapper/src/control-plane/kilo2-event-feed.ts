@@ -199,6 +199,8 @@ export function createKilo2EventFeed(options: KiloEventFeedOptions): KiloEventFe
       return;
     }
     if (typeof id !== 'string') return;
+    // The next step start clears retry status. Emit before native reads so a failed
+    // read cannot preserve it.
     if (event.type === 'session.execution.started')
       emit('session.turn.open', { sessionID: id }, directory);
     if (event.type === 'session.execution.started' || event.type === 'session.step.started')

@@ -12,13 +12,13 @@ import { useTRPC } from '@/lib/trpc';
 
 /**
  * The council config a first visit edits: every preset enabled on the default
- * governance mode, which is the web form's initial picker state. Nothing runs
- * until repositories opt in (`councilEnabledRepositoryIds`), so this is a
- * starting point, not an activation.
+ * governance mode, which is the web form's initial picker state. It is a draft,
+ * not an activation: the switch starts off because no council is stored, and
+ * the draft's `enabled` follows that until the user turns it on.
  */
 export function defaultCouncilConfig(): CouncilConfig {
   return {
-    enabled: true,
+    enabled: false,
     aggregation_strategy: DEFAULT_COUNCIL_AGGREGATION_STRATEGY,
     specialists: COUNCIL_SPECIALIST_PRESETS.map(preset => ({
       id: preset.id,

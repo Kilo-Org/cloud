@@ -6,6 +6,10 @@
 // 2. the specialist minimum. Disabling specialists below `COUNCIL_MIN_SPECIALISTS`
 //    would persist `enabled: true` on a council that `isCouncilActive` never
 //    runs, so the toggle that would cross that line must not write.
+// 3. the unit of write. An organization with no stored council reads off, and a
+//    save that enables the council, or opts a repository in, carries the council
+//    config the org PATCH needs to store one; switching council off clears the
+//    opt-in ids in the same save.
 
 import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
@@ -25,7 +29,10 @@ type ToggleProps = {
 
 type SaveMutation = { mutate: Mock; isPending: boolean };
 
-type SavedPatch = { council?: { specialists: { id: string; enabled: boolean }[] } };
+type SavedPatch = {
+  council?: { enabled?: boolean; specialists: { id: string; enabled: boolean }[] } | null;
+  councilEnabledRepositoryIds?: (number | string)[];
+};
 
 const state = vi.hoisted(() => {
   const save: SaveMutation = { mutate: vi.fn(), isPending: false };
@@ -75,7 +82,11 @@ vi.mock('@/lib/hooks/use-reviewer-route-params', () => ({
 }));
 vi.mock('@/lib/hooks/use-reviewer-council', () => ({
   useCouncilGate: () => state.gate,
-  defaultCouncilConfig: () => specialists.map(entry => ({ ...entry })),
+  defaultCouncilConfig: () => ({
+    enabled: false,
+    aggregation_strategy: 'advisory',
+    specialists: specialists.map(entry => ({ ...entry })),
+  }),
   enabledSpecialistCount: (council: { specialists: { enabled: boolean }[] }) =>
     council.specialists.filter(entry => entry.enabled).length,
 }));
@@ -269,6 +280,72 @@ describe('council specialist minimum', () => {
       state.patches[0]?.council?.specialists.find(entry => entry.id === 'performance')?.enabled
     ).toBe(false);
     expect(state.toastErrors).toHaveLength(0);
+
+    mounted.unmount();
+  });
+});
+
+describe('council unit of write', () => {
+  const noStoredCouncil = () => {
+    state.config.data = {
+      council: null,
+      selectedRepositoryIds: [1],
+      councilEnabledRepositoryIds: [],
+    };
+  };
+
+  it('reads the switch off for an organization with no stored council', async () => {
+    noStoredCouncil();
+
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    await act(() => undefined);
+
+    expect(specialistToggle('Council review')?.value).toBe(false);
+    // An opt-in only runs against a stored council, so the row stays closed
+    // until the switch stores one.
+    expect(specialistToggle('kilo/app')?.disabled).toBe(true);
+
+    mounted.unmount();
+  });
+
+  it('writes a council config in the save that turns the council on', async () => {
+    noStoredCouncil();
+
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    await act(() => undefined);
+
+    await act(() => {
+      specialistToggle('Council review')?.onValueChange?.(true);
+    });
+
+    expect(state.save.mutate).toHaveBeenCalledTimes(1);
+    expect(state.patches[0]?.council?.enabled).toBe(true);
+    expect(state.patches[0]?.council?.specialists.length).toBeGreaterThan(0);
+
+    mounted.unmount();
+  });
+
+  it('clears the repository opt-ins in the save that turns the council off', async () => {
+    state.config.data = {
+      council: {
+        enabled: true,
+        aggregation_strategy: 'advisory',
+        specialists,
+      },
+      selectedRepositoryIds: [1],
+      councilEnabledRepositoryIds: [1],
+    };
+
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    await act(() => undefined);
+
+    await act(() => {
+      specialistToggle('Council review')?.onValueChange?.(false);
+    });
+
+    expect(state.save.mutate).toHaveBeenCalledTimes(1);
+    expect(state.patches[0]?.council?.enabled).toBe(false);
+    expect(state.patches[0]?.councilEnabledRepositoryIds).toEqual([]);
 
     mounted.unmount();
   });

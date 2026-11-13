@@ -87,7 +87,10 @@ function CouncilScreen({
   }));
   const canEdit = permission.status === 'ready' && permission.canEdit;
 
-  const stored = config.data?.council;
+  const stored = config.data?.council ?? null;
+  // The switch reads the stored state: an organization that never saved a
+  // council has none switched on, so a first visit starts from the default
+  // draft with the council off rather than from an implicit "on".
   const council = stored ?? defaultCouncilConfig();
   const selectedIds = config.data?.selectedRepositoryIds ?? [];
   const councilRepoIds = config.data?.councilEnabledRepositoryIds ?? [];
@@ -167,11 +170,18 @@ function CouncilScreen({
   };
 
   const setRepositoryEnabled = (repositoryId: number | string, value: boolean) => {
-    save.mutate({
-      councilEnabledRepositoryIds: value
-        ? [...new Set([...councilRepoIds, repositoryId])]
-        : councilRepoIds.filter(existing => existing !== repositoryId),
-    });
+    const next = value
+      ? [...new Set([...councilRepoIds, repositoryId])]
+      : councilRepoIds.filter(existing => existing !== repositoryId);
+    // An opt-in only runs against a stored council (`isCouncilActive`), and the
+    // org PATCH writes a council only when the patch carries one. An opt-in
+    // sent alone would therefore persist ids that never run, so the write that
+    // adds one also carries the council — the web form's unit of write.
+    save.mutate(
+      stored
+        ? { councilEnabledRepositoryIds: next }
+        : { council: { ...council, enabled: true }, councilEnabledRepositoryIds: next }
+    );
   };
 
   return (
@@ -185,7 +195,17 @@ function CouncilScreen({
             value={council.enabled}
             disabled={disabled || (belowMinimum && !council.enabled)}
             onValueChange={value => {
-              writeCouncil({ ...council, enabled: value });
+              // Turning council off clears the opt-in list in the same save:
+              // keeping the ids would reactivate every repository the user had
+              // opted in, unreviewed, the moment the switch went back on.
+              save.mutate(
+                value
+                  ? { council: { ...council, enabled: true } }
+                  : {
+                      council: { ...council, enabled: false },
+                      councilEnabledRepositoryIds: [],
+                    }
+              );
             }}
           />
           {belowMinimum ? (

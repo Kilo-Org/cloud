@@ -753,9 +753,9 @@ export function createExtensionAgentSessionManager({
       };
     },
 
+    spawnedSessionOpen: { graceMs: 20_000, maxAttempts: 13, retryDelayMs: 1500 },
     store,
     userWebConnection,
     websocketBaseUrl: getCloudAgentWsUrl(),
-    spawnedSessionOpen: { graceMs: 20_000, maxAttempts: 13, retryDelayMs: 1_500 },
   });
 }

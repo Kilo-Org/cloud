@@ -166,12 +166,12 @@ const reopenRunningSession = async ({
     await expect
       .poll(() => idRow.count(), { timeout: 30_000 })
       .toBeGreaterThan(0)
-      .catch(() => undefined);
+      .catch(() => null);
   }
   const idRowCount = idRow === undefined ? 0 : await idRow.count().catch(() => 0);
 
-  // 'Session' is the view's placeholder before the session metadata loads; it
-  // matches unrelated rows, so treat it as unknown and take the newest row.
+  // 'Session' is the view's placeholder before the session metadata loads.
+  // It matches unrelated rows, so treat it as unknown and take the newest row.
   const titleRow =
     sessionTitle === '' || sessionTitle === 'Session'
       ? undefined
@@ -457,7 +457,7 @@ const decideCloudForm = async (sidePanel: Page): Promise<string | null> => {
 };
 
 /** The extension's own API bearer token, read from its storage. */
-const readExtensionToken = async (sidePanel: Page): Promise<string> =>
+const readExtensionToken = (sidePanel: Page): Promise<string> =>
   sidePanel.evaluate(
     () =>
       new Promise<string>(resolve => {
@@ -495,11 +495,11 @@ const listSessionIds = async (
     const response = await context.request.get(`${localBackendUrl}/api/trpc/${path}`, {
       headers: { authorization: `Bearer ${token}` },
     });
-    for (const match of (await response.text()).matchAll(
-      /"(?:id|session_id)":"(ses_[A-Za-z0-9]+)"/gu
-    )) {
-      const id = match[1];
-      if (id !== undefined) ids.add(id);
+    const body = await response.text();
+    for (const [, id] of body.matchAll(/"(?:id|session_id)":"(ses_[A-Za-z0-9]+)"/gu)) {
+      if (id !== undefined) {
+        ids.add(id);
+      }
     }
   }
   return ids;
@@ -514,10 +514,14 @@ const waitForCreatedSessionId = async (
   for (let attempt = 0; attempt < 30; attempt += 1) {
     // eslint-disable-next-line no-await-in-loop -- polling the create's server-side row
     const current = await listSessionIds(context, token);
-    for (const id of current) if (!before.has(id)) return id;
+    for (const id of current) {
+      if (!before.has(id)) {
+        return id;
+      }
+    }
     // eslint-disable-next-line no-await-in-loop -- polls between list reads
     await new Promise<void>(resolve => {
-      setTimeout(resolve, 1_000);
+      setTimeout(resolve, 1000);
     });
   }
   throw new Error('the CLI create added no session row the list reads can see');
@@ -599,18 +603,18 @@ test('live local backend: cloud agent covers start, reopen, queue, and stop', as
 
     const nonce = `p${process.pid}-${Date.now().toString(36)}`;
 
-    // The form returns the session id from prepareSession; capture it so the
-    // reopen selects the row that owns this run instead of a title match.
-    let createdKiloSessionId: string | undefined;
-    sidePanel.on('response', response => {
-      if (!response.url().includes('cloudAgentNext.prepareSession')) return;
-      void response
-        .text()
-        .then(text => {
-          const id = /"kiloSessionId":"(ses_[A-Za-z0-9]+)"/u.exec(text)?.[1];
-          if (id !== undefined) createdKiloSessionId = id;
-        })
-        .catch(() => undefined);
+    // The form returns the session id from prepareSession.
+    // Reopening then selects the row that owns this run, not a title match.
+    const createdKiloSessionIds: string[] = [];
+    sidePanel.on('response', async response => {
+      if (!response.url().includes('cloudAgentNext.prepareSession')) {
+        return;
+      }
+      const text = await response.text().catch(() => '');
+      const id = /"kiloSessionId":"(ses_[A-Za-z0-9]+)"/u.exec(text)?.[1];
+      if (id !== undefined) {
+        createdKiloSessionIds.push(id);
+      }
     });
 
     // Start: prepare a cloud session through the form.
@@ -628,9 +632,9 @@ test('live local backend: cloud agent covers start, reopen, queue, and stop', as
         .then(() => true)
         .catch(() => false);
       if (started) {
-        await expect.poll(() => createdKiloSessionId !== undefined, { timeout: 10_000 }).toBe(true);
+        await expect.poll(() => createdKiloSessionIds.length > 0, { timeout: 10_000 }).toBe(true);
         await runOpenSessionPhases({
-          kiloSessionId: createdKiloSessionId,
+          kiloSessionId: createdKiloSessionIds[0],
           nonce,
           platformLabel: 'Cloud agent',
           sidePanel,

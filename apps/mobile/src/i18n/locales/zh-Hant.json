@@ -327,7 +327,7 @@
     },
     "signInMethods": {
       "title": "登入方式",
-      "unlink": "取消連結",
+      "unlink": "移除連結",
       "unlinkProvider": "取消連結 {{provider}}",
       "unlinkTitle": "取消連結 {{provider}}？",
       "unlinkMessage": "你將無法再使用 {{provider}} 登入。其他登入方式不受影響。",
@@ -4135,7 +4135,7 @@
       "sessionPullRequest": "工作階段 PR",
       "sessionPullRequestNumber": "工作階段 PR #{{number}}",
       "openSessionHint": "開啟該工作階段。",
-      "unlinkSessionAction": "取消連結工作階段",
+      "unlinkSessionAction": "移除連結工作階段",
       "unlinkConfirmTitle": "要取消連結 {{title}} 嗎？",
       "unlinkConfirmMessage": "工作階段本身不會被刪除，只會移除它與此待辦事項的連結。",
       "startNewSession": "開始新的工作階段",

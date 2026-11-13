@@ -3051,7 +3051,7 @@
     "revokeConsentTitle": "Да се оттегли ли съгласието за споделяне на данни?",
     "acceptAndContinue": "Приеми и продължи",
     "decline": "Откажи",
-    "declineAndSignOut": "Откажи и излез от акаунта",
+    "declineAndSignOut": "Не приемай и излез от акаунта",
     "declineTitle": "Да се откаже ли споделянето на данни?",
     "couldNotLoadConsentSettings": "Не успяхме да заредим настройките ти за съгласие. Опитай отново.",
     "couldNotLoadAccount": "Не успяхме да заредим акаунта ти. Опитай отново.",

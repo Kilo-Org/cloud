@@ -3047,7 +3047,7 @@
     "voiceTranscriptionTitle": "Puheentunnistus",
     "retentionPrefix": "Tarkat tiedot säilytysajoista, oikeuksistasi ja yhteydenotosta:",
     "backToConsent": "Takaisin suostumukseen",
-    "revokeConsent": "Peruuta suostumus",
+    "revokeConsent": "Poista suostumus",
     "revokeConsentTitle": "Peruutetaanko suostumus tietojen jakamiseen?",
     "acceptAndContinue": "Hyväksy ja jatka",
     "decline": "Hylkää",

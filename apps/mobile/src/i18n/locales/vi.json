@@ -63,7 +63,7 @@
     "personal": "Cá nhân",
     "connectGithub": "Kết nối GitHub",
     "cost": "Chi phí",
-    "discard": "Hủy bỏ",
+    "discard": "Bỏ",
     "discardChangesMessage": "Các thay đổi của bạn sẽ bị mất.",
     "discardChangesTitle": "Hủy bỏ thay đổi?",
     "findings": "Vấn đề",
@@ -327,7 +327,7 @@
     },
     "signInMethods": {
       "title": "Phương thức đăng nhập",
-      "unlink": "Hủy liên kết",
+      "unlink": "Xóa liên kết",
       "unlinkProvider": "Hủy liên kết {{provider}}",
       "unlinkTitle": "Hủy liên kết {{provider}}?",
       "unlinkMessage": "Bạn sẽ không thể đăng nhập bằng {{provider}} nữa. Các phương thức khác của bạn vẫn giữ nguyên.",

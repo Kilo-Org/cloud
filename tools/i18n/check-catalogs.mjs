@@ -563,20 +563,105 @@ function holdsLabel(values, run) {
   return false;
 }
 
+/** The name a plain, non-computed object property declares. */
+function propertyName(property) {
+  if (property.type !== 'Property' || property.computed) {
+    return null;
+  }
+  const { key } = property;
+  if (key.type === 'Identifier') {
+    return key.name;
+  }
+  if (key.type === 'Literal' && typeof key.value === 'string') {
+    return key.value;
+  }
+  return null;
+}
+
+/** The catalog key a property's value translates, when it is `t('literal')`. */
+function propertyTranslation(property) {
+  const value = unwrap(property.value);
+  if (value.type !== 'CallExpression' || !isTranslateCallee(value.callee)) {
+    return null;
+  }
+  const [first] = value.arguments;
+  if (first === undefined) {
+    return null;
+  }
+  const key = unwrap(first);
+  return key.type === 'Literal' && typeof key.value === 'string' && key.value !== ''
+    ? key.value
+    : null;
+}
+
 /**
- * Two sets:
+ * The catalog keys one object literal paints on a destructive button.
+ *
+ * Two shapes write it: the `confirmLabel` a `useConfirmDialog().confirm()` call
+ * passes, and an `Alert` button whose `style` is `'destructive'`. A
+ * `confirmLabel` counts only when the object carries no `cancelLabel`, because
+ * `destructive-confirm-dialog.tsx` renders the safe button as
+ * `cancelLabel ?? t('common.cancel')`: a call site that names its own cancel
+ * label never paints the generic one. An alert button always paints its own
+ * text, so it counts either way.
+ *
+ * A `destructiveLabel` counts as the red choice of a confirmation that leaves
+ * the safe button to the fallback. The name exists for exactly that role —
+ * `consent-card.tsx` passes `actions.destructiveLabel` straight into
+ * `confirm()` with no `cancelLabel` — and the cancel label, when one exists,
+ * lives in the caller rather than in this literal, so the property's own object
+ * says nothing about it.
+ */
+function destructiveLabels(object) {
+  const properties = object.properties.filter(property => property.type === 'Property');
+  const find = name => properties.find(property => propertyName(property) === name);
+  const keys = [];
+  const confirmLabel = find('confirmLabel');
+  if (confirmLabel && !find('cancelLabel')) {
+    const key = propertyTranslation(confirmLabel);
+    if (key !== null) {
+      keys.push(key);
+    }
+  }
+  const destructiveLabel = find('destructiveLabel');
+  if (destructiveLabel) {
+    const key = propertyTranslation(destructiveLabel);
+    if (key !== null) {
+      keys.push(key);
+    }
+  }
+  const style = find('style');
+  const text = find('text');
+  if (style && text) {
+    const styleValue = unwrap(style.value);
+    if (styleValue.type === 'Literal' && styleValue.value === 'destructive') {
+      const key = propertyTranslation(text);
+      if (key !== null) {
+        keys.push(key);
+      }
+    }
+  }
+  return keys;
+}
+
+/**
+ * Three sets:
  * - `called`: keys passed to t() or i18n.t() as a plain string. Each must exist.
  * - `referenced`: every string literal in the source. A key named in a lookup
  *   table and passed to t() through a variable is used, so the dead-key check
  *   reads this wider set and never asks anyone to delete a live key.
+ * - `destructiveKeys`: keys an object literal paints on a destructive button
+ *   while the dialog can also paint the generic Cancel label. See the rule that
+ *   reads this set, `destructiveConfirmKeys` below.
  *
- * Both come from the syntax tree (tools/lib/ast.mjs), so text that only looks
- * like a call — in a comment, in a string, in a type annotation — moves no key,
- * and an apostrophe in prose cannot throw the quote pairing out of step.
+ * All three come from the syntax tree (tools/lib/ast.mjs), so text that only
+ * looks like a call — in a comment, in a string, in a type annotation — moves no
+ * key, and an apostrophe in prose cannot throw the quote pairing out of step.
  */
 function scanSource(root) {
   const called = new Set();
   const referenced = new Set();
+  const destructiveKeys = new Set();
   for (const { file, program, problems: unparsed } of parseSourceTree(
     join(root, 'apps/mobile/src'),
     root,
@@ -592,6 +677,12 @@ function scanSource(root) {
       if (node.type === 'Literal' && typeof node.value === 'string') {
         if (node.value !== '') {
           referenced.add(node.value);
+        }
+        return;
+      }
+      if (node.type === 'ObjectExpression') {
+        for (const key of destructiveLabels(node)) {
+          destructiveKeys.add(key);
         }
         return;
       }
@@ -611,7 +702,95 @@ function scanSource(root) {
       }
     });
   }
-  return { called, referenced };
+  return { called, referenced, destructiveKeys };
+}
+
+/**
+ * Fold a value for the destructive-label comparison: NFC, lower case, one
+ * space, no edge space. Diacritics stay, because a locale that writes Cancel
+ * with another accent has written a different word; the comparison asks
+ * whether the reader sees the same button twice.
+ *
+ * The dotted capital is not a different word. Turkish writes the capital of
+ * `i` as `İ` (U+0130), which `toLowerCase` spells `i` + U+0307, so `İptal`
+ * would fold to `i̇ptal` and never match a value that spells `iptal` with a
+ * plain `i`. The pair becomes that plain `i`.
+ */
+function foldDestructiveLabel(value) {
+  return value
+    .normalize('NFC')
+    .toLowerCase()
+    .replace(/\u0069\u0307/g, 'i')
+    .replace(/\s+/gu, ' ')
+    .trim();
+}
+
+/**
+ * The destructively painted keys, each mapped to whether its label may also be
+ * rejected for merely CONTAINING this catalog's Cancel word.
+ *
+ * `destructive-confirm-dialog.tsx` paints the safe button with
+ * `cancelLabel ?? t('common.cancel')`, so a confirmation that leaves the safe
+ * button to the fallback shows two buttons reading Cancel when the confirm
+ * label was translated with the Cancel word.
+ *
+ * Exact equality is the defect whatever English says: a red button reading only
+ * Cancel is the second Cancel button. Every key that paints the red choice is
+ * checked for it.
+ *
+ * English anchors only the wider contains test: "Cancel subscription" beside
+ * "Cancel" is the shipped English pattern, so a locale may translate that label
+ * with its own Cancel word as long as the label also names the action. A key
+ * whose English value is the bare Cancel word anchors nothing new — English
+ * paints Cancel twice itself — so it takes the same exemption. A key missing
+ * from English is not checked here; the parity rule reports it.
+ */
+function destructiveConfirmKeys(source, english) {
+  const checks = new Map();
+  if (source === null) {
+    return checks;
+  }
+  const englishCancel = foldDestructiveLabel(english.get('common.cancel') ?? '');
+  for (const key of source.destructiveKeys) {
+    const englishValue = english.get(key);
+    if (englishValue === undefined) {
+      continue;
+    }
+    checks.set(
+      key,
+      englishCancel !== '' && !foldDestructiveLabel(englishValue).includes(englishCancel)
+    );
+  }
+  return checks;
+}
+
+/**
+ * Reject a destructive button whose label reads as this catalog's Cancel word.
+ *
+ * An exact match is always a defect: the reader sees Cancel on the red button
+ * too, so it is rejected for every key. The substring test applies only to a
+ * key whose English copy is a bare destructive verb such as "Revoke": a red
+ * button reading "Revoke link" when Cancel sits beneath it is ambiguous, while
+ * "Cancel subscription" beside "Cancel" is deliberate English and its
+ * translation may keep the locale's Cancel word. `allowContains` carries that
+ * per-key decision, so a key whose English names Cancel never reaches the
+ * substring test.
+ */
+function checkDestructiveConfirmLabel(label, key, value, cancelValue, allowContains) {
+  if (cancelValue === undefined) {
+    return;
+  }
+  const cancel = foldDestructiveLabel(cancelValue);
+  if (cancel === '') {
+    return;
+  }
+  const folded = foldDestructiveLabel(value);
+  if (folded !== cancel && !(allowContains && folded.includes(cancel))) {
+    return;
+  }
+  fail(
+    `${label}: "${key}" reads "${value}", which this catalog already uses for Cancel ("${cancelValue}"); the destructive button must use a verb the locale does not use for Cancel`
+  );
 }
 
 /**
@@ -926,6 +1105,9 @@ export function checkCatalogs(root = ROOT) {
     const english = flattenCatalog(
       parseCatalog(join(catalog.dir, 'en.json'), `${catalog.name}/en`)
     );
+    // One parse of the mobile source serves the usage check and the
+    // destructive-confirm rule; the notifications catalog reads no source.
+    const source = catalog.checkUsage ? scanSource(root) : null;
     const englishFamilies = new Set(
       [...english.keys()]
         .map(pluralParts)
@@ -953,6 +1135,7 @@ export function checkCatalogs(root = ROOT) {
       wordingGroups.get(folded).push(key);
     }
     const sharedWordings = [...wordingGroups].filter(([, keys]) => keys.length > 1);
+    const destructiveChecks = destructiveConfirmKeys(source, english);
 
     // One key per piece of copy. Two keys holding the same English string cannot
     // be translated apart without the catalogs drifting, so the copy belongs to
@@ -1127,6 +1310,16 @@ export function checkCatalogs(root = ROOT) {
           fail(`${label}: "${key}" is empty`);
         }
         const englishValue = english.get(key);
+        const allowContains = destructiveChecks.get(key);
+        if (allowContains !== undefined) {
+          checkDestructiveConfirmLabel(
+            label,
+            key,
+            value,
+            translated.get('common.cancel'),
+            allowContains
+          );
+        }
         if (catalog.name === 'mobile' && key === 'home.noLiveSessions' && value === englishValue) {
           fail(`${label}: "${key}" must be translated`);
         }
@@ -1331,15 +1524,14 @@ export function checkCatalogs(root = ROOT) {
       }
     }
 
-    if (catalog.checkUsage) {
-      const { called, referenced } = scanSource(root);
-      for (const key of called) {
+    if (source !== null) {
+      for (const key of source.called) {
         if (!english.has(key) && !englishFamilies.has(key)) {
           fail(`${catalog.name}: source uses "${key}", which en.json does not define`);
         }
       }
       for (const key of english.keys()) {
-        if (!referenced.has(key) && !referenced.has(pluralBaseKey(key))) {
+        if (!source.referenced.has(key) && !source.referenced.has(pluralBaseKey(key))) {
           fail(`${catalog.name}: en.json defines "${key}", which no source file uses`);
         }
       }

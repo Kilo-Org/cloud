@@ -4,6 +4,14 @@ import { View } from 'react-native';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { securityConfigMutationMessage } from '@/lib/security-agent-ledger';
 
+/**
+ * Largest OS font scale the refusal line grows to. It is a status line whose
+ * copy length the catalog does not bound, so it carries a cap on how far a
+ * raised text size can grow it — the same rule the cannot-send reason uses, and
+ * the reason the settings body below keeps its room.
+ */
+const REFUSAL_MAX_FONT_SCALE = 1.6;
+
 type SettingsSaveFeedback = {
   /** Await a settings save, keep its refusal for the inline line, and rethrow it. */
   run: (save: () => Promise<void>) => Promise<void>;
@@ -56,11 +64,13 @@ export function useSettingsSaveFeedback(): SettingsSaveFeedback {
   // sentences these screens show wrap to two lines at the app's widths, so the
   // reserve is `min-h-10` (2.5rem = 35dp).
   //
-  // The line is never clipped. A longer sentence — another language, or a
-  // larger text size — grows the slot instead of losing its tail, because the
-  // tail is the part that says what to do next, and a refusal the reader cannot
-  // finish reading is the defect this line exists to remove. Growth is bounded
-  // by the message itself and only happens when the copy needs it.
+  // The line is never clipped: a longer sentence — another language, or a larger
+  // text size — grows the slot instead of losing its tail. The tail is the part
+  // that says what to do next, and a refusal the reader cannot finish reading is
+  // the defect this line exists to remove. The growth is bounded by the font
+  // cap instead: like the cannot-send reason, this is a status line whose copy
+  // length the catalog does not bound, so a raised text size may enlarge it only
+  // so far and the settings body below keeps its room.
   //
   // This slot sits above the screen's scroller, not inside it, so the design
   // gate's leading-gap rule — which measures the gap below a scroller's own top
@@ -74,6 +84,7 @@ export function useSettingsSaveFeedback(): SettingsSaveFeedback {
           message={securityConfigMutationMessage(failure)}
           tone="error"
           className="text-sm"
+          maxFontSizeMultiplier={REFUSAL_MAX_FONT_SCALE}
         />
       )}
     </View>

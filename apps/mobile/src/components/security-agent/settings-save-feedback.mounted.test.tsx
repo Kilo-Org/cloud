@@ -113,6 +113,9 @@ describe('useSettingsSaveFeedback', () => {
     // The same slot holds the sentence: the line swaps in place instead of
     // pushing the scrolling body down.
     expect(slot(renderer).findAllByType('Text')).toHaveLength(1);
+    // A raised OS text size may enlarge the line only up to the cap, so a long
+    // refusal cannot squeeze the settings body out of its room.
+    expect(slot(renderer).findAllByType('Text')[0]?.props.maxFontSizeMultiplier).toBe(1.6);
 
     act(() => {
       renderer.unmount();

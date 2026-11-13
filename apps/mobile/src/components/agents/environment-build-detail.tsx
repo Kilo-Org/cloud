@@ -70,7 +70,8 @@ export function EnvironmentBuildDetail({
   const buildId = status?.activeBuild?.buildId ?? status?.latestBuild?.buildId ?? null;
   const requestBuild = useMutation(
     trpc.cloudEnvironments.build.mutationOptions({
-      onSuccess: result => {
+      onSuccess: (result, variables) => {
+        requestIds.answered(variables.environmentId, variables.expectedRevision);
         void queryClient.invalidateQueries({
           queryKey: trpc.cloudEnvironments.buildStatus.queryKey(),
         });
@@ -82,9 +83,6 @@ export function EnvironmentBuildDetail({
       },
       onError: error => {
         toast.error(failureToast(error.message, t('agentChat.environment.couldNotStartBuild')));
-      },
-      onSettled: (_result, _error, variables) => {
-        requestIds.answered(variables.environmentId, variables.expectedRevision);
       },
     })
   );

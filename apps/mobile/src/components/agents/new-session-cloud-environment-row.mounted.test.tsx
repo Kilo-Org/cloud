@@ -3,7 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TestRenderer } from '@/test/renderer';
 import { i18n } from '@/i18n';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
-import { type EnvironmentSelection } from '@/lib/cloud-environments/environment-selection';
+import {
+  type EnvironmentSelection,
+  type EnvironmentSummaryRow,
+} from '@/lib/cloud-environments/environment-selection';
 
 import { NewSessionCloudEnvironmentRow } from './new-session-cloud-environment-row';
 
@@ -19,7 +22,7 @@ type RowProps = Parameters<typeof NewSessionCloudEnvironmentRow>[0];
 const CARD_CHROME = `${ROW_TARGET_CLASS} flex-row items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5`;
 const ROW_TEST_ID = 'session-cloud-environment-row';
 
-const ENVIRONMENT = {
+const ENVIRONMENT: EnvironmentSummaryRow = {
   id: 'env-1',
   name: 'Mobile parity lab',
   createdAt: '2026-01-01 00:00:00+00',
@@ -30,9 +33,13 @@ const ENVIRONMENT = {
   configurationRevision: 1,
   sandboxAllocation: null,
   repositories: [{ platform: 'github', repoFullName: 'picker-lab/private-repo' }],
-} as const;
+};
 
-const OTHER_ENVIRONMENT = { ...ENVIRONMENT, id: 'env-2', name: 'Broken build lab' } as const;
+const OTHER_ENVIRONMENT: EnvironmentSummaryRow = {
+  ...ENVIRONMENT,
+  id: 'env-2',
+  name: 'Broken build lab',
+};
 
 const CHOOSE: EnvironmentSelection = {
   status: 'choose',

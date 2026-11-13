@@ -24,7 +24,12 @@ export const databaseTypeParsers: pg.CustomTypesConfig = {
 
 export type CreateDrizzleClientOptions = {
   connectionString: string;
-  poolConfig?: Partial<pg.PoolConfig>;
+  /**
+   * Pool settings this client does not derive itself. `types` is excluded because the client
+   * installs `databaseTypeParsers` on the pool it creates; replacing it would change how every
+   * raw result and export path reads `int8`.
+   */
+  poolConfig?: Omit<Partial<pg.PoolConfig>, 'types'>;
   logger?: boolean;
   /**
    * Replaces the TLS settings that `getDatabaseClientConfig` derives from the connection string
@@ -55,7 +60,11 @@ export function createDrizzleClient(options: CreateDrizzleClientOptions) {
   return { db, pool, schema };
 }
 
-export type GetWorkerDbOptions = Omit<pg.PoolConfig, 'connectionString' | 'max'>;
+/**
+ * `connectionString`, `max` and `types` are fixed by `getWorkerDb`: Hyperdrive owns pooling, and
+ * the int8 parser is what raw results expect, so a caller cannot replace either.
+ */
+export type GetWorkerDbOptions = Omit<pg.PoolConfig, 'connectionString' | 'max' | 'types'>;
 
 /**
  * Convenience wrapper for Cloudflare Workers using Hyperdrive.

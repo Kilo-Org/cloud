@@ -354,37 +354,22 @@ describe('createExtensionAgentSessionManager', () => {
     expect(capturedConfig!.lifecycleHooks).toBeTruthy();
     expect(capturedConfig!.websocketBaseUrl).toBe(getCloudAgentWsUrl());
     expect(capturedConfig!.spawnedSessionOpen).toStrictEqual({
-      graceMs: 30_000,
-      maxAttempts: 15,
+      graceMs: 20_000,
+      maxAttempts: 13,
       retryDelayMs: 1_500,
     });
   });
 
   describe('resolveSession', () => {
-    it('retries a NOT_FOUND from cliSessionsV2.get before classifying the session', async () => {
-      vi.useFakeTimers();
-      try {
-        const trpc = makeTrpcMock();
-        let calls = 0;
-        trpc.cliSessionsV2.get.query = vi.fn(async () => {
-          calls += 1;
-          if (calls === 1) throw notFoundError();
-          return { cloud_agent_session_id: null, session_id: SESSION_ID };
-        });
-        trpc.activeSessions.list.query = mockQuery({ sessions: [] });
-        createExtensionAgentSessionManager({ ...makeDefaultOptions(), trpcClient: trpc as never });
+    it('fails fast on NOT_FOUND instead of retrying every open', async () => {
+      const trpc = makeTrpcMock();
+      trpc.cliSessionsV2.get.query = vi.fn(async () => {
+        throw notFoundError();
+      });
+      createExtensionAgentSessionManager({ ...makeDefaultOptions(), trpcClient: trpc as never });
 
-        const pending = capturedConfig!.resolveSession(SESSION_ID);
-        await vi.advanceTimersByTimeAsync(1_000);
-
-        await expect(pending).resolves.toStrictEqual({
-          kiloSessionId: SESSION_ID,
-          type: 'read-only',
-        });
-        expect(calls).toBe(2);
-      } finally {
-        vi.useRealTimers();
-      }
+      await expect(capturedConfig!.resolveSession(SESSION_ID)).rejects.toThrow('Session not found');
+      expect(trpc.cliSessionsV2.get.query).toHaveBeenCalledTimes(1);
     });
 
     it('returns cloud-agent when cloud_agent_session_id is present', async () => {

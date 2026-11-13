@@ -11964,10 +11964,9 @@ describe('createSessionManager — spawned session open', () => {
     );
   });
 
-  it('keeps NOT_FOUND terminal when the option is absent', async () => {
-    const config = createMockConfig({
-      fetchSession: jest.fn().mockRejectedValue(notFound),
-    });
+  it('fails immediately when the option is absent', async () => {
+    const fetchSession = jest.fn().mockRejectedValue(notFound);
+    const config = createMockConfig({ fetchSession });
     const mgr = createSessionManager(config);
     mgr.noteSpawnedSession(kiloId('ses-1'));
 
@@ -11976,6 +11975,7 @@ describe('createSessionManager — spawned session open', () => {
     expect(atomValue<{ code?: string } | null>(config.store, mgr.atoms.statusIndicator)?.code).toBe(
       'child-session-not-found'
     );
+    expect(fetchSession).toHaveBeenCalledTimes(1);
   });
 
   it('gives up after maxAttempts so a session that never appears still surfaces', async () => {

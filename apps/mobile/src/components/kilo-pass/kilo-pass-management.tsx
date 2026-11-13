@@ -20,6 +20,7 @@ import {
   storeSubscriptionsUrl,
 } from '@/lib/kilo-pass/management';
 import { kiloPassPlanLabel } from '@/lib/kilo-pass/state';
+import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
 
@@ -57,8 +58,12 @@ export function KiloPassManagementSections({
   const invalidateKiloPass = () => {
     void queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getState.pathKey() });
     void queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getScheduledChange.pathKey() });
-    void queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getBillingHistory.pathKey() });
-    void queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getCreditHistory.pathKey() });
+    // Both ledgers are infinite lists that keep several pages. Invalidating one
+    // refetches every retained page — one Stripe `invoices.list` per billing
+    // page — so the refresh reads page one and leaves the rows on screen until
+    // it lands.
+    void reconcileFirstPage(queryClient, trpc.kiloPass.getBillingHistory.pathFilter().queryKey);
+    void reconcileFirstPage(queryClient, trpc.kiloPass.getCreditHistory.pathFilter().queryKey);
   };
 
   const cancelSubscription = useMutation(

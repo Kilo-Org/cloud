@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import migrations from '../../../drizzle/migrations';
+import { enableForeignKeys } from '../persist/foreign-keys';
 import { type SqlValue, type SshDatabase } from './database';
 import { createForward, getForward, listForwards, type SshForwardInput } from './forwards';
 import { createHost, deleteHost, getHost, listHosts, type SshHostInput, updateHost } from './hosts';
@@ -66,13 +67,16 @@ let db: SshDatabase = sshDatabase(database);
 
 beforeEach(() => {
   database = new DatabaseSync(':memory:');
-  // The app's open path sets no `PRAGMA foreign_keys = ON` (see
-  // encrypted-kv.ts), so this suite proves the constraints the migration
-  // declares rather than the behaviour of a real device's connection.
-  database.exec('PRAGMA foreign_keys = ON');
+  // The same order as the app's open path: migrations first, on a connection
+  // with enforcement off, then `enableForeignKeys`.
   for (const statement of MIGRATIONS) {
     database.exec(statement);
   }
+  enableForeignKeys({
+    execSync: statement => {
+      database.exec(statement);
+    },
+  });
   db = sshDatabase(database);
 });
 
@@ -102,6 +106,12 @@ const host = (label: string, extra: Record<string, unknown> = {}) =>
 
 const key = (label: string, extra: Record<string, unknown> = {}) =>
   createKey(db, keyInput(label, extra));
+
+describe('the connection', () => {
+  it('enforces foreign keys once the migrations have run', () => {
+    expect(database.prepare('PRAGMA foreign_keys').get()).toEqual({ foreign_keys: 1 });
+  });
+});
 
 describe('hosts', () => {
   it('lists by sort order, then label', () => {

@@ -6,6 +6,8 @@ import { impactHaptic } from '@/lib/haptics';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
+import { displaySafeText } from '@kilocode/app-shared/display-text';
+
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import {
@@ -18,6 +20,7 @@ import {
 import { permissionToolLabel } from '@/components/agents/permission-tool-label';
 import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -161,7 +164,7 @@ export function PermissionCard({
               </Text>
               {patterns.map((pattern, index) => (
                 <Text key={index} className="text-xs text-muted-foreground">
-                  • {pattern}
+                  • {isolateLtrBidiText(displaySafeText(pattern))}
                 </Text>
               ))}
             </View>
@@ -172,7 +175,9 @@ export function PermissionCard({
               <Text className="text-xs font-medium text-muted-foreground">
                 {t('profiles.commandLabel')}
               </Text>
-              <Text className="text-xs text-muted-foreground">{command}</Text>
+              <Text className="text-xs text-muted-foreground">
+                {isolateLtrBidiText(displaySafeText(command))}
+              </Text>
             </View>
           ) : null}
         </View>

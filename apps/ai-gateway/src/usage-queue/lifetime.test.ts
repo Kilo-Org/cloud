@@ -23,7 +23,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   },
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  USAGE_INGEST_URL: 'http://usage.example.test/usage',
+  USAGE_INGEST_URL: 'https://usage.example.test/usage',
   USAGE_INGEST_PUBLISH_SECRET: 'synthetic-local-secret',
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/usage-publisher', () => {

@@ -27,8 +27,12 @@ describe('native token rate limits', () => {
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
   });
 
-  it('counts the address limit on the first forwarded hop', async () => {
-    const request = createRequest({ 'x-forwarded-for': '203.0.113.7, 10.0.0.1' });
+  it('counts the address limit on the first platform hop', async () => {
+    const request = createRequest({
+      'x-vercel-forwarded-for': '203.0.113.7, 10.0.0.1',
+      'x-forwarded-for': '192.0.2.11, 10.0.0.2',
+      'x-real-ip': '198.51.100.4',
+    });
 
     await isNativeTokenAddressRateLimited(request);
 
@@ -39,11 +43,18 @@ describe('native token rate limits', () => {
   });
 
   it('falls back to the real-ip header, then to an opaque key', async () => {
-    const realIp = createRequest({ 'x-real-ip': '198.51.100.4' });
+    const realIp = createRequest({ 'x-real-ip': '198.51.100.4', 'x-forwarded-for': '192.0.2.11' });
     await isNativeTokenAddressRateLimited(realIp);
     expect(mockCheckRateLimit).toHaveBeenLastCalledWith('native-token-address', {
       request: realIp,
       rateLimitKey: 'native-token-address:198.51.100.4',
+    });
+
+    const forwardedOnly = createRequest({ 'x-forwarded-for': '192.0.2.11' });
+    await isNativeTokenAddressRateLimited(forwardedOnly);
+    expect(mockCheckRateLimit).toHaveBeenLastCalledWith('native-token-address', {
+      request: forwardedOnly,
+      rateLimitKey: 'native-token-address:unknown',
     });
 
     const bare = createRequest();

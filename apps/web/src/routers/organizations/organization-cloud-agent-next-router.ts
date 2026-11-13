@@ -127,6 +127,7 @@ import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-
 import { TRPCError } from '@trpc/server';
 import { getBalanceForOrganizationUser } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { isMobileClient } from '@kilocode/web-shared/lib/trpc/min-version';
+import { backgroundActivityInventorySchema } from '@kilocode/session-ingest-contracts';
 import { buildCloudAgentNextEligibility } from '../cloud-agent-next-eligibility';
 import {
   getWorktreeChangesOutputSchema,
@@ -1598,4 +1599,3 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       })
     ),
 });
-import { backgroundActivityInventorySchema } from '@kilocode/session-ingest-contracts';

@@ -107,6 +107,7 @@ import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session
 import { TRPCError } from '@trpc/server';
 import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import { isMobileClient } from '@kilocode/web-shared/lib/trpc/min-version';
+import { backgroundActivityInventorySchema } from '@kilocode/session-ingest-contracts';
 import { buildCloudAgentNextEligibility } from './cloud-agent-next-eligibility';
 import {
   getWorktreeChangesOutputSchema,
@@ -1127,4 +1128,3 @@ export const cloudAgentNextRouter = createTRPCRouter({
       })
     ),
 });
-import { backgroundActivityInventorySchema } from '@kilocode/session-ingest-contracts';

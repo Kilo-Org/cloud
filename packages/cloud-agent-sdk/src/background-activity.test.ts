@@ -129,7 +129,7 @@ describe('authoritative reader', () => {
   afterEach(() => jest.useRealTimers());
   const advance = () => jest.advanceTimersByTimeAsync(100);
 
-  test('coalesces lifecycle bursts and discards a read invalidated by newer evidence', async () => {
+  test('coalesces lifecycle bursts and publishes an overtaken read before reading again', async () => {
     let resolve!: (value: unknown) => void;
     const read = jest
       .fn()
@@ -149,18 +149,56 @@ describe('authoritative reader', () => {
     reader.start();
     await advance();
     for (let i = 0; i < 10; i++) reader.invalidate();
-    await advance();
+    await jest.advanceTimersByTimeAsync(2000);
     expect(read).toHaveBeenCalledTimes(1);
     resolve(inventory);
     await advance();
     expect(states.filter(state => state.status === 'current')).toEqual([
+      { status: 'current', inventory },
+    ]);
+    await jest.advanceTimersByTimeAsync(1000);
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(states.filter(state => state.status === 'current')).toEqual([
+      { status: 'current', inventory },
       { status: 'current', inventory: { ...inventory, jobs: [] } },
     ]);
-    expect(read).toHaveBeenCalledTimes(2);
+    expect(states.filter(state => state.status === 'loading')).toHaveLength(1);
     reader.stop();
   });
 
-  test('disconnect and reconnect fence stale responses without overlapping requests', async () => {
+  test('streaming invalidations do not starve a current publication', async () => {
+    const read = jest.fn().mockResolvedValue(inventory);
+    const states: BackgroundActivityState[] = [];
+    const reader = createBackgroundActivityReader({
+      sessionID: 'ses_root',
+      read,
+      publish: state => states.push(state),
+    });
+    reader.start();
+    for (let i = 0; i < 50; i++) {
+      reader.invalidate();
+      await jest.advanceTimersByTimeAsync(50);
+    }
+    expect(states.filter(state => state.status === 'current').length).toBeGreaterThan(0);
+    expect(read.mock.calls.length).toBeLessThanOrEqual(4);
+    reader.stop();
+  });
+
+  test('stop hides the strip, and retry while stopped does nothing', async () => {
+    const read = jest.fn().mockResolvedValue(inventory);
+    const publish = jest.fn();
+    const reader = createBackgroundActivityReader({ sessionID: 'ses_root', read, publish });
+    reader.start();
+    await advance();
+    reader.stop();
+    expect(publish).toHaveBeenLastCalledWith({ status: 'inactive' });
+    reader.retry();
+    await advance();
+    expect(publish).toHaveBeenLastCalledWith({ status: 'inactive' });
+    expect(read).toHaveBeenCalledTimes(1);
+  });
+
+  test('disconnect aborts the in-flight read and reconnect does not wait for it', async () => {
     let resolve!: (value: unknown) => void;
     const read = jest
       .fn()
@@ -179,10 +217,12 @@ describe('authoritative reader', () => {
     });
     reader.start();
     await advance();
+    const firstSignal = read.mock.calls[0]![0] as AbortSignal;
     reader.stop();
+    expect(firstSignal.aborted).toBe(true);
     reader.start();
     await advance();
-    expect(read).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledTimes(2);
     resolve(inventory);
     await advance();
     expect(states.filter(state => state.status === 'current')).toEqual([

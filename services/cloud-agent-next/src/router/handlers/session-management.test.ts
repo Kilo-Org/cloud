@@ -153,6 +153,13 @@ describe('background activity authorization', () => {
       harness.caller.getBackgroundActivity({ cloudAgentSessionId: sessionId })
     ).rejects.toThrow('unavailable');
   });
+  it('reports an invalid native inventory as unavailable rather than an internal error', async () => {
+    const harness = setup();
+    harness.stub.kiloRequest.mockResolvedValueOnce({ ok: true, result: { jobs: 'invalid' } });
+    await expect(
+      harness.caller.getBackgroundActivity({ cloudAgentSessionId: sessionId })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+  });
 });
 
 describe('getSession runtime agents', () => {

@@ -74,7 +74,7 @@ test('reads v2 inventory on connect, shell lifecycle events, completion, and rec
       },
     },
   });
-  await jest.advanceTimersByTimeAsync(100);
+  await jest.advanceTimersByTimeAsync(1000);
   expect(read).toHaveBeenCalledTimes(2);
   connection.onEvent({
     eventId: 0,
@@ -86,16 +86,41 @@ test('reads v2 inventory on connect, shell lifecycle events, completion, and rec
       properties: { id: 'question_local', sessionID: native.id, questions: [] },
     },
   });
-  await jest.advanceTimersByTimeAsync(100);
+  await jest.advanceTimersByTimeAsync(1000);
   expect(read).toHaveBeenCalledTimes(3);
   connection.onUnexpectedDisconnect?.();
   expect(events.at(-1)?.type === 'stopped' ? events.at(-2) : events.at(-1)).toMatchObject({
     type: 'background.activity',
-    state: { status: 'unavailable' },
+    state: { status: 'inactive' },
   });
   connection.onReconnected?.();
   await jest.advanceTimersByTimeAsync(100);
   expect(read).toHaveBeenCalledTimes(4);
+  transport.destroy();
+});
+
+test('streamed tool frames do not trigger inventory reads', async () => {
+  const { transport, read } = setup();
+  transport.connect();
+  await jest.advanceTimersByTimeAsync(100);
+  for (const type of ['session.tool.input.delta', 'session.tool.progress']) {
+    connection.onEvent({
+      eventId: 0,
+      sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+      streamEventType: 'kilocode',
+      timestamp: '',
+      data: {
+        type: 'conversation.event',
+        properties: {
+          sessionID: native.id,
+          source: { version: 'v2' },
+          event: { id: `evt_${type}`, type, data: { sessionID: native.id } },
+        },
+      },
+    });
+  }
+  await jest.advanceTimersByTimeAsync(2000);
+  expect(read).toHaveBeenCalledTimes(1);
   transport.destroy();
 });
 
@@ -124,6 +149,6 @@ test('destroy fences a late read from the previous chat', async () => {
   await jest.advanceTimersByTimeAsync(100);
   expect(events.at(-1)).toMatchObject({
     type: 'background.activity',
-    state: { status: 'unavailable' },
+    state: { status: 'inactive' },
   });
 });

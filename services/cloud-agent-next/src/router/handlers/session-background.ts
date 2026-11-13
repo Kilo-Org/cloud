@@ -18,18 +18,26 @@ export const getBackgroundActivity = protectedProcedure
       kiloUserId: ctx.userId,
       cloudAgentSessionId: input.cloudAgentSessionId,
     });
-    const result = await withDORetry<
-      DurableObjectStub<SandboxSessionV2>,
-      ControlPlaneControlResult
-    >(
-      () => getSandboxSessionStub(ctx.env, ctx.userId, input.cloudAgentSessionId),
-      stub => stub.kiloRequest({ name: 'session.background' }),
-      'getBackgroundActivity'
-    );
-    if (!result.ok)
+    let result: ControlPlaneControlResult;
+    try {
+      result = await withDORetry<DurableObjectStub<SandboxSessionV2>, ControlPlaneControlResult>(
+        () => getSandboxSessionStub(ctx.env, ctx.userId, input.cloudAgentSessionId),
+        stub => stub.kiloRequest({ name: 'session.background' }),
+        'getBackgroundActivity'
+      );
+    } catch {
+      throw new TRPCError({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Background activity status is temporarily unavailable',
+      });
+    }
+    const inventory = result.ok
+      ? backgroundActivityInventorySchema.safeParse(result.result)
+      : undefined;
+    if (!inventory?.success)
       throw new TRPCError({
         code: 'PRECONDITION_FAILED',
         message: 'Background activity status is unavailable',
       });
-    return backgroundActivityInventorySchema.parse(result.result);
+    return inventory.data;
   });

@@ -15,7 +15,7 @@ export function serializeBackgroundActivityReads(
       await pending.get(sessionId)?.catch(() => undefined);
     }
     signal?.throwIfAborted();
-    const request = read({ sessionId });
+    const request = read({ sessionId, signal });
     pending.set(sessionId, request);
     try {
       const result = await request;
@@ -108,72 +108,73 @@ export function createBackgroundActivityReader(options: {
   publish: (state: BackgroundActivityState) => void;
 }) {
   let active = false;
-  let version = 0;
-  let inFlight = false;
+  let shown: BackgroundActivityState['status'] = 'inactive';
   let dirty = false;
   let retries = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let pendingRead: AbortController | undefined;
-  function schedule(delay = 100) {
-    if (!active || inFlight || timer) return;
+  function publish(state: BackgroundActivityState) {
+    shown = state.status;
+    options.publish(state);
+  }
+  function schedule(delay: number) {
+    if (!active || pendingRead || timer) return;
     timer = setTimeout(() => {
       timer = undefined;
       void refresh();
     }, delay);
   }
   async function refresh() {
-    if (!active || inFlight) return;
-    inFlight = true;
+    if (!active || pendingRead) return;
     dirty = false;
-    const expected = version;
     const request = new AbortController();
     pendingRead = request;
+    let failed = false;
     try {
       const inventory = backgroundActivityInventorySchema.parse(await options.read(request.signal));
       if (inventory.sessionID !== options.sessionID)
         throw new Error('Background inventory session mismatch');
-      if (active && expected === version) {
+      if (pendingRead === request) {
         retries = 0;
-        options.publish({ status: 'current', inventory });
+        publish({ status: 'current', inventory });
       }
     } catch {
-      if (active && expected === version) {
-        options.publish({ status: 'unavailable' });
-        if (retries < 2) {
-          retries++;
-          dirty = true;
-        }
+      if (pendingRead === request && !dirty) {
+        failed = true;
+        publish({ status: 'unavailable' });
       }
     } finally {
-      inFlight = false;
-      if (pendingRead === request) pendingRead = undefined;
-      if (active && (dirty || expected !== version))
-        schedule(retries ? 500 * 2 ** (retries - 1) : 100);
+      if (pendingRead === request) {
+        pendingRead = undefined;
+        if (failed && retries < 2) {
+          retries++;
+          schedule(500 * 2 ** (retries - 1));
+        } else if (dirty) schedule(1000);
+      }
     }
   }
-  function invalidate() {
+  function invalidate(delay = 1000) {
     if (!active) return;
-    version++;
     retries = 0;
     dirty = true;
-    options.publish({ status: 'loading' });
-    schedule();
+    if (shown === 'inactive' || shown === 'unavailable') publish({ status: 'loading' });
+    schedule(delay);
   }
   return {
     start() {
       active = true;
-      invalidate();
+      invalidate(100);
     },
-    invalidate,
-    retry: invalidate,
+    invalidate: () => invalidate(),
+    retry: () => invalidate(100),
     stop() {
       pendingRead?.abort();
+      pendingRead = undefined;
       active = false;
-      version++;
       dirty = false;
       clearTimeout(timer);
       timer = undefined;
-      options.publish({ status: 'unavailable' });
+      publish({ status: 'inactive' });
     },
   };
 }

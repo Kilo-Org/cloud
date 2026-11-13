@@ -34,7 +34,7 @@ export function backgroundOutcome(
   const exit = input.kind === 'shell' ? input.exit : undefined;
   if (state === 'cancelled' || state === 'canceled') return 'cancelled';
   if (['killed', 'terminated', 'interrupted'].includes(state)) return 'terminated';
-  if (state === 'error' || state === 'failed' || (exit !== undefined && exit !== 0))
+  if (['error', 'failed', 'timeout'].includes(state) || (exit !== undefined && exit !== 0))
     return 'failed';
   if (state === 'completed')
     return input.kind === 'subagent' || exit === 0 ? 'finished' : 'unknown';
@@ -44,7 +44,7 @@ export function backgroundOutcome(
 export function backgroundResultLabel(result: BackgroundResult): string {
   if (result.kind === 'notice') return 'Agent notice';
   const name = result.kind === 'shell' ? 'Shell' : result.agent || 'Agent';
-  return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${result.outcome === 'unknown' ? 'finished' : result.outcome}`;
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${result.outcome === 'unknown' ? 'ended' : result.outcome}`;
 }
 
 export function readBackgroundResult(part: ToolPart): BackgroundResult | undefined {
@@ -72,13 +72,18 @@ export function projectBackgroundResult(
         name: result.kind === 'notice' ? 'agent_notice' : `background_${result.kind}_result`,
         time: { created: message.time.created, completed: message.time.created },
         state: {
-          status: 'completed',
           input: {},
           metadata: {
             ...z.record(z.string(), z.unknown()).parse(message['metadata']),
             backgroundResult: result,
           },
           content: [{ type: 'text', text: result.output }],
+          ...(result.outcome === 'failed'
+            ? {
+                status: 'error' as const,
+                error: { type: 'background', message: backgroundResultLabel(result) },
+              }
+            : { status: 'completed' as const }),
         },
       },
     ],

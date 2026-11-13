@@ -260,11 +260,15 @@ export function CloudAgentProvider({ children, userId, organizationId }: CloudAg
       lifecycleHooks: createBrowserLifecycleHooks(),
 
       api: {
-        getBackgroundActivity: serializeBackgroundActivityReads(({ sessionId }) =>
+        getBackgroundActivity: serializeBackgroundActivityReads(({ sessionId, signal: caller }) =>
           queryClient.fetchQuery({
             queryKey: ['cloud-background-activity', userId, organizationId ?? null, sessionId],
             queryFn: ({ signal }) => {
-              const deadline = AbortSignal.any([signal, AbortSignal.timeout(30_000)]);
+              const deadline = AbortSignal.any([
+                signal,
+                ...(caller ? [caller] : []),
+                AbortSignal.timeout(30_000),
+              ]);
               return organizationId
                 ? trpcClient.organizations.cloudAgentNext.getBackgroundActivity.query(
                     { cloudAgentSessionId: sessionId, organizationId },
@@ -278,6 +282,7 @@ export function CloudAgentProvider({ children, userId, organizationId }: CloudAg
             staleTime: 0,
             gcTime: 0,
             retry: false,
+            networkMode: 'always',
           })
         ),
         send,

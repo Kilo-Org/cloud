@@ -6,9 +6,7 @@ import {
 import type { Kilo2Api } from './kilo2-api.js';
 import { createKilo2Reads } from './kilo2-reads.js';
 
-const inventorySchema = z
-  .array(z.union([backgroundJobSchema, z.object({ kind: z.literal('image') })]))
-  .max(256);
+const LIMIT = 256;
 
 export async function readKilo2BackgroundActivity(
   api: Kilo2Api,
@@ -23,7 +21,13 @@ export async function readKilo2BackgroundActivity(
     reads.getQuestions(directory, signal),
     reads.getPermissions(directory, signal),
   ]);
-  const jobs = inventorySchema.parse(raw).filter(job => job.kind !== 'image');
+  const readable = z
+    .array(z.unknown())
+    .parse(raw)
+    .flatMap(entry => {
+      const job = backgroundJobSchema.safeParse(entry);
+      return job.success ? [job.data] : [];
+    });
   const sessions = new Map<string, Awaited<ReturnType<typeof session>>>();
   const root = await session(sessionID, signal);
   if (root.location.directory !== directory)
@@ -31,24 +35,29 @@ export async function readKilo2BackgroundActivity(
   sessions.set(sessionID, root);
   async function owns(id: string, seen = new Set<string>()): Promise<boolean> {
     if (id === sessionID) return true;
-    if (seen.has(id) || seen.size >= 32 || sessions.size >= 256)
-      throw new Error('Background activity lineage exceeds its bound');
+    if (seen.has(id) || seen.size >= 32) return false;
     seen.add(id);
-    const info = sessions.get(id) ?? (await session(id, signal));
-    sessions.set(id, info);
+    let info = sessions.get(id);
+    if (!info) {
+      if (sessions.size >= LIMIT) return false;
+      info = await session(id, signal);
+      sessions.set(id, info);
+    }
     return (
       info.location.directory === directory && !!info.parentID && (await owns(info.parentID, seen))
     );
   }
-  for (const job of jobs) {
-    if (!(await owns(job.sessionID))) throw new Error('Background job belongs to another chat');
-    if (job.kind === 'subagent') {
-      if (
-        !(await owns(job.childSessionID)) ||
-        sessions.get(job.childSessionID)?.parentID !== job.sessionID
-      )
-        throw new Error('Background agent lineage mismatch');
-    }
+  const jobs = [];
+  for (const job of readable) {
+    if (jobs.length >= LIMIT) break;
+    if (!(await owns(job.sessionID))) continue;
+    if (
+      job.kind === 'subagent' &&
+      (!(await owns(job.childSessionID)) ||
+        sessions.get(job.childSessionID)?.parentID !== job.sessionID)
+    )
+      continue;
+    jobs.push(job);
   }
   const waits: Array<{ sessionID: string; kind: 'question' | 'permission' }> = [];
   for (const [kind, requests] of [
@@ -68,5 +77,10 @@ export async function readKilo2BackgroundActivity(
         ...(info.title ? { title: info.title } : {}),
       });
   }
-  return backgroundActivityInventorySchema.parse({ sessionID, jobs, sessions: owned, waits });
+  return backgroundActivityInventorySchema.parse({
+    sessionID,
+    jobs,
+    sessions: owned.slice(0, LIMIT),
+    waits: waits.slice(0, LIMIT),
+  });
 }

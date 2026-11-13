@@ -66,7 +66,8 @@ test.each([1, 130])('nonzero shell exit %i is a command error, not a session fai
     type: 'tool',
     tool: 'background_shell_result',
     state: {
-      status: 'completed',
+      status: 'error',
+      error: 'Shell failed',
       metadata: { backgroundResult: { exit, outcome: 'failed', output: 'diagnostic output' } },
     },
   });

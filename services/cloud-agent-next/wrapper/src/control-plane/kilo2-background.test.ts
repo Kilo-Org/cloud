@@ -81,30 +81,41 @@ test('reads the pinned inventory, includes descendant work and excludes sibling 
   expect(result.sessions.map(session => session.id)).toEqual(['ses_root', 'ses_child']);
 });
 
-test('rejects sibling inventory even if the native filter returns it', async () => {
-  expect(
-    await errorMessage(
-      readKilo2BackgroundActivity(
-        apiFor([{ ...shell, sessionID: 'ses_sibling' }]),
-        'ses_root',
-        '/workspace/app',
-        new AbortController().signal
-      )
-    )
-  ).toContain('another chat');
+test('drops sibling inventory even if the native filter returns it', async () => {
+  const result = await readKilo2BackgroundActivity(
+    apiFor([{ ...shell, sessionID: 'ses_sibling' }, agent]),
+    'ses_root',
+    '/workspace/app',
+    new AbortController().signal
+  );
+  expect(result.jobs).toEqual([agent]);
+  expect(result.sessions.map(session => session.id)).not.toContain('ses_sibling');
 });
 
-test('rejects an agent whose child does not belong to its owning chat', async () => {
-  expect(
-    await errorMessage(
-      readKilo2BackgroundActivity(
-        apiFor([agent], 'ses_sibling'),
-        'ses_root',
-        '/workspace/app',
-        new AbortController().signal
-      )
-    )
-  ).toContain('lineage mismatch');
+test('drops an agent whose child does not belong to its owning chat', async () => {
+  const result = await readKilo2BackgroundActivity(
+    apiFor([agent, { ...shell, sessionID: 'ses_root' }], 'ses_sibling'),
+    'ses_root',
+    '/workspace/app',
+    new AbortController().signal
+  );
+  expect(result.jobs).toEqual([{ ...shell, sessionID: 'ses_root' }]);
+});
+
+test('skips unreadable job kinds and truncates a large inventory', async () => {
+  const many = Array.from({ length: 300 }, (_, index) => ({
+    ...shell,
+    id: `job_${index}`,
+    shellID: `sh_${index}`,
+  }));
+  const result = await readKilo2BackgroundActivity(
+    apiFor([{ kind: 'future_kind', id: 'job_future' }, shell, ...many]),
+    'ses_root',
+    '/workspace/app',
+    new AbortController().signal
+  );
+  expect(result.jobs[0]).toEqual(shell);
+  expect(result.jobs).toHaveLength(256);
 });
 
 test('does not turn a failed native read into an empty inventory', async () => {

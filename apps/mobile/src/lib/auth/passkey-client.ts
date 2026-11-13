@@ -1,15 +1,11 @@
 import { z } from 'zod';
 
-import { buildAuthHeaders } from '@/lib/auth/auth-header';
 import { postAuth } from '@/lib/auth/auth-fetch';
 import { parseTokenPair, type PendingLinkResult } from '@/lib/auth/native-auth-contract';
 import { resolveAdmission } from '@/lib/auth/resolve-admission';
-import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 
 /** The one route that mints options and verifies the assertion, both server-side. */
 const AUTHENTICATE_ROUTE = '/api/auth/passkey/authenticate';
-/** The one route that mints registration options and verifies the attestation. */
-const REGISTER_ROUTE = '/api/auth/passkey/register';
 
 /**
  * The ceremony options the server minted. `@simplewebauthn/server` produces them
@@ -22,14 +18,13 @@ type CeremonyOptions = Record<string, unknown>;
 export type CredentialResponse = Record<string, unknown>;
 
 /**
- * The slice of the platform credential API this module drives: the same calls on
- * iOS and Android, against the server routes that store the challenge. It is a
+ * The slice of the platform credential API this module drives: the same call on
+ * iOS and Android, against the server route that stores the challenge. It is a
  * named contract so the ceremony can be exercised without a device.
  */
 export type PasskeysApi = {
   isSupported: () => boolean;
   get: (request: CeremonyOptions) => Promise<CredentialResponse | null>;
-  create: (request: CeremonyOptions) => Promise<CredentialResponse | null>;
 };
 
 /** Each file gets one attempt: a module that failed to load stays failed. */
@@ -284,83 +279,4 @@ export async function signInWithPasskey(
     created: parsed.created,
     ...(parsed.pendingLink ? { pendingLink: parsed.pendingLink } : {}),
   };
-}
-
-export type PasskeyRegistrationResult =
-  | { status: 'ok' }
-  | { status: 'error'; failure: 'cancelled' | 'unsupported' | 'unavailable' | 'failed' };
-
-/**
- * The registration route answers a browser session only: it refuses a request
- * that carries a bearer token (`Unauthorized`), and it refuses a session that
- * is not recent enough (`REAUTH_REQUIRED`). Neither answer changes by repeating
- * the request, so both map to `unavailable` instead of the retryable `failed`.
- */
-function registrationRefusal(
-  failure: { errorCode: string | undefined; httpStatus?: number },
-  step: 'options' | 'verify'
-): 'unavailable' | 'failed' {
-  if (failure.errorCode === 'Unauthorized' || failure.errorCode === 'REAUTH_REQUIRED') {
-    return 'unavailable';
-  }
-  // The options step answers 401 only for a session it will not accept, so the
-  // status alone is enough there even when the body is not one this client
-  // parses. Verify also answers 401 for credential refusals — an expired
-  // challenge, a signature that did not verify — which a fresh ceremony can
-  // fix, so the session refusals are named by code there instead.
-  return step === 'options' && failure.httpStatus === 401 ? 'unavailable' : 'failed';
-}
-
-/** Creation has no credential to be missing yet, so `no-passkey` is just a refusal. */
-function registrationFailure(error: unknown): 'cancelled' | 'unsupported' | 'failed' {
-  const failure = classifyPasskeyError(error);
-  return failure === 'cancelled' || failure === 'unsupported' ? failure : 'failed';
-}
-
-/**
- * Create a passkey for the signed-in user: mint registration options with the
- * session's bearer token, run the platform ceremony, then let the server verify
- * the attestation against the challenge it stored. The credential only exists
- * once the server has accepted it.
- */
-export async function registerPasskey(
-  api: PasskeysApi | null = loadPasskeys()
-): Promise<PasskeyRegistrationResult> {
-  if (!usable(api)) {
-    return { status: 'error', failure: 'unsupported' };
-  }
-
-  const authHeaders = buildAuthHeaders(await getAuthTokenForRequest());
-  const optionsResult = await postAuth(REGISTER_ROUTE, { action: 'options' }, authHeaders);
-  if (!optionsResult.ok) {
-    return { status: 'error', failure: registrationRefusal(optionsResult, 'options') };
-  }
-  const ceremony = ceremonyOptionsSchema.safeParse(optionsResult.data);
-  if (!ceremony.success) {
-    return { status: 'error', failure: 'failed' };
-  }
-
-  let attestation: CredentialResponse | null = null;
-  try {
-    attestation = await api.create(ceremony.data.options as CeremonyOptions);
-  } catch (error) {
-    return { status: 'error', failure: registrationFailure(error) };
-  }
-  if (!attestation) {
-    return { status: 'error', failure: 'cancelled' };
-  }
-
-  const verifyResult = await postAuth(
-    REGISTER_ROUTE,
-    {
-      action: 'verify',
-      challengeId: ceremony.data.challengeId,
-      response: attestation,
-    },
-    authHeaders
-  );
-  if (!verifyResult.ok) {
-    return { status: 'error', failure: registrationRefusal(verifyResult, 'verify') };
-  }
-  return { status: 'ok' };
 }

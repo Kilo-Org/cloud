@@ -1,12 +1,4 @@
-import {
-  first,
-  hasButtonLabel,
-  list,
-  mount,
-  nodes,
-  store,
-  windowSize,
-} from './passkeys-screen.test-helpers';
+import { first, list, mount, nodes, store, windowSize } from './passkeys-screen.test-helpers';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { waitFor } from '@/test/render-with-providers';
 
@@ -15,7 +7,6 @@ beforeEach(() => {
   windowSize.width = 411;
   windowSize.height = 914;
   store.rows = [];
-  list.supported.mockReturnValue(true);
   list.queryFn.mockImplementation(() => ({ success: true, passkeys: store.rows }));
 });
 
@@ -29,14 +20,13 @@ describe('PasskeysScreen empty state in a short window', () => {
     const empty = first(view, 'EmptyState');
     expect(empty.props.compact).toBe(false);
     expect(empty.props.title).toBe('No passkeys yet');
-    expect(hasButtonLabel(view, 'Add a passkey')).toBe(true);
     view.unmount();
   });
 
   it('drops the decoration when the window is a phone held sideways', async () => {
-    // The footer above the tab bar owns most of a landscape window, so the
-    // empty state's band is shorter than the bubble plus the copy: the title
-    // and the hint would start below the fold.
+    // The header, the notice and the tab bar own most of a landscape window, so
+    // the empty state's band is shorter than the bubble plus the copy: the
+    // title would start below the fold.
     windowSize.width = 914;
     windowSize.height = 411;
     const view = await mount();
@@ -45,8 +35,6 @@ describe('PasskeysScreen empty state in a short window', () => {
     const empty = first(view, 'EmptyState');
     expect(empty.props.compact).toBe(true);
     expect(empty.props.title).toBe('No passkeys yet');
-    expect(empty.props.description).toBe('Add a passkey to sign in without a password.');
-    expect(hasButtonLabel(view, 'Add a passkey')).toBe(true);
     view.unmount();
   });
 

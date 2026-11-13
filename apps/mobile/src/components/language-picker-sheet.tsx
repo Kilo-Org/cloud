@@ -41,8 +41,8 @@ import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib
 // the list fills the sheet's body. The list stays transparent: the route's
 // themed `contentStyle` paints the surface (see the (auth) layout), and a
 // second opaque layer would cover the sheet's own themed surface.
-const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingHorizontal: 16, paddingBottom: 16 } satisfies ViewStyle;
+const listFlexStyle = { flex: 1 } satisfies ViewStyle,
+  listPadStyle = { paddingHorizontal: 16, paddingBottom: 16 } satisfies ViewStyle;
 // A query that matches nothing leaves the no-match state as the list's only
 // content, and the sheet body is far taller than it. Without this the content
 // box shrinks to the state's own height, so the state's own centring collapses
@@ -51,7 +51,7 @@ const listContentContainerStyle = { paddingHorizontal: 16, paddingBottom: 16 } s
 // starts at the list's first pixel; a search field that leads the list is
 // content too, and must stay at the top, so that list keeps the plain style.
 const emptyListContentContainerStyle = {
-  ...listContentContainerStyle,
+  ...listPadStyle,
   flexGrow: 1,
   justifyContent: 'center',
 } satisfies ViewStyle;
@@ -384,10 +384,8 @@ export function LanguagePickerSheet({
       */}
       <FlashList
         nestedScrollEnabled
-        style={listStyle}
-        contentContainerStyle={
-          listIsEmpty ? emptyListContentContainerStyle : listContentContainerStyle
-        }
+        style={listFlexStyle}
+        contentContainerStyle={listIsEmpty ? emptyListContentContainerStyle : listPadStyle}
         data={items}
         extraData={rowExtraData}
         keyExtractor={item => item.key}

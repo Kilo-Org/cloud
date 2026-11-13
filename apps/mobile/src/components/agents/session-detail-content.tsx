@@ -408,6 +408,11 @@ export function SessionDetailContent({
   const agentStatus = useAtomValue(manager.atoms.agentStatus);
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
   const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
+  // A failed preparation row is the run's own failure statement, so it counts as
+  // content: without this the zero-message open would replace it with the
+  // page-load card. Only a failed attempt counts — a running or completed one is
+  // still a load in progress or a loaded run.
+  const hasFailedPreparation = preparationAttempts.some(attempt => attempt.status === 'failed');
   const canSend = useAtomValue(manager.atoms.canSend);
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
   // A failed row offers Retry only when this session can accept the re-send now.
@@ -2037,9 +2042,10 @@ export function SessionDetailContent({
         error,
         statusIndicator,
         messageCount: messages.length,
+        hasFailedPreparation,
         connectionLost,
       }),
-    [error, statusIndicator, messages.length, connectionLost]
+    [error, statusIndicator, messages.length, hasFailedPreparation, connectionLost]
   );
   // Acknowledging a terminal error's Retry. The reopen clears `errorAtom` and
   // sets the loading flag before its first await, so the card that carries the
@@ -2111,8 +2117,11 @@ export function SessionDetailContent({
     fetchedData,
     sessionId,
   ]);
+  // A Retry tapped while the rows were still missing must release once the
+  // failed preparation rows arrive: they are the run's own failure statement,
+  // so the stale page-load failure has nothing left to say.
   const shownTerminalError =
-    terminalRetryPending && messages.length === 0
+    terminalRetryPending && messages.length === 0 && !hasFailedPreparation
       ? (terminalError ?? terminalRetry.error)
       : terminalError;
   const handleTerminalRetry = (failure: SessionTerminalError): void => {

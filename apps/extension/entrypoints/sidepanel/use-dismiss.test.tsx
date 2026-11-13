@@ -76,6 +76,54 @@ const EscapeHarness = ({ enabled }: { enabled: boolean }): JSX.Element => {
   );
 };
 
+const NestedHarness = ({
+  onCloseDialog,
+  onClosePopover,
+}: {
+  onCloseDialog: () => void;
+  onClosePopover: () => void;
+}): JSX.Element => {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const dialogRef = useModalDialog({
+    onClose: () => {
+      setIsDialogOpen(false);
+      onCloseDialog();
+    },
+    open: isDialogOpen,
+  });
+  useEscapeKey(isPopoverOpen, () => {
+    setIsPopoverOpen(false);
+    onClosePopover();
+  });
+
+  return (
+    <div>
+      <button
+        onClick={() => {
+          setIsDialogOpen(true);
+        }}
+        type="button"
+      >
+        Open dialog
+      </button>
+      {isDialogOpen ? (
+        <div ref={dialogRef} role="dialog" tabIndex={-1}>
+          <button
+            onClick={() => {
+              setIsPopoverOpen(true);
+            }}
+            type="button"
+          >
+            Open popover
+          </button>
+          {isPopoverOpen ? <button type="button">Popover action</button> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
 const OutsideClickHarness = ({ enabled }: { enabled: boolean }): JSX.Element => {
   const [dismissed, setDismissed] = useState(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -154,6 +202,46 @@ describe('modal dialog focus and dismissal', () => {
 
     fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
     expect(document.activeElement).toBe(last);
+  });
+});
+
+describe('dismiss layer order', () => {
+  it('closes the popover opened inside a dialog before the dialog', () => {
+    const onCloseDialog = vi.fn();
+    const onClosePopover = vi.fn();
+    render(<NestedHarness onCloseDialog={onCloseDialog} onClosePopover={onClosePopover} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open dialog' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open popover' }));
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    // eslint-disable-next-line vitest/prefer-called-times -- vitest/prefer-called-once is also enabled and prefers the singular matcher.
+    expect(onClosePopover).toHaveBeenCalledOnce();
+    expect(onCloseDialog).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeNull();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    // eslint-disable-next-line vitest/prefer-called-times -- vitest/prefer-called-once is also enabled and prefers the singular matcher.
+    expect(onCloseDialog).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('gives Escape to a dialog opened over an open popover', () => {
+    const onClose = vi.fn();
+    render(
+      <div>
+        <EscapeHarness enabled />
+        <DialogHarness onClose={onClose} />
+      </div>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Open settings' }));
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    // eslint-disable-next-line vitest/prefer-called-times -- vitest/prefer-called-once is also enabled and prefers the singular matcher.
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Dismissed 0' })).toBeDefined();
   });
 });
 

@@ -24,12 +24,66 @@ const useLatestRef = <TValue>(value: TValue): RefObject<TValue> => {
   return valueRef;
 };
 
+interface DismissLayer {
+  readonly dismissOnEscape?: () => void;
+  readonly dismissOnPointerDown?: (event: PointerEvent) => void;
+}
+
 /*
- * A control that already handled Escape has called `preventDefault`, and the
- * surface behind it must not dismiss as well. A native `<select>` needs no
- * guard of its own: the browser keeps keys for an open popup, so a focused
- * select still lets Escape reach the dialog.
+ * A surface joins the stack when it becomes dismissible and leaves when it
+ * stops. Only the topmost surface that handles a gesture acts on it, so a
+ * modal covering a popover takes the Escape that closes the modal instead of
+ * both, and the ordering follows the order the surfaces opened.
  */
+const dismissLayers: DismissLayer[] = [];
+let isListening = false;
+
+const findTopLayer = (matches: (layer: DismissLayer) => boolean): DismissLayer | undefined =>
+  dismissLayers.findLast(layer => matches(layer));
+
+const handleKeyDown = (event: KeyboardEvent): void => {
+  if (event.key !== 'Escape' || event.defaultPrevented) {
+    return;
+  }
+
+  const layer = findTopLayer(candidate => candidate.dismissOnEscape !== undefined);
+  if (layer?.dismissOnEscape === undefined) {
+    return;
+  }
+
+  event.preventDefault();
+  layer.dismissOnEscape();
+};
+
+const handlePointerDown = (event: PointerEvent): void => {
+  findTopLayer(candidate => candidate.dismissOnPointerDown !== undefined)?.dismissOnPointerDown?.(
+    event
+  );
+};
+
+const pushLayer = (layer: DismissLayer): void => {
+  dismissLayers.push(layer);
+
+  if (!isListening) {
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    isListening = true;
+  }
+};
+
+const removeLayer = (layer: DismissLayer): void => {
+  const index = dismissLayers.lastIndexOf(layer);
+  if (index !== -1) {
+    dismissLayers.splice(index, 1);
+  }
+
+  if (dismissLayers.length === 0 && isListening) {
+    document.removeEventListener('keydown', handleKeyDown);
+    document.removeEventListener('pointerdown', handlePointerDown, true);
+    isListening = false;
+  }
+};
+
 export const useEscapeKey = (enabled: boolean, onEscape: () => void): void => {
   const onEscapeRef = useLatestRef(onEscape);
 
@@ -38,19 +92,15 @@ export const useEscapeKey = (enabled: boolean, onEscape: () => void): void => {
       return;
     }
 
-    const handleKeyDown = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape' || event.defaultPrevented) {
-        return;
-      }
-
-      event.preventDefault();
-      onEscapeRef.current();
+    const layer: DismissLayer = {
+      dismissOnEscape: () => {
+        onEscapeRef.current();
+      },
     };
-
-    document.addEventListener('keydown', handleKeyDown);
+    pushLayer(layer);
 
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      removeLayer(layer);
     };
   }, [enabled, onEscapeRef]);
 };
@@ -71,23 +121,24 @@ export const useDismissOnOutsideClick = ({
       return;
     }
 
-    const handlePointerDown = (event: PointerEvent): void => {
-      const target = targetRef.current;
-      if (target === null) {
-        return;
-      }
+    const layer: DismissLayer = {
+      dismissOnPointerDown: (event: PointerEvent) => {
+        const target = targetRef.current;
+        if (target === null) {
+          return;
+        }
 
-      if (event.target instanceof Node && target.contains(event.target)) {
-        return;
-      }
+        if (event.target instanceof Node && target.contains(event.target)) {
+          return;
+        }
 
-      onDismissRef.current();
+        onDismissRef.current();
+      },
     };
-
-    document.addEventListener('pointerdown', handlePointerDown, true);
+    pushLayer(layer);
 
     return () => {
-      document.removeEventListener('pointerdown', handlePointerDown, true);
+      removeLayer(layer);
     };
   }, [enabled, onDismissRef, targetRef]);
 };
@@ -125,15 +176,7 @@ export const useModalDialog = ({
       (firstFocusable ?? dialog).focus();
     }
 
-    const handleKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        if (!event.defaultPrevented) {
-          event.preventDefault();
-          onCloseRef.current();
-        }
-        return;
-      }
-
+    const handleTab = (event: KeyboardEvent): void => {
       if (event.key !== 'Tab') {
         return;
       }
@@ -164,10 +207,18 @@ export const useModalDialog = ({
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleTab);
+
+    const layer: DismissLayer = {
+      dismissOnEscape: () => {
+        onCloseRef.current();
+      },
+    };
+    pushLayer(layer);
 
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleTab);
+      removeLayer(layer);
 
       if (previouslyFocused !== null && previouslyFocused.isConnected) {
         previouslyFocused.focus();

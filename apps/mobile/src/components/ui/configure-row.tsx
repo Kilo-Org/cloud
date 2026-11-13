@@ -46,6 +46,12 @@ type ConfigureRowProps = {
    */
   subtitlePlaceholder?: ReactNode;
   /**
+   * One more muted line under the subtitle, for a row that must say why it
+   * offers nothing to change (an integration the viewer's role cannot manage).
+   * Wraps: it is a sentence, not a value, so it takes the row's full width.
+   */
+  note?: string;
+  /**
    * Semantic tone override (good / warn / danger). When omitted the row uses
    * the shared neutral tile, so every row in a settings list carries the same
    * accent instead of a hue hashed from its title.
@@ -81,6 +87,7 @@ export function ConfigureRow({
   subtitle,
   subtitleNumberOfLines,
   subtitlePlaceholder,
+  note,
   tone,
   hue,
   onPress,
@@ -151,6 +158,11 @@ export function ConfigureRow({
         {title}
       </Text>
       {subtitleNode}
+      {note ? (
+        <Text className="mt-1 text-xs text-muted-foreground" numberOfLines={3}>
+          {note}
+        </Text>
+      ) : null}
     </View>
   );
 

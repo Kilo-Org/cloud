@@ -129,6 +129,57 @@ function rolesFor(
 }
 
 /**
+ * Roles a provider's hub row names when it offers the viewer no action. The hub
+ * hint names {@link ORGANIZATION_MANAGE_ROLES}, so a provider whose manager set
+ * names no such role would be misdescribed by it: the Bitbucket page admits
+ * owners and billing managers only, and an admin cannot change it. A note keyed
+ * by the exact set keeps the sentence true for each provider instead of
+ * widening the set or narrowing the hint.
+ */
+const MANAGER_NOTE_KEYS: readonly {
+  roles: readonly OrganizationRole[];
+  key: string;
+}[] = [{ roles: BITBUCKET_ROLES, key: 'integrations.rowManagedByOwnersAndBilling' }];
+
+/** The hub hint's own role set; a note is needed only where this set cannot act. */
+const HUB_HINT_ROLES = ORGANIZATION_MANAGE_ROLES;
+
+/**
+ * The roles this action requires, or `null` when any member may take it.
+ */
+export function providerManagerRoles(input: {
+  provider: IntegrationProvider;
+  action: IntegrationAction;
+  installed?: boolean;
+}): readonly OrganizationRole[] | null {
+  return rolesFor(PROVIDERS[input.provider], input.action, input.installed);
+}
+
+/**
+ * The key of the sentence a row shows when the viewer can take no action on it
+ * and the hub hint would misdirect. The hint is true only where every role it
+ * names can act — Bitbucket's `owner` is such a role and its `admin` is not, so
+ * the hint would send a member to a role the page turns away. Undefined when
+ * the hint's roles all act, and for a provider set the table does not cover.
+ */
+export function providerBlockedNoteKey(input: {
+  provider: IntegrationProvider;
+  action: IntegrationAction;
+  installed?: boolean;
+}): string | undefined {
+  const roles = providerManagerRoles(input);
+  if (roles === null) {
+    return undefined;
+  }
+  if (HUB_HINT_ROLES.every(hintRole => roles.includes(hintRole))) {
+    return undefined;
+  }
+  return MANAGER_NOTE_KEYS.find(
+    entry => entry.roles.length === roles.length && entry.roles.every(role => roles.includes(role))
+  )?.key;
+}
+
+/**
  * Whether the viewer may take this action on this provider's connection. The
  * personal scope belongs to the viewer, so every action is theirs. In an
  * organization the answer follows the server procedure that would run, action

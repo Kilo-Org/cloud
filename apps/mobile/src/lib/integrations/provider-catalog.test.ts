@@ -5,6 +5,7 @@ import {
   INTEGRATION_PROVIDERS,
   type IntegrationProvider,
   integrationScope,
+  providerBlockedNoteKey,
   providerLabelKey,
   visibleIntegrationProviders,
 } from './provider-catalog';
@@ -131,6 +132,31 @@ describe('canManageProvider', () => {
         })
       ).toBe(false);
     }
+  });
+});
+
+describe('providerBlockedNoteKey', () => {
+  it('names the roles for the Bitbucket row, whose set omits an admin', () => {
+    for (const action of ['connect', 'disconnect'] as const) {
+      expect(providerBlockedNoteKey({ provider: 'bitbucket', action, installed: true })).toBe(
+        'integrations.rowManagedByOwnersAndBilling'
+      );
+    }
+  });
+
+  it('stays quiet where the hub hint names only roles that can act', () => {
+    const providers = ['github', 'slack', 'gitlab', 'discord', 'linear'] as const;
+    for (const provider of providers) {
+      for (const action of ['connect', 'disconnect'] as const) {
+        expect(providerBlockedNoteKey({ provider, action, installed: true })).toBeUndefined();
+      }
+    }
+  });
+
+  it('has no note for a connect any member may take', () => {
+    expect(
+      providerBlockedNoteKey({ provider: 'gitlab', action: 'connect', installed: false })
+    ).toBeUndefined();
   });
 });
 

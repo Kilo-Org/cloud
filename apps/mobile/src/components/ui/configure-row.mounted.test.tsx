@@ -55,6 +55,7 @@ function renderRow(
     disabled?: boolean;
     /** `false` renders the inert row a display-only row is: no Pressable at all. */
     pressable?: boolean;
+    note?: string;
   } = {}
 ) {
   act(() => {
@@ -65,6 +66,7 @@ function renderRow(
       ...(props.pressable === false ? {} : { onPress: () => undefined }),
       ...(props.tone === undefined ? {} : { tone: props.tone }),
       ...(props.disabled === undefined ? {} : { disabled: props.disabled }),
+      ...(props.note === undefined ? {} : { note: props.note }),
     });
     if (renderer) {
       renderer.update(element);
@@ -236,5 +238,27 @@ describe('ConfigureRow disabled cue', () => {
     // no state of its own to announce from a node a reader never reaches.
     expect(root.findAllByType('Pressable' as never)).toHaveLength(0);
     expect(root.findAll(node => node.props.accessibilityState !== undefined)).toHaveLength(0);
+  });
+});
+
+describe('ConfigureRow note', () => {
+  const NOTE = 'Only organization owners and billing managers can change this connection.';
+
+  it('renders the note as one more muted line under the subtitle', () => {
+    const root = renderRow({ note: NOTE });
+
+    expect(textOf(root, NOTE)).toEqual(
+      expect.arrayContaining(['mt-1', 'text-xs', 'text-muted-foreground'])
+    );
+    // It is a sentence, so it wraps instead of ellipsizing like a value does.
+    const note = root.find(
+      node => Object.is(node.type, 'Text') && Object.is(node.props.children, NOTE)
+    );
+    expect(note.props.numberOfLines).toBe(3);
+    expect(textOf(root, 'Transcribe')).toContain('mt-0.5');
+  });
+
+  it('renders only the title and subtitle when a row has no note', () => {
+    expect(renderRow().findAll(node => Object.is(node.type, 'Text'))).toHaveLength(2);
   });
 });

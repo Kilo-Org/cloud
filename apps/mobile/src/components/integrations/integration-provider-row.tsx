@@ -19,6 +19,7 @@ import {
   canManageProvider,
   type IntegrationProvider,
   type IntegrationScope,
+  providerBlockedNoteKey,
   providerLabelKey,
 } from '@/lib/integrations/provider-catalog';
 
@@ -133,12 +134,24 @@ export function IntegrationProviderRow({
     ) : null;
   }
 
+  // A row that offers the viewer nothing names the roles that can change it,
+  // but only where the hub hint's own roles cannot all act on that row.
+  const blockedNoteKey =
+    action == null && !row.actionPending
+      ? providerBlockedNoteKey({
+          provider: row.provider,
+          action: row.installed ? 'disconnect' : 'connect',
+          installed: row.installed,
+        })
+      : undefined;
+
   return (
     <ConfigureRow
       icon={PROVIDER_ICONS[row.provider]}
       title={label}
       subtitle={subtitle}
       subtitleNumberOfLines={1}
+      note={blockedNoteKey ? t(blockedNoteKey) : undefined}
       trailing={action}
       last={last}
     />

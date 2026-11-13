@@ -14,6 +14,9 @@ import { IntegrationsScreen } from './integrations-screen';
 type SetupStatusRow = { platform: string; installed: boolean; installation?: unknown };
 
 const MEMBER_HINT = 'Ask an organization owner or admin to change these connections.';
+// Bitbucket's page admits owners and billing managers, so the hub hint's
+// "owner or admin" would send a member to a role that cannot change it.
+const BITBUCKET_NOTE = 'Only organization owners and billing managers can change this connection.';
 
 const GITHUB_CONNECTION = {
   id: 'gh-1',
@@ -122,10 +125,15 @@ vi.mock('@/components/ui/text', () => ({
 // Each row carries its action as a child, so a test can ask one row for its
 // button instead of inspecting the trailing element it was handed.
 vi.mock('@/components/ui/configure-row', () => ({
-  ConfigureRow: (props: { title?: string; subtitle?: string; trailing?: ReactNode }) =>
+  ConfigureRow: (props: {
+    title?: string;
+    subtitle?: string;
+    note?: string;
+    trailing?: ReactNode;
+  }) =>
     createElement(
       'RowMock',
-      { title: props.title, subtitle: props.subtitle },
+      { title: props.title, subtitle: props.subtitle, note: props.note },
       props.trailing ?? null
     ),
 }));
@@ -319,6 +327,45 @@ describe('IntegrationsScreen', () => {
     expect(texts(root)).not.toContain(MEMBER_HINT);
   });
 
+  it('names the roles that can change a blocked Bitbucket row for a member', () => {
+    state.role = 'member';
+    state.statuses.data = [
+      { platform: 'github', installed: true, installation: { accountLogin: 'acme' } },
+      { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
+    ];
+    const root = mount('org-1').root;
+
+    // The hub hint sends a member to an owner or an admin; Bitbucket's page
+    // only lets an owner change the connection, so the row says so itself.
+    expect(texts(root)).toContain(MEMBER_HINT);
+    expect(rowTitled(root, 'Bitbucket').props.note).toBe(BITBUCKET_NOTE);
+    // GitHub's manager set is the one the hint names, so its row stays quiet.
+    expect(rowTitled(root, 'GitHub').props.note).toBeUndefined();
+  });
+
+  it('names the roles that can change a blocked Bitbucket row for an admin', () => {
+    state.role = 'admin';
+    state.statuses.data = [
+      { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
+    ];
+    const root = mount('org-1').root;
+
+    // No hub hint for an admin, and the hint would be wrong for this row anyway.
+    expect(texts(root)).not.toContain(MEMBER_HINT);
+    expect(rowTitled(root, 'Bitbucket').props.note).toBe(BITBUCKET_NOTE);
+  });
+
+  it('leaves the Bitbucket row quiet for an owner, who is offered its action', () => {
+    state.role = 'owner';
+    state.statuses.data = [
+      { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
+    ];
+    const root = mount('org-1').root;
+
+    expect(actionOf(rowTitled(root, 'Bitbucket'))).not.toBeNull();
+    expect(rowTitled(root, 'Bitbucket').props.note).toBeUndefined();
+  });
+
   it('never explains the rows in the personal scope', () => {
     state.role = 'member';
     state.statuses.data = [
@@ -328,6 +375,8 @@ describe('IntegrationsScreen', () => {
 
     expect(findOne(root, 'RowMock').every(row => actionOf(row) != null)).toBe(true);
     expect(texts(root)).not.toContain(MEMBER_HINT);
+    // The personal scope belongs to the viewer, so no row is blocked.
+    expect(findOne(root, 'RowMock').every(row => row.props.note === undefined)).toBe(true);
   });
 
   it('names the organization in the header of the organization scope', () => {

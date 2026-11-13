@@ -55,7 +55,9 @@ export function getChildSessionTaskStatus({
   }
 
   // A completed background tool acknowledges dispatch, not child completion.
-  if (isBackgroundChildTask(taskToolPart))
-    return hydrationState?.status === 'error' ? 'unavailable' : 'running';
+  if (isBackgroundChildTask(taskToolPart) && hydrationState)
+    return hydrationState.status === 'idle' || hydrationState.status === 'loading'
+      ? 'running'
+      : 'unavailable';
   return taskStatus;
 }

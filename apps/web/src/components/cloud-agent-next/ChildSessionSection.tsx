@@ -182,7 +182,7 @@ function ChildSessionSectionBody({
       {statusLabel && (
         <span
           className={taskStatus === 'error' ? 'text-destructive' : undefined}
-          title={taskStatus === 'unavailable' ? 'Could not load sub-agent history.' : undefined}
+          title={taskStatus === 'unavailable' ? 'Sub-agent status is unavailable.' : undefined}
         >
           {statusLabel}
         </span>

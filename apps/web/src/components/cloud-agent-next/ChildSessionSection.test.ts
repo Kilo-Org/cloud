@@ -315,7 +315,8 @@ describe('ChildSessionSection live subscription', () => {
         )
       );
       const button = container.querySelector('button');
-      expect(button?.firstElementChild?.textContent).toContain(label);
+      const summary = button?.firstElementChild?.children[2];
+      expect(summary?.firstElementChild?.textContent).toBe(label);
       expect(button?.children).toHaveLength(1);
     }
   );
@@ -332,8 +333,9 @@ describe('ChildSessionSection live subscription', () => {
       )
     );
     const button = container.querySelector('button');
-    expect(button?.firstElementChild?.textContent).toContain('Working');
-    expect(button?.firstElementChild?.textContent).toContain('1 tool call');
+    const summary = button?.firstElementChild?.children[2];
+    expect(summary?.firstElementChild?.textContent).toBe('Working');
+    expect(summary?.lastElementChild?.textContent).toBe('1 tool call');
     expect(button?.children).toHaveLength(2);
     expect(button?.lastElementChild?.textContent).toBe('Read /repo/file.ts');
   });
@@ -372,58 +374,85 @@ describe('ChildSessionSection live subscription', () => {
     expect(container.querySelector('button')?.hasAttribute('aria-busy')).toBe(false);
   });
 
-  it('shows unavailable status after a history failure and recovers when history loads', async () => {
-    const store = createStore();
-    const messages = atom<StoredMessage[]>([]);
-    const hydration = atom<ChildSessionHydrationState>({ status: 'idle' });
-    const hydrateChildSession = jest.fn(async () => {
-      store.set(hydration, { status: 'error', message: 'Synthetic history failure' });
-    });
-    const onOpenChildSession = jest.fn();
-    jest.mocked(useOptionalManager).mockReturnValue({
-      atoms: {
-        childMessages: atom(get => {
-          const current = get(messages);
-          return () => current;
-        }),
-        childSessionHydrationState: atom(get => {
-          const current = get(hydration);
-          return () => current;
-        }),
-      },
-      hydrateChildSession,
-    } as unknown as SessionManager);
-    await act(async () =>
-      root?.render(
-        createElement(
-          Provider,
-          { store },
-          createElement(ChildSessionSection, {
-            taskToolPart: taskToolPart({ sessionId: childSessionId, status: 'running' }),
-            sessionId: childSessionId,
-            onOpenChildSession,
-          })
+  it.each([
+    { status: 'error', message: 'Synthetic history failure' },
+    {
+      status: 'ready',
+      cursor: null,
+      hasOlder: false,
+      isLoadingOlder: false,
+      olderError: null,
+      omittedItemCount: 0,
+    },
+  ] satisfies ChildSessionHydrationState[])(
+    'shows unavailable status after history becomes $status without messages and recovers when messages arrive',
+    async hydrationResult => {
+      const store = createStore();
+      const messages = atom<StoredMessage[]>([]);
+      const hydration = atom<ChildSessionHydrationState>({ status: 'idle' });
+      const hydrateChildSession = jest.fn(async () => {
+        store.set(hydration, hydrationResult);
+      });
+      const onOpenChildSession = jest.fn();
+      jest.mocked(useOptionalManager).mockReturnValue({
+        atoms: {
+          childMessages: atom(get => {
+            const current = get(messages);
+            return () => current;
+          }),
+          childSessionHydrationState: atom(get => {
+            const current = get(hydration);
+            return () => current;
+          }),
+        },
+        hydrateChildSession,
+      } as unknown as SessionManager);
+      await act(async () =>
+        root?.render(
+          createElement(
+            Provider,
+            { store },
+            createElement(ChildSessionSection, {
+              taskToolPart: taskToolPart({ sessionId: childSessionId, status: 'running' }),
+              sessionId: childSessionId,
+              onOpenChildSession,
+            })
+          )
         )
+      );
+      expect(container.textContent).toContain('Status unavailable');
+      expect(container.textContent).not.toContain('Failed');
+      const button = container.querySelector('button');
+      if (!button) throw new Error('Missing child transcript control');
+      expect(button.hasAttribute('aria-busy')).toBe(false);
+      expect(hydrateChildSession).toHaveBeenCalledTimes(1);
+      click(button);
+      expect(onOpenChildSession).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionId: childSessionId })
+      );
+      act(() => store.set(hydration, { status: 'loading' }));
+      expect(container.textContent).toContain('Working');
+      expect(button.getAttribute('aria-busy')).toBe('true');
+      act(() => store.set(messages, [childMessageWithTools(1)]));
+      expect(container.textContent).toContain('Completed');
+      expect(container.textContent).not.toContain('Status unavailable');
+      expect(button.hasAttribute('aria-busy')).toBe(false);
+      expect(hydrateChildSession).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('uses completed tool status for a background task without a manager or child history', () => {
+    act(() =>
+      root?.render(
+        createElement(ChildSessionSection, {
+          taskToolPart: taskToolPart({ sessionId: childSessionId, status: 'running' }),
+          sessionId: childSessionId,
+        })
       )
     );
-    expect(container.textContent).toContain('Status unavailable');
-    expect(container.textContent).not.toContain('Failed');
-    const button = container.querySelector('button');
-    if (!button) throw new Error('Missing child transcript control');
-    expect(button.hasAttribute('aria-busy')).toBe(false);
-    expect(hydrateChildSession).toHaveBeenCalledTimes(1);
-    click(button);
-    expect(onOpenChildSession).toHaveBeenCalledWith(
-      expect.objectContaining({ sessionId: childSessionId })
-    );
-    act(() => store.set(hydration, { status: 'loading' }));
-    expect(container.textContent).toContain('Working');
-    expect(button.getAttribute('aria-busy')).toBe('true');
-    act(() => store.set(messages, [childMessageWithTools(1)]));
     expect(container.textContent).toContain('Completed');
-    expect(container.textContent).not.toContain('Status unavailable');
-    expect(button.hasAttribute('aria-busy')).toBe(false);
-    expect(hydrateChildSession).toHaveBeenCalledTimes(1);
+    expect(container.textContent).not.toContain('Working');
+    expect(container.querySelector('[aria-busy="true"]')).toBeNull();
   });
 
   it('passes the current live getter into an open recursive transcript and refreshes it from SDK state', () => {

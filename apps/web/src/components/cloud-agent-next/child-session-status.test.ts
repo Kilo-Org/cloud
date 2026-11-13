@@ -1,3 +1,4 @@
+import type { ChildSessionHydrationState } from '@kilocode/cloud-agent-sdk';
 import type { SessionStatus } from '@kilocode/cloud-agent-sdk/schemas';
 import { getChildSessionTaskStatus, isBackgroundChildTask } from './child-session-status';
 import type { StoredMessage, ToolPart } from './types';
@@ -52,16 +53,40 @@ describe('isBackgroundChildTask', () => {
   ] as const)('reads incomplete completed tool fields safely: %j', (fields, background) => {
     const incompleteTask = { ...task, state: { status: 'completed', ...fields } } as ToolPart;
     expect(isBackgroundChildTask(incompleteTask)).toBe(background);
-    expect(getChildSessionTaskStatus({ taskToolPart: incompleteTask, childMessages: [] })).toBe(
-      background ? 'running' : 'completed'
-    );
+    expect(
+      getChildSessionTaskStatus({
+        taskToolPart: incompleteTask,
+        childMessages: [],
+        hydrationState: { status: 'loading' },
+      })
+    ).toBe(background ? 'running' : 'completed');
   });
 });
 
 describe('getChildSessionTaskStatus', () => {
-  it('does not treat background dispatch as child completion before messages arrive', () => {
-    expect(getChildSessionTaskStatus({ taskToolPart: task, childMessages: [] })).toBe('running');
-  });
+  it.each([
+    [undefined, 'completed'],
+    [{ status: 'idle' }, 'running'],
+    [{ status: 'loading' }, 'running'],
+    [
+      {
+        status: 'ready',
+        cursor: null,
+        hasOlder: false,
+        isLoadingOlder: false,
+        olderError: null,
+        omittedItemCount: 0,
+      },
+      'unavailable',
+    ],
+  ] satisfies [ChildSessionHydrationState | undefined, string][])(
+    'uses hydration state %j when background child evidence is missing',
+    (hydrationState, expected) => {
+      expect(
+        getChildSessionTaskStatus({ taskToolPart: task, childMessages: [], hydrationState })
+      ).toBe(expected);
+    }
+  );
 
   it('does not claim a child is working or failed when its history cannot load', () => {
     expect(
@@ -159,12 +184,13 @@ describe('getChildSessionTaskStatus', () => {
     );
   });
 
-  it('does not mistake an unrecognized status for completion', () => {
+  it('keeps loading background history active when the live status is unrecognized', () => {
     expect(
       getChildSessionTaskStatus({
         taskToolPart: task,
         childMessages: [],
         sessionStatus: { type: 'future-status' },
+        hydrationState: { status: 'loading' },
       })
     ).toBe('running');
   });

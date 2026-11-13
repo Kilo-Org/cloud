@@ -115,7 +115,6 @@ describe('apple-store-sdk', () => {
       1234567890
     );
   });
-
   it('accepts a production environment with its numeric App ID', () => {
     process.env.APPLE_IAP_ENVIRONMENT = 'Production';
     const { createAppleStoreSignedDataVerifier } = loadAppleStoreSdk();

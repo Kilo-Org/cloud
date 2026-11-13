@@ -1,0 +1,17 @@
+{
+  "name": "pages",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "predeploy": "pnpm run build",
+    "deploy": "wrangler deploy",
+    "pin": "node scripts/pin.mjs",
+    "test": "node --test scripts/*.test.mjs",
+    "typecheck": "node --check scripts/build.mjs && node --check scripts/package.mjs && node --check scripts/pin.mjs"
+  },
+  "devDependencies": {
+    "jsonc-parser": "3.3.1",
+    "wrangler": "catalog:"
+  }
+}

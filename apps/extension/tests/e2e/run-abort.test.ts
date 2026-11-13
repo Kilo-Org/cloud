@@ -41,9 +41,7 @@ test('new conversation keeps the running request in its original tab', async () 
     await expect(sidePanel.getByRole('button', { name: 'Stop' })).toBeVisible();
     await sidePanel.getByLabel('New conversation').click();
 
-    const emptyHint = sidePanel
-      .getByLabel('Agent conversation')
-      .getByText('Pick a tab and ask Kilo to inspect it.');
+    const emptyHint = sidePanel.getByLabel('Agent conversation').getByText(/Ask Kilo about /u);
     await expect(emptyHint).toBeVisible();
     const hintBox = await emptyHint.boundingBox();
     expect(hintBox).not.toBeNull();

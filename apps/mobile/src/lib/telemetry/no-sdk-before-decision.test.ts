@@ -46,6 +46,7 @@ const hoisted = vi.hoisted(() => {
 
   // Fresh controller — no decision set.
   const controller = {
+    allowsMandatory: vi.fn().mockReturnValue(false),
     allowsOptional: vi.fn().mockReturnValue(false),
     currentGeneration: vi.fn().mockReturnValue(0),
   };
@@ -54,7 +55,9 @@ const hoisted = vi.hoisted(() => {
 });
 
 vi.mock('posthog-react-native', () => ({
-  default: vi.fn(() => hoisted.client),
+  default: vi.fn(function PostHogMock() {
+    return hoisted.client;
+  }),
   PostHogPersistedProperty: {
     Queue: 'queue',
     LogsQueue: 'logs_queue',
@@ -86,6 +89,7 @@ vi.mock('@/lib/config', () => ({
 }));
 
 vi.mock('@/lib/telemetry/controller', () => ({
+  allowsMandatory: hoisted.controller.allowsMandatory,
   allowsOptional: hoisted.controller.allowsOptional,
   currentGeneration: hoisted.controller.currentGeneration,
 }));
@@ -144,6 +148,7 @@ describe('no SDK starts before a telemetry decision', () => {
   });
 
   it('importing posthog does not construct PostHog', async () => {
+    hoisted.controller.allowsMandatory.mockReturnValue(false);
     hoisted.controller.allowsOptional.mockReturnValue(false);
     hoisted.controller.currentGeneration.mockReturnValue(0);
     vi.clearAllMocks();
@@ -166,6 +171,7 @@ describe('no SDK starts before a telemetry decision', () => {
   });
 
   it('initPostHog with a fresh controller does not construct PostHog', async () => {
+    hoisted.controller.allowsMandatory.mockReturnValue(false);
     hoisted.controller.allowsOptional.mockReturnValue(false);
     hoisted.controller.currentGeneration.mockReturnValue(0);
     vi.clearAllMocks();
@@ -175,6 +181,23 @@ describe('no SDK starts before a telemetry decision', () => {
 
     const PostHogModule = await import('posthog-react-native');
     expect(PostHogModule.default).not.toHaveBeenCalled();
+  });
+
+  it('initPostHog after the consent decision constructs a capture-free client', async () => {
+    // The invariant is "no SDK before the decision", not "no SDK without
+    // optional consent": a decided account still evaluates feature flags, with
+    // every capture path closed.
+    hoisted.controller.allowsMandatory.mockReturnValue(true);
+    hoisted.controller.allowsOptional.mockReturnValue(false);
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+    vi.clearAllMocks();
+
+    const posthog = await loadPostHogModule();
+    posthog.initPostHog();
+
+    const PostHogModule = await import('posthog-react-native');
+    expect(PostHogModule.default).toHaveBeenCalledTimes(1);
+    expect(hoisted.client.capture).not.toHaveBeenCalled();
   });
 
   it('initAppsFlyer with a fresh controller does not call the SDK', async () => {

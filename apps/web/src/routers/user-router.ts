@@ -60,7 +60,7 @@ import { AuthProviderIdSchema, isAccountLinkingProvider } from '@/lib/auth/provi
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { AUTOCOMPLETE_MODEL } from '@kilocode/web-shared/lib/constants';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
-import { createAutoTopUpSetupCheckoutSession } from '@/lib/stripe';
+import { createAutoTopUpSetupCheckoutSession, getStripeInvoicesPage } from '@/lib/stripe';
 import {
   reportChargeAttempted,
   ipCountryFromHeaders,
@@ -253,6 +253,12 @@ const CreditPurchaseHistoryOutputSchema = z.object({
       description: z.string(),
       amount_mUsd: z.number().positive(),
       expiryDate: z.iso.datetime().nullable(),
+      /**
+       * The recorded purchase channel (`stripe`, `apple`, `google_play`, …),
+       * null for rows recorded before the column existed. A client shows a card
+       * purchase's receipt and points a store purchase at the store instead.
+       */
+      creditSource: z.string().nullable(),
     })
   ),
   nextCursor: z.number().int().positive().nullable(),
@@ -273,6 +279,11 @@ const CreditPurchaseConfirmationOutputSchema = z.object({
 
 const CreditPurchaseReceiptOutputSchema = z.object({
   url: z.url().nullable(),
+});
+
+const PersonalInvoicesPageInputSchema = z.object({
+  period: PeriodSchema.default('month'),
+  cursor: z.string().optional(),
 });
 
 type RawDeduction = {
@@ -364,6 +375,8 @@ function getDeductionKind(
   return 'deduction';
 }
 
+const STORE_CREDIT_PURCHASE_SOURCES = ['apple', 'google_play'];
+
 function getPersonalTopUpConditions(userId: string) {
   return and(
     eq(credit_transactions.kilo_user_id, userId),
@@ -371,7 +384,14 @@ function getPersonalTopUpConditions(userId: string) {
     eq(credit_transactions.is_free, false),
     gt(credit_transactions.amount_microdollars, 0),
     isNotNull(credit_transactions.stripe_payment_id),
-    inArray(credit_transactions.description, PERSONAL_TOP_UP_DESCRIPTIONS)
+    // A paid credit grant reaches this list through its purchase channel: a
+    // card top-up through its Stripe description, an in-app pack through the
+    // store that sold it. The store's record is the receipt, so the row is
+    // listed here without a Stripe invoice behind it.
+    or(
+      inArray(credit_transactions.description, PERSONAL_TOP_UP_DESCRIPTIONS),
+      inArray(credit_transactions.credit_source, STORE_CREDIT_PURCHASE_SOURCES)
+    )
   );
 }
 
@@ -615,6 +635,26 @@ export const userRouter = createTRPCRouter({
       isAdmin: ctx.user.is_admin,
     });
   }),
+
+  /**
+   * The profile links the account form edits. Separate from `getMe`, which
+   * every screen reads on boot and would otherwise carry fields only one form
+   * needs.
+   */
+  getProfileLinks: baseProcedure
+    .output(z.object({ linkedinUrl: z.string().nullable(), githubUrl: z.string().nullable() }))
+    .query(async ({ ctx }) => {
+      const [row] = await db
+        .select({
+          linkedin_url: kilocode_users.linkedin_url,
+          github_url: kilocode_users.github_url,
+        })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, ctx.user.id))
+        .limit(1);
+
+      return { linkedinUrl: row?.linkedin_url ?? null, githubUrl: row?.github_url ?? null };
+    }),
 
   // Whether the caller has any Kilo gateway usage. Any `microdollar_usage` row
   // for the user counts (org-scoped and zero-cost free-model rows included), so
@@ -869,6 +909,7 @@ export const userRouter = createTRPCRouter({
           description: credit_transactions.description,
           amount_mUsd: credit_transactions.amount_microdollars,
           expiryDate: credit_transactions.expiry_date,
+          creditSource: credit_transactions.credit_source,
         })
         .from(credit_transactions)
         .where(getTopUpConditions(ctx.user.id, input.organizationId))
@@ -886,6 +927,7 @@ export const userRouter = createTRPCRouter({
             : 'Credit purchase',
         amount_mUsd: transaction.amount_mUsd,
         expiryDate: transaction.expiryDate ? new Date(transaction.expiryDate).toISOString() : null,
+        creditSource: transaction.creditSource,
       }));
 
       return {
@@ -961,6 +1003,28 @@ export const userRouter = createTRPCRouter({
         skipInAutomatedTest: true,
       });
       return { url };
+    }),
+
+  /**
+   * The personal counterpart of `organizations.invoicesPage`: the same
+   * cursor-paginated Stripe invoice page the web `/invoices` page reads, scoped
+   * to the caller's own customer instead of an organization's.
+   */
+  invoicesPage: baseProcedure
+    .input(PersonalInvoicesPageInputSchema)
+    .query(async ({ ctx, input }) => {
+      const stripeCustomerId = ctx.user.stripe_customer_id;
+      if (!stripeCustomerId) {
+        // A person with no Stripe customer has never been billed, so the page
+        // is empty; a read never creates a customer.
+        return { entries: [], hasMore: false, nextCursor: null };
+      }
+      const threshold = getDateThreshold(input.period);
+      return await getStripeInvoicesPage(
+        stripeCustomerId,
+        threshold ? new Date(threshold) : null,
+        input.cursor
+      );
     }),
 
   getBalance: baseProcedure

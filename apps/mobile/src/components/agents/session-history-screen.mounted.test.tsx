@@ -355,7 +355,6 @@ vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'account' }
 // The shared scope control reaches the skeleton (expo-linear-gradient) and the
 // theme colors (expo-router themes); neither is the subject of this suite.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/context-picker-sheet', () => ({ ContextPickerSheet: 'ContextPickerSheet' }));
 vi.mock('@/lib/a11y/motion', () => ({ useMotionPolicy: () => ({ reducedMotion: false }) }));
 
 const mountedRenderers: TestRenderer.ReactTestRenderer[] = [];

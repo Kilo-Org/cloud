@@ -238,3 +238,79 @@ diff --git a/types_generated/Libraries/Components/TextInput/TextInput.d.ts b/typ
 -declare type $$TextInput = typeof $$TextInput;
 +declare type $$TextInput = TextInputInstance;
  export default $$TextInput;
+diff --git a/Libraries/Renderer/implementations/ReactFabric-dev.js b/Libraries/Renderer/implementations/ReactFabric-dev.js
+index 615eb91780098d8082c560978b92b9f7bb4f973f..3ddb498770d7205d3137b2052d099646b90bd1ff 100644
+--- a/Libraries/Renderer/implementations/ReactFabric-dev.js
++++ b/Libraries/Renderer/implementations/ReactFabric-dev.js
+@@ -17166,7 +17166,16 @@ __DEV__ &&
+       });
+       return suspendedState;
+     }
++    function kiloViewTagBase() {
++      try {
++        var base = globalThis.__kiloViewTagBase;
++        return "number" === typeof base && base > 0 ? base : 0;
++      } catch (_error) {
++        return 0;
++      }
++    }
+     function allocateTag() {
++      if (-1 === nextReactTag) nextReactTag = 2 + kiloViewTagBase();
+       var tag = nextReactTag;
+       nextReactTag += 2;
+       return tag;
+@@ -20195,7 +20204,7 @@ __DEV__ &&
+       },
+       getViewConfigForType =
+         reactPrivateInterface.ReactNativeViewConfigRegistry.get,
+-      nextReactTag = 2;
++      nextReactTag = -1;
+     registerEventHandler && registerEventHandler(dispatchEvent);
+     var currentUpdatePriority = 0,
+       schedulerEvent = void 0,
+diff --git a/Libraries/Renderer/implementations/ReactFabric-prod.js b/Libraries/Renderer/implementations/ReactFabric-prod.js
+index bf3cacd4395cf42885e4e16b7cf2b1829c5b00ec..098263c4c4c28c6bc3a3ab10aa6a0cb24ab1d522 100644
+--- a/Libraries/Renderer/implementations/ReactFabric-prod.js
++++ b/Libraries/Renderer/implementations/ReactFabric-prod.js
+@@ -11427,8 +11427,17 @@ var createNode = reactPrivateInterface.fabricUIManager.createNode,
+   },
+   getViewConfigForType =
+     reactPrivateInterface.ReactNativeViewConfigRegistry.get,
+-  nextReactTag = 2;
++  nextReactTag = -1;
++function kiloViewTagBase() {
++  try {
++    var base = globalThis.__kiloViewTagBase;
++    return "number" === typeof base && base > 0 ? base : 0;
++  } catch (_error) {
++    return 0;
++  }
++}
+ function allocateTag() {
++  if (-1 === nextReactTag) nextReactTag = 2 + kiloViewTagBase();
+   var tag = nextReactTag;
+   nextReactTag += 2;
+   return tag;
+diff --git a/Libraries/Renderer/implementations/ReactFabric-profiling.js b/Libraries/Renderer/implementations/ReactFabric-profiling.js
+index 1934f48a23dc8c44de0e640bdcfff5b41e5b2fdc..01a34b125d92a4648fe2287fdd37c7ad67325bfd 100644
+--- a/Libraries/Renderer/implementations/ReactFabric-profiling.js
++++ b/Libraries/Renderer/implementations/ReactFabric-profiling.js
+@@ -13305,8 +13305,17 @@ var createNode = reactPrivateInterface.fabricUIManager.createNode,
+   },
+   getViewConfigForType =
+     reactPrivateInterface.ReactNativeViewConfigRegistry.get,
+-  nextReactTag = 2;
++  nextReactTag = -1;
++function kiloViewTagBase() {
++  try {
++    var base = globalThis.__kiloViewTagBase;
++    return "number" === typeof base && base > 0 ? base : 0;
++  } catch (_error) {
++    return 0;
++  }
++}
+ function allocateTag() {
++  if (-1 === nextReactTag) nextReactTag = 2 + kiloViewTagBase();
+   var tag = nextReactTag;
+   nextReactTag += 2;
+   return tag;

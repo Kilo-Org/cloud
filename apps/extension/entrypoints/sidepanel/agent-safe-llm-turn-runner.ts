@@ -136,7 +136,6 @@ export const runSafeLlmTurn = ({
 
       return executeSafeToolCall(toolCall);
     },
-    failureMessage: error => (error instanceof Error ? error.message : 'Failed to run safe mode.'),
     maxToolRounds: maxAgentToolRounds,
     noResponseMessage: 'The model did not return a response.',
     prepareTools: async () => {

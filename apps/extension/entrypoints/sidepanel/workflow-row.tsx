@@ -15,6 +15,9 @@ const deleteButtonClass = `${iconButtonClass} hover:border-status-red-500/50 hov
 const confirmDeleteButtonClass =
   'flex size-8 shrink-0 items-center justify-center rounded-md border border-status-red-500 bg-status-red-500/20 text-status-red-300 transition hover:bg-status-red-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background';
 
+const inlineActionClass =
+  'type-label h-8 shrink-0 rounded-md border border-border bg-surface-overlay px-2 text-foreground-on-secondary transition hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background disabled:cursor-not-allowed disabled:text-foreground-subtle';
+
 /**
  * One saved workflow: name, description, scope, and the run and delete
  * controls. The row owns its own delete confirmation and, when the workflow
@@ -25,17 +28,21 @@ export const WorkflowRow = ({
   activeConversationRunning,
   allowWorkflowsInSafeMode,
   autoApproveChanges,
+  canEnableSafeModeWorkflows,
   isDangerousMode,
   item,
   onDelete,
+  onEnableSafeModeWorkflows,
   onRun,
 }: {
   activeConversationRunning: boolean;
   allowWorkflowsInSafeMode: boolean;
   autoApproveChanges: boolean;
+  canEnableSafeModeWorkflows: boolean;
   isDangerousMode: boolean;
   item: WorkflowSettingsListItem;
   onDelete: (id: string) => void;
+  onEnableSafeModeWorkflows: () => void;
   onRun: (id: string, input?: Record<string, string>) => void;
 }): JSX.Element => {
   const disabledReason = deriveWorkflowRunDisabledReason({
@@ -44,6 +51,7 @@ export const WorkflowRow = ({
     isApproved: item.isApproved,
     isDangerousMode,
   });
+  const disabledReasonId = `workflow-run-reason-${item.id}`;
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [collectingInput, setCollectingInput] = useState(false);
 
@@ -75,9 +83,27 @@ export const WorkflowRow = ({
             </>
           )}
         </p>
+        {disabledReason === undefined ? null : (
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <p className="type-label text-foreground-muted" id={disabledReasonId}>
+              {disabledReason.hint}
+            </p>
+            {disabledReason.reason === 'safeModeDisabled' ? (
+              <button
+                className={inlineActionClass}
+                disabled={!canEnableSafeModeWorkflows}
+                onClick={onEnableSafeModeWorkflows}
+                type="button"
+              >
+                Allow in safe mode
+              </button>
+            ) : null}
+          </div>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <button
+          aria-describedby={disabledReason === undefined ? undefined : disabledReasonId}
           aria-label={`Run workflow "${item.name}"`}
           className={runButtonClass}
           disabled={disabledReason !== undefined}

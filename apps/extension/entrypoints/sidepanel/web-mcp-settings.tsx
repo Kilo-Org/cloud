@@ -75,7 +75,8 @@ export const WebMcpSettings = (): JSX.Element => {
       aria-label="WebMCP"
       className="min-w-0 rounded-xl border border-border bg-surface-raised p-3"
     >
-      <div className="flex flex-col gap-3">
+      <h2 className="type-label text-foreground-muted">WebMCP</h2>
+      <div className="mt-2 flex flex-col gap-3">
         <SettingsToggle
           checked={allowWebMcpInSafeMode === true}
           description={DESCRIPTION}

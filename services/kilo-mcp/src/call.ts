@@ -86,6 +86,33 @@ function describeViolations(errors: OutputUnit[]): string[] {
 }
 
 /**
+ * Decode a JSON-encoded `input` when the endpoint's schema does not accept it as
+ * a string. `call` and `call_protected` publish `input` with a description and
+ * no JSON Schema `type` (the catalog row decides the shape), so some MCP clients
+ * send a structured value as a JSON string; the schema then rejects it with a
+ * `type` violation.
+ *
+ * The schema still decides everything: a string it accepts is a legitimate
+ * scalar (`debug.badInputError`) and is returned untouched. Only a string that
+ * parses to an object or array is decoded — a parsed scalar would replace the
+ * value the string itself is, and a parsed `null` reads as "no input". The
+ * decoded value still goes through `assertInputMatchesSchema`, so an invalid
+ * object is refused with its own violations instead of a bare `type` mismatch.
+ */
+function decodeStringifiedInput(inputSchema: Record<string, unknown>, input: unknown): unknown {
+  if (typeof input !== 'string') return input;
+  if (validatorFor(inputSchema).validate(input).valid) return input;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(input);
+  } catch {
+    return input;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return input;
+  return parsed;
+}
+
+/**
  * Serialize `data` for the tool result, capped at `maxBytes`. Over the cap the
  * JSON is cut at a byte boundary (partial trailing code points dropped) and the
  * `[truncated]` marker is appended so the total stays within the cap.
@@ -468,10 +495,11 @@ export async function callCatalogEndpoint(options: {
         inputSchema: cloudAgentAuthorityInputSchema(options.auth.cloudAgentAuthority, path),
       }
     : row;
-  assertInputMatchesSchema(inputRow, path, input);
+  const decodedInput = decodeStringifiedInput(inputRow.inputSchema, input);
+  assertInputMatchesSchema(inputRow, path, decodedInput);
   return forwardCatalogCall({
     row,
-    input,
+    input: decodedInput,
     auth: options.auth,
     webBaseUrl: options.webBaseUrl,
     ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
@@ -507,8 +535,10 @@ export async function requestProtectedCall(options: {
     );
   }
   // Validate before recording anything: the payload the user approves is
-  // exactly the payload the schema describes.
-  const sendInput = assertInputMatchesSchema(row, path, input);
+  // exactly the payload the schema describes. A JSON-encoded structured input
+  // is decoded first, so the recorded payload is the value, not its encoding.
+  const recordedInput = decodeStringifiedInput(row.inputSchema, input);
+  const sendInput = assertInputMatchesSchema(row, path, recordedInput);
 
   const sessionId = auth.sessionId;
   if (!requests || typeof sessionId !== 'string' || sessionId.length === 0) {
@@ -526,7 +556,7 @@ export async function requestProtectedCall(options: {
       clientId: auth.clientId,
       path,
       kind: row.debug === true ? 'debug' : 'admin',
-      inputJson: sendInput ? JSON.stringify(input) : null,
+      inputJson: sendInput ? JSON.stringify(recordedInput) : null,
       nowIso: new Date().toISOString(),
     });
   } catch {

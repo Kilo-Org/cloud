@@ -6,6 +6,7 @@ final class SshModuleState: @unchecked Sendable {
   let shellIds = IdSequence(prefix: "shell-")
   let sftpIds = IdSequence(prefix: "sftp-")
   let forwardIds = IdSequence(prefix: "forward-")
+  let requestIds = IdSequence(prefix: "request-")
 
   private let lock = NSLock()
   private var sessions: [String: SshSession] = [:]

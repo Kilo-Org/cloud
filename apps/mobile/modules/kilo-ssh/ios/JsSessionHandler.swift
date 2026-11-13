@@ -6,15 +6,17 @@ final class JsSessionHandler: SessionHandler, @unchecked Sendable {
   private let requestHostKey: @Sendable (HostKeyRequest) async -> Bool
   private let requestPrompts: @Sendable (KeyboardInteractiveRequest) async -> PromptReply
   private let notifyDisconnect: @Sendable (DisconnectNotice) -> Void
-  private let requestIds = IdSequence(prefix: "request-")
+  private let requestIds: IdSequence
 
   init(
     sessionId: String,
+    requestIds: IdSequence,
     requestHostKey: @escaping @Sendable (HostKeyRequest) async -> Bool,
     requestPrompts: @escaping @Sendable (KeyboardInteractiveRequest) async -> PromptReply,
     notifyDisconnect: @escaping @Sendable (DisconnectNotice) -> Void
   ) {
     self.sessionId = sessionId
+    self.requestIds = requestIds
     self.requestHostKey = requestHostKey
     self.requestPrompts = requestPrompts
     self.notifyDisconnect = notifyDisconnect

@@ -272,6 +272,115 @@ describe('workspace DO history and mutation cursors', () => {
     expect(older).not.toHaveProperty('queuedMessages');
   });
 
+  it('reserves the appended stream rows from the page budget', async () => {
+    const { stub, sessionId, kiloSessionId } = await fixture();
+    const reserved = 2 * 1024 * 1024;
+    const [plain, shrunk] = await runInDurableObject(stub, (_instance, state) => {
+      const db = drizzle(state.storage);
+      const queries = createSessionEventQueries(db, state.storage);
+      // Each stored info is ~200 KB, so the hard cap decides how many messages
+      // fit and the reservation visibly drops the older ones.
+      for (let index = 0; index < 30; index += 1) {
+        queries.upsert({
+          executionId: '',
+          sessionId,
+          streamEventType: 'kilocode',
+          entityId: `message/msg_reserved_${index}`,
+          timestamp: index,
+          payload: JSON.stringify({
+            event: 'message.updated',
+            type: 'message.updated',
+            properties: {
+              info: {
+                ...message(kiloSessionId, `msg_reserved_${index}`, index),
+                padding: 'x'.repeat(200_000),
+              },
+            },
+          }),
+        });
+      }
+      const input = {
+        db,
+        storage: state.storage,
+        queries,
+        sessionId,
+        rootKiloSessionId: kiloSessionId,
+        kiloSessionId,
+        metadata: null,
+      };
+      return [
+        readSessionMessagesPage(input),
+        readSessionMessagesPage({ ...input, reservedBytes: reserved }),
+      ];
+    });
+    expect(plain.messages.length).toBeGreaterThan(1);
+    expect(shrunk.messages.length).toBeLessThan(plain.messages.length);
+    expect(
+      new TextEncoder().encode(JSON.stringify(shrunk)).byteLength + reserved
+    ).toBeLessThanOrEqual(MAX_SESSION_PAGE_BYTES);
+  });
+
+  it('trims the appended stream rows to the newest rows under their own cap', async () => {
+    const { stub, sessionId } = await fixture();
+    const now = Date.now();
+    await runInDurableObject(stub, (_instance, state) => {
+      drizzle(state.storage)
+        .insert(controlPlaneMessages)
+        .values({
+          message_id: 'msg_trimmed',
+          intent: JSON.stringify({
+            messageId: 'msg_trimmed',
+            turn: { type: 'prompt', prompt: 'Keep the question' },
+            agent: { mode: 'code', model: 'test/model' },
+          }),
+          state: 'failed',
+          created_at: now,
+          accepted_at: null,
+          settled_at: now,
+          reason: 'workspace_setup_failed',
+        })
+        .run();
+    });
+    await runInDurableObject(stub, instance => {
+      const queries = instance['eventQueries'];
+      for (let index = 0; index < 12; index += 1) {
+        queries.upsert({
+          executionId: '',
+          sessionId,
+          streamEventType: 'preparing',
+          entityId: `preparation/attempt/attempt_${index}`,
+          timestamp: index,
+          payload: JSON.stringify({
+            action: 'attempt_snapshot',
+            attempt: {
+              id: `attempt_${index}`,
+              triggerMessageId: `msg_${index}`,
+              status: 'failed',
+              startedAt: index,
+              safeError: 'x'.repeat(40_000),
+              revision: 1,
+            },
+          }),
+        });
+      }
+    });
+    // Messages are read once per instance, so the seed needs a fresh read.
+    await evictAllDurableObjects();
+
+    const rows = await runInDurableObject(stub, instance => instance['readSnapshotRows']());
+    const kept = rows.preparationAttempts.map(attempt => attempt.id);
+    expect(kept.length).toBeLessThan(12);
+    expect(kept.at(-1)).toBe('attempt_11');
+    expect(kept).toEqual(
+      Array.from({ length: 12 }, (_, index) => `attempt_${index}`).slice(-kept.length)
+    );
+    expect(rows.queuedMessages.map(item => item.messageId)).toEqual(['msg_trimmed']);
+    expect(rows.bytes).toBeLessThanOrEqual(256 * 1024);
+    expect(rows.bytes).toBeGreaterThan(0);
+    // The queued turn survives whole: only preparation attempts give way.
+    expect(rows.queuedMessages[0]?.content).toBe('Keep the question');
+  });
+
   it('keeps native v2 history pages on indexed entity ranges', async () => {
     const { stub, kiloSessionId } = await fixture();
     const source = {

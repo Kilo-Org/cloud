@@ -639,6 +639,13 @@ export type NativeSnapshotCursor = {
 
 export const CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES = NATIVE_DELIVERY_LIMITS.eventBytes;
 
+/**
+ * Cap on the stream rows the first history page appends. The page's own budget
+ * is reduced by their measured size, so the whole response stays inside the
+ * history page bound.
+ */
+const MAX_SNAPSHOT_ROWS_BYTES = 256 * 1024;
+
 type SessionMessageRow = typeof controlPlaneMessages.$inferSelect;
 
 type TransportPass = { deadlineAt: number; scheduleRecovery: boolean };
@@ -2853,6 +2860,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.ensureClientHistory(kiloSessionId);
     if (this.registration !== registration) return null;
     this.partText.flush();
+    // The first page carries the rows the stream replays on connect, so a
+    // client that cannot reach the socket still shows the preparation attempts
+    // and the run's queued or failed turns. Older pages stay bare: the rows are
+    // current state, not history. Their size is reserved from the page budget so
+    // the response stays inside the page bound.
+    const snapshotRows = parsed.cursor === undefined ? this.readSnapshotRows() : undefined;
     const page = readSessionMessagesPage({
       db: this.db,
       storage: this.ctx.storage,
@@ -2866,16 +2879,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       omittedItemCount:
         readHistoryHydration(this.ctx.storage, isRoot ? undefined : kiloSessionId)
           ?.omittedItemCount ?? 0,
+      reservedBytes: snapshotRows?.bytes,
     });
-    // The first page carries the rows the stream replays on connect, so a
-    // client that cannot reach the socket still shows the preparation attempts
-    // and the run's queued or failed turns. Older pages stay bare: the rows are
-    // current state, not history.
-    if (parsed.cursor !== undefined) return page;
+    if (snapshotRows === undefined) return page;
     return {
       ...page,
-      preparationAttempts: listPreparationAttempts(this.eventQueries),
-      queuedMessages: this.deriveQueuedMessages(),
+      preparationAttempts: snapshotRows.preparationAttempts,
+      queuedMessages: snapshotRows.queuedMessages,
     };
   }
 
@@ -4590,6 +4600,42 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         }
         return snapshot;
       });
+  }
+
+  /**
+   * The stream rows the first history page appends, trimmed to
+   * `MAX_SNAPSHOT_ROWS_BYTES` newest first, and their measured size. The page's
+   * own budget is reduced by that size so the response stays inside
+   * `MAX_SESSION_PAGE_BYTES`. Preparation attempts give way before queued turns,
+   * so a failed run keeps the question row it is answering.
+   */
+  private readSnapshotRows(): {
+    preparationAttempts: PreparationAttempt[];
+    queuedMessages: QueuedMessageSnapshot[];
+    bytes: number;
+  } {
+    const encoder = new TextEncoder();
+    const budget = { remaining: MAX_SNAPSHOT_ROWS_BYTES };
+    // Both lists run oldest first, so walking back keeps the newest rows.
+    const keepNewest = <T>(rows: T[]): T[] => {
+      const kept: T[] = [];
+      for (let index = rows.length - 1; index >= 0; index -= 1) {
+        const row = rows.at(index);
+        if (row === undefined) break;
+        const rowBytes = encoder.encode(JSON.stringify(row)).byteLength;
+        if (rowBytes > budget.remaining) break;
+        budget.remaining -= rowBytes;
+        kept.push(row);
+      }
+      return kept.reverse();
+    };
+    const preparationAttempts = keepNewest(listPreparationAttempts(this.eventQueries));
+    const queuedMessages = keepNewest(this.deriveQueuedMessages());
+    return {
+      preparationAttempts,
+      queuedMessages,
+      bytes: MAX_SNAPSHOT_ROWS_BYTES - budget.remaining,
+    };
   }
 
   private readPendingInteractions(): { questions: unknown[]; permissions: unknown[] } | undefined {

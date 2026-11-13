@@ -81,7 +81,7 @@ export function AccountSettingsScreen() {
   } else if (isFetchError) {
     // A failed attempt keeps a cached identity, which must not be presented as
     // the current account's settings, so the retry stands in place of the rows.
-    body = <QueryError onRetry={refetch} isRetrying={isLoading} />;
+    body = <QueryError onRetry={refetch} />;
   } else {
     body = (
       <>

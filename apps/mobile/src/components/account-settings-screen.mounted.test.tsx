@@ -220,7 +220,6 @@ describe('AccountSettingsScreen', () => {
     if (!retry) {
       throw new Error('missing retry state');
     }
-    expect(retry.props.isRetrying).toBe(false);
 
     act(() => {
       (retry.props.onRetry as () => void)();

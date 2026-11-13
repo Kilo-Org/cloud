@@ -6,9 +6,13 @@ import {
 } from './pending-deep-link-delivery';
 
 const SESSION_HREF = '/(app)/agent-chat/ses_1';
-// The pathname a screen reports for that thread: no layout groups, no query.
+// The pathname the router reports for that thread: every layout group dropped,
+// no query (the same form `profileScreenPath` produces).
 const SESSION_PATHNAME = '/agent-chat/ses_1';
-const ACCOUNT_PATHNAME = '/(tabs)/(3_profile)/account';
+// The pathname the router reports with the account settings screen focused:
+// the tab group is a layout group too, so it does not survive either.
+const ACCOUNT_PATHNAME = '/account';
+const ACCOUNT_HREF = '/(app)/(tabs)/(3_profile)/account';
 
 describe('shouldDeliverPendingDeepLink', () => {
   it('always delivers a destination the person chose in this process', () => {
@@ -44,8 +48,9 @@ describe('shouldDeliverPendingDeepLink', () => {
   });
 
   it('delivers a recovered destination the app is already showing', () => {
-    // A cold launch restores its own base Intent: the query and the layout
-    // groups do not make the same destination look like a different one.
+    // A cold launch restores its own base Intent: the resume anchor and the
+    // group segments do not make the same destination look like a different
+    // one.
     expect(
       shouldDeliverPendingDeepLink({
         arrival: 'restored',
@@ -54,10 +59,12 @@ describe('shouldDeliverPendingDeepLink', () => {
         pathname: SESSION_PATHNAME,
       })
     ).toBe(true);
+    // A tab-grouped destination: the router reports `/account` while the href
+    // carries both the app group and the tab group.
     expect(
       shouldDeliverPendingDeepLink({
         arrival: 'restored',
-        href: '/(app)/(tabs)/(3_profile)/account',
+        href: ACCOUNT_HREF,
         atLandingRoute: false,
         pathname: ACCOUNT_PATHNAME,
       })
@@ -73,6 +80,14 @@ describe('shouldDeliverPendingDeepLink', () => {
         pathname: ACCOUNT_PATHNAME,
       })
     ).toBe(false);
+    expect(
+      shouldDeliverPendingDeepLink({
+        arrival: 'restored',
+        href: '/(app)/agent-chat/ses_2',
+        atLandingRoute: false,
+        pathname: SESSION_PATHNAME,
+      })
+    ).toBe(false);
   });
 });
 
@@ -83,8 +98,9 @@ describe('isSessionDestinationHref', () => {
   });
 
   it('refuses every other destination the slot can carry', () => {
-    expect(isSessionDestinationHref('/(app)/(tabs)/(3_profile)/account')).toBe(false);
+    expect(isSessionDestinationHref(ACCOUNT_HREF)).toBe(false);
     expect(isSessionDestinationHref('/(app)/agent-chat/new')).toBe(false);
+    expect(isSessionDestinationHref('/(app)/agent-chat/model-picker')).toBe(false);
     expect(isSessionDestinationHref('/(app)/pr-review/Kilo-Org/cloud/6234')).toBe(false);
     expect(isSessionDestinationHref('/(app)/notifications')).toBe(false);
   });

@@ -1,6 +1,6 @@
 import { type PendingDeepLinkArrival } from './deep-link-launch';
-import { normalizedRoutePath } from './last-route-repair';
 import { SESSION_ROUTE_SIBLINGS } from './deep-link-destination';
+import { profileScreenPath } from './profile-route-stack';
 import { SESSION_HREF_PREFIX } from './system-search-families';
 
 /**
@@ -22,9 +22,10 @@ import { SESSION_HREF_PREFIX } from './system-search-families';
  * Intent has the app there before the slot is consumed, and that navigation is
  * the one `withAnchor` exists for — it inserts each Stack's layout anchor
  * beneath the target so Back returns to the tab's own root (see
- * `deep-link-destination.ts`). The comparison uses `normalizedRoutePath`, so a
- * query (`?at=` resume anchor) and the layout groups do not make the same
- * destination look like a different one.
+ * `deep-link-destination.ts`). Both sides are compared in the form the router
+ * reports a pathname — `profileScreenPath` drops every group segment and the
+ * query — so a tab-grouped href, a layout group and a `?at=` resume anchor do
+ * not make the same destination look like a different one.
  */
 export function shouldDeliverPendingDeepLink(input: {
   readonly arrival: PendingDeepLinkArrival;
@@ -35,9 +36,7 @@ export function shouldDeliverPendingDeepLink(input: {
   if (input.arrival === 'live') {
     return true;
   }
-  return (
-    input.atLandingRoute || normalizedRoutePath(input.href) === normalizedRoutePath(input.pathname)
-  );
+  return input.atLandingRoute || profileScreenPath(input.href) === input.pathname;
 }
 
 /**

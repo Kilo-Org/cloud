@@ -187,6 +187,18 @@ function seatsReadout(renderer: ReactTestRenderer): unknown {
   return row?.props.value;
 }
 
+/** The manage-on-web destinations, as the screen builds them from `org-1`. */
+const SUBSCRIPTIONS_URL = 'http://localhost:3000/organizations/org-1/subscriptions';
+/** The auto top-up link's page: the billing page the destination mock returns. */
+const AUTO_TOP_UP_URL = 'http://localhost:3000/org-1';
+
+/** A manage-on-web link, found by the page it opens. */
+function manageOnWebLink(renderer: ReactTestRenderer, url: string): ReactTestInstance | undefined {
+  return renderer.root
+    .findAllByType('ExternalBillingLink' as never)
+    .find(node => node.props.url === url);
+}
+
 beforeEach(() => {
   for (const query of Object.values(queries)) {
     query.isPending = false;
@@ -269,6 +281,51 @@ describe('OrganizationBillingScreen seats row', () => {
 
     const { renderer, unmount } = await mount();
     expect(seatsReadout(renderer)).toBe('3 / 4');
+    unmount();
+  });
+});
+
+describe('OrganizationBillingScreen manage-on-web links', () => {
+  it('offers to manage auto top-up once the read answers enabled', async () => {
+    queries.autoTopUp.data = { enabled: true, amountCents: 5000, thresholdCents: 1000 };
+    const { renderer, unmount } = await mount();
+
+    const autoTopUpLink = manageOnWebLink(renderer, AUTO_TOP_UP_URL);
+    expect(autoTopUpLink?.props.label).toBe('Manage auto top-up');
+    expect(autoTopUpLink?.props.url).toBe('http://localhost:3000/org-1');
+    // The wording change belongs to this link alone: the block's other two
+    // destinations keep the copy they had.
+    expect(manageOnWebLink(renderer, SUBSCRIPTIONS_URL)?.props.label).toBe('Change plan');
+    expect(manageOnWebLink(renderer, `${SUBSCRIPTIONS_URL}/seats`)?.props.label).toBe('Buy seats');
+    unmount();
+  });
+
+  it('keeps the set-up wording when the read answers disabled', async () => {
+    queries.autoTopUp.data = { enabled: false, amountCents: 5000, thresholdCents: 1000 };
+    const { renderer, unmount } = await mount();
+
+    expect(manageOnWebLink(renderer, AUTO_TOP_UP_URL)?.props.label).toBe('Set up auto top-up');
+    unmount();
+  });
+
+  it('keeps the set-up wording while the read is pending', async () => {
+    // A pending read has no state to manage, so the block cannot claim one.
+    queries.autoTopUp.isPending = true;
+    queries.autoTopUp.data = undefined;
+    const { renderer, unmount } = await mount();
+
+    expect(manageOnWebLink(renderer, AUTO_TOP_UP_URL)?.props.label).toBe('Set up auto top-up');
+    unmount();
+  });
+
+  it('keeps the set-up wording when the read failed', async () => {
+    // A first read that rejected carries no data, and the error card above
+    // already asks for the retry.
+    queries.autoTopUp.isError = true;
+    queries.autoTopUp.data = undefined;
+    const { renderer, unmount } = await mount();
+
+    expect(manageOnWebLink(renderer, AUTO_TOP_UP_URL)?.props.label).toBe('Set up auto top-up');
     unmount();
   });
 });

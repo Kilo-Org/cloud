@@ -3272,6 +3272,7 @@
       "changePlan": "Canvia el pla",
       "buySeats": "Compra llicències",
       "setupAutoTopUp": "Configura la recàrrega automàtica",
+      "manageAutoTopUp": "Gestiona la recàrrega automàtica",
       "webAddress": "Adreça web {{url}}",
       "opensOnWeb": "S'obre al web"
     },

@@ -3423,6 +3423,7 @@
       "changePlan": "تغيير الخطة",
       "buySeats": "شراء مقاعد",
       "setupAutoTopUp": "إعداد الشحن التلقائي",
+      "manageAutoTopUp": "إدارة الشحن التلقائي",
       "webAddress": "عنوان الويب {{url}}",
       "opensOnWeb": "يُفتح على الويب"
     },

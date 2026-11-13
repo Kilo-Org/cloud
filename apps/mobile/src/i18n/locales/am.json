@@ -3219,6 +3219,7 @@
       "changePlan": "ዕቅድ ይቀይሩ",
       "buySeats": "የተጠቃሚ ፈቃዶችን ይግዙ",
       "setupAutoTopUp": "ራስ-ሰር መሙላትን ያዋቅሩ",
+      "manageAutoTopUp": "ራስ-ሰር መሙላትን አስተዳድር",
       "webAddress": "የድር አድራሻ {{url}}",
       "opensOnWeb": "በድር ላይ ይከፈታል"
     },

@@ -3219,6 +3219,7 @@
       "changePlan": "ਪਲਾਨ ਬਦਲੋ",
       "buySeats": "ਸੀਟਾਂ ਖਰੀਦੋ",
       "setupAutoTopUp": "ਆਟੋ ਟੌਪ-ਅੱਪ ਸੈੱਟ ਕਰੋ",
+      "manageAutoTopUp": "ਆਟੋ ਟੌਪ-ਅੱਪ ਪ੍ਰਬੰਧ ਕਰੋ",
       "webAddress": "ਵੈੱਬ ਪਤਾ {{url}}",
       "opensOnWeb": "ਵੈੱਬ 'ਤੇ ਖੁੱਲ੍ਹਦਾ ਹੈ"
     },

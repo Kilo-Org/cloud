@@ -3219,6 +3219,7 @@
       "changePlan": "Planı dəyiş",
       "buySeats": "İstifadəçi yerləri al",
       "setupAutoTopUp": "Avtomatik artırmanı qur",
+      "manageAutoTopUp": "Avtomatik artırmanı idarə et",
       "webAddress": "Veb ünvan {{url}}",
       "opensOnWeb": "Vebdə açılır"
     },

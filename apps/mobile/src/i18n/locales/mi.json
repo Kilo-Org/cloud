@@ -3219,6 +3219,7 @@
       "changePlan": "Huri mahere",
       "buySeats": "Hoko raihana",
       "setupAutoTopUp": "Whakaritea te whakakī aunoa",
+      "manageAutoTopUp": "Whakahaerehia te whakakī aunoa",
       "webAddress": "Wāhitau ipurangi {{url}}",
       "opensOnWeb": "Ka tuwhera i te ipurangi"
     },

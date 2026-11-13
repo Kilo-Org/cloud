@@ -3219,6 +3219,7 @@
       "changePlan": "Badilisha mpango",
       "buySeats": "Nunua nafasi",
       "setupAutoTopUp": "Weka uongezaji salio kiotomatiki",
+      "manageAutoTopUp": "Dhibiti uongezaji salio kiotomatiki",
       "webAddress": "Anwani ya wavuti {{url}}",
       "opensOnWeb": "Hufunguka kwenye wavuti"
     },

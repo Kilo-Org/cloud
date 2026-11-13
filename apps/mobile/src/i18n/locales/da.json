@@ -3219,6 +3219,7 @@
       "changePlan": "Skift plan",
       "buySeats": "Køb pladser",
       "setupAutoTopUp": "Konfigurer automatisk optankning",
+      "manageAutoTopUp": "Administrer automatisk optankning",
       "webAddress": "Webadresse {{url}}",
       "opensOnWeb": "Åbner på nettet"
     },

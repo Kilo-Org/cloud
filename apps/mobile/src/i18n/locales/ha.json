@@ -3219,6 +3219,7 @@
       "changePlan": "Canza tsari",
       "buySeats": "Sayi gurabe",
       "setupAutoTopUp": "Saita ƙara kuɗi ta atomatik",
+      "manageAutoTopUp": "Sarrafa ƙara kuɗi ta atomatik",
       "webAddress": "Adireshin yanar gizo {{url}}",
       "opensOnWeb": "Yana buɗewa a yanar gizo"
     },

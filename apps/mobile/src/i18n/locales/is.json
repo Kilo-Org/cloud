@@ -3219,6 +3219,7 @@
       "changePlan": "Breyta áætlun",
       "buySeats": "Kaupa notendasæti",
       "setupAutoTopUp": "Setja upp sjálfvirka áfyllingu",
+      "manageAutoTopUp": "Stjórna sjálfvirkri áfyllingu",
       "webAddress": "Veffang {{url}}",
       "opensOnWeb": "Opnast á vefnum"
     },

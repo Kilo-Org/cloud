@@ -3219,6 +3219,7 @@
       "changePlan": "Palitan ang plano",
       "buySeats": "Bumili ng mga puwesto",
       "setupAutoTopUp": "I-set up ang auto top-up",
+      "manageAutoTopUp": "Pamahalaan ang auto top-up",
       "webAddress": "Web address {{url}}",
       "opensOnWeb": "Bubuksan sa web"
     },

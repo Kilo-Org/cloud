@@ -3211,6 +3211,7 @@
       "changePlan": "變更套餐",
       "buySeats": "購買席次",
       "setupAutoTopUp": "設定自動儲值",
+      "manageAutoTopUp": "管理自動儲值",
       "webAddress": "網址 {{url}}",
       "opensOnWeb": "在網頁上開啟"
     },

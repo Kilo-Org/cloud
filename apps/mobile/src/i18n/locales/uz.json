@@ -3219,6 +3219,7 @@
       "changePlan": "Tarifni o'zgartirish",
       "buySeats": "O'rin sotib olish",
       "setupAutoTopUp": "Avtomatik to'ldirishni sozlash",
+      "manageAutoTopUp": "Avtomatik to'ldirishni boshqarish",
       "webAddress": "Veb-manzil {{url}}",
       "opensOnWeb": "Vebda ochiladi"
     },

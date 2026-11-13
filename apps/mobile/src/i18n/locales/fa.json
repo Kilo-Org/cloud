@@ -3219,6 +3219,7 @@
       "changePlan": "تغییر طرح",
       "buySeats": "خرید مجوز کاربری",
       "setupAutoTopUp": "راه‌اندازی شارژ خودکار",
+      "manageAutoTopUp": "مدیریت شارژ خودکار",
       "webAddress": "نشانی وب {{url}}",
       "opensOnWeb": "در وب باز می‌شود"
     },

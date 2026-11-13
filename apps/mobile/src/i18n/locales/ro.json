@@ -3272,6 +3272,7 @@
       "changePlan": "Schimbă planul",
       "buySeats": "Cumpără locuri",
       "setupAutoTopUp": "Configurează reîncărcarea automată",
+      "manageAutoTopUp": "Gestionează reîncărcarea automată",
       "webAddress": "Adresă web {{url}}",
       "opensOnWeb": "Se deschide pe web"
     },

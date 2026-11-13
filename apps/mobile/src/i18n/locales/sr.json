@@ -3272,6 +3272,7 @@
       "changePlan": "Promeni plan",
       "buySeats": "Kupi mesta",
       "setupAutoTopUp": "Podesi automatsku dopunu",
+      "manageAutoTopUp": "Upravljaj automatskom dopunom",
       "webAddress": "Veb adresa {{url}}",
       "opensOnWeb": "Otvara se na vebu"
     },

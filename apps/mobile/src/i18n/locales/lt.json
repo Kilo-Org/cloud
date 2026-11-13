@@ -3325,6 +3325,7 @@
       "changePlan": "Keisti planą",
       "buySeats": "Pirkti vietų",
       "setupAutoTopUp": "Nustatyti automatinį papildymą",
+      "manageAutoTopUp": "Tvarkyti automatinį papildymą",
       "webAddress": "Žiniatinklio adresas {{url}}",
       "opensOnWeb": "Atidaroma žiniatinklyje"
     },

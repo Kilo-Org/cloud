@@ -3219,6 +3219,7 @@
       "changePlan": "Փոխել պլանը",
       "buySeats": "Գնել տեղեր",
       "setupAutoTopUp": "Կարգավորել ավտոմատ համալրումը",
+      "manageAutoTopUp": "Կառավարել ավտոմատ համալրումը",
       "webAddress": "Վեբ հասցե՝ {{url}}",
       "opensOnWeb": "Բացվում է վեբում"
     },

@@ -3272,6 +3272,7 @@
       "changePlan": "Promijeni plan",
       "buySeats": "Kupi korisnička mjesta",
       "setupAutoTopUp": "Postavi automatsku nadoplatu",
+      "manageAutoTopUp": "Upravljaj automatskom nadoplatom",
       "webAddress": "Web-adresa {{url}}",
       "opensOnWeb": "Otvara se na webu"
     },

@@ -3211,6 +3211,7 @@
       "changePlan": "प्लान बदलें",
       "buySeats": "सीटें खरीदें",
       "setupAutoTopUp": "ऑटो टॉप-अप सेट करें",
+      "manageAutoTopUp": "ऑटो टॉप-अप प्रबंधित करें",
       "webAddress": "वेब पता {{url}}",
       "opensOnWeb": "वेब पर खुलता है"
     },

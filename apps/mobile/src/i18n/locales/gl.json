@@ -3219,6 +3219,7 @@
       "changePlan": "Cambiar plan",
       "buySeats": "Mercar prazas",
       "setupAutoTopUp": "Configurar recarga automática",
+      "manageAutoTopUp": "Xestionar a recarga automática",
       "webAddress": "Enderezo web {{url}}",
       "opensOnWeb": "Ábrese na web"
     },

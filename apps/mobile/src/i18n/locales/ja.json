@@ -3211,6 +3211,7 @@
       "changePlan": "プランを変更",
       "buySeats": "シートを購入",
       "setupAutoTopUp": "自動チャージを設定",
+      "manageAutoTopUp": "自動チャージを管理",
       "webAddress": "Webアドレス {{url}}",
       "opensOnWeb": "Webで開きます"
     },

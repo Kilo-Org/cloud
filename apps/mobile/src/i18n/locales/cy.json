@@ -3431,6 +3431,7 @@
       "changePlan": "Newid cynllun",
       "buySeats": "Prynu seddau",
       "setupAutoTopUp": "Gosod ail-lenwi awtomatig",
+      "manageAutoTopUp": "Rheoli ail-lenwi awtomatig",
       "webAddress": "Cyfeiriad gwe {{url}}",
       "opensOnWeb": "Yn agor ar y we"
     },

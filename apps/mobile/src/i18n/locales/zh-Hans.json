@@ -3211,6 +3211,7 @@
       "changePlan": "更改套餐",
       "buySeats": "购买席位",
       "setupAutoTopUp": "设置自动充值",
+      "manageAutoTopUp": "管理自动充值",
       "webAddress": "网址 {{url}}",
       "opensOnWeb": "在网页中打开"
     },

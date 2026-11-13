@@ -3219,6 +3219,7 @@
       "changePlan": "پلان بدل کړئ",
       "buySeats": "د غړیتوب ځایونه واخلئ",
       "setupAutoTopUp": "اتومات بیا ډکول تنظیم کړئ",
+      "manageAutoTopUp": "اتومات بیا ډکول اداره کړئ",
       "webAddress": "وېب پته {{url}}",
       "opensOnWeb": "په وېب کې پرانیستل کېږي"
     },

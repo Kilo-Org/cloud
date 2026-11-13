@@ -3219,6 +3219,7 @@
       "changePlan": "Vaihda pakettia",
       "buySeats": "Osta käyttäjäpaikkoja",
       "setupAutoTopUp": "Ota automaattinen täydennys käyttöön",
+      "manageAutoTopUp": "Hallinnoi automaattista täydennystä",
       "webAddress": "Verkko-osoite {{url}}",
       "opensOnWeb": "Avautuu verkossa"
     },

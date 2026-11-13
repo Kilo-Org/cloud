@@ -3211,6 +3211,7 @@
       "changePlan": "요금제 변경",
       "buySeats": "라이선스 구매",
       "setupAutoTopUp": "자동 충전 설정",
+      "manageAutoTopUp": "자동 충전 관리",
       "webAddress": "웹 주소 {{url}}",
       "opensOnWeb": "웹에서 열림"
     },

@@ -3219,6 +3219,7 @@
       "changePlan": "Muuda plaani",
       "buySeats": "Osta kasutajakohti",
       "setupAutoTopUp": "Seadista automaatne täiendamine",
+      "manageAutoTopUp": "Halda automaatset täiendamist",
       "webAddress": "Veebiaadress {{url}}",
       "opensOnWeb": "Avaneb veebis"
     },

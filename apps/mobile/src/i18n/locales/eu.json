@@ -3219,6 +3219,7 @@
       "changePlan": "Aldatu plana",
       "buySeats": "Erosi lizentziak",
       "setupAutoTopUp": "Konfiguratu birkarga automatikoa",
+      "manageAutoTopUp": "Kudeatu birkarga automatikoa",
       "webAddress": "Web-helbidea {{url}}",
       "opensOnWeb": "Webean irekitzen da"
     },

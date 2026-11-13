@@ -12,7 +12,6 @@ import {
   KeyRound,
   LineChart,
   Lock,
-  LogOut,
   MessageSquare,
   Plug,
   ShieldCheck,
@@ -34,6 +33,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { DirectionalLogOut } from '@/components/ui/directional-icons';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -522,7 +522,7 @@ export function ProfileScreen() {
             onPress={showPrivacyChoices}
           />
           <ActionTile
-            icon={LogOut}
+            icon={DirectionalLogOut}
             label={t('common.signOut')}
             hue="fern"
             onPress={requestSignOut}

@@ -50,11 +50,11 @@ vi.mock('@/components/ui/dialog', () => ({
   }),
 }));
 vi.mock('@/components/ui/icons', () => ({
-  LogOut: 'LogOut',
   Smartphone: 'Smartphone',
   Shield: 'Shield',
   X: 'X',
 }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));
 vi.mock('@/lib/auth/auth-context', () => ({
   useAuth: () => ({ token: 'test-token', signOut: vi.fn() }),
 }));

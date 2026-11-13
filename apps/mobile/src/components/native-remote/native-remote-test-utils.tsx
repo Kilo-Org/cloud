@@ -8,7 +8,11 @@ import { useOpenPartDetail } from '@/components/agents/open-part-detail-context'
 
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
-vi.mock('react-native', () => ({ View: 'View', Keyboard: { dismiss: vi.fn() } }));
+vi.mock('react-native', () => ({
+  Platform: { OS: 'android' },
+  View: 'View',
+  Keyboard: { dismiss: vi.fn() },
+}));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -128,6 +132,7 @@ export function inventoryPending(): NativePendingRequests {
         fields: [{ key: 'answer', title: 'Your choice', type: 'text' }],
       },
     ],
+    unreadablePermissions: [],
   };
 }
 beforeEach(() => {

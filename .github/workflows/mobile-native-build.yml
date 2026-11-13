@@ -206,7 +206,9 @@ jobs:
     needs: [gate, prepare-harness-sdk, prepare-trpc]
     if: needs.gate.outputs.need_ios == 'true'
     runs-on: macos-26
-    timeout-minutes: 90
+    # The app build alone runs close to an hour on this runner; the SSH module's
+    # Rust core adds several minutes on a cache miss.
+    timeout-minutes: 120
     # A pull_request run takes one slot per ref, so pull requests with the same
     # native inputs never cancel each other's pending build; the artifact
     # re-check below still turns a duplicate that arrives after a build
@@ -287,8 +289,18 @@ jobs:
       # The script installs the pinned toolchain and its iOS targets on first
       # use. It runs after the hash check because its outputs are gitignored and
       # therefore not fingerprint inputs.
-      - name: Build the SSH Rust core
+      - name: Restore the SSH Rust core
+        id: ssh-core
         if: steps.published.outputs.published != 'true'
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: |
+            apps/mobile/modules/kilo-ssh/ios/Frameworks
+            apps/mobile/modules/kilo-ssh/ios/Generated
+          key: ${{ runner.os }}-${{ runner.arch }}-ssh-core-ios-${{ hashFiles('apps/mobile/modules/kilo-ssh/rust/**/*.rs', 'apps/mobile/modules/kilo-ssh/rust/**/Cargo.toml', 'apps/mobile/modules/kilo-ssh/rust/Cargo.lock', 'apps/mobile/modules/kilo-ssh/rust-toolchain.toml', 'apps/mobile/modules/kilo-ssh/rust/**/uniffi*.toml', 'apps/mobile/modules/kilo-ssh/scripts/*.sh') }}
+
+      - name: Build the SSH Rust core
+        if: steps.published.outputs.published != 'true' && steps.ssh-core.outputs.cache-hit != 'true'
         run: bash apps/mobile/modules/kilo-ssh/scripts/build-native.sh
 
       - name: Expo prebuild

@@ -70,6 +70,8 @@ export type CodeReviewConfigPatch = Partial<{
   selectedRepositoryIds: (number | string)[];
   repositoryModelOverrides: RepositoryModelOverrideInput[];
   disableReviewMd: boolean;
+  /** GitHub only: skip automated reviews of PRs opened by bot accounts. */
+  skipBotPullRequests: boolean;
 }>;
 
 // Field-merge PATCH surface. Extends the save patch with the org-only fields
@@ -97,6 +99,7 @@ export type CodeReviewStoredConfig = {
   selectedRepositoryIds?: (number | string)[];
   repositoryModelOverrides?: RepositoryModelOverrideInput[];
   disableReviewMd?: boolean;
+  skipBotPullRequests?: boolean;
   // Org-only fields. Personal configs never have these in storage, so the
   // stored snapshot can omit them and the helper still works.
   manuallyAddedRepositories?: ManuallyAddedRepositoryInput[];

@@ -25,6 +25,7 @@ private fun SshException.code(): String = when (this) {
   is SshException.InvalidExport -> "InvalidExport"
   is SshException.ChannelClosed -> "ChannelClosed"
   is SshException.Protocol -> "Protocol"
+  is SshException.OutputLimit -> "OutputLimit"
   is SshException.KeyGeneration -> "KeyGeneration"
   is SshException.NotFound -> "NotFound"
   is SshException.PermissionDenied -> "PermissionDenied"

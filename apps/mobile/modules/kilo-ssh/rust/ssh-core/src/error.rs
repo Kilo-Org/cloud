@@ -18,39 +18,68 @@ use russh::keys::ssh_key;
 #[uniffi(flat_error)]
 pub enum SshError {
     /// The transport could not reach the server or lost it.
-    Network { message: String },
+    Network {
+        message: String,
+    },
     /// The server did not answer within the configured timeout.
-    Timeout { message: String },
+    Timeout {
+        message: String,
+    },
     /// The host key was rejected by the session handler.
     HostKeyRejected,
     /// The server refused the supplied credentials.
-    AuthFailed { message: String },
+    AuthFailed {
+        message: String,
+    },
     /// The keyboard-interactive handler declined to answer.
     AuthCancelled,
     /// The key or negotiated algorithm is not supported.
-    UnsupportedAlgorithm { message: String },
+    UnsupportedAlgorithm {
+        message: String,
+    },
     /// The private key could not be parsed.
-    KeyParse { message: String },
+    KeyParse {
+        message: String,
+    },
     /// A passphrase is required, or does not decrypt the key.
     WrongPassphrase,
     /// An export is not a valid age file, or cannot be produced from its inputs.
-    InvalidExport { message: String },
+    InvalidExport {
+        message: String,
+    },
     /// The channel is closed: end of stream, server close, or session loss.
-    ChannelClosed { message: String },
+    ChannelClosed {
+        message: String,
+    },
     /// The peer broke the protocol or the session ended unexpectedly.
-    Protocol { message: String },
+    Protocol {
+        message: String,
+    },
+    OutputLimit {
+        message: String,
+    },
     /// A local key pair could not be created.
-    KeyGeneration { message: String },
+    KeyGeneration {
+        message: String,
+    },
     /// The remote path does not exist.
-    NotFound { path: String },
+    NotFound {
+        path: String,
+    },
     /// The server refused access to the path.
-    PermissionDenied { path: String },
+    PermissionDenied {
+        path: String,
+    },
     /// The app cancelled the transfer.
     Cancelled,
     /// A port forward could not be set up.
-    Forwarding { message: String },
+    Forwarding {
+        message: String,
+    },
     /// A file in the app sandbox could not be read or written.
-    LocalIo { message: String },
+    LocalIo {
+        message: String,
+    },
 }
 
 impl SshError {
@@ -73,6 +102,7 @@ impl SshError {
             Self::InvalidExport { .. } => "InvalidExport",
             Self::ChannelClosed { .. } => "ChannelClosed",
             Self::Protocol { .. } => "Protocol",
+            Self::OutputLimit { .. } => "OutputLimit",
             Self::KeyGeneration { .. } => "KeyGeneration",
             Self::NotFound { .. } => "NotFound",
             Self::PermissionDenied { .. } => "PermissionDenied",
@@ -119,6 +149,7 @@ impl fmt::Display for SshError {
             Self::InvalidExport { message } => write!(f, "invalid export: {message}"),
             Self::ChannelClosed { message } => write!(f, "channel closed: {message}"),
             Self::Protocol { message } => write!(f, "protocol error: {message}"),
+            Self::OutputLimit { message } => write!(f, "output limit exceeded: {message}"),
             Self::KeyGeneration { message } => write!(f, "key generation failed: {message}"),
             Self::NotFound { path } => write!(f, "not found: {path}"),
             Self::PermissionDenied { path } => write!(f, "permission denied: {path}"),
@@ -299,6 +330,9 @@ mod tests {
             SshError::Protocol {
                 message: "bad mac".into(),
             },
+            SshError::OutputLimit {
+                message: "exec output exceeded the cap".into(),
+            },
             SshError::KeyGeneration {
                 message: "no entropy".into(),
             },
@@ -349,6 +383,7 @@ mod tests {
                 "InvalidExport",
                 "ChannelClosed",
                 "Protocol",
+                "OutputLimit",
                 "KeyGeneration",
                 "NotFound",
                 "PermissionDenied",

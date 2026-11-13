@@ -4345,5 +4345,88 @@
     "unavailableDescription": "انتهت صلاحية رابط المشاركة هذا أو تم إبطاله.",
     "transcriptUnavailableTitle": "تعذّر تحميل هذا السجل",
     "transcriptUnavailableDescription": "لا يزال الرابط يعمل. حاول مرة أخرى بعد قليل."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "اتصل بخوادمك الخاصة.",
+    "storage": {
+      "lockedTitle": "افتح القفل لاستخدام SSH",
+      "lockedMessage": "افتح قفل جهازك، ثم حاول مرة أخرى.",
+      "unavailableTitle": "التخزين غير متاح",
+      "unavailableMessage": "تعذّر فتح مخزن التطبيق على الجهاز. أعد تشغيل Kilo، ثم حاول مرة أخرى."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "لا توجد مضيفات بعد",
+      "emptyDescription": "أضف مضيفًا، أو استورد المضيفات من إعدادات SSH.",
+      "addHost": "إضافة مضيف",
+      "importConfig": "استيراد من إعدادات SSH",
+      "rowActions": "{{label}}، {{target}}. يفتح التحرير والحذف.",
+      "viaJump": "عبر {{label}}",
+      "deleteTitle": "حذف {{label}}؟",
+      "deleteMessage": "تُزال معه إعداداته وتحويلات المنافذ. لا يمكن التراجع عن هذا.",
+      "deleteFailed": "تعذّر حذف المضيف."
+    },
+    "editor": {
+      "newTitle": "مضيف جديد",
+      "editTitle": "تحرير المضيف",
+      "label": "التسمية",
+      "labelPlaceholder": "خادم المنزل",
+      "hostname": "اسم المضيف",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "المنفذ",
+      "username": "اسم المستخدم",
+      "authMethod": "طريقة المصادقة",
+      "password": "كلمة المرور",
+      "key": "مفتاح SSH",
+      "keyboardInteractive": "تفاعلي بلوحة المفاتيح",
+      "passwordPlaceholder": "يُكتب عند الاتصال، ما لم تُحفظ",
+      "savePassword": "حفظ كلمة المرور",
+      "savePasswordHint": "تُحفظ في المخزن المشفّر على هذا الجهاز.",
+      "chooseKey": "اختيار مفتاح",
+      "noKeys": "لا توجد مفاتيح بعد",
+      "jumpHost": "مضيف العبور",
+      "directConnection": "اتصال مباشر",
+      "tmuxAttach": "إرفاق tmux",
+      "tmuxSession": "اسم جلسة tmux",
+      "saved": "تم حفظ المضيف.",
+      "saveFailed": "تعذّر حفظ المضيف."
+    },
+    "errors": {
+      "invalidPort": "استخدم منفذًا من 1 إلى 65535",
+      "jumpCycle": "هذا المضيف يعبر بالفعل من خلال هذا المضيف."
+    },
+    "import": {
+      "title": "استيراد إعدادات SSH",
+      "description": "الصق إعدادات SSH، أو اختر الملف.",
+      "sourceLabel": "إعدادات SSH",
+      "chooseFile": "اختيار ملف",
+      "preview": "معاينة",
+      "apply": "استيراد المضيفات",
+      "imported": "تم استيراد المضيفات.",
+      "importFailed": "لم يُستورد أي شيء.",
+      "nothingDescription": "لا تصف هذه الإعدادات أي مضيف يمكن لهذا التطبيق استيراده.",
+      "notImported": "غير مستورد",
+      "needsKey": "يحتاج مفتاحًا",
+      "warnNeedsKey": "لا يمكن استيراد ملف مفتاحه. اختر مفتاحًا في المحرر.",
+      "warnJumpMissing": "{{target}} ليس ضمن الاستيراد، لذا يتصل هذا المضيف مباشرة.",
+      "warnJumpMultiHop": "يُستورد أول مضيف عبور فقط.",
+      "warnJumpCycle": "{{target}} يعبر عائدًا عبر هذا المضيف، لذا أُسقط عبوره.",
+      "warnForward": "تعذّرت قراءة سطر تحويل في هذا المضيف.",
+      "skippedNoUsername": "{{alias}} بلا سطر User.",
+      "skippedInvalidPort": "منفذ {{alias}} ليس رقمًا من 1 إلى 65535.",
+      "unreadableFile": "تعذّرت قراءة ذلك الملف."
+    },
+    "knownHosts": {
+      "title": "المضيفون المعروفون",
+      "emptyTitle": "لا توجد مضيفات موثوقة بعد",
+      "emptyDescription": "يُوثَق مفتاح المضيف عند اتصالك به للمرة الأولى.",
+      "deleteTitle": "نسيان {{pattern}}؟",
+      "deleteMessage": "سيطلب منك الاتصال التالي الوثوق بمفتاحه من جديد.",
+      "deleteFailed": "تعذّرت إزالة مفتاح المضيف.",
+      "deleteLabel": "نسيان {{pattern}}"
+    }
   }
 }

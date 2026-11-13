@@ -4215,5 +4215,88 @@
     "unavailableDescription": "Ta povezava za deljenje je potekla ali je bila preklicana.",
     "transcriptUnavailableTitle": "Prepisa ni bilo mogoče naložiti",
     "transcriptUnavailableDescription": "Povezava še vedno deluje. Poskusite znova čez trenutek."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Povežite se s svojimi strežniki.",
+    "storage": {
+      "lockedTitle": "Odklenite za uporabo SSH",
+      "lockedMessage": "Odklenite napravo in poskusite znova.",
+      "unavailableTitle": "Shramba ni na voljo",
+      "unavailableMessage": "Shrambe v napravi ni bilo mogoče odpreti. Znova zaženite Kilo in poskusite znova."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Ni še nobenega gostitelja",
+      "emptyDescription": "Dodajte gostitelja ali uvozite gostitelje iz svoje konfiguracije SSH.",
+      "addHost": "Dodaj gostitelja",
+      "importConfig": "Uvozi iz konfiguracije SSH",
+      "rowActions": "{{label}}, {{target}}. Odpre urejanje in brisanje.",
+      "viaJump": "prek {{label}}",
+      "deleteTitle": "Izbrisati {{label}}?",
+      "deleteMessage": "Z njim se odstranijo tudi njegove nastavitve in preusmeritve vrat. Tega ni mogoče razveljaviti.",
+      "deleteFailed": "Gostitelja ni bilo mogoče izbrisati."
+    },
+    "editor": {
+      "newTitle": "Nov gostitelj",
+      "editTitle": "Uredi gostitelja",
+      "label": "Oznaka",
+      "labelPlaceholder": "Domači strežnik",
+      "hostname": "Ime gostitelja",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Vrata",
+      "username": "Uporabniško ime",
+      "authMethod": "Način overjanja",
+      "password": "Geslo",
+      "key": "Ključ SSH",
+      "keyboardInteractive": "Interaktivno s tipkovnico",
+      "passwordPlaceholder": "Vnesete ob povezovanju, razen če je shranjeno",
+      "savePassword": "Shrani geslo",
+      "savePasswordHint": "Shranjeno v šifrirani shrambi na tej napravi.",
+      "chooseKey": "Izberi ključ",
+      "noKeys": "Ni še nobenega ključa",
+      "jumpHost": "Skakalni gostitelj",
+      "directConnection": "Neposredna povezava",
+      "tmuxAttach": "Priklopi tmux",
+      "tmuxSession": "Ime seje tmux",
+      "saved": "Gostitelj je shranjen.",
+      "saveFailed": "Gostitelja ni bilo mogoče shraniti."
+    },
+    "errors": {
+      "invalidPort": "Uporabite vrata od 1 do 65535",
+      "jumpCycle": "Ta gostitelj že skače prek tega."
+    },
+    "import": {
+      "title": "Uvozi konfiguracijo SSH",
+      "description": "Prilepite svojo konfiguracijo SSH ali izberite datoteko.",
+      "sourceLabel": "Konfiguracija SSH",
+      "chooseFile": "Izberi datoteko",
+      "preview": "Predogled",
+      "apply": "Uvozi gostitelje",
+      "imported": "Gostitelji so uvoženi.",
+      "importFailed": "Ni bilo uvoženega ničesar.",
+      "nothingDescription": "Ta konfiguracija ne opisuje nobenega gostitelja, ki bi ga ta aplikacija lahko uvozila.",
+      "notImported": "Ni uvoženo",
+      "needsKey": "Potrebuje ključ",
+      "warnNeedsKey": "Njegove datoteke ključa ni mogoče uvoziti. Izberite ključ v urejevalniku.",
+      "warnJumpMissing": "{{target}} ni v uvozu, zato se ta gostitelj poveže neposredno.",
+      "warnJumpMultiHop": "Uvožen je le prvi skakalni gostitelj.",
+      "warnJumpCycle": "{{target}} skače nazaj prek tega gostitelja, zato je bil njegov skok opuščen.",
+      "warnForward": "Vrstice preusmeritve pri tem gostitelju ni bilo mogoče prebrati.",
+      "skippedNoUsername": "{{alias}} nima vrstice User.",
+      "skippedInvalidPort": "{{alias}} ima vrata, ki niso število od 1 do 65535.",
+      "unreadableFile": "Te datoteke ni bilo mogoče prebrati."
+    },
+    "knownHosts": {
+      "title": "Znani gostitelji",
+      "emptyTitle": "Ni še nobenih zaupanja vrednih gostiteljev",
+      "emptyDescription": "Ključ gostitelja se zaupa ob prvi povezavi z njim.",
+      "deleteTitle": "Pozabiti {{pattern}}?",
+      "deleteMessage": "Ob naslednji povezavi boste morali znova zaupati njegovemu ključu.",
+      "deleteFailed": "Ključa gostitelja ni bilo mogoče odstraniti.",
+      "deleteLabel": "Pozabi {{pattern}}"
+    }
   }
 }

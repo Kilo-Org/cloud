@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Կիսման այս հղման ժամկետը լրացել է, կամ այն չեղարկվել է։",
     "transcriptUnavailableTitle": "Չհաջողվեց բեռնել այս զրույցի պատմությունը",
     "transcriptUnavailableDescription": "Հղումը դեռ աշխատում է։ Փորձեք մի փոքր ուշ։"
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Միացեք ձեր սեփական սերվերներին։",
+    "storage": {
+      "lockedTitle": "Բացեք կողպեքը՝ SSH-ն օգտագործելու համար",
+      "lockedMessage": "Բացեք ձեր սարքի կողպեքը, ապա կրկին փորձեք։",
+      "unavailableTitle": "Պահոցն անհասանելի է",
+      "unavailableMessage": "Հավելվածի սարքային պահոցը հնարավոր չեղավ բացել։ Վերագործարկեք Kilo-ն, ապա կրկին փորձեք։"
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Դեռ հոսթեր չկան",
+      "emptyDescription": "Ավելացրեք հոսթ կամ ներմուծեք հոսթերը ձեր SSH կոնֆիգից։",
+      "addHost": "Ավելացնել հոսթ",
+      "importConfig": "Ներմուծել SSH կոնֆիգից",
+      "rowActions": "{{label}}, {{target}}։ Բացում է խմբագրումը և ջնջումը։",
+      "viaJump": "{{label}}-ի միջոցով",
+      "deleteTitle": "Ջնջել {{label}}-ը?",
+      "deleteMessage": "Դրա հետ հեռացվում են նաև դրա կարգավորումը և պորտերի փոխանցումները։ Սա հնարավոր չէ հետարկել։",
+      "deleteFailed": "Հոսթը հնարավոր չեղավ ջնջել։"
+    },
+    "editor": {
+      "newTitle": "Նոր հոսթ",
+      "editTitle": "Խմբագրել հոսթը",
+      "label": "Պիտակ",
+      "labelPlaceholder": "Տնային սերվեր",
+      "hostname": "HostName",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Պորտ",
+      "username": "Օգտանուն",
+      "authMethod": "Նույնականացման եղանակ",
+      "password": "Գաղտնաբառ",
+      "key": "SSH բանալի",
+      "keyboardInteractive": "Ստեղնաշարով ինտերակտիվ",
+      "passwordPlaceholder": "Մուտքագրվում է միանալիս, եթե պահպանված չէ",
+      "savePassword": "Պահպանել գաղտնաբառը",
+      "savePasswordHint": "Պահվում է այս սարքի գաղտնագրված պահոցում։",
+      "chooseKey": "Ընտրել բանալի",
+      "noKeys": "Դեռ բանալիներ չկան",
+      "jumpHost": "Միջանկյալ հոսթ",
+      "directConnection": "Ուղիղ միացում",
+      "tmuxAttach": "Կցել tmux",
+      "tmuxSession": "tmux սեսիայի անվանում",
+      "saved": "Հոսթը պահպանված է։",
+      "saveFailed": "Հոսթը հնարավոր չեղավ պահպանել։"
+    },
+    "errors": {
+      "invalidPort": "Օգտագործեք 1-ից 65535 պորտ",
+      "jumpCycle": "Այդ հոսթն արդեն ցատկում է այս մեկի միջով։"
+    },
+    "import": {
+      "title": "Ներմուծել SSH կոնֆիգ",
+      "description": "Տեղադրեք ձեր SSH կոնֆիգը կամ ընտրեք ֆայլը։",
+      "sourceLabel": "SSH կոնֆիգ",
+      "chooseFile": "Ընտրել ֆայլ",
+      "preview": "Նախադիտում",
+      "apply": "Ներմուծել հոսթերը",
+      "imported": "Հոսթերը ներմուծված են։",
+      "importFailed": "Ոչինչ չներմուծվեց։",
+      "nothingDescription": "Այս կոնֆիգը չի նկարագրում ոչ մի հոսթ, որը այս հավելվածը կարող է ներմուծել։",
+      "notImported": "Չներմուծված",
+      "needsKey": "Բանալի է պետք",
+      "warnNeedsKey": "Դրա բանալու ֆայլը հնարավոր չէ ներմուծել։ Բանալի ընտրեք խմբագրիչում։",
+      "warnJumpMissing": "{{target}} ներմուծման մեջ չկա, ուստի այս հոսթը միանում է ուղիղ։",
+      "warnJumpMultiHop": "Ներմուծվում է միայն առաջին միջանկյալ հոսթը։",
+      "warnJumpCycle": "{{target}}-ը ցատկում է այս հոսթի միջով, ուստի դրա ցատկը հեռացվեց։",
+      "warnForward": "Այս հոսթի փոխանցման տողը հնարավոր չեղավ կարդալ։",
+      "skippedNoUsername": "{{alias}}-ը չունի User տող։",
+      "skippedInvalidPort": "{{alias}}-ի պորտը 1-ից 65535 թիվ չէ։",
+      "unreadableFile": "Այդ ֆայլը հնարավոր չեղավ կարդալ։"
+    },
+    "knownHosts": {
+      "title": "Հայտնի հոսթեր",
+      "emptyTitle": "Դեռ վստահելի հոսթեր չկան",
+      "emptyDescription": "Հոսթի բանալին վստահելի է դառնում դրան առաջին անգամ միանալիս։",
+      "deleteTitle": "Մոռանալ {{pattern}}-ը?",
+      "deleteMessage": "Հաջորդ միացման ժամանակ կրկին կառաջարկվի վստահել դրա բանալին։",
+      "deleteFailed": "Հոսթի բանալին հնարավոր չեղավ հեռացնել։",
+      "deleteLabel": "Մոռանալ {{pattern}}-ը"
+    }
   }
 }

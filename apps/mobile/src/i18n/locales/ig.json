@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Njikọ nkesa a agwụla oge ma ọ bụ a kagbuola ya.",
     "transcriptUnavailableTitle": "Enweghị ike ibugo ndekọ a",
     "transcriptUnavailableDescription": "Njikọ ahụ ka na-arụ ọrụ. Nwaa ọzọ n'oge na-adịghị anya."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Jikọọ na sava nke gị.",
+    "storage": {
+      "lockedTitle": "Mepee mkpọchi ka i jiri SSH",
+      "lockedMessage": "Mepee mkpọchi ngwaọrụ gị, wee nwaa ọzọ.",
+      "unavailableTitle": "Nchekwa adịghị adị",
+      "unavailableMessage": "Enweghị ike imeghe ebe nchekwa dị n'ime ngwaọrụ nke ngwa ahụ. Malitegharịa Kilo, wee nwaa ọzọ."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Enwebeghị host ọ bụla",
+      "emptyDescription": "Tinye host, ma ọ bụ bubata host ndị dị na nhazi SSH gị.",
+      "addHost": "Tinye host",
+      "importConfig": "Bubata site na nhazi SSH",
+      "rowActions": "{{label}}, {{target}}. Na-emepe ndezi na ihichapụ.",
+      "viaJump": "site na {{label}}",
+      "deleteTitle": "Hichapụ {{label}}?",
+      "deleteMessage": "A na-ewepụ ntọala ya na port forward ya na ya. Enweghị ike iweghachi ya.",
+      "deleteFailed": "Enweghị ike ihichapụ host ahụ."
+    },
+    "editor": {
+      "newTitle": "Host ọhụrụ",
+      "editTitle": "Dezie host",
+      "label": "Aha",
+      "labelPlaceholder": "Sava ụlọ",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Aha onye ọrụ",
+      "authMethod": "Ụzọ nkwenye",
+      "password": "Paswọọdụ",
+      "key": "Igodo SSH",
+      "keyboardInteractive": "Mkparịta ụka kiiboodu",
+      "passwordPlaceholder": "A na-etinye ya mgbe ị na-ejikọ, belụsọ ma e chekwara ya",
+      "savePassword": "Chekwaa paswọọdụ",
+      "savePasswordHint": "A na-edebe ya n'ebe nchekwa ezoro ezo dị na ngwaọrụ a.",
+      "chooseKey": "Họrọ igodo",
+      "noKeys": "Enwebeghị igodo ọ bụla",
+      "jumpHost": "Jump host",
+      "directConnection": "Njikọ kpọmkwem",
+      "tmuxAttach": "Jikọta tmux",
+      "tmuxSession": "Aha nnọkọ tmux",
+      "saved": "Echekwara host.",
+      "saveFailed": "Enweghị ike ichekwa host ahụ."
+    },
+    "errors": {
+      "invalidPort": "Jiri port site na 1 ruo 65535",
+      "jumpCycle": "Host ahụ na-esi na nke a agafe ugbua."
+    },
+    "import": {
+      "title": "Bubata nhazi SSH",
+      "description": "Tapịa nhazi SSH gị, ma ọ bụ họrọ faịlụ ahụ.",
+      "sourceLabel": "Nhazi SSH",
+      "chooseFile": "Họrọ faịlụ",
+      "preview": "Nlele mbụ",
+      "apply": "Bubata host",
+      "imported": "Ebubatala host.",
+      "importFailed": "Ọnweghị ihe e bubatara.",
+      "nothingDescription": "Nhazi a akọwaghị host ọ bụla ngwa a nwere ike ibubata.",
+      "notImported": "Ebubataghị ya",
+      "needsKey": "Chọrọ igodo",
+      "warnNeedsKey": "Enweghị ike ibubata faịlụ igodo ya. Họrọ igodo na ndezi.",
+      "warnJumpMissing": "{{target}} adịghị na mbubata ahụ, yabụ host a na-ejikọ kpọmkwem.",
+      "warnJumpMultiHop": "Naanị jump host mbụ ka a na-ebubata.",
+      "warnJumpCycle": "{{target}} na-esi na host a alọghachi, yabụ ewepụrụ jump ya.",
+      "warnForward": "Enweghị ike ịgụ otu ahịrị forward dị na host a.",
+      "skippedNoUsername": "{{alias}} enweghị ahịrị User.",
+      "skippedInvalidPort": "{{alias}} nwere port na-abụghị ọnụọgụ site na 1 ruo 65535.",
+      "unreadableFile": "Enweghị ike ịgụ faịlụ ahụ."
+    },
+    "knownHosts": {
+      "title": "Host ndị amaara",
+      "emptyTitle": "Enwebeghị host ntụkwasị obi ọ bụla",
+      "emptyDescription": "A na-atụkwasị igodo host obi oge mbụ i jikọtara ya.",
+      "deleteTitle": "Chefuo {{pattern}}?",
+      "deleteMessage": "Njikọ na-esote ga-ajụ gị ka i tụkwasị igodo ya obi ọzọ.",
+      "deleteFailed": "Enweghị ike iwepụ igodo host ahụ.",
+      "deleteLabel": "Chefuo {{pattern}}"
+    }
   }
 }

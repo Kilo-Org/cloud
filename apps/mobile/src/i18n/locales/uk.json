@@ -4215,5 +4215,88 @@
     "unavailableDescription": "Термін дії цього посилання сплив, або його відкликано.",
     "transcriptUnavailableTitle": "Не вдалося завантажити транскрипт",
     "transcriptUnavailableDescription": "Посилання досі працює. Спробуйте ще раз за мить."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Підключайтеся до власних серверів.",
+    "storage": {
+      "lockedTitle": "Розблокуйте, щоб користуватися SSH",
+      "lockedMessage": "Розблокуйте пристрій і спробуйте ще раз.",
+      "unavailableTitle": "Сховище недоступне",
+      "unavailableMessage": "Не вдалося відкрити локальне сховище застосунку. Перезапустіть Kilo і спробуйте ще раз."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Ще немає хостів",
+      "emptyDescription": "Додайте хост або імпортуйте хости зі свого конфігу SSH.",
+      "addHost": "Додати хост",
+      "importConfig": "Імпортувати з конфігу SSH",
+      "rowActions": "{{label}}, {{target}}. Відкриває редагування й видалення.",
+      "viaJump": "через {{label}}",
+      "deleteTitle": "Видалити {{label}}?",
+      "deleteMessage": "Разом із ним буде видалено його налаштування та перенаправлення портів. Скасувати цю дію неможливо.",
+      "deleteFailed": "Не вдалося видалити хост."
+    },
+    "editor": {
+      "newTitle": "Новий хост",
+      "editTitle": "Редагувати хост",
+      "label": "Назва",
+      "labelPlaceholder": "Домашній сервер",
+      "hostname": "Ім'я хоста",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Порт",
+      "username": "Ім'я користувача",
+      "authMethod": "Спосіб автентифікації",
+      "password": "Пароль",
+      "key": "Ключ SSH",
+      "keyboardInteractive": "Клавіатурна взаємодія",
+      "passwordPlaceholder": "Вводиться під час підключення, якщо не збережено",
+      "savePassword": "Зберегти пароль",
+      "savePasswordHint": "Зберігається в зашифрованому сховищі на цьому пристрої.",
+      "chooseKey": "Вибрати ключ",
+      "noKeys": "Ще немає ключів",
+      "jumpHost": "Проміжний хост",
+      "directConnection": "Пряме підключення",
+      "tmuxAttach": "Приєднати tmux",
+      "tmuxSession": "Назва сеансу tmux",
+      "saved": "Хост збережено.",
+      "saveFailed": "Не вдалося зберегти хост."
+    },
+    "errors": {
+      "invalidPort": "Використовуйте порт від 1 до 65535",
+      "jumpCycle": "Той хост уже підключається через цей."
+    },
+    "import": {
+      "title": "Імпорт конфігу SSH",
+      "description": "Вставте свій конфіг SSH або виберіть файл.",
+      "sourceLabel": "Конфіг SSH",
+      "chooseFile": "Вибрати файл",
+      "preview": "Попередній перегляд",
+      "apply": "Імпортувати хости",
+      "imported": "Хости імпортовано.",
+      "importFailed": "Нічого не імпортовано.",
+      "nothingDescription": "У цьому конфігу немає жодного хоста, який застосунок може імпортувати.",
+      "notImported": "Не імпортовано",
+      "needsKey": "Потрібен ключ",
+      "warnNeedsKey": "Його файл ключа не вдається імпортувати. Виберіть ключ у редакторі.",
+      "warnJumpMissing": "{{target}} немає в імпорті, тому цей хост підключається напряму.",
+      "warnJumpMultiHop": "Імпортується лише перший проміжний хост.",
+      "warnJumpCycle": "{{target}} підключається назад через цей хост, тому його проміжний хост відкинуто.",
+      "warnForward": "Не вдалося прочитати рядок перенаправлення цього хоста.",
+      "skippedNoUsername": "У {{alias}} немає рядка User.",
+      "skippedInvalidPort": "У {{alias}} порт не є числом від 1 до 65535.",
+      "unreadableFile": "Не вдалося прочитати цей файл."
+    },
+    "knownHosts": {
+      "title": "Відомі хости",
+      "emptyTitle": "Ще немає довірених хостів",
+      "emptyDescription": "Ключ хоста вважається довіреним під час першого підключення до нього.",
+      "deleteTitle": "Забути {{pattern}}?",
+      "deleteMessage": "Під час наступного підключення вас знову попросять довіритися його ключу.",
+      "deleteFailed": "Не вдалося видалити ключ хоста.",
+      "deleteLabel": "Забути {{pattern}}"
+    }
   }
 }

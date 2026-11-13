@@ -4085,5 +4085,88 @@
     "unavailableDescription": "この共有リンクは期限切れか、無効化されています。",
     "transcriptUnavailableTitle": "このトランスクリプトを読み込めませんでした",
     "transcriptUnavailableDescription": "リンクは引き続き有効です。しばらくしてからもう一度お試しください。"
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "自分のサーバーに接続します。",
+    "storage": {
+      "lockedTitle": "SSHを使うにはロック解除",
+      "lockedMessage": "デバイスのロックを解除して、もう一度お試しください。",
+      "unavailableTitle": "ストレージを利用できません",
+      "unavailableMessage": "アプリのデバイス内ストアを開けませんでした。Kiloを再起動して、もう一度お試しください。"
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "ホストがまだありません",
+      "emptyDescription": "ホストを追加するか、SSH configからホストを読み込んでください。",
+      "addHost": "ホストを追加",
+      "importConfig": "SSH configから読み込む",
+      "rowActions": "{{label}}、{{target}}。編集と削除を開きます。",
+      "viaJump": "{{label}}経由",
+      "deleteTitle": "{{label}}を削除しますか?",
+      "deleteMessage": "設定とポート転送も一緒に削除されます。この操作は取り消せません。",
+      "deleteFailed": "ホストを削除できませんでした。"
+    },
+    "editor": {
+      "newTitle": "新規ホスト",
+      "editTitle": "ホストを編集",
+      "label": "ラベル",
+      "labelPlaceholder": "自宅サーバー",
+      "hostname": "ホスト名",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "ポート",
+      "username": "ユーザー名",
+      "authMethod": "認証方法",
+      "password": "パスワード",
+      "key": "SSHキー",
+      "keyboardInteractive": "キーボードインタラクティブ",
+      "passwordPlaceholder": "保存しない場合は接続時に入力します",
+      "savePassword": "パスワードを保存",
+      "savePasswordHint": "このデバイスの暗号化ストアに保存されます。",
+      "chooseKey": "キーを選択",
+      "noKeys": "キーがまだありません",
+      "jumpHost": "踏み台ホスト",
+      "directConnection": "直接接続",
+      "tmuxAttach": "tmuxにアタッチ",
+      "tmuxSession": "tmuxセッション名",
+      "saved": "ホストを保存しました。",
+      "saveFailed": "ホストを保存できませんでした。"
+    },
+    "errors": {
+      "invalidPort": "1〜65535のポートを指定してください",
+      "jumpCycle": "そのホストはすでにこのホストを経由しています。"
+    },
+    "import": {
+      "title": "SSH configを読み込む",
+      "description": "SSH configを貼り付けるか、ファイルを選択してください。",
+      "sourceLabel": "SSH config",
+      "chooseFile": "ファイルを選択",
+      "preview": "プレビュー",
+      "apply": "ホストを読み込む",
+      "imported": "ホストを読み込みました。",
+      "importFailed": "何も読み込まれませんでした。",
+      "nothingDescription": "このconfigには、このアプリが読み込めるホストがありません。",
+      "notImported": "未読み込み",
+      "needsKey": "キーが必要",
+      "warnNeedsKey": "キーファイルを読み込めません。エディタでキーを選択してください。",
+      "warnJumpMissing": "{{target}}は読み込み対象にないため、このホストは直接接続します。",
+      "warnJumpMultiHop": "最初の踏み台ホストのみ読み込まれます。",
+      "warnJumpCycle": "{{target}}はこのホストを経由して戻るため、その踏み台設定は破棄されました。",
+      "warnForward": "このホストのforward行を読み取れませんでした。",
+      "skippedNoUsername": "{{alias}}にUser行がありません。",
+      "skippedInvalidPort": "{{alias}}のポートが1〜65535の数値ではありません。",
+      "unreadableFile": "そのファイルを読み取れませんでした。"
+    },
+    "knownHosts": {
+      "title": "既知のホスト",
+      "emptyTitle": "信頼済みのホストがまだありません",
+      "emptyDescription": "ホストキーは初回接続時に信頼されます。",
+      "deleteTitle": "{{pattern}}を忘れますか?",
+      "deleteMessage": "次回接続時に、再度キーの信頼を求められます。",
+      "deleteFailed": "ホストキーを削除できませんでした。",
+      "deleteLabel": "{{pattern}}を忘れる"
+    }
   }
 }

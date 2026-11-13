@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Le linki yokwabelana iphelelwe yisikhathi noma ihoxisiwe.",
     "transcriptUnavailableTitle": "Akukwazekanga ukulayisha lo mbhalo wengxoxo",
     "transcriptUnavailableDescription": "Ilinki isasebenza. Zama futhi kungekudala."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Xhumana namaseva akho.",
+    "storage": {
+      "lockedTitle": "Vula ukuze usebenzise i-SSH",
+      "lockedMessage": "Vula idivayisi yakho, bese uzama futhi.",
+      "unavailableTitle": "Isitoreji asitholakali",
+      "unavailableMessage": "Isitoreji sohlelo lokusebenza esikudivayisi asikwazanga ukuvulwa. Qala kabusha i-Kilo, bese uzama futhi."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Awekho amahosthi okwamanje",
+      "emptyDescription": "Engeza ihosthi, noma ngenisa amahosthi asuka kukhonfigi yakho ye-SSH.",
+      "addHost": "Engeza ihosthi",
+      "importConfig": "Ngenisa kusuka kukhonfigi ye-SSH",
+      "rowActions": "{{label}}, {{target}}. Ivula ukuhlela nokususa.",
+      "viaJump": "ngokusebenzisa {{label}}",
+      "deleteTitle": "Susa {{label}}?",
+      "deleteMessage": "Izilungiselelo zayo nokudluliswa kwamachweba kususwa kanye nayo. Lokhu akukwazi ukuhlehliswa.",
+      "deleteFailed": "Ihosthi ayikwazanga ukususwa."
+    },
+    "editor": {
+      "newTitle": "Ihosthi entsha",
+      "editTitle": "Hlela ihosthi",
+      "label": "Ilebuli",
+      "labelPlaceholder": "Iseva yasekhaya",
+      "hostname": "Igama lehosthi",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Iphothi",
+      "username": "Igama lomsebenzisi",
+      "authMethod": "Indlela yokuqinisekisa",
+      "password": "Iphasiwedi",
+      "key": "Ukhiye we-SSH",
+      "keyboardInteractive": "Ukuxhumana ngekhibhodi",
+      "passwordPlaceholder": "Kufakwa lapho uxhuma, ngaphandle uma kulondoloziwe",
+      "savePassword": "Londoloza iphasiwedi",
+      "savePasswordHint": "Igcinwa esitolo esivikelekile kule divayisi.",
+      "chooseKey": "Khetha ukhiye",
+      "noKeys": "Awekho okhiye okwamanje",
+      "jumpHost": "Ihosthi yokugxuma",
+      "directConnection": "Ukuxhumana okuqondile",
+      "tmuxAttach": "Namathisela i-tmux",
+      "tmuxSession": "Igama leseshini ye-tmux",
+      "saved": "Ihosthi ilondoloziwe.",
+      "saveFailed": "Ihosthi ayikwazanga ukulondolozwa."
+    },
+    "errors": {
+      "invalidPort": "Sebenzisa iphothi esukela ku-1 kuya ku-65535",
+      "jumpCycle": "Leyo hosthi isivele igxuma ngalena."
+    },
+    "import": {
+      "title": "Ngenisa ikhonfigi ye-SSH",
+      "description": "Namathisela ikhonfigi yakho ye-SSH, noma khetha ifayela.",
+      "sourceLabel": "Ikhonfigi ye-SSH",
+      "chooseFile": "Khetha ifayela",
+      "preview": "Buka kuqala",
+      "apply": "Ngenisa amahosthi",
+      "imported": "Amahosthi angenisiwe.",
+      "importFailed": "Akukho okungenisiwe.",
+      "nothingDescription": "Le khonfigi ayichazi ihosthi uhlelo lokusebenza olungayingenisa.",
+      "notImported": "Akungenisiwe",
+      "needsKey": "Idinga ukhiye",
+      "warnNeedsKey": "Ifayela layo lokhiye alikwazi ukungeniswa. Khetha ukhiye kumhleli.",
+      "warnJumpMissing": "{{target}} akekho kokungenisiwe, ngakho le hosthi ixhuma ngqo.",
+      "warnJumpMultiHop": "Kungeniswa kuphela ihosthi yokuqala yokugxuma.",
+      "warnJumpCycle": "{{target}} igxuma ibuyela kule hosthi, ngakho ukugxuma kwayo kususiwe.",
+      "warnForward": "Umgqa wokudlulisela kule hosthi awukwazanga ukufundwa.",
+      "skippedNoUsername": "{{alias}} awunawo umugqa we-User.",
+      "skippedInvalidPort": "{{alias}} inephothi engeyona inombolo esukela ku-1 kuya ku-65535.",
+      "unreadableFile": "Leyo fayela ayikwazanga ukufundwa."
+    },
+    "knownHosts": {
+      "title": "Amahosthi aziwayo",
+      "emptyTitle": "Awekho amahosthi athenjwayo okwamanje",
+      "emptyDescription": "Ukhiye wehosthi uthenjwa okokuqala lapho uxhuma kuwo.",
+      "deleteTitle": "Khohlwa {{pattern}}?",
+      "deleteMessage": "Ukuxhumana okulandelayo kuzokucela ukuthi uthembe ukhiye wayo futhi.",
+      "deleteFailed": "Ukhiye wehosthi awukwazanga ukususwa.",
+      "deleteLabel": "Khohlwa {{pattern}}"
+    }
   }
 }

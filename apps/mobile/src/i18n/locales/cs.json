@@ -4215,5 +4215,88 @@
     "unavailableDescription": "Platnost tohoto odkazu pro sdílení vypršela nebo byl odkaz zrušen.",
     "transcriptUnavailableTitle": "Tento přepis se nepodařilo načíst",
     "transcriptUnavailableDescription": "Odkaz stále funguje. Zkuste to znovu za chvíli."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Připojte se ke svým vlastním serverům.",
+    "storage": {
+      "lockedTitle": "Odemkněte pro použití SSH",
+      "lockedMessage": "Odemkněte zařízení a zkuste to znovu.",
+      "unavailableTitle": "Úložiště není dostupné",
+      "unavailableMessage": "Úložiště aplikace v tomto zařízení se nepodařilo otevřít. Restartujte Kilo a zkuste to znovu."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Zatím žádní hostitelé",
+      "emptyDescription": "Přidejte hostitele nebo načtěte hostitele z konfigurace SSH.",
+      "addHost": "Přidat hostitele",
+      "importConfig": "Importovat z konfigurace SSH",
+      "rowActions": "{{label}}, {{target}}. Otevře úpravu a smazání.",
+      "viaJump": "přes {{label}}",
+      "deleteTitle": "Smazat {{label}}?",
+      "deleteMessage": "Smazáním se odstraní i jeho nastavení a přesměrování portů. Tuto akci nelze vrátit.",
+      "deleteFailed": "Hostitele se nepodařilo smazat."
+    },
+    "editor": {
+      "newTitle": "Nový hostitel",
+      "editTitle": "Upravit hostitele",
+      "label": "Název",
+      "labelPlaceholder": "Domácí server",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Uživatelské jméno",
+      "authMethod": "Způsob ověření",
+      "password": "Heslo",
+      "key": "Klíč SSH",
+      "keyboardInteractive": "Keyboard interactive",
+      "passwordPlaceholder": "Zadává se při připojení, pokud není uloženo",
+      "savePassword": "Uložit heslo",
+      "savePasswordHint": "Uloží se do šifrovaného úložiště v tomto zařízení.",
+      "chooseKey": "Vybrat klíč",
+      "noKeys": "Zatím žádné klíče",
+      "jumpHost": "Přeskakovací hostitel",
+      "directConnection": "Přímé připojení",
+      "tmuxAttach": "Připojit tmux",
+      "tmuxSession": "Název relace tmux",
+      "saved": "Hostitel uložen.",
+      "saveFailed": "Hostitele se nepodařilo uložit."
+    },
+    "errors": {
+      "invalidPort": "Použijte port od 1 do 65535",
+      "jumpCycle": "Tento hostitel už přes tento přeskakuje."
+    },
+    "import": {
+      "title": "Import konfigurace SSH",
+      "description": "Vložte konfiguraci SSH nebo vyberte soubor.",
+      "sourceLabel": "Konfigurace SSH",
+      "chooseFile": "Vybrat soubor",
+      "preview": "Náhled",
+      "apply": "Importovat hostitele",
+      "imported": "Hostitelé importováni.",
+      "importFailed": "Nic se neimportovalo.",
+      "nothingDescription": "Tato konfigurace neobsahuje žádného hostitele, kterého by aplikace mohla importovat.",
+      "notImported": "Neimportováno",
+      "needsKey": "Vyžaduje klíč",
+      "warnNeedsKey": "Jeho soubor s klíčem nelze importovat. Vyberte klíč v editoru.",
+      "warnJumpMissing": "{{target}} není součástí importu, takže se tento hostitel připojí přímo.",
+      "warnJumpMultiHop": "Importuje se pouze první přeskakovací hostitel.",
+      "warnJumpCycle": "{{target}} přeskakuje zpět přes tohoto hostitele, proto byl jeho přeskok odebrán.",
+      "warnForward": "Řádek s přesměrováním u tohoto hostitele se nepodařilo přečíst.",
+      "skippedNoUsername": "{{alias}} nemá řádek User.",
+      "skippedInvalidPort": "{{alias}} má port, který není číslo od 1 do 65535.",
+      "unreadableFile": "Tento soubor se nepodařilo přečíst."
+    },
+    "knownHosts": {
+      "title": "Známí hostitelé",
+      "emptyTitle": "Zatím žádní důvěryhodní hostitelé",
+      "emptyDescription": "Klíč hostitele se považuje za důvěryhodný při prvním připojení.",
+      "deleteTitle": "Zapomenout {{pattern}}?",
+      "deleteMessage": "Při příštím připojení budete muset jeho klíč znovu označit jako důvěryhodný.",
+      "deleteFailed": "Klíč hostitele se nepodařilo odebrat.",
+      "deleteLabel": "Zapomenout {{pattern}}"
+    }
   }
 }

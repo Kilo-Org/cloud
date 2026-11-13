@@ -4150,5 +4150,88 @@
     "unavailableDescription": "Acest link de partajare a expirat sau a fost revocat.",
     "transcriptUnavailableTitle": "Transcrierea nu a putut fi încărcată",
     "transcriptUnavailableDescription": "Linkul încă funcționează. Încearcă din nou în câteva momente."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Conectează-te la propriile servere.",
+    "storage": {
+      "lockedTitle": "Deblochează pentru a folosi SSH",
+      "lockedMessage": "Deblochează dispozitivul, apoi încearcă din nou.",
+      "unavailableTitle": "Stocare indisponibilă",
+      "unavailableMessage": "Spațiul de stocare local al aplicației nu a putut fi deschis. Repornește Kilo, apoi încearcă din nou."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Încă nu există gazde",
+      "emptyDescription": "Adaugă o gazdă sau importă gazdele din configurația SSH.",
+      "addHost": "Adaugă gazdă",
+      "importConfig": "Importă din configurația SSH",
+      "rowActions": "{{label}}, {{target}}. Deschide editarea și ștergerea.",
+      "viaJump": "prin {{label}}",
+      "deleteTitle": "Ștergi {{label}}?",
+      "deleteMessage": "Setarea și redirecționările de port se elimină împreună cu ea. Această acțiune nu poate fi anulată.",
+      "deleteFailed": "Gazda nu a putut fi ștearsă."
+    },
+    "editor": {
+      "newTitle": "Gazdă nouă",
+      "editTitle": "Editează gazda",
+      "label": "Etichetă",
+      "labelPlaceholder": "Server de acasă",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Utilizator",
+      "authMethod": "Metodă de autentificare",
+      "password": "Parolă",
+      "key": "Cheie SSH",
+      "keyboardInteractive": "Tastatură interactivă",
+      "passwordPlaceholder": "Se introduce la conectare, dacă nu este salvată",
+      "savePassword": "Salvează parola",
+      "savePasswordHint": "Păstrată în spațiul de stocare criptat de pe acest dispozitiv.",
+      "chooseKey": "Alege o cheie",
+      "noKeys": "Încă nu există chei",
+      "jumpHost": "Gazdă intermediară",
+      "directConnection": "Conexiune directă",
+      "tmuxAttach": "Atașează tmux",
+      "tmuxSession": "Numele sesiunii tmux",
+      "saved": "Gazda a fost salvată.",
+      "saveFailed": "Gazda nu a putut fi salvată."
+    },
+    "errors": {
+      "invalidPort": "Folosește un port de la 1 la 65535",
+      "jumpCycle": "Acea gazdă trece deja prin aceasta."
+    },
+    "import": {
+      "title": "Importă configurația SSH",
+      "description": "Lipește configurația SSH sau alege fișierul.",
+      "sourceLabel": "Configurație SSH",
+      "chooseFile": "Alege fișierul",
+      "preview": "Previzualizare",
+      "apply": "Importă gazdele",
+      "imported": "Gazdele au fost importate.",
+      "importFailed": "Nu a fost importat nimic.",
+      "nothingDescription": "Această configurație nu descrie nicio gazdă pe care aplicația o poate importa.",
+      "notImported": "Neimportat",
+      "needsKey": "Necesită cheie",
+      "warnNeedsKey": "Fișierul său de cheie nu poate fi importat. Alege o cheie în editor.",
+      "warnJumpMissing": "{{target}} nu face parte din import, așa că această gazdă se conectează direct.",
+      "warnJumpMultiHop": "Se importă doar prima gazdă intermediară.",
+      "warnJumpCycle": "{{target}} trece înapoi prin această gazdă, așa că saltul său a fost eliminat.",
+      "warnForward": "O linie de redirecționare din această gazdă nu a putut fi citită.",
+      "skippedNoUsername": "{{alias}} nu are o linie User.",
+      "skippedInvalidPort": "{{alias}} are un port care nu este un număr de la 1 la 65535.",
+      "unreadableFile": "Fișierul respectiv nu a putut fi citit."
+    },
+    "knownHosts": {
+      "title": "Gazde cunoscute",
+      "emptyTitle": "Încă nu există gazde de încredere",
+      "emptyDescription": "Cheia unei gazde devine de încredere prima dată când te conectezi la ea.",
+      "deleteTitle": "Uită {{pattern}}?",
+      "deleteMessage": "La următoarea conectare ți se va cere din nou să ai încredere în cheia sa.",
+      "deleteFailed": "Cheia gazdei nu a putut fi eliminată.",
+      "deleteLabel": "Uită {{pattern}}"
+    }
   }
 }

@@ -4156,5 +4156,88 @@
     "unavailableDescription": "Este link de partilha expirou ou foi revogado.",
     "transcriptUnavailableTitle": "Não foi possível carregar esta transcrição",
     "transcriptUnavailableDescription": "O link continua a funcionar. Tente novamente dentro de momentos."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Ligue-se aos seus próprios servidores.",
+    "storage": {
+      "lockedTitle": "Desbloqueie para usar SSH",
+      "lockedMessage": "Desbloqueie o dispositivo e tente novamente.",
+      "unavailableTitle": "Armazenamento indisponível",
+      "unavailableMessage": "Não foi possível abrir o armazenamento local da aplicação. Reinicie o Kilo e tente novamente."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Ainda não há anfitriões",
+      "emptyDescription": "Adicione um anfitrião ou importe os anfitriões da sua configuração SSH.",
+      "addHost": "Adicionar anfitrião",
+      "importConfig": "Importar da configuração SSH",
+      "rowActions": "{{label}}, {{target}}. Abre a edição e a eliminação.",
+      "viaJump": "via {{label}}",
+      "deleteTitle": "Eliminar {{label}}?",
+      "deleteMessage": "A sua configuração e os reencaminhamentos de portas são removidos com ele. Esta ação não pode ser anulada.",
+      "deleteFailed": "Não foi possível eliminar o anfitrião."
+    },
+    "editor": {
+      "newTitle": "Novo anfitrião",
+      "editTitle": "Editar anfitrião",
+      "label": "Nome",
+      "labelPlaceholder": "Servidor de casa",
+      "hostname": "Nome do anfitrião",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Porta",
+      "username": "Nome de utilizador",
+      "authMethod": "Método de autenticação",
+      "password": "Palavra-passe",
+      "key": "Chave SSH",
+      "keyboardInteractive": "Teclado interativo",
+      "passwordPlaceholder": "Introduzida ao ligar, a menos que seja guardada",
+      "savePassword": "Guardar palavra-passe",
+      "savePasswordHint": "Guardada no armazenamento encriptado deste dispositivo.",
+      "chooseKey": "Escolher uma chave",
+      "noKeys": "Ainda não há chaves",
+      "jumpHost": "Anfitrião de salto",
+      "directConnection": "Ligação direta",
+      "tmuxAttach": "Anexar tmux",
+      "tmuxSession": "Nome da sessão tmux",
+      "saved": "Anfitrião guardado.",
+      "saveFailed": "Não foi possível guardar o anfitrião."
+    },
+    "errors": {
+      "invalidPort": "Utilize uma porta entre 1 e 65535",
+      "jumpCycle": "Esse anfitrião já salta através deste."
+    },
+    "import": {
+      "title": "Importar configuração SSH",
+      "description": "Cole a sua configuração SSH ou escolha o ficheiro.",
+      "sourceLabel": "Configuração SSH",
+      "chooseFile": "Escolher ficheiro",
+      "preview": "Pré-visualizar",
+      "apply": "Importar anfitriões",
+      "imported": "Anfitriões importados.",
+      "importFailed": "Não foi importado nada.",
+      "nothingDescription": "Esta configuração não descreve nenhum anfitrião que esta aplicação possa importar.",
+      "notImported": "Não importado",
+      "needsKey": "Precisa de chave",
+      "warnNeedsKey": "O ficheiro de chave não pode ser importado. Escolha uma chave no editor.",
+      "warnJumpMissing": "{{target}} não está na importação, por isso este anfitrião liga-se diretamente.",
+      "warnJumpMultiHop": "Só o primeiro anfitrião de salto é importado.",
+      "warnJumpCycle": "{{target}} salta de volta através deste anfitrião, por isso o seu salto foi removido.",
+      "warnForward": "Não foi possível ler uma linha de reencaminhamento neste anfitrião.",
+      "skippedNoUsername": "{{alias}} não tem linha User.",
+      "skippedInvalidPort": "{{alias}} tem uma porta que não é um número entre 1 e 65535.",
+      "unreadableFile": "Não foi possível ler esse ficheiro."
+    },
+    "knownHosts": {
+      "title": "Anfitriões conhecidos",
+      "emptyTitle": "Ainda não há anfitriões de confiança",
+      "emptyDescription": "A chave de um anfitrião torna-se de confiança na primeira vez que se liga a ele.",
+      "deleteTitle": "Esquecer {{pattern}}?",
+      "deleteMessage": "A próxima ligação volta a pedir que confie na chave.",
+      "deleteFailed": "Não foi possível remover a chave do anfitrião.",
+      "deleteLabel": "Esquecer {{pattern}}"
+    }
   }
 }

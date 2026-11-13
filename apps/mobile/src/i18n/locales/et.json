@@ -4085,5 +4085,88 @@
     "unavailableDescription": "See jagamislink on aegunud või tühistatud.",
     "transcriptUnavailableTitle": "Seda transkripti ei õnnestunud laadida",
     "transcriptUnavailableDescription": "Link töötab endiselt. Proovi hetke pärast uuesti."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Ühenda oma serveritega.",
+    "storage": {
+      "lockedTitle": "Ava lukk, et SSH-d kasutada",
+      "lockedMessage": "Ava seade lukust ja proovi uuesti.",
+      "unavailableTitle": "Salvestusruum pole saadaval",
+      "unavailableMessage": "Rakenduse seadmesisest salvestust ei õnnestunud avada. Taaskäivita Kilo ja proovi uuesti."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Ühtegi hosti veel pole",
+      "emptyDescription": "Lisa host või impordi hostid oma SSH-konfiguratsioonist.",
+      "addHost": "Lisa host",
+      "importConfig": "Impordi SSH-konfiguratsioonist",
+      "rowActions": "{{label}}, {{target}}. Avab muutmise ja kustutamise.",
+      "viaJump": "läbi {{label}}",
+      "deleteTitle": "Kustuta {{label}}?",
+      "deleteMessage": "Koos sellega eemaldatakse ka selle seaded ja pordisuunamised. Seda ei saa tagasi võtta.",
+      "deleteFailed": "Hosti ei õnnestunud kustutada."
+    },
+    "editor": {
+      "newTitle": "Uus host",
+      "editTitle": "Muuda hosti",
+      "label": "Nimi",
+      "labelPlaceholder": "Koduserver",
+      "hostname": "Hostinimi",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Kasutajanimi",
+      "authMethod": "Autentimismeetod",
+      "password": "Parool",
+      "key": "SSH-võti",
+      "keyboardInteractive": "Interaktiivne klaviatuur",
+      "passwordPlaceholder": "Sisestatakse ühendamisel, kui pole salvestatud",
+      "savePassword": "Salvesta parool",
+      "savePasswordHint": "Hoitakse selle seadme krüpteeritud hoidlas.",
+      "chooseKey": "Vali võti",
+      "noKeys": "Ühtegi võtit veel pole",
+      "jumpHost": "Hüppeserver",
+      "directConnection": "Otseühendus",
+      "tmuxAttach": "Ühenda tmux",
+      "tmuxSession": "tmuxi sessiooni nimi",
+      "saved": "Host salvestatud.",
+      "saveFailed": "Hosti ei õnnestunud salvestada."
+    },
+    "errors": {
+      "invalidPort": "Kasuta porti vahemikus 1–65535",
+      "jumpCycle": "See host hüppab juba selle hosti kaudu."
+    },
+    "import": {
+      "title": "Impordi SSH-konfiguratsioon",
+      "description": "Kleebi oma SSH-konfiguratsioon või vali fail.",
+      "sourceLabel": "SSH-konfiguratsioon",
+      "chooseFile": "Vali fail",
+      "preview": "Eelvaade",
+      "apply": "Impordi hostid",
+      "imported": "Hostid imporditud.",
+      "importFailed": "Midagi ei imporditud.",
+      "nothingDescription": "See konfiguratsioon ei kirjelda ühtegi hosti, mida see rakendus saaks importida.",
+      "notImported": "Pole imporditud",
+      "needsKey": "Vajab võtit",
+      "warnNeedsKey": "Selle võtmefaili ei saa importida. Vali võti hosti muutmisel.",
+      "warnJumpMissing": "{{target}} pole impordis, seega ühendub see host otse.",
+      "warnJumpMultiHop": "Imporditakse ainult esimene hüppeserver.",
+      "warnJumpCycle": "{{target}} hüppab tagasi selle hosti kaudu, seega selle hüpe jäeti välja.",
+      "warnForward": "Selle hosti suunamisrida ei õnnestunud lugeda.",
+      "skippedNoUsername": "{{alias}}-l puudub User rida.",
+      "skippedInvalidPort": "{{alias}}-l on port, mis pole arv vahemikus 1–65535.",
+      "unreadableFile": "Seda faili ei õnnestunud lugeda."
+    },
+    "knownHosts": {
+      "title": "Tuntud hostid",
+      "emptyTitle": "Ühtegi usaldatud hosti veel pole",
+      "emptyDescription": "Hosti võti loetakse usaldatuks esimesel ühendamisel selle hostiga.",
+      "deleteTitle": "Unusta {{pattern}}?",
+      "deleteMessage": "Järgmisel ühendamisel palutakse selle võtit uuesti usaldada.",
+      "deleteFailed": "Hosti võtit ei õnnestunud eemaldada.",
+      "deleteLabel": "Unusta {{pattern}}"
+    }
   }
 }

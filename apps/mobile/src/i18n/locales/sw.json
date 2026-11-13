@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Muda wa kiungo hiki cha kushiriki umeisha au kimebatilishwa.",
     "transcriptUnavailableTitle": "Imeshindwa kupakia nakala hii",
     "transcriptUnavailableDescription": "Kiungo bado kinafanya kazi. Jaribu tena baada ya muda mfupi."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Ungana na seva zako mwenyewe.",
+    "storage": {
+      "lockedTitle": "Fungua kifaa ili kutumia SSH",
+      "lockedMessage": "Fungua kifaa chako, kisha ujaribu tena.",
+      "unavailableTitle": "Nafasi ya kuhifadhi haipatikani",
+      "unavailableMessage": "Hazina ya kifaa ya programu haikuweza kufunguliwa. Anzisha upya Kilo, kisha ujaribu tena."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Bado hakuna wenyeji",
+      "emptyDescription": "Ongeza mwenyeji, au leta wenyeji kutoka kwenye SSH config yako.",
+      "addHost": "Ongeza mwenyeji",
+      "importConfig": "Leta kutoka SSH config",
+      "rowActions": "{{label}}, {{target}}. Hufungua kuhariri na kufuta.",
+      "viaJump": "kupitia {{label}}",
+      "deleteTitle": "Futa {{label}}?",
+      "deleteMessage": "Mipangilio yake na uelekezaji wa bandari huondolewa pamoja nayo. Hili haliwezi kutenduliwa.",
+      "deleteFailed": "Mwenyeji hakuweza kufutwa."
+    },
+    "editor": {
+      "newTitle": "Mwenyeji mpya",
+      "editTitle": "Hariri mwenyeji",
+      "label": "Lebo",
+      "labelPlaceholder": "Seva ya nyumbani",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Bandari",
+      "username": "Jina la mtumiaji",
+      "authMethod": "Njia ya uthibitishaji",
+      "password": "Nenosiri",
+      "key": "Ufunguo wa SSH",
+      "keyboardInteractive": "Mwingiliano wa kibodi",
+      "passwordPlaceholder": "Huandikwa wakati wa kuunganisha, isipokuwa umehifadhiwa",
+      "savePassword": "Hifadhi nenosiri",
+      "savePasswordHint": "Huhifadhiwa katika hazina iliyosimbwa kwa siri kwenye kifaa hiki.",
+      "chooseKey": "Chagua ufunguo",
+      "noKeys": "Bado hakuna funguo",
+      "jumpHost": "Mwenyeji wa kuruka",
+      "directConnection": "Muunganisho wa moja kwa moja",
+      "tmuxAttach": "Ambatisha tmux",
+      "tmuxSession": "Jina la kipindi cha tmux",
+      "saved": "Mwenyeji amehifadhiwa.",
+      "saveFailed": "Mwenyeji hakuweza kuhifadhiwa."
+    },
+    "errors": {
+      "invalidPort": "Tumia bandari kuanzia 1 hadi 65535",
+      "jumpCycle": "Mwenyeji huyo tayari anaruka kupitia huyu."
+    },
+    "import": {
+      "title": "Leta SSH config",
+      "description": "Bandika SSH config yako, au chagua faili.",
+      "sourceLabel": "SSH config",
+      "chooseFile": "Chagua faili",
+      "preview": "Hakiki",
+      "apply": "Leta wenyeji",
+      "imported": "Wenyeji wameletwa.",
+      "importFailed": "Hakuna kilicholetwa.",
+      "nothingDescription": "Config hii haielezi mwenyeji yeyote ambaye programu hii inaweza kuleta.",
+      "notImported": "Haikuletwa",
+      "needsKey": "Inahitaji ufunguo",
+      "warnNeedsKey": "Faili yake ya ufunguo haiwezi kuletwa. Chagua ufunguo kwenye kihariri.",
+      "warnJumpMissing": "{{target}} hayumo kwenye uletaji, kwa hivyo mwenyeji huyu anaunganisha moja kwa moja.",
+      "warnJumpMultiHop": "Ni mwenyeji wa kwanza wa kuruka tu ndiye anayeletwa.",
+      "warnJumpCycle": "{{target}} anaruka kurudi kupitia mwenyeji huyu, kwa hivyo urukaji wake umeondolewa.",
+      "warnForward": "Mstari wa uelekezaji katika mwenyeji huyu haukuweza kusomwa.",
+      "skippedNoUsername": "{{alias}} hana mstari wa User.",
+      "skippedInvalidPort": "{{alias}} ana bandari ambayo si namba kuanzia 1 hadi 65535.",
+      "unreadableFile": "Faili hiyo haikuweza kusomwa."
+    },
+    "knownHosts": {
+      "title": "Wenyeji wanaojulikana",
+      "emptyTitle": "Bado hakuna wenyeji wanaotumainiwa",
+      "emptyDescription": "Ufunguo wa mwenyeji hutumainiwa mara ya kwanza unapounganisha naye.",
+      "deleteTitle": "Sahau {{pattern}}?",
+      "deleteMessage": "Muunganisho ujao utakuomba kuamini ufunguo wake tena.",
+      "deleteFailed": "Ufunguo wa mwenyeji haukuweza kuondolewa.",
+      "deleteLabel": "Sahau {{pattern}}"
+    }
   }
 }

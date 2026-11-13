@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Hierdie deelskakel het verval of is herroep.",
     "transcriptUnavailableTitle": "Kon nie hierdie transkrip laai nie",
     "transcriptUnavailableDescription": "Die skakel werk steeds. Probeer weer oor 'n oomblik."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Koppel aan jou eie bedieners.",
+    "storage": {
+      "lockedTitle": "Ontsluit om SSH te gebruik",
+      "lockedMessage": "Ontsluit jou toestel en probeer dan weer.",
+      "unavailableTitle": "Berging nie beskikbaar nie",
+      "unavailableMessage": "Die app se berging op die toestel kon nie oopgemaak word nie. Herbegin Kilo en probeer dan weer."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Nog geen gashere nie",
+      "emptyDescription": "Voeg 'n gasheer by, of bring die gashere uit jou SSH-konfigurasie in.",
+      "addHost": "Voeg gasheer by",
+      "importConfig": "Voer in vanaf SSH-konfigurasie",
+      "rowActions": "{{label}}, {{target}}. Open wysig en skrap.",
+      "viaJump": "via {{label}}",
+      "deleteTitle": "Skrap {{label}}?",
+      "deleteMessage": "Sy instellings en poortaansture word saam verwyder. Dit kan nie ongedaan gemaak word nie.",
+      "deleteFailed": "Die gasheer kon nie geskrap word nie."
+    },
+    "editor": {
+      "newTitle": "Nuwe gasheer",
+      "editTitle": "Wysig gasheer",
+      "label": "Etiket",
+      "labelPlaceholder": "Tuisbediener",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Poort",
+      "username": "Gebruikersnaam",
+      "authMethod": "Verifikasiemetode",
+      "password": "Wagwoord",
+      "key": "SSH-sleutel",
+      "keyboardInteractive": "Sleutelbord-interaktief",
+      "passwordPlaceholder": "Word getik wanneer daar gekoppel word, tensy gestoor",
+      "savePassword": "Stoor wagwoord",
+      "savePasswordHint": "Word in die geënkripteerde berging op hierdie toestel gehou.",
+      "chooseKey": "Kies 'n sleutel",
+      "noKeys": "Nog geen sleutels nie",
+      "jumpHost": "Spronggasheer",
+      "directConnection": "Direkte verbinding",
+      "tmuxAttach": "Heg tmux aan",
+      "tmuxSession": "tmux-sessienaam",
+      "saved": "Gasheer gestoor.",
+      "saveFailed": "Die gasheer kon nie gestoor word nie."
+    },
+    "errors": {
+      "invalidPort": "Gebruik 'n poort van 1 tot 65535",
+      "jumpCycle": "Daardie gasheer spring reeds deur hierdie een."
+    },
+    "import": {
+      "title": "Voer SSH-konfigurasie in",
+      "description": "Plak jou SSH-konfigurasie, of kies die lêer.",
+      "sourceLabel": "SSH-konfigurasie",
+      "chooseFile": "Kies lêer",
+      "preview": "Voorskou",
+      "apply": "Voer gashere in",
+      "imported": "Gashere ingevoer.",
+      "importFailed": "Niks is ingevoer nie.",
+      "nothingDescription": "Hierdie konfigurasie beskryf geen gasheer wat hierdie app kan invoer nie.",
+      "notImported": "Nie ingevoer nie",
+      "needsKey": "Benodig sleutel",
+      "warnNeedsKey": "Sy sleutellêer kan nie ingevoer word nie. Kies 'n sleutel in die redigeerder.",
+      "warnJumpMissing": "{{target}} is nie in die invoer nie, so hierdie gasheer koppel direk.",
+      "warnJumpMultiHop": "Net die eerste spronggasheer word ingevoer.",
+      "warnJumpCycle": "{{target}} spring terug deur hierdie gasheer, so sy sprong is laat vaar.",
+      "warnForward": "'n Aanstuurlyn in hierdie gasheer kon nie gelees word nie.",
+      "skippedNoUsername": "{{alias}} het geen User-lyn nie.",
+      "skippedInvalidPort": "{{alias}} het 'n poort wat nie 'n nommer van 1 tot 65535 is nie.",
+      "unreadableFile": "Daardie lêer kon nie gelees word nie."
+    },
+    "knownHosts": {
+      "title": "Bekende gashere",
+      "emptyTitle": "Nog geen vertroude gashere nie",
+      "emptyDescription": "'n Gasheersleutel word vertrou die eerste keer wat jy daaraan koppel.",
+      "deleteTitle": "Vergeet {{pattern}}?",
+      "deleteMessage": "Die volgende verbinding vra jou weer om sy sleutel te vertrou.",
+      "deleteFailed": "Die gasheersleutel kon nie verwyder word nie.",
+      "deleteLabel": "Vergeet {{pattern}}"
+    }
   }
 }

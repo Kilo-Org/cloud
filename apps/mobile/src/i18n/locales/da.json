@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Dette delingslink er udløbet eller blevet tilbagekaldt.",
     "transcriptUnavailableTitle": "Udskriften kunne ikke indlæses",
     "transcriptUnavailableDescription": "Linket virker stadig. Prøv igen om lidt."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Opret forbindelse til dine egne servere.",
+    "storage": {
+      "lockedTitle": "Lås op for at bruge SSH",
+      "lockedMessage": "Lås din enhed op, og prøv igen.",
+      "unavailableTitle": "Lageret er ikke tilgængeligt",
+      "unavailableMessage": "Appens lager på enheden kunne ikke åbnes. Genstart Kilo, og prøv igen."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Ingen værter endnu",
+      "emptyDescription": "Tilføj en vært, eller importér værterne fra din SSH-konfiguration.",
+      "addHost": "Tilføj vært",
+      "importConfig": "Importér fra SSH-konfiguration",
+      "rowActions": "{{label}}, {{target}}. Åbner redigering og sletning.",
+      "viaJump": "via {{label}}",
+      "deleteTitle": "Slet {{label}}?",
+      "deleteMessage": "Dens opsætning og portvideresendelser fjernes sammen med den. Det kan ikke fortrydes.",
+      "deleteFailed": "Værten kunne ikke slettes."
+    },
+    "editor": {
+      "newTitle": "Ny vært",
+      "editTitle": "Rediger vært",
+      "label": "Navn",
+      "labelPlaceholder": "Hjemmeserver",
+      "hostname": "Værtsnavn",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Brugernavn",
+      "authMethod": "Godkendelsesmetode",
+      "password": "Adgangskode",
+      "key": "SSH-nøgle",
+      "keyboardInteractive": "Tastaturinteraktiv",
+      "passwordPlaceholder": "Indtastes ved forbindelse, medmindre den er gemt",
+      "savePassword": "Gem adgangskode",
+      "savePasswordHint": "Gemmes i det krypterede lager på denne enhed.",
+      "chooseKey": "Vælg en nøgle",
+      "noKeys": "Ingen nøgler endnu",
+      "jumpHost": "Jump-vært",
+      "directConnection": "Direkte forbindelse",
+      "tmuxAttach": "Vedhæft tmux",
+      "tmuxSession": "Navn på tmux-session",
+      "saved": "Værten er gemt.",
+      "saveFailed": "Værten kunne ikke gemmes."
+    },
+    "errors": {
+      "invalidPort": "Brug en port fra 1 til 65535",
+      "jumpCycle": "Den vært går allerede gennem denne."
+    },
+    "import": {
+      "title": "Importér SSH-konfiguration",
+      "description": "Indsæt din SSH-konfiguration, eller vælg filen.",
+      "sourceLabel": "SSH-konfiguration",
+      "chooseFile": "Vælg fil",
+      "preview": "Forhåndsvisning",
+      "apply": "Importér værter",
+      "imported": "Værter importeret.",
+      "importFailed": "Intet blev importeret.",
+      "nothingDescription": "Denne konfiguration beskriver ingen vært, som appen kan importere.",
+      "notImported": "Ikke importeret",
+      "needsKey": "Kræver nøgle",
+      "warnNeedsKey": "Dens nøglefil kan ikke importeres. Vælg en nøgle i editoren.",
+      "warnJumpMissing": "{{target}} findes ikke i importen, så denne vært forbinder direkte.",
+      "warnJumpMultiHop": "Kun den første jump-vært importeres.",
+      "warnJumpCycle": "{{target}} går tilbage gennem denne vært, så dens jump blev droppet.",
+      "warnForward": "En videresendelseslinje i denne vært kunne ikke læses.",
+      "skippedNoUsername": "{{alias}} har ingen User-linje.",
+      "skippedInvalidPort": "{{alias}} har en port, som ikke er et tal fra 1 til 65535.",
+      "unreadableFile": "Filen kunne ikke læses."
+    },
+    "knownHosts": {
+      "title": "Kendte værter",
+      "emptyTitle": "Ingen betroede værter endnu",
+      "emptyDescription": "En værtsnøgle betros første gang, du opretter forbindelse til den.",
+      "deleteTitle": "Glem {{pattern}}?",
+      "deleteMessage": "Ved næste forbindelse bliver du bedt om at betro dens nøgle igen.",
+      "deleteFailed": "Værtsnøglen kunne ikke fjernes.",
+      "deleteLabel": "Glem {{pattern}}"
+    }
   }
 }

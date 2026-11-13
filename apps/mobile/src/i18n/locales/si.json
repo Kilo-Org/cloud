@@ -4085,5 +4085,88 @@
     "unavailableDescription": "මෙම බෙදාගැනීමේ සබැඳිය කල් ඉකුත් වී හෝ අවලංගු කර ඇත.",
     "transcriptUnavailableTitle": "මෙම සංවාද සටහන පූරණය කළ නොහැකි විය",
     "transcriptUnavailableDescription": "සබැඳිය තවමත් ක්‍රියා කරයි. මොහොතකින් නැවත උත්සාහ කරන්න."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "ඔබේම සේවාදායකවලට සම්බන්ධ වන්න.",
+    "storage": {
+      "lockedTitle": "SSH භාවිතයට අගුළු හරින්න",
+      "lockedMessage": "ඔබේ උපාංගයේ අගුළු හරින්න, පසුව නැවත උත්සාහ කරන්න.",
+      "unavailableTitle": "ගබඩාව ලබා ගත නොහැක",
+      "unavailableMessage": "යෙදුමේ උපාංගයේ ගබඩාව විවෘත කළ නොහැකි විය. Kilo නැවත ආරම්භ කර, පසුව නැවත උත්සාහ කරන්න."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "තවම සත්කාරක නැත",
+      "emptyDescription": "සත්කාරකයක් එක් කරන්න, නැතහොත් ඔබේ SSH config එකෙන් සත්කාරක ගෙන්වන්න.",
+      "addHost": "සත්කාරක එක් කරන්න",
+      "importConfig": "SSH config එකෙන් ආයාත කරන්න",
+      "rowActions": "{{label}}, {{target}}. සංස්කරණය සහ මකන්න විවෘත කරයි.",
+      "viaJump": "{{label}} හරහා",
+      "deleteTitle": "{{label}} මකන්නද?",
+      "deleteMessage": "එහි සැකසුම සහ port forward ද එය සමඟ ඉවත් වේ. මෙය ආපසු හැරවිය නොහැක.",
+      "deleteFailed": "සත්කාරකය මකා දැමිය නොහැකි විය."
+    },
+    "editor": {
+      "newTitle": "නව සත්කාරකය",
+      "editTitle": "සත්කාරකය සංස්කරණය කරන්න",
+      "label": "ලේබලය",
+      "labelPlaceholder": "නිවසේ සේවාදායකය",
+      "hostname": "සත්කාරක නාමය",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "තොටුපළ",
+      "username": "පරිශීලක නාමය",
+      "authMethod": "සත්යාපන ක්‍රමය",
+      "password": "මුරපදය",
+      "key": "SSH යතුර",
+      "keyboardInteractive": "යතුරුපුවරු අන්තර්ක්‍රිය",
+      "passwordPlaceholder": "සුරකින්නේ නම් මිස, සම්බන්ධ වීමේදී ටයිප් කරන්න",
+      "savePassword": "මුරපදය සුරකින්න",
+      "savePasswordHint": "මෙම උපාංගයේ සංකේතනය කළ ගබඩාවේ තබා ගනී.",
+      "chooseKey": "යතුරක් තෝරන්න",
+      "noKeys": "තවම යතුරු නැත",
+      "jumpHost": "Jump සත්කාරකය",
+      "directConnection": "සෘජු සම්බන්ධතාවය",
+      "tmuxAttach": "tmux සම්බන්ධ කරන්න",
+      "tmuxSession": "tmux සැසි නාමය",
+      "saved": "සත්කාරකය සුරකින ලදී.",
+      "saveFailed": "සත්කාරකය සුරැකිය නොහැකි විය."
+    },
+    "errors": {
+      "invalidPort": "1 සිට 65535 දක්වා තොටුපළක් භාවිත කරන්න",
+      "jumpCycle": "එම සත්කාරකය දැනටමත් මෙය හරහා jump වේ."
+    },
+    "import": {
+      "title": "SSH config ආයාත කරන්න",
+      "description": "ඔබේ SSH config අලවන්න, නැතහොත් ගොනුව තෝරන්න.",
+      "sourceLabel": "SSH config",
+      "chooseFile": "ගොනුව තෝරන්න",
+      "preview": "පෙරදසුන",
+      "apply": "සත්කාරක ආයාත කරන්න",
+      "imported": "සත්කාරක ආයාත කරන ලදී.",
+      "importFailed": "කිසිවක් ආයාත නොවීය.",
+      "nothingDescription": "මෙම config මගින් මෙම යෙදුමට ආයාත කළ හැකි කිසිදු සත්කාරකයක් විස්තර නොකරයි.",
+      "notImported": "ආයාත කර නැත",
+      "needsKey": "යතුර අවශ්‍යයි",
+      "warnNeedsKey": "එහි යතුරු ගොනුව ආයාත කළ නොහැක. සංස්කාරකයේ යතුරක් තෝරන්න.",
+      "warnJumpMissing": "{{target}} ආයාතයේ නැත, එබැවින් මෙම සත්කාරකය සෘජුවම සම්බන්ධ වේ.",
+      "warnJumpMultiHop": "ආයාත වන්නේ පළමු jump සත්කාරකය පමණි.",
+      "warnJumpCycle": "{{target}} මෙම සත්කාරකය හරහා ආපසු jump වේ, එබැවින් එහි jump ඉවත් කරන ලදී.",
+      "warnForward": "මෙම සත්කාරකයේ forward පේළියක් කියවා ගත නොහැකි විය.",
+      "skippedNoUsername": "{{alias}} සඳහා User පේළියක් නැත.",
+      "skippedInvalidPort": "{{alias}} හි 1 සිට 65535 දක්වා සංඛ්‍යාවක් නොවන තොටුපළක් ඇත.",
+      "unreadableFile": "එම ගොනුව කියවා ගත නොහැකි විය."
+    },
+    "knownHosts": {
+      "title": "දන්නා සත්කාරක",
+      "emptyTitle": "තවම විශ්වාසනීය සත්කාරක නැත",
+      "emptyDescription": "ඔබ පළමු වරට සම්බන්ධ වන විට සත්කාරක යතුර විශ්වාස කෙරේ.",
+      "deleteTitle": "{{pattern}} අමතක කරන්නද?",
+      "deleteMessage": "ඊළඟ සම්බන්ධතාවයේදී එහි යතුර නැවත විශ්වාස කරන ලෙස ඔබෙන් අසනු ලැබේ.",
+      "deleteFailed": "සත්කාරක යතුර ඉවත් කළ නොහැකි විය.",
+      "deleteLabel": "{{pattern}} අමතක කරන්න"
+    }
   }
 }

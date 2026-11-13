@@ -4345,5 +4345,88 @@
     "unavailableDescription": "Mae'r ddolen rannu hon wedi dod i ben neu wedi'i dirymu.",
     "transcriptUnavailableTitle": "Methu llwytho'r trawsgrifiad hwn",
     "transcriptUnavailableDescription": "Mae'r ddolen yn dal i weithio. Rhowch gynnig arall arni mewn ychydig."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Cysylltwch â'ch gweinyddion eich hun.",
+    "storage": {
+      "lockedTitle": "Datgloi i ddefnyddio SSH",
+      "lockedMessage": "Datgloiwch eich dyfais, yna ceisiwch eto.",
+      "unavailableTitle": "Storfa ddim ar gael",
+      "unavailableMessage": "Nid oedd modd agor storfa'r ap ar y ddyfais. Ailgychwynnwch Kilo, yna ceisiwch eto."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Dim gwesteiwyr eto",
+      "emptyDescription": "Ychwanegwch westeiwr, neu mewnforiwch y gwesteiwyr o'ch cyfluniad SSH.",
+      "addHost": "Ychwanegu gwesteiwr",
+      "importConfig": "Mewnforio o gyfluniad SSH",
+      "rowActions": "{{label}}, {{target}}. Yn agor golygu a dileu.",
+      "viaJump": "drwy {{label}}",
+      "deleteTitle": "Dileu {{label}}?",
+      "deleteMessage": "Mae ei osodiad a'r porthladdoedd a anfonir ymlaen yn cael eu tynnu gyda hi. Ni ellir dadwneud hyn.",
+      "deleteFailed": "Nid oedd modd dileu'r gwesteiwr."
+    },
+    "editor": {
+      "newTitle": "Gwesteiwr newydd",
+      "editTitle": "Golygu gwesteiwr",
+      "label": "Enw",
+      "labelPlaceholder": "Gweinydd cartref",
+      "hostname": "Enw gwesteiwr",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Porth",
+      "username": "Enw defnyddiwr",
+      "authMethod": "Dull dilysu",
+      "password": "Cyfrinair",
+      "key": "Allwedd SSH",
+      "keyboardInteractive": "Bysellfwrdd rhyngweithiol",
+      "passwordPlaceholder": "Teipir wrth gysylltu, oni bai ei fod wedi'i gadw",
+      "savePassword": "Cadw cyfrinair",
+      "savePasswordHint": "Cedwir yn y storfa wedi'i hamgryptio ar y ddyfais hon.",
+      "chooseKey": "Dewis allwedd",
+      "noKeys": "Dim allweddi eto",
+      "jumpHost": "Gwesteiwr naid",
+      "directConnection": "Cysylltiad uniongyrchol",
+      "tmuxAttach": "Atodi tmux",
+      "tmuxSession": "Enw sesiwn tmux",
+      "saved": "Gwesteiwr wedi'i gadw.",
+      "saveFailed": "Nid oedd modd cadw'r gwesteiwr."
+    },
+    "errors": {
+      "invalidPort": "Defnyddiwch borth rhwng 1 a 65535",
+      "jumpCycle": "Mae'r gwesteiwr hwnnw eisoes yn neidio drwy'r un hwn."
+    },
+    "import": {
+      "title": "Mewnforio cyfluniad SSH",
+      "description": "Gludwch eich cyfluniad SSH, neu dewiswch y ffeil.",
+      "sourceLabel": "Cyfluniad SSH",
+      "chooseFile": "Dewis ffeil",
+      "preview": "Rhagolwg",
+      "apply": "Mewnforio gwesteiwyr",
+      "imported": "Gwesteiwyr wedi'u mewnforio.",
+      "importFailed": "Ni fewnforiwyd dim.",
+      "nothingDescription": "Nid yw'r cyfluniad hwn yn disgrifio unrhyw westeiwr y gall yr ap hwn ei fewnforio.",
+      "notImported": "Heb ei fewnforio",
+      "needsKey": "Angen allwedd",
+      "warnNeedsKey": "Ni ellir mewnforio ei ffeil allwedd. Dewiswch allwedd yn y golygydd.",
+      "warnJumpMissing": "Nid yw {{target}} yn y mewnforiad, felly mae'r gwesteiwr hwn yn cysylltu'n uniongyrchol.",
+      "warnJumpMultiHop": "Dim ond y gwesteiwr naid cyntaf sy'n cael ei fewnforio.",
+      "warnJumpCycle": "Mae {{target}} yn neidio'n ôl drwy'r gwesteiwr hwn, felly gollyngwyd ei naid.",
+      "warnForward": "Nid oedd modd darllen llinell anfon ymlaen yn y gwesteiwr hwn.",
+      "skippedNoUsername": "Nid oes gan {{alias}} linell User.",
+      "skippedInvalidPort": "Mae gan {{alias}} borth nad yw'n rhif rhwng 1 a 65535.",
+      "unreadableFile": "Nid oedd modd darllen y ffeil honno."
+    },
+    "knownHosts": {
+      "title": "Gwesteiwyr hysbys",
+      "emptyTitle": "Dim gwesteiwyr dibynadwy eto",
+      "emptyDescription": "Ymddiriedir yn allwedd gwesteiwr y tro cyntaf y byddwch yn cysylltu â hi.",
+      "deleteTitle": "Anghofio {{pattern}}?",
+      "deleteMessage": "Bydd y cysylltiad nesaf yn gofyn i chi ymddiried yn ei hallwedd eto.",
+      "deleteFailed": "Nid oedd modd tynnu allwedd y gwesteiwr.",
+      "deleteLabel": "Anghofio {{pattern}}"
+    }
   }
 }

@@ -4085,5 +4085,88 @@
     "unavailableDescription": "ଏହି ସେୟାର ଲିଙ୍କ୍‌ର ମିଆଦ ସରିଯାଇଛି କିମ୍ବା ଏହାକୁ ପ୍ରତ୍ୟାହାର କରାଯାଇଛି।",
     "transcriptUnavailableTitle": "ଏହି ଟ୍ରାନ୍ସକ୍ରିପ୍ଟ ଲୋଡ୍ କରିହେଲା ନାହିଁ",
     "transcriptUnavailableDescription": "ଲିଙ୍କ୍ ଏବେ ବି କାମ କରୁଛି। କିଛି ସମୟ ପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "ଆପଣଙ୍କର ନିଜ ସର୍ଭର ସହିତ ସଂଯୋଗ କରନ୍ତୁ।",
+    "storage": {
+      "lockedTitle": "SSH ବ୍ୟବହାର କରିବାକୁ ଅନଲକ କରନ୍ତୁ",
+      "lockedMessage": "ଆପଣଙ୍କ ଡିଭାଇସ ଅନଲକ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "unavailableTitle": "ଷ୍ଟୋରେଜ ଉପଲବ୍ଧ ନାହିଁ",
+      "unavailableMessage": "ଆପର ଅନ-ଡିଭାଇସ ଷ୍ଟୋର ଖୋଲା ଯାଇପାରିଲା ନାହିଁ। Kilo କୁ ପୁନଃ ଆରମ୍ଭ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "ଏବେ କୌଣସି ହୋଷ୍ଟ ନାହିଁ",
+      "emptyDescription": "ଏକ ହୋଷ୍ଟ ଯୋଡ଼ନ୍ତୁ, କିମ୍ବା ଆପଣଙ୍କ SSH config ରୁ ହୋଷ୍ଟଗୁଡ଼ିକ ଆଣନ୍ତୁ।",
+      "addHost": "ହୋଷ୍ଟ ଯୋଡ଼ନ୍ତୁ",
+      "importConfig": "SSH config ରୁ ଆମଦାନୀ କରନ୍ତୁ",
+      "rowActions": "{{label}}, {{target}}। ସମ୍ପାଦନ ଏବଂ ବିଲୋପ ଖୋଲେ।",
+      "viaJump": "{{label}} ମାଧ୍ୟମରେ",
+      "deleteTitle": "{{label}} ବିଲୋପ କରିବେ?",
+      "deleteMessage": "ଏହା ସହିତ ଏହାର ସେଟିଂ ଏବଂ ପୋର୍ଟ ଫରୱାର୍ଡ ମଧ୍ୟ ହଟିଯିବ। ଏହା ପୂର୍ବାବସ୍ଥାକୁ ଫେରାଯାଇପାରିବ ନାହିଁ।",
+      "deleteFailed": "ହୋଷ୍ଟକୁ ବିଲୋପ କରାଯାଇପାରିଲା ନାହିଁ।"
+    },
+    "editor": {
+      "newTitle": "ନୂଆ ହୋଷ୍ଟ",
+      "editTitle": "ହୋଷ୍ଟ ସମ୍ପାଦନ କରନ୍ତୁ",
+      "label": "ଲେବଲ",
+      "labelPlaceholder": "ଘର ସର୍ଭର",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "ପୋର୍ଟ",
+      "username": "ଉପଭୋକ୍ତା ନାମ",
+      "authMethod": "ପ୍ରମାଣୀକରଣ ପଦ୍ଧତି",
+      "password": "ପାସୱାର୍ଡ",
+      "key": "SSH ଚାବି",
+      "keyboardInteractive": "କୀବୋର୍ଡ ଇଣ୍ଟରାକ୍ଟିଭ",
+      "passwordPlaceholder": "ସଂରକ୍ଷିତ ନ ହେଲେ, ସଂଯୋଗ ସମୟରେ ଟାଇପ କରାଯାଏ",
+      "savePassword": "ପାସୱାର୍ଡ ସଂରକ୍ଷଣ କରନ୍ତୁ",
+      "savePasswordHint": "ଏହି ଡିଭାଇସର ଏନକ୍ରିପ୍ଟେଡ ଷ୍ଟୋରରେ ରଖାଯାଏ।",
+      "chooseKey": "ଏକ ଚାବି ଚୟନ କରନ୍ତୁ",
+      "noKeys": "ଏବେ କୌଣସି ଚାବି ନାହିଁ",
+      "jumpHost": "ଜମ୍ପ ହୋଷ୍ଟ",
+      "directConnection": "ସିଧାସଳଖ ସଂଯୋଗ",
+      "tmuxAttach": "tmux ସଂଲଗ୍ନ କରନ୍ତୁ",
+      "tmuxSession": "tmux ସେସନ ନାମ",
+      "saved": "ହୋଷ୍ଟ ସଂରକ୍ଷିତ ହେଲା।",
+      "saveFailed": "ହୋଷ୍ଟକୁ ସଂରକ୍ଷଣ କରାଯାଇପାରିଲା ନାହିଁ।"
+    },
+    "errors": {
+      "invalidPort": "1 ରୁ 65535 ମଧ୍ୟରେ ଏକ ପୋର୍ଟ ବ୍ୟବହାର କରନ୍ତୁ",
+      "jumpCycle": "ସେହି ହୋଷ୍ଟ ପୂର୍ବରୁ ଏହା ମାଧ୍ୟମରେ ଜମ୍ପ କରେ।"
+    },
+    "import": {
+      "title": "SSH config ଆମଦାନୀ କରନ୍ତୁ",
+      "description": "ଆପଣଙ୍କ SSH config ପେଷ୍ଟ କରନ୍ତୁ, କିମ୍ବା ଫାଇଲ ଚୟନ କରନ୍ତୁ।",
+      "sourceLabel": "SSH config",
+      "chooseFile": "ଫାଇଲ ଚୟନ କରନ୍ତୁ",
+      "preview": "ପୂର୍ବାବଲୋକନ",
+      "apply": "ହୋଷ୍ଟ ଆମଦାନୀ କରନ୍ତୁ",
+      "imported": "ହୋଷ୍ଟଗୁଡ଼ିକ ଆମଦାନୀ ହେଲା।",
+      "importFailed": "କିଛି ଆମଦାନୀ ହୋଇନାହିଁ।",
+      "nothingDescription": "ଏହି config ରେ ଏପରି କୌଣସି ହୋଷ୍ଟ ନାହିଁ ଯାହା ଏହି ଆପ ଆମଦାନୀ କରିପାରିବ।",
+      "notImported": "ଆମଦାନୀ ହୋଇନାହିଁ",
+      "needsKey": "ଚାବି ଆବଶ୍ୟକ",
+      "warnNeedsKey": "ଏହାର ଚାବି ଫାଇଲ ଆମଦାନୀ ହୋଇପାରିବ ନାହିଁ। ସମ୍ପାଦକରେ ଏକ ଚାବି ଚୟନ କରନ୍ତୁ।",
+      "warnJumpMissing": "{{target}} ଆମଦାନୀରେ ନାହିଁ, ତେଣୁ ଏହି ହୋଷ୍ଟ ସିଧାସଳଖ ସଂଯୋଗ ହେବ।",
+      "warnJumpMultiHop": "କେବଳ ପ୍ରଥମ ଜମ୍ପ ହୋଷ୍ଟ ଆମଦାନୀ ହେଲା।",
+      "warnJumpCycle": "{{target}} ଏହି ହୋଷ୍ଟ ମାଧ୍ୟମରେ ଫେରି ଯାଉଛି, ତେଣୁ ଏହାର ଜମ୍ପ ବାଦ ଦିଆଗଲା।",
+      "warnForward": "ଏହି ହୋଷ୍ଟରେ ଥିବା ଏକ ଫରୱାର୍ଡ ଲାଇନ ପଢ଼ାଯାଇପାରିଲା ନାହିଁ।",
+      "skippedNoUsername": "{{alias}} ରେ User ଲାଇନ ନାହିଁ।",
+      "skippedInvalidPort": "{{alias}} ର ପୋର୍ଟ 1 ରୁ 65535 ମଧ୍ୟରେ ଏକ ସଂଖ୍ୟା ନୁହେଁ।",
+      "unreadableFile": "ସେହି ଫାଇଲ ପଢ଼ାଯାଇପାରିଲା ନାହିଁ।"
+    },
+    "knownHosts": {
+      "title": "ଜଣାଶୁଣା ହୋଷ୍ଟ",
+      "emptyTitle": "ଏବେ କୌଣସି ବିଶ୍ୱସ୍ତ ହୋଷ୍ଟ ନାହିଁ",
+      "emptyDescription": "ପ୍ରଥମ ସଂଯୋଗ ସମୟରେ ଏକ ହୋଷ୍ଟ ଚାବି ବିଶ୍ୱସ୍ତ ହୁଏ।",
+      "deleteTitle": "{{pattern}} ଭୁଲିଯିବେ?",
+      "deleteMessage": "ପରବର୍ତ୍ତୀ ସଂଯୋଗ ସମୟରେ ଏହାର ଚାବିକୁ ପୁଣି ବିଶ୍ୱାସ କରିବାକୁ କୁହାଯିବ।",
+      "deleteFailed": "ହୋଷ୍ଟ ଚାବି ହଟାଯାଇପାରିଲା ନାହିଁ।",
+      "deleteLabel": "{{pattern}} ଭୁଲିଯାଅ"
+    }
   }
 }

@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Yeroon liinkii qooddannaa kanaa darbeera ykn haqameera.",
     "transcriptUnavailableTitle": "Galmee kana fe'uun hin danda'amne",
     "transcriptUnavailableDescription": "Liinkiin ammallee ni hojjeta. Yeroo muraasa booda irra deebi'ii yaali."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Serveroota kee mataa keetiitti walqunnami.",
+    "storage": {
+      "lockedTitle": "SSH fayyadamuuf qulfii bani",
+      "lockedMessage": "Meeshaa kee qulfii bani, sana booda ammas yaali.",
+      "unavailableTitle": "Kuusaa hin jiru",
+      "unavailableMessage": "Kuusaan appii meeshaa kana irratti jiru hin banamne. Kilo irra deebi'ii kakaasi, sana booda ammas yaali."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Hostiin hin jiru",
+      "emptyDescription": "Hostii dabali, yookaan hostoota SSH config kee keessaa fidi.",
+      "addHost": "Hostii dabali",
+      "importConfig": "SSH config irraa galchi",
+      "rowActions": "{{label}}, {{target}}. Gulaali fi balleessi ni bana.",
+      "viaJump": "{{label}} keessaan",
+      "deleteTitle": "{{label}} balleessuu?",
+      "deleteMessage": "Qindaa'inni isaa fi port forwardoonni isaa isa wajjin keessaa ba'u. Kun hin deebi'u.",
+      "deleteFailed": "Hostiin hin balleeffamne."
+    },
+    "editor": {
+      "newTitle": "Hostii haaraa",
+      "editTitle": "Hostii gulaali",
+      "label": "Maqaa",
+      "labelPlaceholder": "Serverii manaa",
+      "hostname": "HostName",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Maqaa fayyadamaa",
+      "authMethod": "Mala mirkaneessaa",
+      "password": "Jecha darbii",
+      "key": "Furtuu SSH",
+      "keyboardInteractive": "Keyboard interactive",
+      "passwordPlaceholder": "Yoo hin kuufamne, yeroo walqunnamtii barreeffama",
+      "savePassword": "Jecha darbii kuusi",
+      "savePasswordHint": "Kuusaa icciitii meeshaa kana irratti kuufama.",
+      "chooseKey": "Furtuu filadhu",
+      "noKeys": "Ammaaf furtuun hin jiru",
+      "jumpHost": "Hostii ce'umsaa",
+      "directConnection": "Walqunnamtii kallattii",
+      "tmuxAttach": "tmuxitti maxxansi",
+      "tmuxSession": "Maqaa sessii tmux",
+      "saved": "Hostiin kuufame.",
+      "saveFailed": "Hostiin hin kuufamne."
+    },
+    "errors": {
+      "invalidPort": "Port 1 hanga 65535 fayyadami",
+      "jumpCycle": "Hostiin sun duraan kana keessa darbaa jira."
+    },
+    "import": {
+      "title": "SSH config galchi",
+      "description": "SSH config kee maxxansi, yookaan faayilii filadhu.",
+      "sourceLabel": "SSH config",
+      "chooseFile": "Faayilii filadhu",
+      "preview": "Dursee ilaali",
+      "apply": "Hostoota galchi",
+      "imported": "Hostoonni galchamaniiru.",
+      "importFailed": "Wanti tokko hin galchamne.",
+      "nothingDescription": "Config kun hostii appiin kun galchuu danda'u tokkoillee hin ibsu.",
+      "notImported": "Hin galchamne",
+      "needsKey": "Furtuu barbaada",
+      "warnNeedsKey": "Faayiliin furtuu isaa galchuun hin danda'amu. Gulaaltuu keessatti furtuu filadhu.",
+      "warnJumpMissing": "{{target}} galcha keessa hin jiru, kanaaf hostiin kun kallattiin walqunnama.",
+      "warnJumpMultiHop": "Hostii ce'umsaa jalqabaa qofa galchame.",
+      "warnJumpCycle": "{{target}} hostii kana keessa deebi'a, kanaaf ce'umsi isaa haqame.",
+      "warnForward": "Sararri forward hostii kana keessaa hin dubbifamne.",
+      "skippedNoUsername": "{{alias}} sarara User hin qabu.",
+      "skippedInvalidPort": "{{alias}} portii lakkoofsa 1 hanga 65535 hin taane qaba.",
+      "unreadableFile": "Faayiliin sun hin dubbifamne."
+    },
+    "knownHosts": {
+      "title": "Hostoota beekaman",
+      "emptyTitle": "Ammaaf hostiin amanamaa hin jiru",
+      "emptyDescription": "Furtuun hostii yeroo jalqabaa itti walqunnamtu amanama.",
+      "deleteTitle": "{{pattern}} dagattaa?",
+      "deleteMessage": "Walqunnamtii itti aanu furtuu isaa amanamuu si gaafata.",
+      "deleteFailed": "Furtuun hostii hin haqamne.",
+      "deleteLabel": "{{pattern}} dagahi"
+    }
   }
 }

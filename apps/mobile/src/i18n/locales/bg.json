@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Тази връзка за споделяне е изтекла или е отменена.",
     "transcriptUnavailableTitle": "Преписът на сесията не можа да бъде зареден",
     "transcriptUnavailableDescription": "Връзката все още работи. Опитайте отново след малко."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Свържи се със собствените си сървъри.",
+    "storage": {
+      "lockedTitle": "Отключи, за да използваш SSH",
+      "lockedMessage": "Отключи устройството си и опитай отново.",
+      "unavailableTitle": "Хранилището е недостъпно",
+      "unavailableMessage": "Хранилището на устройството не можа да се отвори. Рестартирай Kilo и опитай отново."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Още няма хостове",
+      "emptyDescription": "Добави хост или внеси хостовете от своя SSH config.",
+      "addHost": "Добави хост",
+      "importConfig": "Внеси от SSH config",
+      "rowActions": "{{label}}, {{target}}. Отваря редактиране и изтриване.",
+      "viaJump": "през {{label}}",
+      "deleteTitle": "Да се изтрие ли {{label}}?",
+      "deleteMessage": "Настройката и пренасочванията на портове се премахват заедно с него. Действието не може да се отмени.",
+      "deleteFailed": "Хостът не можа да се изтрие."
+    },
+    "editor": {
+      "newTitle": "Нов хост",
+      "editTitle": "Редактирай хост",
+      "label": "Наименование",
+      "labelPlaceholder": "Домашен сървър",
+      "hostname": "Име на хоста",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Порт",
+      "username": "Потребителско име",
+      "authMethod": "Метод за удостоверяване",
+      "password": "Парола",
+      "key": "SSH ключ",
+      "keyboardInteractive": "Интерактивна с клавиатура",
+      "passwordPlaceholder": "Въвежда се при свързване, освен ако не е запазена",
+      "savePassword": "Запази паролата",
+      "savePasswordHint": "Съхранява се в криптираното хранилище на това устройство.",
+      "chooseKey": "Избери ключ",
+      "noKeys": "Още няма ключове",
+      "jumpHost": "Междинен хост",
+      "directConnection": "Директна връзка",
+      "tmuxAttach": "Прикачи tmux",
+      "tmuxSession": "Име на tmux сесия",
+      "saved": "Хостът е запазен.",
+      "saveFailed": "Хостът не можа да се запази."
+    },
+    "errors": {
+      "invalidPort": "Използвай порт от 1 до 65535",
+      "jumpCycle": "Избраният хост вече минава през този."
+    },
+    "import": {
+      "title": "Внеси SSH config",
+      "description": "Постави своя SSH config или избери файл.",
+      "sourceLabel": "SSH config",
+      "chooseFile": "Избери файл",
+      "preview": "Преглед",
+      "apply": "Внеси хостове",
+      "imported": "Хостовете са внесени.",
+      "importFailed": "Нищо не беше внесено.",
+      "nothingDescription": "Този config не описва хост, който приложението може да внесе.",
+      "notImported": "Не е внесен",
+      "needsKey": "Нужен е ключ",
+      "warnNeedsKey": "Файлът с ключа му не може да се внесе. Избери ключ в редактора.",
+      "warnJumpMissing": "{{target}} не е сред внесените, затова този хост се свързва директно.",
+      "warnJumpMultiHop": "Внася се само първият междинен хост.",
+      "warnJumpCycle": "{{target}} минава обратно през този хост, затова междинният хост е пропуснат.",
+      "warnForward": "Ред за пренасочване в този хост не можа да бъде прочетен.",
+      "skippedNoUsername": "{{alias}} няма ред User.",
+      "skippedInvalidPort": "{{alias}} има порт, който не е число от 1 до 65535.",
+      "unreadableFile": "Този файл не можа да бъде прочетен."
+    },
+    "knownHosts": {
+      "title": "Известни хостове",
+      "emptyTitle": "Още няма доверени хостове",
+      "emptyDescription": "Ключът на хост се доверява при първото свързване с него.",
+      "deleteTitle": "Да се забрави ли {{pattern}}?",
+      "deleteMessage": "При следващото свързване ще трябва отново да се довериш на ключа му.",
+      "deleteFailed": "Ключът на хоста не можа да бъде премахнат.",
+      "deleteLabel": "Забрави {{pattern}}"
+    }
   }
 }

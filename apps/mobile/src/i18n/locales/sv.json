@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Den här delningslänken har gått ut eller återkallats.",
     "transcriptUnavailableTitle": "Det gick inte att läsa in det här transkriptet",
     "transcriptUnavailableDescription": "Länken fungerar fortfarande. Försök igen om en stund."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Anslut till dina egna servrar.",
+    "storage": {
+      "lockedTitle": "Lås upp för att använda SSH",
+      "lockedMessage": "Lås upp din enhet och försök igen.",
+      "unavailableTitle": "Lagring otillgänglig",
+      "unavailableMessage": "Appens lokala lagring kunde inte öppnas. Starta om Kilo och försök igen."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Inga värdar än",
+      "emptyDescription": "Lägg till en värd, eller hämta värdarna från din SSH-konfiguration.",
+      "addHost": "Lägg till värd",
+      "importConfig": "Importera från SSH-konfiguration",
+      "rowActions": "{{label}}, {{target}}. Öppnar redigera och ta bort.",
+      "viaJump": "via {{label}}",
+      "deleteTitle": "Ta bort {{label}}?",
+      "deleteMessage": "Dess inställning och portvidarebefordringar tas bort med den. Detta kan inte ångras.",
+      "deleteFailed": "Värden kunde inte tas bort."
+    },
+    "editor": {
+      "newTitle": "Ny värd",
+      "editTitle": "Redigera värd",
+      "label": "Etikett",
+      "labelPlaceholder": "Hemmaserver",
+      "hostname": "Värdnamn",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Användarnamn",
+      "authMethod": "Autentiseringsmetod",
+      "password": "Lösenord",
+      "key": "SSH-nyckel",
+      "keyboardInteractive": "Tangentbordsinteraktiv",
+      "passwordPlaceholder": "Anges vid anslutning, om det inte sparats",
+      "savePassword": "Spara lösenord",
+      "savePasswordHint": "Sparas i det krypterade lagringsutrymmet på den här enheten.",
+      "chooseKey": "Välj en nyckel",
+      "noKeys": "Inga nycklar än",
+      "jumpHost": "Hoppvärd",
+      "directConnection": "Direkt anslutning",
+      "tmuxAttach": "Koppla till tmux",
+      "tmuxSession": "Namn på tmux-session",
+      "saved": "Värden har sparats.",
+      "saveFailed": "Värden kunde inte sparas."
+    },
+    "errors": {
+      "invalidPort": "Använd en port från 1 till 65535",
+      "jumpCycle": "Den värden hoppar redan via den här."
+    },
+    "import": {
+      "title": "Importera SSH-konfiguration",
+      "description": "Klistra in din SSH-konfiguration eller välj filen.",
+      "sourceLabel": "SSH-konfiguration",
+      "chooseFile": "Välj fil",
+      "preview": "Förhandsgranska",
+      "apply": "Importera värdar",
+      "imported": "Värdarna har importerats.",
+      "importFailed": "Inget importerades.",
+      "nothingDescription": "Den här konfigurationen beskriver ingen värd som appen kan importera.",
+      "notImported": "Ej importerad",
+      "needsKey": "Behöver nyckel",
+      "warnNeedsKey": "Dess nyckelfil kan inte importeras. Välj en nyckel i redigeraren.",
+      "warnJumpMissing": "{{target}} finns inte med i importen, så den här värden ansluter direkt.",
+      "warnJumpMultiHop": "Endast den första hoppvärden importeras.",
+      "warnJumpCycle": "{{target}} hoppar tillbaka via den här värden, så dess hopp togs bort.",
+      "warnForward": "En forward-rad i den här värden kunde inte läsas.",
+      "skippedNoUsername": "{{alias}} saknar en User-rad.",
+      "skippedInvalidPort": "{{alias}} har en port som inte är ett tal från 1 till 65535.",
+      "unreadableFile": "Filen kunde inte läsas."
+    },
+    "knownHosts": {
+      "title": "Kända värdar",
+      "emptyTitle": "Inga betrodda värdar än",
+      "emptyDescription": "En värdnyckel betros första gången du ansluter till den.",
+      "deleteTitle": "Glöm {{pattern}}?",
+      "deleteMessage": "Nästa anslutning ber dig betro dess nyckel igen.",
+      "deleteFailed": "Värdnyckeln kunde inte tas bort.",
+      "deleteLabel": "Glöm {{pattern}}"
+    }
   }
 }

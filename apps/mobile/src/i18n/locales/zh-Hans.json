@@ -4085,5 +4085,88 @@
     "unavailableDescription": "此分享链接已过期或已被撤销。",
     "transcriptUnavailableTitle": "无法加载此对话记录",
     "transcriptUnavailableDescription": "链接仍然有效。请稍后重试。"
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "连接到自己的服务器。",
+    "storage": {
+      "lockedTitle": "解锁后使用 SSH",
+      "lockedMessage": "解锁设备后重试。",
+      "unavailableTitle": "存储不可用",
+      "unavailableMessage": "无法打开应用的本机存储。请重启 Kilo 后重试。"
+    },
+    "field": {
+      "value": "{{label}}：{{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "还没有主机",
+      "emptyDescription": "添加一台主机，或从 SSH 配置中导入主机。",
+      "addHost": "添加主机",
+      "importConfig": "从 SSH 配置导入",
+      "rowActions": "{{label}}，{{target}}。可打开编辑和删除。",
+      "viaJump": "经由 {{label}}",
+      "deleteTitle": "删除 {{label}}？",
+      "deleteMessage": "它的设置和端口转发也会一并移除。此操作无法撤销。",
+      "deleteFailed": "无法删除该主机。"
+    },
+    "editor": {
+      "newTitle": "新建主机",
+      "editTitle": "编辑主机",
+      "label": "标签",
+      "labelPlaceholder": "家庭服务器",
+      "hostname": "主机名",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "端口",
+      "username": "用户名",
+      "authMethod": "认证方式",
+      "password": "密码",
+      "key": "SSH 密钥",
+      "keyboardInteractive": "键盘交互",
+      "passwordPlaceholder": "连接时输入，除非已保存",
+      "savePassword": "保存密码",
+      "savePasswordHint": "保存在本机的加密存储中。",
+      "chooseKey": "选择密钥",
+      "noKeys": "还没有密钥",
+      "jumpHost": "跳板主机",
+      "directConnection": "直接连接",
+      "tmuxAttach": "附加 tmux",
+      "tmuxSession": "tmux 会话名",
+      "saved": "主机已保存。",
+      "saveFailed": "无法保存该主机。"
+    },
+    "errors": {
+      "invalidPort": "请使用 1 到 65535 之间的端口",
+      "jumpCycle": "该主机已经通过此主机跳转。"
+    },
+    "import": {
+      "title": "导入 SSH 配置",
+      "description": "粘贴 SSH 配置，或选择文件。",
+      "sourceLabel": "SSH 配置",
+      "chooseFile": "选择文件",
+      "preview": "预览",
+      "apply": "导入主机",
+      "imported": "主机已导入。",
+      "importFailed": "未导入任何内容。",
+      "nothingDescription": "此配置中没有本应用可导入的主机。",
+      "notImported": "未导入",
+      "needsKey": "需要密钥",
+      "warnNeedsKey": "它的密钥文件无法导入。请在编辑器中选一个密钥。",
+      "warnJumpMissing": "{{target}} 不在本次导入中，因此该主机将直接连接。",
+      "warnJumpMultiHop": "仅导入第一个跳板主机。",
+      "warnJumpCycle": "{{target}} 会经由本主机跳回，因此已移除其跳转。",
+      "warnForward": "该主机中的一条转发配置行无法读取。",
+      "skippedNoUsername": "{{alias}} 没有 User 行。",
+      "skippedInvalidPort": "{{alias}} 的端口不是 1 到 65535 之间的数字。",
+      "unreadableFile": "无法读取该文件。"
+    },
+    "knownHosts": {
+      "title": "已知主机",
+      "emptyTitle": "还没有受信任的主机",
+      "emptyDescription": "首次连接到某台主机时，其主机密钥即被信任。",
+      "deleteTitle": "忘记 {{pattern}}？",
+      "deleteMessage": "下次连接时会再次要求你信任它的密钥。",
+      "deleteFailed": "无法移除该主机密钥。",
+      "deleteLabel": "忘记 {{pattern}}"
+    }
   }
 }

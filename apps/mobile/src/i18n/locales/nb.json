@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Denne delingslenken har utløpt eller blitt tilbakekalt.",
     "transcriptUnavailableTitle": "Kunne ikke laste inn denne transkripsjonen",
     "transcriptUnavailableDescription": "Lenken fungerer fortsatt. Prøv igjen om litt."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Koble til dine egne servere.",
+    "storage": {
+      "lockedTitle": "Lås opp for å bruke SSH",
+      "lockedMessage": "Lås opp enheten, og prøv igjen.",
+      "unavailableTitle": "Lagring utilgjengelig",
+      "unavailableMessage": "Appens lokale lager kunne ikke åpnes. Start Kilo på nytt, og prøv igjen."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Ingen verter ennå",
+      "emptyDescription": "Legg til en vert, eller hent inn vertene fra SSH-konfigurasjonen din.",
+      "addHost": "Legg til vert",
+      "importConfig": "Importer fra SSH-konfig",
+      "rowActions": "{{label}}, {{target}}. Åpner rediger og slett.",
+      "viaJump": "via {{label}}",
+      "deleteTitle": "Slette {{label}}?",
+      "deleteMessage": "Innstillingene og portvideresendingene fjernes sammen med den. Dette kan ikke angres.",
+      "deleteFailed": "Vertet kunne ikke slettes."
+    },
+    "editor": {
+      "newTitle": "Ny vert",
+      "editTitle": "Rediger vert",
+      "label": "Etikett",
+      "labelPlaceholder": "Hjemmeserver",
+      "hostname": "Vertsnavn",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Brukernavn",
+      "authMethod": "Autentiseringsmetode",
+      "password": "Passord",
+      "key": "SSH-nøkkel",
+      "keyboardInteractive": "Tastaturinteraktiv",
+      "passwordPlaceholder": "Skrives inn ved tilkobling, med mindre den er lagret",
+      "savePassword": "Lagre passord",
+      "savePasswordHint": "Oppbevares i det krypterte lageret på denne enheten.",
+      "chooseKey": "Velg en nøkkel",
+      "noKeys": "Ingen nøkler ennå",
+      "jumpHost": "Hoppvert",
+      "directConnection": "Direkte tilkobling",
+      "tmuxAttach": "Koble til tmux",
+      "tmuxSession": "Navn på tmux-økt",
+      "saved": "Vert lagret.",
+      "saveFailed": "Vertet kunne ikke lagres."
+    },
+    "errors": {
+      "invalidPort": "Bruk en port fra 1 til 65535",
+      "jumpCycle": "Den verten hopper allerede via denne."
+    },
+    "import": {
+      "title": "Importer SSH-konfig",
+      "description": "Lim inn SSH-konfigurasjonen din, eller velg filen.",
+      "sourceLabel": "SSH-konfig",
+      "chooseFile": "Velg fil",
+      "preview": "Forhåndsvis",
+      "apply": "Importer verter",
+      "imported": "Verter importert.",
+      "importFailed": "Ingenting ble importert.",
+      "nothingDescription": "Denne konfigurasjonen beskriver ingen vert som appen kan importere.",
+      "notImported": "Ikke importert",
+      "needsKey": "Trenger nøkkel",
+      "warnNeedsKey": "Nøkkelfilen kan ikke importeres. Velg en nøkkel i redigeringsvisningen.",
+      "warnJumpMissing": "{{target}} er ikke med i importen, så denne verten kobles til direkte.",
+      "warnJumpMultiHop": "Bare den første hoppverten importeres.",
+      "warnJumpCycle": "{{target}} hopper tilbake via denne verten, så hoppet ble fjernet.",
+      "warnForward": "En videresendingslinje for denne verten kunne ikke leses.",
+      "skippedNoUsername": "{{alias}} har ingen User-linje.",
+      "skippedInvalidPort": "{{alias}} har en port som ikke er et tall fra 1 til 65535.",
+      "unreadableFile": "Filen kunne ikke leses."
+    },
+    "knownHosts": {
+      "title": "Kjente verter",
+      "emptyTitle": "Ingen klarerte verter ennå",
+      "emptyDescription": "En vertsnøkkel klareres første gang du kobler til den.",
+      "deleteTitle": "Glemme {{pattern}}?",
+      "deleteMessage": "Neste tilkobling ber deg klarere nøkkelen på nytt.",
+      "deleteFailed": "Vertsnøkkelen kunne ikke fjernes.",
+      "deleteLabel": "Glem {{pattern}}"
+    }
   }
 }

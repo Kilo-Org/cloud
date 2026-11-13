@@ -4085,5 +4085,88 @@
     "unavailableDescription": "ይህ የማጋሪያ ሊንክ ጊዜው አልፏል ወይም ተሰርዟል።",
     "transcriptUnavailableTitle": "ይህን ግልባጭ መጫን አልተቻለም",
     "transcriptUnavailableDescription": "ሊንኩ አሁንም ይሰራል። ትንሽ ቆይተው እንደገና ይሞክሩ።"
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "ወደ የራስዎ አገልጋዮች ይገናኙ።",
+    "storage": {
+      "lockedTitle": "SSH ለመጠቀም ይክፈቱ",
+      "lockedMessage": "መሣሪያዎን ይክፈቱ፣ ከዚያ እንደገና ይሞክሩ።",
+      "unavailableTitle": "ማከማቻ አይገኝም",
+      "unavailableMessage": "የመተግበሪያው በመሣሪያው ላይ ያለ ማከማቻ ሊከፈት አልቻለም። Kiloን ዳግም ያስጀምሩ፣ ከዚያ እንደገና ይሞክሩ።"
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "እስካሁን አስተናጋጅ የለም",
+      "emptyDescription": "አስተናጋጅ ይጨምሩ፣ ወይም ከ SSH ውቅርዎ አስተናጋጆችን ያስገቡ።",
+      "addHost": "አስተናጋጅ ጨምር",
+      "importConfig": "ከ SSH ውቅር አስገባ",
+      "rowActions": "{{label}}፣ {{target}}። ማስተካከልንና መሰረዝን ይከፍታል።",
+      "viaJump": "በ{{label}} በኩል",
+      "deleteTitle": "{{label}}ን ይሰረዝ?",
+      "deleteMessage": "ቅንብሩና የወደብ ማስተላለፊያዎቹ አብረውት ይወገዳሉ። ይህ መመለስ አይቻልም።",
+      "deleteFailed": "አስተናጋጁ ሊሰረዝ አልቻለም።"
+    },
+    "editor": {
+      "newTitle": "አዲስ አስተናጋጅ",
+      "editTitle": "አስተናጋጅ አስተካክል",
+      "label": "ስያሜ",
+      "labelPlaceholder": "የቤት አገልጋይ",
+      "hostname": "የአስተናጋጅ ስም",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "ወደብ",
+      "username": "የተጠቃሚ ስም",
+      "authMethod": "የማረጋገጫ ዘዴ",
+      "password": "የይለፍ ቃል",
+      "key": "SSH ቁልፍ",
+      "keyboardInteractive": "የቁልፍ ሰሌዳ በይነተገናኝ",
+      "passwordPlaceholder": "ካልተቀመጠ በስተቀር በሚገናኙበት ጊዜ ይጻፋል",
+      "savePassword": "የይለፍ ቃል አስቀምጥ",
+      "savePasswordHint": "በዚህ መሣሪያ ላይ ባለው የተመሰጠረ ማከማቻ ውስጥ ይቀመጣል።",
+      "chooseKey": "ቁልፍ ይምረጡ",
+      "noKeys": "እስካሁን ቁልፍ የለም",
+      "jumpHost": "የመዝለል አስተናጋጅ",
+      "directConnection": "ቀጥታ ግንኙነት",
+      "tmuxAttach": "tmux አያዝ",
+      "tmuxSession": "የ tmux ክፍለ ጊዜ ስም",
+      "saved": "አስተናጋጁ ተቀምጧል።",
+      "saveFailed": "አስተናጋጁ ሊቀመጥ አልቻለም።"
+    },
+    "errors": {
+      "invalidPort": "ከ 1 እስከ 65535 ያለ ወደብ ይጠቀሙ",
+      "jumpCycle": "ያ አስተናጋጅ አስቀድሞ በዚህ በኩል ይዘላል።"
+    },
+    "import": {
+      "title": "SSH ውቅር አስገባ",
+      "description": "የ SSH ውቅርዎን ይለጥፉ፣ ወይም ፋይሉን ይምረጡ።",
+      "sourceLabel": "SSH ውቅር",
+      "chooseFile": "ፋይል ይምረጡ",
+      "preview": "ቅድመ እይታ",
+      "apply": "አስተናጋጆችን አስገባ",
+      "imported": "አስተናጋጆች ገብተዋል።",
+      "importFailed": "ምንም አልገባም።",
+      "nothingDescription": "ይህ ውቅር ይህ መተግበሪያ ሊያስገባው የሚችለውን አስተናጋጅ አይገልጽም።",
+      "notImported": "አልገባም",
+      "needsKey": "ቁልፍ ይፈልጋል",
+      "warnNeedsKey": "የቁልፍ ፋይሉ ሊገባ አይችልም። በአርታዒው ውስጥ ቁልፍ ይምረጡ።",
+      "warnJumpMissing": "{{target}} በገባው ውስጥ የለም፣ ስለዚህ ይህ አስተናጋጅ በቀጥታ ይገናኛል።",
+      "warnJumpMultiHop": "የመጀመሪያው የመዝለል አስተናጋጅ ብቻ ነው የሚገባው።",
+      "warnJumpCycle": "{{target}} በዚህ አስተናጋጅ በኩል ወደኋላ ይዘላል፣ ስለዚህ መዝለሉ ተወግዷል።",
+      "warnForward": "በዚህ አስተናጋጅ ውስጥ ያለ የማስተላለፊያ መስመር ሊነበብ አልቻለም።",
+      "skippedNoUsername": "{{alias}} የ User መስመር የለውም።",
+      "skippedInvalidPort": "{{alias}} ከ 1 እስከ 65535 ያልሆነ ወደብ አለው።",
+      "unreadableFile": "ያ ፋይል ሊነበብ አልቻለም።"
+    },
+    "knownHosts": {
+      "title": "የታወቁ አስተናጋጆች",
+      "emptyTitle": "እስካሁን የታመነ አስተናጋጅ የለም",
+      "emptyDescription": "የአስተናጋጅ ቁልፍ ለመጀመሪያ ጊዜ ሲገናኙበት ይታመናል።",
+      "deleteTitle": "{{pattern}}ን ይረሳ?",
+      "deleteMessage": "በሚቀጥለው ግንኙነት ቁልፉን እንደገና እንዲያምኑ ይጠየቃሉ።",
+      "deleteFailed": "የአስተናጋጅ ቁልፉ ሊወገድ አልቻለም።",
+      "deleteLabel": "{{pattern}}ን ረሳ"
+    }
   }
 }

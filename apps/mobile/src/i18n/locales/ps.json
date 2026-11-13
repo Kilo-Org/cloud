@@ -4085,5 +4085,88 @@
     "unavailableDescription": "د شریکولو دا لینک پای ته رسېدلی یا لغوه شوی دی.",
     "transcriptUnavailableTitle": "د خبرو دا لیکنه بار نه شوه",
     "transcriptUnavailableDescription": "لینک لا هم کار کوي. یوه شېبه وروسته بیا هڅه وکړئ."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "خپلو سرورونو ته وصل شئ.",
+    "storage": {
+      "lockedTitle": "د SSH کارولو لپاره خلاص کړئ",
+      "lockedMessage": "خپله وسیله خلاصه کړئ، بیا هڅه وکړئ.",
+      "unavailableTitle": "ذخیره نشته",
+      "unavailableMessage": "په وسیله کې د اپ داخلي ذخیره پرانیستل نه شوه. Kilo بیا پیل کړئ، بیا هڅه وکړئ."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "لا هوسټونه نشته",
+      "emptyDescription": "یو هوسټ اضافه کړئ، یا له خپل SSH کانفیګ څخه هوسټونه راوړئ.",
+      "addHost": "هوسټ اضافه کړئ",
+      "importConfig": "له SSH کانفیګ څخه وارد کړئ",
+      "rowActions": "{{label}}، {{target}}. سمون او ړنګول پرانیزي.",
+      "viaJump": "د {{label}} له لارې",
+      "deleteTitle": "{{label}} ړنګ کړئ?",
+      "deleteMessage": "د هغه تنظیمات او پورټ فوروارډونه ورسره لرې کېږي. دا بېرته نه شي ګرځول کېدای.",
+      "deleteFailed": "هوسټ ړنګ نه شو."
+    },
+    "editor": {
+      "newTitle": "نوی هوسټ",
+      "editTitle": "هوسټ سم کړئ",
+      "label": "لیبل",
+      "labelPlaceholder": "کورنی سرور",
+      "hostname": "HostName",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "پورټ",
+      "username": "کارن نوم",
+      "authMethod": "د تصدیق طریقه",
+      "password": "پټنوم",
+      "key": "SSH کیلي",
+      "keyboardInteractive": "کیبورډ متقابل",
+      "passwordPlaceholder": "د وصل پر مهال لیکل کېږي، که خوندي نه وي",
+      "savePassword": "پټنوم خوندي کړئ",
+      "savePasswordHint": "په دې وسیله کې په کوډشوي ذخیره کې ساتل کېږي.",
+      "chooseKey": "یوه کیلي وټاکئ",
+      "noKeys": "لا کیلي نشته",
+      "jumpHost": "جمپ هوسټ",
+      "directConnection": "مستقیمه اړیکه",
+      "tmuxAttach": "tmux ونښلوئ",
+      "tmuxSession": "د tmux سیشن نوم",
+      "saved": "هوسټ خوندي شو.",
+      "saveFailed": "هوسټ خوندي نه شو."
+    },
+    "errors": {
+      "invalidPort": "له 1 څخه تر 65535 پورې پورټ وکاروئ",
+      "jumpCycle": "هغه هوسټ لا دمخه د دې له لارې تېریږي."
+    },
+    "import": {
+      "title": "SSH کانفیګ وارد کړئ",
+      "description": "خپل SSH کانفیګ پیسټ کړئ، یا فایل وټاکئ.",
+      "sourceLabel": "SSH کانفیګ",
+      "chooseFile": "فایل وټاکئ",
+      "preview": "مخکتنه",
+      "apply": "هوسټونه وارد کړئ",
+      "imported": "هوسټونه وارد شول.",
+      "importFailed": "هیڅ شی وارد نه شو.",
+      "nothingDescription": "دا کانفیګ هغه هوسټ نه ښیي چې دا اپ یې وارد کړای شي.",
+      "notImported": "وارد شوی نه دی",
+      "needsKey": "کیلي ته اړتیا لري",
+      "warnNeedsKey": "د هغه کیلي فایل وارد نه شي کېدای. په سمونګر کې یوه کیلي وټاکئ.",
+      "warnJumpMissing": "{{target}} په وارد شویو کې نشته، نو دا هوسټ مستقیم وصل کېږي.",
+      "warnJumpMultiHop": "یوازې لومړنی جمپ هوسټ وارد کېږي.",
+      "warnJumpCycle": "{{target}} د دې هوسټ له لارې بېرته تېریږي، نو د هغه جمپ پرېښودل شو.",
+      "warnForward": "په دې هوسټ کې یوه فوروارډ کرښه ونه لوستل شوه.",
+      "skippedNoUsername": "{{alias}} د User کرښه نه لري.",
+      "skippedInvalidPort": "{{alias}} یو پورټ لري چې له 1 څخه تر 65535 پورې شمیره نه ده.",
+      "unreadableFile": "هغه فایل ونه لوستل شو."
+    },
+    "knownHosts": {
+      "title": "پیژندل شوي هوسټونه",
+      "emptyTitle": "لا باوري هوسټونه نشته",
+      "emptyDescription": "کله چې لومړی ځل یوه هوسټ ته وصل شئ، د هغه کیلي باوري کیږي.",
+      "deleteTitle": "{{pattern}} هېر کړئ?",
+      "deleteMessage": "راتلونکی وصل به بیا ستاسو څخه د هغه کیلي باور وغواړي.",
+      "deleteFailed": "د هوسټ کیلي لرې نه شوه.",
+      "deleteLabel": "{{pattern}} هېر کړئ"
+    }
   }
 }

@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Nag-expire na o binawi na ang share link na ito.",
     "transcriptUnavailableTitle": "Hindi ma-load ang transcript na ito",
     "transcriptUnavailableDescription": "Gumagana pa rin ang link. Subukang muli maya-maya."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Kumonekta sa sarili mong mga server.",
+    "storage": {
+      "lockedTitle": "I-unlock para magamit ang SSH",
+      "lockedMessage": "I-unlock ang iyong device, pagkatapos ay subukan muli.",
+      "unavailableTitle": "Hindi available ang storage",
+      "unavailableMessage": "Hindi mabuksan ang on-device na imbakan ng app. I-restart ang Kilo, pagkatapos ay subukan muli."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Wala pang host",
+      "emptyDescription": "Magdagdag ng host, o mag-import ng mga host mula sa iyong SSH config.",
+      "addHost": "Magdagdag ng host",
+      "importConfig": "I-import mula sa SSH config",
+      "rowActions": "{{label}}, {{target}}. Binubuksan ang pag-edit at pagbura.",
+      "viaJump": "sa pamamagitan ng {{label}}",
+      "deleteTitle": "Burahin ang {{label}}?",
+      "deleteMessage": "Aalisin din kasama nito ang setting at port forwards nito. Hindi na ito maibabalik.",
+      "deleteFailed": "Hindi nabura ang host."
+    },
+    "editor": {
+      "newTitle": "Bagong host",
+      "editTitle": "I-edit ang host",
+      "label": "Label",
+      "labelPlaceholder": "Server sa bahay",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Username",
+      "authMethod": "Paraan ng authentication",
+      "password": "Password",
+      "key": "SSH key",
+      "keyboardInteractive": "Keyboard interactive",
+      "passwordPlaceholder": "Ie-type kapag kumokonekta, maliban kung naka-save",
+      "savePassword": "I-save ang password",
+      "savePasswordHint": "Itinatago sa naka-encrypt na imbakan sa device na ito.",
+      "chooseKey": "Pumili ng key",
+      "noKeys": "Wala pang key",
+      "jumpHost": "Jump host",
+      "directConnection": "Direktang koneksyon",
+      "tmuxAttach": "I-attach ang tmux",
+      "tmuxSession": "Pangalan ng tmux session",
+      "saved": "Na-save ang host.",
+      "saveFailed": "Hindi na-save ang host."
+    },
+    "errors": {
+      "invalidPort": "Gumamit ng port mula 1 hanggang 65535",
+      "jumpCycle": "Dumadaan na ang host na iyon sa isang ito."
+    },
+    "import": {
+      "title": "I-import ang SSH config",
+      "description": "I-paste ang iyong SSH config, o pumili ng file.",
+      "sourceLabel": "SSH config",
+      "chooseFile": "Pumili ng file",
+      "preview": "I-preview",
+      "apply": "I-import ang mga host",
+      "imported": "Na-import ang mga host.",
+      "importFailed": "Walang na-import.",
+      "nothingDescription": "Walang host na ma-import ng app na ito sa config na ito.",
+      "notImported": "Hindi na-import",
+      "needsKey": "Kailangan ng key",
+      "warnNeedsKey": "Hindi ma-import ang key file nito. Pumili ng key sa editor.",
+      "warnJumpMissing": "Wala ang {{target}} sa import, kaya direktang kumokonekta ang host na ito.",
+      "warnJumpMultiHop": "Ang unang jump host lang ang na-import.",
+      "warnJumpCycle": "Bumabalik ang {{target}} sa pamamagitan ng host na ito, kaya inalis ang jump nito.",
+      "warnForward": "Hindi mabasa ang isang forward line sa host na ito.",
+      "skippedNoUsername": "Walang User line ang {{alias}}.",
+      "skippedInvalidPort": "May port ang {{alias}} na hindi numero mula 1 hanggang 65535.",
+      "unreadableFile": "Hindi mabasa ang file na iyon."
+    },
+    "knownHosts": {
+      "title": "Mga kilalang host",
+      "emptyTitle": "Wala pang pinagkakatiwalaang host",
+      "emptyDescription": "Pinagkakatiwalaan ang host key sa unang pagkakataong kumonekta ka rito.",
+      "deleteTitle": "Kalimutan ang {{pattern}}?",
+      "deleteMessage": "Hihilingin muli sa susunod na koneksyon na pagkatiwalaan ang key nito.",
+      "deleteFailed": "Hindi naalis ang host key.",
+      "deleteLabel": "Kalimutan ang {{pattern}}"
+    }
   }
 }

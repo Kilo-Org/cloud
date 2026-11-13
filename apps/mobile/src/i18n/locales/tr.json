@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Bu paylaşım bağlantısının süresi dolmuş veya bağlantı iptal edilmiş.",
     "transcriptUnavailableTitle": "Bu döküm yüklenemedi",
     "transcriptUnavailableDescription": "Bağlantı hâlâ çalışıyor. Birazdan tekrar deneyin."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Kendi sunucularınıza bağlanın.",
+    "storage": {
+      "lockedTitle": "SSH kullanmak için kilidi açın",
+      "lockedMessage": "Cihazınızın kilidini açın, sonra tekrar deneyin.",
+      "unavailableTitle": "Depolama kullanılamıyor",
+      "unavailableMessage": "Uygulamanın cihaz içi depolama alanı açılamadı. Kilo'yu yeniden başlatın, sonra tekrar deneyin."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Henüz host yok",
+      "emptyDescription": "Bir host ekleyin veya hostları SSH yapılandırmanızdan içe aktarın.",
+      "addHost": "Host ekle",
+      "importConfig": "SSH yapılandırmasından içe aktar",
+      "rowActions": "{{label}}, {{target}}. Düzenleme ve silme seçeneklerini açar.",
+      "viaJump": "{{label}} üzerinden",
+      "deleteTitle": "{{label}} silinsin mi?",
+      "deleteMessage": "Ayarları ve port yönlendirmeleri de onunla birlikte kaldırılır. Bu işlem geri alınamaz.",
+      "deleteFailed": "Host silinemedi."
+    },
+    "editor": {
+      "newTitle": "Yeni host",
+      "editTitle": "Hostu düzenle",
+      "label": "Etiket",
+      "labelPlaceholder": "Ev sunucusu",
+      "hostname": "HostName",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Kullanıcı adı",
+      "authMethod": "Kimlik doğrulama yöntemi",
+      "password": "Parola",
+      "key": "SSH anahtarı",
+      "keyboardInteractive": "Klavye etkileşimli",
+      "passwordPlaceholder": "Kaydedilmediği sürece bağlanırken girilir",
+      "savePassword": "Parolayı kaydet",
+      "savePasswordHint": "Bu cihazdaki şifreli depolama alanında saklanır.",
+      "chooseKey": "Anahtar seç",
+      "noKeys": "Henüz anahtar yok",
+      "jumpHost": "Atlama hostu",
+      "directConnection": "Doğrudan bağlantı",
+      "tmuxAttach": "tmux'e bağlan",
+      "tmuxSession": "tmux oturum adı",
+      "saved": "Host kaydedildi.",
+      "saveFailed": "Host kaydedilemedi."
+    },
+    "errors": {
+      "invalidPort": "1 ile 65535 arasında bir port kullanın",
+      "jumpCycle": "O host zaten bu host üzerinden atlıyor."
+    },
+    "import": {
+      "title": "SSH yapılandırmasını içe aktar",
+      "description": "SSH yapılandırmanızı yapıştırın veya dosyayı seçin.",
+      "sourceLabel": "SSH yapılandırması",
+      "chooseFile": "Dosya seç",
+      "preview": "Önizleme",
+      "apply": "Hostları içe aktar",
+      "imported": "Hostlar içe aktarıldı.",
+      "importFailed": "Hiçbir şey içe aktarılmadı.",
+      "nothingDescription": "Bu yapılandırma, uygulamanın içe aktarabileceği bir host içermiyor.",
+      "notImported": "İçe aktarılmadı",
+      "needsKey": "Anahtar gerekli",
+      "warnNeedsKey": "Anahtar dosyası içe aktarılamıyor. Düzenleyicide bir anahtar seçin.",
+      "warnJumpMissing": "{{target}} içe aktarmada yok, bu yüzden bu host doğrudan bağlanır.",
+      "warnJumpMultiHop": "Yalnızca ilk atlama hostu içe aktarılır.",
+      "warnJumpCycle": "{{target}} bu host üzerinden geri atlıyor, bu yüzden atlaması kaldırıldı.",
+      "warnForward": "Bu hosttaki bir yönlendirme satırı okunamadı.",
+      "skippedNoUsername": "{{alias}} için User satırı yok.",
+      "skippedInvalidPort": "{{alias}} için port 1 ile 65535 arasında bir sayı değil.",
+      "unreadableFile": "Bu dosya okunamadı."
+    },
+    "knownHosts": {
+      "title": "Bilinen hostlar",
+      "emptyTitle": "Henüz güvenilen host yok",
+      "emptyDescription": "Bir host anahtarına ilk kez bağlandığınızda güvenilir.",
+      "deleteTitle": "{{pattern}} unutulsun mu?",
+      "deleteMessage": "Bir sonraki bağlantıda anahtarına yeniden güvenmeniz istenir.",
+      "deleteFailed": "Host anahtarı kaldırılamadı.",
+      "deleteLabel": "{{pattern}} unut"
+    }
   }
 }

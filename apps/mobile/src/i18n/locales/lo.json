@@ -4085,5 +4085,88 @@
     "unavailableDescription": "ລິ້ງແບ່ງປັນນີ້ໝົດອາຍຸ ຫຼື ຖືກຍົກເລີກແລ້ວ.",
     "transcriptUnavailableTitle": "ບໍ່ສາມາດໂຫຼດບົດບັນທຶກນີ້ໄດ້",
     "transcriptUnavailableDescription": "ລິ້ງຍັງໃຊ້ໄດ້ຢູ່. ລອງໃໝ່ອີກຄັ້ງໃນອີກຈັກໜ່ອຍ."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "ເຊື່ອມຕໍ່ກັບເຊີບເວີຂອງທ່ານເອງ.",
+    "storage": {
+      "lockedTitle": "ປົດລັອກເພື່ອໃຊ້ SSH",
+      "lockedMessage": "ປົດລັອກອຸປະກອນຂອງທ່ານ ແລ້ວລອງໃໝ່.",
+      "unavailableTitle": "ບ່ອນເກັບຂໍ້ມູນບໍ່ພ້ອມໃຊ້",
+      "unavailableMessage": "ບໍ່ສາມາດເປີດບ່ອນເກັບຂໍ້ມູນພາຍໃນອຸປະກອນຂອງແອັບໄດ້. ຣີສະຕາດ Kilo ແລ້ວລອງໃໝ່."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "ຍັງບໍ່ມີໂຮສ",
+      "emptyDescription": "ເພີ່ມໂຮສ ຫຼື ນຳເຂົ້າໂຮສຈາກການຕັ້ງຄ່າ SSH ຂອງທ່ານ.",
+      "addHost": "ເພີ່ມໂຮສ",
+      "importConfig": "ນຳເຂົ້າຈາກການຕັ້ງຄ່າ SSH",
+      "rowActions": "{{label}}, {{target}}. ເປີດການແກ້ໄຂ ແລະ ການລຶບ.",
+      "viaJump": "ຜ່ານ {{label}}",
+      "deleteTitle": "ລຶບ {{label}}?",
+      "deleteMessage": "ການຕັ້ງຄ່າ ແລະ ການສົ່ງຕໍ່ພອດຂອງມັນຈະຖືກເອົາອອກນຳ. ບໍ່ສາມາດກັບຄືນໄດ້.",
+      "deleteFailed": "ບໍ່ສາມາດລຶບໂຮສໄດ້."
+    },
+    "editor": {
+      "newTitle": "ໂຮສໃໝ່",
+      "editTitle": "ແກ້ໄຂໂຮສ",
+      "label": "ປ້າຍຊື່",
+      "labelPlaceholder": "ເຊີບເວີບ້ານ",
+      "hostname": "ຊື່ໂຮສ",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "ພອດ",
+      "username": "ຊື່ຜູ້ໃຊ້",
+      "authMethod": "ວິທີຢືນຢັນຕົວຕົນ",
+      "password": "ລະຫັດຜ່ານ",
+      "key": "ກະແຈ SSH",
+      "keyboardInteractive": "ໂຕ້ຕອບຜ່ານແປ້ນພິມ",
+      "passwordPlaceholder": "ພິມເມື່ອເຊື່ອມຕໍ່ ເວັ້ນເສຍແຕ່ໄດ້ບັນທຶກໄວ້",
+      "savePassword": "ບັນທຶກລະຫັດຜ່ານ",
+      "savePasswordHint": "ເກັບໄວ້ໃນບ່ອນເກັບຂໍ້ມູນທີ່ເຂົ້າລະຫັດໃນອຸປະກອນນີ້.",
+      "chooseKey": "ເລືອກກະແຈ",
+      "noKeys": "ຍັງບໍ່ມີກະແຈ",
+      "jumpHost": "ໂຮສກະໂດດ",
+      "directConnection": "ການເຊື່ອມຕໍ່ໂດຍກົງ",
+      "tmuxAttach": "ເຂົ້າຮ່ວມ tmux",
+      "tmuxSession": "ຊື່ເຊສຊັນ tmux",
+      "saved": "ບັນທຶກໂຮສແລ້ວ.",
+      "saveFailed": "ບໍ່ສາມາດບັນທຶກໂຮສໄດ້."
+    },
+    "errors": {
+      "invalidPort": "ໃຊ້ພອດຕັ້ງແຕ່ 1 ຫາ 65535",
+      "jumpCycle": "ໂຮສນັ້ນກະໂດດຜ່ານໂຮສນີ້ຢູ່ແລ້ວ."
+    },
+    "import": {
+      "title": "ນຳເຂົ້າການຕັ້ງຄ່າ SSH",
+      "description": "ວາງການຕັ້ງຄ່າ SSH ຂອງທ່ານ ຫຼື ເລືອກໄຟລ໌.",
+      "sourceLabel": "ການຕັ້ງຄ່າ SSH",
+      "chooseFile": "ເລືອກໄຟລ໌",
+      "preview": "ເບິ່ງຕົວຢ່າງ",
+      "apply": "ນຳເຂົ້າໂຮສ",
+      "imported": "ນຳເຂົ້າໂຮສແລ້ວ.",
+      "importFailed": "ບໍ່ມີຫຍັງຖືກນຳເຂົ້າ.",
+      "nothingDescription": "ການຕັ້ງຄ່ານີ້ບໍ່ມີໂຮສທີ່ແອັບນີ້ສາມາດນຳເຂົ້າໄດ້.",
+      "notImported": "ບໍ່ໄດ້ນຳເຂົ້າ",
+      "needsKey": "ຕ້ອງການກະແຈ",
+      "warnNeedsKey": "ບໍ່ສາມາດນຳເຂົ້າໄຟລ໌ກະແຈຂອງມັນໄດ້. ເລືອກກະແຈໃນຕົວແກ້ໄຂ.",
+      "warnJumpMissing": "{{target}} ບໍ່ໄດ້ຢູ່ໃນການນຳເຂົ້າ ດັ່ງນັ້ນໂຮສນີ້ຈະເຊື່ອມຕໍ່ໂດຍກົງ.",
+      "warnJumpMultiHop": "ນຳເຂົ້າພຽງໂຮສກະໂດດອັນທຳອິດເທົ່ານັ້ນ.",
+      "warnJumpCycle": "{{target}} ກະໂດດກັບຜ່ານໂຮສນີ້ ດັ່ງນັ້ນຈຶ່ງເອົາການກະໂດດຂອງມັນອອກ.",
+      "warnForward": "ບໍ່ສາມາດອ່ານແຖວສົ່ງຕໍ່ໃນໂຮສນີ້ໄດ້.",
+      "skippedNoUsername": "{{alias}} ບໍ່ມີແຖວ User.",
+      "skippedInvalidPort": "{{alias}} ມີພອດທີ່ບໍ່ແມ່ນຕົວເລກຕັ້ງແຕ່ 1 ຫາ 65535.",
+      "unreadableFile": "ບໍ່ສາມາດອ່ານໄຟລ໌ນັ້ນໄດ້."
+    },
+    "knownHosts": {
+      "title": "ໂຮສທີ່ຮູ້ຈັກ",
+      "emptyTitle": "ຍັງບໍ່ມີໂຮສທີ່ໄວ້ວາງໃຈ",
+      "emptyDescription": "ກະແຈຂອງໂຮສຈະຖືກໄວ້ວາງໃຈເມື່ອທ່ານເຊື່ອມຕໍ່ກັບມັນຄັ້ງທຳອິດ.",
+      "deleteTitle": "ລືມ {{pattern}}?",
+      "deleteMessage": "ການເຊື່ອມຕໍ່ຄັ້ງຕໍ່ໄປຈະຖາມໃຫ້ທ່ານໄວ້ວາງໃຈກະແຈຂອງມັນອີກຄັ້ງ.",
+      "deleteFailed": "ບໍ່ສາມາດເອົາກະແຈຂອງໂຮສອອກໄດ້.",
+      "deleteLabel": "ລືມ {{pattern}}"
+    }
   }
 }

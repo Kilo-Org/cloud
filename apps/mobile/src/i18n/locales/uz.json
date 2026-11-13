@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Bu ulashish havolasining muddati tugagan yoki u bekor qilingan.",
     "transcriptUnavailableTitle": "Bu transkriptni yuklab boʻlmadi",
     "transcriptUnavailableDescription": "Havola hali ham ishlaydi. Birozdan soʻng qayta urinib koʻring."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "O‘z serverlaringizga ulaning.",
+    "storage": {
+      "lockedTitle": "SSH’dan foydalanish uchun qulfni oching",
+      "lockedMessage": "Qurilmangiz qulfini ochib, qayta urinib ko‘ring.",
+      "unavailableTitle": "Xotira mavjud emas",
+      "unavailableMessage": "Ilovaning qurilmadagi xotirasi ochilmadi. Kilo’ni qayta ishga tushirib, qayta urinib ko‘ring."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Hozircha host yo‘q",
+      "emptyDescription": "Host qo‘shing yoki SSH konfiguratsiyangizdagi hostlarni olib keling.",
+      "addHost": "Host qo‘shish",
+      "importConfig": "SSH konfiguratsiyasidan import qilish",
+      "rowActions": "{{label}}, {{target}}. Tahrirlash va o‘chirishni ochadi.",
+      "viaJump": "{{label}} orqali",
+      "deleteTitle": "{{label}} o‘chirilsinmi?",
+      "deleteMessage": "U bilan birga sozlamalari va port yo‘naltirishlari ham olib tashlanadi. Buni qaytarib bo‘lmaydi.",
+      "deleteFailed": "Hostni o‘chirib bo‘lmadi."
+    },
+    "editor": {
+      "newTitle": "Yangi host",
+      "editTitle": "Hostni tahrirlash",
+      "label": "Nom",
+      "labelPlaceholder": "Uy serveri",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Foydalanuvchi nomi",
+      "authMethod": "Autentifikatsiya usuli",
+      "password": "Parol",
+      "key": "SSH kaliti",
+      "keyboardInteractive": "Klaviatura interaktiv",
+      "passwordPlaceholder": "Saqlanmasa, ulanishda kiritiladi",
+      "savePassword": "Parolni saqlash",
+      "savePasswordHint": "Shu qurilmadagi shifrlangan xotirada saqlanadi.",
+      "chooseKey": "Kalitni tanlash",
+      "noKeys": "Hozircha kalit yo‘q",
+      "jumpHost": "Oraliq host",
+      "directConnection": "To‘g‘ridan-to‘g‘ri ulanish",
+      "tmuxAttach": "tmux’ga ulanish",
+      "tmuxSession": "tmux sessiya nomi",
+      "saved": "Host saqlandi.",
+      "saveFailed": "Hostni saqlab bo‘lmadi."
+    },
+    "errors": {
+      "invalidPort": "1 dan 65535 gacha portdan foydalaning",
+      "jumpCycle": "O‘sha host allaqachon shu host orqali o‘tadi."
+    },
+    "import": {
+      "title": "SSH konfiguratsiyasini import qilish",
+      "description": "SSH konfiguratsiyangizni joylashtiring yoki faylni tanlang.",
+      "sourceLabel": "SSH konfiguratsiyasi",
+      "chooseFile": "Faylni tanlash",
+      "preview": "Ko‘rib chiqish",
+      "apply": "Hostlarni import qilish",
+      "imported": "Hostlar import qilindi.",
+      "importFailed": "Hech narsa import qilinmadi.",
+      "nothingDescription": "Bu konfiguratsiyada ilova import qila oladigan host yo‘q.",
+      "notImported": "Import qilinmadi",
+      "needsKey": "Kalit kerak",
+      "warnNeedsKey": "Uning kalit faylini import qilib bo‘lmaydi. Tahrirlovchida kalitni tanlang.",
+      "warnJumpMissing": "{{target}} importda yo‘q, shuning uchun bu host to‘g‘ridan-to‘g‘ri ulanadi.",
+      "warnJumpMultiHop": "Faqat birinchi oraliq host import qilinadi.",
+      "warnJumpCycle": "{{target}} shu host orqali qaytadi, shuning uchun uning oraliq hosti olib tashlandi.",
+      "warnForward": "Bu hostdagi yo‘naltirish qatorini o‘qib bo‘lmadi.",
+      "skippedNoUsername": "{{alias}}da User qatori yo‘q.",
+      "skippedInvalidPort": "{{alias}}dagi port 1 dan 65535 gacha bo‘lgan son emas.",
+      "unreadableFile": "O‘sha faylni o‘qib bo‘lmadi."
+    },
+    "knownHosts": {
+      "title": "Ma’lum hostlar",
+      "emptyTitle": "Hozircha ishonchli host yo‘q",
+      "emptyDescription": "Host kaliti unga birinchi marta ulanganingizda ishonchli deb belgilanadi.",
+      "deleteTitle": "{{pattern}} unutilsinmi?",
+      "deleteMessage": "Keyingi ulanishda uning kalitiga yana ishonish so‘raladi.",
+      "deleteFailed": "Host kalitini olib tashlab bo‘lmadi.",
+      "deleteLabel": "{{pattern}}ni unutish"
+    }
   }
 }

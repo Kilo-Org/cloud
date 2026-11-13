@@ -4085,5 +4085,88 @@
     "unavailableDescription": "ဤမျှဝေလင့်ခ်သည် သက်တမ်းကုန်သွားပြီ သို့မဟုတ် ရုပ်သိမ်းခံထားရပြီ ဖြစ်သည်။",
     "transcriptUnavailableTitle": "ဤစာသားမှတ်တမ်းကို ဖွင့်၍ မရပါ",
     "transcriptUnavailableDescription": "လင့်ခ်သည် အလုပ်လုပ်နေဆဲ ဖြစ်သည်။ ခဏအကြာတွင် ထပ်စမ်းကြည့်ပါ။"
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "သင့်ကိုယ်ပိုင် ဆာဗာများသို့ ချိတ်ဆက်ပါ။",
+    "storage": {
+      "lockedTitle": "SSH အသုံးပြုရန် လော့ခ်ဖွင့်ပါ",
+      "lockedMessage": "သင့်စက်ကို လော့ခ်ဖွင့်ပြီး ထပ်စမ်းကြည့်ပါ။",
+      "unavailableTitle": "သိုလှောင်မှု မရနိုင်ပါ",
+      "unavailableMessage": "အက်ပ်၏ စက်တွင်းသိုလှောင်ရာကို ဖွင့်မရပါ။ Kilo ကို ပြန်စပြီး ထပ်စမ်းကြည့်ပါ။"
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "ဟိုစ့်များ မရှိသေးပါ",
+      "emptyDescription": "ဟိုစ့်တစ်ခု ထည့်ပါ၊ သို့မဟုတ် သင့် SSH config မှ ဟိုစ့်များကို ထည့်သွင်းပါ။",
+      "addHost": "ဟိုစ့် ထည့်ပါ",
+      "importConfig": "SSH config မှ တင်သွင်းပါ",
+      "rowActions": "{{label}}၊ {{target}}။ တည်းဖြတ်ခြင်းနှင့် ဖျက်ခြင်းကို ဖွင့်ပါသည်။",
+      "viaJump": "{{label}} မှတစ်ဆင့်",
+      "deleteTitle": "{{label}} ကို ဖျက်မလား?",
+      "deleteMessage": "၎င်း၏ ဆက်တင်နှင့် ပို့တ် ပို့ဆောင်မှုများလည်း အတူ ဖယ်ရှားခံရပါမည်။ ပြန်ပြင်၍ မရနိုင်ပါ။",
+      "deleteFailed": "ဟိုစ့်ကို ဖျက်၍ မရပါ။"
+    },
+    "editor": {
+      "newTitle": "ဟိုစ့်အသစ်",
+      "editTitle": "ဟိုစ့် တည်းဖြတ်ပါ",
+      "label": "အမည်ပြ",
+      "labelPlaceholder": "အိမ်ဆာဗာ",
+      "hostname": "HostName",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "ပို့တ်",
+      "username": "အသုံးပြုသူအမည်",
+      "authMethod": "အတည်ပြုနည်း",
+      "password": "စကားဝှက်",
+      "key": "SSH သော့",
+      "keyboardInteractive": "ကီးဘုတ်ဖြင့် အပြန်အလှန်",
+      "passwordPlaceholder": "မသိမ်းထားပါက ချိတ်ဆက်စဉ် ရိုက်ထည့်ရမည်",
+      "savePassword": "စကားဝှက် သိမ်းပါ",
+      "savePasswordHint": "ဤစက်ရှိ ကုဒ်ဝှက်ထားသော သိုလှောင်ရာတွင် သိမ်းထားသည်။",
+      "chooseKey": "သော့ ရွေးပါ",
+      "noKeys": "သော့များ မရှိသေးပါ",
+      "jumpHost": "Jump ဟိုစ့်",
+      "directConnection": "တိုက်ရိုက် ချိတ်ဆက်မှု",
+      "tmuxAttach": "tmux ချိတ်တွယ်ပါ",
+      "tmuxSession": "tmux ဆက်ရှင် အမည်",
+      "saved": "ဟိုစ့်ကို သိမ်းပြီးပါပြီ။",
+      "saveFailed": "ဟိုစ့်ကို သိမ်း၍ မရပါ။"
+    },
+    "errors": {
+      "invalidPort": "1 မှ 65535 အတွင်း ပို့တ်ကို အသုံးပြုပါ",
+      "jumpCycle": "ထိုဟိုစ့်သည် ဤဟိုစ့်မှတစ်ဆင့် ခုန်နေပြီး ဖြစ်သည်။"
+    },
+    "import": {
+      "title": "SSH config တင်သွင်းပါ",
+      "description": "သင့် SSH config ကို ကူးထည့်ပါ၊ သို့မဟုတ် ဖိုင်ကို ရွေးပါ။",
+      "sourceLabel": "SSH config",
+      "chooseFile": "ဖိုင် ရွေးပါ",
+      "preview": "ကြိုကြည့်ပါ",
+      "apply": "ဟိုစ့်များ တင်သွင်းပါ",
+      "imported": "ဟိုစ့်များ တင်သွင်းပြီးပါပြီ။",
+      "importFailed": "ဘာမျှ တင်သွင်းမခဲ့ပါ။",
+      "nothingDescription": "ဤ config တွင် ဤအက်ပ် တင်သွင်းနိုင်သော ဟိုစ့် မပါဝင်ပါ။",
+      "notImported": "မတင်သွင်းထားပါ",
+      "needsKey": "သော့ လိုအပ်သည်",
+      "warnNeedsKey": "၎င်း၏ သော့ဖိုင်ကို တင်သွင်း၍ မရပါ။ တည်းဖြတ်ရာတွင် သော့ ရွေးပါ။",
+      "warnJumpMissing": "{{target}} သည် တင်သွင်းမှုတွင် မပါဝင်သောကြောင့် ဤဟိုစ့်သည် တိုက်ရိုက် ချိတ်ဆက်ပါမည်။",
+      "warnJumpMultiHop": "ပထမဆုံး Jump ဟိုစ့်ကိုသာ တင်သွင်းပါသည်။",
+      "warnJumpCycle": "{{target}} သည် ဤဟိုစ့်မှတစ်ဆင့် ပြန်ခုန်နေသောကြောင့် ၎င်း၏ Jump ကို ဖယ်လိုက်ပါသည်။",
+      "warnForward": "ဤဟိုစ့်ရှိ ပို့ဆောင်မှုလိုင်း တစ်ခုကို ဖတ်၍ မရပါ။",
+      "skippedNoUsername": "{{alias}} တွင် User လိုင်း မရှိပါ။",
+      "skippedInvalidPort": "{{alias}} ၏ ပို့တ်သည် 1 မှ 65535 အတွင်း ဂဏန်း မဟုတ်ပါ။",
+      "unreadableFile": "ထိုဖိုင်ကို ဖတ်၍ မရပါ။"
+    },
+    "knownHosts": {
+      "title": "သိထားသော ဟိုစ့်များ",
+      "emptyTitle": "ယုံကြည်ထားသော ဟိုစ့်များ မရှိသေးပါ",
+      "emptyDescription": "ဟိုစ့်တစ်ခုသို့ ပထမဆုံး ချိတ်ဆက်ချိန်တွင် ၎င်း၏ ဟိုစ့်သော့ကို ယုံကြည်ပါသည်။",
+      "deleteTitle": "{{pattern}} ကို မေ့ပစ်မလား?",
+      "deleteMessage": "နောက်တစ်ကြိမ် ချိတ်ဆက်ချိန်တွင် ၎င်း၏ သော့ကို ထပ်မံ ယုံကြည်ရန် တောင်းဆိုပါမည်။",
+      "deleteFailed": "ဟိုစ့်သော့ကို ဖယ်ရှား၍ မရပါ။",
+      "deleteLabel": "{{pattern}} ကို မေ့ပါ"
+    }
   }
 }

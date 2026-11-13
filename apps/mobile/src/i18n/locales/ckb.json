@@ -4085,5 +4085,88 @@
     "unavailableDescription": "ئەم بەستەری هاوبەشکردنە بەسەرچووە یان هەڵوەشێنراوەتەوە.",
     "transcriptUnavailableTitle": "نەتوانرا ئەم تۆمارە بار بکرێت",
     "transcriptUnavailableDescription": "بەستەرەکە هێشتا کار دەکات. کەمێکی تر هەوڵ بدەرەوە."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "بە سێرڤەرەکانی خۆتەوە ببەستە.",
+    "storage": {
+      "lockedTitle": "بۆ بەکارهێنانی SSH بیکەرەوە",
+      "lockedMessage": "ئامێرەکەت بکەرەوە، پاشان دووبارە هەوڵ بدەرەوە.",
+      "unavailableTitle": "کۆگا بەردەست نییە",
+      "unavailableMessage": "کۆگای سەر ئامێری ئەپەکە نەتوانرا بکرێتەوە. Kilo دووبارە دەستپێبکەرەوە، پاشان دووبارە هەوڵ بدەرەوە."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "هێشتا هیچ هاستێک نییە",
+      "emptyDescription": "هاستێک زیاد بکە، یان هاستەکان لە ڕێکخستنی SSH بهێنە.",
+      "addHost": "هاست زیاد بکە",
+      "importConfig": "هاوردەکردن لە ڕێکخستنی SSH",
+      "rowActions": "{{label}}، {{target}}. دەستکاریکردن و سڕینەوە دەکاتەوە.",
+      "viaJump": "لە ڕێگەی {{label}}",
+      "deleteTitle": "{{label}} بسڕدرێتەوە؟",
+      "deleteMessage": "ڕێکخستنەکە و فۆرواردکردنەکانی پۆرت لەگەڵیدا لادەبرێن. ئەمە ناتوانرێت بگەڕێندرێتەوە.",
+      "deleteFailed": "هاستەکە نەتوانرا بسڕدرێتەوە."
+    },
+    "editor": {
+      "newTitle": "هاستی نوێ",
+      "editTitle": "دەستکاری هاست",
+      "label": "ناونیشان",
+      "labelPlaceholder": "سێرڤەری ماڵەوە",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "پۆرت",
+      "username": "ناوی بەکارهێنەر",
+      "authMethod": "شێوازی پشتڕاستکردنەوە",
+      "password": "وشەی نهێنی",
+      "key": "کلیلی SSH",
+      "keyboardInteractive": "تەختەکلیل چالاک",
+      "passwordPlaceholder": "لە کاتی پەیوەندیکردن دەنووسرێت، مەگەر پاشەکەوت کرابێت",
+      "savePassword": "وشەی نهێنی پاشەکەوت بکە",
+      "savePasswordHint": "لە کۆگای شفرەکراوی ئەم ئامێرەدا هەڵدەگیرێت.",
+      "chooseKey": "کلیلێک هەڵبژێرە",
+      "noKeys": "هێشتا هیچ کلیلێک نییە",
+      "jumpHost": "هاستی جەمپ",
+      "directConnection": "پەیوەندی ڕاستەوخۆ",
+      "tmuxAttach": "tmux ببەستە",
+      "tmuxSession": "ناوی دانیشتنی tmux",
+      "saved": "هاست پاشەکەوت کرا.",
+      "saveFailed": "هاستەکە نەتوانرا پاشەکەوت بکرێت."
+    },
+    "errors": {
+      "invalidPort": "پۆرتێک لە 1 بۆ 65535 بەکاربهێنە",
+      "jumpCycle": "ئەو هاستە پێشتر بەم هاستەدا دەبازدێت."
+    },
+    "import": {
+      "title": "هاوردەکردنی ڕێکخستنی SSH",
+      "description": "ڕێکخستنی SSHی خۆت بچەسپێنە، یان فایلەکە هەڵبژێرە.",
+      "sourceLabel": "ڕێکخستنی SSH",
+      "chooseFile": "فایل هەڵبژێرە",
+      "preview": "پێشبینین",
+      "apply": "هاستەکان هاوردە بکە",
+      "imported": "هاستەکان هاوردە کران.",
+      "importFailed": "هیچ هاوردە نەکرا.",
+      "nothingDescription": "ئەم ڕێکخستنە هیچ هاستێک باس ناکات کە ئەم ئەپە بتوانێت هاوردەی بکات.",
+      "notImported": "هاوردە نەکرا",
+      "needsKey": "پێویستی بە کلیلە",
+      "warnNeedsKey": "فایلی کلیلەکەی ناتوانرێت هاوردە بکرێت. لە دەستکاریکەرەکەدا کلیلێک هەڵبژێرە.",
+      "warnJumpMissing": "{{target}} لە هاوردەکردنەکەدا نییە، بۆیە ئەم هاستە ڕاستەوخۆ پەیوەندی دەکات.",
+      "warnJumpMultiHop": "تەنها یەکەم هاستی جەمپ هاوردە دەکرێت.",
+      "warnJumpCycle": "{{target}} بەم هاستەدا دەگەڕێتەوە، بۆیە بازدانەکەی لابرا.",
+      "warnForward": "هێڵێکی فۆروارد لەم هاستەدا نەتوانرا بخوێنرێتەوە.",
+      "skippedNoUsername": "{{alias}} هێڵی Userی نییە.",
+      "skippedInvalidPort": "{{alias}} پۆرتێکی هەیە کە ژمارەیەک نییە لە 1 بۆ 65535.",
+      "unreadableFile": "ئەو فایلە نەتوانرا بخوێنرێتەوە."
+    },
+    "knownHosts": {
+      "title": "هاستە ناسراوەکان",
+      "emptyTitle": "هێشتا هیچ هاستێکی متمانەپێکراو نییە",
+      "emptyDescription": "کلیلی هاست لە یەکەم پەیوەندیکردنت پێی متمانە دەکرێت.",
+      "deleteTitle": "{{pattern}} لەبیر بکرێت؟",
+      "deleteMessage": "پەیوەندی داهاتوو دووبارە داوات لێدەکات متمانە بە کلیلەکەی بکەیت.",
+      "deleteFailed": "کلیلی هاست نەتوانرا لاببرێت.",
+      "deleteLabel": "{{pattern}} لەبیر بکە"
+    }
   }
 }

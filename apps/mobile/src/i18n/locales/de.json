@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Dieser Freigabelink ist abgelaufen oder wurde widerrufen.",
     "transcriptUnavailableTitle": "Transkript konnte nicht geladen werden",
     "transcriptUnavailableDescription": "Der Link funktioniert noch. Versuche es gleich noch einmal."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Mit deinen eigenen Servern verbinden.",
+    "storage": {
+      "lockedTitle": "Entsperren, um SSH zu verwenden",
+      "lockedMessage": "Entsperre dein Gerät und versuche es dann erneut.",
+      "unavailableTitle": "Speicher nicht verfügbar",
+      "unavailableMessage": "Der Speicher der App konnte nicht geöffnet werden. Starte Kilo neu und versuche es dann erneut."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Noch keine Hosts",
+      "emptyDescription": "Füge einen Host hinzu oder übernimm die Hosts aus deiner SSH-Konfiguration.",
+      "addHost": "Host hinzufügen",
+      "importConfig": "Aus SSH-Konfiguration importieren",
+      "rowActions": "{{label}}, {{target}}. Öffnet Bearbeiten und Löschen.",
+      "viaJump": "über {{label}}",
+      "deleteTitle": "{{label}} löschen?",
+      "deleteMessage": "Die Einstellung und die Portweiterleitungen werden mitgelöscht. Das kann nicht rückgängig gemacht werden.",
+      "deleteFailed": "Der Host konnte nicht gelöscht werden."
+    },
+    "editor": {
+      "newTitle": "Neuer Host",
+      "editTitle": "Host bearbeiten",
+      "label": "Bezeichnung",
+      "labelPlaceholder": "Heimserver",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Benutzername",
+      "authMethod": "Authentifizierungsmethode",
+      "password": "Passwort",
+      "key": "SSH-Schlüssel",
+      "keyboardInteractive": "Tastaturinteraktiv",
+      "passwordPlaceholder": "Wird beim Verbinden eingegeben, sofern nicht gespeichert",
+      "savePassword": "Passwort speichern",
+      "savePasswordHint": "Wird im verschlüsselten Speicher dieses Geräts aufbewahrt.",
+      "chooseKey": "Schlüssel auswählen",
+      "noKeys": "Noch keine Schlüssel",
+      "jumpHost": "Jump-Host",
+      "directConnection": "Direkte Verbindung",
+      "tmuxAttach": "tmux anhängen",
+      "tmuxSession": "Name der tmux-Sitzung",
+      "saved": "Host gespeichert.",
+      "saveFailed": "Der Host konnte nicht gespeichert werden."
+    },
+    "errors": {
+      "invalidPort": "Verwende einen Port von 1 bis 65535",
+      "jumpCycle": "Dieser Host springt bereits über diesen."
+    },
+    "import": {
+      "title": "SSH-Konfiguration importieren",
+      "description": "Füge deine SSH-Konfiguration ein oder wähle die Datei aus.",
+      "sourceLabel": "SSH-Konfiguration",
+      "chooseFile": "Datei auswählen",
+      "preview": "Vorschau",
+      "apply": "Hosts importieren",
+      "imported": "Hosts importiert.",
+      "importFailed": "Es wurde nichts importiert.",
+      "nothingDescription": "Diese Konfiguration beschreibt keinen Host, den diese App importieren kann.",
+      "notImported": "Nicht importiert",
+      "needsKey": "Schlüssel nötig",
+      "warnNeedsKey": "Die zugehörige Schlüsseldatei kann nicht importiert werden. Wähle im Editor einen Schlüssel aus.",
+      "warnJumpMissing": "{{target}} ist nicht im Import enthalten, daher verbindet sich dieser Host direkt.",
+      "warnJumpMultiHop": "Nur der erste Jump-Host wird importiert.",
+      "warnJumpCycle": "{{target}} springt zurück über diesen Host, daher wurde der Jump verworfen.",
+      "warnForward": "Eine Forward-Zeile in diesem Host konnte nicht gelesen werden.",
+      "skippedNoUsername": "{{alias}} hat keine User-Zeile.",
+      "skippedInvalidPort": "{{alias}} hat einen Port, der keine Zahl von 1 bis 65535 ist.",
+      "unreadableFile": "Diese Datei konnte nicht gelesen werden."
+    },
+    "knownHosts": {
+      "title": "Bekannte Hosts",
+      "emptyTitle": "Noch keine vertrauenswürdigen Hosts",
+      "emptyDescription": "Ein Hostschlüssel wird beim ersten Verbinden als vertrauenswürdig eingestuft.",
+      "deleteTitle": "{{pattern}} vergessen?",
+      "deleteMessage": "Bei der nächsten Verbindung wirst du erneut gefragt, ob du dem Schlüssel vertraust.",
+      "deleteFailed": "Der Hostschlüssel konnte nicht entfernt werden.",
+      "deleteLabel": "{{pattern}} vergessen"
+    }
   }
 }

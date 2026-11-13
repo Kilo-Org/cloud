@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Ez a megosztási link lejárt, vagy visszavonták.",
     "transcriptUnavailableTitle": "Nem sikerült betölteni az átiratot",
     "transcriptUnavailableDescription": "A link továbbra is működik. Próbáld újra egy kicsit később."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Csatlakozz a saját szervereidhez.",
+    "storage": {
+      "lockedTitle": "Oldd fel a zárolást az SSH használatához",
+      "lockedMessage": "Oldd fel az eszközöd, majd próbáld újra.",
+      "unavailableTitle": "A tárhely nem érhető el",
+      "unavailableMessage": "Az alkalmazás eszközön lévő tárhelyét nem sikerült megnyitni. Indítsd újra a Kilót, majd próbáld újra."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Még nincs gazdagép",
+      "emptyDescription": "Adj hozzá egy gazdagépet, vagy hozd be a gazdagépeket az SSH-konfigurációdból.",
+      "addHost": "Gazdagép hozzáadása",
+      "importConfig": "Importálás SSH-konfigurációból",
+      "rowActions": "{{label}}, {{target}}. Szerkesztés és törlés megnyitása.",
+      "viaJump": "{{label}} ugrógazdagépen át",
+      "deleteTitle": "{{label}} törlése?",
+      "deleteMessage": "A beállításai és a porttovábbításai is törlődnek vele együtt. Ez nem vonható vissza.",
+      "deleteFailed": "A gazdagépet nem sikerült törölni."
+    },
+    "editor": {
+      "newTitle": "Új gazdagép",
+      "editTitle": "Gazdagép szerkesztése",
+      "label": "Címke",
+      "labelPlaceholder": "Otthoni szerver",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Felhasználónév",
+      "authMethod": "Hitelesítési mód",
+      "password": "Jelszó",
+      "key": "SSH-kulcs",
+      "keyboardInteractive": "Billentyűzet-interaktív",
+      "passwordPlaceholder": "Csatlakozáskor kell megadni, hacsak nincs mentve",
+      "savePassword": "Jelszó mentése",
+      "savePasswordHint": "Az eszközön lévő titkosított tárhelyen tároljuk.",
+      "chooseKey": "Kulcs kiválasztása",
+      "noKeys": "Még nincs kulcs",
+      "jumpHost": "Ugrógazdagép",
+      "directConnection": "Közvetlen kapcsolat",
+      "tmuxAttach": "tmux csatolása",
+      "tmuxSession": "tmux-munkamenet neve",
+      "saved": "Gazdagép mentve.",
+      "saveFailed": "A gazdagépet nem sikerült menteni."
+    },
+    "errors": {
+      "invalidPort": "1 és 65535 közötti portot használj",
+      "jumpCycle": "Az a gazdagép már ezen a gazdagépen keresztül ugrik."
+    },
+    "import": {
+      "title": "SSH-konfiguráció importálása",
+      "description": "Illeszd be az SSH-konfigurációdat, vagy válaszd ki a fájlt.",
+      "sourceLabel": "SSH-konfiguráció",
+      "chooseFile": "Fájl kiválasztása",
+      "preview": "Előnézet",
+      "apply": "Gazdagépek importálása",
+      "imported": "Gazdagépek importálva.",
+      "importFailed": "Semmi sem lett importálva.",
+      "nothingDescription": "Ez a konfiguráció nem ír le olyan gazdagépet, amelyet ez az alkalmazás importálhat.",
+      "notImported": "Nincs importálva",
+      "needsKey": "Kulcs szükséges",
+      "warnNeedsKey": "A kulcsfájlja nem importálható. Válassz kulcsot a szerkesztőben.",
+      "warnJumpMissing": "{{target}} nincs az importban, ezért ez a gazdagép közvetlenül kapcsolódik.",
+      "warnJumpMultiHop": "Csak az első ugrógazdagép kerül importálásra.",
+      "warnJumpCycle": "{{target}} ezen a gazdagépen keresztül ugrik vissza, ezért az ugrását elvetettük.",
+      "warnForward": "Egy porttovábbítási sort ebben a gazdagépben nem sikerült beolvasni.",
+      "skippedNoUsername": "{{alias}} esetében nincs User sor.",
+      "skippedInvalidPort": "{{alias}} portja nem 1 és 65535 közötti szám.",
+      "unreadableFile": "Azt a fájlt nem sikerült beolvasni."
+    },
+    "knownHosts": {
+      "title": "Ismert gazdagépek",
+      "emptyTitle": "Még nincs megbízható gazdagép",
+      "emptyDescription": "A gazdagépkulcs akkor válik megbízhatóvá, amikor először csatlakozol hozzá.",
+      "deleteTitle": "{{pattern}} elfelejtése?",
+      "deleteMessage": "A következő kapcsolódáskor újra meg kell bíznod a kulcsában.",
+      "deleteFailed": "A gazdagépkulcsot nem sikerült eltávolítani.",
+      "deleteLabel": "{{pattern}} elfelejtése"
+    }
   }
 }

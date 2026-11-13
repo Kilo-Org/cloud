@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Pautan kongsi ini telah tamat tempoh atau dibatalkan.",
     "transcriptUnavailableTitle": "Tidak dapat memuatkan transkrip ini",
     "transcriptUnavailableDescription": "Pautan ini masih berfungsi. Cuba lagi sebentar lagi."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Sambung ke pelayan anda sendiri.",
+    "storage": {
+      "lockedTitle": "Buka kunci untuk guna SSH",
+      "lockedMessage": "Buka kunci peranti anda, kemudian cuba lagi.",
+      "unavailableTitle": "Storan tidak tersedia",
+      "unavailableMessage": "Storan dalam peranti aplikasi tidak dapat dibuka. Mulakan semula Kilo, kemudian cuba lagi."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Belum ada hos",
+      "emptyDescription": "Tambah hos, atau import hos daripada konfig SSH anda.",
+      "addHost": "Tambah hos",
+      "importConfig": "Import daripada konfig SSH",
+      "rowActions": "{{label}}, {{target}}. Membuka edit dan padam.",
+      "viaJump": "melalui {{label}}",
+      "deleteTitle": "Padam {{label}}?",
+      "deleteMessage": "Tetapan dan pemajuan portnya turut dibuang. Tindakan ini tidak boleh dibatalkan.",
+      "deleteFailed": "Hos tidak dapat dipadamkan."
+    },
+    "editor": {
+      "newTitle": "Hos baharu",
+      "editTitle": "Edit hos",
+      "label": "Label",
+      "labelPlaceholder": "Pelayan rumah",
+      "hostname": "Nama hos",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Nama pengguna",
+      "authMethod": "Kaedah pengesahan",
+      "password": "Kata laluan",
+      "key": "Kunci SSH",
+      "keyboardInteractive": "Papan kekunci interaktif",
+      "passwordPlaceholder": "Ditaip semasa menyambung, melainkan disimpan",
+      "savePassword": "Simpan kata laluan",
+      "savePasswordHint": "Disimpan dalam storan tersulit pada peranti ini.",
+      "chooseKey": "Pilih kunci",
+      "noKeys": "Belum ada kunci",
+      "jumpHost": "Hos lompat",
+      "directConnection": "Sambungan terus",
+      "tmuxAttach": "Lampir tmux",
+      "tmuxSession": "Nama sesi tmux",
+      "saved": "Hos disimpan.",
+      "saveFailed": "Hos tidak dapat disimpan."
+    },
+    "errors": {
+      "invalidPort": "Gunakan port 1 hingga 65535",
+      "jumpCycle": "Hos itu sudah melompat melalui hos ini."
+    },
+    "import": {
+      "title": "Import konfig SSH",
+      "description": "Tampal konfig SSH anda, atau pilih fail.",
+      "sourceLabel": "Konfig SSH",
+      "chooseFile": "Pilih fail",
+      "preview": "Pratonton",
+      "apply": "Import hos",
+      "imported": "Hos diimport.",
+      "importFailed": "Tiada apa-apa diimport.",
+      "nothingDescription": "Konfig ini tidak menyatakan hos yang boleh diimport oleh aplikasi ini.",
+      "notImported": "Tidak diimport",
+      "needsKey": "Perlu kunci",
+      "warnNeedsKey": "Fail kuncinya tidak dapat diimport. Pilih kunci dalam editor.",
+      "warnJumpMissing": "{{target}} tiada dalam import, jadi hos ini menyambung secara terus.",
+      "warnJumpMultiHop": "Hanya hos lompat pertama diimport.",
+      "warnJumpCycle": "{{target}} melompat balik melalui hos ini, jadi lompatannya digugurkan.",
+      "warnForward": "Satu baris pemajuan dalam hos ini tidak dapat dibaca.",
+      "skippedNoUsername": "{{alias}} tiada baris User.",
+      "skippedInvalidPort": "{{alias}} mempunyai port yang bukan nombor 1 hingga 65535.",
+      "unreadableFile": "Fail itu tidak dapat dibaca."
+    },
+    "knownHosts": {
+      "title": "Hos diketahui",
+      "emptyTitle": "Belum ada hos dipercayai",
+      "emptyDescription": "Kunci hos dipercayai kali pertama anda menyambung ke hos itu.",
+      "deleteTitle": "Lupakan {{pattern}}?",
+      "deleteMessage": "Sambungan seterusnya meminta anda mempercayai kuncinya sekali lagi.",
+      "deleteFailed": "Kunci hos tidak dapat dibuang.",
+      "deleteLabel": "Lupakan {{pattern}}"
+    }
   }
 }

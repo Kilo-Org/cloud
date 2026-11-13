@@ -206,6 +206,11 @@ export default function AppLayout() {
             <Stack.Screen name="agent-chat/new" options={{ headerShown: false }} />
             <Stack.Screen name="agent-chat/[session-id]" />
             <Stack.Screen name="native-remote" />
+            <Stack.Screen name="ssh/index" />
+            <Stack.Screen name="ssh/host/new" />
+            <Stack.Screen name="ssh/host/[host-id]" />
+            <Stack.Screen name="ssh/import" />
+            <Stack.Screen name="ssh/known-hosts" />
             <Stack.Screen name="session-changes/[session-id]" options={{ headerShown: false }} />
             <Stack.Screen name="shared/[token]" options={{ headerShown: false }} />
             <Stack.Screen name="agent-chat/model-picker" options={searchSheetOptions} />

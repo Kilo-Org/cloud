@@ -4150,5 +4150,88 @@
     "unavailableDescription": "Ovaj link za dijeljenje je istekao ili je opozvan.",
     "transcriptUnavailableTitle": "Nije moguće učitati ovaj transkript",
     "transcriptUnavailableDescription": "Link i dalje radi. Pokušajte ponovo za trenutak."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Povežite se na svoje servere.",
+    "storage": {
+      "lockedTitle": "Otključajte da biste koristili SSH",
+      "lockedMessage": "Otključajte uređaj, pa pokušajte ponovo.",
+      "unavailableTitle": "Pohrana nije dostupna",
+      "unavailableMessage": "Pohranu aplikacije na uređaju nije bilo moguće otvoriti. Ponovo pokrenite Kilo, pa pokušajte ponovo."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Još nema hostova",
+      "emptyDescription": "Dodajte host ili uvezite hostove iz svoje SSH konfiguracije.",
+      "addHost": "Dodaj host",
+      "importConfig": "Uvezi iz SSH konfiguracije",
+      "rowActions": "{{label}}, {{target}}. Otvara uređivanje i brisanje.",
+      "viaJump": "preko {{label}}",
+      "deleteTitle": "Obrisati {{label}}?",
+      "deleteMessage": "Njegove postavke i prosljeđivanja portova uklanjaju se zajedno s njim. Ovo se ne može poništiti.",
+      "deleteFailed": "Nije bilo moguće obrisati host."
+    },
+    "editor": {
+      "newTitle": "Novi host",
+      "editTitle": "Uredi host",
+      "label": "Oznaka",
+      "labelPlaceholder": "Kućni server",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Korisničko ime",
+      "authMethod": "Način autentifikacije",
+      "password": "Lozinka",
+      "key": "SSH ključ",
+      "keyboardInteractive": "Interaktivno preko tastature",
+      "passwordPlaceholder": "Upisuje se pri povezivanju, osim ako je sačuvana",
+      "savePassword": "Sačuvaj lozinku",
+      "savePasswordHint": "Čuva se u šifrovanoj pohrani na ovom uređaju.",
+      "chooseKey": "Odaberi ključ",
+      "noKeys": "Još nema ključeva",
+      "jumpHost": "Posredni host",
+      "directConnection": "Direktna veza",
+      "tmuxAttach": "Priključi tmux",
+      "tmuxSession": "Naziv tmux sesije",
+      "saved": "Host je sačuvan.",
+      "saveFailed": "Nije bilo moguće sačuvati host."
+    },
+    "errors": {
+      "invalidPort": "Koristite port od 1 do 65535",
+      "jumpCycle": "Taj host već ide preko ovog."
+    },
+    "import": {
+      "title": "Uvezi SSH konfiguraciju",
+      "description": "Zalijepite svoju SSH konfiguraciju ili odaberite datoteku.",
+      "sourceLabel": "SSH konfiguracija",
+      "chooseFile": "Odaberi datoteku",
+      "preview": "Pregled",
+      "apply": "Uvezi hostove",
+      "imported": "Hostovi su uvezeni.",
+      "importFailed": "Ništa nije uvezeno.",
+      "nothingDescription": "Ova konfiguracija ne opisuje nijedan host koji ova aplikacija može uvesti.",
+      "notImported": "Nije uvezen",
+      "needsKey": "Potreban ključ",
+      "warnNeedsKey": "Njegovu datoteku ključa nije moguće uvesti. Odaberite ključ u uređivaču.",
+      "warnJumpMissing": "{{target}} nije u uvozu, pa se ovaj host povezuje direktno.",
+      "warnJumpMultiHop": "Uvozi se samo prvi posredni host.",
+      "warnJumpCycle": "{{target}} ide natrag preko ovog hosta, pa je njegov posredni host izostavljen.",
+      "warnForward": "Liniju prosljeđivanja u ovom hostu nije bilo moguće pročitati.",
+      "skippedNoUsername": "{{alias}} nema liniju User.",
+      "skippedInvalidPort": "{{alias}} ima port koji nije broj od 1 do 65535.",
+      "unreadableFile": "Tu datoteku nije bilo moguće pročitati."
+    },
+    "knownHosts": {
+      "title": "Poznati hostovi",
+      "emptyTitle": "Još nema pouzdanih hostova",
+      "emptyDescription": "Ključ hosta postaje pouzdan pri prvom povezivanju s njim.",
+      "deleteTitle": "Zaboraviti {{pattern}}?",
+      "deleteMessage": "Pri sljedećem povezivanju ponovo ćete morati potvrditi da vjerujete njegovom ključu.",
+      "deleteFailed": "Nije bilo moguće ukloniti ključ hosta.",
+      "deleteLabel": "Zaboravi {{pattern}}"
+    }
   }
 }

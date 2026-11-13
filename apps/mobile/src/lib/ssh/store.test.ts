@@ -7,7 +7,16 @@ import migrations from '../../../drizzle/migrations';
 import { enableForeignKeys } from '../persist/foreign-keys';
 import { type SqlValue, type SshDatabase } from './database';
 import { createForward, getForward, listForwards, type SshForwardInput } from './forwards';
-import { createHost, deleteHost, getHost, listHosts, type SshHostInput, updateHost } from './hosts';
+import { importSshConfig, planSshConfigImport } from './config-import';
+import {
+  createHost,
+  deleteHost,
+  getHost,
+  listHosts,
+  SshJumpHostCycleError,
+  type SshHostInput,
+  updateHost,
+} from './hosts';
 import { createKey, deleteKey, getKey, listKeys, type SshKeyInput, updateKey } from './keys';
 import {
   findKnownHost,
@@ -59,6 +68,16 @@ const sshDatabase = (database: DatabaseSync): SshDatabase => ({
     database.prepare(source).all(...params) as T[],
   runSync: (source: string, params: SqlValue[]) => {
     database.prepare(source).run(...params);
+  },
+  withTransactionSync: (task: () => void) => {
+    database.exec('BEGIN');
+    try {
+      task();
+      database.exec('COMMIT');
+    } catch (error) {
+      database.exec('ROLLBACK');
+      throw error;
+    }
   },
 });
 
@@ -182,6 +201,33 @@ describe('hosts', () => {
     expect(getHost(db, behind.id)?.jumpHostId).toBeNull();
   });
 
+  it('accepts a chain of jumps', () => {
+    const outer = host('outer');
+    const inner = host('inner', { jumpHostId: outer.id });
+    const target = host('target', { jumpHostId: inner.id });
+
+    expect(getHost(db, target.id)?.jumpHostId).toBe(inner.id);
+  });
+
+  it('refuses a host that jumps through itself', () => {
+    const created = host('web');
+
+    expect(() => updateHost(db, created.id, { jumpHostId: created.id })).toThrow(
+      SshJumpHostCycleError
+    );
+    expect(getHost(db, created.id)?.jumpHostId).toBeNull();
+  });
+
+  it('refuses a jump that would close a loop through another host', () => {
+    const outer = host('outer');
+    const inner = host('inner', { jumpHostId: outer.id });
+
+    expect(() => updateHost(db, outer.id, { jumpHostId: inner.id })).toThrow(
+      SshJumpHostCycleError
+    );
+    expect(getHost(db, outer.id)?.jumpHostId).toBeNull();
+  });
+
   it('deletes its snippets and forwards with it', () => {
     const doomed = host('doomed');
     const kept = host('kept');
@@ -206,6 +252,51 @@ describe('hosts', () => {
 
     expect(listSnippets(db).map(row => row.label)).toEqual(['global']);
     expect(listForwards(db).map(row => row.hostId)).toEqual([kept.id]);
+  });
+});
+
+describe('ssh config import', () => {
+  const CONFIG = `
+Host bastion
+  User jump
+Host internal
+  User igor
+  HostName internal.example.com
+  Port 2222
+  ProxyJump bastion
+  LocalForward 8080 localhost:80
+`;
+
+  it('writes the hosts, their jump and their forwards in one call', () => {
+    const result = importSshConfig(db, planSshConfigImport(CONFIG, []));
+
+    expect(result.hosts.map(row => row.label)).toEqual(['bastion', 'internal']);
+    expect(result.forwardCount).toBe(1);
+    const [bastion, internal] = result.hosts;
+    expect(internal).toMatchObject({ port: 2222, hostname: 'internal.example.com' });
+    expect(internal?.jumpHostId).toBe(bastion?.id);
+    expect(listForwards(db)).toMatchObject([{ hostId: internal?.id, bindPort: 8080 }]);
+  });
+
+  it('resolves a jump to a host that was already stored', () => {
+    const stored = host('bastion');
+
+    const result = importSshConfig(db, planSshConfigImport('Host internal\n  User igor\n  ProxyJump bastion\n', listHosts(db)));
+
+    expect(result.hosts[0]?.jumpHostId).toBe(stored.id);
+  });
+
+  it('leaves the store untouched when a host in the batch is refused', () => {
+    const plan = planSshConfigImport(CONFIG, []);
+    const first = plan.hosts[0];
+    if (first === undefined) {
+      throw new Error('the fixture config produced no host');
+    }
+    const hosts = [...plan.hosts, { ...first, alias: 'broken', username: '' }];
+
+    expect(() => importSshConfig(db, { ...plan, hosts })).toThrow();
+    expect(listHosts(db)).toEqual([]);
+    expect(listForwards(db)).toEqual([]);
   });
 });
 

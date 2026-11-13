@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Bu paylaşım linkinin müddəti bitib və ya o ləğv edilib.",
     "transcriptUnavailableTitle": "Bu transkripti yükləmək alınmadı",
     "transcriptUnavailableDescription": "Link hələ də işləyir. Bir az sonra yenidən cəhd edin."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Öz serverlərinizə qoşulun.",
+    "storage": {
+      "lockedTitle": "SSH istifadə etmək üçün kilidi aç",
+      "lockedMessage": "Cihazınızın kilidini açın, sonra yenidən cəhd edin.",
+      "unavailableTitle": "Yaddaş əlçatan deyil",
+      "unavailableMessage": "Tətbiqin cihazdaxili yaddaşı açıla bilmədi. Kilo-nu yenidən başladın, sonra yenidən cəhd edin."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Hələ host yoxdur",
+      "emptyDescription": "Host əlavə edin və ya SSH konfiqurasiyanızdakı hostları gətirin.",
+      "addHost": "Host əlavə et",
+      "importConfig": "SSH konfiqurasiyasından idxal et",
+      "rowActions": "{{label}}, {{target}}. Redaktə və silməni açır.",
+      "viaJump": "{{label}} vasitəsilə",
+      "deleteTitle": "{{label}} silinsin?",
+      "deleteMessage": "Onunla birlikdə parametrləri və port yönləndirmələri də silinir. Bu geri qaytarıla bilməz.",
+      "deleteFailed": "Host silinə bilmədi."
+    },
+    "editor": {
+      "newTitle": "Yeni host",
+      "editTitle": "Hostu redaktə et",
+      "label": "Etiket",
+      "labelPlaceholder": "Ev serveri",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "İstifadəçi adı",
+      "authMethod": "Doğrulama üsulu",
+      "password": "Şifrə",
+      "key": "SSH açarı",
+      "keyboardInteractive": "İnteraktiv klaviatura",
+      "passwordPlaceholder": "Saxlanmadıqca qoşularkən yazılır",
+      "savePassword": "Şifrəni yadda saxla",
+      "savePasswordHint": "Bu cihazdakı şifrələnmiş yaddaşda saxlanılır.",
+      "chooseKey": "Açar seç",
+      "noKeys": "Hələ açar yoxdur",
+      "jumpHost": "Keçid hostu",
+      "directConnection": "Birbaşa qoşulma",
+      "tmuxAttach": "tmux-a qoşul",
+      "tmuxSession": "tmux sessiyasının adı",
+      "saved": "Host yadda saxlanıldı.",
+      "saveFailed": "Host yadda saxlanıla bilmədi."
+    },
+    "errors": {
+      "invalidPort": "1–65535 aralığında port istifadə edin",
+      "jumpCycle": "Həmin host artıq bunun vasitəsilə keçid edir."
+    },
+    "import": {
+      "title": "SSH konfiqurasiyasını idxal et",
+      "description": "SSH konfiqurasiyanızı yapışdırın və ya faylı seçin.",
+      "sourceLabel": "SSH konfiqurasiyası",
+      "chooseFile": "Fayl seç",
+      "preview": "Önbaxış",
+      "apply": "Hostları idxal et",
+      "imported": "Hostlar idxal edildi.",
+      "importFailed": "Heç nə idxal edilmədi.",
+      "nothingDescription": "Bu konfiqurasiyada tətbiqin idxal edə biləcəyi host yoxdur.",
+      "notImported": "İdxal edilmədi",
+      "needsKey": "Açar tələb olunur",
+      "warnNeedsKey": "Onun açar faylı idxal edilə bilməz. Redaktorda açar seçin.",
+      "warnJumpMissing": "{{target}} idxala daxil deyil, ona görə bu host birbaşa qoşulur.",
+      "warnJumpMultiHop": "Yalnız ilk keçid hostu idxal edilir.",
+      "warnJumpCycle": "{{target}} bu host vasitəsilə geri keçid edir, ona görə onun keçidi çıxarıldı.",
+      "warnForward": "Bu hostdakı yönləndirmə sətri oxuna bilmədi.",
+      "skippedNoUsername": "{{alias}} üçün User sətri yoxdur.",
+      "skippedInvalidPort": "{{alias}} üçün port 1–65535 aralığında rəqəm deyil.",
+      "unreadableFile": "Həmin fayl oxuna bilmədi."
+    },
+    "knownHosts": {
+      "title": "Tanınan hostlar",
+      "emptyTitle": "Hələ etibarlı host yoxdur",
+      "emptyDescription": "Host açarı ona ilk dəfə qoşulduqda etibarlı sayılır.",
+      "deleteTitle": "{{pattern}} unudulsun?",
+      "deleteMessage": "Növbəti qoşulmada onun açarına yenidən etibar etməyiniz istəniləcək.",
+      "deleteFailed": "Host açarı silinə bilmədi.",
+      "deleteLabel": "{{pattern}} unut"
+    }
   }
 }

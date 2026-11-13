@@ -4215,5 +4215,88 @@
     "unavailableDescription": "Šios bendrinimo nuorodos galiojimas baigėsi arba ji buvo atšaukta.",
     "transcriptUnavailableTitle": "Nepavyko įkelti šio pokalbio įrašo",
     "transcriptUnavailableDescription": "Nuoroda vis dar veikia. Bandykite dar kartą po akimirkos."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Prisijunkite prie savo serverių.",
+    "storage": {
+      "lockedTitle": "Atrakinkite, kad galėtumėte naudotis SSH",
+      "lockedMessage": "Atrakinkite įrenginį ir bandykite dar kartą.",
+      "unavailableTitle": "Saugykla nepasiekiama",
+      "unavailableMessage": "Nepavyko atidaryti programėlės saugyklos šiame įrenginyje. Paleiskite Kilo iš naujo ir bandykite dar kartą."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Kol kas nėra hostų",
+      "emptyDescription": "Pridėkite hostą arba importuokite hostus iš savo SSH konfigūracijos.",
+      "addHost": "Pridėti hostą",
+      "importConfig": "Importuoti iš SSH konfigūracijos",
+      "rowActions": "{{label}}, {{target}}. Atidaro redagavimą ir trynimą.",
+      "viaJump": "per {{label}}",
+      "deleteTitle": "Ištrinti {{label}}?",
+      "deleteMessage": "Kartu bus pašalinti jo nustatymai ir prievadų peradresavimai. Šio veiksmo atšaukti negalima.",
+      "deleteFailed": "Nepavyko ištrinti hosto."
+    },
+    "editor": {
+      "newTitle": "Naujas hostas",
+      "editTitle": "Redaguoti hostą",
+      "label": "Žymė",
+      "labelPlaceholder": "Namų serveris",
+      "hostname": "Serverio vardas",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Prievadas",
+      "username": "Vartotojo vardas",
+      "authMethod": "Autentifikavimo būdas",
+      "password": "Slaptažodis",
+      "key": "SSH raktas",
+      "keyboardInteractive": "Interaktyvusis klaviatūros",
+      "passwordPlaceholder": "Įvedamas jungiantis, jei neišsaugotas",
+      "savePassword": "Išsaugoti slaptažodį",
+      "savePasswordHint": "Saugomas šifruotoje šio įrenginio saugykloje.",
+      "chooseKey": "Pasirinkti raktą",
+      "noKeys": "Kol kas nėra raktų",
+      "jumpHost": "Tarpinis hostas",
+      "directConnection": "Tiesioginis ryšys",
+      "tmuxAttach": "Prijungti tmux",
+      "tmuxSession": "tmux sesijos pavadinimas",
+      "saved": "Hostas išsaugotas.",
+      "saveFailed": "Nepavyko išsaugoti hosto."
+    },
+    "errors": {
+      "invalidPort": "Naudokite prievadą nuo 1 iki 65535",
+      "jumpCycle": "Tas hostas jau jungiasi per šį."
+    },
+    "import": {
+      "title": "Importuoti SSH konfigūraciją",
+      "description": "Įklijuokite savo SSH konfigūraciją arba pasirinkite failą.",
+      "sourceLabel": "SSH konfigūracija",
+      "chooseFile": "Pasirinkti failą",
+      "preview": "Peržiūra",
+      "apply": "Importuoti hostus",
+      "imported": "Hostai importuoti.",
+      "importFailed": "Nieko neimportuota.",
+      "nothingDescription": "Ši konfigūracija neaprašo nė vieno hosto, kurį ši programėlė galėtų importuoti.",
+      "notImported": "Neimportuota",
+      "needsKey": "Reikia rakto",
+      "warnNeedsKey": "Jo rakto failo importuoti negalima. Pasirinkite raktą redaktoriuje.",
+      "warnJumpMissing": "{{target}} nėra importuojamų hostų sąraše, todėl šis hostas jungiasi tiesiogiai.",
+      "warnJumpMultiHop": "Importuojamas tik pirmasis tarpinis hostas.",
+      "warnJumpCycle": "{{target}} jungiasi atgal per šį hostą, todėl jo tarpinis maršrutas atmestas.",
+      "warnForward": "Nepavyko perskaityti šio hosto peradresavimo eilutės.",
+      "skippedNoUsername": "{{alias}} neturi User eilutės.",
+      "skippedInvalidPort": "{{alias}} nurodytas prievadas nėra skaičius nuo 1 iki 65535.",
+      "unreadableFile": "Nepavyko perskaityti to failo."
+    },
+    "knownHosts": {
+      "title": "Žinomi hostai",
+      "emptyTitle": "Kol kas nėra patikimų hostų",
+      "emptyDescription": "Hosto raktas pripažįstamas patikimu pirmą kartą prisijungus prie jo.",
+      "deleteTitle": "Pamiršti {{pattern}}?",
+      "deleteMessage": "Kito prisijungimo metu vėl būsite paprašyti patvirtinti jo raktą.",
+      "deleteFailed": "Nepavyko pašalinti hosto rakto.",
+      "deleteLabel": "Pamiršti {{pattern}}"
+    }
   }
 }

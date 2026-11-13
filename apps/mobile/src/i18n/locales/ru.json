@@ -4215,5 +4215,88 @@
     "unavailableDescription": "Срок действия ссылки истёк, или она была отозвана.",
     "transcriptUnavailableTitle": "Не удалось загрузить транскрипт",
     "transcriptUnavailableDescription": "Ссылка по-прежнему работает. Повторите попытку чуть позже."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Подключайтесь к своим серверам.",
+    "storage": {
+      "lockedTitle": "Разблокируйте для SSH",
+      "lockedMessage": "Разблокируйте устройство и повторите попытку.",
+      "unavailableTitle": "Хранилище недоступно",
+      "unavailableMessage": "Не удалось открыть локальное хранилище приложения. Перезапустите Kilo и повторите попытку."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Хостов пока нет",
+      "emptyDescription": "Добавьте хост или перенесите хосты из своего SSH config.",
+      "addHost": "Добавить хост",
+      "importConfig": "Импорт из SSH config",
+      "rowActions": "{{label}}, {{target}}. Открывает редактирование и удаление.",
+      "viaJump": "через {{label}}",
+      "deleteTitle": "Удалить {{label}}?",
+      "deleteMessage": "Вместе с ним будут удалены его настройки и перенаправления портов. Это нельзя отменить.",
+      "deleteFailed": "Не удалось удалить хост."
+    },
+    "editor": {
+      "newTitle": "Новый хост",
+      "editTitle": "Изменить хост",
+      "label": "Название",
+      "labelPlaceholder": "Домашний сервер",
+      "hostname": "Имя хоста",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Порт",
+      "username": "Имя пользователя",
+      "authMethod": "Метод аутентификации",
+      "password": "Пароль",
+      "key": "SSH-ключ",
+      "keyboardInteractive": "Клавиатурно-интерактивный",
+      "passwordPlaceholder": "Вводится при подключении, если не сохранён",
+      "savePassword": "Сохранить пароль",
+      "savePasswordHint": "Хранится в зашифрованном хранилище на этом устройстве.",
+      "chooseKey": "Выбрать ключ",
+      "noKeys": "Ключей пока нет",
+      "jumpHost": "Промежуточный хост",
+      "directConnection": "Прямое подключение",
+      "tmuxAttach": "Подключаться к tmux",
+      "tmuxSession": "Имя сессии tmux",
+      "saved": "Хост сохранён.",
+      "saveFailed": "Не удалось сохранить хост."
+    },
+    "errors": {
+      "invalidPort": "Укажите порт от 1 до 65535",
+      "jumpCycle": "Тот хост уже подключается через этот."
+    },
+    "import": {
+      "title": "Импорт SSH config",
+      "description": "Вставьте свой SSH config или выберите файл.",
+      "sourceLabel": "SSH config",
+      "chooseFile": "Выбрать файл",
+      "preview": "Предпросмотр",
+      "apply": "Импортировать хосты",
+      "imported": "Хосты импортированы.",
+      "importFailed": "Ничего не импортировано.",
+      "nothingDescription": "В этом config нет хостов, которые приложение может импортировать.",
+      "notImported": "Не импортировано",
+      "needsKey": "Нужен ключ",
+      "warnNeedsKey": "Его файл ключа нельзя импортировать. Выберите ключ в редакторе.",
+      "warnJumpMissing": "{{target}} нет в импорте, поэтому этот хост подключается напрямую.",
+      "warnJumpMultiHop": "Импортируется только первый промежуточный хост.",
+      "warnJumpCycle": "{{target}} подключается обратно через этот хост, поэтому его переход отброшен.",
+      "warnForward": "Не удалось прочитать строку перенаправления для этого хоста.",
+      "skippedNoUsername": "У {{alias}} нет строки User.",
+      "skippedInvalidPort": "У {{alias}} указан порт, не являющийся числом от 1 до 65535.",
+      "unreadableFile": "Не удалось прочитать этот файл."
+    },
+    "knownHosts": {
+      "title": "Известные хосты",
+      "emptyTitle": "Доверенных хостов пока нет",
+      "emptyDescription": "Ключ хоста становится доверенным при первом подключении к нему.",
+      "deleteTitle": "Забыть {{pattern}}?",
+      "deleteMessage": "При следующем подключении придётся снова подтвердить доверие к его ключу.",
+      "deleteFailed": "Не удалось удалить ключ хоста.",
+      "deleteLabel": "Забыть {{pattern}}"
+    }
   }
 }

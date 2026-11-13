@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Tämä jakolinkki on vanhentunut tai mitätöity.",
     "transcriptUnavailableTitle": "Tätä transkriptiota ei voitu ladata",
     "transcriptUnavailableDescription": "Linkki toimii yhä. Yritä hetken kuluttua uudelleen."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Yhdistä omiin palvelimiisi.",
+    "storage": {
+      "lockedTitle": "Avaa lukitus käyttääksesi SSH:ta",
+      "lockedMessage": "Avaa laitteen lukitus ja yritä uudelleen.",
+      "unavailableTitle": "Tallennustila ei ole käytettävissä",
+      "unavailableMessage": "Sovelluksen laitteen sisäistä tallennustilaa ei voitu avata. Käynnistä Kilo uudelleen ja yritä uudelleen."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Ei vielä isäntiä",
+      "emptyDescription": "Lisää isäntä tai tuo isännät SSH-asetustiedostostasi.",
+      "addHost": "Lisää isäntä",
+      "importConfig": "Tuo SSH-asetustiedostosta",
+      "rowActions": "{{label}}, {{target}}. Avaa muokkauksen ja poiston.",
+      "viaJump": "{{label}} kautta",
+      "deleteTitle": "Poistetaanko {{label}}?",
+      "deleteMessage": "Sen asetukset ja porttiohjaukset poistetaan sen mukana. Tätä ei voi kumota.",
+      "deleteFailed": "Isäntää ei voitu poistaa."
+    },
+    "editor": {
+      "newTitle": "Uusi isäntä",
+      "editTitle": "Muokkaa isäntää",
+      "label": "Nimi",
+      "labelPlaceholder": "Kotipalvelin",
+      "hostname": "Isäntänimi",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Portti",
+      "username": "Käyttäjänimi",
+      "authMethod": "Todennustapa",
+      "password": "Salasana",
+      "key": "SSH-avain",
+      "keyboardInteractive": "Näppäimistövuorovaikutteinen",
+      "passwordPlaceholder": "Kirjoitetaan yhdistettäessä, ellei tallennettu",
+      "savePassword": "Tallenna salasana",
+      "savePasswordHint": "Säilytetään tämän laitteen salatussa tallennustilassa.",
+      "chooseKey": "Valitse avain",
+      "noKeys": "Ei vielä avaimia",
+      "jumpHost": "Hyppyisäntä",
+      "directConnection": "Suora yhteys",
+      "tmuxAttach": "Liitä tmuxiin",
+      "tmuxSession": "tmux-istunnon nimi",
+      "saved": "Isäntä tallennettu.",
+      "saveFailed": "Isäntää ei voitu tallentaa."
+    },
+    "errors": {
+      "invalidPort": "Käytä porttia väliltä 1–65535",
+      "jumpCycle": "Tuo isäntä hyppää jo tämän kautta."
+    },
+    "import": {
+      "title": "Tuo SSH-asetustiedosto",
+      "description": "Liitä SSH-asetustiedosto tai valitse tiedosto.",
+      "sourceLabel": "SSH-asetustiedosto",
+      "chooseFile": "Valitse tiedosto",
+      "preview": "Esikatselu",
+      "apply": "Tuo isännät",
+      "imported": "Isännät tuotu.",
+      "importFailed": "Mitään ei tuotu.",
+      "nothingDescription": "Tämä asetustiedosto ei sisällä yhtään isäntää, jonka tämä sovellus voi tuoda.",
+      "notImported": "Ei tuotu",
+      "needsKey": "Tarvitsee avaimen",
+      "warnNeedsKey": "Sen avaintiedostoa ei voi tuoda. Valitse avain muokkausnäkymässä.",
+      "warnJumpMissing": "{{target}} ei ole tuonnissa, joten tämä isäntä yhdistää suoraan.",
+      "warnJumpMultiHop": "Vain ensimmäinen hyppyisäntä tuodaan.",
+      "warnJumpCycle": "{{target}} hyppää takaisin tämän isännän kautta, joten sen hyppy jätettiin pois.",
+      "warnForward": "Tämän isännän edelleenohjausriviä ei voitu lukea.",
+      "skippedNoUsername": "{{alias}}-isännällä ei ole User-riviä.",
+      "skippedInvalidPort": "{{alias}}-isännän portti ei ole luku väliltä 1–65535.",
+      "unreadableFile": "Tiedostoa ei voitu lukea."
+    },
+    "knownHosts": {
+      "title": "Tunnetut isännät",
+      "emptyTitle": "Ei vielä luotettuja isäntiä",
+      "emptyDescription": "Isännän avain merkitään luotetuksi, kun yhdistät siihen ensimmäisen kerran.",
+      "deleteTitle": "Unohdetaanko {{pattern}}?",
+      "deleteMessage": "Seuraavalla yhdistämiskerralla sinulta kysytään uudelleen, luotatko sen avaimeen.",
+      "deleteFailed": "Isännän avainta ei voitu poistaa.",
+      "deleteLabel": "Unohda {{pattern}}"
+    }
   }
 }

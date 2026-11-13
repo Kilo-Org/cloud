@@ -7,6 +7,8 @@ export type SqlValue = string | number | null;
 export type SshDatabase = {
   readonly getAllSync: <T>(source: string, params: SqlValue[]) => T[];
   readonly runSync: (source: string, params: SqlValue[]) => void;
+  /** Runs `task` as one transaction: a throw rolls every write in it back. */
+  readonly withTransactionSync: (task: () => void) => void;
 };
 
 type ReadOptions<S extends z.ZodType> = {

@@ -4085,5 +4085,88 @@
     "unavailableDescription": "اس شیئر لنک کی میعاد ختم ہو چکی ہے یا اسے منسوخ کر دیا گیا ہے۔",
     "transcriptUnavailableTitle": "یہ ٹرانسکرپٹ لوڈ نہیں ہو سکا",
     "transcriptUnavailableDescription": "لنک اب بھی کام کر رہا ہے۔ تھوڑی دیر بعد دوبارہ کوشش کریں۔"
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "اپنے سرورز سے جڑیں۔",
+    "storage": {
+      "lockedTitle": "SSH استعمال کرنے کے لیے ان لاک کریں",
+      "lockedMessage": "اپنا ڈیوائس ان لاک کریں، پھر دوبارہ کوشش کریں۔",
+      "unavailableTitle": "اسٹوریج دستیاب نہیں",
+      "unavailableMessage": "ایپ کا آن ڈیوائس اسٹور نہیں کھل سکا۔ Kilo دوبارہ شروع کریں، پھر کوشش کریں۔"
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "ابھی کوئی ہوسٹ نہیں",
+      "emptyDescription": "ایک ہوسٹ شامل کریں، یا اپنے SSH config سے ہوسٹس لے آئیں۔",
+      "addHost": "ہوسٹ شامل کریں",
+      "importConfig": "SSH config سے درآمد کریں",
+      "rowActions": "{{label}}، {{target}}۔ ترمیم اور حذف کھولتا ہے۔",
+      "viaJump": "{{label}} کے ذریعے",
+      "deleteTitle": "{{label}} حذف کریں؟",
+      "deleteMessage": "اس کی سیٹنگ اور پورٹ فارورڈز اس کے ساتھ ہٹ جائیں گے۔ اسے واپس نہیں کیا جا سکتا۔",
+      "deleteFailed": "ہوسٹ حذف نہیں ہو سکا۔"
+    },
+    "editor": {
+      "newTitle": "نیا ہوسٹ",
+      "editTitle": "ہوسٹ میں ترمیم",
+      "label": "لیبل",
+      "labelPlaceholder": "گھر کا سرور",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "پورٹ",
+      "username": "صارف نام",
+      "authMethod": "تصدیق کا طریقہ",
+      "password": "پاس ورڈ",
+      "key": "SSH کلید",
+      "keyboardInteractive": "کی بورڈ انٹرایکٹیو",
+      "passwordPlaceholder": "کنیکٹ کرتے وقت لکھا جاتا ہے، جب تک محفوظ نہ ہو",
+      "savePassword": "پاس ورڈ محفوظ کریں",
+      "savePasswordHint": "اس ڈیوائس کے خفیہ کردہ اسٹور میں رکھا جاتا ہے۔",
+      "chooseKey": "کلید منتخب کریں",
+      "noKeys": "ابھی کوئی کلید نہیں",
+      "jumpHost": "جمپ ہوسٹ",
+      "directConnection": "براہ راست کنکشن",
+      "tmuxAttach": "tmux منسلک کریں",
+      "tmuxSession": "tmux سیشن کا نام",
+      "saved": "ہوسٹ محفوظ ہو گیا۔",
+      "saveFailed": "ہوسٹ محفوظ نہیں ہو سکا۔"
+    },
+    "errors": {
+      "invalidPort": "1 سے 65535 تک کا پورٹ استعمال کریں",
+      "jumpCycle": "وہ ہوسٹ پہلے ہی اس کے ذریعے جمپ کرتا ہے۔"
+    },
+    "import": {
+      "title": "SSH config درآمد کریں",
+      "description": "اپنا SSH config چسپاں کریں، یا فائل منتخب کریں۔",
+      "sourceLabel": "SSH config",
+      "chooseFile": "فائل منتخب کریں",
+      "preview": "پیش منظر",
+      "apply": "ہوسٹس درآمد کریں",
+      "imported": "ہوسٹس درآمد ہو گئے۔",
+      "importFailed": "کچھ بھی درآمد نہیں ہوا۔",
+      "nothingDescription": "یہ config ایسا کوئی ہوسٹ بیان نہیں کرتا جو یہ ایپ درآمد کر سکے۔",
+      "notImported": "درآمد نہیں ہوا",
+      "needsKey": "کلید درکار",
+      "warnNeedsKey": "اس کی کلید فائل درآمد نہیں ہو سکتی۔ ایڈیٹر میں کوئی کلید منتخب کریں۔",
+      "warnJumpMissing": "{{target}} درآمد میں شامل نہیں، لہٰذا یہ ہوسٹ براہ راست جڑتا ہے۔",
+      "warnJumpMultiHop": "صرف پہلا جمپ ہوسٹ درآمد ہوتا ہے۔",
+      "warnJumpCycle": "{{target}} اس ہوسٹ کے ذریعے واپس جمپ کرتا ہے، لہٰذا اس کا جمپ ہٹا دیا گیا۔",
+      "warnForward": "اس ہوسٹ میں ایک فارورڈ لائن پڑھی نہیں جا سکی۔",
+      "skippedNoUsername": "{{alias}} میں User لائن نہیں ہے۔",
+      "skippedInvalidPort": "{{alias}} کا پورٹ ایسا نمبر نہیں ہے جو 1 سے 65535 تک ہو۔",
+      "unreadableFile": "وہ فائل پڑھی نہیں جا سکی۔"
+    },
+    "knownHosts": {
+      "title": "معروف ہوسٹس",
+      "emptyTitle": "ابھی کوئی قابلِ اعتماد ہوسٹ نہیں",
+      "emptyDescription": "کسی ہوسٹ کی کلید پر پہلی بار جڑنے پر اعتماد کیا جاتا ہے۔",
+      "deleteTitle": "{{pattern}} بھلا دیں؟",
+      "deleteMessage": "اگلی بار جڑنے پر آپ سے دوبارہ اس کی کلید پر اعتماد کرنے کو کہا جائے گا۔",
+      "deleteFailed": "ہوسٹ کلید ہٹ نہیں سکی۔",
+      "deleteLabel": "{{pattern}} بھلا دیں"
+    }
   }
 }

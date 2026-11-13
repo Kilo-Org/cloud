@@ -4085,5 +4085,88 @@
     "unavailableDescription": "This share link has expired or been revoked.",
     "transcriptUnavailableTitle": "Couldn't load this transcript",
     "transcriptUnavailableDescription": "The link still works. Try again in a moment."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Connect to your own servers.",
+    "storage": {
+      "lockedTitle": "Unlock to use SSH",
+      "lockedMessage": "Unlock your device, then try again.",
+      "unavailableTitle": "Storage unavailable",
+      "unavailableMessage": "The app's on-device store could not be opened. Restart Kilo, then try again."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "No hosts yet",
+      "emptyDescription": "Add a host, or bring in the hosts from your SSH config.",
+      "addHost": "Add host",
+      "importConfig": "Import from SSH config",
+      "rowActions": "{{label}}, {{target}}. Opens edit and delete.",
+      "viaJump": "via {{label}}",
+      "deleteTitle": "Delete {{label}}?",
+      "deleteMessage": "Its setting and port forwards are removed with it. This cannot be undone.",
+      "deleteFailed": "The host could not be deleted."
+    },
+    "editor": {
+      "newTitle": "New host",
+      "editTitle": "Edit host",
+      "label": "Label",
+      "labelPlaceholder": "Home server",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Username",
+      "authMethod": "Authentication method",
+      "password": "Password",
+      "key": "SSH key",
+      "keyboardInteractive": "Keyboard interactive",
+      "passwordPlaceholder": "Typed when connecting, unless saved",
+      "savePassword": "Save password",
+      "savePasswordHint": "Kept in the encrypted store on this device.",
+      "chooseKey": "Choose a key",
+      "noKeys": "No keys yet",
+      "jumpHost": "Jump host",
+      "directConnection": "Direct connection",
+      "tmuxAttach": "Attach tmux",
+      "tmuxSession": "tmux session name",
+      "saved": "Host saved.",
+      "saveFailed": "The host could not be saved."
+    },
+    "errors": {
+      "invalidPort": "Use a port from 1 to 65535",
+      "jumpCycle": "That host already jumps through this one."
+    },
+    "import": {
+      "title": "Import SSH config",
+      "description": "Paste your SSH config, or choose the file.",
+      "sourceLabel": "SSH config",
+      "chooseFile": "Choose file",
+      "preview": "Preview",
+      "apply": "Import hosts",
+      "imported": "Hosts imported.",
+      "importFailed": "Nothing was imported.",
+      "nothingDescription": "This config describes no host this app can import.",
+      "notImported": "Not imported",
+      "needsKey": "Needs key",
+      "warnNeedsKey": "Its key file can't be imported. Choose a key in the editor.",
+      "warnJumpMissing": "{{target}} isn't in the import, so this host connects directly.",
+      "warnJumpMultiHop": "Only the first jump host is imported.",
+      "warnJumpCycle": "{{target}} jumps back through this host, so its jump was dropped.",
+      "warnForward": "A forward line in this host couldn't be read.",
+      "skippedNoUsername": "{{alias}} has no User line.",
+      "skippedInvalidPort": "{{alias}} has a port that isn't a number from 1 to 65535.",
+      "unreadableFile": "That file couldn't be read."
+    },
+    "knownHosts": {
+      "title": "Known hosts",
+      "emptyTitle": "No trusted hosts yet",
+      "emptyDescription": "A host key is trusted the first time you connect to it.",
+      "deleteTitle": "Forget {{pattern}}?",
+      "deleteMessage": "The next connection asks you to trust its key again.",
+      "deleteFailed": "The host key could not be removed.",
+      "deleteLabel": "Forget {{pattern}}"
+    }
   }
 }

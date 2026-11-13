@@ -4150,5 +4150,88 @@
     "unavailableDescription": "Ovaj link za deljenje je istekao ili je opozvan.",
     "transcriptUnavailableTitle": "Nije moguće učitati ovaj transkript",
     "transcriptUnavailableDescription": "Link i dalje radi. Pokušajte ponovo za trenutak."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Poveži se na sopstvene servere.",
+    "storage": {
+      "lockedTitle": "Otključaj za korišćenje SSH",
+      "lockedMessage": "Otključaj uređaj, pa pokušaj ponovo.",
+      "unavailableTitle": "Skladište nije dostupno",
+      "unavailableMessage": "Skladište aplikacije na uređaju nije moglo da se otvori. Ponovo pokreni Kilo, pa pokušaj ponovo."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Još nema hostova",
+      "emptyDescription": "Dodaj host ili uvezi hostove iz svoje SSH konfiguracije.",
+      "addHost": "Dodaj host",
+      "importConfig": "Uvezi iz SSH konfiguracije",
+      "rowActions": "{{label}}, {{target}}. Otvara izmenu i brisanje.",
+      "viaJump": "preko {{label}}",
+      "deleteTitle": "Obrisati {{label}}?",
+      "deleteMessage": "Uklanjaju se i njegova podešavanja i prosleđivanja portova. Ovo se ne može poništiti.",
+      "deleteFailed": "Host nije mogao da se obriše."
+    },
+    "editor": {
+      "newTitle": "Novi host",
+      "editTitle": "Izmeni host",
+      "label": "Oznaka",
+      "labelPlaceholder": "Kućni server",
+      "hostname": "Ime hosta",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Korisničko ime",
+      "authMethod": "Način autentifikacije",
+      "password": "Lozinka",
+      "key": "SSH ključ",
+      "keyboardInteractive": "Interaktivno preko tastature",
+      "passwordPlaceholder": "Unosi se pri povezivanju, osim ako je sačuvana",
+      "savePassword": "Sačuvaj lozinku",
+      "savePasswordHint": "Čuva se u šifrovanom skladištu na ovom uređaju.",
+      "chooseKey": "Izaberi ključ",
+      "noKeys": "Još nema ključeva",
+      "jumpHost": "Jump host",
+      "directConnection": "Direktna veza",
+      "tmuxAttach": "Priključi tmux",
+      "tmuxSession": "Ime tmux sesije",
+      "saved": "Host je sačuvan.",
+      "saveFailed": "Host nije mogao da se sačuva."
+    },
+    "errors": {
+      "invalidPort": "Koristi port od 1 do 65535",
+      "jumpCycle": "Taj host već ide preko ovog hosta."
+    },
+    "import": {
+      "title": "Uvezi SSH konfiguraciju",
+      "description": "Nalepi svoju SSH konfiguraciju ili izaberi datoteku.",
+      "sourceLabel": "SSH konfiguracija",
+      "chooseFile": "Izaberi datoteku",
+      "preview": "Pregled",
+      "apply": "Uvezi hostove",
+      "imported": "Hostovi su uvezeni.",
+      "importFailed": "Ništa nije uvezeno.",
+      "nothingDescription": "Ova konfiguracija ne opisuje nijedan host koji aplikacija može da uveze.",
+      "notImported": "Nije uvezeno",
+      "needsKey": "Potreban ključ",
+      "warnNeedsKey": "Njegova datoteka ključa ne može da se uveze. Izaberi ključ u uređivaču.",
+      "warnJumpMissing": "{{target}} nije u uvozu, pa se ovaj host povezuje direktno.",
+      "warnJumpMultiHop": "Uvozi se samo prvi jump host.",
+      "warnJumpCycle": "{{target}} ide natrag preko ovog hosta, pa je njegov jump izostavljen.",
+      "warnForward": "Linija za prosleđivanje porta kod ovog hosta nije mogla da se pročita.",
+      "skippedNoUsername": "{{alias}} nema liniju User.",
+      "skippedInvalidPort": "{{alias}} ima port koji nije broj od 1 do 65535.",
+      "unreadableFile": "Ta datoteka nije mogla da se pročita."
+    },
+    "knownHosts": {
+      "title": "Poznati hostovi",
+      "emptyTitle": "Još nema pouzdanih hostova",
+      "emptyDescription": "Ključ hosta se prihvata kao pouzdan pri prvom povezivanju.",
+      "deleteTitle": "Zaboraviti {{pattern}}?",
+      "deleteMessage": "Pri sledećem povezivanju ponovo će se tražiti da poveruješ u njegov ključ.",
+      "deleteFailed": "Ključ hosta nije mogao da se ukloni.",
+      "deleteLabel": "Zaboravi {{pattern}}"
+    }
   }
 }

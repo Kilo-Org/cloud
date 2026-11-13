@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Partekatze-esteka hau iraungita dago edo baliogabetu egin da.",
     "transcriptUnavailableTitle": "Ezin izan da transkripzio hau kargatu",
     "transcriptUnavailableDescription": "Estekak funtzionatzen du oraindik. Saiatu berriro geroxeago."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Konektatu zure zerbitzarietara.",
+    "storage": {
+      "lockedTitle": "Desblokeatu SSH erabiltzeko",
+      "lockedMessage": "Desblokeatu zure gailua eta saiatu berriro.",
+      "unavailableTitle": "Biltegia ez dago erabilgarri",
+      "unavailableMessage": "Ezin izan da aplikazioaren gailuko biltegia ireki. Berrabiarazi Kilo eta saiatu berriro."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Oraindik ez dago ostalaririk",
+      "emptyDescription": "Gehitu ostalari bat edo inportatu zure SSH konfigurazioko ostalariak.",
+      "addHost": "Gehitu ostalaria",
+      "importConfig": "Inportatu SSH konfiguraziotik",
+      "rowActions": "{{label}}, {{target}}. Editatzeko eta ezabatzeko aukerak irekitzen ditu.",
+      "viaJump": "{{label}} bidez",
+      "deleteTitle": "Ezabatu {{label}}?",
+      "deleteMessage": "Bere konfigurazioa eta portu-birbidalketak harekin batera kenduko dira. Hau ezin da desegin.",
+      "deleteFailed": "Ezin izan da ostalaria ezabatu."
+    },
+    "editor": {
+      "newTitle": "Ostalari berria",
+      "editTitle": "Editatu ostalaria",
+      "label": "Etiketa",
+      "labelPlaceholder": "Etxeko zerbitzaria",
+      "hostname": "Ostalariaren izena",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Ataka",
+      "username": "Erabiltzaile-izena",
+      "authMethod": "Autentifikazio-metodoa",
+      "password": "Pasahitza",
+      "key": "SSH gakoa",
+      "keyboardInteractive": "Teklatu bidezko autentifikazio interaktiboa",
+      "passwordPlaceholder": "Konektatzean idatziko da, gorde ezean",
+      "savePassword": "Gorde pasahitza",
+      "savePasswordHint": "Gailuko biltegi zifratuan gordetzen da.",
+      "chooseKey": "Aukeratu gako bat",
+      "noKeys": "Oraindik ez dago gakorik",
+      "jumpHost": "Jauzi-ostalaria",
+      "directConnection": "Konexio zuzena",
+      "tmuxAttach": "Erantsi tmux",
+      "tmuxSession": "tmux saioaren izena",
+      "saved": "Ostalaria gordeta.",
+      "saveFailed": "Ezin izan da ostalaria gorde."
+    },
+    "errors": {
+      "invalidPort": "Erabili 1etik 65535era bitarteko ataka bat",
+      "jumpCycle": "Ostalari horrek dagoeneko honen bidez egiten du jauzi."
+    },
+    "import": {
+      "title": "Inportatu SSH konfigurazioa",
+      "description": "Itsatsi zure SSH konfigurazioa edo aukeratu fitxategia.",
+      "sourceLabel": "SSH konfigurazioa",
+      "chooseFile": "Aukeratu fitxategia",
+      "preview": "Aurrebista",
+      "apply": "Inportatu ostalariak",
+      "imported": "Ostalariak inportatu dira.",
+      "importFailed": "Ez da ezer inportatu.",
+      "nothingDescription": "Konfigurazio honek ez du aplikazio honek inporta dezakeen ostalaririk deskribatzen.",
+      "notImported": "Ez da inportatu",
+      "needsKey": "Gakoa behar du",
+      "warnNeedsKey": "Bere gako-fitxategia ezin da inportatu. Aukeratu gako bat editorean.",
+      "warnJumpMissing": "{{target}} ez dago inportazioan, beraz ostalari hau zuzenean konektatzen da.",
+      "warnJumpMultiHop": "Lehen jauzi-ostalaria soilik inportatzen da.",
+      "warnJumpCycle": "{{target}} ostalari honen bidez atzera egiten du jauzi, beraz haren jauzia baztertu da.",
+      "warnForward": "Ostalari honetako birbidalketa-lerro bat ezin izan da irakurri.",
+      "skippedNoUsername": "{{alias}} sarrerak ez du User lerroarik.",
+      "skippedInvalidPort": "{{alias}} sarrerako ataka ez da 1etik 65535era bitarteko zenbaki bat.",
+      "unreadableFile": "Ezin izan da fitxategi hori irakurri."
+    },
+    "knownHosts": {
+      "title": "Ostalari ezagunak",
+      "emptyTitle": "Oraindik ez dago ostalari fidagarririk",
+      "emptyDescription": "Ostalari baten gakoa fidagarritzat hartzen da harekin lehen aldiz konektatzean.",
+      "deleteTitle": "Ahaztu {{pattern}}?",
+      "deleteMessage": "Hurrengo konexioan berriro eskatuko zaizu gakoa fidagarritzat jotzeko.",
+      "deleteFailed": "Ezin izan da ostalariaren gakoa kendu.",
+      "deleteLabel": "Ahaztu {{pattern}}"
+    }
   }
 }

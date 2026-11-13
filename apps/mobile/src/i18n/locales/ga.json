@@ -4280,5 +4280,88 @@
     "unavailableDescription": "Chuaigh an nasc comhroinnte seo in éag nó cúlghaireadh é.",
     "transcriptUnavailableTitle": "Níorbh fhéidir an tras-scríbhinn seo a lódáil",
     "transcriptUnavailableDescription": "Tá an nasc fós ag obair. Bain triail eile as ar ball beag."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Ceangail le do fhreastalaithe féin.",
+    "storage": {
+      "lockedTitle": "Díghlasáil chun SSH a úsáid",
+      "lockedMessage": "Díghlasáil do ghléas, ansin triail arís.",
+      "unavailableTitle": "Níl an stóras ar fáil",
+      "unavailableMessage": "Níorbh fhéidir stóras an aip ar an ngléas a oscailt. Atosaigh Kilo, ansin triail arís."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Níl aon óstach fós",
+      "emptyDescription": "Cuir óstach leis, nó tabhair isteach na hóstaigh ó do chumraíocht SSH.",
+      "addHost": "Cuir óstach leis",
+      "importConfig": "Iompórtáil ó chumraíocht SSH",
+      "rowActions": "{{label}}, {{target}}. Osclaíonn sé eagarthóireacht agus scriosadh.",
+      "viaJump": "trí {{label}}",
+      "deleteTitle": "Scrios {{label}}?",
+      "deleteMessage": "Baintear a shocrú agus a chuid aistrithe port leis. Ní féidir é seo a chealú.",
+      "deleteFailed": "Níorbh fhéidir an t-óstach a scriosadh."
+    },
+    "editor": {
+      "newTitle": "Óstach nua",
+      "editTitle": "Cuir óstach in eagar",
+      "label": "Lipéad",
+      "labelPlaceholder": "Freastalaí baile",
+      "hostname": "Ainm óstaigh",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Ainm úsáideora",
+      "authMethod": "Modh fíordheimhniúcháin",
+      "password": "Pasfhocal",
+      "key": "Eochair SSH",
+      "keyboardInteractive": "Méarchlár idirghníomhach",
+      "passwordPlaceholder": "Clóscrífear é nuair a cheanglaítear, mura sábháiltear é",
+      "savePassword": "Sábháil pasfhocal",
+      "savePasswordHint": "Coinnítear sa stóras criptithe ar an ngléas seo é.",
+      "chooseKey": "Roghnaigh eochair",
+      "noKeys": "Níl aon eochracha fós",
+      "jumpHost": "Óstach léim",
+      "directConnection": "Ceangal díreach",
+      "tmuxAttach": "Ceangail tmux",
+      "tmuxSession": "Ainm seisiúin tmux",
+      "saved": "Sábhálaíodh an t-óstach.",
+      "saveFailed": "Níorbh fhéidir an t-óstach a shábháil."
+    },
+    "errors": {
+      "invalidPort": "Úsáid port ó 1 go 65535",
+      "jumpCycle": "Léimeann an t-óstach sin tríd an gceann seo cheana."
+    },
+    "import": {
+      "title": "Iompórtáil cumraíocht SSH",
+      "description": "Greamaigh do chumraíocht SSH, nó roghnaigh an comhad.",
+      "sourceLabel": "Cumraíocht SSH",
+      "chooseFile": "Roghnaigh comhad",
+      "preview": "Réamhamharc",
+      "apply": "Iompórtáil óstaigh",
+      "imported": "Iompórtáladh na hóstaigh.",
+      "importFailed": "Níor iompórtáladh rud ar bith.",
+      "nothingDescription": "Ní chuireann an chumraíocht seo síos ar aon óstach is féidir leis an aip seo a iompórtáil.",
+      "notImported": "Gan iompórtáil",
+      "needsKey": "Teastaíonn eochair",
+      "warnNeedsKey": "Ní féidir a chomhad eochrach a iompórtáil. Roghnaigh eochair san eagarthóir.",
+      "warnJumpMissing": "Níl {{target}} san iompórtáil, mar sin ceanglaíonn an t-óstach seo go díreach.",
+      "warnJumpMultiHop": "Ní iompórtáiltear ach an chéad óstach léim.",
+      "warnJumpCycle": "Léimeann {{target}} ar ais tríd an óstach seo, mar sin fágadh a léim ar lár.",
+      "warnForward": "Níorbh fhéidir líne aistrithe san óstach seo a léamh.",
+      "skippedNoUsername": "Níl aon líne User ag {{alias}}.",
+      "skippedInvalidPort": "Tá port ag {{alias}} nach uimhir ó 1 go 65535 é.",
+      "unreadableFile": "Níorbh fhéidir an comhad sin a léamh."
+    },
+    "knownHosts": {
+      "title": "Óstaigh aitheanta",
+      "emptyTitle": "Níl aon óstach iontaofa fós",
+      "emptyDescription": "Cuirtear muinín in eochair óstaigh an chéad uair a cheanglaíonn tú léi.",
+      "deleteTitle": "Déan dearmad ar {{pattern}}?",
+      "deleteMessage": "Iarrfaidh an chéad cheangal eile ort muinín a chur ina heochair arís.",
+      "deleteFailed": "Níorbh fhéidir eochair an óstaigh a bhaint.",
+      "deleteLabel": "Déan dearmad ar {{pattern}}"
+    }
   }
 }

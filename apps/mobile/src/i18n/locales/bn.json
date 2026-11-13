@@ -4085,5 +4085,88 @@
     "unavailableDescription": "এই শেয়ার লিংকের মেয়াদ শেষ হয়ে গেছে অথবা এটি বাতিল করা হয়েছে।",
     "transcriptUnavailableTitle": "এই ট্রান্সক্রিপ্ট লোড করা যায়নি",
     "transcriptUnavailableDescription": "লিংকটি এখনও কাজ করছে। একটু পরে আবার চেষ্টা করুন।"
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "নিজের সার্ভারে সংযোগ করুন।",
+    "storage": {
+      "lockedTitle": "SSH ব্যবহার করতে আনলক করুন",
+      "lockedMessage": "আপনার ডিভাইস আনলক করুন, তারপর আবার চেষ্টা করুন।",
+      "unavailableTitle": "স্টোরেজ পাওয়া যাচ্ছে না",
+      "unavailableMessage": "অ্যাপের ডিভাইস-ভিত্তিক স্টোর খোলা যায়নি। Kilo পুনরায় চালু করুন, তারপর আবার চেষ্টা করুন।"
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "এখনও কোনো হোস্ট নেই",
+      "emptyDescription": "একটি হোস্ট যোগ করুন, অথবা আপনার SSH কনফিগ থেকে হোস্টগুলো আনুন।",
+      "addHost": "হোস্ট যোগ করুন",
+      "importConfig": "SSH কনফিগ থেকে আমদানি করুন",
+      "rowActions": "{{label}}, {{target}}। সম্পাদনা ও মুছুন খোলে।",
+      "viaJump": "{{label}} হয়ে",
+      "deleteTitle": "{{label}} মুছবেন?",
+      "deleteMessage": "এর সাথে এর সেটিং ও পোর্ট ফরওয়ার্ডও সরানো হবে। এটি ফিরিয়ে আনা যাবে না।",
+      "deleteFailed": "হোস্টটি মোছা যায়নি।"
+    },
+    "editor": {
+      "newTitle": "নতুন হোস্ট",
+      "editTitle": "হোস্ট সম্পাদনা করুন",
+      "label": "লেবেল",
+      "labelPlaceholder": "হোম সার্ভার",
+      "hostname": "হোস্টনেম",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "পোর্ট",
+      "username": "ব্যবহারকারীর নাম",
+      "authMethod": "প্রমাণীকরণ পদ্ধতি",
+      "password": "পাসওয়ার্ড",
+      "key": "SSH কী",
+      "keyboardInteractive": "কীবোর্ড ইন্টারঅ্যাকটিভ",
+      "passwordPlaceholder": "সংরক্ষণ না করলে সংযোগের সময় টাইপ করতে হবে",
+      "savePassword": "পাসওয়ার্ড সংরক্ষণ করুন",
+      "savePasswordHint": "এই ডিভাইসের এনক্রিপ্ট করা স্টোরে রাখা হয়।",
+      "chooseKey": "একটি কী বাছুন",
+      "noKeys": "এখনও কোনো কী নেই",
+      "jumpHost": "জাম্প হোস্ট",
+      "directConnection": "সরাসরি সংযোগ",
+      "tmuxAttach": "tmux সংযুক্ত করুন",
+      "tmuxSession": "tmux সেশন নাম",
+      "saved": "হোস্ট সংরক্ষিত হয়েছে।",
+      "saveFailed": "হোস্টটি সংরক্ষণ করা যায়নি।"
+    },
+    "errors": {
+      "invalidPort": "1 থেকে 65535 এর মধ্যে পোর্ট ব্যবহার করুন",
+      "jumpCycle": "ওই হোস্ট ইতিমধ্যে এটির মধ্য দিয়ে জাম্প করে।"
+    },
+    "import": {
+      "title": "SSH কনফিগ আমদানি করুন",
+      "description": "আপনার SSH কনফিগ পেস্ট করুন, অথবা ফাইলটি বাছুন।",
+      "sourceLabel": "SSH কনফিগ",
+      "chooseFile": "ফাইল বাছুন",
+      "preview": "প্রিভিউ",
+      "apply": "হোস্ট আমদানি করুন",
+      "imported": "হোস্ট আমদানি হয়েছে।",
+      "importFailed": "কিছুই আমদানি হয়নি।",
+      "nothingDescription": "এই কনফিগে এমন কোনো হোস্ট নেই যা এই অ্যাপ আমদানি করতে পারে।",
+      "notImported": "আমদানি হয়নি",
+      "needsKey": "কী প্রয়োজন",
+      "warnNeedsKey": "এর কী ফাইল আমদানি করা যায় না। সম্পাদকে একটি কী বাছুন।",
+      "warnJumpMissing": "{{target}} আমদানিতে নেই, তাই এই হোস্ট সরাসরি সংযোগ করে।",
+      "warnJumpMultiHop": "শুধু প্রথম জাম্প হোস্টটি আমদানি করা হয়।",
+      "warnJumpCycle": "{{target}} এই হোস্টের মধ্য দিয়ে ফিরে জাম্প করে, তাই এর জাম্প বাদ দেওয়া হয়েছে।",
+      "warnForward": "এই হোস্টের একটি ফরওয়ার্ড লাইন পড়া যায়নি।",
+      "skippedNoUsername": "{{alias}}-এ কোনো User লাইন নেই।",
+      "skippedInvalidPort": "{{alias}}-এর পোর্টটি 1 থেকে 65535 এর মধ্যে কোনো সংখ্যা নয়।",
+      "unreadableFile": "ওই ফাইলটি পড়া যায়নি।"
+    },
+    "knownHosts": {
+      "title": "পরিচিত হোস্ট",
+      "emptyTitle": "এখনও কোনো বিশ্বস্ত হোস্ট নেই",
+      "emptyDescription": "কোনো হোস্টে প্রথমবার সংযোগ করার সময় তার হোস্ট কী বিশ্বস্ত হিসেবে ধরা হয়।",
+      "deleteTitle": "{{pattern}} ভুলে যাবেন?",
+      "deleteMessage": "পরের সংযোগে আবার এর কী বিশ্বস্ত করতে বলা হবে।",
+      "deleteFailed": "হোস্ট কী সরানো যায়নি।",
+      "deleteLabel": "{{pattern}} ভুলে যান"
+    }
   }
 }

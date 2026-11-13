@@ -4150,5 +4150,88 @@
     "unavailableDescription": "תוקפו של קישור השיתוף הזה פג או שהוא בוטל.",
     "transcriptUnavailableTitle": "לא ניתן היה לטעון את התמליל",
     "transcriptUnavailableDescription": "הקישור עדיין פעיל. אפשר לנסות שוב בעוד רגע."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "התחברות לשרתים שלכם.",
+    "storage": {
+      "lockedTitle": "פתיחת נעילה לשימוש ב-SSH",
+      "lockedMessage": "פתחו את נעילת המכשיר ונסו שוב.",
+      "unavailableTitle": "האחסון אינו זמין",
+      "unavailableMessage": "לא ניתן היה לפתוח את המאגר המקומי של האפליקציה. הפעילו מחדש את Kilo ונסו שוב."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "אין עדיין מארחים",
+      "emptyDescription": "הוסיפו מארח, או ייבאו מארחים מקובץ ההגדרות של SSH.",
+      "addHost": "הוספת מארח",
+      "importConfig": "ייבוא מהגדרות SSH",
+      "rowActions": "{{label}}, {{target}}. פותח עריכה ומחיקה.",
+      "viaJump": "דרך {{label}}",
+      "deleteTitle": "למחוק את {{label}}?",
+      "deleteMessage": "ההגדרה והעברות הפורטים שלו יוסרו יחד איתו. לא ניתן לבטל פעולה זו.",
+      "deleteFailed": "לא ניתן היה למחוק את המארח."
+    },
+    "editor": {
+      "newTitle": "מארח חדש",
+      "editTitle": "עריכת מארח",
+      "label": "תווית",
+      "labelPlaceholder": "השרת הביתי",
+      "hostname": "שם מארח",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "פורט",
+      "username": "שם משתמש",
+      "authMethod": "שיטת אימות",
+      "password": "סיסמה",
+      "key": "מפתח SSH",
+      "keyboardInteractive": "אינטראקטיבי במקלדת",
+      "passwordPlaceholder": "יוזן בעת ההתחברות, אלא אם נשמר",
+      "savePassword": "שמירת סיסמה",
+      "savePasswordHint": "נשמרת במאגר המוצפן במכשיר זה.",
+      "chooseKey": "בחירת מפתח",
+      "noKeys": "אין עדיין מפתחות",
+      "jumpHost": "מארח קפיצה",
+      "directConnection": "חיבור ישיר",
+      "tmuxAttach": "הצטרפות ל-tmux",
+      "tmuxSession": "שם הפעלת tmux",
+      "saved": "המארח נשמר.",
+      "saveFailed": "לא ניתן היה לשמור את המארח."
+    },
+    "errors": {
+      "invalidPort": "יש להשתמש בפורט בין 1 ל-65535",
+      "jumpCycle": "המארח הזה כבר עובר דרך המארח הנוכחי."
+    },
+    "import": {
+      "title": "ייבוא הגדרות SSH",
+      "description": "הדביקו את הגדרות ה-SSH שלכם, או בחרו את הקובץ.",
+      "sourceLabel": "הגדרות SSH",
+      "chooseFile": "בחירת קובץ",
+      "preview": "תצוגה מקדימה",
+      "apply": "ייבוא מארחים",
+      "imported": "המארחים יובאו.",
+      "importFailed": "לא יובא דבר.",
+      "nothingDescription": "הקובץ הזה לא מתאר אף מארח שהאפליקציה הזו יכולה לייבא.",
+      "notImported": "לא יובא",
+      "needsKey": "דורש מפתח",
+      "warnNeedsKey": "לא ניתן לייבא את קובץ המפתח שלו. בחרו מפתח בעורך.",
+      "warnJumpMissing": "{{target}} לא נכלל בייבוא, ולכן המארח הזה מתחבר ישירות.",
+      "warnJumpMultiHop": "רק מארח הקפיצה הראשון מיובא.",
+      "warnJumpCycle": "{{target}} עובר חזרה דרך המארח הזה, ולכן מארח הקפיצה שלו הוסר.",
+      "warnForward": "לא ניתן היה לקרוא שורת העברת פורט במארח הזה.",
+      "skippedNoUsername": "ל-{{alias}} אין שורת User.",
+      "skippedInvalidPort": "ל-{{alias}} יש פורט שאינו מספר בין 1 ל-65535.",
+      "unreadableFile": "לא ניתן היה לקרוא את הקובץ הזה."
+    },
+    "knownHosts": {
+      "title": "מארחים מוכרים",
+      "emptyTitle": "אין עדיין מארחים מהימנים",
+      "emptyDescription": "מפתח מארח נחשב מהימן בפעם הראשונה שמתחברים אליו.",
+      "deleteTitle": "לשכוח את {{pattern}}?",
+      "deleteMessage": "בחיבור הבא תתבקשו שוב לתת אמון במפתח שלו.",
+      "deleteFailed": "לא ניתן היה להסיר את מפתח המארח.",
+      "deleteLabel": "שכחת {{pattern}}"
+    }
   }
 }

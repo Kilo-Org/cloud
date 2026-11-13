@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Efa lany daty na nofoanana ity rohy fizarana ity.",
     "transcriptUnavailableTitle": "Tsy nety nampidirina ity firaketana ity",
     "transcriptUnavailableDescription": "Mbola miasa ihany ny rohy. Andramo indray afaka kelikely."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Mifandraisa amin'ny serveur-nao manokana.",
+    "storage": {
+      "lockedTitle": "Vahao hidirana mba hampiasa SSH",
+      "lockedMessage": "Vahao ny fitaovanao, dia andramo indray.",
+      "unavailableTitle": "Tsy misy fitahirizana",
+      "unavailableMessage": "Tsy afaka nosokafana ny fitahirizana ao anatin'ny fitaovana. Avereno alefa Kilo, dia andramo indray."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Mbola tsy misy host",
+      "emptyDescription": "Ampio host, na ento ao ny host avy amin'ny SSH config-nao.",
+      "addHost": "Ampio host",
+      "importConfig": "Ento avy amin'ny SSH config",
+      "rowActions": "{{label}}, {{target}}. Manokatra fanovana sy famafana.",
+      "viaJump": "amin'ny alalan'ny {{label}}",
+      "deleteTitle": "Fafao {{label}}?",
+      "deleteMessage": "Esorina miaraka aminy ny fandrindrana sy ny fampitana port. Tsy azo averina izany.",
+      "deleteFailed": "Tsy afaka nofafana ny host."
+    },
+    "editor": {
+      "newTitle": "Host vaovao",
+      "editTitle": "Ovay ny host",
+      "label": "Anarana",
+      "labelPlaceholder": "Serveur an-trano",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Anarana mpampiasa",
+      "authMethod": "Fomba fanamarinana",
+      "password": "Tenimiafina",
+      "key": "Fanalahidin'ny SSH",
+      "keyboardInteractive": "Fifanakalozana amin'ny klavie",
+      "passwordPlaceholder": "Soratana rehefa mifandray, raha tsy voatahiry",
+      "savePassword": "Tehirizo ny tenimiafina",
+      "savePasswordHint": "Tehirizina ao amin'ny fitahirizana voaaro amin'ity fitaovana ity.",
+      "chooseKey": "Safidio ny fanalahidy",
+      "noKeys": "Mbola tsy misy fanalahidy",
+      "jumpHost": "Host fiampitana",
+      "directConnection": "Fifandraisana mivantana",
+      "tmuxAttach": "Ampifandraiso tmux",
+      "tmuxSession": "Anaran'ny session tmux",
+      "saved": "Voatahiry ny host.",
+      "saveFailed": "Tsy afaka notahirizina ny host."
+    },
+    "errors": {
+      "invalidPort": "Ampiasao ny port 1 ka hatramin'ny 65535",
+      "jumpCycle": "Efa mamakivaky ity iray ity io host io."
+    },
+    "import": {
+      "title": "Ento ny SSH config",
+      "description": "Apetaho ny SSH config-nao, na safidio ny rakitra.",
+      "sourceLabel": "SSH config",
+      "chooseFile": "Safidio ny rakitra",
+      "preview": "Topi-maso",
+      "apply": "Ento ny host",
+      "imported": "Voentina ny host.",
+      "importFailed": "Tsy nisy na inona na inona voentina.",
+      "nothingDescription": "Tsy misy host azon'ity app ity entina ao amin'ity config ity.",
+      "notImported": "Tsy voentina",
+      "needsKey": "Mila fanalahidy",
+      "warnNeedsKey": "Tsy azo entina ny rakitra fanalahidiny. Safidio ny fanalahidy ao amin'ny mpamoaka.",
+      "warnJumpMissing": "Tsy ao anatin'ny fanentana i {{target}}, ka mifandray mivantana ity host ity.",
+      "warnJumpMultiHop": "Ny host fiampitana voalohany ihany no entina.",
+      "warnJumpCycle": "Mamakivaky ity host ity miverina i {{target}}, ka nesorina ny fiampitanany.",
+      "warnForward": "Tsy afaka novakiana ny andalana forward ao amin'ity host ity.",
+      "skippedNoUsername": "Tsy manana andalana User i {{alias}}.",
+      "skippedInvalidPort": "Manana port tsy isa eo anelanelan'ny 1 sy 65535 i {{alias}}.",
+      "unreadableFile": "Tsy afaka novakiana io rakitra io."
+    },
+    "knownHosts": {
+      "title": "Host fantatra",
+      "emptyTitle": "Mbola tsy misy host azo itokisana",
+      "emptyDescription": "Itokisana ny fanalahidin'ny host amin'ny fotoana voalohany ifandraisanao aminy.",
+      "deleteTitle": "Adinoo {{pattern}}?",
+      "deleteMessage": "Hangataka anao hitoky ny fanalahidiny indray ny fifandraisana manaraka.",
+      "deleteFailed": "Tsy afaka noesorina ny fanalahidin'ny host.",
+      "deleteLabel": "Adinoo {{pattern}}"
+    }
   }
 }

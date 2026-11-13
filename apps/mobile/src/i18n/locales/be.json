@@ -4215,5 +4215,88 @@
     "unavailableDescription": "Тэрмін дзеяння гэтай спасылкі скончыўся, або яе адклікалі.",
     "transcriptUnavailableTitle": "Не ўдалося загрузіць гэты запіс",
     "transcriptUnavailableDescription": "Спасылка па-ранейшаму працуе. Паспрабуйце яшчэ раз крыху пазней."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Падключыцеся да ўласных сервераў.",
+    "storage": {
+      "lockedTitle": "Разблакуйце, каб карыстацца SSH",
+      "lockedMessage": "Разблакуйце прыладу і паспрабуйце зноў.",
+      "unavailableTitle": "Сховішча недаступнае",
+      "unavailableMessage": "Не ўдалося адкрыць лакальнае сховішча праграмы. Перазапусціце Kilo і паспрабуйце зноў."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Пакуль няма хостаў",
+      "emptyDescription": "Дадайце хост або імпартуйце хосты з канфігу SSH.",
+      "addHost": "Дадаць хост",
+      "importConfig": "Імпартаваць з канфігу SSH",
+      "rowActions": "{{label}}, {{target}}. Адкрывае рэдагаванне і выдаленне.",
+      "viaJump": "праз {{label}}",
+      "deleteTitle": "Выдаліць {{label}}?",
+      "deleteMessage": "Разам з ім выдаляюцца яго налады і перанакіраванні портаў. Гэта нельга адмяніць.",
+      "deleteFailed": "Не ўдалося выдаліць хост."
+    },
+    "editor": {
+      "newTitle": "Новы хост",
+      "editTitle": "Рэдагаваць хост",
+      "label": "Назва",
+      "labelPlaceholder": "Хатні сервер",
+      "hostname": "Імя хоста",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Порт",
+      "username": "Імя карыстальніка",
+      "authMethod": "Спосаб аўтэнтыфікацыі",
+      "password": "Пароль",
+      "key": "Ключ SSH",
+      "keyboardInteractive": "Клавіятурна-інтэрактыўная",
+      "passwordPlaceholder": "Уводзіцца пры падключэнні, калі не захаваны",
+      "savePassword": "Захаваць пароль",
+      "savePasswordHint": "Захоўваецца ў зашыфраваным сховішчы на гэтай прыладзе.",
+      "chooseKey": "Выбраць ключ",
+      "noKeys": "Пакуль няма ключоў",
+      "jumpHost": "Прамежкавы хост",
+      "directConnection": "Прамое падключэнне",
+      "tmuxAttach": "Далучыцца да tmux",
+      "tmuxSession": "Імя сесіі tmux",
+      "saved": "Хост захаваны.",
+      "saveFailed": "Не ўдалося захаваць хост."
+    },
+    "errors": {
+      "invalidPort": "Выкарыстоўвайце порт ад 1 да 65535",
+      "jumpCycle": "Той хост ужо ідзе праз гэты."
+    },
+    "import": {
+      "title": "Імпартаваць канфіг SSH",
+      "description": "Устаўце свой канфіг SSH або выберыце файл.",
+      "sourceLabel": "Канфіг SSH",
+      "chooseFile": "Выбраць файл",
+      "preview": "Прадпрагляд",
+      "apply": "Імпартаваць хосты",
+      "imported": "Хосты імпартаваныя.",
+      "importFailed": "Нічога не імпартавана.",
+      "nothingDescription": "Гэты канфіг не апісвае ніводнага хоста, які можа імпартаваць гэтая праграма.",
+      "notImported": "Не імпартаваны",
+      "needsKey": "Патрэбны ключ",
+      "warnNeedsKey": "Яго файл ключа нельга імпартаваць. Выберыце ключ у рэдактары.",
+      "warnJumpMissing": "{{target}} няма ў імпарце, таму гэты хост падключаецца напрамую.",
+      "warnJumpMultiHop": "Імпартуецца толькі першы прамежкавы хост.",
+      "warnJumpCycle": "{{target}} ідзе назад праз гэты хост, таму яго пераход адкінуты.",
+      "warnForward": "Не ўдалося прачытаць радок перанакіравання ў гэтым хосце.",
+      "skippedNoUsername": "У {{alias}} няма радка User.",
+      "skippedInvalidPort": "У {{alias}} паказаны порт, які не з'яўляецца лікам ад 1 да 65535.",
+      "unreadableFile": "Не ўдалося прачытаць гэты файл."
+    },
+    "knownHosts": {
+      "title": "Вядомыя хасты",
+      "emptyTitle": "Пакуль няма давераных хастоў",
+      "emptyDescription": "Ключ хоста лічыцца давераным пры першым падключэнні да яго.",
+      "deleteTitle": "Забыць {{pattern}}?",
+      "deleteMessage": "Пры наступным падключэнні вас зноў папросяць даверыць яго ключу.",
+      "deleteFailed": "Не ўдалося выдаліць ключ хоста.",
+      "deleteLabel": "Забыць {{pattern}}"
+    }
   }
 }

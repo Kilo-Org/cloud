@@ -4150,5 +4150,88 @@
     "unavailableDescription": "Šīs kopīgošanas saites derīguma termiņš ir beidzies, vai tā ir atsaukta.",
     "transcriptUnavailableTitle": "Neizdevās ielādēt šo sarunas ierakstu",
     "transcriptUnavailableDescription": "Saite joprojām darbojas. Mēģiniet vēlreiz pēc brīža."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Pieslēdzieties saviem serveriem.",
+    "storage": {
+      "lockedTitle": "Atbloķējiet, lai izmantotu SSH",
+      "lockedMessage": "Atbloķējiet ierīci un mēģiniet vēlreiz.",
+      "unavailableTitle": "Krātuve nav pieejama",
+      "unavailableMessage": "Lietotnes vietējo krātuvi nevarēja atvērt. Restartējiet Kilo un mēģiniet vēlreiz."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Vēl nav resursdatoru",
+      "emptyDescription": "Pievienojiet resursdatoru vai importējiet resursdatorus no SSH konfigurācijas.",
+      "addHost": "Pievienot resursdatoru",
+      "importConfig": "Importēt no SSH konfigurācijas",
+      "rowActions": "{{label}}, {{target}}. Atver rediģēšanu un dzēšanu.",
+      "viaJump": "caur {{label}}",
+      "deleteTitle": "Dzēst {{label}}?",
+      "deleteMessage": "Līdz ar to tiek noņemti tā iestatījumi un portu pāradresācijas. To nevar atsaukt.",
+      "deleteFailed": "Resursdatoru nevarēja dzēst."
+    },
+    "editor": {
+      "newTitle": "Jauns resursdators",
+      "editTitle": "Rediģēt resursdatoru",
+      "label": "Nosaukums",
+      "labelPlaceholder": "Mājas serveris",
+      "hostname": "Resursdatora nosaukums",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Ports",
+      "username": "Lietotājvārds",
+      "authMethod": "Autentifikācijas metode",
+      "password": "Parole",
+      "key": "SSH atslēga",
+      "keyboardInteractive": "Klaviatūras interaktīvā",
+      "passwordPlaceholder": "Ievada savienošanās laikā, ja nav saglabāta",
+      "savePassword": "Saglabāt paroli",
+      "savePasswordHint": "Glabāta šīs ierīces šifrētajā krātuvē.",
+      "chooseKey": "Izvēlēties atslēgu",
+      "noKeys": "Vēl nav atslēgu",
+      "jumpHost": "Starpposma resursdators",
+      "directConnection": "Tiešs savienojums",
+      "tmuxAttach": "Pievienoties tmux",
+      "tmuxSession": "tmux sesijas nosaukums",
+      "saved": "Resursdators saglabāts.",
+      "saveFailed": "Resursdatoru nevarēja saglabāt."
+    },
+    "errors": {
+      "invalidPort": "Izmantojiet portu no 1 līdz 65535",
+      "jumpCycle": "Tas resursdators jau izmanto šo kā starpposmu."
+    },
+    "import": {
+      "title": "Importēt SSH konfigurāciju",
+      "description": "Ielīmējiet savu SSH konfigurāciju vai izvēlieties failu.",
+      "sourceLabel": "SSH konfigurācija",
+      "chooseFile": "Izvēlēties failu",
+      "preview": "Priekšskatījums",
+      "apply": "Importēt resursdatorus",
+      "imported": "Resursdatori importēti.",
+      "importFailed": "Nekas netika importēts.",
+      "nothingDescription": "Šī konfigurācija neapraksta nevienu resursdatoru, ko šī lietotne varētu importēt.",
+      "notImported": "Nav importēts",
+      "needsKey": "Nepieciešama atslēga",
+      "warnNeedsKey": "Tā atslēgas failu nevar importēt. Izvēlieties atslēgu redaktorā.",
+      "warnJumpMissing": "{{target}} nav importā, tāpēc šis resursdators savienojas tieši.",
+      "warnJumpMultiHop": "Tiek importēts tikai pirmais starpposma resursdators.",
+      "warnJumpCycle": "{{target}} iet atpakaļ caur šo resursdatoru, tāpēc tā starpposms tika atmests.",
+      "warnForward": "Šajā resursdatorā nevarēja nolasīt pāradresācijas rindu.",
+      "skippedNoUsername": "{{alias}} nav rindas User.",
+      "skippedInvalidPort": "{{alias}} ir ports, kas nav skaitlis no 1 līdz 65535.",
+      "unreadableFile": "Šo failu nevarēja nolasīt."
+    },
+    "knownHosts": {
+      "title": "Zināmie resursdatori",
+      "emptyTitle": "Vēl nav uzticamu resursdatoru",
+      "emptyDescription": "Resursdatora atslēga tiek uzticēta pirmajā savienojumā ar to.",
+      "deleteTitle": "Aizmirst {{pattern}}?",
+      "deleteMessage": "Nākamajā savienojumā jums atkal prasīs uzticēties tās atslēgai.",
+      "deleteFailed": "Resursdatora atslēgu nevarēja noņemt.",
+      "deleteLabel": "Aizmirst {{pattern}}"
+    }
   }
 }

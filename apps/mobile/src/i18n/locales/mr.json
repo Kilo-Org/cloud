@@ -4085,5 +4085,88 @@
     "unavailableDescription": "ही शेअर लिंक कालबाह्य झाली आहे किंवा रद्द केली गेली आहे.",
     "transcriptUnavailableTitle": "हा ट्रान्सक्रिप्ट लोड करता आला नाही",
     "transcriptUnavailableDescription": "लिंक अजूनही काम करते. थोड्या वेळाने पुन्हा प्रयत्न करा."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "तुमच्या स्वतःच्या सर्व्हरशी कनेक्ट व्हा.",
+    "storage": {
+      "lockedTitle": "SSH वापरण्यासाठी अनलॉक करा",
+      "lockedMessage": "तुमचे डिव्हाइस अनलॉक करा, नंतर पुन्हा प्रयत्न करा.",
+      "unavailableTitle": "स्टोरेज उपलब्ध नाही",
+      "unavailableMessage": "अ‍ॅपचे डिव्हाइसवरील स्टोअर उघडता आले नाही. Kilo पुन्हा सुरू करा, नंतर पुन्हा प्रयत्न करा."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "अजून होस्ट नाहीत",
+      "emptyDescription": "होस्ट जोडा, किंवा तुमच्या SSH कॉन्फिगमधील होस्ट आणा.",
+      "addHost": "होस्ट जोडा",
+      "importConfig": "SSH कॉन्फिगमधून आयात करा",
+      "rowActions": "{{label}}, {{target}}. संपादन आणि हटवण्याचे पर्याय उघडते.",
+      "viaJump": "{{label}} मार्फत",
+      "deleteTitle": "{{label}} हटवायचे?",
+      "deleteMessage": "त्याची सेटिंग आणि पोर्ट फॉरवर्ड त्यासोबत काढले जातील. हे पूर्ववत करता येणार नाही.",
+      "deleteFailed": "होस्ट हटवता आला नाही."
+    },
+    "editor": {
+      "newTitle": "नवीन होस्ट",
+      "editTitle": "होस्ट संपादित करा",
+      "label": "लेबल",
+      "labelPlaceholder": "होम सर्व्हर",
+      "hostname": "होस्टनाव",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "पोर्ट",
+      "username": "वापरकर्तानाव",
+      "authMethod": "प्रमाणीकरण पद्धत",
+      "password": "पासवर्ड",
+      "key": "SSH की",
+      "keyboardInteractive": "कीबोर्ड इंटरॅक्टिव्ह",
+      "passwordPlaceholder": "जतन केले नसेल तर कनेक्ट करताना टाइप करा",
+      "savePassword": "पासवर्ड जतन करा",
+      "savePasswordHint": "या डिव्हाइसवरील एन्क्रिप्टेड स्टोअरमध्ये ठेवला जातो.",
+      "chooseKey": "की निवडा",
+      "noKeys": "अजून की नाहीत",
+      "jumpHost": "जंप होस्ट",
+      "directConnection": "थेट कनेक्शन",
+      "tmuxAttach": "tmux संलग्न करा",
+      "tmuxSession": "tmux सत्राचे नाव",
+      "saved": "होस्ट जतन केला.",
+      "saveFailed": "होस्ट जतन करता आला नाही."
+    },
+    "errors": {
+      "invalidPort": "1 ते 65535 मधील पोर्ट वापरा",
+      "jumpCycle": "तो होस्ट आधीच यामार्फत जंप करतो."
+    },
+    "import": {
+      "title": "SSH कॉन्फिग आयात करा",
+      "description": "तुमचा SSH कॉन्फिग पेस्ट करा, किंवा फाइल निवडा.",
+      "sourceLabel": "SSH कॉन्फिग",
+      "chooseFile": "फाइल निवडा",
+      "preview": "पूर्वावलोकन",
+      "apply": "होस्ट आयात करा",
+      "imported": "होस्ट आयात झाले.",
+      "importFailed": "काहीही आयात झाले नाही.",
+      "nothingDescription": "हा कॉन्फिग अशा कोणत्याही होस्टचे वर्णन करत नाही जो हे अ‍ॅप आयात करू शकते.",
+      "notImported": "आयात केले नाही",
+      "needsKey": "की आवश्यक",
+      "warnNeedsKey": "त्याची की फाइल आयात करता येत नाही. संपादकात की निवडा.",
+      "warnJumpMissing": "{{target}} आयातमध्ये नाही, म्हणून हा होस्ट थेट कनेक्ट होतो.",
+      "warnJumpMultiHop": "फक्त पहिला जंप होस्ट आयात केला जातो.",
+      "warnJumpCycle": "{{target}} या होस्टमार्फत परत जंप करतो, म्हणून त्याचा जंप वगळण्यात आला.",
+      "warnForward": "या होस्टमधील एक फॉरवर्ड ओळ वाचता आली नाही.",
+      "skippedNoUsername": "{{alias}} मध्ये User ओळ नाही.",
+      "skippedInvalidPort": "{{alias}} मध्ये 1 ते 65535 मधील संख्या नसलेला पोर्ट आहे.",
+      "unreadableFile": "ती फाइल वाचता आली नाही."
+    },
+    "knownHosts": {
+      "title": "ज्ञात होस्ट",
+      "emptyTitle": "अजून विश्वसनीय होस्ट नाहीत",
+      "emptyDescription": "होस्टशी पहिल्यांदा कनेक्ट करताना त्याची की विश्वासार्ह मानली जाते.",
+      "deleteTitle": "{{pattern}} विसरायचे?",
+      "deleteMessage": "पुढील कनेक्शनवेळी त्याची की पुन्हा विश्वासार्ह मानण्यास सांगितले जाईल.",
+      "deleteFailed": "होस्ट की काढता आली नाही.",
+      "deleteLabel": "{{pattern}} विसरा"
+    }
   }
 }

@@ -5,6 +5,7 @@ import { takeRemoteMcpRedirect } from '@/lib/chat/remote-mcp-oauth-browser';
 import { redirectSystemPath as mapWebPath } from '@/lib/deep-link-handler';
 import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
 import { handleHomeFixturePath } from '@/lib/home-fixture';
+import { handleSshFixturePath } from '@/lib/ssh/fixture';
 import { instancePickerFixtureRoute } from '@/lib/instance-picker-fixture';
 import { handleLockedKeychainFixturePath } from '@/lib/locked-keychain-fixture';
 import { modelPickerFixtureRoute } from '@/lib/model-picker-fixture';
@@ -43,6 +44,10 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   }
   // Dev-only Home fixture links (`kiloapp:///dev/home-fixture/<name>`).
   if (__DEV__ && handleHomeFixturePath(path)) {
+    return null;
+  }
+  // Dev-only SSH fixture links (`kiloapp:///dev/ssh-fixture/<name>`).
+  if (__DEV__ && handleSshFixturePath(path)) {
     return null;
   }
   // Dev-only locked-keychain links (`kiloapp:///dev/locked-keychain/<name>`).

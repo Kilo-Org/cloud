@@ -4085,5 +4085,88 @@
     "unavailableDescription": "ఈ షేర్ లింక్ గడువు ముగిసింది లేదా రద్దు చేయబడింది.",
     "transcriptUnavailableTitle": "ఈ ట్రాన్స్‌క్రిప్ట్‌ను లోడ్ చేయలేకపోయాము",
     "transcriptUnavailableDescription": "లింక్ ఇప్పటికీ పనిచేస్తుంది. కాసేపట్లో మళ్లీ ప్రయత్నించండి."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "మీ స్వంత సర్వర్‌లకు కనెక్ట్ అవ్వండి.",
+    "storage": {
+      "lockedTitle": "SSH ఉపయోగించడానికి అన్‌లాక్ చేయండి",
+      "lockedMessage": "మీ పరికరాన్ని అన్‌లాక్ చేసి, మళ్లీ ప్రయత్నించండి.",
+      "unavailableTitle": "నిల్వ అందుబాటులో లేదు",
+      "unavailableMessage": "యాప్‌లోని ఆన్-డివైస్ స్టోర్ తెరవలేకపోయింది. Kiloను మళ్లీ ప్రారంభించి, మళ్లీ ప్రయత్నించండి."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "ఇంకా హోస్ట్‌లు లేవు",
+      "emptyDescription": "హోస్ట్‌ను జోడించండి, లేదా మీ SSH config నుండి హోస్ట్‌లను తీసుకురండి.",
+      "addHost": "హోస్ట్ జోడించండి",
+      "importConfig": "SSH config నుండి దిగుమతి చేయండి",
+      "rowActions": "{{label}}, {{target}}. సవరించు మరియు తొలగించు తెరుస్తుంది.",
+      "viaJump": "{{label}} ద్వారా",
+      "deleteTitle": "{{label}} తొలగించాలా?",
+      "deleteMessage": "దానితో పాటు దాని సెట్టింగ్ మరియు పోర్ట్ ఫార్వార్డ్‌లు తీసివేయబడతాయి. దీన్ని వెనక్కి తిరిగి చేయలేరు.",
+      "deleteFailed": "హోస్ట్‌ను తొలగించలేకపోయింది."
+    },
+    "editor": {
+      "newTitle": "కొత్త హోస్ట్",
+      "editTitle": "హోస్ట్ సవరించండి",
+      "label": "లేబుల్",
+      "labelPlaceholder": "ఇంటి సర్వర్",
+      "hostname": "హోస్ట్‌నేమ్",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "పోర్ట్",
+      "username": "యూజర్‌నేమ్",
+      "authMethod": "ప్రామాణీకరణ పద్ధతి",
+      "password": "పాస్‌వర్డ్",
+      "key": "SSH కీ",
+      "keyboardInteractive": "కీబోర్డ్ ఇంటరాక్టివ్",
+      "passwordPlaceholder": "సేవ్ చేయకపోతే, కనెక్ట్ అయ్యేటప్పుడు టైప్ చేయండి",
+      "savePassword": "పాస్‌వర్డ్ సేవ్ చేయండి",
+      "savePasswordHint": "ఈ పరికరంలోని ఎన్‌క్రిప్టెడ్ స్టోర్‌లో ఉంచబడుతుంది.",
+      "chooseKey": "కీని ఎంచుకోండి",
+      "noKeys": "ఇంకా కీలు లేవు",
+      "jumpHost": "జంప్ హోస్ట్",
+      "directConnection": "నేరుగా కనెక్షన్",
+      "tmuxAttach": "tmux అటాచ్ చేయండి",
+      "tmuxSession": "tmux సెషన్ పేరు",
+      "saved": "హోస్ట్ సేవ్ చేయబడింది.",
+      "saveFailed": "హోస్ట్‌ను సేవ్ చేయలేకపోయింది."
+    },
+    "errors": {
+      "invalidPort": "1 నుండి 65535 వరకు ఉన్న పోర్ట్‌ను ఉపయోగించండి",
+      "jumpCycle": "ఆ హోస్ట్ ఇప్పటికే దీని ద్వారా జంప్ అవుతుంది."
+    },
+    "import": {
+      "title": "SSH config దిగుమతి చేయండి",
+      "description": "మీ SSH configను పేస్ట్ చేయండి, లేదా ఫైల్‌ను ఎంచుకోండి.",
+      "sourceLabel": "SSH config",
+      "chooseFile": "ఫైల్ ఎంచుకోండి",
+      "preview": "ప్రివ్యూ",
+      "apply": "హోస్ట్‌లను దిగుమతి చేయండి",
+      "imported": "హోస్ట్‌లు దిగుమతి అయ్యాయి.",
+      "importFailed": "ఏదీ దిగుమతి కాలేదు.",
+      "nothingDescription": "ఈ యాప్ దిగుమతి చేయగల ఏ హోస్ట్‌ను ఈ config వివరించదు.",
+      "notImported": "దిగుమతి కాలేదు",
+      "needsKey": "కీ అవసరం",
+      "warnNeedsKey": "దాని కీ ఫైల్ దిగుమతి చేయలేము. ఎడిటర్‌లో కీని ఎంచుకోండి.",
+      "warnJumpMissing": "{{target}} దిగుమతిలో లేదు, కాబట్టి ఈ హోస్ట్ నేరుగా కనెక్ట్ అవుతుంది.",
+      "warnJumpMultiHop": "మొదటి జంప్ హోస్ట్ మాత్రమే దిగుమతి అవుతుంది.",
+      "warnJumpCycle": "{{target}} ఈ హోస్ట్ ద్వారా తిరిగి జంప్ అవుతుంది, కాబట్టి దాని జంప్ తీసివేయబడింది.",
+      "warnForward": "ఈ హోస్ట్‌లోని ఒక ఫార్వార్డ్ లైన్ చదవలేకపోయింది.",
+      "skippedNoUsername": "{{alias}}లో User లైన్ లేదు.",
+      "skippedInvalidPort": "{{alias}}లో 1 నుండి 65535 వరకు ఉన్న సంఖ్య కాని పోర్ట్ ఉంది.",
+      "unreadableFile": "ఆ ఫైల్‌ను చదవలేకపోయింది."
+    },
+    "knownHosts": {
+      "title": "తెలిసిన హోస్ట్‌లు",
+      "emptyTitle": "ఇంకా విశ్వసనీయ హోస్ట్‌లు లేవు",
+      "emptyDescription": "మీరు మొదటిసారి కనెక్ట్ అయినప్పుడు హోస్ట్ కీ విశ్వసించబడుతుంది.",
+      "deleteTitle": "{{pattern}} మరచిపోవాలా?",
+      "deleteMessage": "తదుపరి కనెక్షన్‌లో దాని కీని మళ్లీ విశ్వసించమని అడుగుతుంది.",
+      "deleteFailed": "హోస్ట్ కీని తీసివేయలేకపోయింది.",
+      "deleteLabel": "{{pattern}} మరచిపోండి"
+    }
   }
 }

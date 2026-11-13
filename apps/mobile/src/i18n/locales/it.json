@@ -4150,5 +4150,88 @@
     "unavailableDescription": "Questo link di condivisione è scaduto o è stato revocato.",
     "transcriptUnavailableTitle": "Impossibile caricare questa trascrizione",
     "transcriptUnavailableDescription": "Il link funziona ancora. Riprova tra qualche istante."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Connettiti ai tuoi server.",
+    "storage": {
+      "lockedTitle": "Sblocca per usare SSH",
+      "lockedMessage": "Sblocca il dispositivo, poi riprova.",
+      "unavailableTitle": "Archiviazione non disponibile",
+      "unavailableMessage": "Impossibile aprire l'archivio locale dell'app. Riavvia Kilo, poi riprova."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Nessun host",
+      "emptyDescription": "Aggiungi un host oppure importa gli host dalla tua configurazione SSH.",
+      "addHost": "Aggiungi host",
+      "importConfig": "Importa dalla configurazione SSH",
+      "rowActions": "{{label}}, {{target}}. Apre modifica ed eliminazione.",
+      "viaJump": "tramite {{label}}",
+      "deleteTitle": "Eliminare {{label}}?",
+      "deleteMessage": "Le sue impostazioni e i port forward vengono rimossi con esso. L'operazione non può essere annullata.",
+      "deleteFailed": "Impossibile eliminare l'host."
+    },
+    "editor": {
+      "newTitle": "Nuovo host",
+      "editTitle": "Modifica host",
+      "label": "Etichetta",
+      "labelPlaceholder": "Server di casa",
+      "hostname": "Nome host",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Porta",
+      "username": "Nome utente",
+      "authMethod": "Metodo di autenticazione",
+      "password": "Password",
+      "key": "Chiave SSH",
+      "keyboardInteractive": "Tastiera interattiva",
+      "passwordPlaceholder": "Digitata alla connessione, se non salvata",
+      "savePassword": "Salva password",
+      "savePasswordHint": "Conservata nell'archivio crittografato di questo dispositivo.",
+      "chooseKey": "Scegli una chiave",
+      "noKeys": "Nessuna chiave",
+      "jumpHost": "Jump host",
+      "directConnection": "Connessione diretta",
+      "tmuxAttach": "Collega tmux",
+      "tmuxSession": "Nome della sessione tmux",
+      "saved": "Host salvato.",
+      "saveFailed": "Impossibile salvare l'host."
+    },
+    "errors": {
+      "invalidPort": "Usa una porta da 1 a 65535",
+      "jumpCycle": "Quell'host passa già attraverso questo."
+    },
+    "import": {
+      "title": "Importa configurazione SSH",
+      "description": "Incolla la tua configurazione SSH oppure scegli il file.",
+      "sourceLabel": "Configurazione SSH",
+      "chooseFile": "Scegli file",
+      "preview": "Anteprima",
+      "apply": "Importa host",
+      "imported": "Host importati.",
+      "importFailed": "Non è stato importato nulla.",
+      "nothingDescription": "Questa configurazione non descrive alcun host che questa app possa importare.",
+      "notImported": "Non importato",
+      "needsKey": "Richiede chiave",
+      "warnNeedsKey": "Il suo file di chiave non può essere importato. Scegli una chiave nell'editor.",
+      "warnJumpMissing": "{{target}} non è nell'importazione, quindi questo host si connette direttamente.",
+      "warnJumpMultiHop": "Viene importato solo il primo jump host.",
+      "warnJumpCycle": "{{target}} passa a sua volta attraverso questo host, quindi il suo jump è stato rimosso.",
+      "warnForward": "Impossibile leggere una riga di forward di questo host.",
+      "skippedNoUsername": "{{alias}} non ha una riga User.",
+      "skippedInvalidPort": "{{alias}} ha una porta che non è un numero da 1 a 65535.",
+      "unreadableFile": "Impossibile leggere quel file."
+    },
+    "knownHosts": {
+      "title": "Host conosciuti",
+      "emptyTitle": "Nessun host attendibile",
+      "emptyDescription": "La chiave di un host viene considerata attendibile la prima volta che ti connetti.",
+      "deleteTitle": "Dimenticare {{pattern}}?",
+      "deleteMessage": "Alla prossima connessione ti verrà chiesto di considerare attendibile di nuovo la sua chiave.",
+      "deleteFailed": "Impossibile rimuovere la chiave dell'host.",
+      "deleteLabel": "Dimentica {{pattern}}"
+    }
   }
 }

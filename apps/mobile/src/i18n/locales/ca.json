@@ -4150,5 +4150,88 @@
     "unavailableDescription": "Aquest enllaç per compartir ha caducat o s'ha revocat.",
     "transcriptUnavailableTitle": "No s'ha pogut carregar aquesta transcripció",
     "transcriptUnavailableDescription": "L'enllaç encara funciona. Torna-ho a provar d'aquí a un moment."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Connecta amb els teus propis servidors.",
+    "storage": {
+      "lockedTitle": "Desbloqueja per usar SSH",
+      "lockedMessage": "Desbloqueja el dispositiu i torna-ho a provar.",
+      "unavailableTitle": "Emmagatzematge no disponible",
+      "unavailableMessage": "No s'ha pogut obrir l'emmagatzematge local de l'app. Reinicia Kilo i torna-ho a provar."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Encara no hi ha cap amfitrió",
+      "emptyDescription": "Afegeix un amfitrió o importa els amfitrions de la teva configuració SSH.",
+      "addHost": "Afegeix amfitrió",
+      "importConfig": "Importa de la configuració SSH",
+      "rowActions": "{{label}}, {{target}}. Obre edita i elimina.",
+      "viaJump": "via {{label}}",
+      "deleteTitle": "Vols eliminar {{label}}?",
+      "deleteMessage": "Se n'eliminen la configuració i els reenviaments de port. Això no es pot desfer.",
+      "deleteFailed": "No s'ha pogut eliminar l'amfitrió."
+    },
+    "editor": {
+      "newTitle": "Amfitrió nou",
+      "editTitle": "Edita l'amfitrió",
+      "label": "Etiqueta",
+      "labelPlaceholder": "Servidor de casa",
+      "hostname": "Nom d'amfitrió",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Nom d'usuari",
+      "authMethod": "Mètode d'autenticació",
+      "password": "Contrasenya",
+      "key": "Clau SSH",
+      "keyboardInteractive": "Teclat interactiu",
+      "passwordPlaceholder": "S'escriu en connectar, tret que es desi",
+      "savePassword": "Desa la contrasenya",
+      "savePasswordHint": "Es guarda a l'emmagatzematge xifrat d'aquest dispositiu.",
+      "chooseKey": "Tria una clau",
+      "noKeys": "Encara no hi ha cap clau",
+      "jumpHost": "Amfitrió de salt",
+      "directConnection": "Connexió directa",
+      "tmuxAttach": "Adjunta tmux",
+      "tmuxSession": "Nom de la sessió tmux",
+      "saved": "Amfitrió desat.",
+      "saveFailed": "No s'ha pogut desar l'amfitrió."
+    },
+    "errors": {
+      "invalidPort": "Fes servir un port de l'1 al 65535",
+      "jumpCycle": "Aquell amfitrió ja passa per aquest."
+    },
+    "import": {
+      "title": "Importa la configuració SSH",
+      "description": "Enganxa la teva configuració SSH o tria el fitxer.",
+      "sourceLabel": "Configuració SSH",
+      "chooseFile": "Tria un fitxer",
+      "preview": "Vista prèvia",
+      "apply": "Importa els amfitrions",
+      "imported": "Amfitrions importats.",
+      "importFailed": "No s'ha importat res.",
+      "nothingDescription": "Aquesta configuració no descriu cap amfitrió que aquesta app pugui importar.",
+      "notImported": "No importat",
+      "needsKey": "Necessita clau",
+      "warnNeedsKey": "El seu fitxer de clau no es pot importar. Tria una clau a l'editor.",
+      "warnJumpMissing": "{{target}} no forma part de la importació, així que aquest amfitrió es connecta directament.",
+      "warnJumpMultiHop": "Només s'importa el primer amfitrió de salt.",
+      "warnJumpCycle": "{{target}} torna a saltar a través d'aquest amfitrió, així que s'ha descartat el seu salt.",
+      "warnForward": "No s'ha pogut llegir una línia de reenviament d'aquest amfitrió.",
+      "skippedNoUsername": "{{alias}} no té cap línia User.",
+      "skippedInvalidPort": "{{alias}} té un port que no és un número de l'1 al 65535.",
+      "unreadableFile": "No s'ha pogut llegir aquest fitxer."
+    },
+    "knownHosts": {
+      "title": "Amfitrions coneguts",
+      "emptyTitle": "Encara no hi ha cap amfitrió de confiança",
+      "emptyDescription": "La clau d'un amfitrió es considera de confiança la primera vegada que t'hi connectes.",
+      "deleteTitle": "Vols oblidar {{pattern}}?",
+      "deleteMessage": "La propera connexió et tornarà a demanar que confiïs en la seva clau.",
+      "deleteFailed": "No s'ha pogut eliminar la clau de l'amfitrió.",
+      "deleteLabel": "Oblida {{pattern}}"
+    }
   }
 }

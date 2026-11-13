@@ -4150,5 +4150,88 @@
     "unavailableDescription": "Ce lien de partage a expiré ou a été révoqué.",
     "transcriptUnavailableTitle": "Impossible de charger cette transcription",
     "transcriptUnavailableDescription": "Le lien fonctionne toujours. Réessayez dans un instant."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Connectez-vous à vos propres serveurs.",
+    "storage": {
+      "lockedTitle": "Déverrouillez pour utiliser SSH",
+      "lockedMessage": "Déverrouillez votre appareil, puis réessayez.",
+      "unavailableTitle": "Stockage indisponible",
+      "unavailableMessage": "Le stockage local de l’application n’a pas pu être ouvert. Redémarrez Kilo, puis réessayez."
+    },
+    "field": {
+      "value": "{{label}} : {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Aucun hôte pour l’instant",
+      "emptyDescription": "Ajoutez un hôte ou importez les hôtes de votre configuration SSH.",
+      "addHost": "Ajouter un hôte",
+      "importConfig": "Importer depuis la configuration SSH",
+      "rowActions": "{{label}}, {{target}}. Ouvre la modification et la suppression.",
+      "viaJump": "via {{label}}",
+      "deleteTitle": "Supprimer {{label}} ?",
+      "deleteMessage": "Ses paramètres et ses redirections de port sont supprimés avec lui. Cette action est irréversible.",
+      "deleteFailed": "L’hôte n’a pas pu être supprimé."
+    },
+    "editor": {
+      "newTitle": "Nouvel hôte",
+      "editTitle": "Modifier l’hôte",
+      "label": "Libellé",
+      "labelPlaceholder": "Serveur maison",
+      "hostname": "Nom d’hôte",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Nom d’utilisateur",
+      "authMethod": "Méthode d’authentification",
+      "password": "Mot de passe",
+      "key": "Clé SSH",
+      "keyboardInteractive": "Clavier interactif",
+      "passwordPlaceholder": "Saisi lors de la connexion, sauf s’il est enregistré",
+      "savePassword": "Enregistrer le mot de passe",
+      "savePasswordHint": "Conservé dans le stockage chiffré de cet appareil.",
+      "chooseKey": "Choisir une clé",
+      "noKeys": "Aucune clé pour l’instant",
+      "jumpHost": "Hôte de rebond",
+      "directConnection": "Connexion directe",
+      "tmuxAttach": "Attacher tmux",
+      "tmuxSession": "Nom de la session tmux",
+      "saved": "Hôte enregistré.",
+      "saveFailed": "L’hôte n’a pas pu être enregistré."
+    },
+    "errors": {
+      "invalidPort": "Utilisez un port entre 1 et 65535",
+      "jumpCycle": "Cet hôte passe déjà par celui-ci."
+    },
+    "import": {
+      "title": "Importer la configuration SSH",
+      "description": "Collez votre configuration SSH ou choisissez le fichier.",
+      "sourceLabel": "Configuration SSH",
+      "chooseFile": "Choisir un fichier",
+      "preview": "Aperçu",
+      "apply": "Importer les hôtes",
+      "imported": "Hôtes importés.",
+      "importFailed": "Rien n’a été importé.",
+      "nothingDescription": "Cette configuration ne contient aucun hôte que cette application peut importer.",
+      "notImported": "Non importé",
+      "needsKey": "Clé requise",
+      "warnNeedsKey": "Son fichier de clé ne peut pas être importé. Choisissez une clé dans l’éditeur.",
+      "warnJumpMissing": "{{target}} ne figure pas dans l’importation, cet hôte se connecte donc directement.",
+      "warnJumpMultiHop": "Seul le premier hôte de rebond est importé.",
+      "warnJumpCycle": "{{target}} repasse par cet hôte, son rebond a donc été retiré.",
+      "warnForward": "Une ligne de redirection de cet hôte n’a pas pu être lue.",
+      "skippedNoUsername": "{{alias}} n’a pas de ligne User.",
+      "skippedInvalidPort": "{{alias}} a un port qui n’est pas un nombre entre 1 et 65535.",
+      "unreadableFile": "Ce fichier n’a pas pu être lu."
+    },
+    "knownHosts": {
+      "title": "Hôtes connus",
+      "emptyTitle": "Aucun hôte de confiance pour l’instant",
+      "emptyDescription": "La clé d’un hôte est approuvée lors de votre première connexion.",
+      "deleteTitle": "Oublier {{pattern}} ?",
+      "deleteMessage": "La prochaine connexion vous demandera à nouveau de faire confiance à sa clé.",
+      "deleteFailed": "La clé de l’hôte n’a pas pu être supprimée.",
+      "deleteLabel": "Oublier {{pattern}}"
+    }
   }
 }

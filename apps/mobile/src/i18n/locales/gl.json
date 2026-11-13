@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Esta ligazón para compartir caducou ou foi revogada.",
     "transcriptUnavailableTitle": "Non se puido cargar esta transcrición",
     "transcriptUnavailableDescription": "A ligazón segue funcionando. Téntao de novo nun momento."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Conéctate aos teus propios servidores.",
+    "storage": {
+      "lockedTitle": "Desbloquea para usar SSH",
+      "lockedMessage": "Desbloquea o teu dispositivo e téntao de novo.",
+      "unavailableTitle": "Almacenamento non dispoñible",
+      "unavailableMessage": "Non se puido abrir o almacenamento local da app. Reinicia Kilo e téntao de novo."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Aínda non hai hosts",
+      "emptyDescription": "Engade un host ou importa os hosts do teu ficheiro de configuración SSH.",
+      "addHost": "Engadir host",
+      "importConfig": "Importar da configuración SSH",
+      "rowActions": "{{label}}, {{target}}. Abre editar e eliminar.",
+      "viaJump": "vía {{label}}",
+      "deleteTitle": "Eliminar {{label}}?",
+      "deleteMessage": "A súa configuración e os reenvíos de portos elimínanse con el. Isto non se pode desfacer.",
+      "deleteFailed": "Non se puido eliminar o host."
+    },
+    "editor": {
+      "newTitle": "Novo host",
+      "editTitle": "Editar host",
+      "label": "Etiqueta",
+      "labelPlaceholder": "Servidor da casa",
+      "hostname": "Nome do host",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Porto",
+      "username": "Nome de usuario",
+      "authMethod": "Método de autenticación",
+      "password": "Contrasinal",
+      "key": "Chave SSH",
+      "keyboardInteractive": "Interactivo por teclado",
+      "passwordPlaceholder": "Escribirase ao conectar, agás que se garde",
+      "savePassword": "Gardar contrasinal",
+      "savePasswordHint": "Gárdase no almacenamento cifrado deste dispositivo.",
+      "chooseKey": "Escoller unha chave",
+      "noKeys": "Aínda non hai chaves",
+      "jumpHost": "Host de salto",
+      "directConnection": "Conexión directa",
+      "tmuxAttach": "Anexar tmux",
+      "tmuxSession": "Nome da sesión tmux",
+      "saved": "Host gardado.",
+      "saveFailed": "Non se puido gardar o host."
+    },
+    "errors": {
+      "invalidPort": "Usa un porto do 1 ao 65535",
+      "jumpCycle": "Ese host xa salta a través deste."
+    },
+    "import": {
+      "title": "Importar configuración SSH",
+      "description": "Pega a túa configuración SSH ou escolle o ficheiro.",
+      "sourceLabel": "Configuración SSH",
+      "chooseFile": "Escoller ficheiro",
+      "preview": "Vista previa",
+      "apply": "Importar hosts",
+      "imported": "Hosts importados.",
+      "importFailed": "Non se importou nada.",
+      "nothingDescription": "Esta configuración non describe ningún host que esta app poida importar.",
+      "notImported": "Non importado",
+      "needsKey": "Precisa chave",
+      "warnNeedsKey": "Non se pode importar o seu ficheiro de chave. Escolle unha chave no editor.",
+      "warnJumpMissing": "{{target}} non está na importación, polo que este host conéctase directamente.",
+      "warnJumpMultiHop": "Só se importa o primeiro host de salto.",
+      "warnJumpCycle": "{{target}} salta de volta a través deste host, polo que se descartou o seu salto.",
+      "warnForward": "Non se puido ler unha liña de reenvío deste host.",
+      "skippedNoUsername": "{{alias}} non ten liña User.",
+      "skippedInvalidPort": "{{alias}} ten un porto que non é un número do 1 ao 65535.",
+      "unreadableFile": "Non se puido ler ese ficheiro."
+    },
+    "knownHosts": {
+      "title": "Hosts coñecidos",
+      "emptyTitle": "Aínda non hai hosts de confianza",
+      "emptyDescription": "A chave dun host considérase de confianza a primeira vez que te conectas a el.",
+      "deleteTitle": "Esquecer {{pattern}}?",
+      "deleteMessage": "A próxima conexión pedirache que confíes na súa chave de novo.",
+      "deleteFailed": "Non se puido eliminar a chave do host.",
+      "deleteLabel": "Esquecer {{pattern}}"
+    }
   }
 }

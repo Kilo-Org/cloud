@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Xiriirkan wadaagga wuu dhacay ama waa la baajiyay.",
     "transcriptUnavailableTitle": "Qoraalkan lama soo dejin karin",
     "transcriptUnavailableDescription": "Xiriirku weli wuu shaqaynayaa. Isku day mar kale wax yar kadib."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Ku xidh server-yadaada.",
+    "storage": {
+      "lockedTitle": "Fur si aad u isticmaasho SSH",
+      "lockedMessage": "Fur qalabkaaga, ka dibna isku day mar kale.",
+      "unavailableTitle": "Kaydka lama heli karo",
+      "unavailableMessage": "Kaydka qalabka ee app-ka lama furi karin. Dib u bilow Kilo, ka dibna isku day mar kale."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Weli host-yo ma jiraan",
+      "emptyDescription": "Ku dar host, ama ka soo qaado host-yada SSH config-kaaga.",
+      "addHost": "Ku dar host",
+      "importConfig": "Ka soo qaado SSH config",
+      "rowActions": "{{label}}, {{target}}. Waxay furtaa tafatirka iyo tirtirka.",
+      "viaJump": "loo marayo {{label}}",
+      "deleteTitle": "Tirtir {{label}}?",
+      "deleteMessage": "Dejinta iyo port forwards-keeda waa la saarayaa. Tan dib looma noqon karo.",
+      "deleteFailed": "Host-ka lama tirtiri karin."
+    },
+    "editor": {
+      "newTitle": "Host cusub",
+      "editTitle": "Tafatir host",
+      "label": "Sumad",
+      "labelPlaceholder": "Server guriga",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Magaca isticmaalaha",
+      "authMethod": "Habka xaqiijinta",
+      "password": "Furaha sirta",
+      "key": "Fure SSH",
+      "keyboardInteractive": "Keyboard interactive",
+      "passwordPlaceholder": "Waa la qoraa marka la xidhayo, haddii aan la kaydin.",
+      "savePassword": "Kaydi furaha sirta",
+      "savePasswordHint": "Waxaa lagu hayaa kaydka lagu sireeyay ee qalabkan.",
+      "chooseKey": "Dooro fure",
+      "noKeys": "Weli furayaal ma jiraan",
+      "jumpHost": "Host-ka boodidda",
+      "directConnection": "Xidhiidh toos ah",
+      "tmuxAttach": "Ku xidh tmux",
+      "tmuxSession": "Magaca session-ka tmux",
+      "saved": "Host-ka waa la kaydiyay.",
+      "saveFailed": "Host-ka lama kaydin karin."
+    },
+    "errors": {
+      "invalidPort": "Isticmaal port u dhexeeya 1 iyo 65535",
+      "jumpCycle": "Host-kaas mar hore ayuu kan ka booday."
+    },
+    "import": {
+      "title": "Soo qaado SSH config",
+      "description": "Ku dheji SSH config-kaaga, ama dooro faylka.",
+      "sourceLabel": "SSH config",
+      "chooseFile": "Dooro fayl",
+      "preview": "Horudhac",
+      "apply": "Soo qaado host-yada",
+      "imported": "Host-yada waa la soo qaaday.",
+      "importFailed": "Waxba lama soo qaadin.",
+      "nothingDescription": "Config-kan ma qeexayo host ay app-kan soo qaadi karo.",
+      "notImported": "Lama soo qaadin",
+      "needsKey": "U baahan fure",
+      "warnNeedsKey": "Faylka furaha lama soo qaadi karo. Dooro fure tafatirka dhexdiisa.",
+      "warnJumpMissing": "{{target}} kama jiro soo-qaadista, sidaas darteed host-kan si toos ah ayuu u xidhmaa.",
+      "warnJumpMultiHop": "Kaliya host-ka boodidda ee ugu horreeya ayaa la soo qaaday.",
+      "warnJumpCycle": "{{target}} dib ayuu uga boodaa host-kan, sidaas darteed boodistiisa waa la tuuray.",
+      "warnForward": "Xariiq forward ah oo host-kan ku jirta lama akhrin karin.",
+      "skippedNoUsername": "{{alias}} ma laha xariiq User.",
+      "skippedInvalidPort": "{{alias}} waxay leedahay port aan ahayn lambar u dhexeeya 1 iyo 65535.",
+      "unreadableFile": "Faylkaas lama akhrin karin."
+    },
+    "knownHosts": {
+      "title": "Host-yada la yaqaan",
+      "emptyTitle": "Weli host-yo la aaminay ma jiraan",
+      "emptyDescription": "Furaha host-ka waa la aaminaa markii ugu horreysa ee aad ku xidhanto.",
+      "deleteTitle": "Ma iloowdo {{pattern}}?",
+      "deleteMessage": "Xidhiidhka xiga wuxuu kaa codsanayaa inaad mar kale aaminto furahiisa.",
+      "deleteFailed": "Furaha host-ka lama saari karin.",
+      "deleteLabel": "Iloobi {{pattern}}"
+    }
   }
 }

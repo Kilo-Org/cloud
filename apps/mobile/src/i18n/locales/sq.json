@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Kjo lidhje ndarjeje ka skaduar ose është revokuar.",
     "transcriptUnavailableTitle": "Ky transkript nuk u ngarkua",
     "transcriptUnavailableDescription": "Lidhja funksionon ende. Provo përsëri pas pak."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Lidhu me serverët e tu.",
+    "storage": {
+      "lockedTitle": "Zhblloko për të përdorur SSH",
+      "lockedMessage": "Zhblloko pajisjen, pastaj provo përsëri.",
+      "unavailableTitle": "Ruajtja nuk disponohet",
+      "unavailableMessage": "Ruajtja lokale e aplikacionit nuk mund të hapej. Rinis Kilo, pastaj provo përsëri."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Nuk ka ende hoste",
+      "emptyDescription": "Shto një host ose importo hostet nga konfigurimi yt SSH.",
+      "addHost": "Shto host",
+      "importConfig": "Importo nga konfigurimi SSH",
+      "rowActions": "{{label}}, {{target}}. Hap redaktimin dhe fshirjen.",
+      "viaJump": "përmes {{label}}",
+      "deleteTitle": "Të fshihet {{label}}?",
+      "deleteMessage": "Cilësimi i tij dhe përcjelljet e portit hiqen bashkë me të. Kjo nuk mund të zhbëhet.",
+      "deleteFailed": "Host nuk mund të fshihej."
+    },
+    "editor": {
+      "newTitle": "Host i ri",
+      "editTitle": "Redakto hostin",
+      "label": "Etiketa",
+      "labelPlaceholder": "Serveri i shtëpisë",
+      "hostname": "Emri i hostit",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Porta",
+      "username": "Emri i përdoruesit",
+      "authMethod": "Metoda e vërtetimit",
+      "password": "Fjalëkalimi",
+      "key": "Çelës SSH",
+      "keyboardInteractive": "Tastierë interaktive",
+      "passwordPlaceholder": "Shkruhet gjatë lidhjes, përveçse kur ruhet",
+      "savePassword": "Ruaj fjalëkalimin",
+      "savePasswordHint": "Mbahet në ruajtësen e kriptuar të kësaj pajisjeje.",
+      "chooseKey": "Zgjidh një çelës",
+      "noKeys": "Nuk ka çelësa ende",
+      "jumpHost": "Host kapërcimi",
+      "directConnection": "Lidhje e drejtpërdrejtë",
+      "tmuxAttach": "Lidhu me tmux",
+      "tmuxSession": "Emri i sesionit tmux",
+      "saved": "Host u ruajt.",
+      "saveFailed": "Host nuk mund të ruhej."
+    },
+    "errors": {
+      "invalidPort": "Përdor një portë nga 1 deri në 65535",
+      "jumpCycle": "Ai host tashmë kalon përmes këtij."
+    },
+    "import": {
+      "title": "Importo konfigurimin SSH",
+      "description": "Ngjit konfigurimin tënd SSH ose zgjidh skedarin.",
+      "sourceLabel": "Konfigurimi SSH",
+      "chooseFile": "Zgjidh skedarin",
+      "preview": "Parapamje",
+      "apply": "Importo hostet",
+      "imported": "Hostet u importuan.",
+      "importFailed": "Asgjë nuk u importua.",
+      "nothingDescription": "Ky konfigurim nuk përshkruan asnjë host që ky aplikacion mund të importojë.",
+      "notImported": "Nuk u importua",
+      "needsKey": "Kërkon çelës",
+      "warnNeedsKey": "Skedari i çelësit të tij nuk mund të importohet. Zgjidh një çelës në redaktues.",
+      "warnJumpMissing": "{{target}} nuk është në import, kështu që ky host lidhet drejtpërdrejt.",
+      "warnJumpMultiHop": "Importohet vetëm hosti i parë i kapërcimit.",
+      "warnJumpCycle": "{{target}} kalon përsëri përmes këtij hosti, prandaj kapërcimi i tij u hoq.",
+      "warnForward": "Një rresht përcjelljeje në këtë host nuk mund të lexohej.",
+      "skippedNoUsername": "{{alias}} nuk ka rresht User.",
+      "skippedInvalidPort": "{{alias}} ka një portë që nuk është numër nga 1 deri në 65535.",
+      "unreadableFile": "Ai skedar nuk mund të lexohej."
+    },
+    "knownHosts": {
+      "title": "Hostet e njohur",
+      "emptyTitle": "Nuk ka ende hoste të besuar",
+      "emptyDescription": "Një çelës hosti besohet herën e parë që lidhesh me të.",
+      "deleteTitle": "Harro {{pattern}}?",
+      "deleteMessage": "Lidhja tjetër do të të kërkojë të besosh përsëri çelësin e tij.",
+      "deleteFailed": "Çelësi i hostit nuk mund të hiqej.",
+      "deleteLabel": "Harro {{pattern}}"
+    }
   }
 }

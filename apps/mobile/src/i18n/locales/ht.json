@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Lyen pataj sa a ekspire oswa yo anile l.",
     "transcriptUnavailableTitle": "Nou pa t ka chaje transkripsyon sa a",
     "transcriptUnavailableDescription": "Lyen an toujou mache. Eseye ankò nan yon ti moman."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Konekte ak pwòp sèvè w yo.",
+    "storage": {
+      "lockedTitle": "Debloke pou itilize SSH",
+      "lockedMessage": "Debloke aparèy ou, epi eseye ankò.",
+      "unavailableTitle": "Depo pa disponib",
+      "unavailableMessage": "Nou pa t ka louvri depo aplikasyon an sou aparèy la. Rekòmanse Kilo, epi eseye ankò."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Poko gen ot",
+      "emptyDescription": "Ajoute yon ot, oswa enpòte ot yo soti nan konfigirasyon SSH ou.",
+      "addHost": "Ajoute ot",
+      "importConfig": "Enpòte soti nan konfigirasyon SSH",
+      "rowActions": "{{label}}, {{target}}. Louvri modifye ak efase.",
+      "viaJump": "atravè {{label}}",
+      "deleteTitle": "Efase {{label}}?",
+      "deleteMessage": "Paramèt li ak redireksyon pò li yo ap retire ansanm avè l. Sa pa ka defèt.",
+      "deleteFailed": "Nou pa t ka efase ot la."
+    },
+    "editor": {
+      "newTitle": "Nouvo ot",
+      "editTitle": "Modifye ot",
+      "label": "Etikèt",
+      "labelPlaceholder": "Sèvè lakay",
+      "hostname": "Non ot",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Pò",
+      "username": "Non itilizatè",
+      "authMethod": "Metòd otantifikasyon",
+      "password": "Modpas",
+      "key": "Kle SSH",
+      "keyboardInteractive": "Klavye entèaktif",
+      "passwordPlaceholder": "Tape lè w konekte, sof si li anrejistre",
+      "savePassword": "Anrejistre modpas",
+      "savePasswordHint": "Li kenbe nan depo chifre sou aparèy sa a.",
+      "chooseKey": "Chwazi yon kle",
+      "noKeys": "Poko gen kle",
+      "jumpHost": "Ot pon",
+      "directConnection": "Koneksyon dirèk",
+      "tmuxAttach": "Atache tmux",
+      "tmuxSession": "Non sesyon tmux",
+      "saved": "Ot la anrejistre.",
+      "saveFailed": "Nou pa t ka anrejistre ot la."
+    },
+    "errors": {
+      "invalidPort": "Itilize yon pò soti 1 rive 65535",
+      "jumpCycle": "Ot sa a deja pase atravè ot sa a."
+    },
+    "import": {
+      "title": "Enpòte konfigirasyon SSH",
+      "description": "Kole konfigirasyon SSH ou, oswa chwazi fichye a.",
+      "sourceLabel": "Konfigirasyon SSH",
+      "chooseFile": "Chwazi fichye",
+      "preview": "Apèsi",
+      "apply": "Enpòte ot yo",
+      "imported": "Ot yo enpòte.",
+      "importFailed": "Anyen pa t enpòte.",
+      "nothingDescription": "Konfigirasyon sa a pa dekri okenn ot ke aplikasyon sa a ka enpòte.",
+      "notImported": "Pa enpòte",
+      "needsKey": "Bezwen kle",
+      "warnNeedsKey": "Nou pa ka enpòte fichye kle li. Chwazi yon kle nan editè a.",
+      "warnJumpMissing": "{{target}} pa nan enpòtasyon an, kidonk ot sa a konekte dirèkteman.",
+      "warnJumpMultiHop": "Se sèlman premye ot pon an ki enpòte.",
+      "warnJumpCycle": "{{target}} retounen atravè ot sa a, kidonk yo te retire ot pon li.",
+      "warnForward": "Nou pa t ka li yon liy redireksyon nan ot sa a.",
+      "skippedNoUsername": "{{alias}} pa gen liy User.",
+      "skippedInvalidPort": "{{alias}} gen yon pò ki pa yon nimewo soti 1 rive 65535.",
+      "unreadableFile": "Nou pa t ka li fichye sa a."
+    },
+    "knownHosts": {
+      "title": "Ot yo konnen",
+      "emptyTitle": "Poko gen ot konfyans",
+      "emptyDescription": "Premye fwa w konekte ak yon ot, yo fè konfyans ak kle li.",
+      "deleteTitle": "Bliye {{pattern}}?",
+      "deleteMessage": "Pwochen koneksyon an ap mande w pou w fè konfyans ak kle li ankò.",
+      "deleteFailed": "Nou pa t ka retire kle ot la.",
+      "deleteLabel": "Bliye {{pattern}}"
+    }
   }
 }

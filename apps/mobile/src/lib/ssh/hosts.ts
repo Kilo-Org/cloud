@@ -55,7 +55,7 @@ const hostFields = {
   lastConnectedAt: z.number().nullable(),
 };
 
-const hostInputSchema = z.object({
+export const hostInputSchema = z.object({
   ...hostFields,
   port: portSchema.default(22),
   password: hostFields.password.default(null),
@@ -86,6 +86,28 @@ export function listHosts(db: SshDatabase): SshHost[] {
   });
 }
 
+/** A jump host that already jumps through the host being saved. */
+export class SshJumpHostCycleError extends Error {
+  override readonly name = 'SshJumpHostCycleError';
+}
+
+/**
+ * Refuses a jump host that would close a loop. A connection follows the jump
+ * chain, so it has to reach a host that jumps nowhere; a loop would ask for a
+ * route through hosts that each wait on the next one.
+ */
+function assertJumpHostAcyclic(db: SshDatabase, id: string, jumpHostId: string | null): void {
+  const seen = new Set<string>();
+  let current = jumpHostId;
+  while (current !== null && !seen.has(current)) {
+    if (current === id) {
+      throw new SshJumpHostCycleError(`ssh_hosts: ${id} cannot jump through itself`);
+    }
+    seen.add(current);
+    current = getHost(db, current)?.jumpHostId ?? null;
+  }
+}
+
 export function getHost(db: SshDatabase, id: string): SshHost | null {
   return readRow({
     db,
@@ -98,6 +120,7 @@ export function getHost(db: SshDatabase, id: string): SshHost | null {
 export function createHost(db: SshDatabase, input: SshHostInput, at: number = Date.now()): SshHost {
   const host = hostInputSchema.parse(input);
   const id = newId();
+  assertJumpHostAcyclic(db, id, host.jumpHostId);
   db.runSync(
     `insert into ssh_hosts (id, label, hostname, port, username, auth_method, password,
        key_id, jump_host_id, tmux_attach, tmux_session_name, sort_order,
@@ -130,6 +153,9 @@ export function createHost(db: SshDatabase, input: SshHostInput, at: number = Da
 
 export function updateHost(db: SshDatabase, id: string, patch: SshHostPatch): SshHost | null {
   const host = hostPatchSchema.parse(patch);
+  if (host.jumpHostId !== undefined) {
+    assertJumpHostAcyclic(db, id, host.jumpHostId);
+  }
   updateRow({
     db,
     table: 'ssh_hosts',

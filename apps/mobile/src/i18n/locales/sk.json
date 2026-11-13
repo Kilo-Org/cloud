@@ -4215,5 +4215,88 @@
     "unavailableDescription": "Platnosť tohto odkazu na zdieľanie vypršala alebo bol zrušený.",
     "transcriptUnavailableTitle": "Tento prepis sa nepodarilo načítať",
     "transcriptUnavailableDescription": "Odkaz stále funguje. Skúste to znova o chvíľu."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Pripojte sa k svojim serverom.",
+    "storage": {
+      "lockedTitle": "Odomknite na používanie SSH",
+      "lockedMessage": "Odomknite zariadenie a skúste to znova.",
+      "unavailableTitle": "Úložisko nie je dostupné",
+      "unavailableMessage": "Úložisko aplikácie v zariadení sa nepodarilo otvoriť. Reštartujte Kilo a skúste to znova."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Zatiaľ žiadni hostitelia",
+      "emptyDescription": "Pridajte hostiteľa alebo importujte hostiteľov z konfigurácie SSH.",
+      "addHost": "Pridať hostiteľa",
+      "importConfig": "Importovať z konfigurácie SSH",
+      "rowActions": "{{label}}, {{target}}. Otvorí úpravu a odstránenie.",
+      "viaJump": "cez {{label}}",
+      "deleteTitle": "Odstrániť {{label}}?",
+      "deleteMessage": "Jeho nastavenie a presmerovania portov sa odstránia spolu s ním. Toto sa nedá vrátiť.",
+      "deleteFailed": "Hostiteľa sa nepodarilo odstrániť."
+    },
+    "editor": {
+      "newTitle": "Nový hostiteľ",
+      "editTitle": "Upraviť hostiteľa",
+      "label": "Označenie",
+      "labelPlaceholder": "Domovský server",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Používateľské meno",
+      "authMethod": "Metóda overenia",
+      "password": "Heslo",
+      "key": "SSH kľúč",
+      "keyboardInteractive": "Interaktívne overenie",
+      "passwordPlaceholder": "Zadá sa pri pripájaní, ak nie je uložené",
+      "savePassword": "Uložiť heslo",
+      "savePasswordHint": "Ukladá sa v šifrovanom úložisku na tomto zariadení.",
+      "chooseKey": "Vybrať kľúč",
+      "noKeys": "Zatiaľ žiadne kľúče",
+      "jumpHost": "Prestupný hostiteľ",
+      "directConnection": "Priame pripojenie",
+      "tmuxAttach": "Pripojiť tmux",
+      "tmuxSession": "Názov relácie tmux",
+      "saved": "Hostiteľ uložený.",
+      "saveFailed": "Hostiteľa sa nepodarilo uložiť."
+    },
+    "errors": {
+      "invalidPort": "Použite port od 1 do 65535",
+      "jumpCycle": "Tento hostiteľ už prechádza cez tohto."
+    },
+    "import": {
+      "title": "Importovať konfiguráciu SSH",
+      "description": "Vložte konfiguráciu SSH alebo vyberte súbor.",
+      "sourceLabel": "Konfigurácia SSH",
+      "chooseFile": "Vybrať súbor",
+      "preview": "Náhľad",
+      "apply": "Importovať hostiteľov",
+      "imported": "Hostitelia boli importovaní.",
+      "importFailed": "Nič sa neimportovalo.",
+      "nothingDescription": "Táto konfigurácia neobsahuje žiadneho hostiteľa, ktorého by táto aplikácia mohla importovať.",
+      "notImported": "Neimportované",
+      "needsKey": "Vyžaduje kľúč",
+      "warnNeedsKey": "Jeho súbor s kľúčom sa nedá importovať. Vyberte kľúč v editore.",
+      "warnJumpMissing": "{{target}} nie je v importe, takže sa tento hostiteľ pripája priamo.",
+      "warnJumpMultiHop": "Importuje sa iba prvý prestupný hostiteľ.",
+      "warnJumpCycle": "{{target}} prechádza späť cez tohto hostiteľa, preto bol jeho prestup vynechaný.",
+      "warnForward": "Riadok presmerovania v tomto hostiteľovi sa nepodarilo prečítať.",
+      "skippedNoUsername": "{{alias}} nemá riadok User.",
+      "skippedInvalidPort": "{{alias}} má port, ktorý nie je číslo od 1 do 65535.",
+      "unreadableFile": "Tento súbor sa nepodarilo prečítať."
+    },
+    "knownHosts": {
+      "title": "Známi hostitelia",
+      "emptyTitle": "Zatiaľ žiadni dôveryhodní hostitelia",
+      "emptyDescription": "Kľúč hostiteľa sa považuje za dôveryhodný pri prvom pripojení k nemu.",
+      "deleteTitle": "Zabudnúť {{pattern}}?",
+      "deleteMessage": "Pri ďalšom pripojení sa znova zobrazí výzva na dôveru v jeho kľúč.",
+      "deleteFailed": "Kľúč hostiteľa sa nepodarilo odstrániť.",
+      "deleteLabel": "Zabudnúť {{pattern}}"
+    }
   }
 }

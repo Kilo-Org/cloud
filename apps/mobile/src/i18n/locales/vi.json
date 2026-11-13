@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Liên kết chia sẻ này đã hết hạn hoặc đã bị thu hồi.",
     "transcriptUnavailableTitle": "Không thể tải bản ghi này",
     "transcriptUnavailableDescription": "Liên kết vẫn hoạt động. Hãy thử lại sau giây lát."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Kết nối tới máy chủ của bạn.",
+    "storage": {
+      "lockedTitle": "Mở khóa để dùng SSH",
+      "lockedMessage": "Mở khóa thiết bị, rồi thử lại.",
+      "unavailableTitle": "Bộ nhớ lưu trữ không khả dụng",
+      "unavailableMessage": "Không thể mở kho lưu trữ trên thiết bị của ứng dụng. Khởi động lại Kilo, rồi thử lại."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Chưa có máy chủ nào",
+      "emptyDescription": "Thêm máy chủ, hoặc nhập các máy chủ từ cấu hình SSH của bạn.",
+      "addHost": "Thêm máy chủ",
+      "importConfig": "Nhập từ cấu hình SSH",
+      "rowActions": "{{label}}, {{target}}. Mở chỉnh sửa và xóa.",
+      "viaJump": "qua {{label}}",
+      "deleteTitle": "Xóa {{label}}?",
+      "deleteMessage": "Cấu hình và các chuyển tiếp cổng của nó cũng bị xóa theo. Không thể hoàn tác.",
+      "deleteFailed": "Không thể xóa máy chủ."
+    },
+    "editor": {
+      "newTitle": "Máy chủ mới",
+      "editTitle": "Sửa máy chủ",
+      "label": "Nhãn",
+      "labelPlaceholder": "Máy chủ tại nhà",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Cổng",
+      "username": "Tên người dùng",
+      "authMethod": "Phương thức xác thực",
+      "password": "Mật khẩu",
+      "key": "Khóa SSH",
+      "keyboardInteractive": "Tương tác bàn phím",
+      "passwordPlaceholder": "Nhập khi kết nối, trừ khi đã lưu",
+      "savePassword": "Lưu mật khẩu",
+      "savePasswordHint": "Được giữ trong kho mã hóa trên thiết bị này.",
+      "chooseKey": "Chọn khóa",
+      "noKeys": "Chưa có khóa nào",
+      "jumpHost": "Máy chủ trung chuyển",
+      "directConnection": "Kết nối trực tiếp",
+      "tmuxAttach": "Gắn tmux",
+      "tmuxSession": "Tên phiên tmux",
+      "saved": "Đã lưu máy chủ.",
+      "saveFailed": "Không thể lưu máy chủ."
+    },
+    "errors": {
+      "invalidPort": "Dùng cổng từ 1 đến 65535",
+      "jumpCycle": "Máy chủ đó đã trung chuyển qua máy chủ này."
+    },
+    "import": {
+      "title": "Nhập cấu hình SSH",
+      "description": "Dán cấu hình SSH của bạn, hoặc chọn tệp.",
+      "sourceLabel": "Cấu hình SSH",
+      "chooseFile": "Chọn tệp",
+      "preview": "Xem trước",
+      "apply": "Nhập máy chủ",
+      "imported": "Đã nhập máy chủ.",
+      "importFailed": "Không có gì được nhập.",
+      "nothingDescription": "Cấu hình này không mô tả máy chủ nào mà ứng dụng có thể nhập.",
+      "notImported": "Không nhập",
+      "needsKey": "Cần khóa",
+      "warnNeedsKey": "Không thể nhập tệp khóa của nó. Chọn khóa trong phần chỉnh sửa.",
+      "warnJumpMissing": "{{target}} không có trong lần nhập này, nên máy chủ này sẽ kết nối trực tiếp.",
+      "warnJumpMultiHop": "Chỉ máy chủ trung chuyển đầu tiên được nhập.",
+      "warnJumpCycle": "{{target}} trung chuyển ngược lại qua máy chủ này, nên đã bỏ trung chuyển của nó.",
+      "warnForward": "Không thể đọc một dòng chuyển tiếp trong máy chủ này.",
+      "skippedNoUsername": "{{alias}} không có dòng User.",
+      "skippedInvalidPort": "{{alias}} có cổng không phải là số từ 1 đến 65535.",
+      "unreadableFile": "Không thể đọc tệp đó."
+    },
+    "knownHosts": {
+      "title": "Máy chủ đã biết",
+      "emptyTitle": "Chưa có máy chủ tin cậy nào",
+      "emptyDescription": "Khóa máy chủ được tin cậy ngay lần đầu bạn kết nối tới nó.",
+      "deleteTitle": "Quên {{pattern}}?",
+      "deleteMessage": "Lần kết nối tiếp theo sẽ yêu cầu bạn tin cậy khóa của nó lần nữa.",
+      "deleteFailed": "Không thể xóa khóa máy chủ.",
+      "deleteLabel": "Quên {{pattern}}"
+    }
   }
 }

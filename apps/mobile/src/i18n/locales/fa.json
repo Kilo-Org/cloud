@@ -4085,5 +4085,88 @@
     "unavailableDescription": "این پیوند اشتراک‌گذاری منقضی یا لغو شده است.",
     "transcriptUnavailableTitle": "بارگیری این رونوشت ممکن نشد",
     "transcriptUnavailableDescription": "پیوند همچنان کار می‌کند. چند لحظه دیگر دوباره امتحان کنید."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "به سرورهای خودتان متصل شوید.",
+    "storage": {
+      "lockedTitle": "برای استفاده از SSH قفل را باز کنید",
+      "lockedMessage": "دستگاه خود را باز کنید، سپس دوباره تلاش کنید.",
+      "unavailableTitle": "فضای ذخیره‌سازی در دسترس نیست",
+      "unavailableMessage": "انبار درون‌دستگاهی برنامه باز نشد. Kilo را دوباره راه‌اندازی کنید، سپس دوباره تلاش کنید."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "هنوز میزبانی وجود ندارد",
+      "emptyDescription": "یک میزبان اضافه کنید، یا میزبان‌ها را از پیکربندی SSH خود وارد کنید.",
+      "addHost": "افزودن میزبان",
+      "importConfig": "وارد کردن از پیکربندی SSH",
+      "rowActions": "{{label}}، {{target}}. ویرایش و حذف را باز می‌کند.",
+      "viaJump": "از طریق {{label}}",
+      "deleteTitle": "{{label}} حذف شود؟",
+      "deleteMessage": "تنظیمات و انتقال‌های پورت آن نیز با آن حذف می‌شود. این کار قابل بازگشت نیست.",
+      "deleteFailed": "میزبان حذف نشد."
+    },
+    "editor": {
+      "newTitle": "میزبان جدید",
+      "editTitle": "ویرایش میزبان",
+      "label": "برچسب",
+      "labelPlaceholder": "سرور خانگی",
+      "hostname": "نام میزبان",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "پورت",
+      "username": "نام کاربری",
+      "authMethod": "روش احراز هویت",
+      "password": "رمز عبور",
+      "key": "کلید SSH",
+      "keyboardInteractive": "تعاملی با صفحه‌کلید",
+      "passwordPlaceholder": "در زمان اتصال وارد می‌شود، مگر اینکه ذخیره شده باشد",
+      "savePassword": "ذخیره رمز عبور",
+      "savePasswordHint": "در انبار رمزنگاری‌شده روی این دستگاه نگه داشته می‌شود.",
+      "chooseKey": "انتخاب کلید",
+      "noKeys": "هنوز کلیدی وجود ندارد",
+      "jumpHost": "میزبان واسط",
+      "directConnection": "اتصال مستقیم",
+      "tmuxAttach": "اتصال به tmux",
+      "tmuxSession": "نام نشست tmux",
+      "saved": "میزبان ذخیره شد.",
+      "saveFailed": "میزبان ذخیره نشد."
+    },
+    "errors": {
+      "invalidPort": "پورتی از 1 تا 65535 استفاده کنید",
+      "jumpCycle": "آن میزبان از قبل از طریق این میزبان متصل می‌شود."
+    },
+    "import": {
+      "title": "وارد کردن پیکربندی SSH",
+      "description": "پیکربندی SSH خود را جای‌گذاری کنید، یا فایل را انتخاب کنید.",
+      "sourceLabel": "پیکربندی SSH",
+      "chooseFile": "انتخاب فایل",
+      "preview": "پیش‌نمایش",
+      "apply": "وارد کردن میزبان‌ها",
+      "imported": "میزبان‌ها وارد شدند.",
+      "importFailed": "چیزی وارد نشد.",
+      "nothingDescription": "این پیکربندی هیچ میزبانی را توصیف نمی‌کند که این برنامه بتواند وارد کند.",
+      "notImported": "وارد نشد",
+      "needsKey": "نیازمند کلید",
+      "warnNeedsKey": "فایل کلید آن قابل وارد کردن نیست. در ویرایشگر یک کلید انتخاب کنید.",
+      "warnJumpMissing": "{{target}} در ورود وجود ندارد، بنابراین این میزبان مستقیم متصل می‌شود.",
+      "warnJumpMultiHop": "فقط اولین میزبان واسط وارد می‌شود.",
+      "warnJumpCycle": "{{target}} از طریق این میزبان به عقب پرش می‌کند، بنابراین پرش آن حذف شد.",
+      "warnForward": "یک خط ارسال پورت در این میزبان خوانده نشد.",
+      "skippedNoUsername": "{{alias}} خط User ندارد.",
+      "skippedInvalidPort": "{{alias}} پورتی دارد که عددی از 1 تا 65535 نیست.",
+      "unreadableFile": "آن فایل خوانده نشد."
+    },
+    "knownHosts": {
+      "title": "میزبان‌های شناخته‌شده",
+      "emptyTitle": "هنوز میزبان مورد اعتمادی وجود ندارد",
+      "emptyDescription": "کلید میزبان نخستین بار که به آن متصل می‌شوید مورد اعتماد قرار می‌گیرد.",
+      "deleteTitle": "{{pattern}} فراموش شود؟",
+      "deleteMessage": "اتصال بعدی دوباره از شما می‌خواهد به کلید آن اعتماد کنید.",
+      "deleteFailed": "کلید میزبان حذف نشد.",
+      "deleteLabel": "فراموش کردن {{pattern}}"
+    }
   }
 }

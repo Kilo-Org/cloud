@@ -4280,5 +4280,88 @@
     "unavailableDescription": "Dan il-link għall-qsim skada jew ġie rrevokat.",
     "transcriptUnavailableTitle": "Ma stajniex intellgħu din it-traskrizzjoni",
     "transcriptUnavailableDescription": "Il-link għadu jaħdem. Erġa' pprova fi ftit mumenti."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Qabbad mal-servers tiegħek.",
+    "storage": {
+      "lockedTitle": "Iftaħ biex tuża SSH",
+      "lockedMessage": "Iftaħ it-tagħmir tiegħek, imbagħad erġa' pprova.",
+      "unavailableTitle": "Ħażna mhix disponibbli",
+      "unavailableMessage": "Il-maħżen fuq it-tagħmir tal-app ma setax jinfetaħ. Ibda Kilo mill-ġdid, imbagħad erġa' pprova."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Għad m'hemmx hosts",
+      "emptyDescription": "Żid host, jew ġib il-hosts mill-konfigurazzjoni SSH tiegħek.",
+      "addHost": "Żid host",
+      "importConfig": "Importa mill-konfigurazzjoni SSH",
+      "rowActions": "{{label}}, {{target}}. Jiftaħ l-editjar u l-ħassar.",
+      "viaJump": "permezz ta' {{label}}",
+      "deleteTitle": "Ħassar {{label}}?",
+      "deleteMessage": "L-issettjar u l-port forwards tiegħu jitneħħew miegħu. Dan ma jistax jiġi annullat.",
+      "deleteFailed": "Il-host ma setax jiġi mħassar."
+    },
+    "editor": {
+      "newTitle": "Host ġdid",
+      "editTitle": "Editja host",
+      "label": "Tikketta",
+      "labelPlaceholder": "Server tad-dar",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Isem l-utent",
+      "authMethod": "Metodu ta' awtentikazzjoni",
+      "password": "Password",
+      "key": "Ċavetta SSH",
+      "keyboardInteractive": "Interattiv bit-tastiera",
+      "passwordPlaceholder": "Jinkiteb waqt il-qabda, sakemm ma jkunx issejvjat",
+      "savePassword": "Issejvja l-password",
+      "savePasswordHint": "Jinżamm fil-maħżen ikkriptat fuq dan it-tagħmir.",
+      "chooseKey": "Agħżel ċavetta",
+      "noKeys": "Għad m'hemmx ċwievet",
+      "jumpHost": "Jump host",
+      "directConnection": "Konnessjoni diretta",
+      "tmuxAttach": "Ittakka tmux",
+      "tmuxSession": "Isem is-sessjoni tmux",
+      "saved": "Host issejvjat.",
+      "saveFailed": "Il-host ma setax jiġi ssejvjat."
+    },
+    "errors": {
+      "invalidPort": "Uża port minn 1 sa 65535",
+      "jumpCycle": "Dak il-host diġà jgħaddi minn dan."
+    },
+    "import": {
+      "title": "Importa l-konfigurazzjoni SSH",
+      "description": "Ippejstja l-konfigurazzjoni SSH tiegħek, jew agħżel il-fajl.",
+      "sourceLabel": "Konfigurazzjoni SSH",
+      "chooseFile": "Agħżel fajl",
+      "preview": "Previżjoni",
+      "apply": "Importa hosts",
+      "imported": "Hosts importati.",
+      "importFailed": "Ma ġie importat xejn.",
+      "nothingDescription": "Din il-konfigurazzjoni ma tiddeskrivix host li din l-app tista' timporta.",
+      "notImported": "Mhux importat",
+      "needsKey": "Jeħtieġ ċavetta",
+      "warnNeedsKey": "Il-fajl taċ-ċavetta tiegħu ma jistax jiġi importat. Agħżel ċavetta fl-editur.",
+      "warnJumpMissing": "{{target}} mhux fl-importazzjoni, għalhekk dan il-host jikkonnettja direttament.",
+      "warnJumpMultiHop": "Jiġi importat biss l-ewwel jump host.",
+      "warnJumpCycle": "{{target}} jgħaddi lura minn dan il-host, għalhekk il-jump tiegħu tneħħa.",
+      "warnForward": "Linja ta' forward f'dan il-host ma setgħetx tinqara.",
+      "skippedNoUsername": "{{alias}} m'għandux linja User.",
+      "skippedInvalidPort": "{{alias}} għandu port li mhuwiex numru minn 1 sa 65535.",
+      "unreadableFile": "Dak il-fajl ma setax jinqara."
+    },
+    "knownHosts": {
+      "title": "Hosts magħrufa",
+      "emptyTitle": "Għad m'hemmx hosts fdati",
+      "emptyDescription": "Ċavetta ta' host tiġi fdata l-ewwel darba li tikkonnettja magħha.",
+      "deleteTitle": "Tinsa {{pattern}}?",
+      "deleteMessage": "Il-konnessjoni li jmiss titolbok tafda ċ-ċavetta tiegħu mill-ġdid.",
+      "deleteFailed": "Iċ-ċavetta tal-host ma setgħetx titneħħa.",
+      "deleteLabel": "Tinsa {{pattern}}"
+    }
   }
 }

@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Wannan hanyar haɗin rabawa ta ƙare ko an soke ta.",
     "transcriptUnavailableTitle": "An kasa loda wannan rubutun tattaunawa",
     "transcriptUnavailableDescription": "Hanyar haɗin har yanzu tana aiki. Sake gwadawa nan ba da jimawa ba."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Haɗa zuwa sabar naka.",
+    "storage": {
+      "lockedTitle": "Buɗe makulli don amfani da SSH",
+      "lockedMessage": "Buɗe makullin na'urarka, sannan sake gwadawa.",
+      "unavailableTitle": "Ajiya ba ta samuwa",
+      "unavailableMessage": "Ba a iya buɗe ma'ajiyar manhajar da ke cikin na'urar ba. Sake kunna Kilo, sannan sake gwadawa."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Babu host tukuna",
+      "emptyDescription": "Ƙara host, ko shigo da hosts daga config ɗin SSH ɗinka.",
+      "addHost": "Ƙara host",
+      "importConfig": "Shigo daga config ɗin SSH",
+      "rowActions": "{{label}}, {{target}}. Yana buɗe gyara da share.",
+      "viaJump": "ta {{label}}",
+      "deleteTitle": "Share {{label}}?",
+      "deleteMessage": "Ana cire saitin sa da port forwards tare da shi. Ba za a iya juyar da wannan ba.",
+      "deleteFailed": "Ba a iya share host ɗin ba."
+    },
+    "editor": {
+      "newTitle": "Sabon host",
+      "editTitle": "Gyara host",
+      "label": "Lakabi",
+      "labelPlaceholder": "Sabar gida",
+      "hostname": "Sunan host",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Sunan mai amfani",
+      "authMethod": "Hanyar tabbatarwa",
+      "password": "Kalmar sirri",
+      "key": "Maɓallin SSH",
+      "keyboardInteractive": "Ma'amala ta madannai",
+      "passwordPlaceholder": "Ana rubuta shi lokacin haɗawa, sai dai idan an adana shi",
+      "savePassword": "Adana kalmar sirri",
+      "savePasswordHint": "Ana ajiye shi a ma'ajiyar sirri a wannan na'urar.",
+      "chooseKey": "Zaɓi maɓalli",
+      "noKeys": "Babu maɓallai tukuna",
+      "jumpHost": "Host ɗin tsalle",
+      "directConnection": "Haɗi kai tsaye",
+      "tmuxAttach": "Haɗa tmux",
+      "tmuxSession": "Sunan zaman tmux",
+      "saved": "An adana host ɗin.",
+      "saveFailed": "Ba a iya adana host ɗin ba."
+    },
+    "errors": {
+      "invalidPort": "Yi amfani da port daga 1 zuwa 65535",
+      "jumpCycle": "Wannan host ɗin ya riga ya bi ta wannan."
+    },
+    "import": {
+      "title": "Shigo da config ɗin SSH",
+      "description": "Manna config ɗin SSH ɗinka, ko zaɓi fayil ɗin.",
+      "sourceLabel": "Config ɗin SSH",
+      "chooseFile": "Zaɓi fayil",
+      "preview": "Duba",
+      "apply": "Shigo da hosts",
+      "imported": "An shigo da hosts.",
+      "importFailed": "Ba a shigo da komai ba.",
+      "nothingDescription": "Wannan config ɗin bai bayyana wani host da wannan manhaja za ta iya shigo da shi ba.",
+      "notImported": "Ba a shigo da shi ba",
+      "needsKey": "Yana bukatar maɓalli",
+      "warnNeedsKey": "Ba za a iya shigo da fayil ɗin maɓallinsa ba. Zaɓi maɓalli a cikin edita.",
+      "warnJumpMissing": "{{target}} ba ya cikin abin da aka shigo da shi, don haka wannan host ɗin yana haɗawa kai tsaye.",
+      "warnJumpMultiHop": "Ana shigo da host ɗin tsalle na farko ne kawai.",
+      "warnJumpCycle": "{{target}} yana komawa ta wannan host ɗin, don haka an cire tsallen sa.",
+      "warnForward": "Ba a iya karanta layin turawa a wannan host ɗin ba.",
+      "skippedNoUsername": "{{alias}} ba shi da layin User.",
+      "skippedInvalidPort": "{{alias}} yana da port wanda ba lamba ba ne daga 1 zuwa 65535.",
+      "unreadableFile": "Ba a iya karanta wannan fayil ɗin ba."
+    },
+    "knownHosts": {
+      "title": "Hosts da aka sani",
+      "emptyTitle": "Babu host ɗin da aka amince da su tukuna",
+      "emptyDescription": "Ana amincewa da maɓallin host a karon farko da ka haɗa zuwa gare shi.",
+      "deleteTitle": "Manta {{pattern}}?",
+      "deleteMessage": "Haɗin na gaba zai sake neman ka amince da maɓallinsa.",
+      "deleteFailed": "Ba a iya cire maɓallin host ɗin ba.",
+      "deleteLabel": "Manta {{pattern}}"
+    }
   }
 }

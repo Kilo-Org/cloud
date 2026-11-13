@@ -4150,5 +4150,88 @@
     "unavailableDescription": "Ova poveznica za dijeljenje je istekla ili je opozvana.",
     "transcriptUnavailableTitle": "Nije moguće učitati ovaj transkript",
     "transcriptUnavailableDescription": "Poveznica i dalje radi. Pokušajte ponovno za trenutak."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Povežite se s vlastitim poslužiteljima.",
+    "storage": {
+      "lockedTitle": "Otključajte za korištenje SSH-a",
+      "lockedMessage": "Otključajte uređaj pa pokušajte ponovno.",
+      "unavailableTitle": "Pohrana nedostupna",
+      "unavailableMessage": "Nije bilo moguće otvoriti pohranu aplikacije na uređaju. Ponovno pokrenite Kilo pa pokušajte ponovno."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Još nema hostova",
+      "emptyDescription": "Dodajte host ili uvezite hostove iz svoje SSH konfiguracije.",
+      "addHost": "Dodaj host",
+      "importConfig": "Uvezi iz SSH konfiguracije",
+      "rowActions": "{{label}}, {{target}}. Otvara uređivanje i brisanje.",
+      "viaJump": "preko {{label}}",
+      "deleteTitle": "Obriši {{label}}?",
+      "deleteMessage": "Njegove postavke i prosljeđivanja portova uklanjaju se zajedno s njim. To se ne može poništiti.",
+      "deleteFailed": "Host nije bilo moguće obrisati."
+    },
+    "editor": {
+      "newTitle": "Novi host",
+      "editTitle": "Uredi host",
+      "label": "Oznaka",
+      "labelPlaceholder": "Kućni poslužitelj",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Korisničko ime",
+      "authMethod": "Način autentifikacije",
+      "password": "Lozinka",
+      "key": "SSH ključ",
+      "keyboardInteractive": "Interaktivno putem tipkovnice",
+      "passwordPlaceholder": "Upisuje se pri povezivanju, osim ako je spremljena",
+      "savePassword": "Spremi lozinku",
+      "savePasswordHint": "Čuva se u šifriranoj pohrani na ovom uređaju.",
+      "chooseKey": "Odaberi ključ",
+      "noKeys": "Još nema ključeva",
+      "jumpHost": "Jump host",
+      "directConnection": "Izravna veza",
+      "tmuxAttach": "Priključi tmux",
+      "tmuxSession": "Naziv tmux sesije",
+      "saved": "Host je spremljen.",
+      "saveFailed": "Host nije bilo moguće spremiti."
+    },
+    "errors": {
+      "invalidPort": "Koristite port od 1 do 65535",
+      "jumpCycle": "Taj host već ide preko ovog hosta."
+    },
+    "import": {
+      "title": "Uvezi SSH konfiguraciju",
+      "description": "Zalijepite svoju SSH konfiguraciju ili odaberite datoteku.",
+      "sourceLabel": "SSH konfiguracija",
+      "chooseFile": "Odaberi datoteku",
+      "preview": "Pregled",
+      "apply": "Uvezi hostove",
+      "imported": "Hostovi su uvezeni.",
+      "importFailed": "Ništa nije uvezeno.",
+      "nothingDescription": "Ova konfiguracija ne opisuje nijedan host koji ova aplikacija može uvesti.",
+      "notImported": "Nije uvezeno",
+      "needsKey": "Potreban ključ",
+      "warnNeedsKey": "Njegovu datoteku ključa nije moguće uvesti. Odaberite ključ u uređivaču.",
+      "warnJumpMissing": "{{target}} nije u uvozu pa se ovaj host povezuje izravno.",
+      "warnJumpMultiHop": "Uvozi se samo prvi jump host.",
+      "warnJumpCycle": "{{target}} ide natrag preko ovog hosta pa je njegov jump host izostavljen.",
+      "warnForward": "Nije bilo moguće pročitati jednu liniju prosljeđivanja ovog hosta.",
+      "skippedNoUsername": "{{alias}} nema liniju User.",
+      "skippedInvalidPort": "{{alias}} ima port koji nije broj od 1 do 65535.",
+      "unreadableFile": "Tu datoteku nije bilo moguće pročitati."
+    },
+    "knownHosts": {
+      "title": "Poznati hostovi",
+      "emptyTitle": "Još nema pouzdanih hostova",
+      "emptyDescription": "Ključ hosta postaje pouzdan pri prvom povezivanju s njim.",
+      "deleteTitle": "Zaboravi {{pattern}}?",
+      "deleteMessage": "Pri sljedećem povezivanju ponovno ćete morati potvrditi povjerenje u njegov ključ.",
+      "deleteFailed": "Ključ hosta nije bilo moguće ukloniti.",
+      "deleteLabel": "Zaboravi {{pattern}}"
+    }
   }
 }

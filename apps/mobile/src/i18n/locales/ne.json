@@ -4085,5 +4085,88 @@
     "unavailableDescription": "यो सेयर लिङ्कको म्याद सकिएको छ वा रद्द गरिएको छ।",
     "transcriptUnavailableTitle": "यो ट्रान्सक्रिप्ट लोड गर्न सकिएन",
     "transcriptUnavailableDescription": "लिङ्कले अझै काम गर्छ। केही बेरपछि फेरि प्रयास गर्नुहोस्।"
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "आफ्नै सर्भरमा जडान गर्नुहोस्।",
+    "storage": {
+      "lockedTitle": "SSH प्रयोग गर्न अनलक गर्नुहोस्",
+      "lockedMessage": "आफ्नो यन्त्र अनलक गर्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
+      "unavailableTitle": "भण्डारण उपलब्ध छैन",
+      "unavailableMessage": "एपको यन्त्रभित्रको स्टोर खोल्न सकिएन। Kilo पुनः सुरु गर्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।"
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "अझै कुनै होस्ट छैन",
+      "emptyDescription": "होस्ट थप्नुहोस्, वा आफ्नो SSH कन्फिगबाट होस्टहरू ल्याउनुहोस्।",
+      "addHost": "होस्ट थप्नुहोस्",
+      "importConfig": "SSH कन्फिगबाट आयात गर्नुहोस्",
+      "rowActions": "{{label}}, {{target}}। सम्पादन र मेट्ने विकल्प खोल्छ।",
+      "viaJump": "{{label}} मार्फत",
+      "deleteTitle": "{{label}} मेट्ने?",
+      "deleteMessage": "यससँगै यसको सेटिङ र पोर्ट फर्वार्डहरू हटाइन्छन्। यो पूर्ववत गर्न सकिँदैन।",
+      "deleteFailed": "होस्ट मेट्न सकिएन।"
+    },
+    "editor": {
+      "newTitle": "नयाँ होस्ट",
+      "editTitle": "होस्ट सम्पादन",
+      "label": "लेबल",
+      "labelPlaceholder": "होम सर्भर",
+      "hostname": "HostName",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "पोर्ट",
+      "username": "प्रयोगकर्ता नाम",
+      "authMethod": "प्रमाणीकरण विधि",
+      "password": "पासवर्ड",
+      "key": "SSH कुञ्जी",
+      "keyboardInteractive": "किबोर्ड इन्टरएक्टिभ",
+      "passwordPlaceholder": "सेभ नगरेसम्म जडान गर्दा टाइप गरिन्छ",
+      "savePassword": "पासवर्ड सेभ गर्नुहोस्",
+      "savePasswordHint": "यो यन्त्रको इन्क्रिप्टेड स्टोरमा राखिन्छ।",
+      "chooseKey": "कुञ्जी छान्नुहोस्",
+      "noKeys": "अझै कुनै कुञ्जी छैन",
+      "jumpHost": "जम्प होस्ट",
+      "directConnection": "सिधा जडान",
+      "tmuxAttach": "tmux संलग्न गर्नुहोस्",
+      "tmuxSession": "tmux सत्र नाम",
+      "saved": "होस्ट सेभ भयो।",
+      "saveFailed": "होस्ट सेभ गर्न सकिएन।"
+    },
+    "errors": {
+      "invalidPort": "1 देखि 65535 सम्मको पोर्ट प्रयोग गर्नुहोस्",
+      "jumpCycle": "त्यो होस्ट पहिले नै यसै मार्फत जम्प हुन्छ।"
+    },
+    "import": {
+      "title": "SSH कन्फिग आयात गर्नुहोस्",
+      "description": "आफ्नो SSH कन्फिग टाँस्नुहोस्, वा फाइल छान्नुहोस्।",
+      "sourceLabel": "SSH कन्फिग",
+      "chooseFile": "फाइल छान्नुहोस्",
+      "preview": "पूर्वावलोकन",
+      "apply": "होस्टहरू आयात गर्नुहोस्",
+      "imported": "होस्टहरू आयात भए।",
+      "importFailed": "केही पनि आयात भएन।",
+      "nothingDescription": "यो कन्फिगले यो एपले आयात गर्न सक्ने कुनै होस्ट वर्णन गर्दैन।",
+      "notImported": "आयात भएको छैन",
+      "needsKey": "कुञ्जी आवश्यक",
+      "warnNeedsKey": "यसको कुञ्जी फाइल आयात गर्न सकिँदैन। सम्पादकमा कुञ्जी छान्नुहोस्।",
+      "warnJumpMissing": "{{target}} आयातमा छैन, त्यसैले यो होस्ट सिधै जडान हुन्छ।",
+      "warnJumpMultiHop": "पहिलो जम्प होस्ट मात्र आयात हुन्छ।",
+      "warnJumpCycle": "{{target}} यस होस्ट मार्फत फर्केर जम्प हुन्छ, त्यसैले यसको जम्प हटाइयो।",
+      "warnForward": "यो होस्टको एउटा फर्वार्ड लाइन पढ्न सकिएन।",
+      "skippedNoUsername": "{{alias}} मा User लाइन छैन।",
+      "skippedInvalidPort": "{{alias}} मा रहेको पोर्ट 1 देखि 65535 सम्मको संख्या होइन।",
+      "unreadableFile": "त्यो फाइल पढ्न सकिएन।"
+    },
+    "knownHosts": {
+      "title": "ज्ञात होस्टहरू",
+      "emptyTitle": "अझै कुनै विश्वसनीय होस्ट छैन",
+      "emptyDescription": "कुनै होस्टमा पहिलो पटक जडान गर्दा त्यसको कुञ्जीलाई विश्वास गरिन्छ।",
+      "deleteTitle": "{{pattern}} बिर्सने?",
+      "deleteMessage": "अर्को जडानमा यसको कुञ्जीलाई फेरि विश्वास गर्न भनिनेछ।",
+      "deleteFailed": "होस्ट कुञ्जी हटाउन सकिएन।",
+      "deleteLabel": "{{pattern}} बिर्सनुहोस्"
+    }
   }
 }

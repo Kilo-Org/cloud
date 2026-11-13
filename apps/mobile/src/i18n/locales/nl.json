@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Deze deellink is verlopen of ingetrokken.",
     "transcriptUnavailableTitle": "Kan dit transcript niet laden",
     "transcriptUnavailableDescription": "De link werkt nog. Probeer het zo opnieuw."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Verbind met je eigen servers.",
+    "storage": {
+      "lockedTitle": "Ontgrendel om SSH te gebruiken",
+      "lockedMessage": "Ontgrendel je apparaat en probeer het opnieuw.",
+      "unavailableTitle": "Opslag niet beschikbaar",
+      "unavailableMessage": "De opslag op dit apparaat kon niet worden geopend. Herstart Kilo en probeer het opnieuw."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Nog geen hosts",
+      "emptyDescription": "Voeg een host toe of importeer de hosts uit je SSH-configuratie.",
+      "addHost": "Host toevoegen",
+      "importConfig": "Importeren uit SSH-configuratie",
+      "rowActions": "{{label}}, {{target}}. Opent bewerken en verwijderen.",
+      "viaJump": "via {{label}}",
+      "deleteTitle": "{{label}} verwijderen?",
+      "deleteMessage": "De instellingen en port forwards worden mee verwijderd. Dit kan niet ongedaan worden gemaakt.",
+      "deleteFailed": "De host kon niet worden verwijderd."
+    },
+    "editor": {
+      "newTitle": "Nieuwe host",
+      "editTitle": "Host bewerken",
+      "label": "Label",
+      "labelPlaceholder": "Thuisserver",
+      "hostname": "Hostnaam",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Poort",
+      "username": "Gebruikersnaam",
+      "authMethod": "Authenticatiemethode",
+      "password": "Wachtwoord",
+      "key": "SSH-sleutel",
+      "keyboardInteractive": "Toetsenbordinteractief",
+      "passwordPlaceholder": "Wordt bij het verbinden ingevoerd, tenzij opgeslagen",
+      "savePassword": "Wachtwoord opslaan",
+      "savePasswordHint": "Bewaard in de versleutelde opslag op dit apparaat.",
+      "chooseKey": "Sleutel kiezen",
+      "noKeys": "Nog geen sleutels",
+      "jumpHost": "Jumphost",
+      "directConnection": "Directe verbinding",
+      "tmuxAttach": "tmux koppelen",
+      "tmuxSession": "Naam tmux-sessie",
+      "saved": "Host opgeslagen.",
+      "saveFailed": "De host kon niet worden opgeslagen."
+    },
+    "errors": {
+      "invalidPort": "Gebruik een poort van 1 tot 65535",
+      "jumpCycle": "Die host springt al via deze host."
+    },
+    "import": {
+      "title": "SSH-configuratie importeren",
+      "description": "Plak je SSH-configuratie of kies het bestand.",
+      "sourceLabel": "SSH-configuratie",
+      "chooseFile": "Bestand kiezen",
+      "preview": "Voorbeeld",
+      "apply": "Hosts importeren",
+      "imported": "Hosts geïmporteerd.",
+      "importFailed": "Er is niets geïmporteerd.",
+      "nothingDescription": "Deze configuratie bevat geen host die deze app kan importeren.",
+      "notImported": "Niet geïmporteerd",
+      "needsKey": "Sleutel nodig",
+      "warnNeedsKey": "Het sleutelbestand kan niet worden geïmporteerd. Kies een sleutel in de editor.",
+      "warnJumpMissing": "{{target}} zit niet in de import, dus deze host maakt direct verbinding.",
+      "warnJumpMultiHop": "Alleen de eerste jumphost wordt geïmporteerd.",
+      "warnJumpCycle": "{{target}} springt terug via deze host, dus de sprong is weggelaten.",
+      "warnForward": "Een forward-regel in deze host kon niet worden gelezen.",
+      "skippedNoUsername": "{{alias}} heeft geen User-regel.",
+      "skippedInvalidPort": "{{alias}} heeft een poort die geen getal van 1 tot 65535 is.",
+      "unreadableFile": "Dat bestand kon niet worden gelezen."
+    },
+    "knownHosts": {
+      "title": "Bekende hosts",
+      "emptyTitle": "Nog geen vertrouwde hosts",
+      "emptyDescription": "Een hostsleutel wordt vertrouwd zodra je er voor het eerst verbinding mee maakt.",
+      "deleteTitle": "{{pattern}} vergeten?",
+      "deleteMessage": "Bij de volgende verbinding moet je de sleutel opnieuw vertrouwen.",
+      "deleteFailed": "De hostsleutel kon niet worden verwijderd.",
+      "deleteLabel": "{{pattern}} vergeten"
+    }
   }
 }

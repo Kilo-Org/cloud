@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Þessi deilitengill er útrunninn eða hefur verið afturkallaður.",
     "transcriptUnavailableTitle": "Ekki tókst að hlaða þessu endurriti",
     "transcriptUnavailableDescription": "Tengillinn virkar enn. Reyndu aftur eftir smástund."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Tengstu þínum eigin netþjónum.",
+    "storage": {
+      "lockedTitle": "Opnaðu til að nota SSH",
+      "lockedMessage": "Opnaðu tækið og reyndu aftur.",
+      "unavailableTitle": "Geymsla ekki tiltæk",
+      "unavailableMessage": "Ekki tókst að opna geymslu forritsins á tækinu. Endurræstu Kilo og reyndu aftur."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Engir netþjónar ennþá",
+      "emptyDescription": "Bættu við netþjóni eða flyttu inn netþjóna úr SSH-stillingunni þinni.",
+      "addHost": "Bæta við netþjóni",
+      "importConfig": "Flytja inn úr SSH-stillingu",
+      "rowActions": "{{label}}, {{target}}. Opnar fyrir breytingu og eyðingu.",
+      "viaJump": "í gegnum {{label}}",
+      "deleteTitle": "Eyða {{label}}?",
+      "deleteMessage": "Stilling hans og gáttarflutningar eru fjarlægðir með honum. Þetta er ekki hægt að afturkalla.",
+      "deleteFailed": "Ekki tókst að eyða netþjóninum."
+    },
+    "editor": {
+      "newTitle": "Nýr netþjónn",
+      "editTitle": "Breyta netþjóni",
+      "label": "Heiti",
+      "labelPlaceholder": "Heimanetþjónn",
+      "hostname": "Vélarheiti",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Gátt",
+      "username": "Notandanafn",
+      "authMethod": "Auðkenningaraðferð",
+      "password": "Lykilorð",
+      "key": "SSH-lykill",
+      "keyboardInteractive": "Gagnvirkt lyklaborð",
+      "passwordPlaceholder": "Slegið inn við tengingu, nema vistað.",
+      "savePassword": "Vista lykilorð",
+      "savePasswordHint": "Geymt í dulkóðaðri geymslu á þessu tæki.",
+      "chooseKey": "Velja lykil",
+      "noKeys": "Engir lyklar ennþá",
+      "jumpHost": "Milliþjónn",
+      "directConnection": "Bein tenging",
+      "tmuxAttach": "Tengjast tmux",
+      "tmuxSession": "Heiti tmux-lotu",
+      "saved": "Netþjónn vistaður.",
+      "saveFailed": "Ekki tókst að vista netþjóninn."
+    },
+    "errors": {
+      "invalidPort": "Notaðu gátt frá 1 til 65535",
+      "jumpCycle": "Sá netþjónn fer þegar í gegnum þennan."
+    },
+    "import": {
+      "title": "Flytja inn SSH-stillingu",
+      "description": "Límdu SSH-stillinguna þína eða veldu skrána.",
+      "sourceLabel": "SSH-stilling",
+      "chooseFile": "Velja skrá",
+      "preview": "Forskoða",
+      "apply": "Flytja inn netþjóna",
+      "imported": "Netþjónar fluttir inn.",
+      "importFailed": "Ekkert var flutt inn.",
+      "nothingDescription": "Þessi stilling lýsir engum netþjóni sem forritið getur flutt inn.",
+      "notImported": "Ekki fluttur inn",
+      "needsKey": "Þarf lykil",
+      "warnNeedsKey": "Ekki er hægt að flytja inn lykilskrána hans. Veldu lykil í breytingaskjánum.",
+      "warnJumpMissing": "{{target}} er ekki í innflutningnum, svo þessi netþjónn tengist beint.",
+      "warnJumpMultiHop": "Aðeins fyrsti milliþjónninn er fluttur inn.",
+      "warnJumpCycle": "{{target}} fer aftur í gegnum þennan netþjón, svo millistökkinu var sleppt.",
+      "warnForward": "Ekki tókst að lesa gáttarflutningslínu í þessum netþjóni.",
+      "skippedNoUsername": "{{alias}} hefur enga User-línu.",
+      "skippedInvalidPort": "{{alias}} er með gátt sem er ekki tala frá 1 til 65535.",
+      "unreadableFile": "Ekki tókst að lesa þá skrá."
+    },
+    "knownHosts": {
+      "title": "Þekktir netþjónar",
+      "emptyTitle": "Engir treystir netþjónar ennþá",
+      "emptyDescription": "Netþjónslykli er treyst í fyrsta skipti sem þú tengist honum.",
+      "deleteTitle": "Gleyma {{pattern}}?",
+      "deleteMessage": "Næsta tenging biður þig að treysta lyklinum hans aftur.",
+      "deleteFailed": "Ekki tókst að fjarlægja netþjónslykilinn.",
+      "deleteLabel": "Gleyma {{pattern}}"
+    }
   }
 }

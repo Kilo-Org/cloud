@@ -4215,5 +4215,88 @@
     "unavailableDescription": "Ten link do udostępniania wygasł lub został unieważniony.",
     "transcriptUnavailableTitle": "Nie udało się wczytać tej transkrypcji",
     "transcriptUnavailableDescription": "Link nadal działa. Spróbuj ponownie za chwilę."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Połącz się z własnymi serwerami.",
+    "storage": {
+      "lockedTitle": "Odblokuj, aby użyć SSH",
+      "lockedMessage": "Odblokuj urządzenie, a następnie spróbuj ponownie.",
+      "unavailableTitle": "Pamięć niedostępna",
+      "unavailableMessage": "Nie udało się otworzyć pamięci aplikacji na urządzeniu. Uruchom ponownie Kilo i spróbuj ponownie."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Brak hostów",
+      "emptyDescription": "Dodaj hosta lub zaimportuj hosty z konfiguracji SSH.",
+      "addHost": "Dodaj hosta",
+      "importConfig": "Importuj z konfiguracji SSH",
+      "rowActions": "{{label}}, {{target}}. Otwiera edycję i usuwanie.",
+      "viaJump": "przez {{label}}",
+      "deleteTitle": "Usunąć {{label}}?",
+      "deleteMessage": "Jego ustawienia i przekierowania portów zostaną usunięte razem z nim. Tej operacji nie można cofnąć.",
+      "deleteFailed": "Nie udało się usunąć hosta."
+    },
+    "editor": {
+      "newTitle": "Nowy host",
+      "editTitle": "Edytuj hosta",
+      "label": "Etykieta",
+      "labelPlaceholder": "Serwer domowy",
+      "hostname": "Nazwa hosta",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Nazwa użytkownika",
+      "authMethod": "Metoda uwierzytelniania",
+      "password": "Hasło",
+      "key": "Klucz SSH",
+      "keyboardInteractive": "Interaktywne klawiaturowo",
+      "passwordPlaceholder": "Wpisywane przy połączeniu, chyba że zapisane",
+      "savePassword": "Zapisz hasło",
+      "savePasswordHint": "Przechowywane w zaszyfrowanej pamięci na tym urządzeniu.",
+      "chooseKey": "Wybierz klucz",
+      "noKeys": "Brak kluczy",
+      "jumpHost": "Host pośredniczący",
+      "directConnection": "Połączenie bezpośrednie",
+      "tmuxAttach": "Podłącz tmux",
+      "tmuxSession": "Nazwa sesji tmux",
+      "saved": "Zapisano hosta.",
+      "saveFailed": "Nie udało się zapisać hosta."
+    },
+    "errors": {
+      "invalidPort": "Użyj portu od 1 do 65535",
+      "jumpCycle": "Ten host już łączy się przez tego hosta."
+    },
+    "import": {
+      "title": "Importuj konfigurację SSH",
+      "description": "Wklej konfigurację SSH lub wybierz plik.",
+      "sourceLabel": "Konfiguracja SSH",
+      "chooseFile": "Wybierz plik",
+      "preview": "Podgląd",
+      "apply": "Importuj hosty",
+      "imported": "Zaimportowano hosty.",
+      "importFailed": "Nie zaimportowano niczego.",
+      "nothingDescription": "Ta konfiguracja nie opisuje żadnego hosta, który ta aplikacja może zaimportować.",
+      "notImported": "Nie zaimportowano",
+      "needsKey": "Wymaga klucza",
+      "warnNeedsKey": "Nie można zaimportować pliku jego klucza. Wybierz klucz w edytorze.",
+      "warnJumpMissing": "{{target}} nie występuje w imporcie, więc ten host łączy się bezpośrednio.",
+      "warnJumpMultiHop": "Importowany jest tylko pierwszy host pośredniczący.",
+      "warnJumpCycle": "{{target}} łączy się z powrotem przez tego hosta, więc pominięto jego hosta pośredniczącego.",
+      "warnForward": "Nie udało się odczytać wiersza przekierowania w tym hoście.",
+      "skippedNoUsername": "{{alias}} nie ma wiersza User.",
+      "skippedInvalidPort": "{{alias}} ma port, który nie jest liczbą od 1 do 65535.",
+      "unreadableFile": "Nie udało się odczytać tego pliku."
+    },
+    "knownHosts": {
+      "title": "Znane hosty",
+      "emptyTitle": "Brak zaufanych hostów",
+      "emptyDescription": "Klucz hosta jest zaufany przy pierwszym połączeniu z nim.",
+      "deleteTitle": "Zapomnieć {{pattern}}?",
+      "deleteMessage": "Przy następnym połączeniu znów zostaniesz poproszony o zaufanie jego kluczowi.",
+      "deleteFailed": "Nie udało się usunąć klucza hosta.",
+      "deleteLabel": "Zapomnij {{pattern}}"
+    }
   }
 }

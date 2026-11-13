@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Ìjápọ̀ ìpínpín yìí ti dópin tàbí a ti fagilé e.",
     "transcriptUnavailableTitle": "Kò ṣeé ṣe láti gbé àkọsílẹ̀ yìí jáde",
     "transcriptUnavailableDescription": "Ìjápọ̀ náà ṣì ń ṣiṣẹ́. Gbìyànjú lẹ́ẹ̀kan sí i láìpẹ́."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Sopọ̀ mọ́ àwọn sáfà tirẹ.",
+    "storage": {
+      "lockedTitle": "Ṣí kí o lè lo SSH",
+      "lockedMessage": "Ṣí ẹ̀rọ rẹ, lẹ́yìn náà tún gbìyànjú.",
+      "unavailableTitle": "Ibi ìpamọ́ kò wà",
+      "unavailableMessage": "A kò lè ṣí ibi ìpamọ́ orí ẹ̀rọ ti áàpù. Tún Kilo bẹ̀rẹ̀, lẹ́yìn náà tún gbìyànjú."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Kò tíì sí sáfà kankan",
+      "emptyDescription": "Fi sáfà kún, tàbí gbe àwọn sáfà wọlé láti inú SSH config rẹ.",
+      "addHost": "Fi sáfà kún",
+      "importConfig": "Gbe wọlé láti inú SSH config",
+      "rowActions": "{{label}}, {{target}}. Ṣí àtúnṣe àti ìparẹ́.",
+      "viaJump": "nípasẹ̀ {{label}}",
+      "deleteTitle": "Parẹ́ {{label}}?",
+      "deleteMessage": "A máa yọ ètò rẹ̀ àti àwọn ìtọ́ka port kúrò pẹ̀lú rẹ̀. A kò lè yí èyí padà.",
+      "deleteFailed": "A kò lè parẹ́ sáfà náà."
+    },
+    "editor": {
+      "newTitle": "Sáfà tuntun",
+      "editTitle": "Àtúnṣe sáfà",
+      "label": "Àmì",
+      "labelPlaceholder": "Sáfà ilé",
+      "hostname": "Orúkọ sáfà",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Port",
+      "username": "Orúkọ olùmúlò",
+      "authMethod": "Ọ̀nà ìjẹ́rìí",
+      "password": "Ọ̀rọ̀ ìpamọ́",
+      "key": "Kọ́kọ́rọ́ SSH",
+      "keyboardInteractive": "Ìbáṣepọ̀ kíbọ́ọ̀dù",
+      "passwordPlaceholder": "A máa tẹ̀ ẹ́ nígbà ìsopọ̀, àyàfi tí a bá fipamọ́",
+      "savePassword": "Fipamọ́ ọ̀rọ̀ ìpamọ́",
+      "savePasswordHint": "A máa pa á mọ́ ní ibi ìpamọ́ tí a fi àṣírí bo lórí ẹ̀rọ yìí.",
+      "chooseKey": "Yan kọ́kọ́rọ́ kan",
+      "noKeys": "Kò tíì sí kọ́kọ́rọ́ kankan",
+      "jumpHost": "Sáfà ìfò",
+      "directConnection": "Ìsopọ̀ tààrà",
+      "tmuxAttach": "So tmux mọ́",
+      "tmuxSession": "Orúkọ ìpàdé tmux",
+      "saved": "A ti fipamọ́ sáfà.",
+      "saveFailed": "A kò lè fipamọ́ sáfà náà."
+    },
+    "errors": {
+      "invalidPort": "Lo port láti 1 sí 65535",
+      "jumpCycle": "Sáfà yẹn ti ń fò nípasẹ̀ ẹyí."
+    },
+    "import": {
+      "title": "Gbe SSH config wọlé",
+      "description": "Lẹ̀ SSH config rẹ, tàbí yan fáìlì náà.",
+      "sourceLabel": "SSH config",
+      "chooseFile": "Yan fáìlì",
+      "preview": "Àyẹ̀wò",
+      "apply": "Gbe àwọn sáfà wọlé",
+      "imported": "A ti gbe àwọn sáfà wọlé.",
+      "importFailed": "Kò sí nǹkan tí a gbe wọlé.",
+      "nothingDescription": "Config yìí kò ṣàpèjúwe sáfà kankan tí áàpù yìí lè gbe wọlé.",
+      "notImported": "A kò gbe wọlé",
+      "needsKey": "Nílò kọ́kọ́rọ́",
+      "warnNeedsKey": "A kò lè gbe fáìlì kọ́kọ́rọ́ rẹ̀ wọlé. Yan kọ́kọ́rọ́ kan nínú àtúnṣe sáfà.",
+      "warnJumpMissing": "{{target}} kò sí nínú ìgbéwọlé, nítorí náà sáfà yìí máa ń sopọ̀ tààrà.",
+      "warnJumpMultiHop": "Sáfà ìfò àkọ́kọ́ nìkan ni a gbé wọlé.",
+      "warnJumpCycle": "{{target}} tún ń fò padà nípasẹ̀ sáfà yìí, nítorí náà a yọ ìfò rẹ̀ kúrò.",
+      "warnForward": "A kò lè kà ìlà ìtọ́ka kan nínú sáfà yìí.",
+      "skippedNoUsername": "{{alias}} kò ní ìlà User.",
+      "skippedInvalidPort": "{{alias}} ní port tí kì í ṣe nọ́mbà láti 1 sí 65535.",
+      "unreadableFile": "A kò lè kà fáìlì yẹn."
+    },
+    "knownHosts": {
+      "title": "Àwọn sáfà tí a mọ̀",
+      "emptyTitle": "Kò tíì sí sáfà tí a gbẹ́kẹ̀lé",
+      "emptyDescription": "A máa gbẹ́kẹ̀lé kọ́kọ́rọ́ sáfà nígbà àkọ́kọ́ tí o bá sopọ̀ mọ́ ẹ.",
+      "deleteTitle": "Gbàgbé {{pattern}}?",
+      "deleteMessage": "Ìsopọ̀ tó kàn yóò tún béèrè kí o gbẹ́kẹ̀lé kọ́kọ́rọ́ rẹ̀.",
+      "deleteFailed": "A kò lè yọ kọ́kọ́rọ́ sáfà kúrò.",
+      "deleteLabel": "Gbàgbé {{pattern}}"
+    }
   }
 }

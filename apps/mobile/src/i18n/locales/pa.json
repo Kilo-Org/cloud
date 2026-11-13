@@ -4085,5 +4085,88 @@
     "unavailableDescription": "ਇਸ ਸਾਂਝਾਕਰਨ ਲਿੰਕ ਦੀ ਮਿਆਦ ਖਤਮ ਹੋ ਗਈ ਹੈ ਜਾਂ ਇਸਨੂੰ ਰੱਦ ਕਰ ਦਿੱਤਾ ਗਿਆ ਹੈ।",
     "transcriptUnavailableTitle": "ਇਹ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ",
     "transcriptUnavailableDescription": "ਲਿੰਕ ਅਜੇ ਵੀ ਕੰਮ ਕਰਦਾ ਹੈ। ਥੋੜ੍ਹੀ ਦੇਰ ਬਾਅਦ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "ਆਪਣੇ ਸਰਵਰਾਂ ਨਾਲ ਕਨੈਕਟ ਕਰੋ।",
+    "storage": {
+      "lockedTitle": "SSH ਵਰਤਣ ਲਈ ਅਨਲਾਕ ਕਰੋ",
+      "lockedMessage": "ਆਪਣੀ ਡਿਵਾਈਸ ਅਨਲਾਕ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "unavailableTitle": "ਸਟੋਰੇਜ ਉਪਲਬਧ ਨਹੀਂ",
+      "unavailableMessage": "ਐਪ ਦਾ ਡਿਵਾਈਸ 'ਤੇ ਸਥਿਤ ਸਟੋਰ ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। Kilo ਨੂੰ ਰੀਸਟਾਰਟ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "ਹਾਲੇ ਕੋਈ ਹੋਸਟ ਨਹੀਂ",
+      "emptyDescription": "ਹੋਸਟ ਸ਼ਾਮਲ ਕਰੋ, ਜਾਂ ਆਪਣੀ SSH ਕਾਨਫਿਗ ਤੋਂ ਹੋਸਟ ਲਿਆਓ।",
+      "addHost": "ਹੋਸਟ ਸ਼ਾਮਲ ਕਰੋ",
+      "importConfig": "SSH ਕਾਨਫਿਗ ਤੋਂ ਆਯਾਤ ਕਰੋ",
+      "rowActions": "{{label}}, {{target}}। ਸੋਧ ਅਤੇ ਮਿਟਾਉਣਾ ਖੋਲ੍ਹਦਾ ਹੈ।",
+      "viaJump": "{{label}} ਰਾਹੀਂ",
+      "deleteTitle": "{{label}} ਮਿਟਾਉਣਾ ਹੈ?",
+      "deleteMessage": "ਇਸ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਅਤੇ ਪੋਰਟ ਫਾਰਵਰਡ ਇਸ ਨਾਲ ਹਟ ਜਾਣਗੇ। ਇਸ ਨੂੰ ਵਾਪਸ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।",
+      "deleteFailed": "ਹੋਸਟ ਮਿਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।"
+    },
+    "editor": {
+      "newTitle": "ਨਵਾਂ ਹੋਸਟ",
+      "editTitle": "ਹੋਸਟ ਸੋਧੋ",
+      "label": "ਲੇਬਲ",
+      "labelPlaceholder": "ਹੋਮ ਸਰਵਰ",
+      "hostname": "ਹੋਸਟਨੇਮ",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "ਪੋਰਟ",
+      "username": "ਉਪਭੋਗਤਾ ਨਾਮ",
+      "authMethod": "ਪਰਮਾਣਿਕਤਾ ਢੰਗ",
+      "password": "ਪਾਸਵਰਡ",
+      "key": "SSH ਕੁੰਜੀ",
+      "keyboardInteractive": "ਕੀਬੋਰਡ ਇੰਟਰਐਕਟਿਵ",
+      "passwordPlaceholder": "ਸੰਭਾਲਿਆ ਨਾ ਹੋਣ 'ਤੇ ਕਨੈਕਟ ਕਰਨ ਵੇਲੇ ਟਾਈਪ ਕੀਤਾ ਜਾਂਦਾ ਹੈ",
+      "savePassword": "ਪਾਸਵਰਡ ਸੰਭਾਲੋ",
+      "savePasswordHint": "ਇਸ ਡਿਵਾਈਸ ਦੇ ਐਨਕ੍ਰਿਪਟਿਡ ਸਟੋਰ ਵਿੱਚ ਰੱਖਿਆ ਜਾਂਦਾ ਹੈ।",
+      "chooseKey": "ਕੁੰਜੀ ਚੁਣੋ",
+      "noKeys": "ਹਾਲੇ ਕੋਈ ਕੁੰਜੀ ਨਹੀਂ",
+      "jumpHost": "ਜੰਪ ਹੋਸਟ",
+      "directConnection": "ਸਿੱਧਾ ਕਨੈਕਸ਼ਨ",
+      "tmuxAttach": "tmux ਅਟੈਚ ਕਰੋ",
+      "tmuxSession": "tmux ਸੈਸ਼ਨ ਨਾਮ",
+      "saved": "ਹੋਸਟ ਸੰਭਾਲਿਆ ਗਿਆ।",
+      "saveFailed": "ਹੋਸਟ ਸੰਭਾਲਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।"
+    },
+    "errors": {
+      "invalidPort": "1 ਤੋਂ 65535 ਤੱਕ ਦਾ ਪੋਰਟ ਵਰਤੋ",
+      "jumpCycle": "ਉਹ ਹੋਸਟ ਪਹਿਲਾਂ ਹੀ ਇਸ ਰਾਹੀਂ ਜੰਪ ਕਰਦਾ ਹੈ।"
+    },
+    "import": {
+      "title": "SSH ਕਾਨਫਿਗ ਆਯਾਤ ਕਰੋ",
+      "description": "ਆਪਣੀ SSH ਕਾਨਫਿਗ ਪੇਸਟ ਕਰੋ, ਜਾਂ ਫਾਈਲ ਚੁਣੋ।",
+      "sourceLabel": "SSH ਕਾਨਫਿਗ",
+      "chooseFile": "ਫਾਈਲ ਚੁਣੋ",
+      "preview": "ਝਲਕ",
+      "apply": "ਹੋਸਟ ਆਯਾਤ ਕਰੋ",
+      "imported": "ਹੋਸਟ ਆਯਾਤ ਕੀਤੇ ਗਏ।",
+      "importFailed": "ਕੁਝ ਵੀ ਆਯਾਤ ਨਹੀਂ ਹੋਇਆ।",
+      "nothingDescription": "ਇਹ ਕਾਨਫਿਗ ਅਜਿਹਾ ਕੋਈ ਹੋਸਟ ਨਹੀਂ ਦੱਸਦੀ ਜਿਸ ਨੂੰ ਇਹ ਐਪ ਆਯਾਤ ਕਰ ਸਕੇ।",
+      "notImported": "ਆਯਾਤ ਨਹੀਂ ਹੋਇਆ",
+      "needsKey": "ਕੁੰਜੀ ਲੋੜੀਂਦੀ ਹੈ",
+      "warnNeedsKey": "ਇਸ ਦੀ ਕੁੰਜੀ ਫਾਈਲ ਆਯਾਤ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ। ਐਡੀਟਰ ਵਿੱਚ ਕੁੰਜੀ ਚੁਣੋ।",
+      "warnJumpMissing": "{{target}} ਆਯਾਤ ਵਿੱਚ ਨਹੀਂ ਹੈ, ਇਸ ਲਈ ਇਹ ਹੋਸਟ ਸਿੱਧਾ ਕਨੈਕਟ ਕਰਦਾ ਹੈ।",
+      "warnJumpMultiHop": "ਸਿਰਫ਼ ਪਹਿਲਾ ਜੰਪ ਹੋਸਟ ਆਯਾਤ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
+      "warnJumpCycle": "{{target}} ਇਸ ਹੋਸਟ ਰਾਹੀਂ ਵਾਪਸ ਜੰਪ ਕਰਦਾ ਹੈ, ਇਸ ਲਈ ਇਸ ਦਾ ਜੰਪ ਹਟਾ ਦਿੱਤਾ ਗਿਆ।",
+      "warnForward": "ਇਸ ਹੋਸਟ ਵਿੱਚ ਇੱਕ ਫਾਰਵਰਡ ਲਾਈਨ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕੀ।",
+      "skippedNoUsername": "{{alias}} ਵਿੱਚ User ਲਾਈਨ ਨਹੀਂ ਹੈ।",
+      "skippedInvalidPort": "{{alias}} ਦਾ ਪੋਰਟ 1 ਤੋਂ 65535 ਤੱਕ ਦੀ ਸੰਖਿਆ ਨਹੀਂ ਹੈ।",
+      "unreadableFile": "ਉਹ ਫਾਈਲ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕੀ।"
+    },
+    "knownHosts": {
+      "title": "ਜਾਣੇ-ਪਛਾਣੇ ਹੋਸਟ",
+      "emptyTitle": "ਹਾਲੇ ਕੋਈ ਭਰੋਸੇਯੋਗ ਹੋਸਟ ਨਹੀਂ",
+      "emptyDescription": "ਪਹਿਲੀ ਵਾਰ ਕਨੈਕਟ ਕਰਨ 'ਤੇ ਹੋਸਟ ਕੁੰਜੀ ਨੂੰ ਭਰੋਸੇਯੋਗ ਮੰਨਿਆ ਜਾਂਦਾ ਹੈ।",
+      "deleteTitle": "{{pattern}} ਨੂੰ ਭੁੱਲਣਾ ਹੈ?",
+      "deleteMessage": "ਅਗਲੀ ਵਾਰ ਕਨੈਕਟ ਕਰਨ 'ਤੇ ਤੁਹਾਨੂੰ ਦੁਬਾਰਾ ਇਸ ਦੀ ਕੁੰਜੀ 'ਤੇ ਭਰੋਸਾ ਕਰਨ ਲਈ ਕਿਹਾ ਜਾਵੇਗਾ।",
+      "deleteFailed": "ਹੋਸਟ ਕੁੰਜੀ ਹਟਾਈ ਨਹੀਂ ਜਾ ਸਕੀ।",
+      "deleteLabel": "{{pattern}} ਭੁੱਲੋ"
+    }
   }
 }

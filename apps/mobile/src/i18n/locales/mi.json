@@ -4085,5 +4085,88 @@
     "unavailableDescription": "Kua pau, kua whakakorehia rānei tēnei hono tiri.",
     "transcriptUnavailableTitle": "Kāore i taea te uta i tēnei tuhinga",
     "transcriptUnavailableDescription": "Kei te mahi tonu te hono. Ngana anō ā kō ake nei."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "Hono atu ki ōu ake tūmau.",
+    "storage": {
+      "lockedTitle": "Wetekia kia whakamahi SSH",
+      "lockedMessage": "Wetekia tō pūrere, kātahi ka whakamātau anō.",
+      "unavailableTitle": "Kāore te rokiroki e wātea",
+      "unavailableMessage": "Kāore i taea te whakatuwhera i te rokiroki ā-pūrere o te taupānga. Whakaara anō i a Kilo, kātahi ka whakamātau anō."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "Kāore anō he pou",
+      "emptyDescription": "Tāpiri he pou, kawe mai rānei i ngā pou mai i tō whirihoranga SSH.",
+      "addHost": "Tāpiri pou",
+      "importConfig": "Kawemai mai i te whirihoranga SSH",
+      "rowActions": "{{label}}, {{target}}. Ka whakatuwhera i te whakatika me te muku.",
+      "viaJump": "mā {{label}}",
+      "deleteTitle": "Muku {{label}}?",
+      "deleteMessage": "Ka tangohia tahitia ōna tautuhinga me ōna whakawhiti tauranga. Kāore e taea te whakahoki.",
+      "deleteFailed": "Kāore i taea te muku i te pou."
+    },
+    "editor": {
+      "newTitle": "Pou hou",
+      "editTitle": "Whakatika pou",
+      "label": "Tapanga",
+      "labelPlaceholder": "Tūmau kāinga",
+      "hostname": "Ingoa pou",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "Tauranga",
+      "username": "Ingoa kaiwhakamahi",
+      "authMethod": "Tikanga whakamana",
+      "password": "Kupuhipa",
+      "key": "Kī SSH",
+      "keyboardInteractive": "Papapātuhi pāhekoheko",
+      "passwordPlaceholder": "Ka patohia ina hono atu, ki te kore e tiakina",
+      "savePassword": "Tiaki kupuhipa",
+      "savePasswordHint": "Ka tiakina ki te rokiroki whakamunatia o tēnei pūrere.",
+      "chooseKey": "Kōwhiri kī",
+      "noKeys": "Kāore anō he kī",
+      "jumpHost": "Pou peke",
+      "directConnection": "Hononga tōtika",
+      "tmuxAttach": "Āpiti tmux",
+      "tmuxSession": "Ingoa wātū tmux",
+      "saved": "Kua tiakina te pou.",
+      "saveFailed": "Kāore i taea te tiaki i te pou."
+    },
+    "errors": {
+      "invalidPort": "Whakamahia he tauranga mai i 1 ki 65535",
+      "jumpCycle": "Kua peke kē tērā pou mā tēnei."
+    },
+    "import": {
+      "title": "Kawemai whirihoranga SSH",
+      "description": "Whakapirihia tō whirihoranga SSH, kōwhiria rānei te kōnae.",
+      "sourceLabel": "Whirihoranga SSH",
+      "chooseFile": "Kōwhiri kōnae",
+      "preview": "Arokite",
+      "apply": "Kawemai pou",
+      "imported": "Kua kawemai ngā pou.",
+      "importFailed": "Kāore he mea i kawemai.",
+      "nothingDescription": "Kāore tēnei whirihoranga e whakaatu ana i tētahi pou ka taea e tēnei taupānga te kawemai.",
+      "notImported": "Kāore i kawemai",
+      "needsKey": "Hiahia kī",
+      "warnNeedsKey": "Kāore e taea te kawemai tōna kōnae kī. Kōwhiria he kī i te ētita.",
+      "warnJumpMissing": "Kāore a {{target}} i te kawemai, nō reira ka hono tōtika tēnei pou.",
+      "warnJumpMultiHop": "Ko te pou peke tuatahi anake ka kawemai.",
+      "warnJumpCycle": "Ka peke hoki a {{target}} mā tēnei pou, nō reira i whakarerea tōna peke.",
+      "warnForward": "Kāore i taea te pānui i tētahi rārangi whakawhiti i tēnei pou.",
+      "skippedNoUsername": "Kāore he rārangi User a {{alias}}.",
+      "skippedInvalidPort": "He tauranga tō {{alias}} kāore i te nama mai i 1 ki 65535.",
+      "unreadableFile": "Kāore i taea te pānui i tērā kōnae."
+    },
+    "knownHosts": {
+      "title": "Pou mōhiotia",
+      "emptyTitle": "Kāore anō he pou whakawhirinaki",
+      "emptyDescription": "Ka whakawhirinakihia te kī pou i te wā tuatahi e hono atu ai koe ki a ia.",
+      "deleteTitle": "Wareware ki a {{pattern}}?",
+      "deleteMessage": "Ka pātai te hononga e whai ake nei kia whakawhirinaki anō koe ki tōna kī.",
+      "deleteFailed": "Kāore i taea te tango i te kī pou.",
+      "deleteLabel": "Wareware ki a {{pattern}}"
+    }
   }
 }

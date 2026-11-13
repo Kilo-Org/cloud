@@ -4085,5 +4085,88 @@
     "unavailableDescription": "ลิงก์แชร์นี้หมดอายุหรือถูกเพิกถอนแล้ว.",
     "transcriptUnavailableTitle": "โหลดบันทึกการสนทนานี้ไม่ได้",
     "transcriptUnavailableDescription": "ลิงก์ยังใช้งานได้ โปรดลองอีกครั้งในอีกสักครู่."
+  },
+  "ssh": {
+    "title": "SSH",
+    "subtitle": "เชื่อมต่อกับเซิร์ฟเวอร์ของคุณเอง.",
+    "storage": {
+      "lockedTitle": "ปลดล็อกเพื่อใช้ SSH",
+      "lockedMessage": "ปลดล็อกอุปกรณ์ของคุณ แล้วลองอีกครั้ง.",
+      "unavailableTitle": "ที่จัดเก็บไม่พร้อมใช้งาน",
+      "unavailableMessage": "ไม่สามารถเปิดที่จัดเก็บข้อมูลในเครื่องของแอปได้ รีสตาร์ท Kilo แล้วลองอีกครั้ง."
+    },
+    "field": {
+      "value": "{{label}}: {{value}}"
+    },
+    "hosts": {
+      "emptyTitle": "ยังไม่มีโฮสต์",
+      "emptyDescription": "เพิ่มโฮสต์ หรือนำเข้าโฮสต์จาก SSH config ของคุณ.",
+      "addHost": "เพิ่มโฮสต์",
+      "importConfig": "นำเข้าจาก SSH config",
+      "rowActions": "{{label}}, {{target}} เปิดการแก้ไขและลบ.",
+      "viaJump": "ผ่าน {{label}}",
+      "deleteTitle": "ลบ {{label}}?",
+      "deleteMessage": "การตั้งค่าและการส่งต่อพอร์ตจะถูกลบไปพร้อมกัน ไม่สามารถย้อนกลับได้.",
+      "deleteFailed": "ไม่สามารถลบโฮสต์ได้."
+    },
+    "editor": {
+      "newTitle": "โฮสต์ใหม่",
+      "editTitle": "แก้ไขโฮสต์",
+      "label": "ป้ายชื่อ",
+      "labelPlaceholder": "เซิร์ฟเวอร์ที่บ้าน",
+      "hostname": "Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "port": "พอร์ต",
+      "username": "ชื่อผู้ใช้",
+      "authMethod": "วิธีการยืนยันตัวตน",
+      "password": "รหัสผ่าน",
+      "key": "คีย์ SSH",
+      "keyboardInteractive": "Keyboard interactive",
+      "passwordPlaceholder": "พิมพ์เมื่อเชื่อมต่อ เว้นแต่จะบันทึกไว้",
+      "savePassword": "บันทึกรหัสผ่าน",
+      "savePasswordHint": "เก็บไว้ในที่จัดเก็บที่เข้ารหัสบนอุปกรณ์นี้.",
+      "chooseKey": "เลือกคีย์",
+      "noKeys": "ยังไม่มีคีย์",
+      "jumpHost": "Jump host",
+      "directConnection": "เชื่อมต่อโดยตรง",
+      "tmuxAttach": "เชื่อมต่อ tmux",
+      "tmuxSession": "ชื่อเซสชัน tmux",
+      "saved": "บันทึกโฮสต์แล้ว.",
+      "saveFailed": "ไม่สามารถบันทึกโฮสต์ได้."
+    },
+    "errors": {
+      "invalidPort": "ใช้พอร์ตตั้งแต่ 1 ถึง 65535",
+      "jumpCycle": "โฮสต์นั้นใช้โฮสต์นี้เป็น jump host อยู่แล้ว."
+    },
+    "import": {
+      "title": "นำเข้า SSH config",
+      "description": "วาง SSH config ของคุณ หรือเลือกไฟล์.",
+      "sourceLabel": "SSH config",
+      "chooseFile": "เลือกไฟล์",
+      "preview": "ดูตัวอย่าง",
+      "apply": "นำเข้าโฮสต์",
+      "imported": "นำเข้าโฮสต์แล้ว.",
+      "importFailed": "ไม่มีรายการใดถูกนำเข้า.",
+      "nothingDescription": "config นี้ไม่มีโฮสต์ที่แอปนี้สามารถนำเข้าได้.",
+      "notImported": "ไม่ได้นำเข้า",
+      "needsKey": "ต้องใช้คีย์",
+      "warnNeedsKey": "ไม่สามารถนำเข้าไฟล์คีย์ของโฮสต์นี้ได้ เลือกคีย์ในหน้าตัวแก้ไข.",
+      "warnJumpMissing": "{{target}} ไม่ได้ถูกนำเข้า โฮสต์นี้จึงเชื่อมต่อโดยตรง.",
+      "warnJumpMultiHop": "นำเข้าเฉพาะ jump host ตัวแรกเท่านั้น.",
+      "warnJumpCycle": "{{target}} ใช้โฮสต์นี้เป็น jump host ย้อนกลับ จึงตัดการตั้งค่า jump host ออก.",
+      "warnForward": "ไม่สามารถอ่านบรรทัดการส่งต่อพอร์ตในโฮสต์นี้ได้.",
+      "skippedNoUsername": "{{alias}} ไม่มีบรรทัด User.",
+      "skippedInvalidPort": "{{alias}} มีพอร์ตที่ไม่ใช่ตัวเลขตั้งแต่ 1 ถึง 65535.",
+      "unreadableFile": "ไม่สามารถอ่านไฟล์นั้นได้."
+    },
+    "knownHosts": {
+      "title": "โฮสต์ที่รู้จัก",
+      "emptyTitle": "ยังไม่มีโฮสต์ที่เชื่อถือได้",
+      "emptyDescription": "คีย์โฮสต์จะถูกเชื่อถือเมื่อคุณเชื่อมต่อกับโฮสต์นั้นเป็นครั้งแรก.",
+      "deleteTitle": "ลืม {{pattern}}?",
+      "deleteMessage": "การเชื่อมต่อครั้งถัดไปจะถามให้คุณเชื่อถือคีย์อีกครั้ง.",
+      "deleteFailed": "ไม่สามารถลบคีย์โฮสต์ได้.",
+      "deleteLabel": "ลืม {{pattern}}"
+    }
   }
 }

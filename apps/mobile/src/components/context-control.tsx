@@ -216,6 +216,16 @@ export function ContextControl({
     </Text>
   );
 
+  // The trailing glyph's box. In the `field` shape the column's chevrons all
+  // end on the body's trailing edge — the Repository and Branch triggers draw a
+  // bare 14 dp chevron — so this one must not sit in a wider fixed box, or the
+  // top chevron stops ~1.9 dp short of the ones below it in what is meant to be
+  // one column. The inline row keeps its `size-5` box, which is what holds the
+  // row's line height steady there.
+  const trailingGlyphClass = field
+    ? 'shrink-0 items-center justify-center'
+    : 'size-5 shrink-0 items-center justify-center';
+
   // The `field` shape puts its content in the shared 48 dp trigger body, so
   // every stated height (value, skeleton, retry) fills the same box as the
   // other pickers in the column. The inline shape is a single row and lays its
@@ -245,7 +255,7 @@ export function ContextControl({
       {fieldBody(
         <>
           {content}
-          <View className="size-5 shrink-0 items-center justify-center">
+          <View className={trailingGlyphClass}>
             {retryBusy && <ActivityIndicator size="small" color={colors.mutedForeground} />}
           </View>
         </>
@@ -269,7 +279,7 @@ export function ContextControl({
       {fieldBody(
         <>
           {content}
-          <View className="size-5 shrink-0 items-center justify-center">
+          <View className={trailingGlyphClass}>
             {pickerBusy ? (
               <ActivityIndicator size="small" color={colors.mutedForeground} />
             ) : (

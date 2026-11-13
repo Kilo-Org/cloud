@@ -136,8 +136,14 @@ export function RepositoryBranchSelector({
           >
             <View className={BRANCH_ROW_BODY_CLASS}>
               {/* A branch-name line, so the placeholder reads as the row it
-                  becomes instead of a block that resizes into one. */}
-              <Skeleton className="h-4 w-full" />
+                  becomes instead of a block that resizes into one.
+                  `bg-muted-soft`, not the default `bg-skeleton-fill`: in the
+                  light palette that fill equals this row's `bg-secondary`, so
+                  a default bar painted nothing and the loading row read as an
+                  empty field (org-usage-stats.tsx reserves its value the same
+                  way). `w-1/3` makes it read as a branch name, not a progress
+                  bar. */}
+              <Skeleton className="h-4 w-1/3 bg-muted-soft" />
             </View>
           </View>
         );
@@ -184,11 +190,13 @@ export function RepositoryBranchSelector({
             {renderTrigger()}
             {/* The provider holds branches this list cannot include: say so here,
                 before the sheet is opened, rather than presenting a partial list
-                as the repository's whole set. */}
+                as the repository's whole set. It sits under a live trigger, so
+                it is muted helper text with no frame of its own — a second
+                bordered box there would read as another, broken picker. */}
             {section.truncated ? (
-              <View className="mt-2">
-                {renderNote(t('agentChat.newSession.branchListIncomplete'))}
-              </View>
+              <Text className="mt-2 text-sm text-muted-foreground">
+                {t('agentChat.newSession.branchListIncomplete')}
+              </Text>
             ) : null}
           </>
         );

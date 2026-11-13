@@ -79,9 +79,11 @@ export const FIELD_TRIGGER_FRAME_CLASS =
  * The content box inside {@link FIELD_TRIGGER_FRAME_CLASS}. Every trigger and
  * every state of one renders in this box, so all of them measure
  * `48 dp + the frame's two borders` (50 dp) — above `DESIGN.md:364`'s 44pt
- * floor, and the height the 48 dp form buttons below them already use. A
- * value line, a skeleton, a note or a 48 dp action all fit inside it without
- * growing the frame.
+ * floor, and the height the controls beside them take rather than their own:
+ * a 48 dp action on the same row stretches to this frame's outer edges, so the
+ * two boxes line up instead of one sitting a border inside the other. A value
+ * line, a skeleton, a note or a 48 dp action all fit inside it without growing
+ * the frame.
  */
 export const FIELD_TRIGGER_BODY_CLASS = 'min-h-[48px] flex-1 flex-row items-center gap-2';
 

@@ -94,6 +94,11 @@ export function NewSessionRunTarget({
             size="icon"
             onPress={handleRefresh}
             disabled={disabled}
+            // The trigger beside it owns the row's height (48 dp of content plus
+            // its two borders), so the square gives up its own box and stretches
+            // to those same edges instead of sitting 1 dp inside them. The
+            // corner radius matches the trigger's frame for the same reason.
+            className="h-auto w-auto aspect-square self-stretch rounded-lg"
             // A refetch in flight is not a disabled state: the button keeps the
             // glyph at full foreground ink and stays pressable, and the tap
             // animates the same glyph. Disabling it would dim the only mark it

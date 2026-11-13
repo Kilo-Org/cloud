@@ -646,8 +646,19 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     const label = picker(ui).findByType(Text);
     expect(label.props.className).toContain('flex-1');
     expect(label.props.className).toContain('text-foreground');
+    // The column's chevrons all end on the body's trailing edge — the
+    // Repository and Branch triggers draw a bare 14 dp glyph — so this one must
+    // not sit in a fixed `size-5` box (17.52 dp at this app's 14 pt rem), which
+    // left the top chevron ~1.9 dp short of the ones below it.
+    const glyphBox = picker(ui).findByType('ChevronDown' as never).parent?.props
+      .className as string;
+    expect(glyphBox).not.toContain('size-5');
     const inline = await mount();
     const inlineTrigger = picker(inline).props.className as string;
     expect(inlineTrigger).not.toContain('bg-secondary');
+    // The inline row keeps its fixed glyph box, which holds the line height.
+    const inlineGlyphBox = picker(inline).findByType('ChevronDown' as never).parent?.props
+      .className as string;
+    expect(inlineGlyphBox).toContain('size-5');
   });
 });

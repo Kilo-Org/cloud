@@ -200,6 +200,13 @@ describe('RepositoryBranchSelector', () => {
 
     expect(texts(renderer)).toContain(partialNote);
 
+    // The note sits under a live trigger, so it is helper text with no frame of
+    // its own: a second bordered `bg-secondary` box there read as another,
+    // broken picker sitting 8 dp below the real one. Exactly one node may draw
+    // the trigger frame and its 48 dp body.
+    expect(rowsWithClass(renderer, 'bg-secondary')).toHaveLength(1);
+    expect(rowsWithClass(renderer, 'min-h-[48px]')).toHaveLength(1);
+
     openPicker(renderer, 'main');
 
     expect(branchPickerSlot.get(UNFENCED_ROUTE_KEY)?.truncated).toBe(true);
@@ -256,6 +263,14 @@ describe('RepositoryBranchSelector', () => {
         node => node.props.accessibilityLabel === i18n.t('agentChat.newSession.branchLoading')
       )
     ).not.toHaveLength(0);
+
+    // `--skeleton-fill` equals `--secondary` in the light palette, so a default
+    // bar on this row's own `bg-secondary` fill painted nothing and the loading
+    // state read as an empty field. The bar takes `bg-muted-soft`, and `w-1/3`
+    // sizes it as a branch name rather than a progress bar.
+    const bar = loading.root.findAllByType('Skeleton' as never)[0];
+    expect(classesOf(bar)).toEqual(expect.arrayContaining(['h-4', 'w-1/3', 'bg-muted-soft']));
+    expect(classesOf(bar)).not.toContain('bg-skeleton-fill');
 
     const loaded = mountSelector(githubRow);
     expect(rowFrame(loaded)?.props.accessibilityLabel).toBe(branchLabel('main'));

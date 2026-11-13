@@ -481,15 +481,11 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         return;
       }
 
-      let executedResultEvents: ToolResultEvent[] = [];
-
-      try {
-        executedResultEvents = await runToolCalls(toolCallEvents, guardedExecuteToolCall, signal);
-      } catch (error) {
-        if (!isAbortError(error)) {
-          throw error;
-        }
-      }
+      const executedResultEvents = await runToolCalls(
+        toolCallEvents,
+        guardedExecuteToolCall,
+        signal
+      );
 
       // Every call needs a result: a stopped turn leaves the rest unanswered, and a provider rejects a replayed call that never got one.
       const answeredToolCallIds = new Set(executedResultEvents.map(event => event.toolCallId));

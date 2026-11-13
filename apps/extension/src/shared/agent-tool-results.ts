@@ -31,18 +31,28 @@ export const runToolCalls = <ToolCall extends ToolCallEvent>(
       return results;
     }
 
-    // A tool that throws must still produce an error tool-result: providers require a result for every call, and the model needs the failure text to react. Only an abort propagates.
-    const result: EvalTabResult = await executeToolCall(toolCall).catch((error: unknown) => {
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw error;
+    /*
+     * A tool that throws must still produce an error tool-result: providers
+     * require a result for every call, and the model needs the failure text to
+     * react. An abort ends the batch without a result for the call it
+     * interrupted, but the calls that already ran keep theirs.
+     */
+    const result: EvalTabResult | undefined = await executeToolCall(toolCall).catch(
+      (error: unknown) => {
+        if (error instanceof Error && error.name === 'AbortError') {
+          // oxlint-disable-next-line unicorn/no-useless-undefined -- the interrupted call has no result; the caller answers it as unanswered.
+          return undefined;
+        }
+        return {
+          error: `${toolCall.name} failed: ${error instanceof Error ? error.message : String(error)}`,
+          ok: false as const,
+        };
       }
-      return {
-        error: `${toolCall.name} failed: ${error instanceof Error ? error.message : String(error)}`,
-        ok: false as const,
-      };
-    });
+    );
 
-    return runNext(index + 1, [...results, toToolResultEvent(toolCall, result)]);
+    return result === undefined
+      ? results
+      : runNext(index + 1, [...results, toToolResultEvent(toolCall, result)]);
   };
 
   return runNext(0, []);

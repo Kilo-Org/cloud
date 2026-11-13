@@ -21,6 +21,28 @@ const SECRET_PATTERNS: { pattern: RegExp; replacement: string }[] = [
     replacement: `$1${REDACTED}`,
   },
   {
+    pattern: /(Authorization\s*:\s*)(?!\s*(?:Bearer|Basic)\b)[^\r\n]+/gi,
+    replacement: `$1${REDACTED}`,
+  },
+  {
+    pattern:
+      /(("|')[A-Za-z0-9_.-]*(?:secret|token|password|passphrase|credential|api[_-]?key|private[_-]?key|access[_-]?key|authorization|cookie)[A-Za-z0-9_.-]*\2\s*:\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/gi,
+    replacement: `$1"${REDACTED}"`,
+  },
+  {
+    pattern: /(("|')(?:key|access|refresh)\2\s*:\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/gi,
+    replacement: `$1"${REDACTED}"`,
+  },
+  {
+    pattern:
+      /(\\+"[A-Za-z0-9_.-]*(?:secret|token|password|passphrase|credential|key|authorization|cookie|access|refresh)[A-Za-z0-9_.-]*\\+"\s*:\s*)[^\r\n]+/gi,
+    replacement: `$1${REDACTED}`,
+  },
+  {
+    pattern: /(https?:\/\/[^\s<>"'\\?]+)\?[^\s<>"'\\]*/gi,
+    replacement: `$1?${REDACTED}`,
+  },
+  {
     pattern: /(https?:\/\/)[^\s/@]+@/gi,
     replacement: `$1${REDACTED}@`,
   },
@@ -30,7 +52,7 @@ const SECRET_PATTERNS: { pattern: RegExp; replacement: string }[] = [
   },
   {
     pattern:
-      /\b([A-Za-z0-9_]*(?:SECRET|TOKEN|PASSWORD|PASSPHRASE|CREDENTIAL|API_KEY|PRIVATE_KEY|ACCESS_KEY)[A-Za-z0-9_]*)\s*=\s*(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s\r\n]+)/gi,
+      /\b([A-Za-z0-9_-]*(?:SECRET|TOKEN|PASSWORD|PASSPHRASE|CREDENTIAL|API[_-]?KEY|PRIVATE[_-]?KEY|ACCESS[_-]?KEY)[A-Za-z0-9_-]*)\s*=\s*(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s\r\n]+)/gi,
     replacement: `$1=${REDACTED}`,
   },
   {

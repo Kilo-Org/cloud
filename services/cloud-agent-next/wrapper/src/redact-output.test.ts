@@ -30,6 +30,39 @@ describe('redactSecrets', () => {
     expect(redactSecrets('Cookie: session=abc123; csrf=xyz')).toBe('Cookie: [REDACTED]');
   });
 
+  it('redacts structured runtime credentials and custom authorization schemes', () => {
+    const text = JSON.stringify({
+      apiKey: 'synthetic-api-key',
+      token: 'synthetic-token',
+      password: 'synthetic-password',
+      key: 'synthetic-key',
+      authorization: 'Bearer synthetic-auth',
+      Cookie: 'synthetic-cookie',
+      safe: 'session drain pending',
+    });
+    const safe = redactSecrets(text);
+    expect(safe).not.toContain('synthetic-');
+    expect(safe).toContain('session drain pending');
+    expect(redactSecrets('Authorization: Custom synthetic-credential')).toBe(
+      'Authorization: [REDACTED]'
+    );
+    expect(redactSecrets('apiKey=synthetic-api-key')).toBe('apiKey=[REDACTED]');
+    const escaped = JSON.stringify({
+      error: JSON.stringify({ headers: { authorization: 'synthetic-secret' } }),
+    });
+    expect(redactSecrets(escaped)).not.toContain('synthetic-secret');
+  });
+
+  it.each([
+    'https://logs.example/file?X-Amz-Signature=synthetic-secret&X-Amz-Credential=synthetic-key',
+    'https://logs.example/file?token=synthetic-secret',
+    'https://logs.example/file?sig=synthetic-secret&sv=1',
+  ])('removes URL queries, including signed credentials: %s', url => {
+    expect(redactSecrets(JSON.stringify({ url }))).toBe(
+      '{"url":"https://logs.example/file?[REDACTED]"}'
+    );
+  });
+
   it('redacts KEY=VALUE where key contains secret-like names', () => {
     expect(redactSecrets('SECRET_VALUE=env-secret')).toBe('SECRET_VALUE=[REDACTED]');
     expect(redactSecrets('GITHUB_TOKEN=ghp_abc123')).toBe('GITHUB_TOKEN=[REDACTED]');

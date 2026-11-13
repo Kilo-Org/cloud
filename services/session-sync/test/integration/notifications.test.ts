@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { getSessionNotificationsDOStub } from '../../src/dos/SessionNotificationsDO';
-import { session } from '../../src/db/sqlite-schema';
+import { session, sessionStatus } from '../../src/db/sqlite-schema';
 import { getSessionSyncDOStub, RETENTION_MS } from '../../src/dos/SessionSyncDO';
 import { mintTicket } from '../../src/live/ticket';
 import {
@@ -139,6 +139,7 @@ describe('session notifications', () => {
     await second.next('session.updated');
     await second.barrier();
     expect(second.events.at(-1)?.session.title).toBe('Renamed');
+    expect(second.events.at(-1)?.session.status).toMatchObject({ value: 'question', version: 2 });
     expect((await f.api.remove(f.id)).status).toBe(200);
     expect(await second.next('session.deleted')).toMatchObject({
       session: { sessionID: f.id, deletedAt: expect.any(Number), status: null },
@@ -188,6 +189,104 @@ describe('session notifications', () => {
       'session.deleted',
     ]);
   });
+
+  it('does not reload session metadata to build or route batch notifications', async () => {
+    const f = await fixture();
+    const stub = getSessionSyncDOStub(testEnv, { tenant: f.principal.tenant, sessionID: f.id });
+    const result = await runInDurableObject(stub, async (instance, state) => {
+      const queries: string[] = [];
+      const previous = Reflect.get(instance, 'db');
+      const storage = {
+        sql: {
+          exec(query: string, ...bindings: SqlStorageValue[]) {
+            queries.push(query);
+            return state.storage.sql.exec(query, ...bindings);
+          },
+        },
+        transactionSync: <T>(fn: () => T) => state.storage.transactionSync(fn),
+      };
+      Reflect.set(instance, 'db', drizzle(storage as unknown as DurableObjectStorage));
+      try {
+        const applied = await instance.applyBatch({
+          principal: f.principal,
+          sessionID: f.id,
+          body: JSON.stringify(batch(f.sourceID, 0, 1, [])),
+        });
+        return { applied, queries };
+      } finally {
+        Reflect.set(instance, 'db', previous);
+      }
+    });
+    expect(result.applied).toMatchObject({ ok: true, value: { revision: 1 } });
+    expect(
+      result.queries.filter(query => /^select .* from "session" where/.test(query))
+    ).toHaveLength(3);
+    expect(
+      result.queries.filter(query => /^select .* from "session_status" where/.test(query))
+    ).toHaveLength(1);
+    await f.stream.next('session.updated');
+  });
+
+  it('still bounds ordinary notifications when the queue is full', async () => {
+    const f = await fixture();
+    const stub = getSessionSyncDOStub(testEnv, { tenant: f.principal.tenant, sessionID: f.id });
+    await runInDurableObject(stub, instance => {
+      Reflect.set(instance, 'pendingNotifications', 64);
+    });
+    expect((await f.api.apply(f.id, batch(f.sourceID, 0, 1, []))).status).toBe(200);
+    await f.stream.barrier();
+    expect(f.stream.events.filter(event => event.type === 'session.updated')).toHaveLength(0);
+    expect(await (await f.api.state(f.id)).json()).toMatchObject({ revision: 1 });
+  });
+
+  it.each([
+    { value: 'invalid status', version: 1, updated_at: 1 },
+    { value: 'busy', version: -1, updated_at: 1 },
+    { value: 'busy', version: 1, updated_at: 1.5 },
+  ])('keeps updates deliverable with invalid stored status: %j', async row => {
+    const f = await fixture();
+    const stub = getSessionSyncDOStub(testEnv, { tenant: f.principal.tenant, sessionID: f.id });
+    await runInDurableObject(stub, (_instance, state) => {
+      drizzle(state.storage)
+        .insert(sessionStatus)
+        .values({ key: 1, ...row })
+        .run();
+    });
+    expect((await f.api.apply(f.id, batch(f.sourceID, 0, 1, []))).status).toBe(200);
+    expect(await f.stream.next('session.updated')).toMatchObject({
+      session: { revision: 1, status: null },
+    });
+    expect(await (await f.api.state(f.id)).json()).toMatchObject({ status: null });
+  });
+
+  it.each(['delete', 'retention', 'erase'] as const)(
+    'delivers %s deletion when the notification queue is full',
+    async mode => {
+      const f = await fixture();
+      const stub = getSessionSyncDOStub(testEnv, { tenant: f.principal.tenant, sessionID: f.id });
+      await runInDurableObject(stub, (instance, state) => {
+        Reflect.set(instance, 'pendingNotifications', 64);
+        if (mode === 'retention') {
+          drizzle(state.storage)
+            .update(session)
+            .set({ last_write_at: Date.now() - RETENTION_MS - 1 })
+            .run();
+        }
+      });
+      if (mode === 'delete') expect((await f.api.remove(f.id)).status).toBe(200);
+      else if (mode === 'retention') await runDurableObjectAlarm(stub);
+      else {
+        expect(await stub.eraseForUser({ principal: f.principal, sessionID: f.id })).toEqual({
+          ok: true,
+          value: null,
+        });
+      }
+      await f.stream.next('session.deleted');
+      expect((await f.api.remove(f.id)).status).toBe(200);
+      await f.stream.barrier();
+      expect(f.stream.events.filter(event => event.type === 'session.deleted')).toHaveLength(1);
+    }
+  );
 
   it('isolates users and tenants, including two creators in the same organization', async () => {
     const userID = `owner-${crypto.randomUUID()}`;

@@ -208,17 +208,15 @@ export class SessionSyncDO extends DurableObject<Env> {
     }
   }
 
-  private notify(event: SessionNotification | undefined): void {
+  private notify(userID: string, event: SessionNotification | undefined): void {
     if (!event) return;
-    const meta = session.load(this.db);
-    if (!meta) return;
-    if (this.pendingNotifications >= 64) {
+    if (this.pendingNotifications >= 64 && event.type !== 'session.deleted') {
       console.error('Session sync notification queue is full');
       return;
     }
     this.pendingNotifications++;
     this.ctx.waitUntil(
-      publishNotification(this.env, meta.creator_id, event).finally(() => {
+      publishNotification(this.env, userID, event).finally(() => {
         this.pendingNotifications--;
       })
     );
@@ -495,7 +493,10 @@ export class SessionSyncDO extends DurableObject<Env> {
       );
       if (registered.ok) {
         if (registered.value.created)
-          this.notify(notifications.snapshot(this.db, 'session.created', Date.now()));
+          this.notify(
+            principal.userID,
+            notifications.snapshot(this.db, 'session.created', Date.now())
+          );
         await this.ctx.storage.delete('pendingRegistration');
         this.pendingRegistration = undefined;
         await this.scheduleSweep();
@@ -559,7 +560,7 @@ export class SessionSyncDO extends DurableObject<Env> {
         notifications.setStatus(this.db, principal, sessionID, request, Date.now())
       );
       if (!result.ok) return result;
-      this.notify(result.value.notification);
+      this.notify(principal.userID, result.value.notification);
       await this.scheduleSweep();
       return ok(result.value.status);
     });
@@ -634,8 +635,7 @@ export class SessionSyncDO extends DurableObject<Env> {
           if (!batch.ok) work.validationCode = batch.error.code;
         }
         if (!batch.ok) throw new session.SyncFailure(batch.error);
-        const revision = session.load(this.db)?.revision ?? 0;
-        const receipt = batches.apply(
+        const { receipt, meta } = batches.apply(
           this.db,
           principal,
           sessionID,
@@ -646,14 +646,13 @@ export class SessionSyncDO extends DurableObject<Env> {
         );
         return {
           receipt,
-          notification:
-            receipt.revision > revision
-              ? notifications.snapshot(this.db, 'session.updated', receipt.committedAt)
-              : undefined,
+          notification: meta
+            ? notifications.snapshot(this.db, 'session.updated', receipt.committedAt, meta)
+            : undefined,
         };
       });
       if (!applied.ok) return applied;
-      this.notify(applied.value.notification);
+      this.notify(principal.userID, applied.value.notification);
       await phase(
         this.env,
         'applyBatch',
@@ -828,7 +827,7 @@ export class SessionSyncDO extends DurableObject<Env> {
       this.tx(() => erase.tombstone(this.db, principal, sessionID, Date.now()))
     );
     if (!erased.ok) return erased;
-    this.notify(erased.value.notification);
+    this.notify(principal.userID, erased.value.notification);
     let r2Ms = 0;
     try {
       await this.scheduleSweep();
@@ -862,7 +861,7 @@ export class SessionSyncDO extends DurableObject<Env> {
       }
       if (meta.creator_id !== principal.userID) return ok(null);
       const result = this.tx(() => erase.tombstone(this.db, principal, sessionID, Date.now()));
-      if (result.ok) this.notify(result.value.notification);
+      if (result.ok) this.notify(principal.userID, result.value.notification);
       return result.ok ? ok(null) : result;
     });
     if (!erased.ok) return erased;
@@ -894,7 +893,7 @@ export class SessionSyncDO extends DurableObject<Env> {
             )
           );
           if (!erased.ok) throw new Error(erased.error.message);
-          this.notify(erased.value.notification);
+          this.notify(meta.creator_id, erased.value.notification);
         }
       });
       const purged = await this.purgeRelay();

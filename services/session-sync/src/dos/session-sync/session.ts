@@ -2,6 +2,7 @@ import { desc, eq } from 'drizzle-orm';
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 
 import { receipts, session, sessionRoles, sessionStatus } from '../../db/sqlite-schema';
+import { sessionStatusSchema } from '../../protocol';
 import type {
   ErrorCode,
   Principal,
@@ -35,7 +36,13 @@ export function load(db: Db): Meta | undefined {
 
 export function readStatus(db: Db): SessionStatus | null {
   const row = db.select().from(sessionStatus).where(eq(sessionStatus.key, KEY)).get();
-  return row ? { value: row.value, version: row.version, updatedAt: row.updated_at } : null;
+  if (!row) return null;
+  const parsed = sessionStatusSchema.safeParse({
+    value: row.value,
+    version: row.version,
+    updatedAt: row.updated_at,
+  });
+  return parsed.success ? parsed.data : null;
 }
 
 function belongs(meta: Meta, principal: Principal, sessionID: string): boolean {

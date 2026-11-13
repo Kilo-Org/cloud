@@ -13,7 +13,10 @@ export async function publishNotification(
     await withDORetry(
       () => getSessionNotificationsDOStub(env, userID),
       stub => stub.publish({ userID, event }),
-      'SessionNotificationsDO.publish'
+      'SessionNotificationsDO.publish',
+      undefined,
+      // Retry logs include raw error messages; report only the error class below.
+      { warn: () => undefined, error: () => undefined }
     );
   } catch (error) {
     console.error('Session sync notification delivery failed', {

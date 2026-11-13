@@ -603,7 +603,8 @@ same-status writes and exact last-transition retries are no-ops. A stale version
 returns `position_conflict` with the current status version. Status accepts bounded
 lowercase tokens such as `busy`, `question`, `permission`, `retry`, and `idle`.
 `GET /v1/sessions/:id` exposes the last committed status, or null before the first
-status write. Status writes do not change transcript revision or position.
+status write or when stored status is invalid. Notifications also use null for
+invalid stored status. Status writes do not change transcript revision or position.
 
 Notifications are best-effort invalidation hints, not a durable event log.
 Delivery failure cannot reject a committed upload. Delivery can be missing,
@@ -611,7 +612,8 @@ duplicated, or reordered; consumers refetch authoritative data and use transcrip
 revision/status version to reject stale results. Refresh the creator index and
 canonical session state on every connection and periodically while connected.
 The stream has no replay cursor and retains no offline events. Each session
-bounds pending notification delivery to 64 tasks. Each user has at most 100
+allows 64 pending notification tasks plus one deletion task. The first tombstone
+can use the extra task; repeated deletion emits no event. Each user has at most 100
 notification sockets, with 120 client frames per minute per socket and an 8 KiB
 input-frame limit. Socket attachments survive hibernation; alarms close expired
 tickets. Send `{type:"reauth",ticket}` before expiry; user, tenant, and audience

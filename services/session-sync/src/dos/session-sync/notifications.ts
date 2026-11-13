@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { entities, sessionStatus } from '../../db/sqlite-schema';
 import type { SessionNotification } from '../../notifications/protocol';
 import type { statusRequestSchema, Principal, SessionStatus } from '../../protocol';
-import { KEY, load, raise, readStatus, update, writable, type Db } from './session';
+import { KEY, load, raise, readStatus, update, writable, type Db, type Meta } from './session';
 
 export function setStatus(
   db: Db,
@@ -39,7 +39,16 @@ export function setStatus(
     })
     .run();
   update(db, { updated_at: now, last_write_at: now });
-  return { status, notification: snapshot(db, 'session.status.updated', now) };
+  return {
+    status,
+    notification: snapshot(
+      db,
+      'session.status.updated',
+      now,
+      { ...meta, updated_at: now, last_write_at: now },
+      status
+    ),
+  };
 }
 
 const titleSchema = z.object({ title: z.string().nullable().optional() });
@@ -47,9 +56,10 @@ const titleSchema = z.object({ title: z.string().nullable().optional() });
 export function snapshot(
   db: Db,
   type: SessionNotification['type'],
-  changedAt: number
+  changedAt: number,
+  meta: Meta | undefined = load(db),
+  status: SessionStatus | null = meta?.deleted_at === null ? readStatus(db) : null
 ): SessionNotification {
-  const meta = load(db);
   if (!meta) throw new Error('Notification requires a stored session');
   const entity = db
     .select({ value: entities.value })
@@ -71,7 +81,7 @@ export function snapshot(
       revision: meta.revision,
       position: meta.position,
       ...(title === undefined ? {} : { title }),
-      status: meta.deleted_at === null ? readStatus(db) : null,
+      status,
       createdAt: meta.created_at,
       updatedAt: meta.updated_at,
       deletedAt: meta.deleted_at,

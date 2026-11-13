@@ -57,11 +57,10 @@ const nativeSessionSchema = z
   .passthrough();
 
 const nativeMessageSchema = z
-  .object({
-    info: z.object({ id: z.string().min(1), sessionID: z.string().min(1) }),
-    parts: z.array(z.object({ sessionID: z.string().min(1) }).passthrough()).optional(),
-  })
+  .object({ info: z.object({ id: z.string().min(1), sessionID: z.string().min(1) }) })
   .passthrough();
+const nativePartSchema = z.object({ sessionID: z.string().min(1) }).passthrough();
+const nativePartsSchema = z.array(nativePartSchema);
 
 export type NativeReadOutcome =
   | { kind: 'ok'; body: unknown }
@@ -124,9 +123,9 @@ function sessionPublicShape(value: unknown, kiloSessionId: string): NativeReadOu
 }
 
 /**
- * Projects only the requested session's transcript window: a row and each of its
- * parts must carry the session's identity, and a row with no identity refuses
- * the read.
+ * Projects only the requested session's transcript window. A row with no session
+ * identity refuses the read; a row outside the session is not returned, and an
+ * owned row whose part has no identity refuses the read.
  */
 function messagesPublicShape(
   value: unknown,
@@ -137,10 +136,12 @@ function messagesPublicShape(
   const window = value.slice(-limit);
   const owned: unknown[] = [];
   for (const message of window) {
-    const parsed = nativeMessageSchema.safeParse(message);
-    if (!parsed.success) return invalidNativeResult();
-    if (parsed.data.info.sessionID !== kiloSessionId) continue;
-    if (parsed.data.parts?.some(part => part.sessionID !== kiloSessionId) === true) continue;
+    const row = nativeMessageSchema.safeParse(message);
+    if (!row.success) return invalidNativeResult();
+    if (row.data.info.sessionID !== kiloSessionId) continue;
+    const parts = nativePartsSchema.safeParse(row.data.parts ?? []);
+    if (!parts.success) return invalidNativeResult();
+    if (parts.data.some(part => part.sessionID !== kiloSessionId)) continue;
     owned.push(message);
   }
   return bounded(projectPublicStructuredPaths(owned, kiloSessionId));

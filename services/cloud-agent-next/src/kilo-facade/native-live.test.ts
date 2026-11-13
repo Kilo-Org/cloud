@@ -341,6 +341,21 @@ describe('readNativeLiveOperation', () => {
     expect(outcome).toMatchObject({ kind: 'failed', code: 'KILO_UPSTREAM_RESPONSE_INVALID' });
   });
 
+  it('drops a row outside the session before it validates its parts', async () => {
+    const outcome = await readNativeLiveOperation(
+      readParams({ name: 'session.messages' }, async () => ({
+        ok: true,
+        result: [
+          {
+            info: { id: 'msg_sibling', sessionID: 'ses_ffffffffffffffffffffffffff' },
+            parts: [{ type: 'text', text: 'anonymous part' }],
+          },
+        ],
+      }))
+    );
+    expect(outcome).toEqual({ kind: 'ok', body: [] });
+  });
+
   it('drops a transcript row whose parts belong to another session', async () => {
     const outcome = await readNativeLiveOperation(
       readParams({ name: 'session.messages' }, async () => ({

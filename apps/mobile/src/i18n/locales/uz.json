@@ -355,7 +355,7 @@
       "add": "Kalit qo'shish",
       "added": "Kalit qo'shildi",
       "emptyTitle": "Provayder kalitlari yo'q",
-      "emptyDescription": "So'rovlar uchun to'lov o'z provayder hisobingizdan olinishi uchun kalit qo'shing.",
+      "emptyDescription": "Boshlash uchun kalit qo'shing.",
       "chooseProvider": "Provayderni tanlang",
       "searchProviders": "Provayderlarni qidirish",
       "noProvidersTitle": "Mos provayderlar topilmadi",

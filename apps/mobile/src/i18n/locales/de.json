@@ -355,7 +355,7 @@
       "add": "Schlüssel hinzufügen",
       "added": "Schlüssel hinzugefügt",
       "emptyTitle": "Keine Anbieterschlüssel",
-      "emptyDescription": "Füge einen Schlüssel hinzu, um Anfragen über dein eigenes Anbieterkonto abzurechnen.",
+      "emptyDescription": "Füge einen Schlüssel hinzu, um loszulegen.",
       "chooseProvider": "Anbieter auswählen",
       "searchProviders": "Anbieter suchen",
       "noProvidersTitle": "Keine passenden Anbieter",

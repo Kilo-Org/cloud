@@ -355,7 +355,7 @@
       "add": "Adicionar chave",
       "added": "Chave adicionada",
       "emptyTitle": "Nenhuma chave de provedor",
-      "emptyDescription": "Adicione uma chave para cobrar as solicitações na sua própria conta do provedor.",
+      "emptyDescription": "Adicione uma chave para começar.",
       "chooseProvider": "Escolha um provedor",
       "searchProviders": "Pesquisar provedores",
       "noProvidersTitle": "Nenhum provedor correspondente",

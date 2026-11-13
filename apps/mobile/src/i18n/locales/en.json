@@ -422,7 +422,7 @@
       "add": "Add key",
       "added": "Key added",
       "emptyTitle": "No provider keys",
-      "emptyDescription": "Add a key to bill requests to your own provider account.",
+      "emptyDescription": "Add a key to get started.",
       "chooseProvider": "Choose a provider",
       "searchProviders": "Search providers",
       "noProvidersTitle": "No matching providers",

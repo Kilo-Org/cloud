@@ -355,7 +355,7 @@
       "add": "Engadir clave",
       "added": "Clave engadida",
       "emptyTitle": "Non hai claves de provedor",
-      "emptyDescription": "Engade unha clave para facturar as solicitudes na túa propia conta do provedor.",
+      "emptyDescription": "Engade unha clave para comezar.",
       "chooseProvider": "Escolle un provedor",
       "searchProviders": "Buscar provedores",
       "noProvidersTitle": "Non hai provedores coincidentes",

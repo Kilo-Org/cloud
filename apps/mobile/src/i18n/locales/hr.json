@@ -355,7 +355,7 @@
       "add": "Dodaj ključ",
       "added": "Ključ je dodan",
       "emptyTitle": "Nema ključeva pružatelja usluga",
-      "emptyDescription": "Dodaj ključ kako bi se zahtjevi naplaćivali na tvoj račun kod pružatelja usluga.",
+      "emptyDescription": "Dodaj ključ za početak.",
       "chooseProvider": "Odaberi pružatelja usluga",
       "searchProviders": "Pretraži pružatelje usluga",
       "noProvidersTitle": "Nema odgovarajućih pružatelja usluga",

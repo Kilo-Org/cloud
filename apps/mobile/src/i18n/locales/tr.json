@@ -355,7 +355,7 @@
       "add": "Anahtar ekle",
       "added": "Anahtar eklendi",
       "emptyTitle": "Sağlayıcı anahtarı yok",
-      "emptyDescription": "İstekleri kendi sağlayıcı hesabına faturalandırmak için bir anahtar ekle.",
+      "emptyDescription": "Başlamak için anahtar ekle.",
       "chooseProvider": "Bir sağlayıcı seç",
       "searchProviders": "Sağlayıcı ara",
       "noProvidersTitle": "Eşleşen sağlayıcı yok",

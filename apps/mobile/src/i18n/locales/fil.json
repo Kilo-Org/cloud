@@ -355,7 +355,7 @@
       "add": "Magdagdag ng key",
       "added": "Naidagdag ang key",
       "emptyTitle": "Walang key ng provider",
-      "emptyDescription": "Magdagdag ng key para masingil ang mga request sa sarili mong akawnt sa provider.",
+      "emptyDescription": "Magdagdag ng key para magsimula.",
       "chooseProvider": "Pumili ng provider",
       "searchProviders": "Maghanap ng provider",
       "noProvidersTitle": "Walang tugmang provider",

@@ -355,7 +355,7 @@
       "add": "키 추가",
       "added": "키 추가됨",
       "emptyTitle": "제공업체 키 없음",
-      "emptyDescription": "키를 추가하면 요청 비용이 내 제공업체 계정으로 청구됩니다.",
+      "emptyDescription": "키 추가로 시작하세요.",
       "chooseProvider": "제공업체 선택",
       "searchProviders": "제공업체 검색",
       "noProvidersTitle": "일치하는 제공업체 없음",

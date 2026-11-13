@@ -355,7 +355,7 @@
       "add": "Añadir clave",
       "added": "Clave añadida",
       "emptyTitle": "No hay claves de proveedor",
-      "emptyDescription": "Añade una clave para facturar las solicitudes a tu propia cuenta del proveedor.",
+      "emptyDescription": "Añade una clave para empezar.",
       "chooseProvider": "Elige un proveedor",
       "searchProviders": "Buscar proveedores",
       "noProvidersTitle": "No hay proveedores coincidentes",

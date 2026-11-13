@@ -355,7 +355,7 @@
       "add": "Dodaj klucz",
       "added": "Dodano klucz",
       "emptyTitle": "Brak kluczy dostawców",
-      "emptyDescription": "Dodaj klucz, aby żądania były rozliczane na twoim koncie u dostawcy.",
+      "emptyDescription": "Dodaj klucz, aby rozpocząć.",
       "chooseProvider": "Wybierz dostawcę",
       "searchProviders": "Szukaj dostawców",
       "noProvidersTitle": "Brak pasujących dostawców",

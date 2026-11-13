@@ -355,7 +355,7 @@
       "add": "Ajouter une clé",
       "added": "Clé ajoutée",
       "emptyTitle": "Aucune clé de fournisseur",
-      "emptyDescription": "Ajoutez une clé pour facturer les requêtes sur votre propre compte fournisseur.",
+      "emptyDescription": "Ajouter une clé pour commencer.",
       "chooseProvider": "Choisir un fournisseur",
       "searchProviders": "Rechercher des fournisseurs",
       "noProvidersTitle": "Aucun fournisseur correspondant",

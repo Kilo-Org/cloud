@@ -355,7 +355,7 @@
       "add": "Aggiungi chiave",
       "added": "Chiave aggiunta",
       "emptyTitle": "Nessuna chiave dei provider",
-      "emptyDescription": "Aggiungi una chiave per addebitare le richieste sul tuo account del provider.",
+      "emptyDescription": "Aggiungi una chiave per iniziare.",
       "chooseProvider": "Scegli un provider",
       "searchProviders": "Cerca provider",
       "noProvidersTitle": "Nessun provider corrispondente",

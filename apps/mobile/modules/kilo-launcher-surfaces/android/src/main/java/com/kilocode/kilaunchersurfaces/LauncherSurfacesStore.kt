@@ -7,21 +7,33 @@ import android.net.Uri
 import org.json.JSONObject
 
 /**
+ * One action a launcher surface offers: the destination and the copy that names it.
+ *
+ * The url and its label are one unit because the surface is one tap. A label
+ * without its url names an action nothing opens, and a url without its label
+ * shows copy the payload never wrote; a null action is an action that is absent.
+ */
+internal data class SurfaceAction(val url: String, val label: String)
+
+/**
  * The launcher surfaces payload frozen by the JS side.
  *
- * `newAgentUrl` and `newAgentLabel` are always present. The other two actions are
- * dynamic: a null url means the action is absent and must not be pinned or offered.
+ * [newAgent] is required: JS always publishes it, and
+ * [KiloLauncherSurfacesModule] rejects a payload without it before the cache is
+ * touched. The other two actions are dynamic: a null action is absent and must
+ * be neither pinned nor offered.
  */
 internal data class CachedSurfaces(
-  val newAgentUrl: String?,
-  val newAgentLabel: String?,
-  val needsInputUrl: String?,
-  val needsInputLabel: String?,
-  val openLastSessionUrl: String?,
-  val openLastSessionLabel: String?,
+  val newAgent: SurfaceAction,
+  val needsInput: SurfaceAction?,
+  val openLastSession: SurfaceAction?,
 ) {
-  /** True when an agent waits for input, so the tile routes to Needs input. */
-  val hasPendingInput: Boolean get() = !needsInputUrl.isNullOrEmpty()
+  /**
+   * The quick-settings tile's one decision: Needs input while an agent waits,
+   * otherwise New agent. The tile label and the tap both read this value, so
+   * the tile cannot name one action and open another.
+   */
+  val tileAction: SurfaceAction get() = needsInput ?: newAgent
 }
 
 /**
@@ -43,15 +55,16 @@ internal object LauncherSurfacesStore {
   fun prefs(context: Context): SharedPreferences =
     context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-  fun read(context: Context): CachedSurfaces {
+  /**
+   * The cached surfaces, or null when no usable payload was ever published. A
+   * caller with nothing cached shows its static label and opens the app itself.
+   */
+  fun read(context: Context): CachedSurfaces? {
     val prefs = prefs(context)
     return CachedSurfaces(
-      newAgentUrl = prefs.stringOrNull(KEY_NEW_AGENT_URL),
-      newAgentLabel = prefs.stringOrNull(KEY_NEW_AGENT_LABEL),
-      needsInputUrl = prefs.stringOrNull(KEY_NEEDS_INPUT_URL),
-      needsInputLabel = prefs.stringOrNull(KEY_NEEDS_INPUT_LABEL),
-      openLastSessionUrl = prefs.stringOrNull(KEY_OPEN_LAST_SESSION_URL),
-      openLastSessionLabel = prefs.stringOrNull(KEY_OPEN_LAST_SESSION_LABEL),
+      newAgent = prefs.action(KEY_NEW_AGENT_URL, KEY_NEW_AGENT_LABEL) ?: return null,
+      needsInput = prefs.action(KEY_NEEDS_INPUT_URL, KEY_NEEDS_INPUT_LABEL),
+      openLastSession = prefs.action(KEY_OPEN_LAST_SESSION_URL, KEY_OPEN_LAST_SESSION_LABEL),
     )
   }
 }
@@ -60,12 +73,35 @@ internal object LauncherSurfacesStore {
 internal fun actionIntent(context: Context, url: String): Intent =
   Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage(context.packageName)
 
-/** Stores `value` when present and drops the key when absent, so stale actions disappear. */
-internal fun SharedPreferences.Editor.putOrRemove(key: String, value: String?): SharedPreferences.Editor =
-  if (value.isNullOrEmpty()) remove(key) else putString(key, value)
+/**
+ * Stores [action], or drops both of its keys when it is absent, so an action the
+ * payload leaves out disappears from the launcher and the tile.
+ */
+internal fun SharedPreferences.Editor.putAction(
+  urlKey: String,
+  labelKey: String,
+  action: SurfaceAction?,
+): SharedPreferences.Editor =
+  if (action == null) {
+    remove(urlKey).remove(labelKey)
+  } else {
+    putString(urlKey, action.url).putString(labelKey, action.label)
+  }
+
+/** Reads one cached action: both halves or nothing. */
+private fun SharedPreferences.action(urlKey: String, labelKey: String): SurfaceAction? {
+  val url = stringOrNull(urlKey) ?: return null
+  return SurfaceAction(url, stringOrNull(labelKey) ?: return null)
+}
 
 private fun SharedPreferences.stringOrNull(key: String): String? =
   getString(key, null)?.takeIf { it.isNotEmpty() }
+
+/** Reads one action from a payload: both halves or nothing. */
+internal fun JSONObject.action(urlKey: String, labelKey: String): SurfaceAction? {
+  val url = stringOrNull(urlKey) ?: return null
+  return SurfaceAction(url, stringOrNull(labelKey) ?: return null)
+}
 
 /** Reads a payload string, treating an explicit JSON null or an absent key as null. */
 internal fun JSONObject.stringOrNull(key: String): String? =

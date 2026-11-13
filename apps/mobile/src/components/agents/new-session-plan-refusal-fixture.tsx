@@ -74,6 +74,7 @@ export function NewSessionPlanRefusalFixture() {
         autoFocusPrompt={false}
         groups={[]}
         isRetrying={false}
+        repositoryRegionSettled
         onChangeRepo={noop}
         onConnectProvider={noop}
         onRefreshRepos={noop}

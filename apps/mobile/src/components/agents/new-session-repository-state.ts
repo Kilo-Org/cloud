@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The new-session screen reads these repository helpers together: provider status, grouping, stored-selection validity, the region-settle signal, and branch state all describe one section, and splitting them would scatter the rules that must agree on `platform:fullName`. */
 import { type RepoPlatform } from '@/lib/picker-bridge';
 import { dedupeBy } from '@/lib/query/dedupe-by-id';
 
@@ -212,6 +213,40 @@ export function isStoredRepoSelectionGone(input: {
   }
   return !input.repositories.some(
     repository => `${repository.platform}:${repository.fullName}` === input.selectedRepo
+  );
+}
+
+/**
+ * Whether the repository region's final height is known, so the provider cards
+ * and every row below them can paint in one commit.
+ *
+ * A card's height is data-dependent (an expanded connect prompt, a compact row
+ * after a selection, nothing while a provider loads), so painting one after the
+ * form has settled pushes every row under the section down. The last clause is
+ * the prefill: it seeds the selection in the same render `prefillSettled` turns
+ * true, so with no selection yet and a seed still due the connect card would
+ * paint expanded and then collapse to the compact row.
+ */
+export function isRepositoryRegionSettled(input: {
+  /** Every provider query finished its first load (a paused query counts as resolved). */
+  providerQueriesResolved: boolean;
+  /** The persisted connect-card collapse list has been read. */
+  connectCtasLoaded: boolean;
+  /** The durable repository draft for this account and scope has loaded. */
+  draftSettled: boolean;
+  /** The `platform:fullName` selection the form holds, `''` when none. */
+  selectedRepo: string;
+  /** The prefill condition: no provider is loading or failed and there are rows. */
+  prefillSettled: boolean;
+  /** A stored selection its provider's list no longer contains, still to be dropped. */
+  storedSelectionGone: boolean;
+}): boolean {
+  return (
+    input.providerQueriesResolved &&
+    input.connectCtasLoaded &&
+    input.draftSettled &&
+    !input.storedSelectionGone &&
+    (input.selectedRepo !== '' || !input.prefillSettled)
   );
 }
 

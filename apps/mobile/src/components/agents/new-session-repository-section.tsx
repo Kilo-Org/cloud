@@ -53,6 +53,16 @@ type NewSessionRepositorySectionProps = {
    * would show a choice the submit silently drops, so it is not rendered.
    */
   isCloneEntry: boolean;
+  /**
+   * Whether the repository region's final height is known. The branch row and
+   * the provider cards wait for it; the picker above them is a fixed-height
+   * control and always paints. The form gates the rows below this section on
+   * the same signal, so the cards and those rows enter in one commit: a card's
+   * height depends on the persisted collapse list and on whether a repository
+   * is selected, and painting it first would push every row under it down after
+   * the form had settled.
+   */
+  settled: boolean;
 };
 
 /**
@@ -76,9 +86,10 @@ export function NewSessionRepositorySection({
   value,
   organizationId,
   isCloneEntry,
+  settled,
 }: Readonly<NewSessionRepositorySectionProps>) {
   const { t } = useTranslation();
-  const { collapsedCtas, hasLoaded: collapseStateLoaded } = useCollapsedConnectCtas();
+  const { collapsedCtas } = useCollapsedConnectCtas();
 
   const hasRepos = repositories.length > 0;
   const anyLoading = groups.some(group => group.status === 'loading');
@@ -117,26 +128,28 @@ export function NewSessionRepositorySection({
         disabled={disabled}
       />
 
-      {isCloneEntry ? null : (
+      {settled && !isCloneEntry ? (
         <RepositoryBranchSelector
           repository={selectedRepository}
           organizationId={organizationId}
           disabled={disabled}
         />
-      )}
+      ) : null}
 
-      {groups.map(group => (
-        <Fragment key={group.key}>
-          {group.notice === 'partial' ? (
-            <RepositoryPartialNotice
-              platform={group.key}
-              onRefreshRepos={onRefreshRepos}
-              isRetrying={isRetrying}
-            />
-          ) : null}
-          {renderGroupCard(group.key, group.status)}
-        </Fragment>
-      ))}
+      {settled
+        ? groups.map(group => (
+            <Fragment key={group.key}>
+              {group.notice === 'partial' ? (
+                <RepositoryPartialNotice
+                  platform={group.key}
+                  onRefreshRepos={onRefreshRepos}
+                  isRetrying={isRetrying}
+                />
+              ) : null}
+              {renderGroupCard(group.key, group.status)}
+            </Fragment>
+          ))
+        : null}
     </View>
   );
 
@@ -203,13 +216,6 @@ export function NewSessionRepositorySection({
   function renderConnectCard(platform: RepositoryPlatform): ReactElement | null {
     const copy = PROVIDER_COPY[platform];
     const noteKey = connectNoteKey(platform);
-    // The persisted flag decides the card's height, so the card must not paint
-    // expanded and then snap shut when the disk read lands (every row below it
-    // would move). The read is already in flight from module import, so this
-    // gate lasts a frame, not a spinner.
-    if (!collapseStateLoaded) {
-      return null;
-    }
     return (
       <CollapsibleSection
         className="mt-3 rounded-lg border border-border bg-card"

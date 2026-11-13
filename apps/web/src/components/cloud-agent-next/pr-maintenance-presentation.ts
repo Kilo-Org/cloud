@@ -10,7 +10,7 @@ import {
 
 export const maintenanceStatusLabels: Record<WatchPrExecutionStatus | WatchPrStatus, string> = {
   watching: 'Watching',
-  waiting_for_session: 'Waiting for your session to finish',
+  waiting_for_session: 'Waiting for chats',
   fixing: 'Fixing',
   waiting_for_checks: 'Waiting for checks',
   needs_input: 'Needs your input',
@@ -41,12 +41,10 @@ export function getMaintenanceExecutionHelp(watch: {
 }): string | null {
   if (watch.status !== 'watching' || watch.policy.version !== 2) return null;
   if (watch.execution_status === 'waiting_for_session') {
-    return 'Maintenance waits for your running chats and the workspace quiet period. No repair chat exists until it can start.';
+    return 'Auto-fix waits for your running chats and the workspace quiet period.';
   }
-  // The `maintenance_question` recovery message already names the chat action,
-  // so this line adds guidance only when no chat can answer the question.
   if (watch.execution_status === 'needs_input' && !watch.activeChat?.chatAvailable) {
-    return 'Resolve the reported blocker, then recheck the PR. No maintenance chat needs an answer.';
+    return 'Resolve the reported blocker, then recheck the PR. No auto-fix chat needs an answer.';
   }
   return null;
 }
@@ -88,45 +86,40 @@ export function getMaintenanceControlsState(
 }
 
 const recoveryMessages: Record<MaintenanceReason, string> = {
-  user_pause: 'You paused maintenance. Resume when you want automatic work to continue.',
-  ready_to_resume:
-    'Readiness checks passed. Maintenance remains paused. Select Resume when you are ready.',
-  user_stop: 'You stopped maintenance. Enable it again to assess the PR and continue.',
-  expired: 'The observation watch expired. Enable maintenance with new consent to continue.',
-  maintenance_chat_stopped:
-    'You stopped the maintenance chat. Resume maintenance when you are ready.',
-  user_session_active:
-    'Maintenance waits for your chats and the workspace quiet period. Your chats can continue.',
+  user_pause: 'Auto-fix is paused. Select Resume to continue.',
+  ready_to_resume: 'Readiness checks passed. Select Resume to continue auto-fix.',
+  user_stop: 'Auto-fix is stopped. Enable it again to continue.',
+  expired: 'The observation watch expired. Enable auto-fix to continue.',
+  maintenance_chat_stopped: 'You stopped the auto-fix chat. Select Resume to continue.',
+  user_session_active: 'Auto-fix waits for your chats and the workspace quiet period.',
   conflict_state_unknown:
     'GitHub could not determine merge conflicts. Inspect the PR, then recheck.',
-  delivery_attempt_limit:
-    'Maintenance could not start after its delivery retries. Check workspace access, then resume maintenance.',
+  delivery_attempt_limit: 'Auto-fix could not start. Check workspace access, then select Resume.',
   problem_attempt_limit:
-    'A problem reached its attempt limit. Review its maintenance chat and resolve the blocker.',
+    'A problem reached its attempt limit. Open its auto-fix chat and resolve the blocker.',
   publication_unverified:
-    'The push result is not verified. Inspect the remote branch and maintenance chat, verify the result, then Recheck.',
+    'The push result is not verified. Inspect the remote branch and auto-fix chat, then select Recheck.',
   maintenance_attempt_timeout:
-    'The maintenance attempt exceeded its time limit. Inspect its chat and workspace before you resume.',
+    'Auto-fix exceeded its time limit. Inspect its chat and workspace before you resume.',
   total_attempt_limit:
-    'The total attempt limit was reached. Inspect the maintenance chats and repair the PR manually, or stop maintenance.',
-  source_worktree_deleted:
-    'The workspace is unavailable. Maintenance cannot continue in this workspace.',
-  pr_closed: 'The PR is closed. Maintenance has finished.',
-  pr_merged: 'The PR is merged. Maintenance has finished.',
+    'The PR reached its attempt limit. Inspect the auto-fix chats and fix the PR manually.',
+  source_worktree_deleted: 'The workspace is unavailable. Auto-fix cannot continue.',
+  pr_closed: 'The PR is closed. Auto-fix has finished.',
+  pr_merged: 'The PR is merged. Auto-fix has finished.',
   maintenance_question:
-    'Open the current maintenance chat and answer its question. Your answer continues the same chat.',
+    'Open the auto-fix chat and answer its question. Your answer continues the same chat.',
   maintenance_workspace_settings_changed:
-    'Workspace settings or the selected model changed. Stop maintenance, then enable it with current settings and new consent.',
+    'Workspace settings or the model changed. Stop auto-fix, check your settings, then enable it again.',
   maintenance_pr_identity_changed:
-    'The linked PR or branch changed. Stop maintenance, verify the workspace PR, then enable maintenance with new consent.',
+    'The linked PR or branch changed. Stop auto-fix, verify the workspace PR, then enable it again.',
   maintenance_purpose_unavailable:
-    'Restore a clear workspace task and PR description, then Recheck. If the source task cannot be restored, stop maintenance and use a chat with a clear task.',
+    'Restore a clear workspace task and PR description, then select Recheck. Otherwise stop auto-fix and use a chat with a clear task.',
   maintenance_parent_commit_unavailable:
-    'Restore the stacked workspace parent commit, then Recheck. If it is unavailable, stop maintenance and repair the workspace manually.',
+    'Restore the stacked workspace parent commit, then select Recheck. Otherwise stop auto-fix and fix the workspace manually.',
   maintenance_access_unavailable:
     'Restore repository access and the GitHub connection, then Recheck.',
   maintenance_balance_unavailable:
-    'Maintenance needs at least $1 in credits for this model. Add credits, then Recheck. To change models, stop and enable maintenance with new consent.',
+    'Auto-fix needs at least $1 in credits. Add credits, then select Recheck. To change models, stop auto-fix and update your settings.',
   maintenance_precondition_changed:
     'Workspace or PR requirements changed. Correct the reported change, then Recheck.',
   pr_assessment_unavailable:
@@ -134,46 +127,44 @@ const recoveryMessages: Record<MaintenanceReason, string> = {
   pr_observation_incomplete:
     'GitHub feedback is incomplete. Check PR access and wait for GitHub to recover, then Recheck.',
   maintenance_verification_failed:
-    'Maintenance verification failed. Inspect the chat, repair the failure, then Recheck.',
+    'Auto-fix verification failed. Inspect the chat, fix the failure, then select Recheck.',
   maintenance_verification_unavailable:
-    'Maintenance could not verify its changes. Inspect the chat and verify the changes manually, then Recheck.',
+    'Auto-fix could not verify its changes. Inspect the chat and verify the changes manually, then select Recheck.',
   maintenance_result_unavailable_after_publication:
-    'Git publication was observed, but the updated repair result is missing. Inspect the remote branch and chat, correct the issue, then Stop and enable maintenance with new consent.',
+    'A push was observed, but its repair result is missing. Inspect the remote branch and chat, then Stop and enable auto-fix again.',
   maintenance_result_unavailable_after_answer:
-    'Your answer completed, but maintenance did not return an updated repair result. Inspect the chat, correct the issue, then Stop and enable maintenance with new consent.',
+    'Your answer completed, but its repair result is missing. Inspect the chat, then Stop and enable auto-fix again.',
   maintenance_github_action_blocked:
     'A GitHub reply or thread update is blocked. Inspect the PR and GitHub access before rechecking.',
   maintenance_runtime_state_unavailable:
-    'The maintenance chat state is unavailable. Check the workspace and chat, then Recheck.',
+    'The auto-fix chat state is unavailable. Check the workspace and chat, then select Recheck.',
   missing_stable_session_identity:
-    'The maintenance chat identity is incomplete. Inspect the workspace and contact support before starting another repair.',
+    'The auto-fix chat identity is incomplete. Inspect the workspace and contact support before starting another repair.',
   reviewer_approval_required:
-    'The PR needs a human review decision. Open the GitHub review and request the required approval. Other maintenance can continue.',
+    'The PR needs human approval. Request it on GitHub. Auto-fix can continue.',
   waiting_for_clean_checkout:
-    'Maintenance waits for a clean checkout and the workspace quiet period. Keep unrelated changes safe; do not discard them.',
+    'Auto-fix waits for a clean checkout and the workspace quiet period. Keep unrelated changes safe.',
   remote_head_changed_reassessing:
-    'The remote branch changed. Maintenance will fetch and reassess it before another bounded attempt.',
-  rate_limited:
-    'GitHub delayed maintenance because of its rate limit. Maintenance waits until the reset time.',
-  low_budget: 'Maintenance waits for available GitHub API budget. It remains enabled.',
-  throttled: 'Maintenance waits before the next GitHub refresh.',
-  write_pacing: 'Maintenance waits before the next GitHub reply or thread update.',
-  unavailable: 'GitHub is temporarily unavailable. Maintenance will retry within its limits.',
-  maintenance_session_active:
-    'Another maintenance chat is active in this workspace. Maintenance waits for that attempt to finish.',
+    'The remote branch changed. Auto-fix will fetch and check it before another attempt.',
+  rate_limited: 'Auto-fix waits for the GitHub rate limit to reset.',
+  low_budget: 'Auto-fix waits for available GitHub API budget.',
+  throttled: 'Auto-fix waits before the next GitHub refresh.',
+  write_pacing: 'Auto-fix waits before the next GitHub reply or thread update.',
+  unavailable: 'GitHub is temporarily unavailable. Auto-fix will retry within its limits.',
+  maintenance_session_active: 'Another auto-fix chat is active. Auto-fix waits for it to finish.',
   pr_assessment_retry:
     'PR assessment will retry within its limits. No repair starts from missing evidence.',
   maintenance_delivery_retry:
-    'The maintenance chat request will retry with the same identity. No duplicate repair is requested.',
+    'The auto-fix chat request will retry. No duplicate repair is requested.',
   conflict_state_pending:
-    'GitHub is still checking merge conflicts. Maintenance waits for the bounded follow-up check.',
+    'GitHub is still checking merge conflicts. Auto-fix waits for the next check.',
 };
 
 export function getMaintenanceRecoveryMessage(reason: string | null): string | null {
   if (!reason) return null;
   return Object.prototype.hasOwnProperty.call(recoveryMessages, reason)
     ? recoveryMessages[reason as keyof typeof recoveryMessages]
-    : `${reason.replaceAll('_', ' ')}. Inspect the maintenance chat and PR before rechecking.`;
+    : `${reason.replaceAll('_', ' ')}. Inspect the auto-fix chat and PR before rechecking.`;
 }
 
 export function getMaintenancePublicationLabel(

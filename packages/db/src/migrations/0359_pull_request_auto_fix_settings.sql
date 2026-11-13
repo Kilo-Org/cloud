@@ -1,0 +1,1 @@
+ALTER TABLE "cloud_agent_user_settings" ADD COLUMN "pull_request_auto_fix" jsonb;

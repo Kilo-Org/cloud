@@ -3,6 +3,7 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { pullRequestAutoFixSettingsSchema } from '@kilocode/db/cloud-agent-pr-maintenance';
 import {
   agent_environment_profile_repo_bindings,
   agent_environment_profiles,
@@ -117,6 +118,54 @@ describe('cloud-agent-settings router', () => {
   });
 
   describe('personal context', () => {
+    test('stores auto-fix settings for the caller, including an organization member', async () => {
+      const caller = await createCallerForUser(memberUser.id);
+      const otherCaller = await createCallerForUser(otherUser.id);
+      expect(await caller.cloudAgentSettings.getPullRequestAutoFix()).toBeNull();
+      const settings = pullRequestAutoFixSettingsSchema.parse({
+        autoEnable: true,
+        model: 'test/auto-fix-model',
+        categories: { reviews: true, failedChecks: true, conflicts: false },
+        automaticWritesConsent: true,
+        historyRewriteConsent: true,
+        noHardSpendCapConsent: true,
+      });
+      await caller.cloudAgentSettings.setWorkspaceOrder({ workspaceOrder: 'activity' });
+      expect(await caller.cloudAgentSettings.setPullRequestAutoFix(settings)).toEqual(settings);
+      expect(await caller.cloudAgentSettings.getPullRequestAutoFix()).toEqual(settings);
+      expect(await otherCaller.cloudAgentSettings.getPullRequestAutoFix()).toBeNull();
+      expect(await caller.cloudAgentSettings.getWorkspaceOrder()).toEqual({
+        workspaceOrder: 'activity',
+      });
+      await caller.cloudAgentSettings.setPullRequestAutoFix({ ...settings, autoEnable: false });
+      expect((await caller.cloudAgentSettings.getPullRequestAutoFix())?.autoEnable).toBe(false);
+    });
+
+    test('rejects auto-fix settings without explicit write and billing consent', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const settings = {
+        autoEnable: true,
+        model: 'test/auto-fix-model',
+        categories: { reviews: true, failedChecks: true, conflicts: true },
+        automaticWritesConsent: true,
+        historyRewriteConsent: true,
+        noHardSpendCapConsent: true,
+      };
+      for (const key of [
+        'automaticWritesConsent',
+        'historyRewriteConsent',
+        'noHardSpendCapConsent',
+      ]) {
+        await expect(
+          caller.cloudAgentSettings.setPullRequestAutoFix({
+            ...settings,
+            [key]: false,
+          } as Parameters<typeof caller.cloudAgentSettings.setPullRequestAutoFix>[0])
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      }
+      expect(await caller.cloudAgentSettings.getPullRequestAutoFix()).toBeNull();
+    });
+
     test('sets and reads the context default and repository overrides', async () => {
       const caller = await createCallerForUser(ownerUser.id);
       const profileId = await insertProfile({ type: 'user', id: ownerUser.id }, 'Personal');

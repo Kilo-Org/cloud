@@ -20,6 +20,7 @@ export function resolveSettingsDeepLink(settings: string | null): SettingsDeepLi
   if (settings === 'sidebar') return { open: true, initialSection: 'sidebar' };
   if (settings === 'compute') return { open: true, initialSection: 'compute' };
   if (settings === 'preferences') return { open: true, initialSection: 'preferences' };
+  if (settings === 'auto-fix') return { open: true, initialSection: 'auto-fix' };
   return { open: false, initialSection: 'general' };
 }
 

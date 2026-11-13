@@ -1,5 +1,10 @@
 import { POST } from './route';
 import { dispatchWatchPrMaintenance } from '@/lib/cloud-agent/watch-pr-maintenance';
+import { enablePullRequestAutoFixWorkspaces } from '@/lib/cloud-agent/pr-auto-fix';
+
+jest.mock('@/lib/cloud-agent/pr-auto-fix', () => ({
+  enablePullRequestAutoFixWorkspaces: jest.fn(async () => ({ enabled: 0, unavailable: 0 })),
+}));
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'synthetic-internal-secret',
@@ -24,6 +29,7 @@ it('authenticates before parsing or dispatching work', async () => {
   const response = await POST(request({}, false));
   expect(response.status).toBe(401);
   expect(dispatchWatchPrMaintenance).not.toHaveBeenCalled();
+  expect(enablePullRequestAutoFixWorkspaces).not.toHaveBeenCalled();
 });
 
 it.each([
@@ -47,9 +53,11 @@ it('accepts a bounded scheduler request and returns durable due work', async () 
   expect(response.status).toBe(200);
   expect(await response.json()).toEqual({ scheduled: [{ watchId, dueAt }], nextDueAt: dueAt });
   expect(dispatchWatchPrMaintenance).toHaveBeenCalledWith({ watchId, limit: 20 });
+  expect(enablePullRequestAutoFixWorkspaces).not.toHaveBeenCalled();
 });
 
 it('defaults the cron batch to twenty without accepting an owner override', async () => {
   expect((await POST(request({}))).status).toBe(200);
   expect(dispatchWatchPrMaintenance).toHaveBeenCalledWith({ limit: 20 });
+  expect(enablePullRequestAutoFixWorkspaces).toHaveBeenCalledTimes(1);
 });

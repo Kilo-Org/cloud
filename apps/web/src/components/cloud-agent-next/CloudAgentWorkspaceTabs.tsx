@@ -29,6 +29,7 @@ import {
   Plus,
   Terminal,
   X,
+  Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CHAT_TAB_ID, fileTabId, terminalTabId } from './workspace-tabs';
@@ -277,7 +278,8 @@ export function CloudAgentWorkspaceTabs({
             const selected = active && !selectionSuppressed;
             const isDeleting = deletingSessionIds.includes(session.sessionId);
             const isEditing = editingSessionId === session.sessionId;
-            const canRename = Boolean(onRenameChat) && !isDeleting;
+            const isAutoFix = session.chatKind === 'maintenance';
+            const canRename = Boolean(onRenameChat) && !isDeleting && !isAutoFix;
             const progress =
               currentChatProgress?.sessionId === session.sessionId ? currentChatProgress : null;
             const activityKind = isEditing
@@ -381,7 +383,12 @@ export function CloudAgentWorkspaceTabs({
                     }}
                   >
                     <TooltipTrigger>
-                      <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                      <span
+                        className={cn(
+                          'flex h-4 w-4 shrink-0 items-center justify-center',
+                          isAutoFix && 'text-violet-400'
+                        )}
+                      >
                         {session.localSync === 'failed' ? (
                           <CircleAlert
                             className="text-destructive h-3.5 w-3.5 shrink-0"
@@ -399,6 +406,8 @@ export function CloudAgentWorkspaceTabs({
                             className="text-muted-foreground h-4 w-4 shrink-0"
                             title="Busy"
                           />
+                        ) : isAutoFix ? (
+                          <Zap className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         ) : (
                           <MessageSquare className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         )}
@@ -406,10 +415,9 @@ export function CloudAgentWorkspaceTabs({
                       {isEditing ? (
                         <span className="sr-only">{session.prompt}</span>
                       ) : (
-                        <span className="min-w-0 max-w-36 truncate">{session.prompt}</span>
-                      )}
-                      {session.chatKind === 'maintenance' && (
-                        <MaintenanceBadge pinned={isMaintenanceChatPinned(session)} />
+                        <span className="min-w-0 max-w-36 truncate">
+                          {isAutoFix ? 'Auto fix' : session.prompt}
+                        </span>
                       )}
                     </TooltipTrigger>
                   </TabsTrigger>

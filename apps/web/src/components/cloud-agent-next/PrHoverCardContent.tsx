@@ -44,17 +44,6 @@ const REVIEW_DECISION_CLASSES: Record<ReviewDecision, string> = {
   review_required: 'text-muted-foreground',
 };
 
-const MERGE_STATE_LABELS: Record<string, string> = {
-  clean: 'Clean',
-  blocked: 'Blocked',
-  behind: 'Behind base branch',
-  unstable: 'Checks failing',
-  dirty: 'Conflicts',
-  draft: 'Draft',
-  unknown: 'Unknown',
-  has_hooks: 'Pre-receive hooks',
-};
-
 const UNAVAILABLE_LABELS = {
   checks: 'check runs',
   statuses: 'commit statuses',
@@ -83,7 +72,6 @@ export function PrHoverCardContent({
   const queryClient = useQueryClient();
   const state = normalizePrBadgeState(pr.state);
   const awaitingSync = pr.state === 'unknown';
-  const headShaShort = pr.headSha?.slice(0, 7) ?? null;
   const truncatedTitle = truncatePrTitle(pr.title, 80);
   const observations = pr.platform === 'github' ? pr.observations : null;
   const checks = observations?.checks ?? null;
@@ -126,9 +114,7 @@ export function PrHoverCardContent({
       </div>
 
       {awaitingSync && (
-        <p className="text-muted-foreground text-xs leading-snug">
-          Pull request status has not synced yet. Refresh to fetch the latest status from GitHub.
-        </p>
+        <p className="text-muted-foreground text-xs leading-snug">Status has not synced yet.</p>
       )}
 
       {truncatedTitle && (
@@ -153,17 +139,10 @@ export function PrHoverCardContent({
                 'Unknown'
               ) : hasDetailedChecks ? (
                 <>
-                  <span>{checks.total} total</span>
-                  <span className="block">
-                    {checks.passed ?? 0} passed / {checks.failed} failed / {checks.pending ?? 0}{' '}
-                    pending
-                  </span>
-                  {(checks.skipped ?? 0) > 0 && (
-                    <span className="block">{checks.skipped} skipped</span>
-                  )}
-                  {(checks.unknown ?? 0) > 0 && (
-                    <span className="block">{checks.unknown} unknown</span>
-                  )}
+                  {checks.passed ?? 0} passed · {checks.failed} failed · {checks.pending ?? 0}{' '}
+                  pending
+                  {(checks.unknown ?? 0) > 0 && ` · ${checks.unknown} unknown`}
+                  {(checks.skipped ?? 0) > 0 && ` · ${checks.skipped} skipped`}
                 </>
               ) : (
                 `${checks.total} total / ${checks.failed} failed`
@@ -195,20 +174,6 @@ export function PrHoverCardContent({
                   ? 'Conflicts detected'
                   : 'Unknown'}
             </span>
-            {mergeability?.state && (
-              <>
-                <span className="text-muted-foreground">Merge status</span>
-                <span>{MERGE_STATE_LABELS[mergeability.state] ?? mergeability.state}</span>
-              </>
-            )}
-            {mergeability && (
-              <>
-                <span className="text-muted-foreground">Base</span>
-                <span className="truncate font-mono" title={mergeability.baseSha}>
-                  {mergeability.baseRef}
-                </span>
-              </>
-            )}
           </>
         )}
         {(pr.platform === 'github' || pr.reviewDecision) && (
@@ -227,12 +192,6 @@ export function PrHoverCardContent({
             <span className="truncate font-mono">{gitBranch}</span>
           </>
         )}
-        {headShaShort && (
-          <>
-            <span className="text-muted-foreground">Commit</span>
-            <span className="font-mono">{headShaShort}</span>
-          </>
-        )}
         <span className="text-muted-foreground">Synced</span>
         <span>{formatRelativeSync(pr.lastSyncedAt)}</span>
       </div>
@@ -245,7 +204,7 @@ export function PrHoverCardContent({
               {unavailable.map(part => UNAVAILABLE_LABELS[part]).join(', ')}.{' '}
             </>
           )}
-          Partial observations; some evidence is missing.
+          {unavailable.length === 0 && 'Some GitHub status data is missing.'}
         </p>
       )}
 

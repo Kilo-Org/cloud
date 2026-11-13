@@ -67,7 +67,7 @@ export async function startMaintenanceChat(env: Env, input: MaintenanceStart) {
       requestedKiloSessionId: input.kiloSessionId,
       requestedCloudAgentSessionId: input.cloudAgentSessionId,
       agent,
-      title: 'PR maintenance',
+      title: 'Pull request auto-fix',
       chat: {
         kind: 'maintenance',
         watchId: input.watchId,

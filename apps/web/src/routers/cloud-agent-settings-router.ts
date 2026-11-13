@@ -35,6 +35,7 @@ import {
 } from '@/lib/cloud-agent-next/sandbox-allocation-offers';
 import { DEFAULT_WORKSPACE_ORDER, workspaceOrderSchema } from '@/lib/cloud-agent/workspace-folders';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { pullRequestAutoFixSettingsSchema } from '@kilocode/db/cloud-agent-pr-maintenance';
 
 const RepositoryPlatformSchema = z.enum(['github', 'gitlab']);
 
@@ -76,6 +77,32 @@ function toRepositoryPlatform(platform: string): RepositoryPlatform {
 }
 
 export const cloudAgentSettingsRouter = createTRPCRouter({
+  getPullRequestAutoFix: baseProcedure
+    .output(pullRequestAutoFixSettingsSchema.nullable())
+    .query(async ({ ctx }) => {
+      const settings = await db.query.cloud_agent_user_settings.findFirst({
+        where: eq(cloud_agent_user_settings.kilo_user_id, ctx.user.id),
+        columns: { pull_request_auto_fix: true },
+      });
+      return pullRequestAutoFixSettingsSchema
+        .nullable()
+        .parse(settings?.pull_request_auto_fix ?? null);
+    }),
+
+  setPullRequestAutoFix: baseProcedure
+    .input(pullRequestAutoFixSettingsSchema)
+    .output(pullRequestAutoFixSettingsSchema)
+    .mutation(async ({ ctx, input }) => {
+      await db
+        .insert(cloud_agent_user_settings)
+        .values({ kilo_user_id: ctx.user.id, pull_request_auto_fix: input })
+        .onConflictDoUpdate({
+          target: cloud_agent_user_settings.kilo_user_id,
+          set: { pull_request_auto_fix: input },
+        });
+      return input;
+    }),
+
   canManage: baseProcedure
     .input(z.object({ organizationId: z.uuid().optional() }))
     .output(z.object({ canManage: z.boolean() }))

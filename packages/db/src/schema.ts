@@ -28,6 +28,7 @@ import * as z from 'zod';
 import type { SessionLiveSummary } from '@kilocode/session-ingest-contracts';
 import type {
   CloudAgentChatKind,
+  PullRequestAutoFixSettings,
   WatchPrAttemptStatus,
   WatchPrEvidence,
   WatchPrExecutionStatus,
@@ -9228,6 +9229,7 @@ export const cloud_agent_user_settings = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     workspace_order: text().$type<'manual' | 'created' | 'activity'>().notNull().default('manual'),
     builtin_agents: jsonb().$type<CloudAgentBuiltinAgentOverrides>().notNull().default({}),
+    pull_request_auto_fix: jsonb().$type<PullRequestAutoFixSettings>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

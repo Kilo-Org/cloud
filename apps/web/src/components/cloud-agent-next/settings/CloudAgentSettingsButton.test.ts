@@ -10,7 +10,14 @@ type DialogProps = {
   organizationId?: string;
   onOpenChange?: (open: boolean) => void;
   onSectionChange?: (
-    section: 'general' | 'profiles' | 'environments' | 'compute' | 'sidebar' | 'preferences'
+    section:
+      | 'general'
+      | 'profiles'
+      | 'environments'
+      | 'compute'
+      | 'sidebar'
+      | 'preferences'
+      | 'auto-fix'
   ) => void;
 };
 
@@ -70,6 +77,7 @@ describe('CloudAgentSettingsButton deep links', () => {
     ['?settings=environments', 'environments'],
     ['?settings=sidebar', 'sidebar'],
     ['?settings=preferences', 'preferences'],
+    ['?settings=auto-fix', 'auto-fix'],
   ] as const)('opens %s on the %s section', (search, section) => {
     setSearchParams(search);
 

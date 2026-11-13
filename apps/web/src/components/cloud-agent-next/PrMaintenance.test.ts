@@ -14,7 +14,11 @@ const mockUseMutation = jest.fn((_options: MutationOptions) => ({
 
 jest.mock('@/lib/trpc/utils', () => ({
   useTRPC: () => ({
+    cloudAgentSettings: {
+      getPullRequestAutoFix: { queryOptions: () => ({ queryKey: ['options'] }) },
+    },
     cliSessionsV2: {
+      enablePullRequestAutoFix: { mutationOptions: () => ({ mutationKey: ['enable'] }) },
       getPrWatchOptions: { queryOptions: () => ({ queryKey: ['options'] }) },
       getWatchPr: { queryOptions: () => ({ queryKey: ['watch'] }) },
       ...Object.fromEntries(
@@ -26,6 +30,7 @@ jest.mock('@/lib/trpc/utils', () => ({
     },
   }),
 }));
+jest.mock('./settings/CloudAgentSettingsDialog', () => ({ CloudAgentSettingsDialog: () => null }));
 jest.mock('@tanstack/react-query', () => ({
   useMutation: (options: MutationOptions) => mockUseMutation(options),
   useQuery: ({ queryKey }: { queryKey: string[] }) =>
@@ -43,7 +48,7 @@ jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: jest.fn() }),
 }));
 
-it('refreshes current enable options as well as watch state after an enable error', async () => {
+it('refreshes the watch state after an enable error without opening a per-PR settings form', async () => {
   renderToStaticMarkup(
     createElement(PrMaintenance, {
       sessionId: 'ses_example',
@@ -67,5 +72,5 @@ it('refreshes current enable options as well as watch state after an enable erro
   if (!enable?.onError) throw new Error('Missing actual enable error handler');
   await enable.onError(new Error('Workspace settings changed'));
   expect(mockWatchRefetch).toHaveBeenCalledTimes(1);
-  expect(mockOptionsRefetch).toHaveBeenCalledTimes(1);
+  expect(mockOptionsRefetch).not.toHaveBeenCalled();
 });

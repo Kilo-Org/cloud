@@ -307,6 +307,26 @@ describe('CloudAgentWorkspaceTabs', () => {
     }
   });
 
+  it('uses one compact auto-fix label and preserves live-run pinning', () => {
+    const user = makeSession('ses_user', 'Review the changes');
+    const autoFix = makeSession('ses_auto_fix', 'Pull request auto-fix', {
+      chatKind: 'maintenance',
+      isMaintenancePinned: true,
+    });
+    const html = renderWorkspaceTabs({
+      chatSessions: [user, autoFix],
+      currentSessionId: user.sessionId,
+      openChatSessionIds: [user.sessionId],
+    });
+    const tab = findButtonMarkup(html, 'Auto fix');
+    expect(tab.match(/Auto fix/g)).toHaveLength(1);
+    expect(tab).toContain('lucide-zap');
+    expect(tab).toContain('text-violet-400');
+    expect(tab).not.toContain('data-slot="badge"');
+    expect(html).not.toContain(`aria-label="Close ${autoFix.prompt}"`);
+    expect(html.indexOf(tab)).toBeLessThan(html.indexOf(findButtonMarkup(html, user.prompt)));
+  });
+
   it('renders existing shared busy and attention indicators for different chats', () => {
     const busy = makeSession('ses_busy', 'Running investigation', { sessionStatus: 'busy' });
     const attention = makeSession('ses_attention', 'Waiting on an answer', {

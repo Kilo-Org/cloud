@@ -1,13 +1,7 @@
 'use client';
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { useEffect, useRef, useState } from 'react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 import { PrBadge, PrBadgeSkeleton } from './PrBadge';
 import { PrHoverCardContent } from './PrHoverCardContent';
@@ -21,6 +15,26 @@ type SessionPrIndicatorProps = {
 };
 
 export function SessionPrIndicator({ session }: SessionPrIndicatorProps) {
+  const [mode, setMode] = useState<'preview' | 'pinned' | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const restoreFocus = useRef(false);
+  function cancelClose() {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = null;
+  }
+  function scheduleClose() {
+    cancelClose();
+    closeTimer.current = setTimeout(
+      () => setMode(current => (current === 'preview' ? null : current)),
+      150
+    );
+  }
+  useEffect(
+    () => () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    },
+    []
+  );
   if (session.associatedPr === undefined) {
     if (!session.branch) return null;
     return <PrBadgeSkeleton />;
@@ -34,25 +48,63 @@ export function SessionPrIndicator({ session }: SessionPrIndicatorProps) {
 
   return (
     <span className="inline-flex shrink-0" onClick={event => event.stopPropagation()}>
-      <Dialog>
-        <DialogTrigger asChild>
-          <PrBadge pr={pr} title="Open pull request status and maintenance" />
-        </DialogTrigger>
-        <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Pull request status</DialogTitle>
-            <DialogDescription>
-              Cached GitHub evidence and automatic maintenance for this workspace.
-            </DialogDescription>
-          </DialogHeader>
+      <Popover
+        open={mode !== null}
+        onOpenChange={open => {
+          cancelClose();
+          if (open) restoreFocus.current = true;
+          setMode(open ? 'pinned' : null);
+        }}
+      >
+        <PopoverTrigger asChild>
+          <PrBadge
+            pr={pr}
+            title="Pull request status"
+            onPointerEnter={event => {
+              if (event.pointerType !== 'mouse') return;
+              cancelClose();
+              if (mode === null) restoreFocus.current = false;
+              setMode(current => current ?? 'preview');
+            }}
+            onPointerLeave={scheduleClose}
+            onClick={event => {
+              event.preventDefault();
+              cancelClose();
+              restoreFocus.current = true;
+              setMode(current => (current === 'pinned' ? null : 'pinned'));
+            }}
+          />
+        </PopoverTrigger>
+        <PopoverContent
+          aria-label="Pull request status"
+          align="end"
+          className="w-80 max-w-[calc(100vw-2rem)] max-h-[min(36rem,85dvh)] overflow-y-auto"
+          onOpenAutoFocus={event => {
+            if (mode === 'preview') event.preventDefault();
+          }}
+          onCloseAutoFocus={event => {
+            if (!restoreFocus.current) event.preventDefault();
+          }}
+          onPointerEnter={cancelClose}
+          onPointerLeave={scheduleClose}
+          onPointerDownCapture={() => {
+            cancelClose();
+            restoreFocus.current = true;
+            setMode('pinned');
+          }}
+          onFocusCapture={() => {
+            restoreFocus.current = true;
+            setMode('pinned');
+          }}
+        >
           <PrHoverCardContent
             pr={pr}
             sessionId={session.sessionId}
             gitBranch={session.branch ?? null}
             worktreeId={session.worktreeId}
           />
-        </DialogContent>
-      </Dialog>
+        </PopoverContent>
+      </Popover>
     </span>
   );
 }

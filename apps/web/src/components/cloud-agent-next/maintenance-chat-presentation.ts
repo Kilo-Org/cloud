@@ -1,5 +1,10 @@
 import type { StoredSession } from './types';
 
+export function maintenanceChatHref(sessionId: string, organizationId?: string | null): string {
+  const base = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
+  return `${base}/chat?sessionId=${encodeURIComponent(sessionId)}`;
+}
+
 export function isMaintenanceChatPinned(
   session: Pick<StoredSession, 'chatKind' | 'isMaintenancePinned'>
 ): boolean {

@@ -1,4 +1,5 @@
 import 'server-only';
+import { enablePullRequestAutoFix } from '@/lib/cloud-agent/pr-auto-fix';
 import { createHash, randomUUID } from 'node:crypto';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
@@ -961,6 +962,10 @@ function joinWithAnd(fragments: SQL[]): SQL {
  * This router only queries the data.
  */
 export const cliSessionsV2Router = createTRPCRouter({
+  enablePullRequestAutoFix: baseProcedure
+    .input(watchPrQuerySchema)
+    .mutation(({ ctx, input }) => enablePullRequestAutoFix(ctx, input)),
+
   getPrWatchOptions: baseProcedure
     .input(watchPrQuerySchema)
     .query(({ ctx, input }) => getPrWatchOptions(ctx, input)),

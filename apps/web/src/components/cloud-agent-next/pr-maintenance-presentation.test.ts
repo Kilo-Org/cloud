@@ -56,7 +56,7 @@ describe('maintenance presentation', () => {
   it('keeps the watch lifecycle separate from execution', () => {
     expect(
       getMaintenanceStatusLabel({ status: 'watching', execution_status: 'waiting_for_session' })
-    ).toBe('Waiting for your session to finish');
+    ).toBe('Waiting for chats');
     expect(getMaintenanceStatusLabel({ status: 'paused', execution_status: 'fixing' })).toBe(
       'Paused'
     );
@@ -101,7 +101,7 @@ describe('maintenance presentation', () => {
     expect(getMaintenanceRecoveryMessage('maintenance_access_unavailable')).toContain(
       'Restore repository access'
     );
-    expect(getMaintenanceRecoveryMessage('new_blocker')).toContain('Inspect the maintenance chat');
+    expect(getMaintenanceRecoveryMessage('new_blocker')).toContain('Inspect the auto-fix chat');
     expect(getMaintenanceRecoveryMessage(null)).toBeNull();
   });
 
@@ -109,9 +109,7 @@ describe('maintenance presentation', () => {
     'maintenance_result_unavailable_after_answer',
     'maintenance_result_unavailable_after_publication',
   ])('keeps %s recovery manual without offering Resume', reason => {
-    expect(getMaintenanceRecoveryMessage(reason)).toContain(
-      'then Stop and enable maintenance with new consent'
-    );
+    expect(getMaintenanceRecoveryMessage(reason)).toContain('then Stop and enable auto-fix again');
     expect(getMaintenanceRecoveryMessage(reason)).not.toMatch(/resume|recheck/i);
     expect(
       getMaintenanceControlsState({
@@ -149,7 +147,7 @@ describe('maintenance presentation', () => {
         ...answered,
         activeChat: { chatAvailable: false },
       })
-    ).toContain('No maintenance chat needs an answer');
+    ).toContain('No auto-fix chat needs an answer');
   });
 
   it('does not poll absent or finished watches', () => {

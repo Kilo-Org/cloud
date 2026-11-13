@@ -11,6 +11,7 @@ import {
   Palette,
   SlidersHorizontal,
   User,
+  Zap,
   type LucideIcon,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +36,7 @@ import { RepositoryOverridesSection } from './RepositoryOverridesSection';
 import { SidebarSettingsSection } from './SidebarSettingsSection';
 import { TranscriptPreferencesSection } from './TranscriptPreferencesSection';
 import { VercelComputeSettings } from './VercelComputeSettings';
+import { PullRequestAutoFixSection } from './PullRequestAutoFixSection';
 
 export type SettingsSection =
   | 'general'
@@ -42,6 +44,7 @@ export type SettingsSection =
   | 'environments'
   | 'compute'
   | 'sidebar'
+  | 'auto-fix'
   | 'preferences';
 
 type CloudAgentSettingsDialogProps = {
@@ -116,6 +119,7 @@ function CloudAgentSettings({
         settings &&
         !settings.canManage &&
         activeSection !== 'sidebar' &&
+        activeSection !== 'auto-fix' &&
         activeSection !== 'preferences' ? (
           <DialogDescription className="mt-1 flex items-center gap-1.5">
             <Lock className="size-3.5 shrink-0" aria-hidden />
@@ -136,6 +140,7 @@ function CloudAgentSettings({
             value === 'profiles' ||
             value === 'environments' ||
             value === 'sidebar' ||
+            value === 'auto-fix' ||
             value === 'preferences' ||
             (value === 'compute' && settings?.canManage)
           ) {
@@ -201,8 +206,21 @@ function CloudAgentSettings({
             <LayoutList className="size-4 shrink-0" aria-hidden />
             Sidebar
           </TabsTrigger>
+          <TabsTrigger
+            value="auto-fix"
+            className="gap-2 pointer-coarse:min-h-11 md:w-full md:justify-start"
+          >
+            <Zap className="size-4 shrink-0" aria-hidden />
+            PR auto-fix
+          </TabsTrigger>
         </TabsList>
 
+        <TabsContent
+          value="auto-fix"
+          className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
+        >
+          <PullRequestAutoFixSection />
+        </TabsContent>
         <TabsContent
           value="general"
           className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"

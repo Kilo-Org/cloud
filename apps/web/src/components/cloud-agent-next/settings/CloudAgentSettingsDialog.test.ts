@@ -65,6 +65,9 @@ jest.mock('./RepositoryOverridesSection', () => ({
 jest.mock('./EnvironmentsSection', () => ({ EnvironmentsSection: () => null }));
 
 jest.mock('./VercelComputeSettings', () => ({ VercelComputeSettings: () => null }));
+jest.mock('./PullRequestAutoFixSection', () => ({
+  PullRequestAutoFixSection: () => createElement('div', null, 'Personal auto-fix settings'),
+}));
 
 jest.mock('@/components/ui/dialog', () => {
   const stub =

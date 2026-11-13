@@ -25,6 +25,7 @@ describe('Cross-region Claude payer state', () => {
             user_profile_id: 'uprof_owner',
             connected_at: '2026-01-01T00:00:00Z',
             created_by: 'owner',
+            kilo_user_id: 'owner',
           },
         })
       )
@@ -35,6 +36,7 @@ describe('Cross-region Claude payer state', () => {
             user_profile_id: 'uprof_owner',
             connected_at: null,
             created_by: 'owner',
+            kilo_user_id: 'owner',
           },
         })
       );
@@ -93,5 +95,57 @@ describe('Cross-region Claude payer state', () => {
         organizationId: '00000000-0000-4000-8000-000000000002',
       })
     ).resolves.toBeNull();
+  });
+
+  it('returns a personal row that names its owner', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        connection: {
+          status: 'connected',
+          user_profile_id: 'uprof_owner',
+          connected_at: null,
+          kilo_user_id: 'owner',
+        },
+      })
+    );
+    await expect(getAuthoritativeClaudeBillingState(owner)).resolves.toMatchObject({
+      user_profile_id: 'uprof_owner',
+    });
+  });
+
+  it.each([
+    ['another person', { kilo_user_id: 'other-person' }],
+    ['no person', {}],
+    ['a null person', { kilo_user_id: null }],
+  ])('requires a personal row to name its owner, given %s', async (_label, identity) => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        connection: {
+          status: 'connected',
+          user_profile_id: 'uprof_owner',
+          connected_at: null,
+          ...identity,
+        },
+      })
+    );
+    await expect(getAuthoritativeClaudeBillingState(owner)).resolves.toBeNull();
+  });
+
+  it('returns a shared-services row, which names an organization rather than a person', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        connection: {
+          status: 'connected',
+          user_profile_id: 'uprof_org',
+          connected_at: null,
+        },
+      })
+    );
+    await expect(
+      getAuthoritativeClaudeBillingState({
+        kind: 'shared_services',
+        organizationId: '00000000-0000-4000-8000-000000000002',
+      })
+    ).resolves.toMatchObject({ user_profile_id: 'uprof_org' });
   });
 });

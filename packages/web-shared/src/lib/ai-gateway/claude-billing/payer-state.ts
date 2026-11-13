@@ -103,8 +103,11 @@ export async function getAuthoritativeClaudeBillingState(
   );
   if (!response.ok) throw new Error(`Claude payer-state read failed with HTTP ${response.status}`);
   const { connection } = responseSchema.parse(await response.json());
-  // A member connection is that person's row. The previous web app release
-  // answers a member query with the organization's row, which is never it.
-  if (owner.kind === 'member' && connection?.kilo_user_id !== owner.kiloUserId) return null;
+  // A personal or member row belongs to the person it names, so the read
+  // returns it only for that person. A shared-services row belongs to the
+  // organization and names no person.
+  if (owner.kind !== 'shared_services' && connection?.kilo_user_id !== owner.kiloUserId) {
+    return null;
+  }
   return connection;
 }

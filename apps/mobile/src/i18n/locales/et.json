@@ -22,6 +22,7 @@
     "expired": "Aegunud"
   },
   "common": {
+    "manageOnWeb": "Halda veebis",
     "creditHistory": "Krediitide ajalugu",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Teenusepakkuja võtmed",
       "rowSubtitle": "Kasuta oma teenusepakkuja arveldust",
-      "manageOnWeb": "Halda veebis",
       "manageOnWebReason": "Need teenusepakkujad vajavad struktureeritud mandaate.",
       "description": "Nende võtmetega tehtud päringud arveldatakse sinu teenusepakkuja kontolt, mitte Kilo saldolt.",
       "enabled": "Kasutusel",
@@ -4118,8 +4118,7 @@
     "couldNotLoad": "Integratsioone ei õnnestunud laadida",
     "permissionDenied": "Sul pole õigust neid integratsioone hallata.",
     "memberHint": "Nende ühenduste muutmiseks pöördu organisatsiooni omaniku või administraatori poole.",
-    "connectFailed": "Ühendamise lehte ei õnnestunud avada",
-    "manageOnWeb": "Halda veebis"
+    "connectFailed": "Ühendamise lehte ei õnnestunud avada"
   },
   "invoices": {
     "personalEmptyDescription": "Sinu enda ostude arved kuvatakse siin pärast arve esitamist."

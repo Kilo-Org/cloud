@@ -22,6 +22,7 @@
     "expired": "Muda wake umeisha"
   },
   "common": {
+    "manageOnWeb": "Dhibiti kwenye wavuti",
     "creditHistory": "Historia ya salio",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Funguo za watoa huduma",
       "rowSubtitle": "Tumia malipo ya mtoa huduma wako",
-      "manageOnWeb": "Dhibiti kwenye wavuti",
       "manageOnWebReason": "Watoa huduma hawa wanahitaji vitambulisho vilivyopangwa.",
       "description": "Maombi yanayopitia funguo hizi yanatozwa kwenye akaunti yako ya mtoa huduma badala ya salio lako la Kilo.",
       "enabled": "Inatumika",
@@ -4118,8 +4118,7 @@
     "couldNotLoad": "Imeshindwa kupakia miunganisho",
     "permissionDenied": "Huna ruhusa ya kudhibiti miunganisho hii.",
     "memberHint": "Mwombe mmiliki au msimamizi wa shirika abadilishe miunganisho hii.",
-    "connectFailed": "Imeshindwa kufungua ukurasa wa kuunganisha",
-    "manageOnWeb": "Dhibiti kwenye wavuti"
+    "connectFailed": "Imeshindwa kufungua ukurasa wa kuunganisha"
   },
   "invoices": {
     "personalEmptyDescription": "Ankara za ununuzi wako binafsi zitaonekana hapa baada ya kutozwa."

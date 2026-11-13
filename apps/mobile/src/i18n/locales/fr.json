@@ -22,6 +22,7 @@
     "expired": "Expirée"
   },
   "common": {
+    "manageOnWeb": "Gérer sur le web",
     "creditHistory": "Historique des crédits",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Clés de fournisseur",
       "rowSubtitle": "Utiliser votre propre facturation fournisseur",
-      "manageOnWeb": "Gérer sur le web",
       "manageOnWebReason": "Ces fournisseurs nécessitent des identifiants structurés.",
       "description": "Les requêtes effectuées avec ces clés sont facturées sur votre compte fournisseur au lieu de votre solde Kilo.",
       "enabled": "Utilisée",
@@ -4183,8 +4183,7 @@
     "couldNotLoad": "Impossible de charger les intégrations",
     "permissionDenied": "Vous n'avez pas l'autorisation de gérer ces intégrations.",
     "memberHint": "Demandez à un propriétaire ou à un administrateur de l'organisation de modifier ces connexions.",
-    "connectFailed": "Impossible d'ouvrir la page de connexion",
-    "manageOnWeb": "Gérer sur le web"
+    "connectFailed": "Impossible d'ouvrir la page de connexion"
   },
   "invoices": {
     "personalEmptyDescription": "Les factures de vos achats personnels apparaîtront ici dès votre première facturation."

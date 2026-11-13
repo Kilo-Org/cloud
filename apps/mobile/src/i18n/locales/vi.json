@@ -22,6 +22,7 @@
     "expired": "Đã hết hạn"
   },
   "common": {
+    "manageOnWeb": "Quản lý trên web",
     "creditHistory": "Lịch sử tín dụng",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Khóa nhà cung cấp",
       "rowSubtitle": "Dùng thanh toán của nhà cung cấp riêng",
-      "manageOnWeb": "Quản lý trên web",
       "manageOnWebReason": "Các nhà cung cấp này cần thông tin xác thực có cấu trúc.",
       "description": "Các yêu cầu qua những khóa này sẽ được tính phí vào tài khoản nhà cung cấp của bạn thay vì số dư Kilo.",
       "enabled": "Đang dùng",
@@ -4118,8 +4118,7 @@
     "couldNotLoad": "Không thể tải các tích hợp",
     "permissionDenied": "Bạn không có quyền quản lý các tích hợp này.",
     "memberHint": "Hãy yêu cầu chủ sở hữu hoặc quản trị viên của tổ chức thay đổi các kết nối này.",
-    "connectFailed": "Không thể mở trang kết nối",
-    "manageOnWeb": "Quản lý trên web"
+    "connectFailed": "Không thể mở trang kết nối"
   },
   "invoices": {
     "personalEmptyDescription": "Hóa đơn cho các giao dịch mua của riêng bạn sẽ hiển thị tại đây sau khi bạn được tính phí."

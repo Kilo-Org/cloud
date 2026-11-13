@@ -22,6 +22,7 @@
     "expired": "Caducada"
   },
   "common": {
+    "manageOnWeb": "Gestiona-ho al web",
     "creditHistory": "Historial de crèdits",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Claus de proveïdor",
       "rowSubtitle": "Utilitza la facturació del teu proveïdor",
-      "manageOnWeb": "Gestiona-ho al web",
       "manageOnWebReason": "Aquests proveïdors necessiten credencials estructurades.",
       "description": "Les sol·licituds fetes amb aquestes claus es facturen al teu compte del proveïdor en lloc del saldo de Kilo.",
       "enabled": "En ús",
@@ -4183,8 +4183,7 @@
     "couldNotLoad": "No s'han pogut carregar les integracions",
     "permissionDenied": "No tens permís per gestionar aquestes integracions.",
     "memberHint": "Demana a un propietari o administrador de l'organització que canviï aquestes connexions.",
-    "connectFailed": "No s'ha pogut obrir la pàgina de connexió",
-    "manageOnWeb": "Gestiona-ho al web"
+    "connectFailed": "No s'ha pogut obrir la pàgina de connexió"
   },
   "invoices": {
     "personalEmptyDescription": "Les factures de les teves compres apareixeran aquí quan se't facturi."

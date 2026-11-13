@@ -22,6 +22,7 @@
     "expired": "Udløbet"
   },
   "common": {
+    "manageOnWeb": "Administrer på nettet",
     "creditHistory": "Kredithistorik",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Udbydernøgler",
       "rowSubtitle": "Brug din egen udbyderfakturering",
-      "manageOnWeb": "Administrer på nettet",
       "manageOnWebReason": "Disse udbydere kræver strukturerede legitimationsoplysninger.",
       "description": "Anmodninger via disse nøgler faktureres til din udbyderkonto i stedet for din Kilo-saldo.",
       "enabled": "I brug",
@@ -4118,8 +4118,7 @@
     "couldNotLoad": "Integrationerne kunne ikke indlæses",
     "permissionDenied": "Du har ikke tilladelse til at administrere disse integrationer.",
     "memberHint": "Bed en ejer eller administrator i organisationen om at ændre disse forbindelser.",
-    "connectFailed": "Siden til oprettelse af forbindelse kunne ikke åbnes",
-    "manageOnWeb": "Administrer på nettet"
+    "connectFailed": "Siden til oprettelse af forbindelse kunne ikke åbnes"
   },
   "invoices": {
     "personalEmptyDescription": "Fakturaer for dine egne køb vises her, når du er blevet faktureret."

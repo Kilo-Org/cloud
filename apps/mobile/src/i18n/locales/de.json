@@ -22,6 +22,7 @@
     "expired": "Abgelaufen"
   },
   "common": {
+    "manageOnWeb": "Im Web verwalten",
     "creditHistory": "Credit-Verlauf",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Anbieterschlüssel",
       "rowSubtitle": "Eigene Anbieterabrechnung nutzen",
-      "manageOnWeb": "Im Web verwalten",
       "manageOnWebReason": "Diese Anbieter benötigen strukturierte Anmeldedaten.",
       "description": "Anfragen über diese Schlüssel werden über dein Anbieterkonto statt über dein Kilo-Guthaben abgerechnet.",
       "enabled": "Aktiv",
@@ -4118,8 +4118,7 @@
     "couldNotLoad": "Integrationen konnten nicht geladen werden",
     "permissionDenied": "Du hast keine Berechtigung, diese Integrationen zu verwalten.",
     "memberHint": "Bitte eine Person mit Inhaber- oder Admin-Rechten in der Organisation, diese Verbindungen zu ändern.",
-    "connectFailed": "Die Verbindungsseite konnte nicht geöffnet werden",
-    "manageOnWeb": "Im Web verwalten"
+    "connectFailed": "Die Verbindungsseite konnte nicht geöffnet werden"
   },
   "invoices": {
     "personalEmptyDescription": "Rechnungen für deine eigenen Käufe werden hier angezeigt, sobald dir etwas in Rechnung gestellt wurde."

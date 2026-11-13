@@ -22,6 +22,7 @@
     "expired": "Wygasło"
   },
   "common": {
+    "manageOnWeb": "Zarządzaj w przeglądarce",
     "creditHistory": "Historia kredytów",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Klucze dostawców",
       "rowSubtitle": "Korzystaj z własnych rozliczeń u dostawcy",
-      "manageOnWeb": "Zarządzaj w przeglądarce",
       "manageOnWebReason": "Ci dostawcy wymagają danych uwierzytelniających w określonym formacie.",
       "description": "Żądania wysyłane z użyciem tych kluczy są rozliczane na twoim koncie u dostawcy zamiast z salda Kilo.",
       "enabled": "W użyciu",
@@ -4248,8 +4248,7 @@
     "couldNotLoad": "Nie udało się wczytać integracji",
     "permissionDenied": "Nie masz uprawnień do zarządzania tymi integracjami.",
     "memberHint": "Poproś właściciela lub administratora organizacji o zmianę tych połączeń.",
-    "connectFailed": "Nie udało się otworzyć strony połączenia",
-    "manageOnWeb": "Zarządzaj w przeglądarce"
+    "connectFailed": "Nie udało się otworzyć strony połączenia"
   },
   "invoices": {
     "personalEmptyDescription": "Faktury za Twoje zakupy pojawią się tutaj po pierwszym obciążeniu."

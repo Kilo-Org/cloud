@@ -22,6 +22,7 @@
     "expired": "Kuphelelwe yisikhathi"
   },
   "common": {
+    "manageOnWeb": "Phatha kuwebhu",
     "creditHistory": "Umlando wamakhredithi",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Okhiye babahlinzeki",
       "rowSubtitle": "Sebenzisa ukukhokhisa komhlinzeki wakho",
-      "manageOnWeb": "Phatha kuwebhu",
       "manageOnWebReason": "Laba bahlinzeki badinga imininingwane yokungena ehlelekile.",
       "description": "Izicelo ezenziwa ngalaba khiye zikhokhiswa ku-akhawunti yakho yomhlinzeki esikhundleni sebhalansi yakho ye-Kilo.",
       "enabled": "Uyasetshenziswa",
@@ -4118,8 +4118,7 @@
     "couldNotLoad": "Akukwazekanga ukulayisha ukuhlanganiswa",
     "permissionDenied": "Awunayo imvume yokuphatha lokhu kuhlanganiswa.",
     "memberHint": "Cela umnikazi wenhlangano noma umphathi ukuthi ashintshe lokhu kuxhumana.",
-    "connectFailed": "Akukwazekanga ukuvula ikhasi lokuxhuma",
-    "manageOnWeb": "Phatha kuwebhu"
+    "connectFailed": "Akukwazekanga ukuvula ikhasi lokuxhuma"
   },
   "invoices": {
     "personalEmptyDescription": "Ama-invoyisi okuthenga kwakho azovela lapha uma usukhokhisiwe."

@@ -22,6 +22,7 @@
     "expired": "Àkókò ti kọjá"
   },
   "common": {
+    "manageOnWeb": "Ṣàkóso lórí wẹ́ẹ̀bù",
     "creditHistory": "Ìtàn kírẹ́dítì",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Àwọn kọ́kọ́rọ́ olùpèsè",
       "rowSubtitle": "Lo ìsanwó olùpèsè tìrẹ",
-      "manageOnWeb": "Ṣàkóso lórí wẹ́ẹ̀bù",
       "manageOnWebReason": "Àwọn olùpèsè wọ̀nyí nílò àwọn ìwé-ẹ̀rí ìwọlé tí a ṣètò.",
       "description": "Àwọn ìbéèrè tí ó gba àwọn kọ́kọ́rọ́ wọ̀nyí kọjá ni a ó gba owó wọn lórí àkọọ́lẹ̀ olùpèsè rẹ dípò owó Kilo rẹ tó kù.",
       "enabled": "Ní lílò",
@@ -4118,8 +4118,7 @@
     "couldNotLoad": "Kò ṣeé ṣe láti gbé àwọn ìsopọ̀ wá",
     "permissionDenied": "O kò ní àṣẹ láti ṣàkóso àwọn ìsopọ̀ wọ̀nyí.",
     "memberHint": "Bèèrè lọ́wọ́ ẹni tó ni àjọ náà tàbí alákòóso láti yí àwọn ìsopọ̀ wọ̀nyí padà.",
-    "connectFailed": "Kò ṣeé ṣe láti ṣí ojú-ìwé ìsopọ̀",
-    "manageOnWeb": "Ṣàkóso lórí wẹ́ẹ̀bù"
+    "connectFailed": "Kò ṣeé ṣe láti ṣí ojú-ìwé ìsopọ̀"
   },
   "invoices": {
     "personalEmptyDescription": "Àwọn ìwé owó fún àwọn ìrajà tìrẹ yóò hàn níbí nígbà tí a bá ti gba owó lọ́wọ́ rẹ."

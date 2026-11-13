@@ -98,9 +98,9 @@ export function IntegrationProviderRow({
         size="sm"
         variant="outline"
         onPress={onManageOnWeb}
-        accessibilityLabel={namedAction(t('integrations.manageOnWeb'))}
+        accessibilityLabel={namedAction(t('common.manageOnWeb'))}
       >
-        <Text>{t('integrations.manageOnWeb')}</Text>
+        <Text>{t('common.manageOnWeb')}</Text>
       </Button>
     ) : null;
   } else if (row.installed) {

@@ -22,6 +22,7 @@
     "expired": "Termiņš beidzies"
   },
   "common": {
+    "manageOnWeb": "Pārvaldi tīmeklī",
     "creditHistory": "Kredītu vēsture",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Nodrošinātāju atslēgas",
       "rowSubtitle": "Izmanto sava nodrošinātāja norēķinus",
-      "manageOnWeb": "Pārvaldi tīmeklī",
       "manageOnWebReason": "Šiem nodrošinātājiem nepieciešami strukturēti akreditācijas dati.",
       "description": "Pieprasījumi, kas veikti ar šīm atslēgām, tiek iekasēti no tava nodrošinātāja konta, nevis no tava Kilo atlikuma.",
       "enabled": "Tiek izmantota",
@@ -4183,8 +4183,7 @@
     "couldNotLoad": "Neizdevās ielādēt integrācijas",
     "permissionDenied": "Jums nav atļaujas pārvaldīt šīs integrācijas.",
     "memberHint": "Lūdziet organizācijas īpašniekam vai administratoram mainīt šos savienojumus.",
-    "connectFailed": "Neizdevās atvērt savienojuma lapu",
-    "manageOnWeb": "Pārvaldīt tīmeklī"
+    "connectFailed": "Neizdevās atvērt savienojuma lapu"
   },
   "invoices": {
     "personalEmptyDescription": "Rēķini par jūsu pirkumiem šeit parādīsies, kad jums tiks izrakstīts rēķins."

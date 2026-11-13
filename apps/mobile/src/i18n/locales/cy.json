@@ -22,6 +22,7 @@
     "expired": "Wedi dod i ben"
   },
   "common": {
+    "manageOnWeb": "Rheoli ar y we",
     "creditHistory": "Hanes credydau",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Allweddi darparwr",
       "rowSubtitle": "Defnyddio bilio eich darparwr eich hun",
-      "manageOnWeb": "Rheoli ar y we",
       "manageOnWebReason": "Mae angen manylion adnabod strwythuredig ar y darparwyr hyn.",
       "description": "Codir tâl am geisiadau drwy'r allweddi hyn ar eich cyfrif darparwr yn lle eich balans Kilo.",
       "enabled": "Yn cael ei defnyddio",
@@ -4378,8 +4378,7 @@
     "couldNotLoad": "Methu llwytho'r integreiddiadau",
     "permissionDenied": "Does gennych chi ddim caniatâd i reoli'r integreiddiadau hyn.",
     "memberHint": "Gofynnwch i berchennog neu weinyddwr y sefydliad newid y cysylltiadau hyn.",
-    "connectFailed": "Methu agor y dudalen gysylltu",
-    "manageOnWeb": "Rheoli ar y we"
+    "connectFailed": "Methu agor y dudalen gysylltu"
   },
   "invoices": {
     "personalEmptyDescription": "Bydd anfonebau ar gyfer eich pryniannau eich hun yn ymddangos yma unwaith y cewch eich bilio."

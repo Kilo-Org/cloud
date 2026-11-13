@@ -22,6 +22,7 @@
     "expired": "Iraungita"
   },
   "common": {
+    "manageOnWeb": "Kudeatu webean",
     "creditHistory": "Kredituen historia",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Hornitzaileen gakoak",
       "rowSubtitle": "Erabili zure hornitzailearen fakturazioa",
-      "manageOnWeb": "Kudeatu webean",
       "manageOnWebReason": "Hornitzaile hauek egiturazko kredentzialak behar dituzte.",
       "description": "Gako hauen bidezko eskaerak zure hornitzaile-kontuan fakturatzen dira, ez zure Kilo saldoan.",
       "enabled": "Erabiltzen",
@@ -4118,8 +4118,7 @@
     "couldNotLoad": "Ezin izan dira integrazioak kargatu",
     "permissionDenied": "Ez duzu integrazio hauek kudeatzeko baimenik.",
     "memberHint": "Eskatu erakundearen jabe edo administratzaile bati konexio hauek aldatzeko.",
-    "connectFailed": "Ezin izan da konexio-orria ireki",
-    "manageOnWeb": "Kudeatu webean"
+    "connectFailed": "Ezin izan da konexio-orria ireki"
   },
   "invoices": {
     "personalEmptyDescription": "Zure erosketen fakturak hemen agertuko dira fakturatzen zaizunean."

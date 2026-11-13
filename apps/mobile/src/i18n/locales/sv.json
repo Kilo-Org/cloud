@@ -22,6 +22,7 @@
     "expired": "Utgånget"
   },
   "common": {
+    "manageOnWeb": "Hantera på webben",
     "creditHistory": "Kredithistorik",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Leverantörsnycklar",
       "rowSubtitle": "Använd din egen leverantörsfakturering",
-      "manageOnWeb": "Hantera på webben",
       "manageOnWebReason": "Dessa leverantörer kräver strukturerade autentiseringsuppgifter.",
       "description": "Förfrågningar via dessa nycklar faktureras ditt leverantörskonto i stället för ditt Kilo-saldo.",
       "enabled": "Används",
@@ -4118,8 +4118,7 @@
     "couldNotLoad": "Det gick inte att läsa in integrationerna",
     "permissionDenied": "Du har inte behörighet att hantera de här integrationerna.",
     "memberHint": "Be en ägare eller administratör i organisationen att ändra de här anslutningarna.",
-    "connectFailed": "Det gick inte att öppna anslutningssidan",
-    "manageOnWeb": "Hantera på webben"
+    "connectFailed": "Det gick inte att öppna anslutningssidan"
   },
   "invoices": {
     "personalEmptyDescription": "Fakturor för dina egna köp visas här när du har fakturerats."

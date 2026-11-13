@@ -22,6 +22,7 @@
     "expired": "Imithe in éag"
   },
   "common": {
+    "manageOnWeb": "Bainistigh ar an ngréasán",
     "creditHistory": "Stair chreidmheasa",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Eochracha soláthraí",
       "rowSubtitle": "Úsáid billeáil do sholáthraí féin",
-      "manageOnWeb": "Bainistigh ar an ngréasán",
       "manageOnWebReason": "Teastaíonn dintiúir struchtúrtha ó na soláthraithe seo.",
       "description": "Gearrtar iarratais a dhéantar trí na heochracha seo ar do chuntas soláthraí in ionad d'iarmhéid Kilo.",
       "enabled": "In úsáid",
@@ -4313,8 +4313,7 @@
     "couldNotLoad": "Níorbh fhéidir na comhtháthuithe a lódáil",
     "permissionDenied": "Níl cead agat na comhtháthuithe seo a bhainistiú.",
     "memberHint": "Iarr ar úinéir nó ar riarthóir na heagraíochta na ceangail seo a athrú.",
-    "connectFailed": "Níorbh fhéidir an leathanach ceangail a oscailt",
-    "manageOnWeb": "Bainistigh ar an ngréasán"
+    "connectFailed": "Níorbh fhéidir an leathanach ceangail a oscailt"
   },
   "invoices": {
     "personalEmptyDescription": "Taispeánfar sonraisc do do cheannacháin féin anseo nuair a bheidh bille curtha chugat."

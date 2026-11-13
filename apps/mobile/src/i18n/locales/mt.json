@@ -22,6 +22,7 @@
     "expired": "Skada"
   },
   "common": {
+    "manageOnWeb": "Immaniġġja fuq il-web",
     "creditHistory": "Storja tal-krediti",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Ċwievet tal-fornitur",
       "rowSubtitle": "Uża l-fatturazzjoni tal-fornitur tiegħek",
-      "manageOnWeb": "Immaniġġja fuq il-web",
       "manageOnWebReason": "Dawn il-fornituri jeħtieġu kredenzjali strutturati.",
       "description": "It-talbiet magħmula b'dawn iċ-ċwievet jiġu ffatturati lill-kont tal-fornitur tiegħek minflok jitnaqqsu mill-bilanċ ta' Kilo tiegħek.",
       "enabled": "Qed tintuża",
@@ -4313,8 +4313,7 @@
     "couldNotLoad": "L-integrazzjonijiet ma setgħux jitgħabbew",
     "permissionDenied": "M'għandekx permess timmaniġġja dawn l-integrazzjonijiet.",
     "memberHint": "Itlob lil sid jew amministratur tal-organizzazzjoni biex ibiddel dawn il-konnessjonijiet.",
-    "connectFailed": "Il-paġna tal-konnessjoni ma setgħetx tinfetaħ",
-    "manageOnWeb": "Immaniġġja fuq il-web"
+    "connectFailed": "Il-paġna tal-konnessjoni ma setgħetx tinfetaħ"
   },
   "invoices": {
     "personalEmptyDescription": "Il-fatturi għax-xiri tiegħek stess se jidhru hawn ladarba tiġi ddebitat."

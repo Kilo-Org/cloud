@@ -22,6 +22,7 @@
     "expired": "Poteklo"
   },
   "common": {
+    "manageOnWeb": "Upravljaj v spletu",
     "creditHistory": "Zgodovina kreditov",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Ključi ponudnikov",
       "rowSubtitle": "Uporabi lastno obračunavanje pri ponudniku",
-      "manageOnWeb": "Upravljaj v spletu",
       "manageOnWebReason": "Ti ponudniki potrebujejo strukturirane poverilnice.",
       "description": "Zahteve prek teh ključev se zaračunajo tvojemu računu pri ponudniku namesto stanju v Kilo.",
       "enabled": "V uporabi",
@@ -4248,8 +4248,7 @@
     "couldNotLoad": "Integracij ni bilo mogoče naložiti",
     "permissionDenied": "Nimate dovoljenja za upravljanje teh integracij.",
     "memberHint": "Za spremembo teh povezav prosite lastnika ali skrbnika organizacije.",
-    "connectFailed": "Strani za povezavo ni bilo mogoče odpreti",
-    "manageOnWeb": "Upravljaj v spletu"
+    "connectFailed": "Strani za povezavo ni bilo mogoče odpreti"
   },
   "invoices": {
     "personalEmptyDescription": "Računi za vaše lastne nakupe bodo prikazani tukaj, ko vam bo izstavljen račun."

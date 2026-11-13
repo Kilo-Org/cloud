@@ -22,6 +22,7 @@
     "expired": "Lejárt"
   },
   "common": {
+    "manageOnWeb": "Kezelés a weben",
     "creditHistory": "Kreditelőzmények",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Szolgáltatói kulcsok",
       "rowSubtitle": "Saját szolgáltatói számlázás használata",
-      "manageOnWeb": "Kezelés a weben",
       "manageOnWebReason": "Ezekhez a szolgáltatókhoz strukturált hitelesítő adatok szükségesek.",
       "description": "Az ezekkel a kulcsokkal küldött kérések a szolgáltatói fiókodat terhelik a Kilo-egyenleged helyett.",
       "enabled": "Használatban",
@@ -4118,8 +4118,7 @@
     "couldNotLoad": "Nem sikerült betölteni az integrációkat",
     "permissionDenied": "Nincs jogosultságod ezeknek az integrációknak a kezeléséhez.",
     "memberHint": "Kérd meg a szervezet egyik tulajdonosát vagy adminisztrátorát, hogy módosítsa ezeket a kapcsolatokat.",
-    "connectFailed": "Nem sikerült megnyitni a csatlakozási oldalt",
-    "manageOnWeb": "Kezelés a weben"
+    "connectFailed": "Nem sikerült megnyitni a csatlakozási oldalt"
   },
   "invoices": {
     "personalEmptyDescription": "A saját vásárlásaid számlái itt jelennek meg, amint kiállítjuk őket."

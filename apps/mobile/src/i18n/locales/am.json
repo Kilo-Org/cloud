@@ -22,6 +22,7 @@
     "expired": "ጊዜው አልፏል"
   },
   "common": {
+    "manageOnWeb": "በድር ላይ ያስተዳድሩ",
     "creditHistory": "የክሬዲት ታሪክ",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "የአቅራቢ ቁልፎች",
       "rowSubtitle": "የራስዎን የአቅራቢ ክፍያ ይጠቀሙ",
-      "manageOnWeb": "በድር ላይ ያስተዳድሩ",
       "manageOnWebReason": "እነዚህ አቅራቢዎች የተዋቀሩ የማረጋገጫ መረጃዎችን ይፈልጋሉ።",
       "description": "በእነዚህ ቁልፎች የሚላኩ ጥያቄዎች ከKilo ቀሪ ሂሳብዎ ይልቅ በአቅራቢ መለያዎ ይከፈላሉ።",
       "enabled": "በጥቅም ላይ",
@@ -4118,8 +4118,7 @@
     "couldNotLoad": "ውህደቶችን መጫን አልተቻለም",
     "permissionDenied": "እነዚህን ውህደቶች የማስተዳደር ፈቃድ የለዎትም።",
     "memberHint": "እነዚህን ግንኙነቶች ለመቀየር የድርጅቱን ባለቤት ወይም አስተዳዳሪ ይጠይቁ።",
-    "connectFailed": "የግንኙነት ገጹን መክፈት አልተቻለም",
-    "manageOnWeb": "በድር ላይ ያስተዳድሩ"
+    "connectFailed": "የግንኙነት ገጹን መክፈት አልተቻለም"
   },
   "invoices": {
     "personalEmptyDescription": "ክፍያ ከተጠየቀብዎ በኋላ ለራስዎ ግዢዎች የሚወጡ የክፍያ መጠየቂያዎች እዚህ ይታያሉ።"

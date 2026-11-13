@@ -22,6 +22,7 @@
     "expired": "انتهت الصلاحية"
   },
   "common": {
+    "manageOnWeb": "الإدارة عبر الويب",
     "creditHistory": "سجل الرصيد",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "مفاتيح المزوّدين",
       "rowSubtitle": "استخدم الفوترة الخاصة بمزوّدك",
-      "manageOnWeb": "الإدارة عبر الويب",
       "manageOnWebReason": "تتطلب هؤلاء المزوّدون بيانات اعتماد منظّمة.",
       "description": "تُحتسب تكلفة الطلبات المُرسلة عبر هذه المفاتيح على حسابك لدى المزوّد بدلًا من رصيدك في Kilo.",
       "enabled": "قيد الاستخدام",
@@ -4378,8 +4378,7 @@
     "couldNotLoad": "تعذّر تحميل التكاملات",
     "permissionDenied": "ليس لديك إذن لإدارة هذه التكاملات.",
     "memberHint": "اطلب من مالك المؤسسة أو أحد مسؤوليها تغيير هذه الاتصالات.",
-    "connectFailed": "تعذّر فتح صفحة الاتصال",
-    "manageOnWeb": "الإدارة عبر الويب"
+    "connectFailed": "تعذّر فتح صفحة الاتصال"
   },
   "invoices": {
     "personalEmptyDescription": "ستظهر هنا فواتير مشترياتك الشخصية بعد إصدار أول فاتورة لك."

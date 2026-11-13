@@ -22,6 +22,7 @@
     "expired": "Galiojimas baigėsi"
   },
   "common": {
+    "manageOnWeb": "Tvarkyti žiniatinklyje",
     "creditHistory": "Kreditų istorija",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Teikėjų raktai",
       "rowSubtitle": "Naudoti savo teikėjo atsiskaitymą",
-      "manageOnWeb": "Tvarkyti žiniatinklyje",
       "manageOnWebReason": "Šiems teikėjams reikalingi struktūrizuoti prisijungimo duomenys.",
       "description": "Užklausos, atliekamos su šiais raktais, apmokestinamos jūsų teikėjo paskyroje, o ne iš jūsų Kilo likučio.",
       "enabled": "Naudojamas",
@@ -4248,8 +4248,7 @@
     "couldNotLoad": "Nepavyko įkelti integracijų",
     "permissionDenied": "Neturite teisių tvarkyti šių integracijų.",
     "memberHint": "Paprašykite organizacijos savininko arba administratoriaus pakeisti šias jungtis.",
-    "connectFailed": "Nepavyko atidaryti prijungimo puslapio",
-    "manageOnWeb": "Tvarkyti žiniatinklyje"
+    "connectFailed": "Nepavyko atidaryti prijungimo puslapio"
   },
   "invoices": {
     "personalEmptyDescription": "Jūsų asmeninių pirkimų sąskaitos faktūros bus rodomos čia, kai jums bus išrašyta sąskaita."

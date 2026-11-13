@@ -22,6 +22,7 @@
     "expired": "Waqtigiisu dhacay"
   },
   "common": {
+    "manageOnWeb": "Ku maamul shabakadda",
     "creditHistory": "Taariikhda kiredit-ka",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Furayaasha bixiyaha",
       "rowSubtitle": "Isticmaal biilasha bixiyahaaga",
-      "manageOnWeb": "Ku maamul shabakadda",
       "manageOnWebReason": "Bixiyeyaashan waxay u baahan yihiin aqoonsiyo habaysan.",
       "description": "Codsiyada maraya furayaashan waxaa lagu dallacayaa akoonka bixiyahaaga halkii laga jari lahaa hadhaagaaga Kilo.",
       "enabled": "La isticmaalayo",
@@ -4118,8 +4118,7 @@
     "couldNotLoad": "Lama soo gelin karo isku-xidhka",
     "permissionDenied": "Ma haysatid ogolaansho aad ku maamusho isku-xidhkan.",
     "memberHint": "Weydii milkiilaha ama maamulaha ururka si uu u beddelo isku-xidhkan.",
-    "connectFailed": "Bogga isku-xidhka lama furi karo",
-    "manageOnWeb": "Ku maamul shabakadda"
+    "connectFailed": "Bogga isku-xidhka lama furi karo"
   },
   "invoices": {
     "personalEmptyDescription": "Qaansheegyada iibsiyadaada gaarka ah halkan ayay ka muuqan doonaan marka lacag lagaa qaado."

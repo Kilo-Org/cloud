@@ -89,6 +89,7 @@
     "expired": "Expired"
   },
   "common": {
+    "manageOnWeb": "Manage on the web",
     "creditHistory": "Credit history",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -405,7 +406,6 @@
     "providerKeys": {
       "title": "Provider keys",
       "rowSubtitle": "Use your own provider billing",
-      "manageOnWeb": "Manage on the web",
       "manageOnWebReason": "These providers need structured credentials.",
       "description": "Requests through these keys are billed to your provider account instead of your Kilo balance.",
       "enabled": "In use",
@@ -4118,8 +4118,7 @@
     "couldNotLoad": "Could not load integrations",
     "permissionDenied": "You do not have permission to manage these integrations.",
     "memberHint": "Ask an organization owner or admin to change these connections.",
-    "connectFailed": "Could not open the connection page",
-    "manageOnWeb": "Manage on the web"
+    "connectFailed": "Could not open the connection page"
   },
   "invoices": {
     "personalEmptyDescription": "Invoices for your own purchases will appear here once you are billed."

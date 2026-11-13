@@ -22,6 +22,7 @@
     "expired": "Isteklo"
   },
   "common": {
+    "manageOnWeb": "Upravljaj na webu",
     "creditHistory": "Povijest kredita",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Ključevi pružatelja usluga",
       "rowSubtitle": "Koristi vlastitu naplatu kod pružatelja usluga",
-      "manageOnWeb": "Upravljaj na webu",
       "manageOnWebReason": "Ovi pružatelji usluga trebaju strukturirane vjerodajnice.",
       "description": "Zahtjevi putem ovih ključeva naplaćuju se na tvoj račun kod pružatelja usluga umjesto s tvog Kilo salda.",
       "enabled": "U upotrebi",
@@ -4183,8 +4183,7 @@
     "couldNotLoad": "Nije moguće učitati integracije",
     "permissionDenied": "Nemate dopuštenje za upravljanje ovim integracijama.",
     "memberHint": "Zamolite vlasnika ili administratora organizacije da promijeni ove veze.",
-    "connectFailed": "Nije moguće otvoriti stranicu za povezivanje",
-    "manageOnWeb": "Upravljajte na webu"
+    "connectFailed": "Nije moguće otvoriti stranicu za povezivanje"
   },
   "invoices": {
     "personalEmptyDescription": "Računi za vaše osobne kupnje prikazat će se ovdje nakon prve naplate."

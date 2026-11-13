@@ -22,6 +22,7 @@
     "expired": "만료됨"
   },
   "common": {
+    "manageOnWeb": "웹에서 관리",
     "creditHistory": "크레딧 내역",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "제공업체 키",
       "rowSubtitle": "내 제공업체 결제 사용",
-      "manageOnWeb": "웹에서 관리",
       "manageOnWebReason": "이 제공업체에는 구조화된 자격 증명이 필요합니다.",
       "description": "이 키를 통한 요청은 Kilo 잔액 대신 제공업체 계정으로 청구됩니다.",
       "enabled": "사용 중",
@@ -4118,8 +4118,7 @@
     "couldNotLoad": "연동 목록을 불러오지 못했습니다",
     "permissionDenied": "이 연동을 관리할 권한이 없습니다.",
     "memberHint": "이 연결을 변경하려면 조직 소유자 또는 관리자에게 요청하세요.",
-    "connectFailed": "연결 페이지를 열지 못했습니다",
-    "manageOnWeb": "웹에서 관리"
+    "connectFailed": "연결 페이지를 열지 못했습니다"
   },
   "invoices": {
     "personalEmptyDescription": "결제가 청구되면 본인 구매에 대한 인보이스가 여기에 표시됩니다."

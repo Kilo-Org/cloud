@@ -22,6 +22,7 @@
     "expired": "Platnosť vypršala"
   },
   "common": {
+    "manageOnWeb": "Spravovať na webe",
     "creditHistory": "História kreditov",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Kľúče poskytovateľov",
       "rowSubtitle": "Používať vlastnú fakturáciu u poskytovateľa",
-      "manageOnWeb": "Spravovať na webe",
       "manageOnWebReason": "Títo poskytovatelia vyžadujú štruktúrované prihlasovacie údaje.",
       "description": "Požiadavky cez tieto kľúče sa účtujú na tvoj účet u poskytovateľa namiesto tvojho zostatku v Kilo.",
       "enabled": "Používa sa",
@@ -4248,8 +4248,7 @@
     "couldNotLoad": "Integrácie sa nepodarilo načítať",
     "permissionDenied": "Nemáte oprávnenie spravovať tieto integrácie.",
     "memberHint": "Požiadajte vlastníka alebo správcu organizácie, aby tieto pripojenia zmenil.",
-    "connectFailed": "Stránku pripojenia sa nepodarilo otvoriť",
-    "manageOnWeb": "Spravovať na webe"
+    "connectFailed": "Stránku pripojenia sa nepodarilo otvoriť"
   },
   "invoices": {
     "personalEmptyDescription": "Faktúry za vaše vlastné nákupy sa tu zobrazia po vyúčtovaní."

@@ -22,6 +22,7 @@
     "expired": "Caducado"
   },
   "common": {
+    "manageOnWeb": "Gestionar en la web",
     "creditHistory": "Historial de créditos",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Claves de proveedor",
       "rowSubtitle": "Usa la facturación de tu propio proveedor",
-      "manageOnWeb": "Gestionar en la web",
       "manageOnWebReason": "Estos proveedores necesitan credenciales estructuradas.",
       "description": "Las solicitudes realizadas con estas claves se facturan a tu cuenta del proveedor en lugar de a tu saldo de Kilo.",
       "enabled": "En uso",
@@ -4183,8 +4183,7 @@
     "couldNotLoad": "No se pudieron cargar las integraciones",
     "permissionDenied": "No tienes permiso para gestionar estas integraciones.",
     "memberHint": "Pide a un propietario o administrador de la organización que cambie estas conexiones.",
-    "connectFailed": "No se pudo abrir la página de conexión",
-    "manageOnWeb": "Gestionar en la web"
+    "connectFailed": "No se pudo abrir la página de conexión"
   },
   "invoices": {
     "personalEmptyDescription": "Las facturas de tus compras personales aparecerán aquí cuando se te facture."

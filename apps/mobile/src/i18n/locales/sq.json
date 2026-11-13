@@ -22,6 +22,7 @@
     "expired": "Skaduar"
   },
   "common": {
+    "manageOnWeb": "Menaxho në ueb",
     "creditHistory": "Historiku i kredive",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Çelësat e ofruesve",
       "rowSubtitle": "Përdor faturimin e ofruesit tënd",
-      "manageOnWeb": "Menaxho në ueb",
       "manageOnWebReason": "Këta ofrues kërkojnë kredenciale të strukturuara.",
       "description": "Kërkesat përmes këtyre çelësave faturohen në llogarinë tënde te ofruesi, në vend të gjendjes tënde në Kilo.",
       "enabled": "Në përdorim",
@@ -4118,8 +4118,7 @@
     "couldNotLoad": "Integrimet nuk mund të ngarkoheshin",
     "permissionDenied": "Nuk ke leje për të menaxhuar këto integrime.",
     "memberHint": "Kërkoji një pronari ose administratori të organizatës t'i ndryshojë këto lidhje.",
-    "connectFailed": "Faqja e lidhjes nuk mund të hapej",
-    "manageOnWeb": "Menaxho në ueb"
+    "connectFailed": "Faqja e lidhjes nuk mund të hapej"
   },
   "invoices": {
     "personalEmptyDescription": "Faturat për blerjet e tua personale do të shfaqen këtu pasi të faturohesh."

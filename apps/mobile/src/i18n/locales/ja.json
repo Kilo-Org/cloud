@@ -22,6 +22,7 @@
     "expired": "期限切れ"
   },
   "common": {
+    "manageOnWeb": "Webで管理",
     "creditHistory": "クレジット履歴",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "プロバイダーキー",
       "rowSubtitle": "自分のプロバイダーアカウントで課金",
-      "manageOnWeb": "Webで管理",
       "manageOnWebReason": "これらのプロバイダーには構造化された認証情報が必要です",
       "description": "これらのキーを使ったリクエストは、Kiloの残高ではなくプロバイダーのアカウントに請求されます。",
       "enabled": "使用中",
@@ -4118,8 +4118,7 @@
     "couldNotLoad": "連携を読み込めませんでした",
     "permissionDenied": "これらの連携を管理する権限がありません。",
     "memberHint": "これらの接続を変更するには、組織のオーナーまたは管理者に依頼してください。",
-    "connectFailed": "接続ページを開けませんでした",
-    "manageOnWeb": "ウェブで管理"
+    "connectFailed": "接続ページを開けませんでした"
   },
   "invoices": {
     "personalEmptyDescription": "ご自身の購入に対する請求書は、請求が発生するとここに表示されます。"

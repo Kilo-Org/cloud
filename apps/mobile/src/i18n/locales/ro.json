@@ -22,6 +22,7 @@
     "expired": "Expirat"
   },
   "common": {
+    "manageOnWeb": "Gestionează pe web",
     "creditHistory": "Istoric credite",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Chei de furnizor",
       "rowSubtitle": "Folosește facturarea propriului furnizor",
-      "manageOnWeb": "Gestionează pe web",
       "manageOnWebReason": "Acești furnizori necesită date de autentificare structurate.",
       "description": "Solicitările făcute cu aceste chei sunt facturate în contul tău de furnizor, nu din soldul Kilo.",
       "enabled": "În uz",
@@ -4183,8 +4183,7 @@
     "couldNotLoad": "Integrările nu au putut fi încărcate",
     "permissionDenied": "Nu ai permisiunea de a gestiona aceste integrări.",
     "memberHint": "Cere unui proprietar sau administrator al organizației să modifice aceste conexiuni.",
-    "connectFailed": "Pagina de conectare nu a putut fi deschisă",
-    "manageOnWeb": "Gestionează pe web"
+    "connectFailed": "Pagina de conectare nu a putut fi deschisă"
   },
   "invoices": {
     "personalEmptyDescription": "Facturile pentru achizițiile tale personale vor apărea aici după prima facturare."

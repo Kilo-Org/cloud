@@ -22,6 +22,7 @@
     "expired": "Müddəti bitib"
   },
   "common": {
+    "manageOnWeb": "Vebdə idarə et",
     "creditHistory": "Kredit tarixçəsi",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Provayder açarları",
       "rowSubtitle": "Öz provayder ödənişindən istifadə et",
-      "manageOnWeb": "Vebdə idarə et",
       "manageOnWebReason": "Bu provayderlər strukturlaşdırılmış etimadnamələr tələb edir.",
       "description": "Bu açarlarla göndərilən sorğuların haqqı Kilo balansından deyil, provayder hesabından tutulur.",
       "enabled": "İstifadədədir",
@@ -4118,8 +4118,7 @@
     "couldNotLoad": "İnteqrasiyaları yükləmək mümkün olmadı",
     "permissionDenied": "Bu inteqrasiyaları idarə etmək üçün icazəniz yoxdur.",
     "memberHint": "Bu bağlantıları dəyişmək üçün təşkilatın sahibinə və ya administratoruna müraciət edin.",
-    "connectFailed": "Qoşulma səhifəsini açmaq mümkün olmadı",
-    "manageOnWeb": "Vebdə idarə et"
+    "connectFailed": "Qoşulma səhifəsini açmaq mümkün olmadı"
   },
   "invoices": {
     "personalEmptyDescription": "Ödəniş tutulduqdan sonra şəxsi alışlarınızın fakturaları burada görünəcək."

@@ -22,6 +22,7 @@
     "expired": "Verlopen"
   },
   "common": {
+    "manageOnWeb": "Beheren op het web",
     "creditHistory": "Tegoedgeschiedenis",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Providersleutels",
       "rowSubtitle": "Facturering via je eigen provider",
-      "manageOnWeb": "Beheren op het web",
       "manageOnWebReason": "Deze providers hebben gestructureerde inloggegevens nodig.",
       "description": "Verzoeken via deze sleutels worden gefactureerd aan je provideraccount in plaats van afgeschreven van je Kilo-saldo.",
       "enabled": "In gebruik",
@@ -4118,8 +4118,7 @@
     "couldNotLoad": "Kan integraties niet laden",
     "permissionDenied": "Je hebt geen toestemming om deze integraties te beheren.",
     "memberHint": "Vraag een eigenaar of beheerder van de organisatie om deze koppelingen te wijzigen.",
-    "connectFailed": "Kan de koppelingspagina niet openen",
-    "manageOnWeb": "Beheren op het web"
+    "connectFailed": "Kan de koppelingspagina niet openen"
   },
   "invoices": {
     "personalEmptyDescription": "Facturen voor je eigen aankopen verschijnen hier zodra je wordt gefactureerd."

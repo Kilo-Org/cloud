@@ -113,6 +113,16 @@ function texts(root: ReactTestRenderer['root']) {
   return root.findAll(node => Object.is(node.type, 'Text')).map(node => node.props.children);
 }
 
+function textNode(root: ReactTestRenderer['root'], value: string) {
+  const [node] = root.findAll(
+    node => Object.is(node.type, 'Text') && node.props.children === value
+  );
+  if (!node) {
+    throw new Error(`missing text node for ${value}`);
+  }
+  return node;
+}
+
 function appealButton(root: ReactTestRenderer['root']) {
   const [button] = root.findAll(node => Object.is(node.type, BUTTON));
   return button;
@@ -152,6 +162,13 @@ describe('ReportReceiptScreen', () => {
     if (!copyControl) {
       throw new Error('missing copy control');
     }
+
+    // A middle cut keeps the first and last characters of the id on screen in
+    // the compact cell; the status rows cut at their end instead.
+    expect(textNode(root, RECEIPT_ID).props.ellipsizeMode).toBe('middle');
+    expect(textNode(root, 'Received').props.ellipsizeMode).toBe('tail');
+    expect(textNode(root, 'None submitted').props.ellipsizeMode).toBe('tail');
+
     act(() => {
       (copyControl.props.onPress as () => void)();
     });

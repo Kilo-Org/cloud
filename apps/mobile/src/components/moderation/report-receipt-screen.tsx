@@ -56,8 +56,10 @@ function statusLabel(dictionary: Readonly<Record<string, string>>, status: strin
 /**
  * One label/value line. `copyLabel` turns the row into one whose value the
  * reader can carry away: the control copies the whole value it was given, so an
- * id the row truncates still reaches the clipboard in one piece. A row without
- * it holds no control, as the status rows keep none.
+ * id the row truncates still reaches the clipboard in one piece. A copied value
+ * cuts at its middle rather than its end, so the characters that tell one id
+ * from another stay on screen. A row without it holds no control, as the status
+ * rows keep none.
  */
 function StatusRow({
   label,
@@ -71,7 +73,11 @@ function StatusRow({
         {label}
       </Text>
       <View className="min-w-0 flex-1 flex-row items-center justify-end gap-2">
-        <Text className="min-w-0 shrink text-sm font-medium text-foreground" numberOfLines={1}>
+        <Text
+          className="min-w-0 shrink text-sm font-medium text-foreground"
+          numberOfLines={1}
+          ellipsizeMode={copyLabel === undefined ? 'tail' : 'middle'}
+        >
           {value}
         </Text>
         {copyLabel === undefined ? null : (

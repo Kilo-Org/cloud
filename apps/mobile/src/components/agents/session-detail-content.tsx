@@ -3421,9 +3421,12 @@ export function SessionDetailContent({
               }
               isRetrying={terminalRetryPending}
             />
+            {/* One primary action per surface (DESIGN.md): Back is the recovery
+                action, so it fills; Copy stays outlined as the utility. */}
             <View className="flex-row gap-3">
               <Button
-                variant="ghost"
+                variant="outline"
+                size="action"
                 accessibilityLabel={t('agentChat.session.copyErrorDetails')}
                 onPress={() => {
                   void performCopy(copyText);
@@ -3431,7 +3434,7 @@ export function SessionDetailContent({
               >
                 <Text>{t('common.copy')}</Text>
               </Button>
-              <Button variant="ghost" onPress={handleBackToSessions}>
+              <Button size="action" onPress={handleBackToSessions}>
                 <Text>{t('agentChat.session.backToSessions')}</Text>
               </Button>
             </View>

@@ -61,9 +61,12 @@ export function SessionPermanentError({
             onRetry={retry}
             isRetrying={isRetrying}
           />
+          {/* One primary action per surface (DESIGN.md): Back is the recovery
+              action, so it fills; Copy stays outlined as the utility. */}
           <View className="flex-row gap-3">
             <Button
-              variant="ghost"
+              variant="outline"
+              size="action"
               accessibilityLabel={t('agentChat.session.copyErrorDetails')}
               onPress={() => {
                 void performCopy(copyText);
@@ -72,7 +75,7 @@ export function SessionPermanentError({
               <Text>{t('common.copy')}</Text>
             </Button>
             <Button
-              variant="ghost"
+              size="action"
               onPress={() => {
                 // POP_TO reuses the `(tabs)` route under this screen and
                 // truncates every `agent-chat` route above it, so a composer

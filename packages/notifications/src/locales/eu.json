@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Agente aktiboek eguneratze bat dute"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Ataza amaituta"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Huts egin du: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Etena: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

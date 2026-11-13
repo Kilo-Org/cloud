@@ -13,20 +13,6 @@
       "activeAgentsGlanceable": "Aktivni agenti imajo posodobitev"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Naloga dokončana"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Ni uspelo: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Prekinjeno: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",

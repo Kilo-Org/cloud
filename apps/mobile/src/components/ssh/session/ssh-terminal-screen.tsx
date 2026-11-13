@@ -2,7 +2,7 @@ import { type TerminalViewHandle } from '../../../../modules/kilo-ssh/src';
 import { usePathname, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Keyboard, View } from 'react-native';
+import { View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
 import { ScreenHeader } from '@/components/screen-header';
@@ -14,7 +14,11 @@ import { SshSessionNotice } from '@/components/ssh/session/ssh-session-notice';
 import { SshSessionStage } from '@/components/ssh/session/ssh-session-stage';
 import { SshSessionSwitcher } from '@/components/ssh/session/ssh-session-switcher';
 import { TerminalKeyBar } from '@/components/ssh/session/terminal-key-bar';
-import { sendToShell } from '@/components/ssh/session/terminal-input';
+import {
+  blurShell,
+  sendToShell,
+  startupCommandForShell,
+} from '@/components/ssh/session/terminal-input';
 import { useTerminalPaste } from '@/components/ssh/session/terminal-paste';
 import { TerminalSurface } from '@/components/ssh/session/terminal-surface';
 import { Button } from '@/components/ui/button';
@@ -72,6 +76,7 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [forwardsOpen, setForwardsOpen] = useState(false);
   const [shellTitle, setShellTitle] = useState<string | null>(null);
+  const [laidOutShellId, setLaidOutShellId] = useState<string | null>(null);
   const paste = useTerminalPaste(terminalRef);
 
   const phase: SshSessionPhase | null = session?.phase ?? null;
@@ -86,7 +91,7 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
   // status; the keyboard would only cover that shell, so it closes.
   useEffect(() => {
     if (phase?.kind === 'reconnecting') {
-      Keyboard.dismiss();
+      void blurShell(terminalRef.current);
     }
   }, [phase?.kind]);
 
@@ -96,15 +101,15 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
     }
   }, [promptWaiting, promptOnTop, router, sessionId]);
 
-  // The tmux attach is typed into the pty once, as soon as the view that owns
-  // the source has mounted.
+  // Fabric may expose the ref before its native view tag can receive commands.
   useEffect(() => {
     const terminal = terminalRef.current;
-    if (pendingCommand === null || shellId === null || terminal === null) {
+    const command = startupCommandForShell(shellId, laidOutShellId, pendingCommand);
+    if (command === null || terminal === null) {
       return;
     }
-    void typeOnce(terminal, sessionId, pendingCommand);
-  }, [pendingCommand, shellId, sessionId]);
+    void typeOnce(terminal, sessionId, command);
+  }, [pendingCommand, shellId, laidOutShellId, sessionId]);
 
   async function sendSnippet(snippet: SshSnippet) {
     setSnippetsOpen(false);
@@ -129,10 +134,14 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
   const terminalArea =
     shellId === null ? null : (
       <TerminalSurface
+        key={shellId}
         handleRef={terminalRef}
         sourceId={shellId}
         autoFocus
         fontSize={fontSize}
+        onLayout={() => {
+          setLaidOutShellId(shellId);
+        }}
         onLinkPress={url => {
           void openExternalUrl(url);
         }}
@@ -238,6 +247,9 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
               }}
               onSnippets={() => {
                 setSnippetsOpen(true);
+              }}
+              onHideKeyboard={() => {
+                void blurShell(terminalRef.current);
               }}
             />
           )}

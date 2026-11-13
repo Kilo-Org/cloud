@@ -2,7 +2,7 @@ import { type TerminalViewHandle } from '../../../../modules/kilo-ssh/src';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Keyboard, View } from 'react-native';
+import { View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
 import { EmptyState } from '@/components/empty-state';
@@ -10,7 +10,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { SnippetsSheet } from '@/components/ssh/snippets/snippets-sheet';
 import { SshSessionNotice } from '@/components/ssh/session/ssh-session-notice';
 import { TerminalKeyBar } from '@/components/ssh/session/terminal-key-bar';
-import { sendToShell } from '@/components/ssh/session/terminal-input';
+import { blurShell, sendToShell } from '@/components/ssh/session/terminal-input';
 import { useTerminalPaste } from '@/components/ssh/session/terminal-paste';
 import { TerminalSurface } from '@/components/ssh/session/terminal-surface';
 import { Button } from '@/components/ui/button';
@@ -57,7 +57,7 @@ export function SandboxTerminalScreen({
   // the keyboard would only cover it.
   useEffect(() => {
     if (state.kind === 'reconnecting' || state.kind === 'stopped') {
-      Keyboard.dismiss();
+      void blurShell(terminalRef.current);
     }
   }, [state.kind]);
 
@@ -176,6 +176,9 @@ export function SandboxTerminalScreen({
             }}
             onSnippets={() => {
               setSnippetsOpen(true);
+            }}
+            onHideKeyboard={() => {
+              void blurShell(terminalRef.current);
             }}
           />
         </KeyboardAvoidingView>

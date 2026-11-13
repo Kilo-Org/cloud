@@ -28,3 +28,21 @@ export async function pasteToShell(
     // The shell closed before the paste.
   }
 }
+
+/** Native terminal focus is separate from React Native's TextInput focus. */
+export async function blurShell(terminal: TerminalViewHandle | null): Promise<void> {
+  try {
+    await terminal?.blur();
+  } catch {
+    // The view was removed before the blur reached it.
+  }
+}
+
+/** A ref exists before Fabric has mounted the native view that can accept commands. */
+export function startupCommandForShell(
+  shellId: string | null,
+  laidOutShellId: string | null,
+  pendingCommand: string | null
+): string | null {
+  return shellId !== null && shellId === laidOutShellId ? pendingCommand : null;
+}

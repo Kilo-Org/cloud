@@ -30,6 +30,7 @@ type TerminalSurfaceProps = Readonly<{
   /** Receives the view's handle, which is how input reaches the pty. */
   handleRef: RefObject<TerminalViewHandle | null>;
   onResize?: (cols: number, rows: number) => void;
+  onLayout?: () => void;
   onFontSizeChange?: (fontSize: number) => void;
   onLinkPress?: (url: string) => void;
   onTitleChange?: (title: string | null) => void;
@@ -55,6 +56,7 @@ export function TerminalSurface({
   autoFocus,
   onResize,
   onFontSizeChange,
+  onLayout,
   onLinkPress,
   onTitleChange,
   onClosed,
@@ -72,6 +74,7 @@ export function TerminalSurface({
       fontFamily={FONT_FAMILY}
       fontSize={fontSize}
       theme={theme}
+      onLayout={onLayout}
       onResize={size => onResize?.(size.cols, size.rows)}
       onFontSizeChange={onFontSizeChange}
       onLinkPress={onLinkPress}

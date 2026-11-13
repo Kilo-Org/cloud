@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Keyboard, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { ClipboardPaste, KeyboardOff, ScrollText } from '@/components/ui/icons';
@@ -27,6 +27,7 @@ type TerminalKeyBarProps = Readonly<{
   onSend: (text: string) => void;
   onPaste: () => void;
   onSnippets: () => void;
+  onHideKeyboard: () => void;
 }>;
 
 /**
@@ -41,7 +42,13 @@ type TerminalKeyBarProps = Readonly<{
  * phone needs most and the row is wider than the screen; the scroller is sized
  * so the next key is always partly visible, which is what says there is more.
  */
-export function TerminalKeyBar({ disabled, onSend, onPaste, onSnippets }: TerminalKeyBarProps) {
+export function TerminalKeyBar({
+  disabled,
+  onSend,
+  onPaste,
+  onSnippets,
+  onHideKeyboard,
+}: TerminalKeyBarProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const [modifier, setModifier] = useState<Modifier | null>(null);
@@ -127,9 +134,7 @@ export function TerminalKeyBar({ disabled, onSend, onPaste, onSnippets }: Termin
               <ClipboardPaste size={18} color={colors.foreground} />
             </Pressable>
             <Pressable
-              onPress={() => {
-                Keyboard.dismiss();
-              }}
+              onPress={onHideKeyboard}
               accessibilityRole="button"
               accessibilityLabel={t('ssh.session.hideKeyboard')}
               className={cn(KEY_BOX_CLASS, 'bg-secondary active:opacity-70')}

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { mkdtemp, writeFile, readFile, rm, access } from 'node:fs/promises';
 import path from 'node:path';
 import { createMaintenanceGit } from './maintenance-git.js';
@@ -45,7 +46,7 @@ function git(directory: string, ...args: string[]) {
 }
 
 async function fixture() {
-  const directory = await mkdtemp('/tmp/kilo2/pr-maintenance-');
+  const directory = await mkdtemp(path.join(tmpdir(), 'pr-maintenance-'));
   directories.push(directory);
   const remote = path.join(directory, 'remote.git');
   const seed = path.join(directory, 'seed');

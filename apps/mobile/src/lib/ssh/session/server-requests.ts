@@ -71,6 +71,10 @@ export function handlePrompts(request: KeyboardInteractiveRequest): void {
     answerPrompts(request.requestId, null);
     return;
   }
+  if (request.prompts.length === 0) {
+    answerPrompts(request.requestId, []);
+    return;
+  }
   entry.prompts = {
     requestId: request.requestId,
     name: request.name,

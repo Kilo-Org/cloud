@@ -22,6 +22,9 @@
     "expired": "Iraungita"
   },
   "common": {
+    "creditHistory": "Kredituen historia",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Utzi",
@@ -118,6 +121,7 @@
     "copyLink": "Kopiatu esteka",
     "couldNotLoadOrganizations": "Ezin izan dira erakundeak kargatu.",
     "couldNotLoadSessions": "Ezin izan dira saioak kargatu.",
+    "couldnTLoad": "Ezin izan da kargatu.",
     "couldnTLoadMore": "Ezin izan dira gehiago kargatu.",
     "deviceSessions": "Gailuen saioak",
     "disabled": "Desgaituta",
@@ -245,6 +249,10 @@
     "notAdded": "Saioa hasi duzu. Ez da {{provider}} zure kontuan gehitu."
   },
   "profile": {
+    "creditHistorySubtitle": "Erosketak, ordainagiriak eta kredituen jarduera",
+    "invoicesSubtitle": "Deskargatu zure erosketen fakturak",
+    "manageBilling": "Kudeatu fakturazioa kilo.ai-n",
+    "manageBillingIosNote": "Ordainketa-metodoak, saldoaren birkarga automatikoa eta fakturazio-xehetasunak kilo.ai-n kudeatzen dira.",
     "codeReviewerSubtitle": "PR-ak automatikoki berrikustea",
     "securityAgentSubtitle": "Aurkitu eta konpondu ahultasunak",
     "reviews": "Berrikuspenak",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "Lehenengo {{displayCount}} fitxategiak bakarrik erantsiko dira."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Fakturazio-historia",
+      "billingHistoryEmpty": "Oraindik ez dago fakturazio-historiarik.",
+      "cancel": "Ezeztatu harpidetza",
+      "cancelDescription": "Zure Kilo Pass-ak aktibo jarraituko du fakturazio-aldia amaitu arte, eta ez da berrituko.",
+      "cancelScheduled": "Ezeztatze-data: {{date}}",
+      "cancelScheduledChange": "Ezeztatu programatutako aldaketa",
+      "cancelled": "Harpidetza ezeztatu da",
+      "changePlan": "Aldatu plana kilo.ai-n",
+      "changePlanIosNote": "Ordainpeko planen aldaketak kilo.ai-n egin daitezke.",
+      "creditHistoryEmpty": "Oraindik ez dago Kilo Pass krediturik.",
+      "manageInStore": "Kudeatu hemen: {{store}}",
+      "resume": "Berraktibatu harpidetza",
+      "resumeCancelledDescription": "Zure Kilo Pass-a berriro automatikoki berrituko da.",
+      "resumePausedDescription": "Zure Kilo Pass-a orain berraktibatuko da, programatutako berrabiatze-data baino lehen.",
+      "resumed": "Harpidetza berraktibatu da",
+      "scheduledChange": "Programatutako aldaketa",
+      "scheduledChangeCancelDescription": "Zure Kilo Pass-ak uneko planean jarraituko du eta orain bezala berrituko da.",
+      "scheduledChangeSummary": "{{plan}}, data: {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass ez dago erabilgarri.",
     "couldNotLoad": "Ezin izan da Kilo Pass kargatu. Saiatu berriro.",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Configa inportatuta"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Ezin izan da kreditu-jarduera kargatu.",
+      "appStoreReceipt": "App Store-ko ordainagiria",
+      "deductionFallback": "Kreditu-kenketa",
+      "emptyDescription": "Kreditu-erosketak, ordainagiriak eta erabilera hemen agertuko dira.",
+      "emptyTitle": "Ez dago kredituen historiarik",
+      "googlePlayReceipt": "Google Play-ko ordainagiria",
+      "kind": {
+        "adjustment": "Doikuntza",
+        "balanceNeutral": "Saldoan eraginik gabe",
+        "deduction": "Kenketa",
+        "grant": "Kreditu-emakida",
+        "purchase": "Erosketa"
+      },
+      "purchaseFallback": "Kreditu-erosketa",
+      "receipt": "Ordainagiria",
+      "receiptA11y": "Ireki honen ordainagiria: {{description}}",
+      "receiptUnavailable": "Ez dago ordainagiririk erosketa honetarako."
+    },
     "title": "Erosi kredituak",
     "description": "Kredituak Kilo App-en AI kodetze-saioak exekutatzeko zure Kilo saldoari gehitzen zaion behin betiko erosketa bat dira. Dendak zure kontuari kobratzen dio eta kredituak dendak ordainketa baieztatu ondoren gehitzen dira.",
     "nextExpiry": "{{amount}} kreditu iraungiko dira data honetan: {{date}} (UTC). Lehenago iraungitzen diren kredituak erabiltzen dira lehenik.",
@@ -4070,6 +4117,9 @@
     "emptyTitle": "Ez dago erabilerarik aldi honetan",
     "orgSelfNotice": "Erakunde honetan zure erabilera ikusten ari zara.",
     "viewDetails": "Ikusi erabileraren xehetasunak"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Zure erosketen fakturak hemen agertuko dira fakturatzen zaizunean."
   },
   "cloudAgent": {
     "compute": {

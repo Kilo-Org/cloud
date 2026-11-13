@@ -22,6 +22,9 @@
     "expired": "Udløbet"
   },
   "common": {
+    "creditHistory": "Kredithistorik",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Annuller",
@@ -118,6 +121,7 @@
     "copyLink": "Kopiér link",
     "couldNotLoadOrganizations": "Organisationerne kunne ikke indlæses.",
     "couldNotLoadSessions": "Sessionerne kunne ikke indlæses.",
+    "couldnTLoad": "Det lykkedes ikke at indlæse.",
     "couldnTLoadMore": "Det lykkedes ikke at indlæse flere.",
     "deviceSessions": "Enhedssessioner",
     "disabled": "Deaktiveret",
@@ -245,6 +249,10 @@
     "notAdded": "Du er logget ind. {{provider}} blev ikke føjet til din konto."
   },
   "profile": {
+    "creditHistorySubtitle": "Køb, kvitteringer og kreditaktivitet",
+    "invoicesSubtitle": "Download fakturaer for dine køb",
+    "manageBilling": "Administrer betaling på kilo.ai",
+    "manageBillingIosNote": "Betalingsmetoder, automatisk optankning og betalingsoplysninger administreres på kilo.ai.",
     "codeReviewerSubtitle": "Automatiske PR-gennemgange",
     "securityAgentSubtitle": "Find og afhjælp sårbarheder",
     "reviews": "Kodegennemgange",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "Kun de første {{displayCount}} filer vedhæftes."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Betalingshistorik",
+      "billingHistoryEmpty": "Ingen betalingshistorik endnu.",
+      "cancel": "Opsig abonnement",
+      "cancelDescription": "Dit Kilo Pass forbliver aktivt indtil udgangen af betalingsperioden og fornyes ikke.",
+      "cancelScheduled": "Opsiges den {{date}}",
+      "cancelScheduledChange": "Annuller planlagt ændring",
+      "cancelled": "Abonnementet er opsagt",
+      "changePlan": "Skift abonnement på kilo.ai",
+      "changePlanIosNote": "Ændringer af betalte abonnementer kan foretages på kilo.ai.",
+      "creditHistoryEmpty": "Ingen Kilo Pass-kreditter endnu.",
+      "manageInStore": "Administrer i {{store}}",
+      "resume": "Genoptag abonnement",
+      "resumeCancelledDescription": "Dit Kilo Pass begynder igen at blive fornyet automatisk.",
+      "resumePausedDescription": "Dit Kilo Pass genoptages nu, før den planlagte genoptagelsesdato.",
+      "resumed": "Abonnementet er genoptaget",
+      "scheduledChange": "Planlagt ændring",
+      "scheduledChangeCancelDescription": "Dit Kilo Pass forbliver på det nuværende abonnement og fornyes som hidtil.",
+      "scheduledChangeSummary": "{{plan}} den {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass er ikke tilgængeligt.",
     "couldNotLoad": "Kilo Pass kunne ikke indlæses. Prøv igen.",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Konfiguration importeret"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Kunne ikke indlæse kreditaktivitet.",
+      "appStoreReceipt": "Kvittering fra App Store",
+      "deductionFallback": "Kreditfradrag",
+      "emptyDescription": "Kreditkøb, kvitteringer og forbrug vises her.",
+      "emptyTitle": "Ingen kredithistorik",
+      "googlePlayReceipt": "Kvittering fra Google Play",
+      "kind": {
+        "adjustment": "Justering",
+        "balanceNeutral": "Saldoneutral",
+        "deduction": "Fradrag",
+        "grant": "Tildelt kredit",
+        "purchase": "Køb"
+      },
+      "purchaseFallback": "Kreditkøb",
+      "receipt": "Kvittering",
+      "receiptA11y": "Åbn kvitteringen for {{description}}",
+      "receiptUnavailable": "Der er ingen kvittering for dette køb."
+    },
     "title": "Køb kreditter",
     "description": "Kreditter er et engangskøb, der lægges til din Kilo-saldo til at køre AI-kodningssessioner i Kilo App. Butikken opkræver betaling på din konto, og kreditterne tilføjes, når butikken bekræfter betalingen.",
     "nextExpiry": "{{amount}} i kreditter udløber {{date}} (UTC). Kreditter med den tidligste udløbsdato bruges først.",
@@ -4070,6 +4117,9 @@
     "emptyTitle": "Intet forbrug i denne periode",
     "orgSelfNotice": "Du ser dit eget forbrug i denne organisation.",
     "viewDetails": "Se forbrugsdetaljer"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Fakturaer for dine egne køb vises her, når du er blevet faktureret."
   },
   "cloudAgent": {
     "compute": {

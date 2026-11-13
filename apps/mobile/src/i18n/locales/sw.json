@@ -22,6 +22,9 @@
     "expired": "Muda wake umeisha"
   },
   "common": {
+    "creditHistory": "Historia ya salio",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Ghairi",
@@ -118,6 +121,7 @@
     "copyLink": "Nakili kiungo",
     "couldNotLoadOrganizations": "Imeshindikana kupakia mashirika.",
     "couldNotLoadSessions": "Imeshindikana kupakia vikao.",
+    "couldnTLoad": "Imeshindikana kupakia.",
     "couldnTLoadMore": "Imeshindikana kupakia zaidi.",
     "deviceSessions": "Vikao vya vifaa",
     "disabled": "Imezimwa",
@@ -245,6 +249,10 @@
     "notAdded": "Umeingia. {{provider}} haikuongezwa kwenye akaunti yako."
   },
   "profile": {
+    "creditHistorySubtitle": "Ununuzi, risiti na shughuli za salio",
+    "invoicesSubtitle": "Pakua ankara za ununuzi wako",
+    "manageBilling": "Dhibiti malipo kwenye kilo.ai",
+    "manageBillingIosNote": "Njia za malipo, kujaza salio kiotomatiki na maelezo ya malipo hudhibitiwa kwenye kilo.ai.",
     "codeReviewerSubtitle": "Ukaguzi wa kiotomatiki wa PR",
     "securityAgentSubtitle": "Tafuta na urekebishe udhaifu wa usalama",
     "reviews": "Ukaguzi",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "Faili {{displayCount}} za kwanza pekee zitaambatishwa."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Historia ya malipo",
+      "billingHistoryEmpty": "Bado hakuna historia ya malipo.",
+      "cancel": "Ghairi usajili",
+      "cancelDescription": "Kilo Pass yako itaendelea kutumika hadi mwisho wa kipindi cha malipo na haitasasishwa.",
+      "cancelScheduled": "Itaghairiwa tarehe {{date}}",
+      "cancelScheduledChange": "Ghairi mabadiliko yaliyoratibiwa",
+      "cancelled": "Usajili umeghairiwa",
+      "changePlan": "Badilisha mpango kwenye kilo.ai",
+      "changePlanIosNote": "Mabadiliko ya mipango ya kulipia yanapatikana kwenye kilo.ai.",
+      "creditHistoryEmpty": "Bado hakuna salio la Kilo Pass.",
+      "manageInStore": "Dhibiti kwenye {{store}}",
+      "resume": "Endeleza usajili",
+      "resumeCancelledDescription": "Kilo Pass yako itaanza tena kusasishwa kiotomatiki.",
+      "resumePausedDescription": "Kilo Pass yako inaendelea sasa, kabla ya tarehe iliyoratibiwa ya kuendelea.",
+      "resumed": "Usajili umeendelezwa",
+      "scheduledChange": "Mabadiliko yaliyoratibiwa",
+      "scheduledChangeCancelDescription": "Kilo Pass yako itabaki kwenye mpango wake wa sasa na itasasishwa kama ilivyo sasa.",
+      "scheduledChangeSummary": "{{plan}} tarehe {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass haipatikani.",
     "couldNotLoad": "Kilo Pass haikuweza kupakiwa. Jaribu tena.",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Config imeingizwa"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Imeshindwa kupakia shughuli za salio.",
+      "appStoreReceipt": "Risiti kutoka App Store",
+      "deductionFallback": "Makato ya salio",
+      "emptyDescription": "Ununuzi wa salio, risiti na matumizi vitaonekana hapa.",
+      "emptyTitle": "Hakuna historia ya salio",
+      "googlePlayReceipt": "Risiti kutoka Google Play",
+      "kind": {
+        "adjustment": "Marekebisho",
+        "balanceNeutral": "Haibadilishi salio",
+        "deduction": "Makato",
+        "grant": "Salio la bure",
+        "purchase": "Ununuzi"
+      },
+      "purchaseFallback": "Ununuzi wa salio",
+      "receipt": "Risiti",
+      "receiptA11y": "Fungua risiti ya {{description}}",
+      "receiptUnavailable": "Hakuna risiti ya ununuzi huu."
+    },
     "title": "Nunua salio",
     "description": "Salio ni ununuzi wa mara moja unaoongezwa kwenye usawa wako wa Kilo kwa kuendesha vikao vya kuandika msimbo kwa AI katika Kilo App. Duka hukutoza akaunti yako na salio huongezwa baada ya duka kuthibitisha malipo.",
     "nextExpiry": "Muda wa salio la {{amount}} unaisha {{date}} (UTC). Salio linaloisha muda mapema zaidi hutumika kwanza.",
@@ -4070,6 +4117,9 @@
     "emptyTitle": "Hakuna matumizi katika kipindi hiki",
     "orgSelfNotice": "Unaona matumizi yako mwenyewe katika shirika hili.",
     "viewDetails": "Angalia maelezo ya matumizi"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Ankara za ununuzi wako binafsi zitaonekana hapa baada ya kutozwa."
   },
   "cloudAgent": {
     "compute": {

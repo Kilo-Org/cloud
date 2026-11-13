@@ -22,6 +22,9 @@
     "expired": "Àkókò ti kọjá"
   },
   "common": {
+    "creditHistory": "Ìtàn kírẹ́dítì",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Fagilé",
@@ -118,6 +121,7 @@
     "copyLink": "Da ìjápọ̀ kọ",
     "couldNotLoadOrganizations": "A kò lè gbé àwọn àjọ wọlé.",
     "couldNotLoadSessions": "A kò lè gbé àwọn ìgbà iṣẹ́ wọlé.",
+    "couldnTLoad": "A kò lè gbé e wọlé.",
     "couldnTLoadMore": "A kò lè gbé síi wọlé.",
     "deviceSessions": "Àwọn ìgbà iṣẹ́ ẹ̀rọ",
     "disabled": "A ti pa",
@@ -245,6 +249,10 @@
     "notAdded": "O ti wọlé. A kò ṣàfikún {{provider}} sí àkọọ́lẹ̀ rẹ."
   },
   "profile": {
+    "creditHistorySubtitle": "Àwọn ìrajà, ìwé ẹ̀rí ìsanwó, àti ìgbòkègbodò kírẹ́dítì",
+    "invoicesSubtitle": "Ṣe ìgbàsílẹ̀ àwọn ìwé owó fún àwọn ìrajà rẹ",
+    "manageBilling": "Ṣàkóso ìsanwó lórí kilo.ai",
+    "manageBillingIosNote": "A ń ṣàkóso àwọn ọ̀nà ìsanwó, àfikún owó aládàáṣe, àti àwọn àlàyé ìsanwó lórí kilo.ai.",
     "codeReviewerSubtitle": "Àtúnyẹ̀wò PR láìfọwọ́yí",
     "securityAgentSubtitle": "Wá àwọn àlàfo ààbò kí o sì ṣàtúnṣe wọn",
     "reviews": "Àwọn àtúnyẹ̀wò",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "Fáìlì {{displayCount}} àkọ́kọ́ nìkan ni a ó so mọ́ ọn."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Ìtàn ìsanwó",
+      "billingHistoryEmpty": "Kò sí ìtàn ìsanwó síbẹ̀.",
+      "cancel": "Fagilé ìforúkọsílẹ̀",
+      "cancelDescription": "Kilo Pass rẹ yóò máa ṣiṣẹ́ títí di òpin àkókò ìsanwó, kò sì ní sọ ara rẹ̀ dọ̀tun.",
+      "cancelScheduled": "Yóò parí ní {{date}}",
+      "cancelScheduledChange": "Fagilé àyípadà tí a ṣètò",
+      "cancelled": "A ti fagilé ìforúkọsílẹ̀",
+      "changePlan": "Yí ètò padà lórí kilo.ai",
+      "changePlanIosNote": "Àwọn àyípadà ètò tí a ń sanwó fún wà lórí kilo.ai.",
+      "creditHistoryEmpty": "Kò sí kírẹ́dítì Kilo Pass síbẹ̀.",
+      "manageInStore": "Ṣàkóso nínú {{store}}",
+      "resume": "Tún ìforúkọsílẹ̀ bẹ̀rẹ̀",
+      "resumeCancelledDescription": "Kilo Pass rẹ yóò tún bẹ̀rẹ̀ sí í sọ ara rẹ̀ dọ̀tun láìfọwọ́yí.",
+      "resumePausedDescription": "Kilo Pass rẹ yóò tún bẹ̀rẹ̀ báyìí, ṣáájú ọjọ́ tí a ṣètò fún un láti tún bẹ̀rẹ̀.",
+      "resumed": "Ìforúkọsílẹ̀ ti tún bẹ̀rẹ̀",
+      "scheduledChange": "Àyípadà tí a ṣètò",
+      "scheduledChangeCancelDescription": "Kilo Pass rẹ yóò dúró lórí ètò rẹ̀ lọ́wọ́lọ́wọ́, yóò sì máa sọ ara rẹ̀ dọ̀tun bí ó ti ń ṣe báyìí.",
+      "scheduledChangeSummary": "{{plan}} ní {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass kò sí.",
     "couldNotLoad": "A kò lè gbé Kilo Pass wọlé. Gbìyànjú lẹ́ẹ̀kan sí i.",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "A ti gba Config wọlé"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Kò lè gbé ìgbòkègbodò kírẹ́dítì wọ̀.",
+      "appStoreReceipt": "Ìwé ẹ̀rí ìsanwó láti App Store",
+      "deductionFallback": "Ìyọkúrò kírẹ́dítì",
+      "emptyDescription": "Àwọn ìrajà kírẹ́dítì, ìwé ẹ̀rí ìsanwó, àti ìlò yóò hàn níbí.",
+      "emptyTitle": "Kò sí ìtàn kírẹ́dítì",
+      "googlePlayReceipt": "Ìwé ẹ̀rí ìsanwó láti Google Play",
+      "kind": {
+        "adjustment": "Àtúnṣe",
+        "balanceNeutral": "Kò yí ìyókù padà",
+        "deduction": "Ìyọkúrò",
+        "grant": "Ẹ̀bùn kírẹ́dítì",
+        "purchase": "Ìrajà"
+      },
+      "purchaseFallback": "Ìrajà kírẹ́dítì",
+      "receipt": "Ìwé ẹ̀rí ìsanwó",
+      "receiptA11y": "Ṣí ìwé ẹ̀rí ìsanwó fún {{description}}",
+      "receiptUnavailable": "Kò sí ìwé ẹ̀rí ìsanwó fún ìrajà yìí."
+    },
     "title": "Ra kírẹ́dítì",
     "description": "Kírẹ́dítì jẹ́ rírà ẹ̀ẹ̀kan tí a fi kún iwọntunwọnsi Kilo rẹ fún ṣíṣe àwọn ìpàdé kíkọ kóòdù AI nínú Kilo App. Ṣọ́ọ̀bù gba owó láti inú àkọọ́lẹ̀ rẹ, a sì fi kírẹ́dítì kún un lẹ́yìn tí ṣọ́ọ̀bù bá fọwọ́sí ìsanwó.",
     "nextExpiry": "Kírẹ́dítì {{amount}} yóò dópin {{date}} (UTC). A máa kọ́kọ́ lo kírẹ́dítì tí yóò tètè dópin.",
@@ -4070,6 +4117,9 @@
     "emptyTitle": "Kò sí ìlò ní sáà yìí",
     "orgSelfNotice": "Ìlò tìrẹ nínú àjọ yìí ni ò ń rí.",
     "viewDetails": "Wo àlàyé ìlò"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Àwọn ìwé owó fún àwọn ìrajà tìrẹ yóò hàn níbí nígbà tí a bá ti gba owó lọ́wọ́ rẹ."
   },
   "cloudAgent": {
     "compute": {

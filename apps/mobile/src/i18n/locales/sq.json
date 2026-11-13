@@ -22,6 +22,9 @@
     "expired": "Skaduar"
   },
   "common": {
+    "creditHistory": "Historiku i kredive",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Anulo",
@@ -118,6 +121,7 @@
     "copyLink": "Kopjo lidhjen",
     "couldNotLoadOrganizations": "Organizatat nuk u ngarkuan.",
     "couldNotLoadSessions": "Sesionet nuk u ngarkuan.",
+    "couldnTLoad": "Nuk u ngarkuan të dhënat.",
     "couldnTLoadMore": "Nuk u ngarkuan më shumë të dhëna.",
     "deviceSessions": "Sesionet në pajisje",
     "disabled": "Çaktivizuar",
@@ -245,6 +249,10 @@
     "notAdded": "Ke hyrë. {{provider}} nuk u shtua në llogarinë tënde."
   },
   "profile": {
+    "creditHistorySubtitle": "Blerjet, dëftesat dhe aktiviteti i kredive",
+    "invoicesSubtitle": "Shkarko faturat për blerjet e tua",
+    "manageBilling": "Menaxho faturimin në kilo.ai",
+    "manageBillingIosNote": "Metodat e pagesës, rimbushja automatike dhe detajet e faturimit menaxhohen në kilo.ai.",
     "codeReviewerSubtitle": "Rishikime automatike të PR",
     "securityAgentSubtitle": "Gjej dhe korrigjo cenueshmëritë",
     "reviews": "Rishikimet",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "Vetëm {{displayCount}} skedarët e parë do të bashkëngjiten."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Historiku i faturimit",
+      "billingHistoryEmpty": "Ende nuk ka historik faturimi.",
+      "cancel": "Anulo abonimin",
+      "cancelDescription": "Kilo Pass mbetet aktiv deri në fund të periudhës së faturimit dhe nuk do të rinovohet.",
+      "cancelScheduled": "Anulohet më {{date}}",
+      "cancelScheduledChange": "Anulo ndryshimin e planifikuar",
+      "cancelled": "Abonimi u anulua",
+      "changePlan": "Ndrysho planin në kilo.ai",
+      "changePlanIosNote": "Ndryshimet e planeve me pagesë mund të bëhen në kilo.ai.",
+      "creditHistoryEmpty": "Ende nuk ka kredite nga Kilo Pass.",
+      "manageInStore": "Menaxho në {{store}}",
+      "resume": "Rifillo abonimin",
+      "resumeCancelledDescription": "Kilo Pass fillon sërish të rinovohet automatikisht.",
+      "resumePausedDescription": "Kilo Pass rifillon tani, përpara datës së planifikuar të rifillimit.",
+      "resumed": "Abonimi rifilloi",
+      "scheduledChange": "Ndryshim i planifikuar",
+      "scheduledChangeCancelDescription": "Kilo Pass mbetet në planin aktual dhe rinovohet si deri tani.",
+      "scheduledChangeSummary": "{{plan}} më {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass nuk është i disponueshëm.",
     "couldNotLoad": "Nuk u ngarkua Kilo Pass. Provo përsëri.",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Konfigurimi u importua"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Nuk u aktivizua dot veprimtaria e kredisë.",
+      "appStoreReceipt": "Dëftesë nga App Store",
+      "deductionFallback": "Zbritje kredish",
+      "emptyDescription": "Blerjet e kredive, dëftesat dhe përdorimi do të shfaqen këtu.",
+      "emptyTitle": "Nuk ka historik kredish",
+      "googlePlayReceipt": "Dëftesë nga Google Play",
+      "kind": {
+        "adjustment": "Rregullim",
+        "balanceNeutral": "Pa ndikim në bilanc",
+        "deduction": "Zbritje",
+        "grant": "Kredi të dhuruara",
+        "purchase": "Blerje"
+      },
+      "purchaseFallback": "Blerje kredish",
+      "receipt": "Dëftesë",
+      "receiptA11y": "Hap dëftesën për {{description}}",
+      "receiptUnavailable": "Nuk ka dëftesë për këtë blerje."
+    },
     "title": "Bli kredite",
     "description": "Kreditet janë një blerje e njëhershme që shtohet në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App. Dyqani të faturova llogarinë dhe kreditet shtohen pasi dyqani konfirmon pagesën.",
     "nextExpiry": "Kredite në vlerën {{amount}} skadojnë më {{date}} (UTC). Kreditet që skadojnë më herët përdoren të parat.",
@@ -4070,6 +4117,9 @@
     "emptyTitle": "Asnjë përdorim në këtë periudhë",
     "orgSelfNotice": "Po shihni përdorimin tuaj në këtë organizatë.",
     "viewDetails": "Shiko detajet e përdorimit"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Faturat për blerjet e tua personale do të shfaqen këtu pasi të faturohesh."
   },
   "cloudAgent": {
     "compute": {

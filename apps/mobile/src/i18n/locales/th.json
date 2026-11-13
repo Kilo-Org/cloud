@@ -22,6 +22,9 @@
     "expired": "หมดอายุแล้ว"
   },
   "common": {
+    "creditHistory": "ประวัติเครดิต",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "ยกเลิก",
@@ -118,6 +121,7 @@
     "copyLink": "คัดลอกลิงก์",
     "couldNotLoadOrganizations": "ไม่สามารถโหลดรายชื่อองค์กรได้",
     "couldNotLoadSessions": "ไม่สามารถโหลดเซสชันได้",
+    "couldnTLoad": "ไม่สามารถโหลดได้",
     "couldnTLoadMore": "ไม่สามารถโหลดเพิ่มได้",
     "deviceSessions": "เซสชันบนอุปกรณ์",
     "disabled": "ปิดใช้งานแล้ว",
@@ -245,6 +249,10 @@
     "notAdded": "คุณลงชื่อเข้าใช้แล้ว ไม่ได้เพิ่ม {{provider}} ในบัญชีของคุณ"
   },
   "profile": {
+    "creditHistorySubtitle": "การซื้อ ใบเสร็จ และความเคลื่อนไหวของเครดิต",
+    "invoicesSubtitle": "ดาวน์โหลดใบแจ้งหนี้สำหรับการซื้อของคุณ",
+    "manageBilling": "จัดการการเรียกเก็บเงินบน kilo.ai",
+    "manageBillingIosNote": "วิธีการชำระเงิน การเติมเงินอัตโนมัติ และรายละเอียดการเรียกเก็บเงินจะจัดการบน kilo.ai",
     "codeReviewerSubtitle": "การตรวจสอบ PR อัตโนมัติ",
     "securityAgentSubtitle": "ค้นหาและแก้ไขช่องโหว่",
     "reviews": "การตรวจสอบโค้ด",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "จะแนบเฉพาะ {{displayCount}} ไฟล์แรกเท่านั้น"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "ประวัติการเรียกเก็บเงิน",
+      "billingHistoryEmpty": "ยังไม่มีประวัติการเรียกเก็บเงิน",
+      "cancel": "ยกเลิกการสมัครสมาชิก",
+      "cancelDescription": "Kilo Pass ของคุณจะยังใช้งานได้จนถึงสิ้นรอบการเรียกเก็บเงิน และจะไม่ต่ออายุ",
+      "cancelScheduled": "ยกเลิกในวันที่ {{date}}",
+      "cancelScheduledChange": "ยกเลิกการเปลี่ยนแปลงที่กำหนดไว้",
+      "cancelled": "ยกเลิกการสมัครสมาชิกแล้ว",
+      "changePlan": "เปลี่ยนแพ็กเกจบน kilo.ai",
+      "changePlanIosNote": "การเปลี่ยนแพ็กเกจแบบชำระเงินทำได้บน kilo.ai",
+      "creditHistoryEmpty": "ยังไม่มีเครดิตจาก Kilo Pass",
+      "manageInStore": "จัดการใน {{store}}",
+      "resume": "กลับมาใช้การสมัครสมาชิกต่อ",
+      "resumeCancelledDescription": "Kilo Pass ของคุณจะกลับมาต่ออายุโดยอัตโนมัติอีกครั้ง",
+      "resumePausedDescription": "Kilo Pass ของคุณจะกลับมาใช้งานทันที ก่อนวันที่กำหนดไว้",
+      "resumed": "กลับมาใช้การสมัครสมาชิกแล้ว",
+      "scheduledChange": "การเปลี่ยนแปลงที่กำหนดไว้",
+      "scheduledChangeCancelDescription": "Kilo Pass ของคุณจะยังคงใช้แพ็กเกจปัจจุบันและต่ออายุเหมือนเดิม",
+      "scheduledChangeSummary": "{{plan}} ในวันที่ {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "ไม่สามารถโหลด Kilo Pass ได้",
     "couldNotLoad": "โหลด Kilo Pass ไม่สำเร็จ ลองอีกครั้ง",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "นำเข้า Config แล้ว"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "ไม่สามารถโหลดกิจกรรมเครดิตได้",
+      "appStoreReceipt": "ใบเสร็จจาก App Store",
+      "deductionFallback": "การหักเครดิต",
+      "emptyDescription": "การซื้อเครดิต ใบเสร็จ และการใช้งานจะแสดงที่นี่",
+      "emptyTitle": "ไม่มีประวัติเครดิต",
+      "googlePlayReceipt": "ใบเสร็จจาก Google Play",
+      "kind": {
+        "adjustment": "การปรับปรุง",
+        "balanceNeutral": "ไม่กระทบยอดคงเหลือ",
+        "deduction": "การหักเครดิต",
+        "grant": "เครดิตที่ได้รับ",
+        "purchase": "การซื้อ"
+      },
+      "purchaseFallback": "การซื้อเครดิต",
+      "receipt": "ใบเสร็จ",
+      "receiptA11y": "เปิดใบเสร็จสำหรับ {{description}}",
+      "receiptUnavailable": "ไม่มีใบเสร็จสำหรับการซื้อนี้"
+    },
     "title": "ซื้อเครดิต",
     "description": "เครดิตคือการซื้อครั้งเดียวที่เพิ่มเข้าสู่ยอดคงเหลือ Kilo ของคุณสำหรับการรันเซสชันการเขียนโค้ด AI ใน Kilo App สโตร์เรียกเก็บเงินจากบัญชีของคุณ และเครดิตจะถูกเพิ่มหลังจากที่สโตร์ยืนยันการชำระเงิน",
     "nextExpiry": "เครดิต {{amount}} จะหมดอายุ {{date}} (UTC) เครดิตที่หมดอายุเร็วที่สุดจะถูกใช้ก่อน",
@@ -4070,6 +4117,9 @@
     "emptyTitle": "ไม่มีการใช้งานในช่วงนี้",
     "orgSelfNotice": "คุณกำลังดูการใช้งานของคุณเองในองค์กรนี้",
     "viewDetails": "ดูรายละเอียดการใช้งาน"
+  },
+  "invoices": {
+    "personalEmptyDescription": "ใบแจ้งหนี้สำหรับการซื้อของคุณเองจะแสดงที่นี่เมื่อมีการเรียกเก็บเงิน"
   },
   "cloudAgent": {
     "compute": {

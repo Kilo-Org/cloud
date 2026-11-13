@@ -22,6 +22,9 @@
     "expired": "期限切れ"
   },
   "common": {
+    "creditHistory": "クレジット履歴",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": "。",
     "listJoiner": "、",
     "cancel": "キャンセル",
@@ -118,6 +121,7 @@
     "copyLink": "リンクをコピー",
     "couldNotLoadOrganizations": "組織を読み込めませんでした。",
     "couldNotLoadSessions": "セッションを読み込めませんでした。",
+    "couldnTLoad": "読み込めませんでした。",
     "couldnTLoadMore": "続きを読み込めませんでした。",
     "deviceSessions": "デバイスのセッション",
     "disabled": "無効",
@@ -245,6 +249,10 @@
     "notAdded": "サインインしました。{{provider}} はアカウントに追加されませんでした。"
   },
   "profile": {
+    "creditHistorySubtitle": "購入、領収書、クレジットのアクティビティ",
+    "invoicesSubtitle": "購入の請求書をダウンロード",
+    "manageBilling": "kilo.ai で支払いを管理",
+    "manageBillingIosNote": "支払い方法、自動チャージ、請求情報は kilo.ai で管理されます。",
     "codeReviewerSubtitle": "PRの自動レビュー",
     "securityAgentSubtitle": "脆弱性を検出して修正",
     "reviews": "レビュー",
@@ -2318,6 +2326,26 @@
     "onlyFirstFilesAttached_other": "最初の{{displayCount}}件のファイルのみが添付されます。"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "請求履歴",
+      "billingHistoryEmpty": "請求履歴はまだありません。",
+      "cancel": "サブスクリプションを解約",
+      "cancelDescription": "Kilo Pass は請求期間の終了まで有効で、その後は更新されません。",
+      "cancelScheduled": "{{date}} に解約予定",
+      "cancelScheduledChange": "予定された変更を取り消す",
+      "cancelled": "サブスクリプションを解約しました",
+      "changePlan": "kilo.ai でプランを変更",
+      "changePlanIosNote": "有料プランの変更は kilo.ai で行えます。",
+      "creditHistoryEmpty": "Kilo Pass のクレジットはまだありません。",
+      "manageInStore": "{{store}} で管理",
+      "resume": "サブスクリプションを再開",
+      "resumeCancelledDescription": "Kilo Pass の自動更新が再び有効になります。",
+      "resumePausedDescription": "Kilo Pass は予定の再開日を待たずに今すぐ再開されます。",
+      "resumed": "サブスクリプションを再開しました",
+      "scheduledChange": "予定された変更",
+      "scheduledChangeCancelDescription": "Kilo Pass は現在のプランのまま、これまでどおり更新されます。",
+      "scheduledChangeSummary": "{{date}} に {{plan}} へ変更"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Passを利用できません。",
     "couldNotLoad": "Kilo Passを読み込めませんでした。もう一度お試しください。",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Configをインポートしました"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "クレジットアクティビティを読み込めませんでした。",
+      "appStoreReceipt": "領収書は App Store にあります",
+      "deductionFallback": "クレジットの差し引き",
+      "emptyDescription": "クレジットの購入、領収書、使用状況がここに表示されます。",
+      "emptyTitle": "クレジット履歴はありません",
+      "googlePlayReceipt": "領収書は Google Play にあります",
+      "kind": {
+        "adjustment": "調整",
+        "balanceNeutral": "残高変動なし",
+        "deduction": "差し引き",
+        "grant": "クレジット付与",
+        "purchase": "購入"
+      },
+      "purchaseFallback": "クレジットの購入",
+      "receipt": "領収書",
+      "receiptA11y": "{{description}} の領収書を開く",
+      "receiptUnavailable": "この購入の領収書はありません。"
+    },
     "title": "クレジットを購入",
     "description": "クレジットは、Kilo AppでAIコーディングセッションを実行するためにKilo残高に追加される買い切りの購入です。ストアがアカウントに請求し、ストアが支払いを確認した後にクレジットが追加されます。",
     "nextExpiry": "{{amount}}のクレジットが{{date}}（UTC）に失効します。有効期限が早いクレジットから先に使用されます。",
@@ -4070,6 +4117,9 @@
     "emptyTitle": "この期間の使用はありません",
     "orgSelfNotice": "この組織でのあなた自身の使用状況を表示しています。",
     "viewDetails": "使用状況の詳細を表示"
+  },
+  "invoices": {
+    "personalEmptyDescription": "ご自身の購入に対する請求書は、請求が発生するとここに表示されます。"
   },
   "cloudAgent": {
     "compute": {

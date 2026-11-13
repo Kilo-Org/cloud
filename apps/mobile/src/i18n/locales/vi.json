@@ -22,6 +22,9 @@
     "expired": "Đã hết hạn"
   },
   "common": {
+    "creditHistory": "Lịch sử tín dụng",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Hủy",
@@ -118,6 +121,7 @@
     "copyLink": "Sao chép liên kết",
     "couldNotLoadOrganizations": "Không thể tải danh sách tổ chức.",
     "couldNotLoadSessions": "Không thể tải danh sách phiên.",
+    "couldnTLoad": "Không thể tải được.",
     "couldnTLoadMore": "Không thể tải thêm.",
     "deviceSessions": "Phiên đăng nhập trên thiết bị",
     "disabled": "Đã tắt",
@@ -245,6 +249,10 @@
     "notAdded": "Bạn đã đăng nhập. Chưa thêm {{provider}} vào tài khoản của bạn."
   },
   "profile": {
+    "creditHistorySubtitle": "Giao dịch mua, biên lai và hoạt động tín dụng",
+    "invoicesSubtitle": "Tải xuống hóa đơn cho các giao dịch mua của bạn",
+    "manageBilling": "Quản lý thanh toán trên kilo.ai",
+    "manageBillingIosNote": "Phương thức thanh toán, tự động nạp tiền và thông tin thanh toán được quản lý trên kilo.ai.",
     "codeReviewerSubtitle": "Rà soát PR tự động",
     "securityAgentSubtitle": "Tìm và khắc phục lỗ hổng",
     "reviews": "Rà soát mã",
@@ -2318,6 +2326,26 @@
     "onlyFirstFilesAttached_other": "Chỉ {{displayCount}} tệp đầu tiên sẽ được đính kèm."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Lịch sử thanh toán",
+      "billingHistoryEmpty": "Chưa có lịch sử thanh toán.",
+      "cancel": "Hủy gói đăng ký",
+      "cancelDescription": "Kilo Pass của bạn vẫn hoạt động đến hết kỳ thanh toán và sẽ không được gia hạn.",
+      "cancelScheduled": "Sẽ hủy vào {{date}}",
+      "cancelScheduledChange": "Hủy thay đổi đã lên lịch",
+      "cancelled": "Đã hủy gói đăng ký",
+      "changePlan": "Đổi gói trên kilo.ai",
+      "changePlanIosNote": "Bạn có thể thay đổi gói trả phí trên kilo.ai.",
+      "creditHistoryEmpty": "Chưa có tín dụng Kilo Pass nào.",
+      "manageInStore": "Quản lý trong {{store}}",
+      "resume": "Tiếp tục gói đăng ký",
+      "resumeCancelledDescription": "Kilo Pass của bạn sẽ lại được tự động gia hạn.",
+      "resumePausedDescription": "Kilo Pass của bạn sẽ tiếp tục ngay bây giờ, trước ngày tiếp tục đã lên lịch.",
+      "resumed": "Đã tiếp tục gói đăng ký",
+      "scheduledChange": "Thay đổi đã lên lịch",
+      "scheduledChangeCancelDescription": "Kilo Pass của bạn sẽ giữ gói hiện tại và gia hạn như bình thường.",
+      "scheduledChangeSummary": "{{plan}} vào {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Hiện không thể dùng Kilo Pass.",
     "couldNotLoad": "Không thể tải Kilo Pass. Hãy thử lại.",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Đã nhập cấu hình"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Không thể tải hoạt động tín dụng.",
+      "appStoreReceipt": "Biên lai từ App Store",
+      "deductionFallback": "Khấu trừ tín dụng",
+      "emptyDescription": "Các giao dịch mua tín dụng, biên lai và mức sử dụng sẽ hiển thị tại đây.",
+      "emptyTitle": "Chưa có lịch sử tín dụng",
+      "googlePlayReceipt": "Biên lai từ Google Play",
+      "kind": {
+        "adjustment": "Điều chỉnh",
+        "balanceNeutral": "Không ảnh hưởng số dư",
+        "deduction": "Khấu trừ",
+        "grant": "Tặng tín dụng",
+        "purchase": "Mua"
+      },
+      "purchaseFallback": "Mua tín dụng",
+      "receipt": "Biên lai",
+      "receiptA11y": "Mở biên lai cho {{description}}",
+      "receiptUnavailable": "Không có biên lai cho giao dịch mua này."
+    },
     "title": "Mua tín dụng",
     "description": "Tín dụng là giao dịch mua một lần được thêm vào số dư Kilo của bạn để chạy các phiên lập trình AI trong Kilo App. Cửa hàng tính phí vào tài khoản của bạn và tín dụng được thêm sau khi cửa hàng xác nhận thanh toán.",
     "nextExpiry": "Khoản tín dụng {{amount}} sẽ hết hạn vào {{date}} (UTC). Tín dụng hết hạn sớm nhất sẽ được dùng trước.",
@@ -4070,6 +4117,9 @@
     "emptyTitle": "Không có mức sử dụng trong kỳ này",
     "orgSelfNotice": "Bạn đang xem mức sử dụng của chính mình trong tổ chức này.",
     "viewDetails": "Xem chi tiết mức sử dụng"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Hóa đơn cho các giao dịch mua của riêng bạn sẽ hiển thị tại đây sau khi bạn được tính phí."
   },
   "cloudAgent": {
     "compute": {

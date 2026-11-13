@@ -89,6 +89,9 @@
     "expired": "Expired"
   },
   "common": {
+    "creditHistory": "Credit history",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancel",
@@ -185,6 +188,7 @@
     "copyLink": "Copy link",
     "couldNotLoadOrganizations": "Could not load organizations",
     "couldNotLoadSessions": "Could not load sessions",
+    "couldnTLoad": "Couldn't load",
     "couldnTLoadMore": "Couldn't load more",
     "deviceSessions": "Device sessions",
     "disabled": "Disabled",
@@ -312,6 +316,10 @@
     "notAdded": "You're signed in. {{provider}} wasn't added to your account."
   },
   "profile": {
+    "creditHistorySubtitle": "Purchases, receipts, and credit activity",
+    "invoicesSubtitle": "Download invoices for your purchases",
+    "manageBilling": "Manage billing on kilo.ai",
+    "manageBillingIosNote": "Payment methods, auto top-up, and billing details are managed on kilo.ai.",
     "codeReviewerSubtitle": "Automatic PR reviews",
     "securityAgentSubtitle": "Find and remediate vulnerabilities",
     "reviews": "Reviews",
@@ -2940,6 +2948,26 @@
     "couldNotReadContent": "Couldn't read the shared content"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Billing history",
+      "billingHistoryEmpty": "No billing history yet.",
+      "cancel": "Cancel subscription",
+      "cancelDescription": "Your Kilo Pass stays active until the end of the billing period and will not renew.",
+      "cancelScheduled": "Cancels on {{date}}",
+      "cancelScheduledChange": "Cancel scheduled change",
+      "cancelled": "Cancelled subscription",
+      "changePlan": "Change plan on kilo.ai",
+      "changePlanIosNote": "Paid plan changes are available on kilo.ai.",
+      "creditHistoryEmpty": "No Kilo Pass credits yet.",
+      "manageInStore": "Manage in {{store}}",
+      "resume": "Resume subscription",
+      "resumeCancelledDescription": "Your Kilo Pass starts renewing automatically again.",
+      "resumePausedDescription": "Your Kilo Pass resumes now, before its scheduled resume date.",
+      "resumed": "Subscription resumed",
+      "scheduledChange": "Scheduled change",
+      "scheduledChangeCancelDescription": "Your Kilo Pass stays on its current plan and renews as it does today.",
+      "scheduledChangeSummary": "{{plan}} on {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Couldn't load Kilo Pass.",
     "couldNotLoad": "Kilo Pass could not be loaded. Try again.",
@@ -3941,6 +3969,25 @@
     "importConfigApplied": "Config imported"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Couldn't load credit activity.",
+      "appStoreReceipt": "Receipt from the App Store",
+      "deductionFallback": "Credit deduction",
+      "emptyDescription": "Credit purchases, receipts, and usage will appear here.",
+      "emptyTitle": "No credit history",
+      "googlePlayReceipt": "Receipt from Google Play",
+      "kind": {
+        "adjustment": "Adjustment",
+        "balanceNeutral": "Balance neutral",
+        "deduction": "Deduction",
+        "grant": "Credit grant",
+        "purchase": "Purchase"
+      },
+      "purchaseFallback": "Credit purchase",
+      "receipt": "Receipt",
+      "receiptA11y": "Open the receipt for {{description}}",
+      "receiptUnavailable": "A receipt is not available for this purchase."
+    },
     "title": "Buy credits",
     "description": "Credits are a one-time purchase added to your Kilo balance for running AI coding sessions in Kilo App. The store charges your account and credits are added after the store confirms payment.",
     "nextExpiry": "{{amount}} in credits expires {{date}} (UTC). Credits with the earliest expiry are used first.",
@@ -4070,6 +4117,9 @@
     "emptyTitle": "No usage in this period",
     "orgSelfNotice": "You're seeing your own usage in this organization.",
     "viewDetails": "View usage details"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Invoices for your own purchases will appear here once you are billed."
   },
   "cloudAgent": {
     "compute": {

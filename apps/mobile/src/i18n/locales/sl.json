@@ -22,6 +22,9 @@
     "expired": "Poteklo"
   },
   "common": {
+    "creditHistory": "Zgodovina kreditov",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Prekliči",
@@ -118,6 +121,7 @@
     "copyLink": "Kopiraj povezavo",
     "couldNotLoadOrganizations": "Organizacij ni bilo mogoče naložiti.",
     "couldNotLoadSessions": "Sej ni bilo mogoče naložiti.",
+    "couldnTLoad": "Podatkov ni bilo mogoče naložiti.",
     "couldnTLoadMore": "Dodatnih podatkov ni bilo mogoče naložiti.",
     "deviceSessions": "Seje v napravah",
     "disabled": "Onemogočeno",
@@ -245,6 +249,10 @@
     "notAdded": "Prijavljen si. Storitev {{provider}} ni bila dodana tvojemu računu."
   },
   "profile": {
+    "creditHistorySubtitle": "Nakupi, potrdila in dejavnost kreditov",
+    "invoicesSubtitle": "Prenesite račune za svoje nakupe",
+    "manageBilling": "Upravljanje obračunavanja na kilo.ai",
+    "manageBillingIosNote": "Plačilna sredstva, samodejno polnjenje in podatki za obračun se upravljajo na kilo.ai.",
     "codeReviewerSubtitle": "Samodejni pregledi PR",
     "securityAgentSubtitle": "Poišči in odpravi ranljivosti",
     "reviews": "Pregledi",
@@ -2966,6 +2974,26 @@
     "onlyFirstFilesAttached_few": "Priloženih bo samo prvih {{displayCount}} datoteke."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Zgodovina obračunov",
+      "billingHistoryEmpty": "Zgodovine obračunov še ni.",
+      "cancel": "Prekliči naročnino",
+      "cancelDescription": "Vaš Kilo Pass ostane aktiven do konca obračunskega obdobja in se ne bo podaljšal.",
+      "cancelScheduled": "Preklic dne {{date}}",
+      "cancelScheduledChange": "Prekliči načrtovano spremembo",
+      "cancelled": "Naročnina je preklicana",
+      "changePlan": "Spremeni paket na kilo.ai",
+      "changePlanIosNote": "Spremembe plačljivih paketov so na voljo na kilo.ai.",
+      "creditHistoryEmpty": "Kreditov Kilo Pass še ni.",
+      "manageInStore": "Upravljaj v trgovini {{store}}",
+      "resume": "Nadaljuj naročnino",
+      "resumeCancelledDescription": "Vaš Kilo Pass se bo znova samodejno podaljševal.",
+      "resumePausedDescription": "Vaš Kilo Pass se nadaljuje zdaj, pred načrtovanim datumom nadaljevanja.",
+      "resumed": "Naročnina je spet aktivna",
+      "scheduledChange": "Načrtovana sprememba",
+      "scheduledChangeCancelDescription": "Vaš Kilo Pass ostane na trenutnem paketu in se podaljšuje kot doslej.",
+      "scheduledChangeSummary": "{{plan}} od {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass ni na voljo.",
     "couldNotLoad": "Naročnine Kilo Pass ni bilo mogoče naložiti. Poskusi znova.",
@@ -3996,6 +4024,25 @@
     "importConfigApplied": "Konfiguracija uvožena"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Kreditne aktivnosti ni bilo mogoče naložiti.",
+      "appStoreReceipt": "Potrdilo iz trgovine App Store",
+      "deductionFallback": "Odbitek kreditov",
+      "emptyDescription": "Tukaj bodo prikazani nakupi kreditov, potrdila in poraba.",
+      "emptyTitle": "Ni zgodovine kreditov",
+      "googlePlayReceipt": "Potrdilo iz trgovine Google Play",
+      "kind": {
+        "adjustment": "Prilagoditev",
+        "balanceNeutral": "Brez vpliva na stanje",
+        "deduction": "Odbitek",
+        "grant": "Dodelitev kreditov",
+        "purchase": "Nakup"
+      },
+      "purchaseFallback": "Nakup kreditov",
+      "receipt": "Potrdilo",
+      "receiptA11y": "Odpri potrdilo za {{description}}",
+      "receiptUnavailable": "Potrdilo za ta nakup ni na voljo."
+    },
     "title": "Kupi kredite",
     "description": "Krediti so enkraten nakup, ki se doda tvojemu Kilo stanju za izvajanje sej kodiranja z umetno inteligenco v aplikaciji Kilo. Trgovina obremeni tvoj račun in krediti se dodajo, ko trgovina potrdi plačilo.",
     "nextExpiry": "Veljavnost kreditov v vrednosti {{amount}} poteče {{date}} (UTC). Najprej se porabijo krediti z najzgodnejšim potekom veljavnosti.",
@@ -4200,6 +4247,9 @@
     "emptyTitle": "V tem obdobju ni porabe",
     "orgSelfNotice": "Prikazana je vaša lastna poraba v tej organizaciji.",
     "viewDetails": "Ogled podrobnosti porabe"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Računi za vaše lastne nakupe bodo prikazani tukaj, ko vam bo izstavljen račun."
   },
   "cloudAgent": {
     "compute": {

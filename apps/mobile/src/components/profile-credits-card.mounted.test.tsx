@@ -5,13 +5,7 @@
 // safe because sign-out clears the React Query cache (`queryClient.clear()`), so
 // a new owner refetches and never reuses the previous owner's cached balance.
 
-import {
-  createElement,
-  type ElementType,
-  type ReactNode,
-  useEffect,
-  useSyncExternalStore,
-} from 'react';
+import { createElement, type ElementType, type ReactNode } from 'react';
 import type * as ReactModule from 'react';
 import { Platform, Pressable } from 'react-native';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
@@ -29,6 +23,7 @@ import {
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
+import { contextPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { OrganizationProvider } from '@/lib/organization-context';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
@@ -117,33 +112,8 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 }));
 
 const routerPush = vi.hoisted(() => vi.fn());
-// The context picker closes itself when the owning screen loses focus, so the
-// suite can drive that blur through this store.
-const pickerFocus = vi.hoisted(() => {
-  const listeners = new Set<() => void>();
-  const subscribe = (notify: () => void) => {
-    listeners.add(notify);
-    return () => {
-      listeners.delete(notify);
-    };
-  };
-  return {
-    focused: true,
-    setFocused(next: boolean) {
-      pickerFocus.focused = next;
-      for (const notify of listeners) {
-        notify();
-      }
-    },
-    subscribe,
-  };
-});
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: routerPush }),
-  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
-    const focused = useSyncExternalStore(pickerFocus.subscribe, () => pickerFocus.focused);
-    useEffect(() => (focused ? effect() : undefined), [effect, focused]);
-  },
+  useRouter: () => ({ push: routerPush, back: vi.fn() }),
 }));
 
 // The mounted OrganizationProvider reads the shared memberships from this
@@ -237,6 +207,12 @@ vi.mock('@/components/add-credits-row', () => ({
 const kiloPassCardProps = vi.hoisted(() => ({
   latest: undefined as { hideLoadingSkeleton?: boolean } | undefined,
 }));
+vi.mock('@/components/credits/credits-links', () => ({
+  // The card's own contract is the balance block; the personal rows have their
+  // own mounted suite.
+  PersonalCreditsLinks: () => null,
+}));
+
 vi.mock('@/components/kilo-pass/kilo-pass-subscription-card', () => ({
   KiloPassSubscriptionCard: (props: { hideLoadingSkeleton?: boolean }) => {
     kiloPassCardProps.latest = props;
@@ -295,40 +271,46 @@ async function openSheet(renderer: ReactTestRenderer) {
   });
 }
 
-/** The selected state an account action button carries, if it carries one. */
-function selectedState(node: ReactTestInstance): boolean | undefined {
-  const state: unknown = node.props.accessibilityState;
-  if (typeof state !== 'object' || state === null || !('selected' in state)) {
-    return undefined;
+/** The bridge the card handed the shared account picker route. */
+function pickerBridge() {
+  const bridge = contextPickerSlot.get(UNFENCED_ROUTE_KEY);
+  if (bridge === undefined) {
+    throw new Error('the account picker route was not handed a bridge');
   }
-  return typeof state.selected === 'boolean' ? state.selected : undefined;
+  return bridge;
 }
 
-/** An account action button: the picker marks every row's selection. */
-function accountRow(node: ReactTestInstance) {
-  return (
-    node.type === Pressable &&
-    node.props.accessibilityRole === 'button' &&
-    selectedState(node) !== undefined
-  );
+/** The account labels the picker route would render, in option order. */
+function accountLabels() {
+  return pickerBridge().options;
 }
 
-/** The sheet's account rows, in option order. */
-function accountLabels(renderer: ReactTestRenderer) {
-  return renderer.root.findAll(accountRow).map(node => node.props.accessibilityLabel as string);
-}
-
-/** Presses one row of the open sheet: an account row or Cancel (button). */
-async function choose(renderer: ReactTestRenderer, label: string) {
+/** Presses a plain control of the card by its visible label. */
+async function pressLabel(renderer: ReactTestRenderer, label: string) {
   const target = renderer.root.find(
-    node =>
-      node.type === Pressable &&
-      node.props.accessibilityLabel === label &&
-      node.props.onPress !== undefined &&
-      (accountRow(node) ? true : node.props.accessibilityHint === undefined)
+    node => node.type === Pressable && node.props.accessibilityLabel === label
   );
   await act(() => {
     (target.props.onPress as () => void)();
+  });
+}
+
+/**
+ * Applies one account choice, or dismisses without one for `Cancel`: the card
+ * presses the choice the route reports, exactly as a row press would.
+ */
+async function choose(label: string) {
+  if (label === 'Cancel') {
+    contextPickerSlot.clear(UNFENCED_ROUTE_KEY);
+    return;
+  }
+  const bridge = pickerBridge();
+  const index = bridge.options.indexOf(label);
+  if (index === -1) {
+    throw new Error(`${label} is not one of the picker's rows`);
+  }
+  await act(() => {
+    bridge.onSelect(index);
   });
 }
 
@@ -410,6 +392,7 @@ beforeEach(() => {
   // stage a stored selection set their own payload.
   listState.payload = [];
   routerPush.mockReset();
+  contextPickerSlot.clearAll();
   storage.read.mockReset().mockImplementation(async (key: string) => {
     await Promise.resolve();
     return savedMetadata.get(key) ?? null;
@@ -531,7 +514,7 @@ describe('CreditsCard balance state', () => {
     const stalled = Promise.withResolvers<undefined>();
     getContextBalanceQueryFn.mockReturnValue(stalled.promise);
     await openSheet(renderer);
-    await choose(renderer, 'Beta');
+    await choose('Beta');
 
     await waitFor(() => texts().includes('SKELETON'));
     expect(texts()).not.toContain('$10.00');
@@ -554,7 +537,7 @@ describe('CreditsCard balance state', () => {
       const { renderer, texts, unmount } = await mountCard();
       await waitFor(() => texts().includes('No expiring credits.'));
 
-      await choose(renderer, 'Hide balance');
+      await pressLabel(renderer, 'Hide balance');
       expect(texts()).toContain('No expiring credits.');
       expect(texts()).toContain('*****');
       expect(texts()).not.toContain('$10.00');
@@ -577,11 +560,11 @@ describe('CreditsCard balance state', () => {
         .includes(`$2.00${explanation}`)
     );
 
-    await choose(renderer, 'Hide balance');
+    await pressLabel(renderer, 'Hide balance');
     expect(texts().map(text => readable(text))).toContain(`*****${explanation}`);
     expect(texts().map(text => readable(text))).not.toContain(`$2.00${explanation}`);
     expect(texts()).not.toContain('$10.00');
-    await choose(renderer, 'Show balance');
+    await pressLabel(renderer, 'Show balance');
     expect(texts().map(text => readable(text))).toContain(`$2.00${explanation}`);
     expect(texts()).toContain('$10.00');
     unmount();
@@ -597,7 +580,7 @@ describe('CreditsCard balance state', () => {
 
     expect(texts()).toContain('SKELETON');
     expect(texts()).not.toContain('No expiring credits.');
-    await choose(renderer, 'Hide balance');
+    await pressLabel(renderer, 'Hide balance');
     expect(texts()).toContain('SKELETON');
     await act(async () => {
       pending.resolve({ creditBlocks: [] });
@@ -626,7 +609,7 @@ describe('CreditsCard balance state', () => {
       const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
       await waitFor(() => texts().includes('Credit expiry unavailable.'));
       expect(texts()).not.toContain('No expiring credits.');
-      await choose(renderer, 'Hide balance');
+      await pressLabel(renderer, 'Hide balance');
       expect(texts()).toContain('Credit expiry unavailable.');
       unmount();
     }
@@ -655,7 +638,7 @@ describe('CreditsCard balance state', () => {
     const pending = Promise.withResolvers<{ creditBlocks: [] }>();
     orgCreditBlocksQueryFn.mockReturnValue(pending.promise);
     await openSheet(renderer);
-    await choose(renderer, 'Beta');
+    await choose('Beta');
     await waitFor(() => texts().includes('$10.00') && texts().includes('SKELETON'));
 
     expect(texts()).not.toContain(previousNote);
@@ -786,13 +769,13 @@ describe('CreditsCard balance state', () => {
       state.orgs as OrgListEntry[]
     );
     await openSheet(renderer);
-    expect([...accountLabels(renderer), 'Cancel']).toEqual(state.options);
-    await choose(renderer, 'Cancel');
+    expect(accountLabels()).toEqual(state.options.filter(label => label !== 'Cancel'));
+    await choose('Cancel');
     expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(
       (state.orgs as OrgListEntry[])[0]?.organizationId ?? undefined
     );
     await openSheet(renderer);
-    await choose(renderer, state.label);
+    await choose(state.label);
     expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(state.expected ?? undefined);
     const label = renderer.root.findByProps({ children: state.label });
     expect(label.props).toMatchObject({ numberOfLines: 1, ellipsizeMode: 'tail' });
@@ -815,7 +798,7 @@ describe('CreditsCard balance state', () => {
       storage.write.mockRejectedValueOnce(new Error('write failed'));
       const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
       await openSheet(renderer);
-      await choose(renderer, 'Supplied organization');
+      await choose('Supplied organization');
       expect(texts()).toContain('Could not save setting');
       expect(texts()).toContain('Supplied organization');
       expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');
@@ -828,7 +811,7 @@ describe('CreditsCard balance state', () => {
         new Error('latest save failed')
       );
       await openSheet(renderer);
-      await choose(renderer, id === null ? 'Personal' : 'Latest organization');
+      await choose(id === null ? 'Personal' : 'Latest organization');
       const label = id === null ? 'Personal' : 'Latest organization';
       expect(texts()).toContain(label);
       expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');

@@ -22,6 +22,9 @@
     "expired": "Platnost vypršela"
   },
   "common": {
+    "creditHistory": "Historie kreditů",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Zrušit",
@@ -118,6 +121,7 @@
     "copyLink": "Kopírovat odkaz",
     "couldNotLoadOrganizations": "Organizace se nepodařilo načíst.",
     "couldNotLoadSessions": "Relace se nepodařilo načíst.",
+    "couldnTLoad": "Načtení se nezdařilo.",
     "couldnTLoadMore": "Další položky se nepodařilo načíst.",
     "deviceSessions": "Přihlášená zařízení",
     "disabled": "Vypnuto",
@@ -245,6 +249,10 @@
     "notAdded": "Jste přihlášeni. {{provider}} nebyl přidán k vašemu účtu."
   },
   "profile": {
+    "creditHistorySubtitle": "Nákupy, účtenky a pohyby kreditů",
+    "invoicesSubtitle": "Stáhněte si faktury ke svým nákupům",
+    "manageBilling": "Spravovat fakturaci na kilo.ai",
+    "manageBillingIosNote": "Platební metody, automatické dobíjení a fakturační údaje se spravují na kilo.ai.",
     "codeReviewerSubtitle": "Automatické kontroly PR",
     "securityAgentSubtitle": "Vyhledávat a odstraňovat zranitelnosti",
     "reviews": "Kontroly kódu",
@@ -2966,6 +2974,26 @@
     "onlyFirstFilesAttached_many": "Připojí se jen soubory ze začátku seznamu ({{displayCount}})."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Historie fakturace",
+      "billingHistoryEmpty": "Zatím žádná historie fakturace.",
+      "cancel": "Zrušit předplatné",
+      "cancelDescription": "Váš Kilo Pass zůstane aktivní do konce fakturačního období a neobnoví se.",
+      "cancelScheduled": "Zruší se {{date}}",
+      "cancelScheduledChange": "Zrušit naplánovanou změnu",
+      "cancelled": "Předplatné zrušeno",
+      "changePlan": "Změnit tarif na kilo.ai",
+      "changePlanIosNote": "Změny placeného tarifu jsou k dispozici na kilo.ai.",
+      "creditHistoryEmpty": "Zatím žádné kredity z Kilo Pass.",
+      "manageInStore": "Spravovat v {{store}}",
+      "resume": "Obnovit předplatné",
+      "resumeCancelledDescription": "Váš Kilo Pass se bude opět automaticky obnovovat.",
+      "resumePausedDescription": "Váš Kilo Pass se znovu aktivuje hned, ještě před plánovaným datem obnovení.",
+      "resumed": "Předplatné obnoveno",
+      "scheduledChange": "Naplánovaná změna",
+      "scheduledChangeCancelDescription": "Váš Kilo Pass zůstane na současném tarifu a bude se obnovovat jako dosud.",
+      "scheduledChangeSummary": "{{plan}} od {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass není k dispozici.",
     "couldNotLoad": "Kilo Pass se nepodařilo načíst. Zkuste to znovu.",
@@ -3996,6 +4024,25 @@
     "importConfigApplied": "Konfigurace importována"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Aktivitu kreditů se nepodařilo načíst.",
+      "appStoreReceipt": "Účtenka z App Store",
+      "deductionFallback": "Odečtení kreditů",
+      "emptyDescription": "Zde se zobrazí nákupy kreditů, účtenky a využití.",
+      "emptyTitle": "Žádná historie kreditů",
+      "googlePlayReceipt": "Účtenka z Google Play",
+      "kind": {
+        "adjustment": "Úprava",
+        "balanceNeutral": "Bez vlivu na zůstatek",
+        "deduction": "Odečtení",
+        "grant": "Přidělení kreditů",
+        "purchase": "Nákup"
+      },
+      "purchaseFallback": "Nákup kreditů",
+      "receipt": "Účtenka",
+      "receiptA11y": "Otevřít účtenku pro {{description}}",
+      "receiptUnavailable": "Pro tento nákup není účtenka k dispozici."
+    },
     "title": "Koupit kredity",
     "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",
     "nextExpiry": "Platnost kreditů v hodnotě {{amount}} vyprší {{date}} (UTC). Nejdříve se čerpají kredity s nejbližším datem vypršení.",
@@ -4200,6 +4247,9 @@
     "emptyTitle": "V tomto období žádné využití",
     "orgSelfNotice": "Vidíte své vlastní využití v této organizaci.",
     "viewDetails": "Zobrazit podrobnosti o využití"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Faktury za vaše vlastní nákupy se zde zobrazí po vyúčtování."
   },
   "cloudAgent": {
     "compute": {

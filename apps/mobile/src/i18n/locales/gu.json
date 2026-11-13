@@ -22,6 +22,9 @@
     "expired": "સમયસીમા સમાપ્ત"
   },
   "common": {
+    "creditHistory": "ક્રેડિટ ઇતિહાસ",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "રદ કરો",
@@ -118,6 +121,7 @@
     "copyLink": "લિંક કૉપિ કરો",
     "couldNotLoadOrganizations": "સંસ્થાઓ લોડ કરી શકાઈ નહીં.",
     "couldNotLoadSessions": "સત્રો લોડ કરી શકાયાં નહીં.",
+    "couldnTLoad": "લોડ કરી શકાયું નહીં.",
     "couldnTLoadMore": "વધુ લોડ કરી શકાયું નહીં.",
     "deviceSessions": "ઉપકરણનાં સત્રો",
     "disabled": "બંધ",
@@ -245,6 +249,10 @@
     "notAdded": "તમે સાઇન ઇન કરેલું છે. {{provider}} તમારા એકાઉન્ટમાં ઉમેરાયું નથી."
   },
   "profile": {
+    "creditHistorySubtitle": "ખરીદીઓ, રસીદો અને ક્રેડિટ પ્રવૃત્તિ",
+    "invoicesSubtitle": "તમારી ખરીદીઓના ઇન્વૉઇસ ડાઉનલોડ કરો",
+    "manageBilling": "kilo.ai પર બિલિંગ મેનેજ કરો",
+    "manageBillingIosNote": "ચુકવણી પદ્ધતિઓ, ઑટો ટૉપ-અપ અને બિલિંગ વિગતો kilo.ai પર મેનેજ થાય છે.",
     "codeReviewerSubtitle": "સ્વચાલિત PR સમીક્ષાઓ",
     "securityAgentSubtitle": "નબળાઈઓ શોધો અને ઠીક કરો",
     "reviews": "સમીક્ષાઓ",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "ફક્ત પહેલી {{displayCount}} ફાઇલો જોડવામાં આવશે."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "બિલિંગ ઇતિહાસ",
+      "billingHistoryEmpty": "હજી સુધી કોઈ બિલિંગ ઇતિહાસ નથી.",
+      "cancel": "સબ્સ્ક્રિપ્શન રદ કરો",
+      "cancelDescription": "તમારો Kilo Pass બિલિંગ સમયગાળાના અંત સુધી સક્રિય રહેશે અને રિન્યૂ થશે નહીં.",
+      "cancelScheduled": "{{date}}ના રોજ રદ થશે",
+      "cancelScheduledChange": "શેડ્યૂલ કરેલો ફેરફાર રદ કરો",
+      "cancelled": "સબ્સ્ક્રિપ્શન રદ કર્યું",
+      "changePlan": "kilo.ai પર પ્લાન બદલો",
+      "changePlanIosNote": "પેઇડ પ્લાનમાં ફેરફાર kilo.ai પર ઉપલબ્ધ છે.",
+      "creditHistoryEmpty": "હજી સુધી કોઈ Kilo Pass ક્રેડિટ નથી.",
+      "manageInStore": "{{store}}માં મેનેજ કરો",
+      "resume": "સબ્સ્ક્રિપ્શન ફરી શરૂ કરો",
+      "resumeCancelledDescription": "તમારો Kilo Pass ફરીથી ઑટોમેટિક રીતે રિન્યૂ થવા લાગશે.",
+      "resumePausedDescription": "તમારો Kilo Pass તેની શેડ્યૂલ કરેલી ફરી શરૂ થવાની તારીખ પહેલાં, હમણાં જ ફરી શરૂ થશે.",
+      "resumed": "સબ્સ્ક્રિપ્શન ફરી શરૂ થયું",
+      "scheduledChange": "શેડ્યૂલ કરેલો ફેરફાર",
+      "scheduledChangeCancelDescription": "તમારો Kilo Pass તેના વર્તમાન પ્લાન પર જ રહેશે અને હાલની જેમ જ રિન્યૂ થશે.",
+      "scheduledChangeSummary": "{{date}}ના રોજ {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass ઉપલબ્ધ નથી.",
     "couldNotLoad": "Kilo Pass લોડ કરી શકાયું નહીં. ફરી પ્રયાસ કરો.",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Config આયાત થઈ"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "ક્રેડિટ પ્રવૃત્તિ લોડ થઈ શકી નથી.",
+      "appStoreReceipt": "App Storeની રસીદ",
+      "deductionFallback": "ક્રેડિટ કપાત",
+      "emptyDescription": "ક્રેડિટ ખરીદીઓ, રસીદો અને વપરાશ અહીં દેખાશે.",
+      "emptyTitle": "કોઈ ક્રેડિટ ઇતિહાસ નથી",
+      "googlePlayReceipt": "Google Playની રસીદ",
+      "kind": {
+        "adjustment": "સમાયોજન",
+        "balanceNeutral": "બેલેન્સ પર અસર નહીં",
+        "deduction": "કપાત",
+        "grant": "ક્રેડિટ અનુદાન",
+        "purchase": "ખરીદી"
+      },
+      "purchaseFallback": "ક્રેડિટ ખરીદી",
+      "receipt": "રસીદ",
+      "receiptA11y": "{{description}}ની રસીદ ખોલો",
+      "receiptUnavailable": "આ ખરીદી માટે રસીદ ઉપલબ્ધ નથી."
+    },
     "title": "ક્રેડિટ ખરીદો",
     "description": "ક્રેડિટ એ Kilo એપમાં AI કોડિંગ સત્રો ચલાવવા માટે તમારા Kilo બેલેન્સમાં ઉમેરાતી એકવારની ખરીદી છે. સ્ટોર તમારા ખાતામાંથી ચાર્જ લે છે અને સ્ટોર ચુકવણીની પુષ્ટિ કર્યા પછી ક્રેડિટ ઉમેરાય છે.",
     "nextExpiry": "{{amount}}ના ક્રેડિટની મુદત {{date}} (UTC)ના રોજ પૂરી થાય છે. સૌથી વહેલી મુદત પૂરી થતા ક્રેડિટ પહેલા વપરાય છે.",
@@ -4070,6 +4117,9 @@
     "emptyTitle": "આ સમયગાળામાં કોઈ વપરાશ નથી",
     "orgSelfNotice": "તમે આ સંસ્થામાં તમારો પોતાનો વપરાશ જોઈ રહ્યા છો.",
     "viewDetails": "વપરાશની વિગતો જુઓ"
+  },
+  "invoices": {
+    "personalEmptyDescription": "તમને બિલ મોકલવામાં આવે પછી તમારી પોતાની ખરીદીઓના ઇન્વૉઇસ અહીં દેખાશે."
   },
   "cloudAgent": {
     "compute": {

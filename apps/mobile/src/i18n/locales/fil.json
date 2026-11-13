@@ -22,6 +22,9 @@
     "expired": "Nag-expire"
   },
   "common": {
+    "creditHistory": "Kasaysayan ng credit",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Kanselahin",
@@ -118,6 +121,7 @@
     "copyLink": "Kopyahin ang link",
     "couldNotLoadOrganizations": "Hindi ma-load ang mga organisasyon.",
     "couldNotLoadSessions": "Hindi ma-load ang mga sesyon.",
+    "couldnTLoad": "Hindi ma-load.",
     "couldnTLoadMore": "Hindi ma-load ang iba pa.",
     "deviceSessions": "Mga sesyon sa aparato",
     "disabled": "Naka-disable",
@@ -245,6 +249,10 @@
     "notAdded": "Naka-sign in ka na. Hindi naidagdag ang {{provider}} sa iyong account."
   },
   "profile": {
+    "creditHistorySubtitle": "Mga pagbili, resibo, at aktibidad ng credit",
+    "invoicesSubtitle": "I-download ang mga invoice ng iyong mga binili",
+    "manageBilling": "Pamahalaan ang billing sa kilo.ai",
+    "manageBillingIosNote": "Ang mga paraan ng pagbabayad, auto top-up, at mga detalye ng billing ay pinamamahalaan sa kilo.ai.",
     "codeReviewerSubtitle": "Awtomatikong pagsusuri ng PR",
     "securityAgentSubtitle": "Hanapin at ayusin ang mga kahinaan sa seguridad",
     "reviews": "Mga pagsusuri",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "Ang unang {{displayCount}} na file lang ang ilalakip."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Kasaysayan ng billing",
+      "billingHistoryEmpty": "Wala pang kasaysayan ng billing.",
+      "cancel": "Kanselahin ang subscription",
+      "cancelDescription": "Mananatiling aktibo ang iyong Kilo Pass hanggang sa katapusan ng billing period at hindi na ito magre-renew.",
+      "cancelScheduled": "Makakansela sa {{date}}",
+      "cancelScheduledChange": "Kanselahin ang nakaiskedyul na pagbabago",
+      "cancelled": "Nakansela na ang subscription",
+      "changePlan": "Palitan ang plan sa kilo.ai",
+      "changePlanIosNote": "Magagawa ang pagpapalit ng bayad na plan sa kilo.ai.",
+      "creditHistoryEmpty": "Wala pang Kilo Pass credit.",
+      "manageInStore": "Pamahalaan sa {{store}}",
+      "resume": "Ituloy ang subscription",
+      "resumeCancelledDescription": "Muling awtomatikong magre-renew ang iyong Kilo Pass.",
+      "resumePausedDescription": "Itutuloy na ngayon ang iyong Kilo Pass, bago ang nakaiskedyul na petsa ng pagtuloy nito.",
+      "resumed": "Naituloy na ang subscription",
+      "scheduledChange": "Nakaiskedyul na pagbabago",
+      "scheduledChangeCancelDescription": "Mananatili ang iyong Kilo Pass sa kasalukuyang plan nito at magre-renew gaya ng dati.",
+      "scheduledChangeSummary": "{{plan}} sa {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Hindi magagamit ang Kilo Pass.",
     "couldNotLoad": "Hindi ma-load ang Kilo Pass. Subukang muli.",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Na-import ang config"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Hindi ma-load ang aktibidad ng credit.",
+      "appStoreReceipt": "Resibo mula sa App Store",
+      "deductionFallback": "Bawas sa credit",
+      "emptyDescription": "Lalabas dito ang mga pagbili, resibo, at paggamit ng credit.",
+      "emptyTitle": "Walang kasaysayan ng credit",
+      "googlePlayReceipt": "Resibo mula sa Google Play",
+      "kind": {
+        "adjustment": "Adjustment",
+        "balanceNeutral": "Walang epekto sa balanse",
+        "deduction": "Bawas",
+        "grant": "Libreng credit",
+        "purchase": "Pagbili"
+      },
+      "purchaseFallback": "Pagbili ng credit",
+      "receipt": "Resibo",
+      "receiptA11y": "Buksan ang resibo para sa {{description}}",
+      "receiptUnavailable": "Walang available na resibo para sa pagbiling ito."
+    },
     "title": "Bumili ng kredito",
     "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",
     "nextExpiry": "Mawawalan ng bisa sa {{date}} (UTC) ang {{amount}} na kredito. Unang ginagamit ang mga kreditong pinakamaagang mawawalan ng bisa.",
@@ -4070,6 +4117,9 @@
     "emptyTitle": "Walang paggamit sa panahong ito",
     "orgSelfNotice": "Nakikita mo ang sarili mong paggamit sa organisasyong ito.",
     "viewDetails": "Tingnan ang detalye ng paggamit"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Lalabas dito ang mga invoice ng sarili mong mga binili kapag nasingil ka na."
   },
   "cloudAgent": {
     "compute": {

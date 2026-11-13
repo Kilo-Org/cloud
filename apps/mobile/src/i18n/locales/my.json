@@ -22,6 +22,9 @@
     "expired": "သက်တမ်းကုန်ပြီ"
   },
   "common": {
+    "creditHistory": "ခရက်ဒစ် မှတ်တမ်း",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": "။ ",
     "listJoiner": "၊ ",
     "cancel": "ပယ်ဖျက်ပါ",
@@ -118,6 +121,7 @@
     "copyLink": "လင့်ခ်ကို ကူးယူပါ",
     "couldNotLoadOrganizations": "အဖွဲ့အစည်းများကို မရယူနိုင်ပါ။",
     "couldNotLoadSessions": "ဆက်ရှင်များကို မရယူနိုင်ပါ။",
+    "couldnTLoad": "မရယူနိုင်ပါ။",
     "couldnTLoadMore": "နောက်ထပ် မရယူနိုင်ပါ။",
     "deviceSessions": "စက်ပစ္စည်း ဆက်ရှင်များ",
     "disabled": "ပိတ်ထား",
@@ -245,6 +249,10 @@
     "notAdded": "သင် အကောင့်ဝင်ပြီးပါပြီ။ {{provider}} ကို သင့်အကောင့်တွင် မထည့်ရသေးပါ။"
   },
   "profile": {
+    "creditHistorySubtitle": "ဝယ်ယူမှုများ၊ ပြေစာများနှင့် ခရက်ဒစ် လှုပ်ရှားမှုများ",
+    "invoicesSubtitle": "သင့်ဝယ်ယူမှုများအတွက် ငွေတောင်းခံလွှာများကို ဒေါင်းလုဒ်လုပ်ပါ",
+    "manageBilling": "kilo.ai တွင် ငွေပေးချေမှုကို စီမံရန်",
+    "manageBillingIosNote": "ငွေပေးချေနည်းလမ်းများ၊ အလိုအလျောက် ငွေဖြည့်ခြင်းနှင့် ငွေတောင်းခံမှု အသေးစိတ်များကို kilo.ai တွင် စီမံပါသည်။",
     "codeReviewerSubtitle": "အလိုအလျောက် PR သုံးသပ်မှုများ",
     "securityAgentSubtitle": "အားနည်းချက်များကို ရှာဖွေပြီး ပြုပြင်ပါ",
     "reviews": "သုံးသပ်မှုများ",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "ပထမဆုံးဖိုင် {{displayCount}} ခုကိုသာ ပူးတွဲပါမည်။"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "ငွေတောင်းခံမှု မှတ်တမ်း",
+      "billingHistoryEmpty": "ငွေတောင်းခံမှု မှတ်တမ်း မရှိသေးပါ။",
+      "cancel": "စာရင်းသွင်းမှုကို ပယ်ဖျက်ရန်",
+      "cancelDescription": "သင့် Kilo Pass သည် ငွေတောင်းခံကာလ ကုန်ဆုံးသည်အထိ ဆက်လက်အသုံးပြုနိုင်ပြီး သက်တမ်းတိုးမည် မဟုတ်ပါ။",
+      "cancelScheduled": "{{date}} တွင် ပယ်ဖျက်မည်",
+      "cancelScheduledChange": "စီစဉ်ထားသော ပြောင်းလဲမှုကို ပယ်ဖျက်ရန်",
+      "cancelled": "စာရင်းသွင်းမှုကို ပယ်ဖျက်ပြီးပါပြီ",
+      "changePlan": "kilo.ai တွင် အစီအစဉ် ပြောင်းရန်",
+      "changePlanIosNote": "အခပေး အစီအစဉ် ပြောင်းလဲမှုများကို kilo.ai တွင် ပြုလုပ်နိုင်ပါသည်။",
+      "creditHistoryEmpty": "Kilo Pass ခရက်ဒစ်များ မရှိသေးပါ။",
+      "manageInStore": "{{store}} တွင် စီမံရန်",
+      "resume": "စာရင်းသွင်းမှုကို ပြန်စရန်",
+      "resumeCancelledDescription": "သင့် Kilo Pass သည် အလိုအလျောက် ပြန်လည် သက်တမ်းတိုးပါမည်။",
+      "resumePausedDescription": "သင့် Kilo Pass သည် စီစဉ်ထားသော ပြန်စမည့်ရက် မတိုင်မီ ယခုပင် ပြန်စပါမည်။",
+      "resumed": "စာရင်းသွင်းမှု ပြန်စပြီးပါပြီ",
+      "scheduledChange": "စီစဉ်ထားသော ပြောင်းလဲမှု",
+      "scheduledChangeCancelDescription": "သင့် Kilo Pass သည် လက်ရှိအစီအစဉ်အတိုင်း ဆက်ရှိပြီး ယခုအတိုင်း သက်တမ်းတိုးပါမည်။",
+      "scheduledChangeSummary": "{{date}} တွင် {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass ကို အသုံးပြု၍ မရပါ။",
     "couldNotLoad": "Kilo Pass ကို မဖွင့်နိုင်ပါ။ ထပ်ကြိုးစားပါ။",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Config တင်သွင်းပြီးပါပြီ"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "ခရက်ဒစ် လှုပ်ရှားမှုကို ဖွင့်၍ မရပါ။",
+      "appStoreReceipt": "App Store မှ ပြေစာ",
+      "deductionFallback": "ခရက်ဒစ် နုတ်ယူမှု",
+      "emptyDescription": "ခရက်ဒစ် ဝယ်ယူမှုများ၊ ပြေစာများနှင့် အသုံးပြုမှုများ ဤနေရာတွင် ပေါ်လာပါမည်။",
+      "emptyTitle": "ခရက်ဒစ် မှတ်တမ်း မရှိပါ",
+      "googlePlayReceipt": "Google Play မှ ပြေစာ",
+      "kind": {
+        "adjustment": "ချိန်ညှိမှု",
+        "balanceNeutral": "လက်ကျန် မပြောင်းလဲ",
+        "deduction": "နုတ်ယူမှု",
+        "grant": "ခရက်ဒစ် ပေးအပ်မှု",
+        "purchase": "ဝယ်ယူမှု"
+      },
+      "purchaseFallback": "ခရက်ဒစ် ဝယ်ယူမှု",
+      "receipt": "ပြေစာ",
+      "receiptA11y": "{{description}} အတွက် ပြေစာကို ဖွင့်ရန်",
+      "receiptUnavailable": "ဤဝယ်ယူမှုအတွက် ပြေစာ မရရှိနိုင်ပါ။"
+    },
     "title": "ခရက်ဒစ်များ ဝယ်ယူပါ",
     "description": "ခရက်ဒစ်များသည် Kilo App တွင် AI ကုဒ်ရေးခြင်း စက်ရှင်များ လုပ်ဆောင်ရန် သင့် Kilo လက်ကျန်ထဲသို့ ထည့်သွင်းသည့် တစ်ကြိမ်တည်း ဝယ်ယူမှုဖြစ်သည်။ စတိုးသည် သင့်အကောင့်မှ ကောက်ခံပြီး စတိုးမှ ငွေပေးချေမှုကို အတည်ပြုပြီးနောက် ခရက်ဒစ်များ ထည့်သွင်းသည်။",
     "nextExpiry": "ခရက်ဒစ် {{amount}} သည် {{date}} (UTC) တွင် သက်တမ်းကုန်ပါမည်။ သက်တမ်းအစောဆုံးကုန်မည့် ခရက်ဒစ်များကို ဦးစွာ အသုံးပြုပါသည်။",
@@ -4070,6 +4117,9 @@
     "emptyTitle": "ဤကာလအတွင်း အသုံးပြုမှု မရှိပါ",
     "orgSelfNotice": "ဤအဖွဲ့အစည်းအတွင်း သင့်ကိုယ်ပိုင် အသုံးပြုမှုကို ကြည့်နေသည်။",
     "viewDetails": "အသုံးပြုမှု အသေးစိတ် ကြည့်ရန်"
+  },
+  "invoices": {
+    "personalEmptyDescription": "သင်ကိုယ်တိုင် ဝယ်ယူမှုများအတွက် ငွေတောင်းခံလွှာများသည် ငွေတောင်းခံပြီးသည်နှင့် ဤနေရာတွင် ပေါ်လာပါမည်။"
   },
   "cloudAgent": {
     "compute": {

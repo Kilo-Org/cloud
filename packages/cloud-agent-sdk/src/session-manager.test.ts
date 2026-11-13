@@ -3790,6 +3790,30 @@ describe('createSessionManager', () => {
       expect(persistPendingSendConfirmation).not.toHaveBeenCalled();
     });
 
+    it('keeps the server reason on the error indicator for an unmapped code', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.send.mockRejectedValueOnce(
+        Object.assign(new Error('Sandbox eviction in progress'), {
+          data: { code: 'SANDBOX_EVICTED', httpStatus: 500 },
+        })
+      );
+      await expect(
+        mgr.send({ payload: { type: 'prompt', prompt: 'Still there?', mode: 'code' } })
+      ).resolves.toBe(false);
+
+      expect(config.store.get(mgr.atoms.statusIndicator)).toEqual(
+        expect.objectContaining({
+          type: 'error',
+          message: 'Something went wrong. Please retry in a moment.',
+          code: 'generic-error',
+          detail: 'Sandbox eviction in progress',
+        })
+      );
+    });
+
     it('records no pending confirmation for a refusal the server answered', async () => {
       const persistPendingSendConfirmation = jest.fn();
       const config = createMockConfig({ persistPendingSendConfirmation });

@@ -119,6 +119,11 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Platform: { OS: 'android' },
+  // The session route's system Back listener registers on mount. These tests
+  // never press Android Back, so the subscription stays inert.
+  BackHandler: {
+    addEventListener: () => ({ remove: () => undefined }),
+  },
   // The header reads the window to decide whether its actions share the title
   // row; this phone is wide enough for them to.
   useWindowDimensions: () => ({ width: 390, fontScale: 1, height: 844 }),
@@ -178,6 +183,11 @@ vi.mock('expo-router', () => ({
   useLocalSearchParams: useLocalSearchParamsMock,
   useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   useRouter: useRouterMock,
+  // The session route's Back listener runs while the route is focused, which
+  // for these tests is its mount lifetime.
+  useFocusEffect: (effect: () => undefined | (() => void)) => {
+    useEffect(effect, [effect]);
+  },
 }));
 
 vi.mock('@tanstack/react-query', async importOriginal => ({

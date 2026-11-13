@@ -22,6 +22,9 @@
     "expired": "గడువు ముగిసింది"
   },
   "common": {
+    "creditHistory": "క్రెడిట్ చరిత్ర",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "రద్దు చేయండి",
@@ -118,6 +121,7 @@
     "copyLink": "లింక్ కాపీ చేయండి",
     "couldNotLoadOrganizations": "సంస్థలను లోడ్ చేయలేకపోయాం.",
     "couldNotLoadSessions": "సెషన్‌లను లోడ్ చేయలేకపోయాం.",
+    "couldnTLoad": "లోడ్ చేయలేకపోయాం.",
     "couldnTLoadMore": "మరిన్ని లోడ్ చేయలేకపోయాం.",
     "deviceSessions": "పరికర సెషన్‌లు",
     "disabled": "నిలిపివేశారు",
@@ -245,6 +249,10 @@
     "notAdded": "మీరు సైన్ ఇన్ చేశారు. {{provider}} మీ ఖాతాకు జోడించబడలేదు."
   },
   "profile": {
+    "creditHistorySubtitle": "కొనుగోళ్లు, రసీదులు మరియు క్రెడిట్ కార్యకలాపాలు",
+    "invoicesSubtitle": "మీ కొనుగోళ్ల ఇన్‌వాయిస్‌లను డౌన్‌లోడ్ చేయండి",
+    "manageBilling": "kilo.aiలో బిల్లింగ్‌ను నిర్వహించండి",
+    "manageBillingIosNote": "చెల్లింపు పద్ధతులు, ఆటో టాప్-అప్ మరియు బిల్లింగ్ వివరాలు kilo.aiలో నిర్వహించబడతాయి.",
     "codeReviewerSubtitle": "స్వయంచాలక PR సమీక్షలు",
     "securityAgentSubtitle": "భద్రతా లోపాలను కనుగొని పరిష్కరించండి",
     "reviews": "సమీక్షలు",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "మొదటి {{displayCount}} ఫైళ్లను మాత్రమే జత చేస్తాము."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "బిల్లింగ్ చరిత్ర",
+      "billingHistoryEmpty": "ఇంకా బిల్లింగ్ చరిత్ర ఏదీ లేదు.",
+      "cancel": "సబ్‌స్క్రిప్షన్‌ను రద్దు చేయండి",
+      "cancelDescription": "మీ Kilo Pass బిల్లింగ్ వ్యవధి ముగిసే వరకు యాక్టివ్‌గా ఉంటుంది, ఆ తర్వాత పునరుద్ధరించబడదు.",
+      "cancelScheduled": "{{date}}న రద్దవుతుంది",
+      "cancelScheduledChange": "షెడ్యూల్ చేసిన మార్పును రద్దు చేయండి",
+      "cancelled": "సబ్‌స్క్రిప్షన్ రద్దు చేయబడింది",
+      "changePlan": "kilo.aiలో ప్లాన్ మార్చండి",
+      "changePlanIosNote": "చెల్లింపు ప్లాన్ మార్పులు kilo.aiలో అందుబాటులో ఉన్నాయి.",
+      "creditHistoryEmpty": "ఇంకా Kilo Pass క్రెడిట్‌లు ఏవీ లేవు.",
+      "manageInStore": "{{store}}లో నిర్వహించండి",
+      "resume": "సబ్‌స్క్రిప్షన్‌ను పునఃప్రారంభించండి",
+      "resumeCancelledDescription": "మీ Kilo Pass మళ్లీ ఆటోమేటిక్‌గా పునరుద్ధరించబడటం ప్రారంభమవుతుంది.",
+      "resumePausedDescription": "మీ Kilo Pass షెడ్యూల్ చేసిన పునఃప్రారంభ తేదీ కంటే ముందే, ఇప్పుడే పునఃప్రారంభమవుతుంది.",
+      "resumed": "సబ్‌స్క్రిప్షన్ పునఃప్రారంభించబడింది",
+      "scheduledChange": "షెడ్యూల్ చేసిన మార్పు",
+      "scheduledChangeCancelDescription": "మీ Kilo Pass ప్రస్తుత ప్లాన్‌లోనే కొనసాగుతుంది మరియు ఇప్పటిలాగే పునరుద్ధరించబడుతుంది.",
+      "scheduledChangeSummary": "{{date}}న {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass అందుబాటులో లేదు.",
     "couldNotLoad": "Kilo Passని లోడ్ చేయలేకపోయాము. మళ్లీ ప్రయత్నించండి.",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "కాన్ఫిగ్ ఇంపోర్ట్ చేయబడింది"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "క్రెడిట్ యాక్టివిటీని లోడ్ చేయలేకపోయాం.",
+      "appStoreReceipt": "App Store నుండి రసీదు",
+      "deductionFallback": "క్రెడిట్ తగ్గింపు",
+      "emptyDescription": "క్రెడిట్ కొనుగోళ్లు, రసీదులు మరియు వినియోగం ఇక్కడ కనిపిస్తాయి.",
+      "emptyTitle": "క్రెడిట్ చరిత్ర లేదు",
+      "googlePlayReceipt": "Google Play నుండి రసీదు",
+      "kind": {
+        "adjustment": "సర్దుబాటు",
+        "balanceNeutral": "బ్యాలెన్స్‌పై ప్రభావం లేదు",
+        "deduction": "తగ్గింపు",
+        "grant": "క్రెడిట్ మంజూరు",
+        "purchase": "కొనుగోలు"
+      },
+      "purchaseFallback": "క్రెడిట్ కొనుగోలు",
+      "receipt": "రసీదు",
+      "receiptA11y": "{{description}} కోసం రసీదును తెరవండి",
+      "receiptUnavailable": "ఈ కొనుగోలుకు రసీదు అందుబాటులో లేదు."
+    },
     "title": "క్రెడిట్‌లు కొనండి",
     "description": "క్రెడిట్‌లు అనేవి Kilo యాప్‌లో AI కోడింగ్ సెషన్‌లను నడపడానికి మీ Kilo బ్యాలెన్స్‌కు జోడించే ఒక-సారి కొనుగోలు. స్టోర్ మీ ఖాతా నుండి ఛార్జ్ చేస్తుంది మరియు స్టోర్ చెల్లింపును నిర్ధారించిన తర్వాత క్రెడిట్‌లు జోడించబడతాయి.",
     "nextExpiry": "{{amount}} క్రెడిట్ల గడువు {{date}} (UTC)న ముగుస్తుంది. ముందుగా గడువు ముగిసే క్రెడిట్లు ముందుగా ఉపయోగించబడతాయి.",
@@ -4070,6 +4117,9 @@
     "emptyTitle": "ఈ వ్యవధిలో వినియోగం లేదు",
     "orgSelfNotice": "మీరు ఈ సంస్థలో మీ స్వంత వినియోగాన్ని చూస్తున్నారు.",
     "viewDetails": "వినియోగ వివరాలను చూడండి"
+  },
+  "invoices": {
+    "personalEmptyDescription": "మీకు బిల్ చేయబడిన తర్వాత, మీ స్వంత కొనుగోళ్ల ఇన్‌వాయిస్‌లు ఇక్కడ కనిపిస్తాయి."
   },
   "cloudAgent": {
     "compute": {

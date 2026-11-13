@@ -22,6 +22,9 @@
     "expired": "Kedaluwarsa"
   },
   "common": {
+    "creditHistory": "Riwayat kredit",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Batal",
@@ -118,6 +121,7 @@
     "copyLink": "Salin tautan",
     "couldNotLoadOrganizations": "Tidak dapat memuat organisasi.",
     "couldNotLoadSessions": "Tidak dapat memuat sesi.",
+    "couldnTLoad": "Tidak dapat memuat data.",
     "couldnTLoadMore": "Tidak dapat memuat lebih banyak data.",
     "deviceSessions": "Sesi perangkat",
     "disabled": "Nonaktif",
@@ -245,6 +249,10 @@
     "notAdded": "Kamu sudah masuk. {{provider}} tidak ditambahkan ke akunmu."
   },
   "profile": {
+    "creditHistorySubtitle": "Pembelian, tanda terima, dan aktivitas kredit",
+    "invoicesSubtitle": "Unduh faktur untuk pembelian Anda",
+    "manageBilling": "Kelola penagihan di kilo.ai",
+    "manageBillingIosNote": "Metode pembayaran, isi ulang otomatis, dan detail penagihan dikelola di kilo.ai.",
     "codeReviewerSubtitle": "Tinjauan PR otomatis",
     "securityAgentSubtitle": "Temukan dan perbaiki kerentanan",
     "reviews": "Tinjauan",
@@ -2318,6 +2326,26 @@
     "onlyFirstFilesAttached_other": "Hanya {{displayCount}} file pertama yang akan dilampirkan."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Riwayat penagihan",
+      "billingHistoryEmpty": "Belum ada riwayat penagihan.",
+      "cancel": "Batalkan langganan",
+      "cancelDescription": "Kilo Pass Anda tetap aktif hingga akhir periode penagihan dan tidak akan diperpanjang.",
+      "cancelScheduled": "Berakhir pada {{date}}",
+      "cancelScheduledChange": "Batalkan perubahan terjadwal",
+      "cancelled": "Langganan dibatalkan",
+      "changePlan": "Ubah paket di kilo.ai",
+      "changePlanIosNote": "Perubahan paket berbayar tersedia di kilo.ai.",
+      "creditHistoryEmpty": "Belum ada kredit Kilo Pass.",
+      "manageInStore": "Kelola di {{store}}",
+      "resume": "Lanjutkan langganan",
+      "resumeCancelledDescription": "Kilo Pass Anda akan kembali diperpanjang secara otomatis.",
+      "resumePausedDescription": "Kilo Pass Anda dilanjutkan sekarang, sebelum tanggal lanjutan yang dijadwalkan.",
+      "resumed": "Langganan dilanjutkan",
+      "scheduledChange": "Perubahan terjadwal",
+      "scheduledChangeCancelDescription": "Kilo Pass Anda tetap menggunakan paket saat ini dan diperpanjang seperti biasa.",
+      "scheduledChangeSummary": "{{plan}} pada {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass tidak tersedia.",
     "couldNotLoad": "Kilo Pass tidak dapat dimuat. Coba lagi.",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Config diimpor"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Aktivitas kredit gagal dimuat.",
+      "appStoreReceipt": "Tanda terima dari App Store",
+      "deductionFallback": "Pengurangan kredit",
+      "emptyDescription": "Pembelian kredit, tanda terima, dan penggunaan akan muncul di sini.",
+      "emptyTitle": "Tidak ada riwayat kredit",
+      "googlePlayReceipt": "Tanda terima dari Google Play",
+      "kind": {
+        "adjustment": "Penyesuaian",
+        "balanceNeutral": "Saldo tetap",
+        "deduction": "Pengurangan",
+        "grant": "Kredit gratis",
+        "purchase": "Pembelian"
+      },
+      "purchaseFallback": "Pembelian kredit",
+      "receipt": "Tanda terima",
+      "receiptA11y": "Buka tanda terima untuk {{description}}",
+      "receiptUnavailable": "Tanda terima tidak tersedia untuk pembelian ini."
+    },
     "title": "Beli kredit",
     "description": "Kredit adalah pembelian satu kali yang ditambahkan ke saldo Kilo Anda untuk menjalankan sesi coding AI di Kilo App. Toko menagih akun Anda dan kredit ditambahkan setelah toko mengonfirmasi pembayaran.",
     "nextExpiry": "Kredit senilai {{amount}} akan kedaluwarsa pada {{date}} (UTC). Kredit dengan masa berlaku paling awal digunakan lebih dulu.",
@@ -4070,6 +4117,9 @@
     "emptyTitle": "Tidak ada penggunaan pada periode ini",
     "orgSelfNotice": "Anda melihat penggunaan Anda sendiri di organisasi ini.",
     "viewDetails": "Lihat detail penggunaan"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Faktur untuk pembelian pribadi Anda akan muncul di sini setelah Anda ditagih."
   },
   "cloudAgent": {
     "compute": {

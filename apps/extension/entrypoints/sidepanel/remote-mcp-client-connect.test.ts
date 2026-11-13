@@ -15,8 +15,12 @@ const mocks = vi.hoisted(() => {
   const finishAuth = vi.fn<(code: string) => Promise<void>>();
   // Captures args passed to new StreamableHTTPClientTransport(url, opts)
   const transportCalls: { opts: TransportOpts; url: URL }[] = [];
+  const launchWebAuthFlow = vi.fn<() => Promise<string | undefined>>(() =>
+    // eslint-disable-next-line promise/prefer-await-to-then
+    Promise.resolve('https://abc.chromiumapp.org/remote-mcp?code=x')
+  );
 
-  return { close, connect, finishAuth, listTools, transportCalls };
+  return { close, connect, finishAuth, launchWebAuthFlow, listTools, transportCalls };
 });
 
 // eslint-disable-next-line vitest/prefer-import-in-mock, jest/no-untyped-mock-factory
@@ -35,8 +39,7 @@ vi.mock('#imports', () => ({
   browser: {
     identity: {
       getRedirectURL: () => 'https://abc.chromiumapp.org/remote-mcp',
-      // eslint-disable-next-line promise/prefer-await-to-then
-      launchWebAuthFlow: () => Promise.resolve('https://abc.chromiumapp.org/remote-mcp?code=x'),
+      launchWebAuthFlow: mocks.launchWebAuthFlow,
     },
   },
 }));
@@ -212,10 +215,10 @@ describe('remote MCP server connection', () => {
     expect(new Date(result.lastConnectedAt!).getTime()).toBeGreaterThanOrEqual(before);
   });
 
-  it('maps StreamableHTTPError code 401 to needs_auth', async () => {
+  it('maps StreamableHTTPError code 401 to needs_auth with a credentials message', async () => {
     const { StreamableHTTPError } =
       await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
-    mocks.connect.mockRejectedValueOnce(new StreamableHTTPError(401, 'Unauthorized'));
+    mocks.connect.mockRejectedValueOnce(new StreamableHTTPError(401, 'Error POSTing to endpoint:'));
     mocks.close.mockResolvedValueOnce();
 
     const result = await connectRemoteMcpServer({
@@ -224,8 +227,43 @@ describe('remote MCP server connection', () => {
     });
 
     expect(result.status).toBe('needs_auth');
-    expect(result.lastError).toContain('401');
+    // The row must say what is missing, never a bare status code or transport scaffolding.
+    expect(result.lastError).toBe(
+      'This server needs credentials. Add a bearer token, a custom header, or OAuth in Edit.'
+    );
     expect(result.cachedTools).toHaveLength(0);
+  });
+
+  it('reports a network failure as unreachable rather than a raw fetch error', async () => {
+    mocks.connect.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    mocks.close.mockResolvedValueOnce();
+
+    const result = await connectRemoteMcpServer({
+      fetch: noopFetch,
+      server: baseServer(),
+    });
+
+    expect(result.status).toBe('unavailable');
+    expect(result.lastError).toBe(
+      "Kilo couldn't reach this server. Check the URL and that the server is running."
+    );
+  });
+
+  it('keeps the server reason on a server error', async () => {
+    const { StreamableHTTPError } =
+      await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
+    mocks.connect.mockRejectedValueOnce(
+      new StreamableHTTPError(500, 'Error POSTing to endpoint: internal boom')
+    );
+    mocks.close.mockResolvedValueOnce();
+
+    const result = await connectRemoteMcpServer({
+      fetch: noopFetch,
+      server: baseServer(),
+    });
+
+    expect(result.status).toBe('unavailable');
+    expect(result.lastError).toBe('The server is busy. Try again in a moment. internal boom');
   });
 
   it('maps non-401 errors to unavailable', async () => {
@@ -334,5 +372,27 @@ describe('remote MCP server connection', () => {
     });
 
     expect(result.status).toBe('needs_auth');
+    // An OAuth server that reported unauthorized without handing back a code did not finish signing in.
+    expect(result.lastError).toBe('Sign-in did not complete. Start it again with Connect.');
+  });
+
+  it('says the sign-in did not complete when the browser flow is closed', async () => {
+    const oauthServer = baseServer({ auth: { type: 'oauth' } });
+    mocks.launchWebAuthFlow.mockRejectedValueOnce(new Error('The user did not approve access.'));
+    mocks.connect.mockImplementationOnce(async () => {
+      await lastTransportCall().opts.authProvider?.redirectToAuthorization(
+        new URL('https://auth.example.com/authorize')
+      );
+    });
+    mocks.close.mockResolvedValueOnce();
+
+    const result = await connectRemoteMcpServer({
+      fetch: noopFetch,
+      server: oauthServer,
+      storageArea: { getItem: () => ({ servers: [oauthServer] }), setItem: () => {} },
+    });
+
+    expect(result.status).toBe('needs_auth');
+    expect(result.lastError).toBe('Sign-in did not complete. Start it again with Connect.');
   });
 });

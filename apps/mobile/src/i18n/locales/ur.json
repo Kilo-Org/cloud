@@ -22,6 +22,9 @@
     "expired": "میعاد ختم ہو گئی"
   },
   "common": {
+    "creditHistory": "کریڈٹ کی تاریخچہ",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": "۔ ",
     "listJoiner": "، ",
     "cancel": "منسوخ کریں",
@@ -118,6 +121,7 @@
     "copyLink": "لنک کاپی کریں",
     "couldNotLoadOrganizations": "تنظیمیں لوڈ نہیں ہو سکیں۔",
     "couldNotLoadSessions": "سیشنز لوڈ نہیں ہو سکے۔",
+    "couldnTLoad": "لوڈ نہیں ہو سکا۔",
     "couldnTLoadMore": "مزید لوڈ نہیں ہو سکا۔",
     "deviceSessions": "ڈیوائس کے سیشنز",
     "disabled": "غیر فعال",
@@ -245,6 +249,10 @@
     "notAdded": "آپ سائن ان ہو چکے ہیں۔ {{provider}} آپ کے اکاؤنٹ میں شامل نہیں کیا گیا۔"
   },
   "profile": {
+    "creditHistorySubtitle": "خریداریاں، رسیدیں اور کریڈٹ کی سرگرمی",
+    "invoicesSubtitle": "اپنی خریداریوں کے انوائسز ڈاؤن لوڈ کریں",
+    "manageBilling": "kilo.ai پر بلنگ کا انتظام کریں",
+    "manageBillingIosNote": "ادائیگی کے طریقے، خودکار ٹاپ اپ اور بلنگ کی تفصیلات کا انتظام kilo.ai پر ہوتا ہے۔",
     "codeReviewerSubtitle": "خودکار PR جائزے",
     "securityAgentSubtitle": "کمزوریاں تلاش کریں اور دور کریں",
     "reviews": "جائزے",
@@ -2860,6 +2868,26 @@
     "onlyFirstFilesAttached_other": "صرف پہلی {{displayCount}} فائلیں منسلک ہوں گی۔"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "بلنگ کی تاریخچہ",
+      "billingHistoryEmpty": "ابھی تک بلنگ کی کوئی تاریخچہ نہیں۔",
+      "cancel": "سبسکرپشن منسوخ کریں",
+      "cancelDescription": "آپ کا Kilo Pass بلنگ کی مدت کے اختتام تک فعال رہے گا اور اس کی تجدید نہیں ہوگی۔",
+      "cancelScheduled": "{{date}} کو منسوخ ہو جائے گی",
+      "cancelScheduledChange": "طے شدہ تبدیلی منسوخ کریں",
+      "cancelled": "سبسکرپشن منسوخ ہو گئی",
+      "changePlan": "kilo.ai پر پلان تبدیل کریں",
+      "changePlanIosNote": "ادا شدہ پلان میں تبدیلیاں kilo.ai پر دستیاب ہیں۔",
+      "creditHistoryEmpty": "ابھی تک کوئی Kilo Pass کریڈٹس نہیں۔",
+      "manageInStore": "{{store}} میں انتظام کریں",
+      "resume": "سبسکرپشن دوبارہ شروع کریں",
+      "resumeCancelledDescription": "آپ کے Kilo Pass کی تجدید دوبارہ خودکار طور پر ہونے لگے گی۔",
+      "resumePausedDescription": "آپ کا Kilo Pass اپنی طے شدہ تاریخ سے پہلے، ابھی دوبارہ شروع ہو جائے گا۔",
+      "resumed": "سبسکرپشن دوبارہ شروع ہو گئی",
+      "scheduledChange": "طے شدہ تبدیلی",
+      "scheduledChangeCancelDescription": "آپ کا Kilo Pass اپنے موجودہ پلان پر رہے گا اور اس کی تجدید پہلے کی طرح ہوتی رہے گی۔",
+      "scheduledChangeSummary": "{{date}} کو {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass دستیاب نہیں ہے۔",
     "couldNotLoad": "Kilo Pass لوڈ نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
@@ -3874,6 +3902,25 @@
     "importConfigApplied": "Config درآمد ہو گئی"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "کریڈٹ کی سرگرمی لوڈ نہیں ہو سکی۔",
+      "appStoreReceipt": "App Store کی رسید",
+      "deductionFallback": "کریڈٹ کی کٹوتی",
+      "emptyDescription": "کریڈٹ کی خریداریاں، رسیدیں اور استعمال یہاں نظر آئیں گے۔",
+      "emptyTitle": "کریڈٹ کی کوئی تاریخچہ نہیں",
+      "googlePlayReceipt": "Google Play کی رسید",
+      "kind": {
+        "adjustment": "ترمیم",
+        "balanceNeutral": "بیلنس پر اثر نہیں",
+        "deduction": "کٹوتی",
+        "grant": "مفت کریڈٹ",
+        "purchase": "خریداری"
+      },
+      "purchaseFallback": "کریڈٹ کی خریداری",
+      "receipt": "رسید",
+      "receiptA11y": "{{description}} کی رسید کھولیں",
+      "receiptUnavailable": "اس خریداری کی رسید دستیاب نہیں ہے۔"
+    },
     "title": "کریڈٹس خریدیں",
     "description": "کریڈٹس ایک بار کی خریداری ہیں جو Kilo App میں AI کوڈنگ سیشن چلانے کے لیے آپ کے Kilo بیلنس میں شامل کیے جاتے ہیں۔ اسٹور آپ کے اکاؤنٹ سے رقم وصول کرتا ہے اور اسٹور کے ادائیگی کی تصدیق کرنے کے بعد کریڈٹس شامل کیے جاتے ہیں۔",
     "nextExpiry": "{{amount}} کے کریڈٹس کی میعاد {{date}} (UTC) کو ختم ہو رہی ہے۔ سب سے پہلے میعاد ختم ہونے والے کریڈٹس پہلے استعمال ہوتے ہیں۔",
@@ -4070,6 +4117,9 @@
     "emptyTitle": "اس مدت میں کوئی استعمال نہیں",
     "orgSelfNotice": "آپ اس تنظیم میں اپنا استعمال دیکھ رہے ہیں۔",
     "viewDetails": "استعمال کی تفصیلات دیکھیں"
+  },
+  "invoices": {
+    "personalEmptyDescription": "بل بننے کے بعد آپ کی اپنی خریداریوں کے انوائسز یہاں نظر آئیں گے۔"
   },
   "cloudAgent": {
     "compute": {

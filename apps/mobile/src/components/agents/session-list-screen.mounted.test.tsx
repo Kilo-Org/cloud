@@ -323,7 +323,6 @@ vi.mock('@/components/agents/session-list-search-header', async () => {
     },
   };
 });
-vi.mock('@/components/context-picker-sheet', () => ({ ContextPickerSheet: 'ContextPickerSheet' }));
 vi.mock('@/components/agents/platform-filter-modal', async importOriginal => ({
   ...(await importOriginal<typeof PlatformFilterModule>()),
   SessionFilterModal: 'SessionFilterModal',

@@ -13,6 +13,11 @@ import { describeFetchError } from './error-notice';
 import type { DescribedFetchError } from './error-notice';
 
 const pollIntervalMs = 3000;
+const maxPollBackoffMs = 30_000;
+
+/** A failed poll is transient until the request expires, so polling continues with bounded backoff. */
+export const pollDelayMs = (failedPolls: number): number =>
+  Math.min(pollIntervalMs * 2 ** failedPolls, maxPollBackoffMs);
 
 export type { DescribedFetchError };
 
@@ -77,7 +82,8 @@ export const useDeviceSignIn = ({
       });
     },
     queryKey: ['side-panel', 'device-auth', pendingAuthRequest?.code ?? 'idle'],
-    refetchInterval: pendingAuthRequest === undefined ? false : pollIntervalMs,
+    refetchInterval: query =>
+      pendingAuthRequest === undefined ? false : pollDelayMs(query.state.fetchFailureCount),
   });
 
   useEffect(() => {
@@ -115,13 +121,6 @@ export const useDeviceSignIn = ({
     reportError,
     reportMessage,
   ]);
-
-  useEffect(() => {
-    if (devicePollQuery.isError) {
-      setPendingAuthRequest(undefined);
-      reportMessage('Sign in failed. Try again.');
-    }
-  }, [devicePollQuery.isError, reportMessage]);
 
   useEffect(() => {
     if (pendingAuthRequest === undefined) {

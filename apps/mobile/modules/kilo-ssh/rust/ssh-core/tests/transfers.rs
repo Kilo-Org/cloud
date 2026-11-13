@@ -301,6 +301,21 @@ async fn a_remote_forward_reaches_a_device_server() {
         .await
         .expect("remote forward");
     assert_eq!(forward.actual_port(), bind_port);
+    let duplicate = session
+        .start_remote_forward(
+            ForwardConfig {
+                bind_host: "0.0.0.0".into(),
+                bind_port,
+                dest_host: "127.0.0.1".into(),
+                dest_port: echo_port,
+            },
+            Arc::clone(&events) as Arc<dyn ForwardSink>,
+        )
+        .await;
+    match duplicate {
+        Err(error) => assert_eq!(error.category(), "Forwarding"),
+        Ok(_) => panic!("duplicate remote forward succeeded"),
+    }
 
     let mut stream = tokio::net::TcpStream::connect((server.host.as_str(), bind_port))
         .await

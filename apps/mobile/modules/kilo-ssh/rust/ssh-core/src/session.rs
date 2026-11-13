@@ -690,14 +690,14 @@ impl russh::client::Handler for ClientHandler {
     async fn server_channel_open_forwarded_tcpip(
         &mut self,
         channel: Channel<Msg>,
-        _connected_address: &str,
+        connected_address: &str,
         connected_port: u32,
         _originator_address: &str,
         _originator_port: u32,
         reply: ChannelOpenHandle,
         _session: &mut Session,
     ) -> Result<(), Self::Error> {
-        let Some(destination) = self.forwards.destination(connected_port) else {
+        let Some(destination) = self.forwards.destination(connected_address, connected_port) else {
             reply.reject(ChannelOpenFailure::ConnectFailed).await;
             return Ok(());
         };

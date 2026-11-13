@@ -47,6 +47,33 @@ describe('displaySafeText', () => {
     expect(displaySafeText('a\u200Db')).toBe('a\u200Db');
   });
 
+  it('prints a literal backslash as two backslashes', () => {
+    expect(displaySafeText('echo \\u202E')).toBe('echo \\\\u202E');
+    expect(displaySafeText('C:\\tmp\\n')).toBe('C:\\\\tmp\\\\n');
+    expect(displaySafeText('\\')).toBe('\\\\');
+  });
+
+  it('spells out a soft hyphen', () => {
+    expect(displaySafeText('a\u00ADb')).toBe('a\\u00adb');
+    expect(displaySafeText('\u00AD')).toBe('\\u00ad');
+  });
+
+  it('spells out a format character above the Basic Multilingual Plane', () => {
+    expect(displaySafeText('a\u{E0001}b')).toBe('a\\U000E0001b');
+    expect(displaySafeText('a\u{E007F}b')).toBe('a\\U000E007Fb');
+  });
+
+  it('spells out an invisible filler', () => {
+    expect(displaySafeText('a\u3164b')).toBe('a\\u3164b');
+    expect(displaySafeText('\u115F\u1160\u2800\uFFA0')).toBe('\\u115f\\u1160\\u2800\\uffa0');
+  });
+
+  it('keeps a combining mark and a variation selector', () => {
+    expect(displaySafeText('e\u0301')).toBe('e\u0301');
+    expect(displaySafeText('a\u0308\u0304b')).toBe('a\u0308\u0304b');
+    expect(displaySafeText('\u2764\uFE0F')).toBe('\u2764\uFE0F');
+  });
+
   it('keeps an astral character whole', () => {
     expect(displaySafeText('\u{1F44B}')).toBe('\u{1F44B}');
   });

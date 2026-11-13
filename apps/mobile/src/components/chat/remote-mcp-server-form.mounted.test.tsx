@@ -57,9 +57,7 @@ vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'Segment
 const { mountedTokenValues } = vi.hoisted(() => ({ mountedTokenValues: [] as string[] }));
 
 const saved: RemoteMcpServerDraft[] = [];
-const onSave = (draft: RemoteMcpServerDraft): void => {
-  saved.push(draft);
-};
+const onSave = (draft: RemoteMcpServerDraft): void => void saved.push(draft);
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
@@ -70,20 +68,22 @@ async function mount(props: ComponentProps<typeof RemoteMcpServerForm>): Promise
   });
 }
 
-function fields(): FieldProps[] {
+/** The mounted tree, for the helpers that read it. */
+function mounted(): TestRenderer.ReactTestRenderer {
   if (renderer === undefined) {
     throw new Error('not mounted');
   }
-  return renderer.root
-    .findAll(node => String(node.type) === 'FormField')
+  return renderer;
+}
+
+function fields(): FieldProps[] {
+  return mounted()
+    .root.findAll(node => String(node.type) === 'FormField')
     .map(node => node.props as FieldProps);
 }
 
 function saveButton(): ButtonProps {
-  if (renderer === undefined) {
-    throw new Error('not mounted');
-  }
-  return renderer.root.find(node => String(node.type) === 'Button').props as ButtonProps;
+  return mounted().root.find(node => String(node.type) === 'Button').props as ButtonProps;
 }
 
 /** Types into one field, the way the field's own onChangeText reports it. */
@@ -109,16 +109,19 @@ function expectTokenCleared(): void {
   expect(saveButton().disabled).toBe(true);
 }
 
+/** The save reported the bearer value the person typed, as entered by them. */
+function expectSavedBearer(token: string): void {
+  expect(saved[0]?.auth).toEqual({ type: 'bearer', token });
+  expect(saved[0]?.tokenEntered).toBe(true);
+}
+
 type SegmentedProps = {
   readonly onChange: (value: string) => void;
 };
 
 /** Picks a sign-in method, the way the segmented control reports it. */
 async function choose(method: RemoteMcpServerDraft['auth']['type']): Promise<void> {
-  if (renderer === undefined) {
-    throw new Error('not mounted');
-  }
-  const control = renderer.root.find(node => String(node.type) === 'SegmentedControl')
+  const control = mounted().root.find(node => String(node.type) === 'SegmentedControl')
     .props as SegmentedProps;
   await act(async () => {
     control.onChange(method);
@@ -275,8 +278,7 @@ describe('the remote MCP server form', () => {
 
     await pressSave();
 
-    expect(saved[0]?.auth).toEqual({ type: 'bearer', token: 'rotated' });
-    expect(saved[0]?.tokenEntered).toBe(true);
+    expectSavedBearer('rotated');
   });
 
   it('does not carry a typed value to another endpoint', async () => {
@@ -292,8 +294,7 @@ describe('the remote MCP server form', () => {
     await pressSave();
 
     expect(saved[0]?.url).toBe('https://two.example/mcp');
-    expect(saved[0]?.auth).toEqual({ type: 'bearer', token: 'rotated' });
-    expect(saved[0]?.tokenEntered).toBe(true);
+    expectSavedBearer('rotated');
   });
 
   it('does not carry a saved value that was typed and erased to another endpoint', async () => {
@@ -356,8 +357,26 @@ describe('the remote MCP server form', () => {
     expect(saveButton().disabled).toBe(false);
 
     await pressSave();
-    expect(saved[0]?.auth).toEqual({ type: 'bearer', token: 'secret' });
-    expect(saved[0]?.tokenEntered).toBe(true);
+    expectSavedBearer('secret');
+  });
+
+  it('keeps a value typed while the URL names no endpoint', async () => {
+    await mount({ server: savedBearer, onSave });
+
+    // The URL names nothing while the person retypes it, and a value typed
+    // then is theirs: it belongs to the endpoint the URL then names, so the
+    // field keeps it rather than being cleared or restored over.
+    await type(1, '');
+    await type(2, 'typed');
+    await type(1, 'https://two.example/mcp');
+
+    expect(mountedTokenValues).toEqual(['secret', '']);
+    expect(saveButton().disabled).toBe(false);
+
+    await pressSave();
+
+    expect(saved[0]?.url).toBe('https://two.example/mcp');
+    expectSavedBearer('typed');
   });
 
   it('keeps a token typed while adding a server', async () => {

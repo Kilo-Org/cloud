@@ -468,7 +468,7 @@ export function NewSessionScreenBody() {
     entityKey: repositoryDraftKey,
   });
 
-  const { selectedRepo, setSelectedRepo } = useNewSessionPrefillTargets({
+  const { selectedRepo, setSelectedRepo, repoSeedPending } = useNewSessionPrefillTargets({
     repositories,
     reposSettled,
     models,
@@ -542,8 +542,7 @@ export function NewSessionScreenBody() {
     providerQueriesResolved,
     connectCtasLoaded,
     draftSettled: repositoryDraft.settled,
-    selectedRepo,
-    prefillSettled: reposSettled,
+    seedPending: repoSeedPending,
     storedSelectionGone: dropUnresolvedRepo,
   });
 

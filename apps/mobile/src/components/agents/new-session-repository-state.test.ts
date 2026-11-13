@@ -342,13 +342,12 @@ describe('new-session branch state', () => {
 });
 
 describe('isRepositoryRegionSettled', () => {
-  /** Every input final: a provider answered, its selection is in place. */
+  /** Every input final: a provider answered, no selection is still to arrive. */
   const settled = {
     providerQueriesResolved: true,
     connectCtasLoaded: true,
     draftSettled: true,
-    selectedRepo: 'github:drain-team/kilo-app',
-    prefillSettled: true,
+    seedPending: false,
     storedSelectionGone: false,
   };
 
@@ -369,21 +368,7 @@ describe('isRepositoryRegionSettled', () => {
   });
 
   it('holds the region while a seed is still due, so the card never paints expanded and collapses', () => {
-    expect(isRepositoryRegionSettled({ ...settled, selectedRepo: '', prefillSettled: true })).toBe(
-      false
-    );
-  });
-
-  it('settles with no selection when no rows can seed one', () => {
-    // A provider failed, or every list is empty: no seed is coming, so the
-    // region's height is already final.
-    expect(isRepositoryRegionSettled({ ...settled, selectedRepo: '', prefillSettled: false })).toBe(
-      true
-    );
-  });
-
-  it('settles with a selection present', () => {
-    expect(isRepositoryRegionSettled({ ...settled, selectedRepo: 'gitlab:owner/repo' })).toBe(true);
+    expect(isRepositoryRegionSettled({ ...settled, seedPending: true })).toBe(false);
   });
 
   it('holds the region while a stored selection is still to be dropped', () => {

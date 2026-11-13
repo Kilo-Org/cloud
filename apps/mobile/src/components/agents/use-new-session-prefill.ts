@@ -4,6 +4,7 @@ import { toast } from 'sonner-native';
 
 import {
   describePrefillFallback,
+  isRepoSeedPending,
   type NewSessionPrefill,
   readNewSessionPrefill,
   resolvePrefillModel,
@@ -133,5 +134,15 @@ export function useNewSessionPrefillTargets(input: UseNewSessionPrefillTargetsIn
     }
   }, [prefill, reposSettled, modelsSettled, repositories, models]);
 
-  return { selectedRepo, setSelectedRepo };
+  return {
+    selectedRepo,
+    setSelectedRepo,
+    /** Whether the route prefill can still replace the selection. */
+    repoSeedPending: isRepoSeedPending({
+      prefillRepo: prefill.repo,
+      applied: hasAppliedRepo.current,
+      selectedRepo,
+      reposSettled,
+    }),
+  };
 }

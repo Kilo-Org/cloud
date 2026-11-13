@@ -222,10 +222,11 @@ export function isStoredRepoSelectionGone(input: {
  *
  * A card's height is data-dependent (an expanded connect prompt, a compact row
  * after a selection, nothing while a provider loads), so painting one after the
- * form has settled pushes every row under the section down. The last clause is
- * the prefill: it seeds the selection in the same render `prefillSettled` turns
- * true, so with no selection yet and a seed still due the connect card would
- * paint expanded and then collapse to the compact row.
+ * form has settled pushes every row under the section down. The last two
+ * clauses cover the selection: the route prefill seeds a repository in the render
+ * its lists settle (`seedPending`), and a stored selection the provider no longer
+ * lists is dropped after mount (`storedSelectionGone`). Either would turn an
+ * expanded connect card into the compact row under rows that had already painted.
  */
 export function isRepositoryRegionSettled(input: {
   /** Every provider query finished its first load (a paused query counts as resolved). */
@@ -234,10 +235,12 @@ export function isRepositoryRegionSettled(input: {
   connectCtasLoaded: boolean;
   /** The durable repository draft for this account and scope has loaded. */
   draftSettled: boolean;
-  /** The `platform:fullName` selection the form holds, `''` when none. */
-  selectedRepo: string;
-  /** The prefill condition: no provider is loading or failed and there are rows. */
-  prefillSettled: boolean;
+  /**
+   * The route prefill can still replace the selection with a repository. A
+   * prefill that names no repository never seeds one, so a settled list with
+   * rows and no request is already final.
+   */
+  seedPending: boolean;
   /** A stored selection its provider's list no longer contains, still to be dropped. */
   storedSelectionGone: boolean;
 }): boolean {
@@ -245,8 +248,8 @@ export function isRepositoryRegionSettled(input: {
     input.providerQueriesResolved &&
     input.connectCtasLoaded &&
     input.draftSettled &&
-    !input.storedSelectionGone &&
-    (input.selectedRepo !== '' || !input.prefillSettled)
+    !input.seedPending &&
+    !input.storedSelectionGone
   );
 }
 

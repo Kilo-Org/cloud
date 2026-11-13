@@ -284,6 +284,33 @@ export function resolvePrefillRepo(
 }
 
 /**
+ * Whether a route prefill can still select a repository, so the new-session
+ * form must not treat its repository region as final.
+ *
+ * Only a prefill that names a repository seeds one, and only once the provider
+ * lists have settled with rows: `useNewSessionPrefillTargets` applies it in the
+ * render that condition turns true. Without a request in the route, a form with
+ * rows and no selection is already final — nothing will arrive later.
+ */
+export function isRepoSeedPending(input: {
+  /** The repository the route asked for, if any. */
+  prefillRepo: string | undefined;
+  /** Whether the seed has already run for this mount. */
+  applied: boolean;
+  /** The `platform:fullName` selection the form holds, `''` when none. */
+  selectedRepo: string;
+  /** Whether the provider lists finished loading without error and have rows. */
+  reposSettled: boolean;
+}): boolean {
+  return (
+    input.prefillRepo !== undefined &&
+    !input.applied &&
+    input.selectedRepo === '' &&
+    !input.reposSettled
+  );
+}
+
+/**
  * Resolve a prefill repository to a platform-qualified picker key
  * `platform:fullName`. Continuation prefill is GitHub-only (see
  * `buildContinuePrefillParams` + `isGitHubUrl`), so only a GitHub row may

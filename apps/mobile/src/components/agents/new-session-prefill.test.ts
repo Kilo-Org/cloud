@@ -7,6 +7,7 @@ import {
   appendNewSessionPrefill,
   buildContinuePrefillParams,
   describePrefillFallback,
+  isRepoSeedPending,
   type NewSessionPrefill,
   readNewSessionPrefill,
   resolvePrefillModel,
@@ -336,6 +337,33 @@ describe('resolvePrefillRepoSelection', () => {
     { repo: '', desc: 'empty string' },
   ])('returns null when repo is $desc', ({ repo }) => {
     expect(resolvePrefillRepoSelection(repos, { mode: 'code', repo })).toBeNull();
+  });
+});
+
+describe('isRepoSeedPending', () => {
+  const base = { prefillRepo: 'owner/repo', applied: false, selectedRepo: '', reposSettled: false };
+
+  it('reports a seed pending while the lists are still loading', () => {
+    expect(isRepoSeedPending(base)).toBe(true);
+  });
+
+  it('settles once the seed has run for this mount', () => {
+    expect(isRepoSeedPending({ ...base, applied: true })).toBe(false);
+  });
+
+  it('settles once the lists have settled, because the seed ran in that render', () => {
+    expect(isRepoSeedPending({ ...base, reposSettled: true })).toBe(false);
+  });
+
+  it('settles when the form already holds a selection', () => {
+    expect(isRepoSeedPending({ ...base, selectedRepo: 'github:owner/repo' })).toBe(false);
+  });
+
+  it('settles a plain New session entry that asked for no repository', () => {
+    // The regression this rule exists for: without a request in the route no
+    // seed is coming, so the form must not wait for one before it paints the
+    // rows below the repository section.
+    expect(isRepoSeedPending({ ...base, prefillRepo: undefined, reposSettled: true })).toBe(false);
   });
 });
 

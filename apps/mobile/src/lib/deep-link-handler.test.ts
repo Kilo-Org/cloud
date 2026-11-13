@@ -229,11 +229,13 @@ describe('redirectSystemPath', () => {
       'kiloapp://agent-chat/ses:1',
       'kiloapp:///(app)/agent-chat/ses:1',
       // Sub-paths of the account pages the app owns at their root: the app has
-      // no per-service detail screen, so these stay on the web.
+      // no per-service detail screen, so these stay on the web. A literal row
+      // matches exactly, so Android's filter never delivers them here.
+      // `/security-agent/<page>` is NOT in this list: that family is indexed for
+      // the phone's search, and `opensAppRoutePath` passes it through by design.
       'https://app.kilo.ai/integrations/slack',
       'https://app.kilo.ai/integrations/linear/reinstall',
       'https://app.kilo.ai/subscriptions/kilo-pass/refer',
-      'https://app.kilo.ai/security-agent/audit-report',
       'https://app.kilo.ai/organizations/org_1/byok',
       'https://app.kilo.ai/organizations/org_1/members',
       'https://app.kilo.ai/organizations/org_1/payment-details',

@@ -63,9 +63,10 @@ workspace repository and the head ref must be the workspace branch. A missing
 PR is `not_linked`; a repo/head-ref mismatch is `unverified` with no PR data.
 When the installation cannot read the PR but a connected user credential would,
 the result is the distinct `credential_required`; Cloud never spends the
-connected-user credential for these reads. A moved PR head is normal publication
-progress and is served as the live head (`cacheStale` reports the cached-head
-difference), while GitHub access, rate-limit and availability failures map to
+connected-user credential for these reads. A live head that moved relative to
+the webhook cache is normal publication progress (`cacheStale` reports the
+difference); a head that moves between live verification and the files fetch
+returns `stale` without mixed-revision data. GitHub access, rate-limit and availability failures map to
 distinct `github_access_denied`, `github_rate_limited` and `github_unavailable`
 results.
 

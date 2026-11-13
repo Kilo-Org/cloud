@@ -267,6 +267,31 @@ describe('getHostedWorkspaceChanges', () => {
     });
   });
 
+  it('preserves save-time truncation on every multi-repository comparison', async () => {
+    const files = [savedFile('src/app.ts')];
+    const saved = snapshot(files, {
+      truncated: true,
+      repositories: [
+        { path: '', repoFullName: 'acme/mono', comparison, truncated: false },
+        { path: 'web', repoFullName: 'acme/web', comparison, truncated: false },
+      ],
+    });
+    const test = fixture({
+      stubs: {
+        [firstSession]: stub({
+          getWorktreeChangeStates: vi
+            .fn()
+            .mockResolvedValue({ snapshot: saved, states: statesFor(files) }),
+        }),
+      },
+    });
+
+    const result = await test.caller.getHostedWorkspaceChanges({ workspaceId });
+
+    expect(result.truncated).toBe(true);
+    expect(result.comparisons?.map(entry => entry.truncated)).toEqual([true, true]);
+  });
+
   it('fails closed when a multi-repository file matches no repository', async () => {
     const files = [savedFile('outside.ts')];
     const saved = snapshot(files, {

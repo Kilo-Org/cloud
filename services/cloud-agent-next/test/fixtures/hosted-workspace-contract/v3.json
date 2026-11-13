@@ -630,6 +630,7 @@
     "github_access_denied",
     "github_rate_limited",
     "github_unavailable",
+    "pull_request_changed",
     "head_ref_mismatch",
     "repository_mismatch",
     "pull_request_not_found",

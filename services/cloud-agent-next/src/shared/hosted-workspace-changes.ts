@@ -35,6 +35,7 @@ export const hostedWorkspacePullRequestReasonSchema = z.enum([
   'github_access_denied',
   'github_rate_limited',
   'github_unavailable',
+  'pull_request_changed',
   'unsupported_repository',
 ]);
 
@@ -209,6 +210,7 @@ export const getHostedWorkspacePullRequestOutput = z
   .object({
     status: z.enum([
       'linked',
+      'stale',
       'not_linked',
       'unverified',
       'credential_required',

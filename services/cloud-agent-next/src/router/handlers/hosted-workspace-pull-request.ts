@@ -60,6 +60,8 @@ const livePullRequestSchema = z.object({
 });
 
 type PullRequestFile = z.infer<typeof pullRequestFileSchema>;
+type PullRequestFileSummary = Omit<PullRequestFile, 'patch'> & { patchAvailable: boolean };
+type LivePullRequest = z.infer<typeof livePullRequestSchema>;
 
 type PullRequestTarget = {
   owner: string;
@@ -71,6 +73,7 @@ type PullRequestTarget = {
 
 type LinkedPullRequest = {
   target: PullRequestTarget;
+  branch: string;
   output: NonNullable<GetHostedWorkspacePullRequestOutput['pullRequest']>;
 };
 
@@ -81,6 +84,16 @@ type PullRequestResolution =
   | { kind: 'unverified'; reason: HostedWorkspacePullRequestReason }
   | { kind: 'credential_required'; reason: HostedWorkspacePullRequestReason }
   | { kind: 'unavailable'; reason: HostedWorkspacePullRequestReason };
+
+type VerifiedPullRequestResolution =
+  | { kind: 'verified'; pullRequest: LivePullRequest }
+  | { kind: 'unverified'; reason: HostedWorkspacePullRequestReason }
+  | { kind: 'unavailable'; reason: HostedWorkspacePullRequestReason };
+
+type PullRequestRevalidation =
+  | { kind: 'same' }
+  | { kind: 'moved'; headSha: string }
+  | Exclude<VerifiedPullRequestResolution, { kind: 'verified' }>;
 
 function parseGitHubRepository(
   gitUrl: string
@@ -110,7 +123,11 @@ async function githubRequest(
     throw new GitHubRequestError('unavailable');
   }
   if (response.status === 401 || response.status === 403 || response.status === 429) {
-    if (response.status === 429 || response.headers.get('x-ratelimit-remaining') === '0') {
+    if (
+      response.status === 429 ||
+      response.headers.get('retry-after') !== null ||
+      response.headers.get('x-ratelimit-remaining') === '0'
+    ) {
       throw new GitHubRequestError('rate_limited');
     }
     throw new GitHubRequestError('access_denied');
@@ -144,13 +161,14 @@ async function readFilePage(
 
 async function listPullRequestFiles(
   target: PullRequestTarget
-): Promise<{ files: PullRequestFile[]; truncated: boolean }> {
-  const files: PullRequestFile[] = [];
+): Promise<{ files: PullRequestFileSummary[]; truncated: boolean }> {
+  const files: PullRequestFileSummary[] = [];
   for (let page = 1; page <= FILES_MAX_PAGES; page += 1) {
     const pageResult = await readFilePage(target, page);
     for (const file of pageResult.files) {
       if (files.length >= MAX_PR_FILES) return { files, truncated: true };
-      files.push(file);
+      const { patch, ...summary } = file;
+      files.push({ ...summary, patchAvailable: patch !== undefined && patch.length > 0 });
     }
     if (!pageResult.hasNext) return { files, truncated: false };
     if (page === FILES_MAX_PAGES) return { files, truncated: true };
@@ -185,6 +203,48 @@ function reasonForGitHubFailure(
     case 'unavailable':
       return 'github_unavailable';
   }
+}
+
+async function fetchVerifiedPullRequest(
+  target: PullRequestTarget,
+  branch: string
+): Promise<VerifiedPullRequestResolution> {
+  let data: unknown;
+  try {
+    ({ data } = await githubRequest(
+      target.token,
+      `/repos/${target.owner}/${target.repo}/pulls/${target.number}`
+    ));
+  } catch (error) {
+    if (!(error instanceof GitHubRequestError)) throw error;
+    const reason = reasonForGitHubFailure(error.failure, 'pull_request');
+    return error.failure === 'not_found'
+      ? { kind: 'unverified', reason }
+      : { kind: 'unavailable', reason };
+  }
+  const parsed = livePullRequestSchema.safeParse(data);
+  if (!parsed.success) return { kind: 'unavailable', reason: 'github_unavailable' };
+  const pullRequest = parsed.data;
+  if (
+    pullRequest.base.repo?.full_name.toLowerCase() !== target.repoFullName.toLowerCase() ||
+    pullRequest.head.repo?.full_name.toLowerCase() !== target.repoFullName.toLowerCase()
+  ) {
+    return { kind: 'unverified', reason: 'repository_mismatch' };
+  }
+  if (pullRequest.head.ref !== branch) {
+    return { kind: 'unverified', reason: 'head_ref_mismatch' };
+  }
+  return { kind: 'verified', pullRequest };
+}
+
+async function revalidateLinkedPullRequest(
+  linked: LinkedPullRequest
+): Promise<PullRequestRevalidation> {
+  const resolution = await fetchVerifiedPullRequest(linked.target, linked.branch);
+  if (resolution.kind !== 'verified') return resolution;
+  return resolution.pullRequest.head.sha.toLowerCase() === linked.output.headSha.toLowerCase()
+    ? { kind: 'same' }
+    : { kind: 'moved', headSha: resolution.pullRequest.head.sha };
 }
 
 function isWorkspacePullRequestRow(
@@ -290,37 +350,14 @@ async function resolveLinkedPullRequest(
     number: cached.pr_number,
     token: credential.token,
   };
-  let data: unknown;
-  try {
-    ({ data } = await githubRequest(
-      target.token,
-      `/repos/${target.owner}/${target.repo}/pulls/${target.number}`
-    ));
-  } catch (error) {
-    if (!(error instanceof GitHubRequestError)) throw error;
-    const reason = reasonForGitHubFailure(error.failure, 'pull_request');
-    return error.failure === 'not_found'
-      ? { kind: 'unverified', reason }
-      : { kind: 'unavailable', reason };
-  }
-  const parsed = livePullRequestSchema.safeParse(data);
-  if (!parsed.success) return { kind: 'unavailable', reason: 'github_unavailable' };
-  const pullRequest = parsed.data;
-  const liveRepository = pullRequest.base.repo?.full_name.toLowerCase();
-  const liveHeadRepository = pullRequest.head.repo?.full_name.toLowerCase();
-  if (
-    liveRepository !== repository.repoFullName.toLowerCase() ||
-    liveHeadRepository !== repository.repoFullName.toLowerCase()
-  ) {
-    return { kind: 'unverified', reason: 'repository_mismatch' };
-  }
-  if (pullRequest.head.ref !== workspace.gitBranch) {
-    return { kind: 'unverified', reason: 'head_ref_mismatch' };
-  }
+  const verified = await fetchVerifiedPullRequest(target, workspace.gitBranch);
+  if (verified.kind !== 'verified') return verified;
+  const pullRequest = verified.pullRequest;
   return {
     kind: 'linked',
     linked: {
       target,
+      branch: workspace.gitBranch,
       output: {
         number: pullRequest.number,
         url: pullRequest.html_url,
@@ -391,7 +428,7 @@ function failureOutput(
 function linkedOutput(
   workspaceId: CloudAgentWorktreeId,
   linked: LinkedPullRequest,
-  files: { files: PullRequestFile[]; truncated: boolean }
+  files: { files: PullRequestFileSummary[]; truncated: boolean }
 ): GetHostedWorkspacePullRequestOutput {
   return {
     status: 'linked',
@@ -405,15 +442,29 @@ function linkedOutput(
       status: file.status,
       additions: file.additions,
       deletions: file.deletions,
-      patchAvailable: file.patch !== undefined && file.patch.length > 0,
+      patchAvailable: file.patchAvailable,
     })),
   };
 }
 
 async function readLinkedPullRequestFiles(
   linked: LinkedPullRequest
-): Promise<{ files: PullRequestFile[]; truncated: boolean }> {
+): Promise<{ files: PullRequestFileSummary[]; truncated: boolean }> {
   return await listPullRequestFiles(linked.target);
+}
+
+function fileFailureOutput(
+  path: string,
+  failure: PullRequestFailureOutput
+): z.infer<typeof getHostedWorkspacePullRequestFileOutput> {
+  return {
+    status: failure.status,
+    path,
+    reason: failure.reason,
+    omissionReason: null,
+    headSha: null,
+    patch: null,
+  };
 }
 
 export const getHostedWorkspacePullRequest = protectedProcedure
@@ -426,11 +477,22 @@ export const getHostedWorkspacePullRequest = protectedProcedure
       return failureOutput(workspace.workspaceId, resolution);
     }
     try {
-      return linkedOutput(
-        workspace.workspaceId,
-        resolution.linked,
-        await readLinkedPullRequestFiles(resolution.linked)
-      );
+      const files = await readLinkedPullRequestFiles(resolution.linked);
+      const revalidated = await revalidateLinkedPullRequest(resolution.linked);
+      if (revalidated.kind === 'moved') {
+        return {
+          status: 'stale' as const,
+          workspaceId: workspace.workspaceId,
+          reason: 'pull_request_changed' as const,
+          pullRequest: null,
+          truncated: false,
+          files: [],
+        };
+      }
+      if (revalidated.kind !== 'same') {
+        return failureOutput(workspace.workspaceId, revalidated);
+      }
+      return linkedOutput(workspace.workspaceId, resolution.linked, files);
     } catch (error) {
       if (!(error instanceof GitHubRequestError)) throw error;
       return {
@@ -451,15 +513,7 @@ export const getHostedWorkspacePullRequestFile = protectedProcedure
     const workspace = await getAuthorizedHostedWorkspace(ctx, input);
     const resolution = await resolveLinkedPullRequest(ctx, workspace);
     if (resolution.kind !== 'linked') {
-      const failure = failureOutput(workspace.workspaceId, resolution);
-      return {
-        status: failure.status,
-        path: input.path,
-        reason: failure.reason,
-        omissionReason: null,
-        headSha: null,
-        patch: null,
-      };
+      return fileFailureOutput(input.path, failureOutput(workspace.workspaceId, resolution));
     }
     const headSha = resolution.linked.output.headSha;
     if (headSha.toLowerCase() !== input.expectedHeadSha.toLowerCase()) {
@@ -485,6 +539,20 @@ export const getHostedWorkspacePullRequestFile = protectedProcedure
         headSha: null,
         patch: null,
       };
+    }
+    const revalidated = await revalidateLinkedPullRequest(resolution.linked);
+    if (revalidated.kind === 'moved') {
+      return {
+        status: 'stale' as const,
+        path: input.path,
+        reason: null,
+        omissionReason: null,
+        headSha: revalidated.headSha,
+        patch: null,
+      };
+    }
+    if (revalidated.kind !== 'same') {
+      return fileFailureOutput(input.path, failureOutput(workspace.workspaceId, revalidated));
     }
     if (file === null) {
       return {

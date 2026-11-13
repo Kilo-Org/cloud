@@ -147,7 +147,7 @@ function buildComparisons(
   return groups.map(({ repository, files }) => ({
     repository: repositoryIdentity(repository),
     comparison: repository.comparison,
-    truncated: repository.truncated,
+    truncated: snapshot.truncated || repository.truncated,
     files: files.map(file =>
       projectFile(file, byIdentity.get(worktreeFileIdentity(file)), repositoryIdentity(repository))
     ),
@@ -174,7 +174,7 @@ function buildChanges(workspaceId: CloudAgentWorktreeId, result: WorkspaceChange
     workspaceId,
     revision: result.snapshot.revision,
     capturedAt: result.snapshot.capturedAt,
-    truncated: comparisons.some(comparison => comparison.truncated),
+    truncated: result.snapshot.truncated || comparisons.some(comparison => comparison.truncated),
     comparisons,
   };
 }

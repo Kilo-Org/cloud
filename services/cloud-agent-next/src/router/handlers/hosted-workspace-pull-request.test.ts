@@ -170,7 +170,11 @@ beforeEach(() => {
 describe('getHostedWorkspacePullRequest', () => {
   it('serves the verified linked PR and its bounded file list with the installation credential', async () => {
     const test = fixture({ rows: [cachedRow] });
-    const fetch = fetchMock(jsonResponse(livePullRequest()), jsonResponse(filesPayload));
+    const fetch = fetchMock(
+      jsonResponse(livePullRequest()),
+      jsonResponse(filesPayload),
+      jsonResponse(livePullRequest())
+    );
 
     const result = await test.caller.getHostedWorkspacePullRequest({ workspaceId });
 
@@ -208,7 +212,7 @@ describe('getHostedWorkspacePullRequest', () => {
         },
       ],
     });
-    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledTimes(3);
     const headers = (fetch.mock.calls[0]?.[1] as RequestInit | undefined)?.headers as Record<
       string,
       string
@@ -223,7 +227,11 @@ describe('getHostedWorkspacePullRequest', () => {
 
   it('flags a stale cache head without rejecting the live publication', async () => {
     const test = fixture({ rows: [{ ...cachedRow, pr_head_sha: otherSha }] });
-    fetchMock(jsonResponse(livePullRequest()), jsonResponse(filesPayload));
+    fetchMock(
+      jsonResponse(livePullRequest()),
+      jsonResponse(filesPayload),
+      jsonResponse(livePullRequest())
+    );
 
     const result = await test.caller.getHostedWorkspacePullRequest({ workspaceId });
 
@@ -314,6 +322,42 @@ describe('getHostedWorkspacePullRequest', () => {
     ).resolves.toMatchObject({ status: 'unverified', reason: 'pull_request_not_found' });
   });
 
+  it('maps a secondary GitHub rate limit to a retryable rate-limit result', async () => {
+    const test = fixture({ rows: [cachedRow] });
+    fetchMock(
+      jsonResponse(
+        { message: 'You have exceeded a secondary rate limit' },
+        { status: 403, headers: { 'retry-after': '60' } }
+      )
+    );
+
+    await expect(test.caller.getHostedWorkspacePullRequest({ workspaceId })).resolves.toMatchObject(
+      { status: 'unavailable', reason: 'github_rate_limited' }
+    );
+  });
+
+  it('returns stale instead of mixing a file list with a newer PR head', async () => {
+    const test = fixture({ rows: [cachedRow] });
+    fetchMock(
+      jsonResponse(livePullRequest()),
+      jsonResponse(filesPayload),
+      jsonResponse(
+        livePullRequest({
+          head: { ref: 'feature/diffs', sha: otherSha, repo: { full_name: 'Kilo-Org/cloud' } },
+        })
+      )
+    );
+
+    await expect(test.caller.getHostedWorkspacePullRequest({ workspaceId })).resolves.toMatchObject(
+      {
+        status: 'stale',
+        reason: 'pull_request_changed',
+        pullRequest: null,
+        files: [],
+      }
+    );
+  });
+
   it('reports a non-GitHub workspace without resolving GitHub authority', async () => {
     const test = fixture({
       workspace: workspace({ repositoryProvider: 'gitlab', gitUrl: 'https://gitlab.com/a/b' }),
@@ -330,7 +374,11 @@ describe('getHostedWorkspacePullRequest', () => {
 describe('getHostedWorkspacePullRequestFile', () => {
   it('returns the exact patch for the requested path and head', async () => {
     const test = fixture({ rows: [cachedRow] });
-    fetchMock(jsonResponse(livePullRequest()), jsonResponse(filesPayload));
+    fetchMock(
+      jsonResponse(livePullRequest()),
+      jsonResponse(filesPayload),
+      jsonResponse(livePullRequest())
+    );
 
     await expect(
       test.caller.getHostedWorkspacePullRequestFile({
@@ -362,9 +410,34 @@ describe('getHostedWorkspacePullRequestFile', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects a patch when the PR head moves during the files fetch', async () => {
+    const test = fixture({ rows: [cachedRow] });
+    fetchMock(
+      jsonResponse(livePullRequest()),
+      jsonResponse(filesPayload),
+      jsonResponse(
+        livePullRequest({
+          head: { ref: 'feature/diffs', sha: otherSha, repo: { full_name: 'Kilo-Org/cloud' } },
+        })
+      )
+    );
+
+    await expect(
+      test.caller.getHostedWorkspacePullRequestFile({
+        workspaceId,
+        path: 'src/app.ts',
+        expectedHeadSha: headSha,
+      })
+    ).resolves.toMatchObject({ status: 'stale', headSha: otherSha, patch: null });
+  });
+
   it('keeps a provider-omitted patch explicit', async () => {
     const test = fixture({ rows: [cachedRow] });
-    fetchMock(jsonResponse(livePullRequest()), jsonResponse(filesPayload));
+    fetchMock(
+      jsonResponse(livePullRequest()),
+      jsonResponse(filesPayload),
+      jsonResponse(livePullRequest())
+    );
 
     await expect(
       test.caller.getHostedWorkspacePullRequestFile({
@@ -382,7 +455,11 @@ describe('getHostedWorkspacePullRequestFile', () => {
 
   it('reports a path that the PR does not list', async () => {
     const test = fixture({ rows: [cachedRow] });
-    fetchMock(jsonResponse(livePullRequest()), jsonResponse(filesPayload));
+    fetchMock(
+      jsonResponse(livePullRequest()),
+      jsonResponse(filesPayload),
+      jsonResponse(livePullRequest())
+    );
 
     await expect(
       test.caller.getHostedWorkspacePullRequestFile({

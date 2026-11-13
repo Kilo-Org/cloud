@@ -1394,14 +1394,15 @@ must be the workspace branch. A missing or never-cached PR is `not_linked`; a
 repo or head-ref mismatch is `unverified` and exposes no PR data. When the
 installation cannot read the PR but a connected-user credential would, the
 result is the distinct `credential_required`; the connected-user credential is
-never spent on these reads. A moved PR head is normal publication progress and
-is served as the current head with `cacheStale` set when it differs from the
-cached head. GitHub authorization, rate-limit, not-found and availability
+never spent on these reads. A live head that moved relative to the webhook
+cache is normal publication progress and is served with `cacheStale`; a head
+that moves between live verification and the files fetch returns `stale` with
+no mixed-revision file data. GitHub authorization, rate-limit, not-found and availability
 failures stay distinct (`github_access_denied`, `github_rate_limited`,
 `pull_request_not_found`, `github_unavailable`) and never look like an empty
-PR. The PR file list is bounded and the per-file patch is fenced by
-`expectedHeadSha`, returning `stale`, `not_listed` or `provider_omitted` rather
-than synthesizing a patch.
+PR. The PR file list discards patch text while accumulating its bounded summary,
+and the per-file patch is fenced by `expectedHeadSha`, returning `stale`,
+`not_listed` or `provider_omitted` rather than synthesizing a patch.
 
 Bootstrap → Worker (HTTPS on the `WORKER_URL` host, `downloaded` mode only): `GET` one payload with
 the artifact grant, and `POST` one startup-failure report with the wrapper launch credential. The

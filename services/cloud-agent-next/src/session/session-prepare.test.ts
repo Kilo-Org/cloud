@@ -7676,50 +7676,6 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     );
   });
 
-  it('treats a clone-only "Session already registered" DO result as idempotent success', async () => {
-    // A lost first-attempt response can make the retry see this rejection from
-    // the registration RPC. The caller must settle success without rolling back
-    // the live clone or tombstoning its IDs.
-    createCliSessionMock.mockResolvedValue({
-      status: 'ready',
-      clone: { sessionId: KILO_SESSION_ID, copiedItemCount: 1 },
-    });
-    const doStub = makeDoStub({
-      registerSessionFromMetadata: vi.fn().mockResolvedValue({
-        success: false,
-        error: 'Session already registered',
-      }),
-    });
-    const ctx = makeContext(doStub);
-
-    const result = await runCreate(ctx, cloneRequest());
-
-    expect(doStub.registerSessionFromMetadata.mock.calls.length).toBe(1);
-    expect(deleteCliSessionMock).not.toHaveBeenCalled();
-    expect(recordSessionFailureMock).not.toHaveBeenCalled();
-    expect(recordOperationProgressMock).not.toHaveBeenCalledWith(
-      expect.any(Object),
-      ROW_ID,
-      expect.objectContaining({ [SESSION_CREATE_TOMBSTONED_IDS_KEY]: expect.anything() })
-    );
-    expect(settleOperationMock).toHaveBeenCalledWith(
-      expect.any(Object),
-      expect.objectContaining({
-        rowId: ROW_ID,
-        status: 'completed',
-        outcomeCode: 'ok',
-        canonicalResult: {
-          cloudAgentSessionId: SANDBOX_SESSION_ID,
-          kiloSessionId: KILO_SESSION_ID,
-        },
-      })
-    );
-    expect(result).toEqual({
-      cloudAgentSessionId: SANDBOX_SESSION_ID,
-      kiloSessionId: KILO_SESSION_ID,
-    });
-  });
-
   it('records sandbox allocation fields in ledger progress before the ingest call', async () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);

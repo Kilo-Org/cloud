@@ -208,7 +208,7 @@ public final class ReactNativeSshTerminalView: ExpoView, TerminalViewDelegate, T
   }
 
   public func clipboardCopy(source: TerminalView, content: Data) {
-    UIPasteboard.general.string = String(decoding: content, as: UTF8.self)
+    // SwiftTerm routes OSC 52 here: remote output must not replace the clipboard without a user copy action.
   }
 
   public func iTermContent(source: TerminalView, content: ArraySlice<UInt8>) {

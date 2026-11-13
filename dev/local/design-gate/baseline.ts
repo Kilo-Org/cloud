@@ -28,7 +28,7 @@ const TargetSchema = z
       .string()
       .max(256)
       .regex(/^(?:[^/]+(?:\/[^/]+)*)?$/),
-    readyTestID: z.string().min(1).max(128),
+    readyTestID: z.string().min(1).max(128).optional(),
     diagnostic: z
       .object({
         component: SourcePath,
@@ -425,12 +425,20 @@ export function targetReadiness(
       const blocked = /(?:^|\/)(?:login|sign-in|signin|splash|onboarding)(?:\/|$)/i.test(
         `${dump.env.route}/${dump.env.screen ?? ''}`
       );
-      const ready = normalize(dump).nodes.some(
-        node =>
-          node.probe.testID === target.readyTestID &&
-          node.visibleRect[2] > 0 &&
-          node.visibleRect[3] > 0
-      );
+      // A product screen need not carry a testID. Without a readiness marker the
+      // declared route and screen (checked below) plus one laid-out node identify
+      // the same prepared screen; a declared marker keeps the stricter rule that
+      // this exact node is visible.
+      const nodes = normalize(dump).nodes;
+      const ready =
+        target.readyTestID === undefined
+          ? nodes.some(node => node.visibleRect[2] > 0 && node.visibleRect[3] > 0)
+          : nodes.some(
+              node =>
+                node.probe.testID === target.readyTestID &&
+                node.visibleRect[2] > 0 &&
+                node.visibleRect[3] > 0
+            );
       const warning = outcome.findings.some(
         finding =>
           finding.cell === cell.id &&

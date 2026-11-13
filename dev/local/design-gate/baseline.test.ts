@@ -36,7 +36,7 @@ const TARGET = {
 };
 const manifest = ProofManifestSchema.parse({ version: 1, targets: [TARGET] });
 
-function syntheticRepo(t: TestContext) {
+function syntheticRepo(t: TestContext, proofManifest = manifest) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'design-proof-git-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const repo = path.join(root, 'repo');
@@ -70,7 +70,7 @@ function syntheticRepo(t: TestContext) {
   git('commit', '-m', 'head product');
   const head = git('rev-parse', 'HEAD');
   const targets = path.join(root, 'targets.json');
-  fs.writeFileSync(targets, JSON.stringify(manifest));
+  fs.writeFileSync(targets, JSON.stringify(proofManifest));
   const out = path.join(root, 'prepared');
   return { root, repo, git, base, head, targets, out };
 }
@@ -210,24 +210,16 @@ test('prepared run rejects changed product, changed fixtures and unrelated files
   );
 });
 
-function capture(
-  preparation: Preparation,
-  revision: Revision,
-  dir: string,
+function probeDump(
   options: {
     route?: string;
     screen?: string;
     ready?: boolean;
-    findings?: (Finding & { count?: number })[];
     width?: number;
     nodes?: ProbeDump['nodes'];
-    skipped?: SkippedTarget[];
-    /** Model a cell the runner applied but never started: no CellRun at all. */
-    omitCell?: boolean;
   } = {}
-) {
-  fs.mkdirSync(dir);
-  const dump: ProbeDump = {
+): ProbeDump {
+  return {
     version: 1,
     env: {
       platform: 'android',
@@ -253,6 +245,27 @@ function capture(
       },
     ],
   };
+}
+
+function capture(
+  preparation: Preparation,
+  revision: Revision,
+  dir: string,
+  options: {
+    target?: { id: string; link: string };
+    route?: string;
+    screen?: string;
+    ready?: boolean;
+    findings?: (Finding & { count?: number })[];
+    width?: number;
+    nodes?: ProbeDump['nodes'];
+    skipped?: SkippedTarget[];
+    /** Model a cell the runner applied but never started: no CellRun at all. */
+    omitCell?: boolean;
+  } = {}
+) {
+  fs.mkdirSync(dir);
+  const dump = probeDump(options);
   fs.writeFileSync(path.join(dir, 'screen.json'), JSON.stringify(dump));
   // Deliberately synthetic bytes: these tests exercise receipt binding, not visual claims.
   fs.writeFileSync(path.join(dir, 'screen.png'), 'synthetic-image');
@@ -266,8 +279,8 @@ function capture(
               config: { id: 'base', dark: false, rtl: false, compact: false, landscape: false },
               screens: [
                 {
-                  target: TARGET.id,
-                  link: TARGET.link,
+                  target: (options.target ?? TARGET).id,
+                  link: (options.target ?? TARGET).link,
                   dump: 'screen.json',
                   screenshot: 'screen.png',
                   annotated: 'annotated.png',
@@ -501,6 +514,128 @@ test('manifest screen identity uses the raw segments.join producer key, not a ro
       targets: [{ ...TARGET, screen: '/design-proof-card' }],
     }).success,
     false
+  );
+});
+
+/** A readiness run for one captured dump, without a full preparation. */
+function readinessRun(
+  t: TestContext,
+  target: { id: string; link: string },
+  dump: ProbeDump
+) {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-ready-'));
+  t.after(() => fs.rmSync(out, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(out, 'screen.json'), JSON.stringify(dump));
+  return {
+    out,
+    outcome: {
+      cells: [
+        {
+          id: 'base',
+          screens: [{ target: target.id, link: target.link, dump: 'screen.json' }],
+        },
+      ],
+      findings: [],
+    },
+  };
+}
+
+const UNMARKED = {
+  id: 'profile',
+  link: 'kiloapp:///profile',
+  route: '/profile',
+  screen: '(app)/(tabs)/profile',
+};
+const unmarkedManifest = ProofManifestSchema.parse({ version: 1, targets: [UNMARKED] });
+
+test('manifest accepts a target without readyTestID and rejects an empty marker', () => {
+  assert.equal(
+    ProofManifestSchema.parse({ version: 1, targets: [UNMARKED] }).targets[0].readyTestID,
+    undefined
+  );
+  assert.equal(
+    ProofManifestSchema.safeParse({ version: 1, targets: [{ ...UNMARKED, readyTestID: '' }] })
+      .success,
+    false
+  );
+  assert.equal(
+    ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [{ ...UNMARKED, readyTestID: 'r'.repeat(129) }],
+    }).success,
+    false
+  );
+});
+
+test('a target without readyTestID is ready by its declared route, screen and a visible node', t => {
+  const run = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({
+      route: UNMARKED.route,
+      screen: UNMARKED.screen,
+      nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800] }],
+    })
+  );
+  assert.deepEqual(targetReadiness(run.outcome, unmarkedManifest, run.out), []);
+});
+
+test('a target without readyTestID is not ready on another screen or with no visible node', t => {
+  const otherScreen = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({ route: UNMARKED.route, screen: '(app)/(tabs)/chats' })
+  );
+  assert.deepEqual(targetReadiness(otherScreen.outcome, unmarkedManifest, otherScreen.out), [
+    `base/${UNMARKED.id}: target not ready or screen identity differs (${UNMARKED.route}, (app)/(tabs)/chats)`,
+  ]);
+  const hidden = readinessRun(
+    t,
+    UNMARKED,
+    probeDump({
+      route: UNMARKED.route,
+      screen: UNMARKED.screen,
+      nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800], style: { display: 'none' } }],
+    })
+  );
+  assert.deepEqual(targetReadiness(hidden.outcome, unmarkedManifest, hidden.out), [
+    `base/${UNMARKED.id}: target not ready or screen identity differs (${UNMARKED.route}, ${UNMARKED.screen})`,
+  ]);
+});
+
+test('a target with readyTestID is not ready when that node is absent', t => {
+  const run = readinessRun(t, TARGET, probeDump({ ready: false }));
+  assert.deepEqual(targetReadiness(run.outcome, manifest, run.out), [
+    `base/${TARGET.id}: target not ready or screen identity differs (${TARGET.route}, ${TARGET.screen})`,
+  ]);
+});
+
+test('a target ready by its route keeps the comparison inconclusive when it never reached that screen', async t => {
+  const fixture = syntheticRepo(t, unmarkedManifest);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'unmarked-base');
+  const headRun = path.join(fixture.root, 'unmarked-head');
+  capture(preparation, 'base', baseRun, {
+    target: UNMARKED,
+    route: UNMARKED.route,
+    screen: '(app)/(tabs)/chats',
+  });
+  capture(preparation, 'head', headRun, {
+    target: UNMARKED,
+    route: UNMARKED.route,
+    screen: UNMARKED.screen,
+  });
+  const result = await compareProof(
+    preparation,
+    baseRun,
+    headRun,
+    path.join(fixture.root, 'unmarked-comparison')
+  );
+  assert.equal(result.status, 'inconclusive');
+  assert.deepEqual(result.introduced, []);
+  assert.match(
+    result.reasons.join(' '),
+    /base: base\/profile: target not ready or screen identity differs/
   );
 });
 

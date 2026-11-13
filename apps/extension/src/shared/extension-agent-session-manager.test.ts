@@ -353,9 +353,25 @@ describe('createExtensionAgentSessionManager', () => {
     expect(capturedConfig!.userWebConnection).toBe(opts.userWebConnection);
     expect(capturedConfig!.lifecycleHooks).toBeTruthy();
     expect(capturedConfig!.websocketBaseUrl).toBe(getCloudAgentWsUrl());
+    expect(capturedConfig!.spawnedSessionOpen).toStrictEqual({
+      graceMs: 20_000,
+      maxAttempts: 13,
+      retryDelayMs: 1500,
+    });
   });
 
   describe('resolveSession', () => {
+    it('fails fast on NOT_FOUND instead of retrying every open', async () => {
+      const trpc = makeTrpcMock();
+      const query = vi.spyOn(trpc.cliSessionsV2.get, 'query').mockImplementation(async () => {
+        throw notFoundError();
+      });
+      createExtensionAgentSessionManager({ ...makeDefaultOptions(), trpcClient: trpc as never });
+
+      await expect(capturedConfig!.resolveSession(SESSION_ID)).rejects.toThrow('Session not found');
+      expect(query).toHaveBeenCalledTimes(1);
+    });
+
     it('returns cloud-agent when cloud_agent_session_id is present', async () => {
       const trpc = makeTrpcMock();
       // Make get return a session with cloud_agent_session_id

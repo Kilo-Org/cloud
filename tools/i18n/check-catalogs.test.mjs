@@ -4,6 +4,7 @@ import {
   copyFileSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   realpathSync,
   rmSync,
   symlinkSync,
@@ -11,11 +12,18 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import test from 'node:test';
+import test, { after } from 'node:test';
 
-// The checker parses with oxc through the shared scanner, so a fixture links the
-// repository's dependency tree at its own root.
+import { checkCatalogs } from './check-catalogs.mjs';
+
+// The checker parses with oxc through the shared scanner, so the import-only
+// probe links the repository's dependency tree at its own root.
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
+const SHARED_MODULES = ['ast.mjs', 'catalogs.mjs', 'source-files.mjs'];
+const WORDING_EXCEPTIONS = readFileSync(
+  new URL('./wording-exceptions.json', import.meta.url),
+  'utf8'
+);
 
 const ENGLISH = {
   agents: {
@@ -35,20 +43,35 @@ const TRANSLATED = {
 };
 const SOURCE = "t('agents.title');\nt('agents.liveCount', { count: 2 });";
 
-function runChecker(
-  context,
-  {
-    english = ENGLISH,
-    translated = TRANSLATED,
-    source = SOURCE,
-    language = 'ru',
-    extraFiles = {},
-  } = {}
-) {
-  const root = mkdtempSync(join(tmpdir(), 'check-catalogs-'));
-  context.after(() => rmSync(root, { recursive: true, force: true }));
+// One parent directory for the whole file: each case writes its files into a
+// directory of its own, so a case never sees another case's catalogs.
+const FIXTURES = mkdtempSync(join(tmpdir(), 'check-catalogs-'));
+after(() => rmSync(FIXTURES, { recursive: true, force: true }));
 
-  const files = {
+/** Write `files` into a fresh directory under the fixture parent, and return it. */
+function fixture(files) {
+  const root = mkdtempSync(join(FIXTURES, 'case-'));
+  for (const [path, content] of Object.entries(files)) {
+    const file = join(root, path);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, content);
+  }
+  return root;
+}
+
+/**
+ * The audit over a fixture tree, in this process. `root` is a directory
+ * argument to the audit itself, so the tree holds no copy of the checker and
+ * links nothing: only the files the audit reads.
+ */
+function run({
+  english = ENGLISH,
+  translated = TRANSLATED,
+  source = SOURCE,
+  language = 'ru',
+  extraFiles = {},
+} = {}) {
+  const root = fixture({
     'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', '${language}'];`,
     'apps/mobile/src/example.ts': source,
     'apps/mobile/src/i18n/locales/en.json': JSON.stringify(english),
@@ -62,28 +85,53 @@ function runChecker(
       `import ${language.replaceAll('-', '_')} from './locales/${language}.json';`,
       `const pushCatalogs = { 'en': en, '${language}': ${language.replaceAll('-', '_')} };`,
     ].join('\n'),
+    'tools/i18n/wording-exceptions.json': WORDING_EXCEPTIONS,
     ...extraFiles,
-  };
-  for (const [path, content] of Object.entries(files)) {
-    const file = join(root, path);
-    mkdirSync(dirname(file), { recursive: true });
-    writeFileSync(file, content);
-  }
+  });
+  return checkCatalogs(root).problems;
+}
 
-  // Preserve the real command and its import.meta.url-based repository layout.
-  const toolDir = join(root, 'tools/i18n');
-  mkdirSync(toolDir, { recursive: true });
-  for (const name of ['check-catalogs.mjs', 'wording-exceptions.json']) {
-    copyFileSync(new URL(`./${name}`, import.meta.url), join(toolDir, name));
-  }
+/**
+ * A fixture tree that can run the checker as CI does: a copy of the checker,
+ * its shared modules and its wording exceptions, and the repository's
+ * dependency tree linked at the root the command resolves from.
+ */
+function cliFixture(files) {
+  const root = fixture({
+    ...files,
+    'tools/i18n/check-catalogs.mjs': readFileSync(
+      new URL('./check-catalogs.mjs', import.meta.url),
+      'utf8'
+    ),
+    'tools/i18n/wording-exceptions.json': WORDING_EXCEPTIONS,
+  });
   mkdirSync(join(root, 'tools/lib'), { recursive: true });
-  for (const name of ['ast.mjs', 'catalogs.mjs', 'source-files.mjs']) {
-    copyFileSync(new URL(`../lib/${name}`, import.meta.url), join(root, 'tools/lib', name));
+  for (const name of SHARED_MODULES) {
+    copyFileSync(new URL(`../lib/${name}`, import.meta.url), join(root, `tools/lib/${name}`));
   }
-  // The shared scanner parses with oxc, a root dependency: resolve it the way
-  // the repository does, from the fixture's own root.
   symlinkSync(join(REPO, 'node_modules'), join(root, 'node_modules'), 'dir');
-  const result = spawnSync(process.execPath, [join(toolDir, 'check-catalogs.mjs')], {
+  return root;
+}
+
+/** The standard fixture files, for a tree that runs the command. */
+function standardFiles({ english = ENGLISH, translated = TRANSLATED, source = SOURCE } = {}) {
+  return {
+    'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', 'ru'];`,
+    'apps/mobile/src/example.ts': source,
+    'apps/mobile/src/i18n/locales/en.json': JSON.stringify(english),
+    'apps/mobile/src/i18n/locales/ru.json': JSON.stringify(translated),
+    'packages/notifications/src/locales/en.json': '{}',
+    'packages/notifications/src/locales/ru.json': '{}',
+    'packages/notifications/src/i18n.ts': [
+      `import en from './locales/en.json';`,
+      `import ru from './locales/ru.json';`,
+      `const pushCatalogs = { 'en': en, 'ru': ru };`,
+    ].join('\n'),
+  };
+}
+
+function cli(root) {
+  const result = spawnSync(process.execPath, [join(root, 'tools/i18n/check-catalogs.mjs')], {
     cwd: root,
     encoding: 'utf8',
     timeout: 10_000,
@@ -93,81 +141,76 @@ function runChecker(
 }
 
 for (const callee of ['t', 'i18n.t']) {
-  test(`accepts a plural base called through ${callee} with English siblings`, context => {
-    const result = runChecker(context, {
+  test(`accepts a plural base called through ${callee} with English siblings`, () => {
+    const found = run({
       source: `t('agents.title');\n${callee}('agents.liveCount', { count: 2 });`,
     });
-    assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stderr, '');
-    assert.match(result.stdout, /check-catalogs: 2 languages, every catalog matches en\.json/);
+    assert.deepEqual(found, []);
   });
 }
 
-test('accepts an exact source key without plural siblings', context => {
-  const result = runChecker(context, {
+test('accepts an exact source key without plural siblings', () => {
+  const found = run({
     english: { agents: { title: 'Agents' } },
     translated: { agents: { title: 'Localized agents' } },
     source: "t('agents.title');",
   });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stderr, '');
+  assert.deepEqual(found, []);
 });
 
 for (const [name, call, key] of [
   ['a missing unrelated source key', "t('profile.missing');", 'profile.missing'],
   ['a nonexistent plural family', "t('agents.missingCount', { count: 2 });", 'agents.missingCount'],
 ]) {
-  test(`rejects ${name}`, context => {
-    const result = runChecker(context, { source: `${SOURCE}\n${call}` });
-    assert.equal(result.status, 1, result.stderr);
+  test(`rejects ${name}`, () => {
+    const found = run({ source: `${SOURCE}\n${call}` });
+    assert.ok(found.length > 0, 'expected a problem');
     assert.ok(
-      result.stderr.includes(`mobile: source uses "${key}", which en.json does not define`)
+      found.join('\n').includes(`mobile: source uses "${key}", which en.json does not define`)
     );
   });
 }
 
-test('rejects a missing translated English key', context => {
+test('rejects a missing translated English key', () => {
   const translated = { agents: { ...TRANSLATED.agents } };
   delete translated.agents.title;
-  const result = runChecker(context, { translated });
-  assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
+  const found = run({ translated });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/ru: missing key "agents\.title"/);
 });
 
-test('rejects a missing required locale plural category', context => {
+test('rejects a missing required locale plural category', () => {
   const translated = { agents: { ...TRANSLATED.agents } };
   delete translated.agents.liveCount_few;
-  const result = runChecker(context, { translated });
-  assert.equal(result.status, 1, result.stderr);
+  const found = run({ translated });
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile\/ru: plural family "agents\.liveCount" lacks the few category of ru/
   );
 });
 
-test('rejects an unused English exact key', context => {
-  const result = runChecker(context, { source: "t('agents.liveCount', { count: 2 });" });
-  assert.equal(result.status, 1, result.stderr);
+test('rejects an unused English exact key', () => {
+  const found = run({ source: "t('agents.liveCount', { count: 2 });" });
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile: en\.json defines "agents\.title", which no source file uses/
   );
 });
 
-test('rejects unused English plural siblings', context => {
-  const result = runChecker(context, { source: "t('agents.title');" });
-  assert.equal(result.status, 1, result.stderr);
+test('rejects unused English plural siblings', () => {
+  const found = run({ source: "t('agents.title');" });
+  const text = found.join('\n');
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(text, /mobile: en\.json defines "agents\.liveCount_one", which no source file uses/);
   assert.match(
-    result.stderr,
-    /mobile: en\.json defines "agents\.liveCount_one", which no source file uses/
-  );
-  assert.match(
-    result.stderr,
+    text,
     /mobile: en\.json defines "agents\.liveCount_other", which no source file uses/
   );
 });
 
-test('ignores a call written in a comment or a string', context => {
+test('ignores a call written in a comment or a string', () => {
   const source = [
     "t('agents.title');",
     "t('agents.liveCount', { count: 2 });",
@@ -175,51 +218,59 @@ test('ignores a call written in a comment or a string', context => {
     `const note = "t('agents.quotedInText') is not a call";`,
     'void note;',
   ].join('\n');
-  const result = runChecker(context, { source });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stderr, '');
+  assert.deepEqual(run({ source }), []);
 });
 
-test('does not count a key named only in a comment as a use', context => {
+test('does not count a key named only in a comment as a use', () => {
   const english = { agents: { title: 'Agents', retired: 'Retired agents' } };
   const translated = { agents: { title: 'Localized agents', retired: 'Localized retirees' } };
-  const result = runChecker(context, {
+  const found = run({
     english,
     translated,
     source: "t('agents.title');\n// 'agents.retired' left with the old screen",
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile: en\.json defines "agents\.retired", which no source file uses/
   );
 });
 
-test('still rejects a template-literal key', context => {
+test('still rejects a template-literal key', () => {
   const source = [
     "t('agents.title');",
     "t('agents.liveCount', { count: 2 });",
     'const page = 1;',
     't(`agents.page${page}`);',
   ].join('\n');
-  const result = runChecker(context, { source });
-  assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stderr, /t\(\) called with a template literal; the key check cannot see it/);
+  const found = run({ source });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /t\(\) called with a template literal; the key check cannot see it/
+  );
 });
 
-test('ignores a mounted-harness helper while a source file still reports its keys', context => {
+test('reports an unparsed file by its path below the tree it was read from', () => {
+  const found = run({ source: "t('agents.title'\n" });
+  assert.match(
+    found.join('\n'),
+    /^apps\/mobile\/src\/example\.ts:2: cannot parse: /m,
+    found.join('\n')
+  );
+});
+
+test('ignores a mounted-harness helper while a source file still reports its keys', () => {
   const source = "t('agents.missing');\n";
-  const inSource = runChecker(context, { source });
-  assert.equal(inSource.status, 1, inSource.stderr);
-  assert.match(inSource.stderr, /"agents\.missing"/);
+  const inSource = run({ source });
+  assert.ok(inSource.length > 0, 'expected a problem');
+  assert.match(inSource.join('\n'), /"agents\.missing"/);
 
   for (const helper of [
     'apps/mobile/src/components/screen.mounted.test-helpers.ts',
     'apps/mobile/src/components/screen.test.tsx',
   ]) {
-    const inScaffolding = runChecker(context, { extraFiles: { [helper]: source } });
-    assert.equal(inScaffolding.status, 0, inScaffolding.stderr);
-    assert.equal(inScaffolding.stderr, '');
+    assert.deepEqual(run({ extraFiles: { [helper]: source } }), []);
   }
 });
 
@@ -229,56 +280,56 @@ for (const [language, title, badge] of [
   ['el', 'Σε εξέλιξη', 'ΣΕ ΕΞΕΛΙΞΗ'],
   ['de', 'Straße', 'STRASSE'],
 ]) {
-  test(`accepts locale-aware case variants in ${language}`, context => {
-    const result = runChecker(context, {
+  test(`accepts locale-aware case variants in ${language}`, () => {
+    const found = run({
       language,
       english: { title: 'Running', badge: 'RUNNING' },
       translated: { title, badge },
       source: "t('title'); t('badge');",
     });
-    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(found, []);
   });
 }
 
-test('still rejects different wording after locale-aware case folding', context => {
-  const result = runChecker(context, {
+test('still rejects different wording after locale-aware case folding', () => {
+  const found = run({
     language: 'tr',
     english: { title: 'Running', badge: 'RUNNING' },
     translated: { title: 'Çalışıyor', badge: 'DURDU' },
     source: "t('title'); t('badge');",
   });
-  assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stderr, /English "running" is translated 2 ways/);
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /English "running" is translated 2 ways/);
 });
 
-test('rejects the English live-session empty state in a translated catalog', context => {
+test('rejects the English live-session empty state in a translated catalog', () => {
   const english = { home: { noLiveSessions: 'Nothing running right now' } };
-  const result = runChecker(context, {
+  const found = run({
     english,
     translated: english,
     source: "t('home.noLiveSessions');",
   });
-  assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stderr, /mobile\/ru: "home\.noLiveSessions" must be translated/);
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/ru: "home\.noLiveSessions" must be translated/);
 });
 
-test('rejects an empty translated value', context => {
-  const result = runChecker(context, {
+test('rejects an empty translated value', () => {
+  const found = run({
     translated: { agents: { ...TRANSLATED.agents, title: '' } },
   });
-  assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stderr, /mobile\/ru: "agents\.title" is empty/);
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/ru: "agents\.title" is empty/);
 });
 
-test('rejects a trailing space that English does not carry', context => {
-  const result = runChecker(context, {
+test('rejects a trailing space that English does not carry', () => {
+  const found = run({
     translated: { agents: { ...TRANSLATED.agents, title: 'Localized agents ' } },
   });
-  assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stderr, /mobile\/ru: "agents\.title" leading or trailing space differs/);
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/ru: "agents\.title" leading or trailing space differs/);
 });
 
-test('accepts a locale-owned separator in the login legal sentence', context => {
+test('accepts a locale-owned separator in the login legal sentence', () => {
   // A catalog that does not separate words with spaces abuts the prefix, the
   // Terms link and the conjunction, so its values carry no edge whitespace
   // where English has one.
@@ -289,7 +340,7 @@ test('accepts a locale-owned separator in the login legal sentence', context => 
       termsConnector: ' and ',
     },
   };
-  const result = runChecker(context, {
+  const found = run({
     language: 'zh-Hans',
     english,
     translated: {
@@ -297,27 +348,29 @@ test('accepts a locale-owned separator in the login legal sentence', context => 
     },
     source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
   });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stderr, '');
+  assert.deepEqual(found, []);
 });
 
-test('still rejects separator whitespace elsewhere in the same catalog', context => {
+test('still rejects separator whitespace elsewhere in the same catalog', () => {
   const english = { login: { termsPrefix: 'By continuing you agree to our ', terms: 'Terms' } };
-  const result = runChecker(context, {
+  const found = run({
     language: 'zh-Hans',
     english,
     translated: { login: { termsPrefix: '继续即表示你同意我们的', terms: '条款 ' } },
     source: "t('login.termsPrefix'); t('login.terms');",
   });
-  assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stderr, /mobile\/zh-Hans: "login\.terms" leading or trailing space differs/);
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /mobile\/zh-Hans: "login\.terms" leading or trailing space differs/
+  );
 });
 
 for (const [name, termsPrefix, termsConnector] of [
   ['a dropped separator in a spaced catalog', 'Unsere', ' und '],
   ['a padded prefix beside a bare conjunction', 'Unsere ', 'und'],
 ]) {
-  test(`rejects ${name}`, context => {
+  test(`rejects ${name}`, () => {
     const english = {
       login: {
         termsPrefix: 'By continuing you agree to our ',
@@ -325,21 +378,21 @@ for (const [name, termsPrefix, termsConnector] of [
         termsConnector: ' and ',
       },
     };
-    const result = runChecker(context, {
+    const found = run({
       language: 'de',
       english,
       translated: { login: { termsPrefix, terms: 'Bedingungen', termsConnector } },
       source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
     });
-    assert.equal(result.status, 1, result.stderr);
+    assert.ok(found.length > 0, 'expected a problem');
     assert.match(
-      result.stderr,
+      found.join('\n'),
       /mobile\/de: "login\.termsPrefix" and "login\.termsConnector" disagree about the space before the Terms link/
     );
   });
 }
 
-test('accepts a spaced catalog that pads both separator keys', context => {
+test('accepts a spaced catalog that pads both separator keys', () => {
   const english = {
     login: {
       termsPrefix: 'By continuing you agree to our ',
@@ -347,7 +400,7 @@ test('accepts a spaced catalog that pads both separator keys', context => {
       termsConnector: ' and ',
     },
   };
-  const result = runChecker(context, {
+  const found = run({
     language: 'de',
     english,
     translated: {
@@ -359,11 +412,10 @@ test('accepts a spaced catalog that pads both separator keys', context => {
     },
     source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
   });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stderr, '');
+  assert.deepEqual(found, []);
 });
 
-test('accepts a catalog whose conjunction is a prefix letter joined to the next word', context => {
+test('accepts a catalog whose conjunction is a prefix letter joined to the next word', () => {
   // Arabic writes the waw as a prefix of the noun it governs, so the catalog
   // pads the space before the conjunction and none after it. The junction
   // before the conjunction is the separator the two keys have to agree on.
@@ -374,7 +426,7 @@ test('accepts a catalog whose conjunction is a prefix letter joined to the next 
       termsConnector: ' and ',
     },
   };
-  const result = runChecker(context, {
+  const found = run({
     language: 'ar',
     english,
     translated: {
@@ -386,11 +438,10 @@ test('accepts a catalog whose conjunction is a prefix letter joined to the next 
     },
     source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
   });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stderr, '');
+  assert.deepEqual(found, []);
 });
 
-test('rejects a detached conjunction in a catalog that writes one prefix letter', context => {
+test('rejects a detached conjunction in a catalog that writes one prefix letter', () => {
   // The prefix letter joins the noun it governs, so a space after it splits the
   // conjunction from that noun — the defect this rule exists to catch.
   const english = {
@@ -400,7 +451,7 @@ test('rejects a detached conjunction in a catalog that writes one prefix letter'
       termsConnector: ' and ',
     },
   };
-  const result = runChecker(context, {
+  const found = run({
     language: 'ar',
     english,
     translated: {
@@ -412,14 +463,14 @@ test('rejects a detached conjunction in a catalog that writes one prefix letter'
     },
     source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile\/ar: "login\.termsConnector" must end without a space, because this catalog writes the conjunction as a prefix of the next word/
   );
 });
 
-test('rejects a separately written conjunction that lost its trailing space', context => {
+test('rejects a separately written conjunction that lost its trailing space', () => {
   // A catalog that writes the conjunction as a word of its own pads both sides;
   // keeping only the leading space runs it into the noun after the link.
   const english = {
@@ -429,7 +480,7 @@ test('rejects a separately written conjunction that lost its trailing space', co
       termsConnector: ' and ',
     },
   };
-  const result = runChecker(context, {
+  const found = run({
     language: 'de',
     english,
     translated: {
@@ -441,14 +492,14 @@ test('rejects a separately written conjunction that lost its trailing space', co
     },
     source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile\/de: "login\.termsConnector" must end with a space, because this catalog writes the conjunction as a separate word/
   );
 });
 
-test('accepts an abutting catalog whose conjunction carries no spaces', context => {
+test('accepts an abutting catalog whose conjunction carries no spaces', () => {
   // Japanese abuts its words, so neither the prefix nor the conjunction carries
   // an edge space. The connector's edge rule follows the prefix: a catalog that
   // pads nothing demands nothing.
@@ -459,7 +510,7 @@ test('accepts an abutting catalog whose conjunction carries no spaces', context 
       termsConnector: ' and ',
     },
   };
-  const result = runChecker(context, {
+  const found = run({
     language: 'ja',
     english,
     translated: {
@@ -471,11 +522,10 @@ test('accepts an abutting catalog whose conjunction carries no spaces', context 
     },
     source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
   });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stderr, '');
+  assert.deepEqual(found, []);
 });
 
-test('rejects a conjunction that starts without the space its prefix carries', context => {
+test('rejects a conjunction that starts without the space its prefix carries', () => {
   const english = {
     login: {
       termsPrefix: 'By continuing you agree to our ',
@@ -483,7 +533,7 @@ test('rejects a conjunction that starts without the space its prefix carries', c
       termsConnector: ' and ',
     },
   };
-  const result = runChecker(context, {
+  const found = run({
     language: 'ar',
     english,
     translated: {
@@ -495,46 +545,46 @@ test('rejects a conjunction that starts without the space its prefix carries', c
     },
     source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile\/ar: "login\.termsPrefix" and "login\.termsConnector" disagree about the space before the Terms link/
   );
 });
 
-test('rejects a translated $TOKEN expansion token', context => {
-  const result = runChecker(context, {
+test('rejects a translated $TOKEN expansion token', () => {
+  const found = run({
     english: { agents: { template: 'Explain $ARGUMENTS' } },
     translated: { agents: { template: 'Explique $ARGUMENTOS' } },
     source: "t('agents.template');",
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile\/ru: "agents\.template" \$TOKEN expansion tokens differ from English \(\$ARGUMENTS\)/
   );
 });
 
-test('rejects changed placeholders in an English plural sibling', context => {
-  const result = runChecker(context, {
+test('rejects changed placeholders in an English plural sibling', () => {
+  const found = run({
     translated: { agents: { ...TRANSLATED.agents, liveCount_one: '{{total}} localized session' } },
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile\/ru: "agents\.liveCount_one" placeholders differ from English \(count\)/
   );
 });
 
-test('rejects unknown placeholders in a locale-specific plural category', context => {
-  const result = runChecker(context, {
+test('rejects unknown placeholders in a locale-specific plural category', () => {
+  const found = run({
     translated: {
       agents: { ...TRANSLATED.agents, liveCount_few: '{{total}} localized sessions (few)' },
     },
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile\/ru: "agents\.liveCount_few" uses placeholder \{\{total\}\}, which the English family does not/
   );
 });
@@ -547,8 +597,8 @@ const SINGULAR_COUNTED = {
   },
 };
 
-test('accepts a category that interpolates the count its English family uses', context => {
-  const result = runChecker(context, {
+test('accepts a category that interpolates the count its English family uses', () => {
+  const found = run({
     english: SINGULAR_COUNTED,
     translated: {
       agents: {
@@ -560,12 +610,11 @@ test('accepts a category that interpolates the count its English family uses', c
       },
     },
   });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stderr, '');
+  assert.deepEqual(found, []);
 });
 
-test('still rejects a token no value of the family uses', context => {
-  const result = runChecker(context, {
+test('still rejects a token no value of the family uses', () => {
+  const found = run({
     english: SINGULAR_COUNTED,
     translated: {
       agents: {
@@ -577,15 +626,15 @@ test('still rejects a token no value of the family uses', context => {
       },
     },
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile\/ru: "agents\.liveCount_one" placeholders differ from English \(none\)/
   );
 });
 
-test('still rejects a category that drops a placeholder English requires', context => {
-  const result = runChecker(context, {
+test('still rejects a category that drops a placeholder English requires', () => {
+  const found = run({
     english: {
       agents: {
         title: 'Agents',
@@ -603,9 +652,9 @@ test('still rejects a category that drops a placeholder English requires', conte
       },
     },
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile\/ru: "agents\.liveCount_other" placeholders differ from English \(count,total\)/
   );
 });
@@ -641,19 +690,18 @@ const WORDED_TRANSLATED = {
   },
 };
 
-test('accepts the reviewed plural forms that say their count in a word', context => {
-  const result = runChecker(context, {
+test('accepts the reviewed plural forms that say their count in a word', () => {
+  const found = run({
     english: WORDED_ENGLISH,
     translated: WORDED_TRANSLATED,
     source: WORDED_SOURCE,
     language: 'ar',
   });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stderr, '');
+  assert.deepEqual(found, []);
 });
 
-test('rejects a dropped count in an unreviewed locale-only plural form', context => {
-  const result = runChecker(context, {
+test('rejects a dropped count in an unreviewed locale-only plural form', () => {
+  const found = run({
     english: WORDED_ENGLISH,
     translated: {
       securityAgent: {
@@ -666,15 +714,15 @@ test('rejects a dropped count in an unreviewed locale-only plural form', context
     source: WORDED_SOURCE,
     language: 'ar',
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile\/ar: "securityAgent\.dashboard\.daysOverdue_few" drops \{\{displayCount\}\} without a reviewed worded form/
   );
 });
 
-test('rejects a dropped count in a plural form the allowlist does not name', context => {
-  const result = runChecker(context, {
+test('rejects a dropped count in a plural form the allowlist does not name', () => {
+  const found = run({
     english: WORDED_ENGLISH,
     translated: {
       securityAgent: {
@@ -687,15 +735,15 @@ test('rejects a dropped count in a plural form the allowlist does not name', con
     source: WORDED_SOURCE,
     language: 'ar',
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile\/ar: "securityAgent\.dashboard\.daysOverdue_other" placeholders differ from English \(displayCount\)/
   );
 });
 
-test('rejects a plural sibling that drops a value other than its count', context => {
-  const result = runChecker(context, {
+test('rejects a plural sibling that drops a value other than its count', () => {
+  const found = run({
     english: {
       agents: {
         title: 'Agents',
@@ -716,9 +764,9 @@ test('rejects a plural sibling that drops a value other than its count', context
     },
     source: "t('agents.title');\nt('agents.window', { count: 2 });",
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile\/ru: "agents\.window_one" placeholders differ from English \(displayCount,start\)/
   );
 });
@@ -752,19 +800,18 @@ const WORDED_COUNT_TRANSLATED = {
   },
 };
 
-test('accepts a reviewed worded form of a family counted with i18next’s count', context => {
-  const result = runChecker(context, {
+test('accepts a reviewed worded form of a family counted with i18next’s count', () => {
+  const found = run({
     english: WORDED_COUNT_ENGLISH,
     translated: WORDED_COUNT_TRANSLATED,
     source: WORDED_COUNT_SOURCE,
     language: 'ar',
   });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stderr, '');
+  assert.deepEqual(found, []);
 });
 
-test('rejects a dropped count in an unreviewed form of that family', context => {
-  const result = runChecker(context, {
+test('rejects a dropped count in an unreviewed form of that family', () => {
+  const found = run({
     english: WORDED_COUNT_ENGLISH,
     translated: {
       securityAgent: {
@@ -777,15 +824,15 @@ test('rejects a dropped count in an unreviewed form of that family', context => 
     source: WORDED_COUNT_SOURCE,
     language: 'ar',
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile\/ar: "securityAgent\.deadline\.dueInDays_few" drops \{\{count\}\} without a reviewed worded form/
   );
 });
 
-test('rejects the same worded form in a locale the allowlist does not name', context => {
-  const result = runChecker(context, {
+test('rejects the same worded form in a locale the allowlist does not name', () => {
+  const found = run({
     english: WORDED_COUNT_ENGLISH,
     translated: {
       securityAgent: {
@@ -800,11 +847,11 @@ test('rejects the same worded form in a locale the allowlist does not name', con
     source: WORDED_COUNT_SOURCE,
     language: 'he',
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   // The dual has no English sibling, so only the reviewed-form allowance could
   // accept it: a Hebrew entry must not ride on the Arabic one.
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile\/he: "securityAgent\.deadline\.dueInDays_two" drops \{\{count\}\} without a reviewed worded form/
   );
 });
@@ -817,8 +864,8 @@ const COUNTED = {
 };
 const COUNTED_SOURCE = "t('counts.items', { count: 2 });\nt('counts.itemsShort', { count: 2 });";
 
-test('accepts a locale-declared family for a flat counted English key', context => {
-  const result = runChecker(context, {
+test('accepts a locale-declared family for a flat counted English key', () => {
+  const found = run({
     english: COUNTED,
     translated: {
       counts: {
@@ -832,22 +879,20 @@ test('accepts a locale-declared family for a flat counted English key', context 
     },
     source: COUNTED_SOURCE,
   });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stderr, '');
+  assert.deepEqual(found, []);
 });
 
-test('accepts a flat counted key kept untranslated to a family in another locale', context => {
-  const result = runChecker(context, {
+test('accepts a flat counted key kept untranslated to a family in another locale', () => {
+  const found = run({
     english: COUNTED,
     translated: { counts: { items: '{{count}} lokala', itemsShort: '{{count}}l' } },
     source: COUNTED_SOURCE,
   });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stderr, '');
+  assert.deepEqual(found, []);
 });
 
-test('rejects an incomplete locale-declared family for a counted key', context => {
-  const result = runChecker(context, {
+test('rejects an incomplete locale-declared family for a counted key', () => {
+  const found = run({
     english: COUNTED,
     translated: {
       counts: {
@@ -858,15 +903,15 @@ test('rejects an incomplete locale-declared family for a counted key', context =
     },
     source: COUNTED_SOURCE,
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile\/ru: plural family "counts\.items" lacks the other category of ru/
   );
 });
 
-test('rejects a wrong placeholder in a locale-declared counted family', context => {
-  const result = runChecker(context, {
+test('rejects a wrong placeholder in a locale-declared counted family', () => {
+  const found = run({
     english: COUNTED,
     translated: {
       counts: {
@@ -878,15 +923,15 @@ test('rejects a wrong placeholder in a locale-declared counted family', context 
     },
     source: COUNTED_SOURCE,
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile\/ru: "counts\.items_one" uses placeholder \{\{total\}\}, which the English family does not/
   );
 });
 
-test('still rejects an unrelated extra key beside a counted family', context => {
-  const result = runChecker(context, {
+test('still rejects an unrelated extra key beside a counted family', () => {
+  const found = run({
     english: COUNTED,
     translated: {
       counts: {
@@ -899,8 +944,8 @@ test('still rejects an unrelated extra key beside a counted family', context => 
     },
     source: COUNTED_SOURCE,
   });
-  assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stderr, /mobile\/ru: extra key "counts\.stray" is not in en\.json/);
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/ru: extra key "counts\.stray" is not in en\.json/);
 });
 
 /**
@@ -938,8 +983,8 @@ const BUCKET_SOURCE = [
   "t('securityAgent.dashboardMetrics.breakdownHigh', { count: 1, displayCount: '1' });",
 ].join('\n');
 
-test('accepts the two lines wording one bucket apart', context => {
-  const result = runChecker(context, {
+test('accepts the two lines wording one bucket apart', () => {
+  const found = run({
     english: BUCKET_PHRASES,
     translated: {
       securityAgent: {
@@ -967,10 +1012,10 @@ test('accepts the two lines wording one bucket apart', context => {
     // categories its own plural rules require.
     language: 'nb',
   });
-  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(found, []);
 });
 
-test('still rejects two unrelated families worded apart', context => {
+test('still rejects two unrelated families worded apart', () => {
   const english = {
     agents: {
       title: 'Agents',
@@ -980,7 +1025,7 @@ test('still rejects two unrelated families worded apart', context => {
       heldCount_other: '{{count}} live sessions',
     },
   };
-  const result = runChecker(context, {
+  const found = run({
     english,
     translated: {
       agents: {
@@ -997,8 +1042,8 @@ test('still rejects two unrelated families worded apart', context => {
     },
     source: `${SOURCE}\nt('agents.heldCount', { count: 2 });`,
   });
-  assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stderr, /is translated 2 ways/);
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /is translated 2 ways/);
 });
 
 const AGENT_EDITOR = {
@@ -1031,18 +1076,17 @@ const AGENT_EDITOR_SOURCE = [
   "t('profiles.agents.topP');",
 ].join('\n');
 
-test('accepts one spaced em dash in every agent-editor visibility option', context => {
-  const result = runChecker(context, {
+test('accepts one spaced em dash in every agent-editor visibility option', () => {
+  const found = run({
     english: AGENT_EDITOR,
     translated: AGENT_EDITOR_TRANSLATED,
     source: AGENT_EDITOR_SOURCE,
   });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stderr, '');
+  assert.deepEqual(found, []);
 });
 
-test('rejects a visibility option whose label and description use a hyphen', context => {
-  const result = runChecker(context, {
+test('rejects a visibility option whose label and description use a hyphen', () => {
+  const found = run({
     english: AGENT_EDITOR,
     translated: {
       ...AGENT_EDITOR_TRANSLATED,
@@ -1052,15 +1096,15 @@ test('rejects a visibility option whose label and description use a hyphen', con
     },
     source: AGENT_EDITOR_SOURCE,
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile\/ru: "profiles\.agents\.visibilityAll" must join its label and description with " — "/
   );
 });
 
-test('rejects a catalog that translates the sampling parameter label', context => {
-  const result = runChecker(context, {
+test('rejects a catalog that translates the sampling parameter label', () => {
+  const found = run({
     english: AGENT_EDITOR,
     translated: {
       ...AGENT_EDITOR_TRANSLATED,
@@ -1070,9 +1114,9 @@ test('rejects a catalog that translates the sampling parameter label', context =
     },
     source: AGENT_EDITOR_SOURCE,
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile\/ru: "profiles\.agents\.topP" must read "Top P" in every catalog/
   );
 });
@@ -1083,8 +1127,8 @@ const PULL_REQUEST_TERM = {
 };
 const PULL_REQUEST_TERM_SOURCE = "t('agents.title');\nt('manualReview.startNotFound');";
 
-test('accepts the pull-request term capitalized in a catalog', context => {
-  const result = runChecker(context, {
+test('accepts the pull-request term capitalized in a catalog', () => {
+  const found = run({
     english: PULL_REQUEST_TERM,
     translated: {
       agents: { title: 'Агенты' },
@@ -1092,16 +1136,15 @@ test('accepts the pull-request term capitalized in a catalog', context => {
     },
     source: PULL_REQUEST_TERM_SOURCE,
   });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stderr, '');
+  assert.deepEqual(found, []);
 });
 
 for (const [miscased, name] of [
   ['pR', 'the acronym with a lower-case first letter'],
   ['pull-Request', 'the hyphenated term with a lower-case first letter'],
 ]) {
-  test(`rejects ${name}`, context => {
-    const result = runChecker(context, {
+  test(`rejects ${name}`, () => {
+    const found = run({
       english: PULL_REQUEST_TERM,
       translated: {
         agents: { title: 'Агенты' },
@@ -1109,9 +1152,9 @@ for (const [miscased, name] of [
       },
       source: PULL_REQUEST_TERM_SOURCE,
     });
-    assert.equal(result.status, 1, result.stderr);
+    assert.ok(found.length > 0, 'expected a problem');
     assert.match(
-      result.stderr,
+      found.join('\n'),
       new RegExp(
         `mobile/ru: "manualReview\\.startNotFound" writes the pull-request term "${miscased}"; write "PR" or "Pull-Request"`
       )
@@ -1131,8 +1174,8 @@ const ARMENIAN_TERMINATORS = {
 const ARMENIAN_TERMINATORS_SOURCE =
   "t('work.empty');\nt('work.waiting');\nt('work.retry');\nt('work.host');\nt('work.note');";
 
-test('accepts Armenian copy that closes its sentences with «։»', context => {
-  const result = runChecker(context, {
+test('accepts Armenian copy that closes its sentences with «։»', () => {
+  const found = run({
     language: 'hy',
     english: ARMENIAN_TERMINATORS,
     translated: {
@@ -1146,8 +1189,7 @@ test('accepts Armenian copy that closes its sentences with «։»', context => {
     },
     source: ARMENIAN_TERMINATORS_SOURCE,
   });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stderr, '');
+  assert.deepEqual(found, []);
 });
 
 for (const [name, value, mark] of [
@@ -1155,8 +1197,8 @@ for (const [name, value, mark] of [
   ['a period before the next sentence', 'Չհաջողվեց. Կրկին փորձեք', '.'],
   ['a terminal colon', 'Չհաջողվեց պատասխանել:', ':'],
 ]) {
-  test(`rejects Armenian copy with ${name}`, context => {
-    const result = runChecker(context, {
+  test(`rejects Armenian copy with ${name}`, () => {
+    const found = run({
       language: 'hy',
       english: ARMENIAN_TERMINATORS,
       translated: {
@@ -1170,9 +1212,9 @@ for (const [name, value, mark] of [
       },
       source: ARMENIAN_TERMINATORS_SOURCE,
     });
-    assert.equal(result.status, 1, result.stderr);
+    assert.ok(found.length > 0, 'expected a problem');
     assert.match(
-      result.stderr,
+      found.join('\n'),
       new RegExp(
         `mobile/hy: "work\\.empty" ends a sentence with the ASCII "${mark}"; Armenian writes «։»`
       )
@@ -1180,8 +1222,8 @@ for (const [name, value, mark] of [
   });
 }
 
-test('rejects Armenian copy with a period that joins two sentences', context => {
-  const result = runChecker(context, {
+test('rejects Armenian copy with a period that joins two sentences', () => {
+  const found = run({
     language: 'hy',
     english: ARMENIAN_TERMINATORS,
     translated: {
@@ -1195,15 +1237,15 @@ test('rejects Armenian copy with a period that joins two sentences', context => 
     },
     source: ARMENIAN_TERMINATORS_SOURCE,
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /mobile\/hy: "work\.empty" joins two sentences with the ASCII "\."; Armenian writes «։» and «՝»/
   );
 });
 
-test('leaves another locale’s ASCII sentence terminator alone', context => {
-  const result = runChecker(context, {
+test('leaves another locale’s ASCII sentence terminator alone', () => {
+  const found = run({
     language: 'ru',
     english: ARMENIAN_TERMINATORS,
     translated: {
@@ -1217,12 +1259,11 @@ test('leaves another locale’s ASCII sentence terminator alone', context => {
     },
     source: ARMENIAN_TERMINATORS_SOURCE,
   });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stderr, '');
+  assert.deepEqual(found, []);
 });
 
-test('rejects a notification catalog the push locale registry omits', context => {
-  const result = runChecker(context, {
+test('rejects a notification catalog the push locale registry omits', () => {
+  const found = run({
     extraFiles: {
       'packages/notifications/src/i18n.ts': [
         `import en from './locales/en.json';`,
@@ -1231,15 +1272,15 @@ test('rejects a notification catalog the push locale registry omits', context =>
       ].join('\n'),
     },
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /notifications: catalog "ru\.json" has no push locale registry entry/
   );
 });
 
-test('rejects a push locale registry entry with no catalog import', context => {
-  const result = runChecker(context, {
+test('rejects a push locale registry entry with no catalog import', () => {
+  const found = run({
     extraFiles: {
       'packages/notifications/src/i18n.ts': [
         `import en from './locales/en.json';`,
@@ -1248,12 +1289,15 @@ test('rejects a push locale registry entry with no catalog import', context => {
       ].join('\n'),
     },
   });
-  assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stderr, /notifications: the push locale registry names "de" with no catalog/);
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications: the push locale registry names "de" with no catalog/
+  );
 });
 
-test('rejects a notification catalog file the push locale module does not import', context => {
-  const result = runChecker(context, {
+test('rejects a notification catalog file the push locale module does not import', () => {
+  const found = run({
     extraFiles: {
       'packages/notifications/src/i18n.ts': [
         `import en from './locales/en.json';`,
@@ -1261,15 +1305,15 @@ test('rejects a notification catalog file the push locale module does not import
       ].join('\n'),
     },
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /notifications: catalog "ru\.json" has no import in packages\/notifications\/src\/i18n\.ts/
   );
 });
 
-test('rejects a push locale registry entry bound to another catalog', context => {
-  const result = runChecker(context, {
+test('rejects a push locale registry entry bound to another catalog', () => {
+  const found = run({
     extraFiles: {
       'packages/notifications/src/i18n.ts': [
         `import en from './locales/en.json';`,
@@ -1278,15 +1322,15 @@ test('rejects a push locale registry entry bound to another catalog', context =>
       ].join('\n'),
     },
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /notifications: the push locale registry binds "ru" to "en" instead of the "ru" catalog import/
   );
 });
 
-test('rejects a push locale registry with no initializer', context => {
-  const result = runChecker(context, {
+test('rejects a push locale registry with no initializer', () => {
+  const found = run({
     extraFiles: {
       'packages/notifications/src/i18n.ts': [
         `import en from './locales/en.json';`,
@@ -1295,9 +1339,267 @@ test('rejects a push locale registry with no initializer', context => {
       ].join('\n'),
     },
   });
-  assert.equal(result.status, 1, result.stderr);
+  assert.ok(found.length > 0, 'expected a problem');
   assert.match(
-    result.stderr,
+    found.join('\n'),
     /notifications\/src\/i18n\.ts: the push locale registry has no initializer/
   );
+});
+
+test('importing the module reads and audits nothing', () => {
+  // A root holding only the checker and its shared modules: no catalogs, no
+  // wording exceptions, no source tree. Anything the module does on import
+  // beyond declaring its exports fails here.
+  const root = fixture({});
+  mkdirSync(join(root, 'tools/i18n'), { recursive: true });
+  mkdirSync(join(root, 'tools/lib'), { recursive: true });
+  for (const name of SHARED_MODULES) {
+    copyFileSync(new URL(`../lib/${name}`, import.meta.url), join(root, `tools/lib/${name}`));
+  }
+  copyFileSync(
+    new URL('./check-catalogs.mjs', import.meta.url),
+    join(root, 'tools/i18n/check-catalogs.mjs')
+  );
+  // The parser resolves, because importing the checker loads the scanner.
+  symlinkSync(join(REPO, 'node_modules'), join(root, 'node_modules'), 'dir');
+  writeFileSync(join(root, 'probe.mjs'), "import './tools/i18n/check-catalogs.mjs';\n");
+  const result = spawnSync(process.execPath, [join(root, 'probe.mjs')], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.equal(result.stderr, '');
+});
+
+test('reports a matching catalog tree through the command', () => {
+  const root = cliFixture(standardFiles());
+  const result = cli(root);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+  assert.match(result.stdout, /check-catalogs: 2 languages, every catalog matches en\.json/);
+});
+
+test('reports a broken catalog through the command and exits non-zero', () => {
+  const translated = { agents: { ...TRANSLATED.agents } };
+  delete translated.agents.title;
+  const root = cliFixture(standardFiles({ translated }));
+  const result = cli(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
+  assert.match(result.stderr, /check-catalogs: \d+ problem\(s\)/);
+});
+
+// A confirmation's safe button falls back to the catalog's own Cancel label
+// (`cancelLabel ?? t('common.cancel')`), so a destructive label translated with
+// that same word leaves the reader two buttons that both read Cancel.
+const CONFIRM_ENGLISH = {
+  common: { cancel: 'Cancel', keepEditing: 'Keep editing' },
+  sessionShare: { revoke: 'Revoke link' },
+};
+const CONFIRM_SOURCE = [
+  "t('common.cancel');",
+  "t('common.keepEditing');",
+  "confirm({ message: 'Stop sharing?', confirmLabel: t('sessionShare.revoke') });",
+].join('\n');
+const FRENCH_CANCEL = { cancel: 'Annuler', keepEditing: 'Continuer la modification' };
+
+test('rejects a destructive confirm label that is the catalog’s Cancel word', () => {
+  const found = run({
+    language: 'fr',
+    english: CONFIRM_ENGLISH,
+    translated: {
+      common: FRENCH_CANCEL,
+      sessionShare: { revoke: 'Annuler' },
+    },
+    source: CONFIRM_SOURCE,
+  });
+  assert.deepEqual(found, [
+    'mobile/fr: "sessionShare.revoke" reads "Annuler", which this catalog already uses for Cancel ("Annuler"); the destructive button must use a verb the locale does not use for Cancel',
+  ]);
+});
+
+test('rejects a destructive confirm label that contains the Cancel word', () => {
+  const found = run({
+    language: 'fr',
+    english: CONFIRM_ENGLISH,
+    translated: {
+      common: FRENCH_CANCEL,
+      sessionShare: { revoke: 'Annuler le partage' },
+    },
+    source: CONFIRM_SOURCE,
+  });
+  assert.deepEqual(found, [
+    'mobile/fr: "sessionShare.revoke" reads "Annuler le partage", which this catalog already uses for Cancel ("Annuler"); the destructive button must use a verb the locale does not use for Cancel',
+  ]);
+});
+
+test('accepts a destructive confirm label with a verb of its own', () => {
+  const found = run({
+    language: 'fr',
+    english: CONFIRM_ENGLISH,
+    translated: {
+      common: FRENCH_CANCEL,
+      sessionShare: { revoke: 'Révoquer le lien' },
+    },
+    source: CONFIRM_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+// "Cancel subscription" beside "Cancel" is the shipped English pattern, so
+// English anchors the class: a locale may translate this label with its Cancel
+// word, because English already tells the reader which action ends. The
+// equality test still applies there: a locale that renders the red button with
+// nothing but the Cancel word leaves two buttons reading Cancel.
+const ANCHORED_ENGLISH = {
+  common: { cancel: 'Cancel', keepEditing: 'Keep editing' },
+  kiloPass: { manage: { cancel: 'Cancel subscription' } },
+};
+const ANCHORED_SOURCE = [
+  "t('common.cancel');",
+  "t('common.keepEditing');",
+  "confirm({ message: 'Stop renewing?', confirmLabel: t('kiloPass.manage.cancel') });",
+].join('\n');
+
+test('accepts an English confirm label that names the action it cancels', () => {
+  const found = run({
+    english: ANCHORED_ENGLISH,
+    translated: {
+      common: { cancel: 'Отмена', keepEditing: 'Продолжить изменение' },
+      kiloPass: { manage: { cancel: 'Отмена подписки' } },
+    },
+    source: ANCHORED_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects an anchored confirm label that is only the catalog’s Cancel word', () => {
+  const found = run({
+    english: ANCHORED_ENGLISH,
+    translated: {
+      common: { cancel: 'Отмена', keepEditing: 'Продолжить изменение' },
+      kiloPass: { manage: { cancel: 'Отмена' } },
+    },
+    source: ANCHORED_SOURCE,
+  });
+  assert.deepEqual(found, [
+    'mobile/ru: "kiloPass.manage.cancel" reads "Отмена", which this catalog already uses for Cancel ("Отмена"); the destructive button must use a verb the locale does not use for Cancel',
+  ]);
+});
+
+// Turkish writes the capital of `i` as `İ` (U+0130), which lowercases to `i`
+// plus U+0307; a fold that keeps the mark misses every value spelling the word
+// with a plain `i`.
+const TURKISH_CANCEL = { cancel: 'İptal', keepEditing: 'Düzenlemeye devam et' };
+const TURKISH_ENGLISH = {
+  common: { cancel: 'Cancel', keepEditing: 'Keep editing' },
+  sessionShare: { revoke: 'Revoke link' },
+};
+
+test('rejects a destructive confirm label that spells the dotted Cancel word with a plain i', () => {
+  const found = run({
+    language: 'tr',
+    english: TURKISH_ENGLISH,
+    translated: {
+      common: TURKISH_CANCEL,
+      sessionShare: { revoke: 'Bağlantıyı iptal et' },
+    },
+    source: CONFIRM_SOURCE,
+  });
+  assert.deepEqual(found, [
+    'mobile/tr: "sessionShare.revoke" reads "Bağlantıyı iptal et", which this catalog already uses for Cancel ("İptal"); the destructive button must use a verb the locale does not use for Cancel',
+  ]);
+});
+
+test('accepts a Turkish label that names the action beside an anchored Cancel word', () => {
+  const found = run({
+    language: 'tr',
+    english: ANCHORED_ENGLISH,
+    translated: {
+      common: TURKISH_CANCEL,
+      kiloPass: { manage: { cancel: 'Aboneliği iptal et' } },
+    },
+    source: ANCHORED_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('accepts a destructive label whose every call site names its own cancel label', () => {
+  const found = run({
+    language: 'fr',
+    english: CONFIRM_ENGLISH,
+    translated: {
+      common: FRENCH_CANCEL,
+      sessionShare: { revoke: 'Annuler' },
+    },
+    source: [
+      "t('common.cancel');",
+      "t('common.keepEditing');",
+      "confirm({ message: 'Stop sharing?', confirmLabel: t('sessionShare.revoke'), cancelLabel: t('common.keepEditing') });",
+      "confirm({ message: 'Stop sharing this link?', confirmLabel: t('sessionShare.revoke'), cancelLabel: t('common.keepEditing') });",
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects an Alert destructive button that reads as the Cancel word', () => {
+  const found = run({
+    language: 'fr',
+    english: CONFIRM_ENGLISH,
+    translated: {
+      common: FRENCH_CANCEL,
+      sessionShare: { revoke: 'Annuler' },
+    },
+    source: [
+      "t('common.cancel');",
+      "t('common.keepEditing');",
+      "Alert.alert('Stop sharing?', undefined, [{ text: t('common.keepEditing'), style: 'cancel' }, { text: t('sessionShare.revoke'), style: 'destructive' }]);",
+    ].join('\n'),
+  });
+  assert.deepEqual(found, [
+    'mobile/fr: "sessionShare.revoke" reads "Annuler", which this catalog already uses for Cancel ("Annuler"); the destructive button must use a verb the locale does not use for Cancel',
+  ]);
+});
+
+// `consent-card.tsx` passes `actions.destructiveLabel` into `confirm()` with no
+// `cancelLabel`, so the safe button falls back to Cancel there too; the label
+// itself is resolved from an object literal in `consent-mode.ts`.
+const CONSENT_ENGLISH = {
+  common: { back: 'Back', cancel: 'Cancel' },
+  consent: { revokeConsent: 'Revoke consent' },
+};
+const CONSENT_SOURCE = [
+  "t('common.back');",
+  "t('common.cancel');",
+  "const actions = { primaryLabel: i18n.t('common.back'), destructiveLabel: i18n.t('consent.revokeConsent') };",
+  "confirm({ title: 'Revoke consent?', message: 'You will be signed out.', confirmLabel: actions.destructiveLabel });",
+].join('\n');
+
+test('rejects a consent destructive label that reads as the Cancel word, and accepts a verb of its own', () => {
+  const found = run({
+    language: 'fr',
+    english: CONSENT_ENGLISH,
+    translated: {
+      common: { back: 'Retour', cancel: 'Annuler' },
+      consent: { revokeConsent: 'Annuler' },
+    },
+    source: CONSENT_SOURCE,
+  });
+  assert.deepEqual(found, [
+    'mobile/fr: "consent.revokeConsent" reads "Annuler", which this catalog already uses for Cancel ("Annuler"); the destructive button must use a verb the locale does not use for Cancel',
+  ]);
+
+  const distinct = run({
+    language: 'fr',
+    english: CONSENT_ENGLISH,
+    translated: {
+      common: { back: 'Retour', cancel: 'Annuler' },
+      consent: { revokeConsent: 'Révoquer le consentement' },
+    },
+    source: CONSENT_SOURCE,
+  });
+  assert.deepEqual(distinct, []);
 });

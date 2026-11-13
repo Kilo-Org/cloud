@@ -23,6 +23,10 @@
   },
   "common": {
     "deleteTitle": "刪除 {{label}}？",
+    "manageOnWeb": "在網頁上管理",
+    "creditHistory": "點數紀錄",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": "。",
     "listJoiner": "、",
     "cancel": "取消",
@@ -119,6 +123,7 @@
     "copyLink": "複製連結",
     "couldNotLoadOrganizations": "無法載入組織。",
     "couldNotLoadSessions": "無法載入工作階段。",
+    "couldnTLoad": "無法載入內容。",
     "couldnTLoadMore": "無法載入更多內容。",
     "deviceSessions": "裝置工作階段",
     "disabled": "已停用",
@@ -246,6 +251,10 @@
     "notAdded": "你已登入。{{provider}} 未新增至你的帳戶。"
   },
   "profile": {
+    "creditHistorySubtitle": "購買、收據與點數活動",
+    "invoicesSubtitle": "下載你的購買發票",
+    "manageBilling": "在 kilo.ai 管理帳單",
+    "manageBillingIosNote": "付款方式、自動儲值與帳單詳細資料皆在 kilo.ai 上管理。",
     "codeReviewerSubtitle": "自動 PR 審查",
     "securityAgentSubtitle": "尋找並修復漏洞",
     "reviews": "審查",
@@ -299,6 +308,7 @@
     "passkeyAdded": "已新增通行密鑰。",
     "passkeyAddFailed": "無法新增通行密鑰。請重試。",
     "passkeyAddUnsupported": "此裝置無法建立通行密鑰。",
+    "passkeyAddUnavailable": "通行密鑰只能在網頁瀏覽器中新增。",
     "passkeyAddCancelled": "通行密鑰建立已取消。",
     "passkeyRemoved": "已移除通行密鑰。",
     "passkeyRemoveFailed": "無法移除該通行密鑰。請重試。",
@@ -318,7 +328,7 @@
     },
     "signInMethods": {
       "title": "登入方式",
-      "unlink": "取消連結",
+      "unlink": "移除連結",
       "unlinkProvider": "取消連結 {{provider}}",
       "unlinkTitle": "取消連結 {{provider}}？",
       "unlinkMessage": "你將無法再使用 {{provider}} 登入。其他登入方式不受影響。",
@@ -331,7 +341,6 @@
     "providerKeys": {
       "title": "供應商金鑰",
       "rowSubtitle": "使用你自己的供應商計費",
-      "manageOnWeb": "在網頁上管理",
       "manageOnWebReason": "這些供應商需要結構化憑證",
       "description": "透過這些金鑰發出的請求會向你的供應商帳戶計費，而不會從你的 Kilo 餘額扣除。",
       "enabled": "使用中",
@@ -760,6 +769,16 @@
       "changeRequestFailed": "Kilo 無法開啟提取請求。請稍後再試。",
       "proposalConflict": "此儲存庫已有另一個審查記憶提案仍在進行中，因此目前無法儲存此提案。",
       "offAction": "審查記憶已關閉。請啟用後再試一次。",
+      "analyze": {
+        "title": "分析意見回饋",
+        "description": "選擇一個最近有維護者回覆的存放庫，然後找出一個重複出現的指引模式。",
+        "chooseRepository": "選擇存放庫",
+        "action": "立即分析",
+        "noRepositories": "目前還沒有任何存放庫有維護者的最新回覆。",
+        "proposed": "已建立審查記憶提案",
+        "noFeedback": "找不到此存放庫最近的意見回饋",
+        "noPattern": "找不到明確的重複模式"
+      },
       "off": "審查記憶已關閉。",
       "on": "審查記憶已開啟。",
       "offDescription": "啟用後，Kilo 會從維護者的回覆中學習，並提出 REVIEW.md 指引建議。",
@@ -835,7 +854,63 @@
       "title": "程式碼審查助手有問題需要處理。",
       "recoveryLabel": "聯絡客服"
     },
-    "unknownError": "未知錯誤"
+    "unknownError": "未知錯誤",
+    "skipBotPullRequests": {
+      "title": "略過來自機器人的提取要求",
+      "subtitle": "不要對 Dependabot 或 Renovate 等機器人開啟的提取要求執行自動審查。關閉此選項即可連機器人的提取要求一起審查。"
+    },
+    "repoModels": {
+      "title": "依存放庫設定模型",
+      "description": "讓部分存放庫的審查使用不同的模型、思考強度或兩者。",
+      "defaultModel": "使用預設模型",
+      "resetLabel": "重設 {{repository}} 的模型",
+      "changeHint": "開啟模型選擇器"
+    },
+    "analytics": {
+      "title": "分析",
+      "trackedReviews": "已追蹤的審查",
+      "findingsRaised": "提出的問題",
+      "highImpactChanges": "高影響變更",
+      "impactPoints": "影響分數",
+      "repositoryLine": "審查：{{reviews}} · 問題：{{findings}}",
+      "empty": "尚無含有分析資料的審查",
+      "emptyDescription": "在組織啟用分析期間，系統會記錄已完成的審查。",
+      "off": "此組織已關閉分析。",
+      "couldNotLoad": "無法載入分析資料"
+    },
+    "council": {
+      "title": "審查小組審查",
+      "subtitle": "多位專家分別審查每個提取要求，他們的投票會彙整成一項決定。",
+      "unavailable": "此組織無法使用審查小組審查。",
+      "noRepositories": "尚未選取任何存放庫。請先在存放庫設定中選取存放庫。",
+      "specialists": "專家",
+      "labels": "觸發審查小組審查的標籤",
+      "labelsPlaceholder": "例如：審查小組、深入審查",
+      "labelsDescription": "以逗號分隔標籤。啟用審查小組的存放庫接著只會對帶有至少一個這些標籤的提取要求執行審查小組。留空則適用於所有符合條件的提取要求。",
+      "tooManyLabels": "審查小組標籤過多。最多可使用 {{maximum}} 個標籤。",
+      "labelTooLong": "審查小組標籤過長。每個標籤不得超過 {{maximum}} 個字元。",
+      "minSpecialists": "請至少選取 {{minimum}} 位專家。已選取 {{selected}} 位。",
+      "specialistName": {
+        "testCoverage": "測試涵蓋範圍",
+        "correctness": "正確性",
+        "custom": "專家"
+      },
+      "specialist": {
+        "security": "權限繞過、密鑰處理與不安全的輸入。",
+        "performance": "熱路徑、N+1 查詢與大量記憶體配置。",
+        "testing": "新行為缺少涵蓋或涵蓋不足。",
+        "correctness": "邏輯錯誤、邊界情況與競爭條件。",
+        "custom": "審查其自身領域的問題。"
+      },
+      "strategy": {
+        "advisory": "建議性",
+        "advisoryDescription": "回報問題並投票，但不阻止合併。",
+        "unanimous": "全體一致",
+        "unanimousDescription": "任何專家回報嚴重問題時阻止合併。",
+        "majority": "多數決",
+        "majorityDescription": "只有在多數專家回報嚴重問題時才阻止合併。"
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1338,6 +1413,16 @@
       "auto": "自動",
       "shallow": "初步",
       "deep": "深度"
+    },
+    "orphanedFindings": {
+      "title": "已移除存放庫的問題",
+      "description": "這些存放庫已無法透過 GitHub 整合存取。它們的問題仍會計入儀表板與報告。",
+      "count": "問題：{{count}}",
+      "clearLabel": "清除 {{repository}} 的問題",
+      "confirmTitle": "清除問題？",
+      "confirmMessage": "{{repository}} 的所有已記錄問題都會被刪除，且無法復原。",
+      "confirmAction": "刪除問題",
+      "cleared": "已清除問題：{{count}}"
     }
   },
   "agents": {
@@ -1517,6 +1602,7 @@
       "branchPlaceholder": "選取一個分支",
       "runOnWithTarget": "執行環境：{{target}}",
       "environment": "環境",
+      "cloudEnvironment": "雲端環境",
       "couldNotLoadEnvironment": "無法載入你的環境。",
       "retryLoadingEnvironment": "重新載入環境",
       "defaultEnvironment": "預設環境",
@@ -1577,6 +1663,89 @@
       "openSettingsToReview": "打開設定進行查看",
       "profileSelection": "型材選擇",
       "profileLayerAccessibility": "{{label}}：{{detail}}"
+    },
+    "environment": {
+      "loadingEnvironments": "正在載入環境",
+      "couldNotLoadEnvironments": "無法載入環境",
+      "couldNotLoadEnvironmentsDetail": "請再試一次，以載入此存放庫的環境。",
+      "noEnvironment": "無環境",
+      "noEnvironmentDetail": "此工作階段將從基礎映像檔開始。",
+      "chooseEnvironment": "選擇環境",
+      "chooseEnvironmentDetail": "此存放庫有多個環境。",
+      "environmentAccessibility": "選擇環境：{{label}}",
+      "environmentsForRepository": "{{repository}} 的環境",
+      "selectEnvironmentToStart": "請選擇要開始使用的環境。",
+      "buildDetails": "建置詳細資料",
+      "buildNotBuilt": "尚未建置",
+      "buildUnavailableShort": "無法建置快照",
+      "buildPreparing": "正在準備建置器",
+      "buildCloning": "正在複製預設分支",
+      "buildSetup": "正在執行環境設定",
+      "buildCleanup": "正在移除建置憑證",
+      "buildCapturing": "正在擷取快照",
+      "buildPublishing": "正在發布快照",
+      "buildStopping": "正在停止建置器",
+      "buildStoppingRetrying": "正在停止建置器，重試中",
+      "buildFinishing": "正在完成建置",
+      "buildSucceeded": "快照已就緒",
+      "buildSuperseded": "已被較新的建置取代",
+      "buildStale": "此快照建立後設定已變更",
+      "buildStaleAge": "快照已超過四天；下一個工作階段會重新整理它",
+      "buildStaleImage": "針對較早的沙箱映像檔建置",
+      "failureClone": "無法複製存放庫。",
+      "failureSetup": "設定指令執行失敗。請查看建置記錄。",
+      "failureTimeout": "設定指令逾時。請查看建置記錄。",
+      "failureCleanup": "無法移除憑證，因此未擷取快照。",
+      "failureCapture": "無法擷取快照。",
+      "failureCaptureUncertain": "快照結果已遺失；此建置未發佈。",
+      "failureDeadline": "建置未能在時限內完成。",
+      "failureBuilderLost": "建置器已停止回報。",
+      "failureBuilderStart": "建置器無法啟動。",
+      "failureUnauthorized": "存放庫存取權已不再獲得授權。",
+      "failureActorUnauthorized": "啟動此建置的人員已不再具有存取權。",
+      "failureBilling": "建置需要可用的點數。",
+      "failureBillingUnavailable": "計費系統無法受理此建置。請再試一次。",
+      "failureConfiguration": "建置期間設定已變更。",
+      "failureRuntime": "無法安裝所選的執行階段版本。",
+      "failureGeneric": "建置失敗。",
+      "buildLogs": "建置記錄",
+      "noBuildLogs": "尚無記錄輸出。",
+      "buildLogsLatestOnly": "正在顯示最新保留的 500 行記錄。",
+      "buildLogsTruncated": "後續輸出已遭截斷。",
+      "couldNotLoadBuild": "無法載入建置狀態",
+      "couldNotLoadBuildLogs": "無法載入建置記錄",
+      "buildsUnavailable": "此環境無法建置快照。",
+      "onlyManagersCanBuild": "只有組織管理員可以建置快照。",
+      "waitForBuilder": "請等待建置器停止後再重新建置。",
+      "buildAction": "建置快照",
+      "refreshAction": "重新整理快照",
+      "cancelBuildAction": "取消建置",
+      "buildStarted": "已開始建置快照",
+      "buildCanceled": "已取消建置快照",
+      "couldNotStartBuild": "無法開始建置",
+      "couldNotCancelBuild": "無法取消建置",
+      "sandbox": "沙箱",
+      "sandboxActive": "沙箱運作中",
+      "sandboxSleeping": "沙箱休眠中",
+      "sandboxStarting": "沙箱啟動中",
+      "sandboxStopping": "沙箱停止中",
+      "sandboxError": "沙箱發生錯誤",
+      "sandboxUnreachable": "無法連線至沙箱",
+      "sandboxStatusUnknown": "沙箱狀態未知",
+      "sandboxChecked": "檢查時間：{{when}}",
+      "sandboxDetailStopped": "傳送訊息即可繼續使用。",
+      "sandboxDetailFailed": "傳送訊息即可再試一次。",
+      "sandboxDetailConnection": "沙箱連線無法使用。",
+      "sandboxDetailUnavailable": "暫時無法取得沙箱狀態。",
+      "sandboxDetailInsufficient": "資訊不足，無法確認沙箱目前的狀態。",
+      "sandboxDetailCheckNeeded": "沙箱最近未確認其健康狀態。",
+      "startFresh": "重新開始",
+      "startFreshTitle": "要重新開始嗎？",
+      "startFreshMessage": "這會捨棄擷取時間為 {{when}} 的工作區快照。該工作區中未提交的變更將會遺失。",
+      "startFreshMessageUnknown": "這會捨棄已儲存的工作區快照，該快照無法讀取。該工作區中未提交的變更將會遺失。",
+      "startFreshDone": "已移除工作區快照。",
+      "couldNotRemoveSnapshot": "無法移除工作區快照。",
+      "snapshotCaptured": "工作區快照擷取時間：{{when}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 個檔案。",
@@ -1926,7 +2095,8 @@
       "cancelQueued": "取消訊息",
       "cancelQueuedAccessibility": "取消已排入佇列的訊息",
       "restoreQueued": "還原",
-      "restoreQueuedAccessibility": "將已取消的訊息還原至訊息輸入框"
+      "restoreQueuedAccessibility": "將已取消的訊息還原至訊息輸入框",
+      "noReplyRecorded": "沒有為此訊息記錄任何回覆。"
     },
     "olderMessages": {
       "arrived": "已載入較早的訊息",
@@ -2319,6 +2489,26 @@
     "onlyFirstFilesAttached_other": "只會附加前 {{displayCount}} 個檔案。"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "帳單紀錄",
+      "billingHistoryEmpty": "尚無帳單紀錄。",
+      "cancel": "取消訂閱",
+      "cancelDescription": "你的 Kilo Pass 會維持有效至本計費週期結束，且不會續訂。",
+      "cancelScheduled": "將於 {{date}} 取消",
+      "cancelScheduledChange": "取消排定的變更",
+      "cancelled": "已取消訂閱",
+      "changePlan": "在 kilo.ai 變更方案",
+      "changePlanIosNote": "付費方案變更請至 kilo.ai 進行。",
+      "creditHistoryEmpty": "尚無 Kilo Pass 點數。",
+      "manageInStore": "在 {{store}} 管理",
+      "resume": "恢復訂閱",
+      "resumeCancelledDescription": "你的 Kilo Pass 將重新開始自動續訂。",
+      "resumePausedDescription": "你的 Kilo Pass 將立即恢復，不必等到排定的恢復日期。",
+      "resumed": "已恢復訂閱",
+      "scheduledChange": "排定的變更",
+      "scheduledChangeCancelDescription": "你的 Kilo Pass 將維持目前的方案，並照常續訂。",
+      "scheduledChangeSummary": "{{date}} 變更為 {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "目前無法使用 Kilo Pass。",
     "couldNotLoad": "無法載入 Kilo Pass。請再試一次。",
@@ -2328,7 +2518,7 @@
     "subscriptionLoading": "正在載入 Kilo Pass 訂閱",
     "retryHint": "重新取得 Kilo Pass 狀態。",
     "cardAccessibility": "{{title}}。{{description}}。{{actionLabel}}",
-    "purchaseUnavailableEnded": "你的 Kilo Pass 已結束。",
+    "endedOn": "已於 {{date}} 結束",
     "notAvailableInApp": "Kilo Pass 無法在應用程式內使用。",
     "statusActive": "使用中",
     "statusTrialing": "試用中",
@@ -2350,7 +2540,7 @@
     "kiloPassManagement": "Kilo Pass 管理",
     "kiloPassSetup": "Kilo Pass 設定",
     "opensManagementOnWeb": "開啟 Kilo Pass 網頁版管理頁面。",
-    "tryAgainFromProfile": "請從個人資料頁再試一次。",
+    "loadFailedRetry": "請檢查您的網路連線，然後再試一次。",
     "legalTermsOfUse": "使用條款（EULA）",
     "purchaseDifferentAccount": "此 App Store 購買項目未連結至你的 Kilo 帳戶。請登入購買時使用的 Apple 帳戶後再試一次。",
     "purchaseFailed": "無法完成購買。",
@@ -2373,6 +2563,11 @@
     "accountDescription": "你的 Kilo 帳戶 ID 與請求中繼資料，用於驗證身分並計算用量。",
     "diagnosticsTitle": "應用程式診斷",
     "diagnosticsDescription": "已移除應用程式內容的當機與錯誤報告，用於維持應用程式的穩定性。",
+    "featureFlagsTitle": "功能推出",
+    "featureFlagsDescription": "你的帳戶電子郵件地址，由 PostHog 用於決定你會看到哪些功能。",
+    "featureFlagsWhat": "你的帳戶電子郵件地址。",
+    "featureFlagsWhy": "決定你會看到哪些功能，包括我們仍在逐步推出的功能。",
+    "featureFlagsWho": "PostHog，功能旗標服務。",
     "helpImprove": "協助改善 Kilo",
     "helpImproveDescription": "分享匿名的產品分析資料與安裝來源。你可以隨時在「設定」中變更此選項。",
     "seeFullDetails": "查看完整說明",
@@ -2988,6 +3183,36 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "稽核記錄",
+      "permissionDenied": "只有 Enterprise 套餐組織的擁有者、管理員或帳務管理員可以查看其稽核記錄。",
+      "emptyTitle": "沒有稽核事件",
+      "emptyDescription": "在此組織中執行的操作會顯示在這裡。",
+      "truncated": "僅顯示最近的事件。"
+    },
+    "billing": {
+      "title": "帳單",
+      "permissionDenied": "只有組織擁有者、管理員或帳單管理員可以查看組織帳單。",
+      "subscription": "訂閱",
+      "state": "狀態",
+      "stateNone": "無訂閱",
+      "statePastDue": "逾期未付",
+      "stateCancelsAtPeriodEnd": "將於本期結束時取消",
+      "stateTrialEndsOn": "試用期於 {{date}} 結束",
+      "stateTrialing": "試用中",
+      "stateRenewsOn": "將於 {{date}} 續訂",
+      "seatsDropTo": "{{date}} 起減為 {{seats}} 個席次",
+      "seats": "席次",
+      "autoTopUp": "自動儲值",
+      "autoTopUpAmount": "儲值金額",
+      "autoTopUpThreshold": "餘額低於此值時",
+      "manageOnWeb": "請在網頁上進行變更",
+      "changePlan": "變更套餐",
+      "buySeats": "購買席次",
+      "setupAutoTopUp": "設定自動儲值",
+      "webAddress": "網址 {{url}}",
+      "opensOnWeb": "在網頁上開啟"
+    },
     "boundary": {
       "backToProfile": "返回個人資料",
       "loadErrorMessage": "請檢查網路連線後再試一次。",
@@ -2995,14 +3220,20 @@
       "loadErrorTitle": "無法載入你的組織清單。",
       "membershipLostNotice": "你已無法存取此組織。已切換至 {{target}}。",
       "noOrganization": "沒有組織",
-      "noOrganizationDescription": "此帳戶不屬於任何組織。請在網頁版建立或加入組織，以使用成員邀請和低餘額提醒等組織功能。",
-      "openWebOrganizations": "在網頁版開啟組織",
+      "noOrganizationDescription": "此帳號不屬於任何組織。建立組織即可使用成員邀請、低餘額提醒等組織功能，或前往網頁加入你受邀的組織。",
       "organizationUnavailable": "無法存取組織。",
       "selectDescriptionWithOrganizations": "您屬於一個或多個組織。請選取此畫面應使用的帳戶。",
       "selectOrganization": "選取組織",
       "unavailableDescription": "此組織已無法存取。請到個人資料頁面選取其他組織，即可繼續。",
       "unavailableSessionsDescription": "此組織已無法存取。無法載入其工作階段。",
       "accessDeniedDescription": "你沒有存取此組織的權限。"
+    },
+    "create": {
+      "title": "建立組織",
+      "description": "組織可讓你與團隊共用點數、代理和設定。",
+      "nameLabel": "組織名稱",
+      "nameRequired": "請輸入組織名稱。",
+      "trialNote": "建立組織後，即會開始 14 天的 Enterprise 試用。套餐需在網頁上購買。"
     },
     "creditActivity": {
       "emptyDescription": "此組織的購買、用量與點數調整記錄都會顯示在這裡。",
@@ -3124,6 +3355,21 @@
       "ownRoleChange": "您無法變更自己的角色。",
       "inviteExpired": "此邀請已過期。",
       "inviteAccepted": "此邀請已被接受。"
+    },
+    "settingsOnWeb": {
+      "title": "網頁版組織設定",
+      "usageDetails": "使用詳情",
+      "providersAndModels": "供應商與模型",
+      "groups": "群組",
+      "guardrails": "防護機制",
+      "byok": "自備金鑰",
+      "ssoAndDomain": "SSO 與網域",
+      "emailPreferences": "電子郵件偏好設定",
+      "dataCollection": "資料收集",
+      "auditLogs": "稽核記錄",
+      "requestLogs": "請求記錄",
+      "subOrganizations": "子組織",
+      "distributeFunds": "分配資金"
     },
     "usageStats": {
       "inputTokens": "輸入詞元",
@@ -3870,6 +4116,25 @@
     "importConfigApplied": "設定已匯入"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "無法載入點數活動。",
+      "appStoreReceipt": "App Store 收據",
+      "deductionFallback": "點數扣除",
+      "emptyDescription": "點數購買、收據與使用情況會顯示在這裡。",
+      "emptyTitle": "尚無點數紀錄",
+      "googlePlayReceipt": "Google Play 收據",
+      "kind": {
+        "adjustment": "調整",
+        "balanceNeutral": "餘額不變",
+        "deduction": "扣除",
+        "grant": "贈送點數",
+        "purchase": "購買"
+      },
+      "purchaseFallback": "點數購買",
+      "receipt": "收據",
+      "receiptA11y": "開啟「{{description}}」的收據",
+      "receiptUnavailable": "此筆購買沒有可用的收據。"
+    },
     "title": "購買點數",
     "description": "點數是一次性購買，會加入你的 Kilo 餘額，用於在 Kilo App 中執行 AI 程式設計工作階段。商店會向你的帳戶收費，商店確認付款後點數才會入帳。",
     "nextExpiry": "{{amount}} 的點數將於 {{date}}（UTC）到期。最早到期的點數會優先使用。",
@@ -3955,7 +4220,7 @@
       "sessionPullRequest": "工作階段 PR",
       "sessionPullRequestNumber": "工作階段 PR #{{number}}",
       "openSessionHint": "開啟該工作階段。",
-      "unlinkSessionAction": "取消連結工作階段",
+      "unlinkSessionAction": "移除連結工作階段",
       "unlinkConfirmTitle": "要取消連結 {{title}} 嗎？",
       "unlinkConfirmMessage": "工作階段本身不會被刪除，只會移除它與此待辦事項的連結。",
       "startNewSession": "開始新的工作階段",
@@ -4051,6 +4316,70 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "無法開啟此搜尋結果"
+  },
+  "usage": {
+    "title": "用量",
+    "orgTitle": "組織用量",
+    "entrySubtitle": "費用、請求與詞元",
+    "rangePicker": "時間範圍",
+    "range90d": "90 天",
+    "metricPicker": "圖表指標",
+    "chartA11y": "每日{{metric}}",
+    "avgCostPerRequest": "每次請求平均費用",
+    "topModels": "最常用模型",
+    "topFeatures": "最常用功能",
+    "emptyTitle": "此期間沒有用量",
+    "orgSelfNotice": "你看到的是你自己在此組織中的用量。",
+    "viewDetails": "查看用量詳情"
+  },
+  "integrations": {
+    "title": "整合",
+    "sectionTitle": "已連結的服務",
+    "entrySubtitle": "GitHub、Slack、Linear 等",
+    "subtitle": "將您的開發工具與工作流程連結至 Kilo",
+    "emptyHint": "尚未連結任何整合。",
+    "disconnect": "中斷連結",
+    "disconnectTitle": "要中斷與 {{provider}} 的連結嗎？",
+    "disconnectMessage": "Kilo 將停止在 {{provider}} 中回應。您可以隨時重新連結。",
+    "connectedTo": "已連結至 {{account}}",
+    "disconnected": "已中斷與 {{provider}} 的連結",
+    "disconnectFailed": "無法中斷與 {{provider}} 的連結",
+    "couldNotLoad": "無法載入整合",
+    "permissionDenied": "您沒有管理這些整合的權限。",
+    "memberHint": "請洽詢組織擁有者或管理員來變更這些連結。",
+    "connectFailed": "無法開啟連結頁面"
+  },
+  "invoices": {
+    "personalEmptyDescription": "你個人購買的發票會在計費後顯示在這裡。"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "運算",
+      "noUsage": "尚無使用量",
+      "sharedWorkspace": "由此工作區中的所有對話共用",
+      "currentRates": "目前費率",
+      "perHour": "{{rate}}/小時",
+      "mediumSandbox": "中型沙箱",
+      "largeSandbox": "大型沙箱",
+      "earlierActivity": "較早的活動",
+      "now": "現在",
+      "loadFailed": "無法載入運算費用。"
+    },
+    "preview": {
+      "title": "開啟預覽",
+      "listeningServices": "監聽中的服務",
+      "empty": "找不到監聽中的服務。請要求代理啟動網頁伺服器，然後重新整理。",
+      "notRunning": "此沙箱已停止。傳送訊息給代理即可重新啟動。",
+      "notReady": "沙箱尚未就緒。連線後請重新整理。",
+      "unsupported": "此沙箱無法使用服務探索。",
+      "failed": "無法探索服務。",
+      "openService": "開啟連接埠 {{port}} 上的 {{name}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "觸發條件與 Webhook",
+      "subtitle": "在網頁上管理 Webhook 與排程觸發條件。"
+    }
   },
   "sessionShare": {
     "title": "分享工作階段",

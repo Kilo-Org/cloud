@@ -1,8 +1,16 @@
 import { desc, eq } from 'drizzle-orm';
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 
-import { receipts, session, sessionRoles } from '../../db/sqlite-schema';
-import type { ErrorCode, Principal, Receipt, SessionState, SyncError } from '../../protocol';
+import { receipts, session, sessionRoles, sessionStatus } from '../../db/sqlite-schema';
+import { sessionStatusSchema } from '../../protocol';
+import type {
+  ErrorCode,
+  Principal,
+  Receipt,
+  SessionState,
+  SessionStatus,
+  SyncError,
+} from '../../protocol';
 
 export type Db = DrizzleSqliteDODatabase;
 export type Meta = typeof session.$inferSelect;
@@ -24,6 +32,17 @@ export function raise(code: ErrorCode, message: string, details?: SyncError['det
 
 export function load(db: Db): Meta | undefined {
   return db.select().from(session).where(eq(session.key, KEY)).get();
+}
+
+export function readStatus(db: Db): SessionStatus | null {
+  const row = db.select().from(sessionStatus).where(eq(sessionStatus.key, KEY)).get();
+  if (!row) return null;
+  const parsed = sessionStatusSchema.safeParse({
+    value: row.value,
+    version: row.version,
+    updatedAt: row.updated_at,
+  });
+  return parsed.success ? parsed.data : null;
 }
 
 function belongs(meta: Meta, principal: Principal, sessionID: string): boolean {
@@ -115,6 +134,7 @@ export function toState(db: Db, meta: Meta): SessionState {
     },
     createdAt: meta.created_at,
     updatedAt: meta.updated_at,
+    status: readStatus(db),
   };
 }
 

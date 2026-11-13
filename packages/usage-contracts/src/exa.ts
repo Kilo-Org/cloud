@@ -41,7 +41,7 @@ export const EXA_USAGE_TYPE_MAX_LENGTH = 128;
  */
 export const ExaUsageRecordSchema = z.strictObject({
   id: z.string().uuid(),
-  occurredAt: z.string().datetime({ offset: true }),
+  occurredAt: z.iso.datetime({ offset: true }),
   userId: z.string().min(1),
   organizationId: z.string().uuid().nullable(),
   path: z.enum(EXA_ALLOWED_PATHS),

@@ -53,9 +53,10 @@ async function ticket(role, presence = false) {
 }
 async function socket(role, presence = false) {
   const auth = await ticket(role, presence);
-  const url = new URL(
-    presence ? `${origin}/v1/presence` : `${origin}/v1/sessions/${sessionID}/live`
-  );
+  return openSocket(auth, presence ? '/presence' : `/sessions/${sessionID}/live`);
+}
+async function openSocket(auth, path) {
+  const url = new URL(`${origin}/v1${path}`);
   url.protocol = 'ws:';
   const selectedProtocol = `kilo-session-ticket.${auth.ticket}`;
   const ws = new WebSocket(url, [selectedProtocol]);
@@ -83,7 +84,7 @@ async function socket(role, presence = false) {
         if (index >= 0) pending.splice(index, 1);
         reject(
           new Error(
-            `Timed out waiting for ${role}/${presence ? 'presence' : 'relay'} ${type}; queued: ${JSON.stringify(queue)}`
+            `Timed out waiting for ${path} ${type}; queued types: ${queue.map(frame => frame.type).join(',')}`
           )
         );
       }, 10_000);
@@ -138,6 +139,11 @@ try {
       reject(new Error(`Wrangler exited ${code}: ${output}`));
     });
   });
+  const notifications = await openSocket(
+    await request('/notifications/ticket', 'POST'),
+    '/notifications'
+  );
+  check((await notifications.next('hello')).body.resetRequired, true);
   const presenceRunner = await socket('runner', true);
   const presenceViewer = await socket('viewer', true);
   const instanceID = crypto.randomUUID();
@@ -173,6 +179,43 @@ try {
   check(create.body.commandID, createID);
   const registered = await request(`/sessions/${sessionID}`, 'PUT', { version: 1, sourceID });
   check(registered.creatorID, userID);
+  check((await notifications.next('session.created')).session.sessionID, sessionID);
+  const packet = {
+    version: 1,
+    sourceID,
+    batchID: crypto.randomUUID(),
+    after: 0,
+    through: 1,
+    changes: [
+      {
+        op: 'put',
+        kind: 'session',
+        id: sessionID,
+        value: { title: 'Synthetic notification title' },
+      },
+    ],
+  };
+  await request(`/sessions/${sessionID}/batches`, 'POST', packet);
+  check(
+    (await notifications.next('session.updated')).session.title,
+    'Synthetic notification title'
+  );
+  const busy = await request(`/sessions/${sessionID}/status`, 'PUT', {
+    version: 1,
+    sourceID,
+    after: 0,
+    status: 'busy',
+  });
+  check(busy.version, 1);
+  check((await notifications.next('session.status.updated')).session.status.value, 'busy');
+  await request(`/sessions/${sessionID}/status`, 'PUT', {
+    version: 1,
+    sourceID,
+    after: 1,
+    status: 'question',
+  });
+  check((await notifications.next('session.status.updated')).session.status.value, 'question');
+  check((await request(`/sessions/${sessionID}`)).status.value, 'question');
   presenceRunner.send({ type: 'reply', commandID: createID, body: { sessionID, created: true } });
   const created = await presenceController.next(
     'reply',
@@ -355,6 +398,8 @@ try {
   catchingUp.ws.close();
   controller.ws.close();
   check((await presenceRunner.next('watch', frame => !frame.body.watching)).body.watching, false);
+  await request(`/sessions/${sessionID}`, 'DELETE');
+  check((await notifications.next('session.deleted')).session.deletedAt > 0, true);
   console.log(
     JSON.stringify({
       result: 'PASS',

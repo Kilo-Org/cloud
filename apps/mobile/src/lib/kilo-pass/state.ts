@@ -16,6 +16,8 @@ export type KiloPassSubscription = {
   status: string;
   cancelAtPeriodEnd: boolean;
   resumesAt: string | null;
+  /** The date the pass stopped, for a pass that already ended. */
+  endedAt: string | null;
   nextBillingAt: string | null;
   refillAt: string | null;
   currentPeriodBaseCreditsUsd: number;
@@ -33,7 +35,7 @@ export type KiloPassSubscription = {
  * provider's value unchanged, so the set is written here instead of trusting
  * a fixed count.
  */
-const ENDED_STATUSES = new Set(['canceled', 'incomplete_expired', 'unpaid']);
+export const ENDED_STATUSES = new Set(['canceled', 'incomplete_expired', 'unpaid']);
 
 /** The plan's tier name, keyed by the tier the server stores. */
 const TIER_LABEL_KEYS = {
@@ -55,7 +57,14 @@ type KiloPassRow = {
 
 export type KiloPassDetail =
   | { kind: 'none' }
-  | { kind: 'ended' }
+  | {
+      kind: 'ended';
+      /** The plan's tier alone, for one line beside the end date. */
+      tierLabel: string;
+      planLabel: string;
+      /** The pass's end date, or the bare "Ended" when none is stored. */
+      endedLabel: string;
+    }
   | {
       kind: 'active';
       planLabel: string;
@@ -87,13 +96,26 @@ function formatIsoDate(iso: string | null | undefined): string | null {
       });
 }
 
+/** A plan as a reader names it: the tier and the cadence it bills on. */
+export function kiloPassPlanLabel(
+  tier: KiloPassSubscription['tier'],
+  cadence: KiloPassSubscription['cadence']
+): string {
+  return `${i18n.t(TIER_LABEL_KEYS[tier])} · ${i18n.t(CADENCE_LABEL_KEYS[cadence])}`;
+}
+
 function planLabel(subscription: KiloPassSubscription): string {
-  return `${i18n.t(TIER_LABEL_KEYS[subscription.tier])} · ${i18n.t(CADENCE_LABEL_KEYS[subscription.cadence])}`;
+  return kiloPassPlanLabel(subscription.tier, subscription.cadence);
 }
 
 function statusLabel(subscription: KiloPassSubscription): string {
   if (subscription.cancelAtPeriodEnd) {
-    return i18n.t('organization.kiloPass.canceling');
+    // The cancellation date is the pass's own paid-through date, so the status
+    // line says when access ends instead of only that it will.
+    const cancelsOn = formatIsoDate(subscription.nextBillingAt);
+    return cancelsOn
+      ? i18n.t('kiloPass.manage.cancelScheduled', { date: cancelsOn })
+      : i18n.t('organization.kiloPass.canceling');
   }
   switch (subscription.status) {
     case 'trialing': {
@@ -211,7 +233,17 @@ export function getKiloPassDetailState(params: KiloPassQueryFields): KiloPassDet
   // must not turn into an error row every time a foreground refetch fails.
   if (subscription) {
     if (ENDED_STATUSES.has(subscription.status)) {
-      return { kind: 'ended' };
+      // A lapsed pass still names the plan it was and the day it stopped: the
+      // reader is looking for where their pass stands, not a bare "ended".
+      const endedAt = formatIsoDate(subscription.endedAt);
+      return {
+        kind: 'ended',
+        tierLabel: i18n.t(TIER_LABEL_KEYS[subscription.tier]),
+        planLabel: planLabel(subscription),
+        endedLabel: endedAt
+          ? i18n.t('kiloPass.endedOn', { date: endedAt })
+          : i18n.t('organization.kiloPass.ended'),
+      };
     }
     return {
       kind: 'active',
@@ -253,7 +285,9 @@ export function getKiloPassCardContentState(params: KiloPassQueryFields): KiloPa
     return {
       kind: 'error',
       title: i18n.t('kiloPass.unavailable'),
-      description: i18n.t('kiloPass.tryAgainFromProfile'),
+      // The card sits on the Profile screen, so it names the action instead of
+      // sending the reader to the screen they are already on.
+      description: i18n.t('kiloPass.loadFailedRetry'),
       actionLabel: i18n.t('common.retry'),
     };
   }
@@ -264,7 +298,7 @@ export function getKiloPassCardContentState(params: KiloPassQueryFields): KiloPa
     return cardState(i18n.t('kiloPass.notAvailableInApp'));
   }
   if (state.kind === 'ended') {
-    return cardState(i18n.t('kiloPass.purchaseUnavailableEnded'));
+    return cardState(`${state.tierLabel} · ${state.endedLabel}`);
   }
   return cardState(state.statusLabel);
 }

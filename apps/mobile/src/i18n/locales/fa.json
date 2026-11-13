@@ -23,6 +23,10 @@
   },
   "common": {
     "deleteTitle": "{{label}} حذف شود؟",
+    "manageOnWeb": "مدیریت در وب",
+    "creditHistory": "تاریخچهٔ اعتبار",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": "، ",
     "cancel": "لغو",
@@ -119,6 +123,7 @@
     "copyLink": "کپی پیوند",
     "couldNotLoadOrganizations": "بارگذاری سازمان‌ها ناموفق بود.",
     "couldNotLoadSessions": "بارگذاری نشست‌ها ناموفق بود.",
+    "couldnTLoad": "بارگذاری ناموفق بود.",
     "couldnTLoadMore": "بارگذاری موارد بیشتر ناموفق بود.",
     "deviceSessions": "نشست‌های دستگاه",
     "disabled": "غیرفعال",
@@ -246,6 +251,10 @@
     "notAdded": "وارد شده‌اید. {{provider}} به حساب شما افزوده نشد."
   },
   "profile": {
+    "creditHistorySubtitle": "خریدها، رسیدها و فعالیت اعتبار",
+    "invoicesSubtitle": "فاکتورهای خریدهایتان را دانلود کنید",
+    "manageBilling": "مدیریت صورتحساب در kilo.ai",
+    "manageBillingIosNote": "روش‌های پرداخت، شارژ خودکار و جزئیات صورتحساب در kilo.ai مدیریت می‌شوند.",
     "codeReviewerSubtitle": "بازبینی خودکار PR",
     "securityAgentSubtitle": "یافتن و رفع آسیب‌پذیری‌ها",
     "reviews": "بازبینی‌ها",
@@ -299,6 +308,7 @@
     "passkeyAdded": "کلید عبور افزوده شد.",
     "passkeyAddFailed": "افزودن کلید عبور ممکن نشد. دوباره تلاش کنید.",
     "passkeyAddUnsupported": "این دستگاه نمی‌تواند کلید عبور بسازد.",
+    "passkeyAddUnavailable": "کلیدهای عبور را فقط می‌توان در یک مرورگر وب افزود.",
     "passkeyAddCancelled": "ساخت کلید عبور لغو شد.",
     "passkeyRemoved": "کلید عبور حذف شد.",
     "passkeyRemoveFailed": "حذف آن کلید عبور ممکن نشد. دوباره تلاش کنید.",
@@ -318,7 +328,7 @@
     },
     "signInMethods": {
       "title": "روش‌های ورود",
-      "unlink": "لغو اتصال",
+      "unlink": "حذف اتصال",
       "unlinkProvider": "لغو اتصال {{provider}}",
       "unlinkTitle": "اتصال {{provider}} لغو شود؟",
       "unlinkMessage": "دیگر نمی‌توانید با {{provider}} وارد شوید. روش‌های دیگر شما بدون تغییر باقی می‌مانند.",
@@ -331,7 +341,6 @@
     "providerKeys": {
       "title": "کلیدهای ارائه‌دهنده",
       "rowSubtitle": "استفاده از صورت‌حساب ارائه‌دهنده خودتان",
-      "manageOnWeb": "مدیریت در وب",
       "manageOnWebReason": "این ارائه‌دهندگان به اطلاعات اعتبارسنجی ساختاریافته نیاز دارند.",
       "description": "هزینه درخواست‌هایی که با این کلیدها ارسال می‌شوند به جای موجودی Kilo، از حساب ارائه‌دهنده شما کسر می‌شود.",
       "enabled": "در حال استفاده",
@@ -1245,7 +1254,17 @@
       "changeRequestMissingPermissions": "اپلیکیشن GitHub در Kilo نمی‌تواند در این مخزن پول ریکوئست باز کند. مالک مخزن باید به اپلیکیشن دسترسی نوشتن به محتوا و پول ریکوئست‌ها بدهد و سپس دوباره تلاش کنید.",
       "changeRequestFailed": "Kilo نتوانست پول ریکوئست را باز کند. لطفاً لحظه‌ای دیگر دوباره تلاش کنید.",
       "proposalConflict": "پیشنهاد حافظه بررسی دیگری برای همین مخزن هنوز فعال است.",
-      "offAction": "حافظه بررسی غیرفعال است. آن را فعال کنید، سپس دوباره تلاش کنید."
+      "offAction": "حافظه بررسی غیرفعال است. آن را فعال کنید، سپس دوباره تلاش کنید.",
+      "analyze": {
+        "title": "تحلیل بازخوردها",
+        "description": "مخزنی با پاسخ‌های اخیر نگهدارندگان انتخاب کنید تا یک الگوی تکراری در راهنمایی‌ها جست‌وجو شود.",
+        "chooseRepository": "انتخاب مخزن",
+        "action": "شروع تحلیل",
+        "noRepositories": "هنوز هیچ مخزنی پاسخ اخیری از نگهدارندگان ندارد.",
+        "proposed": "پیشنهاد حافظه بازبینی ایجاد شد",
+        "noFeedback": "بازخورد اخیری برای این مخزن یافت نشد",
+        "noPattern": "الگوی تکراری مشخصی یافت نشد"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "یک URL معتبر برای درخواست ادغام وارد کنید.",
@@ -1377,7 +1396,63 @@
       "title": "بازبین کد به رسیدگی نیاز دارد.",
       "recoveryLabel": "تماس با پشتیبانی"
     },
-    "unknownError": "خطای نامشخص"
+    "unknownError": "خطای نامشخص",
+    "skipBotPullRequests": {
+      "title": "رد کردن درخواست‌های ادغام ربات‌ها",
+      "subtitle": "بازبینی خودکار روی درخواست‌های ادغامی که ربات‌هایی مانند Dependabot یا Renovate باز کرده‌اند اجرا نمی‌شود. برای بازبینی درخواست‌های ادغام ربات‌ها، این گزینه را خاموش کنید."
+    },
+    "repoModels": {
+      "title": "مدل برای هر مخزن",
+      "description": "بازبینی برخی مخازن را با مدل یا میزان تفکر متفاوت، یا هر دو، اجرا کنید.",
+      "defaultModel": "از مدل پیش‌فرض استفاده می‌کند",
+      "resetLabel": "بازنشانی مدل برای {{repository}}",
+      "changeHint": "انتخابگر مدل را باز می‌کند"
+    },
+    "analytics": {
+      "title": "تحلیل‌ها",
+      "trackedReviews": "بازبینی‌های ثبت‌شده",
+      "findingsRaised": "یافته‌های مطرح‌شده",
+      "highImpactChanges": "تغییرات پرتأثیر",
+      "impactPoints": "امتیاز تأثیر",
+      "repositoryLine": "بازبینی‌ها: {{reviews}} · یافته‌ها: {{findings}}",
+      "empty": "هنوز بازبینی‌ای با داده‌های تحلیلی وجود ندارد",
+      "emptyDescription": "تا زمانی که تحلیل‌ها برای سازمان فعال باشد، بازبینی‌های تکمیل‌شده ثبت می‌شوند.",
+      "off": "تحلیل‌ها برای این سازمان غیرفعال است.",
+      "couldNotLoad": "بارگیری تحلیل‌ها ممکن نشد"
+    },
+    "council": {
+      "title": "بازبینی شورایی",
+      "subtitle": "چند متخصص هر درخواست ادغام را بازبینی می‌کنند و آرای آن‌ها در یک تصمیم واحد ترکیب می‌شود.",
+      "unavailable": "بازبینی شورایی برای این سازمان در دسترس نیست.",
+      "noRepositories": "هنوز مخزنی انتخاب نشده است. ابتدا در تنظیمات مخزن، مخازن را انتخاب کنید.",
+      "specialists": "متخصصان",
+      "labels": "برچسب‌هایی که بازبینی شورایی را فعال می‌کنند",
+      "labelsPlaceholder": "مثلاً council, deep review",
+      "labelsDescription": "برچسب‌ها را با ویرگول (,) از هم جدا کنید. در این صورت، مخزنی که بازبینی شورایی برایش فعال است فقط برای درخواست‌های ادغامی که دست‌کم یکی از این برچسب‌ها را دارند بازبینی شورایی اجرا می‌کند. برای همه درخواست‌های ادغام واجد شرایط، خالی بگذارید.",
+      "tooManyLabels": "تعداد برچسب‌های بازبینی شورایی بیش از حد مجاز است. حداکثر از {{maximum}} برچسب استفاده کنید.",
+      "labelTooLong": "برچسب بازبینی شورایی بیش از حد طولانی است. هر برچسب باید حداکثر {{maximum}} نویسه داشته باشد.",
+      "minSpecialists": "دست‌کم {{minimum}} متخصص انتخاب کنید. {{selected}} مورد انتخاب شده است.",
+      "specialistName": {
+        "testCoverage": "پوشش تست",
+        "correctness": "درستی",
+        "custom": "متخصص"
+      },
+      "specialist": {
+        "security": "دور زدن مجوزدهی، مدیریت اسرار و ورودی ناامن.",
+        "performance": "مسیرهای پرتکرار، کوئری‌های N+1 و تخصیص‌های سنگین حافظه.",
+        "testing": "پوشش تست ناقص یا ضعیف برای رفتار جدید.",
+        "correctness": "خطاهای منطقی، حالت‌های مرزی و شرایط رقابتی.",
+        "custom": "مشکلات حوزه تخصصی خود را بازبینی می‌کند."
+      },
+      "strategy": {
+        "advisory": "مشورتی",
+        "advisoryDescription": "یافته‌ها و آرا را بدون جلوگیری از ادغام گزارش می‌کند.",
+        "unanimous": "اتفاق آرا",
+        "unanimousDescription": "اگر هر یک از متخصصان مشکلی بحرانی گزارش کند، مانع ادغام می‌شود.",
+        "majority": "اکثریت",
+        "majorityDescription": "فقط زمانی مانع ادغام می‌شود که بیشتر متخصصان مشکلی بحرانی گزارش کنند."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1880,6 +1955,16 @@
       "auto": "خودکار",
       "shallow": "سطحی",
       "deep": "عمیق"
+    },
+    "orphanedFindings": {
+      "title": "یافته‌های مخازن حذف‌شده",
+      "description": "این مخازن دیگر از طریق یکپارچه‌سازی GitHub در دسترس نیستند. یافته‌های آن‌ها همچنان در داشبوردها و گزارش‌ها شمرده می‌شوند.",
+      "count": "یافته‌ها: {{count}}",
+      "clearLabel": "پاک کردن یافته‌های {{repository}}",
+      "confirmTitle": "یافته‌ها پاک شوند؟",
+      "confirmMessage": "همه یافته‌های ثبت‌شده برای {{repository}} حذف خواهند شد. این کار قابل بازگشت نیست.",
+      "confirmAction": "حذف یافته‌ها",
+      "cleared": "یافته‌های پاک‌شده: {{count}}"
     }
   },
   "agents": {
@@ -2059,6 +2144,7 @@
       "branchPlaceholder": "یک شاخه انتخاب کنید",
       "runOnWithTarget": "اجرا روی: {{target}}",
       "environment": "محیط",
+      "cloudEnvironment": "محیط ابری",
       "couldNotLoadEnvironment": "بارگذاری محیط شما ممکن نشد.",
       "retryLoadingEnvironment": "تلاش دوباره برای بارگذاری محیط",
       "defaultEnvironment": "محیط پیش‌فرض",
@@ -2119,6 +2205,89 @@
       "openSettingsToReview": "برای بازبینی تنظیمات را باز کنید",
       "profileSelection": "انتخاب نمایه",
       "profileLayerAccessibility": "{{label}}: {{detail}}"
+    },
+    "environment": {
+      "loadingEnvironments": "در حال بارگذاری محیط‌ها",
+      "couldNotLoadEnvironments": "بارگذاری محیط‌ها ممکن نشد",
+      "couldNotLoadEnvironmentsDetail": "برای بارگذاری محیط‌های این مخزن دوباره تلاش کنید.",
+      "noEnvironment": "بدون محیط",
+      "noEnvironmentDetail": "این نشست از ایمیج پایه شروع می‌شود.",
+      "chooseEnvironment": "انتخاب محیط",
+      "chooseEnvironmentDetail": "این مخزن بیش از یک محیط دارد.",
+      "environmentAccessibility": "انتخاب محیط: {{label}}",
+      "environmentsForRepository": "محیط‌های {{repository}}",
+      "selectEnvironmentToStart": "برای شروع، یک محیط انتخاب کنید.",
+      "buildDetails": "جزئیات ساخت",
+      "buildNotBuilt": "ساخته نشده",
+      "buildUnavailableShort": "ساخت اسنپ‌شات در دسترس نیست",
+      "buildPreparing": "در حال آماده‌سازی بیلدر",
+      "buildCloning": "در حال کلون کردن شاخه پیش‌فرض",
+      "buildSetup": "در حال اجرای راه‌اندازی محیط",
+      "buildCleanup": "در حال حذف اعتبارنامه‌های ساخت",
+      "buildCapturing": "در حال گرفتن اسنپ‌شات",
+      "buildPublishing": "در حال انتشار اسنپ‌شات",
+      "buildStopping": "در حال متوقف کردن بیلدر",
+      "buildStoppingRetrying": "در حال متوقف کردن بیلدر، تلاش مجدد",
+      "buildFinishing": "در حال تکمیل ساخت",
+      "buildSucceeded": "اسنپ‌شات آماده است",
+      "buildSuperseded": "با یک ساخت جدیدتر جایگزین شد",
+      "buildStale": "تنظیمات از زمان این اسنپ‌شات تغییر کرده است",
+      "buildStaleAge": "اسنپ‌شات قدیمی‌تر از چهار روز است؛ جلسه بعدی آن را تازه‌سازی می‌کند",
+      "buildStaleImage": "برای یک ایمیج قدیمی‌تر سندباکس ساخته شده است",
+      "failureClone": "کلون کردن مخزن ممکن نشد.",
+      "failureSetup": "یکی از دستورهای راه‌اندازی ناموفق بود. گزارش ساخت را ببینید.",
+      "failureTimeout": "مهلت یکی از دستورهای راه‌اندازی به پایان رسید. گزارش ساخت را ببینید.",
+      "failureCleanup": "حذف اعتبارنامه‌ها ممکن نشد، بنابراین اسنپ‌شاتی گرفته نشد.",
+      "failureCapture": "گرفتن اسنپ‌شات ممکن نشد.",
+      "failureCaptureUncertain": "نتیجه اسنپ‌شات از دست رفت؛ ساخت منتشر نشد.",
+      "failureDeadline": "ساخت به‌موقع تمام نشد.",
+      "failureBuilderLost": "بیلدر دیگر گزارشی ارسال نمی‌کند.",
+      "failureBuilderStart": "بیلدر نتوانست شروع به کار کند.",
+      "failureUnauthorized": "دسترسی به مخزن دیگر مجاز نیست.",
+      "failureActorUnauthorized": "فردی که ساخت را شروع کرد دیگر دسترسی ندارد.",
+      "failureBilling": "ساخت به اعتبار در دسترس نیاز دارد.",
+      "failureBillingUnavailable": "سیستم صورتحساب نتوانست ساخت را بپذیرد. دوباره تلاش کنید.",
+      "failureConfiguration": "پیکربندی در حین ساخت تغییر کرد.",
+      "failureRuntime": "نصب نسخه انتخاب‌شده محیط اجرا ممکن نشد.",
+      "failureGeneric": "ساخت ناموفق بود.",
+      "buildLogs": "گزارش‌های ساخت",
+      "noBuildLogs": "هنوز خروجی گزارشی وجود ندارد.",
+      "buildLogsLatestOnly": "در حال نمایش آخرین ۵۰۰ خط نگه‌داری‌شده از گزارش.",
+      "buildLogsTruncated": "ادامه خروجی کوتاه شد.",
+      "couldNotLoadBuild": "بارگذاری وضعیت ساخت ممکن نشد",
+      "couldNotLoadBuildLogs": "بارگذاری گزارش‌های ساخت ممکن نشد",
+      "buildsUnavailable": "ساخت اسنپ‌شات برای این محیط در دسترس نیست.",
+      "onlyManagersCanBuild": "فقط مدیران سازمان می‌توانند اسنپ‌شات بسازند.",
+      "waitForBuilder": "پیش از ساخت مجدد، صبر کنید تا بیلدر متوقف شود.",
+      "buildAction": "ساخت اسنپ‌شات",
+      "refreshAction": "به‌روزرسانی اسنپ‌شات",
+      "cancelBuildAction": "لغو ساخت",
+      "buildStarted": "ساخت اسنپ‌شات شروع شد",
+      "buildCanceled": "ساخت اسنپ‌شات لغو شد",
+      "couldNotStartBuild": "شروع ساخت ممکن نشد",
+      "couldNotCancelBuild": "لغو ساخت ممکن نشد",
+      "sandbox": "سندباکس",
+      "sandboxActive": "سندباکس فعال است",
+      "sandboxSleeping": "سندباکس در حالت خواب است",
+      "sandboxStarting": "سندباکس در حال راه‌اندازی است",
+      "sandboxStopping": "سندباکس در حال توقف است",
+      "sandboxError": "خطای سندباکس",
+      "sandboxUnreachable": "سندباکس در دسترس نیست",
+      "sandboxStatusUnknown": "وضعیت سندباکس نامشخص است",
+      "sandboxChecked": "بررسی‌شده {{when}}",
+      "sandboxDetailStopped": "برای ازسرگیری، یک پیام ارسال کنید.",
+      "sandboxDetailFailed": "برای تلاش مجدد، یک پیام ارسال کنید.",
+      "sandboxDetailConnection": "اتصال سندباکس در دسترس نیست.",
+      "sandboxDetailUnavailable": "وضعیت سندباکس موقتاً در دسترس نیست.",
+      "sandboxDetailInsufficient": "اطلاعات کافی برای تأیید وضعیت فعلی سندباکس وجود ندارد.",
+      "sandboxDetailCheckNeeded": "سندباکس اخیراً سلامت خود را تأیید نکرده است.",
+      "startFresh": "شروع از نو",
+      "startFreshTitle": "از نو شروع شود؟",
+      "startFreshMessage": "این کار اسنپ‌شات فضای کاری را که {{when}} گرفته شده است دور می‌اندازد. تغییرات کامیت‌نشده آن فضای کاری از بین می‌رود.",
+      "startFreshMessageUnknown": "این کار اسنپ‌شات ذخیره‌شده فضای کاری را که قابل خواندن نبود دور می‌اندازد. تغییرات کامیت‌نشده آن فضای کاری از بین می‌رود.",
+      "startFreshDone": "اسنپ‌شات فضای کاری حذف شد.",
+      "couldNotRemoveSnapshot": "حذف اسنپ‌شات فضای کاری ممکن نشد.",
+      "snapshotCaptured": "اسنپ‌شات فضای کاری {{when}} گرفته شد"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل به‌روزرسانی شد.",
@@ -2468,7 +2637,8 @@
       "cancelQueued": "لغو پیام",
       "cancelQueuedAccessibility": "لغو پیام در صف",
       "restoreQueued": "بازیابی",
-      "restoreQueuedAccessibility": "بازیابی پیام لغوشده در کادر پیام"
+      "restoreQueuedAccessibility": "بازیابی پیام لغوشده در کادر پیام",
+      "noReplyRecorded": "برای این پیام پاسخی ثبت نشد."
     },
     "olderMessages": {
       "arrived": "پیام‌های قبلی بارگذاری شدند",
@@ -2861,6 +3031,26 @@
     "onlyFirstFilesAttached_other": "فقط {{displayCount}} فایل اول پیوست می‌شوند."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "تاریخچهٔ صورتحساب",
+      "billingHistoryEmpty": "هنوز تاریخچهٔ صورتحسابی وجود ندارد.",
+      "cancel": "لغو اشتراک",
+      "cancelDescription": "Kilo Pass شما تا پایان دورهٔ صورتحساب فعال می‌ماند و تمدید نخواهد شد.",
+      "cancelScheduled": "در {{date}} لغو می‌شود",
+      "cancelScheduledChange": "لغو تغییر زمان‌بندی‌شده",
+      "cancelled": "اشتراک لغو شد",
+      "changePlan": "تغییر طرح در kilo.ai",
+      "changePlanIosNote": "تغییر طرح‌های پولی در kilo.ai امکان‌پذیر است.",
+      "creditHistoryEmpty": "هنوز اعتباری از Kilo Pass وجود ندارد.",
+      "manageInStore": "مدیریت در {{store}}",
+      "resume": "ازسرگیری اشتراک",
+      "resumeCancelledDescription": "Kilo Pass شما دوباره به‌طور خودکار تمدید می‌شود.",
+      "resumePausedDescription": "Kilo Pass شما هم‌اکنون، پیش از تاریخ ازسرگیری زمان‌بندی‌شده، از سر گرفته می‌شود.",
+      "resumed": "اشتراک از سر گرفته شد",
+      "scheduledChange": "تغییر زمان‌بندی‌شده",
+      "scheduledChangeCancelDescription": "Kilo Pass شما روی طرح فعلی می‌ماند و مانند اکنون تمدید می‌شود.",
+      "scheduledChangeSummary": "{{plan}} در {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass در دسترس نیست.",
     "couldNotLoad": "Kilo Pass بارگذاری نشد. دوباره تلاش کنید.",
@@ -2870,7 +3060,7 @@
     "subscriptionLoading": "در حال بارگذاری اشتراک Kilo Pass",
     "retryHint": "وضعیت Kilo Pass را دوباره بررسی می‌کند.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailableEnded": "Kilo Pass شما به پایان رسیده است.",
+    "endedOn": "پایان‌یافته {{date}}",
     "notAvailableInApp": "Kilo Pass در برنامه در دسترس نیست.",
     "statusActive": "فعال",
     "statusTrialing": "دوره آزمایشی",
@@ -2892,7 +3082,7 @@
     "kiloPassManagement": "مدیریت Kilo Pass",
     "kiloPassSetup": "راه‌اندازی Kilo Pass",
     "opensManagementOnWeb": "مدیریت Kilo Pass را در وب باز می‌کند.",
-    "tryAgainFromProfile": "از بخش نمایه دوباره تلاش کنید.",
+    "loadFailedRetry": "اتصال خود را بررسی کنید، سپس دوباره تلاش کنید.",
     "legalTermsOfUse": "شرایط استفاده (EULA)",
     "purchaseDifferentAccount": "این خرید از App Store به حساب Kilo شما متصل نیست. وارد همان Apple Account شوید که با آن خرید کرده‌اید، سپس دوباره تلاش کنید.",
     "purchaseFailed": "تکمیل خرید ممکن نشد.",
@@ -2915,6 +3105,11 @@
     "accountDescription": "شناسهٔ حساب Kilo شما و فرادادهٔ درخواست‌ها برای احراز هویت شما و محاسبهٔ میزان مصرف به کار می‌روند.",
     "diagnosticsTitle": "اطلاعات عیب‌یابی برنامه",
     "diagnosticsDescription": "گزارش‌های خرابی و خطا، پس از حذف محتوای برنامه، برای حفظ پایداری برنامه به کار می‌روند.",
+    "featureFlagsTitle": "عرضهٔ تدریجی قابلیت‌ها",
+    "featureFlagsDescription": "ایمیل حساب شما، که PostHog برای تعیین قابلیت‌هایی که می‌بینید به کار می‌برد.",
+    "featureFlagsWhat": "ایمیل حساب شما.",
+    "featureFlagsWhy": "برای تعیین قابلیت‌هایی که می‌بینید، از جمله قابلیت‌هایی که هنوز در حال عرضهٔ آن‌ها هستیم.",
+    "featureFlagsWho": "PostHog، سرویس پرچم‌های قابلیت.",
     "helpImprove": "کمک به بهبود Kilo",
     "helpImproveDescription": "داده‌های آماری ناشناس دربارهٔ استفاده از برنامه و منبع نصب را به اشتراک بگذارید. می‌توانید هر زمان این گزینه را در تنظیمات تغییر دهید.",
     "seeFullDetails": "مشاهده جزئیات کامل",
@@ -2937,7 +3132,7 @@
     "voiceTranscriptionTitle": "تبدیل گفتار به متن",
     "retentionPrefix": "جزئیات مدت نگهداری داده‌ها، حقوق شما و اطلاعات تماس در این سند آمده است:",
     "backToConsent": "بازگشت به صفحهٔ رضایت‌نامه",
-    "revokeConsent": "لغو رضایت",
+    "revokeConsent": "حذف رضایت",
     "revokeConsentTitle": "رضایت به اشتراک‌گذاری داده‌ها لغو شود؟",
     "acceptAndContinue": "پذیرش و ادامه",
     "decline": "رد",
@@ -2996,6 +3191,36 @@
     "sendFeedback": "ارسال بازخورد"
   },
   "organization": {
+    "auditLog": {
+      "title": "گزارش حسابرسی",
+      "permissionDenied": "فقط مالک، ادمین یا مدیر صورتحساب سازمانی که طرح Enterprise دارد می‌تواند گزارش حسابرسی آن را ببیند.",
+      "emptyTitle": "هیچ رویداد حسابرسی‌ای وجود ندارد",
+      "emptyDescription": "اقداماتی که در این سازمان انجام می‌شود اینجا نمایش داده می‌شود.",
+      "truncated": "جدیدترین رویدادها نمایش داده می‌شوند."
+    },
+    "billing": {
+      "title": "صورت‌حساب",
+      "permissionDenied": "فقط مالک، مدیر یا مسئول صورت‌حساب سازمان می‌تواند صورت‌حساب آن را ببیند.",
+      "subscription": "اشتراک",
+      "state": "وضعیت",
+      "stateNone": "بدون اشتراک",
+      "statePastDue": "پرداخت معوق",
+      "stateCancelsAtPeriodEnd": "در پایان دوره لغو می‌شود",
+      "stateTrialEndsOn": "دوره آزمایشی در {{date}} به پایان می‌رسد",
+      "stateTrialing": "دوره آزمایشی",
+      "stateRenewsOn": "در {{date}} تمدید می‌شود",
+      "seatsDropTo": "در {{date}} به {{seats}} مجوز کاربری کاهش می‌یابد",
+      "seats": "مجوزهای کاربری",
+      "autoTopUp": "شارژ خودکار",
+      "autoTopUpAmount": "مبلغ شارژ",
+      "autoTopUpThreshold": "هنگام کاهش موجودی به زیر",
+      "manageOnWeb": "تغییرات در وب انجام می‌شود",
+      "changePlan": "تغییر طرح",
+      "buySeats": "خرید مجوز کاربری",
+      "setupAutoTopUp": "راه‌اندازی شارژ خودکار",
+      "webAddress": "نشانی وب {{url}}",
+      "opensOnWeb": "در وب باز می‌شود"
+    },
     "boundary": {
       "backToProfile": "بازگشت به پروفایل",
       "loadErrorMessage": "اتصال اینترنت خود را بررسی کنید و دوباره تلاش کنید.",
@@ -3003,14 +3228,20 @@
       "loadErrorTitle": "بارگذاری سازمان‌های شما ممکن نشد.",
       "membershipLostNotice": "شما دیگر به این سازمان دسترسی ندارید. به {{target}} تغییر یافت.",
       "noOrganization": "بدون سازمان",
-      "noOrganizationDescription": "این حساب بخشی از هیچ سازمانی نیست. برای استفاده از ویژگی‌های سازمان مانند دعوت اعضا و هشدارهای موجودی کم، در وب یک سازمان ایجاد کنید یا به یکی بپیوندید.",
-      "openWebOrganizations": "باز کردن سازمان‌ها در وب",
+      "noOrganizationDescription": "این حساب عضو هیچ سازمانی نیست. برای استفاده از قابلیت‌های سازمان مانند دعوت اعضا و هشدار موجودی کم، یک سازمان ایجاد کنید، یا وب را باز کنید تا به سازمانی که به آن دعوت شده‌اید بپیوندید.",
       "organizationUnavailable": "سازمان در دسترس نیست.",
       "selectDescriptionWithOrganizations": "شما عضو یک یا چند سازمان هستید. حسابی را انتخاب کنید که این صفحه باید استفاده کند.",
       "selectOrganization": "انتخاب سازمان",
       "unavailableDescription": "این سازمان دیگر در دسترس نیست. برای ادامه، در پروفایل خود سازمان دیگری انتخاب کنید.",
       "unavailableSessionsDescription": "این سازمان دیگر در دسترس نیست. جلسات آن قابل بارگذاری نیست.",
       "accessDeniedDescription": "شما به این سازمان دسترسی ندارید."
+    },
+    "create": {
+      "title": "ایجاد سازمان",
+      "description": "سازمان، اعتبارها، عامل‌ها و تنظیمات را با تیم شما به اشتراک می‌گذارد.",
+      "nameLabel": "نام سازمان",
+      "nameRequired": "نام سازمان را وارد کنید.",
+      "trialNote": "دورهٔ آزمایشی ۱۴ روزهٔ Enterprise شما با ایجاد سازمان شروع می‌شود. طرح‌ها از طریق وب خریداری می‌شوند."
     },
     "creditActivity": {
       "emptyDescription": "خریدها، مصرف و اصلاحات اعتبار این سازمان به‌محض ثبت در اینجا نمایش داده می‌شوند.",
@@ -3097,7 +3328,7 @@
       "manageInvitationA11y": "مدیریت دعوت‌نامهٔ {{email}}",
       "removeMember": "حذف عضو",
       "removeMemberMessage": "{{name}} از این سازمان حذف شود؟",
-      "revokeConfirm": "لغو",
+      "revokeConfirm": "حذف",
       "revokeInvitation": "لغو دعوت‌نامه",
       "revokeInvitationMessage": "دعوت‌نامهٔ ارسال‌شده به {{email}} لغو شود؟",
       "setDailyUsageLimit": "تنظیم محدودیت مصرف روزانه",
@@ -3119,6 +3350,21 @@
       "ownRoleChange": "شما نمی‌توانید نقش خودتان را تغییر دهید.",
       "inviteExpired": "این دعوت‌نامه منقضی شده است.",
       "inviteAccepted": "این دعوت‌نامه قبلاً پذیرفته شده است."
+    },
+    "settingsOnWeb": {
+      "title": "تنظیمات سازمان در وب",
+      "usageDetails": "جزئیات مصرف",
+      "providersAndModels": "ارائه‌دهندگان و مدل‌ها",
+      "groups": "گروه‌ها",
+      "guardrails": "محدودیت‌های ایمنی",
+      "byok": "استفاده از کلید خودتان",
+      "ssoAndDomain": "SSO و دامنه",
+      "emailPreferences": "تنظیمات ایمیل",
+      "dataCollection": "جمع‌آوری داده",
+      "auditLogs": "گزارش‌های حسابرسی",
+      "requestLogs": "گزارش‌های درخواست",
+      "subOrganizations": "زیرسازمان‌ها",
+      "distributeFunds": "توزیع اعتبار"
     },
     "usageStats": {
       "inputTokens": "توکن‌های ورودی",
@@ -3870,6 +4116,25 @@
     "importConfigApplied": "Config درون‌ریزی شد"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "فعالیت اعتباری بارگذاری نشد.",
+      "appStoreReceipt": "رسید از App Store",
+      "deductionFallback": "کسر اعتبار",
+      "emptyDescription": "خریدهای اعتبار، رسیدها و مصرف در اینجا نمایش داده می‌شوند.",
+      "emptyTitle": "تاریخچهٔ اعتباری وجود ندارد",
+      "googlePlayReceipt": "رسید از Google Play",
+      "kind": {
+        "adjustment": "اصلاحیه",
+        "balanceNeutral": "بدون تأثیر بر موجودی",
+        "deduction": "کسر",
+        "grant": "اعطای اعتبار",
+        "purchase": "خرید"
+      },
+      "purchaseFallback": "خرید اعتبار",
+      "receipt": "رسید",
+      "receiptA11y": "باز کردن رسید {{description}}",
+      "receiptUnavailable": "رسیدی برای این خرید موجود نیست."
+    },
     "title": "خرید اعتبار",
     "description": "اعتبار یک خرید یکباره است که برای اجرای جلسات کدنویسی هوش مصنوعی در Kilo App به موجودی Kilo شما اضافه می‌شود. فروشگاه مبلغ را از حساب شما دریافت می‌کند و اعتبار پس از تأیید پرداخت توسط فروشگاه اضافه می‌شود.",
     "nextExpiry": "{{amount}} اعتبار در {{date}} (UTC) منقضی می‌شود. اعتبارهایی که زودتر منقضی می‌شوند، اول استفاده می‌شوند.",
@@ -3955,7 +4220,7 @@
       "sessionPullRequest": "درخواست ادغام نشست",
       "sessionPullRequestNumber": "PR نشست #{{number}}",
       "openSessionHint": "نشست را باز می‌کند.",
-      "unlinkSessionAction": "لغو پیوند نشست",
+      "unlinkSessionAction": "حذف پیوند نشست",
       "unlinkConfirmTitle": "لغو پیوند {{title}}؟",
       "unlinkConfirmMessage": "خود نشست حذف نمی‌شود. فقط پیوند آن به این کار حذف می‌شود.",
       "startNewSession": "شروع نشست جدید",
@@ -4052,6 +4317,70 @@
   "systemSearch": {
     "couldNotOpenResult": "باز کردن این نتیجه جست‌وجو ممکن نشد"
   },
+  "usage": {
+    "title": "مصرف",
+    "orgTitle": "مصرف سازمان",
+    "entrySubtitle": "هزینه، درخواست‌ها و توکن‌ها",
+    "rangePicker": "بازه زمانی",
+    "range90d": "۹۰ روز",
+    "metricPicker": "معیار نمودار",
+    "chartA11y": "{{metric}} در روز",
+    "avgCostPerRequest": "میانگین هزینه / درخواست",
+    "topModels": "مدل‌های پرکاربرد",
+    "topFeatures": "قابلیت‌های پرکاربرد",
+    "emptyTitle": "مصرفی در این بازه ثبت نشده است",
+    "orgSelfNotice": "شما مصرف خودتان در این سازمان را می‌بینید.",
+    "viewDetails": "مشاهده جزئیات مصرف"
+  },
+  "integrations": {
+    "title": "یکپارچه‌سازی‌ها",
+    "sectionTitle": "سرویس‌های متصل",
+    "entrySubtitle": "GitHub، Slack، Linear و موارد دیگر",
+    "subtitle": "ابزارها و گردش‌کارهای توسعهٔ خود را به Kilo متصل کنید",
+    "emptyHint": "هنوز هیچ یکپارچه‌سازی متصل نشده است.",
+    "disconnect": "قطع اتصال",
+    "disconnectTitle": "اتصال {{provider}} قطع شود؟",
+    "disconnectMessage": "Kilo دیگر در {{provider}} پاسخ نمی‌دهد. هر زمان بخواهید می‌توانید دوباره متصل شوید.",
+    "connectedTo": "متصل به {{account}}",
+    "disconnected": "اتصال {{provider}} قطع شد",
+    "disconnectFailed": "قطع اتصال {{provider}} ممکن نشد",
+    "couldNotLoad": "بارگیری یکپارچه‌سازی‌ها ممکن نشد",
+    "permissionDenied": "شما اجازهٔ مدیریت این یکپارچه‌سازی‌ها را ندارید.",
+    "memberHint": "برای تغییر این اتصال‌ها از مالک یا مدیر سازمان درخواست کنید.",
+    "connectFailed": "باز کردن صفحهٔ اتصال ممکن نشد"
+  },
+  "invoices": {
+    "personalEmptyDescription": "فاکتورهای خریدهای شخصی‌تان پس از صدور صورتحساب در اینجا نمایش داده می‌شوند."
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "منابع پردازشی",
+      "noUsage": "هنوز مصرفی ثبت نشده است",
+      "sharedWorkspace": "مشترک بین همه گفتگوهای این فضای کاری",
+      "currentRates": "نرخ‌های فعلی",
+      "perHour": "{{rate}}/ساعت",
+      "mediumSandbox": "سندباکس متوسط",
+      "largeSandbox": "سندباکس بزرگ",
+      "earlierActivity": "فعالیت‌های قبلی",
+      "now": "اکنون",
+      "loadFailed": "هزینه‌های منابع پردازشی بارگذاری نشد."
+    },
+    "preview": {
+      "title": "باز کردن پیش‌نمایش",
+      "listeningServices": "سرویس‌های در حال شنود",
+      "empty": "هیچ سرویس در حال شنودی یافت نشد. از عامل بخواهید یک وب‌سرور راه‌اندازی کند، سپس بازخوانی کنید.",
+      "notRunning": "این سندباکس متوقف شده است. برای راه‌اندازی دوباره، به عامل پیامی بفرستید.",
+      "notReady": "سندباکس هنوز آماده نیست. پس از برقراری اتصال، بازخوانی کنید.",
+      "unsupported": "شناسایی سرویس برای این سندباکس در دسترس نیست.",
+      "failed": "شناسایی سرویس‌ها ممکن نشد.",
+      "openService": "باز کردن {{name}} روی پورت {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "تریگرها و وب‌هوک‌ها",
+      "subtitle": "تریگرهای وب‌هوک و زمان‌بندی‌شده را در وب مدیریت کنید."
+    }
+  },
   "sessionShare": {
     "title": "اشتراک‌گذاری نشست",
     "subtitle": "هر کسی که پیوند را داشته باشد می‌تواند این نشست را بخواند.",
@@ -4069,7 +4398,7 @@
     "existingTitle": "پیوند موجود",
     "existingDescription": "این نشست از قبل یک پیوند اشتراک‌گذاری دارد. ساختن پیوند جدید جایگزین آن می‌شود و پیوند قبلی دیگر کار نمی‌کند.",
     "rotate": "ساخت پیوند جدید",
-    "revoke": "لغو پیوند",
+    "revoke": "حذف پیوند",
     "revokeTitle": "پیوند لغو شود؟",
     "revokeMessage": "پیوند فعلی بلافاصله از کار می‌افتد.",
     "revokeFailed": "پیوند لغو نشد.",

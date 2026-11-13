@@ -42,6 +42,10 @@ jobs:
       session_sync: ${{ steps.filter_session_sync.outputs.session_sync || steps.filter_session_sync_retry.outputs.session_sync }}
       # Every input the ci-wiring job reads, also its own pair.
       wiring: ${{ steps.filter_wiring.outputs.wiring || steps.filter_wiring_retry.outputs.wiring }}
+      # The Rust core of the local SSH module, also its own pair: the cargo
+      # checks read no other tree, and a mobile JavaScript change must not pay
+      # for them.
+      mobile_ssh_rust: ${{ steps.filter_mobile_ssh_rust.outputs.mobile_ssh_rust || steps.filter_mobile_ssh_rust_retry.outputs.mobile_ssh_rust }}
       # The two input sets of the test-scripts job, each its own pair. The
       # script chain reads no web source, the web Jest suite, the web build and
       # the cycle check read no script input, and the Postgres and Durable
@@ -510,6 +514,28 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
               - 'patches/**'
+      # The Rust core of the local SSH module is its own subject: the cargo
+      # checks read nothing else, and every other job reads no Rust source.
+      - name: Detect mobile SSH Rust changes
+        id: filter_mobile_ssh_rust
+        continue-on-error: true
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            mobile_ssh_rust:
+              - 'apps/mobile/modules/kilo-ssh/rust/**'
+              - 'apps/mobile/modules/kilo-ssh/rust-toolchain.toml'
+              - '.github/workflows/ci.yml'
+      - name: Detect mobile SSH Rust changes (retry)
+        id: filter_mobile_ssh_rust_retry
+        if: steps.filter_mobile_ssh_rust.outcome == 'failure'
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            mobile_ssh_rust:
+              - 'apps/mobile/modules/kilo-ssh/rust/**'
+              - 'apps/mobile/modules/kilo-ssh/rust-toolchain.toml'
+              - '.github/workflows/ci.yml'
       # A pull request and a main push both check only the workspaces their own
       # diff can affect: the pull request the branch's base, the push the commit
       # main moved from. The merge queue passes no base, so it still checks
@@ -1222,6 +1248,8 @@ jobs:
       - harness-sdk
       - mobile-diagram-host
       - session-sync-postgres
+      - mobile-ssh-rust
+      - mobile-ssh-rust-integration
       - build
       - build-ai-gateway
       - build-ai-gateway-secure-proxy
@@ -1456,8 +1484,28 @@ jobs:
         with:
           bun-version: 1.4.4
 
+      # Only the closures these parts run plus the root project, as the deploy
+      # job for this Worker already installs them: a recursive workspace install
+      # links every unrelated package and runs its lifecycle scripts once per
+      # part. A few suites reach another workspace's source by relative path,
+      # and the two whose sources resolve workspace packages need that
+      # workspace's own links: src/telemetry/report-consumer.glanceable.test.ts
+      # reads services/notifications and apps/web, and
+      # test/integration/scm-broker-parity.test.ts reads
+      # services/git-token-service. The suites that read
+      # packages/cloud-agent-sdk, src/websocket/stream.test.ts and
+      # test/integration/control-plane-session-v2-history.test.ts, resolve
+      # without that package's node_modules. Widen the filter when a step here
+      # imports a workspace outside these closures.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: >-
+          pnpm install --frozen-lockfile
+          --filter 'cloud-agent-next...'
+          --filter '@kilocode/cloud-agent-wrapper...'
+          --filter 'notifications...'
+          --filter 'cloudflare-git-token-service...'
+          --filter 'web...'
+          --filter kilocode-monorepo
 
       - name: Run cloud-agent-next unit tests
         if: matrix.part == 'unit'
@@ -1656,6 +1704,127 @@ jobs:
       # suffix that computeDatabaseUrl adds whenever NODE_ENV=test.
       - name: Run session-sync account database tests
         run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter cloudflare-session-sync test:postgres
+
+  # The Rust core of the local SSH module. Its own filter gates it, so a mobile
+  # JavaScript change pays neither job, and the required `test` job needs both
+  # so a Rust failure blocks the merge.
+  #
+  # No install: cargo reads the module's workspace and its Cargo.lock, and
+  # rust-toolchain.toml pins the channel, its components and, once a caller
+  # asks for one, its targets. The runner image ships the rustup proxies.
+  mobile-ssh-rust:
+    needs: changes
+    if: needs.changes.outputs.mobile_ssh_rust == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/mobile/modules/kilo-ssh/rust
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Install the pinned toolchain
+        run: rustup show
+
+      # Registry and git checkouts only: the compiled target tree is large and
+      # rotates with every source change, so a restored one would rarely match.
+      - name: Cache the cargo registry
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-registry-${{ hashFiles('apps/mobile/modules/kilo-ssh/rust/Cargo.lock', 'apps/mobile/modules/kilo-ssh/rust-toolchain.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-cargo-registry-
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Lint
+        run: cargo clippy --all-targets -- -D warnings
+
+      # The integration suites in tests/ skip themselves without SSH_TEST_HOST,
+      # so this runs the unit tests and proves the other suites compile.
+      - name: Test
+        run: cargo test
+
+  # The suites that run against the Docker SSH fixtures. Each test self-skips
+  # unless its SSH_TEST_* variable is set, so this job is the only place they
+  # execute. One network for the whole fixture: the bastion reaches the target
+  # only over it, and `ssh-core-http` has no published port at all.
+  mobile-ssh-rust-integration:
+    needs: changes
+    if: needs.changes.outputs.mobile_ssh_rust == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/mobile/modules/kilo-ssh/rust
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Install the pinned toolchain
+        run: rustup show
+
+      - name: Cache the cargo registry
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-registry-${{ hashFiles('apps/mobile/modules/kilo-ssh/rust/Cargo.lock', 'apps/mobile/modules/kilo-ssh/rust-toolchain.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-cargo-registry-
+
+      - name: Build the SSH test server
+        run: docker build -t ssh-core-test -f ssh-core/tests/docker/Dockerfile ssh-core/tests
+
+      # Port 9000 is published so a remote forward bound inside the container
+      # is reachable; 2222-2226 carry password, two-factor, silent and bastion.
+      - name: Start the SSH test servers
+        run: |
+          set -euo pipefail
+          docker network create ssh-core-net
+          docker run -d --name ssh-core-password --network ssh-core-net -p 2222:2222 -p 9000:9000 ssh-core-test password
+          docker run -d --name ssh-core-twofactor --network ssh-core-net -p 2223:2222 ssh-core-test two-factor
+          docker run -d --name ssh-core-silent --network ssh-core-net -p 2224:2222 ssh-core-test silent
+          docker run -d --name ssh-core-http --network ssh-core-net ssh-core-test http
+          docker run -d --name ssh-core-bastion --network ssh-core-net -p 2226:2222 ssh-core-test password
+          docker run -d --name ssh-core-target --network ssh-core-net ssh-core-test password
+          for port in 2222 2223 2224 2226; do
+            for attempt in $(seq 1 30); do
+              if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then break; fi
+              sleep 1
+            done
+          done
+
+      - name: Run the integration suites
+        env:
+          SSH_TEST_HOST: 127.0.0.1
+          SSH_TEST_REMOTE_FORWARD_PORT: '9000'
+          SSH_TEST_HTTP_HOST: ssh-core-http
+          SSH_TEST_HTTP_PORT: '8080'
+          SSH_TEST_BASTION_PORT: '2226'
+          SSH_TEST_TARGET_HOST: ssh-core-target
+          SSH_TEST_TARGET_PORT: '2222'
+          SSH_TEST_THIRD_HOP_HOST: ssh-core-password
+          SSH_TEST_THIRD_HOP_PORT: '2222'
+        run: cargo test --test integration --test transfers
+
+      - name: Show the server logs on failure
+        if: failure()
+        run: |
+          for name in ssh-core-password ssh-core-twofactor ssh-core-silent ssh-core-http ssh-core-bastion ssh-core-target; do
+            echo "== $name"
+            docker logs "$name" || true
+          done
+
+      - name: Stop the SSH test servers
+        if: always()
+        run: |
+          docker rm -f ssh-core-password ssh-core-twofactor ssh-core-silent ssh-core-http ssh-core-bastion ssh-core-target || true
+          docker network rm ssh-core-net || true
 
   workspace-tests:
     needs: changes

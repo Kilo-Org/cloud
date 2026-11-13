@@ -7,6 +7,7 @@ import {
   MessageSquareText,
   ScrollText,
   ShieldCheck,
+  Users,
 } from '@/components/ui/icons';
 
 import { i18n } from '@/i18n';
@@ -65,6 +66,7 @@ export function buildOverviewRows({
   modelsLoading,
   onOpenModelPicker,
   onOpenReviewMemory,
+  onOpenCouncil,
 }: {
   data: ReviewConfigData;
   capabilities: (typeof PLATFORM_CAPABILITIES)[keyof typeof PLATFORM_CAPABILITIES];
@@ -72,6 +74,8 @@ export function buildOverviewRows({
   modelsLoading: boolean;
   onOpenModelPicker: () => void;
   onOpenReviewMemory?: () => void;
+  /** Organizations only, and only when the council gate (entitlement + flag) passes. */
+  onOpenCouncil?: () => void;
 }): OverviewRow[] {
   return [
     {
@@ -141,6 +145,24 @@ export function buildOverviewRows({
               displayCount: formatNumber(data.selectedRepositoryIds.length, i18n.language),
             }),
     },
+    // Council review is an organization entitlement behind a rollout flag; the
+    // caller only wires this row when both hold. It reports only whether any
+    // repository opted in, because that opt-in — not the specialist list — is
+    // what makes a run a council run.
+    ...(onOpenCouncil
+      ? [
+          {
+            field: 'council',
+            icon: Users,
+            title: i18n.t('codeReviewer.council.title'),
+            subtitle:
+              data.council != null && data.councilEnabledRepositoryIds.length > 0
+                ? i18n.t('codeReviewer.overview.set')
+                : i18n.t('codeReviewer.overview.notSet'),
+            onPress: onOpenCouncil,
+          },
+        ]
+      : []),
     // Review memory is GitHub-only and only offered when the caller wires the
     // navigation callback (the overview screen pushes the scope-level route,
     // not a per-platform settings field). Members may open it read-only: the

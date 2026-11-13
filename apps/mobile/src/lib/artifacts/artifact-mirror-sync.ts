@@ -221,21 +221,22 @@ async function runSyncOnce(
 
   const scope = readCacheScope(userId);
   const key = syncStateItemKey(userId);
-  const state = parseSyncState(await deps.readState(scope, key));
+  const stored = parseSyncState(await deps.readState(scope, key));
   const now = deps.now();
-  if (!options.force && isWithinMinInterval(state.lastRunAt, now)) {
+  if (!options.force && isWithinMinInterval(stored.lastRunAt, now)) {
     return { status: 'skipped', reason: 'interval' };
   }
   if (!canPublish(epoch)) {
     return { status: 'discarded' };
   }
-
+  // Reconcile only once the run is going ahead: the probe stats the mirror, and
+  // a run the interval gate skips must not pay for that on the JS thread.
   const page = await listSessionPage({}, deps);
   const run: SyncRun = {
     deps,
     epoch,
     generation,
-    states: nextSessionStates(page.sessions, state.sessions),
+    states: nextSessionStates(page.sessions, reconcileWithDisk(stored, deps).sessions),
   };
   const advanced = await advanceSessions(page.sessions, run);
   if (advanced.discarded || !canPublish(epoch)) {
@@ -540,6 +541,56 @@ function applyByteBudget(
 /** The publication fence: no sign-out in progress and the epoch still current. */
 function canPublish(epoch: number): boolean {
   return !isSignOutActive() && isCurrentAuthEpoch(epoch);
+}
+
+/**
+ * Reconcile the stored crawl state with the bytes actually in the mirror.
+ *
+ * The mirror is derived data, and the device can remove it: the file browser
+ * can delete a folder and the OS can sweep the cache. A stored state that still
+ * names a file whose byte is gone would skip re-materializing it and publish it
+ * in the index anyway, so the state is checked against the disk first.
+ *
+ * A session that lost bytes keeps the files it still has and restarts its crawl
+ * from the first page: the lost artifact may sit behind an earlier cursor, so
+ * the cursor must go for the crawl to reach it again, while the files that
+ * survived stay in the index and are never fetched a second time. The walk is
+ * one existence check per stored file, and a session it cannot inspect keeps
+ * its stored state, because this probe reads the filesystem and must not fail a
+ * run.
+ */
+function reconcileWithDisk(state: MirrorSyncState, deps: ArtifactMirrorSyncDeps): MirrorSyncState {
+  const sessions: Record<string, MirrorSyncSessionState> = {};
+  for (const [sessionId, session] of Object.entries(state.sessions)) {
+    sessions[sessionId] = reconcileSession(sessionId, session, deps);
+  }
+  return { lastRunAt: state.lastRunAt, sessions };
+}
+
+/**
+ * One session's state after the disk check. A session the probe cannot read
+ * keeps its stored state, so one unreadable folder never costs the other
+ * sessions their reconciliation or fails the run.
+ */
+function reconcileSession(
+  sessionId: string,
+  session: MirrorSyncSessionState,
+  deps: ArtifactMirrorSyncDeps
+): MirrorSyncSessionState {
+  try {
+    const directory = deps.mirrorSessionDir(sessionId);
+    // No browsable container means nothing was ever materialized there, so the
+    // state is kept as it is.
+    const present =
+      directory === null
+        ? session.files
+        : session.files.filter(file => new File(directory, file.id).exists);
+    return present.length === session.files.length
+      ? session
+      : { cursor: null, done: false, files: present, updatedAt: session.updatedAt };
+  } catch {
+    return session;
+  }
 }
 
 function isWithinMinInterval(lastRunAt: number | null, now: number): boolean {

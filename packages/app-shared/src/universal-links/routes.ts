@@ -21,12 +21,49 @@ export type UniversalLinkRoute = {
    * wildcard (the rightmost `*`).
    */
   readonly exclusions?: readonly string[];
+  /**
+   * Emit an AASA `exclude` for `<webPath>/*` immediately before this row.
+   * Apple's `*` is a greedy glob that crosses `/`, so `<webPath>` alone also
+   * matches deeper paths on iOS — where the association file applies to every
+   * installed app version at once. Set this on a row whose version of "one
+   * wildcard segment" must stay exact, and put every deeper path the app DOES
+   * handle earlier in this table: AASA's first match wins, so those rows still
+   * associate, and everything below them falls through to the exclusion.
+   * Android needs no counterpart here: the row below states its own
+   * one-segment `androidPathPattern`, and the runtime matcher compares
+   * segments. An Android `pathPattern` cannot express exclusions at all, so the
+   * literal pages under the row still reach the app and the mobile deep-link
+   * handler opens them in the browser (`browserHandoffUrl`).
+   */
+  readonly excludeDeeperAasaPaths?: boolean;
+  /**
+   * Android `pathPattern` override for this row. `pathPattern` is a full
+   * regular expression and the table compile of `*` is `.*`, which crosses
+   * `/` — so a row that must match exactly one segment states its own pattern
+   * here (`[^/]+`). Every row without an override keeps the compile it shipped
+   * with.
+   */
+  readonly androidPathPattern?: string;
 };
 
 export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
   { webPath: '/home', appPath: '/(app)/(tabs)/(0_home)' },
   { webPath: '/profile', appPath: '/(app)/(tabs)/(3_profile)' },
   { webPath: '/profile/preferences', appPath: '/(app)/(tabs)/(3_profile)/preferences' },
+  // The app's own account screens. Every one of these is a literal path: the
+  // web pages below them (`/integrations/linear`, `/subscriptions/kilo-pass/
+  // refer`, …) have no screen of their own in the app, and a literal row
+  // matches exactly, so those sub-paths stay in the browser on both platforms
+  // without an exclusion.
+  { webPath: '/credits', appPath: '/(app)/(tabs)/(3_profile)/credit-history' },
+  { webPath: '/usage', appPath: '/(app)/usage' },
+  { webPath: '/invoices', appPath: '/(app)/(tabs)/(3_profile)/invoices' },
+  { webPath: '/data-exports', appPath: '/(app)/(tabs)/(3_profile)/data-export' },
+  { webPath: '/byok', appPath: '/(app)/(tabs)/(3_profile)/provider-keys' },
+  { webPath: '/integrations', appPath: '/(app)/(tabs)/(3_profile)/integrations' },
+  // Kilo Pass management is a modal screen in the app, so it is its own row,
+  // not a tab.
+  { webPath: '/subscriptions/kilo-pass', appPath: '/(app)/kilo-pass' },
   { webPath: '/cloud/sessions', appPath: '/(app)/(tabs)/(2_agents)' },
   { webPath: '/cloud/sessions/*', appPath: '/(app)/agent-chat/<1>' },
   {
@@ -37,6 +74,9 @@ export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
     webPath: '/security-agent/findings',
     appPath: '/(app)/security-agent/personal/findings',
   },
+  // The security agent's settings page. Literal, so its sibling web pages
+  // (`/security-agent/audit-report`) keep opening in the browser.
+  { webPath: '/security-agent/config', appPath: '/(app)/security-agent/personal/settings' },
   {
     webPath: '/code-reviews',
     appPath: '/(app)/code-reviewer/personal',
@@ -55,6 +95,10 @@ export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
     appPath: '/(app)/security-agent/<1>/findings',
   },
   {
+    webPath: '/organizations/*/security-agent/config',
+    appPath: '/(app)/security-agent/<1>/settings',
+  },
+  {
     webPath: '/organizations/*/code-reviews',
     appPath: '/(app)/code-reviewer/<1>',
   },
@@ -66,6 +110,39 @@ export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
   {
     webPath: '/organizations/*/overview',
     appPath: '/(app)/(tabs)/(3_profile)/organization/<1>',
+  },
+  // The organization screens that live behind the app's org settings but read a
+  // scope of their own: the integrations hub already takes an `?org=` scope,
+  // and the usage screen takes the same one through its route. The web's org
+  // invoices live on `/organizations/<id>/payment-details`, a page of several
+  // cards (balance, top-up, purchase history, invoices) that no single app
+  // screen shows, so that page stays in the browser.
+  {
+    webPath: '/organizations/*/integrations',
+    appPath: '/(app)/(tabs)/(3_profile)/integrations?org=<1>',
+  },
+  {
+    webPath: '/organizations/*/usage-details',
+    appPath: '/(app)/(tabs)/(3_profile)/organization/usage?org=<1>',
+  },
+  // The bare organization route: the web dashboard, and where an accepted
+  // invitation lands (`apps/web` redirects to `/organizations/<id>`). Exactly
+  // one segment — every deeper `/organizations/<id>/…` page without a row of
+  // its own above (SSO, guardrails, request logs, payment details, …) is
+  // web-only, so those links stay in the browser. The two
+  // literal pages under the same shape are not ids either: the create form
+  // must open where the account is asked. On iOS `*` crosses `/`, hence
+  // `excludeDeeperAasaPaths`; on Android the explicit `[^/]+` override keeps
+  // the filter to one segment without touching any other row's pattern. Android
+  // `pathPattern` cannot exclude, so `/organizations/new` and
+  // `/organizations/create` still arrive in the app — the mobile deep-link
+  // handler opens those two in the browser instead of navigating.
+  {
+    webPath: '/organizations/*',
+    appPath: '/(app)/(tabs)/(3_profile)/organization/<1>',
+    exclusions: ['new', 'create'],
+    excludeDeeperAasaPaths: true,
+    androidPathPattern: '/organizations/[^/]+',
   },
   // Provider rows BEFORE the GitHub row: `/pr-review/gitlab/x/123` has the
   // same segment count as a GitHub PR path, and the literal platform segment
@@ -144,9 +221,18 @@ function parseHttpsPath(authorityAndPath: string): string | null {
   const authority = slash < 0 ? authorityAndPath : authorityAndPath.slice(0, slash);
   const pathPart = slash < 0 ? '' : authorityAndPath.slice(slash);
 
-  // Strip optional port for host comparison.
+  // `https://app.kilo.ai:pass@evil.com/x` puts a foreign host after the first
+  // `:` — an authority carrying userinfo is never ours.
+  if (authority.includes('@')) {
+    return null;
+  }
+
+  // Strip optional port for host comparison; a port is digits only.
   const colon = authority.indexOf(':');
   const host = (colon >= 0 ? authority.slice(0, colon) : authority).toLowerCase();
+  if (colon >= 0 && !/^\d{1,5}$/.test(authority.slice(colon + 1))) {
+    return null;
+  }
 
   if (host !== KILO_WEB_HOST) {
     return null;
@@ -340,7 +426,10 @@ export type AasaComponent = {
  * Compile the table to Apple AASA `components` entries.
  * Exclusion components are emitted immediately BEFORE their row.
  * Apple AASA `*` is a glob that crosses `/`; that superset is deliberate —
- * the table's `*` is kept verbatim in AASA output.
+ * the table's `*` is kept verbatim in AASA output. A row that must not leak
+ * to web-only subpages sets `excludeDeeperAasaPaths`, which emits
+ * `<webPath>/*` as an exclusion right before the row (AASA is first match
+ * wins, so rows earlier in the table keep their deeper paths associated).
  */
 export function aasaComponents(): AasaComponent[] {
   const components: AasaComponent[] = [];
@@ -353,6 +442,9 @@ export function aasaComponents(): AasaComponent[] {
           exclude: true,
         });
       }
+    }
+    if (route.excludeDeeperAasaPaths) {
+      components.push({ '/': `${route.webPath}/*`, exclude: true });
     }
     components.push({ '/': route.webPath });
   }
@@ -372,15 +464,19 @@ function patternWithFinalWildcardReplaced(pattern: string, value: string): strin
 /**
  * Compile the table to Android `pathPattern` strings.
  * Each `*` or trailing `**` segment becomes `.*` (Android's pattern crosses
- * `/`, so the multi-segment tail needs no special form). Android cannot
- * express exclusions — the runtime matcher (`webPathToAppPath` /
- * `resolveIncomingUrl`) is the exclusion enforcement.
+ * `/`, so the multi-segment tail needs no special form) — the compile every
+ * shipped row uses. A row that must match exactly one segment states an
+ * explicit `androidPathPattern` instead, so narrowing it changes no other
+ * row's filter. Android cannot express exclusions — the runtime matcher
+ * (`webPathToAppPath` / `resolveIncomingUrl`) is the exclusion enforcement.
  */
 export function androidPathPatterns(): string[] {
-  return UNIVERSAL_LINK_ROUTES.map(route =>
-    route.webPath
-      .split('/')
-      .map(seg => (seg === '*' || seg === '**' ? '.*' : seg))
-      .join('/')
+  return UNIVERSAL_LINK_ROUTES.map(
+    route =>
+      route.androidPathPattern ??
+      route.webPath
+        .split('/')
+        .map(seg => (seg === '*' || seg === '**' ? '.*' : seg))
+        .join('/')
   );
 }

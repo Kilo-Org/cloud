@@ -23,6 +23,10 @@
   },
   "common": {
     "deleteTitle": "Eliminar {{label}}?",
+    "manageOnWeb": "Xestionar na web",
+    "creditHistory": "Historial de créditos",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancelar",
@@ -119,6 +123,7 @@
     "copyLink": "Copiar a ligazón",
     "couldNotLoadOrganizations": "Non se puideron cargar as organizacións.",
     "couldNotLoadSessions": "Non se puideron cargar as sesións.",
+    "couldnTLoad": "Non se puido cargar.",
     "couldnTLoadMore": "Non se puideron cargar máis resultados.",
     "deviceSessions": "Sesións nos dispositivos",
     "disabled": "Desactivado",
@@ -246,6 +251,10 @@
     "notAdded": "Iniciaches sesión. Non se engadiu {{provider}} á túa conta."
   },
   "profile": {
+    "creditHistorySubtitle": "Compras, recibos e actividade de créditos",
+    "invoicesSubtitle": "Descarga as facturas das túas compras",
+    "manageBilling": "Xestionar a facturación en kilo.ai",
+    "manageBillingIosNote": "Os métodos de pagamento, a recarga automática e os datos de facturación xestiónanse en kilo.ai.",
     "codeReviewerSubtitle": "Revisións automáticas de PR",
     "securityAgentSubtitle": "Atopar e corrixir vulnerabilidades",
     "reviews": "Revisións",
@@ -299,6 +308,7 @@
     "passkeyAdded": "Chave de acceso engadida.",
     "passkeyAddFailed": "Non se puido engadir unha chave de acceso. Téntao de novo.",
     "passkeyAddUnsupported": "Este dispositivo non pode crear chaves de acceso.",
+    "passkeyAddUnavailable": "As chaves de acceso só se poden engadir nun navegador web.",
     "passkeyAddCancelled": "Cancelouse a creación da chave de acceso.",
     "passkeyRemoved": "Chave de acceso eliminada.",
     "passkeyRemoveFailed": "Non se puido eliminar esa chave de acceso. Téntao de novo.",
@@ -331,7 +341,6 @@
     "providerKeys": {
       "title": "Claves de provedor",
       "rowSubtitle": "Usa a facturación do teu propio provedor",
-      "manageOnWeb": "Xestionar na web",
       "manageOnWebReason": "Estes provedores necesitan credenciais estruturadas.",
       "description": "As solicitudes feitas con estas claves facúranse na túa conta do provedor en lugar de descontarse do teu saldo de Kilo.",
       "enabled": "En uso",
@@ -1245,7 +1254,17 @@
       "changeRequestMissingPermissions": "A aplicación de GitHub de Kilo non pode abrir solicitudes de incorporación neste repositorio. Un propietario do repositorio debe darlle á aplicación permiso de escritura sobre os contidos e as solicitudes de incorporación e, despois, téntao de novo.",
       "changeRequestFailed": "Kilo non puido abrir a solicitude de incorporación. Téntao de novo dentro dun intre.",
       "proposalConflict": "Outra proposta de memoria de revisión para este repositorio aínda está activa.",
-      "offAction": "A memoria de revisión está desactivada. Actívaa e téntao de novo."
+      "offAction": "A memoria de revisión está desactivada. Actívaa e téntao de novo.",
+      "analyze": {
+        "title": "Analizar comentarios",
+        "description": "Escolle un repositorio con respostas recentes dos responsables do mantemento e busca un patrón de pautas repetido.",
+        "chooseRepository": "Escolle un repositorio",
+        "action": "Analizar agora",
+        "noRepositories": "Ningún repositorio ten aínda respostas recentes dos responsables do mantemento.",
+        "proposed": "Creouse a proposta de memoria de revisión",
+        "noFeedback": "Non se atoparon comentarios recentes para este repositorio",
+        "noPattern": "Non se atopou ningún patrón repetido claro"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Introduce un URL válido dunha solicitude de fusión.",
@@ -1377,7 +1396,63 @@
       "title": "O revisor de código precisa a túa atención.",
       "recoveryLabel": "Contactar coa asistencia"
     },
-    "unknownError": "Erro descoñecido"
+    "unknownError": "Erro descoñecido",
+    "skipBotPullRequests": {
+      "title": "Omitir pull requests de bots",
+      "subtitle": "Non executar revisións automáticas en pull requests abertas por bots como Dependabot ou Renovate. Desactívao para revisar tamén as pull requests de bots."
+    },
+    "repoModels": {
+      "title": "Modelo por repositorio",
+      "description": "Usa outro modelo, outro nivel de razoamento ou ambos nas revisións dalgúns repositorios.",
+      "defaultModel": "Usa o modelo predeterminado",
+      "resetLabel": "Restablecer o modelo de {{repository}}",
+      "changeHint": "Abre o selector de modelos"
+    },
+    "analytics": {
+      "title": "Analítica",
+      "trackedReviews": "Revisións rexistradas",
+      "findingsRaised": "Achados detectados",
+      "highImpactChanges": "Cambios de alto impacto",
+      "impactPoints": "Puntos de impacto",
+      "repositoryLine": "Revisións: {{reviews}} · Achados: {{findings}}",
+      "empty": "Aínda non hai revisións con analítica",
+      "emptyDescription": "A analítica rexistra as revisións completadas mentres estea activada para a organización.",
+      "off": "A analítica está desactivada para esta organización.",
+      "couldNotLoad": "Non se puido cargar a analítica"
+    },
+    "council": {
+      "title": "Revisión en consello",
+      "subtitle": "Varios especialistas revisan cada pull request e os seus votos combínanse nunha única decisión.",
+      "unavailable": "A revisión en consello non está dispoñible para esta organización.",
+      "noRepositories": "Aínda non hai repositorios seleccionados. Primeiro escolle repositorios na configuración de repositorios.",
+      "specialists": "Especialistas",
+      "labels": "Etiquetas que activan a revisión en consello",
+      "labelsPlaceholder": "p. ex. consello, revisión profunda",
+      "labelsDescription": "Separa as etiquetas con comas. Así, un repositorio co consello activado só o executa nas pull requests que teñan polo menos unha destas etiquetas. Déixao en branco para todas as pull requests aptas.",
+      "tooManyLabels": "Demasiadas etiquetas para a revisión en consello. Usa como máximo {{maximum}} etiquetas.",
+      "labelTooLong": "Unha etiqueta para a revisión en consello é demasiado longa. Cada etiqueta debe ter {{maximum}} caracteres ou menos.",
+      "minSpecialists": "Selecciona polo menos {{minimum}} especialistas. Seleccionados: {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Cobertura de probas",
+        "correctness": "Corrección",
+        "custom": "Especialista"
+      },
+      "specialist": {
+        "security": "Omisión da autorización, xestión de segredos e entradas non seguras.",
+        "performance": "Rutas críticas, consultas N+1 e asignacións pesadas.",
+        "testing": "Cobertura ausente ou insuficiente para o novo comportamento.",
+        "correctness": "Erros lóxicos, casos límite e condicións de carreira.",
+        "custom": "Revisa problemas da súa propia área."
+      },
+      "strategy": {
+        "advisory": "Consultivo",
+        "advisoryDescription": "Informa de achados e votos sen bloquear a fusión.",
+        "unanimous": "Unánime",
+        "unanimousDescription": "Bloquea a fusión cando calquera especialista informa dun problema crítico.",
+        "majority": "Por maioría",
+        "majorityDescription": "Bloquea a fusión só cando a maioría dos especialistas informa dun problema crítico."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1880,6 +1955,16 @@
       "auto": "Automática",
       "shallow": "Superficial",
       "deep": "Profunda"
+    },
+    "orphanedFindings": {
+      "title": "Achados de repositorios eliminados",
+      "description": "Estes repositorios xa non son accesibles a través da integración con GitHub. Os seus achados seguen contando nos paneis e informes.",
+      "count": "Achados: {{count}}",
+      "clearLabel": "Borrar os achados de {{repository}}",
+      "confirmTitle": "Borrar os achados?",
+      "confirmMessage": "Eliminaranse todos os achados rexistrados de {{repository}}. Non se pode desfacer.",
+      "confirmAction": "Eliminar achados",
+      "cleared": "Achados borrados: {{count}}"
     }
   },
   "agents": {
@@ -2059,6 +2144,7 @@
       "branchPlaceholder": "Selecciona unha rama",
       "runOnWithTarget": "Executar en: {{target}}",
       "environment": "Contorno",
+      "cloudEnvironment": "Contorno na nube",
       "couldNotLoadEnvironment": "Non se puido cargar o teu contorno.",
       "retryLoadingEnvironment": "Volver tentar cargar o contorno",
       "defaultEnvironment": "Contorno predeterminado",
@@ -2119,6 +2205,89 @@
       "openSettingsToReview": "Abre Configuración para revisar",
       "profileSelection": "Selección de perfil",
       "profileLayerAccessibility": "{{label}}: {{detail}}"
+    },
+    "environment": {
+      "loadingEnvironments": "Cargando contornos",
+      "couldNotLoadEnvironments": "Non se puideron cargar os contornos",
+      "couldNotLoadEnvironmentsDetail": "Téntao de novo para cargar os contornos deste repositorio.",
+      "noEnvironment": "Sen contorno",
+      "noEnvironmentDetail": "Esta sesión iníciase desde a imaxe base.",
+      "chooseEnvironment": "Escoller contorno",
+      "chooseEnvironmentDetail": "Este repositorio ten máis dun contorno.",
+      "environmentAccessibility": "Escolle un contorno: {{label}}",
+      "environmentsForRepository": "Contornos de {{repository}}",
+      "selectEnvironmentToStart": "Selecciona un contorno para comezar.",
+      "buildDetails": "Detalles da compilación",
+      "buildNotBuilt": "Sen compilar",
+      "buildUnavailableShort": "Compilacións de snapshot non dispoñibles",
+      "buildPreparing": "Preparando o builder",
+      "buildCloning": "Clonando a rama predeterminada",
+      "buildSetup": "Executando a configuración do contorno",
+      "buildCleanup": "Eliminando as credenciais de compilación",
+      "buildCapturing": "Capturando o snapshot",
+      "buildPublishing": "Publicando o snapshot",
+      "buildStopping": "Detendo o builder",
+      "buildStoppingRetrying": "Detendo o builder, tentando de novo",
+      "buildFinishing": "Finalizando a compilación",
+      "buildSucceeded": "Snapshot listo",
+      "buildSuperseded": "Substituída por unha compilación máis recente",
+      "buildStale": "A configuración cambiou desde este snapshot",
+      "buildStaleAge": "Snapshot con máis de catro días; a próxima sesión actualízao",
+      "buildStaleImage": "Compilado para unha imaxe de sandbox anterior",
+      "failureClone": "Non se puido clonar o repositorio.",
+      "failureSetup": "Fallou un comando de configuración. Consulta o rexistro da compilación.",
+      "failureTimeout": "Esgotouse o tempo dun comando de configuración. Consulta o rexistro da compilación.",
+      "failureCleanup": "Non se puideron eliminar as credenciais, polo que non se capturou ningún snapshot.",
+      "failureCapture": "Non se puido capturar o snapshot.",
+      "failureCaptureUncertain": "Perdeuse o resultado do snapshot; a compilación non se publicou.",
+      "failureDeadline": "A compilación non rematou a tempo.",
+      "failureBuilderLost": "O builder deixou de informar.",
+      "failureBuilderStart": "O builder non puido iniciarse.",
+      "failureUnauthorized": "O acceso ao repositorio xa non está autorizado.",
+      "failureActorUnauthorized": "A persoa que iniciou a compilación xa non ten acceso.",
+      "failureBilling": "As compilacións requiren créditos dispoñibles.",
+      "failureBillingUnavailable": "A facturación non puido admitir a compilación. Téntao de novo.",
+      "failureConfiguration": "A configuración cambiou durante a compilación.",
+      "failureRuntime": "Non se puido instalar a versión seleccionada do runtime.",
+      "failureGeneric": "A compilación fallou.",
+      "buildLogs": "Rexistros da compilación",
+      "noBuildLogs": "Aínda non hai saída no rexistro.",
+      "buildLogsLatestOnly": "Móstranse as últimas 500 liñas conservadas do rexistro.",
+      "buildLogsTruncated": "A saída posterior truncouse.",
+      "couldNotLoadBuild": "Non se puido cargar o estado da compilación",
+      "couldNotLoadBuildLogs": "Non se puideron cargar os rexistros da compilación",
+      "buildsUnavailable": "As compilacións de snapshots non están dispoñibles para este contorno.",
+      "onlyManagersCanBuild": "Só os xestores da organización poden compilar snapshots.",
+      "waitForBuilder": "Agarda a que o builder se deteña antes de compilar de novo.",
+      "buildAction": "Compilar snapshot",
+      "refreshAction": "Actualizar snapshot",
+      "cancelBuildAction": "Cancelar compilación",
+      "buildStarted": "Iniciouse a compilación do snapshot",
+      "buildCanceled": "Cancelouse a compilación do snapshot",
+      "couldNotStartBuild": "Non se puido iniciar a compilación",
+      "couldNotCancelBuild": "Non se puido cancelar a compilación",
+      "sandbox": "Sandbox",
+      "sandboxActive": "Sandbox activa",
+      "sandboxSleeping": "Sandbox en repouso",
+      "sandboxStarting": "Sandbox iniciándose",
+      "sandboxStopping": "Sandbox deténdose",
+      "sandboxError": "Erro da sandbox",
+      "sandboxUnreachable": "Sandbox inaccesible",
+      "sandboxStatusUnknown": "Estado da sandbox descoñecido",
+      "sandboxChecked": "Comprobado {{when}}",
+      "sandboxDetailStopped": "Envía unha mensaxe para retomala.",
+      "sandboxDetailFailed": "Envía unha mensaxe para tentalo de novo.",
+      "sandboxDetailConnection": "A conexión coa sandbox non está dispoñible.",
+      "sandboxDetailUnavailable": "O estado da sandbox non está dispoñible temporalmente.",
+      "sandboxDetailInsufficient": "Non hai información suficiente para confirmar o estado actual da sandbox.",
+      "sandboxDetailCheckNeeded": "A sandbox non confirmou o seu estado de saúde recentemente.",
+      "startFresh": "Comezar de cero",
+      "startFreshTitle": "Comezar de cero?",
+      "startFreshMessage": "Isto descarta o snapshot do espazo de traballo capturado {{when}}. Perderanse os cambios sen confirmar dese espazo de traballo.",
+      "startFreshMessageUnknown": "Isto descarta o snapshot gardado do espazo de traballo, que non se puido ler. Perderanse os cambios sen confirmar dese espazo de traballo.",
+      "startFreshDone": "Eliminouse o snapshot do espazo de traballo.",
+      "couldNotRemoveSnapshot": "Non se puido eliminar o snapshot do espazo de traballo.",
+      "snapshotCaptured": "Snapshot do espazo de traballo capturado {{when}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizouse {{displayCount}} ficheiro.",
@@ -2468,7 +2637,8 @@
       "cancelQueued": "Cancelar mensaxe",
       "cancelQueuedAccessibility": "Cancelar a mensaxe na cola",
       "restoreQueued": "Restaurar",
-      "restoreQueuedAccessibility": "Restaurar a mensaxe cancelada no campo de mensaxe"
+      "restoreQueuedAccessibility": "Restaurar a mensaxe cancelada no campo de mensaxe",
+      "noReplyRecorded": "Non se rexistrou ningunha resposta para esta mensaxe."
     },
     "olderMessages": {
       "arrived": "Cargáronse as mensaxes anteriores",
@@ -2861,6 +3031,26 @@
     "onlyFirstFilesAttached_other": "Só se anexarán os primeiros {{displayCount}} ficheiros."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Historial de facturación",
+      "billingHistoryEmpty": "Aínda non hai historial de facturación.",
+      "cancel": "Cancelar subscrición",
+      "cancelDescription": "O teu Kilo Pass seguirá activo ata o final do período de facturación e non se renovará.",
+      "cancelScheduled": "Cancélase o {{date}}",
+      "cancelScheduledChange": "Cancelar cambio programado",
+      "cancelled": "Subscrición cancelada",
+      "changePlan": "Cambiar de plan en kilo.ai",
+      "changePlanIosNote": "Os cambios a plans de pagamento están dispoñibles en kilo.ai.",
+      "creditHistoryEmpty": "Aínda non hai créditos de Kilo Pass.",
+      "manageInStore": "Xestionar en {{store}}",
+      "resume": "Retomar subscrición",
+      "resumeCancelledDescription": "O teu Kilo Pass volverá renovarse automaticamente.",
+      "resumePausedDescription": "O teu Kilo Pass retómase agora, antes da data de reactivación programada.",
+      "resumed": "Subscrición retomada",
+      "scheduledChange": "Cambio programado",
+      "scheduledChangeCancelDescription": "O teu Kilo Pass mantense no plan actual e renóvase como ata agora.",
+      "scheduledChangeSummary": "{{plan}} o {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass non está dispoñible.",
     "couldNotLoad": "Non se puido cargar Kilo Pass. Téntao de novo.",
@@ -2870,7 +3060,7 @@
     "subscriptionLoading": "Cargando a subscrición de Kilo Pass",
     "retryHint": "Volve consultar o estado de Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailableEnded": "O teu Kilo Pass rematou.",
+    "endedOn": "Rematado o {{date}}",
     "notAvailableInApp": "Kilo Pass non está dispoñible na aplicación.",
     "statusActive": "Activo",
     "statusTrialing": "En proba",
@@ -2892,7 +3082,7 @@
     "kiloPassManagement": "Xestión de Kilo Pass",
     "kiloPassSetup": "Configuración de Kilo Pass",
     "opensManagementOnWeb": "Abre a xestión de Kilo Pass na web.",
-    "tryAgainFromProfile": "Téntao de novo desde o perfil.",
+    "loadFailedRetry": "Comproba a túa conexión e téntao de novo.",
     "legalTermsOfUse": "Termos de uso (EULA)",
     "purchaseDifferentAccount": "Esta compra da App Store non está vinculada á túa conta de Kilo. Inicia sesión na Apple Account que usaches para a compra e téntao de novo.",
     "purchaseFailed": "Non se puido completar a compra.",
@@ -2915,6 +3105,11 @@
     "accountDescription": "O identificador da túa conta de Kilo e os metadatos das solicitudes, usados para autenticarte e medir o uso.",
     "diagnosticsTitle": "Diagnósticos da aplicación",
     "diagnosticsDescription": "Informes de peches inesperados e erros, sen o contido da aplicación, para manter a aplicación estable.",
+    "featureFlagsTitle": "Despregamento de funcións",
+    "featureFlagsDescription": "O enderezo de correo electrónico da túa conta, usado por PostHog para decidir que funcións ves.",
+    "featureFlagsWhat": "O enderezo de correo electrónico da túa conta.",
+    "featureFlagsWhy": "Decidir que funcións ves, incluídas as que aínda estamos a despregar.",
+    "featureFlagsWho": "PostHog, o servizo de indicadores de funcións.",
     "helpImprove": "Axudar a mellorar Kilo",
     "helpImproveDescription": "Comparte estatísticas de uso anónimas e a orixe da instalación. Podes cambiar esta opción en calquera momento na configuración.",
     "seeFullDetails": "Ver todos os detalles",
@@ -2996,6 +3191,36 @@
     "sendFeedback": "Enviar comentarios"
   },
   "organization": {
+    "auditLog": {
+      "title": "Rexistro de auditoría",
+      "permissionDenied": "Só un propietario, administrador ou xestor de facturación dunha organización co plan Enterprise pode ler o seu rexistro de auditoría.",
+      "emptyTitle": "Non hai eventos de auditoría",
+      "emptyDescription": "Aquí aparecen as accións realizadas nesta organización.",
+      "truncated": "Móstranse os eventos máis recentes."
+    },
+    "billing": {
+      "title": "Facturación",
+      "permissionDenied": "Só o propietario, un administrador ou un xestor de facturación da organización pode ver a súa facturación.",
+      "subscription": "Subscrición",
+      "state": "Estado",
+      "stateNone": "Sen subscrición",
+      "statePastDue": "Pagamento vencido",
+      "stateCancelsAtPeriodEnd": "Cancélase ao final do período",
+      "stateTrialEndsOn": "A proba remata o {{date}}",
+      "stateTrialing": "Proba",
+      "stateRenewsOn": "Renóvase o {{date}}",
+      "seatsDropTo": "Baixa a {{seats}} prazas o {{date}}",
+      "seats": "Prazas",
+      "autoTopUp": "Recarga automática",
+      "autoTopUpAmount": "Importe da recarga",
+      "autoTopUpThreshold": "Cando o saldo baixe de",
+      "manageOnWeb": "Os cambios fanse na web",
+      "changePlan": "Cambiar plan",
+      "buySeats": "Mercar prazas",
+      "setupAutoTopUp": "Configurar recarga automática",
+      "webAddress": "Enderezo web {{url}}",
+      "opensOnWeb": "Ábrese na web"
+    },
     "boundary": {
       "backToProfile": "Volver ao perfil",
       "loadErrorMessage": "Comproba a túa conexión e téntao de novo.",
@@ -3003,14 +3228,20 @@
       "loadErrorTitle": "Non se puideron cargar as túas organizacións.",
       "membershipLostNotice": "Xa non tes acceso a esta organización. Cambiado a {{target}}.",
       "noOrganization": "Sen organización",
-      "noOrganizationDescription": "Esta conta non forma parte dunha organización. Crea unha ou únete a unha na web para usar funcións de organización como as invitacións de membros e as alertas de saldo baixo.",
-      "openWebOrganizations": "Abrir as organizacións na web",
+      "noOrganizationDescription": "Esta conta non forma parte de ningunha organización. Crea unha para usar funcións da organización, como os convites a membros e as alertas de saldo baixo, ou abre a web para unirte a unha á que te convidaron.",
       "organizationUnavailable": "A organización non está dispoñible.",
       "selectDescriptionWithOrganizations": "Pertences a unha ou máis organizacións. Escolle a conta que debe usar esta pantalla.",
       "selectOrganization": "Seleccionar unha organización",
       "unavailableDescription": "Esta organización xa non está dispoñible. Escolle unha desde o teu perfil para continuar.",
       "unavailableSessionsDescription": "Esta organización xa non está dispoñible. Non se poden cargar as súas sesións.",
       "accessDeniedDescription": "Non tes acceso a esta organización."
+    },
+    "create": {
+      "title": "Crear organización",
+      "description": "Unha organización comparte créditos, axentes e configuración co teu equipo.",
+      "nameLabel": "Nome da organización",
+      "nameRequired": "Introduce un nome para a organización.",
+      "trialNote": "A túa proba de 14 días de Enterprise comeza cando a crees. Os plans cómpranse na web."
     },
     "creditActivity": {
       "emptyDescription": "Aquí aparecerán as compras, o consumo e os axustes de créditos desta organización a medida que se produzan.",
@@ -3119,6 +3350,21 @@
       "ownRoleChange": "Non podes cambiar o teu propio rol.",
       "inviteExpired": "Esta invitación caducou.",
       "inviteAccepted": "Esta invitación xa foi aceptada."
+    },
+    "settingsOnWeb": {
+      "title": "Configuración da organización na web",
+      "usageDetails": "Detalles de uso",
+      "providersAndModels": "Provedores e modelos",
+      "groups": "Grupos",
+      "guardrails": "Barreiras de protección",
+      "byok": "Usa a túa propia clave",
+      "ssoAndDomain": "SSO e dominio",
+      "emailPreferences": "Preferencias de correo electrónico",
+      "dataCollection": "Recollida de datos",
+      "auditLogs": "Rexistros de auditoría",
+      "requestLogs": "Rexistros de solicitudes",
+      "subOrganizations": "Suborganizacións",
+      "distributeFunds": "Distribuír fondos"
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
@@ -3870,6 +4116,25 @@
     "importConfigApplied": "Config importada"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Non se puido cargar a actividade de crédito.",
+      "appStoreReceipt": "Recibo da App Store",
+      "deductionFallback": "Dedución de créditos",
+      "emptyDescription": "As compras de créditos, os recibos e o uso aparecerán aquí.",
+      "emptyTitle": "Sen historial de créditos",
+      "googlePlayReceipt": "Recibo de Google Play",
+      "kind": {
+        "adjustment": "Axuste",
+        "balanceNeutral": "Sen efecto no saldo",
+        "deduction": "Dedución",
+        "grant": "Concesión de créditos",
+        "purchase": "Compra"
+      },
+      "purchaseFallback": "Compra de créditos",
+      "receipt": "Recibo",
+      "receiptA11y": "Abrir o recibo de {{description}}",
+      "receiptUnavailable": "Non hai ningún recibo dispoñible para esta compra."
+    },
     "title": "Mercar créditos",
     "description": "Os créditos son unha compra única que se engade ao teu saldo de Kilo para executar sesións de codificación con IA na app de Kilo. A tenda cobra na túa conta e os créditos engádense despois de que a tenda confirme o pagamento.",
     "nextExpiry": "{{amount}} en créditos caducan o {{date}} (UTC). Os créditos coa caducidade máis próxima úsanse primeiro.",
@@ -4051,6 +4316,70 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Non se puido abrir este resultado da busca"
+  },
+  "usage": {
+    "title": "Uso",
+    "orgTitle": "Uso da organización",
+    "entrySubtitle": "Gasto, solicitudes e tokens",
+    "rangePicker": "Intervalo de tempo",
+    "range90d": "90 días",
+    "metricPicker": "Métrica do gráfico",
+    "chartA11y": "{{metric}} por día",
+    "avgCostPerRequest": "Custo medio / solic.",
+    "topModels": "Modelos principais",
+    "topFeatures": "Funcións principais",
+    "emptyTitle": "Sen uso neste período",
+    "orgSelfNotice": "Estás a ver o teu propio uso nesta organización.",
+    "viewDetails": "Ver detalles do uso"
+  },
+  "integrations": {
+    "title": "Integracións",
+    "sectionTitle": "Servizos conectados",
+    "entrySubtitle": "GitHub, Slack, Linear e moito máis",
+    "subtitle": "Conecta as túas ferramentas e fluxos de traballo de desenvolvemento con Kilo",
+    "emptyHint": "Aínda non hai ningunha integración conectada.",
+    "disconnect": "Desconectar",
+    "disconnectTitle": "Desconectar {{provider}}?",
+    "disconnectMessage": "Kilo deixará de responder en {{provider}}. Podes volver conectalo en calquera momento.",
+    "connectedTo": "Conectado a {{account}}",
+    "disconnected": "{{provider}} desconectado",
+    "disconnectFailed": "Non se puido desconectar {{provider}}",
+    "couldNotLoad": "Non se puideron cargar as integracións",
+    "permissionDenied": "Non tes permiso para xestionar estas integracións.",
+    "memberHint": "Pídelle a unha persoa propietaria ou administradora da organización que cambie estas conexións.",
+    "connectFailed": "Non se puido abrir a páxina de conexión"
+  },
+  "invoices": {
+    "personalEmptyDescription": "As facturas das túas propias compras aparecerán aquí cando se che facture."
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Aínda sen uso",
+      "sharedWorkspace": "Compartido por todos os chats deste espazo de traballo",
+      "currentRates": "Tarifas actuais",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Sandbox mediana",
+      "largeSandbox": "Sandbox grande",
+      "earlierActivity": "Actividade anterior",
+      "now": "agora",
+      "loadFailed": "Non se puideron cargar os cargos de Compute."
+    },
+    "preview": {
+      "title": "Abrir vista previa",
+      "listeningServices": "Servizos á escoita",
+      "empty": "Non se atoparon servizos á escoita. Pídelle ao axente que inicie un servidor web e despois actualiza.",
+      "notRunning": "Esta sandbox está detida. Envíalle unha mensaxe ao axente para iniciala de novo.",
+      "notReady": "A sandbox aínda non está lista. Actualiza cando estea conectada.",
+      "unsupported": "A detección de servizos non está dispoñible para esta sandbox.",
+      "failed": "Non se puideron detectar os servizos.",
+      "openService": "Abrir {{name}} no porto {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Activadores e webhooks",
+      "subtitle": "Xestiona os activadores de webhook e programados na web."
+    }
   },
   "sessionShare": {
     "title": "Compartir sesión",

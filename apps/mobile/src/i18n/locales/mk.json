@@ -23,6 +23,10 @@
   },
   "common": {
     "deleteTitle": "Да се избрише {{label}}?",
+    "manageOnWeb": "Управувај на веб",
+    "creditHistory": "Историја на кредити",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Откажи",
@@ -119,6 +123,7 @@
     "copyLink": "Копирај врска",
     "couldNotLoadOrganizations": "Организациите не се вчитаа.",
     "couldNotLoadSessions": "Сесиите не се вчитаа.",
+    "couldnTLoad": "Не се вчита.",
     "couldnTLoadMore": "Не се вчитаа дополнителни ставки.",
     "deviceSessions": "Сесии на уреди",
     "disabled": "Оневозможено",
@@ -246,6 +251,10 @@
     "notAdded": "Најавен си. {{provider}} не е додаден на твојата сметка."
   },
   "profile": {
+    "creditHistorySubtitle": "Купувања, сметки и активност на кредити",
+    "invoicesSubtitle": "Преземете фактури за вашите купувања",
+    "manageBilling": "Управувајте со плаќањето на kilo.ai",
+    "manageBillingIosNote": "Начините на плаќање, автоматското дополнување и деталите за плаќање се управуваат на kilo.ai.",
     "codeReviewerSubtitle": "Автоматски прегледи на PR",
     "securityAgentSubtitle": "Пронаоѓај и отстранувај ранливости",
     "reviews": "Прегледи",
@@ -299,6 +308,7 @@
     "passkeyAdded": "Клучот за пристап е додаден.",
     "passkeyAddFailed": "Не успеа додавањето на клуч за пристап. Обиди се повторно.",
     "passkeyAddUnsupported": "Овој уред не може да создава клучеви за пристап.",
+    "passkeyAddUnavailable": "Клучевите за пристап можат да се додадат само во веб-прелистувач.",
     "passkeyAddCancelled": "Создавањето на клучот за пристап е откажано.",
     "passkeyRemoved": "Клучот за пристап е отстранет.",
     "passkeyRemoveFailed": "Тој клуч за пристап не може да се отстрани. Обиди се повторно.",
@@ -331,7 +341,6 @@
     "providerKeys": {
       "title": "Клучеви на провајдери",
       "rowSubtitle": "Користи наплата преку сопствениот провајдер",
-      "manageOnWeb": "Управувај на веб",
       "manageOnWebReason": "Овие провајдери бараат структурирани акредитиви.",
       "description": "Барањата преку овие клучеви се наплаќаат на твојата сметка кај провајдерот наместо од твојата состојба во Kilo.",
       "enabled": "Во употреба",
@@ -1245,7 +1254,17 @@
       "changeRequestMissingPermissions": "GitHub апликацијата на Kilo не може да отвора PR во овој репозиториум. Сопственикот на репозиториумот мора да ѝ даде на апликацијата пристап за пишување до содржините и PR, потоа обиди се повторно.",
       "changeRequestFailed": "Kilo не успеа да го отвори PR. Обиди се повторно за момент.",
       "proposalConflict": "Друг предлог за меморијата за прегледи за овој репозиториум е сè уште активен, затоа овој не може да се зачува.",
-      "offAction": "Меморијата за прегледи е исклучена. Вклучи ја, потоа обиди се повторно."
+      "offAction": "Меморијата за прегледи е исклучена. Вклучи ја, потоа обиди се повторно.",
+      "analyze": {
+        "title": "Анализирај повратни информации",
+        "description": "Избери складиште со неодамнешни одговори од одржувачите, потоа побарај една шема на насоки што се повторува.",
+        "chooseRepository": "Избери складиште",
+        "action": "Анализирај сега",
+        "noRepositories": "Сè уште нема складиште со неодамнешни одговори од одржувачите.",
+        "proposed": "Создаден е предлог за меморијата за прегледи",
+        "noFeedback": "Не се пронајдени неодамнешни повратни информации за ова складиште",
+        "noPattern": "Не е пронајдена јасна шема што се повторува"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Внеси валидна URL-адреса на merge барање.",
@@ -1377,7 +1396,63 @@
       "title": "Агентот за преглед на код бара внимание.",
       "recoveryLabel": "Контактирај ја поддршката"
     },
-    "unknownError": "Непозната грешка"
+    "unknownError": "Непозната грешка",
+    "skipBotPullRequests": {
+      "title": "Прескокни PR од ботови",
+      "subtitle": "Не извршувај автоматски прегледи за PR што ги отвораат ботови како Dependabot или Renovate. Исклучи го ова за да ги прегледуваш и PR од ботови."
+    },
+    "repoModels": {
+      "title": "Модел по складиште",
+      "description": "Извршувај ги прегледите на некои складишта со друг модел, ниво на размислување или обете.",
+      "defaultModel": "Го користи стандардниот модел",
+      "resetLabel": "Врати стандарден модел за {{repository}}",
+      "changeHint": "Го отвора избирачот на модел"
+    },
+    "analytics": {
+      "title": "Аналитика",
+      "trackedReviews": "Следени прегледи",
+      "findingsRaised": "Пријавени наоди",
+      "highImpactChanges": "Промени со големо влијание",
+      "impactPoints": "Поени за влијание",
+      "repositoryLine": "Прегледи: {{reviews}} · Наоди: {{findings}}",
+      "empty": "Сè уште нема прегледи со аналитика",
+      "emptyDescription": "Аналитиката ги бележи завршените прегледи додека е овозможена за организацијата.",
+      "off": "Аналитиката е исклучена за оваа организација.",
+      "couldNotLoad": "Не успеа вчитувањето на аналитиката"
+    },
+    "council": {
+      "title": "Советен преглед",
+      "subtitle": "Секој PR го прегледуваат неколку специјалисти, а нивните гласови се спојуваат во една одлука.",
+      "unavailable": "Советниот преглед не е достапен за оваа организација.",
+      "noRepositories": "Сè уште не е избрано ниту едно складиште. Најпрво избери складишта во поставките за складиштата.",
+      "specialists": "Специјалисти",
+      "labels": "Ознаки што го активираат советниот преглед",
+      "labelsPlaceholder": "на пр. совет, длабински преглед",
+      "labelsDescription": "Оддели ги ознаките со запирки. Складиштето со овозможен совет потоа извршува советен преглед само за PR што носат барем една од овие ознаки. Остави празно за секој подобен PR.",
+      "tooManyLabels": "Премногу ознаки за советен преглед. Користи најмногу {{maximum}} ознаки.",
+      "labelTooLong": "Ознаката за советен преглед е предолга. Секоја ознака мора да има најмногу {{maximum}} знаци.",
+      "minSpecialists": "Избери најмалку {{minimum}} специјалисти. Избрани: {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Покриеност со тестови",
+        "correctness": "Точност",
+        "custom": "Специјалист"
+      },
+      "specialist": {
+        "security": "Заобиколување авторизација, ракување со тајни и небезбеден внес.",
+        "performance": "Критични патеки, повторени барања и големи распределби.",
+        "testing": "Недостапна или слаба покриеност на новото однесување.",
+        "correctness": "Логички грешки, рабни случаи и состојби на трка.",
+        "custom": "Прегледува проблеми во својата област."
+      },
+      "strategy": {
+        "advisory": "Советодавно",
+        "advisoryDescription": "Пријавува наоди и гласа без да го блокира спојувањето.",
+        "unanimous": "Едногласно",
+        "unanimousDescription": "Го блокира спојувањето кога кој било специјалист пријави критичен проблем.",
+        "majority": "Мнозинство",
+        "majorityDescription": "Го блокира спојувањето само кога мнозинството специјалисти пријават критичен проблем."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1880,6 +1955,16 @@
       "auto": "Автоматски",
       "shallow": "Површински",
       "deep": "Длабински"
+    },
+    "orphanedFindings": {
+      "title": "Наоди за отстранети репозиториуми",
+      "description": "Овие репозиториуми повеќе не се достапни преку интеграцијата со GitHub. Нивните наоди сè уште се бројат во контролните табли и извештаите.",
+      "count": "Наоди: {{count}}",
+      "clearLabel": "Исчисти ги наодите за {{repository}}",
+      "confirmTitle": "Да се исчистат наодите?",
+      "confirmMessage": "Сите евидентирани наоди за {{repository}} ќе бидат избришани. Ова не може да се врати.",
+      "confirmAction": "Избриши наоди",
+      "cleared": "Исчистени наоди: {{count}}"
     }
   },
   "agents": {
@@ -2059,6 +2144,7 @@
       "branchPlaceholder": "Изберете гранка",
       "runOnWithTarget": "Изврши на: {{target}}",
       "environment": "Околина",
+      "cloudEnvironment": "Облачна околина",
       "couldNotLoadEnvironment": "Не успеа вчитувањето на твојата околина.",
       "retryLoadingEnvironment": "Повторно вчитај ја околината",
       "defaultEnvironment": "Стандардна околина",
@@ -2119,6 +2205,89 @@
       "openSettingsToReview": "Отворете Поставки за прегледување",
       "profileSelection": "Избор на профил",
       "profileLayerAccessibility": "{{label}}: {{detail}}"
+    },
+    "environment": {
+      "loadingEnvironments": "Се вчитуваат околините",
+      "couldNotLoadEnvironments": "Не може да се вчитаат околините",
+      "couldNotLoadEnvironmentsDetail": "Обидете се повторно за да се вчитаат околините за овој репозиториум.",
+      "noEnvironment": "Без околина",
+      "noEnvironmentDetail": "Оваа сесија започнува од основната слика.",
+      "chooseEnvironment": "Изберете околина",
+      "chooseEnvironmentDetail": "Овој репозиториум има повеќе од една околина.",
+      "environmentAccessibility": "Изберете околина: {{label}}",
+      "environmentsForRepository": "Околини за {{repository}}",
+      "selectEnvironmentToStart": "Изберете околина за да започнете.",
+      "buildDetails": "Детали за градењето",
+      "buildNotBuilt": "Не е изграден",
+      "buildUnavailableShort": "Градењето snapshot е недостапно",
+      "buildPreparing": "Подготовка на builder",
+      "buildCloning": "Клонирање на стандардната гранка",
+      "buildSetup": "Извршување на поставувањето на околината",
+      "buildCleanup": "Отстранување на акредитивите за градење",
+      "buildCapturing": "Снимање на snapshot",
+      "buildPublishing": "Објавување на snapshot",
+      "buildStopping": "Запирање на builder",
+      "buildStoppingRetrying": "Запирање на builder, повторен обид",
+      "buildFinishing": "Завршување на градењето",
+      "buildSucceeded": "Snapshot е подготвен",
+      "buildSuperseded": "Заменето со поново градење",
+      "buildStale": "Поставките се променети по овој snapshot",
+      "buildStaleAge": "Snapshot е постар од четири дена; следната сесија ќе го освежи",
+      "buildStaleImage": "Изграден за постара слика на sandbox",
+      "failureClone": "Репозиториумот не можеше да се клонира.",
+      "failureSetup": "Команда за поставување не успеа. Видете го логот на градењето.",
+      "failureTimeout": "Истече времето за команда за поставување. Видете го логот на градењето.",
+      "failureCleanup": "Акредитивите не можеа да се отстранат, па не е направен snapshot.",
+      "failureCapture": "Snapshot не можеше да се сними.",
+      "failureCaptureUncertain": "Резултатот од snapshot е изгубен; градењето не е објавено.",
+      "failureDeadline": "Градењето не заврши навреме.",
+      "failureBuilderLost": "Builder престана да испраќа извештаи.",
+      "failureBuilderStart": "Builder не можеше да се стартува.",
+      "failureUnauthorized": "Пристапот до репозиториумот повеќе не е овластен.",
+      "failureActorUnauthorized": "Лицето што го започна градењето повеќе нема пристап.",
+      "failureBilling": "За градењата се потребни достапни кредити.",
+      "failureBillingUnavailable": "Наплатата не можеше да го одобри градењето. Обиди се повторно.",
+      "failureConfiguration": "Конфигурацијата се промени за време на градењето.",
+      "failureRuntime": "Избраното издание на runtime не можеше да се инсталира.",
+      "failureGeneric": "Градењето не успеа.",
+      "buildLogs": "Логови од градењето",
+      "noBuildLogs": "Сè уште нема излез во логот.",
+      "buildLogsLatestOnly": "Се прикажуваат последните 500 зачувани линии од логот.",
+      "buildLogsTruncated": "Подоцнежниот излез е скратен.",
+      "couldNotLoadBuild": "Не може да се вчита статусот на градењето",
+      "couldNotLoadBuildLogs": "Не може да се вчитаат логовите од градењето",
+      "buildsUnavailable": "Градењето snapshot не е достапно за оваа околина.",
+      "onlyManagersCanBuild": "Само менаџерите на организацијата можат да градат snapshot.",
+      "waitForBuilder": "Почекајте builder да запре пред повторно да градите.",
+      "buildAction": "Изгради snapshot",
+      "refreshAction": "Освежи snapshot",
+      "cancelBuildAction": "Откажи градење",
+      "buildStarted": "Градењето на snapshot започна",
+      "buildCanceled": "Градењето на snapshot е откажано",
+      "couldNotStartBuild": "Не може да се започне градењето",
+      "couldNotCancelBuild": "Не може да се откаже градењето",
+      "sandbox": "Sandbox",
+      "sandboxActive": "Sandbox е активен",
+      "sandboxSleeping": "Sandbox е во мирување",
+      "sandboxStarting": "Sandbox се стартува",
+      "sandboxStopping": "Sandbox се запира",
+      "sandboxError": "Грешка во sandbox",
+      "sandboxUnreachable": "Sandbox е недостапен",
+      "sandboxStatusUnknown": "Статусот на sandbox е непознат",
+      "sandboxChecked": "Проверено {{when}}",
+      "sandboxDetailStopped": "Испратете порака за да го продолжите.",
+      "sandboxDetailFailed": "Испратете порака за да се обидете повторно.",
+      "sandboxDetailConnection": "Врската со sandbox е недостапна.",
+      "sandboxDetailUnavailable": "Статусот на sandbox е привремено недостапен.",
+      "sandboxDetailInsufficient": "Нема доволно информации за да се потврди моменталната состојба на sandbox.",
+      "sandboxDetailCheckNeeded": "Sandbox неодамна не ја потврдил својата исправност.",
+      "startFresh": "Започни одново",
+      "startFreshTitle": "Да се започне одново?",
+      "startFreshMessage": "Ова го отфрла snapshot на работниот простор снимен {{when}}. Некомитираните промени од тој работен простор ќе се изгубат.",
+      "startFreshMessageUnknown": "Ова го отфрла зачуваниот snapshot на работниот простор, кој не можеше да се прочита. Некомитираните промени од тој работен простор ќе се изгубат.",
+      "startFreshDone": "Snapshot на работниот простор е отстранет.",
+      "couldNotRemoveSnapshot": "Не може да се отстрани snapshot на работниот простор.",
+      "snapshotCaptured": "Snapshot на работниот простор снимен {{when}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ажурирана е {{displayCount}} датотека.",
@@ -2468,7 +2637,8 @@
       "cancelQueued": "Откажи ја пораката",
       "cancelQueuedAccessibility": "Откажи ја пораката што чека",
       "restoreQueued": "Врати",
-      "restoreQueuedAccessibility": "Врати ја откажаната порака во полето за порака"
+      "restoreQueuedAccessibility": "Врати ја откажаната порака во полето за порака",
+      "noReplyRecorded": "Не е забележан одговор за оваа порака."
     },
     "olderMessages": {
       "arrived": "Постарите пораки се вчитани",
@@ -2861,6 +3031,26 @@
     "onlyFirstFilesAttached_other": "Ќе се прикачат само првите {{displayCount}} датотеки."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Историја на плаќања",
+      "billingHistoryEmpty": "Сè уште нема историја на плаќања.",
+      "cancel": "Откажи претплата",
+      "cancelDescription": "Вашиот Kilo Pass останува активен до крајот на периодот на наплата и нема да се обнови.",
+      "cancelScheduled": "Се откажува на {{date}}",
+      "cancelScheduledChange": "Откажи ја закажаната промена",
+      "cancelled": "Претплатата е откажана",
+      "changePlan": "Променете го планот на kilo.ai",
+      "changePlanIosNote": "Промените на платените планови се достапни на kilo.ai.",
+      "creditHistoryEmpty": "Сè уште нема кредити од Kilo Pass.",
+      "manageInStore": "Управувајте во {{store}}",
+      "resume": "Продолжи ја претплатата",
+      "resumeCancelledDescription": "Вашиот Kilo Pass повторно ќе се обновува автоматски.",
+      "resumePausedDescription": "Вашиот Kilo Pass продолжува сега, пред закажаниот датум за продолжување.",
+      "resumed": "Претплатата е продолжена",
+      "scheduledChange": "Закажана промена",
+      "scheduledChangeCancelDescription": "Вашиот Kilo Pass останува на тековниот план и се обновува како и досега.",
+      "scheduledChangeSummary": "{{plan}} на {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass не е достапен.",
     "couldNotLoad": "Не успеа вчитувањето на Kilo Pass. Обиди се повторно.",
@@ -2870,7 +3060,7 @@
     "subscriptionLoading": "Се вчитува претплатата на Kilo Pass",
     "retryHint": "Повторно ја проверува состојбата на Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailableEnded": "Вашиот Kilo Pass заврши.",
+    "endedOn": "Завршено на {{date}}",
     "notAvailableInApp": "Kilo Pass не е достапен во апликацијата.",
     "statusActive": "Активен",
     "statusTrialing": "Пробен период",
@@ -2892,7 +3082,7 @@
     "kiloPassManagement": "Управување со Kilo Pass",
     "kiloPassSetup": "Поставување на Kilo Pass",
     "opensManagementOnWeb": "Го отвора управувањето со Kilo Pass на веб-страницата.",
-    "tryAgainFromProfile": "Обиди се повторно од профилот.",
+    "loadFailedRetry": "Провери ја врската, потоа обиди се повторно.",
     "legalTermsOfUse": "Услови за користење (EULA)",
     "purchaseDifferentAccount": "Ова купување од App Store не е поврзано со твојата сметка на Kilo. Најави се на Apple Account што ја користеше за купувањето, па обиди се повторно.",
     "purchaseFailed": "Не успеа завршувањето на купувањето.",
@@ -2915,6 +3105,11 @@
     "accountDescription": "Идентификаторот на твојата сметка на Kilo и метаподатоците за барањата се користат за потврда на идентитетот и мерење на користењето.",
     "diagnosticsTitle": "Дијагностика на апликацијата",
     "diagnosticsDescription": "Извештаите за падови и грешки, без содржината од апликацијата, помагаат апликацијата да остане стабилна.",
+    "featureFlagsTitle": "Воведување функции",
+    "featureFlagsDescription": "Е-поштата на твојата сметка, која PostHog ја користи за да одлучи кои функции ги гледаш.",
+    "featureFlagsWhat": "Е-поштата на твојата сметка.",
+    "featureFlagsWhy": "За да се одлучи кои функции ги гледаш, вклучувајќи ги и оние што сè уште постепено ги воведуваме.",
+    "featureFlagsWho": "PostHog, услугата за знаменца на функции.",
     "helpImprove": "Помогни да го подобриме Kilo",
     "helpImproveDescription": "Сподели анонимни аналитички податоци за производот и изворот на инсталацијата. Ова можеш да го смениш во секое време во поставките.",
     "seeFullDetails": "Види ги сите детали",
@@ -2996,6 +3191,36 @@
     "sendFeedback": "Испрати повратна информација"
   },
   "organization": {
+    "auditLog": {
+      "title": "Дневник за ревизија",
+      "permissionDenied": "Само сопственик, администратор или менаџер за наплата на организација со планот Enterprise може да го чита нејзиниот дневник за ревизија.",
+      "emptyTitle": "Нема настани за ревизија",
+      "emptyDescription": "Тука се прикажуваат дејствата преземени во оваа организација.",
+      "truncated": "Се прикажуваат најновите настани."
+    },
+    "billing": {
+      "title": "Наплата",
+      "permissionDenied": "Наплатата на организацијата може да ја видат само нејзин сопственик, администратор или менаџер за наплата.",
+      "subscription": "Претплата",
+      "state": "Статус",
+      "stateNone": "Нема претплата",
+      "statePastDue": "Задоцнето плаќање",
+      "stateCancelsAtPeriodEnd": "Се откажува на крајот на периодот",
+      "stateTrialEndsOn": "Пробниот период завршува на {{date}}",
+      "stateTrialing": "Пробен период",
+      "stateRenewsOn": "Се обновува на {{date}}",
+      "seatsDropTo": "Се намалува на {{seats}} места на {{date}}",
+      "seats": "Места",
+      "autoTopUp": "Автоматско дополнување",
+      "autoTopUpAmount": "Износ на дополнување",
+      "autoTopUpThreshold": "Кога состојбата ќе падне под",
+      "manageOnWeb": "Промените се прават на веб",
+      "changePlan": "Промени план",
+      "buySeats": "Купи места",
+      "setupAutoTopUp": "Постави автоматско дополнување",
+      "webAddress": "Веб-адреса {{url}}",
+      "opensOnWeb": "Се отвора на веб"
+    },
     "boundary": {
       "backToProfile": "Назад на профилот",
       "loadErrorMessage": "Провери ја врската и обиди се повторно.",
@@ -3003,14 +3228,20 @@
       "loadErrorTitle": "Не успеа вчитувањето на твоите организации.",
       "membershipLostNotice": "Веќе немаш пристап до оваа организација. Префрлено на {{target}}.",
       "noOrganization": "Нема организација",
-      "noOrganizationDescription": "Оваа сметка не е дел од организација. Создај или придружи се на организација на веб-страницата за да ги користиш функциите на организацијата, како покани за членови и предупредувања за низок баланс.",
-      "openWebOrganizations": "Отвори организации на веб-страницата",
+      "noOrganizationDescription": "Оваа сметка не е дел од организација. Создајте организација за да ги користите нејзините функции, како покани за членови и известувања за ниска состојба, или отворете го вебот за да се приклучите на организација во која сте поканети.",
       "organizationUnavailable": "Организацијата не е достапна.",
       "selectDescriptionWithOrganizations": "Припаѓаш на една или повеќе организации. Избери ја сметката што треба да ја користи овој екран.",
       "selectOrganization": "Избор на организација",
       "unavailableDescription": "Оваа организација веќе не е достапна. Избери друга од твојот профил за да продолжиш.",
       "unavailableSessionsDescription": "Оваа организација веќе не е достапна. Нејзините сесии не можат да се вчитаат.",
       "accessDeniedDescription": "Немаш пристап до оваа организација."
+    },
+    "create": {
+      "title": "Создај организација",
+      "description": "Организацијата споделува кредити, агенти и поставки со вашиот тим.",
+      "nameLabel": "Име на организацијата",
+      "nameRequired": "Внесете име на организацијата.",
+      "trialNote": "Вашиот 14-дневен пробен период на Enterprise започнува кога ќе ја создадете. Плановите се купуваат на веб."
     },
     "creditActivity": {
       "emptyDescription": "Тука ќе се прикажуваат купувањата, потрошувачката и корекциите на кредитите за оваа организација.",
@@ -3119,6 +3350,21 @@
       "ownRoleChange": "Не можеш да ја промениш сопствената улога.",
       "inviteExpired": "Оваа покана истече.",
       "inviteAccepted": "Оваа покана е веќе прифатена."
+    },
+    "settingsOnWeb": {
+      "title": "Поставки на организацијата на веб",
+      "usageDetails": "Детали за користењето",
+      "providersAndModels": "Провајдери и модели",
+      "groups": "Групи",
+      "guardrails": "Заштитни ограничувања",
+      "byok": "Сопствен клуч (BYOK)",
+      "ssoAndDomain": "SSO и домен",
+      "emailPreferences": "Поставки за е-пошта",
+      "dataCollection": "Собирање податоци",
+      "auditLogs": "Дневници за ревизија",
+      "requestLogs": "Дневници на барања",
+      "subOrganizations": "Подорганизации",
+      "distributeFunds": "Распредели средства"
     },
     "usageStats": {
       "inputTokens": "Влезни токени",
@@ -3870,6 +4116,25 @@
     "importConfigApplied": "Конфигурацијата е увезена"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Не може да се вчитаат активностите со кредити.",
+      "appStoreReceipt": "Сметка од App Store",
+      "deductionFallback": "Одбивање кредити",
+      "emptyDescription": "Купувањата на кредити, сметките и користењето ќе се појават тука.",
+      "emptyTitle": "Нема историја на кредити",
+      "googlePlayReceipt": "Сметка од Google Play",
+      "kind": {
+        "adjustment": "Корекција",
+        "balanceNeutral": "Без промена на салдото",
+        "deduction": "Одбивање",
+        "grant": "Доделени кредити",
+        "purchase": "Купување"
+      },
+      "purchaseFallback": "Купување кредити",
+      "receipt": "Сметка",
+      "receiptA11y": "Отвори ја сметката за {{description}}",
+      "receiptUnavailable": "Не е достапна сметка за ова купување."
+    },
     "title": "Купи кредити",
     "description": "Кредитите се еднократна набавка што се додава на вашата Kilo состојба за извршување на AI сесии за кодирање во Kilo App. Продавницата ви го наплатува сметката и кредитите се додаваат откако продавницата ќе го потврди плаќањето.",
     "nextExpiry": "Кредитите во износ од {{amount}} истекуваат на {{date}} (UTC). Прво се користат кредитите со најран рок на истекување.",
@@ -4051,6 +4316,70 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Не успеа отворањето на овој резултат од пребарувањето"
+  },
+  "usage": {
+    "title": "Користење",
+    "orgTitle": "Користење на организацијата",
+    "entrySubtitle": "Трошоци, барања и токени",
+    "rangePicker": "Временски опсег",
+    "range90d": "90 дена",
+    "metricPicker": "Метрика на графиконот",
+    "chartA11y": "{{metric}} по ден",
+    "avgCostPerRequest": "Прос. трошок / барање",
+    "topModels": "Најкористени модели",
+    "topFeatures": "Најкористени функции",
+    "emptyTitle": "Нема користење во овој период",
+    "orgSelfNotice": "Го гледате вашето користење во оваа организација.",
+    "viewDetails": "Прикажи детали за користењето"
+  },
+  "integrations": {
+    "title": "Интеграции",
+    "sectionTitle": "Поврзани услуги",
+    "entrySubtitle": "GitHub, Slack, Linear и друго",
+    "subtitle": "Поврзете ги вашите развојни алатки и работни процеси со Kilo",
+    "emptyHint": "Сè уште нема поврзани интеграции.",
+    "disconnect": "Прекини врска",
+    "disconnectTitle": "Да се прекине врската со {{provider}}?",
+    "disconnectMessage": "Kilo ќе престане да одговара во {{provider}}. Можете повторно да се поврзете во секое време.",
+    "connectedTo": "Поврзано со {{account}}",
+    "disconnected": "Врската со {{provider}} е прекината",
+    "disconnectFailed": "Не може да се прекине врската со {{provider}}",
+    "couldNotLoad": "Не може да се вчитаат интеграциите",
+    "permissionDenied": "Немате дозвола за управување со овие интеграции.",
+    "memberHint": "Побарајте од сопственик или администратор на организацијата да ги промени овие врски.",
+    "connectFailed": "Не може да се отвори страницата за поврзување"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Фактурите за вашите лични купувања ќе се појават тука откако ќе ви биде наплатено."
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Сè уште нема користење",
+      "sharedWorkspace": "Заеднички за сите разговори во овој работен простор",
+      "currentRates": "Тековни цени",
+      "perHour": "{{rate}}/ч",
+      "mediumSandbox": "Среден sandbox",
+      "largeSandbox": "Голем sandbox",
+      "earlierActivity": "Претходна активност",
+      "now": "сега",
+      "loadFailed": "Трошоците за Compute не можеа да се вчитаат."
+    },
+    "preview": {
+      "title": "Отвори преглед",
+      "listeningServices": "Сервиси што слушаат",
+      "empty": "Не се пронајдени сервиси што слушаат. Побарај од агентот да стартува веб-сервер, па освежи.",
+      "notRunning": "Овој sandbox е запрен. Испрати порака до агентот за повторно да го стартуваш.",
+      "notReady": "Sandbox-от сè уште не е подготвен. Освежи откако ќе се поврзе.",
+      "unsupported": "Откривањето сервиси не е достапно за овој sandbox.",
+      "failed": "Сервисите не можеа да се откријат.",
+      "openService": "Отвори {{name}} на порта {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Тригери и webhooks",
+      "subtitle": "Управувај со webhook тригери и закажани тригери на веб."
+    }
   },
   "sessionShare": {
     "title": "Сподели сесија",

@@ -23,6 +23,10 @@
   },
   "common": {
     "deleteTitle": "Ištrinti {{label}}?",
+    "manageOnWeb": "Tvarkyti žiniatinklyje",
+    "creditHistory": "Kreditų istorija",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Atšaukti",
@@ -119,6 +123,7 @@
     "copyLink": "Kopijuoti nuorodą",
     "couldNotLoadOrganizations": "Nepavyko įkelti organizacijų.",
     "couldNotLoadSessions": "Nepavyko įkelti sesijų.",
+    "couldnTLoad": "Nepavyko įkelti.",
     "couldnTLoadMore": "Nepavyko įkelti daugiau.",
     "deviceSessions": "Įrenginių sesijos",
     "disabled": "Išjungta",
@@ -246,6 +251,10 @@
     "notAdded": "Esi prisijungęs. {{provider}} nepridėtas prie tavo paskyros."
   },
   "profile": {
+    "creditHistorySubtitle": "Pirkimai, kvitai ir kreditų veikla",
+    "invoicesSubtitle": "Atsisiųskite savo pirkimų sąskaitas faktūras",
+    "manageBilling": "Tvarkyti atsiskaitymą kilo.ai",
+    "manageBillingIosNote": "Mokėjimo būdai, automatinis papildymas ir atsiskaitymo informacija tvarkomi kilo.ai.",
     "codeReviewerSubtitle": "Automatinės PR peržiūros",
     "securityAgentSubtitle": "Rasti ir pašalinti pažeidžiamumus",
     "reviews": "Peržiūros",
@@ -299,6 +308,7 @@
     "passkeyAdded": "Priėjimo raktas pridėtas.",
     "passkeyAddFailed": "Nepavyko pridėti priėjimo rakto. Bandykite dar kartą.",
     "passkeyAddUnsupported": "Šis įrenginys negali kurti priėjimo raktų.",
+    "passkeyAddUnavailable": "Priėjimo raktus galima pridėti tik žiniatinklio naršyklėje.",
     "passkeyAddCancelled": "Priėjimo rakto kūrimas atšauktas.",
     "passkeyRemoved": "Priėjimo raktas pašalintas.",
     "passkeyRemoveFailed": "Nepavyko pašalinti to priėjimo rakto. Bandykite dar kartą.",
@@ -331,7 +341,6 @@
     "providerKeys": {
       "title": "Teikėjų raktai",
       "rowSubtitle": "Naudoti savo teikėjo atsiskaitymą",
-      "manageOnWeb": "Tvarkyti žiniatinklyje",
       "manageOnWebReason": "Šiems teikėjams reikalingi struktūrizuoti prisijungimo duomenys.",
       "description": "Užklausos, atliekamos su šiais raktais, apmokestinamos jūsų teikėjo paskyroje, o ne iš jūsų Kilo likučio.",
       "enabled": "Naudojamas",
@@ -1291,7 +1300,17 @@
       "changeRequestMissingPermissions": "Kilo GitHub programėlė negali atidaryti PR šioje saugykloje. Saugyklos savininkas turi suteikti programėlei rašymo prieigą prie turinio ir PR, tada bandyk dar kartą.",
       "changeRequestFailed": "Kilo nepavyko atidaryti PR. Bandyk dar kartą po akimirkos.",
       "proposalConflict": "Kitas šios saugyklos pasiūlymas vis dar aktyvus.",
-      "offAction": "Peržiūros atmintis išjungta. Įjunk ją, tada bandyk dar kartą."
+      "offAction": "Peržiūros atmintis išjungta. Įjunk ją, tada bandyk dar kartą.",
+      "analyze": {
+        "title": "Analizuoti atsiliepimus",
+        "description": "Pasirink saugyklą su naujais prižiūrėtojų atsakymais, tada ieškok vieno pasikartojančio gairių šablono.",
+        "chooseRepository": "Pasirink saugyklą",
+        "action": "Analizuoti dabar",
+        "noRepositories": "Nė viena saugykla dar neturi naujų prižiūrėtojų atsakymų.",
+        "proposed": "Sukurtas peržiūros atminties pasiūlymas",
+        "noFeedback": "Šiai saugyklai neseniai atsiliepimų nerasta",
+        "noPattern": "Nerastas aiškus pasikartojantis šablonas"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Įvesk tinkamą merge request URL.",
@@ -1425,7 +1444,63 @@
       "title": "Kodo peržiūros agentui reikia tavo dėmesio.",
       "recoveryLabel": "Kreiptis į pagalbos tarnybą"
     },
-    "unknownError": "Nežinoma klaida."
+    "unknownError": "Nežinoma klaida.",
+    "skipBotPullRequests": {
+      "title": "Praleisti botų atidarytus PR",
+      "subtitle": "Neatlik automatinės peržiūros PR, kuriuos atidaro botai, pavyzdžiui, Dependabot arba Renovate. Išjunk tai, jei nori peržiūrėti ir botų PR."
+    },
+    "repoModels": {
+      "title": "Modelis pagal saugyklą",
+      "description": "Kai kurių saugyklų peržiūras vykdyk naudodamas kitą modelį, mąstymo intensyvumą arba abu.",
+      "defaultModel": "Naudoja numatytąjį modelį",
+      "resetLabel": "Atkurti modelį saugyklai {{repository}}",
+      "changeHint": "Atidaro modelio pasirinkimą"
+    },
+    "analytics": {
+      "title": "Analitika",
+      "trackedReviews": "Stebimos peržiūros",
+      "findingsRaised": "Pateikti radiniai",
+      "highImpactChanges": "Didelio poveikio pakeitimai",
+      "impactPoints": "Poveikio taškai",
+      "repositoryLine": "Peržiūros: {{reviews}} · Radiniai: {{findings}}",
+      "empty": "Dar nėra peržiūrų su analitika",
+      "emptyDescription": "Analitika fiksuoja užbaigtas peržiūras, kol ji įjungta organizacijai.",
+      "off": "Šiai organizacijai analitika išjungta.",
+      "couldNotLoad": "Nepavyko įkelti analitikos"
+    },
+    "council": {
+      "title": "Tarybos peržiūra",
+      "subtitle": "Kiekvieną PR peržiūri keli specialistai, o jų balsai sujungiami į vieną sprendimą.",
+      "unavailable": "Tarybos peržiūra šiai organizacijai nepasiekiama.",
+      "noRepositories": "Dar nepasirinkta nė viena saugykla. Pirmiausia pasirink saugyklas saugyklų nustatymuose.",
+      "specialists": "Specialistai",
+      "labels": "Žymos, kurios įjungia tarybos peržiūrą",
+      "labelsPlaceholder": "pvz., taryba, išsami peržiūra",
+      "labelsDescription": "Žymas atskirk kableliais. Saugykla su įjungta taryba tada atlieka tarybos peržiūrą tik tiems PR, kurie turi bent vieną iš šių žymų. Palik tuščią visiems tinkamiems PR.",
+      "tooManyLabels": "Per daug tarybos žymų. Naudok ne daugiau kaip {{maximum}} žymų.",
+      "labelTooLong": "Tarybos žyma per ilga. Kiekvieną žymą turi sudaryti ne daugiau kaip {{maximum}} simbolių.",
+      "minSpecialists": "Pasirink bent {{minimum}} specialistus. Pasirinkta: {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Testų aprėptis",
+        "correctness": "Korektiškumas",
+        "custom": "Specialistas"
+      },
+      "specialist": {
+        "security": "Autorizacijos apėjimas, slaptųjų duomenų tvarkymas ir nesaugi įvestis.",
+        "performance": "Karštosios vietos, N+1 užklausos ir didelės alokacijos.",
+        "testing": "Trūkstama arba silpna naujo elgesio aprėptis.",
+        "correctness": "Logikos klaidos, kraštiniai atvejai ir lenktynių sąlygos.",
+        "custom": "Peržiūri problemas savo srityje."
+      },
+      "strategy": {
+        "advisory": "Patariamoji",
+        "advisoryDescription": "Praneša radinius ir balsuoja neblokuodama sujungimo.",
+        "unanimous": "Vienbalsė",
+        "unanimousDescription": "Blokuoja sujungimą, kai bet kuris specialistas praneša kritinę problemą.",
+        "majority": "Dauguma",
+        "majorityDescription": "Blokuoja sujungimą tik tada, kai dauguma specialistų praneša kritinę problemą."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1958,6 +2033,16 @@
       "auto": "Automatinė",
       "shallow": "Paviršinė",
       "deep": "Išsami"
+    },
+    "orphanedFindings": {
+      "title": "Pašalintų saugyklų radiniai",
+      "description": "Šios saugyklos nebepasiekiamos per GitHub integraciją. Jų radiniai vis dar skaičiuojami ataskaitų lentelėse ir ataskaitose.",
+      "count": "Radiniai: {{count}}",
+      "clearLabel": "Išvalyti saugyklos {{repository}} radinius",
+      "confirmTitle": "Išvalyti radinius?",
+      "confirmMessage": "Visi užfiksuoti saugyklos {{repository}} radiniai bus ištrinti. To atšaukti negalima.",
+      "confirmAction": "Ištrinti radinius",
+      "cleared": "Radiniai išvalyti: {{count}}"
     }
   },
   "agents": {
@@ -2141,6 +2226,7 @@
       "branchPlaceholder": "Pasirinkti šaką",
       "runOnWithTarget": "Vykdymo vieta: {{target}}",
       "environment": "Aplinka",
+      "cloudEnvironment": "Debesų aplinka",
       "couldNotLoadEnvironment": "Nepavyko įkelti jūsų aplinkos.",
       "retryLoadingEnvironment": "Bandyti įkelti aplinką iš naujo",
       "defaultEnvironment": "Numatytoji aplinka",
@@ -2201,6 +2287,89 @@
       "openSettingsToReview": "Norėdami peržiūrėti, atidarykite nustatymus",
       "profileSelection": "Profilio pasirinkimas",
       "profileLayerAccessibility": "{{label}}: {{detail}}"
+    },
+    "environment": {
+      "loadingEnvironments": "Įkeliamos aplinkos",
+      "couldNotLoadEnvironments": "Nepavyko įkelti aplinkų",
+      "couldNotLoadEnvironmentsDetail": "Bandykite dar kartą įkelti šios saugyklos aplinkas.",
+      "noEnvironment": "Be aplinkos",
+      "noEnvironmentDetail": "Ši sesija pradedama nuo bazinio atvaizdo.",
+      "chooseEnvironment": "Pasirinkite aplinką",
+      "chooseEnvironmentDetail": "Ši saugykla turi daugiau nei vieną aplinką.",
+      "environmentAccessibility": "Pasirinkite aplinką: {{label}}",
+      "environmentsForRepository": "Saugyklos {{repository}} aplinkos",
+      "selectEnvironmentToStart": "Pasirinkite aplinką, kad pradėtumėte.",
+      "buildDetails": "Kūrimo informacija",
+      "buildNotBuilt": "Nesukurta",
+      "buildUnavailableShort": "Momentinių kopijų kūrimas nepasiekiamas",
+      "buildPreparing": "Ruošiama kūrimo mašina",
+      "buildCloning": "Klonuojama numatytoji šaka",
+      "buildSetup": "Vykdoma aplinkos sąranka",
+      "buildCleanup": "Šalinami kūrimo prisijungimo duomenys",
+      "buildCapturing": "Fiksuojama momentinė kopija",
+      "buildPublishing": "Skelbiama momentinė kopija",
+      "buildStopping": "Stabdoma kūrimo mašina",
+      "buildStoppingRetrying": "Stabdoma kūrimo mašina, bandoma dar kartą",
+      "buildFinishing": "Baigiamas kūrimas",
+      "buildSucceeded": "Momentinė kopija paruošta",
+      "buildSuperseded": "Pakeista naujesniu kūrimu",
+      "buildStale": "Nustatymai pakeisti po šios momentinės kopijos sukūrimo",
+      "buildStaleAge": "Momentinė kopija senesnė nei keturių dienų; kita sesija ją atnaujins",
+      "buildStaleImage": "Sukurta ankstesniam izoliuotos aplinkos atvaizdui",
+      "failureClone": "Nepavyko klonuoti saugyklos.",
+      "failureSetup": "Sąrankos komanda nepavyko. Žr. kūrimo žurnalą.",
+      "failureTimeout": "Baigėsi sąrankos komandos vykdymo laikas. Žr. kūrimo žurnalą.",
+      "failureCleanup": "Nepavyko pašalinti prisijungimo duomenų, todėl momentinė kopija nesukurta.",
+      "failureCapture": "Nepavyko užfiksuoti momentinės kopijos.",
+      "failureCaptureUncertain": "Momentinės kopijos rezultatas buvo prarastas; kūrinys nebuvo paskelbtas.",
+      "failureDeadline": "Kūrimas nebaigtas laiku.",
+      "failureBuilderLost": "Kūrimo mašina nustojo siųsti būsenos ataskaitas.",
+      "failureBuilderStart": "Kūrimo mašinos nepavyko paleisti.",
+      "failureUnauthorized": "Prieiga prie saugyklos nebėra autorizuota.",
+      "failureActorUnauthorized": "Kūrimą pradėjęs asmuo nebeturi prieigos.",
+      "failureBilling": "Kūrimui reikia turimų kreditų.",
+      "failureBillingUnavailable": "Atsiskaitymų sistemai nepavyko patvirtinti kūrimo. Bandykite dar kartą.",
+      "failureConfiguration": "Kūrimo metu pasikeitė konfigūracija.",
+      "failureRuntime": "Nepavyko įdiegti pasirinktos vykdymo aplinkos versijos.",
+      "failureGeneric": "Kūrimas nepavyko.",
+      "buildLogs": "Kūrimo žurnalai",
+      "noBuildLogs": "Žurnalo įrašų dar nėra.",
+      "buildLogsLatestOnly": "Rodoma paskutinių 500 išsaugotų žurnalo eilučių.",
+      "buildLogsTruncated": "Vėlesnė išvestis buvo sutrumpinta.",
+      "couldNotLoadBuild": "Nepavyko įkelti kūrimo būsenos",
+      "couldNotLoadBuildLogs": "Nepavyko įkelti kūrimo žurnalų",
+      "buildsUnavailable": "Šiai aplinkai momentinių kopijų kūrimas nepasiekiamas.",
+      "onlyManagersCanBuild": "Tik organizacijos vadovai gali kurti momentines kopijas.",
+      "waitForBuilder": "Prieš kurdami dar kartą palaukite, kol kūrimo mašina sustos.",
+      "buildAction": "Kurti momentinę kopiją",
+      "refreshAction": "Atnaujinti momentinę kopiją",
+      "cancelBuildAction": "Atšaukti kūrimą",
+      "buildStarted": "Momentinės kopijos kūrimas pradėtas",
+      "buildCanceled": "Momentinės kopijos kūrimas atšauktas",
+      "couldNotStartBuild": "Nepavyko pradėti kūrimo",
+      "couldNotCancelBuild": "Nepavyko atšaukti kūrimo",
+      "sandbox": "Smėliadėžė",
+      "sandboxActive": "Smėliadėžė aktyvi",
+      "sandboxSleeping": "Smėliadėžė miega",
+      "sandboxStarting": "Smėliadėžė paleidžiama",
+      "sandboxStopping": "Smėliadėžė stabdoma",
+      "sandboxError": "Smėliadėžės klaida",
+      "sandboxUnreachable": "Smėliadėžė nepasiekiama",
+      "sandboxStatusUnknown": "Smėliadėžės būsena nežinoma",
+      "sandboxChecked": "Patikrinta {{when}}",
+      "sandboxDetailStopped": "Išsiųskite žinutę, kad vėl ją paleistumėte.",
+      "sandboxDetailFailed": "Išsiųskite žinutę, kad bandytumėte dar kartą.",
+      "sandboxDetailConnection": "Ryšys su smėliadėže nepasiekiamas.",
+      "sandboxDetailUnavailable": "Smėliadėžės būsena laikinai nepasiekiama.",
+      "sandboxDetailInsufficient": "Nepakanka informacijos dabartinei smėliadėžės būsenai patvirtinti.",
+      "sandboxDetailCheckNeeded": "Smėliadėžė pastaruoju metu nepatvirtino savo būklės.",
+      "startFresh": "Pradėti iš naujo",
+      "startFreshTitle": "Pradėti iš naujo?",
+      "startFreshMessage": "Bus atmesta darbo srities momentinė kopija, užfiksuota {{when}}. Nekomituoti tos darbo srities pakeitimai bus prarasti.",
+      "startFreshMessageUnknown": "Bus atmesta išsaugota darbo srities momentinė kopija, kurios nepavyko nuskaityti. Nekomituoti tos darbo srities pakeitimai bus prarasti.",
+      "startFreshDone": "Darbo srities momentinė kopija pašalinta.",
+      "couldNotRemoveSnapshot": "Nepavyko pašalinti darbo srities momentinės kopijos.",
+      "snapshotCaptured": "Darbo srities momentinė kopija užfiksuota {{when}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Atnaujintas {{displayCount}} failas.",
@@ -2558,7 +2727,8 @@
       "cancelQueued": "Atšaukti žinutę",
       "cancelQueuedAccessibility": "Atšaukti eilėje esančią žinutę",
       "restoreQueued": "Atkurti",
-      "restoreQueuedAccessibility": "Grąžinti atšauktą žinutę į žinutės įvesties lauką"
+      "restoreQueuedAccessibility": "Grąžinti atšauktą žinutę į žinutės įvesties lauką",
+      "noReplyRecorded": "Šiai žinutei nebuvo įrašytas atsakymas."
     },
     "olderMessages": {
       "arrived": "Ankstesnės žinutės įkeltos",
@@ -2967,6 +3137,26 @@
     "onlyFirstFilesAttached_many": "Bus pridėti tik pirmieji failai ({{displayCount}})."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Atsiskaitymų istorija",
+      "billingHistoryEmpty": "Atsiskaitymų istorijos dar nėra.",
+      "cancel": "Atšaukti prenumeratą",
+      "cancelDescription": "Jūsų Kilo Pass liks aktyvus iki atsiskaitymo laikotarpio pabaigos ir nebus atnaujintas.",
+      "cancelScheduled": "Bus atšaukta {{date}}",
+      "cancelScheduledChange": "Atšaukti suplanuotą pakeitimą",
+      "cancelled": "Prenumerata atšaukta",
+      "changePlan": "Keisti planą kilo.ai",
+      "changePlanIosNote": "Mokamus planus galima keisti kilo.ai.",
+      "creditHistoryEmpty": "Kilo Pass kreditų dar nėra.",
+      "manageInStore": "Tvarkyti per {{store}}",
+      "resume": "Tęsti prenumeratą",
+      "resumeCancelledDescription": "Jūsų Kilo Pass vėl bus atnaujinamas automatiškai.",
+      "resumePausedDescription": "Jūsų Kilo Pass bus tęsiamas dabar, anksčiau nei suplanuota.",
+      "resumed": "Prenumerata vėl aktyvi",
+      "scheduledChange": "Suplanuotas pakeitimas",
+      "scheduledChangeCancelDescription": "Jūsų Kilo Pass liks dabartiniame plane ir bus atnaujinamas kaip iki šiol.",
+      "scheduledChangeSummary": "{{plan}} nuo {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass nepasiekiamas.",
     "couldNotLoad": "Nepavyko įkelti Kilo Pass. Bandyk dar kartą.",
@@ -2976,7 +3166,7 @@
     "subscriptionLoading": "Įkeliama Kilo Pass prenumerata",
     "retryHint": "Bando iš naujo gauti Kilo Pass būseną.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailableEnded": "Jūsų Kilo Pass prenumerata baigėsi.",
+    "endedOn": "Baigėsi {{date}}",
     "notAvailableInApp": "Kilo Pass nepasiekiamas programėlėje.",
     "statusActive": "Aktyvi",
     "statusTrialing": "Bandomoji",
@@ -2998,7 +3188,7 @@
     "kiloPassManagement": "Kilo Pass valdymas",
     "kiloPassSetup": "Kilo Pass sąranka",
     "opensManagementOnWeb": "Atidaro Kilo Pass valdymo puslapį naršyklėje.",
-    "tryAgainFromProfile": "Atidaryk profilį ir bandyk dar kartą.",
+    "loadFailedRetry": "Patikrink ryšį, tada bandyk dar kartą.",
     "legalTermsOfUse": "Naudojimo sąlygomis (EULA)",
     "purchaseDifferentAccount": "Šis App Store pirkinys nesusietas su tavo Kilo paskyra. Prisijunk prie perkant naudotos Apple Account paskyros, tada bandyk dar kartą.",
     "purchaseFailed": "Nepavyko užbaigti pirkimo.",
@@ -3021,6 +3211,11 @@
     "accountDescription": "Jūsų Kilo paskyros ID ir užklausų metaduomenys, naudojami jūsų tapatybei patvirtinti ir naudojimo apskaitai.",
     "diagnosticsTitle": "Programėlės diagnostika",
     "diagnosticsDescription": "Strigčių ir klaidų ataskaitos be programėlės turinio, naudojamos stabiliam programėlės veikimui užtikrinti.",
+    "featureFlagsTitle": "Funkcijų diegimas",
+    "featureFlagsDescription": "Jūsų paskyros el. pašto adresas, pagal kurį PostHog nusprendžia, kurias funkcijas matote.",
+    "featureFlagsWhat": "Jūsų paskyros el. pašto adresas.",
+    "featureFlagsWhy": "Nuspręsti, kurias funkcijas matote, įskaitant tas, kurias dar diegiame palaipsniui.",
+    "featureFlagsWho": "PostHog, funkcijų vėliavėlių paslauga.",
     "helpImprove": "Padėti tobulinti Kilo",
     "helpImproveDescription": "Bendrinkite anoniminius naudojimo duomenis ir įdiegimo šaltinį. Šią parinktį bet kada galite pakeisti nustatymuose.",
     "seeFullDetails": "Peržiūrėti visą informaciją",
@@ -3043,7 +3238,7 @@
     "voiceTranscriptionTitle": "Balso transkribavimas",
     "retentionPrefix": "Daugiau apie saugojimo terminus, savo teises ir kontaktinę informaciją sužinosite perskaitę",
     "backToConsent": "Grįžti prie sutikimo",
-    "revokeConsent": "Atšaukti sutikimą",
+    "revokeConsent": "Pašalinti sutikimą",
     "revokeConsentTitle": "Atšaukti sutikimą bendrinti duomenis?",
     "acceptAndContinue": "Sutikti ir tęsti",
     "decline": "Nesutikti",
@@ -3102,6 +3297,36 @@
     "sendFeedback": "Siųsti atsiliepimą"
   },
   "organization": {
+    "auditLog": {
+      "title": "Audito žurnalas",
+      "permissionDenied": "Organizacijos audito žurnalą gali skaityti tik Enterprise plano organizacijos savininkas, administratorius arba atsiskaitymų valdytojas.",
+      "emptyTitle": "Audito įvykių nėra",
+      "emptyDescription": "Čia rodomi šioje organizacijoje atlikti veiksmai.",
+      "truncated": "Rodomi naujausi įvykiai."
+    },
+    "billing": {
+      "title": "Atsiskaitymai",
+      "permissionDenied": "Organizacijos atsiskaitymų informaciją gali matyti tik jos savininkas, administratorius arba atsiskaitymų tvarkytojas.",
+      "subscription": "Prenumerata",
+      "state": "Būsena",
+      "stateNone": "Prenumeratos nėra",
+      "statePastDue": "Pradelstas mokėjimas",
+      "stateCancelsAtPeriodEnd": "Bus atšaukta laikotarpio pabaigoje",
+      "stateTrialEndsOn": "Bandomasis laikotarpis baigsis {{date}}",
+      "stateTrialing": "Bandomasis laikotarpis",
+      "stateRenewsOn": "Bus atnaujinta {{date}}",
+      "seatsDropTo": "{{date}} vietų skaičius sumažės iki {{seats}}",
+      "seats": "Vietos",
+      "autoTopUp": "Automatinis papildymas",
+      "autoTopUpAmount": "Papildymo suma",
+      "autoTopUpThreshold": "Kai likutis nukrenta žemiau",
+      "manageOnWeb": "Pakeitimai atliekami žiniatinklyje",
+      "changePlan": "Keisti planą",
+      "buySeats": "Pirkti vietų",
+      "setupAutoTopUp": "Nustatyti automatinį papildymą",
+      "webAddress": "Žiniatinklio adresas {{url}}",
+      "opensOnWeb": "Atidaroma žiniatinklyje"
+    },
     "boundary": {
       "backToProfile": "Grįžti į profilį",
       "loadErrorMessage": "Patikrink ryšį ir bandyk dar kartą.",
@@ -3109,14 +3334,20 @@
       "loadErrorTitle": "Nepavyko įkelti jūsų organizacijų.",
       "membershipLostNotice": "Jūs nebeturite prieigos prie šios organizacijos. Perjungta į {{target}}.",
       "noOrganization": "Nėra organizacijos",
-      "noOrganizationDescription": "Ši paskyra nepriklauso jokiai organizacijai. Kad galėtumėte naudoti organizacijos funkcijas, tokias kaip narių kvietimai ir įspėjimai apie mažą likutį, sukurkite organizaciją arba prisijunkite prie jos naršyklėje.",
-      "openWebOrganizations": "Atidaryti organizacijas naršyklėje",
+      "noOrganizationDescription": "Ši paskyra nepriklauso jokiai organizacijai. Sukurkite organizaciją, kad galėtumėte naudotis organizacijos funkcijomis, pvz., narių kvietimais ir įspėjimais apie mažą likutį, arba atidarykite žiniatinklį ir prisijunkite prie organizacijos, į kurią buvote pakviesti.",
       "organizationUnavailable": "Organizacija nepasiekiama.",
       "selectDescriptionWithOrganizations": "Priklausote vienai ar daugiau organizacijų. Pasirinkite paskyrą, kurią turėtų naudoti šis ekranas.",
       "selectOrganization": "Pasirinkite organizaciją",
       "unavailableDescription": "Ši organizacija nebepasiekiama. Norėdami tęsti, savo profilyje pasirinkite kitą organizaciją.",
       "unavailableSessionsDescription": "Ši organizacija nebepasiekiama. Jos seansų įkelti negalima.",
       "accessDeniedDescription": "Neturite prieigos prie šios organizacijos."
+    },
+    "create": {
+      "title": "Sukurti organizaciją",
+      "description": "Organizacijoje kreditai, agentai ir nustatymai bendrinami su jūsų komanda.",
+      "nameLabel": "Organizacijos pavadinimas",
+      "nameRequired": "Įveskite organizacijos pavadinimą.",
+      "trialNote": "Sukūrus organizaciją prasidės 14 dienų Enterprise bandomasis laikotarpis. Planai perkami žiniatinklyje."
     },
     "creditActivity": {
       "emptyDescription": "Čia bus rodomi šios organizacijos kreditų pirkimai, naudojimas ir koregavimai.",
@@ -3203,7 +3434,7 @@
       "manageInvitationA11y": "Valdyti {{email}} kvietimą",
       "removeMember": "Pašalinti narį",
       "removeMemberMessage": "Pašalinti {{name}} iš šios organizacijos?",
-      "revokeConfirm": "Atšaukti",
+      "revokeConfirm": "Pašalinti",
       "revokeInvitation": "Atšaukti kvietimą",
       "revokeInvitationMessage": "Atšaukti kvietimą, išsiųstą {{email}}?",
       "setDailyUsageLimit": "Nustatyti dienos išlaidų ribą",
@@ -3225,6 +3456,21 @@
       "ownRoleChange": "Negalite pakeisti savo paties vaidmens.",
       "inviteExpired": "Šio kvietimo galiojimas baigėsi.",
       "inviteAccepted": "Šis kvietimas jau buvo priimtas."
+    },
+    "settingsOnWeb": {
+      "title": "Organizacijos nustatymai žiniatinklyje",
+      "usageDetails": "Naudojimo informacija",
+      "providersAndModels": "Teikėjai ir modeliai",
+      "groups": "Grupės",
+      "guardrails": "Apsaugos ribos",
+      "byok": "Naudoti savo raktą",
+      "ssoAndDomain": "SSO ir domenas",
+      "emailPreferences": "El. pašto nuostatos",
+      "dataCollection": "Duomenų rinkimas",
+      "auditLogs": "Audito žurnalai",
+      "requestLogs": "Užklausų žurnalai",
+      "subOrganizations": "Antrinės organizacijos",
+      "distributeFunds": "Paskirstyti lėšas"
     },
     "usageStats": {
       "inputTokens": "Įvesties žetonai",
@@ -3992,6 +4238,25 @@
     "importConfigApplied": "Konfigūracija importuota"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Nepavyko įkelti kredito aktyvumo.",
+      "appStoreReceipt": "Kvitas iš App Store",
+      "deductionFallback": "Kreditų nurašymas",
+      "emptyDescription": "Čia bus rodomi kreditų pirkimai, kvitai ir naudojimas.",
+      "emptyTitle": "Kreditų istorijos nėra",
+      "googlePlayReceipt": "Kvitas iš Google Play",
+      "kind": {
+        "adjustment": "Koregavimas",
+        "balanceNeutral": "Balanso nekeičia",
+        "deduction": "Nurašymas",
+        "grant": "Kreditų suteikimas",
+        "purchase": "Pirkimas"
+      },
+      "purchaseFallback": "Kreditų pirkimas",
+      "receipt": "Kvitas",
+      "receiptA11y": "Atidaryti kvitą: {{description}}",
+      "receiptUnavailable": "Šiam pirkimui kvito nėra."
+    },
     "title": "Pirkti kreditus",
     "description": "Kreditai yra vienkartinis pirkinys, pridedamas prie jūsų Kilo balanso AI kodavimo sesijoms Kilo programoje vykdyti. Parduotuvė nuskaito lėšas iš jūsų paskyros, o kreditai pridedami po to, kai parduotuvė patvirtina mokėjimą.",
     "nextExpiry": "Kreditai ({{amount}}) baigia galioti {{date}} (UTC). Pirmiausia naudojami anksčiausiai baigiantys galioti kreditai.",
@@ -4182,6 +4447,70 @@
   "systemSearch": {
     "couldNotOpenResult": "Nepavyko atidaryti šio paieškos rezultato"
   },
+  "usage": {
+    "title": "Naudojimas",
+    "orgTitle": "Organizacijos naudojimas",
+    "entrySubtitle": "Išlaidos, užklausos ir žetonai",
+    "rangePicker": "Laikotarpis",
+    "range90d": "90 dienų",
+    "metricPicker": "Diagramos metrika",
+    "chartA11y": "{{metric}} per dieną",
+    "avgCostPerRequest": "Vid. kaina / užkl.",
+    "topModels": "Populiariausi modeliai",
+    "topFeatures": "Populiariausios funkcijos",
+    "emptyTitle": "Šiuo laikotarpiu naudojimo nėra",
+    "orgSelfNotice": "Matote savo naudojimą šioje organizacijoje.",
+    "viewDetails": "Peržiūrėti naudojimo informaciją"
+  },
+  "integrations": {
+    "title": "Integracijos",
+    "sectionTitle": "Prijungtos paslaugos",
+    "entrySubtitle": "GitHub, Slack, Linear ir kitos",
+    "subtitle": "Prijunkite savo kūrimo įrankius ir darbo eigas prie Kilo",
+    "emptyHint": "Dar nėra prijungtų integracijų.",
+    "disconnect": "Atjungti",
+    "disconnectTitle": "Atjungti {{provider}}?",
+    "disconnectMessage": "Kilo nebeatsakys {{provider}} platformoje. Bet kada galėsite vėl prijungti.",
+    "connectedTo": "Prijungta: {{account}}",
+    "disconnected": "Atjungta: {{provider}}",
+    "disconnectFailed": "Nepavyko atjungti {{provider}}",
+    "couldNotLoad": "Nepavyko įkelti integracijų",
+    "permissionDenied": "Neturite teisių tvarkyti šių integracijų.",
+    "memberHint": "Paprašykite organizacijos savininko arba administratoriaus pakeisti šias jungtis.",
+    "connectFailed": "Nepavyko atidaryti prijungimo puslapio"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Jūsų asmeninių pirkimų sąskaitos faktūros bus rodomos čia, kai jums bus išrašyta sąskaita."
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Skaičiavimo ištekliai",
+      "noUsage": "Dar nenaudota",
+      "sharedWorkspace": "Bendra visiems šios darbo erdvės pokalbiams",
+      "currentRates": "Dabartiniai įkainiai",
+      "perHour": "{{rate}}/val.",
+      "mediumSandbox": "Vidutinė smėliadėžė",
+      "largeSandbox": "Didelė smėliadėžė",
+      "earlierActivity": "Ankstesnė veikla",
+      "now": "dabar",
+      "loadFailed": "Nepavyko įkelti skaičiavimo išteklių mokesčių."
+    },
+    "preview": {
+      "title": "Atidaryti peržiūrą",
+      "listeningServices": "Klausančios paslaugos",
+      "empty": "Klausančių paslaugų nerasta. Paprašykite agento paleisti žiniatinklio serverį, tada atnaujinkite.",
+      "notRunning": "Ši smėliadėžė sustabdyta. Nusiųskite agentui žinutę, kad ji vėl būtų paleista.",
+      "notReady": "Smėliadėžė dar neparengta. Atnaujinkite, kai ji prisijungs.",
+      "unsupported": "Šiai smėliadėžei paslaugų aptikimas nepasiekiamas.",
+      "failed": "Nepavyko aptikti paslaugų.",
+      "openService": "Atidaryti {{name}} prievade {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Paleidikliai ir žiniatinklio kabliukai",
+      "subtitle": "Tvarkykite žiniatinklio kabliukų ir suplanuotus paleidiklius svetainėje."
+    }
+  },
   "sessionShare": {
     "title": "Bendrinti sesiją",
     "subtitle": "Šią sesiją gali skaityti visi, turintys nuorodą.",
@@ -4199,7 +4528,7 @@
     "existingTitle": "Esama nuoroda",
     "existingDescription": "Ši sesija jau turi bendrinimo nuorodą. Sukūrus naują, ji pakeis esamą, o senoji nuoroda nustos veikti.",
     "rotate": "Sukurti naują nuorodą",
-    "revoke": "Atšaukti nuorodą",
+    "revoke": "Pašalinti nuorodą",
     "revokeTitle": "Atšaukti nuorodą?",
     "revokeMessage": "Dabartinė nuoroda iš karto nustos veikti.",
     "revokeFailed": "Nepavyko atšaukti nuorodos.",

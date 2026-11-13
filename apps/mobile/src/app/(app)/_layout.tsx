@@ -254,6 +254,7 @@ export default function AppLayout() {
             <Stack.Screen name="agent-chat/instance-picker" options={pickerSheetOptions} />
             <Stack.Screen name="agent-chat/folder-picker" options={pickerSheetOptions} />
             <Stack.Screen name="agent-chat/profile-picker" options={pickerSheetOptions} />
+            <Stack.Screen name="context-picker" options={pickerSheetOptions} />
             <Stack.Screen name="todos/[list-id]" />
             <Stack.Screen name="todos/item/[item-id]" />
             <Stack.Screen

@@ -1,0 +1,6 @@
+# Global uniffi config used by the bindings generator.
+#
+# `ssh-core` is resolved through crate-roots so the generator picks up
+# rust/ssh-core/uniffi.toml (Kotlin package name, Swift module name).
+[crate-roots]
+ssh_core = "ssh-core"

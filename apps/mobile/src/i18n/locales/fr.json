@@ -23,6 +23,10 @@
   },
   "common": {
     "deleteTitle": "Supprimer {{label}} ?",
+    "manageOnWeb": "Gérer sur le web",
+    "creditHistory": "Historique des crédits",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Annuler",
@@ -119,6 +123,7 @@
     "copyLink": "Copier le lien",
     "couldNotLoadOrganizations": "Impossible de charger les organisations",
     "couldNotLoadSessions": "Impossible de charger les sessions",
+    "couldnTLoad": "Le chargement a échoué",
     "couldnTLoadMore": "Impossible de charger la suite",
     "deviceSessions": "Sessions sur les appareils",
     "disabled": "Désactivé",
@@ -246,6 +251,10 @@
     "notAdded": "Vous êtes connecté. {{provider}} n'a pas été ajouté à votre compte."
   },
   "profile": {
+    "creditHistorySubtitle": "Achats, reçus et activité des crédits",
+    "invoicesSubtitle": "Téléchargez les factures de vos achats",
+    "manageBilling": "Gérer la facturation sur kilo.ai",
+    "manageBillingIosNote": "Les moyens de paiement, la recharge automatique et les informations de facturation se gèrent sur kilo.ai.",
     "codeReviewerSubtitle": "Revues automatiques de PR",
     "securityAgentSubtitle": "Trouver et corriger les vulnérabilités",
     "reviews": "Revues",
@@ -299,6 +308,7 @@
     "passkeyAdded": "Clé d'accès ajoutée.",
     "passkeyAddFailed": "Impossible d'ajouter une clé d'accès. Réessayez.",
     "passkeyAddUnsupported": "Cet appareil ne peut pas créer de clés d'accès.",
+    "passkeyAddUnavailable": "Les clés d'accès ne peuvent être ajoutées que dans un navigateur web.",
     "passkeyAddCancelled": "La création de la clé d'accès a été annulée.",
     "passkeyRemoved": "Clé d'accès supprimée.",
     "passkeyRemoveFailed": "Impossible de supprimer cette clé d'accès. Réessayez.",
@@ -331,7 +341,6 @@
     "providerKeys": {
       "title": "Clés de fournisseur",
       "rowSubtitle": "Utiliser votre propre facturation fournisseur",
-      "manageOnWeb": "Gérer sur le web",
       "manageOnWebReason": "Ces fournisseurs nécessitent des identifiants structurés.",
       "description": "Les requêtes effectuées avec ces clés sont facturées sur votre compte fournisseur au lieu de votre solde Kilo.",
       "enabled": "Utilisée",
@@ -727,6 +736,16 @@
       "changeRequestFailed": "Kilo n'a pas pu ouvrir la pull request. Réessayez dans un instant.",
       "proposalConflict": "Une autre proposition pour ce dépôt est toujours active.",
       "offAction": "La mémoire de revue est désactivée. Activez-la, puis réessayez.",
+      "analyze": {
+        "title": "Analyser les retours",
+        "description": "Choisissez un dépôt avec des réponses récentes des responsables, puis recherchez une consigne récurrente.",
+        "chooseRepository": "Choisir un dépôt",
+        "action": "Analyser maintenant",
+        "noRepositories": "Aucun dépôt n'a encore de réponses récentes des responsables.",
+        "proposed": "Proposition de mémoire de revue créée",
+        "noFeedback": "Aucun retour récent trouvé pour ce dépôt",
+        "noPattern": "Aucun schéma récurrent clair trouvé"
+      },
       "off": "La mémoire de revue est désactivée",
       "on": "La mémoire de revue est activée",
       "offDescription": "Activez-la pour permettre à Kilo d'apprendre des réponses des responsables du dépôt et de proposer des consignes pour REVIEW.md.",
@@ -803,7 +822,63 @@
       "title": "L'agent de revue de code nécessite votre intervention",
       "recoveryLabel": "Contacter l'assistance"
     },
-    "unknownError": "Erreur inconnue"
+    "unknownError": "Erreur inconnue",
+    "skipBotPullRequests": {
+      "title": "Ignorer les pull requests des bots",
+      "subtitle": "Ne pas lancer de revues automatiques sur les pull requests ouvertes par des bots comme Dependabot ou Renovate. Désactivez cette option pour les examiner aussi."
+    },
+    "repoModels": {
+      "title": "Modèle par dépôt",
+      "description": "Utilisez un autre modèle, un autre niveau de réflexion, ou les deux, pour les revues de certains dépôts.",
+      "defaultModel": "Utilise le modèle par défaut",
+      "resetLabel": "Réinitialiser le modèle pour {{repository}}",
+      "changeHint": "Ouvre le sélecteur de modèle"
+    },
+    "analytics": {
+      "title": "Statistiques",
+      "trackedReviews": "Revues suivies",
+      "findingsRaised": "Signalements émis",
+      "highImpactChanges": "Modifications à fort impact",
+      "impactPoints": "Points d'impact",
+      "repositoryLine": "Revues : {{reviews}} · Signalements : {{findings}}",
+      "empty": "Aucune revue avec statistiques pour l'instant",
+      "emptyDescription": "Les statistiques enregistrent les revues terminées tant qu'elles sont activées pour l'organisation.",
+      "off": "Les statistiques sont désactivées pour cette organisation.",
+      "couldNotLoad": "Impossible de charger les statistiques"
+    },
+    "council": {
+      "title": "Revue en conseil",
+      "subtitle": "Plusieurs spécialistes examinent chaque pull request, et leurs votes sont combinés en une seule décision.",
+      "unavailable": "La revue en conseil n'est pas disponible pour cette organisation.",
+      "noRepositories": "Aucun dépôt sélectionné pour l'instant. Choisissez d'abord des dépôts dans les paramètres des dépôts.",
+      "specialists": "Spécialistes",
+      "labels": "Étiquettes qui déclenchent la revue en conseil",
+      "labelsPlaceholder": "ex. : conseil, revue approfondie",
+      "labelsDescription": "Séparez les étiquettes par des virgules. Un dépôt avec revue en conseil ne l'exécutera alors que pour les pull requests portant au moins une de ces étiquettes. Laissez vide pour toutes les pull requests éligibles.",
+      "tooManyLabels": "Trop d’étiquettes pour la revue en conseil. Utilisez au maximum {{maximum}} étiquettes.",
+      "labelTooLong": "Une étiquette pour la revue en conseil est trop longue. Chaque étiquette doit comporter au maximum {{maximum}} caractères.",
+      "minSpecialists": "Sélectionnez au moins {{minimum}} spécialistes. Sélectionnés : {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Couverture de tests",
+        "correctness": "Exactitude",
+        "custom": "Spécialiste"
+      },
+      "specialist": {
+        "security": "Contournement d'autorisation, gestion des secrets et entrées non sécurisées.",
+        "performance": "Chemins critiques, requêtes N+1 et allocations lourdes.",
+        "testing": "Couverture absente ou insuffisante des nouveaux comportements.",
+        "correctness": "Erreurs de logique, cas limites et conditions de concurrence.",
+        "custom": "Examine les problèmes de son propre domaine."
+      },
+      "strategy": {
+        "advisory": "Consultatif",
+        "advisoryDescription": "Signale les problèmes et vote sans bloquer la fusion.",
+        "unanimous": "Unanime",
+        "unanimousDescription": "Bloque la fusion dès qu'un spécialiste signale un problème critique.",
+        "majority": "Majorité",
+        "majorityDescription": "Bloque la fusion uniquement si la plupart des spécialistes signalent un problème critique."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1321,6 +1396,16 @@
       "auto": "Auto",
       "shallow": "Superficielle",
       "deep": "Approfondie"
+    },
+    "orphanedFindings": {
+      "title": "Signalements des dépôts supprimés",
+      "description": "Ces dépôts ne sont plus accessibles via l'intégration GitHub. Leurs signalements restent comptabilisés dans les tableaux de bord et les rapports.",
+      "count": "Signalements : {{count}}",
+      "clearLabel": "Effacer les signalements de {{repository}}",
+      "confirmTitle": "Effacer les signalements ?",
+      "confirmMessage": "Tous les signalements enregistrés pour {{repository}} seront supprimés. Cette action est irréversible.",
+      "confirmAction": "Supprimer les signalements",
+      "cleared": "Signalements effacés : {{count}}"
     }
   },
   "agentChat": {
@@ -1434,6 +1519,7 @@
       "branchPlaceholder": "Sélectionner une branche",
       "runOnWithTarget": "Exécution sur : {{target}}",
       "environment": "Environnement",
+      "cloudEnvironment": "Environnement cloud",
       "couldNotLoadEnvironment": "Impossible de charger votre environnement",
       "retryLoadingEnvironment": "Réessayer de charger l'environnement",
       "defaultEnvironment": "Environnement par défaut",
@@ -1494,6 +1580,89 @@
       "openSettingsToReview": "Ouvrez les paramètres pour vérifier",
       "profileSelection": "Sélection de profil",
       "profileLayerAccessibility": "{{label}} : {{detail}}"
+    },
+    "environment": {
+      "loadingEnvironments": "Chargement des environnements",
+      "couldNotLoadEnvironments": "Impossible de charger les environnements",
+      "couldNotLoadEnvironmentsDetail": "Réessayez pour charger les environnements de ce dépôt.",
+      "noEnvironment": "Aucun environnement",
+      "noEnvironmentDetail": "Cette session démarre à partir de l'image de base.",
+      "chooseEnvironment": "Choisir un environnement",
+      "chooseEnvironmentDetail": "Ce dépôt comporte plusieurs environnements.",
+      "environmentAccessibility": "Choisir un environnement : {{label}}",
+      "environmentsForRepository": "Environnements pour {{repository}}",
+      "selectEnvironmentToStart": "Sélectionnez un environnement pour démarrer.",
+      "buildDetails": "Détails du build",
+      "buildNotBuilt": "Non généré",
+      "buildUnavailableShort": "Builds de snapshot indisponibles",
+      "buildPreparing": "Préparation du builder",
+      "buildCloning": "Clonage de la branche par défaut",
+      "buildSetup": "Exécution de la configuration de l'environnement",
+      "buildCleanup": "Suppression des identifiants de build",
+      "buildCapturing": "Capture du snapshot",
+      "buildPublishing": "Publication du snapshot",
+      "buildStopping": "Arrêt du builder",
+      "buildStoppingRetrying": "Arrêt du builder, nouvelle tentative",
+      "buildFinishing": "Finalisation du build",
+      "buildSucceeded": "Snapshot prêt",
+      "buildSuperseded": "Remplacé par un build plus récent",
+      "buildStale": "Les paramètres ont changé depuis ce snapshot",
+      "buildStaleAge": "Snapshot datant de plus de quatre jours ; la prochaine session l'actualise",
+      "buildStaleImage": "Construit pour une image de sandbox antérieure",
+      "failureClone": "Le dépôt n'a pas pu être cloné.",
+      "failureSetup": "Une commande de configuration a échoué. Consultez le journal du build.",
+      "failureTimeout": "Une commande de configuration a expiré. Consultez le journal du build.",
+      "failureCleanup": "Les identifiants n'ont pas pu être supprimés, aucun snapshot n'a donc été pris.",
+      "failureCapture": "Le snapshot n'a pas pu être capturé.",
+      "failureCaptureUncertain": "Le résultat du snapshot a été perdu ; le build n'a pas été publié.",
+      "failureDeadline": "Le build ne s'est pas terminé à temps.",
+      "failureBuilderLost": "Le builder ne répond plus.",
+      "failureBuilderStart": "Le builder n'a pas pu démarrer.",
+      "failureUnauthorized": "L'accès au dépôt n'est plus autorisé.",
+      "failureActorUnauthorized": "La personne qui a lancé le build n'y a plus accès.",
+      "failureBilling": "Les builds nécessitent des crédits disponibles.",
+      "failureBillingUnavailable": "La facturation n'a pas pu accepter le build. Réessayez.",
+      "failureConfiguration": "La configuration a changé pendant le build.",
+      "failureRuntime": "La version du runtime sélectionnée n'a pas pu être installée.",
+      "failureGeneric": "Le build a échoué.",
+      "buildLogs": "Journaux du build",
+      "noBuildLogs": "Aucune sortie de journal pour l'instant.",
+      "buildLogsLatestOnly": "Affichage des 500 dernières lignes de journal conservées.",
+      "buildLogsTruncated": "La sortie ultérieure a été tronquée.",
+      "couldNotLoadBuild": "Impossible de charger l'état du build",
+      "couldNotLoadBuildLogs": "Impossible de charger les journaux du build",
+      "buildsUnavailable": "Les builds de snapshot sont indisponibles pour cet environnement.",
+      "onlyManagersCanBuild": "Seuls les gestionnaires de l'organisation peuvent générer des snapshots.",
+      "waitForBuilder": "Attendez l'arrêt du builder avant de relancer un build.",
+      "buildAction": "Générer le snapshot",
+      "refreshAction": "Actualiser le snapshot",
+      "cancelBuildAction": "Annuler le build",
+      "buildStarted": "Build du snapshot lancé",
+      "buildCanceled": "Build du snapshot annulé",
+      "couldNotStartBuild": "Impossible de lancer le build",
+      "couldNotCancelBuild": "Impossible d'annuler le build",
+      "sandbox": "Bac à sable",
+      "sandboxActive": "Bac à sable actif",
+      "sandboxSleeping": "Bac à sable en veille",
+      "sandboxStarting": "Démarrage du bac à sable",
+      "sandboxStopping": "Arrêt du bac à sable",
+      "sandboxError": "Erreur du bac à sable",
+      "sandboxUnreachable": "Bac à sable injoignable",
+      "sandboxStatusUnknown": "État du bac à sable inconnu",
+      "sandboxChecked": "Vérifié {{when}}",
+      "sandboxDetailStopped": "Envoyez un message pour le relancer.",
+      "sandboxDetailFailed": "Envoyez un message pour réessayer.",
+      "sandboxDetailConnection": "La connexion au bac à sable est indisponible.",
+      "sandboxDetailUnavailable": "L'état du bac à sable est temporairement indisponible.",
+      "sandboxDetailInsufficient": "Les informations sont insuffisantes pour confirmer l'état actuel du bac à sable.",
+      "sandboxDetailCheckNeeded": "Le bac à sable n'a pas confirmé son bon fonctionnement récemment.",
+      "startFresh": "Repartir de zéro",
+      "startFreshTitle": "Repartir de zéro ?",
+      "startFreshMessage": "Cette action supprime le snapshot de l'espace de travail capturé {{when}}. Les modifications non commitées de cet espace de travail seront perdues.",
+      "startFreshMessageUnknown": "Cette action supprime le snapshot enregistré de l'espace de travail, qui n'a pas pu être lu. Les modifications non commitées de cet espace de travail seront perdues.",
+      "startFreshDone": "Snapshot de l'espace de travail supprimé.",
+      "couldNotRemoveSnapshot": "Impossible de supprimer le snapshot de l'espace de travail.",
+      "snapshotCaptured": "Snapshot de l'espace de travail capturé {{when}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fichier mis à jour",
@@ -1847,7 +2016,8 @@
       "cancelQueued": "Annuler le message",
       "cancelQueuedAccessibility": "Annuler le message en attente",
       "restoreQueued": "Restaurer",
-      "restoreQueuedAccessibility": "Restaurer le message annulé dans le champ de saisie"
+      "restoreQueuedAccessibility": "Restaurer le message annulé dans le champ de saisie",
+      "noReplyRecorded": "Aucune réponse n'a été enregistrée pour ce message."
     },
     "olderMessages": {
       "arrived": "Messages précédents chargés",
@@ -2277,6 +2447,26 @@
     "onlyFirstFilesAttached_many": "Seuls les {{displayCount}} premiers fichiers seront joints."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Historique de facturation",
+      "billingHistoryEmpty": "Aucun historique de facturation pour le moment.",
+      "cancel": "Résilier l'abonnement",
+      "cancelDescription": "Votre Kilo Pass reste actif jusqu'à la fin de la période de facturation et ne sera pas renouvelé.",
+      "cancelScheduled": "Prend fin le {{date}}",
+      "cancelScheduledChange": "Annuler le changement prévu",
+      "cancelled": "Abonnement résilié",
+      "changePlan": "Changer de forfait sur kilo.ai",
+      "changePlanIosNote": "Les changements de forfait payant sont disponibles sur kilo.ai.",
+      "creditHistoryEmpty": "Aucun crédit Kilo Pass pour le moment.",
+      "manageInStore": "Gérer dans {{store}}",
+      "resume": "Réactiver l'abonnement",
+      "resumeCancelledDescription": "Votre Kilo Pass sera de nouveau renouvelé automatiquement.",
+      "resumePausedDescription": "Votre Kilo Pass reprend dès maintenant, avant la date de reprise prévue.",
+      "resumed": "Abonnement réactivé",
+      "scheduledChange": "Changement prévu",
+      "scheduledChangeCancelDescription": "Votre Kilo Pass conserve son forfait actuel et se renouvelle comme aujourd'hui.",
+      "scheduledChangeSummary": "{{plan}} le {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass n'a pas pu être chargé.",
     "couldNotLoad": "Impossible de charger Kilo Pass. Réessayez.",
@@ -2286,7 +2476,7 @@
     "subscriptionLoading": "Chargement de l'abonnement Kilo Pass",
     "retryHint": "Actualise à nouveau l'état de Kilo Pass.",
     "cardAccessibility": "{{title}} : {{description}}. {{actionLabel}}",
-    "purchaseUnavailableEnded": "Votre Kilo Pass a pris fin.",
+    "endedOn": "Terminé le {{date}}",
     "notAvailableInApp": "Kilo Pass n'est pas disponible dans l'application.",
     "statusActive": "Actif",
     "statusTrialing": "Période d'essai",
@@ -2308,7 +2498,7 @@
     "kiloPassManagement": "Gestion de Kilo Pass",
     "kiloPassSetup": "Configuration de Kilo Pass",
     "opensManagementOnWeb": "Ouvre la gestion de Kilo Pass sur le site web.",
-    "tryAgainFromProfile": "Réessayez depuis le profil.",
+    "loadFailedRetry": "Vérifiez votre connexion, puis réessayez.",
     "legalTermsOfUse": "Conditions d'utilisation (EULA)",
     "purchaseDifferentAccount": "Cet achat sur l'App Store n'est pas lié à votre compte Kilo. Connectez-vous au compte Apple utilisé pour l'achat, puis réessayez.",
     "purchaseFailed": "Impossible de finaliser l'achat.",
@@ -2331,6 +2521,11 @@
     "accountDescription": "Votre identifiant de compte Kilo et les métadonnées des requêtes, utilisés pour vous authentifier et mesurer l'utilisation.",
     "diagnosticsTitle": "Diagnostics de l'application",
     "diagnosticsDescription": "Rapports de plantage et d'erreur, sans le contenu de l'application, utilisés pour assurer sa stabilité.",
+    "featureFlagsTitle": "Déploiement des fonctionnalités",
+    "featureFlagsDescription": "L'adresse e-mail de votre compte, utilisée par PostHog pour déterminer les fonctionnalités que vous voyez.",
+    "featureFlagsWhat": "L'adresse e-mail de votre compte.",
+    "featureFlagsWhy": "Déterminer les fonctionnalités que vous voyez, y compris celles que nous sommes encore en train de déployer.",
+    "featureFlagsWho": "PostHog, le service de feature flags.",
     "helpImprove": "Aider à améliorer Kilo",
     "helpImproveDescription": "Partager des données d'utilisation anonymes et l'origine de l'installation. Vous pouvez modifier ce choix à tout moment dans les réglages.",
     "seeFullDetails": "Voir tous les détails",
@@ -3041,6 +3236,36 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "Journal d'audit",
+      "permissionDenied": "Seuls un propriétaire, un administrateur ou un responsable de la facturation d'une organisation sous formule Enterprise peuvent consulter son journal d'audit.",
+      "emptyTitle": "Aucun événement d'audit",
+      "emptyDescription": "Les actions effectuées dans cette organisation s'affichent ici.",
+      "truncated": "Affichage des événements les plus récents."
+    },
+    "billing": {
+      "title": "Facturation",
+      "permissionDenied": "Seul un propriétaire, un administrateur ou un responsable de la facturation de l'organisation peut consulter sa facturation.",
+      "subscription": "Abonnement",
+      "state": "Statut",
+      "stateNone": "Aucun abonnement",
+      "statePastDue": "Paiement en retard",
+      "stateCancelsAtPeriodEnd": "Résiliation en fin de période",
+      "stateTrialEndsOn": "Fin de l'essai le {{date}}",
+      "stateTrialing": "Essai",
+      "stateRenewsOn": "Renouvellement le {{date}}",
+      "seatsDropTo": "Passe à {{seats}} licences le {{date}}",
+      "seats": "Licences",
+      "autoTopUp": "Recharge automatique",
+      "autoTopUpAmount": "Montant de la recharge",
+      "autoTopUpThreshold": "Quand le solde passe sous",
+      "manageOnWeb": "Les modifications se font sur le web",
+      "changePlan": "Changer de formule",
+      "buySeats": "Acheter des licences",
+      "setupAutoTopUp": "Configurer la recharge automatique",
+      "webAddress": "Adresse web {{url}}",
+      "opensOnWeb": "S'ouvre sur le web"
+    },
     "boundary": {
       "backToProfile": "Retour au profil",
       "loadErrorMessage": "Vérifiez votre connexion et réessayez.",
@@ -3048,14 +3273,20 @@
       "loadErrorTitle": "Impossible de charger vos organisations",
       "membershipLostNotice": "Vous n'avez plus accès à cette organisation. Basculé vers {{target}}.",
       "noOrganization": "Aucune organisation",
-      "noOrganizationDescription": "Ce compte ne fait partie d'aucune organisation. Créez une organisation ou rejoignez-en une sur le site web pour utiliser les fonctionnalités d'organisation telles que les invitations de membres et les alertes de solde faible.",
-      "openWebOrganizations": "Ouvrir les organisations sur le site web",
+      "noOrganizationDescription": "Ce compte ne fait partie d'aucune organisation. Créez-en une pour utiliser des fonctionnalités comme les invitations de membres et les alertes de solde bas, ou ouvrez le web pour rejoindre une organisation à laquelle vous avez été invité.",
       "organizationUnavailable": "L'organisation n'est pas disponible",
       "selectDescriptionWithOrganizations": "Vous appartenez à une ou plusieurs organisations. Choisissez le compte que cet écran doit utiliser.",
       "selectOrganization": "Choix d'une organisation",
       "unavailableDescription": "Cette organisation n'est plus disponible. Choisissez un autre compte dans le sélecteur de comptes pour continuer.",
       "unavailableSessionsDescription": "Cette organisation n'est plus disponible. Ses sessions ne peuvent pas être chargées.",
       "accessDeniedDescription": "Vous n'avez pas accès à cette organisation."
+    },
+    "create": {
+      "title": "Créer une organisation",
+      "description": "Une organisation partage ses crédits, ses agents et ses paramètres avec votre équipe.",
+      "nameLabel": "Nom de l'organisation",
+      "nameRequired": "Saisissez un nom d'organisation.",
+      "trialNote": "Votre essai Enterprise de 14 jours commence dès la création de l'organisation. Les formules s'achètent sur le web."
     },
     "creditActivity": {
       "emptyDescription": "Les achats, la consommation et les ajustements de crédits de cette organisation apparaîtront ici au fur et à mesure.",
@@ -3177,6 +3408,21 @@
       "ownRoleChange": "Vous ne pouvez pas changer votre propre rôle.",
       "inviteExpired": "Cette invitation a expiré.",
       "inviteAccepted": "Cette invitation a déjà été acceptée."
+    },
+    "settingsOnWeb": {
+      "title": "Paramètres de l'organisation sur le web",
+      "usageDetails": "Détails d'utilisation",
+      "providersAndModels": "Fournisseurs et modèles",
+      "groups": "Groupes",
+      "guardrails": "Garde-fous",
+      "byok": "Utiliser votre propre clé",
+      "ssoAndDomain": "SSO et domaine",
+      "emailPreferences": "Préférences d'e-mail",
+      "dataCollection": "Collecte de données",
+      "auditLogs": "Journaux d'audit",
+      "requestLogs": "Journaux des requêtes",
+      "subOrganizations": "Sous-organisations",
+      "distributeFunds": "Répartir les fonds"
     },
     "usageStats": {
       "inputTokens": "Jetons d'entrée",
@@ -3931,6 +4177,25 @@
     "importConfigApplied": "Config importée"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Impossible de charger l'activité de crédits.",
+      "appStoreReceipt": "Reçu disponible sur l'App Store",
+      "deductionFallback": "Déduction de crédits",
+      "emptyDescription": "Vos achats de crédits, reçus et consommations apparaîtront ici.",
+      "emptyTitle": "Aucun historique de crédits",
+      "googlePlayReceipt": "Reçu disponible sur Google Play",
+      "kind": {
+        "adjustment": "Ajustement",
+        "balanceNeutral": "Sans effet sur le solde",
+        "deduction": "Déduction",
+        "grant": "Crédits offerts",
+        "purchase": "Achat"
+      },
+      "purchaseFallback": "Achat de crédits",
+      "receipt": "Reçu",
+      "receiptA11y": "Ouvrir le reçu pour {{description}}",
+      "receiptUnavailable": "Aucun reçu n'est disponible pour cet achat."
+    },
     "title": "Acheter des crédits",
     "description": "Les crédits sont un achat unique ajouté à votre solde Kilo pour lancer des sessions de codage IA dans Kilo App. La boutique débite votre compte et les crédits sont ajoutés après confirmation du paiement par la boutique.",
     "nextExpiry": "{{amount}} de crédits expirent le {{date}} (UTC). Les crédits dont l'expiration est la plus proche sont utilisés en premier.",
@@ -4116,6 +4381,70 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Impossible d'ouvrir ce résultat de recherche"
+  },
+  "usage": {
+    "title": "Utilisation",
+    "orgTitle": "Utilisation de l'organisation",
+    "entrySubtitle": "Dépenses, requêtes et jetons",
+    "rangePicker": "Période",
+    "range90d": "90 jours",
+    "metricPicker": "Métrique du graphique",
+    "chartA11y": "{{metric}} par jour",
+    "avgCostPerRequest": "Coût moy. / requête",
+    "topModels": "Principaux modèles",
+    "topFeatures": "Principales fonctionnalités",
+    "emptyTitle": "Aucune utilisation sur cette période",
+    "orgSelfNotice": "Vous voyez votre propre utilisation dans cette organisation.",
+    "viewDetails": "Voir les détails d'utilisation"
+  },
+  "integrations": {
+    "title": "Intégrations",
+    "sectionTitle": "Services connectés",
+    "entrySubtitle": "GitHub, Slack, Linear et plus encore",
+    "subtitle": "Connectez vos outils et flux de travail de développement à Kilo",
+    "emptyHint": "Aucune intégration connectée pour le moment.",
+    "disconnect": "Déconnecter",
+    "disconnectTitle": "Déconnecter {{provider}} ?",
+    "disconnectMessage": "Kilo ne répondra plus dans {{provider}}. Vous pouvez le reconnecter à tout moment.",
+    "connectedTo": "Connecté à {{account}}",
+    "disconnected": "{{provider}} déconnecté",
+    "disconnectFailed": "Impossible de déconnecter {{provider}}",
+    "couldNotLoad": "Impossible de charger les intégrations",
+    "permissionDenied": "Vous n'avez pas l'autorisation de gérer ces intégrations.",
+    "memberHint": "Demandez à un propriétaire ou à un administrateur de l'organisation de modifier ces connexions.",
+    "connectFailed": "Impossible d'ouvrir la page de connexion"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Les factures de vos achats personnels apparaîtront ici dès votre première facturation."
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Aucune utilisation pour l'instant",
+      "sharedWorkspace": "Partagé par toutes les discussions de cet espace de travail",
+      "currentRates": "Tarifs actuels",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Bac à sable moyen",
+      "largeSandbox": "Grand bac à sable",
+      "earlierActivity": "Activité antérieure",
+      "now": "maintenant",
+      "loadFailed": "Impossible de charger les frais de Compute."
+    },
+    "preview": {
+      "title": "Ouvrir l'aperçu",
+      "listeningServices": "Services en écoute",
+      "empty": "Aucun service en écoute trouvé. Demander à l'agent de démarrer un serveur web, puis actualiser.",
+      "notRunning": "Ce bac à sable est arrêté. Il redémarrera dès que l'agent recevra un message.",
+      "notReady": "Le bac à sable n'est pas encore prêt. Actualiser une fois la connexion établie.",
+      "unsupported": "La découverte de services n'est pas disponible pour ce bac à sable.",
+      "failed": "Impossible de découvrir les services.",
+      "openService": "Ouvrir {{name}} sur le port {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Déclencheurs et webhooks",
+      "subtitle": "Gérer les déclencheurs webhook et planifiés sur le web."
+    }
   },
   "sessionShare": {
     "title": "Partager la session",

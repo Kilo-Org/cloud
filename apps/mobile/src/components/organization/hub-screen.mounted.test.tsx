@@ -78,6 +78,17 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     isResolving: false,
   }),
   useOrgWithMembers: () => membersQuery,
+  // Mirrors the hook's derivation over the same mocked membership payload.
+  useOrgParentLink: (_organizationId: string | null, listParentLink: string | null | undefined) => {
+    const membershipParentLink = membersQuery.data?.parent_organization_id;
+    const reportedParentLink = listParentLink ?? membershipParentLink;
+    return {
+      membership: membersQuery,
+      parentLink: reportedParentLink ?? (membershipParentLink === null ? null : undefined),
+      membershipUnavailable:
+        membersQuery.data == null && (membersQuery.isError || membersQuery.isPaused),
+    };
+  },
   useOrgKiloPassSummary: (_organizationId: string, enabled: boolean) => {
     kiloPassQuery.enabled.push(enabled);
     return { data: undefined, isError: false, refetch: vi.fn() };
@@ -192,11 +203,25 @@ vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
 }));
 
+// Every icon the hub composes, including the web-settings rows' own set: the
+// row table resolves them at module scope, so a missing export fails collection.
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
+  Building2: 'Building2',
+  Cpu: 'Cpu',
+  CreditCard: 'CreditCard',
   FileText: 'FileText',
+  KeyRound: 'KeyRound',
+  LineChart: 'LineChart',
+  Lock: 'Lock',
+  Mail: 'Mail',
   Pencil: 'Pencil',
+  Plug: 'Plug',
   Receipt: 'Receipt',
+  ScrollText: 'ScrollText',
+  Server: 'Server',
+  Shield: 'Shield',
+  SlidersHorizontal: 'SlidersHorizontal',
   Users: 'Users',
   Wallet: 'Wallet',
 }));
@@ -322,6 +347,12 @@ describe('Organization hub card', () => {
     // the button once the copy beside it left.
     const trailing: object | null | undefined = balance?.props.trailing;
     expect(isValidElement(trailing) && trailing.type === AddCreditsRow).toBe(true);
+    // `inline` drops the control's own block, and `lineAction` keeps the
+    // amount's line one text line tall instead of growing it to 48 dp.
+    const trailingProps = isValidElement<{ inline?: boolean; lineAction?: boolean }>(trailing)
+      ? trailing.props
+      : undefined;
+    expect(trailingProps).toMatchObject({ inline: true, lineAction: true });
     unmount();
   });
 

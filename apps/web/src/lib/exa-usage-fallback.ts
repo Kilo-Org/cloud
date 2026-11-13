@@ -4,6 +4,7 @@ import type { ExaUsageRecord } from '@kilocode/usage-contracts';
 import { EXA_USAGE_QUEUE_FALLBACK_ENABLED } from '@kilocode/web-shared/lib/config.server';
 import {
   enqueueExaUsage,
+  isExaUsagePublicationConfigured,
   type UsageEnqueueOutcome,
 } from '@kilocode/web-shared/lib/ai-gateway/usage-publisher';
 
@@ -30,6 +31,14 @@ function unexpectedRejection(error: unknown): PublicationOutcome {
     reason: 'unexpected_rejection',
     errorName: error instanceof Error ? error.name : typeof error,
   };
+}
+
+/**
+ * Whether a failed direct write can still reach durable storage through the queue. Callers use
+ * this to reserve invocation time only for a publication that can actually happen.
+ */
+export function isExaUsageQueueFallbackAvailable(): boolean {
+  return EXA_USAGE_QUEUE_FALLBACK_ENABLED && isExaUsagePublicationConfigured();
 }
 
 /**

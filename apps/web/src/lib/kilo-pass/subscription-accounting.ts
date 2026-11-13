@@ -4,7 +4,7 @@ import { and, desc, eq, lte, sql } from 'drizzle-orm';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { getPausedMonthSet } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
-import { getPreviousIssueMonth } from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-utils';
+import { getPreviousIssueMonth } from '@kilocode/web-shared/lib/kilo-pass/issue-month';
 
 export async function updateKiloPassThresholdAfterBaseCredits(
   tx: DrizzleTransaction,

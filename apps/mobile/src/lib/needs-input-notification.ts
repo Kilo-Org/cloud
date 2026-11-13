@@ -43,6 +43,7 @@ import {
 
 import { type CachedActiveSession, isAttentionStatus } from '@/lib/active-sessions-live';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import { postedRaiseChanged } from '@/lib/notification-raise';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { getLanguageSnapshot, i18n } from '@/i18n';
@@ -63,6 +64,11 @@ export type NeedsInputNotificationRow = {
   sessionId: string;
   title: string;
   kind: NeedsInputAttentionKind;
+  /**
+   * The raise this post presents: the cached row's own status time, or null
+   * when it carries none. The posted actions answer this raise.
+   */
+  raiseId: string | null;
   prUrl: string | null;
   organizationId: string | null;
   /**
@@ -229,6 +235,7 @@ function toNotificationRow(
     // instead of the raw identifier (SPOT-DEFECT e7.png).
     title: sessionDisplayTitle(row.title) ?? i18n.t('agents.sessionRow.untitled'),
     kind,
+    raiseId: row.statusUpdatedAt ?? null,
     prUrl: row.associatedPr?.url ?? null,
     organizationId: row.organizationId ?? null,
     previews,
@@ -344,11 +351,9 @@ function needsRepublish(
   notifiedRow: NeedsInputNotificationRow | undefined,
   next: NeedsInputNotificationRow
 ): boolean {
-  if (notifiedRow === undefined) {
-    return true;
-  }
   return (
-    notifiedRow.kind !== next.kind ||
+    notifiedRow === undefined ||
+    postedRaiseChanged(notifiedRow, next) ||
     notifiedRow.prUrl !== next.prUrl ||
     notifiedRow.previews !== next.previews ||
     (next.previews === 'full' && notifiedRow.title !== next.title)
@@ -364,6 +369,7 @@ function pushDataForRow(
     cliSessionId: row.sessionId,
     category: 'attention',
     attentionKind: row.kind,
+    ...(row.raiseId === null ? {} : { raiseId: row.raiseId }),
     ...(row.prUrl === null ? {} : { prUrl: row.prUrl }),
     ...(row.organizationId === null ? {} : { organizationId: row.organizationId }),
   };

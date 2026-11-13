@@ -23,6 +23,10 @@
   },
   "common": {
     "deleteTitle": "ลบ {{label}}?",
+    "manageOnWeb": "จัดการบนเว็บ",
+    "creditHistory": "ประวัติเครดิต",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "ยกเลิก",
@@ -119,6 +123,7 @@
     "copyLink": "คัดลอกลิงก์",
     "couldNotLoadOrganizations": "ไม่สามารถโหลดรายชื่อองค์กรได้",
     "couldNotLoadSessions": "ไม่สามารถโหลดเซสชันได้",
+    "couldnTLoad": "ไม่สามารถโหลดได้",
     "couldnTLoadMore": "ไม่สามารถโหลดเพิ่มได้",
     "deviceSessions": "เซสชันบนอุปกรณ์",
     "disabled": "ปิดใช้งานแล้ว",
@@ -246,6 +251,10 @@
     "notAdded": "คุณลงชื่อเข้าใช้แล้ว ไม่ได้เพิ่ม {{provider}} ในบัญชีของคุณ"
   },
   "profile": {
+    "creditHistorySubtitle": "การซื้อ ใบเสร็จ และความเคลื่อนไหวของเครดิต",
+    "invoicesSubtitle": "ดาวน์โหลดใบแจ้งหนี้สำหรับการซื้อของคุณ",
+    "manageBilling": "จัดการการเรียกเก็บเงินบน kilo.ai",
+    "manageBillingIosNote": "วิธีการชำระเงิน การเติมเงินอัตโนมัติ และรายละเอียดการเรียกเก็บเงินจะจัดการบน kilo.ai",
     "codeReviewerSubtitle": "การตรวจสอบ PR อัตโนมัติ",
     "securityAgentSubtitle": "ค้นหาและแก้ไขช่องโหว่",
     "reviews": "การตรวจสอบโค้ด",
@@ -299,6 +308,7 @@
     "passkeyAdded": "เพิ่มพาสคีย์แล้ว",
     "passkeyAddFailed": "เพิ่มพาสคีย์ไม่สำเร็จ ลองอีกครั้ง",
     "passkeyAddUnsupported": "อุปกรณ์นี้สร้างพาสคีย์ไม่ได้",
+    "passkeyAddUnavailable": "เพิ่มพาสคีย์ได้เฉพาะในเว็บเบราว์เซอร์เท่านั้น",
     "passkeyAddCancelled": "การสร้างพาสคีย์ถูกยกเลิก",
     "passkeyRemoved": "ลบพาสคีย์แล้ว",
     "passkeyRemoveFailed": "ลบพาสคีย์นั้นไม่สำเร็จ ลองอีกครั้ง",
@@ -318,7 +328,7 @@
     },
     "signInMethods": {
       "title": "วิธีการลงชื่อเข้าใช้",
-      "unlink": "ยกเลิกการเชื่อมโยง",
+      "unlink": "ลบการเชื่อมโยง",
       "unlinkProvider": "ยกเลิกการเชื่อมโยง {{provider}}",
       "unlinkTitle": "ยกเลิกการเชื่อมโยง {{provider}} หรือไม่?",
       "unlinkMessage": "คุณจะไม่สามารถลงชื่อเข้าใช้ด้วย {{provider}} ได้อีก วิธีการอื่นๆ ของคุณจะยังคงเหมือนเดิม.",
@@ -331,7 +341,6 @@
     "providerKeys": {
       "title": "คีย์ผู้ให้บริการ",
       "rowSubtitle": "ใช้การเรียกเก็บเงินจากผู้ให้บริการของคุณเอง",
-      "manageOnWeb": "จัดการบนเว็บ",
       "manageOnWebReason": "ผู้ให้บริการเหล่านี้ต้องใช้ข้อมูลรับรองแบบมีโครงสร้าง",
       "description": "คำขอที่ส่งผ่านคีย์เหล่านี้จะเรียกเก็บเงินจากบัญชีผู้ให้บริการของคุณแทนยอดคงเหลือ Kilo.",
       "enabled": "กำลังใช้งาน",
@@ -1245,7 +1254,17 @@
       "changeRequestMissingPermissions": "แอป GitHub ของ Kilo ไม่สามารถเปิด Pull Request ในที่เก็บนี้ได้ เจ้าของที่เก็บต้องให้สิทธิ์การเขียนเนื้อหาและ Pull Request แก่แอป แล้วลองอีกครั้ง",
       "changeRequestFailed": "Kilo ไม่สามารถเปิด Pull Request ได้ โปรดลองอีกครั้งในอีกสักครู่",
       "proposalConflict": "ข้อเสนอความจำในการตรวจสอบอีกข้อสำหรับที่เก็บนี้ยังคงเปิดใช้งานอยู่ จึงยังไม่สามารถบันทึกข้อเสนอนี้ได้",
-      "offAction": "ความจำในการตรวจสอบปิดอยู่ เปิดใช้งานแล้วลองอีกครั้ง"
+      "offAction": "ความจำในการตรวจสอบปิดอยู่ เปิดใช้งานแล้วลองอีกครั้ง",
+      "analyze": {
+        "title": "วิเคราะห์ข้อเสนอแนะ",
+        "description": "เลือกคลังโค้ดที่มีการตอบกลับล่าสุดจากผู้ดูแล แล้วมองหารูปแบบคำแนะนำหนึ่งรูปแบบที่เกิดขึ้นซ้ำ",
+        "chooseRepository": "เลือกคลังโค้ด",
+        "action": "วิเคราะห์ตอนนี้",
+        "noRepositories": "ยังไม่มีคลังโค้ดที่มีการตอบกลับล่าสุดจากผู้ดูแล",
+        "proposed": "สร้างข้อเสนอหน่วยความจำการตรวจสอบแล้ว",
+        "noFeedback": "ไม่พบข้อเสนอแนะล่าสุดสำหรับคลังโค้ดนี้",
+        "noPattern": "ไม่พบรูปแบบที่เกิดซ้ำอย่างชัดเจน"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "ป้อน URL ของ merge request ที่ถูกต้อง",
@@ -1377,7 +1396,63 @@
       "title": "ตัวตรวจสอบโค้ดมีปัญหาที่ต้องแก้ไข",
       "recoveryLabel": "ติดต่อฝ่ายสนับสนุน"
     },
-    "unknownError": "ข้อผิดพลาดที่ไม่ทราบสาเหตุ"
+    "unknownError": "ข้อผิดพลาดที่ไม่ทราบสาเหตุ",
+    "skipBotPullRequests": {
+      "title": "ข้าม PR จากบอต",
+      "subtitle": "ไม่ต้องรันการตรวจสอบอัตโนมัติกับ PR ที่เปิดโดยบอต เช่น Dependabot หรือ Renovate ปิดตัวเลือกนี้เพื่อตรวจสอบ PR จากบอตด้วย"
+    },
+    "repoModels": {
+      "title": "โมเดลแยกตามคลังโค้ด",
+      "description": "รันการตรวจสอบของบางคลังโค้ดด้วยโมเดล ระดับการคิด หรือทั้งสองอย่างที่แตกต่างกัน",
+      "defaultModel": "ใช้โมเดลเริ่มต้น",
+      "resetLabel": "รีเซ็ตโมเดลสำหรับ {{repository}}",
+      "changeHint": "เปิดตัวเลือกโมเดล"
+    },
+    "analytics": {
+      "title": "การวิเคราะห์",
+      "trackedReviews": "การตรวจสอบที่ติดตาม",
+      "findingsRaised": "ข้อค้นพบที่พบ",
+      "highImpactChanges": "การเปลี่ยนแปลงที่มีผลกระทบสูง",
+      "impactPoints": "คะแนนผลกระทบ",
+      "repositoryLine": "การตรวจสอบ: {{reviews}} · ข้อค้นพบ: {{findings}}",
+      "empty": "ยังไม่มีการตรวจสอบที่มีข้อมูลการวิเคราะห์",
+      "emptyDescription": "การวิเคราะห์จะบันทึกการตรวจสอบที่เสร็จสิ้นในขณะที่เปิดใช้สำหรับองค์กร",
+      "off": "การวิเคราะห์ปิดอยู่สำหรับองค์กรนี้",
+      "couldNotLoad": "ไม่สามารถโหลดข้อมูลการวิเคราะห์ได้"
+    },
+    "council": {
+      "title": "การตรวจสอบโดยคณะ",
+      "subtitle": "ผู้เชี่ยวชาญหลายคนตรวจสอบแต่ละ PR และคะแนนเสียงของพวกเขาจะรวมเป็นการตัดสินใจเดียว",
+      "unavailable": "การตรวจสอบโดยคณะไม่พร้อมใช้งานสำหรับองค์กรนี้",
+      "noRepositories": "ยังไม่ได้เลือกคลังโค้ด โปรดเลือกคลังโค้ดในการตั้งค่าคลังโค้ดก่อน",
+      "specialists": "ผู้เชี่ยวชาญ",
+      "labels": "ป้ายที่ทำให้เกิดการตรวจสอบโดยคณะ",
+      "labelsPlaceholder": "เช่น คณะ, การตรวจสอบเชิงลึก",
+      "labelsDescription": "แยกป้ายด้วยเครื่องหมายจุลภาค คลังโค้ดที่เปิดใช้คณะจะรันคณะเฉพาะ PR ที่มีป้ายเหล่านี้อย่างน้อยหนึ่งป้าย เว้นว่างไว้สำหรับ PR ที่เข้าเกณฑ์ทั้งหมด",
+      "tooManyLabels": "มีป้ายที่ทำให้เกิดการตรวจสอบโดยคณะมากเกินไป ใช้ได้สูงสุด {{maximum}} ป้าย.",
+      "labelTooLong": "ป้ายที่ทำให้เกิดการตรวจสอบโดยคณะยาวเกินไป แต่ละป้ายต้องมีความยาวไม่เกิน {{maximum}} อักขระ.",
+      "minSpecialists": "เลือกผู้เชี่ยวชาญอย่างน้อย {{minimum}} คน เลือกแล้ว {{selected}} คน",
+      "specialistName": {
+        "testCoverage": "ความครอบคลุมของการทดสอบ",
+        "correctness": "ความถูกต้อง",
+        "custom": "ผู้เชี่ยวชาญ"
+      },
+      "specialist": {
+        "security": "การข้ามการอนุญาต การจัดการความลับ และข้อมูลนำเข้าที่ไม่ปลอดภัย",
+        "performance": "เส้นทางที่ถูกเรียกบ่อย คำสั่ง N+1 และการจัดสรรหน่วยความจำจำนวนมาก",
+        "testing": "ความครอบคลุมที่ขาดหายหรืออ่อนแอสำหรับพฤติกรรมใหม่",
+        "correctness": "ข้อผิดพลาดทางตรรกะ กรณีขอบ และสภาวะการแข่งกัน",
+        "custom": "ตรวจสอบปัญหาในขอบเขตของตนเอง"
+      },
+      "strategy": {
+        "advisory": "คำแนะนำ",
+        "advisoryDescription": "รายงานข้อค้นพบและลงคะแนนโดยไม่บล็อกการผสาน",
+        "unanimous": "เป็นเอกฉันท์",
+        "unanimousDescription": "บล็อกการผสานเมื่อผู้เชี่ยวชาญคนใดรายงานปัญหาวิกฤต",
+        "majority": "เสียงส่วนใหญ่",
+        "majorityDescription": "บล็อกการผสานเฉพาะเมื่อผู้เชี่ยวชาญส่วนใหญ่รายงานปัญหาวิกฤต"
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1880,6 +1955,16 @@
       "auto": "อัตโนมัติ",
       "shallow": "เบื้องต้น",
       "deep": "เชิงลึก"
+    },
+    "orphanedFindings": {
+      "title": "ข้อค้นพบสำหรับคลังโค้ดที่ถูกนำออก",
+      "description": "คลังโค้ดเหล่านี้ไม่สามารถเข้าถึงได้ผ่านการเชื่อมต่อ GitHub อีกต่อไป ข้อค้นพบยังคงถูกนับในแดชบอร์ดและรายงาน",
+      "count": "ข้อค้นพบ: {{count}}",
+      "clearLabel": "ล้างข้อค้นพบสำหรับ {{repository}}",
+      "confirmTitle": "ล้างข้อค้นพบ?",
+      "confirmMessage": "ข้อค้นพบทั้งหมดที่บันทึกไว้สำหรับ {{repository}} จะถูกลบ และไม่สามารถเรียกคืนได้",
+      "confirmAction": "ลบข้อค้นพบ",
+      "cleared": "ล้างข้อค้นพบแล้ว: {{count}}"
     }
   },
   "agents": {
@@ -2059,6 +2144,7 @@
       "branchPlaceholder": "เลือกบรานช์หนึ่ง",
       "runOnWithTarget": "รันบน: {{target}}",
       "environment": "สภาพแวดล้อม",
+      "cloudEnvironment": "สภาพแวดล้อมคลาวด์",
       "couldNotLoadEnvironment": "ไม่สามารถโหลดสภาพแวดล้อมของคุณได้",
       "retryLoadingEnvironment": "ลองโหลดสภาพแวดล้อมใหม่",
       "defaultEnvironment": "สภาพแวดล้อมเริ่มต้น",
@@ -2119,6 +2205,89 @@
       "openSettingsToReview": "เปิดการตั้งค่าเพื่อตรวจสอบ",
       "profileSelection": "การเลือกโปรไฟล์",
       "profileLayerAccessibility": "{{label}}: {{detail}}"
+    },
+    "environment": {
+      "loadingEnvironments": "กำลังโหลดสภาพแวดล้อม",
+      "couldNotLoadEnvironments": "โหลดสภาพแวดล้อมไม่ได้",
+      "couldNotLoadEnvironmentsDetail": "ลองอีกครั้งเพื่อโหลดสภาพแวดล้อมของรีโพสิทอรีนี้",
+      "noEnvironment": "ไม่มีสภาพแวดล้อม",
+      "noEnvironmentDetail": "เซสชันนี้จะเริ่มจากอิมเมจพื้นฐาน",
+      "chooseEnvironment": "เลือกสภาพแวดล้อม",
+      "chooseEnvironmentDetail": "รีโพสิทอรีนี้มีสภาพแวดล้อมมากกว่าหนึ่งรายการ",
+      "environmentAccessibility": "เลือกสภาพแวดล้อม: {{label}}",
+      "environmentsForRepository": "สภาพแวดล้อมของ {{repository}}",
+      "selectEnvironmentToStart": "เลือกสภาพแวดล้อมเพื่อเริ่มต้น",
+      "buildDetails": "รายละเอียดการบิลด์",
+      "buildNotBuilt": "ยังไม่ได้บิลด์",
+      "buildUnavailableShort": "ไม่สามารถบิลด์สแนปช็อตได้",
+      "buildPreparing": "กำลังเตรียมบิลเดอร์",
+      "buildCloning": "กำลังโคลนบรานช์เริ่มต้น",
+      "buildSetup": "กำลังรันการตั้งค่าสภาพแวดล้อม",
+      "buildCleanup": "กำลังลบข้อมูลรับรองสำหรับการบิลด์",
+      "buildCapturing": "กำลังบันทึกสแนปช็อต",
+      "buildPublishing": "กำลังเผยแพร่สแนปช็อต",
+      "buildStopping": "กำลังหยุดบิลเดอร์",
+      "buildStoppingRetrying": "กำลังหยุดบิลเดอร์ และกำลังลองใหม่",
+      "buildFinishing": "กำลังสิ้นสุดการบิลด์",
+      "buildSucceeded": "สแนปช็อตพร้อมแล้ว",
+      "buildSuperseded": "ถูกแทนที่ด้วยการบิลด์ที่ใหม่กว่า",
+      "buildStale": "การตั้งค่ามีการเปลี่ยนแปลงหลังจากสร้างสแนปช็อตนี้",
+      "buildStaleAge": "สแนปช็อตเก่ากว่าสี่วัน เซสชันถัดไปจะรีเฟรชสแนปช็อตนี้",
+      "buildStaleImage": "บิลด์สำหรับอิมเมจแซนด์บ็อกซ์รุ่นก่อนหน้า",
+      "failureClone": "ไม่สามารถโคลนรีโพสิทอรีได้",
+      "failureSetup": "คำสั่งตั้งค่ารายการหนึ่งล้มเหลว ดูบันทึกการบิลด์",
+      "failureTimeout": "คำสั่งตั้งค่ารายการหนึ่งหมดเวลา ดูบันทึกการบิลด์",
+      "failureCleanup": "ไม่สามารถลบข้อมูลรับรองได้ จึงไม่มีการสร้างสแนปช็อต",
+      "failureCapture": "ไม่สามารถบันทึกสแนปช็อตได้",
+      "failureCaptureUncertain": "ผลลัพธ์ของสแนปช็อตสูญหาย จึงไม่ได้เผยแพร่การบิลด์",
+      "failureDeadline": "การบิลด์ไม่เสร็จสิ้นภายในเวลาที่กำหนด",
+      "failureBuilderLost": "บิลเดอร์หยุดรายงานสถานะ",
+      "failureBuilderStart": "ไม่สามารถเริ่มบิลเดอร์ได้",
+      "failureUnauthorized": "สิทธิ์การเข้าถึงรีโพสิทอรีไม่ได้รับอนุญาตอีกต่อไป",
+      "failureActorUnauthorized": "ผู้ที่เริ่มการบิลด์ไม่มีสิทธิ์เข้าถึงอีกต่อไป",
+      "failureBilling": "การบิลด์ต้องมีเครดิตที่ใช้ได้",
+      "failureBillingUnavailable": "ระบบเรียกเก็บเงินไม่สามารถอนุมัติการบิลด์ได้ โปรดลองอีกครั้ง",
+      "failureConfiguration": "การกำหนดค่ามีการเปลี่ยนแปลงระหว่างการบิลด์",
+      "failureRuntime": "ไม่สามารถติดตั้งรันไทม์รุ่นที่เลือกได้",
+      "failureGeneric": "การบิลด์ล้มเหลว",
+      "buildLogs": "บันทึกการบิลด์",
+      "noBuildLogs": "ยังไม่มีเอาต์พุตบันทึก",
+      "buildLogsLatestOnly": "กำลังแสดงบันทึก 500 บรรทัดล่าสุดที่เก็บไว้",
+      "buildLogsTruncated": "เอาต์พุตส่วนที่เหลือถูกตัดทอน",
+      "couldNotLoadBuild": "โหลดสถานะการบิลด์ไม่ได้",
+      "couldNotLoadBuildLogs": "โหลดบันทึกการบิลด์ไม่ได้",
+      "buildsUnavailable": "ไม่สามารถบิลด์สแนปช็อตสำหรับสภาพแวดล้อมนี้ได้",
+      "onlyManagersCanBuild": "เฉพาะผู้จัดการองค์กรเท่านั้นที่บิลด์สแนปช็อตได้",
+      "waitForBuilder": "รอให้บิลเดอร์หยุดก่อนบิลด์อีกครั้ง",
+      "buildAction": "บิลด์สแนปช็อต",
+      "refreshAction": "รีเฟรชสแนปช็อต",
+      "cancelBuildAction": "ยกเลิกการบิลด์",
+      "buildStarted": "เริ่มบิลด์สแนปช็อตแล้ว",
+      "buildCanceled": "ยกเลิกการบิลด์สแนปช็อตแล้ว",
+      "couldNotStartBuild": "เริ่มการบิลด์ไม่ได้",
+      "couldNotCancelBuild": "ยกเลิกการบิลด์ไม่ได้",
+      "sandbox": "แซนด์บ็อกซ์",
+      "sandboxActive": "แซนด์บ็อกซ์ทำงานอยู่",
+      "sandboxSleeping": "แซนด์บ็อกซ์อยู่ในโหมดพัก",
+      "sandboxStarting": "แซนด์บ็อกซ์กำลังสตาร์ต",
+      "sandboxStopping": "แซนด์บ็อกซ์กำลังหยุด",
+      "sandboxError": "แซนด์บ็อกซ์เกิดข้อผิดพลาด",
+      "sandboxUnreachable": "เข้าถึงแซนด์บ็อกซ์ไม่ได้",
+      "sandboxStatusUnknown": "ไม่ทราบสถานะแซนด์บ็อกซ์",
+      "sandboxChecked": "ตรวจสอบเมื่อ {{when}}",
+      "sandboxDetailStopped": "ส่งข้อความเพื่อให้กลับมาทำงานต่อ",
+      "sandboxDetailFailed": "ส่งข้อความเพื่อลองอีกครั้ง",
+      "sandboxDetailConnection": "การเชื่อมต่อแซนด์บ็อกซ์ไม่พร้อมใช้งาน",
+      "sandboxDetailUnavailable": "สถานะแซนด์บ็อกซ์ไม่พร้อมใช้งานชั่วคราว",
+      "sandboxDetailInsufficient": "ข้อมูลไม่เพียงพอที่จะยืนยันสถานะปัจจุบันของแซนด์บ็อกซ์",
+      "sandboxDetailCheckNeeded": "แซนด์บ็อกซ์ไม่ได้ยืนยันสถานะความพร้อมในช่วงที่ผ่านมา",
+      "startFresh": "เริ่มใหม่ทั้งหมด",
+      "startFreshTitle": "เริ่มใหม่ทั้งหมดหรือไม่",
+      "startFreshMessage": "การดำเนินการนี้จะทิ้งสแนปช็อตเวิร์กสเปซที่บันทึกไว้เมื่อ {{when}} การเปลี่ยนแปลงที่ยังไม่ได้คอมมิตจากเวิร์กสเปซนั้นจะสูญหาย",
+      "startFreshMessageUnknown": "การดำเนินการนี้จะทิ้งสแนปช็อตเวิร์กสเปซที่บันทึกไว้ซึ่งไม่สามารถอ่านได้ การเปลี่ยนแปลงที่ยังไม่ได้คอมมิตจากเวิร์กสเปซนั้นจะสูญหาย",
+      "startFreshDone": "ลบสแนปช็อตเวิร์กสเปซแล้ว",
+      "couldNotRemoveSnapshot": "ลบสแนปช็อตเวิร์กสเปซไม่ได้",
+      "snapshotCaptured": "บันทึกสแนปช็อตเวิร์กสเปซเมื่อ {{when}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "อัปเดตไฟล์แล้ว {{displayCount}} ไฟล์",
@@ -2468,7 +2637,8 @@
       "cancelQueued": "ยกเลิกข้อความ",
       "cancelQueuedAccessibility": "ยกเลิกข้อความที่อยู่ในคิว",
       "restoreQueued": "กู้คืน",
-      "restoreQueuedAccessibility": "กู้คืนข้อความที่ยกเลิกไปยังช่องป้อนข้อความ"
+      "restoreQueuedAccessibility": "กู้คืนข้อความที่ยกเลิกไปยังช่องป้อนข้อความ",
+      "noReplyRecorded": "ไม่มีบันทึกคำตอบสำหรับข้อความนี้"
     },
     "olderMessages": {
       "arrived": "โหลดข้อความก่อนหน้าแล้ว",
@@ -2861,6 +3031,26 @@
     "onlyFirstFilesAttached_other": "จะแนบเฉพาะ {{displayCount}} ไฟล์แรกเท่านั้น"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "ประวัติการเรียกเก็บเงิน",
+      "billingHistoryEmpty": "ยังไม่มีประวัติการเรียกเก็บเงิน",
+      "cancel": "ยกเลิกการสมัครสมาชิก",
+      "cancelDescription": "Kilo Pass ของคุณจะยังใช้งานได้จนถึงสิ้นรอบการเรียกเก็บเงิน และจะไม่ต่ออายุ",
+      "cancelScheduled": "ยกเลิกในวันที่ {{date}}",
+      "cancelScheduledChange": "ยกเลิกการเปลี่ยนแปลงที่กำหนดไว้",
+      "cancelled": "ยกเลิกการสมัครสมาชิกแล้ว",
+      "changePlan": "เปลี่ยนแพ็กเกจบน kilo.ai",
+      "changePlanIosNote": "การเปลี่ยนแพ็กเกจแบบชำระเงินทำได้บน kilo.ai",
+      "creditHistoryEmpty": "ยังไม่มีเครดิตจาก Kilo Pass",
+      "manageInStore": "จัดการใน {{store}}",
+      "resume": "กลับมาใช้การสมัครสมาชิกต่อ",
+      "resumeCancelledDescription": "Kilo Pass ของคุณจะกลับมาต่ออายุโดยอัตโนมัติอีกครั้ง",
+      "resumePausedDescription": "Kilo Pass ของคุณจะกลับมาใช้งานทันที ก่อนวันที่กำหนดไว้",
+      "resumed": "กลับมาใช้การสมัครสมาชิกแล้ว",
+      "scheduledChange": "การเปลี่ยนแปลงที่กำหนดไว้",
+      "scheduledChangeCancelDescription": "Kilo Pass ของคุณจะยังคงใช้แพ็กเกจปัจจุบันและต่ออายุเหมือนเดิม",
+      "scheduledChangeSummary": "{{plan}} ในวันที่ {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "ไม่สามารถโหลด Kilo Pass ได้",
     "couldNotLoad": "โหลด Kilo Pass ไม่สำเร็จ ลองอีกครั้ง",
@@ -2870,7 +3060,7 @@
     "subscriptionLoading": "กำลังโหลดการสมัครสมาชิก Kilo Pass",
     "retryHint": "ลองโหลดสถานะ Kilo Pass อีกครั้ง",
     "cardAccessibility": "{{title}} {{description}} {{actionLabel}}",
-    "purchaseUnavailableEnded": "Kilo Pass ของคุณสิ้นสุดแล้ว",
+    "endedOn": "สิ้นสุดวันที่ {{date}}",
     "notAvailableInApp": "Kilo Pass ไม่พร้อมใช้งานในแอป",
     "statusActive": "ใช้งานอยู่",
     "statusTrialing": "ช่วงทดลองใช้",
@@ -2892,7 +3082,7 @@
     "kiloPassManagement": "การจัดการ Kilo Pass",
     "kiloPassSetup": "การตั้งค่า Kilo Pass",
     "opensManagementOnWeb": "เปิดหน้าจัดการ Kilo Pass บนเว็บ",
-    "tryAgainFromProfile": "ลองอีกครั้งจากหน้าโปรไฟล์",
+    "loadFailedRetry": "ตรวจสอบการเชื่อมต่อของคุณ แล้วลองอีกครั้ง",
     "legalTermsOfUse": "ข้อกำหนดการใช้งาน (EULA)",
     "purchaseDifferentAccount": "การซื้อใน App Store นี้ไม่ได้เชื่อมโยงกับบัญชี Kilo ของคุณ ลงชื่อเข้าใช้ Apple Account ที่ใช้ซื้อ แล้วลองอีกครั้ง",
     "purchaseFailed": "ทำการซื้อไม่สำเร็จ",
@@ -2915,6 +3105,11 @@
     "accountDescription": "รหัสบัญชี Kilo และข้อมูลเมตาของคำขอ ใช้เพื่อยืนยันตัวตนและวัดปริมาณการใช้งานของคุณ",
     "diagnosticsTitle": "ข้อมูลวินิจฉัยแอป",
     "diagnosticsDescription": "รายงานการขัดข้องและข้อผิดพลาดที่ลบเนื้อหาภายในแอปออกแล้ว ใช้เพื่อให้แอปทำงานได้เสถียร",
+    "featureFlagsTitle": "การทยอยเปิดตัวฟีเจอร์",
+    "featureFlagsDescription": "อีเมลบัญชีของคุณ ซึ่ง PostHog ใช้เพื่อตัดสินว่าคุณจะเห็นฟีเจอร์ใดบ้าง",
+    "featureFlagsWhat": "อีเมลบัญชีของคุณ",
+    "featureFlagsWhy": "เพื่อตัดสินว่าคุณจะเห็นฟีเจอร์ใดบ้าง รวมถึงฟีเจอร์ที่เรายังทยอยเปิดตัวอยู่",
+    "featureFlagsWho": "PostHog บริการจัดการฟีเจอร์แฟล็ก",
     "helpImprove": "ช่วยปรับปรุง Kilo",
     "helpImproveDescription": "แชร์ข้อมูลวิเคราะห์การใช้งานแบบไม่ระบุตัวตนและแหล่งที่มาของการติดตั้ง คุณเปลี่ยนตัวเลือกนี้ได้ทุกเมื่อในหน้าการตั้งค่า",
     "seeFullDetails": "ดูรายละเอียดทั้งหมด",
@@ -2996,6 +3191,36 @@
     "sendFeedback": "ส่งความคิดเห็น"
   },
   "organization": {
+    "auditLog": {
+      "title": "บันทึกการตรวจสอบ",
+      "permissionDenied": "เฉพาะเจ้าของ ผู้ดูแลระบบ หรือผู้จัดการการเรียกเก็บเงินขององค์กรที่ใช้แผน Enterprise เท่านั้นที่ดูบันทึกการตรวจสอบได้",
+      "emptyTitle": "ไม่มีเหตุการณ์ที่บันทึกไว้",
+      "emptyDescription": "การดำเนินการที่เกิดขึ้นในองค์กรนี้จะแสดงที่นี่",
+      "truncated": "กำลังแสดงเหตุการณ์ล่าสุด"
+    },
+    "billing": {
+      "title": "การเรียกเก็บเงิน",
+      "permissionDenied": "เฉพาะเจ้าของ ผู้ดูแลระบบ หรือผู้จัดการการเรียกเก็บเงินขององค์กรเท่านั้นที่ดูข้อมูลการเรียกเก็บเงินได้",
+      "subscription": "การสมัครใช้บริการ",
+      "state": "สถานะ",
+      "stateNone": "ไม่มีการสมัครใช้บริการ",
+      "statePastDue": "เลยกำหนดชำระ",
+      "stateCancelsAtPeriodEnd": "ยกเลิกเมื่อสิ้นสุดรอบบิล",
+      "stateTrialEndsOn": "ช่วงทดลองใช้สิ้นสุดวันที่ {{date}}",
+      "stateTrialing": "ทดลองใช้",
+      "stateRenewsOn": "ต่ออายุวันที่ {{date}}",
+      "seatsDropTo": "ลดเหลือ {{seats}} สิทธิ์ใช้งานในวันที่ {{date}}",
+      "seats": "สิทธิ์ใช้งาน",
+      "autoTopUp": "เติมเงินอัตโนมัติ",
+      "autoTopUpAmount": "จำนวนเงินที่เติม",
+      "autoTopUpThreshold": "เมื่อยอดคงเหลือต่ำกว่า",
+      "manageOnWeb": "ทำการเปลี่ยนแปลงได้บนเว็บ",
+      "changePlan": "เปลี่ยนแผน",
+      "buySeats": "ซื้อสิทธิ์ใช้งาน",
+      "setupAutoTopUp": "ตั้งค่าการเติมเงินอัตโนมัติ",
+      "webAddress": "ที่อยู่เว็บ {{url}}",
+      "opensOnWeb": "เปิดบนเว็บ"
+    },
     "boundary": {
       "backToProfile": "กลับไปยังโปรไฟล์",
       "loadErrorMessage": "ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
@@ -3003,14 +3228,20 @@
       "loadErrorTitle": "โหลดองค์กรของคุณไม่สำเร็จ",
       "membershipLostNotice": "คุณไม่มีสิทธิ์เข้าถึงองค์กรนี้อีกต่อไป เปลี่ยนเป็น {{target}} แล้ว",
       "noOrganization": "ไม่มีองค์กร",
-      "noOrganizationDescription": "บัญชีนี้ไม่ได้เป็นส่วนหนึ่งขององค์กร สร้างหรือเข้าร่วมองค์กรบนเว็บเพื่อใช้ฟีเจอร์ขององค์กร เช่น คำเชิญสมาชิกและการแจ้งเตือนยอดคงเหลือต่ำ",
-      "openWebOrganizations": "เปิดองค์กรบนเว็บ",
+      "noOrganizationDescription": "บัญชีนี้ไม่ได้อยู่ในองค์กรใด สร้างองค์กรเพื่อใช้ฟีเจอร์ขององค์กร เช่น การเชิญสมาชิกและการแจ้งเตือนเมื่อยอดคงเหลือต่ำ หรือเปิดเว็บเพื่อเข้าร่วมองค์กรที่คุณได้รับคำเชิญ",
       "organizationUnavailable": "องค์กรไม่พร้อมใช้งาน",
       "selectDescriptionWithOrganizations": "คุณเป็นสมาชิกขององค์กรหนึ่งแห่งขึ้นไป เลือกบัญชีที่หน้าจอนี้ควรใช้",
       "selectOrganization": "เลือกองค์กร",
       "unavailableDescription": "องค์กรนี้ไม่พร้อมใช้งานแล้ว เลือกองค์กรอื่นจากโปรไฟล์เพื่อดำเนินการต่อ",
       "unavailableSessionsDescription": "องค์กรนี้ไม่พร้อมใช้งานแล้ว โหลดเซสชันขององค์กรนี้ไม่ได้",
       "accessDeniedDescription": "คุณไม่มีสิทธิ์เข้าถึงองค์กรนี้"
+    },
+    "create": {
+      "title": "สร้างองค์กร",
+      "description": "องค์กรช่วยให้คุณแชร์เครดิต เอเจนต์ และการตั้งค่ากับทีมได้",
+      "nameLabel": "ชื่อองค์กร",
+      "nameRequired": "กรอกชื่อองค์กร",
+      "trialNote": "ช่วงทดลองใช้ Enterprise 14 วันจะเริ่มทันทีที่คุณสร้างองค์กร โดยต้องซื้อแผนบนเว็บ"
     },
     "creditActivity": {
       "emptyDescription": "รายการซื้อ การใช้งาน และการปรับยอดเครดิตขององค์กรนี้จะแสดงที่นี่เมื่อมีรายการใหม่",
@@ -3119,6 +3350,21 @@
       "ownRoleChange": "คุณไม่สามารถเปลี่ยนบทบาทของตัวเองได้",
       "inviteExpired": "คำเชิญนี้หมดอายุแล้ว",
       "inviteAccepted": "คำเชิญนี้ได้รับการตอบรับแล้ว"
+    },
+    "settingsOnWeb": {
+      "title": "การตั้งค่าองค์กรบนเว็บ",
+      "usageDetails": "รายละเอียดการใช้งาน",
+      "providersAndModels": "ผู้ให้บริการและโมเดล",
+      "groups": "กลุ่ม",
+      "guardrails": "Guardrails",
+      "byok": "ใช้คีย์ของคุณเอง",
+      "ssoAndDomain": "SSO และโดเมน",
+      "emailPreferences": "การตั้งค่าอีเมล",
+      "dataCollection": "การเก็บรวบรวมข้อมูล",
+      "auditLogs": "บันทึกการตรวจสอบ",
+      "requestLogs": "บันทึกคำขอ",
+      "subOrganizations": "องค์กรย่อย",
+      "distributeFunds": "จัดสรรเงินทุน"
     },
     "usageStats": {
       "inputTokens": "โทเคนขาเข้า",
@@ -3870,6 +4116,25 @@
     "importConfigApplied": "นำเข้า Config แล้ว"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "ไม่สามารถโหลดกิจกรรมเครดิตได้",
+      "appStoreReceipt": "ใบเสร็จจาก App Store",
+      "deductionFallback": "การหักเครดิต",
+      "emptyDescription": "การซื้อเครดิต ใบเสร็จ และการใช้งานจะแสดงที่นี่",
+      "emptyTitle": "ไม่มีประวัติเครดิต",
+      "googlePlayReceipt": "ใบเสร็จจาก Google Play",
+      "kind": {
+        "adjustment": "การปรับปรุง",
+        "balanceNeutral": "ไม่กระทบยอดคงเหลือ",
+        "deduction": "การหักเครดิต",
+        "grant": "เครดิตที่ได้รับ",
+        "purchase": "การซื้อ"
+      },
+      "purchaseFallback": "การซื้อเครดิต",
+      "receipt": "ใบเสร็จ",
+      "receiptA11y": "เปิดใบเสร็จสำหรับ {{description}}",
+      "receiptUnavailable": "ไม่มีใบเสร็จสำหรับการซื้อนี้"
+    },
     "title": "ซื้อเครดิต",
     "description": "เครดิตคือการซื้อครั้งเดียวที่เพิ่มเข้าสู่ยอดคงเหลือ Kilo ของคุณสำหรับการรันเซสชันการเขียนโค้ด AI ใน Kilo App สโตร์เรียกเก็บเงินจากบัญชีของคุณ และเครดิตจะถูกเพิ่มหลังจากที่สโตร์ยืนยันการชำระเงิน",
     "nextExpiry": "เครดิต {{amount}} จะหมดอายุ {{date}} (UTC) เครดิตที่หมดอายุเร็วที่สุดจะถูกใช้ก่อน",
@@ -3955,7 +4220,7 @@
       "sessionPullRequest": "PR ของเซสชัน",
       "sessionPullRequestNumber": "PR ของเซสชัน #{{number}}",
       "openSessionHint": "เปิดเซสชัน.",
-      "unlinkSessionAction": "ยกเลิกการเชื่อมโยงเซสชัน",
+      "unlinkSessionAction": "ลบการเชื่อมโยงเซสชัน",
       "unlinkConfirmTitle": "ยกเลิกการเชื่อมโยง {{title}} หรือไม่",
       "unlinkConfirmMessage": "เซสชันเองจะไม่ถูกลบ จะลบเฉพาะการเชื่อมโยงกับรายการสิ่งที่ต้องทำนี้เท่านั้น.",
       "startNewSession": "เริ่มเซสชันใหม่",
@@ -4051,6 +4316,70 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ไม่สามารถเปิดผลการค้นหานี้ได้"
+  },
+  "usage": {
+    "title": "การใช้งาน",
+    "orgTitle": "การใช้งานขององค์กร",
+    "entrySubtitle": "ค่าใช้จ่าย คำขอ และโทเคน",
+    "rangePicker": "ช่วงเวลา",
+    "range90d": "90 วัน",
+    "metricPicker": "ตัวชี้วัดของแผนภูมิ",
+    "chartA11y": "{{metric}} ต่อวัน",
+    "avgCostPerRequest": "ค่าใช้จ่ายเฉลี่ย/คำขอ",
+    "topModels": "โมเดลที่ใช้มากที่สุด",
+    "topFeatures": "ฟีเจอร์ที่ใช้มากที่สุด",
+    "emptyTitle": "ไม่มีการใช้งานในช่วงนี้",
+    "orgSelfNotice": "คุณกำลังดูการใช้งานของคุณเองในองค์กรนี้",
+    "viewDetails": "ดูรายละเอียดการใช้งาน"
+  },
+  "integrations": {
+    "title": "การเชื่อมต่อ",
+    "sectionTitle": "บริการที่เชื่อมต่อแล้ว",
+    "entrySubtitle": "GitHub, Slack, Linear และอื่นๆ",
+    "subtitle": "เชื่อมต่อเครื่องมือและเวิร์กโฟลว์การพัฒนาของคุณกับ Kilo",
+    "emptyHint": "ยังไม่มีการเชื่อมต่อ",
+    "disconnect": "ลบการเชื่อมต่อ",
+    "disconnectTitle": "ยกเลิกการเชื่อมต่อ {{provider}} ใช่ไหม",
+    "disconnectMessage": "Kilo จะหยุดตอบกลับใน {{provider}} คุณสามารถเชื่อมต่อใหม่ได้ทุกเมื่อ",
+    "connectedTo": "เชื่อมต่อกับ {{account}} แล้ว",
+    "disconnected": "ยกเลิกการเชื่อมต่อ {{provider}} แล้ว",
+    "disconnectFailed": "ไม่สามารถยกเลิกการเชื่อมต่อ {{provider}} ได้",
+    "couldNotLoad": "ไม่สามารถโหลดการเชื่อมต่อได้",
+    "permissionDenied": "คุณไม่มีสิทธิ์จัดการการเชื่อมต่อเหล่านี้",
+    "memberHint": "โปรดขอให้เจ้าของหรือผู้ดูแลองค์กรเปลี่ยนแปลงการเชื่อมต่อเหล่านี้",
+    "connectFailed": "ไม่สามารถเปิดหน้าการเชื่อมต่อได้"
+  },
+  "invoices": {
+    "personalEmptyDescription": "ใบแจ้งหนี้สำหรับการซื้อของคุณเองจะแสดงที่นี่เมื่อมีการเรียกเก็บเงิน"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "คอมพิวต์",
+      "noUsage": "ยังไม่มีการใช้งาน",
+      "sharedWorkspace": "ใช้ร่วมกันโดยทุกแชตในเวิร์กสเปซนี้",
+      "currentRates": "อัตราปัจจุบัน",
+      "perHour": "{{rate}}/ชม.",
+      "mediumSandbox": "แซนด์บ็อกซ์ขนาดกลาง",
+      "largeSandbox": "แซนด์บ็อกซ์ขนาดใหญ่",
+      "earlierActivity": "กิจกรรมก่อนหน้า",
+      "now": "ตอนนี้",
+      "loadFailed": "โหลดค่าใช้จ่ายคอมพิวต์ไม่ได้."
+    },
+    "preview": {
+      "title": "เปิดพรีวิว",
+      "listeningServices": "บริการที่กำลังรับฟัง",
+      "empty": "ไม่พบบริการที่กำลังรับฟัง ขอให้เอเจนต์เริ่มเว็บเซิร์ฟเวอร์แล้วรีเฟรช.",
+      "notRunning": "แซนด์บ็อกซ์นี้หยุดทำงานแล้ว ส่งข้อความถึงเอเจนต์เพื่อเริ่มใหม่อีกครั้ง.",
+      "notReady": "แซนด์บ็อกซ์ยังไม่พร้อม รีเฟรชเมื่อเชื่อมต่อแล้ว.",
+      "unsupported": "การค้นหาบริการไม่พร้อมใช้งานสำหรับแซนด์บ็อกซ์นี้.",
+      "failed": "ค้นหาบริการไม่ได้.",
+      "openService": "เปิด {{name}} บนพอร์ต {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "ทริกเกอร์และเว็บฮุก",
+      "subtitle": "จัดการเว็บฮุกและทริกเกอร์ตามกำหนดเวลาบนเว็บ."
+    }
   },
   "sessionShare": {
     "title": "แชร์เซสชัน",

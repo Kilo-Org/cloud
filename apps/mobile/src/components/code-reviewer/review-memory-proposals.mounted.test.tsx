@@ -67,6 +67,9 @@ vi.mock('@shopify/flash-list', () => ({
     ),
 }));
 vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
+vi.mock('@/components/code-reviewer/review-memory-analyze-section', () => ({
+  ReviewMemoryAnalyzeSection: 'ReviewMemoryAnalyzeSection',
+}));
 vi.mock('expo-router', () => ({
   usePreventRemove: (
     preventRemove: boolean,

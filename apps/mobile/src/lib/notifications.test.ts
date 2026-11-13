@@ -2562,6 +2562,7 @@ describe('foreground attention-push suppression', () => {
     sessionId: 'ses_1',
     title: 'Fix the bug',
     kind: 'permission',
+    raiseId: null,
     prUrl: null,
     organizationId: null,
     previews: 'generic',

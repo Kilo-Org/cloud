@@ -23,6 +23,10 @@
   },
   "common": {
     "deleteTitle": "ລຶບ {{label}}?",
+    "manageOnWeb": "ຈັດການໃນເວັບ",
+    "creditHistory": "ປະຫວັດເຄຣດິດ",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "ຍົກເລີກ",
@@ -119,6 +123,7 @@
     "copyLink": "ຄັດລອກລິ້ງ",
     "couldNotLoadOrganizations": "ບໍ່ສາມາດໂຫຼດລາຍຊື່ອົງກອນໄດ້.",
     "couldNotLoadSessions": "ບໍ່ສາມາດໂຫຼດເຊສຊັນໄດ້.",
+    "couldnTLoad": "ບໍ່ສາມາດໂຫຼດໄດ້.",
     "couldnTLoadMore": "ບໍ່ສາມາດໂຫຼດເພີ່ມເຕີມໄດ້.",
     "deviceSessions": "ເຊສຊັນຂອງອຸປະກອນ",
     "disabled": "ປິດໃຊ້ແລ້ວ",
@@ -246,6 +251,10 @@
     "notAdded": "ທ່ານເຂົ້າສູ່ລະບົບແລ້ວ. ບໍ່ໄດ້ເພີ່ມ {{provider}} ໃສ່ບັນຊີຂອງທ່ານ."
   },
   "profile": {
+    "creditHistorySubtitle": "ການຊື້, ໃບຮັບເງິນ ແລະ ການເຄື່ອນໄຫວເຄຣດິດ",
+    "invoicesSubtitle": "ດາວໂຫຼດໃບແຈ້ງໜີ້ສຳລັບການຊື້ຂອງທ່ານ",
+    "manageBilling": "ຈັດການການຮຽກເກັບເງິນໃນ kilo.ai",
+    "manageBillingIosNote": "ວິທີຊຳລະເງິນ, ການເຕີມເງິນອັດຕະໂນມັດ ແລະ ລາຍລະອຽດການຮຽກເກັບເງິນແມ່ນຈັດການໃນ kilo.ai.",
     "codeReviewerSubtitle": "ການກວດສອບ PR ອັດຕະໂນມັດ",
     "securityAgentSubtitle": "ຊອກຫາ ແລະ ແກ້ໄຂຈຸດອ່ອນດ້ານຄວາມປອດໄພ",
     "reviews": "ການກວດສອບ",
@@ -299,6 +308,7 @@
     "passkeyAdded": "ເພີ່ມກະແຈເຂົ້າແລ້ວ.",
     "passkeyAddFailed": "ບໍ່ສາມາດເພີ່ມກະແຈເຂົ້າໄດ້. ລອງອີກຄັ້ງ.",
     "passkeyAddUnsupported": "ອຸປະກອນນີ້ສ້າງກະແຈເຂົ້າບໍ່ໄດ້.",
+    "passkeyAddUnavailable": "ສາມາດເພີ່ມກະແຈເຂົ້າໄດ້ໃນບຣາວເຊີເວັບເທົ່ານັ້ນ.",
     "passkeyAddCancelled": "ການສ້າງກະແຈເຂົ້າຖືກຍົກເລິກ.",
     "passkeyRemoved": "ລຶບກະແຈເຂົ້າແລ້ວ.",
     "passkeyRemoveFailed": "ບໍ່ສາມາດລຶບກະແຈເຂົ້ານັ້ນໄດ້. ລອງອີກຄັ້ງ.",
@@ -318,7 +328,7 @@
     },
     "signInMethods": {
       "title": "ວິທີເຂົ້າສູ່ລະບົບ",
-      "unlink": "ຍົກເລີກການເຊື່ອມໂຍງ",
+      "unlink": "ເອົາອອກການເຊື່ອມໂຍງ",
       "unlinkProvider": "ຍົກເລີກການເຊື່ອມໂຍງ {{provider}}",
       "unlinkTitle": "ຍົກເລີກການເຊື່ອມໂຍງ {{provider}} ບໍ?",
       "unlinkMessage": "ທ່ານຈະບໍ່ສາມາດເຂົ້າສູ່ລະບົບດ້ວຍ {{provider}} ໄດ້ອີກ. ວິທີອື່ນຂອງທ່ານຈະຍັງຄືເດີມ.",
@@ -331,7 +341,6 @@
     "providerKeys": {
       "title": "ຄີຂອງຜູ້ໃຫ້ບໍລິການ",
       "rowSubtitle": "ໃຊ້ການຮຽກເກັບເງິນຂອງຜູ້ໃຫ້ບໍລິການຂອງທ່ານເອງ",
-      "manageOnWeb": "ຈັດການໃນເວັບ",
       "manageOnWebReason": "ຜູ້ໃຫ້ບໍລິການເຫຼົ່ານີ້ຕ້ອງການຂໍ້ມູນຮັບຮອງແບບມີໂຄງສ້າງ",
       "description": "ຄຳຂໍທີ່ສົ່ງຜ່ານຄີເຫຼົ່ານີ້ຈະຖືກຮຽກເກັບເງິນຈາກບັນຊີຜູ້ໃຫ້ບໍລິການຂອງທ່ານ ແທນຍອດເງິນ Kilo ຂອງທ່ານ.",
       "enabled": "ກຳລັງໃຊ້ງານ",
@@ -1245,7 +1254,17 @@
       "changeRequestMissingPermissions": "GitHub App ຂອງ Kilo ບໍ່ສາມາດເປີດ PR ໃນ repository ນີ້ໄດ້. ເຈົ້າຂອງ repository ຕ້ອງໃຫ້ສິດຂຽນແກ່ແອັບສຳລັບເນື້ອຫາ ແລະ PR, ແລ້ວລອງອີກຄັ້ງ.",
       "changeRequestFailed": "Kilo ບໍ່ສາມາດເປີດ PR ໄດ້. ລອງອີກຄັ້ງໃນອີກຈັກຄູ່.",
       "proposalConflict": "ຂໍ້ສະເໜີຄວາມຈຳການກວດສອບອີກອັນໜຶ່ງສຳລັບ repository ນີ້ຍັງເຄື່ອນໄຫວຢູ່ ດັ່ງນັ້ນຈຶ່ງຍັງບໍ່ສາມາດບັນທຶກອັນນີ້ໄດ້.",
-      "offAction": "ຄວາມຈຳການກວດສອບປິດຢູ່. ເປີດໃຊ້ມັນ, ແລ້ວລອງອີກຄັ້ງ."
+      "offAction": "ຄວາມຈຳການກວດສອບປິດຢູ່. ເປີດໃຊ້ມັນ, ແລ້ວລອງອີກຄັ້ງ.",
+      "analyze": {
+        "title": "ວິເຄາະຄວາມຄິດເຫັນ",
+        "description": "ເລືອກຄັງໂຄ້ດທີ່ມີການຕອບກັບຫຼ້າສຸດຈາກຜູ້ດູແລ, ແລ້ວຊອກຫາຮູບແບບຄຳແນະນຳໜຶ່ງທີ່ເກີດຂຶ້ນຊ້ຳໆ.",
+        "chooseRepository": "ເລືອກຄັງໂຄ້ດ",
+        "action": "ວິເຄາະຕອນນີ້",
+        "noRepositories": "ຍັງບໍ່ມີຄັງໂຄ້ດໃດທີ່ມີການຕອບກັບຫຼ້າສຸດຈາກຜູ້ດູແລ.",
+        "proposed": "ສ້າງຂໍ້ສະເໜີຄວາມຈຳສຳລັບການກວດສອບແລ້ວ",
+        "noFeedback": "ບໍ່ພົບຄວາມຄິດເຫັນຫຼ້າສຸດສຳລັບຄັງໂຄ້ດນີ້",
+        "noPattern": "ບໍ່ພົບຮູບແບບທີ່ເກີດຊ້ຳຢ່າງຊັດເຈນ"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "ໃສ່ URL ຂອງ merge request ທີ່ຖືກຕ້ອງ.",
@@ -1377,7 +1396,63 @@
       "title": "ຜູ້ກວດສອບໂຄ້ດມີບັນຫາທີ່ຕ້ອງແກ້ໄຂ.",
       "recoveryLabel": "ຕິດຕໍ່ຝ່າຍສະໜັບສະໜູນ"
     },
-    "unknownError": "ຂໍ້ຜິດພາດທີ່ບໍ່ຊາບສາເຫດ"
+    "unknownError": "ຂໍ້ຜິດພາດທີ່ບໍ່ຊາບສາເຫດ",
+    "skipBotPullRequests": {
+      "title": "ຂ້າມຄຳຂໍລວມໂຄ້ດຈາກບອດ",
+      "subtitle": "ບໍ່ຕ້ອງດຳເນີນການກວດສອບອັດຕະໂນມັດໃສ່ຄຳຂໍລວມໂຄ້ດທີ່ບອດເປີດ ເຊັ່ນ Dependabot ຫຼື Renovate. ປິດຕົວເລືອກນີ້ ເພື່ອກວດສອບຄຳຂໍລວມໂຄ້ດຈາກບອດນຳ."
+    },
+    "repoModels": {
+      "title": "ໂມເດລຕາມຄັງໂຄ້ດ",
+      "description": "ດຳເນີນການກວດສອບບາງຄັງໂຄ້ດດ້ວຍໂມເດລ, ລະດັບການຄິດ ຫຼື ທັງສອງທີ່ແຕກຕ່າງ.",
+      "defaultModel": "ໃຊ້ໂມເດລເລີ່ມຕົ້ນ",
+      "resetLabel": "ຕັ້ງໂມເດລຄືນໃໝ່ສຳລັບ {{repository}}",
+      "changeHint": "ເປີດຕົວເລືອກໂມເດລ"
+    },
+    "analytics": {
+      "title": "ການວິເຄາະ",
+      "trackedReviews": "ການກວດສອບທີ່ຕິດຕາມ",
+      "findingsRaised": "ບັນຫາທີ່ກວດພົບ",
+      "highImpactChanges": "ການປ່ຽນແປງທີ່ມີຜົນກະທົບສູງ",
+      "impactPoints": "ຄະແນນຜົນກະທົບ",
+      "repositoryLine": "ການກວດສອບ: {{reviews}} · ບັນຫາທີ່ກວດພົບ: {{findings}}",
+      "empty": "ຍັງບໍ່ມີການກວດສອບທີ່ມີຂໍ້ມູນວິເຄາະ",
+      "emptyDescription": "ການວິເຄາະບັນທຶກການກວດສອບທີ່ສຳເລັດ ໃນຂະນະທີ່ເປີດໃຊ້ສຳລັບອົງກອນ.",
+      "off": "ການວິເຄາະຖືກປິດສຳລັບອົງກອນນີ້.",
+      "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການວິເຄາະໄດ້"
+    },
+    "council": {
+      "title": "ການກວດສອບໂດຍຄະນະ",
+      "subtitle": "ຜູ້ຊ່ຽວຊານຫຼາຍຄົນກວດສອບແຕ່ລະຄຳຂໍລວມໂຄ້ດ ແລະ ຄະແນນສຽງຂອງພວກເຂົາລວມເປັນການຕັດສິນດຽວ.",
+      "unavailable": "ການກວດສອບໂດຍຄະນະບໍ່ມີສຳລັບອົງກອນນີ້.",
+      "noRepositories": "ຍັງບໍ່ໄດ້ເລືອກຄັງໂຄ້ດໃດ. ເລືອກຄັງໂຄ້ດໃນການຕັ້ງຄ່າຄັງໂຄ້ດກ່ອນ.",
+      "specialists": "ຜູ້ຊ່ຽວຊານ",
+      "labels": "ປ້າຍທີ່ເຮັດໃຫ້ເກີດການກວດສອບໂດຍຄະນະ",
+      "labelsPlaceholder": "ເຊັ່ນ ຄະນະ, ການກວດສອບເລິກ",
+      "labelsDescription": "ແຍກປ້າຍດ້ວຍເຄື່ອງໝາຍຈຸດ. ຄັງໂຄ້ດທີ່ເປີດໃຊ້ຄະນະຈະດຳເນີນການຄະນະສະເພາະຄຳຂໍລວມໂຄ້ດທີ່ມີປ້າຍເຫຼົ່ານີ້ຢ່າງໜ້ອຍໜຶ່ງ. ປະໄວ້ຫວ່າງເພື່ອໃຊ້ກັບທຸກຄຳຂໍລວມໂຄ້ດທີ່ມີສິດ.",
+      "tooManyLabels": "ມີປ້າຍສຳລັບການກວດສອບໂດຍຄະນະຫຼາຍເກີນໄປ. ໃຊ້ໄດ້ບໍ່ເກີນ {{maximum}} ປ້າຍ.",
+      "labelTooLong": "ປ້າຍສຳລັບການກວດສອບໂດຍຄະນະຍາວເກີນໄປ. ແຕ່ລະປ້າຍຕ້ອງມີຄວາມຍາວບໍ່ເກີນ {{maximum}} ຕົວອັກສອນ.",
+      "minSpecialists": "ເລືອກຜູ້ຊ່ຽວຊານຢ່າງໜ້ອຍ {{minimum}} ຄົນ. ເລືອກແລ້ວ {{selected}} ຄົນ.",
+      "specialistName": {
+        "testCoverage": "ຄວາມຄຸ້ມຄອງການທົດສອບ",
+        "correctness": "ຄວາມຖືກຕ້ອງ",
+        "custom": "ຜູ້ຊ່ຽວຊານ"
+      },
+      "specialist": {
+        "security": "ການຂ້າມສິດອະນຸຍາດ, ການຈັດການຄວາມລັບ ແລະ ຂໍ້ມູນປ້ອນທີ່ບໍ່ປອດໄພ.",
+        "performance": "ເສັ້ນທາງທີ່ຖືກເອີ້ນເລື້ອຍໆ, ຄຳຖາມ N+1 ແລະ ການຈັດສັນຫນ່ວຍຄວາມຈຳຫຼາຍເກີນ.",
+        "testing": "ການຂາດ ຫຼື ຄວາມຄຸ້ມຄອງທີ່ອ່ອນແອສຳລັບພຶດຕິກຳໃໝ່.",
+        "correctness": "ຄວາມຜິດພາດທາງຕັກກະສາດ, ກໍລະນີຂອບເຂດ ແລະ ສະພາບການແຂ່ງຂັນ.",
+        "custom": "ກວດສອບບັນຫາໃນຂົງເຂດຂອງຕົນເອງ."
+      },
+      "strategy": {
+        "advisory": "ຄຳແນະນຳ",
+        "advisoryDescription": "ລາຍງານບັນຫາທີ່ກວດພົບ ແລະ ລົງຄະແນນສຽງໂດຍບໍ່ສະກັດກັ້ນການລວມໂຄ້ດ.",
+        "unanimous": "ເອກະສຽງ",
+        "unanimousDescription": "ສະກັດກັ້ນການລວມໂຄ້ດ ເມື່ອຜູ້ຊ່ຽວຊານຄົນໃດຄົນໜຶ່ງລາຍງານບັນຫາຮ້າຍແຮງ.",
+        "majority": "ສ່ວນຫຼາຍ",
+        "majorityDescription": "ສະກັດກັ້ນການລວມໂຄ້ດສະເພາະເມື່ອຜູ້ຊ່ຽວຊານສ່ວນຫຼາຍລາຍງານບັນຫາຮ້າຍແຮງ."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1880,6 +1955,16 @@
       "auto": "ອັດຕະໂນມັດ",
       "shallow": "ເບື້ອງຕົ້ນ",
       "deep": "ເຊິງເລິກ"
+    },
+    "orphanedFindings": {
+      "title": "ບັນຫາທີ່ກວດພົບສຳລັບຄັງໂຄ້ດທີ່ຖືກລຶບ",
+      "description": "ຄັງໂຄ້ດເຫຼົ່ານີ້ບໍ່ສາມາດເຂົ້າເຖິງໄດ້ຜ່ານການເຊື່ອມຕໍ່ GitHub ອີກ. ບັນຫາທີ່ກວດພົບຍັງຖືກນັບໃນແດຊະບອດ ແລະ ລາຍງານ.",
+      "count": "ບັນຫາທີ່ກວດພົບ: {{count}}",
+      "clearLabel": "ລ້າງບັນຫາທີ່ກວດພົບສຳລັບ {{repository}}",
+      "confirmTitle": "ລ້າງບັນຫາທີ່ກວດພົບ?",
+      "confirmMessage": "ບັນຫາທີ່ກວດພົບທຸກລາຍການທີ່ບັນທຶກໄວ້ສຳລັບ {{repository}} ຈະຖືກລຶບ. ບໍ່ສາມາດຍົກເລີກການນີ້ໄດ້.",
+      "confirmAction": "ລຶບບັນຫາທີ່ກວດພົບ",
+      "cleared": "ລ້າງບັນຫາທີ່ກວດພົບແລ້ວ: {{count}}"
     }
   },
   "agents": {
@@ -2059,6 +2144,7 @@
       "branchPlaceholder": "ເລືອກສາຂາໂຄ້ດໜຶ່ງ",
       "runOnWithTarget": "ເຮັດວຽກເທິງ: {{target}}",
       "environment": "ສະພາບແວດລ້ອມ",
+      "cloudEnvironment": "ສະພາບແວດລ້ອມຄລາວ",
       "couldNotLoadEnvironment": "ບໍ່ສາມາດໂຫຼດສະພາບແວດລ້ອມຂອງເຈົ້າໄດ້.",
       "retryLoadingEnvironment": "ລອງໂຫຼດສະພາບແວດລ້ອມໃໝ່",
       "defaultEnvironment": "ສະພາບແວດລ້ອມມາດຕະຖານ",
@@ -2119,6 +2205,89 @@
       "openSettingsToReview": "ເປີດການຕັ້ງຄ່າເພື່ອກວດສອບ",
       "profileSelection": "ການເລືອກໂປຣໄຟລ໌",
       "profileLayerAccessibility": "{{label}}: {{detail}}"
+    },
+    "environment": {
+      "loadingEnvironments": "ກຳລັງໂຫຼດສະພາບແວດລ້ອມ",
+      "couldNotLoadEnvironments": "ບໍ່ສາມາດໂຫຼດສະພາບແວດລ້ອມໄດ້",
+      "couldNotLoadEnvironmentsDetail": "ລອງໃໝ່ເພື່ອໂຫຼດສະພາບແວດລ້ອມສຳລັບ repository ນີ້.",
+      "noEnvironment": "ບໍ່ມີສະພາບແວດລ້ອມ",
+      "noEnvironmentDetail": "ເຊດຊັນນີ້ເລີ່ມຕົ້ນຈາກອິມເມຈພື້ນຖານ.",
+      "chooseEnvironment": "ເລືອກສະພາບແວດລ້ອມ",
+      "chooseEnvironmentDetail": "repository ນີ້ມີສະພາບແວດລ້ອມຫຼາຍກວ່າໜຶ່ງອັນ.",
+      "environmentAccessibility": "ເລືອກສະພາບແວດລ້ອມ: {{label}}",
+      "environmentsForRepository": "ສະພາບແວດລ້ອມສຳລັບ {{repository}}",
+      "selectEnvironmentToStart": "ເລືອກສະພາບແວດລ້ອມເພື່ອເລີ່ມຕົ້ນ.",
+      "buildDetails": "ລາຍລະອຽດການສ້າງ",
+      "buildNotBuilt": "ຍັງບໍ່ໄດ້ສ້າງ",
+      "buildUnavailableShort": "ການສ້າງ snapshot ບໍ່ພ້ອມໃຊ້ງານ",
+      "buildPreparing": "ກຳລັງກະກຽມ builder",
+      "buildCloning": "ກຳລັງໂຄລນ branch ເລີ່ມຕົ້ນ",
+      "buildSetup": "ກຳລັງດຳເນີນການຕັ້ງຄ່າສະພາບແວດລ້ອມ",
+      "buildCleanup": "ກຳລັງລຶບຂໍ້ມູນປະຈຳຕົວສຳລັບການສ້າງ",
+      "buildCapturing": "ກຳລັງບັນທຶກ snapshot",
+      "buildPublishing": "ກຳລັງເຜີຍແຜ່ snapshot",
+      "buildStopping": "ກຳລັງຢຸດ builder",
+      "buildStoppingRetrying": "ກຳລັງຢຸດ builder, ກຳລັງລອງໃໝ່",
+      "buildFinishing": "ກຳລັງສ້າງໃຫ້ສຳເລັດ",
+      "buildSucceeded": "Snapshot ພ້ອມແລ້ວ",
+      "buildSuperseded": "ຖືກແທນທີ່ດ້ວຍການສ້າງທີ່ໃໝ່ກວ່າ",
+      "buildStale": "ການຕັ້ງຄ່າມີການປ່ຽນແປງຕັ້ງແຕ່ snapshot ນີ້",
+      "buildStaleAge": "Snapshot ນີ້ເກົ່າກວ່າສີ່ມື້; ເຊດຊັນຖັດໄປຈະອັບເດດມັນໃໝ່",
+      "buildStaleImage": "ສ້າງສຳລັບອິມເມຈ sandbox ລຸ້ນກ່ອນໜ້າ",
+      "failureClone": "ບໍ່ສາມາດໂຄລນ repository ໄດ້.",
+      "failureSetup": "ຄຳສັ່ງຕັ້ງຄ່າລົ້ມເຫຼວ. ເບິ່ງບັນທຶກການສ້າງ.",
+      "failureTimeout": "ຄຳສັ່ງຕັ້ງຄ່າໝົດເວລາ. ເບິ່ງບັນທຶກການສ້າງ.",
+      "failureCleanup": "ບໍ່ສາມາດລຶບຂໍ້ມູນປະຈຳຕົວໄດ້, ດັ່ງນັ້ນຈຶ່ງບໍ່ໄດ້ບັນທຶກ snapshot.",
+      "failureCapture": "ບໍ່ສາມາດບັນທຶກ snapshot ໄດ້.",
+      "failureCaptureUncertain": "ຜົນລັບຂອງ snapshot ສູນຫາຍ; ການສ້າງບໍ່ໄດ້ຖືກເຜີຍແຜ່.",
+      "failureDeadline": "ການສ້າງບໍ່ສຳເລັດທັນເວລາ.",
+      "failureBuilderLost": "builder ຢຸດການລາຍງານແລ້ວ.",
+      "failureBuilderStart": "builder ບໍ່ສາມາດເລີ່ມໄດ້.",
+      "failureUnauthorized": "ການເຂົ້າເຖິງ repository ບໍ່ໄດ້ຮັບອະນຸຍາດອີກຕໍ່ໄປ.",
+      "failureActorUnauthorized": "ຜູ້ທີ່ເລີ່ມການສ້າງບໍ່ມີສິດເຂົ້າເຖິງອີກຕໍ່ໄປ.",
+      "failureBilling": "ການສ້າງຕ້ອງມີເຄຣດິດທີ່ພ້ອມໃຊ້.",
+      "failureBillingUnavailable": "ລະບົບການເກັບເງິນບໍ່ສາມາດອະນຸມັດການສ້າງໄດ້. ລອງໃໝ່ອີກຄັ້ງ.",
+      "failureConfiguration": "ການກຳນົດຄ່າມີການປ່ຽນແປງລະຫວ່າງການສ້າງ.",
+      "failureRuntime": "ບໍ່ສາມາດຕິດຕັ້ງລຸ້ນ runtime ທີ່ເລືອກໄດ້.",
+      "failureGeneric": "ການສ້າງລົ້ມເຫຼວ.",
+      "buildLogs": "ບັນທຶກການສ້າງ",
+      "noBuildLogs": "ຍັງບໍ່ມີຂໍ້ມູນບັນທຶກເທື່ອ.",
+      "buildLogsLatestOnly": "ກຳລັງສະແດງ 500 ແຖວບັນທຶກລ່າສຸດທີ່ເກັບໄວ້.",
+      "buildLogsTruncated": "ຜົນລັບທີ່ຕາມມາຖືກຕັດອອກແລ້ວ.",
+      "couldNotLoadBuild": "ບໍ່ສາມາດໂຫຼດສະຖານະການສ້າງໄດ້",
+      "couldNotLoadBuildLogs": "ບໍ່ສາມາດໂຫຼດບັນທຶກການສ້າງໄດ້",
+      "buildsUnavailable": "ການສ້າງ snapshot ບໍ່ພ້ອມໃຊ້ງານສຳລັບສະພາບແວດລ້ອມນີ້.",
+      "onlyManagersCanBuild": "ມີແຕ່ຜູ້ຈັດການອົງກອນເທົ່ານັ້ນທີ່ສາມາດສ້າງ snapshot ໄດ້.",
+      "waitForBuilder": "ລໍຖ້າໃຫ້ builder ຢຸດກ່ອນ ແລ້ວຈຶ່ງສ້າງອີກຄັ້ງ.",
+      "buildAction": "ສ້າງ snapshot",
+      "refreshAction": "ອັບເດດ snapshot",
+      "cancelBuildAction": "ຍົກເລີກການສ້າງ",
+      "buildStarted": "ເລີ່ມການສ້າງ snapshot ແລ້ວ",
+      "buildCanceled": "ຍົກເລີກການສ້າງ snapshot ແລ້ວ",
+      "couldNotStartBuild": "ບໍ່ສາມາດເລີ່ມການສ້າງໄດ້",
+      "couldNotCancelBuild": "ບໍ່ສາມາດຍົກເລີກການສ້າງໄດ້",
+      "sandbox": "Sandbox",
+      "sandboxActive": "Sandbox ກຳລັງເຮັດວຽກ",
+      "sandboxSleeping": "Sandbox ຢູ່ໃນໂໝດພັກ",
+      "sandboxStarting": "Sandbox ກຳລັງເລີ່ມຕົ້ນ",
+      "sandboxStopping": "Sandbox ກຳລັງຢຸດ",
+      "sandboxError": "Sandbox ມີຂໍ້ຜິດພາດ",
+      "sandboxUnreachable": "ບໍ່ສາມາດເຊື່ອມຕໍ່ Sandbox ໄດ້",
+      "sandboxStatusUnknown": "ບໍ່ຊາບສະຖານະ Sandbox",
+      "sandboxChecked": "ກວດສອບແລ້ວ {{when}}",
+      "sandboxDetailStopped": "ສົ່ງຂໍ້ຄວາມເພື່ອສືບຕໍ່ການເຮັດວຽກ.",
+      "sandboxDetailFailed": "ສົ່ງຂໍ້ຄວາມເພື່ອລອງໃໝ່.",
+      "sandboxDetailConnection": "ການເຊື່ອມຕໍ່ sandbox ບໍ່ພ້ອມໃຊ້ງານ.",
+      "sandboxDetailUnavailable": "ສະຖານະ sandbox ບໍ່ພ້ອມໃຊ້ງານຊົ່ວຄາວ.",
+      "sandboxDetailInsufficient": "ບໍ່ມີຂໍ້ມູນພຽງພໍເພື່ອຢືນຢັນສະຖານະປັດຈຸບັນຂອງ sandbox.",
+      "sandboxDetailCheckNeeded": "ບໍ່ດົນມານີ້ sandbox ບໍ່ໄດ້ຢືນຢັນວ່າເຮັດວຽກປົກກະຕິ.",
+      "startFresh": "ເລີ່ມໃໝ່",
+      "startFreshTitle": "ເລີ່ມໃໝ່ບໍ?",
+      "startFreshMessage": "ການດຳເນີນການນີ້ຈະລຶບ snapshot ຂອງພື້ນທີ່ເຮັດວຽກທີ່ບັນທຶກໄວ້ {{when}}. ການປ່ຽນແປງທີ່ຍັງບໍ່ໄດ້ commit ຈາກພື້ນທີ່ເຮັດວຽກນັ້ນຈະສູນຫາຍ.",
+      "startFreshMessageUnknown": "ການດຳເນີນການນີ້ຈະລຶບ snapshot ຂອງພື້ນທີ່ເຮັດວຽກທີ່ບັນທຶກໄວ້ ເຊິ່ງບໍ່ສາມາດອ່ານໄດ້. ການປ່ຽນແປງທີ່ຍັງບໍ່ໄດ້ commit ຈາກພື້ນທີ່ເຮັດວຽກນັ້ນຈະສູນຫາຍ.",
+      "startFreshDone": "ລຶບ snapshot ຂອງພື້ນທີ່ເຮັດວຽກແລ້ວ.",
+      "couldNotRemoveSnapshot": "ບໍ່ສາມາດລຶບ snapshot ຂອງພື້ນທີ່ເຮັດວຽກໄດ້.",
+      "snapshotCaptured": "ບັນທຶກ snapshot ຂອງພື້ນທີ່ເຮັດວຽກແລ້ວ {{when}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "ອັບເດດໄຟລ໌ແລ້ວ {{displayCount}} ໄຟລ໌.",
@@ -2468,7 +2637,8 @@
       "cancelQueued": "ຍົກເລີກຂໍ້ຄວາມ",
       "cancelQueuedAccessibility": "ຍົກເລີກຂໍ້ຄວາມທີ່ລໍຖ້າສົ່ງ",
       "restoreQueued": "ກູ້ຄືນ",
-      "restoreQueuedAccessibility": "ນຳຂໍ້ຄວາມທີ່ຍົກເລີກກັບຄືນສູ່ຊ່ອງປ້ອນຂໍ້ຄວາມ"
+      "restoreQueuedAccessibility": "ນຳຂໍ້ຄວາມທີ່ຍົກເລີກກັບຄືນສູ່ຊ່ອງປ້ອນຂໍ້ຄວາມ",
+      "noReplyRecorded": "ບໍ່ມີການບັນທຶກຄຳຕອບສຳລັບຂໍ້ຄວາມນີ້."
     },
     "olderMessages": {
       "arrived": "ໂຫຼດຂໍ້ຄວາມກ່ອນໜ້າແລ້ວ",
@@ -2861,6 +3031,26 @@
     "onlyFirstFilesAttached_other": "ຈະແນບສະເພາະໄຟລ໌ {{displayCount}} ໄຟລ໌ທຳອິດເທົ່ານັ້ນ."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "ປະຫວັດການຮຽກເກັບເງິນ",
+      "billingHistoryEmpty": "ຍັງບໍ່ມີປະຫວັດການຮຽກເກັບເງິນ.",
+      "cancel": "ຍົກເລີກການສະໝັກສະມາຊິກ",
+      "cancelDescription": "Kilo Pass ຂອງທ່ານຈະຍັງໃຊ້ງານໄດ້ຈົນຮອດທ້າຍຮອບການຮຽກເກັບເງິນ ແລະ ຈະບໍ່ຕໍ່ອາຍຸ.",
+      "cancelScheduled": "ຈະຍົກເລີກໃນວັນທີ {{date}}",
+      "cancelScheduledChange": "ຍົກເລີກການປ່ຽນແປງທີ່ກຳນົດໄວ້",
+      "cancelled": "ຍົກເລີກການສະໝັກສະມາຊິກແລ້ວ",
+      "changePlan": "ປ່ຽນແຜນໃນ kilo.ai",
+      "changePlanIosNote": "ການປ່ຽນແຜນແບບເສຍເງິນສາມາດເຮັດໄດ້ໃນ kilo.ai.",
+      "creditHistoryEmpty": "ຍັງບໍ່ມີເຄຣດິດ Kilo Pass.",
+      "manageInStore": "ຈັດການໃນ {{store}}",
+      "resume": "ສືບຕໍ່ການສະໝັກສະມາຊິກ",
+      "resumeCancelledDescription": "Kilo Pass ຂອງທ່ານຈະເລີ່ມຕໍ່ອາຍຸອັດຕະໂນມັດອີກຄັ້ງ.",
+      "resumePausedDescription": "Kilo Pass ຂອງທ່ານຈະສືບຕໍ່ດຽວນີ້ ກ່ອນວັນທີສືບຕໍ່ທີ່ກຳນົດໄວ້.",
+      "resumed": "ສືບຕໍ່ການສະໝັກສະມາຊິກແລ້ວ",
+      "scheduledChange": "ການປ່ຽນແປງທີ່ກຳນົດໄວ້",
+      "scheduledChangeCancelDescription": "Kilo Pass ຂອງທ່ານຈະຢູ່ໃນແຜນປັດຈຸບັນ ແລະ ຕໍ່ອາຍຸຄືເກົ່າ.",
+      "scheduledChangeSummary": "{{plan}} ໃນວັນທີ {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "ບໍ່ສາມາດໃຊ້ Kilo Pass ໄດ້.",
     "couldNotLoad": "ບໍ່ສາມາດໂຫຼດ Kilo Pass ໄດ້. ລອງອີກຄັ້ງ.",
@@ -2870,7 +3060,7 @@
     "subscriptionLoading": "ກຳລັງໂຫຼດຂໍ້ມູນການສະໝັກ Kilo Pass",
     "retryHint": "ລອງໂຫຼດສະຖານະ Kilo Pass ອີກຄັ້ງ.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailableEnded": "Kilo Pass ຂອງທ່ານໄດ້ສິ້ນສຸດແລ້ວ.",
+    "endedOn": "ສິ້ນສຸດວັນທີ {{date}}",
     "notAvailableInApp": "ບໍ່ສາມາດໃຊ້ Kilo Pass ໃນແອັບໄດ້.",
     "statusActive": "ເປີດໃຊ້ງານ",
     "statusTrialing": "ກຳລັງທົດລອງ",
@@ -2892,7 +3082,7 @@
     "kiloPassManagement": "ການຈັດການ Kilo Pass",
     "kiloPassSetup": "ການຕັ້ງຄ່າ Kilo Pass",
     "opensManagementOnWeb": "ເປີດໜ້າຈັດການ Kilo Pass ໃນເວັບ.",
-    "tryAgainFromProfile": "ລອງອີກຄັ້ງຈາກໜ້າໂປຣໄຟລ໌.",
+    "loadFailedRetry": "ກວດເບິ່ງການເຊື່ອມຕໍ່ຂອງທ່ານ, ແລ້ວລອງໃໝ່.",
     "legalTermsOfUse": "ຂໍ້ກຳນົດການນຳໃຊ້ (EULA)",
     "purchaseDifferentAccount": "ການຊື້ App Store ນີ້ບໍ່ໄດ້ເຊື່ອມໂຍງກັບບັນຊີ Kilo ຂອງທ່ານ. ເຂົ້າສູ່ລະບົບ Apple Account ທີ່ໃຊ້ສຳລັບການຊື້, ແລ້ວລອງອີກຄັ້ງ.",
     "purchaseFailed": "ບໍ່ສາມາດດຳເນີນການຊື້ໃຫ້ສຳເລັດໄດ້.",
@@ -2915,6 +3105,11 @@
     "accountDescription": "ລະຫັດບັນຊີ Kilo ແລະ ຂໍ້ມູນປະກອບຄຳຂໍຂອງທ່ານ ໃຊ້ເພື່ອຢັ້ງຢືນຕົວຕົນ ແລະ ວັດແທກປະລິມານການໃຊ້ງານ.",
     "diagnosticsTitle": "ຂໍ້ມູນກວດສອບບັນຫາແອັບ",
     "diagnosticsDescription": "ລາຍງານແອັບຂັດຂ້ອງ ແລະ ຂໍ້ຜິດພາດທີ່ລຶບເນື້ອຫາໃນແອັບອອກແລ້ວ ໃຊ້ເພື່ອໃຫ້ແອັບເຮັດວຽກໄດ້ຢ່າງສະຖຽນ.",
+    "featureFlagsTitle": "ການເປີດໃຊ້ຟີເຈີ",
+    "featureFlagsDescription": "ອີເມວບັນຊີຂອງທ່ານ ທີ່ PostHog ໃຊ້ເພື່ອກຳນົດວ່າທ່ານຈະເຫັນຟີເຈີໃດແດ່.",
+    "featureFlagsWhat": "ອີເມວບັນຊີຂອງທ່ານ.",
+    "featureFlagsWhy": "ເພື່ອກຳນົດວ່າທ່ານຈະເຫັນຟີເຈີໃດແດ່, ລວມທັງຟີເຈີທີ່ພວກເຮົາຍັງທະຍອຍເປີດໃຊ້ຢູ່.",
+    "featureFlagsWho": "PostHog, ບໍລິການເປີດປິດຟີເຈີ.",
     "helpImprove": "ຊ່ວຍປັບປຸງ Kilo",
     "helpImproveDescription": "ແບ່ງປັນຂໍ້ມູນວິເຄາະການໃຊ້ແອັບແບບບໍ່ລະບຸຕົວຕົນ ແລະ ແຫຼ່ງທີ່ມາຂອງການຕິດຕັ້ງ. ທ່ານປ່ຽນຕົວເລືອກນີ້ໄດ້ທຸກເວລາໃນການຕັ້ງຄ່າ.",
     "seeFullDetails": "ເບິ່ງລາຍລະອຽດທັງໝົດ",
@@ -2996,6 +3191,36 @@
     "sendFeedback": "ສົ່ງຄຳຕິຊົມ"
   },
   "organization": {
+    "auditLog": {
+      "title": "ບັນທຶກການກວດສອບ",
+      "permissionDenied": "ມີແຕ່ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການເອີ້ນເກັບເງິນໃນແຜນ Enterprise ເທົ່ານັ້ນທີ່ສາມາດອ່ານບັນທຶກການກວດສອບຂອງອົງກອນໄດ້.",
+      "emptyTitle": "ບໍ່ມີເຫດການກວດສອບ",
+      "emptyDescription": "ການດຳເນີນການທີ່ເກີດຂຶ້ນໃນອົງກອນນີ້ຈະສະແດງຢູ່ບ່ອນນີ້.",
+      "truncated": "ກຳລັງສະແດງເຫດການຫຼ້າສຸດ."
+    },
+    "billing": {
+      "title": "ການຮຽກເກັບເງິນ",
+      "permissionDenied": "ມີແຕ່ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເທົ່ານັ້ນທີ່ສາມາດເບິ່ງຂໍ້ມູນການຮຽກເກັບເງິນຂອງອົງກອນໄດ້.",
+      "subscription": "ການສະໝັກສະມາຊິກ",
+      "state": "ສະຖານະ",
+      "stateNone": "ບໍ່ມີການສະໝັກສະມາຊິກ",
+      "statePastDue": "ເກີນກຳນົດຊຳລະ",
+      "stateCancelsAtPeriodEnd": "ຍົກເລີກເມື່ອສິ້ນສຸດຮອບປັດຈຸບັນ",
+      "stateTrialEndsOn": "ການທົດລອງໃຊ້ສິ້ນສຸດໃນວັນທີ {{date}}",
+      "stateTrialing": "ທົດລອງໃຊ້",
+      "stateRenewsOn": "ຕໍ່ອາຍຸໃນວັນທີ {{date}}",
+      "seatsDropTo": "ຫຼຸດລົງເປັນ {{seats}} ສິດຜູ້ໃຊ້ໃນວັນທີ {{date}}",
+      "seats": "ສິດຜູ້ໃຊ້",
+      "autoTopUp": "ເຕີມເງິນອັດຕະໂນມັດ",
+      "autoTopUpAmount": "ຈຳນວນເງິນທີ່ເຕີມ",
+      "autoTopUpThreshold": "ເມື່ອຍອດເງິນຕ່ຳກວ່າ",
+      "manageOnWeb": "ການປ່ຽນແປງຕ້ອງເຮັດຢູ່ໃນເວັບ",
+      "changePlan": "ປ່ຽນແຜນ",
+      "buySeats": "ຊື້ສິດຜູ້ໃຊ້",
+      "setupAutoTopUp": "ຕັ້ງຄ່າການເຕີມເງິນອັດຕະໂນມັດ",
+      "webAddress": "ທີ່ຢູ່ເວັບ {{url}}",
+      "opensOnWeb": "ເປີດໃນເວັບ"
+    },
     "boundary": {
       "backToProfile": "ກັບໄປທີ່ໂປຣໄຟລ໌",
       "loadErrorMessage": "ກວດສອບການເຊື່ອມຕໍ່ ແລ້ວລອງໃໝ່.",
@@ -3003,14 +3228,20 @@
       "loadErrorTitle": "ບໍ່ສາມາດໂຫຼດລາຍຊື່ອົງກອນຂອງທ່ານໄດ້.",
       "membershipLostNotice": "ທ່ານບໍ່ມີສິດເຂົ້າເຖິງອົງກອນນີ້ອີກແລ້ວ. ປ່ຽນໄປ {{target}} ແລ້ວ.",
       "noOrganization": "ບໍ່ມີອົງກອນ",
-      "noOrganizationDescription": "ບັນຊີນີ້ບໍ່ແມ່ນສ່ວນໜຶ່ງຂອງອົງກອນ. ສ້າງ ຫຼື ເຂົ້າຮ່ວມອົງກອນໃນເວັບ ເພື່ອໃຊ້ຄຸນສົມບັດຂອງອົງກອນ ເຊັ່ນ ການເຊີນສະມາຊິກ ແລະ ການແຈ້ງເຕືອນຍອດເງິນຕ່ຳ.",
-      "openWebOrganizations": "ເປີດອົງກອນໃນເວັບ",
+      "noOrganizationDescription": "ບັນຊີນີ້ບໍ່ໄດ້ເປັນສ່ວນໜຶ່ງຂອງອົງກອນໃດ. ສ້າງອົງກອນເພື່ອໃຊ້ຄຸນສົມບັດຂອງອົງກອນ ເຊັ່ນ: ການເຊີນສະມາຊິກ ແລະ ການແຈ້ງເຕືອນເມື່ອຍອດເງິນຕ່ຳ, ຫຼື ເປີດເວັບເພື່ອເຂົ້າຮ່ວມອົງກອນທີ່ທ່ານໄດ້ຮັບເຊີນ.",
       "organizationUnavailable": "ບໍ່ສາມາດໃຊ້ງານອົງກອນນີ້ໄດ້.",
       "selectDescriptionWithOrganizations": "ທ່ານເປັນສະມາຊິກຂອງໜຶ່ງ ຫຼື ຫຼາຍອົງກອນ. ເລືອກບັນຊີທີ່ໜ້າຈໍນີ້ຄວນໃຊ້.",
       "selectOrganization": "ເລືອກອົງກອນ",
       "unavailableDescription": "ບໍ່ສາມາດໃຊ້ງານອົງກອນນີ້ໄດ້ອີກແລ້ວ. ເລືອກອົງກອນອື່ນຈາກໂປຣໄຟລ໌ຂອງທ່ານເພື່ອສືບຕໍ່.",
       "unavailableSessionsDescription": "ບໍ່ສາມາດໃຊ້ງານອົງກອນນີ້ໄດ້ອີກແລ້ວ. ບໍ່ສາມາດໂຫຼດເຊດຊັນຂອງອົງກອນນີ້ໄດ້.",
       "accessDeniedDescription": "ທ່ານບໍ່ມີສິດເຂົ້າເຖິງອົງກອນນີ້."
+    },
+    "create": {
+      "title": "ສ້າງອົງກອນ",
+      "description": "ອົງກອນຈະແບ່ງປັນເຄຣດິດ, ເອເຈນ ແລະ ການຕັ້ງຄ່າກັບທີມຂອງທ່ານ.",
+      "nameLabel": "ຊື່ອົງກອນ",
+      "nameRequired": "ໃສ່ຊື່ອົງກອນ.",
+      "trialNote": "ການທົດລອງໃຊ້ແຜນ Enterprise 14 ມື້ຂອງທ່ານຈະເລີ່ມເມື່ອທ່ານສ້າງອົງກອນ. ແຜນຕ່າງໆຕ້ອງຊື້ຜ່ານເວັບ."
     },
     "creditActivity": {
       "emptyDescription": "ລາຍການຊື້, ການໃຊ້ງານ ແລະ ການປັບຍອດເຄຣດິດຂອງອົງກອນນີ້ຈະສະແດງຢູ່ທີ່ນີ້ເມື່ອມີລາຍການໃໝ່.",
@@ -3119,6 +3350,21 @@
       "ownRoleChange": "ທ່ານບໍ່ສາມາດປ່ຽນບົດບາດຂອງຕົນເອງໄດ້.",
       "inviteExpired": "ຄຳເຊີນນີ້ໝົດອາຍຸແລ້ວ.",
       "inviteAccepted": "ຄຳເຊີນນີ້ໄດ້ຮັບການຕອບຮັບແລ້ວ."
+    },
+    "settingsOnWeb": {
+      "title": "ການຕັ້ງຄ່າອົງກອນໃນເວັບ",
+      "usageDetails": "ລາຍລະອຽດການນຳໃຊ້",
+      "providersAndModels": "ຜູ້ໃຫ້ບໍລິການ ແລະ ໂມເດວ",
+      "groups": "ກຸ່ມ",
+      "guardrails": "ມາດຕະການປ້ອງກັນ",
+      "byok": "ໃຊ້ກະແຈຂອງທ່ານເອງ",
+      "ssoAndDomain": "SSO ແລະ ໂດເມນ",
+      "emailPreferences": "ການຕັ້ງຄ່າອີເມວ",
+      "dataCollection": "ການເກັບກຳຂໍ້ມູນ",
+      "auditLogs": "ບັນທຶກການກວດສອບ",
+      "requestLogs": "ບັນທຶກຄຳຮ້ອງຂໍ",
+      "subOrganizations": "ອົງກອນຍ່ອຍ",
+      "distributeFunds": "ແຈກຢາຍເງິນທຶນ"
     },
     "usageStats": {
       "inputTokens": "ໂທເຄັນຂາເຂົ້າ",
@@ -3870,6 +4116,25 @@
     "importConfigApplied": "ນຳເຂົ້າ config ແລ້ວ"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "ບໍ່ສາມາດໂຫລດກິດຈະກຳເຄຣດິດໄດ້.",
+      "appStoreReceipt": "ໃບຮັບເງິນຈາກ App Store",
+      "deductionFallback": "ການຫັກເຄຣດິດ",
+      "emptyDescription": "ການຊື້ເຄຣດິດ, ໃບຮັບເງິນ ແລະ ການນຳໃຊ້ຈະສະແດງຢູ່ບ່ອນນີ້.",
+      "emptyTitle": "ບໍ່ມີປະຫວັດເຄຣດິດ",
+      "googlePlayReceipt": "ໃບຮັບເງິນຈາກ Google Play",
+      "kind": {
+        "adjustment": "ການປັບປຸງ",
+        "balanceNeutral": "ບໍ່ກະທົບຍອດເງິນ",
+        "deduction": "ການຫັກ",
+        "grant": "ເຄຣດິດທີ່ໄດ້ຮັບ",
+        "purchase": "ການຊື້"
+      },
+      "purchaseFallback": "ການຊື້ເຄຣດິດ",
+      "receipt": "ໃບຮັບເງິນ",
+      "receiptA11y": "ເປີດໃບຮັບເງິນສຳລັບ {{description}}",
+      "receiptUnavailable": "ບໍ່ມີໃບຮັບເງິນສຳລັບການຊື້ນີ້."
+    },
     "title": "ຊື້ເຄຣດິດ",
     "description": "ເຄຣດິດເປັນການຊື້ຄັ້ງດຽວທີ່ເພີ່ມໃສ່ຍອດ Kilo ຂອງທ່ານສຳລັບການແລ່ນເຊດຊັນການຂຽນໂຄ້ດ AI ໃນ Kilo App. ຮ້ານຄ້າຄິດຄ່າຈາກບັນຊີຂອງທ່ານ ແລະ ເຄຣດິດຈະຖືກເພີ່ມຫຼັງຈາກຮ້ານຄ້າຢືນຢັນການຊຳລະ.",
     "nextExpiry": "ເຄຣດິດ {{amount}} ຈະໝົດອາຍຸ {{date}} (UTC). ເຄຣດິດທີ່ໝົດອາຍຸກ່ອນຈະຖືກໃຊ້ກ່ອນ.",
@@ -4052,6 +4317,70 @@
   "systemSearch": {
     "couldNotOpenResult": "ບໍ່ສາມາດເປີດຜົນການຄົ້ນຫານີ້ໄດ້"
   },
+  "usage": {
+    "title": "ການນຳໃຊ້",
+    "orgTitle": "ການນຳໃຊ້ຂອງອົງກອນ",
+    "entrySubtitle": "ຄ່າໃຊ້ຈ່າຍ, ຄຳຂໍ ແລະ ໂທເຄັນ",
+    "rangePicker": "ຊ່ວງເວລາ",
+    "range90d": "90 ວັນ",
+    "metricPicker": "ຕົວຊີ້ວັດແຜນພູມ",
+    "chartA11y": "{{metric}} ຕໍ່ວັນ",
+    "avgCostPerRequest": "ຄ່າໃຊ້ຈ່າຍສະເລ່ຍ / ຄຳຂໍ",
+    "topModels": "ໂມເດວທີ່ໃຊ້ຫຼາຍສຸດ",
+    "topFeatures": "ຄຸນສົມບັດທີ່ໃຊ້ຫຼາຍສຸດ",
+    "emptyTitle": "ບໍ່ມີການນຳໃຊ້ໃນຊ່ວງເວລານີ້",
+    "orgSelfNotice": "ທ່ານກຳລັງເບິ່ງການນຳໃຊ້ຂອງທ່ານເອງໃນອົງກອນນີ້.",
+    "viewDetails": "ເບິ່ງລາຍລະອຽດການນຳໃຊ້"
+  },
+  "integrations": {
+    "title": "ການເຊື່ອມໂຍງ",
+    "sectionTitle": "ບໍລິການທີ່ເຊື່ອມຕໍ່ແລ້ວ",
+    "entrySubtitle": "GitHub, Slack, Linear ແລະ ອື່ນໆ",
+    "subtitle": "ເຊື່ອມຕໍ່ເຄື່ອງມືພັດທະນາ ແລະ ຂັ້ນຕອນການເຮັດວຽກຂອງທ່ານກັບ Kilo",
+    "emptyHint": "ຍັງບໍ່ມີການເຊື່ອມໂຍງໃດໆເທື່ອ.",
+    "disconnect": "ຕັດການເຊື່ອມຕໍ່",
+    "disconnectTitle": "ຕັດການເຊື່ອມຕໍ່ {{provider}} ບໍ?",
+    "disconnectMessage": "Kilo ຈະຢຸດຕອບກັບໃນ {{provider}}. ທ່ານສາມາດເຊື່ອມຕໍ່ຄືນໄດ້ທຸກເວລາ.",
+    "connectedTo": "ເຊື່ອມຕໍ່ກັບ {{account}} ແລ້ວ",
+    "disconnected": "ຕັດການເຊື່ອມຕໍ່ {{provider}} ແລ້ວ",
+    "disconnectFailed": "ບໍ່ສາມາດຕັດການເຊື່ອມຕໍ່ {{provider}} ໄດ້",
+    "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການເຊື່ອມໂຍງໄດ້",
+    "permissionDenied": "ທ່ານບໍ່ມີສິດຈັດການການເຊື່ອມໂຍງເຫຼົ່ານີ້.",
+    "memberHint": "ກະລຸນາຂໍໃຫ້ເຈົ້າຂອງ ຫຼື ຜູ້ດູແລອົງກອນປ່ຽນແປງການເຊື່ອມຕໍ່ເຫຼົ່ານີ້.",
+    "connectFailed": "ບໍ່ສາມາດເປີດໜ້າການເຊື່ອມຕໍ່ໄດ້"
+  },
+  "invoices": {
+    "personalEmptyDescription": "ໃບແຈ້ງໜີ້ສຳລັບການຊື້ຂອງທ່ານເອງຈະສະແດງຢູ່ບ່ອນນີ້ເມື່ອມີການຮຽກເກັບເງິນ."
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "ຍັງບໍ່ມີການໃຊ້ງານ",
+      "sharedWorkspace": "ໃຊ້ຮ່ວມກັນໂດຍທຸກການສົນທະນາໃນພື້ນທີ່ເຮັດວຽກນີ້",
+      "currentRates": "ອັດຕາປັດຈຸບັນ",
+      "perHour": "{{rate}}/ຊົ່ວໂມງ",
+      "mediumSandbox": "Sandbox ຂະໜາດກາງ",
+      "largeSandbox": "Sandbox ຂະໜາດໃຫຍ່",
+      "earlierActivity": "ກິດຈະກຳກ່ອນໜ້າ",
+      "now": "ດຽວນີ້",
+      "loadFailed": "ບໍ່ສາມາດໂຫຼດຄ່າ Compute ໄດ້."
+    },
+    "preview": {
+      "title": "ເປີດຕົວຢ່າງ",
+      "listeningServices": "ບໍລິການທີ່ກຳລັງຮັບຟັງ",
+      "empty": "ບໍ່ພົບບໍລິການທີ່ກຳລັງຮັບຟັງ. ຂໍໃຫ້ຕົວແທນເລີ່ມເວັບເຊີບເວີ ແລ້ວໂຫຼດໃໝ່.",
+      "notRunning": "Sandbox ນີ້ຖືກຢຸດແລ້ວ. ສົ່ງຂໍ້ຄວາມຫາຕົວແທນເພື່ອເລີ່ມມັນອີກຄັ້ງ.",
+      "notReady": "Sandbox ຍັງບໍ່ພ້ອມເທື່ອ. ໂຫຼດໃໝ່ເມື່ອເຊື່ອມຕໍ່ແລ້ວ.",
+      "unsupported": "ການຄົ້ນຫາບໍລິການບໍ່ມີໃຫ້ໃຊ້ສຳລັບ sandbox ນີ້.",
+      "failed": "ບໍ່ສາມາດຄົ້ນຫາບໍລິການໄດ້.",
+      "openService": "ເປີດ {{name}} ທີ່ພອດ {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "ທຣິກເກີ ແລະ webhook",
+      "subtitle": "ຈັດການທຣິກເກີ webhook ແລະ ທຣິກເກີຕາມກຳນົດເວລາໃນເວັບ."
+    }
+  },
   "sessionShare": {
     "title": "ແບ່ງປັນເຊດຊັນ",
     "subtitle": "ທຸກຄົນທີ່ມີລິ້ງສາມາດອ່ານເຊດຊັນນີ້ໄດ້.",
@@ -4069,7 +4398,7 @@
     "existingTitle": "ລິ້ງທີ່ມີຢູ່ແລ້ວ",
     "existingDescription": "ເຊດຊັນນີ້ມີລິ້ງແບ່ງປັນແລ້ວ. ການສ້າງລິ້ງໃໝ່ຈະແທນທີ່ລິ້ງເກົ່າ ແລະ ເຮັດໃຫ້ລິ້ງເກົ່າໃຊ້ບໍ່ໄດ້ອີກ.",
     "rotate": "ສ້າງລິ້ງໃໝ່",
-    "revoke": "ຍົກເລີກລິ້ງ",
+    "revoke": "ເອົາອອກລິ້ງ",
     "revokeTitle": "ຍົກເລີກລິ້ງບໍ?",
     "revokeMessage": "ລິ້ງປັດຈຸບັນຈະໃຊ້ບໍ່ໄດ້ທັນທີ.",
     "revokeFailed": "ບໍ່ສາມາດຍົກເລີກລິ້ງໄດ້.",

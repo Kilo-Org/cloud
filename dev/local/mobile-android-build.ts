@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { DEFAULT_SOURCE_SKIPS, SourceSkips, type HashSourceContents } from '@expo/fingerprint';
+import { DEFAULT_SOURCE_SKIPS, type HashSource, SourceSkips } from '@expo/fingerprint';
 
 import { hashRootNativeInputs } from './mobile-native-build';
 
@@ -51,13 +51,17 @@ export type AndroidBuildDeps = {
 };
 
 // Repo-root inputs that shape the native build but live outside
-// apps/mobile (pnpm patches, pnpm-workspace.yaml, pnpm-lock.yaml) are
-// mixed in as an extra source.
+// apps/mobile (pnpm patches, pnpm-workspace.yaml, pnpm-lock.yaml) are mixed in
+// as an extra source, and so is the local modules/ tree: Expo hashes an
+// autolinked module by its package identity, which a module under modules/ has
+// none of, so its native sources would otherwise never key a build. Module JS
+// and tests stay out; the native sources of one platform for another platform
+// only over-key the hash, which is the safe direction.
 export function buildAndroidFingerprintOptions(): {
   platforms: ['android'];
   sourceSkips: number;
   ignorePaths: string[];
-  extraSources: HashSourceContents[];
+  extraSources: HashSource[];
   silent: boolean;
 } {
   return {
@@ -66,7 +70,24 @@ export function buildAndroidFingerprintOptions(): {
     // The generated android/ tree is output, not an input: its bytes differ
     // per worktree. Pin it out of the hash so no fingerprint version can key
     // builds on it.
-    ignorePaths: ['android/**'],
+    ignorePaths: [
+      'android/**',
+      // Module build output is generated per tree and machine, not an input.
+      'modules/**/build/**',
+      'modules/*/src/**',
+      'modules/**/*.test.ts',
+      // The SSH module's Rust artifacts: scripts/build-android.sh writes the
+      // libraries, the bindings and a multi-gigabyte cargo target tree, and
+      // the versions of those bytes depend on the host that built them.
+      'modules/kilo-ssh/rust/target/**',
+      'modules/kilo-ssh/android/src/main/jniLibs/**',
+      'modules/kilo-ssh/android/src/main/java/ai/kilo/reactnativessh/uniffi/**',
+      // The same module's iOS artifacts, which the Android hash covers because
+      // it hashes the whole modules/ tree: only a Mac that ran the iOS build
+      // has them, so they would key Android builds on the producer's machine.
+      'modules/kilo-ssh/ios/Generated/**',
+      'modules/kilo-ssh/ios/Frameworks/**',
+    ],
     extraSources: [
       {
         type: 'contents',
@@ -74,6 +95,7 @@ export function buildAndroidFingerprintOptions(): {
         contents: hashRootNativeInputs(path.resolve(import.meta.dirname, '..', '..')),
         reasons: ['repo-root patches/, pnpm-workspace.yaml, and pnpm-lock.yaml'],
       },
+      { type: 'dir', filePath: 'modules', reasons: ['localExpoModules'] },
     ],
     silent: true,
   };

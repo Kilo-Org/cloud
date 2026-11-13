@@ -122,7 +122,7 @@ test('dangerous mode conversation can evaluate against a normal tab', async () =
     await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo extension fixture');
 
     const conversation = sidePanel.getByLabel('Agent conversation');
-    const emptyHint = conversation.getByText('Pick a tab and ask Kilo to inspect it.');
+    const emptyHint = conversation.getByText(/Ask Kilo about /u);
     await expect(emptyHint).toBeVisible();
     const hintBox = await emptyHint.boundingBox();
     expect(hintBox).not.toBeNull();
@@ -162,7 +162,7 @@ test('dangerous mode conversation can evaluate against a normal tab', async () =
     await sidePanel.getByLabel('New conversation').click();
     await expect(sidePanel.getByText('Evaluate JavaScript completed')).toBeHidden();
     const newConversation = sidePanel.getByLabel('Agent conversation');
-    const newEmptyHint = newConversation.getByText('Pick a tab and ask Kilo to inspect it.');
+    const newEmptyHint = newConversation.getByText(/Ask Kilo about /u);
     await expect(newEmptyHint).toBeVisible();
     const newHintBox = await newEmptyHint.boundingBox();
     expect(newHintBox).not.toBeNull();

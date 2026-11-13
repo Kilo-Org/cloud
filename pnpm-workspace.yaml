@@ -356,6 +356,14 @@ patchedDependencies:
   # KILO-APP-6H; react/react-native#58299). Also synchronizes the
   # LegacyViewManagerInterop cache. iOS needs buildReactNativeFromSource to
   # compile this in — see apps/mobile/app.config.ts.
+  # Android: the renderer allocates view tags from the first tag of every JS
+  # instance, while the platform keeps state keyed by those tags for the life of
+  # the process — the measured text of a text input is cached under its tag and
+  # freed when an input holding the same tag is collected — so a reloaded
+  # instance reissued tags a live input was still measured under and the native
+  # text layout threw ("Required value was null"). Start each instance's tags at
+  # the range it claims (apps/mobile/src/lib/view-tag-range.ts,
+  # modules/kilo-view-tag-range), defaulting to the platform's own start.
   react-native@0.88.0: patches/react-native@0.88.0.patch
   # Android: defer sheet insets registration to ON_RESUME when React has no
   # current activity during fragment ON_START; react-native-screens#4531.

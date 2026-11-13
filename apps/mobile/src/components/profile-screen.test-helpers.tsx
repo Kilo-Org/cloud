@@ -1,5 +1,5 @@
 /* eslint-disable promise/prefer-await-to-callbacks -- controls delivery of the native idle callback */
-import { createElement, useEffect } from 'react';
+import { createElement } from 'react';
 import { type QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, vi } from 'vitest';
 
@@ -80,13 +80,7 @@ vi.mock('react-native-reanimated', () => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: routerPush }),
-  // The account picker closes itself on the owning screen's focus loss; these
-  // suites keep the screen focused, so the effect runs for the tree's lifetime
-  // and its cleanup only runs when the suite unmounts.
-  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
-    useEffect(effect, [effect]);
-  },
+  useRouter: () => ({ push: routerPush, back: vi.fn() }),
 }));
 
 vi.mock('expo-application', () => ({
@@ -194,15 +188,18 @@ vi.mock('@/components/ui/icons', () => ({
   GitPullRequest: 'GitPullRequest',
   Globe: 'Globe',
   KeyRound: 'KeyRound',
+  LineChart: 'LineChart',
   Lock: 'Lock',
-  LogOut: 'LogOut',
   MessageSquare: 'MessageSquare',
+  Plus: 'Plus',
+  Plug: 'Plug',
   ShieldCheck: 'ShieldCheck',
   SlidersHorizontal: 'SlidersHorizontal',
   Smartphone: 'Smartphone',
   Sparkles: 'Sparkles',
   Trash2: 'Trash2',
   Users: 'Users',
+  Workflow: 'Workflow',
 }));
 
 vi.mock('@/components/profile-action-tile', () => ({ ActionTile: 'ActionTile' }));
@@ -216,6 +213,7 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

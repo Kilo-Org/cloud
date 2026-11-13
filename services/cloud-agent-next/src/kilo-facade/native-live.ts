@@ -56,7 +56,11 @@ const nativeSessionSchema = z
   .object({ id: z.string().min(1), directory: z.string().optional() })
   .passthrough();
 
-const nativeMessageSchema = z.object({ info: z.object({ id: z.string().min(1) }) }).passthrough();
+const nativeMessageSchema = z
+  .object({ info: z.object({ id: z.string().min(1), sessionID: z.string().min(1) }) })
+  .passthrough();
+const nativePartSchema = z.object({ sessionID: z.string().min(1) }).passthrough();
+const nativePartsSchema = z.array(nativePartSchema);
 
 export type NativeReadOutcome =
   | { kind: 'ok'; body: unknown }
@@ -118,6 +122,11 @@ function sessionPublicShape(value: unknown, kiloSessionId: string): NativeReadOu
   });
 }
 
+/**
+ * Projects only the requested session's transcript window. A row with no session
+ * identity refuses the read; a row outside the session is not returned, and an
+ * owned row whose part has no identity refuses the read.
+ */
 function messagesPublicShape(
   value: unknown,
   kiloSessionId: string,
@@ -125,10 +134,17 @@ function messagesPublicShape(
 ): NativeReadOutcome {
   if (!Array.isArray(value)) return invalidNativeResult();
   const window = value.slice(-limit);
-  if (!window.every(message => nativeMessageSchema.safeParse(message).success)) {
-    return invalidNativeResult();
+  const owned: unknown[] = [];
+  for (const message of window) {
+    const row = nativeMessageSchema.safeParse(message);
+    if (!row.success) return invalidNativeResult();
+    if (row.data.info.sessionID !== kiloSessionId) continue;
+    const parts = nativePartsSchema.safeParse(row.data.parts ?? []);
+    if (!parts.success) return invalidNativeResult();
+    if (parts.data.some(part => part.sessionID !== kiloSessionId)) continue;
+    owned.push(message);
   }
-  return bounded(projectPublicStructuredPaths(window, kiloSessionId));
+  return bounded(projectPublicStructuredPaths(owned, kiloSessionId));
 }
 
 function parseNativeResult(
@@ -150,14 +166,8 @@ function parseNativeResult(
       if (!parsed.success || Object.keys(parsed.data).length > MAX_NATIVE_STATUSES) {
         return invalidNativeResult();
       }
-      return bounded(
-        Object.fromEntries(
-          Object.entries(parsed.data).map(([sessionId, status]) => [
-            sessionId,
-            withoutPrivatePaths(status),
-          ])
-        )
-      );
+      const status = parsed.data[kiloSessionId];
+      return bounded(status === undefined ? {} : { [kiloSessionId]: withoutPrivatePaths(status) });
     }
     case 'session.todo': {
       const parsed = z.array(todoSchema).safeParse(absentAsEmpty(value));

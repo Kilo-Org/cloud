@@ -58,6 +58,77 @@ describe('apple-store-sdk', () => {
     expect(second).toBe(first);
     expect(mockAppStoreServerAPIClient).toHaveBeenCalledTimes(1);
   });
+
+  it('rejects an unsupported APPLE_IAP_ENVIRONMENT before building the verifier', () => {
+    process.env.APPLE_IAP_ENVIRONMENT = 'production';
+    const { createAppleStoreSignedDataVerifier } = loadAppleStoreSdk();
+
+    expect(() => createAppleStoreSignedDataVerifier()).toThrow(
+      'APPLE_IAP_ENVIRONMENT must be one of Production, Sandbox'
+    );
+    expect(mockSignedDataVerifier).not.toHaveBeenCalled();
+  });
+
+  it.each(['abc', '0', '-5', '1.5', '0x10'])(
+    'rejects APPLE_APP_APPLE_ID %s before building the verifier',
+    value => {
+      process.env.APPLE_APP_APPLE_ID = value;
+      const { createAppleStoreSignedDataVerifier } = loadAppleStoreSdk();
+
+      expect(() => createAppleStoreSignedDataVerifier()).toThrow(
+        'APPLE_APP_APPLE_ID must be a positive integer'
+      );
+      expect(mockSignedDataVerifier).not.toHaveBeenCalled();
+    }
+  );
+
+  it('passes no App ID when APPLE_APP_APPLE_ID is empty', () => {
+    process.env.APPLE_APP_APPLE_ID = '';
+    const { createAppleStoreSignedDataVerifier } = loadAppleStoreSdk();
+
+    createAppleStoreSignedDataVerifier();
+
+    expect(mockSignedDataVerifier).toHaveBeenCalledWith(
+      expect.any(Array),
+      true,
+      'Sandbox',
+      'com.kilocode.kiloapp',
+      undefined
+    );
+  });
+
+  it.each([
+    [' Production ', 'Production'],
+    ['Sandbox\n', 'Sandbox'],
+    ['\tSandbox', 'Sandbox'],
+  ])('trims padding from APPLE_IAP_ENVIRONMENT %j and selects %s', (value, expected) => {
+    process.env.APPLE_IAP_ENVIRONMENT = value;
+    const { createAppleStoreSignedDataVerifier } = loadAppleStoreSdk();
+
+    createAppleStoreSignedDataVerifier();
+
+    expect(mockSignedDataVerifier).toHaveBeenCalledWith(
+      expect.any(Array),
+      true,
+      expected,
+      'com.kilocode.kiloapp',
+      1234567890
+    );
+  });
+  it('accepts a production environment with its numeric App ID', () => {
+    process.env.APPLE_IAP_ENVIRONMENT = 'Production';
+    const { createAppleStoreSignedDataVerifier } = loadAppleStoreSdk();
+
+    createAppleStoreSignedDataVerifier();
+
+    expect(mockSignedDataVerifier).toHaveBeenCalledWith(
+      expect.any(Array),
+      true,
+      'Production',
+      'com.kilocode.kiloapp',
+      1234567890
+    );
+  });
   it('verifies and decodes a consumable transaction without subscription fields', async () => {
     const payload = {
       transactionId: 'credit-tx',
@@ -89,11 +160,29 @@ describe('apple-store-sdk', () => {
     expect(mockVerifyAndDecodeTransaction).toHaveBeenCalledWith('signed-credit');
   });
 
-  it('rejects transaction payloads missing required identifiers', async () => {
+  it('reports which payload fields failed validation', async () => {
     mockVerifyAndDecodeTransaction.mockResolvedValueOnce({ productId: 'credits.usd10.v1' });
-    await expect(loadAppleStoreSdk().decodeAppleStoreTransactionJws('invalid')).rejects.toThrow(
-      'Apple transaction payload missing required identifiers'
-    );
+    const promise = loadAppleStoreSdk().decodeAppleStoreTransactionJws('invalid');
+    await expect(promise).rejects.toThrow(/^Apple transaction payload failed validation: /);
+    await expect(promise).rejects.toThrow(/validation: .*transactionId: /);
+  });
+
+  it('names a malformed field without echoing its value', async () => {
+    mockVerifyAndDecodeTransaction.mockResolvedValueOnce({
+      transactionId: 'credit-tx',
+      originalTransactionId: 'credit-original',
+      bundleId: 'com.kilocode.kiloapp',
+      productId: 'credits.usd10.v1',
+      purchaseDate: 1_777_626_000_000,
+      appAccountToken: 'not-a-uuid',
+    });
+    const error = await loadAppleStoreSdk()
+      .decodeAppleStoreTransactionJws('invalid')
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/appAccountToken: /);
+    expect((error as Error).message).not.toContain('not-a-uuid');
   });
 
   it('propagates signature verification failures', async () => {

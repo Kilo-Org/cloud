@@ -36,6 +36,7 @@ import {
   markRestoredAuthenticatedOwner,
 } from '@/lib/context-scope';
 import { _resetLastRouteForTests, noteRestoredRouteOpen } from '@/lib/last-route';
+import type * as SpawnedNotFoundRetry from '@/lib/spawned-not-found-retry';
 import SessionDetailScreen from './[session-id]';
 
 const useLocalSearchParamsMock = vi.hoisted(() => vi.fn());
@@ -119,6 +120,11 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Platform: { OS: 'android' },
+  // The session route's system Back listener registers on mount. These tests
+  // never press Android Back, so the subscription stays inert.
+  BackHandler: {
+    addEventListener: () => ({ remove: () => undefined }),
+  },
   // The header reads the window to decide whether its actions share the title
   // row; this phone is wide enough for them to.
   useWindowDimensions: () => ({ width: 390, fontScale: 1, height: 844 }),
@@ -178,6 +184,11 @@ vi.mock('expo-router', () => ({
   useLocalSearchParams: useLocalSearchParamsMock,
   useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   useRouter: useRouterMock,
+  // The session route's Back listener runs while the route is focused, which
+  // for these tests is its mount lifetime.
+  useFocusEffect: (effect: () => undefined | (() => void)) => {
+    useEffect(effect, [effect]);
+  },
 }));
 
 vi.mock('@tanstack/react-query', async importOriginal => ({
@@ -338,8 +349,10 @@ vi.mock('@/components/ui/text', async () => {
   return { Text: 'Text', TextClassContext: createContext<string | undefined>(undefined) };
 });
 
-vi.mock('@/lib/spawned-not-found-retry', () => ({
-  shouldRetryNotFoundOnSpawnedRoute: () => false,
+// The route's retry decision is a pure helper with its own suite; this suite
+// drives the query options it receives, so answer with the helper as loaded.
+vi.mock('@/lib/spawned-not-found-retry', async importOriginal => ({
+  ...(await importOriginal<typeof SpawnedNotFoundRetry>()),
 }));
 
 function findByType(
@@ -1154,6 +1167,42 @@ describe('SessionDetailScreen foreground refresh scope', () => {
     // The whole-procedure prefix would refetch every retained `cliSessionsV2`
     // query — the stored `cliSessionsV2.list` pages behind this pushed route.
     expect(keys).not.toContainEqual([['cliSessionsV2']]);
+  });
+});
+
+describe('SessionDetailScreen metadata retry', () => {
+  type Retry = (failureCount: number, error: unknown) => boolean;
+
+  function setSessionParam(): void {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
+  }
+
+  function retryOption(): Retry {
+    const options: unknown = queryOptionsMock.mock.calls[0]?.[1];
+    if (typeof options !== 'object' || options === null || !('retry' in options)) {
+      throw new Error('the route passed no retry to the metadata read');
+    }
+    const { retry } = options;
+    if (typeof retry !== 'function') {
+      throw new TypeError('the metadata retry is not a function');
+    }
+    return (failureCount, error) => Boolean(Reflect.apply(retry, undefined, [failureCount, error]));
+  }
+
+  it('repeats an unsettled NOT_FOUND', async () => {
+    setSessionParam();
+    await mountRoute();
+
+    expect(retryOption()(0, { data: { code: 'NOT_FOUND' } })).toBe(true);
+  });
+
+  it('does not repeat an access denial, so the account boundary stays immediate', async () => {
+    setSessionParam();
+    await mountRoute();
+    const retry = retryOption();
+
+    expect(retry(0, { data: { code: 'UNAUTHORIZED' } })).toBe(false);
+    expect(retry(0, { data: { code: 'FORBIDDEN' } })).toBe(false);
   });
 });
 

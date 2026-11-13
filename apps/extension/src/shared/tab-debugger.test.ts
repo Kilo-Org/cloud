@@ -104,7 +104,7 @@ const createWebMcpScriptingApi = ({
   ],
 });
 
-// Rebuild the ordered definition signature exactly as the injected executor does, so tests pass a matching signature without hardcoding JSON.
+// Rebuild the definition signature exactly as the injected executor does, so tests pass a matching signature without hardcoding JSON.
 const webMcpDefinitionSignature = (tool: {
   readonly description: string;
   readonly inputSchema: unknown;
@@ -122,8 +122,23 @@ const webMcpDefinitionSignature = (tool: {
   }
   const normalized =
     typeof schema === 'object' && schema !== null && !Array.isArray(schema) ? schema : undefined;
+  const canonicalize = (value: unknown): unknown => {
+    if (Array.isArray(value)) {
+      return value.map(entry => canonicalize(entry));
+    }
+    if (value === null || typeof value !== 'object') {
+      return value;
+    }
+    return Object.fromEntries(
+      Object.entries(value)
+        .toSorted(([left], [right]) => (left < right ? -1 : Number(left > right)))
+        .map(([key, entry]) => [key, canonicalize(entry)])
+    );
+  };
 
-  return JSON.stringify([tool.name, tool.title, tool.description, tool.origin, normalized]);
+  return JSON.stringify(
+    canonicalize([tool.name, tool.title, tool.description, tool.origin, normalized])
+  );
 };
 
 describe('tab debugger helpers', () => {
@@ -1015,8 +1030,58 @@ describe('tab debugger helpers', () => {
         toolName: 'double',
       })
     ).resolves.toStrictEqual({
-      error: 'WebMCP tool execution failed: WebMCP tool "double" changed; refresh the page tools.',
+      error: 'WebMCP tool "double" changed; refresh the page tools.',
       ok: false,
     });
+  });
+
+  it('reports an error when the page returns no execution result', async () => {
+    // Chrome reports a throw inside injected code as a null result with no error, so a missing envelope must fail.
+    const scriptingApi: BrowserScriptingApi = {
+      executeScript: () => [{ result: null }],
+    };
+
+    await expect(
+      executeWebMcpToolInTab({
+        arguments: '{}',
+        definitionSignature: 'sig',
+        documentId: 'doc-1',
+        scriptingApi,
+        tabId: 7,
+        toolName: 'double',
+      })
+    ).resolves.toStrictEqual({
+      error: 'WebMCP tool execution failed: the page returned no result.',
+      ok: false,
+    });
+  });
+
+  it('executes a tool whose schema keys arrive in a different order', async () => {
+    // Extension messaging reorders object keys, so the page-side rebuild must not depend on JSON key order.
+    setModelContext({
+      executeTool: () => resolved('{"doubled":42}'),
+      getTools: () =>
+        resolved([
+          {
+            description: 'D',
+            inputSchema: { properties: { value: { type: 'number' } }, type: 'object' },
+            name: 'double',
+            origin: 'https://example.com',
+            title: 'Double',
+          },
+        ]),
+    });
+
+    await expect(
+      executeWebMcpToolInTab({
+        arguments: '{}',
+        definitionSignature:
+          '["double","Double","D","https://example.com",{"properties":{"value":{"type":"number"}},"type":"object"}]',
+        documentId: 'doc-1',
+        scriptingApi: createWebMcpScriptingApi(),
+        tabId: 7,
+        toolName: 'double',
+      })
+    ).resolves.toStrictEqual({ ok: true, value: '{"doubled":42}' });
   });
 });

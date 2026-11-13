@@ -35,8 +35,8 @@ import {
   hasActiveOrganizationModelPolicy,
   isOrganizationAutoTargetModel,
   isOrganizationCustomRouterTarget,
-  ORGANIZATION_AUTO_MODEL_FLAG,
 } from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
+import { ORGANIZATION_AUTO_MODEL_FLAG } from '@kilocode/app-shared/feature-flags';
 import { cn } from '@/lib/utils';
 
 type DefaultModelDialogProps = {

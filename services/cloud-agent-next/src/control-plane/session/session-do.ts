@@ -29,6 +29,7 @@ import {
 } from '@kilocode/worker-utils/cloud-agent-authority';
 import { sessionCallbackContext } from './callback-context.js';
 import { createSessionListStatusOutbox, deriveSessionListStatus } from './list-status.js';
+import { createRuntimeHarnessRecorder } from './runtime-harness-record.js';
 import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
@@ -111,8 +112,11 @@ import {
   controlPlaneRouteUpdateSchema,
   controlPlaneRouteViewSchema,
   controlPlaneSetupEventSchema,
+  controlPlaneWorkspaceStoppedPayloadSchema,
   type ControlPlaneAnswerPayload,
   type ControlPlaneAnswerReply,
+  type ControlPlaneCancelWorkspacePayload,
+  type ControlPlaneCancelWorkspaceResult,
   type ControlPlaneControlResult,
   type ControlPlaneDeliverPayload,
   type ControlPlaneDeliverResult,
@@ -131,6 +135,7 @@ import {
   type ControlPlaneStatusResult,
   type ControlPlaneTerminalInput,
   type ControlPlaneWorktreeCaptureInput,
+  type ControlPlaneWorkspaceStoppedPayload,
 } from '../../shared/control-plane-protocol.js';
 import {
   worktreeBranchOperationResultSchema,
@@ -179,7 +184,7 @@ import {
   oldestOpenMessage,
   openMessages,
   queueMessage,
-  renderTurnContent,
+  renderQueuedMessageContent,
   settleAcceptedUpTo,
   settleMessages,
   type MessageReduction,
@@ -288,6 +293,17 @@ const TRANSPORT_RECOVERY_KEY = 'control_plane_transport_recovery_at';
 const PENDING_INTERACTIONS_KEY = 'session_pending_interactions';
 const AVAILABLE_COMMANDS_KEY = 'available_commands';
 const ROOT_STATUS_KEY = 'session_root_status';
+/** Workspace Stop authority: newest epoch/at and the attempts it retired. */
+const WORKSPACE_STOP_STATE_KEY = 'control_plane_workspace_stop_state';
+const WORKSPACE_STOPPED_ATTEMPTS_MAX = 8;
+const workspaceStopStateSchema = z
+  .object({
+    epoch: z.number().int().nonnegative(),
+    at: z.number().int().nonnegative(),
+    attempts: z.array(z.string().min(1)).max(WORKSPACE_STOPPED_ATTEMPTS_MAX),
+  })
+  .strict();
+type WorkspaceStopState = z.infer<typeof workspaceStopStateSchema>;
 const EVENT_RECEIPT_PREFIX = 'native_event_receipt/';
 /**
  * A delivery is retried only until `expiresAt`, but an attempt can wait in this DO's queue past it.
@@ -539,6 +555,10 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   prepare(input: ControlPlanePrepareInputWithSelection): Promise<ControlPlaneRouteView>;
   deliver(payload: ControlPlaneDeliverPayload): Promise<ControlPlaneDeliverResult>;
   abort(payload: ControlPlaneSessionRefPayload): Promise<ControlPlaneDispatchResult>;
+  /** Workspace Stop during preparation; returns the durable stop epoch. */
+  cancelWorkspace(
+    payload: ControlPlaneCancelWorkspacePayload
+  ): Promise<ControlPlaneCancelWorkspaceResult>;
   answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneDispatchResult>;
   release(payload: ControlPlaneSessionRefPayload): Promise<void>;
   /** H4: the Sandbox DO returns the connected allocation fence for a bound handle. */
@@ -619,6 +639,13 @@ export type NativeSnapshotCursor = {
 };
 
 export const CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES = NATIVE_DELIVERY_LIMITS.eventBytes;
+
+/**
+ * Cap on the stream rows the first history page appends. The page's own budget
+ * is reduced by their measured size, so the whole response stays inside the
+ * history page bound.
+ */
+const MAX_SNAPSHOT_ROWS_BYTES = 256 * 1024;
 
 type SessionMessageRow = typeof controlPlaneMessages.$inferSelect;
 
@@ -761,6 +788,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private runtimeAuthorization: RuntimeAuthorization | undefined;
   private messages: SessionMessage[] = [];
   private route: ControlPlaneRouteView = { state: 'unknown' };
+  private workspaceStop: WorkspaceStopState = { epoch: 0, at: 0, attempts: [] };
   private transportRecoveryAt: number | null = null;
   private pendingInteractions: PendingInteractions | undefined;
   private availableCommands: CommandsAvailableData = { commands: [] };
@@ -769,6 +797,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
   private readonly listStatusOutbox: ReturnType<typeof createSessionListStatusOutbox>;
+  private readonly runtimeHarnessRecorder: ReturnType<typeof createRuntimeHarnessRecorder>;
   /** Terminal callback outbox (plan B5); one job per drained batch. */
   private readonly messageCallbacks: MessageCallbacks;
   /** Worktree-changes projection from the shared event log (plan B10). */
@@ -817,6 +846,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.listStatusOutbox = createSessionListStatusOutbox({
       storage: ctx.storage,
       publish: update => this.env.SESSION_INGEST.publishCloudAgentSessionStatus(update),
+    });
+    this.runtimeHarnessRecorder = createRuntimeHarnessRecorder({
+      storage: ctx.storage,
+      record: params => this.env.SESSION_INGEST.recordCloudAgentSessionHarness(params),
     });
     this.messageCallbacks = createMessageCallbacks({
       storage: ctx.storage,
@@ -1222,6 +1255,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.availableCommands = commands?.commands ? commands : { commands: [] };
     const rootStatus = rootStatusSchema.safeParse(await this.ctx.storage.get(ROOT_STATUS_KEY));
     this.rootStatus = rootStatus.success ? rootStatus.data : undefined;
+    const stop = workspaceStopStateSchema.safeParse(
+      await this.ctx.storage.get<unknown>(WORKSPACE_STOP_STATE_KEY)
+    );
+    this.workspaceStop = stop.success ? stop.data : { epoch: 0, at: 0, attempts: [] };
     this.messages = await this.loadMessages();
     this.route = await this.loadRoute();
     const recoveryAt = z
@@ -1243,17 +1280,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     } else {
       this.wipeLocator = parsedLocator.locator;
     }
-  }
-
-  async registerSession(input: ControlPlaneSessionRegistration): Promise<{ ok: true }> {
-    await this.initialized;
-    const registration = controlPlaneSessionRegistrationSchema.parse(input);
-    await this.enqueue(async () => {
-      if (this.registration === null) markHistoryHydrated(this.ctx.storage);
-      await this.ctx.storage.put(REGISTRATION_KEY, registration);
-      this.registration = registration;
-    });
-    return { ok: true };
   }
 
   /**
@@ -2012,8 +2038,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       const view = await this.readSandboxView(pass);
       if (view?.state === 'failed' && view.attemptId === this.currentAttemptId()) {
         await this.applyView(view, pass);
-        reduction = queueMessage(this.messages, parsed, now);
       }
+      // Reconciliation can cancel queued work; rebuild against the current set.
+      reduction = queueMessage(this.messages, parsed, now);
+      if (reduction.rejected === 'queue-full') return 'queue-full';
     }
     if (reduction.changed.length > 0) {
       this.messages = reduction.messages;
@@ -2045,8 +2073,50 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       // A user cancel: mark the interruption so the next idle schedules a
       // capture that shows the cancelled worktree state.
       this.worktreeChanges.markInterrupted();
-      await this.settleMessages(open, 'cancelled', 'interrupted');
       const peer = this.sandboxPeer();
+      const pass = this.transportPass();
+      const status = await this.readSandboxStatus(peer, pass);
+      if (status !== null && status.workspaceStopEpoch > this.workspaceStop.epoch) {
+        const localAttempt = this.route.state === 'unknown' ? undefined : this.route.attemptId;
+        const authoritativeRetired =
+          localAttempt !== undefined &&
+          (status.view.state === 'unknown' || status.view.attemptId !== localAttempt);
+        await this.settleWorkspaceStop(
+          status.workspaceStopEpoch,
+          status.workspaceStopAt,
+          authoritativeRetired ? localAttempt : undefined
+        );
+        const newerWork =
+          this.route.state === 'preparing' ||
+          status.workspacePreparing ||
+          openMessages(this.messages).some(message => message.createdAt > status.workspaceStopAt);
+        if (!newerWork) return { interrupted: open.length > 0 };
+      }
+      const workspacePreparing =
+        this.route.state === 'preparing' || status?.workspacePreparing === true;
+      if (workspacePreparing) {
+        const requestedAt = Math.max(Date.now(), this.workspaceStop.at + 1);
+        const current = openMessages(this.messages).map(message => message.messageId);
+        let result: ControlPlaneCancelWorkspaceResult;
+        try {
+          if (peer === null) throw new Error('Sandbox unavailable');
+          result = await withDORetry(
+            () => this.sandboxPeer() ?? peer,
+            current => current.cancelWorkspace({ sessionId: this.sessionId, requestedAt }),
+            'session.cancel_workspace',
+            this.sandboxRpcConfig(this.transportPass())
+          );
+        } catch {
+          throw new Error('Could not stop workspace preparation. Try Stop again.');
+        }
+        await this.settleWorkspaceStop(
+          result.stopEpoch,
+          result.stopAt,
+          this.route.state === 'unknown' ? undefined : this.route.attemptId
+        );
+        return { interrupted: open.length > 0 || current.length > 0 };
+      }
+      await this.settleMessages(open, 'cancelled', 'interrupted');
       if (peer !== null) {
         try {
           await withDORetry(
@@ -2060,6 +2130,88 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         }
       }
       return { interrupted: open.length > 0 };
+    });
+  }
+
+  private async readSandboxStatus(
+    peer: ControlPlaneSandboxPeer | null,
+    pass: TransportPass
+  ): Promise<ControlPlaneStatusResult | null> {
+    if (peer === null) return null;
+    try {
+      return await withDORetry(
+        () => this.sandboxPeer() ?? peer,
+        current => current.status({ sessionId: this.sessionId }),
+        'session.status',
+        this.sandboxRpcConfig(pass)
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Cancel work created before the Stop; work created after it is new intent.
+   * Duplicate or older notification epochs are ignored.
+   */
+  private async settleWorkspaceStop(
+    stopEpoch: number,
+    stopAt: number,
+    retiredAttemptId?: string
+  ): Promise<boolean> {
+    if (stopEpoch <= this.workspaceStop.epoch) return false;
+    const newerIntent = openMessages(this.messages).some(message => message.createdAt > stopAt);
+    this.workspaceStop = {
+      epoch: stopEpoch,
+      at: Math.max(this.workspaceStop.at, stopAt),
+      attempts: this.workspaceStop.attempts,
+    };
+    await this.ctx.storage.put(WORKSPACE_STOP_STATE_KEY, this.workspaceStop);
+    const cancel = openMessages(this.messages)
+      .filter(message => message.createdAt <= stopAt)
+      .map(message => message.messageId);
+    if (cancel.length > 0) await this.settleMessages(cancel, 'cancelled', 'interrupted');
+    if (newerIntent) {
+      await this.armAlarm();
+      return true;
+    }
+    await this.settleCancelledRoute(retiredAttemptId);
+    return true;
+  }
+
+  private async rememberStoppedAttempt(attemptId: string): Promise<void> {
+    if (this.workspaceStop.attempts.includes(attemptId)) return;
+    this.workspaceStop = {
+      ...this.workspaceStop,
+      attempts: [...this.workspaceStop.attempts, attemptId].slice(-WORKSPACE_STOPPED_ATTEMPTS_MAX),
+    };
+    await this.ctx.storage.put(WORKSPACE_STOP_STATE_KEY, this.workspaceStop);
+  }
+
+  private async settleCancelledRoute(retiredAttemptId?: string): Promise<void> {
+    if (retiredAttemptId !== undefined) await this.rememberStoppedAttempt(retiredAttemptId);
+    if (this.route.state === 'preparing') {
+      this.finalizeAttempt(this.route.attemptId, {
+        status: 'failed',
+        safeError: 'preparation_cancelled',
+      });
+    }
+    this.finishWorktreePreparation();
+    this.route = { state: 'unknown' };
+    await this.ctx.storage.put(ROUTE_KEY, this.route);
+    await this.clearPendingInteractions();
+    await this.clearTransportRecovery();
+    this.emitCloudStatus({ type: 'error', message: 'preparation_cancelled' });
+    await this.armAlarm();
+  }
+
+  async onWorkspaceStopped(payload: ControlPlaneWorkspaceStoppedPayload): Promise<void> {
+    await this.initialized;
+    if (this.registration === null) return;
+    const parsed = controlPlaneWorkspaceStoppedPayloadSchema.parse(payload);
+    await this.enqueue(async () => {
+      if (this.registration === null) return;
+      await this.settleWorkspaceStop(parsed.stopEpoch, parsed.requestedAt, parsed.attemptId);
     });
   }
 
@@ -2294,6 +2446,25 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.enqueue(async () => {
       // A delete queued ahead of this notification wiped the session.
       if (this.registration === null) return;
+      // Retired attempts must not revive a route that is now `unknown`.
+      if (parsed.state !== 'unknown' && this.workspaceStop.attempts.includes(parsed.attemptId)) {
+        return;
+      }
+      if (parsed.state !== 'unknown' && this.route.state === 'unknown') {
+        const pass = this.transportPass();
+        const authoritative = await this.readSandboxView(pass);
+        if (authoritative === null) {
+          await this.armAlarm();
+          return;
+        }
+        if (authoritative.state !== 'unknown') {
+          await this.applyView(authoritative, pass);
+        } else if (this.messages.some(message => message.state === 'queued')) {
+          await this.recoverQueued(pass);
+        }
+        await this.armAlarm();
+        return;
+      }
       if (parsed.state === 'lost' && parsed.attemptId === this.currentAttemptId()) {
         await this.captureQueuedRouteContainer(parsed);
       }
@@ -2495,7 +2666,15 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       // Retry any report/callback obligation a previous attempt could not send.
       await this.repairOutboxes();
       const now = Date.now();
-      const due = dueBackstopMessages(this.messages, now, this.sessionTimers());
+      let due = dueBackstopMessages(this.messages, now, this.sessionTimers());
+      let reconciled = false;
+      if (due.length > 0) {
+        // Reconcile a dropped workspace_stopped before applying backstop failure.
+        const epochBefore = this.workspaceStop.epoch;
+        await this.readSandboxView(this.transportPass(false));
+        reconciled = this.workspaceStop.epoch > epochBefore;
+        due = dueBackstopMessages(this.messages, now, this.sessionTimers());
+      }
       if (due.length > 0) {
         if (due.some(entry => entry.message.state === 'queued')) {
           await this.captureQueuedRouteContainer(this.route);
@@ -2512,6 +2691,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       }
       if (this.transportRecoveryAt !== null && this.transportRecoveryAt <= now) {
         await this.clearTransportRecovery();
+        await this.recoverQueued(this.transportPass(false));
+      } else if (reconciled && this.messages.some(message => message.state === 'queued')) {
         await this.recoverQueued(this.transportPass(false));
       }
       await this.armAlarm();
@@ -2560,23 +2741,27 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (!this.messages.some(message => message.state === 'queued')) {
       await this.clearTransportRecovery();
     }
+    const harnessDueAt = this.runtimeHarnessRecorder.nextDueAt();
     const candidates = [
       this.transportRecoveryAt,
       nextBackstopAt(this.messages, this.sessionTimers()),
       this.reportOutbox.nextDueAt() ?? null,
       this.messageCallbacks.nextCallbackDueAt() ?? null,
       statusDueAt,
+      harnessDueAt,
     ].filter((value): value is number => value !== null);
     if (candidates.length === 0) {
       await this.ctx.storage.deleteAlarm();
       return;
     }
     await this.ctx.storage.setAlarm(Math.min(...candidates));
-    if (statusDueAt !== null && statusDueAt <= Date.now()) {
+    if (
+      (statusDueAt !== null && statusDueAt <= Date.now()) ||
+      (harnessDueAt !== null && harnessDueAt <= Date.now())
+    ) {
       // Metadata publication never holds up preparation, answers, or outcomes.
       this.ctx.waitUntil(
-        this.listStatusOutbox
-          .repair()
+        Promise.all([this.listStatusOutbox.repair(), this.runtimeHarnessRecorder.repair()])
           .then(() =>
             this.enqueue(async () => {
               // The serialized finalizer re-arms the alarm after publication.
@@ -2585,7 +2770,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           .catch(() => {
             logger
               .withFields({ sessionId: this.sessionId })
-              .warn('Session list status repair failed');
+              .warn('Session list metadata repair failed');
           })
       );
     }
@@ -2685,7 +2870,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.ensureClientHistory(kiloSessionId);
     if (this.registration !== registration) return null;
     this.partText.flush();
-    return readSessionMessagesPage({
+    // The first page carries the rows the stream replays on connect, so a
+    // client that cannot reach the socket still shows the preparation attempts
+    // and the run's queued or failed turns. Older pages stay bare: the rows are
+    // current state, not history. Their size is reserved from the page budget so
+    // the response stays inside the page bound.
+    const snapshotRows = parsed.cursor === undefined ? this.readSnapshotRows() : undefined;
+    const page = readSessionMessagesPage({
       db: this.db,
       storage: this.ctx.storage,
       queries: this.eventQueries,
@@ -2698,7 +2889,14 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       omittedItemCount:
         readHistoryHydration(this.ctx.storage, isRoot ? undefined : kiloSessionId)
           ?.omittedItemCount ?? 0,
+      reservedBytes: snapshotRows?.bytes,
     });
+    if (snapshotRows === undefined) return page;
+    return {
+      ...page,
+      preparationAttempts: snapshotRows.preparationAttempts,
+      queuedMessages: snapshotRows.queuedMessages,
+    };
   }
 
   /** Returns a descendant's lineage under the registered root; the root has none. */
@@ -3312,6 +3510,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.pendingInteractions = undefined;
     this.availableCommands = { commands: [] };
     this.rootStatus = undefined;
+    this.workspaceStop = { epoch: 0, at: 0, attempts: [] };
     this.historyHydrations.clear();
     this.worktreePreparationGeneration = undefined;
     this.preparationRecorders.clear();
@@ -3483,11 +3682,24 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
-  private async applyView(view: ControlPlaneRouteView, pass = this.transportPass()): Promise<void> {
-    // The route view is the source of the preparation row: the previous
-    // persisted view names the attempt that is open, so a transition closes it
-    // even if this process lost its in-memory recorder map to eviction.
+  private async applyView(
+    view: ControlPlaneRouteView,
+    pass = this.transportPass(),
+    allowStopRetry = true
+  ): Promise<void> {
     const previous = this.route;
+    if (view.state === 'unknown' && view.stopEpoch !== undefined) {
+      const retiredAttemptId = previous.state === 'unknown' ? undefined : previous.attemptId;
+      if (view.stopEpoch > this.workspaceStop.epoch) {
+        await this.settleWorkspaceStop(view.stopEpoch, view.stopAt ?? Date.now(), retiredAttemptId);
+      }
+      if (allowStopRetry && this.messages.some(message => message.state === 'queued')) {
+        const prepared = await this.prepareSandbox(pass);
+        if (prepared !== null) await this.applyView(prepared, pass, false);
+        return;
+      }
+      if (view.stopEpoch > this.workspaceStop.epoch) return;
+    }
     if (view.state === 'failed') await this.captureQueuedRouteContainer(view);
     const previousAttemptId = previous.state === 'unknown' ? undefined : previous.attemptId;
     const nextAttemptId = view.state === 'unknown' ? undefined : view.attemptId;
@@ -3662,6 +3874,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           runtimeHarness: message.container?.runtimeHarness,
         });
       }
+      this.recordDeliveredRuntimeHarness();
       await this.armAlarm();
       return;
     }
@@ -3678,6 +3891,24 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       return;
     }
     await this.applyView(view, pass);
+  }
+
+  private recordDeliveredRuntimeHarness(): void {
+    const runtimeHarness =
+      this.route.state === 'ready' ? this.route.container?.runtimeHarness : undefined;
+    if (
+      runtimeHarness === undefined ||
+      this.registration === null ||
+      this.metadata === null ||
+      this.env.SESSION_INGEST === undefined
+    )
+      return;
+    this.runtimeHarnessRecorder.record({
+      sessionId: this.registration.spec.kiloSessionId,
+      kiloUserId: this.metadata.identity.userId,
+      cloudAgentSessionId: this.sessionId,
+      runtimeHarness,
+    });
   }
 
   private async persistQueuedContainer(
@@ -3728,6 +3959,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       await this.scheduleTransportRecovery(pass);
       return null;
     }
+    // A Stop refuses work created before its wall clock; a later message is new intent.
+    const intent = oldestOpenMessage(this.messages, 'queued');
     try {
       return await withDORetry(
         () => this.sandboxPeer() ?? peer,
@@ -3739,6 +3972,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               ? { sandboxSelection: registration.sandboxSelection }
               : {}),
             ...(registration.environment ? { environment: registration.environment } : {}),
+            stopEpoch: this.workspaceStop.epoch,
+            ...(intent === undefined ? {} : { intentAt: intent.createdAt }),
           }),
         'session.prepare',
         this.sandboxRpcConfig(pass)
@@ -3826,6 +4061,20 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         'session.status',
         this.sandboxRpcConfig(pass)
       );
+      if (status.workspaceStopEpoch > this.workspaceStop.epoch) {
+        const localAttempt = this.route.state === 'unknown' ? undefined : this.route.attemptId;
+        const authoritativeRetired =
+          localAttempt !== undefined &&
+          (status.view.state === 'unknown' || status.view.attemptId !== localAttempt);
+        await this.settleWorkspaceStop(
+          status.workspaceStopEpoch,
+          status.workspaceStopAt,
+          authoritativeRetired ? localAttempt : undefined
+        );
+        return this.messages.some(message => message.state === 'queued')
+          ? { state: 'unknown' }
+          : null;
+      }
       return controlPlaneRouteViewSchema.parse(status.view);
     } catch {
       await this.scheduleTransportRecovery(pass);
@@ -4155,7 +4404,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       'cloud.message.queued',
       {
         messageId: message.messageId,
-        content: renderTurnContent(message.intent),
+        content: renderQueuedMessageContent(message),
         delivery: 'queued',
       },
       `cloud-message/queued/${message.messageId}`,
@@ -4166,7 +4415,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private emitSent(message: SessionMessage): void {
     this.emitSynthetic(
       'cloud.message.sent',
-      { messageId: message.messageId, delivery: 'sent' },
+      {
+        messageId: message.messageId,
+        delivery: 'sent',
+        ...(message.intent.turn.type === 'command' ? { turnType: 'command' } : {}),
+      },
       `cloud-message/sent/${message.messageId}`,
       message.acceptedAt ?? message.createdAt
     );
@@ -4342,20 +4595,27 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return this.messages
       .filter(
         message =>
-          message.state === 'queued' || message.state === 'accepted' || message.state === 'failed'
+          message.state === 'queued' ||
+          message.state === 'accepted' ||
+          message.state === 'failed' ||
+          (message.intent.turn.type === 'command' && message.acceptedAt !== null)
       )
       .map(message => {
         const timestamp = message.acceptedAt ?? message.createdAt;
         const snapshot: QueuedMessageSnapshot = {
           messageId: message.messageId,
-          content: renderTurnContent(message.intent),
+          content: renderQueuedMessageContent(message),
           timestamp,
+          ...(message.intent.turn.type === 'command' ? { turnType: 'command' as const } : {}),
           ...(message.state === 'accepted' ? { delivery: 'sent' as const } : {}),
         };
-        if (message.state === 'failed') {
+        if (message.state === 'completed') {
+          snapshot.completedAt = message.settledAt ?? timestamp;
+        }
+        if (message.state === 'failed' || message.state === 'cancelled') {
           snapshot.terminalFailure = {
             messageId: message.messageId,
-            status: 'failed',
+            status: message.state === 'cancelled' ? 'interrupted' : 'failed',
             delivery: message.acceptedAt === null ? 'queued' : 'sent',
             accepted: message.acceptedAt !== null,
             ...(message.billingFailure === undefined
@@ -4369,6 +4629,42 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         }
         return snapshot;
       });
+  }
+
+  /**
+   * The stream rows the first history page appends, trimmed to
+   * `MAX_SNAPSHOT_ROWS_BYTES` newest first, and their measured size. The page's
+   * own budget is reduced by that size so the response stays inside
+   * `MAX_SESSION_PAGE_BYTES`. Queued turns are reserved first, so a failed run
+   * always keeps the question row it is answering; preparation attempts give way.
+   */
+  private readSnapshotRows(): {
+    preparationAttempts: PreparationAttempt[];
+    queuedMessages: QueuedMessageSnapshot[];
+    bytes: number;
+  } {
+    const encoder = new TextEncoder();
+    const budget = { remaining: MAX_SNAPSHOT_ROWS_BYTES };
+    // Both lists run oldest first, so walking back keeps the newest rows.
+    const keepNewest = <T>(rows: T[]): T[] => {
+      const kept: T[] = [];
+      for (let index = rows.length - 1; index >= 0; index -= 1) {
+        const row = rows.at(index);
+        if (row === undefined) break;
+        const rowBytes = encoder.encode(JSON.stringify(row)).byteLength;
+        if (rowBytes > budget.remaining) break;
+        budget.remaining -= rowBytes;
+        kept.push(row);
+      }
+      return kept.reverse();
+    };
+    const queuedMessages = keepNewest(this.deriveQueuedMessages());
+    const preparationAttempts = keepNewest(listPreparationAttempts(this.eventQueries));
+    return {
+      preparationAttempts,
+      queuedMessages,
+      bytes: MAX_SNAPSHOT_ROWS_BYTES - budget.remaining,
+    };
   }
 
   private readPendingInteractions(): { questions: unknown[]; permissions: unknown[] } | undefined {

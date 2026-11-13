@@ -23,6 +23,10 @@
   },
   "common": {
     "deleteTitle": "Eliminar {{label}}?",
+    "manageOnWeb": "Gerir na web",
+    "creditHistory": "Histórico de créditos",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancelar",
@@ -119,6 +123,7 @@
     "copyLink": "Copiar ligação",
     "couldNotLoadOrganizations": "Não foi possível carregar as organizações.",
     "couldNotLoadSessions": "Não foi possível carregar as sessões.",
+    "couldnTLoad": "Não foi possível carregar.",
     "couldnTLoadMore": "Não foi possível carregar mais.",
     "deviceSessions": "Sessões nos dispositivos",
     "disabled": "Desativado",
@@ -246,6 +251,10 @@
     "notAdded": "Tens sessão iniciada. {{provider}} não foi adicionado à tua conta."
   },
   "profile": {
+    "creditHistorySubtitle": "Compras, recibos e atividade de créditos",
+    "invoicesSubtitle": "Baixe as faturas das suas compras",
+    "manageBilling": "Gerenciar cobrança em kilo.ai",
+    "manageBillingIosNote": "Métodos de pagamento, recarga automática e dados de cobrança são gerenciados em kilo.ai.",
     "codeReviewerSubtitle": "Revisões automáticas de PR",
     "securityAgentSubtitle": "Detetar e corrigir vulnerabilidades",
     "reviews": "Revisões",
@@ -299,6 +308,7 @@
     "passkeyAdded": "Chave de acesso adicionada.",
     "passkeyAddFailed": "Não foi possível adicionar uma chave de acesso. Tenta novamente.",
     "passkeyAddUnsupported": "Este dispositivo não pode criar chaves de acesso.",
+    "passkeyAddUnavailable": "As chaves de acesso só podem ser adicionadas num navegador web.",
     "passkeyAddCancelled": "A criação da chave de acesso foi cancelada.",
     "passkeyRemoved": "Chave de acesso removida.",
     "passkeyRemoveFailed": "Não foi possível remover essa chave de acesso. Tenta novamente.",
@@ -331,7 +341,6 @@
     "providerKeys": {
       "title": "Chaves de fornecedor",
       "rowSubtitle": "Usa a faturação do teu próprio fornecedor",
-      "manageOnWeb": "Gerir na web",
       "manageOnWebReason": "Estes fornecedores precisam de credenciais estruturadas.",
       "description": "Os pedidos feitos com estas chaves são faturados na tua conta do fornecedor em vez de no teu saldo Kilo.",
       "enabled": "Em uso",
@@ -1268,7 +1277,17 @@
       "changeRequestMissingPermissions": "A aplicação GitHub do Kilo não consegue abrir pull requests neste repositório. Um proprietário do repositório tem de conceder à aplicação acesso de escrita a conteúdos e pull requests; depois, tenta novamente.",
       "changeRequestFailed": "O Kilo não conseguiu abrir o pull request. Tenta novamente dentro de momentos.",
       "proposalConflict": "Há outra proposta de memória de revisão para este repositório que ainda está ativa, por isso esta ainda não pode ser guardada.",
-      "offAction": "A memória de revisão está desativada. Ativa-a e tenta novamente."
+      "offAction": "A memória de revisão está desativada. Ativa-a e tenta novamente.",
+      "analyze": {
+        "title": "Analisar comentários",
+        "description": "Escolhe um repositório com respostas recentes dos responsáveis pelo projeto e procura depois um padrão de orientação repetido.",
+        "chooseRepository": "Escolher um repositório",
+        "action": "Analisar agora",
+        "noRepositories": "Ainda não há nenhum repositório com respostas recentes dos responsáveis pelo projeto.",
+        "proposed": "Proposta de memória de revisão criada",
+        "noFeedback": "Não foram encontrados comentários recentes para este repositório",
+        "noPattern": "Não foi encontrado nenhum padrão repetido claro"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Introduz um URL válido de um merge request.",
@@ -1401,7 +1420,63 @@
       "title": "O revisor de código precisa da tua atenção.",
       "recoveryLabel": "Contactar o suporte"
     },
-    "unknownError": "Erro desconhecido"
+    "unknownError": "Erro desconhecido",
+    "skipBotPullRequests": {
+      "title": "Ignorar pedidos de integração de bots",
+      "subtitle": "Não executes revisões automáticas em pedidos de integração abertos por bots como o Dependabot ou o Renovate. Desativa esta opção para rever também os pedidos de integração de bots."
+    },
+    "repoModels": {
+      "title": "Modelo por repositório",
+      "description": "Executa as revisões de alguns repositórios com outro modelo, outro esforço de raciocínio ou ambos.",
+      "defaultModel": "Utiliza o modelo predefinido",
+      "resetLabel": "Repor o modelo de {{repository}}",
+      "changeHint": "Abre o seletor de modelos"
+    },
+    "analytics": {
+      "title": "Estatísticas",
+      "trackedReviews": "Revisões acompanhadas",
+      "findingsRaised": "Ocorrências levantadas",
+      "highImpactChanges": "Alterações de grande impacto",
+      "impactPoints": "Pontos de impacto",
+      "repositoryLine": "Revisões: {{reviews}} · Ocorrências: {{findings}}",
+      "empty": "Ainda não há revisões com estatísticas",
+      "emptyDescription": "As estatísticas registam revisões concluídas enquanto estão ativadas para a organização.",
+      "off": "As estatísticas estão desativadas para esta organização.",
+      "couldNotLoad": "Não foi possível carregar as estatísticas"
+    },
+    "council": {
+      "title": "Revisão do conselho",
+      "subtitle": "Vários especialistas revêm cada pedido de integração e os votos deles combinam-se numa única decisão.",
+      "unavailable": "A revisão do conselho não está disponível para esta organização.",
+      "noRepositories": "Ainda não há repositórios selecionados. Escolhe primeiro repositórios nas definições de repositórios.",
+      "specialists": "Especialistas",
+      "labels": "Etiquetas que ativam a revisão do conselho",
+      "labelsPlaceholder": "ex.: conselho, revisão profunda",
+      "labelsDescription": "Separa as etiquetas com vírgulas. Um repositório com o conselho ativado passa a executar a revisão apenas nos pedidos de integração que tenham pelo menos uma destas etiquetas. Deixa em branco para todos os pedidos de integração elegíveis.",
+      "tooManyLabels": "Demasiadas etiquetas do conselho. Usa no máximo {{maximum}} etiquetas.",
+      "labelTooLong": "Etiqueta do conselho demasiado longa. Cada etiqueta deve ter no máximo {{maximum}} caracteres.",
+      "minSpecialists": "Seleciona pelo menos {{minimum}} especialistas. {{selected}} selecionados.",
+      "specialistName": {
+        "testCoverage": "Cobertura de testes",
+        "correctness": "Corretude",
+        "custom": "Especialista"
+      },
+      "specialist": {
+        "security": "Contorno de autorização, tratamento de segredos e entrada não segura.",
+        "performance": "Caminhos críticos, consultas N+1 e alocações pesadas.",
+        "testing": "Cobertura ausente ou fraca para o novo comportamento.",
+        "correctness": "Erros de lógica, casos limite e condições de corrida.",
+        "custom": "Revê problemas da sua própria área."
+      },
+      "strategy": {
+        "advisory": "Consultivo",
+        "advisoryDescription": "Comunica ocorrências e vota sem bloquear a fusão.",
+        "unanimous": "Unânime",
+        "unanimousDescription": "Bloqueia a fusão quando qualquer especialista comunica um problema crítico.",
+        "majority": "Maioria",
+        "majorityDescription": "Bloqueia a fusão apenas quando a maioria dos especialistas comunica um problema crítico."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1925,6 +2000,16 @@
       "auto": "Automático",
       "shallow": "Superficial",
       "deep": "Profundo"
+    },
+    "orphanedFindings": {
+      "title": "Ocorrências de repositórios removidos",
+      "description": "Estes repositórios já não estão acessíveis através da integração com o GitHub. As ocorrências deles continuam a contar nos painéis e relatórios.",
+      "count": "Ocorrências: {{count}}",
+      "clearLabel": "Eliminar ocorrências de {{repository}}",
+      "confirmTitle": "Eliminar ocorrências?",
+      "confirmMessage": "Todas as ocorrências registadas de {{repository}} serão eliminadas. Esta ação não pode ser anulada.",
+      "confirmAction": "Eliminar ocorrências",
+      "cleared": "Ocorrências eliminadas: {{count}}"
     }
   },
   "agents": {
@@ -2106,6 +2191,7 @@
       "branchPlaceholder": "Selecionar um ramo",
       "runOnWithTarget": "Executar em: {{target}}",
       "environment": "Ambiente",
+      "cloudEnvironment": "Ambiente de nuvem",
       "couldNotLoadEnvironment": "Não foi possível carregar o seu ambiente.",
       "retryLoadingEnvironment": "Tentar carregar o ambiente novamente",
       "defaultEnvironment": "Ambiente predefinido",
@@ -2166,6 +2252,89 @@
       "openSettingsToReview": "Abra as definições para rever",
       "profileSelection": "Seleção de perfil",
       "profileLayerAccessibility": "{{label}}: {{detail}}"
+    },
+    "environment": {
+      "loadingEnvironments": "A carregar ambientes",
+      "couldNotLoadEnvironments": "Não foi possível carregar os ambientes",
+      "couldNotLoadEnvironmentsDetail": "Tente novamente carregar os ambientes deste repositório.",
+      "noEnvironment": "Sem ambiente",
+      "noEnvironmentDetail": "Esta sessão começa a partir da imagem base.",
+      "chooseEnvironment": "Escolher ambiente",
+      "chooseEnvironmentDetail": "Este repositório tem mais do que um ambiente.",
+      "environmentAccessibility": "Escolher um ambiente: {{label}}",
+      "environmentsForRepository": "Ambientes de {{repository}}",
+      "selectEnvironmentToStart": "Selecione um ambiente para iniciar.",
+      "buildDetails": "Detalhes do build",
+      "buildNotBuilt": "Não criado",
+      "buildUnavailableShort": "Builds de snapshot indisponíveis",
+      "buildPreparing": "A preparar o builder",
+      "buildCloning": "A clonar o branch predefinido",
+      "buildSetup": "A executar a configuração do ambiente",
+      "buildCleanup": "A remover as credenciais do build",
+      "buildCapturing": "A capturar o snapshot",
+      "buildPublishing": "A publicar o snapshot",
+      "buildStopping": "A parar o builder",
+      "buildStoppingRetrying": "A parar o builder, a tentar novamente",
+      "buildFinishing": "A concluir o build",
+      "buildSucceeded": "Snapshot pronto",
+      "buildSuperseded": "Substituído por um build mais recente",
+      "buildStale": "As definições mudaram desde este snapshot",
+      "buildStaleAge": "Snapshot com mais de quatro dias; a próxima sessão vai atualizá-lo",
+      "buildStaleImage": "Criado para uma imagem de sandbox anterior",
+      "failureClone": "Não foi possível clonar o repositório.",
+      "failureSetup": "Um comando de configuração falhou. Consulte o log do build.",
+      "failureTimeout": "Um comando de configuração excedeu o tempo limite. Consulte o log do build.",
+      "failureCleanup": "Não foi possível remover as credenciais, por isso não foi criado nenhum snapshot.",
+      "failureCapture": "Não foi possível capturar o snapshot.",
+      "failureCaptureUncertain": "O resultado do snapshot perdeu-se; o build não foi publicado.",
+      "failureDeadline": "O build não terminou a tempo.",
+      "failureBuilderLost": "O builder deixou de enviar informações.",
+      "failureBuilderStart": "Não foi possível iniciar o builder.",
+      "failureUnauthorized": "O acesso ao repositório já não está autorizado.",
+      "failureActorUnauthorized": "A pessoa que iniciou o build já não tem acesso.",
+      "failureBilling": "Os builds precisam de créditos disponíveis.",
+      "failureBillingUnavailable": "A faturação não conseguiu aceitar o build. Tente novamente.",
+      "failureConfiguration": "A configuração mudou durante o build.",
+      "failureRuntime": "Não foi possível instalar a versão de runtime selecionada.",
+      "failureGeneric": "O build falhou.",
+      "buildLogs": "Logs do build",
+      "noBuildLogs": "Ainda não há output no log.",
+      "buildLogsLatestOnly": "A mostrar as últimas 500 linhas de log guardadas.",
+      "buildLogsTruncated": "O output posterior foi truncado.",
+      "couldNotLoadBuild": "Não foi possível carregar o estado do build",
+      "couldNotLoadBuildLogs": "Não foi possível carregar os logs do build",
+      "buildsUnavailable": "Os builds de snapshot não estão disponíveis para este ambiente.",
+      "onlyManagersCanBuild": "Apenas os gestores da organização podem criar snapshots.",
+      "waitForBuilder": "Aguarde que o builder pare antes de fazer um novo build.",
+      "buildAction": "Criar snapshot",
+      "refreshAction": "Atualizar snapshot",
+      "cancelBuildAction": "Cancelar build",
+      "buildStarted": "Build do snapshot iniciado",
+      "buildCanceled": "Build do snapshot cancelado",
+      "couldNotStartBuild": "Não foi possível iniciar o build",
+      "couldNotCancelBuild": "Não foi possível cancelar o build",
+      "sandbox": "Sandbox",
+      "sandboxActive": "Sandbox ativa",
+      "sandboxSleeping": "Sandbox em suspensão",
+      "sandboxStarting": "Sandbox a iniciar",
+      "sandboxStopping": "Sandbox a parar",
+      "sandboxError": "Erro na sandbox",
+      "sandboxUnreachable": "Sandbox inacessível",
+      "sandboxStatusUnknown": "Estado da sandbox desconhecido",
+      "sandboxChecked": "Verificado {{when}}",
+      "sandboxDetailStopped": "Envie uma mensagem para a retomar.",
+      "sandboxDetailFailed": "Envie uma mensagem para tentar novamente.",
+      "sandboxDetailConnection": "A ligação à sandbox não está disponível.",
+      "sandboxDetailUnavailable": "O estado da sandbox está temporariamente indisponível.",
+      "sandboxDetailInsufficient": "Não há informação suficiente para confirmar o estado atual da sandbox.",
+      "sandboxDetailCheckNeeded": "A sandbox não confirmou o seu estado de funcionamento recentemente.",
+      "startFresh": "Começar do zero",
+      "startFreshTitle": "Começar do zero?",
+      "startFreshMessage": "Isto descarta o snapshot do espaço de trabalho capturado {{when}}. As alterações sem commit desse espaço de trabalho serão perdidas.",
+      "startFreshMessageUnknown": "Isto descarta o snapshot guardado do espaço de trabalho, que não foi possível ler. As alterações sem commit desse espaço de trabalho serão perdidas.",
+      "startFreshDone": "Snapshot do espaço de trabalho removido.",
+      "couldNotRemoveSnapshot": "Não foi possível remover o snapshot do espaço de trabalho.",
+      "snapshotCaptured": "Snapshot do espaço de trabalho capturado {{when}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Foi atualizado {{displayCount}} ficheiro.",
@@ -2519,7 +2688,8 @@
       "cancelQueued": "Cancelar mensagem",
       "cancelQueuedAccessibility": "Cancelar mensagem em fila",
       "restoreQueued": "Restaurar",
-      "restoreQueuedAccessibility": "Restaurar a mensagem cancelada no campo de mensagem"
+      "restoreQueuedAccessibility": "Restaurar a mensagem cancelada no campo de mensagem",
+      "noReplyRecorded": "Nenhuma resposta foi registrada para esta mensagem."
     },
     "olderMessages": {
       "arrived": "Mensagens anteriores carregadas",
@@ -2920,6 +3090,26 @@
     "onlyFirstFilesAttached_many": "Apenas os primeiros {{displayCount}} ficheiros serão anexados."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Histórico de cobranças",
+      "billingHistoryEmpty": "Ainda não há histórico de cobranças.",
+      "cancel": "Cancelar assinatura",
+      "cancelDescription": "Seu Kilo Pass continua ativo até o fim do período de cobrança e não será renovado.",
+      "cancelScheduled": "Será cancelada em {{date}}",
+      "cancelScheduledChange": "Cancelar alteração agendada",
+      "cancelled": "Assinatura cancelada",
+      "changePlan": "Alterar plano em kilo.ai",
+      "changePlanIosNote": "Alterações de planos pagos estão disponíveis em kilo.ai.",
+      "creditHistoryEmpty": "Ainda não há créditos do Kilo Pass.",
+      "manageInStore": "Gerenciar em {{store}}",
+      "resume": "Retomar assinatura",
+      "resumeCancelledDescription": "Seu Kilo Pass voltará a ser renovado automaticamente.",
+      "resumePausedDescription": "Seu Kilo Pass será retomado agora, antes da data de retomada agendada.",
+      "resumed": "Assinatura retomada",
+      "scheduledChange": "Alteração agendada",
+      "scheduledChangeCancelDescription": "Seu Kilo Pass permanece no plano atual e será renovado como acontece hoje.",
+      "scheduledChangeSummary": "{{plan}} em {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "O Kilo Pass não está disponível.",
     "couldNotLoad": "Não foi possível carregar o Kilo Pass. Tenta novamente.",
@@ -2929,7 +3119,7 @@
     "subscriptionLoading": "A carregar a subscrição do Kilo Pass",
     "retryHint": "Tenta obter novamente o estado do Kilo Pass.",
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
-    "purchaseUnavailableEnded": "O seu Kilo Pass terminou.",
+    "endedOn": "Terminado em {{date}}",
     "notAvailableInApp": "O Kilo Pass não está disponível na app.",
     "statusActive": "Ativo",
     "statusTrialing": "Em período de teste",
@@ -2951,7 +3141,7 @@
     "kiloPassManagement": "Gestão do Kilo Pass",
     "kiloPassSetup": "Configuração do Kilo Pass",
     "opensManagementOnWeb": "Abre a gestão do Kilo Pass na web.",
-    "tryAgainFromProfile": "Tenta novamente a partir do perfil.",
+    "loadFailedRetry": "Verifica a tua ligação e tenta novamente.",
     "legalTermsOfUse": "Termos de utilização (EULA)",
     "purchaseDifferentAccount": "Esta compra da App Store não está associada à tua conta Kilo. Inicia sessão na Apple Account utilizada na compra e tenta novamente.",
     "purchaseFailed": "Não foi possível concluir a compra.",
@@ -2974,6 +3164,11 @@
     "accountDescription": "O ID da sua conta Kilo e os metadados dos pedidos, usados para autenticar a sua identidade e medir a utilização.",
     "diagnosticsTitle": "Diagnósticos da aplicação",
     "diagnosticsDescription": "Relatórios de falhas e erros, sem conteúdo da aplicação, usados para manter a aplicação estável.",
+    "featureFlagsTitle": "Disponibilização de funcionalidades",
+    "featureFlagsDescription": "O e-mail da sua conta, usado pelo PostHog para decidir que funcionalidades vê.",
+    "featureFlagsWhat": "O e-mail da sua conta.",
+    "featureFlagsWhy": "Decidir que funcionalidades vê, incluindo as que ainda estamos a disponibilizar.",
+    "featureFlagsWho": "PostHog, o serviço de feature flags.",
     "helpImprove": "Ajudar a melhorar o Kilo",
     "helpImproveDescription": "Partilhe dados anónimos de utilização do produto e a origem da instalação. Pode alterar esta opção a qualquer momento nas definições.",
     "seeFullDetails": "Ver todos os detalhes",
@@ -3055,6 +3250,36 @@
     "sendFeedback": "Enviar opinião"
   },
   "organization": {
+    "auditLog": {
+      "title": "Registo de auditoria",
+      "permissionDenied": "Só um proprietário, administrador ou gestor de faturação de uma organização com o plano Enterprise pode consultar o respetivo registo de auditoria.",
+      "emptyTitle": "Sem eventos de auditoria",
+      "emptyDescription": "As ações realizadas nesta organização aparecem aqui.",
+      "truncated": "São apresentados os eventos mais recentes."
+    },
+    "billing": {
+      "title": "Faturação",
+      "permissionDenied": "Só o proprietário, um administrador ou um gestor de faturação da organização pode ver a faturação.",
+      "subscription": "Subscrição",
+      "state": "Estado",
+      "stateNone": "Sem subscrição",
+      "statePastDue": "Pagamento em atraso",
+      "stateCancelsAtPeriodEnd": "Cancela no fim do período",
+      "stateTrialEndsOn": "O período experimental termina a {{date}}",
+      "stateTrialing": "Período experimental",
+      "stateRenewsOn": "Renova a {{date}}",
+      "seatsDropTo": "Desce para {{seats}} lugares a {{date}}",
+      "seats": "Lugares",
+      "autoTopUp": "Carregamento automático",
+      "autoTopUpAmount": "Valor do carregamento",
+      "autoTopUpThreshold": "Quando o saldo for inferior a",
+      "manageOnWeb": "As alterações são feitas na web",
+      "changePlan": "Alterar plano",
+      "buySeats": "Comprar lugares",
+      "setupAutoTopUp": "Configurar carregamento automático",
+      "webAddress": "Endereço web {{url}}",
+      "opensOnWeb": "Abre na web"
+    },
     "boundary": {
       "backToProfile": "Voltar ao perfil",
       "loadErrorMessage": "Verifica a tua ligação e tenta novamente.",
@@ -3062,14 +3287,20 @@
       "loadErrorTitle": "Não foi possível carregar as suas organizações.",
       "membershipLostNotice": "Já não tem acesso a esta organização. Mudou para {{target}}.",
       "noOrganization": "Sem organização",
-      "noOrganizationDescription": "Esta conta não faz parte de uma organização. Crie ou ingresse em uma organização na web para usar recursos de organização como convites de membros e alertas de saldo baixo.",
-      "openWebOrganizations": "Abrir organizações na web",
+      "noOrganizationDescription": "Esta conta não faz parte de uma organização. Crie uma para utilizar funcionalidades de organização, como convites de membros e alertas de saldo baixo, ou abra a Web para aderir a uma organização para a qual foi convidado.",
       "organizationUnavailable": "A organização não está disponível.",
       "selectDescriptionWithOrganizations": "Você pertence a uma ou mais organizações. Escolha a conta que esta tela deve usar.",
       "selectOrganization": "Selecionar uma organização",
       "unavailableDescription": "Esta organização já não está disponível. Escolha outra no seu perfil para continuar.",
       "unavailableSessionsDescription": "Esta organização já não está disponível. Não é possível carregar as suas sessões.",
       "accessDeniedDescription": "Não tem acesso a esta organização."
+    },
+    "create": {
+      "title": "Criar organização",
+      "description": "Uma organização partilha créditos, agentes e definições com a sua equipa.",
+      "nameLabel": "Nome da organização",
+      "nameRequired": "Introduza um nome para a organização.",
+      "trialNote": "O seu período experimental Enterprise de 14 dias começa quando a criar. Os planos são adquiridos na Web."
     },
     "creditActivity": {
       "emptyDescription": "As compras, a utilização e os ajustes de créditos desta organização aparecem aqui à medida que ocorrem.",
@@ -3178,6 +3409,21 @@
       "ownRoleChange": "Você não pode alterar sua própria função.",
       "inviteExpired": "Este convite expirou.",
       "inviteAccepted": "Este convite já foi aceito."
+    },
+    "settingsOnWeb": {
+      "title": "Definições da organização na Web",
+      "usageDetails": "Detalhes de utilização",
+      "providersAndModels": "Fornecedores e modelos",
+      "groups": "Grupos",
+      "guardrails": "Salvaguardas",
+      "byok": "Utilize a sua própria chave",
+      "ssoAndDomain": "SSO e domínio",
+      "emailPreferences": "Preferências de e-mail",
+      "dataCollection": "Recolha de dados",
+      "auditLogs": "Registos de auditoria",
+      "requestLogs": "Registos de pedidos",
+      "subOrganizations": "Suborganizações",
+      "distributeFunds": "Distribuir fundos"
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
@@ -3937,6 +4183,25 @@
     "importConfigApplied": "Config importada"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Não foi possível carregar a atividade de créditos.",
+      "appStoreReceipt": "Recibo da App Store",
+      "deductionFallback": "Dedução de créditos",
+      "emptyDescription": "Compras, recibos e uso de créditos aparecerão aqui.",
+      "emptyTitle": "Nenhum histórico de créditos",
+      "googlePlayReceipt": "Recibo do Google Play",
+      "kind": {
+        "adjustment": "Ajuste",
+        "balanceNeutral": "Sem efeito no saldo",
+        "deduction": "Dedução",
+        "grant": "Concessão de créditos",
+        "purchase": "Compra"
+      },
+      "purchaseFallback": "Compra de créditos",
+      "receipt": "Recibo",
+      "receiptA11y": "Abrir o recibo de {{description}}",
+      "receiptUnavailable": "Não há recibo disponível para esta compra."
+    },
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de programação com IA na aplicação Kilo. A loja cobra na sua conta e os créditos são adicionados depois de a loja confirmar o pagamento.",
     "nextExpiry": "Os créditos no valor de {{amount}} expiram em {{date}} (UTC). Os créditos com a data de expiração mais próxima são utilizados primeiro.",
@@ -4122,6 +4387,70 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Não foi possível abrir este resultado de pesquisa"
+  },
+  "usage": {
+    "title": "Utilização",
+    "orgTitle": "Utilização da organização",
+    "entrySubtitle": "Gastos, pedidos e tokens",
+    "rangePicker": "Período",
+    "range90d": "90 dias",
+    "metricPicker": "Métrica do gráfico",
+    "chartA11y": "{{metric}} por dia",
+    "avgCostPerRequest": "Custo médio / pedido",
+    "topModels": "Modelos mais usados",
+    "topFeatures": "Funcionalidades mais usadas",
+    "emptyTitle": "Sem utilização neste período",
+    "orgSelfNotice": "Está a ver a sua própria utilização nesta organização.",
+    "viewDetails": "Ver detalhes de utilização"
+  },
+  "integrations": {
+    "title": "Integrações",
+    "sectionTitle": "Serviços conectados",
+    "entrySubtitle": "GitHub, Slack, Linear e mais",
+    "subtitle": "Conecte suas ferramentas e fluxos de trabalho de desenvolvimento ao Kilo",
+    "emptyHint": "Nenhuma integração conectada ainda.",
+    "disconnect": "Desconectar",
+    "disconnectTitle": "Desconectar {{provider}}?",
+    "disconnectMessage": "O Kilo deixará de responder no {{provider}}. Você pode reconectar a qualquer momento.",
+    "connectedTo": "Conectado a {{account}}",
+    "disconnected": "{{provider}} desconectado",
+    "disconnectFailed": "Não foi possível desconectar {{provider}}",
+    "couldNotLoad": "Não foi possível carregar as integrações",
+    "permissionDenied": "Você não tem permissão para gerenciar estas integrações.",
+    "memberHint": "Peça a um proprietário ou administrador da organização para alterar estas conexões.",
+    "connectFailed": "Não foi possível abrir a página de conexão"
+  },
+  "invoices": {
+    "personalEmptyDescription": "As faturas das suas compras pessoais aparecerão aqui assim que você for cobrado."
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Computação",
+      "noUsage": "Ainda sem utilização",
+      "sharedWorkspace": "Partilhado por todos os chats deste espaço de trabalho",
+      "currentRates": "Tarifas atuais",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Sandbox média",
+      "largeSandbox": "Sandbox grande",
+      "earlierActivity": "Atividade anterior",
+      "now": "agora",
+      "loadFailed": "Não foi possível carregar os custos de computação."
+    },
+    "preview": {
+      "title": "Abrir pré-visualização",
+      "listeningServices": "Serviços à escuta",
+      "empty": "Não foram encontrados serviços à escuta. Peça ao agente para iniciar um servidor web e, depois, atualize.",
+      "notRunning": "Esta sandbox está parada. Envie uma mensagem ao agente para a voltar a iniciar.",
+      "notReady": "A sandbox ainda não está pronta. Atualize quando estiver ligada.",
+      "unsupported": "A deteção de serviços não está disponível para esta sandbox.",
+      "failed": "Não foi possível detetar serviços.",
+      "openService": "Abrir {{name}} na porta {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Acionadores e webhooks",
+      "subtitle": "Faça a gestão dos acionadores de webhook e agendados na web."
+    }
   },
   "sessionShare": {
     "title": "Partilhar sessão",

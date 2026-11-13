@@ -1,6 +1,6 @@
 // Boundary-state regression: four mutually exclusive settled states must map
 // to four distinct copies. An account with no memberships gets the
-// no-organization state whose action opens the web organizations page;
+// no-organization state whose action opens the in-app create flow;
 // memberships with nothing selected get the picker state whose action opens
 // the context picker sheet; a deep-link override absent from a NON-empty
 // member list is access-denied, while the same override against zero
@@ -21,9 +21,8 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: (...args: unknown[]) => useOrgBoundaryMock(...args),
 }));
 
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
-}));
+const routerMock = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
+vi.mock('expo-router', () => ({ useRouter: () => routerMock }));
 
 vi.mock('@/components/empty-state', () => ({
   EmptyState: (props: { title?: string; description?: ReactNode; action?: ReactNode }) =>
@@ -53,20 +52,11 @@ vi.mock('@/components/ui/text', () => ({
 
 vi.mock('@/components/ui/icons', () => ({
   Building2: 'Building2',
-  Globe: 'Globe',
 }));
-
-const openExternalUrlMock = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/external-link', () => ({ openExternalUrl: openExternalUrlMock }));
-
-vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://cloud.example.test' }));
 
 const openPickerMock = vi.hoisted(() => vi.fn());
 vi.mock('@/components/context-control', () => ({
-  useContextPicker: () => ({
-    openPicker: openPickerMock,
-    picker: createElement('ContextPickerSheetMock'),
-  }),
+  useContextPicker: () => ({ openPicker: openPickerMock }),
 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -143,7 +133,8 @@ function collectText(node: unknown): string[] {
 
 beforeEach(() => {
   useOrgBoundaryMock.mockReset();
-  openExternalUrlMock.mockReset();
+  routerMock.push.mockReset();
+  routerMock.replace.mockReset();
   openPickerMock.mockReset();
 });
 
@@ -213,7 +204,7 @@ describe('OrganizationBoundary settled states', () => {
     });
   });
 
-  it('offers the web organizations page when the account has no organization', () => {
+  it('offers the in-app create flow when the account has no organization', () => {
     useOrgBoundaryMock.mockReturnValue(boundaryState({ organizationId: null, orgs: [] }));
 
     const renderer = mountBoundary();
@@ -222,31 +213,28 @@ describe('OrganizationBoundary settled states', () => {
     expect(findByType(renderer.root, 'EmptyStateMock')).toHaveLength(1);
     expect(texts).toContain('No organization');
     expect(texts).toContain(
-      'This account is not part of an organization. Create or join one on the web to use organization features like member invites and low-balance alerts.'
+      'This account is not part of an organization. Create one to use organization features like member invites and low-balance alerts, or open the web to join one you were invited to.'
     );
-    expect(texts).toContain('Open organizations on web');
+    expect(texts).toContain('Create organization');
     expect(texts).toContain('Back to profile');
     expect(texts).not.toContain('Select an organization');
 
-    const webButton = renderer.root.find(
+    const createButton = renderer.root.find(
       node =>
-        String(node.type) === 'ButtonMock' &&
-        collectText(node).includes('Open organizations on web')
+        String(node.type) === 'ButtonMock' && collectText(node).includes('Create organization')
     );
-    expect(webButton).toBeDefined();
+    expect(createButton).toBeDefined();
     act(() => {
-      (webButton.props.onPress as (() => void) | undefined)?.();
+      (createButton.props.onPress as (() => void) | undefined)?.();
     });
-    expect(openExternalUrlMock).toHaveBeenCalledWith('https://cloud.example.test/organizations', {
-      label: 'Open organizations on web',
-    });
+    expect(routerMock.push).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization/create');
 
     act(() => {
       renderer.unmount();
     });
   });
 
-  it('offers the web organizations page for a deep-link override with no memberships', () => {
+  it('offers the in-app create flow for a deep-link override with no memberships', () => {
     useOrgBoundaryMock.mockReturnValue(
       boundaryState({ organizationId: 'org-linked', org: undefined, orgs: [] })
     );
@@ -256,22 +244,19 @@ describe('OrganizationBoundary settled states', () => {
 
     expect(findByType(renderer.root, 'EmptyStateMock')).toHaveLength(1);
     expect(texts).toContain('No organization');
-    expect(texts).toContain('Open organizations on web');
+    expect(texts).toContain('Create organization');
     expect(texts).toContain('Back to profile');
     expect(texts).not.toContain('Access denied');
     expect(texts).not.toContain('Select an organization');
 
-    const webButton = renderer.root.find(
+    const createButton = renderer.root.find(
       node =>
-        String(node.type) === 'ButtonMock' &&
-        collectText(node).includes('Open organizations on web')
+        String(node.type) === 'ButtonMock' && collectText(node).includes('Create organization')
     );
     act(() => {
-      (webButton.props.onPress as (() => void) | undefined)?.();
+      (createButton.props.onPress as (() => void) | undefined)?.();
     });
-    expect(openExternalUrlMock).toHaveBeenCalledWith('https://cloud.example.test/organizations', {
-      label: 'Open organizations on web',
-    });
+    expect(routerMock.push).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization/create');
 
     act(() => {
       renderer.unmount();
@@ -296,8 +281,6 @@ describe('OrganizationBoundary settled states', () => {
     );
     expect(texts).toContain('Choose an account');
     expect(texts).toContain('Back to profile');
-    // The picker sheet element stays mounted in the caller's tree.
-    expect(findByType(renderer.root, 'ContextPickerSheetMock')).toHaveLength(1);
     expect(texts).not.toContain('No organization');
 
     const chooseButton = renderer.root.find(
@@ -308,7 +291,6 @@ describe('OrganizationBoundary settled states', () => {
       (chooseButton.props.onPress as (() => void) | undefined)?.();
     });
     expect(openPickerMock).toHaveBeenCalledTimes(1);
-    expect(openExternalUrlMock).not.toHaveBeenCalled();
 
     act(() => {
       renderer.unmount();
@@ -329,7 +311,6 @@ describe('OrganizationBoundary settled states', () => {
 
     expect(texts).toContain('Select an organization');
     expect(texts).toContain('Choose an account');
-    expect(findByType(renderer.root, 'ContextPickerSheetMock')).toHaveLength(1);
     expect(texts).not.toContain('Organization unavailable');
     expect(texts).not.toContain('Access denied');
 
@@ -345,7 +326,7 @@ describe('OrganizationBoundary settled states', () => {
     const texts = collectText(renderer.toJSON());
 
     expect(texts).toContain('No organization');
-    expect(texts).toContain('Open organizations on web');
+    expect(texts).toContain('Create organization');
     expect(texts).not.toContain('Organization unavailable');
     expect(texts).not.toContain('Select an organization');
 

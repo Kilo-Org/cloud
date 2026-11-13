@@ -8,10 +8,12 @@ import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { type SessionComputeCharges } from '@/lib/session-compute-total';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
 import { type SessionAutoApproveState } from './session-auto-approve';
 import { SessionContextSheet } from './session-context-sheet';
+import { formatSessionTotalCost } from './session-list-helpers';
 
 const holder = vi.hoisted(() => ({
   instances: [] as unknown[],
@@ -20,6 +22,9 @@ const holder = vi.hoisted(() => ({
   copyResult: true as boolean | Promise<boolean>,
   copiedLinks: [] as { sessionId: string; anchorMessageId: string | null }[],
   linkCopyResult: true as boolean | Promise<boolean>,
+  // The compute read the sheet's total adds to the model cost. `undefined` is
+  // the "nothing recorded" read, which is what the model-only assertions want.
+  computeCharges: undefined as SessionComputeCharges | undefined,
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -27,15 +32,33 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: () => Promise.resolve() }),
   useMutation: () => ({ mutate: () => undefined, isPending: false }),
 }));
-vi.mock('@/lib/trpc', () => ({
-  useTRPC: () => ({
-    activeSessions: { listInstances: { queryOptions: () => ({}) } },
-    cliSessionsV2: {
-      get: { queryOptions: () => ({}), queryKey: () => ['get'] },
-      share: { mutationOptions: () => ({}) },
-      unshare: { mutationOptions: () => ({}) },
-    },
+vi.mock('@/lib/trpc', () => {
+  const options = { queryOptions: () => ({}), queryKey: () => [] };
+  const namespace = { getSandboxStatus: options, getWorkspaceSnapshotRecovery: options };
+  return {
+    trpcClient: { cloudAgentNext: {}, organizations: { cloudAgentNext: {} } },
+    useTRPC: () => ({
+      activeSessions: { listInstances: { queryOptions: () => ({}) } },
+      cliSessionsV2: {
+        get: { queryOptions: () => ({}), queryKey: () => ['get'] },
+        share: { mutationOptions: () => ({}) },
+        unshare: { mutationOptions: () => ({}) },
+      },
+      cloudAgentNext: namespace,
+      organizations: { cloudAgentNext: namespace },
+    }),
+  };
+});
+vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+// The sheet's compute block and its total read one query; the harness pins it
+// to "nothing recorded" unless a test supplies charges.
+vi.mock('@/lib/hooks/use-session-compute', () => ({
+  useSessionComputeCharges: () => ({
+    data: holder.computeCharges,
+    isError: false,
+    refetch: vi.fn<() => void>(),
   }),
+  useComputeRates: () => ({ data: [] }),
 }));
 vi.mock('./session-row-actions', () => ({
   copySessionId: async (id: string) => {
@@ -78,6 +101,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+// The sandbox section's own button and dialog edges reach react-native through
+// modules the mounted transform cannot parse (activity-indicator -> motion ->
+// expo-battery), so both are mocked at their adapter.
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
@@ -131,6 +157,9 @@ function renderSheet(
         sessionTitle: 'Greeting',
         activeSessionType: null,
         ownerConnectionId: null,
+        cloudAgentSessionId: null,
+        cloudStatusType: null,
+        organizationId: undefined,
         modelDisplay: 'Model X',
         providerDisplay: 'Kilo',
         totalCostMicrodollars: null,
@@ -313,6 +342,9 @@ function sheetElement(
     sessionTitle: 'Greeting',
     activeSessionType: null,
     ownerConnectionId: null,
+    cloudAgentSessionId: null,
+    cloudStatusType: null,
+    organizationId: undefined,
     modelDisplay: 'Claude',
     providerDisplay: 'Kilo',
     totalCostMicrodollars: null,
@@ -372,6 +404,7 @@ beforeEach(() => {
   holder.copyResult = true;
   holder.copiedLinks = [];
   holder.linkCopyResult = true;
+  holder.computeCharges = undefined;
 });
 
 describe('SessionContextSheet session id and running on', () => {
@@ -680,3 +713,70 @@ describe('SessionContextSheet connection row', () => {
     await unmount(lost);
   });
 });
+
+describe('SessionContextSheet total cost row', () => {
+  it('adds the shared workspace compute to the total and names the sharing', async () => {
+    holder.computeCharges = computeCharges('workspace');
+    const renderer = await mountSheet({ totalCostMicrodollars: 1_000_000 });
+
+    expect(textValues(renderer)).toContain(formatSessionTotalCost(1_500_000));
+    const notes = findByTestID(renderer.root, 'session-context-sheet-shared-compute');
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.props.children).toBe(i18n.t('cloudAgent.compute.sharedWorkspace'));
+
+    await unmount(renderer);
+  });
+
+  it('adds a session-scoped compute total without the sharing note', async () => {
+    holder.computeCharges = computeCharges('session');
+    const renderer = await mountSheet({ totalCostMicrodollars: 1_000_000 });
+
+    expect(textValues(renderer)).toContain(formatSessionTotalCost(1_500_000));
+    expect(findByTestID(renderer.root, 'session-context-sheet-shared-compute')).toHaveLength(0);
+
+    await unmount(renderer);
+  });
+
+  it('paints no note before the compute read settles', async () => {
+    const renderer = await mountSheet({ totalCostMicrodollars: 1_000_000 });
+
+    expect(textValues(renderer)).toContain(formatSessionTotalCost(1_000_000));
+    expect(findByTestID(renderer.root, 'session-context-sheet-shared-compute')).toHaveLength(0);
+
+    await unmount(renderer);
+  });
+
+  it('keeps a compute-only total and its sharing note on a read-only session', async () => {
+    holder.computeCharges = computeCharges('workspace');
+    const renderer = await mountSheet({
+      autoApproveState: 'unavailable',
+      totalCostMicrodollars: null,
+    });
+
+    expect(textValues(renderer)).toContain(formatSessionTotalCost(500_000));
+    expect(findByTestID(renderer.root, 'session-context-sheet-shared-compute')).toHaveLength(1);
+
+    await unmount(renderer);
+  });
+});
+
+/** One charged run, so the total has a compute side to add. */
+function computeCharges(scope: 'session' | 'workspace'): SessionComputeCharges {
+  return {
+    amountMicrodollars: 500_000,
+    seconds: 60,
+    scope,
+    earlierRuns: null,
+    runs: [
+      {
+        startedAt: '2026-11-12T10:00:00.000Z',
+        stoppedAt: '2026-11-12T10:01:00.000Z',
+        running: false,
+        instance: 'standard-3',
+        rateCentsPerSecond: 0.2,
+        seconds: 60,
+        amountMicrodollars: 500_000,
+      },
+    ],
+  };
+}

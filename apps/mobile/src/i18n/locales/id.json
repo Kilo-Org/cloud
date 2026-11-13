@@ -23,6 +23,10 @@
   },
   "common": {
     "deleteTitle": "Hapus {{label}}?",
+    "manageOnWeb": "Kelola di web",
+    "creditHistory": "Riwayat kredit",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Batal",
@@ -119,6 +123,7 @@
     "copyLink": "Salin tautan",
     "couldNotLoadOrganizations": "Tidak dapat memuat organisasi.",
     "couldNotLoadSessions": "Tidak dapat memuat sesi.",
+    "couldnTLoad": "Tidak dapat memuat data.",
     "couldnTLoadMore": "Tidak dapat memuat lebih banyak data.",
     "deviceSessions": "Sesi perangkat",
     "disabled": "Nonaktif",
@@ -246,6 +251,10 @@
     "notAdded": "Kamu sudah masuk. {{provider}} tidak ditambahkan ke akunmu."
   },
   "profile": {
+    "creditHistorySubtitle": "Pembelian, tanda terima, dan aktivitas kredit",
+    "invoicesSubtitle": "Unduh faktur untuk pembelian Anda",
+    "manageBilling": "Kelola penagihan di kilo.ai",
+    "manageBillingIosNote": "Metode pembayaran, isi ulang otomatis, dan detail penagihan dikelola di kilo.ai.",
     "codeReviewerSubtitle": "Tinjauan PR otomatis",
     "securityAgentSubtitle": "Temukan dan perbaiki kerentanan",
     "reviews": "Tinjauan",
@@ -299,6 +308,7 @@
     "passkeyAdded": "Kunci sandi ditambahkan.",
     "passkeyAddFailed": "Tidak dapat menambahkan kunci sandi. Coba lagi.",
     "passkeyAddUnsupported": "Perangkat ini tidak dapat membuat kunci sandi.",
+    "passkeyAddUnavailable": "Kunci sandi hanya dapat ditambahkan di browser web.",
     "passkeyAddCancelled": "Pembuatan kunci sandi dibatalkan.",
     "passkeyRemoved": "Kunci sandi dihapus.",
     "passkeyRemoveFailed": "Tidak dapat menghapus kunci sandi itu. Coba lagi.",
@@ -331,7 +341,6 @@
     "providerKeys": {
       "title": "Kunci penyedia",
       "rowSubtitle": "Gunakan penagihan penyedia milikmu sendiri",
-      "manageOnWeb": "Kelola di web",
       "manageOnWebReason": "Penyedia ini memerlukan kredensial terstruktur.",
       "description": "Permintaan melalui kunci ini ditagihkan ke akun penyediamu, bukan ke saldo Kilo-mu.",
       "enabled": "Digunakan",
@@ -760,6 +769,16 @@
       "changeRequestFailed": "Kilo tidak dapat membuka pull request. Coba lagi sebentar.",
       "proposalConflict": "Usulan memori tinjauan lain untuk repositori ini masih aktif, jadi usulan ini belum dapat disimpan.",
       "offAction": "Memori tinjauan nonaktif. Aktifkan, lalu coba lagi.",
+      "analyze": {
+        "title": "Analisis umpan balik",
+        "description": "Pilih repositori dengan balasan pengelola terbaru, lalu cari satu pola panduan yang berulang.",
+        "chooseRepository": "Pilih repositori",
+        "action": "Analisis sekarang",
+        "noRepositories": "Belum ada repositori dengan balasan pengelola terbaru.",
+        "proposed": "Usulan memori tinjauan dibuat",
+        "noFeedback": "Tidak ada umpan balik terbaru untuk repositori ini",
+        "noPattern": "Tidak ditemukan pola berulang yang jelas"
+      },
       "off": "Memori tinjauan nonaktif.",
       "on": "Memori tinjauan aktif.",
       "offDescription": "Aktifkan agar Kilo dapat belajar dari balasan pengelola repositori dan mengusulkan panduan untuk REVIEW.md.",
@@ -835,7 +854,63 @@
       "title": "Peninjau kode perlu ditangani.",
       "recoveryLabel": "Hubungi tim dukungan"
     },
-    "unknownError": "Terjadi kesalahan yang tidak diketahui."
+    "unknownError": "Terjadi kesalahan yang tidak diketahui.",
+    "skipBotPullRequests": {
+      "title": "Lewati PR dari bot",
+      "subtitle": "Jangan jalankan tinjauan otomatis pada PR yang dibuka bot seperti Dependabot atau Renovate. Matikan opsi ini untuk turut meninjau PR bot."
+    },
+    "repoModels": {
+      "title": "Model per repositori",
+      "description": "Jalankan tinjauan sebagian repositori dengan model, tingkat penalaran, atau keduanya yang berbeda.",
+      "defaultModel": "Menggunakan model bawaan",
+      "resetLabel": "Atur ulang model untuk {{repository}}",
+      "changeHint": "Membuka pemilih model"
+    },
+    "analytics": {
+      "title": "Analitik",
+      "trackedReviews": "Tinjauan dilacak",
+      "findingsRaised": "Temuan yang dilaporkan",
+      "highImpactChanges": "Perubahan berdampak tinggi",
+      "impactPoints": "Poin dampak",
+      "repositoryLine": "Tinjauan: {{reviews}} · Temuan: {{findings}}",
+      "empty": "Belum ada tinjauan dengan analitik",
+      "emptyDescription": "Analitik mencatat tinjauan yang selesai selama fitur ini aktif untuk organisasi.",
+      "off": "Analitik nonaktif untuk organisasi ini.",
+      "couldNotLoad": "Tidak dapat memuat analitik"
+    },
+    "council": {
+      "title": "Tinjauan dewan",
+      "subtitle": "Beberapa spesialis meninjau setiap PR, dan suara mereka digabungkan menjadi satu keputusan.",
+      "unavailable": "Tinjauan dewan tidak tersedia untuk organisasi ini.",
+      "noRepositories": "Belum ada repositori yang dipilih. Pilih repositori di setelan repositori terlebih dahulu.",
+      "specialists": "Spesialis",
+      "labels": "Label yang memicu tinjauan dewan",
+      "labelsPlaceholder": "mis. dewan, tinjauan mendalam",
+      "labelsDescription": "Pisahkan label dengan koma. Repositori yang mengaktifkan dewan kemudian hanya menjalankan dewan untuk PR yang membawa setidaknya satu dari label ini. Biarkan kosong untuk setiap PR yang memenuhi syarat.",
+      "tooManyLabels": "Terlalu banyak label dewan. Gunakan maksimal {{maximum}} label.",
+      "labelTooLong": "Label dewan terlalu panjang. Setiap label harus terdiri dari maksimal {{maximum}} karakter.",
+      "minSpecialists": "Pilih setidaknya {{minimum}} spesialis. {{selected}} dipilih.",
+      "specialistName": {
+        "testCoverage": "Cakupan pengujian",
+        "correctness": "Ketepatan",
+        "custom": "Spesialis"
+      },
+      "specialist": {
+        "security": "Bypass otorisasi, penanganan rahasia, dan input yang tidak aman.",
+        "performance": "Jalur kritis, kueri N+1, dan alokasi memori berat.",
+        "testing": "Cakupan yang hilang atau lemah untuk perilaku baru.",
+        "correctness": "Kesalahan logika, kasus tepi, dan kondisi balapan.",
+        "custom": "Meninjau masalah di areanya sendiri."
+      },
+      "strategy": {
+        "advisory": "Saran",
+        "advisoryDescription": "Melaporkan temuan dan memberikan suara tanpa memblokir penggabungan.",
+        "unanimous": "Suara bulat",
+        "unanimousDescription": "Memblokir penggabungan jika ada spesialis yang melaporkan masalah kritis.",
+        "majority": "Mayoritas",
+        "majorityDescription": "Memblokir penggabungan hanya jika sebagian besar spesialis melaporkan masalah kritis."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1338,6 +1413,16 @@
       "auto": "Otomatis",
       "shallow": "Dasar",
       "deep": "Mendalam"
+    },
+    "orphanedFindings": {
+      "title": "Temuan untuk repositori yang dihapus",
+      "description": "Repositori ini tidak lagi dapat dijangkau melalui integrasi GitHub. Temuannya tetap dihitung di dasbor dan laporan.",
+      "count": "Temuan: {{count}}",
+      "clearLabel": "Hapus temuan untuk {{repository}}",
+      "confirmTitle": "Hapus temuan?",
+      "confirmMessage": "Setiap temuan yang tercatat untuk {{repository}} akan dihapus. Tindakan ini tidak dapat dibatalkan.",
+      "confirmAction": "Hapus temuan",
+      "cleared": "Temuan dihapus: {{count}}"
     }
   },
   "agents": {
@@ -1517,6 +1602,7 @@
       "branchPlaceholder": "Pilih cabang",
       "runOnWithTarget": "Jalankan di: {{target}}",
       "environment": "Lingkungan",
+      "cloudEnvironment": "Lingkungan cloud",
       "couldNotLoadEnvironment": "Tidak dapat memuat lingkunganmu.",
       "retryLoadingEnvironment": "Coba muat ulang lingkungan",
       "defaultEnvironment": "Lingkungan bawaan",
@@ -1577,6 +1663,89 @@
       "openSettingsToReview": "Buka Pengaturan untuk meninjau",
       "profileSelection": "Pemilihan profil",
       "profileLayerAccessibility": "{{label}}: {{detail}}"
+    },
+    "environment": {
+      "loadingEnvironments": "Memuat lingkungan",
+      "couldNotLoadEnvironments": "Tidak dapat memuat lingkungan",
+      "couldNotLoadEnvironmentsDetail": "Coba lagi untuk memuat lingkungan repositori ini.",
+      "noEnvironment": "Tanpa lingkungan",
+      "noEnvironmentDetail": "Sesi ini dimulai dari image dasar.",
+      "chooseEnvironment": "Pilih lingkungan",
+      "chooseEnvironmentDetail": "Repositori ini memiliki lebih dari satu lingkungan.",
+      "environmentAccessibility": "Pilih lingkungan: {{label}}",
+      "environmentsForRepository": "Lingkungan untuk {{repository}}",
+      "selectEnvironmentToStart": "Pilih lingkungan untuk memulai.",
+      "buildDetails": "Detail build",
+      "buildNotBuilt": "Belum di-build",
+      "buildUnavailableShort": "Build snapshot tidak tersedia",
+      "buildPreparing": "Menyiapkan builder",
+      "buildCloning": "Mengkloning branch default",
+      "buildSetup": "Menjalankan penyiapan lingkungan",
+      "buildCleanup": "Menghapus kredensial build",
+      "buildCapturing": "Mengambil snapshot",
+      "buildPublishing": "Memublikasikan snapshot",
+      "buildStopping": "Menghentikan builder",
+      "buildStoppingRetrying": "Menghentikan builder, mencoba lagi",
+      "buildFinishing": "Menyelesaikan build",
+      "buildSucceeded": "Snapshot siap",
+      "buildSuperseded": "Digantikan oleh build yang lebih baru",
+      "buildStale": "Pengaturan berubah sejak snapshot ini dibuat",
+      "buildStaleAge": "Snapshot berusia lebih dari empat hari; sesi berikutnya akan memperbaruinya",
+      "buildStaleImage": "Dibuat untuk image sandbox versi sebelumnya",
+      "failureClone": "Repositori tidak dapat dikloning.",
+      "failureSetup": "Perintah penyiapan gagal. Lihat log build.",
+      "failureTimeout": "Perintah penyiapan melebihi batas waktu. Lihat log build.",
+      "failureCleanup": "Kredensial tidak dapat dihapus, jadi snapshot tidak diambil.",
+      "failureCapture": "Snapshot tidak dapat diambil.",
+      "failureCaptureUncertain": "Hasil snapshot hilang; build tidak dipublikasikan.",
+      "failureDeadline": "Build tidak selesai tepat waktu.",
+      "failureBuilderLost": "Builder berhenti mengirim laporan.",
+      "failureBuilderStart": "Builder tidak dapat dimulai.",
+      "failureUnauthorized": "Akses ke repositori tidak lagi diizinkan.",
+      "failureActorUnauthorized": "Orang yang memulai build tidak lagi memiliki akses.",
+      "failureBilling": "Build memerlukan kredit yang tersedia.",
+      "failureBillingUnavailable": "Penagihan tidak dapat menyetujui build. Coba lagi.",
+      "failureConfiguration": "Konfigurasi berubah selama build berlangsung.",
+      "failureRuntime": "Rilis runtime yang dipilih tidak dapat diinstal.",
+      "failureGeneric": "Build gagal.",
+      "buildLogs": "Log build",
+      "noBuildLogs": "Belum ada output log.",
+      "buildLogsLatestOnly": "Menampilkan 500 baris log terbaru yang disimpan.",
+      "buildLogsTruncated": "Output selanjutnya terpotong.",
+      "couldNotLoadBuild": "Tidak dapat memuat status build",
+      "couldNotLoadBuildLogs": "Tidak dapat memuat log build",
+      "buildsUnavailable": "Build snapshot tidak tersedia untuk lingkungan ini.",
+      "onlyManagersCanBuild": "Hanya manajer organisasi yang dapat mem-build snapshot.",
+      "waitForBuilder": "Tunggu hingga builder berhenti sebelum melakukan build lagi.",
+      "buildAction": "Build snapshot",
+      "refreshAction": "Perbarui snapshot",
+      "cancelBuildAction": "Batalkan build",
+      "buildStarted": "Build snapshot dimulai",
+      "buildCanceled": "Build snapshot dibatalkan",
+      "couldNotStartBuild": "Tidak dapat memulai build",
+      "couldNotCancelBuild": "Tidak dapat membatalkan build",
+      "sandbox": "Sandbox",
+      "sandboxActive": "Sandbox aktif",
+      "sandboxSleeping": "Sandbox sedang tidur",
+      "sandboxStarting": "Sandbox sedang dimulai",
+      "sandboxStopping": "Sandbox sedang dihentikan",
+      "sandboxError": "Kesalahan sandbox",
+      "sandboxUnreachable": "Sandbox tidak dapat dijangkau",
+      "sandboxStatusUnknown": "Status sandbox tidak diketahui",
+      "sandboxChecked": "Diperiksa {{when}}",
+      "sandboxDetailStopped": "Kirim pesan untuk melanjutkannya.",
+      "sandboxDetailFailed": "Kirim pesan untuk mencoba lagi.",
+      "sandboxDetailConnection": "Koneksi sandbox tidak tersedia.",
+      "sandboxDetailUnavailable": "Status sandbox untuk sementara tidak tersedia.",
+      "sandboxDetailInsufficient": "Informasi tidak cukup untuk memastikan status sandbox saat ini.",
+      "sandboxDetailCheckNeeded": "Sandbox belum mengonfirmasi kondisinya akhir-akhir ini.",
+      "startFresh": "Mulai dari awal",
+      "startFreshTitle": "Mulai dari awal?",
+      "startFreshMessage": "Tindakan ini akan membuang snapshot ruang kerja yang diambil {{when}}. Perubahan yang belum di-commit dari ruang kerja tersebut akan hilang.",
+      "startFreshMessageUnknown": "Tindakan ini akan membuang snapshot ruang kerja tersimpan, yang tidak dapat dibaca. Perubahan yang belum di-commit dari ruang kerja tersebut akan hilang.",
+      "startFreshDone": "Snapshot ruang kerja dihapus.",
+      "couldNotRemoveSnapshot": "Tidak dapat menghapus snapshot ruang kerja.",
+      "snapshotCaptured": "Snapshot ruang kerja diambil {{when}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} berkas telah diperbarui.",
@@ -1926,7 +2095,8 @@
       "cancelQueued": "Batalkan pesan",
       "cancelQueuedAccessibility": "Batalkan pesan dalam antrean",
       "restoreQueued": "Pulihkan",
-      "restoreQueuedAccessibility": "Pulihkan pesan yang dibatalkan ke kolom pesan"
+      "restoreQueuedAccessibility": "Pulihkan pesan yang dibatalkan ke kolom pesan",
+      "noReplyRecorded": "Tidak ada respons yang tercatat untuk pesan ini."
     },
     "olderMessages": {
       "arrived": "Pesan sebelumnya dimuat",
@@ -2319,6 +2489,26 @@
     "onlyFirstFilesAttached_other": "Hanya {{displayCount}} file pertama yang akan dilampirkan."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Riwayat penagihan",
+      "billingHistoryEmpty": "Belum ada riwayat penagihan.",
+      "cancel": "Batalkan langganan",
+      "cancelDescription": "Kilo Pass Anda tetap aktif hingga akhir periode penagihan dan tidak akan diperpanjang.",
+      "cancelScheduled": "Berakhir pada {{date}}",
+      "cancelScheduledChange": "Batalkan perubahan terjadwal",
+      "cancelled": "Langganan dibatalkan",
+      "changePlan": "Ubah paket di kilo.ai",
+      "changePlanIosNote": "Perubahan paket berbayar tersedia di kilo.ai.",
+      "creditHistoryEmpty": "Belum ada kredit Kilo Pass.",
+      "manageInStore": "Kelola di {{store}}",
+      "resume": "Lanjutkan langganan",
+      "resumeCancelledDescription": "Kilo Pass Anda akan kembali diperpanjang secara otomatis.",
+      "resumePausedDescription": "Kilo Pass Anda dilanjutkan sekarang, sebelum tanggal lanjutan yang dijadwalkan.",
+      "resumed": "Langganan dilanjutkan",
+      "scheduledChange": "Perubahan terjadwal",
+      "scheduledChangeCancelDescription": "Kilo Pass Anda tetap menggunakan paket saat ini dan diperpanjang seperti biasa.",
+      "scheduledChangeSummary": "{{plan}} pada {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass tidak tersedia.",
     "couldNotLoad": "Kilo Pass tidak dapat dimuat. Coba lagi.",
@@ -2328,7 +2518,7 @@
     "subscriptionLoading": "Memuat langganan Kilo Pass",
     "retryHint": "Mencoba memuat ulang status Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailableEnded": "Kilo Pass Anda telah berakhir.",
+    "endedOn": "Berakhir pada {{date}}",
     "notAvailableInApp": "Kilo Pass tidak tersedia di aplikasi.",
     "statusActive": "Aktif",
     "statusTrialing": "Uji coba",
@@ -2350,7 +2540,7 @@
     "kiloPassManagement": "Pengelolaan Kilo Pass",
     "kiloPassSetup": "Penyiapan Kilo Pass",
     "opensManagementOnWeb": "Membuka pengelolaan Kilo Pass di web.",
-    "tryAgainFromProfile": "Coba lagi dari halaman profil.",
+    "loadFailedRetry": "Periksa koneksi Anda, lalu coba lagi.",
     "legalTermsOfUse": "Ketentuan penggunaan (EULA)",
     "purchaseDifferentAccount": "Pembelian App Store ini tidak tertaut ke akun Kilo milikmu. Masuk ke Apple Account yang digunakan untuk pembelian, lalu coba lagi.",
     "purchaseFailed": "Gagal menyelesaikan pembelian.",
@@ -2373,6 +2563,11 @@
     "accountDescription": "ID akun Kilo dan metadata permintaanmu digunakan untuk memverifikasi identitasmu dan menghitung penggunaan.",
     "diagnosticsTitle": "Diagnostik aplikasi",
     "diagnosticsDescription": "Laporan aplikasi berhenti mendadak dan kesalahan digunakan untuk menjaga kestabilan aplikasi. Konten aplikasi dihapus dari laporan ini.",
+    "featureFlagsTitle": "Peluncuran fitur",
+    "featureFlagsDescription": "Email akunmu, yang digunakan PostHog untuk menentukan fitur mana yang kamu lihat.",
+    "featureFlagsWhat": "Email akunmu.",
+    "featureFlagsWhy": "Untuk menentukan fitur mana yang kamu lihat, termasuk fitur yang masih kami luncurkan secara bertahap.",
+    "featureFlagsWho": "PostHog, layanan feature flag.",
     "helpImprove": "Bantu tingkatkan Kilo",
     "helpImproveDescription": "Bagikan data analitik produk anonim dan sumber pemasangan aplikasi. Kamu dapat mengubahnya kapan saja di Pengaturan.",
     "seeFullDetails": "Lihat detail lengkap",
@@ -2988,6 +3183,36 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "Log audit",
+      "permissionDenied": "Hanya pemilik, admin, atau pengelola penagihan organisasi dengan paket Enterprise yang dapat membaca log auditnya.",
+      "emptyTitle": "Tidak ada peristiwa audit",
+      "emptyDescription": "Tindakan yang dilakukan di organisasi ini akan muncul di sini.",
+      "truncated": "Menampilkan peristiwa terbaru."
+    },
+    "billing": {
+      "title": "Penagihan",
+      "permissionDenied": "Hanya pemilik, admin, atau manajer penagihan organisasi yang dapat melihat penagihannya.",
+      "subscription": "Langganan",
+      "state": "Status",
+      "stateNone": "Tidak ada langganan",
+      "statePastDue": "Lewat jatuh tempo",
+      "stateCancelsAtPeriodEnd": "Dibatalkan di akhir periode",
+      "stateTrialEndsOn": "Uji coba berakhir pada {{date}}",
+      "stateTrialing": "Uji coba",
+      "stateRenewsOn": "Diperpanjang pada {{date}}",
+      "seatsDropTo": "Turun menjadi {{seats}} lisensi pada {{date}}",
+      "seats": "Lisensi pengguna",
+      "autoTopUp": "Isi ulang otomatis",
+      "autoTopUpAmount": "Jumlah isi ulang",
+      "autoTopUpThreshold": "Saat saldo di bawah",
+      "manageOnWeb": "Perubahan dilakukan di web",
+      "changePlan": "Ubah paket",
+      "buySeats": "Beli lisensi",
+      "setupAutoTopUp": "Atur isi ulang otomatis",
+      "webAddress": "Alamat web {{url}}",
+      "opensOnWeb": "Dibuka di web"
+    },
     "boundary": {
       "backToProfile": "Kembali ke profil",
       "loadErrorMessage": "Periksa koneksimu dan coba lagi.",
@@ -2995,14 +3220,20 @@
       "loadErrorTitle": "Tidak dapat memuat daftar organisasimu.",
       "membershipLostNotice": "Kamu tidak lagi memiliki akses ke organisasi ini. Beralih ke {{target}}.",
       "noOrganization": "Tidak ada organisasi",
-      "noOrganizationDescription": "Akun ini bukan bagian dari organisasi. Buat atau gabung ke organisasi di web untuk menggunakan fitur organisasi seperti undangan anggota dan peringatan saldo rendah.",
-      "openWebOrganizations": "Buka organisasi di web",
+      "noOrganizationDescription": "Akun ini bukan bagian dari organisasi. Buat organisasi untuk menggunakan fitur organisasi seperti undangan anggota dan peringatan saldo rendah, atau buka web untuk bergabung dengan organisasi yang mengundang Anda.",
       "organizationUnavailable": "Organisasi tidak tersedia.",
       "selectDescriptionWithOrganizations": "Kamu termasuk dalam satu atau beberapa organisasi. Pilih akun yang harus digunakan layar ini.",
       "selectOrganization": "Pilih organisasi",
       "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih organisasi lain dari profilmu untuk melanjutkan.",
       "unavailableSessionsDescription": "Organisasi ini tidak lagi tersedia. Sesi untuk organisasi ini tidak dapat dimuat.",
       "accessDeniedDescription": "Kamu tidak memiliki akses ke organisasi ini."
+    },
+    "create": {
+      "title": "Buat organisasi",
+      "description": "Organisasi memungkinkan tim Anda berbagi kredit, agen, dan pengaturan.",
+      "nameLabel": "Nama organisasi",
+      "nameRequired": "Masukkan nama organisasi.",
+      "trialNote": "Uji coba Enterprise 14 hari Anda dimulai saat Anda membuatnya. Paket dibeli di web."
     },
     "creditActivity": {
       "emptyDescription": "Setiap pembelian, penggunaan, dan penyesuaian kredit organisasi ini akan ditampilkan di sini.",
@@ -3124,6 +3355,21 @@
       "ownRoleChange": "Anda tidak dapat mengubah peran Anda sendiri.",
       "inviteExpired": "Undangan ini telah kedaluwarsa.",
       "inviteAccepted": "Undangan ini sudah diterima."
+    },
+    "settingsOnWeb": {
+      "title": "Pengaturan organisasi di web",
+      "usageDetails": "Detail penggunaan",
+      "providersAndModels": "Penyedia dan model",
+      "groups": "Grup",
+      "guardrails": "Guardrail",
+      "byok": "Gunakan kunci sendiri",
+      "ssoAndDomain": "SSO dan domain",
+      "emailPreferences": "Preferensi email",
+      "dataCollection": "Pengumpulan data",
+      "auditLogs": "Log audit",
+      "requestLogs": "Log permintaan",
+      "subOrganizations": "Sub-organisasi",
+      "distributeFunds": "Distribusikan dana"
     },
     "usageStats": {
       "inputTokens": "Token masukan",
@@ -3870,6 +4116,25 @@
     "importConfigApplied": "Config diimpor"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Aktivitas kredit gagal dimuat.",
+      "appStoreReceipt": "Tanda terima dari App Store",
+      "deductionFallback": "Pengurangan kredit",
+      "emptyDescription": "Pembelian kredit, tanda terima, dan penggunaan akan muncul di sini.",
+      "emptyTitle": "Tidak ada riwayat kredit",
+      "googlePlayReceipt": "Tanda terima dari Google Play",
+      "kind": {
+        "adjustment": "Penyesuaian",
+        "balanceNeutral": "Saldo tetap",
+        "deduction": "Pengurangan",
+        "grant": "Kredit gratis",
+        "purchase": "Pembelian"
+      },
+      "purchaseFallback": "Pembelian kredit",
+      "receipt": "Tanda terima",
+      "receiptA11y": "Buka tanda terima untuk {{description}}",
+      "receiptUnavailable": "Tanda terima tidak tersedia untuk pembelian ini."
+    },
     "title": "Beli kredit",
     "description": "Kredit adalah pembelian satu kali yang ditambahkan ke saldo Kilo Anda untuk menjalankan sesi coding AI di Kilo App. Toko menagih akun Anda dan kredit ditambahkan setelah toko mengonfirmasi pembayaran.",
     "nextExpiry": "Kredit senilai {{amount}} akan kedaluwarsa pada {{date}} (UTC). Kredit dengan masa berlaku paling awal digunakan lebih dulu.",
@@ -4051,6 +4316,70 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Tidak dapat membuka hasil pencarian ini"
+  },
+  "usage": {
+    "title": "Penggunaan",
+    "orgTitle": "Penggunaan organisasi",
+    "entrySubtitle": "Pengeluaran, permintaan, dan token",
+    "rangePicker": "Rentang waktu",
+    "range90d": "90 hari",
+    "metricPicker": "Metrik grafik",
+    "chartA11y": "{{metric}} per hari",
+    "avgCostPerRequest": "Biaya rata-rata / permintaan",
+    "topModels": "Model teratas",
+    "topFeatures": "Fitur teratas",
+    "emptyTitle": "Tidak ada penggunaan pada periode ini",
+    "orgSelfNotice": "Anda melihat penggunaan Anda sendiri di organisasi ini.",
+    "viewDetails": "Lihat detail penggunaan"
+  },
+  "integrations": {
+    "title": "Integrasi",
+    "sectionTitle": "Layanan terhubung",
+    "entrySubtitle": "GitHub, Slack, Linear, dan lainnya",
+    "subtitle": "Hubungkan alat dan alur kerja pengembangan Anda ke Kilo",
+    "emptyHint": "Belum ada integrasi yang terhubung.",
+    "disconnect": "Putuskan",
+    "disconnectTitle": "Putuskan {{provider}}?",
+    "disconnectMessage": "Kilo tidak akan merespons lagi di {{provider}}. Anda dapat menghubungkannya kembali kapan saja.",
+    "connectedTo": "Terhubung ke {{account}}",
+    "disconnected": "{{provider}} telah diputuskan",
+    "disconnectFailed": "Tidak dapat memutuskan {{provider}}",
+    "couldNotLoad": "Tidak dapat memuat integrasi",
+    "permissionDenied": "Anda tidak memiliki izin untuk mengelola integrasi ini.",
+    "memberHint": "Minta pemilik atau admin organisasi untuk mengubah koneksi ini.",
+    "connectFailed": "Tidak dapat membuka halaman koneksi"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Faktur untuk pembelian pribadi Anda akan muncul di sini setelah Anda ditagih."
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Belum ada penggunaan",
+      "sharedWorkspace": "Digunakan bersama oleh semua chat di workspace ini",
+      "currentRates": "Tarif saat ini",
+      "perHour": "{{rate}}/jam",
+      "mediumSandbox": "Sandbox sedang",
+      "largeSandbox": "Sandbox besar",
+      "earlierActivity": "Aktivitas sebelumnya",
+      "now": "sekarang",
+      "loadFailed": "Biaya compute gagal dimuat."
+    },
+    "preview": {
+      "title": "Buka pratinjau",
+      "listeningServices": "Layanan yang mendengarkan",
+      "empty": "Tidak ditemukan layanan yang mendengarkan. Minta agen menjalankan server web, lalu muat ulang.",
+      "notRunning": "Sandbox ini dihentikan. Kirim pesan ke agen untuk menyalakannya lagi.",
+      "notReady": "Sandbox belum siap. Muat ulang setelah terhubung.",
+      "unsupported": "Penemuan layanan tidak tersedia untuk sandbox ini.",
+      "failed": "Tidak dapat menemukan layanan.",
+      "openService": "Buka {{name}} di port {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Pemicu & webhook",
+      "subtitle": "Kelola pemicu webhook dan terjadwal di web."
+    }
   },
   "sessionShare": {
     "title": "Bagikan sesi",

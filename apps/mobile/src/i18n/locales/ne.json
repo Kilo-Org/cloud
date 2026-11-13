@@ -23,6 +23,10 @@
   },
   "common": {
     "deleteTitle": "{{label}} मेट्ने?",
+    "manageOnWeb": "वेबमा व्यवस्थापन गर्नुहोस्",
+    "creditHistory": "क्रेडिट इतिहास",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": "। ",
     "listJoiner": ", ",
     "cancel": "रद्द गर्नुहोस्",
@@ -119,6 +123,7 @@
     "copyLink": "लिङ्क प्रतिलिपि गर्नुहोस्",
     "couldNotLoadOrganizations": "संस्थाहरू लोड गर्न सकिएन।",
     "couldNotLoadSessions": "सत्रहरू लोड गर्न सकिएन।",
+    "couldnTLoad": "लोड गर्न सकिएन।",
     "couldnTLoadMore": "थप लोड गर्न सकिएन।",
     "deviceSessions": "यन्त्रका सत्रहरू",
     "disabled": "बन्द",
@@ -246,6 +251,10 @@
     "notAdded": "तपाईं साइन इन हुनुभएको छ। {{provider}} तपाईंको खातामा थपिएन।"
   },
   "profile": {
+    "creditHistorySubtitle": "खरिद, रसिद र क्रेडिट गतिविधि",
+    "invoicesSubtitle": "तपाईंका खरिदहरूका इनभ्वाइस डाउनलोड गर्नुहोस्",
+    "manageBilling": "kilo.ai मा बिलिङ व्यवस्थापन गर्नुहोस्",
+    "manageBillingIosNote": "भुक्तानी विधि, स्वतः टप-अप र बिलिङ विवरणहरू kilo.ai मा व्यवस्थापन गरिन्छन्।",
     "codeReviewerSubtitle": "स्वचालित PR समीक्षाहरू",
     "securityAgentSubtitle": "सुरक्षा कमजोरीहरू पत्ता लगाएर समाधान गर्नुहोस्",
     "reviews": "समीक्षाहरू",
@@ -299,6 +308,7 @@
     "passkeyAdded": "पासकी थपियो।",
     "passkeyAddFailed": "पासकी थप्न सकिएन। फेरि प्रयास गर्नुहोस्।",
     "passkeyAddUnsupported": "यो यन्त्रले पासकी बनाउन सक्दैन।",
+    "passkeyAddUnavailable": "पासकीहरू वेब ब्राउजरमा मात्र थप्न सकिन्छन्।",
     "passkeyAddCancelled": "पासकी बनाउने कार्य रद्द भयो।",
     "passkeyRemoved": "पासकी हटाइयो।",
     "passkeyRemoveFailed": "त्यो पासकी हटाउन सकिएन। फेरि प्रयास गर्नुहोस्।",
@@ -331,7 +341,6 @@
     "providerKeys": {
       "title": "प्रदायक कुञ्जीहरू",
       "rowSubtitle": "आफ्नै प्रदायक बिलिङ प्रयोग गर्नुहोस्",
-      "manageOnWeb": "वेबमा व्यवस्थापन गर्नुहोस्",
       "manageOnWebReason": "यी प्रदायकहरूलाई संरचित प्रमाणपत्रहरू चाहिन्छ।",
       "description": "यी कुञ्जीहरूमार्फत गरिएका अनुरोधहरूको बिल तपाईंको Kilo मौज्दातको सट्टा तपाईंको प्रदायक खातामा लाग्छ।",
       "enabled": "प्रयोगमा",
@@ -1245,7 +1254,17 @@
       "changeRequestMissingPermissions": "Kilo को GitHub App ले यो रिपोजिटरीमा पुल अनुरोध खोल्न सक्दैन। रिपोजिटरी मालिकले एपलाई सामग्री र पुल अनुरोधहरूमा लेख्ने पहुँच दिनुपर्छ, त्यसपछि फेरि प्रयास गर्नुहोस्।",
       "changeRequestFailed": "Kilo ले पुल रिक्वेस्ट खोल्न सकेन। केही क्षणमा फेरि प्रयास गर्नुहोस्।",
       "proposalConflict": "यो रिपोजिटरीका लागि अर्को प्रस्ताव अझै सक्रिय छ।",
-      "offAction": "समीक्षा मेमोरी बन्द छ। यसलाई चालु गर्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।"
+      "offAction": "समीक्षा मेमोरी बन्द छ। यसलाई चालु गर्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
+      "analyze": {
+        "title": "प्रतिक्रियाको विश्लेषण गर्नुहोस्",
+        "description": "हालैका मर्मतकर्ताका जवाफ भएको रिपोजिटरी छान्नुहोस्, त्यसपछि दोहोरिने एउटा मार्गदर्शन ढाँचा खोज्नुहोस्.",
+        "chooseRepository": "रिपोजिटरी छान्नुहोस्",
+        "action": "अहिले विश्लेषण गर्नुहोस्",
+        "noRepositories": "अहिलेसम्म कुनै पनि रिपोजिटरीमा हालैका मर्मतकर्ताका जवाफ छैनन्.",
+        "proposed": "समीक्षा मेमोरी प्रस्ताव सिर्जना गरियो",
+        "noFeedback": "यो रिपोजिटरीका लागि हालको प्रतिक्रिया भेटिएन",
+        "noPattern": "स्पष्ट दोहोरिने ढाँचा भेटिएन"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "मर्ज रिक्वेस्टको मान्य URL लेख्नुहोस्।",
@@ -1377,7 +1396,63 @@
       "title": "कोड समीक्षकमा ध्यान दिनुपर्ने समस्या छ।",
       "recoveryLabel": "सहायता टोलीलाई सम्पर्क गर्नुहोस्"
     },
-    "unknownError": "अज्ञात त्रुटि"
+    "unknownError": "अज्ञात त्रुटि",
+    "skipBotPullRequests": {
+      "title": "बोटबाट आउने पुल रिक्वेस्ट छोड्नुहोस्",
+      "subtitle": "Dependabot वा Renovate जस्ता बोटले खोल्ने पुल रिक्वेस्टमा स्वचालित समीक्षा नगर्नुहोस्. बोटका पुल रिक्वेस्ट पनि समीक्षा गर्न यो बन्द गर्नुहोस्."
+    },
+    "repoModels": {
+      "title": "प्रति-रिपोजिटरी मोडेल",
+      "description": "केही रिपोजिटरीका समीक्षा फरक मोडेलमा, सोच प्रयासमा वा दुवैमा चलाउनुहोस्.",
+      "defaultModel": "पूर्वनिर्धारित मोडेल प्रयोग गर्छ",
+      "resetLabel": "{{repository}} का लागि मोडेल रिसेट गर्नुहोस्",
+      "changeHint": "मोडेल छनोट खोल्छ"
+    },
+    "analytics": {
+      "title": "एनालिटिक्स",
+      "trackedReviews": "ट्र्याक गरिएका समीक्षा",
+      "findingsRaised": "रिपोर्ट गरिएका समस्या",
+      "highImpactChanges": "उच्च प्रभावका परिवर्तन",
+      "impactPoints": "प्रभाव अंक",
+      "repositoryLine": "समीक्षा: {{reviews}} · समस्या: {{findings}}",
+      "empty": "अझै एनालिटिक्ससहितका समीक्षा छैनन्",
+      "emptyDescription": "संस्थाका लागि एनालिटिक्स खुला हुँदा यसले पूरा भएका समीक्षा रेकर्ड गर्छ.",
+      "off": "यो संस्थाका लागि एनालिटिक्स बन्द छ.",
+      "couldNotLoad": "एनालिटिक्स लोड गर्न सकिएन"
+    },
+    "council": {
+      "title": "समीक्षक मण्डल",
+      "subtitle": "धेरै विशेषज्ञले प्रत्येक पुल रिक्वेस्टको समीक्षा गर्छन् र उनीहरूका मत एउटै निर्णयमा मिल्छन्.",
+      "unavailable": "यो संस्थाका लागि समीक्षक मण्डल उपलब्ध छैन.",
+      "noRepositories": "अहिलेसम्म कुनै रिपोजिटरी छानिएको छैन. पहिले रिपोजिटरी सेटिङमा रिपोजिटरी छान्नुहोस्.",
+      "specialists": "विशेषज्ञहरू",
+      "labels": "समीक्षक मण्डल सुरु गर्ने लेबलहरू",
+      "labelsPlaceholder": "जस्तै मण्डल, गहिरो समीक्षा",
+      "labelsDescription": "लेबलहरूलाई कमाले छुट्याउनुहोस्. मण्डल सक्रिय भएको रिपोजिटरीले यी लेबलमध्ये कम्तीमा एउटा भएका पुल रिक्वेस्टका लागि मात्र मण्डल चलाउँछ. सबै योग्य पुल रिक्वेस्टका लागि यो खाली छोड्नुहोस्.",
+      "tooManyLabels": "समीक्षक मण्डलका लेबलहरू धेरै भए। बढीमा {{maximum}} वटा लेबल प्रयोग गर्नुहोस्।",
+      "labelTooLong": "समीक्षक मण्डलको लेबल धेरै लामो भयो। प्रत्येक लेबलमा बढीमा {{maximum}} अक्षर हुनुपर्छ।",
+      "minSpecialists": "कम्तीमा {{minimum}} विशेषज्ञ छान्नुहोस्. {{selected}} छानिए.",
+      "specialistName": {
+        "testCoverage": "परीक्षण कभरेज",
+        "correctness": "शुद्धता",
+        "custom": "विशेषज्ञ"
+      },
+      "specialist": {
+        "security": "अधिकार बाइपास, गोप्य व्यवस्थापन र असुरक्षित इनपुट.",
+        "performance": "हट पाथ, एन+1 क्वेरी र भारी मेमोरी बाँडफाँट.",
+        "testing": "नयाँ व्यवहारका लागि कमी वा कमजोर परीक्षण कभरेज.",
+        "correctness": "तर्क त्रुटि, सीमान्त अवस्था र रेस अवस्था.",
+        "custom": "आफ्नै क्षेत्रका समस्या समीक्षा गर्छ."
+      },
+      "strategy": {
+        "advisory": "सल्लाहकार",
+        "advisoryDescription": "मर्ज नरोकी समस्या रिपोर्ट गर्छ र मत दिन्छ.",
+        "unanimous": "सर्वसम्मत",
+        "unanimousDescription": "कुनै पनि विशेषज्ञले गम्भीर समस्या रिपोर्ट गरे मर्ज रोक्छ.",
+        "majority": "बहुमत",
+        "majorityDescription": "धेरैजसो विशेषज्ञले गम्भीर समस्या रिपोर्ट गरेमा मात्र मर्ज रोक्छ."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1880,6 +1955,16 @@
       "auto": "स्वचालित",
       "shallow": "सतही",
       "deep": "गहिरो"
+    },
+    "orphanedFindings": {
+      "title": "हटाइएका रिपोजिटरीका समस्या",
+      "description": "यी रिपोजिटरी GitHub इन्टिग्रेसनमार्फत अब पहुँचयोग्य छैनन्. तिनका समस्या अझै ड्यासबोर्ड र रिपोर्टमा गनिन्छन्.",
+      "count": "समस्या: {{count}}",
+      "clearLabel": "{{repository}} का समस्या हटाउनुहोस्",
+      "confirmTitle": "समस्या हटाउने?",
+      "confirmMessage": "{{repository}} का लागि रेकर्ड भएका सबै समस्या मेटिनेछन्. यो फिर्ता गर्न सकिँदैन.",
+      "confirmAction": "समस्या मेट्नुहोस्",
+      "cleared": "समस्या हटाइयो: {{count}}"
     }
   },
   "agents": {
@@ -2059,6 +2144,7 @@
       "branchPlaceholder": "एउटा ब्रान्च चयन गर्नुहोस्",
       "runOnWithTarget": "{{target}} मा चलाउनुहोस्",
       "environment": "वातावरण",
+      "cloudEnvironment": "क्लाउड वातावरण",
       "couldNotLoadEnvironment": "तपाईंको वातावरण लोड गर्न सकिएन।",
       "retryLoadingEnvironment": "वातावरण लोड गर्न पुनः प्रयास गर्नुहोस्",
       "defaultEnvironment": "पूर्वनिर्धारित वातावरण",
@@ -2119,6 +2205,89 @@
       "openSettingsToReview": "समीक्षा गर्न सेटिङहरू खोल्नुहोस्",
       "profileSelection": "प्रोफाइल चयन",
       "profileLayerAccessibility": "{{label}}: {{detail}}"
+    },
+    "environment": {
+      "loadingEnvironments": "वातावरणहरू लोड हुँदैछन्",
+      "couldNotLoadEnvironments": "वातावरणहरू लोड गर्न सकिएन",
+      "couldNotLoadEnvironmentsDetail": "यो रिपोजिटरीका वातावरणहरू लोड गर्न फेरि प्रयास गर्नुहोस्।",
+      "noEnvironment": "कुनै वातावरण छैन",
+      "noEnvironmentDetail": "यो सत्र आधार इमेजबाट सुरु हुन्छ।",
+      "chooseEnvironment": "वातावरण छान्नुहोस्",
+      "chooseEnvironmentDetail": "यो रिपोजिटरीमा एकभन्दा बढी वातावरण छन्।",
+      "environmentAccessibility": "वातावरण छान्नुहोस्: {{label}}",
+      "environmentsForRepository": "{{repository}} का वातावरणहरू",
+      "selectEnvironmentToStart": "सुरु गर्न वातावरण चयन गर्नुहोस्।",
+      "buildDetails": "बिल्ड विवरण",
+      "buildNotBuilt": "बिल्ड गरिएको छैन",
+      "buildUnavailableShort": "स्न्यापसट बिल्ड उपलब्ध छैन",
+      "buildPreparing": "बिल्डर तयार गरिँदैछ",
+      "buildCloning": "पूर्वनिर्धारित ब्रान्च क्लोन गरिँदैछ",
+      "buildSetup": "वातावरण सेटअप चलाइँदैछ",
+      "buildCleanup": "बिल्ड क्रेडेन्सियलहरू हटाइँदैछ",
+      "buildCapturing": "स्न्यापसट लिइँदैछ",
+      "buildPublishing": "स्न्यापसट प्रकाशित गरिँदैछ",
+      "buildStopping": "बिल्डर रोकिँदैछ",
+      "buildStoppingRetrying": "बिल्डर रोकिँदैछ, फेरि प्रयास गरिँदैछ",
+      "buildFinishing": "बिल्ड पूरा गरिँदैछ",
+      "buildSucceeded": "स्न्यापसट तयार छ",
+      "buildSuperseded": "नयाँ बिल्डले प्रतिस्थापन गर्‍यो",
+      "buildStale": "यो स्न्यापसटपछि सेटिङहरू परिवर्तन भएका छन्",
+      "buildStaleAge": "स्न्यापसट चार दिनभन्दा पुरानो छ; अर्को सत्रले यसलाई रिफ्रेस गर्नेछ",
+      "buildStaleImage": "पहिलेको स्यान्डबक्स इमेजका लागि बनाइएको",
+      "failureClone": "रिपोजिटरी क्लोन गर्न सकिएन।",
+      "failureSetup": "एउटा सेटअप कमान्ड असफल भयो। बिल्ड लग हेर्नुहोस्।",
+      "failureTimeout": "एउटा सेटअप कमान्डको समय सकियो। बिल्ड लग हेर्नुहोस्।",
+      "failureCleanup": "क्रेडेन्सियलहरू हटाउन नसकिएकाले कुनै स्न्यापसट लिइएन।",
+      "failureCapture": "स्न्यापसट लिन सकिएन।",
+      "failureCaptureUncertain": "स्न्यापसटको नतिजा हरायो; बिल्ड प्रकाशित गरिएन।",
+      "failureDeadline": "बिल्ड समयमै पूरा भएन।",
+      "failureBuilderLost": "बिल्डरले रिपोर्ट गर्न छोड्यो।",
+      "failureBuilderStart": "बिल्डर सुरु हुन सकेन।",
+      "failureUnauthorized": "रिपोजिटरी पहुँच अब अधिकृत छैन।",
+      "failureActorUnauthorized": "बिल्ड सुरु गर्ने व्यक्तिसँग अब पहुँच छैन।",
+      "failureBilling": "बिल्डहरूका लागि उपलब्ध क्रेडिट आवश्यक छ।",
+      "failureBillingUnavailable": "बिलिङले बिल्डलाई स्वीकृति दिन सकेन। फेरि प्रयास गर्नुहोस्।",
+      "failureConfiguration": "बिल्डको क्रममा कन्फिगरेसन परिवर्तन भयो।",
+      "failureRuntime": "चयन गरिएको रनटाइम रिलिज इन्स्टल गर्न सकिएन।",
+      "failureGeneric": "बिल्ड असफल भयो।",
+      "buildLogs": "बिल्ड लगहरू",
+      "noBuildLogs": "अहिलेसम्म कुनै लग आउटपुट छैन।",
+      "buildLogsLatestOnly": "राखिएका पछिल्ला ५०० लग लाइनहरू देखाइँदै।",
+      "buildLogsTruncated": "त्यसपछिको आउटपुट काटिएको छ।",
+      "couldNotLoadBuild": "बिल्ड स्थिति लोड गर्न सकिएन",
+      "couldNotLoadBuildLogs": "बिल्ड लगहरू लोड गर्न सकिएन",
+      "buildsUnavailable": "यो वातावरणका लागि स्न्यापसट बिल्डहरू उपलब्ध छैनन्।",
+      "onlyManagersCanBuild": "संगठनका प्रबन्धकहरूले मात्र स्न्यापसट बिल्ड गर्न सक्छन्।",
+      "waitForBuilder": "फेरि बिल्ड गर्नुअघि बिल्डर रोकिने प्रतीक्षा गर्नुहोस्।",
+      "buildAction": "स्न्यापसट बिल्ड गर्नुहोस्",
+      "refreshAction": "स्न्यापसट रिफ्रेस गर्नुहोस्",
+      "cancelBuildAction": "बिल्ड रद्द गर्नुहोस्",
+      "buildStarted": "स्न्यापसट बिल्ड सुरु भयो",
+      "buildCanceled": "स्न्यापसट बिल्ड रद्द गरियो",
+      "couldNotStartBuild": "बिल्ड सुरु गर्न सकिएन",
+      "couldNotCancelBuild": "बिल्ड रद्द गर्न सकिएन",
+      "sandbox": "स्यान्डबक्स",
+      "sandboxActive": "स्यान्डबक्स सक्रिय",
+      "sandboxSleeping": "स्यान्डबक्स स्लिप मोडमा",
+      "sandboxStarting": "स्यान्डबक्स सुरु हुँदैछ",
+      "sandboxStopping": "स्यान्डबक्स रोकिँदैछ",
+      "sandboxError": "स्यान्डबक्स त्रुटि",
+      "sandboxUnreachable": "स्यान्डबक्समा पहुँच छैन",
+      "sandboxStatusUnknown": "स्यान्डबक्स स्थिति अज्ञात",
+      "sandboxChecked": "{{when}} जाँच गरिएको",
+      "sandboxDetailStopped": "यसलाई पुनः सुरु गर्न सन्देश पठाउनुहोस्।",
+      "sandboxDetailFailed": "फेरि प्रयास गर्न सन्देश पठाउनुहोस्।",
+      "sandboxDetailConnection": "स्यान्डबक्स जडान उपलब्ध छैन।",
+      "sandboxDetailUnavailable": "स्यान्डबक्स स्थिति अस्थायी रूपमा उपलब्ध छैन।",
+      "sandboxDetailInsufficient": "स्यान्डबक्सको हालको अवस्था पुष्टि गर्न पर्याप्त जानकारी छैन।",
+      "sandboxDetailCheckNeeded": "स्यान्डबक्सले हालै आफ्नो स्वास्थ्य पुष्टि गरेको छैन।",
+      "startFresh": "नयाँ सिराबाट सुरु गर्नुहोस्",
+      "startFreshTitle": "नयाँ सिराबाट सुरु गर्ने?",
+      "startFreshMessage": "यसले {{when}} लिइएको कार्यक्षेत्र स्न्यापसट हटाउँछ। त्यस कार्यक्षेत्रका कमिट नगरिएका परिवर्तनहरू हराउनेछन्।",
+      "startFreshMessageUnknown": "यसले सेभ गरिएको कार्यक्षेत्र स्न्यापसट हटाउँछ, जुन पढ्न सकिएन। त्यस कार्यक्षेत्रका कमिट नगरिएका परिवर्तनहरू हराउनेछन्।",
+      "startFreshDone": "कार्यक्षेत्र स्न्यापसट हटाइयो।",
+      "couldNotRemoveSnapshot": "कार्यक्षेत्र स्न्यापसट हटाउन सकिएन।",
+      "snapshotCaptured": "कार्यक्षेत्र स्न्यापसट {{when}} लिइएको"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्यावधिक गरियो।",
@@ -2468,7 +2637,8 @@
       "cancelQueued": "सन्देश रद्द गर्नुहोस्",
       "cancelQueuedAccessibility": "लाममा रहेको सन्देश रद्द गर्नुहोस्",
       "restoreQueued": "फिर्ता ल्याउनुहोस्",
-      "restoreQueuedAccessibility": "रद्द गरिएको सन्देश सन्देश लेख्ने ठाउँमा फिर्ता ल्याउनुहोस्"
+      "restoreQueuedAccessibility": "रद्द गरिएको सन्देश सन्देश लेख्ने ठाउँमा फिर्ता ल्याउनुहोस्",
+      "noReplyRecorded": "यो सन्देशको लागि कुनै उत्तर रेकर्ड गरिएको छैन।"
     },
     "olderMessages": {
       "arrived": "पहिलेका सन्देशहरू लोड भए",
@@ -2861,6 +3031,26 @@
     "onlyFirstFilesAttached_other": "सुरुका {{displayCount}} फाइल मात्र संलग्न गरिनेछन्।"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "बिलिङ इतिहास",
+      "billingHistoryEmpty": "अहिलेसम्म कुनै बिलिङ इतिहास छैन।",
+      "cancel": "सदस्यता रद्द गर्नुहोस्",
+      "cancelDescription": "तपाईंको Kilo Pass बिलिङ अवधिको अन्त्यसम्म सक्रिय रहन्छ र नवीकरण हुने छैन।",
+      "cancelScheduled": "{{date}} मा रद्द हुन्छ",
+      "cancelScheduledChange": "तय गरिएको परिवर्तन रद्द गर्नुहोस्",
+      "cancelled": "सदस्यता रद्द गरियो",
+      "changePlan": "kilo.ai मा योजना परिवर्तन गर्नुहोस्",
+      "changePlanIosNote": "सशुल्क योजना परिवर्तन kilo.ai मा उपलब्ध छन्।",
+      "creditHistoryEmpty": "अहिलेसम्म कुनै Kilo Pass क्रेडिट छैन।",
+      "manageInStore": "{{store}} मा व्यवस्थापन गर्नुहोस्",
+      "resume": "सदस्यता पुनः सुरु गर्नुहोस्",
+      "resumeCancelledDescription": "तपाईंको Kilo Pass फेरि स्वतः नवीकरण हुन थाल्छ।",
+      "resumePausedDescription": "तपाईंको Kilo Pass तय गरिएको पुनः सुरु मितिभन्दा पहिले, अहिले नै पुनः सुरु हुन्छ।",
+      "resumed": "सदस्यता पुनः सुरु भयो",
+      "scheduledChange": "तय गरिएको परिवर्तन",
+      "scheduledChangeCancelDescription": "तपाईंको Kilo Pass हालकै योजनामा रहन्छ र अहिले जस्तै नवीकरण हुन्छ।",
+      "scheduledChangeSummary": "{{date}} मा {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass उपलब्ध छैन।",
     "couldNotLoad": "Kilo Pass लोड गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
@@ -2870,7 +3060,7 @@
     "subscriptionLoading": "Kilo Pass सदस्यता लोड हुँदै",
     "retryHint": "Kilo Pass को स्थिति फेरि लोड गर्ने प्रयास गर्छ।",
     "cardAccessibility": "{{title}}। {{description}}। {{actionLabel}}",
-    "purchaseUnavailableEnded": "तपाईंको Kilo Pass समाप्त भएको छ।",
+    "endedOn": "{{date}} मा समाप्त भयो",
     "notAvailableInApp": "Kilo Pass एपमा उपलब्ध छैन।",
     "statusActive": "सक्रिय",
     "statusTrialing": "परीक्षणमा",
@@ -2892,7 +3082,7 @@
     "kiloPassManagement": "Kilo Pass व्यवस्थापन",
     "kiloPassSetup": "Kilo Pass सेटअप",
     "opensManagementOnWeb": "वेबमा Kilo Pass व्यवस्थापन गर्ने पृष्ठ खोल्छ।",
-    "tryAgainFromProfile": "प्रोफाइलबाट फेरि प्रयास गर्नुहोस्।",
+    "loadFailedRetry": "तपाईंको जडान जाँच्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
     "legalTermsOfUse": "प्रयोगका सर्तहरू (EULA)",
     "purchaseDifferentAccount": "यो App Store खरिद तपाईंको Kilo खातासँग जोडिएको छैन। खरिद गर्दा प्रयोग गरेको Apple Account मा साइन इन गर्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
     "purchaseFailed": "खरिद पूरा गर्न सकिएन।",
@@ -2915,6 +3105,11 @@
     "accountDescription": "तपाईंको पहिचान पुष्टि गर्न र प्रयोग मापन गर्न तपाईंको Kilo खाता ID र अनुरोधको मेटाडेटा प्रयोग गरिन्छ।",
     "diagnosticsTitle": "एपको समस्या जाँच",
     "diagnosticsDescription": "एपको सामग्री हटाइएका क्र्यास र त्रुटि रिपोर्टहरू एपलाई स्थिर राख्न प्रयोग गरिन्छन्।",
+    "featureFlagsTitle": "सुविधाहरूको क्रमिक उपलब्धता",
+    "featureFlagsDescription": "तपाईंको खाताको इमेल, जसलाई PostHog ले तपाईंले कुन सुविधाहरू देख्नुहुन्छ भन्ने निर्णय गर्न प्रयोग गर्छ।",
+    "featureFlagsWhat": "तपाईंको खाताको इमेल।",
+    "featureFlagsWhy": "तपाईंले कुन सुविधाहरू देख्नुहुन्छ भन्ने निर्णय गर्न, हामीले अझै क्रमशः उपलब्ध गराउँदै गरेका सुविधाहरूसहित।",
+    "featureFlagsWho": "PostHog, फिचर-फ्ल्याग सेवा।",
     "helpImprove": "Kilo सुधार्न मद्दत गर्नुहोस्",
     "helpImproveDescription": "आफ्नो पहिचान नखुल्ने गरी एपको प्रयोगसम्बन्धी डेटा र स्थापनाको स्रोत साझा गर्नुहोस्। यो विकल्प सेटिङहरूमा जुनसुकै बेला बदल्न सक्नुहुन्छ।",
     "seeFullDetails": "पूर्ण विवरण हेर्नुहोस्",
@@ -2996,6 +3191,36 @@
     "sendFeedback": "प्रतिक्रिया पठाउनुहोस्"
   },
   "organization": {
+    "auditLog": {
+      "title": "अडिट लग",
+      "permissionDenied": "Enterprise प्लानमा रहेको संस्थाको मालिक, एडमिन वा बिलिङ प्रबन्धकले मात्र यसको अडिट लग पढ्न सक्नुहुन्छ।",
+      "emptyTitle": "कुनै अडिट घटना छैन",
+      "emptyDescription": "यस संस्थामा गरिएका कार्यहरू यहाँ देखिन्छन्।",
+      "truncated": "पछिल्ला घटनाहरू देखाइँदै छ।"
+    },
+    "billing": {
+      "title": "बिलिङ",
+      "permissionDenied": "संस्थाको मालिक, एडमिन वा बिलिङ प्रबन्धकले मात्र यसको बिलिङ हेर्न सक्नुहुन्छ।",
+      "subscription": "सदस्यता",
+      "state": "स्थिति",
+      "stateNone": "सदस्यता छैन",
+      "statePastDue": "भुक्तानी बाँकी",
+      "stateCancelsAtPeriodEnd": "अवधिको अन्त्यमा रद्द हुन्छ",
+      "stateTrialEndsOn": "ट्रायल {{date}} मा सकिन्छ",
+      "stateTrialing": "ट्रायल",
+      "stateRenewsOn": "{{date}} मा नवीकरण हुन्छ",
+      "seatsDropTo": "{{date}} मा {{seats}} सिटमा घट्छ",
+      "seats": "सिटहरू",
+      "autoTopUp": "स्वतः टप-अप",
+      "autoTopUpAmount": "टप-अप रकम",
+      "autoTopUpThreshold": "मौज्दात यसभन्दा कम हुँदा",
+      "manageOnWeb": "परिवर्तनहरू वेबमा गरिन्छन्",
+      "changePlan": "प्लान बदल्नुहोस्",
+      "buySeats": "सिटहरू किन्नुहोस्",
+      "setupAutoTopUp": "स्वतः टप-अप सेट अप गर्नुहोस्",
+      "webAddress": "वेब ठेगाना {{url}}",
+      "opensOnWeb": "वेबमा खुल्छ"
+    },
     "boundary": {
       "backToProfile": "प्रोफाइलमा फर्कनुहोस्",
       "loadErrorMessage": "इन्टरनेट जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
@@ -3003,14 +3228,20 @@
       "loadErrorTitle": "तपाईंका संस्थाहरू लोड गर्न सकिएन।",
       "membershipLostNotice": "तपाईंसँग यो संस्थामा अब पहुँच छैन। {{target}} मा स्विच गरियो।",
       "noOrganization": "कुनै संस्था छैन",
-      "noOrganizationDescription": "यो खाता कुनै संस्थाको भाग होइन। सदस्य निमन्त्रणा र कम ब्यालेन्स सतर्कता जस्ता संस्था सुविधाहरू प्रयोग गर्न वेबमा संस्था सिर्जना गर्नुहोस् वा सामेल हुनुहोस्।",
-      "openWebOrganizations": "वेबमा संस्थाहरू खोल्नुहोस्",
+      "noOrganizationDescription": "यो खाता कुनै संस्थाको हिस्सा होइन। सदस्य निम्तो र कम मौज्दात सूचनाजस्ता संस्थाका सुविधाहरू प्रयोग गर्न एउटा संस्था बनाउनुहोस्, वा तपाईंलाई निम्तो गरिएको संस्थामा सामेल हुन वेब खोल्नुहोस्।",
       "organizationUnavailable": "संस्था उपलब्ध छैन।",
       "selectDescriptionWithOrganizations": "तपाईं एक वा धेरै संस्थासँग सम्बन्धित हुनुहुन्छ। यो स्क्रिनले प्रयोग गर्नुपर्ने खाता छान्नुहोस्।",
       "selectOrganization": "संस्था चयन गर्नुहोस्",
       "unavailableDescription": "यो संस्था अब उपलब्ध छैन। जारी राख्न आफ्नो प्रोफाइलबाट अर्को संस्था छान्नुहोस्।",
       "unavailableSessionsDescription": "यो संस्था अब उपलब्ध छैन। यसका सत्रहरू लोड गर्न सकिँदैन।",
       "accessDeniedDescription": "तपाईंसँग यो संस्थामा पहुँच छैन।"
+    },
+    "create": {
+      "title": "संस्था बनाउनुहोस्",
+      "description": "संस्थाले तपाईंको टोलीसँग क्रेडिट, एजेन्ट र सेटिङहरू साझा गर्छ।",
+      "nameLabel": "संस्थाको नाम",
+      "nameRequired": "संस्थाको नाम लेख्नुहोस्।",
+      "trialNote": "संस्था बनाएपछि तपाईंको १४-दिने Enterprise ट्रायल सुरु हुन्छ। प्लानहरू वेबमा किनिन्छन्।"
     },
     "creditActivity": {
       "emptyDescription": "यस संस्थाका खरिद, प्रयोग र क्रेडिट समायोजनका विवरण ती काम भएलगत्तै यहाँ देखिनेछन्।",
@@ -3119,6 +3350,21 @@
       "ownRoleChange": "तपाईं आफ्नो भूमिका परिवर्तन गर्न सक्नुहुन्न।",
       "inviteExpired": "यो निम्तोको म्याद सकिएको छ।",
       "inviteAccepted": "यो निम्तो पहिले नै स्वीकार भइसकेको छ।"
+    },
+    "settingsOnWeb": {
+      "title": "वेबमा संस्थाका सेटिङहरू",
+      "usageDetails": "प्रयोग विवरण",
+      "providersAndModels": "प्रदायक र मोडेलहरू",
+      "groups": "समूहहरू",
+      "guardrails": "गार्डरेलहरू",
+      "byok": "आफ्नै की प्रयोग गर्नुहोस्",
+      "ssoAndDomain": "SSO र डोमेन",
+      "emailPreferences": "इमेल प्राथमिकताहरू",
+      "dataCollection": "डेटा सङ्कलन",
+      "auditLogs": "अडिट लगहरू",
+      "requestLogs": "अनुरोध लगहरू",
+      "subOrganizations": "उप-संस्थाहरू",
+      "distributeFunds": "रकम बाँड्नुहोस्"
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकनहरू",
@@ -3870,6 +4116,25 @@
     "importConfigApplied": "Config आयात भयो"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "क्रेडिट गतिविधि लोड गर्न सकिएन।",
+      "appStoreReceipt": "App Store बाट रसिद",
+      "deductionFallback": "क्रेडिट कटौती",
+      "emptyDescription": "क्रेडिट खरिद, रसिद र प्रयोग यहाँ देखिनेछन्।",
+      "emptyTitle": "कुनै क्रेडिट इतिहास छैन",
+      "googlePlayReceipt": "Google Play बाट रसिद",
+      "kind": {
+        "adjustment": "समायोजन",
+        "balanceNeutral": "ब्यालेन्समा असर नगर्ने",
+        "deduction": "कटौती",
+        "grant": "क्रेडिट अनुदान",
+        "purchase": "खरिद"
+      },
+      "purchaseFallback": "क्रेडिट खरिद",
+      "receipt": "रसिद",
+      "receiptA11y": "{{description}} को रसिद खोल्नुहोस्",
+      "receiptUnavailable": "यो खरिदको रसिद उपलब्ध छैन।"
+    },
     "title": "क्रेडिट किन्नुहोस्",
     "description": "क्रेडिट भनेको Kilo App मा AI कोडिङ सत्रहरू चलाउन तपाईंको Kilo ब्यालेन्समा थपिने एक-पटकको खरिद हो। स्टोरले तपाईंको खाताबाट शुल्क लिन्छ र स्टोरले भुक्तानी पुष्टि गरेपछि क्रेडिट थपिन्छ।",
     "nextExpiry": "{{amount}} बराबरको क्रेडिटको म्याद {{date}} (UTC) मा सकिन्छ। सबैभन्दा पहिले म्याद सकिने क्रेडिट पहिले प्रयोग गरिन्छ।",
@@ -4052,6 +4317,70 @@
   "systemSearch": {
     "couldNotOpenResult": "यो खोज परिणाम खोल्न सकिएन"
   },
+  "usage": {
+    "title": "प्रयोग",
+    "orgTitle": "संगठनको प्रयोग",
+    "entrySubtitle": "खर्च, अनुरोधहरू र टोकनहरू",
+    "rangePicker": "समय अवधि",
+    "range90d": "90 दिन",
+    "metricPicker": "चार्ट मेट्रिक",
+    "chartA11y": "प्रति दिन {{metric}}",
+    "avgCostPerRequest": "औसत लागत / अनुरोध",
+    "topModels": "शीर्ष मोडेलहरू",
+    "topFeatures": "शीर्ष सुविधाहरू",
+    "emptyTitle": "यस अवधिमा कुनै प्रयोग छैन",
+    "orgSelfNotice": "तपाईं यस संगठनमा आफ्नै प्रयोग हेर्दै हुनुहुन्छ।",
+    "viewDetails": "प्रयोग विवरण हेर्नुहोस्"
+  },
+  "integrations": {
+    "title": "एकीकरणहरू",
+    "sectionTitle": "जोडिएका सेवाहरू",
+    "entrySubtitle": "GitHub, Slack, Linear र अन्य",
+    "subtitle": "आफ्ना विकास उपकरण र कार्यप्रवाहहरूलाई Kilo सँग जोड्नुहोस्",
+    "emptyHint": "अहिलेसम्म कुनै एकीकरण जोडिएको छैन।",
+    "disconnect": "विच्छेद गर्नुहोस्",
+    "disconnectTitle": "{{provider}} विच्छेद गर्ने हो?",
+    "disconnectMessage": "Kilo ले {{provider}} मा जवाफ दिन बन्द गर्नेछ। तपाईं जुनसुकै बेला पुनः जोड्न सक्नुहुन्छ।",
+    "connectedTo": "{{account}} मा जोडिएको",
+    "disconnected": "{{provider}} विच्छेद गरियो",
+    "disconnectFailed": "{{provider}} विच्छेद गर्न सकिएन",
+    "couldNotLoad": "एकीकरणहरू लोड गर्न सकिएन",
+    "permissionDenied": "तपाईंसँग यी एकीकरणहरू व्यवस्थापन गर्ने अनुमति छैन।",
+    "memberHint": "यी जडानहरू परिवर्तन गर्न संस्थाका मालिक वा प्रशासकलाई अनुरोध गर्नुहोस्।",
+    "connectFailed": "जडान पृष्ठ खोल्न सकिएन"
+  },
+  "invoices": {
+    "personalEmptyDescription": "तपाईंलाई बिल गरिएपछि तपाईंका आफ्नै खरिदहरूका इनभ्वाइस यहाँ देखिनेछन्।"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "कम्प्युट",
+      "noUsage": "अहिलेसम्म कुनै प्रयोग छैन",
+      "sharedWorkspace": "यस वर्कस्पेसका सबै च्याटहरूमा साझा",
+      "currentRates": "हालका दरहरू",
+      "perHour": "{{rate}}/घण्टा",
+      "mediumSandbox": "मध्यम स्यान्डबक्स",
+      "largeSandbox": "ठूलो स्यान्डबक्स",
+      "earlierActivity": "पहिलेको गतिविधि",
+      "now": "अहिले",
+      "loadFailed": "कम्प्युट शुल्कहरू लोड हुन सकेनन्।"
+    },
+    "preview": {
+      "title": "प्रिभ्यू खोल्नुहोस्",
+      "listeningServices": "सुनिरहेका सेवाहरू",
+      "empty": "कुनै सुनिरहेका सेवाहरू भेटिएनन्। एजेन्टलाई वेब सर्भर सुरु गर्न भन्नुहोस्, त्यसपछि रिफ्रेस गर्नुहोस्।",
+      "notRunning": "यो स्यान्डबक्स रोकिएको छ। यसलाई फेरि सुरु गर्न एजेन्टलाई सन्देश पठाउनुहोस्।",
+      "notReady": "स्यान्डबक्स अझै तयार छैन। जडान भएपछि रिफ्रेस गर्नुहोस्।",
+      "unsupported": "यस स्यान्डबक्सका लागि सेवा पत्ता लगाउने सुविधा उपलब्ध छैन।",
+      "failed": "सेवाहरू पत्ता लगाउन सकिएन।",
+      "openService": "पोर्ट {{port}} मा {{name}} खोल्नुहोस्",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "ट्रिगर र वेबहुकहरू",
+      "subtitle": "वेबमा वेबहुक र निर्धारित ट्रिगरहरू व्यवस्थापन गर्नुहोस्।"
+    }
+  },
   "sessionShare": {
     "title": "सत्र सेयर गर्नुहोस्",
     "subtitle": "लिङ्क भएका जो कोहीले यो सत्र पढ्न सक्छन्।",
@@ -4069,7 +4398,7 @@
     "existingTitle": "विद्यमान लिङ्क",
     "existingDescription": "यो सत्रको सेयर लिङ्क पहिले नै छ। नयाँ लिङ्क बनाउँदा यसलाई प्रतिस्थापन गर्छ र पुरानो लिङ्कले काम गर्न छोड्छ।",
     "rotate": "नयाँ लिङ्क बनाउनुहोस्",
-    "revoke": "लिङ्क रद्द गर्नुहोस्",
+    "revoke": "लिङ्क हटाउनुहोस्",
     "revokeTitle": "लिङ्क रद्द गर्ने?",
     "revokeMessage": "हालको लिङ्कले तुरुन्तै काम गर्न छोड्छ।",
     "revokeFailed": "लिङ्क रद्द गर्न सकिएन।",

@@ -1124,7 +1124,7 @@ describe('ConversationMessages', () => {
   );
 
   it.each(['pending', 'running'] as const)(
-    'keeps a progress line before %s child activity arrives',
+    'keeps the header status before %s child activity arrives',
     status => {
       const state: ToolPart['state'] =
         status === 'pending'
@@ -1134,7 +1134,8 @@ describe('ConversationMessages', () => {
         assistantMessage('parent', [toolPart('task', 'task', state)]),
       ]);
 
-      expect(html).toContain(status === 'pending' ? 'Delegating...' : 'Working...');
+      expect(html).toContain(`<span>${status === 'pending' ? 'Delegating' : 'Working'}</span>`);
+      expect(html).not.toContain('ml-6');
       expect(html).toContain(`<title>${status === 'pending' ? 'Delegating' : 'Working'}</title>`);
       expect(html).toContain('aria-busy="true"');
       expect(html).not.toContain('0 tool calls');
@@ -1710,6 +1711,39 @@ describe('ConversationMessages memoization', () => {
     expect(container.textContent).not.toContain('1 tool call');
     expect(container.textContent).toContain('pnpm test -- bash-1');
   });
+
+  it.each([false, true])(
+    'preserves expanded work when paging prepends the same turn (intro=%s)',
+    withIntro => {
+      const latest = assistantMessage('assistant-2', [toolPart('bash-2')]);
+      const props = baseProps({ collapseTools: true, staticMessages: [latest] });
+      renderConversationMessages(props);
+      const group = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+      expect(group).not.toBeNull();
+      act(() => group?.click());
+      const tool = container.querySelector<HTMLButtonElement>('[data-tool-card] button');
+      act(() => tool?.click());
+      expect(container.textContent).toContain('Output for bash-2');
+
+      renderConversationMessages({
+        ...props,
+        staticMessages: [
+          assistantMessage('assistant-1', [
+            ...(withIntro ? [textPart('intro', 'Inspecting the code')] : []),
+            toolPart('bash-1'),
+          ]),
+          latest,
+        ],
+      });
+
+      expect(container.textContent).toContain('2 tool calls');
+      expect(container.contains(group)).toBe(true);
+      expect(group?.getAttribute('aria-expanded')).toBe('true');
+      expect(container.contains(tool)).toBe(true);
+      expect(tool?.getAttribute('aria-expanded')).toBe('true');
+      expect(container.textContent).toContain('Output for bash-2');
+    }
+  );
 
   it.each(['reasoning', 'todowrite'] as const)(
     'preserves group and tool expansion when leading %s becomes visible while streaming',

@@ -23,6 +23,10 @@
   },
   "common": {
     "deleteTitle": "{{label}} ବିଲୋପ କରିବେ?",
+    "manageOnWeb": "ୱେବରେ ପରିଚାଳନା କରନ୍ତୁ",
+    "creditHistory": "କ୍ରେଡିଟ୍ ଇତିହାସ",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": "। ",
     "listJoiner": ", ",
     "cancel": "ବାତିଲ କରନ୍ତୁ",
@@ -119,6 +123,7 @@
     "copyLink": "ଲିଙ୍କ୍ କପି କରନ୍ତୁ",
     "couldNotLoadOrganizations": "ସଂଗଠନର ତାଲିକା ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "couldNotLoadSessions": "ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+    "couldnTLoad": "ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "couldnTLoadMore": "ଆହୁରି ତଥ୍ୟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "deviceSessions": "ଉପକରଣର ସେସନ୍",
     "disabled": "ବନ୍ଦ",
@@ -246,6 +251,10 @@
     "notAdded": "ଆପଣ ସାଇନ୍ ଇନ୍ କରିଛନ୍ତି। {{provider}} ଆପଣଙ୍କ ଆକାଉଣ୍ଟରେ ଯୋଡ଼ାଗଲା ନାହିଁ।"
   },
   "profile": {
+    "creditHistorySubtitle": "କ୍ରୟ, ରସିଦ ଏବଂ କ୍ରେଡିଟ୍ କାର୍ଯ୍ୟକଳାପ",
+    "invoicesSubtitle": "ଆପଣଙ୍କ କ୍ରୟର ଇନଭଏସ୍ ଡାଉନଲୋଡ୍ କରନ୍ତୁ",
+    "manageBilling": "kilo.aiରେ ବିଲିଂ ପରିଚାଳନା କରନ୍ତୁ",
+    "manageBillingIosNote": "ପେମେଣ୍ଟ ପଦ୍ଧତି, ଅଟୋ ଟପ୍-ଅପ୍ ଏବଂ ବିଲିଂ ବିବରଣୀ kilo.aiରେ ପରିଚାଳିତ ହୁଏ।",
     "codeReviewerSubtitle": "ସ୍ୱୟଂଚାଳିତ PR ସମୀକ୍ଷା",
     "securityAgentSubtitle": "ସୁରକ୍ଷା ଦୁର୍ବଳତା ଖୋଜି ସୁଧାରନ୍ତୁ",
     "reviews": "ସମୀକ୍ଷା",
@@ -299,6 +308,7 @@
     "passkeyAdded": "ପାସକି ଯୋଡ଼ାଗଲା।",
     "passkeyAddFailed": "ପାସକି ଯୋଡ଼ାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "passkeyAddUnsupported": "ଏହି ଡିଭାଇସ୍ ପାସକି ତିଆରି କରିପାରିବ ନାହିଁ।",
+    "passkeyAddUnavailable": "ପାସକି କେବଳ ଏକ ୱେବ୍ ବ୍ରାଉଜରରେ ଯୋଡ଼ାଯାଇପାରିବ।",
     "passkeyAddCancelled": "ପାସକି ତିଆରି ବାତିଲ୍ ହୋଇଛି।",
     "passkeyRemoved": "ପାସକି ହଟାଗଲା।",
     "passkeyRemoveFailed": "ସେହି ପାସକି ହଟାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
@@ -331,7 +341,6 @@
     "providerKeys": {
       "title": "ପ୍ରଦାନକାରୀ କୀ",
       "rowSubtitle": "ନିଜ ପ୍ରଦାନକାରୀ ବିଲିଂ ବ୍ୟବହାର କରନ୍ତୁ",
-      "manageOnWeb": "ୱେବରେ ପରିଚାଳନା କରନ୍ତୁ",
       "manageOnWebReason": "ଏହି ପ୍ରଦାନକାରୀମାନଙ୍କ ପାଇଁ ସଂରଚିତ କ୍ରେଡେନସିଆଲ୍ ଆବଶ୍ୟକ।",
       "description": "ଏହି କୀ ମାଧ୍ୟମରେ ହେଉଥିବା ଅନୁରୋଧର ବିଲ୍ ଆପଣଙ୍କ Kilo ବ୍ୟାଲାନ୍ସ ବଦଳରେ ଆପଣଙ୍କ ପ୍ରଦାନକାରୀ ଆକାଉଣ୍ଟରେ ହେବ।",
       "enabled": "ବ୍ୟବହାରରେ ଅଛି",
@@ -1245,7 +1254,17 @@
       "changeRequestMissingPermissions": "Kilo ର GitHub ଆପ୍ ଏହି ରିପୋଜିଟୋରୀରେ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଖୋଲିପାରିବ ନାହିଁ। ଜଣେ ରିପୋଜିଟୋରୀ ମାଲିକ ଆପ୍କୁ ବିଷୟବସ୍ତୁ ଏବଂ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ପାଇଁ ଲେଖିବା ପ୍ରବେଶ ଦେବା ଆବଶ୍ୟକ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "changeRequestFailed": "Kilo ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଖୋଲିପାରିଲା ନାହିଁ। ଅଳ୍ପ ସମୟ ପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "proposalConflict": "ଏହି ରିପୋଜିଟୋରୀ ପାଇଁ ଆଉ ଏକ ସମୀକ୍ଷା ସ୍ମୃତି ପ୍ରସ୍ତାବ ଏବେ ମଧ୍ୟ ସକ୍ରିୟ ଅଛି।",
-      "offAction": "ସମୀକ୍ଷା ସ୍ମୃତି ବନ୍ଦ ଅଛି। ଏହାକୁ ଚାଲୁ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+      "offAction": "ସମୀକ୍ଷା ସ୍ମୃତି ବନ୍ଦ ଅଛି। ଏହାକୁ ଚାଲୁ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "analyze": {
+        "title": "ମତାମତ ବିଶ୍ଳେଷଣ କରନ୍ତୁ",
+        "description": "ସାମ୍ପ୍ରତିକ ରକ୍ଷଣାବେକ୍ଷକଙ୍କ ଉତ୍ତର ଥିବା ଏକ ରିପୋଜିଟୋରୀ ବାଛନ୍ତୁ, ତାପରେ ପୁନରାବୃତ୍ତ ହେଉଥିବା ଏକ ମାର୍ଗଦର୍ଶନ ଢାଞ୍ଚା ଖୋଜନ୍ତୁ।",
+        "chooseRepository": "ଏକ ରିପୋଜିଟୋରୀ ବାଛନ୍ତୁ",
+        "action": "ବର୍ତ୍ତମାନ ବିଶ୍ଳେଷଣ କରନ୍ତୁ",
+        "noRepositories": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ରିପୋଜିଟୋରୀରେ ସାମ୍ପ୍ରତିକ ରକ୍ଷଣାବେକ୍ଷକଙ୍କ ଉତ୍ତର ନାହିଁ।",
+        "proposed": "ସମୀକ୍ଷା ସ୍ମୃତି ପ୍ରସ୍ତାବ ସୃଷ୍ଟି ହେଲା",
+        "noFeedback": "ଏହି ରିପୋଜିଟୋରୀ ପାଇଁ ସାମ୍ପ୍ରତିକ ମତାମତ ମିଳିଲା ନାହିଁ",
+        "noPattern": "ସ୍ପଷ୍ଟ ପୁନରାବୃତ୍ତ ଢାଞ୍ଚା ମିଳିଲା ନାହିଁ"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "ଏକ ବୈଧ ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ URL ଲେଖନ୍ତୁ।",
@@ -1377,7 +1396,63 @@
       "title": "କୋଡ୍ ସମୀକ୍ଷକ ପାଇଁ ଆପଣଙ୍କ ଧ୍ୟାନ ଆବଶ୍ୟକ।",
       "recoveryLabel": "ସହାୟତା ଦଳ ସହ ଯୋଗାଯୋଗ କରନ୍ତୁ"
     },
-    "unknownError": "ଅଜଣା ତ୍ରୁଟି"
+    "unknownError": "ଅଜଣା ତ୍ରୁଟି",
+    "skipBotPullRequests": {
+      "title": "ବଟ୍‌ମାନଙ୍କଠାରୁ ଆସୁଥିବା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଛାଡ଼ନ୍ତୁ",
+      "subtitle": "Dependabot କିମ୍ବା Renovate ଭଳି ବଟ୍ ଖୋଲୁଥିବା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟରେ ସ୍ୱଚାଳିତ ସମୀକ୍ଷା ଚଲାନ୍ତୁ ନାହିଁ। ବଟ୍ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ମଧ୍ୟ ସମୀକ୍ଷା କରିବାକୁ ଏହା ବନ୍ଦ କରନ୍ତୁ।"
+    },
+    "repoModels": {
+      "title": "ପ୍ରତି-ରିପୋଜିଟୋରୀ ମଡେଲ୍",
+      "description": "କିଛି ରିପୋଜିଟୋରୀର ସମୀକ୍ଷା ଅନ୍ୟ ମଡେଲରେ, ଚିନ୍ତା ପ୍ରୟାସରେ କିମ୍ବା ଉଭୟରେ ଚଲାନ୍ତୁ।",
+      "defaultModel": "ଡିଫଲ୍ଟ ମଡେଲ୍ ବ୍ୟବହାର କରେ",
+      "resetLabel": "{{repository}} ପାଇଁ ମଡେଲ୍ ରିସେଟ୍ କରନ୍ତୁ",
+      "changeHint": "ମଡେଲ୍ ଚୟନକାରୀ ଖୋଲେ"
+    },
+    "analytics": {
+      "title": "ଆନାଲିଟିକ୍ସ",
+      "trackedReviews": "ଟ୍ରାକ୍ ହୋଇଥିବା ସମୀକ୍ଷା",
+      "findingsRaised": "ଉଠାଯାଇଥିବା ସମସ୍ୟା",
+      "highImpactChanges": "ଉଚ୍ଚ-ପ୍ରଭାବ ପରିବର୍ତ୍ତନ",
+      "impactPoints": "ପ୍ରଭାବ ପଏଣ୍ଟ",
+      "repositoryLine": "ସମୀକ୍ଷା: {{reviews}} · ସମସ୍ୟା: {{findings}}",
+      "empty": "ଏପର୍ଯ୍ୟନ୍ତ ଆନାଲିଟିକ୍ସ ସହିତ ସମୀକ୍ଷା ନାହିଁ",
+      "emptyDescription": "ସଂଗଠନ ପାଇଁ ଆନାଲିଟିକ୍ସ ସକ୍ରିୟ ଥିବାବେଳେ ଏହା ସମ୍ପୂର୍ଣ୍ଣ ସମୀକ୍ଷାଗୁଡ଼ିକ ରେକର୍ଡ କରେ।",
+      "off": "ଏହି ସଂଗଠନ ପାଇଁ ଆନାଲିଟିକ୍ସ ବନ୍ଦ ଅଛି।",
+      "couldNotLoad": "ଆନାଲିଟିକ୍ସ ଲୋଡ୍ କରିହେଲା ନାହିଁ"
+    },
+    "council": {
+      "title": "ସମୀକ୍ଷକ ମଣ୍ଡଳୀ",
+      "subtitle": "ଅନେକ ବିଶେଷଜ୍ଞ ପ୍ରତ୍ୟେକ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ସମୀକ୍ଷା କରନ୍ତି ଏବଂ ସେମାନଙ୍କ ଭୋଟ୍ ଗୋଟିଏ ନିଷ୍ପତ୍ତିରେ ମିଶିଯାଏ।",
+      "unavailable": "ଏହି ସଂଗଠନ ପାଇଁ ସମୀକ୍ଷକ ମଣ୍ଡଳୀ ଉପଲବ୍ଧ ନାହିଁ।",
+      "noRepositories": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ରିପୋଜିଟୋରୀ ଚୟନ ହୋଇନାହିଁ। ପ୍ରଥମେ ରିପୋଜିଟୋରୀ ସେଟିଂସରେ ରିପୋଜିଟୋରୀ ବାଛନ୍ତୁ।",
+      "specialists": "ବିଶେଷଜ୍ଞ",
+      "labels": "ସମୀକ୍ଷକ ମଣ୍ଡଳୀ ଆରମ୍ଭ କରୁଥିବା ଲେବଲ୍",
+      "labelsPlaceholder": "ଉଦାହରଣ ସ୍ୱରୂପ ମଣ୍ଡଳୀ, ଗଭୀର ସମୀକ୍ଷା",
+      "labelsDescription": "ଲେବଲ୍‌ଗୁଡ଼ିକୁ କମା ସହିତ ଅଲଗା କରନ୍ତୁ। ମଣ୍ଡଳୀ ସକ୍ରିୟ ଥିବା ରିପୋଜିଟୋରୀ ଏହି ଲେବଲ୍‌ମାନଙ୍କ ମଧ୍ୟରୁ ଅତି କମରେ ଗୋଟିଏ ଥିବା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ପାଇଁ ହିଁ ମଣ୍ଡଳୀ ଚଲାଏ। ସମସ୍ତ ଯୋଗ୍ୟ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ପାଇଁ ଏହା ଖାଲି ଛାଡ଼ନ୍ତୁ।",
+      "tooManyLabels": "ସମୀକ୍ଷକ ମଣ୍ଡଳୀର ଲେବଲ୍ ସଂଖ୍ୟା ଅତ୍ୟଧିକ। ସର୍ବାଧିକ {{maximum}} ଲେବଲ୍ ବ୍ୟବହାର କରନ୍ତୁ।",
+      "labelTooLong": "ସମୀକ୍ଷକ ମଣ୍ଡଳୀର ଲେବଲ୍ ଅତ୍ୟଧିକ ଲମ୍ବା। ପ୍ରତ୍ୟେକ ଲେବଲ୍‌ରେ ସର୍ବାଧିକ {{maximum}} ଅକ୍ଷର ରହିବା ଆବଶ୍ୟକ।",
+      "minSpecialists": "ଅତି କମରେ {{minimum}} ବିଶେଷଜ୍ଞ ଚୟନ କରନ୍ତୁ। {{selected}} ଚୟନିତ।",
+      "specialistName": {
+        "testCoverage": "ପରୀକ୍ଷଣ କଭରେଜ୍",
+        "correctness": "ଶୁଦ୍ଧତା",
+        "custom": "ବିଶେଷଜ୍ଞ"
+      },
+      "specialist": {
+        "security": "ଅନୁମତି ବାଇପାସ୍, ଗୁପ୍ତ ପରିଚାଳନା ଏବଂ ଅସୁରକ୍ଷିତ ଇନପୁଟ୍।",
+        "performance": "ହଟ୍ ପାଥ୍, ଏନ୍+1 କ୍ୱେରୀ ଏବଂ ଭାରୀ ମେମୋରୀ ଆବଣ୍ଟନ।",
+        "testing": "ନୂଆ ଆଚରଣ ପାଇଁ ଅଭାବୀ କିମ୍ବା ଦୁର୍ବଳ ପରୀକ୍ଷଣ କଭରେଜ୍।",
+        "correctness": "ତର୍କ ତ୍ରୁଟି, ସୀମା ଅବସ୍ଥା ଏବଂ ରେସ୍ ଅବସ୍ଥା।",
+        "custom": "ନିଜ କ୍ଷେତ୍ରର ସମସ୍ୟା ସମୀକ୍ଷା କରେ।"
+      },
+      "strategy": {
+        "advisory": "ପରାମର୍ଶଦାତା",
+        "advisoryDescription": "ମର୍ଜ୍ ନ ଅଟକାଇ ସମସ୍ୟା ରିପୋର୍ଟ କରେ ଏବଂ ଭୋଟ୍ ଦିଏ।",
+        "unanimous": "ସର୍ବସମ୍ମତ",
+        "unanimousDescription": "କୌଣସି ବିଶେଷଜ୍ଞ ଗମ୍ଭୀର ସମସ୍ୟା ରିପୋର୍ଟ କଲେ ମର୍ଜ୍ ଅଟକାଏ।",
+        "majority": "ସଂଖ୍ୟାଗରିଷ୍ଠ",
+        "majorityDescription": "ଅଧିକାଂଶ ବିଶେଷଜ୍ଞ ଗମ୍ଭୀର ସମସ୍ୟା ରିପୋର୍ଟ କଲେ ହିଁ ମର୍ଜ୍ ଅଟକାଏ।"
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1880,6 +1955,16 @@
       "auto": "ସ୍ୱୟଂଚାଳିତ",
       "shallow": "ପ୍ରାଥମିକ",
       "deep": "ଗଭୀର"
+    },
+    "orphanedFindings": {
+      "title": "ଅପସାରିତ ରିପୋଜିଟୋରୀର ସମସ୍ୟା",
+      "description": "ଏହି ରିପୋଜିଟୋରୀଗୁଡ଼ିକ GitHub ଇଣ୍ଟିଗ୍ରେସନ୍ ମାଧ୍ୟମରେ ଆଉ ପ୍ରବେଶଯୋଗ୍ୟ ନାହିଁ। ସେଗୁଡ଼ିକର ସମସ୍ୟା ଏବେ ମଧ୍ୟ ଡ୍ୟାସବୋର୍ଡ ଏବଂ ରିପୋର୍ଟରେ ଗଣାଯାଏ।",
+      "count": "ସମସ୍ୟା: {{count}}",
+      "clearLabel": "{{repository}} ପାଇଁ ସମସ୍ୟା ସଫା କରନ୍ତୁ",
+      "confirmTitle": "ସମସ୍ୟା ସଫା କରିବେ?",
+      "confirmMessage": "{{repository}} ପାଇଁ ରେକର୍ଡ ହୋଇଥିବା ପ୍ରତ୍ୟେକ ସମସ୍ୟା ବିଲୋପ ହେବ। ଏହା ପୂର୍ବାବସ୍ଥାକୁ ଫେରାଇ ହେବ ନାହିଁ।",
+      "confirmAction": "ସମସ୍ୟା ବିଲୋପ କରନ୍ତୁ",
+      "cleared": "ସମସ୍ୟା ସଫା ହେଲା: {{count}}"
     }
   },
   "agents": {
@@ -2059,6 +2144,7 @@
       "branchPlaceholder": "ଗୋଟିଏ ଶାଖା ବାଛନ୍ତୁ",
       "runOnWithTarget": "{{target}} ରେ ଚଲାନ୍ତୁ",
       "environment": "ପରିବେଶ",
+      "cloudEnvironment": "କ୍ଲାଉଡ ପରିବେଶ",
       "couldNotLoadEnvironment": "ଆପଣଙ୍କ ପରିବେଶ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "retryLoadingEnvironment": "ପରିବେଶ ପୁଣି ଲୋଡ୍ କରନ୍ତୁ",
       "defaultEnvironment": "ଡିଫଲ୍ଟ ପରିବେଶ",
@@ -2119,6 +2205,89 @@
       "openSettingsToReview": "ସମୀକ୍ଷା କରିବାକୁ ସେଟିଂସମୂହ ଖୋଲନ୍ତୁ।",
       "profileSelection": "ପ୍ରୋଫାଇଲ୍ ଚୟନ",
       "profileLayerAccessibility": "{{label}}: {{detail}}"
+    },
+    "environment": {
+      "loadingEnvironments": "ପରିବେଶଗୁଡ଼ିକ ଲୋଡ୍ ହେଉଛି",
+      "couldNotLoadEnvironments": "ପରିବେଶଗୁଡ଼ିକ ଲୋଡ୍ କରିହେଲା ନାହିଁ",
+      "couldNotLoadEnvironmentsDetail": "ଏହି ରିପୋଜିଟୋରୀ ପାଇଁ ପରିବେଶଗୁଡ଼ିକ ଲୋଡ୍ କରିବାକୁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "noEnvironment": "କୌଣସି ପରିବେଶ ନାହିଁ",
+      "noEnvironmentDetail": "ଏହି ସେସନ୍ ବେସ୍ ଇମେଜରୁ ଆରମ୍ଭ ହୁଏ।",
+      "chooseEnvironment": "ପରିବେଶ ବାଛନ୍ତୁ",
+      "chooseEnvironmentDetail": "ଏହି ରିପୋଜିଟୋରୀରେ ଏକରୁ ଅଧିକ ପରିବେଶ ଅଛି।",
+      "environmentAccessibility": "ଏକ ପରିବେଶ ବାଛନ୍ତୁ: {{label}}",
+      "environmentsForRepository": "{{repository}} ପାଇଁ ପରିବେଶଗୁଡ଼ିକ",
+      "selectEnvironmentToStart": "ଆରମ୍ଭ କରିବାକୁ ଏକ ପରିବେଶ ଚୟନ କରନ୍ତୁ।",
+      "buildDetails": "ବିଲ୍ଡ ବିବରଣୀ",
+      "buildNotBuilt": "ବିଲ୍ଡ ହୋଇନାହିଁ",
+      "buildUnavailableShort": "ସ୍ନାପସଟ୍ ବିଲ୍ଡ ଉପଲବ୍ଧ ନାହିଁ",
+      "buildPreparing": "ବିଲ୍ଡର୍ ପ୍ରସ୍ତୁତ କରାଯାଉଛି",
+      "buildCloning": "ଡିଫଲ୍ଟ ବ୍ରାଞ୍ଚ କ୍ଲୋନ୍ କରାଯାଉଛି",
+      "buildSetup": "ପରିବେଶ ସେଟଅପ୍ ଚାଲୁଛି",
+      "buildCleanup": "ବିଲ୍ଡ କ୍ରେଡେନସିଆଲ୍ ହଟାଯାଉଛି",
+      "buildCapturing": "ସ୍ନାପସଟ୍ କ୍ୟାପଚର୍ କରାଯାଉଛି",
+      "buildPublishing": "ସ୍ନାପସଟ୍ ପ୍ରକାଶ କରାଯାଉଛି",
+      "buildStopping": "ବିଲ୍ଡର୍ ବନ୍ଦ କରାଯାଉଛି",
+      "buildStoppingRetrying": "ବିଲ୍ଡର୍ ବନ୍ଦ କରାଯାଉଛି, ପୁଣି ଚେଷ୍ଟା କରାଯାଉଛି",
+      "buildFinishing": "ବିଲ୍ଡ ସମାପ୍ତ କରାଯାଉଛି",
+      "buildSucceeded": "ସ୍ନାପସଟ୍ ପ୍ରସ୍ତୁତ",
+      "buildSuperseded": "ଏକ ନୂଆ ବିଲ୍ଡ ଦ୍ୱାରା ପ୍ରତିସ୍ଥାପିତ",
+      "buildStale": "ଏହି ସ୍ନାପସଟ୍ ପରଠାରୁ ସେଟିଂସ୍ ବଦଳିଛି",
+      "buildStaleAge": "ସ୍ନାପସଟ୍ ଚାରି ଦିନରୁ ପୁରୁଣା; ପରବର୍ତ୍ତୀ ସେସନ୍ ଏହାକୁ ରିଫ୍ରେସ୍ କରିବ",
+      "buildStaleImage": "ପୂର୍ବ ସାଣ୍ଡବକ୍ସ ଇମେଜ୍ ପାଇଁ ବିଲ୍ଡ କରାଯାଇଥିଲା",
+      "failureClone": "ରିପୋଜିଟୋରୀ କ୍ଲୋନ୍ କରିହେଲା ନାହିଁ।",
+      "failureSetup": "ଏକ ସେଟଅପ୍ କମାଣ୍ଡ ବିଫଳ ହେଲା। ବିଲ୍ଡ ଲଗ୍ ଦେଖନ୍ତୁ।",
+      "failureTimeout": "ଏକ ସେଟଅପ୍ କମାଣ୍ଡର ସମୟସୀମା ସମାପ୍ତ ହୋଇଗଲା। ବିଲ୍ଡ ଲଗ୍ ଦେଖନ୍ତୁ।",
+      "failureCleanup": "କ୍ରେଡେନସିଆଲ୍ ହଟାଇହେଲା ନାହିଁ, ତେଣୁ କୌଣସି ସ୍ନାପସଟ୍ ନିଆଗଲା ନାହିଁ।",
+      "failureCapture": "ସ୍ନାପସଟ୍ କ୍ୟାପଚର୍ କରିହେଲା ନାହିଁ।",
+      "failureCaptureUncertain": "ସ୍ନାପସଟ୍ ଫଳାଫଳ ହଜିଗଲା; ବିଲ୍ଡ ପ୍ରକାଶିତ ହେଲା ନାହିଁ।",
+      "failureDeadline": "ବିଲ୍ଡ ସମୟ ମଧ୍ୟରେ ସମାପ୍ତ ହେଲା ନାହିଁ।",
+      "failureBuilderLost": "ବିଲ୍ଡର୍ ରିପୋର୍ଟ କରିବା ବନ୍ଦ କରିଦେଲା।",
+      "failureBuilderStart": "ବିଲ୍ଡର୍ ଆରମ୍ଭ ହୋଇପାରିଲା ନାହିଁ।",
+      "failureUnauthorized": "ରିପୋଜିଟୋରୀ ଆକ୍ସେସ୍ ଆଉ ଅନୁମୋଦିତ ନୁହେଁ।",
+      "failureActorUnauthorized": "ଯିଏ ବିଲ୍ଡ ଆରମ୍ଭ କରିଥିଲେ ତାଙ୍କର ଆଉ ଆକ୍ସେସ୍ ନାହିଁ।",
+      "failureBilling": "ବିଲ୍ଡ ପାଇଁ ଉପଲବ୍ଧ କ୍ରେଡିଟ୍ ଆବଶ୍ୟକ।",
+      "failureBillingUnavailable": "ବିଲିଂ ବିଲ୍ଡକୁ ଅନୁମତି ଦେଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "failureConfiguration": "ବିଲ୍ଡ ସମୟରେ କନଫିଗରେସନ୍ ବଦଳିଗଲା।",
+      "failureRuntime": "ଚୟନିତ ରନଟାଇମ୍ ରିଲିଜ୍ ଇନଷ୍ଟଲ୍ କରିହେଲା ନାହିଁ।",
+      "failureGeneric": "ବିଲ୍ଡ ବିଫଳ ହେଲା।",
+      "buildLogs": "ବିଲ୍ଡ ଲଗ୍",
+      "noBuildLogs": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ଲଗ୍ ଆଉଟପୁଟ୍ ନାହିଁ।",
+      "buildLogsLatestOnly": "ସଂରକ୍ଷିତ ସର୍ବଶେଷ 500ଟି ଲଗ୍ ଲାଇନ୍ ଦେଖାଯାଉଛି।",
+      "buildLogsTruncated": "ପରବର୍ତ୍ତୀ ଆଉଟପୁଟ୍ କାଟି ଦିଆଯାଇଛି।",
+      "couldNotLoadBuild": "ବିଲ୍ଡ ସ୍ଥିତି ଲୋଡ୍ କରିହେଲା ନାହିଁ",
+      "couldNotLoadBuildLogs": "ବିଲ୍ଡ ଲଗ୍ ଲୋଡ୍ କରିହେଲା ନାହିଁ",
+      "buildsUnavailable": "ଏହି ପରିବେଶ ପାଇଁ ସ୍ନାପସଟ୍ ବିଲ୍ଡ ଉପଲବ୍ଧ ନାହିଁ।",
+      "onlyManagersCanBuild": "କେବଳ ସଂସ୍ଥାର ପରିଚାଳକମାନେ ସ୍ନାପସଟ୍ ବିଲ୍ଡ କରିପାରିବେ।",
+      "waitForBuilder": "ପୁଣି ବିଲ୍ଡ କରିବା ପୂର୍ବରୁ ବିଲ୍ଡର୍ ବନ୍ଦ ହେବା ପର୍ଯ୍ୟନ୍ତ ଅପେକ୍ଷା କରନ୍ତୁ।",
+      "buildAction": "ସ୍ନାପସଟ୍ ବିଲ୍ଡ କରନ୍ତୁ",
+      "refreshAction": "ସ୍ନାପସଟ୍ ରିଫ୍ରେସ୍ କରନ୍ତୁ",
+      "cancelBuildAction": "ବିଲ୍ଡ ବାତିଲ କରନ୍ତୁ",
+      "buildStarted": "ସ୍ନାପସଟ୍ ବିଲ୍ଡ ଆରମ୍ଭ ହେଲା",
+      "buildCanceled": "ସ୍ନାପସଟ୍ ବିଲ୍ଡ ବାତିଲ ହେଲା",
+      "couldNotStartBuild": "ବିଲ୍ଡ ଆରମ୍ଭ କରିହେଲା ନାହିଁ",
+      "couldNotCancelBuild": "ବିଲ୍ଡ ବାତିଲ କରିହେଲା ନାହିଁ",
+      "sandbox": "ସାଣ୍ଡବକ୍ସ",
+      "sandboxActive": "ସାଣ୍ଡବକ୍ସ ସକ୍ରିୟ",
+      "sandboxSleeping": "ସାଣ୍ଡବକ୍ସ ସ୍ଲିପ୍ ମୋଡରେ ଅଛି",
+      "sandboxStarting": "ସାଣ୍ଡବକ୍ସ ଆରମ୍ଭ ହେଉଛି",
+      "sandboxStopping": "ସାଣ୍ଡବକ୍ସ ବନ୍ଦ ହେଉଛି",
+      "sandboxError": "ସାଣ୍ଡବକ୍ସ ତ୍ରୁଟି",
+      "sandboxUnreachable": "ସାଣ୍ଡବକ୍ସ ସହ ସଂଯୋଗ ହୋଇପାରୁନାହିଁ",
+      "sandboxStatusUnknown": "ସାଣ୍ଡବକ୍ସ ସ୍ଥିତି ଅଜଣା",
+      "sandboxChecked": "{{when}} ଯାଞ୍ଚ କରାଗଲା",
+      "sandboxDetailStopped": "ଏହାକୁ ପୁନଃ ଆରମ୍ଭ କରିବାକୁ ଏକ ବାର୍ତ୍ତା ପଠାନ୍ତୁ।",
+      "sandboxDetailFailed": "ପୁଣି ଚେଷ୍ଟା କରିବାକୁ ଏକ ବାର୍ତ୍ତା ପଠାନ୍ତୁ।",
+      "sandboxDetailConnection": "ସାଣ୍ଡବକ୍ସ ସଂଯୋଗ ଉପଲବ୍ଧ ନାହିଁ।",
+      "sandboxDetailUnavailable": "ସାଣ୍ଡବକ୍ସ ସ୍ଥିତି ଅସ୍ଥାୟୀ ଭାବେ ଉପଲବ୍ଧ ନାହିଁ।",
+      "sandboxDetailInsufficient": "ସାଣ୍ଡବକ୍ସର ବର୍ତ୍ତମାନ ସ୍ଥିତି ନିଶ୍ଚିତ କରିବା ପାଇଁ ଯଥେଷ୍ଟ ସୂଚନା ନାହିଁ।",
+      "sandboxDetailCheckNeeded": "ସାଣ୍ଡବକ୍ସ ନିକଟରେ ଏହାର ସ୍ୱାସ୍ଥ୍ୟ ନିଶ୍ଚିତ କରିନାହିଁ।",
+      "startFresh": "ନୂଆ କରି ଆରମ୍ଭ କରନ୍ତୁ",
+      "startFreshTitle": "ନୂଆ କରି ଆରମ୍ଭ କରିବେ?",
+      "startFreshMessage": "ଏହା {{when}} କ୍ୟାପଚର୍ କରାଯାଇଥିବା ୱର୍କସ୍ପେସ୍ ସ୍ନାପସଟକୁ ହଟାଇଦେବ। ସେହି ୱର୍କସ୍ପେସର କମିଟ୍ ହୋଇନଥିବା ପରିବର୍ତ୍ତନଗୁଡ଼ିକ ହଜିଯିବ।",
+      "startFreshMessageUnknown": "ଏହା ସେଭ୍ ହୋଇଥିବା ୱର୍କସ୍ପେସ୍ ସ୍ନାପସଟକୁ ହଟାଇଦେବ, ଯାହାକୁ ପଢ଼ିହେଲା ନାହିଁ। ସେହି ୱର୍କସ୍ପେସର କମିଟ୍ ହୋଇନଥିବା ପରିବର୍ତ୍ତନଗୁଡ଼ିକ ହଜିଯିବ।",
+      "startFreshDone": "ୱର୍କସ୍ପେସ୍ ସ୍ନାପସଟ୍ ହଟାଗଲା।",
+      "couldNotRemoveSnapshot": "ୱର୍କସ୍ପେସ୍ ସ୍ନାପସଟ୍ ହଟାଇହେଲା ନାହିଁ।",
+      "snapshotCaptured": "ୱର୍କସ୍ପେସ୍ ସ୍ନାପସଟ୍ {{when}} କ୍ୟାପଚର୍ କରାଗଲା"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}ଟି ଫାଇଲ୍ ଅଦ୍ୟତନ ହୋଇଛି।",
@@ -2468,7 +2637,8 @@
       "cancelQueued": "ବାର୍ତ୍ତା ବାତିଲ କରନ୍ତୁ",
       "cancelQueuedAccessibility": "ଅପେକ୍ଷାରେ ଥିବା ବାର୍ତ୍ତା ବାତିଲ କରନ୍ତୁ",
       "restoreQueued": "ଫେରାନ୍ତୁ",
-      "restoreQueuedAccessibility": "ବାତିଲ ହୋଇଥିବା ବାର୍ତ୍ତାକୁ ବାର୍ତ୍ତା ଲେଖିବା ସ୍ଥାନକୁ ଫେରାନ୍ତୁ"
+      "restoreQueuedAccessibility": "ବାତିଲ ହୋଇଥିବା ବାର୍ତ୍ତାକୁ ବାର୍ତ୍ତା ଲେଖିବା ସ୍ଥାନକୁ ଫେରାନ୍ତୁ",
+      "noReplyRecorded": "ଏହି ବାର୍ତ୍ତା ପାଇଁ କୌଣସି ଉତ୍ତର ରେକର୍ଡ କରାଯାଇ ନାହିଁ।"
     },
     "olderMessages": {
       "arrived": "ପୂର୍ବ ବାର୍ତ୍ତାଗୁଡ଼ିକ ଲୋଡ୍ ହେଲା",
@@ -2861,6 +3031,26 @@
     "onlyFirstFilesAttached_other": "କେବଳ ପ୍ରଥମ {{displayCount}} ଫାଇଲ୍ ସଂଲଗ୍ନ ହେବ।"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "ବିଲିଂ ଇତିହାସ",
+      "billingHistoryEmpty": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ବିଲିଂ ଇତିହାସ ନାହିଁ।",
+      "cancel": "ସବସ୍କ୍ରିପସନ୍ ବାତିଲ କରନ୍ତୁ",
+      "cancelDescription": "ଆପଣଙ୍କ Kilo Pass ବିଲିଂ ଅବଧି ଶେଷ ହେବା ପର୍ଯ୍ୟନ୍ତ ସକ୍ରିୟ ରହିବ ଏବଂ ନବୀକରଣ ହେବ ନାହିଁ।",
+      "cancelScheduled": "{{date}}ରେ ବାତିଲ ହେବ",
+      "cancelScheduledChange": "ନିର୍ଧାରିତ ପରିବର୍ତ୍ତନ ବାତିଲ କରନ୍ତୁ",
+      "cancelled": "ସବସ୍କ୍ରିପସନ୍ ବାତିଲ ହୋଇଛି",
+      "changePlan": "kilo.aiରେ ପ୍ଲାନ୍ ବଦଳାନ୍ତୁ",
+      "changePlanIosNote": "ପେଡ୍ ପ୍ଲାନ୍ ପରିବର୍ତ୍ତନ kilo.aiରେ ଉପଲବ୍ଧ।",
+      "creditHistoryEmpty": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି Kilo Pass କ୍ରେଡିଟ୍ ନାହିଁ।",
+      "manageInStore": "{{store}}ରେ ପରିଚାଳନା କରନ୍ତୁ",
+      "resume": "ସବସ୍କ୍ରିପସନ୍ ପୁନଃଆରମ୍ଭ କରନ୍ତୁ",
+      "resumeCancelledDescription": "ଆପଣଙ୍କ Kilo Pass ପୁଣି ସ୍ୱୟଂଚାଳିତ ଭାବେ ନବୀକରଣ ହେବା ଆରମ୍ଭ କରିବ।",
+      "resumePausedDescription": "ଆପଣଙ୍କ Kilo Pass ଏହାର ନିର୍ଧାରିତ ପୁନଃଆରମ୍ଭ ତାରିଖ ପୂର୍ବରୁ ଏବେ ପୁନଃଆରମ୍ଭ ହେବ।",
+      "resumed": "ସବସ୍କ୍ରିପସନ୍ ପୁନଃଆରମ୍ଭ ହୋଇଛି",
+      "scheduledChange": "ନିର୍ଧାରିତ ପରିବର୍ତ୍ତନ",
+      "scheduledChangeCancelDescription": "ଆପଣଙ୍କ Kilo Pass ଏହାର ବର୍ତ୍ତମାନର ପ୍ଲାନ୍‌ରେ ରହିବ ଏବଂ ଏବେ ଯେପରି ନବୀକରଣ ହେଉଛି ସେହିପରି ହେବ।",
+      "scheduledChangeSummary": "{{date}}ରେ {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass ଉପଲବ୍ଧ ନାହିଁ।",
     "couldNotLoad": "Kilo Pass ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
@@ -2870,7 +3060,7 @@
     "subscriptionLoading": "Kilo Pass ସବସ୍କ୍ରିପସନ୍ ଲୋଡ୍ ହେଉଛି",
     "retryHint": "Kilo Pass ର ସ୍ଥିତି ପୁଣି ଲୋଡ୍ କରେ।",
     "cardAccessibility": "{{title}}। {{description}}। {{actionLabel}}",
-    "purchaseUnavailableEnded": "ଆପଣଙ୍କ Kilo Pass ସମାପ୍ତ ହୋଇଛି।",
+    "endedOn": "{{date}}ରେ ସମାପ୍ତ",
     "notAvailableInApp": "Kilo Pass ଆପ୍‌ରେ ଉପଲବ୍ଧ ନାହିଁ।",
     "statusActive": "ସକ୍ରିୟ",
     "statusTrialing": "ପରୀକ୍ଷାଧୀନ",
@@ -2892,7 +3082,7 @@
     "kiloPassManagement": "Kilo Pass ପରିଚାଳନା",
     "kiloPassSetup": "Kilo Pass ସେଟଅପ୍",
     "opensManagementOnWeb": "ୱେବ୍‌ରେ Kilo Pass ପରିଚାଳନା ପୃଷ୍ଠା ଖୋଲେ।",
-    "tryAgainFromProfile": "ପ୍ରୋଫାଇଲ୍‌ରୁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "loadFailedRetry": "ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "legalTermsOfUse": "ବ୍ୟବହାର ନିୟମାବଳୀ (EULA)",
     "purchaseDifferentAccount": "ଏହି App Store କ୍ରୟ ଆପଣଙ୍କ Kilo ଆକାଉଣ୍ଟ ସହ ଯୋଡ଼ାଯାଇନାହିଁ। କ୍ରୟ ପାଇଁ ବ୍ୟବହାର କରିଥିବା Apple Account ରେ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "purchaseFailed": "କ୍ରୟ ସମ୍ପୂର୍ଣ୍ଣ ହୋଇପାରିଲା ନାହିଁ।",
@@ -2915,6 +3105,11 @@
     "accountDescription": "ଆପଣଙ୍କ ପରିଚୟ ଯାଞ୍ଚ ଓ ବ୍ୟବହାର ମାପିବା ପାଇଁ ଆପଣଙ୍କ Kilo ଆକାଉଣ୍ଟ ID ଏବଂ ଅନୁରୋଧର ମେଟାଡାଟା ବ୍ୟବହାର ହୁଏ।",
     "diagnosticsTitle": "ଆପ୍ ସମସ୍ୟାର ତଥ୍ୟ",
     "diagnosticsDescription": "ଆପ୍‌କୁ ସ୍ଥିର ରଖିବା ପାଇଁ କ୍ରାଶ୍ ଓ ତ୍ରୁଟି ରିପୋର୍ଟ ବ୍ୟବହାର ହୁଏ। ଏହି ରିପୋର୍ଟରୁ ଆପ୍‌ର ବିଷୟବସ୍ତୁ ହଟାଯାଏ।",
+    "featureFlagsTitle": "ସୁବିଧାର କ୍ରମିକ ଉପଲବ୍ଧତା",
+    "featureFlagsDescription": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟର ଇମେଲ୍, ଯାହାକୁ PostHog ଆପଣ କେଉଁ ସୁବିଧା ଦେଖିବେ ତାହା ସ୍ଥିର କରିବା ପାଇଁ ବ୍ୟବହାର କରେ।",
+    "featureFlagsWhat": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟର ଇମେଲ୍।",
+    "featureFlagsWhy": "ଆପଣ କେଉଁ ସୁବିଧା ଦେଖିବେ ତାହା ସ୍ଥିର କରିବାକୁ, ଆମେ ଏବେ ବି ଧୀରେ ଧୀରେ ଆଣୁଥିବା ସୁବିଧାଗୁଡ଼ିକ ସମେତ।",
+    "featureFlagsWho": "PostHog, ଫିଚର୍-ଫ୍ଲାଗ୍ ସେବା।",
     "helpImprove": "Kilo କୁ ଉନ୍ନତ କରିବାରେ ସାହାଯ୍ୟ କରନ୍ତୁ",
     "helpImproveDescription": "ଆପଣଙ୍କ ପରିଚୟ ପ୍ରକାଶ ନକରି ଆପ୍ ବ୍ୟବହାରର ବିଶ୍ଳେଷଣ ତଥ୍ୟ ଓ ଇନଷ୍ଟଲ୍‌ର ଉତ୍ସ ସେୟାର କରନ୍ତୁ। ସେଟିଂସ୍‌ରେ ଏହି ପସନ୍ଦ ଯେକୌଣସି ସମୟରେ ବଦଳାଇପାରିବେ।",
     "seeFullDetails": "ସମ୍ପୂର୍ଣ୍ଣ ବିବରଣୀ ଦେଖନ୍ତୁ",
@@ -2996,6 +3191,36 @@
     "sendFeedback": "ମତାମତ ପଠାନ୍ତୁ"
   },
   "organization": {
+    "auditLog": {
+      "title": "ଅଡିଟ୍ ଲଗ୍",
+      "permissionDenied": "ଏଣ୍ଟରପ୍ରାଇଜ୍ ଯୋଜନାରେ ଥିବା ସଂଗଠନର କେବଳ ମାଲିକ, ଆଡମିନ୍ କିମ୍ବା ବିଲିଂ ମ୍ୟାନେଜର୍ ଏହାର ଅଡିଟ୍ ଲଗ୍ ପଢ଼ିପାରିବେ।",
+      "emptyTitle": "କୌଣସି ଅଡିଟ୍ ଇଭେଣ୍ଟ ନାହିଁ",
+      "emptyDescription": "ଏହି ସଂଗଠନରେ କରାଯାଇଥିବା କାର୍ଯ୍ୟଗୁଡ଼ିକ ଏଠାରେ ଦେଖାଯାଏ।",
+      "truncated": "ସବୁଠାରୁ ସାମ୍ପ୍ରତିକ ଇଭେଣ୍ଟଗୁଡ଼ିକ ଦେଖାଯାଉଛି।"
+    },
+    "billing": {
+      "title": "ବିଲିଂ",
+      "permissionDenied": "କେବଳ ସଂଗଠନର ମାଲିକ, ଆଡମିନ୍ କିମ୍ବା ବିଲିଂ ମ୍ୟାନେଜର ଏହାର ବିଲିଂ ଦେଖିପାରିବେ।",
+      "subscription": "ସବସ୍କ୍ରିପସନ୍",
+      "state": "ସ୍ଥିତି",
+      "stateNone": "କୌଣସି ସବସ୍କ୍ରିପସନ୍ ନାହିଁ",
+      "statePastDue": "ଦେୟ ସମୟ ଅତିକ୍ରାନ୍ତ",
+      "stateCancelsAtPeriodEnd": "ଅବଧି ଶେଷରେ ବାତିଲ ହେବ",
+      "stateTrialEndsOn": "ଟ୍ରାଏଲ୍ {{date}} ରେ ଶେଷ ହେବ",
+      "stateTrialing": "ଟ୍ରାଏଲ୍",
+      "stateRenewsOn": "{{date}} ରେ ନବୀକରଣ ହେବ",
+      "seatsDropTo": "{{date}} ରେ {{seats}} ସିଟ୍‌କୁ କମିବ",
+      "seats": "ସିଟ୍",
+      "autoTopUp": "ସ୍ୱୟଂଚାଳିତ ଟପ୍-ଅପ୍",
+      "autoTopUpAmount": "ଟପ୍-ଅପ୍ ରାଶି",
+      "autoTopUpThreshold": "ବ୍ୟାଲାନ୍ସ ଏହାଠାରୁ କମିଲେ",
+      "manageOnWeb": "ପରିବର୍ତ୍ତନ ୱେବ୍‌ରେ କରାଯାଏ",
+      "changePlan": "ଯୋଜନା ବଦଳାନ୍ତୁ",
+      "buySeats": "ସିଟ୍ କିଣନ୍ତୁ",
+      "setupAutoTopUp": "ସ୍ୱୟଂଚାଳିତ ଟପ୍-ଅପ୍ ସେଟ୍ ଅପ୍ କରନ୍ତୁ",
+      "webAddress": "ୱେବ୍ ଠିକଣା {{url}}",
+      "opensOnWeb": "ୱେବ୍‌ରେ ଖୋଲେ"
+    },
     "boundary": {
       "backToProfile": "ପ୍ରୋଫାଇଲକୁ ଫେରନ୍ତୁ",
       "loadErrorMessage": "ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
@@ -3003,14 +3228,20 @@
       "loadErrorTitle": "ଆପଣଙ୍କ ସଂଗଠନଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "membershipLostNotice": "ଆପଣଙ୍କର ଏହି ସଂଗଠନରେ ଆଉ ପ୍ରବେଶ ଅଧିକାର ନାହିଁ। {{target}} କୁ ସ୍ୱିଚ୍ ହୋଇଛି।",
       "noOrganization": "କୋଣସି ସଂଗଠନ ନାହିଁ",
-      "noOrganizationDescription": "ଏହି ଖାତା କୌଣସି ସଂଗଠନର ଅଂଶ ନୁହେଁ। ସଦସ୍ୟ ଆମନ୍ତ୍ରଣ ଏବଂ କମ୍ ବାଲାନ୍ସ ସତର୍କତା ପରି ସଂଗଠନ ସୁବିଧାଗୁଡ଼ିକ ବ୍ୟବହାର କରିବାକୁ ୱେବ୍‌ରେ ଏକ ସଂଗଠନ ସୃଷ୍ଟି କରନ୍ତୁ କିମ୍ବା ଯୋଗ ଦିଅନ୍ତୁ।",
-      "openWebOrganizations": "ୱେବ୍‌ରେ ସଂଗଠନଗୁଡ଼ିକ ଖୋଲନ୍ତୁ",
+      "noOrganizationDescription": "ଏହି ଆକାଉଣ୍ଟ କୌଣସି ସଂଗଠନର ଅଂଶ ନୁହେଁ। ସଦସ୍ୟ ଆମନ୍ତ୍ରଣ ଏବଂ କମ୍ ବ୍ୟାଲାନ୍ସ ଆଲର୍ଟ ପରି ସଂଗଠନ ସୁବିଧା ବ୍ୟବହାର କରିବାକୁ ଗୋଟିଏ ତିଆରି କରନ୍ତୁ, କିମ୍ବା ଆପଣଙ୍କୁ ଆମନ୍ତ୍ରଣ କରାଯାଇଥିବା ସଂଗଠନରେ ଯୋଗ ଦେବାକୁ ୱେବ୍ ଖୋଲନ୍ତୁ।",
       "organizationUnavailable": "ସଂଗଠନ ଉପଲବ୍ଧ ନାହିଁ।",
       "selectDescriptionWithOrganizations": "ଆପଣ ଏକ କିମ୍ବା ଅଧିକ ସଂଗଠନର ସଦସ୍ୟ। ଏହି ସ୍କ୍ରିନ୍ ବ୍ୟବହାର କରିବା ଉଚିତ ଖାତା ବାଛନ୍ତୁ।",
       "selectOrganization": "ଏକ ସଂଗଠନ ବାଛନ୍ତୁ",
       "unavailableDescription": "ଏହି ସଂଗଠନ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଆଗକୁ ବଢ଼ିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରୁ ଅନ୍ୟ ଏକ ସଂଗଠନ ବାଛନ୍ତୁ।",
       "unavailableSessionsDescription": "ଏହି ସଂଗଠନ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଏହାର ସେସନ୍ ଲୋଡ୍ କରାଯାଇପାରିବ ନାହିଁ।",
       "accessDeniedDescription": "ଆପଣଙ୍କର ଏହି ସଂଗଠନରେ ପ୍ରବେଶ ଅଧିକାର ନାହିଁ।"
+    },
+    "create": {
+      "title": "ସଂଗଠନ ତିଆରି କରନ୍ତୁ",
+      "description": "ଏକ ସଂଗଠନ ଆପଣଙ୍କ ଟିମ୍ ସହିତ କ୍ରେଡିଟ୍, ଏଜେଣ୍ଟ ଏବଂ ସେଟିଂସ୍ ସେୟାର୍ କରେ।",
+      "nameLabel": "ସଂଗଠନର ନାମ",
+      "nameRequired": "ଏକ ସଂଗଠନର ନାମ ଲେଖନ୍ତୁ।",
+      "trialNote": "ଆପଣ ଏହାକୁ ତିଆରି କଲେ ଆପଣଙ୍କ 14-ଦିନିଆ ଏଣ୍ଟରପ୍ରାଇଜ୍ ଟ୍ରାଏଲ୍ ଆରମ୍ଭ ହେବ। ଯୋଜନାଗୁଡ଼ିକ ୱେବରେ କିଣାଯାଏ।"
     },
     "creditActivity": {
       "emptyDescription": "ଏହି ସଂଗଠନର କ୍ରେଡିଟ୍ କିଣା, ବ୍ୟବହାର ଓ ହିସାବ ସଂଶୋଧନ ହେବା ସହ ସେଗୁଡ଼ିକର ବିବରଣୀ ଏଠାରେ ଦେଖାଯିବ।",
@@ -3119,6 +3350,21 @@
       "ownRoleChange": "ଆପଣ ନିଜର ଭୂମିକା ପରିବର୍ତ୍ତନ କରିପାରିବେ ନାହିଁ।",
       "inviteExpired": "ଏହି ନିମନ୍ତ୍ରଣର ଅବଧି ସମାପ୍ତ ହୋଇଛି।",
       "inviteAccepted": "ଏହି ନିମନ୍ତ୍ରଣ ପୂର୍ବରୁ ଗ୍ରହଣ କରାଯାଇଛି।"
+    },
+    "settingsOnWeb": {
+      "title": "ୱେବରେ ସଂଗଠନର ସେଟିଂସ୍",
+      "usageDetails": "ବ୍ୟବହାର ବିବରଣୀ",
+      "providersAndModels": "ପ୍ରୋଭାଇଡର୍ ଏବଂ ମଡେଲ୍",
+      "groups": "ଗ୍ରୁପ୍",
+      "guardrails": "ଗାର୍ଡରେଲ୍",
+      "byok": "ନିଜର କି ଆଣନ୍ତୁ",
+      "ssoAndDomain": "SSO ଏବଂ ଡୋମେନ୍",
+      "emailPreferences": "ଇମେଲ୍ ପସନ୍ଦ",
+      "dataCollection": "ଡାଟା ସଂଗ୍ରହ",
+      "auditLogs": "ଅଡିଟ୍ ଲଗ୍",
+      "requestLogs": "ଅନୁରୋଧ ଲଗ୍",
+      "subOrganizations": "ଉପ-ସଂଗଠନ",
+      "distributeFunds": "ପାଣ୍ଠି ବଣ୍ଟନ କରନ୍ତୁ"
     },
     "usageStats": {
       "inputTokens": "ଇନପୁଟ୍ ଟୋକନ୍",
@@ -3870,6 +4116,25 @@
     "importConfigApplied": "Config ଆମଦାନୀ ହୋଇଗଲା"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "କ୍ରେଡିଟ୍ କାର୍ଯ୍ୟକଳାପ ଲୋଡ୍ କରାଯାଇପାରିଲା ନାହିଁ।",
+      "appStoreReceipt": "App Storeରୁ ରସିଦ",
+      "deductionFallback": "କ୍ରେଡିଟ୍ କଟାଣ",
+      "emptyDescription": "କ୍ରେଡିଟ୍ କ୍ରୟ, ରସିଦ ଏବଂ ବ୍ୟବହାର ଏଠାରେ ଦେଖାଯିବ।",
+      "emptyTitle": "କୌଣସି କ୍ରେଡିଟ୍ ଇତିହାସ ନାହିଁ",
+      "googlePlayReceipt": "Google Playରୁ ରସିଦ",
+      "kind": {
+        "adjustment": "ସମାୟୋଜନ",
+        "balanceNeutral": "ବାଲାନ୍ସ ଅପରିବର୍ତ୍ତିତ",
+        "deduction": "କଟାଣ",
+        "grant": "କ୍ରେଡିଟ୍ ଅନୁଦାନ",
+        "purchase": "କ୍ରୟ"
+      },
+      "purchaseFallback": "କ୍ରେଡିଟ୍ କ୍ରୟ",
+      "receipt": "ରସିଦ",
+      "receiptA11y": "{{description}} ପାଇଁ ରସିଦ ଖୋଲନ୍ତୁ",
+      "receiptUnavailable": "ଏହି କ୍ରୟ ପାଇଁ କୌଣସି ରସିଦ ଉପଲବ୍ଧ ନାହିଁ।"
+    },
     "title": "କ୍ରେଡିଟ୍ କିଣନ୍ତୁ",
     "description": "କ୍ରେଡିଟ୍ ହେଉଛି Kilo App ରେ AI କୋଡିଂ ସେସନ୍ ଚଲାଇବା ପାଇଁ ଆପଣଙ୍କ Kilo ବାଲାନ୍ସରେ ଯୋଡ଼ାଯାଉଥିବା ଏକ-ଥର କ୍ରୟ। ଷ୍ଟୋର ଆପଣଙ୍କ ଖାତାରୁ ଶୁଳ୍କ ନେଇଥାଏ ଏବଂ ଷ୍ଟୋର ଦେୟ ନିଶ୍ଚିତ କରିବା ପରେ କ୍ରେଡିଟ୍ ଯୋଡ଼ାଯାଏ।",
     "nextExpiry": "{{amount}} କ୍ରେଡିଟ୍‌ର ମିଆଦ {{date}} (UTC) ରେ ଶେଷ ହେବ। ସବୁଠାରୁ ଶୀଘ୍ର ମିଆଦ ଶେଷ ହେଉଥିବା କ୍ରେଡିଟ୍ ପ୍ରଥମେ ବ୍ୟବହୃତ ହୁଏ।",
@@ -4051,6 +4316,70 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ଏହି ଖୋଜା ଫଳାଫଳ ଖୋଲିହେଲା ନାହିଁ"
+  },
+  "usage": {
+    "title": "ବ୍ୟବହାର",
+    "orgTitle": "ସଂସ୍ଥାର ବ୍ୟବହାର",
+    "entrySubtitle": "ଖର୍ଚ୍ଚ, ଅନୁରୋଧ ଓ ଟୋକନ୍",
+    "rangePicker": "ସମୟ ପରିସର",
+    "range90d": "90 ଦିନ",
+    "metricPicker": "ଚାର୍ଟ ମେଟ୍ରିକ୍",
+    "chartA11y": "ପ୍ରତି ଦିନ {{metric}}",
+    "avgCostPerRequest": "ହାରାହାରି ଖର୍ଚ୍ଚ / ଅନୁରୋଧ",
+    "topModels": "ଶୀର୍ଷ ମଡେଲ୍",
+    "topFeatures": "ଶୀର୍ଷ ଫିଚର୍",
+    "emptyTitle": "ଏହି ଅବଧିରେ କୌଣସି ବ୍ୟବହାର ନାହିଁ",
+    "orgSelfNotice": "ଆପଣ ଏହି ସଂସ୍ଥାରେ ନିଜର ବ୍ୟବହାର ଦେଖୁଛନ୍ତି।",
+    "viewDetails": "ବ୍ୟବହାର ବିବରଣୀ ଦେଖନ୍ତୁ"
+  },
+  "integrations": {
+    "title": "ଇଣ୍ଟିଗ୍ରେସନ୍",
+    "sectionTitle": "ସଂଯୁକ୍ତ ସେବାଗୁଡ଼ିକ",
+    "entrySubtitle": "GitHub, Slack, Linear ଏବଂ ଅଧିକ",
+    "subtitle": "ଆପଣଙ୍କ ଡେଭେଲପମେଣ୍ଟ ଟୁଲ୍ ଏବଂ ୱାର୍କଫ୍ଲୋକୁ Kilo ସହ ସଂଯୋଗ କରନ୍ତୁ",
+    "emptyHint": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ଇଣ୍ଟିଗ୍ରେସନ୍ ସଂଯୁକ୍ତ ହୋଇନାହିଁ।",
+    "disconnect": "ବିଚ୍ଛିନ୍ନ କରନ୍ତୁ",
+    "disconnectTitle": "{{provider}} ସହ ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ କରିବେ?",
+    "disconnectMessage": "Kilo ଆଉ {{provider}}ରେ ଉତ୍ତର ଦେବ ନାହିଁ। ଆପଣ ଯେକୌଣସି ସମୟରେ ପୁଣି ସଂଯୋଗ କରିପାରିବେ।",
+    "connectedTo": "{{account}} ସହ ସଂଯୁକ୍ତ",
+    "disconnected": "{{provider}} ସହ ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ ହେଲା",
+    "disconnectFailed": "{{provider}} ସହ ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ କରିହେଲା ନାହିଁ",
+    "couldNotLoad": "ଇଣ୍ଟିଗ୍ରେସନ୍‌ଗୁଡ଼ିକ ଲୋଡ୍ କରିହେଲା ନାହିଁ",
+    "permissionDenied": "ଏହି ଇଣ୍ଟିଗ୍ରେସନ୍‌ଗୁଡ଼ିକ ପରିଚାଳନା କରିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
+    "memberHint": "ଏହି ସଂଯୋଗଗୁଡ଼ିକ ପରିବର୍ତ୍ତନ କରିବାକୁ ଜଣେ ସଂସ୍ଥା ମାଲିକ କିମ୍ବା ଆଡମିନଙ୍କୁ କୁହନ୍ତୁ।",
+    "connectFailed": "ସଂଯୋଗ ପୃଷ୍ଠା ଖୋଲିହେଲା ନାହିଁ"
+  },
+  "invoices": {
+    "personalEmptyDescription": "ଆପଣଙ୍କୁ ବିଲ୍ କରାଗଲା ପରେ ଆପଣଙ୍କ ନିଜ କ୍ରୟର ଇନଭଏସ୍ ଏଠାରେ ଦେଖାଯିବ।"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "କମ୍ପ୍ୟୁଟ୍",
+      "noUsage": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ବ୍ୟବହାର ନାହିଁ",
+      "sharedWorkspace": "ଏହି ୱାର୍କସ୍ପେସ୍‌ର ସମସ୍ତ ଚାଟ୍ ଦ୍ୱାରା ସେୟାର୍ କରାଯାଇଛି",
+      "currentRates": "ବର୍ତ୍ତମାନର ଦର",
+      "perHour": "{{rate}}/ଘଣ୍ଟା",
+      "mediumSandbox": "ମଧ୍ୟମ ସାଣ୍ଡବକ୍ସ",
+      "largeSandbox": "ବଡ଼ ସାଣ୍ଡବକ୍ସ",
+      "earlierActivity": "ପୂର୍ବ କାର୍ଯ୍ୟକଳାପ",
+      "now": "ବର୍ତ୍ତମାନ",
+      "loadFailed": "କମ୍ପ୍ୟୁଟ୍ ଶୁଳ୍କ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।"
+    },
+    "preview": {
+      "title": "ପ୍ରିଭ୍ୟୁ ଖୋଲନ୍ତୁ",
+      "listeningServices": "ଲିସନ୍ କରୁଥିବା ସେବାଗୁଡ଼ିକ",
+      "empty": "ଲିସନ୍ କରୁଥିବା କୌଣସି ସେବା ମିଳିଲା ନାହିଁ। ଏଜେଣ୍ଟଙ୍କୁ ଏକ ୱେବ୍ ସର୍ଭର୍ ଆରମ୍ଭ କରିବାକୁ କୁହନ୍ତୁ, ତାପରେ ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
+      "notRunning": "ଏହି ସାଣ୍ଡବକ୍ସ ବନ୍ଦ ଅଛି। ଏହାକୁ ପୁଣି ଆରମ୍ଭ କରିବାକୁ ଏଜେଣ୍ଟଙ୍କୁ ଏକ ବାର୍ତ୍ତା ପଠାନ୍ତୁ।",
+      "notReady": "ସାଣ୍ଡବକ୍ସ ଏପର୍ଯ୍ୟନ୍ତ ପ୍ରସ୍ତୁତ ନାହିଁ। ଏହା ସଂଯୁକ୍ତ ହେବା ପରେ ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
+      "unsupported": "ଏହି ସାଣ୍ଡବକ୍ସ ପାଇଁ ସେବା ଆବିଷ୍କାର ଉପଲବ୍ଧ ନାହିଁ।",
+      "failed": "ସେବାଗୁଡ଼ିକ ଖୋଜିହେଲା ନାହିଁ।",
+      "openService": "ପୋର୍ଟ {{port}}ରେ {{name}} ଖୋଲନ୍ତୁ",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "ଟ୍ରିଗର୍ ଓ ୱେବହୁକ୍",
+      "subtitle": "ୱେବରେ ୱେବହୁକ୍ ଏବଂ ନିର୍ଧାରିତ ଟ୍ରିଗର୍ ପରିଚାଳନା କରନ୍ତୁ।"
+    }
   },
   "sessionShare": {
     "title": "ସେସନ୍ ସେୟାର କରନ୍ତୁ",

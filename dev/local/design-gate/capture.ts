@@ -9,7 +9,7 @@ import {
   type TimedTree,
 } from './capture-evidence';
 import type { ProbeClient, ProbeSample } from './cdp';
-import type { ElementRef, Finding } from './findings';
+import type { ElementRef, Finding, RuleId } from './findings';
 import { enterTouchMode } from './input-mode';
 import { envMismatches, isRtlLanguage, mirrorReference, type CellConfig } from './matrix';
 import type { Rgba } from './pixels';
@@ -156,6 +156,14 @@ export function loadingPlaceholder(tree: LayoutTree): boolean {
     if (node.probe.testID !== undefined && LOADING_TEST_ID.test(node.probe.testID)) return true;
     return (node.probe.owners ?? []).some(owner => LOADING_OWNERS[owner] === true);
   });
+}
+
+/** One sampling window, sized for the settle it spans. */
+function startSampling(ctx: { probe: Pick<ProbeClient, 'startSampling'>; observeMs: number }) {
+  return ctx.probe.startSampling(
+    IN_APP_SAMPLE_INTERVAL_MS,
+    ctx.observeMs + IN_APP_SAMPLING_SLACK_MS + 2 * LOADING_SETTLE_TIMEOUT_MS
+  );
 }
 
 export async function sampleUntilSettled(
@@ -451,7 +459,6 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     screenTexts(dump) !== beforeTexts ||
     (dump.env.screen !== undefined && dump.env.screen !== beforeScreen) ||
     (beforeRoute === linkRoute && dump.env.route.split('?')[0] === linkRoute);
-
   await ctx.probe.openLink(target.link);
   // A cold screen paints its own loading placeholder and holds it still, so a
   // settle loop would measure the placeholder. Wait for it to clear first, and
@@ -482,9 +489,12 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
   let unopened: string | undefined;
   if (!opened(settled.dump)) {
     ctx.log(`design-gate: ${target.id} did not change the screen; opening the link again`);
+    // The retry opens the same cold screen, so it gets the same wait, and the
+    // timeline is restarted after it for the same reason as above.
+    await ctx.probe.stopSampling();
     await ctx.probe.openLink(target.link);
-    // The retry opens the same cold screen, so it gets the same wait.
     await waitForPlaceholder();
+    await startSampling(ctx);
     settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
     if (!opened(settled.dump)) unopened = await ctx.probe.lastOutcome();
   }
@@ -676,10 +686,11 @@ function warningFinding(
   target: string,
   dump: ProbeDump,
   expected: string,
-  message: string
+  message: string,
+  rule: RuleId = 'env-mismatch'
 ): Finding {
   return {
-    rule: 'env-mismatch',
+    rule,
     severity: 'warning',
     cell,
     target,
@@ -806,7 +817,11 @@ export async function runMatrix(
                 target.id,
                 dump,
                 'the deep link changes the screen',
-                `${target.id} left the screen unchanged (route ${dump.env.route}); the deep link did not open: ${unopened}`
+                `${target.id} left the screen unchanged (route ${dump.env.route}); the deep link did not open: ${unopened}`,
+                // A tab route keeps the URL at its group root, so an unchanged
+                // route is not by itself a failed open; the screen identity is
+                // what decides that, so this notice has its own rule.
+                'link-unopened'
               )
             );
           } else if (other !== undefined) {

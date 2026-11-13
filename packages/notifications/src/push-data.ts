@@ -101,6 +101,16 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     // Needs-input raise detail: which answer the waiting agent wants, and the
     // PR that can be opened from the notification. Absent on status pushes.
     attentionKind: z.enum(NEEDS_INPUT_ATTENTION_KINDS).optional(),
+    /**
+     * The one raise this attention push presents: the waiting session's own
+     * status time (`cli_sessions_v2.status_updated_at`), in the payload's ISO
+     * form. The app answers the raise this id names and nothing else, so a
+     * notification left over from a raise that already moved cannot answer the
+     * session's current one. Absent on status pushes, on a producer that
+     * cannot name the raise, and on a payload posted before this field
+     * existed — the app then keeps its previous behaviour.
+     */
+    raiseId: nonEmptyStringSchema.optional(),
     prUrl: nonEmptyStringSchema.optional(),
     // The session's organization, so a tap can land the app in the context
     // the session belongs to. Optional so a push from an older producer in a

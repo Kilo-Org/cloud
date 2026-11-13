@@ -23,6 +23,10 @@
   },
   "common": {
     "deleteTitle": "Odstrániť {{label}}?",
+    "manageOnWeb": "Spravovať na webe",
+    "creditHistory": "História kreditov",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Zrušiť",
@@ -119,6 +123,7 @@
     "copyLink": "Kopírovať odkaz",
     "couldNotLoadOrganizations": "Nepodarilo sa načítať organizácie.",
     "couldNotLoadSessions": "Nepodarilo sa načítať relácie.",
+    "couldnTLoad": "Nepodarilo sa načítať.",
     "couldnTLoadMore": "Nepodarilo sa načítať ďalšie položky.",
     "deviceSessions": "Relácie zariadení",
     "disabled": "Vypnuté",
@@ -246,6 +251,10 @@
     "notAdded": "Ste prihlásený. {{provider}} nebol pridaný do vášho účtu."
   },
   "profile": {
+    "creditHistorySubtitle": "Nákupy, doklady a pohyby kreditov",
+    "invoicesSubtitle": "Stiahnite si faktúry za svoje nákupy",
+    "manageBilling": "Spravovať fakturáciu na kilo.ai",
+    "manageBillingIosNote": "Spôsoby platby, automatické dobíjanie a fakturačné údaje sa spravujú na kilo.ai.",
     "codeReviewerSubtitle": "Automatické kontroly PR",
     "securityAgentSubtitle": "Vyhľadávať a odstraňovať zraniteľnosti",
     "reviews": "Kontroly",
@@ -299,6 +308,7 @@
     "passkeyAdded": "Prístupový kľúč pridaný.",
     "passkeyAddFailed": "Prístupový kľúč sa nepodarilo pridať. Skúste to znova.",
     "passkeyAddUnsupported": "Toto zariadenie nedokáže vytvárať prístupové kľúče.",
+    "passkeyAddUnavailable": "Prístupové kľúče je možné pridať len vo webovom prehliadači.",
     "passkeyAddCancelled": "Vytvorenie prístupového kľúča bolo zrušené.",
     "passkeyRemoved": "Prístupový kľúč odstránený.",
     "passkeyRemoveFailed": "Tento prístupový kľúč sa nepodarilo odstrániť. Skúste to znova.",
@@ -331,7 +341,6 @@
     "providerKeys": {
       "title": "Kľúče poskytovateľov",
       "rowSubtitle": "Používať vlastnú fakturáciu u poskytovateľa",
-      "manageOnWeb": "Spravovať na webe",
       "manageOnWebReason": "Títo poskytovatelia vyžadujú štruktúrované prihlasovacie údaje.",
       "description": "Požiadavky cez tieto kľúče sa účtujú na tvoj účet u poskytovateľa namiesto tvojho zostatku v Kilo.",
       "enabled": "Používa sa",
@@ -1291,7 +1300,17 @@
       "changeRequestMissingPermissions": "Aplikácia Kilo na GitHube nemôže v tomto úložisku otvárať pull requesty. Vlastník úložiska musí aplikácii udeliť prístup na zápis k obsahu a pull requestom a potom to skúste znova.",
       "changeRequestFailed": "Kilo nemohlo otvoriť pull request. Skúste to o chvíľu znova.",
       "proposalConflict": "Ďalší návrh pre toto úložisko je stále aktívny, takže tento zatiaľ nemožno uložiť.",
-      "offAction": "Pamäť kontrol je vypnutá. Zapnite ju a skúste to znova."
+      "offAction": "Pamäť kontrol je vypnutá. Zapnite ju a skúste to znova.",
+      "analyze": {
+        "title": "Analyzovať spätnú väzbu",
+        "description": "Vyberte repozitár s nedávnymi odpoveďami správcov a potom hľadajte jeden opakujúci sa vzor usmernení.",
+        "chooseRepository": "Vyberte repozitár",
+        "action": "Analyzovať teraz",
+        "noRepositories": "Žiadny repozitár zatiaľ nemá nedávne odpovede správcov.",
+        "proposed": "Návrh pamäte kontrol bol vytvorený",
+        "noFeedback": "Pre tento repozitár sa nenašla žiadna nedávna spätná väzba",
+        "noPattern": "Nenašiel sa žiadny jasný opakujúci sa vzor"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Zadajte platnú URL adresu merge requestu.",
@@ -1425,7 +1444,63 @@
       "title": "Agent na kontrolu kódu vyžaduje tvoju pozornosť.",
       "recoveryLabel": "Kontaktovať podporu"
     },
-    "unknownError": "Neznáma chyba"
+    "unknownError": "Neznáma chyba",
+    "skipBotPullRequests": {
+      "title": "Preskočiť pull requesty od botov",
+      "subtitle": "Nespúšťajte automatické kontroly pre pull requesty otvárané botmi, ako sú Dependabot alebo Renovate. Vypnite to, ak chcete kontrolovať aj pull requesty botov."
+    },
+    "repoModels": {
+      "title": "Model pre repozitár",
+      "description": "Kontroly niektorých repozitárov spúšťajte s iným modelom, intenzitou uvažovania alebo oboma.",
+      "defaultModel": "Používa predvolený model",
+      "resetLabel": "Obnoviť model pre {{repository}}",
+      "changeHint": "Otvorí výber modelu"
+    },
+    "analytics": {
+      "title": "Analytika",
+      "trackedReviews": "Sledované kontroly",
+      "findingsRaised": "Nahlásené nálezy",
+      "highImpactChanges": "Zmeny s veľkým vplyvom",
+      "impactPoints": "Body vplyvu",
+      "repositoryLine": "Kontroly: {{reviews}} · Nálezy: {{findings}}",
+      "empty": "Zatiaľ žiadne kontroly s analytikou",
+      "emptyDescription": "Analytika zaznamenáva dokončené kontroly, kým je pre organizáciu zapnutá.",
+      "off": "Analytika je pre túto organizáciu vypnutá.",
+      "couldNotLoad": "Analytiku sa nepodarilo načítať"
+    },
+    "council": {
+      "title": "Kontrola rady",
+      "subtitle": "Každý pull request kontroluje niekoľko špecialistov a ich hlasy sa spájajú do jedného rozhodnutia.",
+      "unavailable": "Kontrola rady nie je pre túto organizáciu dostupná.",
+      "noRepositories": "Zatiaľ nie je vybraný žiadny repozitár. Najprv vyberte repozitáre v nastaveniach repozitárov.",
+      "specialists": "Špecialisti",
+      "labels": "Štítky, ktoré spúšťajú kontrolu rady",
+      "labelsPlaceholder": "napr. rada, hĺbková kontrola",
+      "labelsDescription": "Štítky oddeľte čiarkami. Repozitár s povolenou radou potom spúšťa radu len pre pull requesty s aspoň jedným z týchto štítkov. Nechajte prázdne pre každý vhodný pull request.",
+      "tooManyLabels": "Príliš veľa štítkov rady. Použite najviac {{maximum}} štítkov.",
+      "labelTooLong": "Štítok rady je príliš dlhý. Každý štítok môže mať najviac {{maximum}} znakov.",
+      "minSpecialists": "Vyberte aspoň {{minimum}} špecialistov. Vybraných: {{selected}}.",
+      "specialistName": {
+        "testCoverage": "Pokrytie testami",
+        "correctness": "Správnosť",
+        "custom": "Špecialista"
+      },
+      "specialist": {
+        "security": "Obchádzanie autorizácie, práca s tajomstvami a nebezpečný vstup.",
+        "performance": "Kritické cesty, dopyty N+1 a náročné alokácie.",
+        "testing": "Chýbajúce alebo slabé pokrytie nového správania.",
+        "correctness": "Logické chyby, okrajové prípady a súbehové podmienky.",
+        "custom": "Kontroluje problémy vo svojej oblasti."
+      },
+      "strategy": {
+        "advisory": "Poradné",
+        "advisoryDescription": "Nahlasuje nálezy a hlasuje bez blokovania zlúčenia.",
+        "unanimous": "Jednohlasné",
+        "unanimousDescription": "Zablokuje zlúčenie, keď ktorýkoľvek špecialista nahlási kritický problém.",
+        "majority": "Väčšina",
+        "majorityDescription": "Zablokuje zlúčenie len vtedy, keď väčšina špecialistov nahlási kritický problém."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1958,6 +2033,16 @@
       "auto": "Automatická",
       "shallow": "Základná",
       "deep": "Hĺbková"
+    },
+    "orphanedFindings": {
+      "title": "Nálezy pre odstránené repozitáre",
+      "description": "Tieto repozitáre už nie sú dostupné cez integráciu GitHub. Ich nálezy sa stále počítajú v prehľadoch a správach.",
+      "count": "Nálezy: {{count}}",
+      "clearLabel": "Vymazať nálezy pre {{repository}}",
+      "confirmTitle": "Vymazať nálezy?",
+      "confirmMessage": "Všetky zaznamenané nálezy pre {{repository}} budú odstránené. Túto akciu nie je možné vrátiť.",
+      "confirmAction": "Odstrániť nálezy",
+      "cleared": "Vymazané nálezy: {{count}}"
     }
   },
   "agents": {
@@ -2141,6 +2226,7 @@
       "branchPlaceholder": "Vybrať vetvu",
       "runOnWithTarget": "Spustiť na: {{target}}",
       "environment": "Prostredie",
+      "cloudEnvironment": "Cloudové prostredie",
       "couldNotLoadEnvironment": "Tvoje prostredie sa nepodarilo načítať.",
       "retryLoadingEnvironment": "Skúsiť znova načítať prostredie",
       "defaultEnvironment": "Predvolené prostredie",
@@ -2201,6 +2287,89 @@
       "openSettingsToReview": "Ak chcete skontrolovať, otvorte Nastavenia",
       "profileSelection": "Výber profilu",
       "profileLayerAccessibility": "{{label}}: {{detail}}"
+    },
+    "environment": {
+      "loadingEnvironments": "Načítavajú sa prostredia",
+      "couldNotLoadEnvironments": "Prostredia sa nepodarilo načítať",
+      "couldNotLoadEnvironmentsDetail": "Skúste znova načítať prostredia pre tento repozitár.",
+      "noEnvironment": "Žiadne prostredie",
+      "noEnvironmentDetail": "Táto relácia sa spustí zo základného obrazu.",
+      "chooseEnvironment": "Vyberte prostredie",
+      "chooseEnvironmentDetail": "Tento repozitár má viac ako jedno prostredie.",
+      "environmentAccessibility": "Vyberte prostredie: {{label}}",
+      "environmentsForRepository": "Prostredia pre {{repository}}",
+      "selectEnvironmentToStart": "Na spustenie vyberte prostredie.",
+      "buildDetails": "Podrobnosti zostavenia",
+      "buildNotBuilt": "Nezostavené",
+      "buildUnavailableShort": "Zostavenia snapshotov nie sú dostupné",
+      "buildPreparing": "Príprava buildera",
+      "buildCloning": "Klonovanie predvolenej vetvy",
+      "buildSetup": "Spúšťanie nastavenia prostredia",
+      "buildCleanup": "Odstraňovanie prihlasovacích údajov zostavenia",
+      "buildCapturing": "Zachytávanie snapshotu",
+      "buildPublishing": "Publikovanie snapshotu",
+      "buildStopping": "Zastavovanie buildera",
+      "buildStoppingRetrying": "Zastavovanie buildera, opakuje sa pokus",
+      "buildFinishing": "Dokončovanie zostavenia",
+      "buildSucceeded": "Snapshot je pripravený",
+      "buildSuperseded": "Nahradené novším zostavením",
+      "buildStale": "Nastavenia sa od tohto snapshotu zmenili",
+      "buildStaleAge": "Snapshot je starší ako štyri dni; ďalšia relácia ho obnoví",
+      "buildStaleImage": "Zostavené pre starší obraz sandboxu",
+      "failureClone": "Repozitár sa nepodarilo naklonovať.",
+      "failureSetup": "Príkaz nastavenia zlyhal. Pozrite si denník zostavenia.",
+      "failureTimeout": "Vypršal časový limit príkazu nastavenia. Pozrite si denník zostavenia.",
+      "failureCleanup": "Prihlasovacie údaje sa nepodarilo odstrániť, preto sa snapshot nevytvoril.",
+      "failureCapture": "Snapshot sa nepodarilo zachytiť.",
+      "failureCaptureUncertain": "Výsledok snapshotu sa stratil; zostavenie nebolo zverejnené.",
+      "failureDeadline": "Zostavenie sa nedokončilo včas.",
+      "failureBuilderLost": "Builder prestal odosielať hlásenia.",
+      "failureBuilderStart": "Builder sa nepodarilo spustiť.",
+      "failureUnauthorized": "Prístup k repozitáru už nie je autorizovaný.",
+      "failureActorUnauthorized": "Osoba, ktorá spustila zostavenie, už nemá prístup.",
+      "failureBilling": "Zostavenia vyžadujú dostupné kredity.",
+      "failureBillingUnavailable": "Fakturácia nemohla prijať zostavenie. Skúste to znova.",
+      "failureConfiguration": "Konfigurácia sa počas zostavenia zmenila.",
+      "failureRuntime": "Vybrané vydanie runtime sa nepodarilo nainštalovať.",
+      "failureGeneric": "Zostavenie zlyhalo.",
+      "buildLogs": "Denníky zostavenia",
+      "noBuildLogs": "Zatiaľ žiadny výstup denníka.",
+      "buildLogsLatestOnly": "Zobrazuje sa posledných 500 uchovaných riadkov denníka.",
+      "buildLogsTruncated": "Neskorší výstup bol skrátený.",
+      "couldNotLoadBuild": "Stav zostavenia sa nepodarilo načítať",
+      "couldNotLoadBuildLogs": "Denníky zostavenia sa nepodarilo načítať",
+      "buildsUnavailable": "Zostavenia snapshotov nie sú pre toto prostredie dostupné.",
+      "onlyManagersCanBuild": "Snapshoty môžu zostavovať iba správcovia organizácie.",
+      "waitForBuilder": "Pred ďalším zostavením počkajte, kým sa builder zastaví.",
+      "buildAction": "Zostaviť snapshot",
+      "refreshAction": "Obnoviť snapshot",
+      "cancelBuildAction": "Zrušiť zostavenie",
+      "buildStarted": "Zostavenie snapshotu sa spustilo",
+      "buildCanceled": "Zostavenie snapshotu bolo zrušené",
+      "couldNotStartBuild": "Zostavenie sa nepodarilo spustiť",
+      "couldNotCancelBuild": "Zostavenie sa nepodarilo zrušiť",
+      "sandbox": "Sandbox",
+      "sandboxActive": "Sandbox je aktívny",
+      "sandboxSleeping": "Sandbox je uspaný",
+      "sandboxStarting": "Sandbox sa spúšťa",
+      "sandboxStopping": "Sandbox sa zastavuje",
+      "sandboxError": "Chyba sandboxu",
+      "sandboxUnreachable": "Sandbox je nedostupný",
+      "sandboxStatusUnknown": "Stav sandboxu je neznámy",
+      "sandboxChecked": "Skontrolované {{when}}",
+      "sandboxDetailStopped": "Na obnovenie pošlite správu.",
+      "sandboxDetailFailed": "Ak to chcete skúsiť znova, pošlite správu.",
+      "sandboxDetailConnection": "Pripojenie k sandboxu nie je dostupné.",
+      "sandboxDetailUnavailable": "Stav sandboxu je dočasne nedostupný.",
+      "sandboxDetailInsufficient": "Nie je dostatok informácií na potvrdenie aktuálneho stavu sandboxu.",
+      "sandboxDetailCheckNeeded": "Sandbox v poslednom čase nepotvrdil, že je v poriadku.",
+      "startFresh": "Začať odznova",
+      "startFreshTitle": "Začať odznova?",
+      "startFreshMessage": "Týmto sa zahodí snapshot pracovného priestoru zachytený {{when}}. Necommitnuté zmeny z tohto pracovného priestoru sa stratia.",
+      "startFreshMessageUnknown": "Týmto sa zahodí uložený snapshot pracovného priestoru, ktorý sa nepodarilo načítať. Necommitnuté zmeny z tohto pracovného priestoru sa stratia.",
+      "startFreshDone": "Snapshot pracovného priestoru bol odstránený.",
+      "couldNotRemoveSnapshot": "Snapshot pracovného priestoru sa nepodarilo odstrániť.",
+      "snapshotCaptured": "Snapshot pracovného priestoru zachytený {{when}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizoval sa {{displayCount}} súbor.",
@@ -2558,7 +2727,8 @@
       "cancelQueued": "Zrušiť správu",
       "cancelQueuedAccessibility": "Zrušiť správu vo fronte",
       "restoreQueued": "Obnoviť",
-      "restoreQueuedAccessibility": "Vrátiť zrušenú správu do poľa na správu"
+      "restoreQueuedAccessibility": "Vrátiť zrušenú správu do poľa na správu",
+      "noReplyRecorded": "Pre túto správu nebola zaznamenaná žiadna odpoveď."
     },
     "olderMessages": {
       "arrived": "Staršie správy sa načítali",
@@ -2967,6 +3137,26 @@
     "onlyFirstFilesAttached_many": "Priložia sa len prvé súbory ({{displayCount}})."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "História fakturácie",
+      "billingHistoryEmpty": "Zatiaľ žiadna história fakturácie.",
+      "cancel": "Zrušiť predplatné",
+      "cancelDescription": "Váš Kilo Pass zostane aktívny do konca fakturačného obdobia a nebude sa obnovovať.",
+      "cancelScheduled": "Zruší sa {{date}}",
+      "cancelScheduledChange": "Zrušiť naplánovanú zmenu",
+      "cancelled": "Predplatné bolo zrušené",
+      "changePlan": "Zmeniť plán na kilo.ai",
+      "changePlanIosNote": "Zmeny platených plánov sú dostupné na kilo.ai.",
+      "creditHistoryEmpty": "Zatiaľ žiadne kredity z Kilo Pass.",
+      "manageInStore": "Spravovať v obchode {{store}}",
+      "resume": "Obnoviť predplatné",
+      "resumeCancelledDescription": "Váš Kilo Pass sa bude opäť automaticky obnovovať.",
+      "resumePausedDescription": "Váš Kilo Pass sa obnoví hneď, ešte pred plánovaným dátumom obnovenia.",
+      "resumed": "Predplatné bolo obnovené",
+      "scheduledChange": "Naplánovaná zmena",
+      "scheduledChangeCancelDescription": "Váš Kilo Pass zostane na aktuálnom pláne a bude sa obnovovať ako doteraz.",
+      "scheduledChangeSummary": "{{plan}} od {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass nie je dostupný.",
     "couldNotLoad": "Kilo Pass sa nepodarilo načítať. Skúste to znova.",
@@ -2976,7 +3166,7 @@
     "subscriptionLoading": "Načítava sa predplatné Kilo Pass",
     "retryHint": "Znova načíta stav Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailableEnded": "Váš Kilo Pass sa skončil.",
+    "endedOn": "Skončené {{date}}",
     "notAvailableInApp": "Kilo Pass nie je dostupný v aplikácii.",
     "statusActive": "Aktívne",
     "statusTrialing": "Skúšobné obdobie",
@@ -2998,7 +3188,7 @@
     "kiloPassManagement": "Správa Kilo Pass",
     "kiloPassSetup": "Nastavenie Kilo Pass",
     "opensManagementOnWeb": "Otvorí správu Kilo Pass na webe.",
-    "tryAgainFromProfile": "Skúste to znova z profilu.",
+    "loadFailedRetry": "Skontrolujte pripojenie a skúste to znova.",
     "legalTermsOfUse": "Podmienky používania (EULA)",
     "purchaseDifferentAccount": "Tento nákup v App Store nie je prepojený s vaším účtom Kilo. Prihláste sa do účtu Apple Account použitého pri nákupe a skúste to znova.",
     "purchaseFailed": "Nákup sa nepodarilo dokončiť.",
@@ -3021,6 +3211,11 @@
     "accountDescription": "ID tvojho účtu Kilo a metaúdaje požiadaviek, ktoré slúžia na overenie tvojej identity a meranie spotreby.",
     "diagnosticsTitle": "Diagnostika aplikácie",
     "diagnosticsDescription": "Hlásenia o pádoch a chybách bez obsahu aplikácie, ktoré pomáhajú udržiavať aplikáciu stabilnú.",
+    "featureFlagsTitle": "Postupné zavádzanie funkcií",
+    "featureFlagsDescription": "E-mail tvojho účtu, ktorý PostHog používa na rozhodnutie, ktoré funkcie uvidíš.",
+    "featureFlagsWhat": "E-mail tvojho účtu.",
+    "featureFlagsWhy": "Rozhodnúť, ktoré funkcie uvidíš, vrátane tých, ktoré ešte postupne zavádzame.",
+    "featureFlagsWho": "PostHog, služba pre príznaky funkcií.",
     "helpImprove": "Pomôcť vylepšiť Kilo",
     "helpImproveDescription": "Zdieľaj anonymné údaje o používaní aplikácie a zdroj inštalácie. Túto voľbu môžeš kedykoľvek zmeniť v nastaveniach.",
     "seeFullDetails": "Zobraziť všetky podrobnosti",
@@ -3102,6 +3297,36 @@
     "sendFeedback": "Odoslať spätnú väzbu"
   },
   "organization": {
+    "auditLog": {
+      "title": "Protokol auditu",
+      "permissionDenied": "Protokol auditu si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie s plánom Enterprise.",
+      "emptyTitle": "Žiadne udalosti auditu",
+      "emptyDescription": "Tu sa zobrazia akcie vykonané v tejto organizácii.",
+      "truncated": "Zobrazujú sa najnovšie udalosti."
+    },
+    "billing": {
+      "title": "Fakturácia",
+      "permissionDenied": "Fakturáciu organizácie môže zobraziť iba jej vlastník, administrátor alebo správca fakturácie.",
+      "subscription": "Predplatné",
+      "state": "Stav",
+      "stateNone": "Bez predplatného",
+      "statePastDue": "Po splatnosti",
+      "stateCancelsAtPeriodEnd": "Zruší sa na konci obdobia",
+      "stateTrialEndsOn": "Skúšobné obdobie končí {{date}}",
+      "stateTrialing": "Skúšobné obdobie",
+      "stateRenewsOn": "Obnoví sa {{date}}",
+      "seatsDropTo": "Počet miest klesne {{date}} na {{seats}}",
+      "seats": "Miesta",
+      "autoTopUp": "Automatické dobíjanie",
+      "autoTopUpAmount": "Suma dobitia",
+      "autoTopUpThreshold": "Keď zostatok klesne pod",
+      "manageOnWeb": "Zmeny sa vykonávajú na webe",
+      "changePlan": "Zmeniť plán",
+      "buySeats": "Kúpiť miesta",
+      "setupAutoTopUp": "Nastaviť automatické dobíjanie",
+      "webAddress": "Webová adresa {{url}}",
+      "opensOnWeb": "Otvorí sa na webe"
+    },
     "boundary": {
       "backToProfile": "Späť na profil",
       "loadErrorMessage": "Skontroluj pripojenie a skús to znova.",
@@ -3109,14 +3334,20 @@
       "loadErrorTitle": "Tvoje organizácie sa nepodarilo načítať.",
       "membershipLostNotice": "Už nemáš prístup k tejto organizácii. Prepnuté na {{target}}.",
       "noOrganization": "Žiadna organizácia",
-      "noOrganizationDescription": "Tento účet nie je súčasťou organizácie. Vytvor organizáciu alebo sa k nej pripoj na webe, aby si mohol používať funkcie organizácie, ako sú pozvánky pre členov a upozornenia na nízky zostatok.",
-      "openWebOrganizations": "Otvoriť organizácie na webe",
+      "noOrganizationDescription": "Tento účet nie je súčasťou žiadnej organizácie. Vytvorte si ju, ak chcete používať funkcie organizácie, ako sú pozvánky pre členov a upozornenia na nízky zostatok, alebo otvorte web a pripojte sa k organizácii, do ktorej ste dostali pozvánku.",
       "organizationUnavailable": "Organizácia nie je dostupná.",
       "selectDescriptionWithOrganizations": "Patríš k jednej alebo viacerým organizáciám. Vyber účet, ktorý má táto obrazovka používať.",
       "selectOrganization": "Vybrať organizáciu",
       "unavailableDescription": "Táto organizácia už nie je dostupná. Ak chceš pokračovať, vyber inú vo svojom profile.",
       "unavailableSessionsDescription": "Táto organizácia už nie je dostupná. Jej relácie nie je možné načítať.",
       "accessDeniedDescription": "Nemáš prístup k tejto organizácii."
+    },
+    "create": {
+      "title": "Vytvoriť organizáciu",
+      "description": "Organizácia zdieľa kredity, agentov a nastavenia s vaším tímom.",
+      "nameLabel": "Názov organizácie",
+      "nameRequired": "Zadajte názov organizácie.",
+      "trialNote": "Po jej vytvorení sa spustí vaše 14-dňové skúšobné obdobie plánu Enterprise. Plány sa kupujú na webe."
     },
     "creditActivity": {
       "emptyDescription": "Tu sa budú priebežne zobrazovať nákupy, spotreba a úpravy kreditov tejto organizácie.",
@@ -3203,7 +3434,7 @@
       "manageInvitationA11y": "Spravovať pozvánku pre {{email}}",
       "removeMember": "Odstrániť člena",
       "removeMemberMessage": "Odstrániť {{name}} z tejto organizácie?",
-      "revokeConfirm": "Zrušiť",
+      "revokeConfirm": "Odstrániť",
       "revokeInvitation": "Zrušiť pozvánku",
       "revokeInvitationMessage": "Zrušiť pozvánku odoslanú na {{email}}?",
       "setDailyUsageLimit": "Nastaviť denný limit spotreby",
@@ -3225,6 +3456,21 @@
       "ownRoleChange": "Nemôžete si zmeniť vlastnú rolu.",
       "inviteExpired": "Tejto pozvánke vypršila platnosť.",
       "inviteAccepted": "Táto pozvánka už bola prijatá."
+    },
+    "settingsOnWeb": {
+      "title": "Nastavenia organizácie na webe",
+      "usageDetails": "Podrobnosti o využití",
+      "providersAndModels": "Poskytovatelia a modely",
+      "groups": "Skupiny",
+      "guardrails": "Ochranné pravidlá",
+      "byok": "Vlastný kľúč",
+      "ssoAndDomain": "SSO a doména",
+      "emailPreferences": "Predvoľby e-mailov",
+      "dataCollection": "Zber údajov",
+      "auditLogs": "Protokoly auditu",
+      "requestLogs": "Protokoly požiadaviek",
+      "subOrganizations": "Podorganizácie",
+      "distributeFunds": "Rozdeliť prostriedky"
     },
     "usageStats": {
       "inputTokens": "Vstupné tokeny",
@@ -3992,6 +4238,25 @@
     "importConfigApplied": "Konfigurácia importovaná"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Aktivitu kreditov sa nepodarilo načítať.",
+      "appStoreReceipt": "Doklad v obchode App Store",
+      "deductionFallback": "Odpočet kreditov",
+      "emptyDescription": "Tu sa zobrazia nákupy kreditov, doklady a ich využitie.",
+      "emptyTitle": "Žiadna história kreditov",
+      "googlePlayReceipt": "Doklad v obchode Google Play",
+      "kind": {
+        "adjustment": "Úprava",
+        "balanceNeutral": "Bez vplyvu na zostatok",
+        "deduction": "Odpočet",
+        "grant": "Pridelené kredity",
+        "purchase": "Nákup"
+      },
+      "purchaseFallback": "Nákup kreditov",
+      "receipt": "Doklad",
+      "receiptA11y": "Otvoriť doklad za {{description}}",
+      "receiptUnavailable": "Pre tento nákup nie je k dispozícii doklad."
+    },
     "title": "Kúpiť kredity",
     "description": "Kredity sú jednorazový nákup pridaný do vášho zostatku Kilo na spúšťanie AI programovacích relácií v aplikácii Kilo. Obchod vám strhne platbu z účtu a kredity sa pripíšu po potvrdení platby obchodom.",
     "nextExpiry": "Platnosť kreditov v hodnote {{amount}} sa skončí {{date}} (UTC). Najprv sa čerpajú kredity s najskorším koncom platnosti.",
@@ -4182,6 +4447,70 @@
   "systemSearch": {
     "couldNotOpenResult": "Nepodarilo sa otvoriť tento výsledok vyhľadávania"
   },
+  "usage": {
+    "title": "Využitie",
+    "orgTitle": "Využitie organizácie",
+    "entrySubtitle": "Výdavky, požiadavky a tokeny",
+    "rangePicker": "Časové obdobie",
+    "range90d": "90 dní",
+    "metricPicker": "Metrika grafu",
+    "chartA11y": "{{metric}} za deň",
+    "avgCostPerRequest": "Priem. cena / požiadavka",
+    "topModels": "Najpoužívanejšie modely",
+    "topFeatures": "Najpoužívanejšie funkcie",
+    "emptyTitle": "V tomto období žiadne využitie",
+    "orgSelfNotice": "Vidíte svoje vlastné využitie v tejto organizácii.",
+    "viewDetails": "Zobraziť podrobnosti o využití"
+  },
+  "integrations": {
+    "title": "Integrácie",
+    "sectionTitle": "Pripojené služby",
+    "entrySubtitle": "GitHub, Slack, Linear a ďalšie",
+    "subtitle": "Prepojte svoje vývojárske nástroje a pracovné postupy s Kilo",
+    "emptyHint": "Zatiaľ nie sú pripojené žiadne integrácie.",
+    "disconnect": "Odpojiť",
+    "disconnectTitle": "Odpojiť {{provider}}?",
+    "disconnectMessage": "Kilo prestane reagovať v službe {{provider}}. Kedykoľvek ju môžete znova pripojiť.",
+    "connectedTo": "Pripojené k účtu {{account}}",
+    "disconnected": "Služba {{provider}} bola odpojená",
+    "disconnectFailed": "Službu {{provider}} sa nepodarilo odpojiť",
+    "couldNotLoad": "Integrácie sa nepodarilo načítať",
+    "permissionDenied": "Nemáte oprávnenie spravovať tieto integrácie.",
+    "memberHint": "Požiadajte vlastníka alebo správcu organizácie, aby tieto pripojenia zmenil.",
+    "connectFailed": "Stránku pripojenia sa nepodarilo otvoriť"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Faktúry za vaše vlastné nákupy sa tu zobrazia po vyúčtovaní."
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Zatiaľ bez využitia",
+      "sharedWorkspace": "Zdieľané všetkými chatmi v tomto pracovnom priestore",
+      "currentRates": "Aktuálne sadzby",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Stredný sandbox",
+      "largeSandbox": "Veľký sandbox",
+      "earlierActivity": "Staršia aktivita",
+      "now": "teraz",
+      "loadFailed": "Poplatky za Compute sa nepodarilo načítať."
+    },
+    "preview": {
+      "title": "Otvoriť náhľad",
+      "listeningServices": "Načúvajúce služby",
+      "empty": "Nenašli sa žiadne načúvajúce služby. Požiadajte agenta, aby spustil webový server, a potom obnovte.",
+      "notRunning": "Tento sandbox je zastavený. Ak ho chcete znova spustiť, pošlite agentovi správu.",
+      "notReady": "Sandbox ešte nie je pripravený. Obnovte, keď bude pripojený.",
+      "unsupported": "Vyhľadávanie služieb nie je pre tento sandbox dostupné.",
+      "failed": "Služby sa nepodarilo vyhľadať.",
+      "openService": "Otvoriť {{name}} na porte {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Spúšťače a webhooky",
+      "subtitle": "Spravujte webhookové a plánované spúšťače na webe."
+    }
+  },
   "sessionShare": {
     "title": "Zdieľať reláciu",
     "subtitle": "Túto reláciu si môže prečítať ktokoľvek s odkazom.",
@@ -4199,7 +4528,7 @@
     "existingTitle": "Existujúci odkaz",
     "existingDescription": "Táto relácia už má odkaz na zdieľanie. Vytvorením nového odkazu sa nahradí a starý odkaz prestane fungovať.",
     "rotate": "Vytvoriť nový odkaz",
-    "revoke": "Zrušiť odkaz",
+    "revoke": "Odstrániť odkaz",
     "revokeTitle": "Zrušiť odkaz?",
     "revokeMessage": "Aktuálny odkaz okamžite prestane fungovať.",
     "revokeFailed": "Odkaz sa nepodarilo zrušiť.",

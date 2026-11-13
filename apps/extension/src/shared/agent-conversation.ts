@@ -3,6 +3,8 @@ import type { KiloBrowserToolName } from './browser-tool-contract';
 export type { KiloBrowserToolName };
 
 export type AgentMode = 'dangerous' | 'safe';
+/** What a retried error re-runs: the failed turn, or the failed compaction. */
+export type ErrorRetryKind = 'compaction' | 'turn';
 export type SafeToolName = 'get_memory' | 'search_memories' | 'web_search';
 export type WorkflowToolName =
   | 'delete_workflow'
@@ -106,9 +108,22 @@ export type AgentConversationEvent =
       readonly toolCallId: string;
       readonly type: 'tool-result';
       readonly value?: unknown;
+    }
+  | {
+      /** An optional next step, such as the credits page for an exhausted balance. */
+      readonly action?: { readonly href: string; readonly label: string };
+      /** The server's own reason, when it sent one. */
+      readonly detail?: string;
+      readonly id: string;
+      /** Absent when repeating the request cannot help. */
+      readonly retry?: ErrorRetryKind;
+      /** Plain language: what happened, never a raw status code or fetch failure. */
+      readonly title: string;
+      readonly type: 'error';
     };
 
 type MessageEvent = Extract<AgentConversationEvent, { readonly type: 'message' }>;
+export type ConversationErrorEvent = Extract<AgentConversationEvent, { readonly type: 'error' }>;
 export type RemoteMcpToolCallEvent = Extract<
   AgentConversationEvent,
   { readonly name: RemoteMcpAgentToolName }
@@ -325,6 +340,25 @@ export const createToolResult = ({
   ...(value === undefined ? {} : { value }),
 });
 
+export const createConversationErrorEvent = ({
+  action,
+  detail,
+  retry,
+  title,
+}: {
+  readonly action?: { readonly href: string; readonly label: string } | undefined;
+  readonly detail?: string | undefined;
+  readonly retry?: ErrorRetryKind | undefined;
+  readonly title: string;
+}): ConversationErrorEvent => ({
+  id: createEventId(),
+  title,
+  type: 'error',
+  ...(action === undefined ? {} : { action }),
+  ...(detail === undefined ? {} : { detail }),
+  ...(retry === undefined ? {} : { retry }),
+});
+
 export const groupConversationEvents = (
   events: AgentConversationEvent[]
 ): GroupedConversationItem[] => {
@@ -342,7 +376,8 @@ export const groupConversationEvents = (
         );
 
         if (result === undefined) {
-          groupedItems.push({ event, type: 'event' });
+          // A call with no result yet is in flight: render it as a running row, not a bare block.
+          groupedItems.push({ toolCall: event, type: 'tool-exchange' });
         } else {
           consumedEventIds.add(result.id);
           groupedItems.push({ result, toolCall: event, type: 'tool-exchange' });

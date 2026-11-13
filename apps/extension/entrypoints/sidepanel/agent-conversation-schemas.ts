@@ -122,6 +122,14 @@ export const conversationEventSchema = z.union([
     type: z.literal('tool-result'),
     value: z.unknown().optional(),
   }),
+  z.object({
+    action: z.object({ href: z.string(), label: z.string() }).optional(),
+    detail: z.string().optional(),
+    id: z.string(),
+    retry: z.enum(['compaction', 'turn']).optional(),
+    title: z.string(),
+    type: z.literal('error'),
+  }),
 ]);
 
 export const conversationEventsSchema = z.array(conversationEventSchema);

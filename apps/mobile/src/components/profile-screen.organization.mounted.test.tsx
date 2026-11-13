@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   authState,
   findConfigureRows,
+  findNode,
   flushIdle,
   idleState,
   keys,
@@ -18,17 +19,9 @@ import {
   setOrganizationIdFn,
 } from '@/components/profile-screen.test-helpers';
 import { i18n } from '@/i18n';
-import { act, type ReactTestInstance } from '@/test/renderer';
+import { contextPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
+import { act } from '@/test/renderer';
 import { createTestQueryClient, waitFor } from '@/test/render-with-providers';
-
-/** The selected state an account action button carries, if it carries one. */
-function selectedState(node: ReactTestInstance): boolean | undefined {
-  const state: unknown = node.props.accessibilityState;
-  if (typeof state !== 'object' || state === null || !('selected' in state)) {
-    return undefined;
-  }
-  return typeof state.selected === 'boolean' ? state.selected : undefined;
-}
 
 describe('ProfileScreen Organization section', () => {
   beforeEach(() => {
@@ -70,29 +63,84 @@ describe('ProfileScreen Organization section', () => {
       (row?.props as { onPress?: () => void } | undefined)?.onPress?.();
     });
 
-    // The row opens the app's account picker: Personal first, then both
-    // memberships, with the current account marked as selected.
-    const rows = root.findAll(
-      node =>
-        typeof node.type === 'string' &&
-        node.props.accessibilityRole === 'button' &&
-        selectedState(node) !== undefined
-    );
-    expect(rows.map(account => account.props.accessibilityLabel)).toEqual([
-      i18n.t('common.personal'),
-      'Kilo',
-      'Acme',
-    ]);
-    expect(rows[0]?.props.accessibilityState).toMatchObject({ selected: true });
+    // The row opens the shared account picker route, and the route is handed
+    // Personal first, then both memberships, with the current account marked.
+    expect(routerPush).toHaveBeenCalledWith('/(app)/context-picker');
+    const bridge = contextPickerSlot.get(UNFENCED_ROUTE_KEY);
+    if (bridge === undefined) {
+      throw new Error('the account picker route was not handed a bridge');
+    }
+    expect(bridge.options).toEqual([i18n.t('common.personal'), 'Kilo', 'Acme']);
+    expect(bridge.currentIndex).toBe(0);
 
     act(() => {
-      (rows[2]?.props as { onPress?: () => void } | undefined)?.onPress?.();
+      bridge.onSelect(2);
     });
 
     expect(setOrganizationIdFn).toHaveBeenCalledWith('org-2');
     // Choosing stays on Profile; the section renders the chosen organization's
     // row once the context publishes instead of navigating away.
-    expect(routerPush).not.toHaveBeenCalled();
+    expect(routerPush).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('keeps the section when a selected organization switches to Personal with memberships listed', async () => {
+    providersQueryFn.mockResolvedValue({ providers: [] });
+    organizationsQueryFn.mockResolvedValue([
+      { organizationId: 'org-1', organizationName: 'Kilo', role: 'admin' },
+    ]);
+
+    const queryClient = createTestQueryClient();
+    const { renderer, unmount } = await mountProfile(queryClient);
+    const root = renderer.root;
+
+    flushIdle();
+    const chooserTitle = i18n.t('organization.boundary.selectOrganization');
+    await waitFor(() => findConfigureRows(root, i18n.t('profile.manageOrganization')).length === 1);
+
+    // The mocked context reads its state at render time, so the cache write is
+    // what re-renders the screen after the context switches to Personal.
+    act(() => {
+      organizationState.organizationId = null;
+      queryClient.setQueryData(keys.organizations, [
+        { organizationId: 'org-1', organizationName: 'Kilo', role: 'admin' },
+      ]);
+    });
+
+    await waitFor(() => findConfigureRows(root, chooserTitle).length === 1);
+
+    expect(nodeCountWithChildren(root, 'Text', i18n.t('common.organization'))).toBe(1);
+    expect(findConfigureRows(root, i18n.t('profile.manageOrganization'))).toHaveLength(0);
+    expect(findConfigureRows(root, chooserTitle)).toHaveLength(1);
+
+    unmount();
+  });
+
+  it('keeps the Organization section and its retry when the memberships read fails', async () => {
+    organizationState.organizationId = null;
+    providersQueryFn.mockResolvedValue({ providers: [] });
+    organizationsQueryFn.mockRejectedValue(new Error('memberships unavailable'));
+
+    const { renderer, unmount } = await mountProfile();
+    const root = renderer.root;
+
+    flushIdle();
+    await waitFor(() => nodeCount(root, 'QueryError') === 1);
+
+    expect(nodeCountWithChildren(root, 'Text', i18n.t('common.organization'))).toBe(1);
+    const error = findNode(root, 'QueryError');
+    expect(error?.props.title).toBe(i18n.t('profile.couldNotLoadOrganization'));
+    expect(
+      findConfigureRows(root, i18n.t('organization.boundary.selectOrganization'))
+    ).toHaveLength(0);
+
+    const callsBeforeRetry = organizationsQueryFn.mock.calls.length;
+    act(() => {
+      (error?.props as { onRetry?: () => void } | undefined)?.onRetry?.();
+    });
+
+    await waitFor(() => organizationsQueryFn.mock.calls.length > callsBeforeRetry);
 
     unmount();
   });

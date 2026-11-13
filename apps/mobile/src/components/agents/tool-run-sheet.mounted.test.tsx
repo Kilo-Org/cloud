@@ -250,11 +250,13 @@ describe('ToolRunSheet mounted', () => {
     await settleTranslation();
 
     expect(textsOf(renderer.root)).toContain('Dateien auflisten');
-    expect(requestMock).toHaveBeenCalledWith({
-      texts: ['List files'],
-      targetLanguage: 'en',
-      model: MODEL.id,
-    });
+    expect(requestMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        texts: ['List files'],
+        targetLanguage: 'en',
+        model: MODEL.id,
+      })
+    );
 
     await act(async () => {
       await Promise.resolve();

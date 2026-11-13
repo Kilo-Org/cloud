@@ -23,6 +23,10 @@
   },
   "common": {
     "deleteTitle": "Të fshihet {{label}}?",
+    "manageOnWeb": "Menaxho në ueb",
+    "creditHistory": "Historiku i kredive",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Anulo",
@@ -119,6 +123,7 @@
     "copyLink": "Kopjo lidhjen",
     "couldNotLoadOrganizations": "Organizatat nuk u ngarkuan.",
     "couldNotLoadSessions": "Sesionet nuk u ngarkuan.",
+    "couldnTLoad": "Nuk u ngarkuan të dhënat.",
     "couldnTLoadMore": "Nuk u ngarkuan më shumë të dhëna.",
     "deviceSessions": "Sesionet në pajisje",
     "disabled": "Çaktivizuar",
@@ -246,6 +251,10 @@
     "notAdded": "Ke hyrë. {{provider}} nuk u shtua në llogarinë tënde."
   },
   "profile": {
+    "creditHistorySubtitle": "Blerjet, dëftesat dhe aktiviteti i kredive",
+    "invoicesSubtitle": "Shkarko faturat për blerjet e tua",
+    "manageBilling": "Menaxho faturimin në kilo.ai",
+    "manageBillingIosNote": "Metodat e pagesës, rimbushja automatike dhe detajet e faturimit menaxhohen në kilo.ai.",
     "codeReviewerSubtitle": "Rishikime automatike të PR",
     "securityAgentSubtitle": "Gjej dhe korrigjo cenueshmëritë",
     "reviews": "Rishikimet",
@@ -299,6 +308,7 @@
     "passkeyAdded": "Çelësi i hyrjes u shtua.",
     "passkeyAddFailed": "Nuk u arrit të shtohej një çelës hyrjeje. Provo përsëri.",
     "passkeyAddUnsupported": "Kjo pajisje nuk mund të krijojë çelësa hyrjeje.",
+    "passkeyAddUnavailable": "Çelësat e hyrjes mund të shtohen vetëm në një shfletues ueb.",
     "passkeyAddCancelled": "Krijimi i çelësit të hyrjes u anulua.",
     "passkeyRemoved": "Çelësi i hyrjes u hoq.",
     "passkeyRemoveFailed": "Ai çelës hyrjeje nuk u hoq dot. Provo përsëri.",
@@ -331,7 +341,6 @@
     "providerKeys": {
       "title": "Çelësat e ofruesve",
       "rowSubtitle": "Përdor faturimin e ofruesit tënd",
-      "manageOnWeb": "Menaxho në ueb",
       "manageOnWebReason": "Këta ofrues kërkojnë kredenciale të strukturuara.",
       "description": "Kërkesat përmes këtyre çelësave faturohen në llogarinë tënde te ofruesi, në vend të gjendjes tënde në Kilo.",
       "enabled": "Në përdorim",
@@ -1245,7 +1254,17 @@
       "changeRequestMissingPermissions": "Aplikacioni GitHub i Kilo nuk mund të hapë pull request në këtë depo. Një pronar i depos duhet t'i japë aplikacionit akses shkrimi në përmbajtje dhe pull request, më pas provo përsëri.",
       "changeRequestFailed": "Kilo nuk mund të hapte pull request. Provo përsëri pas një çasti.",
       "proposalConflict": "Një propozim tjetër për këtë depo është ende aktiv.",
-      "offAction": "Kujtesa e shqyrtimit është e çaktivizuar. Aktivizoje dhe pastaj provo përsëri."
+      "offAction": "Kujtesa e shqyrtimit është e çaktivizuar. Aktivizoje dhe pastaj provo përsëri.",
+      "analyze": {
+        "title": "Analizo komentet",
+        "description": "Zgjidh një depo me përgjigje të reja nga mirëmbajtësit dhe më pas kërko një model të vetëm udhëzimi që përsëritet.",
+        "chooseRepository": "Zgjidh një depo",
+        "action": "Analizo tani",
+        "noRepositories": "Asnjë depo nuk ka ende përgjigje të reja nga mirëmbajtësit.",
+        "proposed": "Propozimi për kujtesën e shqyrtimit u krijua",
+        "noFeedback": "Nuk u gjetën komente të reja për këtë depo",
+        "noPattern": "Nuk u gjet asnjë model i qartë që përsëritet"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Shkruaj një URL të vlefshme për kërkesën e integrimit.",
@@ -1377,7 +1396,63 @@
       "title": "Shqyrtuesi i kodit kërkon vëmendje.",
       "recoveryLabel": "Kontakto mbështetjen"
     },
-    "unknownError": "Ndodhi një gabim i panjohur."
+    "unknownError": "Ndodhi një gabim i panjohur.",
+    "skipBotPullRequests": {
+      "title": "Anashkalo PR-të e botëve",
+      "subtitle": "Mos ekzekuto shqyrtime automatike në PR-të e hapura nga botë si Dependabot ose Renovate. Çaktivizoje këtë për të shqyrtuar edhe PR-të e botëve."
+    },
+    "repoModels": {
+      "title": "Model për çdo depo",
+      "description": "Ekzekuto shqyrtimet e disa depove me një model tjetër, një nivel tjetër arsyetimi ose me të dyja.",
+      "defaultModel": "Përdor modelin e parazgjedhur",
+      "resetLabel": "Rivendos modelin për {{repository}}",
+      "changeHint": "Hap zgjedhësin e modeleve"
+    },
+    "analytics": {
+      "title": "Statistika",
+      "trackedReviews": "Shqyrtime të ndjekura",
+      "findingsRaised": "Gjetje të ngritura",
+      "highImpactChanges": "Ndryshime me ndikim të lartë",
+      "impactPoints": "Pikë ndikimi",
+      "repositoryLine": "Shqyrtime: {{reviews}} · Gjetje: {{findings}}",
+      "empty": "Ende nuk ka shqyrtime me statistika",
+      "emptyDescription": "Statistikat regjistrojnë shqyrtimet e përfunduara sa kohë që janë aktive për organizatën.",
+      "off": "Statistikat janë çaktivizuar për këtë organizatë.",
+      "couldNotLoad": "Statistikat nuk mund të ngarkoheshin"
+    },
+    "council": {
+      "title": "Shqyrtimi nga këshilli",
+      "subtitle": "Disa ekspertë shqyrtojnë çdo PR dhe votat e tyre bashkohen në një vendim të vetëm.",
+      "unavailable": "Shqyrtimi nga këshilli nuk është i disponueshëm për këtë organizatë.",
+      "noRepositories": "Ende nuk është zgjedhur asnjë depo. Zgjidh fillimisht depot te cilësimet e depove.",
+      "specialists": "Ekspertë",
+      "labels": "Etiketa që aktivizojnë shqyrtimin nga këshilli",
+      "labelsPlaceholder": "p.sh. këshill, shqyrtim i thelluar",
+      "labelsDescription": "Ndaji etiketat me presje. Një depo me këshillin e aktivizuar ekzekuton më pas shqyrtimin vetëm për PR-të që mbajnë të paktën një nga këto etiketa. Lëre bosh për të gjitha PR-të e përshtatshme.",
+      "tooManyLabels": "Ka tepër etiketa për shqyrtimin nga këshilli. Përdor jo më shumë se {{maximum}} etiketa.",
+      "labelTooLong": "Etiketa për shqyrtimin nga këshilli është tepër e gjatë. Çdo etiketë duhet të ketë jo më shumë se {{maximum}} karaktere.",
+      "minSpecialists": "Zgjidh të paktën {{minimum}} ekspertë. {{selected}} të zgjedhur.",
+      "specialistName": {
+        "testCoverage": "Mbulimi me teste",
+        "correctness": "Korrektësia",
+        "custom": "Ekspert"
+      },
+      "specialist": {
+        "security": "Anashkalim i autorizimit, trajtimi i sekreteve dhe hyrje e pasigurt.",
+        "performance": "Rrugë kritike, pyetje N+1 dhe alokime të rënda.",
+        "testing": "Mbulim që mungon ose është i dobët për sjelljen e re.",
+        "correctness": "Gabime logjike, raste kufitare dhe kushte garuese.",
+        "custom": "Shqyrton problemet në fushën e vet."
+      },
+      "strategy": {
+        "advisory": "Këshillues",
+        "advisoryDescription": "Raporton gjetjet dhe voton pa bllokuar bashkimin.",
+        "unanimous": "Unanim",
+        "unanimousDescription": "Bllokon bashkimin kur ndonjë ekspert raporton një problem kritik.",
+        "majority": "Shumicë",
+        "majorityDescription": "Bllokon bashkimin vetëm kur shumica e ekspertëve raporton një problem kritik."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1880,6 +1955,16 @@
       "auto": "Automatike",
       "shallow": "Sipërfaqësore",
       "deep": "E thellë"
+    },
+    "orphanedFindings": {
+      "title": "Gjetjet për depot e hequra",
+      "description": "Këto depo nuk janë më të arritshme përmes integrimit me GitHub. Gjetjet e tyre vazhdojnë të numërohen në panele dhe raporte.",
+      "count": "Gjetje: {{count}}",
+      "clearLabel": "Fshi gjetjet për {{repository}}",
+      "confirmTitle": "Të fshihen gjetjet?",
+      "confirmMessage": "Të gjitha gjetjet e regjistruara për {{repository}} do të fshihen. Ky veprim nuk mund të zhbëhet.",
+      "confirmAction": "Fshi gjetjet",
+      "cleared": "Gjetjet u fshinë: {{count}}"
     }
   },
   "agents": {
@@ -2059,6 +2144,7 @@
       "branchPlaceholder": "Përzgjidh një degë",
       "runOnWithTarget": "Ekzekuto në: {{target}}",
       "environment": "Mjedisi",
+      "cloudEnvironment": "Mjedis cloud",
       "couldNotLoadEnvironment": "Nuk u ngarkua mjedisi yt.",
       "retryLoadingEnvironment": "Provo ta ngarkosh përsëri mjedisin",
       "defaultEnvironment": "Mjedisi i parazgjedhur",
@@ -2119,6 +2205,89 @@
       "openSettingsToReview": "Hapni Cilësimet për t'i rishikuar",
       "profileSelection": "Zgjedhja e profilit",
       "profileLayerAccessibility": "{{label}}: {{detail}}"
+    },
+    "environment": {
+      "loadingEnvironments": "Po ngarkohen mjediset",
+      "couldNotLoadEnvironments": "Mjediset nuk u ngarkuan",
+      "couldNotLoadEnvironmentsDetail": "Riprovo për të ngarkuar mjediset për këtë depo.",
+      "noEnvironment": "Pa mjedis",
+      "noEnvironmentDetail": "Kjo seancë nis nga imazhi bazë.",
+      "chooseEnvironment": "Zgjidh mjedisin",
+      "chooseEnvironmentDetail": "Kjo depo ka më shumë se një mjedis.",
+      "environmentAccessibility": "Zgjidh një mjedis: {{label}}",
+      "environmentsForRepository": "Mjediset për {{repository}}",
+      "selectEnvironmentToStart": "Zgjidh një mjedis për të nisur.",
+      "buildDetails": "Detajet e ndërtimit",
+      "buildNotBuilt": "Nuk është ndërtuar",
+      "buildUnavailableShort": "Ndërtimi i snapshot-eve nuk ofrohet",
+      "buildPreparing": "Po përgatitet builder-i",
+      "buildCloning": "Po klonohet dega e parazgjedhur",
+      "buildSetup": "Po ekzekutohet konfigurimi i mjedisit",
+      "buildCleanup": "Po hiqen kredencialet e ndërtimit",
+      "buildCapturing": "Po kapet snapshot-i",
+      "buildPublishing": "Po publikohet snapshot-i",
+      "buildStopping": "Po ndalet builder-i",
+      "buildStoppingRetrying": "Po ndalet builder-i, po riprovohet",
+      "buildFinishing": "Po përfundon ndërtimi",
+      "buildSucceeded": "Snapshot-i është gati",
+      "buildSuperseded": "Zëvendësuar nga një ndërtim më i ri",
+      "buildStale": "Cilësimet kanë ndryshuar që nga ky snapshot",
+      "buildStaleAge": "Snapshot-i është më i vjetër se katër ditë; sesioni i ardhshëm e rifreskon",
+      "buildStaleImage": "Ndërtuar për një imazh më të hershëm të sandbox-it",
+      "failureClone": "Depoja nuk mund të klonohej.",
+      "failureSetup": "Një komandë konfigurimi dështoi. Shih regjistrin e ndërtimit.",
+      "failureTimeout": "Një komande konfigurimi i mbaroi koha. Shih regjistrin e ndërtimit.",
+      "failureCleanup": "Kredencialet nuk mund të hiqeshin, ndaj nuk u krijua asnjë snapshot.",
+      "failureCapture": "Snapshot-i nuk mund të kapej.",
+      "failureCaptureUncertain": "Rezultati i snapshot-it humbi; ndërtimi nuk u publikua.",
+      "failureDeadline": "Ndërtimi nuk përfundoi në kohë.",
+      "failureBuilderLost": "Builder-i ndaloi së raportuari.",
+      "failureBuilderStart": "Builder-i nuk mund të nisej.",
+      "failureUnauthorized": "Qasja në depo nuk është më e autorizuar.",
+      "failureActorUnauthorized": "Personi që nisi ndërtimin nuk ka më qasje.",
+      "failureBilling": "Ndërtimet kërkojnë kredite të disponueshme.",
+      "failureBillingUnavailable": "Faturimi nuk mund ta pranonte ndërtimin. Provo sërish.",
+      "failureConfiguration": "Konfigurimi ndryshoi gjatë ndërtimit.",
+      "failureRuntime": "Versioni i zgjedhur i runtime-it nuk mund të instalohej.",
+      "failureGeneric": "Ndërtimi dështoi.",
+      "buildLogs": "Regjistrat e ndërtimit",
+      "noBuildLogs": "Ende nuk ka dalje në regjistër.",
+      "buildLogsLatestOnly": "Po shfaqen 500 rreshtat më të fundit të ruajtur të regjistrit.",
+      "buildLogsTruncated": "Dalja e mëvonshme u shkurtua.",
+      "couldNotLoadBuild": "Gjendja e ndërtimit nuk u ngarkua",
+      "couldNotLoadBuildLogs": "Regjistrat e ndërtimit nuk u ngarkuan",
+      "buildsUnavailable": "Ndërtimi i snapshot-eve nuk ofrohet për këtë mjedis.",
+      "onlyManagersCanBuild": "Vetëm menaxherët e organizatës mund të ndërtojnë snapshot-e.",
+      "waitForBuilder": "Prit që builder-i të ndalet para se të ndërtosh përsëri.",
+      "buildAction": "Ndërto snapshot-in",
+      "refreshAction": "Rifresko snapshot-in",
+      "cancelBuildAction": "Anulo ndërtimin",
+      "buildStarted": "Ndërtimi i snapshot-it filloi",
+      "buildCanceled": "Ndërtimi i snapshot-it u anulua",
+      "couldNotStartBuild": "Ndërtimi nuk mund të nisej",
+      "couldNotCancelBuild": "Ndërtimi nuk mund të anulohej",
+      "sandbox": "Sandbox",
+      "sandboxActive": "Sandbox-i aktiv",
+      "sandboxSleeping": "Sandbox-i në gjumë",
+      "sandboxStarting": "Sandbox-i po niset",
+      "sandboxStopping": "Sandbox-i po ndalet",
+      "sandboxError": "Gabim i sandbox-it",
+      "sandboxUnreachable": "Sandbox-i i paarritshëm",
+      "sandboxStatusUnknown": "Gjendja e sandbox-it e panjohur",
+      "sandboxChecked": "Kontrolluar {{when}}",
+      "sandboxDetailStopped": "Dërgo një mesazh për ta vazhduar.",
+      "sandboxDetailFailed": "Dërgo një mesazh për të provuar përsëri.",
+      "sandboxDetailConnection": "Lidhja me sandbox-in nuk është e disponueshme.",
+      "sandboxDetailUnavailable": "Gjendja e sandbox-it përkohësisht nuk është e disponueshme.",
+      "sandboxDetailInsufficient": "Nuk ka informacion të mjaftueshëm për të konfirmuar gjendjen aktuale të sandbox-it.",
+      "sandboxDetailCheckNeeded": "Sandbox-i nuk e ka konfirmuar së fundmi që funksionon mirë.",
+      "startFresh": "Nis nga e para",
+      "startFreshTitle": "Të nisësh nga e para?",
+      "startFreshMessage": "Kjo heq snapshot-in e hapësirës së punës të kapur {{when}}. Ndryshimet pa commit nga ajo hapësirë pune do të humbasin.",
+      "startFreshMessageUnknown": "Kjo heq snapshot-in e ruajtur të hapësirës së punës, i cili nuk mund të lexohej. Ndryshimet pa commit nga ajo hapësirë pune do të humbasin.",
+      "startFreshDone": "Snapshot-i i hapësirës së punës u hoq.",
+      "couldNotRemoveSnapshot": "Snapshot-i i hapësirës së punës nuk mund të hiqej.",
+      "snapshotCaptured": "Snapshot-i i hapësirës së punës u kap {{when}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "U përditësua {{displayCount}} skedar.",
@@ -2468,7 +2637,8 @@
       "cancelQueued": "Anulo mesazhin",
       "cancelQueuedAccessibility": "Anulo mesazhin në pritje",
       "restoreQueued": "Rikthe",
-      "restoreQueuedAccessibility": "Rikthe mesazhin e anuluar në fushën e mesazhit"
+      "restoreQueuedAccessibility": "Rikthe mesazhin e anuluar në fushën e mesazhit",
+      "noReplyRecorded": "Nuk u regjistrua asnjë përgjigje për këtë mesazh."
     },
     "olderMessages": {
       "arrived": "U ngarkuan mesazhet e mëparshme",
@@ -2861,6 +3031,26 @@
     "onlyFirstFilesAttached_other": "Vetëm {{displayCount}} skedarët e parë do të bashkëngjiten."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Historiku i faturimit",
+      "billingHistoryEmpty": "Ende nuk ka historik faturimi.",
+      "cancel": "Anulo abonimin",
+      "cancelDescription": "Kilo Pass mbetet aktiv deri në fund të periudhës së faturimit dhe nuk do të rinovohet.",
+      "cancelScheduled": "Anulohet më {{date}}",
+      "cancelScheduledChange": "Anulo ndryshimin e planifikuar",
+      "cancelled": "Abonimi u anulua",
+      "changePlan": "Ndrysho planin në kilo.ai",
+      "changePlanIosNote": "Ndryshimet e planeve me pagesë mund të bëhen në kilo.ai.",
+      "creditHistoryEmpty": "Ende nuk ka kredite nga Kilo Pass.",
+      "manageInStore": "Menaxho në {{store}}",
+      "resume": "Rifillo abonimin",
+      "resumeCancelledDescription": "Kilo Pass fillon sërish të rinovohet automatikisht.",
+      "resumePausedDescription": "Kilo Pass rifillon tani, përpara datës së planifikuar të rifillimit.",
+      "resumed": "Abonimi rifilloi",
+      "scheduledChange": "Ndryshim i planifikuar",
+      "scheduledChangeCancelDescription": "Kilo Pass mbetet në planin aktual dhe rinovohet si deri tani.",
+      "scheduledChangeSummary": "{{plan}} më {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass nuk është i disponueshëm.",
     "couldNotLoad": "Nuk u ngarkua Kilo Pass. Provo përsëri.",
@@ -2870,7 +3060,7 @@
     "subscriptionLoading": "Po ngarkohet abonimi Kilo Pass",
     "retryHint": "Riprovohet ngarkimi i gjendjes së Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailableEnded": "Kilo Pass juaj ka përfunduar.",
+    "endedOn": "Përfundoi më {{date}}",
     "notAvailableInApp": "Kilo Pass nuk është i disponueshëm në aplikacion.",
     "statusActive": "Aktiv",
     "statusTrialing": "Në provë",
@@ -2892,7 +3082,7 @@
     "kiloPassManagement": "Menaxhimi i Kilo Pass",
     "kiloPassSetup": "Konfigurimi i Kilo Pass",
     "opensManagementOnWeb": "Hap menaxhimin e Kilo Pass në ueb.",
-    "tryAgainFromProfile": "Provo përsëri nga profili.",
+    "loadFailedRetry": "Kontrollo lidhjen, pastaj riprovo.",
     "legalTermsOfUse": "Kushtet e përdorimit (EULA)",
     "purchaseDifferentAccount": "Kjo blerje në App Store nuk është e lidhur me llogarinë tënde Kilo. Hyr në Apple Account që përdore për blerjen, pastaj provo përsëri.",
     "purchaseFailed": "Nuk u përfundua blerja.",
@@ -2915,6 +3105,11 @@
     "accountDescription": "ID-ja e llogarisë tënde Kilo dhe metadatat e kërkesave përdoren për të verifikuar identitetin tënd dhe për të matur përdorimin.",
     "diagnosticsTitle": "Diagnostika e aplikacionit",
     "diagnosticsDescription": "Raportet e ndërprerjeve të papritura dhe të gabimeve, pa përmbajtjen e aplikacionit, përdoren për ta mbajtur aplikacionin të qëndrueshëm.",
+    "featureFlagsTitle": "Lançimi gradual i veçorive",
+    "featureFlagsDescription": "Email-i i llogarisë tënde, i përdorur nga PostHog për të vendosur cilat veçori sheh.",
+    "featureFlagsWhat": "Email-i i llogarisë tënde.",
+    "featureFlagsWhy": "Për të vendosur cilat veçori sheh, përfshirë ato që ende po i lançojmë gradualisht.",
+    "featureFlagsWho": "PostHog, shërbimi i flamujve të veçorive.",
     "helpImprove": "Ndihmo në përmirësimin e Kilo",
     "helpImproveDescription": "Ndaj të dhëna anonime për përdorimin e produktit dhe burimin e instalimit. Mund ta ndryshosh këtë në çdo kohë te cilësimet.",
     "seeFullDetails": "Shiko detajet e plota",
@@ -2996,6 +3191,36 @@
     "sendFeedback": "Dërgo përshtypje"
   },
   "organization": {
+    "auditLog": {
+      "title": "Regjistri i auditimit",
+      "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate me planin Enterprise mund ta lexojë regjistrin e saj të auditimit.",
+      "emptyTitle": "Nuk ka ngjarje auditimi",
+      "emptyDescription": "Veprimet e kryera në këtë organizatë shfaqen këtu.",
+      "truncated": "Po shfaqen ngjarjet më të fundit."
+    },
+    "billing": {
+      "title": "Faturimi",
+      "permissionDenied": "Faturimin e organizatës mund ta shohë vetëm pronari, administratori ose menaxheri i faturimit.",
+      "subscription": "Abonimi",
+      "state": "Statusi",
+      "stateNone": "Pa abonim",
+      "statePastDue": "Pagesë e vonuar",
+      "stateCancelsAtPeriodEnd": "Anulohet në fund të periudhës",
+      "stateTrialEndsOn": "Prova përfundon më {{date}}",
+      "stateTrialing": "Në provë",
+      "stateRenewsOn": "Rinovohet më {{date}}",
+      "seatsDropTo": "Zbret në {{seats}} vende më {{date}}",
+      "seats": "Vendet",
+      "autoTopUp": "Rimbushje automatike",
+      "autoTopUpAmount": "Shuma e rimbushjes",
+      "autoTopUpThreshold": "Kur gjendja zbret nën",
+      "manageOnWeb": "Ndryshimet bëhen në ueb",
+      "changePlan": "Ndrysho planin",
+      "buySeats": "Bli vende",
+      "setupAutoTopUp": "Konfiguro rimbushjen automatike",
+      "webAddress": "Adresa në ueb {{url}}",
+      "opensOnWeb": "Hapet në ueb"
+    },
     "boundary": {
       "backToProfile": "Kthehu te profili",
       "loadErrorMessage": "Kontrollo lidhjen dhe provo përsëri.",
@@ -3003,14 +3228,20 @@
       "loadErrorTitle": "Nuk u ngarkuan organizatat e tua.",
       "membershipLostNotice": "Nuk ke më qasje në këtë organizatë. U kalua te {{target}}.",
       "noOrganization": "Asnjë organizatë",
-      "noOrganizationDescription": "Kjo llogari nuk është pjesë e një organizate. Krijo ose bashkohu me një organizatë në ueb për të përdorur veçoritë e organizatës si ftesat për anëtarët dhe alarmet për balancë të ulët.",
-      "openWebOrganizations": "Hap organizatat në ueb",
+      "noOrganizationDescription": "Kjo llogari nuk bën pjesë në asnjë organizatë. Krijo një për të përdorur veçoritë e organizatës, si ftesat për anëtarë dhe sinjalizimet për gjendje të ulët, ose hap uebin për t'u bashkuar me një organizatë ku je ftuar.",
       "organizationUnavailable": "Organizata nuk është e disponueshme.",
       "selectDescriptionWithOrganizations": "Ti i përket një ose më shumë organizatave. Zgjidh llogarinë që duhet të përdorë ky ekran.",
       "selectOrganization": "Zgjidh një organizatë",
       "unavailableDescription": "Kjo organizatë nuk është më e disponueshme. Zgjidh një tjetër nga profili yt për të vazhduar.",
       "unavailableSessionsDescription": "Kjo organizatë nuk është më e disponueshme. Sesionet e saj nuk mund të ngarkohen.",
       "accessDeniedDescription": "Nuk ke qasje në këtë organizatë."
+    },
+    "create": {
+      "title": "Krijo organizatë",
+      "description": "Një organizatë ndan kreditet, agjentët dhe cilësimet me ekipin tënd.",
+      "nameLabel": "Emri i organizatës",
+      "nameRequired": "Fut emrin e organizatës.",
+      "trialNote": "Prova jote 14-ditore e Enterprise fillon kur e krijon. Planet blihen në ueb."
     },
     "creditActivity": {
       "emptyDescription": "Blerjet, përdorimi dhe rregullimet e krediteve të kësaj organizate do të shfaqen këtu sapo të ndodhin.",
@@ -3119,6 +3350,21 @@
       "ownRoleChange": "Nuk mund të ndryshosh rolin tënd.",
       "inviteExpired": "Kjo ftesë ka skaduar.",
       "inviteAccepted": "Kjo ftesë është pranuar tashmë."
+    },
+    "settingsOnWeb": {
+      "title": "Cilësimet e organizatës në ueb",
+      "usageDetails": "Detajet e përdorimit",
+      "providersAndModels": "Ofruesit dhe modelet",
+      "groups": "Grupet",
+      "guardrails": "Masat mbrojtëse",
+      "byok": "Përdor çelësin tënd",
+      "ssoAndDomain": "SSO dhe domeni",
+      "emailPreferences": "Preferencat e email-it",
+      "dataCollection": "Mbledhja e të dhënave",
+      "auditLogs": "Regjistrat e auditimit",
+      "requestLogs": "Regjistrat e kërkesave",
+      "subOrganizations": "Nënorganizatat",
+      "distributeFunds": "Shpërndaj fondet"
     },
     "usageStats": {
       "inputTokens": "Tokenët hyrës",
@@ -3870,6 +4116,25 @@
     "importConfigApplied": "Konfigurimi u importua"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Nuk u aktivizua dot veprimtaria e kredisë.",
+      "appStoreReceipt": "Dëftesë nga App Store",
+      "deductionFallback": "Zbritje kredish",
+      "emptyDescription": "Blerjet e kredive, dëftesat dhe përdorimi do të shfaqen këtu.",
+      "emptyTitle": "Nuk ka historik kredish",
+      "googlePlayReceipt": "Dëftesë nga Google Play",
+      "kind": {
+        "adjustment": "Rregullim",
+        "balanceNeutral": "Pa ndikim në bilanc",
+        "deduction": "Zbritje",
+        "grant": "Kredi të dhuruara",
+        "purchase": "Blerje"
+      },
+      "purchaseFallback": "Blerje kredish",
+      "receipt": "Dëftesë",
+      "receiptA11y": "Hap dëftesën për {{description}}",
+      "receiptUnavailable": "Nuk ka dëftesë për këtë blerje."
+    },
     "title": "Bli kredite",
     "description": "Kreditet janë një blerje e njëhershme që shtohet në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App. Dyqani të faturova llogarinë dhe kreditet shtohen pasi dyqani konfirmon pagesën.",
     "nextExpiry": "Kredite në vlerën {{amount}} skadojnë më {{date}} (UTC). Kreditet që skadojnë më herët përdoren të parat.",
@@ -4051,6 +4316,70 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nuk u hap dot ky rezultat kërkimi"
+  },
+  "usage": {
+    "title": "Përdorimi",
+    "orgTitle": "Përdorimi i organizatës",
+    "entrySubtitle": "Shpenzimet, kërkesat dhe tokenët",
+    "rangePicker": "Periudha kohore",
+    "range90d": "90 ditë",
+    "metricPicker": "Metrika e grafikut",
+    "chartA11y": "{{metric}} në ditë",
+    "avgCostPerRequest": "Kosto mesatare / kërkesë",
+    "topModels": "Modelet kryesore",
+    "topFeatures": "Veçoritë kryesore",
+    "emptyTitle": "Asnjë përdorim në këtë periudhë",
+    "orgSelfNotice": "Po shihni përdorimin tuaj në këtë organizatë.",
+    "viewDetails": "Shiko detajet e përdorimit"
+  },
+  "integrations": {
+    "title": "Integrimet",
+    "sectionTitle": "Shërbimet e lidhura",
+    "entrySubtitle": "GitHub, Slack, Linear dhe të tjera",
+    "subtitle": "Lidh mjetet dhe proceset e tua të zhvillimit me Kilo",
+    "emptyHint": "Ende nuk ka asnjë integrim të lidhur.",
+    "disconnect": "Shkëput",
+    "disconnectTitle": "Të shkëputet {{provider}}?",
+    "disconnectMessage": "Kilo do të ndalojë së përgjigjuri në {{provider}}. Mund ta lidhësh sërish në çdo kohë.",
+    "connectedTo": "I lidhur me {{account}}",
+    "disconnected": "{{provider}} u shkëput",
+    "disconnectFailed": "{{provider}} nuk mund të shkëputej",
+    "couldNotLoad": "Integrimet nuk mund të ngarkoheshin",
+    "permissionDenied": "Nuk ke leje për të menaxhuar këto integrime.",
+    "memberHint": "Kërkoji një pronari ose administratori të organizatës t'i ndryshojë këto lidhje.",
+    "connectFailed": "Faqja e lidhjes nuk mund të hapej"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Faturat për blerjet e tua personale do të shfaqen këtu pasi të faturohesh."
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Ende pa përdorim",
+      "sharedWorkspace": "E përbashkët për të gjitha bisedat në këtë hapësirë pune",
+      "currentRates": "Tarifat aktuale",
+      "perHour": "{{rate}}/orë",
+      "mediumSandbox": "Sandbox mesatar",
+      "largeSandbox": "Sandbox i madh",
+      "earlierActivity": "Aktiviteti i mëparshëm",
+      "now": "tani",
+      "loadFailed": "Kostot e Compute nuk mund të ngarkoheshin."
+    },
+    "preview": {
+      "title": "Hap pamjen paraprake",
+      "listeningServices": "Shërbimet në dëgjim",
+      "empty": "Nuk u gjet asnjë shërbim në dëgjim. Kërkoji agjentit të nisë një server web, pastaj rifresko.",
+      "notRunning": "Ky sandbox është ndalur. Dërgoji agjentit një mesazh për ta nisur përsëri.",
+      "notReady": "Sandbox-i nuk është ende gati. Rifresko sapo të lidhet.",
+      "unsupported": "Zbulimi i shërbimeve nuk është i disponueshëm për këtë sandbox.",
+      "failed": "Shërbimet nuk mund të zbuloheshin.",
+      "openService": "Hap {{name}} në portën {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Aktivizuesit dhe webhook-et",
+      "subtitle": "Menaxho në ueb aktivizuesit me webhook dhe ata të planifikuar."
+    }
   },
   "sessionShare": {
     "title": "Ndaj seancën",

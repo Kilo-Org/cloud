@@ -10,6 +10,7 @@ import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
   type ConfigPatch,
+  isPersonal,
   PERSONAL_SCOPE,
   type ReviewConfigData,
   type ReviewerPlatform,
@@ -24,11 +25,7 @@ import { chainSave } from '@/lib/hooks/save-chain';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import { pick } from '@/lib/utils';
 
-export { PERSONAL_SCOPE, toPersonalPlatform };
-
-export function isPersonal(scope: string) {
-  return scope === PERSONAL_SCOPE;
-}
+export { isPersonal, PERSONAL_SCOPE, toPersonalPlatform };
 
 // chainSave keys in-flight saves by "scope:platform", so config saves for
 // the same reviewer config are never in flight concurrently — each waits
@@ -302,6 +299,11 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
         const {
           selectedRepositoryIds: rawSelectedRepositoryIds,
           repositoryModelOverrides: rawRepositoryModelOverrides,
+          // Council is org-only (the personal PATCH schema does not accept it),
+          // so these two keys are pulled out here and forwarded on the org
+          // branch only.
+          council: rawCouncil,
+          councilEnabledRepositoryIds: rawCouncilEnabledRepositoryIds,
           ...restPatch
         } = patch;
         // The personal schema only accepts numeric repository IDs
@@ -354,6 +356,10 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
                 : {}),
               ...(rawRepositoryModelOverrides !== undefined
                 ? { repositoryModelOverrides: rawRepositoryModelOverrides }
+                : {}),
+              ...(rawCouncil !== undefined ? { council: rawCouncil } : {}),
+              ...(rawCouncilEnabledRepositoryIds !== undefined
+                ? { councilEnabledRepositoryIds: rawCouncilEnabledRepositoryIds }
                 : {}),
               ...gitlabAutoConfigure,
             });
@@ -415,39 +421,9 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
 export { classifyProviderState } from '@/lib/code-reviewer-status';
 export { useReviewerEditGuard, useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
 
-// Bitbucket is org-only, so unlike the GitHub/GitLab status hooks above
-// there is no personal-vs-org split here.
-export function useBitbucketReadiness(scope: string) {
-  const trpc = useTRPC();
-  return useQuery({
-    ...trpc.organizations.reviewAgent.getBitbucketReadiness.queryOptions({
-      organizationId: scope,
-    }),
-    enabled: !isPersonal(scope),
-  });
-}
-
-export function useConnectBitbucket(scope: string) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const queryKey = trpc.organizations.reviewAgent.getBitbucketReadiness.queryKey({
-    organizationId: scope,
-  });
-
-  return useMutation({
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    mutationFn: (vars: { accessToken: string }) =>
-      trpcClient.organizations.bitbucket.connect.mutate({
-        organizationId: scope,
-        accessToken: vars.accessToken,
-      }),
-    onError: error => {
-      announcingToast.error(error.message);
-    },
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
-  });
-}
+// Bitbucket hooks live in use-bitbucket.ts (keeps this file under the
+// max-lines limit); re-exported here so call sites are unchanged.
+export { useBitbucketReadiness, useConnectBitbucket } from '@/lib/hooks/use-bitbucket';
 
 // Review-memory hooks live in use-review-memory.ts (keeps this file under
 // the max-lines limit); re-exported here so call sites are unchanged.

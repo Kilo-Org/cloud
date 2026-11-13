@@ -21,9 +21,16 @@ export const PlatformRepositoryCacheSchema = z
   )
   .nullable();
 
-export function parsePlatformRepositoryCache(value: unknown): PlatformRepository[] {
+export function parsePlatformRepositoryCache(
+  value: unknown,
+  onInvalid?: () => void
+): PlatformRepository[] {
   const parsed = PlatformRepositoryCacheSchema.safeParse(value ?? null);
-  return parsed.success ? (parsed.data ?? []) : [];
+  if (!parsed.success) {
+    onInvalid?.();
+    return [];
+  }
+  return parsed.data ?? [];
 }
 
 /**

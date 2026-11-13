@@ -27125,6 +27125,9 @@
         "disableReviewMd": {
           "type": "boolean"
         },
+        "skipBotPullRequests": {
+          "type": "boolean"
+        },
         "gateThreshold": {
           "type": "string",
           "enum": [
@@ -27281,12 +27284,13 @@
       "manuallyaddedrepositories",
       "repositorymodeloverrides",
       "disablereviewmd",
+      "skipbotpullrequests",
       "gatethreshold",
       "council",
       "councilenabledrepositoryids",
       "autoconfigurewebhooks"
     ],
-    "searchBlob": "organizations.reviewAgent.patchReviewConfig Update specific settings on an existing organization code review agent configuration. Use to tweak the review agent without replacing the whole config. organizations reviewagent patchreviewconfig organizationid platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd gatethreshold council councilenabledrepositoryids autoconfigurewebhooks organizationId platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd gateThreshold council councilEnabledRepositoryIds autoConfigureWebhooks"
+    "searchBlob": "organizations.reviewAgent.patchReviewConfig Update specific settings on an existing organization code review agent configuration. Use to tweak the review agent without replacing the whole config. organizations reviewagent patchreviewconfig organizationid platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd skipbotpullrequests gatethreshold council councilenabledrepositoryids autoconfigurewebhooks organizationId platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd skipBotPullRequests gateThreshold council councilEnabledRepositoryIds autoConfigureWebhooks"
   },
   "organizations.reviewAgent.rotateGitLabWebhookSecret": {
     "path": "organizations.reviewAgent.rotateGitLabWebhookSecret",
@@ -31097,6 +31101,9 @@
         "disableReviewMd": {
           "type": "boolean"
         },
+        "skipBotPullRequests": {
+          "type": "boolean"
+        },
         "gateThreshold": {
           "type": "string",
           "enum": [
@@ -31126,10 +31133,11 @@
       "manuallyaddedrepositories",
       "repositorymodeloverrides",
       "disablereviewmd",
+      "skipbotpullrequests",
       "gatethreshold",
       "autoconfigurewebhooks"
     ],
-    "searchBlob": "personalReviewAgent.patchReviewConfig Update individual fields of an existing personal code review agent configuration without replacing the whole config. Use it to change one or a few settings, including adding or removing selected repositories. personalreviewagent patchreviewconfig platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd gatethreshold autoconfigurewebhooks platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd gateThreshold autoConfigureWebhooks"
+    "searchBlob": "personalReviewAgent.patchReviewConfig Update individual fields of an existing personal code review agent configuration without replacing the whole config. Use it to change one or a few settings, including adding or removing selected repositories. personalreviewagent patchreviewconfig platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd skipbotpullrequests gatethreshold autoconfigurewebhooks platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd skipBotPullRequests gateThreshold autoConfigureWebhooks"
   },
   "personalReviewAgent.saveReviewConfig": {
     "path": "personalReviewAgent.saveReviewConfig",
@@ -37201,6 +37209,37 @@
       "hasgatewayusage"
     ],
     "searchBlob": "user.hasGatewayUsage Check whether the current user has any Kilo gateway usage, including organization-scoped requests and zero-cost free-model requests. user hasgatewayusage"
+  },
+  "user.invoicesPage": {
+    "path": "user.invoicesPage",
+    "kind": "query",
+    "summary": "List a user's personal billing invoices from Stripe, filtered to a time period and paginated with a cursor, for showing payment history or past receipts.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "period": {
+          "default": "month",
+          "type": "string",
+          "enum": [
+            "week",
+            "month",
+            "year",
+            "all"
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        }
+      }
+    },
+    "tags": [
+      "user",
+      "invoicespage",
+      "period",
+      "cursor"
+    ],
+    "searchBlob": "user.invoicesPage List a user's personal billing invoices from Stripe, filtered to a time period and paginated with a cursor, for showing payment history or past receipts. user invoicespage period cursor period cursor"
   },
   "user.linkAuthProvider": {
     "path": "user.linkAuthProvider",

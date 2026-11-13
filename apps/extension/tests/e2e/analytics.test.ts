@@ -17,6 +17,7 @@ const ANALYTICS_OPT_OUT_KEY = 'analyticsOptOut';
 const SEEDED_EMAIL = 'user@kilo.ai';
 const PRODUCT_EVENTS = [
   '$identify',
+  'extension_active',
   'extension_signed_in',
   'extension_signed_out',
   'message_sent',

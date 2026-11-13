@@ -89,6 +89,10 @@
     "expired": "Expired"
   },
   "common": {
+    "manageOnWeb": "Manage on the web",
+    "creditHistory": "Credit history",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancel",
@@ -186,6 +190,7 @@
     "copyLink": "Copy link",
     "couldNotLoadOrganizations": "Could not load organizations",
     "couldNotLoadSessions": "Could not load sessions",
+    "couldnTLoad": "Couldn't load",
     "couldnTLoadMore": "Couldn't load more",
     "deviceSessions": "Device sessions",
     "disabled": "Disabled",
@@ -313,6 +318,10 @@
     "notAdded": "You're signed in. {{provider}} wasn't added to your account."
   },
   "profile": {
+    "creditHistorySubtitle": "Purchases, receipts, and credit activity",
+    "invoicesSubtitle": "Download invoices for your purchases",
+    "manageBilling": "Manage billing on kilo.ai",
+    "manageBillingIosNote": "Payment methods, auto top-up, and billing details are managed on kilo.ai.",
     "codeReviewerSubtitle": "Automatic PR reviews",
     "securityAgentSubtitle": "Find and remediate vulnerabilities",
     "reviews": "Reviews",
@@ -366,6 +375,7 @@
     "passkeyAdded": "Passkey added.",
     "passkeyAddFailed": "Could not add a passkey. Try again.",
     "passkeyAddUnsupported": "This device cannot create passkeys.",
+    "passkeyAddUnavailable": "Passkeys can only be added in a web browser.",
     "passkeyAddCancelled": "Passkey creation was cancelled.",
     "passkeyRemoved": "Passkey removed.",
     "passkeyRemoveFailed": "Could not remove that passkey. Try again.",
@@ -398,7 +408,6 @@
     "providerKeys": {
       "title": "Provider keys",
       "rowSubtitle": "Use your own provider billing",
-      "manageOnWeb": "Manage on the web",
       "manageOnWebReason": "These providers need structured credentials.",
       "description": "Requests through these keys are billed to your provider account instead of your Kilo balance.",
       "enabled": "In use",
@@ -1312,7 +1321,17 @@
       "changeRequestMissingPermissions": "Kilo's GitHub App cannot open pull requests in this repository. A repository owner must give the app write access to contents and pull requests, then try again.",
       "changeRequestFailed": "Kilo could not open the pull request. Try again in a moment.",
       "proposalConflict": "Another proposal for this repository is still active.",
-      "offAction": "Review memory is off. Turn it on, then try again."
+      "offAction": "Review memory is off. Turn it on, then try again.",
+      "analyze": {
+        "title": "Analyze feedback",
+        "description": "Pick a repository with recent maintainer replies, then look for one repeated guidance pattern.",
+        "chooseRepository": "Choose a repository",
+        "action": "Analyze now",
+        "noRepositories": "No repository has recent maintainer replies yet.",
+        "proposed": "Review memory proposal created",
+        "noFeedback": "No recent feedback found for this repository",
+        "noPattern": "No clear repeated pattern found"
+      }
     },
     "manualReview": {
       "title": "Manual review",
@@ -1444,7 +1463,63 @@
       "title": "Code Reviewer needs attention",
       "recoveryLabel": "Contact support"
     },
-    "unknownError": "Unknown error"
+    "unknownError": "Unknown error",
+    "skipBotPullRequests": {
+      "title": "Skip pull requests from bots",
+      "subtitle": "Do not run automated reviews on pull requests opened by bots such as Dependabot or Renovate. Turn this off to review bot pull requests too."
+    },
+    "repoModels": {
+      "title": "Per-repository model",
+      "description": "Run some repositories' reviews on a different model, thinking effort, or both.",
+      "defaultModel": "Uses the default model",
+      "resetLabel": "Reset model for {{repository}}",
+      "changeHint": "Opens the model picker"
+    },
+    "analytics": {
+      "title": "Analytics",
+      "trackedReviews": "Reviews tracked",
+      "findingsRaised": "Findings raised",
+      "highImpactChanges": "High-impact changes",
+      "impactPoints": "Impact points",
+      "repositoryLine": "Reviews: {{reviews}} · Findings: {{findings}}",
+      "empty": "No reviews with analytics yet",
+      "emptyDescription": "Analytics records completed reviews while it is enabled for the organization.",
+      "off": "Analytics is off for this organization.",
+      "couldNotLoad": "Could not load analytics"
+    },
+    "council": {
+      "title": "Council review",
+      "subtitle": "Several specialists review each pull request, and their votes combine into one decision.",
+      "unavailable": "Council review is not available for this organization.",
+      "noRepositories": "No repositories selected yet. Choose repositories in the repository settings first.",
+      "specialists": "Specialists",
+      "labels": "Labels that trigger council review",
+      "labelsPlaceholder": "e.g. council, deep review",
+      "labelsDescription": "Separate labels with commas. A council-enabled repository then runs council only for pull requests carrying at least one of these labels. Leave blank for every eligible pull request.",
+      "tooManyLabels": "Too many council labels. Use at most {{maximum}} labels.",
+      "labelTooLong": "Council label too long. Each label must be {{maximum}} characters or fewer.",
+      "minSpecialists": "Select at least {{minimum}} specialists. {{selected}} selected.",
+      "specialistName": {
+        "testCoverage": "Test coverage",
+        "correctness": "Correctness",
+        "custom": "Specialist"
+      },
+      "specialist": {
+        "security": "Authorization bypass, secret handling and unsafe input.",
+        "performance": "Hot paths, N+1 queries and heavy allocations.",
+        "testing": "Missing or weak coverage for new behavior.",
+        "correctness": "Logic errors, edge cases and race conditions.",
+        "custom": "Reviews issues in its own area."
+      },
+      "strategy": {
+        "advisory": "Advisory",
+        "advisoryDescription": "Reports findings and votes without blocking the merge.",
+        "unanimous": "Unanimous",
+        "unanimousDescription": "Blocks the merge when any specialist reports a critical issue.",
+        "majority": "Majority",
+        "majorityDescription": "Blocks the merge only when most specialists report a critical issue."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1947,6 +2022,16 @@
       "auto": "Auto",
       "shallow": "Shallow",
       "deep": "Deep"
+    },
+    "orphanedFindings": {
+      "title": "Findings for removed repositories",
+      "description": "These repositories are no longer reachable through the GitHub integration. Their findings still count in dashboards and reports.",
+      "count": "Findings: {{count}}",
+      "clearLabel": "Clear findings for {{repository}}",
+      "confirmTitle": "Clear findings?",
+      "confirmMessage": "Every recorded finding for {{repository}} will be deleted. This cannot be undone.",
+      "confirmAction": "Delete findings",
+      "cleared": "Findings cleared: {{count}}"
     }
   },
   "agents": {
@@ -2126,6 +2211,7 @@
       "branchPlaceholder": "Select a branch",
       "runOnWithTarget": "Run on: {{target}}",
       "environment": "Environment",
+      "cloudEnvironment": "Cloud environment",
       "couldNotLoadEnvironment": "Couldn't load your environment",
       "retryLoadingEnvironment": "Retry loading environment",
       "defaultEnvironment": "Default environment",
@@ -2186,6 +2272,89 @@
       "openSettingsToReview": "Open Settings to review",
       "profileSelection": "Profile selection",
       "profileLayerAccessibility": "{{label}}: {{detail}}"
+    },
+    "environment": {
+      "loadingEnvironments": "Loading environments",
+      "couldNotLoadEnvironments": "Couldn't load environments",
+      "couldNotLoadEnvironmentsDetail": "Retry to load the environments for this repository.",
+      "noEnvironment": "No environment",
+      "noEnvironmentDetail": "This session starts from the base image.",
+      "chooseEnvironment": "Choose environment",
+      "chooseEnvironmentDetail": "This repository has more than one environment.",
+      "environmentAccessibility": "Choose an environment: {{label}}",
+      "environmentsForRepository": "Environments for {{repository}}",
+      "selectEnvironmentToStart": "Select an environment to start.",
+      "buildDetails": "Build details",
+      "buildNotBuilt": "Not built",
+      "buildUnavailableShort": "Snapshot builds unavailable",
+      "buildPreparing": "Preparing the builder",
+      "buildCloning": "Cloning the default branch",
+      "buildSetup": "Running the environment setup",
+      "buildCleanup": "Removing build credentials",
+      "buildCapturing": "Capturing the snapshot",
+      "buildPublishing": "Publishing the snapshot",
+      "buildStopping": "Stopping the builder",
+      "buildStoppingRetrying": "Stopping the builder, retrying",
+      "buildFinishing": "Finishing the build",
+      "buildSucceeded": "Snapshot ready",
+      "buildSuperseded": "Superseded by a newer build",
+      "buildStale": "Settings changed since this snapshot",
+      "buildStaleAge": "Snapshot older than four days; the next session refreshes it",
+      "buildStaleImage": "Built for an earlier sandbox image",
+      "failureClone": "The repository could not be cloned.",
+      "failureSetup": "A setup command failed. See the build log.",
+      "failureTimeout": "A setup command timed out. See the build log.",
+      "failureCleanup": "Credentials could not be removed, so no snapshot was taken.",
+      "failureCapture": "The snapshot could not be captured.",
+      "failureCaptureUncertain": "The snapshot result was lost; the build was not published.",
+      "failureDeadline": "The build did not finish in time.",
+      "failureBuilderLost": "The builder stopped reporting.",
+      "failureBuilderStart": "The builder could not start.",
+      "failureUnauthorized": "Repository access is no longer authorized.",
+      "failureActorUnauthorized": "The person who started the build no longer has access.",
+      "failureBilling": "Builds need available credits.",
+      "failureBillingUnavailable": "Billing could not admit the build. Try again.",
+      "failureConfiguration": "The configuration changed during the build.",
+      "failureRuntime": "The selected runtime release could not be installed.",
+      "failureGeneric": "The build failed.",
+      "buildLogs": "Build logs",
+      "noBuildLogs": "No log output yet.",
+      "buildLogsLatestOnly": "Showing the latest 500 retained log lines.",
+      "buildLogsTruncated": "Later output was truncated.",
+      "couldNotLoadBuild": "Couldn't load the build status",
+      "couldNotLoadBuildLogs": "Couldn't load the build logs",
+      "buildsUnavailable": "Snapshot builds are unavailable for this environment.",
+      "onlyManagersCanBuild": "Only organization managers can build snapshots.",
+      "waitForBuilder": "Wait for the builder to stop before building again.",
+      "buildAction": "Build snapshot",
+      "refreshAction": "Refresh snapshot",
+      "cancelBuildAction": "Cancel build",
+      "buildStarted": "Snapshot build started",
+      "buildCanceled": "Snapshot build canceled",
+      "couldNotStartBuild": "Couldn't start the build",
+      "couldNotCancelBuild": "Couldn't cancel the build",
+      "sandbox": "Sandbox",
+      "sandboxActive": "Sandbox active",
+      "sandboxSleeping": "Sandbox sleeping",
+      "sandboxStarting": "Sandbox starting",
+      "sandboxStopping": "Sandbox stopping",
+      "sandboxError": "Sandbox error",
+      "sandboxUnreachable": "Sandbox unreachable",
+      "sandboxStatusUnknown": "Sandbox status unknown",
+      "sandboxChecked": "Checked {{when}}",
+      "sandboxDetailStopped": "Send a message to resume it.",
+      "sandboxDetailFailed": "Send a message to try again.",
+      "sandboxDetailConnection": "The sandbox connection is unavailable.",
+      "sandboxDetailUnavailable": "Sandbox status is temporarily unavailable.",
+      "sandboxDetailInsufficient": "There is not enough information to confirm the sandbox's current state.",
+      "sandboxDetailCheckNeeded": "The sandbox has not confirmed its health recently.",
+      "startFresh": "Start fresh",
+      "startFreshTitle": "Start fresh?",
+      "startFreshMessage": "This discards the workspace snapshot captured {{when}}. Uncommitted changes from that workspace are lost.",
+      "startFreshMessageUnknown": "This discards the saved workspace snapshot, which could not be read. Uncommitted changes from that workspace are lost.",
+      "startFreshDone": "Workspace snapshot removed.",
+      "couldNotRemoveSnapshot": "Couldn't remove the workspace snapshot.",
+      "snapshotCaptured": "Workspace snapshot captured {{when}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Updated {{displayCount}} file",
@@ -2552,6 +2721,7 @@
       "cancelQueuedAccessibility": "Cancel queued message",
       "restoreQueued": "Restore",
       "restoreQueuedAccessibility": "Restore canceled message to the composer",
+      "noReplyRecorded": "No response was recorded for this message.",
       "userMessage": "User message",
       "assistantMessage": "Assistant message",
       "longPressHint": "Long press for message details"
@@ -2941,6 +3111,26 @@
     "couldNotReadContent": "Couldn't read the shared content"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Billing history",
+      "billingHistoryEmpty": "No billing history yet.",
+      "cancel": "Cancel subscription",
+      "cancelDescription": "Your Kilo Pass stays active until the end of the billing period and will not renew.",
+      "cancelScheduled": "Cancels on {{date}}",
+      "cancelScheduledChange": "Cancel scheduled change",
+      "cancelled": "Cancelled subscription",
+      "changePlan": "Change plan on kilo.ai",
+      "changePlanIosNote": "Paid plan changes are available on kilo.ai.",
+      "creditHistoryEmpty": "No Kilo Pass credits yet.",
+      "manageInStore": "Manage in {{store}}",
+      "resume": "Resume subscription",
+      "resumeCancelledDescription": "Your Kilo Pass starts renewing automatically again.",
+      "resumePausedDescription": "Your Kilo Pass resumes now, before its scheduled resume date.",
+      "resumed": "Subscription resumed",
+      "scheduledChange": "Scheduled change",
+      "scheduledChangeCancelDescription": "Your Kilo Pass stays on its current plan and renews as it does today.",
+      "scheduledChangeSummary": "{{plan}} on {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Couldn't load Kilo Pass.",
     "couldNotLoad": "Kilo Pass could not be loaded. Try again.",
@@ -2950,7 +3140,7 @@
     "subscriptionLoading": "Kilo Pass subscription loading",
     "retryHint": "Retries Kilo Pass state.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailableEnded": "Your Kilo Pass has ended.",
+    "endedOn": "Ended {{date}}",
     "notAvailableInApp": "Kilo Pass isn't available in the app.",
     "statusActive": "Active",
     "statusTrialing": "Trialing",
@@ -2972,7 +3162,7 @@
     "kiloPassManagement": "Kilo Pass management",
     "kiloPassSetup": "Kilo Pass setup",
     "opensManagementOnWeb": "Opens Kilo Pass management on web.",
-    "tryAgainFromProfile": "Try again from Profile.",
+    "loadFailedRetry": "Check your connection, then try again.",
     "legalTermsOfUse": "Terms of Use (EULA)",
     "purchaseDifferentAccount": "This App Store purchase isn't linked to your Kilo account. Sign in to the Apple Account used for the purchase, then try again.",
     "purchaseFailed": "Failed to complete purchase.",
@@ -2995,6 +3185,11 @@
     "accountDescription": "Your Kilo account ID and request metadata, used to authenticate you and meter usage.",
     "diagnosticsTitle": "App diagnostics",
     "diagnosticsDescription": "Crash and error reports, with app content removed, used to keep the app stable.",
+    "featureFlagsTitle": "Feature rollout",
+    "featureFlagsDescription": "Your account email, used by PostHog to decide which features you see.",
+    "featureFlagsWhat": "Your account email.",
+    "featureFlagsWhy": "To decide which features you see, including ones we are still rolling out.",
+    "featureFlagsWho": "PostHog, the feature-flag service.",
     "helpImprove": "Help improve Kilo",
     "helpImproveDescription": "Share anonymous product analytics and install source. You can change this any time in Settings.",
     "seeFullDetails": "See full details",
@@ -3076,6 +3271,36 @@
     "sendFeedback": "Send feedback"
   },
   "organization": {
+    "auditLog": {
+      "title": "Audit log",
+      "permissionDenied": "Only an organization owner, admin or billing manager on the Enterprise plan can read its audit log.",
+      "emptyTitle": "No audit events",
+      "emptyDescription": "Actions taken in this organization appear here.",
+      "truncated": "Showing the most recent events."
+    },
+    "billing": {
+      "title": "Billing",
+      "permissionDenied": "Only an organization owner, admin or billing manager can see its billing.",
+      "subscription": "Subscription",
+      "state": "State",
+      "stateNone": "No subscription",
+      "statePastDue": "Past due",
+      "stateCancelsAtPeriodEnd": "Cancels at the end of the period",
+      "stateTrialEndsOn": "Trial ends on {{date}}",
+      "stateTrialing": "Trial",
+      "stateRenewsOn": "Renews on {{date}}",
+      "seatsDropTo": "Drops to {{seats}} seats on {{date}}",
+      "seats": "Seats",
+      "autoTopUp": "Auto top-up",
+      "autoTopUpAmount": "Top-up amount",
+      "autoTopUpThreshold": "When balance drops below",
+      "manageOnWeb": "Changes are made on the web",
+      "changePlan": "Change plan",
+      "buySeats": "Buy seats",
+      "setupAutoTopUp": "Set up auto top-up",
+      "webAddress": "Web address {{url}}",
+      "opensOnWeb": "Opens on the web"
+    },
     "boundary": {
       "accessDeniedDescription": "You do not have access to this organization.",
       "backToProfile": "Back to profile",
@@ -3084,13 +3309,19 @@
       "loadErrorTitle": "Couldn't load your organizations",
       "membershipLostNotice": "You no longer have access to this organization. Switched to {{target}}.",
       "noOrganization": "No organization",
-      "noOrganizationDescription": "This account is not part of an organization. Create or join one on the web to use organization features like member invites and low-balance alerts.",
-      "openWebOrganizations": "Open organizations on web",
+      "noOrganizationDescription": "This account is not part of an organization. Create one to use organization features like member invites and low-balance alerts, or open the web to join one you were invited to.",
       "organizationUnavailable": "Organization unavailable",
       "selectDescriptionWithOrganizations": "You belong to one or more organizations. Choose the account this screen should use.",
       "selectOrganization": "Select an organization",
       "unavailableDescription": "This organization is no longer available. Choose another account from the account picker to continue.",
       "unavailableSessionsDescription": "This organization is no longer available. Sessions for it cannot be loaded."
+    },
+    "create": {
+      "title": "Create organization",
+      "description": "An organization shares credits, agents and settings with your team.",
+      "nameLabel": "Organization name",
+      "nameRequired": "Enter an organization name.",
+      "trialNote": "Your 14-day Enterprise trial starts when you create it. Plans are bought on the web."
     },
     "creditActivity": {
       "emptyDescription": "Purchases, usage, and credit adjustments for this organization will appear here as they happen.",
@@ -3199,6 +3430,21 @@
       "ownRoleChange": "You cannot change your own role.",
       "inviteExpired": "This invitation has expired.",
       "inviteAccepted": "This invitation has already been accepted."
+    },
+    "settingsOnWeb": {
+      "title": "Organization settings on the web",
+      "usageDetails": "Usage details",
+      "providersAndModels": "Providers and models",
+      "groups": "Groups",
+      "guardrails": "Guardrails",
+      "byok": "Bring your own key",
+      "ssoAndDomain": "SSO and domain",
+      "emailPreferences": "Email preferences",
+      "dataCollection": "Data collection",
+      "auditLogs": "Audit logs",
+      "requestLogs": "Request logs",
+      "subOrganizations": "Sub-organizations",
+      "distributeFunds": "Distribute funds"
     },
     "usageStats": {
       "inputTokens": "Input Tokens",
@@ -3937,6 +4183,25 @@
     "importConfigApplied": "Config imported"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Couldn't load credit activity.",
+      "appStoreReceipt": "Receipt from the App Store",
+      "deductionFallback": "Credit deduction",
+      "emptyDescription": "Credit purchases, receipts, and usage will appear here.",
+      "emptyTitle": "No credit history",
+      "googlePlayReceipt": "Receipt from Google Play",
+      "kind": {
+        "adjustment": "Adjustment",
+        "balanceNeutral": "Balance neutral",
+        "deduction": "Deduction",
+        "grant": "Credit grant",
+        "purchase": "Purchase"
+      },
+      "purchaseFallback": "Credit purchase",
+      "receipt": "Receipt",
+      "receiptA11y": "Open the receipt for {{description}}",
+      "receiptUnavailable": "A receipt is not available for this purchase."
+    },
     "title": "Buy credits",
     "description": "Credits are a one-time purchase added to your Kilo balance for running AI coding sessions in Kilo App. The store charges your account and credits are added after the store confirms payment.",
     "nextExpiry": "{{amount}} in credits expires {{date}} (UTC). Credits with the earliest expiry are used first.",
@@ -4051,6 +4316,70 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Could not open this search result"
+  },
+  "usage": {
+    "title": "Usage",
+    "orgTitle": "Organization usage",
+    "entrySubtitle": "Spend, requests, and tokens",
+    "rangePicker": "Time range",
+    "range90d": "90 days",
+    "metricPicker": "Chart metric",
+    "chartA11y": "{{metric}} per day",
+    "avgCostPerRequest": "Avg cost / req",
+    "topModels": "Top models",
+    "topFeatures": "Top features",
+    "emptyTitle": "No usage in this period",
+    "orgSelfNotice": "You're seeing your own usage in this organization.",
+    "viewDetails": "View usage details"
+  },
+  "integrations": {
+    "title": "Integrations",
+    "sectionTitle": "Connected services",
+    "entrySubtitle": "GitHub, Slack, Linear and more",
+    "subtitle": "Connect your development tools and workflows to Kilo",
+    "emptyHint": "No integrations connected yet.",
+    "disconnect": "Disconnect",
+    "disconnectTitle": "Disconnect {{provider}}?",
+    "disconnectMessage": "Kilo will stop responding in {{provider}}. You can reconnect at any time.",
+    "connectedTo": "Connected to {{account}}",
+    "disconnected": "{{provider}} disconnected",
+    "disconnectFailed": "Could not disconnect {{provider}}",
+    "couldNotLoad": "Could not load integrations",
+    "permissionDenied": "You do not have permission to manage these integrations.",
+    "memberHint": "Ask an organization owner or admin to change these connections.",
+    "connectFailed": "Could not open the connection page"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Invoices for your own purchases will appear here once you are billed."
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "No usage yet",
+      "sharedWorkspace": "Shared by all chats in this workspace",
+      "currentRates": "Current rates",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Medium sandbox",
+      "largeSandbox": "Large sandbox",
+      "earlierActivity": "Earlier activity",
+      "now": "now",
+      "loadFailed": "Compute charges could not load."
+    },
+    "preview": {
+      "title": "Open preview",
+      "listeningServices": "Listening services",
+      "empty": "No listening services found. Ask the agent to start a web server, then refresh.",
+      "notRunning": "This sandbox is stopped. Send the agent a message to start it again.",
+      "notReady": "The sandbox is not ready yet. Refresh once it is connected.",
+      "unsupported": "Service discovery is not available for this sandbox.",
+      "failed": "Could not discover services.",
+      "openService": "Open {{name}} on port {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Triggers & webhooks",
+      "subtitle": "Manage webhook and scheduled triggers on the web."
+    }
   },
   "sessionShare": {
     "title": "Share session",

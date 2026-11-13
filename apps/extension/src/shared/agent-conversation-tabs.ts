@@ -33,8 +33,17 @@ const conversationIdPrefix = 'conversation-';
 const defaultConversationTitlePrefix = 'Conversation';
 const maxTitleLength = 36;
 
-/** Legacy seeded assistant greeting; stripped on load and reused as the transcript empty-state hint. */
+/** Legacy seeded assistant greeting; stripped on load. */
 export const LEGACY_CONVERSATION_GREETING = 'Pick a tab and ask Kilo to inspect it.';
+
+export const getConversationEmptyHint = ({
+  targetTabTitle,
+}: {
+  readonly targetTabTitle: string | undefined;
+}): string =>
+  targetTabTitle === undefined
+    ? 'Pick a tab, then ask Kilo about it.'
+    : `Ask Kilo about ${targetTabTitle}.`;
 
 const stripLegacyLeadingGreeting = (events: AgentConversationEvent[]): AgentConversationEvent[] => {
   const [first] = events;

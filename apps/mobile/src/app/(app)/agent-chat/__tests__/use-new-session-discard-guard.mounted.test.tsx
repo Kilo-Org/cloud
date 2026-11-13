@@ -18,6 +18,7 @@ import {
   pressDialogButton,
   renderedLabels,
   resetGuardHarness,
+  setComposerFocused,
   setPickerTopRoute,
   toastErrorMock,
   triggerPreventRemoveInAct,
@@ -196,6 +197,40 @@ describe('useNewSessionDiscardGuard', () => {
       });
     }
   );
+
+  // The session route's not-found card sits above this composer and its "Back
+  // to sessions" truncates the stack with `POP_TO`. The confirm this screen
+  // would open is behind that card, so refusing the removal left the person on
+  // a screen whose Back did nothing.
+  it('replays a removal another screen asked for unconfirmed', () => {
+    const { renderer } = mountGuard(true, noOpDiscard);
+    setComposerFocused(false);
+
+    const action = triggerPreventRemoveInAct({ type: 'POP_TO' });
+
+    expect(alertMock).not.toHaveBeenCalled();
+    expect(renderedLabels(renderer)).not.toContain('Discard draft?');
+    expect(dispatchMock).toHaveBeenCalledTimes(1);
+    expect(dispatchMock).toHaveBeenCalledWith(action);
+    expect(usePreventRemoveHolder.preventRemove).toBe(false);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('still asks when this screen is the one the person is on', () => {
+    const { renderer } = mountGuard(true, noOpDiscard);
+
+    triggerPreventRemoveInAct({ type: 'POP_TO' });
+
+    expect(renderedLabels(renderer)).toContain('Discard draft?');
+    expect(dispatchMock).not.toHaveBeenCalled();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
 
   it.each(PLATFORMS)(
     'runs onDiscard before dispatching when Discard is accepted (%s)',

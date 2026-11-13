@@ -23,6 +23,10 @@
   },
   "common": {
     "deleteTitle": "Ħassar {{label}}?",
+    "manageOnWeb": "Immaniġġja fuq il-web",
+    "creditHistory": "Storja tal-krediti",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Ikkanċella",
@@ -119,6 +123,7 @@
     "copyLink": "Ikkopja l-ħolqa",
     "couldNotLoadOrganizations": "Ma stajniex ngħabbu l-organizzazzjonijiet.",
     "couldNotLoadSessions": "Ma stajniex ngħabbu s-sessjonijiet.",
+    "couldnTLoad": "Ma stajniex ngħabbu.",
     "couldnTLoadMore": "Ma stajniex ngħabbu aktar.",
     "deviceSessions": "Sessjonijiet tal-apparat",
     "disabled": "Diżattivat",
@@ -246,6 +251,10 @@
     "notAdded": "Dħalt. {{provider}} ma żdiedx mal-kont tiegħek."
   },
   "profile": {
+    "creditHistorySubtitle": "Xiri, irċevuti u attività tal-krediti",
+    "invoicesSubtitle": "Niżżel il-fatturi tax-xiri tiegħek",
+    "manageBilling": "Immaniġġja l-ħlasijiet fuq kilo.ai",
+    "manageBillingIosNote": "Il-metodi ta' ħlas, it-top-up awtomatiku u d-dettalji tal-ħlas jiġu mmaniġġjati fuq kilo.ai.",
     "codeReviewerSubtitle": "Reviżjonijiet awtomatiċi tal-PR",
     "securityAgentSubtitle": "Sib u rrimedja l-vulnerabbiltajiet",
     "reviews": "Reviżjonijiet",
@@ -299,6 +308,7 @@
     "passkeyAdded": "Iċ-ċavetta tal-aċċess miżjuda.",
     "passkeyAddFailed": "Ma setgħetx tiġi miżjuda ċavetta tal-aċċess. Erġa' pprova.",
     "passkeyAddUnsupported": "Dan l-apparat ma jistax joħloq ċwievet tal-aċċess.",
+    "passkeyAddUnavailable": "Ċwievet tal-aċċess jistgħu jiġu miżjuda biss fi browser tal-web.",
     "passkeyAddCancelled": "Il-ħolqien taċ-ċavetta tal-aċċess ġie kkanċellat.",
     "passkeyRemoved": "Iċ-ċavetta tal-aċċess tneħħiet.",
     "passkeyRemoveFailed": "Dik iċ-ċavetta tal-aċċess ma setgħetx titneħħa. Erġa' pprova.",
@@ -331,7 +341,6 @@
     "providerKeys": {
       "title": "Ċwievet tal-fornitur",
       "rowSubtitle": "Uża l-fatturazzjoni tal-fornitur tiegħek",
-      "manageOnWeb": "Immaniġġja fuq il-web",
       "manageOnWebReason": "Dawn il-fornituri jeħtieġu kredenzjali strutturati.",
       "description": "It-talbiet magħmula b'dawn iċ-ċwievet jiġu ffatturati lill-kont tal-fornitur tiegħek minflok jitnaqqsu mill-bilanċ ta' Kilo tiegħek.",
       "enabled": "Qed tintuża",
@@ -1314,7 +1323,17 @@
       "changeRequestMissingPermissions": "L-App GitHub ta' Kilo ma tistax tiftaħ pull requests f'dan ir-repożitorju. Sid ir-repożitorju jrid jagħti lill-app aċċess tal-kitba għall-kontenut u l-pull requests, imbagħad erġa' pprova.",
       "changeRequestFailed": "Kilo ma setax jiftaħ il-pull request. Erġa' pprova fi ftit mument.",
       "proposalConflict": "Proposta oħra għal dan ir-repożitorju għadha attiva.",
-      "offAction": "Il-memorja tar-reviżjoni hija diżattivata. Attivaha, mbagħad erġa' pprova."
+      "offAction": "Il-memorja tar-reviżjoni hija diżattivata. Attivaha, mbagħad erġa' pprova.",
+      "analyze": {
+        "title": "Analizza l-kummenti",
+        "description": "Agħżel repożitorju b'tweġibiet reċenti mill-manutenturi, imbagħad fittex mudell wieħed ta' gwida li jirrepeti.",
+        "chooseRepository": "Agħżel repożitorju",
+        "action": "Analizza issa",
+        "noRepositories": "Għad m'hemm l-ebda repożitorju b'tweġibiet reċenti mill-manutenturi.",
+        "proposed": "Proposta tal-memorja tar-reviżjoni nħolqot",
+        "noFeedback": "Ma nstab l-ebda kumment reċenti għal dan ir-repożitorju",
+        "noPattern": "Ma nstab l-ebda mudell ċar li jirrepeti"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Daħħal URL validu għal merge request.",
@@ -1449,7 +1468,63 @@
       "title": "Ir-reviżur tal-kodiċi jeħtieġ l-attenzjoni tiegħek.",
       "recoveryLabel": "Ikkuntattja l-appoġġ"
     },
-    "unknownError": "Żball mhux magħruf"
+    "unknownError": "Żball mhux magħruf",
+    "skipBotPullRequests": {
+      "title": "Aqbeż il-PRs mill-bots",
+      "subtitle": "Tħaddimx reviżjonijiet awtomatiċi fuq PRs miftuħa minn bots bħal Dependabot jew Renovate. Itfi din l-għażla biex tirrevedi wkoll il-PRs tal-bots."
+    },
+    "repoModels": {
+      "title": "Mudell għal kull repożitorju",
+      "description": "Ħaddem ir-reviżjonijiet ta' xi repożitorji b'mudell differenti, b'sforz ta' ħsieb differenti, jew it-tnejn.",
+      "defaultModel": "Juża l-mudell predefinit",
+      "resetLabel": "Irrisettja l-mudell għal {{repository}}",
+      "changeHint": "Jiftaħ l-għażla tal-mudell"
+    },
+    "analytics": {
+      "title": "Statistika",
+      "trackedReviews": "Reviżjonijiet segwiti",
+      "findingsRaised": "Sejbiet imqajma",
+      "highImpactChanges": "Bidliet b'impatt kbir",
+      "impactPoints": "Punti ta' impatt",
+      "repositoryLine": "Reviżjonijiet: {{reviews}} · Sejbiet: {{findings}}",
+      "empty": "Għad m'hemmx reviżjonijiet bi statistika",
+      "emptyDescription": "L-istatistika tirrekordja reviżjonijiet kompluti sakemm tkun attiva għall-organizzazzjoni.",
+      "off": "L-istatistika hija mitfija għal din l-organizzazzjoni.",
+      "couldNotLoad": "L-istatistika ma setgħetx tiġi mgħobbija"
+    },
+    "council": {
+      "title": "Reviżjoni tal-kunsill",
+      "subtitle": "Diversi speċjalisti jirrevedu kull PR, u l-voti tagħhom jingħaqdu f'deċiżjoni waħda.",
+      "unavailable": "Ir-reviżjoni tal-kunsill mhijiex disponibbli għal din l-organizzazzjoni.",
+      "noRepositories": "Għad m'hemm l-ebda repożitorju magħżul. Agħżel repożitorji fl-issettjar tar-repożitorji l-ewwel.",
+      "specialists": "Speċjalisti",
+      "labels": "Tikketti li jattivaw ir-reviżjoni tal-kunsill",
+      "labelsPlaceholder": "eż. kunsill, reviżjoni fil-fond",
+      "labelsDescription": "Issepara t-tikketti bil-virgoli. Repożitorju bil-kunsill attivat imbagħad iħaddem ir-reviżjoni biss għall-PRs li jġorru mill-inqas waħda minn dawn it-tikketti. Ħallih vojt għal kull PR eliġibbli.",
+      "tooManyLabels": "Wisq tikketti tal-kunsill. Uża mhux aktar minn {{maximum}} tikketta.",
+      "labelTooLong": "Tikketta tal-kunsill twila wisq. Kull tikketta għandha tkun twila {{maximum}} karattru jew inqas.",
+      "minSpecialists": "Agħżel mill-inqas {{minimum}} speċjalisti. {{selected}} magħżula.",
+      "specialistName": {
+        "testCoverage": "Kopertura tat-testijiet",
+        "correctness": "Korrektezza",
+        "custom": "Speċjalist"
+      },
+      "specialist": {
+        "security": "Evitar tal-awtorizzazzjoni, immaniġġjar tas-sigrieti u input mhux sigur.",
+        "performance": "Mogħdijiet kritiċi, mistoqsijiet N+1 u allokazzjonijiet tqal.",
+        "testing": "Kopertura nieqsa jew dgħajfa għall-imġiba l-ġdida.",
+        "correctness": "Żbalji tal-loġika, każijiet estremi u kundizzjonijiet ta' tlielaq.",
+        "custom": "Jirrevedi problemi fil-qasam tiegħu stess."
+      },
+      "strategy": {
+        "advisory": "Konsultattiv",
+        "advisoryDescription": "Jirrapporta s-sejbiet u jivvota mingħajr ma jibblokka l-għaqda.",
+        "unanimous": "Unanimi",
+        "unanimousDescription": "Jibblokka l-għaqda meta xi speċjalist jirrapporta problema kritika.",
+        "majority": "Maġġoranza",
+        "majorityDescription": "Jibblokka l-għaqda biss meta l-maġġoranza tal-ispeċjalisti tirrapporta problema kritika."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1997,6 +2072,16 @@
       "auto": "Awtomatika",
       "shallow": "Superfiċjali",
       "deep": "Fil-fond"
+    },
+    "orphanedFindings": {
+      "title": "Sejbiet għal repożitorji mneħħija",
+      "description": "Dawn ir-repożitorji m'għadhomx aċċessibbli permezz tal-integrazzjoni mal-GitHub. Is-sejbiet tagħhom għadhom jingħaddu fil-pannelli u fir-rapporti.",
+      "count": "Sejbiet: {{count}}",
+      "clearLabel": "Ħassar is-sejbiet għal {{repository}}",
+      "confirmTitle": "Tħassar is-sejbiet?",
+      "confirmMessage": "Kull sejba rrekordjata għal {{repository}} se titħassar. Dan ma jistax jiġi annullat.",
+      "confirmAction": "Ħassar is-sejbiet",
+      "cleared": "Sejbiet imħassra: {{count}}"
     }
   },
   "agents": {
@@ -2182,6 +2267,7 @@
       "branchPlaceholder": "Agħżel fergħa",
       "runOnWithTarget": "Ħaddem fuq: {{target}}",
       "environment": "Ambjent",
+      "cloudEnvironment": "Ambjent cloud",
       "couldNotLoadEnvironment": "Ma setax jitgħabba l-ambjent tiegħek.",
       "retryLoadingEnvironment": "Erġa' pprova tgħabbi l-ambjent",
       "defaultEnvironment": "Ambjent prestabbilit",
@@ -2242,6 +2328,89 @@
       "openSettingsToReview": "Iftaħ Settings biex tirrevedi",
       "profileSelection": "Għażla tal-profil",
       "profileLayerAccessibility": "{{label}}: {{detail}}"
+    },
+    "environment": {
+      "loadingEnvironments": "Qed jitgħabbew l-ambjenti",
+      "couldNotLoadEnvironments": "Ma setgħux jitgħabbew l-ambjenti",
+      "couldNotLoadEnvironmentsDetail": "Erġa' pprova biex jitgħabbew l-ambjenti għal dan ir-repożitorju.",
+      "noEnvironment": "L-ebda ambjent",
+      "noEnvironmentDetail": "Din is-sessjoni tibda mill-immaġni bażi.",
+      "chooseEnvironment": "Agħżel ambjent",
+      "chooseEnvironmentDetail": "Dan ir-repożitorju għandu aktar minn ambjent wieħed.",
+      "environmentAccessibility": "Agħżel ambjent: {{label}}",
+      "environmentsForRepository": "Ambjenti għal {{repository}}",
+      "selectEnvironmentToStart": "Agħżel ambjent biex tibda.",
+      "buildDetails": "Dettalji tal-bini",
+      "buildNotBuilt": "Mhux mibni",
+      "buildUnavailableShort": "Il-bini tas-snapshots mhux disponibbli",
+      "buildPreparing": "Qed jitħejja l-builder",
+      "buildCloning": "Qed tiġi kklonata l-fergħa predefinita",
+      "buildSetup": "Qed titħaddem il-konfigurazzjoni tal-ambjent",
+      "buildCleanup": "Qed jitneħħew il-kredenzjali tal-bini",
+      "buildCapturing": "Qed jittieħed is-snapshot",
+      "buildPublishing": "Qed jiġi ppubblikat is-snapshot",
+      "buildStopping": "Qed jitwaqqaf il-builder",
+      "buildStoppingRetrying": "Qed jitwaqqaf il-builder, qed jerġa' jipprova",
+      "buildFinishing": "Qed jitlesta l-bini",
+      "buildSucceeded": "Is-snapshot lest",
+      "buildSuperseded": "Sostitwit minn bini aktar ġdid",
+      "buildStale": "Is-settings inbidlu minn meta ttieħed dan is-snapshot",
+      "buildStaleAge": "Is-snapshot għandu aktar minn erbat ijiem; is-sessjoni li jmiss iġġeddu",
+      "buildStaleImage": "Inbena għal immaġni tas-sandbox ta' qabel",
+      "failureClone": "Ir-repożitorju ma setax jiġi kklonat.",
+      "failureSetup": "Kmand ta' konfigurazzjoni falla. Ara l-log tal-bini.",
+      "failureTimeout": "Kmand ta' konfigurazzjoni skada l-ħin. Ara l-log tal-bini.",
+      "failureCleanup": "Il-kredenzjali ma setgħux jitneħħew, għalhekk ma ttieħed l-ebda snapshot.",
+      "failureCapture": "Is-snapshot ma setax jittieħed.",
+      "failureCaptureUncertain": "Ir-riżultat tas-snapshot intilef; il-bini ma ġiex ippubblikat.",
+      "failureDeadline": "Il-bini ma spiċċax fil-ħin.",
+      "failureBuilderLost": "Il-builder waqaf jirrapporta.",
+      "failureBuilderStart": "Il-builder ma setax jibda.",
+      "failureUnauthorized": "L-aċċess għar-repożitorju m'għadux awtorizzat.",
+      "failureActorUnauthorized": "Il-persuna li bdiet il-bini m'għadx għandha aċċess.",
+      "failureBilling": "Il-bini jeħtieġ krediti disponibbli.",
+      "failureBillingUnavailable": "Is-sistema tal-ħlas ma setgħetx taċċetta l-bini. Erġa' pprova.",
+      "failureConfiguration": "Il-konfigurazzjoni nbidlet waqt il-bini.",
+      "failureRuntime": "Ir-rilaxx tar-runtime magħżul ma setax jiġi installat.",
+      "failureGeneric": "Il-bini falla.",
+      "buildLogs": "Logs tal-bini",
+      "noBuildLogs": "Għad m'hemm l-ebda output fil-log.",
+      "buildLogsLatestOnly": "Qed jintwerew l-aħħar 500 linja tal-log miżmuma.",
+      "buildLogsTruncated": "L-output ta' wara nqata'.",
+      "couldNotLoadBuild": "Ma setax jitgħabba l-istatus tal-bini",
+      "couldNotLoadBuildLogs": "Ma setgħux jitgħabbew il-logs tal-bini",
+      "buildsUnavailable": "Il-bini tas-snapshots mhux disponibbli għal dan l-ambjent.",
+      "onlyManagersCanBuild": "Il-maniġers tal-organizzazzjoni biss jistgħu jibnu s-snapshots.",
+      "waitForBuilder": "Stenna li l-builder jieqaf qabel ma terġa' tibni.",
+      "buildAction": "Ibni s-snapshot",
+      "refreshAction": "Aġġorna s-snapshot",
+      "cancelBuildAction": "Ikkanċella l-bini",
+      "buildStarted": "Il-bini tas-snapshot beda",
+      "buildCanceled": "Il-bini tas-snapshot ġie kkanċellat",
+      "couldNotStartBuild": "Ma setax jinbeda l-bini",
+      "couldNotCancelBuild": "Il-bini ma setax jiġi kkanċellat",
+      "sandbox": "Sandbox",
+      "sandboxActive": "Sandbox attiv",
+      "sandboxSleeping": "Sandbox rieqed",
+      "sandboxStarting": "Sandbox qed jibda",
+      "sandboxStopping": "Sandbox qed jieqaf",
+      "sandboxError": "Żball fis-sandbox",
+      "sandboxUnreachable": "Sandbox ma jistax jintlaħaq",
+      "sandboxStatusUnknown": "Status tas-sandbox mhux magħruf",
+      "sandboxChecked": "Iċċekkjat {{when}}",
+      "sandboxDetailStopped": "Ibgħat messaġġ biex terġa' tibdih.",
+      "sandboxDetailFailed": "Ibgħat messaġġ biex terġa' tipprova.",
+      "sandboxDetailConnection": "Il-konnessjoni mas-sandbox mhix disponibbli.",
+      "sandboxDetailUnavailable": "L-istatus tas-sandbox mhux disponibbli temporanjament.",
+      "sandboxDetailInsufficient": "M'hemmx biżżejjed informazzjoni biex jiġi kkonfermat l-istat attwali tas-sandbox.",
+      "sandboxDetailCheckNeeded": "Is-sandbox ma kkonfermax is-saħħa tiegħu dan l-aħħar.",
+      "startFresh": "Ibda mill-ġdid",
+      "startFreshTitle": "Tibda mill-ġdid?",
+      "startFreshMessage": "Dan jarmi s-snapshot tal-ispazju tax-xogħol meħud {{when}}. Il-bidliet mhux ikkommittjati minn dak l-ispazju tax-xogħol jintilfu.",
+      "startFreshMessageUnknown": "Dan jarmi s-snapshot salvat tal-ispazju tax-xogħol, li ma setax jinqara. Il-bidliet mhux ikkommittjati minn dak l-ispazju tax-xogħol jintilfu.",
+      "startFreshDone": "Is-snapshot tal-ispazju tax-xogħol tneħħa.",
+      "couldNotRemoveSnapshot": "Is-snapshot tal-ispazju tax-xogħol ma setax jitneħħa.",
+      "snapshotCaptured": "Snapshot tal-ispazju tax-xogħol meħud {{when}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ġie aġġornat {{displayCount}} fajl.",
@@ -2603,7 +2772,8 @@
       "cancelQueued": "Ikkanċella l-messaġġ",
       "cancelQueuedAccessibility": "Ikkanċella l-messaġġ fil-kju",
       "restoreQueued": "Irrestawra",
-      "restoreQueuedAccessibility": "Irrestawra l-messaġġ ikkanċellat fil-qasam tal-messaġġ"
+      "restoreQueuedAccessibility": "Irrestawra l-messaġġ ikkanċellat fil-qasam tal-messaġġ",
+      "noReplyRecorded": "Ma ġiet irreġistrata l-ebda tweġiba għal dan il-messaġġ."
     },
     "olderMessages": {
       "arrived": "Il-messaġġi ta' qabel tgħabbew",
@@ -3020,6 +3190,26 @@
     "onlyFirstFilesAttached_many": "Se jinthemżu l-ewwel {{displayCount}} fajls biss."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Storja tal-ħlasijiet",
+      "billingHistoryEmpty": "Għad m'hemm l-ebda storja tal-ħlasijiet.",
+      "cancel": "Ikkanċella l-abbonament",
+      "cancelDescription": "Il-Kilo Pass tiegħek jibqa' attiv sal-aħħar tal-perjodu tal-ħlas u ma jiġġeddidx.",
+      "cancelScheduled": "Jiġi kkanċellat nhar {{date}}",
+      "cancelScheduledChange": "Ikkanċella l-bidla skedata",
+      "cancelled": "Abbonament ikkanċellat",
+      "changePlan": "Biddel il-pjan fuq kilo.ai",
+      "changePlanIosNote": "Il-bidliet fil-pjanijiet imħallsa huma disponibbli fuq kilo.ai.",
+      "creditHistoryEmpty": "Għad m'hemm l-ebda krediti tal-Kilo Pass.",
+      "manageInStore": "Immaniġġja fuq {{store}}",
+      "resume": "Kompli l-abbonament",
+      "resumeCancelledDescription": "Il-Kilo Pass tiegħek jerġa' jibda jiġġedded awtomatikament.",
+      "resumePausedDescription": "Il-Kilo Pass tiegħek ikompli issa, qabel id-data skedata biex jerġa' jibda.",
+      "resumed": "L-abbonament reġa' beda",
+      "scheduledChange": "Bidla skedata",
+      "scheduledChangeCancelDescription": "Il-Kilo Pass tiegħek jibqa' fuq il-pjan attwali tiegħu u jiġġedded bħalma jagħmel illum.",
+      "scheduledChangeSummary": "{{plan}} nhar {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass mhux disponibbli.",
     "couldNotLoad": "Kilo Pass ma setax jitgħabba. Erġa' pprova.",
@@ -3029,7 +3219,7 @@
     "subscriptionLoading": "Qed titgħabba s-sottoskrizzjoni ta' Kilo Pass",
     "retryHint": "Jerġa' jipprova jgħabbi l-istat ta' Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailableEnded": "Il-Kilo Pass tiegħek intemm.",
+    "endedOn": "Spiċċa {{date}}",
     "notAvailableInApp": "Kilo Pass mhux disponibbli fl-app.",
     "statusActive": "Attiv",
     "statusTrialing": "Fi prova",
@@ -3051,7 +3241,7 @@
     "kiloPassManagement": "Ġestjoni ta' Kilo Pass",
     "kiloPassSetup": "Konfigurazzjoni ta' Kilo Pass",
     "opensManagementOnWeb": "Jiftaħ il-ġestjoni ta' Kilo Pass fuq il-web.",
-    "tryAgainFromProfile": "Erġa' pprova mill-profil.",
+    "loadFailedRetry": "Iċċekkja l-konnessjoni tiegħek, imbagħad erġa' pprova.",
     "legalTermsOfUse": "Termini tal-użu (EULA)",
     "purchaseDifferentAccount": "Dan ix-xiri mill-App Store mhuwiex marbut mal-kont tiegħek ta' Kilo. Idħol fl-Apple Account użat għax-xiri, imbagħad erġa' pprova.",
     "purchaseFailed": "Ma setax jitlesta x-xiri.",
@@ -3074,6 +3264,11 @@
     "accountDescription": "L-ID tal-kont tiegħek ta' Kilo u l-metadata tat-talbiet, użati biex tiġi vverifikata l-identità tiegħek u jitkejjel l-użu.",
     "diagnosticsTitle": "Dijanjostika tal-applikazzjoni",
     "diagnosticsDescription": "Rapporti ta' waqfien mhux mistenni u żbalji, mingħajr il-kontenut tal-applikazzjoni, użati biex l-applikazzjoni tibqa' stabbli.",
+    "featureFlagsTitle": "Tnedija tal-funzjonijiet",
+    "featureFlagsDescription": "L-email tal-kont tiegħek, użata minn PostHog biex jiddeċiedi liema funzjonijiet tara.",
+    "featureFlagsWhat": "L-email tal-kont tiegħek.",
+    "featureFlagsWhy": "Biex jiġi deċiż liema funzjonijiet tara, inklużi dawk li għadna qed inniedu gradwalment.",
+    "featureFlagsWho": "PostHog, is-servizz tal-bnadar tal-funzjonijiet.",
     "helpImprove": "Għin biex jitjieb Kilo",
     "helpImproveDescription": "Aqsam dejta anonima għall-analiżi tal-prodott u s-sors tal-installazzjoni. Tista' tbiddel din l-għażla meta trid fis-settings.",
     "seeFullDetails": "Ara d-dettalji sħaħ",
@@ -3155,6 +3350,36 @@
     "sendFeedback": "Ibgħat il-kummenti tiegħek"
   },
   "organization": {
+    "auditLog": {
+      "title": "Reġistru tal-awditjar",
+      "permissionDenied": "Il-reġistru tal-awditjar jista' jaqrah biss sid, amministratur jew maniġer tal-fatturazzjoni tal-organizzazzjoni fuq il-pjan Enterprise.",
+      "emptyTitle": "L-ebda avveniment tal-awditjar",
+      "emptyDescription": "L-azzjonijiet meħuda f'din l-organizzazzjoni jidhru hawn.",
+      "truncated": "Qed jintwerew l-aktar avvenimenti riċenti."
+    },
+    "billing": {
+      "title": "Ħlasijiet",
+      "permissionDenied": "Is-sid, amministratur jew maniġer tal-ħlasijiet tal-organizzazzjoni biss jistgħu jaraw il-ħlasijiet tagħha.",
+      "subscription": "Abbonament",
+      "state": "Stat",
+      "stateNone": "L-ebda abbonament",
+      "statePastDue": "Ħlas skadut",
+      "stateCancelsAtPeriodEnd": "Jiġi kkanċellat fl-aħħar tal-perjodu",
+      "stateTrialEndsOn": "Il-prova tispiċċa fid-data {{date}}",
+      "stateTrialing": "Prova",
+      "stateRenewsOn": "Jiġġedded fid-data {{date}}",
+      "seatsDropTo": "Jinżlu għal {{seats}} postijiet fid-data {{date}}",
+      "seats": "Postijiet",
+      "autoTopUp": "Rikarika awtomatika",
+      "autoTopUpAmount": "Ammont tar-rikarika",
+      "autoTopUpThreshold": "Meta l-bilanċ jinżel taħt",
+      "manageOnWeb": "Il-bidliet isiru fuq il-web",
+      "changePlan": "Ibdel il-pjan",
+      "buySeats": "Ixtri postijiet",
+      "setupAutoTopUp": "Issettja r-rikarika awtomatika",
+      "webAddress": "Indirizz tal-web {{url}}",
+      "opensOnWeb": "Jinfetaħ fuq il-web"
+    },
     "boundary": {
       "backToProfile": "Lura għall-profil",
       "loadErrorMessage": "Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
@@ -3162,14 +3387,20 @@
       "loadErrorTitle": "Ma setgħux jitgħabbew l-organizzazzjonijiet tiegħek.",
       "membershipLostNotice": "M'għandekx iktar aċċess għal din l-organizzazzjoni. Inbidel għal {{target}}.",
       "noOrganization": "L-ebda organizzazzjoni",
-      "noOrganizationDescription": "Dan il-kont mhuwiex parti minn organizzazzjoni. Oħloq jew ingħaqad ma' organizzazzjoni fuq il-web biex tuża karatteristiċi tal-organizzazzjoni bħal stedini għall-membri u twissijiet dwar bilanċ baxx.",
-      "openWebOrganizations": "Iftaħ l-organizzazzjonijiet fuq il-web",
+      "noOrganizationDescription": "Dan il-kont mhuwiex parti minn organizzazzjoni. Oħloq waħda biex tuża l-funzjonijiet tal-organizzazzjoni bħall-istediniet għall-membri u t-twissijiet ta' bilanċ baxx, jew iftaħ il-web biex tingħaqad ma' waħda li ġejt mistieden fiha.",
       "organizationUnavailable": "L-organizzazzjoni mhix disponibbli.",
       "selectDescriptionWithOrganizations": "Int tagħmel parti minn organizzazzjoni waħda jew aktar. Agħżel il-kont li għandha tuża dan l-iskrin.",
       "selectOrganization": "Agħżel organizzazzjoni",
       "unavailableDescription": "Din l-organizzazzjoni m'għadhiex disponibbli. Agħżel waħda mill-profil tiegħek biex tkompli.",
       "unavailableSessionsDescription": "Din l-organizzazzjoni m'għadhiex disponibbli. Is-sessjonijiet tagħha ma jistgħux jitgħabbew.",
       "accessDeniedDescription": "M'għandekx aċċess għal din l-organizzazzjoni."
+    },
+    "create": {
+      "title": "Oħloq organizzazzjoni",
+      "description": "Organizzazzjoni taqsam il-krediti, l-aġenti u l-issettjar mat-tim tiegħek.",
+      "nameLabel": "Isem l-organizzazzjoni",
+      "nameRequired": "Daħħal isem għall-organizzazzjoni.",
+      "trialNote": "Il-prova Enterprise tiegħek ta' 14-il jum tibda meta toħloqha. Il-pjanijiet jinxtraw fuq il-web."
     },
     "creditActivity": {
       "emptyDescription": "Ix-xiri, l-użu u l-aġġustamenti tal-krediti ta' din l-organizzazzjoni se jidhru hawn hekk kif iseħħu.",
@@ -3278,6 +3509,21 @@
       "ownRoleChange": "Ma tistax tibdel ir-rwol tiegħek.",
       "inviteExpired": "Din l-istedina skadiet.",
       "inviteAccepted": "Din l-istedina diġà ġiet aċċettata."
+    },
+    "settingsOnWeb": {
+      "title": "Issettjar tal-organizzazzjoni fuq il-web",
+      "usageDetails": "Dettalji tal-użu",
+      "providersAndModels": "Fornituri u mudelli",
+      "groups": "Gruppi",
+      "guardrails": "Salvagwardji",
+      "byok": "Uża ċ-ċavetta tiegħek",
+      "ssoAndDomain": "SSO u dominju",
+      "emailPreferences": "Preferenzi tal-email",
+      "dataCollection": "Ġbir tad-data",
+      "auditLogs": "Reġistri tal-awditjar",
+      "requestLogs": "Reġistri tat-talbiet",
+      "subOrganizations": "Sotto-organizzazzjonijiet",
+      "distributeFunds": "Iddistribwixxi l-fondi"
     },
     "usageStats": {
       "inputTokens": "Unitajiet tat-test tad-dħul",
@@ -4053,6 +4299,25 @@
     "importConfigApplied": "Il-config ġie importat"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Ma stajniex nitgħabbu l-attività tal-kreditu.",
+      "appStoreReceipt": "Irċevuta mill-App Store",
+      "deductionFallback": "Tnaqqis tal-krediti",
+      "emptyDescription": "Ix-xiri, l-irċevuti u l-użu tal-krediti se jidhru hawn.",
+      "emptyTitle": "L-ebda storja tal-krediti",
+      "googlePlayReceipt": "Irċevuta minn Google Play",
+      "kind": {
+        "adjustment": "Aġġustament",
+        "balanceNeutral": "Newtrali għall-bilanċ",
+        "deduction": "Tnaqqis",
+        "grant": "Għotja ta' krediti",
+        "purchase": "Xiri"
+      },
+      "purchaseFallback": "Xiri ta' krediti",
+      "receipt": "Irċevuta",
+      "receiptA11y": "Iftaħ l-irċevuta għal {{description}}",
+      "receiptUnavailable": "M'hemmx irċevuta disponibbli għal dan ix-xiri."
+    },
     "title": "Ixtri krediti",
     "description": "Il-krediti huma xiri ta' darba li jiżdied mal-bilanċ Kilo tiegħek biex imexxi sessjonijiet ta' kodifikazzjoni bl-AI fl-App Kilo. Il-ħanut jaddebita l-kont tiegħek u l-krediti jiżdiedu wara li l-ħanut jikkonferma l-ħlas.",
     "nextExpiry": "{{amount}} fi krediti jiskadu: {{date}} (UTC). Il-krediti li jiskadu l-ewwel jintużaw l-ewwel.",
@@ -4246,6 +4511,70 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ma stajniex niftħu dan ir-riżultat tat-tfittxija"
+  },
+  "usage": {
+    "title": "Użu",
+    "orgTitle": "Użu tal-organizzazzjoni",
+    "entrySubtitle": "Spiża, talbiet u unitajiet tat-test",
+    "rangePicker": "Medda ta' żmien",
+    "range90d": "90 jum",
+    "metricPicker": "Metrika tal-grafika",
+    "chartA11y": "{{metric}} kuljum",
+    "avgCostPerRequest": "Spiża medja / talba",
+    "topModels": "Il-mudelli l-aktar użati",
+    "topFeatures": "Il-funzjonijiet l-aktar użati",
+    "emptyTitle": "L-ebda użu f'dan il-perjodu",
+    "orgSelfNotice": "Qed tara l-użu tiegħek stess f'din l-organizzazzjoni.",
+    "viewDetails": "Ara d-dettalji tal-użu"
+  },
+  "integrations": {
+    "title": "Integrazzjonijiet",
+    "sectionTitle": "Servizzi konnessi",
+    "entrySubtitle": "GitHub, Slack, Linear u aktar",
+    "subtitle": "Qabbad l-għodod u l-proċessi tax-xogħol tal-iżvilupp tiegħek ma' Kilo",
+    "emptyHint": "Għad m'hemm l-ebda integrazzjoni konnessa.",
+    "disconnect": "Skonnettja",
+    "disconnectTitle": "Tiskonnettja {{provider}}?",
+    "disconnectMessage": "Kilo se jieqaf jirrispondi f'{{provider}}. Tista' terġa' tikkonnettja fi kwalunkwe ħin.",
+    "connectedTo": "Konness ma' {{account}}",
+    "disconnected": "{{provider}} ġie skonnettjat",
+    "disconnectFailed": "L-iskonnettjar ta' {{provider}} ma rnexxiex",
+    "couldNotLoad": "L-integrazzjonijiet ma setgħux jitgħabbew",
+    "permissionDenied": "M'għandekx permess timmaniġġja dawn l-integrazzjonijiet.",
+    "memberHint": "Itlob lil sid jew amministratur tal-organizzazzjoni biex ibiddel dawn il-konnessjonijiet.",
+    "connectFailed": "Il-paġna tal-konnessjoni ma setgħetx tinfetaħ"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Il-fatturi għax-xiri tiegħek stess se jidhru hawn ladarba tiġi ddebitat."
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Għad m'hemm l-ebda użu",
+      "sharedWorkspace": "Maqsum bejn iċ-chats kollha f'dan il-workspace",
+      "currentRates": "Rati attwali",
+      "perHour": "{{rate}}/siegħa",
+      "mediumSandbox": "Sandbox medju",
+      "largeSandbox": "Sandbox kbir",
+      "earlierActivity": "Attività preċedenti",
+      "now": "issa",
+      "loadFailed": "L-ispejjeż tal-Compute ma setgħux jitgħabbew."
+    },
+    "preview": {
+      "title": "Iftaħ il-preview",
+      "listeningServices": "Servizzi li qed jisimgħu",
+      "empty": "Ma nstab l-ebda servizz li qed jisma'. Staqsi lill-aġent biex jibda web server, imbagħad aġġorna.",
+      "notRunning": "Dan is-sandbox huwa mwaqqaf. Ibgħat messaġġ lill-aġent biex terġa' tibdih.",
+      "notReady": "Is-sandbox għadu mhux lest. Aġġorna ladarba jkun konness.",
+      "unsupported": "L-iskoperta tas-servizzi mhix disponibbli għal dan is-sandbox.",
+      "failed": "Ma kienx possibbli li jinstabu s-servizzi.",
+      "openService": "Iftaħ {{name}} fuq il-port {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Triggers u webhooks",
+      "subtitle": "Immaniġġja t-triggers tal-webhook u dawk skedati fuq il-web."
+    }
   },
   "sessionShare": {
     "title": "Aqsam is-sessjoni",

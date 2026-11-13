@@ -33,7 +33,7 @@ export { isStreamError, isValidCloudAgentEvent } from './schemas';
 export type { CloudAgentEvent, StreamError, StreamErrorCode } from './schemas';
 
 export { formatError as formatSessionError } from './session-manager';
-export { createSessionManager } from './session-manager';
+export { createSessionManager, RETAINED_MESSAGE_WINDOW } from './session-manager';
 export { sessionConfigFromFetchedSession } from './session-config';
 export { customerBillingFailureSchema, parseCustomerBillingFailure } from './schemas';
 export type { CustomerBillingFailure } from './schemas';
@@ -177,7 +177,10 @@ export { splitByContiguousPrefix } from './array-utils';
 export { calculateContextUsagePercentage } from './context-usage';
 export type { ContextUsage } from './context-usage';
 
-export { isNoOpCompletedPreparationAttempt } from './preparation-attempts';
+export {
+  isNoOpCompletedPreparationAttempt,
+  isPreparationCancellation,
+} from './preparation-attempts';
 
 export type {
   KiloSdkMessageHistory,

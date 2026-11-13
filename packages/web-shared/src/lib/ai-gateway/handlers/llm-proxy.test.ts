@@ -2258,6 +2258,96 @@ describe('POST /api/v1/chat/completions request handling', () => {
     );
   });
 
+  describe('delegated routes and the organization provider policy', () => {
+    type DelegatedRoute = 'an OpenAI ChatGPT connection' | 'a Claude billing connection';
+    const delegatedRoutes: Record<DelegatedRoute, Pick<ProviderRoute, 'provider' | 'userByok'>> = {
+      'an OpenAI ChatGPT connection': {
+        provider: { ...provider, type: 'openai-chatgpt' },
+        userByok: null,
+      },
+      'a Claude billing connection': {
+        provider: { ...provider, type: 'claude-billing' },
+        userByok: null,
+      },
+    };
+
+    /**
+     * Sends one request through a delegated route under an enterprise organization policy that
+     * admits `admittedProviders` for the model.
+     */
+    async function sendThrough(route: DelegatedRoute, admittedProviders: readonly string[]) {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: {
+          id: 'user-123',
+          google_user_email: 'test@example.com',
+          microdollars_used: 0,
+        } as User,
+        authFailedResponse: null,
+        organizationId: 'org-1',
+      });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: { provider_allow_list: [...admittedProviders] },
+        plan: 'enterprise',
+      });
+      mockedGetEffectiveModelDecision.mockResolvedValue({
+        allowed: true,
+        eligibleProviderRoutes: new Set(admittedProviders),
+      });
+      mockedIsModelAllowedForProviderKey.mockImplementation(
+        async (_policy, _modelId, providerSlug) => admittedProviders.includes(providerSlug)
+      );
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          ...delegatedRoutes[route],
+          isFree: false,
+          bypassAccessCheck: false,
+          skipBalanceCheck: true,
+        })
+      );
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      return handleLlmProxyRequest(makeRequest(makeBody()) as never);
+    }
+
+    afterEach(() => {
+      mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
+      mockedIsModelAllowedForProviderKey.mockResolvedValue(true);
+    });
+
+    it('refuses a ChatGPT connection whose upstream provider the organization policy does not admit', async () => {
+      const response = await sendThrough('an OpenAI ChatGPT connection', ['anthropic']);
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      expect(mockedIsModelAllowedForProviderKey).toHaveBeenCalledWith(
+        expect.anything(),
+        'openai/gpt-4o',
+        'openai'
+      );
+    });
+
+    it('serves a ChatGPT connection whose upstream provider the organization policy admits', async () => {
+      const response = await sendThrough('an OpenAI ChatGPT connection', ['anthropic', 'openai']);
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses a Claude billing connection whose upstream provider the organization policy does not admit', async () => {
+      const response = await sendThrough('a Claude billing connection', ['openai']);
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      expect(mockedIsModelAllowedForProviderKey).toHaveBeenCalledWith(
+        expect.anything(),
+        'openai/gpt-4o',
+        'anthropic'
+      );
+    });
+  });
+
   it.each(['openrouter', 'vercel'] as const)(
     'returns 404 when the %s model id is unknown',
     async providerType => {

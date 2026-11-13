@@ -23,6 +23,10 @@
   },
   "common": {
     "deleteTitle": "Slet {{label}}?",
+    "manageOnWeb": "Administrer på nettet",
+    "creditHistory": "Kredithistorik",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Annuller",
@@ -119,6 +123,7 @@
     "copyLink": "Kopiér link",
     "couldNotLoadOrganizations": "Organisationerne kunne ikke indlæses.",
     "couldNotLoadSessions": "Sessionerne kunne ikke indlæses.",
+    "couldnTLoad": "Det lykkedes ikke at indlæse.",
     "couldnTLoadMore": "Det lykkedes ikke at indlæse flere.",
     "deviceSessions": "Enhedssessioner",
     "disabled": "Deaktiveret",
@@ -246,6 +251,10 @@
     "notAdded": "Du er logget ind. {{provider}} blev ikke føjet til din konto."
   },
   "profile": {
+    "creditHistorySubtitle": "Køb, kvitteringer og kreditaktivitet",
+    "invoicesSubtitle": "Download fakturaer for dine køb",
+    "manageBilling": "Administrer betaling på kilo.ai",
+    "manageBillingIosNote": "Betalingsmetoder, automatisk optankning og betalingsoplysninger administreres på kilo.ai.",
     "codeReviewerSubtitle": "Automatiske PR-gennemgange",
     "securityAgentSubtitle": "Find og afhjælp sårbarheder",
     "reviews": "Kodegennemgange",
@@ -299,6 +308,7 @@
     "passkeyAdded": "Adgangsnøgle tilføjet.",
     "passkeyAddFailed": "Kunne ikke tilføje en adgangsnøgle. Prøv igen.",
     "passkeyAddUnsupported": "Denne enhed kan ikke oprette adgangsnøgler.",
+    "passkeyAddUnavailable": "Adgangsnøgler kan kun tilføjes i en webbrowser.",
     "passkeyAddCancelled": "Oprettelsen af adgangsnøglen blev annulleret.",
     "passkeyRemoved": "Adgangsnøgle fjernet.",
     "passkeyRemoveFailed": "Kunne ikke fjerne den adgangsnøgle. Prøv igen.",
@@ -331,7 +341,6 @@
     "providerKeys": {
       "title": "Udbydernøgler",
       "rowSubtitle": "Brug din egen udbyderfakturering",
-      "manageOnWeb": "Administrer på nettet",
       "manageOnWebReason": "Disse udbydere kræver strukturerede legitimationsoplysninger.",
       "description": "Anmodninger via disse nøgler faktureres til din udbyderkonto i stedet for din Kilo-saldo.",
       "enabled": "I brug",
@@ -1245,7 +1254,17 @@
       "changeRequestMissingPermissions": "Kilos GitHub App kan ikke åbne pull requests i dette repository. En ejer af repositoryet skal give appen skriveadgang til indhold og pull requests. Prøv derefter igen.",
       "changeRequestFailed": "Kilo kunne ikke åbne pull requesten. Prøv igen om et øjeblik.",
       "proposalConflict": "Endnu et forslag til hukommelsen for gennemgange i dette repository er stadig aktivt, så dette forslag kan ikke gemmes endnu.",
-      "offAction": "Hukommelsen for gennemgange er slået fra. Slå den til, og prøv igen."
+      "offAction": "Hukommelsen for gennemgange er slået fra. Slå den til, og prøv igen.",
+      "analyze": {
+        "title": "Analysér feedback",
+        "description": "Vælg et kodelager med nylige svar fra vedligeholdelsesansvarlige, og find derefter ét gentaget mønster i retningslinjerne.",
+        "chooseRepository": "Vælg et kodelager",
+        "action": "Analysér nu",
+        "noRepositories": "Intet kodelager har nylige svar fra vedligeholdelsesansvarlige endnu.",
+        "proposed": "Forslag til gennemgangshukommelse oprettet",
+        "noFeedback": "Der blev ikke fundet nylig feedback for dette kodelager",
+        "noPattern": "Der blev ikke fundet et tydeligt gentaget mønster"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "Indtast en gyldig URL til en merge request.",
@@ -1377,7 +1396,63 @@
       "title": "Kodegennemgangen kræver din opmærksomhed.",
       "recoveryLabel": "Kontakt support"
     },
-    "unknownError": "Ukendt fejl"
+    "unknownError": "Ukendt fejl",
+    "skipBotPullRequests": {
+      "title": "Spring pull requests fra bots over",
+      "subtitle": "Kør ikke automatiske gennemgange af pull requests, der er oprettet af bots som Dependabot eller Renovate. Slå dette fra for også at gennemgå pull requests fra bots."
+    },
+    "repoModels": {
+      "title": "Model pr. kodelager",
+      "description": "Kør gennemgange for visse kodelagre med en anden model, tænkeindsats eller begge dele.",
+      "defaultModel": "Bruger standardmodellen",
+      "resetLabel": "Nulstil model for {{repository}}",
+      "changeHint": "Åbner modelvælgeren"
+    },
+    "analytics": {
+      "title": "Analyse",
+      "trackedReviews": "Registrerede gennemgange",
+      "findingsRaised": "Rapporterede fund",
+      "highImpactChanges": "Ændringer med stor effekt",
+      "impactPoints": "Effektpoint",
+      "repositoryLine": "Gennemgange: {{reviews}} · Fund: {{findings}}",
+      "empty": "Ingen gennemgange med analysedata endnu",
+      "emptyDescription": "Analyse registrerer afsluttede gennemgange, mens funktionen er slået til for organisationen.",
+      "off": "Analyse er slået fra for denne organisation.",
+      "couldNotLoad": "Kunne ikke indlæse analysedata"
+    },
+    "council": {
+      "title": "Rådsgennemgang",
+      "subtitle": "Flere specialister gennemgår hver pull request, og deres stemmer samles til én beslutning.",
+      "unavailable": "Rådsgennemgang er ikke tilgængelig for denne organisation.",
+      "noRepositories": "Der er endnu ikke valgt nogen kodelagre. Vælg først kodelagre i indstillingerne for kodelagre.",
+      "specialists": "Specialister",
+      "labels": "Etiketter, der udløser rådsgennemgang",
+      "labelsPlaceholder": "f.eks. råd, grundig gennemgang",
+      "labelsDescription": "Adskil etiketter med kommaer. Et kodelager med rådsgennemgang kører så kun rådet for pull requests, der har mindst én af disse etiketter. Lad feltet stå tomt for at gælde alle relevante pull requests.",
+      "tooManyLabels": "For mange etiketter til rådsgennemgang. Brug højst {{maximum}} etiketter.",
+      "labelTooLong": "En etiket til rådsgennemgang er for lang. Hver etiket må højst være på {{maximum}} tegn.",
+      "minSpecialists": "Vælg mindst {{minimum}} specialister. {{selected}} valgt.",
+      "specialistName": {
+        "testCoverage": "Testdækning",
+        "correctness": "Korrekthed",
+        "custom": "Tilpasset specialist"
+      },
+      "specialist": {
+        "security": "Omgåelse af autorisation, håndtering af hemmeligheder og usikkert input.",
+        "performance": "Kritiske kodestier, N+1-forespørgsler og tunge allokeringer.",
+        "testing": "Manglende eller svag testdækning af ny adfærd.",
+        "correctness": "Logikfejl, grænsetilfælde og kapløbssituationer.",
+        "custom": "Gennemgår problemer inden for sit eget område."
+      },
+      "strategy": {
+        "advisory": "Rådgivende",
+        "advisoryDescription": "Rapporterer fund og stemmer uden at blokere sammenfletningen.",
+        "unanimous": "Enstemmig",
+        "unanimousDescription": "Blokerer sammenfletningen, når en specialist rapporterer et kritisk problem.",
+        "majority": "Flertal",
+        "majorityDescription": "Blokerer kun sammenfletningen, når de fleste specialister rapporterer et kritisk problem."
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1880,6 +1955,16 @@
       "auto": "Auto",
       "shallow": "Overfladisk",
       "deep": "Dybdegående"
+    },
+    "orphanedFindings": {
+      "title": "Fund for fjernede kodelagre",
+      "description": "Disse kodelagre kan ikke længere nås via GitHub-integrationen. Deres fund tæller stadig med i oversigter og rapporter.",
+      "count": "Fund: {{count}}",
+      "clearLabel": "Ryd fund for {{repository}}",
+      "confirmTitle": "Ryd fund?",
+      "confirmMessage": "Alle registrerede fund for {{repository}} slettes. Dette kan ikke fortrydes.",
+      "confirmAction": "Slet fund",
+      "cleared": "Fund ryddet: {{count}}"
     }
   },
   "agents": {
@@ -2059,6 +2144,7 @@
       "branchPlaceholder": "Vælg en gren",
       "runOnWithTarget": "Kør på: {{target}}",
       "environment": "Miljø",
+      "cloudEnvironment": "Cloudmiljø",
       "couldNotLoadEnvironment": "Kunne ikke indlæse dit miljø.",
       "retryLoadingEnvironment": "Prøv at indlæse miljøet igen",
       "defaultEnvironment": "Standardmiljø",
@@ -2119,6 +2205,89 @@
       "openSettingsToReview": "Åbn Indstillinger for at gennemgå",
       "profileSelection": "Valg af profil",
       "profileLayerAccessibility": "{{label}}: {{detail}}"
+    },
+    "environment": {
+      "loadingEnvironments": "Indlæser miljøer",
+      "couldNotLoadEnvironments": "Kunne ikke indlæse miljøer",
+      "couldNotLoadEnvironmentsDetail": "Prøv igen for at indlæse miljøerne for dette repository.",
+      "noEnvironment": "Intet miljø",
+      "noEnvironmentDetail": "Denne session starter fra basisimaget.",
+      "chooseEnvironment": "Vælg miljø",
+      "chooseEnvironmentDetail": "Dette repository har mere end ét miljø.",
+      "environmentAccessibility": "Vælg et miljø: {{label}}",
+      "environmentsForRepository": "Miljøer for {{repository}}",
+      "selectEnvironmentToStart": "Vælg et miljø for at starte.",
+      "buildDetails": "Build-detaljer",
+      "buildNotBuilt": "Ikke bygget",
+      "buildUnavailableShort": "Snapshot-builds er ikke tilgængelige",
+      "buildPreparing": "Forbereder build-maskinen",
+      "buildCloning": "Kloner standardbranchen",
+      "buildSetup": "Kører miljøets opsætning",
+      "buildCleanup": "Fjerner build-legitimationsoplysninger",
+      "buildCapturing": "Tager snapshottet",
+      "buildPublishing": "Udgiver snapshottet",
+      "buildStopping": "Stopper build-maskinen",
+      "buildStoppingRetrying": "Stopper build-maskinen, prøver igen",
+      "buildFinishing": "Afslutter buildet",
+      "buildSucceeded": "Snapshot klar",
+      "buildSuperseded": "Erstattet af et nyere build",
+      "buildStale": "Indstillingerne er ændret siden dette snapshot",
+      "buildStaleAge": "Snapshot ældre end fire dage; den næste session opdaterer det",
+      "buildStaleImage": "Bygget til et tidligere sandbox-image",
+      "failureClone": "Repositoryet kunne ikke klones.",
+      "failureSetup": "En opsætningskommando mislykkedes. Se build-loggen.",
+      "failureTimeout": "En opsætningskommando fik timeout. Se build-loggen.",
+      "failureCleanup": "Legitimationsoplysningerne kunne ikke fjernes, så der blev ikke taget et snapshot.",
+      "failureCapture": "Snapshottet kunne ikke tages.",
+      "failureCaptureUncertain": "Resultatet af snapshottet gik tabt; buildet blev ikke udgivet.",
+      "failureDeadline": "Buildet blev ikke færdigt i tide.",
+      "failureBuilderLost": "Build-maskinen holdt op med at rapportere.",
+      "failureBuilderStart": "Build-maskinen kunne ikke starte.",
+      "failureUnauthorized": "Adgangen til repositoryet er ikke længere godkendt.",
+      "failureActorUnauthorized": "Personen, der startede buildet, har ikke længere adgang.",
+      "failureBilling": "Builds kræver tilgængelige kreditter.",
+      "failureBillingUnavailable": "Faktureringen kunne ikke godkende buildet. Prøv igen.",
+      "failureConfiguration": "Konfigurationen blev ændret under buildet.",
+      "failureRuntime": "Den valgte runtime-version kunne ikke installeres.",
+      "failureGeneric": "Buildet mislykkedes.",
+      "buildLogs": "Build-logs",
+      "noBuildLogs": "Intet logoutput endnu.",
+      "buildLogsLatestOnly": "Viser de seneste 500 gemte loglinjer.",
+      "buildLogsTruncated": "Senere output blev afkortet.",
+      "couldNotLoadBuild": "Kunne ikke indlæse build-status",
+      "couldNotLoadBuildLogs": "Kunne ikke indlæse build-logs",
+      "buildsUnavailable": "Snapshot-builds er ikke tilgængelige for dette miljø.",
+      "onlyManagersCanBuild": "Kun organisationens administratorer kan bygge snapshots.",
+      "waitForBuilder": "Vent på, at build-maskinen stopper, før du bygger igen.",
+      "buildAction": "Byg snapshot",
+      "refreshAction": "Opdater snapshot",
+      "cancelBuildAction": "Annuller build",
+      "buildStarted": "Snapshot-build startet",
+      "buildCanceled": "Snapshot-build annulleret",
+      "couldNotStartBuild": "Kunne ikke starte buildet",
+      "couldNotCancelBuild": "Kunne ikke annullere buildet",
+      "sandbox": "Sandbox",
+      "sandboxActive": "Sandbox aktiv",
+      "sandboxSleeping": "Sandbox i dvale",
+      "sandboxStarting": "Sandbox starter",
+      "sandboxStopping": "Sandbox stopper",
+      "sandboxError": "Sandbox-fejl",
+      "sandboxUnreachable": "Sandbox kan ikke nås",
+      "sandboxStatusUnknown": "Sandbox-status ukendt",
+      "sandboxChecked": "Tjekket {{when}}",
+      "sandboxDetailStopped": "Send en besked for at genoptage den.",
+      "sandboxDetailFailed": "Send en besked for at prøve igen.",
+      "sandboxDetailConnection": "Forbindelsen til sandboxen er ikke tilgængelig.",
+      "sandboxDetailUnavailable": "Sandbox-status er midlertidigt utilgængelig.",
+      "sandboxDetailInsufficient": "Der er ikke nok information til at bekræfte sandboxens aktuelle tilstand.",
+      "sandboxDetailCheckNeeded": "Sandboxen har ikke for nylig bekræftet, at den fungerer korrekt.",
+      "startFresh": "Start forfra",
+      "startFreshTitle": "Start forfra?",
+      "startFreshMessage": "Dette kasserer snapshottet af arbejdsområdet, der blev taget {{when}}. Ikke-committede ændringer fra det arbejdsområde går tabt.",
+      "startFreshMessageUnknown": "Dette kasserer det gemte snapshot af arbejdsområdet, som ikke kunne læses. Ikke-committede ændringer fra det arbejdsområde går tabt.",
+      "startFreshDone": "Snapshot af arbejdsområdet fjernet.",
+      "couldNotRemoveSnapshot": "Kunne ikke fjerne snapshottet af arbejdsområdet.",
+      "snapshotCaptured": "Snapshot af arbejdsområdet taget {{when}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil er opdateret.",
@@ -2468,7 +2637,8 @@
       "cancelQueued": "Annullér besked",
       "cancelQueuedAccessibility": "Annullér besked i kø",
       "restoreQueued": "Gendan",
-      "restoreQueuedAccessibility": "Gendan den annullerede besked i beskedfeltet"
+      "restoreQueuedAccessibility": "Gendan den annullerede besked i beskedfeltet",
+      "noReplyRecorded": "Der blev ikke registreret noget svar for denne besked."
     },
     "olderMessages": {
       "arrived": "Tidligere beskeder indlæst",
@@ -2861,6 +3031,26 @@
     "onlyFirstFilesAttached_other": "Kun de første {{displayCount}} filer vedhæftes."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Betalingshistorik",
+      "billingHistoryEmpty": "Ingen betalingshistorik endnu.",
+      "cancel": "Opsig abonnement",
+      "cancelDescription": "Dit Kilo Pass forbliver aktivt indtil udgangen af betalingsperioden og fornyes ikke.",
+      "cancelScheduled": "Opsiges den {{date}}",
+      "cancelScheduledChange": "Annuller planlagt ændring",
+      "cancelled": "Abonnementet er opsagt",
+      "changePlan": "Skift abonnement på kilo.ai",
+      "changePlanIosNote": "Ændringer af betalte abonnementer kan foretages på kilo.ai.",
+      "creditHistoryEmpty": "Ingen Kilo Pass-kreditter endnu.",
+      "manageInStore": "Administrer i {{store}}",
+      "resume": "Genoptag abonnement",
+      "resumeCancelledDescription": "Dit Kilo Pass begynder igen at blive fornyet automatisk.",
+      "resumePausedDescription": "Dit Kilo Pass genoptages nu, før den planlagte genoptagelsesdato.",
+      "resumed": "Abonnementet er genoptaget",
+      "scheduledChange": "Planlagt ændring",
+      "scheduledChangeCancelDescription": "Dit Kilo Pass forbliver på det nuværende abonnement og fornyes som hidtil.",
+      "scheduledChangeSummary": "{{plan}} den {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass er ikke tilgængeligt.",
     "couldNotLoad": "Kilo Pass kunne ikke indlæses. Prøv igen.",
@@ -2870,7 +3060,7 @@
     "subscriptionLoading": "Indlæser Kilo Pass-abonnement",
     "retryHint": "Prøver at indlæse status for Kilo Pass igen.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailableEnded": "Dit Kilo Pass er udløbet.",
+    "endedOn": "Afsluttet {{date}}",
     "notAvailableInApp": "Kilo Pass er ikke tilgængeligt i appen.",
     "statusActive": "Aktiv",
     "statusTrialing": "Prøveperiode",
@@ -2892,7 +3082,7 @@
     "kiloPassManagement": "Kilo Pass-administration",
     "kiloPassSetup": "Kilo Pass-opsætning",
     "opensManagementOnWeb": "Åbner administrationen af Kilo Pass på hjemmesiden.",
-    "tryAgainFromProfile": "Prøv igen fra din profil.",
+    "loadFailedRetry": "Tjek din forbindelse, og prøv derefter igen.",
     "legalTermsOfUse": "Brugsvilkår (EULA)",
     "purchaseDifferentAccount": "Dette App Store-køb er ikke knyttet til din Kilo-konto. Log ind på den Apple-konto, der blev brugt til købet, og prøv igen.",
     "purchaseFailed": "Kunne ikke fuldføre købet.",
@@ -2915,6 +3105,11 @@
     "accountDescription": "Dit Kilo-konto-id og metadata om anmodninger bruges til at bekræfte din identitet og måle forbruget.",
     "diagnosticsTitle": "Appdiagnostik",
     "diagnosticsDescription": "Rapporter om nedbrud og fejl bruges til at holde appen stabil. Indhold fra appen fjernes først.",
+    "featureFlagsTitle": "Udrulning af funktioner",
+    "featureFlagsDescription": "Din kontos e-mailadresse, som PostHog bruger til at afgøre hvilke funktioner du ser.",
+    "featureFlagsWhat": "Din kontos e-mailadresse.",
+    "featureFlagsWhy": "For at afgøre hvilke funktioner du ser, også dem vi stadig er ved at udrulle.",
+    "featureFlagsWho": "PostHog, tjenesten til funktionsflag.",
     "helpImprove": "Hjælp med at forbedre Kilo",
     "helpImproveDescription": "Del anonyme data om brugen af appen og oplysninger om installationskilden. Du kan altid ændre dette i indstillingerne.",
     "seeFullDetails": "Se alle oplysninger",
@@ -2996,6 +3191,36 @@
     "sendFeedback": "Send din feedback"
   },
   "organization": {
+    "auditLog": {
+      "title": "Revisionslog",
+      "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i en organisation på Enterprise-planen kan se organisationens revisionslog.",
+      "emptyTitle": "Ingen revisionshændelser",
+      "emptyDescription": "Handlinger, der udføres i denne organisation, vises her.",
+      "truncated": "Viser de seneste hændelser."
+    },
+    "billing": {
+      "title": "Fakturering",
+      "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i organisationen kan se dens fakturering.",
+      "subscription": "Abonnement",
+      "state": "Status",
+      "stateNone": "Intet abonnement",
+      "statePastDue": "Forfalden",
+      "stateCancelsAtPeriodEnd": "Opsiges ved periodens udløb",
+      "stateTrialEndsOn": "Prøveperioden slutter den {{date}}",
+      "stateTrialing": "Prøveperiode",
+      "stateRenewsOn": "Fornyes den {{date}}",
+      "seatsDropTo": "Falder til {{seats}} pladser den {{date}}",
+      "seats": "Pladser",
+      "autoTopUp": "Automatisk optankning",
+      "autoTopUpAmount": "Optankningsbeløb",
+      "autoTopUpThreshold": "Når saldoen falder under",
+      "manageOnWeb": "Ændringer foretages på nettet",
+      "changePlan": "Skift plan",
+      "buySeats": "Køb pladser",
+      "setupAutoTopUp": "Konfigurer automatisk optankning",
+      "webAddress": "Webadresse {{url}}",
+      "opensOnWeb": "Åbner på nettet"
+    },
     "boundary": {
       "backToProfile": "Tilbage til profil",
       "loadErrorMessage": "Tjek din forbindelse og prøv igen.",
@@ -3003,14 +3228,20 @@
       "loadErrorTitle": "Kunne ikke indlæse dine organisationer.",
       "membershipLostNotice": "Du har ikke længere adgang til denne organisation. Skiftet til {{target}}.",
       "noOrganization": "Ingen organisation",
-      "noOrganizationDescription": "Denne konto er ikke en del af en organisation. Opret eller tilslut dig en organisation på hjemmesiden for at bruge organisationsfunktioner som medlemsinvitationer og advarsler om lav saldo.",
-      "openWebOrganizations": "Åbn organisationer på hjemmesiden",
+      "noOrganizationDescription": "Denne konto er ikke en del af en organisation. Opret en for at bruge organisationsfunktioner som invitationer til medlemmer og advarsler om lav saldo, eller åbn nettet for at blive medlem af en organisation, du er inviteret til.",
       "organizationUnavailable": "Organisationen er ikke tilgængelig.",
       "selectDescriptionWithOrganizations": "Du tilhører en eller flere organisationer. Vælg den konto, som denne skærm skal bruge.",
       "selectOrganization": "Vælg en organisation",
       "unavailableDescription": "Denne organisation er ikke længere tilgængelig. Vælg en organisation på din profil for at fortsætte.",
       "unavailableSessionsDescription": "Denne organisation er ikke længere tilgængelig. Dens sessioner kan ikke indlæses.",
       "accessDeniedDescription": "Du har ikke adgang til denne organisation."
+    },
+    "create": {
+      "title": "Opret organisation",
+      "description": "En organisation deler kreditter, agenter og indstillinger med dit team.",
+      "nameLabel": "Organisationens navn",
+      "nameRequired": "Angiv et navn til organisationen.",
+      "trialNote": "Din 14-dages Enterprise-prøveperiode starter, når du opretter organisationen. Planer købes på nettet."
     },
     "creditActivity": {
       "emptyDescription": "Her vises organisationens køb, forbrug og justeringer af kreditter løbende.",
@@ -3119,6 +3350,21 @@
       "ownRoleChange": "Du kan ikke ændre din egen rolle.",
       "inviteExpired": "Denne invitation er udløbet.",
       "inviteAccepted": "Denne invitation er allerede blevet accepteret."
+    },
+    "settingsOnWeb": {
+      "title": "Organisationsindstillinger på nettet",
+      "usageDetails": "Forbrugsdetaljer",
+      "providersAndModels": "Udbydere og modeller",
+      "groups": "Grupper",
+      "guardrails": "Sikkerhedsgrænser",
+      "byok": "Brug din egen nøgle",
+      "ssoAndDomain": "SSO og domæne",
+      "emailPreferences": "E-mailpræferencer",
+      "dataCollection": "Dataindsamling",
+      "auditLogs": "Revisionslogs",
+      "requestLogs": "Anmodningslogs",
+      "subOrganizations": "Underorganisationer",
+      "distributeFunds": "Fordel midler"
     },
     "usageStats": {
       "inputTokens": "Tokens i inddata",
@@ -3870,6 +4116,25 @@
     "importConfigApplied": "Konfiguration importeret"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "Kunne ikke indlæse kreditaktivitet.",
+      "appStoreReceipt": "Kvittering fra App Store",
+      "deductionFallback": "Kreditfradrag",
+      "emptyDescription": "Kreditkøb, kvitteringer og forbrug vises her.",
+      "emptyTitle": "Ingen kredithistorik",
+      "googlePlayReceipt": "Kvittering fra Google Play",
+      "kind": {
+        "adjustment": "Justering",
+        "balanceNeutral": "Saldoneutral",
+        "deduction": "Fradrag",
+        "grant": "Tildelt kredit",
+        "purchase": "Køb"
+      },
+      "purchaseFallback": "Kreditkøb",
+      "receipt": "Kvittering",
+      "receiptA11y": "Åbn kvitteringen for {{description}}",
+      "receiptUnavailable": "Der er ingen kvittering for dette køb."
+    },
     "title": "Køb kreditter",
     "description": "Kreditter er et engangskøb, der lægges til din Kilo-saldo til at køre AI-kodningssessioner i Kilo App. Butikken opkræver betaling på din konto, og kreditterne tilføjes, når butikken bekræfter betalingen.",
     "nextExpiry": "{{amount}} i kreditter udløber {{date}} (UTC). Kreditter med den tidligste udløbsdato bruges først.",
@@ -4051,6 +4316,70 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Kunne ikke åbne dette søgeresultat"
+  },
+  "usage": {
+    "title": "Forbrug",
+    "orgTitle": "Organisationens forbrug",
+    "entrySubtitle": "Udgifter, anmodninger og tokens",
+    "rangePicker": "Tidsperiode",
+    "range90d": "90 dage",
+    "metricPicker": "Diagrammets nøgletal",
+    "chartA11y": "{{metric}} pr. dag",
+    "avgCostPerRequest": "Gns. pris pr. anmodning",
+    "topModels": "Mest brugte modeller",
+    "topFeatures": "Mest brugte funktioner",
+    "emptyTitle": "Intet forbrug i denne periode",
+    "orgSelfNotice": "Du ser dit eget forbrug i denne organisation.",
+    "viewDetails": "Se forbrugsdetaljer"
+  },
+  "integrations": {
+    "title": "Integrationer",
+    "sectionTitle": "Forbundne tjenester",
+    "entrySubtitle": "GitHub, Slack, Linear og flere",
+    "subtitle": "Forbind dine udviklingsværktøjer og arbejdsgange med Kilo",
+    "emptyHint": "Ingen integrationer er forbundet endnu.",
+    "disconnect": "Afbryd forbindelse",
+    "disconnectTitle": "Afbryd forbindelsen til {{provider}}?",
+    "disconnectMessage": "Kilo holder op med at svare i {{provider}}. Du kan altid oprette forbindelsen igen.",
+    "connectedTo": "Forbundet med {{account}}",
+    "disconnected": "Forbindelsen til {{provider}} er afbrudt",
+    "disconnectFailed": "Forbindelsen til {{provider}} kunne ikke afbrydes",
+    "couldNotLoad": "Integrationerne kunne ikke indlæses",
+    "permissionDenied": "Du har ikke tilladelse til at administrere disse integrationer.",
+    "memberHint": "Bed en ejer eller administrator i organisationen om at ændre disse forbindelser.",
+    "connectFailed": "Siden til oprettelse af forbindelse kunne ikke åbnes"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Fakturaer for dine egne køb vises her, når du er blevet faktureret."
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Intet forbrug endnu",
+      "sharedWorkspace": "Deles af alle chats i dette arbejdsområde",
+      "currentRates": "Aktuelle priser",
+      "perHour": "{{rate}}/t",
+      "mediumSandbox": "Mellemstor sandbox",
+      "largeSandbox": "Stor sandbox",
+      "earlierActivity": "Tidligere aktivitet",
+      "now": "nu",
+      "loadFailed": "Compute-omkostninger kunne ikke indlæses."
+    },
+    "preview": {
+      "title": "Åbn forhåndsvisning",
+      "listeningServices": "Lyttende tjenester",
+      "empty": "Ingen lyttende tjenester fundet. Bed agenten om at starte en webserver, og opdater derefter.",
+      "notRunning": "Denne sandbox er stoppet. Send agenten en besked for at starte den igen.",
+      "notReady": "Sandboxen er ikke klar endnu. Opdater, når den er forbundet.",
+      "unsupported": "Tjenestesøgning er ikke tilgængelig for denne sandbox.",
+      "failed": "Kunne ikke finde tjenester.",
+      "openService": "Åbn {{name}} på port {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Triggere og webhooks",
+      "subtitle": "Administrer webhook- og planlagte triggere på nettet."
+    }
   },
   "sessionShare": {
     "title": "Del session",

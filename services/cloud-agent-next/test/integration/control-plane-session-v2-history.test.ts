@@ -1,4 +1,4 @@
-import { env, reset, runInDurableObject } from 'cloudflare:test';
+import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
 import { asc, eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -12,6 +12,7 @@ import {
 import {
   MAX_SESSION_PAGE_BYTES,
   MAX_SESSION_PREVIEW_PAGE_BYTES,
+  encodeCursor,
   readSessionMessagesPage,
 } from '../../src/control-plane/session/history.js';
 import {
@@ -25,6 +26,7 @@ import {
   readNativeEventPayload,
 } from '../../src/control-plane/session/native-events.js';
 import {
+  controlPlaneMessages,
   eventMutationCursor,
   events,
   historyImport,
@@ -34,6 +36,7 @@ import { parseSessionMetadata } from '../../src/persistence/session-metadata.js'
 import { sessionDoName } from '../../src/session-identity.js';
 import type { SessionIngestBinding } from '../../src/session-ingest-binding.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
+import { seedRegistration } from './helpers/seed-registration.js';
 
 const USER_ID = 'history-user';
 const sessions = (env as unknown as { SANDBOX_SESSION: DurableObjectNamespace<SandboxSessionV2> })
@@ -57,7 +60,7 @@ async function fixture() {
     }),
     sandboxSelection: { provider: 'cloudflare' },
   });
-  await stub.registerSession({
+  await seedRegistration(stub, {
     sandboxId,
     spec: {
       sessionId,
@@ -209,6 +212,285 @@ describe('workspace DO history and mutation cursors', () => {
       part: part(kiloSessionId, 'msg_plan', 'prt_plan'),
     });
     await expectIndexedEventReads(stub);
+  });
+
+  it('carries the stream rows on the first history page only', async () => {
+    const { stub, sessionId, kiloSessionId } = await fixture();
+    const now = Date.now();
+    await runInDurableObject(stub, async (instance, state) => {
+      drizzle(state.storage)
+        .insert(controlPlaneMessages)
+        .values({
+          message_id: 'msg_failed',
+          intent: JSON.stringify({
+            messageId: 'msg_failed',
+            turn: { type: 'prompt', prompt: 'Fix the build' },
+            agent: { mode: 'code', model: 'test/model' },
+          }),
+          state: 'failed',
+          created_at: now,
+          accepted_at: null,
+          settled_at: now,
+          reason: 'workspace_setup_failed',
+        })
+        .run();
+      const recorder = instance['preparationRecorder']('attempt_failed', 'msg_failed');
+      recorder.onProgress('workspace_setup', 'Preparing environment');
+      recorder.finalize({ status: 'failed', safeError: 'Workspace setup failed' });
+    });
+    // Messages are read once per instance, so the seed needs a fresh read.
+    await evictAllDurableObjects();
+
+    const first = await stub.getSessionMessagesPage();
+    expect(first).toMatchObject({
+      preparationAttempts: [expect.objectContaining({ id: 'attempt_failed', status: 'failed' })],
+      queuedMessages: [
+        expect.objectContaining({
+          messageId: 'msg_failed',
+          content: 'Fix the build',
+          terminalFailure: expect.objectContaining({
+            status: 'failed',
+            delivery: 'queued',
+            reason: 'workspace_setup_failed',
+          }),
+        }),
+      ],
+    });
+
+    const older = await stub.getSessionMessagesPage({
+      cursor: encodeCursor({
+        version: 1,
+        sessionId,
+        rootKiloSessionId: kiloSessionId,
+        kiloSessionId,
+        createdAt: 0,
+        messageId: 'msg_oldest',
+        rowId: 1,
+      }),
+    });
+    expect(older).not.toHaveProperty('preparationAttempts');
+    expect(older).not.toHaveProperty('queuedMessages');
+  });
+
+  it('reserves the appended stream rows from the page budget', async () => {
+    const { stub, sessionId, kiloSessionId } = await fixture();
+    const reserved = 2 * 1024 * 1024;
+    const [plain, shrunk] = await runInDurableObject(stub, (_instance, state) => {
+      const db = drizzle(state.storage);
+      const queries = createSessionEventQueries(db, state.storage);
+      // Each stored info is ~200 KB, so the hard cap decides how many messages
+      // fit and the reservation visibly drops the older ones.
+      for (let index = 0; index < 30; index += 1) {
+        queries.upsert({
+          executionId: '',
+          sessionId,
+          streamEventType: 'kilocode',
+          entityId: `message/msg_reserved_${index}`,
+          timestamp: index,
+          payload: JSON.stringify({
+            event: 'message.updated',
+            type: 'message.updated',
+            properties: {
+              info: {
+                ...message(kiloSessionId, `msg_reserved_${index}`, index),
+                padding: 'x'.repeat(200_000),
+              },
+            },
+          }),
+        });
+      }
+      const input = {
+        db,
+        storage: state.storage,
+        queries,
+        sessionId,
+        rootKiloSessionId: kiloSessionId,
+        kiloSessionId,
+        metadata: null,
+      };
+      return [
+        readSessionMessagesPage(input),
+        readSessionMessagesPage({ ...input, reservedBytes: reserved }),
+      ];
+    });
+    expect(plain.messages.length).toBeGreaterThan(1);
+    expect(shrunk.messages.length).toBeLessThan(plain.messages.length);
+    expect(
+      new TextEncoder().encode(JSON.stringify(shrunk)).byteLength + reserved
+    ).toBeLessThanOrEqual(MAX_SESSION_PAGE_BYTES);
+  });
+
+  it('trims the appended stream rows to the newest rows under their own cap', async () => {
+    const { stub, sessionId } = await fixture();
+    const now = Date.now();
+    await runInDurableObject(stub, (_instance, state) => {
+      drizzle(state.storage)
+        .insert(controlPlaneMessages)
+        .values({
+          message_id: 'msg_trimmed',
+          intent: JSON.stringify({
+            messageId: 'msg_trimmed',
+            turn: { type: 'prompt', prompt: 'Keep the question' },
+            agent: { mode: 'code', model: 'test/model' },
+          }),
+          state: 'failed',
+          created_at: now,
+          accepted_at: null,
+          settled_at: now,
+          reason: 'workspace_setup_failed',
+        })
+        .run();
+    });
+    await runInDurableObject(stub, instance => {
+      const queries = instance['eventQueries'];
+      for (let index = 0; index < 12; index += 1) {
+        queries.upsert({
+          executionId: '',
+          sessionId,
+          streamEventType: 'preparing',
+          entityId: `preparation/attempt/attempt_${index}`,
+          timestamp: index,
+          payload: JSON.stringify({
+            action: 'attempt_snapshot',
+            attempt: {
+              id: `attempt_${index}`,
+              triggerMessageId: `msg_${index}`,
+              status: 'failed',
+              startedAt: index,
+              safeError: 'x'.repeat(40_000),
+              revision: 1,
+            },
+          }),
+        });
+      }
+    });
+    // Messages are read once per instance, so the seed needs a fresh read.
+    await evictAllDurableObjects();
+
+    const rows = await runInDurableObject(stub, instance => instance['readSnapshotRows']());
+    const kept = rows.preparationAttempts.map(attempt => attempt.id);
+    expect(kept.length).toBeLessThan(12);
+    expect(kept.at(-1)).toBe('attempt_11');
+    expect(kept).toEqual(
+      Array.from({ length: 12 }, (_, index) => `attempt_${index}`).slice(-kept.length)
+    );
+    expect(rows.queuedMessages.map(item => item.messageId)).toEqual(['msg_trimmed']);
+    expect(rows.bytes).toBeLessThanOrEqual(256 * 1024);
+    expect(rows.bytes).toBeGreaterThan(0);
+    // The queued turn survives whole: only preparation attempts give way.
+    expect(rows.queuedMessages[0]?.content).toBe('Keep the question');
+  });
+
+  it('keeps the failed queued turn when preparation attempts would exhaust the row budget', async () => {
+    const { stub, sessionId } = await fixture();
+    const now = Date.now();
+    const question = 'Why did preparation fail? '.repeat(200);
+    await runInDurableObject(stub, (_instance, state) => {
+      drizzle(state.storage)
+        .insert(controlPlaneMessages)
+        .values({
+          message_id: 'msg_question',
+          intent: JSON.stringify({
+            messageId: 'msg_question',
+            turn: { type: 'prompt', prompt: question },
+            agent: { mode: 'code', model: 'test/model' },
+          }),
+          state: 'failed',
+          created_at: now,
+          accepted_at: null,
+          settled_at: now,
+          reason: 'workspace_setup_failed',
+        })
+        .run();
+    });
+    await runInDurableObject(stub, instance => {
+      const queries = instance['eventQueries'];
+      for (const index of [0, 1]) {
+        queries.upsert({
+          executionId: '',
+          sessionId,
+          streamEventType: 'preparing',
+          entityId: `preparation/attempt/attempt_${index}`,
+          timestamp: index,
+          payload: JSON.stringify({
+            action: 'attempt_snapshot',
+            attempt: {
+              id: `attempt_${index}`,
+              triggerMessageId: 'msg_question',
+              status: 'failed',
+              startedAt: index,
+              safeError: 'x'.repeat(130_000),
+              revision: 1,
+            },
+          }),
+        });
+      }
+    });
+    // Messages are read once per instance, so the seed needs a fresh read.
+    await evictAllDurableObjects();
+
+    const rows = await runInDurableObject(stub, instance => instance['readSnapshotRows']());
+    // The question alone is ~5 KB, so only the newest attempt still fits beside it.
+    expect(rows.queuedMessages.map(item => item.messageId)).toEqual(['msg_question']);
+    expect(rows.queuedMessages[0]?.content).toBe(question);
+    expect(rows.preparationAttempts.map(attempt => attempt.id)).toEqual(['attempt_1']);
+    expect(rows.bytes).toBeLessThanOrEqual(256 * 1024);
+  });
+
+  it('reserves the appended stream rows from a native v2 page budget', async () => {
+    const { stub, sessionId, kiloSessionId } = await fixture();
+    const reserved = 2 * 1024 * 1024;
+    const source = {
+      version: 'v2',
+      session: {
+        id: kiloSessionId,
+        location: { directory: '/workspace/app' },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    await publish(stub, 'conversation.source', { sessionID: kiloSessionId, source });
+    // Each native message is ~500 KB, so the hard cap decides how many fit and
+    // the reservation visibly drops the older ones.
+    for (let index = 0; index < 12; index += 1) {
+      await publish(stub, 'conversation.message.updated', {
+        sessionID: kiloSessionId,
+        source,
+        message: {
+          id: `msg_v2_reserved_${index}`,
+          type: 'user',
+          time: { created: index + 1 },
+          content: [],
+          padding: 'x'.repeat(500_000),
+        },
+      });
+    }
+    const [plain, shrunk] = await runInDurableObject(stub, (_instance, state) => {
+      const db = drizzle(state.storage);
+      const input = {
+        db,
+        storage: state.storage,
+        queries: createSessionEventQueries(db, state.storage),
+        sessionId,
+        rootKiloSessionId: kiloSessionId,
+        kiloSessionId,
+        metadata: null,
+      };
+      return [
+        readSessionMessagesPage(input),
+        readSessionMessagesPage({ ...input, reservedBytes: reserved }),
+      ];
+    });
+    if (plain.source.version !== 'v2' || shrunk.source.version !== 'v2')
+      throw new Error('Expected native v2 history pages');
+    expect(plain.messages.length).toBeGreaterThan(1);
+    expect(shrunk.messages.length).toBeGreaterThan(0);
+    expect(shrunk.messages.length).toBeLessThan(plain.messages.length);
+    expect(new TextEncoder().encode(JSON.stringify(plain)).byteLength).toBeLessThanOrEqual(
+      MAX_SESSION_PAGE_BYTES
+    );
+    expect(
+      new TextEncoder().encode(JSON.stringify(shrunk)).byteLength + reserved
+    ).toBeLessThanOrEqual(MAX_SESSION_PAGE_BYTES);
   });
 
   it('keeps native v2 history pages on indexed entity ranges', async () => {

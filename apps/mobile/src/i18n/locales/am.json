@@ -23,6 +23,10 @@
   },
   "common": {
     "deleteTitle": "{{label}}ን ይሰረዝ?",
+    "manageOnWeb": "በድር ላይ ያስተዳድሩ",
+    "creditHistory": "የክሬዲት ታሪክ",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": "። ",
     "listJoiner": "፣ ",
     "cancel": "ተው",
@@ -119,6 +123,7 @@
     "copyLink": "አገናኙን ቅዳ",
     "couldNotLoadOrganizations": "ድርጅቶችን መጫን አልተቻለም።",
     "couldNotLoadSessions": "ክፍለ ጊዜዎችን መጫን አልተቻለም።",
+    "couldnTLoad": "መጫን አልተቻለም።",
     "couldnTLoadMore": "ተጨማሪ መጫን አልተቻለም።",
     "deviceSessions": "የመሣሪያ ክፍለ ጊዜዎች",
     "disabled": "ተሰናክሏል",
@@ -246,6 +251,10 @@
     "notAdded": "ገብተዋል። {{provider}} ወደ መለያዎ አልታከለም።"
   },
   "profile": {
+    "creditHistorySubtitle": "ግዢዎች፣ ደረሰኞች እና የክሬዲት እንቅስቃሴ",
+    "invoicesSubtitle": "ለግዢዎችዎ የክፍያ መጠየቂያዎችን ያውርዱ",
+    "manageBilling": "ክፍያን በkilo.ai ላይ ያስተዳድሩ",
+    "manageBillingIosNote": "የመክፈያ ዘዴዎች፣ ራስ-ሰር መሙላት እና የክፍያ ዝርዝሮች የሚተዳደሩት በkilo.ai ላይ ነው።",
     "codeReviewerSubtitle": "በራስ ሰር የሚደረጉ የPR ግምገማዎች",
     "securityAgentSubtitle": "ተጋላጭነቶችን ፈልገው ያስተካክሉ",
     "reviews": "ግምገማዎች",
@@ -299,6 +308,7 @@
     "passkeyAdded": "ፓስኪ ተጨምሯል።",
     "passkeyAddFailed": "ፓስኪ ማከል አልተቻለም። እንደገና ይሞክሩ።",
     "passkeyAddUnsupported": "ይህ መሣሪያ ፓስኪዎችን መፍጠር አይችልም።",
+    "passkeyAddUnavailable": "ፓስኪዎች ሊጨመሩ የሚችሉት በድር አሳሽ ውስጥ ብቻ ነው።",
     "passkeyAddCancelled": "ፓስኪ መፍጠር ተሰርዟል።",
     "passkeyRemoved": "ፓስኪ ተወግዷል።",
     "passkeyRemoveFailed": "ያንን ፓስኪ ማስወገድ አልተቻለም። እንደገና ይሞክሩ።",
@@ -331,7 +341,6 @@
     "providerKeys": {
       "title": "የአቅራቢ ቁልፎች",
       "rowSubtitle": "የራስዎን የአቅራቢ ክፍያ ይጠቀሙ",
-      "manageOnWeb": "በድር ላይ ያስተዳድሩ",
       "manageOnWebReason": "እነዚህ አቅራቢዎች የተዋቀሩ የማረጋገጫ መረጃዎችን ይፈልጋሉ።",
       "description": "በእነዚህ ቁልፎች የሚላኩ ጥያቄዎች ከKilo ቀሪ ሂሳብዎ ይልቅ በአቅራቢ መለያዎ ይከፈላሉ።",
       "enabled": "በጥቅም ላይ",
@@ -1245,7 +1254,17 @@
       "changeRequestMissingPermissions": "የKilo GitHub App በዚህ ማከማቻ ውስጥ pull request መክፈት አይችልም። የማከማቻ ባለቤት ለመተግበሪያው የይዘት እና pull request የመጻፍ መዳረሻ መስጠት አለበት፣ ከዚያ እንደገና ይሞክሩ።",
       "changeRequestFailed": "Kilo pull request መክፈት አልቻለም። ከጥቂት ጊዜ በኋላ እንደገና ይሞክሩ።",
       "proposalConflict": "ለዚህ ማከማቻ ሌላ ሐሳብ አሁንም ንቁ ነው።",
-      "offAction": "የግምገማ ትውስታ ተሰናክሏል። ያንቁት፣ ከዚያ እንደገና ይሞክሩ።"
+      "offAction": "የግምገማ ትውስታ ተሰናክሏል። ያንቁት፣ ከዚያ እንደገና ይሞክሩ።",
+      "analyze": {
+        "title": "ግብረመልስ ትንተና",
+        "description": "የቅርብ ጊዜ የተንከባካቢ ምላሾች ያሉት ማከማቻ ይምረጡ፤ ከዚያም አንድ ተደጋጋሚ የመመሪያ ስርዓተ-ጥለት ይፈልጉ።",
+        "chooseRepository": "ማከማቻ ይምረጡ",
+        "action": "አሁን ተንትን",
+        "noRepositories": "እስካሁን የቅርብ ጊዜ የተንከባካቢ ምላሾች ያሉት ማከማቻ የለም።",
+        "proposed": "የግምገማ ማህደረ ትውስታ ሀሳብ ተፈጥሯል",
+        "noFeedback": "ለዚህ ማከማቻ የቅርብ ጊዜ ግብረመልስ አልተገኘም",
+        "noPattern": "ግልጽ ተደጋጋሚ ስርዓተ-ጥለት አልተገኘም"
+      }
     },
     "manualReview": {
       "invalidMergeRequestUrl": "ትክክለኛ የማዋሃድ ጥያቄ URL ያስገቡ።",
@@ -1377,7 +1396,63 @@
       "title": "የኮድ ገምጋሚው ትኩረትህን ይፈልጋል።",
       "recoveryLabel": "የድጋፍ ቡድኑን አግኝ"
     },
-    "unknownError": "የማይታወቅ ስህተት"
+    "unknownError": "የማይታወቅ ስህተት",
+    "skipBotPullRequests": {
+      "title": "ከቦቶች የሚመጡ የመሳብ ጥያቄዎችን መዝለል",
+      "subtitle": "እንደ Dependabot ወይም Renovate ባሉ ቦቶች በተከፈቱ የመሳብ ጥያቄዎች ላይ ራስ-ሰር ግምገማዎችን አያሂዱ። የቦት የመሳብ ጥያቄዎችንም ለመገምገም ይህን ያጥፉት።"
+    },
+    "repoModels": {
+      "title": "ለእያንዳንዱ ማከማቻ የተለየ ሞዴል",
+      "description": "የአንዳንድ ማከማቻዎችን ግምገማዎች በተለየ ሞዴል፣ በተለየ የአስተሳሰብ ጥረት ወይም በሁለቱም ያሂዱ።",
+      "defaultModel": "ነባሪውን ሞዴል ይጠቀማል",
+      "resetLabel": "የ{{repository}} ሞዴልን ዳግም አስጀምር",
+      "changeHint": "የሞዴል መምረጫውን ይከፍታል"
+    },
+    "analytics": {
+      "title": "ትንታኔ",
+      "trackedReviews": "ክትትል የተደረገባቸው ግምገማዎች",
+      "findingsRaised": "የተነሱ ግኝቶች",
+      "highImpactChanges": "ከፍተኛ ተጽዕኖ ያላቸው ለውጦች",
+      "impactPoints": "የተጽዕኖ ነጥቦች",
+      "repositoryLine": "ግምገማዎች፦ {{reviews}} · ግኝቶች፦ {{findings}}",
+      "empty": "እስካሁን ትንታኔ ያላቸው ግምገማዎች የሉም",
+      "emptyDescription": "ትንታኔ ለድርጅቱ ነቅቶ እያለ የተጠናቀቁ ግምገማዎችን ይመዘግባል።",
+      "off": "ለዚህ ድርጅት ትንታኔ ጠፍቷል።",
+      "couldNotLoad": "ትንታኔን መጫን አልተቻለም"
+    },
+    "council": {
+      "title": "የጉባኤ ግምገማ",
+      "subtitle": "በርካታ ባለሙያዎች እያንዳንዱን የመሳብ ጥያቄ ይገመግማሉ፤ ድምፆቻቸውም ወደ አንድ ውሳኔ ይጣመራሉ።",
+      "unavailable": "የጉባኤ ግምገማ ለዚህ ድርጅት አይገኝም።",
+      "noRepositories": "እስካሁን ምንም ማከማቻ አልተመረጠም። መጀመሪያ በማከማቻ ቅንብሮች ውስጥ ማከማቻዎችን ይምረጡ።",
+      "specialists": "ባለሙያዎች",
+      "labels": "የጉባኤ ግምገማን የሚያስጀምሩ መለያዎች",
+      "labelsPlaceholder": "ለምሳሌ፦ ጉባኤ, ጥልቅ ግምገማ",
+      "labelsDescription": "መለያዎችን በኮማ (,) ይለዩ። ከዚያም ጉባኤ የነቃለት ማከማቻ ከእነዚህ መለያዎች ቢያንስ አንዱን ለያዙ የመሳብ ጥያቄዎች ብቻ ጉባኤን ያሂዳል። ለሁሉም ብቁ የመሳብ ጥያቄዎች ባዶ ይተዉት።",
+      "tooManyLabels": "የጉባኤ መለያዎች በዝተዋል። ቢበዛ {{maximum}} መለያዎችን ይጠቀሙ።",
+      "labelTooLong": "የጉባኤ መለያው በጣም ረጅም ነው። እያንዳንዱ መለያ ቢበዛ {{maximum}} ቁምፊዎች ሊኖሩት ይገባል።",
+      "minSpecialists": "ቢያንስ {{minimum}} ባለሙያዎችን ይምረጡ። {{selected}} ተመርጠዋል።",
+      "specialistName": {
+        "testCoverage": "የሙከራ ሽፋን",
+        "correctness": "ትክክለኛነት",
+        "custom": "ባለሙያ"
+      },
+      "specialist": {
+        "security": "የፈቃድ ማለፍ፣ የሚስጥር አያያዝ እና ደህንነቱ ያልተጠበቀ ግብዓት።",
+        "performance": "በተደጋጋሚ የሚሄዱ የኮድ መንገዶች፣ N+1 መጠይቆች እና ከባድ የማህደረ ትውስታ ምደባዎች።",
+        "testing": "ለአዲስ ባህሪ የጎደለ ወይም ደካማ የሙከራ ሽፋን።",
+        "correctness": "የአመክንዮ ስህተቶች፣ ልዩ ሁኔታዎች እና የፉክክር ሁኔታዎች።",
+        "custom": "በራሱ ዘርፍ ያሉ ችግሮችን ይገመግማል።"
+      },
+      "strategy": {
+        "advisory": "አማካሪ",
+        "advisoryDescription": "ውህደቱን ሳያግድ ግኝቶችንና ድምፆችን ሪፖርት ያደርጋል።",
+        "unanimous": "በሙሉ ድምፅ",
+        "unanimousDescription": "ማንኛውም ባለሙያ ወሳኝ ችግር ሪፖርት ሲያደርግ ውህደቱን ያግዳል።",
+        "majority": "በአብላጫ ድምፅ",
+        "majorityDescription": "አብዛኞቹ ባለሙያዎች ወሳኝ ችግር ሪፖርት ሲያደርጉ ብቻ ውህደቱን ያግዳል።"
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1880,6 +1955,16 @@
       "auto": "ራስ-ሰር",
       "shallow": "ጥልቀት የሌለው ትንተና",
       "deep": "ጥልቅ"
+    },
+    "orphanedFindings": {
+      "title": "የተወገዱ ማከማቻዎች ግኝቶች",
+      "description": "እነዚህ ማከማቻዎች ከአሁን በኋላ በGitHub ትስስር በኩል ተደራሽ አይደሉም። ግኝቶቻቸው አሁንም በዳሽቦርዶችና በሪፖርቶች ውስጥ ይቆጠራሉ።",
+      "count": "ግኝቶች፦ {{count}}",
+      "clearLabel": "የ{{repository}} ግኝቶችን አጽዳ",
+      "confirmTitle": "ግኝቶቹ ይጽዱ?",
+      "confirmMessage": "ለ{{repository}} የተመዘገቡ ሁሉም ግኝቶች ይሰረዛሉ። ይህ ሊቀለበስ አይችልም።",
+      "confirmAction": "ግኝቶችን ሰርዝ",
+      "cleared": "የተጸዱ ግኝቶች፦ {{count}}"
     }
   },
   "agents": {
@@ -2059,6 +2144,7 @@
       "branchPlaceholder": "አንድ ቅርንጫፍ ይምረጡ",
       "runOnWithTarget": "ማስኬጃ፦ {{target}}",
       "environment": "የሥራ አካባቢ",
+      "cloudEnvironment": "የክላውድ አካባቢ",
       "couldNotLoadEnvironment": "የሥራ አካባቢዎን መጫን አልተቻለም።",
       "retryLoadingEnvironment": "የሥራ አካባቢውን ለመጫን እንደገና ይሞክሩ",
       "defaultEnvironment": "ነባሪ የሥራ አካባቢ",
@@ -2119,6 +2205,89 @@
       "openSettingsToReview": "ለመገምገም ቅንብሮችን ይክፈቱ",
       "profileSelection": "የመገለጫ ምርጫ",
       "profileLayerAccessibility": "{{label}}፦ {{detail}}"
+    },
+    "environment": {
+      "loadingEnvironments": "የሥራ አካባቢዎችን በመጫን ላይ",
+      "couldNotLoadEnvironments": "የሥራ አካባቢዎችን መጫን አልተቻለም",
+      "couldNotLoadEnvironmentsDetail": "የዚህን ሪፖዚቶሪ የሥራ አካባቢዎች ለመጫን እንደገና ይሞክሩ።",
+      "noEnvironment": "ምንም የሥራ አካባቢ የለም",
+      "noEnvironmentDetail": "ይህ ክፍለ ጊዜ ከመሠረታዊው image ይጀምራል።",
+      "chooseEnvironment": "የሥራ አካባቢ ይምረጡ",
+      "chooseEnvironmentDetail": "ይህ ሪፖዚቶሪ ከአንድ በላይ የሥራ አካባቢ አለው።",
+      "environmentAccessibility": "የሥራ አካባቢ ይምረጡ፦ {{label}}",
+      "environmentsForRepository": "የ{{repository}} የሥራ አካባቢዎች",
+      "selectEnvironmentToStart": "ለመጀመር የሥራ አካባቢ ይምረጡ።",
+      "buildDetails": "የግንባታ ዝርዝሮች",
+      "buildNotBuilt": "አልተገነባም",
+      "buildUnavailableShort": "Snapshot ግንባታዎች አይገኙም",
+      "buildPreparing": "Builderን በማዘጋጀት ላይ",
+      "buildCloning": "ነባሪውን branch በማባዛት (clone) ላይ",
+      "buildSetup": "የሥራ አካባቢውን ማዋቀሪያ በማስኬድ ላይ",
+      "buildCleanup": "የግንባታ ምስክርነቶችን በማስወገድ ላይ",
+      "buildCapturing": "Snapshotን በመውሰድ ላይ",
+      "buildPublishing": "Snapshotን በማተም ላይ",
+      "buildStopping": "Builderን በማቆም ላይ",
+      "buildStoppingRetrying": "Builderን በማቆም ላይ፣ እንደገና በመሞከር ላይ",
+      "buildFinishing": "ግንባታውን በማጠናቀቅ ላይ",
+      "buildSucceeded": "Snapshot ዝግጁ ነው",
+      "buildSuperseded": "በአዲስ ግንባታ ተተክቷል",
+      "buildStale": "ከዚህ snapshot በኋላ ቅንብሮች ተቀይረዋል",
+      "buildStaleAge": "Snapshot ከአራት ቀናት በላይ ቆይቷል፤ ቀጣዩ ክፍለ ጊዜ ያድሰዋል",
+      "buildStaleImage": "ለቀድሞው የsandbox ምስል የተገነባ",
+      "failureClone": "ሪፖዚቶሪውን ማባዛት (clone) አልተቻለም።",
+      "failureSetup": "አንድ የማዋቀሪያ ትዕዛዝ አልተሳካም። የግንባታ ምዝግብ ማስታወሻውን ይመልከቱ።",
+      "failureTimeout": "አንድ የማዋቀሪያ ትዕዛዝ ጊዜው አልፎበታል። የግንባታ ምዝግብ ማስታወሻውን ይመልከቱ።",
+      "failureCleanup": "ምስክርነቶችን ማስወገድ ስላልተቻለ ምንም snapshot አልተወሰደም።",
+      "failureCapture": "Snapshotን መውሰድ አልተቻለም።",
+      "failureCaptureUncertain": "የsnapshot ውጤቱ ጠፍቷል፤ ግንባታው አልተለቀቀም።",
+      "failureDeadline": "ግንባታው በጊዜው አልተጠናቀቀም።",
+      "failureBuilderLost": "Builder ሪፖርት ማድረጉን አቁሟል።",
+      "failureBuilderStart": "Builder መጀመር አልቻለም።",
+      "failureUnauthorized": "የሪፖዚቶሪ መዳረሻ ከአሁን በኋላ ፈቃድ የለውም።",
+      "failureActorUnauthorized": "ግንባታውን የጀመረው ሰው ከአሁን በኋላ መዳረሻ የለውም።",
+      "failureBilling": "ግንባታዎች የሚገኙ ክሬዲቶችን ይፈልጋሉ።",
+      "failureBillingUnavailable": "የክፍያ ሥርዓቱ ግንባታውን መቀበል አልቻለም። እንደገና ይሞክሩ።",
+      "failureConfiguration": "በግንባታው ወቅት ውቅሩ ተቀይሯል።",
+      "failureRuntime": "የተመረጠውን የruntime ልቀት መጫን አልተቻለም።",
+      "failureGeneric": "ግንባታው አልተሳካም።",
+      "buildLogs": "የግንባታ ምዝግብ ማስታወሻዎች",
+      "noBuildLogs": "እስካሁን ምንም የምዝግብ ውጤት የለም።",
+      "buildLogsLatestOnly": "የተቀመጡትን የመጨረሻዎቹን 500 የምዝግብ መስመሮች በማሳየት ላይ።",
+      "buildLogsTruncated": "ከዚያ በኋላ ያለው ውጤት ተቆርጧል።",
+      "couldNotLoadBuild": "የግንባታውን ሁኔታ መጫን አልተቻለም",
+      "couldNotLoadBuildLogs": "የግንባታ ምዝግብ ማስታወሻዎችን መጫን አልተቻለም",
+      "buildsUnavailable": "ለዚህ የሥራ አካባቢ snapshot ግንባታዎች አይገኙም።",
+      "onlyManagersCanBuild": "Snapshot መገንባት የሚችሉት የድርጅት አስተዳዳሪዎች ብቻ ናቸው።",
+      "waitForBuilder": "እንደገና ከመገንባትዎ በፊት builder እስኪቆም ይጠብቁ።",
+      "buildAction": "Snapshot ይገንቡ",
+      "refreshAction": "Snapshot ያድሱ",
+      "cancelBuildAction": "ግንባታውን ይሰርዙ",
+      "buildStarted": "Snapshot ግንባታ ተጀምሯል",
+      "buildCanceled": "Snapshot ግንባታ ተሰርዟል",
+      "couldNotStartBuild": "ግንባታውን መጀመር አልተቻለም",
+      "couldNotCancelBuild": "ግንባታውን መሰረዝ አልተቻለም",
+      "sandbox": "Sandbox",
+      "sandboxActive": "Sandbox ንቁ ነው",
+      "sandboxSleeping": "Sandbox በእንቅልፍ ላይ ነው",
+      "sandboxStarting": "Sandbox በመጀመር ላይ",
+      "sandboxStopping": "Sandbox በመቆም ላይ",
+      "sandboxError": "የSandbox ስህተት",
+      "sandboxUnreachable": "Sandbox ሊደረስበት አይችልም",
+      "sandboxStatusUnknown": "የSandbox ሁኔታ አይታወቅም",
+      "sandboxChecked": "የተፈተሸው {{when}}",
+      "sandboxDetailStopped": "ለመቀጠል መልዕክት ይላኩ።",
+      "sandboxDetailFailed": "እንደገና ለመሞከር መልዕክት ይላኩ።",
+      "sandboxDetailConnection": "ከsandbox ጋር ያለው ግንኙነት አይገኝም።",
+      "sandboxDetailUnavailable": "የSandbox ሁኔታ ለጊዜው አይገኝም።",
+      "sandboxDetailInsufficient": "የsandboxን የአሁኑ ሁኔታ ለማረጋገጥ በቂ መረጃ የለም።",
+      "sandboxDetailCheckNeeded": "Sandbox በቅርብ ጊዜ ጤናማነቱን አላረጋገጠም።",
+      "startFresh": "እንደ አዲስ ይጀምሩ",
+      "startFreshTitle": "እንደ አዲስ ይጀምሩ?",
+      "startFreshMessage": "ይህ {{when}} የተወሰደውን የሥራ ቦታ snapshot ያስወግዳል። በዚያ የሥራ ቦታ ውስጥ commit ያልተደረጉ ለውጦች ይጠፋሉ።",
+      "startFreshMessageUnknown": "ይህ ሊነበብ ያልቻለውን የተቀመጠውን የሥራ ቦታ snapshot ያስወግዳል። በዚያ የሥራ ቦታ ውስጥ commit ያልተደረጉ ለውጦች ይጠፋሉ።",
+      "startFreshDone": "የሥራ ቦታ snapshot ተወግዷል።",
+      "couldNotRemoveSnapshot": "የሥራ ቦታ snapshotን ማስወገድ አልተቻለም።",
+      "snapshotCaptured": "የሥራ ቦታ snapshot የተወሰደው {{when}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ፋይል ተዘምኗል።",
@@ -2468,7 +2637,8 @@
       "cancelQueued": "መልእክቱን ይሰርዙ",
       "cancelQueuedAccessibility": "ወረፋ ላይ ያለውን መልእክት ይሰርዙ",
       "restoreQueued": "ይመልሱ",
-      "restoreQueuedAccessibility": "የተሰረዘውን መልእክት ወደ መልእክት ማስገቢያው ይመልሱ"
+      "restoreQueuedAccessibility": "የተሰረዘውን መልእክት ወደ መልእክት ማስገቢያው ይመልሱ",
+      "noReplyRecorded": "ለዚህ መልእክት ምንም ምላሽ አልተመዘገበም።"
     },
     "olderMessages": {
       "arrived": "የቀደሙ መልእክቶች ተጭነዋል",
@@ -2861,6 +3031,26 @@
     "onlyFirstFilesAttached_other": "የመጀመሪያዎቹ {{displayCount}} ፋይሎች ብቻ ይያያዛሉ።"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "የክፍያ ታሪክ",
+      "billingHistoryEmpty": "እስካሁን የክፍያ ታሪክ የለም።",
+      "cancel": "የደንበኝነት ምዝገባን ሰርዝ",
+      "cancelDescription": "የእርስዎ Kilo Pass እስከ የክፍያ ጊዜው መጨረሻ ድረስ ንቁ ሆኖ ይቆያል፣ እና አይታደስም።",
+      "cancelScheduled": "በ{{date}} ይሰረዛል",
+      "cancelScheduledChange": "የታቀደውን ለውጥ ሰርዝ",
+      "cancelled": "የደንበኝነት ምዝገባ ተሰርዟል",
+      "changePlan": "እቅድን በkilo.ai ላይ ይቀይሩ",
+      "changePlanIosNote": "የሚከፈልባቸው እቅዶች ለውጦች በkilo.ai ላይ ይገኛሉ።",
+      "creditHistoryEmpty": "እስካሁን ምንም የKilo Pass ክሬዲቶች የሉም።",
+      "manageInStore": "በ{{store}} ውስጥ ያስተዳድሩ",
+      "resume": "የደንበኝነት ምዝገባን ቀጥል",
+      "resumeCancelledDescription": "የእርስዎ Kilo Pass እንደገና በራስ-ሰር መታደስ ይጀምራል።",
+      "resumePausedDescription": "የእርስዎ Kilo Pass ከታቀደው የመቀጠያ ቀን በፊት አሁን ይቀጥላል።",
+      "resumed": "የደንበኝነት ምዝገባ ቀጥሏል",
+      "scheduledChange": "የታቀደ ለውጥ",
+      "scheduledChangeCancelDescription": "የእርስዎ Kilo Pass አሁን ባለው እቅድ ላይ ይቆያል፣ እና እንደ አሁኑ ይታደሳል።",
+      "scheduledChangeSummary": "{{plan}} በ{{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass አይገኝም።",
     "couldNotLoad": "Kilo Pass መጫን አልተቻለም። እንደገና ይሞክሩ።",
@@ -2870,7 +3060,7 @@
     "subscriptionLoading": "የKilo Pass ምዝገባ መረጃ በመጫን ላይ",
     "retryHint": "የKilo Pass ሁኔታን ለማግኘት እንደገና ይሞክራል።",
     "cardAccessibility": "{{title}}። {{description}}። {{actionLabel}}",
-    "purchaseUnavailableEnded": "የእርስዎ Kilo Pass አልቋል።",
+    "endedOn": "በ{{date}} ተጠናቋል",
     "notAvailableInApp": "Kilo Pass በመተግበሪያው ውስጥ አይገኝም።",
     "statusActive": "ንቁ",
     "statusTrialing": "በሙከራ ላይ",
@@ -2892,7 +3082,7 @@
     "kiloPassManagement": "የKilo Pass አስተዳደር",
     "kiloPassSetup": "የKilo Pass ማዋቀር",
     "opensManagementOnWeb": "የKilo Pass አስተዳደርን በድር ላይ ይከፍታል።",
-    "tryAgainFromProfile": "ከመገለጫ እንደገና ይሞክሩ።",
+    "loadFailedRetry": "ግንኙነትዎን ይፈትሹ፣ ከዚያ እንደገና ይሞክሩ።",
     "legalTermsOfUse": "የአጠቃቀም ውሎች (EULA)",
     "purchaseDifferentAccount": "ይህ የApp Store ግዢ ከKilo መለያዎ ጋር አልተገናኘም። ለግዢው ወደተጠቀሙበት Apple Account ይግቡ፣ ከዚያ እንደገና ይሞክሩ።",
     "purchaseFailed": "ግዢውን ማጠናቀቅ አልተሳካም።",
@@ -2915,6 +3105,11 @@
     "accountDescription": "የKilo መለያዎ መለያ ቁጥር እና የጥያቄዎች ተጨማሪ መረጃ ማንነትዎን ለማረጋገጥና አጠቃቀምን ለመለካት ያገለግላሉ።",
     "diagnosticsTitle": "የመተግበሪያ ምርመራዎች",
     "diagnosticsDescription": "የመተግበሪያው ይዘት የተወገደላቸው የብልሽትና የስህተት ሪፖርቶች መተግበሪያው በተረጋጋ ሁኔታ እንዲሠራ ያገለግላሉ።",
+    "featureFlagsTitle": "የተግባሮች ደረጃ በደረጃ ልቀት",
+    "featureFlagsDescription": "የመለያዎ ኢሜይል፣ PostHog የትኞቹን ተግባሮች እንደሚያዩ ለመወሰን ይጠቀምበታል።",
+    "featureFlagsWhat": "የመለያዎ ኢሜይል።",
+    "featureFlagsWhy": "የትኞቹን ተግባሮች እንደሚያዩ ለመወሰን፣ አሁንም በመልቀቅ ላይ ያሉትንም ጨምሮ።",
+    "featureFlagsWho": "PostHog፣ ተግባሮችን የሚያበራና የሚያጠፋ አገልግሎት።",
     "helpImprove": "Kiloን ለማሻሻል ይርዱ",
     "helpImproveDescription": "ማንነትዎን የማይገልጽ የአጠቃቀም ትንታኔ ውሂብ እና መተግበሪያውን ያገኙበትን ምንጭ ያጋሩ። ይህን በማንኛውም ጊዜ በቅንብሮች ውስጥ መቀየር ይችላሉ።",
     "seeFullDetails": "ሙሉ ዝርዝሮችን ይመልከቱ",
@@ -2996,6 +3191,36 @@
     "sendFeedback": "አስተያየት ይላኩ"
   },
   "organization": {
+    "auditLog": {
+      "title": "የኦዲት መዝገብ",
+      "permissionDenied": "የኦዲት መዝገቡን ማንበብ የሚችሉት በEnterprise ዕቅድ ላይ ያሉ የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው።",
+      "emptyTitle": "ምንም የኦዲት ክስተቶች የሉም",
+      "emptyDescription": "በዚህ ድርጅት ውስጥ የተወሰዱ እርምጃዎች እዚህ ይታያሉ።",
+      "truncated": "የቅርብ ጊዜዎቹ ክስተቶች እየታዩ ነው።"
+    },
+    "billing": {
+      "title": "ክፍያ",
+      "permissionDenied": "የድርጅቱን የክፍያ መረጃ ማየት የሚችሉት የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ ኃላፊ ብቻ ናቸው።",
+      "subscription": "የደንበኝነት ምዝገባ",
+      "state": "ሁኔታ",
+      "stateNone": "የደንበኝነት ምዝገባ የለም",
+      "statePastDue": "ክፍያው ጊዜው አልፏል",
+      "stateCancelsAtPeriodEnd": "በክፍያ ጊዜው መጨረሻ ላይ ይሰረዛል",
+      "stateTrialEndsOn": "ሙከራው {{date}} ላይ ያበቃል",
+      "stateTrialing": "ሙከራ",
+      "stateRenewsOn": "{{date}} ላይ ይታደሳል",
+      "seatsDropTo": "{{date}} ላይ ወደ {{seats}} የተጠቃሚ ፈቃዶች ይቀንሳል",
+      "seats": "የተጠቃሚ ፈቃዶች",
+      "autoTopUp": "ራስ-ሰር መሙላት",
+      "autoTopUpAmount": "የመሙያ መጠን",
+      "autoTopUpThreshold": "ቀሪ ሂሳብ ከዚህ በታች ሲወርድ",
+      "manageOnWeb": "ለውጦች የሚደረጉት በድር ላይ ነው",
+      "changePlan": "ዕቅድ ይቀይሩ",
+      "buySeats": "የተጠቃሚ ፈቃዶችን ይግዙ",
+      "setupAutoTopUp": "ራስ-ሰር መሙላትን ያዋቅሩ",
+      "webAddress": "የድር አድራሻ {{url}}",
+      "opensOnWeb": "በድር ላይ ይከፈታል"
+    },
     "boundary": {
       "backToProfile": "ወደ መገለጫ ይመለሱ",
       "loadErrorMessage": "ግንኙነትህን አረጋግጠህ እንደገና ሞክር።",
@@ -3003,14 +3228,20 @@
       "loadErrorTitle": "ድርጅቶችዎን መጫን አልተቻለም።",
       "membershipLostNotice": "ይህን ድርጅት ከእንግዲህ የመድረስ ፈቃድ የለዎትም። ወደ {{target}} ተቀይሯል።",
       "noOrganization": "ድርጅት የለም",
-      "noOrganizationDescription": "ይህ መለያ የድርጅት አካል አይደለም። እንደ አባል ግብዣዎች እና ዝቅተኛ ቀሪ ሂሳብ ማንቂያዎች ያሉ የድርጅት ባህሪያትን ለመጠቀም በድር ላይ አንዱን ይፍጠሩ ወይም ይቀላቀሉ።",
-      "openWebOrganizations": "ድርጅቶችን በድር ላይ ይክፈቱ",
+      "noOrganizationDescription": "ይህ መለያ የማንኛውም ድርጅት አካል አይደለም። እንደ የአባላት ግብዣ እና የዝቅተኛ ቀሪ ሂሳብ ማንቂያዎች ያሉ የድርጅት ባህሪያትን ለመጠቀም ድርጅት ይፍጠሩ፣ ወይም የተጋበዙበትን ድርጅት ለመቀላቀል ድሩን ይክፈቱ።",
       "organizationUnavailable": "ድርጅቱ አይገኝም።",
       "selectDescriptionWithOrganizations": "እርስዎ አንድ ወይም ከዚያ በላይ ድርጅቶች አባል ነዎት። ይህ ማያ ገጽ መጠቀም ያለበትን መለያ ይምረጡ።",
       "selectOrganization": "ድርጅት ይምረጡ",
       "unavailableDescription": "ይህ ድርጅት ከእንግዲህ አይገኝም። ለመቀጠል ከመገለጫዎ ሌላ ድርጅት ይምረጡ።",
       "unavailableSessionsDescription": "ይህ ድርጅት ከእንግዲህ አይገኝም። የዚህ ድርጅት ክፍለ ጊዜዎችን መጫን አይቻልም።",
       "accessDeniedDescription": "ይህን ድርጅት የመድረስ ፈቃድ የለዎትም።"
+    },
+    "create": {
+      "title": "ድርጅት ይፍጠሩ",
+      "description": "ድርጅት ክሬዲቶችን፣ ኤጀንቶችን እና ቅንብሮችን ከቡድንዎ ጋር ያጋራል።",
+      "nameLabel": "የድርጅት ስም",
+      "nameRequired": "የድርጅት ስም ያስገቡ።",
+      "trialNote": "የ14 ቀን የEnterprise ሙከራዎ ድርጅቱን ሲፈጥሩ ይጀምራል። ዕቅዶች የሚገዙት በድር ላይ ነው።"
     },
     "creditActivity": {
       "emptyDescription": "የዚህ ድርጅት ግዢዎች፣ አጠቃቀም እና የክሬዲት ማስተካከያዎች ሲኖሩ እዚህ ይታያሉ።",
@@ -3119,6 +3350,21 @@
       "ownRoleChange": "የራስዎን ሚና መቀየር አይችሉም።",
       "inviteExpired": "ይህ ግብዣ ጊዜው አልፎበታል።",
       "inviteAccepted": "ይህ ግብዣ አስቀድሞ ተቀብሏል።"
+    },
+    "settingsOnWeb": {
+      "title": "በድር ላይ ያሉ የድርጅት ቅንብሮች",
+      "usageDetails": "የአጠቃቀም ዝርዝሮች",
+      "providersAndModels": "አቅራቢዎች እና ሞዴሎች",
+      "groups": "ቡድኖች",
+      "guardrails": "የጥበቃ ገደቦች",
+      "byok": "የራስዎን ቁልፍ ይጠቀሙ",
+      "ssoAndDomain": "SSO እና ጎራ",
+      "emailPreferences": "የኢሜይል ምርጫዎች",
+      "dataCollection": "የውሂብ አሰባሰብ",
+      "auditLogs": "የኦዲት መዝገቦች",
+      "requestLogs": "የጥያቄ መዝገቦች",
+      "subOrganizations": "ንዑስ ድርጅቶች",
+      "distributeFunds": "ገንዘብ ያከፋፍሉ"
     },
     "usageStats": {
       "inputTokens": "የግብዓት ቶከኖች",
@@ -3870,6 +4116,25 @@
     "importConfigApplied": "Config ገብቷል"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "የክሬዲት እንቅስቃሴ ማምጣት አልተቻለም።",
+      "appStoreReceipt": "ደረሰኝ ከApp Store",
+      "deductionFallback": "የክሬዲት ቅነሳ",
+      "emptyDescription": "የክሬዲት ግዢዎች፣ ደረሰኞች እና አጠቃቀም እዚህ ይታያሉ።",
+      "emptyTitle": "የክሬዲት ታሪክ የለም",
+      "googlePlayReceipt": "ደረሰኝ ከGoogle Play",
+      "kind": {
+        "adjustment": "ማስተካከያ",
+        "balanceNeutral": "ቀሪ ሂሳብን የማይቀይር",
+        "deduction": "ቅነሳ",
+        "grant": "የክሬዲት ስጦታ",
+        "purchase": "ግዢ"
+      },
+      "purchaseFallback": "የክሬዲት ግዢ",
+      "receipt": "ደረሰኝ",
+      "receiptA11y": "የ{{description}} ደረሰኝን ክፈት",
+      "receiptUnavailable": "ለዚህ ግዢ ደረሰኝ አይገኝም።"
+    },
     "title": "ክሬዲት ይግዙ",
     "description": "ክሬዲት በKilo App ውስጥ የAI ኮዲንግ ክፍለ-ጊዜዎችን ለማስኬድ ወደ Kilo ቀሪ ሂሳብዎ የሚጨመር የአንድ ጊዜ ግዢ ነው። መደብሩ ሂሳብዎን ይከፍላል፣ እና መደብሩ ክፍያውን ካረጋገጠ በኋላ ክሬዲት ይጨመራል።",
     "nextExpiry": "{{amount}} ክሬዲት በ{{date}} (UTC) ጊዜው ያበቃል። ቀድሞ ጊዜው የሚያበቃው ክሬዲት መጀመሪያ ጥቅም ላይ ይውላል።",
@@ -4051,6 +4316,70 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ይህን የፍለጋ ውጤት መክፈት አልተቻለም"
+  },
+  "usage": {
+    "title": "አጠቃቀም",
+    "orgTitle": "የድርጅት አጠቃቀም",
+    "entrySubtitle": "ወጪ፣ ጥያቄዎች እና ቶከኖች",
+    "rangePicker": "የጊዜ ክልል",
+    "range90d": "90 ቀናት",
+    "metricPicker": "የገበታ መለኪያ",
+    "chartA11y": "{{metric}} በቀን",
+    "avgCostPerRequest": "አማካይ ወጪ / ጥያቄ",
+    "topModels": "ዋና ሞዴሎች",
+    "topFeatures": "ዋና ባህሪያት",
+    "emptyTitle": "በዚህ ጊዜ ውስጥ ምንም አጠቃቀም የለም",
+    "orgSelfNotice": "በዚህ ድርጅት ውስጥ የራስዎን አጠቃቀም እያዩ ነው።",
+    "viewDetails": "የአጠቃቀም ዝርዝሮችን ይመልከቱ"
+  },
+  "integrations": {
+    "title": "ውህደቶች",
+    "sectionTitle": "የተገናኙ አገልግሎቶች",
+    "entrySubtitle": "GitHub፣ Slack፣ Linear እና ሌሎችም",
+    "subtitle": "የልማት መሣሪያዎችዎን እና የሥራ ሂደቶችዎን ከKilo ጋር ያገናኙ",
+    "emptyHint": "እስካሁን ምንም የተገናኘ ውህደት የለም።",
+    "disconnect": "ግንኙነት አቋርጥ",
+    "disconnectTitle": "የ{{provider}} ግንኙነት ይቋረጥ?",
+    "disconnectMessage": "Kilo በ{{provider}} ውስጥ ምላሽ መስጠት ያቆማል። በማንኛውም ጊዜ እንደገና ማገናኘት ይችላሉ።",
+    "connectedTo": "ከ{{account}} ጋር ተገናኝቷል",
+    "disconnected": "የ{{provider}} ግንኙነት ተቋርጧል",
+    "disconnectFailed": "የ{{provider}} ግንኙነትን ማቋረጥ አልተቻለም",
+    "couldNotLoad": "ውህደቶችን መጫን አልተቻለም",
+    "permissionDenied": "እነዚህን ውህደቶች የማስተዳደር ፈቃድ የለዎትም።",
+    "memberHint": "እነዚህን ግንኙነቶች ለመቀየር የድርጅቱን ባለቤት ወይም አስተዳዳሪ ይጠይቁ።",
+    "connectFailed": "የግንኙነት ገጹን መክፈት አልተቻለም"
+  },
+  "invoices": {
+    "personalEmptyDescription": "ክፍያ ከተጠየቀብዎ በኋላ ለራስዎ ግዢዎች የሚወጡ የክፍያ መጠየቂያዎች እዚህ ይታያሉ።"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "እስካሁን ምንም አጠቃቀም የለም",
+      "sharedWorkspace": "በዚህ የሥራ ቦታ ውስጥ ባሉ ሁሉም ውይይቶች የሚጋራ",
+      "currentRates": "የአሁኑ ዋጋዎች",
+      "perHour": "{{rate}}/ሰዓት",
+      "mediumSandbox": "መካከለኛ sandbox",
+      "largeSandbox": "ትልቅ sandbox",
+      "earlierActivity": "ቀደም ያለ እንቅስቃሴ",
+      "now": "አሁን",
+      "loadFailed": "የCompute ክፍያዎችን መጫን አልተቻለም።"
+    },
+    "preview": {
+      "title": "ቅድመ እይታ ክፈት",
+      "listeningServices": "የሚያዳምጡ አገልግሎቶች",
+      "empty": "ምንም የሚያዳምጡ አገልግሎቶች አልተገኙም። ወኪሉን የድር አገልጋይ እንዲያስጀምር ጠይቅ፣ ከዚያ አድስ።",
+      "notRunning": "ይህ sandbox ቆሟል። እንደገና ለማስጀመር ለወኪሉ መልዕክት ላክ።",
+      "notReady": "Sandbox ገና ዝግጁ አይደለም። ከተገናኘ በኋላ አድስ።",
+      "unsupported": "ለዚህ sandbox የአገልግሎት ፍለጋ አይገኝም።",
+      "failed": "አገልግሎቶችን ማግኘት አልተቻለም።",
+      "openService": "{{name}}ን በፖርት {{port}} ላይ ክፈት",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "ቀስቅሴዎች እና webhooks",
+      "subtitle": "የwebhook እና የታቀዱ ቀስቅሴዎችን በድር ላይ አስተዳድር።"
+    }
   },
   "sessionShare": {
     "title": "ክፍለ ጊዜውን አጋራ",

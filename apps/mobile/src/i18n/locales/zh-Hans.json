@@ -23,6 +23,10 @@
   },
   "common": {
     "deleteTitle": "删除 {{label}}？",
+    "manageOnWeb": "在网页上管理",
+    "creditHistory": "积分记录",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": "。",
     "listJoiner": "、",
     "cancel": "取消",
@@ -119,6 +123,7 @@
     "copyLink": "复制链接",
     "couldNotLoadOrganizations": "无法加载组织",
     "couldNotLoadSessions": "无法加载会话",
+    "couldnTLoad": "无法加载",
     "couldnTLoadMore": "无法加载更多内容",
     "deviceSessions": "登录设备",
     "disabled": "已禁用",
@@ -246,6 +251,10 @@
     "notAdded": "你已登录，但未能将 {{provider}} 添加到你的账户。"
   },
   "profile": {
+    "creditHistorySubtitle": "购买、收据和积分动态",
+    "invoicesSubtitle": "下载购买发票",
+    "manageBilling": "在 kilo.ai 管理账单",
+    "manageBillingIosNote": "付款方式、自动充值和账单详情请在 kilo.ai 上管理。",
     "codeReviewerSubtitle": "自动 PR 审查",
     "securityAgentSubtitle": "查找并修复漏洞",
     "reviews": "审查",
@@ -299,6 +308,7 @@
     "passkeyAdded": "已添加通行密钥。",
     "passkeyAddFailed": "无法添加通行密钥。请重试。",
     "passkeyAddUnsupported": "此设备无法创建通行密钥。",
+    "passkeyAddUnavailable": "通行密钥只能在网页浏览器中添加。",
     "passkeyAddCancelled": "通行密钥创建已取消。",
     "passkeyRemoved": "已移除通行密钥。",
     "passkeyRemoveFailed": "无法移除该通行密钥。请重试。",
@@ -331,7 +341,6 @@
     "providerKeys": {
       "title": "提供商密钥",
       "rowSubtitle": "使用你自己的提供商计费",
-      "manageOnWeb": "在网页上管理",
       "manageOnWebReason": "这些提供商需要结构化凭据。",
       "description": "通过这些密钥发出的请求将计入你的提供商账户，而不是从 Kilo 余额中扣除。",
       "enabled": "使用中",
@@ -760,6 +769,16 @@
       "changeRequestFailed": "Kilo 无法创建拉取请求。请稍后再试。",
       "proposalConflict": "此仓库的另一个审查记忆建议仍处于活跃状态，因此暂时无法保存此建议。",
       "offAction": "审查记忆已关闭。请开启后重试。",
+      "analyze": {
+        "title": "分析反馈",
+        "description": "选择一个最近有维护者回复的仓库，然后查找一种重复出现的指导模式。",
+        "chooseRepository": "选择仓库",
+        "action": "立即分析",
+        "noRepositories": "还没有任何仓库有维护者的最新回复。",
+        "proposed": "已创建审查记忆建议",
+        "noFeedback": "未找到此仓库的近期反馈",
+        "noPattern": "未发现明确的重复模式"
+      },
       "off": "审查记忆已关闭。",
       "on": "审查记忆已开启。",
       "offDescription": "启用审查记忆后，Kilo 可以从维护者的回复中学习，并为 REVIEW.md 提出审查准则建议。",
@@ -835,7 +854,63 @@
       "title": "代码审查器有问题需要处理",
       "recoveryLabel": "联系技术支持"
     },
-    "unknownError": "未知错误"
+    "unknownError": "未知错误",
+    "skipBotPullRequests": {
+      "title": "跳过来自机器人的拉取请求",
+      "subtitle": "不要对 Dependabot 或 Renovate 等机器人打开的拉取请求运行自动审查。关闭此选项即可连机器人的拉取请求一起审查。"
+    },
+    "repoModels": {
+      "title": "按仓库设置模型",
+      "description": "让部分仓库的审查使用不同的模型、思考强度或两者兼有。",
+      "defaultModel": "使用默认模型",
+      "resetLabel": "重置 {{repository}} 的模型",
+      "changeHint": "打开模型选择器"
+    },
+    "analytics": {
+      "title": "分析",
+      "trackedReviews": "已跟踪的审查",
+      "findingsRaised": "提出的问题",
+      "highImpactChanges": "高影响变更",
+      "impactPoints": "影响分",
+      "repositoryLine": "审查：{{reviews}} · 问题：{{findings}}",
+      "empty": "还没有带分析数据的审查",
+      "emptyDescription": "在组织启用分析期间，系统会记录已完成的审查。",
+      "off": "此组织已关闭分析。",
+      "couldNotLoad": "无法加载分析数据"
+    },
+    "council": {
+      "title": "评审团审查",
+      "subtitle": "多位专家分别审查每个拉取请求，他们的投票汇总为一个决定。",
+      "unavailable": "此组织无法使用评审团审查。",
+      "noRepositories": "尚未选择任何仓库。请先在仓库设置中选择仓库。",
+      "specialists": "专家",
+      "labels": "触发评审团审查的标签",
+      "labelsPlaceholder": "例如：评审团、深度审查",
+      "labelsDescription": "用逗号分隔标签。启用评审团的仓库随后只对带有至少一个上述标签的拉取请求运行评审团。留空则适用于所有符合条件的拉取请求。",
+      "tooManyLabels": "触发评审团审查的标签过多。最多可使用 {{maximum}} 个标签。",
+      "labelTooLong": "触发评审团审查的标签过长。每个标签不得超过 {{maximum}} 个字符。",
+      "minSpecialists": "请至少选择 {{minimum}} 位专家。已选择 {{selected}} 位。",
+      "specialistName": {
+        "testCoverage": "测试覆盖率",
+        "correctness": "正确性",
+        "custom": "专家"
+      },
+      "specialist": {
+        "security": "权限绕过、密钥处理和不安全的输入。",
+        "performance": "热路径、N+1 查询和大量内存分配。",
+        "testing": "新行为缺少覆盖或覆盖不足。",
+        "correctness": "逻辑错误、边界情况和竞态条件。",
+        "custom": "审查其自身领域内的问题。"
+      },
+      "strategy": {
+        "advisory": "建议性",
+        "advisoryDescription": "报告问题并投票，但不阻止合并。",
+        "unanimous": "全体一致",
+        "unanimousDescription": "任何专家报告严重问题时阻止合并。",
+        "majority": "多数决定",
+        "majorityDescription": "只有在多数专家报告严重问题时才阻止合并。"
+      }
+    }
   },
   "securityAgent": {
     "filter": {
@@ -1338,6 +1413,16 @@
       "auto": "自动",
       "shallow": "浅度",
       "deep": "深度"
+    },
+    "orphanedFindings": {
+      "title": "已移除仓库的问题",
+      "description": "这些仓库已无法通过 GitHub 集成访问。它们的问题仍会计入仪表板和报告。",
+      "count": "问题：{{count}}",
+      "clearLabel": "清除 {{repository}} 的问题",
+      "confirmTitle": "清除问题？",
+      "confirmMessage": "{{repository}} 的所有已记录问题都会被删除，且无法撤销。",
+      "confirmAction": "删除问题",
+      "cleared": "已清除问题：{{count}}"
     }
   },
   "agents": {
@@ -1517,6 +1602,7 @@
       "branchPlaceholder": "选择一个分支",
       "runOnWithTarget": "运行位置：{{target}}",
       "environment": "环境",
+      "cloudEnvironment": "云环境",
       "couldNotLoadEnvironment": "无法加载你的环境。",
       "retryLoadingEnvironment": "重新加载环境",
       "defaultEnvironment": "默认环境",
@@ -1577,6 +1663,89 @@
       "openSettingsToReview": "打开设置进行查看",
       "profileSelection": "配置文件选择",
       "profileLayerAccessibility": "{{label}}：{{detail}}"
+    },
+    "environment": {
+      "loadingEnvironments": "正在加载环境",
+      "couldNotLoadEnvironments": "无法加载环境",
+      "couldNotLoadEnvironmentsDetail": "请重试以加载此仓库的环境。",
+      "noEnvironment": "无环境",
+      "noEnvironmentDetail": "此会话将从基础镜像启动。",
+      "chooseEnvironment": "选择环境",
+      "chooseEnvironmentDetail": "此仓库有多个环境。",
+      "environmentAccessibility": "选择环境：{{label}}",
+      "environmentsForRepository": "{{repository}} 的环境",
+      "selectEnvironmentToStart": "请选择一个环境以开始。",
+      "buildDetails": "构建详情",
+      "buildNotBuilt": "未构建",
+      "buildUnavailableShort": "快照构建不可用",
+      "buildPreparing": "正在准备构建机",
+      "buildCloning": "正在克隆默认分支",
+      "buildSetup": "正在运行环境设置",
+      "buildCleanup": "正在移除构建凭据",
+      "buildCapturing": "正在捕获快照",
+      "buildPublishing": "正在发布快照",
+      "buildStopping": "正在停止构建机",
+      "buildStoppingRetrying": "正在停止构建机，正在重试",
+      "buildFinishing": "正在完成构建",
+      "buildSucceeded": "快照已就绪",
+      "buildSuperseded": "已被更新的构建取代",
+      "buildStale": "此快照生成后设置已更改",
+      "buildStaleAge": "快照已超过四天；下次会话将刷新它",
+      "buildStaleImage": "基于较早的沙盒镜像构建",
+      "failureClone": "无法克隆仓库。",
+      "failureSetup": "某个设置命令失败。请查看构建日志。",
+      "failureTimeout": "某个设置命令超时。请查看构建日志。",
+      "failureCleanup": "无法移除凭据，因此未生成快照。",
+      "failureCapture": "无法捕获快照。",
+      "failureCaptureUncertain": "快照结果已丢失；构建未发布。",
+      "failureDeadline": "构建未能按时完成。",
+      "failureBuilderLost": "构建机已停止报告状态。",
+      "failureBuilderStart": "构建机无法启动。",
+      "failureUnauthorized": "仓库访问权限已失效。",
+      "failureActorUnauthorized": "发起此构建的人员已无访问权限。",
+      "failureBilling": "构建需要可用额度。",
+      "failureBillingUnavailable": "计费系统无法接受此构建。请重试。",
+      "failureConfiguration": "构建期间配置已更改。",
+      "failureRuntime": "无法安装所选的运行时版本。",
+      "failureGeneric": "构建失败。",
+      "buildLogs": "构建日志",
+      "noBuildLogs": "暂无日志输出。",
+      "buildLogsLatestOnly": "显示最近保留的 500 行日志。",
+      "buildLogsTruncated": "后续输出已被截断。",
+      "couldNotLoadBuild": "无法加载构建状态",
+      "couldNotLoadBuildLogs": "无法加载构建日志",
+      "buildsUnavailable": "此环境无法使用快照构建。",
+      "onlyManagersCanBuild": "只有组织管理员可以构建快照。",
+      "waitForBuilder": "请等待构建机停止后再重新构建。",
+      "buildAction": "构建快照",
+      "refreshAction": "刷新快照",
+      "cancelBuildAction": "取消构建",
+      "buildStarted": "快照构建已开始",
+      "buildCanceled": "快照构建已取消",
+      "couldNotStartBuild": "无法开始构建",
+      "couldNotCancelBuild": "无法取消构建",
+      "sandbox": "沙盒",
+      "sandboxActive": "沙盒运行中",
+      "sandboxSleeping": "沙盒休眠中",
+      "sandboxStarting": "沙盒启动中",
+      "sandboxStopping": "沙盒停止中",
+      "sandboxError": "沙盒出错",
+      "sandboxUnreachable": "沙盒无法访问",
+      "sandboxStatusUnknown": "沙盒状态未知",
+      "sandboxChecked": "上次检查：{{when}}",
+      "sandboxDetailStopped": "发送消息即可恢复。",
+      "sandboxDetailFailed": "发送消息即可重试。",
+      "sandboxDetailConnection": "沙盒连接不可用。",
+      "sandboxDetailUnavailable": "沙盒状态暂时不可用。",
+      "sandboxDetailInsufficient": "信息不足，无法确认沙盒的当前状态。",
+      "sandboxDetailCheckNeeded": "沙盒最近未确认其健康状态。",
+      "startFresh": "重新开始",
+      "startFreshTitle": "要重新开始吗？",
+      "startFreshMessage": "这将丢弃于 {{when}} 捕获的工作区快照。该工作区中未提交的更改将会丢失。",
+      "startFreshMessageUnknown": "这将丢弃已保存的工作区快照（该快照无法读取）。该工作区中未提交的更改将会丢失。",
+      "startFreshDone": "工作区快照已移除。",
+      "couldNotRemoveSnapshot": "无法移除工作区快照。",
+      "snapshotCaptured": "工作区快照捕获于 {{when}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 个文件。",
@@ -1926,7 +2095,8 @@
       "cancelQueued": "取消消息",
       "cancelQueuedAccessibility": "取消已排队的消息",
       "restoreQueued": "恢复",
-      "restoreQueuedAccessibility": "将已取消的消息恢复到输入框"
+      "restoreQueuedAccessibility": "将已取消的消息恢复到输入框",
+      "noReplyRecorded": "未记录到对此消息的回复。"
     },
     "olderMessages": {
       "arrived": "已加载较早的消息",
@@ -2319,6 +2489,26 @@
     "onlyFirstFilesAttached_other": "仅附加前 {{displayCount}} 个文件。"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "账单记录",
+      "billingHistoryEmpty": "暂无账单记录。",
+      "cancel": "取消订阅",
+      "cancelDescription": "你的 Kilo Pass 将保持有效至当前计费周期结束，之后不再续订。",
+      "cancelScheduled": "将于 {{date}} 取消",
+      "cancelScheduledChange": "取消计划变更",
+      "cancelled": "已取消订阅",
+      "changePlan": "在 kilo.ai 更改方案",
+      "changePlanIosNote": "付费方案变更请前往 kilo.ai。",
+      "creditHistoryEmpty": "暂无 Kilo Pass 积分。",
+      "manageInStore": "在 {{store}} 中管理",
+      "resume": "恢复订阅",
+      "resumeCancelledDescription": "你的 Kilo Pass 将重新开始自动续订。",
+      "resumePausedDescription": "你的 Kilo Pass 将立即恢复，早于原定的恢复日期。",
+      "resumed": "订阅已恢复",
+      "scheduledChange": "计划变更",
+      "scheduledChangeCancelDescription": "你的 Kilo Pass 将保持当前方案，并照常续订。",
+      "scheduledChangeSummary": "{{date}} 变更为 {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass 暂不可用。",
     "couldNotLoad": "无法加载 Kilo Pass。请重试。",
@@ -2328,7 +2518,7 @@
     "subscriptionLoading": "Kilo Pass 订阅加载中",
     "retryHint": "重新获取 Kilo Pass 状态。",
     "cardAccessibility": "{{title}}。{{description}}。{{actionLabel}}",
-    "purchaseUnavailableEnded": "您的 Kilo Pass 已结束。",
+    "endedOn": "{{date}} 已结束",
     "notAvailableInApp": "Kilo Pass 在应用中不可用。",
     "statusActive": "生效中",
     "statusTrialing": "试用中",
@@ -2350,7 +2540,7 @@
     "kiloPassManagement": "Kilo Pass 管理",
     "kiloPassSetup": "Kilo Pass 设置",
     "opensManagementOnWeb": "打开 Kilo Pass 网页版管理页面。",
-    "tryAgainFromProfile": "从个人资料页重试。",
+    "loadFailedRetry": "请检查网络连接，然后重试。",
     "legalTermsOfUse": "使用条款（EULA）",
     "purchaseDifferentAccount": "此 App Store 购买项目未关联到你的 Kilo 账户。请使用购买时所用的 Apple Account 登录，然后重试。",
     "purchaseFailed": "未能完成购买。",
@@ -2373,6 +2563,11 @@
     "accountDescription": "你的 Kilo 账户 ID 和请求元数据，用于验证身份并统计用量。",
     "diagnosticsTitle": "应用诊断",
     "diagnosticsDescription": "移除应用内容后的崩溃和错误报告，用于保障应用稳定运行。",
+    "featureFlagsTitle": "功能逐步推出",
+    "featureFlagsDescription": "你的账户邮箱，PostHog 用它来决定你能看到哪些功能。",
+    "featureFlagsWhat": "你的账户邮箱。",
+    "featureFlagsWhy": "决定你能看到哪些功能，包括我们仍在逐步推出的功能。",
+    "featureFlagsWho": "PostHog，功能开关服务。",
     "helpImprove": "帮助改进 Kilo",
     "helpImproveDescription": "共享匿名的产品分析数据和安装来源。你可以随时在设置中更改此选项。",
     "seeFullDetails": "查看完整详情",
@@ -2988,6 +3183,36 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "审计日志",
+      "permissionDenied": "只有 Enterprise 套餐组织的所有者、管理员或账单管理员才能查看其审计日志。",
+      "emptyTitle": "暂无审计事件",
+      "emptyDescription": "此组织中执行的操作会显示在这里。",
+      "truncated": "仅显示最近的事件。"
+    },
+    "billing": {
+      "title": "账单",
+      "permissionDenied": "只有组织所有者、管理员或账单管理员才能查看组织账单。",
+      "subscription": "订阅",
+      "state": "状态",
+      "stateNone": "无订阅",
+      "statePastDue": "已逾期",
+      "stateCancelsAtPeriodEnd": "将于本期结束时取消",
+      "stateTrialEndsOn": "试用将于 {{date}} 结束",
+      "stateTrialing": "试用中",
+      "stateRenewsOn": "将于 {{date}} 续订",
+      "seatsDropTo": "将于 {{date}} 减至 {{seats}} 个席位",
+      "seats": "席位",
+      "autoTopUp": "自动充值",
+      "autoTopUpAmount": "充值金额",
+      "autoTopUpThreshold": "余额低于",
+      "manageOnWeb": "请在网页端进行更改",
+      "changePlan": "更改套餐",
+      "buySeats": "购买席位",
+      "setupAutoTopUp": "设置自动充值",
+      "webAddress": "网址 {{url}}",
+      "opensOnWeb": "在网页中打开"
+    },
     "boundary": {
       "backToProfile": "返回个人资料",
       "loadErrorMessage": "请检查网络连接后重试。",
@@ -2995,14 +3220,20 @@
       "loadErrorTitle": "无法加载你的组织列表",
       "membershipLostNotice": "你已无法访问此组织。已切换至 {{target}}。",
       "noOrganization": "无组织",
-      "noOrganizationDescription": "此账户不属于任何组织。请在网页版创建或加入组织，以使用成员邀请和低余额提醒等组织功能。",
-      "openWebOrganizations": "在网页版打开组织",
+      "noOrganizationDescription": "此账户不属于任何组织。创建一个组织即可使用邀请成员、低余额提醒等组织功能；如果你已受邀加入某个组织，也可以打开网页版加入。",
       "organizationUnavailable": "此组织不可用",
       "selectDescriptionWithOrganizations": "你属于一个或多个组织。请选择此屏幕应使用的账户。",
       "selectOrganization": "选择组织",
       "unavailableDescription": "此组织已不可用。请从账户选择器中选择其他账户后继续。",
       "unavailableSessionsDescription": "此组织已不可用。无法加载其会话。",
       "accessDeniedDescription": "你无权访问此组织。"
+    },
+    "create": {
+      "title": "创建组织",
+      "description": "组织可让你的团队共享额度、智能体和设置。",
+      "nameLabel": "组织名称",
+      "nameRequired": "请输入组织名称。",
+      "trialNote": "创建组织后，14 天的 Enterprise 试用即开始。套餐需在网页上购买。"
     },
     "creditActivity": {
       "emptyDescription": "此组织的充值、用量和额度调整记录将在这里显示。",
@@ -3124,6 +3355,21 @@
       "ownRoleChange": "您无法更改自己的角色。",
       "inviteExpired": "该邀请已过期。",
       "inviteAccepted": "该邀请已被接受。"
+    },
+    "settingsOnWeb": {
+      "title": "网页版组织设置",
+      "usageDetails": "用量详情",
+      "providersAndModels": "提供商和模型",
+      "groups": "群组",
+      "guardrails": "防护规则",
+      "byok": "自带密钥",
+      "ssoAndDomain": "SSO 和域名",
+      "emailPreferences": "邮件偏好设置",
+      "dataCollection": "数据收集",
+      "auditLogs": "审计日志",
+      "requestLogs": "请求日志",
+      "subOrganizations": "子组织",
+      "distributeFunds": "分配资金"
     },
     "usageStats": {
       "inputTokens": "输入词元",
@@ -3870,6 +4116,25 @@
     "importConfigApplied": "配置已导入"
   },
   "credits": {
+    "history": {
+      "activityUnavailable": "无法加载积分活动。",
+      "appStoreReceipt": "收据位于 App Store",
+      "deductionFallback": "积分扣除",
+      "emptyDescription": "积分购买、收据和使用情况将显示在这里。",
+      "emptyTitle": "暂无积分记录",
+      "googlePlayReceipt": "收据位于 Google Play",
+      "kind": {
+        "adjustment": "调整",
+        "balanceNeutral": "余额不变",
+        "deduction": "扣除",
+        "grant": "赠送积分",
+        "purchase": "购买"
+      },
+      "purchaseFallback": "积分购买",
+      "receipt": "收据",
+      "receiptA11y": "打开 {{description}} 的收据",
+      "receiptUnavailable": "此购买暂无可用收据。"
+    },
     "title": "购买额度",
     "description": "额度是一次性购买，会添加到你的 Kilo 余额中，用于在 Kilo App 中运行 AI 编程会话。商店会向你的账户收费，商店确认付款后额度才会到账。",
     "nextExpiry": "{{amount}} 的额度将于 {{date}}（UTC）到期。最早到期的额度会优先使用。",
@@ -3955,7 +4220,7 @@
       "sessionPullRequest": "会话 PR",
       "sessionPullRequestNumber": "会话 PR #{{number}}",
       "openSessionHint": "打开该会话。",
-      "unlinkSessionAction": "取消关联会话",
+      "unlinkSessionAction": "移除关联会话",
       "unlinkConfirmTitle": "取消关联 {{title}}？",
       "unlinkConfirmMessage": "会话本身不会被删除，只会移除它与该待办事项的关联。",
       "startNewSession": "开始新会话",
@@ -4051,6 +4316,70 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "无法打开此搜索结果"
+  },
+  "usage": {
+    "title": "用量",
+    "orgTitle": "组织用量",
+    "entrySubtitle": "费用、请求和词元",
+    "rangePicker": "时间范围",
+    "range90d": "90 天",
+    "metricPicker": "图表指标",
+    "chartA11y": "每日{{metric}}",
+    "avgCostPerRequest": "平均每次请求费用",
+    "topModels": "常用模型",
+    "topFeatures": "常用功能",
+    "emptyTitle": "此期间无用量",
+    "orgSelfNotice": "你看到的是你自己在此组织中的用量。",
+    "viewDetails": "查看用量详情"
+  },
+  "integrations": {
+    "title": "集成",
+    "sectionTitle": "已连接的服务",
+    "entrySubtitle": "GitHub、Slack、Linear 等",
+    "subtitle": "将你的开发工具和工作流连接到 Kilo",
+    "emptyHint": "尚未连接任何集成。",
+    "disconnect": "断开连接",
+    "disconnectTitle": "要断开 {{provider}} 的连接吗？",
+    "disconnectMessage": "Kilo 将不再在 {{provider}} 中响应。你可以随时重新连接。",
+    "connectedTo": "已连接到 {{account}}",
+    "disconnected": "已断开 {{provider}} 的连接",
+    "disconnectFailed": "无法断开 {{provider}} 的连接",
+    "couldNotLoad": "无法加载集成",
+    "permissionDenied": "你没有管理这些集成的权限。",
+    "memberHint": "请联系组织所有者或管理员更改这些连接。",
+    "connectFailed": "无法打开连接页面"
+  },
+  "invoices": {
+    "personalEmptyDescription": "产生扣费后，你个人购买的发票将显示在这里。"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "计算资源",
+      "noUsage": "暂无用量",
+      "sharedWorkspace": "由此工作区中的所有聊天共享",
+      "currentRates": "当前费率",
+      "perHour": "{{rate}}/小时",
+      "mediumSandbox": "中型沙盒",
+      "largeSandbox": "大型沙盒",
+      "earlierActivity": "更早的活动",
+      "now": "现在",
+      "loadFailed": "无法加载计算资源费用。"
+    },
+    "preview": {
+      "title": "打开预览",
+      "listeningServices": "监听中的服务",
+      "empty": "未找到监听中的服务。请让智能体启动一个 Web 服务器，然后刷新。",
+      "notRunning": "此沙盒已停止。向智能体发送一条消息即可重新启动。",
+      "notReady": "沙盒尚未就绪。连接后请刷新。",
+      "unsupported": "此沙盒不支持服务发现。",
+      "failed": "无法发现服务。",
+      "openService": "打开端口 {{port}} 上的 {{name}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "触发器和 Webhook",
+      "subtitle": "在网页上管理 Webhook 和定时触发器。"
+    }
   },
   "sessionShare": {
     "title": "分享会话",

@@ -1,31 +1,7 @@
-import { computeIssueMonth } from '@kilocode/web-shared/lib/kilo-pass/issuance';
+import { computeIssueMonth } from '@kilocode/web-shared/lib/kilo-pass/issue-month';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { captureException } from '@sentry/nextjs';
 import type Stripe from 'stripe';
-
-/**
- * Adds one month to an issue month string (YYYY-MM-01 format).
- */
-export function addOneMonthToIssueMonth(issueMonth: string): string {
-  const parsed = dayjs(`${issueMonth}T00:00:00.000Z`).utc();
-  if (!parsed.isValid()) {
-    throw new Error(`Invalid issueMonth: ${issueMonth}`);
-  }
-
-  return computeIssueMonth(parsed.add(1, 'month'));
-}
-
-/**
- * Gets the previous issue month from an issue month string (YYYY-MM-01 format).
- */
-export function getPreviousIssueMonth(issueMonth: string): string {
-  const parsed = dayjs(`${issueMonth}T00:00:00.000Z`).utc();
-  if (!parsed.isValid()) {
-    throw new Error(`Invalid issueMonth: ${issueMonth}`);
-  }
-
-  return computeIssueMonth(parsed.subtract(1, 'month'));
-}
 
 /**
  * Returns the period.start of the first subscription line item, which represents
@@ -116,88 +92,55 @@ export type SettledInvoicePaymentResolution =
       refundableTarget: RefundableSettlementTarget | null;
     };
 
+type ReusableInstrumentDetails = Partial<
+  Record<SupportedReusablePaymentMethodType, { fingerprint?: string | null } | null>
+>;
+
 function normalizedFingerprint(value: string | null | undefined): string | null {
   const fingerprint = value?.trim() ?? '';
   return fingerprint || null;
 }
 
+function toSupportedReusablePaymentMethodType(
+  type: string
+): SupportedReusablePaymentMethodType | null {
+  switch (type) {
+    case 'card':
+    case 'sepa_debit':
+    case 'us_bank_account':
+    case 'bacs_debit':
+    case 'au_becs_debit':
+      return type;
+    default:
+      return null;
+  }
+}
+
+function settleReusablePaymentMethod(
+  details: ReusableInstrumentDetails,
+  type: string
+): SettledInvoicePaymentMethod {
+  const paymentMethodType = toSupportedReusablePaymentMethodType(type);
+  if (!paymentMethodType) return { kind: 'without_supported_fingerprint' };
+
+  return {
+    kind: 'reusable',
+    paymentMethodType,
+    fingerprint: normalizedFingerprint(details[paymentMethodType]?.fingerprint),
+  };
+}
+
 function getReusablePaymentMethodResult(
   paymentMethod: Stripe.PaymentMethod
 ): SettledInvoicePaymentMethod {
-  switch (paymentMethod.type) {
-    case 'card':
-      return {
-        kind: 'reusable',
-        paymentMethodType: 'card',
-        fingerprint: normalizedFingerprint(paymentMethod.card?.fingerprint),
-      };
-    case 'sepa_debit':
-      return {
-        kind: 'reusable',
-        paymentMethodType: 'sepa_debit',
-        fingerprint: normalizedFingerprint(paymentMethod.sepa_debit?.fingerprint),
-      };
-    case 'us_bank_account':
-      return {
-        kind: 'reusable',
-        paymentMethodType: 'us_bank_account',
-        fingerprint: normalizedFingerprint(paymentMethod.us_bank_account?.fingerprint),
-      };
-    case 'bacs_debit':
-      return {
-        kind: 'reusable',
-        paymentMethodType: 'bacs_debit',
-        fingerprint: normalizedFingerprint(paymentMethod.bacs_debit?.fingerprint),
-      };
-    case 'au_becs_debit':
-      return {
-        kind: 'reusable',
-        paymentMethodType: 'au_becs_debit',
-        fingerprint: normalizedFingerprint(paymentMethod.au_becs_debit?.fingerprint),
-      };
-    default:
-      return { kind: 'without_supported_fingerprint' };
-  }
+  return settleReusablePaymentMethod(paymentMethod, paymentMethod.type);
 }
 
 function getReusableChargeResult(charge: Stripe.Charge): SettledInvoicePaymentMethod | null {
   const details = charge.payment_method_details;
   if (!details) return null;
 
-  switch (details.type) {
-    case 'card':
-      return {
-        kind: 'reusable',
-        paymentMethodType: 'card',
-        fingerprint: normalizedFingerprint(details.card?.fingerprint),
-      };
-    case 'sepa_debit':
-      return {
-        kind: 'reusable',
-        paymentMethodType: 'sepa_debit',
-        fingerprint: normalizedFingerprint(details.sepa_debit?.fingerprint),
-      };
-    case 'us_bank_account':
-      return {
-        kind: 'reusable',
-        paymentMethodType: 'us_bank_account',
-        fingerprint: normalizedFingerprint(details.us_bank_account?.fingerprint),
-      };
-    case 'bacs_debit':
-      return {
-        kind: 'reusable',
-        paymentMethodType: 'bacs_debit',
-        fingerprint: normalizedFingerprint(details.bacs_debit?.fingerprint),
-      };
-    case 'au_becs_debit':
-      return {
-        kind: 'reusable',
-        paymentMethodType: 'au_becs_debit',
-        fingerprint: normalizedFingerprint(details.au_becs_debit?.fingerprint),
-      };
-    default:
-      return { kind: 'without_supported_fingerprint' };
-  }
+  return settleReusablePaymentMethod(details, details.type);
 }
 
 function reportSettlementLookupFailure(params: {
@@ -396,13 +339,28 @@ export async function resolveSettledInvoicePayment(params: {
 }
 
 /**
+ * Gets the end date Stripe reports for a subscription as an ISO string, or null
+ * when Stripe reports neither `ended_at` nor `canceled_at`.
+ *
+ * For read paths: a pass whose provider date is unknown must not claim a date,
+ * so the caller can render "ended" without a day.
+ */
+export function getStripeReportedEndedAtIso(subscription: Stripe.Subscription): string | null {
+  const seconds = subscription.ended_at ?? subscription.canceled_at ?? null;
+  if (seconds === null) {
+    return null;
+  }
+  return dayjs.unix(seconds).utc().toISOString();
+}
+
+/**
  * Gets the ended_at timestamp from a Stripe subscription as an ISO string.
  * Falls back to current time if no ended_at or canceled_at is available.
+ *
+ * For write paths: a terminal subscription row that is stored needs a date, so
+ * the fallback applies here. A read path that would rather report no date uses
+ * `getStripeReportedEndedAtIso`.
  */
 export function getStripeEndedAtIso(subscription: Stripe.Subscription): string {
-  const seconds = subscription.ended_at ?? subscription.canceled_at ?? null;
-  if (seconds != null) {
-    return dayjs.unix(seconds).utc().toISOString();
-  }
-  return dayjs().utc().toISOString();
+  return getStripeReportedEndedAtIso(subscription) ?? dayjs().utc().toISOString();
 }

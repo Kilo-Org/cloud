@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as UniversalLinks from '@kilocode/app-shared/universal-links';
 
 import { redirectSystemPath } from './deep-link-handler';
+import { openExternalUrl } from './external-link';
 import {
   _resetDeepLinkLaunchForTests,
   _setGetLinkingURLForTests,
@@ -31,6 +32,10 @@ vi.mock('expo-router', () => ({
 vi.mock('@sentry/react-native', () => ({
   captureException: vi.fn(),
 }));
+
+// `openExternalUrl` reads the build-time `__DEV__` global this node project does
+// not define; the browser handoff only needs the call it makes.
+vi.mock('./external-link', () => ({ openExternalUrl: vi.fn() }));
 
 vi.mock('@kilocode/app-shared/universal-links', async importOriginal => {
   const actual = await importOriginal<typeof UniversalLinks>();
@@ -81,6 +86,52 @@ const MAPPED_CASES = [
   {
     path: 'https://app.kilo.ai/organizations/org_1/code-reviews/rev_9',
     href: '/(app)/code-reviewer/org_1/reviews/rev_9',
+  },
+  {
+    path: 'https://app.kilo.ai/credits',
+    href: '/(app)/(tabs)/(3_profile)/credit-history',
+  },
+  {
+    path: 'https://app.kilo.ai/usage',
+    href: '/(app)/usage',
+  },
+  {
+    path: 'https://app.kilo.ai/invoices',
+    href: '/(app)/(tabs)/(3_profile)/invoices',
+  },
+  {
+    path: 'https://app.kilo.ai/data-exports',
+    href: '/(app)/(tabs)/(3_profile)/data-export',
+  },
+  {
+    path: 'https://app.kilo.ai/byok',
+    href: '/(app)/(tabs)/(3_profile)/provider-keys',
+  },
+  {
+    path: 'https://app.kilo.ai/integrations',
+    href: '/(app)/(tabs)/(3_profile)/integrations',
+  },
+  {
+    path: 'https://app.kilo.ai/subscriptions/kilo-pass',
+    href: '/(app)/kilo-pass',
+  },
+  {
+    path: 'https://app.kilo.ai/security-agent/config',
+    href: '/(app)/security-agent/personal/settings',
+  },
+  {
+    path: 'https://app.kilo.ai/organizations/org_1/security-agent/config',
+    href: '/(app)/security-agent/org_1/settings',
+  },
+  {
+    // The org scope rides the query, the way the credit-activity link carries
+    // it, so the screen shows the organization the link names.
+    path: 'https://app.kilo.ai/organizations/org_1/integrations',
+    href: '/(app)/(tabs)/(3_profile)/integrations?org=org_1',
+  },
+  {
+    path: 'https://app.kilo.ai/organizations/org_1/usage-details',
+    href: '/(app)/(tabs)/(3_profile)/organization/usage?org=org_1',
   },
   {
     path: 'https://app.kilo.ai/s/share-token.abc-def',
@@ -177,6 +228,18 @@ describe('redirectSystemPath', () => {
       // A session-family capture the store cannot address names no session.
       'kiloapp://agent-chat/ses:1',
       'kiloapp:///(app)/agent-chat/ses:1',
+      // Sub-paths of the account pages the app owns at their root: the app has
+      // no per-service detail screen, so these stay on the web. A literal row
+      // matches exactly, so Android's filter never delivers them here.
+      // `/security-agent/<page>` is NOT in this list: that family is indexed for
+      // the phone's search, and `opensAppRoutePath` passes it through by design.
+      'https://app.kilo.ai/integrations/slack',
+      'https://app.kilo.ai/integrations/linear/reinstall',
+      'https://app.kilo.ai/subscriptions/kilo-pass/refer',
+      'https://app.kilo.ai/organizations/org_1/byok',
+      'https://app.kilo.ai/organizations/org_1/members',
+      'https://app.kilo.ai/organizations/org_1/payment-details',
+      'https://app.kilo.ai/organizations/org_1/integrations/linear',
     ])('ignores %s without navigate or stash', path => {
       for (const initial of [true, false]) {
         expect(redirectSystemPath({ path, initial })).toBeNull();
@@ -531,6 +594,119 @@ describe('redirectSystemPath', () => {
       expect(mod.getGitHubInstallReturnOutcome()).toEqual({ kind: 'success' });
       // Read clears the slot — subsequent reads return null.
       expect(mod.getGitHubInstallReturnOutcome()).toBeNull();
+    });
+  });
+});
+
+// Android's intent filter for the organization root also matches the two web
+// create pages (a `pathPattern` cannot exclude segments), so the app has to
+// hand them back to the browser instead of navigating nowhere.
+describe('organization pages the app has no screen for', () => {
+  it.each(['new', 'create'])(
+    'hands /organizations/%s to the browser instead of navigating',
+    async page => {
+      _resetDeepLinkLaunchForTests();
+      vi.mocked(openExternalUrl).mockClear();
+
+      const result = redirectSystemPath({
+        path: `https://app.kilo.ai/organizations/${page}`,
+        initial: false,
+      });
+
+      // Falsy, like every handled link: a truthy return re-dispatches the
+      // linking resolver and races our navigation.
+      expect(result).toBeNull();
+      await vi.waitFor(() => {
+        expect(openExternalUrl).toHaveBeenCalledWith(`https://app.kilo.ai/organizations/${page}`);
+      });
+      expect(getPendingDeepLink()).toBeNull();
+    }
+  );
+
+  it('still stashes the organization root itself', () => {
+    redirectSystemPath({ path: 'https://app.kilo.ai/organizations/org_1', initial: false });
+    expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)/organization/org_1');
+  });
+
+  // One tap is one browser tab: the layout's synchronous launch capture opens
+  // the page, and expo-router's cold redirect of the same launch URL must not
+  // open it a second time. The capture's opener is awaited first because both
+  // handoffs share one lazily imported module: two concurrent dynamic imports
+  // of it race in the test environment.
+  it.each(['new', 'create'])('opens /organizations/%s once on a cold launch', async page => {
+    _resetDeepLinkLaunchForTests();
+    vi.mocked(openExternalUrl).mockClear();
+    const url = `https://app.kilo.ai/organizations/${page}`;
+    _setGetLinkingURLForTests(() => url);
+
+    captureLaunchDeepLink();
+    await vi.waitFor(() => {
+      expect(openExternalUrl).toHaveBeenCalledTimes(1);
+    });
+
+    expect(redirectSystemPath({ path: url, initial: true })).toBe('/');
+
+    expect(openExternalUrl).toHaveBeenCalledTimes(1);
+    expect(openExternalUrl).toHaveBeenCalledWith(url);
+    expect(getPendingDeepLink()).toBeNull();
+  });
+
+  // The capture reads the raw launch URL while expo-router passes its own
+  // `path`; the same page can be spelled differently, so the skip compares the
+  // normalized browser URL rather than the raw strings.
+  it('does not open an app-scheme spelling of the captured page again', async () => {
+    _resetDeepLinkLaunchForTests();
+    vi.mocked(openExternalUrl).mockClear();
+    const normalized = 'https://app.kilo.ai/organizations/new';
+    _setGetLinkingURLForTests(() => 'kiloapp:///organizations/new');
+
+    captureLaunchDeepLink();
+    await vi.waitFor(() => {
+      expect(openExternalUrl).toHaveBeenCalledWith(normalized);
+    });
+    vi.mocked(openExternalUrl).mockClear();
+
+    expect(redirectSystemPath({ path: normalized, initial: true })).toBe('/');
+    expect(openExternalUrl).not.toHaveBeenCalled();
+  });
+
+  it('still opens a different create page on an initial redirect', async () => {
+    _resetDeepLinkLaunchForTests();
+    vi.mocked(openExternalUrl).mockClear();
+    _setGetLinkingURLForTests(() => 'https://app.kilo.ai/organizations/new');
+
+    captureLaunchDeepLink();
+    await vi.waitFor(() => {
+      expect(openExternalUrl).toHaveBeenCalledTimes(1);
+    });
+    vi.mocked(openExternalUrl).mockClear();
+
+    expect(
+      redirectSystemPath({ path: 'https://app.kilo.ai/organizations/create', initial: true })
+    ).toBe('/');
+    await vi.waitFor(() => {
+      expect(openExternalUrl).toHaveBeenCalledWith('https://app.kilo.ai/organizations/create');
+    });
+  });
+
+  // A warm arrival is a live tap of its own, never the cold launch again.
+  it('still opens a warm arrival after a captured launch handoff', async () => {
+    _resetDeepLinkLaunchForTests();
+    vi.mocked(openExternalUrl).mockClear();
+    const url = 'https://app.kilo.ai/organizations/new';
+    _setGetLinkingURLForTests(() => url);
+
+    captureLaunchDeepLink();
+    await vi.waitFor(() => {
+      expect(openExternalUrl).toHaveBeenCalledTimes(1);
+    });
+
+    expect(redirectSystemPath({ path: url, initial: true })).toBe('/');
+    expect(openExternalUrl).toHaveBeenCalledTimes(1);
+
+    expect(redirectSystemPath({ path: url, initial: false })).toBeNull();
+    await vi.waitFor(() => {
+      expect(openExternalUrl).toHaveBeenCalledTimes(2);
     });
   });
 });

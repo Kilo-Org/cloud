@@ -20,6 +20,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { formatNumber } from '@/lib/format';
 import {
   type CouncilConfig,
@@ -27,10 +28,12 @@ import {
   type ReviewerPlatform,
 } from '@/lib/code-reviewer-config';
 import {
+  councilSurface,
   parseRequiredLabels,
   specialistCopy,
   STRATEGY_DESCRIPTION_KEYS,
   STRATEGY_LABEL_KEYS,
+  wouldStarveCouncil,
 } from '@/lib/code-reviewer-council';
 import {
   useGitHubRepositories,
@@ -64,7 +67,13 @@ function CouncilScreen({
   // flag. A personal scope, an unentitled org, or a build older than the flag
   // never reaches the rows below. Bitbucket has no council on either client.
   const gate = useCouncilGate(scope);
-  const councilUiEnabled = gate.allowed && PLATFORM_CAPABILITIES[platform].council;
+  const capabilities = PLATFORM_CAPABILITIES[platform];
+  const surface = councilSurface({
+    pending: gate.pending,
+    allowed: gate.allowed,
+    platformSupportsCouncil: capabilities.council,
+  });
+  const councilUiEnabled = surface === 'editor';
   const config = useReviewConfig(scope, platform, { enabled: councilUiEnabled });
   const configBody = useReviewConfigBody(config, { restartable: councilUiEnabled });
   const save = useSaveReviewConfig(scope, platform);
@@ -102,18 +111,17 @@ function CouncilScreen({
     setLabelsText(savedLabels);
   }, [labelsBaseline, savedLabels]);
 
-  if (gate.pending || !gate.allowed) {
+  if (surface !== 'editor') {
     // An in-flight entitlement read keeps the surface blank rather than telling
     // an entitled organization that council is unavailable while it resolves;
-    // only a settled refusal shows that message.
-    const settledRefusal = !gate.pending && !gate.allowed;
+    // a settled refusal, or a platform without council, shows that message.
     return (
       <View className="flex-1 bg-background">
         <ReviewerHeader
           title={t('codeReviewer.council.title')}
           eyebrow={t('common.codeReviewer')}
         />
-        {settledRefusal || !PLATFORM_CAPABILITIES[platform].council ? (
+        {surface === 'unavailable' ? (
           <CenteredState contentContainerClassName="px-6">
             <Text className="text-center text-xs text-muted-foreground">
               {t('codeReviewer.council.unavailable')}
@@ -154,6 +162,18 @@ function CouncilScreen({
   };
 
   const setSpecialistEnabled = (id: string, value: boolean) => {
+    if (wouldStarveCouncil(council, id, value)) {
+      // The web form refuses the equivalent save; a per-toggle screen has to
+      // refuse the toggle itself, or it stores a council that is switched on
+      // and below the voting minimum, which never runs.
+      announcingToast.error(
+        t('codeReviewer.council.minSpecialists', {
+          minimum: formatNumber(COUNCIL_MIN_SPECIALISTS, i18n.language),
+          selected: formatNumber(enabledSpecialistCount(council) - 1, i18n.language),
+        })
+      );
+      return;
+    }
     if (council.specialists.some(specialist => specialist.id === id)) {
       writeCouncil({
         ...council,

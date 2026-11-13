@@ -1,0 +1,260 @@
+/* eslint-disable max-lines -- one mounted suite covers the council route's gate and its specialist guard */
+
+// Two surfaces of the council route:
+// 1. the gate. A platform the server refuses to store council for (Bitbucket)
+//    must read as unavailable, never as an editor whose saves are discarded.
+// 2. the specialist minimum. Disabling specialists below `COUNCIL_MIN_SPECIALISTS`
+//    would persist `enabled: true` on a council that `isCouncilActive` never
+//    runs, so the toggle that would cross that line must not write.
+
+import { createElement, type ReactNode } from 'react';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+
+import '@/i18n';
+import { act } from '@/test/renderer';
+import { renderWithProviders } from '@/test/render-with-providers';
+
+import CouncilRoute from './council';
+
+type ToggleProps = {
+  title: string;
+  value: boolean;
+  disabled?: boolean;
+  onValueChange?: (value: boolean) => void;
+};
+
+type SaveMutation = { mutate: Mock; isPending: boolean };
+
+type SavedPatch = { council?: { specialists: { id: string; enabled: boolean }[] } };
+
+const state = vi.hoisted(() => ({
+  scope: 'org-1',
+  platform: 'github' as 'github' | 'gitlab' | 'bitbucket',
+  gate: { allowed: true, pending: false },
+  configEnabled: [] as boolean[],
+  config: { data: null as unknown, isFetching: false, isError: false, refetch: vi.fn() },
+  save: { mutate: vi.fn(), isPending: false } as SaveMutation,
+  toastErrors: [] as string[],
+  toggleProps: [] as ToggleProps[],
+  patches: [] as SavedPatch[],
+}));
+
+const specialists = vi.hoisted(() => [
+  { id: 'security', role: 'security', name: 'Security', enabled: true, required: false, lens: '' },
+  {
+    id: 'performance',
+    role: 'performance',
+    name: 'Performance',
+    enabled: true,
+    required: false,
+    lens: '',
+  },
+  {
+    id: 'testing',
+    role: 'testing',
+    name: 'Test coverage',
+    enabled: false,
+    required: false,
+    lens: '',
+  },
+]);
+
+vi.mock('react-native', () => ({
+  View: 'View',
+  Text: 'Text',
+  Platform: { OS: 'android' },
+  useColorScheme: () => 'light',
+}));
+vi.mock('expo-router', () => ({ useNavigation: () => ({ isFocused: () => true }) }));
+vi.mock('@/lib/hooks/use-reviewer-route-params', () => ({
+  useReviewerRouteParams: () => ({ scope: state.scope, platform: state.platform }),
+}));
+vi.mock('@/lib/hooks/use-reviewer-council', () => ({
+  useCouncilGate: () => state.gate,
+  defaultCouncilConfig: () => specialists.map(entry => ({ ...entry })),
+  enabledSpecialistCount: (council: { specialists: { enabled: boolean }[] }) =>
+    council.specialists.filter(entry => entry.enabled).length,
+}));
+vi.mock('@/lib/hooks/use-code-reviewer', () => ({
+  useReviewConfig: (_scope: string, _platform: string, options?: { enabled?: boolean }) => {
+    state.configEnabled.push(options?.enabled ?? true);
+    return state.config;
+  },
+  useSaveReviewConfig: () => state.save,
+  useReviewerPermission: () => ({ status: 'ready', canEdit: true }),
+  useGitHubRepositories: () => ({
+    data: { repositories: [{ id: 1, fullName: 'kilo/app' }] },
+    isLoading: false,
+    isError: false,
+  }),
+  useGitLabRepositories: () => ({ data: { repositories: [] }, isLoading: false, isError: false }),
+}));
+vi.mock('@/lib/hooks/use-review-config-body', () => ({
+  useReviewConfigBody: () => ({ body: { status: 'ready' } }),
+  reviewConfigFailure: () => null,
+}));
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: {
+    error: (message: string) => {
+      state.toastErrors.push(message);
+    },
+    success: vi.fn(),
+    warning: vi.fn(),
+  },
+}));
+vi.mock('@/components/code-reviewer/reviewer-header', () => ({ ReviewerHeader: 'ReviewerHeader' }));
+vi.mock('@/components/code-reviewer/reviewer-error-screen', () => ({
+  ReviewerErrorScreen: 'ReviewerErrorScreen',
+}));
+vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
+vi.mock('@/components/centered-state', () => ({
+  CenteredState: (props: { children?: ReactNode }) =>
+    createElement('CenteredState', null, props.children),
+}));
+vi.mock('@/components/security-agent/settings-toggle-row', () => ({
+  ToggleRow: (props: ToggleProps) => {
+    state.toggleProps.push(props);
+    return createElement('ToggleRow', props);
+  },
+}));
+vi.mock('@/components/ui/choice-row', () => ({
+  ChoiceRow: (props: { label: string; selected: boolean; onPress?: () => void }) =>
+    createElement('ChoiceRow', props),
+}));
+vi.mock('@/components/ui/radio-group', () => ({
+  RadioGroup: (props: { children?: ReactNode }) =>
+    createElement('RadioGroup', null, props.children),
+}));
+vi.mock('@/components/ui/input', () => ({ Input: 'TextInput' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/tab-screen', () => ({
+  TabScreenScrollView: (props: { children?: ReactNode }) =>
+    createElement('ScrollView', null, props.children),
+}));
+
+let renderer: Awaited<ReturnType<typeof renderWithProviders>>['renderer'];
+
+const renderedTexts = () =>
+  renderer.root
+    .findAll(node => String(node.type) === 'Text')
+    .flatMap(node => node.props.children as unknown[])
+    .filter((value): value is string => typeof value === 'string');
+
+const specialistToggle = (title: string) =>
+  state.toggleProps.filter(props => props.title === title).at(-1);
+
+beforeEach(() => {
+  state.scope = 'org-1';
+  state.platform = 'github';
+  state.gate.allowed = true;
+  state.gate.pending = false;
+  state.configEnabled.length = 0;
+  state.toggleProps.length = 0;
+  state.toastErrors.length = 0;
+  state.save.mutate.mockReset();
+  state.save.mutate.mockImplementation((patch: SavedPatch) => {
+    state.patches.push(patch);
+  });
+  state.patches.length = 0;
+  state.save.isPending = false;
+  state.config.data = {
+    council: {
+      enabled: true,
+      aggregation_strategy: 'advisory',
+      specialists: specialists.map(entry => ({ ...entry })),
+    },
+    selectedRepositoryIds: [1],
+    councilEnabledRepositoryIds: [],
+  };
+});
+
+describe('council route gate', () => {
+  it('refuses Bitbucket for an entitled organisation instead of painting the editor', async () => {
+    state.platform = 'bitbucket';
+
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    renderer = mounted.renderer;
+    await act(async () => undefined);
+
+    expect(renderedTexts()).toContain('Council review is not available for this organization.');
+    expect(renderer.root.findAll(node => String(node.type) === 'ToggleRow')).toHaveLength(0);
+    // The config read is what the editor needs; a refused platform never asks.
+    expect(state.configEnabled).toEqual([false]);
+
+    mounted.unmount();
+  });
+
+  it('paints the editor for a supported, entitled organisation', async () => {
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    renderer = mounted.renderer;
+    await act(async () => undefined);
+
+    expect(renderedTexts()).not.toContain('Council review is not available for this organization.');
+    expect(state.configEnabled).toContain(true);
+
+    mounted.unmount();
+  });
+
+  it('keeps the surface blank while the entitlement read resolves', async () => {
+    state.gate.allowed = false;
+    state.gate.pending = true;
+
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    renderer = mounted.renderer;
+    await act(async () => undefined);
+
+    expect(renderedTexts()).not.toContain('Council review is not available for this organization.');
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
+      0
+    );
+
+    mounted.unmount();
+  });
+});
+
+describe('council specialist minimum', () => {
+  it('does not save the toggle that would leave an enabled council below the minimum', async () => {
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    renderer = mounted.renderer;
+    await act(async () => undefined);
+
+    await act(async () => {
+      specialistToggle('Performance')?.onValueChange?.(false);
+    });
+
+    expect(state.save.mutate).not.toHaveBeenCalled();
+    expect(state.toastErrors).toHaveLength(1);
+    expect(state.toastErrors[0]).toContain('Select at least 2 specialists');
+
+    mounted.unmount();
+  });
+
+  it('saves a specialist toggle while enough voters stay enabled', async () => {
+    state.config.data = {
+      council: {
+        enabled: true,
+        aggregation_strategy: 'advisory',
+        specialists: specialists.map(entry => ({ ...entry, enabled: true })),
+      },
+      selectedRepositoryIds: [1],
+      councilEnabledRepositoryIds: [],
+    };
+
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    renderer = mounted.renderer;
+    await act(async () => undefined);
+
+    await act(async () => {
+      specialistToggle('Performance')?.onValueChange?.(false);
+    });
+
+    expect(state.save.mutate).toHaveBeenCalledTimes(1);
+    expect(
+      state.patches[0]?.council?.specialists.find(entry => entry.id === 'performance')?.enabled
+    ).toBe(false);
+    expect(state.toastErrors).toHaveLength(0);
+
+    mounted.unmount();
+  });
+});

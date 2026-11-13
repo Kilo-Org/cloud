@@ -1,5 +1,6 @@
 import {
   COUNCIL_MAX_REQUIRED_LABELS,
+  COUNCIL_MIN_SPECIALISTS,
   COUNCIL_REQUIRED_LABEL_MAX_LENGTH,
   type CouncilAggregationStrategy,
 } from '@kilocode/app-shared/code-review';
@@ -45,6 +46,54 @@ export type SpecialistCopy = typeof CUSTOM_SPECIALIST_COPY;
  */
 export function specialistCopy(id: string): SpecialistCopy {
   return SPECIALIST_COPY.find(entry => entry.id === id) ?? CUSTOM_SPECIALIST_COPY;
+}
+
+/** What the council route paints. */
+export type CouncilSurface = 'loading' | 'unavailable' | 'editor';
+
+/**
+ * Decides the council route's body. A platform that has no council is a
+ * refusal on the same footing as an unentitled organization: the org PATCH
+ * drops council fields for it, so an editor opened there could not persist what
+ * it showed, whatever the entitlement read says.
+ */
+export function councilSurface(input: {
+  pending: boolean;
+  allowed: boolean;
+  platformSupportsCouncil: boolean;
+}): CouncilSurface {
+  if (!input.platformSupportsCouncil) {
+    return 'unavailable';
+  }
+  if (input.pending) {
+    return 'loading';
+  }
+  return input.allowed ? 'editor' : 'unavailable';
+}
+
+/**
+ * Whether turning a specialist off would leave a council that is switched on
+ * with fewer voters than it needs. `isCouncilActive` requires the minimum, so
+ * persisting that state would store `enabled: true` on a council that never
+ * runs: the switch would read on while every repository got a plain review.
+ * The web form blocks the equivalent save.
+ */
+export function wouldStarveCouncil(
+  council: Readonly<{
+    enabled: boolean;
+    specialists: readonly Readonly<{ id: string; enabled: boolean }>[];
+  }>,
+  specialistId: string,
+  nextEnabled: boolean
+): boolean {
+  if (!council.enabled || nextEnabled) {
+    return false;
+  }
+  const enabled = council.specialists.filter(specialist => specialist.enabled);
+  if (!enabled.some(specialist => specialist.id === specialistId)) {
+    return false;
+  }
+  return enabled.length - 1 < COUNCIL_MIN_SPECIALISTS;
 }
 
 export const STRATEGY_LABEL_KEYS = {

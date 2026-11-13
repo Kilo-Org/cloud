@@ -223,28 +223,37 @@ export function lastVisibleMessageFailure({
 
 /**
  * The prompt a stored transcript ends on with nothing answering it, or `null`
- * when the transcript ends on anything else.
+ * when anything follows it.
  *
- * Only a read-only session's record can be read this way: a stored user row
- * carries no delivery state, so the record cannot say whether the turn failed
- * to send or the agent answered and the answer was never stored. It can say
- * that no reply follows the prompt. A live session's prompt at the end is
- * simply in flight, and its own delivery states say what happened to it.
+ * The stored rows decide first: only a user row can end this way, so an
+ * assistant row that renders nothing — a reasoning-only answer, or one whose
+ * parts are hidden — still counts as a recorded response and suppresses the
+ * note. A delivery state on that row already states itself through the queued
+ * badge or the failure footer, so it suppresses the note too.
  *
- * The merged transcript decides, so an assistant row, a preparation group or a
- * condensed tool run that follows the prompt suppresses the note. A row that
- * carries a delivery state already states itself through the queued badge or
- * the failure footer.
+ * The merged transcript then has the last word on what sits below the prompt: a
+ * preparation group triggered by it states the turn's own failure, and a prompt
+ * the read-only transcript drops as unrenderable has no row to attach a note to.
+ *
+ * Only a read-only session's record can be read this way. A stored user row
+ * carries no delivery state, so the record cannot say whether the turn failed to
+ * send or the agent answered and the answer was never stored. It can say that no
+ * reply follows the prompt. A live session's prompt at the end is simply in
+ * flight, and its own delivery states say what happened to it.
  */
 export function unansweredPromptMessageId(
+  messages: readonly StoredMessage[],
   transcript: readonly SessionTranscriptItem[],
   deliveryStates: ReadonlyMap<string, MessageDeliveryState>
 ): string | null {
-  const last = transcript.at(-1);
-  if (last?.type !== 'message' || last.message.info.role !== 'user') {
+  const lastMessage = messages.at(-1);
+  if (lastMessage?.info.role !== 'user' || deliveryStates.has(lastMessage.info.id)) {
     return null;
   }
-  return deliveryStates.has(last.message.info.id) ? null : last.message.info.id;
+  const lastItem = transcript.at(-1);
+  return lastItem?.type === 'message' && lastItem.message.info.id === lastMessage.info.id
+    ? lastMessage.info.id
+    : null;
 }
 
 /**

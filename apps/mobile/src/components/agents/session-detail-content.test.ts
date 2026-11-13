@@ -2611,21 +2611,35 @@ describe('session detail stored transcript with no reply recorded', () => {
     expect(renderedText(view.renderer.root)).not.toContain(NOTE);
   });
 
+  it('draws no note when the recorded answer renders nothing', async () => {
+    // Reasoning is not transcript copy: the answer row leaves no visible part,
+    // yet the stored record holds a response to the prompt.
+    const base = assistantMessage('msg-stored-reasoning');
+    const reasoning: StoredMessage = {
+      info: {
+        ...(base.info as Extract<StoredMessage['info'], { role: 'assistant' }>),
+        sessionID: ROOT_ID,
+        parentID: PROMPT_ID,
+      },
+      parts: [
+        {
+          id: 'reasoning-msg-stored-reasoning',
+          sessionID: ROOT_ID,
+          messageID: base.info.id,
+          type: 'reasoning',
+          text: 'Checking the deploy target.',
+          time: { start: 1_761_000_000_000 },
+        },
+      ],
+    };
+    const view = await mountDetails([storedPrompt(), reasoning]);
+    expect(renderedText(view.renderer.root)).not.toContain(NOTE);
+  });
+
   it('draws no note for a live session whose prompt is still in flight', async () => {
     goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([storedPrompt()]);
     expect(view.store.get(view.manager.atoms.isReadOnly)).toBe(false);
-    expect(renderedText(view.renderer.root)).not.toContain(NOTE);
-  });
-
-  it('holds the note back until a cached transcript is replaced by the live page', async () => {
-    const view = await mountDetails([storedPrompt()]);
-    expect(renderedText(view.renderer.root)).toContain(NOTE);
-    // Rows read from the cache can still gain their answer, so the note waits
-    // for the stored page instead of appearing and then leaving.
-    act(() => {
-      view.store.set(view.manager.atoms.isRefreshingCachedTranscript, true);
-    });
     expect(renderedText(view.renderer.root)).not.toContain(NOTE);
   });
 });

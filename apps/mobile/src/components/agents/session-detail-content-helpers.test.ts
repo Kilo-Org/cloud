@@ -148,6 +148,14 @@ describe('unansweredPromptMessageId', () => {
   /** No live transport: a stored transcript's rows carry no delivery state. */
   const noDeliveryStates = new Map<string, MessageDeliveryState>();
 
+  function answer(): StoredMessage {
+    const message = withParent(assistantMessage('m-answer'), 'm-prompt');
+    message.parts = [
+      { id: 'm-answer-text', sessionID: 'ses_1', messageID: 'm-answer', type: 'text', text: 'ok' },
+    ];
+    return message;
+  }
+
   function attemptAfter(triggerMessageId: string): PreparationAttempt {
     return {
       id: 'prep-1',
@@ -160,43 +168,45 @@ describe('unansweredPromptMessageId', () => {
   }
 
   it('names the prompt a stored transcript ends on with nothing answering it', () => {
-    const prompt = userMessage('m-prompt');
-    expect(unansweredPromptMessageId(mergeSessionTranscript([prompt], []), noDeliveryStates)).toBe(
-      'm-prompt'
-    );
+    const rows = [userMessage('m-prompt')];
+    expect(
+      unansweredPromptMessageId(rows, mergeSessionTranscript(rows, []), noDeliveryStates)
+    ).toBe('m-prompt');
   });
 
-  it('names nothing once an assistant row follows the prompt', () => {
-    const prompt = userMessage('m-prompt');
-    const answer = withParent(assistantMessage('m-answer'), 'm-prompt');
-    answer.parts = [
-      { id: 'm-answer-text', sessionID: 'ses_1', messageID: 'm-answer', type: 'text', text: 'ok' },
-    ];
+  it('names nothing once an assistant row answers the prompt', () => {
+    const rows = [userMessage('m-prompt'), answer()];
     expect(
-      unansweredPromptMessageId(mergeSessionTranscript([prompt, answer], []), noDeliveryStates)
+      unansweredPromptMessageId(rows, mergeSessionTranscript(rows, []), noDeliveryStates)
+    ).toBeNull();
+  });
+
+  it('names nothing when the response recorded after the prompt renders nothing', () => {
+    // A reasoning-only or hidden answer is still a recorded response. The
+    // transcript drops its row, but the stored rows say the turn was answered.
+    const rows = [userMessage('m-prompt'), withParent(assistantMessage('m-reasoning'), 'm-prompt')];
+    expect(mergeSessionTranscript(rows, [])).toHaveLength(1);
+    expect(
+      unansweredPromptMessageId(rows, mergeSessionTranscript(rows, []), noDeliveryStates)
     ).toBeNull();
   });
 
   it('names nothing when the turn ended in a preparation group', () => {
-    const prompt = userMessage('m-prompt');
-    const transcript = mergeSessionTranscript([prompt], [attemptAfter('m-prompt')]);
-    expect(unansweredPromptMessageId(transcript, noDeliveryStates)).toBeNull();
+    const rows = [userMessage('m-prompt')];
+    const transcript = mergeSessionTranscript(rows, [attemptAfter('m-prompt')]);
+    expect(unansweredPromptMessageId(rows, transcript, noDeliveryStates)).toBeNull();
   });
 
   it('names nothing for a prompt that carries a delivery state', () => {
     // A queued or failed row already states itself through the badge or the
     // failure footer, so a second statement would describe the same turn twice.
-    const prompt = userMessage('m-prompt');
+    const rows = [userMessage('m-prompt')];
     const queued = new Map<string, MessageDeliveryState>([['m-prompt', { status: 'queued' }]]);
-    expect(unansweredPromptMessageId(mergeSessionTranscript([prompt], []), queued)).toBeNull();
+    expect(unansweredPromptMessageId(rows, mergeSessionTranscript(rows, []), queued)).toBeNull();
   });
 
-  it('names nothing for a transcript that ends on an assistant row or holds no rows', () => {
-    const answer = assistantMessage('m-answer');
-    expect(
-      unansweredPromptMessageId(mergeSessionTranscript([answer], []), noDeliveryStates)
-    ).toBeNull();
-    expect(unansweredPromptMessageId([], noDeliveryStates)).toBeNull();
+  it('names nothing for an empty stored transcript', () => {
+    expect(unansweredPromptMessageId([], [], noDeliveryStates)).toBeNull();
   });
 });
 

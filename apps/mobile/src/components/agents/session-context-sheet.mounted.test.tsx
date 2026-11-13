@@ -674,6 +674,21 @@ describe('SessionContextSheet copy row touch targets', () => {
   );
 });
 
+describe('SessionContextSheet view changes row touch target', () => {
+  it('renders the view changes row on the shared full target', async () => {
+    // It kept a 44 dp frame between two 48 dp copy rows, so one action list
+    // used two row heights — visible the moment a row gets a pressed fill.
+    const renderer = await mountSheet();
+    const target = findByType(renderer.root, 'Pressable').find(
+      node => node.props.testID === 'session-context-sheet-view-changes'
+    );
+    expect(target?.props.accessibilityRole).toBe('button');
+    expect(target?.props.className).toContain(ROW_TARGET_CLASS);
+    expect(target?.props.className).not.toContain('min-h-[44px]');
+    await unmount(renderer);
+  });
+});
+
 describe('SessionContextSheet connection row', () => {
   it.each([
     { display: 'connected' as const, copy: 'common.connected' },

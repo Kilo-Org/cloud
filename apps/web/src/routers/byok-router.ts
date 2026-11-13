@@ -81,6 +81,7 @@ import {
 import { parseAwsBedrockCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/bedrock-byok';
 import { parseGcpVertexCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/vertex-byok';
 import { isExperimentalByokEnabled } from '@/lib/byok/experimental-byok';
+import { ADD_BYOK_PROVIDERS, getByokProviderDisplayName } from '@/lib/byok/provider-names';
 import { sortByokKeysInRouteOrder } from '@kilocode/web-shared/lib/ai-gateway/byok/route-order';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 
@@ -182,7 +183,7 @@ async function toBYOKApiKeyResponse(
   const serveCatalogModels = servesCatalogModels(settings);
   return {
     ...key,
-    provider_name: key.provider_id,
+    provider_name: getByokProviderDisplayName(key.provider_id),
     serve_catalog_models: serveCatalogModels,
     supports_catalog_mode: supportsCatalog,
     // An enabled key can always leave catalog mode, even after its provider loses its mappings.
@@ -357,6 +358,25 @@ export const byokRouter = createTRPCRouter({
       // Map provider_id to provider_name (will be enhanced in UI with actual provider names)
       return Promise.all(
         inRouteOrder(keys).map(key => toBYOKApiKeyResponse(key, organizationRole))
+      );
+    }),
+
+  /**
+   * The providers a key can be added for, in the add form's order. Resolved on
+   * the server so every client offers the same list and validation: the mobile
+   * picker and the web select read this one query instead of each carrying a
+   * copy of the provider table.
+   */
+  listProviders: baseProcedure
+    .input(ListBYOKKeysInputSchema)
+    .output(z.array(z.object({ id: UserByokProviderIdSchema, name: z.string() })))
+    .query(async ({ input, ctx }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const experimentalByokEnabled = await isExperimentalByokEnabled(input.organizationId);
+      return ADD_BYOK_PROVIDERS.filter(
+        provider => experimentalByokEnabled || !isExperimentalByokProviderId(provider.id)
       );
     }),
 

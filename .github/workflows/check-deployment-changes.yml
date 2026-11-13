@@ -145,8 +145,35 @@ jobs:
             echo "Last completed release: \`$base_sha\`" >> "$GITHUB_STEP_SUMMARY"
           fi
 
-          if git diff --quiet "$base_sha" "$target_sha" -- . ':(exclude)apps/mobile'; then
-            echo "No deployment needed: only mobile files changed." >> "$GITHUB_STEP_SUMMARY"
+          # Exclusion list: a diff that touches only paths no deployed artifact
+          # reads skips the release. An unknown path still deploys. The list
+          # tracks the Vercel callers (stage-vercel-deployment.yml) and the
+          # worker discovery in deploy-workers.yml (find services -name
+          # wrangler.jsonc): apps/web, apps/ai-gateway,
+          # apps/ai-gateway-secure-proxy, packages, services, and the root
+          # build inputs stay deploy-triggering. A skipped commit stays in the
+          # next real release: base_sha is the last recorded deployment, so the
+          # next deployment's diff absorbs it.
+          if git diff --quiet "$base_sha" "$target_sha" -- . \
+            ':(exclude)apps/mobile' \
+            ':(exclude)apps/extension' \
+            ':(exclude)apps/storybook' \
+            ':(exclude)*.md' \
+            ':(exclude).github' \
+            ':(exclude)dev' \
+            ':(exclude)tools' \
+            ':(exclude)scripts' \
+            ':(exclude)script' \
+            ':(exclude)docs' \
+            ':(exclude).specs' \
+            ':(exclude).agents' \
+            ':(exclude).kilo' \
+            ':(exclude).kfab' \
+            ':(exclude).vscode' \
+            ':(exclude).cursor' \
+            ':(exclude).husky' \
+            ':(exclude).plans'; then
+            echo "No deployment needed: only files outside the deploy inputs changed." >> "$GITHUB_STEP_SUMMARY"
             echo "should_deploy=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi

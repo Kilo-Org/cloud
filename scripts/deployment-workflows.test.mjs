@@ -471,10 +471,36 @@ test('successful main CI selects the tested deployment SHA', () => {
   assert.match(check.run, /git merge-base --is-ancestor "\$sha" "\$ancestor_ref"/);
   assert.match(check.run, /git hash-object -t tree \/dev\/null/);
   assert.match(check.run, /git merge-base --is-ancestor "\$base_sha" "\$target_sha"/);
+  const predicate = check.run.replace(/\\\n\s*/g, ' ');
   assert.match(
-    check.run,
-    /git diff --quiet "\$base_sha" "\$target_sha" -- \. ':\(exclude\)apps\/mobile'/
+    predicate,
+    /git diff --quiet "\$base_sha" "\$target_sha" -- \.( +':\(exclude\)[\w.*\/-]+')+; then/
   );
+  for (const excluded of [
+    'apps/mobile',
+    'apps/extension',
+    'apps/storybook',
+    '*.md',
+    '.github',
+    'dev',
+    'tools',
+    'scripts',
+    'script',
+    'docs',
+    '.specs',
+    '.agents',
+    '.kilo',
+    '.kfab',
+    '.vscode',
+    '.cursor',
+    '.husky',
+    '.plans',
+  ]) {
+    assert.match(
+      predicate,
+      new RegExp(`':\\(exclude\\)${excluded.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'`)
+    );
+  }
   assert.match(check.run, /should_deploy=false/);
   assert.match(
     check.run,
@@ -1001,6 +1027,32 @@ test('deployment gate only deploys changes since the last complete run', () => {
     writeFileSync(join(directory, 'apps/mobile/file'), 'mobile');
     commit('mobile');
     assert.equal(runGate(deployedSha).should_deploy, 'false');
+
+    // Docs-only, CI-only and scripts-only commits touch no deploy input, so
+    // each skips the release the way a mobile-only commit already did. The
+    // exclusion list lives in the check-deployment-changes.yml predicate.
+    mkdirSync(join(directory, 'docs'), { recursive: true });
+    writeFileSync(join(directory, 'docs', 'note.md'), 'docs');
+    commit('docs');
+    assert.equal(runGate(deployedSha).should_deploy, 'false');
+
+    mkdirSync(join(directory, '.github'), { recursive: true });
+    writeFileSync(join(directory, '.github', 'workflows-ci.yml'), 'ci');
+    commit('ci');
+    assert.equal(runGate(deployedSha).should_deploy, 'false');
+
+    mkdirSync(join(directory, 'scripts'), { recursive: true });
+    writeFileSync(join(directory, 'scripts', 'tool.sh'), 'scripts');
+    commit('scripts');
+    assert.equal(runGate(deployedSha).should_deploy, 'false');
+
+    // Root build inputs stay deploy-triggering.
+    writeFileSync(
+      join(directory, 'package.json'),
+      JSON.stringify({ name: 'kilocode-monorepo', private: true })
+    );
+    commit('root package');
+    assert.equal(runGate(deployedSha).should_deploy, 'true');
 
     writeFileSync(join(directory, 'apps/web/file'), 'web');
     commit('web');

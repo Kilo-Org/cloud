@@ -198,7 +198,7 @@ const TITLE_KEYS = {
   dataCollection: 'organization.settingsOnWeb.dataCollection',
   auditLogs: 'organization.settingsOnWeb.auditLogs',
   requestLogs: 'organization.settingsOnWeb.requestLogs',
-  integrations: 'organization.settingsOnWeb.integrations',
+  integrations: 'integrations.title',
   subOrganizations: 'organization.settingsOnWeb.subOrganizations',
   distributeFunds: 'organization.settingsOnWeb.distributeFunds',
 } satisfies Record<OrgSettingsArea, string>;

@@ -175,8 +175,9 @@ export function summarizeWorkspacePullRequest(
  * This is a passive Postgres read. It never opens a sandbox or asks compute to
  * start, and it never calls GitHub. A workspace whose owner has no GitHub
  * integration therefore has no source for a cache row and returns no summary.
- * Completed-deletion tombstones are excluded. Cached values can be older than
- * `lastSyncedAt`, which is the cache write time.
+ * The only excluded state is a completed-deletion tombstone, matching the
+ * catalog, so a workspace being deleted keeps its last known PR. Cached values
+ * can be older than `lastSyncedAt`, which is the cache write time.
  */
 export async function readWorkspacePullRequestSummaries(
   env: Pick<Env, 'HYPERDRIVE'>,
@@ -188,8 +189,7 @@ export async function readWorkspacePullRequestSummaries(
 
   const db: WorkerDb = getPgDb(env);
   const workspaceBranchMatch = sql`
-    ${cloud_agent_worktrees.deletion_started_at} is null
-    and ${github_branch_pull_requests.git_url} = ${cloud_agent_worktrees.git_url}
+    ${github_branch_pull_requests.git_url} = ${cloud_agent_worktrees.git_url}
     and ${github_branch_pull_requests.git_branch} = ${cloud_agent_worktrees.git_branch}
   `;
 

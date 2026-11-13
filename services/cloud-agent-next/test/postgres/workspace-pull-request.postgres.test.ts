@@ -22,6 +22,8 @@ const worktrees = {
   multiSession: `worktree_${randomUUID()}`,
   secondWorkspace: `worktree_${randomUUID()}`,
   unverified: `worktree_${randomUUID()}`,
+  nullCacheRow: `worktree_${randomUUID()}`,
+  deletionStarted: `worktree_${randomUUID()}`,
   completedDeletion: `worktree_${randomUUID()}`,
   otherOwner: `worktree_${randomUUID()}`,
 };
@@ -108,6 +110,19 @@ beforeAll(async () => {
       git_branch: `${branch}-unverified`,
     },
     {
+      worktree_id: worktrees.nullCacheRow,
+      kilo_user_id: owner,
+      git_url: gitUrl,
+      git_branch: 'feature/null-cache-row',
+    },
+    {
+      worktree_id: worktrees.deletionStarted,
+      kilo_user_id: owner,
+      git_url: gitUrl,
+      git_branch: 'feature/deletion-started',
+      deletion_started_at: new Date(Date.now() - 60_000).toISOString(),
+    },
+    {
       worktree_id: worktrees.completedDeletion,
       kilo_user_id: owner,
       git_url: gitUrl,
@@ -156,6 +171,32 @@ beforeAll(async () => {
     },
     {
       git_url: gitUrl,
+      git_branch: 'feature/null-cache-row',
+      owned_by_user_id: owner,
+      pr_url: null,
+      pr_number: 888,
+      pr_state: 'open',
+      pr_title: null,
+      pr_head_sha: null,
+      pr_observations: null,
+      review_decision_pending: false,
+      pr_last_synced_at: '2026-10-21T12:00:00Z',
+    },
+    {
+      git_url: gitUrl,
+      git_branch: 'feature/deletion-started',
+      owned_by_user_id: owner,
+      pr_url: 'https://github.com/Kilo-Org/cloud/pull/889',
+      pr_number: 889,
+      pr_state: 'open',
+      pr_title: 'Deleting workspace PR',
+      pr_head_sha: headSha,
+      pr_observations: observations(),
+      review_decision_pending: false,
+      pr_last_synced_at: '2026-10-21T12:00:00Z',
+    },
+    {
+      git_url: gitUrl,
       git_branch: branch,
       owned_by_user_id: otherUser,
       pr_url: 'https://github.com/Kilo-Org/cloud/pull/999',
@@ -191,6 +232,14 @@ beforeAll(async () => {
     prUrl: 'https://github.com/Kilo-Org/cloud/pull/777',
     prNumber: 777,
   });
+  await insertSession({
+    worktreeId: worktrees.nullCacheRow,
+    userId: owner,
+    prUrl: 'https://github.com/Kilo-Org/cloud/pull/142',
+    prNumber: 142,
+    prLinkVerifiedAt: '2026-10-21T12:00:00Z',
+  });
+  await insertSession({ worktreeId: worktrees.deletionStarted, userId: owner });
   await insertSession({
     worktreeId: worktrees.completedDeletion,
     userId: owner,
@@ -266,6 +315,30 @@ describe('workspace PR projection against PostgreSQL', () => {
     );
 
     expect(summaries.has(worktrees.unverified)).toBe(false);
+  });
+
+  it('skips a branch cache row that cannot produce a summary', async () => {
+    const summaries = await readWorkspacePullRequestSummaries(
+      { HYPERDRIVE: { connectionString } as Hyperdrive },
+      {
+        userId: owner,
+        workspaces: [{ workspaceId: worktrees.nullCacheRow }],
+      }
+    );
+
+    expect(summaries.get(worktrees.nullCacheRow)?.number).toBe(142);
+  });
+
+  it('keeps the branch PR while deletion has started but not completed', async () => {
+    const summaries = await readWorkspacePullRequestSummaries(
+      { HYPERDRIVE: { connectionString } as Hyperdrive },
+      {
+        userId: owner,
+        workspaces: [{ workspaceId: worktrees.deletionStarted }],
+      }
+    );
+
+    expect(summaries.get(worktrees.deletionStarted)?.number).toBe(889);
   });
 
   it('does not project a completed-deletion workspace', async () => {

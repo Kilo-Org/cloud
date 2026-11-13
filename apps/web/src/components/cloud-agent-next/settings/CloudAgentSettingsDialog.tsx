@@ -26,6 +26,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProfilesManager } from '@/components/cloud-agent/profile-editor/ProfilesManager';
 import { useCloudAgentSettings } from '@/hooks/useCloudAgentSettings';
+import { useVercelComputeEnrollment } from '@/hooks/useVercelComputeEnrollment';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { BuiltinAgentsSection } from './BuiltinAgentsSection';
@@ -100,8 +101,13 @@ function CloudAgentSettings({
   const settingsQuery = useCloudAgentSettings({ organizationId });
   const settings = settingsQuery.data;
   const canManage = organizationId ? (settings?.canManage ?? false) : true;
-  const activeSection =
-    section === 'compute' && settings && !settings.canManage ? 'general' : section;
+  const enrollmentQuery = useVercelComputeEnrollment({
+    organizationId,
+    enabled: settings?.canManage === true,
+  });
+  const canManageCompute =
+    settings?.canManage === true && enrollmentQuery.isSuccess && enrollmentQuery.data.enrolled;
+  const activeSection = section === 'compute' && !canManageCompute ? 'general' : section;
 
   return (
     <>
@@ -137,7 +143,7 @@ function CloudAgentSettings({
             value === 'environments' ||
             value === 'sidebar' ||
             value === 'preferences' ||
-            (value === 'compute' && settings?.canManage)
+            (value === 'compute' && canManageCompute)
           ) {
             if (value === 'environments') setEnvironmentsVisited(true);
             changeSection(value);
@@ -174,7 +180,7 @@ function CloudAgentSettings({
             <FolderCog className="size-4 shrink-0" aria-hidden />
             Profiles
           </TabsTrigger>
-          {settings?.canManage && (
+          {canManageCompute && (
             <TabsTrigger
               value="compute"
               className="gap-2 pointer-coarse:min-h-11 md:w-full md:justify-start"
@@ -286,18 +292,14 @@ function CloudAgentSettings({
         >
           <SidebarSettingsSection organizationId={organizationId} />
         </TabsContent>
-        <TabsContent
-          value="compute"
-          className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
-        >
-          {settings?.canManage ? (
+        {canManageCompute && (
+          <TabsContent
+            value="compute"
+            className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
+          >
             <VercelComputeSettings organizationId={organizationId} />
-          ) : settingsQuery.isError ? (
-            <LoadError onRetry={() => void settingsQuery.refetch()} />
-          ) : (
-            <LoadingSkeleton />
-          )}
-        </TabsContent>
+          </TabsContent>
+        )}
       </Tabs>
     </>
   );

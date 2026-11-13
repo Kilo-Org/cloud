@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import type { RootRouter } from '@/routers/root-router';
 import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
 import type { VercelProject, VercelTeam } from '@/lib/vercel-client';
+import { useVercelComputeEnrollment } from '@/hooks/useVercelComputeEnrollment';
 
 export type VercelComputeRemoveError = {
   data?: { code?: string } | null;
@@ -75,11 +76,7 @@ export function useVercelComputeData(
   const queryClient = useQueryClient();
   const organizationOwner = organizationId !== undefined;
 
-  const enrollmentQuery = useQuery(
-    organizationOwner
-      ? trpc.organizations.vercelCompute.getEnrollment.queryOptions({ organizationId })
-      : trpc.vercelCompute.getEnrollment.queryOptions()
-  );
+  const enrollmentQuery = useVercelComputeEnrollment({ organizationId });
   const enrollmentState: 'checking' | 'unavailable' | 'enrolled' | 'not-enrolled' =
     enrollmentQuery.isPending
       ? 'checking'

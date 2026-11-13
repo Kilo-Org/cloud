@@ -22,6 +22,7 @@
     "expired": "Muddati tugagan"
   },
   "common": {
+    "manageOnWeb": "Vebda boshqarish",
     "creditHistory": "Kreditlar tarixi",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Provayder kalitlari",
       "rowSubtitle": "O'z provayderingiz orqali to'lash",
-      "manageOnWeb": "Vebda boshqarish",
       "manageOnWebReason": "Bu provayderlar tuzilgan hisob ma'lumotlarini talab qiladi.",
       "description": "Bu kalitlar orqali yuborilgan so'rovlar uchun to'lov Kilo balansingizdan emas, provayder hisobingizdan olinadi.",
       "enabled": "Foydalanilmoqda",
@@ -4117,6 +4117,23 @@
     "emptyTitle": "Bu davrda foydalanish yo'q",
     "orgSelfNotice": "Siz ushbu tashkilotdagi o'z foydalanishingizni ko'ryapsiz.",
     "viewDetails": "Foydalanish tafsilotlarini ko'rish"
+  },
+  "integrations": {
+    "title": "Integratsiyalar",
+    "sectionTitle": "Ulangan xizmatlar",
+    "entrySubtitle": "GitHub, Slack, Linear va boshqalar",
+    "subtitle": "Ishlab chiqish vositalaringiz va ish jarayonlaringizni Kilo bilan ulang",
+    "emptyHint": "Hali hech qanday integratsiya ulanmagan.",
+    "disconnect": "Uzish",
+    "disconnectTitle": "{{provider}} xizmati uzilsinmi?",
+    "disconnectMessage": "Kilo endi {{provider}} xizmatida javob bermaydi. Istalgan vaqtda qayta ulashingiz mumkin.",
+    "connectedTo": "{{account}} hisobiga ulangan",
+    "disconnected": "{{provider}} xizmati uzildi",
+    "disconnectFailed": "{{provider}} xizmatini uzib boʻlmadi",
+    "couldNotLoad": "Integratsiyalarni yuklab boʻlmadi",
+    "permissionDenied": "Sizda bu integratsiyalarni boshqarish uchun ruxsat yoʻq.",
+    "memberHint": "Bu ulanishlarni oʻzgartirish uchun tashkilot egasi yoki administratoriga murojaat qiling.",
+    "connectFailed": "Ulanish sahifasini ochib boʻlmadi"
   },
   "invoices": {
     "personalEmptyDescription": "To‘lov amalga oshirilgach, shaxsiy xaridlaringiz uchun hisob-fakturalar shu yerda ko‘rinadi."

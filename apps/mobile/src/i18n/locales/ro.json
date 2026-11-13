@@ -22,6 +22,7 @@
     "expired": "Expirat"
   },
   "common": {
+    "manageOnWeb": "Gestionează pe web",
     "creditHistory": "Istoric credite",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Chei de furnizor",
       "rowSubtitle": "Folosește facturarea propriului furnizor",
-      "manageOnWeb": "Gestionează pe web",
       "manageOnWebReason": "Acești furnizori necesită date de autentificare structurate.",
       "description": "Solicitările făcute cu aceste chei sunt facturate în contul tău de furnizor, nu din soldul Kilo.",
       "enabled": "În uz",
@@ -4182,6 +4182,23 @@
     "emptyTitle": "Nicio utilizare în această perioadă",
     "orgSelfNotice": "Vezi propria utilizare în această organizație.",
     "viewDetails": "Vezi detaliile utilizării"
+  },
+  "integrations": {
+    "title": "Integrări",
+    "sectionTitle": "Servicii conectate",
+    "entrySubtitle": "GitHub, Slack, Linear și altele",
+    "subtitle": "Conectează-ți instrumentele și fluxurile de lucru pentru dezvoltare la Kilo",
+    "emptyHint": "Nicio integrare conectată încă.",
+    "disconnect": "Deconectează",
+    "disconnectTitle": "Deconectezi {{provider}}?",
+    "disconnectMessage": "Kilo nu va mai răspunde în {{provider}}. Te poți reconecta oricând.",
+    "connectedTo": "Conectat la {{account}}",
+    "disconnected": "{{provider}} a fost deconectat",
+    "disconnectFailed": "{{provider}} nu a putut fi deconectat",
+    "couldNotLoad": "Integrările nu au putut fi încărcate",
+    "permissionDenied": "Nu ai permisiunea de a gestiona aceste integrări.",
+    "memberHint": "Cere unui proprietar sau administrator al organizației să modifice aceste conexiuni.",
+    "connectFailed": "Pagina de conectare nu a putut fi deschisă"
   },
   "invoices": {
     "personalEmptyDescription": "Facturile pentru achizițiile tale personale vor apărea aici după prima facturare."

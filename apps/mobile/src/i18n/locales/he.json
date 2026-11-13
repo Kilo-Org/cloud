@@ -22,6 +22,7 @@
     "expired": "פג התוקף"
   },
   "common": {
+    "manageOnWeb": "ניהול באתר",
     "creditHistory": "היסטוריית קרדיטים",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "מפתחות ספקים",
       "rowSubtitle": "שימוש בחיוב דרך הספק שלך",
-      "manageOnWeb": "ניהול באתר",
       "manageOnWebReason": "ספקים אלה דורשים פרטי גישה מובנים.",
       "description": "בקשות שנשלחות באמצעות מפתחות אלה מחויבות בחשבון הספק שלך במקום ביתרת Kilo שלך.",
       "enabled": "בשימוש",
@@ -4182,6 +4182,23 @@
     "emptyTitle": "אין שימוש בתקופה זו",
     "orgSelfNotice": "מוצג השימוש שלך בארגון זה.",
     "viewDetails": "הצגת פרטי השימוש"
+  },
+  "integrations": {
+    "title": "אינטגרציות",
+    "sectionTitle": "שירותים מחוברים",
+    "entrySubtitle": "GitHub, Slack, Linear ועוד",
+    "subtitle": "חיבור כלי הפיתוח ותהליכי העבודה שלך ל-Kilo",
+    "emptyHint": "עדיין לא חוברו אינטגרציות.",
+    "disconnect": "ניתוק",
+    "disconnectTitle": "לנתק את {{provider}}?",
+    "disconnectMessage": "Kilo יפסיק להגיב ב-{{provider}}. אפשר להתחבר מחדש בכל עת.",
+    "connectedTo": "מחובר ל-{{account}}",
+    "disconnected": "החיבור ל-{{provider}} נותק",
+    "disconnectFailed": "לא ניתן לנתק את {{provider}}",
+    "couldNotLoad": "לא ניתן לטעון את האינטגרציות",
+    "permissionDenied": "אין לך הרשאה לנהל את האינטגרציות האלה.",
+    "memberHint": "כדי לשנות את החיבורים האלה, יש לפנות לבעלים או למנהל של הארגון.",
+    "connectFailed": "לא ניתן לפתוח את דף החיבור"
   },
   "invoices": {
     "personalEmptyDescription": "חשבוניות על הרכישות האישיות שלך יופיעו כאן לאחר החיוב."

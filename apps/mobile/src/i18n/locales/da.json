@@ -22,6 +22,7 @@
     "expired": "Udløbet"
   },
   "common": {
+    "manageOnWeb": "Administrer på nettet",
     "creditHistory": "Kredithistorik",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Udbydernøgler",
       "rowSubtitle": "Brug din egen udbyderfakturering",
-      "manageOnWeb": "Administrer på nettet",
       "manageOnWebReason": "Disse udbydere kræver strukturerede legitimationsoplysninger.",
       "description": "Anmodninger via disse nøgler faktureres til din udbyderkonto i stedet for din Kilo-saldo.",
       "enabled": "I brug",
@@ -4117,6 +4117,23 @@
     "emptyTitle": "Intet forbrug i denne periode",
     "orgSelfNotice": "Du ser dit eget forbrug i denne organisation.",
     "viewDetails": "Se forbrugsdetaljer"
+  },
+  "integrations": {
+    "title": "Integrationer",
+    "sectionTitle": "Forbundne tjenester",
+    "entrySubtitle": "GitHub, Slack, Linear og flere",
+    "subtitle": "Forbind dine udviklingsværktøjer og arbejdsgange med Kilo",
+    "emptyHint": "Ingen integrationer er forbundet endnu.",
+    "disconnect": "Afbryd forbindelse",
+    "disconnectTitle": "Afbryd forbindelsen til {{provider}}?",
+    "disconnectMessage": "Kilo holder op med at svare i {{provider}}. Du kan altid oprette forbindelsen igen.",
+    "connectedTo": "Forbundet med {{account}}",
+    "disconnected": "Forbindelsen til {{provider}} er afbrudt",
+    "disconnectFailed": "Forbindelsen til {{provider}} kunne ikke afbrydes",
+    "couldNotLoad": "Integrationerne kunne ikke indlæses",
+    "permissionDenied": "Du har ikke tilladelse til at administrere disse integrationer.",
+    "memberHint": "Bed en ejer eller administrator i organisationen om at ændre disse forbindelser.",
+    "connectFailed": "Siden til oprettelse af forbindelse kunne ikke åbnes"
   },
   "invoices": {
     "personalEmptyDescription": "Fakturaer for dine egne køb vises her, når du er blevet faktureret."

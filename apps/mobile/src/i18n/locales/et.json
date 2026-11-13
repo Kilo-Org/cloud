@@ -22,6 +22,7 @@
     "expired": "Aegunud"
   },
   "common": {
+    "manageOnWeb": "Halda veebis",
     "creditHistory": "Krediitide ajalugu",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Teenusepakkuja võtmed",
       "rowSubtitle": "Kasuta oma teenusepakkuja arveldust",
-      "manageOnWeb": "Halda veebis",
       "manageOnWebReason": "Need teenusepakkujad vajavad struktureeritud mandaate.",
       "description": "Nende võtmetega tehtud päringud arveldatakse sinu teenusepakkuja kontolt, mitte Kilo saldolt.",
       "enabled": "Kasutusel",
@@ -4117,6 +4117,23 @@
     "emptyTitle": "Sel perioodil kasutust pole",
     "orgSelfNotice": "Näed oma kasutust selles organisatsioonis.",
     "viewDetails": "Vaata kasutuse üksikasju"
+  },
+  "integrations": {
+    "title": "Integratsioonid",
+    "sectionTitle": "Ühendatud teenused",
+    "entrySubtitle": "GitHub, Slack, Linear ja muud",
+    "subtitle": "Ühenda oma arendustööriistad ja töövood Kiloga",
+    "emptyHint": "Ühtegi integratsiooni pole veel ühendatud.",
+    "disconnect": "Katkesta ühendus",
+    "disconnectTitle": "Kas katkestada ühendus teenusega {{provider}}?",
+    "disconnectMessage": "Kilo lõpetab teenuses {{provider}} vastamise. Saad selle igal ajal uuesti ühendada.",
+    "connectedTo": "Ühendatud kontoga {{account}}",
+    "disconnected": "Ühendus teenusega {{provider}} katkestati",
+    "disconnectFailed": "Ühendust teenusega {{provider}} ei õnnestunud katkestada",
+    "couldNotLoad": "Integratsioone ei õnnestunud laadida",
+    "permissionDenied": "Sul pole õigust neid integratsioone hallata.",
+    "memberHint": "Nende ühenduste muutmiseks pöördu organisatsiooni omaniku või administraatori poole.",
+    "connectFailed": "Ühendamise lehte ei õnnestunud avada"
   },
   "invoices": {
     "personalEmptyDescription": "Sinu enda ostude arved kuvatakse siin pärast arve esitamist."

@@ -22,6 +22,7 @@
     "expired": "Isteklo"
   },
   "common": {
+    "manageOnWeb": "Upravljaj na webu",
     "creditHistory": "Povijest kredita",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Ključevi pružatelja usluga",
       "rowSubtitle": "Koristi vlastitu naplatu kod pružatelja usluga",
-      "manageOnWeb": "Upravljaj na webu",
       "manageOnWebReason": "Ovi pružatelji usluga trebaju strukturirane vjerodajnice.",
       "description": "Zahtjevi putem ovih ključeva naplaćuju se na tvoj račun kod pružatelja usluga umjesto s tvog Kilo salda.",
       "enabled": "U upotrebi",
@@ -4182,6 +4182,23 @@
     "emptyTitle": "Nema potrošnje u ovom razdoblju",
     "orgSelfNotice": "Prikazuje se vaša vlastita potrošnja u ovoj organizaciji.",
     "viewDetails": "Prikaži detalje potrošnje"
+  },
+  "integrations": {
+    "title": "Integracije",
+    "sectionTitle": "Povezane usluge",
+    "entrySubtitle": "GitHub, Slack, Linear i drugo",
+    "subtitle": "Povežite svoje razvojne alate i tijekove rada s uslugom Kilo",
+    "emptyHint": "Još nema povezanih integracija.",
+    "disconnect": "Prekini vezu",
+    "disconnectTitle": "Prekinuti vezu s uslugom {{provider}}?",
+    "disconnectMessage": "Kilo više neće odgovarati u usluzi {{provider}}. Možete se ponovno povezati u bilo kojem trenutku.",
+    "connectedTo": "Povezano s računom {{account}}",
+    "disconnected": "Veza s uslugom {{provider}} je prekinuta",
+    "disconnectFailed": "Nije moguće prekinuti vezu s uslugom {{provider}}",
+    "couldNotLoad": "Nije moguće učitati integracije",
+    "permissionDenied": "Nemate dopuštenje za upravljanje ovim integracijama.",
+    "memberHint": "Zamolite vlasnika ili administratora organizacije da promijeni ove veze.",
+    "connectFailed": "Nije moguće otvoriti stranicu za povezivanje"
   },
   "invoices": {
     "personalEmptyDescription": "Računi za vaše osobne kupnje prikazat će se ovdje nakon prve naplate."

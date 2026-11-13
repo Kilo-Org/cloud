@@ -22,6 +22,7 @@
     "expired": "Expirado"
   },
   "common": {
+    "manageOnWeb": "Gerir na web",
     "creditHistory": "Histórico de créditos",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Chaves de fornecedor",
       "rowSubtitle": "Usa a faturação do teu próprio fornecedor",
-      "manageOnWeb": "Gerir na web",
       "manageOnWebReason": "Estes fornecedores precisam de credenciais estruturadas.",
       "description": "Os pedidos feitos com estas chaves são faturados na tua conta do fornecedor em vez de no teu saldo Kilo.",
       "enabled": "Em uso",
@@ -4188,6 +4188,23 @@
     "emptyTitle": "Sem utilização neste período",
     "orgSelfNotice": "Está a ver a sua própria utilização nesta organização.",
     "viewDetails": "Ver detalhes de utilização"
+  },
+  "integrations": {
+    "title": "Integrações",
+    "sectionTitle": "Serviços conectados",
+    "entrySubtitle": "GitHub, Slack, Linear e mais",
+    "subtitle": "Conecte suas ferramentas e fluxos de trabalho de desenvolvimento ao Kilo",
+    "emptyHint": "Nenhuma integração conectada ainda.",
+    "disconnect": "Desconectar",
+    "disconnectTitle": "Desconectar {{provider}}?",
+    "disconnectMessage": "O Kilo deixará de responder no {{provider}}. Você pode reconectar a qualquer momento.",
+    "connectedTo": "Conectado a {{account}}",
+    "disconnected": "{{provider}} desconectado",
+    "disconnectFailed": "Não foi possível desconectar {{provider}}",
+    "couldNotLoad": "Não foi possível carregar as integrações",
+    "permissionDenied": "Você não tem permissão para gerenciar estas integrações.",
+    "memberHint": "Peça a um proprietário ou administrador da organização para alterar estas conexões.",
+    "connectFailed": "Não foi possível abrir a página de conexão"
   },
   "invoices": {
     "personalEmptyDescription": "As faturas das suas compras pessoais aparecerão aqui assim que você for cobrado."

@@ -22,6 +22,7 @@
     "expired": "Ekspire"
   },
   "common": {
+    "manageOnWeb": "Jere sou entènèt la",
     "creditHistory": "Istorik kredi",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Kle founisè",
       "rowSubtitle": "Sèvi ak pwòp faktirasyon founisè w",
-      "manageOnWeb": "Jere sou entènèt la",
       "manageOnWebReason": "Founisè sa yo bezwen idantifyan ki estriktire.",
       "description": "Demann ki pase nan kle sa yo ap faktire sou kont founisè w la olye de balans Kilo w la.",
       "enabled": "Ap itilize",
@@ -4117,6 +4117,23 @@
     "emptyTitle": "Pa gen itilizasyon nan peryòd sa a",
     "orgSelfNotice": "W ap wè pwòp itilizasyon pa w nan òganizasyon sa a.",
     "viewDetails": "Wè detay itilizasyon"
+  },
+  "integrations": {
+    "title": "Entegrasyon",
+    "sectionTitle": "Sèvis ki konekte",
+    "entrySubtitle": "GitHub, Slack, Linear ak lòt ankò",
+    "subtitle": "Konekte zouti devlopman ak workflow ou yo ak Kilo",
+    "emptyHint": "Pa gen okenn entegrasyon ki konekte ankò.",
+    "disconnect": "Dekonekte",
+    "disconnectTitle": "Dekonekte {{provider}}?",
+    "disconnectMessage": "Kilo p ap reponn nan {{provider}} ankò. Ou ka rekonekte nenpòt ki lè.",
+    "connectedTo": "Konekte ak {{account}}",
+    "disconnected": "{{provider}} dekonekte",
+    "disconnectFailed": "Pa t ka dekonekte {{provider}}",
+    "couldNotLoad": "Pa t ka chaje entegrasyon yo",
+    "permissionDenied": "Ou pa gen pèmisyon pou jere entegrasyon sa yo.",
+    "memberHint": "Mande yon pwopriyetè oswa yon administratè òganizasyon an pou chanje koneksyon sa yo.",
+    "connectFailed": "Pa t ka louvri paj koneksyon an"
   },
   "invoices": {
     "personalEmptyDescription": "Fakti pou pwòp acha ou yo ap parèt isit la yon fwa yo faktire w."

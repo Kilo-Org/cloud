@@ -22,6 +22,7 @@
     "expired": "સમયસીમા સમાપ્ત"
   },
   "common": {
+    "manageOnWeb": "વેબ પર મેનેજ કરો",
     "creditHistory": "ક્રેડિટ ઇતિહાસ",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "પ્રદાતા કી",
       "rowSubtitle": "તમારા પોતાના પ્રદાતાના બિલિંગનો ઉપયોગ કરો",
-      "manageOnWeb": "વેબ પર મેનેજ કરો",
       "manageOnWebReason": "આ પ્રદાતાઓને સંરચિત ઓળખપત્રોની જરૂર છે.",
       "description": "આ કી દ્વારા થતી વિનંતીઓનું બિલ તમારા Kilo બેલેન્સને બદલે તમારા પ્રદાતા એકાઉન્ટમાં લાગે છે.",
       "enabled": "ઉપયોગમાં",
@@ -4117,6 +4117,23 @@
     "emptyTitle": "આ સમયગાળામાં કોઈ વપરાશ નથી",
     "orgSelfNotice": "તમે આ સંસ્થામાં તમારો પોતાનો વપરાશ જોઈ રહ્યા છો.",
     "viewDetails": "વપરાશની વિગતો જુઓ"
+  },
+  "integrations": {
+    "title": "ઇન્ટિગ્રેશન્સ",
+    "sectionTitle": "કનેક્ટ કરેલી સેવાઓ",
+    "entrySubtitle": "GitHub, Slack, Linear અને વધુ",
+    "subtitle": "તમારા ડેવલપમેન્ટ ટૂલ્સ અને વર્કફ્લોને Kilo સાથે કનેક્ટ કરો",
+    "emptyHint": "હજી સુધી કોઈ ઇન્ટિગ્રેશન કનેક્ટ કરેલું નથી.",
+    "disconnect": "ડિસ્કનેક્ટ કરો",
+    "disconnectTitle": "{{provider}} ડિસ્કનેક્ટ કરીએ?",
+    "disconnectMessage": "Kilo {{provider}}માં જવાબ આપવાનું બંધ કરશે. તમે ગમે ત્યારે ફરીથી કનેક્ટ કરી શકો છો.",
+    "connectedTo": "{{account}} સાથે કનેક્ટ થયેલ",
+    "disconnected": "{{provider}} ડિસ્કનેક્ટ થયું",
+    "disconnectFailed": "{{provider}} ડિસ્કનેક્ટ કરી શકાયું નહીં",
+    "couldNotLoad": "ઇન્ટિગ્રેશન્સ લોડ કરી શકાયા નહીં",
+    "permissionDenied": "તમને આ ઇન્ટિગ્રેશન્સ મેનેજ કરવાની પરવાનગી નથી.",
+    "memberHint": "આ કનેક્શન્સ બદલવા માટે સંસ્થાના માલિક અથવા એડમિનને કહો.",
+    "connectFailed": "કનેક્શન પેજ ખોલી શકાયું નહીં"
   },
   "invoices": {
     "personalEmptyDescription": "તમને બિલ મોકલવામાં આવે પછી તમારી પોતાની ખરીદીઓના ઇન્વૉઇસ અહીં દેખાશે."

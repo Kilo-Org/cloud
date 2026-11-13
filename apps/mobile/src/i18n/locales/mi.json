@@ -22,6 +22,7 @@
     "expired": "Kua pau te wā"
   },
   "common": {
+    "manageOnWeb": "Whakahaerehia i te ipurangi",
     "creditHistory": "Hītori kiredita",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -338,7 +339,6 @@
     "providerKeys": {
       "title": "Ngā kī kaiwhakarato",
       "rowSubtitle": "Whakamahia te pire o tō ake kaiwhakarato",
-      "manageOnWeb": "Whakahaerehia i te ipurangi",
       "manageOnWebReason": "E hiahia ana ēnei kaiwhakarato ki ngā tohu tuakiri whai hanganga.",
       "description": "Ko ngā tono mā ēnei kī ka pirehia ki tō pūkete kaiwhakarato, kaua ki tō toenga Kilo.",
       "enabled": "E whakamahia ana",
@@ -4117,6 +4117,23 @@
     "emptyTitle": "Kāore he whakamahinga i tēnei wā",
     "orgSelfNotice": "Ko tāu ake whakamahinga i tēnei whakahaere e kitea ana e koe.",
     "viewDetails": "Tirohia ngā taipitopito whakamahinga"
+  },
+  "integrations": {
+    "title": "Ngā Tūhononga",
+    "sectionTitle": "Ngā ratonga kua honoa",
+    "entrySubtitle": "GitHub, Slack, Linear me ētahi atu",
+    "subtitle": "Honoa ō taputapu whakawhanake me ō rerenga mahi ki Kilo",
+    "emptyHint": "Kāore anō kia honoa he tūhononga.",
+    "disconnect": "Wetekia",
+    "disconnectTitle": "Wetekia a {{provider}}?",
+    "disconnectMessage": "Ka mutu tā Kilo whakautu i roto i {{provider}}. Ka taea e koe te hono anō i ngā wā katoa.",
+    "connectedTo": "Kua hono ki {{account}}",
+    "disconnected": "Kua wetekia a {{provider}}",
+    "disconnectFailed": "Kāore i taea te wetewete i {{provider}}",
+    "couldNotLoad": "Kāore i taea te uta i ngā tūhononga",
+    "permissionDenied": "Kāore ōu whakaaetanga ki te whakahaere i ēnei tūhononga.",
+    "memberHint": "Tonoa tētahi kaipupuri, kaiwhakahaere rānei o te rōpū kia whakarerekē i ēnei hononga.",
+    "connectFailed": "Kāore i taea te huaki i te whārangi hononga"
   },
   "invoices": {
     "personalEmptyDescription": "Ka puta mai ki konei ngā pire mō āu ake hoko ina tukuna he pire ki a koe."

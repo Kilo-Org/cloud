@@ -183,7 +183,7 @@ import {
   oldestOpenMessage,
   openMessages,
   queueMessage,
-  renderTurnContent,
+  renderQueuedMessageContent,
   settleAcceptedUpTo,
   settleMessages,
   type MessageReduction,
@@ -4355,7 +4355,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       'cloud.message.queued',
       {
         messageId: message.messageId,
-        content: renderTurnContent(message.intent),
+        content: renderQueuedMessageContent(message),
         delivery: 'queued',
       },
       `cloud-message/queued/${message.messageId}`,
@@ -4366,7 +4366,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private emitSent(message: SessionMessage): void {
     this.emitSynthetic(
       'cloud.message.sent',
-      { messageId: message.messageId, delivery: 'sent' },
+      {
+        messageId: message.messageId,
+        delivery: 'sent',
+        ...(message.intent.turn.type === 'command' ? { turnType: 'command' } : {}),
+      },
       `cloud-message/sent/${message.messageId}`,
       message.acceptedAt ?? message.createdAt
     );
@@ -4542,20 +4546,27 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return this.messages
       .filter(
         message =>
-          message.state === 'queued' || message.state === 'accepted' || message.state === 'failed'
+          message.state === 'queued' ||
+          message.state === 'accepted' ||
+          message.state === 'failed' ||
+          (message.intent.turn.type === 'command' && message.acceptedAt !== null)
       )
       .map(message => {
         const timestamp = message.acceptedAt ?? message.createdAt;
         const snapshot: QueuedMessageSnapshot = {
           messageId: message.messageId,
-          content: renderTurnContent(message.intent),
+          content: renderQueuedMessageContent(message),
           timestamp,
+          ...(message.intent.turn.type === 'command' ? { turnType: 'command' as const } : {}),
           ...(message.state === 'accepted' ? { delivery: 'sent' as const } : {}),
         };
-        if (message.state === 'failed') {
+        if (message.state === 'completed') {
+          snapshot.completedAt = message.settledAt ?? timestamp;
+        }
+        if (message.state === 'failed' || message.state === 'cancelled') {
           snapshot.terminalFailure = {
             messageId: message.messageId,
-            status: 'failed',
+            status: message.state === 'cancelled' ? 'interrupted' : 'failed',
             delivery: message.acceptedAt === null ? 'queued' : 'sent',
             accepted: message.acceptedAt !== null,
             ...(message.billingFailure === undefined

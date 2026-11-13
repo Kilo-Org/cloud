@@ -1,9 +1,10 @@
 import { FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN } from './helpers/fake-credentials.js';
 import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
-import { controlPlaneMessages } from '../../src/control-plane/session/sqlite-schema.js';
+import { controlPlaneMessages, events } from '../../src/control-plane/session/sqlite-schema.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import {
@@ -119,6 +120,114 @@ afterEach(async () => {
 });
 
 describe('SandboxSessionV2 queued transport recovery', () => {
+  it('keeps command text in queued and failed snapshots before acceptance', async () => {
+    const { stub, peer } = await setup();
+    await stub.send({
+      ...prompt('command'),
+      turn: { type: 'command', command: 'review', arguments: 'main' },
+    });
+    expect(await runInDurableObject(stub, instance => instance['deriveQueuedMessages']())).toEqual([
+      expect.objectContaining({ messageId: 'command', content: '/review main' }),
+    ]);
+    peer.prepareView = {
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'preparation_timeout',
+    };
+    await stub.onRoute(peer.prepareView);
+    await evictAllDurableObjects();
+    await installPeer(stub, peer);
+    expect(await runInDurableObject(stub, instance => instance['deriveQueuedMessages']())).toEqual([
+      expect.objectContaining({
+        messageId: 'command',
+        content: '/review main',
+        terminalFailure: expect.objectContaining({
+          accepted: false,
+          delivery: 'queued',
+          reason: 'preparation_timeout',
+        }),
+      }),
+    ]);
+  });
+
+  it('omits accepted command text, including after a runtime failure', async () => {
+    const { stub, peer, sessionId } = await setup();
+    peer.prepareView = peer.view('ready');
+    await stub.send({
+      ...prompt('command'),
+      turn: { type: 'command', command: 'review', arguments: 'main' },
+    });
+    expect(await runInDurableObject(stub, instance => instance['deriveQueuedMessages']())).toEqual([
+      expect.objectContaining({
+        messageId: 'command',
+        content: '',
+        delivery: 'sent',
+        turnType: 'command',
+      }),
+    ]);
+    const sent = await runInDurableObject(stub, (_instance, state) =>
+      drizzle(state.storage)
+        .select()
+        .from(events)
+        .where(eq(events.stream_event_type, 'cloud.message.sent'))
+    );
+    expect(sent).toHaveLength(1);
+    expect(JSON.parse(sent[0]!.payload)).toMatchObject({
+      messageId: 'command',
+      turnType: 'command',
+    });
+    await stub.onOutcome({
+      sessionId,
+      status: 'failed',
+      reason: 'wrapper_failed',
+      lastMessageId: 'command',
+    });
+    expect(await runInDurableObject(stub, instance => instance['deriveQueuedMessages']())).toEqual([
+      expect.objectContaining({
+        messageId: 'command',
+        content: '',
+        terminalFailure: expect.objectContaining({ accepted: true }),
+      }),
+    ]);
+  });
+
+  it.each(['completed', 'cancelled'] as const)(
+    'retains an accepted %s command receipt after reconstruction without retaining completed prompts',
+    async status => {
+      const { stub, peer, sessionId } = await setup();
+      peer.prepareView = peer.view('ready');
+      await stub.send(prompt('ordinary'));
+      await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: 'ordinary' });
+      await stub.send({
+        ...prompt('command'),
+        turn: { type: 'command', command: 'review', arguments: 'main' },
+      });
+      await stub.onOutcome({
+        sessionId,
+        status,
+        ...(status === 'cancelled' ? { reason: 'interrupted' as const } : {}),
+        lastMessageId: 'command',
+      });
+      await evictAllDurableObjects();
+      await installPeer(stub, peer);
+      const snapshots = await runInDurableObject(stub, instance =>
+        instance['deriveQueuedMessages']()
+      );
+      expect(snapshots).toEqual([
+        expect.objectContaining({
+          messageId: 'command',
+          content: '',
+          ...(status === 'completed'
+            ? { completedAt: expect.any(Number) }
+            : {
+                terminalFailure: expect.objectContaining({ accepted: true, reason: 'interrupted' }),
+              }),
+        }),
+      ]);
+      expect(snapshots[0]).not.toHaveProperty('delivery', 'sent');
+    }
+  );
+
   it('keeps RPC deadlines real and scales only the recovery delay through the existing development override', () => {
     expect(CONTROL_PLANE_TIMERS.session.sandboxRpcDeadlineMs).toBe(2_000);
     expect(CONTROL_PLANE_TIMERS.session.transportRecoveryMs).toBe(15_000);

@@ -38,7 +38,12 @@ type Row = { id: string; created_at: string };
 type LoadedBlob = { files: { kind: string; value: string | null }[] } | { loadError: string };
 
 async function loadBlob(row: Row): Promise<LoadedBlob> {
-  const key = apiRequestLogBlobKey(row);
+  let key: string;
+  try {
+    key = apiRequestLogBlobKey(row);
+  } catch (error) {
+    return { loadError: `Failed to derive the R2 key of ${row.id}: ${String(error)}` };
+  }
   let body: string | null;
   try {
     body = await getApiRequestLogBlob(key);

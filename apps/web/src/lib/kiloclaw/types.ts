@@ -1,5 +1,5 @@
 import type { EncryptedEnvelope } from '@kilocode/web-shared/lib/encryption';
-import type { InstanceTierKey, InstanceType } from '@kilocode/kiloclaw-instance-tiers';
+import type { InstanceTierKey, InstanceType, MachineSize } from '@kilocode/kiloclaw-instance-tiers';
 import type { SecretFieldKey } from '@kilocode/kiloclaw-secret-catalog';
 
 /** Mirrors the worker's ImageVersionEntry schema (KV stored version metadata) */
@@ -149,12 +149,7 @@ export type DevicePairingApproveResponse = {
   message: string;
 };
 
-/** Fly Machine guest spec (CPU/memory configuration) */
-export type MachineSize = {
-  cpus: number;
-  memory_mb: number;
-  cpu_kind?: 'shared' | 'performance';
-};
+export type { MachineSize };
 
 // Keep in sync with services/kiloclaw/src/schemas/instance-config.ts ProviderIdSchema.
 export type KiloClawProviderId = 'fly' | 'docker-local' | 'northflank';

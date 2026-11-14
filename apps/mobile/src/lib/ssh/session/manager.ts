@@ -33,6 +33,7 @@ export function openSession(host: SshHost): string {
     jumpSessionIds: [],
     passphrase: null,
     connecting: false,
+    attemptAbort: null,
     connectTargets: [],
   };
   live.set(id, entry);
@@ -58,6 +59,7 @@ export async function closeSession(id: string): Promise<void> {
     return;
   }
   clearTimer(entry);
+  entry.attemptAbort?.abort();
   const shellId = sessionById(id)?.shellId ?? null;
   const nativeSessionId = entry.nativeSessionId;
   const jumps = entry.jumpSessionIds;

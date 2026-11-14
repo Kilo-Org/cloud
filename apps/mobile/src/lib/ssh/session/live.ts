@@ -26,6 +26,7 @@ export type LiveSession = {
   /** Typed once for this session when the key needs one. */
   passphrase: string | null;
   connecting: boolean;
+  attemptAbort: AbortController | null;
   /** Every host a host key can arrive for during the current attempt. */
   connectTargets: readonly { host: string; port: number }[];
 };

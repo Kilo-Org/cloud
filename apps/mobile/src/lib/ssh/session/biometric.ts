@@ -32,9 +32,15 @@ function watchAppState(): void {
  * refused prompt, a device with no enrolled biometric or passcode, and a
  * native module this build does not carry — all of which mean no key is sent.
  */
-export async function requireKeyAccess(promptMessage: string): Promise<boolean> {
+export async function requireKeyAccess(
+  promptMessage: string,
+  signal?: AbortSignal
+): Promise<boolean> {
   watchAppState();
-  await waitForForeground();
+  const foregroundWait = waitForForeground(signal);
+  if (signal?.aborted || (foregroundWait !== null && !(await foregroundWait))) {
+    return false;
+  }
   if (unlocked) {
     return true;
   }
@@ -53,17 +59,28 @@ export async function requireKeyAccess(promptMessage: string): Promise<boolean> 
   }
 }
 
-export function waitForForeground(): Promise<void> | null {
+export function waitForForeground(signal?: AbortSignal): Promise<boolean> | null {
+  if (signal?.aborted) {
+    return Promise.resolve(false);
+  }
   if (AppState.currentState === 'active') {
     return null;
   }
-  const { promise, resolve } = Promise.withResolvers<undefined>();
+  const { promise, resolve } = Promise.withResolvers<boolean>();
+  const finish = (active: boolean) => {
+    subscription.remove();
+    signal?.removeEventListener('abort', abort);
+    resolve(active);
+  };
+  const abort = () => {
+    finish(false);
+  };
   const subscription = AppState.addEventListener('change', state => {
     if (state === 'active') {
-      subscription.remove();
-      resolve(undefined);
+      finish(true);
     }
   });
+  signal?.addEventListener('abort', abort, { once: true });
   return promise;
 }
 

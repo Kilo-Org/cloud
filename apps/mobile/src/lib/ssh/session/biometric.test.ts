@@ -86,3 +86,23 @@ it('does not carry an authentication result across backgrounding', async () => {
   expect(await requireKeyAccess('new foreground')).toBe(true);
   expect(state.authenticate).toHaveBeenCalledTimes(2);
 });
+
+it('removes the foreground listener and skips authentication when its attempt aborts', async () => {
+  state.app.currentState = 'background';
+  const { requireKeyAccess } = await import('./biometric');
+  const cancellation = new AbortController();
+  const access = requireKeyAccess('abandoned', cancellation.signal);
+  cancellation.abort();
+  expect(await access).toBe(false);
+  expect(state.remove).toHaveBeenCalledOnce();
+  expect(state.authenticate).not.toHaveBeenCalled();
+});
+
+it('does not subscribe for an already aborted foreground wait', async () => {
+  state.app.currentState = 'background';
+  const { waitForForeground } = await import('./biometric');
+  const cancellation = new AbortController();
+  cancellation.abort();
+  expect(await waitForForeground(cancellation.signal)).toBe(false);
+  expect(state.app.addEventListener).not.toHaveBeenCalled();
+});

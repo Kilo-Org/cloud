@@ -18,6 +18,15 @@ export type SshBackupPlan = {
   conflicts: SshBackupConflict[];
 };
 
+type HostIdentityFields = Pick<
+  SshBackup['hosts'][number],
+  'label' | 'hostname' | 'port' | 'username'
+>;
+
+function hostIdentity(host: HostIdentityFields): string {
+  return JSON.stringify([host.label, host.hostname, host.port, host.username]);
+}
+
 export function planSshBackupMerge(incoming: SshBackup, existing: SshBackup): SshBackupPlan {
   const conflicts: SshBackupConflict[] = [];
   function unique<T>({
@@ -46,9 +55,9 @@ export function planSshBackupMerge(incoming: SshBackup, existing: SshBackup): Ss
       return true;
     });
   }
-  const labels = new Map(incoming.hosts.map(host => [host.id, host.label]));
-  const existingLabels = new Map(existing.hosts.map(host => [host.id, host.label]));
-  const scope = (id: string | null, source = labels) => (id === null ? null : source.get(id));
+  const identities = new Map(incoming.hosts.map(host => [host.id, hostIdentity(host)]));
+  const existingIdentities = new Map(existing.hosts.map(host => [host.id, hostIdentity(host)]));
+  const scope = (id: string | null, source = identities) => (id === null ? null : source.get(id));
   const additions: SshBackup = {
     format: 'kilo-ssh',
     version: 1,
@@ -63,14 +72,14 @@ export function planSshBackupMerge(incoming: SshBackup, existing: SshBackup): Ss
       collection: 'hosts',
       rows: incoming.hosts,
       known: existing.hosts,
-      identity: row => row.label,
+      identity: hostIdentity,
       label: row => row.label,
     }),
     knownHosts: unique({
       collection: 'knownHosts',
       rows: incoming.knownHosts,
       known: existing.knownHosts,
-      identity: row => row.hostPattern,
+      identity: row => JSON.stringify([row.hostPattern, row.keyAlgorithm]),
       label: row => row.hostPattern,
     }),
     snippets: unique({
@@ -79,7 +88,7 @@ export function planSshBackupMerge(incoming: SshBackup, existing: SshBackup): Ss
       known: existing.snippets,
       identity: row => JSON.stringify([scope(row.hostId), row.label]),
       label: row => row.label,
-      existingIdentity: row => JSON.stringify([scope(row.hostId, existingLabels), row.label]),
+      existingIdentity: row => JSON.stringify([scope(row.hostId, existingIdentities), row.label]),
     }),
     forwards: unique({
       collection: 'forwards',
@@ -90,7 +99,7 @@ export function planSshBackupMerge(incoming: SshBackup, existing: SshBackup): Ss
       label: row => row.label ?? `${row.bindHost}:${row.bindPort}`,
       existingIdentity: row =>
         JSON.stringify([
-          scope(row.hostId, existingLabels),
+          scope(row.hostId, existingIdentities),
           row.direction,
           row.bindHost,
           row.bindPort,
@@ -98,24 +107,25 @@ export function planSshBackupMerge(incoming: SshBackup, existing: SshBackup): Ss
     }),
   };
   const incomingById = new Map(incoming.hosts.map(host => [host.id, host]));
-  const addedByLabel = new Map(additions.hosts.map(host => [host.label, host]));
-  const keptLabels = new Set(existing.hosts.map(host => host.label));
+  const addedByIdentity = new Map(additions.hosts.map(host => [hostIdentity(host), host]));
+  const keptIdentities = new Set(existing.hosts.map(host => hostIdentity(host)));
   for (const host of additions.hosts) {
-    const seen = new Set([host.label]);
+    const seen = new Set([hostIdentity(host)]);
     let current = host;
     while (current.jumpHostId !== null) {
       const next = incomingById.get(current.jumpHostId);
       if (next === undefined) {
         throw new InvalidSshExportError();
       }
-      if (keptLabels.has(next.label)) {
+      const nextIdentity = hostIdentity(next);
+      if (keptIdentities.has(nextIdentity)) {
         break;
       }
-      if (seen.has(next.label)) {
+      if (seen.has(nextIdentity)) {
         throw new InvalidSshExportError();
       }
-      seen.add(next.label);
-      const added = addedByLabel.get(next.label);
+      seen.add(nextIdentity);
+      const added = addedByIdentity.get(nextIdentity);
       if (added === undefined) {
         throw new InvalidSshExportError();
       }
@@ -136,7 +146,7 @@ export function mergeSshBackup(db: SshDatabase, incoming: SshBackup): SshBackupP
     const keyIds = new Map(
       incoming.keys.map(key => [key.id, keysByFingerprint.get(key.fingerprintSha256)])
     );
-    const hostsByLabel = new Map(existing.hosts.map(host => [host.label, host.id]));
+    const hostsByIdentity = new Map(existing.hosts.map(host => [hostIdentity(host), host.id]));
     for (const host of plan.additions.hosts) {
       const created = createHost(
         db,
@@ -147,9 +157,11 @@ export function mergeSshBackup(db: SshDatabase, incoming: SshBackup): SshBackupP
         },
         host.createdAt
       );
-      hostsByLabel.set(host.label, created.id);
+      hostsByIdentity.set(hostIdentity(host), created.id);
     }
-    const hostIds = new Map(incoming.hosts.map(host => [host.id, hostsByLabel.get(host.label)]));
+    const hostIds = new Map(
+      incoming.hosts.map(host => [host.id, hostsByIdentity.get(hostIdentity(host))])
+    );
     for (const host of plan.additions.hosts) {
       if (host.jumpHostId !== null) {
         updateHost(db, requiredId(hostIds, host.id), {

@@ -10,6 +10,7 @@ export function useSshBackup() {
   return useQuery({
     queryKey: [...SSH_KEY, 'backup'],
     enabled,
+    networkMode: 'always',
     queryFn: async () => readSshBackup(await sshDatabase()),
   });
 }

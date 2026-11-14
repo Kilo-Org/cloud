@@ -9,12 +9,14 @@ const state = vi.hoisted(() => ({
   write: vi.fn(),
   delete: vi.fn(),
   share: vi.fn(),
+  registerTempFile: vi.fn(),
 }));
 vi.mock('./native', () => ({
   sshPackage: () => Promise.resolve({ encryptExport: state.encrypt, decryptExport: state.decrypt }),
   nativeErrorCode: (error: { code?: string } | null) => error?.code ?? null,
 }));
 vi.mock('@/lib/share-remote-file', () => ({ shareLocalFile: state.share }));
+vi.mock('@/lib/temp-file-registry', () => ({ registerTempFile: state.registerTempFile }));
 vi.mock('expo-file-system', () => ({
   Paths: { cache: 'file:///cache' },
   File: class {
@@ -54,13 +56,17 @@ it('encrypts the versioned JSON with the module and shares only armored cipherte
     expect.stringMatching(/kilo-ssh-\d{4}-\d{2}-\d{2}\.age$/),
     { mimeType: 'application/octet-stream' }
   );
-  expect(state.delete).toHaveBeenCalledOnce();
+  expect(state.registerTempFile).toHaveBeenCalledWith(
+    expect.stringMatching(/kilo-ssh-\d{4}-\d{2}-\d{2}\.age$/)
+  );
+  expect(state.delete).not.toHaveBeenCalled();
 });
 
-it('removes the encrypted cache file even when sharing fails', async () => {
+it('removes the encrypted cache file when sharing fails', async () => {
   state.share.mockRejectedValueOnce(new Error('share unavailable'));
   await expect(shareSshBackup(backup, 'long-test-passphrase')).rejects.toThrow('share unavailable');
   expect(state.delete).toHaveBeenCalledOnce();
+  expect(state.registerTempFile).not.toHaveBeenCalled();
 });
 
 it('decrypts with the module and validates its resulting JSON', async () => {

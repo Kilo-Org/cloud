@@ -3228,7 +3228,7 @@
       "selectOrganization": "एक संगठन चुनें",
       "unavailableDescription": "यह संगठन अब उपलब्ध नहीं है। जारी रखने के लिए अपनी प्रोफ़ाइल से दूसरा संगठन चुनें।",
       "unavailableSessionsDescription": "यह संगठन अब उपलब्ध नहीं है। इसके सत्र लोड नहीं किए जा सकते।",
-      "accessDeniedDescription": "आपको इस संगठन का ऐक्सेस नहीं है।"
+      "accessDeniedDescription": "संगठन के मालिक या एडमिन से आपको ऐक्सेस देने के लिए कहें।"
     },
     "create": {
       "title": "संगठन बनाएँ",

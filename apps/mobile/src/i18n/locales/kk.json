@@ -3236,7 +3236,7 @@
       "selectOrganization": "Ұйымды таңдау",
       "unavailableDescription": "Бұл ұйым енді қолжетімсіз. Жалғастыру үшін профильден басқа ұйымды таңдаңыз.",
       "unavailableSessionsDescription": "Бұл ұйым енді қолжетімсіз. Оның сессияларын жүктеу мүмкін емес.",
-      "accessDeniedDescription": "Бұл ұйымға кіруге рұқсатыңыз жоқ."
+      "accessDeniedDescription": "Ұйым иесінен немесе әкімшісінен сізге рұқсат беруін сұраңыз."
     },
     "create": {
       "title": "Ұйым құру",

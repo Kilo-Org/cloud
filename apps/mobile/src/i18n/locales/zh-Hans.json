@@ -3228,7 +3228,7 @@
       "selectOrganization": "选择组织",
       "unavailableDescription": "此组织已不可用。请从账户选择器中选择其他账户后继续。",
       "unavailableSessionsDescription": "此组织已不可用。无法加载其会话。",
-      "accessDeniedDescription": "你无权访问此组织。"
+      "accessDeniedDescription": "请让组织所有者或管理员授予你访问权限。"
     },
     "create": {
       "title": "创建组织",

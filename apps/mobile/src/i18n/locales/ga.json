@@ -3395,7 +3395,7 @@
       "selectOrganization": "Roghnaigh eagraíocht",
       "unavailableDescription": "Níl an eagraíocht seo ar fáil a thuilleadh. Roghnaigh ceann ó do phróifíl le leanúint ar aghaidh.",
       "unavailableSessionsDescription": "Níl an eagraíocht seo ar fáil a thuilleadh. Ní féidir a seisiúin a luchtú.",
-      "accessDeniedDescription": "Níl rochtain agat ar an eagraíocht seo."
+      "accessDeniedDescription": "Iarr ar úinéir nó ar riarthóir eagraíochta rochtain a thabhairt duit."
     },
     "create": {
       "title": "Cruthaigh eagraíocht",

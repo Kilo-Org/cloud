@@ -3236,7 +3236,7 @@
       "selectOrganization": "یو سازمان غوره کړئ",
       "unavailableDescription": "دا سازمان نور د لاسرسي وړ نه دی. د دوام لپاره له خپل پروفایل څخه یو سازمان غوره کړئ.",
       "unavailableSessionsDescription": "دا سازمان نور د لاسرسي وړ نه دی. د دې سازمان ناستې نشي لوډ کېدلی.",
-      "accessDeniedDescription": "تاسو دې سازمان ته لاسرسی نه لرئ."
+      "accessDeniedDescription": "د یو سازمان له مالک یا مدیر څخه وغوښتئ چې تاسو ته لاسرسی درکړي."
     },
     "create": {
       "title": "سازمان جوړ کړئ",

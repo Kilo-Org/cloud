@@ -3342,7 +3342,7 @@
       "selectOrganization": "Izberi organizacijo",
       "unavailableDescription": "Ta organizacija ni več na voljo. Za nadaljevanje na svojem profilu izberi drugo.",
       "unavailableSessionsDescription": "Ta organizacija ni več na voljo. Njenih sej ni mogoče naložiti.",
-      "accessDeniedDescription": "Nimaš dostopa do te organizacije."
+      "accessDeniedDescription": "Prosi lastnika ali skrbnika organizacije, naj ti odobri dostop."
     },
     "create": {
       "title": "Ustvari organizacijo",

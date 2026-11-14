@@ -3281,7 +3281,7 @@
       "selectOrganization": "Choix d'une organisation",
       "unavailableDescription": "Cette organisation n'est plus disponible. Choisissez un autre compte dans le sélecteur de comptes pour continuer.",
       "unavailableSessionsDescription": "Cette organisation n'est plus disponible. Ses sessions ne peuvent pas être chargées.",
-      "accessDeniedDescription": "Vous n'avez pas accès à cette organisation."
+      "accessDeniedDescription": "Demandez à un propriétaire ou à un administrateur de l'organisation de vous accorder l'accès."
     },
     "create": {
       "title": "Créer une organisation",

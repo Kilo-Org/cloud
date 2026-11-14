@@ -3236,7 +3236,7 @@
       "selectOrganization": "Seleccionar unha organización",
       "unavailableDescription": "Esta organización xa non está dispoñible. Escolle unha desde o teu perfil para continuar.",
       "unavailableSessionsDescription": "Esta organización xa non está dispoñible. Non se poden cargar as súas sesións.",
-      "accessDeniedDescription": "Non tes acceso a esta organización."
+      "accessDeniedDescription": "Pide a un propietario ou administrador da organización que che conceda o acceso."
     },
     "create": {
       "title": "Crear organización",

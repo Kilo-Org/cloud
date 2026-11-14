@@ -3440,7 +3440,7 @@
       "selectOrganization": "اختيار مؤسسة",
       "unavailableDescription": "لم تعد هذه المؤسسة متاحة. اختر واحدة من ملفك الشخصي للمتابعة.",
       "unavailableSessionsDescription": "لم تعد هذه المؤسسة متاحة. لا يمكن تحميل جلساتها.",
-      "accessDeniedDescription": "ليس لديك حق الوصول إلى هذه المؤسسة."
+      "accessDeniedDescription": "اطلب من مالك المؤسسة أو مشرفها منحك صلاحية الوصول."
     },
     "create": {
       "title": "إنشاء مؤسسة",

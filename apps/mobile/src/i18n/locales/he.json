@@ -3465,6 +3465,7 @@
     },
     "settingsOnWeb": {
       "title": "הגדרות הארגון באתר",
+      "integrations": "אינטגרציות באתר",
       "usageDetails": "פרטי שימוש",
       "providersAndModels": "ספקים ומודלים",
       "groups": "קבוצות",
@@ -4475,7 +4476,6 @@
     "sectionTitle": "שירותים מחוברים",
     "entrySubtitle": "GitHub, Slack, Linear ועוד",
     "subtitle": "חיבור כלי הפיתוח ותהליכי העבודה שלך ל-Kilo",
-    "emptyHint": "עדיין לא חוברו אינטגרציות.",
     "disconnect": "ניתוק",
     "disconnectTitle": "לנתק את {{provider}}?",
     "disconnectMessage": "Kilo יפסיק להגיב ב-{{provider}}. אפשר להתחבר מחדש בכל עת.",

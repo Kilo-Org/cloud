@@ -3407,6 +3407,7 @@
     },
     "settingsOnWeb": {
       "title": "Organisasie-instellings op die web",
+      "integrations": "Integrasies op die web",
       "usageDetails": "Gebruiksbesonderhede",
       "providersAndModels": "Verskaffers en modelle",
       "groups": "Groepe",
@@ -4410,7 +4411,6 @@
     "sectionTitle": "Gekoppelde dienste",
     "entrySubtitle": "GitHub, Slack, Linear en meer",
     "subtitle": "Koppel jou ontwikkelingsgereedskap en werkvloeie aan Kilo",
-    "emptyHint": "Nog geen integrasies gekoppel nie.",
     "disconnect": "Ontkoppel",
     "disconnectTitle": "Ontkoppel {{provider}}?",
     "disconnectMessage": "Kilo sal ophou om in {{provider}} te reageer. Jy kan enige tyd weer koppel.",

@@ -3513,6 +3513,7 @@
     },
     "settingsOnWeb": {
       "title": "Nastavenia organizácie na webe",
+      "integrations": "Integrácie na webe",
       "usageDetails": "Podrobnosti o využití",
       "providersAndModels": "Poskytovatelia a modely",
       "groups": "Skupiny",
@@ -4540,7 +4541,6 @@
     "sectionTitle": "Pripojené služby",
     "entrySubtitle": "GitHub, Slack, Linear a ďalšie",
     "subtitle": "Prepojte svoje vývojárske nástroje a pracovné postupy s Kilo",
-    "emptyHint": "Zatiaľ nie sú pripojené žiadne integrácie.",
     "disconnect": "Odpojiť",
     "disconnectTitle": "Odpojiť {{provider}}?",
     "disconnectMessage": "Kilo prestane reagovať v službe {{provider}}. Kedykoľvek ju môžete znova pripojiť.",

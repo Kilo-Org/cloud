@@ -3407,6 +3407,7 @@
     },
     "settingsOnWeb": {
       "title": "Paramèt òganizasyon an sou entènèt",
+      "integrations": "Entegrasyon sou entènèt",
       "usageDetails": "Detay itilizasyon",
       "providersAndModels": "Founisè ak modèl",
       "groups": "Gwoup",
@@ -4410,7 +4411,6 @@
     "sectionTitle": "Sèvis ki konekte",
     "entrySubtitle": "GitHub, Slack, Linear ak lòt ankò",
     "subtitle": "Konekte zouti devlopman ak workflow ou yo ak Kilo",
-    "emptyHint": "Pa gen okenn entegrasyon ki konekte ankò.",
     "disconnect": "Dekonekte",
     "disconnectTitle": "Dekonekte {{provider}}?",
     "disconnectMessage": "Kilo p ap reponn nan {{provider}} ankò. Ou ka rekonekte nenpòt ki lè.",

@@ -3518,6 +3518,7 @@
     },
     "settingsOnWeb": {
       "title": "Настройки организации в веб-версии",
+      "integrations": "Интеграции в веб-версии",
       "usageDetails": "Сведения об использовании",
       "providersAndModels": "Провайдеры и модели",
       "groups": "Группы",
@@ -4540,7 +4541,6 @@
     "sectionTitle": "Подключённые сервисы",
     "entrySubtitle": "GitHub, Slack, Linear и другие",
     "subtitle": "Подключите к Kilo свои инструменты разработки и рабочие процессы",
-    "emptyHint": "Интеграции пока не подключены.",
     "disconnect": "Отключить",
     "disconnectTitle": "Отключить {{provider}}?",
     "disconnectMessage": "Kilo перестанет отвечать в {{provider}}. Вы можете подключиться снова в любое время.",

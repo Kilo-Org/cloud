@@ -3624,6 +3624,7 @@
     },
     "settingsOnWeb": {
       "title": "إعدادات المؤسسة على الويب",
+      "integrations": "التكاملات على الويب",
       "usageDetails": "تفاصيل الاستخدام",
       "providersAndModels": "المزوّدون والنماذج",
       "groups": "المجموعات",
@@ -4670,7 +4671,6 @@
     "sectionTitle": "الخدمات المتصلة",
     "entrySubtitle": "GitHub وSlack وLinear والمزيد",
     "subtitle": "اربط أدوات التطوير ومسارات العمل لديك بـ Kilo",
-    "emptyHint": "لا توجد تكاملات متصلة بعد.",
     "disconnect": "قطع الاتصال",
     "disconnectTitle": "هل تريد قطع الاتصال بـ {{provider}}؟",
     "disconnectMessage": "سيتوقف Kilo عن الرد في {{provider}}. يمكنك إعادة الاتصال في أي وقت.",

@@ -3407,6 +3407,7 @@
     },
     "settingsOnWeb": {
       "title": "Saitunan ƙungiya a yanar gizo",
+      "integrations": "Haɗe-haɗe a yanar gizo",
       "usageDetails": "Bayanan amfani",
       "providersAndModels": "Masu samar da sabis da samfura",
       "groups": "Rukunoni",
@@ -4410,7 +4411,6 @@
     "sectionTitle": "Ayyukan da aka haɗa",
     "entrySubtitle": "GitHub, Slack, Linear da sauransu",
     "subtitle": "Haɗa kayan aikin haɓaka manhaja da tsarin aikinka da Kilo",
-    "emptyHint": "Babu wani haɗi tukuna.",
     "disconnect": "Cire haɗi",
     "disconnectTitle": "A cire haɗin {{provider}}?",
     "disconnectMessage": "Kilo zai daina amsawa a {{provider}}. Kana iya sake haɗawa a kowane lokaci.",

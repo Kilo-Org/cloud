@@ -3407,6 +3407,7 @@
     },
     "settingsOnWeb": {
       "title": "การตั้งค่าองค์กรบนเว็บ",
+      "integrations": "การเชื่อมต่อบนเว็บ",
       "usageDetails": "รายละเอียดการใช้งาน",
       "providersAndModels": "ผู้ให้บริการและโมเดล",
       "groups": "กลุ่ม",
@@ -4410,7 +4411,6 @@
     "sectionTitle": "บริการที่เชื่อมต่อแล้ว",
     "entrySubtitle": "GitHub, Slack, Linear และอื่นๆ",
     "subtitle": "เชื่อมต่อเครื่องมือและเวิร์กโฟลว์การพัฒนาของคุณกับ Kilo",
-    "emptyHint": "ยังไม่มีการเชื่อมต่อ",
     "disconnect": "ลบการเชื่อมต่อ",
     "disconnectTitle": "ยกเลิกการเชื่อมต่อ {{provider}} ใช่ไหม",
     "disconnectMessage": "Kilo จะหยุดตอบกลับใน {{provider}} คุณสามารถเชื่อมต่อใหม่ได้ทุกเมื่อ",

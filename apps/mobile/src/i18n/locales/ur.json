@@ -3407,6 +3407,7 @@
     },
     "settingsOnWeb": {
       "title": "ویب پر تنظیم کی سیٹنگز",
+      "integrations": "ویب پر انٹیگریشنز",
       "usageDetails": "استعمال کی تفصیلات",
       "providersAndModels": "فراہم کنندگان اور ماڈلز",
       "groups": "گروپس",
@@ -4410,7 +4411,6 @@
     "sectionTitle": "منسلک سروسز",
     "entrySubtitle": "GitHub، Slack، Linear اور مزید",
     "subtitle": "اپنے ڈیولپمنٹ ٹولز اور ورک فلوز کو Kilo سے منسلک کریں",
-    "emptyHint": "ابھی تک کوئی انٹیگریشن منسلک نہیں ہے۔",
     "disconnect": "منقطع کریں",
     "disconnectTitle": "{{provider}} کو منقطع کریں؟",
     "disconnectMessage": "Kilo اب {{provider}} میں جواب نہیں دے گا۔ آپ کسی بھی وقت دوبارہ منسلک کر سکتے ہیں۔",

@@ -3407,6 +3407,7 @@
     },
     "settingsOnWeb": {
       "title": "Organisationsinställningar på webben",
+      "integrations": "Integrationer på webben",
       "usageDetails": "Användningsdetaljer",
       "providersAndModels": "Leverantörer och modeller",
       "groups": "Grupper",
@@ -4410,7 +4411,6 @@
     "sectionTitle": "Anslutna tjänster",
     "entrySubtitle": "GitHub, Slack, Linear med flera",
     "subtitle": "Anslut dina utvecklingsverktyg och arbetsflöden till Kilo",
-    "emptyHint": "Inga integrationer har anslutits än.",
     "disconnect": "Koppla från",
     "disconnectTitle": "Koppla från {{provider}}?",
     "disconnectMessage": "Kilo slutar svara i {{provider}}. Du kan ansluta igen när som helst.",

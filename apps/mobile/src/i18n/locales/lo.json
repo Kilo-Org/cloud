@@ -3407,6 +3407,7 @@
     },
     "settingsOnWeb": {
       "title": "ການຕັ້ງຄ່າອົງກອນໃນເວັບ",
+      "integrations": "ການເຊື່ອມໂຍງໃນເວັບ",
       "usageDetails": "ລາຍລະອຽດການນຳໃຊ້",
       "providersAndModels": "ຜູ້ໃຫ້ບໍລິການ ແລະ ໂມເດວ",
       "groups": "ກຸ່ມ",
@@ -4410,7 +4411,6 @@
     "sectionTitle": "ບໍລິການທີ່ເຊື່ອມຕໍ່ແລ້ວ",
     "entrySubtitle": "GitHub, Slack, Linear ແລະ ອື່ນໆ",
     "subtitle": "ເຊື່ອມຕໍ່ເຄື່ອງມືພັດທະນາ ແລະ ຂັ້ນຕອນການເຮັດວຽກຂອງທ່ານກັບ Kilo",
-    "emptyHint": "ຍັງບໍ່ມີການເຊື່ອມໂຍງໃດໆເທື່ອ.",
     "disconnect": "ຕັດການເຊື່ອມຕໍ່",
     "disconnectTitle": "ຕັດການເຊື່ອມຕໍ່ {{provider}} ບໍ?",
     "disconnectMessage": "Kilo ຈະຢຸດຕອບກັບໃນ {{provider}}. ທ່ານສາມາດເຊື່ອມຕໍ່ຄືນໄດ້ທຸກເວລາ.",

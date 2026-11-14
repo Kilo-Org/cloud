@@ -3407,6 +3407,7 @@
     },
     "settingsOnWeb": {
       "title": "ორგანიზაციის პარამეტრები ვებში",
+      "integrations": "ინტეგრაციები ვებში",
       "usageDetails": "გამოყენების დეტალები",
       "providersAndModels": "პროვაიდერები და მოდელები",
       "groups": "ჯგუფები",
@@ -4410,7 +4411,6 @@
     "sectionTitle": "დაკავშირებული სერვისები",
     "entrySubtitle": "GitHub, Slack, Linear და სხვა",
     "subtitle": "დააკავშირეთ თქვენი დეველოპმენტის ხელსაწყოები და სამუშაო პროცესები Kilo-სთან",
-    "emptyHint": "ჯერ არცერთი ინტეგრაცია არ არის დაკავშირებული.",
     "disconnect": "გათიშვა",
     "disconnectTitle": "გავთიშოთ {{provider}}?",
     "disconnectMessage": "Kilo შეწყვეტს პასუხების გაცემას {{provider}}-ში. ხელახლა დაკავშირება ნებისმიერ დროს შეგიძლიათ.",

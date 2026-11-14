@@ -3407,6 +3407,7 @@
     },
     "settingsOnWeb": {
       "title": "ڕێکخستنەکانی ڕێکخراوە لە وێب",
+      "integrations": "یەکخستنەکان لە وێب",
       "usageDetails": "وردەکاریی بەکارهێنان",
       "providersAndModels": "دابینکەران و مۆدێلەکان",
       "groups": "گرووپەکان",
@@ -4410,7 +4411,6 @@
     "sectionTitle": "خزمەتگوزارییە پەیوەستکراوەکان",
     "entrySubtitle": "GitHub، Slack، Linear و زیاتر",
     "subtitle": "ئامراز و ڕەوتی کارەکانی گەشەپێدانت بە Kilo ببەستەوە",
-    "emptyHint": "هێشتا هیچ یەکخستنێک پەیوەست نەکراوە.",
     "disconnect": "پچڕاندن",
     "disconnectTitle": "پەیوەندی {{provider}} بپچڕێنرێت؟",
     "disconnectMessage": "Kilo چیتر لە {{provider}} وەڵام ناداتەوە. هەر کاتێک بتەوێت دەتوانیت دووبارە پەیوەستی بکەیتەوە.",

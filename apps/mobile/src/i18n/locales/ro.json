@@ -3460,6 +3460,7 @@
     },
     "settingsOnWeb": {
       "title": "Setările organizației pe web",
+      "integrations": "Integrări pe web",
       "usageDetails": "Detalii de utilizare",
       "providersAndModels": "Furnizori și modele",
       "groups": "Grupuri",
@@ -4475,7 +4476,6 @@
     "sectionTitle": "Servicii conectate",
     "entrySubtitle": "GitHub, Slack, Linear și altele",
     "subtitle": "Conectează-ți instrumentele și fluxurile de lucru pentru dezvoltare la Kilo",
-    "emptyHint": "Nicio integrare conectată încă.",
     "disconnect": "Deconectează",
     "disconnectTitle": "Deconectezi {{provider}}?",
     "disconnectMessage": "Kilo nu va mai răspunde în {{provider}}. Te poți reconecta oricând.",

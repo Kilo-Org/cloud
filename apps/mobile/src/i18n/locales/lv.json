@@ -3460,6 +3460,7 @@
     },
     "settingsOnWeb": {
       "title": "Organizācijas iestatījumi tīmeklī",
+      "integrations": "Integrācijas tīmeklī",
       "usageDetails": "Lietojuma informācija",
       "providersAndModels": "Nodrošinātāji un modeļi",
       "groups": "Grupas",
@@ -4475,7 +4476,6 @@
     "sectionTitle": "Pievienotie pakalpojumi",
     "entrySubtitle": "GitHub, Slack, Linear un citi",
     "subtitle": "Savienojiet savus izstrādes rīkus un darbplūsmas ar Kilo",
-    "emptyHint": "Vēl nav pievienota neviena integrācija.",
     "disconnect": "Atvienot",
     "disconnectTitle": "Vai atvienot {{provider}}?",
     "disconnectMessage": "Kilo vairs neatbildēs pakalpojumā {{provider}}. Savienojumu varat atjaunot jebkurā laikā.",

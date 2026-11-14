@@ -3407,6 +3407,7 @@
     },
     "settingsOnWeb": {
       "title": "વેબ પર સંસ્થાના સેટિંગ્સ",
+      "integrations": "વેબ પર ઇન્ટિગ્રેશન્સ",
       "usageDetails": "વપરાશની વિગતો",
       "providersAndModels": "પ્રોવાઇડર અને મોડેલ",
       "groups": "ગ્રુપ",
@@ -4410,7 +4411,6 @@
     "sectionTitle": "કનેક્ટ કરેલી સેવાઓ",
     "entrySubtitle": "GitHub, Slack, Linear અને વધુ",
     "subtitle": "તમારા ડેવલપમેન્ટ ટૂલ્સ અને વર્કફ્લોને Kilo સાથે કનેક્ટ કરો",
-    "emptyHint": "હજી સુધી કોઈ ઇન્ટિગ્રેશન કનેક્ટ કરેલું નથી.",
     "disconnect": "ડિસ્કનેક્ટ કરો",
     "disconnectTitle": "{{provider}} ડિસ્કનેક્ટ કરીએ?",
     "disconnectMessage": "Kilo {{provider}}માં જવાબ આપવાનું બંધ કરશે. તમે ગમે ત્યારે ફરીથી કનેક્ટ કરી શકો છો.",

@@ -897,6 +897,39 @@ describe('Organization hub billing card while its data loads', () => {
   });
 });
 
+describe('Organization hub integrations rows', () => {
+  it('names the in-app screen and the web page apart, and opens each where it says', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    // Both rows carry the same Plug glyph and reach different places, so the
+    // titles are the only thing that tells them apart.
+    const rows = renderer.root
+      .findAllByType('ConfigureRow')
+      .filter(node => node.props.icon === 'Plug');
+    expect(rows.map(node => node.props.title)).toEqual([
+      i18n.t('integrations.title'),
+      i18n.t('organization.settingsOnWeb.integrations'),
+    ]);
+
+    const [inApp, web] = rows;
+    act(() => {
+      (inApp.props.onPress as () => void)();
+    });
+    expect(routerPush).toHaveBeenCalledWith(
+      '/(app)/(tabs)/(3_profile)/integrations?org=org-1'
+    );
+
+    act(() => {
+      (web.props.onPress as () => void)();
+    });
+    expect(openExternalUrlMock).toHaveBeenCalledWith(
+      'https://app.kilo.test/organizations/org-1/integrations',
+      { label: i18n.t('organization.settingsOnWeb.integrations') }
+    );
+    unmount();
+  });
+});
+
 describe('Organization hub Kilo Pass icon tile', () => {
   /** The tile's own classes: the View that holds the Kilo Pass glyph. */
   function tileClass(root: TestRenderer.ReactTestInstance): string {

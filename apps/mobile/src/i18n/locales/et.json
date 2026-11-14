@@ -3407,6 +3407,7 @@
     },
     "settingsOnWeb": {
       "title": "Organisatsiooni seaded veebis",
+      "integrations": "Integratsioonid veebis",
       "usageDetails": "Kasutuse üksikasjad",
       "providersAndModels": "Teenusepakkujad ja mudelid",
       "groups": "Grupid",
@@ -4410,7 +4411,6 @@
     "sectionTitle": "Ühendatud teenused",
     "entrySubtitle": "GitHub, Slack, Linear ja muud",
     "subtitle": "Ühenda oma arendustööriistad ja töövood Kiloga",
-    "emptyHint": "Ühtegi integratsiooni pole veel ühendatud.",
     "disconnect": "Katkesta ühendus",
     "disconnectTitle": "Kas katkestada ühendus teenusega {{provider}}?",
     "disconnectMessage": "Kilo lõpetab teenuses {{provider}} vastamise. Saad selle igal ajal uuesti ühendada.",

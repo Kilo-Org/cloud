@@ -3513,6 +3513,7 @@
     },
     "settingsOnWeb": {
       "title": "Organizacijos nustatymai žiniatinklyje",
+      "integrations": "Integracijos žiniatinklyje",
       "usageDetails": "Naudojimo informacija",
       "providersAndModels": "Teikėjai ir modeliai",
       "groups": "Grupės",
@@ -4540,7 +4541,6 @@
     "sectionTitle": "Prijungtos paslaugos",
     "entrySubtitle": "GitHub, Slack, Linear ir kitos",
     "subtitle": "Prijunkite savo kūrimo įrankius ir darbo eigas prie Kilo",
-    "emptyHint": "Dar nėra prijungtų integracijų.",
     "disconnect": "Atjungti",
     "disconnectTitle": "Atjungti {{provider}}?",
     "disconnectMessage": "Kilo nebeatsakys {{provider}} platformoje. Bet kada galėsite vėl prijungti.",

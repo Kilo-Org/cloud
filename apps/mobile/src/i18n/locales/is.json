@@ -3407,6 +3407,7 @@
     },
     "settingsOnWeb": {
       "title": "Stillingar félags á vefnum",
+      "integrations": "Samþættingar á vefnum",
       "usageDetails": "Upplýsingar um notkun",
       "providersAndModels": "Veitur og líkön",
       "groups": "Hópar",
@@ -4410,7 +4411,6 @@
     "sectionTitle": "Tengdar þjónustur",
     "entrySubtitle": "GitHub, Slack, Linear og fleira",
     "subtitle": "Tengdu þróunartólin þín og vinnuflæði við Kilo",
-    "emptyHint": "Engar samþættingar tengdar enn.",
     "disconnect": "Aftengja",
     "disconnectTitle": "Aftengja {{provider}}?",
     "disconnectMessage": "Kilo hættir að svara í {{provider}}. Þú getur tengt aftur hvenær sem er.",

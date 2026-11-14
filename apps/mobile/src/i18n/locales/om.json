@@ -3407,6 +3407,7 @@
     },
     "settingsOnWeb": {
       "title": "Qindaa'ina dhaabbataa weebii irratti",
+      "integrations": "Walitti hidhamiinsota weebii irratti",
       "usageDetails": "Odeeffannoo itti fayyadamaa",
       "providersAndModels": "Dhiyeessitootaa fi moodeelota",
       "groups": "Gareewwan",
@@ -4410,7 +4411,6 @@
     "sectionTitle": "Tajaajilawwan walitti hidhaman",
     "entrySubtitle": "GitHub, Slack, Linear fi kan biroo",
     "subtitle": "Meeshaalee misoomaa fi adeemsa hojii kee Kilo waliin walitti hidhi",
-    "emptyHint": "Hanga ammaatti walitti hidhamiinsi tokkollee hin jiru.",
     "disconnect": "Addaan kuti",
     "disconnectTitle": "{{provider}} addaan kutuu?",
     "disconnectMessage": "Kilo {{provider}} keessatti deebii kennuu ni dhaabata. Yeroo kamiyyuu irra deebitee walitti hidhuu dandeessa.",

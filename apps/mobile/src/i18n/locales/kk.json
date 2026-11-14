@@ -3407,6 +3407,7 @@
     },
     "settingsOnWeb": {
       "title": "Вебтегі ұйым параметрлері",
+      "integrations": "Вебтегі интеграциялар",
       "usageDetails": "Пайдалану мәліметтері",
       "providersAndModels": "Провайдерлер мен модельдер",
       "groups": "Топтар",
@@ -4410,7 +4411,6 @@
     "sectionTitle": "Қосылған қызметтер",
     "entrySubtitle": "GitHub, Slack, Linear және басқалары",
     "subtitle": "Әзірлеу құралдары мен жұмыс процестеріңізді Kilo қызметіне қосыңыз",
-    "emptyHint": "Әзірге ешбір интеграция қосылмаған.",
     "disconnect": "Ажырату",
     "disconnectTitle": "{{provider}} қызметін ажырату керек пе?",
     "disconnectMessage": "Kilo {{provider}} ішінде жауап беруді тоқтатады. Кез келген уақытта қайта қоса аласыз.",

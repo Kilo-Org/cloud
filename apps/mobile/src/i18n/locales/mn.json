@@ -3407,6 +3407,7 @@
     },
     "settingsOnWeb": {
       "title": "Вэб дээрх байгууллагын тохиргоо",
+      "integrations": "Вэб дээрх интеграцууд",
       "usageDetails": "Хэрэглээний дэлгэрэнгүй",
       "providersAndModels": "Үйлчилгээ үзүүлэгч ба загварууд",
       "groups": "Бүлгүүд",
@@ -4410,7 +4411,6 @@
     "sectionTitle": "Холбогдсон үйлчилгээнүүд",
     "entrySubtitle": "GitHub, Slack, Linear болон бусад",
     "subtitle": "Хөгжүүлэлтийн хэрэгсэл, ажлын урсгалаа Kilo-той холбоорой",
-    "emptyHint": "Одоогоор холбогдсон интеграц алга.",
     "disconnect": "Салгах",
     "disconnectTitle": "{{provider}} холболтыг салгах уу?",
     "disconnectMessage": "Kilo {{provider}} дээр хариу өгөхөө болино. Та хүссэн үедээ дахин холбох боломжтой.",

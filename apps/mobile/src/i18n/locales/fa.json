@@ -3407,6 +3407,7 @@
     },
     "settingsOnWeb": {
       "title": "تنظیمات سازمان در وب",
+      "integrations": "یکپارچه‌سازی‌ها در وب",
       "usageDetails": "جزئیات مصرف",
       "providersAndModels": "ارائه‌دهندگان و مدل‌ها",
       "groups": "گروه‌ها",
@@ -4410,7 +4411,6 @@
     "sectionTitle": "سرویس‌های متصل",
     "entrySubtitle": "GitHub، Slack، Linear و موارد دیگر",
     "subtitle": "ابزارها و گردش‌کارهای توسعهٔ خود را به Kilo متصل کنید",
-    "emptyHint": "هنوز هیچ یکپارچه‌سازی متصل نشده است.",
     "disconnect": "قطع اتصال",
     "disconnectTitle": "اتصال {{provider}} قطع شود؟",
     "disconnectMessage": "Kilo دیگر در {{provider}} پاسخ نمی‌دهد. هر زمان بخواهید می‌توانید دوباره متصل شوید.",

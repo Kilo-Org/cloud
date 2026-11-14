@@ -200,7 +200,9 @@ const TITLE_KEYS = {
   emailPreferences: 'organization.settingsOnWeb.emailPreferences',
   dataCollection: 'organization.settingsOnWeb.dataCollection',
   requestLogs: 'organization.settingsOnWeb.requestLogs',
-  integrations: 'integrations.title',
+  // The in-app organization Integrations row opens the app's own screen; this
+  // one opens the web page, so it names the web instead of repeating that title.
+  integrations: 'organization.settingsOnWeb.integrations',
   subOrganizations: 'organization.settingsOnWeb.subOrganizations',
   distributeFunds: 'organization.settingsOnWeb.distributeFunds',
 } satisfies Record<OrgSettingsArea, string>;

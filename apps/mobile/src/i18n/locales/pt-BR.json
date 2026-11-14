@@ -3471,6 +3471,7 @@
     },
     "settingsOnWeb": {
       "title": "Configurações da organização na web",
+      "integrations": "Integrações na web",
       "usageDetails": "Detalhes de uso",
       "providersAndModels": "Provedores e modelos",
       "groups": "Grupos",
@@ -4481,7 +4482,6 @@
     "sectionTitle": "Serviços conectados",
     "entrySubtitle": "GitHub, Slack, Linear e mais",
     "subtitle": "Conecte suas ferramentas e fluxos de trabalho de desenvolvimento ao Kilo",
-    "emptyHint": "Nenhuma integração conectada ainda.",
     "disconnect": "Desconectar",
     "disconnectTitle": "Desconectar {{provider}}?",
     "disconnectMessage": "O Kilo deixará de responder no {{provider}}. Você pode reconectar a qualquer momento.",

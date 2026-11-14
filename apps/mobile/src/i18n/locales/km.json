@@ -3407,6 +3407,7 @@
     },
     "settingsOnWeb": {
       "title": "ការកំណត់អង្គការនៅលើគេហទំព័រ",
+      "integrations": "ការរួមបញ្ចូលនៅលើគេហទំព័រ",
       "usageDetails": "ព័ត៌មានលម្អិតអំពីការប្រើប្រាស់",
       "providersAndModels": "អ្នកផ្តល់សេវា និងម៉ូដែល",
       "groups": "ក្រុម",
@@ -4410,7 +4411,6 @@
     "sectionTitle": "សេវាកម្មដែលបានភ្ជាប់",
     "entrySubtitle": "GitHub, Slack, Linear និងច្រើនទៀត",
     "subtitle": "ភ្ជាប់ឧបករណ៍អភិវឌ្ឍន៍ និងលំហូរការងាររបស់អ្នកទៅ Kilo",
-    "emptyHint": "មិនទាន់មានការរួមបញ្ចូលណាមួយត្រូវបានភ្ជាប់នៅឡើយទេ។",
     "disconnect": "ផ្ដាច់",
     "disconnectTitle": "ផ្ដាច់ {{provider}}?",
     "disconnectMessage": "Kilo នឹងឈប់ឆ្លើយតបនៅក្នុង {{provider}}។ អ្នកអាចភ្ជាប់ឡើងវិញបានគ្រប់ពេល។",

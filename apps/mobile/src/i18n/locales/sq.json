@@ -3407,6 +3407,7 @@
     },
     "settingsOnWeb": {
       "title": "Cilësimet e organizatës në ueb",
+      "integrations": "Integrimet në ueb",
       "usageDetails": "Detajet e përdorimit",
       "providersAndModels": "Ofruesit dhe modelet",
       "groups": "Grupet",
@@ -4410,7 +4411,6 @@
     "sectionTitle": "Shërbimet e lidhura",
     "entrySubtitle": "GitHub, Slack, Linear dhe të tjera",
     "subtitle": "Lidh mjetet dhe proceset e tua të zhvillimit me Kilo",
-    "emptyHint": "Ende nuk ka asnjë integrim të lidhur.",
     "disconnect": "Shkëput",
     "disconnectTitle": "Të shkëputet {{provider}}?",
     "disconnectMessage": "Kilo do të ndalojë së përgjigjuri në {{provider}}. Mund ta lidhësh sërish në çdo kohë.",

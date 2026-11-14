@@ -3407,6 +3407,7 @@
     },
     "settingsOnWeb": {
       "title": "वेबमा संस्थाका सेटिङहरू",
+      "integrations": "वेबमा एकीकरणहरू",
       "usageDetails": "प्रयोग विवरण",
       "providersAndModels": "प्रदायक र मोडेलहरू",
       "groups": "समूहहरू",
@@ -4410,7 +4411,6 @@
     "sectionTitle": "जोडिएका सेवाहरू",
     "entrySubtitle": "GitHub, Slack, Linear र अन्य",
     "subtitle": "आफ्ना विकास उपकरण र कार्यप्रवाहहरूलाई Kilo सँग जोड्नुहोस्",
-    "emptyHint": "अहिलेसम्म कुनै एकीकरण जोडिएको छैन।",
     "disconnect": "विच्छेद गर्नुहोस्",
     "disconnectTitle": "{{provider}} विच्छेद गर्ने हो?",
     "disconnectMessage": "Kilo ले {{provider}} मा जवाफ दिन बन्द गर्नेछ। तपाईं जुनसुकै बेला पुनः जोड्न सक्नुहुन्छ।",

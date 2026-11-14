@@ -912,6 +912,9 @@ describe('Organization hub integrations rows', () => {
     ]);
 
     const [inApp, web] = rows;
+    if (inApp === undefined || web === undefined) {
+      throw new Error('the hub shows both integrations rows');
+    }
     act(() => {
       (inApp.props.onPress as () => void)();
     });

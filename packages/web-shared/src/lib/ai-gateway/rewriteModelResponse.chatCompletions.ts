@@ -74,6 +74,7 @@ export async function rewriteModelResponse_ChatCompletions({
         headers,
       });
     }
+    if (typeof json.id === 'string' && json.id) capture?.setGenerationId(json.id);
     const usage = json.usage as OpenRouterUsage;
     const firstMessage = json.choices?.[0]?.message as
       | (OpenAI.ChatCompletionMessage & ResponseMetadata)
@@ -142,6 +143,7 @@ export async function rewriteModelResponse_ChatCompletions({
           const json = JSON.parse(event.data) as ChatCompletionChunk & ResponseMetadata;
           if (generationId === undefined && json.id) {
             generationId = json.id;
+            capture?.setGenerationId(generationId);
             logExceptInTest('[rewriteModelResponse] received generation ID', {
               kind: 'chat_completions',
               generationId,

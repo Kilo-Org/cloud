@@ -4,7 +4,6 @@ import { useId, useState, type ReactNode } from 'react';
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
@@ -16,8 +15,7 @@ type LogExportFormProps = {
   downloadPath: string;
   idLabel: string;
   idPlaceholder: string;
-  idInputMode?: 'numeric';
-  showErrorsOnly?: boolean;
+  showGenerationId?: boolean;
   /** Optional gate that must succeed before the browser navigates. */
   preflight?: () => Promise<void>;
 };
@@ -28,8 +26,7 @@ export function LogExportForm({
   downloadPath,
   idLabel,
   idPlaceholder,
-  idInputMode,
-  showErrorsOnly = false,
+  showGenerationId = false,
   preflight,
 }: LogExportFormProps) {
   const fieldId = useId();
@@ -42,7 +39,7 @@ export function LogExportForm({
   const [endTime, setEndTime] = useState('');
   const [model, setModel] = useState('');
   const [sessionId, setSessionId] = useState('');
-  const [errorsOnly, setErrorsOnly] = useState(false);
+  const [generationId, setGenerationId] = useState('');
 
   async function handleDownload() {
     const params = new URLSearchParams();
@@ -73,8 +70,8 @@ export function LogExportForm({
     if (sessionId.trim()) {
       params.set('sessionId', sessionId.trim());
     }
-    if (showErrorsOnly && errorsOnly) {
-      params.set('errorsOnly', 'true');
+    if (showGenerationId && generationId.trim()) {
+      params.set('generationId', generationId.trim());
     }
 
     if (preflight) {
@@ -102,12 +99,23 @@ export function LogExportForm({
             <Label htmlFor={`${fieldId}-id`}>{idLabel}</Label>
             <Input
               id={`${fieldId}-id`}
-              inputMode={idInputMode}
               placeholder={idPlaceholder}
               value={id}
               onChange={e => setId(e.target.value)}
             />
           </div>
+
+          {showGenerationId && (
+            <div className="space-y-2">
+              <Label htmlFor={`${fieldId}-generationId`}>Generation ID</Label>
+              <Input
+                id={`${fieldId}-generationId`}
+                placeholder="Enter upstream generation ID"
+                value={generationId}
+                onChange={e => setGenerationId(e.target.value)}
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor={`${fieldId}-userId`}>User ID or email</Label>
@@ -196,19 +204,6 @@ export function LogExportForm({
             whole day, and the end time includes the full minute.
           </p>
         </div>
-
-        {showErrorsOnly && (
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id={`${fieldId}-errorsOnly`}
-              checked={errorsOnly}
-              onCheckedChange={checked => setErrorsOnly(checked === true)}
-            />
-            <Label htmlFor={`${fieldId}-errorsOnly`} className="cursor-pointer">
-              Errors only (status &ge; 400 or error present)
-            </Label>
-          </div>
-        )}
 
         <Button onClick={() => void handleDownload()}>
           <Download />

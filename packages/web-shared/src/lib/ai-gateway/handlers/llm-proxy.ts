@@ -454,6 +454,7 @@ export async function handleLlmProxyRequest(
   const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
   if (bouncerRejection) return bouncerRejection;
   const requestLogging = {
+    usage_id: usageId,
     user: caller.kind === 'signed-in' ? caller.user : null,
     organization_id: organizationId || null,
     session_id: usageContext.session_id,
@@ -472,7 +473,6 @@ export async function handleLlmProxyRequest(
     await logUnrewrittenResponse({
       response: guardrailRejection.clone(),
       model: effectiveModelIdLowerCased,
-      providerId: route.provider.type,
       logging: requestLogging,
       error: { guardrail_rejection: guardrailVerdict.action },
     });

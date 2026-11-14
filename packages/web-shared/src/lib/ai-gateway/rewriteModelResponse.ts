@@ -1,4 +1,4 @@
-import { api_request_log, type User } from '@kilocode/db/schema';
+import { api_request_log_2, type User } from '@kilocode/db/schema';
 import type { CustomPricingTiers } from '@kilocode/db/schema-types';
 import { detectToolCallArgumentErrors } from '@kilocode/web-shared/lib/ai-gateway/api-request-log-errors';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -9,11 +9,12 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { getDynamicRequestLoggingMode } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
+import { stripNulBytesInPlace } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
-import { sanitizeJsonbValue } from '@kilocode/web-shared/lib/sanitize-jsonb';
 import {
-  uploadApiRequestLogBlobs,
+  apiRequestLogBlobKey,
+  uploadApiRequestLogBlob,
   type EnkryptRequestLog,
 } from '@kilocode/web-shared/lib/r2/api-request-log';
 import { after, type NextResponse } from 'next/server';
@@ -26,6 +27,8 @@ import { rewriteModelResponse_Messages } from '@kilocode/web-shared/lib/ai-gatew
 import { rewriteModelResponse_Responses } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.responses';
 
 export type RequestLoggingParams = {
+  /** The `microdollar_usage` id of the request, which is also the log row id. */
+  usage_id: string;
   user: User | null;
   organization_id: string | null;
   session_id: string | null;
@@ -37,9 +40,8 @@ export type RequestLoggingParams = {
 export type LogUnrewrittenResponseParams = {
   response: Response;
   model: string;
-  providerId: ProviderType;
   logging: RequestLoggingParams;
-  /** Merged into the row's `error`, e.g. to mark a response the gateway produced itself. */
+  /** Merged into the logged `error`, e.g. to mark a response the gateway produced itself. */
   error: Record<string, string> | null;
 };
 
@@ -84,20 +86,21 @@ export function redactApiRequestLogRequest(request: GatewayRequest): Record<stri
 async function createRequestLogCapture(
   response: Response,
   model: string,
-  provider: string,
   logging: RequestLoggingParams,
   extraError: Record<string, string> | null
 ): Promise<RequestLogCapture | null> {
-  const { user, organization_id, session_id, vercel_request_id, request } = logging;
+  const { usage_id, user, organization_id, session_id, request } = logging;
   const loggingMode = await getDynamicRequestLoggingMode({
     accountId: user?.id ?? null,
     organizationId: organization_id,
   });
-  if (loggingMode === null) {
+  // Anonymous requests have neither an account nor an organization to opt in, so they never match.
+  if (loggingMode === null || user === null) {
     if (logging.enkrypt) after(async () => void (await logging.enkrypt?.(false)));
     return null;
   }
   const status = response.status;
+  let generationId: string | null = null;
 
   let resolveCaptured: (result: CapturedResponseBody) => void = () => {};
   const captured = new Promise<CapturedResponseBody>(resolve => {
@@ -139,48 +142,45 @@ async function createRequestLogCapture(
         await logging.enkrypt?.(false);
         return;
       }
-      const { columns: blobColumns, uploadError } = await uploadApiRequestLogBlobs({
+      const row = {
+        id: usage_id,
+        created_at: new Date().toISOString(),
+        generation_id: generationId,
+        kilo_user_id: user.id,
+        organization_id,
+        session_id,
+        requested_model: model,
+      };
+      // The session ID comes from client headers and the generation ID from the upstream
+      // response; Postgres text rejects NUL bytes. Stripping them, as microdollar_usage_metadata
+      // does, keeps the session ID equal to the one stored there.
+      stripNulBytesInPlace(row, []);
+      const uploadError = await uploadApiRequestLogBlob(apiRequestLogBlobKey(row), {
         request: redactApiRequestLogRequest(request),
-        response: responseText,
+        response: responseText ?? null,
+        error: detectedError,
         enkrypt: await logging.enkrypt?.(),
       });
-      const r2UploadError = uploadError?.substring(0, 4000);
-      if (r2UploadError !== undefined) {
+      if (uploadError !== null) {
         logExceptInTest(
-          `[rewriteModelResponse] failed to upload api_request_log blobs to R2 (user=${user?.id}, status=${status}, model=${model}): ${r2UploadError}`
+          `[rewriteModelResponse] failed to upload api_request_log_2 blob to R2 (user=${user.id}, status=${status}, model=${model}): ${uploadError.substring(0, 4000)}`
         );
+        return;
       }
-      const error =
-        r2UploadError === undefined
-          ? detectedError
-          : { ...(detectedError ?? {}), r2_upload_error: r2UploadError };
-      const apiRequestLogId = await db
-        .insert(api_request_log)
-        .values({
-          kilo_user_id: user?.id,
-          organization_id,
-          session_id,
-          vercel_request_id,
-          status_code: status,
-          model,
-          provider,
-          error: sanitizeJsonbValue(error),
-          ...blobColumns,
-        })
-        .returning({ id: api_request_log.id });
-      logExceptInTest(
-        '[rewriteModelResponse] Inserted into api_request_log',
-        apiRequestLogId[0].id
-      );
+      await db.insert(api_request_log_2).values(row);
+      logExceptInTest('[rewriteModelResponse] Inserted into api_request_log_2', usage_id);
     } catch (e) {
       const cause = e instanceof Error ? e.cause : undefined;
       logExceptInTest(
-        `[rewriteModelResponse] failed to insert api_request_log (user=${user?.id}, status=${status}, model=${model}) cause (truncated): ${String(cause).substring(0, 4000)} error (truncated): ${String(e).substring(0, 4000)}`
+        `[rewriteModelResponse] failed to insert api_request_log_2 (user=${user.id}, status=${status}, model=${model}) cause (truncated): ${String(cause).substring(0, 4000)} error (truncated): ${String(e).substring(0, 4000)}`
       );
     }
   });
 
   return {
+    setGenerationId: id => {
+      generationId ??= id;
+    },
     setBody: text => settleOnce({ text }),
     setReadError: (error, partialBody) =>
       settleOnce(
@@ -195,11 +195,10 @@ async function createRequestLogCapture(
 export async function logUnrewrittenResponse({
   response,
   model,
-  providerId,
   logging,
   error,
 }: LogUnrewrittenResponseParams): Promise<void> {
-  const capture = await createRequestLogCapture(response, model, providerId, logging, error);
+  const capture = await createRequestLogCapture(response, model, logging, error);
   if (!capture) {
     return;
   }
@@ -221,7 +220,7 @@ export async function rewriteModelResponse({
   logging,
   responseTransforms,
 }: RewriteModelResponseParams): Promise<NextResponse> {
-  const capture = await createRequestLogCapture(response, model, providerId, logging, null);
+  const capture = await createRequestLogCapture(response, model, logging, null);
   const usageContext: ResponseUsageContext = {
     requested_model: model,
     provider: providerId,

@@ -28,6 +28,8 @@ import { NextResponse } from 'next/server';
  * logging and once for rewriting.
  */
 export type RequestLogCapture = {
+  /** Only the first generation ID is kept. */
+  setGenerationId(id: string): void;
   setBody(text: string): void;
   setReadError(error: unknown, partialBody?: string): void;
 };

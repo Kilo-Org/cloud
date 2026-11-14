@@ -5,7 +5,7 @@ import { File, Paths } from 'expo-file-system';
  * `dist/storage.js`: `EVENTS_STORAGE_FILE` and `LOGS_STORAGE_FILE`.
  * The key argument to `getItem`/`setItem` is the file name.
  */
-export const POSTHOG_STORAGE_FILES = ['.posthog-rn.json', '.posthog-rn-logs.json'] as const;
+const POSTHOG_STORAGE_FILES = ['.posthog-rn.json', '.posthog-rn-logs.json'] as const;
 
 /**
  * PostHogCustomStorage backed by `Paths.cache`. iOS Caches is not exposed by

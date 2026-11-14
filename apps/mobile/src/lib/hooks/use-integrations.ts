@@ -13,7 +13,7 @@ import {
 } from '@/lib/pr-review/connect-gate-platform';
 import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
-import { readTrpcErrorField } from '@/lib/trpc-error';
+import { isTrpcClientError, readTrpcErrorField } from '@/lib/trpc-error';
 
 /**
  * The scope's connections, from the same read the web integrations hub uses:
@@ -151,9 +151,14 @@ async function connectUrl(
     // can mint a token, and the page still works without one: it mints its own
     // state for the signed-in web user. Both therefore open that page instead
     // of an error toast, which would leave the row inert in exactly the state
-    // that needs a route to it.
+    // that needs a route to it. A non-tRPC rejection can carry a bare `code`, so
+    // only a real client error counts.
     const code = readTrpcErrorField(error, 'code');
-    if (organizationId && (code === 'FORBIDDEN' || code === 'UNAUTHORIZED')) {
+    if (
+      organizationId &&
+      isTrpcClientError(error) &&
+      (code === 'FORBIDDEN' || code === 'UNAUTHORIZED')
+    ) {
       return getGitHubIntegrationUrl(WEB_BASE_URL, organizationId);
     }
     throw error;

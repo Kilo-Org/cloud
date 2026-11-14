@@ -144,6 +144,23 @@ describe('useIntegrationConnect', () => {
     });
   }
 
+  // A filesystem or domain error carries a bare `code` too, and it is not a
+  // server verdict: only a real tRPC client error may open the page.
+  it('reports a non-tRPC rejection that carries a bare permission code', async () => {
+    mocks.mintInstallState.mockRejectedValueOnce(
+      Object.assign(new Error('EACCES'), { code: 'FORBIDDEN' })
+    );
+    const onReturned = vi.fn(() => Promise.resolve());
+    const resultRef = mountHook('org_1', onReturned);
+
+    await connect(resultRef, 'github');
+
+    expect(mocks.toastError).toHaveBeenCalledWith('integrations.connectFailed');
+    expect(mocks.launch).not.toHaveBeenCalled();
+    expect(onReturned).not.toHaveBeenCalled();
+    expect(requireHook(resultRef).pendingProvider).toBeNull();
+  });
+
   it('reports a mint failure that is neither a permission nor an installation refusal', async () => {
     mocks.mintInstallState.mockRejectedValueOnce({ data: { code: 'INTERNAL_SERVER_ERROR' } });
     const onReturned = vi.fn(() => Promise.resolve());

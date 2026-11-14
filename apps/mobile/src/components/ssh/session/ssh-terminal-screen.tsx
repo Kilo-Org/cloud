@@ -1,6 +1,5 @@
-import { type TerminalViewHandle } from '../../../../modules/kilo-ssh/src';
 import { usePathname, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -14,13 +13,10 @@ import { SshSessionNotice } from '@/components/ssh/session/ssh-session-notice';
 import { SshSessionStage } from '@/components/ssh/session/ssh-session-stage';
 import { SshSessionSwitcher } from '@/components/ssh/session/ssh-session-switcher';
 import { TerminalKeyBar } from '@/components/ssh/session/terminal-key-bar';
-import {
-  blurShell,
-  sendToShell,
-  startupCommandForShell,
-} from '@/components/ssh/session/terminal-input';
+import { blurShell, sendToShell } from '@/components/ssh/session/terminal-input';
 import { useTerminalPaste } from '@/components/ssh/session/terminal-paste';
 import { TerminalSurface } from '@/components/ssh/session/terminal-surface';
+import { useTerminalShell } from '@/components/ssh/session/use-terminal-shell';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { FolderOpen, MoreHorizontal, RefreshCw, Rows3, WifiOff } from '@/components/ui/icons';
@@ -28,13 +24,7 @@ import { Text } from '@/components/ui/text';
 import { openExternalUrl } from '@/lib/external-link';
 import { useTerminalFontSize } from '@/lib/hooks/use-terminal-font-size';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import {
-  closeSession,
-  consumePendingCommand,
-  decideHostKey,
-  endShell,
-  retrySession,
-} from '@/lib/ssh/session/manager';
+import { closeSession, decideHostKey, endShell, retrySession } from '@/lib/ssh/session/manager';
 import { useIdleNotifyArming } from '@/lib/ssh/session/use-idle-notify-arming';
 import { closeReasonMessage } from '@/lib/ssh/session/phase-copy';
 import { needsPrompt, type SshSessionPhase } from '@/lib/ssh/session/types';
@@ -52,7 +42,6 @@ import {
   sshSessionPath,
 } from '@/lib/ssh/routes';
 import { type SshSnippet } from '@/lib/ssh/snippets';
-import { encodeTerminalInput } from '@/lib/ssh/terminal-bytes';
 
 type SshTerminalScreenProps = Readonly<{ sessionId: string }>;
 
@@ -70,46 +59,29 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
   const sessions = useSshSessions();
   const rehydrated = useSshSessionsRehydrated();
   const { fontSize, setFontSize } = useTerminalFontSize();
-  const terminalRef = useRef<TerminalViewHandle>(null);
+  const { terminalRef, displayedShellId, surface, autoFocus, onLayout } = useTerminalShell(
+    sessionId,
+    session
+  );
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [snippetsOpen, setSnippetsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [forwardsOpen, setForwardsOpen] = useState(false);
   const [shellTitle, setShellTitle] = useState<string | null>(null);
-  const [laidOutShellId, setLaidOutShellId] = useState<string | null>(null);
   const paste = useTerminalPaste(terminalRef);
 
   const phase: SshSessionPhase | null = session?.phase ?? null;
   const promptWaiting = phase !== null && needsPrompt(phase);
   const promptOnTop = pathname.includes('/ssh/prompt/');
   const shellId = session?.shellId ?? null;
-  const pendingCommand = session?.pendingCommand ?? null;
 
   useIdleNotifyArming(sessionId, shellId, phase?.kind ?? null);
-
-  // A reconnect leaves the last output on screen and the strip above it as the
-  // status; the keyboard would only cover that shell, so it closes.
-  useEffect(() => {
-    if (phase?.kind === 'reconnecting') {
-      void blurShell(terminalRef.current);
-    }
-  }, [phase?.kind]);
 
   useEffect(() => {
     if (promptWaiting && !promptOnTop) {
       router.push(sshPromptPath(sessionId));
     }
   }, [promptWaiting, promptOnTop, router, sessionId]);
-
-  // Fabric may expose the ref before its native view tag can receive commands.
-  useEffect(() => {
-    const terminal = terminalRef.current;
-    const command = startupCommandForShell(shellId, laidOutShellId, pendingCommand);
-    if (command === null || terminal === null) {
-      return;
-    }
-    void typeOnce(terminal, sessionId, command);
-  }, [pendingCommand, shellId, laidOutShellId, sessionId]);
 
   async function sendSnippet(snippet: SshSnippet) {
     setSnippetsOpen(false);
@@ -127,21 +99,15 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
     return rehydrated ? <SshTerminalClosed /> : null;
   }
 
-  // A shell that exists keeps its view — and its buffer — through a reconnect,
-  // so the strip above is the only status then. The wait and the endings own
-  // the area only when there is no shell at all.
-  const showStage = phase.kind === 'connecting' || phase.kind === 'closed';
+  const showStage = surface?.stage ?? false;
   const terminalArea =
-    shellId === null ? null : (
+    !surface?.terminal || displayedShellId === null ? null : (
       <TerminalSurface
-        key={shellId}
         handleRef={terminalRef}
-        sourceId={shellId}
-        autoFocus
+        sourceId={displayedShellId}
+        autoFocus={autoFocus}
         fontSize={fontSize}
-        onLayout={() => {
-          setLaidOutShellId(shellId);
-        }}
+        onLayout={onLayout}
         onLinkPress={url => {
           void openExternalUrl(url);
         }}
@@ -207,12 +173,18 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
         headerRightWidth={144}
       />
 
-      {phase.kind === 'reconnecting' ? (
+      {surface?.reconnecting ? (
         <SshSessionNotice
           tone="warn"
           icon={WifiOff}
-          title={t('ssh.session.reconnectingTitle', { attempt: phase.attempt })}
-          message={closeReasonMessage(t, phase.reason)}
+          title={t('ssh.session.reconnectingTitle', {
+            attempt:
+              phase.kind === 'connecting' || phase.kind === 'reconnecting' ? phase.attempt : 1,
+          })}
+          message={closeReasonMessage(
+            t,
+            phase.kind === 'reconnecting' ? phase.reason : 'disconnected'
+          )}
           action={
             <Button
               variant="outline"
@@ -231,14 +203,10 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
 
       {blockedHostKey === null ? (
         <KeyboardAvoidingView className="flex-1" behavior="padding">
-          <View className="flex-1 bg-background">
-            {/* A shell that exists stays mounted through a reconnect, with its
-                buffer, so the strip above is the only status on the screen. */}
-            {terminalArea ?? stageArea}
-          </View>
-          {shellId === null ? null : (
+          <View className="flex-1 bg-background">{terminalArea ?? stageArea}</View>
+          {!surface?.terminal ? null : (
             <TerminalKeyBar
-              disabled={phase.kind !== 'connected'}
+              disabled={!surface.inputEnabled}
               onSend={text => {
                 void sendToShell(terminalRef.current, text);
               }}
@@ -327,22 +295,4 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
       {paste.sheet}
     </View>
   );
-}
-
-/**
- * Types the pending command — the tmux attach — and then records that it was
- * sent. The shell can end between the mount and the keystroke, which is not a
- * failure this screen can act on.
- */
-async function typeOnce(
-  terminal: TerminalViewHandle,
-  sessionId: string,
-  command: string
-): Promise<void> {
-  try {
-    await terminal.sendInput(encodeTerminalInput(command));
-    consumePendingCommand(sessionId, command);
-  } catch {
-    // The shell closed before the command reached it.
-  }
 }

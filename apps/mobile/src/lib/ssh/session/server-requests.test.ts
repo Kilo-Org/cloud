@@ -5,7 +5,7 @@ import { type LiveSession } from './live';
 import { handlePrompts } from './server-requests';
 
 const state = vi.hoisted(() => ({
-  live: new Map<string, LiveSession>(),
+  live: new Map<string, Pick<LiveSession, 'connecting' | 'prompts' | 'promptsHostId'>>(),
   answerPrompts: vi.fn(),
   setPhase: vi.fn(),
 }));
@@ -34,18 +34,28 @@ beforeEach(() => {
 
 describe('keyboard-interactive rounds', () => {
   it('acknowledges the final empty PAM round without opening an empty sheet', async () => {
-    const entry = { connecting: true, prompts: null, promptsHostId: 'host-1' } as LiveSession;
+    const entry: Pick<LiveSession, 'connecting' | 'prompts' | 'promptsHostId'> = {
+      connecting: true,
+      prompts: null,
+      promptsHostId: 'host-1',
+    };
     state.live.set('session-1', entry);
 
     handlePrompts(request([]));
 
-    await vi.waitFor(() => expect(state.answerPrompts).toHaveBeenCalledWith('request-1', []));
+    await vi.waitFor(() => {
+      expect(state.answerPrompts).toHaveBeenCalledWith('request-1', []);
+    });
     expect(entry.prompts).toBeNull();
     expect(state.setPhase).not.toHaveBeenCalled();
   });
 
   it('still presents rounds that ask for an answer', () => {
-    const entry = { connecting: true, prompts: null, promptsHostId: 'host-1' } as LiveSession;
+    const entry: Pick<LiveSession, 'connecting' | 'prompts' | 'promptsHostId'> = {
+      connecting: true,
+      prompts: null,
+      promptsHostId: 'host-1',
+    };
     state.live.set('session-1', entry);
     const prompts = [{ text: 'Password', echo: false }];
 
@@ -61,6 +71,8 @@ describe('keyboard-interactive rounds', () => {
 
   it('cancels even an empty round when no connection owns it', async () => {
     handlePrompts(request([]));
-    await vi.waitFor(() => expect(state.answerPrompts).toHaveBeenCalledWith('request-1', null));
+    await vi.waitFor(() => {
+      expect(state.answerPrompts).toHaveBeenCalledWith('request-1', null);
+    });
   });
 });

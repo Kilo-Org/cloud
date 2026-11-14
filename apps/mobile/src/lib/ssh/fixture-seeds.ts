@@ -186,17 +186,16 @@ function fixturePhase(name: string): SshSessionPhase | null {
   }
 }
 
-/**
- * One session in a named state, then its terminal screen. The connected state
- * gets a JavaScript-fed terminal source with real output; every other state is
- * a phase the screen renders without a connection.
- */
+/** Connected and reconnecting fixtures retain a terminal with sample output. */
 export async function seedSession(name: string): Promise<string> {
   const db = await sshDatabase();
   const host = createHost(db, { ...SESSION_HOST, authMethod: 'password' });
   const sessionId = `fixture-session-${name}`;
   const phase = fixturePhase(name) ?? { kind: 'connected' as const };
-  const shellId = phase.kind === 'connected' ? await openSampleShell(host.label) : null;
+  const shellId =
+    phase.kind === 'connected' || phase.kind === 'reconnecting'
+      ? await openSampleShell(host.label)
+      : null;
 
   writeSession({
     id: sessionId,

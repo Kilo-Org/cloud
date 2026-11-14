@@ -24,16 +24,27 @@ describe('startupCommandForShell', () => {
   });
 });
 
+function terminalWithBlur(blur: TerminalViewHandle['blur']): TerminalViewHandle {
+  return {
+    blur,
+    sendInput: vi.fn(),
+    copySelection: vi.fn(),
+    paste: vi.fn(),
+    pasteFromClipboard: vi.fn(),
+    focus: vi.fn(),
+    scrollToBottom: vi.fn(),
+  };
+}
 describe('blurShell', () => {
   it('blurs the native terminal that owns the keyboard', async () => {
     const blur = vi.fn().mockResolvedValue(undefined);
-    await blurShell({ blur } as TerminalViewHandle);
+    await blurShell(terminalWithBlur(blur));
     expect(blur).toHaveBeenCalledOnce();
   });
 
   it('tolerates a terminal that was removed during dismissal', async () => {
     const blur = vi.fn().mockRejectedValue(new Error('view removed'));
     await expect(blurShell(null)).resolves.toBeUndefined();
-    await expect(blurShell({ blur } as TerminalViewHandle)).resolves.toBeUndefined();
+    await expect(blurShell(terminalWithBlur(blur))).resolves.toBeUndefined();
   });
 });

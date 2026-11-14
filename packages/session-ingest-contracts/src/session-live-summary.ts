@@ -110,11 +110,12 @@ function isFormatControl(code: number): boolean {
 }
 
 /**
- * Display text as one line of what it draws: control characters and line breaks
- * become spaces, layout format controls are left out, and the joiners that
- * shape adjacent characters are kept. Every display surface that shows stored
- * text reads it through this, so one string cannot read two ways. White space
- * is left as it is; `sessionLiveText` collapses and bounds it.
+ * Display text as one line of what it draws: control characters (the C0 range,
+ * delete, the C1 range) and line breaks become spaces, layout format controls
+ * are left out, and the joiners that shape adjacent characters are kept. Every
+ * display surface that shows stored text reads it through this, so one string
+ * cannot read two ways. White space is left as it is; `sessionLiveText`
+ * collapses and bounds it.
  */
 export function sessionDisplayLine(raw: string): string {
   // Iterating code points keeps a surrogate pair whole while the control set is
@@ -124,7 +125,9 @@ export function sessionDisplayLine(raw: string): string {
     .map(char => {
       const code = char.codePointAt(0) ?? 0;
       if (isFormatControl(code)) return '';
-      return code <= 0x1f || code === 0x7f || code === 0x2028 || code === 0x2029 ? ' ' : char;
+      return code <= 0x1f || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029
+        ? ' '
+        : char;
     })
     .join('');
 }

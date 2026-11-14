@@ -20,7 +20,7 @@ import { triageSecurityFinding } from './triage.js';
 import { readAnalysisCreditAdmission } from './credit-admission.js';
 import { interruptAnalysisCloudAgentSession } from './session-interrupt.js';
 import { maybeAutoDismissCompletedAnalysis } from './auto-dismiss.js';
-import type { AnalysisMode, SecurityFindingAnalysis } from './types.js';
+import type { AnalysisMode, AutoAnalysisFailureCode, SecurityFindingAnalysis } from './types.js';
 
 export class InsufficientCreditsError extends Error {
   readonly httpStatus = 402;
@@ -169,6 +169,11 @@ export type StartSecurityAnalysisResult = {
   error?: string;
   triageOnly?: boolean;
   failureNeedsLifecycleTransition?: boolean;
+  /**
+   * Declared classification of a failed start. Callers must use it instead of
+   * classifying `error` text when it is present.
+   */
+  failureCode?: AutoAnalysisFailureCode;
 };
 
 export async function startSecurityAnalysis(
@@ -223,6 +228,16 @@ export async function startSecurityAnalysis(
       // The denial is raised before any paid work runs; the caller settles the
       // credit-gated outcome.
       throw new InsufficientCreditsError(admission.message);
+    }
+    if (admission.outcome === 'refused') {
+      // The refusal is permanent, so it declares its own classification and the
+      // caller does not spend retry attempts on it.
+      return {
+        started: false,
+        error: admission.message,
+        failureNeedsLifecycleTransition: true,
+        failureCode: 'PERMISSION_DENIED_PERMANENT',
+      };
     }
     if (admission.outcome === 'unavailable') {
       // The admission read could not decide, so no paid work runs and the

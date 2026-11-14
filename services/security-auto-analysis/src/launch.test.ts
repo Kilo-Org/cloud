@@ -711,6 +711,30 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
     expect(cloudAgentFetch).not.toHaveBeenCalled();
   });
 
+  it('declares a refused admission as a permanent failure without paid work', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
+    vi.mocked(readAnalysisCreditAdmission).mockResolvedValue({
+      outcome: 'refused',
+      message: 'Cloud Agent credit admission was refused',
+    });
+    const cloudAgentFetch = vi.fn();
+
+    await expect(
+      startSecurityAnalysis(createParams(false, cloudAgentFetch as never))
+    ).resolves.toEqual({
+      started: false,
+      error: 'Cloud Agent credit admission was refused',
+      failureNeedsLifecycleTransition: true,
+      failureCode: 'PERMISSION_DENIED_PERMANENT',
+    });
+
+    expect(triageSecurityFinding).not.toHaveBeenCalled();
+    expect(requestsTo(cloudAgentFetch.mock.calls, '/trpc/prepareSession')).toHaveLength(0);
+    expect(
+      requestsTo(cloudAgentFetch.mock.calls, '/trpc/initiateFromKilocodeSessionV2')
+    ).toHaveLength(0);
+  });
+
   it('releases the prepared session when the start reports insufficient credits', async () => {
     vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
     vi.mocked(triageSecurityFinding).mockResolvedValue(existingTriage);

@@ -119,10 +119,26 @@ describe('readAnalysisCreditAdmission unreadable answers', () => {
     expect(unavailableMessage(result)).toBe('Cloud Agent credit admission was not accepted');
   });
 
-  it('reports every refused status as one retryable message', async () => {
-    // The launch classifies the returned text, so the message stays constant and
-    // carries no status value for any refused response.
-    const statuses = [401, 403, 429, 500, 503];
+  it('reports an authorization refusal as a permanent refusal', async () => {
+    for (const status of [401, 403]) {
+      const { env } = createEnv(async () => new Response('refused', { status }));
+
+      const result = await readAnalysisCreditAdmission({ env, authToken: AUTH_TOKEN });
+
+      expect(result).toEqual({
+        outcome: 'refused',
+        message: 'Cloud Agent credit admission was refused',
+      });
+      if (result.outcome !== 'refused') throw new Error('Expected a refused admission');
+      expect(result.message).not.toMatch(/\d/);
+      expect(result.message).not.toContain(AUTH_TOKEN);
+    }
+  });
+
+  it('reports every other non-OK status as one retryable message', async () => {
+    // Only the authorization statuses are decided here; the deploy-ordering
+    // window and every other non-OK answer stay unreadable and retryable.
+    const statuses = [404, 429, 500, 503];
 
     for (const status of statuses) {
       const { env } = createEnv(async () => new Response('refused', { status }));
@@ -133,8 +149,7 @@ describe('readAnalysisCreditAdmission unreadable answers', () => {
 
       expect(message).toBe('Cloud Agent credit admission was not accepted');
       expect(message).not.toMatch(/\d/);
-      expect(message.toLowerCase()).not.toContain('forbidden');
-      expect(message.toLowerCase()).not.toContain('permission denied');
+      expect(message).not.toContain(AUTH_TOKEN);
     }
   });
 

@@ -170,7 +170,65 @@ describe('consumeOwnerBatch scheduled lifecycle handoff', () => {
           queueStatus: 'queued',
           failureCode: 'NETWORK_TIMEOUT',
           incrementAttempt: true,
+          nextRetryAt: expect.any(String),
         }),
+      })
+    );
+    expect(updateQueueFromPending).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('settles a declared permanent start failure once without requeueing it', async () => {
+    vi.mocked(startSecurityAnalysis).mockResolvedValue({
+      started: false,
+      error: 'Cloud Agent credit admission was refused',
+      failureNeedsLifecycleTransition: true,
+      failureCode: 'PERMISSION_DENIED_PERMANENT',
+    });
+    const message = {
+      body: {
+        ownerType: 'user',
+        ownerId: userId,
+        dispatchId: 'dispatch-refused',
+        enqueuedAt: '2026-05-19T08:00:00.000Z',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await consumeOwnerBatch(
+      { queue: 'security-auto-analysis-owner', messages: [message] } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://example' },
+        NEXTAUTH_SECRET: { get: async () => 'next-auth-secret' },
+        INTERNAL_API_SECRET: { get: async () => 'internal-api-secret' },
+        CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
+        GIT_TOKEN_SERVICE: {
+          getTokenForRepo: async () => ({ success: true, token: 'github-token' }),
+        },
+      } as unknown as CloudflareEnv
+    );
+
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledTimes(1);
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        claim: {
+          source: 'scheduled',
+          findingId,
+          queueRowId,
+          claimToken: 'scheduled-claim-token',
+        },
+        outcome: {
+          type: 'start-failed',
+          errorMessage: 'Cloud Agent credit admission was refused',
+          queueStatus: 'failed',
+          failureCode: 'PERMISSION_DENIED_PERMANENT',
+          incrementAttempt: true,
+          nextRetryAt: null,
+        },
       })
     );
     expect(updateQueueFromPending).not.toHaveBeenCalled();

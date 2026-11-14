@@ -362,7 +362,7 @@ export async function processManualAnalysisStart(params: {
           type: 'start-failed',
           errorMessage: result.error ?? 'Security analysis start failed',
           queueStatus: 'failed',
-          failureCode: 'START_CALL_AMBIGUOUS',
+          failureCode: result.failureCode ?? 'START_CALL_AMBIGUOUS',
           incrementAttempt: false,
           nextRetryAt: null,
         },
@@ -372,7 +372,7 @@ export async function processManualAnalysisStart(params: {
         findingId: finding.id,
         claimToken,
         status: 'failed',
-        failureCode: 'START_CALL_AMBIGUOUS',
+        failureCode: result.failureCode ?? 'START_CALL_AMBIGUOUS',
         errorMessage: result.error ?? null,
       });
       await releaseOrphanedStartReservation(params.db, finding.id);

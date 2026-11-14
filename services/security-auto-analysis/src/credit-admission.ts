@@ -1,16 +1,28 @@
 import { z } from 'zod';
 import { logger } from './logger.js';
 
-export const AnalysisCreditAdmissionSchema = z.discriminatedUnion('outcome', [
+const PeerAnalysisCreditAdmissionSchema = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.literal('admitted') }),
   z.object({ outcome: z.literal('insufficient_credits'), message: z.string() }),
   z.object({ outcome: z.literal('unavailable'), message: z.string() }),
 ]);
 
+/**
+ * The peer's three answers plus `refused`, which this service produces itself
+ * from an authorization-status answer so the caller gets a typed outcome
+ * instead of matching message text.
+ */
+export const AnalysisCreditAdmissionSchema = z.discriminatedUnion('outcome', [
+  z.object({ outcome: z.literal('admitted') }),
+  z.object({ outcome: z.literal('insufficient_credits'), message: z.string() }),
+  z.object({ outcome: z.literal('unavailable'), message: z.string() }),
+  z.object({ outcome: z.literal('refused'), message: z.string() }),
+]);
+
 export type AnalysisCreditAdmission = z.infer<typeof AnalysisCreditAdmissionSchema>;
 
 const CreditAdmissionResponseSchema = z.object({
-  result: z.object({ data: AnalysisCreditAdmissionSchema }),
+  result: z.object({ data: PeerAnalysisCreditAdmissionSchema }),
 });
 
 /**
@@ -19,9 +31,12 @@ const CreditAdmissionResponseSchema = z.object({
  * existing balance rule decides; nothing is re-derived here and the
  * initiate-time 402 stays authoritative.
  *
- * Any transport failure or unreadable response is `unavailable`, so the caller
- * keeps its normal retry and attempt classification. Neither the token, the
- * request body nor the peer's error body may appear in the result message.
+ * A `refused` answer is a permanent authorization refusal: the caller must not
+ * consume retry attempts for it. Every other non-OK answer stays unreadable and
+ * therefore keeps its existing retry classification, so the deploy-ordering
+ * window (a peer without this query answers 404) retries instead of failing.
+ * Neither the token, the request body nor the peer's error body may appear in
+ * the result message.
  */
 export async function readAnalysisCreditAdmission(params: {
   env: CloudflareEnv;
@@ -47,11 +62,14 @@ export async function readAnalysisCreditAdmission(params: {
   }
 
   if (!response.ok) {
-    // The launch classifies the returned message, so the message stays constant
-    // for every refused response and the status is recorded in the log instead.
+    // The status is never part of the message, and an authorization refusal is
+    // the only non-OK answer that is decided here rather than left unreadable.
     logger.warn('Cloud Agent credit admission returned non-OK status', {
       status: response.status,
     });
+    if (response.status === 401 || response.status === 403) {
+      return { outcome: 'refused', message: 'Cloud Agent credit admission was refused' };
+    }
     return {
       outcome: 'unavailable',
       message: 'Cloud Agent credit admission was not accepted',

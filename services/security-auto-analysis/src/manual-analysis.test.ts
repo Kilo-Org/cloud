@@ -688,6 +688,62 @@ describe('processManualAnalysisStart', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it('persists a refused start admission as a permanent failure on the queue row', async () => {
+    const execute = vi.fn().mockResolvedValue({ rows: [] });
+    const db = {
+      ...fakeAdmissionDb({
+        admissionAnalysisStatus: null,
+        queueRowId: 'queue-row-refused',
+        actorRow: { id: 'user-123', api_token_pepper: null },
+        configRow: { config: { analysis_mode: 'auto' } },
+      }),
+      execute,
+    };
+    vi.mocked(startSecurityAnalysis).mockResolvedValue({
+      started: false,
+      error: 'Cloud Agent credit admission was refused',
+      failureNeedsLifecycleTransition: true,
+      failureCode: 'PERMISSION_DENIED_PERMANENT',
+    });
+
+    await expect(
+      processManualAnalysisStart({
+        db: db as never,
+        env: {
+          GIT_TOKEN_SERVICE: {
+            getTokenForRepo: async () => ({
+              success: true,
+              token: 'github-token',
+              installationId: 'installation-123',
+              accountLogin: 'kilo',
+              appType: 'standard',
+            }),
+          },
+          NEXTAUTH_SECRET: { get: async () => 'next-auth-secret' },
+          INTERNAL_API_SECRET: { get: async () => 'internal-secret' },
+          CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
+        } as unknown as CloudflareEnv,
+        command,
+      })
+    ).resolves.toEqual({ status: 'failed' });
+
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        claim: expect.objectContaining({ source: 'manual', findingId: command.findingId }),
+        outcome: {
+          type: 'start-failed',
+          errorMessage: 'Cloud Agent credit admission was refused',
+          queueStatus: 'failed',
+          failureCode: 'PERMISSION_DENIED_PERMANENT',
+          incrementAttempt: false,
+          nextRetryAt: null,
+        },
+      })
+    );
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it('settles thrown manual credit failures before preserving queue retry behavior', async () => {
     const db = fakeAdmissionDb({
       admissionAnalysisStatus: null,

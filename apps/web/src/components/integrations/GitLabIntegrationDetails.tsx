@@ -521,38 +521,38 @@ export function GitLabIntegrationDetails({
               </div>
 
               {/* Actions */}
-              {canManage && (
-                <div className="flex flex-wrap gap-3">
-                  {(authType === 'pat' || isSelfHosted) && (
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        const targetUrl =
-                          authType === 'pat'
-                            ? `${gitlabInstanceUrl}/-/user_settings/personal_access_tokens`
-                            : `${gitlabInstanceUrl}/-/profile/applications`;
-                        window.open(targetUrl, '_blank');
-                      }}
-                    >
-                      {authType === 'pat' ? (
-                        <Key className="mr-2 h-4 w-4" />
-                      ) : (
-                        <Settings className="mr-2 h-4 w-4" />
-                      )}
-                      {authType === 'pat' ? 'Manage Access Token' : 'Manage on GitLab'}
-                      <ExternalLink className="ml-2 h-3 w-3" />
-                    </Button>
-                  )}
+              <div className="flex flex-wrap gap-3">
+                {(authType === 'pat' || isSelfHosted) && (
                   <Button
                     variant="outline"
-                    onClick={handleRefresh}
-                    disabled={refreshRepositoriesMutation.isPending}
+                    onClick={() => {
+                      const targetUrl =
+                        authType === 'pat'
+                          ? `${gitlabInstanceUrl}/-/user_settings/personal_access_tokens`
+                          : `${gitlabInstanceUrl}/-/profile/applications`;
+                      window.open(targetUrl, '_blank');
+                    }}
                   >
-                    <RefreshCw
-                      className={`mr-2 h-4 w-4 ${refreshRepositoriesMutation.isPending ? 'animate-spin' : ''}`}
-                    />
-                    {refreshRepositoriesMutation.isPending ? 'Refreshing...' : 'Refresh Projects'}
+                    {authType === 'pat' ? (
+                      <Key className="mr-2 h-4 w-4" />
+                    ) : (
+                      <Settings className="mr-2 h-4 w-4" />
+                    )}
+                    {authType === 'pat' ? 'Manage Access Token' : 'Manage on GitLab'}
+                    <ExternalLink className="ml-2 h-3 w-3" />
                   </Button>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={handleRefresh}
+                  disabled={refreshRepositoriesMutation.isPending}
+                >
+                  <RefreshCw
+                    className={`mr-2 h-4 w-4 ${refreshRepositoriesMutation.isPending ? 'animate-spin' : ''}`}
+                  />
+                  {refreshRepositoriesMutation.isPending ? 'Refreshing...' : 'Refresh Projects'}
+                </Button>
+                {canManage && (
                   <Button
                     variant="destructive"
                     onClick={handleDisconnect}
@@ -560,8 +560,8 @@ export function GitLabIntegrationDetails({
                   >
                     {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
                   </Button>
-                </div>
-              )}
+                )}
+              </div>
             </>
           ) : (
             <>

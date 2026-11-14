@@ -96,9 +96,16 @@ describe('narrowProfilePermission', () => {
     });
   });
 
-  it('keeps an agent ask for a tool the session does not write', () => {
+  it('keeps an agent ask as written', () => {
     expect(narrowProfilePermission({ edit: 'deny' }, { bash: { '*': 'ask' } })).toEqual({
       bash: { '*': 'ask' },
+    });
+    expect(narrowProfilePermission(reviewSession, { bash: { '*': 'ask' } })).toEqual({
+      bash: { '*': 'ask' },
+    });
+    // An ask is stricter than an allowance, so it needs no session rules after it.
+    expect(narrowProfilePermission(reviewSession, { bash: { 'git log *': 'ask' } })).toEqual({
+      bash: { 'git log *': 'ask' },
     });
   });
 

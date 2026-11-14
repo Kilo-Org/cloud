@@ -50,7 +50,9 @@ function composeRuleMap(
   const composed: PermissionRuleMap = {};
   const protectedFrom: number[] = [];
   for (const [pattern, action] of Object.entries(agent)) {
-    if (action !== 'deny' && session[pattern] !== 'allow') continue;
+    // A refusal and an ask apply as written; an allowance needs the session to
+    // write the same pattern, which is what the session permits.
+    if (action === 'allow' && session[pattern] !== 'allow') continue;
     composed[pattern] = action;
     if (action === 'allow') {
       const index = sessionEntries.findIndex(([key]) => key === pattern);

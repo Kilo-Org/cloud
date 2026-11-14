@@ -19,7 +19,13 @@ import { Text } from '@/components/ui/text';
 
 import { MessageDetailsSheet } from './message-details-sheet';
 
-const native = vi.hoisted(() => ({ clipboard: '', copyFails: false, announce: vi.fn() }));
+const native = vi.hoisted(() => ({
+  clipboard: '',
+  copyFails: false,
+  announce: vi.fn(),
+  writes: 0,
+  gate: null as Promise<void> | null,
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ background: '#000', mutedForeground: '#999' }),
 }));
@@ -38,6 +44,10 @@ vi.mock('@tanstack/react-query', () => ({
   }) => ({
     mutate: (input: unknown) => {
       options.onSuccess({ receiptId: 'receipt-1' }, input);
+    },
+    mutateAsync: async (input: unknown) => {
+      options.onSuccess({ receiptId: 'receipt-1' }, input);
+      return { receiptId: 'receipt-1' };
     },
   }),
 }));
@@ -79,6 +89,10 @@ vi.mock('@/components/ui/selectable-text', () => ({
 }));
 vi.mock('expo-clipboard', () => ({
   setStringAsync: async (text: string) => {
+    native.writes += 1;
+    if (native.gate !== null) {
+      await native.gate;
+    }
     if (native.copyFails) {
       throw new Error('clipboard unavailable');
     }
@@ -97,6 +111,8 @@ beforeEach(() => {
   native.clipboard = '';
   native.copyFails = false;
   native.announce.mockClear();
+  native.writes = 0;
+  native.gate = null;
 });
 
 function userInfo(overrides: Partial<UserMessage> = {}): UserMessage {
@@ -433,6 +449,33 @@ describe('MessageDetailsSheet mounted', () => {
     });
     expect(feedback()).toBeUndefined();
 
+    await unmount(renderer);
+  });
+
+  it('issues one clipboard write for a second Copy press during the first', async () => {
+    const gate = Promise.withResolvers<void>();
+    native.gate = gate.promise;
+    const renderer = await mountSheet(storedMessage(assistantInfo(), [textPart('copy once')]));
+
+    act(() => {
+      press(findByTestID(renderer.root, 'message-details-copy')[0]);
+      press(findByTestID(renderer.root, 'message-details-copy')[0]);
+    });
+
+    // The first write owns the feedback; the second press is not admitted.
+    expect(native.writes).toBe(1);
+
+    await act(async () => {
+      gate.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(findByTestID(renderer.root, 'message-details-copy-feedback')[0]?.props.children).toBe(
+      'Copied to clipboard'
+    );
+    expect(native.writes).toBe(1);
+
+    native.gate = null;
     await unmount(renderer);
   });
 

@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto';
 import {
   COMPATIBLE_USER_AGENT,
+  type DirectByokAiSdkProvider,
   type DirectByokModel,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
@@ -61,10 +61,12 @@ function getDirectByokAiSdkProvider(
   provider: DirectByokProvider,
   model: DirectByokModel,
   id: string
-) {
-  return provider.getModelChatApi
-    ? AI_SDK_PROVIDER_FOR_CHAT_API[provider.getModelChatApi(model)]
-    : getAiSdkProvider(id, provider.id);
+): DirectByokAiSdkProvider | undefined {
+  if (provider.getModelChatApi) {
+    return AI_SDK_PROVIDER_FOR_CHAT_API[provider.getModelChatApi(model)];
+  }
+  const choice = provider.getAiSdkProvider?.(id);
+  return choice ? choice.aiSdkProvider : getAiSdkProvider(id);
 }
 
 function convertModel(provider: DirectByokProvider, model: DirectByokModel) {
@@ -359,10 +361,7 @@ export async function createAiSdkProvider(
     baseURL: chatCompletionsUrl,
     apiKey: awsBedrock || apiKeyHeader ? undefined : apiKey,
     name: 'openaiCompatible',
-    headers: {
-      ...(apiKeyHeader === 'x-api-key' && { 'x-api-key': apiKey }),
-      ...(directByokProvider.id === 'opencode-go' && { 'x-opencode-session': randomUUID() }),
-    },
+    headers: directByokProvider.chatCompletionsHeaders(upstream),
     fetch: async (url, init) => {
       const requestUrl = disableUrlSuffix ? chatCompletionsUrl : fetchInputUrlString(url);
       const headers = new Headers(init?.headers);

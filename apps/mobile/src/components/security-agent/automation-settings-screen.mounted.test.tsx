@@ -244,6 +244,15 @@ describe('AutomationSettingsScreen approval gate', () => {
     expect(severityAnalysis).toHaveLength(1);
     expect(severityRemediation).toHaveLength(1);
 
+    // Label in name: each accessible name starts with the control's visible
+    // title, so a composed name that dropped it cannot pass.
+    for (const name of includeNames) {
+      expect(name?.startsWith(includeTitle)).toBe(true);
+    }
+    for (const name of severityNames) {
+      expect(name?.startsWith(severityTitle)).toBe(true);
+    }
+
     const names = [...includeNames, ...severityNames];
     expect(new Set(names).size).toBe(4);
   });

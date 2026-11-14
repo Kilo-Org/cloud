@@ -24,10 +24,12 @@ import { launcherSessionUrl } from '@/lib/launcher-surfaces';
 
 import * as cardScopes from './session-card-scope';
 import {
+  cardPressKey,
   clearSessionCardPress,
+  currentCardPressProps,
+  forgetSessionCardPress,
   readSessionCards,
   type SessionActivity,
-  sessionCardPress,
   sessionCardRelevance,
   settleCardWork,
 } from './session-card-press';
@@ -338,9 +340,13 @@ export function syncFollowedSessionCards(
         forgetFollow(sessionId);
         endCard(activity, after(new Date(Date.now() + SESSION_FINISHED_DISMISS_MS)), content);
       } else if (!drawsSame(current, content)) {
+        // Only the request the card currently shows may contribute press props;
+        // every other entry for this session is retired so the store cannot
+        // grow with the session's history of requests.
+        forgetSessionCardPress(sessionId, cardPressKey(current));
         void settleCardWork(
           activity.update(
-            { ...content, ...sessionCardPress(sessionId) },
+            { ...content, ...currentCardPressProps(current) },
             sessionCardStaleAfterSeconds(content),
             sessionCardRelevance(content)
           )

@@ -20,6 +20,9 @@ const mocks = vi.hoisted(() => ({
   changeLanguage: vi.fn(),
   findSessionCard: vi.fn<(id: string) => unknown>(() => null),
   renderSessionCardPress: vi.fn(),
+  beginSessionCardPress: vi.fn<(key: string) => unknown>(() => null),
+  pressKey: (sessionId: string, approvalKey: string | null) =>
+    `${sessionId}\u0000${approvalKey ?? ''}`,
   readStoredValue: vi.fn<(key: string) => Promise<string | null>>(),
   /** The approving flag as the sink would hold it, read at each render. */
   approving: false,
@@ -65,6 +68,8 @@ vi.mock('@/lib/glanceable/persist', () => ({
 vi.mock('./session-card-press', () => ({
   findSessionCard: mocks.findSessionCard,
   renderSessionCardPress: mocks.renderSessionCardPress,
+  beginSessionCardPress: mocks.beginSessionCardPress,
+  sessionCardPressKey: mocks.pressKey,
 }));
 vi.mock('@/lib/auth/secure-store-value', () => ({ readStoredValue: mocks.readStoredValue }));
 
@@ -387,6 +392,9 @@ describe('handleGlanceableInteraction on a session card', () => {
     awaitingPermission: true,
     approvalKey: KEY,
   };
+  const PRESS_KEY = mocks.pressKey('session-3', KEY);
+  /** The attempt the press flow admits; one per tap. */
+  const pressAttempt = { fail: vi.fn(), abandon: vi.fn(), succeed: vi.fn() };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -397,6 +405,7 @@ describe('handleGlanceableInteraction on a session card', () => {
     mocks.readStoredValue.mockResolvedValue('org-1');
     mocks.runGlanceableApprove.mockResolvedValue({ kind: 'approved' });
     mocks.renderSessionCardPress.mockResolvedValue(undefined);
+    mocks.beginSessionCardPress.mockReturnValue(pressAttempt);
     mocks.changeLanguage.mockResolvedValue(undefined);
     mocks.language.whenLanguagePreferenceLoaded.mockResolvedValue(undefined);
   });
@@ -413,11 +422,14 @@ describe('handleGlanceableInteraction on a session card', () => {
     );
     expect(mocks.readWaitingAsk).not.toHaveBeenCalled();
     expect(mocks.setGlanceableActionApproving).not.toHaveBeenCalled();
-    // Approving… first, then the card without Approve.
+    // The request is the press key; Approving… first, then the card without Approve.
+    expect(mocks.beginSessionCardPress).toHaveBeenCalledWith(PRESS_KEY);
     expect(mocks.renderSessionCardPress.mock.calls.map(call => call.slice(1))).toEqual([
-      [{ approving: true }],
-      [null, true],
+      [PRESS_KEY],
+      [PRESS_KEY, true],
     ]);
+    expect(pressAttempt.abandon).toHaveBeenCalledTimes(1);
+    expect(pressAttempt.fail).not.toHaveBeenCalled();
   });
 
   it('keeps Approve with the failure line after a retryable failure', async () => {
@@ -428,9 +440,14 @@ describe('handleGlanceableInteraction on a session card', () => {
     ).resolves.toEqual({ kind: 'retryable' });
 
     expect(mocks.toastError).toHaveBeenCalledWith('glanceable.approveFailed');
-    expect(mocks.renderSessionCardPress).toHaveBeenLastCalledWith(expect.anything(), {
+    expect(pressAttempt.fail).toHaveBeenCalledWith({
+      kind: 'approve-failed',
       notice: 'glanceable.approveFailed',
     });
+    // The failure entry is drawn, not a bare props object, so a tray rebuild
+    // of the same request keeps the line.
+    expect(mocks.renderSessionCardPress).toHaveBeenLastCalledWith(expect.anything(), PRESS_KEY);
+    expect(pressAttempt.abandon).not.toHaveBeenCalled();
   });
 
   it('turns an unreadable stored scope into a retryable press with the failure line', async () => {
@@ -441,7 +458,8 @@ describe('handleGlanceableInteraction on a session card', () => {
     ).resolves.toEqual({ kind: 'retryable' });
 
     expect(mocks.runGlanceableApprove).not.toHaveBeenCalled();
-    expect(mocks.renderSessionCardPress).toHaveBeenLastCalledWith(expect.anything(), {
+    expect(pressAttempt.fail).toHaveBeenCalledWith({
+      kind: 'approve-failed',
       notice: 'glanceable.approveFailed',
     });
   });
@@ -453,6 +471,17 @@ describe('handleGlanceableInteraction on a session card', () => {
       handleGlanceableInteraction(event(SESSION_ACTIVITY_ID, GLANCEABLE_APPROVE_TARGET))
     ).resolves.toEqual({ kind: 'none' });
     expect(mocks.runGlanceableApprove).not.toHaveBeenCalled();
+    expect(mocks.beginSessionCardPress).not.toHaveBeenCalled();
+  });
+
+  it('refuses a second tap while the first request is still in flight', async () => {
+    mocks.beginSessionCardPress.mockReturnValue(null);
+
+    await expect(
+      handleGlanceableInteraction(event(SESSION_ACTIVITY_ID, GLANCEABLE_APPROVE_TARGET))
+    ).resolves.toEqual({ kind: 'none' });
+    expect(mocks.runGlanceableApprove).not.toHaveBeenCalled();
+    expect(mocks.renderSessionCardPress).not.toHaveBeenCalled();
   });
 
   it('routes an aggregate press to the aggregate flow only', async () => {

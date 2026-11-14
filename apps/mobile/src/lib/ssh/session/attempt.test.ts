@@ -8,6 +8,7 @@ import { resumeSshSessions, retrySession } from './manager';
 import { patchSession, sessionById, writeSession } from './session-store';
 
 const state = vi.hoisted(() => ({
+  remove: vi.fn<() => void>(),
   app: {
     currentState: 'active',
     addEventListener:
@@ -91,7 +92,7 @@ let entry = createEntry();
 beforeEach(() => {
   vi.clearAllMocks();
   state.app.currentState = 'active';
-  state.app.addEventListener.mockImplementation(() => ({ remove: vi.fn() }));
+  state.app.addEventListener.mockImplementation(() => ({ remove: state.remove }));
   live.clear();
   entry = createEntry();
   live.set(entry.id, entry);
@@ -175,7 +176,7 @@ it('keeps a background reconnect pending until the app is active, then unlocks o
   expect(state.access).toHaveBeenCalledTimes(1);
   expect(state.connect).toHaveBeenCalledTimes(1);
   expect(sessionById('app')?.phase.kind).toBe('connected');
-  expect(state.app.addEventListener.mock.results[0]?.value.remove).toHaveBeenCalledOnce();
+  expect(state.remove).toHaveBeenCalledOnce();
 });
 
 it('disconnects target and hops and clears their ids on a channel ending', async () => {

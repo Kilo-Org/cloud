@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
+  remove: vi.fn<() => void>(),
   app: {
     currentState: 'active',
     addEventListener:
@@ -19,14 +20,14 @@ vi.mock('expo-local-authentication', () => ({
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
-  state.app.addEventListener.mockImplementation(() => ({ remove: vi.fn() }));
+  state.app.addEventListener.mockImplementation(() => ({ remove: state.remove }));
   state.app.currentState = 'active';
   state.authenticate.mockResolvedValue({ success: true });
 });
 
 function transition(value: string) {
   state.app.currentState = value;
-  for (const [, listener] of [...state.app.addEventListener.mock.calls]) {
+  for (const [, listener] of state.app.addEventListener.mock.calls) {
     listener(value);
   }
 }
@@ -66,10 +67,7 @@ it('waits through background and inactive states and shares the foreground unloc
   transition('active');
   expect(await Promise.all([first, second])).toEqual([true, true]);
   expect(state.authenticate).toHaveBeenCalledOnce();
-  expect(state.app.addEventListener.mock.results.slice(1)).toHaveLength(2);
-  for (const result of state.app.addEventListener.mock.results.slice(1)) {
-    expect(result.value.remove).toHaveBeenCalledOnce();
-  }
+  expect(state.remove).toHaveBeenCalledTimes(2);
 });
 
 it('does not carry an authentication result across backgrounding', async () => {

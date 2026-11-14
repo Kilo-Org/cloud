@@ -57,11 +57,11 @@ export function waitForForeground(): Promise<void> | null {
   if (AppState.currentState === 'active') {
     return null;
   }
-  const { promise, resolve } = Promise.withResolvers<void>();
+  const { promise, resolve } = Promise.withResolvers<undefined>();
   const subscription = AppState.addEventListener('change', state => {
     if (state === 'active') {
       subscription.remove();
-      resolve();
+      resolve(undefined);
     }
   });
   return promise;

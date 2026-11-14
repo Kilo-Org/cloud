@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest';
 import {
   contentSecurityPolicy,
   DEFAULT_VIEW_HEIGHT,
-  MAX_VIEW_BYTES,
   VIEW_HOST_PAGE,
   viewArguments,
   viewDocument,
@@ -297,7 +296,6 @@ describe('the page a view is drawn in', () => {
     expect(page.frame.srcdoc).toBe('<p>halo</p>');
     // The view cannot reach the network on its own say.
     expect(page.frame.src).toBeUndefined();
-    expect(MAX_VIEW_BYTES).toBeGreaterThan(0);
   });
 
   it('relays only the frame’s own messages, and posts them as text', () => {

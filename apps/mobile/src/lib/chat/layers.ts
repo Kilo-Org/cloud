@@ -52,7 +52,7 @@ import { chatToolsWithMcp } from './tools';
  * reads carries no per-model shapes, so this is the answer for every model
  * until one publishes them.
  */
-export const RELAYED_SHAPE: ModelFacts = { apiKinds: ['chat_completions'] };
+const RELAYED_SHAPE: ModelFacts = { apiKinds: ['chat_completions'] };
 
 /** What the app has been told about each model, replaced as the catalog loads. */
 let known: ReadonlyMap<string, ModelFacts> = new Map();

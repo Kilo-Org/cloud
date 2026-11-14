@@ -489,9 +489,7 @@
       }
     },
     {
-      // The one place that lists every test location, and the one override
-      // that holds every test-only rule exemption: add a new test location
-      // here only. A test file mocks `react-native` and the native libraries
+      // A test file mocks `react-native` and the native libraries
       // directly, so it is permanently exempt from the import bans.
       // `check:i18n` lints this tree too, with .oxlintrc.i18n.json, whose own
       // narrower test-location list still reports `no-literal-copy` in

@@ -4,6 +4,9 @@ import { View } from 'react-native';
 import { PickerSheet } from '@/components/picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { cn } from '@/lib/utils';
+
+import { TODO_SHEET_STATE_BODY_CLASS } from './todo-sheet-body';
 
 /**
  * The list settings formSheet's stand-in while the saved list is still loading,
@@ -33,7 +36,7 @@ export function ListSettingsPendingSheet({
       {isError ? (
         <QueryError onRetry={onRetry} isRetrying={isFetching} placement="top" />
       ) : (
-        <View className="items-center py-8">
+        <View className={cn('items-center', TODO_SHEET_STATE_BODY_CLASS)}>
           <ActivityIndicator />
         </View>
       )}

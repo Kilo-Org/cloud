@@ -1,4 +1,7 @@
-import { type HomeWidgetPresentation } from '@kilocode/app-shared/home-widget';
+import {
+  glanceableSessionTitle,
+  type HomeWidgetPresentation,
+} from '@kilocode/app-shared/home-widget';
 import { parseTimestamp } from '@kilocode/app-shared/utils';
 
 import { type GlanceableCountKind } from '@/lib/glanceable/presentation';
@@ -132,8 +135,9 @@ export function buildAndroidHomeCopy(
   const wake =
     content && home.primaryKind === 'scheduled' ? wakeLine(home, translate, formatClock) : null;
   const actionLine = feedback === null ? null : translate(ACTION_FEEDBACK_KEYS[feedback]);
-  const title =
-    !content || home.primaryTitle === null ? null : home.primaryTitle || translate('common.agent');
+  const title = content
+    ? (glanceableSessionTitle(home.primaryTitle) ?? translate('common.agent'))
+    : null;
   const counts =
     home.primaryKind === null
       ? []
@@ -161,11 +165,11 @@ export function buildAndroidHomeCopy(
     },
     secondaryCounts,
     waitingAgents: home.waitingAgents.map(agent => ({
-      title: agent.title || translate('common.agent'),
+      title: glanceableSessionTitle(agent.title) ?? translate('common.agent'),
       reason: translate(WAIT_REASON_KEYS[agent.kind]),
     })),
     scheduledAgents: home.scheduledAgents.map(agent => ({
-      title: agent.title || translate('common.agent'),
+      title: glanceableSessionTitle(agent.title) ?? translate('common.agent'),
       time: scheduledAgentTime(agent.scheduledAt, translate, formatClock),
     })),
     accessibilityLabel: [

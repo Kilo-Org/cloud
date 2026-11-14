@@ -169,11 +169,11 @@ type CloudAgentSessionTransport = {
   fetchSnapshot?: ((kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>) | undefined;
   /**
    * Page-aware root snapshot fetch. The transport uses this for its initial
-   * bounded read and any reconnect snapshot replays. After a successful
-   * initial fetch the transport calls `onInitialPageLoaded` so the manager
-   * can record the cursor and `omittedItemCount`; reconnect replays do NOT
+   * bounded read and any reconnect snapshot replays. Once per attach, with the
+   * first page that applies, the transport calls `onInitialPageLoaded` so the
+   * manager can record the cursor and `omittedItemCount`; later replays do NOT
    * fire that callback so the user's already-advanced older-messages cursor
-   * isn't reset to the latest 50 on every reconnect.
+   * isn't reset to the latest 50.
    */
   fetchSnapshotPage?:
     | ((
@@ -188,7 +188,10 @@ type CloudAgentSessionTransport = {
       ) => Promise<unknown>)
     | undefined;
   initialSnapshotRead?: CloudAgentTransportConfig['initialSnapshotRead'];
-  /** Called by the transport after a successful initial bounded page read. */
+  /**
+   * Called by the transport once per attach, with the first page that applies
+   * after the initial read starts.
+   */
   onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
   lifecycleHooks?: ConnectionLifecycleHooks | undefined;
   websocketHeaders?: WebSocketHeaders | undefined;

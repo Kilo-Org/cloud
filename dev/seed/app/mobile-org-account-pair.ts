@@ -69,9 +69,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     })
     .onConflictDoNothing();
 
+  // Both names are plain brand names: a seeded name must not carry the role word
+  // of the seeded membership, or a screenshot reads the role as an untranslated
+  // label instead of part of the organization's own name.
   const pair = [
-    { id: OWNER_ORGANIZATION_ID, name: 'Switch lab owned' },
-    { id: MEMBER_ORGANIZATION_ID, name: 'Switch lab member' },
+    { id: OWNER_ORGANIZATION_ID, name: 'Kestrel Studio' },
+    { id: MEMBER_ORGANIZATION_ID, name: 'Lantern Studio' },
   ];
   for (const organization of pair) {
     await db
@@ -107,10 +110,10 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     userId,
     email,
     ownerOrganizationId: OWNER_ORGANIZATION_ID,
-    ownerOrganizationName: 'Switch lab owned',
+    ownerOrganizationName: 'Kestrel Studio',
     ownerHubDeepLink: `kiloapp:///(app)/(tabs)/(3_profile)/organization/${OWNER_ORGANIZATION_ID}`,
     memberOrganizationId: MEMBER_ORGANIZATION_ID,
-    memberOrganizationName: 'Switch lab member',
+    memberOrganizationName: 'Lantern Studio',
     memberHubDeepLink: `kiloapp:///(app)/(tabs)/(3_profile)/organization/${MEMBER_ORGANIZATION_ID}`,
   };
 }

@@ -155,6 +155,24 @@ export function canManageProvider(input: {
 }
 
 /**
+ * Whether the row offers the viewer no action at all. It asks the same question
+ * the trailing button asks, with the action that row would show, so the answer
+ * can never disagree with the control beside it. The hub names the roles that
+ * can change such a row once, above the list, instead of under every row.
+ */
+export function providerRowBlocked(input: {
+  provider: IntegrationProvider;
+  scope: IntegrationScope;
+  role: string | undefined;
+  installed?: boolean;
+}): boolean {
+  return !canManageProvider({
+    ...input,
+    action: input.installed ? 'disconnect' : 'connect',
+  });
+}
+
+/**
  * The catalog key naming a provider. Brand names live under their existing
  * keys: the catalogs keep one key per copy, so the hub points at the key the
  * rest of the app already uses rather than adding a second spelling.

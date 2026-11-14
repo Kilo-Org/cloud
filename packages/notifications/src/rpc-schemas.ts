@@ -17,6 +17,38 @@ const i18nCopyFields = {
   i18nParams: z.record(z.string(), z.string()).optional(),
 };
 
+// ── push delivery outcome vocabulary ────────────────────────────────
+//
+// The suppression and failure states a push dispatch can report. Declared
+// once here; each RPC schema below adds only the states its own response can
+// carry, so a renamed or new shared state is a single edit.
+
+// Reported by every RPC that sends a push.
+const DELIVERY_OUTCOME_REASONS = [
+  'suppressed_presence',
+  'suppressed_preference',
+  'no_tokens',
+  'duplicate',
+  'failed',
+] as const;
+type DeliveryOutcomeReason = (typeof DELIVERY_OUTCOME_REASONS)[number];
+
+// Reported by the per-recipient result and the dispatch outcome only. The
+// agent-session RPC folds both into `failed`.
+const CHANNEL_DELIVERY_OUTCOME_REASONS = ['suppressed_expired', 'suppressed_access'] as const;
+type ChannelDeliveryOutcomeReason = (typeof CHANNEL_DELIVERY_OUTCOME_REASONS)[number];
+
+// Discriminated-union members that carry no payload. A generic parameter keeps
+// each variant's own `kind` literal so `DispatchPushOutcome` stays discriminated.
+function payloadFreeOutcome<
+  const K extends
+    | Exclude<DeliveryOutcomeReason, 'failed'>
+    | ChannelDeliveryOutcomeReason
+    | 'suppressed_rate_limit',
+>(kind: K) {
+  return z.object({ kind: z.literal(kind) });
+}
+
 // ── sendPushForConversation ─────────────────────────────────────────
 
 export const sendPushForConversationInputSchema = z.object({
@@ -33,13 +65,8 @@ export type SendPushForConversationInput = z.infer<typeof sendPushForConversatio
 
 export const perRecipientOutcomeSchema = z.enum([
   'delivered',
-  'suppressed_presence',
-  'suppressed_preference',
-  'no_tokens',
-  'suppressed_expired',
-  'suppressed_access',
-  'duplicate',
-  'failed',
+  ...DELIVERY_OUTCOME_REASONS,
+  ...CHANNEL_DELIVERY_OUTCOME_REASONS,
 ]);
 export type PerRecipientOutcome = z.infer<typeof perRecipientOutcomeSchema>;
 
@@ -252,12 +279,8 @@ export type SendAgentSessionNotificationParams = z.infer<
 
 export const sendAgentSessionNotificationReasonSchema = z.enum([
   'not_found',
-  'suppressed_presence',
-  'suppressed_preference',
+  ...DELIVERY_OUTCOME_REASONS,
   'suppressed_rate_limit',
-  'no_tokens',
-  'duplicate',
-  'failed',
 ]);
 export type SendAgentSessionNotificationReason = z.infer<
   typeof sendAgentSessionNotificationReasonSchema
@@ -313,13 +336,13 @@ export type DispatchPushInput = z.infer<typeof dispatchPushInputSchema>;
 
 export const dispatchPushOutcomeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('delivered'), tokenCount: z.number().int().nonnegative() }),
-  z.object({ kind: z.literal('suppressed_presence') }),
-  z.object({ kind: z.literal('suppressed_rate_limit') }),
-  z.object({ kind: z.literal('suppressed_preference') }),
-  z.object({ kind: z.literal('suppressed_expired') }),
-  z.object({ kind: z.literal('suppressed_access') }),
-  z.object({ kind: z.literal('no_tokens') }),
-  z.object({ kind: z.literal('duplicate') }),
+  payloadFreeOutcome('suppressed_presence'),
+  payloadFreeOutcome('suppressed_rate_limit'),
+  payloadFreeOutcome('suppressed_preference'),
+  payloadFreeOutcome('suppressed_expired'),
+  payloadFreeOutcome('suppressed_access'),
+  payloadFreeOutcome('no_tokens'),
+  payloadFreeOutcome('duplicate'),
   z.object({ kind: z.literal('failed'), error: z.string() }),
 ]);
 export type DispatchPushOutcome = z.infer<typeof dispatchPushOutcomeSchema>;

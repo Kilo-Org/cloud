@@ -30,6 +30,7 @@ import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-pro
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { isolateBidiText } from '@/lib/bidi';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { cn } from '@/lib/utils';
 
@@ -207,9 +208,10 @@ export function ProfileAgentsScreen({
 
   const confirmDelete = (target: AgentSource) => {
     confirm({
-      title: t('common.delete'),
-      message: target.name,
-      confirmLabel: t('common.delete'),
+      // The name is free text, so its own first strong character picks the direction.
+      title: t('profiles.agents.deleteTitle', { name: isolateBidiText(target.name) }),
+      message: t('profiles.agents.deleteMessage'),
+      confirmLabel: t('profiles.agents.deleteConfirm'),
       onConfirm: () => {
         void runDelete(target.id);
       },

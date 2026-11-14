@@ -28,6 +28,7 @@ import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_SKILLS } from '@/lib/agent-profile-forms';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { cn } from '@/lib/utils';
 import { readTrpcErrorField } from '@/lib/trpc-error';
@@ -212,9 +213,10 @@ export function ProfileSkillsScreen({
 
   const confirmDelete = (skill: SkillTarget) => {
     confirm({
-      title: t('common.delete'),
-      message: skill.name,
-      confirmLabel: t('common.delete'),
+      // An identifier reads position by position, so it keeps its left-to-right direction.
+      title: t('profiles.skillDeleteTitle', { name: isolateLtrBidiText(skill.name) }),
+      message: t('profiles.skillDeleteMessage'),
+      confirmLabel: t('profiles.skillDeleteConfirm'),
       onConfirm: () => {
         void runDelete(skill.id);
       },

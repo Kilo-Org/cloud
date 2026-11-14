@@ -17,6 +17,7 @@ import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { PERSONAL_SCOPE, PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { reviewerScopeTitle } from '@/lib/code-reviewer-scope-title';
 import { useReviewerScopeName } from '@/lib/hooks/use-reviewer-scope-title';
@@ -50,10 +51,11 @@ function MetricCard({
   label,
   value,
 }: Readonly<{ icon: LucideIcon; label: string; value: string }>) {
+  const colors = useThemeColors();
   return (
     <View className="min-w-0 flex-1 justify-center gap-1 rounded-lg bg-secondary p-4">
       <View className="flex-row items-center gap-2">
-        <Icon size={14} className="text-muted-foreground" />
+        <Icon size={14} color={colors.mutedForeground} />
         <Text variant="muted" className="min-w-0 flex-1 text-xs" numberOfLines={2}>
           {label}
         </Text>

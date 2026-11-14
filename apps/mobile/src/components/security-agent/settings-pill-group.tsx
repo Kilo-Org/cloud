@@ -6,6 +6,7 @@ import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { selectionCheckColor } from '@/lib/selection-check-color';
 import { cn } from '@/lib/utils';
 
 /**
@@ -17,25 +18,32 @@ import { cn } from '@/lib/utils';
  *
  * A read-only group dims once, by token, never by row opacity: every option
  * label — the selected one included — sits on `text-muted-foreground`, and the
- * check leaves the palette's accent for that same muted ink, so the whole list
- * reads as unavailable. The selected row still stands apart by its weight and
- * its check, which is what a disabled single-select looks like: a control whose
- * choice is dimmed with everything else. Halving the row on top of that muted
- * ink lands the label near 2:1 on the row's `secondary` surface in both schemes
- * — under the 4.5:1 text floor, so a member who cannot manage the settings
- * could not read which options exist. The muted token keeps 4.5:1.
+ * check takes the same muted ink, so the whole list reads as unavailable. The
+ * selected row still stands apart by its weight and its check, which is what a
+ * disabled single-select looks like: a control whose choice is dimmed with
+ * everything else. Halving the row on top of that muted ink lands the label
+ * near 2:1 on the row's `secondary` surface in both schemes — under the 4.5:1
+ * text floor, so a member who cannot manage the settings could not read which
+ * options exist. The muted token keeps 4.5:1.
  *
- * An editable group keeps the selected label at full `foreground` ink and the
- * accent check, so the two states differ by more than the row's tap response.
+ * An editable group keeps the selected label and its check on the row's
+ * `foreground` ink, so the two states differ by more than the row's tap
+ * response.
  */
 export function PillGroup<T extends string>({
   label,
+  accessibilityLabel,
   options,
   value,
   disabled,
   onChange,
 }: Readonly<{
   label: string;
+  /**
+   * Names the group when pickers on one screen share a visible label. The
+   * visible `label` stays unchanged. Defaults to `label`.
+   */
+  accessibilityLabel?: string;
   options: readonly { value: T; label: string }[];
   /** `null` when nothing is selected yet, e.g. an unset dismissal reason. */
   value: T | null;
@@ -46,7 +54,10 @@ export function PillGroup<T extends string>({
   return (
     <View className="gap-1.5">
       <Text className="text-sm font-medium text-muted-foreground">{label}</Text>
-      <RadioGroup label={label} className="overflow-hidden rounded-lg bg-secondary">
+      <RadioGroup
+        label={accessibilityLabel ?? label}
+        className="overflow-hidden rounded-lg bg-secondary"
+      >
         {options.map((option, index) => {
           const active = value === option.value;
           return (
@@ -80,9 +91,7 @@ export function PillGroup<T extends string>({
               >
                 {option.label}
               </Text>
-              {active && (
-                <Check size={16} color={disabled ? colors.mutedForeground : colors.primary} />
-              )}
+              {active && <Check size={16} color={selectionCheckColor(colors, disabled)} />}
             </Pressable>
           );
         })}

@@ -1,8 +1,10 @@
+/* eslint-disable max-lines -- one mounted harness pins the mode badge, draft restore, save ownership, row layout, manage slot, and delete confirmation */
 import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
+import { isolateBidiText } from '@/lib/bidi';
 import { ProfileAgentsScreen } from '@/components/profiles/profile-agents-screen';
 import { type AgentSource } from '@/components/profiles/profile-agents-model';
 import { act, type ReactTestInstance } from '@/test/renderer';
@@ -365,6 +367,103 @@ describe('ProfileAgentsScreen manage slot', () => {
 
     expect(screenTexts(renderer)).not.toContain(i18n.t('profiles.organizationRoleRequired'));
     expect(nodesOfType(renderer, 'Button')).toHaveLength(0);
+
+    unmount();
+  });
+});
+
+/** The agent name the fixture row holds; the dialog must isolate exactly this run. */
+const AGENT_NAME = 'alpha';
+
+/** The confirm sheet's request, as the screen hands it to `useConfirmDialog`. */
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+};
+
+/** Read the request the screen raised, without answering it. */
+function deleteRequest(): ConfirmRequest {
+  const request = h.confirm.mock.calls[0]?.[0] as ConfirmRequest | undefined;
+  if (!request) {
+    throw new Error('the screen asked for no confirmation');
+  }
+  return request;
+}
+
+describe('ProfileAgentsScreen delete confirmation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    h.permission = 'allowed';
+    h.query.data = [agent(AGENT_NAME, 'primary')];
+    h.query.isError = false;
+    h.query.isPending = false;
+    h.query.isRefetching = false;
+    for (const mutation of Object.values(h.mutations)) {
+      Object.assign(mutation, { isPending: false });
+    }
+  });
+
+  // The dialog used to read "Delete" as both its title and its confirm label,
+  // with the bare name as the message, so the reader was never told what
+  // removing the agent would do.
+  it('asks for consent with the agent name in the title and states the consequence', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    pressRow(renderer.root, 'Delete');
+    const request = deleteRequest();
+
+    expect(h.confirm).toHaveBeenCalledTimes(1);
+    expect(request).toMatchObject({
+      title: i18n.t('profiles.agents.deleteTitle', { name: isolateBidiText(AGENT_NAME) }),
+      message: i18n.t('profiles.agents.deleteMessage'),
+      confirmLabel: i18n.t('profiles.agents.deleteConfirm'),
+    });
+    expect(request.confirmLabel).not.toBe(i18n.t('common.delete'));
+    expect(request.title).not.toBe(request.message);
+    expect(request.title).not.toBe(AGENT_NAME);
+    expect(request.message).not.toBe(AGENT_NAME);
+
+    unmount();
+  });
+
+  // An agent name is user prose, so its own first strong character picks the
+  // direction: one first-strong isolate pair, no more.
+  it('keeps the agent name in exactly one first-strong isolate pair', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    pressRow(renderer.root, 'Delete');
+    const { title } = deleteRequest();
+
+    expect(title).toContain(`\u2068${AGENT_NAME}\u2069`);
+    expect(title.split('\u2068')).toHaveLength(2);
+    expect(title.split('\u2069')).toHaveLength(2);
+    expect(title).not.toContain('\u2066');
+
+    unmount();
+  });
+
+  it('deletes nothing until the reader confirms, then deletes that agent', async () => {
+    h.mutations.deleteAgent.mutateAsync.mockResolvedValue({ success: true });
+    const { renderer, unmount } = await mountScreen();
+
+    pressRow(renderer.root, 'Delete');
+    const request = deleteRequest();
+
+    expect(h.mutations.deleteAgent.mutateAsync).not.toHaveBeenCalled();
+
+    await act(async () => {
+      request.onConfirm();
+      await Promise.resolve();
+    });
+
+    expect(h.mutations.deleteAgent.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(h.mutations.deleteAgent.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      profileId: 'profile-1',
+      agentId: AGENT_NAME,
+    });
 
     unmount();
   });

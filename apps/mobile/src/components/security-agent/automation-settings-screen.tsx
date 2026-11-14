@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one screen draws the three automation sections from one draft, and the section-qualified accessible names repeat their headings */
 import { getSettingsDirtyState } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
@@ -13,7 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { formatNumber } from '@/lib/format';
+import { formatList, formatNumber } from '@/lib/format';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -68,6 +69,8 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     value,
     label: t(labelKey),
   }));
+  const analysisSection = t('securityAgent.automation.autoAnalysis');
+  const remediationSection = t('securityAgent.automation.autoRemediation');
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   // This screen announces the outcome itself: the queued count when the save
@@ -232,7 +235,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pt-4">
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('securityAgent.automation.autoAnalysis')}
+            {analysisSection}
           </Text>
           <View className="gap-3">
             <ToggleRow
@@ -245,6 +248,12 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
             {autoAnalysisEnabled && (
               <>
                 <PillGroup
+                  // Both sections repeat this title, so the section joins the
+                  // accessible name while the visible label stays the same.
+                  accessibilityLabel={formatList(
+                    [t('securityAgent.automation.minimumSeverity'), analysisSection],
+                    i18n.language
+                  )}
                   label={t('securityAgent.automation.minimumSeverity')}
                   options={minSeverityOptions}
                   value={autoAnalysisMinSeverity}
@@ -253,6 +262,10 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
                 />
                 <ToggleRow
                   title={t('securityAgent.automation.includeExistingFindings')}
+                  accessibilityLabel={formatList(
+                    [t('securityAgent.automation.includeExistingFindings'), analysisSection],
+                    i18n.language
+                  )}
                   subtitle={t('securityAgent.automation.includeExistingFindingsAnalysisSubtitle')}
                   value={autoAnalysisIncludeExisting}
                   disabled={!canManage}
@@ -265,7 +278,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('securityAgent.automation.autoRemediation')}
+            {remediationSection}
           </Text>
           <View className="gap-3">
             <ToggleRow
@@ -278,6 +291,10 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
             {autoRemediationEnabled && (
               <>
                 <PillGroup
+                  accessibilityLabel={formatList(
+                    [t('securityAgent.automation.minimumSeverity'), remediationSection],
+                    i18n.language
+                  )}
                   label={t('securityAgent.automation.minimumSeverity')}
                   options={minSeverityOptions}
                   value={autoRemediationMinSeverity}
@@ -286,6 +303,10 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
                 />
                 <ToggleRow
                   title={t('securityAgent.automation.includeExistingFindings')}
+                  accessibilityLabel={formatList(
+                    [t('securityAgent.automation.includeExistingFindings'), remediationSection],
+                    i18n.language
+                  )}
                   subtitle={t(
                     'securityAgent.automation.includeExistingFindingsRemediationSubtitle'
                   )}

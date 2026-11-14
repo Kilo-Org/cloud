@@ -115,6 +115,14 @@ describe('getOpenRouterReasoningOptions', () => {
     ]);
   });
 
+  test('does not add none for a suffixed Kimi K3 variant', async () => {
+    const { getOpenRouterReasoningOptions } = await loadModelSettings();
+
+    expect(await getOpenRouterReasoningOptions('moonshotai/kimi-k3:free')).toEqual([
+      { type: 'effort', values: ['minimal', 'low', 'medium', 'high', 'max'] },
+    ]);
+  });
+
   test('uses a toggle or no controls when OpenRouter lists no efforts', async () => {
     const { getOpenRouterReasoningOptions } = await loadModelSettings();
 

@@ -204,6 +204,13 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'securityAgent.findingDetails.cve',
   'securityAgent.findingDetails.ghsa',
   'securityAgent.findingDetails.sourceDependabot',
+  // The audit report's change lines hold no prose of their own: a `$t()` label
+  // reference, one separator, and two placeholders the catalog's own status or
+  // severity words fill. A catalog that keeps the English connector reads in
+  // its own language once the reference and the values resolve, so an
+  // identical value is the finished translation, not a missing one.
+  'securityAgent.auditReport.eventSeverityChange',
+  'securityAgent.auditReport.eventStatusChange',
   'agentChat.toolCard.toolBash',
   'agentChat.toolCard.toolGlob',
   'agentChat.toolCard.toolGrep',
@@ -224,10 +231,6 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'profiles.mcp.commandPlaceholder',
   'profiles.mcp.jsonPlaceholder',
   'profiles.agents.slugPlaceholder',
-  // The sampling parameter's published name. `Top P` is what the provider docs
-  // and every model dashboard call this knob, so no locale translates it — a
-  // translated word would hide which parameter the field sets.
-  'profiles.agents.topP',
   'profiles.slashCommands.namePlaceholder',
   'profiles.slashCommands.agentPlaceholder',
   // The skills.sh source label. It names the published site the skill is
@@ -420,8 +423,9 @@ const VISIBILITY_KEYS = [
  * Agent-editor labels that read the same in every catalog, aside from the
  * separator shape above: `profiles.agents.topP` is the sampling parameter's
  * published name, so a translated word would hide which parameter the field
- * sets. The allowlist exempts the key from the "equals English everywhere"
- * failure; this is the positive requirement that replaces it.
+ * sets. This list is the only registration such a key needs: `checkVerbatimLabels`
+ * requires the key to read English everywhere, and the untranslated check
+ * exempts the same key from the "equals English everywhere" failure.
  */
 const VERBATIM_KEYS = ['profiles.agents.topP'];
 
@@ -872,8 +876,9 @@ function foldDestructiveLabel(value) {
 }
 
 /**
- * The destructively painted keys, each mapped to whether its label may also be
- * rejected for merely CONTAINING this catalog's Cancel word.
+ * The destructively painted keys, each mapped to `rejectContainingCancel`:
+ * whether a label that merely CONTAINS this catalog's Cancel word is also
+ * rejected.
  *
  * `destructive-confirm-dialog.tsx` paints the safe button with
  * `cancelLabel ?? t('common.cancel')`, so a confirmation that leaves the safe
@@ -918,11 +923,12 @@ function destructiveConfirmKeys(source, english) {
  * key whose English copy is a bare destructive verb such as "Revoke": a red
  * button reading "Revoke link" when Cancel sits beneath it is ambiguous, while
  * "Cancel subscription" beside "Cancel" is deliberate English and its
- * translation may keep the locale's Cancel word. `allowContains` carries that
- * per-key decision, so a key whose English names Cancel never reaches the
+ * translation may keep the locale's Cancel word. `rejectContainingCancel`
+ * carries that per-key decision: a true flag rejects a label that CONTAINS this
+ * catalog's Cancel word, so a key whose English names Cancel never reaches the
  * substring test.
  */
-function checkDestructiveConfirmLabel(label, key, value, cancelValue, allowContains) {
+function checkDestructiveConfirmLabel(label, key, value, cancelValue, rejectContainingCancel) {
   if (cancelValue === undefined) {
     return;
   }
@@ -931,7 +937,7 @@ function checkDestructiveConfirmLabel(label, key, value, cancelValue, allowConta
     return;
   }
   const folded = foldDestructiveLabel(value);
-  if (folded !== cancel && !(allowContains && folded.includes(cancel))) {
+  if (folded !== cancel && !(rejectContainingCancel && folded.includes(cancel))) {
     return;
   }
   fail(
@@ -1443,14 +1449,14 @@ export function checkCatalogs(root = ROOT) {
           fail(`${label}: "${key}" is empty`);
         }
         const englishValue = english.get(key);
-        const allowContains = destructiveChecks.get(key);
-        if (allowContains !== undefined) {
+        const rejectContainingCancel = destructiveChecks.get(key);
+        if (rejectContainingCancel !== undefined) {
           checkDestructiveConfirmLabel(
             label,
             key,
             value,
             translated.get('common.cancel'),
-            allowContains
+            rejectContainingCancel
           );
         }
         // A catalog may not leave a listed key in English; MUST_TRANSLATE_KEYS
@@ -1641,7 +1647,7 @@ export function checkCatalogs(root = ROOT) {
     // read can say a key was never translated, so an unreadable one is left out.
     if (catalog.name === 'mobile' && localeValues.size > 0) {
       for (const [key, englishValue] of english) {
-        if (ENGLISH_IDENTICAL_ALLOWLIST.has(key)) {
+        if (ENGLISH_IDENTICAL_ALLOWLIST.has(key) || VERBATIM_KEYS.includes(key)) {
           continue;
         }
         let allEqual = true;

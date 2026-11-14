@@ -19,6 +19,7 @@ import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
+import { selectionCheckColor } from '@/lib/selection-check-color';
 import { cn } from '@/lib/utils';
 
 type RepoPickerSheetProps = Readonly<{
@@ -82,7 +83,7 @@ function RepoOptionRow({
       <Text className="text-[10px] uppercase tracking-wider text-muted-foreground">
         {repo.platform === 'gitlab' ? 'GL' : 'GH'}
       </Text>
-      {isSelected ? <Check size={16} color={colors.primary} /> : null}
+      {isSelected ? <Check size={16} color={selectionCheckColor(colors)} /> : null}
     </Pressable>
   );
 }

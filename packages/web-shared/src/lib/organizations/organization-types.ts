@@ -4,6 +4,7 @@ import {
   ORGANIZATION_ROLES,
 } from '@kilocode/app-shared/organizations';
 import type { Organization, organization_invitations } from '@kilocode/db/schema';
+import { hasVisibleText } from '@kilocode/app-shared/text';
 import type { Result } from '@kilocode/web-shared/lib/maybe-result';
 import { CompanyDomainSchema, isValidDomain } from './company-domain';
 
@@ -48,10 +49,11 @@ export const billingCycleFromDb: (dbCycle: 'monthly' | 'yearly') => BillingCycle
 export const billingCycleFromStripeInterval: (interval: 'month' | 'year') => BillingCycle =
   toBillingCycle;
 
+// `trim()` keeps zero-width and control characters, which made a blank name pass the length check.
 export const OrganizationNameSchema = z
   .string()
   .trim()
-  .min(1, 'Organization name is required')
+  .refine(hasVisibleText, 'Organization name is required')
   .max(
     ORGANIZATION_NAME_MAX_LENGTH,
     `Organization name must be ${ORGANIZATION_NAME_MAX_LENGTH} characters or fewer`

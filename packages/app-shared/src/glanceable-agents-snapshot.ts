@@ -14,8 +14,17 @@ import { timestampMs } from './utils';
  */
 
 export const GLANCEABLE_SNAPSHOT_SCHEMA_VERSION = 1;
-/** 8 hours: matches the usual Live Activity lifetime. */
-export const GLANCEABLE_SNAPSHOT_EXPIRY_MS = 28_800_000;
+/**
+ * ActivityKit ends a Live Activity after at most 8 hours, so nothing a card
+ * carries may outlive this window. Every glanceable budget counts from here.
+ */
+export const LIVE_ACTIVITY_MAX_LIFETIME_MS = 8 * 60 * 60_000;
+/**
+ * How long a snapshot may claim the card it feeds. It is the whole Live
+ * Activity lifetime: a snapshot older than the card it describes has nothing
+ * left to say.
+ */
+export const GLANCEABLE_SNAPSHOT_EXPIRY_MS = LIVE_ACTIVITY_MAX_LIFETIME_MS;
 /**
  * Later happy updates are coalesced for at most this long. A tray with many
  * running sessions heartbeats every few seconds, and each emit re-renders the

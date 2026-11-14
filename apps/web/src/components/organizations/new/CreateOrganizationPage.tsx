@@ -22,6 +22,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { OrganizationNameSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { hasVisibleText } from '@kilocode/app-shared/text';
 import { motion, AnimatePresence } from 'motion/react';
 import { useCreateOrganization } from '@/app/api/organizations/hooks';
 import { SubscriptionsSeatQuantitySchema } from '@/app/payments/subscriptions/types';
@@ -135,7 +136,7 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
     }
   };
 
-  const isFormValid = name.trim().length > 0;
+  const isFormValid = hasVisibleText(name);
 
   return (
     <div className="bg-background mx-auto h-full w-full max-w-[1200px] px-4 py-8 md:px-6 md:py-12">

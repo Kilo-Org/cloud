@@ -6,7 +6,8 @@ import {
 } from '@kilocode/app-shared/code-review';
 
 import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
-import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import { isPlatformIntegrationActive } from '@/lib/integrations/core/health';
 import {
   createGitHubBranch,
   createGitHubPullRequest,
@@ -16,6 +17,7 @@ import {
   generateGitHubInstallationToken,
 } from '@/lib/integrations/platforms/github/adapter';
 import {
+  EDITABLE_PROPOSAL_STATUSES,
   getProposal,
   markProposalChangeRequestFailed,
   markProposalChangeRequestOpened,
@@ -29,11 +31,7 @@ const REVIEW_MEMORY_TARGET_FILE_PATH = 'REVIEW.md';
 const REVIEW_MEMORY_CHANGE_REQUEST_TITLE = 'docs(review): update REVIEW.md guidance';
 const REVIEW_MEMORY_CHANGE_REQUEST_MARKER = '<!-- kilo-review-memory-change-request -->';
 const OPENING_CHANGE_REQUEST_STALE_MS = 30 * 60 * 1000;
-const APPROVABLE_STATUSES: ReadonlySet<ReviewMemoryProposalStatus> = new Set([
-  'open',
-  'edited',
-  'change_request_failed',
-]);
+const APPROVABLE_STATUSES = new Set<ReviewMemoryProposalStatus>(EDITABLE_PROPOSAL_STATUSES);
 
 export class ReviewMemoryChangeRequestError extends Error {
   constructor(
@@ -208,8 +206,7 @@ async function findGitHubIntegrationForProposal(
     integration =>
       integration.platform === PLATFORM.GITHUB &&
       integration.github_connection_role === 'workflow' &&
-      integration.integration_status === INTEGRATION_STATUS.ACTIVE &&
-      !integration.suspended_at &&
+      isPlatformIntegrationActive(integration) &&
       integration.platform_installation_id &&
       hasRepositoryAccess(integration, proposal.repo_full_name)
   );

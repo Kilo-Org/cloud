@@ -379,10 +379,11 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
   const awaitingUpdate = home?.awaitingUpdate === true;
   const feedback = content ? safeText(props.actionFeedback) : null;
   const failed = feedback === 'couldNotApprove';
-  // An untitled agent is still named, so its row never reads as blank.
-  const rawTitle = home === undefined ? null : safeText(home.primaryTitle);
-  const title = rawTitle === null ? null : (filledText(rawTitle) ?? COPY.agent ?? 'Agent');
+  // A content surface always names its agent, including the shared rule's null
+  // for an untitled session, so its title never reads as a blank line. Props
+  // persisted without a Home presentation keep drawing no title at all.
   const agentTitle = (value: unknown) => filledText(value) ?? COPY.agent ?? 'Agent';
+  const title = content && home !== undefined ? agentTitle(home.primaryTitle) : null;
   const secondaryRows = (
     home === undefined ? records(props.countLines) : records(home.secondaryCounts)
   )

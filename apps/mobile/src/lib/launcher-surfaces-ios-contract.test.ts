@@ -78,7 +78,7 @@ describe('iOS Quick Action type contract', () => {
     const body = functionBody(moduleSource, 'shortcut');
     expect(body).toContain('type: identifier');
     expect(body).toContain(
-      'userInfo: [KiloLauncherSurfacesShortcut.urlUserInfoKey: url as NSString]'
+      'userInfo: [KiloLauncherSurfacesShortcut.urlUserInfoKey: action.url as NSString]'
     );
     // The url is data: using it as the type is the collision the contract forbids.
     expect(body).not.toMatch(/type:\s*url\b/);

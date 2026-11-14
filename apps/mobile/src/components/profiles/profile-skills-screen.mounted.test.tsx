@@ -21,6 +21,7 @@ import {
 } from '@/components/profiles/profile-skills-screen.test-helpers';
 import { i18n } from '@/i18n';
 import { MAX_PROFILE_SKILLS, SKILL_NAME_MAX_LENGTH } from '@/lib/agent-profile-forms';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
@@ -729,6 +730,102 @@ describe('ProfileSkillsScreen', () => {
     }
 
     expect(h.confirm).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+});
+
+/** The name the fixture row holds; the dialog must isolate exactly this run. */
+const SKILL_NAME = 'code-review';
+
+/** The confirm sheet's request, as the screen hands it to `useConfirmDialog`. */
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+};
+
+/** Read the request the screen raised, without answering it. */
+function deleteRequest(): ConfirmRequest {
+  const request = h.confirm.mock.calls[0]?.[0] as ConfirmRequest | undefined;
+  if (!request) {
+    throw new Error('the screen asked for no confirmation');
+  }
+  return request;
+}
+
+describe('ProfileSkillsScreen delete confirmation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    permissionState.permission = 'allowed';
+    h.query.data = testSkills([testSkill({ name: SKILL_NAME })]);
+    h.query.isError = false;
+    h.query.isPending = false;
+    h.query.isRefetching = false;
+    for (const mutation of Object.values(h.mutations)) {
+      Object.assign(mutation, { isPending: false });
+    }
+  });
+
+  // The dialog used to read "Delete" as both its title and its confirm label,
+  // with the bare name as the message, so the reader was never told what
+  // removing the skill would do.
+  it('asks for consent with the skill name in the title and states the consequence', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    pressPressable(renderer.root, `Delete skill ${SKILL_NAME}`);
+    const request = deleteRequest();
+
+    expect(h.confirm).toHaveBeenCalledTimes(1);
+    expect(request).toMatchObject({
+      title: i18n.t('profiles.skillDeleteTitle', { name: isolateLtrBidiText(SKILL_NAME) }),
+      message: i18n.t('profiles.skillDeleteMessage'),
+      confirmLabel: i18n.t('profiles.skillDeleteConfirm'),
+    });
+    expect(request.confirmLabel).not.toBe(i18n.t('common.delete'));
+    expect(request.title).not.toBe(request.message);
+    expect(request.title).not.toBe(SKILL_NAME);
+    expect(request.message).not.toBe(SKILL_NAME);
+
+    unmount();
+  });
+
+  // A skill name is compared character by character, so a right-to-left
+  // sentence must not reorder it: one explicit left-to-right run, no more.
+  it('keeps the skill name in exactly one left-to-right isolate pair', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    pressPressable(renderer.root, `Delete skill ${SKILL_NAME}`);
+    const { title } = deleteRequest();
+
+    expect(title).toContain(`\u2066${SKILL_NAME}\u2069`);
+    expect(title.split('\u2066')).toHaveLength(2);
+    expect(title.split('\u2069')).toHaveLength(2);
+
+    unmount();
+  });
+
+  it('deletes nothing until the reader confirms, then deletes that skill', async () => {
+    h.mutations.deleteSkill.mutateAsync.mockResolvedValue({ success: true });
+    const { renderer, unmount } = await mountScreen();
+
+    pressPressable(renderer.root, `Delete skill ${SKILL_NAME}`);
+    const request = deleteRequest();
+
+    expect(h.mutations.deleteSkill.mutateAsync).not.toHaveBeenCalled();
+
+    await act(async () => {
+      request.onConfirm();
+      await Promise.resolve();
+    });
+
+    expect(h.mutations.deleteSkill.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(h.mutations.deleteSkill.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      profileId: 'profile-1',
+      skillId: 'skill-1',
+    });
 
     unmount();
   });

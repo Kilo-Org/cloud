@@ -925,6 +925,32 @@ export type InvitationAuthenticationContext = {
   ssoSourceOrganizationId?: string;
 };
 
+async function expireOrganizationInvitation(
+  tx: DrizzleTransaction,
+  invitation: OrganizationInvitation
+): Promise<void> {
+  await tx
+    .update(organization_invitations)
+    .set({ expires_at: sql`NOW()` })
+    .where(eq(organization_invitations.id, invitation.id));
+  // A delivery already recorded as delivered or failed keeps its own history;
+  // only a delivery still owed for this invitation is stopped.
+  await tx
+    .update(external_side_effect_outbox)
+    .set({
+      status: 'failed',
+      claimed_at: null,
+      next_attempt_at: null,
+      last_error: 'revoked',
+    })
+    .where(
+      and(
+        eq(external_side_effect_outbox.invitation_id, invitation.id),
+        inArray(external_side_effect_outbox.status, ['pending', 'sending'])
+      )
+    );
+}
+
 async function revokeStaleOrganizationInvitation(
   tx: DrizzleTransaction,
   invitation: OrganizationInvitation,
@@ -942,19 +968,7 @@ async function revokeStaleOrganizationInvitation(
     .limit(1);
 
   if (removal && new Date(invitation.created_at) <= new Date(removal.removedAt)) {
-    await tx
-      .update(organization_invitations)
-      .set({ expires_at: sql`NOW()` })
-      .where(eq(organization_invitations.id, invitation.id));
-    await tx
-      .update(external_side_effect_outbox)
-      .set({
-        status: 'failed',
-        claimed_at: null,
-        next_attempt_at: null,
-        last_error: 'revoked',
-      })
-      .where(eq(external_side_effect_outbox.invitation_id, invitation.id));
+    await expireOrganizationInvitation(tx, invitation);
     return true;
   }
 
@@ -1074,7 +1088,11 @@ export async function acceptOrganizationInvite(
           return failureResult(ORGANIZATION_INVITATION_SSO_AUTHENTICATION_REQUIRED);
         }
       } else if (ssoPolicy.status === 'required' && acceptingUserDomain === ssoPolicy.domain) {
-        return failureResult('Invitation requires authentication through organization SSO');
+        // The invitation predates the required policy, so it names no source
+        // organization and no session can satisfy it. Expire it so the address is
+        // free for a fresh SSO invitation.
+        await expireOrganizationInvitation(tx, invitation);
+        return failureResult('Invitation is no longer valid');
       }
 
       const existingMembership = await tx

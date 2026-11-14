@@ -80,13 +80,25 @@ function getReleaseAndroidOrigins(): string[] {
   return origins;
 }
 
-function getRelyingParty(): { rpId: string; expectedOrigins: string[] } {
+/**
+ * Resolve the configured relying party. `rpId` is the host of `NEXTAUTH_URL`
+ * without the port, and `origin` is that URL's origin. Both relying-party
+ * helpers read it through here, so a credential registered by an ordinary
+ * ceremony always verifies for a privileged step-up: WebAuthn binds the
+ * credential and challenge to this `rpId`.
+ */
+function nextAuthRelyingParty(): { rpId: string; origin: string } {
   const url = new URL(NEXTAUTH_URL);
-  const expectedOrigins = [url.origin, ...getReleaseAndroidOrigins()];
+  return { rpId: url.hostname, origin: url.origin };
+}
+
+function getRelyingParty(): { rpId: string; expectedOrigins: string[] } {
+  const { rpId, origin } = nextAuthRelyingParty();
+  const expectedOrigins = [origin, ...getReleaseAndroidOrigins()];
   if (process.env.NODE_ENV !== 'production') {
     expectedOrigins.push(fingerprintToAndroidOrigin(ANDROID_DEBUG_CERT_FINGERPRINT));
   }
-  return { rpId: url.hostname, expectedOrigins };
+  return { rpId, expectedOrigins };
 }
 
 /**
@@ -95,8 +107,8 @@ function getRelyingParty(): { rpId: string; expectedOrigins: string[] } {
  * there would let a mobile client borrow a browser session's proof.
  */
 export function getWebRelyingParty(): { rpId: string; expectedOrigin: string } {
-  const url = new URL(NEXTAUTH_URL);
-  return { rpId: url.hostname, expectedOrigin: url.origin };
+  const { rpId, origin } = nextAuthRelyingParty();
+  return { rpId, expectedOrigin: origin };
 }
 
 const rpName = 'Kilo Code';
@@ -529,6 +541,15 @@ export async function verifyAuthentication(
 }
 
 /**
+ * Derive the stored digest of a sign-in ticket. The ticket itself is never
+ * stored: issuance writes this digest and redemption looks the row up by it,
+ * so both read the one derivation and cannot disagree.
+ */
+function hashSignInTicket(ticket: string): string {
+  return createHash('sha256').update(ticket).digest('hex');
+}
+
+/**
  * Mint a one-time sign-in ticket for a verified passkey assertion. Returns the
  * plaintext ticket and stores only its SHA-256 hash: the ticket is the proof
  * that a WebAuthn assertion verified, and the sign-in provider exchanges it for
@@ -539,7 +560,7 @@ export async function createSignInTicket(
   fromDb: typeof db | DrizzleTransaction = db
 ): Promise<string> {
   const ticket = randomBytes(32).toString('hex');
-  const ticket_hash = createHash('sha256').update(ticket).digest('hex');
+  const ticket_hash = hashSignInTicket(ticket);
 
   await fromDb.insert(passkey_sign_in_tickets).values({
     ticket_hash,
@@ -555,7 +576,7 @@ export async function createSignInTicket(
  * is usable exactly once, and never after its two-minute expiry.
  */
 export async function consumeSignInTicket(ticket: string): Promise<PasskeySignInTicket | null> {
-  const ticket_hash = createHash('sha256').update(ticket).digest('hex');
+  const ticket_hash = hashSignInTicket(ticket);
 
   const [row] = await db
     .update(passkey_sign_in_tickets)

@@ -9,6 +9,10 @@ set -euo pipefail
 # is resolved first and the diff is taken over the whole repository. `--check`
 # selects listing instead of formatting.
 #
+# The pathspecs are bare `*.<ext>` globs, not `**/*.<ext>`: a `*` in a git
+# pathspec already matches at any depth, including the repository root, while
+# the `**/` form did not match root-level files such as ./package.json.
+#
 # Usage:
 #   scripts/format-changed.sh          # rewrite changed files with oxfmt
 #   scripts/format-changed.sh --check  # list changed files that oxfmt would rewrite
@@ -36,13 +40,13 @@ if [ -z "$base" ]; then
 fi
 
 changed=$(git diff --name-only "$base" --diff-filter=ACMR -- \
-  '**/*.js' \
-  '**/*.jsx' \
-  '**/*.ts' \
-  '**/*.tsx' \
-  '**/*.json' \
-  '**/*.css' \
-  '**/*.md')
+  '*.js' \
+  '*.jsx' \
+  '*.ts' \
+  '*.tsx' \
+  '*.json' \
+  '*.css' \
+  '*.md')
 
 if [ -z "$changed" ]; then
   echo "[format] no changed files to format"

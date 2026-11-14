@@ -66,13 +66,18 @@ export type NativeModelBridge = {
   ) => { remove: () => void };
 };
 
-/** A generation that asked for tools and waits, between two harness rounds, for their results. */
-type ToolLoop = {
-  waiting?: { readonly id: string; readonly calls: readonly string[]; readonly hasText: boolean };
+/** A generation that asked for tools and waits, between two rounds, for their results. */
+type HeldRound = {
+  readonly id: string;
+  readonly calls: readonly string[];
+  readonly hasText: boolean;
 };
 
+/** The one native generation this bridge holds open between rounds. */
+type ToolLoop = { readonly kind: 'free' } | { readonly kind: 'waiting'; readonly round: HeldRound };
+
 /** One native module and the tool round it may hold open. */
-type Provider = { readonly bridge: NativeModelBridge; readonly loop: ToolLoop };
+type Provider = { readonly bridge: NativeModelBridge; loop: ToolLoop };
 
 /** A native promise rejection carries its stable reason as an Expo error code. */
 const codedRejection = z.object({ code: z.string() });
@@ -89,11 +94,12 @@ function nextRequestId(): string {
 }
 
 function answer(
-  { bridge, loop }: Provider,
+  provider: Provider,
   availability: NativeAvailability,
   request: ModelRequest
 ): Stream.Stream<ModelEvent, ModelError> {
   return Stream.callback<ModelEvent, ModelError>(queue => {
+    const bridge = provider.bridge;
     const tools = availability.tools === true && bridge.resume !== undefined;
     const offersTools = tools && request.tools !== undefined && request.tools.length > 0;
     const native = nativeRequest(request, {
@@ -104,17 +110,27 @@ function answer(
       maxImages: availability.maxImages,
     });
     const results = tools ? resultsOf(request) : undefined;
-    const { waiting } = loop;
-    loop.waiting = undefined;
+    const held = provider.loop.kind === 'waiting' ? provider.loop.round : undefined;
     // The results answer the waiting generation only when they answer every call it made.
     const resumption =
-      waiting !== undefined &&
-      results?.length === waiting.calls.length &&
-      results.every(result => waiting.calls.includes(result.callId))
-        ? { id: waiting.id, results }
+      held !== undefined &&
+      results?.length === held.calls.length &&
+      results.every(result => held.calls.includes(result.callId))
+        ? { id: held.id, results }
         : undefined;
+    // Another chat's generation is between two rounds: it is live, and this
+    // request has nothing that answers it. Refuse rather than cancel it or
+    // steal its slot. The slot is untouched for the round that owns it.
+    if (held !== undefined && resumption === undefined) {
+      return Effect.fail(nativeModelFailure('busy', false));
+    }
+    // The round this request answers starts here, so the bridge is free again
+    // until that round asks for tools itself.
+    if (resumption !== undefined) {
+      provider.loop = { kind: 'free' };
+    }
     let id = resumption?.id ?? native.id;
-    const hasPreviousText = resumption !== undefined && waiting?.hasText === true;
+    const hasPreviousText = resumption !== undefined && held?.hasText === true;
     // `running` is the only state that owns a live native inference. `waiting`
     // hands it to the next round, which answers its tool calls. `retrying`
     // waits for the failed attempt to settle before a fresh one starts.
@@ -165,10 +181,14 @@ function answer(
     // The round ends here; the native generation waits for the next round's results.
     const pause = async (calls: readonly NativeToolCall[]) => {
       state = 'waiting';
-      loop.waiting = {
-        id,
-        calls: calls.map(call => call.id),
-        hasText: hasPreviousText || output.trim() !== '',
+      // Published before the stream ends, so the results round finds it.
+      provider.loop = {
+        kind: 'waiting',
+        round: {
+          id,
+          calls: calls.map(call => call.id),
+          hasText: hasPreviousText || output.trim() !== '',
+        },
       };
       output += calls.map(call => call.name + call.arguments).join('');
       Queue.offerAllUnsafe(
@@ -259,10 +279,6 @@ function answer(
         await bridge.resume?.(resumption.id, resumption.results).catch(rejected);
         return;
       }
-      // A waiting generation this request does not answer can never continue.
-      if (waiting !== undefined) {
-        await stopNative(waiting.id);
-      }
       // Results with no generation waiting for them: the round they answer is gone.
       if (results !== undefined) {
         fail(undefined);
@@ -302,7 +318,7 @@ function answer(
  * resume that generation instead of starting a new one.
  */
 export function nativeModelClient(bridge: NativeModelBridge): ModelClientService {
-  const provider: Provider = { bridge, loop: {} };
+  const provider: Provider = { bridge, loop: { kind: 'free' } };
   return {
     stream: request =>
       Stream.unwrap(

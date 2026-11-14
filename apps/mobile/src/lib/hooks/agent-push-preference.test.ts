@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   applyAgentPushOptimistic,
-  DEFAULT_NOTIFICATION_PREFERENCE,
   deriveAgentPushEditable,
   deriveGateSettled,
   deriveShowEnableCta,
@@ -23,22 +22,16 @@ function makeQueryClient(): QueryClient {
 
 function fullRow(overrides: Partial<NotificationPreferences> = {}): NotificationPreferences {
   return {
-    agentAttention: DEFAULT_NOTIFICATION_PREFERENCE,
-    agentUpdates: DEFAULT_NOTIFICATION_PREFERENCE,
-    sessionStatus: DEFAULT_NOTIFICATION_PREFERENCE,
-    balanceAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
-    spendAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
-    securityFindings: DEFAULT_NOTIFICATION_PREFERENCE,
-    agentPushEnabled: DEFAULT_NOTIFICATION_PREFERENCE,
+    agentAttention: true,
+    agentUpdates: true,
+    sessionStatus: true,
+    balanceAlerts: true,
+    spendAlerts: true,
+    securityFindings: true,
+    agentPushEnabled: true,
     ...overrides,
   };
 }
-
-describe('DEFAULT_NOTIFICATION_PREFERENCE', () => {
-  it('is true (default ON per plan)', () => {
-    expect(DEFAULT_NOTIFICATION_PREFERENCE).toBe(true);
-  });
-});
 
 describe('NOTIFICATION_CATEGORY_KEYS', () => {
   it('lists the categories rendered on the dedicated screen including balance, spend and security', () => {
@@ -121,7 +114,7 @@ describe('readAgentPushPreference', () => {
   it('returns the default for the requested category when the cache has no snapshot', () => {
     const qc = makeQueryClient();
     for (const category of NOTIFICATION_CATEGORY_KEYS) {
-      expect(readAgentPushPreference(qc, key, category)).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
+      expect(readAgentPushPreference(qc, key, category)).toBe(true);
     }
   });
 
@@ -150,11 +143,9 @@ describe('readAgentPushPreference', () => {
     expect(readAgentPushPreference(qc, key, 'agentUpdates')).toBe(false);
     // Non-agentUpdates categories fall back to the default when only the
     // legacy field is present.
-    expect(readAgentPushPreference(qc, key, 'balanceAlerts')).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
-    expect(readAgentPushPreference(qc, key, 'spendAlerts')).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
-    expect(readAgentPushPreference(qc, key, 'securityFindings')).toBe(
-      DEFAULT_NOTIFICATION_PREFERENCE
-    );
+    expect(readAgentPushPreference(qc, key, 'balanceAlerts')).toBe(true);
+    expect(readAgentPushPreference(qc, key, 'spendAlerts')).toBe(true);
+    expect(readAgentPushPreference(qc, key, 'securityFindings')).toBe(true);
   });
 
   it('defaults to the agentUpdates category when no category is passed', () => {
@@ -204,9 +195,7 @@ describe('readAgentPushPreferenceIfLoaded', () => {
     const qc = makeQueryClient();
     qc.setQueryData(key, { agentPushEnabled: false });
     expect(readAgentPushPreferenceIfLoaded(qc, key, 'agentUpdates')).toBe(false);
-    expect(readAgentPushPreferenceIfLoaded(qc, key, 'agentAttention')).toBe(
-      DEFAULT_NOTIFICATION_PREFERENCE
-    );
+    expect(readAgentPushPreferenceIfLoaded(qc, key, 'agentAttention')).toBe(true);
   });
 });
 

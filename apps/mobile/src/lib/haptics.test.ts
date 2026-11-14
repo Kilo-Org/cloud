@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { impactHaptic, notificationHaptic, selectionHaptic } from './haptics';
 
@@ -17,6 +17,11 @@ vi.mock('expo-haptics', () => ({
 }));
 
 describe('haptics', () => {
+  beforeEach(() => {
+    // A call recorded in the previous case must not satisfy this one's assertion.
+    vi.clearAllMocks();
+  });
+
   it('contains a rejected selection tick instead of leaving it unhandled', async () => {
     haptics.selectionAsync.mockRejectedValue(new Error('no haptic engine'));
     const unhandledRejections: unknown[] = [];
@@ -28,6 +33,7 @@ describe('haptics', () => {
       expect(() => {
         selectionHaptic();
       }).not.toThrow();
+      expect(haptics.selectionAsync).toHaveBeenCalledTimes(1);
       // One macrotask, the turn Node flags an unhandled rejection in.
       const flushed = Promise.withResolvers<undefined>();
       setImmediate(() => {
@@ -54,5 +60,8 @@ describe('haptics', () => {
     expect(() => {
       notificationHaptic('success' as never);
     }).not.toThrow();
+    // A throwing implementation still records its call, so these prove dispatch.
+    expect(haptics.impactAsync).toHaveBeenCalledWith('light');
+    expect(haptics.notificationAsync).toHaveBeenCalledWith('success');
   });
 });

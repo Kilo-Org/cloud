@@ -4050,7 +4050,7 @@
       "add": "မျဥ်းစောင်းအမိန့်ကို ထည့်ပါ။",
       "empty": "မျဥ်းစောင်းအမိန့်များ မရှိသေးပါ။",
       "name": "အမိန့်အမည်",
-      "description": "အမိန့် ဖော်ပြချက်",
+      "description": "အမိန့်ဖော်ပြချက်",
       "template": "ပုံစံခွက်",
       "namePlaceholder": "explain",
       "agentPlaceholder": "reviewer",

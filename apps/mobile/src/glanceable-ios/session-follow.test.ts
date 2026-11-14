@@ -883,7 +883,8 @@ describe('a record rewritten while the restore waits', () => {
     pruneSessionCardScopes([], before);
     await _settleSessionCardScopeWritesForTests();
 
-    expect((await readSessionCardScopes())?.has('session-1')).toBe(true);
+    const kept = await readSessionCardScopes();
+    expect(kept?.has('session-1')).toBe(true);
   });
 });
 

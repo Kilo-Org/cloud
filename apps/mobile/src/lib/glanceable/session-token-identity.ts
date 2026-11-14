@@ -112,12 +112,13 @@ let hydration: Promise<boolean> | null = null;
  * cannot be read now, which leaves the write for a later call.
  */
 function ensureHydrated(): Promise<boolean> {
-  hydration ??= loadFromStore().then(ready => {
+  hydration ??= (async () => {
+    const ready = await loadFromStore();
     if (!ready) {
       hydration = null;
     }
     return ready;
-  });
+  })();
   return hydration;
 }
 

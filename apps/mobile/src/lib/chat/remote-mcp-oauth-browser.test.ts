@@ -30,11 +30,11 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('expo-web-browser', () => ({
-  openBrowserAsync: async (url: string) => {
+  openBrowserAsync: (url: string) => {
     world.opened.push(url);
-    return { type: 'dismiss' };
+    return Promise.resolve({ type: 'dismiss' });
   },
-  openAuthSessionAsync: async () => ({ type: 'dismiss' }),
+  openAuthSessionAsync: () => Promise.resolve({ type: 'dismiss' }),
 }));
 
 vi.mock('./remote-mcp-oauth-provider', () => ({

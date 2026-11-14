@@ -245,22 +245,17 @@ function applyHydratedEntries(raw: string): boolean {
   const now = Date.now();
   let applied = false;
   for (const entry of entries) {
-    // An ack that names no raise (written before acks carried one) suppresses
-    // nothing: dropping it keeps a raise the user has not answered visible.
-    if (entry.raiseId === null) {
-      continue;
+    const raiseId = entry.raiseId;
+    const live = entry.expiresAt === null || entry.expiresAt > now;
+    /* A mutation that landed after hydration began must win over the stale
+       persisted entry: a present in-memory entry means this session already
+       changed this run, so the persisted snapshot is out of date. An ack that
+       names no raise (written before acks carried one) suppresses nothing. */
+    const fresh = raiseId !== null && !store.entries.has(entry.sessionId);
+    if (fresh && live) {
+      store.entries.set(entry.sessionId, hydratedEntry(entry, raiseId));
+      applied = true;
     }
-    if (entry.expiresAt !== null && entry.expiresAt <= now) {
-      continue;
-    }
-    // A mutation that landed after hydration began must win over the stale
-    // persisted entry: a present in-memory entry means this session already
-    // changed this run, so the persisted snapshot is out of date.
-    if (store.entries.has(entry.sessionId)) {
-      continue;
-    }
-    store.entries.set(entry.sessionId, hydratedEntry(entry, entry.raiseId));
-    applied = true;
   }
   return applied;
 }
@@ -377,14 +372,16 @@ export function ackSessionAttention(
   // entry's raise was answered already and must not be reused for a new one.
   const trackedRaise = entry?.kind === 'cleared' && entry.status === status ? entry.raiseId : null;
   const raiseId = statusUpdatedAt ?? trackedRaise ?? status;
-  const knownRaise =
-    entry === undefined
-      ? null
-      : entry.kind === 'cleared'
-        ? entry.raiseId
-        : entry.answered.kind === 'raise'
-          ? entry.answered.raiseId
-          : entry.answered.status;
+  let knownRaise: string | null = null;
+  if (entry !== undefined) {
+    if (entry.kind === 'cleared') {
+      knownRaise = entry.raiseId;
+    } else if (entry.answered.kind === 'raise') {
+      knownRaise = entry.answered.raiseId;
+    } else {
+      knownRaise = entry.answered.status;
+    }
+  }
   if (
     knownRaise !== null &&
     parseTimestamp(knownRaise).getTime() > parseTimestamp(raiseId).getTime()
@@ -554,7 +551,7 @@ export type AttentionRaise = {
  */
 export function isAttentionAcked(sessionId: string, raise: AttentionRaise): boolean {
   const entry = store.entries.get(sessionId);
-  if (entry === undefined || entry.kind !== 'acked') {
+  if (entry?.kind !== 'acked') {
     return false;
   }
   const answeredRaise =

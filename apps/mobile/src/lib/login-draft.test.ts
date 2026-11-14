@@ -50,7 +50,7 @@ vi.mock('@/lib/auth/secure-store', () => ({
 /** A fresh app process: the module's memory is gone, the keychain is not. */
 async function reload(): Promise<typeof LoginDraftModule> {
   vi.resetModules();
-  return await import('./login-draft');
+  return import('./login-draft');
 }
 
 beforeEach(() => {

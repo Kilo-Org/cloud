@@ -370,7 +370,7 @@ export async function verifyRegistration(
 
   assertPresentedChallenge(response, challenge.challenge);
 
-  const verified = await verifyOrRefuse(() =>
+  const { registrationInfo } = await verifyOrRefuse(() =>
     verifyRegistrationResponse({
       response,
       expectedChallenge: challenge.challenge,
@@ -381,7 +381,6 @@ export async function verifyRegistration(
       requireUserVerification: false,
     })
   );
-  const { registrationInfo } = verified;
 
   const { credential, credentialDeviceType, credentialBackedUp, aaguid } = registrationInfo;
 
@@ -507,7 +506,7 @@ export async function verifyAuthentication(
     throw new PasskeyVerificationError('UNKNOWN_CREDENTIAL');
   }
 
-  const verified = await verifyOrRefuse(() =>
+  const { authenticationInfo } = await verifyOrRefuse(() =>
     verifyAuthenticationResponse({
       response,
       expectedChallenge: challenge.challenge,
@@ -523,7 +522,6 @@ export async function verifyAuthentication(
       requireUserVerification: false,
     })
   );
-  const { authenticationInfo } = verified;
 
   if (credential.sign_count !== 0 && authenticationInfo.newCounter <= credential.sign_count) {
     // The counter only moves forward; a lower or equal value is a replayed

@@ -330,9 +330,7 @@ export default function InstancePickerScreen() {
                 {t('agentChat.instancePicker.cloudAgentDescription')}
               </Text>
             </View>
-            {cloudAgentSelected ? (
-              <Check size={18} color={selectionCheckColor(colors)} />
-            ) : null}
+            {cloudAgentSelected ? <Check size={18} color={selectionCheckColor(colors)} /> : null}
           </Pressable>
         }
         ListEmptyComponent={

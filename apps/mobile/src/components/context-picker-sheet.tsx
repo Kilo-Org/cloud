@@ -118,9 +118,7 @@ export function ContextPickerSheet({
                 the check's own 16 dp — the app's rem is 14, so `w-4` would clip
                 the icon. */}
             <View className="w-[16px] items-center">
-              {index === currentIndex && (
-                <Check size={16} color={selectionCheckColor(colors)} />
-              )}
+              {index === currentIndex && <Check size={16} color={selectionCheckColor(colors)} />}
             </View>
             {/* The tail, not the leading words, tells sibling memberships
               apart, so a label cut at the row's width keeps its own name. */}

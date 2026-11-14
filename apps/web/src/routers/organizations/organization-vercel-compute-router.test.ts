@@ -11,7 +11,7 @@ import {
   GET as getInternalCredential,
   PATCH as updateInternalCredential,
 } from '@/app/api/internal/byoc/vercel-credentials/[credentialId]/route';
-jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
+jest.mock('@/lib/cloud-agent-next/cloud-agent-internal-api', () => ({
   cleanupVercelSnapshotBuild: jest.fn(),
   getVercelComputeEnrollment: jest.fn(),
   getVercelComputeEnrollmentForUser: jest.fn(),
@@ -48,7 +48,7 @@ import {
   getVercelComputeEnrollmentForUser,
   getVercelRuntimeIdentity,
   startVercelSnapshotBuild,
-} from '@/lib/cloud-agent-next/cloud-agent-client';
+} from '@/lib/cloud-agent-next/cloud-agent-internal-api';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';

@@ -64,7 +64,7 @@ export function TodoQuickAdd({ onAdd }: Readonly<{ onAdd: (title: string) => Pro
             textRef.current = text;
             const next = text.trim().length > 0;
             setHasText(current => (current === next ? current : next));
-            clearWhere(f => f.kind === 'add-failed');
+            clearWhere(() => true);
           }}
           onSubmitEditing={() => {
             void submit();

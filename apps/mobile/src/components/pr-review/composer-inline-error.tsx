@@ -33,11 +33,7 @@ export function ComposerInlineError({ feedback }: Readonly<ComposerInlineErrorPr
       return (
         <View className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-1.5">
           {feedback.failure.announce === 'here' ? (
-            <AccessibleStatus
-              message={feedback.failure.message}
-              tone="error"
-              className="text-xs"
-            />
+            <AccessibleStatus message={feedback.failure.message} tone="error" className="text-xs" />
           ) : (
             <Text className="text-xs text-destructive">{feedback.failure.message}</Text>
           )}

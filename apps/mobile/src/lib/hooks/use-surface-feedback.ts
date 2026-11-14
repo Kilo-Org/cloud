@@ -22,9 +22,9 @@ export type SurfaceFeedbackController<Failure extends SurfaceFailure> = {
   /** The failure to render, or `null`. The same object `feedback` holds. */
   readonly failure: Failure | null;
   /** Stable identity: safe as a `useCallback` dependency. */
-  begin(): SurfaceAttempt<Failure> | null;
+  readonly begin: () => SurfaceAttempt<Failure> | null;
   /** Stable identity. Retires a failure the surface still shows; never touches pending. */
-  clearWhere(matches: (failure: Failure) => boolean): void;
+  readonly clearWhere: (matches: (failure: Failure) => boolean) => void;
 };
 
 export type KeyedSurfaceFeedbackController<Key extends string, Failure extends SurfaceFailure> = {

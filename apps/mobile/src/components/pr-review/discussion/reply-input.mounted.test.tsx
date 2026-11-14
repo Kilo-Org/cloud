@@ -296,9 +296,7 @@ describe('ReplyInput failure copy', () => {
       pressReply(renderer);
     });
 
-    expect(failureCopy(renderer)).toBe(
-      "This reply can't be posted. The thread may have changed."
-    );
+    expect(failureCopy(renderer)).toBe("This reply can't be posted. The thread may have changed.");
     expect(replyEnabled(renderer)).toBe(false);
   });
 
@@ -318,9 +316,7 @@ describe('ReplyInput failure copy', () => {
       pressReply(renderer);
     });
 
-    expect(failureCopy(renderer)).toBe(
-      "You don't have permission to reply to this merge request."
-    );
+    expect(failureCopy(renderer)).toBe("You don't have permission to reply to this merge request.");
   });
 
   it('never shows the raw provider text for a generic failure', async () => {

@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { classifyPrInlineFailure, prInlineNotRecordedFailure } from '@/lib/pr-review/inline-failure';
+import {
+  classifyPrInlineFailure,
+  prInlineNotRecordedFailure,
+} from '@/lib/pr-review/inline-failure';
 import {
   PR_OPERATION_AMBIGUOUS_MESSAGE,
   PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
@@ -32,8 +35,11 @@ beforeEach(() => {
 describe('classifyPrInlineFailure', () => {
   it('publishes the ledger persistence marker as not-recorded on every surface', async () => {
     const error = new Error(PR_OPERATION_PERSISTENCE_FAILED_MESSAGE);
-    for (const surface of ['composer', 'edit-comment', 'reply'] as const) {
-      const outcome = await classifyPrInlineFailure(error, { surface, announce: 'toast' });
+    const surfaces = ['composer', 'edit-comment', 'reply'] as const;
+    const outcomes = await Promise.all(
+      surfaces.map(surface => classifyPrInlineFailure(error, { surface, announce: 'toast' }))
+    );
+    for (const outcome of outcomes) {
       expect(outcome).toEqual({ kind: 'failure', failure: prInlineNotRecordedFailure('toast') });
     }
   });

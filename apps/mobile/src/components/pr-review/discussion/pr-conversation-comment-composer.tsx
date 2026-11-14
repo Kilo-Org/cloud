@@ -280,8 +280,7 @@ export function PrConversationCommentComposer({
   // recovery lives outside the submit button (the reconnect notice CTA /
   // leaving the sheet); a server bad-request stays retryable so the user can
   // re-post without retyping — the ledger dedupes the retry.
-  const submitDisabled =
-    isSubmitting || (failure !== null && SUBMIT_BLOCKING.has(failure.kind));
+  const submitDisabled = isSubmitting || (failure !== null && SUBMIT_BLOCKING.has(failure.kind));
 
   // PickerSheet invariant: [header, ScrollView] as direct children (no
   // wrapper View, no sticky-footer sibling). Footer is trailing scroll

@@ -266,18 +266,20 @@ export function BriefingContextSettings({
       </View>
       {limitQuote.kind === 'invalid' ? (
         <Text className="text-sm text-destructive">{t('agentBriefing.invalidSafeguards')}</Text>
-      ) : limitQuote.quote?.canGenerate ? (
+      ) : null}
+      {limitQuote.kind === 'quoted' && limitQuote.quote?.canGenerate ? (
         <Text className="text-xs text-muted-foreground">
           {t('agentBriefing.estimate', {
             estimate: briefingMoney(limitQuote.quote.estimatedCostMicrodollars, i18n.language),
             maximum: briefingMoney(limitQuote.quote.maximumCostMicrodollars, i18n.language),
           })}
         </Text>
-      ) : (
+      ) : null}
+      {limitQuote.kind === 'quoted' && !limitQuote.quote?.canGenerate ? (
         <Text className="text-xs text-muted-foreground">
           {t(briefingEstimateUnavailableKey(limitQuote.quote?.unavailableReason))}
         </Text>
-      )}
+      ) : null}
       {estimate.isError ? (
         <Button
           variant="ghost"

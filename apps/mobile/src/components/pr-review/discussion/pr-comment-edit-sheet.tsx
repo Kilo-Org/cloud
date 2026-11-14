@@ -208,10 +208,7 @@ export function PrCommentEditSheet({
   // Save down because their recovery lives outside the button (the reconnect
   // notice CTA / leaving the sheet — a 404 means the comment is gone).
   const primaryDisabled =
-    isSubmitting ||
-    !hasBody ||
-    !dirty ||
-    (failure !== null && EDIT_BLOCKING.has(failure.kind));
+    isSubmitting || !hasBody || !dirty || (failure !== null && EDIT_BLOCKING.has(failure.kind));
 
   // PickerSheet invariant: [header, ScrollView] as direct children (no wrapper
   // View, no sticky-footer sibling). Footer is trailing scroll content so

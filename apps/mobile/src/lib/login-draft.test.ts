@@ -133,7 +133,7 @@ describe('a sign-in attempt', () => {
     await persistLoginDrafts();
 
     const reloaded = await reload();
-    const gate = Promise.withResolvers<void>();
+    const gate = Promise.withResolvers<undefined>();
     stored.readGate = gate.promise;
     const restore = reloaded.restoreLoginDrafts();
     // Wait until the restore is parked on the slow record read.
@@ -148,7 +148,7 @@ describe('a sign-in attempt', () => {
       email: 'typed@b.c',
     });
 
-    gate.resolve();
+    gate.resolve(undefined);
     await expect(restore).resolves.toEqual({ email: 'typed@b.c', ssoRecovery: null });
   });
 

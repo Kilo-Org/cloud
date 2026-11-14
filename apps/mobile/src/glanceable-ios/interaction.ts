@@ -230,7 +230,7 @@ async function approveFromSessionCard(activity: SessionActivity): Promise<Glance
     return { kind: 'none' };
   }
   await renderSessionCardPress(activity, { approving: true });
-  const result = await answerSessionCard(sessionId, approvalKey, props?.statusSince ?? null);
+  const result = await answerSessionCard(sessionId, approvalKey, props.statusSince ?? null);
   if (result.kind === 'retryable') {
     toast.error(i18n.t(APPROVE_FAILED_KEY));
     await renderSessionCardPress(activity, { notice: i18n.t(APPROVE_FAILED_KEY) });

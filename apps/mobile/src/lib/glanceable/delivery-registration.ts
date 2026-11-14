@@ -35,8 +35,8 @@ import {
 import {
   _resetSessionTokenIdentityForTests,
   readSessionTokenIdentitiesForScope,
-  type SessionTokenAccount,
   retireSessionTokenIdentities,
+  type SessionTokenAccount,
 } from './session-token-identity';
 import { enqueueTokenMutation, resetTokenMutationQueue } from './token-mutation-queue';
 import {

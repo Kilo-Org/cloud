@@ -3286,7 +3286,7 @@
       "selectOrganization": "Vali organisatsioon",
       "unavailableDescription": "See organisatsioon pole enam saadaval. Jätkamiseks vali kontovalijast teine konto.",
       "unavailableSessionsDescription": "See organisatsioon pole enam saadaval. Selle seansse ei saa laadida.",
-      "accessDeniedDescription": "Sul puudub juurdepääs sellele organisatsioonile."
+      "accessDeniedDescription": "Palu organisatsiooni omanikul või administraatoril anda sulle juurdepääsu."
     },
     "create": {
       "title": "Loo organisatsioon",

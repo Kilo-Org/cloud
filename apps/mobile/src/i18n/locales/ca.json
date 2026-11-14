@@ -3339,7 +3339,7 @@
       "selectOrganization": "Selecciona una organització",
       "unavailableDescription": "Aquesta organització ja no està disponible. Tria'n una des del teu perfil per continuar.",
       "unavailableSessionsDescription": "Aquesta organització ja no està disponible. No es poden carregar les seves sessions.",
-      "accessDeniedDescription": "No tens accés a aquesta organització."
+      "accessDeniedDescription": "Demana a un propietari o administrador de l'organització que et doni accés."
     },
     "create": {
       "title": "Crea una organització",

@@ -3384,7 +3384,7 @@
       "selectOrganization": "Wybierz organizację",
       "unavailableDescription": "Ta organizacja nie jest już dostępna. Wybierz inną w swoim profilu, aby kontynuować.",
       "unavailableSessionsDescription": "Ta organizacja nie jest już dostępna. Nie można wczytać jej sesji.",
-      "accessDeniedDescription": "Nie masz dostępu do tej organizacji."
+      "accessDeniedDescription": "Poproś właściciela organizacji lub administratora o przyznanie Ci dostępu."
     },
     "create": {
       "title": "Utwórz organizację",

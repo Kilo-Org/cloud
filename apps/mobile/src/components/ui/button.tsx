@@ -190,6 +190,11 @@ type ButtonProps = Omit<React.ComponentProps<typeof Pressable>, 'children'> &
   VariantProps<typeof buttonVariants> & {
     /** Disables the button and replaces its label with a centered ActivityIndicator. */
     loading?: boolean;
+    /**
+     * The token the busy mark paints, for a caller whose variant's own mark
+     * cannot be read on the fill and ink it sets itself.
+     */
+    loadingMark?: keyof ThemeColors;
     children?: React.ReactNode;
   };
 
@@ -198,6 +203,7 @@ function Button({
   variant,
   size,
   loading,
+  loadingMark,
   disabled,
   accessibilityState,
   accessibilityLabel,
@@ -240,7 +246,7 @@ function Button({
   // The children sit one level deeper in that layout, so their spacing moves
   // inside the wrapper; it takes the same size gap the row would have applied.
   const busyLabelGap = buttonGapVariants({ size });
-  const busyInk = colors[BUTTON_INK[variant ?? 'default'].mark];
+  const busyInk = colors[loadingMark ?? BUTTON_INK[variant ?? 'default'].mark];
   const busyMark = (
     <View
       className="items-center justify-center"

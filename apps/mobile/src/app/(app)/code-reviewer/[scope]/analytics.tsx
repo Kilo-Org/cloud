@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/empty-state';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
+import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { FileText, GitPullRequest, LineChart, type LucideIcon } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -18,13 +19,23 @@ import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { PERSONAL_SCOPE, PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
+import { reviewerScopeTitle } from '@/lib/code-reviewer-scope-title';
+import { useReviewerScopeName } from '@/lib/hooks/use-reviewer-scope-title';
+import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
+import { CODE_REVIEWER_HOME_PATH } from '@/lib/profile-agent-navigation';
 import { useTRPC } from '@/lib/trpc';
 import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 
+/**
+ * The day window the dashboard covers. The label is the day count and its unit
+ * in one existing catalog string — the same three the usage screen paints for
+ * the same windows — so a segment reads "30 days" instead of a bare number the
+ * reader cannot attribute to days.
+ */
 const PERIOD_OPTIONS = [
-  { value: '7', label: '7' },
-  { value: '30', label: '30' },
-  { value: '90', label: '90' },
+  { value: '7', labelKey: 'spendAlerts.window7d' },
+  { value: '30', labelKey: 'spendAlerts.window30d' },
+  { value: '90', labelKey: 'usage.range90d' },
 ] as const;
 
 type PeriodDays = 7 | 30 | 90;
@@ -86,6 +97,23 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
   const [period, setPeriod] = useState<PeriodDays>(30);
   const [platform, setPlatform] = useState<AnalyticsPlatform>('github');
 
+  // The organization's own name for the header, and the row a denial titles
+  // itself with. The route already rejected the personal scope, so this read
+  // always has an organization to look up.
+  const organizations = useQuery(trpc.organizations.list.queryOptions());
+  // The name this app last showed stands in once the reader loses the
+  // membership, so the denial below still names the organization it is about.
+  const knownScopeName = useReviewerScopeName(scope, organizations.data);
+  const scopeTitle = reviewerScopeTitle(
+    scope,
+    organizations.data,
+    {
+      personal: t('common.personal'),
+      organization: t('common.organization'),
+    },
+    knownScopeName
+  );
+
   const dashboard = useQuery(
     trpc.codeReviews.analytics.getDashboard.queryOptions({
       organizationId: scope,
@@ -93,6 +121,39 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
       periodDays: period,
     })
   );
+
+  // A denial is not a failed read: the reader cannot see this organization's
+  // analytics at all, so the screen says so with the same surface the platform
+  // list renders, and Retry re-resolves the membership a restored one lands.
+  // Every other failure, and the cached data beside a failed refetch, keeps the
+  // dashboard's own error state below.
+  const access = classifyOrganizationScopeAccess({
+    isOrganizationScope: true,
+    errors: [dashboard.error],
+  });
+
+  const periodOptions = PERIOD_OPTIONS.map(option => ({
+    value: option.value,
+    label: t(option.labelKey),
+  }));
+
+  if (access !== 'granted') {
+    return (
+      <ScopeAccessDeniedScreen
+        title={scopeTitle}
+        // The denied header carries the granted header's identity: this
+        // screen's own name over the organization, so a lost membership still
+        // reads as the analytics screen the reader tried to open.
+        eyebrow={t('codeReviewer.analytics.title')}
+        backFallback={CODE_REVIEWER_HOME_PATH}
+        kind={access}
+        onRetry={() => {
+          void Promise.allSettled([organizations.refetch(), dashboard.refetch()]);
+        }}
+        isRetrying={organizations.isFetching || dashboard.isFetching}
+      />
+    );
+  }
 
   const number = (value: number) => formatNumber(value, i18n.language);
 
@@ -145,11 +206,15 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
         </View>
 
         {repositories.length === 0 ? (
+          // The muted note above already says analytics is off, so the generic
+          // description would restate it.
           <EmptyState
             placement="static"
             icon={LineChart}
             title={t('codeReviewer.analytics.empty')}
-            description={t('codeReviewer.analytics.emptyDescription')}
+            description={
+              settings.enabled ? t('codeReviewer.analytics.emptyDescription') : undefined
+            }
           />
         ) : (
           <View className="gap-2">
@@ -183,8 +248,13 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ReviewerHeader
-        title={t('codeReviewer.analytics.title')}
-        eyebrow={t('common.codeReviewer')}
+        title={scopeTitle}
+        // One line, like the review list this scope also opens: the name arrives
+        // with the membership read and a longer one tail-truncates inside the
+        // same line instead of growing the header. The eyebrow keeps the
+        // screen's own name there, since the organization name is user prose.
+        titleNumberOfLines={1}
+        eyebrow={t('codeReviewer.analytics.title')}
       />
       <TabScreenScrollView className="flex-1" contentContainerClassName="gap-4 px-6 pt-4">
         <View className="gap-2">
@@ -195,7 +265,7 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
             onChange={setPlatform}
           />
           <SegmentedControl
-            options={PERIOD_OPTIONS}
+            options={periodOptions}
             value={String(period)}
             accessibilityLabel={t('usage.rangePicker')}
             onChange={value => {

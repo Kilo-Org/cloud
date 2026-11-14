@@ -3286,7 +3286,7 @@
       "selectOrganization": "ਇੱਕ ਸੰਸਥਾ ਚੁਣੋ",
       "unavailableDescription": "ਇਹ ਸੰਸਥਾ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਜਾਰੀ ਰੱਖਣ ਲਈ ਆਪਣੀ ਪ੍ਰੋਫਾਈਲ ਤੋਂ ਕੋਈ ਹੋਰ ਸੰਸਥਾ ਚੁਣੋ।",
       "unavailableSessionsDescription": "ਇਹ ਸੰਸਥਾ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਇਸ ਦੇ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕਦੇ।",
-      "accessDeniedDescription": "ਤੁਹਾਡੀ ਇਸ ਸੰਸਥਾ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੈ।"
+      "accessDeniedDescription": "ਤੁਹਾਨੂੰ ਪਹੁੰਚ ਦੇਣ ਲਈ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਜਾਂ ਐਡਮਿਨ ਨੂੰ ਕਹੋ।"
     },
     "create": {
       "title": "ਸੰਸਥਾ ਬਣਾਓ",

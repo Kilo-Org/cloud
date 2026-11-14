@@ -3286,7 +3286,7 @@
       "selectOrganization": "Valitse organisaatio",
       "unavailableDescription": "Tämä organisaatio ei ole enää käytettävissä. Jatka valitsemalla toinen organisaatio profiilistasi.",
       "unavailableSessionsDescription": "Tämä organisaatio ei ole enää käytettävissä. Sen istuntoja ei voida ladata.",
-      "accessDeniedDescription": "Sinulla ei ole pääsyä tähän organisaatioon."
+      "accessDeniedDescription": "Pyydä organisaation omistajaa tai ylläpitäjää myöntämään sinulle pääsy."
     },
     "create": {
       "title": "Luo organisaatio",

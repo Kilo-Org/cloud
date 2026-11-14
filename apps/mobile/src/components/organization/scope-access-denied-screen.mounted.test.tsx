@@ -1,7 +1,8 @@
 // The no-access surface is the product landings' shared state for an
-// organization the reader may not see. It must say access is lost (or the
-// organization is gone), and offer both recoveries: a Retry that re-resolves
-// the membership and a way back to Profile that drops the stale selection.
+// organization the reader may not see. It must say who can grant access (or
+// that the organization is gone), and offer both recoveries: a Retry that
+// re-resolves the membership and a way back to Profile that drops the stale
+// selection.
 
 import { type ComponentType, createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -26,14 +27,19 @@ vi.mock('@/components/query-error', () => ({
   QueryError: (props: {
     variant?: string;
     message?: string;
+    descriptionClassName?: string;
     action?: ReactNode;
     onRetry?: () => void;
   }) =>
-    createElement(
-      'QueryErrorMock',
-      { variant: props.variant, message: props.message },
-      props.action ?? (props.onRetry ? 'BUILT_IN_RETRY' : null)
-    ),
+    createElement('QueryErrorMock', { variant: props.variant }, [
+      // The description's own node, carrying the class list the real state
+      // composes: the shared measure plus whatever cap the caller adds.
+      createElement('QueryErrorMessageMock', {
+        className: `text-center text-sm ${props.descriptionClassName ?? ''}`,
+        message: props.message,
+      }),
+      props.action ?? (props.onRetry ? 'BUILT_IN_RETRY' : null),
+    ]),
 }));
 
 vi.mock('@/components/ui/button', () => ({
@@ -42,15 +48,17 @@ vi.mock('@/components/ui/button', () => ({
     children?: ReactNode;
     accessibilityLabel?: string;
     variant?: string;
+    className?: string;
   }) =>
-    createElement('ButtonMock', { onPress: props.onPress, variant: props.variant }, [
+    createElement('ButtonMock', { ...props }, [
       createElement('ButtonLabelMock', { label: props.accessibilityLabel }),
       props.children,
     ]),
 }));
 
 vi.mock('@/components/ui/text', () => ({
-  Text: (props: { children?: ReactNode }) => createElement('TextMock', null, props.children),
+  Text: (props: { children?: ReactNode; className?: string }) =>
+    createElement('TextMock', { className: props.className }, props.children),
 }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
@@ -114,23 +122,43 @@ beforeEach(() => {
 });
 
 describe('ScopeAccessDeniedScreen', () => {
-  it('states that access was lost and offers Retry plus Back to profile', () => {
+  it('states who can grant access and leads with Back to profile', () => {
     const renderer = mountScreen({});
     const error = findByType(renderer.root, 'QueryErrorMock')[0];
+    const description = error ? findByType(error, 'QueryErrorMessageMock')[0] : undefined;
 
     expect(error?.props.variant).toBe('permission');
-    expect(error?.props.message).toBe('You do not have access to this organization.');
-    expect(button('Retry', renderer.root)).toBeDefined();
-    expect(button('Back to profile', renderer.root)).toBeDefined();
-    // Retry is the recovery this state exists for, so it carries the filled
-    // primary; leaving the organization is the outlined secondary under it.
-    expect(button('Retry', renderer.root)?.props.variant ?? 'default').toBe('default');
-    expect(button('Back to profile', renderer.root)?.props.variant).toBe('outline');
-    expect(
-      findByType(renderer.root, 'ButtonMock').filter(
-        node => (node.props.variant ?? 'default') === 'default'
-      )
-    ).toHaveLength(1);
+    expect(description?.props.message).toBe(
+      'Ask an organization owner or admin to grant you access.'
+    );
+    // In the compact cell this sentence wrapped with one word alone on its last
+    // line, so the description carries a capped measure that breaks it into
+    // balanced lines instead.
+    expect(description?.props.className).toContain('max-w-[205px]');
+    const back = button('Back to profile', renderer.root);
+    const retry = button('Retry', renderer.root);
+    expect(back).toBeDefined();
+    expect(retry).toBeDefined();
+
+    // Leaving the stale selection is the recovery this state leads with, so the
+    // filled primary is Back to profile and it comes first.
+    const filled = findByType(renderer.root, 'ButtonMock').filter(
+      node => (node.props.variant ?? 'default') === 'default'
+    );
+    expect(filled).toHaveLength(1);
+    expect(filled[0]).toBe(back);
+    expect(findByType(renderer.root, 'ButtonMock')[0]).toBe(back);
+    // Dark --primary is the brand yellow that glares on the near-black page, so dark takes the muted lifted olive.
+    expect(String(back?.props.className)).toContain('bg-primary');
+    expect(String(back?.props.className)).toContain('dark:bg-selection');
+    const backLabel = back ? findByType(back, 'TextMock')[0] : undefined;
+    expect(String(backLabel?.props.className)).toContain('dark:text-selection-foreground');
+
+    // Retry only re-resolves the membership, so it is the outlined secondary,
+    // and the outline variant's own ink already paints its busy mark.
+    expect(retry?.props.variant).toBe('outline');
+    expect(retry?.props.loadingMark).toBeUndefined();
+    expect(String(retry?.props.className ?? '')).not.toContain('dark:bg-selection');
     expect(findByType(renderer.root, 'ScreenHeaderMock')[0]?.props.title).toBe('Security Agent');
 
     act(() => {
@@ -165,10 +193,17 @@ describe('ScopeAccessDeniedScreen', () => {
     const error = findByType(renderer.root, 'QueryErrorMock')[0];
 
     expect(error?.props.variant).toBe('not-found');
-    expect(error?.props.message).toBe(
+    const description = error ? findByType(error, 'QueryErrorMessageMock')[0] : undefined;
+    expect(description?.props.message).toBe(
       'This organization is no longer available. Choose another account from the account picker to continue.'
     );
     expect(findByType(renderer.root, 'ScreenHeaderMock')[0]?.props.eyebrow).toBe('Code Reviewer');
+    // A deleted organization does not come back by retrying either, so the
+    // filled primary and the order are the denied state's, not Retry's.
+    expect(findByType(renderer.root, 'ButtonMock')[0]).toBe(
+      button('Back to profile', renderer.root)
+    );
+    expect(button('Retry', renderer.root)?.props.variant).toBe('outline');
 
     act(() => {
       renderer.unmount();

@@ -3354,7 +3354,7 @@
       "opensOnWeb": "Opens on the web"
     },
     "boundary": {
-      "accessDeniedDescription": "You do not have access to this organization.",
+      "accessDeniedDescription": "Ask an organization owner or admin to grant you access.",
       "backToProfile": "Back to profile",
       "chooseAccount": "Choose an account",
       "loadErrorMessage": "Check your connection and try again.",

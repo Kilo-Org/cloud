@@ -3286,7 +3286,7 @@
       "selectOrganization": "Val á félagi",
       "unavailableDescription": "Þetta félag er ekki lengur tiltækt. Veldu eitt úr prófílnum þínum til að halda áfram.",
       "unavailableSessionsDescription": "Þetta félag er ekki lengur tiltækt. Ekki er hægt að hlaða setum þess.",
-      "accessDeniedDescription": "Þú hefur ekki aðgang að þessu félagi."
+      "accessDeniedDescription": "Biddu eiganda eða stjórnanda félagsins um að veita þér aðgang."
     },
     "create": {
       "title": "Stofna félag",

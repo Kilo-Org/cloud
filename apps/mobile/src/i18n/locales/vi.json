@@ -3278,7 +3278,7 @@
       "selectOrganization": "Chọn một tổ chức",
       "unavailableDescription": "Bạn không còn truy cập được tổ chức này. Hãy chọn tổ chức khác trong hồ sơ để tiếp tục.",
       "unavailableSessionsDescription": "Bạn không còn truy cập được tổ chức này. Không thể tải phiên của tổ chức này.",
-      "accessDeniedDescription": "Bạn không có quyền truy cập vào tổ chức này."
+      "accessDeniedDescription": "Hãy yêu cầu chủ sở hữu hoặc quản trị viên của tổ chức cấp quyền truy cập cho bạn."
     },
     "create": {
       "title": "Tạo tổ chức",

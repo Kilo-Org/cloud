@@ -15,9 +15,10 @@ const PROFILE_HREF = '/(app)/(tabs)/(3_profile)' as Href;
  * own first-run or empty state, so a lost membership never reads as "nothing is
  * set up yet" and never offers a setup the reader cannot complete.
  *
- * Retry re-resolves the membership: an owner who restores access gets the
- * organization back in place. Back to profile leaves the stale selection behind,
- * exactly like the shared organization boundary's absent-override state.
+ * Leaving leads: Back to profile drops the stale selection, exactly like the
+ * shared organization boundary's absent-override state, so the reader lands on
+ * a scope they can open. Retry only re-resolves the membership, for an owner
+ * who restores access while the reader waits.
  */
 export function ScopeAccessDeniedScreen({
   title,
@@ -52,19 +53,36 @@ export function ScopeAccessDeniedScreen({
           ? 'organization.boundary.unavailableDescription'
           : 'organization.boundary.accessDeniedDescription'
       )}
+      // The access-denied sentence runs just past the width the compact cell
+      // gives this state, so it wrapped with one word alone on its last line.
+      // At this measure it breaks into two lines that each carry a whole
+      // phrase. The longer unavailable sentence keeps the shared measure.
+      descriptionClassName={notFound ? undefined : 'max-w-[205px]'}
       action={
         <View className="gap-3">
-          <Button onPress={onRetry} loading={isRetrying} accessibilityLabel={t('common.retry')}>
-            <Text>{t('common.retry')}</Text>
-          </Button>
+          {/* Leaving is the recovery this surface leads with, so it holds the
+              one filled control: dark `--primary` is the brand yellow that
+              glares on the near-black page, so dark takes the muted olive
+              `--selection` with its own foreground ink. Retry only re-resolves
+              the membership, so it stays the outlined secondary. */}
           <Button
-            variant="outline"
+            className="bg-primary dark:bg-selection"
             accessibilityLabel={t('organization.boundary.backToProfile')}
             onPress={() => {
               router.replace(PROFILE_HREF);
             }}
           >
-            <Text>{t('organization.boundary.backToProfile')}</Text>
+            <Text className="dark:text-selection-foreground">
+              {t('organization.boundary.backToProfile')}
+            </Text>
+          </Button>
+          <Button
+            variant="outline"
+            loading={isRetrying}
+            accessibilityLabel={t('common.retry')}
+            onPress={onRetry}
+          >
+            <Text>{t('common.retry')}</Text>
           </Button>
         </View>
       }

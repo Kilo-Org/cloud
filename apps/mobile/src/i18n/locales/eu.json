@@ -3286,7 +3286,7 @@
       "selectOrganization": "Hautatu erakunde bat",
       "unavailableDescription": "Erakunde hau jada ez dago erabilgarri. Aukeratu bat zure profiletik jarraitzeko.",
       "unavailableSessionsDescription": "Erakunde hau jada ez dago erabilgarri. Ezin dira kargatu haren saioak.",
-      "accessDeniedDescription": "Ez duzu erakunde honetarako sarbiderik."
+      "accessDeniedDescription": "Eskatu erakunde baten jabe edo administratzaile bati zuretzako sarbidea emateko."
     },
     "create": {
       "title": "Sortu erakundea",

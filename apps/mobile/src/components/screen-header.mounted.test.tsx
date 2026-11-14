@@ -992,6 +992,39 @@ describe('ScreenHeader mounted', () => {
     renderer.unmount();
   });
 
+  it('lays out the arriving label in the hidden eyebrow line, so the swap cannot grow it', () => {
+    // The invoices boundary reserves the eyebrow line without
+    // `reserveTitleSpace`, so this transparent slot is what holds the height:
+    // with a no-break space it held the mono 10px line box, which is shorter
+    // than the 13px twin an Arabic-script label takes
+    // (`EYEBROW_RTL_SCRIPT_DISPLAY`), so the header grew on the swap.
+    const renderer = renderHeader({
+      title: 'الفواتير',
+      reserveEyebrow: true,
+      reservedEyebrow: 'الفواتير',
+    });
+    const placeholder = renderer.root.findByType('Eyebrow');
+    expect(placeholder.children).toEqual(['الفواتير']);
+    expect(placeholder.props.className).toContain('opacity-0');
+    expect(placeholder.props.accessible).toBe(false);
+    expect(placeholder.props.accessibilityElementsHidden).toBe(true);
+
+    act(() => {
+      renderer.update(
+        createElement(ScreenHeader, {
+          title: 'استوديو آنا للتصميم',
+          eyebrow: 'الفواتير',
+          reservedEyebrow: 'الفواتير',
+        })
+      );
+    });
+    const label = renderer.root.findByType('Eyebrow');
+    expect(label.children).toEqual(['الفواتير']);
+    expect(label.props.className).not.toContain('opacity-0');
+    expect(label.props.accessible).toBe(true);
+    renderer.unmount();
+  });
+
   it('renders the subtitle under the title on one muted line', () => {
     const renderer = renderHeader({
       title: 'Profile agents',

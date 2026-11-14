@@ -88,6 +88,11 @@ export function useSessionListAutoScroll<ItemT>({
   // this replaced: they could disagree (a live fling beside a send), and a
   // stale fling event could then turn the send's follow off.
   const claimRef = useRef<SessionPositionClaim>({ kind: 'free' });
+  // Whether the list is moving under the user's finger or its fling. Ownership
+  // and motion are different facts: a send takes the position over, but the
+  // fling it interrupted is still moving the viewport, and a scheduled resume
+  // must not yank it mid-fling.
+  const listMovingRef = useRef(false);
   const lastContentHeightRef = useRef(0);
   // Newest item key seen by the previous render. The item-count effect
   // compares against it to tell a genuine append (newest key changed) from
@@ -298,6 +303,7 @@ export function useSessionListAutoScroll<ItemT>({
     // The user's own drag is the current claim on the position: it replaces a
     // send's claim, which a later link is allowed to release (a drag's is not).
     claimRef.current = claimAfterDragBegin(claimRef.current);
+    listMovingRef.current = true;
     isAutoScrollingRef.current = false;
     timeouts.clearReset();
     timeouts.clearRetry();
@@ -314,6 +320,7 @@ export function useSessionListAutoScroll<ItemT>({
       timeouts.clearUserScrolling();
       timeouts.userScrollingRef.current = setTimeout(() => {
         claimRef.current = claimAfterDragEnd(claimRef.current);
+        listMovingRef.current = false;
         timeouts.userScrollingRef.current = null;
       }, 100);
     },
@@ -329,6 +336,7 @@ export function useSessionListAutoScroll<ItemT>({
       timeouts.clearUserScrolling();
       // A late momentum end follows a drag; a send's claim outranks it.
       claimRef.current = claimAfterMomentumEnd(claimRef.current);
+      listMovingRef.current = false;
       updateAutoScrollFromEvent(event);
     },
     [timeouts, updateAutoScrollFromEvent]
@@ -411,6 +419,12 @@ export function useSessionListAutoScroll<ItemT>({
      * read it so they never fight a drag, a settled user, or a send.
      */
     claimRef,
+    /**
+     * True while the list is moving under the user. Ownership and motion are
+     * different facts: a send takes the position over without ending the fling
+     * it interrupted, and a resume must not scroll mid-fling.
+     */
+    listMovingRef,
     handleContentSizeChange,
     handleListLayout,
     handleScroll,

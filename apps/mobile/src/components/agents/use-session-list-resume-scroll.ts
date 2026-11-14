@@ -5,7 +5,6 @@ import { type RefObject, useCallback, useEffect, useRef } from 'react';
 import { shouldTriggerOlderMessagesLoad } from '@/components/agents/session-message-list-state';
 import {
   claimBlocksResume,
-  claimIsDragging,
   claimIsSend,
   type SessionPositionClaim,
 } from '@/components/agents/use-session-auto-scroll-state';
@@ -67,6 +66,12 @@ type UseSessionListResumeScrollParams<ItemT> = {
   listRef: RefObject<FlashListRef<ItemT> | null>;
   /** The live claim on the transcript's position from the auto-scroll hook. */
   claimRef: RefObject<SessionPositionClaim>;
+  /**
+   * True while the list is moving under the user. Ownership and motion are
+   * different facts: a send takes the position over without ending the fling it
+   * interrupted, and no scheduled scroll may yank the list mid-fling.
+   */
+  listMovingRef: RefObject<boolean>;
   suppressAutoFollow: (ms: number) => void;
   /**
    * Message id a `?at=` deep link wants the transcript to open on. When it is
@@ -108,6 +113,7 @@ export function useSessionListResumeScroll<ItemT>({
   isInFlightRef,
   listRef,
   claimRef,
+  listMovingRef,
   suppressAutoFollow,
   resumeAt,
 }: UseSessionListResumeScrollParams<ItemT>): void {
@@ -154,6 +160,9 @@ export function useSessionListResumeScroll<ItemT>({
               clearResumeRetries();
               return;
             }
+            if (listMovingRef.current) {
+              return;
+            }
             const index = latest.anchorIds.indexOf(latest.resumeAnchor);
             if (index !== -1) {
               // Every retry except the last keeps the tail follow suppressed:
@@ -175,7 +184,7 @@ export function useSessionListResumeScroll<ItemT>({
         );
       }
     },
-    [clearResumeRetries, claimRef, listRef, suppressAutoFollow]
+    [clearResumeRetries, claimRef, listMovingRef, listRef, suppressAutoFollow]
   );
   useEffect(() => clearResumeRetries, [clearResumeRetries]);
   useEffect(() => {
@@ -212,11 +221,10 @@ export function useSessionListResumeScroll<ItemT>({
       if (claimBlocksResume(claimRef.current)) {
         return;
       }
-      // An in-flight drag (or momentum fling) must not be yanked either: the
-      // immediate scroll honours the same guard the retries do. When it is
-      // skipped the retry chain below still lands the anchor once the drag
-      // ends, so nothing is lost.
-      if (!claimIsDragging(claimRef.current)) {
+      // An in-flight drag (or a fling a send interrupted) must not be yanked
+      // either: the immediate scroll waits for the list to settle. The retry
+      // chain below still lands the anchor once it has, so nothing is lost.
+      if (!listMovingRef.current) {
         // Arm the suppression before any scroll this plan issues: FlashList's
         // bottom-start events (cold) or this scroll's own 5-step events (warm)
         // read "at the bottom" and would arm the tail follow, whose
@@ -290,6 +298,7 @@ export function useSessionListResumeScroll<ItemT>({
     isInFlightRef,
     listRef,
     claimRef,
+    listMovingRef,
     clearResumeRetries,
     scheduleResumeRetries,
     suppressAutoFollow,

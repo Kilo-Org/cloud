@@ -45,6 +45,7 @@ import {
   applyFreeEndpointDataPolicy,
   getOpenRouterFreeEndpoints,
 } from '@/lib/providers/openrouter/free-endpoint-data-policy';
+import { omitUnavailableModels } from '@/lib/providers/openrouter/omit-unavailable-models';
 import { injectVercelModels } from '@/lib/providers/openrouter/inject-vercel-models';
 import { withWorstProviderDataPolicy } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
@@ -225,6 +226,9 @@ async function syncProviders(params: {
     storedModels: openRouterModels,
     unavailableModelIds,
   });
+
+  // Free endpoint data policy above already consulted the unavailable list for free families.
+  omitUnavailableModels(providerModelData, unavailableModelIds);
 
   // Filter out providers with no models
   const filteredProviderModelData = providerModelData.filter(data => data.models.length > 0);

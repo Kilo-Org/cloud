@@ -174,6 +174,7 @@ describe('a session Approve in a cold process', () => {
         target: {
           kiloSessionId: 'session-1',
           organizationId: null,
+          statusUpdatedAt: null,
           approvalKey: 'a'.repeat(64),
         },
       })

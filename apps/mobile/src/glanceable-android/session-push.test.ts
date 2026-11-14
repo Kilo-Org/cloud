@@ -122,6 +122,7 @@ describe('approveFollowedSession', () => {
       expect.objectContaining({
         target: {
           kiloSessionId: 'session-1',
+          statusUpdatedAt: '2026-10-12T09:55:00.000Z',
           organizationId: 'org-1',
           approvalKey: 'c'.repeat(64),
         },

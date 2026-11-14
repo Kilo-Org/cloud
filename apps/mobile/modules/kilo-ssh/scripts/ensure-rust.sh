@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
-#
-# Makes cargo available to a build host. rust-toolchain.toml pins the channel,
-# components and targets; rustup installs them on first use. EAS images and a
-# bare macOS install neither ship rustup nor put it on PATH, so both build
-# scripts source this file and the EAS pre-install hook runs it.
 set -euo pipefail
 
 export PATH="$HOME/.cargo/bin:$PATH"
+export RUSTUP_TOOLCHAIN
+RUSTUP_TOOLCHAIN=$(sed -n 's/^channel = "\(.*\)"/\1/p' "$(dirname "${BASH_SOURCE[0]}")/../rust-toolchain.toml")
 
 if ! command -v rustup >/dev/null 2>&1; then
   (
@@ -39,6 +36,6 @@ if ! command -v rustup >/dev/null 2>&1; then
       exit 1
     fi
     chmod +x "$temporary/rustup-init"
-    "$temporary/rustup-init" -y --profile minimal --no-modify-path --default-toolchain none
+    "$temporary/rustup-init" -y --profile minimal --no-modify-path --default-toolchain "$RUSTUP_TOOLCHAIN"
   )
 fi

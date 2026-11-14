@@ -112,6 +112,7 @@ const released: string[] = [];
  * Holds a scope's close open, so a test can open the same chat again while the
  * close still runs, which is the moment the ordering is about.
  */
+let cloning: Promise<void> | undefined = undefined;
 let closing: Promise<void> | undefined = undefined;
 
 /**
@@ -130,6 +131,12 @@ const mcp = vi.hoisted(() => ({
     };
   }),
 }));
+const toolReads = vi.hoisted(
+  (): { sessionId: string | null; gate: Promise<void> | undefined } => ({
+    sessionId: null,
+    gate: undefined,
+  })
+);
 
 vi.mock('./local-models', () => ({ localModelProvider: () => undefined }));
 const backendState = vi.hoisted(() => ({ profiles: [] as StoredChatBackend[], failNext: false }));
@@ -276,7 +283,11 @@ vi.mock('@kilocode/harness-sdk', () => {
         return Effect.fail(new FakeToolMissingError());
       }
       clonesMade += 1;
-      return Effect.succeed(handleFor(`s${clonesMade + 1}`));
+      const sessionId = `s${clonesMade + 1}`;
+      return Effect.promise(async () => {
+        await cloning;
+        return handleFor(sessionId);
+      });
     },
   };
 });
@@ -336,6 +347,9 @@ vi.mock('./kilo-mcp', () => ({
     return mcp.enabled.get(sessionId) === undefined ? null : false;
   },
   mcpEnabledFor: async (sessionId: string) => {
+    if (sessionId === toolReads.sessionId) {
+      await toolReads.gate;
+    }
     await Promise.resolve();
     return mcp.enabled.get(sessionId) ?? true;
   },
@@ -530,6 +544,9 @@ beforeEach(async () => {
   asked.length = 0;
   released.length = 0;
   closing = undefined;
+  cloning = undefined;
+  toolReads.sessionId = null;
+  toolReads.gate = undefined;
   finish = undefined;
   emitEvent = undefined;
   storedHistory = undefined;
@@ -2192,6 +2209,40 @@ describe('opening a chat where it was recorded', () => {
       turns: [],
       failureKey: 'queryError.notFoundDescription',
     });
+  });
+});
+
+describe('a tool retry queued behind send startup', () => {
+  it('keeps the answering session until its answer settles', async () => {
+    const cloneGate = Promise.withResolvers<undefined>();
+    cloning = cloneGate.promise;
+    const sending = say(
+      opened,
+      { text: 'first', images: [] },
+      { model: 'kilo/two', effort: null }
+    );
+    await settled();
+    mcp.tools.push({ definition: { name: 'mcp_kilo_read-file' } });
+    mcp.ensure.mockResolvedValueOnce({ status: 'ready', tools: mcp.tools });
+    const retrying = retryKiloMcp(opened);
+    await settled();
+    const namesGate = Promise.withResolvers<undefined>();
+    toolReads.sessionId = 's2';
+    toolReads.gate = namesGate.promise;
+    cloneGate.resolve(undefined);
+    await sending;
+    await settled();
+    expect(asked.at(-1)?.sessionId).toBe('s2');
+    namesGate.resolve(undefined);
+    await retrying;
+    await settled();
+
+    expect(clonesMade).toBe(1);
+    expect(snapshotOf(opened)).toMatchObject({ sessionId: 's2', status: 'working' });
+    finish?.();
+    await settled();
+    expect(snapshotOf(opened).sessionId).toBe('s3');
+    expect(snapshotOf(opened).turns).toEqual([TURN]);
   });
 });
 

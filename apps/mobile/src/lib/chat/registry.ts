@@ -806,123 +806,82 @@ export async function say(
 ): Promise<void> {
   const { text, images } = question;
   const { model, effort } = target;
-  /* Where the failure below belongs. It is the chat the move landed on, not
-     the one it started from, or the report goes to a chat nobody is watching. */
-  let current = snapshotOf(sessionId).sessionId;
-  try {
-    /* A person can type before the session has finished opening, and a
-       question asked of a chat that is not there yet used to vanish with the
-       composer reporting success. It waits for the open instead — and for a
-       flag operation enqueued before it, which is what keeps a tap ordered
-       against the question that follows. */
-    await turnOf(current).tail;
-    /* A move that ran while this waited renamed the chat, and everything below
-       is about the session that carried on. */
-    current = snapshotOf(current).sessionId;
-    const held = chats.get(current);
-    if (held?.answering !== undefined) {
-      /* A session answers one question at a time, and the composer stays open
-         while it works. So a second question joins the line rather than racing
-         the first, and it is on screen while it waits. It is held in memory
-         only: an answer that is still arriving is not written down either. */
-      held.waiting.push({
-        text,
-        images,
-        model,
-        effort,
-        ...(question.from === undefined ? {} : { from: question.from }),
-      });
-      change(current, { waiting: questionsIn(held.waiting) });
-      return;
-    }
-    /* One move, not two: the question is asked on the model on screen, and a
-       switch that moved while the chat sat idle is applied in the same copy.
-       The session freezes its tools, so the list sent to the model has to be
-       the one the switches name at this moment. */
-    if (held === undefined) {
-      throw new Error('the chat is not open');
-    }
-    /* A question with no answer keeps its place in the transcript. It is done
-       before the slot is written, so the words this send takes the place of are
-       already safe if the send itself fails. */
-    const before = snapshotOf(current);
-    await keepAsked(current);
-    /* Nothing said in it yet, so this question is the one the chat is named for
-       while no answer is stored. A question asked again after another one took
-       its place is not the first: the name is already written. */
-    if (before.turns.length === 0 && before.asked === null && before.displaced.length === 0) {
-      await rememberFirstQuestion(current, text);
-    }
-    /* Remember the requested target before the move can fail. The live model
-       stays unchanged until onto installs the session that actually moved. */
-    change(current, {
-      asked: text,
-      askedImages: images,
-      askedModel: model,
-      askedEffort: effort,
-      askedFrom: question.from ?? null,
-    });
-    await rememberAsked(current, {
-      text,
-      model,
-      effort,
-      images,
-      ...(before.turns.length === 0 ? {} : { after: before.turns.length }),
-      ...(question.from == null ? {} : { from: question.from }),
-    });
-    /* The move takes the chat's turn, so a flag tap cannot be split from its
-       own persist while this chat is being copied onto another session. */
-    const from = current;
-    const moved = await runTurn(from, { skippable: false }, async () => {
-      const landed = resolveSessionId(from);
-      const live = chats.get(landed);
-      if (live === undefined) {
+  await runTurn(sessionId, { skippable: false }, async () => {
+    let current = resolveSessionId(sessionId);
+    try {
+      const held = chats.get(current);
+      if (held?.answering !== undefined) {
+        held.waiting.push({
+          text,
+          images,
+          model,
+          effort,
+          ...(question.from === undefined ? {} : { from: question.from }),
+        });
+        change(current, { waiting: questionsIn(held.waiting) });
+        return;
+      }
+      if (held === undefined) {
         throw new Error('the chat is not open');
       }
-      const result = await ontoForUse(landed, { model, effort }, live);
-      return result;
-    });
-    current = moved ?? snapshotOf(from).sessionId;
-    const chat = chats.get(current);
-    if (chat === undefined) {
-      throw new Error('the chat is not open');
+      const before = snapshotOf(current);
+      await keepAsked(current);
+      if (before.turns.length === 0 && before.asked === null && before.displaced.length === 0) {
+        await rememberFirstQuestion(current, text);
+      }
+      change(current, {
+        asked: text,
+        askedImages: images,
+        askedModel: model,
+        askedEffort: effort,
+        askedFrom: question.from ?? null,
+      });
+      await rememberAsked(current, {
+        text,
+        model,
+        effort,
+        images,
+        ...(before.turns.length === 0 ? {} : { after: before.turns.length }),
+        ...(question.from == null ? {} : { from: question.from }),
+      });
+      current = await ontoForUse(current, { model, effort }, held);
+      const chat = chats.get(current);
+      if (chat === undefined) {
+        throw new Error('the chat is not open');
+      }
+      const runtime = await runtimeFor(chat);
+      const at = Date.now();
+      touchChat(await open(), current, at);
+      change(current, {
+        status: 'working',
+        answering: [],
+        asked: text,
+        askedImages: images,
+        askedModel: model,
+        askedEffort: effort,
+        askedFrom: question.from ?? null,
+        failed: null,
+        failureKey: null,
+        record: { ...snapshotOf(current).record, updatedAt: at },
+      });
+      chat.answering = runtime.runFork(reading(current, { text, images }, runtime));
+    } catch (error) {
+      current = snapshotOf(current).sessionId;
+      const failureKey = backendFailureKey(error, model);
+      await keepAskedFailure(current, failureKey);
+      change(current, {
+        status: 'idle',
+        answering: [],
+        asked: text,
+        askedImages: images,
+        askedModel: model,
+        askedEffort: effort,
+        askedFrom: question.from ?? null,
+        failed: reason(error),
+        failureKey,
+      });
     }
-    const runtime = await runtimeFor(chat);
-    const at = Date.now();
-    touchChat(await open(), current, at);
-    change(current, {
-      status: 'working',
-      answering: [],
-      asked: text,
-      askedImages: images,
-      askedModel: model,
-      askedEffort: effort,
-      askedFrom: question.from ?? null,
-      failed: null,
-      failureKey: null,
-      record: { ...snapshotOf(current).record, updatedAt: at },
-    });
-    chat.answering = runtime.runFork(reading(current, { text, images }, runtime));
-  } catch (error) {
-    /* The open, the move, or the write that remembers the question failed. The
-       question is not lost: it stays on screen with a Retry under it, the same
-       as one whose answer never arrived. */
-    /* onto may have installed the new session before its cleanup failed. */
-    current = snapshotOf(current).sessionId;
-    const failureKey = backendFailureKey(error, model);
-    await keepAskedFailure(current, failureKey);
-    change(current, {
-      status: 'idle',
-      answering: [],
-      asked: text,
-      askedImages: images,
-      askedModel: model,
-      askedEffort: effort,
-      askedFrom: question.from ?? null,
-      failed: reason(error),
-      failureKey,
-    });
-  }
+  });
 }
 
 /**
@@ -1819,16 +1778,17 @@ export async function retryKiloMcp(sessionId: string): Promise<void> {
   if (state.status !== 'ready' || state.tools.length === 0) {
     return;
   }
-  if (chat.answering !== undefined) {
-    chat.pendingTools ??= true;
-    return;
-  }
   await runTurn(current, { skippable: true }, async () => {
     const landed = resolveSessionId(current);
     const live = chats.get(landed);
-    if (live !== undefined && !live.closing) {
-      await ontoTools(landed, live);
+    if (live === undefined || live.closing) {
+      return;
     }
+    if (live.answering !== undefined) {
+      live.pendingTools ??= true;
+      return;
+    }
+    await ontoTools(landed, live);
   });
 }
 

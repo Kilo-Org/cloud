@@ -1,6 +1,5 @@
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
-import { isQwenModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
 import { isGrokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/xai';
 import type {
   CustomLlmProvider,
@@ -9,8 +8,6 @@ import type {
   ReasoningOption,
 } from '@kilocode/db/schema-types';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
-import { isMinimaxModel } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
-import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
 import {
   getOpenRouterModelsMetadataFromDatabase,
@@ -109,15 +106,8 @@ export async function getModelVariants(
 }
 
 export function getAiSdkProvider(
-  model: string,
-  directProviderId: DirectUserByokInferenceProviderId | null
+  model: string
 ): Exclude<CustomLlmProvider, 'openrouter' /*the default*/> | undefined {
-  if (directProviderId === 'morph-byok') {
-    return undefined;
-  }
-  if (directProviderId === 'opencode-go' && (isMinimaxModel(model) || isQwenModel(model))) {
-    return 'anthropic';
-  }
   if (isClaudeModel(model)) {
     return 'anthropic';
   }
@@ -140,7 +130,7 @@ export async function getGatewayOpenCodeSettings(
   model: string,
   allowFallback: boolean
 ): Promise<OpenCodeSettings | undefined> {
-  const ai_sdk_provider = getAiSdkProvider(model, null);
+  const ai_sdk_provider = getAiSdkProvider(model);
   const reasoning_options = await getModelReasoningOptions(model, allowFallback);
   const variants = toLegacyVariants(reasoning_options, ai_sdk_provider);
   const prompt = getOpenCodePrompt(model);

@@ -816,6 +816,7 @@ describe('getProvider direct BYOK routing', () => {
         models: async () => [],
         supportedChatApis: ['chat_completions'],
         resolveUpstream,
+        chatCompletionsHeaders: () => ({}),
       },
       model: {
         id: 'zai.glm-5',

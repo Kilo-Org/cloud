@@ -1,8 +1,5 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import {
-  isReasoningExplicitlyDisabled,
-  replaceReasoningObjectWithReasoningEffort,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { applyThinkingToggleAndReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import {
   apiKeyUpstream,
   type DirectByokProvider,
@@ -19,10 +16,7 @@ export default {
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
   transformRequest(context) {
-    context.request.body.thinking = {
-      type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',
-    };
-    replaceReasoningObjectWithReasoningEffort(context.request);
+    applyThinkingToggleAndReasoningEffort(context.request);
   },
   models: cachedDirectByokModelList('zai-coding'),
 } satisfies DirectByokProvider;

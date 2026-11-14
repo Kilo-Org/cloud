@@ -174,7 +174,12 @@ function setCacheControlOnMessagesSystem(
   return system;
 }
 
-function isCacheableMessagesContentBlock(
+/**
+ * A Messages content block may carry a cache breakpoint, except a `thinking`
+ * or `redacted_thinking` block: those are reasoning output, and a breakpoint
+ * belongs on content the model was asked to read.
+ */
+export function isCacheableMessagesContentBlock(
   item: Anthropic.ContentBlockParam
 ): item is Exclude<
   Anthropic.ContentBlockParam,
@@ -432,6 +437,20 @@ export function replaceReasoningObjectWithReasoningEffort(
     request.body.reasoning_effort ??= reasoningEffort;
   }
   delete request.body.reasoning;
+}
+
+/**
+ * For Chat Completions upstreams that gate reasoning with a `thinking: { type }`
+ * toggle and reject OpenRouter's top-level `reasoning` object: BytePlus, Z.ai,
+ * and Kimi Code. The toggle mirrors an explicit client disable, and the
+ * reasoning object is replaced because its `effort` has to reach those
+ * upstreams as the standard `reasoning_effort` instead.
+ */
+export function applyThinkingToggleAndReasoningEffort(request: GatewayRequest) {
+  request.body.thinking = {
+    type: isReasoningExplicitlyDisabled(request) ? 'disabled' : 'enabled',
+  };
+  replaceReasoningObjectWithReasoningEffort(request);
 }
 
 export function enableReasoningSummaries(request: GatewayRequest) {

@@ -43,7 +43,7 @@ export function isAutoFreeEligibleModelId(
       getCustomLlmApiKinds(customLlm.definition).includes('chat_completions')
     );
   }
-  return isFreeModel(model) && getAiSdkProvider(model, null) === undefined;
+  return isFreeModel(model) && getAiSdkProvider(model) === undefined;
 }
 
 export function getIneligibleAutoFreeModelIds(

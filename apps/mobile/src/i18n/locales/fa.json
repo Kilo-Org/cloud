@@ -3996,7 +3996,7 @@
     "skillSourceMarketplace": "بازار",
     "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "یک SKILL.md قرار دهید و نام آن پر می شود. یک مهارت از تلفن خود بدون کشیدن و رها کردن اضافه کنید.",
-    "skillEditTitle": "مهارت ویرایش",
+    "skillEditTitle": "مهارت را ویرایش کنید",
     "skillEdit": "مهارت {{name}} را ویرایش کنید",
     "skillDelete": "مهارت {{name}} را حذف کنید",
     "skillDeleteTitle": "مهارت {{name}} حذف شود؟",

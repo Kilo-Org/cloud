@@ -3996,7 +3996,7 @@
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Tampal SKILL.md dan namanya diisi; tambah kemahiran daripada telefon anda tanpa seret dan lepas.",
-    "skillEditTitle": "Kemahiran mengedit",
+    "skillEditTitle": "Edit kemahiran",
     "skillEdit": "Edit kemahiran {{name}}",
     "skillDelete": "Padam kemahiran {{name}}",
     "skillDeleteTitle": "Padam kemahiran {{name}}?",

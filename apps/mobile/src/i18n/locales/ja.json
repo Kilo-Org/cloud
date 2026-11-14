@@ -3996,7 +3996,7 @@
     "skillSourceMarketplace": "マーケットプレイス",
     "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md を貼り付けると、その名前が入力されます。ドラッグ アンド ドロップせずにスマートフォンからスキルを追加します。",
-    "skillEditTitle": "エディットスキル",
+    "skillEditTitle": "スキルの編集",
     "skillEdit": "スキル{{name}}を編集",
     "skillDelete": "スキル{{name}}を削除",
     "skillDeleteTitle": "スキル{{name}}を削除しますか？",

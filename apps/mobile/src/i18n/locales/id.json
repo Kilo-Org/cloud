@@ -3996,7 +3996,7 @@
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Tempelkan SKILL.md dan isikan namanya; tambahkan keterampilan dari ponsel Anda tanpa drag and drop.",
-    "skillEditTitle": "Mengedit keterampilan",
+    "skillEditTitle": "Edit keterampilan",
     "skillEdit": "Edit keterampilan {{name}}",
     "skillDelete": "Hapus keterampilan {{name}}",
     "skillDeleteTitle": "Hapus keterampilan {{name}}?",

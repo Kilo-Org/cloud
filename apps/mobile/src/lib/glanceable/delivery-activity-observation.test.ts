@@ -122,4 +122,58 @@ describe('observeActivity', () => {
     expect(reads).toBe(2);
     expect(registered).toEqual(['late-token']);
   });
+
+  it('binds the same card again after its listener creation failed once', async () => {
+    const observation = emptyActivityObservation(new Set<string>());
+    const target = createTarget();
+    const registered: string[] = [];
+    const registerToken = (_registration: Registration, token: string): Promise<void> => {
+      registered.push(token);
+      return Promise.resolve();
+    };
+    const listeners = new Set<(event: { activityId: string; pushToken: string }) => void>();
+    let attempts = 0;
+    const instance: GlanceableActivity = {
+      getPushToken: () => Promise.resolve('card-token'),
+      addPushTokenListener: listener => {
+        attempts += 1;
+        if (attempts === 1) {
+          throw new Error('push-token listener unsupported');
+        }
+        listeners.add(listener);
+        return {
+          remove: () => {
+            listeners.delete(listener);
+          },
+        };
+      },
+    };
+
+    // The first observe leaves the card unobserved: nothing is registered and no
+    // listener exists to feed it.
+    await observeActivity({
+      observation,
+      target,
+      instance,
+      onSuperseded: () => undefined,
+      registerToken,
+    });
+    expect(observation.binding).toBeNull();
+    expect(listeners.size).toBe(0);
+    expect(registered).toEqual([]);
+
+    // The same card, observed again, must bind: no path back to it for the rest of
+    // the process is the defect.
+    await observeActivity({
+      observation,
+      target,
+      instance,
+      onSuperseded: () => undefined,
+      registerToken,
+    });
+
+    expect(observation.binding?.instance).toBe(instance);
+    expect(listeners.size).toBe(1);
+    expect(registered).toEqual(['card-token']);
+  });
 });

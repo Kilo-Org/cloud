@@ -4468,6 +4468,7 @@
       "fieldRequired": "Dette felt er påkrævet"
     },
     "errors": {
+      "outputLimit": "Kommandoen genererede mere output, end appen kan rumme. Omdiriger outputtet til en fil, eller begræns kommandoen",
       "bindTaken": "Den adresse videresendes allerede af en anden videresendelse på denne vært.",
       "invalidPort": "Brug en port fra 1 til 65535",
       "jumpCycle": "Den vært går allerede gennem denne."

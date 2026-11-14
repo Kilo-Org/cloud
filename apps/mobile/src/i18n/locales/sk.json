@@ -4598,6 +4598,7 @@
       "fieldRequired": "Toto pole je povinné"
     },
     "errors": {
+      "outputLimit": "Príkaz vytvoril viac výstupu, než aplikácia dokáže uchovať v pamäti. Presmerujte výstup do súboru alebo obmedzte rozsah príkazu",
       "bindTaken": "Táto adresa je už presmerovaná iným presmerovaním na tomto hostiteľovi.",
       "invalidPort": "Použite port od 1 do 65535",
       "jumpCycle": "Tento hostiteľ už prechádza cez tohto."

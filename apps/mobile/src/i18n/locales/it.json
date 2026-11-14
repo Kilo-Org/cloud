@@ -4533,6 +4533,7 @@
       "fieldRequired": "Questo campo è obbligatorio"
     },
     "errors": {
+      "outputLimit": "Il comando ha prodotto più output di quanto l'app possa contenere in memoria. Reindirizza l'output a un file o limita l'ambito del comando",
       "bindTaken": "Quell'indirizzo è già inoltrato da un altro inoltro su questo host.",
       "invalidPort": "Usa una porta da 1 a 65535",
       "jumpCycle": "Quell'host passa già attraverso questo."

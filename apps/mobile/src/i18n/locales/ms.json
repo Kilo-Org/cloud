@@ -4468,6 +4468,7 @@
       "fieldRequired": "Medan ini diperlukan"
     },
     "errors": {
+      "outputLimit": "Perintah ini menghasilkan output yang melebihi had memori aplikasi. Alihkan output ke fail atau kecilkan skop perintah",
       "bindTaken": "Alamat itu sudah dipajukan oleh pemajuan lain pada hos ini.",
       "invalidPort": "Gunakan port 1 hingga 65535",
       "jumpCycle": "Hos itu sudah melompat melalui hos ini."

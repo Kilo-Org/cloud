@@ -4468,6 +4468,7 @@
       "fieldRequired": "Dirreen kun barbaachisaa dha"
     },
     "errors": {
+      "outputLimit": "Ajajichi bu'aa appilikeeshinichi qabachuu danda'u caalu uume. Bu'aa isaa gara faayiliitti dabarsi yookaan ajajicha daangeessi",
       "bindTaken": "Teessoon dhaggeeffannaa sun dabarsa biraatiin hostii kana irratti duraan dabarfamaa jira.",
       "invalidPort": "Port 1 hanga 65535 fayyadami",
       "jumpCycle": "Hostiin sun duraan kana keessa darbaa jira."

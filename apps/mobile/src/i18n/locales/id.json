@@ -4468,6 +4468,7 @@
       "fieldRequired": "Kolom ini wajib diisi"
     },
     "errors": {
+      "outputLimit": "Perintah menghasilkan keluaran yang melebihi batas memori aplikasi. Alihkan keluaran ke file atau persempit cakupan perintah",
       "bindTaken": "Alamat itu sudah digunakan oleh penerusan lain pada host ini.",
       "invalidPort": "Gunakan port 1 hingga 65535",
       "jumpCycle": "Host itu sudah menggunakan host ini sebagai perantara."

@@ -4598,6 +4598,7 @@
       "fieldRequired": "Toto pole je povinné"
     },
     "errors": {
+      "outputLimit": "Příkaz vygeneroval více výstupu, než se vejde do paměti aplikace. Přesměrujte výstup do souboru nebo omezte rozsah příkazu",
       "bindTaken": "Tuto adresu už přesměrovává jiné přesměrování na tomto hostiteli.",
       "invalidPort": "Použijte port od 1 do 65535",
       "jumpCycle": "Tento hostitel už přes tento přeskakuje."

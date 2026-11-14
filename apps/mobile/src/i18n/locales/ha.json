@@ -4468,6 +4468,7 @@
       "fieldRequired": "Ana buƙatar wannan filin"
     },
     "errors": {
+      "outputLimit": "Umarnin ya fitar da sakamako fiye da yadda manhajar za ta iya ɗauka. Tura sakamakon zuwa fayil ko ka taƙaita umarnin",
       "bindTaken": "An riga an tura wannan adireshin saurare ta wata turawa a wannan host ɗin.",
       "invalidPort": "Yi amfani da port daga 1 zuwa 65535",
       "jumpCycle": "Wannan host ɗin ya riga ya bi ta wannan."

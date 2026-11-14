@@ -4468,6 +4468,7 @@
       "fieldRequired": "Kjo fushë është e detyrueshme"
     },
     "errors": {
+      "outputLimit": "Komanda prodhoi më shumë të dhëna dalëse sesa mund të mbajë aplikacioni. Ridrejtojini ato në një skedar ose kufizoni komandën",
       "bindTaken": "Kjo adresë tashmë përcillet nga një përcjellje tjetër në këtë host.",
       "invalidPort": "Përdor një portë nga 1 deri në 65535",
       "jumpCycle": "Ai host tashmë kalon përmes këtij."

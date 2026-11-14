@@ -4468,6 +4468,7 @@
       "fieldRequired": "Bu sahə mütləqdir"
     },
     "errors": {
+      "outputLimit": "Əmr tətbiqin yaddaşında saxlaya biləcəyindən çox çıxış yaratdı. Çıxışı fayla yönləndirin və ya əmrin əhatəsini daraldın",
       "bindTaken": "Həmin ünvan bu hostdakı digər yönləndirmə tərəfindən artıq yönləndirilib.",
       "invalidPort": "1–65535 aralığında port istifadə edin",
       "jumpCycle": "Həmin host artıq bunun vasitəsilə keçid edir."

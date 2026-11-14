@@ -4468,6 +4468,7 @@
       "fieldRequired": "Þetta svæði er nauðsynlegt"
     },
     "errors": {
+      "outputLimit": "Skipunin skilaði meira úttaki en forritið getur geymt í minni. Beindu úttakinu í skrá eða takmarkaðu umfang skipunarinnar",
       "bindTaken": "Þetta heimilisfang er þegar framsent af annarri framsendingu á þessum hýsli.",
       "invalidPort": "Notaðu gátt frá 1 til 65535",
       "jumpCycle": "Sá netþjónn fer þegar í gegnum þennan."

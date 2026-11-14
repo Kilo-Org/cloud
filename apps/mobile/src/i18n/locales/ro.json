@@ -4533,6 +4533,7 @@
       "fieldRequired": "Acest câmp este obligatoriu"
     },
     "errors": {
+      "outputLimit": "Comanda a generat mai multe date decât poate păstra aplicația în memorie. Redirecționează ieșirea către un fișier sau restrânge comanda",
       "bindTaken": "Acea adresă este deja redirecționată de o altă redirecționare pe această gazdă.",
       "invalidPort": "Folosește un port de la 1 la 65535",
       "jumpCycle": "Acea gazdă trece deja prin aceasta."

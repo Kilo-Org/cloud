@@ -4468,6 +4468,7 @@
       "fieldRequired": "Det här fältet är obligatoriskt"
     },
     "errors": {
+      "outputLimit": "Kommandot genererade mer utdata än appen kan hantera. Omdirigera utdata till en fil eller begränsa kommandot",
       "bindTaken": "Den adressen vidarebefordras redan av en annan vidarebefordran på den här värden.",
       "invalidPort": "Använd en port från 1 till 65535",
       "jumpCycle": "Den värden hoppar redan via den här."

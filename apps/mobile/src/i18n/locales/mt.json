@@ -4663,6 +4663,7 @@
       "fieldRequired": "Dan il-qasam huwa meħtieġ"
     },
     "errors": {
+      "outputLimit": "Il-kmand ipproduċa aktar output milli tista’ żżomm l-app. Idderieġi l-output lejn fajl jew illimita l-kmand",
       "bindTaken": "Dak l-indirizz diġà jgħaddi minn forward ieħor fuq dan il-host.",
       "invalidPort": "Uża port minn 1 sa 65535",
       "jumpCycle": "Dak il-host diġà jgħaddi minn dan."

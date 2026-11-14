@@ -4539,6 +4539,7 @@
       "fieldRequired": "Este campo é obrigatório"
     },
     "errors": {
+      "outputLimit": "O comando produziu mais saída do que a aplicação consegue armazenar. Redirecione a saída para um ficheiro ou restrinja o comando",
       "bindTaken": "Esse endereço já está a ser reencaminhado por outro reencaminhamento neste anfitrião.",
       "invalidPort": "Utilize uma porta entre 1 e 65535",
       "jumpCycle": "Esse anfitrião já salta através deste."

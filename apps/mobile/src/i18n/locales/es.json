@@ -4533,6 +4533,7 @@
       "fieldRequired": "Este campo es obligatorio"
     },
     "errors": {
+      "outputLimit": "El comando generó más salida de la que la aplicación puede almacenar. Redirige la salida a un archivo o limita el alcance del comando",
       "bindTaken": "Esa dirección ya está siendo reenviada por otro reenvío de este host.",
       "invalidPort": "Usa un puerto del 1 al 65535",
       "jumpCycle": "Ese host ya salta a través de este."

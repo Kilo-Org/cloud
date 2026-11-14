@@ -4468,6 +4468,7 @@
       "fieldRequired": "Pápá yìí pọn dandan"
     },
     "errors": {
+      "outputLimit": "Àṣẹ náà ṣe àgbéjáde àbájáde tó pọ̀ ju ohun tí ìṣàfilọ́lẹ̀ náà lè gbà lọ. Darí àbájáde náà sínú fáìlì kan tàbí dín ìwọ̀n àṣẹ náà kù",
       "bindTaken": "A ti ń gbé àdírẹ́sì ìgbọ́ yẹn lọ síwájú nípasẹ̀ ìtẹ̀síwájú mìíràn lórí ẹ̀rọ yìí.",
       "invalidPort": "Lo port láti 1 sí 65535",
       "jumpCycle": "Sáfà yẹn ti ń fò nípasẹ̀ ẹyí."

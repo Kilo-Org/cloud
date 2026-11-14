@@ -4468,6 +4468,7 @@
       "fieldRequired": "Ilaina ity saha ity"
     },
     "errors": {
+      "outputLimit": "Namoaka vokatra betsaka noho izay zakan'ny rindranasa ilay baiko. Alefaso any anaty rakitra ny vokatra na ferano ny sahan'ilay baiko",
       "bindTaken": "Efa alefan'ny fandefasana hafa ao amin'ity host ity io adiresy io.",
       "invalidPort": "Ampiasao ny port 1 ka hatramin'ny 65535",
       "jumpCycle": "Efa mamakivaky ity iray ity io host io."

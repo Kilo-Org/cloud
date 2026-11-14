@@ -4468,6 +4468,7 @@
       "fieldRequired": "E hiahiatia ana tēnei āpure"
     },
     "errors": {
+      "outputLimit": "He nui ake te putanga o te whakahau i tā te taupānga e āhei ana ki te pupuri. Whakaangahia te putanga ki tētahi kōnae, whakawhāitihia rānei te whakahau",
       "bindTaken": "Kua whakamuatia kē tērā wāhitau whakarongo e tētahi atu whakamua i tēnei pou.",
       "invalidPort": "Whakamahia he tauranga mai i 1 ki 65535",
       "jumpCycle": "Kua peke kē tērā pou mā tēnei."

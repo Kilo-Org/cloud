@@ -4468,6 +4468,7 @@
       "fieldRequired": "Achọrọ ubi a"
     },
     "errors": {
+      "outputLimit": "Iwu ahụ wepụtara nsonaazụ karịrị ihe ebe nchekwa ngwa ahụ nwere ike ịnabata. Ziga nsonaazụ ahụ na faịlụ ma ọ bụ belata oke ihe iwu ahụ na-eme",
       "bindTaken": "Adreesị ahụ na-esi na nbuga ọzọ na host a agafe ugbua.",
       "invalidPort": "Jiri port site na 1 ruo 65535",
       "jumpCycle": "Host ahụ na-esi na nke a agafe ugbua."

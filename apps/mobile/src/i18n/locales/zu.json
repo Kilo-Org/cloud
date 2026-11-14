@@ -4468,6 +4468,7 @@
       "fieldRequired": "Le nkambu iyadingeka"
     },
     "errors": {
+      "outputLimit": "Umyalo ukhiqize umphumela omningi kunalowo uhlelo lokusebenza olungawugcina. Qondisa umphumela efayeleni noma unciphise ububanzi bomyalo",
       "bindTaken": "Lelo kheli selivele lifowodwa ngenye ifowodi kule hosthi.",
       "invalidPort": "Sebenzisa iphothi esukela ku-1 kuya ku-65535",
       "jumpCycle": "Leyo hosthi isivele igxuma ngalena."

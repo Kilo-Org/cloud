@@ -4468,6 +4468,7 @@
       "fieldRequired": "Dit veld is verplicht"
     },
     "errors": {
+      "outputLimit": "De opdracht heeft meer uitvoer geproduceerd dan de app kan verwerken. Leid de uitvoer om naar een bestand of beperk de opdracht",
       "bindTaken": "Dat adres is al in gebruik door een andere doorschakeling op deze host.",
       "invalidPort": "Gebruik een poort van 1 tot 65535",
       "jumpCycle": "Die host springt al via deze host."

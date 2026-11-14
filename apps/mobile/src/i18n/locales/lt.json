@@ -4598,6 +4598,7 @@
       "fieldRequired": "Šis laukas privalomas"
     },
     "errors": {
+      "outputLimit": "Komanda sugeneravo daugiau išvesties, nei programa gali sutalpinti atmintyje. Nukreipkite išvestį į failą arba susiaurinkite komandos apimtį",
       "bindTaken": "Šis adresas jau peradresuojamas kitu šio hosto peradresavimu.",
       "invalidPort": "Naudokite prievadą nuo 1 iki 65535",
       "jumpCycle": "Tas hostas jau jungiasi per šį."

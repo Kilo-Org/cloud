@@ -4468,6 +4468,7 @@
       "fieldRequired": "Eremu hau derrigorrezkoa da"
     },
     "errors": {
+      "outputLimit": "Komandoak aplikazioak memorian eduki dezakeena baino irteera gehiago sortu du. Birbideratu irteera fitxategi batera edo mugatu komandoa",
       "bindTaken": "Helbide hori dagoeneko ostalari honetako beste birbideratze batek birbideratuta dago.",
       "invalidPort": "Erabili 1etik 65535era bitarteko ataka bat",
       "jumpCycle": "Ostalari horrek dagoeneko honen bidez egiten du jauzi."

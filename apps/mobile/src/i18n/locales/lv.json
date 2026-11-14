@@ -4533,6 +4533,7 @@
       "fieldRequired": "Šis lauks ir obligāts"
     },
     "errors": {
+      "outputLimit": "Komanda radīja vairāk izvades, nekā lietotne spēj glabāt atmiņā. Novirziet izvadi uz failu vai sašauriniet komandas tvērumu",
       "bindTaken": "Cita šī resursdatora pāradresācija jau izmanto šo adresi.",
       "invalidPort": "Izmantojiet portu no 1 līdz 65535",
       "jumpCycle": "Tas resursdators jau izmanto šo kā starpposmu."

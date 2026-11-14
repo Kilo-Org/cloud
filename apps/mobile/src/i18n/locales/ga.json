@@ -4663,6 +4663,7 @@
       "fieldRequired": "Tá an réimse seo riachtanach"
     },
     "errors": {
+      "outputLimit": "Tháirg an t-ordú níos mó aschuir ná mar is féidir leis an aip a choinneáil. Atreoraigh an t-aschur chuig comhad nó cúngaigh scóip an ordaithe",
       "bindTaken": "Tá an seoladh sin á sheoladh cheana ag seoladh eile ar an óstach seo.",
       "invalidPort": "Úsáid port ó 1 go 65535",
       "jumpCycle": "Léimeann an t-óstach sin tríd an gceann seo cheana."

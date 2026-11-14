@@ -4728,6 +4728,7 @@
       "fieldRequired": "Mae'r maes hwn yn ofynnol"
     },
     "errors": {
+      "outputLimit": "Cynhyrchodd y gorchymyn fwy o allbwn nag y gall yr ap ei ddal. Ailgyfeiriwch yr allbwn i ffeil neu gyfyngwch ar y gorchymyn",
       "bindTaken": "Mae'r cyfeiriad hwnnw eisoes yn cael ei anfon ymlaen gan anfoniad arall ar y gwesteiwr hwn.",
       "invalidPort": "Defnyddiwch borth rhwng 1 a 65535",
       "jumpCycle": "Mae'r gwesteiwr hwnnw eisoes yn neidio drwy'r un hwn."

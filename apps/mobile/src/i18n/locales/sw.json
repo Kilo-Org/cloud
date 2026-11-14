@@ -4468,6 +4468,7 @@
       "fieldRequired": "Sehemu hii inahitajika"
     },
     "errors": {
+      "outputLimit": "Amri imetoa matokeo mengi kuliko kumbukumbu ya programu inavyoweza kubeba. Elekeza matokeo kwenye faili au punguza wigo wa amri",
       "bindTaken": "Anwani hiyo tayari inapitishwa na kipitisho kingine kwenye mwenyeji huyu.",
       "invalidPort": "Tumia bandari kuanzia 1 hadi 65535",
       "jumpCycle": "Mwenyeji huyo tayari anaruka kupitia huyu."

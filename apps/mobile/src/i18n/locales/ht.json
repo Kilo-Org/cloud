@@ -4468,6 +4468,7 @@
       "fieldRequired": "Chan sa a obligatwa"
     },
     "errors": {
+      "outputLimit": "Kòmandman an pwodui plis rezilta pase sa aplikasyon an ka kenbe nan memwa. Redirije rezilta yo nan yon fichye oswa limite kòmandman an",
       "bindTaken": "Adrès sa a deja pase atravè yon lòt redireksyon sou menm ot sa a.",
       "invalidPort": "Itilize yon pò soti 1 rive 65535",
       "jumpCycle": "Ot sa a deja pase atravè ot sa a."

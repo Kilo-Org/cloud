@@ -4598,6 +4598,7 @@
       "fieldRequired": "To polje je obvezno"
     },
     "errors": {
+      "outputLimit": "Ukaz je ustvaril več izhoda, kot ga lahko aplikacija shrani v pomnilnik. Preusmerite izhod v datoteko ali omejite obseg ukaza",
       "bindTaken": "Ta naslov je že preusmerjen z drugo preusmeritvijo na tem gostitelju.",
       "invalidPort": "Uporabite vrata od 1 do 65535",
       "jumpCycle": "Ta gostitelj že skače prek tega."

@@ -4468,6 +4468,7 @@
       "fieldRequired": "Hierdie veld is verpligtend"
     },
     "errors": {
+      "outputLimit": "Die opdrag het meer uitvoer gelewer as wat die toepassing in die geheue kan hou. Herlei die uitvoer na ’n lêer of beperk die opdrag",
       "bindTaken": "Daardie adres word reeds deur 'n ander oordrag op hierdie gasheer gebruik.",
       "invalidPort": "Gebruik 'n poort van 1 tot 65535",
       "jumpCycle": "Daardie gasheer spring reeds deur hierdie een."

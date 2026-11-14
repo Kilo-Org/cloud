@@ -4533,6 +4533,7 @@
       "fieldRequired": "Ovo polje je obavezno"
     },
     "errors": {
+      "outputLimit": "Naredba je proizvela više izlaznih podataka nego što aplikacija može pohraniti u memoriju. Preusmjerite izlaz u datoteku ili suzite opseg naredbe",
       "bindTaken": "Tu adresu već prosljeđuje drugo prosljeđivanje na ovom hostu.",
       "invalidPort": "Koristite port od 1 do 65535",
       "jumpCycle": "Taj host već ide preko ovog hosta."

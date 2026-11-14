@@ -4598,6 +4598,7 @@
       "fieldRequired": "To pole jest wymagane"
     },
     "errors": {
+      "outputLimit": "Polecenie wygenerowało więcej danych wyjściowych, niż aplikacja może pomieścić w pamięci. Przekieruj je do pliku lub zawęź zakres polecenia",
       "bindTaken": "Ten adres nasłuchu jest już zajęty przez inne przekierowanie na tym hoście.",
       "invalidPort": "Użyj portu od 1 do 65535",
       "jumpCycle": "Ten host już łączy się przez tego hosta."

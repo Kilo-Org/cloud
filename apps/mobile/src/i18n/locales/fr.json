@@ -4533,6 +4533,7 @@
       "fieldRequired": "Ce champ est obligatoire"
     },
     "errors": {
+      "outputLimit": "La commande a produit plus de données que l’application ne peut en stocker en mémoire. Redirigez la sortie vers un fichier ou limitez la portée de la commande",
       "bindTaken": "Cette adresse est déjà redirigée par une autre redirection sur cet hôte.",
       "invalidPort": "Utilisez un port entre 1 et 65535",
       "jumpCycle": "Cet hôte passe déjà par celui-ci."

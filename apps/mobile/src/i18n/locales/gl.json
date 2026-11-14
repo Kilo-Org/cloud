@@ -4468,6 +4468,7 @@
       "fieldRequired": "Este campo é obrigatorio"
     },
     "errors": {
+      "outputLimit": "A orde produciu máis saída da que a aplicación pode conter na memoria. Redirixe a saída a un ficheiro ou limita o alcance da orde",
       "bindTaken": "Ese enderezo xa está reenviado por outro reenvío neste host.",
       "invalidPort": "Usa un porto do 1 ao 65535",
       "jumpCycle": "Ese host xa salta a través deste."

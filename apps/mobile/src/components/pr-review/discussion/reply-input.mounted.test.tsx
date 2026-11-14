@@ -1,15 +1,25 @@
-/* eslint-disable max-lines -- the gate, draft, provider-arm and failure-copy cases share one mounted reply harness */
 // Mounted coverage for the thread reply surface: the draft clear rules, the
 // provider seam vars, and the inline failures the surface publishes through
 // the shared surface-feedback store.
 
-import { createElement, type ReactElement } from 'react';
+import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
+import { act } from '@/test/renderer';
 
 import { ReplyInput } from './reply-input';
+import {
+  failureCopy,
+  field,
+  hasReconnectNotice,
+  mount,
+  pressReply,
+  pressReplyAndSettle,
+  replyEnabled,
+  typeBody,
+  unmountAll,
+} from './reply-input.test-helpers';
 import { type useReplyToCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
 import { providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
 import { clearDraft } from '@/lib/persist/drafts';
@@ -93,55 +103,6 @@ function makeReply(mutateAsync: (input: unknown) => Promise<unknown>): ReplyMuta
   return { mutateAsync } as unknown as ReplyMutation;
 }
 
-const mounted: ReactTestRenderer[] = [];
-
-async function mount(element: ReactElement): Promise<ReactTestRenderer> {
-  const holder: { current: ReactTestRenderer | undefined } = { current: undefined };
-  await act(async () => {
-    holder.current = TestRenderer.create(element);
-    await Promise.resolve();
-  });
-  const renderer = holder.current;
-  if (!renderer) {
-    throw new Error('renderer did not mount');
-  }
-  mounted.push(renderer);
-  return renderer;
-}
-
-function field(renderer: ReactTestRenderer) {
-  return renderer.root.findByType('TextInput');
-}
-
-function submitButton(renderer: ReactTestRenderer) {
-  return renderer.root.findByType('Button');
-}
-
-function typeBody(renderer: ReactTestRenderer, text: string): void {
-  act(() => {
-    (field(renderer).props.onChangeText as (value: string) => void)(text);
-  });
-}
-
-function pressReply(renderer: ReactTestRenderer): void {
-  act(() => {
-    (submitButton(renderer).props.onPress as () => void)();
-  });
-}
-
-function failureCopy(renderer: ReactTestRenderer): string | undefined {
-  const text = renderer.root.findAllByType('Text')[0];
-  return text?.props.children as string | undefined;
-}
-
-function hasReconnectNotice(renderer: ReactTestRenderer): boolean {
-  return renderer.root.findAllByType('PrReviewReconnectNotice').length > 0;
-}
-
-function replyEnabled(renderer: ReactTestRenderer): boolean {
-  return submitButton(renderer).props.disabled === false;
-}
-
 beforeEach(() => {
   draftLoad.value = { settled: true, value: null };
   connectivity.value = 'online';
@@ -152,21 +113,18 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  for (const renderer of mounted.splice(0)) {
-    renderer.unmount();
-  }
+  unmountAll();
 });
 
 describe('ReplyInput submit', () => {
   it('clears the reply draft on a successful reply', async () => {
-    const mutateAsync = vi.fn(async () => ({}));
+    const mutateAsync = vi.fn<() => Promise<unknown>>();
+    mutateAsync.mockResolvedValue({});
     const renderer = await mount(
       createElement(ReplyInput, { ...baseProps, reply: makeReply(mutateAsync) })
     );
     typeBody(renderer, 'hello');
-    await act(async () => {
-      pressReply(renderer);
-    });
+    await pressReplyAndSettle(renderer);
 
     expect(mutateAsync).toHaveBeenCalledWith({
       owner: 'octocat',
@@ -179,30 +137,28 @@ describe('ReplyInput submit', () => {
   });
 
   it('keeps the draft when the reply is rejected', async () => {
-    const mutateAsync = vi.fn(async () => {
-      throw Object.assign(new Error('stale'), { data: { code: 'BAD_REQUEST' } });
-    });
+    const mutateAsync = vi.fn<() => Promise<unknown>>();
+    mutateAsync.mockRejectedValue(
+      Object.assign(new Error('stale'), { data: { code: 'BAD_REQUEST' } })
+    );
     const renderer = await mount(
       createElement(ReplyInput, { ...baseProps, reply: makeReply(mutateAsync) })
     );
     typeBody(renderer, 'hello');
-    await act(async () => {
-      pressReply(renderer);
-    });
+    await pressReplyAndSettle(renderer);
 
     expect(clearDraft).not.toHaveBeenCalled();
   });
 
   it('does not submit while the Terms gate is dismissed', async () => {
     gate.status.mockResolvedValue({ accepted: false, currentVersion: 'v1' });
-    const mutateAsync = vi.fn(async () => ({}));
+    const mutateAsync = vi.fn<() => Promise<unknown>>();
+    mutateAsync.mockResolvedValue({});
     const renderer = await mount(
       createElement(ReplyInput, { ...baseProps, reply: makeReply(mutateAsync) })
     );
     typeBody(renderer, 'hello');
-    await act(async () => {
-      pressReply(renderer);
-    });
+    await pressReplyAndSettle(renderer);
 
     expect(mutateAsync).not.toHaveBeenCalled();
     expect(clearDraft).not.toHaveBeenCalled();
@@ -211,7 +167,8 @@ describe('ReplyInput submit', () => {
   it('issues one reply for two taps during the Terms status round-trip', async () => {
     const roundTrip = Promise.withResolvers<{ accepted: boolean; currentVersion: string }>();
     gate.status.mockReturnValueOnce(roundTrip.promise);
-    const mutateAsync = vi.fn(async () => ({}));
+    const mutateAsync = vi.fn<() => Promise<unknown>>();
+    mutateAsync.mockResolvedValue({});
     const renderer = await mount(
       createElement(ReplyInput, { ...baseProps, reply: makeReply(mutateAsync) })
     );
@@ -234,7 +191,8 @@ describe('ReplyInput submit', () => {
   });
 
   it('posts the provider seam vars on a provider thread', async () => {
-    const mutateAsync = vi.fn(async () => ({}));
+    const mutateAsync = vi.fn<() => Promise<unknown>>();
+    mutateAsync.mockResolvedValue({});
     const renderer = await mount(
       createElement(ReplyInput, {
         ...baseProps,
@@ -243,9 +201,7 @@ describe('ReplyInput submit', () => {
       })
     );
     typeBody(renderer, 'hello');
-    await act(async () => {
-      pressReply(renderer);
-    });
+    await pressReplyAndSettle(renderer);
 
     expect(mutateAsync).toHaveBeenCalledWith({
       threadId: 'D-77',
@@ -285,25 +241,25 @@ describe('ReplyInput draft seeding', () => {
 
 describe('ReplyInput failure copy', () => {
   it('renders the reply surface copy for a rejected reply', async () => {
-    const mutateAsync = vi.fn(async () => {
-      throw Object.assign(new Error('stale'), { data: { code: 'BAD_REQUEST' } });
-    });
+    const mutateAsync = vi.fn<() => Promise<unknown>>();
+    mutateAsync.mockRejectedValue(
+      Object.assign(new Error('stale'), { data: { code: 'BAD_REQUEST' } })
+    );
     const renderer = await mount(
       createElement(ReplyInput, { ...baseProps, reply: makeReply(mutateAsync) })
     );
     typeBody(renderer, 'hello');
-    await act(async () => {
-      pressReply(renderer);
-    });
+    await pressReplyAndSettle(renderer);
 
     expect(failureCopy(renderer)).toBe("This reply can't be posted. The thread may have changed.");
     expect(replyEnabled(renderer)).toBe(false);
   });
 
   it('words a refused provider reply after the merge-request noun', async () => {
-    const mutateAsync = vi.fn(async () => {
-      throw Object.assign(new Error('403 Forbidden'), { data: { code: 'FORBIDDEN' } });
-    });
+    const mutateAsync = vi.fn<() => Promise<unknown>>();
+    mutateAsync.mockRejectedValue(
+      Object.assign(new Error('403 Forbidden'), { data: { code: 'FORBIDDEN' } })
+    );
     const renderer = await mount(
       createElement(ReplyInput, {
         ...baseProps,
@@ -312,24 +268,19 @@ describe('ReplyInput failure copy', () => {
       })
     );
     typeBody(renderer, 'hello');
-    await act(async () => {
-      pressReply(renderer);
-    });
+    await pressReplyAndSettle(renderer);
 
     expect(failureCopy(renderer)).toBe("You don't have permission to reply to this merge request.");
   });
 
   it('never shows the raw provider text for a generic failure', async () => {
-    const mutateAsync = vi.fn(async () => {
-      throw new Error('You do not have access to this repository.');
-    });
+    const mutateAsync = vi.fn<() => Promise<unknown>>();
+    mutateAsync.mockRejectedValue(new Error('You do not have access to this repository.'));
     const renderer = await mount(
       createElement(ReplyInput, { ...baseProps, reply: makeReply(mutateAsync) })
     );
     typeBody(renderer, 'hello');
-    await act(async () => {
-      pressReply(renderer);
-    });
+    await pressReplyAndSettle(renderer);
 
     expect(failureCopy(renderer)).toBe('Could not reply.');
     expect(replyEnabled(renderer)).toBe(true);
@@ -337,14 +288,13 @@ describe('ReplyInput failure copy', () => {
 
   it('fails a submit while confirmed offline at once, keeping Reply live', async () => {
     connectivity.value = 'offline';
-    const mutateAsync = vi.fn(async () => ({}));
+    const mutateAsync = vi.fn<() => Promise<unknown>>();
+    mutateAsync.mockResolvedValue({});
     const renderer = await mount(
       createElement(ReplyInput, { ...baseProps, reply: makeReply(mutateAsync) })
     );
     typeBody(renderer, 'hello');
-    await act(async () => {
-      pressReply(renderer);
-    });
+    await pressReplyAndSettle(renderer);
 
     expect(mutateAsync).not.toHaveBeenCalled();
     expect(failureCopy(renderer)).toBe('Could not reply.');
@@ -352,18 +302,17 @@ describe('ReplyInput failure copy', () => {
   });
 
   it('retires a reconnect failure on the next keystroke', async () => {
-    const mutateAsync = vi.fn(async () => {
-      throw Object.assign(new Error('GitHub connection expired'), {
+    const mutateAsync = vi.fn<() => Promise<unknown>>();
+    mutateAsync.mockRejectedValue(
+      Object.assign(new Error('GitHub connection expired'), {
         data: { code: 'PRECONDITION_FAILED' },
-      });
-    });
+      })
+    );
     const renderer = await mount(
       createElement(ReplyInput, { ...baseProps, reply: makeReply(mutateAsync) })
     );
     typeBody(renderer, 'hello');
-    await act(async () => {
-      pressReply(renderer);
-    });
+    await pressReplyAndSettle(renderer);
     expect(hasReconnectNotice(renderer)).toBe(true);
 
     typeBody(renderer, 'hello!');

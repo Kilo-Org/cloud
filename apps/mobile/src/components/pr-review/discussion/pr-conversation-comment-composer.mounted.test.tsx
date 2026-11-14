@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- the admission, clearing and blocking rules share one mounted conversation harness */
 // Mounted coverage for the PR conversation composer: one admitted submit, the
 // empty-body validation, and the two rejection policies (a server bad-request
 // stays retryable, the ledger persistence marker blocks until an edit).
@@ -6,7 +5,6 @@
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
 import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 
 import { PrConversationCommentComposer } from './pr-conversation-comment-composer';
@@ -134,6 +132,14 @@ function pressComment(renderer: ReactTestRenderer): void {
   });
 }
 
+/** Presses Comment and lets the submit promise settle before act returns. */
+async function pressCommentAndSettle(renderer: ReactTestRenderer): Promise<void> {
+  await act(async () => {
+    pressComment(renderer);
+    await Promise.resolve();
+  });
+}
+
 function commentDisabled(renderer: ReactTestRenderer): boolean {
   return commentButton(renderer).props.disabled as boolean;
 }
@@ -198,9 +204,7 @@ describe('PrConversationCommentComposer', () => {
     typeBody(renderer, 'a valid body');
     expect(commentDisabled(renderer)).toBe(false);
 
-    await act(async () => {
-      pressComment(renderer);
-    });
+    await pressCommentAndSettle(renderer);
     expect(addComment.mutateAsync).toHaveBeenCalledTimes(1);
   });
 
@@ -211,9 +215,7 @@ describe('PrConversationCommentComposer', () => {
     const renderer = await mount(createElement(PrConversationCommentComposer, baseProps));
     typeBody(renderer, 'hello');
 
-    await act(async () => {
-      pressComment(renderer);
-    });
+    await pressCommentAndSettle(renderer);
 
     expect(failureCopy(renderer)).toBe(i18n.t('prReview.mutationError.commentNotPosted'));
     expect(commentDisabled(renderer)).toBe(false);
@@ -226,9 +228,7 @@ describe('PrConversationCommentComposer', () => {
     const renderer = await mount(createElement(PrConversationCommentComposer, baseProps));
     typeBody(renderer, 'hello');
 
-    await act(async () => {
-      pressComment(renderer);
-    });
+    await pressCommentAndSettle(renderer);
 
     expect(failureCopy(renderer)).toBe(i18n.t('common.actionNotRecorded'));
     expect(commentDisabled(renderer)).toBe(true);

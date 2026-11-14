@@ -5,7 +5,6 @@
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
 import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 
 import { PrCommentEditSheet } from './pr-comment-edit-sheet';
@@ -114,6 +113,7 @@ function saveButton(renderer: ReactTestRenderer) {
 async function pressSave(renderer: ReactTestRenderer): Promise<void> {
   await act(async () => {
     (saveButton(renderer).props.onPress as () => void)();
+    await Promise.resolve();
   });
 }
 

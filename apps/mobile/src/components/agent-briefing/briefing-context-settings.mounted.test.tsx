@@ -148,9 +148,12 @@ it('hides the previous estimate when a field no longer parses', () => {
   const mounted = mount(true);
   expect(JSON.stringify(mounted.toJSON())).toContain('agentBriefing.estimate');
 
-  const durationField = mounted.root.findAll(node => (node.type as string) === 'FormField')[0];
+  const [durationField] = mounted.root.findAll(node => (node.type as string) === 'FormField');
+  if (!durationField) {
+    throw new Error('missing duration field');
+  }
   act(() => {
-    (durationField?.props.onChangeText as (value: string) => void)('not a duration');
+    (durationField.props.onChangeText as (value: string) => void)('not a duration');
   });
 
   const tree = JSON.stringify(mounted.toJSON());

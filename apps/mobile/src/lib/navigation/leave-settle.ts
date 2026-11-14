@@ -90,6 +90,41 @@ function clearBackstop(): void {
   backstop = undefined;
 }
 
+export type SceneState = Readonly<{
+  index?: number;
+  routes: readonly Readonly<{ key: string }>[];
+}>;
+
+/**
+ * The scene a pop of `state` reveals: the route below its focused one.
+ *
+ * A state that reports no index focuses its last route, so the fallback keeps
+ * the name correct for the partial state a navigator can report. A state whose
+ * focused route is its first names no scene below, and `undefined` then fails
+ * open: the window settles on the first end it receives.
+ */
+export function sceneBelow(state: SceneState | undefined): string | undefined {
+  if (state === undefined) {
+    return undefined;
+  }
+  const index = state.index ?? state.routes.length - 1;
+  return state.routes[index - 1]?.key;
+}
+
+/**
+ * The scene `state` has in front: the route at its focused index.
+ *
+ * It takes the same index fallback as `sceneBelow`, so both names come from the
+ * same route of a state that reports no index.
+ */
+export function sceneAt(state: SceneState | undefined): string | undefined {
+  if (state === undefined) {
+    return undefined;
+  }
+  const index = state.index ?? state.routes.length - 1;
+  return state.routes[index]?.key;
+}
+
 /**
  * Record that this screen is dismissing itself for its own reason, not a Back.
  *

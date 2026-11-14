@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 import { NativeStateSurface, type ScreenLayoutProps } from '@/components/centered-state-surface';
-import { settleLeaveWindow } from '@/lib/navigation/leave-settle';
+import { sceneAt, settleLeaveWindow } from '@/lib/navigation/leave-settle';
 
 /**
  * Hides every covered `(app)` stack scene from screen readers.
@@ -87,11 +87,7 @@ function SettledLeaveEndsWithThisScene({
       if (!event.data.closing) {
         // This scene's own route key, so a leave armed for another scene is not
         // settled here. A stack that names no scene settles as before.
-        const sceneKey = () => {
-          const state = navigation.getState();
-          return state.routes[state.index]?.key;
-        };
-        settleLeaveWindow(sceneKey());
+        settleLeaveWindow(sceneAt(navigation.getState()));
       }
     });
     return unsubscribe;

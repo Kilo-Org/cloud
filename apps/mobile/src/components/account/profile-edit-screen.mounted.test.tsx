@@ -66,6 +66,7 @@ vi.mock('expo-router', () => {
     // This route alone, with no scene below it: a dismissal names no reveal
     // scene and its window settles as it always did.
     getState: () => ({ index: 0, routes: [{ key: 'route-this' }] }),
+    getParent: () => undefined,
   };
   return { useRouter: () => router, useNavigation: () => navigation };
 });

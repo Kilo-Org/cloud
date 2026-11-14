@@ -16,12 +16,41 @@ import {
   LEAVE_SETTLE_GRACE_MS,
   noteAcceptedBack,
   resetLeaveSettle,
+  sceneAt,
+  sceneBelow,
   settleLeaveWindow,
   spendsLeaveBackPress,
 } from '@/lib/navigation/leave-settle';
 
 beforeEach(() => {
   resetLeaveSettle();
+});
+
+describe('scene names', () => {
+  it('names the scene below the focused route, and the focused route itself', () => {
+    // The offset a dismissal depends on: the scene a pop reveals is the route
+    // under the one that leaves, never the leaving route itself.
+    const state = { index: 1, routes: [{ key: 'below' }, { key: 'this' }] };
+    expect(sceneBelow(state)).toBe('below');
+    expect(sceneAt(state)).toBe('this');
+  });
+
+  it('names no scene below a state whose focused route is its first', () => {
+    const state = { index: 0, routes: [{ key: 'only' }] };
+    expect(sceneBelow(state)).toBeUndefined();
+    expect(sceneAt(state)).toBe('only');
+  });
+
+  it('names no scene for a navigator that reports no state', () => {
+    expect(sceneBelow(undefined)).toBeUndefined();
+    expect(sceneAt(undefined)).toBeUndefined();
+  });
+
+  it('reads the last route of a state that reports no index', () => {
+    const state = { routes: [{ key: 'below' }, { key: 'last' }] };
+    expect(sceneAt(state)).toBe('last');
+    expect(sceneBelow(state)).toBe('below');
+  });
 });
 
 describe('leave settle window', () => {

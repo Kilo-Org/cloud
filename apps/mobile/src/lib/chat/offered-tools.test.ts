@@ -35,7 +35,11 @@ describe('the tools a model that runs on the device is offered', () => {
   });
 
   it('leaves the tool the harness handed in untouched', () => {
+    const before = structuredClone(offered.parameters.properties);
+    expect(before).toHaveProperty('wait');
+
     offeredTools([offered]);
-    expect(offered.parameters.properties).toHaveProperty('wait');
+
+    expect(offered.parameters.properties).toEqual(before);
   });
 });

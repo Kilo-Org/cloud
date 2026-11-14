@@ -164,7 +164,8 @@ export function getHeaderPillContent({
 }
 
 type ContextSheetContent = {
-  usedTokens: string;
+  /** `null` until a usage report arrives, so the sheet paints no unit beside it. */
+  usedTokens: string | null;
   windowTokens: string | null;
   windowUnavailable: boolean;
   windowUnavailableLabel: string;
@@ -181,7 +182,7 @@ export function getContextSheetContent(
   totalCostMicrodollars: number | null
 ): ContextSheetContent {
   const tone = getContextTone(info?.percentage);
-  const usedTokens = info ? formatExactTokens(info.contextTokens) : '-';
+  const usedTokens = info ? formatExactTokens(info.contextTokens) : null;
   const cost = formatSessionTotalCost(totalCostMicrodollars);
   if (info?.contextWindow === undefined) {
     return {

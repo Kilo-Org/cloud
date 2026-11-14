@@ -147,13 +147,15 @@ export function ChatDetailsSheet({
         <View className="mt-6 gap-4">
           <Row label={t('agentChat.contextUsage.used')}>
             <Text className="text-base font-medium text-foreground tabular-nums">
-              {content.usedTokens}
-              <Text className="text-sm text-muted-foreground">
-                {' '}
-                {content.capacityKnown && content.windowTokens
-                  ? t('agentChat.contextUsage.ofWindowTokens', { window: content.windowTokens })
-                  : t('agentChat.contextUsage.tokens')}
-              </Text>
+              {content.usedTokens ?? '-'}
+              {content.usedTokens !== null ? (
+                <Text className="text-sm text-muted-foreground">
+                  {' '}
+                  {content.capacityKnown && content.windowTokens
+                    ? t('agentChat.contextUsage.ofWindowTokens', { window: content.windowTokens })
+                    : t('agentChat.contextUsage.tokens')}
+                </Text>
+              ) : null}
             </Text>
           </Row>
 

@@ -1097,7 +1097,6 @@ describe('Home widget approval key retention', () => {
     rememberHomeWidgetData({
       snapshot: snapshotFor([{ status: 'permission' }], NOW - 1000),
       details: {
-        primaryKind: 'needsInput',
         primaryTitle: 'Migrate billing',
         waitingAgents: [{ title: 'Migrate billing', kind: 'permission' }],
         scheduledAgents: [],
@@ -1116,7 +1115,6 @@ describe('Home widget approval key retention', () => {
     rememberHomeWidgetData({
       snapshot: snapshotFor([{ status: 'permission' }], NOW - 1000),
       details: {
-        primaryKind: 'needsInput',
         primaryTitle: 'Migrate billing',
         waitingAgents: [{ title: 'Migrate billing', kind: 'permission' }],
         scheduledAgents: [],
@@ -1140,7 +1138,6 @@ describe('Home widget approval key retention', () => {
     rememberHomeWidgetData({
       snapshot: snapshotFor([{ status: 'permission' }], NOW - 1000),
       details: {
-        primaryKind: 'needsInput',
         primaryTitle: 'Migrate billing',
         waitingAgents: [{ title: 'Migrate billing', kind: 'permission' }],
         scheduledAgents: [],
@@ -1174,7 +1171,6 @@ describe('Home widget approval key retention', () => {
     rememberHomeWidgetData({
       snapshot: snapshotFor([{ status: 'permission' }], NOW - 1000),
       details: {
-        primaryKind: 'needsInput',
         primaryTitle: 'Migrate billing',
         waitingAgents: [{ title: 'Migrate billing', kind: 'permission' }],
         scheduledAgents: [],

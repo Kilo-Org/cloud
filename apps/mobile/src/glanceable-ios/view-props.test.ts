@@ -222,7 +222,6 @@ describe('Home-only presentation and timeline', () => {
     const retained: HomeWidgetData = {
       snapshot: snapshotFor([PERMISSION_ROW]),
       details: {
-        primaryKind: 'needsInput',
         approvalKey: 'a'.repeat(64),
         primaryTitle: 'Private title',
         waitingAgents: [{ title: 'Private title', kind: 'permission' }],

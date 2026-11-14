@@ -1,4 +1,4 @@
-import { getItem, removeItem, setItem } from '@/lib/persist/encrypted-kv';
+import { getItem, removeItem, setItem, setItemWithSignal } from '@/lib/persist/encrypted-kv';
 
 import { decodeBackendTarget, decodeLocalTarget } from './backend-target';
 
@@ -33,19 +33,32 @@ export async function webSearchEnabledFor(sessionId: string, model: string): Pro
   return choice ?? webSearchDefault(model);
 }
 
-export async function setWebSearchEnabled(sessionId: string, enabled: boolean): Promise<void> {
-  await setItem(PREFERENCE_SCOPE, sessionId, enabled ? ON : OFF);
+export async function setWebSearchEnabled(
+  sessionId: string,
+  enabled: boolean,
+  signal?: AbortSignal
+): Promise<void> {
+  const value = enabled ? ON : OFF;
+  await (signal === undefined
+    ? setItem(PREFERENCE_SCOPE, sessionId, value)
+    : setItemWithSignal(PREFERENCE_SCOPE, sessionId, { value, signal }));
 }
 
 /** Carries the person's choice across a move, which opens a new session. */
-export async function moveWebSearchEnabled(from: string, to: string): Promise<void> {
+export async function moveWebSearchEnabled(
+  from: string,
+  to: string,
+  signal?: AbortSignal
+): Promise<void> {
   const stored = await getItem(PREFERENCE_SCOPE, from);
-  await removeItem(PREFERENCE_SCOPE, from);
+  await removeItem(PREFERENCE_SCOPE, from, signal);
   if (stored === null) {
-    await removeItem(PREFERENCE_SCOPE, to);
+    await removeItem(PREFERENCE_SCOPE, to, signal);
     return;
   }
-  await setItem(PREFERENCE_SCOPE, to, stored);
+  await (signal === undefined
+    ? setItem(PREFERENCE_SCOPE, to, stored)
+    : setItemWithSignal(PREFERENCE_SCOPE, to, { value: stored, signal }));
 }
 
 /** Drops the choices of chats that are gone, which is what signing out does. */

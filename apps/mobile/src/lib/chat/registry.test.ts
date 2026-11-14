@@ -132,12 +132,10 @@ const mcp = vi.hoisted(() => ({
     };
   }),
 }));
-const toolReads = vi.hoisted(
-  (): { sessionId: string | null; gate: Promise<void> | undefined } => ({
-    sessionId: null,
-    gate: undefined,
-  })
-);
+const toolReads = vi.hoisted((): { sessionId: string | null; gate: Promise<void> | undefined } => ({
+  sessionId: null,
+  gate: undefined,
+}));
 
 vi.mock('./local-models', () => ({ localModelProvider: () => undefined }));
 const backendState = vi.hoisted(() => ({ profiles: [] as StoredChatBackend[], failNext: false }));
@@ -354,16 +352,22 @@ vi.mock('./kilo-mcp', () => ({
     await Promise.resolve();
     return mcp.enabled.get(sessionId) ?? true;
   },
-  setMcpEnabled: async (sessionId: string, enabled: boolean) => {
+  setMcpEnabled: async (sessionId: string, enabled: boolean, signal?: AbortSignal) => {
     await Promise.resolve();
+    if (signal?.aborted) {
+      throw new Error('cancelled');
+    }
     if (enabled) {
       mcp.enabled.delete(sessionId);
       return;
     }
     mcp.enabled.set(sessionId, false);
   },
-  moveMcpEnabled: async (from: string, to: string) => {
+  moveMcpEnabled: async (from: string, to: string, signal?: AbortSignal) => {
     await Promise.resolve();
+    if (signal?.aborted) {
+      throw new Error('cancelled');
+    }
     const held = mcp.enabled.get(from);
     mcp.enabled.delete(from);
     if (held === undefined) {
@@ -385,16 +389,14 @@ const choiceWrites = vi.hoisted(() => ({
   gate: undefined as Promise<void> | undefined,
   refuse: 0,
 }));
-vi.mock('@/lib/persist/encrypted-kv', () => ({
-  encryptedDatabase: async () => {
-    await Promise.resolve();
-    return {};
-  },
-  getItem: async (scope: string, key: string) => {
-    await Promise.resolve();
-    return storedQuestions.get(`${scope}:${key}`) ?? null;
-  },
-  setItem: async (scope: string, key: string, value: string) => {
+vi.mock('@/lib/persist/encrypted-kv', () => {
+  const setItem = async (
+    scope: string,
+    key: string,
+    write: string | { value: string; signal?: AbortSignal }
+  ) => {
+    const value = typeof write === 'string' ? write : write.value;
+    const signal = typeof write === 'string' ? undefined : write.signal;
     await Promise.resolve();
     if (scope === choiceWrites.scope) {
       await choiceWrites.gate;
@@ -403,13 +405,31 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
         throw new Error('the choice could not be written');
       }
     }
+    if (signal?.aborted) {
+      throw new Error('cancelled');
+    }
     storedQuestions.set(`${scope}:${key}`, value);
-  },
-  removeItem: async (scope: string, key: string) => {
-    await Promise.resolve();
-    storedQuestions.delete(`${scope}:${key}`);
-  },
-}));
+  };
+  return {
+    encryptedDatabase: async () => {
+      await Promise.resolve();
+      return {};
+    },
+    getItem: async (scope: string, key: string) => {
+      await Promise.resolve();
+      return storedQuestions.get(`${scope}:${key}`) ?? null;
+    },
+    setItem,
+    setItemWithSignal: setItem,
+    removeItem: async (scope: string, key: string, signal?: AbortSignal) => {
+      await Promise.resolve();
+      if (signal?.aborted) {
+        throw new Error('cancelled');
+      }
+      storedQuestions.delete(`${scope}:${key}`);
+    },
+  };
+});
 /**
  * The scope recorded for each chat, which is what the store's `chats` row holds.
  * A start writes it and a move carries it to the session the chat moved onto.
@@ -2217,11 +2237,7 @@ describe('a tool retry queued behind send startup', () => {
   it('keeps the answering session until its answer settles', async () => {
     const cloneGate = Promise.withResolvers<undefined>();
     cloning = cloneGate.promise;
-    const sending = say(
-      opened,
-      { text: 'first', images: [] },
-      { model: 'kilo/two', effort: null }
-    );
+    const sending = say(opened, { text: 'first', images: [] }, { model: 'kilo/two', effort: null });
     await settled();
     mcp.tools.push({ definition: { name: 'mcp_kilo_read-file' } });
     mcp.ensure.mockResolvedValueOnce({ status: 'ready', tools: mcp.tools });
@@ -2271,6 +2287,47 @@ describe('a flag applied after an answer', () => {
   );
 });
 
+describe('account teardown with an abandoned flag turn', () => {
+  it.each(['persist', 'apply'])(
+    'cancels a never-settling %s and fences its late continuation',
+    async stage => {
+      const gate = Promise.withResolvers<undefined>();
+      if (stage === 'persist') {
+        choiceWrites.gate = gate.promise;
+      } else {
+        cloning = gate.promise;
+      }
+      const picking = setChatFlag({
+        sessionId: opened,
+        place: stage === 'persist' ? null : place,
+        flag: 'webSearch',
+        next: false,
+      });
+      await settled();
+      let finished = false;
+      const releasing = (async () => {
+        await releaseEveryChat();
+        finished = true;
+      })();
+      try {
+        await vi.waitFor(
+          () => {
+            expect(finished).toBe(true);
+          },
+          { timeout: 1_500 }
+        );
+      } finally {
+        storedQuestions.clear();
+        gate.resolve(undefined);
+        await Promise.all([picking, releasing]);
+      }
+      await settled();
+      expect(storedQuestions.size).toBe(0);
+      expect(snapshotOf(opened).webSearch.kind).toBe('reading');
+      expect(snapshotOf('s2').model).toBe('');
+    }
+  );
+});
 
 describe('releasing a chat with queued operations', () => {
   it('releases the successor after a pending flag turn and its waiting successor settle', async () => {
@@ -2313,7 +2370,7 @@ describe('releasing a chat with queued operations', () => {
     expect(snapshotOf(opened).model).toBe('kilo/one');
   });
 
-  it('drains and forgets unopened flags before sign-out or account switch can continue', async () => {
+  it('cancels and forgets unopened flags before sign-out or account switch can continue', async () => {
     const gate = Promise.withResolvers<undefined>();
     choiceWrites.gate = gate.promise;
     const picking = setChatFlag({
@@ -2329,13 +2386,12 @@ describe('releasing a chat with queued operations', () => {
       flag: 'webSearch',
       next: true,
     });
-    const releasing = releaseEveryChat();
-    await settled();
-    expect(snapshotOf('unopened').webSearch.kind).toBe('picking');
+    await releaseEveryChat();
+    expect(snapshotOf('unopened').webSearch.kind).toBe('reading');
     gate.resolve(undefined);
-    await Promise.all([picking, waiting, releasing]);
+    await Promise.all([picking, waiting]);
 
-    expect(storedQuestions.get(`${choiceWrites.scope}:unopened`)).toBe('on');
+    expect(storedQuestions.get(`${choiceWrites.scope}:unopened`)).toBeUndefined();
     expect(snapshotOf('unopened').webSearch.kind).toBe('reading');
   });
 });

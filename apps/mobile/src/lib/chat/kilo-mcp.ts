@@ -10,7 +10,7 @@ import {
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { KILO_MCP_URL } from '@/lib/config';
-import { getItem, removeItem, setItem } from '@/lib/persist/encrypted-kv';
+import { getItem, removeItem, setItem, setItemWithSignal } from '@/lib/persist/encrypted-kv';
 import { KILO_MCP_SERVER_ID } from './mcp-server-namespace';
 import { type ChatPlace } from './scope';
 
@@ -346,23 +346,35 @@ export async function mcpChoiceFor(sessionId: string): Promise<boolean | null> {
   return (await getItem(PREFERENCE_SCOPE, sessionId)) === OFF ? false : null;
 }
 
-export async function setMcpEnabled(sessionId: string, enabled: boolean): Promise<void> {
+export async function setMcpEnabled(
+  sessionId: string,
+  enabled: boolean,
+  signal?: AbortSignal
+): Promise<void> {
   if (enabled) {
-    await removeItem(PREFERENCE_SCOPE, sessionId);
+    await removeItem(PREFERENCE_SCOPE, sessionId, signal);
     return;
   }
-  await setItem(PREFERENCE_SCOPE, sessionId, OFF);
+  await (signal === undefined
+    ? setItem(PREFERENCE_SCOPE, sessionId, OFF)
+    : setItemWithSignal(PREFERENCE_SCOPE, sessionId, { value: OFF, signal }));
 }
 
 /** Carries the setting across a model switch, which opens a new session. */
-export async function moveMcpEnabled(from: string, to: string): Promise<void> {
+export async function moveMcpEnabled(
+  from: string,
+  to: string,
+  signal?: AbortSignal
+): Promise<void> {
   const enabled = await mcpEnabledFor(from);
-  await removeItem(PREFERENCE_SCOPE, from);
+  await removeItem(PREFERENCE_SCOPE, from, signal);
   if (enabled) {
-    await removeItem(PREFERENCE_SCOPE, to);
+    await removeItem(PREFERENCE_SCOPE, to, signal);
     return;
   }
-  await setItem(PREFERENCE_SCOPE, to, OFF);
+  await (signal === undefined
+    ? setItem(PREFERENCE_SCOPE, to, OFF)
+    : setItemWithSignal(PREFERENCE_SCOPE, to, { value: OFF, signal }));
 }
 
 /** Drops the settings of chats that are gone, which is what signing out does. */

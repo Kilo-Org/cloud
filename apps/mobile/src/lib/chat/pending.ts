@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { getItem, removeItem, setItem } from '@/lib/persist/encrypted-kv';
+import { getItem, removeItem, setItem, setItemWithSignal } from '@/lib/persist/encrypted-kv';
 
 import { EFFORTS } from './effort';
 import { type ChatTarget, type Displaced, type Question } from './state';
@@ -111,13 +111,16 @@ export type AskedToRemember = Omit<Asked, 'failureKey'> & {
   readonly failureKey?: string | null;
 };
 
-export async function rememberAsked(sessionId: string, asked: AskedToRemember): Promise<void> {
-  await setItem(
-    SCOPE,
-    sessionId,
-    JSON.stringify({ ...asked, failureKey: asked.failureKey ?? null })
-  );
-  await removeItem(LEGACY_SCOPE, sessionId);
+export async function rememberAsked(
+  sessionId: string,
+  asked: AskedToRemember,
+  signal?: AbortSignal
+): Promise<void> {
+  const value = JSON.stringify({ ...asked, failureKey: asked.failureKey ?? null });
+  await (signal === undefined
+    ? setItem(SCOPE, sessionId, value)
+    : setItemWithSignal(SCOPE, sessionId, { value, signal }));
+  await removeItem(LEGACY_SCOPE, sessionId, signal);
 }
 
 /**
@@ -135,9 +138,9 @@ export async function recordAskedFailure(sessionId: string, failureKey: string):
   await rememberAsked(sessionId, { ...asked, failureKey });
 }
 
-export async function forgetAsked(sessionId: string): Promise<void> {
-  await removeItem(SCOPE, sessionId);
-  await removeItem(LEGACY_SCOPE, sessionId);
+export async function forgetAsked(sessionId: string, signal?: AbortSignal): Promise<void> {
+  await removeItem(SCOPE, sessionId, signal);
+  await removeItem(LEGACY_SCOPE, sessionId, signal);
 }
 
 export async function askedIn(sessionId: string): Promise<Asked | null> {
@@ -146,8 +149,15 @@ export async function askedIn(sessionId: string): Promise<Asked | null> {
 }
 
 /** Writes the questions a later send took the slot from, in the order they were asked. */
-async function writeKept(sessionId: string, kept: readonly Displaced[]): Promise<void> {
-  await setItem(KEPT_SCOPE, sessionId, JSON.stringify(kept));
+async function writeKept(
+  sessionId: string,
+  kept: readonly Displaced[],
+  signal?: AbortSignal
+): Promise<void> {
+  const value = JSON.stringify(kept);
+  await (signal === undefined
+    ? setItem(KEPT_SCOPE, sessionId, value)
+    : setItemWithSignal(KEPT_SCOPE, sessionId, { value, signal }));
 }
 
 export async function keptIn(sessionId: string): Promise<readonly Displaced[]> {
@@ -183,8 +193,14 @@ export async function replaceKept(sessionId: string, kept: readonly Displaced[])
 }
 
 /** Remembers the words a chat is named for, which are the first ones said in it. */
-export async function rememberFirstQuestion(sessionId: string, text: string): Promise<void> {
-  await setItem(NAME_SCOPE, sessionId, text);
+export async function rememberFirstQuestion(
+  sessionId: string,
+  text: string,
+  signal?: AbortSignal
+): Promise<void> {
+  await (signal === undefined
+    ? setItem(NAME_SCOPE, sessionId, text)
+    : setItemWithSignal(NAME_SCOPE, sessionId, { value: text, signal }));
 }
 
 export function firstQuestionIn(sessionId: string): Promise<string | null> {
@@ -197,11 +213,11 @@ export function firstQuestionIn(sessionId: string): Promise<string | null> {
  * Deleting a chat and signing out both do this, so one call cannot forget half
  * of it.
  */
-export async function forgetQuestions(sessionId: string): Promise<void> {
+export async function forgetQuestions(sessionId: string, signal?: AbortSignal): Promise<void> {
   await Promise.all([
-    forgetAsked(sessionId),
-    removeItem(KEPT_SCOPE, sessionId),
-    removeItem(NAME_SCOPE, sessionId),
+    forgetAsked(sessionId, signal),
+    removeItem(KEPT_SCOPE, sessionId, signal),
+    removeItem(NAME_SCOPE, sessionId, signal),
   ]);
 }
 
@@ -217,22 +233,22 @@ export async function migrateAsked(sessionId: string, model: string): Promise<vo
 }
 
 /** Carries the questions across a model switch, which opens a new session. */
-export async function moveQuestions(from: string, to: string): Promise<void> {
+export async function moveQuestions(from: string, to: string, signal?: AbortSignal): Promise<void> {
   const [asked, kept, name] = await Promise.all([
     askedIn(from),
     keptIn(from),
     firstQuestionIn(from),
   ]);
   if (asked !== null) {
-    await rememberAsked(to, asked);
+    await rememberAsked(to, asked, signal);
   }
   if (kept.length > 0) {
-    await writeKept(to, kept);
+    await writeKept(to, kept, signal);
   }
   if (name !== null) {
-    await rememberFirstQuestion(to, name);
+    await rememberFirstQuestion(to, name, signal);
   }
-  await forgetQuestions(from);
+  await forgetQuestions(from, signal);
 }
 
 /**

@@ -298,7 +298,9 @@ The Chat tab runs `@kilocode/harness-sdk` on the device. `src/lib/chat/` holds t
 
 A chat flag is one `ChatFlag` on `ChatState` (`@/lib/chat/chat-flag`): read it and write it through `setChatFlag`, never with a `useState` mirror beside it. A refused persist rejects and restores the stored choice; a saved choice whose move failed stays `saved`/`behind`, and `retryChatFlag` applies it again. Both flags and every move share the chat's registry turn.
 
-Resolve a queued operation's session inside its turn, because an earlier move can rename it. Closing skips only waiting skippable tickets, never a queued reopen or an operation already running. A skipped caller may settle early, but its queue tail still waits for its predecessor. Retire the queue after its last waiter finishes; sign-out and account switch drain and forget unopened flag state too.
+Resolve a queued operation's session inside its turn, because an earlier move can rename it. Keep send startup in that turn through assigning `chat.answering`; a tool retry rechecks the live chat inside its turn and defers while an answer streams. Closing skips only waiting skippable tickets, never a queued reopen. A skipped caller may settle early, but its queue tail still waits for its predecessor.
+
+Sign-out and account switch abort the old account's turn generation before cleanup, which is bounded to one second. Carry the captured `AbortSignal` through flag persistence and migration: encrypted-KV mutations check it after opening the database, immediately before SQL executes. Late old-account continuations must not persist, move or publish. A deferred flag stays `moving` until its move publishes `current` or `behind`.
 
 Quick Chat renders streamed text, reasoning and tools through the shared agent message and tool-detail surfaces. Tool results update the matching call rather than adding user-message bubbles; the same pairing is rebuilt from stored turns when a chat reopens.
 

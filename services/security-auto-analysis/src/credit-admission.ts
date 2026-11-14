@@ -37,6 +37,22 @@ const CreditAdmissionResponseSchema = z.object({
  * window (a peer without this query answers 404) retries instead of failing.
  * Neither the token, the request body nor the peer's error body may appear in
  * the result message.
+ *
+ * Two properties are intended, and both were weighed against adding a retry
+ * here.
+ *
+ * The read runs once per launch attempt. A transient answer is handed to the
+ * caller's existing retry classification, which already owns the attempt budget
+ * and its backoff; a retry inside this module would send a second request
+ * within one attempt and keep that policy in two places.
+ *
+ * A `refused` answer stays permanent on the first answer. It describes a
+ * credential the peer would not accept rather than a decision about the payer:
+ * a policy denial arrives in-band as `insufficient_credits` with status 200,
+ * and the peer has no denial answer in the authorization statuses at all.
+ * Repeating the same request inside the same attempt cannot change that
+ * credential, and the outcome is recorded with its own failure code instead of
+ * spending the finding's remaining attempts.
  */
 export async function readAnalysisCreditAdmission(params: {
   env: CloudflareEnv;

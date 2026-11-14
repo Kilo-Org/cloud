@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Xulashooyinka SSH",
       "emptyTitle": "Weli host-yo ma jiraan",
       "emptyDescription": "Martigeliyayaasha la kaydiyay waxay terminal ka furaan serverkaaga.",
       "addHost": "Ku dar host",
@@ -4587,6 +4588,51 @@
       "createdTitle": "Fure la abuuray",
       "createdDescription": "Ku dar furaha guudkan authorized_keys-ka server-ka, ka dibna furahan ku xiriir.",
       "copyPublicKey": "Koobi furaha"
+    },
+    "backup": {
+      "exportTitle": "Dhoofi kayd sir ah",
+      "importTitle": "Soo qaado kayd sir ah",
+      "exportDescription": "Wax kasta oo hoos ku yaal waa lagu sireeyay oraahdaada sirta. Si gaar ah u hayso; lama soo celin karo.",
+      "importDescription": "Fur kayd Kilo SSH si aad u eegto waxa ku jira ka hor inta aadan soo qaadin.",
+      "noFile": "Fayl kayd ah lama dooran",
+      "confirmPassphrase": "Xaqiiji oraahda sirta",
+      "strengthShort": "Isticmaal ugu yaraan 8 xaraf",
+      "strengthGood": "Dherer wanaagsan · 12 xaraf ama ka badan ayaa ka ammaan badan",
+      "strengthLong": "Oraahda sirta oo dheer · meel ammaan ah ku hayso",
+      "mismatch": "Oraahyada sirta isku mid ma aha.",
+      "share": "Siree oo la wadaag",
+      "unlock": "Fur kaydka",
+      "apply": "Soo qaado kaydka",
+      "mergeStrategy": "Ka bood kuwa isku mid ah",
+      "mergeDescription": "Hayso host-yada jira iyadoo la raacayo sumadda, furaha iyadoo la raacayo fingerprint-ka iyo host-yada la yaqaan iyadoo la raacayo qaabka. Amarro kaydsan iyo xidhiidhka wareejinta ee isku mid ah ayaa sidoo kale la hayaa.",
+      "conflicts": "Qalabkan lagu hayay",
+      "outcomeTitle": "Natiijada soo qaadista",
+      "toSkip": "In la boodo",
+      "counts": {
+        "hosts": "Host-yada SSH",
+        "keys": "Furaha gaarka ah",
+        "snippets": "Amarro kaydsan"
+      },
+      "wrongPassphrase": "Oraahda sirtaas ma furin kaydka. Isku day mar kale.",
+      "invalidExport": "Faylkani ma aha kayd Kilo SSH. Dooro fayl kale.",
+      "fileError": "Faylka kaydka lama akhrin karin.",
+      "storageError": "Kaydka lama kaydin karin. Waxba lama soo qaadin.",
+      "unavailable": "Hawlgalka kaydka sirta ah wuu guuldarraystay. Isku day mar kale.",
+      "empty": "Wax la kaydiyo ma jiraan.",
+      "previewTitle": "Waxa ku jira kaydka",
+      "imported": "Kaydka SSH waa la soo qaaday.",
+      "nothingNew": "Wax kasta oo ku jira kaydkan hore ayay qalabkan ugu jiraan."
+    },
+    "keyBar": {
+      "title": "Bar-ka furaha",
+      "subtitle": "Jiid fure si aad u dhaqaajiso, ama dami si aad u qariso.",
+      "editHint": "Riix dheer si aad u doorato oo u kala hormariso furaha.",
+      "restoreDefault": "Soo celi caadiga",
+      "moveUp": "U dhaqaaji {{label}} kor",
+      "moveDown": "U dhaqaaji {{label}} hoos",
+      "show": "Muuji {{label}}",
+      "keepOne": "Ugu yaraan hal fure ayaa ku hadha bar-ka.",
+      "loadFailed": "Bar-ka furaha lama soo rarin karin."
     },
     "sandbox": {
       "title": "Terminal",

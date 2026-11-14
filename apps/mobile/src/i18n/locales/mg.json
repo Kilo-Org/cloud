@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Safidy SSH",
       "emptyTitle": "Mbola tsy misy host",
       "emptyDescription": "Ny mpampiantrano voatahiry dia manokatra terminal ao amin'ny serveuranao.",
       "addHost": "Ampio host",
@@ -4587,6 +4588,51 @@
       "createdTitle": "Noforonina ny fanalahidy",
       "createdDescription": "Ampio ao amin'ny authorized_keys an'ny mpizara ity fanalahidy ampahibemaso ity, avy eo mifandraisa amin'ny alalan'ity fanalahidy ity.",
       "copyPublicKey": "Adikao ny fanalahidy ampahibemaso"
+    },
+    "backup": {
+      "exportTitle": "Avoahy ny tahiry voafina",
+      "importTitle": "Ento ny tahiry voafina",
+      "exportDescription": "Ny zavatra rehetra etsy ambany dia voafina amin'ny andian-teny miafinao. Tehirizo misaraka izy; tsy azo averina intsony.",
+      "importDescription": "Sokafy ny tahiry SSH Kilo mba hijery ny ao anatiny alohan'ny fampidirana.",
+      "noFile": "Tsy misy rakitra tahiry voafidy",
+      "confirmPassphrase": "Hamafiso ny andian-teny miafina",
+      "strengthShort": "Ampiasao farafahakeliny 8 tarehintsoratra",
+      "strengthGood": "Halava tsara · 12 na mihoatra tarehintsoratra no azo antoka kokoa",
+      "strengthLong": "Andian-teny miafina lava · tehirizo any amin'ny toerana azo antoka",
+      "mismatch": "Tsy mifanaraka ny andian-teny miafina.",
+      "share": "Afeno ary zarao",
+      "unlock": "Sokafy ny tahiry",
+      "apply": "Ento ny tahiry",
+      "mergeStrategy": "Tsidiho ny dika mitovy",
+      "mergeDescription": "Tehirizo ny host efa misy araka ny label, ny fanalahidy araka ny fingerprint ary ny host fantatra araka ny pattern. Voatahiry koa ny sombin-baiko mifanaraka sy ny fifamatorana fandefasana.",
+      "conflicts": "Voatahiry eto amin'ity fitaovana ity",
+      "outcomeTitle": "Vokatry ny fampidirana",
+      "toSkip": "Ho tsidihina",
+      "counts": {
+        "hosts": "Host SSH",
+        "keys": "Fanalahidy manokana",
+        "snippets": "Sombin-baiko"
+      },
+      "wrongPassphrase": "Tsy afaka nosokafana tamin'io andian-teny miafina io ny tahiry. Andramo indray.",
+      "invalidExport": "Tsy tahiry SSH Kilo ity rakitra ity. Safidio ny rakitra hafa.",
+      "fileError": "Tsy afaka novakiana ny rakitra tahiry.",
+      "storageError": "Tsy afaka notahirizina ny tahiry. Tsy nisy na inona na inona voentina.",
+      "unavailable": "Tsy nahomby ny asa fanafenana tahiry. Andramo indray.",
+      "empty": "Tsy misy zavatra hatao tahiry",
+      "previewTitle": "Votoatin'ny tahiry",
+      "imported": "Voentina ny tahiry SSH.",
+      "nothingNew": "Efa ao amin'ity fitaovana ity ny zavatra rehetra ao amin'ity tahiry ity."
+    },
+    "keyBar": {
+      "title": "Baran'ny fanalahidy",
+      "subtitle": "Taritariho ny fanalahidy hamindrana azy, na vonoy mba hanafenana azy.",
+      "editHint": "Tsindrio ela mba hisafidy sy handamina indray ny fanalahidy",
+      "restoreDefault": "Avereno ny mahazatra",
+      "moveUp": "Afindrao ambony {{label}}",
+      "moveDown": "Afindrao ambany {{label}}",
+      "show": "Asehoy {{label}}",
+      "keepOne": "Farafahakeliny fanalahidy iray no mijanona ao amin'ny bara.",
+      "loadFailed": "Tsy afaka nampidirina ny baran'ny fanalahidy."
     },
     "sandbox": {
       "title": "Terminal",

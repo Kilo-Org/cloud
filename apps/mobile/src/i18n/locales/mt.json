@@ -4626,6 +4626,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Għażliet SSH",
       "emptyTitle": "Għad m'hemmx hosts",
       "emptyDescription": "Il-hosts salvati jiftħu terminal fuq is-server tiegħek.",
       "addHost": "Żid host",
@@ -4782,6 +4783,51 @@
       "createdTitle": "Ċavetta ġiet iġġenerata",
       "createdDescription": "Żid din iċ-ċavetta pubblika mal-authorized_keys tas-server, imbagħad ikkonnettja b'din iċ-ċavetta.",
       "copyPublicKey": "Ikkopja ċ-ċavetta"
+    },
+    "backup": {
+      "exportTitle": "Esporta backup kriptat",
+      "importTitle": "Importa backup kriptat",
+      "exportDescription": "Kollox hawn taħt huwa kriptat bil-passphrase tiegħek. Żommha separatament; ma tistax tiġi rkuprata.",
+      "importDescription": "Iftaħ backup SSH ta' Kilo biex tirrevedi l-kontenut tiegħu qabel ma timporta.",
+      "noFile": "L-ebda fajl tal-backup ma ntgħażel",
+      "confirmPassphrase": "Ikkonferma l-passphrase",
+      "strengthShort": "Uża mill-inqas 8 karattri",
+      "strengthGood": "Tul tajjeb · 12-il karattru jew aktar huwa aktar sigur",
+      "strengthLong": "Passphrase twila · żommha f'post sigur",
+      "mismatch": "Il-passphrases ma jaqblux.",
+      "share": "Ikkripta u aqsam",
+      "unlock": "Iftaħ il-backup",
+      "apply": "Importa l-backup",
+      "mergeStrategy": "Aqbeż id-duplikati",
+      "mergeDescription": "Żomm il-hosts eżistenti bil-label, iċ-ċwievet bil-fingerprint u l-hosts magħrufa bil-pattern. Is-siltiet u l-bindings tal-forwards li jaqblu jinżammu wkoll.",
+      "conflicts": "Miżmuma fuq dan l-apparat",
+      "outcomeTitle": "Riżultat tal-import",
+      "toSkip": "Li jinqabżu",
+      "counts": {
+        "hosts": "Hosts SSH",
+        "keys": "Ċwievet privati",
+        "snippets": "Siltiet ta' komandi"
+      },
+      "wrongPassphrase": "Dik il-passphrase ma fetħitx il-backup. Erġa' pprova.",
+      "invalidExport": "Dan il-fajl mhuwiex backup SSH ta' Kilo. Agħżel fajl ieħor.",
+      "fileError": "Il-fajl tal-backup ma setax jinqara.",
+      "storageError": "Il-backup ma setax jiġi ssejvjat. Ma ġie importat xejn.",
+      "unavailable": "L-operazzjoni tal-backup kriptat falliet. Erġa' pprova.",
+      "empty": "Xejn x'jiġi backupjat",
+      "previewTitle": "Kontenut tal-backup",
+      "imported": "Backup SSH importat.",
+      "nothingNew": "Kollox f'dan il-backup diġà jinsab fuq dan l-apparat."
+    },
+    "keyBar": {
+      "title": "Bar taċ-ċwievet",
+      "subtitle": "Iġbed ċavetta biex tmexxiha, jew itfiha biex taħbiha.",
+      "editHint": "Agħfas fit-tul biex tagħżel u terġa' tordna ċ-ċwievet",
+      "restoreDefault": "Irrestawra l-default",
+      "moveUp": "Mexxi {{label}} 'l fuq",
+      "moveDown": "Mexxi {{label}} 'l isfel",
+      "show": "Uri {{label}}",
+      "keepOne": "Mill-inqas ċavetta waħda tibqa' fuq il-bar.",
+      "loadFailed": "Il-bar taċ-ċwievet ma setax jiġi mgħobbi."
     },
     "sandbox": {
       "title": "Terminal",

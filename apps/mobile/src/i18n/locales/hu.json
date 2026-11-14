@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "SSH lehetőségek",
       "emptyTitle": "Még nincs gazdagép",
       "emptyDescription": "A mentett gazdagépek terminált nyitnak a szerverén.",
       "addHost": "Gazdagép hozzáadása",
@@ -4587,6 +4588,51 @@
       "createdTitle": "Kulcs létrehozva",
       "createdDescription": "Adja hozzá ezt a nyilvános kulcsot a szerver authorized_keys fájljához, majd csatlakozzon ezzel a kulccsal.",
       "copyPublicKey": "Kulcs másolása"
+    },
+    "backup": {
+      "exportTitle": "Titkosított biztonsági mentés exportálása",
+      "importTitle": "Titkosított biztonsági mentés importálása",
+      "exportDescription": "Az alábbiak mind a jelmondatoddal vannak titkosítva. Tartsd külön; nem lehet helyreállítani.",
+      "importDescription": "Nyiss meg egy Kilo SSH biztonsági mentést, hogy importálás előtt átnézd a tartalmát.",
+      "noFile": "Nincs kiválasztott biztonsági mentésfájl",
+      "confirmPassphrase": "Jelmondat megerősítése",
+      "strengthShort": "Használj legalább 8 karaktert",
+      "strengthGood": "Jó hossz · 12 vagy több karakter biztonságosabb",
+      "strengthLong": "Hosszú jelmondat · tartsd biztonságos helyen",
+      "mismatch": "A jelmondatok nem egyeznek.",
+      "share": "Titkosítás és megosztás",
+      "unlock": "Biztonsági mentés feloldása",
+      "apply": "Biztonsági mentés importálása",
+      "mergeStrategy": "Ismétlődők kihagyása",
+      "mergeDescription": "A meglévő gazdagépeket címke szerint, a kulcsokat ujjlenyomat szerint tartja meg; az ismert gazdagépek esetében a mintát követi. Az egyező kódrészletek és továbbítási kötések is megmaradnak.",
+      "conflicts": "Megtartva ezen az eszközön",
+      "outcomeTitle": "Importálás eredménye",
+      "toSkip": "Kihagyandó",
+      "counts": {
+        "hosts": "SSH-gazdagépek",
+        "keys": "Privát kulcsok",
+        "snippets": "Parancskódrészletek"
+      },
+      "wrongPassphrase": "Ez a jelmondat nem oldotta fel a biztonsági mentést. Próbáld újra.",
+      "invalidExport": "Ez a fájl nem egy Kilo SSH biztonsági mentés. Válassz másik fájlt.",
+      "fileError": "A biztonsági mentés fájlját nem sikerült beolvasni.",
+      "storageError": "A biztonsági mentést nem sikerült menteni. Semmi sem lett importálva.",
+      "unavailable": "A titkosított biztonsági mentés művelete sikertelen volt. Próbáld újra.",
+      "empty": "Nincs mit biztonsági menteni",
+      "previewTitle": "A biztonsági mentés tartalma",
+      "imported": "SSH biztonsági mentés importálva.",
+      "nothingNew": "Ebben a biztonsági mentésben minden már ezen az eszközön van."
+    },
+    "keyBar": {
+      "title": "Kulcssáv",
+      "subtitle": "Húzz egy kulcsot az áthelyezéshez, vagy kapcsold ki az elrejtéséhez.",
+      "editHint": "Hosszan nyomd meg a kulcsok kiválasztásához és átrendezéséhez",
+      "restoreDefault": "Alapértelmezett visszaállítása",
+      "moveUp": "{{label}} mozgatása fel",
+      "moveDown": "{{label}} mozgatása le",
+      "show": "{{label}} megjelenítése",
+      "keepOne": "Legalább egy kulcs marad a sávon.",
+      "loadFailed": "A kulcssávot nem sikerült betölteni."
     },
     "sandbox": {
       "title": "Terminál",

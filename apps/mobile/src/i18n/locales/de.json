@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "SSH-Optionen",
       "emptyTitle": "Noch keine Hosts",
       "emptyDescription": "Gespeicherte Hosts öffnen ein Terminal auf Ihrem Server.",
       "addHost": "Host hinzufügen",
@@ -4587,6 +4588,51 @@
       "createdTitle": "Schlüssel erzeugt",
       "createdDescription": "Fügen Sie diesen öffentlichen Schlüssel zur authorized_keys-Datei des Servers hinzu und verbinden Sie sich dann mit diesem Schlüssel.",
       "copyPublicKey": "Schlüssel kopieren"
+    },
+    "backup": {
+      "exportTitle": "Verschlüsseltes Backup exportieren",
+      "importTitle": "Verschlüsseltes Backup importieren",
+      "exportDescription": "Alles Folgende wird mit deiner Passphrase verschlüsselt. Bewahre sie separat auf; sie kann nicht wiederhergestellt werden.",
+      "importDescription": "Öffne ein Kilo-SSH-Backup, um den Inhalt vor dem Import zu prüfen.",
+      "noFile": "Keine Backup-Datei ausgewählt",
+      "confirmPassphrase": "Passphrase bestätigen",
+      "strengthShort": "Verwende mindestens 8 Zeichen",
+      "strengthGood": "Gute Länge · 12 oder mehr Zeichen sind sicherer",
+      "strengthLong": "Lange Passphrase · bewahre sie an einem sicheren Ort auf",
+      "mismatch": "Die Passphrasen stimmen nicht überein.",
+      "share": "Verschlüsseln und teilen",
+      "unlock": "Backup entsperren",
+      "apply": "Backup importieren",
+      "mergeStrategy": "Duplikate überspringen",
+      "mergeDescription": "Vorhandene Hosts werden nach Label, Schlüssel nach Fingerabdruck und bekannte Hosts nach Muster beibehalten. Übereinstimmende Snippets und Weiterleitungsbindungen werden ebenfalls beibehalten.",
+      "conflicts": "Auf diesem Gerät behalten",
+      "outcomeTitle": "Importergebnis",
+      "toSkip": "Zu überspringen",
+      "counts": {
+        "hosts": "SSH-Hosts",
+        "keys": "Private Schlüssel",
+        "snippets": "Befehls-Snippets"
+      },
+      "wrongPassphrase": "Diese Passphrase hat das Backup nicht entsperrt. Versuche es erneut.",
+      "invalidExport": "Diese Datei ist kein Kilo-SSH-Backup. Wähle eine andere Datei.",
+      "fileError": "Die Backup-Datei konnte nicht gelesen werden.",
+      "storageError": "Das Backup konnte nicht gespeichert werden. Es wurde nichts importiert.",
+      "unavailable": "Der verschlüsselte Backup-Vorgang ist fehlgeschlagen. Versuche es erneut.",
+      "empty": "Nichts zu sichern",
+      "previewTitle": "Backup-Inhalt",
+      "imported": "SSH-Backup importiert.",
+      "nothingNew": "Alles in diesem Backup ist bereits auf diesem Gerät."
+    },
+    "keyBar": {
+      "title": "Schlüsselleiste",
+      "subtitle": "Ziehe einen Schlüssel, um ihn zu verschieben, oder schalte ihn aus, um ihn auszublenden.",
+      "editHint": "Lang drücken, um Schlüssel auszuwählen und neu anzuordnen",
+      "restoreDefault": "Standard wiederherstellen",
+      "moveUp": "{{label}} nach oben verschieben",
+      "moveDown": "{{label}} nach unten verschieben",
+      "show": "{{label}} anzeigen",
+      "keepOne": "Mindestens ein Schlüssel bleibt in der Leiste.",
+      "loadFailed": "Die Schlüsselleiste konnte nicht geladen werden."
     },
     "sandbox": {
       "title": "Terminal",

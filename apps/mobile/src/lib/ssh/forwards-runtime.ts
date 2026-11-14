@@ -1,5 +1,6 @@
 import { type Forward } from '../../../modules/kilo-ssh/src';
 
+import { trackSshForwardFailed, trackSshForwardStarted } from './analytics';
 import { type SshForward } from './forwards';
 import { nativeErrorCode, sshPackage } from './native';
 
@@ -100,11 +101,13 @@ export async function startForward(
     }
     entry.handles.set(forward.id, handle);
     setStatus(sessionId, forward.id, { kind: 'listening', port: handle.port });
+    trackSshForwardStarted(forward.direction);
   } catch (error) {
     if (sessions.get(sessionId) !== entry || entry.statuses.get(forward.id) !== starting) {
       return;
     }
     setStatus(sessionId, forward.id, { kind: 'failed', code: nativeErrorCode(error) });
+    trackSshForwardFailed(forward.direction, nativeErrorCode(error));
   }
 }
 

@@ -2,6 +2,7 @@ import { hostTarget } from '../host-target';
 import { type SshHost } from '../hosts';
 import { newId } from '../id';
 import { sshPackage } from '../native';
+import { trackSshReconnect } from '../analytics';
 import { handleForwardError, resetSessionForwards } from '../forwards-runtime';
 import { forgetIdleNotify } from './idle-notify';
 import { attempt, fail } from './attempt';
@@ -24,6 +25,7 @@ export function openSession(host: SshHost): string {
     host,
     nativeSessionId: null,
     attempt: 0,
+    reconnecting: false,
     timer: null,
     hostKey: null,
     prompts: null,
@@ -59,6 +61,10 @@ export async function closeSession(id: string): Promise<void> {
   }
   clearTimer(entry);
   entry.attemptAbort?.abort();
+  if (entry.reconnecting) {
+    entry.reconnecting = false;
+    trackSshReconnect('abandoned');
+  }
   const shellId = sessionById(id)?.shellId ?? null;
   const nativeSessionId = entry.nativeSessionId;
   const jumps = entry.jumpSessionIds;
@@ -88,6 +94,7 @@ export function retrySession(id: string): void {
     return;
   }
   entry.attempt = 0;
+  entry.reconnecting = false;
   entry.passwords.clear();
   entry.authHostId = null;
   entry.passphrase = null;
@@ -167,7 +174,9 @@ export function endShell(id: string, error: string | null): void {
     return;
   }
   patchSession(id, { shellId: null, pendingCommand: null });
-  fail(entry, error === null || error.length === 0 ? 'user' : 'ChannelClosed');
+  fail(entry, error === null || error.length === 0 ? 'user' : 'ChannelClosed', {
+    origin: 'session',
+  });
 }
 
 async function begin(entry: LiveSession): Promise<void> {

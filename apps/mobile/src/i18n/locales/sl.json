@@ -4561,6 +4561,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Možnosti SSH",
       "emptyTitle": "Ni še nobenega gostitelja",
       "emptyDescription": "Shranjeni gostitelji odprejo terminal na vašem strežniku.",
       "addHost": "Dodaj gostitelja",
@@ -4717,6 +4718,51 @@
       "createdTitle": "Ključ je ustvarjen",
       "createdDescription": "Dodaj ta javni ključ v datoteko authorized_keys na strežniku in se nato poveži s tem ključem.",
       "copyPublicKey": "Kopiraj ključ"
+    },
+    "backup": {
+      "exportTitle": "Izvozi šifrirano varnostno kopijo",
+      "importTitle": "Uvozi šifrirano varnostno kopijo",
+      "exportDescription": "Vse spodaj je šifrirano z vašim geslom za ključ. Hranite ga ločeno; ni ga mogoče obnoviti.",
+      "importDescription": "Odprite varnostno kopijo Kilo SSH, da pregledate njeno vsebino pred uvozom.",
+      "noFile": "Ni izbrane datoteke varnostne kopije",
+      "confirmPassphrase": "Potrdi geslo za ključ",
+      "strengthShort": "Uporabite vsaj 8 znakov",
+      "strengthGood": "Dobra dolžina · 12 ali več znakov je varnejše",
+      "strengthLong": "Dolgo geslo za ključ · shranite ga na varno mesto",
+      "mismatch": "Gesli za ključ se ne ujemata.",
+      "share": "Šifriraj in deli",
+      "unlock": "Odkleni varnostno kopijo",
+      "apply": "Uvozi varnostno kopijo",
+      "mergeStrategy": "Preskoči dvojnike",
+      "mergeDescription": "Obstoječi gostitelji se ohranijo po oznaki, ključi po odtisu in znani gostitelji po vzorcu. Ustrezni odrezki in povezave preusmeritev se prav tako ohranijo.",
+      "conflicts": "Ohranjeno na tej napravi",
+      "outcomeTitle": "Rezultat uvoza",
+      "toSkip": "Za preskočitev",
+      "counts": {
+        "hosts": "Gostitelji SSH",
+        "keys": "Zasebni ključi",
+        "snippets": "Odrezki ukazov"
+      },
+      "wrongPassphrase": "To geslo za ključ ni odklenilo varnostne kopije. Poskusite znova.",
+      "invalidExport": "Ta datoteka ni varnostna kopija Kilo SSH. Izberite drugo datoteko.",
+      "fileError": "Varnostne kopije ni bilo mogoče prebrati.",
+      "storageError": "Varnostne kopije ni bilo mogoče shraniti. Ni bilo uvoženega ničesar.",
+      "unavailable": "Operacija šifrirane varnostne kopije ni uspela. Poskusite znova.",
+      "empty": "Ni ničesar za varnostno kopiranje",
+      "previewTitle": "Vsebina varnostne kopije",
+      "imported": "Varnostna kopija SSH je uvožena.",
+      "nothingNew": "Vse v tej varnostni kopiji je že na tej napravi."
+    },
+    "keyBar": {
+      "title": "Vrstica ključev",
+      "subtitle": "Povlecite ključ, da ga premaknete, ali ga izklopite, da ga skrijete.",
+      "editHint": "Dolgo pritisnite za izbiro in prerazporeditev ključev",
+      "restoreDefault": "Obnovi privzeto",
+      "moveUp": "Premakni {{label}} navzgor",
+      "moveDown": "Premakni {{label}} navzdol",
+      "show": "Prikaži {{label}}",
+      "keepOne": "Na vrstici ostane vsaj en ključ.",
+      "loadFailed": "Vrstice ključev ni bilo mogoče naložiti."
     },
     "sandbox": {
       "title": "Terminal",

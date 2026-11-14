@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Izinketho ze-SSH",
       "emptyTitle": "Awekho amahosthi okwamanje",
       "emptyDescription": "Amahosthi agciniwe avula itheminali kuseva lakho.",
       "addHost": "Engeza ihosthi",
@@ -4587,6 +4588,51 @@
       "createdTitle": "Ukhiye udaliwe",
       "createdDescription": "Engeza lo khiye womphakathi ku-authorized_keys yeseva, bese uxhuma ngalo khiye.",
       "copyPublicKey": "Kopisha ukhiye"
+    },
+    "backup": {
+      "exportTitle": "Khipha isipele esibethelwe",
+      "importTitle": "Ngenisa isipele esibethelwe",
+      "exportDescription": "Konke okungezansi kubethelwe ngephasiwedi yakho yokhiye. Yigcine ngokwahlukile; ngeke ikwazi ukubuyiselwa.",
+      "importDescription": "Vula isipele se-SSH sakwa-Kilo ukuze uhlole okuqukethwe kwaso ngaphambi kokungenisa.",
+      "noFile": "Alikho ifayela lesipele elikhethiwe",
+      "confirmPassphrase": "Qinisekisa iphasiwedi yokhiye",
+      "strengthShort": "Sebenzisa okungenani izinhlamvu eziyi-8",
+      "strengthGood": "Ubude obuhle · izinhlamvu eziyi-12 noma ngaphezulu ziphephe kakhulu",
+      "strengthLong": "Iphasiwedi yokhiye ende · yigcine endaweni ephephile",
+      "mismatch": "Amaphasiwedi okhiye awafani.",
+      "share": "Bethela futhi wabelane",
+      "unlock": "Vula isipele",
+      "apply": "Ngenisa isipele",
+      "mergeStrategy": "Yeqa okuphindayo",
+      "mergeDescription": "Gcina amahosthi akhona ngokwelebula, okhiye ngeFingerprint, futhi ugcine amahosthi aziwayo ngephethini. Iziqeshana ezihambisanayo nezibopho zamafowodi nakho kuyagcinwa.",
+      "conflicts": "Kugcinwe kule divayisi",
+      "outcomeTitle": "Umphumela wokungenisa",
+      "toSkip": "Okuzoyeqwa",
+      "counts": {
+        "hosts": "Amahosthi e-SSH",
+        "keys": "Okhiye abayimfihlo",
+        "snippets": "Iziqeshana zemiyalo"
+      },
+      "wrongPassphrase": "Leyo phasiwedi yokhiye ayivulanga isipele. Zama futhi.",
+      "invalidExport": "Leli fayela akulona isipele se-SSH sakwa-Kilo. Khetha elinye ifayela.",
+      "fileError": "Ifayela lesipele alikwazanga ukufundwa.",
+      "storageError": "Isipele asikwazanga ukulondolozwa. Akukho okungenisiwe.",
+      "unavailable": "Umsebenzi wesipele esibethelwe wehlulekile. Zama futhi.",
+      "empty": "Akukho okufanele kufakwe esipele",
+      "previewTitle": "Okuqukethwe kwesipele",
+      "imported": "Isipele se-SSH singenisiwe.",
+      "nothingNew": "Konke okukulesi sipele sekukhona kule divayisi."
+    },
+    "keyBar": {
+      "title": "Ibha yokhiye",
+      "subtitle": "Hudula ukhiye ukuze uwuhambise, noma uwucime ukuze uwufihle.",
+      "editHint": "Cindezela isikhathi eside ukuze ukhethe futhi uhlele kabusha okhiye",
+      "restoreDefault": "Buyisela okuzenzakalelayo",
+      "moveUp": "Hambisa {{label}} phezulu",
+      "moveDown": "Hambisa {{label}} phansi",
+      "show": "Bonisa {{label}}",
+      "keepOne": "Okungenani ukhiye oyedwa uhlala kubha.",
+      "loadFailed": "Ibha yokhiye ayikwazanga ukulayishwa."
     },
     "sandbox": {
       "title": "Ithembinali",

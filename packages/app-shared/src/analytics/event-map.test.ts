@@ -33,6 +33,18 @@ import {
   SESSION_CREATED_EVENT,
   SESSION_CREATE_SETTLED_EVENT,
   SESSION_VIEWED_EVENT,
+  SSH_CONNECT_FAILED_EVENT,
+  SSH_CONNECT_SUCCEEDED_EVENT,
+  SSH_EXPORT_EVENT,
+  SSH_FAILURE_CATEGORIES,
+  SSH_FORWARD_DIRECTIONS,
+  SSH_FORWARD_FAILED_EVENT,
+  SSH_FORWARD_STARTED_EVENT,
+  SSH_IMPORT_EVENT,
+  SSH_RECONNECT_EVENT,
+  SSH_RECONNECT_OUTCOMES,
+  SSH_SANDBOX_TERMINAL_EVENT,
+  SSH_SFTP_TRANSFER_EVENT,
   TERMINAL_PHASE_EVENTS,
   type AcceptedPhaseEventName,
   type TerminalOutcomeEventName,
@@ -59,6 +71,15 @@ const ALL_EVENT_CONSTANTS = [
   NOTIFICATION_PERMISSION_RESPONDED_EVENT,
   NOTIFICATION_TOKEN_UPDATED_EVENT,
   ORGANIZATION_MEMBER_JOINED_EVENT,
+  SSH_CONNECT_SUCCEEDED_EVENT,
+  SSH_CONNECT_FAILED_EVENT,
+  SSH_RECONNECT_EVENT,
+  SSH_SFTP_TRANSFER_EVENT,
+  SSH_FORWARD_STARTED_EVENT,
+  SSH_FORWARD_FAILED_EVENT,
+  SSH_EXPORT_EVENT,
+  SSH_IMPORT_EVENT,
+  SSH_SANDBOX_TERMINAL_EVENT,
   SESSION_CREATE_SETTLED_EVENT,
   PR_OPERATION_SETTLED_EVENT,
   SECURITY_COMMAND_SETTLED_EVENT,
@@ -296,6 +317,103 @@ describe('organization_member_joined role schema', () => {
   });
 });
 
+describe('SSH client schemas', () => {
+  const sshEvents = [
+    SSH_CONNECT_SUCCEEDED_EVENT,
+    SSH_CONNECT_FAILED_EVENT,
+    SSH_RECONNECT_EVENT,
+    SSH_SFTP_TRANSFER_EVENT,
+    SSH_FORWARD_STARTED_EVENT,
+    SSH_FORWARD_FAILED_EVENT,
+    SSH_EXPORT_EVENT,
+    SSH_IMPORT_EVENT,
+    SSH_SANDBOX_TERMINAL_EVENT,
+  ] as const;
+
+  it('accepts the allowlisted payload for every event', () => {
+    expect(
+      ANALYTICS_EVENT_SCHEMAS[SSH_CONNECT_SUCCEEDED_EVENT].safeParse({
+        category: 'none',
+        authMethod: 'key',
+      }).success
+    ).toBe(true);
+    expect(
+      ANALYTICS_EVENT_SCHEMAS[SSH_CONNECT_FAILED_EVENT].safeParse({
+        category: 'auth_failed',
+        authMethod: 'password',
+      }).success
+    ).toBe(true);
+    expect(
+      ANALYTICS_EVENT_SCHEMAS[SSH_RECONNECT_EVENT].safeParse({ outcome: 'succeeded' }).success
+    ).toBe(true);
+    expect(
+      ANALYTICS_EVENT_SCHEMAS[SSH_SFTP_TRANSFER_EVENT].safeParse({
+        direction: 'upload',
+        outcome: 'failed',
+        category: 'permission_denied',
+      }).success
+    ).toBe(true);
+    expect(
+      ANALYTICS_EVENT_SCHEMAS[SSH_FORWARD_STARTED_EVENT].safeParse({
+        direction: 'local',
+        category: 'none',
+      }).success
+    ).toBe(true);
+    expect(
+      ANALYTICS_EVENT_SCHEMAS[SSH_FORWARD_FAILED_EVENT].safeParse({
+        direction: 'remote',
+        category: 'forwarding',
+      }).success
+    ).toBe(true);
+    expect(
+      ANALYTICS_EVENT_SCHEMAS[SSH_EXPORT_EVENT].safeParse({
+        outcome: 'completed',
+        category: 'none',
+      }).success
+    ).toBe(true);
+    expect(
+      ANALYTICS_EVENT_SCHEMAS[SSH_IMPORT_EVENT].safeParse({
+        outcome: 'failed',
+        category: 'invalid_export',
+      }).success
+    ).toBe(true);
+    expect(
+      ANALYTICS_EVENT_SCHEMAS[SSH_SANDBOX_TERMINAL_EVENT].safeParse({ outcome: 'connected' })
+        .success
+    ).toBe(true);
+  });
+
+  it('cannot carry free text in any property', () => {
+    const freeText = 'user@host:/home/user cat secrets';
+    for (const name of sshEvents) {
+      const schema = ANALYTICS_EVENT_SCHEMAS[name];
+      const shape = (defOf(schema).shape ?? {}) as Record<string, z.ZodType>;
+      const valid = Object.fromEntries(
+        Object.entries(shape).map(([key, value]) => [key, sampleValue(value)])
+      );
+      expect(schema.safeParse(valid).success, `${name} valid payload`).toBe(true);
+      for (const key of Object.keys(shape)) {
+        expect(
+          schema.safeParse({ ...valid, [key]: freeText }).success,
+          `${name}.${key} must reject free text`
+        ).toBe(false);
+      }
+      for (const extra of ['host', 'username', 'path', 'command']) {
+        expect(
+          schema.safeParse({ ...valid, [extra]: freeText }).success,
+          `${name}.${extra} must be unknown`
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('keeps every SSH enum closed to the shared allowlists', () => {
+    expect(new Set(SSH_FAILURE_CATEGORIES).size).toBe(SSH_FAILURE_CATEGORIES.length);
+    expect(new Set(SSH_RECONNECT_OUTCOMES).size).toBe(SSH_RECONNECT_OUTCOMES.length);
+    expect(new Set(SSH_FORWARD_DIRECTIONS)).toEqual(new Set(['local', 'remote']));
+  });
+});
+
 describe('app_startup validation', () => {
   const startupSchema = ANALYTICS_EVENT_SCHEMAS[APP_STARTUP_EVENT];
 
@@ -430,6 +548,8 @@ describe('privacy deny-list', () => {
       'event_uuid',
       'Event_UUID',
       'eventUuid',
+      'authMethod',
+      'auth_method',
     ]) {
       expect(isProhibitedPropertyKey(key), key).toBe(false);
     }

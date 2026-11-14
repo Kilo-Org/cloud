@@ -4496,6 +4496,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Opțiuni SSH",
       "emptyTitle": "Încă nu există gazde",
       "emptyDescription": "Gazdele salvate deschid un terminal pe serverul tău.",
       "addHost": "Adaugă gazdă",
@@ -4652,6 +4653,51 @@
       "createdTitle": "Cheie creată",
       "createdDescription": "Adaugă această cheie publică la authorized_keys ale serverului, apoi conectează-te folosind această cheie.",
       "copyPublicKey": "Copiază cheia"
+    },
+    "backup": {
+      "exportTitle": "Exportă backup criptat",
+      "importTitle": "Importă backup criptat",
+      "exportDescription": "Tot ce se află mai jos este criptat cu fraza ta de acces. Păstreaz-o separat; nu poate fi recuperată.",
+      "importDescription": "Deschide un backup SSH Kilo pentru a-i verifica conținutul înainte de import.",
+      "noFile": "Niciun fișier de backup selectat",
+      "confirmPassphrase": "Confirmă fraza de acces",
+      "strengthShort": "Folosește cel puțin 8 caractere",
+      "strengthGood": "Lungime bună · 12 sau mai multe caractere oferă mai multă siguranță",
+      "strengthLong": "Frază de acces lungă · păstreaz-o într-un loc sigur",
+      "mismatch": "Frazele de acces nu se potrivesc.",
+      "share": "Criptează și partajează",
+      "unlock": "Deblochează backupul",
+      "apply": "Importă backupul",
+      "mergeStrategy": "Omite duplicatele",
+      "mergeDescription": "Păstrează gazdele existente după etichetă, cheile după amprentă și gazdele cunoscute după model. Snippeturile și legăturile de redirecționare care corespund sunt, de asemenea, păstrate.",
+      "conflicts": "Păstrate pe acest dispozitiv",
+      "outcomeTitle": "Rezultatul importului",
+      "toSkip": "De omis",
+      "counts": {
+        "hosts": "Gazde SSH",
+        "keys": "Chei private",
+        "snippets": "Snippeturi de comenzi"
+      },
+      "wrongPassphrase": "Acea frază de acces nu a deblocat backupul. Încearcă din nou.",
+      "invalidExport": "Acest fișier nu este un backup SSH Kilo. Alege alt fișier.",
+      "fileError": "Fișierul de backup nu a putut fi citit.",
+      "storageError": "Backupul nu a putut fi salvat. Nu a fost importat nimic.",
+      "unavailable": "Operațiunea de backup criptat a eșuat. Încearcă din nou.",
+      "empty": "Nimic de salvat în backup",
+      "previewTitle": "Conținutul backupului",
+      "imported": "Backupul SSH a fost importat.",
+      "nothingNew": "Tot ce se află în acest backup este deja pe acest dispozitiv."
+    },
+    "keyBar": {
+      "title": "Bară de chei",
+      "subtitle": "Trage o cheie pentru a o muta sau dezactiveaz-o pentru a o ascunde.",
+      "editHint": "Apasă lung pentru a alege și reordona cheile",
+      "restoreDefault": "Restaurează valorile implicite",
+      "moveUp": "Mută {{label}} în sus",
+      "moveDown": "Mută {{label}} în jos",
+      "show": "Afișează {{label}}",
+      "keepOne": "Cel puțin o cheie rămâne pe bară.",
+      "loadFailed": "Bara de chei nu a putut fi încărcată."
     },
     "sandbox": {
       "title": "Terminal",

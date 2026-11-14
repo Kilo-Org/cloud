@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Opcións de SSH",
       "emptyTitle": "Aínda non hai hosts",
       "emptyDescription": "Os servidores gardados abren un terminal no teu servidor.",
       "addHost": "Engadir host",
@@ -4587,6 +4588,51 @@
       "createdTitle": "Chave creada",
       "createdDescription": "Engade esta chave pública ao authorized_keys do servidor e despois conéctate con esta chave.",
       "copyPublicKey": "Copiar chave"
+    },
+    "backup": {
+      "exportTitle": "Exportar copia de seguranza cifrada",
+      "importTitle": "Importar copia de seguranza cifrada",
+      "exportDescription": "Todo o que aparece a continuación está cifrado coa túa frase de paso. Gárdaa por separado; non se pode recuperar.",
+      "importDescription": "Abre unha copia de seguranza SSH de Kilo para revisar o seu contido antes de importar.",
+      "noFile": "Ningún ficheiro de copia de seguranza seleccionado",
+      "confirmPassphrase": "Confirmar frase de paso",
+      "strengthShort": "Usa polo menos 8 caracteres",
+      "strengthGood": "Boa lonxitude · 12 ou máis caracteres é máis seguro",
+      "strengthLong": "Frase de paso longa · gárdaa nun lugar seguro",
+      "mismatch": "As frases de paso non coinciden.",
+      "share": "Cifrar e compartir",
+      "unlock": "Desbloquear copia de seguranza",
+      "apply": "Importar copia de seguranza",
+      "mergeStrategy": "Omitir duplicados",
+      "mergeDescription": "Mantéñense os hosts existentes por etiqueta, as chaves por impresión dixital e os hosts coñecidos por patrón. Tamén se manteñen os fragmentos e as vinculacións de reenvío coincidentes.",
+      "conflicts": "Mantidos neste dispositivo",
+      "outcomeTitle": "Resultado da importación",
+      "toSkip": "Para omitir",
+      "counts": {
+        "hosts": "Hosts SSH",
+        "keys": "Chaves privadas",
+        "snippets": "Fragmentos de comandos"
+      },
+      "wrongPassphrase": "Esa frase de paso non desbloqueou a copia de seguranza. Téntao de novo.",
+      "invalidExport": "Este ficheiro non é unha copia de seguranza SSH de Kilo. Escolle outro ficheiro.",
+      "fileError": "Non se puido ler o ficheiro de copia de seguranza.",
+      "storageError": "Non se puido gardar a copia de seguranza. Non se importou nada.",
+      "unavailable": "A operación de copia de seguranza cifrada fallou. Téntao de novo.",
+      "empty": "Non hai nada que copiar",
+      "previewTitle": "Contido da copia de seguranza",
+      "imported": "Copia de seguranza SSH importada.",
+      "nothingNew": "Todo o que hai nesta copia de seguranza xa está neste dispositivo."
+    },
+    "keyBar": {
+      "title": "Barra de chaves",
+      "subtitle": "Arrastra unha chave para movela ou desactívaa para ocultala.",
+      "editHint": "Mantén premido para escoller e reordenar as chaves",
+      "restoreDefault": "Restaurar predeterminado",
+      "moveUp": "Mover {{label}} cara arriba",
+      "moveDown": "Mover {{label}} cara abaixo",
+      "show": "Mostrar {{label}}",
+      "keepOne": "Polo menos unha chave permanece na barra.",
+      "loadFailed": "Non se puido cargar a barra de chaves."
     },
     "sandbox": {
       "title": "Terminal",

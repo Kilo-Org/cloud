@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Filannoo SSH",
       "emptyTitle": "Hostiin hin jiru",
       "emptyDescription": "Hostiiwwan kuufaman terminaalii sarvara kee irratti banu.",
       "addHost": "Hostii dabali",
@@ -4587,6 +4588,51 @@
       "createdTitle": "Furtuun uumame",
       "createdDescription": "Furtuu uummataa kana authorized_keys sirbaa keessatti dabali, ergasii furtuu kanaan walqunnami.",
       "copyPublicKey": "Furtuu garagalchi"
+    },
+    "backup": {
+      "exportTitle": "Kuusaa icceeffame baasi",
+      "importTitle": "Kuusaa icceeffame galchi",
+      "exportDescription": "Wanti armaan gadii hundi jecha icciitii keetiin icceeffameera. Isaa addatti qabi; deebisuu hin danda'amu.",
+      "importDescription": "Kuusaa SSH Kilo galchuu dura qabiyyee isaa ilaaluuf bani.",
+      "noFile": "Faayiliin kuusaa filatame hin jiru",
+      "confirmPassphrase": "Jecha icciitii mirkaneessi",
+      "strengthShort": "Yoo xiqqaate qubee 8 fayyadami",
+      "strengthGood": "Dheerinni gaarii · qubee 12 ykn isaa ol caalaa nagaa qabu",
+      "strengthLong": "Jecha icciitii dheeraa · bakka nagaa ta'etti qabi",
+      "mismatch": "Jechoonni icciitii wal hin fudhatu.",
+      "share": "Icceessii qoodi",
+      "unlock": "Kuusaa bani",
+      "apply": "Kuusaa galchi",
+      "mergeStrategy": "Walfaakkaattoota darbi",
+      "mergeDescription": "Hostoota jiran labeliin, furtuuwwan mallattoo qubaaniin fi hostoota beekaman patterniin qabi. Snippiiwwan fi hidhaawwan dabarsaa wal fakkaatanis ni qabama.",
+      "conflicts": "Meeshaa kana irratti qabame",
+      "outcomeTitle": "Bu'aa galchuu",
+      "toSkip": "Kan darbamu",
+      "counts": {
+        "hosts": "Hostoota SSH",
+        "keys": "Furtuuwwan dhuunfaa",
+        "snippets": "Snippiiwwan ajajaa"
+      },
+      "wrongPassphrase": "Jechi icciitii sanaa kuusaa sana hin banne. Irra deebi'ii yaali.",
+      "invalidExport": "Faayiliin kun kuusaa SSH Kilo hin ta'e. Faayilii biraa filadhu.",
+      "fileError": "Faayiliin kuusaa dubbifamuu hin dandeenye.",
+      "storageError": "Kuusaan kuufamuu hin dandeenye. Wanti tokko hin galchamne.",
+      "unavailable": "Hojiin kuusaa icceeffame hin milkoofne. Irra deebi'ii yaali.",
+      "empty": "Kuusuuf wanti hin jiru",
+      "previewTitle": "Qabiyyee kuusaa",
+      "imported": "Kuusaan SSH galchame.",
+      "nothingNew": "Wanti kuusaa kana keessa jiru hundi duraanuu meeshaa kana irratti jira."
+    },
+    "keyBar": {
+      "title": "Bar furtuu",
+      "subtitle": "Furtuu harkisii sochoosi, ykn dhoksuuf dhaamsi.",
+      "editHint": "Furtuu filachuuf fi tartiiba jijjiiruuf dheeraasii tuqi",
+      "restoreDefault": "Idilee deebisi",
+      "moveUp": "{{label}} ol sochoosi",
+      "moveDown": "{{label}} gadi sochoosi",
+      "show": "{{label}} agarsiisi",
+      "keepOne": "Yoo xiqqaate furtuun tokko bar irratti hafa.",
+      "loadFailed": "Barri furtuu fe'amuu hin dandeenye."
     },
     "sandbox": {
       "title": "Terminaalii",

@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Kōwhiringa SSH",
       "emptyTitle": "Kāore anō he pou",
       "emptyDescription": "Ka whakatuwheratia e ngā pou kua tiakina he tāminara ki tō tūmau.",
       "addHost": "Tāpiri pou",
@@ -4587,6 +4588,51 @@
       "createdTitle": "Kua hangaia te kī",
       "createdDescription": "Tāpiritia tēnei kī tūmatanui ki te authorized_keys o te tūmau, kātahi ka hono atu mā tēnei kī.",
       "copyPublicKey": "Kopea te kī"
+    },
+    "backup": {
+      "exportTitle": "Kaweake pēke whakamuna",
+      "importTitle": "Kawemai pēke whakamuna",
+      "exportDescription": "Ka whakamunatia ngā mea katoa o raro ake nei ki tō kupuhipa kī. Tiakina ki tētahi wāhi kē; kāore e taea te whakaora.",
+      "importDescription": "Whakatuwheratia tētahi pēke SSH o Kilo kia arotake i ōna ihirangi i mua i te kawemai.",
+      "noFile": "Kāore he kōnae pēke i tōkongia",
+      "confirmPassphrase": "Whakaūngia te kupuhipa kī",
+      "strengthShort": "Whakamahia kia 8 pūāhua neke atu",
+      "strengthGood": "He roa pai · he haumaru ake mēnā 12 pūāhua neke atu",
+      "strengthLong": "Kupuhipa kī roa · tiakina ki tētahi wāhi haumaru",
+      "mismatch": "Kāore ngā kupuhipa kī e ōrite ana.",
+      "share": "Whakamuna, tohatoha hoki",
+      "unlock": "Wetewhate pēke",
+      "apply": "Kawemai pēke",
+      "mergeStrategy": "Tungā ngā tāruarua",
+      "mergeDescription": "Ka tiakina ngā pou o nāianei mā te tapanga, ngā kī mā te tāmatimati, me ngā pou mōhiotia mā te tauira. Ka tiakina hoki ngā maramara me ngā hononga whakamua e hāngai ana.",
+      "conflicts": "Kua tiakina ki tēnei pūrere",
+      "outcomeTitle": "Hua o te kawemai",
+      "toSkip": "Hei tungā",
+      "counts": {
+        "hosts": "Pou SSH",
+        "keys": "Kī tūmataiti",
+        "snippets": "Maramara whakahau"
+      },
+      "wrongPassphrase": "Kāore taua kupuhipa kī i wetewhate i te pēke. Whakamātau anō.",
+      "invalidExport": "Ehara tēnei kōnae i tētahi pēke SSH o Kilo. Kōwhiria tētahi atu kōnae.",
+      "fileError": "Kāore i taea te pānui i te kōnae pēke.",
+      "storageError": "Kāore i taea te tiaki i te pēke. Kāore he mea i kawemai.",
+      "unavailable": "I rahua te mahi pēke whakamuna. Whakamātau anō.",
+      "empty": "Kāore he mea hei pēke",
+      "previewTitle": "Ihirangi pēke",
+      "imported": "Kua kawemai te pēke SSH.",
+      "nothingNew": "Kei tēnei pūrere kē ngā mea katoa o tēnei pēke."
+    },
+    "keyBar": {
+      "title": "Pae kī",
+      "subtitle": "Tōia tētahi kī kia nekehia, whakawetohia rānei kia huna.",
+      "editHint": "Pēhia roatia hei kōwhiri, hei whakaraupapa anō hoki i ngā kī",
+      "restoreDefault": "Whakahoki ki te taunoa",
+      "moveUp": "Nekehia a {{label}} ki runga",
+      "moveDown": "Nekehia a {{label}} ki raro",
+      "show": "Whakaaturia a {{label}}",
+      "keepOne": "Me noho tonu kia kotahi te kī ki runga i te pae.",
+      "loadFailed": "Kāore i taea te uta i te pae kī."
     },
     "sandbox": {
       "title": "Tāminara",

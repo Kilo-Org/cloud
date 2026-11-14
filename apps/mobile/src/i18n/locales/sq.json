@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Opsionet SSH",
       "emptyTitle": "Nuk ka ende hoste",
       "emptyDescription": "Pritësit e ruajtur hapin një terminal në serverin tuaj.",
       "addHost": "Shto host",
@@ -4587,6 +4588,51 @@
       "createdTitle": "Çelësi u krijua",
       "createdDescription": "Shto këtë çelës publik në authorized_keys të serverit, më pas lidhu me këtë çelës.",
       "copyPublicKey": "Kopjo çelësin"
+    },
+    "backup": {
+      "exportTitle": "Eksporto kopje rezervë të kriptuar",
+      "importTitle": "Importo kopje rezervë të kriptuar",
+      "exportDescription": "Gjithçka më poshtë kriptohet me frazëkalimin tënd. Mbaje veçmas; nuk mund të rikuperohet.",
+      "importDescription": "Hap një kopje rezervë Kilo SSH për të rishikuar përmbajtjen e saj përpara importimit.",
+      "noFile": "Nuk është zgjedhur asnjë skedar kopje rezervë",
+      "confirmPassphrase": "Konfirmo frazëkalimin",
+      "strengthShort": "Përdor të paktën 8 karaktere",
+      "strengthGood": "Gjatësi e mirë · 12 ose më shumë karaktere është më e sigurt",
+      "strengthLong": "Frazëkalim i gjatë · mbaje në një vend të sigurt",
+      "mismatch": "Frazëkalimet nuk përputhen.",
+      "share": "Kripto dhe ndaj",
+      "unlock": "Zhblloko kopjen rezervë",
+      "apply": "Importo kopjen rezervë",
+      "mergeStrategy": "Anashkalo dublikatat",
+      "mergeDescription": "Mbaji hostet ekzistues sipas etiketës, çelësat sipas gjurmës së gishtash dhe hostet e njohur sipas modelit. Snippet-et dhe lidhjet e përcjelljes që përputhen mbaben gjithashtu.",
+      "conflicts": "Të mbajtura në këtë pajisje",
+      "outcomeTitle": "Rezultati i importimit",
+      "toSkip": "Për t'u anashkaluar",
+      "counts": {
+        "hosts": "Hoste SSH",
+        "keys": "Çelësa privatë",
+        "snippets": "Snippet-e komandash"
+      },
+      "wrongPassphrase": "Ai frazëkalim nuk e zhbllokoi kopjen rezervë. Provo përsëri.",
+      "invalidExport": "Ky skedar nuk është një kopje rezervë Kilo SSH. Zgjidh një skedar tjetër.",
+      "fileError": "Skedari i kopjes rezervë nuk mund të lexohej.",
+      "storageError": "Kopja rezervë nuk mund të ruhej. Asgjë nuk u importua.",
+      "unavailable": "Operacioni i kopjes rezervë të kriptuar dështoi. Provo përsëri.",
+      "empty": "Asgjë për të rezervuar",
+      "previewTitle": "Përmbajtja e kopjes rezervë",
+      "imported": "Kopja rezervë SSH u importua.",
+      "nothingNew": "Gjithçka në këtë kopje rezervë është tashmë në këtë pajisje."
+    },
+    "keyBar": {
+      "title": "Shiriti i çelësave",
+      "subtitle": "Tërhiq një çelës për ta lëvizur, ose fike për ta fshehur.",
+      "editHint": "Shtyp gjatë për të zgjedhur dhe rirenditur çelësat",
+      "restoreDefault": "Rikthe parazgjedhjen",
+      "moveUp": "Lëviz {{label}} lart",
+      "moveDown": "Lëviz {{label}} poshtë",
+      "show": "Shfaq {{label}}",
+      "keepOne": "Të paktën një çelës mbetet në shirit.",
+      "loadFailed": "Shiriti i çelësave nuk mund të ngarkohej."
     },
     "sandbox": {
       "title": "Terminal",

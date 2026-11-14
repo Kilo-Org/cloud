@@ -4502,6 +4502,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Opções SSH",
       "emptyTitle": "Ainda não há anfitriões",
       "emptyDescription": "Hosts salvos abrem um terminal no seu servidor.",
       "addHost": "Adicionar anfitrião",
@@ -4658,6 +4659,51 @@
       "createdTitle": "Chave criada",
       "createdDescription": "Adicione esta chave pública ao authorized_keys do servidor e, em seguida, ligue-se com esta chave.",
       "copyPublicKey": "Copiar chave"
+    },
+    "backup": {
+      "exportTitle": "Exportar cópia de segurança encriptada",
+      "importTitle": "Importar cópia de segurança encriptada",
+      "exportDescription": "Tudo o que está abaixo é encriptado com a sua frase-passe. Guarde-a separadamente; não é possível recuperá-la.",
+      "importDescription": "Abra uma cópia de segurança SSH do Kilo para rever o conteúdo antes de importar.",
+      "noFile": "Nenhum ficheiro de cópia de segurança selecionado",
+      "confirmPassphrase": "Confirmar frase-passe",
+      "strengthShort": "Use pelo menos 8 caracteres",
+      "strengthGood": "Bom comprimento · 12 ou mais caracteres é mais seguro",
+      "strengthLong": "Frase-passe longa · guarde-a num local seguro",
+      "mismatch": "As frases-passe não coincidem.",
+      "share": "Encriptar e partilhar",
+      "unlock": "Desbloquear cópia de segurança",
+      "apply": "Importar cópia de segurança",
+      "mergeStrategy": "Ignorar duplicados",
+      "mergeDescription": "Manter os anfitriões existentes por etiqueta, as chaves por impressão digital e os anfitriões conhecidos por padrão. Os comandos guardados e as associações de reencaminhamento correspondentes também são mantidos.",
+      "conflicts": "Mantidos neste dispositivo",
+      "outcomeTitle": "Resultado da importação",
+      "toSkip": "A ignorar",
+      "counts": {
+        "hosts": "Anfitriões SSH",
+        "keys": "Chaves privadas",
+        "snippets": "Comandos guardados"
+      },
+      "wrongPassphrase": "Essa frase-passe não desbloqueou a cópia de segurança. Tente novamente.",
+      "invalidExport": "Este ficheiro não é uma cópia de segurança SSH do Kilo. Escolha outro ficheiro.",
+      "fileError": "Não foi possível ler o ficheiro de cópia de segurança.",
+      "storageError": "Não foi possível guardar a cópia de segurança. Não foi importado nada.",
+      "unavailable": "A operação de cópia de segurança encriptada falhou. Tente novamente.",
+      "empty": "Nada para salvaguardar",
+      "previewTitle": "Conteúdo da cópia de segurança",
+      "imported": "Cópia de segurança SSH importada.",
+      "nothingNew": "Tudo nesta cópia de segurança já está neste dispositivo."
+    },
+    "keyBar": {
+      "title": "Barra de chaves",
+      "subtitle": "Arraste uma chave para a mover ou desative-a para a ocultar.",
+      "editHint": "Prima sem soltar para escolher e reordenar as chaves",
+      "restoreDefault": "Repor predefinição",
+      "moveUp": "Mover {{label}} para cima",
+      "moveDown": "Mover {{label}} para baixo",
+      "show": "Mostrar {{label}}",
+      "keepOne": "Pelo menos uma chave permanece na barra.",
+      "loadFailed": "Não foi possível carregar a barra de chaves."
     },
     "sandbox": {
       "title": "Terminal",

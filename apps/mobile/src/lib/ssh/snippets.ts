@@ -35,7 +35,7 @@ const snippetFields = {
   sortOrder: z.number().int(),
 };
 
-const snippetInputSchema = z.object({
+export const snippetInputSchema = z.object({
   ...snippetFields,
   appendNewline: z.boolean().default(true),
   hostId: snippetFields.hostId.default(null),

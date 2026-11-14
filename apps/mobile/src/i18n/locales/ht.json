@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Opsyon SSH",
       "emptyTitle": "Poko gen ot",
       "emptyDescription": "Òt ki anrejistre yo ouvri yon tèminal sou sèvè w.",
       "addHost": "Ajoute ot",
@@ -4587,6 +4588,51 @@
       "createdTitle": "Kle kreye",
       "createdDescription": "Ajoute kle piblik sa a nan authorized_keys sèvè a, epi konekte ak kle sa a.",
       "copyPublicKey": "Kopye kle"
+    },
+    "backup": {
+      "exportTitle": "Ekspòte sovgad chifre",
+      "importTitle": "Enpòte sovgad chifre",
+      "exportDescription": "Tout bagay ki anba a chifre ak fraz modpas ou. Kenbe l apa; li pa ka rekipere.",
+      "importDescription": "Louvri yon sovgad Kilo SSH pou w revize kontni l anvan w enpòte.",
+      "noFile": "Pa gen fichye sovgad ki chwazi",
+      "confirmPassphrase": "Konfime fraz modpas",
+      "strengthShort": "Itilize omwen 8 karaktè",
+      "strengthGood": "Bon longè · 12 karaktè oswa plis se pi an sekirite",
+      "strengthLong": "Fraz modpas long · kenbe l yon kote ki an sekirite",
+      "mismatch": "Fraz modpas yo pa menm.",
+      "share": "Chifre epi pataje",
+      "unlock": "Debloke sovgad",
+      "apply": "Enpòte sovgad",
+      "mergeStrategy": "Sote doublon",
+      "mergeDescription": "Kenbe ot ki deja egziste yo dapre etikèt, kle dapre anprent ak ot yo konnen dapre modèl. Kòmand anrejistre ak redireksyon ki matche yo tou kenbe.",
+      "conflicts": "Kenbe sou aparèy sa a",
+      "outcomeTitle": "Rezilta enpòtasyon",
+      "toSkip": "Pou sote",
+      "counts": {
+        "hosts": "Ot SSH",
+        "keys": "Kle prive",
+        "snippets": "Kòmand anrejistre"
+      },
+      "wrongPassphrase": "Fraz modpas sa a pa t debloke sovgad la. Eseye ankò.",
+      "invalidExport": "Fichye sa a pa yon sovgad Kilo SSH. Chwazi yon lòt fichye.",
+      "fileError": "Fichye sovgad la pa t ka li.",
+      "storageError": "Sovgad la pa t ka anrejistre. Anyen pa t enpòte.",
+      "unavailable": "Operasyon sovgad chifre a echwe. Eseye ankò.",
+      "empty": "Anyen pou sovgade",
+      "previewTitle": "Kontni sovgad la",
+      "imported": "Sovgad SSH enpòte.",
+      "nothingNew": "Tout bagay nan sovgad sa a deja sou aparèy sa a."
+    },
+    "keyBar": {
+      "title": "Ba kle",
+      "subtitle": "Trennen yon kle pou w deplase l, oswa etenn li pou w kache l.",
+      "editHint": "Peze lontan pou w chwazi epi reòdone kle yo",
+      "restoreDefault": "Retabli pa defo",
+      "moveUp": "Deplase {{label}} an wo",
+      "moveDown": "Deplase {{label}} an ba",
+      "show": "Montre {{label}}",
+      "keepOne": "Omwen yon kle rete sou ba a.",
+      "loadFailed": "Ba kle a pa t ka chaje."
     },
     "sandbox": {
       "title": "Tèminal",

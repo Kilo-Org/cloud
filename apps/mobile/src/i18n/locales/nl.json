@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "SSH-opties",
       "emptyTitle": "Nog geen hosts",
       "emptyDescription": "Opgeslagen hosts openen een terminal op je server.",
       "addHost": "Host toevoegen",
@@ -4587,6 +4588,51 @@
       "createdTitle": "Sleutel aangemaakt",
       "createdDescription": "Voeg deze publieke sleutel toe aan de authorized_keys van de server en maak daarna verbinding met deze sleutel.",
       "copyPublicKey": "Sleutel kopiëren"
+    },
+    "backup": {
+      "exportTitle": "Versleutelde back-up exporteren",
+      "importTitle": "Versleutelde back-up importeren",
+      "exportDescription": "Alles hieronder wordt met je wachtwoordzin versleuteld. Bewaar hem apart; hij kan niet worden hersteld.",
+      "importDescription": "Open een Kilo SSH-back-up om de inhoud te controleren voordat je importeert.",
+      "noFile": "Geen back-upbestand geselecteerd",
+      "confirmPassphrase": "Wachtwoordzin bevestigen",
+      "strengthShort": "Gebruik minstens 8 tekens",
+      "strengthGood": "Goede lengte · 12 of meer tekens is veiliger",
+      "strengthLong": "Lange wachtwoordzin · bewaar hem ergens veilig",
+      "mismatch": "De wachtwoordzinnen komen niet overeen.",
+      "share": "Versleutelen en delen",
+      "unlock": "Back-up ontgrendelen",
+      "apply": "Back-up importeren",
+      "mergeStrategy": "Duplicaten overslaan",
+      "mergeDescription": "Bestaande hosts worden behouden op label, sleutels op vingerafdruk en bekende hosts op patroon. Overeenkomende snippets en doorschakelkoppelingen worden ook behouden.",
+      "conflicts": "Behouden op dit apparaat",
+      "outcomeTitle": "Resultaat van de import",
+      "toSkip": "Over te slaan",
+      "counts": {
+        "hosts": "SSH-hosts",
+        "keys": "Privésleutels",
+        "snippets": "Commando-snippets"
+      },
+      "wrongPassphrase": "Die wachtwoordzin heeft de back-up niet ontgrendeld. Probeer het opnieuw.",
+      "invalidExport": "Dit bestand is geen Kilo SSH-back-up. Kies een ander bestand.",
+      "fileError": "Het back-upbestand kon niet worden gelezen.",
+      "storageError": "De back-up kon niet worden opgeslagen. Er is niets geïmporteerd.",
+      "unavailable": "De versleutelde back-upbewerking is mislukt. Probeer het opnieuw.",
+      "empty": "Niets om een back-up van te maken",
+      "previewTitle": "Inhoud van de back-up",
+      "imported": "SSH-back-up geïmporteerd.",
+      "nothingNew": "Alles in deze back-up staat al op dit apparaat."
+    },
+    "keyBar": {
+      "title": "Sleutelbalk",
+      "subtitle": "Sleep een sleutel om hem te verplaatsen, of schakel hem uit om hem te verbergen.",
+      "editHint": "Houd ingedrukt om sleutels te kiezen en te herordenen",
+      "restoreDefault": "Standaard herstellen",
+      "moveUp": "{{label}} omhoog verplaatsen",
+      "moveDown": "{{label}} omlaag verplaatsen",
+      "show": "{{label}} tonen",
+      "keepOne": "Er blijft minstens één sleutel op de balk.",
+      "loadFailed": "De sleutelbalk kon niet worden geladen."
     },
     "sandbox": {
       "title": "Terminal",

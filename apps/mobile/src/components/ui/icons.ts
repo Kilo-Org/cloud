@@ -66,6 +66,7 @@ export { default as GitPullRequest } from 'lucide-react-native/icons/git-pull-re
 export { default as GitPullRequestClosed } from 'lucide-react-native/icons/git-pull-request-closed';
 export { default as GitPullRequestDraft } from 'lucide-react-native/icons/git-pull-request-draft';
 export { default as Globe } from 'lucide-react-native/icons/globe';
+export { default as GripVertical } from 'lucide-react-native/icons/grip-vertical';
 export { default as HelpCircle } from 'lucide-react-native/icons/circle-question-mark';
 export { default as History } from 'lucide-react-native/icons/rotate-ccw-clock';
 export { default as House } from 'lucide-react-native/icons/house';

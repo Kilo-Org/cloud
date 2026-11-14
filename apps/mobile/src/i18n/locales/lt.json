@@ -4561,6 +4561,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "SSH parinktys",
       "emptyTitle": "Kol kas nėra hostų",
       "emptyDescription": "Išsaugoti serveriai atidaro terminalą jūsų serveryje.",
       "addHost": "Pridėti hostą",
@@ -4717,6 +4718,51 @@
       "createdTitle": "Raktas sukurtas",
       "createdDescription": "Pridėkite šį viešąjį raktą prie serverio authorized_keys, tada prisijunkite su šiuo raktu.",
       "copyPublicKey": "Kopijuoti raktą"
+    },
+    "backup": {
+      "exportTitle": "Eksportuoti užšifruotą atsarginę kopiją",
+      "importTitle": "Importuoti užšifruotą atsarginę kopiją",
+      "exportDescription": "Viskas, kas pateikta žemiau, užšifruojama jūsų slaptąja fraze. Laikykite ją atskirai; jos atkurti negalima.",
+      "importDescription": "Atidarykite Kilo SSH atsarginę kopiją, kad peržiūrėtumėte jos turinį prieš importuodami.",
+      "noFile": "Nepasirinktas atsarginės kopijos failas",
+      "confirmPassphrase": "Patvirtinti slaptąją frazę",
+      "strengthShort": "Naudokite bent 8 simbolius",
+      "strengthGood": "Geras ilgis · 12 ar daugiau simbolių yra saugiau",
+      "strengthLong": "Ilga slaptoji frazė · laikykite ją saugioje vietoje",
+      "mismatch": "Slaptosios frazės nesutampa.",
+      "share": "Užšifruoti ir bendrinti",
+      "unlock": "Atrakinti atsarginę kopiją",
+      "apply": "Importuoti atsarginę kopiją",
+      "mergeStrategy": "Praleisti dublikatus",
+      "mergeDescription": "Esami hostai išsaugomi pagal žymą, raktai – pagal atspaudą, o žinomi hostai – pagal šabloną. Atitinkami fragmentai ir peradresavimų susiejimai taip pat išsaugomi.",
+      "conflicts": "Išsaugota šiame įrenginyje",
+      "outcomeTitle": "Importavimo rezultatas",
+      "toSkip": "Praleisti",
+      "counts": {
+        "hosts": "SSH hostai",
+        "keys": "Privatūs raktai",
+        "snippets": "Komandų fragmentai"
+      },
+      "wrongPassphrase": "Ši slaptoji frazė neatrakino atsarginės kopijos. Bandykite dar kartą.",
+      "invalidExport": "Šis failas nėra Kilo SSH atsarginė kopija. Pasirinkite kitą failą.",
+      "fileError": "Nepavyko perskaityti atsarginės kopijos failo.",
+      "storageError": "Nepavyko išsaugoti atsarginės kopijos. Nieko neimportuota.",
+      "unavailable": "Užšifruotos atsarginės kopijos operacija nepavyko. Bandykite dar kartą.",
+      "empty": "Nėra ko kurti atsarginės kopijos",
+      "previewTitle": "Atsarginės kopijos turinys",
+      "imported": "SSH atsarginė kopija importuota.",
+      "nothingNew": "Viskas šioje atsarginėje kopijoje jau yra šiame įrenginyje."
+    },
+    "keyBar": {
+      "title": "Raktų juosta",
+      "subtitle": "Vilkite raktą, kad jį perkeltumėte, arba išjunkite, kad jį paslėptumėte.",
+      "editHint": "Ilgai spauskite, kad pasirinktumėte ir pertvarkytumėte raktus",
+      "restoreDefault": "Atkurti numatytąjį",
+      "moveUp": "Perkelti {{label}} aukštyn",
+      "moveDown": "Perkelti {{label}} žemyn",
+      "show": "Rodyti {{label}}",
+      "keepOne": "Juostoje liks bent vienas raktas.",
+      "loadFailed": "Nepavyko įkelti raktų juostos."
     },
     "sandbox": {
       "title": "Terminalas",

@@ -3,6 +3,7 @@ import { clearFinishedTransfers, retryTransfer, startUpload, transfersSnapshot }
 const ssh = vi.hoisted(() => ({
   upload: vi.fn<(...args: unknown[]) => Promise<void>>(() => Promise.resolve()),
 }));
+vi.mock('@/lib/analytics/posthog', () => ({ captureEvent: vi.fn() }));
 vi.mock('../native', () => ({
   sshPackage: () => Promise.resolve(ssh),
   nativeErrorCode: () => 'Protocol',

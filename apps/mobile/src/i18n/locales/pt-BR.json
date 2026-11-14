@@ -4502,6 +4502,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Opções SSH",
       "emptyTitle": "Nenhum host ainda",
       "emptyDescription": "Hosts salvos abrem um terminal no seu servidor.",
       "addHost": "Adicionar host",
@@ -4658,6 +4659,51 @@
       "createdTitle": "Chave criada",
       "createdDescription": "Adicione esta chave pública ao authorized_keys do servidor e conecte-se com esta chave.",
       "copyPublicKey": "Copiar chave"
+    },
+    "backup": {
+      "exportTitle": "Exportar backup criptografado",
+      "importTitle": "Importar backup criptografado",
+      "exportDescription": "Tudo abaixo é criptografado com sua frase secreta. Guarde-a separadamente; ela não pode ser recuperada.",
+      "importDescription": "Abra um backup do Kilo SSH para revisar seu conteúdo antes de importar.",
+      "noFile": "Nenhum arquivo de backup selecionado",
+      "confirmPassphrase": "Confirmar frase secreta",
+      "strengthShort": "Use pelo menos 8 caracteres",
+      "strengthGood": "Bom comprimento · 12 ou mais caracteres é mais seguro",
+      "strengthLong": "Frase secreta longa · guarde-a em um lugar seguro",
+      "mismatch": "As frases secretas não coincidem.",
+      "share": "Criptografar e compartilhar",
+      "unlock": "Desbloquear backup",
+      "apply": "Importar backup",
+      "mergeStrategy": "Ignorar duplicados",
+      "mergeDescription": "Mantém hosts existentes por rótulo, chaves por impressão digital e hosts conhecidos pelo padrão. Snippets e vínculos de encaminhamento correspondentes também são mantidos.",
+      "conflicts": "Mantidos neste dispositivo",
+      "outcomeTitle": "Resultado da importação",
+      "toSkip": "Para ignorar",
+      "counts": {
+        "hosts": "Hosts SSH",
+        "keys": "Chaves privadas",
+        "snippets": "Snippets de comando"
+      },
+      "wrongPassphrase": "Essa frase secreta não desbloqueou o backup. Tente novamente.",
+      "invalidExport": "Este arquivo não é um backup do Kilo SSH. Escolha outro arquivo.",
+      "fileError": "Não foi possível ler o arquivo de backup.",
+      "storageError": "Não foi possível salvar o backup. Nada foi importado.",
+      "unavailable": "A operação de backup criptografado falhou. Tente novamente.",
+      "empty": "Nada para fazer backup",
+      "previewTitle": "Conteúdo do backup",
+      "imported": "Backup SSH importado.",
+      "nothingNew": "Tudo neste backup já está neste dispositivo."
+    },
+    "keyBar": {
+      "title": "Barra de chaves",
+      "subtitle": "Arraste uma chave para movê-la ou desative-a para ocultá-la.",
+      "editHint": "Mantenha pressionado para escolher e reordenar as chaves",
+      "restoreDefault": "Restaurar padrão",
+      "moveUp": "Mover {{label}} para cima",
+      "moveDown": "Mover {{label}} para baixo",
+      "show": "Mostrar {{label}}",
+      "keepOne": "Pelo menos uma chave permanece na barra.",
+      "loadFailed": "Não foi possível carregar a barra de chaves."
     },
     "sandbox": {
       "title": "Terminal",

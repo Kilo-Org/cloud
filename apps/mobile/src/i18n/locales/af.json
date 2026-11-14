@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "SSH-keuses",
       "emptyTitle": "Nog geen gashere nie",
       "emptyDescription": "Gestoorde gashere maak 'n terminaal op jou bediener oop.",
       "addHost": "Voeg gasheer by",
@@ -4587,6 +4588,51 @@
       "createdTitle": "Sleutel geskep",
       "createdDescription": "Voeg hierdie publieke sleutel by die bediener se authorized_keys, en verbind dan met hierdie sleutel.",
       "copyPublicKey": "Kopieer sleutel"
+    },
+    "backup": {
+      "exportTitle": "Voer geënkripteerde rugsteun uit",
+      "importTitle": "Voer geënkripteerde rugsteun in",
+      "exportDescription": "Alles hieronder word met jou wagfrase geënkripteer. Hou dit apart; dit kan nie herwin word nie.",
+      "importDescription": "Maak 'n Kilo SSH-rugsteun oop om die inhoud daarvan na te gaan voordat jy dit invoer.",
+      "noFile": "Geen rugsteunlêer gekies nie",
+      "confirmPassphrase": "Bevestig wagfrase",
+      "strengthShort": "Gebruik ten minste 8 karakters",
+      "strengthGood": "Goeie lengte · 12 of meer karakters is veiliger",
+      "strengthLong": "Lang wagfrase · hou dit op 'n veilige plek",
+      "mismatch": "Die wagfrases stem nie ooreen nie.",
+      "share": "Enkripteer en deel",
+      "unlock": "Ontsluit rugsteun",
+      "apply": "Voer rugsteun in",
+      "mergeStrategy": "Slaan duplikate oor",
+      "mergeDescription": "Hou bestaande gashere volgens etiket, sleutels volgens vingerafdruk en bekende gashere volgens patroon. Ooreenstemmende brokkies en oordragbindings word ook behou.",
+      "conflicts": "Op hierdie toestel behou",
+      "outcomeTitle": "Invoeruitkoms",
+      "toSkip": "Om oor te slaan",
+      "counts": {
+        "hosts": "SSH-gashere",
+        "keys": "Private sleutels",
+        "snippets": "Opdragbrokkies"
+      },
+      "wrongPassphrase": "Daardie wagfrase het nie die rugsteun ontsluit nie. Probeer weer.",
+      "invalidExport": "Hierdie lêer is nie 'n Kilo SSH-rugsteun nie. Kies 'n ander lêer.",
+      "fileError": "Die rugsteunlêer kon nie gelees word nie.",
+      "storageError": "Die rugsteun kon nie gestoor word nie. Niks is ingevoer nie.",
+      "unavailable": "Die geënkripteerde rugsteunbewerking het misluk. Probeer weer.",
+      "empty": "Niks om te rugsteun nie",
+      "previewTitle": "Rugsteuninhoud",
+      "imported": "SSH-rugsteun ingevoer.",
+      "nothingNew": "Alles in hierdie rugsteun is reeds op hierdie toestel."
+    },
+    "keyBar": {
+      "title": "Sleutelbalk",
+      "subtitle": "Sleep 'n sleutel om dit te skuif, of skakel dit af om dit te versteek.",
+      "editHint": "Druk lank om sleutels te kies en te herrangskik",
+      "restoreDefault": "Herstel verstek",
+      "moveUp": "Skuif {{label}} op",
+      "moveDown": "Skuif {{label}} af",
+      "show": "Wys {{label}}",
+      "keepOne": "Ten minste een sleutel bly op die balk.",
+      "loadFailed": "Die sleutelbalk kon nie gelaai word nie."
     },
     "sandbox": {
       "title": "Terminaal",

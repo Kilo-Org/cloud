@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Tùy chọn SSH",
       "emptyTitle": "Chưa có máy chủ nào",
       "emptyDescription": "Host đã lưu sẽ mở một terminal trên máy chủ của bạn.",
       "addHost": "Thêm máy chủ",
@@ -4587,6 +4588,51 @@
       "createdTitle": "Đã tạo khóa",
       "createdDescription": "Thêm khóa công khai này vào authorized_keys của máy chủ, rồi kết nối bằng khóa này.",
       "copyPublicKey": "Sao chép khóa"
+    },
+    "backup": {
+      "exportTitle": "Xuất bản sao lưu được mã hóa",
+      "importTitle": "Nhập bản sao lưu được mã hóa",
+      "exportDescription": "Mọi thứ bên dưới đều được mã hóa bằng cụm mật khẩu của bạn. Hãy giữ nó riêng; không thể khôi phục được.",
+      "importDescription": "Mở bản sao lưu SSH của Kilo để xem nội dung trước khi nhập.",
+      "noFile": "Chưa chọn tệp sao lưu nào",
+      "confirmPassphrase": "Xác nhận cụm mật khẩu",
+      "strengthShort": "Dùng ít nhất 8 ký tự",
+      "strengthGood": "Độ dài tốt · 12 ký tự trở lên sẽ an toàn hơn",
+      "strengthLong": "Cụm mật khẩu dài · hãy giữ nó ở nơi an toàn",
+      "mismatch": "Các cụm mật khẩu không khớp.",
+      "share": "Mã hóa và chia sẻ",
+      "unlock": "Mở khóa bản sao lưu",
+      "apply": "Nhập bản sao lưu",
+      "mergeStrategy": "Bỏ qua các mục trùng lặp",
+      "mergeDescription": "Giữ các máy chủ hiện có theo nhãn, khóa theo dấu vân tay và máy chủ đã biết theo mẫu. Các đoạn lệnh và liên kết chuyển tiếp trùng khớp cũng được giữ lại.",
+      "conflicts": "Được giữ trên thiết bị này",
+      "outcomeTitle": "Kết quả nhập",
+      "toSkip": "Sẽ bỏ qua",
+      "counts": {
+        "hosts": "Máy chủ SSH",
+        "keys": "Khóa riêng",
+        "snippets": "Đoạn lệnh"
+      },
+      "wrongPassphrase": "Cụm mật khẩu đó không mở được bản sao lưu. Hãy thử lại.",
+      "invalidExport": "Tệp này không phải là bản sao lưu SSH của Kilo. Hãy chọn tệp khác.",
+      "fileError": "Không thể đọc tệp sao lưu.",
+      "storageError": "Không thể lưu bản sao lưu. Không có gì được nhập.",
+      "unavailable": "Thao tác sao lưu được mã hóa đã thất bại. Hãy thử lại.",
+      "empty": "Không có gì để sao lưu",
+      "previewTitle": "Nội dung bản sao lưu",
+      "imported": "Đã nhập bản sao lưu SSH.",
+      "nothingNew": "Mọi thứ trong bản sao lưu này đều đã có trên thiết bị."
+    },
+    "keyBar": {
+      "title": "Thanh khóa",
+      "subtitle": "Kéo một khóa để di chuyển, hoặc tắt nó để ẩn đi.",
+      "editHint": "Nhấn giữ để chọn và sắp xếp lại các khóa",
+      "restoreDefault": "Khôi phục mặc định",
+      "moveUp": "Di chuyển {{label}} lên",
+      "moveDown": "Di chuyển {{label}} xuống",
+      "show": "Hiện {{label}}",
+      "keepOne": "Ít nhất một khóa luôn ở trên thanh.",
+      "loadFailed": "Không thể tải thanh khóa."
     },
     "sandbox": {
       "title": "Terminal",

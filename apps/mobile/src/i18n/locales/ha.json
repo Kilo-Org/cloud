@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Zaɓuɓɓukan SSH",
       "emptyTitle": "Babu host tukuna",
       "emptyDescription": "Wuraren da aka adana suna buɗe tashar umarni a uwar garkenka.",
       "addHost": "Ƙara host",
@@ -4587,6 +4588,51 @@
       "createdTitle": "An ƙirƙiri maɓalli",
       "createdDescription": "Ƙara wannan maɓallin jama'a zuwa authorized_keys na uwar garke, sannan ka haɗa da wannan maɓalli.",
       "copyPublicKey": "Kwafi maɓalli"
+    },
+    "backup": {
+      "exportTitle": "Fitar da ajiyen da aka ɓoye",
+      "importTitle": "Shigo da ajiyen da aka ɓoye",
+      "exportDescription": "Ana ɓoye duk abin da ke ƙasa da kalmar wucewarka. Ka adana ta dabam; ba za a iya dawo da ita ba.",
+      "importDescription": "Buɗe ajiyen SSH na Kilo don duba abin da ke ciki kafin shigo da shi.",
+      "noFile": "Babu fayil ɗin ajiye da aka zaɓa",
+      "confirmPassphrase": "Tabbatar da kalmar wucewa",
+      "strengthShort": "Yi amfani da aƙalla haruffa 8",
+      "strengthGood": "Tsayi mai kyau · haruffa 12 ko fiye sun fi aminci",
+      "strengthLong": "Kalmar wucewa mai tsawo · adana ta a wuri mai aminci",
+      "mismatch": "Kalmomin wucewa ba su dace ba.",
+      "share": "Ɓoye ka raba",
+      "unlock": "Buɗe ajiye",
+      "apply": "Shigo da ajiye",
+      "mergeStrategy": "Tsallake kwafi",
+      "mergeDescription": "Adana hosts ɗin da suka wanzu bisa ga lakabi, maɓallai bisa ga sawun yatsa da hosts da aka sani bisa ga tsari. Ana kuma adana gajerun umarni masu dacewa da haɗin turawa.",
+      "conflicts": "An adana a wannan na'urar",
+      "outcomeTitle": "Sakamakon shigo da",
+      "toSkip": "Don tsallake",
+      "counts": {
+        "hosts": "Hosts ɗin SSH",
+        "keys": "Maɓallan sirri",
+        "snippets": "Gajerun umarni"
+      },
+      "wrongPassphrase": "Wannan kalmar wucewa ba ta buɗe ajiyen ba. Sake gwadawa.",
+      "invalidExport": "Wannan fayil ɗin ba ajiyen SSH na Kilo ba ne. Zaɓi wani fayil.",
+      "fileError": "Ba a iya karanta fayil ɗin ajiye ba.",
+      "storageError": "Ba a iya adana ajiyen ba. Ba a shigo da komai ba.",
+      "unavailable": "Aikin ajiyen da aka ɓoye ya kasa. Sake gwadawa.",
+      "empty": "Babu abin da za a adana",
+      "previewTitle": "Abubuwan da ke cikin ajiye",
+      "imported": "An shigo da ajiyen SSH.",
+      "nothingNew": "Duk abin da ke cikin wannan ajiye ya riga ya kasance a wannan na'urar."
+    },
+    "keyBar": {
+      "title": "Sandar maɓalli",
+      "subtitle": "Ja maɓalli don matsar da shi, ko ka kashe shi don ɓoye shi.",
+      "editHint": "Danna na dogon lokaci don zaɓa da sake tsara maɓallai",
+      "restoreDefault": "Mayar da na asali",
+      "moveUp": "Matsar da {{label}} sama",
+      "moveDown": "Matsar da {{label}} ƙasa",
+      "show": "Nuna {{label}}",
+      "keepOne": "Aƙalla maɓalli ɗaya yana zama a sandar.",
+      "loadFailed": "Ba a iya loda sandar maɓalli ba."
     },
     "sandbox": {
       "title": "Tashar umarni",

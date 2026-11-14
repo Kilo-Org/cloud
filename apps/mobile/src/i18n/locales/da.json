@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "SSH-valgmuligheder",
       "emptyTitle": "Ingen værter endnu",
       "emptyDescription": "Gemte værter åbner en terminal på din server.",
       "addHost": "Tilføj vært",
@@ -4587,6 +4588,51 @@
       "createdTitle": "Nøgle oprettet",
       "createdDescription": "Tilføj denne offentlige nøgle til serverens authorized_keys, og opret derefter forbindelse med denne nøgle.",
       "copyPublicKey": "Kopiér nøgle"
+    },
+    "backup": {
+      "exportTitle": "Eksportér krypteret backup",
+      "importTitle": "Importér krypteret backup",
+      "exportDescription": "Alt nedenfor krypteres med din adgangssætning. Opbevar den separat; den kan ikke gendannes.",
+      "importDescription": "Åbn en Kilo SSH-backup for at gennemse indholdet, før du importerer.",
+      "noFile": "Ingen backupfil valgt",
+      "confirmPassphrase": "Bekræft adgangssætning",
+      "strengthShort": "Brug mindst 8 tegn",
+      "strengthGood": "God længde · 12 eller flere tegn er sikrere",
+      "strengthLong": "Lang adgangssætning · opbevar den et sikkert sted",
+      "mismatch": "Adgangssætningerne er ikke ens.",
+      "share": "Kryptér og del",
+      "unlock": "Lås backup op",
+      "apply": "Importér backup",
+      "mergeStrategy": "Spring dubletter over",
+      "mergeDescription": "Behold eksisterende værter efter etiket, nøgler efter fingeraftryk og kendte værter efter mønster. Matchende snippets og videresendelsesbindinger beholdes også.",
+      "conflicts": "Beholdt på denne enhed",
+      "outcomeTitle": "Importresultat",
+      "toSkip": "Springes over",
+      "counts": {
+        "hosts": "SSH-værter",
+        "keys": "Private nøgler",
+        "snippets": "Kommandosnippets"
+      },
+      "wrongPassphrase": "Adgangssætningen låste ikke backuppen op. Prøv igen.",
+      "invalidExport": "Denne fil er ikke en Kilo SSH-backup. Vælg en anden fil.",
+      "fileError": "Backupfilen kunne ikke læses.",
+      "storageError": "Backuppen kunne ikke gemmes. Intet blev importeret.",
+      "unavailable": "Den krypterede backup-handling mislykkedes. Prøv igen.",
+      "empty": "Intet at lave backup af",
+      "previewTitle": "Backupindhold",
+      "imported": "SSH-backup importeret.",
+      "nothingNew": "Alt i denne backup findes allerede på denne enhed."
+    },
+    "keyBar": {
+      "title": "Nøglelinje",
+      "subtitle": "Træk en nøgle for at flytte den, eller slå den fra for at skjule den.",
+      "editHint": "Langt tryk for at vælge og omarrangere nøgler",
+      "restoreDefault": "Gendan standard",
+      "moveUp": "Flyt {{label}} op",
+      "moveDown": "Flyt {{label}} ned",
+      "show": "Vis {{label}}",
+      "keepOne": "Mindst én nøgle forbliver på linjen.",
+      "loadFailed": "Nøglelinjen kunne ikke indlæses."
     },
     "sandbox": {
       "title": "Terminal",

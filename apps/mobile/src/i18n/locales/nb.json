@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "SSH-alternativer",
       "emptyTitle": "Ingen verter ennå",
       "emptyDescription": "Lagrede verter åpner en terminal på serveren din.",
       "addHost": "Legg til vert",
@@ -4587,6 +4588,51 @@
       "createdTitle": "Nøkkel opprettet",
       "createdDescription": "Legg til denne offentlige nøkkelen i serverens authorized_keys, og koble deretter til med denne nøkkelen.",
       "copyPublicKey": "Kopier nøkkel"
+    },
+    "backup": {
+      "exportTitle": "Eksporter kryptert sikkerhetskopi",
+      "importTitle": "Importer kryptert sikkerhetskopi",
+      "exportDescription": "Alt nedenfor krypteres med passfrasen din. Oppbevar den separat; den kan ikke gjenopprettes.",
+      "importDescription": "Åpne en Kilo SSH-sikkerhetskopi for å gjennomgå innholdet før du importerer.",
+      "noFile": "Ingen sikkerhetskopifil valgt",
+      "confirmPassphrase": "Bekreft passfrase",
+      "strengthShort": "Bruk minst 8 tegn",
+      "strengthGood": "God lengde · 12 eller flere tegn er tryggere",
+      "strengthLong": "Lang passfrase · oppbevar den på et trygt sted",
+      "mismatch": "Passfrasene samsvarer ikke.",
+      "share": "Krypter og del",
+      "unlock": "Lås opp sikkerhetskopi",
+      "apply": "Importer sikkerhetskopi",
+      "mergeStrategy": "Hopp over duplikater",
+      "mergeDescription": "Behold eksisterende verter etter etikett, nøkler etter fingeravtrykk og kjente verter etter mønster. Matchende snutter og videresendingsbindinger beholdes også.",
+      "conflicts": "Beholdt på denne enheten",
+      "outcomeTitle": "Resultat av import",
+      "toSkip": "Å hoppe over",
+      "counts": {
+        "hosts": "SSH-verter",
+        "keys": "Private nøkler",
+        "snippets": "Kommandosnutter"
+      },
+      "wrongPassphrase": "Passfrasen låste ikke opp sikkerhetskopien. Prøv igjen.",
+      "invalidExport": "Denne filen er ikke en Kilo SSH-sikkerhetskopi. Velg en annen fil.",
+      "fileError": "Sikkerhetskopifilen kunne ikke leses.",
+      "storageError": "Sikkerhetskopien kunne ikke lagres. Ingenting ble importert.",
+      "unavailable": "Den krypterte sikkerhetskopioperasjonen mislyktes. Prøv igjen.",
+      "empty": "Ingenting å sikkerhetskopiere",
+      "previewTitle": "Innhold i sikkerhetskopien",
+      "imported": "SSH-sikkerhetskopi importert.",
+      "nothingNew": "Alt i denne sikkerhetskopien finnes allerede på denne enheten."
+    },
+    "keyBar": {
+      "title": "Nøkkellinje",
+      "subtitle": "Dra en nøkkel for å flytte den, eller slå den av for å skjule den.",
+      "editHint": "Langt trykk for å velge og endre rekkefølgen på nøkler",
+      "restoreDefault": "Gjenopprett standard",
+      "moveUp": "Flytt {{label}} opp",
+      "moveDown": "Flytt {{label}} ned",
+      "show": "Vis {{label}}",
+      "keepOne": "Minst én nøkkel blir værende på linjen.",
+      "loadFailed": "Nøkkellinjen kunne ikke lastes inn."
     },
     "sandbox": {
       "title": "Terminal",

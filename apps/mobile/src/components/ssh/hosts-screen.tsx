@@ -8,12 +8,12 @@ import { DetailScreenScrollView } from '@/components/detail-screen';
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { HostListRow } from '@/components/ssh/host-list-row';
+import { SshHostsActions } from '@/components/ssh/hosts-actions';
 import { SandboxListRow } from '@/components/ssh/sandbox-list-row';
 import { SshStorageError } from '@/components/ssh/ssh-storage-error';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { IconButton } from '@/components/ui/icon-button';
-import { KeyRound, Plus, Server } from '@/components/ui/icons';
+import { Plus, Server } from '@/components/ui/icons';
 import { MenuSheet, type MenuSheetOption } from '@/components/ui/menu-sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -25,7 +25,6 @@ import { type SshHost } from '@/lib/ssh/hosts';
 import {
   SSH_HOST_IMPORT_ROUTE,
   SSH_HOST_NEW_ROUTE,
-  SSH_KNOWN_HOSTS_ROUTE,
   sshFilesPath,
   sshHostPath,
   sshSandboxPath,
@@ -259,28 +258,7 @@ export function SshHostsScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={t('ssh.title')}
-        headerRight={
-          <View className="flex-row items-center">
-            <IconButton
-              accessibilityLabel={t('ssh.knownHosts.title')}
-              onPress={() => {
-                router.push(SSH_KNOWN_HOSTS_ROUTE);
-              }}
-            >
-              <KeyRound size={20} color={colors.foreground} />
-            </IconButton>
-            {showAdd ? (
-              <IconButton
-                accessibilityLabel={t('ssh.hosts.addHost')}
-                onPress={() => {
-                  router.push(SSH_HOST_NEW_ROUTE);
-                }}
-              >
-                <Plus size={20} color={colors.foreground} />
-              </IconButton>
-            ) : null}
-          </View>
-        }
+        headerRight={<SshHostsActions showAdd={showAdd} />}
         headerRightWidth={showAdd ? 96 : 48}
       />
       {body}

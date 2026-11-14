@@ -4496,6 +4496,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "SSH opcije",
       "emptyTitle": "Još nema hostova",
       "emptyDescription": "Sačuvani hostovi otvaraju terminal na vašem serveru.",
       "addHost": "Dodaj host",
@@ -4652,6 +4653,51 @@
       "createdTitle": "Ključ je generisan",
       "createdDescription": "Dodaj ovaj javni ključ u authorized_keys na serveru, a zatim se poveži ovim ključem.",
       "copyPublicKey": "Kopiraj ključ"
+    },
+    "backup": {
+      "exportTitle": "Izvezi šifrovanu rezervnu kopiju",
+      "importTitle": "Uvezi šifrovanu rezervnu kopiju",
+      "exportDescription": "Sve u nastavku je šifrovano tvojom pristupnom frazom. Čuvaj je odvojeno; ne može se povratiti.",
+      "importDescription": "Otvori Kilo SSH rezervnu kopiju da pregledaš njen sadržaj pre uvoza.",
+      "noFile": "Nije izabrana datoteka rezervne kopije",
+      "confirmPassphrase": "Potvrdi pristupnu frazu",
+      "strengthShort": "Koristi najmanje 8 znakova",
+      "strengthGood": "Dobra dužina · 12 ili više znakova je bezbednije",
+      "strengthLong": "Duga pristupna fraza · čuvaj je na bezbednom mestu",
+      "mismatch": "Pristupne fraze se ne poklapaju.",
+      "share": "Šifruj i podeli",
+      "unlock": "Otključaj rezervnu kopiju",
+      "apply": "Uvezi rezervnu kopiju",
+      "mergeStrategy": "Preskoči duplikate",
+      "mergeDescription": "Postojeći hostovi se zadržavaju po oznaci, ključevi po otisku, a poznati hostovi po obrascu. Podudarni isečci i povezivanja prosleđivanja se takođe zadržavaju.",
+      "conflicts": "Zadržano na ovom uređaju",
+      "outcomeTitle": "Rezultat uvoza",
+      "toSkip": "Za preskakanje",
+      "counts": {
+        "hosts": "SSH hostovi",
+        "keys": "Privatni ključevi",
+        "snippets": "Isečci komandi"
+      },
+      "wrongPassphrase": "Ta pristupna fraza nije otključala rezervnu kopiju. Pokušaj ponovo.",
+      "invalidExport": "Ova datoteka nije Kilo SSH rezervna kopija. Izaberi drugu datoteku.",
+      "fileError": "Datoteka rezervne kopije nije mogla biti pročitana.",
+      "storageError": "Rezervna kopija nije mogla biti sačuvana. Ništa nije uvezeno.",
+      "unavailable": "Operacija šifrovane rezervne kopije nije uspela. Pokušaj ponovo.",
+      "empty": "Nema ničega za rezervnu kopiju",
+      "previewTitle": "Sadržaj rezervne kopije",
+      "imported": "SSH rezervna kopija je uvezena.",
+      "nothingNew": "Sve iz ove rezervne kopije je već na ovom uređaju."
+    },
+    "keyBar": {
+      "title": "Traka sa ključevima",
+      "subtitle": "Prevuci ključ da ga pomeriš ili ga isključi da ga sakriješ.",
+      "editHint": "Dugo pritisni da izabereš i preurediš ključeve",
+      "restoreDefault": "Vrati podrazumevano",
+      "moveUp": "Pomeri {{label}} nagore",
+      "moveDown": "Pomeri {{label}} nadole",
+      "show": "Prikaži {{label}}",
+      "keepOne": "Najmanje jedan ključ ostaje na traci.",
+      "loadFailed": "Traka sa ključevima nije mogla biti učitana."
     },
     "sandbox": {
       "title": "Terminal",

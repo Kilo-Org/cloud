@@ -4431,6 +4431,7 @@
       "value": "{{label}}: {{value}}"
     },
     "hosts": {
+      "menuTitle": "Pilihan SSH",
       "emptyTitle": "Belum ada host",
       "emptyDescription": "Host yang disimpan membuka terminal di server Anda.",
       "addHost": "Tambah host",
@@ -4587,6 +4588,51 @@
       "createdTitle": "Kunci dibuat",
       "createdDescription": "Tambahkan kunci publik ini ke authorized_keys server, lalu hubungkan dengan kunci ini.",
       "copyPublicKey": "Salin kunci"
+    },
+    "backup": {
+      "exportTitle": "Ekspor cadangan terenkripsi",
+      "importTitle": "Impor cadangan terenkripsi",
+      "exportDescription": "Semua yang ada di bawah ini dienkripsi dengan frasa sandi Anda. Simpan secara terpisah; frasa sandi tidak dapat dipulihkan.",
+      "importDescription": "Buka cadangan SSH Kilo untuk meninjau isinya sebelum mengimpor.",
+      "noFile": "Tidak ada file cadangan yang dipilih",
+      "confirmPassphrase": "Konfirmasi frasa sandi",
+      "strengthShort": "Gunakan setidaknya 8 karakter",
+      "strengthGood": "Panjang sudah baik · 12 karakter atau lebih lebih aman",
+      "strengthLong": "Frasa sandi panjang · simpan di tempat yang aman",
+      "mismatch": "Frasa sandi tidak cocok.",
+      "share": "Enkripsi dan bagikan",
+      "unlock": "Buka kunci cadangan",
+      "apply": "Impor cadangan",
+      "mergeStrategy": "Lewati duplikat",
+      "mergeDescription": "Pertahankan host yang ada berdasarkan label, kunci berdasarkan sidik jari, dan host dikenal berdasarkan pola. Snippet dan pengikatan penerusan yang cocok juga dipertahankan.",
+      "conflicts": "Dipertahankan di perangkat ini",
+      "outcomeTitle": "Hasil impor",
+      "toSkip": "Untuk dilewati",
+      "counts": {
+        "hosts": "Host SSH",
+        "keys": "Kunci privat",
+        "snippets": "Snippet perintah"
+      },
+      "wrongPassphrase": "Frasa sandi itu tidak membuka kunci cadangan. Coba lagi.",
+      "invalidExport": "File ini bukan cadangan SSH Kilo. Pilih file lain.",
+      "fileError": "File cadangan tidak dapat dibaca.",
+      "storageError": "Cadangan tidak dapat disimpan. Tidak ada yang diimpor.",
+      "unavailable": "Operasi cadangan terenkripsi gagal. Coba lagi.",
+      "empty": "Tidak ada yang perlu dicadangkan",
+      "previewTitle": "Isi cadangan",
+      "imported": "Cadangan SSH diimpor.",
+      "nothingNew": "Semua yang ada di cadangan ini sudah ada di perangkat ini."
+    },
+    "keyBar": {
+      "title": "Bilah kunci",
+      "subtitle": "Seret kunci untuk memindahkannya, atau matikan untuk menyembunyikannya.",
+      "editHint": "Tekan lama untuk memilih dan mengurutkan ulang kunci",
+      "restoreDefault": "Pulihkan default",
+      "moveUp": "Pindahkan {{label}} ke atas",
+      "moveDown": "Pindahkan {{label}} ke bawah",
+      "show": "Tampilkan {{label}}",
+      "keepOne": "Setidaknya satu kunci tetap ada di bilah.",
+      "loadFailed": "Bilah kunci tidak dapat dimuat."
     },
     "sandbox": {
       "title": "Terminal",

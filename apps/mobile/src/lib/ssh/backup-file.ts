@@ -54,16 +54,13 @@ export async function openSshBackup(armored: string, passphrase: string): Promis
 /**
  * Reads a picked backup file without loading more than [`MAX_SSH_BACKUP_BYTES`].
  *
- * `size` is the picker's asset size; when neither it nor the file reports a
- * size, a single bounded read keeps an oversized file out of memory.
+ * `size` is the picker's asset size, which only short-circuits a reported
+ * overflow: the file's own content decides, so an under-reported size cannot
+ * put more than one byte past the limit in memory.
  */
 export async function readSshBackupFile(file: File, size?: number): Promise<string> {
-  const known = size ?? (file.size > 0 ? file.size : null);
-  if (known !== null) {
-    if (known > MAX_SSH_BACKUP_BYTES) {
-      throw new Error(`the backup file is ${known} bytes; the limit is ${MAX_SSH_BACKUP_BYTES}`);
-    }
-    return file.text();
+  if (size !== undefined && size > MAX_SSH_BACKUP_BYTES) {
+    throw new Error(`the backup file is ${size} bytes; the limit is ${MAX_SSH_BACKUP_BYTES}`);
   }
   const handle = file.open();
   try {

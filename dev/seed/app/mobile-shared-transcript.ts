@@ -262,12 +262,14 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   console.log(
     'Note: the worker mints a fresh share token on every run, so a rerun rotates the link; the token in the Result block is the live one.'
   );
-  console.log('Suggested next step: open the deep link on a signed-in dev build.');
+  console.log(
+    'Suggested next step: open the deep link on a signed-in dev build. It carries the web share path, which the app maps to the shared transcript screen.'
+  );
   return {
     userId: user.id,
     sessionId: SESSION_ID,
     shareToken,
-    deepLink: `kiloapp:///(app)/shared/${shareToken}`,
+    deepLink: `kiloapp:///s/${shareToken}`,
     transcriptUrl: `${baseUrl}/session/${encodeURIComponent(shareToken)}`,
   };
 }

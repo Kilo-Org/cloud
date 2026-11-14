@@ -13,6 +13,7 @@ import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { transferErrorMessage } from '@/lib/ssh/files/error-copy';
 import { type SftpBrowserPhase } from '@/lib/ssh/files/use-sftp-browser';
+import { useSshSessionsRehydrated } from '@/lib/ssh/session/use-sessions';
 import { type SshSession } from '@/lib/ssh/session/types';
 
 const SKELETON_ROWS = [0, 1, 2, 3, 4];
@@ -49,6 +50,17 @@ export function FilesBody({
   onBackToHosts,
 }: FilesBodyProps) {
   const { t } = useTranslation();
+  const rehydrated = useSshSessionsRehydrated();
+
+  if (!rehydrated && session === null) {
+    return (
+      <View className="gap-2 px-4 pt-2">
+        {SKELETON_ROWS.map(row => (
+          <Skeleton key={row} className="h-[58px] rounded-xl" />
+        ))}
+      </View>
+    );
+  }
 
   if (session === null) {
     return (

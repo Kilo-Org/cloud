@@ -200,6 +200,49 @@ describe('SaveProfileSheet', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('shows the refused save inside the sheet and keeps Save live', async () => {
+    const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(false);
+    const renderer = mount({ onSave });
+
+    act(() => {
+      (field(renderer, 'Profile name').props.onChangeText as (value: string) => void)('Retry me');
+    });
+    await submit(renderer);
+
+    // The sheet is the primary channel for a refused save: a toast would paint
+    // behind it. Save is live again, so the reader can correct and retry.
+    expect(texts(renderer)).toContain("Couldn't save profile");
+    expect(header(renderer).props.doneDisabled).toBe(false);
+  });
+
+  it('closes a sheet with a save in flight without asking to discard', async () => {
+    const held = Promise.withResolvers<boolean>();
+    const onSave = vi.fn<() => Promise<boolean>>().mockReturnValue(held.promise);
+    const onClose = vi.fn<() => void>();
+    const confirm = vi.fn();
+    confirmMock.current = request => {
+      confirm(request);
+    };
+    const renderer = mount({ onSave, onClose });
+
+    act(() => {
+      (field(renderer, 'Profile name').props.onChangeText as (value: string) => void)('My AWS');
+    });
+    await act(async () => {
+      (header(renderer).props.onDone as () => void)();
+      await Promise.resolve();
+    });
+
+    // Cancel during the save: the request already left, so there is nothing to
+    // discard and the outcome is announced by the save itself.
+    act(() => {
+      (header(renderer).props.onCancel as () => void)();
+    });
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the entered values and the sheet open when the save fails', async () => {
     const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(false);
     const onClose = vi.fn<() => void>();

@@ -1,196 +1,75 @@
-/* eslint-disable max-lines -- one mounted case per panel state: both manual editors, the save flow, and the retryable save failure */
-import { createElement, type ReactNode, useState } from 'react';
-import { act, TestRenderer } from '@/test/renderer';
+import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { i18n } from '@/i18n';
+import { act, TestRenderer } from '@/test/renderer';
+
 import { AdvancedConfigPanel } from './advanced-config-panel';
-import { type ProfileSelectorProfile } from './profile-selector-model';
-import { MAX_SETUP_COMMANDS } from '@/components/profiles/profile-commands-model';
-import { SelectableText } from '@/components/ui/selectable-text';
-import { type VariableEdit } from '@/components/profiles/profile-variables-model';
-
-const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
-vi.mock('sonner-native', () => ({ toast }));
-
-const announceForAccessibility = vi.hoisted(() => vi.fn());
-
-const listMock = vi.hoisted(() => ({
-  useAgentProfileList: vi.fn(),
-  useAgentProfileMutations: vi.fn(),
-}));
-vi.mock('@/lib/hooks/use-agent-profiles', () => listMock);
-
-vi.mock('react-native', () => ({
-  AccessibilityInfo: { announceForAccessibility },
-  Platform: { OS: 'ios' },
-  useColorScheme: () => 'light',
-  Pressable: 'Pressable',
-  ScrollView: 'ScrollView',
-  Switch: 'Switch',
-  View: 'View',
-}));
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
-vi.mock('@/components/agents/session-page-sheet', () => ({
-  SessionPageSheet: (props: { visible?: boolean; children?: ReactNode }) =>
-    props.visible === false ? null : createElement('SessionPageSheet', null, props.children),
-}));
-vi.mock('@/components/sheet-header', () => ({
-  SheetHeader: (props: Record<string, unknown>) => createElement('SheetHeader', props),
-}));
-vi.mock('@/components/ui/button', () => ({
-  Button: (props: Record<string, unknown> & { children?: ReactNode }) =>
-    createElement('Button', props, props.children),
-}));
-vi.mock('@/components/ui/form-field', () => ({
-  FormField: (props: Record<string, unknown>) => createElement('FormField', props),
-}));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', async () => {
-  const React = await import('react');
-  return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };
-});
-vi.mock('@/components/ui/icons', () => ({
-  AlertCircle: 'AlertCircle',
-  Building2: 'Building2',
-  ChevronDown: 'ChevronDown',
-  ChevronUp: 'ChevronUp',
-  Eye: 'Eye',
-  EyeOff: 'EyeOff',
-  GitBranch: 'GitBranch',
-  Lock: 'Lock',
-  Plus: 'Plus',
-  Settings: 'Settings',
-  Settings2: 'Settings2',
-  Star: 'Star',
-  Trash2: 'Trash2',
-  User: 'User',
-}));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({
-    foreground: '#000',
-    mutedForeground: '#666',
-    destructive: '#f00',
-    primary: '#0a84ff',
-  }),
-}));
-
-const BACKEND: ProfileSelectorProfile = {
-  id: 'backend',
-  name: 'Backend',
-  varCount: 3,
-  commandCount: 1,
-  isDefault: false,
-  ownerType: 'user',
-};
-
-type Mutations = {
-  create: { mutateAsync: ReturnType<typeof vi.fn> };
-  setVar: { mutateAsync: ReturnType<typeof vi.fn> };
-  setCommands: { mutateAsync: ReturnType<typeof vi.fn> };
-  setAsDefault: { mutateAsync: ReturnType<typeof vi.fn> };
-};
-
-function mutations(): Mutations {
-  return {
-    create: { mutateAsync: vi.fn().mockResolvedValue({ id: 'new-1' }) },
-    setVar: { mutateAsync: vi.fn().mockResolvedValue({}) },
-    setCommands: { mutateAsync: vi.fn().mockResolvedValue({}) },
-    setAsDefault: { mutateAsync: vi.fn().mockResolvedValue({}) },
-  };
-}
-
-type ListState = {
-  orgProfiles: ProfileSelectorProfile[];
-  personalProfiles: ProfileSelectorProfile[];
-  effectiveDefaultId: string | null;
-  isLoading: boolean;
-  isError: boolean;
-  isRefetching: boolean;
-  refetch: ReturnType<typeof vi.fn>;
-};
-
-function listState(overrides: Partial<ListState> = {}): ListState {
-  return {
-    orgProfiles: [],
-    personalProfiles: [BACKEND],
-    effectiveDefaultId: null,
-    isLoading: false,
-    isError: false,
-    isRefetching: false,
-    refetch: vi.fn(),
-    ...overrides,
-  };
-}
 
 /**
- * The session owns the profile selected after saving manual configuration.
- * The harness mirrors that ownership and records save selections.
+ * The panel's Save-as-Profile ownership: a settlement from a sheet that has
+ * since been closed and reopened must not close the one that replaced it, which
+ * a boolean open flag could not express.
  */
-function ControlledPanel({
-  organizationId,
-  initialSelectedProfileId,
-  initialCommands = [],
-  disabled = false,
-  onSelectProfile,
-  onRequestReveal,
-}: {
-  organizationId?: string;
-  initialSelectedProfileId?: string | null;
-  initialCommands?: string[];
-  disabled?: boolean;
-  onSelectProfile?: (id: string | null) => void;
-  onRequestReveal?: (contentOffset: number) => void;
-}) {
-  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(
-    initialSelectedProfileId ?? null
-  );
-  // The panel's manual env vars/commands are the session's state now, so the
-  // harness owns them the way the new-session body does.
-  const [manualVars, setManualVars] = useState<VariableEdit[]>([]);
-  const [manualCommands, setManualCommands] = useState<string[]>(initialCommands);
-  return createElement(AdvancedConfigPanel, {
-    organizationId,
-    disabled,
-    selectedProfileId,
-    onSelectProfile: id => {
-      onSelectProfile?.(id);
-      setSelectedProfileId(id);
-    },
-    manualVars,
-    manualCommands,
-    onManualVarsChange: setManualVars,
-    onManualCommandsChange: setManualCommands,
-    onRequestReveal,
-  });
-}
 
-function mount(
-  options: {
-    list?: Partial<ListState>;
-    mocks?: Mutations;
-    organizationId?: string;
-    selectedProfileId?: string | null;
-    initialCommands?: string[];
-    disabled?: boolean;
-    onSelectProfile?: (id: string | null) => void;
-    onRequestReveal?: (contentOffset: number) => void;
-  } = {}
-) {
-  listMock.useAgentProfileList.mockReturnValue(listState(options.list));
-  listMock.useAgentProfileMutations.mockReturnValue(options.mocks ?? mutations());
+const sheetMock = vi.hoisted(() => ({
+  /** The onClose each mounted sheet was handed, in mount order. */
+  closes: [] as (() => void)[],
+}));
+
+vi.mock('react-native', () => ({
+  Pressable: 'Pressable',
+  View: 'View',
+}));
+
+vi.mock('@/components/agents/advanced-config-editors', () => ({
+  ManualEnvVarsEditor: 'ManualEnvVarsEditor',
+  ManualSetupCommandsEditor: 'ManualSetupCommandsEditor',
+}));
+
+// The sheet is replaced by a marker that records the onClose it was given, so
+// the test drives the closure the panel owns rather than the sheet's fields.
+vi.mock('@/components/agents/save-profile-sheet', () => ({
+  SaveProfileSheet: (props: { onClose: () => void }) => {
+    sheetMock.closes.push(props.onClose);
+    return createElement('SaveProfileSheet', props);
+  },
+}));
+
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
+vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown', ChevronUp: 'ChevronUp' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/lib/a11y/tap-target', () => ({ ROW_TARGET_CLASS: 'row' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ foreground: '#000', mutedForeground: '#666' }),
+}));
+vi.mock('@/lib/hooks/use-agent-profiles', () => ({
+  useAgentProfileList: () => ({
+    orgProfiles: [],
+    personalProfiles: [],
+    combined: [],
+    effectiveDefaultId: null,
+  }),
+  useAgentProfileMutations: () => ({
+    create: { mutateAsync: vi.fn() },
+    setVar: { mutateAsync: vi.fn() },
+    setCommands: { mutateAsync: vi.fn() },
+    setAsDefault: { mutateAsync: vi.fn() },
+  }),
+}));
+vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
+function mount() {
   const ref: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
   act(() => {
     ref.current = TestRenderer.create(
-      createElement(ControlledPanel, {
-        organizationId: options.organizationId,
-        disabled: options.disabled,
-        initialCommands: options.initialCommands,
-        initialSelectedProfileId: options.selectedProfileId,
-        onSelectProfile: options.onSelectProfile,
-        onRequestReveal: options.onRequestReveal,
+      createElement(AdvancedConfigPanel, {
+        selectedProfileId: null,
+        onSelectProfile: vi.fn(),
+        manualVars: [{ key: 'API_KEY', value: 'secret', isSecret: true }],
+        manualCommands: [],
+        onManualVarsChange: vi.fn(),
+        onManualCommandsChange: vi.fn(),
       })
     );
   });
@@ -201,467 +80,50 @@ function mount(
   return renderer;
 }
 
-function press(node: TestRenderer.ReactTestInstance | undefined) {
-  act(() => {
-    (node?.props.onPress as (() => void) | undefined)?.();
-  });
-}
-
-/** Fire a layout event, the way the native view reports its frame. */
-function layout(node: TestRenderer.ReactTestInstance, y: number) {
-  act(() => {
-    (node.props.onLayout as (event: { nativeEvent: { layout: { y: number } } }) => void)({
-      nativeEvent: { layout: { y } },
-    });
-  });
-}
-
-/**
- * The panel root, or the block it renders while expanded, found by the class
- * token that identifies it inside the panel. Both are the views whose layout
- * the reveal depends on. Matched by token, not by the whole class list, so a
- * styling change to either view does not have to be mirrored here.
- */
-function layoutView(renderer: TestRenderer.ReactTestRenderer, token: string) {
-  const found = renderer.root
-    .findAll(node =>
-      String(node.props.className ?? '')
-        .split(' ')
-        .includes(token)
-    )
-    .find(node => typeof node.props.onLayout === 'function');
-  if (!found) {
-    throw new Error(`no view with layout class ${token}`);
-  }
-  return found;
-}
-
-function byLabel(renderer: TestRenderer.ReactTestRenderer, label: string) {
-  return renderer.root
-    .findAll(node => node.props.accessibilityLabel === label)
-    .find(node => typeof node.props.onPress === 'function');
-}
-
-function containsText(node: TestRenderer.ReactTestInstance, text: string): boolean {
-  if (node.children.some(child => typeof child === 'string' && child === text)) {
-    return true;
-  }
-  return node.children.some(child => typeof child !== 'string' && containsText(child, text));
-}
-
-function buttonByText(renderer: TestRenderer.ReactTestRenderer, text: string) {
-  return renderer.root.findAllByType('Button' as never).find(node => containsText(node, text));
-}
-
-function texts(renderer: TestRenderer.ReactTestRenderer): string[] {
-  return renderer.root
-    .findAllByType('Text' as never)
-    .flatMap(node => node.children)
-    .filter((child): child is string => typeof child === 'string');
-}
-
-/** The remaining-characters counter nodes, which carry the counted label. */
-function counterTexts(renderer: TestRenderer.ReactTestRenderer) {
-  return renderer.root
-    .findAllByType('Text' as never)
-    .filter(
-      node =>
-        typeof node.props.accessibilityLabel === 'string' &&
-        node.props.accessibilityLabel.includes('characters remaining')
-    );
-}
-
-function field(renderer: TestRenderer.ReactTestRenderer, label: string) {
-  const node = renderer.root
-    .findAllByType('FormField' as never)
-    .find(instance => instance.props.label === label);
-  if (!node) {
-    throw new Error(`no FormField labelled ${label}`);
-  }
-  return node;
-}
-
-function typeInto(renderer: TestRenderer.ReactTestRenderer, label: string, value: string) {
-  act(() => {
-    (field(renderer, label).props.onChangeText as (value: string) => void)(value);
-  });
-}
-
-/** First call position of a mock, for ordering assertions. */
-function callOrder(mock: ReturnType<typeof vi.fn>): number {
-  return mock.mock.invocationCallOrder[0] ?? 0;
-}
-
-function addVariable(renderer: TestRenderer.ReactTestRenderer, key: string, value: string) {
-  press(buttonByText(renderer, 'Add variable'));
-  typeInto(renderer, 'Key', key);
-  typeInto(renderer, 'Value', value);
-  press(buttonByText(renderer, 'Save'));
-}
-
-/** Add a variable marked secret, so its row offers the reveal control. */
-function addSecretVariable(renderer: TestRenderer.ReactTestRenderer, key: string, value: string) {
-  press(buttonByText(renderer, 'Add variable'));
-  typeInto(renderer, 'Key', key);
-  typeInto(renderer, 'Value', value);
-  const markSecret = renderer.root
-    .findAll(node => node.props.accessibilityLabel === 'Mark as secret')
-    .find(node => typeof node.props.onValueChange === 'function');
-  if (!markSecret) {
-    throw new Error('no Mark as secret switch');
+/** Expands the disclosure, then presses the control labelled `label`. */
+function press(renderer: TestRenderer.ReactTestRenderer, label: string) {
+  const target = renderer.root
+    .findAll(node => typeof node.type === 'string')
+    .find(node => node.props.accessibilityLabel === label);
+  if (!target) {
+    throw new Error(`no pressable labelled ${label}`);
   }
   act(() => {
-    (markSecret.props.onValueChange as (next: boolean) => void)(true);
+    (target.props.onPress as () => void)();
   });
-  press(buttonByText(renderer, 'Save'));
 }
 
 beforeEach(() => {
-  toast.success.mockReset();
-  toast.error.mockReset();
-  announceForAccessibility.mockReset();
+  sheetMock.closes.length = 0;
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 });
 
-describe('AdvancedConfigPanel', () => {
-  it('is collapsed by default and reserves only the disclosure row', () => {
+describe('AdvancedConfigPanel save sheet ownership', () => {
+  it('a late onClose from a closed sheet leaves the reopened sheet open', () => {
     const renderer = mount();
 
-    const disclosure = byLabel(renderer, 'Advanced Configuration');
-    expect(disclosure?.props.accessibilityState).toMatchObject({ expanded: false });
-    expect(byLabel(renderer, 'Pick a profile')).toBeUndefined();
-    expect(texts(renderer)).not.toContain('Environment variables');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
-  });
-
-  it('expands to both manual editors and the summary', () => {
-    const renderer = mount();
-    press(byLabel(renderer, 'Advanced Configuration'));
-
-    expect(texts(renderer)).toContain('Environment variables');
-    expect(texts(renderer)).toContain('Setup commands');
-    // No manual config yet, so no Save as Profile.
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
-  });
-
-  it('nests the revealed body under the disclosure row it belongs to', () => {
-    const renderer = mount();
-    press(byLabel(renderer, 'Advanced Configuration'));
-
-    // Without the nesting the body's two headings read like the composer's own
-    // top-level sections: same type, same start column, same gap to its control.
-    const body = layoutView(renderer, 'mt-3');
-    expect(String(body.props.className)).toContain('border-s-2');
-    expect(String(body.props.className)).toContain('ps-3');
-  });
-
-  it('reports the disclosure as expanded once it is open', () => {
-    const renderer = mount();
-    expect(byLabel(renderer, 'Advanced Configuration')?.props.accessibilityState).toMatchObject({
-      expanded: false,
-    });
-
-    press(byLabel(renderer, 'Advanced Configuration'));
-
-    expect(byLabel(renderer, 'Advanced Configuration')?.props.accessibilityState).toMatchObject({
-      expanded: true,
-    });
-  });
-
-  it('announces the revealed guidance instead of only growing below the fold', () => {
-    const renderer = mount();
-    press(byLabel(renderer, 'Advanced Configuration'));
-
-    // The composer sits below the fold of the new-session scroll body, so the
-    // reveal rides the shared status channel: a polite live region on Android
-    // and this one announcement on iOS.
-    expect(announceForAccessibility).toHaveBeenCalledWith(
-      i18n.t('agentChat.newSession.advancedConfigDescription')
-    );
-  });
-
-  it('asks the host to reveal the panel once per expansion', () => {
-    const onRequestReveal = vi.fn<(contentOffset: number) => void>();
-    const renderer = mount({ onRequestReveal });
-
-    // The collapsed panel already reports where it sits in the scroll content.
-    layout(layoutView(renderer, 'mt-5'), 812);
-    press(byLabel(renderer, 'Advanced Configuration'));
-    // The reveal waits for the expanded block: a scroll issued at the tap would
-    // clamp against the collapsed content height and move nothing.
-    expect(onRequestReveal).not.toHaveBeenCalled();
-
-    layout(layoutView(renderer, 'mt-3'), 860);
-    expect(onRequestReveal).toHaveBeenCalledTimes(1);
-    expect(onRequestReveal).toHaveBeenCalledWith(812);
-
-    // A later in-panel layout, such as a new command row, must not scroll the
-    // composer under the reader again.
-    layout(layoutView(renderer, 'mt-3'), 900);
-    expect(onRequestReveal).toHaveBeenCalledTimes(1);
-
-    // Collapsing reveals nothing.
-    press(byLabel(renderer, 'Advanced Configuration'));
-    expect(onRequestReveal).toHaveBeenCalledTimes(1);
-
-    // Re-expanding reveals against the offset the panel last reported.
-    press(byLabel(renderer, 'Advanced Configuration'));
-    layout(layoutView(renderer, 'mt-5'), 640);
-    layout(layoutView(renderer, 'mt-3'), 690);
-    expect(onRequestReveal).toHaveBeenCalledTimes(2);
-    expect(onRequestReveal).toHaveBeenLastCalledWith(640);
-  });
-
-  it('only offers Save as Profile for commands that will be persisted', () => {
-    const renderer = mount();
-    press(byLabel(renderer, 'Advanced Configuration'));
-    press(buttonByText(renderer, 'Add command'));
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
-    typeInto(renderer, 'Command 1', '   ');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
-    typeInto(renderer, 'Command 1', 'pnpm install');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
-    typeInto(renderer, 'Command 1', '');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
-  });
-
-  it('names each setup-command control after the command position', () => {
-    const renderer = mount();
-    press(byLabel(renderer, 'Advanced Configuration'));
-    press(buttonByText(renderer, 'Add command'));
-    typeInto(renderer, 'Command 1', 'pnpm install');
-    press(buttonByText(renderer, 'Add command'));
-
-    // The blank draft row is the second slot in the list, so its controls name
-    // command 2 instead of falling back to a context-free "Move up"/"Delete".
-    expect(field(renderer, 'Command 2')).toBeDefined();
-    expect(
-      renderer.root
-        .findAll(node => typeof node.props.onPress === 'function')
-        .map(node => node.props.accessibilityLabel)
-    ).toEqual(
-      expect.arrayContaining([
-        'Move command 1 up',
-        'Move command 1 down',
-        'Delete command 1',
-        'Move command 2 up',
-        'Move command 2 down',
-        'Delete command 2',
-      ])
-    );
-  });
-
-  it('offers Save as Profile once a manual variable exists', () => {
-    const renderer = mount();
-    press(byLabel(renderer, 'Advanced Configuration'));
-    addVariable(renderer, 'API_KEY', 'abc');
-
-    expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
-    expect(texts(renderer)).toContain('1 var');
-  });
-
-  it('accepts an empty value in the session draft, matching prepare-session', () => {
-    const renderer = mount();
-    press(byLabel(renderer, 'Advanced Configuration'));
-    addVariable(renderer, 'NO_COLOR', '');
-
-    // The profile Variables screen asks for a value; this draft editor does not,
-    // because prepare-session and the web editor accept `KEY=`.
-    expect(
-      renderer.root.findAllByType('FormField' as never).filter(node => node.props.label === 'Value')
-    ).toHaveLength(0);
-    expect(texts(renderer)).toContain('1 var');
-  });
-
-  it('starts an abandoned session variable empty the next time the form opens', () => {
-    const renderer = mount();
-    press(byLabel(renderer, 'Advanced Configuration'));
-
-    press(buttonByText(renderer, 'Add variable'));
-    typeInto(renderer, 'Key', 'ABANDONED_KEY');
-    typeInto(renderer, 'Value', 'abandoned-value');
-    press(buttonByText(renderer, 'Cancel'));
-
-    press(buttonByText(renderer, 'Add variable'));
-    // A session draft belongs to the compose that opened it: the key and the
-    // value of the cancelled attempt must not come back.
-    expect(field(renderer, 'Key').props.defaultValue).toBe('');
-    expect(field(renderer, 'Value').props.defaultValue).toBe('');
-  });
-
-  it('names the row reveal control after its action and reveals the draft value', () => {
-    const renderer = mount();
-    press(byLabel(renderer, 'Advanced Configuration'));
-    addSecretVariable(renderer, 'API_KEY', 's3cretdraft');
-
-    // The row control announces the action a screen-reader user takes, the
-    // same copy the edit-form reveal toggle uses; the "Secret" noun names the
-    // kind, not the action, and no control carries it.
-    expect(byLabel(renderer, 'Secret')).toBeUndefined();
-    const reveal = byLabel(renderer, 'Reveal value');
-    // The name carries the state, so the control reports no separate
-    // selection a reader would hear as "Reveal value, selected".
-    expect(reveal?.props.accessibilityState).toBeUndefined();
-    expect(texts(renderer)).not.toContain('s3cretdraft');
-
-    press(reveal);
-
-    expect(texts(renderer)).toContain('s3cretdraft');
-    // The same control now hides the value it is showing.
-    expect(byLabel(renderer, 'Reveal value')).toBeUndefined();
-    press(byLabel(renderer, 'Hide value'));
-
-    expect(texts(renderer)).not.toContain('s3cretdraft');
-    expect(byLabel(renderer, 'Reveal value')).toBeDefined();
-  });
-
-  it('caps manual setup commands at the server list and row bounds', () => {
-    const renderer = mount();
-    press(byLabel(renderer, 'Advanced Configuration'));
-
-    press(buttonByText(renderer, 'Add command'));
-    expect(field(renderer, 'Command 1').props.maxLength).toBe(500);
-
-    for (let index = 1; index < MAX_SETUP_COMMANDS; index += 1) {
-      press(buttonByText(renderer, 'Add command'));
+    press(renderer, 'Advanced Configuration');
+    press(renderer, 'Save as Profile');
+    expect(renderer.root.findAllByType('SaveProfileSheet' as never)).toHaveLength(1);
+    const firstClose = sheetMock.closes[0];
+    if (!firstClose) {
+      throw new Error('the first sheet was not mounted');
     }
-    const commandFields = () =>
-      renderer.root
-        .findAllByType('FormField' as never)
-        .filter(node => /^Command \d+$/.test(String(node.props.label)));
-    expect(commandFields()).toHaveLength(MAX_SETUP_COMMANDS);
-    expect(buttonByText(renderer, 'Add command')?.props.disabled).toBe(true);
 
-    // A 21st row is refused even if the disabled control is pressed.
-    press(buttonByText(renderer, 'Add command'));
-    expect(commandFields()).toHaveLength(MAX_SETUP_COMMANDS);
-  });
-
-  it('keeps a busy command row a dimmed field instead of read-only text', () => {
-    const renderer = mount({ disabled: true, initialCommands: ['pnpm install'] });
-    press(byLabel(renderer, 'Advanced Configuration'));
-
-    const row = field(renderer, 'Command 1');
-    expect(row.props.disabled).toBe(true);
-    expect(row.props.defaultValue).toBe('pnpm install');
-
-    // A busy row is still the same field, so starting a session never reflows
-    // the editor into a read-only value.
-    expect(renderer.root.findAllByType(SelectableText)).toHaveLength(0);
-
-    renderer.unmount();
-  });
-
-  it('counts the characters left on a setup command and names the bound', () => {
-    const renderer = mount();
-    press(byLabel(renderer, 'Advanced Configuration'));
-
-    press(buttonByText(renderer, 'Add command'));
-    typeInto(renderer, 'Command 1', 'a'.repeat(470));
-    expect(counterTexts(renderer).map(node => node.props.children)).toEqual([30]);
-    expect(texts(renderer)).not.toContain('The command is limited to 500 characters');
-
-    // At the bound the sentence replaces the count, so only one line is present.
-    // At 470 characters the row is a command, so its label carries its position.
-    typeInto(renderer, 'Command 1', 'a'.repeat(500));
-    expect(counterTexts(renderer)).toEqual([]);
-    expect(texts(renderer)).toContain('The command is limited to 500 characters');
-  });
-
-  it('caps a manual env-var value at the 256-character session bound', () => {
-    const renderer = mount();
-    press(byLabel(renderer, 'Advanced Configuration'));
-
-    press(buttonByText(renderer, 'Add variable'));
-    // The prepare-session input caps every inline env-var value at 256
-    // characters, so the field cannot hold a value Start would be refused for.
-    expect(field(renderer, 'Value').props.maxLength).toBe(256);
-  });
-
-  it('keeps manual config working with no profiles at all', () => {
-    const renderer = mount({ list: { personalProfiles: [] } });
-    press(byLabel(renderer, 'Advanced Configuration'));
-
-    addVariable(renderer, 'API_KEY', 'abc');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
-  });
-
-  it('includes the session-owned selected profile in resource counts', () => {
-    const renderer = mount({ selectedProfileId: 'backend' });
-    press(byLabel(renderer, 'Advanced Configuration'));
-
-    expect(texts(renderer)).toContain('3 vars · 1 setup cmd');
-  });
-
-  it('saves the manual config in the web order and selects the new profile', async () => {
-    const mocks = mutations();
-    const onSelectProfile = vi.fn<(id: string | null) => void>();
-    const renderer = mount({ mocks, onSelectProfile });
-    press(byLabel(renderer, 'Advanced Configuration'));
-    addVariable(renderer, 'API_KEY', 'abc');
-    // A setup command.
-    press(buttonByText(renderer, 'Add command'));
-    typeInto(renderer, 'Command 1', 'pnpm install');
-    press(buttonByText(renderer, 'Save as Profile'));
-
-    typeInto(renderer, 'Profile name', 'My Setup');
+    // The person dismisses it, then opens it again.
     act(() => {
-      (renderer.root.findByType('Switch' as never).props.onValueChange as (value: boolean) => void)(
-        true
-      );
+      firstClose();
     });
-    await act(async () => {
-      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
-      await Promise.resolve();
-    });
+    expect(renderer.root.findAllByType('SaveProfileSheet' as never)).toHaveLength(0);
+    press(renderer, 'Save as Profile');
+    const reopened = renderer.root.findAllByType('SaveProfileSheet' as never);
+    expect(reopened).toHaveLength(1);
 
-    expect(callOrder(mocks.create.mutateAsync)).toBeLessThan(callOrder(mocks.setVar.mutateAsync));
-    expect(callOrder(mocks.setVar.mutateAsync)).toBeLessThan(
-      callOrder(mocks.setCommands.mutateAsync)
-    );
-    expect(callOrder(mocks.setCommands.mutateAsync)).toBeLessThan(
-      callOrder(mocks.setAsDefault.mutateAsync)
-    );
-    expect(mocks.create.mutateAsync).toHaveBeenCalledWith({
-      name: 'My Setup',
-      description: undefined,
+    // A settlement from the closed sheet arrives late: it must not close the
+    // sheet that replaced it.
+    act(() => {
+      firstClose();
     });
-    expect(mocks.setVar.mutateAsync).toHaveBeenCalledWith({
-      profileId: 'new-1',
-      key: 'API_KEY',
-      value: 'abc',
-      isSecret: false,
-    });
-    expect(mocks.setCommands.mutateAsync).toHaveBeenCalledWith({
-      profileId: 'new-1',
-      commands: ['pnpm install'],
-    });
-    expect(mocks.setAsDefault.mutateAsync).toHaveBeenCalledWith({ profileId: 'new-1' });
-    expect(toast.success).toHaveBeenCalledTimes(1);
-    expect(onSelectProfile).toHaveBeenCalledWith('new-1');
-    // The profile carries the draft now, and the server appends a profile's
-    // setup commands to the inline ones, so a kept draft would run them twice.
-    expect(texts(renderer)).not.toContain('API_KEY');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
-    expect(texts(renderer)).toContain('1 var · 1 setup cmd');
-  });
-
-  it('keeps the save sheet open and the typed name when the save fails', async () => {
-    const mocks = mutations();
-    mocks.create.mutateAsync.mockRejectedValue(new Error('nope'));
-
-    const renderer = mount({ mocks });
-    press(byLabel(renderer, 'Advanced Configuration'));
-    addVariable(renderer, 'API_KEY', 'abc');
-    press(buttonByText(renderer, 'Save as Profile'));
-    typeInto(renderer, 'Profile name', 'Broken');
-
-    await act(async () => {
-      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
-      await Promise.resolve();
-    });
-
-    expect(field(renderer, 'Profile name')).toBeTruthy();
-    expect(toast.success).not.toHaveBeenCalled();
+    expect(renderer.root.findAllByType('SaveProfileSheet' as never)).toHaveLength(1);
   });
 });

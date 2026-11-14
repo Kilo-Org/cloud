@@ -13,7 +13,13 @@ const mockedPlatform = vi.hoisted(() => ({ OS: 'ios' }));
 vi.mock('react-native', () => ({ Platform: mockedPlatform }));
 
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
-  useCurrentUserId: () => ({ userId: 'user-1' }),
+  useCurrentUserId: () => ({
+    userId: 'user-1',
+    isLoading: false,
+    isError: false,
+    isUnreachable: false,
+    refetchAsync: vi.fn(),
+  }),
 }));
 
 const mockedBackend = vi.hoisted(() => ({ query: vi.fn() }));

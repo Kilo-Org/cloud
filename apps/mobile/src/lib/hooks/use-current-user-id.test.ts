@@ -25,6 +25,9 @@ vi.mock('@tanstack/react-query', () => ({
 // calls hooks directly, so the mock reads the current snapshot.
 vi.mock('react', () => ({
   useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown): unknown => getSnapshot(),
+  // The hook memoises its awaitable retry with a dependency list it does not
+  // need here: this suite calls the hook directly, so the body runs as-is.
+  useCallback: (body: unknown): unknown => body,
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({ user: { getMe: { queryOptions: () => ({}) } } }),
@@ -151,5 +154,16 @@ describe('useCurrentUserId', () => {
       });
       expect(useCurrentUserId().isUnreachable).toBe(false);
     });
+  });
+
+  it('answers the awaitable retry with the identity the read produced', async () => {
+    // React Query resolves `refetch` with a result rather than rejecting, so a
+    // caller cannot treat a finished attempt as an answer: this form hands back
+    // the user id, and a repeat failure yields undefined.
+    query.refetch.mockResolvedValue({ data: { id: 'user-1', email: 'user@example.com' } });
+    await expect(useCurrentUserId().refetchAsync()).resolves.toBe('user-1');
+
+    query.refetch.mockResolvedValue({ data: undefined });
+    await expect(useCurrentUserId().refetchAsync()).resolves.toBeUndefined();
   });
 });

@@ -697,11 +697,22 @@ describe('publication budget', () => {
 });
 
 describe('bounded serialization', () => {
-  it('writes once per throttle window, not once per cache change', async () => {
+  it('serializes and writes once per throttle window, not once per cache change', async () => {
     const { kv, scopes } = createFakeKv();
     const queryClient = makeAuthoritativeQueryClient('u1');
+    // The blob carries this payload, so the serializer reaches its `toJSON` on
+    // every whole-blob serialization. That observes the work the un-throttled
+    // per-change path must not do; the write count cannot see it, because only
+    // a throttled save ever reaches the storage.
+    let blobSerializations = 0;
     const burst: PersistedClient[] = Array.from({ length: 5 }, () =>
-      makePersistedClient({ id: 'u1' })
+      makePersistedClient({
+        id: 'u1',
+        toJSON: () => {
+          blobSerializations += 1;
+          return { id: 'u1' };
+        },
+      })
     );
     const persister = createReadCachePersister({
       queryClient,
@@ -709,14 +720,19 @@ describe('bounded serialization', () => {
       epoch: currentAuthEpoch(),
     });
 
-    // Five query-cache changes inside one throttle window: the save already
-    // running writes once, and the coalesced trailing save writes once more.
+    // Five query-cache changes inside one throttle window. The un-throttled
+    // wrapper path must serialize none of them: only the throttled save already
+    // running has serialized, exactly once for the whole burst.
     const inFlight = burst
       .map(client => persister.persistClient(client))
       .filter((pending): pending is Promise<void> => pending !== undefined);
+    expect(blobSerializations).toBe(1);
 
     await Promise.all(inFlight);
 
+    // The coalesced trailing save serializes at most once more, so the count is
+    // bounded by the throttle window, never by the number of changes.
+    expect(blobSerializations).toBeLessThanOrEqual(2);
     expect(kv.setItem).toHaveBeenCalledTimes(2);
     const stored = scopes.get(readCacheScope('u1'))?.get('read-cache');
     const blob = JSON.parse(stored ?? '{}') as PersistedClient;

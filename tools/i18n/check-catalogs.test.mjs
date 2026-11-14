@@ -1969,3 +1969,39 @@ test('rejects a consent destructive label that reads as the Cancel word, and acc
   });
   assert.deepEqual(distinct, []);
 });
+
+test('reads the supported tags from the array literal, not from a comment inside it', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = [
+  'en',
+  // Sentinels: 'xx' is never shipped.
+  'ru',
+];
+`,
+    },
+  });
+  assert.deepEqual(found, []);
+});
+
+test('reports a SUPPORTED_LANGUAGES element that is not a string literal', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', 'ru', ...EXTRA_TAGS];`,
+    },
+  });
+  assert.deepEqual(found, [
+    'apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES has an element this check cannot read',
+  ]);
+});
+
+test('reports a missing SUPPORTED_LANGUAGES declaration', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const OTHER_TAGS = ['en', 'ru'];`,
+    },
+  });
+  assert.ok(
+    found.includes('apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES is not declared')
+  );
+});

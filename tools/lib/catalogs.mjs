@@ -11,6 +11,7 @@
  * allowlists, wording and exit behavior, including what it does with a key that
  * is not a plural category.
  */
+import { readdirSync } from 'node:fs';
 
 /** The plural categories i18next selects from, as they end a catalog key. */
 const PLURAL_SUFFIX = /_(zero|one|two|few|many|other)$/;
@@ -25,6 +26,14 @@ export function pluralParts(key) {
     return null;
   }
   return { base: key.slice(0, -match[0].length), category: match[1] };
+}
+
+/** The locale tags on disk in `dir`, sorted, without the `.json` extension. */
+export function catalogTags(dir) {
+  return readdirSync(dir)
+    .filter(name => name.endsWith('.json'))
+    .map(name => name.replace(/\.json$/, ''))
+    .sort();
 }
 
 /**

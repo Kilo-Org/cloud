@@ -199,7 +199,7 @@ const fakeFs = vi.hoisted(() => {
       paths.appleSharedContainers = available ? { [appGroup.id]: appGroup.uri } : {};
     },
     /** Name the document a case protects from in-place writes. */
-    protectIndex: (uri: string | null) => {
+    protectIndex: (uri: string) => {
       protectedIndexUri = uri;
     },
     has: (uri: string) => nodes.has(uri),
@@ -224,7 +224,8 @@ const fakeFs = vi.hoisted(() => {
       operations.length = 0;
       directIndexWrites.length = 0;
       indexReplacements.length = 0;
-      protectedIndexUri = null;
+      // The guard outlives a reset: a case that resets mid-case keeps the
+      // protection, so no apply can write the index in place unnoticed.
     },
   };
 });

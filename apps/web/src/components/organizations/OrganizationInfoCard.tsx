@@ -187,6 +187,11 @@ function Inner(props: InnerProps) {
   const expiringCreditGroups = useExpiringCredits(id);
 
   const handleSave = async () => {
+    // The button is disabled for a name without visible characters, but the
+    // field's Enter key reaches this handler directly.
+    if (!hasVisibleText(editedName)) {
+      return;
+    }
     if (editedName.trim() === name) {
       setIsEditing(false);
       return;

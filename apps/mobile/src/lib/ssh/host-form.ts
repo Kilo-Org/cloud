@@ -84,10 +84,13 @@ export function hostFormValuesOf(host: SshHost | null): HostFormValues {
 /** Which field each refused value belongs to, from the store's own schema. */
 export function validateHostInput(input: SshHostInput): HostFormIssue[] {
   const parsed = hostInputSchema.safeParse(input);
+  const issues: HostFormIssue[] =
+    input.authMethod === 'key' && input.keyId === null
+      ? [{ field: 'keyId', kind: 'required' }]
+      : [];
   if (parsed.success) {
-    return [];
+    return issues;
   }
-  const issues: HostFormIssue[] = [];
   for (const field of FORM_FIELDS) {
     const refused = parsed.error.issues.some(issue => issue.path[0] === field);
     if (refused) {

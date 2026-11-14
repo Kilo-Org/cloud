@@ -59,6 +59,7 @@ type HostKeyFieldsProps = Readonly<{
   keys: readonly SshKey[];
   selectedKey: SshKey | null;
   disabled: boolean;
+  error?: string;
   onChoose: () => void;
 }>;
 
@@ -67,7 +68,13 @@ type HostKeyFieldsProps = Readonly<{
  * They push over the editor, so the editor picks the new key up when focus
  * returns (`takeCreatedKeyId`).
  */
-export function HostKeyFields({ keys, selectedKey, disabled, onChoose }: HostKeyFieldsProps) {
+export function HostKeyFields({
+  keys,
+  selectedKey,
+  disabled,
+  error,
+  onChoose,
+}: HostKeyFieldsProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const none = keys.length === 0;
@@ -78,6 +85,7 @@ export function HostKeyFields({ keys, selectedKey, disabled, onChoose }: HostKey
         label={t('ssh.editor.privateKey')}
         value={none ? t('ssh.editor.noKeys') : (selectedKey?.label ?? null)}
         placeholder={t('ssh.editor.chooseKey')}
+        error={error}
         disabled={none || disabled}
         onPress={onChoose}
       />

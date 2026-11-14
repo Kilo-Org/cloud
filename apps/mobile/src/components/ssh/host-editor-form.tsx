@@ -218,6 +218,7 @@ export function HostEditorForm({
           <HostKeyFields
             keys={keys}
             selectedKey={selectedKey}
+            error={errorMessage(hostFormIssue(issues, 'keyId'))}
             disabled={saving}
             onChoose={() => {
               setPicker('key');

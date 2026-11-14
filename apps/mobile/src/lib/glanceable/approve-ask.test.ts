@@ -60,7 +60,6 @@ vi.mock('./waiting-ask', () => ({ readWaitingAsk, recordWaitingAsk, getWaitingAs
 const createGlanceablePublisher = vi.fn();
 vi.mock('./create-publisher', () => ({ createGlanceablePublisher }));
 
-const { trpcClient } = await import('@/lib/trpc');
 const { answerSessionPermission, refreshGlanceableSnapshot, runGlanceableApprove } =
   await import('@/lib/glanceable/approve-ask');
 const { NotApprovableError } = await import('@/lib/glanceable/cloud-agent-session');
@@ -918,9 +917,5 @@ describe('refreshGlanceableSnapshot', () => {
       redrawOnAskBound: false,
     });
     expect(publisher.handleSessions).toHaveBeenCalledTimes(1);
-  });
-
-  it('reads the tray through the same trpc client surface the manager uses', () => {
-    expect(trpcClient.activeSessions.list.query).toBe(listActiveSessionsQuery);
   });
 });

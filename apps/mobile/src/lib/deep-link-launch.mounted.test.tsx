@@ -9,6 +9,7 @@ import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import {
   _resetDeepLinkLaunchForTests,
   _setSecureStoreForTests,
+  applyConsumedPendingDeepLink,
   consumePendingDeepLink,
   setPendingDeepLink,
 } from './deep-link-launch';
@@ -74,38 +75,42 @@ vi.mock('expo-secure-store', () => ({
 // never sees the organization key and vice versa.
 const pendingStore = new Map<string, string>();
 
-let organization: ReturnType<typeof useOrganization> | undefined = undefined;
-let consumeAndNavigate: (() => void) | undefined = undefined;
+/** The provider's published selection, captured on every render of the probe. */
+let organizationId: string | null | undefined = undefined;
+/** Whether the provider finished its restore, so the tests read a settled value. */
+let organizationLoaded = false;
+/** The provider's own switch step, passed to the shared consumer as its spy. */
+let providerSwitch: ((id: string | null) => void) | undefined = undefined;
 const renderers: { unmount: () => void }[] = [];
 
 /**
- * The exact consumer `_layout.tsx` runs: get-and-clear the pending destination,
- * switch the organization when it carried one, then navigate. The switch sits
- * before the navigate with nothing awaited between them.
+ * Reads the real provider's state so the assertions see the selection the
+ * shared consumer step switched. The step itself lives in the module under
+ * test, so nothing here re-implements it.
  */
-function PendingDeepLinkConsumer() {
+function OrganizationProbe() {
   const value = useOrganization();
-  organization = value;
-  consumeAndNavigate = () => {
-    const pending = consumePendingDeepLink();
-    if (!pending) {
-      return;
-    }
-    if (pending.organizationId !== null) {
-      value.setOrganizationId(pending.organizationId);
-    }
-    navigate(pending.href);
-  };
+  organizationId = value.organizationId;
+  organizationLoaded = value.isLoaded;
+  providerSwitch = value.setOrganizationId;
   return null;
 }
 
 async function mount() {
-  const result = await renderWithProviders(createElement(PendingDeepLinkConsumer), {
+  const result = await renderWithProviders(createElement(OrganizationProbe), {
     wrapper: OrganizationProvider,
   });
   renderers.push(result);
-  await waitFor(() => organization?.isLoaded === true);
+  await waitFor(() => organizationLoaded);
   return result;
+}
+
+/** The mounted provider's switch, or a failure that names the missing mount. */
+function mountedSwitch(): (id: string | null) => void {
+  if (providerSwitch === undefined) {
+    throw new Error('the organization provider did not mount');
+  }
+  return providerSwitch;
 }
 
 beforeEach(() => {
@@ -128,8 +133,9 @@ beforeEach(() => {
   secure.values.clear();
   secure.values.set(ORGANIZATION_STORAGE_KEY, 'org-1');
   navigate.mockReset();
-  organization = undefined;
-  consumeAndNavigate = undefined;
+  organizationId = undefined;
+  organizationLoaded = false;
+  providerSwitch = undefined;
 });
 
 afterEach(() => {
@@ -143,29 +149,39 @@ afterEach(() => {
 describe('pending deep-link organization switch', () => {
   it('switches the provider to the destination organization before navigating', async () => {
     await mount();
-    expect(organization?.organizationId).toBe('org-1');
+    expect(organizationId).toBe('org-1');
 
     setPendingDeepLink('/(app)/agent-chat/ses_1', 'notification', { organizationId: 'org-2' });
+    const switchSpy = vi.fn(mountedSwitch());
 
     await act(() => {
-      consumeAndNavigate?.();
+      applyConsumedPendingDeepLink(consumePendingDeepLink(), switchSpy, href => {
+        navigate(href);
+      });
     });
 
-    expect(organization?.organizationId).toBe('org-2');
+    expect(organizationId).toBe('org-2');
     expect(navigate).toHaveBeenCalledWith('/(app)/agent-chat/ses_1');
+    expect(switchSpy.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY).toBeLessThan(
+      navigate.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    );
   });
 
   it('leaves the selection unchanged for a destination with no organization', async () => {
     await mount();
-    expect(organization?.organizationId).toBe('org-1');
+    expect(organizationId).toBe('org-1');
 
     setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'notification');
+    const switchSpy = vi.fn(mountedSwitch());
 
     await act(() => {
-      consumeAndNavigate?.();
+      applyConsumedPendingDeepLink(consumePendingDeepLink(), switchSpy, href => {
+        navigate(href);
+      });
     });
 
-    expect(organization?.organizationId).toBe('org-1');
+    expect(organizationId).toBe('org-1');
     expect(navigate).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)');
+    expect(switchSpy).not.toHaveBeenCalled();
   });
 });

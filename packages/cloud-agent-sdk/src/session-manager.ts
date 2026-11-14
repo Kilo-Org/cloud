@@ -1656,9 +1656,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // further older-page loads for the active session.
   let olderMessagesTerminal: boolean = false;
   /**
-   * Stack of loaded older pages, oldest first. Each entry records the cursor
+   * Stack of loaded older pages, newest first. Each entry records the cursor
    * that was current before that page was fetched and the message ids the page
-   * added. `trimRetainedHistory` pops from the front (oldest) to stay under
+   * added. `trimRetainedHistory` pops from the end (oldest) to stay under
    * `RETAINED_MESSAGE_WINDOW`. The initial bounded page is never pushed here,
    * so the live tail always survives.
    */

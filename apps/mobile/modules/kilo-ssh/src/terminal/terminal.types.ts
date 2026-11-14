@@ -40,6 +40,7 @@ export type TerminalViewHandle = {
 
 export type TerminalViewProps = Omit<ViewProps, 'children'> & {
   sourceId: string;
+  onSourceBound?: (sourceId: string) => void;
   autoFocus?: boolean;
   fontFamily?: string;
   fontSize?: number;
@@ -57,6 +58,7 @@ export type TerminalViewProps = Omit<ViewProps, 'children'> & {
 export type NativeTerminalViewProps = Omit<
   TerminalViewProps,
   | 'onResize'
+  | 'onSourceBound'
   | 'onLinkPress'
   | 'onBell'
   | 'onTitleChange'
@@ -67,6 +69,7 @@ export type NativeTerminalViewProps = Omit<
 > & {
   theme?: NativeTerminalTheme;
   onResize?: (event: { nativeEvent: TerminalSize }) => void;
+  onSourceBound?: (event: { nativeEvent: { sourceId: string } }) => void;
   onLinkPress?: (event: { nativeEvent: { url: string } }) => void;
   onBell?: () => void;
   onTitleChange?: (event: { nativeEvent: { title: string | null } }) => void;

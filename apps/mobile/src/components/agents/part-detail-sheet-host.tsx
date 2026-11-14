@@ -12,6 +12,7 @@ import {
   type PartDetailPhase,
   presentedPartId,
   reducePartDetailPhase,
+  settlePresentation,
 } from './part-detail-sheet-phase';
 
 const KEYBOARD_DISMISS_FALLBACK_MS = 1000;
@@ -25,8 +26,6 @@ type PartDetailSheetHostProps = {
 export function PartDetailSheetHost({ messages, children }: Readonly<PartDetailSheetHostProps>) {
   const [phase, setPhase] = useState<PartDetailPhase>({ kind: 'closed' });
   const keyboardVisible = useKeyboardState(state => state.isVisible);
-  const phaseRef = useRef(phase);
-  phaseRef.current = phase;
   const keyboardVisibleRef = useRef(keyboardVisible);
   keyboardVisibleRef.current = keyboardVisible;
 
@@ -71,12 +70,11 @@ export function PartDetailSheetHost({ messages, children }: Readonly<PartDetailS
   }, [dispatch]);
 
   const handleDismiss = useCallback(() => {
-    const current = phaseRef.current;
-    if (current.kind !== 'dismissing') {
-      return;
-    }
-    dispatch({ type: 'dismissal-settled', partId: current.partId });
-  }, [dispatch]);
+    // Reduced against the queued state, not this render's: the adapter reports the
+    // close and the finished dismissal in one pair, so the close may still be a
+    // pending update here.
+    setPhase(settlePresentation);
+  }, []);
 
   return (
     <>

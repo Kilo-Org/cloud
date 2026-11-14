@@ -44,17 +44,32 @@ export function reducePartDetailPhase(
         : phase;
     }
     case 'dismissal-settled': {
-      if (phase.kind !== 'dismissing' || phase.partId !== event.partId) {
+      // A report for a presentation that is not on screen is ignored; the live one
+      // settles, whether the close that precedes it was already reduced or is still
+      // queued behind the report.
+      if (phase.kind === 'closed' || phase.kind === 'deferred' || phase.partId !== event.partId) {
         return phase;
       }
-      return phase.nextPartId === null
-        ? { kind: 'closed' }
-        : { kind: 'presented', partId: phase.nextPartId };
+      return settlePresentation(phase);
     }
     default: {
       return phase;
     }
   }
+}
+
+/**
+ * Settle the presentation the host is showing, whatever edge reported it: a
+ * dismissal report can arrive before the close it belongs to has been reduced, and
+ * a self-dismissal the native sheet never completed leaves only this edge.
+ */
+export function settlePresentation(phase: PartDetailPhase): PartDetailPhase {
+  if (phase.kind === 'dismissing') {
+    return phase.nextPartId === null
+      ? { kind: 'closed' }
+      : { kind: 'presented', partId: phase.nextPartId };
+  }
+  return phase.kind === 'presented' ? { kind: 'closed' } : phase;
 }
 
 /** The part the sheet renders, or null when it renders nothing. */

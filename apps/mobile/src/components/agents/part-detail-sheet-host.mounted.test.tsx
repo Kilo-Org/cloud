@@ -653,4 +653,72 @@ describe('PartDetailSheetHost mounted', () => {
       vi.useRealTimers();
     }
   });
+
+  it('closes when the native close and dismissal report in one act', async () => {
+    const renderer = await mountHost([makeMessage('m1', [makeBashPart('bash-1', 'echo one', true)])]);
+    try {
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+
+      // The adapter reports the close and the finished dismissal as one pair, so
+      // the host reduces the close after the report has already been queued.
+      await act(() => {
+        reportSheetSelfDismissal(renderer);
+        reportSheetDismissed(renderer);
+      });
+      expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+
+      // The host settled: a later tap presents again instead of queueing forever.
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+      expect(sheetTitle(renderer)).toBe('bash: echo one');
+    } finally {
+      act(() => {
+        renderer.unmount();
+      });
+    }
+  });
+
+  it('reopens for a part chosen after a self-dismissal the native sheet never reported', async () => {
+    vi.useFakeTimers();
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    try {
+      renderer = await mountHost([
+        makeMessage('m1', [
+          makeBashPart('bash-1', 'echo one', true),
+          makeBashPart('bash-2', 'echo two', true),
+        ]),
+      ]);
+      const mounted = renderer;
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      const node = findByType(mounted.root, 'BottomSheet')[0];
+      await act(() => {
+        (propOf(node, 'onRequestDismiss') as () => boolean)();
+      });
+
+      // No report follows: the sheet's own deadline ends the dismissal, forwarding
+      // the dismissal before the close.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(findByType(mounted.root, 'BottomSheet')).toHaveLength(0);
+
+      await act(() => {
+        capturedOpener?.('bash-2');
+      });
+      expect(propOf(findByType(mounted.root, 'BottomSheet')[0], 'index')).toBe(0);
+      expect(sheetTitle(mounted)).toBe('bash: echo two');
+    } finally {
+      act(() => {
+        renderer?.unmount();
+      });
+      vi.useRealTimers();
+    }
+  });
 });

@@ -13,7 +13,7 @@ import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import * as z from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
-import { isMobileClient } from '@kilocode/web-shared/lib/trpc/min-version';
+import { APP_CLIENT_HEADER, isMobileClient } from '@kilocode/web-shared/lib/app-headers';
 import { createCloudAgentNextClient, type CreateWorktreeChatOutput } from './cloud-agent-client';
 import { readCloudAgentErrorCode } from './cloud-agent-error';
 
@@ -81,7 +81,7 @@ export async function createWorktreeChat({
   kiloSessionId,
   organizationId,
 }: CreateWorktreeChatOptions): Promise<CreateWorktreeChatOutput> {
-  if (isMobileClient(headersList)) {
+  if (isMobileClient(headersList?.get(APP_CLIENT_HEADER))) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'Worktree chats are only available in the browser',

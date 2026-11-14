@@ -99,7 +99,10 @@ jest.mock('@sentry/nextjs', () => ({
     ({ next }: { next: () => unknown }) =>
       next(),
 }));
-jest.mock('@kilocode/web-shared/lib/trpc/min-version', () => ({ isMobileClient: () => false }));
+jest.mock('@kilocode/web-shared/lib/app-headers', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/app-headers'),
+  isMobileClient: () => false,
+}));
 jest.mock('@kilocode/web-shared/lib/trpc/control-plane-budget', () => ({
   withControlPlaneBudget: ({ next }: { next: () => unknown }) => next(),
   controlPlanePathFromInfo: () => 'fixture',

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted suite for the reply surface's submit, draft and failure-copy states */
 // Mounted coverage for the thread reply surface: the draft clear rules, the
 // provider seam vars, and the inline failures the surface publishes through
 // the shared surface-feedback store.
@@ -41,6 +42,7 @@ const { draftLoad, gate, connectivity, termsStatus } = vi.hoisted(() => ({
 
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
+  Platform: { OS: 'ios' },
   TextInput: 'TextInput',
   View: 'View',
 }));

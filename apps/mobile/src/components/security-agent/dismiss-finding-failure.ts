@@ -3,9 +3,9 @@ import {
   securityDismissFailureCopy,
 } from '@/lib/hooks/use-security-dismiss-draft';
 import {
+  isSecuritySyncRetryable,
   SECURITY_LEDGER_PERSISTENCE_FAILED_MESSAGE,
   SECURITY_OPERATION_REPLAY_FAILED_MESSAGE,
-  isSecuritySyncRetryable,
 } from '@/lib/security-agent-ledger';
 
 /** Why the dismissal did not go through, and whether the same intent may be retried. */

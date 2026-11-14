@@ -94,9 +94,7 @@ export function DataExportScreen() {
         // copy ("Enter the code from the email.") would describe a field that is
         // not on screen yet. A structured rejection has no reader-facing text,
         // so it falls back to the generic retry line.
-        setRequestCodeError(
-          codeFailureMessage(error, t('queryError.neutralDescription'))
-        );
+        setRequestCodeError(codeFailureMessage(error, t('queryError.neutralDescription')));
       },
     })
   );

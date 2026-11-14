@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { buildBuiltinAgentEntries } from './runtime-profile-config.js';
 import { RuntimeBuiltinAgentsSchema } from './runtime-profile.js';
 import {
+  buildCommandGuardBashPermissions,
+  getCommandGuardPolicy,
+} from '../session/command-guard.js';
+import {
   matchesKiloPermissionPattern,
   narrowProfileAgents,
   narrowProfilePermission,
@@ -68,9 +72,14 @@ describe('narrowProfilePermission', () => {
   });
 
   it('keeps an agent allowance the session writes and omits one it does not', () => {
+    // The profile's other allowance has no session entry, and the session's
+    // refusals name commands this allowance cannot cover, so only the allowance
+    // the session writes is kept and the session's own verdicts still govern.
     expect(
       narrowProfilePermission(reviewSession, { bash: { 'git log *': 'allow', 'ls *': 'allow' } })
-    ).toEqual({ bash: { 'git log *': 'allow' } });
+    ).toEqual({
+      bash: { 'git log *': 'allow' },
+    });
     expect(narrowProfilePermission(reviewSession, { bash: { '*': 'allow' } })).toBeUndefined();
   });
 
@@ -106,7 +115,9 @@ describe('narrowProfilePermission', () => {
     const composed = narrowProfilePermission(session, {
       bash: { 'find *': 'allow' },
     }) as PermissionMap;
-    // The refusal is written after the allowance, so it decides the delete form.
+    // The refusal written after the allowance follows it, so it decides the
+    // delete form; the session's later allow for another command covers no
+    // command of this allowance and is left out.
     expect(Object.keys(composed['bash'] as Record<string, string>)).toEqual([
       'find *',
       'find *-delete*',
@@ -116,7 +127,7 @@ describe('narrowProfilePermission', () => {
     expect(resolve(session, composed, 'bash', 'git status')).toBe('allow');
   });
 
-  it('leaves out a session refusal that a later session allow overrides', () => {
+  it('leaves out a session refusal written before the allowance', () => {
     const session: PermissionMap = {
       bash: {
         'git *': 'deny',
@@ -129,8 +140,10 @@ describe('narrowProfilePermission', () => {
     const composed = narrowProfilePermission(session, {
       bash: { 'git log *': 'allow' },
     }) as PermissionMap;
-    // The broad git refusal is overridden by the session's later read allows, so
-    // it is not written; the specific refusal is.
+    // The broad git refusal is written before the allowance, so it is not
+    // carried and the session's allows keep deciding the read forms; a refusal
+    // the session writes after the allowance is carried, and the session still
+    // denies the output form itself.
     expect(Object.keys(composed['bash'] as Record<string, string>)).toEqual([
       'git log *',
       'git log *--output*',
@@ -150,10 +163,141 @@ describe('narrowProfilePermission', () => {
       },
     };
     // The guard refuses a form of find after permitting find, so the refusal
-    // follows the allowance in the composed map.
+    // follows the allowance in the composed map; the session's later allow for
+    // another command is not carried.
     expect(narrowProfilePermission(session, { bash: { 'find *': 'allow' } })).toEqual({
       bash: { 'find *': 'allow', 'find *-delete*': 'deny' },
     });
+  });
+
+  it('carries a session refusal whose glob overlaps a kept allowance', () => {
+    const session: PermissionMap = {
+      bash: { 'git log *': 'allow', 'git *--output*': 'deny' },
+    };
+    const composed = narrowProfilePermission(session, {
+      bash: { 'git log *': 'allow' },
+    }) as PermissionMap;
+    // The refusal names the output option in another position than the
+    // allowance, so no pattern text nests and only rule order carries it.
+    expect(composed['bash']).toEqual({ 'git log *': 'allow', 'git *--output*': 'deny' });
+    expect(resolve(session, composed, 'bash', 'git log --oneline')).toBe('allow');
+    expect(resolve(session, composed, 'bash', 'git log --output=/tmp/x')).toBe('deny');
+  });
+
+  it('carries the shell syntax refusals that a kept allowance covers', () => {
+    const session: PermissionMap = {
+      bash: { ls: 'allow', 'ls *': 'allow', '*$*': 'deny', '*>*': 'deny' },
+    };
+    const composed = narrowProfilePermission(session, {
+      bash: { 'ls *': 'allow' },
+    }) as PermissionMap;
+    expect(composed['bash']).toEqual({
+      'ls *': 'allow',
+      '*$*': 'deny',
+      '*>*': 'deny',
+    });
+    expect(resolve(session, composed, 'bash', 'ls -la')).toBe('allow');
+    expect(resolve(session, composed, 'bash', 'ls $(id)')).toBe('deny');
+    expect(resolve(session, composed, 'bash', 'ls -la > /tmp/x')).toBe('deny');
+  });
+
+  it('carries a session refusal written with a leading wildcard', () => {
+    const session: PermissionMap = {
+      bash: { 'find *': 'allow', '*|*': 'deny', 'git log *': 'allow' },
+    };
+    const composed = narrowProfilePermission(session, {
+      bash: { 'find *': 'allow' },
+    }) as PermissionMap;
+    const bash = composed['bash'] as Record<string, string>;
+    // The refusal has no literal prefix, so it can cover the allowance and is
+    // carried even though the session writes a later allow for another command.
+    expect(bash['*|*']).toBe('deny');
+    expect(resolve(session, composed, 'bash', 'find x')).toBe('allow');
+    expect(resolve(session, composed, 'bash', 'find x | cat')).toBe('deny');
+  });
+
+  it('carries every refusal the allowance can reach even when a later session allow exists', () => {
+    const session: PermissionMap = {
+      bash: { 'find *': 'allow', 'find *-delete*': 'deny', 'find *-delete* *': 'allow' },
+    };
+    const composed = narrowProfilePermission(session, {
+      bash: { 'find *': 'allow' },
+    }) as PermissionMap;
+    // The session's own allow for the delete form does not lift the refusal the
+    // allowance reaches, so the delete form stays refused.
+    expect(resolve(session, composed, 'bash', 'find . -delete')).toBe('deny');
+  });
+
+  it('carries the bitbucket shell syntax refusals for a permitted command', () => {
+    const policy = getCommandGuardPolicy('code-review', 'bitbucket', 'review-1')!;
+    const session: PermissionMap = { bash: buildCommandGuardBashPermissions(policy) };
+    const composed = narrowProfilePermission(session, {
+      bash: { 'bb pr diff *': 'allow' },
+    }) as PermissionMap;
+    // The guard permits the diff read and refuses the shell syntax written after
+    // it, so every shell form of the permitted command stays refused.
+    expect(resolve(session, composed, 'bash', 'bb pr diff x')).toBe('allow');
+    expect(resolve(session, composed, 'bash', 'bb pr diff x | cat')).toBe('deny');
+    expect(resolve(session, composed, 'bash', 'bb pr diff x > out')).toBe('deny');
+  });
+
+  it('keeps a profile catch-all refusal over a later session allow', () => {
+    const session: PermissionMap = {
+      bash: { find: 'allow', 'find *': 'allow', 'find *-delete*': 'deny', 'git status': 'allow' },
+    };
+    const composed = narrowProfilePermission(session, {
+      bash: { '*': 'deny', 'find *': 'allow' },
+    }) as PermissionMap;
+    // The profile refuses every command and permits the one the session
+    // permits, so the session's allow for another command is not carried and
+    // the catch-all refusal keeps deciding every command the profile did not
+    // name.
+    expect(composed['bash']).toEqual({
+      '*': 'deny',
+      'find *': 'allow',
+      'find *-delete*': 'deny',
+    });
+    expect(resolve(session, composed, 'bash', 'find . -name x')).toBe('allow');
+    expect(resolve(session, composed, 'bash', 'find . -delete')).toBe('deny');
+    expect(resolve(session, composed, 'bash', 'git status')).toBe('deny');
+  });
+
+  it('leaves the session refusals for other commands out of a kept allowance', () => {
+    const session: PermissionMap = {
+      bash: {
+        find: 'allow',
+        'find *': 'allow',
+        git: 'deny',
+        'git log': 'allow',
+        'git log *': 'allow',
+      },
+    };
+    const composed = narrowProfilePermission(session, {
+      bash: { 'find *': 'allow' },
+    }) as PermissionMap;
+    // The refusal names a command the allowance cannot cover, so it is left
+    // out; the session's own later allow for git log keeps deciding.
+    expect(composed['bash']).toEqual({ 'find *': 'allow' });
+    expect(resolve(session, composed, 'bash', 'find . -name x')).toBe('allow');
+    expect(resolve(session, composed, 'bash', 'git log --oneline')).toBe('allow');
+  });
+
+  it('carries a refusal for every command a kept allowance covers when the session has no later exception', () => {
+    const session: PermissionMap = {
+      bash: { 'git log *': 'allow', 'git *--output*': 'deny', 'git *--no-pager*': 'deny' },
+    };
+    const composed = narrowProfilePermission(session, {
+      bash: { 'git log *': 'allow' },
+    }) as PermissionMap;
+    // The session writes no exception, so both refusals follow the allowance
+    // and the read form still passes over them.
+    expect(composed['bash']).toEqual({
+      'git log *': 'allow',
+      'git *--output*': 'deny',
+      'git *--no-pager*': 'deny',
+    });
+    expect(resolve(session, composed, 'bash', 'git log --oneline')).toBe('allow');
+    expect(resolve(session, composed, 'bash', 'git log --output=/tmp/x')).toBe('deny');
   });
 
   it('keeps an agent ask as written', () => {

@@ -10,6 +10,7 @@ import {
   controlPlaneRouteSpecSchema,
 } from '../../shared/control-plane-protocol.js';
 import { matchesKiloPermissionPattern } from '../../shared/profile-permission-policy.js';
+import { buildGitHubReviewBashRules } from '../../shared/github-review-bash-rules.js';
 import { encryptWithPublicKey } from '../../utils/encryption.js';
 import { getSessionWorkspacePath, getWorktreeWorkspacePath } from '../../workspace.js';
 import { buildControlPlaneSessionRegistration } from './registration.js';
@@ -456,6 +457,48 @@ describe('migrated origin permissions', () => {
     expect(resolveBashPermission(guardBash, {}, 'npm test')).toBe('deny');
     expect(resolveBashPermission(guardBash, {}, 'git push')).toBe('deny');
     expect(resolveBashPermission(guardBash, {}, 'git log --oneline')).toBe('allow');
+  });
+
+  it('composes the stored agent against the review publisher refusals', () => {
+    const input = metadata({
+      repository: {
+        type: 'github',
+        repo: 'acme/widgets',
+        pullRequestNumber: 42,
+      },
+      profile: {
+        runtimeAgents: [
+          {
+            slug: 'reviewer',
+            name: 'Reviewer',
+            config: { permission: { bash: { 'gh pr diff *': 'allow' } } },
+          },
+        ],
+      },
+    });
+    input.identity.createdOnPlatform = 'code-review';
+    const { spec } = buildControlPlaneSessionRegistration(input, selection);
+    const sessionBash = spec.permission?.bash as Record<string, string>;
+    const agentBash = (
+      spec.runtimeAgents?.[0]?.config.permission as
+        | Record<string, Record<string, string>>
+        | undefined
+    )?.bash;
+    // The stored entry carries a publisher refusal, so it is not wider than the
+    // entry the runtime writes against the session policy plus those refusals.
+    const publisherRules = Object.keys(buildGitHubReviewBashRules());
+    expect(Object.keys(agentBash ?? {}).some(pattern => publisherRules.includes(pattern))).toBe(
+      true
+    );
+    // The session policy alone allows the read pattern to swallow the comment
+    // write, which the stored entry refuses solely through the publisher rules.
+    const command = 'gh pr diff 1 | gh pr comment 2 -b x';
+    expect(resolveBashPermission(sessionBash, {}, command)).toBe('allow');
+    expect(resolveBashPermission(sessionBash, agentBash ?? {}, command)).toBe('deny');
+    const entryWithoutPublisherRules = Object.fromEntries(
+      Object.entries(agentBash ?? {}).filter(([pattern]) => !publisherRules.includes(pattern))
+    );
+    expect(resolveBashPermission(sessionBash, entryWithoutPublisherRules, command)).toBe('allow');
   });
 
   it('narrows a pattern-map agent allow against the guard flat denial', () => {

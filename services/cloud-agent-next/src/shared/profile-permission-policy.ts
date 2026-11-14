@@ -41,16 +41,39 @@ export function matchesKiloPermissionPattern(input: string, pattern: string): bo
   return new RegExp(`^${escaped}$`, 's').test(input.replaceAll('\\', '/'));
 }
 
+function literalPrefix(pattern: string): string {
+  const wildcard = pattern.search(/[*?]/);
+  return wildcard < 0 ? pattern : pattern.slice(0, wildcard);
+}
+
+/** Two anchored patterns can describe a common command only if one literal prefix starts with the other. */
+function patternsMayCover(a: string, b: string): boolean {
+  const left = literalPrefix(a);
+  const right = literalPrefix(b);
+  return left.startsWith(right) || right.startsWith(left);
+}
+
 /**
  * Combine a session pattern map with an agent pattern map so both apply.
  *
- * Agent rules keep their order, so a profile's own exception after its own
- * refusal survives. An agent allowance is kept only where the session writes an
- * allow for that same pattern, because the session decides every other pattern.
- * Each kept allowance is followed by the session's refusals for the commands it
- * covers, so a command the guard refuses still ends in a refusal; a refusal that
- * a later session allow overrides is left out, so the session's own exceptions
- * keep working.
+ * The composed rule list is built by order rather than by comparing pattern
+ * text. Agent rules come first in their own order, so a profile's exception
+ * after its own refusal survives, and an agent allowance is kept only where the
+ * session writes an allow for that same pattern, because the session decides
+ * every other pattern.
+ *
+ * A kept allowance is followed by each later session refusal that can decide a
+ * command it covers. Only refusals are carried: an appended allow would lift a
+ * refusal the profile wrote, while a session refusal whose literal prefix is
+ * disjoint from the allowance cannot match any command the allowance matches,
+ * so the session map already governs it. A refusal is never dropped in favour of
+ * a later session allow, because the allowance would otherwise decide a command
+ * the session refuses. The composed map is therefore never wider than the
+ * session map, so a session verdict still governs every command the profile
+ * permits.
+ *
+ * Every pattern appears once, at the position of its last decision, so the
+ * rendered map follows the order the decisions were made in.
  */
 function composeRuleMap(
   session: PermissionRuleMap | undefined,
@@ -58,38 +81,30 @@ function composeRuleMap(
 ): PermissionRuleMap | undefined {
   if (session === undefined) return { ...agent };
   const sessionEntries = Object.entries(session);
-  const composed: PermissionRuleMap = {};
-  const allowances: number[] = [];
+  const composed: Array<[string, PermissionAction]> = [];
   for (const [pattern, action] of Object.entries(agent)) {
     // A refusal and an ask apply as written; an allowance needs the session to
     // write the same pattern, which is what the session permits.
     if (action === 'allow' && session[pattern] !== 'allow') continue;
-    composed[pattern] = action;
-    if (action === 'allow') {
-      const index = sessionEntries.findIndex(([key]) => key === pattern);
-      if (index >= 0) allowances.push(index);
+    composed.push([pattern, action]);
+    if (action !== 'allow') continue;
+    const index = sessionEntries.findIndex(([key]) => key === pattern);
+    if (index < 0) continue;
+    for (const [denyIndex, [denyPattern, denyAction]] of sessionEntries.entries()) {
+      if (denyIndex <= index || denyAction !== 'deny') continue;
+      if (!patternsMayCover(pattern, denyPattern)) continue;
+      composed.push([denyPattern, 'deny']);
     }
   }
-  allowances.forEach(allowIndex => {
-    const allowance = sessionEntries[allowIndex]?.[0];
-    if (allowance === undefined) return;
-    sessionEntries.forEach(([pattern, action], index) => {
-      if (action !== 'deny' || index <= allowIndex) return;
-      if (composed[pattern] !== undefined) return;
-      const insideAllowance =
-        matchesKiloPermissionPattern(pattern, allowance) ||
-        matchesKiloPermissionPattern(allowance, pattern);
-      if (!insideAllowance) return;
-      const overriddenLater = sessionEntries.some(
-        ([later, laterAction], laterIndex) =>
-          laterAction === 'allow' &&
-          laterIndex > index &&
-          matchesKiloPermissionPattern(later, pattern)
-      );
-      if (!overriddenLater) composed[pattern] = 'deny';
-    });
+  const lastIndex = new Map<string, number>();
+  composed.forEach(([pattern], index) => {
+    lastIndex.set(pattern, index);
   });
-  return Object.keys(composed).length > 0 ? composed : undefined;
+  const rules: PermissionRuleMap = {};
+  composed.forEach(([pattern, action], index) => {
+    if (lastIndex.get(pattern) === index) rules[pattern] = action;
+  });
+  return Object.keys(rules).length > 0 ? rules : undefined;
 }
 
 /** A single tool value denies when it is `deny` or holds a `deny` rule. */

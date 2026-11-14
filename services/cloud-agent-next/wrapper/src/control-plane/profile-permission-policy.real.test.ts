@@ -288,4 +288,133 @@ suite('pinned Kilo profile permission narrowing', () => {
       await fixture.dispose();
     }
   }, 60_000);
+
+  it('applies a session rule written in another form to a command the profile permits', async () => {
+    if (!binary) throw new Error('KILO_781_BINARY is required');
+    // The session refuses the command through a wildcard form the profile does
+    // not spell, so the composed entry has to keep that refusal.
+    const permission: PermissionMap = {
+      edit: 'deny',
+      bash: { 'git log': 'allow', 'git log *': 'allow', 'git *--output*': 'deny' },
+      webfetch: 'deny',
+    };
+    const fixture = await activityFixture(binary, {
+      permission,
+      runtimeAgents: [profileAgent('profile-intersect', { bash: { 'git log *': 'allow' } })],
+    });
+    try {
+      await initializeRepository(fixture.directory);
+      const written = (await writtenAgent(fixture, 'profile-intersect'))?.permission as Record<
+        string,
+        Record<string, string>
+      >;
+      // The composed entry keeps the session's own order for the commands the
+      // allowance covers, so the narrower session refusal stays last.
+      expect(written.bash?.['git log *']).toBe('allow');
+      expect(written.bash?.['git *--output*']).toBe('deny');
+      const keys = Object.keys(written.bash ?? {});
+      expect(keys.indexOf('git log *')).toBeLessThan(keys.indexOf('git *--output*'));
+
+      requestToolOnce(fixture, [
+        { name: 'bash', arguments: { command: 'git log --output=/tmp/proof-output.txt' } },
+      ]);
+      const deniedSession = await fixture.session();
+      await fixture.prompt(
+        deniedSession,
+        'inspect the repository',
+        fixture.directory,
+        'profile-intersect'
+      );
+      const denied = await settledTool(fixture, deniedSession, 'bash');
+      expect(denied.status).toBe('error');
+      if (denied.status !== 'error') throw new Error('The refused command did not fail');
+      // A permission refusal, not a command failure: the command never ran.
+      expect(denied.error).toContain(
+        'The user has specified a rule which prevents you from using this specific tool call.'
+      );
+      expect(
+        fixture.sessionEvents(deniedSession).filter(event => event.type === 'permission.asked')
+      ).toEqual([]);
+
+      requestToolOnce(fixture, [{ name: 'bash', arguments: { command: 'git log --oneline -1' } }]);
+      const allowedSession = await fixture.session();
+      await fixture.prompt(
+        allowedSession,
+        'inspect the repository',
+        fixture.directory,
+        'profile-intersect'
+      );
+      const allowed = await settledTool(fixture, allowedSession, 'bash');
+      expect(allowed.status).toBe('completed');
+      if (allowed.status !== 'completed') throw new Error('The permitted command did not run');
+      expect(allowed.output).toMatch(/^[0-9a-f]+ fixture-commit\n?$/);
+    } finally {
+      await fixture.dispose();
+    }
+  }, 60_000);
+
+  it('refuses a redirect form of a command the profile permits', async () => {
+    if (!binary) throw new Error('KILO_781_BINARY is required');
+    // The session permits plain listing but refuses a redirected form, and the
+    // profile permits the listing form only. Both policies decide the redirect.
+    const permission: PermissionMap = {
+      edit: 'deny',
+      bash: { ls: 'allow', 'ls *': 'allow', '*|*': 'deny', '*>*': 'deny' },
+      webfetch: 'deny',
+    };
+    const fixture = await activityFixture(binary, {
+      permission,
+      runtimeAgents: [profileAgent('profile-shell', { bash: { 'ls *': 'allow' } })],
+    });
+    try {
+      await initializeRepository(fixture.directory);
+      const written = (await writtenAgent(fixture, 'profile-shell'))?.permission as Record<
+        string,
+        Record<string, string>
+      >;
+      // The composed entry keeps the session's own rule order, so the refusal
+      // follows the allowance that covers the command.
+      expect(written.bash?.['ls *']).toBe('allow');
+      expect(written.bash?.['*|*']).toBe('deny');
+      const keys = Object.keys(written.bash ?? {});
+      expect(keys.indexOf('ls *')).toBeLessThan(keys.indexOf('*|*'));
+
+      // Measured on the pinned CLI: a pipeline is evaluated as separate
+      // segments, so a whole-command rule such as `*|*` decides neither part
+      // while `*>*` sees the redirect form below.
+      requestToolOnce(fixture, [
+        {
+          name: 'bash',
+          arguments: { command: `ls -la > ${path.join(fixture.directory, 'listing.txt')}` },
+        },
+      ]);
+      const deniedSession = await fixture.session();
+      await fixture.prompt(deniedSession, 'list the workspace', fixture.directory, 'profile-shell');
+      const denied = await settledTool(fixture, deniedSession, 'bash');
+      expect(denied.status).toBe('error');
+      if (denied.status !== 'error') throw new Error('The redirected listing did not fail');
+      // A permission refusal, not a command failure: the command never ran.
+      expect(denied.error).toContain(
+        'The user has specified a rule which prevents you from using this specific tool call.'
+      );
+      expect(
+        fixture.sessionEvents(deniedSession).filter(event => event.type === 'permission.asked')
+      ).toEqual([]);
+
+      requestToolOnce(fixture, [{ name: 'bash', arguments: { command: 'ls -la' } }]);
+      const allowedSession = await fixture.session();
+      await fixture.prompt(
+        allowedSession,
+        'list the workspace',
+        fixture.directory,
+        'profile-shell'
+      );
+      const allowed = await settledTool(fixture, allowedSession, 'bash');
+      expect(allowed.status).toBe('completed');
+      if (allowed.status !== 'completed') throw new Error('The permitted listing did not run');
+      expect(allowed.output).toContain('fixture.txt');
+    } finally {
+      await fixture.dispose();
+    }
+  }, 60_000);
 });

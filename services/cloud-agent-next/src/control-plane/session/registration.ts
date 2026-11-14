@@ -40,6 +40,7 @@ import { getCommandGuardPolicy, getCommandGuardPermissions } from '../../session
 import { codeReviewIdFromCallbackTarget } from '../../router/schemas.js';
 import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import { narrowProfileAgents, type PermissionMap } from '../../shared/profile-permission-policy.js';
+import { buildGitHubReviewBashRules } from '../../shared/github-review-bash-rules.js';
 import type { ControlPlaneSessionRegistration } from './session-do.js';
 
 /**
@@ -159,6 +160,18 @@ function materializeAttachPayload(
     }
     throw error;
   }
+}
+
+/**
+ * A flat `bash` action covers every command, so it normalises to the single
+ * wildcard rule; an object keeps its own rules. Mirrors `composedPermissionMap`
+ * in the wrapper, which composes the agent entries against the same shape.
+ */
+function bashRulesOf(permission: PermissionMap): Record<string, 'allow' | 'ask' | 'deny'> {
+  const bash = permission['bash'];
+  if (typeof bash === 'string') return { '*': bash };
+  if (typeof bash === 'object' && bash !== null && !Array.isArray(bash)) return { ...bash };
+  return {};
 }
 
 /**
@@ -288,16 +301,24 @@ export function buildControlPlaneSessionRegistration(
     ...(!isInteractiveSessionOrigin(createdOnPlatform) ? { question: 'deny' } : {}),
     ...(guardPermissions ?? {}),
   };
-  // A guarded session states the session command policy, and a profile agent
-  // carries its own permission map. Apply both here so the stored route spec and
-  // its persisted metadata hold the effective map: the agent's restrictions,
-  // and the session's policy for everything else.
+  // A GitHub code-review session publishes through the trusted publisher, so
+  // the runtime also writes the publisher refusals into the map it composes the
+  // profile entries against. Compose the stored entry against that same map: the
+  // session policy plus the review publisher refusals. A plain code-review
+  // session without a GitHub target composes to the same refusals or stricter,
+  // never wider, so the stored route spec never carries a wider agent entry than
+  // the written `profile.json`.
+  const reviewPublisherRules =
+    commandGuard?.policyName === 'code-review-read-only' && payload.git?.platform === 'github';
+  const compositionPermission: PermissionMap = reviewPublisherRules
+    ? { ...permission, bash: { ...bashRulesOf(permission), ...buildGitHubReviewBashRules() } }
+    : permission;
   const effectiveProfile =
     guardPermissions === undefined || runtimeProfile.runtimeAgents === undefined
       ? runtimeProfile
       : {
           ...runtimeProfile,
-          runtimeAgents: narrowProfileAgents(permission, runtimeProfile.runtimeAgents),
+          runtimeAgents: narrowProfileAgents(compositionPermission, runtimeProfile.runtimeAgents),
         };
   const spec = controlPlaneRouteSpecSchema.parse({
     ...effectiveProfile,

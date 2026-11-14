@@ -357,6 +357,41 @@ describe('todos session links', () => {
       ['Other', 'Other task', false],
     ]);
   });
+
+  it('offers the lists of the session’s own organization, not the caller’s other scope', async () => {
+    const caller = callerFor();
+    const personal = await caller.lists.create({ name: 'Personal' });
+    const organization = await caller.lists.create({
+      organizationId: ORGANIZATION_ID,
+      name: 'Organization',
+    });
+    await caller.items.create({ listId: personal.id, title: 'Personal task' });
+    await caller.items.create({ listId: organization.id, title: 'Organization task' });
+
+    const personalSession = await insertSession();
+    const personalCandidates = await caller.items.candidatesForSession({
+      sessionId: personalSession.session_id,
+    });
+    expect(personalCandidates.map(candidate => candidate.listName)).toEqual(['Personal']);
+
+    const organizationSession = await insertSession({ organization_id: ORGANIZATION_ID });
+    const organizationCandidates = await caller.items.candidatesForSession({
+      sessionId: organizationSession.session_id,
+    });
+    expect(organizationCandidates.map(candidate => candidate.listName)).toEqual(['Organization']);
+  });
+
+  it('offers no personal-list candidates to a session in an organization the caller is not in', async () => {
+    const caller = callerFor();
+    const personal = await caller.lists.create({ name: 'Personal' });
+    await caller.items.create({ listId: personal.id, title: 'Personal task' });
+    const session = await insertSession({ organization_id: FOREIGN_ORGANIZATION_ID });
+
+    const candidates = await caller.items.candidatesForSession({
+      sessionId: session.session_id,
+    });
+    expect(candidates).toEqual([]);
+  });
 });
 
 describe('todos deletion', () => {

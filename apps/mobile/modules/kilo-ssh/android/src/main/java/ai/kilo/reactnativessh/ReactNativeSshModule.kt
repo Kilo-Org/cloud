@@ -285,6 +285,7 @@ class ReactNativeSshModule : Module() {
     val sessionId = sessionIds.next()
     val handler = JsSessionHandler(
       sessionId = sessionId,
+      attemptId = config.attemptId,
       requestIds = requestIds,
       requestHostKey = ::requestHostKey,
       requestPrompts = ::requestPrompts,

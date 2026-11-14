@@ -3,6 +3,7 @@ import Foundation
 /// Bridges the core's session decisions to JavaScript events.
 final class JsSessionHandler: SessionHandler, @unchecked Sendable {
   private let sessionId: String
+  private let attemptId: String
   private let requestHostKey: @Sendable (HostKeyRequest) async -> Bool
   private let requestPrompts: @Sendable (KeyboardInteractiveRequest) async -> PromptReply
   private let notifyDisconnect: @Sendable (DisconnectNotice) -> Void
@@ -10,12 +11,14 @@ final class JsSessionHandler: SessionHandler, @unchecked Sendable {
 
   init(
     sessionId: String,
+    attemptId: String,
     requestIds: IdSequence,
     requestHostKey: @escaping @Sendable (HostKeyRequest) async -> Bool,
     requestPrompts: @escaping @Sendable (KeyboardInteractiveRequest) async -> PromptReply,
     notifyDisconnect: @escaping @Sendable (DisconnectNotice) -> Void
   ) {
     self.sessionId = sessionId
+    self.attemptId = attemptId
     self.requestIds = requestIds
     self.requestHostKey = requestHostKey
     self.requestPrompts = requestPrompts
@@ -32,6 +35,7 @@ final class JsSessionHandler: SessionHandler, @unchecked Sendable {
     await requestHostKey(
       HostKeyRequest(
         sessionId: sessionId,
+        attemptId: attemptId,
         requestId: requestIds.next(),
         host: host,
         port: Int(port),
@@ -50,6 +54,7 @@ final class JsSessionHandler: SessionHandler, @unchecked Sendable {
     let reply = await requestPrompts(
       KeyboardInteractiveRequest(
         sessionId: sessionId,
+        attemptId: attemptId,
         requestId: requestIds.next(),
         name: name,
         instructions: instructions,

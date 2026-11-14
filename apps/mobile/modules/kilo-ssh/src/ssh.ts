@@ -161,6 +161,7 @@ export type {
 
 function nativeConnectConfig(options: ConnectOptions): NativeConnectConfig {
   return {
+    attemptId: options.attemptId ?? '',
     host: options.host,
     port: options.port ?? DEFAULT_PORT,
     username: options.username,

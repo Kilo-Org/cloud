@@ -44,6 +44,8 @@ export type SshAuth =
   | { type: 'keyboardInteractive' };
 
 export type ConnectOptions = {
+  /** Echoed in server requests, including requests raised before connect resolves. */
+  attemptId?: string;
   host: string;
   /** Defaults to 22. */
   port?: number;
@@ -85,6 +87,7 @@ export type ShellOptions = {
 /** The server's host key, awaiting a decision from `answerHostKey`. */
 export type HostKeyRequest = {
   sessionId: string;
+  attemptId: string;
   requestId: string;
   host: string;
   port: number;
@@ -102,6 +105,7 @@ export type KeyboardInteractivePrompt = {
 /** Prompts awaiting answers from `answerPrompts`. */
 export type KeyboardInteractiveRequest = {
   sessionId: string;
+  attemptId: string;
   requestId: string;
   name: string;
   instructions: string;
@@ -190,6 +194,7 @@ export type NativeAuth =
   | { type: 'keyboardInteractive' };
 
 export type NativeConnectConfig = {
+  attemptId: string;
   host: string;
   port: number;
   username: string;

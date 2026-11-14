@@ -4,6 +4,7 @@ import { Effect, Layer, Queue, Stream } from 'effect';
 import { type StoredChatBackend } from './backend-store';
 import { backendTargetId, CREDITS_FAILURE_KEY } from './backend-target';
 import { asMessages } from './turns';
+import { type ChatFlagName } from './chat-flag';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -2245,6 +2246,31 @@ describe('a tool retry queued behind send startup', () => {
     expect(snapshotOf(opened).turns).toEqual([TURN]);
   });
 });
+describe('a flag applied after an answer', () => {
+  it.each(['webSearch', 'kiloTools'] satisfies readonly ChatFlagName[])(
+    'keeps %s moving until a deferred move settles and reports its refusal',
+    async flag => {
+      mcp.tools.push({ definition: { name: 'mcp_kilo_read-file' } });
+      storedTools = [...BASE, ...SETTINGS, 'mcp_kilo_read-file'];
+      await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+      await settled();
+      await setChatFlag({ sessionId: opened, place, flag, next: false });
+      const readFlag = () =>
+        flag === 'webSearch' ? snapshotOf(opened).webSearch : snapshotOf(opened).kiloTools;
+      const whileAnswering = readFlag();
+      failCloneFor = opened;
+      finish?.();
+      await settled();
+
+      expect(whileAnswering).toMatchObject({ kind: 'saved', application: 'moving' });
+      expect(readFlag()).toEqual({ kind: 'saved', choice: false, application: 'behind' });
+      failCloneFor = undefined;
+      await retryChatFlag({ sessionId: opened, place, flag });
+      expect(readFlag()).toEqual({ kind: 'saved', choice: false, application: 'current' });
+    }
+  );
+});
+
 
 describe('releasing a chat with queued operations', () => {
   it('releases the successor after a pending flag turn and its waiting successor settle', async () => {

@@ -1305,8 +1305,14 @@ async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<vo
         if (live === undefined || live.closing) {
           return landed;
         }
-        const result = await ontoTools(landed, live);
-        return result;
+        try {
+          const result = await ontoTools(landed, live);
+          settleFlagApplications(result, 'current');
+          return result;
+        } catch (error) {
+          settleFlagApplications(resolveSessionId(landed), 'behind');
+          throw error;
+        }
       });
       current = moved ?? snapshotOf(from).sessionId;
       if (!failed) {
@@ -1593,6 +1599,23 @@ function writeFlagOf(flag: ChatFlagName, sessionId: string, value: ChatFlag): vo
   change(sessionId, flag === 'webSearch' ? { webSearch: value } : { kiloTools: value });
 }
 
+function settleFlagApplications(
+  sessionId: string,
+  application: 'current' | 'behind'
+): void {
+  const { webSearch, kiloTools } = snapshotOf(sessionId);
+  change(sessionId, {
+    webSearch:
+      webSearch.kind === 'saved' && webSearch.application === 'moving'
+        ? flagApplication(webSearch, application)
+        : webSearch,
+    kiloTools:
+      kiloTools.kind === 'saved' && kiloTools.application === 'moving'
+        ? flagApplication(kiloTools, application)
+        : kiloTools,
+  });
+}
+
 /**
  * Moves the chat onto the tool set its saved choice names.
  *
@@ -1600,7 +1623,11 @@ function writeFlagOf(flag: ChatFlagName, sessionId: string, value: ChatFlag): vo
  * session lagging: the flag stays saved and reports `behind`, and the retry is
  * its recovery.
  */
-async function applyFlag(flag: ChatFlagName, sessionId: string, place: ChatPlace): Promise<void> {
+async function applyFlag(
+  flag: ChatFlagName,
+  sessionId: string,
+  place: ChatPlace
+): Promise<ChatFlagApplication> {
   const id = snapshotOf(sessionId).sessionId;
   const chat = chats.get(id);
   /* Enabling a chat that never discovered tools must reach the server first. */
@@ -1616,9 +1643,10 @@ async function applyFlag(flag: ChatFlagName, sessionId: string, place: ChatPlace
     /* Never under an answer: the tool set would change between two rounds of
        one question. The settle applies it. */
     chat.pendingTools ??= true;
-    return;
+    return 'moving';
   }
   await ontoTools(id, place);
+  return 'current';
 }
 
 /**
@@ -1665,7 +1693,7 @@ export async function setChatFlag(options: {
     }
     let application: ChatFlagApplication = 'current';
     try {
-      await applyFlag(flag, id, place);
+      application = await applyFlag(flag, id, place);
     } catch {
       /* Saved, but this session is not on it. */
       application = 'behind';
@@ -1691,7 +1719,7 @@ export async function retryChatFlag(options: {
     writeFlagOf(flag, id, flagApplication(readFlagOf(flag, id), 'moving'));
     let application: ChatFlagApplication = 'current';
     try {
-      await applyFlag(flag, id, place);
+      application = await applyFlag(flag, id, place);
     } catch {
       application = 'behind';
     }

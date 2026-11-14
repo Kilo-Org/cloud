@@ -147,6 +147,26 @@ describe('LoginMethodsScreen', () => {
     expect(state.mutate).toHaveBeenCalledWith({ provider: 'github' });
   });
 
+  it('refuses to ask when a single linked method is the one being unlinked', async () => {
+    state.providers = [{ provider: 'github', email: 'ada@example.test' }];
+    const root = await mount();
+    const [github] = unlinkButtons(root);
+    if (!github) {
+      throw new Error('missing GitHub unlink button');
+    }
+
+    act(() => {
+      (github.props.onPress as () => void)();
+    });
+
+    expect(state.confirm).not.toHaveBeenCalled();
+    const status = root.findAll(node => Object.is(node.type, 'AccessibleStatus'));
+    expect(status.map(node => node.props.message)).toEqual([
+      "You can't unlink your only sign-in method. Link another method first.",
+    ]);
+    expect(state.mutate).not.toHaveBeenCalled();
+  });
+
   it('reports the last-method rule beside the list in the screen language', async () => {
     state.providers = [{ provider: 'github', email: 'ada@example.test' }];
     const root = await mount();

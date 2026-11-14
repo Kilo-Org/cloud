@@ -126,6 +126,12 @@ export function LoginMethodsScreen() {
   );
 
   const confirmUnlink = (provider: AuthProviderId) => {
+    // The server refuses the last method, so a confirmation would promise an
+    // outcome this tap cannot deliver.
+    if ((providers.data?.providers.length ?? 0) < 2) {
+      setUnlinkError(t('profile.signInMethods.lastMethod'));
+      return;
+    }
     const label = providerLabel(provider);
     confirm({
       title: t('profile.signInMethods.unlinkTitle', { provider: label }),

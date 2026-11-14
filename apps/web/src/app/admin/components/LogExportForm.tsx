@@ -16,7 +16,7 @@ type LogExportFormProps = {
   downloadPath: string;
   idLabel: string;
   idPlaceholder: string;
-  idInputMode?: 'numeric';
+  idDescription?: string;
   showErrorsOnly?: boolean;
   /** Optional gate that must succeed before the browser navigates. */
   preflight?: () => Promise<void>;
@@ -28,7 +28,7 @@ export function LogExportForm({
   downloadPath,
   idLabel,
   idPlaceholder,
-  idInputMode,
+  idDescription,
   showErrorsOnly = false,
   preflight,
 }: LogExportFormProps) {
@@ -102,11 +102,16 @@ export function LogExportForm({
             <Label htmlFor={`${fieldId}-id`}>{idLabel}</Label>
             <Input
               id={`${fieldId}-id`}
-              inputMode={idInputMode}
+              aria-describedby={idDescription ? `${fieldId}-id-help` : undefined}
               placeholder={idPlaceholder}
               value={id}
               onChange={e => setId(e.target.value)}
             />
+            {idDescription && (
+              <p id={`${fieldId}-id-help`} className="text-muted-foreground text-xs">
+                {idDescription}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">

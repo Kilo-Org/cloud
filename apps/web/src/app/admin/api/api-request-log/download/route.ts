@@ -2,7 +2,20 @@ import { connection, type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { api_request_log } from '@kilocode/db/schema';
-import { and, gte, lte, eq, asc, gt, count, or, isNotNull, like, type SQL } from 'drizzle-orm';
+import {
+  and,
+  gte,
+  lte,
+  eq,
+  asc,
+  gt,
+  count,
+  inArray,
+  or,
+  isNotNull,
+  like,
+  type SQL,
+} from 'drizzle-orm';
 import {
   apiRequestLogBlobSchema,
   getApiRequestLogBlob,
@@ -83,12 +96,12 @@ async function loadBodies(row: {
 
 function buildFilter(
   { userId, organizationId, start, end, modelPrefix, sessionId }: LogExportFilters,
-  id: bigint | null,
+  ids: bigint[] | null,
   errorsOnly: boolean
 ) {
   const conditions: SQL[] = [];
-  if (id !== null) {
-    conditions.push(eq(api_request_log.id, id));
+  if (ids !== null) {
+    conditions.push(inArray(api_request_log.id, ids));
   }
   if (userId) {
     conditions.push(eq(api_request_log.kilo_user_id, userId));
@@ -134,19 +147,24 @@ export async function GET(request: NextRequest) {
 
   const searchParams = request.nextUrl.searchParams;
   const id = searchParams.get('id');
+  const idTokens = id === null ? null : id.split(',').map(token => token.trim());
   const errorsOnly = searchParams.get('errorsOnly') === 'true';
 
-  if (id !== null && (!/^[1-9]\d{0,18}$/.test(id) || BigInt(id) > BigInt('9223372036854775807'))) {
+  if (
+    idTokens?.some(
+      token => !/^[1-9]\d{0,18}$/.test(token) || BigInt(token) > BigInt('9223372036854775807')
+    )
+  ) {
     return jsonError('Invalid log ID. Use an integer between 1 and 9223372036854775807.', 400);
   }
-  const parsedId = id === null ? null : BigInt(id);
+  const parsedIds = idTokens === null ? null : [...new Set(idTokens.map(token => BigInt(token)))];
 
   const parsedFilters = await parseLogExportFilters(searchParams);
   if (!parsedFilters.ok) {
     return parsedFilters.response;
   }
   const { filters } = parsedFilters;
-  const filter = buildFilter(filters, parsedId, errorsOnly);
+  const filter = buildFilter(filters, parsedIds, errorsOnly);
 
   const [result] = await db.select({ total: count() }).from(api_request_log).where(filter);
   if (result.total === 0) {
@@ -164,7 +182,10 @@ export async function GET(request: NextRequest) {
       target: audit.target,
       message: 'Started API request log ZIP export',
       metadata: {
-        logId: parsedId?.toString() ?? null,
+        logId: parsedIds?.length === 1 ? parsedIds[0].toString() : null,
+        ...(parsedIds && parsedIds.length > 1
+          ? { logIds: parsedIds.map(id => id.toString()) }
+          : {}),
         ...audit.metadata,
         errorsOnly,
         matchingRows: result.total,
@@ -231,6 +252,12 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  const suffix = `${errorsOnly ? '_errors-only' : ''}${parsedId !== null ? `_id-${parsedId}` : ''}`;
+  const idSuffix =
+    parsedIds === null
+      ? ''
+      : parsedIds.length === 1
+        ? `_id-${parsedIds[0]}`
+        : `_ids-${parsedIds.length}`;
+  const suffix = `${errorsOnly ? '_errors-only' : ''}${idSuffix}`;
   return zipDownloadResponse(stream, logExportFilename('api-request-log', filters, suffix));
 }

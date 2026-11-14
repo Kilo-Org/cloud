@@ -190,6 +190,38 @@ describe('getDatabaseClientConfig', () => {
     });
   });
 
+  describe('with percent-encoded credentials', () => {
+    beforeEach(() => {
+      delete process.env.DATABASE_CA;
+    });
+
+    it('decodes escaped characters in the user, password and database name', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://us%40er:p%40ss@db.example.com:5432/db%2Fname?sslmode=require'
+      );
+
+      expect(config).toMatchObject({
+        user: 'us@er',
+        password: 'p@ss',
+        host: 'db.example.com',
+        port: 5432,
+        database: 'db/name',
+      });
+    });
+
+    it('keeps credentials that need no escaping unchanged', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=require'
+      );
+
+      expect(config).toMatchObject({
+        user: 'user',
+        password: 'secret',
+        database: 'mydb',
+      });
+    });
+  });
+
   describe('with DATABASE_CA set', () => {
     const pem = '-----BEGIN CERTIFICATE-----\\nabc\\n-----END CERTIFICATE-----';
 

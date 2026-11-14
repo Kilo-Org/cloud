@@ -107,13 +107,13 @@ async function readStoredIdentities(): Promise<Map<string, SessionTokenIdentity>
   }
 }
 
-/** True when a record belongs to the account a caller asked about; a null scope asks about any. */
-function belongsTo(identity: SessionTokenIdentity, scope: SessionTokenScope | null): boolean {
-  return (
-    scope === null ||
-    (identity.userId === scope.userId && identity.organizationId === scope.organizationId)
-  );
+/** True when a record belongs to one session's account and organization. */
+function belongsTo(identity: SessionTokenIdentity, scope: SessionTokenScope): boolean {
+  return identity.userId === scope.userId && identity.organizationId === scope.organizationId;
 }
+
+/** The account a teardown retires for: every organization it followed under on this device. */
+export type SessionTokenAccount = { readonly userId: string };
 
 /**
  * One session's record after a restart: what the previous process wrote first,
@@ -233,7 +233,7 @@ export async function readSessionTokenIdentity(
 ): Promise<{ readonly version: number; readonly tokens: readonly string[] } | null> {
   await ensureHydrated();
   const identity = identities.get(sessionId);
-  if (identity === undefined || !belongsTo(identity, scope)) {
+  if (identity === undefined || (scope !== null && !belongsTo(identity, scope))) {
     return null;
   }
   return { version: identity.version, tokens: identity.tokens };
@@ -249,7 +249,7 @@ export async function readSessionTokenIdentities(
 }
 
 /** Every recorded identity of one account, so a scope teardown can delete the rows they name. */
-export async function readSessionTokenIdentitiesForScope(scope: SessionTokenScope | null): Promise<
+export async function readSessionTokenIdentitiesForScope(account: SessionTokenAccount): Promise<
   readonly {
     readonly sessionId: string;
     readonly version: number;
@@ -259,7 +259,7 @@ export async function readSessionTokenIdentitiesForScope(scope: SessionTokenScop
   await ensureHydrated();
   const records: { sessionId: string; version: number; tokens: readonly string[] }[] = [];
   for (const [sessionId, identity] of identities) {
-    if (belongsTo(identity, scope)) {
+    if (identity.userId === account.userId) {
       records.push({ sessionId, version: identity.version, tokens: identity.tokens });
     }
   }
@@ -273,7 +273,9 @@ export async function readSessionTokenIdentitiesForScope(scope: SessionTokenScop
  */
 export function forgetSessionTokenIdentity(sessionId: string, version?: number): void {
   const current = identities.get(sessionId);
-  if (version !== undefined && current?.version !== version) {
+  // A record that is gone is still worth a write: the stored copy may still
+  // hold it, and the next process would merge it back.
+  if (version !== undefined && current !== undefined && current.version !== version) {
     return;
   }
   identities.delete(sessionId);
@@ -281,8 +283,10 @@ export function forgetSessionTokenIdentity(sessionId: string, version?: number):
     if (!(await ensureHydrated())) {
       return;
     }
-    // Hydration may have merged the record back in: retire only the version this call read.
-    if (version !== undefined && identities.get(sessionId)?.version !== version) {
+    // Hydration may have merged a newer record back in: retire only the version
+    // this call read. The absence this call created is not a newer version.
+    const latest = identities.get(sessionId);
+    if (version !== undefined && latest !== undefined && latest.version !== version) {
       return;
     }
     identities.delete(sessionId);
@@ -296,7 +300,7 @@ export function forgetSessionTokenIdentity(sessionId: string, version?: number):
  * next cleanup has to remove.
  */
 export function retireSessionTokenIdentities(
-  scope: SessionTokenScope | null,
+  account: SessionTokenAccount,
   failed: ReadonlySet<string>
 ): void {
   void (async () => {
@@ -307,7 +311,7 @@ export function retireSessionTokenIdentities(
     /* A delete or a rewrite of the entry being visited is well defined for a
        `Map` iterator, and every other entry keeps its turn. */
     for (const [sessionId, identity] of identities) {
-      if (belongsTo(identity, scope)) {
+      if (identity.userId === account.userId) {
         const kept = identity.tokens.filter(token => failed.has(token));
         if (kept.length !== identity.tokens.length) {
           changed = true;

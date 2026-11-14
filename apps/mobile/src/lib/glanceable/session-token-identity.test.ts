@@ -122,12 +122,31 @@ describe('session token identities', () => {
       'ExponentPushToken[second]',
     ]);
 
-    retireSessionTokenIdentities(null, new Set());
+    retireSessionTokenIdentities(CTX, new Set());
     await vi.waitFor(() => {
       expect(stored.get(SESSION_TOKEN_IDENTITY_KEY) ?? '').not.toContain('ExponentPushToken');
     });
     restart();
     expect(await readSessionTokenIdentities('session-2', CTX)).toEqual([]);
+  });
+
+  it('persists the record it drops, so a restart does not merge it back', async () => {
+    rememberSessionTokenIdentity('session-1', CTX, 'ExponentPushToken[released]');
+    await settled('ExponentPushToken[released]');
+    const read = await readSessionTokenIdentity('session-1', CTX);
+    if (read === null) {
+      throw new Error('the recorded identity must be readable');
+    }
+
+    forgetSessionTokenIdentity('session-1', read.version);
+
+    await vi.waitFor(() => {
+      expect(stored.get(SESSION_TOKEN_IDENTITY_KEY) ?? '').not.toContain(
+        'ExponentPushToken[released]'
+      );
+    });
+    restart();
+    expect(await readSessionTokenIdentities('session-1', CTX)).toEqual([]);
   });
 
   it('keeps the newest sessions only', async () => {

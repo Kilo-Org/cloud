@@ -237,6 +237,66 @@ describe('delivery registerTokens', () => {
     expect(trpcMock.registerActivityToken.mutate).not.toHaveBeenCalled();
   });
 
+  it("retires only the account being torn down, leaving another account's identity alone", async () => {
+    platformMock.OS = 'android';
+    const recordStore = new Map<string, string>([
+      ['widget-store-accessibility', 'after-first-unlock'],
+      [
+        SESSION_TOKEN_IDENTITY_KEY,
+        JSON.stringify({
+          version: 1,
+          sessions: {
+            'session-mine': {
+              userId: 'u1',
+              organizationId: null,
+              version: 1,
+              tokens: ['ExponentPushToken[mine]'],
+            },
+            'session-theirs': {
+              userId: 'u2',
+              organizationId: null,
+              version: 2,
+              tokens: ['ExponentPushToken[theirs]'],
+            },
+          },
+        }),
+      ],
+    ]);
+    _setSessionTokenIdentityStoreForTests({
+      getItemAsync: (key: string) => Promise.resolve(recordStore.get(key) ?? null),
+      setItemAsync: (key: string, value: string) => {
+        recordStore.set(key, value);
+        return Promise.resolve();
+      },
+    });
+    // The device's active user id still names the account being torn down.
+    const secureStore = await import('expo-secure-store');
+    vi.mocked(secureStore.getItemAsync).mockImplementation((key: string) =>
+      Promise.resolve(key === 'active-user-id' ? 'u1' : null)
+    );
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setGetDevicePushTokenForTests(() => Promise.resolve('android-token-now'));
+    getGlanceableDelivery().registerTokens(snapshot(), null, 'u1');
+    await vi.waitFor(() => {
+      expect(trpcMock.registerActivityToken.mutate).toHaveBeenCalled();
+    });
+
+    await getGlanceableDelivery().unregisterTokens('scope');
+
+    /* The other account's token cannot be deleted with this account's
+       credentials, so it is not sent and its identity stays able to name it. */
+    expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledWith({
+      token: 'ExponentPushToken[mine]',
+    });
+    expect(trpcMock.unregisterActivityToken.mutate).not.toHaveBeenCalledWith({
+      token: 'ExponentPushToken[theirs]',
+    });
+    expect(await readSessionTokenIdentities('session-mine', null)).toEqual([]);
+    expect(await readSessionTokenIdentities('session-theirs', null)).toEqual([
+      'ExponentPushToken[theirs]',
+    ]);
+  });
+
   it('deletes the rows a previous process recorded, and keeps an identity whose delete failed', async () => {
     platformMock.OS = 'android';
     /* A previous process's identities: the token sets this process holds name
@@ -271,6 +331,11 @@ describe('delivery registerTokens', () => {
         return Promise.resolve();
       },
     });
+    // The device's active user id still names the account being torn down.
+    const secureStore = await import('expo-secure-store');
+    vi.mocked(secureStore.getItemAsync).mockImplementation((key: string) =>
+      Promise.resolve(key === 'active-user-id' ? 'u1' : null)
+    );
     // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
     _setGetDevicePushTokenForTests(() => Promise.resolve('android-token-now'));
     getGlanceableDelivery().registerTokens(snapshot(), null, 'u1');

@@ -15,10 +15,11 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import {
   type DismissFailure,
+  isDismissFailureRetryable,
   resolveDismissFailure,
 } from '@/components/security-agent/dismiss-finding-failure';
 import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
-import { isSecuritySyncRetryable, securityMutationCopyKey } from '@/lib/security-agent-ledger';
+import { securityMutationCopyKey } from '@/lib/security-agent-ledger';
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
 import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
@@ -103,7 +104,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
             comment,
             lastError: error.message,
             lastErrorKey: securityMutationCopyKey(error),
-            retryable: isSecuritySyncRetryable(error),
+            retryable: isDismissFailureRetryable(error),
           });
         },
       }

@@ -334,13 +334,31 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     expect(renderedTexts(root.root)).toContain(IN_PROGRESS_COPY);
   });
 
-  it('disables the dismissal CTA and shows the persistence-failure copy after a non-retryable error', () => {
+  it('keeps the dismissal CTA live for a ledger persistence failure, whose copy invites the retry', () => {
     dismiss.isError = true;
     dismiss.error = mapSecurityDismissOperationError(new Error(PERSISTENCE_FAILED_MESSAGE));
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(true);
+    // The key was rotated, so a resubmit is a fresh intent; leaving the CTA
+    // down would give the reader "try again later" with no way to try.
+    expect(buttonDisabled(root.root)).toBe(false);
+    expect(renderedTexts(root.root)).toContain(PERSISTENCE_FAILED_MESSAGE);
+  });
+
+  it('keeps the CTA live when a stored draft predates the retry rule', () => {
+    dismissDraft.draft = {
+      reason: 'not_used',
+      comment: '',
+      lastError: PERSISTENCE_FAILED_MESSAGE,
+      lastErrorKey: null,
+      retryable: false,
+    };
+
+    const root = renderScreen();
+    selectReason();
+
+    expect(buttonDisabled(root.root)).toBe(false);
     expect(renderedTexts(root.root)).toContain(PERSISTENCE_FAILED_MESSAGE);
   });
 

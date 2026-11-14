@@ -256,8 +256,12 @@ describe('handleInstallationCreated sharing-admission serialization', () => {
   });
 
   afterEach(async () => {
-    // A test that fails on a gate assertion must not leave the pause installed
-    // for the tests that follow it.
+    // A test that fails on a gate assertion must not leave a paused call
+    // waiting: release any installed pause, then clear the gate state for the
+    // tests that follow it.
+    autoCompleteGateState.failBind = false;
+    autoCompleteGateState.release?.();
+    autoCompleteGateState.releaseBind?.();
     autoCompleteGateState.gate = null;
     autoCompleteGateState.entered = null;
     autoCompleteGateState.release = null;
@@ -266,7 +270,6 @@ describe('handleInstallationCreated sharing-admission serialization', () => {
     autoCompleteGateState.bindEntered = null;
     autoCompleteGateState.releaseBind = null;
     autoCompleteGateState.markBindEntered = null;
-    autoCompleteGateState.failBind = false;
     await cleanupDbForTest();
   });
 

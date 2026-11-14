@@ -291,8 +291,8 @@ const pluginEntries = (config.plugins ?? []).map(plugin =>
 const pluginNames = pluginEntries.map(entry => entry.name);
 /** The first entry for a plugin name, with the options it was configured with. */
 const pluginEntry = name => pluginEntries.find(entry => entry.name === name);
-for (const { name } of REQUIRED_PLUGINS) {
-  check(pluginNames.includes(name), `plugins must include "${name}"`);
+for (const { name, reason } of REQUIRED_PLUGINS) {
+  check(pluginNames.includes(name), `plugins must include "${name}": ${reason}`);
 }
 // Without the Sentry Android Gradle Plugin a release build uploads no NDK
 // symbols or R8 mapping, and Android native crashes reach Sentry unsymbolicated.

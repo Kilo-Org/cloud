@@ -209,9 +209,12 @@ const REQUIRED_ENV: Record<string, string | undefined> = Object.fromEntries(
 
 const BASE_ENV: Record<string, string | undefined> = {
   ...REQUIRED_ENV,
+  // Every optional key is cleared, so a value exported in the caller's shell
+  // cannot reach the evaluated config: an optional URL with a foreign host
+  // would fail the production host gate inside a case that did not set it.
+  ...Object.fromEntries(Object.values(OPTIONAL_ENV_KEYS).map(name => [name, undefined])),
   EAS_BUILD_PROFILE: undefined,
   SENTRY_AUTH_TOKEN: undefined,
-  GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER: undefined,
   GITHUB_ACTIONS: undefined,
 };
 

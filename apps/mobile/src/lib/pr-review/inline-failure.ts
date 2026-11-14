@@ -21,7 +21,7 @@ import { type ProviderPrPlatform } from '@/lib/pr-review/provider-pr-ref';
 export type PrInlineAnnounce = 'here' | 'toast' | 'silent';
 
 /** Which validation/gate outcomes this surface announces itself. */
-export type PrInlineSurface = 'composer' | 'edit-comment' | 'reply';
+type PrInlineSurface = 'composer' | 'edit-comment' | 'reply';
 
 /**
  * A composer-family inline failure. `reconnect` carries no copy because

@@ -27,7 +27,7 @@ export type SurfaceFeedbackController<Failure extends SurfaceFailure> = {
   readonly clearWhere: (matches: (failure: Failure) => boolean) => void;
 };
 
-export type KeyedSurfaceFeedbackController<Key extends string, Failure extends SurfaceFailure> = {
+type KeyedSurfaceFeedbackController<Key extends string, Failure extends SurfaceFailure> = {
   readonly snapshot: SurfaceFeedbackSnapshot<Key, Failure>;
   readonly begin: (key: Key) => SurfaceAttempt<Failure> | null;
   readonly clearWhere: (key: Key, matches: (failure: Failure) => boolean) => void;
@@ -36,7 +36,7 @@ export type KeyedSurfaceFeedbackController<Key extends string, Failure extends S
 const IDLE_DEFAULT: SurfaceFeedback<never> = { status: 'idle' };
 const DEFAULT_KEY = 'default';
 
-export function useKeyedSurfaceFeedback<
+function useKeyedSurfaceFeedback<
   Key extends string,
   Failure extends SurfaceFailure,
 >(): KeyedSurfaceFeedbackController<Key, Failure> {

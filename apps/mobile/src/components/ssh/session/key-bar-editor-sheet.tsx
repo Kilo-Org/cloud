@@ -1,9 +1,10 @@
 import { styled } from 'nativewind';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, type ScrollViewInstance, View } from 'react-native';
+import { Pressable, type ScrollViewInstance, useWindowDimensions, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useAnimatedRef } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Sortable from 'react-native-sortables';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -28,6 +29,12 @@ import { cn } from '@/lib/utils';
 const SortableHandle = styled(Sortable.Handle, { className: 'style' });
 
 const ROW_CLASS = 'flex-row items-center gap-1 rounded-lg bg-secondary py-1 pl-1 pr-2';
+
+/** The tallest the list may grow before it scrolls, as a share of the window. */
+const LIST_MAX_WINDOW_FRACTION = 0.5;
+const LIST_MAX_HEIGHT_DP = 420;
+/** Clearance under the footer, on top of the window's bottom inset. */
+const FOOTER_CLEARANCE_DP = 16;
 
 type KeyBarRowProps = Readonly<{
   terminalKey: TerminalKey;
@@ -108,9 +115,15 @@ type KeyBarEditorSheetProps = Readonly<{
  */
 export function KeyBarEditorSheet({ visible, state, onClose }: KeyBarEditorSheetProps) {
   const { t } = useTranslation();
+  const { height: windowHeight } = useWindowDimensions();
+  const { bottom } = useSafeAreaInsets();
   const scrollRef = useAnimatedRef<ScrollViewInstance>();
   const keys = useMemo(() => keyBarKeys(state.layout), [state.layout]);
   const hidden = useMemo(() => new Set<TerminalKeyId>(state.layout.hidden), [state.layout]);
+  const listMaxHeight = Math.min(
+    LIST_MAX_HEIGHT_DP,
+    Math.round(windowHeight * LIST_MAX_WINDOW_FRACTION)
+  );
 
   let body = null;
   if (state.status === 'loading') {
@@ -143,7 +156,7 @@ export function KeyBarEditorSheet({ visible, state, onClose }: KeyBarEditorSheet
             and the drag handles are gesture-handler gestures. */}
         <Animated.ScrollView
           ref={scrollRef}
-          className="max-h-[420px]"
+          style={{ maxHeight: listMaxHeight }}
           keyboardShouldPersistTaps="handled"
         >
           <Sortable.Grid
@@ -188,7 +201,7 @@ export function KeyBarEditorSheet({ visible, state, onClose }: KeyBarEditorSheet
 
   return (
     <Sheet visible={visible} onClose={onClose} dismissGestures={false}>
-      <View className="gap-4 px-4 pb-4 pt-2">
+      <View className="gap-4 px-4 pt-2" style={{ paddingBottom: bottom + FOOTER_CLEARANCE_DP }}>
         <View className="gap-1">
           <Text
             accessibilityRole="header"
@@ -203,6 +216,7 @@ export function KeyBarEditorSheet({ visible, state, onClose }: KeyBarEditorSheet
           ) : null}
         </View>
         {body}
+        <View className="h-px bg-border" />
         <View className="flex-row gap-2">
           <Button
             variant="outline"

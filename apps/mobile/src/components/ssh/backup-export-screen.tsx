@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -5,27 +6,27 @@ import { View } from 'react-native';
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
+import { SshBackupLoading } from '@/components/ssh/backup-loading';
 import { SshBackupSummary } from '@/components/ssh/backup-summary';
 import { SshStorageError } from '@/components/ssh/ssh-storage-error';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Button } from '@/components/ui/button';
-import { FormFieldLabel } from '@/components/ui/form-field-label';
-import { Lock } from '@/components/ui/icons';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { FormField } from '@/components/ui/form-field';
+import { Lock, Server } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { trackSshExport } from '@/lib/ssh/analytics';
 import { shareSshBackup, sshBackupFailure } from '@/lib/ssh/backup-file';
 import { BACKUP_COLLECTIONS } from '@/lib/ssh/backup-payload';
-import { SSH_HOSTS_ROUTE } from '@/lib/ssh/routes';
+import { SSH_HOST_NEW_ROUTE, SSH_HOSTS_ROUTE } from '@/lib/ssh/routes';
 import { useSshBackup } from '@/lib/ssh/use-backup';
 
 export function SshBackupExportScreen({ dev }: { dev?: string }) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const router = useRouter();
   const backup = useSshBackup();
   const passphrase = useRef('');
   const confirmation = useRef('');
@@ -68,12 +69,7 @@ export function SshBackupExportScreen({ dev }: { dev?: string }) {
   }
   let body: ReactNode = null;
   if (backup.isPending || dev === 'loading') {
-    body = (
-      <View className="gap-4 p-4">
-        <Skeleton className="h-64 rounded-xl" />
-        <Skeleton className="h-12 rounded-md" />
-      </View>
-    );
+    body = <SshBackupLoading exporting />;
   } else if (backup.isError || dev === 'error') {
     body = (
       <SshStorageError
@@ -83,7 +79,22 @@ export function SshBackupExportScreen({ dev }: { dev?: string }) {
       />
     );
   } else if (empty || dev === 'empty') {
-    body = <EmptyState icon={Lock} title={t('ssh.backup.empty')} />;
+    body = (
+      <EmptyState
+        icon={Server}
+        title={t('ssh.backup.empty')}
+        action={
+          <Button
+            className={STATE_ACTION_CLASS}
+            onPress={() => {
+              router.push(SSH_HOST_NEW_ROUTE);
+            }}
+          >
+            <Text>{t('ssh.hosts.addHost')}</Text>
+          </Button>
+        }
+      />
+    );
   } else {
     body = (
       <DetailScreenScrollView
@@ -95,42 +106,34 @@ export function SshBackupExportScreen({ dev }: { dev?: string }) {
         <Text className="text-sm text-muted-foreground">{t('ssh.backup.exportDescription')}</Text>
         <SshBackupSummary backup={backup.data} />
         <View className="gap-1.5">
-          <FormFieldLabel label={t('ssh.session.passphrase')} />
-          <Input
-            accessibilityLabel={t('ssh.session.passphrase')}
+          <FormField
+            label={t('ssh.session.passphrase')}
             secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
-            editable={!busy}
+            disabled={busy}
             onChangeText={value => {
               passphrase.current = value;
               setLength(value.length);
               setConfirmed(value === confirmation.current);
             }}
           />
-          <Text className="min-h-10 text-xs text-muted-foreground">{t(strengthKey)}</Text>
+          <Text className="min-h-10 text-sm text-muted-foreground">{t(strengthKey)}</Text>
         </View>
-        <View className="gap-1.5">
-          <FormFieldLabel label={t('ssh.backup.confirmPassphrase')} />
-          <Input
-            accessibilityLabel={t('ssh.backup.confirmPassphrase')}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!busy}
-            onChangeText={value => {
-              confirmation.current = value;
-              setConfirmationTouched(value.length > 0);
-              setConfirmed(value === passphrase.current);
-            }}
-          />
-          <View className="min-h-10">
-            <AccessibleStatus
-              message={confirmationTouched && !confirmed ? t('ssh.backup.mismatch') : null}
-              className="text-sm"
-            />
-          </View>
-        </View>
+        <FormField
+          label={t('ssh.backup.confirmPassphrase')}
+          error={confirmationTouched && !confirmed ? t('ssh.backup.mismatch') : undefined}
+          reserveErrorMessages={[t('ssh.backup.mismatch')]}
+          secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
+          disabled={busy}
+          onChangeText={value => {
+            confirmation.current = value;
+            setConfirmationTouched(value.length > 0);
+            setConfirmed(value === passphrase.current);
+          }}
+        />
         <Button
           className={STATE_ACTION_CLASS}
           disabled={busy || length < 8 || !confirmed}

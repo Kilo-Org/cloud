@@ -49,6 +49,7 @@ import { useAfterIdle } from '@/lib/hooks/use-after-idle';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganization } from '@/lib/organization-context';
+import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
 import {
   getCodeReviewerProfilePath,
   getProfileAgentScope,
@@ -108,6 +109,11 @@ export function ProfileScreen() {
   const { openPicker } = useContextPicker(orgs);
   const selectedOrg = orgs?.find(org => org.organizationId === organizationId);
   const orgRole = selectedOrg?.role;
+  // A settled read that lists no memberships still keeps the section: its Create
+  // organization row is the app's only entry to that flow, so an account with no
+  // organization has to be able to start one. The account-picker row is dropped
+  // in that case alone — it would list Personal and nothing else.
+  const hasOrganizations = (orgs?.length ?? 0) > 0;
   // The Organization section stays on Profile in every credit-account context:
   // a Personal context still offers the account picker when the account has
   // memberships, so organization management is not gated behind the credits
@@ -115,10 +121,12 @@ export function ProfileScreen() {
   // paints for a frame before the active organization's row replaces it. A
   // memberships read that failed keeps the section too: its error and Retry live
   // inside this block, so hiding the section while the list is unavailable would
-  // drop the only retry. Only a read that settles with no memberships hides it.
+  // drop the only retry. A read that is still loading, or paused offline before
+  // it ever fetched, keeps the section hidden: no empty state paints before the
+  // list settles.
   const showOrganizationSection =
     organizationId != null ||
-    (organizationContextLoaded && ((orgs?.length ?? 0) > 0 || organizationsError));
+    (organizationContextLoaded && (organizationsError || orgs !== undefined));
 
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
   // The prompt's surface is platform-specific (`feedback-prompt-platform.ts`);
@@ -358,7 +366,7 @@ export function ProfileScreen() {
               />
             ) : (
               <>
-                {organizationRow}
+                {(organizationId != null || hasOrganizations) && organizationRow}
                 <ConfigureRow
                   icon={Plus}
                   title={t('organization.create.title')}
@@ -366,7 +374,7 @@ export function ProfileScreen() {
                   className="rounded-lg bg-secondary px-3"
                   last
                   onPress={() => {
-                    router.push('/(app)/(tabs)/(3_profile)/organization/create' as Href);
+                    router.push(CREATE_ORGANIZATION_HREF);
                   }}
                 />
               </>

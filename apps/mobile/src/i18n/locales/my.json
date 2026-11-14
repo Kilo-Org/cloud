@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "PR မရနိုင်ပါ",
     "pullRequestUnavailableDescription": "ဒီ PR ကို ဖွင့်၍မရပါ။ ဖျက်ထားပြီးဖြစ်ခြင်း၊ ကုဒ်သိုလှောင်ရာကို သီးသန့်ထားခြင်း သို့မဟုတ် Kilo GitHub အက်ပ်ကို ထည့်သွင်းမထားခြင်းကြောင့် ဖြစ်နိုင်ပါသည်။",
+    "pullRequestDiscussionUnavailableMessage": "ချိတ်ဆက်မှု မအောင်မြင်ခဲ့ခြင်း သို့မဟုတ် ဒီ PR ကို ဖယ်ရှားထားခြင်းကြောင့် ဖြစ်နိုင်ပါသည်။",
     "accessDeniedDescription": "ဒီ PR ကို ကြည့်ရှုခွင့် မရှိပါ။",
     "noFilesChanged": "ပြောင်းလဲထားသော ဖိုင်မရှိပါ",
     "noFilesChangedDescription": "ဒီ PR တွင် ဖိုင်ပြောင်းလဲမှု မရှိပါ။",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Merge request ကို မျှဝေပါ",
       "viewOnProvider": "{{provider}} တွင် ကြည့်ရန်",
       "mergeRequestUnavailable": "Merge request မရနိုင်ပါ",
-      "unavailableDescription": "၎င်းကို ဖယ်ရှားထားခြင်း ဖြစ်နိုင်သည်၊ သို့မဟုတ် သင့်တွင် ဝင်ရောက်ခွင့် မရှိနိုင်ပါ။",
+      "unavailableDescription": "ချိတ်ဆက်မှု မအောင်မြင်ခဲ့ခြင်း၊ ၎င်းကို ဖျက်ထားခြင်း သို့မဟုတ် ဝင်ရောက်၍မရခြင်းတို့ကြောင့် ဖြစ်နိုင်ပါသည်။",
       "accessDeniedMergeRequest": "ဒီ merge request ကို ကြည့်ရှုခွင့် မရှိပါ။",
       "couldNotLoadMergeRequest": "Merge request ကို ရယူ၍မရပါ။",
       "discussionAccessDenied": "ဒီ merge request ၏ ဆွေးနွေးချက်ကို ကြည့်ရှုခွင့် မရှိပါ။",
-      "discussionUnavailableMessage": "ဒီ merge request ကို ဖယ်ရှားထားခြင်း ဖြစ်နိုင်ပါသည်။",
+      "discussionUnavailableMessage": "ချိတ်ဆက်မှု မအောင်မြင်ခဲ့ခြင်း သို့မဟုတ် ဒီ Merge request ကို ဖယ်ရှားထားခြင်းကြောင့် ဖြစ်နိုင်ပါသည်။",
       "noDiscussionDescription": "ဒီ merge request တွင် သုံးသပ်မှု ဆွေးနွေးချက်တွဲများ သို့မဟုတ် စကားဝိုင်းမှတ်ချက်များ မရှိပါ။",
       "noFilesChangedDescription": "ဒီ merge request တွင် ဖိုင်ပြောင်းလဲမှု မရှိပါ။"
     }

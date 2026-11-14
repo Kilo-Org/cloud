@@ -537,6 +537,7 @@
   "prReview": {
     "pullRequestUnavailable": "Pull request unavailable",
     "pullRequestUnavailableDescription": "This PR can't be opened. It may have been deleted, the repository is private, or the Kilo GitHub App isn't installed on it.",
+    "pullRequestDiscussionUnavailableMessage": "The connection may have failed, or the pull request may have been removed.",
     "accessDeniedDescription": "You don't have permission to view this pull request.",
     "noFilesChanged": "No files changed",
     "noFilesChangedDescription": "This pull request has no file changes.",
@@ -1067,11 +1068,11 @@
       "shareMergeRequest": "Share merge request",
       "viewOnProvider": "View on {{provider}}",
       "mergeRequestUnavailable": "Merge request unavailable",
-      "unavailableDescription": "It may be deleted, or you may lack access.",
+      "unavailableDescription": "The connection may have failed, or the item may be deleted or inaccessible.",
       "accessDeniedMergeRequest": "You don't have permission to view this merge request.",
       "couldNotLoadMergeRequest": "Could not load merge request",
       "discussionAccessDenied": "You don't have permission to view this merge request's discussion.",
-      "discussionUnavailableMessage": "This merge request may have been removed.",
+      "discussionUnavailableMessage": "The connection may have failed, or the merge request may have been removed.",
       "noDiscussionDescription": "No review threads or conversation comments on this merge request.",
       "noFilesChangedDescription": "This merge request has no file changes."
     }

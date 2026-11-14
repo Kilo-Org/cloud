@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Sameiningarbeiðni ekki tiltæk",
     "pullRequestUnavailableDescription": "Ekki er hægt að opna þessa PR-beiðni. Henni gæti hafa verið eytt, kóðageymslan gæti verið lokuð eða Kilo-forritið fyrir GitHub er ekki uppsett í henni.",
+    "pullRequestDiscussionUnavailableMessage": "Tengingin gæti hafa bilað, eða samrunabeiðnin gæti hafa verið fjarlægð.",
     "accessDeniedDescription": "Þú hefur ekki heimild til að skoða þessa sameiningarbeiðni.",
     "noFilesChanged": "Engum skrám breytt",
     "noFilesChangedDescription": "Engar skrár hafa breyst í þessari sameiningarbeiðni.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Deila merge request",
       "viewOnProvider": "Skoða á {{provider}}",
       "mergeRequestUnavailable": "Merge request ekki tiltæk",
-      "unavailableDescription": "Hún gæti hafa verið fjarlægð, eða þú gætir skort aðgang.",
+      "unavailableDescription": "Tengingin gæti hafa bilað, eða atriðinu gæti hafa verið eytt eða það gæti verið óaðgengilegt.",
       "accessDeniedMergeRequest": "Þú hefur ekki heimild til að skoða þessa merge request.",
       "couldNotLoadMergeRequest": "Ekki tókst að hlaða merge request.",
       "discussionAccessDenied": "Þú hefur ekki heimild til að skoða umræðuna um þessa merge request.",
-      "discussionUnavailableMessage": "Þessi merge request gæti hafa verið fjarlægð.",
+      "discussionUnavailableMessage": "Tengingin gæti hafa bilað, eða þessi merge request gæti hafa verið fjarlægð.",
       "noDiscussionDescription": "Engir yfirferðarþræðir eða almennar athugasemdir eru við þessa merge request.",
       "noFilesChangedDescription": "Engar skrár hafa breyst í þessari merge request."
     }

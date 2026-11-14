@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ",
     "pullRequestUnavailableDescription": "ਇਹ PR ਖੋਲ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕਦੀ। ਹੋ ਸਕਦਾ ਹੈ ਕਿ ਇਸ ਨੂੰ ਮਿਟਾ ਦਿੱਤਾ ਗਿਆ ਹੋਵੇ, ਰਿਪੋਜ਼ਿਟਰੀ ਨਿੱਜੀ ਹੋਵੇ ਜਾਂ ਇਸ 'ਤੇ Kilo GitHub ਐਪ ਸਥਾਪਿਤ ਨਾ ਹੋਵੇ।",
+    "pullRequestDiscussionUnavailableMessage": "ਹੋ ਸਕਦਾ ਹੈ ਕਿ ਕਨੈਕਸ਼ਨ ਫੇਲ੍ਹ ਹੋ ਗਿਆ ਹੋਵੇ, ਜਾਂ ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਹਟਾਈ ਗਈ ਹੋਵੇ।",
     "accessDeniedDescription": "ਤੁਹਾਨੂੰ ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ ਨੂੰ ਵੇਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
     "noFilesChanged": "ਕੋਈ ਫਾਈਲ ਨਹੀਂ ਬਦਲੀ",
     "noFilesChangedDescription": "ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ ਵਿੱਚ ਕਿਸੇ ਫਾਈਲ ਵਿੱਚ ਬਦਲਾਅ ਨਹੀਂ ਕੀਤਾ ਗਿਆ।",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਸਾਂਝੀ ਕਰੋ",
       "viewOnProvider": "{{provider}} ਉੱਤੇ ਵੇਖੋ",
       "mergeRequestUnavailable": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ",
-      "unavailableDescription": "ਹੋ ਸਕਦਾ ਹੈ ਇਹ ਹਟਾ ਦਿੱਤੀ ਗਈ ਹੋਵੇ ਜਾਂ ਤੁਹਾਡੇ ਕੋਲ ਪਹੁੰਚ ਨਾ ਹੋਵੇ।",
+      "unavailableDescription": "ਹੋ ਸਕਦਾ ਹੈ ਕਿ ਕਨੈਕਸ਼ਨ ਫੇਲ੍ਹ ਹੋ ਗਿਆ ਹੋਵੇ, ਜਾਂ ਇਹ ਚੀਜ਼ ਮਿਟਾ ਦਿੱਤੀ ਗਈ ਹੋਵੇ ਜਾਂ ਇਸ ਤੱਕ ਪਹੁੰਚ ਨਾ ਹੋਵੇ।",
       "accessDeniedMergeRequest": "ਤੁਹਾਨੂੰ ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਨੂੰ ਵੇਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
       "couldNotLoadMergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ।",
       "discussionAccessDenied": "ਤੁਹਾਨੂੰ ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦੀ ਚਰਚਾ ਵੇਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
-      "discussionUnavailableMessage": "ਇਹ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਹਟਾਈ ਗਈ ਹੋ ਸਕਦੀ ਹੈ।",
+      "discussionUnavailableMessage": "ਹੋ ਸਕਦਾ ਹੈ ਕਿ ਕਨੈਕਸ਼ਨ ਫੇਲ੍ਹ ਹੋ ਗਿਆ ਹੋਵੇ, ਜਾਂ ਇਹ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਹਟਾਈ ਗਈ ਹੋਵੇ।",
       "noDiscussionDescription": "ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ 'ਤੇ ਸਮੀਖਿਆ ਦਾ ਕੋਈ ਥ੍ਰੈਡ ਜਾਂ ਗੱਲਬਾਤ ਦੀ ਕੋਈ ਟਿੱਪਣੀ ਨਹੀਂ ਹੈ।",
       "noFilesChangedDescription": "ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਵਿੱਚ ਕਿਸੇ ਫਾਈਲ ਵਿੱਚ ਬਦਲਾਅ ਨਹੀਂ ਕੀਤਾ ਗਿਆ।"
     }

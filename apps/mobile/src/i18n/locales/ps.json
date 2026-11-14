@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسټ نشته",
     "pullRequestUnavailableDescription": "دا PR نه شي پرانیستل کېدای. کېدای شي ړنګ شوی وي، زېرمتون شخصي وي، یا د Kilo د GitHub اپلیکیشن پرې نصب نه وي.",
+    "pullRequestDiscussionUnavailableMessage": "کېدای شي اړیکه ناکامه شوې وي، یا کېدای شي دا پل ریکویسټ لرې شوی وي.",
     "accessDeniedDescription": "تاسو د دې پل ریکویسټ د لیدلو اجازه نه لرئ.",
     "noFilesChanged": "هېڅ فایل نه دی بدل شوی",
     "noFilesChangedDescription": "په دې پل ریکویسټ کې هېڅ فایل نه دی بدل شوی.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "د یوځای کولو غوښتنه شریک کړئ",
       "viewOnProvider": "په {{provider}} کې وګورئ",
       "mergeRequestUnavailable": "د یوځای کولو غوښتنه نشته",
-      "unavailableDescription": "کېدای شي لرې شوی وي، یا تاسو ورسره لاسرسی ونه لرئ.",
+      "unavailableDescription": "کېدای شي اړیکه ناکامه شوې وي، یا کېدای شي هغه شی ړنګ شوی یا د لاسرسي وړ نه وي.",
       "accessDeniedMergeRequest": "تاسو د دې د یوځای کولو غوښتنه د لیدلو اجازه نه لرئ.",
       "couldNotLoadMergeRequest": "د یوځای کولو غوښتنه بار نه شو",
       "discussionAccessDenied": "تاسو د دې د یوځای کولو غوښتنه د بحث د لیدلو اجازه نه لرئ.",
-      "discussionUnavailableMessage": "کېدای شي دا د یوځای کولو غوښتنه لرې شوې وي.",
+      "discussionUnavailableMessage": "کېدای شي اړیکه ناکامه شوې وي، یا کېدای شي دا د یوځای کولو غوښتنه لرې شوې وي.",
       "noDiscussionDescription": "په دې د یوځای کولو غوښتنه کې نه د بیاکتنې د بحث لړۍ شته او نه د خبرو تبصرې.",
       "noFilesChangedDescription": "په دې د یوځای کولو غوښتنه کې هېڅ فایل نه دی بدل شوی."
     }

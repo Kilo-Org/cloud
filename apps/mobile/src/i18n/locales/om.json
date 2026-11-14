@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Gaaffiin walitti makuu hin argamu",
     "pullRequestUnavailableDescription": "PR kana banuun hin danda'amu. Haqameera ta'a, kuusaan koodii dhuunfaa ta'uu danda'a, ykn appiin Kilo GitHub kuusaa sana irratti hin fe'amne ta'a.",
+    "pullRequestDiscussionUnavailableMessage": "Walqunnamtiin hin milkoofne ta'uu danda'a, yookiin Gaaffiin walitti makuu sun haqameera ta'uu danda'a.",
     "accessDeniedDescription": "Gaaffii walitti makuu kana ilaaluuf hayyama hin qabdu.",
     "noFilesChanged": "Faayiliin jijjiirame hin jiru",
     "noFilesChangedDescription": "Gaaffiin walitti makuu kun jijjiirama faayilii hin qabu.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Gaaffii walitti makuu qoodi",
       "viewOnProvider": "{{provider}} irratti ilaali",
       "mergeRequestUnavailable": "Gaaffiin walitti makuu hin argamu",
-      "unavailableDescription": "Haqame ta'uu danda'a, yookiin hayyama isaa hin qabdu.",
+      "unavailableDescription": "Walqunnamtiin hin milkoofne ta'uu danda'a, yookiin wanti sun haqamee ykn hin argamne ta'uu danda'a.",
       "accessDeniedMergeRequest": "Gaaffii walitti makuu kana ilaaluuf hayyama hin qabdu.",
       "couldNotLoadMergeRequest": "Gaaffii walitti makuu fe'uu hin danda'amne.",
       "discussionAccessDenied": "Marii gaaffii walitti makuu kanaa ilaaluuf hayyama hin qabdu.",
-      "discussionUnavailableMessage": "Gaaffiin walitti makuu kun haqameera ta'a.",
+      "discussionUnavailableMessage": "Walqunnamtiin hin milkoofne ta'uu danda'a, yookiin Gaaffiin walitti makuu sun haqameera ta'uu danda'a.",
       "noDiscussionDescription": "Gaaffii walitti makuu kana irratti dameewwan gamaaggamaa ykn yaadonni marii hin jiran.",
       "noFilesChangedDescription": "Gaaffiin walitti makuu kun jijjiirama faayilii hin qabu."
     }

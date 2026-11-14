@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "داواکاری ڕاکێشان بەردەست نییە",
     "pullRequestUnavailableDescription": "ناتوانرێت ئەم PR بکرێتەوە. ڕەنگە سڕابێتەوە، ڕێپۆکە تایبەت بێت، یان ئەپی Kilo بۆ GitHub لەسەری دانەمەزرابێت.",
+    "pullRequestDiscussionUnavailableMessage": "ڕەنگە پەیوەندییەکە شکستی هێنابێت، یان داواکاری یەکخستنەکە لابرابێت.",
     "accessDeniedDescription": "مۆڵەتی بینینی ئەم داواکاری ڕاکێشانەت نییە.",
     "noFilesChanged": "هیچ فایلێک نەگۆڕاوە",
     "noFilesChangedDescription": "لە ئەم داواکارییەی ڕاکێشاندا هیچ فایلێک نەگۆڕاوە.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "داواکارییەکەی تێکەڵکردن هاوبەش بکە",
       "viewOnProvider": "بینین لە {{provider}}",
       "mergeRequestUnavailable": "داواکاری تێکەڵکردن بەردەست نییە",
-      "unavailableDescription": "لەوانەیە سڕابێتەوە، یان لەوانەیە مۆڵەتی بینینت نەبێت.",
+      "unavailableDescription": "ڕەنگە پەیوەندییەکە شکستی هێنابێت، یان ئەو شتە سڕابێتەوە، یان دەستڕاگەیشتنم پێی نەبێت.",
       "accessDeniedMergeRequest": "مۆڵەتی بینینی ئەم داواکاری تێکەڵکردنەت نییە.",
       "couldNotLoadMergeRequest": "نەتوانرا داواکاری تێکەڵکردن بار بکرێت.",
       "discussionAccessDenied": "مۆڵەتی بینینی گفتوگۆی ئەم داواکارییەی تێکەڵکردنەت نییە.",
-      "discussionUnavailableMessage": "ڕەنگە ئەم داواکاری تێکەڵکردنە لابرابێت.",
+      "discussionUnavailableMessage": "ڕەنگە پەیوەندییەکە شکستی هێنابێت، یان داواکاری تێکەڵکردنەکە لابرابێت.",
       "noDiscussionDescription": "لەسەر ئەم داواکارییەی تێکەڵکردن هیچ زنجیرەی پێداچوونەوە یان بۆچوونێکی گفتوگۆ نییە.",
       "noFilesChangedDescription": "لە ئەم داواکارییەی تێکەڵکردندا هیچ فایلێک نەگۆڕاوە."
     }

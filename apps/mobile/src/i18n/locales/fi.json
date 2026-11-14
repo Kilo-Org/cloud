@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Muutospyyntö ei ole käytettävissä",
     "pullRequestUnavailableDescription": "Tätä PR:tä ei voi avata. Se on voitu poistaa, koodivarasto voi olla yksityinen tai Kilo GitHub -sovellusta ei ole asennettu siihen.",
+    "pullRequestDiscussionUnavailableMessage": "Yhteyden muodostaminen on voinut epäonnistua, tai muutospyyntö on voitu poistaa.",
     "accessDeniedDescription": "Sinulla ei ole oikeutta tarkastella tätä muutospyyntöä.",
     "noFilesChanged": "Ei tiedostomuutoksia",
     "noFilesChangedDescription": "Tässä muutospyynnössä ei ole tiedostomuutoksia.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Jaa yhdistämispyyntö",
       "viewOnProvider": "Näytä palvelussa {{provider}}",
       "mergeRequestUnavailable": "Yhdistämispyyntö ei ole käytettävissä",
-      "unavailableDescription": "Se on voitu poistaa, tai sinulla ei ole siihen pääsyä.",
+      "unavailableDescription": "Yhteyden muodostaminen on voinut epäonnistua, tai kohde on voitu poistaa tai siihen ei ehkä ole pääsyä.",
       "accessDeniedMergeRequest": "Sinulla ei ole oikeutta tarkastella tätä yhdistämispyyntöä.",
       "couldNotLoadMergeRequest": "Yhdistämispyyntöä ei voitu ladata.",
       "discussionAccessDenied": "Sinulla ei ole oikeutta tarkastella tämän yhdistämispyynnön keskustelua.",
-      "discussionUnavailableMessage": "Tämä yhdistämispyyntö on voitu poistaa.",
+      "discussionUnavailableMessage": "Yhteyden muodostaminen on voinut epäonnistua, tai yhdistämispyyntö on voitu poistaa.",
       "noDiscussionDescription": "Tässä yhdistämispyynnössä ei ole katselmointiketjuja eikä keskustelukommentteja.",
       "noFilesChangedDescription": "Tässä yhdistämispyynnössä ei ole tiedostomuutoksia."
     }

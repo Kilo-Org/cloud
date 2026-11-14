@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "A PR nem érhető el",
     "pullRequestUnavailableDescription": "Ez a PR nem nyitható meg. Lehet, hogy törölték, a tároló privát, vagy nincs hozzá telepítve a Kilo GitHub-alkalmazása.",
+    "pullRequestDiscussionUnavailableMessage": "Lehet, hogy megszakadt a kapcsolat, vagy a PR-t eltávolították.",
     "accessDeniedDescription": "Nincs jogosultságod a módosítási kérelem megtekintéséhez.",
     "noFilesChanged": "Nincs módosított fájl",
     "noFilesChangedDescription": "Ez a módosítási kérelem nem tartalmaz fájlmódosításokat.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Merge request megosztása",
       "viewOnProvider": "Megtekintés itt: {{provider}}",
       "mergeRequestUnavailable": "A merge request nem érhető el",
-      "unavailableDescription": "Lehet, hogy törölték, vagy nincs hozzáférésed.",
+      "unavailableDescription": "Lehet, hogy megszakadt a kapcsolat, vagy az elem törölve lett, vagy nem érhető el.",
       "accessDeniedMergeRequest": "Nincs jogosultságod a merge request megtekintéséhez.",
       "couldNotLoadMergeRequest": "Nem sikerült betölteni a merge request.",
       "discussionAccessDenied": "Nincs jogosultságod a merge request-hez tartozó beszélgetés megtekintéséhez.",
-      "discussionUnavailableMessage": "Lehet, hogy ezt a merge request eltávolították.",
+      "discussionUnavailableMessage": "Lehet, hogy megszakadt a kapcsolat, vagy a merge requestet eltávolították.",
       "noDiscussionDescription": "Ehhez a merge request nem tartozik kódellenőrzési beszélgetés vagy hozzászólás.",
       "noFilesChangedDescription": "Ez a merge request nem tartalmaz fájlmódosításokat."
     }

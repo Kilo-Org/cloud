@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Žiadosť o zlúčenie nie je dostupná",
     "pullRequestUnavailableDescription": "Tento PR sa nedá otvoriť. Možno bol odstránený, repozitár je súkromný alebo v ňom nie je nainštalovaná aplikácia Kilo pre GitHub.",
+    "pullRequestDiscussionUnavailableMessage": "Možno zlyhalo pripojenie alebo bol PR odstránený.",
     "accessDeniedDescription": "Nemáš oprávnenie zobraziť túto žiadosť o zlúčenie.",
     "noFilesChanged": "Žiadne zmenené súbory",
     "noFilesChangedDescription": "Táto žiadosť o zlúčenie neobsahuje žiadne zmeny súborov.",
@@ -1046,11 +1047,11 @@
       "shareMergeRequest": "Zdieľať merge request",
       "viewOnProvider": "Zobraziť v {{provider}}",
       "mergeRequestUnavailable": "Merge request nie je dostupný",
-      "unavailableDescription": "Možno bol odstránený, alebo k nemu nemáš prístup.",
+      "unavailableDescription": "Možno zlyhalo pripojenie alebo bola položka odstránená, prípadne je neprístupná.",
       "accessDeniedMergeRequest": "Nemáš oprávnenie zobraziť tento merge request.",
       "couldNotLoadMergeRequest": "Merge request sa nepodarilo načítať.",
       "discussionAccessDenied": "Nemáš oprávnenie zobraziť diskusiu k tomuto merge request.",
-      "discussionUnavailableMessage": "Tento merge request bol možná odstránený.",
+      "discussionUnavailableMessage": "Možno zlyhalo pripojenie alebo bol merge request odstránený.",
       "noDiscussionDescription": "Tento merge request zatiaľ nemá žiadne vlákna ku kontrole kódu ani komentáre v diskusii.",
       "noFilesChangedDescription": "Tento merge request neobsahuje žiadne zmeny súborov."
     }

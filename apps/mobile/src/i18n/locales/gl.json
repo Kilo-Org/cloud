@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Solicitude de integración non dispoñible",
     "pullRequestUnavailableDescription": "Non se pode abrir esta PR. Pode que se eliminase, que o repositorio sexa privado ou que a aplicación de Kilo para GitHub non estea instalada nel.",
+    "pullRequestDiscussionUnavailableMessage": "Pode que fallase a conexión ou que a solicitude de cambios se eliminase.",
     "accessDeniedDescription": "Non tes permiso para ver esta solicitude de integración.",
     "noFilesChanged": "Non hai ficheiros modificados",
     "noFilesChangedDescription": "Esta solicitude de integración non contén cambios nos ficheiros.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Compartir a solicitude de fusión",
       "viewOnProvider": "Ver en {{provider}}",
       "mergeRequestUnavailable": "Solicitude de fusión non dispoñible",
-      "unavailableDescription": "Pode que fose eliminada ou que non teñas acceso a ela.",
+      "unavailableDescription": "Pode que fallase a conexión ou que o elemento se eliminase ou non estea accesible.",
       "accessDeniedMergeRequest": "Non tes permiso para ver esta solicitude de fusión.",
       "couldNotLoadMergeRequest": "Non se puido cargar a solicitude de fusión.",
       "discussionAccessDenied": "Non tes permiso para ver a conversa desta solicitude de fusión.",
-      "discussionUnavailableMessage": "Pode que esta solicitude de fusión se eliminase.",
+      "discussionUnavailableMessage": "Pode que fallase a conexión ou que a solicitude de fusión se eliminase.",
       "noDiscussionDescription": "Esta solicitude de fusión non ten fíos de revisión nin comentarios na conversa.",
       "noFilesChangedDescription": "Esta solicitude de fusión non contén cambios nos ficheiros."
     }

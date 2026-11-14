@@ -3271,6 +3271,7 @@
     },
     "pullRequestUnavailable": "طلب السحب غير متاح",
     "pullRequestUnavailableDescription": "لا يمكن فتح PR هذا. ربما حُذف، أو أن المستودع خاص، أو أن تطبيق Kilo على GitHub غير مثبّت فيه.",
+    "pullRequestDiscussionUnavailableMessage": "ربما فشل الاتصال، أو ربما أُزيل طلب السحب.",
     "reconnectNotice": {
       "title": "انتهت صلاحية الربط مع GitHub",
       "message": "أعد التحقق من الربط، وسيُطلب منك إعادة ربط الحساب إذا لزم الأمر.",
@@ -3388,11 +3389,11 @@
       "shareMergeRequest": "مشاركة طلب الدمج",
       "viewOnProvider": "عرض على {{provider}}",
       "mergeRequestUnavailable": "طلب الدمج غير متاح",
-      "unavailableDescription": "ربما حُذف، أو ربما لا تملك صلاحية الوصول إليه.",
+      "unavailableDescription": "ربما فشل الاتصال، أو ربما حُذف العنصر أو تعذّر الوصول إليه.",
       "accessDeniedMergeRequest": "ليست لديك صلاحية لعرض طلب الدمج هذا.",
       "couldNotLoadMergeRequest": "تعذّر تحميل طلب الدمج.",
       "discussionAccessDenied": "ليست لديك صلاحية لعرض مناقشة طلب الدمج هذا.",
-      "discussionUnavailableMessage": "ربما تمت إزالة طلب الدمج هذا.",
+      "discussionUnavailableMessage": "ربما فشل الاتصال، أو ربما أُزيل طلب الدمج.",
       "noDiscussionDescription": "لا توجد سلاسل مناقشة للمراجعة أو تعليقات عامة على طلب الدمج هذا.",
       "noFilesChangedDescription": "لا يتضمن طلب الدمج هذا أي تغييرات على الملفات."
     }

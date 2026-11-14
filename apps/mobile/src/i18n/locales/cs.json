@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "PR není dostupný",
     "pullRequestUnavailableDescription": "Tento PR nelze otevřít. Možná byl smazán, repozitář je soukromý nebo v něm není nainstalovaná aplikace Kilo pro GitHub.",
+    "pullRequestDiscussionUnavailableMessage": "Připojení možná selhalo, nebo mohl být PR smazán.",
     "accessDeniedDescription": "Nemáš oprávnění zobrazit tento PR.",
     "noFilesChanged": "Žádné změněné soubory",
     "noFilesChangedDescription": "Tento PR neobsahuje žádné změny souborů.",
@@ -1046,11 +1047,11 @@
       "shareMergeRequest": "Sdílet merge request",
       "viewOnProvider": "Zobrazit na {{provider}}",
       "mergeRequestUnavailable": "Merge request není dostupný",
-      "unavailableDescription": "Byl možná odstraněn, nebo k němu nemáš přístup.",
+      "unavailableDescription": "Připojení možná selhalo, nebo mohla být položka odstraněna, případně k ní nemáš přístup.",
       "accessDeniedMergeRequest": "Nemáš oprávnění zobrazit tento merge request.",
       "couldNotLoadMergeRequest": "Merge request se nepodařilo načíst.",
       "discussionAccessDenied": "Nemáš oprávnění zobrazit diskusi k tomuto merge request.",
-      "discussionUnavailableMessage": "Tento merge request byl možná smazán.",
+      "discussionUnavailableMessage": "Připojení možná selhalo, nebo mohl být merge request smazán.",
       "noDiscussionDescription": "Tento merge request zatím neobsahuje žádná vlákna revize ani komentáře v diskusi.",
       "noFilesChangedDescription": "Tento merge request neobsahuje žádné změny souborů."
     }

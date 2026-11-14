@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسٹ دستیاب نہیں",
     "pullRequestUnavailableDescription": "یہ PR نہیں کھل سکتی۔ ممکن ہے اسے حذف کر دیا گیا ہو، ریپوزٹری نجی ہو یا اس پر Kilo GitHub ایپ انسٹال نہ ہو۔",
+    "pullRequestDiscussionUnavailableMessage": "ہو سکتا ہے کنکشن ناکام ہو گیا ہو، یا ہو سکتا ہے یہ پل ریکویسٹ ہٹا دی گئی ہو۔",
     "accessDeniedDescription": "آپ کو اس پل ریکویسٹ کو دیکھنے کی اجازت نہیں ہے۔",
     "noFilesChanged": "کوئی فائل تبدیل نہیں ہوئی",
     "noFilesChangedDescription": "اس پل ریکویسٹ میں کسی فائل میں تبدیلی نہیں کی گئی۔",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "مرج ریکویسٹ شیئر کریں",
       "viewOnProvider": "{{provider}} پر دیکھیں",
       "mergeRequestUnavailable": "مرج ریکویسٹ دستیاب نہیں",
-      "unavailableDescription": "ہو سکتا ہے یہ حذف کر دی گئی ہو، یا ہو سکتا ہے آپ کو اس تک رسائی نہ ہو۔",
+      "unavailableDescription": "ہو سکتا ہے کنکشن ناکام ہو گیا ہو، یا ہو سکتا ہے یہ چیز حذف کر دی گئی ہو یا اس تک رسائی نہ ہو۔",
       "accessDeniedMergeRequest": "آپ کو اس مرج ریکویسٹ کو دیکھنے کی اجازت نہیں ہے۔",
       "couldNotLoadMergeRequest": "مرج ریکویسٹ لوڈ نہیں ہو سکی۔",
       "discussionAccessDenied": "آپ کو اس مرج ریکویسٹ کی گفتگو دیکھنے کی اجازت نہیں ہے۔",
-      "discussionUnavailableMessage": "ممکن ہے یہ مرج ریکویسٹ ہٹا دی گئی ہو۔",
+      "discussionUnavailableMessage": "ہو سکتا ہے کنکشن ناکام ہو گیا ہو، یا ہو سکتا ہے یہ مرج ریکویسٹ ہٹا دی گئی ہو۔",
       "noDiscussionDescription": "اس مرج ریکویسٹ پر ابھی جائزے کا کوئی تھریڈ یا گفتگو کا کوئی تبصرہ نہیں ہے۔",
       "noFilesChangedDescription": "اس مرج ریکویسٹ میں کسی فائل میں تبدیلی نہیں کی گئی۔"
     }

@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Hindi mabuksan ang pull request",
     "pullRequestUnavailableDescription": "Hindi mabuksan ang PR na ito. Maaaring nabura na ito, pribado ang repository, o hindi naka-install dito ang Kilo GitHub App.",
+    "pullRequestDiscussionUnavailableMessage": "Maaaring nabigo ang koneksyon, o maaaring naalis ang PR.",
     "accessDeniedDescription": "Wala kang pahintulot na tingnan ang pull request na ito.",
     "noFilesChanged": "Walang binagong file",
     "noFilesChangedDescription": "Walang binagong file sa pull request na ito.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Ibahagi ang merge request",
       "viewOnProvider": "Tingnan sa {{provider}}",
       "mergeRequestUnavailable": "Hindi mabuksan ang merge request",
-      "unavailableDescription": "Baka tinanggal na ito, o wala kang access dito.",
+      "unavailableDescription": "Maaaring nabigo ang koneksyon, o maaaring nabura na o hindi ma-access ang item.",
       "accessDeniedMergeRequest": "Wala kang pahintulot na tingnan ang merge request na ito.",
       "couldNotLoadMergeRequest": "Hindi ma-load ang merge request.",
       "discussionAccessDenied": "Wala kang pahintulot na tingnan ang talakayan ng merge request na ito.",
-      "discussionUnavailableMessage": "Maaaring naalis ang merge request na ito.",
+      "discussionUnavailableMessage": "Maaaring nabigo ang koneksyon, o maaaring naalis ang merge request.",
       "noDiscussionDescription": "Walang talakayan sa pagsusuri o komento sa pag-uusap para sa merge request na ito.",
       "noFilesChangedDescription": "Walang binagong file sa merge request na ito."
     }

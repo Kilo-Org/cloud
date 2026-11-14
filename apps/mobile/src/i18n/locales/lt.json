@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Pakeitimų užklausa nepasiekiama",
     "pullRequestUnavailableDescription": "Šio PR nepavyksta atidaryti. Jis galėjo būti ištrintas, saugykla gali būti privati arba joje neįdiegta Kilo GitHub programėlė.",
+    "pullRequestDiscussionUnavailableMessage": "Ryšys galėjo nutrūkti, o pakeitimų užklausa galėjo būti pašalinta.",
     "accessDeniedDescription": "Neturi teisės peržiūrėti šios pakeitimų užklausos.",
     "noFilesChanged": "Failų nepakeista",
     "noFilesChangedDescription": "Šioje pakeitimų užklausoje nėra failų pakeitimų.",
@@ -1046,11 +1047,11 @@
       "shareMergeRequest": "Bendrinti merge request",
       "viewOnProvider": "Peržiūrėti {{provider}}",
       "mergeRequestUnavailable": "Merge request nepasiekiamas",
-      "unavailableDescription": "Galbūt jis buvo ištrintas, arba neturi prieigos.",
+      "unavailableDescription": "Ryšys galėjo nutrūkti, o įrašas galėjo būti ištrintas arba nepasiekiamas.",
       "accessDeniedMergeRequest": "Neturi teisės peržiūrėti šio merge request.",
       "couldNotLoadMergeRequest": "Nepavyko įkelti merge request.",
       "discussionAccessDenied": "Neturi teisės peržiūrėti šio merge request diskusijos.",
-      "discussionUnavailableMessage": "Šis merge request galėjo būti pašalintas.",
+      "discussionUnavailableMessage": "Ryšys galėjo nutrūkti, o merge request galėjo būti pašalintas.",
       "noDiscussionDescription": "Šiame merge request nėra peržiūros gijų ar diskusijos komentarų.",
       "noFilesChangedDescription": "Šiame merge request nėra failų pakeitimų."
     }

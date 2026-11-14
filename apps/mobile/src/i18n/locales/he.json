@@ -3124,6 +3124,7 @@
     },
     "pullRequestUnavailable": "בקשת המשיכה אינה זמינה",
     "pullRequestUnavailableDescription": "לא ניתן לפתוח את ה-PR הזה. ייתכן שהוא נמחק, שהמאגר פרטי או שאפליקציית Kilo ל-GitHub אינה מותקנת במאגר.",
+    "pullRequestDiscussionUnavailableMessage": "ייתכן שהחיבור נכשל, או שה-PR הוסר.",
     "reconnectNotice": {
       "title": "פג תוקף החיבור ל-GitHub.",
       "message": "בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך.",
@@ -3229,11 +3230,11 @@
       "shareMergeRequest": "שיתוף בקשת המיזוג",
       "viewOnProvider": "הצגה ב-{{provider}}",
       "mergeRequestUnavailable": "בקשת המיזוג אינה זמינה",
-      "unavailableDescription": "ייתכן שנמחק, או שאין לך גישה אליו.",
+      "unavailableDescription": "ייתכן שהחיבור נכשל, שהפריט נמחק, או שאין לך גישה אליו.",
       "accessDeniedMergeRequest": "אין לך הרשאה לצפות בבקשת המיזוג הזו.",
       "couldNotLoadMergeRequest": "לא ניתן היה לטעון את בקשת המיזוג.",
       "discussionAccessDenied": "אין לך הרשאה לצפות בדיון של בקשת המיזוג הזו.",
-      "discussionUnavailableMessage": "ייתכן שבקשת המיזוג הזו הוסרה.",
+      "discussionUnavailableMessage": "ייתכן שהחיבור נכשל, או שבקשת המיזוג הוסרה.",
       "noDiscussionDescription": "אין שרשורי סקירה או תגובות בדיון של בקשת המיזוג הזו.",
       "noFilesChangedDescription": "אין שינויים בקבצים בבקשת המיזוג הזו."
     }

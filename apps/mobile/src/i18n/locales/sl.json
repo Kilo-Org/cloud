@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Zahtevek za združitev ni na voljo",
     "pullRequestUnavailableDescription": "Tega PR-ja ni mogoče odpreti. Morda je izbrisan, repozitorij je zaseben ali pa aplikacija Kilo za GitHub v njem ni nameščena.",
+    "pullRequestDiscussionUnavailableMessage": "Povezava je morda spodletela, zahteva za združitev pa je bila morda odstranjena.",
     "accessDeniedDescription": "Nimaš dovoljenja za ogled tega zahtevka za združitev.",
     "noFilesChanged": "Ni spremenjenih datotek",
     "noFilesChangedDescription": "Ta zahtevek za združitev ne vsebuje sprememb datotek.",
@@ -1046,11 +1047,11 @@
       "shareMergeRequest": "Deli merge request",
       "viewOnProvider": "Poglej na {{provider}}",
       "mergeRequestUnavailable": "Merge request ni na voljo",
-      "unavailableDescription": "Morda je bil odstranjen ali pa nimaš dostopa do njega.",
+      "unavailableDescription": "Povezava je morda spodletela, element pa je morda izbrisan ali nedostopen.",
       "accessDeniedMergeRequest": "Nimaš dovoljenja za ogled tega merge requesta.",
       "couldNotLoadMergeRequest": "Merge requesta ni bilo mogoče naložiti.",
       "discussionAccessDenied": "Nimaš dovoljenja za ogled razprave o tem merge requestu.",
-      "discussionUnavailableMessage": "Ta merge request je bil morda odstranjen.",
+      "discussionUnavailableMessage": "Povezava je morda spodletela, merge request pa je bil morda odstranjen.",
       "noDiscussionDescription": "Ta merge request še nima niti razprave o pregledu ali drugih komentarjev.",
       "noFilesChangedDescription": "Ta merge request ne vsebuje sprememb datotek."
     }

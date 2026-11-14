@@ -174,18 +174,43 @@ describe('PrReviewDiscussionTab full-body states', () => {
     ).toHaveLength(0);
   });
 
+  // Bitbucket Cloud says pull request too, but it is a provider scope like
+  // GitLab: its not-found copy comes from the provider retry state, not the
+  // GitHub terminal one, so it gets its own row instead of inheriting the
+  // GitHub message.
+  const BITBUCKET_REF: ProviderPrRef = {
+    platform: 'bitbucket',
+    workspace: 'acme',
+    repoSlug: 'widgets',
+    prId: 42,
+  };
+
   it.each([
-    ['permission', GITLAB_REF, true],
-    ['not-found', GITLAB_REF, true],
-    ['permission', undefined, false],
-    ['not-found', undefined, false],
-  ] as const)('names a merge request in the %s copy', (kind, scope, forMergeRequest) => {
+    [
+      'permission',
+      GITLAB_REF,
+      "You don't have permission to view this merge request's discussion.",
+    ],
+    [
+      'not-found',
+      GITLAB_REF,
+      'The connection may have failed, or the merge request may have been removed.',
+    ],
+    [
+      'not-found',
+      BITBUCKET_REF,
+      'The connection may have failed, or the pull request may have been removed.',
+    ],
+    // GitHub's denial names no provider object, and its not-found keeps the
+    // terminal copy: the connection clause belongs to the provider scopes only.
+    ['permission', undefined, "You don't have permission to view this PR's discussion."],
+    ['not-found', undefined, 'This pull request may have been removed.'],
+  ] as const)('renders the %s copy this scope owns', (kind, scope, expected) => {
     discussionState.firstPageErrorState = { kind };
     const message = String(
       mountTab(scope).root.find(node => String(node.type) === 'QueryError').props.message
     );
-    expect(message.includes('merge request')).toBe(forMergeRequest);
-    expect(message).not.toContain(forMergeRequest ? 'pull request' : 'merge request');
+    expect(message).toBe(expected);
   });
 
   it('names a merge request in the empty state description', () => {

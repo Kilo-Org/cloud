@@ -3124,6 +3124,7 @@
     },
     "pullRequestUnavailable": "Pull request indisponible",
     "pullRequestUnavailableDescription": "Impossible d'ouvrir cette PR. Elle a peut-être été supprimée, le dépôt est privé ou l'application GitHub de Kilo n'y est pas installée.",
+    "pullRequestDiscussionUnavailableMessage": "Il se peut que la connexion ait échoué ou que la PR ait été supprimée.",
     "reconnectNotice": {
       "title": "La connexion à GitHub a expiré",
       "message": "Vérifiez-la à nouveau. Si nécessaire, vous devrez vous reconnecter.",
@@ -3229,11 +3230,11 @@
       "shareMergeRequest": "Partager le merge request",
       "viewOnProvider": "Voir sur {{provider}}",
       "mergeRequestUnavailable": "Merge request indisponible",
-      "unavailableDescription": "Il a peut-être été supprimé, ou vous n'y avez pas accès.",
+      "unavailableDescription": "Il se peut que la connexion ait échoué, que l'élément ait été supprimé ou qu'il soit inaccessible.",
       "accessDeniedMergeRequest": "Vous n'avez pas l'autorisation de consulter ce merge request.",
       "couldNotLoadMergeRequest": "Impossible de charger le merge request",
       "discussionAccessDenied": "Vous n'avez pas l'autorisation de consulter les échanges de ce merge request.",
-      "discussionUnavailableMessage": "Ce merge request a peut-être été supprimé.",
+      "discussionUnavailableMessage": "Il se peut que la connexion ait échoué ou que le merge request ait été supprimé.",
       "noDiscussionDescription": "Ce merge request ne contient encore aucun fil de revue ni commentaire.",
       "noFilesChangedDescription": "Ce merge request ne modifie aucun fichier."
     }

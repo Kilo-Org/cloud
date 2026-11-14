@@ -3173,6 +3173,7 @@
     },
     "pullRequestUnavailable": "Запрос на слияние недоступен",
     "pullRequestUnavailableDescription": "Не удаётся открыть этот PR. Возможно, он удалён, репозиторий закрытый или в нём не установлено приложение Kilo для GitHub.",
+    "pullRequestDiscussionUnavailableMessage": "Возможно, не удалось установить соединение или пул-реквест был удалён.",
     "reconnectNotice": {
       "title": "Срок действия подключения к GitHub истёк.",
       "message": "Повторно проверьте подключение — при необходимости вам предложат подключиться заново.",
@@ -3282,11 +3283,11 @@
       "shareMergeRequest": "Поделиться запросом на слияние",
       "viewOnProvider": "Открыть в {{provider}}",
       "mergeRequestUnavailable": "Запрос на слияние недоступен",
-      "unavailableDescription": "Возможно, он был удалён или у вас нет к нему доступа.",
+      "unavailableDescription": "Возможно, не удалось установить соединение, либо элемент был удалён или недоступен.",
       "accessDeniedMergeRequest": "У вас нет прав на просмотр этого запроса на слияние.",
       "couldNotLoadMergeRequest": "Не удалось загрузить запрос на слияние",
       "discussionAccessDenied": "У вас нет прав на просмотр обсуждения этого запроса на слияние.",
-      "discussionUnavailableMessage": "Этот запрос на слияние мог быть удалён.",
+      "discussionUnavailableMessage": "Возможно, не удалось установить соединение или запрос на слияние был удалён.",
       "noDiscussionDescription": "В этом запросе на слияние нет веток ревью или комментариев.",
       "noFilesChangedDescription": "В этом запросе на слияние нет изменений файлов."
     }

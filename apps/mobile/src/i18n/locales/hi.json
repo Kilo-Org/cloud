@@ -3075,6 +3075,7 @@
     },
     "pullRequestUnavailable": "पुल रिक्वेस्ट अनुपलब्ध",
     "pullRequestUnavailableDescription": "यह PR नहीं खोला जा सकता। हो सकता है कि इसे हटा दिया गया हो, रिपॉज़िटरी निजी हो या उसमें Kilo GitHub ऐप इंस्टॉल न हो।",
+    "pullRequestDiscussionUnavailableMessage": "हो सकता है कि कनेक्शन विफल हो गया हो, या यह पुल रिक्वेस्ट हटा दी गई हो।",
     "reconnectNotice": {
       "title": "GitHub कनेक्शन की अवधि समाप्त हो गई।",
       "message": "अपना कनेक्शन फिर से जाँचें — ज़रूरत होने पर आपको फिर से कनेक्ट करने के लिए कहा जाएगा।",
@@ -3176,11 +3177,11 @@
       "shareMergeRequest": "मर्ज रिक्वेस्ट साझा करें",
       "viewOnProvider": "{{provider}} पर देखें",
       "mergeRequestUnavailable": "मर्ज रिक्वेस्ट अनुपलब्ध",
-      "unavailableDescription": "हो सकता है कि यह हटा दी गई हो, या आपके पास उसकी पहुँच न हो।",
+      "unavailableDescription": "हो सकता है कि कनेक्शन विफल हो गया हो, या यह आइटम हटा दिया गया हो या उस तक पहुँच न हो।",
       "accessDeniedMergeRequest": "आपको इस मर्ज रिक्वेस्ट को देखने की अनुमति नहीं है।",
       "couldNotLoadMergeRequest": "मर्ज रिक्वेस्ट लोड नहीं हो सकी।",
       "discussionAccessDenied": "आपको इस मर्ज रिक्वेस्ट की चर्चा देखने की अनुमति नहीं है।",
-      "discussionUnavailableMessage": "हो सकता है कि यह मर्ज रिक्वेस्ट हटा दी गई हो।",
+      "discussionUnavailableMessage": "हो सकता है कि कनेक्शन विफल हो गया हो, या यह मर्ज रिक्वेस्ट हटा दी गई हो।",
       "noDiscussionDescription": "इस मर्ज रिक्वेस्ट पर अभी समीक्षा का कोई थ्रेड नहीं है और बातचीत में भी कोई टिप्पणी नहीं है।",
       "noFilesChangedDescription": "इस मर्ज रिक्वेस्ट में किसी फ़ाइल में बदलाव नहीं है।"
     }

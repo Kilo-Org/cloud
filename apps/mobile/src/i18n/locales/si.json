@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "පුල් ඉල්ලීම ලබා ගත නොහැක",
     "pullRequestUnavailableDescription": "මෙම PR විවෘත කළ නොහැක. එය මකා දමා තිබීම, ගබඩාව පෞද්ගලික වීම හෝ එම ගබඩාව සඳහා Kilo GitHub යෙදුම ස්ථාපනය කර නොතිබීම ඊට හේතුව විය හැක.",
+    "pullRequestDiscussionUnavailableMessage": "සම්බන්ධතාවය අසාර්ථක වී තිබිය හැකිය, නැතහොත් පුල් ඉල්ලීම ඉවත් කර තිබිය හැකිය.",
     "accessDeniedDescription": "මෙම පුල් ඉල්ලීම බැලීමට ඔබට අවසර නොමැත.",
     "noFilesChanged": "ගොනු වෙනස් වී නොමැත",
     "noFilesChangedDescription": "මෙම පුල් ඉල්ලීමේ ගොනු වෙනස්කම් නොමැත.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "මර්ජ ඉල්ලීම බෙදාගන්න",
       "viewOnProvider": "{{provider}} මත බලන්න",
       "mergeRequestUnavailable": "මර්ජ ඉල්ලීම ලබා ගත නොහැක",
-      "unavailableDescription": "එය මකා දමා තිබිය හැකිය, නැතහොත් ඔබට එයට ප්‍රවේශය නොමැති විය හැකිය.",
+      "unavailableDescription": "සම්බන්ධතාවය අසාර්ථක වී තිබිය හැකිය, නැතහොත් අයිතමය මකා දමා තිබිය හැකිය, නැතහොත් එයට ප්‍රවේශ විය නොහැකි විය හැකිය.",
       "accessDeniedMergeRequest": "මෙම මර්ජ ඉල්ලීම බැලීමට ඔබට අවසර නොමැත.",
       "couldNotLoadMergeRequest": "මර්ජ ඉල්ලීම පූරණය කිරීමට නොහැකි විය.",
       "discussionAccessDenied": "මෙම මර්ජ ඉල්ලීමේ සාකච්ඡාව බැලීමට ඔබට අවසර නොමැත.",
-      "discussionUnavailableMessage": "මෙම මර්ජ ඉල්ලීම ඉවත් කර තිබිය හැක.",
+      "discussionUnavailableMessage": "සම්බන්ධතාවය අසාර්ථක වී තිබිය හැකිය, නැතහොත් මර්ජ ඉල්ලීම ඉවත් කර තිබිය හැකිය.",
       "noDiscussionDescription": "මෙම මර්ජ ඉල්ලීමේ සමාලෝචන සාකච්ඡා පෙළවල් හෝ සංවාද අදහස් නොමැත.",
       "noFilesChangedDescription": "මෙම මර්ජ ඉල්ලීමේ ගොනු වෙනස්කම් නොමැත."
     }

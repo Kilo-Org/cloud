@@ -3075,6 +3075,7 @@
     },
     "pullRequestUnavailable": "PR tidak tersedia",
     "pullRequestUnavailableDescription": "PR ini tidak dapat dibuka. PR ini mungkin sudah dihapus, repositorinya bersifat privat, atau aplikasi Kilo untuk GitHub belum dipasang di repositori tersebut.",
+    "pullRequestDiscussionUnavailableMessage": "Koneksi mungkin gagal, atau PR mungkin sudah dihapus.",
     "reconnectNotice": {
       "title": "Koneksi GitHub kedaluwarsa.",
       "message": "Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu.",
@@ -3176,11 +3177,11 @@
       "shareMergeRequest": "Bagikan merge request",
       "viewOnProvider": "Lihat di {{provider}}",
       "mergeRequestUnavailable": "Merge request tidak tersedia",
-      "unavailableDescription": "Mungkin sudah dihapus, atau kamu tidak punya akses.",
+      "unavailableDescription": "Koneksi mungkin gagal, atau item mungkin sudah dihapus atau tidak dapat diakses.",
       "accessDeniedMergeRequest": "Kamu tidak memiliki izin untuk melihat merge request ini.",
       "couldNotLoadMergeRequest": "Tidak dapat memuat merge request.",
       "discussionAccessDenied": "Kamu tidak memiliki izin untuk melihat diskusi merge request ini.",
-      "discussionUnavailableMessage": "Merge request ini mungkin sudah dihapus.",
+      "discussionUnavailableMessage": "Koneksi mungkin gagal, atau merge request mungkin sudah dihapus.",
       "noDiscussionDescription": "Belum ada utas tinjauan atau komentar diskusi pada merge request ini.",
       "noFilesChangedDescription": "Tidak ada perubahan file dalam merge request ini."
     }

@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Permintaan tarik tidak tersedia",
     "pullRequestUnavailableDescription": "PR ini tidak dapat dibuka. PR ini mungkin telah dipadam, repositorinya bersifat peribadi, atau apl GitHub Kilo belum dipasang pada repositori itu.",
+    "pullRequestDiscussionUnavailableMessage": "Sambungan mungkin telah gagal, atau PR itu mungkin telah dialih keluar.",
     "accessDeniedDescription": "Anda tidak mempunyai kebenaran untuk melihat permintaan tarik ini.",
     "noFilesChanged": "Tiada fail yang diubah",
     "noFilesChangedDescription": "Tiada perubahan pada fail dalam permintaan tarik ini.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Kongsi permintaan gabungan",
       "viewOnProvider": "Lihat pada {{provider}}",
       "mergeRequestUnavailable": "Permintaan gabungan tidak tersedia",
-      "unavailableDescription": "Ia mungkin telah dipadamkan, atau anda mungkin tiada akses kepadanya.",
+      "unavailableDescription": "Sambungan mungkin telah gagal, atau perkara itu mungkin telah dipadamkan atau tidak dapat diakses.",
       "accessDeniedMergeRequest": "Anda tidak mempunyai kebenaran untuk melihat permintaan gabungan ini.",
       "couldNotLoadMergeRequest": "Tidak dapat memuatkan permintaan gabungan.",
       "discussionAccessDenied": "Anda tidak mempunyai kebenaran untuk melihat perbincangan permintaan gabungan ini.",
-      "discussionUnavailableMessage": "Permintaan gabungan ini mungkin telah dialih keluar.",
+      "discussionUnavailableMessage": "Sambungan mungkin telah gagal, atau permintaan gabungan itu mungkin telah dialih keluar.",
       "noDiscussionDescription": "Belum ada rantaian semakan atau komen perbualan pada permintaan gabungan ini.",
       "noFilesChangedDescription": "Tiada perubahan pada fail dalam permintaan gabungan ini."
     }

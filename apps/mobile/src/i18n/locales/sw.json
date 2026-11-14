@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Ombi la kuunganisha halipatikani",
     "pullRequestUnavailableDescription": "PR hii haiwezi kufunguliwa. Huenda imefutwa, hazina ya msimbo ni ya faragha, au programu ya Kilo ya GitHub haijasakinishwa kwenye hazina hiyo.",
+    "pullRequestDiscussionUnavailableMessage": "Huenda muunganisho umeshindwa, au huenda ombi la kuunganisha limeondolewa.",
     "accessDeniedDescription": "Huna ruhusa ya kuona ombi hili la kuunganisha.",
     "noFilesChanged": "Hakuna faili zilizobadilishwa",
     "noFilesChangedDescription": "Ombi hili la kuunganisha halina mabadiliko ya faili.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Shiriki ombi la kuunganisha",
       "viewOnProvider": "Tazama kwenye {{provider}}",
       "mergeRequestUnavailable": "Ombi la kuunganisha halipatikani",
-      "unavailableDescription": "Huenda kimefutwa, au huenda huna ruhusa ya kukionoa.",
+      "unavailableDescription": "Huenda muunganisho umeshindwa, au huenda kitu kimefutwa au hakiwezi kufikiwa.",
       "accessDeniedMergeRequest": "Huna ruhusa ya kuona ombi hili la kuunganisha.",
       "couldNotLoadMergeRequest": "Imeshindikana kupakia ombi la kuunganisha.",
       "discussionAccessDenied": "Huna ruhusa ya kuangalia mazungumzo ya ombi hili la kuunganisha.",
-      "discussionUnavailableMessage": "Huenda ombi hili la kuunganisha limeondolewa.",
+      "discussionUnavailableMessage": "Huenda muunganisho umeshindwa, au huenda ombi la kuunganisha limeondolewa.",
       "noDiscussionDescription": "Hakuna mada za ukaguzi wala maoni ya mazungumzo kwenye ombi hili la kuunganisha.",
       "noFilesChangedDescription": "Ombi hili la kuunganisha halina mabadiliko ya faili."
     }

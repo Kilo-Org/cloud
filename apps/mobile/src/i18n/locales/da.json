@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Pull request ikke tilgængelig",
     "pullRequestUnavailableDescription": "Denne PR kan ikke åbnes. Den kan være slettet, kodelageret kan være privat, eller Kilo GitHub-appen er ikke installeret i kodelageret.",
+    "pullRequestDiscussionUnavailableMessage": "Forbindelsen kan være mislykkedes, eller også kan PR'en være fjernet.",
     "accessDeniedDescription": "Du har ikke tilladelse til at se denne pull request.",
     "noFilesChanged": "Ingen filer ændret",
     "noFilesChangedDescription": "Der er ingen filændringer i denne pull request.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Del merge request",
       "viewOnProvider": "Se på {{provider}}",
       "mergeRequestUnavailable": "Merge request ikke tilgængelig",
-      "unavailableDescription": "Den er muligvis slettet, eller også har du ikke adgang til den.",
+      "unavailableDescription": "Forbindelsen kan være mislykkedes, eller også kan elementet være slettet eller utilgængeligt.",
       "accessDeniedMergeRequest": "Du har ikke tilladelse til at se denne merge request.",
       "couldNotLoadMergeRequest": "Denne merge request kunne ikke indlæses.",
       "discussionAccessDenied": "Du har ikke tilladelse til at se diskussionen om denne merge request.",
-      "discussionUnavailableMessage": "Denne merge request kan være fjernet.",
+      "discussionUnavailableMessage": "Forbindelsen kan være mislykkedes, eller også kan merge requesten være fjernet.",
       "noDiscussionDescription": "Der er endnu ingen tråde med kodegennemgang eller kommentarer i diskussionen om denne merge request.",
       "noFilesChangedDescription": "Der er ingen filændringer i denne merge request."
     }

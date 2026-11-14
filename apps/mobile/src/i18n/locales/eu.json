@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Bateratze-eskaera ez dago eskuragarri",
     "pullRequestUnavailableDescription": "Ezin da PR hau ireki. Baliteke ezabatuta egotea, biltegia pribatua izatea edo biltegian Kilo GitHub aplikazioa instalatuta ez egotea.",
+    "pullRequestDiscussionUnavailableMessage": "Baliteke konexioak huts egin izana, edo agian bateratze-eskaera kendu izana.",
     "accessDeniedDescription": "Ez duzu baimenik bateratze-eskaera hau ikusteko.",
     "noFilesChanged": "Ez da fitxategirik aldatu",
     "noFilesChangedDescription": "Bateratze-eskaera honek ez du fitxategi-aldaketarik.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Partekatu merge-eskaera",
       "viewOnProvider": "Ikusi {{provider}}(e)n",
       "mergeRequestUnavailable": "Merge-eskaera ez dago eskuragarri",
-      "unavailableDescription": "Baliteke ezabatuta egotea edo agian ez duzu sarbiderik.",
+      "unavailableDescription": "Baliteke konexioak huts egin izana, edo agian elementua ezabatuta egotea edo eskuraezina izatea.",
       "accessDeniedMergeRequest": "Ez duzu baimenik merge-eskaera hau ikusteko.",
       "couldNotLoadMergeRequest": "Ezin izan da merge-eskaera kargatu.",
       "discussionAccessDenied": "Ez duzu baimenik merge-eskaera honen eztabaida ikusteko.",
-      "discussionUnavailableMessage": "Baliteke merge-eskaera hau kendu izana.",
+      "discussionUnavailableMessage": "Baliteke konexioak huts egin izana, edo agian merge-eskaera kendu izana.",
       "noDiscussionDescription": "Merge-eskaera honetan ez dago berrikuspen-haririk, ezta elkarrizketako iruzkinik ere.",
       "noFilesChangedDescription": "Merge-eskaera honek ez du fitxategi-aldaketarik."
     }

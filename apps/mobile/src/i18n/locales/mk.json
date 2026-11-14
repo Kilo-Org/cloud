@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Барањето за спојување е недостапно",
     "pullRequestUnavailableDescription": "Овој PR не може да се отвори. Можеби е избришан, складиштето е приватно или апликацијата Kilo за GitHub не е инсталирана на него.",
+    "pullRequestDiscussionUnavailableMessage": "Можеби врската не успеа, или PR-от е отстранет.",
     "accessDeniedDescription": "Немаш дозвола да го видиш ова барање за спојување.",
     "noFilesChanged": "Нема променети датотеки",
     "noFilesChangedDescription": "Ова барање за спојување не содржи промени во датотеките.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Сподели merge барање",
       "viewOnProvider": "Прикажи на {{provider}}",
       "mergeRequestUnavailable": "Merge барањето е недостапно",
-      "unavailableDescription": "Можеби е избришано или немате пристап до него.",
+      "unavailableDescription": "Можеби врската не успеа, или ставката е избришана или недостапна.",
       "accessDeniedMergeRequest": "Немате дозвола за преглед на ова merge барање.",
       "couldNotLoadMergeRequest": "Не можеше да се вчита merge барањето",
       "discussionAccessDenied": "Немате дозвола за преглед на дискусијата на ова merge барање.",
-      "discussionUnavailableMessage": "Ова merge барање можеби е отстрането.",
+      "discussionUnavailableMessage": "Можеби врската не успеа, или Merge барањето е отстрането.",
       "noDiscussionDescription": "Нема ни теми за преглед ни коментари за разговор на ова merge барање.",
       "noFilesChangedDescription": "Ова merge барање нема промени на датотеки."
     }

@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Sol·licitud d'integració no disponible",
     "pullRequestUnavailableDescription": "No es pot obrir aquesta PR. Pot ser que s'hagi eliminat, que el repositori sigui privat o que no hi estigui instal·lada l'aplicació de Kilo per a GitHub.",
+    "pullRequestDiscussionUnavailableMessage": "Pot ser que la connexió hagi fallat o que la PR s'hagi eliminat.",
     "accessDeniedDescription": "No tens permís per veure aquesta sol·licitud d'integració.",
     "noFilesChanged": "Cap fitxer modificat",
     "noFilesChangedDescription": "Aquesta sol·licitud d'integració no modifica cap fitxer.",
@@ -1023,11 +1024,11 @@
       "shareMergeRequest": "Comparteix la sol·licitud de fusió",
       "viewOnProvider": "Mostra-ho a {{provider}}",
       "mergeRequestUnavailable": "Sol·licitud de fusió no disponible",
-      "unavailableDescription": "Pot ser que l'hagin eliminat o que no hi tinguis accés.",
+      "unavailableDescription": "Pot ser que la connexió hagi fallat, o que l'element s'hagi eliminat o no sigui accessible.",
       "accessDeniedMergeRequest": "No tens permís per veure aquesta sol·licitud de fusió.",
       "couldNotLoadMergeRequest": "No s'ha pogut carregar la sol·licitud de fusió.",
       "discussionAccessDenied": "No tens permís per veure la discussió d'aquesta sol·licitud de fusió.",
-      "discussionUnavailableMessage": "Pot ser que aquesta sol·licitud de fusió s'hagi eliminat.",
+      "discussionUnavailableMessage": "Pot ser que la connexió hagi fallat o que la sol·licitud de fusió s'hagi eliminat.",
       "noDiscussionDescription": "Aquesta sol·licitud de fusió encara no té cap fil de revisió ni cap comentari a la conversa.",
       "noFilesChangedDescription": "Aquesta sol·licitud de fusió no modifica cap fitxer."
     }

@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "পুল রিকোয়েস্ট পাওয়া যাচ্ছে না",
     "pullRequestUnavailableDescription": "এই PR খোলা যাচ্ছে না। এটি মুছে ফেলা হয়ে থাকতে পারে, রিপোজিটরিটি প্রাইভেট হতে পারে অথবা তাতে Kilo GitHub অ্যাপ ইনস্টল করা নেই।",
+    "pullRequestDiscussionUnavailableMessage": "সংযোগটি ব্যর্থ হয়ে থাকতে পারে, অথবা পুল রিকোয়েস্টটি সরিয়ে ফেলা হয়ে থাকতে পারে।",
     "accessDeniedDescription": "এই পুল রিকোয়েস্ট দেখার অনুমতি আপনার নেই।",
     "noFilesChanged": "কোনো ফাইলে পরিবর্তন নেই",
     "noFilesChangedDescription": "এই পুল রিকোয়েস্টে কোনো ফাইলে পরিবর্তন করা হয়নি।",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "মার্জ রিকোয়েস্ট শেয়ার করুন",
       "viewOnProvider": "{{provider}}-এ দেখুন",
       "mergeRequestUnavailable": "মার্জ রিকোয়েস্ট পাওয়া যাচ্ছে না",
-      "unavailableDescription": "এটি মুছে ফেলা হতে পারে, অথবা আপনার অ্যাক্সেস নাও থাকতে পারে।",
+      "unavailableDescription": "সংযোগটি ব্যর্থ হয়ে থাকতে পারে, অথবা আইটেমটি মুছে ফেলা হয়ে থাকতে পারে বা সেটিতে অ্যাক্সেস না-ও থাকতে পারে।",
       "accessDeniedMergeRequest": "এই মার্জ রিকোয়েস্ট দেখার অনুমতি আপনার নেই।",
       "couldNotLoadMergeRequest": "মার্জ রিকোয়েস্ট লোড করা যায়নি।",
       "discussionAccessDenied": "এই মার্জ রিকোয়েস্ট-এর আলোচনা দেখার অনুমতি আপনার নেই।",
-      "discussionUnavailableMessage": "এই মার্জ রিকোয়েস্টটি সরিয়ে ফেলা হয়ে থাকতে পারে।",
+      "discussionUnavailableMessage": "সংযোগটি ব্যর্থ হয়ে থাকতে পারে, অথবা মার্জ রিকোয়েস্টটি সরিয়ে ফেলা হয়ে থাকতে পারে।",
       "noDiscussionDescription": "এই মার্জ রিকোয়েস্টে এখনও কোনো রিভিউ থ্রেড বা আলোচনার মন্তব্য নেই।",
       "noFilesChangedDescription": "এই মার্জ রিকোয়েস্টে কোনো ফাইলে পরিবর্তন করা হয়নি।"
     }

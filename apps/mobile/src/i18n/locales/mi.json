@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "Kāore i te wātea te tono kume",
     "pullRequestUnavailableDescription": "Kāore e taea te whakatuwhera i tēnei PR. Kua mukua pea, he pātaka waehere tūmataiti rānei, kāore rānei te taupānga Kilo GitHub i tāutatia ki reira.",
+    "pullRequestDiscussionUnavailableMessage": "Tērā pea kua rahua te hononga, tērā pea kua tangohia tēnei tono kume.",
     "accessDeniedDescription": "Kāore koe e whakaaetia kia tiro i tēnei tono kume.",
     "noFilesChanged": "Kāore he kōnae i whakarerekētia",
     "noFilesChangedDescription": "Kāore he huringa kōnae i tēnei tono kume.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "Tohaina te tono whakakotahi",
       "viewOnProvider": "Tirohia i {{provider}}",
       "mergeRequestUnavailable": "Kāore i te wātea te tono whakakotahi",
-      "unavailableDescription": "Tērā pea kua mukua, tērā pea kāore ō urunga.",
+      "unavailableDescription": "Tērā pea kua rahua te hononga, tērā pea kua mukua te mea, tērā pea kāore e taea te uru atu ki taua mea.",
       "accessDeniedMergeRequest": "Kāore koe e whakaaetia kia tiro i tēnei tono whakakotahi.",
       "couldNotLoadMergeRequest": "Kāore i taea te uta i te tono whakakotahi.",
       "discussionAccessDenied": "Kāore koe e whakaaetia kia tiro i te kōrerorero o tēnei tono whakakotahi.",
-      "discussionUnavailableMessage": "Kua tangohia pea tēnei tono whakakotahi.",
+      "discussionUnavailableMessage": "Tērā pea kua rahua te hononga, tērā pea kua tangohia tēnei tono whakakotahi.",
       "noDiscussionDescription": "Kāore he aho arotake, he kōrero rānei mō tēnei tono whakakotahi.",
       "noFilesChangedDescription": "Kāore he huringa kōnae i tēnei tono whakakotahi."
     }

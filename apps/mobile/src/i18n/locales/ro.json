@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "PR indisponibil",
     "pullRequestUnavailableDescription": "Acest PR nu poate fi deschis. Este posibil să fi fost șters, depozitul să fie privat sau aplicația Kilo pentru GitHub să nu fie instalată pentru acest depozit.",
+    "pullRequestDiscussionUnavailableMessage": "Este posibil ca conexiunea să fi eșuat sau ca acest PR să fi fost eliminat.",
     "accessDeniedDescription": "Nu ai permisiunea să vezi acest PR.",
     "noFilesChanged": "Niciun fișier modificat",
     "noFilesChangedDescription": "Acest PR nu conține modificări ale fișierelor.",
@@ -1023,11 +1024,11 @@
       "shareMergeRequest": "Distribuie merge request-ul",
       "viewOnProvider": "Vezi pe {{provider}}",
       "mergeRequestUnavailable": "Merge request indisponibil",
-      "unavailableDescription": "S-ar putea să fi fost șters sau să nu ai acces la el.",
+      "unavailableDescription": "Este posibil ca conexiunea să fi eșuat sau ca elementul să fi fost șters ori să fie inaccesibil.",
       "accessDeniedMergeRequest": "Nu ai permisiunea să vezi acest merge request.",
       "couldNotLoadMergeRequest": "Nu s-a putut încărca merge request-ul.",
       "discussionAccessDenied": "Nu ai permisiunea să vezi discuția acestui merge request.",
-      "discussionUnavailableMessage": "Este posibil ca acest merge request să fi fost eliminat.",
+      "discussionUnavailableMessage": "Este posibil ca conexiunea să fi eșuat sau ca acest merge request să fi fost eliminat.",
       "noDiscussionDescription": "Acest merge request nu are încă fire de discuție pentru revizuire sau comentarii generale.",
       "noFilesChangedDescription": "Acest merge request nu conține modificări ale fișierelor."
     }

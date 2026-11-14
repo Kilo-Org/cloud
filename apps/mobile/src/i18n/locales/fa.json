@@ -470,6 +470,7 @@
   "prReview": {
     "pullRequestUnavailable": "درخواست ادغام در دسترس نیست",
     "pullRequestUnavailableDescription": "این PR باز نمی‌شود. ممکن است حذف شده باشد، مخزن خصوصی باشد یا برنامهٔ Kilo در GitHub روی مخزن نصب نباشد.",
+    "pullRequestDiscussionUnavailableMessage": "ممکن است اتصال برقرار نشده باشد، یا این پول ریکوئست حذف شده باشد.",
     "accessDeniedDescription": "اجازهٔ مشاهدهٔ این درخواست ادغام را ندارید.",
     "noFilesChanged": "هیچ فایلی تغییر نکرده است",
     "noFilesChangedDescription": "در این درخواست ادغام هیچ فایلی تغییر نکرده است.",
@@ -1000,11 +1001,11 @@
       "shareMergeRequest": "اشتراک‌گذاری درخواست ادغام",
       "viewOnProvider": "مشاهده در {{provider}}",
       "mergeRequestUnavailable": "درخواست ادغام در دسترس نیست",
-      "unavailableDescription": "ممکن است حذف شده باشد، یا شاید به آن دسترسی نداشته باشید.",
+      "unavailableDescription": "ممکن است اتصال برقرار نشده باشد، یا این مورد حذف شده باشد یا در دسترس نباشد.",
       "accessDeniedMergeRequest": "اجازهٔ مشاهدهٔ این درخواست ادغام را ندارید.",
       "couldNotLoadMergeRequest": "بارگذاری درخواست ادغام ممکن نشد.",
       "discussionAccessDenied": "اجازهٔ مشاهدهٔ گفت‌وگوی این درخواست ادغام را ندارید.",
-      "discussionUnavailableMessage": "ممکن است این درخواست ادغام حذف شده باشد.",
+      "discussionUnavailableMessage": "ممکن است اتصال برقرار نشده باشد، یا این درخواست ادغام حذف شده باشد.",
       "noDiscussionDescription": "هنوز هیچ گفت‌وگوی بازبینی یا نظری در این درخواست ادغام ثبت نشده است.",
       "noFilesChangedDescription": "در این درخواست ادغام هیچ فایلی تغییر نکرده است."
     }

@@ -3075,6 +3075,7 @@
     },
     "pullRequestUnavailable": "无法打开拉取请求",
     "pullRequestUnavailableDescription": "无法打开此 PR。可能是 PR 已被删除、仓库为私有仓库，或仓库尚未安装 Kilo GitHub 应用。",
+    "pullRequestDiscussionUnavailableMessage": "连接可能已失败，或者此拉取请求可能已被删除。",
     "reconnectNotice": {
       "title": "GitHub 连接已过期",
       "message": "请重新检查连接；如需重新连接，系统会提示你。",
@@ -3176,11 +3177,11 @@
       "shareMergeRequest": "分享合并请求",
       "viewOnProvider": "在 {{provider}} 上查看",
       "mergeRequestUnavailable": "无法打开合并请求",
-      "unavailableDescription": "它可能已被删除，或者你可能没有访问权限。",
+      "unavailableDescription": "连接可能已失败，或者该内容可能已被删除或无法访问。",
       "accessDeniedMergeRequest": "你无权查看此合并请求。",
       "couldNotLoadMergeRequest": "无法加载合并请求",
       "discussionAccessDenied": "你无权查看此合并请求的讨论。",
-      "discussionUnavailableMessage": "此合并请求可能已被删除。",
+      "discussionUnavailableMessage": "连接可能已失败，或者此合并请求可能已被删除。",
       "noDiscussionDescription": "此合并请求暂无审查讨论串或评论。",
       "noFilesChangedDescription": "此合并请求不包含文件变更。"
     }

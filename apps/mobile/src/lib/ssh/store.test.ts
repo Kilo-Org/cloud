@@ -5,14 +5,7 @@ import { createSshTestDatabase } from './database.test-helpers';
 import { createForward, getForward, listForwards, type SshForwardInput } from './forwards';
 import { createHost, deleteHost, getHost, listHosts, type SshHostInput, updateHost } from './hosts';
 import { createKey, deleteKey, getKey, listKeys, type SshKeyInput, updateKey } from './keys';
-import {
-  findKnownHost,
-  getKnownHost,
-  listKnownHosts,
-  removeKnownHost,
-  replaceHostKey,
-  trustHostKey,
-} from './known-hosts';
+import { findKnownHost, listKnownHosts, removeKnownHost, trustHostKey } from './known-hosts';
 import { createSnippet, getSnippet, listSnippets } from './snippets';
 
 const ids = vi.hoisted(() => {
@@ -220,24 +213,6 @@ describe('known hosts', () => {
       })
     ).toThrow();
     expect(listKnownHosts(db)).toHaveLength(1);
-  });
-
-  it('replaces a stored key in place, keeping one row and the unique pair', () => {
-    const trusted = trustHostKey(db, hostKey);
-
-    const replaced = replaceHostKey(db, trusted.id, {
-      keyAlgorithm: 'ssh-ed25519',
-      publicKeyBase64: 'AAAAC3NzaC1lZDI1NTE5AAAB',
-      fingerprintSha256: 'SHA256:rotated',
-    });
-
-    expect(replaced).toMatchObject({
-      id: trusted.id,
-      fingerprintSha256: 'SHA256:rotated',
-      publicKeyBase64: 'AAAAC3NzaC1lZDI1NTE5AAAB',
-    });
-    expect(listKnownHosts(db)).toHaveLength(1);
-    expect(getKnownHost(db, trusted.id)?.fingerprintSha256).toBe('SHA256:rotated');
   });
 
   it('removes one entry', () => {

@@ -42,15 +42,17 @@ vi.mock('@/components/ui/button', () => ({
     children?: ReactNode;
     accessibilityLabel?: string;
     variant?: string;
+    className?: string;
   }) =>
-    createElement('ButtonMock', { onPress: props.onPress, variant: props.variant }, [
+    createElement('ButtonMock', { ...props }, [
       createElement('ButtonLabelMock', { label: props.accessibilityLabel }),
       props.children,
     ]),
 }));
 
 vi.mock('@/components/ui/text', () => ({
-  Text: (props: { children?: ReactNode }) => createElement('TextMock', null, props.children),
+  Text: (props: { children?: ReactNode; className?: string }) =>
+    createElement('TextMock', { className: props.className }, props.children),
 }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
@@ -126,6 +128,16 @@ describe('ScopeAccessDeniedScreen', () => {
     // primary; leaving the organization is the outlined secondary under it.
     expect(button('Retry', renderer.root)?.props.variant ?? 'default').toBe('default');
     expect(button('Back to profile', renderer.root)?.props.variant).toBe('outline');
+
+    // Dark --primary is the brand yellow that glares on the near-black page, so dark takes the muted lifted olive.
+    const retry = button('Retry', renderer.root);
+    expect(String(retry?.props.className)).toContain('bg-primary');
+    expect(String(retry?.props.className)).toContain('dark:bg-selection');
+    const retryLabel = retry ? findByType(retry, 'TextMock')[0] : undefined;
+    expect(String(retryLabel?.props.className)).toContain('dark:text-selection-foreground');
+    expect(String(button('Back to profile', renderer.root)?.props.className)).not.toContain(
+      'dark:bg-selection'
+    );
     expect(
       findByType(renderer.root, 'ButtonMock').filter(
         node => (node.props.variant ?? 'default') === 'default'

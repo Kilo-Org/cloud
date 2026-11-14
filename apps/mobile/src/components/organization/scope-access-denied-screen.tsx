@@ -54,8 +54,17 @@ export function ScopeAccessDeniedScreen({
       )}
       action={
         <View className="gap-3">
-          <Button onPress={onRetry} loading={isRetrying} accessibilityLabel={t('common.retry')}>
-            <Text>{t('common.retry')}</Text>
+          {/* Retry is the one filled control on this surface, so it keeps the
+              light mode's weight in both themes: dark `--primary` is the brand
+              yellow that glares on the near-black page, so dark takes the muted
+              olive `--selection` with its own foreground ink. */}
+          <Button
+            className="bg-primary dark:bg-selection"
+            onPress={onRetry}
+            loading={isRetrying}
+            accessibilityLabel={t('common.retry')}
+          >
+            <Text className="dark:text-selection-foreground">{t('common.retry')}</Text>
           </Button>
           <Button
             variant="outline"

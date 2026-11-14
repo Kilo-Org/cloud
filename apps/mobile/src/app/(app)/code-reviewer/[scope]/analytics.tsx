@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { type Href, useLocalSearchParams } from 'expo-router';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -16,6 +16,7 @@ import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { useCodeReviewerAnalyticsFilters } from '@/lib/hooks/use-code-reviewer-analytics-filters';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { PERSONAL_SCOPE, PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { useTRPC } from '@/lib/trpc';
@@ -26,9 +27,6 @@ const PERIOD_OPTIONS = [
   { value: '30', label: '30' },
   { value: '90', label: '90' },
 ] as const;
-
-type PeriodDays = 7 | 30 | 90;
-type AnalyticsPlatform = 'github' | 'gitlab';
 
 const PLATFORM_OPTIONS = (['github', 'gitlab'] as const).map(platform => ({
   value: platform,
@@ -83,8 +81,7 @@ export default function CodeReviewerAnalyticsRoute() {
 function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
   const trpc = useTRPC();
-  const [period, setPeriod] = useState<PeriodDays>(30);
-  const [platform, setPlatform] = useState<AnalyticsPlatform>('github');
+  const { platform, period, setPlatform, setPeriod } = useCodeReviewerAnalyticsFilters(scope);
 
   const dashboard = useQuery(
     trpc.codeReviews.analytics.getDashboard.queryOptions({

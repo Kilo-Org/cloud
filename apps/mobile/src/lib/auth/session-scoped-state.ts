@@ -15,6 +15,7 @@ import { clearRemoteMcpServers } from '@/lib/chat/remote-mcp-store';
 import { clearSettingsToolsEnabled } from '@/lib/chat/settings-tools-switch';
 import { clearFormDrafts } from '@/lib/form-draft';
 import { clearRepoSelectionSenders } from '@/lib/hooks/repo-selection-senders';
+import { clearCodeReviewerAnalyticsFilters } from '@/lib/hooks/use-code-reviewer-analytics-filters';
 import { clearTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { clearLastOpenedSession } from '@/lib/last-opened-session';
@@ -132,6 +133,11 @@ export function clearSessionScopedState(): void {
   runClear(clearRepoSelectionSenders);
   runClear(clearUserSessionTitles);
   runClear(clearSessionGoalCollapseState);
+  // The analytics platform and period are a per-organization choice held in
+  // memory, so the account boundary drops it with the other session-scoped
+  // members: the next account must not open an organization on the previous
+  // account's analytics choice.
+  runClear(clearCodeReviewerAnalyticsFilters);
   // Wiping the mirror is what makes "signed out shows nothing to browse" true;
   // dropping the engine memo keeps a completed run from repopulating it. The
   // wipe alone is invisible to an open Files app, which keeps the listing it

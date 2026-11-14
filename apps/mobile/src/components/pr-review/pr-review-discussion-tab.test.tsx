@@ -186,25 +186,31 @@ describe('PrReviewDiscussionTab full-body states', () => {
   };
 
   it.each([
-    ['permission', GITLAB_REF, 'merge request'],
-    ['not-found', GITLAB_REF, 'merge request'],
-    ['not-found', BITBUCKET_REF, 'pull request'],
-    // GitHub's permission copy says "PR" and names no provider object at all;
-    // this row only pins that it stays that way.
-    ['permission', undefined, null],
-    ['not-found', undefined, 'pull request'],
-  ] as const)('names the provider object in the %s copy', (kind, scope, noun) => {
+    [
+      'permission',
+      GITLAB_REF,
+      "You don't have permission to view this merge request's discussion.",
+    ],
+    [
+      'not-found',
+      GITLAB_REF,
+      'The connection may have failed, or the merge request may have been removed.',
+    ],
+    [
+      'not-found',
+      BITBUCKET_REF,
+      'The connection may have failed, or the pull request may have been removed.',
+    ],
+    // GitHub's denial names no provider object, and its not-found keeps the
+    // terminal copy: the connection clause belongs to the provider scopes only.
+    ['permission', undefined, "You don't have permission to view this PR's discussion."],
+    ['not-found', undefined, 'This pull request may have been removed.'],
+  ] as const)('renders the %s copy this scope owns', (kind, scope, expected) => {
     discussionState.firstPageErrorState = { kind };
     const message = String(
       mountTab(scope).root.find(node => String(node.type) === 'QueryError').props.message
     );
-    if (noun === null) {
-      expect(message).not.toContain('merge request');
-      expect(message).not.toContain('pull request');
-      return;
-    }
-    expect(message).toContain(noun);
-    expect(message).not.toContain(noun === 'merge request' ? 'pull request' : 'merge request');
+    expect(message).toBe(expected);
   });
 
   it('names a merge request in the empty state description', () => {

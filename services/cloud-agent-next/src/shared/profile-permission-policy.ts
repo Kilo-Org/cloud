@@ -60,11 +60,13 @@ function patternsMayCover(a: string, b: string): boolean {
  * text. Agent rules come first in their own order, so a profile's exception
  * after its own refusal survives.
  *
- * An agent refusal applies as written. An agent ask applies as written too, and
- * carries every session decision of the commands it can reach, in the session's
- * order: a session refusal stays a refusal, and a session allow becomes the
- * profile's ask because the profile chose to ask there. A session refusal can
- * therefore never become a prompt.
+ * An agent refusal applies as written. An agent ask applies as written too. It
+ * carries every session refusal it can reach, so a refusal stays a refusal. It
+ * carries a session allow as the profile's ask only for the commands the ask
+ * covers, so a wider session allow keeps its own effect where the ask does not
+ * reach. The ask is omitted where the session refuses the same pattern, because
+ * that refusal already decides it. A session refusal can therefore never become
+ * a prompt.
  *
  * An agent allowance is kept only where the session writes an allow for that
  * same pattern, because the session decides every other pattern.
@@ -93,15 +95,30 @@ function composeRuleMap(
     // A refusal and an ask apply as written; an allowance needs the session to
     // write the same pattern, which is what the session permits.
     if (action === 'allow' && session[pattern] !== 'allow') continue;
-    composed.push([pattern, action]);
-    if (action === 'deny') continue;
     if (action === 'ask') {
+      // A session refusal on this same pattern decides the ask, so the ask adds
+      // nothing and the session map governs the agent.
+      if (session[pattern] === 'deny') continue;
+      composed.push([pattern, 'ask']);
+      const askPrefix = literalPrefix(pattern);
       for (const [sessionPattern, sessionAction] of sessionEntries) {
+        if (sessionPattern === pattern) continue;
         if (!patternsMayCover(pattern, sessionPattern)) continue;
-        composed.push([sessionPattern, sessionAction === 'allow' ? 'ask' : sessionAction]);
+        if (sessionAction === 'deny') {
+          // A session refusal stays a refusal wherever it can reach the ask.
+          composed.push([sessionPattern, 'deny']);
+          continue;
+        }
+        // A session allow applies as the profile's ask only where the ask reaches
+        // it; a wider session allow keeps its own effect for the commands the ask
+        // does not cover.
+        if (sessionAction === 'allow' && literalPrefix(sessionPattern).startsWith(askPrefix))
+          composed.push([sessionPattern, 'ask']);
       }
       continue;
     }
+    composed.push([pattern, action]);
+    if (action === 'deny') continue;
     const index = sessionEntries.findIndex(([key]) => key === pattern);
     if (index < 0) continue;
     for (const [denyIndex, [denyPattern, denyAction]] of sessionEntries.entries()) {

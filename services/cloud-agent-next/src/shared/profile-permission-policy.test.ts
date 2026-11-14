@@ -305,25 +305,17 @@ describe('narrowProfilePermission', () => {
     expect(narrowProfilePermission({ edit: 'deny' }, { bash: { '*': 'ask' } })).toEqual({
       bash: { '*': 'ask' },
     });
-    // The session's catch-all refusal follows the ask and decides, because a
-    // session refusal never becomes a prompt; its allows become the profile's
-    // ask, which is the stricter of the two.
-    expect(narrowProfilePermission(reviewSession, { bash: { '*': 'ask' } })).toEqual({
-      bash: {
-        '*': 'deny',
-        'gh pr diff': 'ask',
-        'gh pr diff *': 'ask',
-        'git log': 'ask',
-        'git log *': 'ask',
-        'git push': 'deny',
-        'git push *': 'deny',
-      },
-    });
+    // The session refuses every command on the ask's own pattern, so the ask is
+    // omitted and the session map governs the agent; a session refusal never
+    // becomes a prompt.
+    expect(narrowProfilePermission(reviewSession, { bash: { '*': 'ask' } })).toBeUndefined();
+    // The ask keeps its own entry as written, and the session's catch-all refusal
+    // can reach it, so that refusal follows and decides every command.
     const composed = narrowProfilePermission(reviewSession, {
       bash: { 'git log *': 'ask' },
     }) as PermissionMap;
-    expect(composed['bash']).toEqual({ '*': 'deny', 'git log': 'ask', 'git log *': 'ask' });
-    expect(resolve(reviewSession, composed, 'bash', 'git log --oneline')).toBe('ask');
+    expect(composed['bash']).toEqual({ 'git log *': 'ask', '*': 'deny' });
+    expect(resolve(reviewSession, composed, 'bash', 'git log --oneline')).toBe('deny');
     expect(resolve(reviewSession, composed, 'bash', 'node x')).toBe('deny');
   });
 
@@ -331,21 +323,64 @@ describe('narrowProfilePermission', () => {
     const session: PermissionMap = {
       bash: { '*': 'deny', 'git log': 'allow', 'git log *': 'allow' },
     };
-    const composed = narrowProfilePermission(session, { bash: { '*': 'ask' } }) as PermissionMap;
-    // The catch-all refusal decides every command the session wrote no allow
-    // for, and the session's allows keep the profile's ask.
+    // The session refuses the ask's own pattern, so the ask adds nothing to the
+    // composed map and the session's own refusals keep deciding; the allows the
+    // session writes separately still permit the read forms.
+    expect(narrowProfilePermission(session, { bash: { '*': 'ask' } })).toBeUndefined();
+    const composed: PermissionMap = {};
     expect(resolve(session, composed, 'bash', 'rm -rf /')).toBe('deny');
     expect(resolve(session, composed, 'bash', 'git push')).toBe('deny');
-    expect(resolve(session, composed, 'bash', 'git log --oneline')).toBe('ask');
+    expect(resolve(session, composed, 'bash', 'git log --oneline')).toBe('allow');
+  });
+
+  it('keeps a profile allowance that a narrower ask sits inside', () => {
+    const session: PermissionMap = {
+      bash: buildCommandGuardBashPermissions(
+        getCommandGuardPolicy('security-remediation', 'github')!
+      ),
+    };
+    const composed = narrowProfilePermission(session, {
+      bash: { 'git *': 'allow', 'git push *': 'ask' },
+    }) as PermissionMap;
+    // The ask reaches only the push form, so the session's wider git allow keeps
+    // its own effect for the reads the profile allows.
+    expect(resolve(session, composed, 'bash', 'git status')).toBe('allow');
+    expect(resolve(session, composed, 'bash', 'git log --oneline')).toBe('allow');
+    expect(resolve(session, composed, 'bash', 'git push origin main')).toBe('ask');
+  });
+
+  it('omits an ask the session refuses on the same pattern', () => {
+    const session: PermissionMap = {
+      bash: { '*': 'deny', 'git log': 'allow', 'git log *': 'allow' },
+    };
+    // The session refuses every command on the ask's own pattern, so the ask
+    // decides nothing and the session map governs the agent on its own.
+    expect(narrowProfilePermission(session, { bash: { '*': 'ask' } })).toBeUndefined();
+    const composed: PermissionMap = {};
+    expect(resolve(session, composed, 'bash', 'rm -rf /')).toBe('deny');
+    expect(resolve(session, composed, 'bash', 'npm test')).toBe('deny');
+    expect(resolve(session, composed, 'bash', 'git log --oneline')).toBe('allow');
+  });
+
+  it('does not carry a wider session allow into an ask', () => {
+    const session: PermissionMap = { bash: { git: 'allow', 'git *': 'allow' } };
+    const composed = narrowProfilePermission(session, {
+      bash: { 'git push *': 'ask' },
+    }) as PermissionMap;
+    // The session's allows are wider than the ask, so they stay out of the
+    // composed map and keep their own effect; the ask decides the push form.
+    expect(composed['bash']).toEqual({ 'git push *': 'ask' });
+    expect(resolve(session, composed, 'bash', 'git status')).toBe('allow');
+    expect(resolve(session, composed, 'bash', 'git push origin main')).toBe('ask');
   });
 
   it('does not let an agent ask widen a flat session denial', () => {
     const session: PermissionMap = { bash: 'deny' };
-    const composed = narrowProfilePermission(session, { bash: { '*': 'ask' } }) as PermissionMap;
-    // The session's flat refusal covers every command of the tool, so no prompt
-    // survives.
-    expect(composed['bash']).toEqual({ '*': 'deny' });
-    expect(resolve(session, composed, 'bash', 'npm test')).toBe('deny');
+    const composed = narrowProfilePermission(session, { bash: { '*': 'ask' } });
+    // The session's flat refusal covers every command of the tool and names the
+    // ask's own pattern, so the ask is omitted and no prompt survives.
+    expect(composed).toBeUndefined();
+    expect(resolve(session, {}, 'bash', 'npm test')).toBe('deny');
   });
 
   it('keeps an agent ask over a session allow for the same tool', () => {

@@ -50,18 +50,29 @@ function formatAuditTime(createdAt: string): string {
   return `${day} · ${formatClockTime(date, i18n.language)}`;
 }
 
-const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAuditLogEntry }>) {
+const AuditLogRow = memo(function AuditLogRow({
+  entry,
+  organizationName,
+}: Readonly<{ entry: OrgAuditLogEntry; organizationName: string }>) {
   const { t } = useTranslation();
   const actor = entry.actor_email ?? entry.actor_name;
   const time = formatAuditTime(entry.created_at);
   const meta = actor ? `${actor} · ${time}` : time;
+  // The server's message for this action is "Organization <name> created",
+  // which only restates the event name already shown above it. The detail line
+  // shows the organization name the screen knows instead, so the row adds
+  // information rather than an English sentence under a translated label.
+  const detail =
+    entry.action === 'organization.created' && organizationName.length > 0
+      ? organizationName
+      : entry.message;
   return (
     <View className="gap-1 rounded-lg bg-secondary p-3">
       <Text className="text-sm font-medium text-foreground">
         {auditActionLabel(t, entry.action)}
       </Text>
       <Text className="text-xs text-muted-foreground" numberOfLines={2}>
-        {entry.message}
+        {detail}
       </Text>
       {meta.length === 0 ? null : (
         <Text className="text-xs text-muted-foreground" numberOfLines={1}>
@@ -91,9 +102,12 @@ export function OrganizationAuditLogScreen() {
   // updates keeps every unchanged row from re-rendering. The row reads `t`
   // itself instead of taking it as a prop: `useTranslation` subscribes each row
   // to a language change, which a prop that never changes could not.
+  const organizationName = org?.organizationName ?? '';
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<OrgAuditLogEntry>) => <AuditLogRow entry={item} />,
-    []
+    ({ item }: ListRenderItemInfo<OrgAuditLogEntry>) => (
+      <AuditLogRow entry={item} organizationName={organizationName} />
+    ),
+    [organizationName]
   );
 
   if (isResolving || organizationId == null || org == null) {

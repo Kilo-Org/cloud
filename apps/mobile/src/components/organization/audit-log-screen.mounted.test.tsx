@@ -4,7 +4,9 @@
 // page's skeleton, a retryable first-page error, the empty state, the paged list
 // with its `hasMore` footer, and a later-page failure that keeps the rows it has.
 // A row also names its event through the catalog, falling back to the generic
-// event name for an action this build does not know.
+// event name for an action this build does not know; the created-organization
+// row's detail line carries the organization name instead of the server's
+// message, which only restates that event name in English.
 // The query layer is mocked so each state is driven directly through the screen
 // JSX, the same way the credit-activity suite does it.
 
@@ -50,7 +52,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
         : {
             id: boundary.organizationId,
             plan: boundary.plan,
-            name: 'Acme',
+            organizationName: 'Acme',
           },
     isResolving: boundary.isResolving,
   }),
@@ -284,6 +286,34 @@ describe('OrganizationAuditLogScreen', () => {
       }
     });
     expect(pageQuery.fetchNextPage).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it("shows the created organization's name in place of the restating server message", async () => {
+    pageHook.entries = [
+      {
+        id: 'audit-created',
+        action: 'organization.created',
+        actor_id: 'user-1',
+        actor_email: 'owner@example.com',
+        actor_name: 'Owner',
+        message: 'Organization Acme created',
+        created_at: '2026-01-01T00:00:00.000Z',
+      },
+    ];
+    const { renderer, unmount } = await mount();
+
+    const texts = renderer.root.findAllByType('Text');
+    const messages = texts
+      .map(node => node.props.children)
+      .filter(child => typeof child === 'string');
+    expect(messages).toContain('Organization created');
+    // The detail line is the only two-line text in the row; for this action it
+    // names the organization instead of repeating the event name in English.
+    const detail = texts.find(node => node.props.numberOfLines === 2);
+    expect(detail?.props.children).toBe('Acme');
+    expect(messages).not.toContain('Organization Acme created');
+    expect(messages.some(text => text.includes('organization.created'))).toBe(false);
     unmount();
   });
 

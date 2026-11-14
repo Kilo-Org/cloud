@@ -24,6 +24,15 @@ import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombob
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { buildGitHubInstallState } from './github-install-state';
 import { useConfirm } from '@/components/ui/confirm';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { OrganizationGitHubInstallations } from './OrganizationGitHubInstallations';
 import { GitHubIdentityCard } from './GitHubIdentityCard';
 
@@ -337,12 +346,28 @@ function GitHubIntegrationDetailsContent({
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         hasUserByokAvailable: model.hasUserByokAvailable,
+        variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : [],
       })) ?? []
     );
   }, [openRouterModels]);
 
-  // Track selected model
+  // Track selected model + thinking effort
   const [selectedModel, setSelectedModel] = useState<string>('');
+  const [selectedEffort, setSelectedEffort] = useState<string | null>(null);
+  const availableVariants = useMemo(
+    () => modelOptions.find(model => model.id === selectedModel)?.variants ?? [],
+    [modelOptions, selectedModel]
+  );
+  // A stored effort can outlive the selected model's variant list (the model
+  // changed, or the catalog dropped the variant). Keep it selectable so the
+  // setting is visible and can be cleared instead of silently persisting.
+  const effortOptions = useMemo(
+    () =>
+      selectedEffort && !availableVariants.includes(selectedEffort)
+        ? [...availableVariants, selectedEffort]
+        : availableVariants,
+    [availableVariants, selectedEffort]
+  );
   const installationDetectedRef = useRef(false);
   const launchedInstallStates = useRef(new Set<string>());
 
@@ -425,12 +450,13 @@ function GitHubIntegrationDetailsContent({
 
   const mintInstallState = useMutation(trpc.githubApps.mintInstallState.mutationOptions());
 
-  // Initialize selected model from installation data
+  // Initialize selected model + effort from installation data
   useEffect(() => {
     if (installationData?.installation?.modelSlug) {
       setSelectedModel(installationData.installation.modelSlug);
     }
-  }, [installationData?.installation?.modelSlug]);
+    setSelectedEffort(installationData?.installation?.thinkingEffort ?? null);
+  }, [installationData?.installation?.modelSlug, installationData?.installation?.thinkingEffort]);
 
   useEffect(() => {
     if (!appReturnPath) return;
@@ -458,8 +484,26 @@ function GitHubIntegrationDetailsContent({
 
   const handleModelChange = (modelSlug: string) => {
     setSelectedModel(modelSlug);
+    // While the catalog is loading, or when it does not know the slug, the
+    // model's variants are unknown. Persist the model change without touching
+    // the stored effort instead of coercing a possibly valid effort to null.
+    const variantsKnown = !isLoadingModels && modelOptions.some(model => model.id === modelSlug);
+    const variants = variantsKnown
+      ? (modelOptions.find(model => model.id === modelSlug)?.variants ?? [])
+      : [];
+    const effort = variantsKnown
+      ? selectedEffort && variants.includes(selectedEffort)
+        ? selectedEffort
+        : null
+      : undefined;
+    if (effort !== undefined) setSelectedEffort(effort);
     updateModel.mutate(
-      { modelSlug, organizationId, integrationId: installationData?.installation?.id },
+      {
+        modelSlug,
+        ...(effort === undefined ? {} : { thinkingEffort: effort }),
+        organizationId,
+        integrationId: installationData?.installation?.id,
+      },
       {
         onSuccess: result => {
           if (result.success) {
@@ -889,7 +933,7 @@ function GitHubIntegrationDetailsContent({
                 </div>
               </div>
 
-              {/* Model Selection */}
+              {/* Model + Thinking Effort Selection */}
               <div className="space-y-3 rounded-lg border p-4">
                 <ModelCombobox
                   label="AI Model"
@@ -900,6 +944,59 @@ function GitHubIntegrationDetailsContent({
                   isLoading={isLoadingModels}
                   placeholder="Select a model"
                 />
+                {effortOptions.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Thinking Effort</Label>
+                    <Select
+                      value={selectedEffort ?? '__default__'}
+                      onValueChange={value => {
+                        const effort = value === '__default__' ? null : value;
+                        setSelectedEffort(effort);
+                        if (selectedModel) {
+                          updateModel.mutate(
+                            {
+                              modelSlug: selectedModel,
+                              thinkingEffort: effort,
+                              organizationId,
+                              integrationId: installationData?.installation?.id,
+                            },
+                            {
+                              onSuccess: result => {
+                                if (result.success) {
+                                  toast.success('Thinking effort updated');
+                                } else {
+                                  toast.error('Failed to update thinking effort', {
+                                    description: result.error,
+                                  });
+                                }
+                              },
+                              onError: err => {
+                                toast.error('Failed to update thinking effort', {
+                                  description: err.message,
+                                });
+                              },
+                            }
+                          );
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__default__">Default</SelectItem>
+                        {effortOptions.map(variant => (
+                          <SelectItem key={variant} value={variant}>
+                            {thinkingEffortLabel(variant)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-muted-foreground text-sm">
+                      Configure the model&apos;s reasoning intensity
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Actions */}

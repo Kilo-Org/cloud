@@ -11,6 +11,7 @@ import {
 } from '@/lib/integrations/platforms/github/provided-token';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
+import { BotThinkingEffortSchema } from '@/lib/bot/model';
 import * as githubAppsService from '@/lib/integrations/github-apps-service';
 import {
   findIntegrationByInstallationId,
@@ -299,6 +300,10 @@ export const githubAppsRouter = createTRPCRouter({
                 (await canUninstallGitHubInstallation(integration)),
               canCancel,
               modelSlug: (metadata?.model_slug as string) || null,
+              thinkingEffort:
+                typeof metadata?.thinking_effort === 'string' && metadata.thinking_effort.trim()
+                  ? metadata.thinking_effort.trim()
+                  : null,
               canManageModel,
             };
           })
@@ -447,6 +452,10 @@ export const githubAppsRouter = createTRPCRouter({
     const pendingApproval = metadata?.pending_approval as Record<string, unknown> | undefined;
     const status = (pendingApproval?.status as string) || null;
     const isInstalled = isPlatformIntegrationHealthy(integration);
+    const thinkingEffort =
+      typeof metadata?.thinking_effort === 'string' && metadata.thinking_effort.trim()
+        ? metadata.thinking_effort.trim()
+        : null;
 
     return {
       installed: isInstalled,
@@ -469,6 +478,7 @@ export const githubAppsRouter = createTRPCRouter({
         installedAt: integration.installed_at,
         status,
         modelSlug: (metadata?.model_slug as string) || null,
+        thinkingEffort,
       },
     };
   }),
@@ -480,6 +490,7 @@ export const githubAppsRouter = createTRPCRouter({
         organizationId: z.string().uuid().optional(),
         integrationId: z.string().uuid().optional(),
         modelSlug: z.string(),
+        thinkingEffort: BotThinkingEffortSchema,
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -490,10 +501,15 @@ export const githubAppsRouter = createTRPCRouter({
       const result = await githubAppsService.updateModel(
         owner,
         input.modelSlug,
-        input.integrationId
+        input.integrationId,
+        input.thinkingEffort
       );
 
       if (input.organizationId && result.success) {
+        const effortSuffix =
+          input.thinkingEffort === undefined
+            ? ''
+            : ` with thinking effort ${input.thinkingEffort ?? 'default'}`;
         await createAuditLog({
           organization_id: input.organizationId,
           action: 'organization.settings.change',
@@ -501,8 +517,8 @@ export const githubAppsRouter = createTRPCRouter({
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
           message: input.integrationId
-            ? `Updated GitHub App installation ${input.integrationId} model to ${input.modelSlug}`
-            : `Updated GitHub App integration model to ${input.modelSlug}`,
+            ? `Updated GitHub App installation ${input.integrationId} model to ${input.modelSlug}${effortSuffix}`
+            : `Updated GitHub App integration model to ${input.modelSlug}${effortSuffix}`,
         });
       }
 

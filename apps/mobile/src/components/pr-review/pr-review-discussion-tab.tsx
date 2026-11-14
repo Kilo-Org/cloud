@@ -447,17 +447,20 @@ export function PrReviewDiscussionTab({
     // GitLab folds its connection failures into the same NOT_FOUND a deleted
     // merge request produces, so provider scopes offer the read retry and the
     // connection check instead of a dead end (GitHub keeps the terminal copy).
+    // Each provider scope names its own object, so the message never calls a
+    // merge request a pull request or the reverse.
     const isProviderScope = ref.platform !== 'github';
+    const unavailableMessage = isMergeRequest
+      ? t('prReview.terms.discussionUnavailableMessage')
+      : isProviderScope
+        ? t('prReview.pullRequestDiscussionUnavailableMessage')
+        : t('prReview.discussion.unavailableMessage');
     return (
       <>
         <QueryError
           variant="not-found"
           title={t('prReview.discussion.unavailable')}
-          message={
-            isMergeRequest
-              ? t('prReview.terms.discussionUnavailableMessage')
-              : t('prReview.discussion.unavailableMessage')
-          }
+          message={unavailableMessage}
           action={
             isProviderScope ? (
               <PrReviewUnavailableActions

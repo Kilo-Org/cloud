@@ -174,18 +174,37 @@ describe('PrReviewDiscussionTab full-body states', () => {
     ).toHaveLength(0);
   });
 
+  // Bitbucket Cloud says pull request too, but it is a provider scope like
+  // GitLab: its not-found copy comes from the provider retry state, not the
+  // GitHub terminal one, so it gets its own row instead of inheriting the
+  // GitHub message.
+  const BITBUCKET_REF: ProviderPrRef = {
+    platform: 'bitbucket',
+    workspace: 'acme',
+    repoSlug: 'widgets',
+    prId: 42,
+  };
+
   it.each([
-    ['permission', GITLAB_REF, true],
-    ['not-found', GITLAB_REF, true],
-    ['permission', undefined, false],
-    ['not-found', undefined, false],
-  ] as const)('names a merge request in the %s copy', (kind, scope, forMergeRequest) => {
+    ['permission', GITLAB_REF, 'merge request'],
+    ['not-found', GITLAB_REF, 'merge request'],
+    ['not-found', BITBUCKET_REF, 'pull request'],
+    // GitHub's permission copy says "PR" and names no provider object at all;
+    // this row only pins that it stays that way.
+    ['permission', undefined, null],
+    ['not-found', undefined, 'pull request'],
+  ] as const)('names the provider object in the %s copy', (kind, scope, noun) => {
     discussionState.firstPageErrorState = { kind };
     const message = String(
       mountTab(scope).root.find(node => String(node.type) === 'QueryError').props.message
     );
-    expect(message.includes('merge request')).toBe(forMergeRequest);
-    expect(message).not.toContain(forMergeRequest ? 'pull request' : 'merge request');
+    if (noun === null) {
+      expect(message).not.toContain('merge request');
+      expect(message).not.toContain('pull request');
+      return;
+    }
+    expect(message).toContain(noun);
+    expect(message).not.toContain(noun === 'merge request' ? 'pull request' : 'merge request');
   });
 
   it('names a merge request in the empty state description', () => {

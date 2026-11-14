@@ -2,7 +2,12 @@ import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
+import {
+  COMPACT_CONTROL_BOX_CLASS,
+  COMPACT_CONTROL_HIT_SLOP_DP,
+  tapTargetReachDp,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
 
 import { MarkdownCodeFence } from './markdown-code-fence';
 
@@ -120,13 +125,19 @@ describe('MarkdownCodeFence', () => {
     expect(mocks.performCopy).toHaveBeenCalledWith(LONG_LINE);
   });
 
-  it('keeps the header row one text line tall with the shared compact box', async () => {
+  it('keeps the header row short with the shared compact icon box', async () => {
     const renderer = await mount(fence());
     const button = hostProps(renderer, 'Pressable');
     expect(String(button.className).split(' ')).toEqual(
-      expect.arrayContaining(LINE_ACTION_BOX_CLASS.split(' '))
+      expect.arrayContaining(COMPACT_CONTROL_BOX_CLASS.split(' '))
     );
-    expect(button.hitSlop).toBe(LINE_ACTION_HIT_SLOP);
+    expect(button.hitSlop).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
+    // The box stays inside the header row, so no clipping ancestor cuts the
+    // control's touch reach short.
+    expect(COMPACT_CONTROL_BOX_CLASS).not.toContain('-my-');
+    expect(tapTargetReachDp(32, COMPACT_CONTROL_HIT_SLOP_DP)).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
   });
 
   it('passes a multi-line fence through unchanged', async () => {

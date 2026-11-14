@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native';
 
 import { Clipboard } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
-import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
+import { COMPACT_CONTROL_BOX_CLASS, COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 import { CodeBlock } from './code-block';
@@ -62,11 +62,8 @@ export function MarkdownCodeFence({
           {language ?? ''}
         </Text>
         <Pressable
-          className={cn(
-            LINE_ACTION_BOX_CLASS,
-            'min-w-[48px] items-center justify-center active:opacity-70'
-          )}
-          hitSlop={LINE_ACTION_HIT_SLOP}
+          className={cn(COMPACT_CONTROL_BOX_CLASS, 'active:opacity-70')}
+          hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
           accessibilityRole="button"
           accessibilityLabel={t('common.copy')}
           onPress={() => {

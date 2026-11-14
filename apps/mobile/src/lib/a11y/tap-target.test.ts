@@ -99,25 +99,29 @@ async function compiledDp(className: string, property: string): Promise<number> 
 }
 
 describe('shared tap-target geometry', () => {
-  it('keeps the control-size audit floor below the design touch target', () => {
-    expect(MIN_TAP_TARGET_DP).toBe(28);
-    expect(TOUCH_TARGET_DP).toBe(44);
-    expect(COMPACT_CONTROL_HIT_SLOP_DP).toBe(8);
-    expect(INLINE_LINK_FACING_HIT_SLOP_DP).toBe(4);
-    expect(INLINE_LINK_OUTER_HIT_SLOP_DP).toBe(12);
-    expect(INLINE_LINK_VERTICAL_HIT_SLOP_DP).toBe(8);
-  });
-
-  it('renders the compact control box from whole pixels that clear the audit floor', () => {
-    expect(COMPACT_CONTROL_BOX_CLASS).toContain('h-[32px]');
-    expect(COMPACT_CONTROL_BOX_CLASS).toContain('w-[32px]');
+  it('renders the compact control box from whole pixels that clear the audit floor', async () => {
+    // The box is measured through the app's own pipeline, so a utility the
+    // compiler fails to extract is caught, and the floor is the exported
+    // constant rather than a second copy of the class's text.
+    const height = await compiledDp(COMPACT_CONTROL_BOX_CLASS, 'height');
+    const width = await compiledDp(COMPACT_CONTROL_BOX_CLASS, 'width');
+    // Whole pixels: the box lays out on the target's own edges, and a
+    // fractional utility is the retune this name rules out.
+    expect(Number.isInteger(height)).toBe(true);
+    expect(Number.isInteger(width)).toBe(true);
+    expect(height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    expect(width).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    // Centring has no dp value to compile, so it stays a class check.
     expect(COMPACT_CONTROL_BOX_CLASS).toContain('items-center');
   });
 
-  it('renders the icon target box at Android 48dp minimum from whole pixels', () => {
-    expect(ICON_TARGET_DP).toBe(48);
-    expect(ICON_TARGET_BOX_CLASS).toContain('h-[48px]');
-    expect(ICON_TARGET_BOX_CLASS).toContain('w-[48px]');
+  it('renders the icon target box at Android 48dp minimum from whole pixels', async () => {
+    const height = await compiledDp(ICON_TARGET_BOX_CLASS, 'height');
+    const width = await compiledDp(ICON_TARGET_BOX_CLASS, 'width');
+    expect(Number.isInteger(height)).toBe(true);
+    expect(Number.isInteger(width)).toBe(true);
+    expect(height).toBeGreaterThanOrEqual(ICON_TARGET_DP);
+    expect(width).toBeGreaterThanOrEqual(ICON_TARGET_DP);
     expect(ICON_TARGET_BOX_CLASS).toContain('items-center');
     expect(ICON_TARGET_BOX_CLASS).toContain('justify-center');
   });
@@ -200,10 +204,15 @@ describe('shared tap-target geometry', () => {
     expect(height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
   });
 
-  it('reaches the design touch target with the compact box plus its slop', () => {
+  it('reaches the design touch target with the compact box plus its slop', async () => {
+    // The policy the two exports encode: the audit floor sits below the design
+    // target, and the box plus its per-side slop carries the reach to it.
+    expect(MIN_TAP_TARGET_DP).toBeLessThan(TOUCH_TARGET_DP);
     expect(tapTargetReachDp(32, 8)).toBe(48);
-    expect(tapTargetReachDp(32, COMPACT_CONTROL_HIT_SLOP_DP)).toBe(48);
-    expect(tapTargetReachDp(32, COMPACT_CONTROL_HIT_SLOP_DP)).toBeGreaterThanOrEqual(
+    // The compiled height is what the layout uses, so the reach is measured
+    // from the class rather than from a second copy of its height.
+    const height = await compiledDp(COMPACT_CONTROL_BOX_CLASS, 'height');
+    expect(tapTargetReachDp(height, COMPACT_CONTROL_HIT_SLOP_DP)).toBeGreaterThanOrEqual(
       TOUCH_TARGET_DP
     );
   });

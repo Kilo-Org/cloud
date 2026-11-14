@@ -1,3 +1,4 @@
+import { needsPartTextRepair } from '@kilocode/session-ingest-contracts';
 import type { Part, FilePart, StepFinishPart, ToolPart, ToolState } from './types';
 
 function isFilePart(part: Part): part is FilePart {
@@ -144,16 +145,17 @@ export function stripPartContentIfFile(part: Part): Part {
  *
  * Identity-preserving: when nothing needs fixing the SAME object is returned
  * so memoized stored messages keep their reference. Whitespace-only text is
- * left untouched; only absent or non-string text is filled with `''`.
+ * left untouched; only absent or non-string text is filled with `''`. The rule
+ * is declared once in `needsPartTextRepair` in
+ * `@kilocode/session-ingest-contracts`.
  */
 export function normalizeMissingPartText(part: Part): Part {
-  if (part.type !== 'text' && part.type !== 'reasoning') {
-    return part;
-  }
-  if (typeof part.text === 'string') {
-    return part;
-  }
-  return { ...part, text: '' };
+  if (!needsPartTextRepair(part)) return part;
+  // A fresh object literal is excess-property-checked against every `Part`
+  // member, and the predicate does not narrow the union, so build the repaired
+  // value first and return it instead of the literal.
+  const repaired = { ...part, text: '' };
+  return repaired;
 }
 
 /**

@@ -2,6 +2,7 @@ import { createElement, type ElementType } from 'react';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import '@/i18n';
+import { resetLeaveSettle } from '@/lib/navigation/leave-settle';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -22,7 +23,10 @@ type ScreenState = {
   mutations: MutationOptions[];
   mutate: Mock;
   back: Mock;
+  focused: boolean;
+  headerBack: (() => void) | undefined;
   toastError: Mock;
+  toastSuccess: Mock;
 };
 
 const state = vi.hoisted((): ScreenState => ({
@@ -32,11 +36,36 @@ const state = vi.hoisted((): ScreenState => ({
   mutate: vi.fn(),
   invalidate: vi.fn(),
   back: vi.fn(),
+  focused: true,
+  headerBack: undefined,
   toastError: vi.fn(),
+  toastSuccess: vi.fn(),
 }));
 
-vi.mock('react-native', () => ({ View: 'View' }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ back: state.back }) }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  // Nothing dispatches a hardware Back in this harness, so the subscription only
+  // has to answer the hook's cleanup.
+  BackHandler: {
+    addEventListener: () => ({
+      remove: () => {
+        // no listener was registered
+      },
+    }),
+  },
+}));
+vi.mock('expo-router', () => {
+  // Stable objects, like the real hooks: a new identity per render would re-run
+  // the effects `usePopOnce` registers on them.
+  const router = { back: state.back };
+  const navigation = {
+    isFocused: () => state.focused,
+    addListener: () => () => {
+      // the mocked navigator never emits `blur`
+    },
+  };
+  return { useRouter: () => router, useNavigation: () => navigation };
+});
 vi.mock('@tanstack/react-query', async importOriginal => {
   // The provider and client stay real so renderWithProviders works; only the
   // hooks the screen calls are replaced.
@@ -59,7 +88,7 @@ vi.mock('@tanstack/react-query', async importOriginal => {
 });
 vi.mock('sonner-native', () => ({ toast: { error: state.toastError, success: vi.fn() } }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
-  announcingToast: { success: vi.fn(), error: vi.fn() },
+  announcingToast: { success: state.toastSuccess, error: vi.fn() },
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -69,7 +98,14 @@ vi.mock('@/lib/trpc', () => ({
     },
   }),
 }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/screen-header', () => ({
+  // The real header runs its `onBack` for a Back press; keep that callback so a
+  // test can deliver the press.
+  ScreenHeader: (props: { onBack?: () => void }) => {
+    state.headerBack = props.onBack;
+    return 'ScreenHeader';
+  },
+}));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -97,6 +133,13 @@ function field(root: ReactTestRenderer['root'], label: string) {
   return only;
 }
 
+/** Type into the GitHub field, as a reader editing the link would. */
+function typeGithub(root: ReactTestRenderer['root'], value: string): void {
+  act(() => {
+    (field(root, 'GitHub URL').props.onChangeText as (value: string) => void)(value);
+  });
+}
+
 function saveButton(root: ReactTestRenderer['root']) {
   const found = root.findAll(
     node => Object.is(node.type, BUTTON) && node.props.className !== undefined
@@ -114,15 +157,36 @@ function press(root: ReactTestRenderer['root']): void {
   });
 }
 
+/**
+ * The reader's Back on this screen's header. The real header dispatches through
+ * `useHeaderBack`: a declared `onBack` is the handler, and without one it pops
+ * with `router.back()` of its own. Both arms are reproduced here, so a screen
+ * that leaves the header to pop by itself is measured, not excused.
+ */
+function pressHeaderBack(): void {
+  const onBack = state.headerBack;
+  act(() => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+    state.back();
+  });
+}
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  resetLeaveSettle();
   state.links = { linkedinUrl: null, githubUrl: null };
   state.error = false;
   state.mutations = [];
+  state.focused = true;
+  state.headerBack = undefined;
   state.mutate.mockClear();
   state.invalidate.mockClear();
   state.back.mockClear();
   state.toastError.mockClear();
+  state.toastSuccess.mockClear();
 });
 
 afterEach(() => {
@@ -158,6 +222,93 @@ describe('ProfileEditScreen', () => {
       state.mutations[0]?.onSuccess?.();
     });
     expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [] });
+    expect(state.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not pop the screen beneath when the reader left before the save settled', async () => {
+    const root = await mount();
+
+    typeGithub(root, 'https://github.com/ada');
+    press(root);
+    expect(state.mutate).toHaveBeenCalledWith({ github_url: 'https://github.com/ada' });
+    expect(state.back).not.toHaveBeenCalled();
+
+    // The reader's Back reached the navigator, so this screen is already leaving.
+    state.focused = false;
+    act(() => {
+      state.mutations.at(-1)?.onSuccess?.();
+    });
+
+    expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [] });
+    expect(state.toastSuccess).toHaveBeenCalledWith('Profile updated');
+    expect(state.back).not.toHaveBeenCalled();
+  });
+
+  it('pops once for a save, and never for a repeated settle or a no-change Save', async () => {
+    const root = await mount();
+
+    typeGithub(root, 'https://github.com/ada');
+    press(root);
+    act(() => {
+      state.mutations.at(-1)?.onSuccess?.();
+    });
+    expect(state.back).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      state.mutations.at(-1)?.onSuccess?.();
+    });
+    expect(state.back).toHaveBeenCalledTimes(1);
+
+    // Back to the saved value: Save submits nothing, and must not pop either.
+    act(() => {
+      (field(root, 'GitHub URL').props.onChangeText as (value: string) => void)('');
+    });
+    press(root);
+
+    expect(state.mutate).toHaveBeenCalledTimes(1);
+    expect(state.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves once when the save completes before the reader presses Back', async () => {
+    const root = await mount();
+
+    typeGithub(root, 'https://github.com/ada');
+    press(root);
+
+    // The mutation settles first: the completion pops the editor and opens the
+    // leave window.
+    act(() => {
+      state.mutations.at(-1)?.onSuccess?.();
+    });
+    expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [] });
+    expect(state.back).toHaveBeenCalledTimes(1);
+
+    // The reader's Back still reaches this header during that pop, because the
+    // header stays the touch owner until the transition ends.
+    pressHeaderBack();
+
+    expect(state.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves once when the header Back precedes the save completion', async () => {
+    const root = await mount();
+
+    typeGithub(root, 'https://github.com/ada');
+    press(root);
+
+    // The reader leaves through the header while the save is in flight.
+    pressHeaderBack();
+    expect(state.back).toHaveBeenCalledTimes(1);
+
+    // The navigator applied that Back, so this route is no longer focused when
+    // the save settles.
+    state.focused = false;
+    act(() => {
+      state.mutations.at(-1)?.onSuccess?.();
+    });
+
+    expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [] });
+    expect(state.toastSuccess).toHaveBeenCalledWith('Profile updated');
     expect(state.back).toHaveBeenCalledTimes(1);
   });
 

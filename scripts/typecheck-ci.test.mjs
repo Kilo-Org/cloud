@@ -1569,6 +1569,7 @@ const scriptSuiteInputs = [
   'services/session-ingest/wrangler.jsonc',
   'services/cloud-agent-next/test/e2e/fake-llm-server.ts',
   '.github/workflows/mobile-native-build.yml',
+  '.github/workflows/kilo-mcp-release.yml',
   'packages/session-ingest-contracts/src/index.ts',
   'pnpm-lock.yaml',
 ];

@@ -1,4 +1,5 @@
 import { unzipSync, type UnzipFileInfo } from 'fflate';
+import { CONFIG_FILE_NAMES } from './config-file';
 import {
   MAX_IMPORT_ARCHIVE_ENTRIES,
   MAX_IMPORT_ARCHIVE_EXPANDED_BYTES,
@@ -44,9 +45,6 @@ const CONFIG_DIRECTORY_NAMES = new Set([
   'skills',
   'instructions',
 ]);
-
-/** Config file names that mark a real config root, so a bare config file is not treated as a wrapper. */
-const CONFIG_FILE_NAMES = new Set(['kilo.json', 'kilo.jsonc']);
 
 const JUNK_SEGMENT_NAMES = new Set(['__macosx', '.git', 'node_modules']);
 const JUNK_FILE_NAMES = new Set(['.ds_store', 'thumbs.db', 'desktop.ini']);

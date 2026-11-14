@@ -310,10 +310,13 @@ export function resolveRuntimeCredentialProxyScopedIngestRoute(
 }
 
 /**
- * Resolves a child session-scope route for an adopted scope handle: the facade
- * forwards create, ingest, export and title on any non-member session id as a
- * v2 assertion. The path id is not required to differ from the handle's own
- * root; membership is the facade's decision.
+ * Resolves the v2 forwarding target for a child session-scope request on an
+ * adopted scope handle. This function only selects the forwarding path: it
+ * checks the shape of the path id and the allowed method, and it makes no
+ * membership decision. session-ingest authorizes every v2 create, ingest,
+ * export and title request and answers 404 or 409 for an id outside the
+ * asserted scope; see `resolveRuntimeCredentialProxyScopeIngestRoute` for the
+ * enforcing functions.
  */
 export function resolveRuntimeCredentialProxyScopedV2IngestRoute(
   input: ResolveRuntimeCredentialProxyScopedV2Input
@@ -349,10 +352,27 @@ export function resolveRuntimeCredentialProxyScopedV2IngestRoute(
 /**
  * Decides, for one adopted scope handle, whether an ingest-plane request is a
  * member-root request served on the public path or a child candidate forwarded
- * as a v2 assertion. This is the single owner of that decision: the caller
- * passes the current member roots and receives either the public URL or the
- * scoped URL. A `{sessionId}`-only create whose id is a current member root
- * stays public; every other create needs a `parentSessionId` and goes scoped.
+ * as a v2 assertion. This is the single owner of the forwarding-path decision:
+ * the caller passes the current member roots and receives either the public
+ * URL or the scoped URL. A `{sessionId}`-only create whose id is a current
+ * member root stays public; every other create needs a `parentSessionId` and
+ * goes scoped.
+ *
+ * The forwarding path is not an authorization decision. session-ingest owns
+ * scope membership for every v2 create, ingest, export and title request:
+ *
+ * - ingest, export and title: `resolveScopedChildSession` authorizes the path
+ *   id, and the routes answer 404 `session_not_found` when it refuses.
+ * - create: `resolveScopedCreateParent` authorizes the body's
+ *   `parentSessionId`, and the route answers 409 `session_scope_conflict` when
+ *   it refuses.
+ *
+ * Both functions live in
+ * `services/session-ingest/src/services/cloud-agent-worktree-scope.ts` and
+ * accept an id only with the same owner, organization and worktree. A non-root
+ * id must also have an ancestry that reaches an asserted member root, and a
+ * root id must itself be an asserted member root. The routes in
+ * `services/session-ingest/src/routes/cloud-agent-session-scope.ts` use both.
  */
 export function resolveRuntimeCredentialProxyScopeIngestRoute(input: {
   targets: RuntimeCredentialProxyTargets;

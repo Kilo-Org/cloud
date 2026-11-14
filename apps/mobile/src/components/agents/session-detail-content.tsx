@@ -3421,9 +3421,18 @@ export function SessionDetailContent({
               }
               isRetrying={terminalRetryPending}
             />
+            {/* One primary action per surface (DESIGN.md): Back is the recovery
+                action, so it fills; Copy stays outlined as the utility. A
+                read-only transcript keeps its footer beside this card, and that
+                footer's Continue in a new session is the surface's filled
+                primary, so Back steps back to the outline there instead. Dark
+                takes the lifted olive `--selection` with its own label tone
+                instead of the glare of #ffdd00, so both themes give the control
+                the light mode's weight. */}
             <View className="flex-row gap-3">
               <Button
-                variant="ghost"
+                variant="outline"
+                size="action"
                 accessibilityLabel={t('agentChat.session.copyErrorDetails')}
                 onPress={() => {
                   void performCopy(copyText);
@@ -3431,8 +3440,20 @@ export function SessionDetailContent({
               >
                 <Text>{t('common.copy')}</Text>
               </Button>
-              <Button variant="ghost" onPress={handleBackToSessions}>
-                <Text>{t('agentChat.session.backToSessions')}</Text>
+              <Button
+                variant={isReadOnlyContinueVisible ? 'outline' : undefined}
+                size="action"
+                className={cn(!isReadOnlyContinueVisible && 'bg-primary dark:bg-selection')}
+                onPress={handleBackToSessions}
+              >
+                <Text
+                  className={cn(
+                    !isReadOnlyContinueVisible &&
+                      'text-primary-foreground dark:text-selection-foreground'
+                  )}
+                >
+                  {t('agentChat.session.backToSessions')}
+                </Text>
               </Button>
             </View>
           </View>

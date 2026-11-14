@@ -1,4 +1,4 @@
-# Hosted workspace contract fixture (v3)
+# Hosted workspace contract fixture (v4)
 
 Versioned request/response examples, procedure list, status enums and stable
 error codes for the Cloud workspace-first surface an Agent Manager Session Host
@@ -6,15 +6,17 @@ consumes.
 
 | Procedure | Kind | Purpose |
 |---|---|---|
-| `listHostedWorkspaces` | query | Owner-scoped workspace catalog |
-| `getHostedWorkspace` | query | One workspace with its root sessions |
+| `listHostedWorkspaces` | query | Owner-scoped workspace catalog with passive PR summaries |
+| `getHostedWorkspace` | query | One workspace with its root sessions and passive PR summary |
 | `getHostedWorkspaceStatus` | query | Passive compute/activity/wake/billing/deletion projection |
 | `createHostedWorkspace` | mutation | Create a workspace and its first root |
 | `createHostedWorkspaceSession` | mutation | Add a root session to an existing workspace |
+| `continueHostedWorkspace` | mutation | Continue imported sessions in a hosted workspace |
 | `listHostedWorkspaceProfiles` | query | Personal and organization profiles with default flags |
 | `setHostedWorkspacePersonalDefaultProfile` | mutation | Set the caller's personal default profile |
 | `clearHostedWorkspacePersonalDefaultProfile` | mutation | Clear the caller's personal default profile |
 | `deleteHostedWorkspaceSession` | mutation | Delete one non-final root session |
+| `refreshHostedWorkspacePullRequest` | mutation | Explicit workspace-scoped PR refresh through the verified-link/throttle path |
 | `deleteWorktree` | mutation | Destructively delete the workspace and every remaining root |
 | `getHostedWorkspaceChanges` | query | Workspace-scoped committed/uncommitted snapshot with per-file availability |
 | `refreshHostedWorkspaceChanges` | mutation | Explicit refresh with `refreshed` / `offline` / `failed` and the previous snapshot |
@@ -27,12 +29,20 @@ consumes.
 - `v1.json` is the released contract. It is **append-only**: never change an
   example, field list, enum or error code in place, because a provider pinned to
   v1 would silently change behavior.
-- `v2.json` adds the hosted workspace profile listing and personal-default
-  mutations while retaining every v1 procedure and shape.
-- `v3.json` is the current contract. It adds the workspace-scoped change reads
-  and the verified linked-PR reads. Every v1/v2 procedure and shape is retained;
-  the fixture test also asserts that each released version stays an append-only
-  subset of the registered router.
+- `v2.json` added the hosted workspace profile listing and personal-default
+  mutations while retaining every v1 procedure and shape. It remains frozen.
+- `v3.json` added the workspace-scoped change reads and verified linked-PR
+  reads. This published fixture remains frozen byte-for-byte, including its
+  workspace summaries without `pullRequest`.
+- `v4.json` is the current contract. It retains every v3 procedure and adds the
+  nullable workspace-level `pullRequest` projection to list/get and the explicit
+  `refreshHostedWorkspacePullRequest` mutation. The PR summary carries its own
+  availability/partial flags; `null` means no verified PR, and a failed refresh
+  is reported separately so it is not confused with `no_pr`.
+- The fixture test validates v1/v2/v3 examples with the historical workspace
+  summary shape and v4 with the current schemas. It also asserts that each
+  released version stays an append-only subset of the registered router and
+  that the latest fixture covers every workspace procedure exactly once.
 - Further breaking or additive contract changes create a new fixture plus a new
   `contractVersion`, and the README documents the difference.
 - `test/unit/hosted-workspace-contract-fixture.test.ts` fails when a fixture

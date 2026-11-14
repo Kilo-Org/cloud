@@ -1,4 +1,5 @@
 import {
+  isDefaultSessionTitle,
   sessionDisplayLine,
   sessionLiveCut,
 } from '@kilocode/session-ingest-contracts/session-live-summary';
@@ -28,6 +29,13 @@ const kindSchema = z.enum(GLANCEABLE_STATUS_KINDS);
 /** Private Home-only data. Never include this in Live Activity content-state. */
 export const homeWidgetDetailsSchema = z.object({
   approvalKey: approvalKeySchema.default(null),
+  /**
+   * The kind whose row produced `primaryTitle`, so the title always describes
+   * the kind drawn beside it. Optional on input: a payload stored or pushed
+   * before this field existed omits it, which reads as an unknown kind and
+   * keeps the title, so an older payload renders as it did.
+   */
+  primaryKind: kindSchema.nullable().optional(),
   primaryTitle: titleSchema.nullable(),
   waitingAgents: z
     .array(
@@ -49,6 +57,7 @@ export const homeWidgetDetailsSchema = z.object({
 export type HomeWidgetDetails = z.infer<typeof homeWidgetDetailsSchema>;
 export const EMPTY_HOME_WIDGET_DETAILS: HomeWidgetDetails = {
   approvalKey: null,
+  primaryKind: null,
   primaryTitle: null,
   waitingAgents: [],
   scheduledAgents: [],
@@ -121,7 +130,23 @@ export function glanceableTitle(value: string | null | undefined): string {
   return sessionLiveCut(title, HOME_WIDGET_TITLE_LIMIT);
 }
 
-/** Same authorized rows as counts, with stable ties and unknown times ranked last. */
+/**
+ * The one title rule every drawing surface applies: the shared display cut, or
+ * null for an empty title and for the backend `New session - <ISO>`
+ * placeholder. Each surface maps null to its own generic agent label. The
+ * stored Home details keep the plain cut, so every app build can still read a
+ * payload.
+ */
+export function glanceableSessionTitle(value: string | null | undefined): string | null {
+  const title = glanceableTitle(value);
+  return title === '' || isDefaultSessionTitle(title) ? null : title;
+}
+
+/**
+ * Same authorized rows as counts, with stable ties and unknown times ranked
+ * last. Returns the kind its `primaryTitle` belongs to, so the title and the
+ * count drawn beside it cannot describe different kinds.
+ */
 export function buildHomeWidgetDetails(
   sessions: readonly HomeWidgetSessionRow[]
 ): HomeWidgetDetails {
@@ -154,6 +179,7 @@ export function buildHomeWidgetDetails(
             )[0];
   return {
     approvalKey: waiting.find(row => row.approvalKey != null)?.approvalKey ?? null,
+    primaryKind: primaryKind ?? null,
     primaryTitle: primary === undefined ? null : glanceableTitle(primary.title),
     waitingAgents: waiting.slice(0, HOME_WIDGET_DETAIL_LIMIT).flatMap(row => {
       // The status fold above admits only needs-input statuses; a status that
@@ -183,17 +209,42 @@ export function buildHomeWidgetData(
   };
 }
 
+/**
+ * Decide four linked presentation facts once: terminal, primaryKind,
+ * checkedAt, and staleAt. The presentation's `stale` flag and the timeline
+ * boundary both read `staleAt`, so native aging cannot disagree with the flag.
+ */
+function staleness(data: HomeWidgetData): {
+  terminal: boolean;
+  primaryKind: GlanceableStatusKind | null;
+  checkedAt: string | null;
+  staleAt: number | null;
+} {
+  const { snapshot } = data;
+  const terminal = isTerminalGlanceableStatus(snapshot.status);
+  const primaryKind = terminal ? null : (PRIORITY.find(kind => snapshot[kind] > 0) ?? null);
+  const checkedAt =
+    terminal || (primaryKind === null && snapshot.status !== 'empty') ? null : snapshot.updatedAt;
+  const confirmedAt = timestampMs(checkedAt);
+  return {
+    terminal,
+    primaryKind,
+    checkedAt,
+    staleAt: confirmedAt === null ? null : confirmedAt + refreshInterval(snapshot),
+  };
+}
+
 /** Pure policy: counts survive activity expiry; only explicit privacy/auth clears hide them. */
 export function buildHomeWidgetPresentation(
   data: HomeWidgetData,
   now: number
 ): HomeWidgetPresentation {
   const { snapshot, details } = data;
-  const terminal = isTerminalGlanceableStatus(snapshot.status);
-  const primaryKind = terminal ? null : (PRIORITY.find(kind => snapshot[kind] > 0) ?? null);
-  const checkedAt =
-    terminal || (primaryKind === null && snapshot.status !== 'empty') ? null : snapshot.updatedAt;
-  const confirmedAt = timestampMs(checkedAt);
+  const { terminal, primaryKind, checkedAt, staleAt } = staleness(data);
+  // A title is drawn only beside the kind it describes. A payload stored or
+  // pushed before details carried the kind omits it, which reads as unknown and
+  // keeps the title, so that payload renders as it did.
+  const titleKind = details.primaryKind ?? null;
   const wake = snapshot.scheduled > 0 ? timestampMs(snapshot.scheduledAt) : null;
   const scheduledAt = snapshot.scheduled > 0 ? timestampToIso(snapshot.scheduledAt) : null;
   return {
@@ -221,11 +272,14 @@ export function buildHomeWidgetPresentation(
       !terminal &&
       (snapshot.status === 'stale' ||
         snapshot.status === 'expired' ||
-        (confirmedAt !== null && now >= confirmedAt + refreshInterval(snapshot))),
+        (staleAt !== null && now >= staleAt)),
     scheduledAt: terminal ? null : scheduledAt,
     approvalKey: terminal || snapshot.needsInput === 0 ? null : details.approvalKey,
     awaitingUpdate: !terminal && wake !== null && now >= wake,
-    primaryTitle: terminal || primaryKind === null ? null : details.primaryTitle,
+    primaryTitle:
+      terminal || primaryKind === null || (titleKind !== null && titleKind !== primaryKind)
+        ? null
+        : details.primaryTitle,
     waitingAgents: terminal || snapshot.needsInput === 0 ? [] : details.waitingAgents,
     scheduledAgents: terminal || snapshot.scheduled === 0 ? [] : details.scheduledAgents,
     canCreate: !terminal && (primaryKind !== null || snapshot.status !== 'waiting'),
@@ -252,8 +306,7 @@ export function buildHomeWidgetPresentationTimeline(
   const times = [now];
   const { snapshot } = data;
   if (!isTerminalGlanceableStatus(snapshot.status)) {
-    const checked = timestampMs(buildHomeWidgetPresentation(data, now).checkedAt);
-    const staleAt = checked === null ? null : checked + refreshInterval(snapshot);
+    const { staleAt } = staleness(data);
     if (staleAt !== null && staleAt > now) times.push(staleAt);
     const wake = snapshot.scheduled > 0 ? timestampMs(snapshot.scheduledAt) : null;
     if (wake !== null && wake > now && wake !== staleAt) times.push(wake);

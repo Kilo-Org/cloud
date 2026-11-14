@@ -36,7 +36,9 @@ export async function getOpenRouterReasoningOptions(
   model: string
 ): Promise<ReasoningOption[] | undefined> {
   const models = await getOpenRouterModelsMetadataFromDatabase();
-  const reasoning = (models[model] ?? models[normalizeModelId(model)])?.reasoning;
+  // A suffixed id such as `:free` has no metadata of its own and resolves to its base id.
+  const resolvedModelId = Object.hasOwn(models, model) ? model : normalizeModelId(model);
+  const reasoning = models[resolvedModelId]?.reasoning;
   if (!reasoning) {
     return undefined;
   }
@@ -48,7 +50,7 @@ export async function getOpenRouterReasoningOptions(
     !reasoning.mandatory &&
     // Kimi does not support non-reasoning despite what OpenRouter says
     // https://huggingface.co/moonshotai/Kimi-K3#6-model-usage
-    model !== 'moonshotai/kimi-k3'
+    normalizeModelId(resolvedModelId) !== 'moonshotai/kimi-k3'
   ) {
     efforts.add('none');
   }

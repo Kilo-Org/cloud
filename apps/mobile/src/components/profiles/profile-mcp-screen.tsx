@@ -11,6 +11,7 @@ import {
   mcpServerRows,
   type McpServerSource,
 } from '@/components/profiles/profile-mcp-model';
+import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -24,9 +25,10 @@ import {
   useAgentProfileMcpServers,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
-import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
+import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
@@ -58,7 +60,8 @@ export function ProfileMcpScreen({
   const profileQuery = useAgentProfileMcpServers(profileId, organizationId);
   const { createMcp, updateMcp, deleteMcp, setMcpEnabled } =
     useAgentProfileSectionMutations(organizationId);
-  const canManage = useCanManageOrganizationProfiles(organizationId);
+  const permission = useOrganizationProfilePermission(organizationId);
+  const canManage = permission === 'allowed';
   const servers = profileQuery.data ?? NO_MCP_SERVERS;
   const rows = mcpServerRows(servers);
   // The open form, its fields and the refusal the sheet shows are one draft, so
@@ -115,9 +118,10 @@ export function ProfileMcpScreen({
 
   const confirmDelete = (target: McpServerSource) => {
     confirm({
-      title: t('common.delete'),
-      message: target.name,
-      confirmLabel: t('common.delete'),
+      // An identifier reads position by position, so it keeps its left-to-right direction.
+      title: t('profiles.mcp.deleteTitle', { name: isolateLtrBidiText(target.name) }),
+      message: t('profiles.mcp.deleteMessage'),
+      confirmLabel: t('profiles.mcp.deleteConfirm'),
       onConfirm: () => {
         void runDelete(target.id);
       },
@@ -145,11 +149,11 @@ export function ProfileMcpScreen({
         description={null}
         placement="top"
         action={
-          canManage ? (
+          <ProfileManageSlot permission={permission}>
             <Button className={STATE_ACTION_CLASS} onPress={handleStartAdd}>
               <Text>{t('profiles.mcp.add')}</Text>
             </Button>
-          ) : null
+          </ProfileManageSlot>
         }
       />
     );
@@ -200,11 +204,11 @@ export function ProfileMcpScreen({
             />
           );
         })}
-        {canManage ? (
+        <ProfileManageSlot permission={permission}>
           <Button onPress={handleStartAdd}>
             <Text>{t('profiles.mcp.add')}</Text>
           </Button>
-        ) : null}
+        </ProfileManageSlot>
       </>
     );
   }

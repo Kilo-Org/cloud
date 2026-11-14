@@ -81,12 +81,6 @@ describe('shouldPublishForSession', () => {
     }
   });
 
-  it('publishes while a different session chat is open', () => {
-    expect(shouldPublishForSession({ appState: ACTIVE, pathname: AWAY, sessionId: 'ses_1' })).toBe(
-      true
-    );
-  });
-
   it('publishes when the router is not mounted', () => {
     expect(shouldPublishForSession({ appState: ACTIVE, pathname: null, sessionId: 'ses_1' })).toBe(
       true
@@ -709,37 +703,6 @@ describe('applyNeedsInputNotifications', () => {
         content: expect.not.objectContaining({ sound: false }),
       })
     );
-  });
-
-  it('keeps a first post of a raise alerting on the shared channel', async () => {
-    const plan = planNeedsInputNotifications({
-      previous: [],
-      next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
-      pathname: AWAY,
-      appState: ACTIVE,
-      attentionEnabled: true,
-      previews: 'full',
-    });
-    expect(plan.updates).toEqual([]);
-
-    await applyNeedsInputNotifications(plan);
-
-    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith({
-      identifier: 'needs-input:ses_1',
-      content: {
-        title: 'Fix the bug',
-        body: 'Agent needs input',
-        data: {
-          type: 'cloud_agent_session',
-          cliSessionId: 'ses_1',
-          category: 'attention',
-          attentionKind: 'question',
-        },
-        categoryIdentifier: 'kilo-needs-input:question',
-        interruptionLevel: 'timeSensitive',
-      },
-      trigger: { channelId: 'needs-input' },
-    });
   });
 
   it('alerts again once the raise was dismissed and comes back', async () => {

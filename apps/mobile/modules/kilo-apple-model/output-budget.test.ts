@@ -11,11 +11,19 @@ const moduleSource = readFileSync(
   'utf8'
 );
 
-function normalizeSwift(source: string): string {
-  return source.replaceAll(/\s+/g, ' ');
-}
+const normalizedModuleSource = moduleSource
+  .replaceAll(/\s+/g, ' ')
+  .replaceAll(/\s*\.\s*/g, '.');
 
-const normalizedModuleSource = normalizeSwift(moduleSource);
+// The budget path is one function. Its markers must sit inside it, so a marker
+// cannot pass because a different function happens to use the same API.
+function swiftFunctionSource(source: string, name: string): string {
+  const anchor = `func ${name}(`;
+  const start = source.indexOf(anchor);
+  if (start === -1) return '';
+  const end = source.indexOf('func ', start + anchor.length);
+  return source.slice(start, end === -1 ? source.length : end);
+}
 
 function runSwiftChecks(prefix: string, binaryName: string, sources: readonly string[]): void {
   const directory = mkdtempSync(join(tmpdir(), prefix));
@@ -35,11 +43,12 @@ function runSwiftChecks(prefix: string, binaryName: string, sources: readonly st
 }
 
 it('uses the counted transcript budget for generation and reported truncation', () => {
+  const budgetSource = swiftFunctionSource(normalizedModuleSource, 'responseLimit');
+  expect(budgetSource).toContain('model.tokenCount(for:');
+  expect(budgetSource).toContain('AppleModelBudget.responseLimit');
+  expect(budgetSource).toContain('reason: "context_window_exceeded"');
   expect(normalizedModuleSource).toContain('AppleModelBudget.outputCeiling');
   expect(normalizedModuleSource).toContain('options.maximumResponseTokens');
-  expect(normalizedModuleSource).toContain('AppleModelBudget.responseLimit');
-  expect(normalizedModuleSource).toContain('model.tokenCount(for:');
-  expect(normalizedModuleSource).toContain('reason: "context_window_exceeded"');
   expect(normalizedModuleSource).toContain('usageSource == "reported"');
   expect(normalizedModuleSource).toContain('outputTokens >= responseLimit');
   expect(normalizedModuleSource).toContain('completion.stop = "maxTokens"');

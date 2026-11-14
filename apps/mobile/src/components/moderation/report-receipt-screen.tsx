@@ -172,7 +172,9 @@ export function ReportReceiptScreen() {
                       appeal.mutate({ receiptId });
                     },
                   },
-                ]
+                ],
+                // Android back dismisses, which equals Cancel: no appeal is sent.
+                { cancelable: true }
               );
             }}
           >

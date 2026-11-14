@@ -150,6 +150,9 @@ describe('ReportReceiptScreen', () => {
 
     expect(state.alert).toHaveBeenCalledTimes(1);
     expect(state.mutate).not.toHaveBeenCalled();
+    // The Android Back gesture must cancel this alert, so the appeal is sent
+    // only when its confirm button is pressed.
+    expect(state.alert.mock.calls[0]?.[3]).toEqual({ cancelable: true });
 
     const buttons = (state.alert.mock.calls[0]?.[2] ?? []) as AlertButton[];
     act(() => {

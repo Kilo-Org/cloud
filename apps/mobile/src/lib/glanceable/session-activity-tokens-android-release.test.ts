@@ -117,8 +117,10 @@ describe('releasing a row written by an earlier process', () => {
 
     await releaseAndroidSessionToken('session-1');
 
-    expect(mocks.unregister.mock.calls.map(call => call[0]?.token).sort()).toEqual(
-      ['ExponentPushToken[device]', 'ExponentPushToken[rotated]'].sort()
+    const deleted = mocks.unregister.mock.calls.map(call => call[0].token);
+    expect(deleted).toHaveLength(2);
+    expect(deleted).toEqual(
+      expect.arrayContaining(['ExponentPushToken[device]', 'ExponentPushToken[rotated]'])
     );
   });
 
@@ -152,7 +154,7 @@ describe('releasing a row written by an earlier process', () => {
 
     await releaseAndroidSessionToken('session-1');
 
-    expect(mocks.unregister.mock.calls.map(call => call[0]?.token)).toContain(
+    expect(mocks.unregister.mock.calls.map(call => call[0].token)).toContain(
       'ExponentPushToken[second]'
     );
   });

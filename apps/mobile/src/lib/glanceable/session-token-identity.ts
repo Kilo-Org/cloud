@@ -144,7 +144,10 @@ async function loadFromStore(): Promise<boolean> {
   for (const [sessionId, persisted] of stored) {
     lastIssuedVersion = Math.max(lastIssuedVersion, persisted.version);
     const current = identities.get(sessionId);
-    identities.set(sessionId, current === undefined ? persisted : mergedIdentity(persisted, current));
+    identities.set(
+      sessionId,
+      current === undefined ? persisted : mergedIdentity(persisted, current)
+    );
   }
   return true;
 }
@@ -241,14 +244,19 @@ export async function readSessionTokenIdentities(
   sessionId: string,
   scope: SessionTokenScope | null
 ): Promise<readonly string[]> {
-  return (await readSessionTokenIdentity(sessionId, scope))?.tokens ?? [];
+  const identity = await readSessionTokenIdentity(sessionId, scope);
+  return identity?.tokens ?? [];
 }
 
 /** Every recorded identity of one account, so a scope teardown can delete the rows they name. */
 export async function readSessionTokenIdentitiesForScope(
   scope: SessionTokenScope | null
 ): Promise<
-  readonly { readonly sessionId: string; readonly version: number; readonly tokens: readonly string[] }[]
+  readonly {
+    readonly sessionId: string;
+    readonly version: number;
+    readonly tokens: readonly string[];
+  }[]
 > {
   await ensureHydrated();
   const records: { sessionId: string; version: number; tokens: readonly string[] }[] = [];
@@ -298,19 +306,17 @@ export function retireSessionTokenIdentities(
       return;
     }
     let changed = false;
-    for (const [sessionId, identity] of [...identities]) {
-      if (!belongsTo(identity, scope)) {
-        continue;
-      }
-      const kept = identity.tokens.filter(token => failed.has(token));
-      if (kept.length === identity.tokens.length) {
-        continue;
-      }
-      changed = true;
-      if (kept.length === 0) {
-        identities.delete(sessionId);
-      } else {
-        identities.set(sessionId, { ...identity, version: nextVersion(), tokens: kept });
+    for (const [sessionId, identity] of Array.from(identities)) {
+      if (belongsTo(identity, scope)) {
+        const kept = identity.tokens.filter(token => failed.has(token));
+        if (kept.length !== identity.tokens.length) {
+          changed = true;
+          if (kept.length === 0) {
+            identities.delete(sessionId);
+          } else {
+            identities.set(sessionId, { ...identity, version: nextVersion(), tokens: kept });
+          }
+        }
       }
     }
     if (changed) {

@@ -197,6 +197,22 @@ export async function restoreLoginDrafts(): Promise<{
 }
 
 /**
+ * Write the tombstone, trying again once. The retry, and the failure it
+ * finally raises, are what make retirement a required step: a record left
+ * `held` is restored by the next cold start.
+ */
+async function writeRetirement(attemptsLeft: number): Promise<void> {
+  try {
+    await writeRecord({ version: 2, state: 'retired' });
+  } catch (error) {
+    if (attemptsLeft <= 1) {
+      throw error;
+    }
+    await writeRetirement(attemptsLeft - 1);
+  }
+}
+
+/**
  * Retire the attempt after a successful sign-in: memory first, then the
  * tombstone.
  *
@@ -208,16 +224,7 @@ export async function restoreLoginDrafts(): Promise<{
  */
 export async function endLoginAttempt(): Promise<void> {
   phase = { kind: 'retired' };
-  let failure: unknown;
-  for (let attempt = 0; attempt < RETIREMENT_ATTEMPTS; attempt += 1) {
-    try {
-      await writeRecord({ version: 2, state: 'retired' });
-      return;
-    } catch (error) {
-      failure = error;
-    }
-  }
-  throw failure;
+  await writeRetirement(RETIREMENT_ATTEMPTS);
 }
 
 // ── Test-only helpers ───────────────────────────────────────────────────────

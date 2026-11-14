@@ -241,28 +241,29 @@ describe('delivery registerTokens', () => {
     platformMock.OS = 'android';
     /* A previous process's identities: the token sets this process holds name
        neither of these rows, so only the record can. */
-    const recordStore = new Map<string, string>();
-    recordStore.set('widget-store-accessibility', 'after-first-unlock');
-    recordStore.set(
-      SESSION_TOKEN_IDENTITY_KEY,
-      JSON.stringify({
-        version: 1,
-        sessions: {
-          'session-a': {
-            userId: 'u1',
-            organizationId: null,
-            version: 1,
-            tokens: ['ExponentPushToken[kept-row]'],
+    const recordStore = new Map<string, string>([
+      ['widget-store-accessibility', 'after-first-unlock'],
+      [
+        SESSION_TOKEN_IDENTITY_KEY,
+        JSON.stringify({
+          version: 1,
+          sessions: {
+            'session-a': {
+              userId: 'u1',
+              organizationId: null,
+              version: 1,
+              tokens: ['ExponentPushToken[kept-row]'],
+            },
+            'session-b': {
+              userId: 'u1',
+              organizationId: null,
+              version: 2,
+              tokens: ['ExponentPushToken[failed-row]'],
+            },
           },
-          'session-b': {
-            userId: 'u1',
-            organizationId: null,
-            version: 2,
-            tokens: ['ExponentPushToken[failed-row]'],
-          },
-        },
-      })
-    );
+        }),
+      ],
+    ]);
     _setSessionTokenIdentityStoreForTests({
       getItemAsync: (key: string) => Promise.resolve(recordStore.get(key) ?? null),
       setItemAsync: (key: string, value: string) => {
@@ -286,9 +287,12 @@ describe('delivery registerTokens', () => {
 
     const result = await getGlanceableDelivery().unregisterTokens('scope');
 
-    const sent = trpcMock.unregisterActivityToken.mutate.mock.calls.map(call => call[0]?.token);
-    expect(sent).toContain('ExponentPushToken[kept-row]');
-    expect(sent).toContain('ExponentPushToken[failed-row]');
+    expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledWith({
+      token: 'ExponentPushToken[kept-row]',
+    });
+    expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledWith({
+      token: 'ExponentPushToken[failed-row]',
+    });
     expect(result.ok).toBe(false);
     /* The deleted row's identity is retired; the one whose delete failed still
        names a row the next cleanup has to remove. */

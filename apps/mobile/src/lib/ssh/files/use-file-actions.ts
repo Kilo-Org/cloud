@@ -10,13 +10,13 @@ import { shareLocalFile } from '@/lib/share-remote-file';
 import { type FilePreview } from '@/components/ssh/files/file-preview-sheet';
 import { nativeErrorCode, sshPackage } from '../native';
 import { joinRemotePath, previewKindOf } from './paths';
+import { allocatePreviewCache, type PreviewCacheFile, sweepPreviewCache } from './preview-cache';
 import {
   downloadedFileUri,
   type SshTransfer,
   startDownload,
   startUpload,
   subscribeTransfers,
-  transferLocalUri,
   transfersForSession,
   transfersSnapshot,
 } from './transfers';
@@ -49,11 +49,30 @@ export function useFileActions({
 }: FileActionsInput) {
   const { t } = useTranslation();
   const previewRequest = useRef(0);
+  const previewCache = useRef<PreviewCacheFile | null>(null);
+
+  function dropPreviewCache() {
+    previewCache.current?.release();
+    previewCache.current = null;
+  }
+
+  useEffect(() => {
+    sweepPreviewCache();
+  }, []);
+
   useEffect(
     () => () => {
       previewRequest.current += 1;
     },
     [sftpId]
+  );
+
+  useEffect(
+    () => () => {
+      previewCache.current?.release();
+      previewCache.current = null;
+    },
+    []
   );
   const [preview, setPreview] = useState<FilePreview | null>(null);
   const [busy, setBusy] = useState(false);
@@ -106,6 +125,7 @@ export function useFileActions({
       setPendingRetry(null);
       return;
     }
+    dropPreviewCache();
     const base = {
       name: entry.name,
       kind,
@@ -116,31 +136,35 @@ export function useFileActions({
     } satisfies FilePreview;
     setPreview(base);
     setPendingRetry(remotePathOf(entry));
+    let cache: PreviewCacheFile | null = null;
     try {
       const ssh = await sshPackage();
-      const localUri = transferLocalUri(
-        `preview-${sessionId}-${request}-${entry.name}`,
-        entry.name
-      );
-      const stale = new File(localUri);
-      if (stale.exists) {
-        stale.delete();
-      }
-      await ssh.download(sftpId, remotePathOf(entry), localUri);
       if (request !== previewRequest.current) {
         return;
       }
+      const allocated = allocatePreviewCache(entry.name);
+      cache = allocated;
+      previewCache.current = allocated;
+      await ssh.download(sftpId, remotePathOf(entry), allocated.uri);
+      if (request !== previewRequest.current) {
+        allocated.release();
+        return;
+      }
       if (kind === 'image') {
-        setPreview({ ...base, loading: false, uri: localUri });
+        setPreview({ ...base, loading: false, uri: allocated.uri });
+        return;
+      }
+      const text = await new File(allocated.uri).text();
+      if (request === previewRequest.current) {
+        setPreview({ ...base, loading: false, text });
       } else {
-        const text = await new File(localUri).text();
-        if (request === previewRequest.current) {
-          setPreview({ ...base, loading: false, text });
-        }
+        allocated.release();
       }
     } catch (error) {
+      const code = nativeErrorCode(error) ?? 'Protocol';
+      cache?.release();
       if (request === previewRequest.current) {
-        setPreview({ ...base, loading: false, code: nativeErrorCode(error) ?? 'Protocol' });
+        setPreview({ ...base, loading: false, code });
       }
     }
   }
@@ -149,9 +173,11 @@ export function useFileActions({
     const remotePath = pendingRetry;
     const entry = entries.find(candidate => remotePath === remotePathOf(candidate));
     setPreview(null);
-    if (entry !== undefined) {
-      void openPreview(entry);
+    if (entry === undefined) {
+      dropPreviewCache();
+      return;
     }
+    void openPreview(entry);
   }
 
   function shareFile(name: string) {
@@ -247,12 +273,14 @@ export function useFileActions({
     busy,
     closePreview: () => {
       previewRequest.current += 1;
+      dropPreviewCache();
       setPreview(null);
     },
     retryPreview,
     /** Dev fixtures only: a preview the gate photographs without a server. */
     showPreview: (next: FilePreview) => {
       previewRequest.current += 1;
+      dropPreviewCache();
       setPreview(next);
     },
     openEntry,

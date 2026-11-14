@@ -72,7 +72,7 @@ export function transfersSnapshot(): readonly SshTransfer[] {
 }
 
 /** The cache file an upload of `name` reads from or a download of it writes to. */
-export function transferLocalUri(id: string, name: string): string {
+function transferLocalUri(id: string, name: string): string {
   const directory = new Directory(Paths.cache, CACHE_DIRECTORY);
   directory.create({ idempotent: true, intermediates: true });
   return new File(directory, getSafeCacheFilename({ id, filename: name })).uri;

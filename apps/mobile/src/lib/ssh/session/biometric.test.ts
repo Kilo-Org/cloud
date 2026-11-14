@@ -1,9 +1,11 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
+  remove: vi.fn<() => void>(),
   app: {
     currentState: 'active',
-    addEventListener: vi.fn<(event: string, listener: (value: string) => void) => void>(),
+    addEventListener:
+      vi.fn<(event: string, listener: (value: string) => void) => { remove: () => void }>(),
   },
   authenticate: vi.fn(),
 }));
@@ -14,17 +16,20 @@ vi.mock('expo-local-authentication', () => ({
   authenticateAsync: state.authenticate,
 }));
 
-// Fresh modules model the foreground-unlock singleton after a runtime reload.
+// Reload the foreground-unlock singleton for each simulated app lifetime.
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
+  state.app.addEventListener.mockImplementation(() => ({ remove: state.remove }));
   state.app.currentState = 'active';
   state.authenticate.mockResolvedValue({ success: true });
 });
 
 function transition(value: string) {
   state.app.currentState = value;
-  state.app.addEventListener.mock.calls[0]?.[1](value);
+  for (const [, listener] of state.app.addEventListener.mock.calls) {
+    listener(value);
+  }
 }
 
 it('unlocks once for reconnects and other keys in the same foreground session', async () => {
@@ -33,9 +38,12 @@ it('unlocks once for reconnects and other keys in the same foreground session', 
   expect(await requireKeyAccess('reconnect')).toBe(true);
   expect(state.authenticate).toHaveBeenCalledTimes(1);
   transition('background');
-  expect(await requireKeyAccess('background retry')).toBe(false);
+  const retry = requireKeyAccess('background retry');
+  await Promise.resolve();
+  expect(state.authenticate).toHaveBeenCalledTimes(1);
   transition('active');
   expect(await requireKeyAccess('foreground reconnect')).toBe(true);
+  expect(await retry).toBe(true);
   expect(await requireKeyAccess('another reconnect')).toBe(true);
   expect(state.authenticate).toHaveBeenCalledTimes(2);
 });
@@ -44,6 +52,22 @@ it('shares an unlock between concurrent key uses', async () => {
   const { requireKeyAccess } = await import('./biometric');
   expect(await Promise.all([requireKeyAccess('a'), requireKeyAccess('b')])).toEqual([true, true]);
   expect(state.authenticate).toHaveBeenCalledTimes(1);
+});
+
+it('waits through background and inactive states and shares the foreground unlock', async () => {
+  state.app.currentState = 'background';
+  const { requireKeyAccess } = await import('./biometric');
+  const first = requireKeyAccess('first');
+  const second = requireKeyAccess('second');
+  await Promise.resolve();
+  expect(state.authenticate).not.toHaveBeenCalled();
+  transition('inactive');
+  await Promise.resolve();
+  expect(state.authenticate).not.toHaveBeenCalled();
+  transition('active');
+  expect(await Promise.all([first, second])).toEqual([true, true]);
+  expect(state.authenticate).toHaveBeenCalledOnce();
+  expect(state.remove).toHaveBeenCalledTimes(2);
 });
 
 it('does not carry an authentication result across backgrounding', async () => {

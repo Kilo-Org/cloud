@@ -13,7 +13,7 @@ import { nativeErrorCode, sshPackage } from '../native';
 import { quoteShellArg } from '../shell-quote';
 import { sshDatabase } from '../store';
 import { MAX_RECONNECT_ATTEMPTS, reconnectDelayMs } from './backoff';
-import { requireKeyAccess } from './biometric';
+import { requireKeyAccess, waitForForeground } from './biometric';
 import { clearTimer, type LiveSession, setPhase, stillOpen } from './live';
 import { passwordFor } from './password';
 import { patchSession, sessionById } from './session-store';
@@ -86,8 +86,18 @@ export async function attempt(entry: LiveSession): Promise<void> {
     return;
   }
   clearTimer(entry);
-  entry.attempt += 1;
   entry.connecting = true;
+  if (sessionById(entry.id)?.phase.kind === 'reconnecting') {
+    const foreground = waitForForeground();
+    if (foreground !== null) {
+      await foreground;
+    }
+    if (!stillOpen(entry)) {
+      entry.connecting = false;
+      return;
+    }
+  }
+  entry.attempt += 1;
   setPhase(entry, { kind: 'connecting', attempt: entry.attempt });
   const opened: string[] = [];
   try {
@@ -230,6 +240,9 @@ async function authFor(
     }
     if (!(await requireKeyAccess(i18n.t('ssh.session.keyPrompt')))) {
       fail(entry, 'AuthCancelled');
+      return null;
+    }
+    if (!stillOpen(entry)) {
       return null;
     }
     const passphrase = entry.passphrase ?? key.passphrase ?? undefined;

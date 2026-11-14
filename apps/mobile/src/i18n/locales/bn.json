@@ -3640,6 +3640,8 @@
       "available": "ব্যবহারযোগ্য টুল: {{count}}",
       "none": "কোনো টুল নেই",
       "noneDescription": "Kilo সার্ভার কোনো টুল ফেরত দেয়নি।",
+      "notApplied": "এই চ্যাটে Kilo টুল যোগ করা হয়নি",
+      "notAppliedDescription": "আপনার পছন্দ সংরক্ষিত আছে। এখন এই চ্যাটে তা ব্যবহার করতে আবার চেষ্টা করুন।",
       "unreachable": "Kilo টুলে পৌঁছানো যায়নি",
       "unreachableDescription": "সার্ভার সাড়া দেয়নি। সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
       "unauthorized": "Kilo টুল এই সেশন প্রত্যাখ্যান করেছে",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "রেপো আনবাইন্ড করা যায়নি",
       "repoValue": "সংগ্রহস্থল: {{name}}",
       "profileValue": "প্রোফাইল: {{name}}",
+      "profileUnavailable": "এই প্রোফাইলটি আর উপলভ্য নেই। অন্য একটি বেছে নিন।",
       "pickerEmptyDescriptionOrganization": "সেশন জুড়ে পরিবেশ ভেরিয়েবল, সেটআপ কমান্ড এবং দক্ষতা পুনরায় ব্যবহার করার জন্য একটি সংগঠন প্রোফাইল তৈরি করুন।",
       "pickerEmptyDescriptionOrganizationReadOnly": "একজন সংগঠন মালিক বা অ্যাডমিন সংগঠন প্রোফাইল তৈরি করতে পারেন।"
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "{{duration}} পরে মেয়াদ শেষ হবে",
     "neverExpires": "মেয়াদ কখনো শেষ হবে না",
     "includesNewMessages": "নতুন বার্তা অন্তর্ভুক্ত আছে।",
-    "excludesNewMessages": "নতুন বার্তা অন্তর্ভুক্ত নেই।"
+    "excludesNewMessages": "নতুন বার্তা অন্তর্ভুক্ত নেই।",
+    "superseded": "এই লিংকটি অন্য কোথাও থেকে বদলে দেওয়া হয়েছে, তাই এটি আর কাজ করছে না।"
   },
   "sharedSession": {
     "title": "শেয়ার করা সেশন",

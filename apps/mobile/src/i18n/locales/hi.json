@@ -3640,6 +3640,8 @@
       "available": "उपलब्ध टूल: {{count}}",
       "none": "कोई टूल उपलब्ध नहीं",
       "noneDescription": "Kilo सर्वर ने कोई टूल नहीं लौटाया।",
+      "notApplied": "इस चैट में Kilo टूल नहीं जोड़े गए",
+      "notAppliedDescription": "आपकी पसंद सहेज ली गई है। इसे अभी इस चैट में इस्तेमाल करने के लिए फिर से कोशिश करें।",
       "unreachable": "Kilo टूल तक नहीं पहुँच सका",
       "unreachableDescription": "सर्वर ने जवाब नहीं दिया। अपना कनेक्शन जाँचें, फिर दोबारा कोशिश करें।",
       "unauthorized": "Kilo टूल ने इस सत्र को अस्वीकार किया",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "रेपो को अनबाइंड नहीं किया जा सका",
       "repoValue": "रिपॉजिटरी: {{name}}",
       "profileValue": "प्रोफ़ाइल: {{name}}",
+      "profileUnavailable": "यह प्रोफ़ाइल अब उपलब्ध नहीं है। कोई दूसरी प्रोफ़ाइल चुनें।",
       "pickerEmptyDescriptionOrganization": "सभी सत्रों में पर्यावरण चर, सेटअप आदेश और कौशल का पुन: उपयोग करने के लिए एक संगठन प्रोफ़ाइल बनाएं।",
       "pickerEmptyDescriptionOrganizationReadOnly": "संगठन स्वामी या व्यवस्थापक एक संगठन प्रोफ़ाइल बना सकता है।"
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "{{duration}} में समाप्त होगा",
     "neverExpires": "कभी समाप्त नहीं होगा",
     "includesNewMessages": "नए मैसेज शामिल हैं।",
-    "excludesNewMessages": "नए मैसेज शामिल नहीं हैं।"
+    "excludesNewMessages": "नए मैसेज शामिल नहीं हैं।",
+    "superseded": "इस लिंक को किसी दूसरे डिवाइस से बदल दिया गया है, इसलिए यह अब काम नहीं करता।"
   },
   "sharedSession": {
     "title": "शेयर किया गया सेशन",

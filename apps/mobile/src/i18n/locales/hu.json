@@ -3640,6 +3640,8 @@
       "available": "Elérhető eszközök: {{count}}",
       "none": "Nincsenek elérhető eszközök",
       "noneDescription": "A Kilo-kiszolgáló nem adott vissza eszközöket.",
+      "notApplied": "A Kilo-eszközök nem lettek hozzáadva ehhez a csevegéshez",
+      "notAppliedDescription": "A választását mentettük. Az „Újrapróbálkozás” gombbal most alkalmazhatja ebben a csevegésben.",
       "unreachable": "Nem sikerült elérni a Kilo-eszközöket",
       "unreachableDescription": "A kiszolgáló nem válaszolt. Ellenőrizd a kapcsolatot, majd próbáld újra.",
       "unauthorized": "A Kilo-eszközök elutasították ezt a munkamenetet",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "Nem sikerült feloldani az adattár kötését",
       "repoValue": "Adattár: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Ez a profil már nem érhető el. Válasszon másikat.",
       "pickerEmptyDescriptionOrganization": "Hozzon létre egy szervezeti profilt a környezeti változók, a beállítási parancsok és a készségek munkamenetek közötti újrafelhasználásához.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Szervezeti profilt a szervezet tulajdonosa vagy rendszergazdája hozhat létre."
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "{{duration}} múlva lejár",
     "neverExpires": "Nem jár le",
     "includesNewMessages": "Az új üzenetek is benne vannak.",
-    "excludesNewMessages": "Az új üzenetek nincsenek benne."
+    "excludesNewMessages": "Az új üzenetek nincsenek benne.",
+    "superseded": "Ezt a linket máshol lecserélték, ezért már nem működik."
   },
   "sharedSession": {
     "title": "Megosztott munkamenet",

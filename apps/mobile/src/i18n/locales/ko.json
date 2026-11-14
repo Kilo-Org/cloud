@@ -3640,6 +3640,8 @@
       "available": "사용 가능한 도구: {{count}}",
       "none": "사용 가능한 도구 없음",
       "noneDescription": "Kilo 서버가 도구를 반환하지 않았습니다.",
+      "notApplied": "이 채팅에 Kilo 도구가 추가되지 않았습니다",
+      "notAppliedDescription": "선택 사항이 저장되었습니다. 지금 이 채팅에서 사용하려면 다시 시도하세요.",
       "unreachable": "Kilo 도구에 연결할 수 없습니다",
       "unreachableDescription": "서버가 응답하지 않았습니다. 연결을 확인한 후 다시 시도하세요.",
       "unauthorized": "Kilo 도구가 이 세션을 거부했습니다",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "저장소를 바인딩 해제할 수 없습니다.",
       "repoValue": "저장소: {{name}}",
       "profileValue": "프로필: {{name}}",
+      "profileUnavailable": "이 프로필은 더 이상 사용할 수 없습니다. 다른 프로필을 선택하세요.",
       "pickerEmptyDescriptionOrganization": "세션 전체에서 환경 변수, 설정 명령 및 기술을 재사용하기 위한 조직 프로필을 만듭니다.",
       "pickerEmptyDescriptionOrganizationReadOnly": "조직 소유자 또는 관리자는 조직 프로필을 만들 수 있습니다."
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "{{duration}} 후 만료",
     "neverExpires": "만료 없음",
     "includesNewMessages": "새 메시지가 포함됩니다.",
-    "excludesNewMessages": "새 메시지는 포함되지 않습니다."
+    "excludesNewMessages": "새 메시지는 포함되지 않습니다.",
+    "superseded": "다른 기기에서 이 링크가 교체되어 더 이상 작동하지 않습니다."
   },
   "sharedSession": {
     "title": "공유된 세션",

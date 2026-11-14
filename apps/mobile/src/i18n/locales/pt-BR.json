@@ -3700,6 +3700,8 @@
       "available": "Ferramentas disponíveis: {{count}}",
       "none": "Nenhuma ferramenta disponível",
       "noneDescription": "O servidor do Kilo não retornou nenhuma ferramenta.",
+      "notApplied": "As ferramentas do Kilo não foram adicionadas a esta conversa",
+      "notAppliedDescription": "Sua escolha foi salva. Toque em Tentar novamente para usá-la nesta conversa agora.",
       "unreachable": "Não foi possível alcançar as ferramentas do Kilo",
       "unreachableDescription": "O servidor não respondeu. Verifique sua conexão e tente novamente.",
       "unauthorized": "As ferramentas do Kilo recusaram esta sessão",
@@ -4226,6 +4228,7 @@
       "unbindFailed": "Não foi possível desvincular o repositório",
       "repoValue": "Repositório: {{name}}",
       "profileValue": "Perfil: {{name}}",
+      "profileUnavailable": "Este perfil não está mais disponível. Escolha outro.",
       "pickerEmptyDescriptionOrganization": "Crie um perfil de organização para reutilizar variáveis de ambiente, comandos de configuração e habilidades entre sessões.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Um proprietário ou administrador da organização pode criar um perfil de organização."
     },
@@ -4551,7 +4554,8 @@
     "expiresIn": "Expira em {{duration}}",
     "neverExpires": "Nunca expira",
     "includesNewMessages": "As novas mensagens estão incluídas.",
-    "excludesNewMessages": "As novas mensagens não estão incluídas."
+    "excludesNewMessages": "As novas mensagens não estão incluídas.",
+    "superseded": "Este link foi substituído em outro dispositivo e não funciona mais."
   },
   "sharedSession": {
     "title": "Sessão compartilhada",

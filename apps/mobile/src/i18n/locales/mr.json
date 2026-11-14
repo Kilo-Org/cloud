@@ -3640,6 +3640,8 @@
       "available": "उपलब्ध साधने: {{count}}",
       "none": "कोणतीही साधने उपलब्ध नाहीत",
       "noneDescription": "Kilo सर्व्हरने कोणतेही साधन परत दिले नाही.",
+      "notApplied": "या चॅटमध्ये Kilo साधने जोडली गेली नाहीत",
+      "notAppliedDescription": "तुमची निवड जतन केली आहे. ती आता या चॅटमध्ये वापरण्यासाठी पुन्हा प्रयत्न करा.",
       "unreachable": "Kilo साधनांपर्यंत पोहोचता आले नाही",
       "unreachableDescription": "सर्व्हरने प्रतिसाद दिला नाही. तुमचे कनेक्शन तपासा, नंतर पुन्हा प्रयत्न करा.",
       "unauthorized": "Kilo साधनांनी हे सत्र नाकारले",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "रेपॉजिटरी अनबाइंड करता आली नाही",
       "repoValue": "रेपॉजिटरी: {{name}}",
       "profileValue": "प्रोफाइल: {{name}}",
+      "profileUnavailable": "हे प्रोफाइल आता उपलब्ध नाही. दुसरे निवडा.",
       "pickerEmptyDescriptionOrganization": "संपूर्ण सत्रांमध्ये पर्यावरण व्हेरिएबल्स, सेटअप कमांड आणि कौशल्ये पुन्हा वापरण्यासाठी संस्था प्रोफाइल तयार करा.",
       "pickerEmptyDescriptionOrganizationReadOnly": "संस्था मालक किंवा प्रशासक संस्था प्रोफाइल तयार करू शकतो."
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "{{duration}} मध्ये कालबाह्य होईल",
     "neverExpires": "कधीही कालबाह्य होत नाही",
     "includesNewMessages": "नवीन संदेश समाविष्ट आहेत.",
-    "excludesNewMessages": "नवीन संदेश वगळले आहेत."
+    "excludesNewMessages": "नवीन संदेश वगळले आहेत.",
+    "superseded": "ही लिंक इतरत्र बदलण्यात आली आहे, त्यामुळे ती आता काम करत नाही."
   },
   "sharedSession": {
     "title": "शेअर केलेले सत्र",

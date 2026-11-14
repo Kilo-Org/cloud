@@ -3694,6 +3694,8 @@
       "available": "Eines disponibles: {{count}}",
       "none": "Cap eina disponible",
       "noneDescription": "El servidor de Kilo no ha retornat cap eina.",
+      "notApplied": "No s'han afegit les eines de Kilo a aquest xat",
+      "notAppliedDescription": "La teva elecció s'ha desat. Torna-ho a provar per fer-la servir ara en aquest xat.",
       "unreachable": "No s'ha pogut contactar amb les eines de Kilo",
       "unreachableDescription": "El servidor no ha respost. Comprova la connexió i torna-ho a provar.",
       "unauthorized": "Les eines de Kilo han rebutjat aquesta sessió",
@@ -4220,6 +4222,7 @@
       "unbindFailed": "No s'ha pogut desenllaçar el repo",
       "repoValue": "Repositori: {{name}}",
       "profileValue": "Perfil: {{name}}",
+      "profileUnavailable": "Aquest perfil ja no està disponible. Tria'n un altre.",
       "pickerEmptyDescriptionOrganization": "Creeu un perfil d'organització per reutilitzar variables d'entorn, ordres de configuració i habilitats entre sessions.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Un propietari o administrador de l'organització pot crear un perfil d'organització."
     },
@@ -4545,7 +4548,8 @@
     "expiresIn": "Caduca d'aquí a {{duration}}",
     "neverExpires": "No caduca mai",
     "includesNewMessages": "Els missatges nous s'hi inclouen.",
-    "excludesNewMessages": "Els missatges nous no s'hi inclouen."
+    "excludesNewMessages": "Els missatges nous no s'hi inclouen.",
+    "superseded": "Aquest enllaç s'ha substituït des d'un altre dispositiu i ja no funciona."
   },
   "sharedSession": {
     "title": "Sessió compartida",

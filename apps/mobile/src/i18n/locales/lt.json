@@ -3748,6 +3748,8 @@
       "available": "Galimi įrankiai: {{count}}",
       "none": "Nėra galimų įrankių",
       "noneDescription": "Kilo serveris negrąžino jokių įrankių.",
+      "notApplied": "Kilo įrankiai nebuvo pridėti prie šio pokalbio",
+      "notAppliedDescription": "Jūsų pasirinkimas išsaugotas. Bandykite dar kartą, kad dabar pritaikytumėte jį šiame pokalbyje.",
       "unreachable": "Nepavyko pasiekti Kilo įrankių",
       "unreachableDescription": "Serveris neatsakė. Patikrink ryšį ir bandyk dar kartą.",
       "unauthorized": "Kilo įrankiai atmetė šią sesiją",
@@ -4281,6 +4283,7 @@
       "unbindFailed": "Nepavyko atsieti atpirkimo sandorio",
       "repoValue": "Saugykla: {{name}}",
       "profileValue": "Profilis: {{name}}",
+      "profileUnavailable": "Šis profilis nebepasiekiamas. Pasirinkite kitą.",
       "pickerEmptyDescriptionOrganization": "Sukurkite organizacijos profilį, kad seansų metu pakartotinai naudotumėte aplinkos kintamuosius, sąrankos komandas ir įgūdžius.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Organizacijos savininkas arba administratorius gali sukurti organizacijos profilį."
     },
@@ -4610,7 +4613,8 @@
     "expiresIn": "Baigs galioti po {{duration}}",
     "neverExpires": "Galioja neribotai",
     "includesNewMessages": "Naujos žinutės įtraukiamos.",
-    "excludesNewMessages": "Naujos žinutės neįtraukiamos."
+    "excludesNewMessages": "Naujos žinutės neįtraukiamos.",
+    "superseded": "Ši nuoroda buvo pakeista kitame įrenginyje, todėl nebeveikia."
   },
   "sharedSession": {
     "title": "Bendrinama sesija",

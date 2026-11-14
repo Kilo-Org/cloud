@@ -3640,6 +3640,8 @@
       "available": "Alat tersedia: {{count}}",
       "none": "Tiada alat tersedia",
       "noneDescription": "Pelayan Kilo tidak memulangkan sebarang alat.",
+      "notApplied": "Alat Kilo belum ditambah pada sembang ini",
+      "notAppliedDescription": "Pilihan anda telah disimpan. Cuba lagi untuk menggunakannya dalam sembang ini sekarang.",
       "unreachable": "Tidak dapat menghubungi alat Kilo",
       "unreachableDescription": "Pelayan tidak menjawab. Periksa sambungan anda, kemudian cuba lagi.",
       "unauthorized": "Alat Kilo menolak sesi ini",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "Tidak dapat menyahikat repo",
       "repoValue": "Repositori: {{name}}",
       "profileValue": "Profil: {{name}}",
+      "profileUnavailable": "Profil ini tidak lagi tersedia. Pilih profil lain.",
       "pickerEmptyDescriptionOrganization": "Buat profil organisasi untuk menggunakan semula pembolehubah persekitaran, arahan persediaan dan kemahiran merentas sesi.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Pemilik atau pentadbir organisasi boleh membuat profil organisasi."
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "Tamat tempoh dalam {{duration}}",
     "neverExpires": "Tidak akan tamat tempoh",
     "includesNewMessages": "Mesej baharu disertakan.",
-    "excludesNewMessages": "Mesej baharu tidak disertakan."
+    "excludesNewMessages": "Mesej baharu tidak disertakan.",
+    "superseded": "Pautan ini telah diganti di tempat lain, jadi pautan ini tidak lagi berfungsi."
   },
   "sharedSession": {
     "title": "Sesi dikongsi",

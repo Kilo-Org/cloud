@@ -3640,6 +3640,8 @@
       "available": "የሚገኙ መሳሪያዎች፦ {{count}}",
       "none": "ምንም መሳሪያ አይገኝም",
       "noneDescription": "የKilo ሰርቨር ምንም መሳሪያ አልመለሰም።",
+      "notApplied": "የKilo መሳሪያዎች ወደዚህ ውይይት አልተጨመሩም",
+      "notAppliedDescription": "ምርጫዎ ተቀምጧል። አሁን በዚህ ውይይት ለመጠቀም እንደገና ሞክር።",
       "unreachable": "የKilo መሳሪያዎችን ማግኘት አልተቻለም",
       "unreachableDescription": "ሰርቨሩ አልመለሰም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።",
       "unauthorized": "የKilo መሳሪያዎች ይህን ክፍለ ጊዜ አልተቀበሉም",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "ሪፖን ማላቀቅ አልተቻለም",
       "repoValue": "ማከማቻ: {{name}}",
       "profileValue": "መገለጫ: {{name}}",
+      "profileUnavailable": "ይህ መገለጫ ከእንግዲህ ወዲህ አይገኝም። ሌላ ይምረጡ።",
       "pickerEmptyDescriptionOrganization": "የአካባቢ ተለዋዋጮችን፣ የማዋቀር ትዕዛዞችን እና በክፍለ-ጊዜዎች ያሉ ክህሎቶችን እንደገና ለመጠቀም የድርጅት መገለጫ ይፍጠሩ።",
       "pickerEmptyDescriptionOrganizationReadOnly": "የድርጅት ባለቤት ወይም አስተዳዳሪ የድርጅት መገለጫ መፍጠር ይችላል።"
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "በ{{duration}} ውስጥ ያበቃል",
     "neverExpires": "በጭራሽ አያበቃም",
     "includesNewMessages": "አዲስ መልዕክቶች ተካትተዋል።",
-    "excludesNewMessages": "አዲስ መልዕክቶች አልተካተቱም።"
+    "excludesNewMessages": "አዲስ መልዕክቶች አልተካተቱም።",
+    "superseded": "ይህ ሊንክ በሌላ ቦታ ተተክቷል፣ ስለዚህ ከእንግዲህ ወዲህ አይሰራም።"
   },
   "sharedSession": {
     "title": "የተጋራ ክፍለ ጊዜ",

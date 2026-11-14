@@ -3640,6 +3640,8 @@
       "available": "可用工具：{{count}}",
       "none": "没有可用工具",
       "noneDescription": "Kilo 服务器未返回任何工具。",
+      "notApplied": "Kilo 工具尚未添加到此聊天",
+      "notAppliedDescription": "你的选择已保存。重试即可在此聊天中应用。",
       "unreachable": "无法连接 Kilo 工具",
       "unreachableDescription": "服务器没有响应。请检查网络连接，然后重试。",
       "unauthorized": "Kilo 工具拒绝了此会话",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "无法解除仓库绑定",
       "repoValue": "仓库: {{name}}",
       "profileValue": "配置文件: {{name}}",
+      "profileUnavailable": "此配置文件已不可用。请选择其他配置文件。",
       "pickerEmptyDescriptionOrganization": "创建组织配置文件，以跨会话重复使用环境变量、设置命令和技能。",
       "pickerEmptyDescriptionOrganizationReadOnly": "组织所有者或管理员可以创建组织配置文件。"
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "{{duration}}后过期",
     "neverExpires": "永不过期",
     "includesNewMessages": "包含新消息。",
-    "excludesNewMessages": "不包含新消息。"
+    "excludesNewMessages": "不包含新消息。",
+    "superseded": "此链接已在其他设备上被替换，现已失效。"
   },
   "sharedSession": {
     "title": "已分享的会话",

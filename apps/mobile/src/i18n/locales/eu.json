@@ -3640,6 +3640,8 @@
       "available": "Erabilgarri dauden tresnak: {{count}}",
       "none": "Ez dago tresnarik erabilgarri",
       "noneDescription": "Kilo zerbitzariak ez du tresnarik itzuli.",
+      "notApplied": "Kilo tresnak ez dira txat honetan gehitu",
+      "notAppliedDescription": "Zure aukera gordeta dago. Saiatu berriro orain txat honetan erabiltzeko.",
       "unreachable": "Ezin izan da Kiloren tresnetara iritsi",
       "unreachableDescription": "Zerbitzariak ez du erantzun. Egiaztatu konexioa eta saiatu berriro.",
       "unauthorized": "Kiloren tresnek txat saio hau baztertu dute",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "Ezin izan da biltegia deslotu",
       "repoValue": "Biltegia: {{name}}",
       "profileValue": "Profila: {{name}}",
+      "profileUnavailable": "Profil hau jada ez dago erabilgarri. Aukeratu beste bat.",
       "pickerEmptyDescriptionOrganization": "Sortu erakunde-profil bat ingurune-aldagaiak, konfigurazio komandoak eta trebetasunak saioetan berrerabiltzeko.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Erakundearen jabe batek edo administratzaile batek sor dezake erakunde-profil bat."
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "{{duration}} barru iraungiko da",
     "neverExpires": "Ez da inoiz iraungiko",
     "includesNewMessages": "Mezu berriak barne daude.",
-    "excludesNewMessages": "Mezu berriak kanpoan daude."
+    "excludesNewMessages": "Mezu berriak kanpoan daude.",
+    "superseded": "Esteka hau beste nonbait ordeztu da, beraz, jada ez du funtzionatzen."
   },
   "sharedSession": {
     "title": "Partekatutako saioa",

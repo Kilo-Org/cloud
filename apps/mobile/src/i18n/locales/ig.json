@@ -3640,6 +3640,8 @@
       "available": "Ngwá ọrụ dịnụ: {{count}}",
       "none": "Ọ dịghị ngwá ọrụ dịnụ",
       "noneDescription": "Sava Kilo ezipụtaghị ngwá ọrụ ọ bụla.",
+      "notApplied": "Etinyebeghị ngwá ọrụ Kilo na nkata a",
+      "notAppliedDescription": "Echekwara nhọrọ gị. Nwaa ọzọ iji ya na nkata a ugbu a.",
       "unreachable": "Enweghị ike iru ngwá ọrụ Kilo",
       "unreachableDescription": "Sava azaghị. Lelee njikọ gị, wee nwaa ọzọ.",
       "unauthorized": "Ngwá ọrụ Kilo jụrụ nnọkọ a",
@@ -4159,6 +4161,7 @@
       "unbindFailed": "Enweghị ike iwepụ repo",
       "repoValue": "Ebe nchekwa: {{name}}",
       "profileValue": "Profaịlụ: {{name}}",
+      "profileUnavailable": "Enweghịzi profaịlụ a. Họrọ nke ọzọ.",
       "pickerEmptyDescriptionOrganization": "Mepụta profaịlụ otumobi iji megharịa mgbanwe gburugburu ebe obibi, iwu ntọlite na nka n'ofe nnọkọ.",
       "pickerEmptyDescriptionOrganizationReadOnly": "Onye nwe otumobi ma ọ bụ onye nchịkwa nwere ike mepụta profaịlụ otumobi."
     },
@@ -4480,7 +4483,8 @@
     "expiresIn": "Ọ ga-agwụ n'ime {{duration}}",
     "neverExpires": "Ọ dịghị mgbe ọ ga-agwụ",
     "includesNewMessages": "A na-etinye ozi ọhụrụ.",
-    "excludesNewMessages": "A naghị etinye ozi ọhụrụ."
+    "excludesNewMessages": "A naghị etinye ozi ọhụrụ.",
+    "superseded": "E dochiela njikọ a n'ebe ọzọ, ya mere ọ naghịzi arụ ọrụ."
   },
   "sharedSession": {
     "title": "Nnọkọ ekesara",

@@ -6,6 +6,7 @@ import {
   type CloudAgentWorktreeId,
 } from './cloud-agent-session-scope';
 import { storedSessionIdSchema } from './kilo-session-id';
+import { needsPartTextRepair } from './part-text';
 
 export { cloudAgentSessionIdSchema, cloudAgentWorktreeIdSchema, type CloudAgentWorktreeId };
 
@@ -1104,24 +1105,19 @@ type NormalizedPersistedStoredMessage = {
 };
 
 /**
- * The generated `Part` types declare `text: string` on text and reasoning
- * parts, but persisted storage can hold a part without the field (Sentry
- * KILO-APP-99). A single such part fails the strict `kiloSdkPartSchema`, so
- * the WHOLE history page degrades to `invalid_data` and the agent chat
- * transcript never renders. Mirror the SDK's `normalizeMissingPartText`
- * (packages/cloud-agent-sdk/src/part-utils.ts — this package cannot import
- * the SDK, it depends back on us): fill absent or non-string text with `''`
- * so the part renders nothing downstream instead of poisoning the page.
- * Returns `null` when the part needs no fix (not a text/reasoning part, or it
- * already carries string text); otherwise a copy with `text: ''`.
+ * Fill absent or non-string text on a persisted text or reasoning part so the
+ * part renders nothing downstream instead of poisoning the page: a single such
+ * part fails the strict `kiloSdkPartSchema`, so the WHOLE history page degrades
+ * to `invalid_data` and the agent chat transcript never renders.
+ *
+ * Returns `null` when the part needs no fix; otherwise a copy with `text: ''`.
+ * The rule itself is declared once in `needsPartTextRepair` (`./part-text`),
+ * shared with the SDK's wire normalizer.
  */
 function normalizePersistedMissingPartText(
   part: Record<string, unknown>
 ): Record<string, unknown> | null {
-  const type = part['type'];
-  if (type !== 'text' && type !== 'reasoning') return null;
-  if (typeof part['text'] === 'string') return null;
-  return { ...part, text: '' };
+  return needsPartTextRepair(part) ? { ...part, text: '' } : null;
 }
 
 function normalizePersistedKiloSdkParts(value: unknown): {

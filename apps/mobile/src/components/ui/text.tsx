@@ -95,6 +95,9 @@ export const EYEBROW_RTL_SCRIPT_DISPLAY = 'text-[13px]';
  * header when the two swap places. `screen-header.tsx`'s reserve holds this box
  * before the label arrives and can never know that label's script, so the box
  * must not depend on it: one explicit height, and both sizes sit inside it.
+ * Emitted unscaled: React Native multiplies an explicit `lineHeight` by the
+ * system font scale itself, bounded by `maxFontSizeMultiplier`, so this is the
+ * dp at scale 1 and the native pipeline carries it to the live scale once.
  */
 export const EYEBROW_LINE_HEIGHT_DP = 22;
 
@@ -110,8 +113,7 @@ function Text({
     asChild?: boolean;
   }) {
   const textClass = React.useContext(TextClassContext);
-  const fontScale = useSystemFontScale();
-  const fontScaleCap = resolveFontScaleCap(fontScale, props.maxFontSizeMultiplier);
+  const fontScaleCap = resolveFontScaleCap(useSystemFontScale(), props.maxFontSizeMultiplier);
   const Component = asChild ? Slot.Text : RNText;
   const isRTL = I18nManager.isRTL;
   // The shared text primitive re-renders whenever its parent does (streamed chat
@@ -138,21 +140,14 @@ function Text({
   // One line box for the eyebrow in every script: the reserve in
   // `screen-header.tsx` can never know the arriving label's script, so the box
   // must not depend on it, and the 10px Latin size and the 13px RTL-script twin
-  // both sit inside `EYEBROW_LINE_HEIGHT_DP`. The box follows the system scale
-  // (a cap on the font size is a cap on the line it sits in), and a caller's own
+  // both sit inside `EYEBROW_LINE_HEIGHT_DP`. The value stays at font scale 1
+  // here: React Native scales an explicit `lineHeight` through the native text
+  // pipeline exactly as it scales the font size, bounded by the same
+  // `maxFontSizeMultiplier`, so pre-scaling it as well would apply the system
+  // scale twice (`use-text-height.tsx`, `scaledLineHeight`). A caller's own
   // `lineHeight` still wins: the computed entry comes before `props.style`.
-  //
-  // `resolveFontScaleCap` reports 0 for a scale below 1 — React Native cannot
-  // express a fractional multiplier and treats 0 as no cap — so only a cap of 1
-  // or more bounds the box here.
-  const eyebrowScale = Math.min(
-    fontScale ?? 1,
-    fontScaleCap != null && fontScaleCap >= 1 ? fontScaleCap : Number.POSITIVE_INFINITY
-  );
   const eyebrowLineHeight: TextStyle | undefined =
-    variant === 'eyebrow'
-      ? { lineHeight: Math.round(EYEBROW_LINE_HEIGHT_DP * eyebrowScale) }
-      : undefined;
+    variant === 'eyebrow' ? { lineHeight: EYEBROW_LINE_HEIGHT_DP } : undefined;
   const headingA11y = HEADING_A11Y.get(variant ?? 'default');
   const classes = cn(
     textVariants({ variant }),

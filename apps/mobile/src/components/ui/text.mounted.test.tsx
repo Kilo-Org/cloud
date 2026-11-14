@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SystemFontScaleContext } from '@/lib/font-scale/system-font-scale-context';
 
 import { Eyebrow } from './eyebrow';
-import { Text } from './text';
+import { EYEBROW_LINE_HEIGHT_DP, Text } from './text';
 import { hostText, mountTextTree, unmountTextTree } from './text.mounted.test-helpers';
 
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
@@ -259,6 +259,9 @@ describe('Text eyebrow line box', () => {
     // and the 13px RTL-script size sit inside the same box.
     expect(boxes).not.toContain(undefined);
     expect(new Set(boxes).size).toBe(1);
+    // The box is the token's own value, never a scaled copy of it: React Native
+    // applies the system font scale to an explicit line height natively.
+    expect(boxes[0]).toBe(EYEBROW_LINE_HEIGHT_DP);
   });
 
   it('keeps a caller-supplied line height', () => {
@@ -269,8 +272,7 @@ describe('Text eyebrow line box', () => {
     ).toBe(40);
   });
 
-  it('scales the box with the system font scale', () => {
-    const unscaled = eyebrowLineHeight(createElement(Text, { variant: 'eyebrow' }, 'Live now'));
+  it('leaves the box at the token value when the system font scale is not 1', () => {
     const scaled = eyebrowLineHeight(
       createElement(
         SystemFontScaleContext.Provider,
@@ -279,10 +281,10 @@ describe('Text eyebrow line box', () => {
       )
     );
 
-    if (typeof unscaled !== 'number') {
-      throw new TypeError('the eyebrow variant laid out no line box');
-    }
-    expect(scaled).toBe(Math.round(unscaled * 2));
+    // The node still declares the scale-1 box: React Native multiplies it by the
+    // system scale along with the font size (`use-text-height.tsx`), so scaling
+    // it here too would apply the scale twice.
+    expect(scaled).toBe(EYEBROW_LINE_HEIGHT_DP);
   });
 
   it('leaves a non-eyebrow variant without a line box of its own', () => {

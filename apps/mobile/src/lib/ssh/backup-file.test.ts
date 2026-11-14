@@ -1,6 +1,14 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-import { openSshBackup, shareSshBackup, sshBackupFailure } from './backup-file';
+import { type File } from 'expo-file-system';
+
+import {
+  MAX_SSH_BACKUP_BYTES,
+  openSshBackup,
+  readSshBackupFile,
+  shareSshBackup,
+  sshBackupFailure,
+} from './backup-file';
 import { InvalidSshExportError, type SshBackup } from './backup-payload';
 
 const state = vi.hoisted(() => ({
@@ -83,4 +91,40 @@ it('distinguishes retryable wrong passphrases from invalid exports without expos
   expect(sshBackupFailure({ code: 'InvalidExport' })).toBe('invalid_export');
   expect(sshBackupFailure(new InvalidSshExportError())).toBe('invalid_export');
   expect(sshBackupFailure(new Error('private details'))).toBe('unavailable');
+});
+
+it('rejects an oversized backup without reading its contents', async () => {
+  const text = vi.fn<() => Promise<string>>();
+  const open = vi.fn();
+  const file = { size: MAX_SSH_BACKUP_BYTES + 1, text, open } as unknown as File;
+  await expect(readSshBackupFile(file, MAX_SSH_BACKUP_BYTES + 1)).rejects.toThrow(
+    `${MAX_SSH_BACKUP_BYTES}`
+  );
+  await expect(readSshBackupFile(file)).rejects.toThrow(`${MAX_SSH_BACKUP_BYTES}`);
+  expect(text).not.toHaveBeenCalled();
+  expect(open).not.toHaveBeenCalled();
+});
+
+it('reads a backup at the size limit', async () => {
+  const text = vi.fn<() => Promise<string>>().mockResolvedValue('age-armored');
+  const file = { size: MAX_SSH_BACKUP_BYTES, text, open: vi.fn() } as unknown as File;
+  await expect(readSshBackupFile(file)).resolves.toBe('age-armored');
+  expect(text).toHaveBeenCalledOnce();
+});
+
+it('reads only the limit plus one byte when no size is known', async () => {
+  const readBytes = vi
+    .fn<(length: number) => Promise<Uint8Array>>()
+    .mockResolvedValue(new Uint8Array([65]));
+  const close = vi.fn();
+  const text = vi.fn<() => Promise<string>>();
+  const file = {
+    size: 0,
+    text,
+    open: () => ({ readBytes, close }),
+  } as unknown as File;
+  await expect(readSshBackupFile(file, undefined)).resolves.toBe('A');
+  expect(readBytes).toHaveBeenCalledWith(MAX_SSH_BACKUP_BYTES + 1);
+  expect(close).toHaveBeenCalledOnce();
+  expect(text).not.toHaveBeenCalled();
 });

@@ -30,6 +30,10 @@ import {
   _resetAndroidSessionTokensForTests,
   androidSessionActivityTokens,
 } from './session-activity-tokens-android';
+import {
+  _resetSessionTokenIdentityForTests,
+  clearSessionTokenIdentities,
+} from './session-token-identity';
 import { enqueueTokenMutation, resetTokenMutationQueue } from './token-mutation-queue';
 import {
   _resetUnregisterSessionForTests,
@@ -257,6 +261,11 @@ const delivery: GlanceableDelivery = {
         return { ok: tokens.length === 0, tokens };
       }
       const failed = await deleteActivityTokens(tokens, authToken, records);
+      if (includeScope && failed.length === 0) {
+        /* Every row for the scope is gone, so the tokens a row was written with
+           are history: a later follow must not delete with them. */
+        clearSessionTokenIdentities();
+      }
       // Keep Android's existing successful-cleanup result contract.
       return {
         ok: failed.length === 0,
@@ -286,6 +295,7 @@ export function _resetDeliveryRegistrationForTests(): void {
   pushToStartToken = null;
   _resetSessionActivityTokensForTests();
   _resetAndroidSessionTokensForTests();
+  _resetSessionTokenIdentityForTests();
   resetTokenMutationQueue();
   _resetUnregisterSessionForTests();
   if (Platform.OS === 'ios') {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+import { WIDGET_STORE_CLASS_MARKER } from '@/lib/auth/secure-store-gated';
 
 import {
   _androidSessionGenerationCountForTests,
@@ -13,7 +14,12 @@ import {
   retryAndroidSessionTokens,
   setAndroidSessionScope,
 } from './session-activity-tokens-android';
+import {
+  _resetSessionTokenIdentityForTests,
+  _setSessionTokenIdentityStoreForTests,
+} from './session-token-identity';
 import { resetTokenMutationQueue } from './token-mutation-queue';
+import { SESSION_TOKEN_IDENTITY_KEY } from './widget-store';
 
 const mocks = vi.hoisted(() => ({
   register: vi.fn<(input: Record<string, unknown>) => Promise<void>>(),
@@ -53,12 +59,30 @@ vi.mock('@/lib/auth/token-owner', () => ({
 const CTX = { userId: 'user-1', organizationId: null };
 const FOLLOW = { sessionId: 'session-1', ...CTX };
 
+// The widget store as the keychain would hold it: the identity record, and the
+// class marker that makes an absent record read as absent instead of unreadable.
+const stored = new Map<string, string>();
+const identityStore = {
+  getItemAsync: async (key: string) => {
+    await Promise.resolve();
+    return stored.get(key) ?? null;
+  },
+  setItemAsync: async (key: string, value: string) => {
+    await Promise.resolve();
+    stored.set(key, value);
+  },
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.deviceToken = 'ExponentPushToken[device]';
   mocks.register.mockResolvedValue(undefined);
   mocks.unregister.mockResolvedValue(undefined);
+  stored.clear();
+  stored.set(WIDGET_STORE_CLASS_MARKER.key, WIDGET_STORE_CLASS_MARKER.value);
   _resetAndroidSessionTokensForTests();
+  _resetSessionTokenIdentityForTests();
+  _setSessionTokenIdentityStoreForTests(identityStore);
   resetTokenMutationQueue();
   setAndroidSessionScope(CTX);
   _setDevicePushTokenReaderForTests(async () => {
@@ -365,6 +389,30 @@ describe('releaseAndroidSessionToken', () => {
     expect(mocks.unregister).toHaveBeenCalledExactlyOnceWith({
       token: 'ExponentPushToken[device]',
       sessionId: 'session-9',
+    });
+  });
+
+  it('a fresh process deletes the row the previous process wrote after Expo rotated the token', async () => {
+    await registerAndroidSessionToken(FOLLOW);
+    // The token the upsert was sent with, kept on disk for the next process.
+    await vi.waitFor(() => {
+      expect(stored.get(SESSION_TOKEN_IDENTITY_KEY)).toContain('ExponentPushToken[device]');
+    });
+
+    // That process is gone, in memory and in the token maps; the store is not.
+    _resetAndroidSessionTokensForTests();
+    _resetSessionTokenIdentityForTests();
+    _setSessionTokenIdentityStoreForTests(identityStore);
+    setAndroidSessionScope(CTX);
+    mocks.deviceToken = 'ExponentPushToken[rotated]';
+
+    await releaseAndroidSessionToken('session-1');
+
+    /* The row is the one written under the old token; deleting the token read
+       now names no row and reports success while the row survives. */
+    expect(mocks.unregister).toHaveBeenCalledExactlyOnceWith({
+      token: 'ExponentPushToken[device]',
+      sessionId: 'session-1',
     });
   });
 });

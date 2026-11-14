@@ -6,6 +6,11 @@ import {
 } from '@/lib/auth/logout-reconciliation';
 import { trpcClient } from '@/lib/trpc';
 
+import {
+  forgetSessionTokenIdentity,
+  readSessionTokenIdentities,
+  rememberSessionTokenIdentity,
+} from './session-token-identity';
 import { enqueueTokenMutation } from './token-mutation-queue';
 import { deleteActivityTokens, readUnregisterAuthToken } from './unregister-session';
 
@@ -153,8 +158,14 @@ async function attemptRegistration(scope: PendingRegistration): Promise<boolean>
       return;
     }
     // An upsert whose answer never arrives can still have landed: keep the
-    // token for the scope teardown before the call goes out.
+    // token for the scope teardown before the call goes out, and record it as
+    // the row's identity so a later process can name the row it must delete.
     androidSessionActivityTokens.add(token);
+    rememberSessionTokenIdentity(
+      scope.sessionId,
+      { userId: scope.userId, organizationId: scope.organizationId },
+      token
+    );
     await trpcClient.user.registerActivityToken.mutate({
       token,
       kind: 'android_session_ongoing',
@@ -239,16 +250,17 @@ export function isAndroidSessionTokenPending(sessionId: string): boolean {
 }
 
 /**
- * Delete one session's row for this device, unless a later call superseded the
+ * Delete one session's rows for this device, unless a later call superseded the
  * release that asked for it: a re-follow made meanwhile holds the row, and its
- * upsert may already have run ahead of this delete in the FIFO. A failed delete
- * is retried by the scope teardown.
+ * upsert may already have run ahead of this delete in the FIFO. Answers the
+ * tokens this delete did not remove, which are the ones still naming a row.
  */
 async function deleteSessionRow(
   sessionId: string,
-  token: string,
+  tokens: readonly string[],
   generation: number
-): Promise<void> {
+): Promise<readonly string[]> {
+  let remaining: readonly string[] = tokens;
   await enqueueTokenMutation(async () => {
     if (generations.get(sessionId) !== generation) {
       return;
@@ -257,15 +269,31 @@ async function deleteSessionRow(
     if (authToken === null) {
       return;
     }
-    await deleteActivityTokens([token], authToken, [androidSessionActivityTokens], sessionId);
+    remaining = await deleteActivityTokens(
+      [...tokens],
+      authToken,
+      [androidSessionActivityTokens],
+      sessionId
+    );
   });
+  return remaining;
+}
+
+/** The tokens worth a delete: an empty or absent token names no row. */
+function isToken(value: string | null | undefined): value is string {
+  return value !== null && value !== undefined && value.length > 0;
 }
 
 /**
- * Forget one followed session: drop its pending registration and delete its row.
- * The device's other followed sessions keep their rows. When this process never
- * learned the token (a fresh process, or a registration that has not answered),
- * the device token is read again, so a dismissed follow cannot leave its row.
+ * Forget one followed session: drop its pending registration and delete its
+ * row. The device's other followed sessions keep their rows.
+ *
+ * The row is deleted under every token it may have been written with — the one
+ * this process saw accepted, and the ones a previous process recorded — because
+ * Expo can rotate the device token between the follow and its unfollow, and a
+ * delete naming a token with no row reports success while the row survives.
+ * Only a process with no identity for the session falls back to the token it
+ * reads now, exactly as before.
  */
 export async function releaseAndroidSessionToken(sessionId: string): Promise<void> {
   const generation = nextGeneration(sessionId);
@@ -273,10 +301,21 @@ export async function releaseAndroidSessionToken(sessionId: string): Promise<voi
   pending.delete(sessionId);
   const known = tokensBySession.get(sessionId);
   tokensBySession.delete(sessionId);
+  /* The device-token read starts where it always did, before anything is looked
+     up: a release asks the device for its token when it is made, not after the
+     record read. */
+  const readNow = known === undefined ? getDevicePushToken() : Promise.resolve(null);
   try {
-    const token = known ?? (await getDevicePushToken());
-    if (token !== null && token.length > 0) {
-      await deleteSessionRow(sessionId, token, generation);
+    const recorded = await readSessionTokenIdentities(sessionId, registeredScope);
+    const tokens = [...new Set([known, ...recorded].filter(isToken))];
+    // Only a process that has no identity for this session falls back to the
+    // token it reads now; a recorded token names the row that exists.
+    const candidates = tokens.length > 0 ? tokens : [(await readNow)].filter(isToken);
+    if (candidates.length > 0) {
+      const remaining = await deleteSessionRow(sessionId, candidates, generation);
+      if (remaining.length === 0) {
+        forgetSessionTokenIdentity(sessionId);
+      }
     }
   } finally {
     const remaining = (releasesInFlight.get(sessionId) ?? 1) - 1;

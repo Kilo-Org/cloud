@@ -39,7 +39,7 @@ import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/re
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
-import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 import { type PrCommentKind } from '@/lib/pr-review/discussion/review-discussion-types';
 import { useUpdatePrCommentMutation } from '@/lib/pr-review/discussion/use-pr-comment-crud-mutations';
 
@@ -133,7 +133,7 @@ export function PrCommentEditSheet({
     // stays intact, nothing is pending, and the same tap retries once the
     // banner clears. A local rejection with no toast owner, so it announces
     // through AccessibleStatus.
-    if (getCommittedConnectivityStatus() === 'offline') {
+    if (connectionRefusesWrites()) {
       setInlineError(t('prReview.discussion.commentEditFailed'));
       setInlineErrorKind('retryable');
       setInlineErrorIsLocal(true);

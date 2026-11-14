@@ -26,6 +26,22 @@ describe('createSurfaceFeedbackStore', () => {
     expect(store.getSnapshot().states.get('a')).toEqual({ status: 'pending' });
   });
 
+  it('reports ownership without settling, and loses it on dismissal or unmount', () => {
+    const store = createStore();
+    const attempt = store.begin('a');
+    expect(attempt?.owns()).toBe(true);
+    expect(store.getSnapshot().states.get('a')).toEqual({ status: 'pending' });
+
+    expect(attempt?.abandon()).toBe(true);
+    expect(attempt?.owns()).toBe(false);
+
+    const remounted = store.begin('a');
+    expect(remounted?.owns()).toBe(true);
+    store.invalidateAll();
+    expect(remounted?.owns()).toBe(false);
+    expect(store.getSnapshot().states.has('a')).toBe(false);
+  });
+
   it('re-admits a settled key at the end of the admission order', () => {
     const store = createStore();
     store.begin('a')?.fail({ kind: 'terminal', message: 'first' });

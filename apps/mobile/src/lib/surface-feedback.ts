@@ -37,6 +37,13 @@ export type SurfaceAttempt<Failure extends SurfaceFailure> = {
   fail(failure: Failure): boolean;
   /** No outcome to publish: the entry goes away, the key reads `idle`. */
   abandon(): boolean;
+  /**
+   * Whether this token still owns its key's pending entry, without settling.
+   * `false` means a newer attempt owns the key, the token already settled, or
+   * the surface unmounted (`invalidateAll`). Callers that await before they
+   * start work re-check this so a dismissed attempt writes nothing.
+   */
+  owns(): boolean;
 };
 
 /** The whole store as one subscribable value. */
@@ -142,9 +149,13 @@ export function createSurfaceFeedbackStore<
     entries.set(key, { phase: 'pending', generation });
     notify();
 
-    function settle(next: StoredPhase<Failure> | null): boolean {
+    function owns(): boolean {
       const owned = entries.get(key);
-      if (owned?.phase !== 'pending' || owned.generation !== generation) {
+      return owned?.phase === 'pending' && owned.generation === generation;
+    }
+
+    function settle(next: StoredPhase<Failure> | null): boolean {
+      if (!owns()) {
         return false;
       }
       if (next === null) {
@@ -160,6 +171,7 @@ export function createSurfaceFeedbackStore<
       succeed: () => settle({ phase: 'succeeded', generation }),
       fail: failure => settle({ phase: 'failed', generation, failure }),
       abandon: () => settle(null),
+      owns,
     };
   }
 

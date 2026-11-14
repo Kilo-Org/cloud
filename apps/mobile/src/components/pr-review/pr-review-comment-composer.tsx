@@ -30,6 +30,7 @@ import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/re
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
+import { type SurfaceAttempt } from '@/lib/surface-feedback';
 import { clearDraft, prCommentDraftKey, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
@@ -152,6 +153,9 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   // a spinner. Cancel stays live while the gate is the only work in flight.
   const [awaitingGate, setAwaitingGate] = useState(false);
   const dismissalLocked = isSubmitting && !awaitingGate;
+  // The attempt admitted for a submit whose Terms gate is still running; a
+  // dismissal abandons it so the continuation leaves nothing to write.
+  const gateAttemptRef = useRef<SurfaceAttempt<PrInlineFailure> | null>(null);
   const lineRangeLabel = composerRangeLabel(line, startLine);
 
   // automaticallyAdjustKeyboardInsets can scroll the focused field under the
@@ -244,8 +248,15 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       return;
     }
     setAwaitingGate(true);
+    gateAttemptRef.current = attempt;
     const outcome = await ensureTermsAcceptedOutcome();
     setAwaitingGate(false);
+    gateAttemptRef.current = null;
+    if (!attempt.owns()) {
+      // Dismissed (or unmounted) while the gate ran: this token no longer owns
+      // the phase, so it must not dispatch the write.
+      return;
+    }
     if (outcome.kind === 'dismissed') {
       attempt.abandon();
       return;
@@ -322,6 +333,9 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     if (dismissalLocked) {
       return;
     }
+    // A pending gate is not a write: leaving abandons the admitted attempt.
+    gateAttemptRef.current?.abandon();
+    gateAttemptRef.current = null;
     const dirty = isEdit
       ? bodyRef.current !== bodyBaselineRef.current
       : bodyRef.current.trim().length > 0;

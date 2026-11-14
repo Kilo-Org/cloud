@@ -31,6 +31,7 @@ import { Text } from '@/components/ui/text';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
+import { type SurfaceAttempt } from '@/lib/surface-feedback';
 import { clearDraft, prConversationCommentDraftKey, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
@@ -113,6 +114,8 @@ export function PrConversationCommentComposer({
   // Cancel must stay live while only the pre-submit Terms gate is in flight.
   const [awaitingGate, setAwaitingGate] = useState(false);
   const dismissalLocked = isSubmitting && !awaitingGate;
+  // The attempt admitted for a submit whose Terms gate is still running.
+  const gateAttemptRef = useRef<SurfaceAttempt<PrInlineFailure> | null>(null);
 
   // automaticallyAdjustKeyboardInsets can scroll the focused field under the
   // pinned header. Compact kb layout fits at offset 0 — snap back so body +
@@ -171,8 +174,14 @@ export function PrConversationCommentComposer({
       return;
     }
     setAwaitingGate(true);
+    gateAttemptRef.current = attempt;
     const outcome = await ensureTermsAcceptedOutcome();
     setAwaitingGate(false);
+    gateAttemptRef.current = null;
+    if (!attempt.owns()) {
+      // Dismissed (or unmounted) while the gate ran: nothing may be written.
+      return;
+    }
     if (outcome.kind === 'dismissed') {
       attempt.abandon();
       return;
@@ -214,6 +223,9 @@ export function PrConversationCommentComposer({
     if (dismissalLocked) {
       return;
     }
+    // A pending gate is not a write: leaving abandons the admitted attempt.
+    gateAttemptRef.current?.abandon();
+    gateAttemptRef.current = null;
     if (bodyRef.current.trim().length > 0) {
       confirm({
         title: t('prReview.composer.discardTitle'),

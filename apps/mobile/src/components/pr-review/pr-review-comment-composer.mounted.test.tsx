@@ -321,6 +321,28 @@ describe('PrReviewCommentComposer submit phase', () => {
     expect(createComment.mutateAsync).toHaveBeenCalledTimes(1);
   });
 
+  it('writes nothing when the composer is dismissed during the Terms read', async () => {
+    const roundTrip = Promise.withResolvers<{ accepted: boolean; currentVersion: string }>();
+    gate.status.mockReturnValueOnce(roundTrip.promise);
+    createComment.mutateAsync.mockResolvedValue({});
+    const renderer = await mountComposer();
+    typeBody(renderer, 'hello');
+
+    act(() => {
+      press(renderer, 'Comment now');
+    });
+    press(renderer, 'Cancel');
+
+    await act(async () => {
+      roundTrip.resolve({ accepted: true, currentVersion: 'v1' });
+      await Promise.resolve();
+    });
+
+    // The gate resolved for an attempt the dismissal already abandoned.
+    expect(createComment.mutateAsync).not.toHaveBeenCalled();
+    expect(clearDraft).not.toHaveBeenCalled();
+  });
+
   it('refuses the write while the connection is being confirmed', async () => {
     connectivity.value = 'confirming-offline';
     createComment.mutateAsync.mockResolvedValue({});

@@ -43,7 +43,7 @@ const { confirmRequests, createCommentMocks, surfaceFeedback } = vi.hoisted(() =
     mutateAsync: vi.fn<() => Promise<unknown>>(),
   },
   surfaceFeedback: {
-    begin: () => ({ fail: vi.fn(), succeed: vi.fn(), abandon: vi.fn() }),
+    begin: () => ({ abandon: vi.fn(), fail: vi.fn(), owns: () => true, succeed: vi.fn() }),
     clearWhere: vi.fn(),
   },
 }));

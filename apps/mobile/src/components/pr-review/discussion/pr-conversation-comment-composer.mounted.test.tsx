@@ -247,6 +247,29 @@ describe('PrConversationCommentComposer', () => {
       }
     );
 
+    it('writes nothing when the composer is dismissed during the Terms read', async () => {
+      const roundTrip = Promise.withResolvers<{ kind: string }>();
+      gate.ensureTermsAcceptedOutcome.mockReturnValueOnce(roundTrip.promise);
+      addComment.mutateAsync.mockResolvedValue({});
+      const renderer = await mount(createElement(PrConversationCommentComposer, baseProps));
+      typeBody(renderer, 'hello');
+
+      act(() => {
+        pressComment(renderer);
+      });
+      act(() => {
+        (buttonByText(renderer, i18n.t('common.cancel')).props.onPress as () => void)();
+      });
+
+      await act(async () => {
+        roundTrip.resolve({ kind: 'accepted' });
+        await Promise.resolve();
+      });
+
+      expect(addComment.mutateAsync).not.toHaveBeenCalled();
+      expect(clearDraft).not.toHaveBeenCalled();
+    });
+
     it('stays on the composer with the retryable copy when the discard clear fails', async () => {
       vi.mocked(clearDraft).mockResolvedValue(false);
       const renderer = await mount(createElement(PrConversationCommentComposer, baseProps));

@@ -238,6 +238,25 @@ describe('PrCommentEditSheet', () => {
     expect(saveDisabled(renderer)).toBe(false);
   });
 
+  it('writes nothing when the sheet is dismissed during the Terms read', async () => {
+    const roundTrip = Promise.withResolvers<{ kind: string }>();
+    gate.ensureTermsAcceptedOutcome.mockReturnValueOnce(roundTrip.promise);
+    const renderer = await mount(createElement(PrCommentEditSheet, baseProps));
+    typeBody(renderer, 'edited body');
+
+    act(() => {
+      (saveButton(renderer).props.onPress as () => void)();
+    });
+    pressCancel(renderer);
+
+    await act(async () => {
+      roundTrip.resolve({ kind: 'accepted' });
+      await Promise.resolve();
+    });
+
+    expect(updateComment.mutateAsync).not.toHaveBeenCalled();
+  });
+
   it('leaves Cancel live while the pre-submit Terms read is stalled', async () => {
     const roundTrip = Promise.withResolvers<{ kind: string }>();
     gate.ensureTermsAcceptedOutcome.mockReturnValueOnce(roundTrip.promise);

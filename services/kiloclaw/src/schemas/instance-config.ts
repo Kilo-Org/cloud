@@ -5,7 +5,12 @@ import {
   isValidCustomSecretKey,
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
-import { InstanceTierKeySchema, InstanceTypeSchema } from '@kilocode/kiloclaw-instance-tiers';
+import {
+  InstanceTierKeySchema,
+  InstanceTypeSchema,
+  MachineSizeSchema,
+  type MachineSize,
+} from '@kilocode/kiloclaw-instance-tiers';
 import { IMAGE_TAG_RE, IMAGE_TAG_MAX_LENGTH } from '../lib/image-tag-validation';
 
 export const EncryptedEnvelopeSchema = z.object({
@@ -18,13 +23,7 @@ export const EncryptedEnvelopeSchema = z.object({
   version: z.literal(1),
 });
 
-export const MachineSizeSchema = z.object({
-  cpus: z.number().int().min(1).max(8),
-  memory_mb: z.number().int().min(256).max(16384),
-  cpu_kind: z.enum(['shared', 'performance']).optional(),
-});
-
-export type MachineSize = z.infer<typeof MachineSizeSchema>;
+export { MachineSizeSchema, type MachineSize };
 
 /**
  * Valid env var name: must be a valid shell identifier and must not use

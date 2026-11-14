@@ -164,9 +164,6 @@ pool.on('error', (err: Error) => {
 if (usesSeparateReplica) {
   replicaPool.on('error', (err: Error) => {
     console.error('Unexpected error on idle client (replica)', err);
-    if (shouldExitOnPoolError('replica')) {
-      process.exit(-1);
-    }
   });
 }
 

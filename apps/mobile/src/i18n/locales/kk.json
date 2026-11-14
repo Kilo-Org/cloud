@@ -4097,7 +4097,7 @@
       "add": "Қиғаш сызық пәрменін қосыңыз",
       "empty": "Әлі қиғаш сызық пәрмендері жоқ",
       "name": "Пәрмен аты",
-      "description": "Команда сипаттамасы",
+      "description": "Пәрмен сипаттамасы",
       "template": "Үлгі",
       "namePlaceholder": "explain",
       "agentPlaceholder": "reviewer",

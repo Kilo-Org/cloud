@@ -4097,7 +4097,7 @@
       "add": "မျဥ်းစောင်းအမိန့်ကို ထည့်ပါ။",
       "empty": "မျဥ်းစောင်းအမိန့်များ မရှိသေးပါ။",
       "name": "အမိန့်အမည်",
-      "description": "Command ဖော်ပြချက်",
+      "description": "အမိန့်ဖော်ပြချက်",
       "template": "ပုံစံခွက်",
       "namePlaceholder": "explain",
       "agentPlaceholder": "reviewer",
@@ -4112,8 +4112,8 @@
       "nameRequired": "အမိန့်အမည်တစ်ခုထည့်ပါ။",
       "nameInvalid": "အမည်သည် စာလုံးအသေးဖြင့် စတင်ရမည်ဖြစ်ပြီး စာလုံးသေးများ၊ ဂဏန်းများနှင့် ဒက်ရှ်များကိုသာ အသုံးပြုရပါမည်။",
       "templateRequired": "အမိန့်ပေးပုံစံကို ထည့်သွင်းပါ။",
-      "nameConflict": "ထိုအမည်ကို built-in command ဖြင့် သိမ်းဆည်းထားသည်။",
-      "duplicateName": "ဤ profile တွင် ဤအမည်ဖြင့် တည်ရှိပြီးသော command ရှိပါသည်။"
+      "nameConflict": "ထိုအမည်ကို built-in အမိန့်ဖြင့် သိမ်းဆည်းထားသည်။",
+      "duplicateName": "ဤ profile တွင် ဤအမည်ဖြင့် တည်ရှိပြီးသော အမိန့် ရှိပါသည်။"
     },
     "repoBindings": {
       "title": "Repos အတွက် မူရင်းပရိုဖိုင်များ",

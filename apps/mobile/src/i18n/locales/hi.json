@@ -1569,7 +1569,7 @@
       "restartExitFailed": "नया सत्र शुरू हुआ। पिछला सत्र अभी भी खुला है।",
       "exitNotSupported": "इस सत्र में रिमोट से बाहर निकलने की सुविधा नहीं है।",
       "exitUnavailable": "अभी इस सत्र से रिमोट के ज़रिए बाहर नहीं निकल सकते।",
-      "exitNeedsNewerCli": "रिमोट स्लैश कमांड के लिए Kilo CLI का नया संस्करण चाहिए। Kilo CLI अपडेट करें और फिर से कनेक्ट करें।"
+      "exitNeedsNewerCli": "रिमोट स्लैश आदेश के लिए Kilo CLI का नया संस्करण चाहिए। Kilo CLI अपडेट करें और फिर से कनेक्ट करें।"
     },
     "newSession": {
       "recentlyUsed": "हाल ही में इस्तेमाल की गईं",
@@ -2120,7 +2120,7 @@
     "composer": {
       "addAttachment": "अटैचमेंट जोड़ें",
       "removeOrRetryFailed": "पहले अपलोड न हुए अटैचमेंट हटाएँ या उन्हें फिर से अपलोड करें।",
-      "attachmentsWithSlashCommands": "स्लैश कमांड के साथ अटैचमेंट नहीं भेजे जा सकते।",
+      "attachmentsWithSlashCommands": "स्लैश आदेश के साथ अटैचमेंट नहीं भेजे जा सकते।",
       "photoMetadataNotRemoved": "एक अटैचमेंट से फ़ोटो का मेटाडेटा हटाया नहीं जा सका।",
       "waitForUploads": "अटैचमेंट का अपलोड पूरा होने तक इंतज़ार करें।",
       "pasteFromClipboard": "क्लिपबोर्ड से पेस्ट करें",
@@ -2180,7 +2180,7 @@
       "resumeClaudeDescription": "Claude Code सत्र का ट्रांसक्रिप्ट आयात करें",
       "resumeCodexDescription": "OpenAI Codex सत्र का ट्रांसक्रिप्ट आयात करें",
       "reviewDescription": "परिवर्तनों की समीक्षा करें [uncommitted|staged|unpushed|branch|commit|pr]",
-      "upgradeRequiredFallback": "इस कमांड का उपयोग करने के लिए कृपया अपना CLI अपग्रेड करें।",
+      "upgradeRequiredFallback": "इस आदेश का उपयोग करने के लिए कृपया अपना CLI अपग्रेड करें।",
       "exitCapabilityUnavailable": "सत्र से बाहर निकलने के लिए अपना CLI अपडेट करें।",
       "clearCapabilityUnavailable": "सत्र फिर से शुरू करने के लिए अपना CLI अपडेट करें।",
       "argumentError": "{{command}} आर्ग्युमेंट नहीं लेता।",
@@ -2188,7 +2188,7 @@
       "useCommand": "/{{command}} का उपयोग करें",
       "useSkillCommand": "/{{command}} स्किल का उपयोग करें",
       "skillBadge": "स्किल",
-      "catalogFull": "कमांड सूची भर गई है, इसलिए कुछ कमांड छिपे हैं।",
+      "catalogFull": "आदेश सूची भर गई है, इसलिए कुछ आदेश छिपे हैं।",
       "catalogOverLimit": "स्किल सूची आकार सीमा से बड़ी है, इसलिए हर स्किल दिखाया गया है।"
     },
     "contextUsage": {
@@ -4094,7 +4094,7 @@
     },
     "slashCommands": {
       "title": "स्लैश आदेश",
-      "add": "स्लैश कमांड जोड़ें",
+      "add": "स्लैश आदेश जोड़ें",
       "empty": "अभी तक कोई स्लैश आदेश नहीं",
       "name": "आदेश का नाम",
       "description": "आदेश विवरण",
@@ -4109,11 +4109,11 @@
       "moveDown": "स्लैश आदेश {{name}} को नीचे ले जाएँ",
       "saveFailed": "आदेश सहेजा नहीं जा सका",
       "deleteFailed": "आदेश हटाया नहीं जा सका",
-      "nameRequired": "एक कमांड नाम दर्ज करें",
+      "nameRequired": "आदेश का नाम दर्ज करें",
       "nameInvalid": "नाम छोटे अक्षर से शुरू होना चाहिए और केवल छोटे अक्षर, अंक और डैश का उपयोग करना चाहिए",
-      "templateRequired": "एक कमांड टेम्पलेट दर्ज करें",
-      "nameConflict": "वह नाम एक अंतर्निहित कमांड द्वारा आरक्षित है",
-      "duplicateName": "इस प्रोफ़ाइल में इस नाम वाली कमांड पहले से मौजूद है"
+      "templateRequired": "आदेश का खाका दर्ज करें",
+      "nameConflict": "वह नाम एक अंतर्निहित आदेश द्वारा आरक्षित है",
+      "duplicateName": "इस प्रोफ़ाइल में इस नाम वाला आदेश पहले से मौजूद है"
     },
     "repoBindings": {
       "title": "रिपोज़ के लिए डिफ़ॉल्ट प्रोफ़ाइल",

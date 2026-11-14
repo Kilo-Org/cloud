@@ -4154,7 +4154,7 @@
       "delete": "Elimina l'agent {{name}}"
     },
     "slashCommands": {
-      "title": "Comandes de barra",
+      "title": "Ordres de barra",
       "add": "Afegeix l'ordre de barra inclinada",
       "empty": "Encara no hi ha ordres de barra inclinada",
       "name": "Nom de l'ordre",

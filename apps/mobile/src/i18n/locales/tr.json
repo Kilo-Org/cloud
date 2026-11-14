@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Bildirim alındısı",
-      "description": "Gönderdiğin bildirimin alındısı. Daha sonra başvurmak için bu kimliği sakla.",
+      "description": "Daha sonra başvurmak için bu kimliği sakla.",
       "receiptLabel": "Alındı",
       "copyReceiptId": "Alındı kimliğini kopyala",
       "appealLabel": "İtiraz",

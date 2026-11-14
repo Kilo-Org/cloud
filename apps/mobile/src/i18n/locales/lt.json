@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Pranešimo patvirtinimas",
-      "description": "Jūsų pateikto pranešimo patvirtinimas. Išsaugokite šį ID, kad vėliau galėtumėte jį nurodyti.",
+      "description": "Išsaugokite šį ID, kad vėliau galėtumėte jį nurodyti.",
       "receiptLabel": "Patvirtinimas",
       "copyReceiptId": "Kopijuoti patvirtinimo ID",
       "appealLabel": "Apskundimas",

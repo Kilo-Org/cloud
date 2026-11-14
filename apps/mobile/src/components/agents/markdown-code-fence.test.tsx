@@ -2,18 +2,25 @@ import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
+import {
+  LINE_ACTION_BOX_CLASS,
+  LINE_ACTION_HIT_SLOP,
+  MIN_TAP_TARGET_DP,
+  TOUCH_TARGET_DP,
+  tapTargetReachDp,
+} from '@/lib/a11y/tap-target';
+
 import { MarkdownCodeFence } from './markdown-code-fence';
 
 const mocks = vi.hoisted(() => ({ performCopy: vi.fn() }));
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => undefined },
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 vi.mock('@/i18n', () => ({ i18n: { language: 'en', t: (key: string) => key } }));
 vi.mock('@/components/ui/icons', () => ({ Clipboard: 'Clipboard' }));
-vi.mock('@/components/ui/icon-button', () => ({ IconButton: 'IconButton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('./code-block', () => ({ CodeBlock: 'CodeBlock' }));
 vi.mock('./use-message-copy', () => ({ performCopy: mocks.performCopy }));
@@ -102,7 +109,7 @@ describe('MarkdownCodeFence', () => {
     const onCopyCode = vi.fn((_code: string) => undefined);
     const renderer = await mount(fence({ onCopyCode }));
 
-    const button = hostProps(renderer, 'IconButton');
+    const button = hostProps(renderer, 'Pressable');
     expect(button).toMatchObject({ accessibilityLabel: 'common.copy' });
     act(() => {
       (button.onPress as () => void)();
@@ -114,9 +121,32 @@ describe('MarkdownCodeFence', () => {
     const renderer = await mount(fence());
 
     act(() => {
-      (hostProps(renderer, 'IconButton').onPress as () => void)();
+      (hostProps(renderer, 'Pressable').onPress as () => void)();
     });
     expect(mocks.performCopy).toHaveBeenCalledWith(LONG_LINE);
+  });
+
+  it('keeps the header one text line tall and reaches the copy target with hitSlop', async () => {
+    const renderer = await mount(fence());
+
+    // The header is the language's line, so the copy control floats the shared
+    // line-action box over it and reaches the 44pt target with its slop instead
+    // of growing the row to a 48dp icon button.
+    const button = hostProps(renderer, 'Pressable');
+    for (const token of LINE_ACTION_BOX_CLASS.split(' ')) {
+      expect(String(button.className)).toContain(token);
+    }
+    expect(String(button.className)).toContain('min-w-[36px]');
+    expect(String(button.className)).toContain('items-center');
+    expect(button.hitSlop).toBe(LINE_ACTION_HIT_SLOP);
+    expect(tapTargetReachDp(MIN_TAP_TARGET_DP, LINE_ACTION_HIT_SLOP.top)).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
+    // The icon's slot is wider than one line, so the 36dp box still carries the
+    // horizontal reach: 36 + 5 + 5 = 46dp.
+    expect(tapTargetReachDp(36, LINE_ACTION_HIT_SLOP.left)).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
   });
 
   it('passes a multi-line fence through unchanged', async () => {

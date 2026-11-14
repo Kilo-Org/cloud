@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "د راپور رسید",
-      "description": "د هغه راپور رسید چې تاسو سپارلی دی. دا ID وساتئ څو وروسته ورته اشاره وکړئ.",
+      "description": "دا ID وساتئ څو وروسته ورته اشاره وکړئ.",
       "receiptLabel": "رسید",
       "copyReceiptId": "د رسید ID کاپي کړئ",
       "appealLabel": "استیناف",

@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Comprovante de denúncia",
-      "description": "O comprovante da denúncia que você enviou. Guarde este ID para consultá-la depois.",
+      "description": "Guarde este ID para consultá-la depois.",
       "receiptLabel": "Comprovante",
       "copyReceiptId": "Copiar ID do comprovante",
       "appealLabel": "Recurso",

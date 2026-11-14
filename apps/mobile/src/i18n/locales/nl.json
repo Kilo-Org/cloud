@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Ontvangstbewijs melding",
-      "description": "Het ontvangstbewijs voor de melding die je hebt ingediend. Bewaar dit ID om er later naar te verwijzen.",
+      "description": "Bewaar dit ID om er later naar te verwijzen.",
       "receiptLabel": "Ontvangstbewijs",
       "copyReceiptId": "Ontvangstbewijs-ID kopiëren",
       "appealLabel": "Bezwaar",

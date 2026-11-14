@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Resi rapò",
-      "description": "Resi pou rapò ou te soumèt la. Kenbe ID sa a pou w ka itilize l pita.",
+      "description": "Kenbe ID sa a pou w ka itilize l pita.",
       "receiptLabel": "Resi",
       "copyReceiptId": "Kopye ID resi a",
       "appealLabel": "Apèl",

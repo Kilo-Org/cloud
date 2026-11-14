@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Clipboard } from '@/components/ui/icons';
-import { IconButton } from '@/components/ui/icon-button';
 import { Text } from '@/components/ui/text';
+import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 import { CodeBlock } from './code-block';
 import { performCopy } from './use-message-copy';
@@ -60,14 +61,24 @@ export function MarkdownCodeFence({
         >
           {language ?? ''}
         </Text>
-        <IconButton
+        {/* The header is the language's one text line, so the copy control
+            floats the shared 28dp line-action box over it and its negative
+            margin cancels back to that line; `LINE_ACTION_HIT_SLOP` carries
+            the touch target past 44dp (apps/mobile/AGENTS.md:211). */}
+        <Pressable
+          className={cn(
+            LINE_ACTION_BOX_CLASS,
+            'min-w-[36px] items-center justify-center active:opacity-70'
+          )}
+          hitSlop={LINE_ACTION_HIT_SLOP}
+          accessibilityRole="button"
           accessibilityLabel={t('common.copy')}
           onPress={() => {
             copy(code);
           }}
         >
           <Clipboard size={14} color={palette.mutedTextColor} />
-        </IconButton>
+        </Pressable>
       </View>
       <CodeBlock
         code={code}

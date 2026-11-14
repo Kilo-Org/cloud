@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Meldebestätigung",
-      "description": "Die Bestätigung für deine eingereichte Meldung. Bewahre diese ID auf, um später darauf Bezug zu nehmen.",
+      "description": "Bewahre diese ID auf, um später darauf Bezug zu nehmen.",
       "receiptLabel": "Bestätigung",
       "copyReceiptId": "Bestätigungs-ID kopieren",
       "appealLabel": "Einspruch",

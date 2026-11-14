@@ -412,7 +412,7 @@
     },
     "reportReceipt": {
       "title": "Ricevuta della segnalazione",
-      "description": "La ricevuta della segnalazione che hai inviato. Conserva questo ID per farvi riferimento in seguito.",
+      "description": "Conserva questo ID per farvi riferimento in seguito.",
       "receiptLabel": "Ricevuta",
       "copyReceiptId": "Copia ID ricevuta",
       "appealLabel": "Ricorso",

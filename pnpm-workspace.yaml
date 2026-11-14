@@ -193,7 +193,7 @@ overrides:
   serialize-javascript: '>=7.0.3 <8'
   hono: 'catalog:'
   '@modelcontextprotocol/sdk@1.29.0': 1.32.1
-  '@modelcontextprotocol/sdk@1.32.1>@hono/node-server': 2.0.10
+  '@modelcontextprotocol/sdk@1.32.1>@hono/node-server': 2.1.6
   # @simplewebauthn/server's ASN.1 parser must come from the same
   # @peculiar/asn1-schema copy its asn1-ecc/asn1-rsa decorators register their
   # schemas into. apps/web pins asn1-schema/-x509 to 2.8.0 for its Apple App
@@ -227,7 +227,8 @@ overrides:
   # https://github.com/parcel-bundler/lightningcss/issues/1081
   lightningcss: 1.30.1
   axios: 1.20.0
-  fast-uri: 3.1.8
+  fast-uri: 3.1.9
+  'eas-cli@24.13.0>ts-deepmerge': 8.0.0
   joi: 17.13.9
   postcss-selector-parser@^7.0.0: 7.1.6
   postcss-selector-parser@6.0.10: 7.1.6
@@ -280,6 +281,7 @@ packageExtensions:
     peerDependencies:
       '@types/react': '*'
 patchedDependencies:
+  eas-cli@24.13.0: patches/eas-cli@24.13.0.patch
   # Text date styles for the glanceable widgets and Live Activity: `elapsed`
   # ("31 minutes", no seconds) and `ago` ("3 minutes ago"). Also separates a
   # bottom sheet's drag gesture from its back/scrim dismissal and lets a caller

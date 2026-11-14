@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -7,6 +6,7 @@ import { ShieldAlert } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
+import { useKeyedSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import {
   useDeleteFindingsByRepository,
   useOrphanedRepositories,
@@ -14,6 +14,9 @@ import {
 import { i18n } from '@/i18n';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+
+/** The delete's own refusal; the mutation hook's toast owns the copy. */
+type DeleteRepositoryFailure = { readonly kind: 'delete-failed' };
 
 /**
  * Findings that belong to repositories the integration no longer exposes
@@ -34,11 +37,39 @@ export function OrphanedFindingsCard({
   const orphans = useOrphanedRepositories(scope);
   const removeFindings = useDeleteFindingsByRepository(scope);
   const { confirm, dialog } = useConfirmDialog();
-  const [pendingRepo, setPendingRepo] = useState<string | null>(null);
+  // One admission per repository: two repositories can delete at once, and a
+  // row is busy while its own delete is in flight.
+  const removals = useKeyedSurfaceFeedback<string, DeleteRepositoryFailure>();
 
   if (!orphans.data || orphans.data.length === 0) {
     return null;
   }
+
+  const confirmRemove = (repository: { repoFullName: string }) => {
+    confirm({
+      title: t('securityAgent.orphanedFindings.confirmTitle'),
+      message: t('securityAgent.orphanedFindings.confirmMessage', {
+        repository: repository.repoFullName,
+      }),
+      confirmLabel: t('securityAgent.orphanedFindings.confirmAction'),
+      onConfirm: () => {
+        const attempt = removals.begin(repository.repoFullName);
+        if (attempt === null) {
+          return;
+        }
+        void (async () => {
+          try {
+            await removeFindings.mutateAsync(repository.repoFullName);
+            // The refetch dropping the row is the delete's own new state.
+            attempt.abandon();
+          } catch {
+            // The mutation hook's toast names the failure; the row goes live.
+            attempt.fail({ kind: 'delete-failed' });
+          }
+        })();
+      },
+    });
+  };
 
   return (
     <>
@@ -53,7 +84,7 @@ export function OrphanedFindingsCard({
           {t('securityAgent.orphanedFindings.description')}
         </Text>
         {orphans.data.map(repository => {
-          const busy = pendingRepo === repository.repoFullName && removeFindings.isPending;
+          const busy = removals.snapshot.states.get(repository.repoFullName)?.status === 'pending';
           return (
             <View
               key={repository.repoFullName}
@@ -83,17 +114,7 @@ export function OrphanedFindingsCard({
                 })}
                 accessibilityState={{ disabled: !canManage || busy }}
                 onPress={() => {
-                  setPendingRepo(repository.repoFullName);
-                  confirm({
-                    title: t('securityAgent.orphanedFindings.confirmTitle'),
-                    message: t('securityAgent.orphanedFindings.confirmMessage', {
-                      repository: repository.repoFullName,
-                    }),
-                    confirmLabel: t('securityAgent.orphanedFindings.confirmAction'),
-                    onConfirm: () => {
-                      removeFindings.mutate(repository.repoFullName);
-                    },
-                  });
+                  confirmRemove(repository);
                 }}
               >
                 <Text variant="muted" className="text-xs underline">

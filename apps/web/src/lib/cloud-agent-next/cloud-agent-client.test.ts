@@ -1538,8 +1538,30 @@ describe('CloudAgentNextClient endpoint capture', () => {
     await expect(new CloudAgentNextClient('auth-token').health()).rejects.toBe(error);
     expect(query).toHaveBeenCalledTimes(1);
     expect(captureException).toHaveBeenCalledTimes(1);
-    expect(captureException).toHaveBeenCalledWith(error, {
+    const [capturedError, context] = captureException.mock.calls[0] ?? [];
+    expect(capturedError).toBe(error);
+    // A present `extra: undefined` passes toHaveBeenCalledWith, so compare the keys.
+    expect(Object.keys(context ?? {})).toEqual(['tags']);
+    expect(context).toEqual({
       tags: { source: 'cloud-agent-next-client', endpoint: 'health' },
+    });
+  });
+
+  it('passes the endpoint extra payload through unchanged', async () => {
+    const error = new Error('Worker unavailable');
+    const createTerminal = jest.fn(async () => {
+      throw error;
+    });
+    mockCreateTRPCClient.mockReturnValueOnce({ createTerminal: { mutate: createTerminal } });
+    const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+
+    await expect(
+      new CloudAgentNextClient('auth-token').createTerminal({ cloudAgentSessionId })
+    ).rejects.toBe(error);
+    expect(createTerminal).toHaveBeenCalledWith({ cloudAgentSessionId });
+    expect(captureException).toHaveBeenCalledWith(error, {
+      tags: { source: 'cloud-agent-next-client', endpoint: 'createTerminal' },
+      extra: { cloudAgentSessionId },
     });
   });
 });

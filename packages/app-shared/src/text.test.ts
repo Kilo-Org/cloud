@@ -30,6 +30,12 @@ describe('hasVisibleText', () => {
     expect(hasVisibleText('\u0301\u0301')).toBe(false);
   });
 
+  it('refuses unpaired surrogates and accepts a surrogate pair', () => {
+    expect(hasVisibleText('\uD800')).toBe(false);
+    expect(hasVisibleText('\uDC00\uD800')).toBe(false);
+    expect(hasVisibleText('\uD83D\uDE00')).toBe(true);
+  });
+
   it('refuses the fillers that are letters or symbols by category', () => {
     expect(hasVisibleText('\u115F\u1160')).toBe(false);
     expect(hasVisibleText('\u2800\u3164\uFFA0')).toBe(false);

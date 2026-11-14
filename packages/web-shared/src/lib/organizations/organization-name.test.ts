@@ -16,7 +16,14 @@ describe('OrganizationNameSchema', () => {
     expect(result.error?.issues[0].message).toBe('Organization name is required');
   });
 
-  it('rejects a whitespace-only name', () => {
+  it('rejects a name made only of unpaired surrogates', () => {
+    const result = OrganizationNameSchema.safeParse('\uD800\uD800');
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].message).toBe('Organization name is required');
+  });
+
+  it('rejects whitespace-only names', () => {
     const result = OrganizationNameSchema.safeParse('   ');
 
     expect(result.success).toBe(false);

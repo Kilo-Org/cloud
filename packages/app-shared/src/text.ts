@@ -1,11 +1,13 @@
 /**
  * A code point a reader can see. A separator, a control, a zero-width or
- * direction mark, or a combining mark draws nothing on its own, so a value made
- * of them is as empty as one made of spaces. A code point this engine's Unicode
- * tables do not classify yet matches (it is neither Cc, Cf, Z nor M), so a
- * message that is a brand-new emoji stays a message.
+ * direction mark, a combining mark, or an unpaired surrogate draws nothing on
+ * its own, so a value made of them is as empty as one made of spaces. A
+ * surrogate pair is one visible code point and stays visible; `\p{Cs}` matches
+ * only the half with no partner. A code point this engine's Unicode tables do
+ * not classify yet matches (it is none of Cc, Cf, Cs, Z or M), so a message
+ * that is a brand-new emoji stays a message.
  */
-const RENDERS = /[^\p{Cc}\p{Cf}\p{Z}\p{M}]/u;
+const RENDERS = /[^\p{Cc}\p{Cf}\p{Cs}\p{Z}\p{M}]/u;
 
 /**
  * Fillers that draw nothing and are still letters or symbols by category: the

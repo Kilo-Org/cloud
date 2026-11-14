@@ -365,6 +365,10 @@ describe('SessionPositionClaim', () => {
       claimAfterResumeAnchor(c('send')),
       claimAfterReset(c('drag')),
     ]).toEqual([c('send'), c('drag'), c('send'), c('free'), c('free')]);
-    expect([claimBlocksResume(c('send')), claimKeepsTail(c('send')), claimIsDragging(c('drag'))]).toEqual([true, true, true]);
+    expect([
+      claimBlocksResume(c('send')),
+      claimKeepsTail(c('send')),
+      claimIsDragging(c('drag')),
+    ]).toEqual([true, true, true]);
   });
 });

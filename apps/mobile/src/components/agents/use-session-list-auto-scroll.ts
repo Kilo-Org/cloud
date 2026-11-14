@@ -25,6 +25,7 @@ import {
   shouldRetrySessionAutoScroll,
   shouldScheduleSessionAutoScroll,
 } from '@/components/agents/use-session-auto-scroll-state';
+import { useSessionListScrollTimeouts } from '@/components/agents/use-session-list-scroll-timeouts';
 import { useSessionTailRepin } from '@/components/agents/use-session-tail-repin';
 import { useMotionPolicy } from '@/lib/a11y/motion';
 
@@ -95,45 +96,19 @@ export function useSessionListAutoScroll<ItemT>({
   // The list's own height, tracked so a viewport resize (the fixed status row
   // mounting outside the list) can re-pin the tail. See `handleListLayout`.
   const lastViewportHeightRef = useRef(0);
-  const autoScrollResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const autoScrollRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const userScrollingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const clearAutoScrollResetTimeout = useCallback(() => {
-    const timeout = autoScrollResetTimeoutRef.current;
-    if (timeout) {
-      clearTimeout(timeout);
-      autoScrollResetTimeoutRef.current = null;
-    }
-  }, []);
-
-  const clearAutoScrollRetryTimeout = useCallback(() => {
-    const timeout = autoScrollRetryTimeoutRef.current;
-    if (timeout) {
-      clearTimeout(timeout);
-      autoScrollRetryTimeoutRef.current = null;
-    }
-  }, []);
-
-  const clearUserScrollingTimeout = useCallback(() => {
-    const timeout = userScrollingTimeoutRef.current;
-    if (timeout) {
-      clearTimeout(timeout);
-      userScrollingTimeoutRef.current = null;
-    }
-  }, []);
+  const timeouts = useSessionListScrollTimeouts();
 
   const scrollToLatestMessage = useCallback(() => {
     isAutoScrollingRef.current = true;
-    clearAutoScrollResetTimeout();
+    timeouts.clearReset();
     // FlashList in v2 supports `scrollToEnd` directly. The list is rendered
     // in chronological order, so the end is the newest message.
     listRef.current?.scrollToEnd({ animated: false });
-    autoScrollResetTimeoutRef.current = setTimeout(() => {
+    timeouts.resetRef.current = setTimeout(() => {
       isAutoScrollingRef.current = false;
-      autoScrollResetTimeoutRef.current = null;
+      timeouts.resetRef.current = null;
     }, 150);
-  }, [clearAutoScrollResetTimeout]);
+  }, [timeouts]);
 
   const tailRepin = useSessionTailRepin(
     () =>
@@ -172,13 +147,13 @@ export function useSessionListAutoScroll<ItemT>({
   const followTailFromSend = useCallback(() => {
     claimRef.current = claimAfterSend(claimRef.current);
     // The fling's trailing momentum end leaves the send's claim alone.
-    clearUserScrollingTimeout();
+    timeouts.clearUserScrolling();
     shouldAutoScrollRef.current = true;
     setIsAtBottom(true);
     scrollToLatestMessage();
-    clearAutoScrollRetryTimeout();
-    autoScrollRetryTimeoutRef.current = setTimeout(() => {
-      autoScrollRetryTimeoutRef.current = null;
+    timeouts.clearRetry();
+    timeouts.retryRef.current = setTimeout(() => {
+      timeouts.retryRef.current = null;
       // Same safety net as `scheduleScrollToLatestMessage`: the sent rows are
       // still being measured when the first scroll lands, so the retry
       // catches the settled height.
@@ -191,7 +166,7 @@ export function useSessionListAutoScroll<ItemT>({
         scrollToLatestMessage();
       }
     }, 80);
-  }, [clearAutoScrollRetryTimeout, clearUserScrollingTimeout, scrollToLatestMessage]);
+  }, [timeouts, scrollToLatestMessage]);
 
   /**
    * Suppresses the tail follow for a bounded window. A scheduled programmatic
@@ -208,13 +183,13 @@ export function useSessionListAutoScroll<ItemT>({
   const suppressAutoFollow = useCallback(
     (ms: number) => {
       isAutoScrollingRef.current = true;
-      clearAutoScrollResetTimeout();
-      autoScrollResetTimeoutRef.current = setTimeout(() => {
+      timeouts.clearReset();
+      timeouts.resetRef.current = setTimeout(() => {
         isAutoScrollingRef.current = false;
-        autoScrollResetTimeoutRef.current = null;
+        timeouts.resetRef.current = null;
       }, ms);
     },
-    [clearAutoScrollResetTimeout]
+    [timeouts]
   );
 
   const scheduleScrollToLatestMessage = useCallback(
@@ -230,9 +205,9 @@ export function useSessionListAutoScroll<ItemT>({
         return;
       }
       scrollToLatestMessage();
-      clearAutoScrollRetryTimeout();
-      autoScrollRetryTimeoutRef.current = setTimeout(() => {
-        autoScrollRetryTimeoutRef.current = null;
+      timeouts.clearRetry();
+      timeouts.retryRef.current = setTimeout(() => {
+        timeouts.retryRef.current = null;
         // The 80ms safety-net retry must not gate on `isAutoScrolling`:
         // a programmatic scroll that's still within its 150ms window
         // would otherwise suppress the retry and make it dead during the
@@ -248,7 +223,7 @@ export function useSessionListAutoScroll<ItemT>({
         }
       }, 80);
     },
-    [clearAutoScrollRetryTimeout, scrollToLatestMessage]
+    [timeouts, scrollToLatestMessage]
   );
 
   // A new session resets the follow policy and the position claim. A policy
@@ -291,15 +266,6 @@ export function useSessionListAutoScroll<ItemT>({
     }
   }, [itemCount, newestItemKey, scheduleScrollToLatestMessage]);
 
-  useEffect(
-    () => () => {
-      clearAutoScrollResetTimeout();
-      clearAutoScrollRetryTimeout();
-      clearUserScrollingTimeout();
-    },
-    [clearAutoScrollResetTimeout, clearAutoScrollRetryTimeout, clearUserScrollingTimeout]
-  );
-
   const updateAutoScrollFromEvent = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
@@ -333,10 +299,10 @@ export function useSessionListAutoScroll<ItemT>({
     // send's claim, which a later link is allowed to release (a drag's is not).
     claimRef.current = claimAfterDragBegin(claimRef.current);
     isAutoScrollingRef.current = false;
-    clearAutoScrollResetTimeout();
-    clearAutoScrollRetryTimeout();
-    clearUserScrollingTimeout();
-  }, [clearAutoScrollResetTimeout, clearAutoScrollRetryTimeout, clearUserScrollingTimeout]);
+    timeouts.clearReset();
+    timeouts.clearRetry();
+    timeouts.clearUserScrolling();
+  }, [timeouts]);
 
   const handleScrollEndDrag = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -345,27 +311,27 @@ export function useSessionListAutoScroll<ItemT>({
       // slow drags release without momentum). Schedule a fallback so the drag
       // claim cannot get stuck live. onMomentumScrollBegin cancels this when
       // real momentum is starting; onMomentumScrollEnd will then settle it.
-      clearUserScrollingTimeout();
-      userScrollingTimeoutRef.current = setTimeout(() => {
+      timeouts.clearUserScrolling();
+      timeouts.userScrollingRef.current = setTimeout(() => {
         claimRef.current = claimAfterDragEnd(claimRef.current);
-        userScrollingTimeoutRef.current = null;
+        timeouts.userScrollingRef.current = null;
       }, 100);
     },
-    [updateAutoScrollFromEvent, clearUserScrollingTimeout]
+    [timeouts, updateAutoScrollFromEvent]
   );
 
   const handleMomentumScrollBegin = useCallback(() => {
-    clearUserScrollingTimeout();
-  }, [clearUserScrollingTimeout]);
+    timeouts.clearUserScrolling();
+  }, [timeouts]);
 
   const handleMomentumScrollEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      clearUserScrollingTimeout();
+      timeouts.clearUserScrolling();
       // A late momentum end follows a drag; a send's claim outranks it.
       claimRef.current = claimAfterMomentumEnd(claimRef.current);
       updateAutoScrollFromEvent(event);
     },
-    [updateAutoScrollFromEvent, clearUserScrollingTimeout]
+    [timeouts, updateAutoScrollFromEvent]
   );
 
   const handleContentSizeChange = useCallback(

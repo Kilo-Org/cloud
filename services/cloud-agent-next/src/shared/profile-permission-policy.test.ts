@@ -51,49 +51,55 @@ describe('narrowProfilePermission', () => {
     expect(narrowed).toEqual({ bash: { npm: 'deny' } });
   });
 
-  it('keeps an agent allowance written with a pattern the session allows', () => {
+  it('keeps an agent allowance the session writes and omits one it does not', () => {
     expect(
       narrowProfilePermission(reviewSession, { bash: { 'git log *': 'allow', 'ls *': 'allow' } })
-    ).toEqual({ bash: { 'git log *': 'allow', 'git push': 'deny', 'git push *': 'deny' } });
-  });
-
-  it('keeps an inspection allow whose wider refusal the session overrides later', () => {
-    const session: PermissionMap = {
-      bash: { '*': 'deny', 'git status': 'allow', 'git status *': 'allow' },
-    };
-    expect(
-      narrowProfilePermission(session, { bash: { 'git status': 'allow', 'git log *': 'allow' } })
-    ).toEqual({ bash: { 'git status': 'allow' } });
-  });
-
-  it('omits an agent allowance the session does not write itself', () => {
-    // A wildcard allowance covers patterns the session decides, so the entry is
-    // omitted and the session map governs.
+    ).toEqual({
+      bash: { 'git log *': 'allow', 'git push': 'deny', 'git push *': 'deny' },
+    });
     expect(narrowProfilePermission(reviewSession, { bash: { '*': 'allow' } })).toBeUndefined();
   });
 
-  it('omits an agent allowance a later session refusal covers', () => {
-    const session: PermissionMap = {
-      bash: { '*': 'deny', 'git *': 'allow', 'git push *': 'deny' },
-    };
-    // The session allows most git commands and refuses pushes, so the agent
-    // allowance runs with the session's push refusal placed after it.
-    expect(narrowProfilePermission(session, { bash: { 'git *': 'allow' } })).toEqual({
-      bash: { 'git *': 'allow', 'git push *': 'deny' },
-    });
-    // An allowance for patterns the session does not write is omitted.
-    expect(
-      narrowProfilePermission(session, { bash: { 'git log *': 'allow', 'git push *': 'allow' } })
-    ).toBeUndefined();
-  });
-
-  it('keeps the explicit allow exception inside a mixed global deny and read allow', () => {
+  it('keeps a stricter denial for a pattern the session permits', () => {
     const session: PermissionMap = {
       bash: { '*': 'deny', 'git status': 'allow', 'git status *': 'allow' },
     };
     expect(
-      narrowProfilePermission(session, { bash: { '*': 'allow', 'git status': 'allow' } })
-    ).toEqual({ bash: { 'git status': 'allow' } });
+      narrowProfilePermission(session, { bash: { 'git status *': 'deny', 'git log *': 'allow' } })
+    ).toEqual({ bash: { 'git status *': 'deny' } });
+  });
+
+  it('keeps a profile refusal and the exception the session writes after it', () => {
+    const session: PermissionMap = {
+      bash: { find: 'allow', 'find *': 'allow', 'find *-delete*': 'deny' },
+    };
+    // The profile refuses every command and permits the one the session permits;
+    // the session's refusal for the delete form follows it.
+    expect(narrowProfilePermission(session, { bash: { '*': 'deny', 'find *': 'allow' } })).toEqual({
+      bash: { '*': 'deny', 'find *': 'allow', 'find *-delete*': 'deny' },
+    });
+  });
+
+  it('carries the session refusals for commands inside a kept allowance', () => {
+    const session: PermissionMap = {
+      bash: {
+        find: 'allow',
+        'find *': 'allow',
+        'find *-delete*': 'deny',
+        'git status': 'allow',
+      },
+    };
+    // The guard refuses a form of find after permitting find, so the refusal
+    // follows the allowance in the composed map.
+    expect(narrowProfilePermission(session, { bash: { 'find *': 'allow' } })).toEqual({
+      bash: { 'find *': 'allow', 'find *-delete*': 'deny' },
+    });
+  });
+
+  it('keeps an agent ask for a tool the session does not write', () => {
+    expect(narrowProfilePermission({ edit: 'deny' }, { bash: { '*': 'ask' } })).toEqual({
+      bash: { '*': 'ask' },
+    });
   });
 
   it('drops an empty agent map', () => {
@@ -130,9 +136,9 @@ describe('narrowProfilePermission', () => {
   it('ignores a rule value that carries no action and keeps the rest of the tool', () => {
     expect(
       narrowProfilePermission({ bash: 'allow' }, {
-        bash: { '*': 'allow', 'rm *': null },
+        bash: { 'rm *': 'deny', 'cp *': null },
       } as unknown as Record<string, unknown>)
-    ).toEqual({ bash: { '*': 'allow' } });
+    ).toEqual({ bash: { 'rm *': 'deny' } });
   });
 
   it('keeps an entry for a tool the session does not mention', () => {

@@ -32,38 +32,35 @@ export function matchesKiloPermissionPattern(input: string, pattern: string): bo
   return new RegExp(`^${escaped}$`, 's').test(input.replaceAll('\\', '/'));
 }
 
-function lastAllowIndex(rules: PermissionRuleMap): number {
-  const entries = Object.entries(rules);
-  for (let index = entries.length - 1; index >= 0; index--) {
-    if (entries[index]?.[1] === 'allow') return index;
-  }
-  return -1;
-}
-
 /**
- * Combine a session pattern map with an agent pattern map. Every agent
- * restriction survives, an agent allowance survives only for a pattern the
- * session itself allows, and the session's trailing refusals are placed last so
- * they decide any call an agent allowance would otherwise cover.
+ * Combine a session pattern map with an agent pattern map so both apply.
+ *
+ * Agent rules keep their order, so a profile's own exception after its own
+ * refusal survives. An agent allowance is kept only where the session writes an
+ * allow for that same pattern, because the session decides every other pattern.
+ * The session's refusals that follow that allow are placed after it, so a
+ * command the guard refuses still ends in a refusal.
  */
 function composeRuleMap(
   session: PermissionRuleMap | undefined,
   agent: PermissionRuleMap
 ): PermissionRuleMap | undefined {
   if (session === undefined) return { ...agent };
+  const sessionEntries = Object.entries(session);
   const composed: PermissionRuleMap = {};
+  const protectedFrom: number[] = [];
   for (const [pattern, action] of Object.entries(agent)) {
-    // A pattern the session does not allow cannot carry an allowance; the
-    // session decides it. An agent refusal always applies.
     if (action !== 'deny' && session[pattern] !== 'allow') continue;
     composed[pattern] = action;
+    if (action === 'allow') {
+      const index = sessionEntries.findIndex(([key]) => key === pattern);
+      if (index >= 0) protectedFrom.push(index);
+    }
   }
-  // Only an allowance needs protection from the session's trailing refusals; a
-  // map of refusals alone already decides every call it matches.
-  if (Object.values(composed).some(action => action !== 'deny')) {
-    const trailingFrom = lastAllowIndex(session);
-    Object.entries(session).forEach(([pattern, action], index) => {
-      if (action === 'deny' && index > trailingFrom && composed[pattern] === undefined) {
+  if (protectedFrom.length > 0) {
+    const from = Math.min(...protectedFrom);
+    sessionEntries.forEach(([pattern, action], index) => {
+      if (action === 'deny' && index > from && composed[pattern] === undefined) {
         composed[pattern] = 'deny';
       }
     });

@@ -3,7 +3,11 @@ import { Pressable, View } from 'react-native';
 
 import { Clipboard } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
-import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
+import {
+  SECTION_ACTION_BOX_CLASS,
+  SECTION_ACTION_HIT_SLOP,
+  SECTION_HEADER_ROW_PADDING_CLASS,
+} from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 import { CodeBlock } from './code-block';
@@ -51,7 +55,12 @@ export function MarkdownCodeFence({
       // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- the card color is the markdown variant's runtime palette
       style={{ backgroundColor: palette.codeBackground }}
     >
-      <View className="mb-1 flex-row items-center justify-between pt-2">
+      <View
+        className={cn(
+          'mb-1 flex-row items-center justify-between',
+          SECTION_HEADER_ROW_PADDING_CLASS
+        )}
+      >
         <Text
           className="text-[11px] font-medium"
           // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- the label tracks the markdown variant's palette
@@ -61,18 +70,14 @@ export function MarkdownCodeFence({
         >
           {language ?? ''}
         </Text>
-        {/* The header is the language's one text line, so the copy control
-            floats the shared 28dp line-action box over it and its negative
-            margin cancels back to that line; `LINE_ACTION_HIT_SLOP` carries
-            the touch target past 44dp (apps/mobile/AGENTS.md:211). The card's
-            top inset sits on the row, not on the card, so the box that floats
-            above the line stays inside the card that clips it. */}
+        {/* The copy control keeps the section header's compact box, and the row
+            reserves its hit slop as padding, so the whole touch target lies
+            inside the row that delivers it: the row is 28 + 9 + 9 dp tall
+            instead of the 48 dp icon box's, and the box itself is never larger
+            than one text line (apps/mobile/AGENTS.md:211). */}
         <Pressable
-          className={cn(
-            LINE_ACTION_BOX_CLASS,
-            'min-w-[36px] items-center justify-center active:opacity-70'
-          )}
-          hitSlop={LINE_ACTION_HIT_SLOP}
+          className={cn(SECTION_ACTION_BOX_CLASS, 'items-center justify-center active:opacity-70')}
+          hitSlop={SECTION_ACTION_HIT_SLOP}
           accessibilityRole="button"
           accessibilityLabel={t('common.copy')}
           onPress={() => {

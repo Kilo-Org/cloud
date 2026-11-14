@@ -3,9 +3,12 @@ import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  LINE_ACTION_BOX_CLASS,
-  LINE_ACTION_HIT_SLOP,
   MIN_TAP_TARGET_DP,
+  SECTION_ACTION_BOX_CLASS,
+  SECTION_ACTION_FRAME_DP,
+  SECTION_ACTION_HIT_SLOP,
+  SECTION_ACTION_HIT_SLOP_DP,
+  SECTION_HEADER_ROW_PADDING_CLASS,
   tapTargetReachDp,
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
@@ -126,25 +129,29 @@ describe('MarkdownCodeFence', () => {
     expect(mocks.performCopy).toHaveBeenCalledWith(LONG_LINE);
   });
 
-  it('keeps the header one text line tall and reaches the copy target with hitSlop', async () => {
+  it('reaches the copy target through a slop its own row reserves', async () => {
     const renderer = await mount(fence());
 
-    // The header is the language's line, so the copy control floats the shared
-    // line-action box over it and reaches the 44pt target with its slop instead
-    // of growing the row to a 48dp icon button.
+    // The control keeps a compact box and the row reserves its hit slop as
+    // padding, so the whole touch target lies inside the row that delivers it.
+    // A row that clipped the slop would deliver only the box, which is why the
+    // row's own padding is part of the assertion.
     const button = hostProps(renderer, 'Pressable');
-    for (const token of LINE_ACTION_BOX_CLASS.split(' ')) {
+    for (const token of SECTION_ACTION_BOX_CLASS.split(' ')) {
       expect(String(button.className)).toContain(token);
     }
-    expect(String(button.className)).toContain('min-w-[36px]');
     expect(String(button.className)).toContain('items-center');
-    expect(button.hitSlop).toBe(LINE_ACTION_HIT_SLOP);
-    expect(tapTargetReachDp(MIN_TAP_TARGET_DP, LINE_ACTION_HIT_SLOP.top)).toBeGreaterThanOrEqual(
-      TOUCH_TARGET_DP
+    expect(button.hitSlop).toBe(SECTION_ACTION_HIT_SLOP);
+    const rowClasses = renderer.root
+      .findAllByType('View' as unknown as React.ComponentType<unknown>)
+      .map(node => String(node.props.className));
+    expect(rowClasses.some(className => className.includes(SECTION_HEADER_ROW_PADDING_CLASS))).toBe(
+      true
     );
-    // The icon's slot is wider than one line, so the 36dp box still carries the
-    // horizontal reach: 36 + 5 + 5 = 46dp.
-    expect(tapTargetReachDp(36, LINE_ACTION_HIT_SLOP.left)).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(
+      tapTargetReachDp(SECTION_ACTION_FRAME_DP, SECTION_ACTION_HIT_SLOP_DP)
+    ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(SECTION_ACTION_FRAME_DP).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
   });
 
   it('passes a multi-line fence through unchanged', async () => {

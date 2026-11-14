@@ -228,11 +228,15 @@ export async function restoreFollowedSessionCardsFromStorage(): Promise<boolean>
  * else. Restoring a card posts it through its channel, so this is the half of the
  * reconcile that may run before the channels exist.
  */
-export function dismissForeignSessionCards(ctx: SessionFollowContext): void {
+export function dismissForeignSessionCards(ctx: SessionFollowContext | null): void {
   const stored = getStoredSessionCards();
-  const owned = stored.filter(
-    card => card.userId === ctx.userId && card.organizationId === ctx.organizationId
-  );
+  // No context is no signed-in account: every stored card belongs to someone else.
+  const owned =
+    ctx === null
+      ? []
+      : stored.filter(
+          card => card.userId === ctx.userId && card.organizationId === ctx.organizationId
+        );
   for (const card of stored) {
     if (!owned.includes(card)) {
       dismissSessionCard(card.sessionId);

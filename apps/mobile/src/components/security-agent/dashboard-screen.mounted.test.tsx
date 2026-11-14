@@ -2214,6 +2214,32 @@ describe('DashboardScreen pull-to-refresh failure retirement', () => {
     expect(renderedTexts(root.root)).not.toContain(REFRESH_FAILED_COPY);
   });
 
+  it('retires a failure that is published after its own read already recovered', async () => {
+    // The third read stays in flight while the stats read recovers, so the
+    // warning is published only after the recovery has moved the timestamp the
+    // effect already saw.
+    const repositoriesRead = Promise.withResolvers<{ isError: boolean; dataUpdatedAt: number }>();
+    dashboardStats.refetch.mockResolvedValue({ isError: true, dataUpdatedAt: 5 });
+    lastSync.refetch.mockResolvedValue({ isError: false, dataUpdatedAt: 9 });
+    repositories.refetch.mockReturnValue(repositoriesRead.promise);
+    const root = renderScreen();
+
+    await pull(root);
+    expect(renderedTexts(root.root)).not.toContain(REFRESH_FAILED_COPY);
+
+    dashboardStats.dataUpdatedAt = 6;
+    act(() => {
+      root.update(dashboardTree());
+    });
+
+    await act(async () => {
+      repositoriesRead.resolve({ isError: false, dataUpdatedAt: 0 });
+      await Promise.resolve();
+    });
+
+    expect(renderedTexts(root.root)).not.toContain(REFRESH_FAILED_COPY);
+  });
+
   it('requires both failed reads to advance when both failed', async () => {
     dashboardStats.refetch.mockResolvedValue({ isError: true, dataUpdatedAt: 5 });
     lastSync.refetch.mockResolvedValue({ isError: true, dataUpdatedAt: 7 });

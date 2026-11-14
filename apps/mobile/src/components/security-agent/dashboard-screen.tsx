@@ -490,12 +490,18 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const statsUpdatedAt = dashboardStats.dataUpdatedAt;
   const syncUpdatedAt = lastSync.dataUpdatedAt;
   useEffect(() => {
+    // A failure published after its own recovery read must retire on that read:
+    // the timestamps alone cannot see it (they already moved, and neither moves
+    // again), so the failure identity is a dependency too.
+    if (refreshFailure === null) {
+      return;
+    }
     clearRefreshFailure(
       f =>
         (f.statsAt === null || statsUpdatedAt > f.statsAt) &&
         (f.syncAt === null || syncUpdatedAt > f.syncAt)
     );
-  }, [clearRefreshFailure, statsUpdatedAt, syncUpdatedAt]);
+  }, [clearRefreshFailure, refreshFailure, statsUpdatedAt, syncUpdatedAt]);
 
   // Repos aren't known yet (still loading or the fetch failed) — the filter
   // stays disabled instead of silently offering a shrunken "All repositories

@@ -80,7 +80,8 @@ export async function startForward(
   if (current.kind === 'starting' || current.kind === 'listening') {
     return;
   }
-  setStatus(sessionId, forward.id, { kind: 'starting' });
+  const starting: ForwardStatus = { kind: 'starting' };
+  setStatus(sessionId, forward.id, starting);
   try {
     const ssh = await sshPackage();
     const config = {
@@ -93,14 +94,14 @@ export async function startForward(
       forward.direction === 'local'
         ? await ssh.startLocalForward(nativeSessionId, config)
         : await ssh.startRemoteForward(nativeSessionId, config);
-    if (!sessions.has(sessionId)) {
+    if (sessions.get(sessionId) !== entry || entry.statuses.get(forward.id) !== starting) {
       await stopQuietly(handle);
       return;
     }
     entry.handles.set(forward.id, handle);
     setStatus(sessionId, forward.id, { kind: 'listening', port: handle.port });
   } catch (error) {
-    if (!sessions.has(sessionId)) {
+    if (sessions.get(sessionId) !== entry || entry.statuses.get(forward.id) !== starting) {
       return;
     }
     setStatus(sessionId, forward.id, { kind: 'failed', code: nativeErrorCode(error) });
@@ -115,6 +116,10 @@ export async function stopForward(sessionId: string, forwardId: string): Promise
   if (handle) {
     await stopQuietly(handle);
   }
+}
+
+export async function stopForwardEverywhere(forwardId: string): Promise<void> {
+  await Promise.all([...sessions.keys()].map(sessionId => stopForward(sessionId, forwardId)));
 }
 
 /**

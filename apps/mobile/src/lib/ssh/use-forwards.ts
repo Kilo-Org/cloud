@@ -11,7 +11,12 @@ import {
   type SshForwardInput,
   updateForward,
 } from './forwards';
-import { forwardsSnapshot, type ForwardStatus, subscribeForwards } from './forwards-runtime';
+import {
+  forwardsSnapshot,
+  type ForwardStatus,
+  stopForwardEverywhere,
+  subscribeForwards,
+} from './forwards-runtime';
 import { sshDatabase } from './store';
 import { SSH_KEY, useSshInvalidation } from './use-ssh';
 
@@ -57,7 +62,9 @@ export function useSshForwardMutations() {
   });
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      deleteForward(await sshDatabase(), id);
+      const db = await sshDatabase();
+      await stopForwardEverywhere(id);
+      deleteForward(db, id);
     },
     onSuccess: () => void invalidate(),
     onError: error => toast.error(error.message),

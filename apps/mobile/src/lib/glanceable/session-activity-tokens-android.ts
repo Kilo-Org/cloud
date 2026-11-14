@@ -8,7 +8,7 @@ import { trpcClient } from '@/lib/trpc';
 
 import {
   forgetSessionTokenIdentity,
-  readSessionTokenIdentities,
+  readSessionTokenIdentity,
   rememberSessionTokenIdentity,
 } from './session-token-identity';
 import { enqueueTokenMutation } from './token-mutation-queue';
@@ -306,15 +306,23 @@ export async function releaseAndroidSessionToken(sessionId: string): Promise<voi
      record read. */
   const readNow = known === undefined ? getDevicePushToken() : Promise.resolve(null);
   try {
-    const recorded = await readSessionTokenIdentities(sessionId, registeredScope);
-    const tokens = [...new Set([known, ...recorded].filter(token => isToken(token)))];
+    const identity = await readSessionTokenIdentity(sessionId, registeredScope);
+    const tokens = [
+      ...new Set([known, ...(identity?.tokens ?? [])].filter(token => isToken(token))),
+    ];
     // Only a process that has no identity for this session falls back to the
     // token it reads now; a recorded token names the row that exists.
     const candidates = tokens.length > 0 ? tokens : [await readNow].filter(token => isToken(token));
     if (candidates.length > 0) {
       const remaining = await deleteSessionRow(sessionId, candidates, generation);
-      if (remaining.length === 0) {
-        forgetSessionTokenIdentity(sessionId);
+      /* A re-follow during the delete owns the session now: its identity is not
+         the one this release meant to retire, so it stays recorded. */
+      if (
+        remaining.length === 0 &&
+        identity !== null &&
+        generations.get(sessionId) === generation
+      ) {
+        forgetSessionTokenIdentity(sessionId, identity.version);
       }
     }
   } finally {

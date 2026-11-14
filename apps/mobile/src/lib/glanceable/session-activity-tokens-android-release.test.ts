@@ -99,4 +99,61 @@ describe('releasing a row written by an earlier process', () => {
       sessionId: 'session-1',
     });
   });
+
+  it('deletes both tokens when a restart re-registers after a rotation', async () => {
+    await registerAndroidSessionToken(FOLLOW);
+    await vi.waitFor(() => {
+      expect(stored.get(SESSION_TOKEN_IDENTITY_KEY)).toContain('ExponentPushToken[device]');
+    });
+
+    /* The restore re-registers the followed session through a fresh process, so
+       the record now holds both tokens; the unfollow must delete both. */
+    _resetAndroidSessionTokensForTests();
+    _resetSessionTokenIdentityForTests();
+    _setSessionTokenIdentityStoreForTests(identityStore);
+    setAndroidSessionScope(CTX);
+    mocks.deviceToken = 'ExponentPushToken[rotated]';
+    await registerAndroidSessionToken(FOLLOW);
+
+    await releaseAndroidSessionToken('session-1');
+
+    expect(mocks.unregister.mock.calls.map(call => call[0]?.token).sort()).toEqual(
+      ['ExponentPushToken[device]', 'ExponentPushToken[rotated]'].sort()
+    );
+  });
+
+  it('keeps the identity a re-follow recorded while the delete was in flight', async () => {
+    await registerAndroidSessionToken(FOLLOW);
+    await vi.waitFor(() => {
+      expect(stored.get(SESSION_TOKEN_IDENTITY_KEY)).toContain('ExponentPushToken[device]');
+    });
+
+    const gate = Promise.withResolvers<undefined>();
+    mocks.unregister.mockReturnValueOnce(gate.promise);
+    const release = releaseAndroidSessionToken('session-1');
+    await vi.waitFor(() => {
+      expect(mocks.unregister).toHaveBeenCalledTimes(1);
+    });
+    /* The person follows the session again while the delete is still on the
+       wire: the queued upsert records the token the new row is written with,
+       and the release that follows may not retire it. */
+    mocks.deviceToken = 'ExponentPushToken[second]';
+    const refollow = registerAndroidSessionToken(FOLLOW);
+    gate.resolve(undefined);
+    await Promise.all([release, refollow]);
+
+    // A restart, then another unfollow: the re-follow's identity still names its row.
+    _resetAndroidSessionTokensForTests();
+    _resetSessionTokenIdentityForTests();
+    _setSessionTokenIdentityStoreForTests(identityStore);
+    setAndroidSessionScope(CTX);
+    mocks.deviceToken = 'ExponentPushToken[third]';
+    mocks.unregister.mockClear();
+
+    await releaseAndroidSessionToken('session-1');
+
+    expect(mocks.unregister.mock.calls.map(call => call[0]?.token)).toContain(
+      'ExponentPushToken[second]'
+    );
+  });
 });

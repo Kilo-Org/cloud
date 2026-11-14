@@ -344,8 +344,6 @@
       "rowSubtitle": "Kendi sağlayıcı faturalandırmanı kullan",
       "manageOnWebReason": "Bu sağlayıcılar yapılandırılmış kimlik bilgileri gerektirir.",
       "description": "Bu anahtarlar üzerinden yapılan istekler Kilo bakiyen yerine sağlayıcı hesabına faturalandırılır.",
-      "enabled": "Kullanımda",
-      "disabled": "Kapalı",
       "managedByPlan": "Kodlama planın tarafından yönetiliyor",
       "enableKey": "{{provider}} anahtarını etkinleştir",
       "test": "Anahtarı test et",

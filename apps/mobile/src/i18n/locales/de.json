@@ -344,8 +344,6 @@
       "rowSubtitle": "Eigene Anbieterabrechnung nutzen",
       "manageOnWebReason": "Diese Anbieter benötigen strukturierte Anmeldedaten.",
       "description": "Anfragen über diese Schlüssel werden über dein Anbieterkonto statt über dein Kilo-Guthaben abgerechnet.",
-      "enabled": "Aktiv",
-      "disabled": "Deaktiviert",
       "managedByPlan": "Von deinem Coding-Plan verwaltet",
       "enableKey": "{{provider}}-Schlüssel aktivieren",
       "test": "Schlüssel testen",

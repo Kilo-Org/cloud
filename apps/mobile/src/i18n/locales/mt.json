@@ -344,8 +344,6 @@
       "rowSubtitle": "Uża l-fatturazzjoni tal-fornitur tiegħek",
       "manageOnWebReason": "Dawn il-fornituri jeħtieġu kredenzjali strutturati.",
       "description": "It-talbiet magħmula b'dawn iċ-ċwievet jiġu ffatturati lill-kont tal-fornitur tiegħek minflok jitnaqqsu mill-bilanċ ta' Kilo tiegħek.",
-      "enabled": "Qed tintuża",
-      "disabled": "Mitfija",
       "managedByPlan": "Immaniġġjata mill-pjan tal-ikkowdjar tiegħek",
       "enableKey": "Attiva ċ-ċavetta ta' {{provider}}",
       "test": "Ittestja ċ-ċavetta",

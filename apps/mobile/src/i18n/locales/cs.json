@@ -344,8 +344,6 @@
       "rowSubtitle": "Používat vlastní fakturaci u poskytovatele",
       "manageOnWebReason": "Tito poskytovatelé vyžadují strukturované přihlašovací údaje.",
       "description": "Požadavky přes tyto klíče se účtují na váš účet u poskytovatele, ne z vašeho zůstatku v Kilo.",
-      "enabled": "Používá se",
-      "disabled": "Vypnuto",
       "managedByPlan": "Spravuje váš programovací tarif",
       "enableKey": "Povolit klíč pro {{provider}}",
       "test": "Otestovat klíč",

@@ -344,8 +344,6 @@
       "rowSubtitle": "Sebenzisa ukukhokhisa komhlinzeki wakho",
       "manageOnWebReason": "Laba bahlinzeki badinga imininingwane yokungena ehlelekile.",
       "description": "Izicelo ezenziwa ngalaba khiye zikhokhiswa ku-akhawunti yakho yomhlinzeki esikhundleni sebhalansi yakho ye-Kilo.",
-      "enabled": "Uyasetshenziswa",
-      "disabled": "Uvaliwe",
       "managedByPlan": "Uphethwe uhlelo lwakho lokukhoda",
       "enableKey": "Vula ukhiye we-{{provider}}",
       "test": "Hlola ukhiye",

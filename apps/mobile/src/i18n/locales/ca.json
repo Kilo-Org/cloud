@@ -344,8 +344,6 @@
       "rowSubtitle": "Utilitza la facturació del teu proveïdor",
       "manageOnWebReason": "Aquests proveïdors necessiten credencials estructurades.",
       "description": "Les sol·licituds fetes amb aquestes claus es facturen al teu compte del proveïdor en lloc del saldo de Kilo.",
-      "enabled": "En ús",
-      "disabled": "Desactivada",
       "managedByPlan": "Gestionada pel teu pla de programació",
       "enableKey": "Activa la clau de {{provider}}",
       "test": "Prova la clau",

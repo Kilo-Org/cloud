@@ -344,8 +344,6 @@
       "rowSubtitle": "Bruk din egen leverandørfakturering",
       "manageOnWebReason": "Disse leverandørene trenger strukturert legitimasjon.",
       "description": "Forespørsler via disse nøklene faktureres leverandørkontoen din i stedet for Kilo-saldoen din.",
-      "enabled": "I bruk",
-      "disabled": "Slått av",
       "managedByPlan": "Administreres av kodeabonnementet ditt",
       "enableKey": "Aktiver {{provider}}-nøkkelen",
       "test": "Test nøkkel",

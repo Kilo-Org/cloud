@@ -344,8 +344,6 @@
       "rowSubtitle": "Kaffaltii dhiyeessaa kee fayyadami",
       "manageOnWebReason": "Dhiyeessitoonni kunneen ragaalee eenyummaa caaseffamoo barbaadu.",
       "description": "Gaaffiiwwan furtuuwwan kanaan ergaman haftee Kilo kee irraa osoo hin taane herrega dhiyeessaa keetti kaffalamu.",
-      "enabled": "Hojiirra jira",
-      "disabled": "Dhaameera",
       "managedByPlan": "Karoora koodii keetiin bulfama",
       "enableKey": "Furtuu {{provider}} dandeessisi",
       "test": "Furtuu qori",

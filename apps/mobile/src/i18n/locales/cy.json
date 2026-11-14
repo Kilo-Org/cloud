@@ -344,8 +344,6 @@
       "rowSubtitle": "Defnyddio bilio eich darparwr eich hun",
       "manageOnWebReason": "Mae angen manylion adnabod strwythuredig ar y darparwyr hyn.",
       "description": "Codir tâl am geisiadau drwy'r allweddi hyn ar eich cyfrif darparwr yn lle eich balans Kilo.",
-      "enabled": "Yn cael ei defnyddio",
-      "disabled": "Wedi'i diffodd",
       "managedByPlan": "Wedi'i rheoli gan eich cynllun codio",
       "enableKey": "Galluogi allwedd {{provider}}",
       "test": "Profi'r allwedd",

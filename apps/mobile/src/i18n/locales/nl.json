@@ -344,8 +344,6 @@
       "rowSubtitle": "Facturering via je eigen provider",
       "manageOnWebReason": "Deze providers hebben gestructureerde inloggegevens nodig.",
       "description": "Verzoeken via deze sleutels worden gefactureerd aan je provideraccount in plaats van afgeschreven van je Kilo-saldo.",
-      "enabled": "In gebruik",
-      "disabled": "Uitgeschakeld",
       "managedByPlan": "Beheerd door je codeerabonnement",
       "enableKey": "Sleutel van {{provider}} inschakelen",
       "test": "Sleutel testen",

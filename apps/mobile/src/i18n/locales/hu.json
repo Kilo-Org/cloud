@@ -344,8 +344,6 @@
       "rowSubtitle": "Saját szolgáltatói számlázás használata",
       "manageOnWebReason": "Ezekhez a szolgáltatókhoz strukturált hitelesítő adatok szükségesek.",
       "description": "Az ezekkel a kulcsokkal küldött kérések a szolgáltatói fiókodat terhelik a Kilo-egyenleged helyett.",
-      "enabled": "Használatban",
-      "disabled": "Kikapcsolva",
       "managedByPlan": "A kódolási csomagod kezeli",
       "enableKey": "A(z) {{provider}} kulcs engedélyezése",
       "test": "Kulcs tesztelése",

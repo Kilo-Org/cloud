@@ -344,8 +344,6 @@
       "rowSubtitle": "Kasuta oma teenusepakkuja arveldust",
       "manageOnWebReason": "Need teenusepakkujad vajavad struktureeritud mandaate.",
       "description": "Nende võtmetega tehtud päringud arveldatakse sinu teenusepakkuja kontolt, mitte Kilo saldolt.",
-      "enabled": "Kasutusel",
-      "disabled": "Välja lülitatud",
       "managedByPlan": "Haldab sinu kodeerimispakett",
       "enableKey": "Luba teenusepakkuja {{provider}} võti",
       "test": "Testi võtit",

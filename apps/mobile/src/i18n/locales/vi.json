@@ -344,8 +344,6 @@
       "rowSubtitle": "Dùng thanh toán của nhà cung cấp riêng",
       "manageOnWebReason": "Các nhà cung cấp này cần thông tin xác thực có cấu trúc.",
       "description": "Các yêu cầu qua những khóa này sẽ được tính phí vào tài khoản nhà cung cấp của bạn thay vì số dư Kilo.",
-      "enabled": "Đang dùng",
-      "disabled": "Đã tắt",
       "managedByPlan": "Do gói lập trình của bạn quản lý",
       "enableKey": "Bật khóa {{provider}}",
       "test": "Kiểm tra khóa",

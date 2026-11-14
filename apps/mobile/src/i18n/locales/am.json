@@ -344,8 +344,6 @@
       "rowSubtitle": "የራስዎን የአቅራቢ ክፍያ ይጠቀሙ",
       "manageOnWebReason": "እነዚህ አቅራቢዎች የተዋቀሩ የማረጋገጫ መረጃዎችን ይፈልጋሉ።",
       "description": "በእነዚህ ቁልፎች የሚላኩ ጥያቄዎች ከKilo ቀሪ ሂሳብዎ ይልቅ በአቅራቢ መለያዎ ይከፈላሉ።",
-      "enabled": "በጥቅም ላይ",
-      "disabled": "ጠፍቷል",
       "managedByPlan": "በኮዲንግ ዕቅድዎ የሚተዳደር",
       "enableKey": "የ{{provider}} ቁልፍን አንቃ",
       "test": "ቁልፉን ሞክር",

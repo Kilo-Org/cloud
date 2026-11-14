@@ -411,8 +411,6 @@
       "rowSubtitle": "Use your own provider billing",
       "manageOnWebReason": "These providers need structured credentials.",
       "description": "Requests through these keys are billed to your provider account instead of your Kilo balance.",
-      "enabled": "In use",
-      "disabled": "Turned off",
       "managedByPlan": "Managed by your coding plan",
       "enableKey": "Enable the {{provider}} key",
       "test": "Test key",

@@ -1022,10 +1022,11 @@ test('leaves an incomplete English family unowed by a locale', () => {
 });
 
 test('names the categories a locale must complete for each family', () => {
-  // A locale that declares a member of a family owes every category its tag
-  // selects, a locale that keeps only the flat base key of an owed English
-  // family owes none of them, and a flat counted English key becomes the
-  // locale's problem only once the locale declares the family itself.
+  // A family the locale declares owes every category its tag selects, whether
+  // it declares the family through a member or through the flat base key of an
+  // owed English family; a locale that carries neither owes nothing for it. A
+  // counted flat English key becomes the locale's problem once the locale
+  // declares the family.
   const english = flattenCatalog({
     agents: {
       open_one: '{{displayCount}} open session',

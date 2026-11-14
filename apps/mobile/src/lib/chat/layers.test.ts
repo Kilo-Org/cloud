@@ -73,30 +73,34 @@ describe('the shape a gateway model is asked over', () => {
 });
 
 /**
+ * A registry kept open, as a session keeps the one it opened with: the
+ * returned accessor reads `tools` through that instance every time, so a tool
+ * discovered after it was built has to appear without a new registry.
+ */
+const openRegistry = (): Promise<() => readonly string[]> =>
+  Effect.runPromise(
+    Effect.gen(function* held() {
+      const registry = yield* ToolRegistry;
+      return () => registry.tools.map(tool => tool.definition.name);
+    }).pipe(Effect.provide(layerToolsFor()))
+  );
+
+/**
  * The tools the registry holds.
  *
  * A session resolves the names it was opened with against this at open, so a
  * tool discovered after the runtime was built has to be in it — otherwise a
  * chat would need a new runtime every time the server's list arrived.
  */
-const namesHeld = async (): Promise<readonly string[]> => {
-  const names = await Effect.runPromise(
-    Effect.gen(function* held() {
-      const registry = yield* ToolRegistry;
-      return registry.tools.map(tool => tool.definition.name);
-    }).pipe(Effect.provide(layerToolsFor()))
-  );
-  return names;
-};
-
 describe('the tools the registry holds', () => {
   it('is a live view, so a tool discovered after the runtime was built is in it', async () => {
     mcp.tools.length = 0;
-    const before = await namesHeld();
+    const namesHeld = await openRegistry();
+    const before = namesHeld();
     expect(before).not.toContain('mcp_kilo_read-file');
 
     mcp.tools.push({ definition: { name: 'mcp_kilo_read-file' } });
 
-    expect(await namesHeld()).toEqual([...before, 'mcp_kilo_read-file']);
+    expect(namesHeld()).toEqual([...before, 'mcp_kilo_read-file']);
   });
 });

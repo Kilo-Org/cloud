@@ -508,7 +508,7 @@ describe('retainPreviousEntries', () => {
     });
   });
 
-  it('restores a previous target that is still listed without an endpoints resource', () => {
+  it('restores the previous target of a retargeted alias while that target is listed', () => {
     const previous = {
       '~vendor/batch-latest': model('~vendor/batch-latest', 'before', 'vendor/kept'),
       'vendor/batch': model('vendor/batch', 'before'),

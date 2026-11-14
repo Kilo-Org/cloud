@@ -62,11 +62,32 @@ const RETIREMENT_ATTEMPTS = 2;
 /** A retirement this process still owes the keychain, retried at the next safe point. */
 let retirementPending = false;
 
+/** Write the record with nothing in front of it: callers hold the key's chain. */
+function writeRecordLocked(record: StoredLoginDraft): Promise<void> {
+  return SecureStore.setItemAsync(LOGIN_DRAFT_RECORD_KEY, JSON.stringify(record));
+}
+
 /** Write the record on the one chain, so a persist can never land after a retirement. */
 function writeRecord(record: StoredLoginDraft): Promise<void> {
-  return chainSave(LOGIN_DRAFT_RECORD_KEY, async () => {
-    await SecureStore.setItemAsync(LOGIN_DRAFT_RECORD_KEY, JSON.stringify(record));
-  });
+  return chainSave(LOGIN_DRAFT_RECORD_KEY, () => writeRecordLocked(record));
+}
+
+/**
+ * What the record says now: `absent` only when the keychain answered that there
+ * is no record. A read that failed and a value this build cannot parse are
+ * `unknown`, because neither is evidence that nothing is stored.
+ */
+async function readRecordState(): Promise<'held' | 'retired' | 'absent' | 'unknown'> {
+  try {
+    const raw = await SecureStore.getItemAsync(LOGIN_DRAFT_RECORD_KEY);
+    if (raw === null) {
+      return 'absent';
+    }
+    const parsed = storedLoginDraftSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data.state : 'unknown';
+  } catch {
+    return 'unknown';
+  }
 }
 
 /** Start an attempt from what the person typed: explicit typing always reopens one. */
@@ -183,7 +204,6 @@ export async function restoreLoginDrafts(): Promise<{
   ssoRecovery: SsoRecoveryDraft | null;
 }> {
   await deleteLegacyDrafts();
-  restored = true;
   if (phase.kind === 'retired') {
     /* The screen about to draw is signed out, which is the last safe point for
        a retirement this process still owes. Fire it after answering. */
@@ -193,6 +213,9 @@ export async function restoreLoginDrafts(): Promise<{
     return { email: '', ssoRecovery: null };
   }
   const held = await readRecord();
+  /* Restored only now: a mount that unmounts while this read is pending holds
+     no attempt yet, so its persist must not write the blanks it began with. */
+  restored = true;
   /* Restoration initializes the attempt: an untyped memory that then persists
      on unmount must write what the person was shown, not the blanks it began
      with. */
@@ -210,14 +233,14 @@ export async function restoreLoginDrafts(): Promise<{
  * finally raises, are what make retirement a required step: a record left
  * `held` is restored by the next cold start.
  */
-async function writeRetirement(attemptsLeft: number): Promise<void> {
+async function writeRetirementLocked(attemptsLeft: number): Promise<void> {
   try {
-    await writeRecord({ version: 2, state: 'retired' });
+    await writeRecordLocked({ version: 2, state: 'retired' });
   } catch (error) {
     if (attemptsLeft <= 1) {
       throw error;
     }
-    await writeRetirement(attemptsLeft - 1);
+    await writeRetirementLocked(attemptsLeft - 1);
   }
 }
 
@@ -254,13 +277,18 @@ export async function retireLoginAttempt(): Promise<void> {
      signed-out screen must not see the attempt this sign-in ended. */
   phase = { kind: 'retired' };
   try {
-    /* Nothing to retire costs no write: a sign-out on a device that never held a
-       draft must not touch the keychain. A record that cannot be read answers
-       "nothing known", because a locked keychain would fail the write too. */
-    if (!retirementPending && (await readRecord()) === null) {
-      return;
-    }
-    await writeRetirement(RETIREMENT_ATTEMPTS);
+    /* The decision is made inside the key's chain, after any queued persist has
+       landed. Only a record the keychain says is absent costs no write: a read
+       that failed, or a value this build cannot parse, is not evidence that
+       nothing is stored, and skipping the tombstone would leave the held copy
+       for the next cold start. */
+    await chainSave(LOGIN_DRAFT_RECORD_KEY, async () => {
+      const state = await readRecordState();
+      if (!retirementPending && (state === 'absent' || state === 'retired')) {
+        return;
+      }
+      await writeRetirementLocked(RETIREMENT_ATTEMPTS);
+    });
     retirementPending = false;
   } catch (error) {
     retirementPending = true;

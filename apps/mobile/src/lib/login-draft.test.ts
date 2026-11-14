@@ -32,11 +32,22 @@ import {
 const stored = vi.hoisted(() => ({
   values: new Map<string, string>(),
   failingWrites: 0,
+  failingReads: 0,
+  readGate: null as Promise<void> | null,
+  readStarted: false,
 }));
 
 vi.mock('@/lib/auth/secure-store', () => ({
   getItemAsync: async (key: string) => {
     await Promise.resolve();
+    if (stored.readGate !== null && key === 'login-draft-record') {
+      stored.readStarted = true;
+      await stored.readGate;
+    }
+    if (stored.failingReads > 0 && key === 'login-draft-record') {
+      stored.failingReads -= 1;
+      throw new Error('keychain unavailable');
+    }
     return stored.values.get(key) ?? null;
   },
   setItemAsync: async (key: string, value: string) => {
@@ -62,6 +73,9 @@ function reload(): Promise<typeof LoginDraftModule> {
 beforeEach(() => {
   stored.values.clear();
   stored.failingWrites = 0;
+  stored.failingReads = 0;
+  stored.readGate = null;
+  stored.readStarted = false;
   _resetLoginDraftForTests();
 });
 
@@ -111,6 +125,47 @@ describe('a sign-in attempt', () => {
     await expect(again.restoreLoginDrafts()).resolves.toEqual({
       email: 'typed@b.c',
       ssoRecovery: null,
+    });
+  });
+
+  it('does not blank the held draft when the mount unmounts during the restore', async () => {
+    beginLoginEmail('typed@b.c');
+    await persistLoginDrafts();
+
+    const reloaded = await reload();
+    const gate = Promise.withResolvers<void>();
+    stored.readGate = gate.promise;
+    const restore = reloaded.restoreLoginDrafts();
+    // Wait until the restore is parked on the slow record read.
+    await vi.waitFor(() => {
+      expect(stored.readStarted).toBe(true);
+    });
+    // The screen unmounts while that read is still pending.
+    await reloaded.persistLoginDrafts();
+
+    expect(JSON.parse(stored.values.get(LOGIN_DRAFT_RECORD_KEY) ?? '{}')).toMatchObject({
+      state: 'held',
+      email: 'typed@b.c',
+    });
+
+    gate.resolve();
+    await expect(restore).resolves.toEqual({ email: 'typed@b.c', ssoRecovery: null });
+  });
+
+  it('writes the tombstone when the record cannot be read but writes still work', async () => {
+    beginLoginEmail('typed@b.c');
+    await persistLoginDrafts();
+    expect(JSON.parse(stored.values.get(LOGIN_DRAFT_RECORD_KEY) ?? '{}')).toMatchObject({
+      state: 'held',
+    });
+
+    // The read fails once; the keychain still accepts the tombstone.
+    stored.failingReads = 1;
+    await retireLoginAttempt();
+
+    expect(JSON.parse(stored.values.get(LOGIN_DRAFT_RECORD_KEY) ?? '{}')).toEqual({
+      version: 2,
+      state: 'retired',
     });
   });
 

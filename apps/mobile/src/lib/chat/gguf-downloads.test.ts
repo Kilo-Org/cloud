@@ -28,9 +28,13 @@ describe('downloading a curated model', () => {
     expect(JSON.parse(h.index.text ?? '[]')).toHaveLength(1);
   });
 
-  it('refuses a second download while one runs, and a model already here', () => {
+  it('refuses a second download while one runs, and a model already here', async () => {
     const h = harness();
     expect(h.store.start(CATALOG)).toBe(true);
+    expect(h.store.start(CATALOG)).toBe(false);
+    expect(h.tasks).toHaveLength(1);
+    await finish(taskAt(h.tasks, 0), 1000);
+    expect(h.store.model('small')).toBeDefined();
     expect(h.store.start(CATALOG)).toBe(false);
     expect(h.tasks).toHaveLength(1);
   });

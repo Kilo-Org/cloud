@@ -3361,7 +3361,7 @@
       "limitLabel": "Hámark (USD á dag)",
       "memberNotFound": "Meðlimurinn fannst ekki.",
       "noLimitPlaceholder": "Ekkert hámark",
-      "permissionDenied": "Aðeins eigandi félagsins getur stjórnað notkunarhámarki.",
+      "permissionDenied": "Aðeins eigandi eða stjórnandi félagsins getur stjórnað notkunarhámarki.",
       "removeLimit": "Fjarlægja hámark",
       "title": "Daglegt notkunarhámark",
       "blankError": "Sláðu inn upphæð eða fjarlægðu hámarkið hér að neðan.",

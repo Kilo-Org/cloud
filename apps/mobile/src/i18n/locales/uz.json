@@ -3361,7 +3361,7 @@
       "limitLabel": "Limit (USD/kun)",
       "memberNotFound": "A'zo topilmadi.",
       "noLimitPlaceholder": "Limit yo'q",
-      "permissionDenied": "Faqat tashkilot egasi foydalanish limitlarini boshqara oladi.",
+      "permissionDenied": "Faqat tashkilot egasi yoki administratori foydalanish limitlarini boshqara oladi.",
       "removeLimit": "Limitni olib tashlash",
       "title": "Kunlik foydalanish limiti",
       "blankError": "Miqdor kiriting yoki quyidagi Limitni olib tashlash tugmasini bosing.",

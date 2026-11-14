@@ -1,3 +1,4 @@
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
@@ -166,7 +167,11 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
     return <OrganizationBoundary />;
   }
 
-  if (role !== 'owner') {
+  // The same roles that manage organization members (owner and admin): the
+  // server's `organizationMembers.update` limit-only branch is an
+  // `organizationAdminMutationProcedure`, and the web members card gates its
+  // limit editor on `canManageMembers`.
+  if (!canManageOrganization(role)) {
     return <PermissionDenied description={t('organization.memberLimit.permissionDenied')} />;
   }
 

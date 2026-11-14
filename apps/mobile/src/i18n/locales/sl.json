@@ -3467,7 +3467,7 @@
       "limitLabel": "Omejitev (USD na dan)",
       "memberNotFound": "Člana ni bilo mogoče najti.",
       "noLimitPlaceholder": "Brez omejitve",
-      "permissionDenied": "Samo lastnik organizacije lahko upravlja omejitve porabe.",
+      "permissionDenied": "Samo lastnik ali skrbnik organizacije lahko upravlja omejitve porabe.",
       "removeLimit": "Odstrani omejitev",
       "title": "Dnevna omejitev porabe",
       "blankError": "Vnesi znesek ali spodaj izberi »Odstrani omejitev«.",

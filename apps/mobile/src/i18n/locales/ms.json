@@ -3361,7 +3361,7 @@
       "limitLabel": "Had (USD sehari)",
       "memberNotFound": "Ahli tidak ditemui.",
       "noLimitPlaceholder": "Tiada had",
-      "permissionDenied": "Hanya pemilik organisasi boleh mengurus had penggunaan.",
+      "permissionDenied": "Hanya pemilik atau pentadbir organisasi boleh mengurus had penggunaan.",
       "removeLimit": "Buang had",
       "title": "Had penggunaan harian",
       "blankError": "Masukkan amaun atau ketik Buang had di bawah.",

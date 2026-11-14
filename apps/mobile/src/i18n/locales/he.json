@@ -3419,7 +3419,7 @@
       "limitLabel": "מגבלה (USD ליום)",
       "memberNotFound": "החבר לא נמצא.",
       "noLimitPlaceholder": "ללא מגבלה",
-      "permissionDenied": "רק בעל הארגון יכול לנהל מגבלות שימוש.",
+      "permissionDenied": "רק בעלים או מנהל של הארגון יכולים לנהל מגבלות שימוש.",
       "removeLimit": "הסרת המגבלה",
       "title": "מגבלת שימוש יומית",
       "blankError": "הזן סכום, או הקש על הסרת המגבלה למטה.",

@@ -3467,7 +3467,7 @@
       "limitLabel": "Riba (USD per dieną)",
       "memberNotFound": "Narys nerastas.",
       "noLimitPlaceholder": "Neribojama",
-      "permissionDenied": "Tik organizacijos savininkas gali valdyti išlaidų ribas.",
+      "permissionDenied": "Tik organizacijos savininkas arba administratorius gali valdyti išlaidų ribas.",
       "removeLimit": "Panaikinti ribą",
       "title": "Dienos išlaidų riba",
       "blankError": "Įveskite sumą arba žemiau panaikinkite ribą.",

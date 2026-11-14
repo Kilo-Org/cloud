@@ -3414,7 +3414,7 @@
       "limitLabel": "Limit (USD dnevno)",
       "memberNotFound": "Član nije pronađen.",
       "noLimitPlaceholder": "Bez limita",
-      "permissionDenied": "Samo vlasnik organizacije može da upravlja limitima potrošnje.",
+      "permissionDenied": "Samo vlasnik ili administrator organizacije može da upravlja limitima potrošnje.",
       "removeLimit": "Ukloni limit",
       "title": "Dnevni limit potrošnje",
       "blankError": "Unesi iznos ili dodirni „Ukloni limit“ ispod.",

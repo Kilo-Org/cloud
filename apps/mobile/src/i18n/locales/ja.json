@@ -3366,7 +3366,7 @@
       "limitLabel": "1日の上限額（USD）",
       "memberNotFound": "メンバーが見つかりません。",
       "noLimitPlaceholder": "上限なし",
-      "permissionDenied": "利用上限額を管理できるのは組織のオーナーのみです。",
+      "permissionDenied": "利用上限額を管理できるのは、組織のオーナーまたは管理者のみです。",
       "removeLimit": "上限を解除",
       "title": "1日の利用上限額",
       "blankError": "金額を入力するか、下の「上限を解除」をタップしてください。",

@@ -3520,7 +3520,7 @@
       "limitLabel": "Limitu (USD kuljum)",
       "memberNotFound": "Il-membru ma nstabx.",
       "noLimitPlaceholder": "L-ebda limitu",
-      "permissionDenied": "Is-sid tal-organizzazzjoni biss jista' jimmaniġġja l-limiti tal-użu.",
+      "permissionDenied": "Is-sid jew amministratur tal-organizzazzjoni biss jistgħu jimmaniġġjaw il-limiti tal-użu.",
       "removeLimit": "Neħħi l-limitu",
       "title": "Limitu tal-użu ta' kuljum",
       "blankError": "Daħħal ammont jew tektek Neħħi l-limitu hawn taħt.",

@@ -3361,7 +3361,7 @@
       "limitLabel": "Limit (USD pa jou)",
       "memberNotFound": "Nou pa jwenn manm nan.",
       "noLimitPlaceholder": "Pa gen limit",
-      "permissionDenied": "Se sèlman pwopriyetè òganizasyon an ki ka jere limit itilizasyon yo.",
+      "permissionDenied": "Se sèlman yon pwopriyetè oswa yon administratè òganizasyon an ki ka jere limit itilizasyon yo.",
       "removeLimit": "Retire limit la",
       "title": "Limit itilizasyon chak jou",
       "blankError": "Antre yon montan, oswa peze Retire limit la anba a.",

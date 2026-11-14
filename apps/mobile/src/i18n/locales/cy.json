@@ -3573,7 +3573,7 @@
       "limitLabel": "Terfyn (USD y dydd)",
       "memberNotFound": "Ni ddaethpwyd o hyd i'r aelod.",
       "noLimitPlaceholder": "Dim terfyn",
-      "permissionDenied": "Dim ond perchennog y sefydliad sy'n gallu rheoli terfynau defnydd.",
+      "permissionDenied": "Dim ond perchennog neu weinyddwr y sefydliad sy'n gallu rheoli terfynau defnydd.",
       "removeLimit": "Dileu'r terfyn",
       "title": "Terfyn defnydd dyddiol",
       "blankError": "Nodwch swm, neu defnyddiwch Dileu'r terfyn isod.",

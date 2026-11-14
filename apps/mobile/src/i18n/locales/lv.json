@@ -3414,7 +3414,7 @@
       "limitLabel": "Limits (USD dienā)",
       "memberNotFound": "Dalībnieks nav atrasts.",
       "noLimitPlaceholder": "Bez limita",
-      "permissionDenied": "Tikai organizācijas īpašnieks var pārvaldīt tēriņu limitus.",
+      "permissionDenied": "Tikai organizācijas īpašnieks vai administrators var pārvaldīt tēriņu limitus.",
       "removeLimit": "Noņemt limitu",
       "title": "Dienas tēriņu limits",
       "blankError": "Ievadi summu vai nospied zemāk esošo pogu „Noņemt limitu”.",

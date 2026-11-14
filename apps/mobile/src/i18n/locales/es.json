@@ -3419,7 +3419,7 @@
       "limitLabel": "Límite (USD por día)",
       "memberNotFound": "No se ha encontrado al miembro.",
       "noLimitPlaceholder": "Sin límite",
-      "permissionDenied": "Solo el propietario de la organización puede gestionar los límites de uso.",
+      "permissionDenied": "Solo el propietario o un administrador de la organización puede gestionar los límites de uso.",
       "removeLimit": "Eliminar límite",
       "title": "Límite de uso diario",
       "blankError": "Introduce un importe o elimina el límite con el botón de abajo.",

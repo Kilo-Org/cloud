@@ -3361,7 +3361,7 @@
       "limitLabel": "Grense (USD per dag)",
       "memberNotFound": "Fant ikke medlemmet.",
       "noLimitPlaceholder": "Ingen grense",
-      "permissionDenied": "Kun organisasjonseieren kan administrere bruksgrenser.",
+      "permissionDenied": "Kun en eier eller administrator i organisasjonen kan administrere bruksgrenser.",
       "removeLimit": "Fjern grense",
       "title": "Daglig bruksgrense",
       "blankError": "Angi et beløp, eller fjern grensen med knappen nedenfor.",

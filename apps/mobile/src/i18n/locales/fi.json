@@ -3361,7 +3361,7 @@
       "limitLabel": "Raja (USD päivässä)",
       "memberNotFound": "Jäsentä ei löytynyt.",
       "noLimitPlaceholder": "Ei rajaa",
-      "permissionDenied": "Vain organisaation omistaja voi hallita käyttörajoja.",
+      "permissionDenied": "Vain organisaation omistaja tai ylläpitäjä voi hallita käyttörajoja.",
       "removeLimit": "Poista raja",
       "title": "Päivittäinen käyttöraja",
       "blankError": "Anna summa tai poista raja alla olevalla Poista raja -painikkeella.",

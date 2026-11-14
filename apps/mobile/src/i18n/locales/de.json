@@ -3366,7 +3366,7 @@
       "limitLabel": "Limit (USD pro Tag)",
       "memberNotFound": "Das Mitglied wurde nicht gefunden.",
       "noLimitPlaceholder": "Kein Limit",
-      "permissionDenied": "Nur der Organisationsinhaber kann Nutzungslimits verwalten.",
+      "permissionDenied": "Nur Inhaber oder Admins einer Organisation können deren Nutzungslimits verwalten.",
       "removeLimit": "Limit entfernen",
       "title": "Tägliches Nutzungslimit",
       "blankError": "Gib einen Betrag ein oder tippe unten auf „Limit entfernen“.",

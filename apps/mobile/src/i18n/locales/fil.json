@@ -3361,7 +3361,7 @@
       "limitLabel": "Limitasyon (USD bawat araw)",
       "memberNotFound": "Hindi makita ang miyembro.",
       "noLimitPlaceholder": "Walang limitasyon",
-      "permissionDenied": "Ang may-ari lang ng organisasyon ang maaaring mamahala sa mga limitasyon sa paggamit.",
+      "permissionDenied": "Ang may-ari o admin lang ng organisasyon ang maaaring mamahala sa mga limitasyon sa paggamit.",
       "removeLimit": "Alisin ang limitasyon",
       "title": "Pang-araw-araw na limitasyon sa paggamit",
       "blankError": "Maglagay ng halaga, o piliin ang Alisin ang limitasyon sa ibaba.",

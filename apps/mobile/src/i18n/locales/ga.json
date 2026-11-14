@@ -3520,7 +3520,7 @@
       "limitLabel": "Teorainn (USD in aghaidh an lae)",
       "memberNotFound": "Níor aimsíodh an ball.",
       "noLimitPlaceholder": "Gan teorainn",
-      "permissionDenied": "Ní féidir ach le húinéir na heagraíochta teorainneacha úsáide a bhainistiú.",
+      "permissionDenied": "Ní féidir ach le húinéir nó riarthóir na heagraíochta teorainneacha úsáide a bhainistiú.",
       "removeLimit": "Bain an teorainn",
       "title": "Teorainn úsáide laethúil",
       "blankError": "Iontráil méid nó tapáil Bain an teorainn thíos.",

@@ -3361,7 +3361,7 @@
       "limitLabel": "Gräns (USD per dag)",
       "memberNotFound": "Medlemmen hittades inte.",
       "noLimitPlaceholder": "Ingen gräns",
-      "permissionDenied": "Endast organisationsägaren kan hantera användningsgränser.",
+      "permissionDenied": "Endast organisationens ägare eller administratörer kan hantera användningsgränser.",
       "removeLimit": "Ta bort gräns",
       "title": "Daglig användningsgräns",
       "blankError": "Ange ett belopp eller ta bort gränsen med knappen nedan.",

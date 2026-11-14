@@ -3361,7 +3361,7 @@
       "limitLabel": "Umkhawulo (USD ngosuku)",
       "memberNotFound": "Ilungu alitholakalanga.",
       "noLimitPlaceholder": "Akukho mkhawulo",
-      "permissionDenied": "Umnikazi wenhlangano kuphela ongaphatha imikhawulo yokusetshenziswa.",
+      "permissionDenied": "Umnikazi wenhlangano noma umlawuli kuphela ongaphatha imikhawulo yokusetshenziswa.",
       "removeLimit": "Susa umkhawulo",
       "title": "Umkhawulo wokusetshenziswa kwansuku zonke",
       "blankError": "Faka inani, noma usebenzise inkinobho yokususa umkhawulo ngezansi.",

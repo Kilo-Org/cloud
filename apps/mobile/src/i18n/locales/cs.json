@@ -3467,7 +3467,7 @@
       "limitLabel": "Limit (USD za den)",
       "memberNotFound": "Člen nebyl nalezen.",
       "noLimitPlaceholder": "Bez limitu",
-      "permissionDenied": "Limity útraty může spravovat pouze vlastník organizace.",
+      "permissionDenied": "Limity útraty může spravovat pouze vlastník nebo administrátor organizace.",
       "removeLimit": "Zrušit limit",
       "title": "Denní limit útraty",
       "blankError": "Zadejte částku nebo níže klepněte na tlačítko Zrušit limit.",

@@ -3467,7 +3467,7 @@
       "limitLabel": "Limit (USD za deň)",
       "memberNotFound": "Člen sa nenašiel.",
       "noLimitPlaceholder": "Bez limitu",
-      "permissionDenied": "Limity spotreby môže spravovať iba vlastník organizácie.",
+      "permissionDenied": "Limity spotreby môže spravovať iba vlastník alebo administrátor organizácie.",
       "removeLimit": "Odstrániť limit",
       "title": "Denný limit spotreby",
       "blankError": "Zadaj sumu alebo klepni na Odstrániť limit nižšie.",

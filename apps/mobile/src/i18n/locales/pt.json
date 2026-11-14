@@ -3420,7 +3420,7 @@
       "limitLabel": "Limite (USD por dia)",
       "memberNotFound": "Não foi possível encontrar o membro.",
       "noLimitPlaceholder": "Sem limite",
-      "permissionDenied": "Apenas o proprietário da organização pode gerir os limites de utilização.",
+      "permissionDenied": "Apenas o proprietário ou um administrador da organização pode gerir os limites de utilização.",
       "removeLimit": "Remover limite",
       "title": "Limite diário de utilização",
       "blankError": "Introduza um valor ou remova o limite através da opção abaixo.",

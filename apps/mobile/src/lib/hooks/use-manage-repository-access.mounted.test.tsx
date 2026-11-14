@@ -252,6 +252,61 @@ describe('useManageRepositoryAccess', () => {
     }
   });
 
+  it('delivers no return event for an attempt the watchdog already released', async () => {
+    vi.useFakeTimers();
+    try {
+      const firstLaunch = Promise.withResolvers<unknown>();
+      const secondLaunch = Promise.withResolvers<unknown>();
+      mocks.launch
+        .mockReturnValueOnce(firstLaunch.promise)
+        .mockReturnValueOnce(secondLaunch.promise);
+      const onReturn = vi.fn<(opened: boolean) => void>();
+      const resultRef = mountHook('personal', 'github', { onReturn });
+
+      await act(async () => {
+        requireHook(resultRef).handlePress();
+        await Promise.resolve();
+      });
+      await act(() => {
+        vi.advanceTimersByTime(20_000);
+      });
+      // The watchdog released the control, and a second tap superseded the attempt.
+      await act(async () => {
+        requireHook(resultRef).handlePress();
+        await Promise.resolve();
+      });
+      expect(onReturn).not.toHaveBeenCalled();
+
+      // The superseded attempt settling must not deliver its return edge: the
+      // caller's own resync flag belongs to the attempt it is still waiting on.
+      await act(async () => {
+        firstLaunch.resolve({
+          reported: Promise.resolve({ type: 'dismiss' }),
+          settledByLaunch: true,
+        });
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(onReturn).not.toHaveBeenCalled();
+      expect(requireHook(resultRef).pending).toBe(true);
+
+      // The attempt that owns the control still delivers its own return.
+      await act(async () => {
+        secondLaunch.resolve({
+          reported: Promise.resolve({ type: 'dismiss' }),
+          settledByLaunch: true,
+        });
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(onReturn).toHaveBeenCalledTimes(1);
+      expect(onReturn).toHaveBeenCalledWith(true);
+      expect(requireHook(resultRef).pending).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('starts no second launch from a repeated tap while a launch is pending', async () => {
     const pendingLaunch = Promise.withResolvers<unknown>();
     mocks.launch.mockReturnValue(pendingLaunch.promise);

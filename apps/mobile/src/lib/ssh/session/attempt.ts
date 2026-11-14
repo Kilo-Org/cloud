@@ -1,9 +1,6 @@
+import { SSH_ERROR_CODES } from '../../../../modules/kilo-ssh/src/ReactNativeSsh.types';
 import type * as SshPackage from '../../../../modules/kilo-ssh/src';
-import {
-  type ConnectOptions,
-  type SshAuth,
-  type SshErrorCode,
-} from '../../../../modules/kilo-ssh/src';
+import { type ConnectOptions, type SshAuth } from '../../../../modules/kilo-ssh/src';
 
 import { i18n } from '@/i18n';
 
@@ -77,25 +74,6 @@ async function openChain(
     return false;
   }
 }
-
-const ERROR_CODES: readonly Exclude<SshErrorCode, 'InvalidExport' | 'OutputLimit'>[] = [
-  'Network',
-  'Timeout',
-  'HostKeyRejected',
-  'AuthFailed',
-  'AuthCancelled',
-  'UnsupportedAlgorithm',
-  'KeyParse',
-  'WrongPassphrase',
-  'ChannelClosed',
-  'Protocol',
-  'KeyGeneration',
-  'NotFound',
-  'PermissionDenied',
-  'Cancelled',
-  'Forwarding',
-  'LocalIo',
-];
 
 /**
  * Opens the hop chain, then the shell, and then the terminal the screen renders.
@@ -335,6 +313,6 @@ function tmuxAttachCommand(host: SshHost): string {
 
 function reasonOf(cause: unknown): SshCloseReason {
   const code = nativeErrorCode(cause);
-  const match = ERROR_CODES.find(candidate => candidate === code);
+  const match = SSH_ERROR_CODES.find(candidate => candidate === code);
   return match ?? 'Protocol';
 }

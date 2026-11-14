@@ -1,5 +1,7 @@
 import { type TFunction } from 'i18next';
 
+import { SSH_ERROR_POLICY } from '../error-policy';
+
 type FileErrorKey =
   | 'ssh.files.errors.network'
   | 'ssh.files.errors.permission'
@@ -23,12 +25,18 @@ const ERROR_KEY = new Map<string, FileErrorKey>([
 ]);
 
 export function transferErrorMessage(t: TFunction, code: string | null): string {
+  if (code === 'OutputLimit') {
+    return t(SSH_ERROR_POLICY.OutputLimit.key);
+  }
   const key = code === null ? undefined : ERROR_KEY.get(code);
   return t(key ?? 'ssh.files.errors.other');
 }
 
 /** A listener's failure, worded for a port forward rather than a file. */
 export function forwardErrorMessage(t: TFunction, code: string | null): string {
+  if (code === 'OutputLimit') {
+    return t(SSH_ERROR_POLICY.OutputLimit.key);
+  }
   if (code === 'PermissionDenied') {
     return t('ssh.forwards.errors.portUnavailable');
   }

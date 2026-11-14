@@ -1,31 +1,20 @@
 import { type SshErrorCode } from '../../../../modules/kilo-ssh/src';
 
-/**
- * Why a session stopped. `SshErrorCode` names what the Rust core reports; the
- * rest are this app's own endings. Export validation and exec output limits
- * are excluded because neither can end an interactive connection.
- */
+import { isSshErrorCategory, SSH_ERROR_POLICY } from '../error-policy';
+
 export type SshCloseReason =
-  | Exclude<SshErrorCode, 'InvalidExport' | 'OutputLimit'>
+  | SshErrorCode
   | 'disconnected'
   | 'user'
   | 'key-missing'
   | 'host-missing'
   | 'unavailable';
 
-/**
- * The endings a new attempt can clear without changing anything the person
- * entered: the transport failed, not the credentials or the host key.
- */
-const RETRYABLE_REASONS = [
-  'Network',
-  'Timeout',
-  'ChannelClosed',
-  'disconnected',
-] as const satisfies readonly SshCloseReason[];
-
 export function isRetryableReason(reason: SshCloseReason): boolean {
-  return RETRYABLE_REASONS.some(candidate => candidate === reason);
+  if (reason === 'disconnected') {
+    return true;
+  }
+  return isSshErrorCategory(reason) && SSH_ERROR_POLICY[reason].retryable;
 }
 
 /** A host key the connection is waiting on the person to decide about. */

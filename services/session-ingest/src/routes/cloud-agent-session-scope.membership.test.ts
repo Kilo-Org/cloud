@@ -58,6 +58,22 @@ const outsiderRow = {
   cloudAgentWorktreeId: worktreeId,
 };
 
+const foreignRootRow = {
+  sessionId: 'ses_eeeeeeeeeeeeeeeeeeeeeeeeee',
+  parentSessionId: null,
+  cloudAgentSessionId: null,
+  cloudAgentSessionScopeId: outsiderRow.cloudAgentSessionScopeId,
+  cloudAgentWorktreeId: worktreeId,
+};
+
+const memberRootRow = {
+  sessionId: memberRootId,
+  parentSessionId: null,
+  cloudAgentSessionId: null,
+  cloudAgentSessionScopeId: outsiderRow.cloudAgentSessionScopeId,
+  cloudAgentWorktreeId: worktreeId,
+};
+
 function makeApp() {
   const app = new Hono<{ Bindings: Record<string, unknown>; Variables: { user_id: string } }>();
   app.use('*', async (c, next) => {
@@ -106,9 +122,9 @@ describe('Cloud Agent session scope membership on the v2 route', () => {
       body: JSON.stringify({ title: 'Reported title', generated: false }),
     },
   ])(
-    'answers 404 for $name of a session whose ancestry misses the member root, without writing',
+    'answers 404 for $name of a session whose ancestry reaches a different root, without writing',
     async ({ method, suffix, body }) => {
-      const fake = makeDb({ sessionRows: [[outsiderRow]], ancestryRows: [] });
+      const fake = makeDb({ sessionRows: [[outsiderRow]], ancestryRows: [foreignRootRow] });
       vi.mocked(getWorkerDb).mockReturnValue(fake as never);
 
       const response = await makeApp().fetch(
@@ -125,8 +141,8 @@ describe('Cloud Agent session scope membership on the v2 route', () => {
         success: false,
         error: 'session_not_found',
       });
-      // The child lookup found a row in the asserted worktree, so the denial is
-      // the ancestry re-derivation and not an earlier shape check.
+      // The child lookup returned a row, so the denial is the ancestry
+      // re-derivation and not an earlier shape check.
       expect(fake.chain.limit).toHaveBeenCalled();
       expect(fake.execute).toHaveBeenCalled();
       expect(handleDirectIngestRequest).not.toHaveBeenCalled();
@@ -144,29 +160,63 @@ describe('Cloud Agent session scope membership on the v2 route', () => {
       suffix: '/title',
       body: JSON.stringify({ title: 'Reported title', generated: false }),
     },
-  ])(
-    'answers 404 for $name of a session outside the asserted worktree',
-    async ({ method, suffix, body }) => {
-      const fake = makeDb({ sessionRows: [[]], ancestryRows: [] });
-      vi.mocked(getWorkerDb).mockReturnValue(fake as never);
+  ])('answers 404 for $name of an unknown session', async ({ method, suffix, body }) => {
+    const fake = makeDb({ sessionRows: [[]], ancestryRows: [] });
+    vi.mocked(getWorkerDb).mockReturnValue(fake as never);
 
-      const response = await makeApp().fetch(
-        new Request(`http://local/session/${outsiderId}${suffix}`, {
-          method,
-          headers: v2Headers(),
-          ...(body === undefined ? {} : { body }),
-        }),
-        env
-      );
+    const response = await makeApp().fetch(
+      new Request(`http://local/session/${outsiderId}${suffix}`, {
+        method,
+        headers: v2Headers(),
+        ...(body === undefined ? {} : { body }),
+      }),
+      env
+    );
 
-      expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toEqual({
-        success: false,
-        error: 'session_not_found',
-      });
-      expect(handleDirectIngestRequest).not.toHaveBeenCalled();
-      expect(getSessionExport).not.toHaveBeenCalled();
-      expect(applyReportedSessionTitle).not.toHaveBeenCalled();
-    }
-  );
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      error: 'session_not_found',
+    });
+    expect(handleDirectIngestRequest).not.toHaveBeenCalled();
+    expect(getSessionExport).not.toHaveBeenCalled();
+    expect(applyReportedSessionTitle).not.toHaveBeenCalled();
+  });
+
+  it('reaches the write for ingest and export of a descendant of the asserted member root', async () => {
+    const fake = makeDb({
+      sessionRows: [[outsiderRow], [outsiderRow]],
+      ancestryRows: [memberRootRow],
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(fake as never);
+    vi.mocked(handleDirectIngestRequest).mockResolvedValue({
+      status: 200,
+      body: { success: true },
+    } as never);
+    vi.mocked(getSessionExport).mockResolvedValue({
+      status: 'ok',
+      stream: new Blob(['{"events":[]}']).stream(),
+    } as never);
+
+    const ingestResponse = await makeApp().fetch(
+      new Request(`http://local/session/${outsiderId}/ingest`, {
+        method: 'POST',
+        headers: v2Headers(),
+        body: JSON.stringify({ data: [] }),
+      }),
+      env
+    );
+    const exportResponse = await makeApp().fetch(
+      new Request(`http://local/session/${outsiderId}/export`, {
+        method: 'GET',
+        headers: v2Headers(),
+      }),
+      env
+    );
+
+    expect(ingestResponse.status).toBe(200);
+    expect(exportResponse.status).toBe(200);
+    expect(handleDirectIngestRequest).toHaveBeenCalledTimes(1);
+    expect(getSessionExport).toHaveBeenCalledTimes(1);
+  });
 });

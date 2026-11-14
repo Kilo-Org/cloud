@@ -314,8 +314,9 @@ export function resolveRuntimeCredentialProxyScopedIngestRoute(
  * adopted scope handle. This function only selects the forwarding path: it
  * checks the shape of the path id and the allowed method, and it makes no
  * membership decision. session-ingest authorizes every v2 create, ingest,
- * export and title request and rejects an id outside the asserted scope; see
- * `resolveRuntimeCredentialProxyScopeIngestRoute` for the enforcing functions.
+ * export and title request and answers 404 or 409 for an id outside the
+ * asserted scope; see `resolveRuntimeCredentialProxyScopeIngestRoute` for the
+ * enforcing functions.
  */
 export function resolveRuntimeCredentialProxyScopedV2IngestRoute(
   input: ResolveRuntimeCredentialProxyScopedV2Input
@@ -358,14 +359,20 @@ export function resolveRuntimeCredentialProxyScopedV2IngestRoute(
  * goes scoped.
  *
  * The forwarding path is not an authorization decision. session-ingest owns
- * scope membership for every v2 create, ingest, export and title request.
- * Session-ingest authorizes the path id with `resolveScopedChildSession` and
- * `resolveScopedCreateParent` in
- * `services/session-ingest/src/services/cloud-agent-worktree-scope.ts`, which
- * accept an id only with the same owner, organization and worktree and an
- * ancestry that reaches an asserted member root. The routes in
- * `services/session-ingest/src/routes/cloud-agent-session-scope.ts` answer 404
- * for any other id.
+ * scope membership for every v2 create, ingest, export and title request:
+ *
+ * - ingest, export and title: `resolveScopedChildSession` authorizes the path
+ *   id, and the routes answer 404 `session_not_found` when it refuses.
+ * - create: `resolveScopedCreateParent` authorizes the body's
+ *   `parentSessionId`, and the route answers 409 `session_scope_conflict` when
+ *   it refuses.
+ *
+ * Both functions live in
+ * `services/session-ingest/src/services/cloud-agent-worktree-scope.ts` and
+ * accept an id only with the same owner, organization and worktree. A non-root
+ * id must also have an ancestry that reaches an asserted member root, and a
+ * root id must itself be an asserted member root. The routes in
+ * `services/session-ingest/src/routes/cloud-agent-session-scope.ts` use both.
  */
 export function resolveRuntimeCredentialProxyScopeIngestRoute(input: {
   targets: RuntimeCredentialProxyTargets;

@@ -78,7 +78,7 @@ export function GitLabIntegrationDetails({
   organizationId,
   success,
   error,
-  canManage = true,
+  canManage = false,
 }: GitLabIntegrationDetailsProps) {
   // Shared state between OAuth and PAT
   const [instanceUrl, setInstanceUrl] = useState('https://gitlab.com');
@@ -522,7 +522,7 @@ export function GitLabIntegrationDetails({
 
               {/* Actions */}
               <div className="flex flex-wrap gap-3">
-                {(authType === 'pat' || isSelfHosted) && (
+                {canManage && (authType === 'pat' || isSelfHosted) && (
                   <Button
                     variant="outline"
                     onClick={() => {

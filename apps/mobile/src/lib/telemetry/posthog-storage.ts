@@ -36,10 +36,6 @@ export function unsealPostHogStorage(): void {
   sealed = false;
 }
 
-export function isPostHogStorageSealed(): boolean {
-  return sealed;
-}
-
 // ---- custom storage ----
 
 export const posthogCustomStorage = {

@@ -174,17 +174,16 @@ describe('ack store state machine', () => {
     expect(isAttentionAcked('s1', { raiseId: 'R2' })).toBe(false);
   });
 
-  it('a status-only ack learns its raise on the first observation, then a later raise shows', () => {
+  it('a status-only ack never learns a dated raise, so a dated raise always shows', () => {
     ackSessionAttention('s1', 'permission');
 
-    // The raise the user answered, observed for the first time.
+    /* The observer can date the raise now, and a status-only ack holds no
+       server time to order it against: the badge returns instead of the raise
+       being adopted as the answered one. */
     reconcileSessionAttention('s1', 'permission', 'R1');
-    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(true);
 
-    // A new permission under the same status.
-    reconcileSessionAttention('s1', 'permission', 'R2');
-    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(false);
-    expect(isAttentionAcked('s1', { raiseId: 'R2' })).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R1', status: 'permission' })).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'permission' })).toBe(false);
   });
 
   it('a same-status re-raise shows on a reader that knows the row time', () => {
@@ -197,22 +196,44 @@ describe('ack store state machine', () => {
     expect(isAttentionAcked('s1', { raiseId: 'permission' })).toBe(true);
   });
 
-  it('a status-only ack answers a dated raise it can order, not one after it', () => {
+  it('a status-only ack answers only a reader that names its status', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-12T10:00:00.000Z'));
     ackSessionAttention('s1', 'permission');
 
-    // A raise dated before the answer is the one the person answered.
+    // The tray, the launcher and the remote rows cannot date their row: they
+    // name the status they show, and the ack answers them.
+    expect(isAttentionAcked('s1', { raiseId: 'permission' })).toBe(true);
+    // A dated raise is the server's to order, and the ack holds no server time.
     expect(
       isAttentionAcked('s1', { raiseId: '2026-10-12T09:59:30.000Z', status: 'permission' })
-    ).toBe(true);
-    // A raise after it is a new raise, whichever status it carries.
+    ).toBe(false);
+    expect(
+      isAttentionAcked('s1', { raiseId: '2026-10-12T10:00:30.000Z', status: 'permission' })
+    ).toBe(false);
+  });
+
+  it('a device clock ahead of the server cannot hide a raise created after the answer', () => {
+    vi.useFakeTimers();
+    /* The answer is stamped by the device (10:01:00) while the server's raise it
+       answered was 10:00:00 and the next one is 10:00:30: compared across the
+       two clocks, the later raise would look earlier than the answer. */
+    vi.setSystemTime(new Date('2026-10-12T10:01:00.000Z'));
+    ackSessionAttention('s1', 'permission');
+
     expect(
       isAttentionAcked('s1', { raiseId: '2026-10-12T10:00:30.000Z', status: 'permission' })
     ).toBe(false);
     expect(
-      isAttentionAcked('s1', { raiseId: '2026-10-12T10:00:30.000Z', status: 'question' })
-    ).toBe(false);
+      shouldShowNeedsInput({
+        status: 'permission',
+        raiseId: '2026-10-12T10:00:30.000Z',
+        isAcked: isAttentionAcked('s1', {
+          raiseId: '2026-10-12T10:00:30.000Z',
+          status: 'permission',
+        }),
+      })
+    ).toBe(true);
   });
 
   it('a dated raise observed after a status-only ack shows its badge', () => {
@@ -221,10 +242,10 @@ describe('ack store state machine', () => {
     const earlier = '2026-10-12T09:59:30.000Z';
     const later = '2026-10-12T10:00:30.000Z';
     ackSessionAttention('s1', 'permission');
-    expect(isAttentionAcked('s1', { raiseId: earlier, status: 'permission' })).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: earlier, status: 'permission' })).toBe(false);
 
-    /* The stored row arrives with its own status time: the raise it names is
-       newer than the answer, so it is a raise the person has not answered. */
+    /* The stored row arrives with its own status time: it is a raise the person
+       has not answered, because a status-only ack cannot order it. */
     reconcileSessionAttention('s1', 'permission', later);
 
     expect(isAttentionAcked('s1', { raiseId: later, status: 'permission' })).toBe(false);
@@ -420,13 +441,18 @@ describe('ack store state machine', () => {
 });
 
 describe('entry shape and re-raise', () => {
-  it('an ack without a timestamp learns its raise and keeps its ack metadata', () => {
+  it('an ack without a timestamp keeps no server raise, so a dated one clears it', () => {
     ackSessionAttention('s1', 'question');
+    const acked = __peekSessionAttentionEntryForTests('s1');
+    expect(acked?.ackedAt).toBeTypeOf('number');
+    expect(acked?.expiresAt).toBe((acked?.ackedAt ?? 0) + SESSION_ATTENTION_EXPIRY_MS);
+
     reconcileSessionAttention('s1', 'question', 'R1');
-    const entry = __peekSessionAttentionEntryForTests('s1');
-    expect(entry).toMatchObject({ raiseId: 'R1', status: 'question' });
-    expect(entry?.ackedAt).toBeTypeOf('number');
-    expect(entry?.expiresAt).toBe((entry?.ackedAt ?? 0) + SESSION_ATTENTION_EXPIRY_MS);
+
+    // The dated observation is not adopted as the answered raise: the ack is
+    // cleared and the badge returns.
+    expect(__peekSessionAttentionEntryForTests('s1')).toMatchObject({ ackedAt: null });
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(false);
   });
 
   it('replaces the raise and clears the ack on a same-session re-raise', () => {

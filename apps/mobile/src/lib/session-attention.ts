@@ -87,23 +87,6 @@ type AckIdentity =
   | { readonly kind: 'status'; readonly status: string };
 
 /**
- * True when a raise id dates at or before `ackedAt`. A raise id that is not a
- * timestamp says nothing about order, so it answers false.
- */
-function orderedAtOrBefore(raiseId: string | null, ackedAt: number): boolean {
-  if (raiseId === null) {
-    return false;
-  }
-  const at = parseTimestamp(raiseId).getTime();
-  return !Number.isNaN(at) && at <= ackedAt;
-}
-
-/** True when a raise id is not a timestamp, which is what "the status alone" is written as. */
-function isUndatedRaise(raiseId: string | null): boolean {
-  return raiseId === null || Number.isNaN(parseTimestamp(raiseId).getTime());
-}
-
-/**
  * One durable entry: the answer a person gave, or the raise a re-raise cleared.
  *
  * `answered` names what the answer was about. A `raise` identity suppresses
@@ -465,26 +448,6 @@ export function reconcileSessionAttention(
     return;
   }
 
-  if (
-    entry.answered.kind === 'status' &&
-    entry.answered.status === status &&
-    (isUndatedRaise(raiseId) || orderedAtOrBefore(raiseId, entry.ackedAt))
-  ) {
-    /* Acked with the status alone: an observation that cannot be ordered after
-       the answer is the raise the user answered. Learn it, so a later dated
-       raise is told apart. An undateable id is the status string in production,
-       so learning it can never steal a later dated raise. */
-    store.entries.set(sessionId, {
-      kind: 'acked',
-      answered: { kind: 'raise', raiseId: raiseId ?? entry.answered.status },
-      status,
-      ackedAt: entry.ackedAt,
-      expiresAt: entry.expiresAt,
-    });
-    commit();
-    return;
-  }
-
   if (statusUpdatedAt == null && entry.status === status) {
     // The observer has no timestamp for the acked status, so it cannot tell
     // this raise from the answered one. Keeping the ack is what hides the
@@ -567,14 +530,12 @@ export function isAttentionAcked(sessionId: string, raise: AttentionRaise): bool
   if (raise.raiseId === entry.status) {
     return true;
   }
-  // A status-only ack answers a raise of the same kind it cannot order: one
-  // dated at or before the answer. A dated raise after the answer, or one of
-  // another kind, is a raise the person has not answered.
-  return (
-    entry.answered.kind === 'status' &&
-    raise.status === entry.answered.status &&
-    orderedAtOrBefore(raise.raiseId, entry.ackedAt)
-  );
+  /* A dated raise is answered only by a dated ack. A status-only ack holds no
+     server time — `ackedAt` is the device clock — so ordering one against the
+     other would let a device clock ahead of the server hide a raise created
+     after the answer. It answers the readers that cannot date their row (the
+     branch above) and leaves every dated raise to the server's own status. */
+  return false;
 }
 
 export function shouldShowNeedsInput({

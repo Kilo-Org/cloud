@@ -200,13 +200,14 @@ async function approveFromCard(): Promise<GlanceableInteractionOutcome> {
  */
 async function answerSessionCard(
   kiloSessionId: string,
-  approvalKey: string
+  approvalKey: string,
+  statusUpdatedAt: string | null
 ): Promise<GlanceableApproveResult> {
   try {
     const organizationId = await readStoredValue(ORGANIZATION_STORAGE_KEY);
     return await runGlanceableApprove({
       now: () => Date.now(),
-      target: { kiloSessionId, organizationId, approvalKey },
+      target: { kiloSessionId, organizationId, approvalKey, statusUpdatedAt },
     });
   } catch {
     return { kind: 'retryable' };
@@ -229,7 +230,7 @@ async function approveFromSessionCard(activity: SessionActivity): Promise<Glance
     return { kind: 'none' };
   }
   await renderSessionCardPress(activity, { approving: true });
-  const result = await answerSessionCard(sessionId, approvalKey);
+  const result = await answerSessionCard(sessionId, approvalKey, props?.statusSince ?? null);
   if (result.kind === 'retryable') {
     toast.error(i18n.t(APPROVE_FAILED_KEY));
     await renderSessionCardPress(activity, { notice: i18n.t(APPROVE_FAILED_KEY) });

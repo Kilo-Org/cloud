@@ -37,7 +37,7 @@ export function listKnownHosts(db: SshDatabase): SshKnownHost[] {
   });
 }
 
-export function getKnownHost(db: SshDatabase, id: string): SshKnownHost | null {
+function getKnownHost(db: SshDatabase, id: string): SshKnownHost | null {
   return readRow({
     db,
     source: `select ${COLUMNS} from ssh_known_hosts where id = ?`,

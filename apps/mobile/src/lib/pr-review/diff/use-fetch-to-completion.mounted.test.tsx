@@ -119,6 +119,25 @@ describe('useFetchToCompletion failure phase', () => {
     expect(current(holder).feedback.status).toBe('idle');
   });
 
+  it('leaves a background refetch alone: Load all while the query is fetching runs nothing', async () => {
+    const fetchNextPage = vi.fn(async () => ({
+      data: PAGE,
+      hasNextPage: false,
+      error: null,
+      dataUpdatedAt: 200,
+    }));
+    const { holder } = await mountProbe({ isFetching: true, fetchNextPage });
+
+    await act(async () => {
+      await current(holder).run();
+    });
+
+    // fetchNextPage would cancel the refresh in flight and append to the old
+    // pages; the surface's admission covers its own attempts, not the query's.
+    expect(fetchNextPage).not.toHaveBeenCalled();
+    expect(current(holder).feedback.status).toBe('idle');
+  });
+
   it('admits one run at a time: a second run while the first is pending issues one request', async () => {
     const gate = Promise.withResolvers<undefined>();
     const fetchNextPage = vi.fn(async () => {

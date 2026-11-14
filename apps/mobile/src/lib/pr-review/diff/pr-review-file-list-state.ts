@@ -194,6 +194,12 @@ export function useFetchToCompletion(
   queryRef.current = query;
 
   const run = useCallback(async () => {
+    // A background refetch is already running: fetchNextPage would cancel it
+    // (TanStack's default cancelRefetch) and append to the old pages. The
+    // admission below guards this surface's own attempt, not the query's work.
+    if (queryRef.current.isFetching || !queryRef.current.hasNextPage) {
+      return;
+    }
     const attempt = begin();
     if (attempt === null) {
       return;

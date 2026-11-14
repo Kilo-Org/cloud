@@ -24,7 +24,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { GitBranch } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
-import { useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
+import { type AgentProfileListItem, useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
 import {
   type OrganizationProfilePermission,
   useOrganizationProfilePermission,
@@ -58,6 +58,21 @@ const PICKER_EMPTY_DESCRIPTION_KEYS = {
 
 type PickerEmptyDescriptionKey =
   (typeof PICKER_EMPTY_DESCRIPTION_KEYS)[keyof typeof PICKER_EMPTY_DESCRIPTION_KEYS];
+
+/** What the Add form's repo field holds. */
+type ChosenRepo =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'chosen'; readonly repo: RepoOption };
+
+/**
+ * What the Add form's profile field holds. `missing` is a stored id whose
+ * profile is no longer in the list, which is not a choice this device can
+ * submit.
+ */
+type ChosenProfile =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'chosen'; readonly profile: AgentProfileListItem }
+  | { readonly kind: 'missing'; readonly profileId: string };
 
 function pickerEmptyDescriptionKey(
   organizationId: string | undefined,
@@ -116,7 +131,20 @@ export function RepoBindingsScreen({
     organizationId === undefined ? profileList.personalProfiles : profileList.orgProfiles;
   const selectedProfile = profileChoices.find(profile => profile.id === selectedProfileId);
   const selectedRepoKey = selectedRepo === null ? null : repositoryOptionKey(selectedRepo);
-  const canAdd = selectedRepo !== null && selectedProfileId !== '' && !bind.isPending;
+  const chosenRepo: ChosenRepo =
+    selectedRepo === null ? { kind: 'none' } : { kind: 'chosen', repo: selectedRepo };
+  /* A stored id is not a choice: the list refetches when the app comes back, and
+     the profile it named can have been deleted from another device. The field
+     then names the reason and Add stays out of reach, rather than submitting an
+     id this device no longer lists. */
+  const chosenProfile: ChosenProfile =
+    selectedProfileId === ''
+      ? { kind: 'none' }
+      : selectedProfile === undefined
+        ? { kind: 'missing', profileId: selectedProfileId }
+        : { kind: 'chosen', profile: selectedProfile };
+  const canAdd =
+    chosenRepo.kind === 'chosen' && chosenProfile.kind === 'chosen' && !bind.isPending;
   // The picker lists this context's own profiles, so its empty state names the
   // profile that would appear there.
   const pickerEmptyDescription = t(pickerEmptyDescriptionKey(organizationId, profilePermission));
@@ -146,14 +174,16 @@ export function RepoBindingsScreen({
   };
 
   const handleAdd = async () => {
-    if (selectedRepo === null || selectedProfileId === '') {
+    if (chosenRepo.kind !== 'chosen' || chosenProfile.kind !== 'chosen') {
       return;
     }
+    const { repo } = chosenRepo;
+    const { profile } = chosenProfile;
     try {
       await bind.mutateAsync({
-        profileId: selectedProfileId,
-        repoFullName: selectedRepo.fullName,
-        platform: selectedRepo.platform,
+        profileId: profile.id,
+        repoFullName: repo.fullName,
+        platform: repo.platform,
       });
     } catch (error) {
       if (!hasUsableMessage(error)) {
@@ -161,7 +191,7 @@ export function RepoBindingsScreen({
       }
       return;
     }
-    toast.success(t('profiles.repoBindings.addedToast', { repo: selectedRepo.fullName }));
+    toast.success(t('profiles.repoBindings.addedToast', { repo: repo.fullName }));
     resetAdd();
   };
 
@@ -231,11 +261,13 @@ export function RepoBindingsScreen({
           <View className="gap-3 rounded-lg border border-border p-3">
             <PickerField
               label={t('profiles.repoBindings.repo')}
-              value={selectedRepo?.fullName ?? null}
+              value={chosenRepo.kind === 'chosen' ? chosenRepo.repo.fullName : null}
+              hint={null}
+              reserveHint={null}
               accessibilityLabel={
-                selectedRepo === null
-                  ? t('profiles.repoBindings.repo')
-                  : t('profiles.repoBindings.repoValue', { name: selectedRepo.fullName })
+                chosenRepo.kind === 'chosen'
+                  ? t('profiles.repoBindings.repoValue', { name: chosenRepo.repo.fullName })
+                  : t('profiles.repoBindings.repo')
               }
               disabled={bind.isPending}
               onPress={() => {
@@ -244,11 +276,19 @@ export function RepoBindingsScreen({
             />
             <PickerField
               label={t('profiles.repoBindings.profile')}
-              value={selectedProfile?.name ?? null}
+              value={chosenProfile.kind === 'chosen' ? chosenProfile.profile.name : null}
+              /* A profile that left the list is said out loud, in the line this
+                 field always reserves, so the buttons under it stay put. */
+              hint={
+                chosenProfile.kind === 'missing'
+                  ? t('profiles.repoBindings.profileUnavailable')
+                  : null
+              }
+              reserveHint={t('profiles.repoBindings.profileUnavailable')}
               accessibilityLabel={
-                selectedProfile === undefined
-                  ? t('profiles.repoBindings.profile')
-                  : t('profiles.repoBindings.profileValue', { name: selectedProfile.name })
+                chosenProfile.kind === 'chosen'
+                  ? t('profiles.repoBindings.profileValue', { name: chosenProfile.profile.name })
+                  : t('profiles.repoBindings.profile')
               }
               disabled={bind.isPending}
               onPress={() => {

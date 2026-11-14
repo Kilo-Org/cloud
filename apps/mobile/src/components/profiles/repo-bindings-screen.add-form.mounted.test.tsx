@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import {
   findAll,
+  findButton,
   mountScreen,
   pressButton,
   pressPressable,
+  rerenderScreen,
   type TestBinding,
 } from '@/components/profiles/repo-bindings-screen.test-helpers';
 import { act, type ReactTestInstance } from '@/test/renderer';
@@ -287,6 +289,40 @@ describe('RepoBindingsScreen add form', () => {
     // The action still waits for the role: a member must never be offered a
     // create the server rejects.
     expect(empty.action).toBeUndefined();
+
+    unmount();
+  });
+
+  it('disables Add and names the reason when a refetch drops the chosen profile', async () => {
+    /* The list has no stale window and refetches when the app comes back, so a
+       profile deleted from another device leaves the form holding an id this
+       device no longer lists. Add must not submit it, and the reason belongs in
+       the line the field already reserves, so the buttons under it stay put. */
+    const unavailable = i18n.t('profiles.repoBindings.profileUnavailable');
+    const hintCopies = (root: ReactTestInstance): number =>
+      findAll(root, 'Text').filter(node => node.props.children === unavailable).length;
+
+    const { renderer, queryClient, unmount } = await mountScreen();
+    pressButton(renderer.root, 'Add default');
+    pressPressable(renderer.root, 'Select repository…');
+    pressPressable(renderer.root, PRIVATE_REPO_LABEL);
+    pressPressable(renderer.root, 'Select profile');
+    pressPressable(renderer.root, 'Backend debugging');
+
+    expect(findButton(renderer.root, 'Add default').props.disabled).toBe(false);
+    // Reserved height with nothing to say yet: the hint cannot push Add down.
+    expect(hintCopies(renderer.root)).toBe(1);
+
+    Object.assign(h.profileList, { personalProfiles: [] });
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+
+    expect(findButton(renderer.root, 'Add default').props.disabled).toBe(true);
+    expect(pressableLabels(renderer.root)).toContain('Select profile');
+    // The reservation stays, and the visible line draws over it.
+    expect(hintCopies(renderer.root)).toBe(2);
+    expect(h.mutations.bind.mutateAsync).not.toHaveBeenCalled();
 
     unmount();
   });

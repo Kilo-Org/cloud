@@ -10,10 +10,20 @@ import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 import { PrCommentEditSheet } from './pr-comment-edit-sheet';
 import { i18n } from '@/i18n';
 
-const { updateComment, gate, connectivity } = vi.hoisted(() => ({
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+};
+
+const { updateComment, gate, connectivity, confirmRequests, backHandler } = vi.hoisted(() => ({
   updateComment: { mutateAsync: vi.fn<(input: unknown) => Promise<unknown>>() },
   gate: { ensureTermsAcceptedOutcome: vi.fn<() => Promise<{ kind: string }>>() },
   connectivity: { value: 'online' },
+  confirmRequests: [] as ConfirmRequest[],
+  backHandler: { current: null as null | (() => boolean) },
 }));
 
 // The Expo modules in this graph read the build-time `__DEV__` global when they
@@ -23,7 +33,16 @@ vi.hoisted(() => {
 });
 
 vi.mock('react-native', () => ({
-  BackHandler: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+  BackHandler: {
+    addEventListener: (_event: string, handler: () => boolean) => {
+      backHandler.current = handler;
+      return {
+        remove: () => {
+          backHandler.current = null;
+        },
+      };
+    },
+  },
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   ScrollView: 'ScrollView',
   View: 'View',
@@ -45,7 +64,12 @@ vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
 }));
 vi.mock('@/components/ui/dialog', () => ({
-  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
+  useConfirmDialog: () => ({
+    confirm: (request: ConfirmRequest) => {
+      confirmRequests.push(request);
+    },
+    dialog: null,
+  }),
 }));
 vi.mock('@/components/pr-review/pr-form-sheet-chrome', () => ({
   PrFormSheetHeader: 'PrFormSheetHeader',
@@ -110,6 +134,24 @@ function saveButton(renderer: ReactTestRenderer) {
   return first;
 }
 
+function cancelButton(renderer: ReactTestRenderer) {
+  const [first] = renderer.root.findAll(
+    node =>
+      Object.is(node.type, 'Button') &&
+      node.findAll(child => child.props.children === i18n.t('common.cancel')).length > 0
+  );
+  if (!first) {
+    throw new Error('missing Cancel button');
+  }
+  return first;
+}
+
+function pressCancel(renderer: ReactTestRenderer): void {
+  act(() => {
+    (cancelButton(renderer).props.onPress as () => void)();
+  });
+}
+
 async function pressSave(renderer: ReactTestRenderer): Promise<void> {
   await act(async () => {
     (saveButton(renderer).props.onPress as () => void)();
@@ -128,6 +170,8 @@ function failureCopy(renderer: ReactTestRenderer): string | undefined {
 }
 
 beforeEach(() => {
+  confirmRequests.length = 0;
+  backHandler.current = null;
   connectivity.value = 'online';
   updateComment.mutateAsync.mockReset();
   gate.ensureTermsAcceptedOutcome.mockReset();
@@ -142,6 +186,57 @@ afterEach(() => {
 });
 
 describe('PrCommentEditSheet', () => {
+  it('asks once before discarding a changed body and dismisses on discard', async () => {
+    const renderer = await mount(createElement(PrCommentEditSheet, baseProps));
+    typeBody(renderer, 'edited body');
+    pressCancel(renderer);
+
+    expect(confirmRequests.at(-1)).toMatchObject({
+      confirmLabel: i18n.t('common.discard'),
+      cancelLabel: i18n.t('common.keepEditing'),
+    });
+    // Keeping editing (never confirming) leaves the sheet open.
+    expect(baseProps.onDismiss).not.toHaveBeenCalled();
+
+    confirmRequests.at(-1)?.onConfirm();
+    expect(baseProps.onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs the same discard gate on the header close and the hardware back', async () => {
+    const renderer = await mount(createElement(PrCommentEditSheet, baseProps));
+    typeBody(renderer, 'edited body');
+
+    act(() => {
+      (renderer.root.findByType('PrFormSheetHeader').props.onBack as () => void)();
+    });
+    expect(confirmRequests).toHaveLength(1);
+
+    act(() => {
+      backHandler.current?.();
+    });
+    expect(confirmRequests).toHaveLength(2);
+  });
+
+  it('dismisses an unchanged body without a discard confirm', async () => {
+    const renderer = await mount(createElement(PrCommentEditSheet, baseProps));
+    pressCancel(renderer);
+
+    expect(confirmRequests).toHaveLength(0);
+    expect(baseProps.onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails an offline submit at once with the retryable copy and keeps Save live', async () => {
+    connectivity.value = 'offline';
+    const renderer = await mount(createElement(PrCommentEditSheet, baseProps));
+    typeBody(renderer, 'edited body');
+    await pressSave(renderer);
+
+    expect(updateComment.mutateAsync).not.toHaveBeenCalled();
+    expect(gate.ensureTermsAcceptedOutcome).not.toHaveBeenCalled();
+    expect(failureCopy(renderer)).toBe(i18n.t('prReview.discussion.commentEditFailed'));
+    expect(saveDisabled(renderer)).toBe(false);
+  });
+
   it('saves an edited body and dismisses', async () => {
     updateComment.mutateAsync.mockResolvedValueOnce({});
     const renderer = await mount(createElement(PrCommentEditSheet, baseProps));

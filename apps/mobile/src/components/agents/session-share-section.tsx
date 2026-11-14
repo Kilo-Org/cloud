@@ -122,10 +122,10 @@ export function SessionShareSection({
   const superseded =
     created !== null &&
     created.publicId !== null &&
-    shareStateQuery.isSuccess &&
+    shareStateLoaded &&
     !shareStateQuery.isFetching &&
     shareStateQuery.dataUpdatedAt > created.at &&
-    (shareStateQuery.data.public_id ?? null) !== created.publicId;
+    (shareStateQuery.data?.public_id ?? null) !== created.publicId;
 
   const panel: SharePanel = shareStateQuery.isError
     ? // A read in error cannot vouch for a URL, so it takes over the panel: the

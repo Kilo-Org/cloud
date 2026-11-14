@@ -8,6 +8,7 @@ import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
@@ -222,6 +223,8 @@ function afterTapGuardWindow(action: () => void): void {
 describe('ProfileKiloCommandsScreen save refusals', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The open form is a draft now, so no case may reopen on an earlier one.
+    resetFormDraftsForTests();
     Object.assign(h.query, {
       data: undefined,
       isError: false,
@@ -232,6 +235,111 @@ describe('ProfileKiloCommandsScreen save refusals', () => {
       Object.assign(mutation, { isPending: false });
     }
     permissionState.permission = 'allowed';
+  });
+
+  it('a save that settles onto another command’s form leaves that form open', async () => {
+    h.query.data = [testCommand(), testCommand({ id: 'cmd-2', name: 'deploy' })];
+    h.query.isPending = false;
+    const held = Promise.withResolvers<unknown>();
+    h.mutations.updateKiloCommand.mutateAsync.mockReturnValue(held.promise);
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Edit slash command release-notes');
+    pressSheetDone(renderer.root);
+    expect(h.mutations.updateKiloCommand.mutateAsync).toHaveBeenCalledTimes(1);
+
+    // The reader cancels A on the real clock (a save in flight closes without
+    // asking) and opens B once the row guard's window has passed.
+    act(() => {
+      (findOne(renderer.root, 'SheetHeader').props.onCancel as () => void)();
+    });
+    await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 0);
+    afterTapGuardWindow(() => {
+      pressPressable(renderer.root, 'Edit slash command deploy');
+    });
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(1);
+
+    await act(async () => {
+      held.resolve({ success: true });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // A's success landed after its form was replaced: B's sheet stays open.
+    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+
+    unmount();
+  });
+
+  it('refuses a second save of the command whose save is already pending', async () => {
+    h.query.data = [testCommand()];
+    h.query.isPending = false;
+    const held = Promise.withResolvers<unknown>();
+    h.mutations.updateKiloCommand.mutateAsync.mockReturnValue(held.promise);
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Edit slash command release-notes');
+    pressSheetDone(renderer.root);
+    expect(h.mutations.updateKiloCommand.mutateAsync).toHaveBeenCalledTimes(1);
+
+    afterTapGuardWindow(() => {
+      (findOne(renderer.root, 'SheetHeader').props.onCancel as () => void)();
+    });
+    afterTapGuardWindow(() => {
+      pressPressable(renderer.root, 'Edit slash command release-notes');
+    });
+
+    // Reopening the same command keeps its admission, so Save stays down.
+    expect(findOne(renderer.root, 'SheetHeader').props.doneDisabled).toBe(true);
+    pressSheetDone(renderer.root);
+    expect(h.mutations.updateKiloCommand.mutateAsync).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      held.resolve({ success: true });
+      await Promise.resolve();
+    });
+    unmount();
+  });
+
+  it('leaves a reopened add form alone when the previous add form’s save settles', async () => {
+    h.query.data = [testCommand()];
+    h.query.isPending = false;
+    const held = Promise.withResolvers<unknown>();
+    h.mutations.createKiloCommand.mutateAsync.mockReturnValue(held.promise);
+
+    const { renderer, unmount } = await mountScreen();
+    pressAddButton(renderer.root);
+    changeText(renderer.root, 'Command name', 'first');
+    changeText(renderer.root, 'Template', 'Do it');
+    pressSheetDone(renderer.root);
+    expect(h.mutations.createKiloCommand.mutateAsync).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      (findOne(renderer.root, 'SheetHeader').props.onCancel as () => void)();
+    });
+    await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 0);
+    afterTapGuardWindow(() => {
+      pressAddButton(renderer.root);
+    });
+    await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 1);
+
+    // Reopening the add form does not reset the running save's admission: Save
+    // stays down and a second save is refused until the first settles.
+    expect(findOne(renderer.root, 'SheetHeader').props.doneDisabled).toBe(true);
+    pressSheetDone(renderer.root);
+    expect(h.mutations.createKiloCommand.mutateAsync).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      held.resolve({ id: 'cmd-9' });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The settle closes nothing: the generation it captured belongs to the
+    // previous form, so the reopened add form stays on screen.
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(1);
+
+    unmount();
   });
 
   it('refuses a name a loaded command already uses, without calling the server', async () => {

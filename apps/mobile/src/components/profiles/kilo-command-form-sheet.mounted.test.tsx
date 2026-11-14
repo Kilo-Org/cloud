@@ -3,7 +3,10 @@ import { createElement, type ReactNode, type Ref } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { KiloCommandFormSheet } from '@/components/profiles/kilo-command-form-sheet';
+import {
+  KiloCommandFormSheet,
+  type KiloCommandSaveFailure,
+} from '@/components/profiles/kilo-command-form-sheet';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -128,8 +131,8 @@ function confirmRequest(index: number): ConfirmRequest | undefined {
 function mountSheet(
   options: {
     existingNames?: readonly string[];
-    nameConflictFromServer?: boolean;
-    saveFailure?: string | null;
+    saveFailure?: KiloCommandSaveFailure | null;
+    onFieldEdited?: () => void;
   } = {}
 ) {
   return renderWithProviders(
@@ -144,8 +147,8 @@ function mountSheet(
         h.onCreate(payload);
       },
       onUpdate: () => undefined,
-      nameConflictFromServer: options.nameConflictFromServer ?? false,
       saveFailure: options.saveFailure ?? null,
+      onFieldEdited: options.onFieldEdited ?? (() => undefined),
     })
   );
 }
@@ -303,8 +306,12 @@ describe('KiloCommandFormSheet duplicate name', () => {
     unmount();
   });
 
-  it('shows a conflict the server reported and drops it once the name changes', async () => {
-    const { renderer, unmount } = await mountSheet({ nameConflictFromServer: true });
+  it('shows a conflict the server reported and asks the caller to drop it on edit', async () => {
+    const onFieldEdited = vi.fn<() => void>();
+    const { renderer, unmount } = await mountSheet({
+      saveFailure: { kind: 'name-conflict' },
+      onFieldEdited,
+    });
 
     expect(findField(renderer.root, 'Command name').props.error).toBe(
       i18n.t('profiles.slashCommands.duplicateName')
@@ -315,15 +322,32 @@ describe('KiloCommandFormSheet duplicate name', () => {
         'another-name'
       );
     });
+    // The refusal is retired by the caller's store, not mirrored here.
+    expect(onFieldEdited).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('keeps a template refusal ahead of a server name conflict', async () => {
+    const { renderer, unmount } = await mountSheet({ saveFailure: { kind: 'name-conflict' } });
+
+    act(() => {
+      (findField(renderer.root, 'Command name').props.onChangeText as (v: string) => void)('ok-name');
+    });
+    callHandler(findOne(renderer.root, 'SheetHeader'), 'onDone');
+
+    // The field's own refusal wins: the name conflict has nothing to say about
+    // an empty template.
+    expect(findField(renderer.root, 'Template').props.error).toBe(
+      i18n.t('profiles.slashCommands.templateRequired')
+    );
     expect(findField(renderer.root, 'Command name').props.error).toBeUndefined();
 
     unmount();
   });
 
   it('shows a save failure the caller cannot name inside the sheet', async () => {
-    const { renderer, unmount } = await mountSheet({
-      saveFailure: i18n.t('profiles.slashCommands.saveFailed'),
-    });
+    const { renderer, unmount } = await mountSheet({ saveFailure: { kind: 'refused' } });
 
     expect(
       findAll(renderer.root, 'Text').some(

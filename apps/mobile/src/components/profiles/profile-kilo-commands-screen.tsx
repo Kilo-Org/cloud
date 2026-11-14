@@ -1,10 +1,13 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
-import { KiloCommandFormSheet } from '@/components/profiles/kilo-command-form-sheet';
+import {
+  KiloCommandFormSheet,
+  type KiloCommandSaveFailure,
+} from '@/components/profiles/kilo-command-form-sheet';
 import { KiloCommandRowView } from '@/components/profiles/kilo-command-row';
 import {
   type KiloCommandCreatePayload,
@@ -31,10 +34,21 @@ import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
+import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
+import { useKeyedSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_COMMANDS: AgentProfileDetail['kiloCommands'] = [];
+
+/** One save this screen can start: a create, or an update of the command it edits. */
+type CommandSaveIntent =
+  | { readonly kind: 'create'; readonly payload: KiloCommandCreatePayload }
+  | {
+      readonly kind: 'update';
+      readonly target: KiloCommandSource;
+      readonly payload: KiloCommandUpdatePayload;
+    };
 
 /** The mutation hook toasts `error.message`; the screen supplies a fallback otherwise. */
 function hasUsableMessage(error: unknown): boolean {
@@ -72,64 +86,69 @@ export function ProfileKiloCommandsScreen({
 
   const commands = profileQuery.data ?? NO_COMMANDS;
   const rows = kiloCommandRows(commands);
-  // `null` = closed, `{ source: null }` = add, `{ source }` = edit that command.
-  const [form, setForm] = useState<{ source: KiloCommandSource | null } | null>(null);
-  // A save the server refused on the name index shows the inline conflict
-  // instead of a toast the open sheet covers; any other refusal shows one line
-  // inside the sheet. Both reset when the form opens and each save starts.
-  const [serverNameConflict, setServerNameConflict] = useState(false);
-  const [saveFailure, setSaveFailure] = useState<string | null>(null);
+  // The open form comes from the sibling screens' draft contract: it survives a
+  // remount, and its generation is what proves a settling save still owns it.
+  const draftScope = `profiles:slash-commands:${profileId}`;
+  const form = useProfileFormDraft<KiloCommandSource, null>(draftScope, commands, null);
+  // Admission is keyed by the resource being saved, so reopening a command whose
+  // save is still running cannot admit a second save for it.
+  const saves = useKeyedSurfaceFeedback<string, KiloCommandSaveFailure>();
+  const formKey = form.editing?.id ?? 'new';
+  const phase = saves.snapshot.states.get(formKey);
+  const saveFailure = phase?.status === 'failed' ? phase.failure : null;
   // The list sits underneath the sheet, and a sheet dismisses natively, so the
   // second tap of a Save double tap would land on the row just saved.
   const { markClosed: markSheetClosed, guard: guardRowPress } = useSheetRowTapGuard();
 
   const startAdd = () => {
-    setForm({ source: null });
-    setServerNameConflict(false);
-    setSaveFailure(null);
+    form.startAdd();
+    // A settled refusal belongs to the previous form: retire it, without
+    // touching a save that is still pending for the same command.
+    saves.clearWhere('new', () => true);
   };
 
   const startEdit = (source: KiloCommandSource) => {
-    setForm({ source });
-    setServerNameConflict(false);
-    setSaveFailure(null);
+    form.startEdit(source);
+    saves.clearWhere(source.id, () => true);
   };
 
-  const closeForm = () => {
+  const handleClose = () => {
     markSheetClosed();
-    setForm(null);
+    form.close();
   };
 
-  const reportRefusedSave = (error: unknown) => {
-    if (readTrpcErrorField(error, 'code') === 'CONFLICT') {
-      setServerNameConflict(true);
+  /** One save this screen can start: a create, or an update of the command it edits. */
+  const saveCommand = async (intent: CommandSaveIntent) => {
+    const key = intent.kind === 'create' ? 'new' : intent.target.id;
+    const generation = form.generation();
+    const attempt = saves.begin(key);
+    if (attempt === null) {
+      // Already saving this command.
       return;
     }
-    setSaveFailure(t('profiles.slashCommands.saveFailed'));
-  };
-
-  const runCreate = async (payload: KiloCommandCreatePayload) => {
-    setServerNameConflict(false);
-    setSaveFailure(null);
     try {
-      await createKiloCommand.mutateAsync({ profileId, ...payload });
+      if (intent.kind === 'create') {
+        await createKiloCommand.mutateAsync({ profileId, ...intent.payload });
+      } else {
+        await updateKiloCommand.mutateAsync({
+          profileId,
+          commandId: intent.target.id,
+          ...intent.payload,
+        });
+      }
     } catch (error) {
-      reportRefusedSave(error);
+      const failure: KiloCommandSaveFailure =
+        readTrpcErrorField(error, 'code') === 'CONFLICT'
+          ? { kind: 'name-conflict' }
+          : { kind: 'refused' };
+      // The failure belongs to the resource, so it is safe to publish even after
+      // the form closed; `isCurrent` fences the side effect, not the record.
+      attempt.fail(failure);
       return;
     }
-    closeForm();
-  };
-
-  const runUpdate = async (commandId: string, payload: KiloCommandUpdatePayload) => {
-    setServerNameConflict(false);
-    setSaveFailure(null);
-    try {
-      await updateKiloCommand.mutateAsync({ profileId, commandId, ...payload });
-    } catch (error) {
-      reportRefusedSave(error);
-      return;
+    if (attempt.abandon() && form.isCurrent(generation)) {
+      handleClose();
     }
-    closeForm();
   };
 
   const runDelete = async (commandId: string) => {
@@ -294,23 +313,25 @@ export function ProfileKiloCommandsScreen({
         {content}
       </TabScreenScrollView>
 
-      {form !== null ? (
+      {form.isOpen ? (
         <KiloCommandFormSheet
-          command={form.source}
+          command={form.editing}
           existingNames={commands
-            .filter(candidate => candidate.id !== form.source?.id)
+            .filter(candidate => candidate.id !== form.editing?.id)
             .map(candidate => candidate.name)}
-          isSaving={createKiloCommand.isPending || updateKiloCommand.isPending}
-          nameConflictFromServer={serverNameConflict}
+          isSaving={phase?.status === 'pending'}
           saveFailure={saveFailure}
-          onClose={closeForm}
+          onFieldEdited={() => {
+            saves.clearWhere(formKey, () => true);
+          }}
+          onClose={handleClose}
           onCreate={payload => {
-            void runCreate(payload);
+            void saveCommand({ kind: 'create', payload });
           }}
           onUpdate={payload => {
-            const source = form.source;
-            if (source !== null) {
-              void runUpdate(source.id, payload);
+            const target = form.editing;
+            if (target !== null) {
+              void saveCommand({ kind: 'update', target, payload });
             }
           }}
         />

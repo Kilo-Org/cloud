@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -65,6 +65,11 @@ function nameErrorMessage(
   return undefined;
 }
 
+/** The save's refusal: a name the server already has, or any other refusal. */
+export type KiloCommandSaveFailure =
+  | { readonly kind: 'name-conflict' }
+  | { readonly kind: 'refused' };
+
 type KiloCommandFormSheetProps = Readonly<{
   command: KiloCommandSource | null;
   /** Names of the profile's other commands, so a duplicate fails validation inline. */
@@ -73,10 +78,10 @@ type KiloCommandFormSheetProps = Readonly<{
   onClose: () => void;
   onCreate: (payload: KiloCommandCreatePayload) => void;
   onUpdate: (payload: KiloCommandUpdatePayload) => void;
-  /** A server-side name conflict, shown on the name field like a validation error. */
-  nameConflictFromServer?: boolean;
-  /** A failure the caller cannot name, shown inside the sheet instead of only a toast. */
-  saveFailure?: string | null;
+  /** The command's last refusal, each arm rendered where it belongs in the sheet. */
+  saveFailure?: KiloCommandSaveFailure | null;
+  /** A field changed, so the refusal it corrects no longer applies. */
+  onFieldEdited: () => void;
 }>;
 
 /**
@@ -89,9 +94,9 @@ type KiloCommandFormSheetProps = Readonly<{
  * name field keeps exactly what was typed, so a name outside the server's
  * pattern is refused under the field rather than rewritten into a shorter one
  * the reader never chose. A name the profile already uses is refused here from
- * `existingNames`, and one only the server can detect (a stale list) arrives as
- * `nameConflictFromServer` and shows the same message under the field. Any
- * other refused save arrives as `saveFailure` and renders one line inside the
+ * `existingNames`, and one only the server can detect (a stale list) arrives in
+ * `saveFailure` as `name-conflict` and shows the same message under the field.
+ * Any other refused save arrives as `refused` and renders one line inside the
  * sheet, because a toast behind the open sheet is invisible. Create omits empty
  * optional fields so the DB default applies; update sends `null` so an emptied
  * field clears.
@@ -103,8 +108,8 @@ export function KiloCommandFormSheet({
   onClose,
   onCreate,
   onUpdate,
-  nameConflictFromServer = false,
   saveFailure = null,
+  onFieldEdited,
 }: KiloCommandFormSheetProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -116,14 +121,6 @@ export function KiloCommandFormSheet({
   const modelRef = useRef(initial.model);
   const [subtask, setSubtask] = useState(initial.subtask);
   const [error, setError] = useState<KiloCommandFormError | null>(null);
-  // The screen raises the server-reported conflict after a refused save; it stays
-  // up until the name changes, so it never outlives the input it describes.
-  const [serverConflict, setServerConflict] = useState(nameConflictFromServer);
-  useEffect(() => {
-    if (nameConflictFromServer) {
-      setServerConflict(true);
-    }
-  }, [nameConflictFromServer]);
   const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<'name' | 'template'>();
 
   const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
@@ -134,6 +131,7 @@ export function KiloCommandFormSheet({
       agentRef.current !== initial.agent ||
       modelRef.current !== initial.model ||
       subtask !== initial.subtask,
+    isRunning: () => isSaving,
     onDiscard: onClose,
   });
 
@@ -160,7 +158,7 @@ export function KiloCommandFormSheet({
     }
   };
 
-  const nameError = nameErrorMessage(t, error, serverConflict);
+  const nameError = nameErrorMessage(t, error, saveFailure?.kind === 'name-conflict');
 
   return (
     <SessionPageSheet visible onClose={onClose} onRequestDismiss={requestDismiss}>
@@ -180,7 +178,10 @@ export function KiloCommandFormSheet({
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
-        <AccessibleStatus message={saveFailure} className="text-sm" />
+        <AccessibleStatus
+          message={saveFailure?.kind === 'refused' ? t('profiles.slashCommands.saveFailed') : null}
+          className="text-sm"
+        />
         <FormField
           label={t('profiles.slashCommands.name')}
           defaultValue={initial.name}
@@ -195,7 +196,7 @@ export function KiloCommandFormSheet({
           onChangeText={value => {
             nameRef.current = value;
             setError(null);
-            setServerConflict(false);
+            onFieldEdited();
           }}
         />
         <FormField

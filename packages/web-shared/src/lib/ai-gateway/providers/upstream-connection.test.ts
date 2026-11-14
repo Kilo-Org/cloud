@@ -1,0 +1,187 @@
+import { Agent, fetch as undiciFetch } from 'undici';
+import type { LookupOptions } from 'node:dns';
+import {
+  clearUpstreamConnectionCache,
+  lookupPinnedUpstreamAddress,
+  normalizeUpstreamHostname,
+  UpstreamAddressUnverifiedError,
+  upstreamDispatcherFor,
+} from './upstream-connection';
+
+const PUBLIC_IPV4 = '104.18.2.115';
+const PUBLIC_IPV6 = '2606:4700::6812:273';
+
+type LookupCall = [error: unknown, address: unknown, family: unknown];
+
+/**
+ * Runs the pinned lookup and records what it answered. It resolves nothing
+ * itself: the callback is the only way an address leaves the module.
+ */
+function runLookup(hostname: string, options: LookupOptions): LookupCall[] {
+  const calls: LookupCall[] = [];
+  lookupPinnedUpstreamAddress(hostname, options, (error, address, family) => {
+    calls.push([error, address, family]);
+  });
+  return calls;
+}
+
+function refusalOf(calls: LookupCall[]): UpstreamAddressUnverifiedError {
+  const [error, address] = calls[0];
+  if (!(error instanceof UpstreamAddressUnverifiedError)) {
+    throw new Error(`expected a refusal, got ${String(error)}`);
+  }
+  expect(address).toBe('');
+  return error;
+}
+
+function causeOf(error: unknown): unknown {
+  return typeof error === 'object' && error !== null && 'cause' in error ? error.cause : undefined;
+}
+
+describe('normalizeUpstreamHostname', () => {
+  it('lowercases the name and strips one trailing dot', () => {
+    expect(normalizeUpstreamHostname('LLM.Example.COM.')).toBe('llm.example.com');
+    expect(normalizeUpstreamHostname('llm.example.com')).toBe('llm.example.com');
+  });
+});
+
+describe('lookupPinnedUpstreamAddress', () => {
+  beforeEach(() => {
+    clearUpstreamConnectionCache();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('answers the first pinned address for a single-address lookup', () => {
+    upstreamDispatcherFor('pinned.example', [PUBLIC_IPV4, PUBLIC_IPV6]);
+
+    const calls = runLookup('PINNED.Example.', { all: false });
+
+    expect(calls).toEqual([[null, PUBLIC_IPV4, 4]]);
+  });
+
+  it('answers every pinned address with its family when the resolver asks for all', () => {
+    upstreamDispatcherFor('pinned.example', [PUBLIC_IPV4, PUBLIC_IPV6]);
+
+    const calls = runLookup('pinned.example', { all: true });
+
+    expect(calls).toEqual([
+      [
+        null,
+        [
+          { address: PUBLIC_IPV4, family: 4 },
+          { address: PUBLIC_IPV6, family: 6 },
+        ],
+        undefined,
+      ],
+    ]);
+  });
+
+  it('refuses a host with no pin instead of resolving it', () => {
+    const calls = runLookup('unpinned.example', { all: false });
+
+    const error = refusalOf(calls);
+    expect(error.code).toBe('ERR_UPSTREAM_ADDRESS_UNVERIFIED');
+    expect(error.name).toBe('UpstreamAddressUnverifiedError');
+    expect(error.message).toContain('unpinned.example');
+    expect(calls).toHaveLength(1);
+  });
+
+  it('refuses once the pin expires', () => {
+    upstreamDispatcherFor('pinned.example', [PUBLIC_IPV4]);
+    const now = Date.now();
+    jest.spyOn(Date, 'now').mockReturnValue(now + 60_001);
+
+    const calls = runLookup('pinned.example', { all: false });
+
+    expect(refusalOf(calls).message).toContain('no live pin');
+
+    // The expired pin is gone, so a later lookup inside the old TTL still fails.
+    jest.restoreAllMocks();
+    expect(refusalOf(runLookup('pinned.example', { all: false })).code).toBe(
+      'ERR_UPSTREAM_ADDRESS_UNVERIFIED'
+    );
+  });
+});
+
+describe('upstreamDispatcherFor', () => {
+  beforeEach(() => {
+    clearUpstreamConnectionCache();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('refuses an empty address list', () => {
+    expect(() => upstreamDispatcherFor('pinned.example', [])).toThrow(
+      UpstreamAddressUnverifiedError
+    );
+  });
+
+  it.each(['10.1.2.3', '127.0.0.1', '169.254.169.254', 'fd00::1'])(
+    'refuses the non-public address %s',
+    address => {
+      expect(() => upstreamDispatcherFor('pinned.example', [PUBLIC_IPV4, address])).toThrow(
+        UpstreamAddressUnverifiedError
+      );
+    }
+  );
+
+  it('returns the same dispatcher for the same host and another for another host', () => {
+    const first = upstreamDispatcherFor('pinned.example', [PUBLIC_IPV4]);
+    const again = upstreamDispatcherFor('PINNED.example.', [PUBLIC_IPV4]);
+    const other = upstreamDispatcherFor('other.example', [PUBLIC_IPV4]);
+
+    expect(again).toBe(first);
+    expect(other).not.toBe(first);
+  });
+
+  it('closes the oldest dispatcher when the pool passes its bound', () => {
+    const closeSpy = jest.spyOn(Agent.prototype, 'close');
+
+    const oldest = upstreamDispatcherFor('h0.example', [PUBLIC_IPV4]);
+    for (let index = 1; index < 64; index += 1) {
+      upstreamDispatcherFor(`h${index}.example`, [PUBLIC_IPV4]);
+    }
+    expect(closeSpy).not.toHaveBeenCalled();
+
+    upstreamDispatcherFor('h64.example', [PUBLIC_IPV4]);
+
+    // `close()` re-enters itself for its promise, so count the distinct agents.
+    const closed = new Set(closeSpy.mock.contexts);
+    expect(closed.size).toBe(1);
+    expect(closed.has(oldest)).toBe(true);
+
+    expect(runLookup('h64.example', { all: false })).toEqual([[null, PUBLIC_IPV4, 4]]);
+  });
+});
+
+describe('pinned connections and fetch', () => {
+  beforeEach(() => {
+    clearUpstreamConnectionCache();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('fails the fetch with the unverified code when the pin is gone', async () => {
+    const dispatcher = upstreamDispatcherFor('pinned.example', [PUBLIC_IPV4]);
+    const now = Date.now();
+    jest.spyOn(Date, 'now').mockReturnValue(now + 60_001);
+
+    // The package's fetch, not the global one: both live in this module realm,
+    // so the rejection's cause keeps the error object the lookup threw.
+    const error = await undiciFetch('https://pinned.example/v1', { dispatcher }).then(
+      () => null,
+      (reason: unknown) => reason
+    );
+
+    expect(error).toBeInstanceOf(TypeError);
+    expect(causeOf(error)).toBeInstanceOf(UpstreamAddressUnverifiedError);
+    expect(causeOf(error)).toMatchObject({ code: 'ERR_UPSTREAM_ADDRESS_UNVERIFIED' });
+  });
+});

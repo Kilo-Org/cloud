@@ -1,5 +1,7 @@
 import { lookup } from 'node:dns/promises';
+import type { LookupAddress } from 'node:dns';
 import { buildDirectProvider } from './build-direct-provider';
+import { clearUpstreamConnectionCache, lookupPinnedUpstreamAddress } from './upstream-connection';
 import { UPSTREAM_DURATION_BUDGET_MS, upstreamRequest } from './upstream-request';
 import { clearUpstreamUrlPolicyCache } from './upstream-url-policy';
 
@@ -66,7 +68,19 @@ function send(provider: ReturnType<typeof directProvider>, signal?: AbortSignal)
   });
 }
 
-const lookupMock = jest.mocked(lookup);
+type LookupAll = (hostname: string, options: { all: true }) => Promise<LookupAddress[]>;
+
+// The policy awaits the `{ all: true }` overload, so the mock is typed for that
+// one; `jest.mocked` would otherwise pick a single-address overload.
+const lookupMock = jest.mocked(lookup as unknown as LookupAll);
+
+function pinnedAddressOf(hostname: string) {
+  const calls: Array<[unknown, unknown, unknown]> = [];
+  lookupPinnedUpstreamAddress(hostname, { all: false }, (error, address, family) => {
+    calls.push([error, address, family]);
+  });
+  return calls;
+}
 
 function setTargetEnv(value: string | undefined) {
   if (value === undefined) delete process.env.VERCEL_TARGET_ENV;
@@ -76,6 +90,7 @@ function setTargetEnv(value: string | undefined) {
 describe('upstreamRequest upstream URL policy', () => {
   beforeEach(() => {
     clearUpstreamUrlPolicyCache();
+    clearUpstreamConnectionCache();
     lookupMock.mockReset();
   });
 
@@ -99,6 +114,28 @@ describe('upstreamRequest upstream URL policy', () => {
       const [url, init] = fetchMock.mock.calls[0];
       expect(url).toBe(`${PUBLIC_IP_URL}/chat/completions`);
       expect(init?.redirect).toBe('manual');
+    });
+
+    it('pins the checked address the request dials', async () => {
+      lookupMock.mockResolvedValue([{ address: '104.18.2.115', family: 4 }]);
+      mockFetch();
+
+      await send(directProvider('https://llm.example.com/v1'));
+
+      expect(pinnedAddressOf('llm.example.com')).toEqual([[null, '104.18.2.115', 4]]);
+    });
+
+    it('keeps the first checked address when a second resolution would answer another', async () => {
+      lookupMock
+        .mockResolvedValueOnce([{ address: '104.18.2.115', family: 4 }])
+        .mockResolvedValue([{ address: '10.1.2.3', family: 4 }]);
+      mockFetch();
+
+      await send(directProvider('https://llm.example.com/v1'));
+      await send(directProvider('https://llm.example.com/v1'));
+
+      expect(lookupMock).toHaveBeenCalledTimes(1);
+      expect(pinnedAddressOf('llm.example.com')).toEqual([[null, '104.18.2.115', 4]]);
     });
 
     it.each([

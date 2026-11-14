@@ -25,6 +25,8 @@ import {
   rejectDisallowedUpstreamUrls,
   rejectUpstreamRedirect,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
+import { upstreamDispatcherFor } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-connection';
+import type { Dispatcher } from 'undici';
 import { fetchClaudeWithRetry } from '@kilocode/web-shared/lib/auth/claude/http';
 
 type UpstreamFetchFailureFamily =
@@ -383,7 +385,7 @@ export async function upstreamRequest({
     // SSRF guard: see upstream-url-policy.ts. The secure proxy fetches the
     // upstream URL from the relay body, so both hops are checked.
     const enforceUrlPolicy = isUpstreamUrlPolicyEnforced();
-    const urlRejection = enforceUrlPolicy
+    const urlPolicy = enforceUrlPolicy
       ? await rejectDisallowedUpstreamUrls({
           urls: provider.secureProxy ? [outgoing.url, targetUrl] : [outgoing.url],
           providerId: provider.type,
@@ -391,18 +393,26 @@ export async function upstreamRequest({
           signal: combinedSignal,
         })
       : null;
-    if (urlRejection) {
+    if (urlPolicy?.rejected) {
       budgetSignal.removeEventListener('abort', onBudgetExceeded);
-      return { type: 'error', response: urlRejection };
+      return { type: 'error', response: urlPolicy.rejected };
     }
 
-    const requestOptions: RequestInit & { duplex: 'half' } = {
+    // The request below dials the hop this process opens, so it connects to the
+    // addresses the policy checked. The secure-proxy `targetUrl` is a body field
+    // the relay dials itself, so only the policy check applies to it.
+    const dispatcher = urlPolicy
+      ? upstreamDispatcherFor(urlPolicy.allowed[0].hostname, urlPolicy.allowed[0].addresses)
+      : undefined;
+
+    const requestOptions: RequestInit & { duplex: 'half'; dispatcher?: Dispatcher } = {
       method,
       headers: outgoing.headers,
       body: outgoing.body,
       redirect: enforceUrlPolicy ? 'manual' : 'follow',
       duplex: 'half',
       signal: combinedSignal,
+      ...(dispatcher ? { dispatcher } : {}),
     };
     const response =
       provider.type === 'claude-billing'

@@ -53,8 +53,9 @@ jobs:
           set -euo pipefail
           # A tag at this commit means an earlier attempt already decided to
           # release it: reuse the tag and finish that release.
-          EXISTING=$(git tag --points-at HEAD --list 'kilo-mcp-release/*' | head -n 1)
-          PREVIOUS=$(git tag --list 'kilo-mcp-release/*' --sort=-creatordate --no-contains HEAD | head -n 1)
+          # sed -n '1p' consumes the whole list, so git never SIGPIPEs into a closed pipe under pipefail.
+          EXISTING=$(git tag --points-at HEAD --list 'kilo-mcp-release/*' | sed -n '1p')
+          PREVIOUS=$(git tag --list 'kilo-mcp-release/*' --sort=-creatordate --no-contains HEAD | sed -n '1p')
           echo "previous=$PREVIOUS" >> "$GITHUB_OUTPUT"
           echo "resume=$([ -n "$EXISTING" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           if [ -n "$EXISTING" ]; then

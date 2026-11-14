@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+
+import { load } from 'js-yaml';
 
 import {
   CHANGELOG,
@@ -16,10 +18,20 @@ import { bundledPackages, packageRootOf } from './kilo-mcp-sbom.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const NOTES = join(HERE, 'kilo-mcp-release-notes.mjs');
+const WORKFLOW = join(HERE, '..', '.github', 'workflows', 'kilo-mcp-release.yml');
 const HEADER = '# Kilo MCP Changelog\n\nNewest first.\n\n';
+// Any pipe in the check step must carry more than a pipe buffer for the
+// early-closing `head` regression to be reachable: 6000 tags of ~35 bytes.
+const TAG_COUNT = 6000;
+const PIPE_BUFFER = 64 * 1024;
 
-function git(cwd, args) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+function git(cwd, args, env) {
+  return execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    ...(env ? { env: { ...process.env, ...env } } : {}),
+  });
 }
 
 function writeFile(dir, rel, content) {
@@ -62,6 +74,81 @@ function land(clone, heading, body) {
 function branchChangelog(clone) {
   git(clone, ['fetch', '-q', 'origin', 'kilo-mcp-changelog']);
   return git(clone, ['show', `FETCH_HEAD:${CHANGELOG}`]);
+}
+
+/** The `run:` block of the release job's check step. */
+function checkStepScript() {
+  const workflow = load(readFileSync(WORKFLOW, 'utf8'));
+  const step = workflow.jobs.release.steps.find(candidate => candidate.id === 'check');
+  assert.equal(typeof step?.run, 'string');
+  return step.run;
+}
+
+/** A scratch repository with its own identity, outside any checkout. */
+function releaseRepo() {
+  const root = mkdtempSync(join(tmpdir(), 'kilo-mcp-check-'));
+  const repo = join(root, 'repo');
+  mkdirSync(repo);
+  git(repo, ['init', '-q', '-b', 'main']);
+  for (const [key, value] of [
+    ['user.name', 'Kilo Test'],
+    ['user.email', 'test@kilo.ai'],
+    ['commit.gpgsign', 'false'],
+  ]) {
+    git(repo, ['config', key, value]);
+  }
+  return { root, repo };
+}
+
+function commitFiles(repo, files, message, env) {
+  for (const [rel, content] of Object.entries(files)) writeFile(repo, rel, content);
+  git(repo, ['add', '-A']);
+  git(repo, ['commit', '-q', '-m', message], env);
+  return git(repo, ['rev-parse', 'HEAD']).trim();
+}
+
+/** `count` release tags on one commit, created by a single git process. */
+function tagCommit(repo, commit, prefix, count) {
+  const refs = Array.from({ length: count }, (_, index) => {
+    return `create refs/tags/${prefix}${String(index).padStart(7, '0')} ${commit}\n`;
+  }).join('');
+  execFileSync('git', ['update-ref', '--stdin'], {
+    cwd: repo,
+    input: refs,
+    encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+}
+
+/**
+ * Run the check step in `cwd` as the runner does: one bash script with the
+ * step's environment, whose appended step outputs come back parsed.
+ */
+function runCheck(cwd) {
+  const dir = mkdtempSync(join(tmpdir(), 'kilo-mcp-run-'));
+  const script = join(dir, 'step.sh');
+  const output = join(dir, 'output');
+  writeFileSync(script, checkStepScript());
+  writeFileSync(output, '');
+  try {
+    const result = spawnSync('bash', [script], {
+      cwd,
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH, HOME: process.env.HOME, GITHUB_OUTPUT: output },
+    });
+    const outputs = Object.fromEntries(
+      readFileSync(output, 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .map(line => {
+          const at = line.indexOf('=');
+          return [line.slice(0, at), line.slice(at + 1)];
+        })
+    );
+    return { status: result.status, stderr: result.stderr, outputs };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 test('bodyLines links each pull request and drops direct commits', () => {
@@ -187,5 +274,143 @@ test('bundledPackages lists only packages the bundle carries bytes of', () => {
     ]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// The check step pipes two git tag lists through a first-line selector. A
+// selector that closes the pipe after one line kills git with SIGPIPE once the
+// list outgrows the pipe buffer, and `pipefail` then fails the release on a tag
+// history that merely got long enough. These tests run the step's own script
+// against real tag histories larger than a pipe buffer, so the failure is
+// deterministic instead of waiting for enough releases to accumulate.
+
+test('the first release starts from an empty tag history', () => {
+  const { root, repo } = releaseRepo();
+  try {
+    commitFiles(repo, { 'services/kilo-mcp/src/index.ts': 'export const version = 1;\n' }, 'init');
+    const result = runCheck(repo);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.outputs.previous, '');
+    assert.equal(result.outputs.resume, 'false');
+    assert.equal(result.outputs.candidate, 'true');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a rerun resumes from many release tags at the deployed commit', () => {
+  const { root, repo } = releaseRepo();
+  try {
+    commitFiles(repo, { 'services/kilo-mcp/src/index.ts': 'export const version = 1;\n' }, 'init');
+    const head = commitFiles(
+      repo,
+      { 'services/kilo-mcp/src/index.ts': 'export const version = 2;\n' },
+      'deploy'
+    );
+    tagCommit(repo, head, 'kilo-mcp-release/2020-01-01-', TAG_COUNT);
+
+    const tags = git(repo, ['tag', '--points-at', 'HEAD', '--list', 'kilo-mcp-release/*']);
+    assert.ok(tags.length > PIPE_BUFFER, `the pipe carries ${tags.length} bytes of tags`);
+    const existing = tags.split('\n')[0];
+
+    const result = runCheck(repo);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.outputs.tag, existing);
+    assert.equal(result.outputs.resume, 'true');
+    assert.equal(result.outputs.previous, '');
+    assert.equal(result.outputs.candidate, 'true');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('the newest of many historical tags is the previous release', () => {
+  const { root, repo } = releaseRepo();
+  try {
+    const base = commitFiles(
+      repo,
+      { 'services/kilo-mcp/src/index.ts': 'export const version = 1;\n' },
+      'base',
+      { GIT_AUTHOR_DATE: '2020-01-01T00:00:00Z', GIT_COMMITTER_DATE: '2020-01-01T00:00:00Z' }
+    );
+    tagCommit(repo, base, 'kilo-mcp-release/2020-01-01-', TAG_COUNT);
+    const newest = 'kilo-mcp-release/2020-01-02-newest';
+    git(repo, ['tag', '-a', newest, '-m', newest, base], {
+      GIT_COMMITTER_DATE: '2020-01-02T00:00:00Z',
+    });
+    commitFiles(
+      repo,
+      { 'services/kilo-mcp/src/index.ts': 'export const version = 2;\n' },
+      'change'
+    );
+
+    const listed = git(repo, [
+      'tag',
+      '--list',
+      'kilo-mcp-release/*',
+      '--sort=-creatordate',
+      '--no-contains',
+      'HEAD',
+    ]);
+    assert.ok(listed.length > PIPE_BUFFER, `the pipe carries ${listed.length} bytes of tags`);
+    assert.equal(listed.split('\n')[0], newest);
+
+    const result = runCheck(repo);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.outputs.previous, newest);
+    assert.equal(result.outputs.resume, 'false');
+    assert.equal(result.outputs.candidate, 'true');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('the change gate ignores a changelog-only commit and releases a bundle input', () => {
+  const { root, repo } = releaseRepo();
+  try {
+    const base = commitFiles(
+      repo,
+      {
+        'services/kilo-mcp/src/index.ts': 'export const version = 1;\n',
+        'services/kilo-mcp/CHANGELOG.md': '# Kilo MCP\n',
+      },
+      'base'
+    );
+    const previous = 'kilo-mcp-release/2026-01-01-aaaaaaa';
+    git(repo, ['tag', previous, base]);
+
+    commitFiles(
+      repo,
+      { 'services/kilo-mcp/CHANGELOG.md': '# Kilo MCP\n\n## 2026-01-01 (aaaaaaa)\n' },
+      'docs(kilo-mcp): land a section (#1)'
+    );
+    const unchanged = runCheck(repo);
+    assert.equal(unchanged.status, 0, unchanged.stderr);
+    assert.equal(unchanged.outputs.previous, previous);
+    assert.equal(unchanged.outputs.resume, 'false');
+    assert.equal(unchanged.outputs.candidate, 'false');
+
+    commitFiles(repo, { 'patches/example.patch': 'diff --git a/x b/x\n' }, 'build: patch a dep');
+    const changed = runCheck(repo);
+    assert.equal(changed.status, 0, changed.stderr);
+    assert.equal(changed.outputs.previous, previous);
+    assert.equal(changed.outputs.candidate, 'true');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a git failure fails the check instead of reading as an empty history', () => {
+  const root = mkdtempSync(join(tmpdir(), 'kilo-mcp-check-'));
+  const dir = join(root, 'not-a-repository');
+  mkdirSync(dir);
+  try {
+    const result = runCheck(dir);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /not a git repository/);
+    assert.deepEqual(result.outputs, {});
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

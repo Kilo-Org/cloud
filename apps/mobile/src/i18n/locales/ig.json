@@ -3293,6 +3293,7 @@
       "description": "Òtù na-ekerịta kredit, agent na ntọala ya na ndị otu gị.",
       "nameLabel": "Aha òtù",
       "nameRequired": "Tinye aha òtù.",
+      "createdNotListed": "Emepụtala òtù. Ọ ga-apụta na onye na-ahọrọ n'oge na-adịghị anya.",
       "trialNote": "Nnwale Enterprise gị nke ụbọchị 14 na-amalite mgbe ị mepụtara ya. A na-azụ atụmatụ na weebụ."
     },
     "creditActivity": {

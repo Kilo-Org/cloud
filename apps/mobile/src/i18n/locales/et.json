@@ -3293,6 +3293,7 @@
       "description": "Organisatsioon jagab krediiti, agente ja seadeid sinu meeskonnaga.",
       "nameLabel": "Organisatsiooni nimi",
       "nameRequired": "Sisesta organisatsiooni nimi.",
+      "createdNotListed": "Organisatsioon on loodud. See ilmub peagi valijasse.",
       "trialNote": "Sinu 14-päevane Enterprise'i prooviperiood algab organisatsiooni loomisel. Plaane saab osta veebis."
     },
     "creditActivity": {

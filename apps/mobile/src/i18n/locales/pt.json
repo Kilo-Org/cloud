@@ -3352,6 +3352,7 @@
       "description": "Uma organização partilha créditos, agentes e definições com a sua equipa.",
       "nameLabel": "Nome da organização",
       "nameRequired": "Introduza um nome para a organização.",
+      "createdNotListed": "Organização criada. Aparecerá no seletor em breve.",
       "trialNote": "O seu período experimental Enterprise de 14 dias começa quando a criar. Os planos são adquiridos na Web."
     },
     "creditActivity": {

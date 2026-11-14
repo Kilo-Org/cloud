@@ -3293,6 +3293,7 @@
       "description": "Organisaation avulla tiimisi käyttää yhteisiä krediittejä, agentteja ja asetuksia.",
       "nameLabel": "Organisaation nimi",
       "nameRequired": "Anna organisaation nimi.",
+      "createdNotListed": "Organisaatio on luotu. Se ilmestyy pian valitsimeen.",
       "trialNote": "14 päivän Enterprise-kokeilusi alkaa, kun luot organisaation. Paketit ostetaan verkossa."
     },
     "creditActivity": {

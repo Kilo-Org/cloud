@@ -3293,6 +3293,7 @@
       "description": "Ururku wuxuu kooxdaada la wadaagaa kredit, wakiillo iyo dejin.",
       "nameLabel": "Magaca ururka",
       "nameRequired": "Geli magaca ururka.",
+      "createdNotListed": "Ururka waa la sameeyay. Wuxuu dhawaan ka soo muuqan doonaa dooriyaha.",
       "trialNote": "Tijaabadaada Enterprise ee 14-ka maalmood waxay bilaabataa marka aad samayso. Qorshayaasha waxaa laga iibsadaa shabakadda."
     },
     "creditActivity": {

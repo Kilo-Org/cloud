@@ -3293,6 +3293,7 @@
       "description": "A szervezetben a csapatod közösen használja a krediteket, az ügynököket és a beállításokat.",
       "nameLabel": "Szervezet neve",
       "nameRequired": "Add meg a szervezet nevét.",
+      "createdNotListed": "A szervezet létrejött. Hamarosan megjelenik a választóban.",
       "trialNote": "A 14 napos Enterprise próbaidőszak a létrehozáskor indul. Csomagot a weben lehet vásárolni."
     },
     "creditActivity": {

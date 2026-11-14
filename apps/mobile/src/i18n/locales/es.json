@@ -3338,6 +3338,7 @@
       "description": "Una organización comparte créditos, agentes y ajustes con tu equipo.",
       "nameLabel": "Nombre de la organización",
       "nameRequired": "Introduce un nombre para la organización.",
+      "createdNotListed": "Organización creada. Aparecerá en el selector en breve.",
       "trialNote": "Tu prueba de 14 días de Enterprise empieza al crearla. Los planes se compran en la web."
     },
     "creditActivity": {

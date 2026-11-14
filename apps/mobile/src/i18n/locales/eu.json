@@ -3293,6 +3293,7 @@
       "description": "Erakunde batek kredituak, agenteak eta ezarpenak partekatzen ditu zure taldearekin.",
       "nameLabel": "Erakundearen izena",
       "nameRequired": "Idatzi erakundearen izen bat.",
+      "createdNotListed": "Erakundea sortu da. Laster agertuko da hautatzailean.",
       "trialNote": "Zure 14 eguneko Enterprise proba erakundea sortzean hasiko da. Planak webean erosten dira."
     },
     "creditActivity": {

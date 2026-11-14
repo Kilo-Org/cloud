@@ -1,8 +1,10 @@
 // Create-organization screen contract: an empty name is refused before any
 // request, a valid one creates with `autoAddCreator`, the new organization
-// becomes the selection and the router lands on its hub, a failure shows the
-// server's copy, and the submit control stays disabled until a name is typed.
-// The tRPC client is mocked so no request leaves the test.
+// becomes the selection and the stack-safe replace lands on its hub, a create
+// whose screen was left only refreshes the list, a failed refresh reports the
+// organization without moving the selection, a failure shows the server's copy,
+// and the submit control stays disabled until a name is typed. The tRPC client
+// is mocked so no request leaves the test.
 
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -19,11 +21,9 @@ import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 const mocks = vi.hoisted(() => ({
   createMutate: vi.fn(),
   replace: vi.fn(),
-  push: vi.fn(),
   setOrganizationId: vi.fn(),
+  focused: { current: true },
 }));
-
-vi.mock('expo-router', () => ({ useRouter: () => ({ replace: mocks.replace, push: mocks.push }) }));
 
 vi.mock('@/lib/trpc', () => ({
   trpcClient: { organizations: { create: { mutate: mocks.createMutate } } },
@@ -31,6 +31,16 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 vi.mock('@/lib/organization-context', () => ({ useOrganization: () => mocks }));
+
+// The create completes outside the screen's lifetime, so the focus answer and
+// the hub navigation are the doubles this file drives.
+vi.mock('@/lib/navigation/route-focus', () => ({
+  useRouteFocused: () => mocks.focused.current,
+}));
+
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: mocks.replace }),
+}));
 
 vi.mock('@/lib/server-error-copy', () => ({
   organizationErrorMessage: (error: unknown) => (error instanceof Error ? error.message : 'Failed'),
@@ -104,8 +114,8 @@ async function type(renderer: ReactTestRenderer, value: string) {
 beforeEach(() => {
   mocks.createMutate.mockReset();
   mocks.replace.mockClear();
-  mocks.push.mockClear();
   mocks.setOrganizationId.mockClear();
+  mocks.focused.current = true;
 });
 
 describe('CreateOrganizationScreen', () => {
@@ -148,7 +158,10 @@ describe('CreateOrganizationScreen', () => {
 
   it('creates with the trimmed name, selects the new organization and lands on its hub', async () => {
     mocks.createMutate.mockResolvedValue({ organization: { id: 'org-new' } });
-    const { renderer, unmount } = await mount();
+    const { renderer, queryClient, unmount } = await mount();
+    // The refresh the completion waits for has to carry the membership, or the
+    // selection would read as a lost membership.
+    queryClient.setQueryData(['organizations.list'], [{ organizationId: 'org-new' }]);
 
     await type(renderer, '  Acme  ');
     await act(() => {
@@ -158,6 +171,93 @@ describe('CreateOrganizationScreen', () => {
     expect(mocks.createMutate).toHaveBeenCalledWith({ name: 'Acme', autoAddCreator: true });
     expect(mocks.setOrganizationId).toHaveBeenCalledWith('org-new');
     expect(mocks.replace).toHaveBeenCalledWith(ORGANIZATION_HUB_PATH);
+    unmount();
+  });
+
+  it('keeps the submit control disabled while the completion runs', async () => {
+    const pending = Promise.withResolvers<{ organization: { id: string } }>();
+    mocks.createMutate.mockReturnValue(pending.promise);
+    const { renderer, queryClient, unmount } = await mount();
+    queryClient.setQueryData(['organizations.list'], [{ organizationId: 'org-new' }]);
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+    expect(submitOf(renderer).props.disabled).toBe(true);
+
+    await act(() => {
+      pending.resolve({ organization: { id: 'org-new' } });
+    });
+    expect(submitOf(renderer).props.disabled).toBe(false);
+    unmount();
+  });
+
+  it('leaves the selection alone when the screen lost focus before the create finished', async () => {
+    const pending = Promise.withResolvers<{ organization: { id: string } }>();
+    mocks.createMutate.mockReturnValue(pending.promise);
+    const { renderer, queryClient, unmount } = await mount();
+    queryClient.setQueryData(['organizations.list'], [{ organizationId: 'org-new' }]);
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+    // A push covers the screen without unmounting it, so the create must not
+    // move the selection of a screen the person is no longer looking at. In the
+    // app the blur subscription re-renders the screen; the field edit here
+    // gives the component that render, and the focus ref follows it.
+    mocks.focused.current = false;
+    await type(renderer, '  ');
+    await act(() => {
+      pending.resolve({ organization: { id: 'org-new' } });
+    });
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['organizations.list'] });
+    expect(mocks.setOrganizationId).not.toHaveBeenCalled();
+    expect(mocks.replace).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('only refreshes the list when the screen was left before the create finished', async () => {
+    const pending = Promise.withResolvers<{ organization: { id: string } }>();
+    mocks.createMutate.mockReturnValue(pending.promise);
+    const { renderer, queryClient, unmount } = await mount();
+    queryClient.setQueryData(['organizations.list'], [{ organizationId: 'org-new' }]);
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+    unmount();
+    await act(() => {
+      pending.resolve({ organization: { id: 'org-new' } });
+    });
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['organizations.list'] });
+    expect(mocks.setOrganizationId).not.toHaveBeenCalled();
+    expect(mocks.replace).not.toHaveBeenCalled();
+  });
+
+  it('keeps the selection when the refreshed list does not carry the new organization', async () => {
+    mocks.createMutate.mockResolvedValue({ organization: { id: 'org-new' } });
+    const { renderer, queryClient, unmount } = await mount();
+    // The refetch behind the invalidation failed, so the list still holds the
+    // memberships from before the create.
+    queryClient.setQueryData(['organizations.list'], []);
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+
+    expect(mocks.setOrganizationId).not.toHaveBeenCalled();
+    expect(mocks.replace).not.toHaveBeenCalled();
+    expect(texts(renderer)).toContain(
+      'Organization created. It will appear in the picker shortly.'
+    );
     unmount();
   });
 

@@ -3391,6 +3391,7 @@
       "description": "Organizacja udostępnia Twojemu zespołowi wspólne kredyty, agentów i ustawienia.",
       "nameLabel": "Nazwa organizacji",
       "nameRequired": "Wpisz nazwę organizacji.",
+      "createdNotListed": "Organizacja została utworzona. Wkrótce pojawi się w selektorze.",
       "trialNote": "Po utworzeniu organizacji rozpocznie się 14-dniowy okres próbny planu Enterprise. Plany kupuje się w wersji internetowej."
     },
     "creditActivity": {

@@ -3285,6 +3285,7 @@
       "description": "Tổ chức giúp bạn chia sẻ tín dụng, tác nhân và cài đặt với nhóm của mình.",
       "nameLabel": "Tên tổ chức",
       "nameRequired": "Nhập tên tổ chức.",
+      "createdNotListed": "Đã tạo tổ chức. Tổ chức sẽ sớm xuất hiện trong bộ chọn.",
       "trialNote": "Bản dùng thử Enterprise 14 ngày sẽ bắt đầu khi bạn tạo tổ chức. Bạn mua gói trên web."
     },
     "creditActivity": {

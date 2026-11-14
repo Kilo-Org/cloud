@@ -3285,6 +3285,7 @@
       "description": "組織可讓你與團隊共用點數、代理和設定。",
       "nameLabel": "組織名稱",
       "nameRequired": "請輸入組織名稱。",
+      "createdNotListed": "組織已建立。它很快就會顯示在選擇器中。",
       "trialNote": "建立組織後，即會開始 14 天的 Enterprise 試用。套餐需在網頁上購買。"
     },
     "creditActivity": {

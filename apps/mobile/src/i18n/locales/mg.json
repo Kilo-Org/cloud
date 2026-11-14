@@ -3293,6 +3293,7 @@
       "description": "Mizara kredit, agent ary fikirakirana amin'ny ekipanao ny fikambanana.",
       "nameLabel": "Anaran'ny fikambanana",
       "nameRequired": "Ampidiro ny anaran'ny fikambanana.",
+      "createdNotListed": "Vita ny famoronana ny fikambanana. Ho hita ao amin'ny mpanangona izy io tsy ho ela.",
       "trialNote": "Manomboka rehefa mamorona azy ianao ny fanandramana Enterprise 14 andro. Amin'ny tranonkala no ividianana ny drafitra."
     },
     "creditActivity": {

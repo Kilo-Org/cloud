@@ -3452,6 +3452,7 @@
       "description": "Roinneann eagraíocht creidmheasanna, gníomhairí agus socruithe le d'fhoireann.",
       "nameLabel": "Ainm na heagraíochta",
       "nameRequired": "Cuir isteach ainm eagraíochta.",
+      "createdNotListed": "Cruthaíodh an eagraíocht. Beidh sí le feiceáil sa roghnóir go luath.",
       "trialNote": "Tosóidh do thriail 14 lá ar Enterprise nuair a chruthóidh tú í. Ceannaítear pleananna ar an ngréasán."
     },
     "creditActivity": {

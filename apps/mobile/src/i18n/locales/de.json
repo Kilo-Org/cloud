@@ -3285,6 +3285,7 @@
       "description": "Eine Organisation teilt Credits, Agents und Einstellungen mit deinem Team.",
       "nameLabel": "Name der Organisation",
       "nameRequired": "Gib einen Namen für die Organisation ein.",
+      "createdNotListed": "Organisation erstellt. Sie wird in Kürze im Picker angezeigt.",
       "trialNote": "Mit dem Erstellen beginnt deine 14-tägige Enterprise-Testphase. Pläne kaufst du im Web."
     },
     "creditActivity": {

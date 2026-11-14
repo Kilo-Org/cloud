@@ -3399,6 +3399,7 @@
       "description": "Organizacijoje kreditai, agentai ir nustatymai bendrinami su jūsų komanda.",
       "nameLabel": "Organizacijos pavadinimas",
       "nameRequired": "Įveskite organizacijos pavadinimą.",
+      "createdNotListed": "Organizacija sukurta. Ji netrukus pasirodys rinkiklyje.",
       "trialNote": "Sukūrus organizaciją prasidės 14 dienų Enterprise bandomasis laikotarpis. Planai perkami žiniatinklyje."
     },
     "creditActivity": {

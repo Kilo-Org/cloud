@@ -3338,6 +3338,7 @@
       "description": "Une organisation partage ses crédits, ses agents et ses paramètres avec votre équipe.",
       "nameLabel": "Nom de l'organisation",
       "nameRequired": "Saisissez un nom d'organisation.",
+      "createdNotListed": "Organisation créée. Elle apparaîtra bientôt dans le sélecteur.",
       "trialNote": "Votre essai Enterprise de 14 jours commence dès la création de l'organisation. Les formules s'achètent sur le web."
     },
     "creditActivity": {

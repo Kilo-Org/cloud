@@ -3293,6 +3293,7 @@
       "description": "'n Organisasie deel krediete, agente en instellings met jou span.",
       "nameLabel": "Organisasienaam",
       "nameRequired": "Voer 'n organisasienaam in.",
+      "createdNotListed": "Organisasie geskep. Dit sal binnekort in die kieser verskyn.",
       "trialNote": "Jou 14-dae Enterprise-proeftydperk begin wanneer jy dit skep. Planne word op die web gekoop."
     },
     "creditActivity": {

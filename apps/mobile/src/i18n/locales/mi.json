@@ -3293,6 +3293,7 @@
       "description": "Ka tiritiri tētahi rōpū i ngā whiwhinga, i ngā māngai me ngā tautuhinga ki tō tīma.",
       "nameLabel": "Te ingoa o te rōpū",
       "nameRequired": "Tāurutia he ingoa rōpū.",
+      "createdNotListed": "Kua waihangatia te rōpū. Ka puta ākuanei ki te kaikokoti.",
       "trialNote": "Ka tīmata tō whakamātautau Enterprise 14-rā ina waihangatia e koe. Ka hokona ngā mahere i te ipurangi."
     },
     "creditActivity": {

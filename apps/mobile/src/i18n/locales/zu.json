@@ -3293,6 +3293,7 @@
       "description": "Inhlangano yabelana ngamakhredithi, ama-ejenti nezilungiselelo nethimba lakho.",
       "nameLabel": "Igama lenhlangano",
       "nameRequired": "Faka igama lenhlangano.",
+      "createdNotListed": "Inhlangano idaliwe. Izovela kusikhi maduze.",
       "trialNote": "Isivivinyo sakho se-Enterprise sezinsuku eziyi-14 siqala uma uyidala. Izinhlelo zithengwa kuwebhu."
     },
     "creditActivity": {

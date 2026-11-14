@@ -3285,6 +3285,7 @@
       "description": "組織では、クレジット、エージェント、設定をチームで共有できます。",
       "nameLabel": "組織名",
       "nameRequired": "組織名を入力してください。",
+      "createdNotListed": "組織が作成されました。まもなくピッカーに表示されます。",
       "trialNote": "作成すると、14日間のEnterpriseトライアルが始まります。プランはWebで購入できます。"
     },
     "creditActivity": {

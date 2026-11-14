@@ -3293,6 +3293,7 @@
       "description": "Ƙungiya na raba kiredit, wakilai da saituna da tawagarka.",
       "nameLabel": "Sunan ƙungiya",
       "nameRequired": "Shigar da sunan ƙungiya.",
+      "createdNotListed": "An ƙirƙiri ƙungiya. Za ta bayyana a cikin mai ɗaukar hoto nan ba da daɗewa ba.",
       "trialNote": "Gwajin Enterprise na kwanaki 14 zai fara da zarar ka ƙirƙira ta. Ana sayen tsare-tsare a yanar gizo."
     },
     "creditActivity": {

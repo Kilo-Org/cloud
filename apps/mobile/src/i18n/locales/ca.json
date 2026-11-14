@@ -3346,6 +3346,7 @@
       "description": "Una organització comparteix crèdits, agents i configuració amb el teu equip.",
       "nameLabel": "Nom de l'organització",
       "nameRequired": "Introdueix un nom per a l'organització.",
+      "createdNotListed": "Organització creada. Apareixerà aviat al selector.",
       "trialNote": "La prova d'Enterprise de 14 dies comença quan la creïs. Els plans es compren al web."
     },
     "creditActivity": {

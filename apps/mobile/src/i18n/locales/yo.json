@@ -3293,6 +3293,7 @@
       "description": "Àjọ kan máa ń pín kírẹ́dìtì, àwọn aṣojú àti ààtò pẹ̀lú ẹgbẹ́ rẹ.",
       "nameLabel": "Orúkọ àjọ",
       "nameRequired": "Tẹ orúkọ àjọ kan sí i.",
+      "createdNotListed": "A ti ṣẹ̀dá àjọ. Yóò hàn nínú oluka láìpẹ́.",
       "trialNote": "Ìdánwò Enterprise ọlọ́jọ́ 14 rẹ yóò bẹ̀rẹ̀ nígbà tí o bá ṣẹ̀dá rẹ̀. Orí wẹ́ẹ̀bù ni a ti ń ra àwọn ètò."
     },
     "creditActivity": {

@@ -3399,6 +3399,7 @@
       "description": "V organizaciji si z ekipo delite kredite, agente in nastavitve.",
       "nameLabel": "Ime organizacije",
       "nameRequired": "Vnesite ime organizacije.",
+      "createdNotListed": "Organizacija je ustvarjena. Kmalu bo prikazana v izbirniku.",
       "trialNote": "Ko jo ustvarite, se začne vaš 14-dnevni preizkus načrta Enterprise. Načrte kupite na spletu."
     },
     "creditActivity": {

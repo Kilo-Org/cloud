@@ -3293,6 +3293,7 @@
       "description": "Dhaabbanni kreeditii, eejentootaa fi qindaa'ina garee kee waliin qooda.",
       "nameLabel": "Maqaa dhaabbataa",
       "nameRequired": "Maqaa dhaabbataa galchi.",
+      "createdNotListed": "Dhaabbanni uumame. Dhiyootti picker keessatti ni mul'ata.",
       "trialNote": "Yaaliin Enterprise guyyaa 14 kee yeroo dhaabbata uumtu jalqaba. Karoorri weebii irratti bitama."
     },
     "creditActivity": {

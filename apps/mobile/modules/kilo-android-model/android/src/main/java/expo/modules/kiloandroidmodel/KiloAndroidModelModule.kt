@@ -81,7 +81,14 @@ class KiloAndroidModelModule : Module() {
 
     AsyncFunction("generate") { request: Map<String, Any?>, promise: Promise ->
       val id = request["id"] as? String ?: ""
-      startOperation(promise, id = id) { operation ->
+      startOperation(
+        promise,
+        id = id,
+        complete = { completion ->
+          sendEvent("onModelEvent", completion + mapOf("id" to id, "kind" to "done"))
+          promise.resolve(null)
+        }
+      ) { operation ->
         if (id.isEmpty()) throw ModelFailure("invalid_request")
         createBackend(operation).generate(ModelRequest.parse(request)) { text ->
           if (!operation.terminal) {
@@ -107,11 +114,17 @@ class KiloAndroidModelModule : Module() {
     }
   }
 
-  private fun startOperation(
+  /**
+   * Runs [body] in the one inference slot and settles [promise] through
+   * [complete]. The body's result type reaches [complete], so an id-carrying
+   * operation hands its event payload over as the map it already is.
+   */
+  private fun <T> startOperation(
     promise: Promise,
     id: String? = null,
     isDownload: Boolean = false,
-    body: suspend (Operation) -> Any?
+    complete: (T) -> Unit = { promise.resolve(it) },
+    body: suspend (Operation) -> T
   ) {
     enqueue(promise) {
       // Reject rather than queue or overwrite a live inference. The rejected
@@ -128,14 +141,7 @@ class KiloAndroidModelModule : Module() {
         currentCoroutineContext().ensureActive()
         if (!operation.terminal) {
           operation.terminal = true
-          if (id != null) {
-            @Suppress("UNCHECKED_CAST")
-            val completion = result as Map<String, Any>
-            sendEvent("onModelEvent", completion + mapOf("id" to id, "kind" to "done"))
-            promise.resolve(null)
-          } else {
-            promise.resolve(result)
-          }
+          complete(result)
         }
       } catch (error: CancellationException) {
         fail(operation, "cancelled")
@@ -150,19 +156,19 @@ class KiloAndroidModelModule : Module() {
   }
 
   private suspend fun availability(): Map<String, Any> {
-    if (Build.VERSION.SDK_INT < 26) return unavailable("unsupported_os")
+    if (Build.VERSION.SDK_INT < 26) return unavailableAvailability("unsupported_os")
     // Like createBackend: the kept ML Kit class loads only after the SDK guard.
     val backend = try {
       MlKitPromptBackend()
     } catch (error: Exception) {
-      return unavailable("provider_error")
+      return unavailableAvailability("provider_error")
     }
     return try {
       backend.availability()
     } catch (error: CancellationException) {
       throw error
     } catch (error: Exception) {
-      unavailable(backend.classify(error))
+      unavailableAvailability(backend.classify(error))
     } finally {
       closeQuietly(backend)
     }
@@ -219,15 +225,6 @@ class KiloAndroidModelModule : Module() {
       Unit
     }
   }
-
-  private fun unavailable(reason: String): Map<String, Any> = mapOf(
-    "status" to "unavailable",
-    "reason" to reason,
-    "modelId" to "",
-    "contextWindow" to 0,
-    "maxOutputTokens" to 0,
-    "systemInstructions" to false
-  )
 
   private class Operation(
     val promise: Promise,

@@ -53,7 +53,7 @@ describe('PermissionUnreadableNotice mounted', () => {
       .join(' ');
 
     expect(text).toContain('Permission request could not be read');
-    expect(text).toContain('waiting on another permission request it cannot show');
+    expect(text).toContain('waiting on a permission request this app cannot show');
     expect(text).toContain('answer the request in the CLI');
   });
 
@@ -83,7 +83,7 @@ describe('PermissionUnreadableNotice mounted', () => {
 
     expect(announceForA11y).toHaveBeenCalledTimes(1);
     expect(announceForA11y).toHaveBeenCalledWith(
-      'The agent is waiting on another permission request it cannot show. Update the app or the CLI, or answer the request in the CLI to continue.'
+      'The agent is waiting on a permission request this app cannot show, so no card appears for it. Update the app or the CLI, or answer the request in the CLI to continue.'
     );
   });
 });

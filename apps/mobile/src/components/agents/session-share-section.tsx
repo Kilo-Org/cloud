@@ -11,7 +11,13 @@ import { notificationHaptic } from '@/lib/haptics';
 import { useTRPC } from '@/lib/trpc';
 
 import { SharePanelBody } from './session-share-panel';
-import { actionErrorMessage, type CreatedLink, sharePanelOf } from './session-share-state';
+import {
+  actionErrorMessage,
+  type CreatedLink,
+  freshnessOf,
+  type ShareFreshness,
+  sharePanelOf,
+} from './session-share-state';
 
 /**
  * The session's public share link: create it with the same choice the web
@@ -33,6 +39,8 @@ export function SessionShareSection({
   const [includeNewMessages, setIncludeNewMessages] = useState(false);
   /** The link this sheet made, or null. Everything the panel draws about it is on it. */
   const [created, setCreated] = useState<CreatedLink | null>(null);
+  /** What the read taken at the last Copy or Share press proved about `created`. */
+  const [freshness, setFreshness] = useState<ShareFreshness>({ kind: 'unchecked' });
   const [actionError, setActionError] = useState<string | null>(null);
 
   const shareStateQuery = useQuery(
@@ -41,7 +49,7 @@ export function SessionShareSection({
       { enabled: visible, staleTime: 30_000 }
     )
   );
-  const panel = sharePanelOf(created, shareStateQuery);
+  const panel = sharePanelOf(created, shareStateQuery, freshness);
 
   // Closing the sheet drops the transient outcomes, so a reopen starts from the
   // action rather than from the last attempt's feedback. The created URL is one
@@ -50,6 +58,7 @@ export function SessionShareSection({
   useEffect(() => {
     if (!visible) {
       setCreated(null);
+      setFreshness({ kind: 'unchecked' });
       setActionError(null);
     }
   }, [visible]);
@@ -74,6 +83,7 @@ export function SessionShareSection({
         copy: 'idle',
       });
       setActionError(null);
+      setFreshness({ kind: 'unchecked' });
       notificationHaptic(Haptics.NotificationFeedbackType.Success);
       /* Awaited, so the read that can judge this link has started before the
          mutation reports success: the panel then compares against a read taken
@@ -89,6 +99,7 @@ export function SessionShareSection({
     ...trpc.cliSessionsV2.unshare.mutationOptions(),
     onSuccess: () => {
       setCreated(null);
+      setFreshness({ kind: 'unchecked' });
       setActionError(null);
       notificationHaptic(Haptics.NotificationFeedbackType.Success);
       void invalidateShareState();
@@ -109,8 +120,24 @@ export function SessionShareSection({
     });
   };
 
+  /*
+   * A read taken now, not the row on screen: the sheet can stay open while
+   * another device rotates the link, and `staleTime` schedules no read that
+   * would notice. Only this read can tell the URL this sheet made from its
+   * replacement. A link created without an identity has nothing to compare.
+   */
+  const mayDistribute = async (link: CreatedLink): Promise<boolean> => {
+    if (link.publicId === null) {
+      return true;
+    }
+    const read = await shareStateQuery.refetch({ cancelRefetch: false });
+    const settled = freshnessOf(link, read);
+    setFreshness(settled);
+    return settled.kind === 'current';
+  };
+
   const copyLink = async () => {
-    if (created === null) {
+    if (created === null || !(await mayDistribute(created))) {
       return;
     }
     const { url } = created;
@@ -129,7 +156,7 @@ export function SessionShareSection({
   };
 
   const shareLink = async () => {
-    if (created === null) {
+    if (created === null || !(await mayDistribute(created))) {
       return;
     }
     const { url } = created;
@@ -177,6 +204,7 @@ export function SessionShareSection({
         }}
         onCreate={createLink}
         onRetry={() => {
+          setFreshness({ kind: 'unchecked' });
           void shareStateQuery.refetch();
         }}
         onRevoke={revokeLink}

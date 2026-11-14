@@ -7,6 +7,12 @@ import { i18n } from '@/i18n';
 
 import { SessionShareSection } from './session-share-section';
 
+/** What the section's fresh identity read returns when Copy or Share runs. */
+type ShareRefetchResult = {
+  data?: { public_id?: string | null };
+  isError: boolean;
+};
+
 /** What the section's `cliSessionsV2.get` read returns; every case replaces it. */
 type ShareQueryState = {
   data?: { public_id?: string | null };
@@ -14,7 +20,7 @@ type ShareQueryState = {
   isError: boolean;
   isFetching: boolean;
   dataUpdatedAt: number;
-  refetch: () => Promise<void>;
+  refetch: (options?: { cancelRefetch?: boolean }) => Promise<ShareRefetchResult>;
 };
 
 type ShareHandler = (created: {
@@ -32,6 +38,10 @@ type ShareInput = {
 const holder = vi.hoisted(
   (): {
     queryState: ShareQueryState;
+    refetchResult: ShareRefetchResult;
+    refetchCalls: unknown[];
+    clipboardWrites: string[];
+    shares: { message: string; url: string }[];
     shareSuccess: ShareHandler | null;
     unshareSuccess: (() => void) | null;
     lastShareInput: ShareInput | null;
@@ -42,8 +52,12 @@ const holder = vi.hoisted(
       isError: false,
       isFetching: false,
       dataUpdatedAt: 0,
-      refetch: () => Promise.resolve(),
+      refetch: () => Promise.resolve({ isError: false }),
     },
+    refetchResult: { isError: false, data: { public_id: 'share_1' } },
+    refetchCalls: [],
+    clipboardWrites: [],
+    shares: [],
     shareSuccess: null,
     unshareSuccess: null,
     lastShareInput: null,
@@ -89,9 +103,23 @@ vi.mock('@/lib/config', () => ({
 vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success' },
 }));
+vi.mock('expo-clipboard', () => ({
+  setStringAsync: async (text: string) => {
+    holder.clipboardWrites.push(text);
+    await Promise.resolve();
+    return true;
+  },
+}));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
+  Share: {
+    share: async (options: { message: string; url: string }) => {
+      holder.shares.push(options);
+      await Promise.resolve();
+      return { action: 'sharedAction' };
+    },
+  },
   View: 'View',
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -148,6 +176,22 @@ function textContent(root: Instance): string[] {
     .filter(child => child.length > 0);
 }
 
+/**
+ * Press an action and let everything it starts settle inside `act`: the fresh
+ * read, the clipboard import, and the state updates their outcomes produce.
+ */
+async function pressAndSettle(button: Instance): Promise<void> {
+  await act(async () => {
+    (button.props.onPress as () => void)();
+    await vi.dynamicImportSettled();
+    await Promise.resolve();
+  });
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
 beforeEach(() => {
   holder.queryState = {
     data: undefined,
@@ -155,8 +199,16 @@ beforeEach(() => {
     isError: false,
     isFetching: false,
     dataUpdatedAt: 0,
-    refetch: () => Promise.resolve(),
+    refetch: async (options?: { cancelRefetch?: boolean }) => {
+      holder.refetchCalls.push(options);
+      await Promise.resolve();
+      return holder.refetchResult;
+    },
   };
+  holder.refetchResult = { isError: false, data: { public_id: 'share_1' } };
+  holder.refetchCalls = [];
+  holder.clipboardWrites = [];
+  holder.shares = [];
   holder.shareSuccess = null;
   holder.unshareSuccess = null;
   holder.lastShareInput = null;
@@ -364,5 +416,94 @@ describe('SessionShareSection created link', () => {
     rerenderSection(renderer, false);
 
     expect(findByTestID(renderer.root, 'session-share-url')).toHaveLength(0);
+  });
+
+  it('withholds Copy when a press-time read names another capability', async () => {
+    /* The sheet stays open on one device while another rotates the link. The
+       cached row still names the old capability, so only a read taken at the
+       press can tell that Copy would hand out a dead URL. */
+    const renderer = await renderCreatedLink();
+    holder.refetchResult = { isError: false, data: { public_id: 'share_2' } };
+
+    const copy = findByTestID(renderer.root, 'session-share-copy')[0];
+    if (!copy) {
+      throw new Error('missing copy action');
+    }
+    await pressAndSettle(copy);
+
+    expect(holder.clipboardWrites).toEqual([]);
+    expect(holder.refetchCalls).toEqual([{ cancelRefetch: false }]);
+    expect(findByTestID(renderer.root, 'session-share-url')).toHaveLength(0);
+    expect(findByTestID(renderer.root, 'session-share-superseded')).toHaveLength(1);
+  });
+
+  it('withholds the system share sheet when a press-time read names another capability', async () => {
+    const renderer = await renderCreatedLink();
+    holder.refetchResult = { isError: false, data: { public_id: 'share_2' } };
+
+    const share = findByTestID(renderer.root, 'session-share-sheet')[0];
+    if (!share) {
+      throw new Error('missing share action');
+    }
+    await pressAndSettle(share);
+
+    expect(holder.shares).toEqual([]);
+    expect(findByTestID(renderer.root, 'session-share-superseded')).toHaveLength(1);
+  });
+
+  it('blocks distribution and offers the read again when the press-time read fails', async () => {
+    const renderer = await renderCreatedLink();
+    holder.refetchResult = { isError: true, data: undefined };
+
+    const copy = findByTestID(renderer.root, 'session-share-copy')[0];
+    if (!copy) {
+      throw new Error('missing copy action');
+    }
+    await pressAndSettle(copy);
+
+    expect(holder.clipboardWrites).toEqual([]);
+    expect(findByTestID(renderer.root, 'session-share-url')).toHaveLength(0);
+    expect(findByTestID(renderer.root, 'session-share-state-error')).toHaveLength(1);
+    expect(findByTestID(renderer.root, 'session-share-state-retry')).toHaveLength(1);
+  });
+
+  it('hands the URL to Copy and Share when the press-time read names the same capability', async () => {
+    const renderer = await renderCreatedLink();
+
+    const copy = findByTestID(renderer.root, 'session-share-copy')[0];
+    if (!copy) {
+      throw new Error('missing copy action');
+    }
+    await pressAndSettle(copy);
+    expect(holder.clipboardWrites).toEqual(['http://localhost:3000/s/tok_1']);
+    expect(holder.refetchCalls).toEqual([{ cancelRefetch: false }]);
+
+    const share = findByTestID(renderer.root, 'session-share-sheet')[0];
+    if (!share) {
+      throw new Error('missing share action');
+    }
+    await pressAndSettle(share);
+    expect(holder.shares).toEqual([
+      { message: 'http://localhost:3000/s/tok_1', url: 'http://localhost:3000/s/tok_1' },
+    ]);
+    expect(findByTestID(renderer.root, 'session-share-url')).toHaveLength(1);
+  });
+
+  it('distributes a link created without an identity without comparing it', async () => {
+    /* A web server older than the create response's capability field leaves
+       nothing to compare, so Copy must not be blocked by a read that would
+       otherwise look like a replacement. */
+    const renderer = await renderCreatedLink({ share_token: 'tok_1' });
+    holder.refetchResult = { isError: false, data: { public_id: 'share_2' } };
+
+    const copy = findByTestID(renderer.root, 'session-share-copy')[0];
+    if (!copy) {
+      throw new Error('missing copy action');
+    }
+    await pressAndSettle(copy);
+
+    expect(holder.clipboardWrites).toEqual(['http://localhost:3000/s/tok_1']);
+    expect(holder.refetchCalls).toEqual([]);
+    expect(findByTestID(renderer.root, 'session-share-url')).toHaveLength(1);
   });
 });

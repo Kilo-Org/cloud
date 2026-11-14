@@ -32,16 +32,36 @@ export type SharePanel =
   | { readonly kind: 'linkSuperseded' };
 
 /**
+ * What the read taken just before Copy or Share proved about the created link.
+ *
+ * `unchecked` is the start, and every link a web server without the capability
+ * field created stays there: with no identity there is nothing to compare.
+ * `current` names the identity the create returned; `superseded` names another
+ * one (or none), so the URL is dead; `readFailed` did not settle, so the sheet
+ * cannot vouch for the URL.
+ */
+export type ShareFreshness =
+  | { readonly kind: 'unchecked' }
+  | { readonly kind: 'current' }
+  | { readonly kind: 'superseded' }
+  | { readonly kind: 'readFailed' };
+
+/** The read fields that judge a link by the identity it reports. */
+type ShareIdentityRead = Readonly<{
+  isError: boolean;
+  data: Readonly<{ public_id: string | null }> | undefined;
+}>;
+
+/**
  * The `cliSessionsV2.get` read, narrowed to the fields that judge a link: the
  * read's own state, when it answered, and the identity it reported.
  */
-type ShareRead = Readonly<{
-  isError: boolean;
-  isFetching: boolean;
-  isPending: boolean;
-  dataUpdatedAt: number;
-  data: Readonly<{ public_id: string | null }> | undefined;
-}>;
+type ShareRead = ShareIdentityRead &
+  Readonly<{
+    isFetching: boolean;
+    isPending: boolean;
+    dataUpdatedAt: number;
+  }>;
 
 /**
  * The message to show for a failed share action: the server's own wording when
@@ -51,6 +71,26 @@ type ShareRead = Readonly<{
 export function actionErrorMessage(error: unknown, fallback: string): string {
   const message = readTrpcErrorField(error, 'message')?.trim();
   return message !== undefined && message.length > 0 ? message : fallback;
+}
+
+/*
+ * The read taken at a press, which is the only one that can judge distribution:
+ * the sheet can stay open while another device rotates the link, and a cached
+ * row never schedules a read of its own. Its answer either names the capability
+ * this sheet created — still live — or another (or no) identity, which means
+ * the URL is dead. A created link with no identity cannot be compared, so it
+ * stays `unchecked` and distributes as it always did.
+ */
+export function freshnessOf(created: CreatedLink, read: ShareIdentityRead): ShareFreshness {
+  if (created.publicId === null) {
+    return { kind: 'unchecked' };
+  }
+  if (read.isError) {
+    return { kind: 'readFailed' };
+  }
+  return (read.data?.public_id ?? null) === created.publicId
+    ? { kind: 'current' }
+    : { kind: 'superseded' };
 }
 
 /*
@@ -69,13 +109,27 @@ function linkIsSuperseded(created: CreatedLink, read: ShareRead): boolean {
 }
 
 /**
- * Which of the sheet's six states to draw. A read in error outranks the created
- * link: it cannot vouch for a URL, and the link may be dead. Until the session
- * row has been read, whether this session already has a link is unknown — and
- * treating that as "no link" offers a create action whose mutation rotates the
- * share generation and revokes the previous link.
+ * Which of the sheet's six states to draw. A press-time read that found another
+ * identity, or none, outranks everything: the URL cannot be handed out. A read
+ * in error also outranks the created link, because it cannot vouch for a URL and
+ * the link may be dead. Until the session row has been read, whether this
+ * session already has a link is unknown — and treating that as "no link" offers
+ * a create action whose mutation rotates the share generation and revokes the
+ * previous link.
  */
-export function sharePanelOf(created: CreatedLink | null, read: ShareRead): SharePanel {
+export function sharePanelOf(
+  created: CreatedLink | null,
+  read: ShareRead,
+  freshness: ShareFreshness
+): SharePanel {
+  if (created !== null) {
+    if (freshness.kind === 'superseded') {
+      return { kind: 'linkSuperseded' };
+    }
+    if (freshness.kind === 'readFailed') {
+      return { kind: 'readFailed' };
+    }
+  }
   if (read.isError) {
     return { kind: 'readFailed' };
   }

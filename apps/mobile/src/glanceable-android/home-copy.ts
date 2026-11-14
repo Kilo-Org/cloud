@@ -132,8 +132,9 @@ export function buildAndroidHomeCopy(
   const wake =
     content && home.primaryKind === 'scheduled' ? wakeLine(home, translate, formatClock) : null;
   const actionLine = feedback === null ? null : translate(ACTION_FEEDBACK_KEYS[feedback]);
-  const title =
-    !content || home.primaryTitle === null ? null : home.primaryTitle || translate('common.agent');
+  // A content surface always names its agent: an absent title draws the same
+  // generic label the session card uses, never a blank line.
+  const title = content ? home.primaryTitle || translate('common.agent') : null;
   const counts =
     home.primaryKind === null
       ? []

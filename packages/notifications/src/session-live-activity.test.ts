@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { LIVE_ACTIVITY_MAX_LIFETIME_MS } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { buildHomeWidgetDetails, HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
 
 import { LIVE_ACTIVITY_RELEVANCE, sessionLiveActivityContentStateSchema } from './push-data';
 import {
   aggregateLiveActivityRelevance,
   buildSessionLiveActivityContentState,
+  SESSION_LIVE_ACTIVITY_MAX_AGE_MS,
   sessionLiveActivityRelevance,
   sessionLiveActivityTitle,
 } from './session-live-activity';
@@ -205,6 +207,49 @@ describe('buildSessionLiveActivityContentState', () => {
     expect(local.permissionCommand).toBeNull();
   });
 
+  it('replaces the remembered facts a row carries and keeps the ones it omits', () => {
+    const pushed = buildSessionLiveActivityContentState(
+      {
+        id: 'ses_11',
+        status: 'busy',
+        currentStep: { verb: 'editing', target: 'auth.ts' },
+        plan: { done: 1, total: 4, current: 'Read the tests' },
+        changes: { files: 2, added: 10, removed: 1 },
+      },
+      options
+    );
+
+    // A carried fact replaces the remembered one outright; the two never merge.
+    const replaced = buildSessionLiveActivityContentState(
+      {
+        id: 'ses_11',
+        status: 'permission',
+        currentStep: { verb: 'running', target: 'schema.ts' },
+        plan: { done: 2, total: 4, current: 'Write the migration' },
+        changes: { files: 3, added: 40, removed: 4 },
+        permissionCommand: 'pnpm test',
+      },
+      { ...options, previous: pushed }
+    );
+    expect(replaced.currentStep).toEqual({
+      verb: 'running',
+      target: 'schema.ts',
+    });
+    expect(replaced.plan).toEqual({ done: 2, total: 4, current: 'Write the migration' });
+    expect(replaced.changes).toEqual({ files: 3, added: 40, removed: 4 });
+    expect(replaced.permissionCommand).toBe('pnpm test');
+
+    // A row that carries none of them keeps every fact the card already shows.
+    const kept = buildSessionLiveActivityContentState(
+      { id: 'ses_11', status: 'permission' },
+      { ...options, previous: replaced }
+    );
+    expect(kept.currentStep).toEqual(replaced.currentStep);
+    expect(kept.plan).toEqual(replaced.plan);
+    expect(kept.changes).toEqual(replaced.changes);
+    expect(kept.permissionCommand).toBe('pnpm test');
+  });
+
   it('drops the permission command with the key it belongs to', () => {
     const question = buildSessionLiveActivityContentState(
       { id: 'ses_3', status: 'question', permissionCommand: 'rm -rf build' },
@@ -342,6 +387,12 @@ describe('buildSessionLiveActivityContentState', () => {
     } finally {
       parse.mockRestore();
     }
+  });
+});
+
+describe('SESSION_LIVE_ACTIVITY_MAX_AGE_MS', () => {
+  it('is the whole Live Activity lifetime the shared snapshot expiry uses', () => {
+    expect(SESSION_LIVE_ACTIVITY_MAX_AGE_MS).toBe(LIVE_ACTIVITY_MAX_LIFETIME_MS);
   });
 });
 

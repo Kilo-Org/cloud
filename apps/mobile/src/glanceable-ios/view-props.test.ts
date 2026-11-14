@@ -309,4 +309,18 @@ describe('Home-only presentation and timeline', () => {
     expect(JSON.stringify(props)).not.toContain(':null');
     expect(props.home?.scheduledAgents).toEqual([{ title: '' }]);
   });
+
+  it('omits a waiting row’s null title at the UserDefaults boundary', () => {
+    const snapshot = snapshotFor([{ status: 'question' }]);
+    const data: HomeWidgetData = {
+      snapshot,
+      details: {
+        ...EMPTY_HOME_WIDGET_DETAILS,
+        waitingAgents: [{ title: null, kind: 'question' }],
+      },
+    };
+    const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate, data, NOW));
+    expect(JSON.stringify(props)).not.toContain(':null');
+    expect(props.home?.waitingAgents).toEqual([{ kind: 'question' }]);
+  });
 });

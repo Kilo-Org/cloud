@@ -238,10 +238,11 @@ export function toWidgetProps(props: GlanceableViewProps): Partial<GlanceableVie
     return widgetProps;
   }
   // UserDefaults rejects null even inside the nested Home-only payload: its
-  // own nullable fields and each scheduled row's wake.
+  // own nullable fields and each waiting or scheduled row's title and wake.
   return Object.assign(widgetProps, {
     home: {
       ...withoutNulls(home),
+      waitingAgents: home.waitingAgents.map(row => withoutNulls(row)),
       scheduledAgents: home.scheduledAgents.map(row => withoutNulls(row)),
     },
   });

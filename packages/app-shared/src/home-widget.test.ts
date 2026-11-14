@@ -61,7 +61,7 @@ describe('Home-only widget policy', () => {
     expect(homeWidgetRefreshAt(data, now)).toBe(now + 30 * 60 * 1000);
   });
 
-  it('keeps missing titles empty for local fallback and never leaks extra row fields', () => {
+  it('keeps missing titles null for local fallback and never leaks extra row fields', () => {
     const row = {
       status: 'busy',
       title: `\n${'x'.repeat(HOME_WIDGET_TITLE_LIMIT + 1)}`,
@@ -76,7 +76,47 @@ describe('Home-only widget policy', () => {
     for (const forbidden of [row.id, row.prompt, row.repository, scope.userId]) {
       expect(JSON.stringify(data)).not.toContain(forbidden);
     }
-    expect(buildHomeWidgetDetails([{ status: 'permission' }]).waitingAgents[0]?.title).toBe('');
+    expect(buildHomeWidgetDetails([{ status: 'permission' }]).waitingAgents[0]?.title).toBeNull();
+  });
+
+  it('gives an unnamed session no title but keeps one that extends the placeholder', () => {
+    const placeholder = 'New session - 2026-09-22T01:09:45.623Z';
+    const details = buildHomeWidgetDetails([
+      { status: 'permission', title: placeholder, statusUpdatedAt: '2026-10-09T09:00:00Z' },
+      { status: 'question', title: ' \n ', statusUpdatedAt: '2026-10-09T09:10:00Z' },
+      { status: 'retry', title: 'Named', statusUpdatedAt: '2026-10-09T09:20:00Z' },
+      { status: 'scheduled', title: placeholder, scheduledAt: '2026-10-09T11:00:00Z' },
+      {
+        status: 'scheduled',
+        title: `${placeholder} follow-up`,
+        scheduledAt: '2026-10-09T12:00:00Z',
+      },
+    ]);
+    expect(details.primaryTitle).toBeNull();
+    expect(details.waitingAgents.map(row => row.title)).toEqual([null, null, 'Named']);
+    expect(details.scheduledAgents.map(row => row.title)).toEqual([
+      null,
+      `${placeholder} follow-up`,
+    ]);
+    const long = buildHomeWidgetDetails([
+      { status: 'permission', title: 'a'.repeat(HOME_WIDGET_TITLE_LIMIT + 5) },
+    ]);
+    expect(long.primaryTitle).toHaveLength(HOME_WIDGET_TITLE_LIMIT);
+  });
+
+  it('parses a details payload whose rows carry the null title marker', () => {
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [
+        { status: 'permission', title: 'New session - 2026-09-22T01:09:45.623Z' },
+        { status: 'scheduled', title: '   ', scheduledAt: '2026-10-09T11:00:00Z' },
+      ],
+    });
+    const parsed = homeWidgetDataSchema.parse(data);
+    expect(parsed.details.primaryTitle).toBeNull();
+    expect(parsed.details.waitingAgents[0]?.title).toBeNull();
+    expect(parsed.details.scheduledAgents[0]?.title).toBeNull();
+    expect(parsed.details).toEqual(data.details);
   });
 
   it('carries only printed characters in a title', () => {
@@ -339,5 +379,21 @@ describe('native Home presentation timeline', () => {
     expect(buildHomeWidgetPresentationTimeline(data, now + GLANCEABLE_STALE_MS)).toHaveLength(1);
     data.snapshot.status = 'privacy';
     expect(buildHomeWidgetPresentationTimeline(data, now)).toHaveLength(1);
+  });
+
+  it('flips the stale flag exactly at the boundary the timeline publishes', () => {
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [
+        { status: 'permission', title: 'Approve', statusUpdatedAt: '2026-10-09T09:55:00Z' },
+      ],
+    });
+    const deadline = now + 30 * 60 * 1000;
+    const timeline = buildHomeWidgetPresentationTimeline(data, now);
+    expect(timeline.map(entry => entry.at)).toEqual([now, deadline]);
+    expect(buildHomeWidgetPresentation(data, deadline - 1).stale).toBe(false);
+    expect(buildHomeWidgetPresentation(data, deadline).stale).toBe(true);
+    expect(timeline[1]?.home.stale).toBe(true);
+    expect(timeline[1]?.home).toEqual(buildHomeWidgetPresentation(data, deadline));
   });
 });

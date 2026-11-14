@@ -1,4 +1,5 @@
 import {
+  isDefaultSessionTitle,
   sessionDisplayLine,
   sessionLiveCut,
 } from '@kilocode/session-ingest-contracts/session-live-summary';
@@ -32,7 +33,7 @@ export const homeWidgetDetailsSchema = z.object({
   waitingAgents: z
     .array(
       z.object({
-        title: titleSchema,
+        title: titleSchema.nullable(),
         kind: z.enum(GLANCEABLE_NEEDS_INPUT_STATUSES),
       })
     )
@@ -40,7 +41,7 @@ export const homeWidgetDetailsSchema = z.object({
   scheduledAgents: z
     .array(
       z.object({
-        title: titleSchema,
+        title: titleSchema.nullable(),
         scheduledAt: z.string().nullable(),
       })
     )
@@ -121,6 +122,17 @@ export function glanceableTitle(value: string | null | undefined): string {
   return sessionLiveCut(title, HOME_WIDGET_TITLE_LIMIT);
 }
 
+/**
+ * The name every glanceable surface gives a session: the shared display cut,
+ * or null when the session has no user-facing name — an empty title or the
+ * backend `New session - <ISO>` creation placeholder. A null title draws the
+ * surface's own generic agent label instead.
+ */
+export function glanceableSessionTitle(value: string | null | undefined): string | null {
+  const title = glanceableTitle(value);
+  return title === '' || isDefaultSessionTitle(title) ? null : title;
+}
+
 /** Same authorized rows as counts, with stable ties and unknown times ranked last. */
 export function buildHomeWidgetDetails(
   sessions: readonly HomeWidgetSessionRow[]
@@ -154,16 +166,16 @@ export function buildHomeWidgetDetails(
             )[0];
   return {
     approvalKey: waiting.find(row => row.approvalKey != null)?.approvalKey ?? null,
-    primaryTitle: primary === undefined ? null : glanceableTitle(primary.title),
+    primaryTitle: primary === undefined ? null : glanceableSessionTitle(primary.title),
     waitingAgents: waiting.slice(0, HOME_WIDGET_DETAIL_LIMIT).flatMap(row => {
       // The status fold above admits only needs-input statuses; a status that
       // is not one of them has no kind here and the row is dropped rather
       // than mislabelled.
       const kind = glanceableNeedsInputKind(row.status);
-      return kind === null ? [] : [{ title: glanceableTitle(row.title), kind }];
+      return kind === null ? [] : [{ title: glanceableSessionTitle(row.title), kind }];
     }),
     scheduledAgents: scheduled.slice(0, HOME_WIDGET_DETAIL_LIMIT).map(row => ({
-      title: glanceableTitle(row.title),
+      title: glanceableSessionTitle(row.title),
       scheduledAt: timestampToIso(row.scheduledAt),
     })),
   };
@@ -183,6 +195,24 @@ export function buildHomeWidgetData(
   };
 }
 
+/**
+ * The confirmed check time and the moment its refresh window lapses. The
+ * presentation's `stale` flag and the timeline entry that flips it both read
+ * this one pair, so the native aging boundary cannot disagree with the flag.
+ */
+function staleness(data: HomeWidgetData): { checkedAt: string | null; staleAt: number | null } {
+  const { snapshot } = data;
+  const terminal = isTerminalGlanceableStatus(snapshot.status);
+  const primaryKind = terminal ? null : (PRIORITY.find(kind => snapshot[kind] > 0) ?? null);
+  const checkedAt =
+    terminal || (primaryKind === null && snapshot.status !== 'empty') ? null : snapshot.updatedAt;
+  const confirmedAt = timestampMs(checkedAt);
+  return {
+    checkedAt,
+    staleAt: confirmedAt === null ? null : confirmedAt + refreshInterval(snapshot),
+  };
+}
+
 /** Pure policy: counts survive activity expiry; only explicit privacy/auth clears hide them. */
 export function buildHomeWidgetPresentation(
   data: HomeWidgetData,
@@ -191,9 +221,7 @@ export function buildHomeWidgetPresentation(
   const { snapshot, details } = data;
   const terminal = isTerminalGlanceableStatus(snapshot.status);
   const primaryKind = terminal ? null : (PRIORITY.find(kind => snapshot[kind] > 0) ?? null);
-  const checkedAt =
-    terminal || (primaryKind === null && snapshot.status !== 'empty') ? null : snapshot.updatedAt;
-  const confirmedAt = timestampMs(checkedAt);
+  const { checkedAt, staleAt } = staleness(data);
   const wake = snapshot.scheduled > 0 ? timestampMs(snapshot.scheduledAt) : null;
   const scheduledAt = snapshot.scheduled > 0 ? timestampToIso(snapshot.scheduledAt) : null;
   return {
@@ -221,7 +249,7 @@ export function buildHomeWidgetPresentation(
       !terminal &&
       (snapshot.status === 'stale' ||
         snapshot.status === 'expired' ||
-        (confirmedAt !== null && now >= confirmedAt + refreshInterval(snapshot))),
+        (staleAt !== null && now >= staleAt)),
     scheduledAt: terminal ? null : scheduledAt,
     approvalKey: terminal || snapshot.needsInput === 0 ? null : details.approvalKey,
     awaitingUpdate: !terminal && wake !== null && now >= wake,
@@ -252,8 +280,7 @@ export function buildHomeWidgetPresentationTimeline(
   const times = [now];
   const { snapshot } = data;
   if (!isTerminalGlanceableStatus(snapshot.status)) {
-    const checked = timestampMs(buildHomeWidgetPresentation(data, now).checkedAt);
-    const staleAt = checked === null ? null : checked + refreshInterval(snapshot);
+    const { staleAt } = staleness(data);
     if (staleAt !== null && staleAt > now) times.push(staleAt);
     const wake = snapshot.scheduled > 0 ? timestampMs(snapshot.scheduledAt) : null;
     if (wake !== null && wake > now && wake !== staleAt) times.push(wake);

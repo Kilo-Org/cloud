@@ -748,6 +748,40 @@ describe('stress', () => {
     expect(texts(tree)).toContain('Agent');
   });
 
+  it.each(HOME_FAMILIES)('names a placeholder-title agent generically in %s', family => {
+    const placeholder = `New session - ${new Date(NOW - 40 * MINUTE).toISOString()}`;
+    const tree = render(propsFor([{ status: 'question', title: placeholder }]), family);
+    expect(texts(tree)).toContain('Agent');
+    expect(texts(tree)).not.toContain(placeholder);
+  });
+
+  it.each(HOME_FAMILIES)('draws no name for persisted props with no Home data in %s', family => {
+    // Props an older build wrote carry counts only. They have no title to draw,
+    // and the generic label belongs to a Home presentation whose title is
+    // absent, not to the absence of the whole presentation.
+    const legacy = {
+      countLines: [{ label: 'Needs input', kind: 'needsInput', count: 1 }],
+      primaryKind: 'needsInput',
+      primaryLabel: 'Needs input',
+      primaryCount: 1,
+      accessibilityLabel: 'Needs input, Open agents',
+    } as unknown as GlanceableWidgetProps;
+    expect(texts(render(legacy, family))).not.toContain('Agent');
+  });
+
+  it.each(HOME_FAMILIES)(
+    'passes a named title through and draws none without content in %s',
+    family => {
+      const named = render(
+        propsFor([{ status: 'question', title: 'Pick a badge colour' }]),
+        family
+      );
+      expect(texts(named)).toContain('Pick a badge colour');
+      const signedOut = render(propsFor([], { status: 'signed_out' }), family);
+      expect(texts(signedOut)).not.toContain('Agent');
+    }
+  );
+
   it('contains malformed persisted props without throwing in any family', () => {
     const corrupt = {
       countLines: [null, { kind: 'unknown', count: 'bad', label: {} }],

@@ -225,6 +225,13 @@ describe('shared Home presentation localization', () => {
     expect(props.home?.awaitingUpdate).toBe(false);
   });
 
+  it('names a content surface generically when its title is absent, and passes a named one through', () => {
+    const untitled = propsFor(dataFor([{ status: 'question' }]));
+    expect(untitled.home).toMatchObject({ status: 'content', primaryTitle: null });
+    expect(untitled.homeCopy?.title).toBe('Agent');
+    expect(propsFor(MIXED).homeCopy?.title).toBe('Permission title');
+  });
+
   it('localizes missing titles generically and carries each waiting reason', () => {
     const data = dataFor([{ status: 'permission' }, { status: 'question' }, { status: 'retry' }]);
     expect(propsFor(data).homeCopy?.waitingAgents).toEqual([

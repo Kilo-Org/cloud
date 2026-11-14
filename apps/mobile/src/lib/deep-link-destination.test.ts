@@ -86,6 +86,12 @@ describe('opensAppRoutePath', () => {
     `kiloapp://agent-chat/${SESSION_ID}`,
     'kiloapp://pr-review/Kilo-Org/cloud/6234',
     'kiloapp://security-agent/personal',
+    // The link shapes the seed fixtures record, so the form a fixture hands a
+    // reader is the form the mapper forwards.
+    'kiloapp:///(app)/agent-briefing/34d743e6-7bb8-4dd1-880c-580bd8d907d5',
+    'kiloapp:///(app)/(tabs)/(2_agents)/history',
+    'kiloapp:///(app)/profile-management/34d743e6-7bb8-4dd1-880c-580bd8d907d5/mcp',
+    'kiloapp:///(app)/agent-chat/new?preselectRunOn=computer',
   ])('opens the app route %s', path => {
     expect(opensAppRoutePath(path)).toBe(true);
   });
@@ -94,7 +100,11 @@ describe('opensAppRoutePath', () => {
     'kiloapp:///',
     'kiloapp://',
     'kiloapp:///definitely-not-a-route',
+    // A `dev/` fixture link is answered by `+native-intent` before this mapper,
+    // so the mapper must never forward one.
     'kiloapp:///dev/unknown-fixture',
+    'kiloapp:///dev/account-picker-sheet-fixture',
+    'kiloapp:///dev/pr-review-entry-fixture?state=empty',
     'https://app.kilo.ai/admin',
     'https://example.com/profile',
     'not a url',

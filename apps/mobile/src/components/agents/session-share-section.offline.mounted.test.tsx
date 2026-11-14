@@ -2,7 +2,7 @@ import { onlineManager } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { deferred, flushQueryUpdates as flush } from '@/lib/active-sessions-live-sync.test-helpers';
+import { deferred, flushQueryUpdates } from '@/lib/active-sessions-live-sync.test-helpers';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import {
   renderWithProviders,
@@ -105,6 +105,21 @@ function press(renderer: Renderer, testID: string): void {
   });
 }
 
+/** The query notifications a press schedules land in a timer, so flush inside act. */
+async function settle(): Promise<void> {
+  await act(async () => {
+    await flushQueryUpdates();
+  });
+}
+
+async function pressAndSettle(renderer: Renderer, testID: string): Promise<void> {
+  const run = pressHandler(only(renderer, testID));
+  await act(async () => {
+    run();
+    await flushQueryUpdates();
+  });
+}
+
 let tree: RenderWithProvidersResult | undefined = undefined;
 
 async function mount(): Promise<Renderer> {
@@ -138,9 +153,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  onlineManager.setOnline(true);
   tree?.unmount();
   tree = undefined;
+  onlineManager.setOnline(true);
 });
 
 describe('SessionShareSection offline distribution', () => {
@@ -159,8 +174,8 @@ describe('SessionShareSection offline distribution', () => {
       copy();
       copy();
     });
-    await flush();
-    await flush();
+    await settle();
+    await settle();
 
     // The attempt, not a paused read: `SETTLE_WHILE_OFFLINE` sends it and the
     // failure settles it. One guarded press, so the duplicate started nothing.
@@ -174,7 +189,7 @@ describe('SessionShareSection offline distribution', () => {
 
     // The read again recovers the live link instead of leaving the sheet stuck.
     state.get.mockResolvedValue({ public_id: 'share_1' });
-    press(renderer, 'session-share-state-retry');
+    await pressAndSettle(renderer, 'session-share-state-retry');
     await waitFor(() => nodes(renderer, 'session-share-url').length === 1);
     expect(state.clipboardWrites).toEqual([]);
   });
@@ -188,9 +203,8 @@ describe('SessionShareSection offline distribution', () => {
     });
     const attemptsBefore = state.get.mock.calls.length;
     state.get.mockImplementation(() => Promise.reject(new Error('Network request failed')));
-    press(renderer, 'session-share-sheet');
-    await flush();
-    await flush();
+    await pressAndSettle(renderer, 'session-share-sheet');
+    await settle();
 
     expect(state.get.mock.calls.length - attemptsBefore).toBe(1);
     expect(state.shares).toEqual([]);
@@ -207,7 +221,7 @@ describe('SessionShareSection offline distribution', () => {
     await createLink(renderer);
     // Let the create's invalidation read finish before swapping the read's
     // implementation: only the presses below may start a read.
-    await flush();
+    await settle();
 
     const read = deferred<ShareRow>();
     state.get.mockReset();
@@ -222,7 +236,7 @@ describe('SessionShareSection offline distribution', () => {
       url();
       copy();
     });
-    await flush();
+    await settle();
 
     expect(state.get).toHaveBeenCalledTimes(1);
     expect(only(renderer, 'session-share-copy').props.disabled).toBe(true);

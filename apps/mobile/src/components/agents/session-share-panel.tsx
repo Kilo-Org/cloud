@@ -7,7 +7,11 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 
-import { DURATION_LABEL_KEYS, ShareActiveLink } from './session-share-active-link';
+import {
+  DURATION_LABEL_KEYS,
+  ShareActiveLink,
+  type ShareDistribution,
+} from './session-share-active-link';
 import { type SharePanel } from './session-share-state';
 
 /** The share durations the worker accepts, in the order the row shows them. */
@@ -226,6 +230,7 @@ export function SharePanelBody({
   busy,
   creating,
   revoking,
+  distribution,
   retrying,
   onCopy,
   onShare,
@@ -241,6 +246,7 @@ export function SharePanelBody({
   busy: boolean;
   creating: boolean;
   revoking: boolean;
+  distribution: ShareDistribution | null;
   retrying: boolean;
   onCopy: () => void;
   onShare: () => void;
@@ -257,6 +263,8 @@ export function SharePanelBody({
         includeNewMessages={includeNewMessages}
         copyState={panel.copy}
         busy={busy}
+        revoking={revoking}
+        distribution={distribution}
         onCopy={onCopy}
         onShare={onShare}
         onRevoke={onRevoke}

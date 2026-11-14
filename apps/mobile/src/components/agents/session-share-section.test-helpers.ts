@@ -1,20 +1,16 @@
-import { act, TestRenderer } from '@/test/renderer';
-import { createElement } from 'react';
 import type * as ReactI18next from 'react-i18next';
 import { beforeEach, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 
-import { SessionShareSection } from './session-share-section';
-
 /** What the section's fresh identity read returns when Copy or Share runs. */
-type ShareRefetchResult = {
+export type ShareRefetchResult = {
   data?: { public_id?: string | null };
   isError: boolean;
 };
 
 /** What the section's `cliSessionsV2.get` read returns; every case replaces it. */
-type ShareQueryState = {
+export type ShareQueryState = {
   data?: { public_id?: string | null };
   isPending: boolean;
   isError: boolean;
@@ -23,10 +19,10 @@ type ShareQueryState = {
   refetch: (options?: { cancelRefetch?: boolean }) => Promise<ShareRefetchResult>;
 };
 
-type ShareHandler = (created: {
+export type ShareCreated = {
   share_token: string;
   public_id?: string | null;
-}) => Promise<void> | void;
+};
 
 /** What the section asks the share mutation to create. */
 type ShareInput = {
@@ -35,16 +31,40 @@ type ShareInput = {
   include_new_messages: boolean;
 };
 
+type ShareSuccess = (
+  created: ShareCreated,
+  input: ShareInput | null,
+  context: unknown
+) => Promise<void> | void;
+
+type ShareFailure = (error: unknown, input: ShareInput | null, context: unknown) => void;
+
+type ShareConfirmConfig = { onConfirm: () => void };
+
+/** The handlers the section registered with each mutation. */
+type MutationOptions = {
+  share?: boolean;
+  unshare?: boolean;
+  onMutate?: () => unknown;
+  onSuccess?: (result: unknown, input: unknown, context: unknown) => unknown;
+  onError?: (error: unknown, input: unknown, context: unknown) => unknown;
+};
+
 const holder = vi.hoisted(
   (): {
     queryState: ShareQueryState;
+    queryOptions: unknown;
     refetchResult: ShareRefetchResult;
     refetchCalls: unknown[];
     clipboardWrites: string[];
     shares: { message: string; url: string }[];
-    shareSuccess: ShareHandler | null;
-    unshareSuccess: (() => void) | null;
+    shareSuccess: ShareSuccess | null;
+    shareError: ShareFailure | null;
+    shareOnMutate: (() => unknown) | null;
+    shareContext: unknown;
     lastShareInput: ShareInput | null;
+    lastUnshareInput: unknown;
+    confirm: ShareConfirmConfig | null;
   } => ({
     queryState: {
       data: undefined,
@@ -54,44 +74,70 @@ const holder = vi.hoisted(
       dataUpdatedAt: 0,
       refetch: () => Promise.resolve({ isError: false }),
     },
+    queryOptions: null,
     refetchResult: { isError: false, data: { public_id: 'share_1' } },
     refetchCalls: [],
     clipboardWrites: [],
     shares: [],
     shareSuccess: null,
-    unshareSuccess: null,
+    shareError: null,
+    shareOnMutate: null,
+    shareContext: undefined,
     lastShareInput: null,
+    lastUnshareInput: undefined,
+    confirm: null,
   })
 );
 export { holder };
 
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => holder.queryState,
+  useQuery: (options: unknown) => {
+    holder.queryOptions = options;
+    return holder.queryState;
+  },
   useQueryClient: () => ({ invalidateQueries: () => Promise.resolve() }),
-  useMutation: (options: {
-    share?: boolean;
-    onSuccess?: (created: { share_token: string }) => Promise<void> | void;
-    unshare?: boolean;
-  }) => {
-    if (options.share) {
-      holder.shareSuccess = options.onSuccess ?? null;
+  useMutation: (options: MutationOptions) => {
+    if (options.share === true) {
+      const success = options.onSuccess;
+      holder.shareSuccess =
+        success === undefined
+          ? null
+          : async (created, input, context) => {
+              await success(created, input, context);
+            };
+      const failure = options.onError;
+      holder.shareError =
+        failure === undefined
+          ? null
+          : (error, input, context) => {
+              failure(error, input, context);
+            };
+      holder.shareOnMutate = options.onMutate ?? null;
       return {
         mutate: (input: ShareInput) => {
           holder.lastShareInput = input;
+          holder.shareContext = options.onMutate?.();
         },
         isPending: false,
       };
     }
-    holder.unshareSuccess = options.onSuccess as never;
-    return { mutate: () => undefined, isPending: false };
+    return {
+      mutate: (input: unknown) => {
+        holder.lastUnshareInput = input;
+      },
+      isPending: false,
+    };
   },
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     cliSessionsV2: {
-      get: { queryOptions: () => ({}), queryKey: () => ['get'] },
-      share: { mutationOptions: () => ({ share: true }) },
-      unshare: { mutationOptions: () => ({ unshare: true }) },
+      get: {
+        queryOptions: (_input: unknown, options?: Record<string, unknown>) => ({ ...options }),
+        queryKey: () => ['get'],
+      },
+      share: { mutationOptions: (config?: object) => ({ ...config, share: true }) },
+      unshare: { mutationOptions: (config?: object) => ({ ...config, unshare: true }) },
     },
   }),
 }));
@@ -127,7 +173,12 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/components/ui/dialog', () => ({
-  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
+  useConfirmDialog: () => ({
+    confirm: (config: ShareConfirmConfig) => {
+      holder.confirm = config;
+    },
+    dialog: null,
+  }),
 }));
 vi.mock('@/components/ui/text', async () => {
   const React = await import('react');
@@ -140,58 +191,6 @@ vi.mock('react-i18next', async importOriginal => {
     useTranslation: () => ({ t: (key: string) => i18n.t(key) }),
   };
 });
-
-export type Renderer = TestRenderer.ReactTestRenderer;
-type Instance = TestRenderer.ReactTestInstance;
-
-export function renderSection(visible = true): Renderer {
-  const ref: { current: Renderer | undefined } = { current: undefined };
-  act(() => {
-    ref.current = TestRenderer.create(
-      createElement(SessionShareSection, { sessionId: 'ses-123', visible })
-    );
-  });
-  const renderer = ref.current;
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
-  return renderer;
-}
-
-export function rerenderSection(renderer: Renderer, visible = true): void {
-  act(() => {
-    renderer.update(createElement(SessionShareSection, { sessionId: 'ses-123', visible }));
-  });
-}
-
-export function findByTestID(root: Instance, testID: string): Instance[] {
-  return root.findAll(node => node.props.testID === testID);
-}
-
-export function textContent(root: Instance): string[] {
-  return root
-    .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
-    .map(node =>
-      node.children.filter((child): child is string => typeof child === 'string').join('')
-    )
-    .filter(child => child.length > 0);
-}
-
-/**
- * Press an action and let everything it starts settle inside `act`: the fresh
- * read, the clipboard import, and the state updates their outcomes produce.
- */
-export async function pressAndSettle(button: Instance): Promise<void> {
-  await act(async () => {
-    (button.props.onPress as () => void)();
-    await vi.dynamicImportSettled();
-    await Promise.resolve();
-  });
-  await act(async () => {
-    await Promise.resolve();
-    await Promise.resolve();
-  });
-}
 
 beforeEach(() => {
   holder.queryState = {
@@ -206,11 +205,16 @@ beforeEach(() => {
       return holder.refetchResult;
     },
   };
+  holder.queryOptions = null;
   holder.refetchResult = { isError: false, data: { public_id: 'share_1' } };
   holder.refetchCalls = [];
   holder.clipboardWrites = [];
   holder.shares = [];
   holder.shareSuccess = null;
-  holder.unshareSuccess = null;
+  holder.shareError = null;
+  holder.shareOnMutate = null;
+  holder.shareContext = undefined;
   holder.lastShareInput = null;
+  holder.lastUnshareInput = undefined;
+  holder.confirm = null;
 });

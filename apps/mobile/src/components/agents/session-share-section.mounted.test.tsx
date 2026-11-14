@@ -2,15 +2,18 @@ import { act } from '@/test/renderer';
 import { describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { holder } from './session-share-section.test-helpers';
 import {
   findByTestID,
-  holder,
+  findOne,
+  pressAction,
   pressAndSettle,
-  type Renderer,
+  renderCreatedLink,
   renderSection,
   rerenderSection,
+  setReadState,
   textContent,
-} from './session-share-section.test-helpers';
+} from './session-share-section.test-utils';
 
 describe('SessionShareSection state gates', () => {
   it('shows a loading row and no create action while the session row is pending', () => {
@@ -21,7 +24,7 @@ describe('SessionShareSection state gates', () => {
   });
 
   it('offers the read again instead of create when the session row failed', () => {
-    holder.queryState = { ...holder.queryState, isPending: false, isError: true };
+    setReadState({ isPending: false, isError: true });
     const renderer = renderSection();
 
     expect(findByTestID(renderer.root, 'session-share-state-error')).toHaveLength(1);
@@ -30,12 +33,7 @@ describe('SessionShareSection state gates', () => {
   });
 
   it('shows the create form only once the read reports no live link', () => {
-    holder.queryState = {
-      ...holder.queryState,
-      data: { public_id: null },
-      isPending: false,
-      dataUpdatedAt: 1,
-    };
+    setReadState({ data: { public_id: null }, isPending: false, dataUpdatedAt: 1 });
     const renderer = renderSection();
 
     expect(findByTestID(renderer.root, 'session-share-create')).toHaveLength(1);
@@ -43,12 +41,7 @@ describe('SessionShareSection state gates', () => {
   });
 
   it('shows the existing-link state with the controls a replacement uses', () => {
-    holder.queryState = {
-      ...holder.queryState,
-      data: { public_id: 'share_1' },
-      isPending: false,
-      dataUpdatedAt: 1,
-    };
+    setReadState({ data: { public_id: 'share_1' }, isPending: false, dataUpdatedAt: 1 });
     const renderer = renderSection();
 
     expect(findByTestID(renderer.root, 'session-share-existing')).toHaveLength(1);
@@ -67,12 +60,7 @@ describe('SessionShareSection state gates', () => {
   });
 
   it('replaces the existing link with the chosen duration and scope', () => {
-    holder.queryState = {
-      ...holder.queryState,
-      data: { public_id: 'share_1' },
-      isPending: false,
-      dataUpdatedAt: 1,
-    };
+    setReadState({ data: { public_id: 'share_1' }, isPending: false, dataUpdatedAt: 1 });
     const renderer = renderSection();
 
     const duration = renderer.root.findAll(
@@ -84,20 +72,14 @@ describe('SessionShareSection state gates', () => {
     act(() => {
       (duration.props.onChange as (value: string) => void)('1d');
     });
-    const include = findByTestID(renderer.root, 'session-share-include-new')[0];
-    if (!include) {
-      throw new Error('missing include switch');
-    }
     act(() => {
-      (include.props.onValueChange as (value: boolean) => void)(true);
+      (
+        findOne(renderer, 'session-share-include-new').props.onValueChange as (
+          value: boolean
+        ) => void
+      )(true);
     });
-    const replace = findByTestID(renderer.root, 'session-share-rotate')[0];
-    if (!replace) {
-      throw new Error('missing replace action');
-    }
-    act(() => {
-      (replace.props.onPress as () => void)();
-    });
+    pressAction(findOne(renderer, 'session-share-rotate'));
 
     expect(holder.lastShareInput).toEqual({
       session_id: 'ses-123',
@@ -105,30 +87,19 @@ describe('SessionShareSection state gates', () => {
       include_new_messages: true,
     });
   });
+
+  it('settles the session read even while the device reports offline', () => {
+    renderSection();
+
+    expect(holder.queryOptions).toMatchObject({
+      enabled: true,
+      networkMode: 'always',
+      refetchOnReconnect: true,
+    });
+  });
 });
 
 describe('SessionShareSection created link', () => {
-  async function renderCreatedLink(created?: {
-    share_token: string;
-    public_id?: string | null;
-  }): Promise<Renderer> {
-    holder.queryState = {
-      ...holder.queryState,
-      data: { public_id: 'share_1' },
-      isPending: false,
-      dataUpdatedAt: 1,
-    };
-    const renderer = renderSection();
-    const onSuccess = holder.shareSuccess;
-    if (onSuccess === null) {
-      throw new Error('the share mutation was not registered');
-    }
-    await act(async () => {
-      await onSuccess(created ?? { share_token: 'tok_1', public_id: 'share_1' });
-    });
-    return renderer;
-  }
-
   it('shows the created link once the share mutation succeeds', async () => {
     const renderer = await renderCreatedLink();
 
@@ -140,11 +111,7 @@ describe('SessionShareSection created link', () => {
     const renderer = await renderCreatedLink();
 
     // A read taken after the create that names the same capability: still live.
-    holder.queryState = {
-      ...holder.queryState,
-      data: { public_id: 'share_1' },
-      dataUpdatedAt: Date.now() + 1_000,
-    };
+    setReadState({ data: { public_id: 'share_1' }, dataUpdatedAt: Date.now() + 1_000 });
     rerenderSection(renderer);
 
     expect(findByTestID(renderer.root, 'session-share-url')).toHaveLength(1);
@@ -157,11 +124,7 @@ describe('SessionShareSection created link', () => {
        look replaced once the read reports the identity the worker wrote. */
     const renderer = await renderCreatedLink({ share_token: 'tok_1' });
 
-    holder.queryState = {
-      ...holder.queryState,
-      data: { public_id: 'share_1' },
-      dataUpdatedAt: Date.now() + 1_000,
-    };
+    setReadState({ data: { public_id: 'share_1' }, dataUpdatedAt: Date.now() + 1_000 });
     rerenderSection(renderer);
 
     expect(findByTestID(renderer.root, 'session-share-url')).toHaveLength(1);
@@ -174,11 +137,7 @@ describe('SessionShareSection created link', () => {
        identities is what tells that from the link still being the live one. */
     const renderer = await renderCreatedLink();
 
-    holder.queryState = {
-      ...holder.queryState,
-      data: { public_id: 'share_2' },
-      dataUpdatedAt: Date.now() + 1_000,
-    };
+    setReadState({ data: { public_id: 'share_2' }, dataUpdatedAt: Date.now() + 1_000 });
     rerenderSection(renderer);
 
     expect(findByTestID(renderer.root, 'session-share-url')).toHaveLength(0);
@@ -194,11 +153,7 @@ describe('SessionShareSection created link', () => {
 
     // A read that started after the create, answering that no link exists: the
     // link expired, was revoked, or was rotated out elsewhere.
-    holder.queryState = {
-      ...holder.queryState,
-      data: { public_id: null },
-      dataUpdatedAt: Date.now() + 1_000,
-    };
+    setReadState({ data: { public_id: null }, dataUpdatedAt: Date.now() + 1_000 });
     rerenderSection(renderer);
 
     expect(findByTestID(renderer.root, 'session-share-url')).toHaveLength(0);
@@ -221,11 +176,7 @@ describe('SessionShareSection created link', () => {
     const renderer = await renderCreatedLink();
     holder.refetchResult = { isError: false, data: { public_id: 'share_2' } };
 
-    const copy = findByTestID(renderer.root, 'session-share-copy')[0];
-    if (!copy) {
-      throw new Error('missing copy action');
-    }
-    await pressAndSettle(copy);
+    await pressAndSettle(findOne(renderer, 'session-share-copy'));
 
     expect(holder.clipboardWrites).toEqual([]);
     expect(holder.refetchCalls).toEqual([{ cancelRefetch: true }]);
@@ -237,11 +188,7 @@ describe('SessionShareSection created link', () => {
     const renderer = await renderCreatedLink();
     holder.refetchResult = { isError: false, data: { public_id: 'share_2' } };
 
-    const share = findByTestID(renderer.root, 'session-share-sheet')[0];
-    if (!share) {
-      throw new Error('missing share action');
-    }
-    await pressAndSettle(share);
+    await pressAndSettle(findOne(renderer, 'session-share-sheet'));
 
     expect(holder.shares).toEqual([]);
     expect(findByTestID(renderer.root, 'session-share-superseded')).toHaveLength(1);
@@ -249,8 +196,7 @@ describe('SessionShareSection created link', () => {
 
   it('restarts an identity read already in flight before Copy', async () => {
     const renderer = await renderCreatedLink();
-    holder.queryState = {
-      ...holder.queryState,
+    setReadState({
       isFetching: true,
       refetch: async options => {
         holder.refetchCalls.push(options);
@@ -260,13 +206,10 @@ describe('SessionShareSection created link', () => {
           data: { public_id: options?.cancelRefetch ? 'share_2' : 'share_1' },
         };
       },
-    };
+    });
     rerenderSection(renderer);
-    const copy = findByTestID(renderer.root, 'session-share-copy')[0];
-    if (!copy) {
-      throw new Error('missing copy action');
-    }
-    await pressAndSettle(copy);
+
+    await pressAndSettle(findOne(renderer, 'session-share-copy'));
 
     expect(holder.clipboardWrites).toEqual([]);
     expect(findByTestID(renderer.root, 'session-share-superseded')).toHaveLength(1);
@@ -276,11 +219,7 @@ describe('SessionShareSection created link', () => {
     const renderer = await renderCreatedLink();
     holder.refetchResult = { isError: true, data: undefined };
 
-    const copy = findByTestID(renderer.root, 'session-share-copy')[0];
-    if (!copy) {
-      throw new Error('missing copy action');
-    }
-    await pressAndSettle(copy);
+    await pressAndSettle(findOne(renderer, 'session-share-copy'));
 
     expect(holder.clipboardWrites).toEqual([]);
     expect(findByTestID(renderer.root, 'session-share-url')).toHaveLength(0);
@@ -291,19 +230,11 @@ describe('SessionShareSection created link', () => {
   it('hands the URL to Copy and Share when the press-time read names the same capability', async () => {
     const renderer = await renderCreatedLink();
 
-    const copy = findByTestID(renderer.root, 'session-share-copy')[0];
-    if (!copy) {
-      throw new Error('missing copy action');
-    }
-    await pressAndSettle(copy);
+    await pressAndSettle(findOne(renderer, 'session-share-copy'));
     expect(holder.clipboardWrites).toEqual(['http://localhost:3000/s/tok_1']);
     expect(holder.refetchCalls).toEqual([{ cancelRefetch: true }]);
 
-    const share = findByTestID(renderer.root, 'session-share-sheet')[0];
-    if (!share) {
-      throw new Error('missing share action');
-    }
-    await pressAndSettle(share);
+    await pressAndSettle(findOne(renderer, 'session-share-sheet'));
     expect(holder.shares).toEqual([
       { message: 'http://localhost:3000/s/tok_1', url: 'http://localhost:3000/s/tok_1' },
     ]);
@@ -317,11 +248,7 @@ describe('SessionShareSection created link', () => {
     const renderer = await renderCreatedLink({ share_token: 'tok_1' });
     holder.refetchResult = { isError: false, data: { public_id: 'share_2' } };
 
-    const copy = findByTestID(renderer.root, 'session-share-copy')[0];
-    if (!copy) {
-      throw new Error('missing copy action');
-    }
-    await pressAndSettle(copy);
+    await pressAndSettle(findOne(renderer, 'session-share-copy'));
 
     expect(holder.clipboardWrites).toEqual(['http://localhost:3000/s/tok_1']);
     expect(holder.refetchCalls).toEqual([]);

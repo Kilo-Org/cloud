@@ -23,13 +23,14 @@ export async function verifyKiloTokenSignature(
 }
 
 /**
- * Validates the `cloudAgentAuthority` claim when the token carries it. A token
- * without the claim passes through untouched.
+ * Validates the `cloudAgentAuthority` claim when the token carries it, and
+ * reports whether it was present. A token without the claim passes through
+ * untouched.
  */
-export function assertKiloTokenAuthorityClaims(payload: JWTPayload): void {
-  if (Object.hasOwn(payload, 'cloudAgentAuthority')) {
-    validateCloudAgentAuthorityClaims(payload);
-  }
+export function checkKiloTokenAuthorityClaims(payload: JWTPayload): boolean {
+  if (!Object.hasOwn(payload, 'cloudAgentAuthority')) return false;
+  validateCloudAgentAuthorityClaims(payload);
+  return true;
 }
 
 /** Refuses a token whose `iat` is missing or later than `nowSeconds`. */

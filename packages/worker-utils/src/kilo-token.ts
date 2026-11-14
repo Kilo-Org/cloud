@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { CloudAgentAuthoritySchema } from './cloud-agent-authority';
 import { CloudAgentNextRuntimeAuthorizationClaimSchema } from './runtime-proxy-attestation';
 import {
-  assertKiloTokenAuthorityClaims,
   assertKiloTokenIssuedAt,
+  checkKiloTokenAuthorityClaims,
   verifyKiloTokenSignature,
 } from './kilo-token-verification.js';
 
@@ -136,8 +136,7 @@ export async function verifyKiloToken(
     throw new Error('Unexpected token audience');
   }
 
-  if (Object.hasOwn(payload, 'cloudAgentAuthority')) {
-    assertKiloTokenAuthorityClaims(payload);
+  if (checkKiloTokenAuthorityClaims(payload)) {
     assertKiloTokenIssuedAt(payload.iat, Math.floor(Date.now() / 1000));
   }
 

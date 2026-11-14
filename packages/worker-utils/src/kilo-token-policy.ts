@@ -5,8 +5,8 @@ import { KILO_TOKEN_VERSION, kiloTokenPayload } from './kilo-token';
 import type { KiloTokenPayload } from './kilo-token';
 import { validateCloudAgentAuthorityClaims } from './cloud-agent-authority';
 import {
-  assertKiloTokenAuthorityClaims,
   assertKiloTokenIssuedAt,
+  checkKiloTokenAuthorityClaims,
   verifyKiloTokenSignature,
 } from './kilo-token-verification.js';
 
@@ -136,8 +136,7 @@ export async function verifyKiloTokenForResource(
 ): Promise<KiloTokenPayload> {
   const { payload } = await verifyKiloTokenSignature(token, secret);
   assertKiloTokenAudience(payload.aud, audiencePolicy);
-  if (Object.hasOwn(payload, 'cloudAgentAuthority')) {
-    assertKiloTokenAuthorityClaims(payload);
+  if (checkKiloTokenAuthorityClaims(payload)) {
     policyClaims.parse(payload);
     assertKiloTokenIssuedAt(payload.iat, Math.floor(Date.now() / 1000));
   }
@@ -182,7 +181,7 @@ export async function verifyKiloTokenForPolicy(
   const currentDate = new Date();
   const { payload } = await verifyKiloTokenSignature(token, secret, { currentDate });
   const claims = policyClaims.parse(payload);
-  assertKiloTokenAuthorityClaims(payload);
+  checkKiloTokenAuthorityClaims(payload);
   assertKiloTokenIssuedAt(claims.iat, Math.floor(currentDate.getTime() / 1000));
   assertKiloTokenAudience(claims.aud, audiencePolicy);
   freezeClaimValue(claims);

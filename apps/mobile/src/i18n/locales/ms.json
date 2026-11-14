@@ -3293,6 +3293,7 @@
       "description": "Organisasi berkongsi kredit, ejen dan tetapan dengan pasukan anda.",
       "nameLabel": "Nama organisasi",
       "nameRequired": "Masukkan nama organisasi.",
+      "createdNotListed": "Organisasi dicipta. Ia akan muncul dalam pemilih tidak lama lagi.",
       "trialNote": "Percubaan Enterprise 14 hari anda bermula sebaik sahaja anda menciptanya. Pelan dibeli di web."
     },
     "creditActivity": {

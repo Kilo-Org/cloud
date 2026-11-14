@@ -3293,6 +3293,7 @@
       "description": "Unha organización comparte créditos, axentes e configuración co teu equipo.",
       "nameLabel": "Nome da organización",
       "nameRequired": "Introduce un nome para a organización.",
+      "createdNotListed": "Organización creada. Aparecerá no selector en breve.",
       "trialNote": "A túa proba de 14 días de Enterprise comeza cando a crees. Os plans cómpranse na web."
     },
     "creditActivity": {

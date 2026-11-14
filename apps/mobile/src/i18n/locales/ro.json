@@ -3346,6 +3346,7 @@
       "description": "O organizație partajează creditele, agenții și setările cu echipa ta.",
       "nameLabel": "Numele organizației",
       "nameRequired": "Introdu numele organizației.",
+      "createdNotListed": "Organizația a fost creată. Va apărea în selector în curând.",
       "trialNote": "Perioada de probă Enterprise de 14 zile începe când o creezi. Planurile se cumpără pe web."
     },
     "creditActivity": {

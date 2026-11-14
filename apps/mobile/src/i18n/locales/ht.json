@@ -3293,6 +3293,7 @@
       "description": "Yon òganizasyon pèmèt ou pataje kredi, ajan ak paramèt ak ekip ou a.",
       "nameLabel": "Non òganizasyon an",
       "nameRequired": "Antre yon non pou òganizasyon an.",
+      "createdNotListed": "Òganizasyon an kreye. Li pral parèt nan seleksyon an talè.",
       "trialNote": "Esè Enterprise 14 jou ou a ap kòmanse lè ou kreye l. Se sou entènèt yo achte plan yo."
     },
     "creditActivity": {

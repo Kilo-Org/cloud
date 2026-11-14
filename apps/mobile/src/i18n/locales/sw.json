@@ -3293,6 +3293,7 @@
       "description": "Shirika huiwezesha timu yako kushiriki krediti, mawakala na mipangilio.",
       "nameLabel": "Jina la shirika",
       "nameRequired": "Weka jina la shirika.",
+      "createdNotListed": "Shirika limeundwa. Litaonekana kwenye kiteua hivi karibuni.",
       "trialNote": "Kipindi chako cha majaribio cha Enterprise cha siku 14 kinaanza unapoliunda. Mipango hununuliwa kwenye wavuti."
     },
     "creditActivity": {

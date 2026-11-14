@@ -3373,6 +3373,7 @@
       "description": "An organization shares credits, agents and settings with your team.",
       "nameLabel": "Organization name",
       "nameRequired": "Enter an organization name.",
+      "createdNotListed": "Organization created. It will appear in the picker shortly.",
       "trialNote": "Your 14-day Enterprise trial starts when you create it. Plans are bought on the web."
     },
     "creditActivity": {

@@ -3293,6 +3293,7 @@
       "description": "En organisation deler kreditter, agenter og indstillinger med dit team.",
       "nameLabel": "Organisationens navn",
       "nameRequired": "Angiv et navn til organisationen.",
+      "createdNotListed": "Organisation oprettet. Den vises i vælgeren om lidt.",
       "trialNote": "Din 14-dages Enterprise-prøveperiode starter, når du opretter organisationen. Planer købes på nettet."
     },
     "creditActivity": {

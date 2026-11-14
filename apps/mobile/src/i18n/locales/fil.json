@@ -3293,6 +3293,7 @@
       "description": "Sa isang organisasyon, nagbabahagi ka ng mga credit, agent at setting sa iyong team.",
       "nameLabel": "Pangalan ng organisasyon",
       "nameRequired": "Maglagay ng pangalan ng organisasyon.",
+      "createdNotListed": "Nagawa na ang organisasyon. Lalabas ito sa picker sa ilang sandali.",
       "trialNote": "Magsisimula ang iyong 14 na araw na Enterprise trial kapag ginawa mo ito. Sa web binibili ang mga plano."
     },
     "creditActivity": {

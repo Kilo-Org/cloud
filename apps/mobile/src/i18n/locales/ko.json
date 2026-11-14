@@ -3285,6 +3285,7 @@
       "description": "조직에서는 팀과 크레딧, 에이전트, 설정을 공유합니다.",
       "nameLabel": "조직 이름",
       "nameRequired": "조직 이름을 입력하세요.",
+      "createdNotListed": "조직이 생성되었습니다. 곧 선택기에 표시됩니다.",
       "trialNote": "조직을 만들면 14일간의 Enterprise 체험판이 시작됩니다. 요금제는 웹에서 구매할 수 있습니다."
     },
     "creditActivity": {

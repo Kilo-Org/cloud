@@ -3399,6 +3399,7 @@
       "description": "Organizácia zdieľa kredity, agentov a nastavenia s vaším tímom.",
       "nameLabel": "Názov organizácie",
       "nameRequired": "Zadajte názov organizácie.",
+      "createdNotListed": "Organizácia bola vytvorená. Čoskoro sa zobrazí vo výbere.",
       "trialNote": "Po jej vytvorení sa spustí vaše 14-dňové skúšobné obdobie plánu Enterprise. Plány sa kupujú na webe."
     },
     "creditActivity": {

@@ -3293,6 +3293,7 @@
       "description": "Təşkilat kreditləri, agentləri və ayarları komandanızla paylaşır.",
       "nameLabel": "Təşkilatın adı",
       "nameRequired": "Təşkilatın adını daxil edin.",
+      "createdNotListed": "Təşkilat yaradıldı. Qısa müddət ərzində seçicidə görünəcək.",
       "trialNote": "14 günlük Enterprise sınaq müddətiniz təşkilatı yaratdığınız zaman başlayır. Planlar vebdə alınır."
     },
     "creditActivity": {

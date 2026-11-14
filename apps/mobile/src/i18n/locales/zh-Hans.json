@@ -3285,6 +3285,7 @@
       "description": "组织可让你的团队共享额度、智能体和设置。",
       "nameLabel": "组织名称",
       "nameRequired": "请输入组织名称。",
+      "createdNotListed": "组织已创建。它很快会显示在选择器中。",
       "trialNote": "创建组织后，14 天的 Enterprise 试用即开始。套餐需在网页上购买。"
     },
     "creditActivity": {

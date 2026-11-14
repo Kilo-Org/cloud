@@ -3293,6 +3293,7 @@
       "description": "Tashkilotda kreditlar, agentlar va sozlamalar jamoangiz bilan umumiy bo'ladi.",
       "nameLabel": "Tashkilot nomi",
       "nameRequired": "Tashkilot nomini kiriting.",
+      "createdNotListed": "Tashkilot yaratildi. U tez orada tanlovchida paydo bo'ladi.",
       "trialNote": "14 kunlik Enterprise sinov muddati tashkilot yaratilganda boshlanadi. Tariflar veb-saytda sotib olinadi."
     },
     "creditActivity": {

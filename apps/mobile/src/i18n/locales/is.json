@@ -3293,6 +3293,7 @@
       "description": "Í félagi deilir teymið þitt inneign, fulltrúum og stillingum.",
       "nameLabel": "Nafn félags",
       "nameRequired": "Sláðu inn nafn félags.",
+      "createdNotListed": "Félag hefur verið stofnað. Það mun birtast í veljaranum fljótlega.",
       "trialNote": "14 daga Enterprise-prufutímabilið þitt hefst þegar þú stofnar félagið. Áætlanir eru keyptar á vefnum."
     },
     "creditActivity": {

@@ -3346,6 +3346,7 @@
       "description": "Organizacija deli kredite, agente i podešavanja sa vašim timom.",
       "nameLabel": "Naziv organizacije",
       "nameRequired": "Unesite naziv organizacije.",
+      "createdNotListed": "Organizacija je kreirana. Uskoro će se pojaviti u biraču.",
       "trialNote": "Vaš 14-dnevni probni period za Enterprise počinje kada kreirate organizaciju. Planovi se kupuju na vebu."
     },
     "creditActivity": {

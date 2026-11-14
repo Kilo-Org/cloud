@@ -1,8 +1,7 @@
 import { ORGANIZATION_NAME_MAX_LENGTH } from '@kilocode/app-shared/organizations';
 import { hasVisibleText } from '@kilocode/app-shared/text';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, type TextInputProps, View } from 'react-native';
 
@@ -12,10 +11,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
+import { useRouteFocused } from '@/lib/navigation/route-focus';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import { useOrganization } from '@/lib/organization-context';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
+
+/** One line under the field: a failure the person can act on, or a result. */
+type CreateMessage = { text: string; tone: 'error' | 'notice' };
 
 /**
  * Creates an organization with the same defaults the web create flow uses:
@@ -29,9 +34,10 @@ import { trpcClient, useTRPC } from '@/lib/trpc';
  */
 export function CreateOrganizationScreen() {
   const { t } = useTranslation();
-  const router = useRouter();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
+  const stackSafeRouter = useStackSafeReplace();
+  const routeFocused = useRouteFocused();
   const { setOrganizationId } = useOrganization();
   // The field keeps what the person typed. Android commits this screen while
   // the create is pending and after it fails, and its text input applies the
@@ -40,34 +46,88 @@ export function CreateOrganizationScreen() {
   const nameRef = useRef('');
   const [text, setText] = useState('');
   const [canSubmit, setCanSubmit] = useState(false);
-  const [errorText, setErrorText] = useState<string | null>(null);
+  const [message, setMessage] = useState<CreateMessage | null>(null);
+  // The create outlives this screen: a back press or a push while the request
+  // or the list refresh runs must not move the active organization. The
+  // completion reads these live values, never the render that started it.
+  const aliveRef = useRef(true);
+  const focusedRef = useRef(routeFocused);
+  const selectOrganizationRef = useRef(setOrganizationId);
+  // A create that already succeeded must not repeat while the list refresh
+  // before its selection runs.
+  const submitLockedRef = useRef(false);
+  useEffect(() => {
+    focusedRef.current = routeFocused;
+  }, [routeFocused]);
+  useEffect(() => {
+    selectOrganizationRef.current = setOrganizationId;
+  }, [setOrganizationId]);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
+
+  const completeCreate = useCallback(
+    async (organizationId: string) => {
+      try {
+        // The membership has to be in the cached list before the selection
+        // moves, or the boundary would read the fresh selection as a lost
+        // membership.
+        await queryClient.invalidateQueries({ queryKey: trpc.organizations.list.queryKey() });
+        // An abandoned create only refreshes the list: the picker shows the new
+        // organization, and the selection it was created from stays put.
+        if (!aliveRef.current || !focusedRef.current) {
+          return;
+        }
+        // The refresh resolves after its refetch settles, and a failed refetch
+        // leaves the list without the new membership. Moving the selection then
+        // would bounce it back with a lost-membership warning, so report the
+        // result and keep the form.
+        const memberships = queryClient.getQueryData<OrgListEntry[]>(
+          trpc.organizations.list.queryKey()
+        );
+        if (memberships?.some(entry => entry.organizationId === organizationId) !== true) {
+          setMessage({ text: t('organization.create.createdNotListed'), tone: 'notice' });
+          return;
+        }
+        selectOrganizationRef.current(organizationId);
+        stackSafeRouter.replace(ORGANIZATION_HUB_PATH);
+      } finally {
+        submitLockedRef.current = false;
+      }
+    },
+    [queryClient, stackSafeRouter, t, trpc]
+  );
 
   const createOrganization = useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (input: { name: string }) =>
       trpcClient.organizations.create.mutate({ name: input.name, autoAddCreator: true }),
-    onSuccess: async ({ organization }) => {
-      // The membership has to be in the cached list before the selection moves,
-      // or the boundary would read the fresh selection as a lost membership.
-      await queryClient.invalidateQueries({ queryKey: trpc.organizations.list.queryKey() });
-      setOrganizationId(organization.id);
-      router.replace(ORGANIZATION_HUB_PATH);
+    // The refresh that has to land before the selection moves runs after this
+    // callback returns. Awaiting it here would keep the button busy, and the
+    // field disabled, for as long as that refresh takes.
+    onSuccess: ({ organization }) => {
+      void completeCreate(organization.id);
     },
     onError: (error: unknown) => {
-      setErrorText(organizationErrorMessage(error));
+      submitLockedRef.current = false;
+      setMessage({ text: organizationErrorMessage(error), tone: 'error' });
     },
   });
 
   const submit = () => {
-    if (createOrganization.isPending) {
+    if (createOrganization.isPending || submitLockedRef.current) {
       return;
     }
     const name = nameRef.current.trim();
     if (!hasVisibleText(name)) {
-      setErrorText(t('organization.create.nameRequired'));
+      setMessage({ text: t('organization.create.nameRequired'), tone: 'error' });
       return;
     }
-    setErrorText(null);
+    setMessage(null);
+    submitLockedRef.current = true;
     createOrganization.mutate({ name });
   };
 
@@ -108,8 +168,8 @@ export function CreateOrganizationScreen() {
                 setText(value);
               }
               setCanSubmit(hasVisibleText(value));
-              if (errorText != null) {
-                setErrorText(null);
+              if (message != null) {
+                setMessage(null);
               }
             }}
             onSubmitEditing={submit}
@@ -118,7 +178,15 @@ export function CreateOrganizationScreen() {
           />
         </View>
         <Text className="text-xs text-muted-foreground">{t('organization.create.trialNote')}</Text>
-        {errorText == null ? null : <Text className="text-sm text-destructive">{errorText}</Text>}
+        {message == null ? null : (
+          <Text
+            className={
+              message.tone === 'error' ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'
+            }
+          >
+            {message.text}
+          </Text>
+        )}
         <Button
           className={STATE_ACTION_CLASS}
           onPress={submit}

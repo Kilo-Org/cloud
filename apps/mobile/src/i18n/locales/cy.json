@@ -3505,6 +3505,7 @@
       "description": "Mae sefydliad yn rhannu credydau, asiantau a gosodiadau gyda'ch tîm.",
       "nameLabel": "Enw'r sefydliad",
       "nameRequired": "Rhowch enw ar gyfer y sefydliad.",
+      "createdNotListed": "Crëwyd y sefydliad. Bydd yn ymddangos yn y codwr cyn bo hir.",
       "trialNote": "Mae eich treial Enterprise 14 diwrnod yn dechrau pan fyddwch yn ei greu. Caiff cynlluniau eu prynu ar y we."
     },
     "creditActivity": {

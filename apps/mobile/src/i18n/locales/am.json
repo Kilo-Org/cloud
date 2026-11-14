@@ -3293,6 +3293,7 @@
       "description": "ድርጅት ክሬዲቶችን፣ ኤጀንቶችን እና ቅንብሮችን ከቡድንዎ ጋር ያጋራል።",
       "nameLabel": "የድርጅት ስም",
       "nameRequired": "የድርጅት ስም ያስገቡ።",
+      "createdNotListed": "ድርጅት ተፈጥሯል። በቃሚው ውስጥ በቅርቡ ይታያል።",
       "trialNote": "የ14 ቀን የEnterprise ሙከራዎ ድርጅቱን ሲፈጥሩ ይጀምራል። ዕቅዶች የሚገዙት በድር ላይ ነው።"
     },
     "creditActivity": {

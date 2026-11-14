@@ -3293,6 +3293,7 @@
       "description": "Një organizatë ndan kreditet, agjentët dhe cilësimet me ekipin tënd.",
       "nameLabel": "Emri i organizatës",
       "nameRequired": "Fut emrin e organizatës.",
+      "createdNotListed": "Organizata u krijua. Do të shfaqet së shpejti në zgjedhës.",
       "trialNote": "Prova jote 14-ditore e Enterprise fillon kur e krijon. Planet blihen në ueb."
     },
     "creditActivity": {

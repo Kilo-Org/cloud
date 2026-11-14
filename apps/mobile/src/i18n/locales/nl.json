@@ -3285,6 +3285,7 @@
       "description": "Een organisatie deelt tegoed, agents en instellingen met je team.",
       "nameLabel": "Naam van organisatie",
       "nameRequired": "Voer een naam voor de organisatie in.",
+      "createdNotListed": "Organisatie aangemaakt. Deze verschijnt binnenkort in de kiezer.",
       "trialNote": "Je proefperiode van 14 dagen voor Enterprise begint zodra je de organisatie aanmaakt. Plannen koop je op het web."
     },
     "creditActivity": {

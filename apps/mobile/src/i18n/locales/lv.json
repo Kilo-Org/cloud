@@ -3346,6 +3346,7 @@
       "description": "Organizācija koplieto kredītus, aģentus un iestatījumus ar jūsu komandu.",
       "nameLabel": "Organizācijas nosaukums",
       "nameRequired": "Ievadiet organizācijas nosaukumu.",
+      "createdNotListed": "Organizācija izveidota. Tā drīzumā parādīsies atlasītājā.",
       "trialNote": "Jūsu 14 dienu Enterprise izmēģinājums sāksies, kad izveidosiet organizāciju. Plāni tiek iegādāti tīmeklī."
     },
     "creditActivity": {

@@ -3344,6 +3344,7 @@
       "description": "Uma organização compartilha créditos, agentes e configurações com sua equipe.",
       "nameLabel": "Nome da organização",
       "nameRequired": "Insira um nome para a organização.",
+      "createdNotListed": "Organização criada. Ela aparecerá no seletor em breve.",
       "trialNote": "Seu período de teste de 14 dias do plano Enterprise começa quando você cria a organização. Os planos são contratados na web."
     },
     "creditActivity": {

@@ -3285,6 +3285,7 @@
       "description": "Kuruluş; kredileri, ajanları ve ayarları ekibinizle paylaşır.",
       "nameLabel": "Kuruluş adı",
       "nameRequired": "Bir kuruluş adı girin.",
+      "createdNotListed": "Kuruluş oluşturuldu. Kısa süre içinde seçicide görünecek.",
       "trialNote": "14 günlük Enterprise denemeniz kuruluşu oluşturduğunuzda başlar. Planlar web üzerinden satın alınır."
     },
     "creditActivity": {

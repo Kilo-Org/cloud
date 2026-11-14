@@ -3285,6 +3285,7 @@
       "description": "Organisasi memungkinkan tim Anda berbagi kredit, agen, dan pengaturan.",
       "nameLabel": "Nama organisasi",
       "nameRequired": "Masukkan nama organisasi.",
+      "createdNotListed": "Organisasi telah dibuat. Ia akan segera muncul di alat pilih.",
       "trialNote": "Uji coba Enterprise 14 hari Anda dimulai saat Anda membuatnya. Paket dibeli di web."
     },
     "creditActivity": {

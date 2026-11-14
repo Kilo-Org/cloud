@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { logger } from './logger.js';
 
 export const AnalysisCreditAdmissionSchema = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.literal('admitted') }),
@@ -46,9 +47,14 @@ export async function readAnalysisCreditAdmission(params: {
   }
 
   if (!response.ok) {
+    // The launch classifies the returned message, so the message stays constant
+    // for every refused response and the status is recorded in the log instead.
+    logger.warn('Cloud Agent credit admission returned non-OK status', {
+      status: response.status,
+    });
     return {
       outcome: 'unavailable',
-      message: `Cloud Agent credit admission returned HTTP ${response.status}`,
+      message: 'Cloud Agent credit admission was not accepted',
     };
   }
 

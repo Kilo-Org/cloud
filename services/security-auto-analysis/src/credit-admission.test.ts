@@ -111,12 +111,31 @@ describe('readAnalysisCreditAdmission answer mapping', () => {
 });
 
 describe('readAnalysisCreditAdmission unreadable answers', () => {
-  it('reports the status when the peer answers 404', async () => {
+  it('reports a rejected response without the status in the message', async () => {
     const { env } = createEnv(async () => new Response('Not Found', { status: 404 }));
 
     const result = await readAnalysisCreditAdmission({ env, authToken: AUTH_TOKEN });
 
-    expect(unavailableMessage(result)).toContain('404');
+    expect(unavailableMessage(result)).toBe('Cloud Agent credit admission was not accepted');
+  });
+
+  it('reports every refused status as one retryable message', async () => {
+    // The launch classifies the returned text, so the message stays constant and
+    // carries no status value for any refused response.
+    const statuses = [401, 403, 429, 500, 503];
+
+    for (const status of statuses) {
+      const { env } = createEnv(async () => new Response('refused', { status }));
+
+      const message = unavailableMessage(
+        await readAnalysisCreditAdmission({ env, authToken: AUTH_TOKEN })
+      );
+
+      expect(message).toBe('Cloud Agent credit admission was not accepted');
+      expect(message).not.toMatch(/\d/);
+      expect(message.toLowerCase()).not.toContain('forbidden');
+      expect(message.toLowerCase()).not.toContain('permission denied');
+    }
   });
 
   it('reports a non-JSON body', async () => {

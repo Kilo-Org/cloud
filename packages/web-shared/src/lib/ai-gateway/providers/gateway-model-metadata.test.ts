@@ -488,6 +488,99 @@ describe('retainPreviousEntries', () => {
       'vendor/kept': joined.models['vendor/kept'],
     });
   });
+
+  it('leaves out an alias to a model listed without an endpoints resource', () => {
+    const previous = {
+      '~vendor/batch-latest': model('~vendor/batch-latest', 'before', 'vendor/batch'),
+      'vendor/batch': model('vendor/batch', 'before'),
+    };
+    const joined = {
+      models: {
+        '~vendor/batch-latest': model('~vendor/batch-latest', 'now', 'vendor/renamed'),
+        'vendor/kept': model('vendor/kept', 'now'),
+      },
+      withoutEndpointsResource: ['vendor/batch'],
+      withoutStoredEndpoints: [],
+    };
+
+    expect(retainPreviousEntries(joined, previous)).toEqual({
+      'vendor/kept': joined.models['vendor/kept'],
+    });
+  });
+
+  it('restores a previous target that is still listed without an endpoints resource', () => {
+    const previous = {
+      '~vendor/batch-latest': model('~vendor/batch-latest', 'before', 'vendor/kept'),
+      'vendor/batch': model('vendor/batch', 'before'),
+    };
+    const joined = {
+      models: {
+        '~vendor/batch-latest': model('~vendor/batch-latest', 'now', 'vendor/renamed'),
+        'vendor/kept': model('vendor/kept', 'now'),
+      },
+      withoutEndpointsResource: ['vendor/batch'],
+      withoutStoredEndpoints: [],
+    };
+
+    expect(retainPreviousEntries(joined, previous)).toEqual({
+      '~vendor/batch-latest': previous['~vendor/batch-latest'],
+      'vendor/kept': joined.models['vendor/kept'],
+    });
+  });
+
+  it('leaves out a chained alias whose target alias is left out', () => {
+    const joined = {
+      models: {
+        '~vendor/a-latest': model('~vendor/a-latest', 'now', '~vendor/b-latest'),
+        '~vendor/b-latest': model('~vendor/b-latest', 'now', 'vendor/gone'),
+        'vendor/kept': model('vendor/kept', 'now'),
+      },
+      withoutEndpointsResource: [],
+      withoutStoredEndpoints: ['vendor/gone'],
+    };
+
+    expect(retainPreviousEntries(joined, {})).toEqual({
+      'vendor/kept': joined.models['vendor/kept'],
+    });
+  });
+
+  it('leaves out an alias whose target is not listed at all', () => {
+    const joined = {
+      models: {
+        '~vendor/unlisted-latest': model('~vendor/unlisted-latest', 'now', 'vendor/unlisted'),
+        'vendor/kept': model('vendor/kept', 'now'),
+      },
+      withoutEndpointsResource: [],
+      withoutStoredEndpoints: [],
+    };
+
+    expect(retainPreviousEntries(joined, {})).toEqual({
+      'vendor/kept': joined.models['vendor/kept'],
+    });
+  });
+
+  it('restores a chained alias to a previous target that is still listed', () => {
+    const previous = {
+      '~vendor/a-latest': model('~vendor/a-latest', 'before', 'vendor/kept'),
+    };
+    const joined = {
+      models: {
+        '~vendor/a-latest': model('~vendor/a-latest', 'now', '~vendor/b-latest'),
+        '~vendor/b-latest': model('~vendor/b-latest', 'now', 'vendor/gone'),
+        'vendor/kept': model('vendor/kept', 'now'),
+      },
+      withoutEndpointsResource: [],
+      withoutStoredEndpoints: ['vendor/gone'],
+    };
+
+    const result = retainPreviousEntries(joined, previous);
+
+    expect(result).toEqual({
+      '~vendor/a-latest': previous['~vendor/a-latest'],
+      'vendor/kept': joined.models['vendor/kept'],
+    });
+    expect(Object.hasOwn(result, '~vendor/b-latest')).toBe(false);
+  });
 });
 
 describe('formatModelIds', () => {

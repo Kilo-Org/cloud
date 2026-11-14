@@ -265,7 +265,8 @@ export function joinGatewayModelEndpoints(
  * briefly list models it cannot serve yet. A listed model without usable stored endpoints keeps its
  * previous entry. An alias retargeted to a model that is not usable yet keeps its previous entry
  * while that entry's target is still in the catalog, and is left out otherwise, so the alias never
- * resolves to a model the catalog leaves out.
+ * resolves to a model the catalog leaves out. A restored previous entry is checked by the same rule,
+ * so an alias whose target disappears in the same refresh is left out too.
  */
 export function retainPreviousEntries(
   joined: JoinedGatewayModels,
@@ -275,16 +276,24 @@ export function retainPreviousEntries(
   for (const modelId of joined.withoutStoredEndpoints) {
     if (Object.hasOwn(previous, modelId)) models[modelId] = previous[modelId];
   }
-  const unusable = new Set(joined.withoutStoredEndpoints.filter(id => !Object.hasOwn(models, id)));
-  for (const [modelId, model] of Object.entries(models)) {
-    const target = model.alias_target?.slug;
-    if (target === undefined || !unusable.has(target)) continue;
-    const previousEntry = Object.hasOwn(previous, modelId) ? previous[modelId] : undefined;
-    const previousTarget = previousEntry?.alias_target?.slug;
-    if (previousEntry && (previousTarget === undefined || Object.hasOwn(models, previousTarget))) {
-      models[modelId] = previousEntry;
-    } else {
-      delete models[modelId];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [modelId, model] of Object.entries(models)) {
+      const target = model.alias_target?.slug;
+      if (target === undefined || Object.hasOwn(models, target)) continue;
+      const previousEntry = Object.hasOwn(previous, modelId) ? previous[modelId] : undefined;
+      const previousTarget = previousEntry?.alias_target?.slug;
+      if (
+        previousEntry !== undefined &&
+        previousEntry !== model &&
+        (previousTarget === undefined || Object.hasOwn(models, previousTarget))
+      ) {
+        models[modelId] = previousEntry;
+      } else {
+        delete models[modelId];
+      }
+      changed = true;
     }
   }
   return models;

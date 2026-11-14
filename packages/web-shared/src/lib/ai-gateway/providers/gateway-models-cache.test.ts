@@ -669,6 +669,7 @@ describe('isValidOpenRouterModelId', () => {
         id: '~deepseek/deepseek-pro-latest',
         alias_target: { slug: 'deepseek/deepseek-v4-pro-0813' },
       }),
+      gatewayModel({ id: 'deepseek/deepseek-v4-pro-0813' }),
     ]);
 
     await expect(resolveOpenRouterModelAlias('~deepseek/deepseek-pro-latest')).resolves.toBe(

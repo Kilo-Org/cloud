@@ -244,6 +244,45 @@ describe('Home-only widget policy', () => {
       canApprove: false,
       approvalKey: null,
     });
+    expect(buildHomeWidgetDetails([{ status: 'permission', title: 'Approve' }]).primaryKind).toBe(
+      'needsInput'
+    );
+    expect(buildHomeWidgetDetails([{ status: 'busy', title: 'Running' }]).primaryKind).toBe(
+      'running'
+    );
+    expect(
+      buildHomeWidgetDetails([
+        { status: 'scheduled', title: 'Soon', scheduledAt: '2026-10-09T11:00:00Z' },
+      ]).primaryKind
+    ).toBe('scheduled');
+    expect(buildHomeWidgetDetails([{ status: 'idle', title: 'Quiet' }]).primaryKind).toBe('idle');
+    expect(buildHomeWidgetDetails([]).primaryKind).toBeNull();
+  });
+
+  it('hides a title whose kind no longer matches the presented kind', () => {
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'busy', title: 'Running' }],
+    });
+    data.details = { ...data.details, primaryKind: 'needsInput', primaryTitle: 'Old wait' };
+    expect(buildHomeWidgetPresentation(data, now)).toMatchObject({
+      primaryKind: 'running',
+      primaryCount: 1,
+      primaryTitle: null,
+    });
+  });
+
+  it('keeps the title of a stored payload that carries no kind', () => {
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'permission', title: 'Approve', approvalKey: 'a'.repeat(64) }],
+    });
+    const olderDetails: Record<string, unknown> = { ...data.details };
+    delete olderDetails.primaryKind;
+    const parsed = homeWidgetDataSchema.parse({ snapshot: data.snapshot, details: olderDetails });
+    expect(parsed.details.primaryKind).toBeNull();
+    expect(parsed.details.primaryTitle).toBe('Approve');
+    expect(buildHomeWidgetPresentation(parsed, now).primaryTitle).toBe('Approve');
   });
 
   it('retains expired counts and honest checkedAt without inventing activity at a missed wake', () => {

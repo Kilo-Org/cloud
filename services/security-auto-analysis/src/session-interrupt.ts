@@ -1,12 +1,23 @@
 import { logger } from './logger.js';
 
 /**
+ * Bound on the best-effort interrupt call. Callers run it on a path whose
+ * outcome is already decided, so a peer that accepts the request and never
+ * answers must not hold that outcome back: the request carries its own
+ * deadline, and a timeout ends the call the same way a failed interrupt does.
+ */
+export const SESSION_INTERRUPT_TIMEOUT_MS = 10_000;
+
+/**
  * Best-effort `interruptSession` call for one Cloud Agent analysis session.
  *
  * Callers use it when a run is replaced, or when a prepared session will not be
  * started. It never throws, because the caller's own outcome is already
- * decided; a failed interrupt only leaves the session to end on its own
- * timeout.
+ * decided; a failed or timed-out interrupt only leaves the session to end on
+ * its own timeout.
+ *
+ * `timeoutMs` exists for tests, which need a short bound to observe the
+ * deadline; callers use the default.
  */
 export async function interruptAnalysisCloudAgentSession(params: {
   env: CloudflareEnv;
@@ -14,6 +25,7 @@ export async function interruptAnalysisCloudAgentSession(params: {
   cloudAgentSessionId: string;
   findingId: string;
   commandId?: string;
+  timeoutMs?: number;
 }): Promise<void> {
   try {
     const response = await params.env.CLOUD_AGENT_NEXT.fetch(
@@ -24,6 +36,7 @@ export async function interruptAnalysisCloudAgentSession(params: {
           Authorization: `Bearer ${params.authToken}`,
         },
         body: JSON.stringify({ sessionId: params.cloudAgentSessionId }),
+        signal: AbortSignal.timeout(params.timeoutMs ?? SESSION_INTERRUPT_TIMEOUT_MS),
       })
     );
     if (!response.ok) {

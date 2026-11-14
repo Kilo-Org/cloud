@@ -799,6 +799,41 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
     expect(requestsTo(cloudAgentFetch.mock.calls, '/trpc/interruptSession')).toHaveLength(1);
   });
 
+  it('bounds the cleanup interrupt so the start outcome still settles', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue(existingTriage);
+    const cloudAgentFetch = vi
+      .fn()
+      .mockResolvedValueOnce(prepareSessionResponse('agent-session-hang'))
+      .mockResolvedValueOnce(new Response('initiate unavailable', { status: 503 }))
+      .mockImplementationOnce((request: Request) => {
+        // The interrupt peer accepts the request and never answers; only the
+        // interrupt's own deadline settles it.
+        const { promise, reject } = Promise.withResolvers<Response>();
+        request.signal.addEventListener('abort', () => reject(request.signal.reason), {
+          once: true,
+        });
+        return promise;
+      });
+
+    await expect(
+      startSecurityAnalysis(createParams(false, cloudAgentFetch as never))
+    ).resolves.toEqual({
+      started: false,
+      error: 'initiate unavailable',
+      failureNeedsLifecycleTransition: true,
+    });
+
+    const interrupts = requestsTo(cloudAgentFetch.mock.calls, '/trpc/interruptSession');
+    expect(interrupts).toHaveLength(1);
+    const interrupt = interrupts[0];
+    if (!(interrupt instanceof Request)) throw new Error('Expected interrupt request');
+    await expect(interrupt.json()).resolves.toEqual({ sessionId: 'agent-session-hang' });
+    expect(interrupt.signal.aborted).toBe(true);
+    // The production deadline is SESSION_INTERRUPT_TIMEOUT_MS, so this case
+    // must outlive it to observe the settlement.
+  }, 15_000);
+
   it('does not interrupt the prepared session when the start succeeds', async () => {
     vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
     vi.mocked(triageSecurityFinding).mockResolvedValue(existingTriage);

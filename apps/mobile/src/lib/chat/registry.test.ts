@@ -406,6 +406,20 @@ const scopes = vi.hoisted(() => {
 /** Every session a reopen asked the SDK for, so an open that never ran is told. */
 let continued: string[] = [];
 
+/**
+ * What the registry released from the on-device model, in order. The model
+ * client itself is proved in its own suite; here it is the call site that
+ * matters — Stop, a close and a sign-out all have to reach it with the chat's
+ * session id.
+ */
+const releasedRounds = vi.hoisted(() => ({ owners: [] as string[] }));
+vi.mock('./native-model-client', () => ({
+  releaseNativeModelRound: async (owner: string) => {
+    await Promise.resolve();
+    releasedRounds.owners.push(owner);
+  },
+}));
+
 vi.mock('./store', () => ({
   forgetSession: (_database: unknown, sessionId: string) => {
     if (failForgetFor === sessionId) {
@@ -450,6 +464,7 @@ const {
   enterChat,
   refreshChatTools,
   releaseChat,
+  releaseEveryChat,
   retryChat,
   retryKiloMcp,
   say,
@@ -525,6 +540,7 @@ beforeEach(async () => {
   storedQuestions.clear();
   clonedWith = undefined;
   clonesMade = 0;
+  releasedRounds.owners.length = 0;
   storedEffort = null;
   openedWith = undefined;
   storedTools = null;
@@ -600,6 +616,37 @@ describe('what a chat is opened with', () => {
     expect(clonedWith).toBeUndefined();
     expect(snapshotOf(opened).sessionId).toBe('s1');
     expect(asked.at(-1)).toEqual({ sessionId: 's1', text: 'hello' });
+  });
+});
+
+describe('ending an exchange while its tools run', () => {
+  it('releases the on-device round on Stop, on closing the chat and on sign-out', async () => {
+    /* An interrupted exchange can leave an on-device generation waiting for tool
+       results nobody will supply. Every teardown path has to hand its session id
+       to the release, or the next chat's ask is refused as busy. */
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    await stopChat(opened);
+    await settled();
+    expect(releasedRounds.owners).toEqual(['s1']);
+
+    // The chat is closed and its row deleted: the same release, from endChat.
+    releasedRounds.owners.length = 0;
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await releaseChat(opened);
+    await settled();
+    expect(releasedRounds.owners).toEqual(['s1']);
+
+    // Signing out ends every open chat through the same path.
+    releasedRounds.owners.length = 0;
+    opened = await startChat(place, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'third', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await releaseEveryChat();
+    expect(releasedRounds.owners).toEqual(['s1']);
   });
 });
 

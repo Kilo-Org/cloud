@@ -37,6 +37,7 @@ import {
   moveMcpEnabled,
   setMcpEnabled as persistMcpEnabled,
 } from './kilo-mcp';
+import { releaseNativeModelRound } from './native-model-client';
 import { ensureRemoteMcp } from './remote-mcp';
 import { type ChatPlace } from './scope';
 import { questionSearches } from './web-search-budget';
@@ -1644,6 +1645,10 @@ async function halt(sessionId: string, chat: Chat): Promise<boolean> {
   await runtime.runPromise(Fiber.interrupt(chat.answering));
   chat.answering = undefined;
   change(sessionId, { status: 'idle', answering: [] });
+  /* An answer interrupted while its tools ran leaves an on-device generation
+     waiting for results nothing will supply. It is released here, the one place
+     Stop, a close, a deletion and a sign-out all pass through. */
+  await releaseNativeModelRound(sessionId);
   return true;
 }
 

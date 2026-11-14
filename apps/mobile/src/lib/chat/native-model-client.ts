@@ -10,6 +10,7 @@ import { Cause, Effect, Queue, Stream } from 'effect';
 import { z } from 'zod';
 
 import { nativeModelFailure } from './native-model-error';
+import { cancelNative, openProvider, type Provider } from './native-round-slot';
 import { estimatedTokens, inputTokensOf } from './native-model-usage';
 import {
   nativeRequest,
@@ -20,6 +21,7 @@ import {
 } from './native-request';
 
 export { IMAGE_NOT_SENT } from './native-request';
+export { releaseNativeModelRound } from './native-round-slot';
 
 /** What an on-device provider says about itself. Reasons are stable codes, never raw text. */
 export type NativeAvailability = {
@@ -65,21 +67,6 @@ export type NativeModelBridge = {
     listener: (event: NativeModelEvent) => void
   ) => { remove: () => void };
 };
-
-/** A generation that asked for tools and waits, between two rounds, for their results. */
-type HeldRound = {
-  readonly id: string;
-  /** The exchange that owns it: the `cacheKey` its request carried, one per chat. */
-  readonly owner: string | undefined;
-  readonly calls: readonly string[];
-  readonly hasText: boolean;
-};
-
-/** The one native generation this bridge holds open between rounds. */
-type ToolLoop = { readonly kind: 'free' } | { readonly kind: 'waiting'; readonly round: HeldRound };
-
-/** One native module and the tool round it may hold open. */
-type Provider = { readonly bridge: NativeModelBridge; loop: ToolLoop };
 
 /** A native promise rejection carries its stable reason as an Expo error code. */
 const codedRejection = z.object({ code: z.string() });
@@ -220,13 +207,6 @@ function answer(
       Queue.offerUnsafe(queue, { kind: 'done', usage, stop: 'tools' });
       Queue.endUnsafe(queue);
     };
-    const stopNative = async (stopped: string) => {
-      try {
-        await bridge.cancel(stopped);
-      } catch {
-        // The native request already ended; there is nothing left to stop.
-      }
-    };
     // The harness ends a turn with a round that offers no tools, so that the
     // model answers from the results it has. A resumed Foundation Models
     // generation keeps the tools its session opened with, and a call it makes
@@ -237,7 +217,7 @@ function answer(
     const refuse = async (calls: readonly NativeToolCall[]) => {
       if (refused) {
         fail('tools_refused');
-        await stopNative(id);
+        await cancelNative(bridge, id);
         return;
       }
       refused = true;
@@ -288,10 +268,9 @@ function answer(
       }
     };
     const run = async () => {
-      // The abandoned round's native generation is stopped by its own owner, so
-      // no other chat's generation is ever touched here.
+      // Only the round this owner abandoned, never another chat's generation.
       if (abandoned) {
-        await stopNative(held.id);
+        await cancelNative(bridge, held.id);
       }
       if (resumption !== undefined) {
         await bridge.resume?.(resumption.id, resumption.results).catch(rejected);
@@ -317,7 +296,7 @@ function answer(
           if (state === 'running' || state === 'retrying') {
             // Interrupted mid-answer: stop the native task. Its late events are ignored.
             state = 'over';
-            void stopNative(id);
+            void cancelNative(bridge, id);
           }
         })
       ),
@@ -336,7 +315,7 @@ function answer(
  * resume that generation instead of starting a new one.
  */
 export function nativeModelClient(bridge: NativeModelBridge): ModelClientService {
-  const provider: Provider = { bridge, loop: { kind: 'free' } };
+  const provider: Provider = openProvider(bridge);
   return {
     stream: request =>
       Stream.unwrap(

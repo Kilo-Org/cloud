@@ -52,10 +52,14 @@ const fetchStub = vi.hoisted(() => {
     }
     return url instanceof URL ? url.toString() : url.url;
   }
+  const envelope = { result: { data: null } };
   globalThis.fetch = ((url: string | URL | Request, init?: RequestInit) => {
-    requests.push({ url: requestUrl(url), init: init ?? {} });
+    const requested = requestUrl(url);
+    requests.push({ url: requested, init: init ?? {} });
+    // A batch is answered with one envelope per call, as the server does.
+    const body = requested.includes('?batch=1') ? [envelope] : envelope;
     return Promise.resolve(
-      Response.json({ result: { data: null } }, { headers: { 'content-type': 'application/json' } })
+      Response.json(body, { headers: { 'content-type': 'application/json' } })
     );
   }) as typeof fetch;
   return { originalFetch, requests };

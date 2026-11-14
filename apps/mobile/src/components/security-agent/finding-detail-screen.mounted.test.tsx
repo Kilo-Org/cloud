@@ -103,7 +103,7 @@ vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
 }));
 vi.mock('./security-command-retry-card', () => ({ SecurityCommandRetryCard: 'RetryCard' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ EYEBROW_RTL_SCRIPT_DISPLAY: '', Text: 'Text' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Pressable' }));
 vi.mock('@/lib/a11y/status-announcement', () => ({ useStatusAnnouncement: vi.fn() }));

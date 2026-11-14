@@ -5,7 +5,6 @@ import tailwindcss from '@tailwindcss/postcss';
 import postcss from 'postcss';
 import { type ComponentProps, createElement } from 'react';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
-import type * as TextModule from '@/components/ui/text';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -26,10 +25,6 @@ const routerState = vi.hoisted(() => ({
   canGoBack: vi.fn(() => true),
 }));
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
-// The eyebrow variant's RTL-script size class, read off the real module by the
-// text mock below: the reserve's tallest-line rule is asserted against the same
-// class string the variant merges in, so the two cannot drift.
-const eyebrowToken = vi.hoisted(() => ({ rtlScriptDisplay: '' }));
 // The container ref the header subscribes to for navigation commits. The suite
 // fires its `state` listeners by hand to reproduce a commit that lands after
 // the header's first render (a restored stack completing).
@@ -78,15 +73,7 @@ vi.mock('@/components/ui/icons', () => ({
   ChevronLeft: 'ChevronLeft',
   ChevronRight: 'ChevronRight',
 }));
-vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
-vi.mock('@/components/ui/text', async importOriginal => {
-  // The real constant, so the reserve's tallest-line class is asserted against
-  // the same string the eyebrow variant merges in, and the header computes the
-  // same class list the app ships (it cannot drift).
-  const { EYEBROW_RTL_SCRIPT_DISPLAY } = await importOriginal<typeof TextModule>();
-  eyebrowToken.rtlScriptDisplay = EYEBROW_RTL_SCRIPT_DISPLAY;
-  return { EYEBROW_RTL_SCRIPT_DISPLAY, Text: 'Text' };
-});
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000' }),
@@ -828,10 +815,6 @@ describe('ScreenHeader mounted', () => {
     // The band is clipped to no width, so it holds height only: it never takes
     // space from the heading or paints beside the title.
     expect(String(band.props.className)).toContain('w-0');
-    // The caller knows the label, so the twin lays out that label and its own
-    // script decides the size: no tallest-line class is forced on it.
-    const twin = band.find(node => String(node.type) === 'Eyebrow');
-    expect(String(twin.props.className)).not.toContain(eyebrowToken.rtlScriptDisplay);
 
     // The visible title keeps its own height, so the eyebrow sits right above
     // it instead of above the empty line the cap reserves.
@@ -840,11 +823,10 @@ describe('ScreenHeader mounted', () => {
     renderer.unmount();
   });
 
-  // The band holds the arriving label's line box, not a blank's: an
-  // Arabic-script eyebrow takes the 13px twin of the token
-  // (`EYEBROW_RTL_SCRIPT_DISPLAY`), whose line box the mono 10px no-break
-  // space the band used to lay out is too short for, so the header grew the
-  // moment the label arrived.
+  // The band holds the arriving label's line box: a known label is laid out as
+  // itself, and an unknown one as a filler whose script matches the interface
+  // (`reservedEyebrowFiller`), so the family and size it resolves to are the
+  // ones a localized label takes.
   it("holds the arriving label's line box in the reserved band", () => {
     const renderer = renderHeader({
       title: 'الفواتير',
@@ -856,46 +838,60 @@ describe('ScreenHeader mounted', () => {
     const twin = findReservedBand(renderer.root).findAll(node => String(node.type) === 'Eyebrow');
     expect(twin).toHaveLength(1);
     expect(twin[0]?.children).toEqual(['الفواتير']);
-    // The label is known, so its own script sets the size: the twin carries no
-    // forced tallest-line class.
-    expect(String(twin[0]?.props.className)).not.toContain(eyebrowToken.rtlScriptDisplay);
     renderer.unmount();
   });
 
-  // A caller that passes only `reserveEyebrow` cannot tell the header what
-  // script the label will be, so both reserve renderings hold the tallest
-  // eyebrow line the token can paint (`EYEBROW_RTL_SCRIPT_DISPLAY`): the mono
-  // 10px no-break space is shorter than Arabic-script copy's 13px line box, and
-  // the header grew by that difference the moment the label arrived (the
-  // session-changes `asOf` timestamp).
-  it('reserves the tallest eyebrow line when the arriving label is unknown', () => {
-    // The mock read the real class off the text module at import time; an empty
-    // value would make every `toContain` below pass for free.
-    expect(eyebrowToken.rtlScriptDisplay).not.toBe('');
+  // ARABIC LETTER MARK carries no ink but it is RTL-script copy, so the reserve
+  // resolves to the same system family and 13px size a localized label takes
+  // and the header cannot grow when the label lands (the session-changes `asOf`
+  // timestamp, which arrives after the first render).
+  it('reserves an RTL-script filler when the arriving label is unknown in an RTL interface', () => {
+    i18nManager.isRTL = true;
+
     const banded = renderHeader({
       title: '#6054',
       reserveEyebrow: true,
       reserveTitleSpace: true,
     });
-    const twin = findReservedBand(banded.root);
-    const twinLabel = twin.find(node => String(node.type) === 'Eyebrow');
-    expect(String(twinLabel.props.className)).toContain(eyebrowToken.rtlScriptDisplay);
-    expect(twinLabel.children).toEqual(['\u00A0']);
+    const twin = findReservedBand(banded.root).find(node => String(node.type) === 'Eyebrow');
+    expect(twin.children).toEqual(['\u061C']);
     banded.unmount();
 
     // The hidden placeholder line, which is what holds the height when the
     // caller does not reserve the title space (the invoices boundary).
     const inline = renderHeader({ title: '#6054', reserveEyebrow: true });
     const placeholder = inline.root.findByType('Eyebrow');
-    expect(String(placeholder.props.className)).toContain(eyebrowToken.rtlScriptDisplay);
+    expect(placeholder.children).toEqual(['\u061C']);
     // It still paints nothing and reaches no reader.
     expect(placeholder.props.className).toContain('opacity-0');
+    inline.unmount();
+
+    i18nManager.isRTL = false;
+  });
+
+  // A left-to-right interface reserves with the mono no-break space, whose line
+  // box is the one a Latin label takes; no eyebrow class is forced on either
+  // reserve rendering, because the filler's script decides the family and size.
+  it('reserves a mono no-break space when the arriving label is unknown in an LTR interface', () => {
+    const banded = renderHeader({
+      title: '#6054',
+      reserveEyebrow: true,
+      reserveTitleSpace: true,
+    });
+    const twin = findReservedBand(banded.root).find(node => String(node.type) === 'Eyebrow');
+    expect(twin.children).toEqual(['\u00A0']);
+    expect(twin.props.className).toBe('mb-0.5');
+    banded.unmount();
+
+    const inline = renderHeader({ title: '#6054', reserveEyebrow: true });
+    const placeholder = inline.root.findByType('Eyebrow');
     expect(placeholder.children).toEqual(['\u00A0']);
+    expect(placeholder.props.className).toBe('mb-0.5 opacity-0');
     inline.unmount();
   });
 
   // A known Latin label keeps the reserve at the eyebrow token's own size.
-  it('keeps the reserve at the token size for a known Latin label', () => {
+  it('holds a known Latin label in the reserve exactly as given', () => {
     const renderer = renderHeader({
       title: '#6054',
       reserveEyebrow: true,
@@ -904,7 +900,6 @@ describe('ScreenHeader mounted', () => {
     });
 
     const twin = findReservedBand(renderer.root).find(node => String(node.type) === 'Eyebrow');
-    expect(String(twin.props.className)).not.toContain(eyebrowToken.rtlScriptDisplay);
     expect(twin.children).toEqual(['Live now']);
     renderer.unmount();
   });

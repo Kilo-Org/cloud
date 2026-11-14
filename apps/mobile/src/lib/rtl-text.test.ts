@@ -46,6 +46,12 @@ describe('hasRtlScript', () => {
     expect(hasRtlScript('פעילים עכשיו')).toBe(true);
   });
 
+  // The header's reserve lays out this mark when it cannot know the arriving
+  // label (`reservedEyebrowFiller`), so the file's script scan must read it.
+  it('detects ARABIC LETTER MARK, the header reserve filler', () => {
+    expect(hasRtlScript('\u061C')).toBe(true);
+  });
+
   it('walks the child tree to reach an Extended-B label', () => {
     expect(hasRtlScript(createElement('Text', null, FIRST_EXTENDED_B))).toBe(true);
   });

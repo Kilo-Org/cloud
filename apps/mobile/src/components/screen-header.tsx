@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown } from '@/components/ui/icons';
 import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
-import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { I18nManager, Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
-import { EYEBROW_RTL_SCRIPT_DISPLAY, Text } from '@/components/ui/text';
+import { Text } from '@/components/ui/text';
 import { useOfflineBannerSpace } from '@/components/offline-banner-space';
 import { useHeaderBack } from '@/lib/hooks/use-header-back';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -97,10 +97,23 @@ export function shouldStackHeaderActions(
 const MAX_TITLE_LINES = 3;
 
 /**
- * What a reserved band's eyebrow twin lays out with: a space, so the twin
- * holds one eyebrow line without painting a label that is not on screen.
+ * What a reserve lays out when it cannot know the label that will fill it.
+ * The filler's own script chooses the family and size through the same path the
+ * arriving label takes (`Text`'s eyebrow variant drops the mono family from
+ * RTL-script copy and sizes it to `EYEBROW_RTL_SCRIPT_DISPLAY`): in a
+ * right-to-left interface an ARABIC LETTER MARK (U+061C) is an RTL-script
+ * character, so the reserve lays out in the system family at 13px — the 22.48dp
+ * line box a localized label takes — while in a left-to-right interface the
+ * mono no-break space holds the 14.1dp box a Latin label takes. Neither mark
+ * paints ink, so the reserve holds height only. A raw space could not: it has no
+ * script, so a forced size would leave it in the mono family and still shorter
+ * than the label. A caller whose arriving label is Latin inside a
+ * right-to-left interface should pass `reservedEyebrow` so the reserve holds
+ * that label's exact box instead of the RTL-script one.
  */
-const blankEyebrow = '\u00A0';
+function reservedEyebrowFiller(isRtl: boolean): string {
+  return isRtl ? '\u061C' : '\u00A0';
+}
 
 type ScreenHeaderProps = {
   /** Omit to render a bare back-button bar (e.g. when the screen body provides its own title). */
@@ -157,13 +170,14 @@ type ScreenHeaderProps = {
   /** Optional mono-uppercase line above the title. */
   eyebrow?: string;
   /**
-   * Render this label in the reserve twin instead of the no-break space, so the
-   * reserved eyebrow line holds the exact line box of the label that replaces
-   * it — in every script: Arabic-script copy takes the 13px eyebrow twin
-   * (`EYEBROW_RTL_SCRIPT_DISPLAY`), whose line box is taller than the mono 10px
-   * space, so a boundary that reserved with the space grew the header when the
-   * label arrived. The reserve paints nothing either way (a zero-width, clipped,
-   * `aria-hidden` twin), so this is the label's metrics, not its text.
+   * Render this label in the reserve instead of the filler, so the reserved
+   * eyebrow line holds the exact line box of the label that replaces it. The
+   * reserve holds one line box at a time and cannot see the arriving label, so
+   * its filler follows the interface (`reservedEyebrowFiller`): pass this when
+   * the two disagree — a Latin label inside a right-to-left interface — or when
+   * the label already exists at the first render. The reserve paints nothing
+   * either way (a zero-width, clipped, `aria-hidden` twin), so this is the
+   * label's metrics, not its text.
    */
   reservedEyebrow?: string;
   reserveEyebrow?: boolean;
@@ -476,28 +490,18 @@ export function ScreenHeader({
     );
   }
 
-  // The reserve cannot know the arriving label's script: a caller that passes
-  // only `reserveEyebrow` — the session-changes `asOf` timestamp, which lands
-  // after the first render — leaves the reserve laying out the mono 10px
-  // no-break space, and an Arabic-script label's 13px line box
-  // (`EYEBROW_RTL_SCRIPT_DISPLAY`) is taller than that, so the header grew by
-  // the difference the moment the label arrived: exactly the shift the reserve
-  // exists to prevent. Such a reserve therefore holds the tallest eyebrow line
-  // the token can paint; a caller that knows the label passes `reservedEyebrow`
-  // and gets that label's own line box instead. The cost: a screen that
-  // reserves a line it never fills is 3dp taller in its header.
-  const reserveTallestEyebrowLine = !eyebrow && !reservedEyebrow;
+  // The reserve cannot know the arriving label, so it lays out a filler whose
+  // own script matches the interface's: an RTL-script mark in a right-to-left
+  // interface (the family and size a localized label takes), the mono no-break
+  // space in a left-to-right one (a Latin label's box). See
+  // `reservedEyebrowFiller`.
+  const eyebrowFiller = reservedEyebrowFiller(I18nManager.isRTL);
 
   const heading = (
     <View className="min-w-0 flex-1">
       {eyebrow || reserveEyebrow ? (
         <Eyebrow
-          className={cn(
-            'mb-0.5',
-            centerTitle && 'text-center',
-            !eyebrow && 'opacity-0',
-            reserveTallestEyebrowLine && EYEBROW_RTL_SCRIPT_DISPLAY
-          )}
+          className={cn('mb-0.5', centerTitle && 'text-center', !eyebrow && 'opacity-0')}
           // A status line is one line: a narrow window truncates it rather than
           // stacking it into a column beside the title. A caller that raises
           // `eyebrowNumberOfLines` opts into the extra lines and the middle
@@ -510,14 +514,13 @@ export function ScreenHeader({
         >
           {/*
             Before the caller's label exists the slot holds the label that will
-            fill it (`reservedEyebrow`), not a bare space: the space's mono 10px
-            line box is shorter than Arabic-script copy's 13px one, so the
-            header grew the moment the label arrived. With no label to go on the
-            slot holds the tallest eyebrow line instead
-            (`reserveTallestEyebrowLine`). The copy stays transparent and hidden
-            from assistive readers until `eyebrow` itself is set.
+            fill it (`reservedEyebrow`), and with no label to go on it holds the
+            reserve filler, whose script makes it take the same family and size
+            a localized label takes (`reservedEyebrowFiller`). The copy stays
+            transparent and hidden from assistive readers until `eyebrow` itself
+            is set.
           */}
-          {eyebrow ?? reservedEyebrow ?? '\u00A0'}
+          {eyebrow ?? reservedEyebrow ?? eyebrowFiller}
         </Eyebrow>
       ) : null}
       {titleNode}
@@ -572,9 +575,7 @@ export function ScreenHeader({
   const reservedTitleBand = reserveTitleSpace ? (
     <View className="w-0 overflow-hidden" aria-hidden>
       {eyebrow || reserveEyebrow ? (
-        <Eyebrow className={cn('mb-0.5', reserveTallestEyebrowLine && EYEBROW_RTL_SCRIPT_DISPLAY)}>
-          {reservedEyebrow ?? eyebrow ?? blankEyebrow}
-        </Eyebrow>
+        <Eyebrow className="mb-0.5">{reservedEyebrow ?? eyebrow ?? eyebrowFiller}</Eyebrow>
       ) : null}
       <View className={reservedTitleHeightClass(size, titleLines)} />
     </View>

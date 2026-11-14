@@ -79,7 +79,7 @@ it.each(['resolve', 'reject'] as const)(
     });
     await act(async () => {
       if (outcome === 'resolve') {
-        download.resolve();
+        download.resolve(undefined);
       } else {
         download.reject(new Error('late'));
       }
@@ -104,7 +104,7 @@ it('keeps the newer preview when the old download completes last', async () => {
     await actions.openPreview({ ...image, name: 'new.png' });
   });
   await act(async () => {
-    download.resolve();
+    download.resolve(undefined);
     await pending;
   });
   expect(actions.preview?.name).toBe('new.png');

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { readRow, readRows, type SshDatabase, updateRow } from './database';
+import { readRow, readRows, type SshDatabase } from './database';
 import { newId } from './id';
 
 const COLUMNS = `
@@ -28,14 +28,6 @@ const hostKeySchema = z.object({
 });
 
 export type TrustedHostKey = z.input<typeof hostKeySchema>;
-
-const replacementSchema = hostKeySchema.pick({
-  keyAlgorithm: true,
-  publicKeyBase64: true,
-  fingerprintSha256: true,
-});
-
-export type HostKeyReplacement = z.input<typeof replacementSchema>;
 
 export function listKnownHosts(db: SshDatabase): SshKnownHost[] {
   return readRows({
@@ -85,26 +77,6 @@ export function trustHostKey(
     throw new Error(`ssh_known_hosts: row ${id} is missing after its own insert`);
   }
   return trusted;
-}
-
-export function replaceHostKey(
-  db: SshDatabase,
-  id: string,
-  replacement: HostKeyReplacement
-): SshKnownHost | null {
-  const key = replacementSchema.parse(replacement);
-  updateRow({
-    db,
-    table: 'ssh_known_hosts',
-    id,
-    updates: {
-      key_algorithm: key.keyAlgorithm,
-      public_key_base64: key.publicKeyBase64,
-      fingerprint_sha256: key.fingerprintSha256,
-      added_at: Date.now(),
-    },
-  });
-  return getKnownHost(db, id);
 }
 
 export function removeKnownHost(db: SshDatabase, id: string): void {

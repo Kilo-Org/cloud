@@ -7,6 +7,7 @@ import ExpoModulesCore
  * same shape as the Kotlin records, because `sendEvent` takes a dictionary.
  */
 struct ConnectConfigRecord: Record, @unchecked Sendable {
+  @Field var attemptId: String = ""
   @Field var host: String = ""
   @Field var port: Int = 22
   @Field var username: String = ""
@@ -119,6 +120,7 @@ struct ForwardInfoRecord: Record, @unchecked Sendable {
 
 struct HostKeyRequest: Sendable {
   let sessionId: String
+  let attemptId: String
   let requestId: String
   let host: String
   let port: Int
@@ -129,6 +131,7 @@ struct HostKeyRequest: Sendable {
   func toEvent() -> [String: Any?] {
     [
       "sessionId": sessionId,
+      "attemptId": attemptId,
       "requestId": requestId,
       "host": host,
       "port": port,
@@ -150,6 +153,7 @@ struct PromptPayload: Sendable {
 
 struct KeyboardInteractiveRequest: Sendable {
   let sessionId: String
+  let attemptId: String
   let requestId: String
   let name: String
   let instructions: String
@@ -158,6 +162,7 @@ struct KeyboardInteractiveRequest: Sendable {
   func toEvent() -> [String: Any?] {
     [
       "sessionId": sessionId,
+      "attemptId": attemptId,
       "requestId": requestId,
       "name": name,
       "instructions": instructions,

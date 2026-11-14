@@ -495,3 +495,9 @@ Password, saved-password, and keyboard-interactive sessions reconnect in the bac
 A connection using a stored key on any hop waits for the foreground before device unlock.
 Closing or disconnecting the session cancels that wait and removes its foreground listener;
 the notification's disconnect-all action uses the same cleanup.
+
+Host-key and keyboard-interactive requests (including password prompts) echo a unique
+`attemptId` for each native connect, including jump hops. The app routes them only to
+that pending connect and rejects requests from a closed or superseded attempt.
+A changed host key blocks the connection. Remove the old entry on the known-hosts
+screen before reconnecting and trusting the new key; stored keys are not replaced in place.

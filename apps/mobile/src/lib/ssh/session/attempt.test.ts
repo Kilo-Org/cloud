@@ -42,7 +42,7 @@ const state = vi.hoisted(() => ({
 vi.mock('@/i18n', () => ({ i18n: { t: () => 'Unlock' } }));
 vi.mock('./idle-notify', () => ({ forgetIdleNotify: vi.fn() }));
 vi.mock('../known-hosts', () => ({ findKnownHost: vi.fn(), trustHostKey: vi.fn() }));
-vi.mock('../id', () => ({ newId: vi.fn() }));
+vi.mock('../id', () => ({ newId: vi.fn(() => crypto.randomUUID()) }));
 vi.mock('../store', () => ({ sshDatabase: () => Promise.resolve({}) }));
 vi.mock('../hosts', () => ({ getHost: state.getHost, updateHost: vi.fn() }));
 vi.mock('../keys', () => ({ getKey: () => ({ privateKeyOpenssh: 'key', passphrase: null }) }));
@@ -81,11 +81,10 @@ function createEntry(): LiveSession {
     prompts: null,
     passwords: new Map(),
     authHostId: null,
-    promptsHostId: null,
     passphrase: null,
     connecting: false,
     attemptAbort: null,
-    connectTargets: [],
+    connectAttemptId: null,
   };
 }
 

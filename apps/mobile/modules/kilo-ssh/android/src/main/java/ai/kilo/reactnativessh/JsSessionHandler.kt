@@ -14,6 +14,7 @@ import ai.kilo.reactnativessh.uniffi.SessionHandler
  */
 internal class JsSessionHandler(
   private val sessionId: String,
+  private val attemptId: String,
   private val requestIds: IdSequence,
   private val requestHostKey: suspend (HostKeyRequestRecord) -> Boolean,
   private val requestPrompts: suspend (KeyboardInteractiveRequestRecord) -> List<String>?,
@@ -28,6 +29,7 @@ internal class JsSessionHandler(
   ): Boolean = requestHostKey(
     HostKeyRequestRecord(
       sessionId = sessionId,
+      attemptId = attemptId,
       requestId = requestIds.next(),
       host = host,
       port = port.toInt(),
@@ -44,6 +46,7 @@ internal class JsSessionHandler(
   ): List<String>? = requestPrompts(
     KeyboardInteractiveRequestRecord(
       sessionId = sessionId,
+      attemptId = attemptId,
       requestId = requestIds.next(),
       name = name,
       instructions = instructions,

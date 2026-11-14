@@ -2,11 +2,11 @@ import { type SshErrorCode } from '../../../../modules/kilo-ssh/src';
 
 /**
  * Why a session stopped. `SshErrorCode` names what the Rust core reports; the
- * rest are this app's own endings. `InvalidExport` is excluded: it belongs to
- * the encrypted export, so no connection can ever end with it.
+ * rest are this app's own endings. Export validation and exec output limits
+ * are excluded because neither can end an interactive connection.
  */
 export type SshCloseReason =
-  | Exclude<SshErrorCode, 'InvalidExport'>
+  | Exclude<SshErrorCode, 'InvalidExport' | 'OutputLimit'>
   | 'disconnected'
   | 'user'
   | 'key-missing'

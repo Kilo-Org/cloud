@@ -31,6 +31,7 @@ type TerminalSurfaceProps = Readonly<{
   handleRef: RefObject<TerminalViewHandle | null>;
   onResize?: (cols: number, rows: number) => void;
   onLayout?: () => void;
+  onSourceBound?: (sourceId: string) => void;
   onFontSizeChange?: (fontSize: number) => void;
   onLinkPress?: (url: string) => void;
   onTitleChange?: (title: string | null) => void;
@@ -57,6 +58,7 @@ export function TerminalSurface({
   onResize,
   onFontSizeChange,
   onLayout,
+  onSourceBound,
   onLinkPress,
   onTitleChange,
   onClosed,
@@ -75,6 +77,7 @@ export function TerminalSurface({
       fontSize={fontSize}
       theme={theme}
       onLayout={onLayout}
+      onSourceBound={onSourceBound}
       onResize={size => onResize?.(size.cols, size.rows)}
       onFontSizeChange={onFontSizeChange}
       onLinkPress={onLinkPress}

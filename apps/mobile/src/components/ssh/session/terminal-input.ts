@@ -38,11 +38,11 @@ export async function blurShell(terminal: TerminalViewHandle | null): Promise<vo
   }
 }
 
-/** A ref exists before Fabric has mounted the native view that can accept commands. */
+/** Layout and a ref do not imply that a replacement native source has bound. */
 export function startupCommandForShell(
   shellId: string | null,
-  laidOutShellId: string | null,
+  boundShellId: string | null,
   pendingCommand: string | null
 ): string | null {
-  return shellId !== null && shellId === laidOutShellId ? pendingCommand : null;
+  return shellId !== null && shellId === boundShellId ? pendingCommand : null;
 }

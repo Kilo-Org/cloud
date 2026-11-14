@@ -163,7 +163,8 @@ export function consumePendingCommand(id: string, command: string): void {
  */
 export function endShell(id: string, error: string | null): void {
   const entry = live.get(id);
-  if (entry === undefined) {
+  const shellId = sessionById(id)?.shellId ?? null;
+  if (entry === undefined || shellId === null) {
     return;
   }
   patchSession(id, { shellId: null, pendingCommand: null });

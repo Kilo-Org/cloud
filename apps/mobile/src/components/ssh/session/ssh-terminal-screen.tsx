@@ -59,10 +59,8 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
   const sessions = useSshSessions();
   const rehydrated = useSshSessionsRehydrated();
   const { fontSize, setFontSize } = useTerminalFontSize();
-  const { terminalRef, displayedShellId, surface, autoFocus, onLayout } = useTerminalShell(
-    sessionId,
-    session
-  );
+  const { terminalRef, displayedShellId, surface, autoFocus, inputReady, onLayout, onSourceBound } =
+    useTerminalShell(sessionId, session);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [snippetsOpen, setSnippetsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -108,6 +106,7 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
         autoFocus={autoFocus}
         fontSize={fontSize}
         onLayout={onLayout}
+        onSourceBound={onSourceBound}
         onLinkPress={url => {
           void openExternalUrl(url);
         }}
@@ -206,7 +205,7 @@ export function SshTerminalScreen({ sessionId }: SshTerminalScreenProps) {
           <View className="flex-1 bg-background">{terminalArea ?? stageArea}</View>
           {!surface?.terminal ? null : (
             <TerminalKeyBar
-              disabled={!surface.inputEnabled}
+              disabled={!inputReady}
               onSend={text => {
                 void sendToShell(terminalRef.current, text);
               }}

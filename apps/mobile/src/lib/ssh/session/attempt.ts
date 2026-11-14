@@ -78,13 +78,7 @@ async function openChain(
   }
 }
 
-/**
- * The core's failure codes a connection can end with, restated so a rejected
- * promise can be classified without loading the native module. Keep in step
- * with `SSH_ERROR_CODES` in the ssh module's `SshErrors`; `InvalidExport` is
- * left out because it belongs to the encrypted export, not to a connection.
- */
-const ERROR_CODES: readonly Exclude<SshErrorCode, 'InvalidExport'>[] = [
+const ERROR_CODES: readonly Exclude<SshErrorCode, 'InvalidExport' | 'OutputLimit'>[] = [
   'Network',
   'Timeout',
   'HostKeyRejected',

@@ -11,6 +11,7 @@ import { blurShell, startupCommandForShell } from './terminal-input';
 export function useTerminalShell(sessionId: string, session: SshSession | null) {
   const terminalRef = useRef<TerminalViewHandle>(null);
   const [laidOut, setLaidOut] = useState(false);
+  const [boundShellId, setBoundShellId] = useState<string | null>(null);
   const lastShell = useRef<{ sessionId: string; shellId: string } | null>(null);
   const firstShellId = useRef<string | null>(null);
   const shellId = session?.shellId ?? null;
@@ -32,18 +33,20 @@ export function useTerminalShell(sessionId: string, session: SshSession | null) 
 
   useEffect(() => {
     const terminal = terminalRef.current;
-    const command = startupCommandForShell(shellId, laidOut ? shellId : null, pendingCommand);
+    const command = startupCommandForShell(shellId, laidOut ? boundShellId : null, pendingCommand);
     if (command === null || terminal === null) {
       return;
     }
     void typeOnce(terminal, sessionId, command);
-  }, [pendingCommand, shellId, laidOut, sessionId]);
+  }, [pendingCommand, shellId, boundShellId, laidOut, sessionId]);
 
   return {
     terminalRef,
     displayedShellId,
     surface,
     autoFocus: displayedShellId === firstShellId.current && !surface?.reconnecting,
+    inputReady: surface?.inputEnabled === true && laidOut && boundShellId === shellId,
+    onSourceBound: setBoundShellId,
     onLayout: () => {
       setLaidOut(true);
     },

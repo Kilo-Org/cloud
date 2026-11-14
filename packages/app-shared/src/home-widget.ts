@@ -29,6 +29,13 @@ const kindSchema = z.enum(GLANCEABLE_STATUS_KINDS);
 /** Private Home-only data. Never include this in Live Activity content-state. */
 export const homeWidgetDetailsSchema = z.object({
   approvalKey: approvalKeySchema.default(null),
+  /**
+   * The kind whose row produced `primaryTitle`, so the title always describes
+   * the kind drawn beside it. Optional on input: a payload stored or pushed
+   * before this field existed omits it, which reads as an unknown kind and
+   * keeps the title, so an older payload renders as it did.
+   */
+  primaryKind: kindSchema.nullable().optional(),
   primaryTitle: titleSchema.nullable(),
   waitingAgents: z
     .array(
@@ -50,6 +57,7 @@ export const homeWidgetDetailsSchema = z.object({
 export type HomeWidgetDetails = z.infer<typeof homeWidgetDetailsSchema>;
 export const EMPTY_HOME_WIDGET_DETAILS: HomeWidgetDetails = {
   approvalKey: null,
+  primaryKind: null,
   primaryTitle: null,
   waitingAgents: [],
   scheduledAgents: [],
@@ -134,7 +142,11 @@ export function glanceableSessionTitle(value: string | null | undefined): string
   return title === '' || isDefaultSessionTitle(title) ? null : title;
 }
 
-/** Same authorized rows as counts, with stable ties and unknown times ranked last. */
+/**
+ * Same authorized rows as counts, with stable ties and unknown times ranked
+ * last. Returns the kind its `primaryTitle` belongs to, so the title and the
+ * count drawn beside it cannot describe different kinds.
+ */
 export function buildHomeWidgetDetails(
   sessions: readonly HomeWidgetSessionRow[]
 ): HomeWidgetDetails {
@@ -167,6 +179,7 @@ export function buildHomeWidgetDetails(
             )[0];
   return {
     approvalKey: waiting.find(row => row.approvalKey != null)?.approvalKey ?? null,
+    primaryKind: primaryKind ?? null,
     primaryTitle: primary === undefined ? null : glanceableTitle(primary.title),
     waitingAgents: waiting.slice(0, HOME_WIDGET_DETAIL_LIMIT).flatMap(row => {
       // The status fold above admits only needs-input statuses; a status that
@@ -228,6 +241,10 @@ export function buildHomeWidgetPresentation(
 ): HomeWidgetPresentation {
   const { snapshot, details } = data;
   const { terminal, primaryKind, checkedAt, staleAt } = staleness(data);
+  // A title is drawn only beside the kind it describes. A payload stored or
+  // pushed before details carried the kind omits it, which reads as unknown and
+  // keeps the title, so that payload renders as it did.
+  const titleKind = details.primaryKind ?? null;
   const wake = snapshot.scheduled > 0 ? timestampMs(snapshot.scheduledAt) : null;
   const scheduledAt = snapshot.scheduled > 0 ? timestampToIso(snapshot.scheduledAt) : null;
   return {
@@ -259,7 +276,10 @@ export function buildHomeWidgetPresentation(
     scheduledAt: terminal ? null : scheduledAt,
     approvalKey: terminal || snapshot.needsInput === 0 ? null : details.approvalKey,
     awaitingUpdate: !terminal && wake !== null && now >= wake,
-    primaryTitle: terminal || primaryKind === null ? null : details.primaryTitle,
+    primaryTitle:
+      terminal || primaryKind === null || (titleKind !== null && titleKind !== primaryKind)
+        ? null
+        : details.primaryTitle,
     waitingAgents: terminal || snapshot.needsInput === 0 ? [] : details.waitingAgents,
     scheduledAgents: terminal || snapshot.scheduled === 0 ? [] : details.scheduledAgents,
     canCreate: !terminal && (primaryKind !== null || snapshot.status !== 'waiting'),

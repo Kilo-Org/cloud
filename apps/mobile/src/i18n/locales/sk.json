@@ -3342,7 +3342,7 @@
       "selectOrganization": "Vybrať organizáciu",
       "unavailableDescription": "Táto organizácia už nie je dostupná. Ak chceš pokračovať, vyber inú vo svojom profile.",
       "unavailableSessionsDescription": "Táto organizácia už nie je dostupná. Jej relácie nie je možné načítať.",
-      "accessDeniedDescription": "Požiadajte vlastníka alebo správcu organizácie o udelenie prístupu."
+      "accessDeniedDescription": "Požiadaj vlastníka organizácie alebo správcu o udelenie prístupu."
     },
     "create": {
       "title": "Vytvoriť organizáciu",

@@ -3228,7 +3228,7 @@
       "selectOrganization": "Bir kuruluş seç",
       "unavailableDescription": "Bu kuruluş artık kullanılamıyor. Devam etmek için profilinden başka bir kuruluş seç.",
       "unavailableSessionsDescription": "Bu kuruluş artık kullanılamıyor. Oturumları yüklenemiyor.",
-      "accessDeniedDescription": "Bir kuruluş sahibinden ya da yöneticiden size erişim vermesini isteyin."
+      "accessDeniedDescription": "Bir kuruluş sahibinden ya da yöneticiden sana erişim vermesini iste."
     },
     "create": {
       "title": "Kuruluş oluştur",

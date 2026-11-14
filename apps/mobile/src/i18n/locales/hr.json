@@ -3289,7 +3289,7 @@
       "selectOrganization": "Odaberi organizaciju",
       "unavailableDescription": "Ova organizacija više nije dostupna. Za nastavak odaberi drugu organizaciju na svom profilu.",
       "unavailableSessionsDescription": "Ova organizacija više nije dostupna. Njezine sesije nije moguće učitati.",
-      "accessDeniedDescription": "Zatražite od vlasnika organizacije ili administratora da vam odobri pristup."
+      "accessDeniedDescription": "Zamoli vlasnika organizacije ili administratora da ti odobri pristup."
     },
     "create": {
       "title": "Izradi organizaciju",

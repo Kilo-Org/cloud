@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   containsJoinedScript,
   hasRtlScript,
-JOINED_SCRIPT,
   ltrValueTextStyle,
   rtlBlockTextAlign,
   withoutMonoFamily,

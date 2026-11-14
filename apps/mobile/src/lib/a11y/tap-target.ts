@@ -198,13 +198,14 @@ export const COMPACT_CONTROL_HIT_SLOP_DP = 8;
  * reaches past 44pt instead of onto it.
  *
  * A box taller than the shared single-line `Input`'s `min-h-[44px]` would grow
- * the field, so it cancels the extra height in layout with the field's own
- * vertical padding: `-my-[7px]` is 7pt a side, exactly the field's `py-2` at
- * NativeWind's 14pt rem, so the box lays out on 48 - 14 = 34pt — under the
- * input's floor, so the field keeps its height — while the box still paints and
- * hit-tests its whole height, overflowing 7pt a side into that padding and
- * staying inside the field's own frame. The same shape as
- * `LINE_ACTION_BOX_CLASS` on a line of copy.
+ * the field, so it cancels the difference in layout: `-my-[7px]` is 7pt a side
+ * at NativeWind's 14pt rem, so the box contributes 48 - 14 = 34pt to the row's
+ * cross size — under the input's floor, which therefore keeps setting the
+ * field's height. The margin does not move the border box: the row centres that
+ * box against the input's 44pt content area, so it overhangs the content area
+ * by `(48 - 44) / 2 = 2pt` each side and still paints and hit-tests its whole
+ * height inside the field's 7pt `py-2` padding, with 5pt to spare before the
+ * field's own edge. The same shape as `LINE_ACTION_BOX_CLASS` on a line of copy.
  */
 export const FIELD_CLEAR_BOX_CLASS = 'h-[48px] w-[48px] -my-[7px] items-center justify-center';
 

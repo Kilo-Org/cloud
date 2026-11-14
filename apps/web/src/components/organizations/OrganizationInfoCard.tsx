@@ -45,6 +45,7 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { hasVisibleText } from '@kilocode/app-shared/text';
 import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds } from '@/lib/utils';
 import { SpendingAlertsModal } from './SpendingAlertsModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -336,7 +337,7 @@ function Inner(props: InnerProps) {
                 size="sm"
                 variant="ghost"
                 onClick={handleSave}
-                disabled={updateOrganizationName.isPending || !editedName.trim()}
+                disabled={updateOrganizationName.isPending || !hasVisibleText(editedName)}
                 className="h-8 w-8 p-0"
               >
                 <Check className="h-4 w-4 text-green-400" />

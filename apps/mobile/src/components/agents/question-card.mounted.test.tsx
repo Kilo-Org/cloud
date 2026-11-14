@@ -72,14 +72,17 @@ function makeQuestion(overrides: { multiple?: boolean; custom?: boolean } = {}):
 
 type Renderer = TestRenderer.ReactTestRenderer;
 
-async function renderCard(questions: Question[]): Promise<Renderer> {
+async function renderCard(
+  questions: Question[],
+  onAnswer: (answers: string[][]) => void = () => undefined
+): Promise<Renderer> {
   const holder: { current?: Renderer } = {};
   await act(async () => {
     await Promise.resolve();
     holder.current = TestRenderer.create(
       createElement(QuestionCard, {
         questions,
-        onAnswer: () => undefined,
+        onAnswer,
         onReject: () => undefined,
         requestId: 'question-req-1',
       })
@@ -157,6 +160,21 @@ function typeCustomText(root: TestRenderer.ReactTestInstance, text: string): voi
   });
 }
 
+/** The card's submit CTA, the button that submits the answers. */
+function submitAction(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  return root.find(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Button' &&
+      node.findAll(
+        child =>
+          typeof child.type === 'string' &&
+          (child.type as string) === 'Text' &&
+          child.children.includes('Send answers')
+      ).length > 0
+  );
+}
+
 /** The row of text lines rendered inside one preset option button. */
 function optionTextLines(root: TestRenderer.ReactTestInstance, label: string): string[] {
   const button = optionButton(root, label);
@@ -219,6 +237,49 @@ describe('QuestionCard custom answer selection', () => {
 
     press(optionButton(renderer.root, 'Continue'));
     expect(customChoiceChecked(renderer.root)).toBe(false);
+  });
+
+  it('pressing a preset after typing replaces the custom field instead of leaving text the card will not send', async () => {
+    // Regression: the preset press left the typed text in the field, and the
+    // payload silently dropped it.
+    let submitted: string[][] = [];
+    const renderer = await renderCard(makeQuestion({ multiple: false }), answers => {
+      submitted = answers;
+    });
+    const inputBefore = customInput(renderer.root);
+
+    typeCustomText(renderer.root, 'deploy staging');
+    expect(customChoiceChecked(renderer.root)).toBe(true);
+
+    press(optionButton(renderer.root, 'Continue'));
+    expect(customChoiceChecked(renderer.root)).toBe(false);
+
+    // A new field instance starts from its empty default.
+    const inputAfter = customInput(renderer.root);
+    expect(inputAfter).not.toBe(inputBefore);
+    expect(inputAfter?.props.defaultValue).toBe('');
+
+    press(submitAction(renderer.root));
+    expect(submitted).toEqual([['Continue']]);
+  });
+
+  it('re-pressing the selected custom radio keeps the typed answer on screen and in the submitted payload', async () => {
+    let submitted: string[][] = [];
+    const renderer = await renderCard(makeQuestion({ multiple: false }), answers => {
+      submitted = answers;
+    });
+
+    typeCustomText(renderer.root, 'deploy staging');
+    expect(customChoiceChecked(renderer.root)).toBe(true);
+    const inputBefore = customInput(renderer.root);
+
+    press(customChoice(renderer.root));
+    expect(customChoiceChecked(renderer.root)).toBe(true);
+    // The radio never remounts the field, so the typed answer stays put.
+    expect(customInput(renderer.root)).toBe(inputBefore);
+
+    press(submitAction(renderer.root));
+    expect(submitted).toEqual([['deploy staging']]);
   });
 
   it('renders an option description as a subtitle under its label', async () => {

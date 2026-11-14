@@ -59,6 +59,17 @@ export class CharacterBoundedCache<T> {
     return entry.value;
   }
 
+  /**
+   * The entry for `key` without refreshing its recency.
+   *
+   * A caller that only looks at an entry to change it — a released walk kept
+   * for a remount — must not make it the newest entry on the way, or the
+   * eviction that follows would drop the older walks worth keeping instead.
+   */
+  peek(key: string): T | undefined {
+    return this.entries.get(key)?.value;
+  }
+
   set(key: string, value: T, weight: number = key.length): void {
     this.remove(key);
     const pinned = this.pinned(value);
@@ -68,6 +79,34 @@ export class CharacterBoundedCache<T> {
       this.pinnedWeight += weight;
       this.pinnedEntries += 1;
     }
+    this.evict();
+  }
+
+  /**
+   * Replace one entry's value and weight without moving it in the eviction
+   * order.
+   *
+   * A caller that is only changing what the entry *is* — a held walk becoming
+   * evictable — must not make it the newest entry: `evict` never drops the
+   * newest, so an entry that is about to be deleted would push out the older
+   * walks that are still worth keeping.
+   */
+  update(key: string, value: T, weight: number = key.length): void {
+    const existing = this.entries.get(key);
+    if (existing === undefined) {
+      return;
+    }
+    const pinned = this.pinned(value);
+    this.totalWeight += weight - existing.weight;
+    if (existing.pinned) {
+      this.pinnedWeight -= existing.weight;
+      this.pinnedEntries -= 1;
+    }
+    if (pinned) {
+      this.pinnedWeight += weight;
+      this.pinnedEntries += 1;
+    }
+    this.entries.set(key, { value, weight, pinned });
     this.evict();
   }
 

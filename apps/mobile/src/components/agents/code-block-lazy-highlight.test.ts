@@ -110,6 +110,35 @@ describe('chunkCodeLines lazy highlighting', () => {
     expect(page.chunks).toEqual(expected);
   });
 
+  it('drops the released walk instead of the cached neighbour', async () => {
+    // Regression: releasing a walk re-inserted it as the newest entry, which
+    // eviction never drops, so it pushed out a cached walk that was still worth
+    // keeping and then deleted itself on the next task anyway.
+    const held = Array.from({ length: 400 }, (_, index) => `const held${index} = ${index};`).join(
+      '\n'
+    );
+    const cached = Array.from(
+      { length: 3200 },
+      (_, index) => `const big${index} = ${'x'.repeat(700)};`
+    ).join('\n');
+
+    chunkCodeLines(held, 'typescript', CODE_FIRST_PAINT_CHUNKS);
+    retainFenceChunkWalk(held, 'typescript');
+    chunkCodeLines(cached, null, CODE_FIRST_PAINT_CHUNKS);
+    expect(fenceWalkCacheStatsForTests().held).toBe(1);
+
+    releaseFenceChunkWalk(held, 'typescript');
+    await Promise.resolve();
+
+    // The released entry is gone and the cached one kept its place.
+    expect(fenceWalkCacheStatsForTests()).toMatchObject({ entries: 1, held: 0 });
+    // The neighbour still resumes: asking for what it already painted highlights
+    // nothing, where a dropped walk would re-highlight from line 0.
+    highlightCalls.lines = [];
+    chunkCodeLines(cached, null, CODE_FIRST_PAINT_CHUNKS);
+    expect(highlightCalls.lines).toEqual([]);
+  });
+
   it('keeps a retained fence walk when another fence exceeds the budget', () => {
     // Regression: the holder count lived in a map beside the cache and eviction
     // never consulted it, so another fence's `set` evicted the walk a mounted

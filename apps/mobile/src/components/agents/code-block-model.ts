@@ -369,28 +369,34 @@ export function retainFenceChunkWalk(code: string, language: string | null): voi
  */
 export function releaseFenceChunkWalk(code: string, language: string | null): void {
   const key = fenceWalkKey(code, language);
-  const entry = fenceWalkCache.get(key);
+  const entry = fenceWalkCache.peek(key);
   if (entry === undefined) {
     return;
   }
   if (entry.kind === 'held' && entry.holders > 1) {
     const walk = entry.walk;
-    fenceWalkCache.set(
+    fenceWalkCache.update(
       key,
       { kind: 'held', walk, holders: entry.holders - 1 },
       fenceWalkWeight(key, walk)
     );
     return;
   }
-  fenceWalkCache.set(key, { kind: 'cached', walk: entry.walk }, fenceWalkWeight(key, entry.walk));
+  // In place, so the released walk keeps its place in the eviction order: it is
+  // dropped on the next task, and making it the newest would push out a walk
+  // another fence still resumes from.
+  fenceWalkCache.update(
+    key,
+    { kind: 'cached', walk: entry.walk },
+    fenceWalkWeight(key, entry.walk)
+  );
   // A block that renders the same fence can mount in the same commit as this
   // release, and React runs a commit's effect cleanups before its effect
   // creates: that new block's retain has not landed yet. Drop the entry on the
   // next task instead, once the commit's creates have run, and keep it if one
   // of them retained it.
   queueMicrotask(() => {
-    const current = fenceWalkCache.get(key);
-    if (current?.kind === 'cached') {
+    if (fenceWalkCache.peek(key)?.kind === 'cached') {
       fenceWalkCache.delete(key);
     }
   });

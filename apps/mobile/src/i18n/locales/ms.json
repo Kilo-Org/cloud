@@ -3338,7 +3338,7 @@
       "sharingUnavailable": "Perkongsian tidak tersedia pada peranti ini.",
       "status": {
         "paid": "Dibayar",
-        "open": "Buka",
+        "open": "Dibuka",
         "void": "Dibatalkan",
         "uncollectible": "Tidak dapat dikutip"
       },

@@ -3396,7 +3396,7 @@
       "sharingUnavailable": "No se puede compartir contenido en este dispositivo.",
       "status": {
         "paid": "Pagada",
-        "open": "Apertura",
+        "open": "Abierta",
         "void": "Anulada",
         "uncollectible": "Incobrable"
       },

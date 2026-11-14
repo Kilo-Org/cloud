@@ -3343,7 +3343,7 @@
       "sharingUnavailable": "Fitur berbagi tidak tersedia di perangkat ini.",
       "status": {
         "paid": "Lunas",
-        "open": "Buka",
+        "open": "Terbuka",
         "void": "Batal",
         "uncollectible": "Tidak tertagih"
       },

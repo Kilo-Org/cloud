@@ -3338,7 +3338,7 @@
       "sharingUnavailable": "Deling er ikke tilgjengelig på denne enheten.",
       "status": {
         "paid": "Betalt",
-        "open": "Åpne",
+        "open": "Åpen",
         "void": "Annullert",
         "uncollectible": "Uinnkrevbar"
       },

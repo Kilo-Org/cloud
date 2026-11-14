@@ -3338,7 +3338,7 @@
       "sharingUnavailable": "Ekki er hægt að deila efni á þessu tæki.",
       "status": {
         "paid": "Greiddur",
-        "open": "Opna",
+        "open": "Opinn",
         "void": "Ógildur",
         "uncollectible": "Óinnheimtanlegur"
       },

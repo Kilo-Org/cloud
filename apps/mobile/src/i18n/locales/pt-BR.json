@@ -3402,7 +3402,7 @@
       "sharingUnavailable": "O compartilhamento não está disponível neste dispositivo.",
       "status": {
         "paid": "Paga",
-        "open": "Abrir",
+        "open": "Em aberto",
         "void": "Cancelada",
         "uncollectible": "Incobrável"
       },

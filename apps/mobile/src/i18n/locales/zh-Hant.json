@@ -3343,7 +3343,7 @@
       "sharingUnavailable": "此裝置無法使用分享功能。",
       "status": {
         "paid": "已付款",
-        "open": "開啟",
+        "open": "待付款",
         "void": "已作廢",
         "uncollectible": "無法收款"
       },

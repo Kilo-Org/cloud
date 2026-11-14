@@ -24,10 +24,10 @@ type AdoptedSession = {
   readonly native: SessionInfo;
   /**
    * The row this connection belongs to: the id the runtime that opened it wrote,
-   * which a route restored by the navigation state still names, or `null` for a
-   * connection that never had one.
+   * which a route restored by the navigation state still names.
    */
-  readonly appSessionId: string | null;
+  readonly appSessionId: string;
+  readonly jumpSessionIds: string[];
   readonly host: SshHost;
   /** The shell the terminal reattaches to; `null` when the shell closed first. */
   readonly shellId: string | null;
@@ -53,7 +53,7 @@ export function planSessions(
   const unmatched: SessionInfo[] = [];
 
   for (const native of nativeSessions) {
-    if (!tracked.has(native.sessionId)) {
+    if (native.appSessionId !== '' && !tracked.has(native.sessionId)) {
       const target = nativeTarget(native);
       const host = hosts.find(candidate => hostTarget(candidate) === target);
       if (host === undefined) {
@@ -63,7 +63,8 @@ export function planSessions(
           native,
           host,
           shellId: native.shellIds[0] ?? null,
-          appSessionId: native.appSessionId === '' ? null : native.appSessionId,
+          appSessionId: native.appSessionId,
+          jumpSessionIds: jumpSessions(native, nativeSessions),
         });
       }
     }
@@ -144,4 +145,21 @@ export function planStale(
   return entries
     .filter(entry => entry.nativeSessionId !== null && !alive.has(entry.nativeSessionId))
     .map(entry => entry.id);
+}
+
+function jumpSessions(target: SessionInfo, sessions: readonly SessionInfo[]): string[] {
+  const ids: string[] = [];
+  const seen = new Set([target.sessionId]);
+  const byId = new Map(sessions.map(session => [session.sessionId, session]));
+  let via = target.viaSessionId;
+  while (via != null && !seen.has(via)) {
+    const hop = byId.get(via);
+    if (hop === undefined) {
+      break;
+    }
+    seen.add(via);
+    ids.unshift(via);
+    via = hop.viaSessionId;
+  }
+  return ids;
 }

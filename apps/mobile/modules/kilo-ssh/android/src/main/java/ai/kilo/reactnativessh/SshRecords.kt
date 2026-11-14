@@ -71,6 +71,7 @@ class ForwardStartRecord(
 class SessionInfoRecord(
   @Field val sessionId: String,
   @Field val appSessionId: String,
+  @Field val viaSessionId: String?,
   @Field val host: String,
   @Field val port: Int,
   @Field val username: String,

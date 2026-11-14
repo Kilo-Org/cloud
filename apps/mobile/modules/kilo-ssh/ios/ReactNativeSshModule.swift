@@ -250,7 +250,8 @@ public final class ReactNativeSshModule: Module {
       host: config.host,
       port: config.port,
       username: config.username,
-      appSessionId: config.appSessionId
+      appSessionId: config.appSessionId,
+      viaSessionId: jumpSessionId
     )
     let handler = JsSessionHandler(
       sessionId: sessionId,

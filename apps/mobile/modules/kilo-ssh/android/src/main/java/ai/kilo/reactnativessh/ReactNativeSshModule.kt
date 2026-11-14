@@ -26,6 +26,12 @@ import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.CompletableDeferred
 
 internal const val EVENT_HOST_KEY = "onHostKey"
@@ -101,7 +107,7 @@ class ReactNativeSshModule : Module() {
     AsyncFunction("connectVia").SuspendBody { jumpSessionId: String, config: ConnectConfigRecord ->
       val jump = session(jumpSessionId)
 
-      connectSession(config) { handler -> SshSession.connectVia(jump, config.toNative(), handler) }
+      connectSession(config, jumpSessionId) { handler -> SshSession.connectVia(jump, config.toNative(), handler) }
     }
 
     AsyncFunction("exec").SuspendBody { sessionId: String, command: String ->
@@ -266,8 +272,9 @@ class ReactNativeSshModule : Module() {
 
   private suspend fun connectSession(
     config: ConnectConfigRecord,
+    viaSessionId: String? = null,
     connect: suspend (SessionHandler) -> SshSession,
-  ): String {
+  ): String = coroutineScope {
     val sessionId = sshRegistry.sessionIds.next()
     val registry = sshRegistry
     val handler = JsSessionHandler(
@@ -288,11 +295,21 @@ class ReactNativeSshModule : Module() {
       port = config.port,
       username = config.username,
       appSessionId = config.appSessionId,
+      viaSessionId = viaSessionId,
     )
-    sshRegistry.putSession(sessionId, translateSuspendFailures { connect(handler) }, target)
-    sshRegistry.sync()
-
-    return sessionId
+    registry.beginConnect(sessionId, currentCoroutineContext().job)
+    try {
+      val connected = translateSuspendFailures { connect(handler) }
+      if (!registry.finishConnect(sessionId, connected, target)) {
+        withContext(NonCancellable) { runCatching { connected.disconnect() } }
+        currentCoroutineContext().ensureActive()
+        throw SshException.ChannelClosed("Connection cancelled").toCodedException()
+      }
+      registry.sync()
+      sessionId
+    } finally {
+      registry.abandonConnect(sessionId)
+    }
   }
 
   private suspend fun runCommand(sessionId: String, command: String): ExecOutputRecord {
@@ -406,7 +423,7 @@ class ReactNativeSshModule : Module() {
 
   private suspend fun requestHostKey(request: HostKeyRequestRecord): Boolean {
     val decision = CompletableDeferred<Boolean>()
-    sshRegistry.putHostKeyRequest(request.requestId, decision)
+    if (!sshRegistry.putHostKeyRequest(request.sessionId, request.requestId, decision)) return false
 
     return try {
       sendEvent(EVENT_HOST_KEY, request.toEvent())
@@ -418,7 +435,7 @@ class ReactNativeSshModule : Module() {
 
   private suspend fun requestPrompts(request: KeyboardInteractiveRequestRecord): List<String>? {
     val answers = CompletableDeferred<List<String>?>()
-    sshRegistry.putPromptRequest(request.requestId, answers)
+    if (!sshRegistry.putPromptRequest(request.sessionId, request.requestId, answers)) return null
 
     return try {
       sendEvent(EVENT_KEYBOARD_INTERACTIVE, request.toEvent())

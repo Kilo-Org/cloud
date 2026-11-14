@@ -14,6 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 
 /** What a session was opened against, kept so a later runtime can name it. */
 internal data class SessionTarget(
@@ -22,6 +23,7 @@ internal data class SessionTarget(
   val username: String,
   /** The JavaScript session this connection belongs to, so a reload adopts its row. */
   val appSessionId: String,
+  val viaSessionId: String?,
 )
 
 /** A forward together with what it was asked to do, so it can be described later. */
@@ -57,6 +59,8 @@ internal object SshRegistry {
   val requestIds = IdSequence("request-")
   val sftpIds = IdSequence("sftp-")
   val forwardIds = IdSequence("forward-")
+
+  private val connecting = ConcurrentHashMap<String, Job>()
 
   private val sessions = ConcurrentHashMap<String, SshSession>()
   private val targets = ConcurrentHashMap<String, SessionTarget>()
@@ -96,9 +100,23 @@ internal object SshRegistry {
 
   fun session(sessionId: String): SshSession? = sessions[sessionId]
 
-  fun putSession(sessionId: String, session: SshSession, target: SessionTarget) {
+  @Synchronized
+  fun beginConnect(sessionId: String, job: Job) {
+    connecting[sessionId] = job
+  }
+
+  @Synchronized
+  fun finishConnect(sessionId: String, session: SshSession, target: SessionTarget): Boolean {
+    val job = connecting.remove(sessionId) ?: return false
+    if (!job.isActive) return false
     targets[sessionId] = target
     sessions[sessionId] = session
+    return true
+  }
+
+  @Synchronized
+  fun abandonConnect(sessionId: String) {
+    connecting.remove(sessionId)
   }
 
   fun removeSession(sessionId: String): SshSession? {
@@ -156,8 +174,11 @@ internal object SshRegistry {
 
   fun removeCancel(transferId: String): CancelToken? = cancels.remove(transferId)
 
-  fun putHostKeyRequest(requestId: String, decision: CompletableDeferred<Boolean>) {
+  @Synchronized
+  fun putHostKeyRequest(sessionId: String, requestId: String, decision: CompletableDeferred<Boolean>): Boolean {
+    if (!connecting.containsKey(sessionId) && !sessions.containsKey(sessionId)) return false
     hostKeyRequests[requestId] = decision
+    return true
   }
 
   fun hostKeyRequest(requestId: String): CompletableDeferred<Boolean>? = hostKeyRequests[requestId]
@@ -166,8 +187,11 @@ internal object SshRegistry {
     hostKeyRequests.remove(requestId)
   }
 
-  fun putPromptRequest(requestId: String, answers: CompletableDeferred<List<String>?>) {
+  @Synchronized
+  fun putPromptRequest(sessionId: String, requestId: String, answers: CompletableDeferred<List<String>?>): Boolean {
+    if (!connecting.containsKey(sessionId) && !sessions.containsKey(sessionId)) return false
     promptRequests[requestId] = answers
+    return true
   }
 
   fun promptRequest(requestId: String): CompletableDeferred<List<String>?>? = promptRequests[requestId]
@@ -184,6 +208,7 @@ internal object SshRegistry {
       SessionInfoRecord(
         sessionId = sessionId,
         appSessionId = target.appSessionId,
+        viaSessionId = target.viaSessionId,
         host = target.host,
         port = target.port,
         username = target.username,
@@ -249,7 +274,15 @@ internal object SshRegistry {
    * rather than in the module so it still works when no JavaScript runtime is
    * attached, which is the state a reload leaves behind.
    */
+  @Synchronized
   fun disconnectAll() {
+    val pending = connecting.values.toList()
+    connecting.clear()
+    pending.forEach { it.cancel() }
+    hostKeyRequests.values.forEach { it.complete(false) }
+    promptRequests.values.forEach { it.complete(null) }
+    hostKeyRequests.clear()
+    promptRequests.clear()
     sessions.keys.toList().forEach { sessionId ->
       releaseSession(sessionId)?.let { session -> scope.launch { runCatching { session.disconnect() } } }
     }

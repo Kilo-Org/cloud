@@ -94,8 +94,9 @@ vi.mock('@/lib/auth/admission', async importOriginal => {
 });
 
 vi.mock('@/lib/login-draft', () => ({
-  setLoginEmailDraft: vi.fn(),
-  setSsoRecoveryDraft: vi.fn(),
+  beginLoginEmail: vi.fn(),
+  holdLoginEmail: vi.fn(),
+  holdSsoRecovery: vi.fn(),
 }));
 
 vi.mock('expo-web-browser', () => ({

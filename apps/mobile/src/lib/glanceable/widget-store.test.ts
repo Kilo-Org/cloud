@@ -39,6 +39,7 @@ import {
   HOME_WIDGET_DATA_KEY,
   migrateWidgetStoreAccessibility,
   SESSION_CARD_SCOPE_KEY,
+  SESSION_TOKEN_IDENTITY_KEY,
 } from './widget-store';
 
 // The constant iOS resolves at load. Android declares none, so the widget store
@@ -188,6 +189,7 @@ describe('migrateWidgetStoreAccessibility', () => {
     [GLANCEABLE_SNAPSHOT_KEY]: '{"scopeKey":"s1"}',
     [GLANCEABLE_LEGACY_SCOPE_KEY]: 'scope-key',
     [SESSION_CARD_SCOPE_KEY]: '{"version":1,"cards":{}}',
+    [SESSION_TOKEN_IDENTITY_KEY]: '{"version":1,"sessions":{}}',
     [ACTIVE_USER_ID_KEY]: 'u1',
     [ORGANIZATION_STORAGE_KEY]: 'org-9',
   };

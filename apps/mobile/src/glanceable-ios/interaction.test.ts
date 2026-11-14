@@ -408,7 +408,11 @@ describe('handleGlanceableInteraction on a session card', () => {
 
     expect(mocks.runGlanceableApprove).toHaveBeenCalledWith(
       expect.objectContaining({
-        target: { kiloSessionId: 'session-3', organizationId: 'org-1', approvalKey: KEY },
+        target: {
+          kiloSessionId: 'session-3',
+          organizationId: 'org-1',
+          approvalKey: KEY,
+        },
       })
     );
     expect(mocks.readWaitingAsk).not.toHaveBeenCalled();

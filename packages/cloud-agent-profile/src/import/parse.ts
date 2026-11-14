@@ -1,6 +1,12 @@
 import { parseSkillFrontmatter } from '../contracts/skills';
 import { decodeConfigArchive, ImportArchiveError, type ArchiveEntry } from './archive';
 import { CONFIG_FILE_NAMES, readConfigSections, type ConfigSections } from './config-file';
+import {
+  AGENT_DIRECTORY_NAMES,
+  COMMAND_DIRECTORY_NAMES,
+  INSTRUCTIONS_DIRECTORY_NAME,
+  SKILLS_DIRECTORY_NAME,
+} from './directory-names';
 import { parseFrontmatter } from './frontmatter';
 import { compileGlob, type CompiledGlob } from './glob';
 import { instructionNameForPath } from './instructions';
@@ -19,11 +25,6 @@ import {
 } from './parse-state';
 import { RUNTIME_BUILTIN_AGENT_SLUGS } from './runtime-contract';
 import type { ImportIssue, ImportPreview, ParsedLocalConfig } from './types';
-
-const AGENT_DIRECTORY_NAMES = new Set(['agent', 'agents']);
-const COMMAND_DIRECTORY_NAMES = new Set(['command', 'commands']);
-const SKILLS_DIRECTORY_NAME = 'skills';
-const INSTRUCTIONS_DIRECTORY_NAME = 'instructions';
 
 /**
  * Agents the Kilo CLI defines itself. A local entry for one of them tunes the

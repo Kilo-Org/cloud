@@ -26,9 +26,6 @@ const COMMAND_COPY_KEYS: string[][] = [
   ['tour', 'remoteOptionBody'],
 ];
 
-/** Jargon the Run on helper sentence must not put in front of the reader. */
-const CLI_JARGON = ['kilo remote', '/remote', 'CLI session', 'local kilo process'];
-
 function valueAt(catalog: unknown, path: string[]): unknown {
   let node: unknown = catalog;
   for (const key of path) {
@@ -62,14 +59,15 @@ describe('stripInlineCodeMarkers', () => {
   });
 
   it('leaves the sentence period outside the isolate', () => {
-    // The Arabic tour card ends with the command and then its period. The
-    // period belongs to the sentence, not to the run: inside the isolate it
-    // would be ordered as left-to-right text and land on the wrong side.
-    const value = valueAt(CATALOG_LOADERS.ar(), ['tour', 'remoteOptionBody']);
-    expect(typeof value, 'tour.remoteOptionBody').toBe('string');
+    // A right-to-left sentence that ends with the command and then its period,
+    // as the tour card does. The period belongs to the sentence, not to the
+    // run: inside the isolate it would be ordered as left-to-right text and
+    // land on the wrong side. The wording is a fixture, not the shipped
+    // translation, so a reworded catalog cannot break the rendering contract.
+    const source = 'شغّل Kilo على جهازك نفسه عبر واجهة سطر الأوامر `kilo remote`.';
 
-    const visible = stripInlineCodeMarkers(value as string);
-    expect(visible).toBe((value as string).replace('`kilo remote`', ISOLATED_COMMAND));
+    const visible = stripInlineCodeMarkers(source);
+    expect(visible).toBe(`شغّل Kilo على جهازك نفسه عبر واجهة سطر الأوامر ${ISOLATED_COMMAND}.`);
     expect(visible.endsWith(`${LTR_ISOLATE_CLOSE}.`)).toBe(true);
   });
 
@@ -92,14 +90,12 @@ describe('run-location help copy', () => {
     // The phone user reads one actionable sentence telling them to start Kilo
     // on their computer; no CLI-only entry point, no internal vocabulary.
     expect(value).toBe('To run on your computer, start Kilo there and leave it running.');
-    expect(value as string).not.toContain('/remote');
-    expect(value as string).not.toContain('CLI session');
-    expect(value as string).not.toContain('local kilo process');
-    expect(value as string).not.toContain('`');
+    // The catalog ships without authoring markers, so the renderer changes nothing.
+    expect(stripInlineCodeMarkers(value as string)).toBe(value);
   });
 
   // The translated catalogs still carry the reviewed wording — the translation
-  // pipeline owns them, so this PR only changed `en.json`. Whatever markers a
+  // pipeline owns them, so only `en.json` lost its markers. Whatever markers a
   // catalog holds, the renderer strips them before the reader sees the text.
   it.each(SUPPORTED_LANGUAGES)('%s never renders an authoring marker', tag => {
     const catalog = CATALOG_LOADERS[tag]();
@@ -147,20 +143,5 @@ describe('run-location help copy', () => {
         source.replaceAll('`', '')
       );
     }
-  });
-
-  it('the English Run on helper sentence names no command or CLI jargon', () => {
-    const catalog = CATALOG_LOADERS.en();
-    const path = ['agentChat', 'newSession', 'remoteHint'];
-    const value = valueAt(catalog, path);
-
-    expect(typeof value, path.join('.')).toBe('string');
-    // The catalog is the source: it must ship without authoring markers.
-    expect(value as string, path.join('.')).not.toContain('`');
-    const visible = stripInlineCodeMarkers(value as string);
-    for (const term of CLI_JARGON) {
-      expect(visible, `${path.join('.')} contains ${term}`).not.toContain(term);
-    }
-    expect(visible).toBe('To run on your computer, start Kilo there and leave it running.');
   });
 });

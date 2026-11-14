@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as SecureStorePreferenceModule from './secure-store-preference';
+
 const { getItemAsync, setItemAsync, deleteItemAsync } = vi.hoisted(() => ({
   getItemAsync: vi.fn(),
   setItemAsync: vi.fn(),
@@ -13,35 +15,40 @@ vi.mock('@sentry/react-native', () => ({ captureException }));
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
 vi.mock('sonner-native', () => ({ toast: { error: toastError } }));
 
-const { setColorScheme } = vi.hoisted(() => ({ setColorScheme: vi.fn() }));
+const { setColorScheme, notifySchemeCounts } = vi.hoisted(() => ({
+  setColorScheme: vi.fn(),
+  notifySchemeCounts: [] as number[],
+}));
 vi.mock('react-native', () => ({ Appearance: { setColorScheme } }));
+
+// The theme module builds its store at import time. Wrap the shipped factory so
+// the test sees the order of the Appearance write and the store notification.
+vi.mock('./secure-store-preference', async importOriginal => {
+  const actual = await importOriginal<typeof SecureStorePreferenceModule>();
+  return {
+    ...actual,
+    createSecureStorePreference: (
+      options: Parameters<typeof actual.createSecureStorePreference>[0]
+    ) => {
+      const store = actual.createSecureStorePreference(options);
+      return {
+        ...store,
+        // Record how many Appearance writes had run when the notification
+        // fires. A notification that runs before Appearance moves records 0.
+        set: (next: unknown): void => {
+          notifySchemeCounts.push(setColorScheme.mock.calls.length);
+          store.set(next);
+        },
+      };
+    },
+  };
+});
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
 function flushMicrotasks(): Promise<void> {
   return new Promise(resolve => {
     setImmediate(resolve);
   });
-}
-
-// eslint-disable-next-line no-empty-function -- listener body is irrelevant, only subscribe()'s side effect (starting the load) is under test
-function noopListener(): void {}
-
-// eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-function makeThemeStore() {
-  // Re-import lazily so the mock wiring above is in effect.
-  return import('./secure-store-preference').then(({ createSecureStorePreference }) =>
-    createSecureStorePreference<'system' | 'light' | 'dark'>({
-      key: 'theme-preference',
-      defaultValue: 'system',
-      parse: raw => {
-        if (raw === 'light' || raw === 'dark' || raw === 'system') {
-          return raw;
-        }
-        return 'system';
-      },
-      serialize: value => value,
-    })
-  );
 }
 
 describe('colorSchemeForPreference', () => {
@@ -57,68 +64,72 @@ describe('colorSchemeForPreference', () => {
   });
 });
 
+// The theme module builds its store when it loads, so every case imports it
+// after vi.resetModules() to read the shipped configuration and wiring with a
+// fresh store. A static import would share one store across cases.
 describe('useThemePreference store', () => {
   beforeEach(() => {
+    vi.resetModules();
     getItemAsync.mockReset();
     setItemAsync.mockReset();
     deleteItemAsync.mockReset();
     captureException.mockReset();
     toastError.mockReset();
     setColorScheme.mockReset();
+    notifySchemeCounts.length = 0;
   });
 
   it("defaults to 'system' when SecureStore returns null", async () => {
     getItemAsync.mockResolvedValue(null);
-    const store = await makeThemeStore();
+    const { getThemePreference, preloadThemePreference } = await import('./use-theme-preference');
 
-    const unsubscribe = store.subscribe(noopListener);
+    preloadThemePreference();
+    await vi.waitFor(() => {
+      expect(getItemAsync).toHaveBeenCalledWith('theme-preference');
+    });
     await flushMicrotasks();
 
-    expect(store.get()).toBe('system');
-    expect(store.getHasLoaded()).toBe(true);
-    unsubscribe();
+    expect(getThemePreference()).toBe('system');
   });
 
   it("falls back to 'system' for an unrecognized stored value", async () => {
     getItemAsync.mockResolvedValue('high-contrast');
-    const store = await makeThemeStore();
+    const { getThemePreference, preloadThemePreference } = await import('./use-theme-preference');
 
-    const unsubscribe = store.subscribe(noopListener);
+    preloadThemePreference();
+    await vi.waitFor(() => {
+      expect(getItemAsync).toHaveBeenCalledWith('theme-preference');
+    });
     await flushMicrotasks();
 
-    expect(store.get()).toBe('system');
-    unsubscribe();
+    expect(getThemePreference()).toBe('system');
   });
 
-  it('persists a persisted value on subscribe and reflects it via get() after the load resolves', async () => {
+  it("loads a persisted 'light' value through the preload", async () => {
     getItemAsync.mockResolvedValue('light');
-    const store = await makeThemeStore();
+    const { getThemePreference, preloadThemePreference } = await import('./use-theme-preference');
 
-    expect(store.get()).toBe('system');
-    expect(store.getHasLoaded()).toBe(false);
+    // Before the read settles the store shows its default.
+    expect(getThemePreference()).toBe('system');
 
-    const unsubscribe = store.subscribe(noopListener);
-    await flushMicrotasks();
-
-    expect(store.get()).toBe('light');
-    expect(store.getHasLoaded()).toBe(true);
-    unsubscribe();
+    preloadThemePreference();
+    await vi.waitFor(() => {
+      expect(getThemePreference()).toBe('light');
+    });
   });
 
   it('setThemePreference persists the serialized value and applies the mapped scheme synchronously', async () => {
-    getItemAsync.mockResolvedValue(null);
     const { setThemePreference } = await import('./use-theme-preference');
 
     setThemePreference('dark');
-    // Appearance must move before the store emit: a subscriber that mounts
-    // from that emit would otherwise see useColorScheme update mid-mount
-    // (LogBox over the tab bar).
     expect(setColorScheme).toHaveBeenCalledWith('dark');
+    // Appearance must move before the store notification: a subscriber that
+    // mounts from that notification would otherwise see useColorScheme update
+    // mid-mount (LogBox over the tab bar). The wrapper mock records 0 here when
+    // the store notified first.
+    expect(notifySchemeCounts[0]).toBeGreaterThan(0);
     await flushMicrotasks();
     expect(setItemAsync).toHaveBeenCalledWith('theme-preference', 'dark');
-    const appearanceAt = setColorScheme.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY;
-    const persistAt = setItemAsync.mock.invocationCallOrder[0] ?? Number.NEGATIVE_INFINITY;
-    expect(appearanceAt).toBeLessThan(persistAt);
 
     setThemePreference('light');
     await flushMicrotasks();

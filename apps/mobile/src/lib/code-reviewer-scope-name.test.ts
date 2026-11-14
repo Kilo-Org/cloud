@@ -104,6 +104,13 @@ function holdRecordRead(): { reached: Promise<void>; release: () => void } {
   };
 }
 
+/**
+ * Let the store's coalesced notification run: one microtask boundary, no timer.
+ */
+async function flushNotifications(): Promise<void> {
+  await Promise.resolve();
+}
+
 function persistedRecord(entries: readonly { organizationId: string; organizationName: string }[]) {
   return JSON.stringify({
     version: 1,
@@ -338,9 +345,31 @@ describe('remembered scope names', () => {
 
     const unsubscribe = subscribeScopeNames(listener);
     await hydrateScopeNames();
+    await flushNotifications();
 
     expect(listener).toHaveBeenCalled();
     expect(readScopeName('org-labs')).toBe('Drain Labs');
+    unsubscribe();
+  });
+
+  it('subscribes without touching the store, and notifies once on a microtask', async () => {
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    const listener = vi.fn<() => void>();
+
+    const unsubscribe = subscribeScopeNames(listener);
+    // Registering is not a read: nothing of the record is loaded yet.
+    expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
+    expect(readScopeName('org-labs')).toBeUndefined();
+
+    rememberScopeName('org-labs', 'Drain Labs');
+    rememberScopeName('org-more', 'More Labs');
+
+    // Nothing re-renders while the caller that changed the store is running.
+    expect(listener).not.toHaveBeenCalled();
+
+    await flushNotifications();
+    // One flush covers both changes in the same turn.
+    expect(listener).toHaveBeenCalledTimes(1);
     unsubscribe();
   });
 

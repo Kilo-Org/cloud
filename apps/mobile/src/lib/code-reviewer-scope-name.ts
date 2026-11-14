@@ -90,11 +90,23 @@ let generation = 0;
 // this never rejects.
 let lastWrite: Promise<void> | null = null;
 const listeners = new Set<() => void>();
+// One flush per turn. A remember or a restored name that lands inside a
+// component's mount effect must not re-render a sibling that has not finished
+// mounting yet — React reports that as an update on a component that has not
+// mounted — so the listeners run after the current turn instead.
+let flushScheduled = false;
 
 function notify(): void {
-  for (const listener of listeners) {
-    listener();
+  if (flushScheduled) {
+    return;
   }
+  flushScheduled = true;
+  queueMicrotask(() => {
+    flushScheduled = false;
+    for (const listener of listeners) {
+      listener();
+    }
+  });
 }
 
 /** Parse a stored record; a corrupt or unreadable mirror reads as absent. */
@@ -281,12 +293,12 @@ export function rememberScopeName(scopeId: string, name: string): void {
 
 /**
  * Subscribe to name changes — the `useSyncExternalStore` contract, with
- * `readScopeName(scope)` as the snapshot. The subscription starts the restart
- * read, so a restored name re-renders the subscriber.
+ * `readScopeName(scope)` as the snapshot. Registering is all it does: the
+ * restart read belongs to the subscriber's own effect (`hydrateScopeNames`), so
+ * mounting a subscription neither touches the keychain nor notifies.
  */
 export function subscribeScopeNames(listener: () => void): () => void {
   listeners.add(listener);
-  void hydrateScopeNames();
   return () => {
     listeners.delete(listener);
   };
@@ -344,6 +356,7 @@ export function _resetScopeNamesForTests(): void {
   names.clear();
   recordUserId = null;
   hydration = null;
+  flushScheduled = false;
   // Bumped, not zeroed: a restart read still in flight from an earlier test
   // must not commit into this one.
   generation += 1;

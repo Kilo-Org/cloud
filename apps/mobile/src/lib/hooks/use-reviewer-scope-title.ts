@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
 import {
+  hydrateScopeNames,
   readScopeName,
   rememberScopeName,
   subscribeScopeNames,
@@ -21,17 +22,20 @@ import { useTRPC } from '@/lib/trpc';
  * `organizations.list` themselves — for access classification and Retry — take
  * this instead of the hook below, which owns its own query.
  *
- * Subscribing is also what starts the restart read: the first subscriber
- * re-renders once the restored names land.
+ * Subscribing is a render-phase registration only; the restart read starts in
+ * this hook's own effect, so no mount reads the keychain mid-render.
  */
 export function useReviewerScopeName(
   scope: string,
   organizations: readonly ScopeOrganization[] | undefined
 ): string | undefined {
-  // The remembered name is the snapshot: it changes only when the store does,
-  // and the subscription starts the restart read.
+  // The remembered name is the snapshot: it changes only when the store does.
   const remembered = useSyncExternalStore(subscribeScopeNames, () => readScopeName(scope));
   const membershipName = reviewerScopeMembershipName(scope, organizations);
+
+  useEffect(() => {
+    void hydrateScopeNames();
+  }, []);
 
   useEffect(() => {
     if (membershipName === undefined) {

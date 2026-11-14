@@ -66,6 +66,7 @@ const denial = { data: { code: 'UNAUTHORIZED', httpStatus: 401 } };
 const rememberedNames = vi.hoisted(() => new Map<string, string>());
 
 vi.mock('@/lib/code-reviewer-scope-name', () => ({
+  hydrateScopeNames: () => Promise.resolve(),
   readScopeName: (scopeId: string) => rememberedNames.get(scopeId),
   rememberScopeName: (scopeId: string, name: string) => {
     rememberedNames.set(scopeId, name);

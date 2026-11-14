@@ -26,8 +26,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
 import {
   countPlaceholderBases,
-  familiesOwedByEveryLocale,
   flattenCatalog,
+  missingPluralCategories,
   pluralFamilyBases,
   pluralParts,
 } from '../lib/catalogs.mjs';
@@ -1265,8 +1265,6 @@ export function checkCatalogs(root = ROOT) {
     // nouns do change with the count may declare a family for that base; see the
     // locale loop below.
     const englishCountedBases = countPlaceholderBases(english);
-    // The families a locale that opts into one owes its own categories for.
-    const owedFamilies = familiesOwedByEveryLocale(english);
     const englishValues = new Set(english.values());
     // Keys whose English text is identical. Short strings only: a long sentence
     // repeated verbatim is rare, and a 60-character cap keeps the groups to the
@@ -1354,11 +1352,10 @@ export function checkCatalogs(root = ROOT) {
       checkArmenianSentenceTerminator(tag, translated, label);
       const ownValues = new Set(translated.values());
 
-      // A locale-driven plural family: the English base interpolates {{count}}
-      // but has no English family. When the locale declares any member, it must
-      // declare every category of its tag; the English `_one`/`_other` siblings
-      // of a family English does declare stay mandatory except where the locale
-      // carries the flat base key instead.
+      // The families this locale declares itself, through a member key with a
+      // category suffix. The English `_one`/`_other` siblings of a family
+      // English declares stay mandatory in the missing-key rule below, except
+      // where the locale carries the flat base key instead.
       const localeFamilies = new Set(
         [...translated.keys()]
           .map(pluralParts)
@@ -1393,23 +1390,11 @@ export function checkCatalogs(root = ROOT) {
         }
         fail(`${label}: extra key "${key}" is not in en.json`);
       }
-      const requiredCategories = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
-      // A locale that declares no member of an English family falls back to its
-      // flat base key, so it cannot lack categories it never opted into. A
-      // locale-driven family (declared here but not in English) must be
-      // complete, and so must an English family every locale owes once the locale
-      // carries it; an English family that is not complete yet is an English
-      // problem, not this locale's.
-      for (const family of new Set([...englishFamilies, ...localeFamilies])) {
-        const localeDeclared = localeFamilies.has(family);
-        const englishDriven = owedFamilies.has(family) && translated.has(family);
-        if (!localeDeclared && !englishDriven) {
-          continue;
-        }
-        for (const category of requiredCategories) {
-          if (!translated.has(`${family}_${category}`)) {
-            fail(`${label}: plural family "${family}" lacks the ${category} category of ${tag}`);
-          }
+      // The families this locale must complete, and the categories it lacks,
+      // come from the rule both audits share.
+      for (const [family, absent] of missingPluralCategories(english, translated, tag)) {
+        for (const category of absent) {
+          fail(`${label}: plural family "${family}" lacks the ${category} category of ${tag}`);
         }
       }
       for (const [key, value] of translated) {

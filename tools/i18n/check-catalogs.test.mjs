@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test, { after } from 'node:test';
 
+import { flattenCatalog, missingPluralCategories } from '../lib/catalogs.mjs';
 import { checkCatalogs } from './check-catalogs.mjs';
 
 // The checker parses with oxc through the shared scanner, so the import-only
@@ -1018,6 +1019,40 @@ test('leaves an incomplete English family unowed by a locale', () => {
     source: "t('counts.items', { count: 2 });",
   });
   assert.deepEqual(found, []);
+});
+
+test('names the categories a locale must complete for each family', () => {
+  // A family the locale declares owes every category its tag selects, whether
+  // it declares the family through a member or through the flat base key of an
+  // owed English family; a locale that carries neither owes nothing for it. A
+  // counted flat English key becomes the locale's problem once the locale
+  // declares the family.
+  const english = flattenCatalog({
+    agents: {
+      open_one: '{{displayCount}} open session',
+      open_other: '{{displayCount}} open sessions',
+    },
+  });
+  const counted = flattenCatalog({ counts: { items: '{{count}} items' } });
+  const flatKey = flattenCatalog({ agents: { open: 'x' } });
+  const oneMember = flattenCatalog({ agents: { open_one: 'x' } });
+  const declared = flattenCatalog({
+    counts: { items: 'x', items_one: 'x', items_other: 'x' },
+  });
+
+  assert.deepEqual(
+    [...missingPluralCategories(english, flatKey, 'ru')],
+    [['agents.open', ['one', 'few', 'many', 'other']]]
+  );
+  assert.deepEqual(
+    [...missingPluralCategories(english, oneMember, 'ru')],
+    [['agents.open', ['few', 'many', 'other']]]
+  );
+  assert.deepEqual([...missingPluralCategories(english, flattenCatalog({}), 'ru')], []);
+  assert.deepEqual(
+    [...missingPluralCategories(counted, declared, 'ru')],
+    [['counts.items', ['few', 'many']]]
+  );
 });
 
 test('rejects an incomplete locale-declared family for a counted key', () => {

@@ -14,14 +14,17 @@
  * `DYNAMIC_COUNTED_KEYS` list, which names the keys each expression can
  * produce; an unlisted variable-key call is a problem of its own. With
  * `--source-only` it stops after English, which is the check the mobile app
- * owns. Without the flag it also measures every other catalog: for each family
- * and each language it looks for the categories that language's own plural
- * rules require, and prints one line per language with the number of families
- * the language is missing. That is the report the translation pass works from,
- * so the app's `check:plurals` passes `--source-only`; the locale categories
- * are gated in CI by `check:i18n` (`check-catalogs.mjs`). A catalog that cannot
- * be read, parsed, or given plural rules is one problem line naming its
- * language, and the rest of the audit still runs.
+ * owned. Without the flag it also measures every other catalog: for each family
+ * and each language it asks the rule the CI catalog gate enforces,
+ * `missingPluralCategories` in tools/lib/catalogs.mjs, and prints one line per
+ * language with the number of families that language is missing. That is the
+ * report the translation pass works from, so the app's `check:plurals` passes
+ * `--source-only`; the locale categories are gated in CI by `check:i18n`
+ * (`check-catalogs.mjs`), which asks the same rule. A locale that has not opted
+ * into an owed English family is reported by that gate as a missing parity key,
+ * not by this worklist. A catalog that cannot be read, parsed, or given plural
+ * rules is one problem line naming its language, and the rest of the audit still
+ * runs.
  *
  * A counted message whose copy owns no word whose form the count changes — a
  * participle, a bare number in parentheses, a label — needs no family, because
@@ -41,12 +44,7 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
-import {
-  declaresPluralFamily,
-  familiesOwedByEveryLocale,
-  flattenCatalog,
-  pluralFamilyBases,
-} from '../lib/catalogs.mjs';
+import { declaresPluralFamily, flattenCatalog, missingPluralCategories } from '../lib/catalogs.mjs';
 import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -465,43 +463,26 @@ function run() {
   }
 
   if (!sourceOnly) {
-    const families = pluralFamilyBases(english);
-    const owed = familiesOwedByEveryLocale(english);
     let totalKeys = 0;
     for (const tag of localeTags()) {
       if (tag === 'en') {
         continue;
       }
       let catalog;
-      let categories;
+      let missing;
       try {
         catalog = flattenCatalog(
           JSON.parse(readFileSync(join(LOCALES_DIR, `${tag}.json`), 'utf8'))
         );
-        categories = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
+        missing = missingPluralCategories(english, catalog, tag);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         problems.push(`${tag}: cannot audit catalog: ${message}`);
         continue;
       }
-      const localeFamilyBases = pluralFamilyBases(catalog);
-      let flagged = 0;
-      for (const family of families) {
-        // A locale may keep the flat counted key and fall back to it when the
-        // copy inflects no word of its own; it only owes categories once it
-        // (or the audit's own rule) declares the family.
-        const localeDeclared = localeFamilyBases.has(family);
-        const mandatory = localeDeclared || owed.has(family);
-        if (!mandatory) {
-          continue;
-        }
-        if (categories.some(category => !catalog.has(`${family}_${category}`))) {
-          flagged++;
-        }
-      }
-      if (flagged > 0) {
-        report.push(`${tag}: ${flagged} keys`);
-        totalKeys += flagged;
+      if (missing.size > 0) {
+        report.push(`${tag}: ${missing.size} keys`);
+        totalKeys += missing.size;
       }
     }
     if (report.length > 0) {

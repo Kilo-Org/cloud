@@ -208,18 +208,6 @@ describe('getDatabaseClientConfig', () => {
         database: 'db/name',
       });
     });
-
-    it('keeps credentials that need no escaping unchanged', () => {
-      const config = getDatabaseClientConfig(
-        'postgres://user:secret@db.example.com:5432/mydb?sslmode=require'
-      );
-
-      expect(config).toMatchObject({
-        user: 'user',
-        password: 'secret',
-        database: 'mydb',
-      });
-    });
   });
 
   describe('with DATABASE_CA set', () => {

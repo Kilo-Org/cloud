@@ -198,7 +198,9 @@ export function RepoBindingsScreen({
           <EmptyState
             icon={GitBranch}
             title={t('profiles.repoBindings.empty')}
-            description={t('profiles.repoBindings.emptyDescription')}
+            // The empty state must not name an action the screen withholds: a
+            // member cannot add a default, so it states only the rule.
+            description={canManage ? t('profiles.repoBindings.emptyDescription') : null}
             placement="top"
           />
         ) : null}

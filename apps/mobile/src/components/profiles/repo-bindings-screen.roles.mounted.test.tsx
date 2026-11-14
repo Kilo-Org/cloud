@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import {
   findAll,
+  findOne,
   mountScreen,
   pressButton,
   testBinding,
@@ -193,6 +194,22 @@ describe('RepoBindingsScreen roles', () => {
     expect(buttonLabels(renderer.root)).not.toContain(ADD_LABEL);
     expect(pressableLabels(renderer.root)).not.toContain('Unbind acme/api');
     expect(textContents(renderer.root).filter(text => text === ROLE_SENTENCE)).toHaveLength(1);
+
+    unmount();
+  });
+
+  it('read-only with no bindings: states the rule and does not name the withheld action', async () => {
+    permissionState.permission = 'read-only';
+    bindingsState.bindingsQuery.bindings = [];
+
+    const { renderer, unmount } = await mountScreen('org-1');
+
+    expect(findOne(renderer.root, 'EmptyState').props.description).toBeNull();
+    expect(textContents(renderer.root).filter(text => text === ROLE_SENTENCE)).toHaveLength(1);
+    expect(buttonLabels(renderer.root)).not.toContain(ADD_LABEL);
+    expect(
+      pressableLabels(renderer.root).filter(label => label.startsWith('Unbind '))
+    ).toHaveLength(0);
 
     unmount();
   });

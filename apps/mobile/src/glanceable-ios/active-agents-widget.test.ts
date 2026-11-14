@@ -788,10 +788,7 @@ describe('stress', () => {
         family
       );
       expect(texts(named)).toContain('Pick a badge colour');
-      const signedOut = render(
-        toWidgetProps(propsFor([], { status: 'signed_out' })),
-        family
-      );
+      const signedOut = render(toWidgetProps(propsFor([], { status: 'signed_out' })), family);
       expect(texts(signedOut)).not.toContain('Agent');
     }
   );

@@ -3,6 +3,8 @@
 // Audit-log screen state contract: the billing-role/enterprise gate, the first
 // page's skeleton, a retryable first-page error, the empty state, the paged list
 // with its `hasMore` footer, and a later-page failure that keeps the rows it has.
+// A row also names its event through the catalog, falling back to the generic
+// event name for an action this build does not know.
 // The query layer is mocked so each state is driven directly through the screen
 // JSX, the same way the credit-activity suite does it.
 
@@ -159,10 +161,10 @@ vi.mock('@/components/ui/text', async () => {
 
 vi.mock('react-native', () => ({ View: 'View' }));
 
-function entries(count: number) {
+function entries(count: number, action = 'organization.settings.change') {
   return Array.from({ length: count }, (_, index) => ({
     id: `audit-${index}`,
-    action: 'organization.settings.change',
+    action,
     actor_id: 'user-1',
     actor_email: 'owner@example.com',
     actor_name: 'Owner',
@@ -254,7 +256,7 @@ describe('OrganizationAuditLogScreen', () => {
     unmount();
   });
 
-  it('renders the entries with their actor and requests the next page', async () => {
+  it('names the event, shows the actor, and requests the next page', async () => {
     pageHook.entries = entries(3);
     pageHook.hasMore = true;
     const { renderer, unmount } = await mount();
@@ -266,6 +268,11 @@ describe('OrganizationAuditLogScreen', () => {
     for (const index of [0, 1, 2]) {
       expect(messages).toContain(`Audit event ${index}`);
     }
+    // The row names the event in the reader's language, never the wire action.
+    expect(messages).toContain('Settings changed');
+    expect(messages.some(text => text.includes('organization.settings.change'))).toBe(false);
+    // The actor's meta line follows the event name, with the time after it.
+    expect(messages.some(text => text.startsWith('owner@example.com · '))).toBe(true);
 
     const loadMore = renderer.root
       .findAllByType('Button')
@@ -277,6 +284,20 @@ describe('OrganizationAuditLogScreen', () => {
       }
     });
     expect(pageQuery.fetchNextPage).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('names an action it has no label for with the generic event name', async () => {
+    pageHook.entries = entries(1, 'organization.future.action');
+    const { renderer, unmount } = await mount();
+
+    const messages = renderer.root
+      .findAllByType('Text')
+      .map(node => node.props.children)
+      .filter(child => typeof child === 'string');
+    expect(messages).toContain('Audit event');
+    expect(messages).toContain('Audit event 0');
+    expect(messages.some(text => text.includes('organization.future.action'))).toBe(false);
     unmount();
   });
 

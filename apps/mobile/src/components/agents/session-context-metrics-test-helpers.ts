@@ -103,7 +103,7 @@ export const PILL_LAYOUT_TOKENS = [
   'flex-row',
   'items-center',
   'rounded-full',
-  // The ring ends the pill: its own 44dp button sits at the trailing edge, so
+  // The ring ends the pill: its own square button sits at the trailing edge, so
   // the padding is leading-only and the header's own cluster gap separates that
   // button from the controls beside the pill.
   'ps-2.5',

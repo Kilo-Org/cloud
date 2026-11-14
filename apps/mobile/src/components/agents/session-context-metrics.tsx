@@ -71,10 +71,11 @@ const RING_STROKE = 3;
  * drifted away from its neighbours.
  *
  * The row ends flush against the ring button's border, and the button's own
- * inner padding — its 44 dp box around a 28 dp ring, 7 dp on each side — is what
- * separates the reading from the ring. That is why the pill carries no `gap-1.5`
- * of its own: the same clearance came out of the button, and the pill is the
- * header's widest control, so the reserved dp it saves is room the title keeps.
+ * inner padding — its 42 dp square inside the 44 dp pill around a 28 dp ring,
+ * 7 dp on each side — is what separates the reading from the ring. That is why
+ * the pill carries no `gap-1.5` of its own: the same clearance came out of the
+ * button, and the pill is the header's widest control, so the reserved dp it
+ * saves is room the title keeps.
  *
  * Exactly one chrome is visible in every state, and only the one that has
  * something to show wears it. While the pill paints a reading or the loading bar
@@ -96,12 +97,14 @@ const PILL_CAPSULE_CLASS = 'border-border bg-secondary';
 const PILL_BARE_CLASS = 'border-transparent';
 
 /**
- * The ring's own round button: a 44 dp box at the pill's trailing edge, one dp
- * of border on every side and fully rounded, so the ring is drawn inside a
- * control rather than floating in an empty box.
+ * The ring's own round button: the pill's content height square — 42 dp inside
+ * the 44 dp pill, whose one-dp borders take the other two — with one dp of
+ * border on every side and fully rounded, so the ring is drawn inside a circle
+ * rather than floating in an empty box. The width follows the height through
+ * `aspect-square`, so the button stays circular at any pill height.
  */
 const RING_BUTTON_CLASS =
-  'h-full w-[44px] shrink-0 items-center justify-center rounded-full border';
+  'h-full aspect-square shrink-0 items-center justify-center rounded-full border';
 /** The fill a ring button wears while it is the pill's only visible chrome. */
 const RING_BUTTON_CAPSULE_CLASS = 'border-border bg-secondary';
 /** The chrome a ring button wears inside the pill's own capsule. */

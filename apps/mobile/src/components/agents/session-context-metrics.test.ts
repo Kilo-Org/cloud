@@ -31,12 +31,12 @@ function sizersOf(pill: React.ReactElement): React.ReactElement[] {
   return findAll(pill, el => el.type === 'Text' && classNameOf(el).includes('opacity-0'));
 }
 
-/** The 44dp box the ring draws inside, at the pill's trailing edge. */
-const RING_BUTTON_WIDTH_TOKEN = 'w-[44px]';
+/** The class that keeps the ring's button a circle: its height's own width. */
+const RING_BUTTON_SQUARE_TOKEN = 'aspect-square';
 
 const RING_BUTTON_LAYOUT_TOKENS = [
   'h-full',
-  RING_BUTTON_WIDTH_TOKEN,
+  RING_BUTTON_SQUARE_TOKEN,
   'shrink-0',
   'items-center',
   'justify-center',
@@ -47,7 +47,7 @@ const RING_BUTTON_LAYOUT_TOKENS = [
 function ringButtonOf(pill: React.ReactElement): React.ReactElement {
   const [button] = findAll(
     pill,
-    el => el.type === 'View' && hasClassToken(classNameOf(el), RING_BUTTON_WIDTH_TOKEN)
+    el => el.type === 'View' && hasClassToken(classNameOf(el), RING_BUTTON_SQUARE_TOKEN)
   );
   if (button === undefined) {
     throw new Error('expected the ring button');

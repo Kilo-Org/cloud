@@ -157,12 +157,13 @@ export function getPillSlotSizers() {
 }
 
 /**
- * The pill's fixed chrome, in dp: its trailing ring button (44 wide, the button
- * the ring draws inside), its border, and the `ps-2.5` leading padding. The
- * classes compile at the app's 14pt rem, so the padding is 8.75. None of it is
- * text, so none of it follows the font scale.
+ * The pill's fixed chrome, in dp: its trailing ring button (42 square — the
+ * pill's 44 dp height less its two border dp — the button the ring draws
+ * inside), its border, and the `ps-2.5` leading padding. The classes compile at
+ * the app's 14pt rem, so the padding is 8.75. None of it is text, so none of it
+ * follows the font scale.
  */
-const PILL_CHROME_WIDTH = 44 + 2 + 8.75;
+const PILL_CHROME_WIDTH = 42 + 2 + 8.75;
 
 /**
  * The widest reserved value row at font scale 1, in dp: the two slots' sizers

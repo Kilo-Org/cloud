@@ -3408,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Поставки на организацијата на веб",
+      "integrations": "Интеграции на веб",
       "usageDetails": "Детали за користењето",
       "providersAndModels": "Провајдери и модели",
       "groups": "Групи",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "Поврзани услуги",
     "entrySubtitle": "GitHub, Slack, Linear и друго",
     "subtitle": "Поврзете ги вашите развојни алатки и работни процеси со Kilo",
-    "emptyHint": "Сè уште нема поврзани интеграции.",
     "disconnect": "Прекини врска",
     "disconnectTitle": "Да се прекине врската со {{provider}}?",
     "disconnectMessage": "Kilo ќе престане да одговара во {{provider}}. Можете повторно да се поврзете во секое време.",

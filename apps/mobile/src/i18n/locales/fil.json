@@ -3408,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Mga setting ng organisasyon sa web",
+      "integrations": "Mga Integration sa web",
       "usageDetails": "Mga detalye ng paggamit",
       "providersAndModels": "Mga provider at model",
       "groups": "Mga grupo",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "Mga nakakonektang serbisyo",
     "entrySubtitle": "GitHub, Slack, Linear at iba pa",
     "subtitle": "Ikonekta ang iyong mga development tool at workflow sa Kilo",
-    "emptyHint": "Wala pang nakakonektang integration.",
     "disconnect": "Idiskonekta",
     "disconnectTitle": "Idiskonekta ang {{provider}}?",
     "disconnectMessage": "Hihinto na ang Kilo sa pagtugon sa {{provider}}. Maaari kang kumonekta muli anumang oras.",

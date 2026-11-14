@@ -3408,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Szervezeti beállítások a weben",
+      "integrations": "Integrációk a weben",
       "usageDetails": "Használati részletek",
       "providersAndModels": "Szolgáltatók és modellek",
       "groups": "Csoportok",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "Csatlakoztatott szolgáltatások",
     "entrySubtitle": "GitHub, Slack, Linear és még sok más",
     "subtitle": "Csatlakoztasd a fejlesztői eszközeidet és munkafolyamataidat a Kilo-fiókodhoz",
-    "emptyHint": "Még nincs csatlakoztatott integráció.",
     "disconnect": "Leválasztás",
     "disconnectTitle": "{{provider}} leválasztása?",
     "disconnectMessage": "A Kilo többé nem fog válaszolni itt: {{provider}}. Bármikor újra csatlakoztathatod.",

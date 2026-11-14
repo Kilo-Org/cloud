@@ -3408,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Erakundearen ezarpenak webean",
+      "integrations": "Integrazioak webean",
       "usageDetails": "Erabileraren xehetasunak",
       "providersAndModels": "Hornitzaileak eta ereduak",
       "groups": "Taldeak",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "Konektatutako zerbitzuak",
     "entrySubtitle": "GitHub, Slack, Linear eta gehiago",
     "subtitle": "Konektatu zure garapen-tresnak eta lan-fluxuak Kilo aplikazioarekin",
-    "emptyHint": "Oraindik ez dago integraziorik konektatuta.",
     "disconnect": "Deskonektatu",
     "disconnectTitle": "{{provider}} deskonektatu?",
     "disconnectMessage": "Kilo aplikazioak ez du gehiago erantzungo {{provider}} zerbitzuan. Edonoiz konekta dezakezu berriro.",

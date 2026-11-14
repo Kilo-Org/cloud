@@ -3408,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Organisationsindstillinger på nettet",
+      "integrations": "Integrationer på nettet",
       "usageDetails": "Forbrugsdetaljer",
       "providersAndModels": "Udbydere og modeller",
       "groups": "Grupper",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "Forbundne tjenester",
     "entrySubtitle": "GitHub, Slack, Linear og flere",
     "subtitle": "Forbind dine udviklingsværktøjer og arbejdsgange med Kilo",
-    "emptyHint": "Ingen integrationer er forbundet endnu.",
     "disconnect": "Afbryd forbindelse",
     "disconnectTitle": "Afbryd forbindelsen til {{provider}}?",
     "disconnectMessage": "Kilo holder op med at svare i {{provider}}. Du kan altid oprette forbindelsen igen.",

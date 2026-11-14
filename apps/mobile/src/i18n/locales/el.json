@@ -3408,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Ρυθμίσεις οργανισμού στον ιστό",
+      "integrations": "Ενσωματώσεις στον ιστό",
       "usageDetails": "Λεπτομέρειες χρήσης",
       "providersAndModels": "Πάροχοι και μοντέλα",
       "groups": "Ομάδες",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "Συνδεδεμένες υπηρεσίες",
     "entrySubtitle": "GitHub, Slack, Linear και άλλες",
     "subtitle": "Συνδέστε τα εργαλεία ανάπτυξης και τις ροές εργασίας σας με το Kilo",
-    "emptyHint": "Δεν έχουν συνδεθεί ακόμη ενσωματώσεις.",
     "disconnect": "Αποσύνδεση",
     "disconnectTitle": "Αποσύνδεση από {{provider}};",
     "disconnectMessage": "Το Kilo θα σταματήσει να απαντά στο {{provider}}. Μπορείτε να συνδεθείτε ξανά οποιαδήποτε στιγμή.",

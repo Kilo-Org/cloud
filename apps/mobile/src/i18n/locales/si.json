@@ -3408,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "වෙබයේ ඇති සංවිධාන සැකසීම්",
+      "integrations": "වෙබයේ ඒකාබද්ධ කිරීම්",
       "usageDetails": "භාවිත විස්තර",
       "providersAndModels": "සපයන්නන් සහ මාදිලි",
       "groups": "කණ්ඩායම්",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "සම්බන්ධිත සේවා",
     "entrySubtitle": "GitHub, Slack, Linear සහ තවත් බොහෝ දේ",
     "subtitle": "ඔබේ සංවර්ධන මෙවලම් සහ කාර්ය ප්‍රවාහ Kilo වෙත සම්බන්ධ කරන්න",
-    "emptyHint": "තවම කිසිදු ඒකාබද්ධ කිරීමක් සම්බන්ධ කර නැත.",
     "disconnect": "විසන්ධි කරන්න",
     "disconnectTitle": "{{provider}} විසන්ධි කරන්නද?",
     "disconnectMessage": "Kilo {{provider}} තුළ ප්‍රතිචාර දැක්වීම නවත්වනු ඇත. ඔබට ඕනෑම වේලාවක නැවත සම්බන්ධ විය හැක.",

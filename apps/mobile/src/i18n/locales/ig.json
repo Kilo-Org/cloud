@@ -3408,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Ntọala òtù na weebụ",
+      "integrations": "Njikọ na weebụ",
       "usageDetails": "Nkọwa ojiji",
       "providersAndModels": "Ndị na-enye ọrụ na model",
       "groups": "Ìgwè",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "Ọrụ ejikọrọ",
     "entrySubtitle": "GitHub, Slack, Linear na ndị ọzọ",
     "subtitle": "Jikọọ ngwaọrụ mmepe gị na usoro ọrụ gị na Kilo",
-    "emptyHint": "Enwebeghị njikọ ọ bụla.",
     "disconnect": "Kwụsị njikọ",
     "disconnectTitle": "Kwụsị njikọ {{provider}}?",
     "disconnectMessage": "Kilo agaghị azaghachi ọzọ na {{provider}}. Ị nwere ike ijikọ ọzọ mgbe ọ bụla.",

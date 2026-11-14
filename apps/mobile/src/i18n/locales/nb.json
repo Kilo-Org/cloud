@@ -3408,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Organisasjonsinnstillinger på nettet",
+      "integrations": "Integrasjoner på nettet",
       "usageDetails": "Bruksdetaljer",
       "providersAndModels": "Leverandører og modeller",
       "groups": "Grupper",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "Tilkoblede tjenester",
     "entrySubtitle": "GitHub, Slack, Linear og mer",
     "subtitle": "Koble utviklingsverktøyene og arbeidsflytene dine til Kilo",
-    "emptyHint": "Ingen integrasjoner er koblet til ennå.",
     "disconnect": "Koble fra",
     "disconnectTitle": "Koble fra {{provider}}?",
     "disconnectMessage": "Kilo slutter å svare i {{provider}}. Du kan koble til igjen når som helst.",

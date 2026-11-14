@@ -3408,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Fikirakiran'ny fikambanana amin'ny tranonkala",
+      "integrations": "Fampifandraisana amin'ny tranonkala",
       "usageDetails": "Antsipirian'ny fampiasana",
       "providersAndModels": "Mpamatsy sy modely",
       "groups": "Vondrona",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "Serivisy mifandray",
     "entrySubtitle": "GitHub, Slack, Linear sy ny hafa",
     "subtitle": "Ampifandraiso amin'i Kilo ireo fitaovana sy fomba fiasanao amin'ny fampandrosoana",
-    "emptyHint": "Mbola tsy misy fampifandraisana mifandray.",
     "disconnect": "Esory",
     "disconnectTitle": "Hanapaka ny fifandraisana amin'i {{provider}}?",
     "disconnectMessage": "Tsy hamaly intsony ao amin'i {{provider}} i Kilo. Afaka mampifandray indray ianao amin'ny fotoana rehetra.",

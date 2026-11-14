@@ -3413,6 +3413,7 @@
     },
     "settingsOnWeb": {
       "title": "Web'deki kuruluş ayarları",
+      "integrations": "Web'deki entegrasyonlar",
       "usageDetails": "Kullanım ayrıntıları",
       "providersAndModels": "Sağlayıcılar ve modeller",
       "groups": "Gruplar",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "Bağlı hizmetler",
     "entrySubtitle": "GitHub, Slack, Linear ve daha fazlası",
     "subtitle": "Geliştirme araçlarınızı ve iş akışlarınızı Kilo'ya bağlayın",
-    "emptyHint": "Henüz bağlı entegrasyon yok.",
     "disconnect": "Bağlantıyı kes",
     "disconnectTitle": "{{provider}} bağlantısı kesilsin mi?",
     "disconnectMessage": "Kilo, {{provider}} üzerinde yanıt vermeyi bırakacak. İstediğiniz zaman yeniden bağlanabilirsiniz.",

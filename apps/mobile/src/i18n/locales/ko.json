@@ -3413,6 +3413,7 @@
     },
     "settingsOnWeb": {
       "title": "웹에서 조직 설정",
+      "integrations": "웹에서 연동",
       "usageDetails": "사용량 세부정보",
       "providersAndModels": "제공업체 및 모델",
       "groups": "그룹",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "연결된 서비스",
     "entrySubtitle": "GitHub, Slack, Linear 등",
     "subtitle": "개발 도구와 워크플로를 Kilo에 연결하세요",
-    "emptyHint": "아직 연결된 서비스가 없습니다.",
     "disconnect": "연결 해제",
     "disconnectTitle": "{{provider}} 연결을 해제할까요?",
     "disconnectMessage": "Kilo가 더 이상 {{provider}}에서 응답하지 않습니다. 언제든지 다시 연결할 수 있습니다.",

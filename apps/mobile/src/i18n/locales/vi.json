@@ -3413,6 +3413,7 @@
     },
     "settingsOnWeb": {
       "title": "Cài đặt tổ chức trên web",
+      "integrations": "Tích hợp trên web",
       "usageDetails": "Chi tiết sử dụng",
       "providersAndModels": "Nhà cung cấp và mô hình",
       "groups": "Nhóm",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "Dịch vụ đã kết nối",
     "entrySubtitle": "GitHub, Slack, Linear và nhiều dịch vụ khác",
     "subtitle": "Kết nối các công cụ và quy trình phát triển của bạn với Kilo",
-    "emptyHint": "Chưa có tích hợp nào được kết nối.",
     "disconnect": "Ngắt kết nối",
     "disconnectTitle": "Ngắt kết nối {{provider}}?",
     "disconnectMessage": "Kilo sẽ ngừng phản hồi trong {{provider}}. Bạn có thể kết nối lại bất cứ lúc nào.",

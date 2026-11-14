@@ -3408,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Ngā tautuhinga rōpū i te ipurangi",
+      "integrations": "Ngā Tūhononga i te ipurangi",
       "usageDetails": "Ngā taipitopito whakamahinga",
       "providersAndModels": "Ngā kaiwhakarato me ngā tauira",
       "groups": "Ngā kāhui",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "Ngā ratonga kua honoa",
     "entrySubtitle": "GitHub, Slack, Linear me ētahi atu",
     "subtitle": "Honoa ō taputapu whakawhanake me ō rerenga mahi ki Kilo",
-    "emptyHint": "Kāore anō kia honoa he tūhononga.",
     "disconnect": "Wetekia",
     "disconnectTitle": "Wetekia a {{provider}}?",
     "disconnectMessage": "Ka mutu tā Kilo whakautu i roto i {{provider}}. Ka taea e koe te hono anō i ngā wā katoa.",

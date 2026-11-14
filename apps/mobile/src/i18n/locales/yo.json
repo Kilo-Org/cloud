@@ -3408,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Ààtò àjọ lórí wẹ́ẹ̀bù",
+      "integrations": "Àwọn ìsopọ̀ lórí wẹ́ẹ̀bù",
       "usageDetails": "Àlàyé ìlò",
       "providersAndModels": "Àwọn olùpèsè àti àwòṣe",
       "groups": "Àwọn ẹgbẹ́",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "Àwọn iṣẹ́ tí a so pọ̀",
     "entrySubtitle": "GitHub, Slack, Linear àti àwọn mìíràn",
     "subtitle": "So àwọn irinṣẹ́ ìdàgbàsókè àti ìlànà iṣẹ́ rẹ pọ̀ mọ́ Kilo",
-    "emptyHint": "Kò tíì sí ìsopọ̀ kankan.",
     "disconnect": "Já ìsopọ̀",
     "disconnectTitle": "Ṣé o fẹ́ já ìsopọ̀ {{provider}}?",
     "disconnectMessage": "Kilo kò ní dáhùn mọ́ nínú {{provider}}. O lè tún un so pọ̀ nígbàkígbà.",

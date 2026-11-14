@@ -3567,6 +3567,7 @@
     },
     "settingsOnWeb": {
       "title": "Issettjar tal-organizzazzjoni fuq il-web",
+      "integrations": "Integrazzjonijiet fuq il-web",
       "usageDetails": "Dettalji tal-użu",
       "providersAndModels": "Fornituri u mudelli",
       "groups": "Gruppi",
@@ -4606,7 +4607,6 @@
     "sectionTitle": "Servizzi konnessi",
     "entrySubtitle": "GitHub, Slack, Linear u aktar",
     "subtitle": "Qabbad l-għodod u l-proċessi tax-xogħol tal-iżvilupp tiegħek ma' Kilo",
-    "emptyHint": "Għad m'hemm l-ebda integrazzjoni konnessa.",
     "disconnect": "Skonnettja",
     "disconnectTitle": "Tiskonnettja {{provider}}?",
     "disconnectMessage": "Kilo se jieqaf jirrispondi f'{{provider}}. Tista' terġa' tikkonnettja fi kwalunkwe ħin.",

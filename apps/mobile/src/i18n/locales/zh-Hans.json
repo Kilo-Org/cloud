@@ -3413,6 +3413,7 @@
     },
     "settingsOnWeb": {
       "title": "网页版组织设置",
+      "integrations": "网页版集成",
       "usageDetails": "用量详情",
       "providersAndModels": "提供商和模型",
       "groups": "群组",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "已连接的服务",
     "entrySubtitle": "GitHub、Slack、Linear 等",
     "subtitle": "将你的开发工具和工作流连接到 Kilo",
-    "emptyHint": "尚未连接任何集成。",
     "disconnect": "断开连接",
     "disconnectTitle": "要断开 {{provider}} 的连接吗？",
     "disconnectMessage": "Kilo 将不再在 {{provider}} 中响应。你可以随时重新连接。",

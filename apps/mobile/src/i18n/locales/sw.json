@@ -3408,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Mipangilio ya shirika kwenye wavuti",
+      "integrations": "Miunganisho kwenye wavuti",
       "usageDetails": "Maelezo ya matumizi",
       "providersAndModels": "Watoa huduma na miundo",
       "groups": "Vikundi",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "Huduma zilizounganishwa",
     "entrySubtitle": "GitHub, Slack, Linear na zaidi",
     "subtitle": "Unganisha zana zako za usanidi na mitiririko yako ya kazi na Kilo",
-    "emptyHint": "Bado hakuna miunganisho iliyounganishwa.",
     "disconnect": "Tenganisha",
     "disconnectTitle": "Ungependa kutenganisha {{provider}}?",
     "disconnectMessage": "Kilo itaacha kujibu kwenye {{provider}}. Unaweza kuunganisha tena wakati wowote.",

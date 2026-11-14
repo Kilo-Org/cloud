@@ -3408,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Կազմակերպության կարգավորումները վեբում",
+      "integrations": "Ինտեգրումներ վեբում",
       "usageDetails": "Օգտագործման մանրամասներ",
       "providersAndModels": "Մատակարարներ և մոդելներ",
       "groups": "Խմբեր",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "Միացված ծառայություններ",
     "entrySubtitle": "GitHub, Slack, Linear և այլն",
     "subtitle": "Միացրեք ձեր մշակման գործիքներն ու աշխատանքային հոսքերը Kilo-ին",
-    "emptyHint": "Դեռ ոչ մի ինտեգրում միացված չէ։",
     "disconnect": "Անջատել",
     "disconnectTitle": "Անջատե՞լ {{provider}} ծառայությունը",
     "disconnectMessage": "Kilo-ն կդադարի պատասխանել {{provider}} ծառայությունում։ Կարող եք կրկին միացնել ցանկացած ժամանակ։",

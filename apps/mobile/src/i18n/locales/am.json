@@ -3408,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "በድር ላይ ያሉ የድርጅት ቅንብሮች",
+      "integrations": "በድር ላይ ውህደቶች",
       "usageDetails": "የአጠቃቀም ዝርዝሮች",
       "providersAndModels": "አቅራቢዎች እና ሞዴሎች",
       "groups": "ቡድኖች",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "የተገናኙ አገልግሎቶች",
     "entrySubtitle": "GitHub፣ Slack፣ Linear እና ሌሎችም",
     "subtitle": "የልማት መሣሪያዎችዎን እና የሥራ ሂደቶችዎን ከKilo ጋር ያገናኙ",
-    "emptyHint": "እስካሁን ምንም የተገናኘ ውህደት የለም።",
     "disconnect": "ግንኙነት አቋርጥ",
     "disconnectTitle": "የ{{provider}} ግንኙነት ይቋረጥ?",
     "disconnectMessage": "Kilo በ{{provider}} ውስጥ ምላሽ መስጠት ያቆማል። በማንኛውም ጊዜ እንደገና ማገናኘት ይችላሉ።",

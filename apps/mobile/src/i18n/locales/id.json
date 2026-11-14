@@ -3413,6 +3413,7 @@
     },
     "settingsOnWeb": {
       "title": "Pengaturan organisasi di web",
+      "integrations": "Integrasi di web",
       "usageDetails": "Detail penggunaan",
       "providersAndModels": "Penyedia dan model",
       "groups": "Grup",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "Layanan terhubung",
     "entrySubtitle": "GitHub, Slack, Linear, dan lainnya",
     "subtitle": "Hubungkan alat dan alur kerja pengembangan Anda ke Kilo",
-    "emptyHint": "Belum ada integrasi yang terhubung.",
     "disconnect": "Putuskan",
     "disconnectTitle": "Putuskan {{provider}}?",
     "disconnectMessage": "Kilo tidak akan merespons lagi di {{provider}}. Anda dapat menghubungkannya kembali kapan saja.",

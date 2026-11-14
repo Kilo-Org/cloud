@@ -3461,6 +3461,7 @@
     },
     "settingsOnWeb": {
       "title": "Postavke organizacije na webu",
+      "integrations": "Integracije na webu",
       "usageDetails": "Pojedinosti o potrošnji",
       "providersAndModels": "Pružatelji i modeli",
       "groups": "Grupe",
@@ -4476,7 +4477,6 @@
     "sectionTitle": "Povezane usluge",
     "entrySubtitle": "GitHub, Slack, Linear i drugo",
     "subtitle": "Povežite svoje razvojne alate i tijekove rada s uslugom Kilo",
-    "emptyHint": "Još nema povezanih integracija.",
     "disconnect": "Prekini vezu",
     "disconnectTitle": "Prekinuti vezu s uslugom {{provider}}?",
     "disconnectMessage": "Kilo više neće odgovarati u usluzi {{provider}}. Možete se ponovno povezati u bilo kojem trenutku.",

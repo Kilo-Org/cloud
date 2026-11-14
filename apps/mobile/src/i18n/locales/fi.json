@@ -3408,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Organisaation asetukset verkossa",
+      "integrations": "Integraatiot verkossa",
       "usageDetails": "Käytön tiedot",
       "providersAndModels": "Palveluntarjoajat ja mallit",
       "groups": "Ryhmät",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "Yhdistetyt palvelut",
     "entrySubtitle": "GitHub, Slack, Linear ja muita",
     "subtitle": "Yhdistä kehitystyökalusi ja työnkulkusi Kiloon",
-    "emptyHint": "Integraatioita ei ole vielä yhdistetty.",
     "disconnect": "Katkaise yhteys",
     "disconnectTitle": "Katkaistaanko yhteys palveluun {{provider}}?",
     "disconnectMessage": "Kilo lakkaa vastaamasta palvelussa {{provider}}. Voit yhdistää uudelleen milloin tahansa.",

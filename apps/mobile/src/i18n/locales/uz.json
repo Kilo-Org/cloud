@@ -3408,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Veb-saytdagi tashkilot sozlamalari",
+      "integrations": "Veb-saytdagi integratsiyalar",
       "usageDetails": "Foydalanish tafsilotlari",
       "providersAndModels": "Provayderlar va modellar",
       "groups": "Guruhlar",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "Ulangan xizmatlar",
     "entrySubtitle": "GitHub, Slack, Linear va boshqalar",
     "subtitle": "Ishlab chiqish vositalaringiz va ish jarayonlaringizni Kilo bilan ulang",
-    "emptyHint": "Hali hech qanday integratsiya ulanmagan.",
     "disconnect": "Uzish",
     "disconnectTitle": "{{provider}} xizmati uzilsinmi?",
     "disconnectMessage": "Kilo endi {{provider}} xizmatida javob bermaydi. Istalgan vaqtda qayta ulashingiz mumkin.",

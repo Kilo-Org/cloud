@@ -3408,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "వెబ్‌లో సంస్థ సెట్టింగ్‌లు",
+      "integrations": "వెబ్‌లో ఇంటిగ్రేషన్‌లు",
       "usageDetails": "వినియోగ వివరాలు",
       "providersAndModels": "ప్రొవైడర్‌లు మరియు మోడల్‌లు",
       "groups": "గ్రూప్‌లు",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "కనెక్ట్ చేసిన సేవలు",
     "entrySubtitle": "GitHub, Slack, Linear మరియు మరిన్ని",
     "subtitle": "మీ డెవలప్‌మెంట్ టూల్స్‌ను, వర్క్‌ఫ్లోలను Kiloకి కనెక్ట్ చేయండి",
-    "emptyHint": "ఇంకా ఏ ఇంటిగ్రేషన్‌లూ కనెక్ట్ చేయలేదు.",
     "disconnect": "డిస్‌కనెక్ట్ చేయండి",
     "disconnectTitle": "{{provider}}ని డిస్‌కనెక్ట్ చేయాలా?",
     "disconnectMessage": "{{provider}}లో Kilo ఇకపై స్పందించదు. మీరు ఎప్పుడైనా మళ్లీ కనెక్ట్ చేయవచ్చు.",

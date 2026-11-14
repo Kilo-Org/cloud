@@ -3461,6 +3461,7 @@
     },
     "settingsOnWeb": {
       "title": "Configuració de l'organització al web",
+      "integrations": "Integracions al web",
       "usageDetails": "Detalls d'ús",
       "providersAndModels": "Proveïdors i models",
       "groups": "Grups",
@@ -4476,7 +4477,6 @@
     "sectionTitle": "Serveis connectats",
     "entrySubtitle": "GitHub, Slack, Linear i més",
     "subtitle": "Connecta les teves eines i fluxos de treball de desenvolupament a Kilo",
-    "emptyHint": "Encara no hi ha cap integració connectada.",
     "disconnect": "Desconnecta",
     "disconnectTitle": "Vols desconnectar {{provider}}?",
     "disconnectMessage": "Kilo deixarà de respondre a {{provider}}. Pots tornar a connectar-lo en qualsevol moment.",

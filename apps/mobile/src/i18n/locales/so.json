@@ -3408,6 +3408,7 @@
     },
     "settingsOnWeb": {
       "title": "Dejinta ururka ee shabakadda",
+      "integrations": "Isku-xidhka ee shabakadda",
       "usageDetails": "Faahfaahinta isticmaalka",
       "providersAndModels": "Bixiyeyaasha iyo moodellada",
       "groups": "Kooxaha",
@@ -4411,7 +4412,6 @@
     "sectionTitle": "Adeegyada ku xidhan",
     "entrySubtitle": "GitHub, Slack, Linear iyo kuwo kale",
     "subtitle": "Ku xidh qalabkaaga horumarinta iyo hababka shaqadaada Kilo",
-    "emptyHint": "Weli wax isku-xidh ah lama samayn.",
     "disconnect": "Ka goo",
     "disconnectTitle": "Ka goo {{provider}}?",
     "disconnectMessage": "Kilo way joojin doontaa ka jawaabista {{provider}}. Waad dib u xidhi kartaa wakhti kasta.",

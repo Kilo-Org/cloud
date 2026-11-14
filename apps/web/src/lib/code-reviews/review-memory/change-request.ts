@@ -6,7 +6,8 @@ import {
 } from '@kilocode/app-shared/code-review';
 
 import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
-import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import { isPlatformIntegrationActive } from '@/lib/integrations/core/health';
 import {
   createGitHubBranch,
   createGitHubPullRequest,
@@ -205,8 +206,7 @@ async function findGitHubIntegrationForProposal(
     integration =>
       integration.platform === PLATFORM.GITHUB &&
       integration.github_connection_role === 'workflow' &&
-      integration.integration_status === INTEGRATION_STATUS.ACTIVE &&
-      !integration.suspended_at &&
+      isPlatformIntegrationActive(integration) &&
       integration.platform_installation_id &&
       hasRepositoryAccess(integration, proposal.repo_full_name)
   );

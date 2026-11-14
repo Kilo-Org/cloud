@@ -324,14 +324,13 @@ describe('PrReviewCommentComposer submit phase', () => {
   it('writes nothing when the composer is dismissed during the Terms read', async () => {
     const roundTrip = Promise.withResolvers<{ accepted: boolean; currentVersion: string }>();
     gate.status.mockReturnValueOnce(roundTrip.promise);
-    createComment.mutateAsync.mockResolvedValue({});
     const renderer = await mountComposer();
     typeBody(renderer, 'hello');
 
     act(() => {
       press(renderer, 'Comment now');
+      press(renderer, 'Cancel');
     });
-    press(renderer, 'Cancel');
 
     await act(async () => {
       roundTrip.resolve({ accepted: true, currentVersion: 'v1' });
@@ -343,29 +342,19 @@ describe('PrReviewCommentComposer submit phase', () => {
     expect(clearDraft).not.toHaveBeenCalled();
   });
 
-  it('refuses the write while the connection is being confirmed', async () => {
-    connectivity.value = 'confirming-offline';
-    createComment.mutateAsync.mockResolvedValue({});
-    const renderer = await mountComposer();
-    typeBody(renderer, 'hello');
-    await pressAndSettle(renderer, 'Comment now');
+  it.each(['offline', 'confirming-offline'] as const)(
+    'fails locally while the connection refuses writes (%s)',
+    async phase => {
+      // A write dispatched in the confirming window waits out its deadline on a
+      // transport that just went away, so both phases fail locally.
+      connectivity.value = phase;
+      const renderer = await mountComposer();
+      typeBody(renderer, 'hello');
+      await pressAndSettle(renderer, 'Comment now');
 
-    // A write dispatched in that window waits out its deadline on a transport
-    // that just went away, so the composer fails locally like its siblings.
-    expect(createComment.mutateAsync).not.toHaveBeenCalled();
-    expect(hasCopy(renderer, 'Could not post comment.')).toBe(true);
-    expect(isDisabled(renderer, 'Comment now')).toBe(false);
-  });
-
-  it('fails at once with the retryable copy while confirmed offline', async () => {
-    connectivity.value = 'offline';
-    createComment.mutateAsync.mockResolvedValue({});
-    const renderer = await mountComposer();
-    typeBody(renderer, 'hello');
-    await pressAndSettle(renderer, 'Comment now');
-
-    expect(createComment.mutateAsync).not.toHaveBeenCalled();
-    expect(hasCopy(renderer, 'Could not post comment.')).toBe(true);
-    expect(isDisabled(renderer, 'Comment now')).toBe(false);
-  });
+      expect(createComment.mutateAsync).not.toHaveBeenCalled();
+      expect(hasCopy(renderer, 'Could not post comment.')).toBe(true);
+      expect(isDisabled(renderer, 'Comment now')).toBe(false);
+    }
+  );
 });

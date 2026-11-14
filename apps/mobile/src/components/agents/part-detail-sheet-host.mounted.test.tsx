@@ -615,4 +615,41 @@ describe('PartDetailSheetHost mounted', () => {
       vi.useRealTimers();
     }
   });
+
+  it('opens a part after a dismissal the native sheet never reported', async () => {
+    vi.useFakeTimers();
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    try {
+      renderer = await mountHost([
+        makeMessage('m1', [
+          makeBashPart('bash-1', 'echo one', true),
+          makeBashPart('bash-2', 'echo two', true),
+        ]),
+      ]);
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      await act(() => {
+        (propOf(findByType(renderer.root, 'SheetHeader')[0], 'onDone') as () => void)();
+      });
+      expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(-1);
+
+      // The native sheet never reports the finished dismissal. Without the sheet's
+      // deadline the host stays dismissing and every later open only queues.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+
+      await act(() => {
+        capturedOpener?.('bash-2');
+      });
+      expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+      expect(sheetTitle(renderer)).toBe('bash: echo two');
+    } finally {
+      act(() => {
+        renderer?.unmount();
+      });
+      vi.useRealTimers();
+    }
+  });
 });

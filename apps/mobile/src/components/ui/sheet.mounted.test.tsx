@@ -27,6 +27,9 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 const theme = vi.hoisted(() => ({ colors: { card: '#1F1F24' } }));
 
+/** The sheet's dismissal report bound (`DISMISS_REPORT_TIMEOUT_MS` in `sheet.tsx`). */
+const DISMISS_REPORT_TIMEOUT_MS = 1000;
+
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => theme.colors }));
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, View: 'View' }));
 
@@ -524,6 +527,64 @@ describe('Sheet', () => {
 
   // iOS only: the native sheet there reports a dimmed-area tap instead of
   // dismissing. Its cases live in `sheet.backdrop-tap.mounted.test.tsx`.
+  it('ignores a native report that arrives after the deadline ended its dismissal', async () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn<() => void>();
+    const onDismiss = vi.fn<() => void>();
+    const { renderer, queryClient } = await mount({ onClose, onDismiss });
+
+    // Close, then reopen the same content before the native sheet reports. The
+    // dismissal stays owed, so the sheet keeps `index` -1 until it reports.
+    await updateSheet(renderer, queryClient, { visible: false, onClose, onDismiss });
+    await updateSheet(renderer, queryClient, { visible: true, onClose, onDismiss });
+    expect(sheet(renderer)?.props.index).toBe(-1);
+
+    // The report never comes: the deadline ends the dismissal and the reopened
+    // sheet is presented again.
+    await settleTimers(DISMISS_REPORT_TIMEOUT_MS);
+    expect(sheet(renderer)?.props.index).toBe(0);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onDismiss).not.toHaveBeenCalled();
+
+    // The adapter re-armed its own guard when the index returned to 0, so its
+    // report walks the props one presentation later. It belongs to the dismissal
+    // that already ended and must not close the sheet that replaced it.
+    await act(async () => {
+      nativeSheet.dismiss();
+      await Promise.resolve();
+    });
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(sheet(renderer)?.props.index).toBe(0);
+    expect(renderer.root.findAllByProps({ testID: 'sheet-content' })).toHaveLength(1);
+  });
+
+  it('ends a self-dismissal the native sheet never completed', async () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn<() => void>();
+    const onDismiss = vi.fn<() => void>();
+    const { renderer } = await mount({ onClose, onDismiss });
+    const node = sheet(renderer);
+    if (!node) {
+      throw new Error('sheet not rendered');
+    }
+
+    // The swipe/backdrop was granted and handed to the native sheet, which never
+    // reports the finished dismissal.
+    await act(async () => {
+      expect((node.props.onRequestDismiss as () => boolean)()).toBe(true);
+      await Promise.resolve();
+    });
+    expect(onClose).not.toHaveBeenCalled();
+
+    await settleTimers(DISMISS_REPORT_TIMEOUT_MS);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(sheet(renderer)).toBeUndefined();
+  });
+
   it('ends the sheet when the native sheet dismisses on its own (swipe, backdrop or Back)', async () => {
     const onClose = vi.fn<() => void>();
     const onDismiss = vi.fn<() => void>();

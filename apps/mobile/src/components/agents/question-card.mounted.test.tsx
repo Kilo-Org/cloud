@@ -36,6 +36,7 @@ vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({ primaryForeground: '#ffffff', mutedForeground: '#6F6A61' }),
 }));
 vi.mock('@/lib/a11y/announce', () => a11yMocks);

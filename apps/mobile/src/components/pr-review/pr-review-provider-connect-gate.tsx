@@ -21,7 +21,7 @@ import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import { useOrganization } from '@/lib/organization-context';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
@@ -79,6 +79,7 @@ export function ProviderConnectGate({
 }>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
   const iconColor = usePrReviewGateIconColor();
   const { t } = useTranslation();
   const scope = useProviderPrScopeOrNull();
@@ -392,7 +393,7 @@ export function ProviderConnectGate({
                   }}
                 >
                   {connecting ? (
-                    <ActivityIndicator size="small" color={colors.primaryForeground} />
+                    <ActivityIndicator size="small" color={mutedDisabledInk} />
                   ) : (
                     <RefreshCcw size={16} color={colors.primaryForeground} />
                   )}

@@ -88,6 +88,7 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ back: routerBack }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({ mutedForeground: '#000', primaryForeground: '#fff' }),
 }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({

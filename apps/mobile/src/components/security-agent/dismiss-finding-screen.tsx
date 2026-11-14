@@ -18,7 +18,7 @@ import { isSecuritySyncRetryable, securityMutationCopyKey } from '@/lib/security
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
 import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 // The five GitHub dismissal reasons the backend's DismissReasonSchema accepts
 // (apps/web/src/lib/security-agent/core/schemas.ts:13-19) — exact value/label
@@ -68,6 +68,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
   // This header is inside a formSheet route: the sheet edge owns the top
   // clearance unless the sheet is the stack's first screen.
   const modalTopInset = useFormSheetHeaderTopInset();
@@ -334,9 +335,9 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
         <Button disabled={!reason || dismissFinding.isPending || dismissBlocked} onPress={onSubmit}>
           {dismissFinding.isPending ? (
-            <ActivityIndicator size="small" color={colors.primaryForeground} />
+            <ActivityIndicator size="small" color={mutedDisabledInk} />
           ) : null}
-          <Text className="text-primary-foreground">{t('securityAgent.dismiss.title')}</Text>
+          <Text>{t('securityAgent.dismiss.title')}</Text>
         </Button>
       </ScrollView>
     </View>

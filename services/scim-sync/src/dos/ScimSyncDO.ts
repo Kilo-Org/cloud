@@ -183,12 +183,15 @@ export class ScimSyncDO extends DurableObject<Env> {
             state.commitCursor(this.db, event.id, seed);
             state.clearFailure(this.db, event.id);
             if (directoryId !== null) {
-              // The window belongs to this event: it closes when the event
-              // that opened it applies, and an activation that applies binds the
-              // directory's organization, so both records are stale.
+              // The window belongs to the event that opened it, so only that
+              // event's success closes it. Every other event of the directory
+              // applying leaves it open, because the window records stream time
+              // the directory has already spent.
               state.closeConflictWindow(this.db, directoryId, event.id);
               if (event.event === 'dsync.activated') {
-                state.clearDirectoryLimits(this.db, directoryId);
+                // The binding makes the parked-activation marker stale, so it
+                // goes. The conflict window is unrelated to the binding.
+                state.clearParkedActivation(this.db, directoryId);
               }
             }
             cursor = event.id;

@@ -19,7 +19,7 @@ import {
 } from '@/components/agents/blocking-card-state';
 import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 // Types matching the SDK's QuestionState structure
@@ -71,6 +71,7 @@ export function QuestionCard({
   pendingCount = 1,
 }: Readonly<QuestionCardProps>) {
   const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const [selectedOptions, setSelectedOptions] = useState<Record<number, Set<number>>>({});
@@ -198,8 +199,10 @@ export function QuestionCard({
   const isInert = presentation.state === 'non-retryable';
   const interactionDisabled = isSubmitting || isInert;
   const submitDisabled = !allQuestionsAnswered || interactionDisabled;
+  // The spinner only shows while submitting, and every button that carries it
+  // is disabled then, so it sits on the muted fill a disabled primary paints.
   const submittingSpinner = isSubmitting ? (
-    <ActivityIndicator size="small" color={colors.primaryForeground} />
+    <ActivityIndicator size="small" color={mutedDisabledInk} />
   ) : null;
 
   return (

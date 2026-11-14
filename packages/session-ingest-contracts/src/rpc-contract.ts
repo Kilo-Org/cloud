@@ -1310,10 +1310,40 @@ export function validateKiloSdkMessagesCursor(cursor: string): boolean {
   }
 }
 
+/** Optional opaque continuation cursor, capped so an oversized value never reaches the decoder. */
+const optionalMessageCursorField = z
+  .string()
+  .min(1)
+  .max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH)
+  .optional();
+
+/** Bounded positive page size with the shared default, for schemas that always bound the read. */
+const boundedMessageHistoryLimitField = z
+  .number()
+  .int()
+  .positive()
+  .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
+  .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE);
+
+/** Adds `<field> is not a valid message cursor` when a present cursor does not decode. */
+function refineMessageCursor(
+  cursor: string | undefined,
+  field: 'before' | 'cursor',
+  ctx: z.RefinementCtx
+): void {
+  if (cursor === undefined) return;
+  if (validateKiloSdkMessagesCursor(cursor)) return;
+  ctx.addIssue({
+    code: 'custom',
+    path: [field],
+    message: `${field} is not a valid message cursor`,
+  });
+}
+
 export const getCloudAgentRootSessionMessagesSchema = resolveCloudAgentRootSessionSchema
   .extend({
     limit: z.number().int().nonnegative().max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE).optional(),
-    before: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
+    before: optionalMessageCursorField,
   })
   .superRefine((params, ctx) => {
     if (params.before !== undefined && (params.limit === undefined || params.limit === 0)) {
@@ -1324,13 +1354,7 @@ export const getCloudAgentRootSessionMessagesSchema = resolveCloudAgentRootSessi
       });
       return;
     }
-    if (params.before !== undefined && !validateKiloSdkMessagesCursor(params.before)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['before'],
-        message: 'before is not a valid message cursor',
-      });
-    }
+    refineMessageCursor(params.before, 'before', ctx);
   });
 export type GetCloudAgentRootSessionMessagesParams = z.input<
   typeof getCloudAgentRootSessionMessagesSchema
@@ -1366,24 +1390,10 @@ export const getSessionMessagesSchema = z
   .object({
     kiloUserId: z.string().min(1),
     kiloSessionId: storedSessionIdSchema,
-    limit: z
-      .number()
-      .int()
-      .positive()
-      .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
-      .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
-    before: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
+    limit: boundedMessageHistoryLimitField,
+    before: optionalMessageCursorField,
   })
-  .superRefine((params, ctx) => {
-    if (params.before === undefined) return;
-    if (!validateKiloSdkMessagesCursor(params.before)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['before'],
-        message: 'before is not a valid message cursor',
-      });
-    }
-  });
+  .superRefine((params, ctx) => refineMessageCursor(params.before, 'before', ctx));
 export type GetSessionMessagesParams = z.input<typeof getSessionMessagesSchema>;
 export type AuthorizedSessionMessages = {
   kiloSessionId: string;
@@ -1407,24 +1417,10 @@ export type GetSessionMessagesResult = AuthorizedSessionMessages | null;
 export const getSessionMessagesPageInputSchema = z
   .object({
     session_id: z.string().min(1),
-    limit: z
-      .number()
-      .int()
-      .positive()
-      .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
-      .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
-    cursor: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
+    limit: boundedMessageHistoryLimitField,
+    cursor: optionalMessageCursorField,
   })
-  .superRefine((params, ctx) => {
-    if (params.cursor === undefined) return;
-    if (!validateKiloSdkMessagesCursor(params.cursor)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['cursor'],
-        message: 'cursor is not a valid message cursor',
-      });
-    }
-  });
+  .superRefine((params, ctx) => refineMessageCursor(params.cursor, 'cursor', ctx));
 
 export type SessionIngestRpcMethods = {
   publishCloudAgentSessionStatus: (params: PublishCloudAgentSessionStatusParams) => Promise<void>;

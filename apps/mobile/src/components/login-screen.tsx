@@ -36,12 +36,7 @@ import {
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import {
-  clearPersistedLoginDrafts,
-  persistLoginDrafts,
-  restoreLoginDrafts,
-  type SsoRecoveryDraft,
-} from '@/lib/login-draft';
+import { persistLoginDrafts, restoreLoginDrafts, type SsoRecoveryDraft } from '@/lib/login-draft';
 import { setLanguagePickerBridge } from '@/lib/picker-bridge';
 import { useScreenInsets } from '@/lib/screen-insets';
 
@@ -143,7 +138,6 @@ export function LoginScreen() {
         const restored = await restoreLoginDrafts();
         if (!cancelled) {
           setDraft(restored);
-          void clearPersistedLoginDrafts();
         }
       } catch {
         if (!cancelled) {

@@ -168,6 +168,21 @@ const buttonLabelClasses = Object.fromEntries(
   Object.entries(BUTTON_INK).map(([variant, ink]) => [variant, ink.label])
 ) as Record<ButtonVariant, string>;
 
+/**
+ * The pair a disabled (not busy) primary action paints: its fill and the label
+ * ink that reads on it. The fill is `--primary-disabled-action` in both themes.
+ * Light keeps the palette's disabled primary, white label at 5.4:1. Dark takes
+ * a dim neutral that still stands off the near-black page (2.6:1) and carries
+ * `--foreground` at 6.4:1, because there the palette's `--primary-disabled`
+ * (5.3:1 above the page) outshines every other element like an enabled control
+ * and the inactive icon surface (`--control-idle`, 1.7:1) leaves a full-width
+ * plate without presence. `--primary-disabled` itself stays with the shared
+ * Switch's disabled on-track. A caller that paints its own mark on this fill
+ * takes `useMutedDisabledInk` from `@/lib/hooks/use-theme-colors`.
+ */
+const MUTED_DISABLED_FILL_CLASS = 'bg-primary-disabled-action';
+const MUTED_DISABLED_LABEL_CLASS = 'dark:text-foreground';
+
 const buttonTextVariants = cva('text-foreground text-center text-sm font-semibold', {
   variants: {
     variant: buttonLabelClasses,
@@ -290,13 +305,18 @@ function Button({
   }
   // oxlint-enable anti-slop/no-runtime-typeof
   return (
-    <TextClassContext.Provider value={buttonTextVariants({ variant, size })}>
+    <TextClassContext.Provider
+      value={cn(
+        buttonTextVariants({ variant, size }),
+        isMutedDisabled && MUTED_DISABLED_LABEL_CLASS
+      )}
+    >
       <Pressable
         className={cn(
           isDimmed && 'opacity-50',
           buttonVariants({ variant, size }),
           buttonGapVariants({ size }),
-          isMutedDisabled && 'bg-primary-disabled',
+          isMutedDisabled && MUTED_DISABLED_FILL_CLASS,
           className
         )}
         role="button"

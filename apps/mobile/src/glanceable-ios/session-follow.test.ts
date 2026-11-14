@@ -17,6 +17,7 @@ import {
   _resetSessionCardScopeStoreForTests,
   _setSessionCardScopeStoreForTests,
   _settleSessionCardScopeWritesForTests,
+  pruneSessionCardScopes,
   readSessionCardScopes,
   rememberSessionCardScope,
 } from './session-card-scope';
@@ -274,7 +275,7 @@ describe('the follow scope record', () => {
     followSession(RUNNING, CTX, NOW);
     await _settleSessionCardScopeWritesForTests();
     const recorded = await readSessionCardScopes();
-    expect(recorded?.get('session-1')).toEqual(CTX);
+    expect(recorded?.get('session-1')).toMatchObject(CTX);
 
     endAllSessionCards();
     await _settleSessionCardScopeWritesForTests();
@@ -462,7 +463,7 @@ describe('discoverSessionCards', () => {
 
     // A read that proved nothing must not cost the card its record.
     const records = await readSessionCardScopes();
-    expect(records?.get('session-1')).toEqual(CTX);
+    expect(records?.get('session-1')).toMatchObject(CTX);
   });
 
   it('keeps the records when its own discovery failed but a later one read ActivityKit', async () => {
@@ -494,7 +495,7 @@ describe('discoverSessionCards', () => {
     await _settleSessionCardScopeWritesForTests();
 
     const kept = await readSessionCardScopes();
-    expect(kept?.get('session-1')).toEqual(CTX);
+    expect(kept?.get('session-1')).toMatchObject(CTX);
   });
 });
 
@@ -777,7 +778,7 @@ describe('a restore with no stored account', () => {
     expect(isSessionFollowed('session-1')).toBe(true);
     await _settleSessionCardScopeWritesForTests();
     const kept = await readSessionCardScopes();
-    expect(kept?.get('session-1')).toEqual(CTX);
+    expect(kept?.get('session-1')).toMatchObject(CTX);
   });
 });
 
@@ -840,7 +841,66 @@ describe('a restore with no live card', () => {
 
     expect(isSessionFollowed('session-2')).toBe(true);
     const records = await readSessionCardScopes();
-    expect(records?.get('session-2')).toEqual(CTX);
+    expect(records?.get('session-2')).toMatchObject(CTX);
+  });
+});
+
+describe('a record rewritten while the restore waits', () => {
+  it('keeps a session record when it is re-followed under the same account while the restore waits', async () => {
+    followSession(RUNNING, CTX, NOW);
+    await _settleSessionCardScopeWritesForTests();
+    /* A record left behind for a session whose card is no longer live, so the
+       record is the earlier one for that session and the re-follow rewrites it. */
+    rememberSessionCardScope('session-B', CTX);
+    await _settleSessionCardScopeWritesForTests();
+
+    const restore = restoreFollowedSessionCards(async () => {
+      followSession({ ...RUNNING, id: 'session-B' }, CTX, NOW);
+      await _settleSessionCardScopeWritesForTests();
+      return { kind: 'account', ctx: CTX };
+    });
+    await restore;
+    await _settleSessionCardScopeWritesForTests();
+
+    const records = await readSessionCardScopes();
+    expect(records?.has('session-B')).toBe(true);
+    /* The card that follow started is in scope on the next restore, rather
+       than ended as an unrecorded one. */
+    await restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
+    expect(isSessionFollowed('session-B')).toBe(true);
+  });
+
+  it('a re-follow after a restart does not collide with the persisted revision', async () => {
+    storedScopes.set(
+      SESSION_CARD_SCOPE_KEY,
+      JSON.stringify({
+        version: 1,
+        cards: {
+          'session-1': { userId: CTX.userId, organizationId: CTX.organizationId, revision: 7 },
+        },
+      })
+    );
+    const before = await readSessionCardScopes();
+    if (before === null) {
+      throw new Error('the seeded record must be readable');
+    }
+    expect(before.get('session-1')?.revision).toBe(7);
+
+    /* A restart: the in-memory revision high-water mark is gone, the store is
+       not, so the next revision must come from what was persisted. */
+    _resetSessionCardScopeStoreForTests();
+    _setSessionCardScopeStoreForTests(scopeStore);
+    rememberSessionCardScope('session-1', CTX);
+    await _settleSessionCardScopeWritesForTests();
+
+    const after = await readSessionCardScopes();
+    expect(after?.get('session-1')?.revision).toBe(8);
+
+    pruneSessionCardScopes([], before);
+    await _settleSessionCardScopeWritesForTests();
+
+    const kept = await readSessionCardScopes();
+    expect(kept?.has('session-1')).toBe(true);
   });
 });
 

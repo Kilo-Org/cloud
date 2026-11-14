@@ -12,7 +12,7 @@ import {
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import {
   db,
-  type DrizzleDatabase,
+  type DrizzleConnection,
   type DrizzleTransaction,
 } from '@kilocode/web-shared/lib/drizzle';
 import { claudeBillingOwnerMatches, type ClaudeBillingOwner } from './owner';
@@ -40,8 +40,6 @@ export type UnreferencedClaudeBillingPayer = {
   id: string;
   userProfileId: string;
 };
-type Database = DrizzleDatabase | DrizzleTransaction;
-type WriteDatabase = DrizzleDatabase | DrizzleTransaction;
 
 export function claudeBillingOwnerWhere(owner: ClaudeBillingOwner) {
   switch (owner.kind) {
@@ -77,7 +75,7 @@ export function claudeBillingOwnerKey(owner: ClaudeBillingOwner): string {
 
 export async function getClaudeBillingConnection(
   owner: ClaudeBillingOwner,
-  fromDb: Database = db
+  fromDb: DrizzleConnection = db
 ): Promise<ClaudeBillingConnectionRow | null> {
   const [row] = await fromDb
     .select()
@@ -111,11 +109,39 @@ export function claudeBillingGrantOwnerWhere(owner: ClaudeBillingOwner) {
   }
 }
 
+/** The oldest still-active grant on this payer becomes its next owner. */
+async function selectNextActiveGrant(
+  onDb: DrizzleConnection,
+  payerConnectionId: string,
+  excludeOwner: ClaudeBillingOwner | null = null
+): Promise<{ kilo_user_id: string | null; organization_id: string | null } | null> {
+  const excludeWhere = excludeOwner ? claudeBillingGrantOwnerWhere(excludeOwner) : undefined;
+  const [grant] = await onDb
+    .select({
+      kilo_user_id: claude_billing_connection_grants.kilo_user_id,
+      organization_id: claude_billing_connection_grants.organization_id,
+    })
+    .from(claude_billing_connection_grants)
+    .where(
+      and(
+        eq(claude_billing_connection_grants.payer_connection_id, payerConnectionId),
+        isNull(claude_billing_connection_grants.removed_at),
+        ...(excludeWhere ? [not(excludeWhere)] : [])
+      )
+    )
+    .orderBy(
+      asc(claude_billing_connection_grants.created_at),
+      asc(claude_billing_connection_grants.id)
+    )
+    .limit(1);
+  return grant ?? null;
+}
+
 async function upsertClaudeBillingGrant(
   owner: ClaudeBillingOwner,
   payerConnectionId: string,
   createdBy: string,
-  onDb: WriteDatabase
+  onDb: DrizzleConnection
 ): Promise<void> {
   await onDb
     .insert(claude_billing_connection_grants)
@@ -136,14 +162,14 @@ export async function activateClaudeBillingGrant(
   owner: ClaudeBillingOwner,
   payerConnectionId: string,
   createdBy: string,
-  onDb: WriteDatabase = db
+  onDb: DrizzleConnection = db
 ): Promise<void> {
   await upsertClaudeBillingGrant(owner, payerConnectionId, createdBy, onDb);
 }
 
 async function findGrantedClaudeBillingConnection(
   owner: ClaudeBillingOwner,
-  fromDb: Database
+  fromDb: DrizzleConnection
 ): Promise<ClaudeBillingConnectionRow | null> {
   const [granted] = await fromDb
     .select({
@@ -187,7 +213,7 @@ async function findGrantedClaudeBillingConnection(
  */
 export async function getGrantedClaudeBillingConnection(
   owner: ClaudeBillingOwner,
-  fromDb: Database = db
+  fromDb: DrizzleConnection = db
 ): Promise<ClaudeBillingConnectionRow | null> {
   return await findGrantedClaudeBillingConnection(owner, fromDb);
 }
@@ -211,7 +237,7 @@ function ownerFromColumns(columns: {
 async function freeClaudeBillingOwnerColumns(
   owner: ClaudeBillingOwner,
   exceptPayerId: string | null,
-  onDb: WriteDatabase
+  onDb: DrizzleConnection
 ): Promise<void> {
   const [occupant] = await onDb
     .select()
@@ -226,25 +252,7 @@ async function freeClaudeBillingOwnerColumns(
     .limit(1);
   if (!occupant) return;
 
-  const ownerGrantWhere = claudeBillingGrantOwnerWhere(owner);
-  const [otherGrant] = await onDb
-    .select({
-      kilo_user_id: claude_billing_connection_grants.kilo_user_id,
-      organization_id: claude_billing_connection_grants.organization_id,
-    })
-    .from(claude_billing_connection_grants)
-    .where(
-      and(
-        eq(claude_billing_connection_grants.payer_connection_id, occupant.id),
-        isNull(claude_billing_connection_grants.removed_at),
-        ...(ownerGrantWhere ? [not(ownerGrantWhere)] : [])
-      )
-    )
-    .orderBy(
-      asc(claude_billing_connection_grants.created_at),
-      asc(claude_billing_connection_grants.id)
-    )
-    .limit(1);
+  const otherGrant = await selectNextActiveGrant(onDb, occupant.id, owner);
 
   if (otherGrant) {
     await onDb
@@ -274,7 +282,7 @@ export async function insertClaudeBillingProfile(
   owner: ClaudeBillingOwner,
   userProfileId: string,
   createdBy: string,
-  onDb: WriteDatabase = db
+  onDb: DrizzleConnection = db
 ): Promise<ClaudeBillingConnectionRow> {
   await freeClaudeBillingOwnerColumns(owner, null, onDb);
   await onDb
@@ -327,7 +335,7 @@ export async function shareClaudeBillingConnection(
   sourceOwner: ClaudeBillingOwner,
   targetOwner: ClaudeBillingOwner,
   createdBy: string,
-  onDb: WriteDatabase = db
+  onDb: DrizzleConnection = db
 ): Promise<ClaudeBillingConnectionRow> {
   return await onDb.transaction(async tx => {
     let source = await getGrantedClaudeBillingConnection(sourceOwner, tx);
@@ -415,7 +423,7 @@ export async function shareClaudeBillingConnection(
 }
 
 async function deletePersonalAnthropicByokKey(
-  tx: WriteDatabase,
+  tx: DrizzleConnection,
   kiloUserId: string
 ): Promise<void> {
   await tx
@@ -450,7 +458,7 @@ async function reassignPayerOwnerColumns(
 
 export async function removeClaudeBillingGrant(
   owner: ClaudeBillingOwner,
-  onDb: WriteDatabase = db
+  onDb: DrizzleConnection = db
 ): Promise<UnreferencedClaudeBillingPayer | null> {
   return await onDb.transaction(async tx => {
     let connection = await getGrantedClaudeBillingConnection(owner, tx);
@@ -464,23 +472,7 @@ export async function removeClaudeBillingGrant(
       .update(claude_billing_connection_grants)
       .set({ removed_at: new Date().toISOString() })
       .where(claudeBillingGrantOwnerWhere(owner));
-    const [remaining] = await tx
-      .select({
-        kilo_user_id: claude_billing_connection_grants.kilo_user_id,
-        organization_id: claude_billing_connection_grants.organization_id,
-      })
-      .from(claude_billing_connection_grants)
-      .where(
-        and(
-          eq(claude_billing_connection_grants.payer_connection_id, connection.id),
-          isNull(claude_billing_connection_grants.removed_at)
-        )
-      )
-      .orderBy(
-        asc(claude_billing_connection_grants.created_at),
-        asc(claude_billing_connection_grants.id)
-      )
-      .limit(1);
+    const remaining = await selectNextActiveGrant(tx, connection.id);
 
     if (!remaining) {
       await tx
@@ -550,7 +542,7 @@ export async function describeClaudeBillingSharing(
   targetOwner: ClaudeBillingOwner,
   canManageTarget: boolean,
   current: ClaudeBillingConnectionRow | null,
-  fromDb: Database = db
+  fromDb: DrizzleConnection = db
 ): Promise<ClaudeBillingScopeSharing> {
   const memberships = await fromDb
     .select({
@@ -789,7 +781,7 @@ export async function describeClaudeBillingSharing(
  */
 export async function removeUserClaudeBillingGrants(
   userId: string,
-  onDb: WriteDatabase
+  onDb: DrizzleConnection
 ): Promise<void> {
   await onDb.transaction(async tx => {
     const grantPayers = await tx
@@ -810,23 +802,7 @@ export async function removeUserClaudeBillingGrants(
       .where(eq(claude_billing_connection_grants.kilo_user_id, userId));
 
     for (const payerId of payerIds) {
-      const [remaining] = await tx
-        .select({
-          kilo_user_id: claude_billing_connection_grants.kilo_user_id,
-          organization_id: claude_billing_connection_grants.organization_id,
-        })
-        .from(claude_billing_connection_grants)
-        .where(
-          and(
-            eq(claude_billing_connection_grants.payer_connection_id, payerId),
-            isNull(claude_billing_connection_grants.removed_at)
-          )
-        )
-        .orderBy(
-          asc(claude_billing_connection_grants.created_at),
-          asc(claude_billing_connection_grants.id)
-        )
-        .limit(1);
+      const remaining = await selectNextActiveGrant(tx, payerId);
 
       if (!remaining) {
         await tx

@@ -204,6 +204,42 @@ type GitHubBranch = {
   isDefault: boolean;
 };
 
+/**
+ * One paged read of the repositories an app installation can reach.
+ *
+ * Both callers mint their own token, so this takes the authenticated client and
+ * keeps the archived filter, the projection and the stop condition in one place.
+ */
+async function listInstallationRepositories(octokit: Octokit): Promise<GitHubRepository[]> {
+  const perPage = 100;
+  const repositories: GitHubRepository[] = [];
+  let page = 1;
+
+  while (true) {
+    const { data } = await octokit.apps.listReposAccessibleToInstallation({
+      per_page: perPage,
+      page,
+    });
+
+    repositories.push(
+      ...data.repositories
+        .filter(repository => !repository.archived)
+        .map(repository => ({
+          id: repository.id,
+          name: repository.name,
+          full_name: repository.full_name,
+          private: repository.private,
+          created_at: repository.created_at ?? new Date().toISOString(),
+        }))
+    );
+
+    if (data.repositories.length < perPage) break;
+    page++;
+  }
+
+  return repositories;
+}
+
 export async function fetchGitHubRepositories(
   installationId: string,
   appType: GitHubAppType = 'standard',
@@ -216,35 +252,7 @@ export async function fetchGitHubRepositories(
     expectedIntegrationId,
     purpose
   );
-  const octokit = new Octokit({ auth: tokenData.token });
-
-  const repositories: GitHubRepository[] = [];
-  let page = 1;
-  const perPage = 100;
-
-  while (true) {
-    const { data } = await octokit.apps.listReposAccessibleToInstallation({
-      per_page: 100,
-      page,
-    });
-
-    repositories.push(
-      ...data.repositories
-        .filter(repo => !repo.archived)
-        .map(repo => ({
-          id: repo.id,
-          name: repo.name,
-          full_name: repo.full_name,
-          private: repo.private,
-          created_at: repo.created_at ?? new Date().toISOString(),
-        }))
-    );
-
-    if (data.repositories.length < perPage) break;
-    page++;
-  }
-
-  return repositories;
+  return listInstallationRepositories(new Octokit({ auth: tokenData.token }));
 }
 
 export async function fetchGitHubRepositoriesForMaintenance(
@@ -252,26 +260,7 @@ export async function fetchGitHubRepositoriesForMaintenance(
   appType: GitHubAppType
 ): Promise<GitHubRepository[]> {
   const tokenData = await generateGitHubInstallationTokenForMaintenance(installationId, appType);
-  const octokit = new Octokit({ auth: tokenData.token });
-  const repositories: GitHubRepository[] = [];
-  let page = 1;
-  while (true) {
-    const response = await octokit.apps.listReposAccessibleToInstallation({ per_page: 100, page });
-    repositories.push(
-      ...response.data.repositories
-        .filter(repository => !repository.archived)
-        .map(repository => ({
-          id: repository.id,
-          name: repository.name,
-          full_name: repository.full_name,
-          private: repository.private,
-          created_at: repository.created_at ?? new Date().toISOString(),
-        }))
-    );
-    if (response.data.repositories.length < 100) break;
-    page += 1;
-  }
-  return repositories;
+  return listInstallationRepositories(new Octokit({ auth: tokenData.token }));
 }
 
 export async function fetchGitHubBranches(

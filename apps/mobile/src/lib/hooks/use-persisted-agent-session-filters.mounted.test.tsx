@@ -121,6 +121,23 @@ describe('usePersistedAgentSessionFilters persistence', () => {
     expect(api().platformFilter).toEqual([]);
   });
 
+  it('does not write anything when Apply repeats the defaults a failed read left on screen', async () => {
+    // Regression: Apply marked the filters edited whatever it sent, so tapping
+    // it without changing a selection wrote the defaults over the record the
+    // failed read could not load.
+    store.read.mockRejectedValue(new Error('the keychain is locked'));
+    const api = mount();
+    await flush();
+    expect(toasts.error).toHaveBeenCalledExactlyOnceWith('common.couldnTLoad');
+
+    act(() => {
+      api().setFilters({ platformFilter: [], projectFilter: [] });
+    });
+    await flush();
+
+    expect(store.write).not.toHaveBeenCalled();
+  });
+
   it('writes two rapid edits in order, behind one shared save chain', async () => {
     store.read.mockResolvedValue(null);
     const api = mount();

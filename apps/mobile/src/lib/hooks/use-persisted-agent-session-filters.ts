@@ -102,18 +102,29 @@ export function usePersistedAgentSessionFilters(storageKey: string) {
     setSaved(prev => (prev.kind === 'unreadable' ? { kind: 'unreadable', edited: true } : prev));
   }, []);
 
-  const setFilters = useCallback(
+  /*
+   * A load that could not read the stored filters leaves the defaults on
+   * screen, and the filter sheet's Apply sends its draft whether or not the
+   * person changed it. Only a real change may mark the filters edited: a no-op
+   * Apply would otherwise write those defaults over the record the read could
+   * not load, which is the overwrite this state exists to prevent.
+   */
+  const applyFilters = useCallback(
     (next: AgentSessionFilters) => {
+      if (sameAgentSessionFilters(next, filters)) {
+        return;
+      }
       markEdited();
       setFiltersState(next);
     },
-    [markEdited]
+    [filters, markEdited]
   );
 
+  const setFilters = applyFilters;
+
   const clearFilters = useCallback(() => {
-    markEdited();
-    setFiltersState(createDefaultAgentSessionFilters());
-  }, [markEdited]);
+    applyFilters(createDefaultAgentSessionFilters());
+  }, [applyFilters]);
 
   const setPlatformFilter = useCallback(
     (updater: StringArrayUpdater) => {

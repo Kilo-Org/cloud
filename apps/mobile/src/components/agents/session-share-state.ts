@@ -5,7 +5,10 @@ import { type ShareCopyState } from './session-share-active-link';
 /** A link this sheet created, and what is known about it. */
 export type CreatedLink = {
   readonly url: string;
-  /** The identity the worker created. `null` only while a worker older than the app answers. */
+  /**
+   * The identity the worker created. `null` while a web server older than this
+   * response field answers, whose reply carries the token alone.
+   */
   readonly publicId: string | null;
   /** When the create landed, so a read that started before it cannot judge the link. */
   readonly at: number;

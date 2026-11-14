@@ -19,7 +19,7 @@ type ShareQueryState = {
 
 type ShareHandler = (created: {
   share_token: string;
-  public_id: string | null;
+  public_id?: string | null;
 }) => Promise<void> | void;
 
 /** What the section asks the share mutation to create. */
@@ -258,7 +258,12 @@ describe('SessionShareSection state gates', () => {
 });
 
 describe('SessionShareSection created link', () => {
-  async function renderCreatedLink(): Promise<Renderer> {
+  async function renderCreatedLink(
+    created: { share_token: string; public_id?: string | null } = {
+      share_token: 'tok_1',
+      public_id: 'share_1',
+    }
+  ): Promise<Renderer> {
     holder.queryState = {
       ...holder.queryState,
       data: { public_id: 'share_1' },
@@ -271,7 +276,7 @@ describe('SessionShareSection created link', () => {
       throw new Error('the share mutation was not registered');
     }
     await act(async () => {
-      await onSuccess({ share_token: 'tok_1', public_id: 'share_1' });
+      await onSuccess(created);
     });
     return renderer;
   }
@@ -287,6 +292,23 @@ describe('SessionShareSection created link', () => {
     const renderer = await renderCreatedLink();
 
     // A read taken after the create that names the same capability: still live.
+    holder.queryState = {
+      ...holder.queryState,
+      data: { public_id: 'share_1' },
+      dataUpdatedAt: Date.now() + 1_000,
+    };
+    rerenderSection(renderer);
+
+    expect(findByTestID(renderer.root, 'session-share-url')).toHaveLength(1);
+    expect(findByTestID(renderer.root, 'session-share-superseded')).toHaveLength(0);
+  });
+
+  it('keeps the link when an older web server answers without a capability', async () => {
+    /* A web server older than the create response's capability field answers
+       with the token alone. There is nothing to compare, so the link must not
+       look replaced once the read reports the identity the worker wrote. */
+    const renderer = await renderCreatedLink({ share_token: 'tok_1' });
+
     holder.queryState = {
       ...holder.queryState,
       data: { public_id: 'share_1' },

@@ -69,7 +69,7 @@ export function SessionShareSection({
       const { WEB_BASE_URL } = await import('@/lib/config');
       setCreated({
         url: `${WEB_BASE_URL}/s/${shared.share_token}`,
-        publicId: shared.public_id,
+        publicId: shared.public_id ?? null,
         at: Date.now(),
         copy: 'idle',
       });

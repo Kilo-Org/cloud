@@ -10,6 +10,7 @@ import {
   CODE_FIRST_PAINT_CHUNKS,
   fenceWalkCacheStatsForTests,
   releaseFenceChunkWalk,
+  retainFenceChunkWalk,
   tokenizeCodeLines,
 } from './code-block-model';
 
@@ -108,6 +109,44 @@ describe('chunkCodeLines lazy highlighting', () => {
 
     expect(page.chunks).toEqual(expected);
   });
+
+  it('keeps a retained fence walk when another fence exceeds the budget', () => {
+    // Regression: the holder count lived in a map beside the cache and eviction
+    // never consulted it, so another fence's `set` evicted the walk a mounted
+    // block still held. Its next batch then re-walked from line 0 and
+    // re-highlighted the prefix it had already placed.
+    const held = Array.from({ length: 400 }, (_, index) => `const held${index} = ${index};`).join(
+      '\n'
+    );
+    chunkCodeLines(held, 'typescript', CODE_FIRST_PAINT_CHUNKS);
+    retainFenceChunkWalk(held, 'typescript');
+    const highlightedPrefix = [...highlightCalls.lines];
+    expect(highlightedPrefix.length).toBeGreaterThan(0);
+
+    const overBudget = Array.from(
+      { length: 3200 },
+      (_, index) => `const big${index} = ${'x'.repeat(700)};`
+    ).join('\n');
+    expect(overBudget.length).toBeGreaterThan(2_000_000);
+    chunkCodeLines(overBudget, null, CODE_FIRST_PAINT_CHUNKS);
+    expect(fenceWalkCacheStatsForTests()).toMatchObject({ entries: 2, held: 1 });
+
+    highlightCalls.lines = [];
+    const mounted = CODE_FIRST_PAINT_CHUNKS + CODE_CHUNK_MOUNT_BATCH;
+    const page = chunkCodeLines(held, 'typescript', mounted);
+    expect(page.chunks.length).toBeGreaterThan(CODE_FIRST_PAINT_CHUNKS);
+
+    // The batch continues past the prefix instead of repeating it.
+    const newlyHighlighted = highlightCalls.lines;
+    expect(newlyHighlighted.length).toBeGreaterThan(0);
+    const alreadyHighlighted = new Set(highlightedPrefix);
+    expect(newlyHighlighted.filter(line => alreadyHighlighted.has(line))).toEqual([]);
+    expect(newlyHighlighted).toEqual(
+      held
+        .split('\n')
+        .slice(highlightedPrefix.length, highlightedPrefix.length + newlyHighlighted.length)
+    );
+  });
 });
 
 describe('fence walk cache accounting', () => {
@@ -141,7 +180,7 @@ describe('fence walk cache accounting', () => {
     // The entry is dropped on the task after the release, so a block mounting
     // the same fence in that commit keeps it.
     await Promise.resolve();
-    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0 });
+    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0, held: 0 });
 
     // A released fence highlights its lines again, because nothing is retained.
     highlightCalls.lines = [];

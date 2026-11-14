@@ -130,4 +130,50 @@ describe('ActivityIndicator reduced-motion fallback', () => {
 
     renderer.unmount();
   });
+
+  // The native indicator's own measurement can be near zero inside a fixed-size
+  // parent, so both branches own the same box. The caller style stays first in
+  // the array and the pinned dimension last.
+  const sizeRows: [IndicatorProps['size'], number][] = [
+    [undefined, 20],
+    ['small', 20],
+    ['large', 36],
+    [48, 48],
+  ];
+
+  it.each<[IndicatorProps['size'], number]>(sizeRows)(
+    'pins the reduced-motion marker box for size %s',
+    async (size, dimension) => {
+      const renderer = await mount({ size, style: { marginTop: 3 } });
+
+      const wrapper = fallback(renderer.root);
+      expect(wrapper.props.style).toEqual([
+        { marginTop: 3 },
+        { width: dimension, height: dimension },
+      ]);
+      expect(byType(wrapper, 'Loader2')[0]?.props.size).toBe(dimension);
+
+      renderer.unmount();
+    }
+  );
+
+  it.each<[IndicatorProps['size'], number]>(sizeRows)(
+    'pins the native indicator box for size %s',
+    async (size, dimension) => {
+      motion.reducedMotion = false;
+      const renderer = await mount({ size, style: { marginTop: 3 } });
+
+      const [indicator] = byType(renderer.root, 'ActivityIndicator');
+      // `size = 'small'` is the component default, so an undefined prop still
+      // reaches the platform control as `'small'`.
+      expect(indicator?.props.size).toBe(size ?? 'small');
+      expect(indicator?.props.style).toEqual([
+        { marginTop: 3 },
+        { width: dimension, height: dimension },
+      ]);
+      expect(byType(renderer.root, 'View')).toHaveLength(0);
+
+      renderer.unmount();
+    }
+  );
 });

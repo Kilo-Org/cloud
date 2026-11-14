@@ -11,7 +11,7 @@
 
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   BackHandler,
@@ -21,10 +21,7 @@ import {
   type TextInput,
   View,
 } from 'react-native';
-import {
-  ComposerInlineError,
-  type ComposerInlineErrorKind,
-} from '@/components/pr-review/composer-inline-error';
+import { ComposerInlineError } from '@/components/pr-review/composer-inline-error';
 import { PrFormSheetFooter, PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
 import { CommentBodyField } from '@/components/pr-review/pr-review-comment-composer-parts';
 import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
@@ -33,22 +30,17 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { clearDraft, prConversationCommentDraftKey, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
-import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
-import { reconnectExpiredMessage } from '@/lib/pr-review/mutation-error-display';
-import {
-  isPrOperationAmbiguous,
-  isPrOperationPersistenceFailed,
-} from '@/lib/pr-review/merge/pr-operation-ledger';
+import { classifyPrInlineFailure, type PrInlineFailure } from '@/lib/pr-review/inline-failure';
 import {
   type ProviderPrRef,
   providerPrRefKey,
   providerPrRefLabel,
 } from '@/lib/pr-review/provider-pr-ref';
 import { useAddPrCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
-import { i18n } from '@/i18n';
 
 type PrConversationCommentComposerProps = Readonly<{
   owner: string;
@@ -71,6 +63,14 @@ type PrConversationCommentComposerProps = Readonly<{
   onDismiss: () => void;
 }>;
 
+/** Failure kinds whose recovery lives outside the Comment button. */
+const SUBMIT_BLOCKING = new Set<PrInlineFailure['kind']>([
+  'body-empty',
+  'not-recorded',
+  'forbidden',
+  'reconnect',
+]);
+
 export function PrConversationCommentComposer({
   owner,
   repo,
@@ -82,9 +82,6 @@ export function PrConversationCommentComposer({
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const addComment = useAddPrCommentMutation(prRef);
-  // The provider platform as a stable primitive: the error effect names the
-  // connected provider without depending on the `prRef` object identity.
-  const providerPlatform = prRef?.platform;
 
   // Durable comment draft, keyed by account and PR. Nothing is saved or
   // restored while the user id is unknown.
@@ -110,18 +107,9 @@ export function PrConversationCommentComposer({
     bodyRef.current = draft.value ?? '';
   }
 
-  const [inlineError, setInlineError] = useState<string | null>(null);
-  const [inlineErrorKind, setInlineErrorKind] = useState<ComposerInlineErrorKind>(null);
-  const [inlineErrorIsLocal, setInlineErrorIsLocal] = useState(false);
-  // The ONLY server failure that must block a retry is the ledger persistence
-  // marker (the row never became `reconcile_pending`, so the ambiguous-outcome
-  // promise does not hold). Every other server rejection — bad-request
-  // included — keeps Comment enabled: the failed post must never dead-end the
-  // composer, and a blind retry is ledger-safe (non-retryable failures rotate
-  // the operation key, retryable ones dedupe on the same key).
-  const [retryBlocked, setRetryBlocked] = useState(false);
+  const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<PrInlineFailure>();
 
-  const isSubmitting = addComment.isPending;
+  const isSubmitting = feedback.status === 'pending';
 
   // automaticallyAdjustKeyboardInsets can scroll the focused field under the
   // pinned header. Compact kb layout fits at offset 0 — snap back so body +
@@ -137,126 +125,62 @@ export function PrConversationCommentComposer({
     };
   }, []);
 
-  // Mirror the mutation error into the inline box (ReplyInput's inline
-  // classification). The add-comment mutation is NOT optimistic, so the user
-  // can hit the inline error and retry without waiting for a re-fetch. Every
-  // failure path preserves the draft, and every failure path except the
-  // retry-blocking ledger marker re-enables Comment for the retry.
-  useEffect(() => {
-    if (!addComment.error) {
-      return;
-    }
-    setInlineErrorIsLocal(false);
-    // The ledger persistence-failure marker is retry-blocking: the same
-    // operation key must not be retried.
-    if (isPrOperationPersistenceFailed(addComment.error)) {
-      setInlineError(i18n.t('common.actionNotRecorded'));
-      setInlineErrorKind('bad-request');
-      setRetryBlocked(true);
-      return;
-    }
-    setRetryBlocked(false);
-    const classification = classifyPrReviewMutationError(addComment.error);
-    if (isPrOperationAmbiguous(addComment.error)) {
-      // The effect may have committed: the user must verify the PR, not be
-      // shown the generic retryable copy. Retry stays enabled.
-      setInlineError(i18n.t('prReview.operation.ambiguous'));
-      setInlineErrorKind('retryable');
-    } else if (classification.kind === 'terms-required') {
-      void (async () => {
-        const outcome = await ensureTermsAcceptedOutcome();
-        if (outcome.kind === 'accepted') {
-          setInlineError(null);
-          setInlineErrorKind(null);
-        } else if (outcome.kind === 'outdated') {
-          setInlineError(t('prReview.discussion.termsOutdatedCopy'));
-          setInlineErrorKind('bad-request');
-        } else if (outcome.kind === 'unknown') {
-          setInlineError(t('prReview.discussion.termsCheckRetryCopy'));
-          setInlineErrorKind('retryable');
-        } else {
-          setInlineError(t('prReview.discussion.termsAcceptRequired'));
-          setInlineErrorKind(null);
-          setInlineErrorIsLocal(true);
-        }
-      })();
-    } else if (classification.kind === 'bad-request') {
-      setInlineError(t('prReview.discussion.commentBadRequest'));
-      setInlineErrorKind('bad-request');
-    } else if (classification.kind === 'forbidden') {
-      // The provider-permission fallback: the PR DTO carries no can-comment
-      // signal, so a permission rejection surfaces here as inline copy.
-      setInlineError(t('prReview.discussion.commentForbidden'));
-      setInlineErrorKind('forbidden');
-    } else if (classification.kind === 'reconnect') {
-      setInlineError(reconnectExpiredMessage(providerPlatform));
-      setInlineErrorKind('reconnect');
-    } else {
-      // A generic/transient failure shows the specified retryable copy, never
-      // the raw provider error (the backend's GitHub access/install text is
-      // actionable to nobody; the toast and the inline box must agree). The
-      // draft stays intact and Comment stays enabled for the retry (uxs3 spot
-      // check, e6-offline-banner).
-      setInlineError(t('prReview.mutationError.couldNotPostComment'));
-      setInlineErrorKind('retryable');
-    }
-  }, [addComment.error, t, providerPlatform]);
-
   function handleBodyChange(value: string) {
     bodyRef.current = value;
-    // A bad-request error clears on body edit — including the retry-blocking
+    // An edit retires the recoverable rejections — including the ledger
     // persistence marker, whose edit changes the intent fingerprint anyway;
     // forbidden/reconnect stay until the next submit.
-    if (inlineErrorKind === 'bad-request') {
-      setInlineError(null);
-      setInlineErrorKind(null);
-      setInlineErrorIsLocal(false);
-      setRetryBlocked(false);
-    }
+    clearWhere(
+      f => f.kind === 'bad-request' || f.kind === 'not-recorded' || f.kind === 'body-empty'
+    );
     if (userId) {
       saveDraft(userId, commentDraftKey, value);
     }
   }
 
   async function handleSubmit() {
-    if (addComment.isPending) {
-      return;
+    const attempt = begin();
+    if (attempt === null) {
+      return; // one post in flight, admitted before any await
     }
     const body = bodyRef.current;
     if (body.trim().length === 0) {
-      setInlineError(t('prReview.composer.bodyEmpty'));
-      setInlineErrorKind('bad-request');
-      setInlineErrorIsLocal(true);
+      attempt.fail({
+        kind: 'body-empty',
+        message: t('prReview.composer.bodyEmpty'),
+        announce: 'here',
+      });
       return;
     }
-    setInlineError(null);
-    setInlineErrorKind(null);
-    setInlineErrorIsLocal(false);
-    setRetryBlocked(false);
     // Confirmed offline: fail the submit at once with the retryable copy
     // instead of starting a request that hangs on the UI deadline behind a
     // spinner with a disabled Cancel (uxs3 spot check, e6-offline-hang). The
     // draft stays intact, nothing is pending, and the same tap retries once
-    // the banner clears. This is a local rejection with no toast owner, so it
-    // announces through AccessibleStatus.
+    // the banner clears.
     if (getCommittedConnectivityStatus() === 'offline') {
-      setInlineError(t('prReview.mutationError.couldNotPostComment'));
-      setInlineErrorKind('retryable');
-      setInlineErrorIsLocal(true);
+      attempt.fail({
+        kind: 'retryable',
+        message: t('prReview.mutationError.couldNotPostComment'),
+        announce: 'here',
+      });
       return;
     }
     const outcome = await ensureTermsAcceptedOutcome();
-    if (outcome.kind === 'outdated') {
-      setInlineError(t('prReview.discussion.termsOutdatedCopy'));
-      setInlineErrorKind('bad-request');
-      setInlineErrorIsLocal(false);
+    if (outcome.kind === 'dismissed') {
+      attempt.abandon();
       return;
     }
-    if (outcome.kind === 'dismissed') {
+    if (outcome.kind === 'outdated') {
+      attempt.fail({
+        kind: 'bad-request',
+        message: t('prReview.discussion.termsOutdatedCopy'),
+        announce: 'toast',
+      });
       return;
     }
     try {
       await addComment.mutateAsync({ owner, repo, number, body });
+      attempt.succeed();
       if (userId) {
         void clearDraft(userId, commentDraftKey);
       }
@@ -264,14 +188,23 @@ export function PrConversationCommentComposer({
       // The mutation hook announces success for a11y; its settle invalidation
       // renders the posted comment in the discussion behind the sheet.
       onDismiss();
-    } catch {
-      // Classified into the inline box by the effect above; the draft is
-      // preserved so the user can retry.
+    } catch (error) {
+      // A server bad-request keeps Comment live: the ledger dedupes the retry.
+      const classified = await classifyPrInlineFailure(error, {
+        surface: 'composer',
+        ...(prRef ? { platform: prRef.platform } : {}),
+        announce: 'toast',
+      });
+      if (classified.kind === 'failure') {
+        attempt.fail(classified.failure);
+      } else {
+        attempt.abandon();
+      }
     }
   }
 
   function handleCancel() {
-    if (addComment.isPending) {
+    if (isSubmitting) {
       return;
     }
     if (bodyRef.current.trim().length > 0) {
@@ -293,9 +226,14 @@ export function PrConversationCommentComposer({
             if (userId) {
               const cleared = await clearDraft(userId, commentDraftKey);
               if (!cleared) {
-                setInlineError(t('agentChat.newSession.discardFailed'));
-                setInlineErrorKind('retryable');
-                setInlineErrorIsLocal(true);
+                const attempt = begin();
+                if (attempt !== null) {
+                  attempt.fail({
+                    kind: 'retryable',
+                    message: t('agentChat.newSession.discardFailed'),
+                    announce: 'here',
+                  });
+                }
                 return;
               }
             }
@@ -337,16 +275,13 @@ export function PrConversationCommentComposer({
   }, []);
 
   // A failed post never dead-ends the composer: only the LOCAL empty-body
-  // validation and the retry-blocking persistence marker keep Comment down
-  // (both clear on the next edit or submit). forbidden/reconnect stay down
-  // because their recovery lives outside the submit button (the reconnect
-  // notice CTA / leaving the sheet); a server bad-request stays retryable so
-  // the user can re-post without retyping — the ledger dedupes the retry.
+  // validation and the ledger persistence marker keep Comment down (both clear
+  // on the next edit or submit). forbidden/reconnect stay down because their
+  // recovery lives outside the submit button (the reconnect notice CTA /
+  // leaving the sheet); a server bad-request stays retryable so the user can
+  // re-post without retyping — the ledger dedupes the retry.
   const submitDisabled =
-    isSubmitting ||
-    (inlineErrorKind === 'bad-request' && (inlineErrorIsLocal || retryBlocked)) ||
-    inlineErrorKind === 'forbidden' ||
-    inlineErrorKind === 'reconnect';
+    isSubmitting || (failure !== null && SUBMIT_BLOCKING.has(failure.kind));
 
   // PickerSheet invariant: [header, ScrollView] as direct children (no
   // wrapper View, no sticky-footer sibling). Footer is trailing scroll
@@ -381,11 +316,7 @@ export function PrConversationCommentComposer({
               onChangeText={handleBodyChange}
             />
           ) : null}
-          <ComposerInlineError
-            inlineError={inlineError}
-            inlineErrorKind={inlineErrorKind}
-            inlineErrorIsLocal={inlineErrorIsLocal}
-          />
+          <ComposerInlineError feedback={feedback} />
         </View>
 
         <PrFormSheetFooter>

@@ -416,8 +416,9 @@ const VISIBILITY_KEYS = [
  * Agent-editor labels that read the same in every catalog, aside from the
  * separator shape above: `profiles.agents.topP` is the sampling parameter's
  * published name, so a translated word would hide which parameter the field
- * sets. The allowlist exempts the key from the "equals English everywhere"
- * failure; this is the positive requirement that replaces it.
+ * sets. This list is the only registration such a key needs: `checkVerbatimLabels`
+ * requires the key to read English everywhere, and the untranslated check
+ * exempts the same key from the "equals English everywhere" failure.
  */
 const VERBATIM_KEYS = ['profiles.agents.topP'];
 

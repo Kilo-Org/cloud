@@ -96,6 +96,16 @@ jest.mock('@/lib/bot-identity', () => ({
 jest.mock('@/lib/bot/linear-link-state', () => ({
   verifyLinearBotLinkState: jest.fn(() => null),
 }));
+// `chat` ships ESM-only, so jest cannot require it; the install flow never
+// deserializes a chat message.
+jest.mock(
+  'chat',
+  () => ({
+    Message: { fromJSON: jest.fn((value: unknown) => value) },
+    ThreadImpl: { fromJSON: jest.fn((value: unknown) => value) },
+  }),
+  { virtual: true }
+);
 jest.mock('@/lib/bot/platform-helpers', () => ({
   getPlatformIntegrationById: jest.fn(),
   canKiloUserAccessPlatformIntegration: jest.fn(),

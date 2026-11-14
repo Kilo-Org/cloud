@@ -63,6 +63,9 @@ vi.mock('expo-router', () => ({
         set.delete(listener);
       };
     },
+    // This route alone, with no scene below it: the dismissal names no reveal
+    // scene and the window settles as it always did.
+    getState: () => ({ index: 0, routes: [{ key: 'route-this' }] }),
   }),
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));

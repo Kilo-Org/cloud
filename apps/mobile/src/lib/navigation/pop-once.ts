@@ -73,7 +73,15 @@ export function usePopOnce(): () => void {
     if (!navigation.isFocused() || insideLeaveSettle() || backAcceptedBy(routeId)) {
       return;
     }
-    armLeaveSettle();
+    // The scene this route reveals: the one below it in the stack, whose
+    // appearance transition carries this screen away. A stack that names no
+    // scene below this route settles as before, so the leave keeps its
+    // protection.
+    const revealKey = () => {
+      const state = navigation.getState();
+      return state === undefined ? undefined : state.routes[state.index - 1]?.key;
+    };
+    armLeaveSettle(revealKey());
     router.back();
   }, [navigation, routeId, router]);
 }

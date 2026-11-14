@@ -72,6 +72,10 @@ function CoveredScreenA11yGate({
  * signal: a wall-clock span would have to guess the JavaScript commit plus the
  * platform transition, and a loaded device lengthens both. The grace then covers
  * the press of a reader still acting on the screen that went.
+ *
+ * The listener is mounted on every scene of every stack, so it reports this
+ * scene's own key: an end that belongs to another scene — a tab switch, or a
+ * push that completes while a leave is pending — cannot end that leave.
  */
 function SettledLeaveEndsWithThisScene({
   navigation,
@@ -81,7 +85,13 @@ function SettledLeaveEndsWithThisScene({
   useEffect(() => {
     const unsubscribe = navigation.addListener('transitionEnd', event => {
       if (!event.data.closing) {
-        settleLeaveWindow();
+        // This scene's own route key, so a leave armed for another scene is not
+        // settled here. A stack that names no scene settles as before.
+        const sceneKey = () => {
+          const state = navigation.getState();
+          return state.routes[state.index]?.key;
+        };
+        settleLeaveWindow(sceneKey());
       }
     });
     return unsubscribe;

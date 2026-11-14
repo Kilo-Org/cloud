@@ -34,6 +34,21 @@
 let dismissing = false;
 
 /**
+ * The key of the scene the dismissal revealed; `undefined` while no leave is
+ * open, and when the dismissing screen could not name that scene.
+ *
+ * The settle listener is mounted on every scene of every stack, so an unrelated
+ * transition end — a tab switch, or a push that completes while a leave is
+ * pending — can arrive first. This key ties the end to the one scene that
+ * carried the dismissing screen away, and to no other.
+ *
+ * It fails open: when either side cannot name its scene, the end still settles
+ * the window, so a screen never loses its protection because a navigator could
+ * not name itself.
+ */
+let leaveRevealKey: string | undefined = undefined;
+
+/**
  * When the grace after the animation ends; `0` while no grace is open.
  *
  * An instant rather than a flag, so the grace needs no timer of its own: the
@@ -78,11 +93,16 @@ function clearBackstop(): void {
 /**
  * Record that this screen is dismissing itself for its own reason, not a Back.
  *
+ * `revealKey` names the scene the dismissal reveals, which is the scene below
+ * the dismissing one in its stack. `settleLeaveWindow` needs that name to tell
+ * that scene's end from any other scene's end.
+ *
  * A new dismissal closes any grace still open: the press that grace covered
  * belonged to the leave that just ended.
  */
-export function armLeaveSettle(): void {
+export function armLeaveSettle(revealKey?: string): void {
   dismissing = true;
+  leaveRevealKey = revealKey;
   graceUntil = 0;
   clearBackstop();
   backstop = setTimeout(endLeaveSettle, LEAVE_SETTLE_BACKSTOP_MS);
@@ -91,16 +111,23 @@ export function armLeaveSettle(): void {
 /**
  * End the leave's animation and open the grace that follows it.
  *
- * The revealed scene's transition end calls this. Every scene reports its own
- * appearance transition on every push and tab switch, so this does nothing
- * unless this app opened a leave window: a press after an ordinary push belongs
- * to the screen that push revealed.
+ * The revealed scene's transition end calls this with its own route key. Every
+ * scene reports its own appearance transition on every push and tab switch, so
+ * an end whose key differs from the one the dismissal named belongs to another
+ * scene and changes nothing here.
+ *
+ * It fails open: when the dismissal named no scene, or this end carries no key,
+ * the end settles the window as before.
  */
-export function settleLeaveWindow(): void {
+export function settleLeaveWindow(sceneKey?: string): void {
   if (!dismissing) {
     return;
   }
+  if (leaveRevealKey !== undefined && sceneKey !== undefined && leaveRevealKey !== sceneKey) {
+    return;
+  }
   dismissing = false;
+  leaveRevealKey = undefined;
   graceUntil = Date.now() + LEAVE_SETTLE_GRACE_MS;
   clearBackstop();
 }
@@ -109,10 +136,12 @@ export function settleLeaveWindow(): void {
  * Close the window and its grace at once.
  *
  * The shell calls this when it spends a press, and `resetLeaveSettle` calls it
- * for tests that assert from a known state.
+ * for tests that assert from a known state. No leave stays open, so the scene
+ * name goes with it.
  */
 export function endLeaveSettle(): void {
   dismissing = false;
+  leaveRevealKey = undefined;
   graceUntil = 0;
   clearBackstop();
 }

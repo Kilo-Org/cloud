@@ -108,7 +108,7 @@ describe('leave grace', () => {
     expect(spendsLeaveBackPress()).toBe(false);
   });
 
-  it('closes an open grace when a later dismissal starts', () => {
+  it('measures the second leave’s grace from its own end', () => {
     armLeaveSettle();
     settleLeaveWindow();
     vi.advanceTimersByTime(LEAVE_SETTLE_GRACE_MS - 100);
@@ -136,6 +136,45 @@ describe('leave grace', () => {
     settleLeaveWindow();
     expect(insideLeaveSettle()).toBe(false);
     expect(spendsLeaveBackPress()).toBe(false);
+  });
+});
+
+describe('reveal attribution', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('holds the window when another scene reports its transition end', () => {
+    armLeaveSettle('scene-reveal');
+    // A tab switch or a push reports its own end while this leave is pending.
+    settleLeaveWindow('scene-other');
+    expect(insideLeaveSettle()).toBe(true);
+    expect(spendsLeaveBackPress()).toBe(true);
+  });
+
+  it('settles when the scene the dismissal revealed reports its end', () => {
+    armLeaveSettle('scene-reveal');
+    settleLeaveWindow('scene-reveal');
+    expect(insideLeaveSettle()).toBe(false);
+    expect(spendsLeaveBackPress()).toBe(true);
+  });
+
+  it('settles on any scene when the dismissal named no scene', () => {
+    armLeaveSettle();
+    settleLeaveWindow('scene-other');
+    expect(insideLeaveSettle()).toBe(false);
+    expect(spendsLeaveBackPress()).toBe(true);
+  });
+
+  it('settles a named leave when the transition end carries no key', () => {
+    armLeaveSettle('scene-reveal');
+    settleLeaveWindow();
+    expect(insideLeaveSettle()).toBe(false);
+    expect(spendsLeaveBackPress()).toBe(true);
   });
 });
 

@@ -655,7 +655,9 @@ describe('PartDetailSheetHost mounted', () => {
   });
 
   it('closes when the native close and dismissal report in one act', async () => {
-    const renderer = await mountHost([makeMessage('m1', [makeBashPart('bash-1', 'echo one', true)])]);
+    const renderer = await mountHost([
+      makeMessage('m1', [makeBashPart('bash-1', 'echo one', true)]),
+    ]);
     try {
       await act(() => {
         capturedOpener?.('bash-1');

@@ -14,11 +14,11 @@ import {
   followSession,
   isSessionFollowed,
   restoreFollowedSessionCards,
-  restoreFollowedSessionCardsFromStorage,
   syncFollowedSessionCards,
   unfollowDismissedSession,
   unfollowSession,
 } from './session-follow';
+import { restoreFollowedSessionCardsFromStorage } from './session-follow-storage';
 import { _setStoredContextReaderForTests } from './session-stored-context';
 
 const mocks = vi.hoisted(() => ({

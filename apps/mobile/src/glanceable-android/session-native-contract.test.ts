@@ -142,7 +142,7 @@ describe('SessionNotifications', () => {
 
   it('starts restoration even when registration loads after the app became active', () => {
     expect(REGISTER).toMatch(
-      /if \(AppState\.currentState === 'active'\) \{\s+void sessionFollow\(\)\.restoreFollowedSessionCardsFromStorage\(\)/
+      /if \(AppState\.currentState === 'active'\) \{\s+void sessionFollowStorage\(\)\.restoreFollowedSessionCardsFromStorage\(\)/
     );
   });
 

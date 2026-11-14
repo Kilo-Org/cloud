@@ -306,6 +306,34 @@ describe('CodeReviewerAnalytics period labels', () => {
   });
 });
 
+describe('CodeReviewerAnalytics empty state', () => {
+  it('drops the generic description when analytics is off and keeps it when analytics is on', () => {
+    queries.dashboard.data = { ...dashboard, settings: { enabled: false } };
+    const offRenderer = mountScreen();
+
+    const offTexts = findByType(offRenderer.root, 'TextMock').map(node => node.props.children);
+    expect(offTexts).toContain('Analytics is off for this organization.');
+    const offEmpty = findByType(offRenderer.root, 'EmptyStateMock')[0];
+    expect(offEmpty?.props.title).toBe('No reviews with analytics yet');
+    expect(offEmpty?.props.description).toBeUndefined();
+
+    act(() => {
+      offRenderer.unmount();
+    });
+
+    queries.dashboard.data = dashboard;
+    const onRenderer = mountScreen();
+
+    expect(findByType(onRenderer.root, 'EmptyStateMock')[0]?.props.description).toBe(
+      'Analytics records completed reviews while it is enabled for the organization.'
+    );
+
+    act(() => {
+      onRenderer.unmount();
+    });
+  });
+});
+
 describe('CodeReviewerAnalytics header', () => {
   it('titles the screen with the organization and keeps the screen name as the eyebrow', () => {
     const renderer = mountScreen();

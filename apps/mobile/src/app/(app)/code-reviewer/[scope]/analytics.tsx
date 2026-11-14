@@ -192,11 +192,15 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
         </View>
 
         {repositories.length === 0 ? (
+          // The muted note above already says analytics is off, so the generic
+          // description would restate it.
           <EmptyState
             placement="static"
             icon={LineChart}
             title={t('codeReviewer.analytics.empty')}
-            description={t('codeReviewer.analytics.emptyDescription')}
+            description={
+              settings.enabled ? t('codeReviewer.analytics.emptyDescription') : undefined
+            }
           />
         ) : (
           <View className="gap-2">

@@ -237,6 +237,28 @@ describe('ack store state machine', () => {
     ).toBe(true);
   });
 
+  it('a different status dated before a status-only ack is not answered by it', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-12T10:00:00.000Z'));
+    ackSessionAttention('s1', 'permission');
+
+    /* A question raised before the permission was answered is a different raise:
+       the answer names a permission, so nothing about it answers a question. */
+    expect(
+      isAttentionAcked('s1', { raiseId: '2026-10-12T09:59:30.000Z', status: 'question' })
+    ).toBe(false);
+    expect(
+      shouldShowNeedsInput({
+        status: 'question',
+        raiseId: '2026-10-12T09:59:30.000Z',
+        isAcked: isAttentionAcked('s1', {
+          raiseId: '2026-10-12T09:59:30.000Z',
+          status: 'question',
+        }),
+      })
+    ).toBe(true);
+  });
+
   it('does not reuse a raise that was already answered', () => {
     ackSessionAttention('s1', 'question', 'R1');
 

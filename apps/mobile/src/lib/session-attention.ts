@@ -567,9 +567,14 @@ export function isAttentionAcked(sessionId: string, raise: AttentionRaise): bool
   if (raise.raiseId === entry.status) {
     return true;
   }
-  // A status-only ack answers a raise it cannot order: one dated at or before
-  // the answer. A dated raise after the answer is a new raise.
-  return entry.answered.kind === 'status' && orderedAtOrBefore(raise.raiseId, entry.ackedAt);
+  // A status-only ack answers a raise of the same kind it cannot order: one
+  // dated at or before the answer. A dated raise after the answer, or one of
+  // another kind, is a raise the person has not answered.
+  return (
+    entry.answered.kind === 'status' &&
+    raise.status === entry.answered.status &&
+    orderedAtOrBefore(raise.raiseId, entry.ackedAt)
+  );
 }
 
 export function shouldShowNeedsInput({

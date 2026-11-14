@@ -108,7 +108,7 @@ describe('useStartTodo start now', () => {
     expect(state.toastError).toHaveBeenCalledExactlyOnceWith(
       i18n.t('todos.item.startRefreshFailed')
     );
-    expect(mounted().startingTodoId).toBeNull();
+    expect(mounted().isStarting(todo.id)).toBe(false);
   });
 
   it('opens the started session when the cache refresh fails', async () => {
@@ -130,7 +130,7 @@ describe('useStartTodo start now', () => {
 
     expect(state.navigate).not.toHaveBeenCalled();
     expect(state.toastError).toHaveBeenCalledExactlyOnceWith('No credits left');
-    expect(mounted().startingTodoId).toBeNull();
+    expect(mounted().isStarting(todo.id)).toBe(false);
   });
 
   it('reports a thrown start instead of rejecting', async () => {
@@ -140,7 +140,7 @@ describe('useStartTodo start now', () => {
 
     expect(state.navigate).not.toHaveBeenCalled();
     expect(state.toastError).toHaveBeenCalledExactlyOnceWith(i18n.t('common.somethingWentWrong'));
-    expect(mounted().startingTodoId).toBeNull();
+    expect(mounted().isStarting(todo.id)).toBe(false);
   });
 
   it('ignores a second start for a to-do that is already starting', async () => {
@@ -157,6 +157,45 @@ describe('useStartTodo start now', () => {
 
     expect(state.startAgent).toHaveBeenCalledOnce();
     expect(state.navigate).toHaveBeenCalledExactlyOnceWith('session-3', 'organization-1');
+  });
+
+  it('starting a second to-do leaves the first row’s start visible and refuses a second press on it', async () => {
+    const firstStart = Promise.withResolvers<unknown>();
+    const secondStart = Promise.withResolvers<unknown>();
+    state.startAgent.mockReturnValueOnce(firstStart.promise).mockReturnValueOnce(secondStart.promise);
+    const other = { id: 'todo-2', title: 'Second task', notes: null };
+
+    await act(async () => {
+      void mounted().startNow(todo, list);
+      void mounted().startNow(other, list);
+      await Promise.resolve();
+    });
+
+    // Both rows show their own start while both requests are out.
+    expect(mounted().isStarting(todo.id)).toBe(true);
+    expect(mounted().isStarting(other.id)).toBe(true);
+
+    await act(async () => {
+      secondStart.resolve({ ok: true, sessionId: 'session-b', message: '' });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Settling the second start must not hide the first row's spinner.
+    expect(mounted().isStarting(todo.id)).toBe(true);
+    expect(mounted().isStarting(other.id)).toBe(false);
+
+    await act(async () => {
+      // A second press on the to-do that is still starting is refused.
+      await mounted().startNow(todo, list);
+      firstStart.resolve({ ok: true, sessionId: 'session-a', message: '' });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // One start for A and one for B: the second press on A never reached the agent.
+    expect(state.startAgent).toHaveBeenCalledTimes(2);
+    expect(mounted().isStarting(todo.id)).toBe(false);
   });
 
   it('opens the review route when the list has no repository', async () => {

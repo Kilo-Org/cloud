@@ -9,10 +9,12 @@
 // `merged: false` reply throws `MergeNotCompletedError` and lands in
 // React Query's `onError` (NOT `onSuccess`).
 //
-// P1-A-08c wiring: the hoisted operation key is merged into the mutate
-// input and the key rotation policy (real `isPrMutationRetryable`) runs
-// inside `mutationFn`; only `useHoistedOperationKey` is mocked (it holds
-// React ref state that needs a mounted renderer).
+// P1-A-08c wiring: the operation key is merged into the mutate input and the
+// retirement policy (real `isPrMutationRetryable`) runs inside `mutationFn`.
+// The merge arm reads the merge domain's retained store, so this suite mocks
+// that store's key pair; the store's persistence across a remount is pinned in
+// `use-pr-merge-mutations.mounted.test.tsx`. The auto-merge arms still hoist a
+// per-mount key, so `useHoistedOperationKey` is mocked for them.
 //
 // s6: the provider arms route the same intents through
 // `providerReview.*` with the s1 provider identity, normalize the
@@ -53,11 +55,22 @@ const hoistedKeys = vi.hoisted(() => ({
   rotateKey: vi.fn(),
 }));
 
+// The merge hook keys its intent through the merge domain's retained store, so
+// the fingerprint bytes and the retirement policy are asserted here; the store's
+// own persistence is pinned in `use-pr-merge-mutations.mounted.test.tsx`. The
+// hoisted mock above still serves the auto-merge arms.
+const mergeKeys = vi.hoisted(() => ({
+  mergeOperationKey: vi.fn(() => 'retained-merge-key'),
+  retireMergeOperationKey: vi.fn(),
+}));
+
 const announceMock = vi.hoisted(() => ({ announceForA11y: vi.fn() }));
 
 vi.mock('expo-crypto', () => ({
   randomUUID: () => 'not-used',
 }));
+
+vi.mock('@/lib/pr-review/merge/pr-merge-operation-key', () => mergeKeys);
 
 vi.mock('@/lib/operation-key', async importOriginal => {
   const actual = await importOriginal<typeof OperationKeyModule>();
@@ -218,6 +231,8 @@ function resetMocks() {
   announceMock.announceForA11y.mockReset();
   hoistedKeys.getKey.mockClear();
   hoistedKeys.rotateKey.mockClear();
+  mergeKeys.mergeOperationKey.mockClear();
+  mergeKeys.retireMergeOperationKey.mockClear();
 }
 
 describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
@@ -298,7 +313,7 @@ describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
     expect(toastErrorMock).toHaveBeenCalledWith('boom');
   });
 
-  it('merges the hoisted operation key into the merge input (P1-A-08c)', async () => {
+  it('stamps the pinned merge fingerprint on the retained key and sends it (P1-A-08c)', async () => {
     mutateMock.mockResolvedValueOnce({ merged: true, sha: 's1', branchDeleted: true });
     useMergePullRequestMutation(REF);
 
@@ -307,11 +322,11 @@ describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
     // The fingerprint is the dedupe identity the server hashes into
     // `resource_key` for 30 days. Pin the exact bytes: a drift in the shared
     // field list must fail here instead of silently rotating in-flight keys.
-    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+    expect(mergeKeys.mergeOperationKey).toHaveBeenCalledWith(
       '{"resource":["octocat","hello",1],"method":"squash","deleteBranch":true,"expectedHeadSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
     );
     expect(mutateMock).toHaveBeenCalledWith(
-      expect.objectContaining({ operationKey: 'hoisted-op-key' })
+      expect.objectContaining({ operationKey: 'retained-merge-key' })
     );
     expect(mutateMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -324,16 +339,18 @@ describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
     );
   });
 
-  it('regenerates the key after a successful merge (fresh intent next)', async () => {
+  it('retires the intent after a successful merge (a fresh one next)', async () => {
     mutateMock.mockResolvedValueOnce({ merged: true, sha: 's1', branchDeleted: true });
     useMergePullRequestMutation(REF);
 
     await lastCapturedOptions?.mutationFn?.(INPUT);
 
-    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+    expect(mergeKeys.retireMergeOperationKey).toHaveBeenCalledWith(
+      '{"resource":["octocat","hello",1],"method":"squash","deleteBranch":true,"expectedHeadSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
+    );
   });
 
-  it('keeps the key when GitHub declines the merge (merged:false is retryable)', async () => {
+  it('keeps the intent when GitHub declines the merge (merged:false is retryable)', async () => {
     mutateMock.mockResolvedValueOnce({ merged: false, sha: 's1', branchDeleted: false });
     useMergePullRequestMutation(REF);
 
@@ -341,12 +358,12 @@ describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
       MergeNotCompletedError
     );
 
-    // The key stays stable so the next same-intent retry reconciles on the
-    // server instead of admitting a brand-new operation.
-    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
+    // The key stays, so the next same-intent retry reconciles on the server
+    // instead of admitting a brand-new operation.
+    expect(mergeKeys.retireMergeOperationKey).not.toHaveBeenCalled();
   });
 
-  it('regenerates the key on a non-retryable failure (bad-request ends the intent)', async () => {
+  it('retires the intent on a non-retryable failure (bad-request ends it)', async () => {
     const badRequest = new Error('Cannot approve your own pull request');
     Object.assign(badRequest, { data: { code: 'BAD_REQUEST' } });
     mutateMock.mockRejectedValueOnce(badRequest);
@@ -355,17 +372,17 @@ describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
     await expect(lastCapturedOptions?.mutationFn?.(INPUT)).rejects.toMatchObject({
       message: 'Cannot approve your own pull request',
     });
-    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+    expect(mergeKeys.retireMergeOperationKey).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the key on an in-progress CONFLICT and maps it onto the merge retryable copy', async () => {
+  it('keeps the intent on an in-progress CONFLICT and maps it onto the merge retryable copy', async () => {
     mutateMock.mockRejectedValueOnce(new Error('operation_in_progress'));
     useMergePullRequestMutation(REF);
 
     await expect(lastCapturedOptions?.mutationFn?.(INPUT)).rejects.toMatchObject({
       message: 'Could not merge pull request.',
     });
-    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
+    expect(mergeKeys.retireMergeOperationKey).not.toHaveBeenCalled();
   });
 
   it('maps the ambiguous ledger marker onto the verify-before-retrying copy in onError', async () => {
@@ -411,14 +428,14 @@ describe('useMergePullRequestMutation (s6 gitlab arm)', () => {
       deleteBranch: true,
       commitTitle: 'My title',
       commitMessage: 'My message',
-      operationKey: 'hoisted-op-key',
+      operationKey: 'retained-merge-key',
     });
     // Pinned bytes mirroring the server's gitlab merge fingerprint input:
     // method folds the squash toggle, and the fence rides the identity.
-    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+    expect(mergeKeys.mergeOperationKey).toHaveBeenCalledWith(
       '{"resource":["gitlab","https://gl.example.com","group/sub/app",12],"method":"squash","commitTitle":"My title","commitMessage":"My message","deleteBranch":true,"expectedHeadSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
     );
-    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+    expect(mergeKeys.retireMergeOperationKey).toHaveBeenCalledTimes(1);
   });
 
   it('never celebrates done:false: throws MergeNotCompletedError with merge-request wording, key kept', async () => {
@@ -436,7 +453,7 @@ describe('useMergePullRequestMutation (s6 gitlab arm)', () => {
       'The merge request was not merged. Check its state and try again.'
     );
     expect(classifyPrReviewMutationError(thrown)).toEqual({ kind: 'retryable' });
-    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
+    expect(mergeKeys.retireMergeOperationKey).not.toHaveBeenCalled();
   });
 
   it('surfaces the server stale-head CONFLICT message unchanged (the sheet keeps it inline)', async () => {
@@ -487,9 +504,9 @@ describe('useMergePullRequestMutation (s6 bitbucket arm)', () => {
       expectedHeadSha: 'a'.repeat(40),
       deleteBranch: true,
       commitMessage: 'My message',
-      operationKey: 'hoisted-op-key',
+      operationKey: 'retained-merge-key',
     });
-    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+    expect(mergeKeys.mergeOperationKey).toHaveBeenCalledWith(
       '{"resource":["bitbucket","acme","widgets",77],"method":"merge","commitMessage":"My message","deleteBranch":true,"expectedHeadSha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
     );
   });

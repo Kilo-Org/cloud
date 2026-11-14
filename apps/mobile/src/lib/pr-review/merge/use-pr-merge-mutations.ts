@@ -52,12 +52,16 @@ import {
   type MergePullRequestResult,
 } from '@/lib/pr-review/merge/merge-result-gate';
 import { MergeNotCompletedError } from '@/lib/pr-review/merge/merge-result-error';
-import { useHoistedOperationKey } from '@/lib/operation-key';
+import {
+  mergeOperationKey,
+  retireMergeOperationKey,
+} from '@/lib/pr-review/merge/pr-merge-operation-key';
 import {
   isPrMutationRetryable,
   mapPrOperationError,
   prOperationToastMessage,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
+import { useHoistedOperationKey } from '@/lib/operation-key';
 
 type RouterInputs = inferRouterInputs<MobileRouter>;
 type MergePullRequestInput = RouterInputs['githubPrReview']['mergePullRequest'];
@@ -127,19 +131,43 @@ async function invalidatePrCaches(
   ]);
 }
 
-/** The hoisted operation-key getter a mutation arm stamps its fingerprint with. */
-type OperationKeyGetter = (fingerprint: string) => string;
+/**
+ * The one fingerprint a merge's key is minted for. Built in one place so the
+ * key that admitted the request is the key the outcome retires: the arms only
+ * carry the operationKey, never a getter, and no "whatever was last" state is
+ * needed to rotate it.
+ */
+function mergeIntentFingerprint(scope: ProviderPrScope, vars: MergeVars): string {
+  if ('owner' in vars) {
+    return prIntentFingerprint('merge', vars);
+  }
+  const identity = providerWriteIdentity(scope);
+  return prIntentFingerprint(
+    'merge',
+    identity.platform === 'gitlab'
+      ? providerFingerprintInput(identity, {
+          method: vars.squash ? 'squash' : 'merge',
+          commitTitle: vars.commitTitle,
+          commitMessage: vars.commitMessage,
+          deleteBranch: vars.deleteBranch,
+          expectedHeadSha: vars.expectedHeadSha,
+        })
+      : providerFingerprintInput(identity, {
+          method: 'merge',
+          commitMessage: vars.commitMessage,
+          deleteBranch: vars.deleteBranch,
+          expectedHeadSha: vars.expectedHeadSha,
+        })
+  );
+}
 
 /** The GitHub merge arm — the pre-s6 call, unchanged. */
 // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
 function githubMergeResult(
   vars: MergePullRequestInput,
-  getKey: OperationKeyGetter
+  operationKey: string
 ): Promise<MergePullRequestResult> {
-  return trpcClient.githubPrReview.mergePullRequest.mutate({
-    ...vars,
-    operationKey: getKey(prIntentFingerprint('merge', vars)),
-  });
+  return trpcClient.githubPrReview.mergePullRequest.mutate({ ...vars, operationKey });
 }
 
 /**
@@ -171,7 +199,7 @@ function mergeNotCompletedMessage(platform: ProviderPrPlatform): string {
 async function providerMergeResult(
   scope: ProviderPrScope,
   vars: ProviderMergeVars,
-  getKey: OperationKeyGetter
+  operationKey: string
 ): Promise<MergePullRequestResult> {
   const identity = providerWriteIdentity(scope);
   const merged =
@@ -183,35 +211,14 @@ async function providerMergeResult(
           ...(vars.deleteBranch !== undefined ? { deleteBranch: vars.deleteBranch } : {}),
           ...(vars.commitTitle !== undefined ? { commitTitle: vars.commitTitle } : {}),
           ...(vars.commitMessage !== undefined ? { commitMessage: vars.commitMessage } : {}),
-          operationKey: getKey(
-            prIntentFingerprint(
-              'merge',
-              providerFingerprintInput(identity, {
-                method: vars.squash ? 'squash' : 'merge',
-                commitTitle: vars.commitTitle,
-                commitMessage: vars.commitMessage,
-                deleteBranch: vars.deleteBranch,
-                expectedHeadSha: vars.expectedHeadSha,
-              })
-            )
-          ),
+          operationKey,
         })
       : await trpcClient.providerReview.mergePullRequest.mutate({
           ...identity,
           expectedHeadSha: vars.expectedHeadSha,
           ...(vars.deleteBranch !== undefined ? { deleteBranch: vars.deleteBranch } : {}),
           ...(vars.commitMessage !== undefined ? { commitMessage: vars.commitMessage } : {}),
-          operationKey: getKey(
-            prIntentFingerprint(
-              'merge',
-              providerFingerprintInput(identity, {
-                method: 'merge',
-                commitMessage: vars.commitMessage,
-                deleteBranch: vars.deleteBranch,
-                expectedHeadSha: vars.expectedHeadSha,
-              })
-            )
-          ),
+          operationKey,
         });
   if (!merged.done) {
     throw new MergeNotCompletedError({
@@ -226,7 +233,6 @@ export function useMergePullRequestMutation(ref: ReviewWriteRef) {
   const queryClient = useQueryClient();
   const scope = useReviewWriteScope(ref);
   const keys = useMergeKeys(scope);
-  const { getKey, rotateKey } = useHoistedOperationKey();
 
   // P0-B-08: gate success on the authoritative `merged: true` result
   // BEFORE React Query resolves the mutation. The server only treats
@@ -239,22 +245,26 @@ export function useMergePullRequestMutation(ref: ReviewWriteRef) {
   // retry. The typed return is preserved so `performSubmit` can read
   // the sha / branchDeleted / branchDeleteError off the resolved value.
   //
-  // P1-A-08c: the hoisted operation key rides the input so a same-key retry
-  // reconciles against authoritative PR state before ever re-merging.
+  // P1-A-08c: the retained operation key rides the input so a same-key retry
+  // reconciles against authoritative PR state before ever re-merging — including
+  // a retry from a merge screen that was dismissed and reopened, which is why
+  // the key lives in the merge domain's store rather than in this hook.
   return useMutation<MergePullRequestResult, Error, MergeVars>({
     mutationFn: async input => {
+      const fingerprint = mergeIntentFingerprint(scope, input);
+      const operationKey = mergeOperationKey(fingerprint);
       try {
         const result =
           scope.ref.platform === 'github'
-            ? await githubMergeResult(input as MergePullRequestInput, getKey)
-            : await providerMergeResult(scope, input as ProviderMergeVars, getKey);
+            ? await githubMergeResult(input as MergePullRequestInput, operationKey)
+            : await providerMergeResult(scope, input as ProviderMergeVars, operationKey);
         // Throws on `merged: false`; returns the gate on clean / partial.
         assertMergeResult(result);
-        rotateKey();
+        retireMergeOperationKey(fingerprint);
         return result;
       } catch (error) {
         if (!isPrMutationRetryable(error)) {
-          rotateKey();
+          retireMergeOperationKey(fingerprint);
         }
         throw mapPrOperationError(error, 'merge');
       }

@@ -23,6 +23,7 @@ import { noteLauncherSurfacesCleared } from '@/lib/launcher-surfaces-publish';
 import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
 import { clearConversationRetention } from '@/lib/pr-review/discussion/conversation-retention';
+import { clearMergeOperationKeys } from '@/lib/pr-review/merge/pr-merge-operation-key';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 import { reportSystemSearchFailure } from '@/lib/system-search-telemetry';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
@@ -121,6 +122,11 @@ export function clearSessionScopedState(): void {
   // stores: a form left open under the previous account must not reopen under
   // the next one.
   runClear(clearFormDrafts);
+  // A retained merge intent is an operation key the server's ledger still holds
+  // for 30 days, and it names this account's pull request. Replaying it under
+  // the next account must be impossible, so the boundary drops the merge
+  // domain's retained keys with the other account-scoped members.
+  runClear(clearMergeOperationKeys);
   runClear(clearSessionAutoApprove);
   runClear(forgetRemoteMcp);
   runClear(clearRemoteMcpServers);

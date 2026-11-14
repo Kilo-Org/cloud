@@ -7,6 +7,7 @@ import { z } from 'zod';
 import migrations from '../../drizzle-relay/migrations';
 import { relayCommands, relayRates, relayState, relayWatches } from '../db/relay-sqlite-schema';
 import type { Env } from '../env';
+import { commandFrame } from '../live/command-frame';
 import {
   LIVE_LIMITS,
   liveMetric,
@@ -617,6 +618,17 @@ export class SessionRelayDO extends DurableObject<Env> {
     }
   }
 
+  private sendFrame(ws: WebSocket, text: string): boolean {
+    try {
+      ws.send(text);
+      return true;
+    } catch {
+      const state = this.attachment(ws);
+      if (state && !state.closed) this.close(ws, state, 1011, 'Command delivery failed');
+      return false;
+    }
+  }
+
   private publish(ws: WebSocket, ticket: LiveTicket, event: z.infer<typeof eventSchema>): void {
     if (this.seq >= Number.MAX_SAFE_INTEGER) {
       this.control(ws, 'error', { code: 'sequence_exhausted' });
@@ -670,21 +682,24 @@ export class SessionRelayDO extends DurableObject<Env> {
     const command = parsed.data;
     const payload = JSON.stringify(command.body);
     const bytes = encoder.encode(JSON.stringify(command)).byteLength;
+    const now = Date.now();
+    const ttl = command.ttlMs ?? LIVE_LIMITS.mailboxDefaultMs;
     // Reserve envelope overhead too, so accepted payloads always fit the runner's wire bound.
-    const envelope = this.commandEnvelope({
-      command_id: command.commandID,
-      from: ticket.userID,
-      type: command.type,
-      payload,
-      expires_at: Date.now() + (command.ttlMs ?? LIVE_LIMITS.mailboxDefaultMs),
-      live_only: command.liveOnly ?? false,
-      created_at: Date.now(),
-    });
-    if (
-      bytes > LIVE_LIMITS.messageBytes ||
-      encoder.encode(JSON.stringify({ ...envelope, seq: Number.MAX_SAFE_INTEGER })).byteLength >
-        LIVE_LIMITS.messageBytes
-    )
+    const worstCase = encoder.encode(
+      commandFrame(
+        {
+          commandID: command.commandID,
+          from: ticket.userID,
+          type: command.type,
+          payload,
+          expiresAt: now + ttl,
+          liveOnly: command.liveOnly ?? false,
+          createdAt: now,
+        },
+        Number.MAX_SAFE_INTEGER
+      )
+    ).byteLength;
+    if (bytes > LIVE_LIMITS.messageBytes || worstCase > LIVE_LIMITS.messageBytes)
       return error(413, 'message_too_large', 'Command exceeds the relay limit');
     const prior = this.db
       .select()
@@ -706,7 +721,6 @@ export class SessionRelayDO extends DurableObject<Env> {
     )
       return error(503, 'service_overloaded', 'The command mailbox is full');
     this.makeReceiptRoom();
-    const now = Date.now();
     this.db
       .insert(relayCommands)
       .values({
@@ -717,7 +731,7 @@ export class SessionRelayDO extends DurableObject<Env> {
         bytes,
         live_only: command.liveOnly ?? false,
         created_at: now,
-        expires_at: now + (command.ttlMs ?? LIVE_LIMITS.mailboxDefaultMs),
+        expires_at: now + ttl,
         delivered_at: null,
         status: 'queued',
         finished_at: null,
@@ -728,7 +742,8 @@ export class SessionRelayDO extends DurableObject<Env> {
       .from(relayCommands)
       .where(eq(relayCommands.command_id, command.commandID))
       .get();
-    const delivered = Boolean(runner && row && this.deliverCommand(runner, row));
+    const delivered =
+      runner && row && row.payload !== null ? this.deliverCommand(runner, row, row.payload) : false;
     liveMetric(this.env, {
       route: 'relay.commands',
       role: ticket.role,
@@ -741,42 +756,31 @@ export class SessionRelayDO extends DurableObject<Env> {
     });
   }
 
-  private commandEnvelope(
-    row: Pick<
-      CommandRow,
-      'command_id' | 'from' | 'type' | 'payload' | 'expires_at' | 'live_only' | 'created_at'
-    >
-  ) {
-    const payload: unknown = row.payload === null ? null : JSON.parse(row.payload);
-    if (!isBoundedJson(payload)) throw new Error('Invalid stored relay command payload');
-    return {
-      v: 1,
-      channel: 'commands',
-      seq: this.seq,
-      from: row.from,
-      at: row.created_at,
-      type: row.type,
-      body: {
-        commandID: row.command_id,
-        payload,
-        expiresAt: new Date(row.expires_at).toISOString(),
-        liveOnly: row.live_only,
-      },
-    };
-  }
-
-  private deliverCommand(ws: WebSocket, row: CommandRow): boolean {
-    if (!send(ws, this.commandEnvelope(row))) {
-      const state = this.attachment(ws);
-      if (state && !state.closed) this.close(ws, state, 1011, 'Command delivery failed');
+  private deliverCommand(ws: WebSocket, row: CommandRow, payload: string): boolean {
+    if (
+      !this.sendFrame(
+        ws,
+        commandFrame(
+          {
+            commandID: row.command_id,
+            from: row.from,
+            type: row.type,
+            payload,
+            expiresAt: row.expires_at,
+            liveOnly: row.live_only,
+            createdAt: row.created_at,
+          },
+          this.seq
+        )
+      )
+    )
       return false;
-    }
+    // Delivery is not acknowledgement: a retained row replays on every runner connection. Only the
+    // first hand-off changes stored state, so a replay writes nothing and announces nothing.
+    if (row.status === 'delivered' && row.delivered_at !== null) return true;
     this.db
       .update(relayCommands)
-      .set({
-        status: 'delivered',
-        delivered_at: row.delivered_at ?? Date.now(),
-      })
+      .set({ status: 'delivered', delivered_at: row.delivered_at ?? Date.now() })
       .where(eq(relayCommands.command_id, row.command_id))
       .run();
     if (row.status !== 'delivered')
@@ -792,7 +796,8 @@ export class SessionRelayDO extends DurableObject<Env> {
       .orderBy(asc(relayCommands.ordinal))
       .all();
     for (const row of rows) {
-      if (!this.attachment(ws)?.closed) this.deliverCommand(ws, row);
+      if (row.payload === null) continue;
+      if (!this.attachment(ws)?.closed) this.deliverCommand(ws, row, row.payload);
     }
   }
 

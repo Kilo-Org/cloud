@@ -559,6 +559,150 @@ it('redelivers unacknowledged queueable commands when the runner reconnects', as
   expect((await replacement.next('send_message')).body).toMatchObject({ commandID: 'retry' });
 });
 
+it('replays the retained mailbox on reconnect without rewriting delivered rows', async () => {
+  const fixture = await setup();
+  const token = await fixture.ticket('controller');
+  for (const id of ['replay-a', 'replay-b'])
+    await rpcResponse(
+      fixture.stub.command({ ticket: token, command: fixture.command(id, { prompt: id }) })
+    );
+  // `total_changes()` counts rows SQLite changed, so the sweep every connect runs counts nothing
+  // when it matches no rows, while rewriting a delivered row would.
+  const changes = () =>
+    runInDurableObject(
+      fixture.stub,
+      (_instance, state) =>
+        state.storage.sql.exec<{ n: number }>('SELECT total_changes() AS n').one().n
+    );
+  const beforeFirst = await changes();
+  const runner = await fixture.connect('runner');
+  const first = await runner.next('send_message');
+  const second = await runner.next('send_message');
+  expect(first.body).toMatchObject({ commandID: 'replay-a', payload: { prompt: 'replay-a' } });
+  expect(second.body).toMatchObject({ commandID: 'replay-b', payload: { prompt: 'replay-b' } });
+  // The first hand-off records the transition for both retained commands.
+  expect((await changes()) - beforeFirst).toBe(2);
+  runner.ws.close();
+  const beforeReplay = await changes();
+  const replacement = await fixture.connect('runner');
+  const replayFirst = await replacement.next('send_message');
+  const replaySecond = await replacement.next('send_message');
+  expect(replayFirst.body).toEqual(first.body);
+  expect(replaySecond.body).toEqual(second.body);
+  // Redelivery is not a state change, so the second connection writes no rows.
+  expect((await changes()) - beforeReplay).toBe(0);
+  await runInDurableObject(fixture.stub, (_instance, state) => {
+    expect(
+      drizzle(state.storage)
+        .select()
+        .from(relayCommands)
+        .all()
+        .map(row => row.status)
+    ).toEqual(['delivered', 'delivered']);
+  });
+});
+
+it('keeps a queued command unrecorded when the runner hand-off send fails, then delivers it later', async () => {
+  const fixture = await setup();
+  const token = await fixture.ticket('controller');
+  await rpcResponse(
+    fixture.stub.command({
+      ticket: token,
+      command: fixture.command('failed-hand-off', { prompt: 'hand-off' }),
+    })
+  );
+  const controller = await fixture.connect('controller');
+  const announced = Promise.withResolvers<'announced'>();
+  const recordStatus = (event: MessageEvent) => {
+    const frame = envelopeSchema.parse(JSON.parse(String(event.data)));
+    if (frame.type === 'command_status') announced.resolve('announced');
+  };
+  controller.ws.addEventListener('message', recordStatus);
+  const runnerToken = await fixture.ticket('runner');
+  const originalSend = WebSocket.prototype.send;
+  const closed = Promise.withResolvers<CloseEvent>();
+  await runInDurableObject(fixture.stub, async instance => {
+    // The relay creates the runner socket inside fetch, so only the prototype can fail its send
+    // before the hand-off starts. Every other frame passes through untouched.
+    const failing = vi.spyOn(WebSocket.prototype, 'send').mockImplementation(function (
+      this: WebSocket,
+      raw
+    ) {
+      if (typeof raw === 'string' && raw.includes('failed-hand-off'))
+        throw new Error('Synthetic command transport failure');
+      originalSend.call(this, raw);
+    });
+    try {
+      const response = await instance.fetch(
+        new Request('https://relay.test/', {
+          headers: { upgrade: 'websocket', authorization: `Bearer ${runnerToken}` },
+        })
+      );
+      expect(response.status).toBe(101);
+      if (!response.webSocket) throw new Error('Runner did not upgrade');
+      response.webSocket.addEventListener('close', closed.resolve, { once: true });
+      response.webSocket.accept();
+    } finally {
+      failing.mockRestore();
+    }
+  });
+  // A transport failure closes the runner instead of recording anything as delivered.
+  expect((await closed.promise).code).toBe(1011);
+  const stored = () =>
+    runInDurableObject(fixture.stub, (_instance, state) =>
+      drizzle(state.storage)
+        .select()
+        .from(relayCommands)
+        .where(eq(relayCommands.command_id, 'failed-hand-off'))
+        .get()
+    );
+  expect(await stored()).toMatchObject({
+    status: 'queued',
+    payload: JSON.stringify({ prompt: 'hand-off' }),
+    delivered_at: null,
+  });
+  // Real 100 ms, not fake timers: the bound covers the runtime's own buffered frame delivery, which
+  // a faked clock cannot advance. It only ever exposes an announcement that never arrives.
+  const silence = Promise.withResolvers<'timeout'>();
+  setTimeout(() => silence.resolve('timeout'), 100);
+  expect(await Promise.race([announced.promise, silence.promise])).toBe('timeout');
+  controller.ws.removeEventListener('message', recordStatus);
+  const replacement = await fixture.connect('runner');
+  expect((await replacement.next('send_message')).body).toMatchObject({
+    commandID: 'failed-hand-off',
+    payload: { prompt: 'hand-off' },
+  });
+  expect((await controller.next('command_status')).body).toEqual({
+    commandID: 'failed-hand-off',
+    status: 'delivered',
+  });
+  expect(await stored()).toMatchObject({
+    status: 'delivered',
+    payload: JSON.stringify({ prompt: 'hand-off' }),
+    delivered_at: expect.any(Number),
+  });
+});
+
+it('sends no frame and changes no row when a runner connects to an empty mailbox', async () => {
+  const fixture = await setup();
+  const changes = () =>
+    runInDurableObject(
+      fixture.stub,
+      (_instance, state) =>
+        state.storage.sql.exec<{ n: number }>('SELECT total_changes() AS n').one().n
+    );
+  const before = await changes();
+  const runner = await fixture.connect('runner');
+  // Explicit bound on a real clock: the frame would already have been buffered by the runtime, so a
+  // faked clock cannot advance it, and the wait only lets a real `send_message` surface.
+  const emptyMailboxWaitMs = 100;
+  const silence = Promise.withResolvers<'timeout'>();
+  setTimeout(() => silence.resolve('timeout'), emptyMailboxWaitMs);
+  const observed = await Promise.race([runner.next('send_message'), silence.promise]);
+  expect(observed).toBe('timeout');
+  expect((await changes()) - before).toBe(0);
+});
+
 it('rejects offline liveOnly commands and clears delivered payloads without replaying after disconnection', async () => {
   const fixture = await setup();
   const token = await fixture.ticket('controller');

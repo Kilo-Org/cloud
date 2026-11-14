@@ -31,6 +31,40 @@ diff --git a/Libraries/Text/TextInput/Multiline/RCTUITextView.mm b/Libraries/Tex
    self.typingAttributes = defaultTextAttributes;
    [self _updatePlaceholder];
  }
+diff --git a/Libraries/Text/TextInput/Multiline/RCTUITextView.mm b/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
+--- a/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
++++ b/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
+@@ -86,21 +86,22 @@
+ 
+ - (NSString *)accessibilityLabel
+ {
+-  NSMutableString *accessibilityLabel = [NSMutableString new];
++  NSString *superAccessibilityLabel = [super accessibilityLabel];
+ 
+-  NSString *superAccessibilityLabel = [super accessibilityLabel];
++  // A text area that carries a name of its own is announced by that name alone.
++  // A placeholder describes the empty box, so folding it into the name reads as
++  // the field's own content and the name changes the moment the person types.
++  // A text area with no name of its own still takes the placeholder as its
++  // name, so an unlabelled field is not left unnamed.
+   if (superAccessibilityLabel.length > 0) {
+-    [accessibilityLabel appendString:superAccessibilityLabel];
++    return superAccessibilityLabel;
+   }
+ 
+   if (self.placeholder.length > 0 && self.attributedText.string.length == 0) {
+-    if (accessibilityLabel.length > 0) {
+-      [accessibilityLabel appendString:@" "];
+-    }
+-    [accessibilityLabel appendString:self.placeholder];
++    return self.placeholder;
+   }
+ 
+-  return accessibilityLabel;
++  return @"";
+ }
+ 
+ #pragma mark - Properties
 diff --git a/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm b/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm
 --- a/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm
 +++ b/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm

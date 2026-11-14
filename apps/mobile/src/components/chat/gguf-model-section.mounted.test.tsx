@@ -180,8 +180,9 @@ describe('the saved-list load failure', () => {
     const retry = view.renderer.root
       .findAll(node => (node.type as string) === 'Button')
       .find(button =>
-        button.findAll(node => (node.type as string) === 'Text').some(node => node.props.children ===
-          'Try again')
+        button
+          .findAll(node => (node.type as string) === 'Text')
+          .some(node => node.props.children === 'Try again')
       );
     expect(retry).toBeDefined();
     (retry?.props.onPress as () => void)();

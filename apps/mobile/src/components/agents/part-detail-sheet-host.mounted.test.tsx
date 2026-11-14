@@ -626,13 +626,14 @@ describe('PartDetailSheetHost mounted', () => {
           makeBashPart('bash-2', 'echo two', true),
         ]),
       ]);
+      const mounted = renderer;
       await act(() => {
         capturedOpener?.('bash-1');
       });
       await act(() => {
-        (propOf(findByType(renderer.root, 'SheetHeader')[0], 'onDone') as () => void)();
+        (propOf(findByType(mounted.root, 'SheetHeader')[0], 'onDone') as () => void)();
       });
-      expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(-1);
+      expect(propOf(findByType(mounted.root, 'BottomSheet')[0], 'index')).toBe(-1);
 
       // The native sheet never reports the finished dismissal. Without the sheet's
       // deadline the host stays dismissing and every later open only queues.
@@ -643,7 +644,7 @@ describe('PartDetailSheetHost mounted', () => {
       await act(() => {
         capturedOpener?.('bash-2');
       });
-      expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+      expect(propOf(findByType(mounted.root, 'BottomSheet')[0], 'index')).toBe(0);
       expect(sheetTitle(renderer)).toBe('bash: echo two');
     } finally {
       act(() => {

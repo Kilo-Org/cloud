@@ -186,12 +186,13 @@ export function useManageRepositoryAccess(
       if (!ownsAttempt()) {
         return false;
       }
-      clearTimeout(watchdog.current);
+      if (watchdog.current !== null) {
+        clearTimeout(watchdog.current);
+      }
       watchdog.current = null;
       move({ kind: 'idle' });
       return true;
     };
-    clearTimeout(watchdog.current);
     watchdog.current = setTimeout(() => {
       if (!ownsAttempt()) {
         return;

@@ -600,7 +600,7 @@ export class SessionRelayDO extends DurableObject<Env> {
     let replayed = false;
     for (const entry of this.ring) {
       if (entry.seq <= cursor) continue;
-      if (!this.sendEncoded(ws, state, entry.encoded)) return false;
+      if (!this.sendText(ws, state, entry.encoded, 'Event delivery failed')) return false;
       replayed = true;
     }
     this.delivered.set(ws, this.seq);
@@ -608,23 +608,13 @@ export class SessionRelayDO extends DurableObject<Env> {
     return !wasSubscribed || replayed;
   }
 
-  private sendEncoded(ws: WebSocket, state: Attachment, encoded: string): boolean {
-    try {
-      ws.send(encoded);
-      return true;
-    } catch {
-      this.close(ws, state, 1011, 'Event delivery failed');
-      return false;
-    }
-  }
-
-  private sendFrame(ws: WebSocket, text: string): boolean {
+  /** Sends one encoded frame; a transport failure closes the socket with the caller's reason. */
+  private sendText(ws: WebSocket, state: Attachment, text: string, failure: string): boolean {
     try {
       ws.send(text);
       return true;
     } catch {
-      const state = this.attachment(ws);
-      if (state && !state.closed) this.close(ws, state, 1011, 'Command delivery failed');
+      if (!state.closed) this.close(ws, state, 1011, failure);
       return false;
     }
   }
@@ -662,7 +652,7 @@ export class SessionRelayDO extends DurableObject<Env> {
     let fanout = 0;
     for (const [viewer, state] of this.sockets()) {
       if (state.ticket.role !== 'runner' && state.subscribed) {
-        if (!this.sendEncoded(viewer, state, encoded)) continue;
+        if (!this.sendText(viewer, state, encoded, 'Event delivery failed')) continue;
         this.delivered.set(viewer, seq);
         fanout++;
       }
@@ -757,24 +747,21 @@ export class SessionRelayDO extends DurableObject<Env> {
   }
 
   private deliverCommand(ws: WebSocket, row: CommandRow, payload: string): boolean {
-    if (
-      !this.sendFrame(
-        ws,
-        commandFrame(
-          {
-            commandID: row.command_id,
-            from: row.from,
-            type: row.type,
-            payload,
-            expiresAt: row.expires_at,
-            liveOnly: row.live_only,
-            createdAt: row.created_at,
-          },
-          this.seq
-        )
-      )
-    )
-      return false;
+    const state = this.attachment(ws);
+    if (!state || state.closed) return false;
+    const frame = commandFrame(
+      {
+        commandID: row.command_id,
+        from: row.from,
+        type: row.type,
+        payload,
+        expiresAt: row.expires_at,
+        liveOnly: row.live_only,
+        createdAt: row.created_at,
+      },
+      this.seq
+    );
+    if (!this.sendText(ws, state, frame, 'Command delivery failed')) return false;
     // Delivery is not acknowledgement: a retained row replays on every runner connection. Only the
     // first hand-off changes stored state, so a replay writes nothing and announces nothing.
     if (row.status === 'delivered' && row.delivered_at !== null) return true;

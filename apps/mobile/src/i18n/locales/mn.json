@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} кодын санг ашиглах боломжгүй болсон. Доороос өөр кодын сан сонгоно уу.",
       "prefillModelUnavailable": "{{model}} загварыг ашиглах боломжгүй болсон. Таны үндсэн загварыг ашиглаж байна.",
       "couldNotReadPendingSessions": "Хүлээгдэж буй сессүүдийг уншиж чадсангүй. Дахин оролдоно уу.",
-      "failedToCreate": "Сесс үүсгэж чадсангүй.",
+      "failedToCreate": "Сесс үүсгэж чадсангүй",
       "checkOrganizationAccess": "Энэ байгууллагад хандах эрхээ шалгаад дахин оролдоно уу.",
       "couldNotRefreshRepositories": "Кодын сангийн жагсаалтыг шинэчилж чадсангүй. Дахин оролдоно уу.",
       "discardDraftTitle": "Нооргийг устгах уу?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Ачаалагдсан түүхэд хамаарахгүй зардал",
       "ofWindowTokens": "{{window}} токеноос",
       "tokens": "токен",
+      "tokens_one": "токен",
+      "tokens_other": "токен",
       "tokensWithPercentage": "токен ({{percentage}})",
       "stepsCount_one": "{{steps}} алхам",
       "stepsCount": "{{steps}} алхам",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Ачаалах",
       "loadWithHost": "{{host}}-оос ачаалах",
-      "httpsOnly": "Зөвхөн HTTPS холбоостой зургийг ачаална.",
+      "httpsOnly": "Зөвхөн HTTPS холбоостой зургийг ачаална",
       "trustTitle": "{{host}}-аас зургийг ачаалах уу?",
       "trustMessage": "{{host}}-д итгэвэл түүний зургуудыг дахин асуулгүйгээр ачаална. Дараа нь Итгэмжлэгдсэн хостууд хэсгээс цуцалж болно.",
       "loadOnce": "Нэг удаа ачаалах"

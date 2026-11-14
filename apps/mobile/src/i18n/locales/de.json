@@ -1623,7 +1623,7 @@
       "prefillRepoUnavailable": "{{repo}} ist nicht mehr verfügbar. Wähle unten ein Repository aus.",
       "prefillModelUnavailable": "{{model}} ist nicht mehr verfügbar. Dein Standardmodell wird verwendet.",
       "couldNotReadPendingSessions": "Die ausstehenden Sitzungen konnten nicht geladen werden. Versuche es erneut.",
-      "failedToCreate": "Die Sitzung konnte nicht erstellt werden.",
+      "failedToCreate": "Die Sitzung konnte nicht erstellt werden",
       "checkOrganizationAccess": "Prüfe deinen Zugriff auf diese Organisation und versuche es erneut.",
       "couldNotRefreshRepositories": "Die Repositorys konnten nicht aktualisiert werden. Bitte versuche es erneut.",
       "discardDraftTitle": "Entwurf verwerfen?",
@@ -2266,6 +2266,8 @@
       "olderActivityDescription": "Kosten, die nicht dem geladenen Verlauf zugeordnet sind",
       "ofWindowTokens": "von {{window}} Tokens",
       "tokens": "text-Tokens",
+      "tokens_one": "text-Tokens",
+      "tokens_other": "text-Tokens",
       "tokensWithPercentage": "tokens ({{percentage}})",
       "stepsCount_one": "{{steps}} Schritt",
       "stepsCount": "{{steps}} Schritte",
@@ -2319,7 +2321,7 @@
     "markdownImage": {
       "load": "Laden",
       "loadWithHost": "Von {{host}} laden",
-      "httpsOnly": "Bilder können nur über HTTPS geladen werden.",
+      "httpsOnly": "Bilder können nur über HTTPS geladen werden",
       "trustTitle": "Bild von {{host}} laden?",
       "trustMessage": "Wenn du {{host}} vertraust, werden seine Bilder geladen, ohne jedes Mal zu fragen. Du kannst das später unter Vertrauenswürdige Hosts widerrufen.",
       "loadOnce": "Einmal laden"

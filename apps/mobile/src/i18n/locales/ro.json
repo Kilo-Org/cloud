@@ -2207,7 +2207,7 @@
       "prefillRepoUnavailable": "{{repo}} nu mai este disponibil. Alege un depozit mai jos.",
       "prefillModelUnavailable": "{{model}} nu mai este disponibil. Se folosește modelul tău implicit.",
       "couldNotReadPendingSessions": "Nu s-au putut citi sesiunile în așteptare. Încearcă din nou.",
-      "failedToCreate": "Nu s-a putut crea sesiunea.",
+      "failedToCreate": "Nu s-a putut crea sesiunea",
       "checkOrganizationAccess": "Verifică accesul la această organizație și încearcă din nou.",
       "couldNotRefreshRepositories": "Nu s-au putut reîmprospăta depozitele. Încearcă din nou.",
       "discardDraftTitle": "Renunți la ciornă?",
@@ -2858,6 +2858,9 @@
       "olderActivityDescription": "Cost neatribuit istoricului încărcat",
       "ofWindowTokens": "din {{window}} tokenuri",
       "tokens": "tokenuri",
+      "tokens_one": "tokenuri",
+      "tokens_few": "tokenuri",
+      "tokens_other": "tokenuri",
       "tokensWithPercentage": "tokenuri ({{percentage}})",
       "stepsCount_one": "{{steps}} pas",
       "stepsCount": "{{steps}} de pași",
@@ -2913,7 +2916,7 @@
     "markdownImage": {
       "load": "Încarcă",
       "loadWithHost": "Încarcă {{host}}",
-      "httpsOnly": "Sunt permise doar imaginile accesibile prin HTTPS.",
+      "httpsOnly": "Sunt permise doar imaginile accesibile prin HTTPS",
       "trustTitle": "Încărcați imaginea de la {{host}}?",
       "trustMessage": "Dacă ai încredere în {{host}}, imaginile sale se încarcă fără a întreba de fiecare dată. Poți retrage acest lucru mai târziu în Gazde de încredere.",
       "loadOnce": "Încarcă o dată"

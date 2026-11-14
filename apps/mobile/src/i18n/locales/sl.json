@@ -2248,7 +2248,7 @@
       "prefillRepoUnavailable": "Skladišče {{repo}} ni več na voljo. Spodaj izberi drugo skladišče.",
       "prefillModelUnavailable": "{{model}} ni več na voljo. Uporabljen je tvoj privzeti model.",
       "couldNotReadPendingSessions": "Čakajočih sej ni bilo mogoče prebrati. Poskusi znova.",
-      "failedToCreate": "Seje ni bilo mogoče ustvariti.",
+      "failedToCreate": "Seje ni bilo mogoče ustvariti",
       "checkOrganizationAccess": "Preveri dostop do te organizacije in poskusi znova.",
       "couldNotRefreshRepositories": "Skladišč ni bilo mogoče osvežiti. Poskusi znova.",
       "discardDraftTitle": "Želiš zavreči osnutek?",
@@ -2907,6 +2907,10 @@
       "olderActivityDescription": "Strošek, ki ni pripisan naloženi zgodovini",
       "ofWindowTokens": "od {{window}} žetonov",
       "tokens": "žetonov",
+      "tokens_one": "žetonov",
+      "tokens_two": "žetonov",
+      "tokens_few": "žetonov",
+      "tokens_other": "žetonov",
       "tokensWithPercentage": "žetonov ({{percentage}})",
       "stepsCount_one": "{{steps}} korak",
       "stepsCount": "{{steps}} korakov",
@@ -2964,7 +2968,7 @@
     "markdownImage": {
       "load": "Naloži",
       "loadWithHost": "Naloži {{host}}",
-      "httpsOnly": "Podprte so samo slike prek HTTPS.",
+      "httpsOnly": "Podprte so samo slike prek HTTPS",
       "trustTitle": "Naložiti sliko z {{host}}?",
       "trustMessage": "Če zaupaš gostitelju {{host}}, se njegove slike naložijo brez vsakokratnega vprašanja. To lahko pozneje prekličeš v Zaupanja vredni gostitelji.",
       "loadOnce": "Naloži enkrat"

@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "Το {{repo}} δεν είναι πλέον διαθέσιμο. Επίλεξε ένα αποθετήριο παρακάτω.",
       "prefillModelUnavailable": "Το {{model}} δεν είναι πλέον διαθέσιμο. Χρησιμοποιείται το προεπιλεγμένο μοντέλο σου.",
       "couldNotReadPendingSessions": "Δεν ήταν δυνατή η ανάγνωση των συνεδριών σε αναμονή. Δοκίμασε ξανά.",
-      "failedToCreate": "Δεν ήταν δυνατή η δημιουργία της συνεδρίας.",
+      "failedToCreate": "Δεν ήταν δυνατή η δημιουργία της συνεδρίας",
       "checkOrganizationAccess": "Έλεγξε την πρόσβασή σου σε αυτόν τον οργανισμό και δοκίμασε ξανά.",
       "couldNotRefreshRepositories": "Δεν ήταν δυνατή η ανανέωση των αποθετηρίων. Δοκίμασε ξανά.",
       "discardDraftTitle": "Απόρριψη πρόχειρου;",
@@ -2630,7 +2630,7 @@
       "loadingDescription": "Αναμένονται μηνύματα από τον υποπράκτορα…"
     },
     "messageBubble": {
-      "failure": "Σφάλμα: {{title}}.",
+      "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. Μπορείς να δοκιμάσεις ξανά.",
       "copyToComposer": "Αντιγραφή στο πεδίο μηνύματος",
       "queuedAccessibility": "Το μήνυμα είναι σε αναμονή",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Κόστος που δεν αποδίδεται στο φορτωμένο ιστορικό",
       "ofWindowTokens": "από {{window}} διακριτικά",
       "tokens": "διακριτικά",
+      "tokens_one": "διακριτικά",
+      "tokens_other": "διακριτικά",
       "tokensWithPercentage": "διακριτικά ({{percentage}})",
       "stepsCount_one": "{{steps}} βήμα",
       "stepsCount": "{{steps}} βήματα",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Φόρτωση",
       "loadWithHost": "Φόρτωση {{host}}",
-      "httpsOnly": "Επιτρέπονται μόνο εικόνες μέσω HTTPS.",
+      "httpsOnly": "Επιτρέπονται μόνο εικόνες μέσω HTTPS",
       "trustTitle": "Φόρτωση εικόνας από το {{host}};",
       "trustMessage": "Η εμπιστοσύνη στο {{host}} φορτώνει τις εικόνες του χωρίς να ρωτά κάθε φορά. Μπορείτε να την ανακαλέσετε αργότερα στους Αξιόπιστους ιστότοπους.",
       "loadOnce": "Φόρτωση μία φορά"

@@ -1695,7 +1695,7 @@
       "prefillRepoUnavailable": "لم يعد {{repo}} متاحًا. اختر مستودعًا أدناه.",
       "prefillModelUnavailable": "لم يعد {{model}} متاحًا. نستخدم نموذجك الافتراضي.",
       "couldNotReadPendingSessions": "تعذّرت قراءة الجلسات المعلقة. حاول مرة أخرى.",
-      "failedToCreate": "تعذّر إنشاء الجلسة.",
+      "failedToCreate": "تعذّر إنشاء الجلسة",
       "checkOrganizationAccess": "تحقّق من صلاحية وصولك إلى هذه المؤسسة، ثم حاول مرة أخرى.",
       "couldNotRefreshRepositories": "تعذّر تحديث المستودعات. حاول مرة أخرى.",
       "discardDraftTitle": "حذف المسودة؟",
@@ -2175,7 +2175,7 @@
       "loadingDescription": "ننتظر رسائل الوكيل الفرعي…"
     },
     "messageBubble": {
-      "failure": "خطأ: {{title}}.",
+      "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. يمكنك إعادة المحاولة.",
       "copyToComposer": "نسخ إلى حقل الرسالة",
       "queuedAccessibility": "الرسالة في قائمة الانتظار",
@@ -2370,6 +2370,12 @@
       "olderActivityDescription": "تكلفة غير منسوبة إلى السجل المحمّل",
       "ofWindowTokens": "من أصل {{window}} من الرموز",
       "tokens": "رموز",
+      "tokens_zero": "رموز",
+      "tokens_one": "رموز",
+      "tokens_two": "رموز",
+      "tokens_few": "رموز",
+      "tokens_many": "رموز",
+      "tokens_other": "رموز",
       "tokensWithPercentage": "رموز ({{percentage}})",
       "stepsCount_one": "خطوة واحدة",
       "stepsCount": "الخطوات: {{steps}}",
@@ -2431,7 +2437,7 @@
     "markdownImage": {
       "load": "تحميل",
       "loadWithHost": "تحميل الصورة من {{host}}",
-      "httpsOnly": "لا تُحمّل إلا الصور عبر HTTPS.",
+      "httpsOnly": "لا تُحمّل إلا الصور عبر HTTPS",
       "trustTitle": "تحميل الصورة من {{host}}؟",
       "trustMessage": "الوثوق بـ{{host}} يحمّل صوره دون سؤال في كل مرة. يمكنك إلغاء ذلك لاحقًا من المضيفين الموثوقين.",
       "loadOnce": "تحميل مرة واحدة"

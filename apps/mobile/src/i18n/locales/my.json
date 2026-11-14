@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} ကို အသုံးပြု၍မရတော့ပါ။ အောက်တွင် ကုဒ်သိုလှောင်ခန်းတစ်ခု ရွေးပါ။",
       "prefillModelUnavailable": "{{model}} ကို အသုံးပြု၍မရတော့ပါ။ သင့်မူလမော်ဒယ်ကို အသုံးပြုနေပါသည်။",
       "couldNotReadPendingSessions": "စောင့်ဆိုင်းနေသော စက်ရှင်များကို ဖတ်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။",
-      "failedToCreate": "စက်ရှင်ကို ဖန်တီး၍မရပါ။",
+      "failedToCreate": "စက်ရှင်ကို ဖန်တီး၍မရပါ",
       "checkOrganizationAccess": "ဤအဖွဲ့အစည်းဆီသို့ သင့်၏ ဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး ထပ်ကြိုးစားပါ။",
       "couldNotRefreshRepositories": "ကုဒ်သိုလှောင်ခန်းစာရင်းကို ပြန်လည်ရယူ၍မရပါ။ ထပ်ကြိုးစားပါ။",
       "discardDraftTitle": "မူကြမ်းကို ပယ်ဖျက်မလား။",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "ရယူထားသော မှတ်တမ်းနှင့် မချိတ်ဆက်နိုင်သည့် ကုန်ကျစရိတ်",
       "ofWindowTokens": "တိုကင် {{window}} ခုအနက်",
       "tokens": "တိုကင်",
+      "tokens_one": "တိုကင်",
+      "tokens_other": "တိုကင်",
       "tokensWithPercentage": "တိုကင် ({{percentage}})",
       "stepsCount_one": "အဆင့် {{steps}} ဆင့်",
       "stepsCount": "အဆင့် {{steps}} ဆင့်",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "ဖွင့်ပါ",
       "loadWithHost": "{{host}} မှ ပုံကို ဖွင့်ပါ",
-      "httpsOnly": "HTTPS ပုံများကိုသာ ဖွင့်နိုင်ပါသည်။",
+      "httpsOnly": "HTTPS ပုံများကိုသာ ဖွင့်နိုင်ပါသည်",
       "trustTitle": "{{host}} မှ ပုံကို ဖွင့်မလား?",
       "trustMessage": "{{host}} ကို ယုံကြည်ပါက ၎င်း၏ ပုံများကို အကြိမ်တိုင်း မမေးဘဲ ဖွင့်ပါမည်။ နောက်ပိုင်းတွင် ယုံကြည်ထားသော ဟို့စ်များ မှ ပြန်ရုပ်သိမ်းနိုင်ပါသည်။",
       "loadOnce": "တစ်ကြိမ်သာ ဖွင့်ပါ"

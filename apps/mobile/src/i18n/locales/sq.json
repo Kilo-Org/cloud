@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "Depoja {{repo}} nuk është më e disponueshme. Zgjidh një depo më poshtë.",
       "prefillModelUnavailable": "{{model}} nuk është më i disponueshëm. Po përdoret modeli yt i parazgjedhur.",
       "couldNotReadPendingSessions": "Nuk u lexuan seancat në pritje. Provo përsëri.",
-      "failedToCreate": "Nuk u krijua seanca.",
+      "failedToCreate": "Nuk u krijua seanca",
       "checkOrganizationAccess": "Kontrollo aksesin tënd në këtë organizatë dhe provo përsëri.",
       "couldNotRefreshRepositories": "Nuk u rifreskuan depot. Provo përsëri.",
       "discardDraftTitle": "Të fshihet drafti?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Kostoja që nuk i atribuohet historisë së ngarkuar",
       "ofWindowTokens": "nga {{window}} tokenë",
       "tokens": "tokenë",
+      "tokens_one": "tokenë",
+      "tokens_other": "tokenë",
       "tokensWithPercentage": "tokenë ({{percentage}})",
       "stepsCount_one": "{{steps}} hap",
       "stepsCount": "{{steps}} hapa",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Ngarko",
       "loadWithHost": "Ngarko {{host}}",
-      "httpsOnly": "Lejohen vetëm imazhe me HTTPS.",
+      "httpsOnly": "Lejohen vetëm imazhe me HTTPS",
       "trustTitle": "Ngarko imazhin nga {{host}}?",
       "trustMessage": "Kur i beson {{host}}, imazhet e tij ngarkohen pa pyetur çdo herë. Mund t'i hiqni besimin më vonë te Serverët e besuar.",
       "loadOnce": "Ngarko një herë"

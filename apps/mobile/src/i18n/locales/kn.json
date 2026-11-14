@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} ಇನ್ನು ಲಭ್ಯವಿಲ್ಲ. ಕೆಳಗೆ ಒಂದು ರೆಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
       "prefillModelUnavailable": "{{model}} ಇನ್ನು ಲಭ್ಯವಿಲ್ಲ. ನಿಮ್ಮ ಡೀಫಾಲ್ಟ್ ಮಾದರಿಯನ್ನು ಬಳಸಲಾಗುತ್ತಿದೆ.",
       "couldNotReadPendingSessions": "ಬಾಕಿ ಇರುವ ಸೆಶನ್‌ಗಳನ್ನು ಓದಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-      "failedToCreate": "ಸೆಶನ್ ರಚಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "failedToCreate": "ಸೆಶನ್ ರಚಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "checkOrganizationAccess": "ಈ ಸಂಸ್ಥೆಗೆ ನಿಮ್ಮ ಪ್ರವೇಶವನ್ನು ಪರಿಶೀಲಿಸಿ, ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "couldNotRefreshRepositories": "ರೆಪೊಸಿಟರಿಗಳ ಪಟ್ಟಿಯನ್ನು ನವೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "discardDraftTitle": "ಕರಡನ್ನು ಅಳಿಸಬೇಕೆ?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "ಲೋಡ್ ಮಾಡಿದ ಇತಿಹಾಸಕ್ಕೆ ಸೇರದ ವೆಚ್ಚ",
       "ofWindowTokens": "{{window}} ಟೋಕನ್‌ಗಳಲ್ಲಿ",
       "tokens": "ಟೋಕನ್‌ಗಳು",
+      "tokens_one": "ಟೋಕನ್‌ಗಳು",
+      "tokens_other": "ಟೋಕನ್‌ಗಳು",
       "tokensWithPercentage": "ಟೋಕನ್‌ಗಳು ({{percentage}})",
       "stepsCount_one": "{{steps}} ಹಂತ",
       "stepsCount": "{{steps}} ಹಂತಗಳು",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "ಲೋಡ್ ಮಾಡಿ",
       "loadWithHost": "{{host}} ನಿಂದ ಲೋಡ್ ಮಾಡಿ",
-      "httpsOnly": "HTTPS ಚಿತ್ರಗಳಿಗೆ ಮಾತ್ರ ಅನುಮತಿ ಇದೆ.",
+      "httpsOnly": "HTTPS ಚಿತ್ರಗಳಿಗೆ ಮಾತ್ರ ಅನುಮತಿ ಇದೆ",
       "trustTitle": "{{host}} ನಿಂದ ಚಿತ್ರ ಲೋಡ್ ಮಾಡುವುದೇ?",
       "trustMessage": "{{host}} ಅನ್ನು ವಿಶ್ವಾಸಿಸಿದರೆ ಅದರ ಚಿತ್ರಗಳು ಪ್ರತಿ ಬಾರಿ ಕೇಳದೆ ಲೋಡ್ ಆಗುತ್ತವೆ. ನಂತರ ವಿಶ್ವಾಸಾರ್ಹ ಹೋಸ್ಟ್‌ಗಳಲ್ಲಿ ಅದನ್ನು ಹಿಂಪಡೆಯಬಹುದು.",
       "loadOnce": "ಒಮ್ಮೆ ಲೋಡ್ ಮಾಡಿ"

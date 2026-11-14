@@ -1614,7 +1614,7 @@
       "prefillRepoUnavailable": "{{repo}} não está mais disponível. Escolha um repositório abaixo.",
       "prefillModelUnavailable": "{{model}} não está mais disponível. Seu modelo padrão está em uso.",
       "couldNotReadPendingSessions": "Não foi possível ler as sessões pendentes. Tente novamente.",
-      "failedToCreate": "Não foi possível criar a sessão.",
+      "failedToCreate": "Não foi possível criar a sessão",
       "checkOrganizationAccess": "Verifique seu acesso a esta organização e tente novamente.",
       "couldNotRefreshRepositories": "Não foi possível atualizar os repositórios. Tente novamente.",
       "discardDraftTitle": "Descartar rascunho?",
@@ -2265,6 +2265,9 @@
       "olderActivityDescription": "Custo não atribuído ao histórico carregado",
       "ofWindowTokens": "de {{window}} tokens",
       "tokens": "unidades de texto",
+      "tokens_one": "unidades de texto",
+      "tokens_many": "unidades de texto",
+      "tokens_other": "unidades de texto",
       "tokensWithPercentage": "tokens usados ({{percentage}})",
       "stepsCount_one": "{{steps}} etapa",
       "stepsCount": "{{steps}} etapas",
@@ -2320,7 +2323,7 @@
     "markdownImage": {
       "load": "Carregar",
       "loadWithHost": "Carregar {{host}}",
-      "httpsOnly": "Só é possível carregar imagens via HTTPS.",
+      "httpsOnly": "Só é possível carregar imagens via HTTPS",
       "trustTitle": "Carregar imagem de {{host}}?",
       "trustMessage": "Ao confiar em {{host}}, as imagens dele serão carregadas sem perguntar a cada vez. Você pode revogar isso depois em Domínios confiáveis.",
       "loadOnce": "Carregar uma vez"

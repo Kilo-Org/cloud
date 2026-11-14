@@ -2207,7 +2207,7 @@
       "prefillRepoUnavailable": "{{repo}} vairs nav pieejams. Izvēlies repozitoriju zemāk.",
       "prefillModelUnavailable": "{{model}} vairs nav pieejams. Tiek izmantots tavs noklusējuma modelis.",
       "couldNotReadPendingSessions": "Neizdevās nolasīt gaidošās sesijas. Mēģini vēlreiz.",
-      "failedToCreate": "Neizdevās izveidot sesiju.",
+      "failedToCreate": "Neizdevās izveidot sesiju",
       "checkOrganizationAccess": "Pārbaudi savu piekļuvi šai organizācijai un mēģini vēlreiz.",
       "couldNotRefreshRepositories": "Neizdevās atsvaidzināt repozitorijus. Lūdzu, mēģini vēlreiz.",
       "discardDraftTitle": "Atmest melnrakstu?",
@@ -2858,6 +2858,9 @@
       "olderActivityDescription": "Izmaksas, kas nav attiecinātas uz ielādēto vēsturi",
       "ofWindowTokens": "no {{window}} tokeniem",
       "tokens": "tokeni",
+      "tokens_zero": "tokeni",
+      "tokens_one": "tokeni",
+      "tokens_other": "tokeni",
       "tokensWithPercentage": "tokeni ({{percentage}})",
       "stepsCount_one": "{{steps}} solis",
       "stepsCount": "{{steps}} soļi",
@@ -2913,7 +2916,7 @@
     "markdownImage": {
       "load": "Ielādēt",
       "loadWithHost": "Ielādēt {{host}}",
-      "httpsOnly": "Atļauti tikai attēli no HTTPS adresēm.",
+      "httpsOnly": "Atļauti tikai attēli no HTTPS adresēm",
       "trustTitle": "Ielādēt attēlu no {{host}}?",
       "trustMessage": "Ja uzticies resursdatoram {{host}}, tā attēli tiks ielādēti, katru reizi neprasot. Vēlāk to vari atsaukt sadaļā Uzticamie resursdatori.",
       "loadOnce": "Ielādēt vienreiz"

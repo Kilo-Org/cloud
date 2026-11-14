@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} دیگر در دسترس نیست. مخزنی را در زیر انتخاب کنید.",
       "prefillModelUnavailable": "{{model}} دیگر در دسترس نیست. از مدل پیش‌فرض شما استفاده می‌شود.",
       "couldNotReadPendingSessions": "خواندن نشست‌های در انتظار ممکن نشد. دوباره تلاش کنید.",
-      "failedToCreate": "ایجاد نشست ممکن نشد.",
+      "failedToCreate": "ایجاد نشست ممکن نشد",
       "checkOrganizationAccess": "دسترسی خود به این سازمان را بررسی کنید و دوباره تلاش کنید.",
       "couldNotRefreshRepositories": "تازه‌سازی مخزن‌ها ممکن نشد. لطفاً دوباره تلاش کنید.",
       "discardDraftTitle": "پیش‌نویس حذف شود؟",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "هزینه‌ای که به تاریخچهٔ بارگذاری‌شده مربوط نیست",
       "ofWindowTokens": "از {{window}} توکن",
       "tokens": "توکن",
+      "tokens_one": "توکن",
+      "tokens_other": "توکن",
       "tokensWithPercentage": "توکن ({{percentage}})",
       "stepsCount_one": "{{steps}} گام",
       "stepsCount": "{{steps}} گام",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "بارگذاری",
       "loadWithHost": "بارگذاری {{host}}",
-      "httpsOnly": "فقط تصاویر دارای پیوند HTTPS بارگذاری می‌شوند.",
+      "httpsOnly": "فقط تصاویر دارای پیوند HTTPS بارگذاری می‌شوند",
       "trustTitle": "بارگذاری تصویر از {{host}}؟",
       "trustMessage": "اعتماد به {{host}} باعث می‌شود تصاویر آن بدون پرسیدن هر بار بارگذاری شوند. می‌توانید آن را بعداً در میزبان‌های مورد اعتماد لغو کنید.",
       "loadOnce": "یک‌بار بارگذاری"

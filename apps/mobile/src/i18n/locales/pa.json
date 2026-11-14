@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਹੇਠਾਂ ਇੱਕ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣੋ।",
       "prefillModelUnavailable": "{{model}} ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਤੁਹਾਡਾ ਪੂਰਵ-ਨਿਰਧਾਰਤ ਮਾਡਲ ਵਰਤਿਆ ਜਾ ਰਿਹਾ ਹੈ।",
       "couldNotReadPendingSessions": "ਉਡੀਕ ਵਿੱਚ ਪਏ ਸੈਸ਼ਨ ਪੜ੍ਹੇ ਨਹੀਂ ਜਾ ਸਕੇ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "failedToCreate": "ਸੈਸ਼ਨ ਨਹੀਂ ਬਣਾਇਆ ਜਾ ਸਕਿਆ।",
+      "failedToCreate": "ਸੈਸ਼ਨ ਨਹੀਂ ਬਣਾਇਆ ਜਾ ਸਕਿਆ",
       "checkOrganizationAccess": "ਇਸ ਸੰਗਠਨ ਲਈ ਆਪਣੀ ਪਹੁੰਚ ਜਾਂਚੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "couldNotRefreshRepositories": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਰਿਫਰੈਸ਼ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "discardDraftTitle": "ਕੀ ਡਰਾਫਟ ਰੱਦ ਕਰਨਾ ਹੈ?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "ਉਹ ਲਾਗਤ ਜੋ ਲੋਡ ਕੀਤੇ ਇਤਿਹਾਸ ਨਾਲ ਨਹੀਂ ਜੋੜੀ ਗਈ",
       "ofWindowTokens": "{{window}} ਟੋਕਨਾਂ ਵਿੱਚੋਂ",
       "tokens": "ਟੋਕਨ",
+      "tokens_one": "ਟੋਕਨ",
+      "tokens_other": "ਟੋਕਨ",
       "tokensWithPercentage": "ਟੋਕਨ ({{percentage}})",
       "stepsCount_one": "{{steps}} ਕਦਮ",
       "stepsCount": "{{steps}} ਕਦਮ",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "ਲੋਡ ਕਰੋ",
       "loadWithHost": "{{host}} ਲੋਡ ਕਰੋ",
-      "httpsOnly": "ਸਿਰਫ਼ HTTPS ਰਾਹੀਂ ਮਿਲਣ ਵਾਲੇ ਚਿੱਤਰ ਹੀ ਲੋਡ ਕੀਤੇ ਜਾ ਸਕਦੇ ਹਨ।",
+      "httpsOnly": "ਸਿਰਫ਼ HTTPS ਰਾਹੀਂ ਮਿਲਣ ਵਾਲੇ ਚਿੱਤਰ ਹੀ ਲੋਡ ਕੀਤੇ ਜਾ ਸਕਦੇ ਹਨ",
       "trustTitle": "{{host}} ਤੋਂ ਚਿੱਤਰ ਲੋਡ ਕਰਨਾ ਹੈ?",
       "trustMessage": "{{host}} 'ਤੇ ਭਰੋਸਾ ਕਰਨ ਨਾਲ ਇਸ ਦੇ ਚਿੱਤਰ ਹਰ ਵਾਰ ਪੁੱਛੇ ਬਿਨਾਂ ਲੋਡ ਹੋਣਗੇ। ਤੁਸੀਂ ਬਾਅਦ ਵਿੱਚ ਭਰੋਸੇਯੋਗ ਹੋਸਟਾਂ ਵਿੱਚ ਇਸਨੂੰ ਹਟਾ ਸਕਦੇ ਹੋ।",
       "loadOnce": "ਇੱਕ ਵਾਰ ਲੋਡ ਕਰੋ"

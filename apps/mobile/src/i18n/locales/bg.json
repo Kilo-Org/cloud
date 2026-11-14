@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} вече не е налично. Избери хранилище по-долу.",
       "prefillModelUnavailable": "{{model}} вече не е наличен. Използва се твоят модел по подразбиране.",
       "couldNotReadPendingSessions": "Не успяхме да прочетем чакащите сесии. Опитай отново.",
-      "failedToCreate": "Не успяхме да създадем сесия.",
+      "failedToCreate": "Не успяхме да създадем сесия",
       "checkOrganizationAccess": "Провери достъпа си до тази организация и опитай отново.",
       "couldNotRefreshRepositories": "Не успяхме да опресним хранилищата. Опитай отново.",
       "discardDraftTitle": "Да се изтрие ли черновата?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Разход, неотнесен към заредената история",
       "ofWindowTokens": "от {{window}} токена",
       "tokens": "токени",
+      "tokens_one": "токени",
+      "tokens_other": "токени",
       "tokensWithPercentage": "токена ({{percentage}})",
       "stepsCount_one": "{{steps}} стъпка",
       "stepsCount": "{{steps}} стъпки",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Зареди",
       "loadWithHost": "Зареди {{host}}",
-      "httpsOnly": "Поддържат се само изображения през HTTPS.",
+      "httpsOnly": "Поддържат се само изображения през HTTPS",
       "trustTitle": "Зареждане на изображение от {{host}}?",
       "trustMessage": "Ако се довериш на {{host}}, изображенията му ще се зареждат без да пита всеки път. По-късно можеш да го премахнеш от Доверени хостове.",
       "loadOnce": "Зареди веднъж"

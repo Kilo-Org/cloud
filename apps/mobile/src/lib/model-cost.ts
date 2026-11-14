@@ -44,7 +44,7 @@ export function formatModelCostPer1M(pricing: ModelPricing | undefined): string 
     million,
     output,
     outputLabel: i18n.t('agentChat.messageDetails.output'),
-    tokens: i18n.t('agentChat.contextUsage.tokens'),
+    tokens: i18n.t('agentChat.contextUsage.tokens', { count: 1_000_000 }),
   });
 }
 

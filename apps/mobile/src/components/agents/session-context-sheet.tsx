@@ -352,7 +352,7 @@ export function SessionContextSheet({
               ) : (
                 <Text className="text-sm text-muted-foreground">
                   {' '}
-                  {t('agentChat.contextUsage.tokens')}
+                  {t('agentChat.contextUsage.tokens', { count: info?.contextTokens ?? 0 })}
                 </Text>
               )}
             </Text>

@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "An daina samun {{repo}}. Zaɓi ma'ajiya a ƙasa.",
       "prefillModelUnavailable": "An daina samun {{model}}. Ana amfani da samfurinka na asali.",
       "couldNotReadPendingSessions": "An kasa karanta zamannin da ke jira. Sake gwadawa.",
-      "failedToCreate": "An kasa ƙirƙirar zama.",
+      "failedToCreate": "An kasa ƙirƙirar zama",
       "checkOrganizationAccess": "Ka duba damar shiga ga wannan ƙungiya, ka sake gwadawa.",
       "couldNotRefreshRepositories": "An kasa sabunta ma'ajiyoyi. Sake gwadawa.",
       "discardDraftTitle": "Watsar da daftari?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Kuɗin da ba a danganta da tarihin da aka loda ba",
       "ofWindowTokens": "cikin guntayen rubutu {{window}}",
       "tokens": "guntayen rubutu",
+      "tokens_one": "guntayen rubutu",
+      "tokens_other": "guntayen rubutu",
       "tokensWithPercentage": "guntayen rubutu ({{percentage}})",
       "stepsCount_one": "mataki {{steps}}",
       "stepsCount": "matakai {{steps}}",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Loda",
       "loadWithHost": "Loda {{host}}",
-      "httpsOnly": "Hotunan HTTPS ne kawai ake karɓa.",
+      "httpsOnly": "Hotunan HTTPS ne kawai ake karɓa",
       "trustTitle": "Loda hoto daga {{host}}?",
       "trustMessage": "Amincewa da {{host}} na loda hotunansa ba tare da tambaya kowane lokaci ba. Za ka iya soke shi daga baya a cikin Rukunonin yanar gizo da aka amince da su.",
       "loadOnce": "Loda sau ɗaya"

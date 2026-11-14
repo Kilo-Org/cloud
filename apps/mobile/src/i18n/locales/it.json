@@ -1608,7 +1608,7 @@
       "prefillRepoUnavailable": "{{repo}} non è più disponibile. Seleziona un repository qui sotto.",
       "prefillModelUnavailable": "{{model}} non è più disponibile. Verrà usato il tuo modello predefinito.",
       "couldNotReadPendingSessions": "Impossibile leggere le sessioni in sospeso. Riprova.",
-      "failedToCreate": "Impossibile creare la sessione.",
+      "failedToCreate": "Impossibile creare la sessione",
       "checkOrganizationAccess": "Verifica il tuo accesso a questa organizzazione, poi riprova.",
       "couldNotRefreshRepositories": "Impossibile aggiornare i repository. Riprova.",
       "discardDraftTitle": "Eliminare la bozza?",
@@ -2259,6 +2259,9 @@
       "olderActivityDescription": "Costo non attribuito alla cronologia caricata",
       "ofWindowTokens": "su {{window}} token",
       "tokens": "token",
+      "tokens_one": "token",
+      "tokens_many": "token",
+      "tokens_other": "token",
       "tokensWithPercentage": "token ({{percentage}})",
       "stepsCount_one": "{{steps}} passaggio",
       "stepsCount": "{{steps}} passaggi",
@@ -2314,7 +2317,7 @@
     "markdownImage": {
       "load": "Carica",
       "loadWithHost": "Carica {{host}}",
-      "httpsOnly": "Sono supportate solo le immagini HTTPS.",
+      "httpsOnly": "Sono supportate solo le immagini HTTPS",
       "trustTitle": "Caricare l'immagine da {{host}}?",
       "trustMessage": "Se consideri attendibile {{host}}, le sue immagini verranno caricate senza chiedere ogni volta. Puoi revocarlo in seguito in Siti attendibili.",
       "loadOnce": "Carica una volta"

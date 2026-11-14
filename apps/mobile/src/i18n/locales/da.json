@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} er ikke længere tilgængeligt. Vælg et kodelager nedenfor.",
       "prefillModelUnavailable": "{{model}} er ikke længere tilgængelig. Din standardmodel bruges i stedet.",
       "couldNotReadPendingSessions": "Kunne ikke læse de ventende sessioner. Prøv igen.",
-      "failedToCreate": "Kunne ikke oprette en session.",
+      "failedToCreate": "Kunne ikke oprette en session",
       "checkOrganizationAccess": "Tjek din adgang til denne organisation, og prøv igen.",
       "couldNotRefreshRepositories": "Kunne ikke opdatere listen over kodelagre. Prøv igen.",
       "discardDraftTitle": "Kassér kladde?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Omkostninger, der ikke kan knyttes til den indlæste historik",
       "ofWindowTokens": "af {{window}} tokens",
       "tokens": "teksttokens",
+      "tokens_one": "teksttokens",
+      "tokens_other": "teksttokens",
       "tokensWithPercentage": "tokens ({{percentage}} brugt)",
       "stepsCount_one": "{{steps}} trin",
       "stepsCount": "{{steps}} trin",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Indlæs",
       "loadWithHost": "Indlæs {{host}}",
-      "httpsOnly": "Kun billeder via HTTPS kan indlæses.",
+      "httpsOnly": "Kun billeder via HTTPS kan indlæses",
       "trustTitle": "Indlæs billede fra {{host}}?",
       "trustMessage": "Når du betror {{host}}, indlæses billederne uden at spørge hver gang. Du kan trække det tilbage senere under Betroede domæner.",
       "loadOnce": "Indlæs én gang"

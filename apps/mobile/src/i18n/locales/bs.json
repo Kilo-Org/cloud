@@ -2207,7 +2207,7 @@
       "prefillRepoUnavailable": "{{repo}} više nije dostupan. Odaberi repozitorij u nastavku.",
       "prefillModelUnavailable": "{{model}} više nije dostupan. Koristi se tvoj zadani model.",
       "couldNotReadPendingSessions": "Nije moguće učitati sesije na čekanju. Pokušaj ponovo.",
-      "failedToCreate": "Nije moguće kreirati sesiju.",
+      "failedToCreate": "Nije moguće kreirati sesiju",
       "checkOrganizationAccess": "Provjeri svoj pristup ovoj organizaciji i pokušaj ponovo.",
       "couldNotRefreshRepositories": "Nije moguće osvježiti repozitorije. Pokušaj ponovo.",
       "discardDraftTitle": "Odbaciti nacrt?",
@@ -2858,6 +2858,9 @@
       "olderActivityDescription": "Trošak koji nije pripisan učitanoj historiji",
       "ofWindowTokens": "od {{window}} tokena",
       "tokens": "tokena",
+      "tokens_one": "tokena",
+      "tokens_few": "tokena",
+      "tokens_other": "tokena",
       "tokensWithPercentage": "tokena ({{percentage}})",
       "stepsCount_one": "{{steps}} korak",
       "stepsCount": "{{steps}} koraka",
@@ -2913,7 +2916,7 @@
     "markdownImage": {
       "load": "Učitaj",
       "loadWithHost": "Učitaj {{host}}",
-      "httpsOnly": "Dozvoljene su samo slike dostupne putem HTTPS-a.",
+      "httpsOnly": "Dozvoljene su samo slike dostupne putem HTTPS-a",
       "trustTitle": "Učitati sliku sa {{host}}?",
       "trustMessage": "Ako povjeruješ hostu {{host}}, njegove slike učitavat će se bez svakog pitanja. Kasnije to možeš povući u odjeljku Pouzdani hostovi.",
       "loadOnce": "Učitaj jednom"

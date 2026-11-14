@@ -2266,6 +2266,8 @@
       "olderActivityDescription": "无法归入已加载历史记录的费用",
       "ofWindowTokens": "／ {{window}} 个词元",
       "tokens": "词元",
+      "tokens_one": "词元",
+      "tokens_other": "词元",
       "tokensWithPercentage": "个词元（{{percentage}}）",
       "stepsCount_one": "{{steps}} 步",
       "stepsCount": "{{steps}} 步",

@@ -1623,7 +1623,7 @@
       "prefillRepoUnavailable": "더 이상 {{repo}} 저장소를 사용할 수 없습니다. 아래에서 저장소를 선택하세요.",
       "prefillModelUnavailable": "더 이상 {{model}} 모델을 사용할 수 없습니다. 기본 모델을 사용합니다.",
       "couldNotReadPendingSessions": "대기 중인 세션을 불러올 수 없습니다. 다시 시도하세요.",
-      "failedToCreate": "세션을 만들지 못했습니다.",
+      "failedToCreate": "세션을 만들지 못했습니다",
       "checkOrganizationAccess": "이 조직에 대한 액세스 권한을 확인한 다음 다시 시도하세요.",
       "couldNotRefreshRepositories": "저장소를 새로고침하지 못했습니다. 다시 시도하세요.",
       "discardDraftTitle": "초안을 삭제할까요?",
@@ -2087,8 +2087,8 @@
       "loadingDescription": "하위 에이전트의 메시지를 기다리고 있습니다."
     },
     "messageBubble": {
-      "failure": "오류: {{title}}.",
-      "failureRetryAvailable": "오류: {{title}}. 다시 시도할 수 있습니다.",
+      "failure": "{{title}}.",
+      "failureRetryAvailable": "{{title}}. 다시 시도할 수 있습니다.",
       "copyToComposer": "메시지 입력란에 복사",
       "queuedAccessibility": "메시지 대기 중",
       "userMessage": "사용자 메시지",
@@ -2266,6 +2266,8 @@
       "olderActivityDescription": "불러온 기록에 포함되지 않은 비용",
       "ofWindowTokens": "{{window}} 토큰 중",
       "tokens": "토큰",
+      "tokens_one": "토큰",
+      "tokens_other": "토큰",
       "tokensWithPercentage": "토큰 ({{percentage}})",
       "stepsCount_one": "{{steps}}단계",
       "stepsCount": "{{steps}}단계",
@@ -2319,7 +2321,7 @@
     "markdownImage": {
       "load": "불러오기",
       "loadWithHost": "{{host}}에서 불러오기",
-      "httpsOnly": "HTTPS 이미지만 지원합니다.",
+      "httpsOnly": "HTTPS 이미지만 지원합니다",
       "trustTitle": "{{host}}에서 이미지를 불러올까요?",
       "trustMessage": "{{host}}를 신뢰하면 매번 묻지 않고 이미지를 불러옵니다. 나중에 신뢰하는 호스트에서 해제할 수 있습니다.",
       "loadOnce": "한 번 불러오기"

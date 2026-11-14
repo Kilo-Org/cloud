@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} ei ole enää käytettävissä. Valitse koodivarasto alta.",
       "prefillModelUnavailable": "{{model}} ei ole enää käytettävissä. Käytetään oletusmalliasi.",
       "couldNotReadPendingSessions": "Odottavia istuntoja ei voitu lukea. Yritä uudelleen.",
-      "failedToCreate": "Istunnon luonti epäonnistui.",
+      "failedToCreate": "Istunnon luonti epäonnistui",
       "checkOrganizationAccess": "Tarkista oikeutesi tähän organisaatioon ja yritä uudelleen.",
       "couldNotRefreshRepositories": "Koodivarastoja ei voitu päivittää. Yritä uudelleen.",
       "discardDraftTitle": "Hylätäänkö luonnos?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Kustannukset, joita ei ole kohdistettu ladattuun historiaan",
       "ofWindowTokens": "/ {{window}} tokenia",
       "tokens": "tokenia",
+      "tokens_one": "tokenia",
+      "tokens_other": "tokenia",
       "tokensWithPercentage": "tokenia ({{percentage}})",
       "stepsCount_one": "{{steps}} vaihe",
       "stepsCount": "{{steps}} vaihetta",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Lataa",
       "loadWithHost": "Lataa kuva verkkotunnuksesta {{host}}",
-      "httpsOnly": "Vain HTTPS-yhteydellä ladattavat kuvat sallitaan.",
+      "httpsOnly": "Vain HTTPS-yhteydellä ladattavat kuvat sallitaan",
       "trustTitle": "Ladataanko kuva verkkotunnuksesta {{host}}?",
       "trustMessage": "Kun luotat verkkotunnukseen {{host}}, sen kuvat ladataan ilman erillistä kysymystä. Voit perua luottamuksen myöhemmin kohdassa Luotetut verkkotunnukset.",
       "loadOnce": "Lataa kerran"

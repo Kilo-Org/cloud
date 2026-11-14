@@ -1659,7 +1659,7 @@
       "prefillRepoUnavailable": "{{repo}} больше недоступен. Выберите репозиторий ниже.",
       "prefillModelUnavailable": "{{model}} больше недоступна. Используется ваша модель по умолчанию.",
       "couldNotReadPendingSessions": "Не удалось прочитать данные сеансов в очереди. Попробуйте снова.",
-      "failedToCreate": "Не удалось создать сеанс.",
+      "failedToCreate": "Не удалось создать сеанс",
       "checkOrganizationAccess": "Проверьте доступ к этой организации и попробуйте снова.",
       "couldNotRefreshRepositories": "Не удалось обновить список репозиториев. Попробуйте снова.",
       "discardDraftTitle": "Удалить черновик?",
@@ -2318,6 +2318,10 @@
       "olderActivityDescription": "Расходы, не учтённые в загруженной истории",
       "ofWindowTokens": "из {{window}} токенов",
       "tokens": "токенов",
+      "tokens_one": "токенов",
+      "tokens_few": "токенов",
+      "tokens_many": "токенов",
+      "tokens_other": "токенов",
       "tokensWithPercentage": "токенов ({{percentage}})",
       "stepsCount_one": "{{steps}} шаг",
       "stepsCount": "{{steps}} шага",
@@ -2375,7 +2379,7 @@
     "markdownImage": {
       "load": "Загрузить",
       "loadWithHost": "Загрузить изображение с {{host}}",
-      "httpsOnly": "Можно загружать изображения только по HTTPS.",
+      "httpsOnly": "Можно загружать изображения только по HTTPS",
       "trustTitle": "Загрузить изображение с {{host}}?",
       "trustMessage": "Доверие к {{host}} позволит загружать его изображения без запроса каждый раз. Позже это можно отменить в разделе Доверенные сайты.",
       "loadOnce": "Загрузить один раз"

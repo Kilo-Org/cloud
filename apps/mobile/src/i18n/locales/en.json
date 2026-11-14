@@ -2904,6 +2904,8 @@
       "olderActivityDescription": "Cost not attributed to the loaded history",
       "ofWindowTokens": "of {{window}} tokens",
       "tokens": "tokens",
+      "tokens_one": "token",
+      "tokens_other": "tokens",
       "tokensWithPercentage": "tokens ({{percentage}})",
       "stepsCount_one": "{{steps}} step",
       "stepsCount": "{{steps}} steps",

@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} pole enam saadaval. Vali allpool hoidla.",
       "prefillModelUnavailable": "{{model}} pole enam saadaval. Kasutatakse sinu vaikemudelit.",
       "couldNotReadPendingSessions": "Ootel seansside lugemine ebaõnnestus. Proovi uuesti.",
-      "failedToCreate": "Seansi loomine ebaõnnestus.",
+      "failedToCreate": "Seansi loomine ebaõnnestus",
       "checkOrganizationAccess": "Kontrolli oma juurdepääsu sellele organisatsioonile ja proovi uuesti.",
       "couldNotRefreshRepositories": "Hoidlate värskendamine ebaõnnestus. Proovi uuesti.",
       "discardDraftTitle": "Kas loobuda mustandist?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Kulu, mis ei kajastu laaditud ajaloos",
       "ofWindowTokens": "{{window}} tokenist",
       "tokens": "tokenit",
+      "tokens_one": "tokenit",
+      "tokens_other": "tokenit",
       "tokensWithPercentage": "tokenit ({{percentage}})",
       "stepsCount_one": "{{steps}} samm",
       "stepsCount": "{{steps}} sammu",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Laadi",
       "loadWithHost": "Laadi {{host}}",
-      "httpsOnly": "Laadida saab ainult HTTPS-ühendusega pilte.",
+      "httpsOnly": "Laadida saab ainult HTTPS-ühendusega pilte",
       "trustTitle": "Laadi pilt saidilt {{host}}?",
       "trustMessage": "Kui usaldad hosti {{host}}, laaditakse selle pildid ilma iga kord küsimata. Saad selle hiljem jaotises Usaldatud hostid tühistada.",
       "loadOnce": "Laadi üks kord"

@@ -2166,7 +2166,7 @@
       "prefillRepoUnavailable": "{{repo}} веќе не е достапен. Избери репозиториум подолу.",
       "prefillModelUnavailable": "{{model}} веќе не е достапен. Се користи твојот стандарден модел.",
       "couldNotReadPendingSessions": "Не успеа вчитувањето на сесиите што чекаат. Обиди се повторно.",
-      "failedToCreate": "Не успеа создавањето на сесијата.",
+      "failedToCreate": "Не успеа создавањето на сесијата",
       "checkOrganizationAccess": "Провери го пристапот до оваа организација и обиди се повторно.",
       "couldNotRefreshRepositories": "Не успеа освежувањето на репозиториумите. Обиди се повторно.",
       "discardDraftTitle": "Да се отфрли нацртот?",
@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "Трошок што не е опфатен во вчитаната историја",
       "ofWindowTokens": "од {{window}} токени",
       "tokens": "токени",
+      "tokens_one": "токени",
+      "tokens_other": "токени",
       "tokensWithPercentage": "токени ({{percentage}})",
       "stepsCount_one": "{{steps}} чекор",
       "stepsCount": "{{steps}} чекори",
@@ -2862,7 +2864,7 @@
     "markdownImage": {
       "load": "Вчитај",
       "loadWithHost": "Вчитај {{host}}",
-      "httpsOnly": "Дозволени се само слики преку HTTPS.",
+      "httpsOnly": "Дозволени се само слики преку HTTPS",
       "trustTitle": "Вчитај слика од {{host}}?",
       "trustMessage": "Ако му довериш на {{host}}, неговите слики ќе се вчитуваат без да прашува секој пат. Подоцна можеш да го отстраниш во Доверливи хостови.",
       "loadOnce": "Вчитај еднаш"

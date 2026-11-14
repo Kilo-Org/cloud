@@ -2809,6 +2809,8 @@
       "olderActivityDescription": "ค่าใช้จ่ายที่ไม่อยู่ในประวัติที่โหลดมา",
       "ofWindowTokens": "จาก {{window}} โทเคน",
       "tokens": "โทเคน",
+      "tokens_one": "โทเค็น",
+      "tokens_other": "โทเคน",
       "tokensWithPercentage": "โทเคน ({{percentage}})",
       "stepsCount_one": "{{steps}} ขั้นตอน",
       "stepsCount": "{{steps}} ขั้นตอน",

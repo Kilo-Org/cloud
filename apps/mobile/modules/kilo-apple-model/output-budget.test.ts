@@ -11,9 +11,7 @@ const moduleSource = readFileSync(
   'utf8'
 );
 
-const normalizedModuleSource = moduleSource
-  .replaceAll(/\s+/g, ' ')
-  .replaceAll(/\s*\.\s*/g, '.');
+const normalizedModuleSource = moduleSource.replaceAll(/\s+/g, ' ').replaceAll(/\s*\.\s*/g, '.');
 
 // The budget path is one function. Its markers must sit inside it, so a marker
 // cannot pass because a different function happens to use the same API.

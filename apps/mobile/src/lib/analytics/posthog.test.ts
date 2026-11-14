@@ -1,5 +1,5 @@
 /* oxlint-disable max-lines */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => {
   const client = {
@@ -678,50 +678,50 @@ describe('resumePostHog', () => {
     vi.clearAllMocks();
     hoisted.controller.allowsOptional.mockReturnValue(true);
     hoisted.controller.currentGeneration.mockReturnValue(0);
+    vi.useFakeTimers();
   });
 
-  it('returns a Promise and unseals storage after the 110 ms debounce', async () => {
-    vi.useFakeTimers();
+  // Restore the clock on the failing path too: a leftover fake clock makes the
+  // later suites' real timer waits hang instead of reporting their own failure.
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it('returns a Promise and unseals storage after the 110 ms debounce', async () => {
     const { resumePostHog } = await loadModule();
     const promise = resumePostHog();
     expect(promise).toBeInstanceOf(Promise);
     expect(hoisted.storage.unsealPostHogStorage).not.toHaveBeenCalled();
     // advanceTimersByTimeAsync processes microtasks (the await discardChain
-    // continuation), then the 110 ms setTimeout, then the microtask from the
+    // continuation), then the 110 ms setTimeout, then the microtask from the
     // resolved setTimeout promise, so unsealPostHogStorage runs synchronously.
     await vi.advanceTimersByTimeAsync(110);
     expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
     await promise;
-    vi.useRealTimers();
   });
 
   it('awaits active discard before unsealing', async () => {
     const { initPostHog, discardPostHog, resumePostHog } = await loadModule();
     initPostHog();
 
-    let optOutResolve: (() => void) | undefined = undefined;
-    hoisted.client.optOut.mockImplementationOnce(async () => {
-      await new Promise<void>(resolve => {
-        optOutResolve = resolve;
-      });
-    });
+    const optOut = Promise.withResolvers<undefined>();
+    hoisted.client.optOut.mockImplementationOnce(() => optOut.promise);
 
+    // The synchronous part of the discard (seal, clear queues, client = null)
+    // runs inside the call, before it awaits optOut.
     const discardPromise = discardPostHog();
-    await new Promise<void>(resolve => {
-      void setTimeout(resolve, 0);
-    });
-
     const resumePromise = resumePostHog();
-    await new Promise<void>(resolve => {
-      void setTimeout(resolve, 10);
-    });
 
-    // Unseal must not have been called — discard is still in flight.
+    // The discard is still unresolved, so resumePostHog cannot reach its
+    // 110 ms debounce. Moving past that window must not unseal: this fails
+    // when resumePostHog stops awaiting the discard chain.
+    await vi.advanceTimersByTimeAsync(110);
     expect(hoisted.storage.unsealPostHogStorage).not.toHaveBeenCalled();
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
-    optOutResolve!();
+    optOut.resolve(undefined);
     await discardPromise;
+    await vi.advanceTimersByTimeAsync(110);
     await resumePromise;
 
     expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
@@ -733,6 +733,14 @@ describe('discard serialization', () => {
     vi.clearAllMocks();
     hoisted.controller.allowsOptional.mockReturnValue(true);
     hoisted.controller.currentGeneration.mockReturnValue(0);
+    vi.useFakeTimers();
+  });
+
+  // Restore the clock on the failing path too: a leftover fake clock makes the
+  // later suites' real timer waits hang instead of reporting their own failure.
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
   });
 
   it('resumePostHog awaits a slow discard even when a later fast discard overwrites the tail', async () => {
@@ -740,39 +748,33 @@ describe('discard serialization', () => {
     initPostHog();
 
     // First discard: slow optOut.
-    let optOutResolve: (() => void) | undefined = undefined;
-    hoisted.client.optOut.mockImplementationOnce(async () => {
-      await new Promise<void>(resolve => {
-        optOutResolve = resolve;
-      });
-    });
+    const optOut = Promise.withResolvers<undefined>();
+    hoisted.client.optOut.mockImplementationOnce(() => optOut.promise);
 
     const firstDiscard = discardPostHog();
 
-    // Let the synchronous part of the first discard run (seal, clear
-    // queues, client=null).
-    await new Promise<void>(resolve => {
-      void setTimeout(resolve, 0);
-    });
-
-    // Second discard: client is already null, so the IIFE returns early.
+    // Second discard: client is already null, so the IIFE returns early. No
+    // timer flush is needed between the two — the first discard's synchronous
+    // part (seal, clear queues, client = null) runs inside its call, before it
+    // awaits optOut.
     const secondDiscard = discardPostHog();
 
     // resumePostHog captures the chain tail. The tail includes the second
     // discard. Since the second discard chains after the first, awaiting
     // the tail must await the first discard too.
     const resumePromise = resumePostHog();
-    await new Promise<void>(resolve => {
-      void setTimeout(resolve, 10);
-    });
 
-    // Unseal must not have been called — the first discard is still in flight.
+    // The first discard is still unresolved, so the tail cannot settle and
+    // resumePostHog cannot reach its 110 ms debounce. Moving past that window
+    // must not unseal: this fails when resumePostHog stops awaiting the
+    // discard chain.
+    await vi.advanceTimersByTimeAsync(110);
     expect(hoisted.storage.unsealPostHogStorage).not.toHaveBeenCalled();
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
-    optOutResolve!();
+    optOut.resolve(undefined);
     await firstDiscard;
     await secondDiscard;
+    await vi.advanceTimersByTimeAsync(110);
     await resumePromise;
 
     expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
@@ -786,12 +788,8 @@ describe('discard serialization', () => {
     await discardPostHog();
 
     // Second discard: slow optOut, but starts after resumePostHog captures the tail.
-    let optOutResolve: (() => void) | undefined = undefined;
-    hoisted.client.optOut.mockImplementationOnce(async () => {
-      await new Promise<void>(resolve => {
-        optOutResolve = resolve;
-      });
-    });
+    const optOut = Promise.withResolvers<undefined>();
+    hoisted.client.optOut.mockImplementationOnce(() => optOut.promise);
     // Re-create a client so the second discard has something to opt out.
     const posthogModule = await import('posthog-react-native');
     (posthogModule.default as ReturnType<typeof vi.fn>).mockClear();
@@ -804,8 +802,9 @@ describe('discard serialization', () => {
     const secondDiscard = discardPostHog();
 
     // resumePostHog captured the tail before the second discard was
-    // appended. The tail should resolve when the first discard's
-    // completion resolves (already done).
+    // appended. The tail resolves when the first discard's completion
+    // resolves (already done), so only the 110 ms debounce is left.
+    await vi.advanceTimersByTimeAsync(110);
     await resumePromise;
 
     // The second discard is still in flight, but resumePostHog has
@@ -813,8 +812,7 @@ describe('discard serialization', () => {
     expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
 
     // Clean up: resolve the second discard.
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
-    optOutResolve!();
+    optOut.resolve(undefined);
     await secondDiscard;
   });
 
@@ -825,8 +823,10 @@ describe('discard serialization', () => {
     // Off: discard the client.
     await discardPostHog();
 
-    // On: resume and re-init.
-    await resumePostHog();
+    // On: resume and re-init. resumePostHog waits out its 110 ms debounce.
+    const resumePromise = resumePostHog();
+    await vi.advanceTimersByTimeAsync(110);
+    await resumePromise;
     expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
 
     const posthogModule = await import('posthog-react-native');

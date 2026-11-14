@@ -47,6 +47,17 @@ let phase: LoginDraftPhase = { kind: 'attempt', email: '', ssoRecovery: null };
 /** The pre-upgrade drafts are deleted once per process and never read as values. */
 let legacyCleaned = false;
 
+/**
+ * Whether a restoration has run in this process, and whether the person has
+ * typed since. A mount that unmounts before either is uninitialized memory: it
+ * must not write its blanks over the record a restart is about to restore.
+ */
+let restored = false;
+let edited = false;
+
+/** How many times a retirement write is tried before the completion fails. */
+const RETIREMENT_ATTEMPTS = 2;
+
 /** Write the record on the one chain, so a persist can never land after a retirement. */
 function writeRecord(record: StoredLoginDraft): Promise<void> {
   return chainSave(LOGIN_DRAFT_RECORD_KEY, async () => {
@@ -56,6 +67,7 @@ function writeRecord(record: StoredLoginDraft): Promise<void> {
 
 /** Start an attempt from what the person typed: explicit typing always reopens one. */
 export function beginLoginEmail(email: string): void {
+  edited = true;
   phase = {
     kind: 'attempt',
     email,
@@ -94,9 +106,15 @@ export function holdSsoRecovery(recovery: SsoRecoveryDraft | null): void {
   phase = { kind: 'attempt', email: phase.email, ssoRecovery: null };
 }
 
-/** Write the drafts to disk so they survive an RTL language reload. A retired attempt writes nothing. */
+/**
+ * Write the drafts to disk so they survive an RTL language reload.
+ *
+ * A retired attempt writes nothing, and neither does an uninitialized process:
+ * a mount that unmounts before its restore ran holds no attempt at all, so
+ * writing it would blank the record the next mount restores.
+ */
 export async function persistLoginDrafts(): Promise<void> {
-  if (phase.kind === 'retired') {
+  if (phase.kind === 'retired' || (!restored && !edited)) {
     return;
   }
   await writeRecord({
@@ -161,10 +179,17 @@ export async function restoreLoginDrafts(): Promise<{
   ssoRecovery: SsoRecoveryDraft | null;
 }> {
   await deleteLegacyDrafts();
+  restored = true;
   if (phase.kind === 'retired') {
     return { email: '', ssoRecovery: null };
   }
   const held = await readRecord();
+  /* Restoration initializes the attempt: an untyped memory that then persists
+     on unmount must write what the person was shown, not the blanks it began
+     with. */
+  if (held !== null && phase.email.length === 0 && phase.ssoRecovery === null) {
+    phase = { kind: 'attempt', email: held.email, ssoRecovery: held.ssoRecovery };
+  }
   return {
     email: phase.email.length > 0 ? phase.email : (held?.email ?? ''),
     ssoRecovery: phase.ssoRecovery ?? held?.ssoRecovery ?? null,
@@ -173,16 +198,26 @@ export async function restoreLoginDrafts(): Promise<{
 
 /**
  * Retire the attempt after a successful sign-in: memory first, then the
- * tombstone. Its failure is reported by the store and memory stays retired, so
- * this process still has no attempt to restore.
+ * tombstone.
+ *
+ * Retirement is a required part of completing the sign-in, not a cleanup: a
+ * record left `held` on disk is restored by the next cold start, which is the
+ * bug this lives for. So the write is retried, and one that still fails
+ * rejects, so the completion can be retried instead of quietly leaving the old
+ * copy restorable. Memory stays retired meanwhile.
  */
 export async function endLoginAttempt(): Promise<void> {
   phase = { kind: 'retired' };
-  try {
-    await writeRecord({ version: 2, state: 'retired' });
-  } catch {
-    // The next sign-in writes the tombstone again.
+  let failure: unknown;
+  for (let attempt = 0; attempt < RETIREMENT_ATTEMPTS; attempt += 1) {
+    try {
+      await writeRecord({ version: 2, state: 'retired' });
+      return;
+    } catch (error) {
+      failure = error;
+    }
   }
+  throw failure;
 }
 
 // ── Test-only helpers ───────────────────────────────────────────────────────
@@ -191,4 +226,6 @@ export async function endLoginAttempt(): Promise<void> {
 export function _resetLoginDraftForTests(): void {
   phase = { kind: 'attempt', email: '', ssoRecovery: null };
   legacyCleaned = false;
+  restored = false;
+  edited = false;
 }

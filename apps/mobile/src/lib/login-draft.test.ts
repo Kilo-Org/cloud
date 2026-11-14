@@ -73,6 +73,67 @@ describe('a sign-in attempt', () => {
     await expect(reloaded.restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
   });
 
+  it('retires the held copy across a restart when the tombstone write fails once', async () => {
+    beginLoginEmail('a@b.c');
+    /* The copy is on disk, so a retirement that is only attempted leaves the
+       old held record restorable by the next cold start. */
+    await persistLoginDrafts();
+    stored.failingWrites = 1;
+
+    await endLoginAttempt();
+
+    const reloaded = await reload();
+    await expect(reloaded.restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
+  });
+
+  it('rejects a completion whose retirement cannot be written at all', async () => {
+    beginLoginEmail('a@b.c');
+    await persistLoginDrafts();
+    stored.failingWrites = 99;
+
+    // The retirement is part of completing the sign-in, so its failure is not
+    // swallowed: the completion can be retried.
+    await expect(endLoginAttempt()).rejects.toThrow('keychain unavailable');
+    // This process still has no attempt to restore, whatever the keychain did.
+    await expect(restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
+  });
+
+  it('does not overwrite a saved draft from a mount that unmounts before restoration', async () => {
+    beginLoginEmail('typed@b.c');
+    await persistLoginDrafts();
+
+    /* A fresh process: the field is blank until the restore answers, and the
+       screen's unmount persists what it holds — before the restore has run. */
+    const reloaded = await reload();
+    await reloaded.persistLoginDrafts();
+
+    await expect(reloaded.restoreLoginDrafts()).resolves.toEqual({
+      email: 'typed@b.c',
+      ssoRecovery: null,
+    });
+    // The remount's own unmount writes the restored attempt, not blanks.
+    await reloaded.persistLoginDrafts();
+    const again = await reload();
+    await expect(again.restoreLoginDrafts()).resolves.toEqual({
+      email: 'typed@b.c',
+      ssoRecovery: null,
+    });
+  });
+
+  it('persists an address typed before restoration answered', async () => {
+    beginLoginEmail('typed-before@b.c');
+
+    const reloaded = await reload();
+    reloaded.beginLoginEmail('typed-before@b.c');
+    await reloaded.persistLoginDrafts();
+
+    const again = await reload();
+    await expect(again.restoreLoginDrafts()).resolves.toEqual({
+      email: 'typed-before@b.c',
+      ssoRecovery: null,
+    });
+  });
+
   it('does not reopen a retired attempt from a passive mount', async () => {
     beginLoginEmail('a@b.c');
     await persistLoginDrafts();

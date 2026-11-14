@@ -878,7 +878,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Acest cont nu are încă nicio organizație. PR-urile Bitbucket pot fi revizuite după ce creezi o organizație sau te alături uneia.",
       "gitlabReconnectAdminOnlyDescription": "Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să o reconecteze.",
       "bitbucketNotConnectedTitle": "Bitbucket nu este conectat",
-      "bitbucketAdminOnlyDescription": "Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta.",
+      "adminOnlyConnectDescription": "Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta.",
       "contextLine": "Pentru {{organization}}",
       "contextLinePersonal": "Pentru contul personal"
     },

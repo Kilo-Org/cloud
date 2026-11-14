@@ -2742,7 +2742,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "לחשבון הזה אין עדיין ארגונים. אפשר לסקור בקשות משיכה ב-Bitbucket לאחר שתיצרו או תצטרפו לארגון.",
       "gitlabReconnectAdminOnlyDescription": "בקש מבעלים של הארגון, מנהל או מנהל חיובים לחבר אותו מחדש.",
       "bitbucketNotConnectedTitle": "Bitbucket לא מחובר",
-      "bitbucketAdminOnlyDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
+      "adminOnlyConnectDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
       "contextLine": "עבור {{organization}}",
       "contextLinePersonal": "עבור החשבון האישי"
     },

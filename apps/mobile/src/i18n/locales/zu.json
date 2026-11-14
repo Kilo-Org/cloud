@@ -861,7 +861,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Le akhawunti ayikaze ibe nezinhlangano. Uma usuka inhlangano noma ungena kuyinhlangano, uzokwazi ukubuyekeza ama-PR e-Bitbucket.",
       "gitlabReconnectAdminOnlyDescription": "Cela umnikazi, umlawuli, noma umphathi wokukhokha wenhlangano ukuxhuma kabusha.",
       "bitbucketNotConnectedTitle": "I-Bitbucket ayixhunyiwe",
-      "bitbucketAdminOnlyDescription": "Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma.",
+      "adminOnlyConnectDescription": "Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma.",
       "contextLine": "Ku-{{organization}}",
       "contextLinePersonal": "Kwokomuntu siqu"
     },

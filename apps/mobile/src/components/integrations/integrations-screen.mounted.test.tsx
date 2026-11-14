@@ -337,16 +337,13 @@ describe('IntegrationsScreen', () => {
     const root = mount('org-1').root;
 
     // Every action a member's role cannot take leaves its row without a
-    // control, and the hub names the one role that can change them once, above
-    // the list, instead of under each row.
-    for (const title of ['GitHub', 'Slack', 'Bitbucket']) {
+    // control, and the hub names the roles that can change them once, above the
+    // list, instead of under each row. GitLab belongs to that set: every
+    // organization GitLab connect asks for a billing role, first connect too.
+    for (const title of ['GitHub', 'Slack', 'GitLab', 'Bitbucket']) {
       expect(actionOf(rowTitled(root, title))).toBeNull();
     }
     expect(texts(root).filter(text => text === SHARED_NOTE)).toHaveLength(1);
-    // A row the server would accept keeps its button: `resolveGitLabOAuthOwner`
-    // asks for billing roles only when a connect replaces an existing
-    // integration, so a member's first connect is offered.
-    expect(actionOf(rowTitled(root, 'GitLab'))?.props.accessibilityLabel).toBe('Connect. GitLab');
   });
 
   it('shows no shared note to an owner, who is offered every row', () => {

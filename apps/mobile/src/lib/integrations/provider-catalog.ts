@@ -27,15 +27,10 @@ export type IntegrationAction = 'connect' | 'disconnect';
 type ProviderDefinition = {
   scope: readonly IntegrationScope[];
   hiddenUnlessInstalled: boolean;
-  /**
-   * Roles the provider's connect flow accepts; `null` means any organization
-   * member, because a first-time OAuth connect only proves membership.
-   */
-  connectRoles: readonly OrganizationRole[] | null;
-  /** Roles the provider's disconnect procedure accepts; `null` means any member. */
-  disconnectRoles: readonly OrganizationRole[] | null;
-  /** Roles a connect that replaces an existing integration needs. */
-  replaceRoles?: readonly OrganizationRole[];
+  /** Roles the provider's connect flow accepts, first connect and replacement alike. */
+  connectRoles: readonly OrganizationRole[];
+  /** Roles the provider's disconnect procedure accepts. */
+  disconnectRoles: readonly OrganizationRole[];
 };
 
 /** Bitbucket's hub page gate: `organizationBitbucketRouter.getStatus.canManage`. */
@@ -44,11 +39,13 @@ const BITBUCKET_ROLES = ['owner', 'billing_manager'] as const satisfies readonly
 /**
  * Mirrors the server, per action, instead of one role set per provider:
  * `githubApps.uninstallApp` and `slack.uninstallApp` name
- * `ORGANIZATION_MANAGE_ROLES`, while `slack`, `linear` and `discord` connects
- * and the `gitlab`/`discord`/`linear` disconnects run through
- * `resolveAuthorizedOwner`, whose default is `ORGANIZATION_BILLING_ROLES`.
- * `resolveGitLabOAuthOwner` only requires billing roles when it replaces an
- * existing integration, so a member may make GitLab's first connect.
+ * `ORGANIZATION_MANAGE_ROLES`, while the `slack`, `linear`, `discord` and
+ * `gitlab` connects and the `gitlab`/`discord`/`linear` disconnects run
+ * through `resolveAuthorizedOwner`, whose default is
+ * `ORGANIZATION_BILLING_ROLES`. Every organization GitLab connect starts at
+ * `resolveGitLabOAuthOwner`. That resolver asks for `ORGANIZATION_BILLING_ROLES`
+ * on the OAuth start and on the callback, for a first connect and for a
+ * replacement.
  */
 const PROVIDERS = {
   github: {
@@ -66,8 +63,7 @@ const PROVIDERS = {
   gitlab: {
     scope: ['personal', 'organization'],
     hiddenUnlessInstalled: false,
-    connectRoles: null,
-    replaceRoles: ORGANIZATION_BILLING_ROLES,
+    connectRoles: ORGANIZATION_BILLING_ROLES,
     disconnectRoles: ORGANIZATION_BILLING_ROLES,
   },
   discord: {
@@ -116,14 +112,10 @@ export function visibleIntegrationProviders(
 /** The roles the server procedure behind this action requires. */
 function rolesFor(
   definition: ProviderDefinition,
-  action: IntegrationAction,
-  installed: boolean | undefined
-): readonly OrganizationRole[] | null {
+  action: IntegrationAction
+): readonly OrganizationRole[] {
   if (action === 'disconnect') {
     return definition.disconnectRoles;
-  }
-  if (installed === true && definition.replaceRoles) {
-    return definition.replaceRoles;
   }
   return definition.connectRoles;
 }
@@ -137,20 +129,19 @@ function rolesFor(
 export function canManageProvider(input: {
   provider: IntegrationProvider;
   scope: IntegrationScope;
+  /** The caller's organization role. An unresolved role (`undefined`) offers nothing. */
   role: string | undefined;
   action: IntegrationAction;
-  /** Whether the connection already exists, so a connect would replace it. */
+  /**
+   * Whether the connection already exists. A replacement connect asks for the
+   * same roles as a first connect, so the answer does not depend on it.
+   */
   installed?: boolean;
 }): boolean {
   if (input.scope === 'personal') {
     return true;
   }
-  const allowedRoles = rolesFor(PROVIDERS[input.provider], input.action, input.installed);
-  // `null` names any member: the connect flow only proves membership. A viewer
-  // whose role is not resolved yet gets nothing.
-  if (allowedRoles === null) {
-    return input.role != null;
-  }
+  const allowedRoles = rolesFor(PROVIDERS[input.provider], input.action);
   return allowedRoles.some(allowedRole => allowedRole === input.role);
 }
 

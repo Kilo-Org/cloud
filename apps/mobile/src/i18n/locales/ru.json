@@ -2776,7 +2776,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "В вашем аккаунте пока нет организаций. Пул-реквесты в Bitbucket можно просматривать после того, как вы создадите организацию или присоединитесь к ней.",
       "gitlabReconnectAdminOnlyDescription": "Попросите Владельца, Администратора или Ответственного за оплату организации подключить его заново.",
       "bitbucketNotConnectedTitle": "Bitbucket не подключён",
-      "bitbucketAdminOnlyDescription": "Подключить его могут только владельцы организации, администраторы и ответственные за оплату.",
+      "adminOnlyConnectDescription": "Подключить его могут только владельцы организации, администраторы и ответственные за оплату.",
       "contextLine": "Для {{organization}}",
       "contextLinePersonal": "Для личного аккаунта"
     },

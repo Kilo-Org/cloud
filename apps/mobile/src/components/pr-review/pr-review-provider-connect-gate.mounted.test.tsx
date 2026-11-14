@@ -247,13 +247,21 @@ describe('organization GitLab reconnect state', () => {
     expect(renderedText(renderer)).not.toContain('GitLab connection expired');
   });
 
-  it('keeps the first-time connect action for a member', () => {
-    // The organization OAuth connect only requires a billing role when a
-    // connection already exists, so a member can complete a first connect.
+  it('names the roles that can connect instead of offering a member an action', () => {
+    // Every organization GitLab connect requires a billing role, a first
+    // connect included, so a member cannot complete the integration page's
+    // action and the gate names who can instead of offering it.
     queryState.status = { connected: false, reconnectRequired: false };
     const renderer = mount('gitlab', 'org-1');
-    expect(renderedText(renderer)).toContain('Connect GitLab');
-    expect(renderer.root.findAllByType('Button')).toHaveLength(1);
+    expect(renderedText(renderer)).toContain(
+      'Only organization owners, admins, and billing managers can connect it.'
+    );
+    // The reader never had a connection, so no line claims an expired one, and
+    // the refused connect action is not rendered under its label.
+    expect(renderedText(renderer)).not.toContain('GitLab connection expired');
+    expect(renderedText(renderer)).not.toContain('Connect GitLab');
+    expect(renderedText(renderer)).not.toContain('Reconnect GitLab');
+    expect(renderer.root.findAllByType('Button')).toHaveLength(0);
   });
 
   it('waits for the restored selection instead of painting the personal scope', () => {

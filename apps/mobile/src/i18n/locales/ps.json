@@ -861,7 +861,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "دا حساب تر اوسه هېڅ سازمان نه لري. د Bitbucket پل ریکویسټونو بیاکتنه به وشي چې یو وخت تاسو یو سازمان جوړ کړئ یا یو سازمان ته ورشئ.",
       "gitlabReconnectAdminOnlyDescription": "له یو سازمان مالک، مدیر، یا د بلونو مدیر څخه وغواړئ چې دا بیا ونښلوي.",
       "bitbucketNotConnectedTitle": "Bitbucket نښلول شوی نه دی",
-      "bitbucketAdminOnlyDescription": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ونښلوي.",
+      "adminOnlyConnectDescription": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ونښلوي.",
       "contextLine": "{{organization}} لپاره",
       "contextLinePersonal": "ستاسو د شخصي حساب لپاره"
     },

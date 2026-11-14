@@ -91,7 +91,8 @@ export function IntegrationProviderRow({
 
   // The page behind "Manage on the web" is the same manager-only surface as
   // Disconnect, so it follows the disconnect roles; Connect follows the
-  // connect flow's own rule, which for GitLab admits any member.
+  // connect flow's own rule, and every organization GitLab connect asks for a
+  // billing role, so a member's GitLab row offers no action.
   let action: ReactNode = null;
   if (row.actionPending) {
     // The connections read that decides between Disconnect and the web page has

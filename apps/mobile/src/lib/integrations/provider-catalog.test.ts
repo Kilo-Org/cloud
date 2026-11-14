@@ -60,11 +60,12 @@ describe('canManageProvider', () => {
   // Mirrors the server procedure each action actually calls:
   // - `githubApps.uninstallApp` and `slack.uninstallApp` pass
   //   ORGANIZATION_MANAGE_ROLES explicitly;
-  // - `slack`, `linear` and `discord` connects, plus `linear`, `discord` and
-  //   `gitlab` disconnects, go through `resolveAuthorizedOwner`, whose default
-  //   is ORGANIZATION_BILLING_ROLES;
-  // - `resolveGitLabOAuthOwner` only demands billing roles when it replaces an
-  //   existing integration, so a member's first GitLab connect is allowed.
+  // - `slack`, `linear`, `discord` and `gitlab` connects, plus `linear`,
+  //   `discord` and `gitlab` disconnects, go through `resolveAuthorizedOwner`,
+  //   whose default is ORGANIZATION_BILLING_ROLES;
+  // - every organization GitLab connect starts at `resolveGitLabOAuthOwner`,
+  //   which asks for ORGANIZATION_BILLING_ROLES on the OAuth start and on the
+  //   callback, so a member is turned away for a first connect too.
   const MATRIX: {
     provider: IntegrationProvider;
     action: 'connect' | 'disconnect';
@@ -79,7 +80,7 @@ describe('canManageProvider', () => {
       provider: 'gitlab',
       action: 'connect',
       installed: false,
-      allowed: ['owner', 'admin', 'billing_manager', 'member'],
+      allowed: ['owner', 'admin', 'billing_manager'],
     },
     {
       provider: 'gitlab',
@@ -140,7 +141,14 @@ describe('providerRowBlocked', () => {
   // the manage set and the billing set both name one, and so does Bitbucket's
   // page. `installed` only picks which action the row would show.
   it('blocks a member on every organization provider whose rule needs an owner', () => {
-    for (const provider of ['github', 'slack', 'discord', 'linear', 'bitbucket'] as const) {
+    for (const provider of [
+      'github',
+      'slack',
+      'gitlab',
+      'discord',
+      'linear',
+      'bitbucket',
+    ] as const) {
       for (const installed of [false, true]) {
         expect(
           providerRowBlocked({ provider, scope: 'organization', role: 'member', installed })
@@ -149,26 +157,14 @@ describe('providerRowBlocked', () => {
     }
   });
 
-  it('leaves the first GitLab connect to any member, and blocks the replace', () => {
-    // `resolveGitLabOAuthOwner` asks for billing roles only when the connect
-    // would replace an existing integration, so a member's first connect is
-    // accepted and that row offers its button.
-    expect(
-      providerRowBlocked({
-        provider: 'gitlab',
-        scope: 'organization',
-        role: 'member',
-        installed: false,
-      })
-    ).toBe(false);
-    expect(
-      providerRowBlocked({
-        provider: 'gitlab',
-        scope: 'organization',
-        role: 'member',
-        installed: true,
-      })
-    ).toBe(true);
+  it('blocks a member on gitlab for a first connect and for a replacement', () => {
+    // `resolveGitLabOAuthOwner` asks for billing roles on the OAuth start and on
+    // the callback, so a member's first connect is refused as well.
+    for (const installed of [false, true]) {
+      expect(
+        providerRowBlocked({ provider: 'gitlab', scope: 'organization', role: 'member', installed })
+      ).toBe(true);
+    }
   });
 
   it('blocks an admin on Bitbucket only, whose page turns an admin away', () => {

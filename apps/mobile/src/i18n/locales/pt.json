@@ -878,7 +878,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta conta ainda não tem organizações. Os PRs do Bitbucket podem ser revistos depois de criares ou aderires a uma organização.",
       "gitlabReconnectAdminOnlyDescription": "Peça a um proprietário, administrador ou gestor de faturação da organização que a volte a ligar.",
       "bitbucketNotConnectedTitle": "O Bitbucket não está ligado",
-      "bitbucketAdminOnlyDescription": "Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar.",
+      "adminOnlyConnectDescription": "Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para a sua conta pessoal"
     },

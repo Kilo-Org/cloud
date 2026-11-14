@@ -861,7 +861,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Wala pang mga organisasyon ang account na ito. Masusuri ang mga pull request sa Bitbucket kapag gumawa ka o sumali ka ng isang organisasyon.",
       "gitlabReconnectAdminOnlyDescription": "Hilingin sa isang may-ari ng organisasyon, admin, o tagapamahala ng pagsingil na ikonekta itong muli.",
       "bitbucketNotConnectedTitle": "Hindi nakakonekta ang Bitbucket",
-      "bitbucketAdminOnlyDescription": "Mga may-ari ng organisasyon, admin, at tagapamahala ng pagsingil lang ang maaaring magkonekta nito.",
+      "adminOnlyConnectDescription": "Mga may-ari ng organisasyon, admin, at tagapamahala ng pagsingil lang ang maaaring magkonekta nito.",
       "contextLine": "Para sa {{organization}}",
       "contextLinePersonal": "Para sa pansariling account"
     },

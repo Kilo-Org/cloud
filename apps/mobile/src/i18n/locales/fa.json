@@ -861,7 +861,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "این حساب هنوز سازمانی ندارد. پول ریکوئست‌های Bitbucket را می‌توانید پس از ایجاد یک سازمان یا پیوستن به آن بازبینی کنید.",
       "gitlabReconnectAdminOnlyDescription": "از مالک، مدیر یا مدیر صورتحساب سازمان بخواهید آن را دوباره متصل کند.",
       "bitbucketNotConnectedTitle": "Bitbucket متصل نیست",
-      "bitbucketAdminOnlyDescription": "فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند آن را متصل کنند.",
+      "adminOnlyConnectDescription": "فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند آن را متصل کنند.",
       "contextLine": "برای {{organization}}",
       "contextLinePersonal": "برای حساب شخصی شما"
     },

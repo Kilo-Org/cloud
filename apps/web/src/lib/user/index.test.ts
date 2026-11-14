@@ -1858,6 +1858,67 @@ describe('User', () => {
       expect(updatedUser?.web_session_pepper).not.toBe('web-pepper-before-workos-relink');
     });
 
+    it('links a WorkOS sign-in to an existing account whose address differs only in case', async () => {
+      const existingUser = await insertTestUserAndGoogleAuth({
+        google_user_email: 'john.doe@case-sso.example.com',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'John.Doe@Case-SSO.example.com',
+          google_user_name: 'John Doe',
+          google_user_image_url: '',
+          hosted_domain: 'case-sso.example.com',
+          provider: 'workos',
+          provider_account_id: 'workos-case-variant-profile',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existingUser.id);
+      expect(result.isNew).toBe(false);
+      expect(result.user.google_user_email).toBe('john.doe@case-sso.example.com');
+      const providers = await db.query.user_auth_provider.findMany({
+        where: eq(user_auth_provider.kilo_user_id, existingUser.id),
+      });
+      expect(providers).toEqual([
+        expect.objectContaining({
+          provider: 'workos',
+          provider_account_id: 'workos-case-variant-profile',
+        }),
+      ]);
+    });
+
+    it('links no account when several differ from a WorkOS address only in case', async () => {
+      await insertTestUser({ google_user_email: 'dup.case@case-sso.example.com' });
+      await insertTestUser({ google_user_email: 'Dup.Case@case-sso.example.com' });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'DUP.CASE@case-sso.example.com',
+          google_user_name: 'Dup Case',
+          google_user_image_url: '',
+          hosted_domain: 'case-sso.example.com',
+          provider: 'workos',
+          provider_account_id: 'workos-ambiguous-case-profile',
+        },
+        undefined,
+        true
+      );
+
+      // It falls through to new-account settlement, which this test does not
+      // admit, so only the absence of a link is asserted.
+      expect(result.success).toBe(false);
+      expect(
+        await db.query.user_auth_provider.findFirst({
+          where: eq(user_auth_provider.provider_account_id, 'workos-ambiguous-case-profile'),
+        })
+      ).toBeUndefined();
+    });
+
     it('returns deferredSignInEvent when deferSignInAnalytics is true and user is existing', async () => {
       const user = await insertTestUserAndGoogleAuth({
         google_user_email: 'existing-defer@example.com',

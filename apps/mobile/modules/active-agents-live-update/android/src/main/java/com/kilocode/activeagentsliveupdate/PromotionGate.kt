@@ -48,7 +48,7 @@ internal object PromotionGate {
   fun request(
     context: Context,
     builder: Notification.Builder,
-    compactText: CharSequence?
+    compactText: String?
   ): Boolean {
     if (!capable(context)) {
       return false

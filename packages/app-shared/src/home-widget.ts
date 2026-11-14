@@ -33,7 +33,7 @@ export const homeWidgetDetailsSchema = z.object({
   waitingAgents: z
     .array(
       z.object({
-        title: titleSchema.nullable(),
+        title: titleSchema,
         kind: z.enum(GLANCEABLE_NEEDS_INPUT_STATUSES),
       })
     )
@@ -41,7 +41,7 @@ export const homeWidgetDetailsSchema = z.object({
   scheduledAgents: z
     .array(
       z.object({
-        title: titleSchema.nullable(),
+        title: titleSchema,
         scheduledAt: z.string().nullable(),
       })
     )
@@ -123,10 +123,11 @@ export function glanceableTitle(value: string | null | undefined): string {
 }
 
 /**
- * The name every glanceable surface gives a session: the shared display cut,
- * or null when the session has no user-facing name — an empty title or the
- * backend `New session - <ISO>` creation placeholder. A null title draws the
- * surface's own generic agent label instead.
+ * The one title rule every drawing surface applies: the shared display cut, or
+ * null for an empty title and for the backend `New session - <ISO>`
+ * placeholder. Each surface maps null to its own generic agent label. The
+ * stored Home details keep the plain cut, so every app build can still read a
+ * payload.
  */
 export function glanceableSessionTitle(value: string | null | undefined): string | null {
   const title = glanceableTitle(value);
@@ -166,16 +167,16 @@ export function buildHomeWidgetDetails(
             )[0];
   return {
     approvalKey: waiting.find(row => row.approvalKey != null)?.approvalKey ?? null,
-    primaryTitle: primary === undefined ? null : glanceableSessionTitle(primary.title),
+    primaryTitle: primary === undefined ? null : glanceableTitle(primary.title),
     waitingAgents: waiting.slice(0, HOME_WIDGET_DETAIL_LIMIT).flatMap(row => {
       // The status fold above admits only needs-input statuses; a status that
       // is not one of them has no kind here and the row is dropped rather
       // than mislabelled.
       const kind = glanceableNeedsInputKind(row.status);
-      return kind === null ? [] : [{ title: glanceableSessionTitle(row.title), kind }];
+      return kind === null ? [] : [{ title: glanceableTitle(row.title), kind }];
     }),
     scheduledAgents: scheduled.slice(0, HOME_WIDGET_DETAIL_LIMIT).map(row => ({
-      title: glanceableSessionTitle(row.title),
+      title: glanceableTitle(row.title),
       scheduledAt: timestampToIso(row.scheduledAt),
     })),
   };

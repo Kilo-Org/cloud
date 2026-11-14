@@ -225,10 +225,17 @@ describe('shared Home presentation localization', () => {
     expect(props.home?.awaitingUpdate).toBe(false);
   });
 
-  it('names a content surface generically when its title is absent, and passes a named one through', () => {
-    const untitled = propsFor(dataFor([{ status: 'question' }]));
-    expect(untitled.home).toMatchObject({ status: 'content', primaryTitle: null });
-    expect(untitled.homeCopy?.title).toBe('Agent');
+  it('draws the generic agent label for a backend placeholder title and keeps a named one', () => {
+    const placeholder = `New session - ${new Date(NOW).toISOString()}`;
+    const unnamed = propsFor(
+      dataFor([
+        { status: 'permission', title: placeholder },
+        { status: 'scheduled', title: placeholder, scheduledAt: WAKE },
+      ])
+    );
+    expect(unnamed.homeCopy?.title).toBe('Agent');
+    expect(unnamed.homeCopy?.waitingAgents.map(row => row.title)).toEqual(['Agent']);
+    expect(unnamed.homeCopy?.scheduledAgents.map(row => row.title)).toEqual(['Agent']);
     expect(propsFor(MIXED).homeCopy?.title).toBe('Permission title');
   });
 

@@ -9,7 +9,12 @@ import { type GlanceableActionFeedback, setSurfaceExtras } from '@/lib/glanceabl
 import { type WidgetFamily } from 'expo-widgets';
 
 import { activeAgentsWidgetLayout } from './active-agents-widget';
-import { buildGlanceableViewProps, type GlanceableWidgetProps } from './view-props';
+import {
+  buildGlanceableViewProps,
+  type GlanceableViewProps,
+  type GlanceableWidgetProps,
+  toWidgetProps,
+} from './view-props';
 
 /** A swift-ui primitive stand-in: the kind tag rides on the function itself. */
 function mockComponent(kind: string) {
@@ -88,7 +93,7 @@ type Options = {
   now?: number;
 };
 
-function propsFor(sessions: HomeWidgetSessionRow[], options: Options = {}): GlanceableWidgetProps {
+function propsFor(sessions: HomeWidgetSessionRow[], options: Options = {}): GlanceableViewProps {
   setSurfaceExtras({ newestSessionTitle: null, actionFeedback: options.feedback ?? null });
   const input = {
     sessions,
@@ -750,7 +755,13 @@ describe('stress', () => {
 
   it.each(HOME_FAMILIES)('names a placeholder-title agent generically in %s', family => {
     const placeholder = `New session - ${new Date(NOW - 40 * MINUTE).toISOString()}`;
-    const tree = render(propsFor([{ status: 'question', title: placeholder }]), family);
+    // The widget reads what the publisher wrote, so the shared rule runs in
+    // `toWidgetProps`: the placeholder title leaves the props and the layout
+    // draws its generic agent label.
+    const tree = render(
+      toWidgetProps(propsFor([{ status: 'question', title: placeholder }])),
+      family
+    );
     expect(texts(tree)).toContain('Agent');
     expect(texts(tree)).not.toContain(placeholder);
   });
@@ -773,11 +784,14 @@ describe('stress', () => {
     'passes a named title through and draws none without content in %s',
     family => {
       const named = render(
-        propsFor([{ status: 'question', title: 'Pick a badge colour' }]),
+        toWidgetProps(propsFor([{ status: 'question', title: 'Pick a badge colour' }])),
         family
       );
       expect(texts(named)).toContain('Pick a badge colour');
-      const signedOut = render(propsFor([], { status: 'signed_out' }), family);
+      const signedOut = render(
+        toWidgetProps(propsFor([], { status: 'signed_out' })),
+        family
+      );
       expect(texts(signedOut)).not.toContain('Agent');
     }
   );

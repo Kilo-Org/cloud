@@ -1,4 +1,7 @@
-import { type HomeWidgetPresentation } from '@kilocode/app-shared/home-widget';
+import {
+  glanceableSessionTitle,
+  type HomeWidgetPresentation,
+} from '@kilocode/app-shared/home-widget';
 import { parseTimestamp } from '@kilocode/app-shared/utils';
 
 import { type GlanceableCountKind } from '@/lib/glanceable/presentation';
@@ -54,14 +57,6 @@ const ACTION_FEEDBACK_KEYS = {
   approving: 'glanceable.approving',
   couldNotApprove: 'glanceable.couldNotApprove',
 } as const;
-
-/**
- * The name a content surface draws for one agent: the title it carries, or the
- * shared generic agent label when the title is absent or empty.
- */
-function agentName(title: string | null, translate: (key: string) => string): string {
-  return title === null || title === '' ? translate('common.agent') : title;
-}
 
 function wakeLine(
   home: HomeWidgetPresentation,
@@ -140,7 +135,9 @@ export function buildAndroidHomeCopy(
   const wake =
     content && home.primaryKind === 'scheduled' ? wakeLine(home, translate, formatClock) : null;
   const actionLine = feedback === null ? null : translate(ACTION_FEEDBACK_KEYS[feedback]);
-  const title = content ? agentName(home.primaryTitle, translate) : null;
+  const title = content
+    ? (glanceableSessionTitle(home.primaryTitle) ?? translate('common.agent'))
+    : null;
   const counts =
     home.primaryKind === null
       ? []
@@ -168,11 +165,11 @@ export function buildAndroidHomeCopy(
     },
     secondaryCounts,
     waitingAgents: home.waitingAgents.map(agent => ({
-      title: agentName(agent.title, translate),
+      title: glanceableSessionTitle(agent.title) ?? translate('common.agent'),
       reason: translate(WAIT_REASON_KEYS[agent.kind]),
     })),
     scheduledAgents: home.scheduledAgents.map(agent => ({
-      title: agentName(agent.title, translate),
+      title: glanceableSessionTitle(agent.title) ?? translate('common.agent'),
       time: scheduledAgentTime(agent.scheduledAt, translate, formatClock),
     })),
     accessibilityLabel: [

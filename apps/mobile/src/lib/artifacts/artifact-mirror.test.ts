@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the atomic-index invariant lives in this suite's fake filesystem, and splitting the harness into a second file would duplicate it */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -22,7 +23,16 @@ const DOCUMENT_URI = 'file:///documents';
 const MIRROR_ROOT = `${APP_GROUP_URI}/${ARTIFACT_MIRROR_DIR_NAME}`;
 const SESSIONS_DIR = `${MIRROR_ROOT}/${ARTIFACT_MIRROR_SESSIONS_DIR_NAME}`;
 const MANIFEST_URI = `${MIRROR_ROOT}/${ARTIFACT_MIRROR_MANIFEST_FILE_NAME}`;
-const MANIFEST_PART_URI = `${MANIFEST_URI}.part`;
+
+/** How the mirror replaced the index, observed at the storage boundary. */
+type IndexReplacement = {
+  /** The document that became the index. */
+  staged: string;
+  /** What a reader at the index URI held while the replacement was staged. */
+  previous: string | undefined;
+  /** The operation-log position of the replacement. */
+  operationIndex: number;
+};
 
 /** One node of the fake filesystem: a directory, or a file with its content. */
 type FakeNode = { kind: 'directory' } | { kind: 'file'; content: string };
@@ -36,6 +46,12 @@ type FakeNode = { kind: 'directory' } | { kind: 'file'; content: string };
 const fakeFs = vi.hoisted(() => {
   const nodes = new Map<string, FakeNode>();
   const operations: string[] = [];
+  // The document the mirror must replace rather than write in place, and what
+  // it did to it. A case seeds fixtures through `seedFile`, which bypasses the
+  // guard; `beforeEach` arms the guard for the mirror's own writes.
+  let protectedIndexUri: string | null = null;
+  const directIndexWrites: string[] = [];
+  const indexReplacements: IndexReplacement[] = [];
   const appGroup = { id: 'group.com.kilocode.kiloapp', uri: 'file:///app-group' };
 
   // eslint-disable-next-line unicorn/consistent-function-scoping -- vi.hoisted runs before module scope
@@ -79,6 +95,16 @@ const fakeFs = vi.hoisted(() => {
     operations.push(`create:${uri}`);
   }
 
+  /** Put a file at `uri`, bypassing the in-place-write guard. */
+  function writeNode(uri: string, content: string): void {
+    const parent = parentOf(uri);
+    if (parent !== '' && nodes.get(parent)?.kind !== 'directory') {
+      throw new Error(`missing parent: ${parent}`);
+    }
+    nodes.set(uri, { kind: 'file', content });
+    operations.push(`write:${uri}`);
+  }
+
   function entryOf(uri: string) {
     return {
       uri,
@@ -102,12 +128,11 @@ const fakeFs = vi.hoisted(() => {
           .map(child => entryOf(child));
       },
       writeSync(content: string) {
-        const parent = parentOf(uri);
-        if (parent !== '' && nodes.get(parent)?.kind !== 'directory') {
-          throw new Error(`missing parent: ${parent}`);
+        if (uri === protectedIndexUri) {
+          directIndexWrites.push(uri);
+          throw new Error(`direct write to a protected document: ${uri}`);
         }
-        nodes.set(uri, { kind: 'file', content });
-        operations.push(`write:${uri}`);
+        writeNode(uri, content);
       },
       textSync() {
         const node = nodes.get(uri);
@@ -135,6 +160,14 @@ const fakeFs = vi.hoisted(() => {
         if (nodes.has(destination.uri) && options.overwrite !== true) {
           throw new Error(`exists: ${destination.uri}`);
         }
+        if (destination.uri === protectedIndexUri) {
+          const target = nodes.get(destination.uri);
+          indexReplacements.push({
+            staged: node.content,
+            previous: target?.kind === 'file' ? target.content : undefined,
+            operationIndex: operations.length,
+          });
+        }
         nodes.delete(uri);
         nodes.set(destination.uri, node);
         operations.push(`move:${uri}->${destination.uri}`);
@@ -160,8 +193,14 @@ const fakeFs = vi.hoisted(() => {
     Paths: paths,
     appGroup,
     operations,
+    directIndexWrites,
+    indexReplacements,
     setAppGroup: (available: boolean) => {
       paths.appleSharedContainers = available ? { [appGroup.id]: appGroup.uri } : {};
+    },
+    /** Name the document a case protects from in-place writes. */
+    protectIndex: (uri: string) => {
+      protectedIndexUri = uri;
     },
     has: (uri: string) => nodes.has(uri),
     readFile: (uri: string) => {
@@ -173,7 +212,7 @@ const fakeFs = vi.hoisted(() => {
       if (parent !== '') {
         createDirectory(parent, { idempotent: true, intermediates: true });
       }
-      entryOf(uri).writeSync(content);
+      writeNode(uri, content);
     },
     /** Deep, order-independent snapshot of the whole tree. */
     snapshot: () =>
@@ -183,6 +222,10 @@ const fakeFs = vi.hoisted(() => {
     reset: () => {
       nodes.clear();
       operations.length = 0;
+      directIndexWrites.length = 0;
+      indexReplacements.length = 0;
+      // The guard outlives a reset: a case that resets mid-case keeps the
+      // protection, so no apply can write the index in place unnoticed.
     },
   };
 });
@@ -227,6 +270,7 @@ beforeEach(() => {
   reactNativeMock.Platform.OS = 'ios';
   fakeFs.reset();
   fakeFs.setAppGroup(true);
+  fakeFs.protectIndex(MANIFEST_URI);
 });
 
 describe('applyArtifactSnapshot', () => {
@@ -259,15 +303,30 @@ describe('applyArtifactSnapshot', () => {
     expect(fakeFs.readFile(`${SESSIONS_DIR}/s1/keep`)).toBe('bytes');
   });
 
-  it('writes the index through manifest.json.part and renames it into place', () => {
-    applyArtifactSnapshot(snapshotOf([{ id: 's1', files: ['f1'] }]));
+  it('publishes the index atomically, after the session folders it describes', () => {
+    const first = snapshotOf([{ id: 's1', files: ['f1'] }]);
+    const second = snapshotOf([{ id: 's1', files: ['f1'] }, { id: 's2' }]);
 
-    expect(fakeFs.operations).toContain(`write:${MANIFEST_PART_URI}`);
-    expect(fakeFs.operations.at(-1)).toBe(`move:${MANIFEST_PART_URI}->${MANIFEST_URI}`);
-    expect(fakeFs.has(MANIFEST_PART_URI)).toBe(false);
-    expect(fakeFs.readFile(MANIFEST_URI)).toBe(
-      JSON.stringify(snapshotOf([{ id: 's1', files: ['f1'] }]))
-    );
+    applyArtifactSnapshot(first);
+    applyArtifactSnapshot(second);
+
+    // A reader at the index URI holds a complete document at every moment.
+    expect(fakeFs.directIndexWrites).toEqual([]);
+    expect(fakeFs.indexReplacements.map(({ staged, previous }) => [staged, previous])).toEqual([
+      [JSON.stringify(first), undefined],
+      [JSON.stringify(second), JSON.stringify(first)],
+    ]);
+    // The new index becomes visible only after the folders it describes exist.
+    expect(fakeFs.indexReplacements.at(-1)?.operationIndex).toBe(fakeFs.operations.length - 1);
+    expect(fakeFs.readFile(MANIFEST_URI)).toBe(JSON.stringify(second));
+    // No scratch document of any name survives the publish.
+    expect(fakeFs.snapshot().filter(entry => entry.startsWith(MIRROR_ROOT))).toEqual([
+      `${MIRROR_ROOT}|<dir>`,
+      `${MANIFEST_URI}|${JSON.stringify(second)}`,
+      `${SESSIONS_DIR}|<dir>`,
+      `${SESSIONS_DIR}/s1|<dir>`,
+      `${SESSIONS_DIR}/s2|<dir>`,
+    ]);
   });
 
   it('is idempotent: a second identical snapshot touches nothing', () => {

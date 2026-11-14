@@ -93,4 +93,33 @@ describe('route registry', () => {
     expect(modePickerSlot.get('session-b')).toBeUndefined();
     expect(prDiffSelectionSlot.get('session-b')).toBeUndefined();
   });
+
+  it('clears only the unmounted route key and keeps the other key intact', () => {
+    const bridgeA = makeBridge('session-a');
+    const bridgeB = makeBridge('session-b');
+    const selectionA = makeDiffSelection();
+    const selectionB = { ...makeDiffSelection(), number: 8 };
+    const rendererA = mountRegistrar('session-a');
+    const rendererB = mountRegistrar('session-b');
+    modelPickerSlot.set('session-a', bridgeA);
+    modelPickerSlot.set('session-b', bridgeB);
+    prDiffSelectionSlot.set('session-a', selectionA);
+    prDiffSelectionSlot.set('session-b', selectionB);
+
+    TestRenderer.act(() => {
+      rendererA.unmount();
+    });
+
+    expect(modelPickerSlot.get('session-a')).toBeUndefined();
+    expect(prDiffSelectionSlot.get('session-a')).toBeUndefined();
+    expect(modelPickerSlot.get('session-b')).toBe(bridgeB);
+    expect(prDiffSelectionSlot.get('session-b')).toBe(selectionB);
+
+    TestRenderer.act(() => {
+      rendererB.unmount();
+    });
+
+    expect(modelPickerSlot.get('session-b')).toBeUndefined();
+    expect(prDiffSelectionSlot.get('session-b')).toBeUndefined();
+  });
 });

@@ -89,7 +89,7 @@ export type OrgSettingsRow = Readonly<{
 }>;
 
 /** The one area the app reads itself instead of opening its web page. */
-export type OrgInAppSettingsArea = 'auditLogs';
+type OrgInAppSettingsArea = 'auditLogs';
 
 export type OrgInAppSettingsRow = Readonly<{
   area: OrgInAppSettingsArea;

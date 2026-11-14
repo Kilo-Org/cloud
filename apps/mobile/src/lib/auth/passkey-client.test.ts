@@ -1,25 +1,17 @@
-/* eslint-disable max-lines -- one suite for the sign-in and registration ceremonies, the platform error classification, and the copy mapping */
+/* eslint-disable max-lines -- one suite for the sign-in ceremony, the platform error classification, and the copy mapping */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type PasskeysApi } from '@/lib/auth/passkey-client';
 
 vi.mock('@/lib/auth/auth-fetch', () => ({ postAuth: vi.fn() }));
 
-vi.mock('@/lib/auth/token-owner', () => ({ getAuthTokenForRequest: vi.fn() }));
-
 vi.mock('@/lib/auth/resolve-admission', () => ({ resolveAdmission: vi.fn() }));
 
 const { postAuth } = await import('@/lib/auth/auth-fetch');
-const { getAuthTokenForRequest } = await import('@/lib/auth/token-owner');
 const { resolveAdmission } = await import('@/lib/auth/resolve-admission');
 
-const {
-  classifyPasskeyError,
-  passkeyFailureKey,
-  passkeysSupported,
-  registerPasskey,
-  signInWithPasskey,
-} = await import('@/lib/auth/passkey-client');
+const { classifyPasskeyError, passkeyFailureKey, passkeysSupported, signInWithPasskey } =
+  await import('@/lib/auth/passkey-client');
 
 const mockPostAuth = vi.mocked(postAuth);
 
@@ -27,7 +19,6 @@ function fakeApi(supported = true) {
   return {
     isSupported: () => supported,
     get: vi.fn<PasskeysApi['get']>(),
-    create: vi.fn<PasskeysApi['create']>(),
   };
 }
 
@@ -37,7 +28,6 @@ function refused(errorCode?: string) {
 }
 
 const assertion = { id: 'cred-1', type: 'public-key', response: {} };
-const attestation = { id: 'cred-2', type: 'public-key', response: {} };
 
 const optionsResponse = {
   ok: true as const,
@@ -53,7 +43,6 @@ const tokenResponse = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(getAuthTokenForRequest).mockResolvedValue('session-token');
   vi.mocked(resolveAdmission).mockResolvedValue({ admission: undefined });
 });
 
@@ -481,191 +470,4 @@ describe('signInWithPasskey', () => {
 
     expect(result).toEqual({ status: 'error', failure: 'failed' });
   });
-});
-
-describe('registerPasskey', () => {
-  it('reports unsupported without a native module instead of throwing', async () => {
-    const result = await registerPasskey(null);
-    expect(result).toEqual({ status: 'error', failure: 'unsupported' });
-    expect(mockPostAuth).not.toHaveBeenCalled();
-  });
-
-  it('runs options, the platform ceremony, then verify with the session token', async () => {
-    const api = fakeApi();
-    api.create.mockResolvedValue(attestation);
-    mockPostAuth
-      .mockResolvedValueOnce(optionsResponse)
-      .mockResolvedValueOnce({ ok: true, data: { credentialId: 'cred-2' } });
-
-    const result = await registerPasskey(api);
-
-    expect(api.create).toHaveBeenCalledWith({ challenge: 'chal' });
-    expect(mockPostAuth).toHaveBeenNthCalledWith(
-      1,
-      '/api/auth/passkey/register',
-      { action: 'options' },
-      { Authorization: 'Bearer session-token' }
-    );
-    expect(mockPostAuth).toHaveBeenNthCalledWith(
-      2,
-      '/api/auth/passkey/register',
-      {
-        action: 'verify',
-        challengeId: 'c0000000-0000-4000-8000-000000000001',
-        response: attestation,
-      },
-      { Authorization: 'Bearer session-token' }
-    );
-    expect(result).toEqual({ status: 'ok' });
-  });
-
-  it('reads the session token through the shared outgoing-request accessor', async () => {
-    const api = fakeApi();
-    api.create.mockResolvedValue(attestation);
-    // The in-memory owner can be cold while the session lives only in
-    // SecureStore, so the request must go through the accessor that reads it.
-    vi.mocked(getAuthTokenForRequest).mockResolvedValue('stored-token');
-    mockPostAuth
-      .mockResolvedValueOnce(optionsResponse)
-      .mockResolvedValueOnce({ ok: true, data: { credentialId: 'cred-2' } });
-
-    await registerPasskey(api);
-
-    expect(getAuthTokenForRequest).toHaveBeenCalled();
-    expect(mockPostAuth).toHaveBeenNthCalledWith(
-      1,
-      '/api/auth/passkey/register',
-      { action: 'options' },
-      { Authorization: 'Bearer stored-token' }
-    );
-  });
-
-  it('sends no bearer token when the request accessor has none', async () => {
-    const api = fakeApi();
-    api.create.mockResolvedValue(attestation);
-    vi.mocked(getAuthTokenForRequest).mockResolvedValue(null);
-    mockPostAuth
-      .mockResolvedValueOnce(optionsResponse)
-      .mockResolvedValueOnce({ ok: true, data: { credentialId: 'cred-2' } });
-
-    await registerPasskey(api);
-
-    expect(mockPostAuth).toHaveBeenNthCalledWith(
-      1,
-      '/api/auth/passkey/register',
-      { action: 'options' },
-      {}
-    );
-  });
-
-  it('keeps a dismissed creation sheet retryable', async () => {
-    const api = fakeApi();
-    api.create.mockRejectedValue({ name: 'UserCancelledException' });
-    mockPostAuth.mockResolvedValueOnce(optionsResponse);
-
-    const result = await registerPasskey(api);
-
-    expect(result).toEqual({ status: 'error', failure: 'cancelled' });
-  });
-
-  it('does not report a missing credential as a creation failure', async () => {
-    const api = fakeApi();
-    api.create.mockRejectedValue({ message: 'DomError: NotAllowedError - refused' });
-    mockPostAuth.mockResolvedValueOnce(optionsResponse);
-
-    const result = await registerPasskey(api);
-
-    expect(result).toEqual({ status: 'error', failure: 'failed' });
-  });
-
-  it('reports a refused options request as the generic failure', async () => {
-    const api = fakeApi();
-    mockPostAuth.mockResolvedValueOnce(refused());
-
-    const result = await registerPasskey(api);
-
-    expect(result).toEqual({ status: 'error', failure: 'failed' });
-    expect(api.create).not.toHaveBeenCalled();
-  });
-
-  it('reports an options refusal the route never accepts as unavailable', async () => {
-    const api = fakeApi();
-    mockPostAuth.mockResolvedValueOnce({
-      ok: false,
-      errorCode: undefined,
-      ssoOrganizationId: undefined,
-      httpStatus: 401,
-    });
-
-    const result = await registerPasskey(api);
-
-    // The options step answers 401 only for a session it will not accept, so
-    // the status alone decides it even when the body carries no known code.
-    expect(result).toEqual({ status: 'error', failure: 'unavailable' });
-    expect(api.create).not.toHaveBeenCalled();
-  });
-
-  it('keeps an attestation 401 from the challenge retryable', async () => {
-    const api = fakeApi();
-    api.create.mockResolvedValue(attestation);
-    mockPostAuth.mockResolvedValueOnce(optionsResponse).mockResolvedValueOnce({
-      ok: false,
-      errorCode: 'CHALLENGE_EXPIRED',
-      ssoOrganizationId: undefined,
-      httpStatus: 401,
-    });
-
-    const result = await registerPasskey(api);
-
-    // Verify also answers 401 for the challenge itself; a fresh ceremony mints
-    // a new one, so this refusal must stay retryable.
-    expect(result).toEqual({ status: 'error', failure: 'failed' });
-  });
-
-  it('keeps a rate-limited refusal retryable', async () => {
-    const api = fakeApi();
-    mockPostAuth.mockResolvedValueOnce({
-      ok: false,
-      errorCode: 'RATE_LIMITED',
-      ssoOrganizationId: undefined,
-      httpStatus: 429,
-    });
-
-    const result = await registerPasskey(api);
-
-    expect(result).toEqual({ status: 'error', failure: 'failed' });
-  });
-
-  it('reports a refused attestation as the generic failure', async () => {
-    const api = fakeApi();
-    api.create.mockResolvedValue(attestation);
-    mockPostAuth
-      .mockResolvedValueOnce(optionsResponse)
-      .mockResolvedValueOnce(refused('VERIFICATION_FAILED'));
-
-    const result = await registerPasskey(api);
-
-    expect(result).toEqual({ status: 'error', failure: 'failed' });
-  });
-
-  it.each(['Unauthorized', 'REAUTH_REQUIRED'] as const)(
-    'reports %s as unavailable rather than a retryable failure',
-    async code => {
-      const optionsApi = fakeApi();
-      mockPostAuth.mockResolvedValueOnce(refused(code));
-      expect(await registerPasskey(optionsApi)).toEqual({
-        status: 'error',
-        failure: 'unavailable',
-      });
-      expect(optionsApi.create).not.toHaveBeenCalled();
-
-      const verifyApi = fakeApi();
-      verifyApi.create.mockResolvedValue(attestation);
-      mockPostAuth.mockResolvedValueOnce(optionsResponse).mockResolvedValueOnce(refused(code));
-      expect(await registerPasskey(verifyApi)).toEqual({
-        status: 'error',
-        failure: 'unavailable',
-      });
-    }
-  );
 });

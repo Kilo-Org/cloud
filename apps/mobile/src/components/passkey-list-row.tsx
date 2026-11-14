@@ -1,34 +1,23 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
-import { KeyRound, Pencil, Trash2 } from '@/components/ui/icons';
+import { KeyRound } from '@/components/ui/icons';
 import { IconTile } from '@/components/ui/icon-tile';
 import { Text } from '@/components/ui/text';
 import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { formatDate } from '@/lib/format';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { parseTimestamp } from '@/lib/utils';
 
 /** The passkey list as `user.getPasskeys` returns it; the types are derived, never copied. */
-export type PasskeysResult = inferRouterOutputs<MobileRouter>['user']['getPasskeys'];
+type PasskeysResult = inferRouterOutputs<MobileRouter>['user']['getPasskeys'];
 export type PasskeyRow = PasskeysResult['passkeys'][number];
 
-/** One passkey: its name (or the default when the server stored none), the date
- * it was added, the date it was last used when the server recorded one, and the
- * rename/remove controls for it. */
-export function PasskeyListRow({
-  passkey,
-  disabled,
-  onRename,
-  onRemove,
-}: Readonly<{
-  passkey: PasskeyRow;
-  disabled: boolean;
-  onRename: (passkey: PasskeyRow) => void;
-  onRemove: (passkey: PasskeyRow) => void;
-}>) {
-  const colors = useThemeColors();
+/** One passkey, read-only: its name (or the default when the server stored
+ * none), the date it was added, and the date it was last used when the server
+ * recorded one. Passkeys are managed in a web browser, so the row carries no
+ * controls. */
+export function PasskeyListRow({ passkey }: Readonly<{ passkey: PasskeyRow }>) {
   const { t, i18n } = useTranslation();
   const name = passkey.name?.trim();
 
@@ -52,30 +41,6 @@ export function PasskeyListRow({
           </Text>
         )}
       </View>
-      <Pressable
-        onPress={() => {
-          onRename(passkey);
-        }}
-        disabled={disabled}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel={t('common.rename')}
-        className="min-h-[44px] min-w-[44px] shrink-0 items-center justify-center active:opacity-70"
-      >
-        <Pencil size={16} color={colors.mutedForeground} />
-      </Pressable>
-      <Pressable
-        onPress={() => {
-          onRemove(passkey);
-        }}
-        disabled={disabled}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel={t('common.remove')}
-        className="min-h-[44px] min-w-[44px] shrink-0 items-center justify-center active:opacity-70"
-      >
-        <Trash2 size={16} color={colors.destructive} />
-      </Pressable>
     </View>
   );
 }

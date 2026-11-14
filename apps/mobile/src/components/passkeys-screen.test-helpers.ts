@@ -1,4 +1,4 @@
-import { createElement, type ReactNode } from 'react';
+import { createElement } from 'react';
 import { vi } from 'vitest';
 
 import '@/i18n';
@@ -46,34 +46,14 @@ type PasskeysView = Awaited<ReturnType<typeof renderWithProviders>>;
 const list = vi.hoisted(() => ({
   key: ['user', 'getPasskeys'] as string[],
   queryFn: vi.fn(),
-  deleteFn: vi.fn(),
-  renameFn: vi.fn(),
-  register: vi.fn(),
-  supported: vi.fn(() => true),
 }));
 const store = vi.hoisted(() => ({ rows: [] as unknown[] }));
 /** The window the screen lays out in; a test sets a landscape size to read the
  *  short-window presentation and restores it afterwards. */
 const windowSize = vi.hoisted(() => ({ width: 411, height: 914 }));
-const toastSuccess = vi.hoisted(() => vi.fn());
-const toastError = vi.hoisted(() => vi.fn());
-const confirmSpy = vi.hoisted(() => vi.fn());
 // `vi.hoisted` results cannot be exported at their declaration (vitest hoists
 // them above the export), so they are exported after the declaration instead.
-export { confirmSpy, list, store, toastError, toastSuccess, windowSize };
-
-/**
- * The confirmation the stubbed `useConfirmDialog` captured; mirrors the
- * `ConfirmDialogRequest` the screen passes.
- */
-export type CapturedConfirm = {
-  title: string;
-  message: string;
-  confirmLabel: string;
-  cancelLabel?: string;
-  presentation?: 'screen' | 'sheet';
-  onConfirm: () => void;
-};
+export { list, store, windowSize };
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -82,28 +62,11 @@ vi.mock('@/lib/trpc', () => ({
         queryKey: () => list.key,
         queryOptions: () => ({ queryKey: list.key, queryFn: list.queryFn }),
       },
-      deletePasskey: {
-        mutationOptions: (opts: object) => ({ ...opts, mutationFn: list.deleteFn }),
-      },
-      renamePasskey: {
-        mutationOptions: (opts: object) => ({ ...opts, mutationFn: list.renameFn }),
-      },
     },
   }),
 }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'test-token' }) }));
-vi.mock('@/lib/auth/passkey-client', () => ({
-  registerPasskey: list.register,
-  passkeysSupported: list.supported,
-}));
-vi.mock('sonner-native', () => ({ toast: { success: toastSuccess, error: toastError } }));
 vi.mock('react-native', () => ({
-  I18nManager: { isRTL: false },
-  Modal: 'Modal',
-  Platform: { OS: 'ios' },
-  Pressable: 'Pressable',
-  ScrollView: 'ScrollView',
-  TextInput: 'TextInput',
   useWindowDimensions: () => windowSize,
   View: 'View',
 }));
@@ -117,28 +80,13 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/format', () => ({ formatDate: () => 'Jan 1, 2026' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
-vi.mock('@/components/empty-state', () => ({
-  // Renders the action so a test can reach the CTA that lives inside it.
-  EmptyState: (props: { action?: ReactNode }) => createElement('EmptyState', props, props.action),
-}));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-// The removal confirmation is the app's in-app dialog. The screen's own
-// behaviour is the subject here, so the hook is stubbed: `confirm` captures the
-// request and the node it returns is irrelevant to these suites.
-vi.mock('@/components/ui/dialog', () => ({
-  useConfirmDialog: () => ({ confirm: confirmSpy, dialog: 'ConfirmDialog' }),
-}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/icons', () => ({
-  KeyRound: 'KeyRound',
-  Pencil: 'Pencil',
-  Plus: 'Plus',
-  Trash2: 'Trash2',
-}));
+vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound' }));
 
 // ── Harness ────────────────────────────────────────────────────────────────
 
@@ -159,18 +107,6 @@ export async function press(control: ReactTestInstance): Promise<void> {
 export async function retry(control: ReactTestInstance): Promise<void> {
   await act(() => {
     (control.props.onRetry as () => void)();
-  });
-}
-
-/**
- * Answer the removal confirmation the screen raised, choosing the destructive
- * action. The request carries the `onConfirm` that removes the passkey, so the
- * confirmation is driven from the captured request, not a native alert.
- */
-export async function confirmRemoval(): Promise<void> {
-  const request = confirmSpy.mock.calls[0]?.[0] as CapturedConfirm | undefined;
-  await act(() => {
-    request?.onConfirm();
   });
 }
 
@@ -200,16 +136,11 @@ export function texts(view: PasskeysView): string[] {
   return nodes(view, 'Text').flatMap(node => flatten(node.props.children));
 }
 
-/**
- * The EmptyState description as text. The screen passes the creation hint as a
- * plain string and the unsupported notice as a node, so a test reads both.
- */
-export function emptyDescription(view: PasskeysView): string {
-  const description = first(view, 'EmptyState').props.description as
-    | string
-    | { props?: { children?: unknown } };
-  const value = typeof description === 'string' ? description : description.props?.children;
-  return flatten(value).join('');
+/** Every accessibility label the rendered tree carries, from any node type. */
+export function accessibilityLabels(view: PasskeysView): string[] {
+  return view.renderer.root
+    .findAll(node => typeof node.props.accessibilityLabel === 'string')
+    .map(node => node.props.accessibilityLabel as string);
 }
 
 export function buttonByLabel(view: PasskeysView, label: string): ReactTestInstance {
@@ -230,12 +161,4 @@ export function hasButtonLabel(view: PasskeysView, label: string): boolean {
       node.findAll(inner => String(inner.type) === 'Text' && inner.props.children === label)
         .length > 0
   );
-}
-
-export function rowAction(view: PasskeysView, label: string): ReactTestInstance {
-  const control = nodes(view, 'Pressable').find(node => node.props.accessibilityLabel === label);
-  if (!control) {
-    throw new Error(`Row control ${label} not found`);
-  }
-  return control;
 }

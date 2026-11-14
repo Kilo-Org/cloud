@@ -27,10 +27,7 @@ export type SurfaceFeedbackController<Failure extends SurfaceFailure> = {
   clearWhere(matches: (failure: Failure) => boolean): void;
 };
 
-export type KeyedSurfaceFeedbackController<
-  Key extends string,
-  Failure extends SurfaceFailure,
-> = {
+export type KeyedSurfaceFeedbackController<Key extends string, Failure extends SurfaceFailure> = {
   readonly snapshot: SurfaceFeedbackSnapshot<Key, Failure>;
   readonly begin: (key: Key) => SurfaceAttempt<Failure> | null;
   readonly clearWhere: (key: Key, matches: (failure: Failure) => boolean) => void;

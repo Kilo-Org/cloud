@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- one helper's whole launch contract: both platforms, the abort edges and the foreground return. */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   launchConnectGateBrowser,
@@ -58,6 +58,9 @@ function flushMicrotasks(): Promise<unknown> {
   // abort or report guard, without a wall-clock wait.
   return Promise.all([Promise.resolve(), Promise.resolve(), Promise.resolve(), Promise.resolve()]);
 }
+
+/** Mirrors `FOREGROUND_DEPARTURE_DEADLINE_MS` in the module under test. */
+const HANDOFF_DEADLINE_MS = 10_000;
 
 function returnHandlers() {
   return { onReturn: vi.fn().mockResolvedValue(undefined), onOpenFailure: vi.fn() };
@@ -175,6 +178,76 @@ describe('Android launch', () => {
     expect(handlers.onOpenFailure).not.toHaveBeenCalled();
     expect(retryHandlers.onReturn).toHaveBeenCalledOnce();
     expect(mocks.subscriptions[1]?.remove).toHaveBeenCalledOnce();
+  });
+
+  // `opened` is only the browser's hand-off: Android reports it as soon as the
+  // URL leaves the app, so the app leaving the foreground is the evidence the
+  // browser reached the screen. These cases pin the deadline that bounds it.
+  describe('hand-off deadline', () => {
+    beforeEach(() => {
+      // The app starts in the foreground, so only a real departure counts.
+      mocks.appState.currentState = 'active';
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('rejects a hand-off that never takes the app out of the foreground', async () => {
+      mocks.openBrowserAsync.mockResolvedValue({ type: 'opened' });
+
+      const wait = openAuthorizationAndWaitForReturn('https://example.com/connect');
+      const settled = Promise.allSettled([wait]);
+      await flushMicrotasks();
+      await vi.advanceTimersByTimeAsync(HANDOFF_DEADLINE_MS);
+
+      const [outcome] = await settled;
+      expect(outcome.status).toBe('rejected');
+      expect(outcome.status === 'rejected' ? outcome.reason : undefined).toMatchObject({
+        message: 'The browser did not come to the foreground',
+      });
+      expect(mocks.subscriptions[0]?.remove).toHaveBeenCalledOnce();
+    });
+
+    it('reports that hand-off as an open failure, never as a return', async () => {
+      mocks.openBrowserAsync.mockResolvedValue({ type: 'opened' });
+      const handlers = returnHandlers();
+
+      const launch = launchConnectGateBrowser('https://example.com/connect', handlers);
+      await flushMicrotasks();
+      await vi.advanceTimersByTimeAsync(HANDOFF_DEADLINE_MS);
+      await launch;
+
+      expect(handlers.onOpenFailure).toHaveBeenCalledOnce();
+      expect(handlers.onReturn).not.toHaveBeenCalled();
+    });
+
+    it('still ends on the foreground return once the browser took the screen', async () => {
+      mocks.openBrowserAsync.mockResolvedValue({ type: 'opened' });
+
+      const wait = openAuthorizationAndWaitForReturn('https://example.com/connect');
+      await flushMicrotasks();
+      emitAppState('background');
+      emitAppState('active');
+
+      await expect(wait).resolves.toMatchObject({ settledByLaunch: true });
+      // The departure cleared the deadline instead of leaving it running.
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('does not wait for the deadline when the app is already away', async () => {
+      mocks.appState.currentState = 'background';
+      mocks.openBrowserAsync.mockResolvedValue({ type: 'opened' });
+
+      const wait = openAuthorizationAndWaitForReturn('https://example.com/connect');
+      await flushMicrotasks();
+      emitAppState('active');
+
+      // Nothing advanced the clock: the departure was already true.
+      await expect(wait).resolves.toMatchObject({ settledByLaunch: true });
+      expect(vi.getTimerCount()).toBe(0);
+    });
   });
 });
 

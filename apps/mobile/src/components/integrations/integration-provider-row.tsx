@@ -8,6 +8,7 @@ import {
   MessageSquare,
 } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
+import { Pressable } from 'react-native';
 import { type ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,7 @@ import {
   type IntegrationScope,
   providerLabelKey,
 } from '@/lib/integrations/provider-catalog';
+import { cn } from '@/lib/utils';
 
 /**
  * The app's icon set carries no brand glyphs, so each provider takes the
@@ -133,7 +135,18 @@ export function IntegrationProviderRow({
     ) : null;
   }
 
-  return (
+  // An uninstalled row's body starts the same Connect action as its trailing
+  // button, for every provider: the row names the service and its state, and a
+  // tap on it is a tap on the only thing the row offers. An installed row stays
+  // inert — its one action is Disconnect or the web page, and a body tap must
+  // never take a destructive action by accident — and a pending row has no
+  // action to offer yet.
+  //
+  // The wrapper is not an accessibility element (`accessible={false}`): the
+  // trailing Button is the row's single named control and carries the busy
+  // state, so a second stop here would read the same provider twice.
+  const rowStartsConnect = !row.installed && !row.actionPending && canConnect;
+  const configuredRow = (
     <ConfigureRow
       icon={PROVIDER_ICONS[row.provider]}
       title={label}
@@ -142,5 +155,19 @@ export function IntegrationProviderRow({
       trailing={action}
       last={last}
     />
+  );
+  if (!rowStartsConnect) {
+    return configuredRow;
+  }
+  return (
+    <Pressable
+      onPress={onConnect}
+      // A second tap while the browser is on its way must not mint again.
+      disabled={connecting}
+      accessible={false}
+      className={cn('active:opacity-70', connecting && 'opacity-70')}
+    >
+      {configuredRow}
+    </Pressable>
   );
 }

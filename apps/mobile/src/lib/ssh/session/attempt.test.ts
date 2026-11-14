@@ -4,7 +4,7 @@ import { type SshHost } from '../hosts';
 import type * as Biometric from './biometric';
 import { attempt, fail } from './attempt';
 import { live, type LiveSession } from './live';
-import { resumeSshSessions, retrySession } from './manager';
+import { closeSession, resumeSshSessions, retrySession } from './manager';
 import { patchSession, sessionById, writeSession } from './session-store';
 
 const state = vi.hoisted(() => ({
@@ -84,6 +84,7 @@ function createEntry(): LiveSession {
     promptsHostId: null,
     passphrase: null,
     connecting: false,
+    attemptAbort: null,
     connectTargets: [],
   };
 }
@@ -127,12 +128,15 @@ it('starts a requested retry immediately and clears the pending backoff timer', 
   expect(vi.getTimerCount()).toBe(1);
   expect(sessionById('app')?.phase.kind).toBe('reconnecting');
 
+  state.connect.mockImplementationOnce(() => {
+    expect(sessionById('app')?.phase).toEqual({ kind: 'connecting', attempt: 1 });
+    return Promise.resolve('new-target');
+  });
   retrySession('app');
 
   expect(entry.timer).toBeNull();
   expect(vi.getTimerCount()).toBe(0);
   expect(entry.connecting).toBe(true);
-  expect(sessionById('app')?.phase).toEqual({ kind: 'connecting', attempt: 1 });
   await vi.waitFor(() => {
     expect(state.connect).toHaveBeenCalledTimes(1);
     expect(sessionById('app')?.phase.kind).toBe('connected');
@@ -235,3 +239,79 @@ it('gives only the target its app row id while keeping hop connections anonymous
   expect(entry.jumpSessionIds).toEqual(['hop']);
   expect(entry.nativeSessionId).toBe('target');
 });
+
+it.each(['typed-password', 'saved-password', 'keyboard-interactive'])(
+  'reconnects %s in the background without waiting for an unlock',
+  async authentication => {
+    const host: SshHost = {
+      ...state.host,
+      authMethod: authentication === 'keyboard-interactive' ? 'keyboard_interactive' : 'password',
+      password: authentication === 'saved-password' ? 'saved' : null,
+    };
+    state.getHost.mockReturnValue(host);
+    if (authentication === 'typed-password') {
+      entry.passwords.set(host.id, 'typed');
+    }
+    patchSession('app', { phase: { kind: 'reconnecting', attempt: 1, reason: 'disconnected' } });
+    state.app.currentState = 'background';
+    await attempt(entry);
+    expect(state.connect).toHaveBeenCalledOnce();
+    expect(state.access).not.toHaveBeenCalled();
+    expect(state.app.addEventListener).not.toHaveBeenCalled();
+    expect(sessionById('app')?.phase.kind).toBe('connected');
+  }
+);
+
+it('waits for foreground when a password target has a key-authenticated jump host', async () => {
+  const target: SshHost = {
+    ...state.host,
+    authMethod: 'password',
+    password: 'saved',
+    jumpHostId: 'jump',
+  };
+  const jump: SshHost = { ...state.host, id: 'jump' };
+  state.getHost.mockImplementation((_db, id) => (id === 'jump' ? jump : target));
+  state.connectVia.mockResolvedValue('target');
+  patchSession('app', { phase: { kind: 'reconnecting', attempt: 1, reason: 'disconnected' } });
+  state.app.currentState = 'background';
+  const reconnect = attempt(entry);
+  await vi.waitFor(() => {
+    expect(state.app.addEventListener).toHaveBeenCalledOnce();
+  });
+  expect(state.connect).not.toHaveBeenCalled();
+  state.app.currentState = 'active';
+  state.app.addEventListener.mock.calls[0]?.[1]('active');
+  await reconnect;
+  expect(state.access).toHaveBeenCalledOnce();
+  expect(state.connectVia).toHaveBeenCalledOnce();
+});
+
+it.each(['close', 'failure'])(
+  'removes a background reconnect listener on session %s',
+  async ending => {
+    patchSession('app', { phase: { kind: 'reconnecting', attempt: 1, reason: 'disconnected' } });
+    state.app.currentState = 'background';
+    const reconnect = attempt(entry);
+    await vi.waitFor(() => {
+      expect(state.app.addEventListener).toHaveBeenCalledOnce();
+    });
+    if (ending === 'close') {
+      await closeSession(entry.id);
+    } else {
+      fail(entry, 'user');
+    }
+    await reconnect;
+    expect(state.remove).toHaveBeenCalledOnce();
+    expect(entry.connecting).toBe(false);
+    expect(entry.attemptAbort).toBeNull();
+    expect(state.connect).not.toHaveBeenCalled();
+    expect(state.access).not.toHaveBeenCalled();
+    if (ending === 'failure') {
+      expect(sessionById('app')?.phase).toEqual({
+        kind: 'closed',
+        reason: 'user',
+        retryable: false,
+      });
+    }
+  }
+);

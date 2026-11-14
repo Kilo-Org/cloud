@@ -488,3 +488,10 @@ No control on either surface buys, cancels, resumes, or manages a pass.
 
 Kilo Pass store verification, provider notifications, and expiry reconciliation
 remain on the backend for existing store subscriptions.
+
+## SSH reconnects
+
+Password, saved-password, and keyboard-interactive sessions reconnect in the background.
+A connection using a stored key on any hop waits for the foreground before device unlock.
+Closing or disconnecting the session cancels that wait and removes its foreground listener;
+the notification's disconnect-all action uses the same cleanup.

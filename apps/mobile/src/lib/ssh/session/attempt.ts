@@ -87,18 +87,9 @@ export async function attempt(entry: LiveSession): Promise<void> {
   }
   clearTimer(entry);
   entry.connecting = true;
-  if (sessionById(entry.id)?.phase.kind === 'reconnecting') {
-    const foreground = waitForForeground();
-    if (foreground !== null) {
-      await foreground;
-    }
-    if (!stillOpen(entry)) {
-      entry.connecting = false;
-      return;
-    }
-  }
-  entry.attempt += 1;
-  setPhase(entry, { kind: 'connecting', attempt: entry.attempt });
+  const reconnecting = sessionById(entry.id)?.phase.kind === 'reconnecting';
+  const cancellation = new AbortController();
+  entry.attemptAbort = cancellation;
   const opened: string[] = [];
   try {
     const db = await sshDatabase();
@@ -113,6 +104,17 @@ export async function attempt(entry: LiveSession): Promise<void> {
       fail(entry, 'host-missing');
       return;
     }
+    if (reconnecting && chain.some(hop => hop.authMethod === 'key')) {
+      const foreground = waitForForeground(cancellation.signal);
+      if (foreground !== null && !(await foreground)) {
+        return;
+      }
+    }
+    if (!stillOpen(entry) || cancellation.signal.aborted) {
+      return;
+    }
+    entry.attempt += 1;
+    setPhase(entry, { kind: 'connecting', attempt: entry.attempt });
     entry.connectTargets = chain.map(hop => ({ host: hop.hostname, port: hop.port }));
 
     const ssh = await sshPackage();
@@ -146,6 +148,7 @@ export async function attempt(entry: LiveSession): Promise<void> {
   } catch (error) {
     fail(entry, reasonOf(error));
   } finally {
+    entry.attemptAbort = null;
     entry.connecting = false;
     entry.connectTargets = [];
     entry.promptsHostId = null;
@@ -161,6 +164,7 @@ export function fail(entry: LiveSession, reason: SshCloseReason, hop?: SshHost):
   if (!stillOpen(entry)) {
     return;
   }
+  entry.attemptAbort?.abort();
   releaseShell(entry);
   entry.prompts = null;
   entry.hostKey = null;
@@ -238,8 +242,10 @@ async function authFor(
       fail(entry, 'key-missing');
       return null;
     }
-    if (!(await requireKeyAccess(i18n.t('ssh.session.keyPrompt')))) {
-      fail(entry, 'AuthCancelled');
+    if (!(await requireKeyAccess(i18n.t('ssh.session.keyPrompt'), entry.attemptAbort?.signal))) {
+      if (!entry.attemptAbort?.signal.aborted) {
+        fail(entry, 'AuthCancelled');
+      }
       return null;
     }
     if (!stillOpen(entry)) {

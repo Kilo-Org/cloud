@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  chatFlagBehind,
   chatFlagValueOf,
   flagApplication,
   flagPersisted,
@@ -63,7 +64,18 @@ describe('the transitions of a chat flag', () => {
     });
   });
 
-  it('applies an outcome only to a saved choice', () => {
+  it.each([false, true])('keeps the application failure when a %s choice is refused', choice => {
+    const refused = flagRefused(flagPicked(saved(choice, 'behind'), !choice));
+
+    expect(chatFlagValueOf(refused, !choice)).toBe(choice);
+    expect(chatFlagBehind(refused)).toBe(true);
+    expect(flagApplication(refused, 'current')).toEqual({
+      kind: 'refused',
+      was: { choice, application: 'current' },
+    });
+  });
+
+  it('applies an outcome to the stored choice', () => {
     expect(flagApplication(saved(true, 'moving'), 'behind')).toEqual(saved(true, 'behind'));
     expect(flagApplication(saved(true), 'current')).toEqual(saved(true, 'current'));
   });

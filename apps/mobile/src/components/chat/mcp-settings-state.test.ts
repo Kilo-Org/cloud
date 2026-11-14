@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { flagPicked, flagRefused } from '@/lib/chat/chat-flag';
+
 import { kiloServerRow, mcpSettingsView, settingsToolsView } from './mcp-settings-state';
 import { saved, tool } from './mcp-settings-state.test-helpers';
 
@@ -139,6 +141,17 @@ describe('what the Kilo MCP sheet shows', () => {
     expect(view).toMatchObject({
       enabled: false,
       toggleable: true,
+      statusKey: 'modelChat.mcp.notApplied',
+      retry: true,
+    });
+  });
+
+  it.each([false, true])('keeps Retry when persisting the opposite of %s is refused', choice => {
+    const flag = flagRefused(flagPicked(saved(choice, 'behind'), !choice));
+    const view = mcpSettingsView({ status: 'ready', tools: [tool('mcp_kilo_read-file')] }, flag);
+
+    expect(view).toMatchObject({
+      enabled: choice,
       statusKey: 'modelChat.mcp.notApplied',
       retry: true,
     });

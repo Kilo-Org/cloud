@@ -123,7 +123,7 @@ function retryable(kind: 'unauthorized' | 'unreachable' | 'missing' | 'protocol'
  * move failed draws off, with the same line and the same Retry. Reading the
  * connection here would claim a tool set the person did not ask for.
  */
-function behind(flag: ChatFlag & { readonly kind: 'saved' }): McpSettingsView {
+function behind(flag: ChatFlag): McpSettingsView {
   return {
     enabled: chatFlagValueOf(flag, true),
     toggleable: true,
@@ -139,7 +139,7 @@ function behind(flag: ChatFlag & { readonly kind: 'saved' }): McpSettingsView {
 export function mcpSettingsView(state: KiloMcpState, flag: ChatFlag): McpSettingsView {
   /* Before the connection branches: a choice this session is not on is about the
      choice, and no connection state can say whether it landed. */
-  if (flag.kind === 'saved' && chatFlagBehind(flag)) {
+  if (chatFlagBehind(flag)) {
     return behind(flag);
   }
   if (!chatFlagValueOf(flag, true)) {

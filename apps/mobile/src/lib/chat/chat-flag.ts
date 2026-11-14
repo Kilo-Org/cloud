@@ -88,7 +88,15 @@ export function chatFlagValueOf(flag: ChatFlag, fallback: boolean): boolean {
  * the saved value and only the status line and Retry change.
  */
 export function chatFlagBehind(flag: ChatFlag): boolean {
-  return flag.kind === 'saved' && flag.application === 'behind';
+  return flag.kind === 'saved'
+    ? flag.application === 'behind'
+    : flag.kind === 'refused' && flag.was.application === 'behind';
+}
+
+export function chatFlagMoving(flag: ChatFlag): boolean {
+  return flag.kind === 'saved'
+    ? flag.application === 'moving'
+    : flag.kind === 'refused' && flag.was.application === 'moving';
 }
 
 /**
@@ -120,8 +128,11 @@ export function flagRefused(flag: ChatFlag): ChatFlag {
   return { kind: 'refused', was: flag.was };
 }
 
-/** How far this session is from the saved choice; only a `saved` flag carries one. */
+/** Updates application of the saved choice, including one restored after refusal. */
 export function flagApplication(flag: ChatFlag, application: ChatFlagApplication): ChatFlag {
+  if (flag.kind === 'refused') {
+    return { kind: 'refused', was: { choice: flag.was.choice, application } };
+  }
   if (flag.kind !== 'saved') {
     return flag;
   }

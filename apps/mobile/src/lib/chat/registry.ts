@@ -33,6 +33,7 @@ import {
   type ChatFlag,
   type ChatFlagApplication,
   chatFlagBehind,
+  chatFlagMoving,
   type ChatFlagName,
   flagApplication,
   flagPersisted,
@@ -1619,14 +1620,8 @@ function writeFlagOf(flag: ChatFlagName, sessionId: string, value: ChatFlag): vo
 function settleFlagApplications(sessionId: string, application: 'current' | 'behind'): void {
   const { webSearch, kiloTools } = snapshotOf(sessionId);
   change(sessionId, {
-    webSearch:
-      webSearch.kind === 'saved' && webSearch.application === 'moving'
-        ? flagApplication(webSearch, application)
-        : webSearch,
-    kiloTools:
-      kiloTools.kind === 'saved' && kiloTools.application === 'moving'
-        ? flagApplication(kiloTools, application)
-        : kiloTools,
+    webSearch: chatFlagMoving(webSearch) ? flagApplication(webSearch, application) : webSearch,
+    kiloTools: chatFlagMoving(kiloTools) ? flagApplication(kiloTools, application) : kiloTools,
   });
 }
 

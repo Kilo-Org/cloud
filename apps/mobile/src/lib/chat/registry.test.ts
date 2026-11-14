@@ -4,7 +4,7 @@ import { Effect, Layer, Queue, Stream } from 'effect';
 import { type StoredChatBackend } from './backend-store';
 import { backendTargetId, CREDITS_FAILURE_KEY } from './backend-target';
 import { asMessages } from './turns';
-import { type ChatFlagName } from './chat-flag';
+import { chatFlagBehind, type ChatFlagName } from './chat-flag';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -124,6 +124,7 @@ const mcp = vi.hoisted(() => ({
   tools: [] as { readonly definition: { readonly name: string } }[],
   /** The per-chat setting, absent meaning on. */
   enabled: new Map<string, boolean>(),
+  refuseNextWrite: false,
   ensure: vi.fn(async () => {
     await Promise.resolve();
     return {
@@ -360,6 +361,10 @@ vi.mock('./kilo-mcp', () => ({
     await Promise.resolve();
     if (signal?.aborted) {
       throw new Error('cancelled');
+    }
+    if (mcp.refuseNextWrite) {
+      mcp.refuseNextWrite = false;
+      throw new Error('the choice could not be written');
     }
     if (enabled) {
       mcp.enabled.delete(sessionId);
@@ -602,6 +607,7 @@ beforeEach(async () => {
   settingsSwitch.enabled = true;
   mcp.tools.length = 0;
   mcp.enabled.clear();
+  mcp.refuseNextWrite = false;
   remote.tools.length = 0;
   remote.offered.length = 0;
   continuesWith = [];
@@ -2270,6 +2276,27 @@ describe('a tool retry queued behind send startup', () => {
     expect(snapshotOf(opened).turns).toEqual([TURN]);
   });
 });
+describe('a refused flag choice whose session is already behind', () => {
+  it('keeps the saved switch value and the explicit application retry', async () => {
+    failCloneFor = opened;
+    await setChatFlag({ sessionId: opened, place, flag: 'kiloTools', next: false });
+    expect(chatFlagBehind(snapshotOf(opened).kiloTools)).toBe(true);
+    mcp.refuseNextWrite = true;
+    await expect(
+      setChatFlag({ sessionId: opened, place, flag: 'kiloTools', next: true })
+    ).rejects.toThrow('the choice could not be written');
+    const refused = snapshotOf(opened).kiloTools;
+    expect(chatFlagValueOf(refused, true)).toBe(false);
+    expect(chatFlagBehind(refused)).toBe(true);
+
+    failCloneFor = undefined;
+    await retryChatFlag({ sessionId: opened, place, flag: 'kiloTools' });
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+    expect(chatFlagBehind(snapshotOf(opened).kiloTools)).toBe(false);
+    expect(chatFlagValueOf(snapshotOf(opened).kiloTools, true)).toBe(false);
+  });
+});
+
 describe('a flag applied after an answer', () => {
   it.each(['webSearch', 'kiloTools'] satisfies readonly ChatFlagName[])(
     'keeps %s moving until a deferred move settles and reports its refusal',

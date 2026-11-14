@@ -2,6 +2,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { formatPercent } from '@/lib/format';
+
+import { formatSessionCostBadge } from './session-list-helpers';
 import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
@@ -14,8 +17,10 @@ import {
   getContextSheetContent,
   getContextTone,
   getHeaderPillContent,
+  getHeaderPillWidth,
   getIndeterminateArcFraction,
   getMetricsAccessibilityLabel,
+  getPillSlotSizers,
   getRemainingTokens,
   type HeaderPillContent,
 } from './context-usage-display';
@@ -48,7 +53,7 @@ function pill(args: {
 const trackOnly: HeaderPillContent = {
   primary: null,
   secondary: null,
-  costSlot: 'none',
+  costSlot: 'unreported',
   tone: 'neutral',
   arcFraction: 0,
   interactive: false,
@@ -191,7 +196,7 @@ describe('getHeaderPillContent', () => {
   it('omits secondary cost when cost is zero or null', () => {
     const base = {
       secondary: null,
-      costSlot: 'none',
+      costSlot: 'unreported',
       tone: 'primary' as const,
       arcFraction: 0.1,
       interactive: true,
@@ -255,7 +260,7 @@ describe('getHeaderPillContent', () => {
     ).toMatchObject({
       primary: null,
       secondary: null,
-      costSlot: 'none',
+      costSlot: 'unreported',
       tone: 'neutral',
       arcFraction: undefined,
       interactive: true,
@@ -285,6 +290,80 @@ describe('getHeaderPillContent', () => {
 
   it('never surfaces a bare cost before a transcript exists', () => {
     expect(pill({ totalCostMicrodollars: 700, hasMessages: false })).toEqual(unreported);
+  });
+});
+
+describe('getPillSlotSizers', () => {
+  // The slots are laid out at the widest reading they can paint, so a reading
+  // that arrives fills its slot instead of resizing the pill beside the title.
+  it('sizes both slots from the widest reading each one paints', () => {
+    const sizers = getPillSlotSizers();
+    // The percentage keeps at most one decimal, so a fractional reading is a
+    // glyph wider than the whole window. The slot holds whichever is longer.
+    const fractional = formatPercent(99.9, i18n.language);
+    const whole = formatPercent(100, i18n.language);
+    expect(sizers.percentage).toBe(fractional.length >= whole.length ? fractional : whole);
+    // The cost sizer holds both badge shapes: the four-decimal one below half a
+    // cent is the wider of the two, so it is the reserve.
+    expect(sizers.cost).toBe(formatSessionCostBadge(4_999));
+  });
+
+  // The percentage slot holds every reading the pill paints, in both shapes the
+  // formatter produces: a fractional reading and a whole window.
+  it('holds a painted percentage in both of its shapes', () => {
+    const { percentage } = getPillSlotSizers();
+    for (const painted of [0, 0.4, 5, 16.7, 42, 88.8, 99.9, 100].map(value =>
+      formatPercent(value, i18n.language)
+    )) {
+      expect(painted.length).toBeLessThanOrEqual(percentage.length);
+    }
+    // A fractional reading is longer than the whole-window one it shares the
+    // slot with, so the reserve cannot be the whole window alone.
+    expect(formatPercent(16.7, i18n.language).length).toBeGreaterThan(
+      formatPercent(100, i18n.language).length
+    );
+  });
+
+  // A badge the pill actually paints fits the width its slot reserved, in both
+  // of the shapes the formatter produces: four decimals below half a cent and
+  // two at or above it.
+  it('holds a painted badge in both of its shapes', () => {
+    const { cost } = getPillSlotSizers();
+    for (const painted of [
+      formatSessionCostBadge(500),
+      formatSessionCostBadge(20_000),
+      formatSessionCostBadge(150_000),
+      formatSessionCostBadge(980_000),
+      // The widest two-decimal badge without a grouping separator. The first
+      // grouped total is a glyph wider than the reserve and truncates inside
+      // its single line, the bound the sizer's own comment states.
+      formatSessionCostBadge(999_990_000),
+    ]) {
+      expect(painted).not.toBeNull();
+      expect((painted ?? '').length).toBeLessThanOrEqual(cost.length);
+    }
+  });
+
+  it('never returns an empty sizer', () => {
+    const sizers = getPillSlotSizers();
+    expect(sizers.percentage.length).toBeGreaterThan(0);
+    expect(sizers.cost.length).toBeGreaterThan(0);
+  });
+});
+
+describe('getHeaderPillWidth', () => {
+  // A header reserves this width beside the title, so the reserve has to be the
+  // width the pill paints: the rows grow with the font scale, the chrome does not.
+  it('grows by its text alone as the font scale rises', () => {
+    const atOne = getHeaderPillWidth(1);
+    const atTwo = getHeaderPillWidth(2);
+    expect(atTwo).toBeGreaterThan(atOne);
+    expect(atTwo).toBeLessThan(atOne * 2);
+  });
+
+  it('reads a missing or unusable scale as the default', () => {
+    expect(getHeaderPillWidth(Number.NaN)).toBe(getHeaderPillWidth(1));
+    expect(getHeaderPillWidth(0)).toBe(getHeaderPillWidth(1));
   });
 });
 

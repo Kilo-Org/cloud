@@ -2089,8 +2089,10 @@ describe('session detail header right cluster', () => {
       throw new Error('expected the cost text');
     }
     expect(cost.props.numberOfLines).toBe(1);
-    expect(cost.props.className).toContain('shrink');
-    expect(cost.props.className).toContain('min-w-0');
+    // The value paints over the slot that reserved its width, so a badge wider
+    // than the slot ellipsizes there instead of widening the pill.
+    expect(cost.props.className).toContain('absolute');
+    expect(cost.props.className).toContain('text-center');
   });
 });
 
@@ -5873,10 +5875,9 @@ describe('session detail read-only composer', () => {
     openSettledReport.value = false;
     const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
     const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
-    // The pill paints its ring alone in every unresolved state, and the box
-    // around it holds the row its values will take, so nothing shrinks when the
-    // values arrive.
-    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(0);
+    // The pill keeps its value row reserved in every state, so nothing shrinks
+    // when the values arrive; while the open resolves, one bar covers that row.
+    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(1);
     expect(
       view.renderer.root.findAll(
         node =>

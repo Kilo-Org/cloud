@@ -1366,14 +1366,39 @@ describe('shouldStackHeaderActions', () => {
   it('reflows for a declared trailing cluster the title cannot share the row with', () => {
     // Declaring a wide cluster makes it reflow before the title is squeezed.
     expect(shouldStackHeaderActions(320, 2)).toBe(false);
-    expect(shouldStackHeaderActions(320, 2, 236)).toBe(true);
+    expect(shouldStackHeaderActions(320, 2, { headerRightWidth: 236 })).toBe(true);
     // A narrower cluster still fits beside the title at a normal phone width.
-    expect(shouldStackHeaderActions(390, 1, 92)).toBe(false);
-    expect(shouldStackHeaderActions(390, 1, 236)).toBe(true);
+    expect(shouldStackHeaderActions(390, 1, { headerRightWidth: 92 })).toBe(false);
+    expect(shouldStackHeaderActions(390, 1, { headerRightWidth: 236 })).toBe(true);
   });
 
   it('treats a missing window measurement as a single row', () => {
     expect(shouldStackHeaderActions(Number.NaN, 1)).toBe(false);
     expect(shouldStackHeaderActions(160, Number.NaN)).toBe(true);
+  });
+
+  it('reserves the title width the caller declares instead of the list title default', () => {
+    // A detail header's title is the 18px style, narrower than the 30px list
+    // title the default reserve assumes. Declaring its own width keeps that
+    // header on one row where the default would already have reflowed it, and
+    // still reflows when the cluster leaves the title below what it needs.
+    expect(shouldStackHeaderActions(411, 1, { headerRightWidth: 240 })).toBe(true);
+    expect(shouldStackHeaderActions(411, 1, { headerRightWidth: 240, titleMinWidth: 104 })).toBe(
+      false
+    );
+    expect(shouldStackHeaderActions(360, 1, { headerRightWidth: 240, titleMinWidth: 104 })).toBe(
+      true
+    );
+  });
+
+  it('counts the row space the caller declares before its title', () => {
+    // The default inset is the widest list gutter, which a header that shows a
+    // back control beside its title does not charge. Declaring the real inset
+    // reflows a window the default keeps on one row with a title too narrow to
+    // paint, and leaves the compact phone width on a single row.
+    const widths = { headerRightWidth: 238, titleMinWidth: 40 };
+    expect(shouldStackHeaderActions(340, 1, widths)).toBe(false);
+    expect(shouldStackHeaderActions(340, 1, { ...widths, contentInset: 65.5 })).toBe(true);
+    expect(shouldStackHeaderActions(360, 1, { ...widths, contentInset: 65.5 })).toBe(false);
   });
 });

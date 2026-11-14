@@ -26,11 +26,18 @@ export function findAll(
       return;
     }
     if (React.isValidElement(value)) {
-      if (predicate(value)) {
-        matches.push(value);
+      const element = value as React.ReactElement<{ children?: unknown }>;
+      if (predicate(element)) {
+        matches.push(element);
       }
-      const props = value.props as { children?: unknown };
-      walk(props.children);
+      // These suites call components as plain functions, so a child component
+      // element is still unrendered here. Invoke it the same way to reach what
+      // it paints; the components under test use no hooks.
+      if (typeof element.type === 'function') {
+        walk((element.type as (props: unknown) => unknown)(element.props));
+        return;
+      }
+      walk(element.props.children);
     }
   }
 
@@ -95,18 +102,35 @@ export const PILL_LAYOUT_TOKENS = [
   'h-[44px]',
   'flex-row',
   'items-center',
-  'gap-2',
+  'gap-1.5',
   'rounded-full',
-  'border',
-  'border-border',
-  'bg-secondary',
-  'px-3',
+  'px-2.5',
   // The header row hands the trailing cluster a capped 50% box, but RN's
   // default flexShrink is 0. Without these the pill keeps its natural width
   // and paints past the row's right edge instead of compressing.
   'shrink',
   'min-w-0',
 ] as const;
+
+/**
+ * The utility that keeps the border slot one dp wide in every state. It is
+ * asserted as a whole class token, never as a substring: `border` is a prefix of
+ * both `border-transparent` and `border-border`, so a substring check would pass
+ * even if the width lived only in one of the two chrome classes — which would
+ * make the settled pill two dp narrower than the reading pill.
+ */
+export const PILL_BORDER_WIDTH_TOKEN = 'border';
+
+/** True when `className` carries `token` as its own class, not as a prefix. */
+export function hasClassToken(className: string, token: string): boolean {
+  return className.split(/\s+/).includes(token);
+}
+
+/** The capsule a pill wears only while it paints a reading. */
+export const PILL_CAPSULE_TOKENS = ['border-border', 'bg-secondary'] as const;
+
+/** The chrome a settled pill wears while it paints nothing: the ring alone. */
+export const PILL_BARE_TOKENS = ['border-transparent'] as const;
 
 export function expectHiddenPill(root: React.ReactElement): void {
   expect(root.type).toBe('View');

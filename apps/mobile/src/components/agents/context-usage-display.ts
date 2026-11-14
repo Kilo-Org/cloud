@@ -72,17 +72,22 @@ export function formatRemainingTokens(remaining: number): string {
 }
 
 export type HeaderPillContent = {
+  /**
+   * The percentage reading, or `null` when the session has none to paint. The
+   * slot keeps its width either way: nothing paints in it for a value that has
+   * not arrived, so a settled empty pill never shows a placeholder glyph.
+   */
   primary: string | null;
+  /** The session's cost, or `null` when it has none to paint. */
   secondary: string | null;
   /**
    * What the cost part of the reading paints:
    *
    * - `label`: the session's cost, as text.
-   * - `loading`: the session is still resolving, so the pill paints nothing and
-   *   the accessibility label says a cost is coming.
-   * - `unreported`: the session settled without a cost, so nothing will fill
-   *   it and the pill paints only the values it has.
-   * - `none`: no cost to paint.
+   * - `loading`: the session is still resolving, so the pill paints one bar
+   *   across its value row instead of a value.
+   * - `unreported`: the session settled without a cost. Nothing paints, and the
+   *   slot keeps its width so a cost that arrives later fills it in place.
    */
   costSlot: PillCostSlot;
   tone: ContextTone;
@@ -96,7 +101,87 @@ export type HeaderPillContent = {
   usageUnavailable: boolean;
 };
 
-type PillCostSlot = 'label' | 'loading' | 'unreported' | 'none';
+type PillCostSlot = 'label' | 'loading' | 'unreported';
+
+/**
+ * The widest reading each value slot reserves, read through the formatters the
+ * painted values use so the slot holds at every font scale and in every locale.
+ *
+ * The pill lays each slot out at this width and paints the reading over it.
+ * A slot therefore never collapses for a value that has not arrived, and a
+ * reading that arrives fills the slot it already showed instead of resizing the
+ * pill — and the title and trailing control beside it — after the screen
+ * settled.
+ *
+ * The percentage reserves the widest reading the formatter paints. It keeps at
+ * most one decimal, so a fractional reading carries a glyph more than a whole
+ * window does (`16.7%` against `100%`), and both are read through the formatter
+ * so the reserve follows this language's own digits and percent sign.
+ * The cost reserves a badge in both of its shapes, since one carries two
+ * decimals at or above half a cent and the other four decimals below it, so the
+ * reserve is the wider of the two.
+ *
+ * The reserve stops there on purpose. A total wide enough to need a grouping
+ * separator paints past it and truncates inside its one line, the way a long
+ * total already truncates under the header's cap. Reserving the grouped form
+ * was measured against the compact window: it leaves the header's title row
+ * 5 dp narrower than the title's own badge needs, which clips that badge — a
+ * defect the design gate reports as an error, on every screen, not only on a
+ * session that happens to spend four figures.
+ */
+const COST_SLOT_SIZER_TWO_DECIMALS_MICRODOLLARS = 12_340_000;
+const COST_SLOT_SIZER_FOUR_DECIMALS_MICRODOLLARS = 4_999;
+
+/**
+ * The percentages the slot has to hold: a fractional reading just below the
+ * whole window and the whole window itself. One of them is the widest shape the
+ * formatter produces here, whichever is longer in this language.
+ */
+const PERCENTAGE_SLOT_SIZER_VALUES = [99.9, 100];
+
+export function getPillSlotSizers() {
+  const twoDecimals = formatSessionCostBadge(COST_SLOT_SIZER_TWO_DECIMALS_MICRODOLLARS) ?? '$0.00';
+  const fourDecimals =
+    formatSessionCostBadge(COST_SLOT_SIZER_FOUR_DECIMALS_MICRODOLLARS) ?? '$0.0000';
+  let percentage = '';
+  for (const value of PERCENTAGE_SLOT_SIZER_VALUES) {
+    const reading = formatPercent(value, i18n.language);
+    if (reading.length > percentage.length) {
+      percentage = reading;
+    }
+  }
+  return {
+    percentage,
+    cost: fourDecimals.length >= twoDecimals.length ? fourDecimals : twoDecimals,
+  };
+}
+
+/**
+ * The pill's fixed chrome, in dp: its 28dp ring, its border, its `px-2.5`
+ * padding, the `gap-1.5` between the ring and the value row, and the row's own
+ * `gap-1`. The classes compile at the app's 14pt rem, so the padding is 8.75 a
+ * side and the two gaps are 5.25 and 3.5. None of it is text, so none of it
+ * follows the font scale.
+ */
+const PILL_CHROME_WIDTH = 28 + 2 + 2 * 8.75 + 5.25 + 3.5;
+
+/**
+ * The two value slots' reserved readings at font scale 1, in dp: the sizers the
+ * slots lay out, plus the slack the painted pill leaves beside them. Both
+ * readings are `Text`, so both follow the system font scale.
+ */
+const PILL_READINGS_WIDTH = 128 - PILL_CHROME_WIDTH;
+
+/**
+ * Width the pill lays out at, in dp, at a font scale: its fixed chrome plus its
+ * reserved readings scaled. A header that reserves its trailing cluster uses
+ * this, so the width it reserves is the width the pill paints at that scale —
+ * and a reading that arrives still fills the slot it already showed.
+ */
+export function getHeaderPillWidth(fontScale: number): number {
+  const scale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
+  return PILL_CHROME_WIDTH + PILL_READINGS_WIDTH * scale;
+}
 
 /**
  * Single selector for the session-detail header pill. Always returns content
@@ -126,7 +211,7 @@ export function getHeaderPillContent({
     return {
       primary,
       secondary,
-      costSlot: secondary !== null ? 'label' : 'none',
+      costSlot: secondary !== null ? 'label' : 'unreported',
       tone,
       arcFraction: getArcFraction(info.percentage),
       interactive: true,
@@ -135,9 +220,12 @@ export function getHeaderPillContent({
   }
 
   const costText = hasMessages ? formatSessionCostBadge(totalCostMicrodollars) : null;
-  // Nothing has reported usage yet, so the pill paints nothing beside its ring:
-  // a value that has not arrived is not a value, and painting a dash for it
-  // would read as a reading that is still pending.
+  // Nothing has reported usage yet. The pill paints nothing beside its ring: a
+  // value that has not arrived is not a value, and a dash standing in for it
+  // would read as a reading that is still pending. Both slots keep their widths
+  // instead, so the pill is already the size of the reading it will show and a
+  // finished empty chat looks settled rather than mid-load. While the open still
+  // resolves, one bar paints across the row those slots lay out.
   if (!hasMessages) {
     return {
       primary: null,
@@ -155,7 +243,7 @@ export function getHeaderPillContent({
   return {
     primary: null,
     secondary: costText,
-    costSlot: costText === null ? 'none' : 'label',
+    costSlot: costText === null ? 'unreported' : 'label',
     tone: 'neutral',
     arcFraction: 0,
     interactive: false,

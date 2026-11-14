@@ -6,6 +6,10 @@ import {
   type KiloSessionId,
   type SessionSnapshotPageOutcome,
 } from '@kilocode/cloud-agent-sdk';
+import {
+  DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
+  getSessionMessagesPageInputSchema,
+} from '@kilocode/session-ingest-contracts';
 
 const mocks = vi.hoisted(() => ({
   getSessionMessagesPageQuery: vi.fn(),
@@ -229,10 +233,10 @@ describe('fetchMobileSessionSnapshotPage', () => {
     expect(results).toEqual(histories);
   });
 
-  it('lets the tRPC input schema default the limit to 50 on the initial read', async () => {
-    // The mobile adapter never sets `limit` itself so the shared contract
-    // default of 50 always applies. This test pins that contract: any
-    // future change here must keep the request bounded by default.
+  it('sends no limit so the server applies its own page default', async () => {
+    // The adapter never sets `limit`: the outbound request carries only the
+    // session id, so the server's input schema bounds the read by applying its
+    // own page default. The wire assertion below pins that omission.
     mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
       kiloSessionId: 'ses_123',
       history: historyPage({ nextCursor: null }),
@@ -241,9 +245,16 @@ describe('fetchMobileSessionSnapshotPage', () => {
     const { fetchMobileSessionSnapshotPage } = await importAdapter();
     await fetchMobileSessionSnapshotPage(kiloSessionId('ses_123'), {});
 
+    expect(mocks.getSessionMessagesPageQuery).toHaveBeenCalledWith({ session_id: 'ses_123' });
     const call = mocks.getSessionMessagesPageQuery.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(call).toBeDefined();
     expect(call.limit).toBeUndefined();
+  });
+
+  it('defaults the wire limit to the shared page size when only the session id is sent', () => {
+    const parsed = getSessionMessagesPageInputSchema.parse({ session_id: 'ses_123' });
+    expect(parsed.limit).toBe(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE);
+    expect(parsed.cursor).toBeUndefined();
   });
 
   it('projects the session goal from the messages page into the snapshot info', async () => {

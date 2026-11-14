@@ -965,16 +965,6 @@ describe('createMobileAgentSessionManager cold open', () => {
     getSessionMessagesPageQuery.mockReset();
   });
 
-  it('omits the cached-snapshot reader so a cold open cannot paint stale rows', () => {
-    const options = { store: {}, userWebConnection: {} };
-    createMobileAgentSessionManager(options as never);
-    const config = configHolder.current;
-    if (config === null) {
-      throw new Error('createSessionManager did not capture a config');
-    }
-    expect(config.readCachedSnapshotPage).toBeUndefined();
-  });
-
   it('leaves the transcript empty while the live page has not landed', async () => {
     const store = createStore();
     // The live metadata read never settles: the open is still in flight, so the

@@ -87,6 +87,23 @@ describe('native launcher surfaces', () => {
     expect(surfaces.consumePendingLaunchUrl()).toBeNull();
   });
 
+  it('takes only a parked destination that names no account', async () => {
+    const surfaces = await import('./native-launcher-surfaces');
+
+    native.consumePendingLaunchUrl.mockReturnValueOnce('kiloapp:///cloud/sessions/new');
+    expect(surfaces.takeAccountIndependentLaunchUrl()).toBe('kiloapp:///cloud/sessions/new');
+
+    // A session destination belongs to the account that published the
+    // shortcut, so it is read and dropped, never handed back.
+    native.consumePendingLaunchUrl.mockReturnValueOnce(
+      'kiloapp:///cloud/sessions/ses_00000000000AlphaSession0001'
+    );
+    expect(surfaces.takeAccountIndependentLaunchUrl()).toBeNull();
+
+    native.consumePendingLaunchUrl.mockReturnValueOnce(null);
+    expect(surfaces.takeAccountIndependentLaunchUrl()).toBeNull();
+  });
+
   it('returns null when the Android module has no pending-launch-url function', async () => {
     native.requireOptionalNativeModule.mockReturnValue({
       setSurfaces: native.setSurfaces,

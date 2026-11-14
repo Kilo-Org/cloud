@@ -4,7 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { createElement, Fragment, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-review';
 
 import { ReviewMemoryScreen } from './review-memory-screen';
 import { collectText } from './review-memory-screen.test-helpers';
@@ -67,6 +67,9 @@ vi.mock('@shopify/flash-list', () => ({
     ),
 }));
 vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
+vi.mock('@/components/code-reviewer/review-memory-analyze-section', () => ({
+  ReviewMemoryAnalyzeSection: 'ReviewMemoryAnalyzeSection',
+}));
 vi.mock('expo-router', () => ({
   usePreventRemove: (
     preventRemove: boolean,

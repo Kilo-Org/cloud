@@ -15,7 +15,7 @@ import {
   openRouterGatewayModelsSource,
   readStoredGatewayModels,
   vercelGatewayModelsSource,
-  type GatewayModelList,
+  type GatewayModelsSource,
   type GatewayModelMap,
   type ListedGatewayModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
@@ -45,10 +45,7 @@ import {
   applyFreeEndpointDataPolicy,
   getOpenRouterFreeEndpoints,
 } from '@/lib/providers/openrouter/free-endpoint-data-policy';
-import {
-  injectExtraProviderModels,
-  injectVercelOnlyProviders,
-} from '@/lib/providers/openrouter/inject-extra-provider-models';
+import { injectVercelModels } from '@/lib/providers/openrouter/inject-vercel-models';
 import { withWorstProviderDataPolicy } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import {
@@ -93,7 +90,7 @@ export const openRouterProvidersSource: MetadataSource<OpenRouterProvider[]> = {
  */
 export async function fetchGatewayModels(
   gateway: Provider,
-  source: MetadataSource<GatewayModelList>
+  source: GatewayModelsSource
 ): Promise<GatewayModelMap> {
   const stored = await readStoredGatewayModels(gateway, source, readDb).catch((error: unknown) => {
     console.warn(`[fetchGatewayModels] stored ${gateway.type} models are unusable`, error);
@@ -185,8 +182,17 @@ async function syncProviders(params: {
     unavailableModelIds
   );
 
-  injectExtraProviderModels(vercelModels, providerModelData, vercelModelIdOverrides);
-  injectVercelOnlyProviders(vercelModels, providerModelData, vercelModelIdOverrides);
+  injectVercelModels({
+    vercelModels,
+    openRouterCatalogModels,
+    openRouterModelIds: [
+      ...Object.keys(openRouterModels),
+      ...openRouterCatalogModels.map(model => model.id),
+    ],
+    providerModelData,
+    vercelModelIdOverrides,
+    updatedAt: new Date().toISOString(),
+  });
 
   const mappedExtraModels = buildPublicCustomLlmSnapshotModels(
     customLlms,

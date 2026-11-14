@@ -347,7 +347,12 @@ describe('ChatInput finalize failure', () => {
     const onStop = jest.fn();
     const dom = installLinkedomDom();
     const root = createRoot(dom.container);
-    const render = (canInterrupt: boolean, disabled: boolean, withHandler = true) => {
+    const render = (
+      canInterrupt: boolean,
+      disabled: boolean,
+      options: { withHandler?: boolean; isStreaming?: boolean; isPreparing?: boolean } = {}
+    ) => {
+      const { withHandler = true, isStreaming = true, isPreparing = false } = options;
       act(() => {
         root.render(
           createElement(ChatInput, {
@@ -355,30 +360,70 @@ describe('ChatInput finalize failure', () => {
             onStop: withHandler ? onStop : undefined,
             canInterrupt,
             disabled,
-            isStreaming: true,
+            isStreaming,
+            isPreparing,
             attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
           })
         );
       });
     };
-    const stopButton = () => {
+    const queryStopButton = () =>
+      dom.container.querySelector<HTMLButtonElement>(
+        'button[aria-label="Stop response or workspace preparation"], button[aria-label="Stop workspace preparation"]'
+      );
+    const stopButton = (label = 'Stop response or workspace preparation') => {
       const button = dom.container.querySelector<HTMLButtonElement>(
-        'button[aria-label="Stop response"]'
+        `button[aria-label="${label}"]`
       );
       if (!button) throw new Error('Stop button missing');
       return button;
     };
 
     try {
+      // Preparation is not a streaming turn, but Stop still applies during it.
+      render(true, true, { isStreaming: false, isPreparing: true });
+      expect(stopButton('Stop workspace preparation').hasAttribute('disabled')).toBe(false);
+      expect(stopButton('Stop workspace preparation').getAttribute('title')).toBe(
+        'Stop preparation and all chats in this workspace'
+      );
+      act(() => stopButton('Stop workspace preparation').click());
+      expect(onStop).toHaveBeenCalledTimes(1);
+
+      // The same interrupt and handler gates apply while preparing.
+      render(false, true, { isStreaming: false, isPreparing: true });
+      expect(stopButton('Stop workspace preparation').hasAttribute('disabled')).toBe(true);
+      act(() => stopButton('Stop workspace preparation').click());
+      expect(onStop).toHaveBeenCalledTimes(1);
+
+      render(true, true, { withHandler: false, isStreaming: false, isPreparing: true });
+      expect(stopButton('Stop workspace preparation').hasAttribute('disabled')).toBe(true);
+
+      render(true, true, { isStreaming: true, isPreparing: true });
+      expect(stopButton('Stop workspace preparation').hasAttribute('disabled')).toBe(false);
+      expect(stopButton('Stop workspace preparation').getAttribute('title')).toBe(
+        'Stop preparation and all chats in this workspace'
+      );
+
+      // Idle shows no Stop, and clearing preparation after Stop hides it again.
+      render(true, false, { isStreaming: false, isPreparing: false });
+      expect(queryStopButton()).toBeNull();
+      render(true, false, { isStreaming: false, isPreparing: true });
+      expect(stopButton('Stop workspace preparation').hasAttribute('disabled')).toBe(false);
+      render(true, false, { isStreaming: false, isPreparing: false });
+      expect(queryStopButton()).toBeNull();
+
       render(true, true);
       expect(stopButton().hasAttribute('disabled')).toBe(false);
+      expect(stopButton().getAttribute('title')).toBe(
+        'Stop this response. If any chat is preparing, stop all chats in this workspace.'
+      );
       act(() => stopButton().click());
-      expect(onStop).toHaveBeenCalledTimes(1);
+      expect(onStop).toHaveBeenCalledTimes(2);
 
       render(false, true);
       expect(stopButton().hasAttribute('disabled')).toBe(true);
       act(() => stopButton().click());
-      expect(onStop).toHaveBeenCalledTimes(1);
+      expect(onStop).toHaveBeenCalledTimes(2);
 
       render(false, false);
       expect(stopButton().hasAttribute('disabled')).toBe(true);
@@ -386,7 +431,7 @@ describe('ChatInput finalize failure', () => {
       render(true, true);
       expect(stopButton().hasAttribute('disabled')).toBe(false);
 
-      render(true, false, false);
+      render(true, false, { withHandler: false });
       expect(stopButton().hasAttribute('disabled')).toBe(true);
     } finally {
       act(() => root.unmount());
@@ -1463,6 +1508,127 @@ it.each(['chat-b', 'new'])(
     }
   }
 );
+
+describe('withdrawing a failed prompt the server delivered', () => {
+  it('clears the restored draft once the confirmed message arrives', async () => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    const onSend = jest.fn(async () => false);
+    const render = (
+      conversationKey: string,
+      initialValue?: string,
+      withdrawnFailedPrompt?: { text: string; sequence: number } | null
+    ) =>
+      act(() =>
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            conversationKey,
+            initialValue,
+            withdrawnFailedPrompt,
+            attachmentUploadOptions: { messageUuid: 'withdraw' },
+          })
+        )
+      );
+    try {
+      render('chat-a');
+      act(() => setTextareaValue(dom.container, 'Delivered late'));
+      await act(async () => {
+        pressEnter(dom.container);
+      });
+      // The transport failed, so the composer put the text back.
+      render('chat-a', 'Delivered late');
+      expect(dom.container.querySelector('textarea')?.value).toBe('Delivered late');
+
+      // The transcript then showed the message the server had accepted: the
+      // restored text is the same message, so it leaves the input.
+      render('chat-a', 'Delivered late', { text: 'Delivered late', sequence: 1 });
+      expect(dom.container.querySelector('textarea')?.value).toBe('');
+      // A repeated record for the same delivery changes nothing.
+      render('chat-a', 'Delivered late', { text: 'Delivered late', sequence: 1 });
+      expect(dom.container.querySelector('textarea')?.value).toBe('');
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+    }
+  });
+
+  it('withdraws a restored draft the composer holds with trailing whitespace', async () => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    const onSend = jest.fn(async () => false);
+    const render = (
+      initialValue?: string,
+      withdrawnFailedPrompt?: { text: string; sequence: number } | null
+    ) =>
+      act(() =>
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            conversationKey: 'chat-a',
+            initialValue,
+            withdrawnFailedPrompt,
+            attachmentUploadOptions: { messageUuid: 'withdraw-trimmed' },
+          })
+        )
+      );
+    try {
+      render();
+      act(() => setTextareaValue(dom.container, 'Delivered late\n'));
+      await act(async () => {
+        pressEnter(dom.container);
+      });
+      render('Delivered late\n');
+      expect(dom.container.querySelector('textarea')?.value).toBe('Delivered late\n');
+
+      render('Delivered late\n', { text: 'Delivered late', sequence: 1 });
+      expect(dom.container.querySelector('textarea')?.value).toBe('');
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+    }
+  });
+
+  it('keeps a draft the reader edited after the restore', async () => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    const onSend = jest.fn(async () => false);
+    const render = (
+      conversationKey: string,
+      initialValue?: string,
+      withdrawnFailedPrompt?: { text: string; sequence: number } | null
+    ) =>
+      act(() =>
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            conversationKey,
+            initialValue,
+            withdrawnFailedPrompt,
+            attachmentUploadOptions: { messageUuid: 'withdraw-edited' },
+          })
+        )
+      );
+    try {
+      render('chat-a');
+      act(() => setTextareaValue(dom.container, 'Restored prompt'));
+      await act(async () => {
+        pressEnter(dom.container);
+      });
+      render('chat-a', 'Restored prompt');
+      // The next message, typed over the restore, is not the delivered one.
+      act(() => setTextareaValue(dom.container, 'Next message'));
+      render('chat-a', 'Restored prompt', { text: 'Restored prompt', sequence: 1 });
+      expect(dom.container.querySelector('textarea')?.value).toBe('Next message');
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+    }
+  });
+});
 
 it('retains submission ownership while another conversation stores its draft', async () => {
   mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());

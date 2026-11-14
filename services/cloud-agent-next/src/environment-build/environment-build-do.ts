@@ -26,11 +26,8 @@ import type {
   EnvironmentBuildStatus,
 } from '../shared/environment-build-status.js';
 import { environmentActorAccess, resolveBuilderGitSource } from './access.js';
-import {
-  builderRuntimeUnsupportedReason,
-  builderSandboxId,
-  createBuilderProvider,
-} from './builder-provider.js';
+import { builderSandboxId, createBuilderProvider } from './builder-provider.js';
+import { resolveEnvironmentBuildTarget, snapshotsRuntimeUnsupportedReason } from './target.js';
 import {
   EnvironmentBuildCoordinator,
   type CoordinatorDeps,
@@ -39,6 +36,7 @@ import {
   type SnapshotResolution,
 } from './coordinator.js';
 import { mintRunnerCredential } from './runner-credential.js';
+import type { PublishedSnapshot } from './policy.js';
 import type { EnvironmentScope } from './reference.js';
 import type { BuildTrigger } from './sqlite-schema.js';
 import { BuildStore } from './store.js';
@@ -131,6 +129,15 @@ export class EnvironmentBuild extends DurableObject<Env> {
           return access;
         },
         gitSource: input => resolveBuilderGitSource(env, input),
+        buildTarget: input =>
+          resolveEnvironmentBuildTarget({
+            env,
+            db: getPgDb(env),
+            reference: input.reference,
+            repoFullName: input.repoFullName,
+            commands: input.commands,
+            sandboxAllocation: input.sandboxAllocation,
+          }),
       },
       provider: createBuilderProvider({
         containers: env.SANDBOX_CONTAINERS,
@@ -164,10 +171,7 @@ export class EnvironmentBuild extends DurableObject<Env> {
         };
       },
       builderSandboxId: sandboxId,
-      unsupportedReason: () => {
-        if (!env.SANDBOX_CONTAINERS) return 'Native containers are not configured';
-        return builderRuntimeUnsupportedReason(env);
-      },
+      unsupportedReason: () => snapshotsRuntimeUnsupportedReason(env),
       log: (message, fields) => logger.withFields(fields).info(message),
     };
   }
@@ -225,6 +229,7 @@ export class EnvironmentBuild extends DurableObject<Env> {
   async resolveSnapshot(input: {
     reference: EnvironmentScope;
     actorUserId: string;
+    provider: PublishedSnapshot['provider'];
   }): Promise<SnapshotResolution> {
     return (await this.coordinatorFor(input.reference.environmentId)).resolveSnapshot(input);
   }

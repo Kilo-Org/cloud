@@ -616,6 +616,12 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
  *
  * Its bubble carries the same failure footer and Copy to composer it had in the
  * slot, and a Retry that asks it again.
+ *
+ * One send keeps one bubble. Two sends of the same words that both failed read
+ * as two bubbles, each stating the failure of its own attempt, because each
+ * send is a question the person asked rather than a repeat of the last one.
+ * Only asking an existing bubble again through its Retry folds into that
+ * bubble, which `says` and the slot's record already handle.
  */
 async function keepAsked(sessionId: string): Promise<void> {
   const held = snapshotOf(sessionId);

@@ -1,6 +1,5 @@
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
-import { isQwenModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
 import { isGrokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/xai';
 import type {
   CustomLlmProvider,
@@ -9,10 +8,19 @@ import type {
   ReasoningOption,
 } from '@kilocode/db/schema-types';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
-import { isMinimaxModel } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
-import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
-import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getOpenRouterModelsMetadataFromDatabase,
+  getVercelModelsMetadataFromDatabase,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getVercelModelIdOverrides,
+  mapResolvedModelIdToVercel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import {
+  findVercelOnlyModels,
+  fromVercelReasoningOptions,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
 import {
   effortOptions,
   getFallbackReasoningOptions,
@@ -25,7 +33,9 @@ export async function getOpenRouterReasoningOptions(
   model: string
 ): Promise<ReasoningOption[] | undefined> {
   const models = await getOpenRouterModelsMetadataFromDatabase();
-  const reasoning = (models[model] ?? models[normalizeModelId(model)])?.reasoning;
+  // A suffixed id such as `:free` has no metadata of its own and resolves to its base id.
+  const resolvedModelId = Object.hasOwn(models, model) ? model : normalizeModelId(model);
+  const reasoning = models[resolvedModelId]?.reasoning;
   if (!reasoning) {
     return undefined;
   }
@@ -37,11 +47,44 @@ export async function getOpenRouterReasoningOptions(
     !reasoning.mandatory &&
     // Kimi does not support non-reasoning despite what OpenRouter says
     // https://huggingface.co/moonshotai/Kimi-K3#6-model-usage
-    model !== 'moonshotai/kimi-k3'
+    normalizeModelId(resolvedModelId) !== 'moonshotai/kimi-k3'
   ) {
     efforts.add('none');
   }
   return effortOptions(...ReasoningEffortSchema.options.filter(effort => efforts.has(effort)));
+}
+
+/**
+ * Vercel's reasoning options for a model the catalog lists because only Vercel AI Gateway serves
+ * it. Undefined for models OpenRouter lists, including those without reasoning metadata.
+ */
+async function getVercelOnlyReasoningOptions(
+  model: string
+): Promise<ReasoningOption[] | undefined> {
+  const openRouterModels = await getOpenRouterModelsMetadataFromDatabase();
+  const openRouterModelIds = Object.keys(openRouterModels);
+  if (
+    // Without OpenRouter's models, every Vercel model would look Vercel-only.
+    openRouterModelIds.length === 0 ||
+    (openRouterModels[model] ?? openRouterModels[normalizeModelId(model)])
+  ) {
+    return undefined;
+  }
+  const [vercelModels, overrides] = await Promise.all([
+    getVercelModelsMetadataFromDatabase(),
+    getVercelModelIdOverrides(),
+  ]);
+  const vercelModel = vercelModels[mapResolvedModelIdToVercel(model, overrides)];
+  const [vercelOnlyModel] = vercelModel
+    ? findVercelOnlyModels({
+        openRouterModelIds,
+        vercelMetadata: { [vercelModel.id]: vercelModel },
+        overrides,
+      })
+    : [];
+  return vercelOnlyModel?.id === model
+    ? fromVercelReasoningOptions(vercelOnlyModel.storedModel.reasoning_options)
+    : undefined;
 }
 
 export async function getModelReasoningOptions(
@@ -50,6 +93,7 @@ export async function getModelReasoningOptions(
 ): Promise<ReasoningOption[] | undefined> {
   return (
     (await getOpenRouterReasoningOptions(model)) ??
+    (await getVercelOnlyReasoningOptions(model)) ??
     (allowFallback ? getFallbackReasoningOptions(model) : undefined)
   );
 }
@@ -62,15 +106,8 @@ export async function getModelVariants(
 }
 
 export function getAiSdkProvider(
-  model: string,
-  directProviderId: DirectUserByokInferenceProviderId | null
+  model: string
 ): Exclude<CustomLlmProvider, 'openrouter' /*the default*/> | undefined {
-  if (directProviderId === 'morph-byok') {
-    return undefined;
-  }
-  if (directProviderId === 'opencode-go' && (isMinimaxModel(model) || isQwenModel(model))) {
-    return 'anthropic';
-  }
   if (isClaudeModel(model)) {
     return 'anthropic';
   }
@@ -93,7 +130,7 @@ export async function getGatewayOpenCodeSettings(
   model: string,
   allowFallback: boolean
 ): Promise<OpenCodeSettings | undefined> {
-  const ai_sdk_provider = getAiSdkProvider(model, null);
+  const ai_sdk_provider = getAiSdkProvider(model);
   const reasoning_options = await getModelReasoningOptions(model, allowFallback);
   const variants = toLegacyVariants(reasoning_options, ai_sdk_provider);
   const prompt = getOpenCodePrompt(model);

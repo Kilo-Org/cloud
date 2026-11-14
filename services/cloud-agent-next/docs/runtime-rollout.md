@@ -14,20 +14,21 @@ New allocations support only downloaded startup on the runtime-free image, on na
 Containers and BYOC Vercel. Preinstalled and all-in-one deployment selections are rejected. Missing
 runtime descriptors fail configuration preflight instead of falling back to a baked runtime.
 Persisted allocation readers still recognize historical startup modes and image identities; running
-allocations are not rewritten. Retired SDK provider pins cannot create a new allocation.
+allocations are not rewritten. Retired SDK provider pins cannot create a new allocation. Because
+every target downloads the runtime, one published release serves native and BYOC Vercel startup.
 
 BYOC Vercel uses its customer-owned snapshot as the base. The snapshot setup provides the fixed Node
 path and Bun version required by the bootstrap. `src/shared/runtime-toolchain.ts` pins every base tool
-(`bun`, `rg`, `gh`, `glab`, `pnpm`, `kilo`) to a release archive or registry tarball whose SHA-256 sits
-next to `RUNTIME_DISTRIBUTION`. The Durable Object build installs `bun` and the Kilo CLI from those pins,
+(`bun`, `rg`, `gh`, `glab`, `pnpm`) to a release archive or registry tarball whose SHA-256 sits
+next to `RUNTIME_DISTRIBUTION`. The Durable Object build installs `bun` and the base tools from those pins,
 checks the downloaded bytes before unpacking or installing, and re-checks the tools it installed by exact
 version and digest before the snapshot is created or accepted.
 Downloaded startup installs the selected immutable CLI
 and control release as root. The base digest covers the ABI, Node major, Bun, and base setup commands;
 CLI and wrapper changes do not change that digest or require a new snapshot. Existing allocations keep
 their installed release until a new allocation starts. Base dependency changes still require a snapshot
-upgrade. Upgrade older BYOC snapshots once before enabling downloaded mode, so they have the required
-fixed Node path. Native image selection does not change the Vercel snapshot.
+upgrade. BYOC base snapshots contain no CLI or wrapper. Native image selection does not affect Vercel
+startup.
 
 ### BYOC snapshot upgrade timing
 
@@ -99,26 +100,33 @@ available to every organization and personal account, independently of startup s
 authorization is still required. Personal-owned Bitbucket environments cannot build snapshots because
 managed Bitbucket repository access requires an organization. Personal GitHub and GitLab environments
 are supported.
-Builds require a downloaded runtime-free deployment and a published runtime release. Existing
-all-in-one environment snapshots are incompatible and trigger replacement builds. Runtime-only updates retain snapshot
-compatibility when the runtime-free base image and ABI stay unchanged.
+Native builds require a downloaded runtime-free deployment and a published runtime release. Vercel
+builds use the saved allocation's customer-owned base snapshot and require a published runtime release,
+not native container enrollment. A Vercel snapshot is restored only in the same credential, team and
+project. After the base snapshot is rebuilt, a snapshot from the earlier base stays usable, is marked
+stale and admits a replacement build, as for native images. Missing or incompatible snapshots
+fail with a rebuild instruction, never a clean-base fallback. Builds always use the environment's
+saved compute. A session pinned to another provider fails at once with a provider-mismatch reason,
+because a rebuild cannot serve it. Existing all-in-one environment snapshots are incompatible and
+trigger replacement builds. Runtime-only updates retain snapshot compatibility when the runtime-free
+base image and ABI stay unchanged.
 
 ## Deployment and qualification
 
-The checked-in catalog selects downloaded runtime-free deployment-wide for all targets. A downloaded
-default or named target makes eligible successful main CI publish a handoff for that SHA, and downloaded
-deployment waits for that handoff. Use a dedicated test organization for real-provider qualification;
-the current catalog does not limit downloaded startup to that organization. Record the Worker name,
-exact source SHA, bucket and instance type for each qualification deployment. Broad enrollment does
-not itself establish that the provider checks below passed.
+The checked-in catalog selects downloaded runtime-free deployment-wide for all targets. A downloaded target makes eligible successful main CI publish a handoff for that
+SHA, and downloaded deployment waits for that handoff. Use a dedicated test organization for
+real-provider qualification; the current catalog does not limit downloaded startup to that
+organization. Record the Worker name, exact source SHA, bucket and instance type for each
+qualification deployment. Broad enrollment does not itself establish that the provider checks below
+passed.
 
 Before deploying a release that removes SDK sandbox bindings, drain every session
 still running on a retired sandbox class. The new Worker cannot stop, inspect or
 reclaim an instance through a binding it no longer has.
 
 1. Provision publication through the process in [runtime-publication.md](runtime-publication.md).
-   Verify that a main CI run publishes the exact-SHA handoff and rejects retired catalog selections.
-   Failed CI, PR, fork and merge-group runs must not
+   Verify that a main CI run publishes the exact-SHA handoff used by native and Vercel startup, and
+   rejects retired catalog selections. Failed CI, PR, fork and merge-group runs must not
    publish. Repeat successful publication and confirm identical retained objects.
 2. Runtime-free relies on B1 ([PR #7914](https://github.com/Kilo-Org/cloud/pull/7914)): a running
    container captures under its start image. B1 is merged into main, and its regression test runs
@@ -171,6 +179,7 @@ Provider metadata retention remains unmeasured until the approved real-provider 
 
 Roll back by selecting a previously verified source SHA and its retained runtime handoff/base digest.
 Do not change the catalog to preinstalled or all-in-one; those selections are no longer accepted.
+BYOC Vercel startup also requires that release and the runtime bucket binding.
 Keep earlier descriptors, payloads, handoffs and image digests. Do not delete snapshots or publication
 objects during rollback. Existing allocations retain their mode, image and deadlines. Keep the runtime
 bucket binding available for allocations that are still bootstrapping, and do not deploy a Worker that

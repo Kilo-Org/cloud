@@ -147,6 +147,7 @@ const {
 const secret = 'test-secret';
 
 type MockEnv = {
+  CONTAINER_USAGE_METER?: { getBillingMode: ReturnType<typeof vi.fn> };
   BYOC_VERCEL_IDS?: string;
   VERCEL_SNAPSHOT_BUILD: { getByName: ReturnType<typeof vi.fn> };
   NEXTAUTH_SECRET: string;
@@ -321,6 +322,53 @@ describe('server /stream', () => {
     await expect(response.text()).resolves.toBe('Session access denied');
     expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
     expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
+  });
+});
+
+describe('server /stream origin policy', () => {
+  const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+  function streamRequest(origin?: string): Request {
+    const headers: Record<string, string> = { Upgrade: 'websocket' };
+    if (origin !== undefined) headers.Origin = origin;
+    return new Request(`http://worker.test/stream?cloudAgentSessionId=${sessionId}`, { headers });
+  }
+
+  it('refuses an origin outside the allowlist before ticket validation', async () => {
+    const env = createEnv();
+    env.WS_ALLOWED_ORIGINS = 'https://app.example.com';
+
+    const response = await fetchWorker(streamRequest('https://evil.example.com'), env);
+
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe('Origin not allowed');
+    expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(loggerWithFieldsMock).toHaveBeenCalledWith({ cloudAgentSessionId: sessionId });
+  });
+
+  it.each([
+    ['an allowlisted origin', 'https://app.example.com'],
+    ['no Origin header', undefined],
+    ['the null serialization', 'null'],
+    ['a Chrome extension origin', 'chrome-extension://abcdefghijklmnopabcdefghijklmnop'],
+    ['a Firefox extension origin', 'moz-extension://6b0a1c2e-7c4d-4f2a-9a53-2f5f83f0b1c9'],
+  ])('passes %s through to ticket validation', async (_label, origin) => {
+    const env = createEnv();
+    env.WS_ALLOWED_ORIGINS = 'https://app.example.com';
+
+    const response = await fetchWorker(streamRequest(origin), env);
+
+    expect(response.status).toBe(401);
+    await expect(response.text()).resolves.toBe('Missing ticket');
+  });
+
+  it('keeps the permissive default when the allowlist is unset', async () => {
+    const env = createEnv();
+
+    const response = await fetchWorker(streamRequest('https://evil.example.com'), env);
+
+    expect(response.status).toBe(401);
+    await expect(response.text()).resolves.toBe('Missing ticket');
   });
 });
 
@@ -689,6 +737,26 @@ describe('server /terminal', () => {
     expect(response.status).toBe(403);
     await expect(response.text()).resolves.toBe('Origin not allowed');
     expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
+  });
+  it('keeps extension origins out of the terminal origin policy', async () => {
+    const env = createEnv();
+    env.WS_ALLOWED_ORIGINS = 'https://app.example.com';
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/terminal?cloudAgentSessionId=workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&ptyId=pty_123&ticket=ticket',
+        {
+          headers: {
+            Upgrade: 'websocket',
+            Origin: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop',
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe('Origin not allowed');
   });
   it('rejects agent_ sessions before resolving the control-plane Durable Object', async () => {
     const sessionId = 'agent_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -2707,6 +2775,81 @@ describe('server preview host dispatch', () => {
     const previewHost = await fetchWorker(new Request(`http://${HOST}/preview/open`), env);
     expect(previewHost.status).toBe(401);
     expect(previewHost.headers.get('cache-control')).toBeNull();
+  });
+});
+
+describe('server code-review billing status', () => {
+  const path = 'http://worker.test/internal/code-review/billing/user/oauth%2Fprovider%2Fuser';
+
+  it('requires internal authentication', async () => {
+    expect((await fetchWorker(new Request(path), createEnv())).status).toBe(401);
+  });
+
+  it.each(['paid', 'shadow'] as const)('uses the meter decision: %s', async mode => {
+    const env = createEnv();
+    const getBillingMode = vi.fn().mockResolvedValue(mode);
+    env.CONTAINER_USAGE_METER = { getBillingMode };
+    const response = await fetchWorker(
+      new Request(path, {
+        headers: { 'x-internal-api-key': 'test-internal-secret' },
+      }),
+      env
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({ enabled: mode === 'paid' });
+    expect(getBillingMode).toHaveBeenCalledWith({
+      service: 'cloud-agent-next-sandbox-containers-code-review',
+      subject: { type: 'user', id: 'oauth/provider/user' },
+    });
+  });
+
+  it('rejects invalid owner types', async () => {
+    const response = await fetchWorker(
+      new Request(path.replace('/user/', '/bot/'), {
+        headers: { 'x-internal-api-key': 'test-internal-secret' },
+      }),
+      createEnv()
+    );
+    expect(response.status).toBe(400);
+  });
+});
+
+describe('server containers billing status', () => {
+  const path =
+    'http://worker.test/internal/containers/billing/user/oauth%2Fprovider%2Fuser/standard-4';
+  const headers = { 'x-internal-api-key': 'test-internal-secret' };
+
+  it('requires internal authentication', async () => {
+    expect((await fetchWorker(new Request(path), createEnv())).status).toBe(401);
+  });
+
+  it.each(['paid', 'shadow'] as const)(
+    'reports the meter decision for the instance service: %s',
+    async mode => {
+      const env = createEnv();
+      const getBillingMode = vi.fn().mockResolvedValue(mode);
+      env.CONTAINER_USAGE_METER = { getBillingMode };
+      const response = await fetchWorker(new Request(path, { headers }), env);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      await expect(response.json()).resolves.toEqual({ billingMode: mode });
+      expect(getBillingMode).toHaveBeenCalledWith({
+        service: 'cloud-agent-next-sandbox-containers-standard4',
+        subject: { type: 'user', id: 'oauth/provider/user' },
+      });
+    }
+  );
+
+  it.each([
+    ['owner type', path.replace('/user/', '/bot/')],
+    ['instance size', path.replace('/standard-4', '/standard-9')],
+  ])('rejects an invalid %s', async (_field, url) => {
+    const env = createEnv();
+    const getBillingMode = vi.fn();
+    env.CONTAINER_USAGE_METER = { getBillingMode };
+    expect((await fetchWorker(new Request(url, { headers }), env)).status).toBe(400);
+    expect(getBillingMode).not.toHaveBeenCalled();
   });
 });
 

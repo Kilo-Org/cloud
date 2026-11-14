@@ -128,6 +128,11 @@ export function findRow(root: ReactTestInstance, title: string): ReactTestInstan
   return row;
 }
 
+/** The subtitle each ConfigureRow rendered, in screen order. */
+export function rowSubtitles(root: ReactTestInstance): unknown[] {
+  return findAll(root, 'ConfigureRow').map(node => node.props.subtitle);
+}
+
 function pressButton(root: ReactTestInstance, index: number): void {
   const button = findAll(root, 'Button')[index];
   if (!button) {
@@ -191,18 +196,18 @@ export async function mountScreen(
 export function rerenderScreen(
   renderer: ReactTestRenderer,
   queryClient: QueryClient,
-  organizationId?: string
+  // The stack the screen was mounted in, and the profile it serves: a reused
+  // route instance answers per destination, so a test can bring either back.
+  options: { organizationId?: string; profileId?: string; stack?: 'app' | 'profileTab' } = {}
 ): void {
   renderer.update(
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      // The rerender helpers serve the Profile tab stack; an app-stack mount is
-      // a single-shot read, so it never needs one.
       createElement(ProfileOverviewScreen, {
-        profileId: 'profile-1',
-        organizationId,
-        stack: 'profileTab',
+        profileId: options.profileId ?? 'profile-1',
+        organizationId: options.organizationId,
+        stack: options.stack ?? 'profileTab',
       })
     )
   );

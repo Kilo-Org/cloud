@@ -14,7 +14,6 @@ select
         else coalesce(mu.requested_model, mu.model)
       end as "model"
     , case
-        when mu.feature ilike '%claw%' then 'kiloclaw'
         when mu.mode ilike '%code%' then 'code'
         when mu.mode ilike '%review%' then 'review'
         when mu.mode ilike '%plan%' then 'plan'
@@ -41,7 +40,7 @@ const modelUsageSchema = z.array(
   z.object({
     usageDate: z.string(),
     model: z.string().min(1),
-    mode: z.enum(['kiloclaw', 'code', 'review', 'plan', 'ask', 'debug']).nullable(),
+    mode: z.enum(['code', 'review', 'plan', 'ask', 'debug']).nullable(),
     tokens: z.number(),
   })
 );

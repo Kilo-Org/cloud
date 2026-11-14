@@ -14,6 +14,7 @@ import {
   replaceCommand,
   sameCommands,
 } from '@/components/profiles/profile-commands-model';
+import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { SetupCommandField } from '@/components/profiles/setup-command-field';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
@@ -23,7 +24,7 @@ import { ChevronDown, ChevronUp, Terminal, Trash2 } from '@/components/ui/icons'
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileCommands } from '@/lib/hooks/use-agent-profiles';
-import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
+import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useProfileCommandsSave } from '@/lib/hooks/use-profile-commands-save';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
@@ -60,7 +61,8 @@ export function ProfileCommandsScreen({
   const router = useRouter();
   const colors = useThemeColors();
   const commandsQuery = useAgentProfileCommands(profileId, organizationId);
-  const canManage = useCanManageOrganizationProfiles(organizationId);
+  const permission = useOrganizationProfilePermission(organizationId);
+  const canManage = permission === 'allowed';
 
   const serverRows: readonly CommandRow[] = commandsQuery.data ?? NO_COMMAND_ROWS;
   const serverCommands = useMemo(() => serverRows.map(row => row.command), [serverRows]);
@@ -302,11 +304,11 @@ export function ProfileCommandsScreen({
         description={null}
         placement="top"
         action={
-          canManage ? (
+          <ProfileManageSlot permission={permission}>
             <Button className={STATE_ACTION_CLASS} onPress={add}>
               <Text>{t('profiles.addCommand')}</Text>
             </Button>
-          ) : null
+          </ProfileManageSlot>
         }
       />
     );
@@ -314,11 +316,11 @@ export function ProfileCommandsScreen({
     content = (
       <>
         {commands.map((command, index) => renderCommandRow(command, index))}
-        {canManage ? (
+        <ProfileManageSlot permission={permission}>
           <Button onPress={add} disabled={commands.length >= MAX_SETUP_COMMANDS}>
             <Text>{t('profiles.addCommand')}</Text>
           </Button>
-        ) : null}
+        </ProfileManageSlot>
       </>
     );
   }

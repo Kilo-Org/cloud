@@ -176,6 +176,7 @@ function createInternalApiContext(options: {
     authToken: effectiveAuthToken,
     request: { headers } as Request,
     env: {
+      CONTAINER_USAGE_METER: { getBillingMode: vi.fn().mockResolvedValue('shadow') },
       SANDBOX_SESSION: {
         idFromName: vi.fn((id: string) => ({ id })),
         get: vi.fn(() => doStub),
@@ -219,7 +220,7 @@ function createInternalApiContext(options: {
         connectionString: 'postgres://profile-test',
       } as TRPCContext['env']['HYPERDRIVE'],
     },
-  } as TRPCContext;
+  } as unknown as TRPCContext;
 }
 
 describe('sandbox selection Worker API', () => {

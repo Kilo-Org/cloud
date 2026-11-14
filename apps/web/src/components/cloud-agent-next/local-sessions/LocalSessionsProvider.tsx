@@ -20,6 +20,7 @@ import {
 } from '../types';
 import {
   reconcileLocalSessions,
+  type LocalComposerSettings,
   type LocalSession,
   type LocalSessionAttempt,
   type LocalSessionSync,
@@ -46,6 +47,7 @@ type LocalSessionsValue = {
   restored: boolean;
   /** Adds the session under a new client id and sends its request. Returns the id. */
   createLocalSession: (draft: LocalSessionDraft) => string;
+  setLocalComposer: (kiloSessionId: string, composer: LocalComposerSettings | null) => void;
   /**
    * Retries a failed session and returns the id it continues under. A failure with
    * a known outcome may still own the old id, so that retry moves to a new id.
@@ -67,6 +69,7 @@ const LocalSessionsContext = createContext<LocalSessionsValue>({
     throw new Error('LocalSessionsProvider is missing');
   },
   retryLocalSession: () => null,
+  setLocalComposer: () => {},
   discardLocalSession: () => {},
   discardedPrompt: null,
   clearDiscardedPrompt: () => {},
@@ -209,6 +212,18 @@ export function LocalSessionsProvider({
     [run]
   );
 
+  const setLocalComposer = useCallback(
+    (kiloSessionId: string, composer: LocalComposerSettings | null) => {
+      const update = (sessions: readonly LocalSession[]) =>
+        sessions.map(session =>
+          session.kiloSessionId === kiloSessionId ? { ...session, composer } : session
+        );
+      localSessionsRef.current = update(localSessionsRef.current);
+      setLocalSessions(update);
+    },
+    []
+  );
+
   const discardLocalSession = useCallback((kiloSessionId: string) => {
     const session = localSessionsRef.current.find(item => item.kiloSessionId === kiloSessionId);
     if (!session) return;
@@ -237,6 +252,7 @@ export function LocalSessionsProvider({
       localSessions,
       restored,
       createLocalSession,
+      setLocalComposer,
       retryLocalSession,
       discardLocalSession,
       discardedPrompt,
@@ -247,6 +263,7 @@ export function LocalSessionsProvider({
       localSessions,
       restored,
       createLocalSession,
+      setLocalComposer,
       retryLocalSession,
       discardLocalSession,
       discardedPrompt,

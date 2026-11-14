@@ -15,6 +15,13 @@ export const SNAPSHOT_START_FAILURE_REASONS = [
 ] as const;
 export type SnapshotStartFailureReason = (typeof SNAPSHOT_START_FAILURE_REASONS)[number];
 
+export type SnapshotLaunchDiagnosticContext = {
+  allocationId: string;
+  source: 'environment' | 'workspace' | 'image';
+  attempt: number;
+  startedAt: number;
+};
+
 export const snapshotStartFailureReasonSchema = z.enum(SNAPSHOT_START_FAILURE_REASONS);
 
 export function snapshotStartFailureIsPermanent(reason: SnapshotStartFailureReason): boolean {

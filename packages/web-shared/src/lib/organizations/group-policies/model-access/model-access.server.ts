@@ -19,6 +19,7 @@ import {
   getModelInferenceProviders,
   isModelRestrictionExempt,
   type CustomLlmGrantee,
+  type ProviderLookup,
 } from '@kilocode/web-shared/lib/model-allow.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -55,20 +56,9 @@ export type EffectiveModelDecision = {
     | 'no_grant';
 };
 
-/**
- * Resolves the providers that can serve a model. Receives the requested model id
- * as-is (including variant suffixes such as `:free`) so implementations can
- * distinguish variants that are served by different providers.
- */
-export type ProviderLookup = (modelId: string) => Promise<ReadonlySet<string>>;
-
 export function evaluateEffectiveModelAccessPolicy(
   context: OrganizationGroupPolicyContext
 ): EffectiveOrganizationModelPolicy {
-  const customLlmGrantee = {
-    organizationId: context.organization.id,
-    groupIds: context.groupIds,
-  };
   const organizationRestrictionsEnabled = context.organization.plan === 'enterprise';
   const organizationModelDenyList = organizationRestrictionsEnabled
     ? (context.organization.settings.model_deny_list ?? []).map(normalizeModelId)
@@ -76,15 +66,23 @@ export function evaluateEffectiveModelAccessPolicy(
   const organizationProviderCeiling = organizationRestrictionsEnabled
     ? context.organization.settings.provider_allow_list
     : undefined;
+  // The fields below do not vary by branch; each branch adds only the snapshot
+  // requirement and the member grant that its policy mode implies.
+  const organizationFields = {
+    organizationModelDenyList,
+    organizationProviderCeiling,
+    dataCollection: context.organization.settings.data_collection,
+    policyRevision: context.policyRevision,
+    customLlmGrantee: {
+      organizationId: context.organization.id,
+      groupIds: context.groupIds,
+    },
+  };
   if (!organizationRestrictionsEnabled) {
     return {
+      ...organizationFields,
       requireModelInCurrentSnapshot: false,
-      organizationModelDenyList,
-      organizationProviderCeiling,
       memberGrant: { mode: 'unrestricted' },
-      dataCollection: context.organization.settings.data_collection,
-      policyRevision: context.policyRevision,
-      customLlmGrantee,
     };
   }
 
@@ -101,20 +99,15 @@ export function evaluateEffectiveModelAccessPolicy(
   );
   if (selectedPolicies.length === 0 && includeOrganizationBaseline) {
     return {
+      ...organizationFields,
       requireModelInCurrentSnapshot: true,
-      organizationModelDenyList,
-      organizationProviderCeiling,
       memberGrant: { mode: 'organization_baseline' },
-      dataCollection: context.organization.settings.data_collection,
-      policyRevision: context.policyRevision,
-      customLlmGrantee,
     };
   }
 
   return {
+    ...organizationFields,
     requireModelInCurrentSnapshot: true,
-    organizationModelDenyList,
-    organizationProviderCeiling,
     memberGrant: {
       mode: 'selected',
       includeOrganizationBaseline,
@@ -135,9 +128,6 @@ export function evaluateEffectiveModelAccessPolicy(
         ),
       ],
     },
-    dataCollection: context.organization.settings.data_collection,
-    policyRevision: context.policyRevision,
-    customLlmGrantee,
   };
 }
 

@@ -28,6 +28,7 @@ import {
 } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
+import { seedRegistration } from './helpers/seed-registration.js';
 import { waitFor } from './wait-for.js';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
@@ -471,7 +472,7 @@ describe('sandbox status badge projection (B10)', () => {
       },
     };
     peer.statusSnapshot = expected;
-    await stub.registerSession({
+    await seedRegistration(stub, {
       sandboxId,
       spec: {
         sessionId,
@@ -527,7 +528,7 @@ describe('sandbox status badge projection (B10)', () => {
       intervalStartedAt: null,
       meterInstanceId: 'sbx-meter',
     };
-    await stub.registerSession({
+    await seedRegistration(stub, {
       sandboxId,
       spec: {
         sessionId,

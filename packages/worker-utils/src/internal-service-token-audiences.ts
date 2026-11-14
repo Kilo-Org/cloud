@@ -4,6 +4,7 @@ export const KILO_CHAT_AUDIENCE = 'kilo-chat';
 export const EVENT_SERVICE_AUDIENCE = 'event-service';
 export const NOTIFICATIONS_AUDIENCE = 'notifications';
 export const CLOUD_AGENT_NEXT_AUDIENCE = 'cloud-agent-next';
+export const RUNTIME_CREDENTIAL_PROXY_AUDIENCE = 'cloud-agent-next:runtime-credential-proxy';
 export const KILOCLAW_AUDIENCE = 'kiloclaw';
 export const SESSION_INGEST_AUDIENCE = 'session-ingest';
 export const AI_ATTRIBUTION_AUDIENCE = 'ai-attribution';

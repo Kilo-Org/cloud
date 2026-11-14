@@ -1,5 +1,13 @@
 import { SecureProxyUpstreamUrlSchema } from '@kilocode/ai-gateway-secure-proxy-contracts';
-import { GATE_THRESHOLDS, REVIEW_STYLES } from '@kilocode/app-shared/code-review';
+import {
+  COUNCIL_AGGREGATION_STRATEGIES,
+  COUNCIL_MAX_REQUIRED_LABELS,
+  COUNCIL_REQUIRED_LABEL_MAX_LENGTH,
+  COUNCIL_SPECIALIST_ROLES,
+  DEFAULT_COUNCIL_AGGREGATION_STRATEGY,
+  GATE_THRESHOLDS,
+  REVIEW_STYLES,
+} from '@kilocode/app-shared/code-review';
 import * as z from 'zod';
 
 export const watchPrPolicySchema = z
@@ -1538,7 +1546,11 @@ export type OrganizationMcpGuardrailConfig =
       kind: 'package';
       ecosystem: 'npm' | 'pypi';
       identifier: string;
-      min_version: string | null;
+      version_spec: string | null;
+      /** True when a stored range or legacy minimum cannot be parsed. */
+      version_spec_invalid?: boolean;
+      /** Transitional floor for clients deployed before version ranges. */
+      min_version?: string | null;
     };
 
 export type OrganizationGuardrailConfig = OrganizationMcpGuardrailConfig;
@@ -1862,8 +1874,6 @@ export type VercelComputeSetupStep =
   | 'create_builder'
   | 'install_system_dependencies'
   | 'install_node_dependencies'
-  | 'upload_runtime_artifacts'
-  | 'verify_runtime_artifacts'
   | 'snapshot_builder'
   | 'create_validator'
   | 'launch_validator_wrapper'
@@ -2042,15 +2052,13 @@ export type ManuallyAddedRepository = z.infer<typeof ManuallyAddedRepositorySche
 
 // --- Code Reviewer Council (enterprise multi-specialist review) ---
 
-export const COUNCIL_SPECIALIST_ROLES = [
-  'security',
-  'performance',
-  'testing',
-  'correctness',
-  'docs',
-  'custom',
-] as const;
-export type CouncilSpecialistRole = (typeof COUNCIL_SPECIALIST_ROLES)[number];
+// The role vocabulary and the governance choices are plain data the config UI
+// paints, so they live in @kilocode/app-shared/code-review and are re-exported
+// here: the web form, the mobile screen and the persisted schema cannot drift.
+export {
+  COUNCIL_SPECIALIST_ROLES,
+  type CouncilSpecialistRole,
+} from '@kilocode/app-shared/code-review';
 
 // Council decision model v2: a vote is BINARY (yes/no). "warn"/"abstain" are NOT votes —
 // a warning is a finding severity (see COUNCIL_FINDING_SEVERITIES), and a specialist that
@@ -2083,6 +2091,14 @@ export const CODE_REVIEW_TRIGGER_SOURCES = ['manual', 'webhook'] as const;
 export const CodeReviewTriggerSourceSchema = z.enum(CODE_REVIEW_TRIGGER_SOURCES);
 export type CodeReviewTriggerSource = z.infer<typeof CodeReviewTriggerSourceSchema>;
 
+export {
+  COUNCIL_AGGREGATION_STRATEGIES,
+  COUNCIL_MAX_REQUIRED_LABELS,
+  COUNCIL_REQUIRED_LABEL_MAX_LENGTH,
+  type CouncilAggregationStrategy,
+  DEFAULT_COUNCIL_AGGREGATION_STRATEGY,
+} from '@kilocode/app-shared/code-review';
+
 // Governance mode (v2). Field is still named `aggregation_strategy` for continuity, but the
 // values are the three DISTINCT modes under binary votes:
 // - 'advisory'  — report votes/findings only; compute NO aggregate decision and NO merge gate.
@@ -2090,14 +2106,7 @@ export type CodeReviewTriggerSource = z.infer<typeof CodeReviewTriggerSourceSche
 // - 'majority'  — block only when block votes outnumber pass votes. Lenient.
 // (v1's 'any_blocking_member' is dropped: with no abstain, it is mathematically identical to
 // 'unanimous'. 'advisory' is the safe default so a new council never blocks a merge unasked.)
-export const COUNCIL_AGGREGATION_STRATEGIES = ['advisory', 'unanimous', 'majority'] as const;
 export const CouncilAggregationStrategySchema = z.enum(COUNCIL_AGGREGATION_STRATEGIES);
-export type CouncilAggregationStrategy = z.infer<typeof CouncilAggregationStrategySchema>;
-
-// The safe default governance mode: report only, never gate a merge unasked. Single source of
-// truth — referenced by the schema default, the manual-job UI state, dispatch, and the label
-// fallback, so the default can't drift between the backend and what the UI initializes to.
-export const DEFAULT_COUNCIL_AGGREGATION_STRATEGY: CouncilAggregationStrategy = 'advisory';
 
 // A specialist id doubles as the cloud-agent-next `runtimeAgents[].slug` (single-session
 // execution) AND the manifest correlation key, so it must satisfy the runtime-agent slug
@@ -2158,10 +2167,9 @@ export const CouncilSpecialistSchema = z.object({
 });
 export type CouncilSpecialist = z.infer<typeof CouncilSpecialistSchema>;
 
-// Caps for the council `required_labels` selection gate. Exported so the config UI can enforce the
-// same limits client-side and keep frontend/backend validation in sync.
-export const COUNCIL_MAX_REQUIRED_LABELS = 20;
-export const COUNCIL_REQUIRED_LABEL_MAX_LENGTH = 100;
+// Caps for the council `required_labels` selection gate live in
+// @kilocode/app-shared/code-review (re-exported above) so the config UI can
+// enforce the same limits client-side and keep frontend/backend validation in sync.
 
 // The council definition: what the council IS (specialists + how their votes
 // aggregate). It carries no trigger/selection logic — whether a given run is a
@@ -3321,9 +3329,58 @@ export const ModelSchema = z.object({
     .catch(undefined),
 });
 
-export type GatewayModel = z.infer<typeof ModelSchema>;
+/**
+ * The fields Vercel AI Gateway's model list adds to describe a model, which Kilo needs to list
+ * models that only Vercel serves. OpenRouter's list lacks them or uses other shapes, so its models
+ * parse with `ModelSchema` alone.
+ */
+export const VercelModelSchema = ModelSchema.extend({
+  description: z.string().optional().catch(undefined),
+  /** Seconds since the epoch: when Vercel added the model, often a shared backfill date. */
+  created: z.number().optional().catch(undefined),
+  /** Seconds since the epoch. */
+  released: z.number().optional().catch(undefined),
+  context_window: z.number().optional().catch(undefined),
+  max_tokens: z.number().optional().catch(undefined),
+  modalities: z
+    .object({ input: z.array(z.string()), output: z.array(z.string()) })
+    .optional()
+    .catch(undefined),
+  supported_parameters: z.array(z.string()).optional().catch(undefined),
+  pricing: z
+    .object({
+      input: z.string(),
+      output: z.string(),
+      input_cache_read: z.string().optional().catch(undefined),
+      input_cache_write: z.string().optional().catch(undefined),
+    })
+    .optional()
+    .catch(undefined),
+  /** Milliseconds since the epoch. */
+  deprecated_at: z
+    .number()
+    .int()
+    .min(0)
+    .max(Date.UTC(9999, 11, 31))
+    .optional()
+    .catch(undefined),
+  reasoning_options: z
+    .array(
+      z.object({
+        type: z.string(),
+        values: z.array(z.string()).optional().catch(undefined),
+      })
+    )
+    .optional()
+    .catch(undefined),
+});
+
+/** A gateway model list entry. The Vercel-only fields are never set on OpenRouter models. */
+export type GatewayModel = z.infer<typeof VercelModelSchema>;
 
 export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
+
+export const VercelModelsSchema = z.object({ data: z.array(VercelModelSchema) });
 
 export const EndpointPricingSchema = z.object({
   prompt: z.string(),

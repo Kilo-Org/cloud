@@ -1,86 +1,39 @@
 import { Mic, Square } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
-import { type Insets, Pressable, View } from 'react-native';
+import { Pressable } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { ICON_TARGET_BOX_CLASS, VOICE_INPUT_LG_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type VoiceInputStatus } from '@/lib/voice-input/voice-input-state';
 import { resolveVoiceInputControlState } from '@/lib/voice-input/voice-input-view-state';
 
-type VoiceInputButtonSize = 'sm' | 'md' | 'lg';
-
 type VoiceInputButtonProps = {
   disabled: boolean;
   onPress(): void;
   status: VoiceInputStatus;
-  size?: VoiceInputButtonSize;
-  /** Replaces the size's own slop when a neighbour sits closer than it. */
-  hitSlop?: Insets;
-  /**
-   * Renders the shared 48dp box on the pressable's own node and keeps the
-   * size's visual circle inside it. A control-size audit reads that node's
-   * rect, so `hitSlop` cannot lift the smaller visual frame above the floor;
-   * the slop is dropped because the box is the whole target.
-   */
-  fullTarget?: boolean;
 };
-
-// Visual class and hitSlop travel as a coupled pair: the tap area is the
-// visual frame plus 2 * hitSlop per side. Frames are rem-scaled (NativeWind's
-// rem is 14pt), so `lg` measures 35dp. The composer input row sits the send
-// control closer than this slop, so it passes its own `hitSlop` with the facing
-// side zeroed (`composerFacingHitSlop`, `chat-composer-input-row.tsx`).
-const SIZE_STYLES = {
-  sm: {
-    className: 'h-8 w-8 rounded-full',
-    hitSlop: { top: 6, bottom: 6, left: 6, right: 6 },
-  },
-  md: {
-    className: 'h-9 w-9 rounded-full',
-    hitSlop: { top: 4, bottom: 4, left: 4, right: 4 },
-  },
-  lg: {
-    className: 'h-10 w-10 rounded-full',
-    hitSlop: {
-      top: VOICE_INPUT_LG_HIT_SLOP_DP,
-      bottom: VOICE_INPUT_LG_HIT_SLOP_DP,
-      left: VOICE_INPUT_LG_HIT_SLOP_DP,
-      right: VOICE_INPUT_LG_HIT_SLOP_DP,
-    },
-  },
-} satisfies Record<
-  VoiceInputButtonSize,
-  {
-    className: string;
-    hitSlop: { top: number; bottom: number; left: number; right: number };
-  }
->;
-
-const DEFAULT_STYLE = {
-  className: 'h-10 w-10 rounded-md',
-  hitSlop: { top: 2, bottom: 2, left: 2, right: 2 },
-} as const;
 
 const ICON_SIZE = 18;
 const LISTENING_BG = 'bg-red-600 dark:bg-red-500';
-const RESTING_BG = 'bg-secondary';
 
 /**
- * Compact voice-input toggle for composer toolbars. Visual size is controlled
- * by `size`; the default renders a 10x10 square that expands to a 44pt touch
- * target via `hitSlop`. While the controller is in `starting` or `stopping`,
- * an ActivityIndicator replaces the icon and the press is ignored. While
- * `listening`, a destructive treatment signals the active session.
+ * Voice-input toggle for composer toolbars and the voice test field. It has
+ * one geometry: the pressable's own node is the shared 48dp box, which
+ * carries the 44pt design target and the 48dp platform minimum, so a
+ * control-size audit reads the target itself. Slop is not used — the box is
+ * the whole reach — so the toggle cannot reach into a neighbour. A bare icon
+ * sits on the box, because a resting circle smaller than the send control's
+ * filled circle beside it reads as a mismatched dot, while a live session
+ * fills the whole box, which is the destructive treatment that signals the
+ * active session. While the controller is in `starting` or `stopping`, an
+ * ActivityIndicator replaces the icon and the press is ignored.
  */
 export function VoiceInputButton({
   disabled,
-  fullTarget = false,
-  hitSlop,
   onPress,
-  size,
   status,
 }: Readonly<VoiceInputButtonProps>): React.ReactElement {
   const colors = useThemeColors();
@@ -89,14 +42,7 @@ export function VoiceInputButton({
     status === 'listening' || status === 'stopping' || status === 'transcribing';
   const showSpinner = control.busy;
   const iconColor = isListeningOrStopping ? colors.destructiveForeground : colors.foreground;
-  const restingBg = isListeningOrStopping ? LISTENING_BG : RESTING_BG;
-  const sizeStyle = size ? SIZE_STYLES[size] : DEFAULT_STYLE;
-  // The visual stays the size's own frame; `fullTarget` moves it inside the
-  // shared 48dp box the size audit measures.
-  const visualClass = cn(sizeStyle.className, 'items-center justify-center', restingBg);
-  const containerClass = fullTarget
-    ? cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')
-    : cn(visualClass, 'active:opacity-70');
+  const activeBg = isListeningOrStopping && LISTENING_BG;
   const renderIcon = (): React.ReactElement => {
     if (showSpinner) {
       return <ActivityIndicator color={iconColor} size="small" />;
@@ -106,19 +52,17 @@ export function VoiceInputButton({
     }
     return <Square color={iconColor} size={ICON_SIZE} />;
   };
-  const icon = renderIcon();
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={control.accessibilityLabel}
       accessibilityState={{ busy: control.busy, disabled: control.disabled }}
-      className={containerClass}
+      className={cn(ICON_TARGET_BOX_CLASS, 'rounded-full', 'active:opacity-70', activeBg)}
       disabled={control.disabled}
-      hitSlop={fullTarget ? undefined : (hitSlop ?? sizeStyle.hitSlop)}
       onPress={onPress}
     >
-      {fullTarget ? <View className={visualClass}>{icon}</View> : icon}
+      {renderIcon()}
     </Pressable>
   );
 }

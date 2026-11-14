@@ -33,6 +33,13 @@ export const sessionRoles = sqliteTable('session_roles', {
   role: text('role', { enum: ['owner', 'viewer', 'editor'] }).notNull(),
 });
 
+export const sessionStatus = sqliteTable('session_status', {
+  key: integer('key').primaryKey(),
+  value: text('value').notNull(),
+  version: integer('version').notNull(),
+  updated_at: integer('updated_at').notNull(),
+});
+
 /** Current portable entities. A row holds an inline JSON value or a blob reference. */
 export const entities = sqliteTable(
   'entities',

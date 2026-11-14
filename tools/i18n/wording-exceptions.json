@@ -1,5 +1,5 @@
 {
-  "af": ["commit", "open", "open pull request", "review", "starting"],
+  "af": ["commit", "open", "open pull request", "receipt", "review", "starting"],
   "am": ["github connection expired", "open", "open pull request"],
   "ar": [
     "commit",
@@ -39,6 +39,7 @@
     "open pull request",
     "personal",
     "privacy policy",
+    "receipt",
     "tokens",
     "truncated",
     "unknown"
@@ -55,6 +56,7 @@
     "medium",
     "open",
     "open pull request",
+    "receipt",
     "search models",
     "tokens",
     "unknown"
@@ -89,6 +91,7 @@
     "open",
     "open pull request",
     "pr opened",
+    "receipt",
     "remediation failed",
     "review"
   ],
@@ -117,6 +120,7 @@
     "pr opened",
     "privacy policy",
     "reactions",
+    "receipt",
     "recommended",
     "remediation blocked",
     "tokens",
@@ -145,7 +149,15 @@
     "plan",
     "review"
   ],
-  "de": ["block", "manual review", "no changes needed", "open", "open pull request", "pr opened"],
+  "de": [
+    "block",
+    "manual review",
+    "no changes needed",
+    "open",
+    "open pull request",
+    "pr opened",
+    "receipt"
+  ],
   "el": [
     "{{count}} open",
     "archived ({{count}})",
@@ -180,6 +192,7 @@
     "open",
     "open pull request",
     "pr opened",
+    "receipt",
     "recommended",
     "remediation failed",
     "review",
@@ -199,6 +212,7 @@
     "pr opened",
     "privacy policy",
     "reactions",
+    "receipt",
     "remediation blocked",
     "remediation failed",
     "search sessions",
@@ -217,6 +231,7 @@
     "open pull request",
     "pr opened",
     "reactions",
+    "receipt",
     "remediation blocked",
     "review",
     "superseded",
@@ -285,6 +300,7 @@
     "open",
     "open pull request",
     "plan",
+    "receipt",
     "recent",
     "recommended",
     "{{loaded}} of {{total}} files loaded"
@@ -311,6 +327,7 @@
     "open",
     "open pull request",
     "pr opened",
+    "receipt",
     "remediation failed",
     "review"
   ],
@@ -334,6 +351,14 @@
     "{{count}} open",
     "{{loaded}} of {{total}} files loaded"
   ],
+  "ha": [
+    "analysis failed",
+    "dismissed",
+    "manual review",
+    "no changes needed",
+    "receipt",
+    "remediation blocked"
+  ],
   "he": [
     "completed",
     "created",
@@ -347,7 +372,8 @@
     "open",
     "open pull request",
     "plan",
-    "pr opened"
+    "pr opened",
+    "receipt"
   ],
   "hi": [
     "analysis failed",
@@ -375,8 +401,10 @@
     "plan",
     "pr opened",
     "reactions",
+    "receipt",
     "tokens"
   ],
+  "ht": ["no changes needed", "pr opened", "remediation blocked", "remediation failed"],
   "hu": [
     "analysis failed",
     "dismissed",
@@ -386,6 +414,7 @@
     "open",
     "open pull request",
     "reactions",
+    "receipt",
     "review",
     "search sessions",
     "stopped",
@@ -424,6 +453,7 @@
     "no changes needed",
     "open",
     "pr opened",
+    "receipt",
     "remediation blocked",
     "remediation failed",
     "superseded",
@@ -462,6 +492,7 @@
     "pr opened",
     "queued",
     "reactions",
+    "receipt",
     "remediation blocked",
     "remediation failed",
     "superseded"
@@ -524,10 +555,19 @@
     "open pull request",
     "plan",
     "pr opened",
+    "receipt",
     "remediation failed",
     "session exited"
   ],
-  "lo": ["dismissed", "manual review", "pr opened", "remediation blocked", "review", "superseded"],
+  "lo": [
+    "dismissed",
+    "manual review",
+    "pr opened",
+    "receipt",
+    "remediation blocked",
+    "review",
+    "superseded"
+  ],
   "lt": [
     "analysis failed",
     "commit",
@@ -540,6 +580,7 @@
     "plan",
     "pr opened",
     "reactions",
+    "receipt",
     "remediation failed",
     "superseded"
   ],
@@ -551,6 +592,7 @@
     "open",
     "open pull request",
     "pr opened",
+    "receipt",
     "review"
   ],
   "mg": [
@@ -560,7 +602,8 @@
     "manual review",
     "no changes needed",
     "open",
-    "open pull request"
+    "open pull request",
+    "receipt"
   ],
   "mi": [
     "analysis failed",
@@ -572,6 +615,7 @@
     "open",
     "open pull request",
     "pr opened",
+    "receipt",
     "remediation blocked",
     "remediation failed"
   ],
@@ -582,6 +626,7 @@
     "manual review",
     "open",
     "open pull request",
+    "receipt",
     "remediation blocked",
     "remediation failed"
   ],
@@ -652,6 +697,7 @@
     "open",
     "open pull request",
     "pr opened",
+    "receipt",
     "remediation blocked",
     "remediation failed",
     "remediation requested",
@@ -671,7 +717,7 @@
     "remediation failed",
     "superseded"
   ],
-  "nl": ["all", "block", "manual review", "open", "open pull request", "pr opened"],
+  "nl": ["all", "block", "manual review", "open", "open pull request", "pr opened", "receipt"],
   "om": [
     "analysis failed",
     "cancelled",
@@ -681,6 +727,7 @@
     "no changes needed",
     "open",
     "pr opened",
+    "receipt",
     "remediation blocked",
     "remediation failed",
     "superseded"
@@ -773,6 +820,7 @@
     "outdated",
     "plan",
     "pr opened",
+    "receipt",
     "review",
     "superseded"
   ],
@@ -787,6 +835,7 @@
     "open",
     "open pull request",
     "pr opened",
+    "receipt",
     "review"
   ],
   "ro": [
@@ -800,6 +849,7 @@
     "open",
     "open pull request",
     "pr opened",
+    "receipt",
     "superseded"
   ],
   "ru": [
@@ -817,6 +867,7 @@
     "open",
     "open pull request",
     "pr opened",
+    "receipt",
     "remediation failed",
     "tokens"
   ],
@@ -843,6 +894,7 @@
     "pending",
     "pr opened",
     "privacy policy",
+    "receipt",
     "review",
     "tokens"
   ],
@@ -883,6 +935,7 @@
     "open",
     "open pull request",
     "reactions",
+    "receipt",
     "review",
     "superseded",
     "tokens",
@@ -899,6 +952,7 @@
     "plan",
     "pr opened",
     "reactions",
+    "receipt",
     "starting…",
     "tokens"
   ],
@@ -943,7 +997,7 @@
     "superseded",
     "unknown"
   ],
-  "th": ["completed", "no kiloclaw instances", "plan"],
+  "th": ["completed", "no kiloclaw instances", "plan", "receipt"],
   "tr": [
     "block",
     "created",
@@ -954,6 +1008,7 @@
     "open pull request",
     "pr opened",
     "reactions",
+    "receipt",
     "review",
     "superseded",
     "tokens"
@@ -966,6 +1021,7 @@
     "pr opened",
     "privacy policy",
     "reactions",
+    "receipt",
     "remediation failed"
   ],
   "ur": [
@@ -997,6 +1053,7 @@
     "open pull request",
     "pr opened",
     "reactions",
+    "receipt",
     "remediation blocked"
   ],
   "vi": [
@@ -1006,6 +1063,7 @@
     "open pull request",
     "plan",
     "pr opened",
+    "receipt",
     "superseded"
   ],
   "yo": [
@@ -1019,6 +1077,7 @@
     "no changes needed",
     "open",
     "pr opened",
+    "receipt",
     "remediation blocked",
     "remediation failed",
     "remediation requested",
@@ -1034,6 +1093,7 @@
     "open pull request",
     "pr opened",
     "reactions",
+    "receipt",
     "remediation blocked",
     "superseded"
   ],
@@ -1047,6 +1107,7 @@
     "open pull request",
     "pr opened",
     "reactions",
+    "receipt",
     "remediation blocked"
   ],
   "zu": [
@@ -1063,13 +1124,5 @@
     "remediation blocked",
     "superseded",
     "{{loaded}} of {{total}} files loaded"
-  ],
-  "ha": [
-    "analysis failed",
-    "dismissed",
-    "manual review",
-    "no changes needed",
-    "remediation blocked"
-  ],
-  "ht": ["no changes needed", "pr opened", "remediation blocked", "remediation failed"]
+  ]
 }

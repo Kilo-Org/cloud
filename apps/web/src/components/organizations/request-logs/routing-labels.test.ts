@@ -34,6 +34,17 @@ describe('describeStep', () => {
     });
   });
 
+  test('says the selected BYOK key was only tried first when the request failed over', () => {
+    expect(
+      describeStep(
+        { step: 'byok-key', outcome: 'selected', route: 'vercel-byok', provider_id: 'openai' },
+        { failedOver: true }
+      ).detail
+    ).toBe(
+      'Tried the OpenAI API key through Vercel AI Gateway first. It failed, so the request failed over to the next BYOK key.'
+    );
+  });
+
   test('names BYOK providers instead of showing their IDs and routes', () => {
     expect(
       describeStep({

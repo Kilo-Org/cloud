@@ -370,6 +370,48 @@ test('auto-creates blank shared callback secrets before syncing worker dev vars'
   }
 });
 
+test('prepares native session sync secrets without reusing the authentication signing key', () => {
+  const syncDir = 'services/session-sync';
+  const repo = createRepo({
+    '.env.local':
+      'NEXTAUTH_SECRET=synthetic-auth-key\nINTERNAL_API_SECRET=synthetic-internal-key\n',
+    [`${syncDir}/package.json`]: JSON.stringify({ scripts: { dev: 'wrangler dev --env local' } }),
+    [`${syncDir}/wrangler.jsonc`]: '{"env":{"local":{"vars":{"ENVIRONMENT":"development"}}}}',
+    [`${syncDir}/.dev.vars.example`]: [
+      'NEXTAUTH_SECRET=""',
+      'SESSION_SYNC_SECRET=""',
+      '# @from INTERNAL_API_SECRET',
+      'INTERNAL_API_SECRET_PROD=""',
+      '',
+    ].join('\n'),
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['cloudflare-session-sync']));
+    assert.deepEqual(plan.envLocalAutoCreates, [
+      { key: 'SESSION_SYNC_SECRET', command: 'openssl', args: ['rand', '-base64', '32'] },
+    ]);
+    writeFile(
+      repo.root,
+      '.env.local',
+      [
+        'NEXTAUTH_SECRET=synthetic-auth-key',
+        'SESSION_SYNC_SECRET=synthetic-sync-key',
+        'INTERNAL_API_SECRET=synthetic-internal-key',
+        '',
+      ].join('\n')
+    );
+    const ready = computePlan(repo.root, new Set(['cloudflare-session-sync']));
+    assert.deepEqual(ready.envLocalAutoCreates, []);
+    const change = ready.devVarsChanges.find(item => item.workerDir === syncDir);
+    assert.ok(change);
+    assert.deepEqual(change.missingValues, []);
+    assert.match(change.newFileContent ?? '', /SESSION_SYNC_SECRET=synthetic-sync-key/);
+    assert.match(change.newFileContent ?? '', /INTERNAL_API_SECRET_PROD=synthetic-internal-key/);
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('syncs generated shared callback secrets into blank worker dev vars', () => {
   const repo = createRepo({
     '.env.local': 'CALLBACK_TOKEN_SECRET=generated-callback-secret\n',

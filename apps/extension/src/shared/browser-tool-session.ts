@@ -15,6 +15,7 @@ import {
   getInspectableTab,
   getViewportScreenshotWithTabsApi,
 } from './tab-debugger';
+import { buildWebMcpDefinitionSignature } from './web-mcp-tools';
 import type {
   BrowserScriptingApi,
   BrowserTabInfo,
@@ -253,7 +254,6 @@ export interface BrowserToolSession {
 
 const jsonRecordSchema = z.record(z.string(), z.unknown());
 const headerValueSchema = z.string();
-const stringValueSchema = z.string();
 // The contract types a checkbox/radio value as the string "true"/"false", so both spellings map to a boolean before the page script decides to click.
 const booleanValueSchema = z
   .union([z.boolean(), z.enum(['false', 'true'])])
@@ -1242,24 +1242,6 @@ const formatTabList = (tabs: readonly BrowserToolTab[], selectedTabId: number): 
       return `${String(index)}: ${tab.title ?? ''} - ${tab.url ?? ''}${marker}`;
     })
     .join('\n');
-
-/** WebMCP definition signatures are compared as ordered JSON, exactly like `tab-debugger.ts` builds them. */
-const normalizeWebMcpInputSchema = (schema: unknown): Record<string, unknown> | undefined => {
-  const asString = stringValueSchema.safeParse(schema);
-  let value = schema;
-
-  if (asString.success) {
-    try {
-      value = JSON.parse(asString.data) as unknown;
-    } catch {
-      return undefined;
-    }
-  }
-
-  const asRecord = jsonRecordSchema.safeParse(value);
-
-  return asRecord.success ? asRecord.data : undefined;
-};
 
 interface MutableNetworkRequest {
   failure?: string;
@@ -2601,13 +2583,7 @@ export const createBrowserToolSession = ({
           };
         }
 
-        const signature = JSON.stringify([
-          tool.name,
-          tool.title,
-          tool.description,
-          tool.origin,
-          normalizeWebMcpInputSchema(tool.inputSchema),
-        ]);
+        const signature = buildWebMcpDefinitionSignature(tool);
         const result = await executeWebMcpToolInTab({
           arguments: JSON.stringify(parsed.data.params ?? {}),
           definitionSignature: signature,

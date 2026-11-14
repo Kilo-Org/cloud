@@ -7,10 +7,12 @@ import {
   _setSecureStoreForTests,
   clearLastRoute,
   consumeLastRouteForRepair,
+  consumeRestoredRouteOpen,
   getLastRoute,
   getLastRouteSnapshot,
   isLastRouteHydrated,
   type LastRouteRecord,
+  noteRestoredRouteOpen,
   prepareLastRouteRepair,
   recordLastRoute,
   subscribeLastRoute,
@@ -188,6 +190,32 @@ describe('consumeLastRouteForRepair', () => {
   });
 });
 
+describe('consumeRestoredRouteOpen', () => {
+  it('marks the route the repair opened, groups and query included', () => {
+    noteRestoredRouteOpen('/(app)/agent-chat/ses_1?at=msg_2');
+
+    expect(consumeRestoredRouteOpen('/agent-chat/ses_1')).toBe(true);
+  });
+
+  it('is one-shot, so a later open of the same route answers for itself', () => {
+    noteRestoredRouteOpen('/(app)/agent-chat/ses_1');
+    expect(consumeRestoredRouteOpen('/agent-chat/ses_1')).toBe(true);
+
+    expect(consumeRestoredRouteOpen('/agent-chat/ses_1')).toBe(false);
+  });
+
+  it('does not mark a different route, and the next route is unmarked', () => {
+    noteRestoredRouteOpen('/(app)/agent-chat/ses_1');
+
+    expect(consumeRestoredRouteOpen('/(app)/(tabs)/(0_home)')).toBe(false);
+    expect(consumeRestoredRouteOpen('/agent-chat/ses_1')).toBe(false);
+  });
+
+  it('marks nothing when no restore ran', () => {
+    expect(consumeRestoredRouteOpen('/agent-chat/ses_1')).toBe(false);
+  });
+});
+
 describe('getLastRoute', () => {
   it('returns null for a record owned by another account', () => {
     _setLastRouteForTests({
@@ -254,10 +282,11 @@ describe('subscribeLastRoute (the restart read)', () => {
       '/(app)/security-agent/org-1/findings/f_1',
     ],
     ['/(app)/(tabs)/(3_profile)/notifications', '/(app)/notifications'],
+    ['/(app)/device-sessions', '/(app)/(tabs)/(3_profile)/device-sessions'],
   ])('rehydrates a %s record at the path the screen has now', async (stored, current) => {
-    // Mirrored before these surfaces moved out of the Profile tab: replaying the
-    // old href after the update opens an unmatched route, so the record is read
-    // at the screen's current path.
+    // Mirrored before these surfaces moved: replaying the old href after the
+    // update opens an unmatched route, so the record is read at the screen's
+    // current path.
     store.set(KEY, recordFor(stored, 'u1'));
     await _hydrateLastRouteForTests();
 
@@ -329,13 +358,26 @@ describe('clearLastRoute', () => {
 });
 
 describe('record shape', () => {
-  it('carries the href, the account and a timestamp', () => {
-    const record: LastRouteRecord = {
-      href: '/(app)',
-      userId: 'u1',
-      storedAt: 5,
-    };
-    _setLastRouteForTests(record);
-    expect(getLastRouteSnapshot()).toEqual(record);
+  it('records the href, the account and a timestamp through the write path', () => {
+    // The layout's repair consumes (and latches) before any write is accepted.
+    consumeLastRouteForRepair('u1');
+    recordLastRoute('/(app)/(tabs)/(0_home)', 'u1');
+
+    const snapshot = getLastRouteSnapshot();
+    expect(snapshot).not.toBeNull();
+    expect(snapshot?.href).toBe('/(app)/(tabs)/(0_home)');
+    expect(snapshot?.userId).toBe('u1');
+    expect(snapshot?.storedAt).toBeTypeOf('number');
+    expect(getLastRoute('u1')).toBe('/(app)/(tabs)/(0_home)');
+  });
+
+  it('hydrates the href, the account and a timestamp off the mirror', async () => {
+    store.set(KEY, recordFor('/(app)/(tabs)/(0_home)', 'u1'));
+    await _hydrateLastRouteForTests();
+
+    const snapshot = getLastRouteSnapshot();
+    expect(snapshot?.href).toBe('/(app)/(tabs)/(0_home)');
+    expect(snapshot?.userId).toBe('u1');
+    expect(snapshot?.storedAt).toBeTypeOf('number');
   });
 });

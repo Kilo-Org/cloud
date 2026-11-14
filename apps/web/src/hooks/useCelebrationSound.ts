@@ -11,7 +11,7 @@ export const SOUND_NOTIFICATIONS_KEY = 'kilo-sound-notifications-enabled';
 
 /**
  * Hook for playing celebration sound when cloud agent streaming completes successfully.
- * Preloads audio on mount and handles browser autoplay restrictions gracefully.
+ * Loads audio only on first play and handles browser autoplay restrictions gracefully.
  * Respects user preference stored in localStorage.
  */
 export function useCelebrationSound() {
@@ -21,9 +21,6 @@ export function useCelebrationSound() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    // Preload audio on mount
-    audioRef.current = new Audio('/sounds/celebration.wav');
-    audioRef.current.preload = 'auto';
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
@@ -36,7 +33,10 @@ export function useCelebrationSound() {
   const play = useCallback(() => {
     // Check if sound is enabled before playing
     if (!soundEnabled) return;
-
+    if (!audioRef.current) {
+      audioRef.current = new Audio('/sounds/celebration.wav');
+      audioRef.current.preload = 'none';
+    }
     if (audioRef.current) {
       // Reset to start if already played
       audioRef.current.currentTime = 0;

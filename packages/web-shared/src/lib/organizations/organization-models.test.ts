@@ -9,6 +9,7 @@ import type {
 import type * as Producer from './organization-models';
 import type * as Cache from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 import type * as Enkrypt from '@kilocode/web-shared/lib/model-stats/enkrypt';
+import type * as Drizzle from '@kilocode/web-shared/lib/drizzle';
 import type { OrganizationModelAudience } from '@kilocode/app-shared/organizations';
 import { fingerprintEnkryptScore } from '@kilocode/web-shared/lib/model-stats/enkrypt-fingerprint';
 
@@ -17,9 +18,10 @@ let mockAutoEnabled = false;
 let mockContext: OrganizationGroupPolicyContext;
 let mockCatalog: OpenRouterModelsResponse & { fixtureCatalogMarker: string };
 const mockReadRows = jest.fn<Promise<Cache.ModelStatsCacheEntry[]>, []>();
-const mockReplicaSelect = jest.fn(() => {
-  throw new Error('Unexpected replica query');
-});
+const mockReplicaRows = jest.fn<Promise<Cache.ModelStatsCacheEntry[]>, []>();
+const mockReplicaSelect = jest.fn(() => ({
+  from: () => ({ orderBy: mockReplicaRows, leftJoin: () => ({ orderBy: mockReplicaRows }) }),
+}));
 const mockGetContext = jest.fn(
   async (_params: { organizationId: string; subject: OrganizationPolicySubject }) => mockContext
 );
@@ -65,6 +67,8 @@ const mockCustom = jest.fn<
   [string, readonly string[], string | null]
 >();
 const mockProviderIds = jest.fn(async (_db: unknown, _organizationId: string) => ['openai']);
+/** Replica snapshot loads a test expects; anything else fails the test teardown. */
+let expectedReplicaLoads = 0;
 const mockCatalogModelIds = new Set(['provider/allowed']);
 const mockDirectByokCatalogModelIds = jest.fn(
   async (_organizationId: string, _policy: unknown): Promise<ReadonlySet<string>> =>
@@ -269,6 +273,9 @@ beforeEach(async () => {
     ],
   };
   mockReadRows.mockReset().mockResolvedValue([entry(), entry('provider/blocked')]);
+  mockReplicaRows.mockReset().mockResolvedValue([entry(), entry('provider/blocked')]);
+  mockReplicaSelect.mockClear();
+  expectedReplicaLoads = 0;
   mockByok.mockReset().mockResolvedValue([catalogModel('morph-byok/private')]);
   mockCustom
     .mockReset()
@@ -283,7 +290,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   expect(mockFetch).not.toHaveBeenCalled();
-  expect(mockReplicaSelect).not.toHaveBeenCalled();
+  expect(mockReplicaSelect).toHaveBeenCalledTimes(expectedReplicaLoads);
   jest.useRealTimers();
   jest.restoreAllMocks();
 });
@@ -470,6 +477,35 @@ describe('organization model producer publication', () => {
     }
   );
 
+  it('reads the snapshot through the read client a gateway caller passes', async () => {
+    const { readDb } = jest.requireMock<typeof Drizzle>('@kilocode/web-shared/lib/drizzle');
+    expectedReplicaLoads = 1;
+    const updated = { ...benchmark, risk_score: 9 };
+    mockReplicaRows.mockResolvedValue([
+      entry('provider/allowed', updated, {
+        checkedAt,
+        scoreHash: fingerprintEnkryptScore(updated),
+      }),
+    ]);
+
+    const result = await producer.getAvailableModelsForOrganization(
+      'fixture-org',
+      subject,
+      'member',
+      { fromDb: readDb, countryCode: null }
+    );
+
+    expect(mockGetContext).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'fixture-org', fromDb: readDb })
+    );
+    expect(mockReadRows).not.toHaveBeenCalled();
+    expect(result?.data[0].enkrypt).toMatchObject({
+      risk_score: 9,
+      lastCheckedAt: checkedAt,
+      freshness: 'fresh',
+    });
+  });
+
   it('builds the public and private custom LLM lists for the requester country', async () => {
     await producer.getAvailableModelsForOrganization('fixture-org', subject, 'member', {
       countryCode: 'CU',
@@ -478,7 +514,8 @@ describe('organization model producer publication', () => {
     const { getEnhancedOpenRouterModels } = jest.requireMock<{
       getEnhancedOpenRouterModels: jest.Mock;
     }>('@kilocode/web-shared/lib/ai-gateway/providers/openrouter');
-    expect(getEnhancedOpenRouterModels).toHaveBeenCalledWith({ countryCode: 'CU' });
+    const { db } = jest.requireMock<typeof Drizzle>('@kilocode/web-shared/lib/drizzle');
+    expect(getEnhancedOpenRouterModels).toHaveBeenCalledWith({ countryCode: 'CU', fromDb: db });
     expect(mockCustom).toHaveBeenCalledWith('fixture-org', ['fixture-group'], 'CU');
   });
 

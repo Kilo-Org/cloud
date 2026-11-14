@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { sql } from 'drizzle-orm';
 import { parseKeyedEnvelope } from '@kilocode/encryption';
 import { byoc_connections, type ByocConnection } from '@kilocode/db/schema';
+import type { VercelComputeSetupStep } from '@kilocode/db/schema-types';
 import type { VercelComputeStatusColumns } from '@/lib/cloud-agent-next/vercel-compute-status';
 
 const identifier = z.string().trim().min(1).max(256);
@@ -24,21 +25,32 @@ const runtimeSchema = z.object({
   runtime_digest: z.string().min(1).max(512).nullable().default(null),
 });
 
+const RETIRED_SETUP_STEPS = ['upload_runtime_artifacts', 'verify_runtime_artifacts'] as const;
+
+/**
+ * Stored rows can still name a setup step from before the downloaded-runtime
+ * split. Normalize them to the step a build now resumes at instead of failing
+ * to decode the row.
+ */
 export const vercelSetupStepSchema = z
   .enum([
     'validating_access',
     'create_builder',
     'install_system_dependencies',
     'install_node_dependencies',
-    'upload_runtime_artifacts',
-    'verify_runtime_artifacts',
     'snapshot_builder',
     'create_validator',
     'launch_validator_wrapper',
     'verify_validator_call_home',
     'stop_validator',
     'confirm_terminal',
+    ...RETIRED_SETUP_STEPS,
   ])
+  .transform((step): VercelComputeSetupStep =>
+    step === 'upload_runtime_artifacts' || step === 'verify_runtime_artifacts'
+      ? 'install_node_dependencies'
+      : step
+  )
   .nullable();
 
 /** Decode provider metadata at the shared-table boundary. */

@@ -12,12 +12,18 @@ import { AddCreditsButton, AddCreditsRow } from '@/components/add-credits-row';
 import { BalanceBlock, type BalanceBlockState } from '@/components/profile-balance-block';
 import { useContextPicker } from '@/components/context-control';
 import { CreditExpiryNote } from '@/components/credits/credit-expiry-note';
+import { PersonalCreditsLinks } from '@/components/credits/credits-links';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { WEB_BASE_URL } from '@/lib/config';
-import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
+import {
+  ICON_TARGET_BOX_CLASS,
+  LINE_ACTION_BOX_CLASS,
+  LINE_ACTION_HIT_SLOP,
+  STATE_ACTION_CLASS,
+} from '@/lib/a11y/tap-target';
 import { formatPrefixedMoney } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
@@ -63,7 +69,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // row's full width.
   const narrow = isNarrowLayout(width);
   const { t, i18n } = useTranslation();
-  const { openPicker, picker } = useContextPicker(orgs);
+  const { openPicker } = useContextPicker(orgs);
   const { organizationId, error, isSaving, retry } = useOrganization();
   const selectedOrgId = organizationId ?? undefined;
 
@@ -250,10 +256,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // the narrow threshold.
   const orgAddCreditsAction =
     selectedOrgId != null && canManageOrgBilling ? (
-      <AddCreditsRow
-        url={`${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`}
-        inline={stackBalance}
-      />
+      <AddCreditsRow url={organizationBillingUrl(selectedOrgId)} inline={stackBalance} />
     ) : null;
 
   const addCreditsAction =
@@ -291,18 +294,15 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         setAvailableWidth(event.nativeEvent.layout.width);
       }}
     >
-      {/* The row and the picker both carry a literal 44dp box: the app's
-          `min-h-11` compiles to about 38.5pt, short of DESIGN.md's 44pt target.
-          The picker's own box therefore holds the whole touch target inside the
-          row's bounds, because RN drops touches outside every ancestor and a
-          shorter row would clip it. Both children align to the row's bottom
-          instead of its centre, which puts the eyebrow on the picker's line and
-          keeps the gap to the credits card at the gap the section headers below
-          keep to their first rows. */}
+      {/* The header is one text line tall, like every other Profile section
+          heading, so "Credits" starts at the screen's top padding instead of
+          sitting at the bottom of a 44dp box. The picker keeps its touch target
+          on the shared line-action box: a 28dp frame that floats over the line
+          and reaches past 44dp with hitSlop, without growing the row. */}
       <View
         className={cn(
-          'min-h-[44px] gap-3',
-          narrow ? 'flex-col items-stretch' : 'flex-row items-end justify-between'
+          'gap-3',
+          narrow ? 'flex-col items-stretch' : 'flex-row items-center justify-between'
         )}
       >
         <Text variant="small" className="shrink uppercase tracking-wide text-muted-foreground">
@@ -311,10 +311,12 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         {canPickContext && (
           <Pressable
             className={cn(
-              // A short account or org name must still carry a 44pt target.
-              'min-h-[44px] min-w-[44px] flex-row items-end gap-1 active:opacity-70',
+              LINE_ACTION_BOX_CLASS,
+              // A short account or org name must still carry the 44pt reach.
+              'min-w-[44px] flex-row items-center gap-1 active:opacity-70',
               narrow ? 'max-w-full justify-start' : 'max-w-[65%] shrink justify-end'
             )}
+            hitSlop={LINE_ACTION_HIT_SLOP}
             onPress={openPicker}
             accessibilityRole="button"
             accessibilityLabel={selectedLabel}
@@ -331,7 +333,6 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           </Pressable>
         )}
       </View>
-      {picker}
       {error === 'save' && (
         <View>
           <AccessibleStatus message={t('common.couldNotSaveSetting')} className="text-sm" />
@@ -362,6 +363,10 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         retryActionLabel={t('common.retry')}
         onRetry={retryBalance}
       />
+      {/* The person's own history and invoices sit under their balance; an
+          organization's balance has no personal rows, so only the personal
+          selection carries them. */}
+      {selectedOrgId == null && <PersonalCreditsLinks />}
       {/* One loading indicator per section: while the balance slot shows its
           skeleton, the KiloPass card reserves its slot quietly instead of
           stacking a second skeleton card. The card's queries still run from

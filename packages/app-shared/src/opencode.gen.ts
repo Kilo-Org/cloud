@@ -51,6 +51,8 @@ export type UserMessage = {
   variant?: string;
   /** Kilo extension: marks a client-materialised row not yet confirmed by the server. */
   synthetic?: boolean;
+  /** Kilo extension: server time a client-materialised row was queued; orders it until the server's own row replaces it. */
+  queuedAt?: number;
   editorContext?: {
     visibleFiles?: Array<string>;
     openTabs?: Array<string>;

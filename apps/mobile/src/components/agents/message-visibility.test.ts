@@ -91,6 +91,11 @@ describe('partRendersContent', () => {
     ).toBe(false);
   });
 
+  it('hides projected compaction summaries but keeps ordinary text visible', () => {
+    expect(partRendersContent(textPart({ metadata: { compactionSummary: true } }))).toBe(false);
+    expect(partRendersContent(textPart())).toBe(true);
+  });
+
   it('returns false for a reasoning part with whitespace-only text', () => {
     expect(partRendersContent(reasoningPart('   \n  '))).toBe(false);
   });

@@ -17,6 +17,7 @@ vi.mock('#imports', () => ({
 import {
   formatSelectedTabSystemEnvironment,
   formatSystemEnvironment,
+  getInitialInspectableTabId,
   getSelectedInspectableTabId,
 } from './agent-chat-panel';
 
@@ -40,64 +41,65 @@ describe('selected tab context formatting', () => {
 describe('inspectable tab selection resolution', () => {
   const inspectableTabs = [{ id: 1 }, { id: 2 }, { id: 3 }];
 
-  it('prefers a valid stored selection over the active tab', () => {
-    expect(
-      getSelectedInspectableTabId({
-        activeTabId: 2,
-        inspectableTabs,
-        selectedTabId: 3,
-      })
-    ).toBe(3);
+  it('keeps a stored selection that is still inspectable', () => {
+    expect(getSelectedInspectableTabId({ inspectableTabs, selectedTabId: 3 })).toBe(3);
   });
 
-  it('prefers the active tab over the first inspectable tab', () => {
-    expect(
-      getSelectedInspectableTabId({
-        activeTabId: 2,
-        inspectableTabs,
-        selectedTabId: undefined,
-      })
-    ).toBe(2);
+  it('reports no target when the stored selection is gone instead of retargeting', () => {
+    expect(getSelectedInspectableTabId({ inspectableTabs, selectedTabId: 99 })).toBeUndefined();
   });
 
-  it('ignores an active tab that is not inspectable and falls back to first', () => {
+  it('reports no target before the conversation has one', () => {
     expect(
-      getSelectedInspectableTabId({
-        activeTabId: 99,
-        inspectableTabs,
-        selectedTabId: undefined,
-      })
-    ).toBe(1);
-  });
-
-  it('falls back to the first inspectable tab when activeTabId is undefined', () => {
-    expect(
-      getSelectedInspectableTabId({
-        activeTabId: undefined,
-        inspectableTabs,
-        selectedTabId: undefined,
-      })
-    ).toBe(1);
-  });
-
-  it('returns undefined when the inspectable list is empty', () => {
-    expect(
-      getSelectedInspectableTabId({
-        activeTabId: 2,
-        inspectableTabs: [],
-        selectedTabId: 1,
-      })
+      getSelectedInspectableTabId({ inspectableTabs, selectedTabId: undefined })
     ).toBeUndefined();
   });
 
-  it('ignores a stored selection that is no longer inspectable and uses active', () => {
+  it('reports no target when the inspectable list is empty', () => {
+    expect(getSelectedInspectableTabId({ inspectableTabs: [], selectedTabId: 1 })).toBeUndefined();
+  });
+});
+
+describe('initial tab selection', () => {
+  const inspectableTabs = [
+    { id: 1, url: 'https://example.com/' },
+    { id: 2, url: 'https://example.org/' },
+    { id: 3, url: 'https://example.net/' },
+  ];
+
+  it('adopts the active tab when it is inspectable', () => {
+    expect(getInitialInspectableTabId({ activeTabId: 2, inspectableTabs })).toBe(2);
+  });
+
+  it('falls back to the first inspectable tab when the active tab is not inspectable', () => {
+    expect(getInitialInspectableTabId({ activeTabId: 99, inspectableTabs })).toBe(1);
+  });
+
+  it('skips Kilo sign-in leftovers when a real page is open', () => {
     expect(
-      getSelectedInspectableTabId({
-        activeTabId: 2,
-        inspectableTabs,
-        selectedTabId: 99,
+      getInitialInspectableTabId({
+        activeTabId: 4,
+        inspectableTabs: [
+          ...inspectableTabs,
+          { id: 4, url: 'http://localhost:3000/users/sign_in?next=%2Fdevice-auth' },
+        ],
       })
-    ).toBe(2);
+    ).toBe(1);
+  });
+
+  it('keeps a sign-in page when it is the only inspectable tab', () => {
+    expect(
+      getInitialInspectableTabId({
+        activeTabId: 4,
+        inspectableTabs: [
+          { id: 4, url: 'http://localhost:3000/users/sign_in?next=%2Fdevice-auth' },
+        ],
+      })
+    ).toBe(4);
+  });
+
+  it('returns undefined when nothing is inspectable', () => {
+    expect(getInitialInspectableTabId({ activeTabId: 2, inspectableTabs: [] })).toBeUndefined();
   });
 });
 
@@ -207,6 +209,22 @@ describe('system environment builder', () => {
     });
 
     expect(context).not.toContain('<workflows');
+  });
+
+  it('marks dangerous mode in the system environment only when it is on', () => {
+    const dangerous = formatSystemEnvironment({
+      memories: [],
+      mode: 'dangerous',
+      selectedTab: { title: 'Example', url: 'https://example.com/' },
+    });
+    const safe = formatSystemEnvironment({
+      memories: [],
+      mode: 'safe',
+      selectedTab: { title: 'Example', url: 'https://example.com/' },
+    });
+
+    expect(dangerous).toContain('Agent mode: dangerous');
+    expect(safe).not.toContain('Agent mode');
   });
 
   it('includes both memories and workflows indices together', () => {

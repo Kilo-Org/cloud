@@ -674,13 +674,13 @@ describe('user router - credit purchase history', () => {
     expect(result.entries).toEqual([
       expect.objectContaining({
         id: automaticPurchaseId,
-        description: 'Automatic top-up',
+        kind: 'auto_top_up',
         amount_mUsd: 15_000_000,
         expiryDate: null,
       }),
       expect.objectContaining({
         id: manualPurchaseId,
-        description: 'Credit purchase',
+        kind: 'purchase',
         amount_mUsd: 20_000_000,
         expiryDate: '2027-06-20T10:00:00.000Z',
       }),
@@ -2139,29 +2139,29 @@ describe('user router - device sessions', () => {
         .values([
           {
             kilo_user_id: owner.id,
-            user_agent: 'Kilo iOS (current)',
+            user_agent: 'Kilo-Code/1.2.3 (ios)',
             last_seen_at: '2026-04-30 10:00:00+00',
           },
           {
             kilo_user_id: owner.id,
-            user_agent: 'Kilo Android (production shape)',
+            user_agent: 'Kilo-Code/1.2.3 (android)',
             created_at: '2026-04-29 01:16:12.945+00',
             last_seen_at: '2026-04-29 01:16:12.945+00',
           },
           {
             kilo_user_id: owner.id,
-            user_agent: 'Kilo Desktop (already revoked)',
+            user_agent: 'Kilo-Code/1.4.0',
             revoked_at: '2026-04-27 10:00:00+00',
             revoked_reason: 'user_revoked',
           },
           {
             kilo_user_id: owner.id,
-            user_agent: 'Kilo macOS (revoke by id)',
+            user_agent: 'okhttp/4.9.2',
             last_seen_at: '2026-04-26 10:00:00+00',
           },
           {
             kilo_user_id: owner.id,
-            user_agent: 'Kilo Tablet (revoke current)',
+            user_agent: 'Kilo-Code/1.4.0',
             last_seen_at: '2026-04-28 10:00:00+00',
           },
           {
@@ -2194,7 +2194,10 @@ describe('user router - device sessions', () => {
     expect(result).toHaveLength(4);
     expect(result[0]).toEqual({
       id: currentSessionId,
-      user_agent: 'Kilo iOS (current)',
+      // `Kilo-Code/<version> (ios)` is the header the mobile app sends.
+      kind: 'app',
+      platform: 'ios',
+      clientName: null,
       created_at: expect.any(String),
       last_seen_at: '2026-04-30T10:00:00.000Z',
       isCurrent: true,
@@ -2203,21 +2206,30 @@ describe('user router - device sessions', () => {
     // normalized to strict UTC ISO before it crosses the JSON boundary.
     expect(result[1]).toEqual({
       id: productionShapeSessionId,
-      user_agent: 'Kilo Android (production shape)',
+      kind: 'app',
+      platform: 'android',
+      clientName: null,
       created_at: '2026-04-29T01:16:12.945Z',
       last_seen_at: '2026-04-29T01:16:12.945Z',
       isCurrent: false,
     });
     expect(result[2]).toEqual({
       id: revokeCurrentSessionId,
-      user_agent: 'Kilo Tablet (revoke current)',
+      // A `Kilo-Code` product token with no app platform word is the CLI.
+      kind: 'cli',
+      platform: null,
+      clientName: null,
       created_at: expect.any(String),
       last_seen_at: '2026-04-28T10:00:00.000Z',
       isCurrent: false,
     });
     expect(result[3]).toEqual({
       id: revokeByIdSessionId,
-      user_agent: 'Kilo macOS (revoke by id)',
+      // OkHttp's default header, recorded by app builds that predate the
+      // client metadata header.
+      kind: 'app',
+      platform: 'android',
+      clientName: null,
       created_at: expect.any(String),
       last_seen_at: '2026-04-26T10:00:00.000Z',
       isCurrent: false,

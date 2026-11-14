@@ -1303,7 +1303,7 @@ describe('api routes', () => {
       }
     );
 
-    it('stages an empty body by value', async () => {
+    it('answers a declared zero-length body with a no-op that writes nothing', async () => {
       const { app, ingest } = prepareIngestRoute();
       const env = directIngestEnv();
       const info = vi.spyOn(console, 'info').mockImplementation(() => {});
@@ -1315,14 +1315,47 @@ describe('api routes', () => {
       const response = await app.fetch(request, env);
 
       expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ success: true });
       expect(ingest).not.toHaveBeenCalled();
-      expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledTimes(1);
-      expect(env.SESSION_INGEST_R2.put.mock.calls[0][1]).toBeInstanceOf(Uint8Array);
+      expect(env.SESSION_INGEST_R2.put).not.toHaveBeenCalled();
+      expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
       expect(info).toHaveBeenCalledWith(
-        expect.objectContaining({ event: 'direct_ingest_legacy', reason: 'empty_body' })
+        expect.objectContaining({
+          event: 'direct_ingest_noop',
+          reason: 'empty_body',
+          declaredBytes: 0,
+        })
       );
       info.mockRestore();
     });
+
+    it.each([
+      ['malformed JSON', '{"data":[{"type":"message","data":{"id":"msg_1"}},broken'],
+      ['unterminated object', '{"data":['],
+    ] as const)(
+      'answers a buffered legacy body the format cannot parse with a client error',
+      async (_name, body) => {
+        const { app, ingest } = prepareIngestRoute();
+        const env = makeTestEnv();
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+        const response = await app.fetch(ingestRequest(body), env);
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual({ success: false, error: 'malformed_json' });
+        expect(ingest).not.toHaveBeenCalled();
+        expect(env.SESSION_INGEST_R2.put).not.toHaveBeenCalled();
+        expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
+        expect(warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            event: 'direct_ingest_parse_reject',
+            reason: 'gate_percent',
+            declaredBytes: new TextEncoder().encode(body).byteLength,
+          })
+        );
+        warn.mockRestore();
+      }
+    );
 
     it.each([
       ['declared over cap', '4194305'],
@@ -2086,6 +2119,50 @@ describe('api routes', () => {
       },
     });
     expect(readKiloSdkMessages).toHaveBeenCalledWith({ limit: 50, before: undefined });
+  });
+
+  it('does not let a stalled session-metadata read hold the page open', async () => {
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+
+      const history = { messages: [], nextCursor: null, omittedItemCount: 0 };
+      vi.mocked(getSessionIngestDO).mockReturnValue({
+        readKiloSdkMessages: vi.fn(async () => history),
+        // The best-effort metadata read never answers.
+        readKiloSdkSessionSnapshot: vi.fn(() => Promise.withResolvers<unknown>().promise),
+      } as never);
+
+      const pending = makeApiApp().fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+          method: 'GET',
+        }),
+        makeTestEnv()
+      );
+      // Flush the request to the metadata deadline, then run past it: the page
+      // must answer with the history and no metadata rather than wait.
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(5_000);
+      const res = await pending;
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({
+        success: true,
+        kiloSessionId: 'ses_12345678901234567890123456',
+        history,
+        sessionMetadata: null,
+      });
+      expect(warn).toHaveBeenCalledWith(
+        'Failed to fetch session snapshot for session ses_12345678901234567890123456:',
+        expect.anything()
+      );
+    } finally {
+      warn.mockRestore();
+      vi.useRealTimers();
+    }
   });
 
   it('requires a live organization when authorizing message reads', async () => {
@@ -3754,6 +3831,49 @@ describe('api routes', () => {
       );
       warn.mockRestore();
     });
+
+    it('falls back to heartbeat titles when the overlay query outlives its budget', async () => {
+      vi.useFakeTimers();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const connectionStub = {
+          getActiveSessions: vi.fn(async () => [
+            baseHeartbeat('ses_aaaaaaaaaaaaaaaaaaaaaaaaaa', 'Heartbeat A'),
+          ]),
+        };
+        vi.mocked(getUserConnectionDO).mockReturnValue(
+          connectionStub as unknown as ReturnType<typeof getUserConnectionDO>
+        );
+        const { db, fns } = makeDbFakes();
+        vi.mocked(getWorkerDb).mockReturnValue(db);
+        // A Postgres hop that never answers. The overlay is an embellishment on
+        // an answer that is already complete, so the route must return the
+        // heartbeat titles instead of holding the caller open until its own
+        // budget expires — which is what made this route a client timeout.
+        fns.selectResult.mockImplementationOnce(() => Promise.withResolvers<unknown[]>().promise);
+
+        const app = makeApiApp();
+        const pending = app.fetch(
+          new Request('http://local/sessions/active', { method: 'GET' }),
+          makeTestEnv()
+        );
+        // Flush the request to its budget timer, then run past it.
+        await vi.advanceTimersByTimeAsync(0);
+        await vi.advanceTimersByTimeAsync(5_000);
+        const res = await pending;
+
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as { sessions: Array<{ id: string; title: string }> };
+        expect(body.sessions.map(s => s.title)).toEqual(['Heartbeat A']);
+        expect(warn).toHaveBeenCalledWith(
+          'Failed to overlay active-session titles from Postgres (non-fatal)',
+          expect.objectContaining({ error: expect.stringContaining('exceeded its') })
+        );
+      } finally {
+        warn.mockRestore();
+        vi.useRealTimers();
+      }
+    });
   });
 
   it('GET /user/cli returns 426 without Upgrade header', async () => {
@@ -4024,6 +4144,48 @@ describe('api routes', () => {
       );
       expect(badBody.status).toBe(400);
     });
+
+    it('returns 400 for a title over 200 characters', async () => {
+      vi.mocked(resolveAccessibleKiloSession).mockResolvedValueOnce({
+        kind: 'owned',
+      } as never);
+      const notifySessionRenamed = vi.fn(async () => ({ delivered: true }));
+      vi.mocked(getUserConnectionDO).mockReturnValue({ notifySessionRenamed } as never);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/rename-notify`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'x'.repeat(201) }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(400);
+      expect(notifySessionRenamed).not.toHaveBeenCalled();
+    });
+
+    it('bounds the body the route parses', async () => {
+      vi.mocked(resolveAccessibleKiloSession).mockResolvedValueOnce({
+        kind: 'owned',
+      } as never);
+      const notifySessionRenamed = vi.fn(async () => ({ delivered: true }));
+      vi.mocked(getUserConnectionDO).mockReturnValue({ notifySessionRenamed } as never);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/rename-notify`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'x'.repeat(2000) }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(413);
+      expect(notifySessionRenamed).not.toHaveBeenCalled();
+    });
   });
 
   describe('POST /session/:sessionId/title', () => {
@@ -4093,6 +4255,24 @@ describe('api routes', () => {
           }),
         })
       );
+    });
+
+    it('bounds the body the route parses', async () => {
+      const { db } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'x'.repeat(2000), generated: true }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(413);
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
     });
 
     it('generated applies over a default-pattern title', async () => {

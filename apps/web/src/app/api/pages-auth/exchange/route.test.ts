@@ -6,6 +6,7 @@ import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/server';
 import { createDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
 import { createPagesAuthCode } from '@/lib/pages-auth/pages-auth-code';
+import { getUserAuthProviders } from '@/lib/user';
 import { POST } from './route';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
@@ -26,7 +27,12 @@ jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
   getProfileOrganizations: jest.fn(),
 }));
 
+jest.mock('@/lib/user', () => ({
+  getUserAuthProviders: jest.fn(),
+}));
+
 const mockedFindUserById = jest.mocked(findUserById);
+const mockedGetUserAuthProviders = jest.mocked(getUserAuthProviders);
 const mockedIsUserBlacklistedByDomain = jest.mocked(isUserBlacklistedByDomain);
 const mockedGetProfileOrganizations = jest.mocked(getProfileOrganizations);
 
@@ -38,6 +44,10 @@ const SECRET = 'p'.repeat(40);
 const DEV_SECRET = 'd'.repeat(40);
 const STATE = 'S'.repeat(43);
 const organizations = [{ id: 'org-1', name: 'Kilo', role: 'member' }];
+
+/** Provider rows as the route reads them; only `provider` and `email` matter. */
+const providerRows = (...rows: [provider: string, email: string][]) =>
+  rows.map(([provider, email]) => ({ provider, email })) as never;
 
 /** `secret` is sent as a bearer credential; `authorization` replaces the whole header. */
 function exchange(body: unknown, secret: string | null = SECRET, authorization?: string) {
@@ -98,13 +108,14 @@ describe('POST /api/pages-auth/exchange', () => {
     } as never);
     mockedIsUserBlacklistedByDomain.mockResolvedValue(false);
     mockedGetProfileOrganizations.mockResolvedValue(organizations as never);
+    mockedGetUserAuthProviders.mockResolvedValue(providerRows(['google', 'ada@kilo.test']));
   });
 
   afterEach(() => {
     jest.useRealTimers();
   });
 
-  test('answers with who signed in, and nothing else about them', async () => {
+  test('answers with who signed in and their verified address, and nothing else', async () => {
     const response = await exchange({
       code: codeFor(),
       audience: PAGES,
@@ -114,12 +125,67 @@ describe('POST /api/pages-auth/exchange', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(await response.json()).toEqual({
-      user: { id: 'user-1', name: 'Ada Lovelace' },
+      user: { id: 'user-1', name: 'Ada Lovelace', verified_email: 'ada@kilo.test' },
       organizations,
     });
     expect(mockedFindUserById).toHaveBeenCalledWith('user-1');
     expect(mockedGetProfileOrganizations).toHaveBeenCalledWith('user-1', {
       excludeAccessBlocked: true,
+    });
+    expect(mockedGetUserAuthProviders).toHaveBeenCalledWith('user-1');
+  });
+
+  describe('verified_email', () => {
+    const exchanges = [
+      ['a code', () => exchange({ code: codeFor(), audience: PAGES, state: STATE })],
+      ['a token', () => exchange({ token: tokenFor(), audience: PAGES })],
+    ] as const;
+
+    describe.each(exchanges)('for %s', (_kind, send) => {
+      test.each([
+        ['a Google row', providerRows(['google', 'ada@kilo.test'])],
+        ['an Anaconda row', providerRows(['anaconda', 'ada@kilo.test'])],
+        ['an email row', providerRows(['email', 'ada@kilo.test'])],
+        ['a row that differs only in case', providerRows(['google', 'Ada@Kilo.TEST'])],
+        [
+          'a verified row beside unverified ones',
+          providerRows(['github', 'ada@kilo.test'], ['email', 'ada@kilo.test']),
+        ],
+      ])('carries the primary address that %s verified', async (_name, rows) => {
+        mockedGetUserAuthProviders.mockResolvedValueOnce(rows);
+
+        const response = await send();
+
+        expect(response.status).toBe(200);
+        expect((await response.json()).user).toEqual({
+          id: 'user-1',
+          name: 'Ada Lovelace',
+          verified_email: 'ada@kilo.test',
+        });
+      });
+
+      test.each([
+        [
+          'only providers that do not verify addresses',
+          providerRows(
+            ['github', 'ada@kilo.test'],
+            ['apple', 'ada@kilo.test'],
+            ['workos', 'ada@kilo.test']
+          ),
+        ],
+        ['a verified row for a different address', providerRows(['google', 'grace@kilo.test'])],
+        ['a verified row for a + alias', providerRows(['email', 'ada+pages@kilo.test'])],
+        ['no provider rows', providerRows()],
+      ])('leaves the key out for an account with %s', async (_name, rows) => {
+        mockedGetUserAuthProviders.mockResolvedValueOnce(rows);
+
+        const response = await send();
+
+        expect(response.status).toBe(200);
+        const { user } = await response.json();
+        expect(user).toEqual({ id: 'user-1', name: 'Ada Lovelace' });
+        expect('verified_email' in user).toBe(false);
+      });
     });
   });
 
@@ -255,6 +321,7 @@ describe('POST /api/pages-auth/exchange', () => {
       expect(await response.json()).toEqual({ error: 'account_unavailable' });
     }
     expect(mockedGetProfileOrganizations).not.toHaveBeenCalled();
+    expect(mockedGetUserAuthProviders).not.toHaveBeenCalled();
   });
 
   test('refuses an account whose block timestamp is set', async () => {
@@ -271,6 +338,7 @@ describe('POST /api/pages-auth/exchange', () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'account_unavailable' });
     expect(mockedGetProfileOrganizations).not.toHaveBeenCalled();
+    expect(mockedGetUserAuthProviders).not.toHaveBeenCalled();
   });
 
   test.each([
@@ -296,7 +364,7 @@ describe('POST /api/pages-auth/exchange', () => {
       expect(response.status).toBe(200);
       expect(response.headers.get('cache-control')).toBe('no-store');
       expect(await response.json()).toEqual({
-        user: { id: 'user-1', name: 'Ada Lovelace' },
+        user: { id: 'user-1', name: 'Ada Lovelace', verified_email: 'ada@kilo.test' },
         organizations,
       });
       expect(mockedFindUserById).toHaveBeenCalledWith('user-1');
@@ -435,6 +503,7 @@ describe('POST /api/pages-auth/exchange', () => {
         expect(await response.json()).toEqual({ error: 'account_unavailable' });
       }
       expect(mockedGetProfileOrganizations).not.toHaveBeenCalled();
+      expect(mockedGetUserAuthProviders).not.toHaveBeenCalled();
     });
 
     test.each([

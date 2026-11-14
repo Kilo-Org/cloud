@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
+import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { skillRowSubtitle } from '@/components/profiles/skill-markdown';
 import { SkillFormSheet, type SkillFormSubmission } from '@/components/profiles/skill-form-sheet';
@@ -21,12 +22,13 @@ import {
   useAgentProfileMutations,
   useAgentProfileSkills,
 } from '@/lib/hooks/use-agent-profiles';
-import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
+import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_SKILLS } from '@/lib/agent-profile-forms';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { cn } from '@/lib/utils';
 import { readTrpcErrorField } from '@/lib/trpc-error';
@@ -128,7 +130,8 @@ export function ProfileSkillsScreen({
   const profileQuery = useAgentProfileSkills(profileId, organizationId);
   const { createCustomSkill, updateSkill, deleteSkill, setSkillEnabled } =
     useAgentProfileMutations(organizationId);
-  const canManage = useCanManageOrganizationProfiles(organizationId);
+  const permission = useOrganizationProfilePermission(organizationId);
+  const canManage = permission === 'allowed';
 
   const skills = profileQuery.data ?? NO_SKILLS;
   const atSkillCap = skills.length >= MAX_PROFILE_SKILLS;
@@ -210,9 +213,10 @@ export function ProfileSkillsScreen({
 
   const confirmDelete = (skill: SkillTarget) => {
     confirm({
-      title: t('common.delete'),
-      message: skill.name,
-      confirmLabel: t('common.delete'),
+      // An identifier reads position by position, so it keeps its left-to-right direction.
+      title: t('profiles.skillDeleteTitle', { name: isolateLtrBidiText(skill.name) }),
+      message: t('profiles.skillDeleteMessage'),
+      confirmLabel: t('profiles.skillDeleteConfirm'),
       onConfirm: () => {
         void runDelete(skill.id);
       },
@@ -240,11 +244,11 @@ export function ProfileSkillsScreen({
         description={null}
         placement="top"
         action={
-          canManage ? (
+          <ProfileManageSlot permission={permission}>
             <Button className={STATE_ACTION_CLASS} onPress={handleStartAdd}>
               <Text>{t('profiles.addSkill')}</Text>
             </Button>
-          ) : null
+          </ProfileManageSlot>
         }
       />
     );
@@ -291,20 +295,18 @@ export function ProfileSkillsScreen({
             }
           />
         ))}
-        {canManage ? (
-          <>
-            <Button onPress={handleStartAdd}>
-              <Text>{t('profiles.addSkill')}</Text>
-            </Button>
-            {atSkillCap ? (
-              <AccessibleStatus
-                message={t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS })}
-                tone="warn"
-                className="text-sm"
-              />
-            ) : null}
-          </>
-        ) : null}
+        <ProfileManageSlot permission={permission}>
+          <Button onPress={handleStartAdd}>
+            <Text>{t('profiles.addSkill')}</Text>
+          </Button>
+          {atSkillCap ? (
+            <AccessibleStatus
+              message={t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS })}
+              tone="warn"
+              className="text-sm"
+            />
+          ) : null}
+        </ProfileManageSlot>
       </>
     );
   }

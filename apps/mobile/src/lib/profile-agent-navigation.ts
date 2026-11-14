@@ -57,6 +57,7 @@ const PROFILE_SCREEN_ROUTE_NAMES = {
       commands: 'profile-management/[profileId]/commands',
       mcp: 'profile-management/[profileId]/mcp',
       skills: 'profile-management/[profileId]/skills',
+      instructions: 'profile-management/[profileId]/instructions',
       'slash-commands': 'profile-management/[profileId]/slash-commands',
       variables: 'profile-management/[profileId]/variables',
     },
@@ -70,6 +71,7 @@ const PROFILE_SCREEN_ROUTE_NAMES = {
       commands: 'profiles/[profileId]/commands',
       mcp: 'profiles/[profileId]/mcp',
       skills: 'profiles/[profileId]/skills',
+      instructions: 'profiles/[profileId]/instructions',
       'slash-commands': 'profiles/[profileId]/slash-commands',
       variables: 'profiles/[profileId]/variables',
     },
@@ -316,6 +318,15 @@ export function getProfileMcpPath(
   stack: ProfileManagementStack = 'profileTab'
 ): Href {
   return profileSectionPath(profileId, 'mcp', { organizationId, stack });
+}
+
+/** The profile editor's Instructions tab. */
+export function getProfileInstructionsPath(
+  profileId: string,
+  organizationId?: string,
+  stack: ProfileManagementStack = 'profileTab'
+): Href {
+  return profileSectionPath(profileId, 'instructions', { organizationId, stack });
 }
 
 /** The profile editor's Agents tab. */

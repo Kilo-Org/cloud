@@ -785,6 +785,23 @@ describe('getOrganizationSeatUsage', () => {
     });
   });
 
+  test('should report no total for a soft-deleted organization', async () => {
+    const owner = await insertTestUser();
+    const organization = await createOrganization('Deleted Org', owner.id);
+
+    await db
+      .update(organizations)
+      .set({ seat_count: 5, deleted_at: sql`NOW()` })
+      .where(sql`${organizations.id} = ${organization.id}`);
+
+    const result = await getOrganizationSeatUsage(organization.id);
+
+    expect(result).toEqual({
+      used: 1,
+      total: 0,
+    });
+  });
+
   test('should count all non-billing_manager roles in seat usage', async () => {
     const owner = await insertTestUser();
     const member = await insertTestUser();

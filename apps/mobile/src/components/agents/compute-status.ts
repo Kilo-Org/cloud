@@ -2,6 +2,7 @@ import { type Part } from '@kilocode/cloud-agent-sdk';
 
 import { i18n } from '@/i18n';
 
+import { type BlockingInteraction } from './agent-interaction-policy';
 import { isSnapshotProgressPart } from './part-types';
 
 const toolStatusKeyMap = {
@@ -64,4 +65,18 @@ export function lastActivePart(parts: readonly Part[]): Part | undefined {
 export function computeMessageStatus(parts: readonly Part[]): string {
   const part = lastActivePart(parts);
   return part ? computeStatus(part) : i18n.t('agentChat.computeStatus.consideringNextSteps');
+}
+
+/**
+ * Spinner label while the transcript asks the reader to answer before the agent
+ * can continue. The pending ask owns the label: the last active part is the tool
+ * call the ask blocks, so its activity label ("Running commands") would claim
+ * work that has not started.
+ */
+export function computeBlockingAskStatus(ask: Exclude<BlockingInteraction, 'none'>): string {
+  return i18n.t(
+    ask === 'permission'
+      ? 'agentChat.computeStatus.waitingForPermission'
+      : 'agentChat.computeStatus.askingQuestion'
+  );
 }

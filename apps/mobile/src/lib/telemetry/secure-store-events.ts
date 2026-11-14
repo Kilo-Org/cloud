@@ -7,8 +7,8 @@
  * graph. The sink adapter itself stays in `error-sink.ts`.
  */
 
-import { isProtectedDataAvailable, ProtectedDataUnavailableError } from '@/lib/protected-data';
-import { captureTelemetry } from '@/lib/telemetry/error-sink';
+import { ProtectedDataUnavailableError } from '@/lib/protected-data';
+import { addTelemetryBreadcrumb, captureTelemetry } from '@/lib/telemetry/error-sink';
 
 /**
  * Which SecureStore call rejected. `read` is `getItemAsync`
@@ -29,6 +29,16 @@ function secureStoreFailureFingerprint(operation: SecureStoreOperation): readonl
 }
 
 /**
+ * The message expo-secure-store builds for `errSecInteractionNotAllowed`: its
+ * iOS `KeyChainException` (`ios/SecureStoreExceptions.swift`) returns this text
+ * from a fixed switch case, so it is the same on every OS version and in every
+ * device locale. The rejection reaches JS as a `FunctionCallException` whose
+ * `code` is the cause's `ERR_KEY_CHAIN`, which every keychain status shares, so
+ * the message is the only stable marker of this one.
+ */
+const KEYCHAIN_INTERACTION_REFUSED_MESSAGE = 'User interaction is not allowed';
+
+/**
  * Report one failed SecureStore operation at warning level.
  *
  * The fingerprint and tags name the operation, never the raw native message.
@@ -38,11 +48,29 @@ function secureStoreFailureFingerprint(operation: SecureStoreOperation): readonl
  *
  * A refusal from a locked device is not reported: iOS rejects every
  * `WHEN_UNLOCKED*` item with `errSecInteractionNotAllowed` until unlock, by
- * design. The state is read after the call failed, so a call that started
- * just before the lock is not reported either.
+ * design, and an `AFTER_FIRST_UNLOCK` item the same way until the device's first
+ * unlock since boot. The refusal itself is recognised by its fixed message — the
+ * cached protected-data state is not a substitute, because a background start
+ * can read it as available and it can flip during the call — and it leaves a
+ * breadcrumb on the next event instead of an event of its own.
+ *
+ * Every other failure is reported even while the keychain is closed: the widget
+ * and glanceable scope store runs in that state by design
+ * (`lib/auth/secure-store-gated`), so a real failure there must stay visible
+ * rather than being dropped as unattributable.
  */
 export function reportSecureStoreFailure(operation: SecureStoreOperation, error: unknown): void {
-  if (error instanceof ProtectedDataUnavailableError || !isProtectedDataAvailable()) {
+  // The app's own guard: the keychain was never called.
+  if (error instanceof ProtectedDataUnavailableError) {
+    return;
+  }
+  if (error instanceof Error && error.message.includes(KEYCHAIN_INTERACTION_REFUSED_MESSAGE)) {
+    addTelemetryBreadcrumb({
+      category: 'secure_store',
+      level: 'warning',
+      message: 'keychain refused a call while the device was locked',
+      data: { operation },
+    });
     return;
   }
   captureTelemetry({

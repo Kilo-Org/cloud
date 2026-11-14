@@ -358,6 +358,33 @@ describe('ContainersOutbound egress enforcement', () => {
     expect(handleManagedScmOutbound).not.toHaveBeenCalled();
   });
 
+  it('forwards HTTPS Session Sync requests only through the service binding', async () => {
+    const sessionSync = vi.fn(async (_request: Request) => new Response('synced'));
+    const worker = outbound(
+      { containerId: 'container-1', egressAllowlist: ['session-sync.kiloapps.io'] },
+      { SESSION_SYNC: { fetch: sessionSync } } as unknown as Partial<Cloudflare.Env>
+    );
+    const synced = await worker.fetch(
+      new Request('https://session-sync.kiloapps.io/v1/sessions/ses_synthetic', { method: 'PUT' })
+    );
+    expect(await synced.text()).toBe('synced');
+    for (const origin of [
+      'http://session-sync.kiloapps.io',
+      'https://session-sync.kiloapps.io.',
+      'http://session-sync.kiloapps.io.',
+    ]) {
+      const refused = await worker.fetch(
+        new Request(`${origin}/v1/sessions/ses_synthetic`, {
+          method: 'PUT',
+          headers: { Authorization: 'Bearer synthetic-handle' },
+        })
+      );
+      expect(refused.status, origin).toBe(403);
+    }
+    expect(sessionSync).toHaveBeenCalledTimes(1);
+    expect(handleManagedScmOutbound).not.toHaveBeenCalled();
+  });
+
   it('fails closed without a runtime-bound container id', async () => {
     const response = await outbound({ containerId: '', egressAllowlist: ['example.com'] }).fetch(
       new Request('https://example.com/')

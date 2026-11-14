@@ -7,6 +7,7 @@ import {
   addUserToOrganization,
   getOrganizationById,
   getOrganizationMembers,
+  assertInviteeAddressIsAvailable,
   inviteUserToOrganization,
   getAcceptInviteUrl,
   lockOrganizationMembershipMutation,
@@ -32,8 +33,13 @@ import {
 } from '@kilocode/web-shared/routers/organizations/utils';
 import {
   ORGANIZATION_BILLING_ROLES,
+  ORGANIZATION_INVITE_SEAT_LIMIT_REACHED,
   ORGANIZATION_MANAGE_ROLES,
 } from '@kilocode/app-shared/organizations';
+import {
+  assertInviteSeatCapacity,
+  lockOrganizationInvites,
+} from '@/lib/organizations/organization-seats';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import {
   getOrganizationMembershipRoles,
@@ -605,12 +611,25 @@ export const organizationsMembersRouter = createTRPCRouter({
       // Owners and Kilo admins can invite any role. Billing managers can invite members only.
       try {
         const result = await db.transaction(async tx => {
+          // One lock orders everything an invitation does — the duplicate
+          // lookup, the seat check and the insert — so two concurrent invites
+          // for one address cannot both pass the lookup, and neither can take
+          // the last free seat twice.
+          await lockOrganizationInvites(tx, organizationId);
+          // An existing member or an outstanding invitation answers first: a
+          // full organization must not describe an address it already has as a
+          // seat problem.
+          await assertInviteeAddressIsAvailable(tx, organizationId, email);
+          await assertInviteSeatCapacity(tx, organizationId, role);
           const invitation = await inviteUserToOrganization(
             organizationId,
             user.id,
             email,
             role,
-            tx
+            tx,
+            // The duplicate lookup above runs before the seat check, so the
+            // insert must not repeat it.
+            { addressAlreadyChecked: true }
           );
           const acceptInviteUrl = getAcceptInviteUrl(invitation.token);
 
@@ -677,6 +696,12 @@ export const organizationsMembersRouter = createTRPCRouter({
             throw new TRPCError({
               code: 'PRECONDITION_FAILED',
               message: CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER,
+            });
+          }
+          if (error.message === ORGANIZATION_INVITE_SEAT_LIMIT_REACHED) {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: ORGANIZATION_INVITE_SEAT_LIMIT_REACHED,
             });
           }
           if (error.message === 'User must join this organization through SSO') {

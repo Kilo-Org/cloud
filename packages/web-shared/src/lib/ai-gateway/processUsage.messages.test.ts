@@ -433,6 +433,7 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
         captureVercelMetadata: value => collector.capture(value, 'messages'),
         captureEnkryptReport: jest.fn(),
         captureEnkryptOutputReport: jest.fn(),
+        captureByokFailoverAttempts: jest.fn(),
         waitFor: jest.fn(),
       }
     ).then(result => {

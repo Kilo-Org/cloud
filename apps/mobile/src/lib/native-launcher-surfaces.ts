@@ -1,5 +1,7 @@
 import { requireOptionalNativeModule } from 'expo';
 
+import { LAUNCHER_NEW_AGENT_URL } from '@/lib/launcher-surfaces';
+
 /**
  * JS wrapper over the local `KiloLauncherSurfaces` native module: the launcher
  * shortcuts the OS shows on the app icon and the quick-settings tile. The
@@ -64,4 +66,19 @@ export function consumePendingLaunchUrl(): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Read-and-clear the parked launch URL when it names a destination that belongs
+ * to no account.
+ *
+ * A Quick Action tapped while the app is signed out parks its URL natively, and
+ * the signed-in launcher mount is the only reader. The value is read and
+ * cleared here so the caller owns it; only the destination that names no
+ * account is returned, and every other value is left to the surfaces it came
+ * from.
+ */
+export function takeAccountIndependentLaunchUrl(): string | null {
+  const url = consumePendingLaunchUrl();
+  return url === LAUNCHER_NEW_AGENT_URL ? url : null;
 }

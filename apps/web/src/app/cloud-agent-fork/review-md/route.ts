@@ -24,11 +24,11 @@ import { createCallerFactory, createTRPCContext } from '@kilocode/web-shared/lib
 import { rootRouter } from '@/routers/root-router';
 import { isSameOriginNavigation } from '@/lib/auth/same-origin';
 import {
-  CODE_REVIEW_MD_CONVERSION_FLAG,
   DEFAULT_CODE_REVIEW_MODE,
   REVIEW_MD_CONVERSION_RATE_LIMIT,
   REVIEW_MD_CONVERSION_RATE_WINDOW_SECONDS,
 } from '@/lib/code-reviews/core/constants';
+import { CODE_REVIEW_MD_CONVERSION_FLAG } from '@kilocode/app-shared/feature-flags';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { buildReviewMdConversionPrompt } from '@/lib/code-reviews/prompts/review-md-conversion-prompt';
 import { isFeatureFlagEnabledOrDevelopment } from '@kilocode/web-shared/lib/posthog-feature-flags';

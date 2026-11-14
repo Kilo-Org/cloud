@@ -17,14 +17,15 @@ const ANALYTICS_OPT_OUT_KEY = 'analyticsOptOut';
 const SEEDED_EMAIL = 'user@kilo.ai';
 const PRODUCT_EVENTS = [
   '$identify',
+  'extension_active',
   'extension_signed_in',
   'extension_signed_out',
   'message_sent',
   'conversation_created',
 ] as const;
 
-/** Brand accent track (#f7f586) and knob (#1f1f1f); off track is surface-overlay (#333333). */
-const BRAND_PRIMARY_RGB = { blue: 134, green: 245, red: 247 } as const;
+/** Brand accent track (#ffdd00) and knob (#1f1f1f); off track is surface-overlay (#333333). */
+const BRAND_PRIMARY_RGB = { blue: 0, green: 221, red: 255 } as const;
 const BRAND_PRIMARY_FOREGROUND_RGB = { blue: 31, green: 31, red: 31 } as const;
 const SURFACE_OVERLAY_RGB = { blue: 51, green: 51, red: 51 } as const;
 

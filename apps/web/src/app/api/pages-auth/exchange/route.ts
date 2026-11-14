@@ -10,6 +10,8 @@ import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token'
 import { verifyKiloTokenForPolicy } from '@kilocode/worker-utils/kilo-token-policy';
 import { isPagesAuthClient } from '@/lib/pages-auth/pages-auth-clients';
 import { PAGES_AUTH_STATE_PATTERN, verifyPagesAuthCode } from '@/lib/pages-auth/pages-auth-code';
+import { getUserAuthProviders } from '@/lib/user';
+import { hasVerifiedPrimaryAddress } from '@/lib/user/verified-address';
 
 const CodeExchangeSchema = z.object({
   code: z.string().min(1).max(2048),
@@ -92,8 +94,16 @@ async function userIdFromPagesToken(token: string, audience: string): Promise<st
  *   browser session, such as the CLI). The token is bound to the deployment by
  *   its audience, so one minted for `pages-dev` is refused for `pages`.
  *
- * The answer is identity only: an account id, a name and the person's
- * organizations. No Kilo token is issued.
+ * The answer is identity only, and no Kilo token is issued:
+ *
+ *     { "user": { "id", "name", "verified_email"? }, "organizations": [...] }
+ *
+ * `verified_email` is the account's primary address, present only when a
+ * sign-in method that verifies addresses carries it
+ * (`hasVerifiedPrimaryAddress`). Without that proof the key is absent, never
+ * null or empty: Pages honors an invitation by email only for a verified
+ * address. An account with no provider rows has no proof, so it gets no key.
+ * The address is in the response body only; nothing here logs it.
  *
  * A caller that is not a configured deployment gets 401 before the code or
  * token is checked. A code that is forged, stale, or minted for another
@@ -134,13 +144,19 @@ export const POST = withRestTiming('/api/pages-auth/exchange', async (request: R
     return refuse(403, 'account_unavailable');
   }
 
-  const organizations = await getProfileOrganizations(user.id, {
-    excludeAccessBlocked: true,
-  });
+  const [organizations, providers] = await Promise.all([
+    getProfileOrganizations(user.id, { excludeAccessBlocked: true }),
+    getUserAuthProviders(user.id),
+  ]);
+  const verified = hasVerifiedPrimaryAddress(user.google_user_email, providers);
 
   return NextResponse.json(
     {
-      user: { id: user.id, name: user.google_user_name },
+      user: {
+        id: user.id,
+        name: user.google_user_name,
+        ...(verified ? { verified_email: user.google_user_email } : {}),
+      },
       organizations,
     },
     { headers: { 'Cache-Control': 'no-store' } }

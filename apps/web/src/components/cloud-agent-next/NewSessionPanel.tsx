@@ -59,6 +59,7 @@ import { environmentBlocksStart } from '@/components/cloud-agent-next/environmen
 import { useSessionEnvironment } from '@/hooks/useSessionEnvironment';
 import type { EnvironmentRepository } from '@/hooks/useCloudAgentEnvironments';
 import { StackedOnSegment } from '@/components/cloud-agent-next/StackedOnSegment';
+import { NewSessionComputePrice } from '@/components/cloud-agent-next/NewSessionComputePrice';
 import {
   contextGroupClassName,
   contextSegmentClassName,
@@ -1972,6 +1973,12 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               This workspace is being deleted or no longer exists. Remove the stack target and start
               a normal session.
             </p>
+          )}
+          {!organizationId && (
+            <NewSessionComputePrice
+              repository={environmentRepository}
+              environment={repositoryEnvironment}
+            />
           )}
         </div>
 

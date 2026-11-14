@@ -151,6 +151,13 @@ const cases: ReadonlyArray<
   ['no_progress', 'accepted', 'failed', 'post_dispatch_no_activity', 'wrapper_no_output'],
   ['no_outcome', 'accepted', 'failed', 'post_dispatch_no_activity', 'wrapper_no_output'],
   [
+    'completion_unconfirmed',
+    'accepted',
+    'failed',
+    'post_dispatch_no_activity',
+    'wrapper_no_output',
+  ],
+  [
     'prompt_failed',
     'accepted',
     'failed',

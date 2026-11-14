@@ -60,12 +60,12 @@ import {
 } from '@kilocode/worker-utils/code-review-council';
 import { CouncilSpecialistPicker } from './CouncilSpecialistPicker';
 import {
-  CODE_REVIEW_COUNCIL_FLAG,
   buildCouncilSpecialists,
   countEnabledSelections,
   defaultCouncilSelections,
   type CouncilSpecialistSelection,
 } from '@/lib/code-reviews/core/council-selection';
+import { CODE_REVIEW_COUNCIL_FLAG } from '@kilocode/app-shared/feature-flags';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import {
   getCodeReviewActionRequiredCopy,

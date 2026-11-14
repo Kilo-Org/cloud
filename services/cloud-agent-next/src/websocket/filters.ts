@@ -85,6 +85,7 @@ export function parseStreamFilters(url: URL, sessionId: SessionId): StreamFilter
 
   filters.startTime = parseTimestamp(url.searchParams.get('startTime'));
   filters.endTime = parseTimestamp(url.searchParams.get('endTime'));
+  if (url.searchParams.get('toolDisplay') === 'preview') filters.toolDisplay = 'preview';
 
   return filters;
 }

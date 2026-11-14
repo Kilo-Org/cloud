@@ -148,8 +148,8 @@ test('Agents active list shows retryable error and recovers', async () => {
     const sidePanel = await getSidePanel();
     await navigateToAgentsMode(sidePanel);
 
-    // Error state visible
-    await expect(sidePanel.getByText('Failed to load active sessions')).toBeVisible();
+    // Error state visible: the shared error notice names the cause and offers Retry.
+    await expect(sidePanel.getByRole('alert')).toBeVisible();
     const retryButton = sidePanel.getByRole('button', { name: 'Retry' });
     await expect(retryButton).toBeVisible();
 
@@ -503,7 +503,7 @@ test('Agents history list shows retryable error and recovers', async () => {
     const sidePanel = await getSidePanel();
     await navigateToAgentsMode(sidePanel);
 
-    await expect(sidePanel.getByText('Failed to load sessions')).toBeVisible({ timeout: 10_000 });
+    await expect(sidePanel.getByRole('alert')).toBeVisible({ timeout: 10_000 });
     await sidePanel.getByRole('button', { name: 'Retry' }).click();
     await expect(sidePanel.getByText('Refactor auth module')).toBeVisible({ timeout: 10_000 });
   } finally {

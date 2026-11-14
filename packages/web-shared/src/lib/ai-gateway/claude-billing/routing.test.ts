@@ -87,64 +87,86 @@ function sharedOwner() {
 }
 
 describe('Claude customer-billed routing', () => {
-  it.each(['anthropic/claude-fable-5.2', '~anthropic/claude-fable-latest'])(
-    'drops mismatched thinking blocks for %s',
-    async model => {
-      const provider = buildClaudeBillingProvider(
-        'operator-token',
-        'claude-fable-5-2',
-        { kind: 'personal', kiloUserId: 'user' },
-        'uprof_test'
-      );
-      const gatewayRequest: GatewayRequest = {
-        kind: 'messages',
-        body: {
-          model,
-          max_tokens: 2_048,
-          messages: [{ role: 'user', content: 'hello' }],
-          thinking: { type: 'adaptive', display: 'summarized' },
-        },
-      };
-      const headers: Record<string, string> = {
-        'anthropic-beta': 'fine-grained-tool-streaming-2025-05-14',
-        'x-anthropic-beta': 'fine-grained-tool-streaming-2025-05-14',
-      };
-
-      const context = {
-        provider,
+  it.each(
+    ['anthropic/claude-fable-5.2', '~anthropic/claude-fable-latest'].flatMap(model =>
+      (['adaptive', 'disabled', 'omitted'] as const).map(mode => ({ model, mode }))
+    )
+  )('handles $mode thinking for $model', async ({ model, mode }) => {
+    const provider = buildClaudeBillingProvider(
+      'operator-token',
+      'claude-fable-5-2',
+      { kind: 'personal', kiloUserId: 'user' },
+      'uprof_test'
+    );
+    const gatewayRequest: GatewayRequest = {
+      kind: 'messages',
+      body: {
         model,
-        request: gatewayRequest,
-        extraHeaders: headers,
-        originalHeaders: {} as never,
-        userByok: null,
-        kilo_user_id: 'user',
-        organization_id: null,
-        session_id: null,
-      };
-      await provider.transformRequest(context);
+        max_tokens: 2_048,
+        messages: [
+          { role: 'user', content: 'hello' },
+          {
+            role: 'assistant',
+            content: [
+              { type: 'thinking', thinking: '', signature: 'FAKE_BILLING_TEST_SIGNATURE' },
+              { type: 'redacted_thinking', data: 'FAKE_BILLING_TEST_REDACTED_DATA' },
+              { type: 'text', text: 'Previous answer.' },
+            ],
+          },
+        ],
+        ...(mode === 'adaptive' && { thinking: { type: 'adaptive', display: 'summarized' } }),
+        ...(mode === 'disabled' && { thinking: { type: 'disabled' } }),
+      },
+    };
+    const headers: Record<string, string> = {
+      'anthropic-beta': 'fine-grained-tool-streaming-2025-05-14',
+      'x-anthropic-beta': 'fine-grained-tool-streaming-2025-05-14',
+    };
 
-      expect(context.model).toBe(model);
-      expect(gatewayRequest.body).toMatchObject({
-        model: 'claude-fable-5-2',
-        thinking: {
-          type: 'adaptive',
-          display: 'summarized',
-          block_binding: { prefix_mismatch_behavior: 'drop_block' },
-        },
-        billing_policy: { type: 'billing_policy', bill_to: 'user_profile' },
-      });
-      for (const header of ['anthropic-beta', 'x-anthropic-beta']) {
-        expect(headers[header].split(',')).toEqual(
-          expect.arrayContaining([
-            'fine-grained-tool-streaming-2025-05-14',
-            'oauth-2025-04-20',
-            'user-profiles-billing-2026-10-01',
-            'thinking-binding-controls-2026-08-01',
-          ])
-        );
-      }
+    const context = {
+      provider,
+      model,
+      request: gatewayRequest,
+      extraHeaders: headers,
+      originalHeaders: {} as never,
+      userByok: null,
+      kilo_user_id: 'user',
+      organization_id: null,
+      session_id: null,
+    };
+    await provider.transformRequest(context);
+
+    expect(context.model).toBe(model);
+    expect(gatewayRequest.body).toMatchObject({
+      model: 'claude-fable-5-2',
+      thinking:
+        mode === 'disabled'
+          ? { type: 'disabled' }
+          : {
+              type: 'adaptive',
+              ...(mode === 'adaptive' && { display: 'summarized' }),
+              block_binding: { prefix_mismatch_behavior: 'drop_block' },
+            },
+      billing_policy: { type: 'billing_policy', bill_to: 'user_profile' },
+    });
+    expect(gatewayRequest.body.messages[1]).toMatchObject({
+      role: 'assistant',
+      content:
+        mode === 'disabled'
+          ? [{ type: 'text', text: 'Previous answer.' }]
+          : [{ type: 'thinking' }, { type: 'redacted_thinking' }, { type: 'text' }],
+    });
+    for (const header of ['anthropic-beta', 'x-anthropic-beta']) {
+      expect(headers[header].split(',')).toEqual(
+        expect.arrayContaining([
+          'fine-grained-tool-streaming-2025-05-14',
+          'oauth-2025-04-20',
+          'user-profiles-billing-2026-10-01',
+          'thinking-binding-controls-2026-08-01',
+        ])
+      );
     }
-  );
+  });
 
   it.each(['messages', 'chat_completions'] as const)(
     'bills the profile over %s without a Kilo charge',

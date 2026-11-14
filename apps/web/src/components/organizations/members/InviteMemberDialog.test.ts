@@ -5,19 +5,21 @@ import React, { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { parseHTML } from 'linkedom';
 import type * as DialogModule from './InviteMemberDialog';
+import { hasInviteSeatCapacity } from '@kilocode/app-shared/organizations';
 
 let InviteMemberDialog: typeof DialogModule.InviteMemberDialog;
-let hasInviteSeatCapacity: typeof DialogModule.hasInviteSeatCapacity;
 let inviteEmailErrorMessage: typeof DialogModule.inviteEmailErrorMessage;
 let INVITE_SUCCESS_MESSAGE: typeof DialogModule.INVITE_SUCCESS_MESSAGE;
 let organizationMemberInvitedCaptureProperties: typeof DialogModule.organizationMemberInvitedCaptureProperties;
 
 const mutate = jest.fn();
 let inputChange: ((event: { target: { value: string } }) => void) | undefined;
+/** Seat usage the mocked hook reports; a test overrides it to fill the org. */
+let seatUsage = { usedSeats: 0, totalSeats: 1 };
 
 jest.mock('@/app/api/organizations/hooks', () => ({
   useInviteMember: () => ({ mutate, isPending: false }),
-  useOrganizationSeatUsage: () => ({ data: { usedSeats: 0, totalSeats: 1 } }),
+  useOrganizationSeatUsage: () => ({ data: seatUsage }),
   useOrganizationWithMembers: () => ({
     data: {
       plan: 'teams',
@@ -66,7 +68,6 @@ jest.mock('@/components/ui/dropdown-menu', () => {
 beforeAll(async () => {
   ({
     InviteMemberDialog,
-    hasInviteSeatCapacity,
     inviteEmailErrorMessage,
     INVITE_SUCCESS_MESSAGE,
     organizationMemberInvitedCaptureProperties,
@@ -147,6 +148,26 @@ describe('InviteMemberDialog with required SSO', () => {
     expect(inviteButton?.disabled).toBe(true);
     act(() => inviteButton?.click());
     expect(mutate).not.toHaveBeenCalled();
+  });
+
+  test('explains a full organization and keeps the owner-row invite blocked', () => {
+    seatUsage = { usedSeats: 2, totalSeats: 2 };
+    try {
+      const container = mountDialog();
+      act(() => inputChange?.({ target: { value: 'person@example.com' } }));
+
+      // Owners see the billing-manager escape hatch in the same sentence.
+      expect(container.textContent).toContain('All seats are in use (2/2)');
+      expect(container.textContent).toContain('You can still invite billing managers');
+      const inviteButton = Array.from(container.querySelectorAll('button')).find(button =>
+        button.textContent?.includes('Send Invitation')
+      );
+      expect(inviteButton?.disabled).toBe(true);
+      act(() => inviteButton?.click());
+      expect(mutate).not.toHaveBeenCalled();
+    } finally {
+      seatUsage = { usedSeats: 0, totalSeats: 1 };
+    }
   });
 });
 

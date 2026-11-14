@@ -1,7 +1,6 @@
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
-import type { MetadataSource } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import {
@@ -11,7 +10,7 @@ import {
   readStoredGatewayModels,
   retainPreviousEntries,
   vercelGatewayModelsSource,
-  type GatewayModelList,
+  type GatewayModelsSource,
   type GatewayModelMap,
   type GatewayModelWithEndpoints,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
@@ -25,11 +24,7 @@ const TTL_MS = 300_000;
  * are not stored yet keeps its previous entry, or is left out until the refresh job stores them. A
  * list or joined catalog that looks truncated throws, so callers keep the last good map.
  */
-function createGatewayModelsFetcher(
-  gateway: Provider,
-  source: MetadataSource<GatewayModelList>,
-  name: string
-) {
+function createGatewayModelsFetcher(gateway: Provider, source: GatewayModelsSource, name: string) {
   let previous: GatewayModelMap = {};
   return createCachedFetch<GatewayModelMap>(
     async () => {

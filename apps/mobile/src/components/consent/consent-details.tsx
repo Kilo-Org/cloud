@@ -287,6 +287,13 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
             }
           />
 
+          <Section
+            title={t('consent.featureFlagsTitle')}
+            what={t('consent.featureFlagsWhat')}
+            why={t('consent.featureFlagsWhy')}
+            who={t('consent.featureFlagsWho')}
+          />
+
           <Text className="mt-6 text-sm font-semibold text-foreground">
             {mode === 'review' ? t('consent.optionalReview') : t('consent.optionalOnboarding')}
           </Text>

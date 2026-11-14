@@ -17,10 +17,12 @@ import {
  * with the app's data: the keychain is unavailable because the device is
  * locked (iOS `errSecInteractionNotAllowed` on a `WHEN_UNLOCKED*` item), the
  * keystore is not ready after a reboot, or the OS rewrote the item. Every call
- * through this module reports that failure at warning level with the stable
+ * through this module reports a failure at warning level with the stable
  * operation fingerprint before the rejection reaches the caller, so one
  * failure produces one Sentry issue named after the operation instead of a raw
- * `FunctionCallException` message that changes per platform and OS version.
+ * `FunctionCallException` message that changes per platform and OS version. The
+ * locked-device refusal is the one exception: it is expected, so it leaves a
+ * breadcrumb and files no event (see `lib/telemetry/secure-store-events`).
  *
  * The key and the stored value are never attached to the report: a stored
  * value can be a credential.

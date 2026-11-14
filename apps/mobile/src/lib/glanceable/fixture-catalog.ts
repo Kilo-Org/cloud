@@ -232,6 +232,23 @@ export const GLANCEABLE_FIXTURES = {
       { status: 'scheduled', ago: 8, title: '', scheduledAt: roundWake(now) },
     ],
   },
+  'placeholder-title': {
+    description:
+      'Sessions still on the backend creation title: the generic agent label, never the machine text.',
+    rows: now => [
+      {
+        status: 'question',
+        ago: 6,
+        title: `New session - ${new Date(now - 40 * MINUTE_MS).toISOString()}`,
+      },
+      {
+        status: 'scheduled',
+        ago: 9,
+        title: `Child session - ${new Date(now - 50 * MINUTE_MS).toISOString()}`,
+        scheduledAt: roundWake(now),
+      },
+    ],
+  },
   'stale-idle': {
     description: 'Old idle work remains useful without claiming current confirmation.',
     checkedAgo: 600,

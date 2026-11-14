@@ -862,6 +862,71 @@ describe('stall watchdog', () => {
     expect(failure instanceof KiloGatewayHttpError ? failure.status : null).toBe(503);
   });
 
+  it('keeps the server reason from an error body larger than 2 kB', async () => {
+    const padding = 'x'.repeat(3000);
+    const body = JSON.stringify({ error: { message: 'Insufficient credits.' }, padding });
+    const fetch: FetchLike = () => Promise.resolve(new Response(body, { status: 402 }));
+
+    const failure = await fetchKiloGatewayChatCompletionStream({
+      apiBaseUrl: 'https://gateway.test',
+      fetch,
+      messages: [],
+      model: 'test-model',
+      onContentDelta: () => {},
+      token: 'token',
+      tools: [],
+    }).then(
+      () => {},
+      (error: unknown) => error
+    );
+
+    expect(failure).toBeInstanceOf(KiloGatewayHttpError);
+    expect(failure instanceof KiloGatewayHttpError ? failure.body : null).toStrictEqual({
+      error: { message: 'Insufficient credits.' },
+      padding,
+    });
+  });
+
+  it('stops reading an oversized error body and cancels the stream', async () => {
+    const chunk = new Uint8Array(32 * 1024).fill(120);
+    let cancels = 0;
+    let pulls = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      cancel() {
+        cancels += 1;
+      },
+      pull(controller) {
+        pulls += 1;
+
+        if (pulls > 10) {
+          controller.close();
+          return;
+        }
+
+        controller.enqueue(chunk);
+      },
+    });
+    const fetch: FetchLike = () => Promise.resolve(new Response(stream, { status: 402 }));
+
+    const failure = await fetchKiloGatewayChatCompletionStream({
+      apiBaseUrl: 'https://gateway.test',
+      fetch,
+      messages: [],
+      model: 'test-model',
+      onContentDelta: () => {},
+      token: 'token',
+      tools: [],
+    }).then(
+      () => {},
+      (error: unknown) => error
+    );
+
+    expect(failure).toBeInstanceOf(KiloGatewayHttpError);
+    expect(failure instanceof KiloGatewayHttpError ? failure.body : null).toBeUndefined();
+    expect(pulls).toBeLessThan(10);
+    expect(cancels).toBe(1);
+  });
+
   it('reports a caller abort as an abort, not a stall', async () => {
     const controller = new AbortController();
     const fetch: FetchLike = (_input, init) =>

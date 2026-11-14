@@ -2914,10 +2914,22 @@ describe('SandboxContainers environment snapshot starts', () => {
   });
 
   it('reports a failed snapshot start without destroying the container or retrying the image', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(11_000);
+    const { diagnostics } = captureLogs();
     const { instance, container, readRecord } = setup();
     container.startBehavior = 'effect-then-reject';
 
-    await expect(launchFromSnapshot(instance, REF_A)).resolves.toEqual({
+    await expect(
+      launchFromSnapshot(instance, REF_A, {
+        snapshotDiagnostic: {
+          allocationId: 'allocation-test',
+          source: 'environment',
+          attempt: 2,
+          startedAt: 10_000,
+        },
+      })
+    ).resolves.toEqual({
       started: false,
       startSource: 'repository',
       snapshotFailed: true,
@@ -2931,6 +2943,18 @@ describe('SandboxContainers environment snapshot starts', () => {
       wrapperAttempt: 'exec_pending',
     });
     expect(readRecord()).not.toHaveProperty('repositoryStartFailures');
+    expect(diagnostics('snapshot_start_failed').map(line => line.fields)).toEqual([
+      expect.objectContaining({
+        allocationId: 'allocation-test',
+        source: 'environment',
+        failureStage: 'provider_snapshot',
+        reason: 'transient',
+        errorName: 'Error',
+        cause: 'container_start_failed_after_taking_effect',
+        attempt: 2,
+        elapsedMs: 1_000,
+      }),
+    ]);
   });
 
   it('propagates an image start failure instead of reporting a snapshot failure', async () => {

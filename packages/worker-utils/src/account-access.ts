@@ -69,6 +69,63 @@ export function accountBalanceMicrodollars(account: {
   return account.total_microdollars_acquired - account.microdollars_used;
 }
 
+/**
+ * The organization a bouncer report identifies as the payer, with the totals bouncer judges: the
+ * root of the organization family (the parent when the organization has one, else the organization
+ * itself) and the sums over that root together with its child organizations. Organizations nest one
+ * level deep, so a child is never itself a root of another family.
+ */
+export type OrganizationPayerFamily = {
+  payerRootOrganizationId: string;
+  /** `created_at` of the root organization. */
+  payerRootCreatedAt: string;
+  /** Sum of `microdollars_used` over the root and its children. */
+  payerMicrodollarsUsed: number;
+  /** Sum of `total_microdollars_acquired` over the root and its children. */
+  payerTotalMicrodollarsAcquired: number;
+};
+
+// One row per organization holding its family root and the family's totals. It is correlated on the
+// outer `organizations` row, so a caller reads the family in the same statement as its own row.
+const organizationFamily = sql`(
+  select
+    root.id as root_organization_id,
+    root.created_at as root_created_at,
+    coalesce(sum(member.microdollars_used), 0) as microdollars_used,
+    coalesce(sum(member.total_microdollars_acquired), 0) as total_microdollars_acquired
+  from organizations root
+  join organizations member
+    on member.id = root.id or member.parent_organization_id = root.id
+  where root.id = coalesce(${organizations.parent_organization_id}, ${organizations.id})
+  group by root.id
+) as organization_family`;
+
+const organizationPayerFamily = {
+  payerRootOrganizationId: sql<string>`organization_family.root_organization_id`,
+  payerRootCreatedAt: sql<string>`organization_family.root_created_at`,
+  payerMicrodollarsUsed: sql<number>`organization_family.microdollars_used`.mapWith(Number),
+  payerTotalMicrodollarsAcquired:
+    sql<number>`organization_family.total_microdollars_acquired`.mapWith(Number),
+};
+
+/**
+ * The payer bouncer reports for an organization, from one query: the root of its family with the
+ * family's totals. The inference path reads the same fields inside its balance-row statement; this
+ * is for the charge and credit-event callers that are off that path.
+ */
+export async function findOrganizationPayerFamily(
+  db: AccountDb,
+  organizationId: string
+): Promise<OrganizationPayerFamily | null> {
+  const [row] = await db
+    .select(organizationPayerFamily)
+    .from(organizations)
+    .innerJoinLateral(organizationFamily, sql`true`)
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+    .limit(1);
+  return row ?? null;
+}
+
 export type OrganizationMemberBalanceRow = Pick<
   Organization,
   | 'total_microdollars_acquired'
@@ -79,10 +136,11 @@ export type OrganizationMemberBalanceRow = Pick<
   | 'auto_top_up_enabled'
   | 'next_credit_expiration_at'
   | 'created_at'
-> & {
-  microdollar_limit: number | null;
-  microdollar_usage: number | null;
-};
+> &
+  OrganizationPayerFamily & {
+    microdollar_limit: number | null;
+    microdollar_usage: number | null;
+  };
 
 // Billing managers manage credits but cannot spend them, so they have no member balance.
 export async function findOrganizationMemberBalanceRow(
@@ -103,8 +161,10 @@ export async function findOrganizationMemberBalanceRow(
       auto_top_up_enabled: organizations.auto_top_up_enabled,
       next_credit_expiration_at: organizations.next_credit_expiration_at,
       created_at: organizations.created_at,
+      ...organizationPayerFamily,
     })
     .from(organizations)
+    .innerJoinLateral(organizationFamily, sql`true`)
     .innerJoin(
       organization_memberships,
       eq(organization_memberships.organization_id, organizations.id)

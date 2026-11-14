@@ -1,12 +1,13 @@
 /* eslint-disable max-lines */
 import { storage } from '#imports';
 import { useAtom } from 'jotai';
-import { ChevronDown, ChevronRight, Plus, RefreshCw, Server, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, KeyRound, Plus, RefreshCw, Server, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import type { RemoteMcpServer } from '../../src/shared/remote-mcp';
 import { loadRemoteMcpStore, saveRemoteMcpStore } from '../../src/shared/remote-mcp-storage';
 import { remoteMcpStoreAtom } from './agent-chat-atoms';
+import { ErrorNotice } from './error-notice';
 import { connectAndPersistRemoteMcpServer } from './remote-mcp-client';
 import {
   applyUpsert,
@@ -15,6 +16,7 @@ import {
   formatToolCount,
   getConnectButtonLabel,
   isSecretSaved,
+  needsCredentials,
   removeServer,
   toolsToJsonString,
 } from './remote-mcp-settings-logic';
@@ -297,7 +299,8 @@ const ServerForm = ({
         </label>
       </div>
       {error === null ? null : <p className="type-label text-status-red-400">{error}</p>}
-      <div className="flex gap-2">
+      {/* The settings dialog scrolls; keep the form's primary action reachable at every panel width. */}
+      <div className="sticky bottom-0 z-10 flex gap-2 bg-surface-raised pt-2">
         <button
           className={`h-9 flex-1 px-3 ${filledSecondaryButtonClass} disabled:cursor-not-allowed disabled:bg-surface-selected disabled:text-foreground-subtle`}
           disabled={saving}
@@ -317,28 +320,45 @@ const ServerForm = ({
   );
 };
 
+const connectControlLabel = (
+  busy: boolean,
+  addCredentials: boolean,
+  status: RemoteMcpServer['status']
+): string => {
+  if (busy) {
+    return 'Connecting…';
+  }
+
+  return addCredentials ? 'Add credentials' : getConnectButtonLabel(status);
+};
+
+const connectControlIcon = (busy: boolean, addCredentials: boolean): JSX.Element => {
+  if (busy) {
+    return <RefreshCw aria-hidden="true" className="size-3 animate-spin" />;
+  }
+
+  return addCredentials ? (
+    <KeyRound aria-hidden="true" className="size-3" />
+  ) : (
+    <RefreshCw aria-hidden="true" className="size-3" />
+  );
+};
+
 const ServerRow = ({
+  busy,
   onConnect,
   onEdit,
   onRemove,
   server,
 }: {
+  busy: boolean;
   onConnect: (server: RemoteMcpServer) => Promise<void>;
   onEdit: (server: RemoteMcpServer) => void;
   onRemove: (serverId: string) => void;
   server: RemoteMcpServer;
 }): JSX.Element => {
   const [expanded, setExpanded] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-
-  const handleConnect = async (): Promise<void> => {
-    setConnecting(true);
-    try {
-      await onConnect(server);
-    } finally {
-      setConnecting(false);
-    }
-  };
+  const addCredentials = needsCredentials(server);
 
   return (
     <div className="min-w-0 rounded-xl border border-border bg-surface-raised p-3">
@@ -358,24 +378,36 @@ const ServerRow = ({
             )}
             <span className="type-body font-medium text-foreground">{server.displayName}</span>
           </button>
-          <p className="ml-5 truncate type-label text-foreground-muted">{server.url}</p>
-          <p className="ml-5 type-label text-foreground-muted">
-            {formatToolCount(server.cachedTools.length)} ·{' '}
-            {formatLastConnected(server.lastConnectedAt)}
+          <p className="ml-5 break-all type-label text-foreground-muted">{server.url}</p>
+          <p className="ml-5 flex items-center gap-1 type-label text-foreground-muted">
+            {busy ? (
+              <>
+                <RefreshCw aria-hidden="true" className="size-3 animate-spin" />
+                Connecting…
+              </>
+            ) : (
+              <>
+                {formatToolCount(server.cachedTools.length)} ·{' '}
+                {formatLastConnected(server.lastConnectedAt)}
+              </>
+            )}
           </p>
-          {server.lastError === undefined ? null : (
-            <p className="ml-5 truncate type-label text-status-red-400">{server.lastError}</p>
-          )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
             className={`flex h-9 items-center gap-1 px-2 ${filledSecondaryButtonClass} disabled:cursor-not-allowed disabled:bg-surface-selected disabled:text-foreground-subtle`}
-            disabled={connecting}
-            onClick={() => void handleConnect()}
+            disabled={busy}
+            onClick={() => {
+              if (addCredentials) {
+                onEdit(server);
+                return;
+              }
+              void onConnect(server);
+            }}
             type="button"
           >
-            <RefreshCw aria-hidden="true" className="size-3" />
-            {connecting ? 'Connecting…' : getConnectButtonLabel(server.status)}
+            {connectControlIcon(busy, addCredentials)}
+            {connectControlLabel(busy, addCredentials, server.status)}
           </button>
           <button
             aria-label={`Edit ${server.displayName}`}
@@ -399,6 +431,11 @@ const ServerRow = ({
           </button>
         </div>
       </div>
+      {server.lastError === undefined ? null : (
+        <div className="mt-2">
+          <ErrorNotice retryable={false} title={server.lastError} />
+        </div>
+      )}
       {expanded && server.cachedTools.length > 0 ? (
         <div className="mt-2 overflow-x-auto">
           <pre className="font-mono text-xs text-foreground-muted">
@@ -414,6 +451,8 @@ export const RemoteMcpSettings = (): JSX.Element => {
   const [store, setStore] = useAtom(remoteMcpStoreAtom);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingServer, setEditingServer] = useState<RemoteMcpServer | null>(null);
+  /* A saved server connects immediately, so its row must show that attempt rather than read as idle. */
+  const [connectingIds, setConnectingIds] = useState<readonly string[]>([]);
 
   useEffect(() => {
     void (async () => {
@@ -421,14 +460,20 @@ export const RemoteMcpSettings = (): JSX.Element => {
     })();
   }, [setStore]);
 
-  const handleConnect = async (server: RemoteMcpServer): Promise<void> => {
-    const nextServers = await connectAndPersistRemoteMcpServer({
-      fetch: globalThis.fetch,
-      server,
-      storageArea: storage,
-    });
-    if (nextServers !== undefined) {
-      setStore({ servers: nextServers });
+  const connectServer = async (server: RemoteMcpServer): Promise<void> => {
+    setConnectingIds(prev => (prev.includes(server.id) ? prev : [...prev, server.id]));
+
+    try {
+      const nextServers = await connectAndPersistRemoteMcpServer({
+        fetch: globalThis.fetch,
+        server,
+        storageArea: storage,
+      });
+      if (nextServers !== undefined) {
+        setStore({ servers: nextServers });
+      }
+    } finally {
+      setConnectingIds(prev => prev.filter(id => id !== server.id));
     }
   };
 
@@ -450,14 +495,7 @@ export const RemoteMcpSettings = (): JSX.Element => {
         ? nextStore.servers.find(candidate => !store.servers.some(prev => prev.id === candidate.id))
         : nextStore.servers.find(candidate => candidate.id === existing.id);
     if (savedServer !== undefined) {
-      const nextServers = await connectAndPersistRemoteMcpServer({
-        fetch: globalThis.fetch,
-        server: savedServer,
-        storageArea: storage,
-      });
-      if (nextServers !== undefined) {
-        setStore({ servers: nextServers });
-      }
+      await connectServer(savedServer);
     }
     return null;
   };
@@ -480,7 +518,7 @@ export const RemoteMcpSettings = (): JSX.Element => {
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <p className={labelClass}>Remote MCP servers</p>
+      <h2 className="type-label text-foreground-muted">Remote MCP servers</h2>
       {store.servers.map(server =>
         editingServer?.id === server.id ? (
           <div className="rounded-xl border border-border bg-surface-raised p-3" key={server.id}>
@@ -488,8 +526,9 @@ export const RemoteMcpSettings = (): JSX.Element => {
           </div>
         ) : (
           <ServerRow
+            busy={connectingIds.includes(server.id)}
             key={server.id}
-            onConnect={handleConnect}
+            onConnect={connectServer}
             onEdit={handleEdit}
             onRemove={serverId => void handleRemove(serverId)}
             server={server}

@@ -19,6 +19,7 @@ import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type SheetHeaderTopInset } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-labels';
+import { selectionCheckColor } from '@/lib/selection-check-color';
 import { cn } from '@/lib/utils';
 
 const SKELETON_ROW_COUNT = 4;
@@ -233,7 +234,7 @@ export function ProfilePickerSheet({
             )}
           </View>
           {selectedOverrideProfileId === null && !needsAttention ? (
-            <Check size={18} color={colors.primary} />
+            <Check size={18} color={selectionCheckColor(colors)} />
           ) : null}
         </Pressable>
 
@@ -274,7 +275,7 @@ export function ProfilePickerSheet({
                       </Text>
                     ) : null}
                   </View>
-                  {selected ? <Check size={18} color={colors.primary} /> : null}
+                  {selected ? <Check size={18} color={selectionCheckColor(colors)} /> : null}
                 </Pressable>
               );
             })}

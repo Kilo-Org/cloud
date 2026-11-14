@@ -173,6 +173,7 @@ vi.mock('@/lib/pr-review/discussion/use-pr-comment-crud-mutations', () => ({
 // NetInfo, which this node-environment suite cannot resolve.
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   getCommittedConnectivityStatus: () => hoisted.connectivity.value,
+  connectionRefusesWrites: () => hoisted.connectivity.value === 'offline',
 }));
 
 // The sheet's own-comment write path is mocked above; the trpc module is

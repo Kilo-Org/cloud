@@ -26,6 +26,7 @@ import {
 import { persistGlanceableSink, restorePersistedGlanceable } from './persist';
 import { type GlanceablePublisher } from './publisher';
 import { registerGlanceableSink } from './sink-registry';
+import { migrateWidgetStoreAccessibility } from './widget-store';
 
 // Register only the persist sink here; platform sinks register themselves from
 // files their slices own.
@@ -76,6 +77,10 @@ export function GlanceablePublisherMount(): null {
   useEffect(() => {
     let cancelled = false;
     const restore = async (): Promise<void> => {
+      // Upgrade the items a pre-release wrote WHEN_UNLOCKED before restoring
+      // them, so the first run after the update already leaves them readable to
+      // a locked device's background push.
+      await migrateWidgetStoreAccessibility();
       await restorePersistedGlanceable();
       await restoreNativeHomeWidgetData();
       if (!cancelled) {

@@ -2774,8 +2774,8 @@ export const adminRouter = createTRPCRouter({
 
           try {
             const snapshot = await fetchSessionSnapshot(input.session_id, session.kilo_user_id);
-            // The export streams messages/parts in ingest order; re-sort by the
-            // time-ordered IDs so the trace matches the cloud-agent-next UI.
+            // The export streams messages/parts in ingest order; re-sort in the
+            // transcript's turn order so the trace matches the cloud-agent-next UI.
             return {
               messages: sortSessionMessagesForDisplay(snapshot?.messages ?? []),
               format: 'v2' as const,

@@ -103,26 +103,50 @@ describe('PreparationGroup failure copy', () => {
     mounted.unmount();
   });
 
-  it('names the failed stage and keeps that stage out of the body it named', async () => {
+  it('names the failed stage and drops its progress line from the body it named', async () => {
     const mounted = await mount(
       failedAttempt({
         steps: [
           step({
             id: 'provision',
             key: 'sandbox_provision',
+            latestDetail: 'Creating sandbox',
             safeError: 'sandbox_out_of_memory',
           }),
-          step({ id: 'boot', key: 'sandbox_boot', safeError: 'sandbox_lost' }),
+          step({
+            id: 'boot',
+            key: 'sandbox_boot',
+            latestDetail: 'Starting sandbox',
+            safeError: 'sandbox_lost',
+          }),
         ],
       })
     );
-    expect(mounted.group().props.accessibilityLabel).toBe('Provisioning sandbox failed');
+    expect(mounted.group().props.accessibilityLabel).toBe('Sandbox provisioning failed');
     expect(mounted.group().findAllByType('AlertCircle').length).toBeGreaterThan(0);
     // The header names the provisioning stage, so its cause stands in for its
     // row and the later stage keeps its own expandable row.
     expect(mounted.texts()).toContain('The sandbox ran out of memory');
-    expect(mounted.texts()).not.toContain('Provisioning sandbox');
+    // The header states that the stage failed, so the body never repeats the
+    // line the stage said while it was still running.
+    expect(mounted.texts()).not.toContain('Creating sandbox');
+    expect(mounted.texts()).not.toContain('Sandbox provisioning');
+    expect(mounted.texts()).toContain('Sandbox start');
+    // A row the header does not name keeps its own progress line.
     expect(mounted.texts()).toContain('Starting sandbox');
+    mounted.unmount();
+  });
+
+  it('drops the only evidence a named failed stage has when it is its progress line', async () => {
+    const mounted = await mount(
+      failedAttempt({
+        steps: [
+          step({ id: 'provision', key: 'sandbox_provision', latestDetail: 'Creating sandbox' }),
+        ],
+      })
+    );
+    expect(mounted.group().props.accessibilityLabel).toBe('Sandbox provisioning failed');
+    expect(mounted.texts()).toEqual(['Sandbox provisioning failed']);
     mounted.unmount();
   });
 
@@ -139,6 +163,7 @@ describe('PreparationGroup failure copy', () => {
             commandIndex: 1,
             commandCount: 2,
             command: 'pnpm run build',
+            latestDetail: 'Running build commands',
             outputTail: 'ELIFECYCLE Command failed with exit code 1.',
             exitCode: 1,
           }),
@@ -149,6 +174,7 @@ describe('PreparationGroup failure copy', () => {
     // The header names the command, so its row is gone; the command, its output
     // and its exit code stay where the row used to show them.
     expect(mounted.texts()).not.toContain('Setup command 2 of 2');
+    expect(mounted.texts()).not.toContain('Running build commands');
     expect(mounted.texts()).toContain('pnpm run build');
     expect(mounted.texts()).toContain('Exit code: 1');
     expect(mounted.outputTails()).toContain('ELIFECYCLE Command failed with exit code 1.');

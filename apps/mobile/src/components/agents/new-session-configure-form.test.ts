@@ -12,7 +12,7 @@ import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
-import { NewSessionPlanRefusal } from '@/components/agents/new-session-plan-refusal';
+import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { NewSessionProfileRow } from './new-session-environment-row';
 
 import '@/i18n';
@@ -328,6 +328,7 @@ function defaultProps() {
     onChangeFolderPath: vi.fn(),
     groups: [] as RepositoryGroup[],
     isRetrying: false,
+    repositoryRegionSettled: true,
     onChangeRepo: vi.fn(),
     onConnectProvider: vi.fn(),
     onRefreshRepos: vi.fn(),
@@ -431,7 +432,7 @@ describe('NewSessionConfigureForm', () => {
     // A three-line explanation in the pinned footer shrinks the scroll frame
     // and cuts the launch folder on a compact screen, so the body carries it.
     const scrollBody = findElement(element, 'ScrollView');
-    expect(findElementByComponent(scrollBody, NewSessionPlanRefusal)).toMatchObject({
+    expect(findElementByComponent(scrollBody, OrganizationPlanRefusal)).toMatchObject({
       message: 'The organization trial has ended.',
     });
     // The footer keeps only the start-blocked reason (its own component): the
@@ -443,7 +444,7 @@ describe('NewSessionConfigureForm', () => {
     expect(lift).not.toBeNull();
     expect(footer).toBeDefined();
     expect(findElementByType(footer, 'NewSessionStartButton')).not.toBeNull();
-    expect(findElementByComponent(footer, NewSessionPlanRefusal)).toBeNull();
+    expect(findElementByComponent(footer, OrganizationPlanRefusal)).toBeNull();
   });
 
   // ── Case 1: Cloud, selector shown ──
@@ -1095,6 +1096,32 @@ describe('NewSessionConfigureForm', () => {
 
     expect(findElementByType(element, 'SegmentedControl')).toBeNull();
     expect(findTextContent(element, t => t === 'Changes')).toBe(false);
+  });
+
+it('holds the rows below the repository section until its final height is known', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const unsettled = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      repositoryRegionSettled: false,
+    }) as Node;
+
+    expect(findTextContent(unsettled, t => t === 'Changes')).toBe(false);
+    expect(containsComponent(unsettled, NewSessionProfileRow)).toBe(false);
+    expect(findElementByType(unsettled, 'AdvancedConfigPanel')).toBeNull();
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const settled = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      repositoryRegionSettled: true,
+    }) as Node;
+
+    expect(findTextContent(settled, t => t === 'Changes')).toBe(true);
+    expect(containsComponent(settled, NewSessionProfileRow)).toBe(true);
+    expect(findElementByType(settled, 'AdvancedConfigPanel')).not.toBeNull();
   });
 
   // ── Case 12: the Run on helper sentence stays in plain language, and only under an unbound computer target ──

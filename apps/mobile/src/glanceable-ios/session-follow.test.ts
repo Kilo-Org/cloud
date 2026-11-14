@@ -859,7 +859,9 @@ describe('a record rewritten while the restore waits', () => {
       SESSION_CARD_SCOPE_KEY,
       JSON.stringify({
         version: 1,
-        cards: { 'session-1': { userId: CTX.userId, organizationId: CTX.organizationId, revision: 7 } },
+        cards: {
+          'session-1': { userId: CTX.userId, organizationId: CTX.organizationId, revision: 7 },
+        },
       })
     );
     const before = await readSessionCardScopes();

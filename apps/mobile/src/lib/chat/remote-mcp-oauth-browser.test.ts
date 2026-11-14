@@ -41,9 +41,8 @@ vi.mock('./remote-mcp-oauth-provider', () => ({
   REMOTE_MCP_REDIRECT_URL: 'kiloapp:///remote-mcp',
 }));
 
-const { openRemoteMcpAuthorization, takeRemoteMcpRedirect } = await import(
-  './remote-mcp-oauth-browser'
-);
+const { openRemoteMcpAuthorization, takeRemoteMcpRedirect } =
+  await import('./remote-mcp-oauth-browser');
 
 const authorizeA = 'https://auth.example/authorize?client_id=one&state=a';
 const authorizeB = 'https://auth.example/authorize?client_id=two&state=b';

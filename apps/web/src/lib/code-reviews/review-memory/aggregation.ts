@@ -15,21 +15,34 @@ import { reviewMemoryRetentionCutoff } from './retention';
 const REVIEW_MEMORY_FORBIDDEN_PROPOSAL_PATTERN =
   /\b(?:review\s+memory|kilo|feedback\s+systems?|this\s+analysis|llms?)\b/i;
 
+/**
+ * Caps applied in `validateReviewMemoryProposalDraft`, never in the schema the model
+ * must satisfy: `transformReviewMemoryWireSchema` strips minLength/maxLength/minimum,
+ * so a bound in the schema rejects complete responses the model was never told about
+ * (see the llm.ts header).
+ */
+export const REVIEW_MEMORY_PROPOSAL_LIMITS = {
+  titleChars: 140,
+  rationaleChars: 1_500,
+  proposedMarkdownChars: 4_000,
+  evidenceEventIds: 20,
+} as const;
+
 const ReviewMemoryProposalDraftSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('no_change') }),
   z.object({
     status: z.literal('propose'),
-    title: z.string().min(1).max(140),
-    rationale: z.string().min(1).max(1_500),
-    proposedMarkdown: z.string().min(1).max(4_000),
-    positiveCount: z.number().int().min(0),
-    negativeCount: z.number().int().min(0),
-    neutralCount: z.number().int().min(0),
-    evidenceEventIds: z.array(z.string()).max(20),
+    title: z.string(),
+    rationale: z.string(),
+    proposedMarkdown: z.string(),
+    positiveCount: z.number().int(),
+    negativeCount: z.number().int(),
+    neutralCount: z.number().int(),
+    evidenceEventIds: z.array(z.string()),
   }),
 ]);
 
-const ReviewMemoryProposalOutputSchema = z.object({
+export const ReviewMemoryProposalOutputSchema = z.object({
   proposal: ReviewMemoryProposalDraftSchema,
 });
 
@@ -167,7 +180,7 @@ Feedback events:
 ${JSON.stringify(events, null, 2)}`;
 }
 
-function validateReviewMemoryProposalDraft(
+export function validateReviewMemoryProposalDraft(
   draft: ReviewMemoryProposalDraft
 ): ReviewMemoryProposalDraft {
   if (draft.status === 'no_change') return draft;
@@ -176,5 +189,41 @@ function validateReviewMemoryProposalDraft(
       'Review Memory proposal must not mention Kilo, Review Memory, feedback systems, or LLMs.'
     );
   }
+  assertProposalFieldWithinLimit('title', draft.title, REVIEW_MEMORY_PROPOSAL_LIMITS.titleChars);
+  assertProposalFieldWithinLimit(
+    'rationale',
+    draft.rationale,
+    REVIEW_MEMORY_PROPOSAL_LIMITS.rationaleChars
+  );
+  assertProposalFieldWithinLimit(
+    'proposedMarkdown',
+    draft.proposedMarkdown,
+    REVIEW_MEMORY_PROPOSAL_LIMITS.proposedMarkdownChars
+  );
+  if (draft.evidenceEventIds.length > REVIEW_MEMORY_PROPOSAL_LIMITS.evidenceEventIds) {
+    throw new Error(
+      `Review Memory proposal cites ${draft.evidenceEventIds.length} evidence events; at most ${REVIEW_MEMORY_PROPOSAL_LIMITS.evidenceEventIds} are allowed.`
+    );
+  }
+  for (const [field, count] of [
+    ['positiveCount', draft.positiveCount],
+    ['negativeCount', draft.negativeCount],
+    ['neutralCount', draft.neutralCount],
+  ] as const) {
+    if (count < 0) {
+      throw new Error(`Review Memory proposal ${field} must be non-negative (${count}).`);
+    }
+  }
   return draft;
+}
+
+function assertProposalFieldWithinLimit(field: string, value: string, maxChars: number): void {
+  if (value.length === 0) {
+    throw new Error(`Review Memory proposal ${field} must not be empty.`);
+  }
+  if (value.length > maxChars) {
+    throw new Error(
+      `Review Memory proposal ${field} exceeds ${maxChars} characters (${value.length}).`
+    );
+  }
 }

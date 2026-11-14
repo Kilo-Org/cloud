@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "Amathokheni okufakiwe",
-      "orgLast30Days": "$t(usage.orgTitle) · Izinsuku ezingama-30 ezedlule",
+      "orgLast30Days": "Amalungu onke · Izinsuku ezingama-30 ezedlule",
       "outputTokens": "Amathokheni okukhishiwe",
       "requests": "Izicelo"
     },

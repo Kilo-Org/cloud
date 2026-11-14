@@ -3481,7 +3481,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokeny wejściowe",
-      "orgLast30Days": "$t(usage.orgTitle) · Ostatnie 30 dni",
+      "orgLast30Days": "Wszyscy członkowie · Ostatnie 30 dni",
       "outputTokens": "Tokeny wyjściowe",
       "requests": "Żądania"
     },

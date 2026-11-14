@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "Mga papasok na token",
-      "orgLast30Days": "$t(usage.orgTitle) · Huling 30 araw",
+      "orgLast30Days": "Lahat ng miyembro · Huling 30 araw",
       "outputTokens": "Mga palabas na token",
       "requests": "Mga kahilingan"
     },

@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokenët hyrës",
-      "orgLast30Days": "$t(usage.orgTitle) · 30 Ditët e fundit",
+      "orgLast30Days": "Të gjithë anëtarët · 30 Ditët e fundit",
       "outputTokens": "Tokenët dalës",
       "requests": "Kërkesat"
     },

@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "Halbeegyada qoraalka la geliyay",
-      "orgLast30Days": "$t(usage.orgTitle) · 30-Kii maalmood ee la soo dhaafay",
+      "orgLast30Days": "Dhammaan xubnaha · 30-Kii maalmood ee la soo dhaafay",
       "outputTokens": "Halbeegyada qoraalka la soo saaray",
       "requests": "Codsiyada"
     },

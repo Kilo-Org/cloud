@@ -3375,7 +3375,7 @@
     },
     "usageStats": {
       "inputTokens": "输入词元",
-      "orgLast30Days": "$t(usage.orgTitle) · 最近 30 天",
+      "orgLast30Days": "全部成员 · 最近 30 天",
       "outputTokens": "输出词元",
       "requests": "请求"
     },

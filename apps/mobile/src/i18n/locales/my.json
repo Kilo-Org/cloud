@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "အဝင်တိုကင်များ",
-      "orgLast30Days": "$t(usage.orgTitle) · နောက်ဆုံး ရက် 30",
+      "orgLast30Days": "အဖွဲ့ဝင်အားလုံး · နောက်ဆုံး ရက် 30",
       "outputTokens": "အထွက်တိုကင်များ",
       "requests": "တောင်းဆိုမှုများ"
     },

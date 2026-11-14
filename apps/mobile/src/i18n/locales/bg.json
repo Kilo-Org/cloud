@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "Входни токени",
-      "orgLast30Days": "$t(usage.orgTitle) · Последните 30 дни",
+      "orgLast30Days": "Всички членове · Последните 30 дни",
       "outputTokens": "Изходни токени",
       "requests": "Заявки"
     },

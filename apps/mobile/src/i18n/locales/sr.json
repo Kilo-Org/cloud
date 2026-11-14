@@ -3423,7 +3423,7 @@
     },
     "usageStats": {
       "inputTokens": "Ulazni tokeni",
-      "orgLast30Days": "$t(usage.orgTitle) · Poslednjih 30 dana",
+      "orgLast30Days": "Svi članovi · Poslednjih 30 dana",
       "outputTokens": "Izlazni tokeni",
       "requests": "Zahtevi"
     },

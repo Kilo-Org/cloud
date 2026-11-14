@@ -3375,7 +3375,7 @@
     },
     "usageStats": {
       "inputTokens": "입력 토큰",
-      "orgLast30Days": "$t(usage.orgTitle) · 최근 30일",
+      "orgLast30Days": "전체 멤버 · 최근 30일",
       "outputTokens": "출력 토큰",
       "requests": "요청"
     },

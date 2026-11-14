@@ -3375,7 +3375,7 @@
     },
     "usageStats": {
       "inputTokens": "Girdi tokenları",
-      "orgLast30Days": "$t(usage.orgTitle) · Son 30 gün",
+      "orgLast30Days": "Tüm üyeler · Son 30 gün",
       "outputTokens": "Çıktı tokenları",
       "requests": "İstekler"
     },

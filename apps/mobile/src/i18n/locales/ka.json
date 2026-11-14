@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "შემავალი ტოკენები",
-      "orgLast30Days": "$t(usage.orgTitle) · ბოლო 30 დღე",
+      "orgLast30Days": "ყველა წევრი · ბოლო 30 დღე",
       "outputTokens": "გამომავალი ტოკენები",
       "requests": "მოთხოვნები"
     },

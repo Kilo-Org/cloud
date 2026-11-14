@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "ଇନପୁଟ୍ ଟୋକନ୍",
-      "orgLast30Days": "$t(usage.orgTitle) · ଗତ 30 ଦିନ",
+      "orgLast30Days": "ସମସ୍ତ ସଦସ୍ୟ · ଗତ 30 ଦିନ",
       "outputTokens": "ଆଉଟପୁଟ୍ ଟୋକନ୍",
       "requests": "ଅନୁରୋଧ"
     },

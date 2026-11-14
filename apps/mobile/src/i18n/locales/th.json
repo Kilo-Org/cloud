@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "โทเคนขาเข้า",
-      "orgLast30Days": "$t(usage.orgTitle) · 30 วันที่ผ่านมา",
+      "orgLast30Days": "สมาชิกทั้งหมด · 30 วันที่ผ่านมา",
       "outputTokens": "โทเคนขาออก",
       "requests": "คำขอ"
     },

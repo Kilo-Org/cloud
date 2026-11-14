@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "ఇన్‌పుట్ టోకెన్లు",
-      "orgLast30Days": "$t(usage.orgTitle) · గత 30 రోజులు",
+      "orgLast30Days": "సభ్యులందరూ · గత 30 రోజులు",
       "outputTokens": "అవుట్‌పుట్ టోకెన్లు",
       "requests": "అభ్యర్థనలు"
     },

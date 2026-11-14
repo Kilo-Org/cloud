@@ -42,10 +42,10 @@ type OrgUsageStatsProps = {
 };
 
 /**
- * "Organization usage · last 30 days" eyebrow + 2x2 usage stat tile grid.
+ * "All members · last 30 days" eyebrow + 2x2 usage stat tile grid.
  * Visible to all org roles.
  *
- * The eyebrow names the organization because the tiles are organization-wide
+ * The eyebrow names every member because the tiles are organization-wide
  * totals, while the usage screen the grid opens is self-scoped for a member
  * without a money role (`usage.orgSelfNotice`).
  *

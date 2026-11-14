@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "តូខេនទិន្នន័យបញ្ចូល",
-      "orgLast30Days": "$t(usage.orgTitle) · 30 ថ្ងៃចុងក្រោយ",
+      "orgLast30Days": "សមាជិកទាំងអស់ · 30 ថ្ងៃចុងក្រោយ",
       "outputTokens": "តូខេនលទ្ធផល",
       "requests": "សំណើ"
     },

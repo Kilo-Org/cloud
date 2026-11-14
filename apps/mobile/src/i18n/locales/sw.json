@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokeni za ingizo",
-      "orgLast30Days": "$t(usage.orgTitle) · Siku 30 zilizopita",
+      "orgLast30Days": "Wanachama wote · Siku 30 zilizopita",
       "outputTokens": "Tokeni za matokeo",
       "requests": "Maombi"
     },

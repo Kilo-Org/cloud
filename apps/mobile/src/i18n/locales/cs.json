@@ -3476,7 +3476,7 @@
     },
     "usageStats": {
       "inputTokens": "Vstupní tokeny",
-      "orgLast30Days": "$t(usage.orgTitle) · Posledních 30 dní",
+      "orgLast30Days": "Všichni členové · Posledních 30 dní",
       "outputTokens": "Výstupní tokeny",
       "requests": "Požadavky"
     },

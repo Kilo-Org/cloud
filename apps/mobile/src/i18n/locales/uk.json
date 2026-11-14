@@ -3481,7 +3481,7 @@
     },
     "usageStats": {
       "inputTokens": "Вхідні токени",
-      "orgLast30Days": "$t(usage.orgTitle) · Останні 30 днів",
+      "orgLast30Days": "Усі учасники · Останні 30 днів",
       "outputTokens": "Вихідні токени",
       "requests": "Запити"
     },

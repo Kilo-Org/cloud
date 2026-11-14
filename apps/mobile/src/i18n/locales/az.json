@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "Giriş tokenləri",
-      "orgLast30Days": "$t(usage.orgTitle) · Son 30 gün",
+      "orgLast30Days": "Bütün üzvlər · Son 30 gün",
       "outputTokens": "Çıxış tokenləri",
       "requests": "Sorğular"
     },

@@ -3370,7 +3370,7 @@
     },
     "usageStats": {
       "inputTokens": "Inndatatokener",
-      "orgLast30Days": "$t(usage.orgTitle) · Siste 30 dager",
+      "orgLast30Days": "Alle medlemmer · Siste 30 dager",
       "outputTokens": "Utdatatokener",
       "requests": "Forespørsler"
     },

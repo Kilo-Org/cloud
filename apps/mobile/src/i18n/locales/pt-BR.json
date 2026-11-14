@@ -3434,7 +3434,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
-      "orgLast30Days": "$t(usage.orgTitle) · Últimos 30 dias",
+      "orgLast30Days": "Todos os membros · Últimos 30 dias",
       "outputTokens": "Tokens de saída",
       "requests": "Solicitações"
     },

@@ -3582,7 +3582,7 @@
     },
     "usageStats": {
       "inputTokens": "Tocynnau mewnbwn",
-      "orgLast30Days": "$t(usage.orgTitle) · Y 30 diwrnod diwethaf",
+      "orgLast30Days": "Holl aelodau · Y 30 diwrnod diwethaf",
       "outputTokens": "Tocynnau allbwn",
       "requests": "Ceisiadau"
     },

@@ -105,3 +105,30 @@ describe('SESSION_SYNC_URL', () => {
     await expect(syncUrl()).rejects.toThrow('Invalid scheme');
   });
 });
+
+describe('production host contract', () => {
+  function loadConfig(): Promise<unknown> {
+    vi.resetModules();
+    return vi.importActual('@/lib/config');
+  }
+
+  it('rejects a non-allowlisted host in a production build', async () => {
+    state.extra = {
+      ...REQUIRED_EXTRA,
+      apiBaseUrl: 'https://evil.example.com',
+      isProductionBuild: true,
+    };
+
+    await expect(loadConfig()).rejects.toThrow(/outside the allowlist/);
+  });
+
+  it('loads a non-production build with the same host', async () => {
+    state.extra = {
+      ...REQUIRED_EXTRA,
+      apiBaseUrl: 'https://evil.example.com',
+      isProductionBuild: false,
+    };
+
+    await expect(loadConfig()).resolves.toBeDefined();
+  });
+});

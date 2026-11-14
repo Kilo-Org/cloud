@@ -1,7 +1,8 @@
 /* eslint-disable max-lines -- one cohesive suite: batching, hydration, expiry, persistence and the generation-staleness cases share one mocked store and client */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type ToolSummaryTranslationScope } from './tool-summary-translation-client';
+import { BATCH_WINDOW_MS } from './tool-summary-translation-runtime';
 import type * as runtimeModule from './tool-summary-translation-runtime';
 
 const { requestMock, readMock, writeMock } = vi.hoisted(() => ({
@@ -84,11 +85,10 @@ function pendingBatches(): ((results: (string | null)[]) => void)[] {
   return resolvers;
 }
 
-/** Longer than the 40 ms batch window plus the lazy client import. */
+/** Advances the runtime's batch window and settles the lazy client import. */
 async function flushBatch(): Promise<void> {
-  await new Promise<void>(resolve => {
-    setTimeout(resolve, 150);
-  });
+  await vi.advanceTimersByTimeAsync(BATCH_WINDOW_MS);
+  await vi.advanceTimersByTimeAsync(0);
 }
 
 /** Wait until every item of the batch is cached under its own id. */
@@ -108,11 +108,16 @@ function waitForTranslations(
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
   requestMock.mockReset();
   readMock.mockReset();
   writeMock.mockReset();
   readMock.mockResolvedValue([]);
   writeMock.mockResolvedValue(undefined);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('tool summary translation runtime', () => {
@@ -623,17 +628,12 @@ describe('tool summary translation hydration', () => {
     );
     const mod = await loadRuntime();
     echoBatch();
-    vi.useFakeTimers();
-    try {
-      mod.ensureTranslation({ itemId: 'part-1', text: 'Hello', language: 'de', model: MODEL });
-      await vi.advanceTimersByTimeAsync(10_000);
-      await vi.advanceTimersByTimeAsync(0);
+    mod.ensureTranslation({ itemId: 'part-1', text: 'Hello', language: 'de', model: MODEL });
+    await vi.advanceTimersByTimeAsync(10_000);
+    await vi.advanceTimersByTimeAsync(0);
 
-      expect(requestMock).toHaveBeenCalledTimes(1);
-      expect(requestCalls()[0]?.texts).toEqual(['Hello']);
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    expect(requestCalls()[0]?.texts).toEqual(['Hello']);
   });
 
   it('still translates when the store read fails', async () => {

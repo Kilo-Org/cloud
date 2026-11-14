@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only guard, runs in node, never bundled into the app
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { type ExpoConfig } from 'expo/config';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   assertProductionHost,
@@ -202,44 +203,83 @@ describe('committed production URL defaults (host contract)', () => {
   });
 });
 
-// Text-contract guard over app.config.ts. The URL-contract loop must skip
-// absent values (warn-under-CI path), and the production path must keep its
-// fatal-by-intent throw and Sentry source-map gate.
-const configPath = fileURLToPath(new URL('../../app.config.ts', import.meta.url));
-const configSource = readFileSync(configPath, 'utf8');
-const configTsPath = fileURLToPath(new URL('config.ts', import.meta.url));
-const configTsSource = readFileSync(configTsPath, 'utf8');
+const REQUIRED_ENV: Record<string, string | undefined> = Object.fromEntries(
+  Object.values(ENV_KEYS).map(name => [name, committedEnv[name]])
+);
 
-// Removes `//` line comments and `/* */` block comments while preserving line
-// breaks, so a comment mentioning a gate cannot satisfy the assertion.
-function stripComments(source: string): string {
-  return source
-    .replaceAll(/\/\*[\s\S]*?\*\//g, match => match.replaceAll(/[^\n]/g, ''))
-    .replaceAll(/\/\/[^\n]*/g, '');
+const BASE_ENV: Record<string, string | undefined> = {
+  ...REQUIRED_ENV,
+  EAS_BUILD_PROFILE: undefined,
+  SENTRY_AUTH_TOKEN: undefined,
+  GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER: undefined,
+  GITHUB_ACTIONS: undefined,
+};
+
+function stubBuildEnv(overrides: Record<string, string | undefined>): void {
+  for (const [name, value] of Object.entries({ ...BASE_ENV, ...overrides })) {
+    vi.stubEnv(name, value);
+  }
 }
 
-const configCodeSource = stripComments(configSource);
-const configTsCodeSource = stripComments(configTsSource);
+function productionEnv(overrides: Record<string, string | undefined>) {
+  return {
+    EAS_BUILD_PROFILE: 'production',
+    SENTRY_AUTH_TOKEN: 'sentry-auth-token',
+    [OPTIONAL_ENV_KEYS.playIntegrityProjectNumber]: '123456789012',
+    ...overrides,
+  };
+}
 
-describe('app.config.ts config boundary (text contract)', () => {
-  it('skips absent URL values instead of asserting them', () => {
-    expect(configCodeSource).toMatch(/if \(!value\)\s*continue/);
+// A static import would evaluate the config once, before any case stubs its
+// env; each case needs a fresh evaluation after `vi.resetModules()`.
+async function importAppConfig(): Promise<ExpoConfig> {
+  vi.resetModules();
+  const appConfigModule = await import('../../app.config');
+  return appConfigModule.default;
+}
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+describe('app.config.ts build gates', () => {
+  it('fails a production build that is missing a required URL', async () => {
+    stubBuildEnv(productionEnv({ [ENV_KEYS.apiBaseUrl]: undefined }));
+
+    await expect(importAppConfig()).rejects.toThrow(/Missing required environment variables/);
   });
 
-  it('keeps the fatal-by-intent production gate', () => {
-    expect(configCodeSource).toMatch(/EAS_BUILD_PROFILE === 'production'/);
+  it('fails a production build with no Sentry auth token', async () => {
+    stubBuildEnv(productionEnv({ SENTRY_AUTH_TOKEN: undefined }));
+
+    await expect(importAppConfig()).rejects.toThrow(/SENTRY_AUTH_TOKEN/);
   });
 
-  it('keeps the Sentry source-map upload gate', () => {
-    expect(configCodeSource).toMatch(/SENTRY_AUTH_TOKEN/);
+  it('builds a production config from the committed production hosts', async () => {
+    stubBuildEnv(productionEnv({}));
+
+    const config = await importAppConfig();
+
+    expect(config.extra?.isProductionBuild).toBe(true);
   });
 
-  it('bakes isProductionBuild into the extra block', () => {
-    expect(configCodeSource).toMatch(/extra:\s*\{[\s\S]*?isProductionBuild,/);
+  it('fails a production build whose URL host is outside the allowlist', async () => {
+    stubBuildEnv(productionEnv({ [ENV_KEYS.apiBaseUrl]: 'https://evil.example.com' }));
+
+    await expect(importAppConfig()).rejects.toThrow(/outside the allowlist/);
   });
 
-  it('gates the runtime production host check on the baked flag', () => {
-    expect(configTsCodeSource).toContain('extra?.isProductionBuild === true');
+  it('builds a non-production config that skips a missing URL under CI', async () => {
+    vi.spyOn(console, 'warn').mockReturnValue(undefined);
+    stubBuildEnv({ GITHUB_ACTIONS: 'true', [ENV_KEYS.notificationsUrl]: undefined });
+
+    const config = await importAppConfig();
+
+    expect(config.extra?.isProductionBuild).toBe(false);
+    expect(config.extra?.notificationsUrl).toBeUndefined();
+    expect(config.extra?.apiBaseUrl).toBe(committedEnv[ENV_KEYS.apiBaseUrl]);
   });
 });
 

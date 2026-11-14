@@ -90,7 +90,13 @@ export function DataExportScreen() {
         );
       },
       onError: error => {
-        setRequestCodeError(codeFailureMessage(error, t('profile.dataExport.codeRequired')));
+        // This failure is the request that *sends* a code, so the entry-field
+        // copy ("Enter the code from the email.") would describe a field that is
+        // not on screen yet. A structured rejection has no reader-facing text,
+        // so it falls back to the generic retry line.
+        setRequestCodeError(
+          codeFailureMessage(error, t('queryError.neutralDescription'))
+        );
       },
     })
   );

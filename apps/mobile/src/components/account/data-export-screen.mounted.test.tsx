@@ -1,7 +1,7 @@
 import { createElement, type ElementType } from 'react';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -222,6 +222,24 @@ describe('DataExportScreen', () => {
     // screen: the old copy could only paint inside the open challenge.
     expect(texts(root)).toContain('Too many codes requested.');
     expect(root.findAll(node => Object.is(node.type, 'FormField'))).toHaveLength(0);
+  });
+
+  it('uses the generic retry line when the code request fails without a readable reason', async () => {
+    state.exports = readyExport();
+    const root = await mount();
+
+    act(() => {
+      (root.findByType(ExportRow).props.onRequestCode as () => void)();
+    });
+    act(() => {
+      (state.mutations.requestCode as { onError: (error: unknown) => void }).onError({
+        data: { code: 'BAD_REQUEST' },
+      });
+    });
+
+    // The entry-field copy would name a field that is not on screen yet.
+    expect(texts(root)).toContain(i18n.t('queryError.neutralDescription'));
+    expect(texts(root)).not.toContain(i18n.t('profile.dataExport.codeRequired'));
   });
 
   it('surfaces the server reason for a failed export', async () => {

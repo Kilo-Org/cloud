@@ -26,6 +26,8 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { tagOpenAiChatGptByokModels } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import { tagClaudeBillingByokModels } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/byok-models';
+import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import {
   openAiChatGptSharedServicesOwner,
   type OpenAiChatGptOwner,
@@ -54,6 +56,19 @@ function chatGptByokOwner(
 ): OpenAiChatGptOwner | null {
   if (audience === 'shared_services') return openAiChatGptSharedServicesOwner(organizationId);
   if (subject.type === 'member') return { kiloUserId: subject.kiloUserId, organizationId };
+  return null;
+}
+
+/** The Claude billing link whose models the list marks BYOK-available, scoped like the ChatGPT one. */
+function claudeBillingByokOwner(
+  organizationId: string,
+  subject: OrganizationPolicySubject,
+  audience: OrganizationModelAudience
+): ClaudeBillingOwner | null {
+  if (audience === 'shared_services') return { kind: 'shared_services', organizationId };
+  if (subject.type === 'member') {
+    return { kind: 'member', kiloUserId: subject.kiloUserId, organizationId };
+  }
   return null;
 }
 
@@ -112,6 +127,10 @@ export async function getAvailableModelsForOrganization(
   const chatGptOwner = chatGptByokOwner(organizationId, subject, audience);
   if (chatGptOwner) {
     availableModels = await tagOpenAiChatGptByokModels(chatGptOwner, availableModels);
+  }
+  const claudeOwner = claudeBillingByokOwner(organizationId, subject, audience);
+  if (claudeOwner) {
+    availableModels = await tagClaudeBillingByokModels(claudeOwner, availableModels);
   }
 
   const snapshot = await getEnkryptBenchmarks({ fromDb });

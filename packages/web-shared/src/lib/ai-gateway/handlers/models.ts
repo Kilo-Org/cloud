@@ -15,6 +15,7 @@ import {
   getUserByokProviderIds,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { tagOpenAiChatGptByokModels } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import { tagClaudeBillingByokModels } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/byok-models';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   addAutoRoutingModels,
@@ -108,11 +109,14 @@ export async function handleModelsRequest(
         getDirectByokCatalogModelIds({ type: 'user', id: auth.user.id }),
         usableCustomRouters({ userId: auth.user.id, organizationId: null }),
       ]);
-    const modelsWithByokAvailability = await tagOpenAiChatGptByokModels(
-      { kiloUserId: auth.user.id, organizationId: null },
-      addDirectByokCatalogAvailability(
-        await addUserByokAvailability(models, enabledByokProviderIds),
-        directByokCatalogModelIds
+    const modelsWithByokAvailability = await tagClaudeBillingByokModels(
+      { kind: 'personal', kiloUserId: auth.user.id },
+      await tagOpenAiChatGptByokModels(
+        { kiloUserId: auth.user.id, organizationId: null },
+        addDirectByokCatalogAvailability(
+          await addUserByokAvailability(models, enabledByokProviderIds),
+          directByokCatalogModelIds
+        )
       )
     );
     return await modelResponse({

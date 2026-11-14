@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/require-await, require-await, promise-function-async, promise/prefer-await-to-then -- a download is a pending promise the test settles by hand */
+/* eslint-disable typescript-eslint/require-await, require-await, promise-function-async, promise/prefer-await-to-then, max-lines -- a download is a pending promise the test settles by hand, and the store's whole state machine is one suite */
 import { describe, expect, it } from 'vitest';
 
 import { CATALOG, finish, flush, harness, taskAt } from './gguf-downloads.test-helpers';

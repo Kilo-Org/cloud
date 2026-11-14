@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted suite pins the watchdog, supersession and return-edge contract */
 // The picker's Manage access control is the only way to widen what the
 // repository list may show, so a tap that produces nothing is the whole defect:
 // it has to draw a busy state while the install state is minted, never start a

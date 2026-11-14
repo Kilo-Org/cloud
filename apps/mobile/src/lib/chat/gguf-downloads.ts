@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the transfer state machine and its store share one closure over `active` */
 import {
   type GgufDownloadProblem,
   type GgufDownloadSource,

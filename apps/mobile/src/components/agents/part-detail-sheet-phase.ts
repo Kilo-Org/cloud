@@ -26,7 +26,7 @@ export function reducePartDetailPhase(
   event: PartDetailEvent
 ): PartDetailPhase {
   switch (event.type) {
-    case 'request':
+    case 'request': {
       if (phase.kind === 'dismissing') {
         return { ...phase, nextPartId: event.partId };
       }
@@ -34,19 +34,26 @@ export function reducePartDetailPhase(
         return { kind: 'deferred', partId: event.partId };
       }
       return { kind: 'presented', partId: event.partId };
-    case 'keyboard-hidden':
+    }
+    case 'keyboard-hidden': {
       return phase.kind === 'deferred' ? { kind: 'presented', partId: phase.partId } : phase;
-    case 'close':
+    }
+    case 'close': {
       return phase.kind === 'presented'
         ? { kind: 'dismissing', partId: phase.partId, nextPartId: null }
         : phase;
-    case 'dismissal-settled':
+    }
+    case 'dismissal-settled': {
       if (phase.kind !== 'dismissing' || phase.partId !== event.partId) {
         return phase;
       }
       return phase.nextPartId === null
         ? { kind: 'closed' }
         : { kind: 'presented', partId: phase.nextPartId };
+    }
+    default: {
+      return phase;
+    }
   }
 }
 

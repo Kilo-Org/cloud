@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one sink: the epoch fences, the pending start and the post must be read together */
 import {
   GLANCEABLE_TERMINAL_MS,
   type GlanceableAgentsSnapshot,

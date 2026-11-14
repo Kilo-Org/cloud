@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the plan, its apply, and the posted marker stay one module (the suite reads them together) */
 /**
  * App-owned needs-input notifications.
  *

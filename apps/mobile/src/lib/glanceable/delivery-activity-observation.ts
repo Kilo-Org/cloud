@@ -17,7 +17,7 @@ import { GLANCEABLE_ACTIVITY_TOKEN_KIND, type Registration } from './delivery-re
  * listener that feeds it. All three are created together or not at all, so a card
  * is either observed or unobserved — never recorded without its listener.
  */
-export type ActivityBinding = {
+type ActivityBinding = {
   readonly registration: Registration;
   readonly instance: GlanceableActivity;
   readonly subscription: EventSubscription;
@@ -56,7 +56,7 @@ async function syncActivityToken(
   }
   const token = await instance.getPushToken();
   // A token event is newer than the initial asynchronous read.
-  if (token !== null && registration.token === null) {
+  if (token !== null && binding.registration.token === null) {
     await registerToken(registration, token);
   }
 }
@@ -77,11 +77,11 @@ export async function observeActivity(params: {
   const { observation, target, instance, onSuperseded, registerToken } = params;
   try {
     const existing = observation.binding;
-    if (existing !== null && existing.instance === instance) {
+    if (existing?.instance === instance) {
       await syncActivityToken(existing, registerToken);
       return;
     }
-    if (existing !== null) {
+    if (existing != null) {
       onSuperseded();
       detachActivity(observation);
     }

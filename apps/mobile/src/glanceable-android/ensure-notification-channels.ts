@@ -15,5 +15,5 @@ let notificationsModule: Promise<typeof NotificationsModule> | null = null;
 export async function ensureAndroidNotificationChannels(): Promise<boolean> {
   notificationsModule ??= import('@/lib/notifications');
   const { ensureAndroidNotificationChannels: ensureChannels } = await notificationsModule;
-  return await ensureChannels();
+  return ensureChannels();
 }

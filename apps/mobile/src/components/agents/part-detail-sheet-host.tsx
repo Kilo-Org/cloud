@@ -7,11 +7,11 @@ import { OpenPartDetailContext } from './open-part-detail-context';
 import { findPartById } from './part-detail-model';
 import { PartDetailSheet } from './part-detail-sheet';
 import {
+  type PartDetailEvent,
+  type PartDetailPhase,
   isSheetVisible,
   presentedPartId,
   reducePartDetailPhase,
-  type PartDetailEvent,
-  type PartDetailPhase,
 } from './part-detail-sheet-phase';
 
 const KEYBOARD_DISMISS_FALLBACK_MS = 1000;

@@ -7,14 +7,20 @@ import { type GlanceableActivity } from './sink-registry';
 function createActivity(options: { tokens?: (string | null)[]; listenFails?: boolean }) {
   const listeners = new Set<(event: { activityId: string; pushToken: string }) => void>();
   const tokens = [...(options.tokens ?? [null])];
-  const reads = vi.fn(async () => tokens.shift() ?? null);
-  const addPushTokenListener = vi.fn((listener: (event: { activityId: string; pushToken: string }) => void) => {
-    if (options.listenFails === true) {
-      throw new Error('push-token listener unsupported');
+  const reads = vi.fn(() => Promise.resolve(tokens.shift() ?? null));
+  const addPushTokenListener = vi.fn(
+    (listener: (event: { activityId: string; pushToken: string }) => void) => {
+      if (options.listenFails === true) {
+        throw new Error('push-token listener unsupported');
+      }
+      listeners.add(listener);
+      return {
+        remove: () => {
+          listeners.delete(listener);
+        },
+      };
     }
-    listeners.add(listener);
-    return { remove: () => listeners.delete(listener) };
-  });
+  );
   const instance: GlanceableActivity = { getPushToken: reads, addPushTokenListener };
   return { instance, reads, addPushTokenListener, listeners };
 }
@@ -37,8 +43,9 @@ describe('observeActivity', () => {
     const observation = emptyActivityObservation(new Set<string>());
     const target = createTarget();
     const registered: string[] = [];
-    const registerToken = async (_registration: Registration, token: string) => {
+    const registerToken = (_registration: Registration, token: string): Promise<void> => {
       registered.push(token);
+      return Promise.resolve();
     };
     const failing = createActivity({ tokens: ['first-token'], listenFails: true });
 
@@ -46,7 +53,7 @@ describe('observeActivity', () => {
       observation,
       target,
       instance: failing.instance,
-      onSuperseded: vi.fn(),
+      onSuperseded: () => undefined,
       registerToken,
     });
 
@@ -58,7 +65,7 @@ describe('observeActivity', () => {
       observation,
       target,
       instance: healthy.instance,
-      onSuperseded: vi.fn(),
+      onSuperseded: () => undefined,
       registerToken,
     });
 
@@ -77,16 +84,20 @@ describe('observeActivity', () => {
     let reads = 0;
     const listeners = new Set<(event: { activityId: string; pushToken: string }) => void>();
     const instance: GlanceableActivity = {
-      getPushToken: async () => {
+      getPushToken: () => {
         reads += 1;
         if (reads === 1) {
-          throw new Error('native token read failed');
+          return Promise.reject(new Error('native token read failed'));
         }
-        return 'late-token';
+        return Promise.resolve('late-token');
       },
-      addPushTokenListener: (listener) => {
+      addPushTokenListener: listener => {
         listeners.add(listener);
-        return { remove: () => listeners.delete(listener) };
+        return {
+          remove: () => {
+            listeners.delete(listener);
+          },
+        };
       },
     };
 
@@ -94,7 +105,7 @@ describe('observeActivity', () => {
       observation,
       target,
       instance,
-      onSuperseded: vi.fn(),
+      onSuperseded: () => undefined,
       registerToken,
     });
     expect(registered).toEqual([]);
@@ -103,7 +114,7 @@ describe('observeActivity', () => {
       observation,
       target,
       instance,
-      onSuperseded: vi.fn(),
+      onSuperseded: () => undefined,
       registerToken,
     });
 

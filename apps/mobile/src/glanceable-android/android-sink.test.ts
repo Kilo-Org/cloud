@@ -578,7 +578,7 @@ describe('androidSink start and update', () => {
     expect(delivery.registerTokens).not.toHaveBeenCalled();
 
     mocks.ensureAndroidNotificationChannels.mockResolvedValue(true);
-    handleAppStateActive();
+    void handleAppStateActive();
     await flushAsync();
 
     expect(mocks.native.start).toHaveBeenCalledTimes(1);
@@ -601,7 +601,7 @@ describe('androidSink start and update', () => {
     expect(delivery.registerTokens).not.toHaveBeenCalled();
 
     // The cleared start stays cleared: a later foreground posts nothing.
-    handleAppStateActive();
+    void handleAppStateActive();
     await flushAsync();
     expect(mocks.native.start).not.toHaveBeenCalled();
   });

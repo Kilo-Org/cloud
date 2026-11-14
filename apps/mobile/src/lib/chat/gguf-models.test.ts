@@ -29,58 +29,53 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('expo', () => ({
-  requireNativeModule: () => ({ sha256File: async () => 'a'.repeat(64) }),
+  requireNativeModule: () => ({ sha256File: () => Promise.resolve('a'.repeat(64)) }),
 }));
 
 vi.mock('expo-crypto', () => ({
   CryptoDigestAlgorithm: { SHA256: 'SHA256' },
-  digestStringAsync: async () => 'digest',
+  digestStringAsync: () => Promise.resolve('digest'),
 }));
 
 vi.mock('llama.rn', () => ({ initLlama: vi.fn() }));
 
 // The document directory the store writes into, in memory. `models.json` exists so
 // the index read is attempted, and it throws until the retry the picker offers.
+// `new File(...)` returns the object, so a factory function stands in for the class.
 vi.mock('expo-file-system', () => {
-  class MockDirectory {
-    exists = true;
-    create(): void {
-      this.exists = true;
-    }
-    list(): { name: string }[] {
-      return [...fsMock.files.keys()].map(name => ({ name }));
-    }
+  function MockDirectory() {
+    return {
+      exists: true,
+      create: () => undefined,
+      list: () => [...fsMock.files.keys()].map(name => ({ name })),
+    };
   }
-  class MockFile {
-    private readonly name: string;
-    constructor(_directory: MockDirectory, name: string) {
-      this.name = name;
-    }
-    get exists(): boolean {
-      return fsMock.files.has(this.name);
-    }
-    get size(): number {
-      return fsMock.files.get(this.name) ?? 0;
-    }
-    get uri(): string {
-      return `/documents/gguf-models/${this.name}`;
-    }
-    delete(): void {
-      fsMock.files.delete(this.name);
-    }
-    moveSync(): void {
+  function MockFile(_directory: unknown, name: string) {
+    return {
+      get exists() {
+        return fsMock.files.has(name);
+      },
+      get size() {
+        return fsMock.files.get(name) ?? 0;
+      },
+      get uri() {
+        return `/documents/gguf-models/${name}`;
+      },
+      delete: () => {
+        fsMock.files.delete(name);
+      },
       // The store only moves a finished transfer onto the model's file.
-    }
-    textSync(): string {
-      fsMock.readIndexAttempts += 1;
-      if (fsMock.readIndexFails) {
-        throw new Error('storage unavailable');
-      }
-      return fsMock.indexText;
-    }
-    writeSync(): void {
+      moveSync: () => undefined,
+      textSync: () => {
+        fsMock.readIndexAttempts += 1;
+        if (fsMock.readIndexFails) {
+          throw new Error('storage unavailable');
+        }
+        return fsMock.indexText;
+      },
       // The parsed list is written back; the test asserts the model, not the file.
-    }
+      writeSync: () => undefined,
+    };
   }
   return {
     Directory: MockDirectory,

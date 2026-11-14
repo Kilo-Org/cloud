@@ -30,12 +30,14 @@ describe('BYOC Vercel credential routes without a configured credential', () => 
   it('treats an unset dedicated credential as refusing every request', async () => {
     expect(BYOC_INTERNAL_API_SECRET).toBe('');
 
-    for (const headers of [
+    const presentations: Record<string, string>[] = [
       {},
       { 'x-internal-api-key': '' },
       { 'x-internal-api-key': INTERNAL_API_SECRET },
       { 'x-internal-api-key': 'any-other-value' },
-    ]) {
+    ];
+
+    for (const headers of presentations) {
       const credential = await getCredential(
         credentialRequest(`${credentialId}?userId=${userId}`, headers),
         credentialParams

@@ -164,7 +164,7 @@ describe('BYOC Vercel credential route', () => {
   it('refuses requests that do not present the dedicated BYOC credential', async () => {
     const { user, row } = await personalCredential();
     const query = new URLSearchParams({ userId: user.id });
-    const rejected = [
+    const rejected: { label: string; headers: Record<string, string> }[] = [
       { label: 'no header', headers: {} },
       { label: 'a wrong value', headers: { 'x-internal-api-key': 'wrong-secret' } },
       {

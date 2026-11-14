@@ -310,7 +310,7 @@ export async function releaseAndroidSessionToken(sessionId: string): Promise<voi
     const tokens = [...new Set([known, ...recorded].filter(isToken))];
     // Only a process that has no identity for this session falls back to the
     // token it reads now; a recorded token names the row that exists.
-    const candidates = tokens.length > 0 ? tokens : [(await readNow)].filter(isToken);
+    const candidates = tokens.length > 0 ? tokens : [await readNow].filter(isToken);
     if (candidates.length > 0) {
       const remaining = await deleteSessionRow(sessionId, candidates, generation);
       if (remaining.length === 0) {

@@ -13,7 +13,7 @@ import 'server-only';
 import { createTRPCClient, httpLink, TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
 import { getHTTPStatusCodeFromError } from '@trpc/server/http';
-import { TRPC_ERROR_CODES_BY_KEY, type TRPC_ERROR_CODE_KEY } from '@trpc/server/rpc';
+import { type TRPC_ERROR_CODE_KEY } from '@trpc/server/rpc';
 import * as z from 'zod';
 import type { AgentConfig } from '@kilocode/db/schema-types';
 import type { GateThreshold } from '@kilocode/app-shared/code-review';
@@ -71,6 +71,8 @@ import {
 import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
 import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
 import { approvalKeySchema } from '@kilocode/app-shared/approval-key';
+import { readCloudAgentErrorFields } from '@kilocode/app-shared/cloud-agent-error';
+import { isTRPCErrorCode } from './cloud-agent-error';
 export type { SendMessagePayload } from './types.js';
 
 const CLOUD_AGENT_NEXT_API_URL = getEnvVariable('CLOUD_AGENT_NEXT_API_URL') || '';
@@ -589,8 +591,23 @@ export class CloudAgentBillingError extends Error {
   }
 }
 
-function isTRPCErrorCode(code: unknown): code is TRPC_ERROR_CODE_KEY {
-  return typeof code === 'string' && Object.hasOwn(TRPC_ERROR_CODES_BY_KEY, code);
+/**
+ * The worker answers these six codes, and a 404, to a delete the caller may
+ * report itself instead of swallowing.
+ */
+const DELETE_SESSION_VISIBLE_CODES = new Set<TRPC_ERROR_CODE_KEY>([
+  'NOT_FOUND',
+  'CONFLICT',
+  'FORBIDDEN',
+  'UNAUTHORIZED',
+  'PRECONDITION_FAILED',
+  'BAD_REQUEST',
+]);
+
+function isDeleteSessionFailureVisible(error: unknown): boolean {
+  const { code, httpStatus } = readCloudAgentErrorFields(error);
+  if (httpStatus === 404) return true;
+  return code !== undefined && isTRPCErrorCode(code) && DELETE_SESSION_VISIBLE_CODES.has(code);
 }
 
 /**
@@ -618,8 +635,8 @@ export function rethrowCloudAgentError(error: unknown): never {
     });
   }
   if (error instanceof TRPCClientError) {
-    const code: unknown = error.data?.code ?? error.shape?.data?.code;
-    if (isTRPCErrorCode(code)) {
+    const { code } = readCloudAgentErrorFields(error);
+    if (code !== undefined && isTRPCErrorCode(code)) {
       const workerError = new TRPCError({ code, message: error.message, cause: error });
       if (getHTTPStatusCodeFromError(workerError) < 500) {
         throw workerError;
@@ -635,7 +652,7 @@ export function rethrowCloudAgentError(error: unknown): never {
 function isInsufficientCreditsError(err: unknown): boolean {
   if (parseCustomerBillingFailure(err)) return false;
   if (err instanceof TRPCClientError) {
-    const httpStatus = err.data?.httpStatus || err.shape?.data?.httpStatus;
+    const { httpStatus } = readCloudAgentErrorFields(err);
     if (httpStatus === 402) {
       return true;
     }
@@ -654,9 +671,7 @@ function preserveBillingFailure(error: unknown): void {
   const billingFailure = parseCustomerBillingFailure(error);
   if (!billingFailure) return;
   const status =
-    error instanceof TRPCClientError
-      ? (error.data?.httpStatus ?? error.shape?.data?.httpStatus)
-      : undefined;
+    error instanceof TRPCClientError ? readCloudAgentErrorFields(error).httpStatus : undefined;
   throw new CloudAgentBillingError(
     billingFailure,
     status === 402 || status === 409 || status === 503 ? status : 503
@@ -886,23 +901,9 @@ export class CloudAgentNextClient {
       const result = await this.client.deleteSession.mutate({ sessionId });
       return { success: result.success };
     } catch (error) {
-      if (
-        error instanceof TRPCClientError &&
-        (error.data?.code === 'NOT_FOUND' ||
-          error.shape?.data?.code === 'NOT_FOUND' ||
-          error.data?.code === 'CONFLICT' ||
-          error.shape?.data?.code === 'CONFLICT' ||
-          error.data?.code === 'FORBIDDEN' ||
-          error.shape?.data?.code === 'FORBIDDEN' ||
-          error.data?.code === 'UNAUTHORIZED' ||
-          error.shape?.data?.code === 'UNAUTHORIZED' ||
-          error.data?.code === 'PRECONDITION_FAILED' ||
-          error.shape?.data?.code === 'PRECONDITION_FAILED' ||
-          error.data?.code === 'BAD_REQUEST' ||
-          error.shape?.data?.code === 'BAD_REQUEST' ||
-          error.data?.httpStatus === 404 ||
-          error.shape?.data?.httpStatus === 404)
-      ) {
+      // The calling surfaces show these failures to the user; anything else is
+      // logged and reported as a non-destructive `success: false`.
+      if (error instanceof TRPCClientError && isDeleteSessionFailureVisible(error)) {
         throw error;
       }
 

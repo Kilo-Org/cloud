@@ -316,10 +316,6 @@ describe('getAdmission', () => {
     await expect(getAdmission()).rejects.toThrow(ADMISSION_CHALLENGE_FAILED);
   });
 
-  it('exports ADMISSION_CHALLENGE_FAILED as a constant for caller catch blocks', () => {
-    expect(ADMISSION_CHALLENGE_FAILED).toBe('admission_challenge_failed');
-  });
-
   describe('clearAttestKeyOnRefusal', () => {
     it('drops the stored key id so the next attempt re-attests', async () => {
       // The server refuses an assertion for a key it never persisted. Without

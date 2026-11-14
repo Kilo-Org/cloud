@@ -1887,8 +1887,10 @@ describe('bootstrap and foreground race fencing', () => {
     // Hold the terminal clear open so the epoch can move inside it: this is the
     // window where the refresh still returns refused for the session that
     // owned it.
+    const clearStarted = Promise.withResolvers<undefined>();
     const { promise: clearGate, resolve: releaseClear } = Promise.withResolvers<undefined>();
     hoisted.secureStore.deleteItemAsync.mockImplementationOnce(async () => {
+      clearStarted.resolve(undefined);
       await clearGate;
     });
 
@@ -1900,16 +1902,9 @@ describe('bootstrap and foreground race fencing', () => {
     // Wait until the clear is in flight, then move the epoch: a newer session
     // now owns the tree while the old refresh is still inside its clear.
     const authEpoch = await import('@/lib/auth/auth-epoch');
-    let flushes = 0;
-    while (hoisted.secureStore.deleteItemAsync.mock.calls.length === 0 && flushes < 50) {
-      flushes += 1;
-      // eslint-disable-next-line no-await-in-loop -- sequential flush until the clear is in flight
-      await act(async () => {
-        await new Promise<void>(resolve => {
-          void setTimeout(resolve, 0);
-        });
-      });
-    }
+    await act(async () => {
+      await clearStarted.promise;
+    });
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalled();
     expect(fetchSpy).toHaveBeenCalled();
 

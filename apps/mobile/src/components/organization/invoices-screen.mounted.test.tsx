@@ -42,10 +42,13 @@ const queryErrors = vi.hoisted(() => ({
 const connectivity = vi.hoisted(() => ({ value: 'online' as 'online' | 'offline' | 'unknown' }));
 
 // The organization the boundary resolves to, and whether its membership read is
-// still running. The header contract is driven through both.
+// still running. The header contract is driven through both, and through a
+// settled state where the selection resolves to nothing.
 const boundaryState = vi.hoisted(() => ({
   isResolving: false,
   organizationName: 'Acme Corp',
+  organizationId: 'org-1' as string | null,
+  hasOrg: true,
 }));
 
 // Props each header boundary was rendered with: the boundary's own header and
@@ -75,13 +78,15 @@ const buttons = vi.hoisted(() => ({
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: () => ({
-    organizationId: 'org-1',
+    organizationId: boundaryState.organizationId,
     role: 'owner',
-    org: {
-      organizationId: 'org-1',
-      role: 'owner',
-      organizationName: boundaryState.organizationName,
-    },
+    org: boundaryState.hasOrg
+      ? {
+          organizationId: 'org-1',
+          role: 'owner',
+          organizationName: boundaryState.organizationName,
+        }
+      : undefined,
     isResolving: boundaryState.isResolving,
   }),
   useOrgInvoicesPage: () => ({
@@ -250,6 +255,8 @@ beforeEach(() => {
   buttons.rendered = [];
   boundaryState.isResolving = false;
   boundaryState.organizationName = 'Acme Corp';
+  boundaryState.organizationId = 'org-1';
+  boundaryState.hasOrg = true;
   boundaryProps.rendered = [];
   screenHeaders.rendered = [];
 });
@@ -499,5 +506,21 @@ describe('OrganizationInvoicesScreen header', () => {
     expect(boundaryProps.rendered).toHaveLength(1);
     expect(boundaryProps.rendered[0]?.title).toBe(i18n.t('organization.invoices.title'));
     expect(boundaryProps.rendered[0]?.reserveEyebrow).toBe(true);
+  });
+
+  it('does not reserve the eyebrow line on a settled boundary state that never fills it', async () => {
+    boundaryState.isResolving = false;
+    boundaryState.organizationId = null;
+    boundaryState.hasOrg = false;
+
+    await renderScreen();
+
+    // The boundary owns the header here too, but no resolved header will ever
+    // paint an eyebrow into the reserved line, so the state keeps its own
+    // height instead of being permanently one line taller.
+    expect(screenHeaders.rendered).toHaveLength(0);
+    expect(boundaryProps.rendered).toHaveLength(1);
+    expect(boundaryProps.rendered[0]?.title).toBe(i18n.t('organization.invoices.title'));
+    expect(boundaryProps.rendered[0]?.reserveEyebrow).not.toBe(true);
   });
 });

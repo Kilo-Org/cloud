@@ -98,15 +98,26 @@ const mockFetchGitHubRepositories = jest.fn<() => Promise<PlatformRepository[]>>
 let connectionManagementEnabled = false;
 let selectResults: unknown[][] = [];
 
+// A select terminates either at `.where()` or at a following `.limit()`. The
+// returned value is thenable and also answers `.limit()`, so one fixture queue
+// serves both forms.
+const mockSelectQuery = () => {
+  const rows = selectResults.shift() ?? [];
+  return {
+    limit: async (_count: number) => rows,
+    then: (resolve: (value: unknown[]) => unknown) => Promise.resolve(rows).then(resolve),
+  };
+};
+
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: () => ({
-      from: () => ({ where: async () => selectResults.shift() ?? [] }),
+      from: () => ({ where: mockSelectQuery }),
     }),
     transaction: async (callback: (tx: unknown) => Promise<unknown>) =>
       callback({
         select: () => ({
-          from: () => ({ where: async () => selectResults.shift() ?? [] }),
+          from: () => ({ where: mockSelectQuery }),
         }),
         execute: async () => undefined,
       }),

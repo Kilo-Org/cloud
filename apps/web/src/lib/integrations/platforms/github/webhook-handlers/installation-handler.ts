@@ -8,7 +8,7 @@ import {
 import { effectiveAppTypeCondition } from '@/lib/integrations/db/predicates';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
-import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
+import { and, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import {
   autoCompleteInstallation,
   deleteGitHubInstallationRecords,
@@ -70,8 +70,20 @@ async function hasOtherLiveAssociation(
         isNull(platform_integrations.github_disconnected_at),
         ne(platform_integrations.id, exceptIntegrationId)
       )
-    );
+    )
+    .limit(1);
   return Boolean(otherAssociation);
+}
+
+/**
+ * Bounds how long a repair transaction waits on a contended installation
+ * identity lock, so a delivery that cannot proceed fails fast and GitHub
+ * redelivers it. Matches the bounds of connectVerifiedGitHubInstallation.
+ */
+async function boundRepairTransaction(tx: DbTransaction): Promise<void> {
+  await tx.execute(sql`SET LOCAL lock_timeout = '5s'`);
+  await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
+  await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '60s'`);
 }
 
 export async function handleInstallationCreated(
@@ -115,6 +127,7 @@ export async function handleInstallationCreated(
     repositoryAccess: installationData.repository_selection,
   });
   const activeRepair = await db.transaction(async tx => {
+    await boundRepairTransaction(tx);
     await lockGitHubInstallationIdentity(tx, appType, installationData.installation_id);
     const candidates = await tx
       .select()

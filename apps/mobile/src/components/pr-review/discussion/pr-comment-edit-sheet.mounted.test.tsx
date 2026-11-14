@@ -85,6 +85,7 @@ vi.mock('@/lib/pr-review/discussion/use-pr-comment-crud-mutations', () => ({
   useUpdatePrCommentMutation: () => ({ mutateAsync: updateComment.mutateAsync }),
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  connectionRefusesWrites: () => connectivity.value === 'offline',
   getCommittedConnectivityStatus: () => connectivity.value,
 }));
 

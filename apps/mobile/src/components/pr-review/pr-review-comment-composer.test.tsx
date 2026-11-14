@@ -112,6 +112,7 @@ vi.mock('@/components/pr-review/composer-inline-error', () => ({
 // React dispatcher (useSyncExternalStore); the plain-function mount below
 // stubs the React primitives instead of rendering.
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  connectionRefusesWrites: () => false,
   getCommittedConnectivityStatus: () => 'online',
   useOfflineBannerState: () => false,
   useCommittedConnectivityStatus: () => 'online',

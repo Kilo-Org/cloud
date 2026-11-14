@@ -63,6 +63,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#000000' }),
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  connectionRefusesWrites: () => connectivity.value === 'offline',
   getCommittedConnectivityStatus: () => connectivity.value,
 }));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({

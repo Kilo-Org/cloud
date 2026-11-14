@@ -103,6 +103,7 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'u1', isLoading: false }),
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  connectionRefusesWrites: () => connectivity.value === 'offline',
   getCommittedConnectivityStatus: () => connectivity.value,
 }));
 vi.mock('@/lib/persist/drafts', () => ({

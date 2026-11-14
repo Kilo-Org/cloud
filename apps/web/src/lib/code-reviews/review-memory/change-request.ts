@@ -16,6 +16,7 @@ import {
   generateGitHubInstallationToken,
 } from '@/lib/integrations/platforms/github/adapter';
 import {
+  EDITABLE_PROPOSAL_STATUSES,
   getProposal,
   markProposalChangeRequestFailed,
   markProposalChangeRequestOpened,
@@ -29,11 +30,7 @@ const REVIEW_MEMORY_TARGET_FILE_PATH = 'REVIEW.md';
 const REVIEW_MEMORY_CHANGE_REQUEST_TITLE = 'docs(review): update REVIEW.md guidance';
 const REVIEW_MEMORY_CHANGE_REQUEST_MARKER = '<!-- kilo-review-memory-change-request -->';
 const OPENING_CHANGE_REQUEST_STALE_MS = 30 * 60 * 1000;
-const APPROVABLE_STATUSES: ReadonlySet<ReviewMemoryProposalStatus> = new Set([
-  'open',
-  'edited',
-  'change_request_failed',
-]);
+const APPROVABLE_STATUSES = new Set<ReviewMemoryProposalStatus>(EDITABLE_PROPOSAL_STATUSES);
 
 export class ReviewMemoryChangeRequestError extends Error {
   constructor(

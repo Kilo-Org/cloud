@@ -40,13 +40,14 @@ type TransferCall = Readonly<{
   localUri: string;
 }>;
 
-type Job = { controller: AbortController; call: TransferCall };
+type Job = { controller: AbortController };
 
 const CACHE_DIRECTORY = 'ssh-files';
 const MAX_FINISHED = 20;
 
 const transfers = new Map<string, SshTransfer>();
 const jobs = new Map<string, Job>();
+const calls = new Map<string, TransferCall>();
 const listeners = new Set<() => void>();
 let snapshot: readonly SshTransfer[] = [];
 let counter = 0;
@@ -108,7 +109,8 @@ function nextId(): string {
 
 function run(id: string, call: TransferCall): void {
   const controller = new AbortController();
-  jobs.set(id, { controller, call });
+  jobs.set(id, { controller });
+  calls.set(id, call);
   transfers.set(id, {
     id,
     sessionId: call.sessionId,
@@ -185,6 +187,7 @@ function prune(): void {
   const oldest = finished.slice(0, finished.length - MAX_FINISHED);
   for (const transfer of oldest) {
     transfers.delete(transfer.id);
+    calls.delete(transfer.id);
   }
 }
 
@@ -194,12 +197,12 @@ export function cancelTransfer(id: string): void {
 }
 
 /** Repeats the call that failed, in place, under the same row. */
-export function retryTransfer(id: string): void {
-  const previous = jobs.get(id)?.call;
+export function retryTransfer(id: string, sftpId?: string): void {
+  const previous = calls.get(id);
   if (previous === undefined || transfers.get(id)?.status === 'active') {
     return;
   }
-  run(id, previous);
+  run(id, sftpId === undefined ? previous : { ...previous, sftpId });
 }
 
 export function clearFinishedTransfers(): void {
@@ -207,6 +210,7 @@ export function clearFinishedTransfers(): void {
   for (const [id, transfer] of transfers) {
     if (transfer.status !== 'active') {
       transfers.delete(id);
+      calls.delete(id);
       changed = true;
     }
   }

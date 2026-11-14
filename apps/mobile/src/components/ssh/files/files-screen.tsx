@@ -164,6 +164,7 @@ export function SshFilesScreen({ sessionId, initialPath = null, dev = null }: Ss
       <FilesContentView
         session={session}
         connectionId={connectionId}
+        sftpId={browser.sftpId}
         path={currentPath}
         phase={browser.phase}
         entries={entries}

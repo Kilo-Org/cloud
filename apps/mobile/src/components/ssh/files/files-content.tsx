@@ -24,6 +24,7 @@ import { type SshSession } from '@/lib/ssh/session/types';
 type FilesContentViewProps = Readonly<{
   session: SshSession | null;
   connectionId: string | null;
+  sftpId: string | null;
   /** The directory on screen; null until the home directory resolved. */
   path: string | null;
   phase: SftpBrowserPhase;
@@ -43,6 +44,7 @@ type FilesContentViewProps = Readonly<{
 export function FilesContentView({
   session,
   connectionId,
+  sftpId,
   path,
   phase,
   entries,
@@ -82,7 +84,11 @@ export function FilesContentView({
       <TransfersTray
         transfers={transfers}
         onCancel={cancelTransfer}
-        onRetry={retryTransfer}
+        onRetry={id => {
+          if (sftpId !== null) {
+            retryTransfer(id, sftpId);
+          }
+        }}
         onShare={transfer => {
           const uri = downloadedFileUri(transfer);
           if (uri !== null) {

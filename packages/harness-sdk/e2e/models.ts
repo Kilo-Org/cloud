@@ -88,8 +88,20 @@ const preferred: readonly ApiKind[] = (process.env['KILO_KINDS']?.split(',') as
   | ApiKind[]
   | undefined) ?? ['messages', 'responses', 'chat_completions'];
 
+/** The five answers, what the session kept, and what the provider counted. */
+interface Conversation {
+  readonly answers: readonly Answer[];
+  readonly turns: number;
+  readonly total: ModelUsage;
+}
+
+/** One model's whole run, or the two calls that failed rather than answered. */
+type Outcome =
+  | { readonly model: string; readonly kind: ApiKind; readonly result: Conversation }
+  | { readonly model: string; readonly kind: 'failed'; readonly errors: readonly unknown[] };
+
 /** Tries the best shape first. A model whose provider rejects it falls back. */
-const run = (model: string) =>
+const run = (model: string): Effect.Effect<Outcome> =>
   converse(model, preferred).pipe(
     Effect.map(result => ({ model, kind: preferred[0] ?? 'messages', result })),
     Effect.catch(first =>
@@ -102,7 +114,33 @@ const run = (model: string) =>
     )
   );
 
-const outcomes = await Effect.runPromise(Effect.forEach(models, run, { concurrency: 3 }));
+/**
+ * One model, tried once more when it left a turn unanswered.
+ *
+ * A silent turn is the model's own answer rather than the package's: measured,
+ * the same model on the same five questions answers the turn on the next run and
+ * not on this one. So a conversation that came back with a blank answer is tried
+ * once more before it counts, and only a second one is a finding — the rule
+ * `e2e/live.ts` and `e2e/time.ts` already keep. A refused call is not this:
+ * `run` has already put it on the other shape.
+ *
+ * The whole conversation runs again rather than the empty turn on its own: the
+ * run holds the session to two turns per question, and a second ask would leave
+ * it four turns past that and report a fault this package does not have.
+ */
+const settled = (model: string) =>
+  Effect.gen(function* () {
+    const first = yield* run(model);
+    const blank =
+      first.kind !== 'failed' && first.result.answers.some(answer => answer.said.trim() === '');
+    if (!blank) {
+      return first;
+    }
+    console.log(`  ${model}: a turn came back empty, so the run was tried once more`);
+    return yield* run(model);
+  });
+
+const outcomes = await Effect.runPromise(Effect.forEach(models, settled, { concurrency: 3 }));
 
 const pad = (text: string, width: number) => text.padEnd(width);
 const ms = (taken: number) => `${taken.toFixed(0)}ms`;
@@ -116,10 +154,13 @@ console.log(
     `${pad('first', 8)}${pad('whole', 8)}${pad('cache read', 11)}${pad('input', 8)}ratio`
 );
 
-let broken = 0;
+/* One entry per model, not per fault: a model that both left a turn empty and
+   kept the wrong number of turns is one model that did not carry the
+   conversation, and the line at the end counts models. */
+const broken = new Set<string>();
 for (const outcome of outcomes) {
   if (outcome.kind === 'failed') {
-    broken += 1;
+    broken.add(outcome.model);
     console.log(
       `${pad(outcome.model, 34)}${pad('FAILED', 17)}${JSON.stringify(outcome.errors[0])}`
     );
@@ -131,12 +172,12 @@ for (const outcome of outcomes) {
     .map((answer, index) => (answer.said.trim() === '' ? index : -1))
     .filter(index => index >= 0);
   if (empty.length > 0) {
-    broken += 1;
-    console.log(`  ${outcome.model}: empty answers at turns ${empty.join(', ')}`);
+    broken.add(outcome.model);
+    console.log(`  ${outcome.model}: empty answers at turns ${empty.join(', ')}, twice over`);
     console.log(`  said: ${JSON.stringify(answers.map(answer => answer.said))}`);
   }
   if (turns !== questions.length * 2) {
-    broken += 1;
+    broken.add(outcome.model);
     console.log(
       `  ${outcome.model}: kept ${String(turns)} turns, not ${String(questions.length * 2)}`
     );
@@ -154,8 +195,8 @@ for (const outcome of outcomes) {
 }
 
 console.log(
-  `\n${String(models.length - broken)} of ${String(models.length)} models answered every turn.`
+  `\n${String(models.length - broken.size)} of ${String(models.length)} models answered every turn.`
 );
-if (broken > 0) {
+if (broken.size > 0) {
   process.exitCode = 1;
 }

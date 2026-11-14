@@ -416,6 +416,7 @@
       "title": "אישור דיווח",
       "description": "האישור על הדיווח ששלחת. שמור את המזהה הזה כדי להתייחס אליו בהמשך.",
       "receiptLabel": "אישור",
+      "copyReceiptId": "העתקת מזהה האישור",
       "appealLabel": "ערעור",
       "triageReceived": "התקבל",
       "triageOpen": "בבדיקה",

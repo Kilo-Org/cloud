@@ -416,6 +416,7 @@
       "title": "Teate kinnitus",
       "description": "Sinu esitatud teate kinnitus. Hoia see ID alles, et saaksid sellele hiljem viidata.",
       "receiptLabel": "Kinnitus",
+      "copyReceiptId": "Kopeeri kinnituse ID",
       "appealLabel": "Vaidlustus",
       "triageReceived": "Vastu võetud",
       "triageOpen": "Ülevaatamisel",

@@ -27,6 +27,7 @@ type ScreenState = {
   mutate: Mock;
   alert: Mock;
   toastError: Mock;
+  performCopy: Mock;
 };
 
 const state = vi.hoisted((): ScreenState => ({
@@ -41,9 +42,14 @@ const state = vi.hoisted((): ScreenState => ({
   mutate: vi.fn(),
   alert: vi.fn(),
   toastError: vi.fn(),
+  performCopy: vi.fn(),
 }));
 
-vi.mock('react-native', () => ({ View: 'View', Alert: { alert: state.alert } }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  Pressable: 'Pressable',
+  Alert: { alert: state.alert },
+}));
 vi.mock('expo-router', () => ({ useLocalSearchParams: () => state.params }));
 vi.mock('@tanstack/react-query', async importOriginal => {
   // The provider and client stay real so renderWithProviders works; only the
@@ -87,6 +93,11 @@ vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'Invalid
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/icons', () => ({ Copy: 'Copy' }));
+vi.mock('@/components/agents/use-message-copy', () => ({ performCopy: state.performCopy }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ mutedForeground: '#666666' }),
+}));
 
 const BUTTON = 'Button' as ElementType;
 
@@ -100,6 +111,16 @@ async function mount() {
 
 function texts(root: ReactTestRenderer['root']) {
   return root.findAll(node => Object.is(node.type, 'Text')).map(node => node.props.children);
+}
+
+function textNode(root: ReactTestRenderer['root'], value: string) {
+  const [node] = root.findAll(
+    candidate => Object.is(candidate.type, 'Text') && candidate.props.children === value
+  );
+  if (!node) {
+    throw new Error(`missing text node for ${value}`);
+  }
+  return node;
 }
 
 function appealButton(root: ReactTestRenderer['root']) {
@@ -116,6 +137,7 @@ beforeEach(() => {
   state.mutate.mockClear();
   state.alert.mockClear();
   state.toastError.mockClear();
+  state.performCopy.mockClear();
 });
 
 afterEach(() => {
@@ -128,6 +150,34 @@ describe('ReportReceiptScreen', () => {
     const root = await mount();
 
     expect(texts(root)).toEqual(expect.arrayContaining([RECEIPT_ID, 'Received', 'None submitted']));
+  });
+
+  it('copies the receipt id from its single copy control', async () => {
+    const root = await mount();
+
+    const copyControls = root.findAll(node => node.props.accessibilityLabel === 'Copy receipt ID');
+    expect(copyControls).toHaveLength(1);
+
+    const [copyControl] = copyControls;
+    if (!copyControl) {
+      throw new Error('missing copy control');
+    }
+
+    // The copy row cuts at the middle, so both ends of the id stay visible while
+    // the control copies it whole; the status rows keep one line, end cut.
+    expect(textNode(root, RECEIPT_ID).props.numberOfLines).toBe(1);
+    expect(textNode(root, RECEIPT_ID).props.ellipsizeMode).toBe('middle');
+    expect(textNode(root, 'Received').props.numberOfLines).toBe(1);
+    expect(textNode(root, 'Received').props.ellipsizeMode).toBe('tail');
+    expect(textNode(root, 'None submitted').props.numberOfLines).toBe(1);
+    expect(textNode(root, 'None submitted').props.ellipsizeMode).toBe('tail');
+
+    act(() => {
+      (copyControl.props.onPress as () => void)();
+    });
+
+    expect(state.performCopy).toHaveBeenCalledTimes(1);
+    expect(state.performCopy).toHaveBeenCalledWith(RECEIPT_ID);
   });
 
   it('offers no appeal while the report is still being received', async () => {

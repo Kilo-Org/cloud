@@ -1,20 +1,28 @@
 import { type Href, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Alert, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 import { z } from 'zod';
 
+import { performCopy } from '@/components/agents/use-message-copy';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { Copy } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import {
+  COMPACT_CONTROL_BOX_CLASS,
+  COMPACT_CONTROL_HIT_SLOP_DP,
+  STATE_ACTION_CLASS,
+} from '@/lib/a11y/tap-target';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 import { i18n } from '@/i18n';
 
 const ACCOUNT_ROUTE = '/(app)/(tabs)/(3_profile)/account' as Href;
@@ -45,15 +53,54 @@ function statusLabel(dictionary: Readonly<Record<string, string>>, status: strin
   return key === undefined ? status : i18n.t(key);
 }
 
-function StatusRow({ label, value }: Readonly<{ label: string; value: string }>) {
+/**
+ * One label/value line. `copyLabel` turns the row into one whose value the
+ * reader can carry away. The control copies the whole value it was given.
+ *
+ * A copy row holds its value on one line and cuts at its middle. The first and
+ * last characters of an id therefore stay on screen. A row without a control
+ * also holds one line, with the end cut.
+ *
+ * The row's `gap-5` is 17.5dp at NativeWind's 14pt rem. It is the only
+ * clearance a value keeps once it fills its box, which the copy row's id does
+ * when it truncates, so it stays above the 16dp a label needs from its value.
+ */
+function StatusRow({
+  label,
+  value,
+  copyLabel,
+}: Readonly<{ label: string; value: string; copyLabel?: string }>) {
+  const colors = useThemeColors();
   return (
-    <View className="flex-row items-center justify-between gap-3 rounded-lg bg-secondary p-3">
-      <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+    <View className="flex-row items-center justify-between gap-5 rounded-lg bg-secondary p-3">
+      <Text className="shrink text-sm text-muted-foreground" numberOfLines={1}>
         {label}
       </Text>
-      <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
-        {value}
-      </Text>
+      <View className="min-w-0 flex-1 flex-row items-center justify-end gap-2">
+        <Text
+          className="min-w-0 shrink text-sm font-medium text-foreground"
+          numberOfLines={1}
+          ellipsizeMode={copyLabel === undefined ? 'tail' : 'middle'}
+        >
+          {value}
+        </Text>
+        {copyLabel === undefined ? null : (
+          <Pressable
+            // The compact box carries the whole tap target, and its negative
+            // margin cancels back to one text line, so the row is no higher than
+            // the value's single line.
+            className={cn(COMPACT_CONTROL_BOX_CLASS, '-my-[7px]', 'active:opacity-70')}
+            hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
+            accessibilityRole="button"
+            accessibilityLabel={copyLabel}
+            onPress={() => {
+              void performCopy(value);
+            }}
+          >
+            <Copy size={16} color={colors.mutedForeground} />
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 }
@@ -144,6 +191,7 @@ export function ReportReceiptScreen() {
           <StatusRow
             label={t('profile.reportReceipt.receiptLabel')}
             value={receipt.data.receiptId}
+            copyLabel={t('profile.reportReceipt.copyReceiptId')}
           />
           <StatusRow
             label={t('common.status')}

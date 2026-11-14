@@ -328,8 +328,12 @@ export function useSessionListAutoScroll<ItemT>({
   );
 
   const handleMomentumScrollBegin = useCallback(() => {
-    // The fling is real, and it may never report its end: one bound, not none.
-    timeouts.settleMotion(MOMENTUM_BOUND_MS);
+    /* The fling is real, and it may never report its end: one bound, not none.
+       The bound settles the claim exactly as a momentum end would, or the list
+       would stop following the tail for good once the bound fired. */
+    timeouts.settleMotion(MOMENTUM_BOUND_MS, () => {
+      claimRef.current = claimAfterMomentumEnd(claimRef.current);
+    });
   }, [timeouts]);
 
   const handleMomentumScrollEnd = useCallback(

@@ -9,6 +9,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { useSessionListAutoScroll } from './use-session-list-auto-scroll';
+import { MOMENTUM_BOUND_MS } from './use-session-list-scroll-timeouts';
 
 // The follow policy only needs the scroll-animation preference; the battery and
 // OS hooks behind the real policy are irrelevant here.
@@ -187,6 +188,29 @@ describe('useSessionListAutoScroll send during a fling', () => {
       api.followTailFromSend();
     });
     // The send scrolls directly; only the content follow is under test.
+    scrollToEnd.mockClear();
+
+    act(() => {
+      api.handleContentSizeChange(400, 2000);
+      vi.advanceTimersByTime(1);
+    });
+
+    expect(scrollToEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('follows the tail again after the fling bound settles the claim', () => {
+    // Regression: the bound ended motion but left the drag claim live, so the
+    // content-size follow refused for the rest of the screen.
+    vi.useFakeTimers();
+    const { scrollToEnd, api } = mountAutoScroll(1);
+    closeProgrammaticScrollWindow();
+
+    act(() => {
+      api.handleScrollBeginDrag();
+      api.handleMomentumScrollBegin();
+      // No momentum end ever arrives; the bound is the only thing that fires.
+      vi.advanceTimersByTime(MOMENTUM_BOUND_MS + 1);
+    });
     scrollToEnd.mockClear();
 
     act(() => {

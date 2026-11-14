@@ -155,6 +155,38 @@ describe('SessionNotifications', () => {
   });
 });
 
+describe('the shared card helpers', () => {
+  const GATE = kotlin('PromotionGate.kt');
+  const STYLE = kotlin('CardStyle.kt');
+
+  it('asks the promotion question in the gate alone, never in either card', () => {
+    // A capability tested twice can promote one card and fall back on the other.
+    expect(GATE).toContain('canPostPromotedNotifications()');
+    expect(MODULE).not.toContain('canPostPromotedNotifications');
+    expect(NOTIFICATIONS).not.toContain('canPostPromotedNotifications');
+  });
+
+  it('requests promotion through the documented extra, never the unsettable flag', () => {
+    // The platform clears FLAG_PROMOTED_ONGOING from every post, so setting it
+    // promotes nothing; one request form keeps both cards promotable.
+    expect(MODULE + NOTIFICATIONS).not.toContain('FLAG_PROMOTED_ONGOING');
+    expect(GATE).toContain('putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, true)');
+  });
+
+  it('looks the drawable name up once, so a rename has one place to land', () => {
+    // A second copy of the drawable name silently posts a card with no icon.
+    expect(STYLE).toContain('getIdentifier(ICON, "drawable"');
+    expect(MODULE + NOTIFICATIONS).not.toContain('getIdentifier(');
+  });
+
+  it('spells the day-primary hex once and reports a refused card write', () => {
+    // A copied hex drifts from global.css, and a dropped commit loses the card.
+    expect((MODULE + NOTIFICATIONS + STYLE).match(/#4F5A10/g)).toHaveLength(1);
+    expect(body(NOTIFICATIONS, 'fun post(')).toContain('commitOrReport(');
+    expect(body(NOTIFICATIONS, 'fun cancel(')).toContain('commitOrReport(');
+  });
+});
+
 describe('the quiet moment of a Working card', () => {
   it('posts the card as it shows now, then arms or disarms its quiet alarm', () => {
     const post = body(NOTIFICATIONS, 'fun post(');
@@ -207,9 +239,8 @@ describe('the quiet moment of a Working card', () => {
 
   it('draws the expanded-only line in the big-text style alone, never in the header', () => {
     const build = body(NOTIFICATIONS, 'private fun builder(');
-    const fallback = build.slice(
-      build.indexOf('} else {', build.indexOf('promotionCapable(context)'))
-    );
+    const anchor = build.indexOf('PromotionGate.request(context, builder, card.compactText)');
+    const fallback = build.slice(build.indexOf('} else {', anchor));
     expect(fallback).toContain('card.expandedText?.let');
     expect(fallback).toContain('Notification.BigTextStyle().bigText(');
     expect(build.match(/expandedText/g)).toHaveLength(1);
@@ -298,7 +329,7 @@ describe('the Approve presence gate', () => {
       /if \(Build\.VERSION\.SDK_INT >= 31\) \{\s+builder\.setAuthenticationRequired\(true\)/
     );
     expect(MODULE).toContain(
-      'ApprovalGate.action(context, smallIconId(), it, approvePendingIntent())'
+      'ApprovalGate.action(context, CardStyle.icon(context), it, approvePendingIntent())'
     );
     expect(NOTIFICATIONS).toContain(
       'ApprovalGate.action(context, icon, label, approveIntent(context, card))'

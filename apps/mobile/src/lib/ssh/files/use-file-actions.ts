@@ -1,6 +1,6 @@
 import { type SftpEntry } from '../../../../modules/kilo-ssh/src';
 import { File } from 'expo-file-system';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
@@ -48,6 +48,13 @@ export function useFileActions({
   confirm,
 }: FileActionsInput) {
   const { t } = useTranslation();
+  const previewRequest = useRef(0);
+  useEffect(
+    () => () => {
+      previewRequest.current += 1;
+    },
+    [sftpId]
+  );
   const [preview, setPreview] = useState<FilePreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [pendingShare, setPendingShare] = useState<string | null>(null);
@@ -92,6 +99,8 @@ export function useFileActions({
   }
 
   async function openPreview(entry: SftpEntry) {
+    previewRequest.current += 1;
+    const request = previewRequest.current;
     const kind = previewKindOf(entry);
     if (kind === null || sftpId === null) {
       setPendingRetry(null);
@@ -109,20 +118,30 @@ export function useFileActions({
     setPendingRetry(remotePathOf(entry));
     try {
       const ssh = await sshPackage();
-      const localUri = transferLocalUri(`preview-${sessionId}-${entry.name}`, entry.name);
+      const localUri = transferLocalUri(
+        `preview-${sessionId}-${request}-${entry.name}`,
+        entry.name
+      );
       const stale = new File(localUri);
       if (stale.exists) {
         stale.delete();
       }
       await ssh.download(sftpId, remotePathOf(entry), localUri);
+      if (request !== previewRequest.current) {
+        return;
+      }
       if (kind === 'image') {
         setPreview({ ...base, loading: false, uri: localUri });
       } else {
         const text = await new File(localUri).text();
-        setPreview({ ...base, loading: false, text });
+        if (request === previewRequest.current) {
+          setPreview({ ...base, loading: false, text });
+        }
       }
     } catch (error) {
-      setPreview({ ...base, loading: false, code: nativeErrorCode(error) ?? 'Protocol' });
+      if (request === previewRequest.current) {
+        setPreview({ ...base, loading: false, code: nativeErrorCode(error) ?? 'Protocol' });
+      }
     }
   }
 
@@ -227,11 +246,13 @@ export function useFileActions({
     preview,
     busy,
     closePreview: () => {
+      previewRequest.current += 1;
       setPreview(null);
     },
     retryPreview,
     /** Dev fixtures only: a preview the gate photographs without a server. */
     showPreview: (next: FilePreview) => {
+      previewRequest.current += 1;
       setPreview(next);
     },
     openEntry,

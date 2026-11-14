@@ -43,8 +43,10 @@ export function useSftpBrowser(connectionId: string | null): SftpBrowser {
   // Every list carries the request it belongs to, so an answer for a directory
   // the person already left cannot replace the one on screen.
   const requestRef = useRef(0);
+  const requestedPathRef = useRef<string | null>(null);
 
   const list = useCallback(async (channel: string, target: string, mode: 'open' | 'refresh') => {
+    requestedPathRef.current = target;
     requestRef.current += 1;
     const request = requestRef.current;
     if (mode === 'refresh') {
@@ -82,13 +84,17 @@ export function useSftpBrowser(connectionId: string | null): SftpBrowser {
     setPhase({ kind: 'opening' });
     setEntries([]);
     setPath(null);
+    requestedPathRef.current = null;
     void (async () => {
       try {
         const ssh = await sshPackage();
         const channel = await ssh.openSftp(connectionId);
         const home = await resolveHomeDirectory(channel, (sftp, entryPath) =>
           ssh.resolvePath(sftp, entryPath)
-        );
+        ).catch(async (error: unknown) => {
+          await closeQuietly(ssh, channel);
+          throw error;
+        });
         if (opening.cancelled) {
           await closeQuietly(ssh, channel);
           return;
@@ -132,10 +138,11 @@ export function useSftpBrowser(connectionId: string | null): SftpBrowser {
 
   const refresh = useCallback(() => {
     const channel = sftpRef.current;
-    if (channel !== null && path !== null) {
-      void list(channel, path, 'refresh');
+    const target = requestedPathRef.current;
+    if (channel !== null && target !== null) {
+      void list(channel, target, 'refresh');
     }
-  }, [list, path]);
+  }, [list]);
 
   return { phase, path, entries, loading, refreshing, sftpId, open, refresh };
 }

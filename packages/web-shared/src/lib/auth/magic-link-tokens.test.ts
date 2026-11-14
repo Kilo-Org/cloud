@@ -114,6 +114,33 @@ describe('Magic Link Tokens', () => {
       expect(verified).toBeNull();
     });
 
+    // The stored digest is a storage contract: rows written by earlier releases
+    // hold the SHA-256 hex of the plaintext, so a change to the algorithm or the
+    // encoding would strand every issued link. This row is inserted with a
+    // literal digest computed outside the module.
+    it('accepts a row stored with the SHA-256 hex of the plaintext', async () => {
+      const plaintextToken = 'a'.repeat(64);
+      const storedDigest = 'ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb';
+      await db.insert(magic_link_tokens).values({
+        token_hash: storedDigest,
+        email: testEmail,
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        purpose: 'magic_link',
+      });
+
+      const verified = await verifyAndConsumeMagicLinkToken(plaintextToken);
+
+      expect(verified?.token_hash).toBe(storedDigest);
+      expect(verified?.consumed_at).not.toBeNull();
+    });
+
+    it('stores the SHA-256 hex of the issued plaintext', async () => {
+      const created = await createMagicLinkToken(testEmail);
+      const expectedDigest = createHash('sha256').update(created.plaintext_token).digest('hex');
+
+      expect(created.token_hash).toBe(expectedDigest);
+    });
+
     it('should not allow consuming the same token twice', async () => {
       const created = await createMagicLinkToken(testEmail);
 

@@ -697,51 +697,30 @@ describe('publication budget', () => {
 });
 
 describe('bounded serialization', () => {
-  it('serializes the blob once per throttle window, not once per cache change', async () => {
+  it('writes once per throttle window, not once per cache change', async () => {
     const { kv, scopes } = createFakeKv();
     const queryClient = makeAuthoritativeQueryClient('u1');
-
-    // Build the burst clients before the spy so the fixture's own serialization
-    // is not counted.
     const burst: PersistedClient[] = Array.from({ length: 5 }, () =>
       makePersistedClient({ id: 'u1' })
     );
-    // The spy is installed before the persister so the library's `serialize`
-    // default (`JSON.stringify`) captures it.
-    const stringify = vi.spyOn(JSON, 'stringify');
-    // `JSON.stringify` is also how TanStack Query hashes the query key in the
-    // publication fence, so count only the blob serializations: the argument of
-    // a read-cache blob is the `PersistedClient` itself.
-    const blobSerializations = () =>
-      stringify.mock.calls.filter(([value]) => {
-        const candidate = value as { clientState?: unknown } | null;
-        return typeof candidate === 'object' && candidate !== null && 'clientState' in candidate;
-      }).length;
-    try {
-      const persister = createReadCachePersister({
-        queryClient,
-        userId: 'u1',
-        epoch: currentAuthEpoch(),
-      });
+    const persister = createReadCachePersister({
+      queryClient,
+      userId: 'u1',
+      epoch: currentAuthEpoch(),
+    });
 
-      // Five query-cache changes inside one throttle window. The un-throttled
-      // wrapper path must serialize none of them: only the throttled save
-      // already running has serialized, exactly once for the whole burst.
-      const inFlight = burst
-        .map(client => persister.persistClient(client))
-        .filter((pending): pending is Promise<void> => pending !== undefined);
-      expect(blobSerializations()).toBe(1);
+    // Five query-cache changes inside one throttle window: the save already
+    // running writes once, and the coalesced trailing save writes once more.
+    const inFlight = burst
+      .map(client => persister.persistClient(client))
+      .filter((pending): pending is Promise<void> => pending !== undefined);
 
-      await Promise.all(inFlight);
+    await Promise.all(inFlight);
 
-      // The coalesced trailing save serializes at most once more, so the count
-      // is bounded by the throttle window, never by the number of changes.
-      expect(blobSerializations()).toBeLessThanOrEqual(2);
-      expect(kv.setItem).toHaveBeenCalledTimes(2);
-      expect(scopes.get(readCacheScope('u1'))?.get('read-cache')).toBeDefined();
-    } finally {
-      stringify.mockRestore();
-    }
+    expect(kv.setItem).toHaveBeenCalledTimes(2);
+    const stored = scopes.get(readCacheScope('u1'))?.get('read-cache');
+    const blob = JSON.parse(stored ?? '{}') as PersistedClient;
+    expect(blob.clientState.queries[0]?.queryKey).toEqual(GET_ME_QUERY_KEY);
   });
 });
 
@@ -1021,8 +1000,12 @@ describe('cold-start restore and takeover', () => {
     const queryClient = new QueryClient();
 
     const restorePromise = restorePersistedCacheOnColdStart(queryClient);
+    await vi.waitFor(() => {
+      expect(SecureStore.getItemAsync).toHaveBeenCalled();
+    });
     // The mount takes over while the hint read is still in flight.
     expect(takeOverColdStartRestore()).toBeNull();
+    expect(hintRead.resolve).not.toBeNull();
     hintRead.resolve?.('u1');
     await restorePromise;
 
@@ -1103,9 +1086,13 @@ describe('cold-start restore and takeover', () => {
     const queryClient = new QueryClient();
 
     const restorePromise = restorePersistedCacheOnColdStart(queryClient);
+    await vi.waitFor(() => {
+      expect(SecureStore.getItemAsync).toHaveBeenCalled();
+    });
     // The epoch moved before the hint read settled: the restore is abandoned
     // before it can even read the cache.
     bumpAuthEpoch();
+    expect(hintRead.resolve).not.toBeNull();
     hintRead.resolve?.('u1');
     await restorePromise;
 

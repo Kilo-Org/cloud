@@ -8,7 +8,7 @@ import {
 
 import type * as LoginDraftModule from './login-draft';
 
-import { type TelemetryEvent, setTelemetrySink } from '@/lib/telemetry/error-sink';
+import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 
 import {
   _resetLoginDraftForTests,

@@ -879,14 +879,15 @@ describe('sign-out teardown ordering', () => {
     const recordKey = 'login-draft-record';
     const stored = new Map<string, string>();
     let refusesRetirement = true;
-    hoisted.secureStore.getItemAsync.mockImplementation(
-      async (key: string) => stored.get(key) ?? null
+    hoisted.secureStore.getItemAsync.mockImplementation((key: string) =>
+      Promise.resolve(stored.get(key) ?? null)
     );
-    hoisted.secureStore.setItemAsync.mockImplementation(async (key: string, value: string) => {
+    hoisted.secureStore.setItemAsync.mockImplementation((key: string, value: string) => {
       if (key === recordKey && refusesRetirement) {
-        throw new Error('keychain unavailable');
+        return Promise.reject(new Error('keychain unavailable'));
       }
       stored.set(key, value);
+      return Promise.resolve();
     });
 
     drafts.beginLoginEmail('typed@example.com');
@@ -917,14 +918,15 @@ describe('sign-out teardown ordering', () => {
     const recordKey = 'login-draft-record';
     const stored = new Map<string, string>();
     let refusesWrites = false;
-    hoisted.secureStore.getItemAsync.mockImplementation(
-      async (key: string) => stored.get(key) ?? null
+    hoisted.secureStore.getItemAsync.mockImplementation((key: string) =>
+      Promise.resolve(stored.get(key) ?? null)
     );
-    hoisted.secureStore.setItemAsync.mockImplementation(async (key: string, value: string) => {
+    hoisted.secureStore.setItemAsync.mockImplementation((key: string, value: string) => {
       if (key === recordKey && refusesWrites) {
-        throw new Error('keychain unavailable');
+        return Promise.reject(new Error('keychain unavailable'));
       }
       stored.set(key, value);
+      return Promise.resolve();
     });
 
     drafts.beginLoginEmail('typed@example.com');

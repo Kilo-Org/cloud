@@ -1,4 +1,3 @@
-/* eslint-disable typescript-eslint/require-await, require-await, promise-function-async, promise/prefer-await-to-then -- a download is a pending promise the test settles by hand */
 // A storage read the OS refused is a state the picker reports, not an empty
 // list: the store's load publishes it and clears it on the next successful read.
 import { describe, expect, it } from 'vitest';

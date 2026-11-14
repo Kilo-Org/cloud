@@ -34,12 +34,8 @@ import { getSurfaceExtras, setSurfaceExtras } from '@/lib/glanceable/surface-ext
 import { runWidgetApprove } from '@/lib/glanceable/widget-actions';
 
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
-import {
-  androidSink,
-  getCurrentWidgetProps,
-  handleAppStateActive,
-  refreshPostedCardAction,
-} from './android-sink';
+import { getCurrentWidgetProps } from './widget-render';
+import { androidSink, handleAppStateActive, refreshPostedCardAction } from './android-sink';
 import {
   formatGlanceableAgo,
   formatGlanceableClock,

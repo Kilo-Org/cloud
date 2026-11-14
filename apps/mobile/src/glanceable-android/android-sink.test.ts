@@ -19,7 +19,6 @@ import { i18n } from '@/i18n';
 import {
   _resetAndroidSinkForTests,
   androidSink,
-  getCurrentWidgetProps,
   handleAppStateActive,
   refreshPostedCardAction,
   renderStoredSnapshotWithNotice,
@@ -27,6 +26,7 @@ import {
   setGlanceableActionNotice,
 } from './android-sink';
 import { _setPermissionReaderForTests, type NotificationPermissionStatus } from './permission';
+import { getCurrentWidgetProps } from './widget-render';
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US' }],
   getCalendars: () => [{ uses24hourClock: false }],

@@ -35,15 +35,12 @@ import { cardAction, cardFor } from './notification-card';
 import { isNotificationPermissionGranted } from './permission';
 import {
   _resetWidgetRenderForTests,
-  getCurrentWidgetProps,
   lastWidgetSnapshot,
   noteWidgetSnapshot,
   renderWidgetNow,
   translate,
   widgetPropsFor,
 } from './widget-render';
-
-export { getCurrentWidgetProps };
 
 // Re-exported because the approve task and the widget suite import them from the
 // sink; the notice state itself lives in `./action-notice`.

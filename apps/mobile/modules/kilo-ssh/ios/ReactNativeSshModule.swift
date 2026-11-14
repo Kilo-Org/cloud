@@ -255,6 +255,7 @@ public final class ReactNativeSshModule: Module {
     )
     let handler = JsSessionHandler(
       sessionId: sessionId,
+      attemptId: config.attemptId,
       requestIds: state.requestIds,
       requestHostKey: { [weak self] request in
         await self?.requestHostKey(request) ?? false

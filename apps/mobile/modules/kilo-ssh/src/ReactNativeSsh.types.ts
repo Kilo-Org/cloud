@@ -51,6 +51,8 @@ export type ConnectOptions = {
    * connection with no row of its own, such as a jump hop.
    */
   appSessionId?: string;
+  /** Echoed in server requests, including requests raised before connect resolves. */
+  attemptId?: string;
   host: string;
   /** Defaults to 22. */
   port?: number;
@@ -92,6 +94,7 @@ export type ShellOptions = {
 /** The server's host key, awaiting a decision from `answerHostKey`. */
 export type HostKeyRequest = {
   sessionId: string;
+  attemptId: string;
   requestId: string;
   host: string;
   port: number;
@@ -109,6 +112,7 @@ export type KeyboardInteractivePrompt = {
 /** Prompts awaiting answers from `answerPrompts`. */
 export type KeyboardInteractiveRequest = {
   sessionId: string;
+  attemptId: string;
   requestId: string;
   name: string;
   instructions: string;
@@ -238,6 +242,7 @@ export type NativeConnectConfig = {
    * instead of minting a second id for one connection.
    */
   appSessionId: string;
+  attemptId: string;
   host: string;
   port: number;
   username: string;

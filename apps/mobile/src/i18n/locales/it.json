@@ -635,9 +635,9 @@
     },
     "providerConnect": {
       "description": "Connetti {{label}} di Kilo per revisionare automaticamente le pull request.",
-      "githubApp": "App GitHub",
+      "githubApp": "l'App GitHub",
       "githubError": "Impossibile aprire la configurazione di GitHub. Riprova.",
-      "gitlabAccount": "Account GitLab",
+      "gitlabAccount": "l'account GitLab",
       "gitlabError": "Impossibile aprire la configurazione di GitLab. Riprova.",
       "bitbucketError": "Impossibile aprire la configurazione di Bitbucket. Riprova."
     },

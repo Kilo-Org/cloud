@@ -1328,9 +1328,9 @@
       "activity": "Virkni"
     },
     "providerConnect": {
-      "githubApp": "GitHub-forrit",
+      "githubApp": "GitHub-forritið",
       "githubError": "Ekki tókst að opna uppsetningu GitHub. Reyndu aftur.",
-      "gitlabAccount": "GitLab-reikningur",
+      "gitlabAccount": "GitLab-reikninginn",
       "gitlabError": "Ekki tókst að opna uppsetningu GitLab. Reyndu aftur.",
       "description": "Tengdu Kilo við {{label}} til að yfirfara samrunabeiðnir sjálfkrafa.",
       "bitbucketError": "Ekki tókst að opna uppsetningu Bitbucket. Reyndu aftur."

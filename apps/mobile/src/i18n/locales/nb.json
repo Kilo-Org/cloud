@@ -1328,9 +1328,9 @@
       "activity": "Aktivitet"
     },
     "providerConnect": {
-      "githubApp": "GitHub-app",
+      "githubApp": "GitHub-appen",
       "githubError": "Kunne ikke åpne GitHub-oppsettet. Prøv igjen.",
-      "gitlabAccount": "GitLab-konto",
+      "gitlabAccount": "GitLab-kontoen",
       "gitlabError": "Kunne ikke åpne GitLab-oppsettet. Prøv igjen.",
       "description": "Koble til Kilo via {{label}} for å gjennomgå PR-er automatisk.",
       "bitbucketError": "Kunne ikke åpne Bitbucket-oppsettet. Prøv igjen."

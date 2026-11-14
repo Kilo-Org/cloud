@@ -1526,3 +1526,20 @@ describe('CloudAgentNextClient.getPendingInteractions', () => {
     expect(captureException).not.toHaveBeenCalled();
   });
 });
+
+describe('CloudAgentNextClient endpoint capture', () => {
+  it('reports a failing endpoint without an extra payload when it has none', async () => {
+    const error = new Error('Worker unavailable');
+    const query = jest.fn(async () => {
+      throw error;
+    });
+    mockCreateTRPCClient.mockReturnValueOnce({ health: { query } });
+
+    await expect(new CloudAgentNextClient('auth-token').health()).rejects.toBe(error);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(error, {
+      tags: { source: 'cloud-agent-next-client', endpoint: 'health' },
+    });
+  });
+});

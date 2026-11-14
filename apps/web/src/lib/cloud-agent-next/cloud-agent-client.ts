@@ -33,12 +33,7 @@ import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import {
-  parseCustomerBillingFailure,
-  type CloudSessionMetadata,
-  type PreparationAttempt,
-  type SessionConfig,
-} from '@kilocode/cloud-agent-sdk';
+import { parseCustomerBillingFailure, type PreparationAttempt } from '@kilocode/cloud-agent-sdk';
 import {
   cloudSessionMessagesPageInputSchema,
   cloudSessionMessagesPageWireSchema,
@@ -61,6 +56,7 @@ import type { WorktreeBranchOperationResult } from '@kilocode/worker-utils/cloud
 import {
   baseGetMessageResultNextOutputSchema,
   baseListPreviewServicesNextOutputSchema,
+  type baseGetSessionNextOutputSchema,
   type ListPreviewServicesOutput,
   workerPreviewOptionsSchema,
 } from '@/routers/cloud-agent-next-schemas';
@@ -68,6 +64,16 @@ import {
   SandboxStatusSnapshotSchema,
   type SandboxStatusSnapshot,
 } from '../../../../../services/cloud-agent-next/src/shared/sandbox-status';
+import {
+  environmentBuildCancelResultSchema,
+  environmentBuildLogsSchema,
+  environmentBuildRequestResultSchema,
+  environmentBuildStatusSchema,
+  type EnvironmentBuildCancelResult,
+  type EnvironmentBuildLogs,
+  type EnvironmentBuildRequestResult,
+  type EnvironmentBuildStatus,
+} from '../../../../../services/cloud-agent-next/src/shared/environment-build-status';
 import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
 import { readCloudAgentErrorFields } from '@kilocode/app-shared/cloud-agent-error';
 import { isTRPCErrorCode } from './cloud-agent-error';
@@ -415,86 +421,27 @@ export type GetEgressAuditInput = GetSessionInput & EgressAuditPagination;
 /** The preview target plus the route organization the Worker uses for its UI gate. */
 export type GetPreviewOptionsInput = PreviewTarget & { organizationId?: string };
 
-/** Execution status for getSession response */
-export type ExecutionStatus = {
-  /** Execution ID currently running */
-  id: string;
-  /** Current status of the execution */
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'interrupted';
-  /** Timestamp when execution started */
-  startedAt: number;
-  /** Last heartbeat timestamp from runner (null if never received) */
-  lastHeartbeat: number | null;
-  /** Sandbox process ID (null if not yet started) */
-  processId: string | null;
-  /** Error message if execution failed (null if no error) */
-  error: string | null;
-  /** Health status: healthy (<1min heartbeat), unknown (1-10min), stale (>10min) */
-  health: 'healthy' | 'stale' | 'unknown';
-} | null;
+/** One environment, under the caller's user or the given organization. */
+export type EnvironmentBuildScope = {
+  environmentId: string;
+  kilocodeOrganizationId?: string;
+};
 
-/** Output from getSession procedure (sanitized, no secrets) */
-export type GetSessionOutput = {
-  sessionId: string;
-  kiloSessionId?: string;
-  userId: string;
-  orgId?: string;
-  /** Sandbox ID (hashed format like usr-abc123...) for correlating with Cloudflare logs */
-  sandboxId?: string;
+export type EnvironmentBuildRequestInput = EnvironmentBuildScope & {
+  expectedRevision: number;
+  requestId: string;
+};
 
-  // Worktree ownership (present only for worktree sessions)
-  worktreeId?: string | null;
-  parentSessionId?: string | null;
-  cloudAgentSessionScopeId?: string | null;
-  parentCloudAgentSessionId?: string;
+export type EnvironmentBuildLogsInput = EnvironmentBuildScope & {
+  buildId: string;
+  cursor?: number;
+  limit: number;
+};
 
-  githubRepo?: string;
-  gitUrl?: string;
-  platform?: 'github' | 'gitlab' | 'bitbucket';
-  /** The exact GitHub connection this session's repository was prepared with. */
-  githubIntegrationId?: string;
-  /** Bitbucket repository identity copied from the session's preparation input. */
-  bitbucketWorkspaceUuid?: string;
-  bitbucketRepositoryUuid?: string;
-  /** GitLab project path copied from the session's preparation input. */
-  gitlabProject?: string;
+export type EnvironmentBuildCancelInput = EnvironmentBuildScope & { buildId: string };
 
-  prompt?: string;
-  mode?: AgentMode;
-  model?: string;
-  variant?: string;
-  autoCommit?: boolean;
-  upstreamBranch?: string;
-  branchName?: string;
-
-  /** Installed custom agents, including picker visibility and model overrides. */
-  runtimeAgents?: SessionConfig['runtimeAgents'];
-
-  execution: ExecutionStatus;
-
-  // Lifecycle timestamps (critical for idempotency)
-  preparedAt?: number;
-  initiatedAt?: number;
-  routeReady?: boolean;
-
-  // Callback configuration is intentionally NOT exposed: the stored target
-  // may carry service-to-service auth headers (e.g. X-Internal-Secret used
-  // by Worker callback ingresses), and getSession is reachable by the
-  // session's owning user.
-
-  initialMessageId?: string;
-
-  timestamp: number;
-  version: number;
-
-  // Latest persisted event ID from the Cloud Agent event log. Numeric and
-  // present after at least one event has been persisted. Null when no events
-  // exist, and absent when the DO cannot be reached (fails open).
-  latestEventId?: number | null;
-} & Pick<
-  CloudSessionMetadata,
-  'title' | 'associatedPr' | 'totalCostMicrodollars' | 'createdOnPlatform' | 'profileId'
->;
+/** Output from getSession procedure. Its shape is the shared schema, not a hand-written twin. */
+export type GetSessionOutput = z.infer<typeof baseGetSessionNextOutputSchema>;
 
 /**
  * Input for updateSession procedure.
@@ -821,6 +768,21 @@ type CloudAgentNextTRPCClient = {
   answerPermission: {
     mutate: (input: AnswerPermissionInput) => Promise<{ success: boolean }>;
   };
+  buildEnvironment: {
+    mutate: (input: EnvironmentBuildRequestInput) => Promise<unknown>;
+  };
+  getEnvironmentBuildStatus: {
+    query: (input: EnvironmentBuildScope) => Promise<unknown>;
+  };
+  getEnvironmentBuildLogs: {
+    query: (input: EnvironmentBuildLogsInput) => Promise<unknown>;
+  };
+  cancelEnvironmentBuild: {
+    mutate: (input: EnvironmentBuildCancelInput) => Promise<unknown>;
+  };
+  notifyEnvironmentDeleted: {
+    mutate: (input: { environmentId: string }) => Promise<unknown>;
+  };
 };
 
 /**
@@ -870,25 +832,27 @@ export class CloudAgentNextClient {
     }) as unknown as CloudAgentNextTRPCClient;
   }
 
-  /**
-   * Get the underlying TRPC client for direct access to procedures
-   */
-  getClient(): unknown {
-    return this.client;
+  private async request<T>(
+    endpoint: string,
+    operation: () => Promise<T>,
+    extra?: Record<string, unknown>
+  ): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint },
+        ...(extra === undefined ? {} : { extra }),
+      });
+      throw error;
+    }
   }
 
   /**
    * Check health status of the cloud agent API
    */
   async health(): Promise<HealthOutput> {
-    try {
-      return await this.client.health.query();
-    } catch (error) {
-      captureException(error, {
-        tags: { source: 'cloud-agent-next-client', endpoint: 'health' },
-      });
-      throw error;
-    }
+    return this.request('health', () => this.client.health.query());
   }
 
   /**
@@ -920,15 +884,11 @@ export class CloudAgentNextClient {
    * made since the snapshot was captured.
    */
   async removeWorkspaceSnapshot(sessionId: string): Promise<{ success: true }> {
-    try {
-      return await this.client.removeWorkspaceSnapshot.mutate({ sessionId });
-    } catch (error) {
-      captureException(error, {
-        tags: { source: 'cloud-agent-next-client', endpoint: 'removeWorkspaceSnapshot' },
-        extra: { sessionId },
-      });
-      throw error;
-    }
+    return this.request(
+      'removeWorkspaceSnapshot',
+      () => this.client.removeWorkspaceSnapshot.mutate({ sessionId }),
+      { sessionId }
+    );
   }
 
   /**
@@ -938,15 +898,11 @@ export class CloudAgentNextClient {
   async getWorkspaceSnapshotRecovery(
     sessionId: string
   ): Promise<{ capturedAt: number | null } | null> {
-    try {
-      return await this.client.getWorkspaceSnapshotRecovery.query({ sessionId });
-    } catch (error) {
-      captureException(error, {
-        tags: { source: 'cloud-agent-next-client', endpoint: 'getWorkspaceSnapshotRecovery' },
-        extra: { sessionId },
-      });
-      throw error;
-    }
+    return this.request(
+      'getWorkspaceSnapshotRecovery',
+      () => this.client.getWorkspaceSnapshotRecovery.query({ sessionId }),
+      { sessionId }
+    );
   }
 
   async deleteHostedWorkspaceSession(input: {
@@ -1048,34 +1004,23 @@ export class CloudAgentNextClient {
     cloudAgentSessionId: string,
     organizationId?: string
   ): Promise<GetSessionOutput> {
-    try {
-      return await this.client.getSession.query({
-        cloudAgentSessionId,
-        ...(organizationId === undefined ? {} : { organizationId }),
-      });
-    } catch (error) {
-      captureException(error, {
-        tags: { source: 'cloud-agent-next-client', endpoint: 'getSession' },
-        extra: { cloudAgentSessionId },
-      });
-      throw error;
-    }
+    return this.request(
+      'getSession',
+      () =>
+        this.client.getSession.query({
+          cloudAgentSessionId,
+          ...(organizationId === undefined ? {} : { organizationId }),
+        }),
+      { cloudAgentSessionId }
+    );
   }
 
   async listChildSessions(input: ListChildSessionsInput): Promise<ListChildSessionsOutput> {
-    try {
-      return await this.client.listChildSessions.query(input);
-    } catch (error) {
-      captureException(error, {
-        tags: { source: 'cloud-agent-next-client', endpoint: 'listChildSessions' },
-        extra: {
-          limit: input.limit,
-          cursor: input.cursor,
-          organizationId: input.organizationId,
-        },
-      });
-      throw error;
-    }
+    return this.request('listChildSessions', () => this.client.listChildSessions.query(input), {
+      limit: input.limit,
+      cursor: input.cursor,
+      organizationId: input.organizationId,
+    });
   }
 
   async getSessionMessagesPage(
@@ -1104,15 +1049,11 @@ export class CloudAgentNextClient {
 
   /** The session's preparation attempts, as its stream replays them. */
   async getPreparationAttempts(cloudAgentSessionId: string): Promise<PreparationAttempt[]> {
-    try {
-      return await this.client.getPreparationAttempts.query({ cloudAgentSessionId });
-    } catch (error) {
-      captureException(error, {
-        tags: { source: 'cloud-agent-next-client', endpoint: 'getPreparationAttempts' },
-        extra: { cloudAgentSessionId },
-      });
-      throw error;
-    }
+    return this.request(
+      'getPreparationAttempts',
+      () => this.client.getPreparationAttempts.query({ cloudAgentSessionId }),
+      { cloudAgentSessionId }
+    );
   }
 
   async getSandboxStatus(cloudAgentSessionId: string): Promise<SandboxStatusSnapshot> {
@@ -1209,18 +1150,10 @@ export class CloudAgentNextClient {
   }
 
   async createWorktreeChat(input: CreateWorktreeChatInput): Promise<CreateWorktreeChatOutput> {
-    try {
-      return await this.client.createWorktreeChat.mutate(input);
-    } catch (error) {
-      captureException(error, {
-        tags: { source: 'cloud-agent-next-client', endpoint: 'createWorktreeChat' },
-        extra: {
-          sourceKiloSessionId: input.sourceKiloSessionId,
-          sourceCloudAgentSessionId: input.sourceCloudAgentSessionId,
-        },
-      });
-      throw error;
-    }
+    return this.request('createWorktreeChat', () => this.client.createWorktreeChat.mutate(input), {
+      sourceKiloSessionId: input.sourceKiloSessionId,
+      sourceCloudAgentSessionId: input.sourceCloudAgentSessionId,
+    });
   }
 
   async getSandboxSelectionOptions(
@@ -1301,15 +1234,9 @@ export class CloudAgentNextClient {
    * - For collections, empty array/object clears them
    */
   async updateSession(input: UpdateSessionInput): Promise<UpdateSessionOutput> {
-    try {
-      return await this.client.updateSession.mutate(input);
-    } catch (error) {
-      captureException(error, {
-        tags: { source: 'cloud-agent-next-client', endpoint: 'updateSession' },
-        extra: { cloudAgentSessionId: input.cloudAgentSessionId },
-      });
-      throw error;
-    }
+    return this.request('updateSession', () => this.client.updateSession.mutate(input), {
+      cloudAgentSessionId: input.cloudAgentSessionId,
+    });
   }
 
   /**
@@ -1404,99 +1331,84 @@ export class CloudAgentNextClient {
   }
 
   async createTerminal(input: CreateTerminalInput): Promise<CreateTerminalOutput> {
-    try {
-      return await this.client.createTerminal.mutate(input);
-    } catch (error) {
-      captureException(error, {
-        tags: { source: 'cloud-agent-next-client', endpoint: 'createTerminal' },
-        extra: { cloudAgentSessionId: input.cloudAgentSessionId },
-      });
-      throw error;
-    }
+    return this.request('createTerminal', () => this.client.createTerminal.mutate(input), {
+      cloudAgentSessionId: input.cloudAgentSessionId,
+    });
   }
 
   async resizeTerminal(input: ResizeTerminalInput): Promise<ResizeTerminalOutput> {
-    try {
-      return await this.client.resizeTerminal.mutate(input);
-    } catch (error) {
-      captureException(error, {
-        tags: { source: 'cloud-agent-next-client', endpoint: 'resizeTerminal' },
-        extra: {
-          cloudAgentSessionId: input.cloudAgentSessionId,
-          ptyId: input.ptyId,
-        },
-      });
-      throw error;
-    }
+    return this.request('resizeTerminal', () => this.client.resizeTerminal.mutate(input), {
+      cloudAgentSessionId: input.cloudAgentSessionId,
+      ptyId: input.ptyId,
+    });
   }
 
   async closeTerminal(input: CloseTerminalInput): Promise<CloseTerminalOutput> {
-    try {
-      return await this.client.closeTerminal.mutate(input);
-    } catch (error) {
-      captureException(error, {
-        tags: { source: 'cloud-agent-next-client', endpoint: 'closeTerminal' },
-        extra: {
-          cloudAgentSessionId: input.cloudAgentSessionId,
-          ptyId: input.ptyId,
-        },
-      });
-      throw error;
-    }
+    return this.request('closeTerminal', () => this.client.closeTerminal.mutate(input), {
+      cloudAgentSessionId: input.cloudAgentSessionId,
+      ptyId: input.ptyId,
+    });
   }
 
   async answerQuestion(input: AnswerQuestionInput): Promise<{ success: boolean }> {
-    try {
-      return await this.client.answerQuestion.mutate(input);
-    } catch (error) {
-      captureException(error, {
-        tags: { source: 'cloud-agent-next-client', endpoint: 'answerQuestion' },
-        extra: { sessionId: input.sessionId, questionId: input.questionId },
-      });
-      throw error;
-    }
+    return this.request('answerQuestion', () => this.client.answerQuestion.mutate(input), {
+      sessionId: input.sessionId,
+      questionId: input.questionId,
+    });
   }
 
   async rejectQuestion(input: RejectQuestionInput): Promise<{ success: boolean }> {
-    try {
-      return await this.client.rejectQuestion.mutate(input);
-    } catch (error) {
-      captureException(error, {
-        tags: { source: 'cloud-agent-next-client', endpoint: 'rejectQuestion' },
-        extra: { sessionId: input.sessionId, questionId: input.questionId },
-      });
-      throw error;
-    }
+    return this.request('rejectQuestion', () => this.client.rejectQuestion.mutate(input), {
+      sessionId: input.sessionId,
+      questionId: input.questionId,
+    });
   }
 
   async answerPermission(input: AnswerPermissionInput): Promise<{ success: boolean }> {
-    try {
-      return await this.client.answerPermission.mutate(input);
-    } catch (error) {
-      captureException(error, {
-        tags: {
-          source: 'cloud-agent-next-client',
-          endpoint: 'answerPermission',
-        },
-        extra: { sessionId: input.sessionId, permissionId: input.permissionId },
-      });
-      throw error;
-    }
+    return this.request('answerPermission', () => this.client.answerPermission.mutate(input), {
+      sessionId: input.sessionId,
+      permissionId: input.permissionId,
+    });
   }
 
   async getPendingInteractions(cloudAgentSessionId: string): Promise<GetPendingInteractionsOutput> {
-    try {
-      return await this.client.getPendingInteractions.query({ cloudAgentSessionId });
-    } catch (error) {
-      captureException(error, {
-        tags: {
-          source: 'cloud-agent-next-client',
-          endpoint: 'getPendingInteractions',
-        },
-        extra: { cloudAgentSessionId },
-      });
-      throw error;
-    }
+    return this.request(
+      'getPendingInteractions',
+      () => this.client.getPendingInteractions.query({ cloudAgentSessionId }),
+      { cloudAgentSessionId }
+    );
+  }
+
+  /** Ask the Worker to build an environment snapshot at the expected revision. */
+  async buildEnvironment(
+    input: EnvironmentBuildRequestInput
+  ): Promise<EnvironmentBuildRequestResult> {
+    return environmentBuildRequestResultSchema.parse(
+      await this.client.buildEnvironment.mutate(input)
+    );
+  }
+
+  async getEnvironmentBuildStatus(input: EnvironmentBuildScope): Promise<EnvironmentBuildStatus> {
+    return environmentBuildStatusSchema.parse(
+      await this.client.getEnvironmentBuildStatus.query(input)
+    );
+  }
+
+  async getEnvironmentBuildLogs(input: EnvironmentBuildLogsInput): Promise<EnvironmentBuildLogs> {
+    return environmentBuildLogsSchema.parse(await this.client.getEnvironmentBuildLogs.query(input));
+  }
+
+  async cancelEnvironmentBuild(
+    input: EnvironmentBuildCancelInput
+  ): Promise<EnvironmentBuildCancelResult> {
+    return environmentBuildCancelResultSchema.parse(
+      await this.client.cancelEnvironmentBuild.mutate(input)
+    );
+  }
+
+  /** Prompt the coordinator to drop a deleted environment's build state. */
+  async notifyEnvironmentDeleted(input: { environmentId: string }): Promise<void> {
+    await this.client.notifyEnvironmentDeleted.mutate(input);
   }
 }
 

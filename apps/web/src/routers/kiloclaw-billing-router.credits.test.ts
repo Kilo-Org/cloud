@@ -32,8 +32,6 @@ import {
 import { differenceInCalendarMonths } from 'date-fns';
 import { CURRENT_KILOCLAW_PRICE_VERSION, LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
 
-// ── Credit Enrollment ──────────────────────────────────────────────────────
-
 describe('enrollWithCredits', () => {
   async function giveUserCredits(userId: string, microdollars: number) {
     await db
@@ -240,7 +238,6 @@ describe('enrollWithCredits', () => {
     expect(sub.trial_started_at).not.toBeNull();
     expect(sub.trial_ends_at).not.toBeNull();
 
-    // Verify credit deduction at intro price ($4, not $9)
     const txns = await db
       .select()
       .from(credit_transactions)
@@ -251,7 +248,6 @@ describe('enrollWithCredits', () => {
     expect(deduction!.amount_microdollars).toBe(-4_000_000);
     expect(deduction!.credit_category).toContain('kiloclaw-subscription:');
 
-    // Verify credit spend recorded at intro amount
     const [updatedUser] = await db
       .select({
         acquired: kilocode_users.total_microdollars_acquired,
@@ -1048,7 +1044,6 @@ describe('enrollWithCredits', () => {
     const caller = await createCallerForUser(user.id);
     await caller.kiloclaw.enrollWithCredits({ plan: 'standard' });
 
-    // Second enrollment in the same period should fail
     // Reset subscription status so the enrollment guard doesn't reject first
     await db
       .update(kiloclaw_subscriptions)
@@ -1063,8 +1058,6 @@ describe('enrollWithCredits', () => {
     );
   });
 });
-
-// ── Billing Status with Credits ────────────────────────────────────────────
 
 describe('getBillingStatus with credits', () => {
   async function createKiloPassSubscription(params: {

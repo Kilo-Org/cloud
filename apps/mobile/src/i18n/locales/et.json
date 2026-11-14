@@ -2579,7 +2579,7 @@
       "retryAllowOnce": "Proovi lubamist üks kord uuesti",
       "retryAlwaysAllow": "Proovi lubamist alati uuesti",
       "unreadableTitle": "Lubamistaotlust ei saanud lugeda",
-      "unreadableBody": "Agent ootab luba puudutavat otsust, mida see rakendus ei saa näidata. Uuenda rakendust või CLI-t või vasta taotlusele CLI-s, et jätkata."
+      "unreadableBody": "Agent ootab veel ühte luba puudutavat taotlust, mida see rakendus ei saa näidata. Uuenda rakendust või CLI-t või vasta taotlusele CLI-s, et jätkata."
     },
     "questionCard": {
       "title": "Agent vajab vastust",

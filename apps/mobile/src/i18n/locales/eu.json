@@ -2579,7 +2579,7 @@
       "retryAllowOnce": "Saiatu berriro behin bakarrik baimetzen",
       "retryAlwaysAllow": "Saiatu berriro beti baimetzen",
       "unreadableTitle": "Baimen-eskaera ezin izan da irakurri",
-      "unreadableBody": "Agentea baimen-erabakiaren zain dago, baina aplikazio honek ezin du eskaera hori erakutsi. Eguneratu aplikazioa edo CLI-a, edo erantzun eskaerari CLI-n jarraitzeko."
+      "unreadableBody": "Agentea beste baimen-eskaera baten zain dago, eta aplikazio honek ezin du eskaera hori erakutsi. Eguneratu aplikazioa edo CLI-a, edo erantzun eskaerari CLI-n jarraitzeko."
     },
     "questionCard": {
       "title": "Agenteak zure erantzuna behar du",

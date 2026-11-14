@@ -2579,7 +2579,7 @@
       "retryAllowOnce": "Egyszeri engedélyezés újrapróbálása",
       "retryAlwaysAllow": "Mindig engedélyezés újrapróbálása",
       "unreadableTitle": "Nem sikerült beolvasni az engedélykérést",
-      "unreadableBody": "Az ügynök egy engedélyezési döntésre vár, amelyet ez az alkalmazás nem tud megjeleníteni. Frissítse az alkalmazást vagy a CLI-t, illetve válaszoljon a kérésre a CLI-ben a folytatáshoz."
+      "unreadableBody": "Az ügynök egy másik engedélyezési kérésre vár, amelyet ez az alkalmazás nem tud megjeleníteni. Frissítse az alkalmazást vagy a CLI-t, illetve válaszoljon a kérésre a CLI-ben a folytatáshoz."
     },
     "questionCard": {
       "title": "Az ügynök válaszra vagy jóváhagyásra vár",

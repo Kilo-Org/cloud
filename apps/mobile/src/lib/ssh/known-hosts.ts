@@ -20,7 +20,7 @@ const knownHostRowSchema = z.object({
 
 export type SshKnownHost = z.infer<typeof knownHostRowSchema>;
 
-const hostKeySchema = z.object({
+export const hostKeySchema = z.object({
   hostPattern: z.string().min(1),
   keyAlgorithm: z.string().min(1),
   publicKeyBase64: z.string().min(1),

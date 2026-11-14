@@ -36,7 +36,7 @@ const keyFields = {
   fingerprintSha256: z.string().min(1),
 };
 
-const keyInputSchema = z.object({
+export const keyInputSchema = z.object({
   ...keyFields,
   passphrase: z.string().nullable().default(null),
 });

@@ -215,6 +215,8 @@ export default function AppLayout() {
               <Stack.Screen name="ssh/host/new" />
               <Stack.Screen name="ssh/host/[host-id]" />
               <Stack.Screen name="ssh/import" />
+              <Stack.Screen name="ssh/backup/export" />
+              <Stack.Screen name="ssh/backup/import" />
               <Stack.Screen name="ssh/key/new" />
               <Stack.Screen name="ssh/key/import" />
               <Stack.Screen name="ssh/known-hosts" />

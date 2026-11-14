@@ -43,7 +43,7 @@ const forwardFields = {
   label: z.string().nullable(),
 };
 
-const forwardInputSchema = z.object({
+export const forwardInputSchema = z.object({
   ...forwardFields,
   bindHost: forwardFields.bindHost.default('127.0.0.1'),
   autoStart: forwardFields.autoStart.default(false),

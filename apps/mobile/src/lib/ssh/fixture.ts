@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import {
   clearSshRows,
   resetSshQueries,
+  seedBackup,
   seedEditor,
   seedFilesSurfaces,
   seedHostList,
@@ -66,6 +67,7 @@ export function handleSshFixturePath(path: string): boolean {
     setSshFixtureFlag(false);
     return true;
   }
+  setSshFixtureFlag(true);
   void (async () => {
     // A prompt sheet from the previous fixture is a modal over the screen the
     // next link opens, so a run of links would measure one screen repeatedly.
@@ -99,6 +101,24 @@ export function handleSshFixturePath(path: string): boolean {
       const seeded = await seedFilesSurfaces();
       await resetSshQueries();
       router.replace(sshHostPath(seeded.hostId));
+    } else if (name.startsWith('backup-export') || name.startsWith('backup-import')) {
+      const exporting = name.startsWith('backup-export');
+      const dev = name.slice((exporting ? 'backup-export' : 'backup-import').length + 1);
+      if (dev !== 'empty') {
+        await seedBackup();
+      }
+      await resetSshQueries();
+      router.replace({
+        pathname: exporting ? '/(app)/ssh/backup/export' : '/(app)/ssh/backup/import',
+        params: { dev },
+      });
+    } else if (name === 'key-bar') {
+      const sessionId = await seedSession('connected');
+      await resetSshQueries();
+      router.replace({
+        pathname: '/(app)/ssh/session/[session-id]',
+        params: { 'session-id': sessionId, dev: 'key-bar' },
+      });
     } else if (name.startsWith('session-')) {
       const state = name.slice('session-'.length);
       const sessionId = await seedSession(state);

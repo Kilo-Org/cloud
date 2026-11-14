@@ -8,6 +8,7 @@ import { trustHostKey } from './known-hosts';
 import { sshPackage } from './native';
 import { writeSession } from './session/session-store';
 import { type SshSessionPhase } from './session/types';
+import { createSnippet } from './snippets';
 import { sshDatabase } from './store';
 import { SSH_KEY } from './use-ssh';
 
@@ -93,6 +94,19 @@ export async function seedHostList(): Promise<void> {
   for (const knownHost of KNOWN_HOSTS) {
     trustHostKey(db, knownHost);
   }
+}
+
+export async function seedBackup(): Promise<void> {
+  await seedHostList();
+  const db = await sshDatabase();
+  createSnippet(db, { label: 'Check disk usage', command: 'df -h' });
+  createHost(db, {
+    label:
+      'Production application cluster through the team bastion with a very long descriptive label',
+    hostname: 'long-label.kilo.test',
+    username: 'fixture',
+    authMethod: 'password',
+  });
 }
 
 export async function seedEditor(keyAuth: boolean): Promise<SshHost> {

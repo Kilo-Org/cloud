@@ -5,8 +5,8 @@
 // with its `hasMore` footer, and a later-page failure that keeps the rows it has.
 // A row also names its event through the catalog, falling back to the generic
 // event name for an action this build does not know; the created-organization
-// row's detail line carries the organization name instead of the server's
-// message, which only restates that event name in English.
+// row drops its detail line, because the server's message there only restates
+// that event name in English.
 // The query layer is mocked so each state is driven directly through the screen
 // JSX, the same way the credit-activity suite does it.
 
@@ -289,7 +289,7 @@ describe('OrganizationAuditLogScreen', () => {
     unmount();
   });
 
-  it("shows the created organization's name in place of the restating server message", async () => {
+  it('omits the restating server message on the created organization row', async () => {
     pageHook.entries = [
       {
         id: 'audit-created',
@@ -308,11 +308,12 @@ describe('OrganizationAuditLogScreen', () => {
       .map(node => node.props.children)
       .filter(child => typeof child === 'string');
     expect(messages).toContain('Organization created');
-    // The detail line is the only two-line text in the row; for this action it
-    // names the organization instead of repeating the event name in English.
-    const detail = texts.find(node => node.props.numberOfLines === 2);
-    expect(detail?.props.children).toBe('Acme');
+    // The actor's meta line carries the time after the actor.
+    expect(messages.some(text => text.startsWith('owner@example.com · '))).toBe(true);
+    // The row keeps the translated event name and drops the server sentence,
+    // which only restates that name and would age into a stale one.
     expect(messages).not.toContain('Organization Acme created');
+    expect(texts.some(node => node.props.numberOfLines === 2)).toBe(false);
     expect(messages.some(text => text.includes('organization.created'))).toBe(false);
     unmount();
   });

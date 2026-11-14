@@ -1,3 +1,7 @@
+import { QueryClient } from '@tanstack/react-query';
+import { createTRPCClient, httpBatchLink } from '@trpc/client';
+import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
+import { type MobileRouter } from '@kilocode/trpc/mobile';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -144,14 +148,17 @@ describe('buildActiveSessionsTrayInput', () => {
     });
   });
 
-  it('produces the literal activeSessions.list key the live-sync owner writes into', () => {
+  it('registers the activeSessions.list key both call sites read', () => {
     // active-sessions-live-sync-mount.tsx and hooks/use-agent-sessions.ts both
-    // register trpc.activeSessions.list.queryKey(buildActiveSessionsTrayInput(org));
-    // a drifted input or key wrapper splits the cache the socket owner writes into.
-    expect([
-      ['activeSessions', 'list'],
-      { input: buildActiveSessionsTrayInput('org-1'), type: 'query' },
-    ]).toEqual([
+    // register trpc.activeSessions.list.queryKey(buildActiveSessionsTrayInput(org)).
+    // Rebuild that proxy locally: @/lib/trpc cannot load in a node suite.
+    const trpc = createTRPCOptionsProxy<MobileRouter>({
+      client: createTRPCClient<MobileRouter>({
+        links: [httpBatchLink({ url: 'http://127.0.0.1:3000/api/trpc' })],
+      }),
+      queryClient: new QueryClient(),
+    });
+    expect(trpc.activeSessions.list.queryKey(buildActiveSessionsTrayInput('org-1'))).toEqual([
       ['activeSessions', 'list'],
       { input: { organizationId: 'org-1', includeCloudAgentSessions: true }, type: 'query' },
     ]);

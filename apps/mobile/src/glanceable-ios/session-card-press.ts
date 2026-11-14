@@ -20,7 +20,7 @@ import { getSessionLiveActivity, type SessionLiveActivityProps } from './session
 
 export type SessionActivity = LiveActivity<SessionLiveActivityProps>;
 
-export type SessionCardPressFailure = {
+type SessionCardPressFailure = {
   readonly kind: 'approve-failed';
   readonly notice: string;
 };
@@ -29,7 +29,7 @@ export type SessionCardPressFailure = {
  * One approval request on one card. The request is part of the key, so a later
  * request for the same session can never inherit an older one's press state.
  */
-export type SessionCardPressKey = string;
+type SessionCardPressKey = string;
 
 /** ActivityKit takes the stale window in seconds. */
 export const SESSION_CARD_STALE_AFTER_SECONDS = GLANCEABLE_STALE_MS / 1000;

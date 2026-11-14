@@ -18,10 +18,10 @@ import {
 import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
 import { type ProviderPrPlatform } from '@/lib/pr-review/provider-pr-ref';
 
-export type PrInlineAnnounce = 'here' | 'toast' | 'silent';
+type PrInlineAnnounce = 'here' | 'toast' | 'silent';
 
 /** Which validation/gate outcomes this surface announces itself. */
-type PrInlineSurface = 'composer' | 'edit-comment' | 'reply';
+type PrInlineSurface = 'composer' | 'conversation' | 'edit-comment' | 'reply';
 
 /**
  * A composer-family inline failure. `reconnect` carries no copy because
@@ -44,14 +44,14 @@ export type PrInlineFailure =
       readonly announce: PrInlineAnnounce;
     };
 
-export type PrInlineOptions = {
+type PrInlineOptions = {
   readonly surface: PrInlineSurface;
   readonly platform?: ProviderPrPlatform;
   /** Channel for mutation-derived failures; the hook's own `onError` toasts them. */
   readonly announce: PrInlineAnnounce;
 };
 
-export type PrInlineOutcome =
+type PrInlineOutcome =
   | { readonly kind: 'failure'; readonly failure: PrInlineFailure }
   /** Pre-submit gate cancelled: nothing was sent. */
   | { readonly kind: 'abandoned' };

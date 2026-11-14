@@ -17,7 +17,7 @@ import {
   type SurfaceFeedbackSnapshot,
 } from '@/lib/surface-feedback';
 
-export type SurfaceFeedbackController<Failure extends SurfaceFailure> = {
+type SurfaceFeedbackController<Failure extends SurfaceFailure> = {
   readonly feedback: SurfaceFeedback<Failure>;
   /** The failure to render, or `null`. The same object `feedback` holds. */
   readonly failure: Failure | null;

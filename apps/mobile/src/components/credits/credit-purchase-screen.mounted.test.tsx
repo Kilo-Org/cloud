@@ -101,10 +101,13 @@ vi.mock('react-native', () => ({
 
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 
-// The footer pads itself with the bottom inset. The library loads a native
+// The footer pads itself with the bottom inset, so the read is mutable: the
+// footer case drives a device with a home indicator. The library loads a native
 // module, so the mounted project stubs the read like the other screen tests do.
+const safeAreaInsets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
+
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => safeAreaInsets,
 }));
 
 vi.mock('sonner-native', () => ({ toast: toastMock }));
@@ -336,6 +339,10 @@ describe('CreditPurchaseScreen', () => {
     identity.userId = 'user-1';
     identity.isError = false;
     identity.isUnreachable = false;
+    safeAreaInsets.top = 0;
+    safeAreaInsets.bottom = 0;
+    safeAreaInsets.left = 0;
+    safeAreaInsets.right = 0;
   });
 
   it('happy: renders one row per pack with its amount and store price, purchase enabled', async () => {
@@ -571,8 +578,8 @@ describe('CreditPurchaseScreen', () => {
       expect(allText(renderer)).not.toContain(
         'Could not connect to Google Play. Check your connection and try again.'
       );
-      // The notice fills the pack slot, with a retry to offer, and no row
-      // renders beneath it: the slot paints one surface at a time.
+      // The notice fills the pack area, with a retry to offer, and no row
+      // renders beneath it: the pack area paints one surface at a time.
       expect(packRows(renderer)).toHaveLength(0);
       expect(tryAgainButton(renderer)).toBeDefined();
       unmount();
@@ -667,8 +674,8 @@ describe('CreditPurchaseScreen', () => {
     });
 
     expect(owner.fetchStoreProducts.mock.calls.length).toBe(2);
-    // The notice keeps the slot while the retry runs; no row or placeholder
-    // renders under it.
+    // The notice keeps the pack area while the retry runs; no row or
+    // placeholder renders under it.
     expect(packRows(renderer)).toHaveLength(0);
     expect(placeholderShells(renderer)).toHaveLength(0);
     expect(allText(renderer)).toContain('App Store products unavailable');
@@ -816,7 +823,7 @@ describe('CreditPurchaseScreen', () => {
 
   it('grows the error clearance with the text it clears', async () => {
     // The card is text, so the room reserved beneath it must grow with the same
-    // scale; a fixed clearance would let a raised scale cover the copy.
+    // scale; a fixed clearance would let a raised scale cover the content.
     const contentHeights = async (): Promise<number[]> => {
       const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
       await waitFor(() => packRows(renderer).length === 4);
@@ -838,22 +845,29 @@ describe('CreditPurchaseScreen', () => {
 
     dimensions.fontScale = 1;
     const single = await contentHeights();
+    // The room clears the card up to the pinned footer: three `text-sm` lines,
+    // the card's chrome, and the 8 dp gap its wrapper keeps above the footer.
+    // The home-indicator band belongs to the footer, so the room does not grow
+    // with the bottom inset.
+    safeAreaInsets.bottom = 34;
+    const withHomeIndicator = await contentHeights();
     dimensions.fontScale = 1.5;
     const raised = await contentHeights();
     dimensions.fontScale = 1;
+    safeAreaInsets.bottom = 0;
 
-    // Only the card's text scales: its chrome and the gap under it are fixed.
-    // The stub has no bottom inset, so the gap is the 16 dp floor plus 8.
     const textHeight = 63;
-    const fixed = 26 + 24;
+    const fixed = 26 + 8;
     expect(single.some(height => Math.abs(height - (textHeight + fixed)) <= 0.5)).toBe(true);
+    expect(withHomeIndicator).toEqual(single);
     expect(raised.some(height => Math.abs(height - (textHeight * 1.5 + fixed)) <= 0.5)).toBe(true);
   });
 
-  it('floats the purchase error clear of the copy without taking layout height', async () => {
+  it('floats the purchase error above the pinned footer without taking layout height', async () => {
     // The error is not one of the four pack states, so it must not take layout
-    // height. It floats at the bottom of the scroll area, and the content ends
-    // with a spacer sized to the card, so the copy can scroll above it.
+    // height. It floats at the bottom of the scroll area, directly above the
+    // footer that holds the copy, and the content ends with a spacer sized to
+    // the card, so the content can scroll clear of it.
     owner.errorMessageKey = 'credits.purchaseOwnedByAnotherAccount';
 
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
@@ -861,6 +875,9 @@ describe('CreditPurchaseScreen', () => {
 
     const scroller = renderer.root.findByType(DetailScreenScrollView);
     expect(scroller.findAllByType(AccessibleStatus)).toHaveLength(0);
+    // The copy is not part of the scroll content any more: the floating card is
+    // the only thing outside the footer that can cover it.
+    expect(legalLinkNodes(scroller)).toHaveLength(0);
 
     // The clearance is a child of the content, never a container style: that
     // style prop makes NativeWind drop the caller's contentContainerClassName,
@@ -879,11 +896,16 @@ describe('CreditPurchaseScreen', () => {
         style.height > 0
       );
     });
-    // The spacer is the content's last child, sized to the card it clears.
+    // The spacer is the content's last child, sized to the card it clears: its
+    // three capped `text-sm` lines, read from the compiled theme.
     const spacerHeight = spacers
       .map(node => (node.props.style as { height: number }).height)
       .at(-1);
-    expect(spacerHeight).toBeGreaterThanOrEqual(100);
+    const cardText =
+      3 *
+      (await compiledLengthDp('text-sm', 'fontSize')) *
+      (await compiledLengthDp('text-sm', 'lineHeight'));
+    expect(spacerHeight).toBeGreaterThanOrEqual(cardText);
 
     const [status] = renderer.root.findAllByType(AccessibleStatus);
     const inner = status?.parent;
@@ -892,6 +914,10 @@ describe('CreditPurchaseScreen', () => {
     // one node would replace its className padding.
     expect(String(inner?.props.className)).toContain('px-5');
     expect(String(outer?.props.className)).toContain('bottom-0');
+    // The card keeps only its 8 dp gap to the footer, which owns the
+    // home-indicator band, so the gap is a theme length rather than the inset.
+    const cardBottomGap = await compiledLengthDp(String(inner?.props.className), 'paddingBottom');
+    expect(cardBottomGap).toBe(8);
     unmount();
   });
 
@@ -906,13 +932,13 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
-  it('shows one pack surface in a slot of the row list height in every state', async () => {
-    // The four states are mutually exclusive and share one slot, so a store
-    // answer changes what the slot paints without moving the description and
-    // the legal links below it. The slot is the row list's own height.
+  it('pins the copy in the footer and lays the pack states out in flow', async () => {
+    // The four pack states render in flow directly under the balance card, so a
+    // shorter state ends sooner instead of leaving a reserved blank band under
+    // it. The description and the legal links are no longer scroll content:
+    // they sit in the footer below the scroll area, the last child of the screen
+    // root, so no store answer and no locale can move them off the bottom edge.
     const DESCRIPTION_PREFIX = 'Credits are a one-time purchase';
-    const ROW_COUNT = 4;
-    const GAP = 10.5;
     const surfaceKinds = ['row', 'placeholder', 'empty', 'notice', 'account'] as const;
     type SurfaceKind = (typeof surfaceKinds)[number];
 
@@ -948,6 +974,15 @@ describe('CreditPurchaseScreen', () => {
       }
       return undefined;
     };
+    /** The description paragraphs in `scope`: the footer's copy, not a label. */
+    const descriptionsIn = (scope: TestRenderer.ReactTestInstance): number =>
+      scope.findAll(
+        node =>
+          String(node.type) === 'Text' &&
+          node.children.some(
+            part => typeof part === 'string' && part.startsWith(DESCRIPTION_PREFIX)
+          )
+      ).length;
 
     const cases: { state: string; expected: SurfaceKind; prepare: () => void }[] = [
       {
@@ -980,10 +1015,16 @@ describe('CreditPurchaseScreen', () => {
     const measured: {
       state: string;
       surfaces: SurfaceKind[];
-      slotHeight: number;
-      rowHeight: number;
+      packAreaFound: boolean;
+      packAreaMinHeight: unknown;
+      reservesInScroller: number;
       copyInScroller: boolean;
       legalInScroller: number;
+      descriptionInFooter: number;
+      legalInFooter: number;
+      footerIsScreenRootLastChild: boolean;
+      footerUnderScrollArea: boolean;
+      rowHeight: number;
     }[] = [];
     // Sequential, not parallel: every scenario mutates the same owner mock and
     // the same backend fixture, so two mounted screens would race.
@@ -1003,28 +1044,26 @@ describe('CreditPurchaseScreen', () => {
           renderer.root.findAll(() => true).some(node => surfaceOf(node) === scenario.expected)
       );
       const scroller = renderer.root.findByType(DetailScreenScrollView);
-      // The reserve is the pack area's slot. The balance card carries two
-      // smaller reserves of its own, so they are excluded by their testIDs.
-      const slot = scroller.findAll(
-        node => minHeightOf(node) > 0 && !/^credit-(balance|expiry)-slot$/.test(testIDOf(node))
+      const screenRoot = renderer.root.findByProps({ testID: 'credit-purchase-screen' });
+      const screenChildren = screenRoot.children.filter(
+        (child): child is TestRenderer.ReactTestInstance => typeof child !== 'string'
       );
-      const surfaces = renderer.root
+      const footer = screenChildren.at(-1);
+      // The pack area is the scroller's own child holding this state's surface.
+      // The balance card carries two reservations of its own, so they are told
+      // apart by their testIDs.
+      const packArea = scroller.children.find(
+        (child): child is TestRenderer.ReactTestInstance =>
+          typeof child !== 'string' &&
+          child.findAll(node => surfaceOf(node) !== undefined).length > 0
+      );
+      const reservesInScroller = scroller
+        .findAll(node => minHeightOf(node) > 0)
+        .filter(node => !/^credit-(balance|expiry)-slot$/.test(testIDOf(node))).length;
+      const surfaces = scroller
         .findAll(node => surfaceOf(node) !== undefined)
         .map(node => surfaceOf(node))
         .filter((kind): kind is SurfaceKind => kind !== undefined);
-      const copyIndex = scroller.children.findIndex(
-        child =>
-          typeof child !== 'string' &&
-          child
-            .findAll(() => true)
-            .some(
-              node =>
-                String(node.type) === 'Text' &&
-                node.children.some(
-                  part => typeof part === 'string' && part.startsWith(DESCRIPTION_PREFIX)
-                )
-            )
-      );
       const [firstRow] = renderer.root.findAll(
         node => testIDOf(node) === 'credit-pack-row' || testIDOf(node) === 'credit-pack-placeholder'
       );
@@ -1036,10 +1075,18 @@ describe('CreditPurchaseScreen', () => {
       measured.push({
         state: scenario.state,
         surfaces,
-        slotHeight: slot.length === 1 ? minHeightOf(slot[0] as TestRenderer.ReactTestInstance) : 0,
-        rowHeight,
-        copyInScroller: copyIndex !== -1,
+        packAreaFound: packArea !== undefined,
+        packAreaMinHeight: packArea ? styleOf(packArea).minHeight : undefined,
+        reservesInScroller,
+        copyInScroller: descriptionsIn(scroller) > 0,
         legalInScroller: legalLinkNodes(scroller).length,
+        descriptionInFooter: footer ? descriptionsIn(footer) : 0,
+        legalInFooter: footer ? legalLinkNodes(footer).length : 0,
+        footerIsScreenRootLastChild:
+          footer !== undefined && String(footer.props.className).includes('border-t'),
+        footerUnderScrollArea:
+          screenChildren.at(-2)?.findAllByType(DetailScreenScrollView).length === 1,
+        rowHeight,
       });
       unmount();
       vi.clearAllMocks();
@@ -1048,29 +1095,58 @@ describe('CreditPurchaseScreen', () => {
 
     for (const result of measured) {
       const scenario = cases.find(candidate => candidate.state === result.state);
-      // One surface at a time: a store answer swaps what the slot paints, it
-      // does not stack another surface on top of the rows.
+      // One surface at a time: a store answer swaps what the pack area paints,
+      // it does not stack another surface on top of the rows.
       expect([...new Set(result.surfaces)], result.state).toEqual([scenario?.expected]);
       expect(result.surfaces.length, result.state).toBeGreaterThan(0);
-      // One slot in every state, so a store answer cannot move the copy.
-      expect(result.slotHeight, result.state).toBeGreaterThan(0);
-      expect(result.copyInScroller, result.state).toBe(true);
-      expect(result.legalInScroller, result.state).toBe(2);
+      // The pack area sits in flow and reserves nothing: only the balance
+      // card's two data slots keep a height in the scroller, so a shorter pack
+      // state leaves no blank band under it.
+      expect(result.packAreaFound, result.state).toBe(true);
+      expect(result.packAreaMinHeight, result.state).toBeUndefined();
+      expect(result.reservesInScroller, result.state).toBe(0);
+      // The copy is outside the scroll content, in the footer that closes the
+      // screen: the description plus exactly the two store legal links.
+      expect(result.copyInScroller, result.state).toBe(false);
+      expect(result.legalInScroller, result.state).toBe(0);
+      expect(result.descriptionInFooter, result.state).toBe(1);
+      expect(result.legalInFooter, result.state).toBe(2);
+      expect(result.footerIsScreenRootLastChild, result.state).toBe(true);
+      expect(result.footerUnderScrollArea, result.state).toBe(true);
     }
-    // The slot is the row list's own height, and it is the same in every state:
-    // four rows plus the steps between them.
-    const slotHeights = new Set(measured.map(result => result.slotHeight));
-    expect(slotHeights.size, 'one slot height in every state').toBe(1);
+    // The placeholder rows take exactly the priced row's height, so the list
+    // never jumps when the store answers.
     const rowHeights = measured
       .filter(result => result.rowHeight > 0)
       .map(result => result.rowHeight);
     expect(new Set(rowHeights).size, 'rows and placeholders share one height').toBe(1);
-    const [rowHeight] = rowHeights;
-    expect(rowHeight).toBeDefined();
-    expect([...slotHeights][0]).toBeCloseTo(
-      ROW_COUNT * Number(rowHeight) + (ROW_COUNT - 1) * GAP,
-      1
-    );
+    expect(rowHeights[0]).toBeGreaterThan(0);
+  });
+
+  it('pads the footer with the bottom inset so the copy holds the safe-area edge', async () => {
+    // The footer, not the floating card, clears the home-indicator band. With
+    // no home indicator the app's 16 dp floor keeps the links off the edge.
+    const footerPadding = async (): Promise<number | undefined> => {
+      const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+      await waitFor(() => packRows(renderer).length === 4);
+      const screenRoot = renderer.root.findByProps({ testID: 'credit-purchase-screen' });
+      const footer = screenRoot.children.findLast(
+        (child): child is TestRenderer.ReactTestInstance => typeof child !== 'string'
+      );
+      const style: unknown = footer?.props.style;
+      const padding =
+        typeof style === 'object' && style !== null && 'paddingBottom' in style
+          ? style.paddingBottom
+          : undefined;
+      unmount();
+      return typeof padding === 'number' ? padding : undefined;
+    };
+
+    safeAreaInsets.bottom = 0;
+    expect(await footerPadding()).toBe(16);
+    safeAreaInsets.bottom = 34;
+    expect(await footerPadding()).toBe(34);
+    safeAreaInsets.bottom = 0;
   });
 
   it('sizes a pack row and its placeholder to the same height', async () => {
@@ -1105,7 +1181,7 @@ describe('CreditPurchaseScreen', () => {
 
   it('caps every text block a pack row sizes', async () => {
     // The row's height is its capped text plus its spacing, so an uncapped line
-    // would grow the row and the copy below it.
+    // would grow the row past the height it reserves.
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => packRows(renderer).length === 4);
     const caps = renderer.root
@@ -1118,7 +1194,7 @@ describe('CreditPurchaseScreen', () => {
 
   it('scales the row height with the system font scale', async () => {
     // Only the row's text scales; its paddings and the content gaps keep their
-    // size. A static height would clip the text or leave the slot short of it.
+    // size. A static height would clip the text at a raised scale.
     const rowHeight = async (): Promise<number> => {
       const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
       await waitFor(() => packRows(renderer).length === 4);
@@ -1168,7 +1244,7 @@ describe('CreditPurchaseScreen', () => {
     // The card is the only block above the pack area whose content arrives
     // late, so it paints one height in every state: a skeleton, the value, the
     // failed read's retry target, and a caption in all three cases. Otherwise a
-    // settling read would move the packs and the copy below them.
+    // settling read would move the packs below it.
     /** The card's data-slot Views, found by the testID the screen sets. */
     const slotOf = (scope: TestRenderer.ReactTestInstance, testID: string) => {
       const [slot] = scope.findAll(node => (node.props as { testID?: string }).testID === testID);
@@ -1293,7 +1369,7 @@ describe('CreditPurchaseScreen', () => {
     // A raised scale fits fewer characters per line, so the caption needs more
     // lines than it does at the default scale. The floor must count those
     // lines, not just scale the two lines' height, or the caption outgrows it
-    // and the copy below moves.
+    // and the packs below move.
     dimensions.fontScale = 1.5;
     const raised = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => allText(raised.renderer).includes('No expiring credits.'));

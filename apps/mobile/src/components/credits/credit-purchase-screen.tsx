@@ -45,28 +45,27 @@ import { CreditExpiryNote } from './credit-expiry-note';
  * The room the scroller keeps at its end for the floating purchase error.
  *
  * Only the card's text scales, so only the text is multiplied: three capped
- * `text-sm` lines, then the card's own `py-3` and its border, then the gap
- * beneath it, which clears the home-indicator band. Multiplying the whole sum
- * would under-reserve at a scale below 1 and leave the copy under the card.
+ * `text-sm` lines, then the card's own `py-3` and its border, then the 8 dp gap
+ * its wrapper keeps above the footer. Multiplying the whole sum would
+ * under-reserve at a scale below 1 and leave the content under the card.
  *
- * Reserved in every state, so the copy can scroll above the card and the
+ * The home-indicator band is not part of the sum: the footer below the scroller
+ * owns it, and the card floats above the footer.
+ *
+ * Reserved in every state, so the content can scroll above the card and the
  * clearance never depends on whether the error shows.
  */
 const PURCHASE_ERROR_TEXT_HEIGHT = 63;
 const PURCHASE_ERROR_CHROME = 26;
-const purchaseErrorClearance = (fontScale: number, bottomInset: number): number =>
-  PURCHASE_ERROR_TEXT_HEIGHT * fontScale +
-  PURCHASE_ERROR_CHROME +
-  // The gap under the card is the same one the card's own wrapper uses.
-  Math.max(bottomInset, 16) +
-  8;
+const purchaseErrorClearance = (fontScale: number): number =>
+  PURCHASE_ERROR_TEXT_HEIGHT * fontScale + PURCHASE_ERROR_CHROME + 8;
 
 /**
  * The balance card's data slots, at the default font scale.
  *
  * The card is the one block above the pack area whose content arrives late, so
- * it holds one height in every state of its two reads and the copy below never
- * moves. Two measured line boxes decide that height, and both are the text's
+ * it holds one height in every state of its two reads and the packs below never
+ * move. Two measured line boxes decide that height, and both are the text's
  * own box rather than extra space, so the card's bottom padding stays its
  * `py-4` and matches the top:
  *
@@ -90,7 +89,7 @@ const EXPIRY_CAPTION_LINES = 2;
  * raised scale fits fewer characters per line: the sentence's line count grows
  * with the scale, and the floor counts those lines before it multiplies each
  * one's height. Reserving only the scaled height of two lines would let the
- * caption outgrow the floor and move the copy below.
+ * caption outgrow the floor and move the packs below.
  */
 function expiryCaptionFloor(fontScale: number): number {
   return Math.ceil(EXPIRY_CAPTION_LINES * fontScale) * EXPIRY_LINE_HEIGHT * fontScale;
@@ -100,38 +99,27 @@ function expiryCaptionFloor(fontScale: number): number {
 const PACK_SKELETON_ROWS = 4;
 
 /**
- * The height the pack area holds, at the default font scale.
+ * The pack-height constants, at the default font scale.
  *
  * The pack surface shows one of four mutually exclusive things: placeholder
  * rows while the store connects, the priced rows, the empty-catalogue card, or
- * the store's notice. They share one slot sized to the tallest of them, the
- * row list, so the description and the legal links below it keep their place
- * when the store answers, and the normal state has no blank band because the
- * rows fill the slot.
- *
- * The shorter cards are laid out inside the slot from its top, so the space
- * they leave stays below them rather than moving the copy.
+ * the store's notice. They render in flow directly under the balance card, so a
+ * shorter state simply ends sooner: the description and the legal links are
+ * pinned in the footer below the scroller, and no blank band is left under the
+ * surface. The placeholder rows still take exactly the priced row's height, so
+ * the list never jumps when the store answers.
  *
  * A row's height is its text plus its spacing. The text is one line of title
  * with the price beside it and one line of expiry, each capped; only that text
  * grows with the system font scale, so only it is multiplied. The spacing —
- * the row's 20 dp paddings and the 8 dp gap above the expiry line, plus the
- * column's 10.5 dp step between rows — is fixed.
+ * the row's 20 dp paddings and the 8 dp gap above the expiry line — is fixed.
  */
 const PACK_ROW_TEXT_HEIGHT = 35.4;
 const PACK_ROW_SPACING = 44.2;
-const PACK_CONTENT_GAP = 10.5;
 
 /** One row's height at the live font scale. */
 const packRowHeight = (fontScale: number): number =>
   PACK_ROW_TEXT_HEIGHT * fontScale + PACK_ROW_SPACING;
-
-/**
- * The slot's height for `rows` rows: the tallest state the pack area shows.
- * A card that replaces the rows is laid out inside this height.
- */
-const packSlotHeight = (rows: number, fontScale: number): number =>
-  rows === 0 ? 0 : rows * packRowHeight(fontScale) + (rows - 1) * PACK_CONTENT_GAP;
 
 /**
  * One-off credit packs bought with the store's own purchase sheet.
@@ -144,13 +132,13 @@ const packSlotHeight = (rows: number, fontScale: number): number =>
 export function CreditPurchaseScreen() {
   const { t, i18n } = useTranslation();
   const storefront = getCreditStorefront();
-  // Every text line the pack area reserves space for grows with the system
-  // font scale, so the reservation does too; see `packAreaMinHeight`.
+  // Every pack row's text grows with the system font scale, so each row's
+  // height and the scroller's trailing clearance scale with it.
   const fontScale = useLiveFontScale();
-  // The error overlay sits outside the scroller, so it takes the side insets
-  // the scroller applies to its own content.
+  // The footer and the error overlay sit outside the scroller, so they take the
+  // side insets the scroller applies to its own content.
   const sideInsetStyle = useSideInsetStyle();
-  // The error overlay must stay out of the home-indicator band.
+  // The copy's footer clears the home-indicator band.
   const { bottom: bottomInset } = useScreenInsets();
   const trpc = useTRPC();
   const {
@@ -219,8 +207,8 @@ export function CreditPurchaseScreen() {
   const packsEmpty = !isLoading && catalogEmpty;
   // The pack surface shows one of five things at a time: the account read's
   // failure, the store's notice, the empty catalogue, the placeholder rows or
-  // the priced rows. They are exclusive so the slot paints one surface and the
-  // copy below it never sees two stacked.
+  // the priced rows. They are exclusive so the pack area paints one surface and
+  // the list never shows two stacked.
   const storeUnavailableAlone = storeUnavailable && !identityUnavailable;
   const showPlaceholders = isLoading && !identityUnavailable && !storeUnavailable;
   const showRows = !isLoading && !identityUnavailable && !storeUnavailable && !packsEmpty;
@@ -240,10 +228,10 @@ export function CreditPurchaseScreen() {
 
   const renderBalanceValue = () => {
     // Every branch below is one `h-8` tall, the amount's own line box: the
-    // card's height stays the same in all three states, so the copy below it
-    // never moves when the read settles. The skeleton keeps the value's box,
+    // card's height stays the same in all three states, so the packs below never
+    // move when the read settles. The skeleton keeps the value's box,
     // and the failed read's target keeps the box too: its tap area comes from
-    // the hit slop, not from a taller box, which would move the copy.
+    // the hit slop, not from a taller box, which would move the packs below.
     if (balancePending) {
       return <Skeleton className="h-8 w-24 rounded" />;
     }
@@ -285,7 +273,7 @@ export function CreditPurchaseScreen() {
     // unavailable" when the read fails, or the skeleton. The floor counts the
     // lines the sentence wraps to in this card's width, and the caption
     // centres inside it, so the card's padding stays its `py-4` at both edges
-    // and the copy below never moves.
+    // and the packs below never move.
     if (creditBlocksQuery.isError) {
       return (
         <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
@@ -353,17 +341,13 @@ export function CreditPurchaseScreen() {
 
           {/* The pack surface shows exactly one of four things — placeholder
               rows while the store connects, the priced rows, the empty
-              catalogue card, or the store's notice — and they share one slot
-              sized to the row list. The description and the legal links follow
-              that slot, so a store answer changes what the slot paints without
-              moving them, and the normal state leaves no blank band because the
-              rows fill the slot. A shorter card starts at the slot's top. */}
-          <View
-            className="gap-3"
-            style={{
-              minHeight: packSlotHeight(Math.max(PACK_SKELETON_ROWS, products.length), fontScale),
-            }}
-          >
+              catalogue card, or the store's notice — in flow directly under
+              the balance card. The description and the legal links are pinned
+              in the footer below the scroller, so a shorter state ends sooner
+              instead of leaving a reserved blank band under it, while the
+              placeholder rows keep exactly the priced row's height so the list
+              never jumps when the store answers. */}
+          <View className="gap-3">
             {/* The account read gates both catalogue reads, so its failure is
                 the one state where nothing else can settle. It gets the same
                 card shape as the store's failure, with its own retry: an empty
@@ -507,41 +491,11 @@ export function CreditPurchaseScreen() {
               })}
           </View>
 
-          {/* The description and the two store legal links close the scroll
-              content, after the last pack row. The two links are controls of
-              their own, not words in the sentence above, so each carries the
-              shared legal-link box: a real 48dp target the control-size audit
-              can read, which keeps its height in the flow so the two boxes
-              never overlap when a long locale wraps them onto two lines. */}
-          <Text className="px-1 pt-1 text-xs text-muted-foreground">
-            {t('credits.description')}
-          </Text>
-          <View className={cn('px-1', LEGAL_LINK_ROW_CLASS)}>
-            <Pressable
-              accessibilityRole="link"
-              className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
-              onPress={() => {
-                void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
-              }}
-            >
-              <Text className="text-xs text-primary underline">{termsOfUseLink.label}</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="link"
-              className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
-              onPress={() => {
-                void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
-              }}
-            >
-              <Text className="text-xs text-primary underline">{privacyPolicyLink.label}</Text>
-            </Pressable>
-          </View>
-
           {/* The room the floating purchase error needs at the end of the
               content, as a child of the content rather than a container style
               (see the scroller's comment). It scales with the text, because the
               card it clears does. */}
-          <View style={{ height: purchaseErrorClearance(fontScale, bottomInset) }} />
+          <View style={{ height: purchaseErrorClearance(fontScale) }} />
         </DetailScreenScrollView>
         {/* The purchase error floats above the bottom of the scroll area. It
             is not one of the four pack states, so it takes no layout height,
@@ -550,16 +504,73 @@ export function CreditPurchaseScreen() {
             adds the safe-area side insets to the gutter, and the inner one
             carries the gutter itself, because an inline padding on one node
             replaces its className padding. The scroller keeps a trailing
-            clearance so the last content can scroll clear of the card. */}
+            clearance so the last content can scroll clear of the card, and the
+            footer below this area clears the home indicator. */}
         <View className="pointer-events-none absolute inset-x-0 bottom-0" style={sideInsetStyle}>
-          {/* The card clears the home indicator: the bottom inset is the
-              gesture area, and the card's text must not sit in it. */}
-          <View className="px-5" style={{ paddingBottom: Math.max(bottomInset, 16) + 8 }}>
+          {/* The card keeps only the 8 dp gap to the footer under it: the
+              footer owns the home-indicator band. */}
+          <View className="px-5 pb-[8px]">
             <AccessibleStatus
               message={purchaseErrorMessageKey ? t(purchaseErrorMessageKey) : null}
               className="rounded-xl border border-destructive bg-card px-4 py-3 text-sm"
               numberOfLines={3}
             />
+          </View>
+        </View>
+      </View>
+      {/* The description and the store's legal links are the screen's footer,
+          outside the scroll view and below the scroll area. The pack area
+          answers late — placeholder rows while the store connects, the priced
+          rows after, an empty card or the unavailable card instead — so copy
+          written under it inside the scroller is pushed by every one of those
+          swaps. Pinned below the scroller, the copy holds the bottom
+          safe-area edge in every state and every locale.
+
+          `pt-[17px]` is the gap the legal boxes already leave around their own
+          ink: each box reserves a 48dp target around a 14dp line, so 17dp sits
+          above and below the link text by construction. Matching that number
+          above the description gives the footer one rhythm — divider,
+          description, links — with no margin pulled through a neighbouring
+          frame, and the boxes keep their full audited height.
+
+          The two links are controls of their own, not words in the sentence
+          above, so each carries the shared legal-link box: a real 48dp target
+          the control-size audit can read, which keeps its height in the flow so
+          the two boxes never overlap when a long locale wraps them onto two
+          lines.
+
+          The divider spans the whole width, so the content inside carries the
+          side insets itself: the scroller above insets its own content for the
+          landscape notch band, and copy outside it would otherwise sit nearer
+          the edge than the rows it follows. */}
+      <View className="border-t border-border" style={{ paddingBottom: Math.max(bottomInset, 16) }}>
+        {/* The side inset and the gutter sit on separate wrappers: an inline
+            padding value replaces a className's `px-5` on the same node, so one
+            node holding both would lose the gutter wherever an inset is
+            non-zero. */}
+        <View style={sideInsetStyle}>
+          <View className="px-5 pt-[17px]">
+            <Text className="text-xs text-muted-foreground">{t('credits.description')}</Text>
+            <View className={LEGAL_LINK_ROW_CLASS}>
+              <Pressable
+                accessibilityRole="link"
+                className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
+                onPress={() => {
+                  void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
+                }}
+              >
+                <Text className="text-xs text-primary underline">{termsOfUseLink.label}</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="link"
+                className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
+                onPress={() => {
+                  void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
+                }}
+              >
+                <Text className="text-xs text-primary underline">{privacyPolicyLink.label}</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </View>
